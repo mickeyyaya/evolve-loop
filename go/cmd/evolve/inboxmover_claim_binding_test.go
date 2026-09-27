@@ -1,12 +1,5 @@
 package main
 
-// inboxmover_claim_binding_test.go — ADR-0074 finding-1 pin: the triage agent
-// doc and its permission profile must bind the claim step to the Go floor
-// (`evolve inbox-mover claim`), not the deleted inbox-mover.sh script. Without
-// this, ErrConsoleRouted (and every future claim-side control) is unreachable
-// on the live path — the producer-without-consumer disease ADR-0074 exists to
-// end. This is a WIRING test: it reads the real repo files.
-
 import (
 	"os"
 	"path/filepath"

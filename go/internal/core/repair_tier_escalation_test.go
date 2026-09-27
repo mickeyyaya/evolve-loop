@@ -1,18 +1,5 @@
 package core
 
-// repair_tier_escalation_test.go — the producer half of `audit_retry_2plus`.
-//
-// builder.json and tdd-engineer.json have declared
-// `model_tier_overrides.audit_retry_2plus: "deep"` since the override table
-// landed, and the only tests guarding it checked that the VALUE is a canonical
-// tier. Nothing produced the situation: cycles 1595–1605 re-dispatched every
-// repair round at the identical tier (balanced, balanced, balanced) and ship
-// probability by audit-round count ran 100 % → 50 % → 17 % → 0 %. The
-// orchestrator now raises the tdd/build re-dispatch tier to the profile's
-// declared override while CycleState.AuditRepairActive is set — the same
-// persisted flag the repair brief derives from — through the same envelope
-// clamp the ADR-0076 D floor uses.
-
 import (
 	"context"
 	"os"
@@ -91,12 +78,6 @@ func TestRepairRoundTier_EnvelopeMaxClampsThroughRealGuardrail(t *testing.T) {
 	}
 }
 
-// TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop is the wiring proof
-// (I2 invariant): driven through RunCycle with the real dispatch seam, the
-// FIRST build runs at the profile default (no overlay) and the build
-// re-dispatched inside the repair round granted after audit round 1's FAIL
-// carries ModelRoutingTier=deep — the declared override, live. A unit-green
-// repairRoundTier that nothing calls would leave this red.
 func TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop(t *testing.T) {
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", repairBuilderProfile)
@@ -124,13 +105,6 @@ func TestRepairRoundDispatch_RaisesBuildTierThroughLiveLoop(t *testing.T) {
 	}
 }
 
-// TestRepairRoundResume_RaisesBuildTierAndArchivesPromptThroughResumePath is
-// the resume-surface twin of the live-loop proof: a cycle RESUMED at audit
-// whose audit FAILs is granted a repair round by resume.go's own audit-FAIL
-// branch, and the build it re-dispatches must carry ModelRoutingTier=deep and
-// must have retired the previous attempt's prompt — through resume.go's
-// request builder, not cyclerun_dispatch.go's. A raise wired only on the live
-// loop would leave this red (the crash-resume divergence class).
 func TestRepairRoundResume_RaisesBuildTierAndArchivesPromptThroughResumePath(t *testing.T) {
 	root := t.TempDir()
 	writeRepairProfile(t, root, "builder", repairBuilderProfile)

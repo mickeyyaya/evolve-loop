@@ -1,11 +1,5 @@
 package bridge
 
-// tokendriver_test.go — cycle-779 AC2 plumbing contract (named by ACS
-// predicate C779_005): recordTokenUsage must forward the launch's CLI/driver
-// identity into the tokenusage.Window it hands the resolver. Without it the
-// resolver cannot dispatch per driver and uncovered drivers (agy/codex)
-// surface as silent zeros — the 2026-07-13 all-zeros baseline defect.
-
 import (
 	"testing"
 	"time"

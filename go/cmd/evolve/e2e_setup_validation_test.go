@@ -1,16 +1,5 @@
 //go:build e2e
 
-// Coverage of `evolve setup detect` — the kernel clamp behind the /setup skill
-// that enforces the CLI×model integrity floor (ADR-0027). Step 9b removed the
-// standalone `setup validate` subcommand (+ the llm_config.json it clamped); the
-// same floor is now applied by policy.ValidatePin and surfaced inline by detect:
-//   - pinned tier ∉ profile model_tier_envelope → phase `pin_violation` (+ dispatch hard-fail)
-//   - pinned cli  ∉ profile allowed_clis         → phase `pin_violation` (+ dispatch hard-fail)
-//
-// Driven in-process via runSetup (this is package main), so these are fast and
-// host-independent: the pin overlay reads only the fixture .evolve/policy.json +
-// profiles. (detect additionally scans the host for CLI binaries, so the clis[]
-// array is asserted on SHAPE only, not on host-specific values.)
 package main
 
 import (
@@ -80,8 +69,6 @@ func phase(rep detectReport, role string) (string, string, string, string) {
 	return "", "", "", ""
 }
 
-// envelope violation: a pinned tier below the profile's min is surfaced as a
-// pin_violation naming the envelope.
 func TestSetupDetect_PinEnvelopeViolation(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
@@ -95,8 +82,6 @@ func TestSetupDetect_PinEnvelopeViolation(t *testing.T) {
 	}
 }
 
-// allowed_clis violation: a pinned cli outside the profile's allowed_clis is
-// surfaced as a pin_violation.
 func TestSetupDetect_PinAllowedCLIsViolation(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
@@ -110,7 +95,6 @@ func TestSetupDetect_PinAllowedCLIsViolation(t *testing.T) {
 	}
 }
 
-// a valid pin overlays the routing with source=policy-pin and no violation.
 func TestSetupDetect_PinValidNoViolation(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
@@ -127,7 +111,6 @@ func TestSetupDetect_PinValidNoViolation(t *testing.T) {
 	}
 }
 
-// a malformed policy.json sets the top-level policy_error and disables overlay.
 func TestSetupDetect_MalformedPolicy(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
@@ -144,8 +127,6 @@ func TestSetupDetect_MalformedPolicy(t *testing.T) {
 	}
 }
 
-// detect --json must emit a well-formed digest: a clis array and a phases
-// array. Host CLI presence varies, so only the SHAPE is asserted.
 func TestSetupDetect_JSONShape(t *testing.T) {
 	evolveDir := writeSetupFixture(t,
 		map[string]string{

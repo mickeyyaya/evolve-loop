@@ -29,8 +29,6 @@ func laneAuditedInWorktree(t *testing.T) (string, string) {
 	return repo, wt
 }
 
-// The plane's tracked files hold pipeline bookkeeping (the inbox queue) that operators and sibling
-// lanes move while a lane is between audit and ship; none of it is in what this lane ships.
 func TestVerifyAuditBinding_PlaneBookkeepingAfterAuditDoesNotUnbindAWorktreeShip(t *testing.T) {
 	repo, wt := laneAuditedInWorktree(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "a tracked queue file moved after audit\n")

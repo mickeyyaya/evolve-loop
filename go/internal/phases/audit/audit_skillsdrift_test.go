@@ -13,9 +13,7 @@ import (
 )
 
 // A cycle whose worktree drifted a SKILL.md (e.g. edited .evolve/profiles/*.json
-// without regenerating the phase-facts region) must FAIL audit — the gate that
-// would have caught cycle 339's SKILL.md drift before it shipped CI-red on
-// TestSkills_NoDrift.
+// without regenerating the phase-facts region) must FAIL audit.
 func TestRun_SkillsDrift_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0) // EGPS green, so only the skills gate can FAIL it.
@@ -194,8 +192,6 @@ func TestNewDefault_WiresSkillsDriftCheck(t *testing.T) {
 	}
 }
 
-// TestSkillsDriftCheckDefault_EmptyRoot_NoOp: both Worktree and ProjectRoot
-// empty → early return nil, nil (no-op guard).
 func TestSkillsDriftCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{})
 	if err != nil || got != nil {
@@ -203,13 +199,9 @@ func TestSkillsDriftCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 	}
 }
 
-// TestSkillsDriftCheckDefault_FallsBackToProjectRoot: Worktree="" falls through
-// to ProjectRoot instead of the empty-root no-op, proven by the check actually
-// running (not returning nil) on the ProjectRoot.
 func TestSkillsDriftCheckDefault_FallsBackToProjectRoot(t *testing.T) {
-	tmp := t.TempDir() // no catalog → skillcheck.Check returns error (not early nil)
+	tmp := t.TempDir() // no catalog → skillcheck.Check returns error, not an early nil
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{Worktree: "", ProjectRoot: tmp})
-	// The error proves Check was called on ProjectRoot (not early-returned nil).
 	if err == nil {
 		t.Error("want error from skillcheck.Check on empty ProjectRoot dir; got nil (may indicate early no-op instead of fallback)")
 	}
@@ -218,8 +210,6 @@ func TestSkillsDriftCheckDefault_FallsBackToProjectRoot(t *testing.T) {
 	}
 }
 
-// TestGofmtCheckDefault_EmptyRoot_NoOp: both Worktree and ProjectRoot empty
-// → early return nil, nil.
 func TestGofmtCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 	got, err := gofmtCheckDefault(core.PhaseRequest{})
 	if err != nil || got != nil {
@@ -227,8 +217,6 @@ func TestGofmtCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 	}
 }
 
-// TestGofmtCheckDefault_FallsBackToProjectRoot: Worktree="" falls through to
-// ProjectRoot. A dirty go file at root/go/ must be detected via the fallback.
 func TestGofmtCheckDefault_FallsBackToProjectRoot(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {

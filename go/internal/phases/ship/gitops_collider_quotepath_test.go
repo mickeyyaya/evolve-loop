@@ -1,42 +1,3 @@
-// gitops_collider_quotepath_test.go — RED contract for cycle-1469 top_n task
-// `gitstage-collider-quotepath` (the collider-side hole left by cycle-1108).
-//
-// Cycle-1108 taught every path-classifying git reader in this package the
-// quote-path contract — `-c core.quotePath=false` on the read (rawPathRead,
-// gitops.go) plus unquoteGitPath (manifest.go) for the residue that flag does
-// not suppress. detectColliders (gitops.go:77) was never enrolled. It reads
-// BOTH `git diff --name-only` and `git status --porcelain` with a bare
-// captureGitOutputAtDir, and its only decoding is a naive strip of the wrapping
-// quotes:
-//
-//	if strings.HasPrefix(path, "\"") && strings.HasSuffix(path, "\"") {
-//	    path = path[1 : len(path)-1]
-//	}
-//
-// Verified against real git 2.50.1 (2026-08-15, `git status --porcelain` on a
-// tree holding all three input classes):
-//
-//	?? "caf\303\251.txt"       # non-ASCII → octal-escaped, quoted
-//	?? "we\"ird.txt"           # embedded quote → backslash-escaped, quoted
-//	?? "we -> ird.txt"         # space → quoted, NOT escaped
-//
-// So the strip yields the 15-byte literal `caf\303\251.txt` and the 11-byte
-// literal `we\"ird.txt` — paths that exist on no disk. detectColliders then
-// os.Stat()s them, gets ENOENT, and `continue`s: the real untracked main-side
-// collider is INVISIBLE to both the pre-flight and the repair ladder, and the
-// ff-merge hits the file git refuses to overwrite. The `git diff --name-only`
-// stream is worse — it gets no decoding at all, not even the strip.
-//
-// Contract pinned here:
-//  1. A quoted porcelain entry (non-ASCII, embedded quote, backslash) is
-//     compared as its LITERAL repo-relative path, so a real collider is found.
-//  2. A quoted `git diff --name-only` entry decodes the same way.
-//  3. Negative/anti-no-op: a path that is not a collider — absent on the main
-//     side, or present but TRACKED there — is never reported, and a deleted
-//     porcelain entry stays skipped.
-//  4. Both classification reads carry `-c core.quotePath=false` BEFORE the
-//     subcommand, the zero-parsing half of the same contract every other reader
-//     in this package already honours.
 package ship
 
 import (
@@ -91,7 +52,6 @@ func (c *colliderStub) runner() CmdRunner {
 	}
 }
 
-// gitCallWith returns the first recorded git argv containing sub, or nil.
 func (c *colliderStub) gitCallWith(sub string) []string {
 	for _, call := range c.calls {
 		if len(call) > 0 && call[0] == "git" && slices.Contains(call[1:], sub) {
@@ -127,10 +87,6 @@ func colliderTrees(t *testing.T, names []string, mainOnlyAbsent ...string) (root
 	return root, worktree
 }
 
-// TestDetectColliders_QuotePathDecodesPorcelainEntries — AC1. Each quoted
-// porcelain class must be reported under its LITERAL name. Today the naive
-// quote-strip hands back the escaped text, os.Stat fails, and the collider is
-// dropped on the floor.
 func TestDetectColliders_QuotePathDecodesPorcelainEntries(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -175,10 +131,6 @@ func TestDetectColliders_QuotePathDecodesPorcelainEntries(t *testing.T) {
 	}
 }
 
-// TestDetectColliders_QuotePathDecodesDiffNameOnly — AC2. The
-// `git diff --name-only` stream gets no decoding at all today, not even the
-// naive strip, so a quote-bearing file changed in branch..cycleBranch is
-// invisible even when it collides.
 func TestDetectColliders_QuotePathDecodesDiffNameOnly(t *testing.T) {
 	const want = "café.txt"
 	root, wt := colliderTrees(t, []string{want})
@@ -194,12 +146,6 @@ func TestDetectColliders_QuotePathDecodesDiffNameOnly(t *testing.T) {
 	}
 }
 
-// TestDetectColliders_QuotePathNonCollidersStaySilent — AC3, the anti-no-op
-// half. Decoding must not turn every quoted incoming path into a collider: a
-// quoted path absent on the main side, a quoted path TRACKED on the main side,
-// and a quoted DELETION are all non-colliders and must stay out of the list.
-// A change that reports these would quarantine operator files that a ff-merge
-// would have accepted.
 func TestDetectColliders_QuotePathNonCollidersStaySilent(t *testing.T) {
 	const (
 		real     = "café.txt"     // untracked on main → the one true collider
@@ -226,12 +172,6 @@ func TestDetectColliders_QuotePathNonCollidersStaySilent(t *testing.T) {
 	}
 }
 
-// TestDetectColliders_QuotePathDisabledOnGitReads — AC4. Both classification
-// reads must carry `-c core.quotePath=false` before the subcommand, so the
-// common non-ASCII case never reaches the parser escaped at all (git only
-// accepts config args before the subcommand). This is the same argv contract
-// TestStageExplicitPaths_QuotePathDisabledOnGitReads pins for the staging
-// reads; detectColliders was simply never enrolled.
 func TestDetectColliders_QuotePathDisabledOnGitReads(t *testing.T) {
 	root, wt := colliderTrees(t, []string{"plain.txt"})
 	stub := &colliderStub{status: "?? plain.txt\n", diff: "plain.txt\n"}
@@ -255,9 +195,6 @@ func TestDetectColliders_QuotePathDisabledOnGitReads(t *testing.T) {
 			t.Errorf("`git %s` argv %v places `-c core.quotePath=false` (index %d) after the subcommand (index %d) — git only accepts config args before the subcommand", sub, args, cfgAt, subAt)
 		}
 	}
-	// Guard the decode half stays wired too: quotePath=false does NOT suppress
-	// quoting for embedded quotes/backslashes/spaces (verified against git
-	// 2.50.1), so the flag alone is not the whole fix.
 	if !strings.Contains(strings.Join(stub.gitCallWith("status"), " "), "porcelain") {
 		t.Errorf("status read is no longer `--porcelain`: %v", stub.gitCallWith("status"))
 	}

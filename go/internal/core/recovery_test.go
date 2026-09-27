@@ -1,10 +1,5 @@
 package core
 
-// recovery_test.go — PA-DDK DDK-6 (ADR-0060): the recovery successor TARGETS are
-// config-driven (retrospective in the registry, debugger in the control seam);
-// the decision POLICY stays Go. Tests load config via the fixture and assert the
-// resolver consults it, with the literal as the fallback.
-
 import (
 	"testing"
 
@@ -30,8 +25,6 @@ func TestRecoveryTarget_ConfigDriven(t *testing.T) {
 	}
 }
 
-// TestRecoveryTarget_DegradesWithoutCatalog: a bare orchestrator (no catalog)
-// returns the literal fallback — byte-identical to pre-DDK-6.
 func TestRecoveryTarget_DegradesWithoutCatalog(t *testing.T) {
 	t.Parallel()
 	o := NewOrchestrator(nil, nil, nil)

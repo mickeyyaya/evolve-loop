@@ -1,22 +1,5 @@
 //go:build integration
 
-// direct_bound_witness_integration_test.go — the direct-path mirror of
-// audit_bound_witness_integration_test.go.
-//
-// atomicShip takes the DIRECT path whenever the class is not cycle, or the
-// cycle's active worktree resolves to the project root (gitops.go). That path
-// carries the same audit binding the worktree path does — entry.WorktreeTreeSHA,
-// the changes tree — but verified NOTHING against it.
-//
-// The worktree path verifies twice (pre-commit and post-push); the direct path
-// verified neither, so a tree that drifted from what the auditor approved
-// shipped clean.
-//
-// Three tests fix the guard's boundaries, and the third is the one that
-// matters most: a guard that rejects real ships is worse than the gap it
-// closes. It is driven through the REAL binding producer for that reason —
-// see its own comment for how a hand-set binding made an earlier version of
-// this test unfalsifiable and drove the guard to the wrong comparand.
 package ship
 
 import (
@@ -30,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestShipDirect_RefusesAnUnsatisfiedBinding pins that the direct
-// path refuses a commit whose tree does not satisfy its audit binding, with
-// the same error code the worktree path raises.
 func TestShipDirect_RefusesAnUnsatisfiedBinding(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -66,8 +46,6 @@ func TestShipDirect_RefusesAnUnsatisfiedBinding(t *testing.T) {
 	if !strings.Contains(err.Error(), "audit-bound tree SHA") {
 		t.Fatalf("the breach must name the binding it failed, got: %v", err)
 	}
-	// The refusal must land PRE-COMMIT: nothing committed, nothing pushed, so
-	// there is no bad commit for an operator to unwind.
 	if se.Stage != core.StageAtomicShip {
 		t.Fatalf("want the PRE-COMMIT guard to fire (stage %q) so the breach is caught before anything lands; got stage %q: %v",
 			core.StageAtomicShip, se.Stage, err)
@@ -82,9 +60,6 @@ func TestShipDirect_RefusesAnUnsatisfiedBinding(t *testing.T) {
 	}
 }
 
-// TestShipDirect_UnboundShipIsUnaffected pins the narrowness of the guard: a
-// direct ship with NO audit binding (the ordinary `--class manual` operator
-// commit) must be untouched by it.
 func TestShipDirect_UnboundShipIsUnaffected(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -105,18 +80,6 @@ func TestShipDirect_UnboundShipIsUnaffected(t *testing.T) {
 	}
 }
 
-// TestShipDirect_LegitimateBoundShipIsNotBlocked is the false-positive guard,
-// and it is deliberately driven through the REAL binding producer.
-//
-// An earlier version hand-set internalAuditBoundTreeSHA to `HEAD^{tree}` on
-// the theory that the non-worktree flow binds the base tree. It does not: the
-// audit report is never a binding source (only the ledger's worktree_tree_sha
-// is), and verifyAuditBinding refuses any ledger entry whose worktree_tree_sha does not
-// equal treefence.Take's current tree — which is never empty. So the binding
-// that reaches ship is always the CHANGES tree. Hand-setting a value no
-// producer emits made the test unfalsifiable, and it drove the guard itself to
-// the wrong comparand. Going through seedAudit + the full Run path is what
-// makes this test able to reject a wrong design.
 func TestShipDirect_LegitimateBoundShipIsNotBlocked(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)

@@ -1,11 +1,5 @@
 package core
 
-// Slice-4 contract: the routing advisor SEES the environment (cycle-283 — the
-// advisor kept planning codex-routed inserts all night while codex was
-// quota-walled, because RouteInput carried zero CLI state). The orchestrator
-// projects the cli-health store's active benches here; the prompt section
-// they render into is the advisor leaf's (ADR-0103 unit 04).
-
 import (
 	"testing"
 	"time"

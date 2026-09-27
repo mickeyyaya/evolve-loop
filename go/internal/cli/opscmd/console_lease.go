@@ -64,13 +64,9 @@ func normalizeLeasePaths(projectRoot string, raw []string) ([]string, error) {
 	return out, nil
 }
 
-// RunConsoleLease implements `evolve console-lease`.
-func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+func parseConsoleLeaseArgs(args []string, stderr io.Writer) (ttl time.Duration, reason, projectRoot string, clear bool, rawPaths []string, code int, done bool) {
 	fs := flag.NewFlagSet("evolve console-lease", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var ttl time.Duration
-	var reason, projectRoot string
-	var clear bool
 	fs.DurationVar(&ttl, "ttl", 30*time.Minute, "lease lifetime (hard expiry; guard re-arms automatically)")
 	fs.StringVar(&reason, "reason", "", "why the operator is touching the runtime tree")
 	fs.StringVar(&projectRoot, "project-root", ".", "runtime plane root the lease applies to")
@@ -80,11 +76,10 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// cmdutil.ReorderArgs is bool-flag-only by contract (it scatters
 	// `--ttl 10m` style values into the positional list) — so collect
 	// positionals ourselves and re-parse the remainder.
-	var rawPaths []string
 	rest := args
 	for {
 		if err := fs.Parse(rest); err != nil {
-			return 10
+			return ttl, reason, projectRoot, clear, nil, 10, true
 		}
 		if fs.NArg() == 0 {
 			break
@@ -92,32 +87,23 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		rawPaths = append(rawPaths, fs.Arg(0))
 		rest = fs.Args()[1:]
 	}
-	leasePath, err := hubLeasePath(projectRoot)
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
+	return ttl, reason, projectRoot, clear, rawPaths, 0, false
+}
+
+func clearConsoleLease(leasePath string, rawPaths []string, stdout, stderr io.Writer) int {
+	if len(rawPaths) > 0 {
+		fmt.Fprintln(stderr, "evolve console-lease: --clear takes no paths (it removes the whole lease)")
+		return 10
+	}
+	if err := os.Remove(leasePath); err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(stderr, "evolve console-lease: clear: %v\n", err)
 		return 1
 	}
-	if clear {
-		if len(rawPaths) > 0 {
-			fmt.Fprintln(stderr, "evolve console-lease: --clear takes no paths (it removes the whole lease)")
-			return 10
-		}
-		if err := os.Remove(leasePath); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(stderr, "evolve console-lease: clear: %v\n", err)
-			return 1
-		}
-		fmt.Fprintln(stdout, "[console-lease] cleared — tree-diff guard fully armed")
-		return 0
-	}
-	paths, err := normalizeLeasePaths(projectRoot, rawPaths)
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
-		return 10
-	}
-	if len(paths) == 0 {
-		fmt.Fprintln(stderr, "evolve console-lease: at least one exact repo-relative path is required (or --clear)")
-		return 10
-	}
+	fmt.Fprintln(stdout, "[console-lease] cleared — tree-diff guard fully armed")
+	return 0
+}
+
+func writeConsoleLease(leasePath string, paths []string, reason string, ttl time.Duration, stdout, stderr io.Writer) int {
 	expires := time.Now().Add(ttl).UTC()
 	b, err := json.MarshalIndent(leaseFile{
 		Paths:     paths,
@@ -151,4 +137,30 @@ func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "[console-lease] %d path(s) leased until %s at %s — every waived leak still WARNs in the cycle log; adoption is at the NEXT cycle start\n", len(paths), expires.Format(time.RFC3339), leasePath)
 	return 0
+}
+
+// RunConsoleLease implements `evolve console-lease`.
+func RunConsoleLease(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	ttl, reason, projectRoot, clear, rawPaths, code, done := parseConsoleLeaseArgs(args, stderr)
+	if done {
+		return code
+	}
+	leasePath, err := hubLeasePath(projectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
+		return 1
+	}
+	if clear {
+		return clearConsoleLease(leasePath, rawPaths, stdout, stderr)
+	}
+	paths, err := normalizeLeasePaths(projectRoot, rawPaths)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
+		return 10
+	}
+	if len(paths) == 0 {
+		fmt.Fprintln(stderr, "evolve console-lease: at least one exact repo-relative path is required (or --clear)")
+		return 10
+	}
+	return writeConsoleLease(leasePath, paths, reason, ttl, stdout, stderr)
 }

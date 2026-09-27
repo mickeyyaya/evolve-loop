@@ -12,7 +12,8 @@ import (
 
 // A document cycle whose solutions/<slug>/ fails the deterministic contract
 // (internal/solutioncheck) must FAIL audit even when the narrative says PASS
-// and EGPS is green — the same single-exit gate shape as gofmt (ADR-0099 slice 2).
+// and EGPS is green — the same single-exit gate shape as gofmt.
+// See ADR-0099.
 func TestRun_SolutionContractViolation_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)

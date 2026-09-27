@@ -1,10 +1,5 @@
 package audit
 
-// ciparity_seam_test.go — ADR-0103 unit 14: the host seam (ciparity.go) that
-// builds the CI-parity gates per call from the package-var seams, projects
-// the request, keeps the five Strangler facades, and threads the Signal
-// Center from the composition root through Config.Signals / WithSignals.
-
 import (
 	"context"
 	"errors"
@@ -189,11 +184,11 @@ func productionRunFixture(t *testing.T, cycle int) core.PhaseRequest {
 	return core.PhaseRequest{Cycle: cycle, ProjectRoot: root, Worktree: root, Workspace: ws, WorktreeVerified: true}
 }
 
-// Test 38 (review fold — architecture MEDIUM 1) — an Option over the full
-// Config is honoured in FULL: a hook an Option sets through the production
-// constructor is the hook the phase runs (never post-clobbered by the
-// CI-parity wiring, which fills only the hooks no Option set), while the
-// hooks it left nil are still the wired gates (go vet runs through the runner).
+// Test 38 — an Option over the full Config is honoured in full: a hook an
+// Option sets through the production constructor is the hook the phase runs
+// (never post-clobbered by the CI-parity wiring, which fills only the hooks
+// no Option set), while the hooks it left nil are still the wired gates (go
+// vet runs through the runner).
 func TestNewDefaultWithStageCompactSpec_AnOptionSettingAHookIsHonoured(t *testing.T) {
 	req := productionRunFixture(t, 8)
 	vetRuns, tierRuns := 0, 0
@@ -259,8 +254,7 @@ func TestCIParityFacades_ReadThePackageVarSeamsPerCall(t *testing.T) {
 	}
 }
 
-// Test 36 (the JSON half of audit/ciparity_unit_test.go:162-182, kept in the
-// host) — the locator's handoff shape and its two file names.
+// Test 36 — the locator's handoff shape and its two file names.
 func TestChangedPackagesForAudit_HandoffShape(t *testing.T) {
 	if pkgs, derivable := changedPackagesForAudit("", 1); pkgs != nil || derivable {
 		t.Errorf("no root: (%v, %v)", pkgs, derivable)
@@ -281,9 +275,8 @@ func TestChangedPackagesForAudit_HandoffShape(t *testing.T) {
 	}
 }
 
-// Test 37 — through the FACADES, a mixed env-exclusive scope and a deferred
-// graduation write ZERO bytes to os.Stderr (the two declared replacements,
-// measured against the pre-move stderr golden).
+// Test 37 — through the facades, a mixed env-exclusive scope and a deferred
+// graduation write zero bytes to os.Stderr, compared against the golden.
 func TestCIParity_WritesNothingToStderr(t *testing.T) {
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
@@ -324,8 +317,7 @@ func TestCIParity_WritesNothingToStderr(t *testing.T) {
 	}
 }
 
-// Test 41 (review fold — go MINOR 2, the Q13 consumer pin) — the host's
-// applyCIGate keys off len(offenders), not nilness (gates.go:66): the
+// Test 41 — the host's applyCIGate keys off len(offenders), not nilness: the
 // graduation gate's empty-but-non-nil list for an all-deferred cycle is
 // PASS at the consumer — no override, no diagnostic — while one offender FAILs.
 func TestApplyCIGate_EmptyNonNilOffendersIsPass(t *testing.T) {

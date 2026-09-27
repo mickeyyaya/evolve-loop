@@ -54,7 +54,6 @@ func TestDispatch_Unknown(t *testing.T) {
 }
 
 func TestDispatch_PhaseRoutesToRunPhase(t *testing.T) {
-	// Empty args after "phase" → runPhase emits "missing phase name" and exit 10.
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"phase"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -88,9 +87,6 @@ func TestDispatch_WorktreeRoutesToRunWorktree(t *testing.T) {
 }
 
 func TestDispatch_LoopRoutesToRunLoop(t *testing.T) {
-	// loop with no args still reaches runLoop which then errors on
-	// missing goal (v11.5.0 M1: accepts --goal-hash, --goal-text,
-	// positional goal, or --resume; error wording reflects the menu).
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"loop"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -232,7 +228,6 @@ func TestDispatch_Ledger_Verify_Empty(t *testing.T) {
 
 func TestDispatch_Ledger_Verify_Broken(t *testing.T) {
 	tmp := t.TempDir()
-	// Write a malformed ledger to provoke a chain break.
 	if err := os.WriteFile(filepath.Join(tmp, "ledger.jsonl"), []byte("garbage\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

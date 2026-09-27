@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// I9: after the build phase the orchestrator must deterministically gofmt -s the
-// builder's output so a formatting lapse never reaches (and FAILs) the audit
-// gofmt gate. normalizeBuildGofmt formats the worktree's go/ module in place.
 func TestNormalizeBuildGofmt_FormatsWorktreeGoModule(t *testing.T) {
 	wt := t.TempDir()
 	goDir := filepath.Join(wt, "go")
@@ -39,9 +36,6 @@ func TestNormalizeBuildGofmt_EmptyWorktreeIsNoOp(t *testing.T) {
 	normalizeBuildGofmt("")
 }
 
-// Cycle 352: test-amplification authored a .go file AFTER the build-only
-// normalize, re-failing the audit gofmt gate. The gofmt normalize must run
-// after EVERY worktree phase (here a non-build phase), not just build.
 func TestNormalizeBuildWorktree_GofmtsAfterNonBuildPhase(t *testing.T) {
 	wt := t.TempDir()
 	goDir := filepath.Join(wt, "go")

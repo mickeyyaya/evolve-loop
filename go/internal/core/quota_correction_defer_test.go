@@ -45,8 +45,6 @@ func runWalledCorrectionCycle(t *testing.T) (root string, probe *walledCorrectio
 	return root, probe, runners, led, err
 }
 
-// A wall met on a correction re-dispatch is the same deferral a wall on the first dispatch is: the
-// cycle is resumable, not failed, and nothing learns from it.
 func TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch(t *testing.T) {
 	prevHook := QuotaBoundaryCheckpointer
 	t.Cleanup(func() { QuotaBoundaryCheckpointer = prevHook })
@@ -160,7 +158,6 @@ func TestReviewResumedDeliverable_WalledCorrection_ReturnsTheExhaustionSentinel(
 	}
 }
 
-// The resume path consumes the review gate's sentinel through the same pause as its own dispatch.
 func TestRunCycleFromPhase_WalledResumedCorrection_Defers(t *testing.T) {
 	prevHook := QuotaBoundaryCheckpointer
 	t.Cleanup(func() { QuotaBoundaryCheckpointer = prevHook })
@@ -194,7 +191,6 @@ func TestRunCycleFromPhase_WalledResumedCorrection_Defers(t *testing.T) {
 	}
 }
 
-// A correction re-dispatch that fails for any other reason is still a failure, never a deferral.
 func TestRunCycle_FailedCorrectionRedispatch_IsNotADeferral(t *testing.T) {
 	prevHook := QuotaBoundaryCheckpointer
 	t.Cleanup(func() { QuotaBoundaryCheckpointer = prevHook })

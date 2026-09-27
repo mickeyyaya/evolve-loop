@@ -1,14 +1,3 @@
-// gitops.go — atomic commit + (ff-merge if worktree) + push + optional gh release.
-//
-// Mirrors ship.sh section 7 (lines 578-907) and section 8 (909-939):
-//
-//   - Branch detection (refuse detached HEAD)
-//   - Worktree-aware ship (when cycle-state.json:active_worktree set + class=cycle):
-//     commit in worktree, pre-merge tree-SHA check, ff-merge into main, push,
-//     post-push tree-SHA verification, ship-binding.json sidecar
-//   - Non-worktree path: git add -A → diff-footer-append → commit-prefix-gate
-//     → commit → push
-//   - EVOLVE_SHIP_RELEASE_NOTES → gh release create
 package ship
 
 import (
@@ -29,11 +18,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
-// acquireShipLock acquires the ADR-0049 S5 integrator lock (gap G1): the
-// BLOCKING flock serializing the shared-main integration critical section so
-// two concurrent ships can't corrupt main's index/ref/origin. nil seam →
-// flock.Lock on <ProjectRoot>/.evolve/ship.lock. No-op under the whole-cycle
-// project lock (uncontended); load-bearing once that lock is scoped per-run.
+// acquireShipLock takes the BLOCKING flock serializing the shared-main
+// integration critical section so two concurrent ships cannot corrupt main's
+// index/ref/origin.
+// See ADR-0049.
 func (o *Options) acquireShipLock() (release func(), err error) {
 	p := flock.ShipLockPath(o.ProjectRoot)
 	if o.shipLock != nil {
@@ -42,16 +30,14 @@ func (o *Options) acquireShipLock() (release func(), err error) {
 	return flock.Lock(p)
 }
 
-// atomicShip is the single entry point for "do the actual git work."
-// Returns nil on success (commit + push completed, or DryRun skipped them).
-// Returns *IntegrityError on tree-SHA binding mismatch.
+// atomicShip is the single entry point for the actual git work; a tree-SHA
+// binding mismatch returns *IntegrityError.
 func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
 	tree, fromWorktree, err := landingTree(opts)
 	if err != nil {
 		return err
 	}
 
-	// Branch detection — refuse detached HEAD.
 	branch, err := currentBranch(ctx, opts)
 	if err != nil {
 		return err
@@ -67,13 +53,9 @@ func atomicShip(ctx context.Context, opts *Options, res *RunResult) error {
 	return shipDirect(ctx, opts, res, branch)
 }
 
-// landingTree is the ONE decision of which tree a ship lands from: the
+// landingTree is the one decision of which tree a ship lands from: the
 // cycle's active worktree when the class is cycle, it is set, differs from
-// the project root and is a directory on disk; the project root otherwise. A
-// typed (host-bound) worktree that cannot be resolved or is missing is
-// CodeWorktreeResolve — never a silent fall-through to the root. atomicShip
-// lands from it and the repo-contract gate tests it (repoContractGateRoot),
-// so the tree the gate proves is the tree the ship pushes.
+// the project root and is a directory on disk; the project root otherwise.
 func landingTree(opts *Options) (tree string, fromWorktree bool, err error) {
 	worktree, typed, err := activeWorktreeForShip(opts)
 	if err != nil {
@@ -98,9 +80,9 @@ func landingTree(opts *Options) (tree string, fromWorktree bool, err error) {
 	return opts.ProjectRoot, false, nil // an untyped hint that is gone: the ship lands from the root
 }
 
-// activeWorktreeForShip returns the PhaseRunner's typed host identity when it
-// is present. A Builder-writable run.json may corroborate that identity but can
-// never select or clear the tree Ship mutates.
+// activeWorktreeForShip returns the PhaseRunner's typed host identity when
+// present. A Builder-writable run.json may corroborate it but never selects or
+// clears the tree Ship mutates.
 func activeWorktreeForShip(opts *Options) (worktree string, typed bool, err error) {
 	if opts.Class != ClassCycle || opts.ActiveWorktree == "" {
 		return readActiveWorktree(opts), false, nil
@@ -123,15 +105,12 @@ func activeWorktreeForShip(opts *Options) (worktree string, typed bool, err erro
 	return opts.ActiveWorktree, true, nil
 }
 
-// detectColliders returns the sorted list of paths that are incoming from the
-// worktree (commits branch..cycleBranch + worktree status) AND exist UNTRACKED
-// in the main working tree — the files a ff-merge would refuse to overwrite.
-// Shared by the shipFromWorktree pre-flight and the collider repair
-// (repair.go) so both always see the same list.
+// detectColliders returns the sorted paths incoming from the worktree that
+// exist UNTRACKED in the main working tree — the files a ff-merge would
+// refuse to overwrite.
 func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycleBranch string) ([]string, error) {
 	incomingFiles := make(map[string]bool)
 
-	// 1. Files modified in commits branch..cycleBranch
 	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, rawPathRead("diff", "--name-only", branch, cycleBranch)...)
 	if err == nil {
 		for _, line := range strings.Split(diffOut, "\n") {
@@ -142,14 +121,13 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 		}
 	}
 
-	// 2. Files in worktree status (modified, added, untracked, staged)
 	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, rawPathRead("status", "--porcelain")...)
 	if err == nil {
 		for _, line := range strings.Split(statusOut, "\n") {
 			line = strings.TrimSpace(line)
 			if len(line) > 3 {
 				status := line[:2]
-				if !strings.Contains(status, "D") { // Skip deleted files
+				if !strings.Contains(status, "D") { // "D" marks a deleted path; it cannot collide with a ff-merge.
 					path := unquoteGitPath(line[3:])
 					incomingFiles[path] = true
 				}
@@ -157,7 +135,6 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 		}
 	}
 
-	// Expand directories in incomingFiles
 	expandedIncomingFiles := make(map[string]bool)
 	for p := range incomingFiles {
 		wtFilePath := filepath.Join(worktree, p)
@@ -166,7 +143,7 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 			continue
 		}
 		if info.IsDir() {
-			// Best-effort expansion: per-entry Walk errors are tolerated (callback returns nil).
+			// Best-effort: a per-entry Walk error is tolerated, not fatal.
 			_ = filepath.Walk(wtFilePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
 				if walkErr != nil {
 					return nil
@@ -188,13 +165,12 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 	for p := range expandedIncomingFiles {
 		wtFilePath := filepath.Join(worktree, p)
 		if _, err := os.Stat(wtFilePath); err != nil {
-			continue // Does not exist in worktree
+			continue
 		}
 		mainFilePath := filepath.Join(opts.ProjectRoot, p)
 		if _, err := os.Stat(mainFilePath); err != nil {
-			continue // Does not exist on main side
+			continue
 		}
-		// Check if it is untracked in main repo
 		mainTracked, err := captureGitOutput(ctx, opts, "ls-files", p)
 		if err != nil {
 			continue
@@ -217,16 +193,10 @@ func readActiveWorktree(opts *Options) string {
 	return stateString(csMap, "active_worktree")
 }
 
-// cycleStateFile returns the file ship reads run-defining inputs (active_worktree,
-// cycle_id) from. It prefers the per-run run.json mirror under the run workspace
-// (ADR-0049 S3 / gap G3) — a full cycle-state.json mirror (CB.4, only
-// CycleState-modeled keys) — so a concurrent cycle's host-global cycle-state.json
-// cannot make ship integrate the WRONG run's worktree/number. Falls back to the
-// global file when WorkspacePath is unset (standalone `evolve ship`) or the
-// mirror is absent. A no-op for the live loop: with one cycle running, run.json
-// and the global file hold identical content. (cycle_size_estimate is NOT a
-// CycleState field, so verifyTrivial — a standalone-only path — keeps reading the
-// global file directly.)
+// cycleStateFile prefers the per-run run.json mirror over the global
+// cycle-state.json so a concurrent cycle cannot make ship integrate the wrong
+// run's worktree.
+// See ADR-0049.
 func (o *Options) cycleStateFile() string {
 	if o.WorkspacePath != "" {
 		runJSON := filepath.Join(o.WorkspacePath, core.RunStateFile)
@@ -237,23 +207,7 @@ func (o *Options) cycleStateFile() string {
 	return filepath.Join(o.ProjectRoot, ".evolve", "cycle-state.json")
 }
 
-// shipDirect: the non-worktree path.
-//
-//	git add -A
-//	check for staged changes (else exit 0)
-//	build actual-diff footer (cycle/manual only)
-//	run commit-prefix-gate (best-effort; missing is OK)
-//	git commit -m <msg-with-footer>
-//	git push origin <branch>
 func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch string) error {
-	// ADR-0049 S5 / gap G1: the non-worktree ship path (manual ships, release
-	// ships, and any cycle ship without a live worktree) mutates
-	// opts.ProjectRoot's index directly via add -A → commit → push. Hold the
-	// integrator lock across that whole critical section so two concurrent
-	// ships that both land here serialize instead of racing main's
-	// index/ref/origin — the same guard shipFromWorktree already holds.
-	// BLOCKING flock; skipped on dry-run (mutates nothing). No-op under the
-	// whole-cycle project lock (uncontended).
 	if !opts.DryRun {
 		release, lockErr := opts.acquireShipLock()
 		if lockErr != nil {
@@ -265,13 +219,9 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 
 	if !opts.DryRun {
 		if opts.Class == ClassRelease {
-			// Release staging is class-special (v18.3.0→v18.5.0 forensics):
-			// the pipeline's rebuild-binary step is the AUDITED producer of
-			// go/evolve, so the churn discard below would throw away the
-			// release's own product (→ SELF_SHA_TAMPERED on the next ship);
-			// and `add -A` swept untracked operator files (evolve.log,
-			// release-*.log) into release commits. Stage exactly the known
-			// release set instead.
+			// Release class stages the explicit release set instead of add -A:
+			// add -A would sweep untracked operator files into the commit, and
+			// the churn discard would delete the release's own rebuilt go/evolve.
 			if err := stageReleaseSet(ctx, opts); err != nil {
 				return err
 			}
@@ -284,17 +234,14 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		}
 	}
 
-	// Backstop against accidental compiled-binary commits (tracked-binary-in-
-	// acs-dir): after staging, before the commit, refuse any staged oversized
-	// executable outside the go/bin//go/evolve allowlist.
+	// Refuse an oversized staged executable outside the allowlist before committing.
 	if !opts.DryRun {
 		if err := stageBinaryGuard(ctx, opts); err != nil {
 			return err
 		}
 	}
 
-	// Check for staged changes. git diff --cached --quiet exits 0 if no
-	// diff, 1 if diff. (We use io.Discard for stdout — there's no output.)
+	// git diff --cached --quiet exits 0 when nothing is staged, 1 otherwise.
 	exit, err := opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, io.Discard, io.Discard)
 	if err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip,
@@ -305,7 +252,6 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		return nil
 	}
 
-	// Build commit message with actual-diff footer (cycle/manual only).
 	msg := opts.CommitMessage
 	if opts.Class == ClassCycle || opts.Class == ClassManual {
 		footer, err := buildDiffFooter(ctx, opts)
@@ -314,38 +260,14 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		}
 		msg = msg + footer
 	}
-	// Reviewed-by trailer (manual class only) — durable per-commit record of
-	// who reviewed before commit, derived from the verified attestation.
 	msg += reviewedByTrailer(opts)
 
-	// Optional: commit-prefix-gate (Layer 1 of ADR-0012). Best-effort
-	// shellout to the bash gate when present; missing or non-executable
-	// is silently skipped to match bash behavior (`if [ -x ... ]`).
 	if err := runCommitPrefixGate(ctx, opts, msg, opts.ProjectRoot); err != nil {
 		return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
 			"ship: commit-prefix-gate rejected main-path commit (Layer 1 of ADR-0012). To bypass for manual class only: --bypass-prefix-gate: "+err.Error(),
 			"gate_err", err.Error())
 	}
 
-	// Audit-binding check, pre-commit. This path verified NOTHING before, while
-	// still writing audit_bound_tree_sha into ship-binding.json — a sidecar
-	// asserting a verification that had not happened.
-	//
-	// The comparand is the STAGED tree, mirroring verifyStagedTree. Getting
-	// this wrong is easy and expensive, so the reasoning is recorded: the
-	// auditor persona computes `git rev-parse HEAD^{tree}` (evolve-auditor.md),
-	// which on an uncommitted cycle is the BASE tree — but that value cannot
-	// reach here. audit.go's report-comment fallback is taken only when the
-	// ledger entry has no worktree_tree_sha, and twenty lines later
-	// verifyAuditBinding refuses outright unless treefence.Take's tree equals
-	// that same empty value, which it never does. So the binding that reaches
-	// shipDirect is always entry.WorktreeTreeSHA — `git add -u` + `git
-	// write-tree`, the CHANGES tree (core/phase_bindings.go, the cycle-152
-	// fix). An intermediate version of this guard compared HEAD^{tree}
-	// instead, on the strength of a test that hand-set a binding no producer
-	// emits; it would have been inert where reachable and is the reason
-	// TestShipDirect_LegitimateBoundShipIsNotBlocked now drives the REAL
-	// producer rather than a literal.
 	if !opts.DryRun && opts.internalAuditBoundTreeSHA != "" {
 		stagedTree, terr := captureGitOutput(ctx, opts, "write-tree")
 		if terr != nil {
@@ -371,7 +293,6 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		return nil
 	}
 
-	// git commit -m <msg>
 	exit, err = opts.run(ctx, "git", []string{"commit", "-m", msg}, opts.Stdout, opts.Stderr)
 	if err != nil || exit != 0 {
 		return shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
@@ -380,21 +301,16 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: committed to %s", branch))
 
-	// git push origin <branch> — a rejection gets ONE inline fetch+ff-retry
-	// (the landing's push repair, gitops_landing.go); a diverged origin
-	// reclassifies to needs-reaudit. The landed HEAD is recorded on the result.
+	// A push rejection retries once via an inline fetch+ff-merge; a genuine
+	// divergence reclassifies to needs-reaudit.
 	if err := pushWithRepair(ctx, opts, res, branch, landing.SiteDirect); err != nil {
 		return err
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))
 
-	// Post-push, mirroring verifyCommittedTree: the pre-commit check inspects
-	// the INDEX, this one inspects what actually landed. No branch on this path
-	// reaches it without the pre-commit check having passed first (an empty
-	// index returns before pushing, and the landing's push repair never
-	// rebases or force-pushes), so it is defense in depth rather than an
-	// independently reachable gate — it witnesses commit-time divergence
-	// between index and commit, and it keeps both ship paths applying one rule.
+	// Post-push, mirrors verifyCommittedTree: the pre-commit check inspected the
+	// index, this inspects what actually landed — defense in depth against
+	// commit-time divergence.
 	if opts.internalAuditBoundTreeSHA != "" {
 		committedTree, _ := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")
 		committedTree = strings.TrimSpace(committedTree)
@@ -410,16 +326,13 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		}
 	}
 
-	// Optional GitHub release.
 	return maybeCreateRelease(ctx, opts, res)
 }
 
-// shipFromWorktree: the v8.43.0 worktree-aware path. Commit in the
-// cycle's worktree (where Builder's edits live), pre-merge tree-SHA
-// check, ff-merge cycle branch into main, push main, post-push
-// integrity verification, ship-binding.json sidecar (the ff-merge, the push
-// with its inline repair and the binding writer live in landing/ — ADR-0103
-// unit 07; gitops_landing.go is the seam).
+// shipFromWorktree commits in the cycle's worktree (where Builder's edits
+// live), then ff-merges, pushes and verifies through landing/
+// (gitops_landing.go is the seam).
+// See ADR-0103.
 func shipFromWorktree(ctx context.Context, opts *Options, res *RunResult, branch, worktree string) error {
 	return newWorktreeShip(ctx, opts, res, branch, worktree).run()
 }
@@ -438,8 +351,8 @@ func currentBranch(ctx context.Context, opts *Options) (string, error) {
 }
 
 // buildDiffFooter computes the actual-diff footer appended to commit
-// messages for cycle/manual classes. Mirrors ship.sh's footer text
-// byte-for-byte so reviewers and Test U pass.
+// messages for cycle/manual classes, byte-for-byte matching ship.sh's
+// legacy footer format.
 func buildDiffFooter(ctx context.Context, opts *Options) (string, error) {
 	return buildDiffFooterAtDir(ctx, opts, opts.ProjectRoot)
 }
@@ -475,10 +388,9 @@ func buildDiffFooterAtDir(ctx context.Context, opts *Options, cwd string) (strin
 	return footer, nil
 }
 
-// runCommitPrefixGate calls the commitprefixgate Go library directly
-// (v11.8.2+; prior versions shelled out to legacy/scripts/guards/
-// commit-prefix-gate.sh). Missing manifest is silently passed through by
-// the library (matches the bash "pass-through when not provisioned" rule).
+// runCommitPrefixGate calls the commitprefixgate Go library directly; a
+// missing manifest is silently passed through, matching legacy bash
+// behavior.
 func runCommitPrefixGate(ctx context.Context, opts *Options, msg, repoDir string) error {
 	_, err := commitprefixgate.Run(commitprefixgate.Options{
 		CommitMsg: msg,
@@ -538,29 +450,15 @@ func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args 
 	return captureGitOutput(ctx, opts, all...)
 }
 
-// rawPathRead prefixes a path-REPORTING git read with `-c core.quotePath=false`
-// so git emits non-ASCII paths raw instead of octal-escaped — the zero-parsing
-// half of the cycle-1108 fix, with unquoteGitPath (manifest.go) covering the
-// residue that flag does not suppress (embedded quotes, backslashes, control
-// chars, which stay C-quoted regardless). Config args are only legal BEFORE the
-// subcommand, which is where this puts them (captureGitOutputAtDir's own -C is
-// a global option too, so either order is accepted by git).
+// rawPathRead prefixes a path-reporting git read with `-c
+// core.quotePath=false` so git emits non-ASCII paths raw; unquoteGitPath
+// (manifest.go) covers the residue that flag does not suppress.
 func rawPathRead(args ...string) []string {
 	return append([]string{"-c", "core.quotePath=false"}, args...)
 }
 
-// stageExplicitPaths stages a non-release ship (cycle/manual/trivial) as an
-// explicit `git add -- <paths>` instead of the `git add -A` sweep both call
-// sites used before cycle-1067 (`ship-stage-explicit-paths`). The pathspec is
-// stagePathspec(declared manifest, porcelain changed set) — see its doc for the
-// exact set and for why the fallbacks are the changed set and never `-A` nor
-// nothing. dir is the tree to stage in: "" for opts.ProjectRoot (shipDirect),
-// or the cycle worktree (shipFromWorktree).
-//
-// The `git add` call is issued even for an empty pathspec (git: "Nothing
-// specified, nothing added.", rc=0) so the staging step stays observable and a
-// clean tree keeps flowing into the staged-diff check that exits cleanly —
-// staging is never silently skipped.
+// stageExplicitPaths stages a non-release ship as an explicit `git add --
+// <paths>`, never a blanket `git add -A`.
 func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir string) error {
 	root := dir
 	var prefix []string
@@ -584,10 +482,9 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		fi, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
 		return statErr == nil && fi.Mode().IsRegular()
 	})
-	// Drop the paths that exist in neither the worktree nor the index under
-	// that name. Naming one is fatal rc=128 and it kills the WHOLE staging
-	// call, so a single such path fails the entire ship — see stagedGonePaths
-	// for the two porcelain shapes that produce it.
+	// Drop paths gone from both the worktree and the index: naming one is a
+	// fatal rc=128 that kills the whole staging call. See stagedGonePaths for
+	// the two porcelain shapes that produce it.
 	gone := stagedGonePaths(out)
 	kept := paths[:0]
 	for _, p := range paths {
@@ -600,17 +497,13 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 
 	args := make([]string, 0, len(prefix)+3+len(paths))
 	args = append(args, prefix...)
-	// `-A` WITH a pathspec is a SCOPED sweep (never repo-wide): within these
-	// paths it stages adds, modifications, and deletions idempotently. Plain
-	// `add -- <path>` fatals rc=128 on an already-staged deletion — the exact
-	// operator boundary flow (stage explicit paths → commit-gate → ship
-	// re-stages), which broke every boundary ship after this rework landed.
+	// `-A` with a pathspec is a scoped sweep, never repo-wide: within these
+	// paths it stages adds, modifications and deletions idempotently. Plain
+	// `add -- <path>` fatals rc=128 on an already-staged deletion.
 	args = append(args, "add", "-A", "--")
 	args = append(args, paths...)
-	// Tee stderr into a bounded buffer so the failure REASON travels in the
-	// ship error (failure digest, retro, escalation report) — cycle-1098's
-	// `fatal: Invalid path '/go'` was only visible in the lane log while the
-	// error said `git add failed (rc=128): <nil>`.
+	// Tee stderr into a bounded buffer so the failure reason travels in the
+	// ship error, not just the lane log.
 	var errTail bytes.Buffer
 	stderr := io.Writer(&errTail)
 	if opts.Stderr != nil {
@@ -618,17 +511,9 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 	}
 	exit, runErr := opts.run(ctx, "git", args, io.Discard, stderr)
 	if runErr == nil && exit != 0 {
-		// Layer 4 of the staging onion (2026-08-14 halt, ship|unknown|99c38818):
-		// a pathspec the check-ignore probe is blind to can still be refused
-		// by add. The live blind shape (probed on the runtime repo, git
-		// 2.50.1): a directory whose rule sits under a NEGATED parent
-		// (`!.evolve/inbox/` re-include above `.evolve/inbox/processed/`) —
-		// check-ignore returns not-ignored for BOTH slash forms there, while
-		// a minimal `dir/` rule without the negation IS flagged (review
-		// probe). The fix is deliberately mechanism-independent: rather than
-		// re-implement ignore semantics a third time, trust git's own
-		// refusal — it NAMES the offending pathspecs in stderr. Drop exactly
-		// those, retry ONCE.
+		// check-ignore can miss a directory hidden by a negated parent
+		// .gitignore rule; trust git's own add refusal instead — it names the
+		// offenders. Drop exactly those and retry once.
 		if offenders := ignoredPathsFromAddRefusal(errTail.String()); len(offenders) > 0 {
 			offenderSet := make(map[string]bool, len(offenders))
 			for _, o := range offenders {
@@ -640,12 +525,9 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 					retryPaths = append(retryPaths, p)
 				}
 			}
-			// Progress is mandatory, and so is having something left to stage:
-			// an offender list that filters nothing (form mismatch) falls
-			// through to the honest error below, and an ALL-ignored set stays
-			// on the two-strikes ladder (cycle-1365: refusal → strike →
-			// deterministic precondition → continuation/salvage) — a success
-			// that staged nothing would delete that routing.
+			// A retry that would stage nothing is refused, not reported as
+			// success: an all-ignored offender set stays on the two-strikes
+			// ladder instead of silently discarding the ship's routing.
 			if len(retryPaths) > 0 && len(retryPaths) < len(paths) {
 				res.Logs = append(res.Logs, fmt.Sprintf(
 					"[ship] git refused %d gitignored pathspec(s) the check-ignore probe cannot see (directory-form rules); dropped and retrying: %s",
@@ -666,12 +548,9 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 		if len(tail) > 300 {
 			tail = "…" + tail[len(tail)-300:]
 		}
-		// Two-strikes-same-pathspec (deterministic-stage-refusal-router): the
-		// FIRST refusal keeps its retry (a genuinely flaky add must), but the
-		// SAME pathspec refused twice in a row cannot win in place — cycle-1365
-		// burned its whole retry budget re-adding one .evolve/evals path whose
-		// worktree base predated the .gitignore carve-out. Precondition routes
-		// it to continuation/salvage instead of another doomed attempt.
+		// Two-strikes-same-pathspec: a first refusal keeps its retry (a
+		// genuinely flaky add must), but the same pathspec refused twice in a
+		// row is deterministic, not transient.
 		class := core.ShipClassTransient
 		deterministic := exit == 128 && (strings.Contains(gitStderr, "fatal: Invalid path ") ||
 			strings.Contains(gitStderr, " is outside repository at ") ||
@@ -691,29 +570,12 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 	return nil
 }
 
-// dropIgnoredPaths removes pathspec entries git refuses to stage: a declared
-// path matched by .gitignore makes `git add` exit 1 ("The following paths are
-// ignored by one of your .gitignore files") even though it stages the other
-// paths first. Cycle-1101: the eval-quality contract puts the cycle's
-// `.evolve/evals/<slug>.md` in every test-report, .evolve/* is ignored BY
-// DESIGN (runtime state, never committed), so every green cycle's declared
-// manifest carried a refusal — a deterministic ship-killer. `check-ignore`
-// rc 0 lists the ignored subset one-per-line; rc 1 means none (both are
-// success for captureGitOutput). NOT `-z`: that flag is stdin-mode-only
-// (`fatal: -z only makes sense with --stdin`, rc=128 — adversarial review
-// caught the probe failing open on EVERY ship). Newline parsing stays safe
-// (git never puts a bare newline in this output — it C-quotes such a path
-// instead), but cycle-1108 falsified this comment's older premise that git
-// never quotes here at all: the pathspec is the DECLARED manifest, whose
-// entries are arbitrary repo paths, so a non-ASCII or quote-bearing one comes
-// back C-quoted and matched nothing — the ignored path then rode into `git add`
-// and reproduced the cycle-1101 rc=1 ship-killer. Hence the raw-path read plus
-// unquoteGitPath on every probe line. A broken probe fails OPEN with the full
-// set and a loud log: the probe must never block ship — if the refusal
-// survives, the add's own stderr now travels in the ship error.
+// dropIgnoredPaths removes pathspec entries git refuses to stage: a
+// gitignored declared path makes `git add` exit 1 even though it stages the
+// rest. A broken probe fails open with the full set — it must never block
+// ship; if the refusal survives, add's own stderr travels in the ship error.
 // stageRefusalMemoFile is where a lane remembers the pathspec its last `git
-// add` refused. Workspace-scoped on purpose: fleet lanes run concurrently, so
-// one lane's strike must never deterministically block a peer's first attempt.
+// add` refused.
 const stageRefusalMemoFile = "ship-stage-refusal.txt"
 
 // stageRefusalKey is the identity of a staging attempt: the sorted path set,
@@ -725,11 +587,8 @@ func stageRefusalKey(paths []string) string {
 	return strings.Join(sorted, "\n")
 }
 
-// recordStageRefusal remembers that pathspec was refused and reports whether
-// this is the SECOND CONSECUTIVE refusal of that same pathspec — the signal
-// that no retry can win in place. With no workspace there is nowhere to record
-// a strike, so it degrades to the pre-existing transient behavior rather than
-// guessing deterministic.
+// recordStageRefusal reports whether this is the second consecutive refusal
+// of the same pathspec.
 func recordStageRefusal(workspace string, paths []string) bool {
 	if workspace == "" {
 		return false
@@ -765,10 +624,8 @@ func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root s
 	}
 	ignored := map[string]bool{}
 	for _, p := range strings.Split(out, "\n") {
-		// Decode ONLY genuinely quoted lines: an unquoted line is git naming a
-		// path literally, and fuzzy-matching it against a different declared
-		// path would silently under-stage the ship — strictly worse than the
-		// refusal this filter exists to prevent.
+		// Decode only genuinely quoted lines; an unquoted line names a path
+		// literally, and fuzzy-matching it would silently under-stage the ship.
 		if p = unquoteGitPath(strings.TrimSpace(p)); p != "" {
 			ignored[p] = true
 		}
@@ -824,7 +681,7 @@ func stageReleaseSet(ctx context.Context, opts *Options) error {
 			continue
 		}
 		if _, err := os.Stat(a); err != nil {
-			continue // absent on disk — nothing to stage
+			continue
 		}
 		seen[rel] = struct{}{}
 		args = append(args, rel)
@@ -841,22 +698,8 @@ func stageReleaseSet(ctx context.Context, opts *Options) error {
 	return nil
 }
 
-// discardBinaryChurn discards unaudited tracked-binary rebuild churn from the
-// WORKTREE before `git add -A` stages the ship commit. It deliberately uses
-// `git checkout -- <path>` (restore from INDEX), not `git checkout HEAD -- <path>`:
-// after normalizeWorktreeToBase's `git reset --soft`, the index holds the full
-// audited diff, so the index — not HEAD — is the audited reference. Restoring
-// from the index discards exactly the post-audit worktree churn (e.g. an ACS
-// rerun rebuilding go/evolve) while preserving an audited, intentionally staged
-// binary update. Contrast with core.discardMainLeak, which runs mid-cycle on the
-// MAIN tree where the cycle is not yet committed and HEAD is the audited
-// reference — there `HEAD --` is correct. The two forms are not interchangeable.
-// osExecutable is a test seam for the running-binary lookup (production =
-// os.Executable). The churn discard must never delete the binary it is
-// executing from — inbox ship-manual-deletes-running-binary, 2026-07-12
-// incidents: `ship --class manual` resolved the untracked go/bin/evolve via
-// this fallback and os.Remove'd it, degrading every kernel hook to the stale
-// tracked fallback until rebuild.
+// osExecutable is a test seam for the running-binary lookup; production uses
+// os.Executable.
 var osExecutable = os.Executable
 
 // isRunningExecutable reports whether path is the currently-executing binary,
@@ -888,7 +731,6 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 		}
 	}
 
-	// Always discard the standard production path "go/evolve" as well as relBin
 	pathsToDiscard := []string{"go/evolve"}
 	if relBin != "" && relBin != "go/evolve" {
 		pathsToDiscard = append(pathsToDiscard, relBin)
@@ -897,20 +739,14 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 	for _, p := range pathsToDiscard {
 		absPath := filepath.Join(dir, p)
 		if _, err := os.Stat(absPath); os.IsNotExist(err) {
-			continue // doesn't exist, skip
+			continue
 		}
-		// Check if it is tracked in the repository context of dir
 		var buf strings.Builder
 		exitCode, err := opts.run(ctx, "git", []string{"-C", dir, "ls-files", p}, &buf, io.Discard)
 		if err == nil && exitCode == 0 && strings.TrimSpace(buf.String()) != "" {
-			// Revert the changes
 			_, _ = opts.run(ctx, "git", []string{"-C", dir, "checkout", "--", p}, io.Discard, io.Discard)
 		} else {
-			// Untracked: remove the file — unless it is the currently-executing
-			// binary. An untracked go/bin/evolve is gitignored (go/.gitignore
-			// `/bin/`), so `git add -A` can never stage it; removing it has zero
-			// staging-hygiene value and kills the binary the kernel hooks and the
-			// rollback shellout are running (2026-07-12 incidents, cycle-243).
+			// Untracked: remove the file unless it is the currently-executing binary.
 			if isRunningExecutable(absPath) {
 				if opts.Stderr != nil {
 					fmt.Fprintf(opts.Stderr,
@@ -925,11 +761,8 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 }
 
 // ignoredPathsFromAddRefusal extracts the pathspecs git names in an add
-// refusal ("The following paths are ignored by one of your .gitignore
-// files:") — the lines between that header and the first hint:. Strict by
-// design: no header means no offenders (a fuzzy parse of an unrelated failure
-// would silently under-stage the ship). Quoted lines decode through
-// unquoteGitPath (the cycle-1108 quotepath contract applies here too).
+// refusal — the lines between the ignored-files header and the first hint:.
+// Quoted lines decode through unquoteGitPath.
 func ignoredPathsFromAddRefusal(stderr string) []string {
 	const header = "The following paths are ignored by one of your .gitignore files:"
 	lines := strings.Split(stderr, "\n")

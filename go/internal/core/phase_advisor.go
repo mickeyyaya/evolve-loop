@@ -1,16 +1,5 @@
 package core
 
-// phase_advisor.go — unit 04 (ADR-0103, design decomposition/04-advisor.md):
-// core's seam onto the phase advisor. The brain lives in internal/core/advisor
-// behind a leaf-owned Launcher port; this file keeps the host struct the
-// composition root builds with its four options, projects the core Bridge
-// onto that port ONCE, and holds the facades every old caller keeps its
-// spelling through — the router ports, replay, the span/identity aliases,
-// resume's plan parser, the judge's and the adjudicator's span scanner, the
-// task-recall cap, the failure digest's atomic writer, the orchestrator's
-// bench projection and the git reader the seam injects — plus the test
-// facades the ACS-named and protected core tests call by name.
-
 import (
 	"context"
 	"os"
@@ -30,18 +19,16 @@ import (
 // PhaseAdvisor is the bridge-backed DynamicLLM brain. It satisfies two router
 // ports: router.Proposer (Propose — the per-transition "insert this optional
 // phase?" advice) and router.Planner (Plan — the upfront whole-cycle run/skip
-// plan, ADR-0024 §2). Both ask an LLM via the core.Bridge port given the
-// objective digest. All output is ADVISORY: the pure router.Route() clamp pass
-// re-validates it against the kernel floor (mandatory spine, TDD-pin,
-// ship-needs-real-audit), so a hallucinated or malformed proposal can never
-// weaken the ship guarantee. Any failure is returned as an error and the caller
-// degrades cleanly to the deterministic static path — "model proposes, kernel
-// disposes", fail-safe to the floor. Since ADR-0103 unit 04 it is the host of
-// the advisor leaf: the options mutate the identity, the depth guard and the
-// Center before the ONE construction.
+// plan). Both ask an LLM via the core.Bridge port given the objective digest.
+// All output is ADVISORY: the pure router.Route() clamp pass re-validates it
+// against the kernel floor (mandatory spine, TDD-pin, ship-needs-real-audit),
+// so a hallucinated or malformed proposal can never weaken the ship
+// guarantee. Any failure is returned as an error and the caller degrades
+// cleanly to the deterministic static path — "model proposes, kernel
+// disposes", fail-safe to the floor.
 type PhaseAdvisor struct {
 	bridge   Bridge
-	identity AgentIdentity // ADR-0052 WS1-S1: the shared dispatch identity (cli/model/profile/persona/label)
+	identity AgentIdentity // the shared dispatch identity (cli/model/profile/persona/label)
 	// checkDepth is an injectable depth guard (defense-in-depth recursion check).
 	// nil = skip the check. Wire AdvisorDepthExceeded via WithDepthCheck for production.
 	checkDepth func(env map[string]string) bool
@@ -74,9 +61,10 @@ func WithProposerModel(model string) PhaseAdvisorOption {
 	}
 }
 
-// WithDepthCheck injects the recursion-depth guard (defense-in-depth, ADR-0052 §4.3).
+// WithDepthCheck injects the recursion-depth guard (defense-in-depth).
 // When fn returns true for the dispatch env, the launch errors before the bridge.
 // Pass AdvisorDepthExceeded for production behavior; nil (the zero-field default) skips the check.
+// See ADR-0052.
 func WithDepthCheck(fn func(env map[string]string) bool) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) {
 		p.checkDepth = fn
@@ -94,10 +82,10 @@ func WithPersona(body string) PhaseAdvisorOption {
 	}
 }
 
-// WithAdvisorSignals hands the root's Signal Center to the advisor (ADR-0103
-// unit 04): the brain reports its faults as advisor.warning through it. The
-// composition root builds the Center before the advisor in the same function,
-// so this is honest construction-time DI — the ONE declared root spelling change.
+// WithAdvisorSignals hands the root's Signal Center to the advisor: the brain
+// reports its faults as advisor.warning through it. The composition root
+// builds the Center before the advisor in the same function, so this is
+// honest construction-time DI — the ONE declared root spelling change.
 func WithAdvisorSignals(c *signalcenter.Center) PhaseAdvisorOption {
 	return func(p *PhaseAdvisor) { p.signals = c }
 }
@@ -200,7 +188,7 @@ func (p *PhaseAdvisor) Plan(in router.RouteInput) (*router.PhasePlan, error) {
 	return p.advisor().Plan(in)
 }
 
-// RePlan is the post-scout re-plan (ADR-0052 WS1-S3), called in shadow every
+// RePlan is the post-scout re-plan, called in shadow every
 // cycle by the orchestrator under the cfg.RouterReplan dial.
 func (p *PhaseAdvisor) RePlan(in router.RouteInput) (*router.PhasePlan, error) {
 	return p.advisor().RePlan(in)
@@ -214,7 +202,7 @@ var (
 	_ rePlanner       = (*PhaseAdvisor)(nil)
 )
 
-// AdvisorSpan is the OTel-GenAI decision span (ADR-0052 WS3-S3) — the leaf's
+// AdvisorSpan is the OTel-GenAI decision span — the leaf's
 // Span, kept under its core spelling for the routing explain command.
 type AdvisorSpan = advisor.Span
 
@@ -311,14 +299,11 @@ func mintConfigsFrom(entries []router.PhasePlanEntry) []phaseconfig.PhaseConfig 
 // Deprecated: test facade — the protected phase_advisor_guard_test.go names it.
 func reservedAdvisorMintReason(name string) string { return advisor.ReservedMintReason(name) }
 
-// writeArtifactAtomically writes data via a temp file + rename, so a capture
-// artifact on disk is always either absent or COMPLETE — never a truncated
-// half-write (a crash mid-write leaves a stale .tmp, not a corrupt capture).
-// This is what keeps the ledger's disk-read SHA (WS3-S2 bindArtifactSHA) equal
-// to the span's in-memory SHA (WS3-S3) for the same bytes, and matches the
-// repo's atomic-write convention. Single-writer per (workspace, kind) per
-// cycle, so the fixed .tmp suffix cannot collide. The failure digest writes
-// through it too; the seam injects it into the advisor leaf positionally.
+// writeArtifactAtomically writes via a temp file + rename, so a capture
+// artifact on disk is always either absent or complete — never a truncated
+// half-write. This keeps the ledger's disk-read SHA equal to the span's
+// in-memory SHA for the same bytes. Single-writer per (workspace, kind) per
+// cycle, so the fixed .tmp suffix cannot collide.
 func writeArtifactAtomically(path string, data []byte) error {
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {

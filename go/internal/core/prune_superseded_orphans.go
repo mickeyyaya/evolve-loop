@@ -1,14 +1,3 @@
-// prune_superseded_orphans.go — housekeeping walker for stale orphan `cycle-*`
-// branches (cycle 962, dependent on carryforward-real-cherrypick-filter).
-//
-// Over a fleet campaign the local ref namespace accumulates `cycle-*` branches
-// whose work has already landed on the base under a different sha. Left alone
-// they silently regrow the carry-forward candidate backlog. This walker reuses
-// the Task-1 supersession screen (refSuperseded) to flag those functional
-// duplicates and prune the stale refs — honoring
-// verify_remote_pr_before_branch_delete: a branch with an open PR (or remote
-// presence) is flagged but NEVER deleted. Distinct, not-yet-landed
-// (different-goal) orphans are left untouched.
 package core
 
 import (

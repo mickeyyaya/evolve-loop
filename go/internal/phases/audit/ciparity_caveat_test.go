@@ -1,23 +1,10 @@
 package audit
 
-// ciparity_caveat_test.go — a gate may not assert a CI outcome it cannot know.
-//
-// cycle-1543 (wave-20260822b-verify) was blocked by the integration-tier gate
-// with: "the integration tier reported 13 offender(s) — CI's integration-tier
-// test step would FAIL (e.g. TestFleetSoak)". That claim is FALSE, and provably
-// so: all 13 offenders were TestRealTmux_Interactive_*, every one guarded by
-// requireTmux, which t.Skip()s when tmux is absent from PATH. GitHub runners
-// have no tmux, so those tests SKIP in CI — main's go job on 444815a4 ran
-// `go test -race -tags integration` and passed with all of them in the tree.
-//
-// The failures were host contention, measured: 7/7 PASS in 17.2s with no wave
-// running, versus 3.6x-7.7x slower and exit=80 (REPL BOOT timeout) while the
-// wave held concurrent agent tmux sessions.
-//
-// A gate that blocks real work citing an impossible CI failure teaches
-// operators to bypass gates. The caveat is DERIVED from the same predicate
-// requireTmux uses — does this host have tmux — so it stays true if the guarded
-// test set ever changes, rather than encoding today's file names.
+// A gate may not assert a CI outcome it cannot know. A gate that blocks real
+// work citing an impossible CI failure teaches operators to bypass gates. The
+// caveat is derived from the same predicate requireTmux uses — does this host
+// have tmux — so it stays true if the guarded test set ever changes, rather
+// than encoding today's file names.
 
 import (
 	"context"
@@ -105,13 +92,10 @@ func fmtSprintfLike(tmpl string, n int, offenders string) string {
 	return fmt.Sprintf(tmpl, n, offenders)
 }
 
-// THE REAL WIRING TEST — through phase.Run, the path production uses.
-//
-// The composition tests above prove the caveat helper is correct; this proves
-// the GATE emits it. Mutating audit.go to pass the bare template survived every
-// test until this existed, which is the same "correct component, never wired"
-// shape three separate fixes hit today. The assertion is on the DIAGNOSTIC the
-// orchestrator actually receives, not on a string built in the test.
+// The real wiring test, through phase.Run, the path production uses: the
+// composition tests above prove the caveat helper is correct, this proves the
+// gate emits it. The assertion is on the diagnostic the orchestrator actually
+// receives, not on a string built in the test.
 func TestRun_IntegrationTierGate_DiagnosticDoesNotAssertACIOutcome(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0) // EGPS green → only the integration-tier gate can FAIL.
@@ -137,7 +121,7 @@ func TestRun_IntegrationTierGate_DiagnosticDoesNotAssertACIOutcome(t *testing.T)
 	if msg == "" {
 		t.Fatalf("expected an integration-tier diagnostic; got %+v", resp.Diagnostics)
 	}
-	// The falsehood that blocked cycle-1543 must be gone from the LIVE message.
+	// The gate must not assert an outcome it cannot know.
 	if strings.Contains(msg, "CI's integration-tier test step would FAIL") {
 		t.Fatalf("the emitted diagnostic still asserts a CI outcome it cannot know: %q", msg)
 	}

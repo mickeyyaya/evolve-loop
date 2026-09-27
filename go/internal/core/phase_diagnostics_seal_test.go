@@ -13,19 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// phase_diagnostics_seal_test.go — a phase's own FAIL reason must reach the seal.
-//
-// Live incidents (two-wave health batch, 2026-09-12/13): cycles 1634 and 1636
-// both FAILed at triage because Classify's protected-surface admission check
-// refused a top_n card naming a control-plane file. Classify returned the
-// reason as an error-severity diagnostic; the C1 outcome record carried no
-// field for it, so phase-timing.json held only `verdict: FAIL` and the seal
-// wrote "phase triage: verdict FAIL with no recorded abort reason (phase-infra
-// class)" — a deterministic, reasoned rejection paged as infrastructure, twice,
-// with the actual reason persisted nowhere. Floor phases never hit this: their
-// diagnostics ride a side channel (persistFloorFailReasons). Every other phase
-// dropped them at the chokepoint.
-
 // diagnosticFailRunner returns FAIL with the phase's own diagnostics — the
 // shape Classify produces for an admission rejection.
 type diagnosticFailRunner struct {
@@ -114,8 +101,8 @@ func redirectStderr(t *testing.T, fn func()) string {
 // The C1 chokepoint is the ONE producer: phaseOutcomeFrom relays the phase's
 // diagnostics, recordPhaseOutcome writes them to the record and emits ONE
 // phase.outcome; the root's WARN-filtered stderr sink renders a reasoned FAIL
-// in the one line format (ADR-0101 S1) — the chokepoint itself prints nothing.
-// A PASS carrying warnings is recorded (the durable trail) and stays off stderr.
+// in one line — the chokepoint itself prints nothing. A PASS carrying
+// warnings is recorded (the durable trail) and stays off stderr.
 func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *testing.T) {
 	c := signalcenter.New()
 	var sink bytes.Buffer

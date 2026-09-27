@@ -1,12 +1,5 @@
 //go:build e2e
 
-// End-to-end proof that release-verify-binaries integrates with the REAL
-// .goreleaser.yml SSOT and that the subcommand is wired into the dispatcher.
-//
-// Why this tier: the unit tests in cmd_release_verify_binaries_test.go drive the
-// orchestration with a fixture Config, so they say nothing about whether the
-// real goreleaser config parses or whether the binary actually recognizes the
-// subcommand. These tests close both gaps without touching the network.
 package main
 
 import (
@@ -18,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/releasetargets"
 )
 
-// TestReleaseVerifyBinaries_RealConfigAllPresent parses the checked-in
-// .goreleaser.yml (the SSOT) and verifies the orchestration reports every target
-// OK when the release publishes exactly the assets the config implies. This is
-// the deterministic form of "all prebuilt binaries are accounted for".
 func TestReleaseVerifyBinaries_RealConfigAllPresent(t *testing.T) {
 	repoRoot := mustRepoRoot(t)
 	cfg, err := releasetargets.ParseConfig(filepath.Join(repoRoot, ".goreleaser.yml"))
@@ -57,9 +46,8 @@ func TestReleaseVerifyBinaries_RealConfigAllPresent(t *testing.T) {
 	}
 }
 
-// TestReleaseVerifyBinaries_BinaryDispatch builds the real binary and proves the
-// subcommand is recognized by the dispatcher (NOT "unknown command") via the
-// usage path — exercised with no tag so it stays network-free.
+// TestReleaseVerifyBinaries_BinaryDispatch runs with no tag arg so it stays
+// network-free.
 func TestReleaseVerifyBinaries_BinaryDispatch(t *testing.T) {
 	if testing.Short() {
 		t.Skip("E2E test (builds the evolve binary); skipped in -short mode")

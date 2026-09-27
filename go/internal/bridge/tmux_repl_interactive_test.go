@@ -11,23 +11,6 @@ import (
 	"time"
 )
 
-// tmux_repl_interactive_test.go — proves the AUTO-REPLY POLICY keeps the
-// workflow flowing on a REAL tmux server with the REAL embedded manifest
-// rules. Unlike driver_claudetmux_test.go (fake TmuxController) this runs the
-// full runTmuxREPL flow against execTmux, so the auto-responder's capture-pane
-// → regex-match → send-keys round-trip is exercised with real tmux I/O.
-//
-// The fake CLI is the linchpin: it emits a real interactive-prompt string and
-// ONLY writes the artifact once it has received the auto-responder's expected
-// keystroke. So a green test proves the policy actually unblocked the REPL; a
-// failed auto-reply would mean the fake never gets the key → no artifact →
-// EC81 artifact-timeout → loud failure. That is the "no hang on human input"
-// guarantee, end to end.
-//
-// Escalate/loop-guard scenarios use "persist" mode: the fake emits the prompt
-// and never unblocks, so the auto-responder's own EC85/EC86 (not an artifact)
-// must end the run — proving the bridge fails FAST instead of hanging.
-
 // writeInteractiveFake writes a per-scenario fake CLI. Everything is BAKED
 // into the script body (never argv) so tmux's echo of the launch command can't
 // leak the marker or prompt text into the pane and trip a false match — the

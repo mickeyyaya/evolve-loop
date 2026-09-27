@@ -11,12 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// fakeBridge records the request and returns canned output.
 type fakeBridge struct {
 	stdout     string
 	err        error
 	durationMS int64
-	tokens     TokenUsage // ADR-0103 unit 04: the span golden threads token usage
+	tokens     TokenUsage // the span golden threads token usage
 	gotReq     BridgeRequest
 	calls      int
 }
@@ -31,12 +30,6 @@ func (f *fakeBridge) Launch(_ context.Context, req BridgeRequest) (BridgeRespons
 }
 func (f *fakeBridge) Probe(_ context.Context) (BridgeProbe, error) { return BridgeProbe{}, nil }
 
-// TestAdvisorLaunch_ThreadsActiveWorktree: the advisor's bridge launch must carry
-// the cycle's git worktree on BridgeRequest.Worktree. Under EVOLVE_FLEET=1 the tmux
-// driver refuses an empty Worktree (refusing the process-cwd fallback), so an
-// unthreaded worktree silently degrades every cycle to the static spine. The value
-// flows RouteInput.ActiveWorktree -> BridgeRequest.Worktree, mirroring normal-phase
-// dispatch (PhaseRequest.Worktree).
 func TestAdvisorLaunch_ThreadsActiveWorktree(t *testing.T) {
 	t.Parallel()
 	fb := &fakeBridge{stdout: `[{"phase":"scout","run":true,"justification":"x"}]`}
@@ -51,10 +44,6 @@ func TestAdvisorLaunch_ThreadsActiveWorktree(t *testing.T) {
 	}
 }
 
-// TestAdvisorPlanInput_ThreadsActiveWorktree: the orchestrator must copy the
-// cycle's provisioned worktree (cs.ActiveWorktree) into the RouteInput it feeds
-// the advisor — value-asserted so a future refactor can't silently break the
-// threading that satisfies the EVOLVE_FLEET worktree guard.
 func TestAdvisorPlanInput_ThreadsActiveWorktree(t *testing.T) {
 	t.Parallel()
 	o := &Orchestrator{now: func() time.Time { return time.Time{} }}
@@ -86,7 +75,6 @@ func TestPhaseAdvisor_ParsesValidJSON(t *testing.T) {
 	if prop.NextPhase != "tester" || len(prop.InsertPhases) != 1 || prop.InsertPhases[0] != "tester" {
 		t.Errorf("proposal=%+v, want next=tester insert=[tester]", prop)
 	}
-	// The proposer wires the router profile path + workspace artifact.
 	if !strings.HasSuffix(fb.gotReq.Profile, "/.evolve/profiles/router.json") {
 		t.Errorf("profile=%q, want .../.evolve/profiles/router.json", fb.gotReq.Profile)
 	}
@@ -176,7 +164,6 @@ func TestPhaseAdvisor_FailSafe(t *testing.T) {
 			t.Errorf("%s: want error (so LLMProposal degrades to static), got nil", c.name)
 		}
 	}
-	// nil bridge + empty workspace also error without panicking.
 	if _, err := NewPhaseAdvisor(nil).Propose(baseRouteInput()); err == nil {
 		t.Error("nil bridge: want error")
 	}
@@ -187,9 +174,6 @@ func TestPhaseAdvisor_FailSafe(t *testing.T) {
 	}
 }
 
-// Integration: LLMProposal defers to the proposer, but router.Route CLAMPS an
-// illegal proposal to the kernel's legal next — proving "model proposes, kernel
-// disposes". Proposer says ship (illegal from build); kernel forces audit.
 func TestPhaseAdvisor_ProposalIsClampedByKernel(t *testing.T) {
 	t.Parallel()
 	fb := &fakeBridge{stdout: `{"next_phase":"ship","justification":"skip audit"}`}
@@ -223,9 +207,6 @@ func TestPhaseAdvisor_ProposalIsClampedByKernel(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_PlanParsesArray covers Plan + parsePhasePlan: the whole-cycle
-// JSON array (run true+false mix), fence/prose tolerance, and that the plan path
-// wires phase-plan.json (distinct from Propose's routing-proposal.json).
 func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -251,11 +232,6 @@ func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 			if plan.Entries[0].Phase != "scout" || plan.Entries[0].Run != c.wantScoutRun {
 				t.Errorf("first entry=%+v, want scout run=%v", plan.Entries[0], c.wantScoutRun)
 			}
-			// The advisor's RAW plan artifact is routing-plan.json, distinct from
-			// the orchestrator's clamped phase-plan.json (both survive for
-			// forensics). The Plan path now uses the UNIFORM artifact-completion
-			// contract (the brain WRITES routing-plan.json; the bridge reads it
-			// back) — same as every phase agent, replacing the brittle stdout scrape.
 			if !strings.HasSuffix(fb.gotReq.ArtifactPath, "routing-plan.json") {
 				t.Errorf("artifact=%q, want .../routing-plan.json", fb.gotReq.ArtifactPath)
 			}
@@ -266,10 +242,6 @@ func TestPhaseAdvisor_PlanParsesArray(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_PersonaComposition proves the Plan prompt is composed the
-// uniform way: the injected persona (agents/evolve-router.md body) followed by
-// the dynamic per-cycle context — and falls back to the inline framing when no
-// persona is injected.
 func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
 	t.Parallel()
 	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
@@ -290,7 +262,7 @@ func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
 
 	t.Run("no persona falls back to inline framing", func(t *testing.T) {
 		fb := &fakeBridge{stdout: plan}
-		adv := NewPhaseAdvisor(fb) // no persona injected
+		adv := NewPhaseAdvisor(fb)
 		if _, err := adv.Plan(router.RouteInput{Workspace: "/tmp/x", Cycle: 7}); err != nil {
 			t.Fatal(err)
 		}
@@ -300,14 +272,6 @@ func TestPhaseAdvisor_PersonaComposition(t *testing.T) {
 	})
 }
 
-// TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath pins the fix for the
-// cycle-210 degradation: composePlanPrompt must instruct the agent to write the
-// ABSOLUTE workspace artifact path (the same path advisorLaunch tells the bridge
-// to watch), not a relative "routing-plan.json". Under claude-tmux the REPL cwd
-// is NOT the workspace (it varies per cycle — repo root / worktree), so a relative
-// write lands where the bridge never polls → 600s artifact-timeout → degrade to
-// static. The absolute path makes the file land where the bridge watches,
-// regardless of REPL cwd.
 func TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath(t *testing.T) {
 	t.Parallel()
 	const ws = "/tmp/ws-abs-artifact-test"
@@ -324,13 +288,10 @@ func TestPhaseAdvisor_PlanPromptUsesAbsoluteArtifactPath(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_DispatchWiringFlowsToBridge proves the configured {cli,model}
-// actually REACH BridgeRequest.{CLI,Model} on a Plan launch — and that the
-// uniform contract (artifact completion + routing-plan.json + injected persona)
-// holds identically for non-claude CLIs. This is the heart of the any-CLI ×
-// any-model invariant: the brain is dispatched to whatever the composition root
-// resolved, not a hardcoded claude/opus. (Regression guard: TestPhaseAdvisorOptions
-// pins the struct fields; this pins the field→bridge flow that advisorLaunch owns.)
+// Proves the configured {cli,model} actually reach BridgeRequest.{CLI,Model}
+// on a Plan launch, and that the uniform contract (artifact completion,
+// routing-plan.json, injected persona) holds identically for non-claude CLIs
+// — the any-CLI × any-model invariant.
 func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
 	t.Parallel()
 	plan := `[{"phase":"scout","run":true,"justification":"x"}]`
@@ -358,9 +319,6 @@ func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
 			if fb.gotReq.Model != c.model {
 				t.Errorf("BridgeRequest.Model=%q, want %q", fb.gotReq.Model, c.model)
 			}
-			// The uniform contract is CLI-agnostic: artifact completion, the
-			// routing-plan.json deliverable, and the injected persona hold for
-			// every CLI, not just claude.
 			if fb.gotReq.Completion != "artifact" {
 				t.Errorf("Completion=%q, want artifact for %s", fb.gotReq.Completion, c.cli)
 			}
@@ -377,8 +335,6 @@ func TestPhaseAdvisor_DispatchWiringFlowsToBridge(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_PlanFailSafe proves every malformed/failed plan returns an
-// error so the caller degrades to the deterministic static path (fail to floor).
 func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -396,7 +352,6 @@ func TestPhaseAdvisor_PlanFailSafe(t *testing.T) {
 			t.Errorf("%s: want error (so caller degrades to static), got nil", c.name)
 		}
 	}
-	// nil bridge + empty workspace also error without panicking.
 	if _, err := NewPhaseAdvisor(nil).Plan(baseRouteInput()); err == nil {
 		t.Error("nil bridge: want error")
 	}

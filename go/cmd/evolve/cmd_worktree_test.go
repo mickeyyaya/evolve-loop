@@ -1,23 +1,5 @@
 package main
 
-// cmd_worktree_test.go — RED contract for cycle-549's
-// cli-command-layer-test-coverage task (triage-report.md top_n item, this
-// lane's fleet_scope: cli-command-layer-test-coverage-worktree-swarm).
-//
-// PROBLEM: `evolve worktree create|list|cleanup` (cmd_worktree.go) had ZERO
-// direct test coverage (0.0% per `go tool cover -func` on every handler) even
-// though cycle-543 already lifted the sibling guardcmd/opscmd packages to the
-// 80% bar — this file is the un-shipped remainder of the original inbox item
-// (`cli-command-layer-test-coverage`), scoped by this lane's fleet_scope to
-// cmd/evolve's worktree + swarm-reap surface.
-//
-// These tests drive the REAL `git worktree` subprocess against a throwaway
-// repo in t.TempDir() — no fake Runner seam exists for this file today (the
-// functions call exec.Command directly), so success+error coverage means
-// actually creating/listing/removing a real worktree. Skips if `git` is
-// unavailable (mirrors the existing e2e convention in this package, e.g.
-// cmd_loop_coverage_test.go's TestRunLoop_ResumePhaseRunnerError).
-
 import (
 	"errors"
 	"os"
@@ -28,12 +10,10 @@ import (
 	"time"
 )
 
-// `worktree create` now provisions through the SHARED bounded retry, whose
-// backoff is a real time.Sleep in production. Without this no-op, every test in
-// this package whose fixture makes `worktree add` fail permanently (a non-repo
-// root) pays the full 2s+4s ladder for a failure that was never transient.
-// Mirrors core's worktree_retry_test.go init(); tests that COUNT sleeps install
-// their own recorder and restore this default.
+// worktree create now provisions through the shared bounded retry, whose
+// backoff is a real time.Sleep in production; without this no-op, a fixture
+// that makes `worktree add` fail permanently would pay the full retry ladder.
+// Tests that count sleeps install their own recorder and restore this default.
 func init() { worktreeAddRetry.Sleep = func(time.Duration) {} }
 
 func requireGit(t *testing.T) {

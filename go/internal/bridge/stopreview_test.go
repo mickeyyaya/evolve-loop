@@ -11,16 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// TestDeterministicReviewer covers the Stage-0 review decision: extend while
-// the agent produces SUBSTANTIVE output (State=Converging) — extend without
-// bound; the maxExtends backstop applies only to a busy-but-STALLED pane
-// (spinner, no new content). The key property — a genuinely-progressing agent
-// is NEVER told to stop (cycle-311/312: a scout producing output for >30min was
-// killed at the backstop) — is what keeps a slow-but-working phase alive.
-// Cost/budget caps bound a pathological infinite-producer, not this wait
-// reviewer. StopEvent.State is set explicitly (S3: the driver's
-// panestream.LivenessCenter is the sole liveness source; the pre-S3
-// Progressed/Busy boolean fallback is retired).
 func TestDeterministicReviewer(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	cases := []struct {
@@ -43,17 +33,6 @@ func TestDeterministicReviewer(t *testing.T) {
 	}
 }
 
-// TestDeterministicReviewer_BusyPaneIsLiveness pins the fix for the Opus
-// recovery-audit false-FAIL (cycles 254/255): a pane with no substantive delta
-// but a visible per-CLI busy affordance (State=BusyButStagnant) is a WORKING
-// agent — extended-thinking models (Opus) render only the stripped
-// "Deliberating Ns"/token-counter lines, so PaneHasSubstantiveChange reads false
-// while the agent is demonstrably alive. Such an agent must be EXTENDED (bounded
-// by maxExtends), never paused/killed at interval 0 — that kill recorded a PASS
-// audit report as FAIL and halted the batch. StopEvent.State is set explicitly
-// (S3: verdict is a pure function of State, not the retired Progressed/Busy
-// booleans — Progressed/Busy still ride along on the event as evidence for
-// fatalpane.go + logging, but the reviewer no longer reads them).
 func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
 	r := newDeterministicReviewer(2)
 	cases := []struct {
@@ -76,9 +55,6 @@ func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
 	}
 }
 
-// TestDeterministicReviewer_NonPositiveMaxFallsBack guards that a 0/negative cap
-// does not collapse to "pause at interval 0" (which would resurrect the
-// kill-a-working-agent bug): it falls back to the default backstop.
 func TestDeterministicReviewer_NonPositiveMaxFallsBack(t *testing.T) {
 	for _, max := range []int{0, -1} {
 		r := newDeterministicReviewer(max)
@@ -116,9 +92,8 @@ func TestEnvInt(t *testing.T) {
 	}
 }
 
-// scriptedReviewer returns a fixed sequence of verdicts, recording the events
-// it saw. Once the script is exhausted it pauses (so a test can never spin
-// forever waiting on an artifact that never lands).
+// scriptedReviewer pauses once its verdict script is exhausted, so a test can
+// never spin forever waiting on an artifact that never lands.
 type scriptedReviewer struct {
 	verdicts []ReviewVerdict
 	events   []StopEvent
@@ -140,14 +115,6 @@ func (alwaysExtendReviewer) Review(StopEvent) ReviewVerdict {
 	return ReviewVerdict{Action: ReviewExtend, Reason: "always extend"}
 }
 
-// TestPaneHasSubstantiveChange (cycle-432 S4): relocated to
-// panestream.TestPaneHasSubstantiveChange alongside the function it tests —
-// panestream is now the single home for both (single-source-with-projection;
-// see panedelta.go and panedelta_test.go).
-
-// TestRunTmuxREPL_ContextCancelledBreaks proves the wait loop honours context
-// cancellation even under a reviewer that would extend forever — so an
-// orchestrator timeout / SIGTERM is not swallowed by the extend budget.
 func TestRunTmuxREPL_ContextCancelledBreaks(t *testing.T) {
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
@@ -166,9 +133,6 @@ func TestRunTmuxREPL_ContextCancelledBreaks(t *testing.T) {
 	}
 }
 
-// runTmuxRev mirrors runTmux but injects a custom StopReviewer so a test can
-// drive the artifact-wait review loop deterministically. extraDeps carries
-// typed Deps overrides (e.g. ArtifactTimeoutS); use Deps{} for no overrides.
 func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer, extraDeps Deps, extra ...string) (int, string) {
 	t.Helper()
 	d := extraDeps
@@ -187,9 +151,6 @@ func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer
 	return code, stderr.String()
 }
 
-// TestRunTmuxREPL_ReviewExtendThenPause proves the wait loop honours the
-// reviewer: two extensions keep it waiting past the first interval (the old
-// wall-clock would have killed it), then a pause verdict ends it as a timeout.
 func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
@@ -207,7 +168,6 @@ func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
 	if len(rev.events) != 3 {
 		t.Fatalf("reviewer called %d times, want 3 (extend, extend, pause)", len(rev.events))
 	}
-	// Attempt counter advances only on extension.
 	for i, want := range []int{0, 1, 2} {
 		if rev.events[i].Attempt != want {
 			t.Fatalf("event[%d].Attempt = %d, want %d", i, rev.events[i].Attempt, want)
@@ -218,9 +178,6 @@ func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
 	}
 }
 
-// TestRunTmuxREPL_ArtifactAppears_NoReview proves the fast path is unchanged:
-// when the artifact is already present the loop exits on the first poll and the
-// reviewer is never consulted.
 func TestRunTmuxREPL_ArtifactAppears_NoReview(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {

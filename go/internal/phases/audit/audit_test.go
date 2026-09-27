@@ -1,6 +1,3 @@
-// Tests for the audit phase. Audit is the EGPS gate: PASS requires
-// BOTH a parseable PASS verdict in audit-report.md AND red_count == 0
-// in acs-verdict.json.
 package audit
 
 import (
@@ -472,8 +469,8 @@ func TestRun_AuditWARN_WARN(t *testing.T) {
 func TestRun_StrictAuditMode_WARNBecomesFAIL(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
-	// Strict mode is now sourced from .evolve/policy.json (workflow.strict_audit),
-	// not an env dial — replaces the EVOLVE_STRICT_AUDIT read (flag-reduction, ADR-0064).
+	// Strict mode is sourced from .evolve/policy.json (workflow.strict_audit).
+	// See ADR-0064.
 	proj := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(proj, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -594,11 +591,11 @@ func TestName(t *testing.T) {
 	}
 }
 
-// cycle-138/139 fix: when acs-verdict.json is ABSENT, the audit phase
-// generates it (via the injected GenerateVerdict seam → acssuite in prod)
-// before reading red_count, so a clean autonomous cycle reaches PASS→ship
-// instead of being forced to FAIL on the missing file. The generator
-// stand-in here writes a red_count==0 verdict, mimicking a green suite.
+// When acs-verdict.json is absent, the audit phase generates it (via the
+// injected GenerateVerdict seam → acssuite in prod) before reading red_count,
+// so a clean autonomous cycle reaches PASS→ship instead of being forced to
+// FAIL on the missing file. The generator stand-in here writes a
+// red_count==0 verdict, mimicking a green suite.
 func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -782,8 +779,6 @@ func TestRegistry_AuditFactory_BuildsRunner(t *testing.T) {
 	}
 }
 
-// --- verdict-format robustness (cycle-148 mis-grade fix) ---
-
 func TestExtractAuditVerdict_Formats(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -820,8 +815,8 @@ func TestExtractAuditVerdict_Formats(t *testing.T) {
 	}
 }
 
-// Regression for cycle-148: a genuine PASS written inline as "**Verdict: PASS**"
-// with red_count==0 must grade PASS and route to ship — not be mis-graded FAIL.
+// A PASS written inline as "**Verdict: PASS**" with red_count==0 must grade
+// PASS and route to ship, not be mis-graded FAIL.
 func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -868,10 +863,10 @@ func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 	}
 }
 
-// TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt — the
-// FORMAT tolerance that cycles 1604/1605/1606 needed (several Evidence lines,
-// a line range, citations under another field name, backticked values) while
-// the substance rule (every reference cited at a line) is unchanged.
+// TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt — format
+// tolerance (several Evidence lines, a line range, citations under another
+// field name, backticked values) while the substance rule (every reference
+// cited at a line) is unchanged.
 func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
@@ -937,11 +932,12 @@ func containsAdvisory(advisories []string, substr string) bool {
 	return strings.Contains(strings.Join(advisories, "\n"), substr)
 }
 
-// The cycle-1638/1640 shape (2026-09-13): the auditor's narrative is PASS and
-// its review reasons about the document, but its Evidence cites the material
-// paths without a literal path:line. ADR-0102: the reasoning is the gate, the
-// citation form is advisory — the verdict stands and the advisory rides the
-// record so the shape can still be improved without burning the cycle.
+// The auditor's narrative is PASS and its review reasons about the document,
+// but its Evidence cites the material paths without a literal path:line. The
+// reasoning is the gate, the citation form is advisory — the verdict stands
+// and the advisory rides the record so the shape can still be improved
+// without burning the cycle.
+// See ADR-0102.
 func TestClassify_PathOnlyCitationsKeepThePassVerdictAndRecordTheAdvisory(t *testing.T) {
 	workspace := t.TempDir()
 	writeACSVerdict(t, workspace, 0)

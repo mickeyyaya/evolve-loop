@@ -1,12 +1,5 @@
 //go:build e2e
 
-// Tier 3 — LIVE cross-family adversarial soak. Runs a full cycle with the
-// builder and auditor on DIFFERENT model families (e.g. claude builder × codex
-// auditor) so the adversarial-audit integrity the offline tests can only assert
-// structurally is exercised against real models. Output is non-deterministic,
-// so this tier is OBSERVATIONAL: it asserts only that the cycle reaches a valid
-// terminal state, logs whether the auditor PASS/FAIL'd, and surfaces the verdict
-// for human review / catch-rate tracking across runs. Gate: EVOLVE_E2E_LIVE_SOAK=1.
 package main
 
 import (
@@ -41,9 +34,8 @@ func TestE2ELiveCrossFamilySoak(t *testing.T) {
 			if ok, why := liveCLIAvailable(auditor); !ok {
 				t.Skip("auditor " + why)
 			}
-			// Default every phase to the builder's CLI, then pin the auditor to a
-			// different-family CLI via the per-agent override (cli_chain precedence:
-			// EVOLVE_<AGENT>_CLI > EVOLVE_CLI > profile).
+			// Default every phase to the builder's CLI, then pin the auditor via the
+			// per-agent override (EVOLVE_<AGENT>_CLI beats EVOLVE_CLI beats profile).
 			res := runLiveCycle(t, liveCycleCfg{
 				EvolveBin: evolveBin,
 				RepoRoot:  repoRoot,
@@ -58,9 +50,6 @@ func TestE2ELiveCrossFamilySoak(t *testing.T) {
 				t.Skipf("%s soak quarantined after transient retries:\n%s", name, lastN(res.Out, 800))
 			}
 
-			// Observational: derive the auditor verdict from the cycle output and
-			// log the catch/miss. We do NOT hard-assert a specific verdict (real
-			// models vary); we DO require the cycle reached audit (integration).
 			if !ledgerHasRole(res.Entries, "audit") {
 				if isTransient(res.Out, res.Err) {
 					t.Skipf("%s: provider failure before audit (quarantined)", name)

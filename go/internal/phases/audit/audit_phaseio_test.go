@@ -7,9 +7,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// ADR-0050 §3.10 Slice 5: at enforce the machine-readable evolve-verdict sentinel
-// is mandatory — the legacy prose/regex verdict fallbacks are gated off. Below
-// enforce (off/shadow/advisory) every path stays active, byte-identical.
+// At enforce the machine-readable evolve-verdict sentinel is mandatory; below
+// it (off/shadow/advisory) every path stays active.
+// See ADR-0050.
 
 const auditSentinelPASS = "<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->"
 

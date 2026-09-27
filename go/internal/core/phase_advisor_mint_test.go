@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestPhaseAdvisor_PlanEmitsMintPhases proves the advisor can propose a NEW
-// phase: an entry carrying a `mint` sub-object is mapped into
-// plan.MintPhases as a phaseconfig.PhaseConfig (name from the entry, persona +
-// tier + cli from the mint block), while plain run/skip entries are untouched.
 func TestPhaseAdvisor_PlanEmitsMintPhases(t *testing.T) {
 	t.Parallel()
 	stdout := `[
@@ -40,9 +36,6 @@ func TestPhaseAdvisor_PlanEmitsMintPhases(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_PlanNoMint_EmptyMintPhases proves the common path is
-// untouched: a plan with no mint sub-objects yields zero MintPhases (so
-// registerMintedPhases is a no-op — byte-identical to pre-emit behavior).
 func TestPhaseAdvisor_PlanNoMint_EmptyMintPhases(t *testing.T) {
 	t.Parallel()
 	stdout := `[{"phase":"scout","run":true},{"phase":"triage","run":false}]`
@@ -55,9 +48,6 @@ func TestPhaseAdvisor_PlanNoMint_EmptyMintPhases(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_MintRunFalse_StillCollected proves a run:false mint entry is
-// still mapped into MintPhases (registration is distinct from dispatch — the
-// routing loop governs whether it runs).
 func TestPhaseAdvisor_MintRunFalse_StillCollected(t *testing.T) {
 	t.Parallel()
 	stdout := `[{"phase":"deferred-probe","run":false,"justification":"reserve","mint":{"prompt":"probe persona","tier":"fast"}}]`
@@ -70,12 +60,6 @@ func TestPhaseAdvisor_MintRunFalse_StillCollected(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_PlanMintCarriesSelectMetadata proves the minter satisfies the
-// catalog SELECT-metadata contract itself (cycle-1275): description/when_to_use
-// supplied in the advisor's mint block land on the minted PhaseSpec, which is
-// exactly what TestPhaseCatalog_OptionalPhasesHaveSelectMetadata reads. Before
-// this, every minted phase reached the catalog metadata-less and the gate was
-// satisfied by padding metadataAllowlist after the fact (#404, #406).
 func TestPhaseAdvisor_PlanMintCarriesSelectMetadata(t *testing.T) {
 	t.Parallel()
 	stdout := `[{"phase":"schema-drift-check","run":true,"justification":"wire types changed","mint":{"prompt":"drift persona","tier":"balanced","description":"Reports wire-schema drift.","when_to_use":"Select when router wire structs change."}}]`
@@ -95,9 +79,6 @@ func TestPhaseAdvisor_PlanMintCarriesSelectMetadata(t *testing.T) {
 	}
 }
 
-// TestPhaseAdvisor_PlanMintWithoutMetadata_StaysEmpty pins backward
-// compatibility: a mint block with no metadata keys mints exactly as before —
-// empty metadata, every other field carried, no error.
 func TestPhaseAdvisor_PlanMintWithoutMetadata_StaysEmpty(t *testing.T) {
 	t.Parallel()
 	stdout := `[{"phase":"legacy-probe","run":true,"mint":{"prompt":"legacy persona","tier":"deep"}}]`

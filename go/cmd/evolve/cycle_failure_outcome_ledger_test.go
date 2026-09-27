@@ -1,12 +1,5 @@
 package main
 
-// cycle_failure_outcome_ledger_test.go — ADR-0101 S4a: the failed-cycle inbox
-// walk (cycleoutcome.ApplyFailure) appends its lifecycle lines through the
-// ROOT's ledger — the one the Signal Center observes — on every path that
-// reaches it: the cycle-run root and both sequential loop paths. Before this
-// the inbox mover built its own unobserved FileLedger over the same file
-// (S4a architecture review HIGH-1).
-
 import (
 	"bytes"
 	"encoding/json"
@@ -88,8 +81,6 @@ func TestHandleCycleError_FailureWalkGoesThroughTheRootLedger(t *testing.T) {
 	assertLifecycleWentThroughTheRootLedger(t, evolveDir, fake)
 }
 
-// The two voices of a failed walk: the cycle-run root's and the loop's. Both
-// WARN the seam's error and never change their caller's flow.
 func TestWarnCycleFailureOutcome_SpeaksOnlyOnAnError(t *testing.T) {
 	var stderr bytes.Buffer
 	warnCycleFailureOutcome(&stderr, 7, nil)

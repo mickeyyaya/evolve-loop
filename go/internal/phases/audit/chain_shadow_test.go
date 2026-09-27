@@ -1,15 +1,9 @@
 package audit
 
-// chain_shadow_test.go — the audit phase consuming the reasoning chain, in
-// SHADOW (ADR-0088 rollout).
-//
-// Shadow means: the chain is parsed, concluded against the evidence the phase
-// was actually given, and RECORDED beside the cycle — and the phase's verdict
-// is byte-identical to what it would have been without any of it. That is the
-// whole point of the stage: a wave produces the comparison data that says
-// whether the chain agrees with the narrative verdict, and where it does not,
-// WHICH LINK the narrative was silent about. Enforcing before that data exists
-// would be the same mistake as every gate this repo has had to walk back.
+// The audit phase consumes the reasoning chain in shadow: the chain is
+// parsed, concluded and recorded beside the cycle, and the phase's verdict
+// stays byte-identical to what it would have been without any of it.
+// See ADR-0088.
 
 import (
 	"context"

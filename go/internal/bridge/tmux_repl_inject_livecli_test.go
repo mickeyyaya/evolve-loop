@@ -13,20 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
 )
 
-// tmux_repl_inject_livecli_test.go — end-to-end proof of LIVE COMMAND
-// INJECTION on a REAL tmux server. Unlike the deterministic fakeTmux tests
-// (which record SendKeys but cannot exercise real paste-buffer I/O), this
-// drives the full runTmuxREPL flow against execTmux: an external sender
-// queues a command into the agent inbox mid-run, the driver drains it from
-// the artifact-wait poll loop, and injects it via real `tmux load-buffer` +
-// `paste-buffer` into the fake REPL's stdin.
-//
-// The fake is the linchpin: it boots, consumes the pasted prompt, and ONLY
-// writes the artifact once it receives the injected "PROCEED" line. So a
-// green test proves the injection actually reached the running agent; a
-// broken inject path would mean the fake never gets PROCEED → no artifact →
-// EC81 artifact-timeout → loud failure.
-
 // writeAwaitInjectFake writes a fake CLI that blocks until a live-injected
 // "PROCEED" command arrives, then writes a sentinel value (INJECTED-OK) the
 // test can distinguish from any prompt-driven write. The marker is baked into
@@ -70,12 +56,10 @@ func TestRealTmux_E2E_LiveInjection_UnblocksAgent(t *testing.T) {
 	sess := itSession("einject")
 	defer itTmuxCtl.KillSession(context.Background(), sess)
 
-	// External sender: queue the unblocking command exactly as
-	// `evolve bridge send --workspace=<ws> --agent=itest "PROCEED"` would
-	// (inbox.Append is the function that subcommand calls — see T2). Re-append
-	// idempotently until the artifact appears: the driver seeks the cursor to
-	// EOF on entry, so a send that lands before that point is skipped as
-	// backlog; retrying guarantees one lands inside the wait loop.
+	// External sender: queue the unblocking command as `evolve bridge send
+	// --workspace=<ws> --agent=itest "PROCEED"` would. Re-append idempotently
+	// until the artifact appears, since a send that lands before the driver's
+	// inbox cursor reaches EOF is skipped as backlog.
 	done := make(chan struct{})
 	go func() {
 		defer close(done)

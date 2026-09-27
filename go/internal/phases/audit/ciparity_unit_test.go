@@ -150,20 +150,15 @@ func TestCiparity_ApicoverRunsInProcess_NoBinaryCreated(t *testing.T) {
 	}
 }
 
-// TestCiparity_NoExecutableFileCreatedByGate is the one-binary S3 runtime
-// guarantee (complementing the acs/regression/norebuild source-scan): running
-// the API-coverage gate over an enforced package must not create ANY executable
-// file anywhere in the worktree — not just the historic bin/apicover. It walks
-// the whole tree before and after and asserts the executable-file set is
-// unchanged.
+// TestCiparity_NoExecutableFileCreatedByGate: running the API-coverage gate
+// over an enforced package must not create any executable file anywhere in
+// the worktree, not just the historic bin/apicover. It walks the whole tree
+// before and after and asserts the executable-file set is unchanged.
 //
-// SCOPE (honest): the subprocess seam (runCmd) is replaced with a no-op fake
-// here, so this proves the IN-PROCESS work — apicover.Run plus any direct
-// os.WriteFile/os.Chmod the gate itself does — drops no executable. It does NOT
-// exercise a real forked `go build` (that path is faked out); catching a NEW
-// forked-build site is the acs/regression/norebuild source-scan's job. The two
-// guards are complementary: source-scan catches the site at ship/CI time, this
-// catches an in-process binary drop at runtime.
+// The subprocess seam (runCmd) is faked here, so this proves the in-process
+// work — apicover.Run plus any direct os.WriteFile/os.Chmod the gate itself
+// does — drops no executable; a real forked `go build` is out of scope and is
+// the acs/regression/norebuild source-scan's job instead.
 func TestCiparity_NoExecutableFileCreatedByGate(t *testing.T) {
 	root, goDir := writeApicoverFixture(t, apicoverOffenderPkg)
 	withFakeRunner(t, apicoverPipelineRunner(goDir, nil))
@@ -207,10 +202,9 @@ func executableFiles(t *testing.T, root string) map[string]bool {
 
 // TestApicoverEnforceChanged_MeasurementError_Fails: when apicover.Run itself
 // errors (a touched package won't parse → code 2), the gate must FAIL
-// (offenders, nil) — the same bucket the old bin/apicover exit-2 fell into — NOT
-// silently downgrade to a WARN (nil, err). In-process there is no exec-start
-// failure mode, so any measurement error is a real gate failure (cf. the
-// underivable-changed-set hard-FAIL, cycle-581 D1).
+// (offenders, nil), not silently downgrade to a WARN (nil, err). In-process
+// there is no exec-start failure mode, so any measurement error is a real
+// gate failure.
 func TestApicoverEnforceChanged_MeasurementError_Fails(t *testing.T) {
 	root, goDir := writeApicoverFixture(t, apicoverBrokenPkg)
 	withFakeRunner(t, apicoverPipelineRunner(goDir, nil))
@@ -223,17 +217,12 @@ func TestApicoverEnforceChanged_MeasurementError_Fails(t *testing.T) {
 	}
 }
 
-// --- integration-tier flake-absorb (post-v22.4.2 false-RED class) ----------
+// --- integration-tier flake-absorb ------------------------------------------
 //
-// Post-release audit of the verification batch proved 3 audit-FAILs (cycles
-// 943/950/955) were tier false-REDs: every named test PASSES in isolation in
-// the failed cycles' own preserved worktrees. Two mechanisms, two remedies:
-//   - env-inheritance: the gate subprocess inherited the lane's full
-//     environment (sysexec nil-env → os.Environ()) while CI runs clean — a
-//     CI-parity bug; the tier now ALWAYS runs with a scrubbed allowlist env;
-//   - fleet contention: -race integration tests starve under live lanes; on
-//     red the tier retakes ONCE under a cross-lane exclusive lock — a green
-//     retake is a flake (absorbed → WARN), a red retake is genuine (FAIL).
+// The tier always runs with a scrubbed allowlist environment, matching CI's
+// clean environment. On a red first attempt it retakes once under a
+// cross-lane exclusive lock: a green retake is absorbed as a flake (WARN), a
+// red retake is genuine (FAIL).
 
 // seqRunFunc scripts one (code, stdout) per successive call and records the
 // env each call received.
@@ -258,11 +247,9 @@ func seqRunFunc(t *testing.T, script []struct {
 }
 
 // killedAtDeadline makes a scripted runner faithful to a process the ctx
-// deadline KILLED: it returns only once ctx is done — a real SIGKILL follows
-// the deadline, never precedes it — so the 1 ns budgets below reach the
-// deadline arms deterministically. Without it context.WithTimeout(…, 1ns) may
-// arm a timer instead of expiring synchronously and an instant fake is
-// observed before ctx.Err() is set (the leaf saw 2/40 such runs, 2026-09-14).
+// deadline killed: it returns only once ctx is done, since a real SIGKILL
+// follows the deadline rather than preceding it, so the 1 ns budgets below
+// reach the deadline arms deterministically.
 func killedAtDeadline(fn sysexec.RunFunc) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, in io.Reader, so, se io.Writer) (int, error) {
 		<-ctx.Done()

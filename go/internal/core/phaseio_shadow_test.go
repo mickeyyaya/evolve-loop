@@ -12,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// TestComparePhaseIOShadow_EquivalentNoMismatch: the typed Upstream assembled
-// from a RoutingSignals digest must compare equal to that same digest — the
-// shadow stage's "normal" outcome (zero mismatches across a soak ⇒ safe to
-// advance to advisory). Independent re-derivation, so it catches a
-// HandoffsFromSignals projection bug rather than being tautological.
 func TestComparePhaseIOShadow_EquivalentNoMismatch(t *testing.T) {
 	sig := router.RoutingSignals{
 		Scout: router.ScoutSignals{CycleSizeEstimate: "medium", ItemCount: 3, BacklogSize: 7, Present: true},
@@ -29,9 +24,6 @@ func TestComparePhaseIOShadow_EquivalentNoMismatch(t *testing.T) {
 	}
 }
 
-// TestComparePhaseIOShadow_DivergenceDetected: a Handoffs that does NOT match
-// the digest (here: build present in the digest but absent in the assembly)
-// must surface a mismatch.
 func TestComparePhaseIOShadow_DivergenceDetected(t *testing.T) {
 	sig := router.RoutingSignals{Build: router.BuildSignals{Verdict: "PASS", SeverityMax: router.SevHigh, Present: true}}
 	h := phaseio.NewHandoffs(phaseio.HandoffsInit{}) // build absent → diverges from sig
@@ -39,7 +31,6 @@ func TestComparePhaseIOShadow_DivergenceDetected(t *testing.T) {
 	if len(ms) == 0 {
 		t.Fatal("divergent assembly should yield at least one mismatch")
 	}
-	// the build.present field must be among the reported mismatches
 	found := false
 	for _, m := range ms {
 		if m.Field == "build.present" {
@@ -51,11 +42,6 @@ func TestComparePhaseIOShadow_DivergenceDetected(t *testing.T) {
 	}
 }
 
-// TestComparePhaseIOShadow_CoversAllProjectedFields pins the comparator's
-// completeness contract: every field HandoffsFromSignals projects must be
-// compared, so a projection bug surfaces as a mismatch. Perturbs exactly the
-// fields the first cut omitted (phase_skip, the ACS siblings, DefectsBySeverity
-// incl. the .String() key conversion) and asserts each divergence is caught.
 func TestComparePhaseIOShadow_CoversAllProjectedFields(t *testing.T) {
 	sig := router.RoutingSignals{
 		Triage: router.TriageSignals{CycleSize: "medium", PhaseSkip: []string{"tdd"}, Present: true},
@@ -79,18 +65,14 @@ func TestComparePhaseIOShadow_CoversAllProjectedFields(t *testing.T) {
 	}
 }
 
-// TestPhaseIOShadow_MismatchEmitsLedgerEntry: a non-empty mismatch list appends
-// exactly one phaseio_shadow_mismatch ledger entry; an empty list appends none.
 func TestPhaseIOShadow_MismatchEmitsLedgerEntry(t *testing.T) {
 	fl := &fakeLedger{}
 
-	// Equivalent (no mismatch) → no ledger entry.
 	appendPhaseIOShadowMismatch(context.Background(), fl, "2026-06-15T00:00:00Z", 7, "run1", PhaseBuild, nil)
 	if len(fl.entries) != 0 {
 		t.Fatalf("no mismatch must emit no entry, got %d", len(fl.entries))
 	}
 
-	// Mismatch → exactly one entry of the right kind/identity.
 	ms := []phaseIOMismatch{{Field: "build.present", Want: "true", Got: "false"}}
 	appendPhaseIOShadowMismatch(context.Background(), fl, "2026-06-15T00:00:00Z", 7, "run1", PhaseBuild, ms)
 	if len(fl.entries) != 1 {
@@ -108,9 +90,6 @@ func TestPhaseIOShadow_MismatchEmitsLedgerEntry(t *testing.T) {
 	}
 }
 
-// TestAssembleCycleInputs_FromContext: the typed CycleInputs is populated from
-// the exact legacy ctxSnap keys the phases read today (incl. the camelCase
-// challengeToken key, not snake_case).
 func TestAssembleCycleInputs_FromContext(t *testing.T) {
 	ctx := map[string]string{
 		"goal":              "cut latency",
@@ -129,8 +108,6 @@ func TestAssembleCycleInputs_FromContext(t *testing.T) {
 	}
 }
 
-// TestAssembleErrorContext_PresentAndAbsent: the ship_error_* keys assemble into
-// a typed ErrorContext, or nil when none are set.
 func TestAssembleErrorContext_PresentAndAbsent(t *testing.T) {
 	if ec := assembleErrorContext(map[string]string{}); ec != nil {
 		t.Fatalf("no ship_error_* keys → want nil, got %+v", ec)
@@ -144,12 +121,7 @@ func TestAssembleErrorContext_PresentAndAbsent(t *testing.T) {
 	}
 }
 
-// TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext is the named 3.5
-// anchor: for the retro phase, the typed CycleInputs.PreviousVerdict() must
-// equal the legacy req.Context["previous_verdict"] the retro phase reads — and
-// the shadow comparator must report ZERO mismatch when they agree.
 func TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext(t *testing.T) {
-	// Mirrors the dispatch retro-clone: phaseCtx carries previous_verdict.
 	phaseCtx := map[string]string{"goal": "g", "previous_verdict": VerdictFAIL}
 	ci := assembleCycleInputs(phaseCtx)
 	if ci.PreviousVerdict() != phaseCtx["previous_verdict"] {
@@ -160,23 +132,6 @@ func TestRetro_PreviousVerdict_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// ── ADR-0050 Phase 3.6: named per-reader equivalence anchors ──────────────────
-// One named test per remaining Context reader (scout/triage/intent/ship/debugger),
-// each pinning that the typed CycleInputs/ErrorContext getter reproduces the exact
-// legacy req.Context key the live phase still reads — the per-field key-drift guard
-// the soak relies on. Each test asserts ONLY its own field so a failure localizes
-// to the reader it names (the comparator's drift behaviour, incl. clean and
-// diverging paths, is proven once over ALL fields in
-// TestCompareCycleInputsShadow_KeyDrift). The phase code keeps reading req.Context
-// until the 3.10 enforce cutover; these prove the typed envelope is a faithful
-// shadow of every reader before that cutover is permitted.
-//
-// These tests run unconditionally — they exercise the assembler directly. At
-// EVOLVE_PHASE_IO=off the production shadow hook (emitPhaseIOShadow, gated at
-// cyclerun_dispatch.go:112) is never called, but the unit tests remain always-on.
-
-// TestScout_Strategy_FromCycleInputs_MatchesContext: scout reads
-// req.Context["strategy"] (scout.go ComposePrompt + Classify).
 func TestScout_Strategy_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
 	if got := assembleCycleInputs(phaseCtx).Strategy(); got != phaseCtx["strategy"] {
@@ -184,8 +139,6 @@ func TestScout_Strategy_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestScout_Goal_FromCycleInputs_MatchesContext: scout reads req.Context["goal"]
-// (scout.go ComposePrompt — the operator --goal-text constraint).
 func TestScout_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
 	if got := assembleCycleInputs(phaseCtx).Goal(); got != phaseCtx["goal"] {
@@ -193,9 +146,6 @@ func TestScout_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestScout_ChallengeToken_FromCycleInputs_MatchesContext: scout reads the
-// camelCase req.Context["challengeToken"] (scout.go ComposePrompt). The typed
-// getter must read the SAME camelCase key, not the snake_case wire-JSON name.
 func TestScout_ChallengeToken_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"strategy": "profile-first", "goal": "cut latency", "challengeToken": "tok-7"}
 	if got := assembleCycleInputs(phaseCtx).ChallengeToken(); got != phaseCtx["challengeToken"] {
@@ -203,8 +153,6 @@ func TestScout_ChallengeToken_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestTriage_FleetScope_FromCycleInputs_MatchesContext: triage reads
-// req.Context["fleet_scope"] (triage.go ComposePrompt).
 func TestTriage_FleetScope_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"fleet_scope": "core,bridge", "carryover_summary": "carried: x"}
 	if got := assembleCycleInputs(phaseCtx).FleetScope(); got != phaseCtx["fleet_scope"] {
@@ -212,10 +160,6 @@ func TestTriage_FleetScope_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestTriage_Carryover_FromCycleInputs_MatchesContext: triage reads
-// req.Context["carryover_summary"] (triage.go:63). The typed getter is
-// Carryover() — note the legacy key is carryover_summary, not carryover.
-// (3.6's genuinely-new field; this is the RED that drives the leaf addition.)
 func TestTriage_Carryover_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"fleet_scope": "core", "carryover_summary": "carried: finish the digest fallback"}
 	if got := assembleCycleInputs(phaseCtx).Carryover(); got != phaseCtx["carryover_summary"] {
@@ -223,8 +167,6 @@ func TestTriage_Carryover_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestIntent_Goal_FromCycleInputs_MatchesContext: intent reads req.Context["goal"]
-// (intent.go:54).
 func TestIntent_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"goal": "add a typed envelope"}
 	if got := assembleCycleInputs(phaseCtx).Goal(); got != phaseCtx["goal"] {
@@ -232,8 +174,6 @@ func TestIntent_Goal_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestShip_CommitMessage_FromCycleInputs_MatchesContext: ship reads
-// req.Context["commit_message"] (ship.go:72).
 func TestShip_CommitMessage_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{"commit_message": "feat(core): unified phase I/O"}
 	if got := assembleCycleInputs(phaseCtx).CommitMessage(); got != phaseCtx["commit_message"] {
@@ -241,9 +181,6 @@ func TestShip_CommitMessage_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestDebugger_ErrorContext_FromCycleInputs_MatchesContext: the debugger reads the
-// ship_error_* keys (debugger.go ComposePrompt) carried in by the recovery path;
-// the typed ErrorContext must reproduce all four.
 func TestDebugger_ErrorContext_FromCycleInputs_MatchesContext(t *testing.T) {
 	phaseCtx := map[string]string{
 		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
@@ -256,15 +193,6 @@ func TestDebugger_ErrorContext_FromCycleInputs_MatchesContext(t *testing.T) {
 	}
 }
 
-// TestCompareCycleInputsShadow_KeyDrift: the comparator catches a typed view
-// whose value diverges from the legacy Context key (the key-drift bug class —
-// e.g. an assembler reading the wrong key name). Table-driven over EVERY
-// cycle_inputs field so each comparator line — incl. the 3.6 carryover line —
-// has genuine drift coverage: each row supplies the ground-truth Context key the
-// live phase reads + a CycleInputs whose corresponding getter is drifted, and
-// asserts the comparator reports exactly that field with want/got in the right
-// orientation (want=legacy ground truth, got=typed getter). The empty want/got
-// guards against a swapped mismatch struct.
 func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
 	const real, wrong = "real-value", "wrong-value"
 	cases := []struct {
@@ -282,7 +210,7 @@ func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
 		{"challenge_token", "challengeToken", "cycle_inputs.challenge_token", phaseio.CycleInputsInit{ChallengeToken: wrong}},
 		{"previous_verdict", "previous_verdict", "cycle_inputs.previous_verdict", phaseio.CycleInputsInit{PreviousVerdict: wrong}},
 		// carryover: the comparator field name is carryover, the live Context key
-		// is carryover_summary (triage) — the 3.6 key-drift trap.
+		// is carryover_summary (triage) — the same key-drift trap.
 		{"carryover", "carryover_summary", "cycle_inputs.carryover", phaseio.CycleInputsInit{Carryover: wrong}},
 	}
 	for _, tc := range cases {
@@ -305,10 +233,6 @@ func TestCompareCycleInputsShadow_KeyDrift(t *testing.T) {
 	}
 }
 
-// TestCompareCycleInputsShadow_ErrorContext exercises the comparator's typed
-// ErrorContext path (the ship-failure recovery case): a matching ErrorContext
-// yields no mismatch; a diverging one surfaces the offending field with correct
-// want/got.
 func TestCompareCycleInputsShadow_ErrorContext(t *testing.T) {
 	ctx := map[string]string{
 		"ship_error_code": "E_PUSH", "ship_error_class": "transient",
@@ -330,8 +254,6 @@ func TestCompareCycleInputsShadow_ErrorContext(t *testing.T) {
 	}
 }
 
-// TestWritePhaseIOShadowFile_Parseable: the shadow artifact is written as
-// parseable JSON capturing the assembled upstream presence + any mismatches.
 func TestWritePhaseIOShadowFile_Parseable(t *testing.T) {
 	ws := t.TempDir()
 	h := router.HandoffsFromSignals(router.RoutingSignals{Build: router.BuildSignals{Verdict: "PASS", Present: true}})
@@ -351,24 +273,12 @@ func TestWritePhaseIOShadowFile_Parseable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Cycle 1632 RED contract (tokenopt-handoff-digests): the shadow comparator
-// must be CAP-AWARE but not cap-BLIND. NewCycleInputs now bounds the two
-// free-text fields through phaseio.CapField, so comparing the raw legacy value
-// against the typed getter byte-for-byte would flag every over-cap dispatch as
-// a false mismatch AND leak the full uncapped text into the ledger message
-// (cycle-1593 round-2 H1). The fix runs the legacy "want" through the SAME
-// phaseio.CapField — which must still surface a typed value that genuinely
-// differs. Frozen (doNotModifyTests).
-// ---------------------------------------------------------------------------
-
 // overCapCtxValue is a valid-UTF-8 value strictly larger than the cap whose
 // first byte is `lead` so two values can differ INSIDE the retained prefix.
 func overCapCtxValue(lead byte) string {
 	return string(lead) + strings.Repeat("x", phaseio.MaxFieldBytes+64)
 }
 
-// mismatchFor returns the comparator row for field, or nil.
 func mismatchFor(ms []phaseIOMismatch, field string) *phaseIOMismatch {
 	for i := range ms {
 		if ms[i].Field == field {
@@ -378,10 +288,6 @@ func mismatchFor(ms []phaseIOMismatch, field string) *phaseIOMismatch {
 	return nil
 }
 
-// TestCompareCycleInputsShadow_CapAware_NoFalseMismatch: an over-cap legacy
-// value assembled through the production assembler yields NO mismatch, and two
-// values that differ only BEYOND the cap are cap-equivalent (no mismatch) —
-// for both bounded fields.
 func TestCompareCycleInputsShadow_CapAware_NoFalseMismatch(t *testing.T) {
 	ctx := map[string]string{
 		"carryover_summary": overCapCtxValue('a'),
@@ -403,10 +309,6 @@ func TestCompareCycleInputsShadow_CapAware_NoFalseMismatch(t *testing.T) {
 	}
 }
 
-// TestCompareCycleInputsShadow_DetectsRealDrift: the negative — a typed value
-// that genuinely differs from the legacy value INSIDE the retained prefix is
-// still reported, on exactly its own field, with want/got in the right
-// orientation, and want is the BOUNDED form (no uncapped ledger leak).
 func TestCompareCycleInputsShadow_DetectsRealDrift(t *testing.T) {
 	cases := []struct {
 		name, ctxKey, field string
@@ -430,8 +332,6 @@ func TestCompareCycleInputsShadow_DetectsRealDrift(t *testing.T) {
 			if m.Got != phaseio.CapField(overCapCtxValue('B')) {
 				t.Errorf("got must be the typed getter's bounded value, got len %d", len(m.Got))
 			}
-			// Only the drifted field may be reported: every other field is
-			// empty on both sides.
 			for _, other := range ms {
 				if other.Field != tc.field {
 					t.Errorf("unexpected extra mismatch on %s: %+v", other.Field, other)

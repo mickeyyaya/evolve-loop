@@ -17,32 +17,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// reset.go — the complement of resume.go. Where resume CONTINUES a
-// checkpointed cycle, SealCycle ABANDONS a stuck/unfinished cycle while
-// preserving its full history for later analysis:
-//
-//   - the workspace is moved into a sibling archive <workspace>.reset-<UTCnano>/
-//     (never deleted), alongside a verbatim cycle-state snapshot + a
-//     reset-manifest.json describing why/when/what was sealed;
-//   - lastCycleNumber is advanced to the sealed cycle's number so the number
-//     is never reused (the next cycle is N+1);
-//   - an auditable, hash-chained ledger entry is appended (cycle:0 +
-//     cycle_label); and
-//   - cycle-state.json is removed — the abandon commit point that disarms the
-//     phase-gate precondition and lets a fresh cycle start clean.
-//
-// state.json is mutated through a full-fidelity map (not the typed core.State,
-// which would drop unmodelled fields like expected_ship_sha on round-trip —
-// the same trap ship/statefile.go documents).
-
 // ErrNothingToReset is returned when there is no in-progress cycle to seal
 // (no cycle-state.json, or cycle_id == 0).
 var ErrNothingToReset = errors.New("reset: no in-progress cycle to seal")
 
 // ErrCycleOwnedLive is returned when the cycle's per-run lease is still FRESH
-// (its owner is alive, heartbeating) and SealOptions.Force was not set. Sealing
-// a running loop's cycle out from under it is the cycle-395 race this fence
-// closes; a stale/missing lease (dead owner) seals freely. SealResult carries
+// (its owner is alive, heartbeating) and SealOptions.Force was not set. A
+// stale/missing lease (dead owner) seals freely. SealResult carries
 // LeaseOwnerPID + LeaseHeartbeatAge so the caller can name the live owner.
 var ErrCycleOwnedLive = errors.New("reset: cycle is owned by a live run (fresh lease) — refusing to seal without --force")
 
@@ -67,23 +48,19 @@ type SealOptions struct {
 	// LeaseTTL overrides the liveness-fence freshness window; 0 = runlease.DefaultTTL.
 	LeaseTTL time.Duration
 	// PidAlive probes whether the lease's owner process is still running. When
-	// set, the F1 fence uses runlease.OwnerLive (fresh heartbeat AND alive pid)
-	// instead of freshness alone: a crashed owner whose heartbeat is still fresh
-	// (the 2-6min post-crash window) now seals WITHOUT --force. nil preserves the
-	// old freshness-only fence for un-migrated callers (back-compat).
+	// set, the liveness fence uses runlease.OwnerLive (fresh heartbeat AND
+	// alive pid) instead of freshness alone: a crashed owner whose heartbeat is
+	// still fresh (the 2-6min post-crash window) now seals WITHOUT --force. nil
+	// preserves the old freshness-only fence for un-migrated callers
+	// (back-compat).
 	PidAlive func(pid int) bool
-	// AutomatedRecovery marks a seal driven by unattended boot self-heal
-	// (AutosealStaleMarker, triggered merely by a dead owner PID — trivially
-	// arrangeable by anything that can kill the owning process) rather than an
-	// explicit human `evolve cycle reset`. ADR-0081's in-band epoch anchor
-	// trusts a ledger line ONLY when its Role is exactly "operator" — a real
-	// human sign-off. Before this flag, both paths wrote Role:"operator"
-	// identically, so triggering the automated path was enough to mint a
-	// trust-anchor-eligible seal with no human involved at all (the
-	// unauthenticated-self-declared-role defect). Set true, the ledger entry
-	// carries a distinct role that Verify's epoch-anchor resolver does not
-	// recognise — the automated recovery still runs (clearing the role-gate
-	// block), it just never gains operator trust for chain verification.
+	// AutomatedRecovery marks a seal driven by unattended boot self-heal (a
+	// dead owner PID) rather than an explicit human `evolve cycle reset`. The
+	// ledger verify epoch-anchor resolver trusts a ledger line only when its
+	// Role is exactly "operator" — a real human sign-off — so an automated
+	// seal carries a distinct role that the resolver does not recognize: the
+	// recovery still runs (clearing the role-gate block), it just never gains
+	// operator trust for chain verification.
 	AutomatedRecovery bool
 }
 
@@ -109,8 +86,13 @@ type SealResult struct {
 	LeaseHeartbeatAge time.Duration
 }
 
-// SealCycle seals the in-progress cycle described by
-// <EvolveDir>/cycle-state.json. See the package comment for the contract.
+// SealCycle abandons a stuck/unfinished cycle while preserving its full
+// history: the workspace is archived to a sibling
+// <workspace>.reset-<UTCnano>/ directory (never deleted) alongside a
+// cycle-state snapshot and a reset-manifest.json, lastCycleNumber advances
+// past the sealed cycle so the number is never reused, an auditable ledger
+// entry is appended, and cycle-state.json is removed to disarm the
+// phase-gate precondition for a fresh cycle.
 func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (SealResult, error) {
 	now := opts.Now
 	if now == nil {
@@ -158,14 +140,14 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 		DryRun:        opts.DryRun,
 	}
 
-	// F1 — liveness fence: refuse to seal a cycle whose run owner is still alive.
+	// Liveness fence: refuse to seal a cycle whose run owner is still alive.
 	// runlease is the SSOT for liveness: a fresh heartbeat AND (when PidAlive is
 	// wired) a running owner pid. A stale heartbeat is never live regardless of
-	// pid state (guards pid reuse); a dead owner with a still-fresh heartbeat —
-	// the batch-boundary case that used to force `--force` — now seals freely.
-	// A stale/missing/unparsable lease ⇒ the owner is gone ⇒ safe to seal. Dry-run
-	// is a read-only preview and never blocks; Force overrides a live owner
-	// (loud, operator-attested) and is recorded in ForcedOverLiveOwner.
+	// pid state (guards pid reuse); a dead owner with a still-fresh heartbeat
+	// now seals freely. A stale/missing/unparsable lease ⇒ the owner is gone ⇒
+	// safe to seal. Dry-run is a read-only preview and never blocks; Force
+	// overrides a live owner (loud, operator-attested) and is recorded in
+	// ForcedOverLiveOwner.
 	if lease, ok, _ := runlease.Read(workspace); ok && runlease.OwnerLive(lease, t, opts.LeaseTTL, opts.PidAlive) {
 		res.LeaseOwnerPID = lease.OwnerPID
 		if hb, perr := time.Parse(time.RFC3339Nano, lease.HeartbeatAt); perr == nil {
@@ -208,11 +190,11 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 	}
 	manRaw = append(manRaw, '\n')
 
-	// Failure floor (retro-always-invariant gap 2): an operator reset is
-	// an abnormal termination and must LEARN, not just archive. The
-	// deterministic retrospective is written INTO the workspace alongside
-	// the snapshot/manifest (before the rename — same complete-at-
-	// appearance invariant), the lesson goes to instincts/lessons/.
+	// An operator reset is an abnormal termination and must LEARN, not just
+	// archive. The deterministic retrospective is written INTO the workspace
+	// alongside the snapshot/manifest (before the rename — same
+	// complete-at-appearance invariant), the lesson goes to
+	// instincts/lessons/.
 	ev := faillearn.FailureEvent{
 		Cycle:          cycleID,
 		FailedPhase:    phase,
@@ -267,10 +249,9 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 	}
 
 	// 3. Auditable ledger entry (append-only, hash-chained). Role is
-	// "operator" only for an explicit human `evolve cycle reset` — an
-	// AutomatedRecovery seal (unattended boot self-heal) writes autosealRole
-	// instead so it can never be mistaken for a human trust decision by the
-	// ledger verify epoch-anchor resolver (see SealOptions.AutomatedRecovery).
+	// "operator" only for an explicit human `evolve cycle reset`; an
+	// AutomatedRecovery seal writes autosealRole instead (see
+	// SealOptions.AutomatedRecovery).
 	if ledger != nil {
 		role := "operator"
 		if opts.AutomatedRecovery {
@@ -295,8 +276,8 @@ func SealCycle(ctx context.Context, ledger ledgerAppender, opts SealOptions) (Se
 	// documented single-writer contract). Both the failedApproaches record and
 	// the lastCycleNumber/batch RMW below were previously unlocked, so in fleet
 	// mode (2+ concurrent lanes are the live operating mode) a concurrent locked
-	// UpdateState could read stale state and clobber this seal's writes — the
-	// cycle-616 lost-update fix. flock is blocking and per-open-file-description;
+	// UpdateState could read stale state and clobber this seal's writes.
+	// flock is blocking and per-open-file-description;
 	// neither failurelog.Record nor readJSONMapFile/writeJSONMapFileAtomic locks
 	// internally, so wrapping them here is not re-entrant. ORDERING IS
 	// LOAD-BEARING: Record runs BEFORE the seal's own read-modify-write, so the

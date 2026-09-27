@@ -21,28 +21,12 @@ func resolveSession(cfg *Config, deps Deps, ephemeralPrefix string) (session str
 		return NamedSessionName(cfg.SessionName), true
 	}
 	agent := orDefault(cfg.Agent, "probe")
-	// CB.5: a run-scoped token right after the driver prefix namespaces the
-	// session to its run — observers/watchers assert it (CB.6) and `tmux ls`
-	// under an M-run fleet reads unambiguously. runscope.SessionPrefix returns ""
-	// for an empty RunID (single-driver legacy, degraded paths), keeping the
-	// pre-CB.5 name byte-identical; it delegates to sessionrecord.RunScopeToken.
 	runTok := runscope.New("", cfg.RunID, cfg.Cycle).SessionPrefix()
-	// ADR-0049 N15: a per-process monotonic nonce GUARANTEES uniqueness even
-	// when two ephemeral sessions are minted in the same wall-clock second
-	// (concurrent fleet cycles, or a same-phase retry within a cycle). The
-	// second-granularity timestamp alone collided; pid covers cross-process and
-	// the nonce covers within-process. It sits BEFORE the timestamp so
-	// truncate64 (tmux's 64-char ceiling) degrades the recency hint, never the
-	// uniqueness — for a long agent like build-planner the tail timestamp may be
-	// clipped, but n<nonce> always survives.
 	nonce := strconv.FormatUint(ephemeralSessionNonce.Add(1), 36)
 	s := fmt.Sprintf("%s%sc%d-%s-pid%d-n%s-%d", ephemeralPrefix, runTok, cfg.Cycle, agent, os.Getpid(), nonce, deps.Now().Unix())
 	return truncate64(s), false
 }
 
-// ephemeralSessionNonce is the process-global counter behind resolveSession's
-// per-session nonce (ADR-0049 N15). atomic so concurrent fleet dispatches in
-// one process never read the same value.
 var ephemeralSessionNonce atomic.Uint64
 
 func truncate64(s string) string {
@@ -76,15 +60,12 @@ func parseExtendSecs(action string) int {
 	return n
 }
 
-// recoverBlankPane handles the claude ≥2.1.173 BLANK-PANE render wedge
-// (inbox claude-2.1.173-blank-pane-after-interval): an EMPTY capture while
-// the session is alive is the Ink renderer wedging, not idleness —
-// cycle-291's agent kept working behind a blank pane and the stall-pause
-// burned interval×attempts to exit=81. Recovery: jiggle the window width
-// (two SIGWINCHes → full repaint, windowJiggler optional capability) and
-// re-read. Returns the freshest pane and whether the wedge persisted — a
-// still-blank pane must read BUSY (extend; never pause a live agent on a
-// pane that stopped rendering; the maxExtends backstop still bounds it).
+// recoverBlankPane handles a render wedge: an EMPTY capture while the
+// session is alive is the renderer wedging, not idleness. Recovery: jiggle
+// the window (two SIGWINCHes → full repaint, windowJiggler optional
+// capability) and re-read. Returns the freshest pane and whether the wedge
+// persisted — a still-blank pane must read BUSY, never pause a live agent
+// on a pane that stopped rendering (the maxExtends backstop still bounds it).
 func recoverBlankPane(ctx context.Context, deps Deps, session string, scrollback int, pane, pfx string) (string, bool) {
 	if strings.TrimSpace(pane) != "" || !deps.Tmux.HasSession(ctx, session) {
 		return pane, false
@@ -105,14 +86,11 @@ func recoverBlankPane(ctx context.Context, deps Deps, session string, scrollback
 // delay teardown by at most this, never leave the provider running.
 const tmuxCleanupTimeout = 15 * time.Second
 
-// tmuxCleanup captures final scrollback then kills the session — unless it
-// is a named session, which is preserved for resume. It runs on a context
-// DETACHED from the launch context's cancellation and bounded by
-// tmuxCleanupTimeout: the deferred cleanup fires exactly when the launch
-// context has been canceled (operator pause, batch stop, watchdog), and a
-// canceled context would make every tmux command below refuse to run — the
-// provider session then survives the orchestrator (2026-09-09 token-waste
-// root cause #1). Cancellation is the reason to clean up, not a reason to skip it.
+// tmuxCleanup captures final scrollback then kills the session, unless it
+// is a named session (preserved for resume). It runs on a context detached
+// from the launch context's cancellation: the deferred cleanup fires exactly
+// when the launch context is canceled, and a canceled context would make
+// every tmux command below refuse to run, leaking the session.
 func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile string, named bool, scrollback int) {
 	pfx := "[" + name + "]"
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tmuxCleanupTimeout)
