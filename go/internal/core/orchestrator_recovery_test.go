@@ -14,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// --- minimal test harness for core_test package ---
-
-// recStorage is a minimal in-memory Storage for recovery tests.
 type recStorage struct {
 	mu    sync.Mutex
 	state core.State
@@ -49,7 +46,6 @@ func (s *recStorage) AcquireLock(_ context.Context) (func() error, error) {
 	return func() error { return nil }, nil
 }
 
-// fakeLedger is the core_test-package ledger stub.
 type fakeLedger struct {
 	mu      sync.Mutex
 	entries []core.LedgerEntry
@@ -75,14 +71,12 @@ func (l *fakeLedger) entryKinds() []string {
 	return kinds
 }
 
-// allPhases is the ordered set of phases a complete runner map must cover.
 var allPhases = []core.Phase{
 	core.PhaseIntent, core.PhaseScout, core.PhaseTriage, core.PhaseTDD,
 	core.PhaseBuildPlanner, core.PhaseBuild, core.PhaseAudit,
 	core.PhaseShip, core.PhaseRetro, core.PhaseDebugger,
 }
 
-// passRunner is a PhaseRunner that always returns PASS.
 type passRunner struct{ name string }
 
 func (r *passRunner) Name() string { return r.name }
@@ -139,7 +133,6 @@ func explanationHarnessOptions(opts ...core.Option) []core.Option {
 	return append([]core.Option{core.WithWorktreeProvisioner(explanationTestWorktree{})}, opts...)
 }
 
-// newRunners builds a full phase→runner map, replacing phases present in over.
 func newRunners(over map[core.Phase]core.PhaseRunner) map[core.Phase]core.PhaseRunner {
 	out := make(map[core.Phase]core.PhaseRunner, len(allPhases))
 	for _, p := range allPhases {
@@ -151,9 +144,6 @@ func newRunners(over map[core.Phase]core.PhaseRunner) map[core.Phase]core.PhaseR
 	return out
 }
 
-// newTestOrchestrator constructs an Orchestrator with in-memory fakes.
-// Returns (orchestrator, storage, ledger) — storage is rarely needed by callers
-// but is returned for completeness (callers discard it with _).
 func newTestOrchestrator(t *testing.T, runners map[core.Phase]core.PhaseRunner) (*core.Orchestrator, *recStorage, *fakeLedger) {
 	t.Helper()
 	st := &recStorage{}
@@ -161,7 +151,6 @@ func newTestOrchestrator(t *testing.T, runners map[core.Phase]core.PhaseRunner) 
 	return core.NewOrchestrator(st, ld, runners, explanationHarnessOptions()...), st, ld
 }
 
-// runCycleT runs a cycle with a minimal CycleRequest and returns the result.
 func runCycleT(t *testing.T, o *core.Orchestrator) (core.CycleResult, error) {
 	t.Helper()
 	return o.RunCycle(context.Background(), core.CycleRequest{
@@ -171,12 +160,9 @@ func runCycleT(t *testing.T, o *core.Orchestrator) (core.CycleResult, error) {
 	})
 }
 
-// shipErrorStub is a PhaseRunner that returns a ShipError on its first N calls
-// then a PASS, to exercise the orchestrator's ship-error recovery seam
-// (Component #7). It records how many times Run was invoked.
 type shipErrorStub struct {
 	name      string
-	failFirst int // number of leading calls that return errOnFail
+	failFirst int
 	errOnFail error
 	calls     int
 }
@@ -191,8 +177,6 @@ func (s *shipErrorStub) Run(_ context.Context, _ core.PhaseRequest) (core.PhaseR
 	return core.PhaseResponse{Phase: s.name, Verdict: core.VerdictPASS}, nil
 }
 
-// signalStub is a PhaseRunner returning a fixed PASS response with the given
-// Signals — used to fake the debugger phase's recovery decision.
 type signalStub struct {
 	name    string
 	signals map[string]any
@@ -213,9 +197,6 @@ func runRecoveryCycle(t *testing.T, over map[core.Phase]core.PhaseRunner) (core.
 	return res, err, ld
 }
 
-// Precondition-class ShipError (e.g. AUDIT_BINDING_HEAD_MOVED) → the recovery
-// chain re-runs audit (saga alternative path); ship then succeeds. The cycle
-// completes without error and ship is invoked twice.
 func TestRunCycle_ShipPreconditionError_ReRunsAuditThenShips(t *testing.T) {
 	t.Parallel()
 	ship := &shipErrorStub{
@@ -236,11 +217,6 @@ func TestRunCycle_ShipPreconditionError_ReRunsAuditThenShips(t *testing.T) {
 	_ = res
 }
 
-// F37 (architecture review M3): a control-plane refusal (CONTROL_PLANE_VIOLATION,
-// class precondition) recovers into BUILD — the phase that owns the diff —
-// then audit re-binds and ship succeeds, through the real orchestrator. The
-// generic precondition route would re-audit the same diff instead (the
-// cycle-230 audit↔ship loop).
 func TestRunCycle_ShipControlPlaneViolation_RebuildsThenShips(t *testing.T) {
 	t.Parallel()
 	ship := &shipErrorStub{
@@ -248,9 +224,8 @@ func TestRunCycle_ShipControlPlaneViolation_RebuildsThenShips(t *testing.T) {
 		failFirst: 1,
 		errOnFail: core.NewShipError(core.CodeControlPlaneViolation, core.ShipClassPrecondition, core.StageVerifyClass, "INTEGRITY VIOLATION: go/internal/core/cyclerun.go"),
 	}
-	// The re-entered Build authors its Explanation Documentation again,
-	// exactly as a real builder does (ship_recovery_composition_test.go's
-	// explanationWritingRunner; countingRunner counts the audits).
+	// build reuses explanationWritingRunner from ship_recovery_composition_test.go
+	// so the re-entered Build authors Explanation Documentation like a real builder.
 	build := &explanationWritingRunner{}
 	audit := &countingRunner{name: "audit"}
 	_, err, ld := runRecoveryCycle(t, map[core.Phase]core.PhaseRunner{core.PhaseShip: ship, core.PhaseBuild: build, core.PhaseAudit: audit})
@@ -265,7 +240,6 @@ func TestRunCycle_ShipControlPlaneViolation_RebuildsThenShips(t *testing.T) {
 	}
 }
 
-// Transient-class ShipError (e.g. GIT_PUSH_REJECTED) → retry ship directly.
 func TestRunCycle_ShipTransientError_RetriesShip(t *testing.T) {
 	t.Parallel()
 	ship := &shipErrorStub{
@@ -282,8 +256,6 @@ func TestRunCycle_ShipTransientError_RetriesShip(t *testing.T) {
 	}
 }
 
-// Integrity-class ShipError (e.g. INTEGRITY_TREE_DRIFT) → BLOCK: the cycle
-// aborts loudly with the ShipError surfaced, never auto-recovered.
 func TestRunCycle_ShipIntegrityError_AbortsLoud(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StageAtomicShip, "tree drift")
@@ -300,8 +272,6 @@ func TestRunCycle_ShipIntegrityError_AbortsLoud(t *testing.T) {
 	}
 }
 
-// A persistently-failing precondition error exhausts maxRecoveryDepth (2) and
-// then aborts — the bounded-recursion safety invariant.
 func TestRunCycle_ShipRecoveryExhausted_Aborts(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, core.StageVerifyClass, "always stale")
@@ -316,8 +286,6 @@ func TestRunCycle_ShipRecoveryExhausted_Aborts(t *testing.T) {
 	}
 }
 
-// Unknown/unmapped ShipError → debugger phase; its RESHIP decision routes back
-// to ship, which then succeeds.
 func TestRunCycle_ShipUnknownError_DebuggerReship(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeWorktreeResolve, core.ShipClassConfig, core.StageArgs, "novel")
@@ -342,7 +310,6 @@ func TestRunCycle_ShipUnknownError_DebuggerReship(t *testing.T) {
 	_ = res
 }
 
-// Debugger RERUN_PHASE:audit → re-run audit, then ship succeeds.
 func TestRunCycle_ShipUnknownError_DebuggerRerunAudit(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeWorktreeResolve, core.ShipClassConfig, core.StageArgs, "novel")
@@ -363,7 +330,6 @@ func TestRunCycle_ShipUnknownError_DebuggerRerunAudit(t *testing.T) {
 	}
 }
 
-// Debugger BLOCK → cycle ends without re-shipping (no further ship attempt).
 func TestRunCycle_ShipUnknownError_DebuggerBlock(t *testing.T) {
 	t.Parallel()
 	se := core.NewShipError(core.CodeWorktreeResolve, core.ShipClassConfig, core.StageArgs, "novel")
@@ -384,7 +350,6 @@ func TestRunCycle_ShipUnknownError_DebuggerBlock(t *testing.T) {
 	}
 }
 
-// containsKind reports whether the ledger recorded an entry of the given kind.
 func containsKind(ld *fakeLedger, kind string) bool {
 	for _, k := range ld.entryKinds() {
 		if k == kind {

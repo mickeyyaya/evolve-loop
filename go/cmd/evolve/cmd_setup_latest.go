@@ -1,15 +1,5 @@
 package main
 
-// `evolve setup latest` — the read-only live-latest probe behind /evo:setup
-// (operator directive): query EVERY ready LLM CLI's bridge IN PARALLEL for the
-// models it currently offers, and report per family whether a model fresher
-// than today's dispatch map exists in the same lineage. No writes — adopting
-// the latest is `evolve models refresh` (catalog commit, policy-family-gated),
-// and this probe is the staleness evidence the setup skill offers it on.
-//
-// Thin adapter: the staleness decision is setup.ComputeLatest (pure); the
-// fan-out here only sequences captures and preserves detection order.
-
 import (
 	"context"
 	"encoding/json"
@@ -26,21 +16,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
-// setupLatestProbeTimeout bounds ONE family's live capture; the fan-out is
-// parallel, so the whole probe costs roughly the slowest single capture.
-// Var, not const: the timeout wiring is test-pinned (a dropped timeout let a
-// hung capture stall the whole probe).
 var setupLatestProbeTimeout = 90 * time.Second
 
-// latestProbeTiers is the fixed tier order staleness is judged over — the
-// WHOLE dispatch map, not only deep (most phases dispatch balanced).
 var latestProbeTiers = []string{"fast", "balanced", "deep", "top"}
 
-// setupLatestReport fans the live listing out across every READY family and
-// folds the results into detection order. catTiers is the catalog's tier map
-// (the hot-reloading dispatch authority) — when it knows a family's tier,
-// staleness is judged against it, not the manifest default. A per-family
-// probe failure stays on its own row; siblings are unaffected.
 func setupLatestReport(ctx context.Context, rep setup.DetectReport, catTiers map[string]map[string]string, lister modelquery.Lister, fresh map[string]modelquery.FreshnessPolicy) setup.LatestReport {
 	var ready []setup.CLIStatus
 	for _, c := range rep.CLIs {
@@ -73,8 +52,6 @@ func setupLatestReport(ctx context.Context, rep setup.DetectReport, catTiers map
 			for _, tier := range latestProbeTiers {
 				current := tierModel(tier)
 				if current == "" || current == tier {
-					// Absent, or the identity fallback (a tier WORD, not a
-					// model) — nothing judgeable; never fabricate a verdict.
 					continue
 				}
 				latest, stale, observed := setup.ComputeLatest(current, ids, fresh[c.CLI])
@@ -82,7 +59,7 @@ func setupLatestReport(ctx context.Context, rep setup.DetectReport, catTiers map
 					row.LatestModel, row.CurrentSeenLive = latest, observed
 				}
 				switch {
-				case stale: // stale ⇒ observed structurally (an unseen model can never differ from its own singleton bucket)
+				case stale:
 					row.StaleTiers = append(row.StaleTiers, setup.TierStale{Tier: tier, Current: current, Latest: latest})
 				case !observed:
 					row.UnverifiedTiers = append(row.UnverifiedTiers, tier)
@@ -96,10 +73,6 @@ func setupLatestReport(ctx context.Context, rep setup.DetectReport, catTiers map
 	return setup.LatestReport{Source: "live", CLIs: rows}
 }
 
-// perCLIScratchLister gives each family its own scratch workspace so parallel
-// tmux captures cannot collide on pane/log filenames, salvaging each family's
-// probe diagnostics before teardown (a deleted failed-probe artifact explains
-// nothing — Rule 12).
 type perCLIScratchLister struct {
 	evolveDir string
 	log       io.Writer
@@ -140,8 +113,6 @@ func runSetupLatest(args []string, stdout, stderr io.Writer) int {
 			readyCLIs = append(readyCLIs, c.CLI)
 		}
 	}
-	// Catalog read is tolerant: no catalog just means the manifest map is the
-	// staleness baseline (exactly what dispatch would fall back to).
 	catTiers := map[string]map[string]string{}
 	if cat, err := modelcatalog.Read(evolveDir); err == nil {
 		for name, c := range cat.CLIs {

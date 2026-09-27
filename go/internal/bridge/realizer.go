@@ -8,20 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
-// realizer.go — the Go engine half of the hybrid Realizer (ADR-0022). The
-// per-CLI mapping data lives declaratively in each manifest's `params` table;
-// this engine interprets it. Flags-first: an intent realizes to a launch flag
-// when the CLI declares one, to REPL injection when declared `repl`, to a
-// controller hint for session lifecycle, or to nothing (no entry / `noop`).
-
-// ParamSpec is the declarative realization of ONE high-level intent parameter
-// for ONE CLI (a manifest `params.<name>` entry).
-//
-// Two shapes:
-//   - Enum-mapped (permission, settings_scope): Values maps each intent value to
-//     the concrete flag tokens, e.g. {"bypass": ["--dangerously-skip-permissions"]}.
-//   - Dynamic (model_tier): Channel + Flag/Template, with From:"tier_alias" to
-//     resolve the value through the manifest's ModelTierMap before emitting.
+// ParamSpec is the declarative realization of one high-level intent parameter for one CLI (a manifest `params.<name>` entry).
 type ParamSpec struct {
 	Channel  string              `json:"channel"`            // flag | repl | controller | noop
 	Flag     string              `json:"flag,omitempty"`     // flag name for a dynamic value (model_tier) or a multi-value flag (allowed_tools)
@@ -29,45 +16,20 @@ type ParamSpec struct {
 	Template string              `json:"template,omitempty"` // repl: "/model {alias}"
 	Values   map[string][]string `json:"values,omitempty"`   // enum intent value → flag tokens
 	// Default is the value realized when the intent leaves this param empty —
-	// data-driven, per CLI (2026-08-15: codex's two-layer model config runs at
-	// the CLI's own reasoning-effort default unless the second layer is set;
-	// the manifest now pins effort=high by default, operator directive).
+	// data-driven, per CLI.
 	Default string `json:"default,omitempty"`
 }
 
-// unresolvedModelTokens is the closed vocabulary that never names a model on
-// ANY CLI: the "auto" resolve-me sentinel (ADR-0044 C2/D3, cycle-262), every
-// canonical tier, and "high" (the input alias of "deep", translateV1TierKey).
-// A value still in this set after Manifest.ModelTierMap translation means the
-// manifest declared no entry for the tier and the fallback ladder left the tier
-// NAME in place — translateV1TierKey passes unknown keys through verbatim,
-// which is what lets one reach an emit point at all.
-//
-// Derived from modelcatalog.CanonicalTiers so the tier vocabulary has exactly
-// one source: a tier added there is covered here, in every driver, and in the
-// tests that sweep this var — with no parallel list to keep in sync.
-//
-// Note what is deliberately ABSENT: haiku/sonnet/opus. translateV1TierKey maps
-// them as legacy tier aliases, but they are also real claude model ids, so
-// suppressing them would disable model routing outright.
 var unresolvedModelTokens = append([]string{"auto", "high"}, modelcatalog.CanonicalTiers...)
 
-// isUnresolvedModelToken reports whether a resolved model value is vocabulary
-// rather than a concrete model id. Every builder of a model argument — the
-// realizer's flag/repl channels and each headless driver's own argv — consults
-// this one predicate, so the guard is genuinely matrix-wide.
+// isUnresolvedModelToken reports whether a resolved model value is
+// vocabulary rather than a concrete model id; every builder of a model
+// argument — the realizer's channels and each headless driver's own argv —
+// consults this one predicate.
 func isUnresolvedModelToken(resolved string) bool {
 	return slices.Contains(unresolvedModelTokens, resolved)
 }
 
-// permissionIntent maps a profile's claude-style permission_mode string onto
-// the high-level LaunchIntent.Permission the Realizer understands. An empty
-// permission_mode means "bypass" — matching the *-tmux drivers' historical
-// default (claude/agy launch with --dangerously-skip-permissions when no mode
-// is set). "bypassPermissions" is the explicit spelling of the same posture;
-// every other claude mode (plan, acceptEdits, …) passes through verbatim and
-// realizes per the CLI's manifest (claude maps bypass+plan; agy bypass only;
-// codex none — its trust posture is handled by the auto-responder).
 func permissionIntent(permissionMode string) string {
 	switch permissionMode {
 	case "", "bypassPermissions":
@@ -78,15 +40,11 @@ func permissionIntent(permissionMode string) string {
 }
 
 // RealizeFor loads the embedded manifest for cli and realizes intent against
-// it. A missing/unreadable manifest realizes to an empty Realization — the
-// same no-op philosophy as an absent param: a launch is never aborted by the
-// realizer itself (the driver separately validates the CLI/binary).
-//
-// CAVEAT for the launch-path wiring (next slice): an empty Realization is
-// indistinguishable from "manifest missing" here, so a typo'd CLI name would
-// realize to zero flags rather than error. The caller MUST validate the CLI
-// (e.g. via the driver registry / LoadManifest) before trusting an empty
-// realization — do not infer "no flags needed" from an empty result.
+// it; a missing or unreadable manifest realizes to an empty Realization
+// rather than aborting the launch. An empty Realization is indistinguishable
+// from "manifest missing," so the caller must validate the CLI (via the
+// driver registry or LoadManifest) before trusting an empty result as "no
+// flags needed."
 func RealizeFor(cli string, intent LaunchIntent) Realization {
 	m, err := LoadManifest(cli)
 	if err != nil {
@@ -95,21 +53,16 @@ func RealizeFor(cli string, intent LaunchIntent) Realization {
 	return Realize(m, intent)
 }
 
-// Realize maps a LaunchIntent onto a CLI's Realization using m.Params. Any
-// intent field whose param is absent from the manifest (or marked noop) emits
-// nothing — the property that makes a foreign/unsupported parameter unable to
-// abort a launch.
+// Realize maps a LaunchIntent onto a CLI's Realization using m.Params: an
+// intent field whose param is absent from the manifest, or marked noop,
+// emits nothing rather than aborting the launch.
 func Realize(m Manifest, intent LaunchIntent) Realization {
 	var r Realization
 
-	// Manifest-level default_args land FIRST so per-param flags + raw
-	// escape-hatch flags append after them. This is the "always-on" hook
-	// each CLI uses for unconditional launch flags (e.g. codex-tmux's
-	// --yolo to short-circuit the per-edit-approval modal that stalled
-	// cycle-123 tdd — see docs/incidents/cycle-123-codex-edit-approval-
-	// modal-and-empty-fallback-chain.md G1a). The field has existed on
-	// Manifest since manifest.go:63 but was previously unread; wired in
-	// cycle-124 Fix G1a.
+	// Manifest-level default_args land FIRST so per-param flags and the raw
+	// escape-hatch flags append after them — the "always-on" hook a CLI uses
+	// for unconditional launch flags (e.g. codex-tmux's --yolo, which
+	// short-circuits the per-edit-approval modal).
 	if len(m.DefaultArgs) > 0 {
 		r.LaunchFlags = append(r.LaunchFlags, m.DefaultArgs...)
 	}
@@ -118,9 +71,6 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	realizeScalar(&r, m, "model_tier", intent.ModelTier)
 	realizeScalar(&r, m, "permission", intent.Permission)
 	realizeScalar(&r, m, "settings_scope", intent.SettingsScope)
-	// effort → each CLI's native reasoning-effort dial (claude --effort, codex
-	// model_reasoning_effort); manifests without an effort param (or marked
-	// noop) emit nothing, so an unsupported CLI can never abort on it.
 	realizeScalar(&r, m, "effort", intent.Effort)
 
 	// session_mode → controller lifecycle (never a CLI flag for a REPL).
@@ -139,9 +89,8 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 		r.LaunchFlags = append(r.LaunchFlags, intent.AllowedTools...)
 	}
 
-	// Manifest-realized flags have known construction. Keep their deduplicated
-	// prefix separate so selector provenance can be derived from the exact final
-	// argv while arbitrary profile flags still use the conservative parser.
+	// trustedFlags keeps the manifest-realized prefix separate so selector
+	// provenance can be derived from the exact final argv.
 	trustedFlags := dedupeLaunchFlags(r.LaunchFlags)
 	combinedFlags := append([]string(nil), r.LaunchFlags...)
 
@@ -149,78 +98,37 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	if raw, ok := intent.RawByCLI[m.CLI]; ok {
 		combinedFlags = append(combinedFlags, raw...)
 	}
-	// Dedupe LaunchFlags (cycle-124 G1a wire-up consequence): a manifest's
-	// default_args may declare a flag that one of its params ALSO emits when
-	// a particular intent value is set (e.g. agy-tmux declares
+	// A manifest's default_args may declare a flag that one of its params ALSO
+	// emits for a particular intent value (e.g. agy-tmux declares
 	// --dangerously-skip-permissions in default_args AND in
-	// params.permission.values.bypass; both fire under
-	// intent.Permission="bypass"). Dedupe is order-preserving (keep first
-	// occurrence) so the operator-declared default still takes the leading
-	// position. Idempotent for the already-unique case.
+	// params.permission.values.bypass); dedupe is order-preserving so the
+	// operator-declared default keeps the leading position.
 	r.LaunchFlags = dedupeLaunchFlags(combinedFlags)
 	r.modelDispatchEffect = modelDispatchFromFinalizedFlags(m.CLI, trustedFlags, r.LaunchFlags)
 	return r
 }
 
-// dedupeLaunchFlags returns a copy of in with subsequent duplicate UNITS
-// removed, preserving order. A unit is a flag-value PAIR when a `-`-prefixed
-// token is followed by a non-flag token (`-c key=val`, `-m model`), otherwise
-// the single token (`--yolo`). So a flag repeated with distinct values is kept
-// in full, while an identical pair or a repeated boolean collapses.
-//
-// LIMITATION, deliberate and pinned: pairing keys on "the next token does not
-// start with `-`", NOT on flag arity, which nothing here can know. So a value
-// that itself begins with `-` is not recognised as a value, and that pair
-// degrades to the old token-wise behaviour — `--min -1 --max -1` still yields
-// `--min -1 --max`, dropping the second `-1` and leaving `--max` dangling. No
-// manifest or tracked profile emits a `-`-leading value today; the case is
-// pinned in realizer_dedupe_pairs_test.go so a future one is caught here rather
-// than in a lane. An empty next token is likewise not treated as a value (see
-// the guard below).
-//
-// It used to dedupe individual tokens, which did neither thing its own comment
-// claimed. `-m gpt-5.4 -m gpt-5.5` became `-m gpt-5.4 gpt-5.5` — the repeated
-// FLAG dropped, both VALUES kept, i.e. a different command line rather than a
-// deduplicated one, with the second value silently demoted to a positional.
-// Latent until codex's effort param needed two `-c` overrides
-// (model_reasoning_effort + plan_mode_reasoning_effort) and the realized argv
-// came out as `-c model_reasoning_effort=high plan_mode_reasoning_effort=high`.
-// Caught by an exact-argv pin, which is the argument for pinning argv exactly.
-//
-// Its original purpose (cycle-124 G1a) was a manifest's default_args declaring
-// a flag that a param also emits — e.g. agy-tmux declaring
-// --dangerously-skip-permissions in both. That collision no longer exists on
-// any manifest (claude-tmux and agy-tmux both ship default_args: []), so the
-// live jobs today are the internal-duplicate typo guard and, above all, NOT
-// corrupting codex's two `-c` overrides. Order-preserving, keep-first, so an
-// operator-declared default retains the leading position. Idempotent.
-//
-// One asymmetry versus the old behaviour, recorded rather than fixed: a bare
-// flag no longer dedupes against the same flag used as a pair, so
-// ["-c","a=1","-c"] keeps the dangling "-c" where token-wise dedupe dropped it.
-// Only reachable through an operator typo in extra_flags_by_cli, and a dangling
-// -c is a loud codex parse error rather than a silent wrong command line.
+// dedupeLaunchFlags returns a copy of in with subsequent duplicate units
+// removed, preserving order. A unit is a flag-value pair when a `-`-prefixed
+// token is followed by a token that doesn't start with `-` (`-c key=val`,
+// `-m model`), otherwise the single token (`--yolo`); a flag repeated with
+// distinct values is kept in full.
 func dedupeLaunchFlags(in []string) []string {
 	if len(in) <= 1 {
 		return in
 	}
 	seen := make(map[string]struct{}, len(in))
-	// Fresh backing array (cycle-124 review HIGH): `out := in[:0]` would
-	// alias `in`'s storage. The function's contract is "returns a copy"
-	// and the call site relies on that — keeping `in` intact lets the
-	// caller hold a pre-dedupe reference for diagnostics without
-	// witnessing in-place writes through it.
+	// Fresh backing array: `out := in[:0]` would alias in's storage, but the
+	// contract is "returns a copy" — callers rely on `in` staying unmodified.
 	out := make([]string, 0, len(in))
 	for i := 0; i < len(in); i++ {
 		tok := in[i]
 		// NUL joins the pair key so a value containing the separator cannot
 		// forge a collision with a different flag/value split.
 		unit, paired := tok, false
-		// in[i+1] != "": an empty token is manifest noise (a typo or a stray
-		// element), not a flag's value. Pairing with it would preserve that
-		// noise and let two different flags with empty values collide on the
-		// bare "" key. Empty tokens therefore stay standalone and collapse, as
-		// they did before this rewrite.
+		// An empty next token is manifest noise (a typo or a stray element), not a
+		// flag's value: pairing with it would let two different flags with empty
+		// values collide on the bare "" key, so empty tokens stay standalone.
 		if strings.HasPrefix(tok, "-") && i+1 < len(in) && in[i+1] != "" && !strings.HasPrefix(in[i+1], "-") {
 			unit, paired = tok+"\x00"+in[i+1], true
 		}
@@ -241,20 +149,18 @@ func dedupeLaunchFlags(in []string) []string {
 }
 
 // legacyTierAlias translates the deprecated Anthropic-named tier vocabulary
-// (haiku/sonnet/opus) into the canonical abstract vocabulary (fast/balanced/
-// deep) used by ModelTierMap keys after the cycle-124 schema migration.
-// Pass-through for already-canonical names AND for raw model identifiers
-// (which fall through to the realizer's identity-fallback at the call site).
-// Delegates to manifest.translateV1TierKey so the 3-entry mapping has a
-// single source of truth (avoids silent drift if a fourth legacy alias is
-// ever added — see ADR-0022 PR 2 addendum).
+// (haiku/sonnet/opus) into the canonical vocabulary (fast/balanced/deep).
+// Pass-through for already-canonical names and for raw model identifiers.
+// Delegates to manifest.translateV1TierKey so the mapping has a single
+// source of truth.
+// See ADR-0022.
 func legacyTierAlias(value string) string {
 	return translateV1TierKey(value)
 }
 
-// realizeScalar handles a single-valued intent param (model_tier, permission,
-// settings_scope). No manifest entry, empty value, or an unmapped enum value
-// emits nothing.
+// realizeScalar handles a single-valued intent param (model_tier,
+// permission, settings_scope); a missing entry, empty value, or unmapped
+// enum value emits nothing.
 func realizeScalar(r *Realization, m Manifest, param, value string) {
 	spec, ok := m.Params[param]
 	if !ok {
@@ -276,24 +182,22 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 	// Dynamic: resolve the value (optionally via tier_alias) then emit per channel.
 	resolved := value
 	// ParamSpec.From identifies the manifest sidecar table to translate
-	// through. "model_tier_map" is canonical (cycle-124 followup); the
-	// legacy spelling "tier_alias" is accepted unchanged for one release
-	// so operator-installed v1 override manifests keep working.
+	// through: "model_tier_map" is canonical; the legacy "tier_alias"
+	// spelling is accepted unchanged so operator-installed v1 override
+	// manifests keep working.
 	if spec.From == "model_tier_map" || spec.From == "tier_alias" {
 		resolved = resolveTierModel(m, value)
 	}
-	// ModelFlagPolicy (ADR-0044 C2 / D3, generalized): a vocabulary token here
-	// means model_tier_map translation fell through, so the value names no
-	// model on any CLI and `<cli> --model <token>` is the cycle-262 fatal boot.
-	// Omit the param — the CLI's own default always beats a fatal boot. This is
-	// the emit point for every flag/repl CLI; the headless drivers guard their
-	// own argv against the same vocabulary (claudePArgs, driver_codex.go).
+	// A vocabulary token here means model_tier_map translation fell through, so
+	// the value names no model on any CLI — emitting `<cli> --model <token>`
+	// would boot-fail. Omit the param instead so the CLI's own default wins.
+	// This is the emit point for every flag/repl CLI; the headless drivers guard
+	// their own argv against the same vocabulary (claudePArgs, driver_codex.go).
+	// See ADR-0044.
 	if param == "model_tier" && isUnresolvedModelToken(resolved) {
 		// Record the suppression so the driver's launch line can report the
-		// model the CLI will ACTUALLY run under. Silently omitting the flag
-		// while the log still prints the requested tier is how an
-		// adversarial-audit tier degrades to the account default with the only
-		// telemetry claiming otherwise.
+		// model the CLI will actually run under, rather than silently logging
+		// the requested tier while it degrades to the account default.
 		r.ModelOmitted = resolved
 		return
 	}
@@ -310,16 +214,13 @@ func realizeScalar(r *Realization, m Manifest, param, value string) {
 	// controller / noop / unknown channel → no scalar emission.
 }
 
-// resolveTierModel is the ONE tier→model ladder for every transport: the
-// realizer's flag/repl emit (realizeScalar) and the headless codex driver's
-// own -m composition both resolve through it, so a change here (e.g. the
-// queued within-tier fallback axis) reaches every dispatch. Fallback ladder
-// for the cycle-124 deprecation window: try the raw intent value first
-// (synthetic test fixtures + operator v1 manifests where keys are still
-// haiku/sonnet/opus); if that misses, try the canonical translation
-// (parseManifest's v1-shimmed manifests where keys are now fast/balanced/deep).
-// Native ids and genuinely unknown values pass through unchanged — the
-// vocabulary guard at each emit point then decides whether to omit the flag.
+// resolveTierModel is the one tier→model ladder for every transport: the
+// realizer's flag/repl emit and the headless codex driver's own -m
+// composition both resolve through it. It tries the raw intent value first
+// (synthetic fixtures and operator v1 manifests still keyed by
+// haiku/sonnet/opus), then the canonical translation (fast/balanced/deep);
+// native ids and unknown values pass through unchanged for the vocabulary
+// guard at each emit point to decide.
 func resolveTierModel(m Manifest, value string) string {
 	if alias, found := m.ModelTierMap[value]; found && alias != "" {
 		return alias

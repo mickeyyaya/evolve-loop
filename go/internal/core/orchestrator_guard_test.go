@@ -13,40 +13,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// orchestrator_guard_test.go — cycle-274 G task: inserted-phase tree-diff guard gap.
-//
-// Background (cycle-270 defect): the tree-diff guard was gated on
-// `phaseWorktree != ""`, so non-worktree phases (scout, triage, retro, and
-// advisor-inserted minted phases) ran with no snapshot — any untracked source
-// file they wrote to the main tree slipped through to audit and potentially to
-// ship. The fix (G-B): drop the worktree gate, snapshot every phase, filter
-// legitimate `.evolve/` workspace writes via isLegitimateMainTreePath.
-//
-// Test map:
-//   TestIsLegitimateMainTreePath     — R9: pure classifier unit test (no git, ≥2 sub-cases)
-//   TestGuardCatchesInsertedPhaseLeak — R5+R6: cycle aborts when untracked source leak detected (≥2 sub-cases)
-//   TestGuardIgnoresLegitimateWorkspaceWrite — R7: legitimate .evolve/ workspace write does NOT trip the guard
-
-// --- TestIsLegitimateMainTreePath ---
-
 func TestIsLegitimateMainTreePath(t *testing.T) {
 	cases := []struct {
 		path string
 		want bool
 		note string
 	}{
-		// Legitimate: .evolve/ workspace paths (runs, state, runtime logs)
 		{".evolve/runs/cycle-274/triage-report.md", true, "workspace run artifact"},
 		{".evolve/state.json", true, "cycle state"},
 		{".evolve/ledger.jsonl", true, "ledger"},
 		{".evolve", true, "top-level .evolve dir"},
 		{"go/subdir/.evolve/guards.log", true, "nested .evolve guard log (cycle-176 precedent)"},
-		// Legitimate: build artifacts
 		{"go/evolve", true, "tracked release binary"},
 		{"go/bin/evolve", true, "gitignored build binary"},
-		// Legitimate: bare directory entry from -uall
 		{"go/acs/cycle274/", true, "bare worktree dir entry (trailing slash)"},
-		// NOT legitimate: real source files
 		{"go/internal/looppreflight/bug_reproduction_test.go", false, "cycle-270 leak path"},
 		{"go/internal/core/new_feature.go", false, "source file leak"},
 		{"docs/architecture/new-adr.md", false, "doc leak"},
@@ -62,10 +42,6 @@ func TestIsLegitimateMainTreePath(t *testing.T) {
 	}
 }
 
-// --- TestGuardCatchesInsertedPhaseLeak ---
-
-// leakInjector is a fake phase runner that reports PASS but also calls an
-// optional side-effect (e.g. writing a source file leak to the main tree).
 type leakInjector struct {
 	name  Phase
 	onRun func(req PhaseRequest)
@@ -79,14 +55,12 @@ func (r *leakInjector) Run(_ context.Context, req PhaseRequest) (PhaseResponse, 
 	return PhaseResponse{Phase: string(r.name), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// fakeGitDirty is a test seam for the tree-diff guard: before the first call
-// it returns the clean baseline; after the first call it returns the dirty set
-// (simulating a phase that wrote a new untracked file). This avoids the need
-// for a real git repo while exercising the full guard + isLegitimateMainTreePath logic.
+// fakeGitDirty fakes the guard's git query without a real repo: baseline on
+// the first call (snapshot), afterLeak on every call after (check).
 type fakeGitDirty struct {
 	callCount int
-	baseline  []string // returned on first call (snapshot)
-	afterLeak []string // returned on subsequent calls (check)
+	baseline  []string
+	afterLeak []string
 }
 
 func (f *fakeGitDirty) Fn() func(ctx context.Context, repoRoot string) ([]string, error) {
@@ -99,8 +73,6 @@ func (f *fakeGitDirty) Fn() func(ctx context.Context, repoRoot string) ([]string
 	}
 }
 
-// minimalRunners builds a runners map where all spine phases pass trivially.
-// The provided phase runner overrides the default for that phase.
 func minimalRunners(override Phase, r PhaseRunner) map[Phase]PhaseRunner {
 	pass := func(ph Phase) PhaseRunner { return &leakInjector{name: ph} }
 	m := map[Phase]PhaseRunner{
@@ -118,10 +90,6 @@ func minimalRunners(override Phase, r PhaseRunner) map[Phase]PhaseRunner {
 	return m
 }
 
-// TestGuardCatchesInsertedPhaseLeak tests that the guard fires for any
-// non-worktree phase that writes a new untracked source file into the main
-// tree. Two sub-cases exercise distinct aspects of R5 (any-phase) and R6
-// (untracked granularity).
 func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -129,15 +97,11 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 		leakPath  string // path that appears as untracked after the phase
 	}{
 		{
-			// R6: an untracked source file (never in git) shows up after scout
-			// (a spine, non-worktree phase) — the original cycle-270 escape route.
 			name:      "untracked_source_file_after_scout",
 			leakPhase: PhaseScout,
 			leakPath:  "go/internal/looppreflight/bug_reproduction_test.go",
 		},
 		{
-			// R5: a different spine non-worktree phase (triage) also triggers —
-			// the guard fires regardless of phase identity.
 			name:      "untracked_source_file_after_triage",
 			leakPhase: PhaseTriage,
 			leakPath:  "go/internal/core/advisor_injected_feature.go",
@@ -146,10 +110,9 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			// fakeGitDirty: before the leaking phase → clean; after → leakPath
 			dirty := &fakeGitDirty{
-				baseline:  []string{},            // clean before
-				afterLeak: []string{tc.leakPath}, // new untracked file after
+				baseline:  []string{},
+				afterLeak: []string{tc.leakPath},
 			}
 			runners := minimalRunners(tc.leakPhase, &leakInjector{name: tc.leakPhase})
 			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
@@ -157,7 +120,7 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 				WithGitDirtyPaths(dirty.Fn()),
 			)
 			_, err := o.RunCycle(context.Background(), CycleRequest{
-				ProjectRoot: t.TempDir(), // fake root; gitDirtyPaths is injected
+				ProjectRoot: t.TempDir(),
 				GoalHash:    "g",
 			})
 			if err == nil {
@@ -173,28 +136,19 @@ func TestGuardCatchesInsertedPhaseLeak(t *testing.T) {
 	}
 }
 
-// TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase pins the CI regression
-// from the cycle-274 salvage: during a WORKTREE phase (tdd/build), the
-// orchestrator-side contract gate writes its own untracked runtime state
-// (.evolve/contract-gate-breaker.json) into the main tree. That is not a
-// phase escape — recoverBuildLeak already classifies it legitimate and skips
-// it — so the tree-diff guard must apply the same classification instead of
-// aborting the cycle (guard and recovery must agree on one vocabulary).
 func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
 	breakerPath := ".evolve/contract-gate-breaker.json"
-	// Phase-aware seam: the dirty set appears only once BUILD has run, so the
-	// leak is attributed to the worktree phase (fakeGitDirty's first-call flip
-	// would surface it at scout, a non-worktree phase, and miss the branch
-	// under test).
+	// dirtyFn flips only after the phase runs, so the leak attributes to the
+	// worktree phase rather than fakeGitDirty's fixed first-call flip.
 	leakPhaseRan := false
 	dirtyFn := func(_ context.Context, _ string) ([]string, error) {
 		if leakPhaseRan {
-			return []string{breakerPath}, nil // gate wrote its breaker during the phase
+			return []string{breakerPath}, nil
 		}
-		return nil, nil // clean before the worktree phase
+		return nil, nil
 	}
-	// tdd: a worktree phase (runsInWorktree) reachable with minimalRunners —
-	// build sits behind build-planner, which this harness does not register.
+	// tdd stands in for a worktree phase; build sits behind build-planner,
+	// which this harness doesn't register.
 	runners := minimalRunners(PhaseTDD, &leakInjector{
 		name:  PhaseTDD,
 		onRun: func(PhaseRequest) { leakPhaseRan = true },
@@ -207,26 +161,18 @@ func TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase(t *testing.T) {
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
 	})
-	// The guard must NOT have fired. Any other error (e.g. ship gate) is acceptable.
 	if err != nil && strings.Contains(err.Error(), "tree-diff") {
 		t.Errorf("guard must not fire on orchestrator self-write during a worktree phase; got: %v", err)
 	}
 }
 
-// TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase pins the companion
-// strict case: when both rename sides reach the guard (the porcelain
-// emission contract is pinned separately by
-// TestDefaultGitDirtyPaths_RenameEmitsBothSides), the deliverable old path
-// keeps the guard armed even though the look-alike new path classifies as
-// legitimate runtime state — so a worktree phase cannot smuggle a
-// deliverable out via rename.
 func TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase(t *testing.T) {
 	leakPhaseRan := false
 	dirtyFn := func(_ context.Context, _ string) ([]string, error) {
 		if leakPhaseRan {
 			return []string{
-				".evolve/commit-prefix-scope.json",         // rename source (deliverable)
-				".evolve/commit-prefix-scope.renamed.json", // rename target (look-alike)
+				".evolve/commit-prefix-scope.json",
+				".evolve/commit-prefix-scope.renamed.json",
 			}, nil
 		}
 		return nil, nil
@@ -251,17 +197,11 @@ func TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase(t *testing.T) {
 	}
 }
 
-// TestGuardIgnoresLegitimateWorkspaceWrite tests R7: a non-worktree phase that
-// writes only its .evolve/runs/... workspace artifact must NOT trip the guard.
-// The cycle must NOT fail due to "tree-diff" after the workspace write.
 func TestGuardIgnoresLegitimateWorkspaceWrite(t *testing.T) {
-	// Simulate triage writing its workspace report (.evolve/runs/cycle-1/triage-report.md).
-	// The guard sees this as a new path but isLegitimateMainTreePath returns true,
-	// so the cycle continues without a tree-diff abort.
 	workspacePath := ".evolve/runs/cycle-1/triage-report.md"
 	dirty := &fakeGitDirty{
-		baseline:  []string{},              // clean before triage
-		afterLeak: []string{workspacePath}, // triage wrote its report
+		baseline:  []string{},
+		afterLeak: []string{workspacePath},
 	}
 	runners := minimalRunners(PhaseTriage, &leakInjector{name: PhaseTriage})
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
@@ -272,16 +212,11 @@ func TestGuardIgnoresLegitimateWorkspaceWrite(t *testing.T) {
 		ProjectRoot: t.TempDir(),
 		GoalHash:    "g",
 	})
-	// The guard must NOT have fired. Any other error (e.g. ship gate) is acceptable.
 	if err != nil && strings.Contains(err.Error(), "tree-diff") {
 		t.Errorf("guard must not fire on legitimate .evolve/ workspace write; got: %v", err)
 	}
 }
 
-// TestDefaultGitDirtyPaths_RenameEmitsBothSides pins the porcelain parsing
-// contract the rename-smuggle guard case depends on: a staged rename must
-// surface BOTH the old and the new path, so a deliverable renamed to a
-// look-alike name cannot vanish from the guard's view.
 func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -318,14 +253,6 @@ func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
 	}
 }
 
-// TestGuardIgnoresScoutEvalMaterialization pins the soak-#6 cycle-319 defect:
-// scout's contract (internal/evalgate/materialization.go) is to write the
-// SELECTED slugs' evals to projectRoot/.evolve/evals/<slug>.md in the MAIN
-// tree, where Gate A reads them. A later cycle iterating the same coverage
-// target re-materializes the same slug, MODIFYING the prior cycle's committed
-// eval (318→319 ledger-seal-io-coverage) — a main-tree write the tree-diff
-// guard wrongly flagged as a deliverable leak and aborted the cycle. Scout's
-// eval materialization is its JOB, not a deliverable escape.
 func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
 	evalPath := ".evolve/evals/ledger-seal-io-coverage.md"
 	dirty := &fakeGitDirty{baseline: []string{}, afterLeak: []string{evalPath}}
@@ -335,10 +262,8 @@ func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
 		WithGitDirtyPaths(dirty.Fn()),
 	)
 	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
-	// Non-vacuous: the cycle must ADVANCE PAST scout's guard. minimalRunners
-	// registers only scout, so the next spine phase has no runner — the cycle
-	// errors with "no runner", proving the scout guard passed (not a tree-diff
-	// abort, and the eval path is never named as a leak).
+	// minimalRunners registers only scout, so reaching the next phase's
+	// "no runner" error proves the cycle advanced past scout's guard.
 	if err == nil || !strings.Contains(err.Error(), "no runner") {
 		t.Fatalf("expected the cycle to advance past scout's guard to a no-runner phase; got: %v", err)
 	}
@@ -347,10 +272,6 @@ func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
 	}
 }
 
-// TestIsScoutEvalMaterialization pins the exemption's scope so it cannot widen
-// into a deliverable-leak loophole: ONLY scout + .evolve/evals/ is exempt. A
-// non-scout phase writing an eval, or scout writing anything outside evals/,
-// is NOT exempt and still classifies as a leak.
 func TestIsScoutEvalMaterialization(t *testing.T) {
 	cases := []struct {
 		phase Phase
@@ -372,50 +293,19 @@ func TestIsScoutEvalMaterialization(t *testing.T) {
 	}
 }
 
-// --- cycle-533: fix-treediff-leak-recovery-catalog-predicate ---
-//
-// The leak-recovery gate at cyclerun_review.go:263 invokes recoverBuildLeak
-// only when `WorktreePhase(next)` is true — the catalog-BLIND two-literal set
-// {tdd, build}. Every other phase, INCLUDING advisor-minted / catalog phases the
-// catalog marks writes_source:true (bug-reproduction, coverage-gate), gets ZERO
-// recovery: any source file it leaks into the main tree goes straight to the
-// tree-diff guard, which hard-aborts the cycle. That is the confirmed,
-// repeating root cause of the 10 recorded "tree-diff guard: phase wrote to the
-// main tree" aborts (cycles 390..529). The catalog-aware verdict already exists
-// on the Orchestrator — (*Orchestrator).worktreePhase(next) — and `cr.o` (the
-// *Orchestrator holding the catalog) is already in scope at this exact call
-// site, so the fix is a one-line swap to the method form. No new field is
-// needed here (contrast the role-gate half, which is control-plane-protected —
-// see the cycle-533 test-report AC-Materialization section).
-//
-// Both cases use a REAL git repo + the real gitWorktree provisioner (mirroring
-// TestTDDLeakRecover / TestOrchestrator_AuditLeakRecover) so the production
-// recovery + tree-diff guard paths run end-to-end — not a stubbed classifier.
-
-// TestGuardRecoversCatalogWritesSourcePhaseLeak is the cycle-533 RED proof. A
-// spine phase that is NOT a WorktreePhase literal (scout) is marked a catalog
-// source-writer via WithCatalog and leaks a tracked-file edit into the main
-// tree. With the bug, WorktreePhase(scout)==false skips recovery and the
-// tree-diff guard aborts the cycle. With the fix, o.worktreePhase(scout)==true
-// (catalog), recoverBuildLeak relocates the leak into the worktree, main is
-// restored to HEAD, and the cycle proceeds to ship.
 func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
 	root := initAuditLeakRepo(t)
 	runners := buildRunners(nil)
-	// scout leaks a modification to the tracked docs/note.md in the MAIN tree.
 	runners[PhaseScout] = &auditLeakRunner{name: string(PhaseScout), onRun: func() {
 		if err := os.WriteFile(filepath.Join(root, "docs", "note.md"), []byte(auditLeakChurn), 0o644); err != nil {
 			t.Errorf("scout leak write: %v", err)
 		}
 	}}
-	// Mark scout a catalog source-writer. o.worktreePhase(scout) returns true
-	// ONLY when the recovery gate consults the catalog (the fix); the hardcoded
-	// WorktreePhase(scout) stays false. A string-match fake keyed on "scout"
-	// would also have to special-case every future minted phase — defeated by
-	// the negative case below, which shares this same catalog.
+	// A catalog-declared source-writer (not the hardcoded WorktreePhase literal
+	// set) so o.worktreePhase(scout) is true only via catalog consultation.
 	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "scout", WritesSource: true}})
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
 		WithWorktreeProvisioner(gitWorktree{}),
@@ -425,11 +315,9 @@ func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
 	if err != nil {
 		t.Fatalf("catalog source-writer (scout, writes_source:true) leak must be recovered, not aborted; got: %v", err)
 	}
-	// Recovery relocated the leak into the worktree and restored main to HEAD.
 	if got := auditLeakReadFile(t, filepath.Join(root, "docs", "note.md")); got != auditLeakNoteV1 {
 		t.Errorf("docs/note.md in main = %q, want committed %q (leak must be relocated, main restored)", got, auditLeakNoteV1)
 	}
-	// The cycle proceeded past the scout guard all the way to ship.
 	shipRan := false
 	for _, p := range res.PhasesRun {
 		if p == PhaseShip {
@@ -441,14 +329,6 @@ func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {
 	}
 }
 
-// TestGuardStillAbortsNonSourcePhaseLeak is the paired anti-over-broadening
-// guard: the catalog-aware gate must NOT make recovery unconditional. A phase
-// that is NOT a declared source-writer (audit — absent from the injected
-// catalog, so o.worktreePhase(audit)==false) leaking a source file into the
-// main tree must STILL hard-abort via the tree-diff guard. Shares the positive
-// case's catalog (scout=source-writer) to prove the gate keys off the per-phase
-// verdict, not a blanket allow. Passes before AND after the fix (a
-// pre-existing-green regression pin; RED status noted in the cycle-533 report).
 func TestGuardStillAbortsNonSourcePhaseLeak(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")

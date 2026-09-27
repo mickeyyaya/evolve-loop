@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -70,5 +71,67 @@ func TestRunLoop_ResumeQuotaPauseReturnsFiveAndPreservesCheckpoint(t *testing.T)
 	}
 	if _, err := os.Stat(filepath.Join(root, "knowledge-base", "cycles", "cycle-7.json")); !os.IsNotExist(err) {
 		t.Fatalf("quota pause emitted terminal dossier: %v", err)
+	}
+	var state struct {
+		FailedApproaches []json.RawMessage `json:"failedApproaches"`
+	}
+	raw, err := os.ReadFile(filepath.Join(evolveDir, "state.json"))
+	if err != nil || json.Unmarshal(raw, &state) != nil {
+		t.Fatalf("state.json unreadable after the pause: %v", err)
+	}
+	if len(state.FailedApproaches) != 0 {
+		t.Fatalf("a capacity wall is nobody's failed approach, yet the pause recorded one: %s", raw)
+	}
+}
+
+func TestRunLoop_AFreshCycleWalledOnCapacityIsNobodysFailedApproach(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	root := t.TempDir()
+	initLoopContractRepo(t, root)
+	evolveDir := filepath.Join(root, ".evolve")
+	st := storage.New(evolveDir)
+	if err := st.WriteState(context.Background(), core.State{}); err != nil {
+		t.Fatal(err)
+	}
+	old := wireOrchestratorDepsFn
+	t.Cleanup(func() { wireOrchestratorDepsFn = old })
+	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+		ledger := newFakeLedger()
+		runners := map[core.Phase]core.PhaseRunner{}
+		for _, p := range []core.Phase{core.PhaseIntent, core.PhaseScout, core.PhaseTriage, core.PhaseTDD, core.PhaseBuildPlanner, core.PhaseBuild, core.PhaseAudit, core.PhaseShip, core.PhaseRetro} {
+			runners[p] = resumedQuotaRunner{}
+		}
+		orch := core.NewOrchestrator(st, ledger, runners, core.WithRetryConfig(policy.RetryConfig{PhaseMaxAttempts: 2}))
+		return orchDeps{Storage: st, Ledger: ledger, Orchestrator: orch}
+	}
+	var stdout, stderr bytes.Buffer
+
+	rc := runLoop([]string{"--project-root", root, "--max-cycles", "1", "--goal-text", "walled"}, nil, &stdout, &stderr)
+
+	if rc != 5 || !strings.Contains(stdout.String(), `"stop_reason": "quota-pause"`) {
+		t.Fatalf("a walled fresh cycle pauses the loop: rc=%d stdout=%s stderr=%s", rc, stdout.String(), stderr.String())
+	}
+	var state struct {
+		FailedApproaches []json.RawMessage `json:"failedApproaches"`
+	}
+	raw, err := os.ReadFile(filepath.Join(evolveDir, "state.json"))
+	if err != nil || json.Unmarshal(raw, &state) != nil {
+		t.Fatalf("state.json unreadable after the pause: %v", err)
+	}
+	if len(state.FailedApproaches) != 0 {
+		t.Fatalf("a capacity wall is nobody's failed approach, yet the pause recorded one: %s", raw)
+	}
+	var summary struct {
+		RecoverableFailures int `json:"recoverable_failures"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &summary); err != nil {
+		t.Fatalf("the loop's summary is JSON: %v\n%s", err, stdout.String())
+	}
+	if summary.RecoverableFailures != 0 {
+		t.Errorf("a deferral is not a recoverable failure: %+v", summary)
 	}
 }

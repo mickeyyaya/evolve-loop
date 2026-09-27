@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-// TestSubagentRun_NoInProcessFallbackSignal is the B1 invariant proof: the
-// subagent-run command must NOT emit any signal telling the orchestrator to
-// fall back to the in-process Agent tool. The agent-bridge is the only
-// dispatch path; the historical LEGACY_DISPATCH escape hatch is retired.
-//
-// This is a source-level guard because the "fallback" was a printed contract
-// signal consumed by the (LLM) orchestrator, not a reachable Go branch.
 func TestSubagentRun_NoInProcessFallbackSignal(t *testing.T) {
 	body, err := os.ReadFile("cmd_subagent.go")
 	if err != nil {
@@ -31,11 +24,6 @@ func TestSubagentRun_NoInProcessFallbackSignal(t *testing.T) {
 		}
 	}
 
-	// Every surviving mention of LEGACY_AGENT_DISPATCH must either mark it as
-	// retired (help/usage text) or be the env read that feeds the hard error
-	// (os.Getenv, or the envchain.* getter it was migrated onto in Phase 1.3).
-	// It must NEVER be advertised as an honored/supported env var — that
-	// duplicated-and-stale advertisement is exactly what the auditor caught.
 	for i, line := range strings.Split(src, "\n") {
 		if !strings.Contains(line, "LEGACY_AGENT_DISPATCH") {
 			continue

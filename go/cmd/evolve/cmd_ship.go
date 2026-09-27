@@ -12,24 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// runShipCmd implements `evolve ship` — the native Go replacement for
-// `bash legacy/scripts/lifecycle/ship.sh`. Drop-in for hook chains, operator use,
-// and the release-pipeline.
-//
-// Usage:
-//
-//	evolve ship "<commit-message>"                   # --class cycle (default)
-//	evolve ship --class manual "<commit-message>"
-//	evolve ship --class release "<commit-message>"
-//	evolve ship --class trivial "<commit-message>"
-//	evolve ship --dry-run "<commit-message>"
-//
-// Exit codes mirror ship.sh:
-//
-//	0   — shipped
-//	1   — runtime failure (bad args, missing binary, git fail)
-//	2   — integrity failure (audit binding, SHA-pin tamper, manual refused)
-//	127 — required binary missing
 func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve ship", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -77,17 +59,12 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 	}
-	// A relative --project-root or $EVOLVE_PROJECT_ROOT would make audit-binding
-	// and commit-gate paths diverge from the worktree-relative ones (cycle-119).
 	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve ship: WARN: %s\n", m)
 	})
 	if pluginRoot == "" {
 		pluginRoot = os.Getenv("EVOLVE_PLUGIN_ROOT")
 	}
-	// ADR-0103 unit 07: the manual/release root wires the landing's warnings
-	// like every other root — the tracked-binary reset WARN that used to be a
-	// raw stderr line stays visible on the operator's console here.
 	signals := shipRootSignals(projectRoot, stderr)
 	defer signals.Flush()
 
@@ -108,16 +85,13 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	res, err := ship.Run(context.Background(), opts)
 
-	// Emit logs to stderr so callers can grep them (matches ship.sh's `log` → stderr).
 	for _, line := range res.Logs {
 		fmt.Fprintln(stderr, line)
 	}
 
 	if err != nil {
-		// Trust finalize()'s authoritative exit-code classification (keyed off
-		// the structured ShipError.Class: integrity → ExitIntegrity, else →
-		// ExitFailure). Early-validation errors bypass finalize and leave
-		// ExitCode==ExitOK; map those to ExitFailure.
+		// finalize() classifies err into ExitCode (integrity → ExitIntegrity, else
+		// ExitFailure); early-validation errors bypass it, leaving ExitCode==ExitOK.
 		if res.ExitCode != ship.ExitOK {
 			return int(res.ExitCode)
 		}
@@ -126,11 +100,6 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return int(res.ExitCode)
 }
 
-// shipRootSignals builds the standalone `evolve ship` root's Signal Center —
-// the ONE sink topology every root builds (newRootSignalCenter): fault-only
-// WARNs render on the operator's stderr and persist to
-// <evolveDir>/signals.ndjson (cycle-less; the file is opened on the first
-// event only, so a green manual ship touches no file).
 func shipRootSignals(projectRoot string, stderr io.Writer) *signalcenter.Center {
 	return newRootSignalCenter(projectRoot, paths.EvolveDirOf(projectRoot), stderr)
 }

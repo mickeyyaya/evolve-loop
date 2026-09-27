@@ -190,6 +190,26 @@ What it does not change: a rebase the proof declines still returns to Audit (or 
 
 One scoping, stated: ship re-proves the ancestry and the bytes itself and verifies the ledger chain the record sits in, but does not re-run the composed gates (build, test, acs, apicover) a second time; the writer refuses a record whose gates are not green, and the chain proves the record came through the writer, so a ship-side gate check would be dead code. The orchestrator also declines a carry when the auditor row was bound on another base than the one the change was authored on. Re-running the gates in ship (C4b) is a follow-up if a forged, re-chained ledger is ever a credible threat.
 
+### 5.9 The cycle's own record is not history (wave 18, cycle 1718)
+
+Cycle 1718 (`profiles-test-hygiene`) built a test-only change — five `internal/profiles` test files, a doc, an eval and its ACS predicates — and explained it: the builder wrote the cycle's own explanation document at the canonical path and declared it. The contract classes unambiguous test files as non-material, so the host's material set was empty, and the build floor's no-material branch refused the handoff with `not-applicable Build changed immutable cycle explanation record(s): docs/explain/builds/cycle-1718-….md`, naming the document the build had just written as if it were published history. The correction rung re-dispatched the builder (a codex deep launch that bounced on `model_unsupported`, then claude deep) to delete its own document and declare `NOT_APPLICABLE`; the second handoff passed. The cycle paid a full builder dispatch to remove a document that contradicted nothing.
+
+The defect is an asymmetry, not a policy: the material branch already excluded the cycle's own path from the immutability rule (`foreignHistoryFailures(paths, current)`), the no-material branch did not (`changedCycleRecords(paths)`), and the message called the builder's deliverable immutable. Under §4 the facts are: the diff is non-material (the host's judgment, from Git); the record is the cycle's own (its path binds the cycle and run id, and it did not exist at base); the builder declared it. No material change is hidden and no published record is rewritten, so nothing may block.
+
+X3 makes immutability one rule in every branch and lets the declaration choose the path:
+
+| The diff | The cycle's own record | The declaration | Before | Now |
+|---|---|---|---|---|
+| material | present | REQUIRED | verified | verified (unchanged) |
+| non-material | absent | NOT_APPLICABLE | N/A | N/A (unchanged) |
+| non-material | present | REQUIRED | refused as history | verified like any explanation, with an empty material set (the builder explained a non-material change; `Changed Areas` may cite only paths in the diff) |
+| non-material | present | NOT_APPLICABLE | refused as history | N/A; the undeclared record rides as documentation (the cycle's own, newly added, binding no verification — its content is not validated and no review is owed to it; once landed it is a published record, immutable to every later cycle) |
+| any | a foreign record changed | any | refused | refused: `published cycle records are immutable` — one message, every branch |
+
+The Verify mirror (audit, ship, `VerifyLanded`) branches on the recorded status rather than on the material set, so a required view with an empty material set verifies at ship exactly as at build. Its own foreign-record check sat behind the diff-SHA check — any path added after the build check changes the base-bound diff's SHA, which Verify compares first — and is removed as dead; `TestNonMaterialDiff_ARecordAddedAfterTheCheckDoesNotVerify` pins that the SHA check carries it.
+
+What it does not change: the builder's rule stays "no material path — declare `NOT_APPLICABLE` and write no record" (the reference says so, with the test-only example); the host merely stops punishing a builder that over-delivers. The same cycle then met a second process failure at ship: the importer backstop ran 89 targets under full load and `bridge/channel.TestChannel_EndToEnd` — a package the cycle did not touch — failed on the 10 ms sleep between its two ticks (`answer text = ""`, the assistant envelope outside the span); the test now waits for the first tick's envelope in the feed. The backstop's own rung for a named red in a package the ship did not change (one isolated re-run of that test before it is the lane's RED; a green re-run is flake evidence, recorded, and the ship proceeds; a red one stays RED) is F7 in §7.3, designed and not built.
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -255,6 +275,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | E2 | the assign-back correction names `Missing`; only the directive changes | designed | `core/retry_backoff.go` (`composeCorrection`), `core/resume.go` |
 | F0 | stable codes for floor rejections; routing on the whole violation set | designed | `explanationdocs`, `core/build_floor_reviewer.go`, `deliverable` |
 | F6a | E1 and E2 wired into the re-dispatch, before any agent rung | designed | `core/cyclerun_correction.go` |
+| F7 | the importer backstop re-runs a named red test of a package the ship did not change once, alone, before it is the lane's RED: green ⇒ flake evidence (a WARN naming the test, and an inbox item for its hygiene fix so the lesson queues work), the ship proceeds; red ⇒ RED as today (§5.9; 1718's `TestChannel_EndToEnd`) | designed | `phases/ship/repocontract.go` (`runClassifiedPackRetrying`, after `realRed`) |
 
 ### 7.4 Verdict and ladder (V, F)
 
@@ -279,7 +300,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 |---|---|---|---|
 | Q1 | exhaustion during a correction re-dispatch, a remediation re-run and the resume review gate defers through `pauseForQuota` (`isQuotaWall`: the runner's exit 85 means its whole family chain was walled — one sample suffices, unlike the first dispatch's two-sample rule, which predates the tiered chain); a non-wall failure stays a failure; the pause records the phase's total dispatches | shipped on the P3 train | `core/cyclerun_correction.go`, `core/cyclerun_remediate.go`, `core/resume.go` |
 | Q2 | `auth_recheck` (`clihealth.CredentialPattern`) benches the family; unlike a quota bench it stays active for routing after its cooldown (time says nothing about a login) while the canary probes it, and a succeeding probe after the operator's login clears it; the bench entry carries `operator_action` (`clihealth.OperatorAction`), which the chain walker's bench line and the canary's re-bench line print | shipped on the P3 train | `internal/clihealth`, `internal/bridgechain`, `cmd/evolve/cli_health_canary.go` |
-| Q3 | a deferral writes no failure digest and counts toward no halt | designed (§5.5) | `core/blocker_breaker.go`, `cmd/evolve` wave accounting |
+| Q3 | a deferral writes no failure digest and counts toward no halt: the wave breaker reads only digests and a deferral writes none (Q1's `TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch`); the sequential loop now pauses on a deferral before it records a failed approach or runs the failure closeout, so a capacity wall never demotes the item or counts as a recoverable failure (`TestRunLoop_AFreshCycleWalledOnCapacityIsNobodysFailedApproach`) | shipped | `core/blocker_breaker.go`, `cmd/evolve/cmd_loop_sequential_dispatch.go` |
 | Q4 | the fallback chain filters candidates by the phase's requirements | designed (§5.5) | `internal/bridgechain` |
 
 ### 7.6 Ledger of outcomes (L)
@@ -297,6 +318,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | W2 | a failing authored id accrues a durable failure count toward the S5 ceiling | designed (§5.6) | `internal/inboxmover` |
 | X1 | `.evolve/inbox/` is non-material to the explanation document: the host claims, moves, stamps and retires those records | shipped | `internal/explanationdocs` |
 | X2 | an explanation review that names only the document of a verified build is a recovery rung, never the audit's FAIL | designed (§5.6) | `phases/audit/explanation_review_gate.go`, the recovery agent (F4/F6) |
+| X3 | the cycle's own explanation record is never history: only foreign cycle records are immutable, in every branch; a no-material diff declared `REQUIRED` is verified with an empty material set, one declared `NOT_APPLICABLE` keeps an undeclared own record as documentation; the Verify mirror branches on the recorded status | shipped (§5.9) | `internal/explanationdocs` (`checkBuildV1`, `verifyResolvedV1`) |
 
 ### 7.8 Routing at triage (R)
 
@@ -413,6 +435,8 @@ Cycles ~1550–1707 (the inventory gathered for ADR-0106):
 | a passed build aborted when the explanation floor exhausted its correction budget (1707, after a rebase and a passed re-audit) | form | the cycle | F0, E1/E2 |
 | a verified build (ACS 10/10, EGPS red 0, mutation probe) sealed FAIL because the explanation document's sentence about a host-consumed inbox record contradicted the consumption stamp (1712 audit; the floor demanded the path twelve times across 1707, 1708 and 1712) | form | the cycle | X1 (shipped), X2 |
 | a top_n card naming a protected surface sealed the cycle FAIL, and the item was routed only by the failure path (1714; the item declared no files, the agent was never told the surfaces) | process | the cycle | R1 (shipped), R2 (shipped) |
+| a test-only build that explained itself was refused because the floor counted the cycle's own record as immutable history; the correction rung re-dispatched the builder to delete it (1718 build) | form | a builder dispatch (plus a codex `model_unsupported` bounce) | X3 (shipped) |
+| the ship's importer backstop went RED on `bridge/channel.TestChannel_EndToEnd`, a timing-window test in a package the cycle did not touch, under the load of 89 targets (1718 ship → re-audit) | process | a re-audit and a second ship attempt | the test waits on the feed (shipped); F7 (designed) |
 
 No `missing_section` or `bad_verdict` rejection is recorded in the range, so the recovery agent (F4/F6) lands last, after H1/H2 and the evidence decision are measured again.
 
@@ -461,10 +485,12 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (W1, H1b) | one gofmt alignment; PASS with three MINORs → applied; PASS with two MINORs → one applied | a present item whose move fails is never stamped unbacked (regression test); the lock-free write is an idempotent create, said in one line; the no-work closeout logs what it routed and retired; the plain-id guard is the one place a path is built from a caller's id |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (R1, R2) | the rewrite split into two helpers; BLOCK → fixed; BLOCK → fixed | an id-less card and a card the decision never committed both fail closed (the removal set can never hold an empty key; a report-versus-decision mismatch is a fault, not a silent commit); the ACS predicate that pins the admission tests by name follows the renames; the package's atomic JSON writer replaces an inline copy |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (P1: B3/B4) | two redundant rebinds; PASS with a MAJOR → fixed; WARNING with the same MAJOR → fixed | ship trusted the record's gate results from an unchained ledger read: ship now verifies the chain (0.4 s on 147K lines) and binds the record's patch-id to the bytes it proved, the ship-side gate check goes (the writer refuses red gates and the chain proves the writer), the git adapter forwards the real exit code, and the orchestrator declines a carry whose auditor row was bound on another base; the reviewers confirmed the full-index byte identity subsumes B2's lineage check at ship |
+| 2026-09-27 | go-reviewer, code-reviewer (Q3) | PASS with two MINORs → applied; PASS with two MINORs → one applied | the skipped failure closeout is intentional (a wall is resumable, its claims stay claimed) and every wall producer wraps it as a cycle-level failure, both said in one comment; the summary assertion parses the loop's JSON instead of matching its spacing |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer (Q1) | one closure; APPROVE-WITH-MINOR → applied; WARNING → justified and fixed | the one-sample reading of a walled `Run` stated in code and §12; the deferral records the phase's total dispatches; the digest assertion made non-vacuous |
 | 2026-09-27 | code-simplifier, go-reviewer, code-reviewer, security-reviewer (P3) | no edits; APPROVE; WARNING → fixed; APPROVE-WITH-MINOR → hardened | the sole-writer line was false for stdout-completion phases (fixed); a manifest `default_env` could set credential or loop variables the guards never see (refused at parse); facts rendered into the block are sanitized; no manifest pattern may match the block (pinned) |
 | 2026-09-26 | consistency audit (every doc vs the design vs the shipped code) | INCONSISTENCIES-FOUND → fixed | three stale package pages, one stale sentence in phase-architecture.md, one imprecise ADR sentence; two new package pages |
 | 2026-09-26 | code-reviewer (design document) | APPROVE-WITH-MINOR | the exit-85 census corrected; the audit-seal clause restored; F2b cross-referenced |
+| 2026-09-27 | X3 (§5.9) reviewed: code-simplifier no edit; go-reviewer PASS, one MINOR (an undeclared own record is unvalidated content that becomes an immutable published record — now stated in the contract doc and the §5.9 table); code-reviewer PASS, none (traced the four status × material combinations through build and Verify; confirmed the removed mirror check dead behind `diffSHA256`, which hashes every changed path) |
 
 ## 14. Document history
 
@@ -482,3 +508,5 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-27 | §5.7 and §7.8: wave 16's first cycle (1714) sealed FAIL on a top_n card naming a protected surface; R1 moves such a card into `escalate_block` by the host's hand and lets the planned no-work closeout route it (never a verdict); R2 tells the agent the surfaces and the drop reason; §8 signatures; the evidence row |
 | 2026-09-27 | §5.8: the carry (P1 = ADR-0105 B3/B4) designed as four components after 1712 and 1715 each re-audited a byte-identical rebase; the P1 row points at it |
 | 2026-09-27 | §5.8 C1–C4 shipped: a byte-identical rebase ships on its audited verdict (`treedelta` leaf; the carry record names the audited tree; `identityCarryForward` after the rebind; ship re-proves the carry inside its one binding rule); the P1 row and §8 updated; the gate re-run in ship scoped out as C4b |
+| 2026-09-27 | Q3 verified and closed: both breakers read only failure digests or FAIL verdicts, which a deferral never produces; the one gap was the sequential dispatcher recording a failed approach and running the failure closeout before its quota pause, now moved after the check |
+| 2026-09-27 | §5.9: cycle 1718's test-only build explained itself and the floor refused its own record as immutable history; X3 makes foreign-only immutability the one rule in every branch, verifies a declared explanation of a non-material diff with an empty material set, and branches the Verify mirror on the recorded status; the X3 row, the evidence rows for 1718's build and ship, the channel test's feed wait, F7 designed |

@@ -24,9 +24,6 @@ func writeTokensTimingFixture(t *testing.T, root string, cycle string, entries [
 	}
 }
 
-// TestTokensReport_RanksPhasesByInputTokens is the S7 RED test: across the
-// walked cycles, phases must rank highest-InputTokens-first in the report,
-// regardless of the order phases appear within any one cycle's log.
 func TestTokensReport_RanksPhasesByInputTokens(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "1", []phasetiming.Entry{
@@ -72,8 +69,6 @@ func TestTokensReport_RanksPhasesByInputTokens(t *testing.T) {
 	}
 }
 
-// TestRunTokensReport_TableRendersPhasesAndTotals covers the human-readable
-// path (no --json): the table must name every phase and the total line.
 func TestRunTokensReport_TableRendersPhasesAndTotals(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "9", []phasetiming.Entry{
@@ -93,7 +88,6 @@ func TestRunTokensReport_TableRendersPhasesAndTotals(t *testing.T) {
 	}
 }
 
-// TestRunTokensReport_NoLogsErrors covers the missing-evidence error path.
 func TestRunTokensReport_NoLogsErrors(t *testing.T) {
 	root := t.TempDir()
 	var out, errb bytes.Buffer
@@ -102,18 +96,6 @@ func TestRunTokensReport_NoLogsErrors(t *testing.T) {
 		t.Fatalf("exit=0, want non-zero when no timing logs exist")
 	}
 }
-
-// --- cycle-1013: surface engine tripwire records in `evolve tokens report` ---
-//
-// The engine (go/internal/bridge/engine.go recordTokenUsage, unchanged) already
-// writes a `"tripwire":true` field into a cycle's llm-calls.ndjson whenever a
-// non-claude launch exits 0, runs past the 60s success threshold, and resolves to
-// source=none. These RED tests encode the report-side gap: `evolve tokens report`
-// must READ those records and SURFACE the tripwire (plain-text + --json), because
-// today buildTokensReport only walks phase-timing.json and never opens
-// llm-calls.ndjson. Fixtures write the exact on-disk record shape; assertions run
-// over the rendered output / generic JSON so they exercise real behavior without
-// binding to a not-yet-authored struct field name.
 
 // writeTokensLLMCalls writes an llm-calls.ndjson fixture (one JSON object per
 // line) into the given cycle's run dir — the same on-disk shape
@@ -151,8 +133,8 @@ func lineContaining(text, needle string) string {
 
 // tripwireCountFromJSON decodes the report JSON and returns the tripwire count:
 // the value of any top-level field whose key contains "tripwire" and is a number,
-// or the length of such an array field. Returns -1 when no tripwire field exists
-// (the RED state today), so the test discriminates "surfaced 1" from "absent".
+// or the length of such an array field; -1 when no such field exists, so the
+// test discriminates "surfaced 1" from "absent".
 func tripwireCountFromJSON(t *testing.T, data []byte) int {
 	t.Helper()
 	var m map[string]any
@@ -178,10 +160,6 @@ func tripwireCountFromJSON(t *testing.T, data []byte) int {
 	return count
 }
 
-// TestRunTokensReport_SurfacesTripwireInTextAndJSON — AC1+AC2. A cycle's
-// llm-calls.ndjson tripwire record surfaces in both the plain-text report and
-// --json, and the surfaced line names the CLI, agent, and cycle. A sibling
-// non-tripwire (claude) record in the same file must NOT be surfaced.
 func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
 	root := t.TempDir()
 	// Cycle 5 is discovered via its phase-timing log; duration 90000 / exit 0
@@ -229,11 +207,6 @@ func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
 	}
 }
 
-// TestRunTokensReport_SurfacesTripwireEvenWhenPhasesEmpty — the cycle-1007
-// render-order regression. Cycle 7 is discovered (its phase-timing.json exists)
-// but has ZERO phase entries, so r.Phases is empty — the exact shape that made
-// renderTokensReport early-return before printing anything. The tripwire must
-// still surface.
 func TestRunTokensReport_SurfacesTripwireEvenWhenPhasesEmpty(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "7", []phasetiming.Entry{})
@@ -255,11 +228,6 @@ func TestRunTokensReport_SurfacesTripwireEvenWhenPhasesEmpty(t *testing.T) {
 	}
 }
 
-// TestRunTokensReport_ZeroTripwireStaysQuiet — AC3 NEGATIVE. A cycle whose
-// launches all have tripwire:false (a claude baseline and a quota-abort exit-85
-// short non-claude launch — the current-quota-abort false-positive pattern) must
-// emit NO TRIPWIRE line. Paired with the surfacing tests, this rejects an
-// always-on implementation.
 func TestRunTokensReport_ZeroTripwireStaysQuiet(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "3", []phasetiming.Entry{
@@ -281,11 +249,6 @@ func TestRunTokensReport_ZeroTripwireStaysQuiet(t *testing.T) {
 	}
 }
 
-// TestRunTokensReport_SanitizesTripwireControlBytes — F1 EDGE (carried from the
-// cycle-1010 audit). A compromised non-claude driver embeds ANSI escape bytes in
-// its own record's CLI/agent/phase fields to rewrite or hide the tripwire line
-// meant to expose it. The plain-text render must escape/strip control bytes: no
-// raw ESC (0x1b) may reach the TTY, and the tripwire must still surface.
 func TestRunTokensReport_SanitizesTripwireControlBytes(t *testing.T) {
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "4", []phasetiming.Entry{

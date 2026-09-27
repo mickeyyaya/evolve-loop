@@ -1,28 +1,5 @@
 package bridge
 
-// sandbox_write_subpaths_test.go — profile.sandbox.write_subpaths is honored.
-//
-// Every phase profile declares its sandbox write surface in
-// sandbox.write_subpaths, and the persona renders its instructions from the
-// same profile. The bash-era dispatcher (subagent-run.sh, v8.21–v8.23) granted
-// those paths; the Go port kept the SBPL glob-widening they fed
-// (adapters/sandbox: "Globs widen to parent dir (bash:520)") but dropped the
-// consumer: launch.go projects deny_subpaths and deny_read_subpaths from the
-// profile and never reads write_subpaths, so the wrapper invents its own
-// allow set (worktree + workspace + /tmp) plus a Go-literal copy of ONE
-// profile's declaration (retrospective's lesson dir).
-//
-// The consequence is the P0 in inbox triage-sandbox-denies-its-own-claim-write:
-// triage declares ".evolve/inbox/processing", its persona instructs
-// `evolve inbox-mover claim` as the atomic hand-off, the profile never grants
-// it, mkdir fails, and cycle 1623 ran twelve phases and shipped 922 lines
-// against an EMPTY commitment. The same gap is latent for every other
-// declared write no literal happens to cover (doc-sync's docs/ and
-// knowledge-base/, orchestrator's ledger, scout's eval materialization).
-//
-// These tests read the REAL profiles, so a declaration that drifts from its
-// grant fails here rather than in a live cycle.
-
 import (
 	"encoding/json"
 	"os"
@@ -67,11 +44,9 @@ func allowWriteLine(path string) string {
 	return "(allow file-write* (subpath " + strconv.Quote(path) + "))"
 }
 
-// TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir is the P0 pin: the
-// triage profile's own write_subpaths declaration must appear as a write
-// grant in the rendered profile. Before the fix the request carries the
-// declaration and the wrapper ignores it — the exact shape of cycle 1623's
-// sandbox-triage.sb (deny on the plane, allow-back set without the inbox).
+// TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir pins that the
+// triage profile's own write_subpaths declaration appears as a write grant
+// in the rendered profile.
 func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
 	if err != nil {
@@ -95,8 +70,8 @@ func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
 	})
 
 	// SBPL (subpath X) covers everything below X, so the claim dir may be
-	// granted by its own line or by a parent's (since PR-0 of ADR-0100 the
-	// profile grants .evolve/inbox — the rename's SOURCE directory too).
+	// granted by its own line or by a parent's — the profile also grants
+	// .evolve/inbox, the rename's SOURCE directory.
 	claimDir := filepath.Join(canonicalRoot, ".evolve", "inbox", "processing", "cycle-1623")
 	var granted []string
 	for _, m := range subpathArgRe.FindAllStringSubmatch(sbpl, -1) {
@@ -152,14 +127,11 @@ func realSandboxProfiles(t *testing.T) map[string]Profile {
 }
 
 // TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper is the wiring proof
-// for the first hop: the REAL launch path (Engine.LaunchArgs → profile load →
+// for the first hop: the real launch path (Engine.LaunchArgs → profile load →
 // Config → sandboxPrefixForLaunch) carries the profile's declared
-// write_subpaths, verbatim, to the sandbox wrapper. It uses the launch
-// fixture's own profile shape with a sandbox block, because the point is the
-// projection, not any one profile's content — the real profiles' declarations
-// are proven at the second hop by TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath.
-// Before the fix the launch path projected deny_subpaths and dropped this
-// field on the floor; this test fails for that regression by assertion.
+// write_subpaths, verbatim, to the sandbox wrapper. The real profiles'
+// declarations are proven at the second hop by
+// TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath.
 func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 	declared := []string{".evolve/inbox/processing", "{worktree_path}/tests"}
 	fx := newFixture(t, "claude-p", "")
@@ -195,12 +167,10 @@ func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 	}
 }
 
-// TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath is the wiring proof
-// for the second hop, and the durable regression gate the P0 asked for: for
-// every sandbox-enabled profile, every declared write_subpaths entry — as the
-// production resolver resolves it and the generator widens it — appears as a
-// write grant in the rendered SBPL. A profile whose declaration the generated
-// profile does not honor fails here, naming the profile and the path.
+// TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath is the durable
+// regression gate: for every sandbox-enabled profile, every declared
+// write_subpaths entry — as the production resolver resolves it and the
+// generator widens it — appears as a write grant in the rendered SBPL.
 func TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath(t *testing.T) {
 	for name, prof := range realSandboxProfiles(t) {
 		t.Run(strings.TrimSuffix(name, ".json"), func(t *testing.T) {
@@ -317,12 +287,10 @@ func TestResolveSandboxWriteGrants_RefusesASymlinkRetargetBelowTheBase(t *testin
 var subpathArgRe = regexp.MustCompile(`\(subpath "([^"]*)"\)`)
 
 // TestTriageProfile_GrantsTheClaimMove pins the grant against the OPERATION
-// the triage persona performs, not just a path. `evolve inbox-mover claim`
-// renames <inbox>/<item>.json → <inbox>/processing/cycle-N/<item>.json; a
+// the triage persona performs, not just a path: `evolve inbox-mover claim`
+// renames <inbox>/<item>.json → <inbox>/processing/cycle-N/<item>.json, and a
 // rename writes BOTH directories (unlink at the source, create at the
-// destination). Batch cycle 1630 (2026-09-12) had the destination granted and
-// the source denied: mkdir succeeded, the rename got EPERM, and the cycle
-// terminated with an empty commitment.
+// destination).
 func TestTriageProfile_GrantsTheClaimMove(t *testing.T) {
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
 	if err != nil {

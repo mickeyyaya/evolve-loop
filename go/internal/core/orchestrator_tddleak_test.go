@@ -24,8 +24,6 @@ func (r *tddLeakRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse,
 	return PhaseResponse{Phase: r.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// TestTDDLeakRecover verifies that when the TDD phase leaks a tracked file to the main tree,
-// recoverBuildLeak relocates it into the active worktree and restores main to HEAD, allowing the cycle to continue.
 func TestTDDLeakRecover(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -35,7 +33,6 @@ func TestTDDLeakRecover(t *testing.T) {
 	root := initAuditLeakRepo(t)
 	runners := buildRunners(nil)
 
-	// Simulate TDD phase modifying docs/note.md in the main tree
 	runners[PhaseTDD] = &tddLeakRunner{
 		name: string(PhaseTDD),
 		onRun: func() {
@@ -49,7 +46,7 @@ func TestTDDLeakRecover(t *testing.T) {
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 
-	// Use the real gitWorktree provisioner to ensure we have a valid git worktree
+	// Real gitWorktree provisioner (not fakeWorktree) so recovery runs against an actual git worktree.
 	o := NewOrchestrator(st, led, runners, WithWorktreeProvisioner(gitWorktree{}))
 
 	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
@@ -57,12 +54,10 @@ func TestTDDLeakRecover(t *testing.T) {
 		t.Fatalf("cycle failed: %v", err)
 	}
 
-	// Verify that docs/note.md in main repo was restored to its committed content
 	if got := auditLeakReadFile(t, filepath.Join(root, "docs", "note.md")); got != auditLeakNoteV1 {
 		t.Errorf("docs/note.md in main = %q, want committed %q", got, auditLeakNoteV1)
 	}
 
-	// Verify that ship actually ran, meaning cycle completed successfully
 	shipRan := false
 	for _, p := range res.PhasesRun {
 		if p == PhaseShip {
@@ -74,8 +69,6 @@ func TestTDDLeakRecover(t *testing.T) {
 	}
 }
 
-// TestDiscardGitignore verifies that isGitignored correctly identifies gitignored files
-// and that untracked gitignored paths are correctly identified.
 func TestDiscardGitignore(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -84,18 +77,15 @@ func TestDiscardGitignore(t *testing.T) {
 	root := initAuditLeakRepo(t)
 	ctx := context.Background()
 
-	// 1. Verify that a tracked file (like go/evolve) is NOT gitignored
 	if isGitignored(ctx, root, "go/evolve") {
 		t.Error("go/evolve is tracked and should not be gitignored")
 	}
 
-	// 2. Create a gitignored file
 	err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte("ignored_file.txt\n"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Commit .gitignore
 	cmd := exec.Command("git", "-C", root, "add", ".gitignore")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git add gitignore: %v\n%s", err, out)
@@ -108,18 +98,15 @@ func TestDiscardGitignore(t *testing.T) {
 		t.Fatalf("git commit gitignore: %v\n%s", err, out)
 	}
 
-	// Create the ignored file
 	err = os.WriteFile(filepath.Join(root, "ignored_file.txt"), []byte("ignored content\n"), 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Verify that ignored_file.txt IS gitignored
 	if !isGitignored(ctx, root, "ignored_file.txt") {
 		t.Error("ignored_file.txt should be gitignored")
 	}
 
-	// 3. Verify that discardMainLeak on a gitignored untracked file fails (since checkout expects a tracked file)
 	err = discardMainLeak(ctx, root, "ignored_file.txt")
 	if err == nil {
 		t.Error("discardMainLeak on untracked gitignored path should return error")

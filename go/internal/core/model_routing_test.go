@@ -13,11 +13,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// modelRoutingCfg builds a DynamicLLM cfg at StageAdvisory with the given
-// model-routing axis — the cycle-440 MR4 wiring gate (o.cfg.Stage >=
-// StageAdvisory && o.cfg.Mode == ModeDynamicLLM && o.planner != nil) is what
-// makes the whole-cycle plan (and, once wired, ClampPlanModelRouting) run at
-// all.
+// modelRoutingCfg builds a DynamicLLM cfg at StageAdvisory, the combination
+// that opens the planner gate (Stage>=Advisory && Mode==DynamicLLM &&
+// planner!=nil) required for the whole-cycle plan to run.
 func modelRoutingCfg(mr config.ModelRouting) config.RoutingConfig {
 	cfg := shadowCfg(config.StageAdvisory)
 	cfg.Mode = config.ModeDynamicLLM
@@ -25,8 +23,6 @@ func modelRoutingCfg(mr config.ModelRouting) config.RoutingConfig {
 	return cfg
 }
 
-// modelRoutingPlanner returns a fixed plan proposing {claude-tmux, deep} for
-// the build phase (the phase this suite inspects requests for).
 type modelRoutingPlanner struct {
 	plan *router.PhasePlan
 	err  error
@@ -45,9 +41,6 @@ func buildProposingPlan() *router.PhasePlan {
 	}}
 }
 
-// TestModelRouting_AutoApplies (mr4-projection AC1): under model_routing=auto,
-// the build phase's PhaseRequest carries the plan's (clamped) {cli,tier}
-// proposal — the only mode that can change actual dispatch (I2).
 func TestModelRouting_AutoApplies(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -70,11 +63,6 @@ func TestModelRouting_AutoApplies(t *testing.T) {
 	}
 }
 
-// TestModelRouting_AdvisoryLogsNotApplies (mr4-projection AC2): under
-// model_routing=advisory, the SAME plan proposal is computed and RECORDED
-// (phase-plan.json carries the clamped {cli,tier}) but the PhaseRequest
-// fields dispatched to the build phase stay empty — advisory logs, it never
-// applies.
 func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -97,9 +85,6 @@ func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
 		t.Errorf("ModelRoutingCLI/Tier = %q/%q, want empty (advisory must NOT apply to dispatch)", req.ModelRoutingCLI, req.ModelRoutingTier)
 	}
 
-	// "Logs" half of the contract: the clamped proposal must still have been
-	// computed and persisted to phase-plan.json (proves ClampPlanModelRouting
-	// ran under advisory too — I2 — it just isn't projected onto the request).
 	ws := RunWorkspacePath(projectRoot, res.Cycle)
 	raw, rerr := os.ReadFile(filepath.Join(ws, "phase-plan.json"))
 	if rerr != nil {
@@ -123,11 +108,6 @@ func TestModelRouting_AdvisoryLogsNotApplies(t *testing.T) {
 	}
 }
 
-// TestModelRouting_StaticIsNoop (mr4-projection AC3, I8 byte-identical
-// regression floor): with model_routing left at its Go zero value (static),
-// the plan's {cli,tier} proposal never reaches the PhaseRequest — dispatch is
-// byte-identical to pre-MR4 behavior even though the advisor proposed
-// something.
 func TestModelRouting_StaticIsNoop(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -149,11 +129,6 @@ func TestModelRouting_StaticIsNoop(t *testing.T) {
 	}
 }
 
-// TestModelRouting_AutoDegradesToProfileStatic (mr4-projection AC4, I4 HARD
-// CONSTRAINT): under model_routing=auto, a failed/absent advisor (Plan
-// returns an error, so clampedPlan stays nil — the documented exit=81
-// outage mode) must NEVER break dispatch. Every phase still runs with empty
-// overlay fields — profile-static per phase — and the cycle completes.
 func TestModelRouting_AutoDegradesToProfileStatic(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -179,12 +154,8 @@ func TestModelRouting_AutoDegradesToProfileStatic(t *testing.T) {
 	}
 }
 
-// TestModelRouting_CatalogMissClampsUnderAuto (mr4-projection AC1
-// counterpart / DI wiring): WithModelCatalogLookup injects the catalog-
-// resolvability gate into router.ClampPlanModelRouting. When the injected
-// lookup reports a miss for every {cli,tier}, an in-bounds-guardrail proposal
-// must still be clamped away — even under auto — proving the DI seam
-// actually reaches the clamp (not merely stored and ignored).
+// Proves the injected catalog lookup actually reaches the clamp, not merely
+// stored and ignored.
 func TestModelRouting_CatalogMissClampsUnderAuto(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	runners := buildRunners(nil)
@@ -208,10 +179,6 @@ func TestModelRouting_CatalogMissClampsUnderAuto(t *testing.T) {
 	}
 }
 
-// TestPhaseRequest_ModelRoutingFieldsOmitEmptyByDefault (I8): the two new
-// wire fields are omitempty — a zero-value PhaseRequest (the entire
-// pre-cycle-440 fleet) marshals with neither key present, so an unaware
-// consumer (e.g. the subprocess phaseproto override path) sees no new shape.
 func TestPhaseRequest_ModelRoutingFieldsOmitEmptyByDefault(t *testing.T) {
 	buf, err := json.Marshal(PhaseRequest{Cycle: 1, ProjectRoot: "/p", GoalHash: "g"})
 	if err != nil {

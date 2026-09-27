@@ -5,16 +5,6 @@ import (
 	"testing"
 )
 
-// realizer_test.go — the heart of ADR-0022: ONE CLI-agnostic LaunchIntent must
-// realize correctly AND differently per CLI, via each manifest's declarative
-// `params` table. The same intent that yields `--dangerously-skip-permissions
-// --model sonnet --setting-sources project` for claude must yield
-// `--dangerously-skip-permissions --model "Gemini 3.5 Flash (High)"` for agy
-// (display-name model tokens, no settings flag; cycle-447) and `-m gpt-5.4`
-// for codex — and NEVER a flag the target CLI does not define. An intent with
-// no manifest entry is a no-op (the property that makes foreign params unable
-// to break a launch).
-
 func claudeTmuxManifest() Manifest {
 	return Manifest{
 		CLI: "claude-tmux", Binary: "claude",
@@ -45,8 +35,8 @@ func codexTmuxManifest() Manifest {
 func agyTmuxManifest() Manifest {
 	return Manifest{
 		CLI: "agy-tmux", Binary: "agy",
-		// Mirrors the real manifest post-cycle-447: agy 1.0.15 grew a --model
-		// launch flag whose selectable tokens are display names (spaces/parens).
+		// Mirrors the real manifest: agy's --model launch flag selects
+		// display-name tokens (spaces/parens).
 		ModelTierMap: map[string]string{"fast": "Gemini 3.5 Flash (Low)", "balanced": "Gemini 3.5 Flash (High)", "deep": "Gemini 3.1 Pro (High)"},
 		Params: map[string]ParamSpec{
 			"model_tier":     {Channel: "flag", Flag: "--model", From: "model_tier_map"},
@@ -113,10 +103,9 @@ func TestRealize_PerCLI_SameIntentDifferentRealization(t *testing.T) {
 }
 
 // TestRealize_REPLChannel covers the post-boot REPL-injection channel — a
-// supported engine capability for CLIs whose model can only be set in-session.
-// No production manifest uses it today (every tmux CLI's model is a launch flag
-// or a no-op), so it's pinned here with a synthetic manifest so the channel
-// stays covered and documented as reserved.
+// supported engine capability for CLIs whose model can only be set
+// in-session. No production manifest uses it today, so it's pinned here with
+// a synthetic manifest to keep the channel covered and reserved.
 func TestRealize_REPLChannel(t *testing.T) {
 	m := Manifest{
 		CLI:          "hypo-tmux",
@@ -143,9 +132,6 @@ func TestRealize_NamedSessionMode(t *testing.T) {
 }
 
 func TestRealize_UnknownIntentIsNoop(t *testing.T) {
-	// A manifest with NO params table: every intent field is a no-op, never an
-	// error. This is the property that makes a foreign/unsupported param unable
-	// to abort a launch.
 	got := Realize(Manifest{CLI: "bare"}, LaunchIntent{ModelTier: "sonnet", Permission: "bypass", SettingsScope: "project"})
 	if len(got.LaunchFlags) != 0 || len(got.REPLInput) != 0 {
 		t.Fatalf("bare manifest must realize to nothing; got flags=%v repl=%v", got.LaunchFlags, got.REPLInput)
@@ -175,15 +161,6 @@ func TestRealize_AllowedToolsExpandsFlag(t *testing.T) {
 	}
 }
 
-// TestRealize_DefaultArgs_LandFirst pins the cycle-124 G1a wire-up: manifest
-// `default_args` is the always-on launch-flag channel (was a dead field
-// before cycle-124 — declared in manifest.go but never read). Tokens land in
-// LaunchFlags BEFORE per-param scalars, so a manifest can prepend
-// unconditional boot-time switches (e.g. codex-tmux --yolo, ollama-tmux
-// --experimental-yolo) without competing with intent-driven flags. An empty
-// or nil default_args remains a no-op (regression guard for the agy/claude
-// migration that emptied their default_args and let params.permission be
-// the sole emitter).
 func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 	// Synthetic manifest: default_args + one per-param scalar. Tokens MUST
 	// appear in this exact order.
@@ -198,9 +175,8 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 		t.Fatalf("default_args must land FIRST; got %v, want %v", got.LaunchFlags, want)
 	}
 
-	// Empty default_args produces unchanged behavior — regression guard for the
-	// cycle-124 agy/claude migration that emptied default_args and let
-	// params.permission be the sole emitter of --dangerously-skip-permissions.
+	// Empty default_args produces unchanged behavior — a regression guard for
+	// manifests that emptied default_args and rely on params.permission alone.
 	mEmpty := Manifest{
 		CLI:         "hypo-empty",
 		DefaultArgs: []string{},
@@ -222,22 +198,6 @@ func TestRealize_DefaultArgs_LandFirst(t *testing.T) {
 	}
 }
 
-// TestRealize_DefaultArgs_Deduped covers the cycle-124 G1a wire-up's
-// order-preserving dedupe: when a manifest declares the same token in
-// default_args AND one of its params channels emits the same token, the
-// duplicate is silently dropped (the operator-declared default keeps the
-// leading position). This is the documented invariant for boolean-style flags;
-// flag/value PAIRS with different VALUES are preserved because dedupe keys on
-// the PAIR.
-//
-// This comment previously said the opposite — that dedupe was "token-level, so
-// `--model gpt-5.4` and `--model gpt-5.5` would both survive — neither matches
-// the other as tokens". That was the exact belief the assertion below encoded,
-// and it was false in a way the sentence hid: token-wise dedupe dropped the
-// second `--model` and kept BOTH values, yielding `--model gpt-5.4 gpt-5.5` and
-// demoting a model name to a positional argument (i.e. into the prompt, since
-// the tmux launch line carries no other positional). Corrected 2026-08-27 with
-// the assertion, so the prose and the pin can no longer disagree.
 func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 	// Collision case: default_args declares the same flag the bypass channel
 	// emits. Result must contain it exactly ONCE, at the leading position.
@@ -252,8 +212,7 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 	}
 
 	// Distinct-value case: different VALUES of the same FLAG NAME each survive
-	// as their own pair. See this function's header for why the previous
-	// wording here was wrong.
+	// as their own pair.
 	m2 := Manifest{
 		CLI:         "hypo2",
 		DefaultArgs: []string{"--model", "gpt-5.4"},
@@ -263,22 +222,17 @@ func TestRealize_DefaultArgs_Deduped(t *testing.T) {
 		ModelTierMap: map[string]string{"sonnet": "gpt-5.5"},
 	}
 	got2 := Realize(m2, LaunchIntent{ModelTier: "sonnet"})
-	// FLIPPED 2026-08-27 (header explains why): both pairs survive, and
-	// last-one-wins lets the param-resolved tier take effect — which is what a
-	// caller declaring the param wanted. Declaring the same flag in both
-	// default_args and params remains poor hygiene, but is no longer harmful.
+	// Both pairs survive, and last-one-wins lets the param-resolved tier take
+	// effect. Declaring the same flag in both default_args and params remains
+	// poor hygiene, but is no longer harmful.
 	if !reflect.DeepEqual(got2.LaunchFlags, []string{"--model", "gpt-5.4", "--model", "gpt-5.5"}) {
 		t.Fatalf("pair-level dedupe expected; got %v, want [--model gpt-5.4 --model gpt-5.5]", got2.LaunchFlags)
 	}
 }
 
-// TestDedupeLaunchFlags_Edges directly exercises the helper that the cycle-124
-// HIGH review-finding had us re-write with a fresh backing slice. The Realize
-// integration tests above exercise the helper indirectly; this table drives
-// the pure function across every plausible input shape so future refactors
-// surface here first. Order-preservation (first occurrence wins) is the
-// load-bearing contract — flags-first reflects the operator-declared default,
-// per-param scalars deduplicate against it, and raw extras come last.
+// TestDedupeLaunchFlags_Edges drives dedupeLaunchFlags across every plausible
+// input shape so future refactors surface here first. Order-preservation
+// (first occurrence wins) is the load-bearing contract.
 func TestDedupeLaunchFlags_Edges(t *testing.T) {
 	cases := []struct {
 		name string
@@ -297,13 +251,6 @@ func TestDedupeLaunchFlags_Edges(t *testing.T) {
 			[]string{"--flag", "value"},
 		},
 		{
-			// FLIPPED 2026-08-27: this pinned a documented FOOTGUN — token-wise
-			// dedupe dropped the repeated flag and kept both values, silently
-			// rewriting `--model x --model y` into `--model x y` and demoting
-			// the second value to a positional. dedupeLaunchFlags now dedupes
-			// flag-value PAIRS as units, which is what its doc comment always
-			// claimed. Exposed by codex's effort param needing two `-c`
-			// overrides; see codex_plan_effort_test.go.
 			"flag-value pair with DISTINCT values → both pairs kept intact",
 			[]string{"--model", "x", "--model", "y"},
 			[]string{"--model", "x", "--model", "y"},
@@ -344,16 +291,11 @@ func TestDedupeLaunchFlags_Edges(t *testing.T) {
 	}
 }
 
-// TestDedupeLaunchFlags_AliasSafety pins the cycle-124 review HIGH fix:
-// dedupeLaunchFlags MUST return a slice that does not share backing storage
-// with its input. Pre-fix `out := in[:0]` would alias, so a caller holding
-// the original could see the deduped result through their reference. The
-// fix `out := make([]string, 0, len(in))` allocates fresh. This test
-// captures the invariant so a future "optimization" can't silently
-// regress it.
+// TestDedupeLaunchFlags_AliasSafety pins that dedupeLaunchFlags returns a
+// slice that shares no backing storage with its input, in either direction.
 func TestDedupeLaunchFlags_AliasSafety(t *testing.T) {
 	in := []string{"--a", "--b", "--a", "--c"}
-	original := append([]string(nil), in...) // snapshot before
+	original := append([]string(nil), in...)
 	got := dedupeLaunchFlags(in)
 
 	// Mutating the returned slice must NOT mutate the input.
@@ -399,9 +341,6 @@ func TestRealize_DefaultArgs_StackInteraction(t *testing.T) {
 	}
 	got := Realize(m, intent)
 
-	// Exact ordering: default_args FIRST, then each per-param scalar in the
-	// internal realize order (model → permission → settings → allowed_tools),
-	// then raw extras at the tail.
 	want := []string{
 		"--default-1", "--default-2", // default_args
 		"--model", "model-x", // model_tier (tier_alias resolved)

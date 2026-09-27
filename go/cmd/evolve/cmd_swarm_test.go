@@ -1,21 +1,13 @@
 package main
 
-// cmd_swarm_test.go — RED contract for cycle-549's
-// cli-command-layer-test-coverage task (see cmd_worktree_test.go's package
-// doc comment for the full task/lane background). `evolve swarm
-// status|reap|reap-orphans` (cmd_swarm.go) had ZERO direct test coverage
-// (0.0% on every handler per `go tool cover -func`).
-//
 // SAFETY: runSwarmReap's production killer sends a REAL syscall.Kill(-pgid,
 // SIGKILL) when a session's PGID>1, and a real tmux kill-session when
-// TmuxSession != "" (see internal/swarm/kill.go's 2026-06-11 killer-B
-// incident doc). Fixtures here use PGID=0 and an empty TmuxSession — both
-// gates in ExecSessionKiller.Kill (h.PGID > 1 / h.TmuxSession != "") skip the
-// dangerous calls entirely, so the reap path is exercised end to end (manifest
-// load, registry rebuild, Reap dispatch, output) without ever touching a real
-// process group or tmux server. reap-orphans tests additionally pass
-// --dry-run, which the CLI itself stubs to a no-op Kill regardless of fixture
-// content.
+// TmuxSession != "" (see internal/swarm/kill.go). Fixtures here use PGID=0 and
+// an empty TmuxSession so ExecSessionKiller.Kill's gates (h.PGID > 1 /
+// h.TmuxSession != "") skip those calls, exercising the reap path end to end
+// (manifest load, registry rebuild, Reap dispatch, output) without ever
+// touching a real process group or tmux server. reap-orphans tests
+// additionally pass --dry-run, which the CLI itself stubs to a no-op Kill.
 
 import (
 	"fmt"
@@ -58,10 +50,8 @@ func TestRunSwarmStatus_MissingCycle_ExitTwo(t *testing.T) {
 	}
 }
 
-// TestRunSwarmStatus_ManifestMissing_ExitZero: LoadManifest is documented
-// fail-open on a missing file (internal/swarm/registry.go: "not an error — it
-// returns an empty manifest so the reaper is a safe no-op") — a cycle with no
-// swarm dispatch at all must report cleanly, not error.
+// LoadManifest is documented fail-open on a missing file (internal/swarm), so
+// a cycle with no swarm dispatch at all must report cleanly, not error.
 func TestRunSwarmStatus_ManifestMissing_ExitZero(t *testing.T) {
 	var stdout, stderr strings.Builder
 	code := runSwarmStatus([]string{"--evolve-dir", t.TempDir(), "--cycle", "1"}, &stdout, &stderr)
@@ -115,8 +105,6 @@ func TestRunSwarmReap_MissingCycle_ExitTwo(t *testing.T) {
 	}
 }
 
-// TestRunSwarmReap_ManifestMissing_ExitZero mirrors LoadManifest's documented
-// fail-open contract on a missing manifest file (see status's equivalent test).
 func TestRunSwarmReap_ManifestMissing_ExitZero(t *testing.T) {
 	var stdout, stderr strings.Builder
 	code := runSwarmReap([]string{"--evolve-dir", t.TempDir(), "--cycle", "3"}, &stdout, &stderr)
@@ -141,11 +129,6 @@ func TestRunSwarmReap_NoSessions_ExitZero(t *testing.T) {
 	}
 }
 
-// TestRunSwarmReap_LiveSession_ReapsWithoutTouchingOS is the SAFE reap path:
-// PGID=0 and an empty TmuxSession mean ExecSessionKiller.Kill's two gates
-// (h.PGID > 1 / h.TmuxSession != "") both skip — no real signal or tmux call
-// fires — yet the session is still marked reaped and counted, proving the
-// manifest-load → registry-rebuild → Reap → report wiring end to end.
 func TestRunSwarmReap_LiveSession_ReapsWithoutTouchingOS(t *testing.T) {
 	evolveDir := t.TempDir()
 	path := manifestPath(evolveDir, 11)

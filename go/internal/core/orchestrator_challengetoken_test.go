@@ -6,15 +6,6 @@ import (
 	"testing"
 )
 
-// orchestrator_challengetoken_test.go — characterization net for the challenge-token
-// mint (RunCycle init, orchestrator.go ~line 581). Every cycle mints an 8-byte hex
-// token and threads it to every phase via Context["challengeToken"] (scout binds its
-// eval to it; PR-5 anti-replay fallback source). This behavior was EXERCISED by every
-// cycle test but never ASSERTED — a refactor (the planCycle extraction) could silently
-// drop the mint and all other tests would still pass. These tests pin it first.
-
-// TestRunCycle_MintsChallengeToken: a cycle with no caller-supplied token mints a
-// fresh 8-byte hex one and passes it to the first phase.
 func TestRunCycle_MintsChallengeToken(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
@@ -40,8 +31,8 @@ func TestRunCycle_MintsChallengeToken(t *testing.T) {
 	}
 }
 
-// TestRunCycle_PreservesSuppliedChallengeToken: when the caller pre-supplies a token
-// (resume / fleet hand-down), the mint must NOT overwrite it.
+// A caller-supplied token (resume / fleet hand-down) must not be overwritten
+// by the mint.
 func TestRunCycle_PreservesSuppliedChallengeToken(t *testing.T) {
 	const supplied = "deadbeefdeadbeef"
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
