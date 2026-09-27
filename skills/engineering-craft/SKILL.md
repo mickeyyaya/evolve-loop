@@ -33,7 +33,7 @@ description: Use when writing or changing any production code or tests — new f
 
 1. **Scope contract**: one sentence of goal + explicit non-goals; identify the blast radius (what must NOT change behavior).
 2. **RED**: failing test(s) — the new behavior's test + for bug fixes a *regression test* (fails pre-fix) AND *preservation tests* (pass pre-fix, must stay green).
-3. **GREEN**: minimal implementation. Match surrounding conventions (naming, error style, comment density) even where you'd choose differently.
+3. **GREEN**: minimal implementation. Match surrounding conventions (naming, error style, layout) even where you'd choose differently.
 4. **REFACTOR**: only with green tests, only within scope; consolidate any duplication you introduced.
 5. **EVIDENCE**: run the check, show output as `N/N PASS, no regression`; verify the diff against the scope contract (nothing outside it).
 
@@ -42,7 +42,7 @@ description: Use when writing or changing any production code or tests — new f
 - A test with no assertion, or asserting only that a mock was called.
 - A new `if err != nil { return nil }` (swallowed error) or empty catch.
 - A guard clause for a condition nothing can produce (agents add ~2× unnecessary guards — every guard needs a caller that triggers it or a test that proves the boundary).
-- A comment narrating what the next line does (comments answer *why*; the code answers *what*).
+- Any comment in new code that is not machine-read (directive, marker, generated header): a name, a type, an extraction or a test says it instead ([code-comments](../../docs/conventions/code-comments.md)).
 - Two blocks that differ by a variable name (extract, or if <3 occurrences, deliberately leave and note — rule-of-three).
 - An exported symbol nothing outside the package calls.
 
