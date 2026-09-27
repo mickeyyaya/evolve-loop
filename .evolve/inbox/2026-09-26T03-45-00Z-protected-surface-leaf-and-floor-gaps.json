@@ -1,7 +1,7 @@
 {
   "id": "protected-surface-leaf-and-floor-gaps",
   "created_at": "2026-09-26T03:45:00Z",
-  "weight": 0.62,
+  "weight": 0.58,
   "title": "F38: the control-plane manifest in a leaf package, and the build floor's remaining protected-surface gaps",
   "kind": "pipeline-repair",
   "priority": "P3",
@@ -20,5 +20,7 @@
     "go/cmd/evolve/cmd_selfcheck.go",
     "go/internal/inboxbatch/consoleroute.go"
   ],
-  "notes": "Console-owned by kind (pipeline-*): the fix surface is the control plane. Evidence: docs/incidents/2026-09-26-lane-edited-the-control-plane-through-a-shell-tool.md (Not fixed here) and the F37 architecture review."
+  "notes": "Console-owned by kind (pipeline-*): the fix surface is the control plane. Evidence: docs/incidents/2026-09-26-lane-edited-the-control-plane-through-a-shell-tool.md (Not fixed here) and the F37 architecture review.",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A structural refactor plus pre-flight fidelity gaps; no incident traces to them since F37."
 }

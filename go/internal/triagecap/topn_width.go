@@ -22,7 +22,7 @@ func SelectFleetWidthTopN(candidates []FleetCandidate, count int) []FleetCandida
 	if len(candidates) == 0 {
 		return nil
 	}
-	sorted := rankForDispatch(candidates)
+	sorted := RankForDispatch(candidates)
 
 	if count < 2 {
 		return []FleetCandidate{sorted[0]}
@@ -68,7 +68,7 @@ func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []Fle
 		return out
 	}
 
-	sorted := rankForDispatch(backlog)
+	sorted := RankForDispatch(backlog)
 
 	for _, c := range sorted {
 		if len(out) >= count {
@@ -96,10 +96,7 @@ func overlapsClaimed(files []string, claimed map[string]bool) bool {
 	return false
 }
 
-// rankForDispatch is the one ordering every seed path shares: weight, then a verified declared surface,
-// then input order. The weight stays the priority; admissibility only breaks ties.
-// See ADR-0074.
-func rankForDispatch(cands []FleetCandidate) []FleetCandidate {
+func RankForDispatch(cands []FleetCandidate) []FleetCandidate {
 	sorted := make([]FleetCandidate, len(cands))
 	copy(sorted, cands)
 	sort.SliceStable(sorted, func(i, j int) bool {

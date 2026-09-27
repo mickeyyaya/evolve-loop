@@ -484,7 +484,7 @@ func TestRoutedResolver_RefusalPrintsTheVerbatimLineOnceAndPassesThrough(t *test
 func TestEmitWave_InfoWithoutCodeWarnWithAndStampsWaveOnACopy(t *testing.T) {
 	h := newHarness(t)
 	fields := map[string]string{"lanes": "3"}
-	EmitWave(h.center, 5, "loopBatchCoordinator.dispatchFleetIteration", "", "wave 5: 3/3 lanes ok", fields)
+	EmitWave(h.center, 5, "loopBatchCoordinator.completeWave", "", "wave 5: 3/3 lanes ok", fields)
 	EmitWave(h.center, 6, "Engine.RepairMinWidth", CodeMinWidthRepair, "repair", nil)
 	if _, stamped := fields["wave"]; stamped || len(fields) != 1 {
 		t.Errorf("the caller's map is never written: %v", fields)

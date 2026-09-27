@@ -10,6 +10,14 @@
   "connects_to": [
     "chronicle-s7b-historian-filer"
   ],
+  "continuation": {
+    "worktree": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1699",
+    "branch": "cycle-cd3ae73e-1699",
+    "snapshot_sha": "469765be96e11714a6b474145be09abe40598a69",
+    "base_sha": "f90346d0f3711e923c3b809de7f2cb3986870d4d",
+    "findings_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1699/audit-fail-reason.json",
+    "cycle": 1699
+  },
   "created_at": "2026-07-10T11:06:00Z",
   "deps": [
     "chronicle-s1-recurrence-index",
@@ -30,5 +38,9 @@
   "source": "approved plan 2026-07-10 (hybrid decision: user 2026-07-10)",
   "summary": "THE ROLE that reads history loop results (user-chosen hybrid: LLM judgment ONCE per batch, not per cycle). New agents/evolve-historian.md + .evolve/profiles/historian.json (memo-profile skeleton: read-mostly; Write limited to its own workspace .evolve/runs/historian-<runid>/{historian-report.md,historian-actions.json}; sandbox write_subpaths accordingly; max_turns ~15; tier balanced). DELETE agents/evolve-operator.md in this slice (dispatch:none vestigial, references retired .evolve/workspace/ layout; its duties were long since scattered to phaseobserver/advisor/ledger - YAGNI precedent deletes dead definitions). Dispatch: cmd_loop dispatches ONCE after the batch/wave loop ends (near finalizeCompletedCycle), via the in-process subagent engine (the runSubagentRun path, cmd_subagent.go:342) - NOT a phase spec (.evolve/phases/ runs inside the cycle DAG; wrong boundary). Inputs: recent-outcomes digest + index summary + batch dossiers. Output: historian-report.md (batch health narrative: recurrence themes, stalled goals, gate-flip readiness) + historian-actions.json {preventive_actions:[{id,title,weight_hint,evidence}]} - REPORT-ONLY in this slice (filing is S7b). Policy: chronicle.historian off|on, compiled default OFF.",
   "title": "Chronicle S7a: evolve-historian batch-boundary agent (report-only shadow) + delete vestigial evolve-operator",
-  "weight": 0.72
+  "weight": 0.45,
+  "route": "console-sandbox-denied",
+  "route_note": "2026-09-26: cycles 1696 and 1699 FAILED at the build floor. The item requires creating .evolve/profiles/historian.json, and the builder profile sandbox denies all writes under .evolve/profiles (deny_subpaths), so no lane can complete it. Console-owned until the routing floor learns sandbox-denied paths (inbox item routing-ignores-builder-sandbox-deny).",
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: A report-only historian feature the operator demoted on 2026-07-29. Its main value now is unblocking S7b, one of the queue's only two lane items."
 }

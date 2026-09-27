@@ -1,7 +1,7 @@
 {
   "id": "ledger-binding-runid",
   "kind": "sweep",
-  "weight": 0.83,
+  "weight": 0.55,
   "title": "Sweep: ledger binding runid (8 auditor prescriptions amortised)",
   "summary": "Ledger binding and run-scoping prescriptions: run_id stamping, auditor binding, cross-run refusal. Amortised from 8 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
   "prescriptions": [
@@ -55,5 +55,11 @@
     "go/internal/phases/ship/audit.go",
     "go/internal/phases/ship/gitops.go"
   ],
-  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/cyclerun_dispatch.go, /go/internal/core/defectledger/, /go/internal/phases/ship/gitops.go), confidence=medium. Sweep of 8: stateRoot is the cycle1420 test helper, and cmd_acs.go's --evolve-dir defaults to a cwd-relative '.evolve'; both are unprotected, but the acs-verdict build-to-audit check, the inherited-defect block and the tree-drift check behind audit_bound_tree_sha are protected; the shipping-delta prescription is new code with no existing home."
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/cyclerun_dispatch.go, /go/internal/core/defectledger/, /go/internal/phases/ship/gitops.go), confidence=medium. Sweep of 8: stateRoot is the cycle1420 test helper, and cmd_acs.go's --evolve-dir defaults to a cwd-relative '.evolve'; both are unprotected, but the acs-verdict build-to-audit check, the inherited-defect block and the tree-drift check behind audit_bound_tree_sha are protected; the shipping-delta prescription is new code with no existing home.",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription 1453 moved to acssuite-relative-evolvedir-litter; fix it there, not here."
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The binding-integrity members have been closed by #503, #535, #648 and ADR-0105; what remains is predicate-helper and CLI path hygiene.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Of 8 members, 4 are addressed. db8dbeb8: #535 (09d32a19) regenerates acs-verdict on the host at audit and fails by name ('host predicate execution'), classification.go:83-112. d8b9b645: defectledger lineage and prompt derive inherited defects from the continuation manifest or registry (go/internal/core/defectledger/lineage.go, prompt.go). d5c0a018 and d843991f: the audit binding fails closed (#503, 28e7f455), a worktree ship binds its own tree (#648, 5806b56b), and the ADR-0105 C4 carry re-prove"
 }

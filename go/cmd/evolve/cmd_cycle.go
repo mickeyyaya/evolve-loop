@@ -27,6 +27,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
@@ -636,6 +637,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	opts = append(opts, compositionOptions()...)
 	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
 	opts = append(opts, core.WithHostEffects(hostEffects))
+	opts = append(opts, core.WithLaneMenu(laneMenuOf(forbidden)))
 	opts = append(opts, core.WithSignalCenter(signals))
 
 	return orchDeps{
@@ -830,4 +832,10 @@ func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {
 		return nil
 	}
 	return &spec
+}
+
+func laneMenuOf(forbidden func(string) bool) core.LaneMenuFn {
+	return func(inboxRoot string, items []inboxbatch.Item) []inboxbatch.Item {
+		return inboxmover.PartitionLaneMenu(inboxmover.Options{InboxDir: inboxRoot, Stderr: io.Discard}, items, forbidden).Ready
+	}
 }

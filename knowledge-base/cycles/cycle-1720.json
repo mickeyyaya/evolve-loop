@@ -1,0 +1,268 @@
+{
+  "schema_version": 2,
+  "cycle": 1720,
+  "run_id": "01M3GCNJJH66E3HVM2XN9B93C4",
+  "goal": "Pipeline-health verification, wave 19 (2026-09-27, on main a1a17ba2, the second wave with the carry live (ADR-0105 B3/B4 = ADR-0106 P1: a ship that meets a moved main, rebases byte-identically and rebinds its explanation ships on the verdict it already earned, with the record chained in the ledger and re-proven by ship, instead of a second audit) beside X3, Q3, R1, R2, W1, H1b, X1, P3, Q1 and Q2: a test-only Build that explains itself anyway is verified, not refused (only foreign cycle records are immutable, in every branch); a capacity wall in the sequential loop pauses the loop before it records a failed approach or runs the failure closeout; a top_n card that names a protected surface is moved by the host into escalate_block and the item routed to the console by the planned no-work closeout, never the cycle's FAIL, and the triage prompt lists the protected surfaces; a shipped or declined id no inbox item backs leaves a retirement record (processed/ or rejected/cycle-N) and is never re-pinned; an empty optional bucket in triage-report.md is no cards; .evolve/inbox/ records are non-material to the explanation document, so no floor asks a builder to describe the ship's consumption stamp; and every tmux phase pane's resolved-prompt.txt ends with the identity statement (\"## Who you are (stated by the evolve bridge)\") and its pane exports CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false before the launch; a quota wall met on a correction re-dispatch, a remediation re-run or a resumed review leaves the cycle DEFERRED (all_families_exhausted in the ledger, no failure digest, no retrospective), never FAIL; a login prompt benches the family with operator_action in cli-health.json and no second dispatch goes into it). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–14 verified, and the fixes on this main:\n- (P3) an agent that inspects its pane finds its own session, its prompt files and the sole-writer fact stated in the prompt it was given; a stdout-completion phase is told the bridge reads its pane;\n- (Q1) a walled correction re-dispatch is the same deferral as a walled first dispatch;\n- (Q2) a credential wall is benched until a probe after the operator's login clears it; the bench lines name the fix;\n- (P4, H1, H2, from wave 14) an exit-85 escalation carries its pattern in cause_code; the host derives triage-decision.json from the report before any judge;\n- (W1, H1b, X1, from wave 15) a lane pinned to an id no inbox item backs ends once, with a record; a `## superseded` with nothing under it derives to []; the explanation floor never names an inbox record as a material path;\n- (R1, R2, from wave 16) a card on a protected surface is a route, not a verdict: the cycle ends planned no-work (or continues on its other cards) and the item arrives console-manual with the lane's reason;\n- (X3, from wave 18) a Build whose diff is non-material (tests, docs, evals, predicates) and whose report declares its own explanation document REQUIRED passes the floor with an empty material set; one that declares NOT_APPLICABLE beside an undeclared own record passes with the record kept as documentation; only a changed FOREIGN cycle record is refused (\"published cycle records are immutable\"); `bridge/channel.TestChannel_EndToEnd` no longer depends on a 10 ms window under the ship backstop's load;\n- (Q3, from wave 18) a sequential-loop cycle walled on capacity stops with `stop_reason: quota-pause`, exit 5, `recoverable_failures` 0 and no entry in failedApproaches;\n- (P1, from wave 17) a byte-identical rebase after a peer's landing carries its audited verdict to ship: the log says \"rebase is byte-identical: the audited verdict carries, shipping without a second audit\" and ship's binding log names the carry; a carry the host or ship cannot prove is the old path, a second audit.\n\nEarlier fixes still in force: a worktree ship binds its own tree (#648); routing never sends a lane work its builder's sandbox forbids; a lane's cycle-state override applies only inside its own evolve dir; a Build may `git rm` its own never-committed explanation draft (#651); the explanation contract can move base without a Build when the host proves the change byte-identical (#649).\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles: 1715 shipped, 1716 shipped, 1717 shipped, 1718 shipped (its ship met a load-window flake in the importer backstop and re-audited before landing), 1719 shipped (a document deliverable: three audit rounds on unsourced numbers, then a rebase conflict on a doc both lanes had edited, resolved by the debugger and re-authored on the new base); the streak stands at five; six in a row is the goal.",
+  "final_verdict": "PASS",
+  "commit_sha": "034a95d1278d4b5e1390ad413fdd35ec39a8e9c6",
+  "tree_sha": "af75d185dc0da8c80763f34e0dc11c8bed3ae80e",
+  "tasks": [
+    "triage-unified-solution-synthesis"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 148149,
+      "started_at": "2026-09-27T02:57:04Z",
+      "ended_at": "2026-09-27T02:59:33Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 30,
+        "output": 10145,
+        "cache_read": 1133868,
+        "cache_write": 94025
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 56797,
+      "started_at": "2026-09-27T03:00:09Z",
+      "ended_at": "2026-09-27T03:01:06Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 2772,
+        "cache_read": 523912,
+        "cache_write": 36415
+      }
+    },
+    {
+      "name": "premise-challenge",
+      "verdict": "PASS",
+      "duration_ms": 354221,
+      "started_at": "2026-09-27T03:01:07Z",
+      "ended_at": "2026-09-27T03:07:01Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 36,
+        "output": 25459,
+        "cache_read": 1872632,
+        "cache_write": 106779
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 83850,
+      "started_at": "2026-09-27T03:07:01Z",
+      "ended_at": "2026-09-27T03:08:26Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 5360,
+        "cache_read": 323289,
+        "cache_write": 56862
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 490108,
+      "started_at": "2026-09-27T03:08:26Z",
+      "ended_at": "2026-09-27T03:16:37Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 70,
+        "output": 37683,
+        "cache_read": 4264231,
+        "cache_write": 160612
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 834833,
+      "started_at": "2026-09-27T03:16:37Z",
+      "ended_at": "2026-09-27T03:30:33Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 112,
+        "output": 79617,
+        "cache_read": 9902202,
+        "cache_write": 224491
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1551270,
+      "started_at": "2026-09-27T03:30:33Z",
+      "ended_at": "2026-09-27T04:11:49Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 26,
+        "output": 4558,
+        "cache_read": 865830,
+        "cache_write": 40683
+      }
+    },
+    {
+      "name": "error-handling-scan",
+      "verdict": "PASS",
+      "duration_ms": 244349,
+      "started_at": "2026-09-27T04:12:23Z",
+      "ended_at": "2026-09-27T04:16:28Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 26,
+        "output": 19931,
+        "cache_read": 723258,
+        "cache_write": 85623
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 498183,
+      "started_at": "2026-09-27T04:16:28Z",
+      "ended_at": "2026-09-27T04:29:56Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 58,
+        "output": 21834,
+        "cache_read": 2741049,
+        "cache_write": 91591
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 277397,
+      "started_at": "2026-09-27T04:30:28Z",
+      "ended_at": "2026-09-27T04:35:06Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "flake-rerun-scan",
+      "verdict": "PASS",
+      "duration_ms": 179292,
+      "started_at": "2026-09-27T04:35:06Z",
+      "ended_at": "2026-09-27T04:38:06Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "memo",
+      "verdict": "PASS",
+      "duration_ms": 197398,
+      "started_at": "2026-09-27T04:38:06Z",
+      "ended_at": "2026-09-27T04:41:24Z",
+      "archetype": "control",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 4915847,
+    "phase_count": 12,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1551270,
+    "by_archetype_ms": {
+      "build": 1551270,
+      "control": 474795,
+      "evaluate": 1766153,
+      "plan": 1123629
+    },
+    "total_tokens": {
+      "input": 388,
+      "output": 207359,
+      "cache_read": 22350271,
+      "cache_write": 897081
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 26,
+        "output": 4558,
+        "cache_read": 865830,
+        "cache_write": 40683
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 190,
+        "output": 104907,
+        "cache_read": 9601170,
+        "cache_write": 444605
+      },
+      "plan": {
+        "input": 172,
+        "output": 97894,
+        "cache_read": 11883271,
+        "cache_write": 411793
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999826403328869,
+    "hot_phase_count": 9,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "premise-challenge",
+      "fault-localization",
+      "bug-reproduction",
+      "tdd",
+      "build",
+      "error-handling-scan",
+      "audit"
+    ]
+  }
+}

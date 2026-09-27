@@ -1,0 +1,25 @@
+{
+  "id": "nonconforming-deliverable-settle-wait-latency",
+  "title": "A phase that LEGITIMATELY produces a non-conforming deliverable (intent delta's \"[intent-unchanged]\" → SKIPPED) now pays the full ~3s settle window every invocation, because verifyReconcileDeliverable waits reconcileSettleRetries×interval for a file that will never pass full Verify. Short-circuit the wait for declared non-conforming outputs.",
+  "weight": 0.85,
+  "kind": "perf",
+  "root_cause": "After the file-authoritative verdict-source fix (fix/verdict-source-file-authoritative), a CONTRACTED phase reads the on-disk deliverable and, on !res.OK, waits the full settle window (reconcileSettleRetries=15 × reconcileSettleInterval=200ms ≈ 3s, go/internal/phases/runner/runner.go) before concluding. That window exists to catch a LATE clean-exit flush of a deliverable that WILL become well-formed. But some phases legitimately emit a deliverable that NEVER passes full Verify yet is a valid non-ship outcome — the canonical case is intent delta mode: an \"[intent-unchanged]\" body classifies SKIPPED but is not a full intent contract, so Verify never returns OK and the phase burns the whole ~3s window on every delta-skip. Pre-existing in spirit (the settle-retry always ran for !res.OK) but the wait was ~600ms before the cycle-921 widening to ~3s; the file-authoritative fix keeps 3s.",
+  "fix": "Short-circuit the settle-WAIT for legitimately non-conforming deliverables. Options: (A) let a phase declare (via its contract or hook) that a specific marker is a terminal non-ship output, so the runner skips the wait once that marker is present; (B) have the intent phase detect delta-skip BEFORE bridge dispatch and return SKIPPED without producing a contract deliverable at all (cleanest — no wait, no Verify); (C) make the settle-wait condition-based on FILE STABILITY (size unchanged across two stats) rather than Verify-OK, so a stable-but-non-conforming file exits the wait immediately. Prefer (B) for intent specifically; (A)/(C) generalize. Do NOT reduce reconcileSettleRetries — that is the liveness ceiling for genuine late flushes.",
+  "acceptance": [
+    "A delta-skip (or other declared non-conforming) phase returns its verdict WITHOUT waiting the full reconcileSettleRetries window; a regression test asserts the verify probe count / elapsed is bounded well below the full window for that case.",
+    "Genuine late-flush behavior is unchanged: a valid deliverable that flushes late still settles within the window and is classified from the file.",
+    "The ship-guard is untouched: a non-conforming deliverable still cannot launder a ship-eligible verdict.",
+    "go test -race on internal/phases/runner + internal/phases/intent green; go-review clears."
+  ],
+  "connects_to": [
+    "verdict-incoherence-why-verify-fails",
+    "verifyreconcile-ctx-cancel-unconditional-sleep",
+    "system_failure_policy"
+  ],
+  "source": "go-review of fix/verdict-source-file-authoritative (the architectural verdict-source fix superseding the settle-window band-aid), finding on intent-delta latency.",
+  "created_at": "2026-07-19T02:00:00Z",
+  "route": "console-manual",
+  "notes": " | 2026-09-14 console-routed by the operator session: lanes 1664/1668/1670 (and more) each claimed it and FAILed at triage — the top_n card names a protected surface (F4 class), so no lane can ship it; work it from the console.",
+  "consumed_by": "inbox review 2026-09-27: OBSOLETE. The canonical case never reaches the settle loop. Intent's ShouldSkip (phases/intent/intent.go:94-106, landed da2e8265 on 2026-06-23, before this item was filed) decides unchanged-goal delta mode deterministically BEFORE dispatch, so no deliverable is written and nothing waits. Intent is opt-in and ran in no cycle from 1600 to 1799 (no intent-* artifacts in any run dir). The only residual is an LLM that emits [intent-unchanged] after a real goal change, which costs at most SettleRetries 15 x 200 ms, about 3 s (phases/runner/verdict/verdict.go:37-40; settle.go:24-38). The item names no other ph",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}

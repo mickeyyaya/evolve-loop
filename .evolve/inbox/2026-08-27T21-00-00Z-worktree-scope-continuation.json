@@ -1,7 +1,7 @@
 {
   "id": "worktree-scope-continuation",
   "kind": "sweep",
-  "weight": 0.8,
+  "weight": 0.56,
   "title": "Sweep: worktree scope continuation (7 auditor prescriptions amortised)",
   "summary": "Worktree/lane-scope/continuation prescriptions: base capture, snapshot guards, scope reconciliation. Amortised from 7 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
   "prescriptions": [
@@ -50,5 +50,8 @@
     "go/internal/core/continuation_stamp.go",
     "go/internal/loopwave/dispatch.go"
   ],
-  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/continuation_stamp.go, /go/internal/loopwave/), confidence=medium. The TDD/Build dispatch gate is already done; the coverage-gate HEAD~1 fallback, the no-rewrite skip, the is-ancestor injection and the cwd-independence check are unprotected, but the continuation selection record (continuation_stamp.go) and retiring a lane before dispatch (loopwave/dispatch.go) are protected; no verifiableBy code exists yet."
+  "surface_note": "2026-09-26 console curation (F29 follow-up): files[] typed from a read-only classification against guards.ProtectedSurfaceManifest — protected=true (/go/internal/core/continuation_stamp.go, /go/internal/loopwave/), confidence=medium. The TDD/Build dispatch gate is already done; the coverage-gate HEAD~1 fallback, the no-rewrite skip, the is-ancestor injection and the cwd-independence check are unprotected, but the continuation selection record (continuation_stamp.go) and retiring a lane before dispatch (loopwave/dispatch.go) are protected; no verifiableBy code exists yet.",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Five small, unrelated prescriptions with no recent incident behind them.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Done: Q2 (an empty top_n ends the lane as planned no-work before TDD/Build: HasEmptyTriageCommitment, internal/core/triage_termination.go:22, F30 df40ecf3). Obsolete: Q4 (no production no-rewrite skip exists; the contractArtifactDetermined classifier is unwired, contract_escalation.go:242-244). Open: Q1 (cwd-independent verification evidence; not found); Q3 (no verifiableBy code); Q5 (no merge-base --is-ancestor result injected into the scout context); Q6 (agents/evolve-coverage-gate.md:27 still"
 }

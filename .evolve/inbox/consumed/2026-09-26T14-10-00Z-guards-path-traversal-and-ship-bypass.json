@@ -1,0 +1,19 @@
+{
+  "id": "guards-path-traversal-and-ship-bypass",
+  "kind": "pipeline-repair",
+  "priority": "P1",
+  "weight": 0.8,
+  "route": "console",
+  "title": "guards: an unclean path gets past the protected-surface check; the ship guard allows `...; echo evolve ship`; the quota guard never denies",
+  "summary": "Found by comment-reduction batch 19 (2026-09-26) by reading the code, not by running an exploit. (1) Neither normalizeSurfacePath nor isAlwaysSafe cleans its path. /wt/go/internal/core/../guards/role.go does not match the /go/internal/guards/ surface, yet isUnderDir cleans it and places it inside the worktree. A build or tdd Edit/Write could therefore reach a protected file in-cycle, and /tmp/../x counts as always-safe. The ship tripwire and the build floor see git's clean paths and still catch it later. (2) The ship guard allows any command containing `evolve ship` or `ship.sh` anywhere, before stripping, so `git push origin main; echo evolve ship` passes. A quoted '<<EOF' also counts as a heredoc opener, so a git push on the next line is stripped and never seen. (3) `evolve guard quota` builds a new guard for each hook call, so its in-memory counters never pass one call and it never denies. (4) TestMain's bypassEnvVars unsets variables nothing reads. testing-strategy.md says 'all 5'; the list has 3. (5) Some tests pass for the wrong reason: TestShip_Decide_VerbInHeredocBody, TestRole_BuilderWritesInWorktree (/tmp rule), and TestRole_AuditPhaseRestricted (t.TempDir under /tmp on Linux).",
+  "fix": "Clean every path with filepath.Clean before any surface, always-safe or worktree decision, through one normalizer shared by all three. Tokenize the command before the ship allow check, allowing only a command whose executable is evolve ship or ship.sh, never a substring match. Recognize heredoc openers only unquoted, as the shell does. Persist quota counters in cycle state, or delete the quota guard. Rewrite the three tests so each denial or allowance comes from the rule its name claims.",
+  "acceptance": [
+    "A build-phase Write to <worktree>/go/internal/core/../guards/role.go is denied (test)",
+    "`git push origin main; echo evolve ship` is denied (test)",
+    "The quota guard denies after its limit across separate hook invocations, or it is removed",
+    "Each rewritten test fails when the rule it names is removed (mutation check)"
+  ],
+  "files": ["go/internal/guards/role.go", "go/internal/guards/protected_surface.go", "go/internal/guards/ship.go", "go/internal/guards/quota.go", "go/internal/cli/guardcmd/"],
+  "created_at": "2026-09-26T14:10:00Z",
+  "source": "console-comment-workstream-batch19"
+}

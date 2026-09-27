@@ -131,7 +131,7 @@ func u13PruneFixture(t *testing.T, decision string) (plan func(stderr io.Writer)
 	root = t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	u13WriteJSON(t, filepath.Join(inbox, "alpha.json"), map[string]any{"id": "alpha", "weight": 0.9, "files": []string{"a.go"}})
-	u13WriteJSON(t, filepath.Join(inbox, "processed", "gamma.json"), map[string]any{"id": "gamma", "weight": 0.7, "files": []string{"g.go"}})
+	u13WriteJSON(t, filepath.Join(inbox, "processed", "cycle-9", "gamma.json"), map[string]any{"id": "gamma", "weight": 0.7, "files": []string{"g.go"}})
 	if err := os.MkdirAll(cycleWorkspace(root, 7), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestWavePlan_PruneAndWidenBytesAreByteIdenticalToTheGolden(t *testing.T) {
 	plan, _ := u13PruneFixture(t, `{"note":"keep","top_n":[{"id":"alpha","files":["a.go"]},{"id":"gamma","files":["g.go"]}]}`)
 	var stderr bytes.Buffer
 	u13Compare(t, "prune", string(plan(&stderr)), u13Golden(t, u13WaveGoldens, "decision_prune.golden.json"))
-	if !strings.Contains(stderr.String(), `pruned consumed top_n id "gamma"`) {
+	if !strings.Contains(stderr.String(), `pruned undispatchable top_n id "gamma"`) {
 		t.Errorf("the prune names the dropped id: %q", stderr.String())
 	}
 	untouched := `{"note":"keep","top_n":[{"id":"alpha","files":["a.go"]}]}`
@@ -252,7 +252,7 @@ func u13WaveStderrSections(t *testing.T) string {
 			map[string]any{"name": "builder", "sandbox": map[string]any{"deny_subpaths": []string{".evolve/profiles"}}})
 		u13WriteJSON(t, filepath.Join(root, ".evolve", "inbox", "console.json"),
 			map[string]any{"id": "console-item", "weight": 0.9, "files": []string{"go/internal/guards/integrity_surface.go"}})
-		consoleRoutedResolver(root, w)("console-item")
+		consoleRoutedResolver(loopConfig{ProjectRoot: root, EvolveDir: filepath.Join(root, ".evolve")}, w)("console-item")
 	})
 	section("prune_dropped", func(w io.Writer) {
 		plan, _ := u13PruneFixture(t, `{"note":"keep","top_n":[{"id":"alpha","files":["a.go"]},{"id":"gamma","files":["g.go"]}]}`)
@@ -563,7 +563,7 @@ func TestLoop_FaultFreeStreamIsByteIdentical(t *testing.T) {
 	if err != nil || !ran || len(results) != 2 {
 		t.Fatalf("a clean wave ran two lanes: ran=%v results=%d err=%v", ran, len(results), err)
 	}
-	emitLoopWave(c, 1, "loopBatchCoordinator.dispatchFleetIteration", "", "wave 1: 2/2 lanes ok", nil)
+	emitLoopWave(c, 1, "loopBatchCoordinator.completeWave", "", "wave 1: 2/2 lanes ok", nil)
 	if got := strings.Join(kinds, ","); got != "loop/loop.wave/" {
 		t.Errorf("the fault-free wave stream is exactly the coordinator's summary: %q", got)
 	}

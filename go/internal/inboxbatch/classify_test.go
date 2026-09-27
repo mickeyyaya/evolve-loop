@@ -93,36 +93,37 @@ func TestClassify_ConnectsToDoesNotClusterByDefault(t *testing.T) {
 	}
 }
 
-func TestClassify_DepsOrderTopologically(t *testing.T) {
-	items := []Item{
+// TestClassify_DepsDoNotAffectGroupingOrOrdering pins the post-removal contract: Deps is
+// carried on Item (kept for now — see the cycle-1724 build report) but neither binds edges
+// nor influences ordering. Items sharing only a Deps chain stay separate singletons, and a
+// campaign-bound heavier child sorts BEFORE a lighter parent it declares a dependency on.
+func TestClassify_DepsDoNotAffectGroupingOrOrdering(t *testing.T) {
+	unbound := []Item{
 		item("child", 0.95, withDeps("parent")),
 		item("parent", 0.2),
 	}
-	batches := Classify(items, Config{MaxItems: 4})
+	if got := len(Classify(unbound, Config{MaxItems: 4})); got != 2 {
+		t.Fatalf("batches = %d, want 2 (a Deps-only reference must not bind an edge)", got)
+	}
+
+	bound := []Item{
+		item("parent", 0.2, withCampaign("camp-x")),
+		item("child", 0.95, withCampaign("camp-x"), withDeps("parent")),
+	}
+	batches := Classify(bound, Config{MaxItems: 4})
 	if len(batches) != 1 {
-		t.Fatalf("batches = %d, want 1 (dep edge unions them)", len(batches))
+		t.Fatalf("batches = %d, want 1 (campaign still unions them)", len(batches))
 	}
-	if got := ids(batches[0]); got != "parent,child" {
-		t.Errorf("order = %s, want parent,child (topological, not weight)", got)
-	}
-	if batches[0].Weight != 0.95 {
-		t.Errorf("batch weight = %v, want the max member weight 0.95", batches[0].Weight)
+	if got := ids(batches[0]); got != "child,parent" {
+		t.Errorf("order = %s, want child,parent (weight-desc; Deps must not reorder)", got)
 	}
 }
 
-func TestClassify_DepOnMissingItemIsSatisfied(t *testing.T) {
-	items := []Item{item("solo", 0.5, withDeps("already-shipped-thing"))}
-	batches := Classify(items, Config{MaxItems: 4})
-	if len(batches) != 1 || ids(batches[0]) != "solo" {
-		t.Fatalf("batches = %+v, want the solo singleton", batches)
-	}
-}
-
-func TestClassify_OversizedClusterChunksInTopoOrder(t *testing.T) {
+func TestClassify_OversizedClusterChunksByWeight(t *testing.T) {
 	items := []Item{
 		item("d1", 0.9, withCampaign("big")),
-		item("d2", 0.8, withCampaign("big"), withDeps("d1")),
-		item("d3", 0.7, withCampaign("big"), withDeps("d2")),
+		item("d2", 0.8, withCampaign("big")),
+		item("d3", 0.7, withCampaign("big")),
 	}
 	batches := Classify(items, Config{MaxItems: 2})
 	if len(batches) != 2 {
@@ -135,46 +136,7 @@ func TestClassify_OversizedClusterChunksInTopoOrder(t *testing.T) {
 		t.Errorf("chunk 2 = %s, want d3", got)
 	}
 	if !batches[1].DependsOnPrev {
-		t.Error("chunk 2 must be flagged DependsOnPrev (d3's dep chain crosses the split)")
-	}
-}
-
-func TestClassify_ContinuationNeverOutranksPredecessor(t *testing.T) {
-	items := []Item{
-		item("E", 0.5, withCampaign("chain")),
-		item("A1", 0.05, withCampaign("chain")),
-		item("A2", 0.04, withCampaign("chain"), withDeps("A1")),
-		item("A3", 0.03, withCampaign("chain"), withDeps("A2")),
-		item("A4", 0.02, withCampaign("chain"), withDeps("A3")),
-		item("C", 0.99, withCampaign("chain"), withDeps("A4")),
-		item("other", 0.7), // outweighs chunk 1, so a per-chunk sort would rank it between the chunks
-	}
-	batches := Classify(items, Config{MaxItems: 4})
-	if len(batches) != 3 {
-		t.Fatalf("batches = %d, want 3 (two chunks + singleton)", len(batches))
-	}
-	if batches[0].DependsOnPrev {
-		t.Fatalf("batch[0] is a continuation — the predecessor must come first; got %s", ids(batches[0]))
-	}
-	if !batches[1].DependsOnPrev {
-		t.Fatalf("batch[1] must be the continuation adjacent to its predecessor; got %s", ids(batches[1]))
-	}
-	if got := ids(batches[2]); got != "other" {
-		t.Errorf("the unrelated singleton must rank after the 0.99 cluster's BOTH chunks; batch[2] = %s", got)
-	}
-}
-
-func TestClassify_DepCycleFallsBackDeterministically(t *testing.T) {
-	items := []Item{
-		item("x", 0.5, withDeps("y")),
-		item("y", 0.5, withDeps("x")),
-	}
-	batches := Classify(items, Config{MaxItems: 4})
-	if len(batches) != 1 {
-		t.Fatalf("batches = %d, want 1", len(batches))
-	}
-	if got := ids(batches[0]); got != "x,y" {
-		t.Errorf("cycle fallback order = %s, want x,y (weight tie → id)", got)
+		t.Error("chunk 2 must be flagged DependsOnPrev (it is a later chunk of the same cluster)")
 	}
 }
 

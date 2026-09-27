@@ -1,0 +1,30 @@
+{
+  "id": "a-fail-closeout-moves-main-under-sibling-lanes",
+  "title": "A FAIL cycle's dossier closeout commit moves main mid-wave, and a sibling lane's passed audit is sent back and overturned on the same bytes",
+  "kind": "bug",
+  "class": "pipeline-process",
+  "priority": "P1",
+  "weight": 0.94,
+  "route": "console",
+  "created_at": "2026-09-26T10:16:00Z",
+  "files": [
+    "go/internal/core/dossier_producer.go",
+    "go/internal/dossier/write.go",
+    "go/internal/phases/ship/audit.go"
+  ],
+  "problem": "Wave 12, 2026-09-26. Cycle 1705 sealed FAIL, and its closeout committed `dossier: cycle-1705 closeout` (2198b2d3) to the plane's main. Cycle 1704 had passed audit with WARN, which ships under the fluent policy. At ship it was refused with AUDIT_BINDING_HEAD_MOVED (audited eef4846b, current 2198b2d3). The forced re-audit read the same bytes, rated finding H1 HIGH instead of MEDIUM, and returned FAIL; the audit report itself notes the round-to-round severity drift. A pure bookkeeping commit therefore turned a shippable result into a failure, which violates the operator's direction that a passed audit must not be blocked by a process issue. Even if ship's HEAD check were scoped away, main has moved, so the lane's ff-merge fails and rebase recovery runs.",
+  "fix": "Keep bookkeeping off the integration branch while a wave runs. Options: write FAIL-cycle dossiers to a tracked-later staging area and commit them at the wave-boundary sync (the plane's tree-diff guard is why the dossier is committed today, per dossier.Write's contract), or let a PASS dossier ride the ship commit like inbox consumption. Separately, ship's plane-HEAD check is load-bearing for resume repair (phases/ship/repair_resume_test.go), so any change to it belongs to ADR-0105 B4 and must keep the merged-locally-push-pending detection.",
+  "acceptance": [
+    "A sibling FAIL closeout during a wave no longer moves main, so an in-flight lane that passed audit ships without a re-audit.",
+    "The dossier still reaches knowledge-base/cycles/ and `evolve dossier verify` still passes after the wave boundary.",
+    "Resume repair after a local merge with the push pending still works (repair_resume_test.go stays green)."
+  ],
+  "evidence": {
+    "cycle_1704_log": "SHIP_AUDIT_BINDING_HEAD_MOVED seq=131; re-audit FAIL seq=141",
+    "audit_report": ".evolve/runs/cycle-1704/audit-report.md: round 1 rated H1 MEDIUM (WARN), round 2 HIGH (FAIL) on the same bytes",
+    "adr": "docs/architecture/adr/0105-identity-preserving-fleet-rebase.md (B4 constraint)"
+  },
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: It overturned a passed audit in the window (1704). Merged mitigations remove the re-audit path but are unproven live, and every mid-wave closeout still forces a rebase and carry on each non-first lane.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. The consequence is mitigated in merged code. #648 (5806b56b) makes a worktree ship bind its own tree, so a sibling closeout no longer raises AUDIT_BINDING_HEAD_MOVED. A moved main now goes B1 unwind (e5af27fe), then B2 rebind (7a07bf87), then the B3/B4 carry to ship (a467e5b1). The carry has not yet fired live. The cause is untouched: closeouts still commit to main mid-wave (e.g. 6002c5d9 'dossier: cycle-1719 closeout' between cycle commits). The fix, P2, is built but parked uncommitted in dev/d"
+}

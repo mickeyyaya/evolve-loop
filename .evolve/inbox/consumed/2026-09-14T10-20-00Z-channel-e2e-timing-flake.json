@@ -1,0 +1,13 @@
+{
+  "id": "channel-e2e-timing-flake",
+  "title": "TestChannel_EndToEnd is timing-based and reds the Ubuntu Go 1.23 race job — make the producer/normalizer span deterministic",
+  "weight": 0.6,
+  "source": "console-wave2-20260914",
+  "details": "PR #614 (advisor-only change; internal/bridge/channel is not in its dependency graph) went red on `build + test (Go) (ubuntu-latest, 1.23)` with `e2e_test.go:102: answer text = \"\", want substring \"3 bullets\"` while macOS 1.23 and Ubuntu 1.27 passed the same head and the test passes 5x locally under GOTOOLCHAIN=go1.23.12 -race. The test drives a 1 ms Producer ticker with 5 ms / 10 ms sleeps so the assistant envelope lands inside the [inject_applied, idle_reached] span; its own comment says 'run with -race -count=20 to confirm non-flaky'. On the slow Ubuntu race runner the two poll windows collapse and the assistant seq falls outside the span. Fix the class, not the sleeps: make the span correlation independent of poll timing (e.g. the Supervisor collects by corr_id/seq ordering the Normalizer guarantees, or the test drives the Producer's poll explicitly instead of sleeping) and add a -race -count=20 pin in CI-parity. Until then every PR can red on this job at random; classify by re-running the failed job (gh run rerun --failed).",
+  "files": [
+    "go/internal/bridge/channel/e2e_test.go"
+  ],
+  "surface_note": "2026-09-26 console readiness audit (read-only, against main b9553b9b): the flake (TestChannel_EndToEnd: PollEvery=1ms, 5/10ms sleeps) and every candidate fix live under go/internal/bridge/ — protected surface (routes console by files[]).",
+  "consumed_by": "inbox review 2026-09-27: FIXED. 2708caee (2026-09-27 10:32) replaced the 10 ms sleep with waitForFeed: tick 2 is written only after tick 1's envelope reaches the feed (go/internal/bridge/channel/e2e_test.go:13-23, :98). The commit reports 30 runs green under -race and load. F7 979c111e adds the importer-backstop 'alone' re-run that named this test. The last failure is cycle 1718's lane (loop-20260927-0811-verify.log:3152), before the fix; the two later logs show none. Minor residual: tick 2's stdout and stderr appends can still split across one Producer poll, and the -race -count=20 CI pin was not added.",
+  "consumed_at": "2026-09-27T23:30:00Z"
+}

@@ -49,9 +49,6 @@ func (b *loopBatchCoordinator) wiredWave() *loopwave.Engine {
 
 func nilSignals() *signalcenter.Center { return nil }
 
-// nullWaveEngine builds a Null-Center engine over roots for the facades that
-// carry no storage (the pool's resolver, the budget wrapper, the launcher):
-// the plan port is never reached on their paths.
 func nullWaveEngine(roots loopwave.Roots, warn io.Writer) *loopwave.Engine {
 	return newWaveEngine(loopConfig{ProjectRoot: roots.ProjectRoot, EvolveDir: roots.EvolveDir}, nil, warn, nilSignals)
 }
@@ -75,8 +72,8 @@ func productionWavePlanFn(cfg loopConfig, storage core.Storage, count int, stder
 
 // consoleRoutedResolver is the ADR-0074 plan-time gate's resolver (the pool
 // scheduler reaches it with no Center, so its refusal WARN stays a line).
-func consoleRoutedResolver(projectRoot string, stderr io.Writer) fleet.RoutedFn {
-	return nullWaveEngine(loopwave.RootsOf(projectRoot), stderr).RoutedResolver()
+func consoleRoutedResolver(cfg loopConfig, stderr io.Writer) fleet.RoutedFn {
+	return newWaveEngine(cfg, nil, stderr, nilSignals).RoutedResolver()
 }
 
 // quotaAwareWaveConfig sizes fc for this wave: the bench shrink, then the

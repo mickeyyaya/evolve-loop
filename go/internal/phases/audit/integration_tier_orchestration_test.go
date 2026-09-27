@@ -26,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -189,4 +190,82 @@ func TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFa
 	if *calls != 2 {
 		t.Fatalf("want 2 attempts, got %d", *calls)
 	}
+}
+
+// doneProbeCtx closes asked the first time its Done channel is requested, so a
+// test can order cancellation after a runner has started waiting — no timers.
+type doneProbeCtx struct {
+	context.Context
+	asked chan struct{}
+	once  sync.Once
+}
+
+func (c *doneProbeCtx) Done() <-chan struct{} {
+	c.once.Do(func() { close(c.asked) })
+	return c.Context.Done()
+}
+
+// markerFreeKillScript is a red first attempt followed by a retake killed with
+// no recognizable verdict in its truncated output.
+var markerFreeKillScript = []struct {
+	Code int
+	Out  string
+}{{1, "--- FAIL: TestSlowRed (0.00s)\nFAIL\tpkg\t1.0s\n"}, {-1, "partial toolchain chatter, no verdict lines\nsignal: killed\n"}}
+
+// TestDecideTier_DeadlineHitRequiresSynchronizedCtx locks in what makes the
+// DeadlineKill tests deterministic: runAttempt records deadlineHit from
+// ctx.Err() when the runner returns, so a scripted kill must return only after
+// its ctx is done. The first subtest detects a helper that stops waiting
+// without depending on losing the 1 ns timer race; the others prove the
+// synchronized runner, and only it, reaches the budget WARN through the
+// production integration-tier seam.
+func TestDecideTier_DeadlineHitRequiresSynchronizedCtx(t *testing.T) {
+	t.Run("killedAtDeadline returns only after ctx is done", func(t *testing.T) {
+		parent, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx := &doneProbeCtx{Context: parent, asked: make(chan struct{})}
+		sawErr := make(chan error, 1)
+		inner := func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
+			sawErr <- ctx.Err()
+			return -1, nil
+		}
+		go func() { _, _ = killedAtDeadline(inner)(ctx, "go", "", nil, nil, nil, io.Discard, io.Discard) }()
+		select {
+		case err := <-sawErr:
+			t.Fatalf("the scripted runner ran before waiting on ctx (ctx.Err()=%v) — the raced shape", err)
+		case <-ctx.asked:
+		}
+		cancel()
+		if err := <-sawErr; err == nil {
+			t.Fatal("the scripted runner must observe a done ctx")
+		}
+	})
+	t.Run("synchronized runner reaches the deadline arm through the production seam", func(t *testing.T) {
+		req := tierFixture(t)
+		oldBudget := integrationTierTimeout
+		integrationTierTimeout = time.Nanosecond
+		t.Cleanup(func() { integrationTierTimeout = oldBudget })
+		fn, _, _ := seqRunFunc(t, markerFreeKillScript)
+		withFakeRunner(t, killedAtDeadline(fn))
+
+		verdict, diags := classifyThroughProductionIntegrationTierGate(t, req)
+
+		if verdict != core.VerdictPASS || !hasDiagContaining(diags, "budget") {
+			t.Fatalf("a synchronized deadline kill must reach the budget WARN; got %q, diags=%v", verdict, diags)
+		}
+	})
+	t.Run("a runner that returns before its deadline never reaches the deadline arm", func(t *testing.T) {
+		req := tierFixture(t)
+		oldBudget := integrationTierTimeout
+		integrationTierTimeout = time.Hour
+		t.Cleanup(func() { integrationTierTimeout = oldBudget })
+		fn, _, _ := seqRunFunc(t, markerFreeKillScript)
+		withFakeRunner(t, fn)
+
+		verdict, diags := classifyThroughProductionIntegrationTierGate(t, req)
+
+		if verdict != core.VerdictFAIL {
+			t.Fatalf("an attempt that returned before its deadline is a red retake, not the budget WARN; got %q, diags=%v", verdict, diags)
+		}
+	})
 }

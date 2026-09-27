@@ -1,7 +1,7 @@
 {
   "id": "correction-completion-needs-deliverable-rewrite",
   "created_at": "2026-09-26T05:20:00Z",
-  "weight": 0.8,
+  "weight": 0.95,
   "title": "F39 part 2: a correction round whose fix lives outside the deliverable must complete deterministically (part 1, the explaining nudge, has landed)",
   "kind": "pipeline-repair",
   "priority": "P1",
@@ -23,5 +23,7 @@
     "go/internal/core/cyclerun_correction.go",
     "go/internal/adapters/bridge/bridge.go"
   ],
-  "notes": "Console-owned by kind (the fix surface is the protected bridge + orchestrator). Evidence: runs/cycle-1691 (build-report.md mtime 04:37:45 < correction dispatch 04:37:58; the builder pane at 04:58 said 'Phase is complete'); operator touch 05:16:07 recorded in the campaign memory. Frequency risk: every build-floor correction whose fix is an explanation doc or source-only change. | 2026-09-26: PART 1 landed (fix/correction-completion-nudge): the idle nudge names an unrewritten deliverable and why a rewrite is needed (bridge.nudgeMessage). PART 2 REMAINS: deterministic completion for a correction re-dispatch whose worktree changed and whose deliverable verifies."
+  "notes": "Console-owned by kind (the fix surface is the protected bridge + orchestrator). Evidence: runs/cycle-1691 (build-report.md mtime 04:37:45 < correction dispatch 04:37:58; the builder pane at 04:58 said 'Phase is complete'); operator touch 05:16:07 recorded in the campaign memory. Frequency risk: every build-floor correction whose fix is an explanation doc or source-only change. | 2026-09-26: PART 1 landed (fix/correction-completion-nudge): the idle nudge names an unrewritten deliverable and why a rewrite is needed (bridge.nudgeMessage). PART 2 REMAINS: deterministic completion for a correction re-dispatch whose worktree changed and whose deliverable verifies.",
+  "priority_class": "stability",
+  "priority_rationale": "inbox review 2026-09-27: Evidenced inside the window: the 1707 build idled about 20 minutes, 1691 needed an operator touch, and six more recoveries in 1706-1720 depended on the one-shot nudge. An agent that declines the nudge turns a correct cycle into an exit-81 FAIL, a process block the P0 policy says must be recovered."
 }

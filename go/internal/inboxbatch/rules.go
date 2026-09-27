@@ -17,11 +17,11 @@ type Rule interface {
 	Edges(items []Item) []Edge
 }
 
-// DefaultRules returns the bounded structural rules: campaign, file area and dep. ConnectsRule is opt-in.
+// DefaultRules returns the bounded structural rules: campaign and file area. ConnectsRule is opt-in.
 // root_cause is never a rule: its values are unique per-defect prose, so exact matching yields zero edges
 // (.evolve/state.json failedApproaches[54]).
 func DefaultRules() []Rule {
-	return []Rule{campaignRule{}, fileAreaRule{}, depRule{}}
+	return []Rule{campaignRule{}, fileAreaRule{}}
 }
 
 type campaignRule struct{}
@@ -98,21 +98,6 @@ func fileArea(f string) string {
 		seg = seg[:areaDepth]
 	}
 	return strings.Join(seg, "/")
-}
-
-type depRule struct{}
-
-func (depRule) Edges(items []Item) []Edge {
-	index := indexByID(items)
-	var edges []Edge
-	for i, it := range items {
-		for _, d := range it.Deps {
-			if j, ok := resolveRef(d, index); ok && j != i {
-				edges = append(edges, Edge{A: j, B: i, Reason: "dep " + items[j].ID + "→" + it.ID})
-			}
-		}
-	}
-	return edges
 }
 
 // ConnectsRule binds items through connects_to entries that begin with a known id; it is opt-in via Config.Rules.

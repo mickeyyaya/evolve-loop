@@ -1,0 +1,25 @@
+{
+  "id": "llmroute-default-trigger-aliasing",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "weight": 0.52,
+  "title": "llmroute: resolveTriggers hands out the package default slice, so a caller that edits Plan.Triggers changes every later plan",
+  "summary": "Found by comment-reduction batch 20 (2026-09-26) and reported without changing code. (1) When a profile sets no triggers, resolveTriggers returns the package-level defaultFallbackOnExit slice itself, not a copy. A caller that appends to or edits Plan.Triggers mutates the default for every later Resolve, and that defect would only show up in some other cycle. (2) ApplyUniversalFallback never uses its lookPath parameter (`_ = lookPath`). (3) ApplyBench and ApplyDriverBench are near-duplicates that differ only in the lookup key. (4) The overlay's family rung decides 'bare name' with strings.HasPrefix(c, ov.CLI+\"-\") instead of Family().",
+  "fix": "Return slices.Clone of the default, with a test that edits one plan's triggers and checks a fresh plan still has the default set. Drop or use the lookPath parameter. Make the bench a single function parameterized by its key (Strategy). Use Family() in the overlay rung.",
+  "acceptance": [
+    "Editing one Plan's Triggers never changes another Plan's (test)",
+    "No unused parameters in the fallback path"
+  ],
+  "files": [
+    "go/internal/llmroute/resolve.go",
+    "go/internal/llmroute/fallback.go",
+    "go/internal/llmroute/bench.go"
+  ],
+  "created_at": "2026-09-26T14:40:00Z",
+  "source": "console-comment-workstream-batch20",
+  "merge_notes": [
+    "inbox review 2026-09-27: prescription 4 moved to bridge-family-manifest-facade; fix it there, not here."
+  ],
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A latent shared-slice alias on the dispatch path; the fix is one slices.Clone plus a test."
+}

@@ -1,0 +1,27 @@
+{
+  "id": "looppreflight-version-cache",
+  "kind": "pipeline-repair",
+  "priority": "P3",
+  "weight": 0.5,
+  "title": "looppreflight: version inventory runs twice, its cache write is not atomic, and a stale ACS predicate plus stale docs remain",
+  "summary": "Found by comment-reduction batch 13 (2026-09-26) and reported without changing code. (1) Run calls o.versionInventory() twice, once in the drift check and once for CLIVersions, so every CLI's --version runs twice and the two results can disagree. (2) saveVersionCache writes to a fixed path+'.tmp' instead of using atomicwrite, so concurrent fleet boots can collide. The drift check also discards both the load and the save errors. (3) goodPipelineOptions does not stub VersionInventory, CLIHealthActive, PhaseRoutingWarnings, OrphanKill or the base-divergence probe, so unit tests run real `claude --version` and real git. (4) The go/acs/cycle270 predicate C270_004 requires TestDefaultTmuxSessions, which no longer exists. (5) runtime-reference.md still describes a 4-check gate with a stale-session warning. The nested-session P2 'honest WARN' text in sandbox-confinement-ssot.md does not match the current fail-closed halt.",
+  "fix": "Compute the inventory once per Run and share it. Write the cache with atomicwrite and surface cache errors as a WARN. Stub every external seam in goodPipelineOptions. Retire or repoint the cycle270 predicate. Correct both docs.",
+  "acceptance": [
+    "One --version call per CLI per Run (test with a counting seam)",
+    "Cache writes go through atomicwrite",
+    "Unit tests make no real exec calls",
+    "go test -tags acs ./acs/cycle270 passes"
+  ],
+  "files": [
+    "go/internal/looppreflight/versioninventory.go",
+    "go/internal/looppreflight/looppreflight.go",
+    "go/internal/looppreflight/looppreflight_test.go",
+    "go/acs/cycle270/",
+    "docs/operations/runtime-reference.md",
+    "docs/architecture/sandbox-confinement-ssot.md"
+  ],
+  "created_at": "2026-09-26T13:23:00Z",
+  "source": "console-comment-workstream-batch13",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: A few seconds of duplicate --version execs per loop boot, a tmp-collision hazard, and a stale predicate and docs."
+}

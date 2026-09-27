@@ -17,6 +17,9 @@
   "notes": "reprioritized 2026-07-29 operator directive: pipeline improvement + token optimization first; byte-stable prefixes = direct cache-hit-rate lever",
   "priority": "medium",
   "summary": "Audit every phase prompt assembly + injected preamble for per-cycle dynamic content above the cache boundary; extend the existing cache-stable-prefix work (StaticPrefix/BaseCycleContext) to ALL injection sites; add an ACS/audit check that fails when a dynamic value appears above the boundary. Published: 41-80% cost cut; cache reads ITPM-exempt = ~5x effective quota at 80% hit. GATED: defer until token-telemetry-s7 ships (measured baseline re-ranks these by actual top consumers). Research: knowledge-base/research/token-concurrency-2026/ (papers.md 2.5-2.7).",
-  "title": "Token-opt: cache-discipline audit \u2014 byte-stable static prefixes across all lanes/phases; cache-breakers (run-id, cycle, timestamps, dynamic tool lists) after the stable prefix",
-  "weight": 0.86
+  "title": "Token-opt: cache-discipline audit — byte-stable static prefixes across all lanes/phases; cache-breakers (run-id, cycle, timestamps, dynamic tool lists) after the stable prefix",
+  "weight": 0.35,
+  "priority_class": "feature",
+  "priority_rationale": "inbox review 2026-09-27: The baseline this item was gated on shows near-perfect cache reads, so the only remainder is pinning the adapter-side prepends, a small speculative gain.",
+  "review_status": "inbox review 2026-09-27: PARTIAL. Done: the BaseRunner boundary is one literal (phases/runner/runner.go:259-307, BaseCycleContext and StaticPrefix), pinned by go/acs/cycle534 (ea36f365, 2026-07-06), which checks cross-cycle byte identity of every registered phase's ComposePrompt. The gate this item waited on also shipped: `evolve tokens report` (cmd/evolve/cmd_tokens.go, 84bdb5e4, 2026-07-07). Remaining: the bridge adapter prepends dynamic blocks above the persona body, injectCorrectionPrefix and injectOperatorDirectives (intern"
 }

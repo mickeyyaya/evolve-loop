@@ -32,7 +32,7 @@ func TestServer_FleetPhaseUpdateRefreshesSnapshot(t *testing.T) {
 	if err := os.Chtimes(path, now, now); err != nil {
 		t.Fatal(err)
 	}
-	s.refresh(false)
+	s.refresh()
 	snap, after := s.current()
 	if after <= before {
 		t.Fatal("fleet phase update did not publish a new snapshot")

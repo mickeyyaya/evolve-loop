@@ -68,3 +68,34 @@ func TestStats_AllowedPointersAreNotNarrative(t *testing.T) {
 		t.Fatalf("Narrative = %d, want 2: a See-ADR pointer, the INCIDENT envelope and f64 are not history; the retold ADR and the incident are", got)
 	}
 }
+
+func TestAddedComments(t *testing.T) {
+	const base = "package p\n\n// kept stays put.\nfunc a() {}\n"
+	cases := []struct {
+		name          string
+		before, after string
+		isNew         bool
+		want          []string
+	}{
+		{"plain line", base, base + "\n// plain why.\nfunc b() {}\n", false, []string{"// plain why."}},
+		{"block line", base, base + "/* block note */\n", false, []string{"/* block note */"}},
+		{"directives", base, base + "//go:noinline\n// Deprecated: use c.\n//nolint:errcheck\n// minimal: no retry\nfunc b() {}\n", false, nil},
+		{"moved line", base, "package p\n\nfunc a() {}\n\n// kept stays put.\nfunc b() {}\n", false, nil},
+		{"second copy", base, base + "\n// kept stays put.\nfunc b() {}\n", false, []string{"// kept stays put."}},
+		{"removed line", base, "package p\n\nfunc a() {}\n", false, nil},
+		{"new file's package doc", "", "// Package p holds a thing\n// across two lines.\npackage p\n\n// helper restates.\nfunc h() {}\n", true, []string{"// helper restates."}},
+		{"package doc in a file at base", "package p\n", "// Package p is new here.\npackage p\n", false, []string{"// Package p is new here."}},
+		{"new file that does not parse", "", "// Package p x\npackage\n", true, []string{"// Package p x"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var before []byte
+			if !tc.isNew {
+				before = []byte(tc.before)
+			}
+			if got := AddedComments(before, []byte(tc.after)); !equal(got, tc.want) {
+				t.Fatalf("AddedComments = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

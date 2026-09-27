@@ -71,6 +71,11 @@ type Server struct {
 	opts Options
 	col  *collector
 
+	// refreshMu serialises refresh, so racing callers (Run's startup poll and
+	// on-demand readers) see each other's publish and never re-bump seq for
+	// the same fingerprint.
+	refreshMu sync.Mutex
+
 	mu       sync.RWMutex
 	snap     *Snapshot
 	dossiers map[int]*dossier.Dossier
@@ -174,7 +179,7 @@ func (s *Server) allowHost(addr string) {
 // Run polls the project root until ctx is cancelled, rebuilding the snapshot
 // and notifying SSE subscribers whenever the change fingerprint moves.
 func (s *Server) Run(ctx context.Context) {
-	s.refresh(true)
+	s.refresh()
 	ticker := time.NewTicker(s.opts.PollInterval)
 	defer ticker.Stop()
 	for {
@@ -182,7 +187,7 @@ func (s *Server) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.refresh(false)
+			s.refresh()
 		}
 	}
 }
@@ -223,12 +228,15 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	return nil
 }
 
-// refresh recomputes the fingerprint and, when it moved (or force), rebuilds
-// the snapshot and publishes the new sequence number.
-func (s *Server) refresh(force bool) {
+// refresh recomputes the fingerprint and, when it moved or nothing has been
+// published yet, rebuilds the snapshot and publishes the new sequence number.
+// An unchanged root never publishes twice, whichever caller gets there first.
+func (s *Server) refresh() {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
 	fp := fingerprint(s.root)
 	s.mu.RLock()
-	unchanged := !force && fp == s.fp && s.snap != nil
+	unchanged := fp == s.fp && s.snap != nil
 	s.mu.RUnlock()
 	if unchanged {
 		return
@@ -254,7 +262,7 @@ func (s *Server) currentEpoch() (*Snapshot, map[int]*dossier.Dossier, uint64) {
 	snap, ds, seq := s.snap, s.dossiers, s.seq
 	s.mu.RUnlock()
 	if snap == nil {
-		s.refresh(true)
+		s.refresh()
 		s.mu.RLock()
 		snap, ds, seq = s.snap, s.dossiers, s.seq
 		s.mu.RUnlock()
