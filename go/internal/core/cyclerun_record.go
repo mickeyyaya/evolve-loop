@@ -204,12 +204,12 @@ func (cr *cycleRun) recordAndBranch(next Phase, dr dispatchResult) (loopAction, 
 		branch := cr.o.decideAfterDebugger(dr.resp)
 		cr.o.recordDebuggerDecision(cr.ctx, cr.cycle, cr.cs, dr.resp)
 		if branch == PhaseEnd {
-			return loopBreak, nil
+			return cr.endAfterDebugger()
 		}
 		if next, resumed := cr.o.resumeFleetRebaseAfterDebugger(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, branch, cr.recoveryDepth, fleetWidthFromEnv(cr.req.Env)); resumed {
 			cr.recoveryDepth++
 			if next == PhaseEnd {
-				return loopBreak, nil
+				return cr.endAfterDebugger()
 			}
 			branch = next
 		}
