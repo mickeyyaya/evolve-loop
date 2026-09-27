@@ -72,7 +72,20 @@ func greenPack() packOutcome { return packOutcome{} }
 // redPack is a GENUINE contract violation: nonzero exit WITH named test
 // failures — the pack itself said "your code is broken".
 func redPack(names ...string) packOutcome {
-	return packOutcome{failedTests: names, err: errors.New("exit status 1")}
+	failures := make([]packFailure, 0, len(names))
+	for _, name := range names {
+		failures = append(failures, packFailureOf(name))
+	}
+	return packOutcome{failures: failures, err: errors.New("exit status 1")}
+}
+
+// packFailureOf reads a "pkg.Test" name back into its parts; a build failure has no test part.
+func packFailureOf(name string) packFailure {
+	if strings.Contains(name, "[build failed]") {
+		return packFailure{Package: name}
+	}
+	dot := strings.LastIndex(name, ".")
+	return packFailure{Package: name[:dot], Test: name[dot+1:]}
 }
 
 // ambiguousPack is the cycle-1402/1403/1405 shape: nonzero exit, but not one
@@ -397,11 +410,11 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("expected exactly 2 classified failures (one test, one build), got %v", got)
 	}
-	if got[0] != "p/profiles.TestBound" {
-		t.Errorf("failing test name = %q, want p/profiles.TestBound", got[0])
+	if got[0] != (packFailure{Package: "p/profiles", Test: "TestBound"}) {
+		t.Errorf("failing test = %+v, want p/profiles.TestBound", got[0])
 	}
-	if !strings.Contains(got[1], "[build failed]") {
-		t.Errorf("compile break must classify as a real RED, got %q", got[1])
+	if !strings.Contains(got[1].String(), "[build failed]") || got[1].Test != "" {
+		t.Errorf("compile break must classify as a real RED with no test name, got %+v", got[1])
 	}
 	if !strings.Contains(tee.String(), "profiles_test.go:12: mismatch") {
 		t.Errorf("Output text must be teed to the scan log, got %q", tee.String())
