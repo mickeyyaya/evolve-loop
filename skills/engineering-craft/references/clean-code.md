@@ -14,12 +14,20 @@ AI-assisted codebases show **+81% duplicated blocks since 2023** with refactored
 The reader's cost, not the writer's taste, decides:
 - **Diff budgets**: ~500 lines for complex changes, ~800 for mechanical ones; past that, split the PR. One concern per change — a fix, a refactor, and a rename are three changes.
 - **Scope contract in the description**: goal + explicit non-goals + blast radius. The reviewer verifies against it; anything outside it is scope creep to remove.
-- **Convention matching**: the codebase's naming, error style, file layout, and comment density win over your preferences — always. Style changes are their own commits, or nothing.
-- Functions stay small enough to hold in one read (the *small* finding survived scrutiny; exact line-count caps did not). Nesting ≤4 remains a good forcing function for extraction.
+- **Convention matching**: the codebase's naming, error style and file layout win over your preferences — always. Style changes are their own commits, or nothing.
+- **Size caps (project rule, RIGID)**: a function ≤ 50 lines, a file ≤ 800 lines, nesting ≤ 4. A new or changed function over a cap is a defect; a touched function already over one shrinks in the same change or the change names why not (the Boy Scout rule).
+
+## Functions (RIGID — *Clean Code* ch. 3)
+
+- **Do one thing, at one level of abstraction.** A function that parses, decides, mutates and logs is four functions; read top-down, each call descends one level (the stepdown rule).
+- **Arguments**: three at most; more is a parameter object. **No flag arguments**: a bool that selects between two behaviors is two functions, or a Strategy.
+- **Command-query separation**: a function either changes state or answers a question. A query that deletes, refreshes or caches as a side effect is a defect; so is a name that hides what the function does.
+- **Law of Demeter at boundaries**: talk to collaborators, not their internals (`a.B().C().D()` across packages is a missing method).
+- **No dead code**: an unexported symbol nothing calls, a parameter nothing reads and an unreachable branch are deleted in the change that orphans them.
 
 ## Comments (RIGID)
 
-Comments answer **why** — a constraint the code cannot express: an invariant, an external contract, a deliberate deviation, a tooling requirement ("explicitly typed so the identifier appears in the test AST"). Never *what* the next line does, never narration of your editing process ("added to fix review"), never restating the diff. AI-generated narration slop is a known review burden — strip it before shipping. Delete stale comments as part of the change that stales them; a wrong comment is worse than none.
+New and changed code carries no comments; the rule and its few machine-read exceptions live in [docs/conventions/code-comments.md](../../../docs/conventions/code-comments.md). The fix for a comment is always a better name, a type, an extracted function, a test or a line in the package's design notes — never a reworded comment.
 
 ## Errors (RIGID)
 
