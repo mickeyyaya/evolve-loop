@@ -18,6 +18,7 @@ Salvaged from the unlanded 2026-09-26 worktree (`fix/dossier-commits-at-wave-bou
 - A first design exempted corpus files from leak recovery. Security review blocked it: an agent-planted pair would have reached `main` unreviewed.
 - Size ratchet: `prepareIteration` 55 → 48 (the wave-binary resolution moved to `resolveWaveBinary`, now its only home: the batch-start copy is gone, `loopBatchCoordinator.run` 108 → 100); `runFleet` and `runCampaignRun` unchanged, since both route their lanes through `runLanesThenPublish`.
 - Record: `docs/incidents/2026-09-26-a-failed-cycles-closeout-moved-main-under-a-passed-sibling.md`.
+
 ## Added — one always-reporting `CI required` check: a skipped, cancelled or missing CI job can no longer read as success (2026-09-28)
 
 - Salvaged from the unlanded 2026-09-14 test-campaign worktree `dev/test-ci-required-results-2026-09-14` (campaign requirement R8). No workflow or `internal/ciparity` file had changed on `main` since its base (`3a972e20`), so the design applies as written.
@@ -30,6 +31,7 @@ Salvaged from the unlanded 2026-09-26 worktree (`fix/dossier-commits-at-wave-bou
 - Docs: go/docs/testing.md "CI shape"; the design and implementation reports under docs/reports/test-ci-required-results-*-2026-09-14.md; the campaign tracker docs/research/testing-completion-2026-09-14.md.
 - Review round (2026-09-29): `CI required` must wait for every other job in `required.yml` (a test derives the set from the YAML); Markdown in `docs/` outside the three skip folders provably runs both suites; the release preflight, `ciwatch` and both release skills read the `required.yml` run (`ciparity.RequiredWorkflow`), not the newest run of any workflow, which a green `landing-pages` run could have been; the routing script uses early exits. After a force-push, routing cannot reach the old tip and fails closed; a manual `workflow_dispatch` run of `required CI` posts a green result.
 - Not done: the branch rule requiring `CI required` (R9) needs the operator's approval, and cycle ships first need a PR-based publication path, because today they push directly to `main`.
+
 ## Fixed — the doc-deletion guard judges what bash will run: `unlink`, `git clean`, a deleting `find` and quoted paths (2026-09-28)
 
 - Salvaged from the unlanded `docdelete-uncommitted` worktree (defence in depth for the open `ship-refuses-deleting-committed-documentation` item, which stays open: a text guard cannot see an interpreter's deletes).
