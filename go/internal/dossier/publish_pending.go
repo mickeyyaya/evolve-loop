@@ -90,8 +90,11 @@ func publishPair(projectRoot string, n int) error {
 		return err
 	}
 	held, err := corpusHoldsPair(corpus, base, jsonB, mdB)
-	if err != nil || held {
+	if err != nil {
 		return err
+	}
+	if held {
+		return commitPairGit(gitexec.Default(projectRoot), corpusPathspec(base))
 	}
 	return commitIntoCorpus(projectRoot, corpus, base, jsonB, mdB)
 }
@@ -139,12 +142,16 @@ func commitIntoCorpus(projectRoot, corpus, base string, jsonB, mdB []byte) error
 	jsonPath, mdPath := filepath.Join(corpus, base+".json"), filepath.Join(corpus, base+".md")
 	err := errors.Join(atomicwrite.Bytes(jsonPath, jsonB), atomicwrite.Bytes(mdPath, mdB))
 	if err == nil {
-		err = commitPairGit(gitexec.Default(projectRoot), filepath.ToSlash(filepath.Join("knowledge-base", "cycles", base)))
+		err = commitPairGit(gitexec.Default(projectRoot), corpusPathspec(base))
 	}
 	if err != nil {
 		return errors.Join(err, removeIfPresent(jsonPath), removeIfPresent(mdPath))
 	}
 	return nil
+}
+
+func corpusPathspec(base string) string {
+	return filepath.ToSlash(filepath.Join("knowledge-base", "cycles", base))
 }
 
 func removePending(pending string, n int) error {

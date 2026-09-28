@@ -230,6 +230,25 @@ func TestPublishPending_ClearsAPendingCopyTheCorpusAlreadyHoldsWithoutACommit(t 
 	}
 }
 
+func TestPublishPending_CommitsAnIdenticalRecordTheCorpusHoldsUntracked(t *testing.T) {
+	r := planeWithPendingDossier(t)
+	if err := Write(pendingCloseout(), CyclesDir(r.Dir), false); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := PublishPending(r.Dir, io.Discard)
+
+	if err != nil || !reflect.DeepEqual(res.Published, []int{7}) || len(res.Failed) != 0 {
+		t.Fatalf("PublishPending = (%+v, %v), want cycle 7 published", res, err)
+	}
+	if got := r.Git("show", "--name-only", "--format=%s", "HEAD"); got != "dossier: cycle-7 closeout\n\nknowledge-base/cycles/cycle-7.json\nknowledge-base/cycles/cycle-7.md" {
+		t.Fatalf("HEAD = %q, want the untracked identical record committed", got)
+	}
+	if entries, _ := os.ReadDir(PendingDir(r.Dir)); len(entries) != 0 {
+		t.Fatalf("the pending copy is still pending: %v", entries)
+	}
+}
+
 func TestPublishPending_RefusesAPendingHalfThatIsNotARegularFile(t *testing.T) {
 	for _, name := range []string{"cycle-7.json", "cycle-7.md"} {
 		t.Run(name, func(t *testing.T) {
