@@ -67,6 +67,18 @@ func SeverityTrigger() Brick {
 	}
 }
 
+var testerOnARedBuild = config.Condition{Field: "build.acs_red", Op: "gt", Value: 0}
+
+func AdvisorJudgedTester() Brick {
+	return func(s *ScenarioSpec) {
+		ensureTriggers(s)
+		s.Triggers["tester"] = config.RoutingBlock{
+			InsertWhen: []config.Condition{testerOnARedBuild},
+			RubricHint: []string{"a risky green build also warrants tester"},
+		}
+	}
+}
+
 // --- signal fixtures ---
 
 func TrivialCycle() Brick { return func(s *ScenarioSpec) { s.Signals.CycleSize = "trivial" } }

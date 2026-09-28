@@ -27,8 +27,13 @@ type Condition struct {
 type RoutingBlock struct {
 	InsertWhen []Condition `json:"insert_when"`
 	SkipWhen   []Condition `json:"skip_when"`
-	// RubricHint lines render into the advisor's decision rubric. A rubric-only block is walk-inert.
+	// RubricHint lines render into the advisor's decision rubric, and a hint opens the phase to the
+	// advisor's judgment beyond its insert_when (TriggerIsTheWholeRule). A rubric-only block is walk-inert.
 	RubricHint []string `json:"rubric_hint,omitempty"`
+}
+
+func (b RoutingBlock) TriggerIsTheWholeRule() bool {
+	return len(b.InsertWhen) > 0 && len(b.RubricHint) == 0
 }
 
 // RoutingConfig is the resolved routing configuration the composition root injects everywhere.

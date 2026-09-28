@@ -138,3 +138,12 @@ func TestBrick_EnableEnvAndTriggerBricks(t *testing.T) {
 		t.Fatalf("severity trigger = %+v", trigger)
 	}
 }
+
+func TestBrick_AdvisorJudgedTesterKeepsTheDefaultTriggerAndAddsAHint(t *testing.T) {
+	var s ScenarioSpec
+	AdvisorJudgedTester()(&s)
+	trigger := s.Triggers["tester"]
+	if len(trigger.InsertWhen) != 1 || trigger.InsertWhen[0].Field != "build.acs_red" || trigger.InsertWhen[0] != buildConfig(ScenarioSpec{}).Triggers["tester"].InsertWhen[0] || len(trigger.RubricHint) != 1 {
+		t.Fatalf("advisor-judged tester trigger = %+v", trigger)
+	}
+}

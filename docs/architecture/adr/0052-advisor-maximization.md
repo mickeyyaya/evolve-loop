@@ -81,3 +81,13 @@ WS0-S1 installs `TestArchitectureSeams_FoundationsExist` (`go/internal/core/seam
 ## Future work
 
 Contextual-bandit / online-learning route selection keyed off the WS4 route-quality history (see `EVOLVE_ROUTING_JUDGE`). Explicitly out-of-scope for the quality-first program; revisit only with a cost-pressure motivation and the eval harness to gate it.
+
+## Amendment (2026-09-28) — the registry bounds the plan
+
+The advisor chooses the path within what the phase registry admits. It plans once, before scout, from the wave goal, so it cannot evaluate a trigger keyed on scout's output such as `scout.goal_type`. Cycle 1733, a refactor lane, was planned fault-localization and bug-reproduction, and it failed inside bug-reproduction.
+
+- On the plan path the router now evaluates a phase's trigger at its turn in the walk. A phase whose `insert_when` has no `rubric_hint` beside it declares that trigger as its whole admission rule, and a plan that runs it while the trigger does not fire is clamped to skip (`insert-when-gates-plan`).
+- A `rubric_hint` is the registry's channel for the advisor's judgment beyond the trigger, so a hinted phase keeps it; architecture-design declares one.
+- The advisor keeps its other powers: skipping any optional phase, running a phase with no trigger, and choosing the CLI and tier. An operator `enabled: on` still runs a phase whatever its trigger says, and floor phases are never gated.
+
+Design record: [logic-first-delivery-design.md §5.11](../logic-first-delivery-design.md) (T4). Mechanics: [dynamic-phase-routing.md](../dynamic-phase-routing.md), the phase registry section.

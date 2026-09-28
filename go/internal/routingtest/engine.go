@@ -68,7 +68,7 @@ func buildConfig(s ScenarioSpec) config.RoutingConfig {
 	}
 	if cfg.Triggers == nil {
 		cfg.Triggers = map[string]config.RoutingBlock{
-			"tester": {InsertWhen: []config.Condition{{Field: "build.acs_red", Op: "gt", Value: 0}}},
+			"tester": {InsertWhen: []config.Condition{testerOnARedBuild}},
 		}
 	}
 	if cfg.MaxInsertions == 0 {

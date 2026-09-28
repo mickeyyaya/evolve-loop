@@ -137,6 +137,8 @@ Example — the content-routed `tester` phase is proposed only when the build's 
 
 Triggers are honored only at `Stage >= Advisory`; in `Shadow` they are forensic-only.
 
+At `Stage >= Advisory` the advisor's whole-cycle plan drives the optional phases, and the registry bounds it. A phase whose `routing` block has an `insert_when` and no `rubric_hint` declares its trigger as its whole admission rule: a plan that runs it while the trigger does not fire is clamped to skip (`insert-when-gates-plan`, recorded in `routing-decision-N.json` and the ledger). A `rubric_hint` opens the phase to the advisor's judgment beyond the trigger (architecture-design: "a novel/cross-cutting goal also warrants architecture-design"), an operator `enabled: on` runs the phase whatever its trigger says, and floor phases are never gated. The advisor plans before scout, so it cannot evaluate a `scout.goal_type` trigger itself; the walk evaluates it at the phase's turn, when the signal exists (cycle 1733).
+
 ## The LLM proposer
 
 `core.PhaseAdvisor` (`go/internal/core/phase_advisor.go` — since ADR-0103 unit 04 the seam; the brain is `go/internal/core/advisor`, see [decomposition/04-advisor.md](decomposition/04-advisor.md)) is the bridge-backed `DynamicLLM` brain:
