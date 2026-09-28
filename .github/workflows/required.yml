@@ -28,45 +28,46 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
         run: |
-          go_required=true
-          landing_required=true
+          route() {
+            printf 'go=%s\nlanding=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
+            exit
+          }
           case "$EVENT_NAME" in
-            workflow_dispatch) ;;
-            push|pull_request)
-              if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ || ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-                echo 'CI routing requires valid base and head commit IDs' >&2
-                exit 1
-              fi
-              if [[ "$EVENT_NAME" != push || "$BASE_SHA" != 0000000000000000000000000000000000000000 ]]; then
-                base="$BASE_SHA"
-                if [[ "$EVENT_NAME" == pull_request ]]; then
-                  if ! base=$(git merge-base "$BASE_SHA" "$HEAD_SHA"); then
-                    echo 'unable to determine the PR merge-base' >&2
-                    exit 1
-                  fi
-                fi
-                # --no-renames keeps both old and new paths in the decision.
-                if ! git diff --no-renames --name-only -z "$base" "$HEAD_SHA" > "$RUNNER_TEMP/ci-paths"; then
-                  echo 'unable to determine changed paths' >&2
-                  exit 1
-                fi
-                if [[ -s "$RUNNER_TEMP/ci-paths" ]]; then
-                  go_required=false
-                  landing_required=false
-                  while IFS= read -r -d '' path; do
-                    case "$path" in
-                      go/*|skills/*|agents/*) go_required=true ;;
-                      landing/*|docs/explain/*) landing_required=true ;;
-                      docs/reports/*.md|docs/research/*.md|docs/private/*.md) ;;
-                      *) go_required=true; landing_required=true ;;
-                    esac
-                  done < "$RUNNER_TEMP/ci-paths"
-                fi
-              fi
-              ;;
+            workflow_dispatch) route true true ;;
+            push|pull_request) ;;
             *) echo "unsupported CI event: $EVENT_NAME" >&2; exit 1 ;;
           esac
-          printf 'go=%s\nlanding=%s\n' "$go_required" "$landing_required" >> "$GITHUB_OUTPUT"
+          if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ || ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'CI routing requires valid base and head commit IDs' >&2
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == push && "$BASE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+            route true true
+          fi
+          base="$BASE_SHA"
+          if [[ "$EVENT_NAME" == pull_request ]] && ! base=$(git merge-base "$BASE_SHA" "$HEAD_SHA"); then
+            echo 'unable to determine the PR merge-base' >&2
+            exit 1
+          fi
+          # --no-renames keeps both old and new paths in the decision.
+          if ! git diff --no-renames --name-only -z "$base" "$HEAD_SHA" > "$RUNNER_TEMP/ci-paths"; then
+            echo 'unable to determine changed paths' >&2
+            exit 1
+          fi
+          if [[ ! -s "$RUNNER_TEMP/ci-paths" ]]; then
+            route true true
+          fi
+          go_required=false
+          landing_required=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              go/*|skills/*|agents/*) go_required=true ;;
+              landing/*|docs/explain/*) landing_required=true ;;
+              docs/reports/*.md|docs/research/*.md|docs/private/*.md) ;;
+              *) go_required=true; landing_required=true ;;
+            esac
+          done < "$RUNNER_TEMP/ci-paths"
+          route "$go_required" "$landing_required"
 
   validate:
     name: plugin and durable ACS
