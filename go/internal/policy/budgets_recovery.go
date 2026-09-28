@@ -149,6 +149,18 @@ func (p Policy) DocsFloorConfig() DocsFloorPolicy {
 	return c
 }
 
+type CommentFloorPolicy struct {
+	Stage string `json:"stage,omitempty"`
+}
+
+func (p Policy) CommentFloorConfig() CommentFloorPolicy {
+	c := CommentFloorPolicy{Stage: "shadow"}
+	if p.CommentFloor != nil && p.CommentFloor.Stage != "" {
+		c.Stage = p.CommentFloor.Stage
+	}
+	return c
+}
+
 // MergeGatePolicy is the "merge_gate" block: the merge-to-main gate's stage and cadence thresholds.
 // See ADR-0057.
 type MergeGatePolicy struct {
