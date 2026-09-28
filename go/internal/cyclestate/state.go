@@ -100,7 +100,8 @@ type CycleState struct {
 	AuditRepairAttempts int `json:"audit_repair_attempts,omitempty"`
 	// ShipRecoveryCode is the ship error a recovery rebuilds from, cleared by the ship latch;
 	// persisted so the live loop and a resume seed the standing-findings brief alike.
-	ShipRecoveryCode string `json:"ship_recovery_code,omitempty"`
+	ShipRecoveryCode      string   `json:"ship_recovery_code,omitempty"`
+	ShipRecoveryConflicts []string `json:"ship_recovery_conflicts,omitempty"`
 	// AuditDeclineReason is the retry envelope's reason when an audit FAIL got no repair grant;
 	// it alone marks a retro-routed tdd/build re-entry as owed the audit's standing findings.
 	AuditDeclineReason string `json:"audit_decline_reason,omitempty"`

@@ -45,7 +45,6 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 		ProjectRoot:                     cr.req.ProjectRoot,
 		Workspace:                       cr.cs.WorkspacePath,
 		Worktree:                        cr.cs.ActiveWorktree,
-		WorktreeReadOnly:                cr.o.worktreeReadOnly(phase),
 		WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
 		ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
 		RunID:                           cr.cs.RunID,
@@ -57,6 +56,7 @@ func (cr *cycleRun) phaseRequestFor(phase Phase) PhaseRequest {
 		BypassPolicy:                    cr.req.BypassPolicy,
 		OperatorDirectives:              cr.directivesSet.Merged,
 	}
+	req = cr.o.withWorktreeFence(req, phase, cr.cs)
 	req.BuildPlan = readUpstreamBuildPlan(cr.o.cfg.PhaseIO, phase, cr.workflowConfig.PhaseEnables, cr.cs.WorkspacePath)
 	projectBuildExplanation(cr.req.ProjectRoot, cr.cs).apply(&req)
 	if cr.o.cfg.PhaseIO >= config.StageShadow {

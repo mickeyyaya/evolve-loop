@@ -150,7 +150,7 @@
   "internal/core.gitWorktree.Create": 71,
   "internal/core.loadResumeStateFrom": 61,
   "internal/core.parseUnifiedDiffToHunks": 54,
-  "internal/core.rebaseWithDerivedRegen": 65,
+  "internal/core.rebaseWithDerivedRegen": 63,
   "internal/core.recoverBuildLeak": 111,
   "internal/core.resumeExecution.run": 404,
   "internal/cyclecost.SummarizeCycle": 57,
