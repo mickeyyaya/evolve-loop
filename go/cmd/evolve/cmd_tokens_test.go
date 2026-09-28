@@ -131,35 +131,6 @@ func lineContaining(text, needle string) string {
 	return ""
 }
 
-// tripwireCountFromJSON decodes the report JSON and returns the tripwire count:
-// the value of any top-level field whose key contains "tripwire" and is a number,
-// or the length of such an array field; -1 when no such field exists, so the
-// test discriminates "surfaced 1" from "absent".
-func tripwireCountFromJSON(t *testing.T, data []byte) int {
-	t.Helper()
-	var m map[string]any
-	if err := json.Unmarshal(data, &m); err != nil {
-		t.Fatalf("unmarshal report json: %v\n%s", err, data)
-	}
-	count := -1
-	for k, v := range m {
-		if !strings.Contains(strings.ToLower(k), "tripwire") {
-			continue
-		}
-		switch val := v.(type) {
-		case float64:
-			if int(val) > count {
-				count = int(val)
-			}
-		case []any:
-			if len(val) > count {
-				count = len(val)
-			}
-		}
-	}
-	return count
-}
-
 func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
 	root := t.TempDir()
 	// Cycle 5 is discovered via its phase-timing log; duration 90000 / exit 0
@@ -199,11 +170,16 @@ func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
 	if code := runTokensReport([]string{"--project-root", root, "--json"}, &jout, &jerr); code != 0 {
 		t.Fatalf("json exit=%d, stderr=%s", code, jerr.String())
 	}
-	if got := tripwireCountFromJSON(t, jout.Bytes()); got != 1 {
-		t.Errorf("json tripwire count=%d want 1:\n%s", got, jout.String())
+	var report TokensReport
+	if err := json.Unmarshal(jout.Bytes(), &report); err != nil {
+		t.Fatalf("unmarshal report json: %v\n%s", err, jout.String())
 	}
-	if !strings.Contains(jout.String(), "codex") {
-		t.Errorf("json output missing offending CLI codex:\n%s", jout.String())
+	if report.TripwireCount != 1 || len(report.Tripwires) != 1 {
+		t.Fatalf("json count=%d records=%d, want exactly one tripwire:\n%s", report.TripwireCount, len(report.Tripwires), jout.String())
+	}
+	want := TripwireEvent{Cycle: 5, CLI: "codex", Agent: "builder", Phase: "build", DurationMS: 90000, ExitCode: 0}
+	if report.Tripwires[0] != want {
+		t.Errorf("json tripwire=%+v, want %+v", report.Tripwires[0], want)
 	}
 }
 

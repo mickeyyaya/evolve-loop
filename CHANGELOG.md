@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file.
 - `acs/regression/cycle1515` and `acs/cycle1498` built `evolve-under-test` into a temp dir in `TestMain`, deferred its removal, and then called `os.Exit(m.Run())`, which skips deferred calls. Each run of the durable suite (every audit's CI-parity gate, every floor, CI) leaked about 22 MB, 1,427 dirs and 32 GB in all. Both `TestMain`s now return, and Go (≥ 1.15) exits with `m.Run()`'s result. Measured: the unfixed predicate leaks one dir per run, the fixed one none.
 - New `internal/testmainexit`: `SkippedDefers` finds a `TestMain` that defers a cleanup and also calls `os.Exit` (closures excluded). `TestModuleTestMainsNeverDeferCleanupPastOsExit` runs it over every bound test file. Red first, it named exactly the two files.
 - Queued: `disk-space-preflight` (halt on low free space before any lane runs) and `gc-pipeline-temp-and-go-cache` (`evolve gc` reaps stale pipeline temp artifacts and bounds the 157 GB Go build cache).
+## Added — `acsassert.GoTests`: ACS predicates judge `go test -json` events, not printed PASS text (2026-09-28)
+
+- Salvaged from the unlanded 2026-09-14 test-campaign worktree. `pkg/acsassert.GoTests` runs the selected tests with `go test -json` and requires, for each named test, one `run` event followed by `pass`, with the package started and passed. Printed `--- PASS:` text, a prefix-colliding subtest, a skip and a swallowed failure no longer satisfy a predicate.
+- Pilots: `acs/cycle1013` and `acs/cycle1015` use it. `cmd/evolve`'s tokens-report test decodes the typed `TokensReport` and compares the exact `TripwireEvent`, replacing a "any key containing tripwire" count.
+- Review: FIX_THEN_MERGE (a `fail` event from another package failed the target's validation before the package filter) → fixed red-first (`another_package_fails_beside_a_passing_target`).
+- Docs: acs-predicate-quality-gate.md, "Structured Go-test evidence".
 
 ## Fixed — `evolve sync-main` is not blocked by an untracked file (2026-09-28)
 

@@ -150,6 +150,18 @@ The cuts also *added* true positives previously invisible: the `git`-without-`-C
 
 **Scope rule SSOT.** The package-pattern recognizer lives in `internal/gopkgpattern`, shared with `internal/acssuite`'s run-time scope-lint, so authoring-time and run-time scope rules cannot drift.
 
+## Structured Go-test evidence (`acsassert.GoTests`, 2026-09-28)
+
+A predicate that proves "these Go tests ran and passed" used to run `go test -v` through `acsassert.SubprocessOutput` and grep stdout for `--- PASS: <name>`. That text can be printed by a test, repeated by a subtest whose name shares a prefix, or left behind by a `TestMain` that swallows a failure and exits 0.
+
+`acsassert.GoTests(tb, GoTestSpec{Dir, Package, Pattern, Names, Race, Tags})` runs `go test -json -count=1 -v -run <Pattern> <Package>` and judges the event stream instead:
+- the package must start and pass;
+- every name in `Names` must have exactly one `run` event followed by `pass`;
+- a `skip` or `fail` of a named test fails the predicate, and so does a non-zero exit;
+- events of other packages are ignored, because `go test`'s own exit code already reports them.
+
+The caller's test deadline bounds the subprocess. Printed `--- PASS:` text, an exact-name prefix collision and a post-`m.Run()` `os.Exit` are its pinned negative controls (`pkg/acsassert/go_tests_test.go` and `go_tests_integration_test.go`). Cycles 1013 and 1015 are the first predicates converted; the rest of the corpus (about 150 files still grep) converts as its predicates are next touched.
+
 ## Lifecycle
 
 ```
