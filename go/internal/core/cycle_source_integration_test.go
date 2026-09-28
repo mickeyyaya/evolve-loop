@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestNewCycleRun_RejectsRootCycleOccupiedInFetchedWorktree(t *testing.T) {
@@ -64,15 +66,14 @@ func newCycleSourceGitFixture(t *testing.T) cycleSourceGitFixture {
 		"GIT_AUTHOR_NAME":     "ci",
 		"GIT_COMMITTER_EMAIL": "ci@example.com",
 		"GIT_COMMITTER_NAME":  "ci",
-		"GIT_CONFIG_COUNT":    "2",
 		"GIT_CONFIG_GLOBAL":   os.DevNull,
-		"GIT_CONFIG_KEY_0":    "commit.gpgsign",
-		"GIT_CONFIG_KEY_1":    "core.hooksPath",
 		"GIT_CONFIG_NOSYSTEM": "1",
-		"GIT_CONFIG_VALUE_0":  "false",
-		"GIT_CONFIG_VALUE_1":  hooks,
 		"GIT_TERMINAL_PROMPT": "0",
 	} {
+		t.Setenv(key, value)
+	}
+	for _, entry := range gittest.ConfigEnv([2]string{"commit.gpgsign", "false"}, [2]string{"core.hooksPath", hooks}) {
+		key, value, _ := strings.Cut(entry, "=")
 		t.Setenv(key, value)
 	}
 	return cycleSourceGitFixture{t: t}
