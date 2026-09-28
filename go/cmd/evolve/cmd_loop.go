@@ -148,23 +148,22 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 		return runResumeBatch(ctx, cfg, orch, deps.Ledger, deps.Signals, cycleEnv, cycleCtx, &lr, stdout, stderr)
 	}
 
-	lastBeforeGCHook, exitCode, halt := prepareFreshBatch(ctx, cfg, deps, &lr, stdout, stderr)
+	exitCode, halt := prepareFreshBatch(ctx, cfg, deps, &lr, stdout, stderr)
 	if halt {
 		return exitCode
 	}
 
 	return (&loopBatchCoordinator{
-		ctx:              ctx,
-		cfg:              cfg,
-		deps:             deps,
-		orch:             orch,
-		cycleEnv:         cycleEnv,
-		cycleContext:     cycleCtx,
-		result:           &lr,
-		workflow:         wc,
-		lastBeforeGCHook: lastBeforeGCHook,
-		stdout:           stdout,
-		stderr:           stderr,
+		ctx:          ctx,
+		cfg:          cfg,
+		deps:         deps,
+		orch:         orch,
+		cycleEnv:     cycleEnv,
+		cycleContext: cycleCtx,
+		result:       &lr,
+		workflow:     wc,
+		stdout:       stdout,
+		stderr:       stderr,
 	}).run()
 }
 
