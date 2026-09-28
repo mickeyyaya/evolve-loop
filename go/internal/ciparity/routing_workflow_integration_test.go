@@ -159,6 +159,23 @@ func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
 	}
 }
 
+func TestRequiredRouting_NonFastForwardPushDiffsTheReachableOldTip(t *testing.T) {
+	dir, base := routingRepo(t)
+	routingFile(t, dir, "go/dropped.go")
+	oldTip := routingCommit(t, dir)
+	routingGit(t, dir, "branch", "-q", "before-force-push")
+	routingGit(t, dir, "checkout", "-q", "-B", "main", base)
+	routingFile(t, dir, "docs/reports/rewrite.md")
+	head := routingCommit(t, dir)
+	if got := routingGit(t, dir, "rev-parse", "before-force-push"); got != oldTip {
+		t.Fatalf("old tip %s is not reachable from before-force-push (%s)", oldTip, got)
+	}
+	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "push", oldTip, head)
+	if err != nil || got != "go=true\nlanding=false\n" {
+		t.Fatalf("a push that drops a Go commit must run Go: %q, %v", got, err)
+	}
+}
+
 func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing.T) {
 	dir, head := routingRepo(t)
 	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
