@@ -189,13 +189,7 @@ func shellWords(command string) []string {
 			continue
 		}
 		if quote != 0 {
-			if quote == '"' && char == '\\' {
-				escaped = true
-			} else if char == quote {
-				quote = 0
-			} else {
-				word.WriteByte(char)
-			}
+			quote, escaped = consumeQuoted(&word, quote, char)
 			inWord = true
 			continue
 		}
@@ -215,4 +209,15 @@ func shellWords(command string) []string {
 	}
 	appendWord()
 	return words
+}
+
+func consumeQuoted(word *strings.Builder, quote, char byte) (byte, bool) {
+	switch {
+	case quote == '"' && char == '\\':
+		return quote, true
+	case char == quote:
+		return 0, false
+	}
+	word.WriteByte(char)
+	return quote, false
 }

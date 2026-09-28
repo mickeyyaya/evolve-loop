@@ -268,27 +268,13 @@ func Fix(root string, m *Manifest) ([]string, error) {
 			if rel == "" {
 				continue
 			}
-			abs := filepath.Join(root, filepath.FromSlash(rel))
-			b, err := os.ReadFile(abs)
-			if err != nil {
-				return nil, fmt.Errorf("naminguard: read %s: %w", rel, err)
-			}
-			nb, err := f.apply(string(b))
+			rewritten, err := rewriteFile(root, rel, f)
 			if err != nil {
 				return nil, err
 			}
-			if nb == string(b) {
-				continue
+			if rewritten {
+				changed[rel] = true
 			}
-			// Atomic, mode-preserving replace: Fix rewrites tracked source files,
-			// so a truncate-in-place (os.WriteFile) could leave one half-written if
-			// interrupted. Write a sibling temp + rename instead (atomic on POSIX),
-			// carrying the original's permission bits so executable scripts keep
-			// their bit (atomicwrite.Bytes would force 0644).
-			if err := writeFilePreservingMode(abs, []byte(nb)); err != nil {
-				return nil, fmt.Errorf("naminguard: write %s: %w", rel, err)
-			}
-			changed[rel] = true
 		}
 	}
 	out := make([]string, 0, len(changed))
@@ -297,6 +283,30 @@ func Fix(root string, m *Manifest) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+func rewriteFile(root, rel string, f Forbidden) (bool, error) {
+	abs := filepath.Join(root, filepath.FromSlash(rel))
+	b, err := os.ReadFile(abs)
+	if err != nil {
+		return false, fmt.Errorf("naminguard: read %s: %w", rel, err)
+	}
+	nb, err := f.apply(string(b))
+	if err != nil {
+		return false, err
+	}
+	if nb == string(b) {
+		return false, nil
+	}
+	// Atomic, mode-preserving replace: Fix rewrites tracked source files,
+	// so a truncate-in-place (os.WriteFile) could leave one half-written if
+	// interrupted. Write a sibling temp + rename instead (atomic on POSIX),
+	// carrying the original's permission bits so executable scripts keep
+	// their bit (atomicwrite.Bytes would force 0644).
+	if err := writeFilePreservingMode(abs, []byte(nb)); err != nil {
+		return false, fmt.Errorf("naminguard: write %s: %w", rel, err)
+	}
+	return true, nil
 }
 
 // writeFilePreservingMode atomically replaces abs with data: write a sibling

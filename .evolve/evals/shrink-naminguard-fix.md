@@ -1,0 +1,68 @@
+---
+score_cap:
+  - criterion: "pkg/naminguard.Fix is <=50 lines (sizeratchet.MaxLines), measured by the ratchet's own AST-based scanner"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_001_ThreeTargetFunctionsFitTheRatchetLimit ./acs/cycle1749"
+  - criterion: "go/internal/sizeratchet/offenders.json is byte-unchanged since b5d63a40 and still lists pkg/naminguard.Fix at 51 — an allowance is a ceiling, so a lane never edits the file"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_002_OffendersJSONLeftUnchanged ./acs/cycle1749"
+  - criterion: "The module-wide sizeratchet.Check reports zero problems — no extracted helper lands past 50 lines unlisted"
+    max_if_missing: 9
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_003_ModuleWideRatchetCheckPasses ./acs/cycle1749"
+  - criterion: "Every baseline *_test.go under go/pkg/naminguard is unmodified and undeleted; characterization tests go in new _test.go files"
+    max_if_missing: 7
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_004_BaselineTestFilesUnchanged ./acs/cycle1749"
+  - criterion: "go test -count=1 ./pkg/naminguard passes"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_005_TargetPackageTestsPass ./acs/cycle1749"
+  - criterion: "go vet and gofmt are clean on go/pkg/naminguard"
+    max_if_missing: 6
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_006_TargetPackagesVetAndGofmtClean ./acs/cycle1749"
+  - criterion: "No comment line is added under go/pkg/naminguard — `commentaudit comments -base b5d63a40` exits 0 (production and test files alike)"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_007_NoCommentLinesAdded ./acs/cycle1749"
+  - criterion: "A non-test source under go/pkg/naminguard changed, and no baseline comment line was deleted from it — the atomic-write why inside Fix moves with its code"
+    max_if_missing: 7
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_008_ShrunkSourcesChangedWithoutLosingAComment ./acs/cycle1749"
+  - criterion: "The naminguard suite passes with the baseline Fix substituted back and kills all 5 behavior mutants of it the baseline suite let survive (binary skip, read-error cause, write-error cause, sorted result, manifest order)"
+    max_if_missing: 8
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_010_FixCharacterizationKillsBaselineMutants ./acs/cycle1749"
+  - criterion: "No file under a protected surface changed since b5d63a40"
+    max_if_missing: 6
+    evidence: "cd go && go test -tags acs -count=1 -run TestC1749_013_NoProtectedSurfaceTouched ./acs/cycle1749"
+---
+
+# Eval: shrink-naminguard-fix
+
+> Pins the behavior-preserving extraction of `pkg/naminguard.Fix` (51 lines at
+> base `b5d63a40`, one over the ratchet) to <=50 lines. Characterization tests
+> come first. `offenders.json` stays byte-unchanged, per the goal's wave-25
+> rule "a lane never edits that file", which overrides the scout's "drop the
+> entry". A baseline mutation probe of 9 one-line mutants of `Fix` found 6
+> that the existing suite does not kill. One (a failed write still returns
+> the path list) was left out as low-value. Each of the other 5 was killed, before
+> this contract was frozen, by a throwaway test that passes on the baseline.
+> That ran in an isolated scratch clone with a trial extraction using
+> `slices.Sorted(maps.Keys(...))`, and all 13 cycle-1749 predicates went
+> GREEN. The probe substitutes mutants of the *baseline* `Fix` text into the
+> current package through `go test -overlay` and reconciles imports. The
+> Builder may extract however it likes; only `Fix` must keep its name and
+> signature. The 5-line atomic-write comment inside `Fix` is the cheapest
+> line to cut, which is why predicate 008 forbids losing it. Source: cycle
+> 1749 triage top_n `shrink-naminguard-fix`. There is no inbox record, and
+> the Task Contract names this eval as the authority.
+
+## Score Cap Rationale
+
+| Pattern | Criterion | max_if_missing | Evidence |
+|---|---|---|---|
+| line-limit | Fix <=50 lines | 8/10 | `go test -run TestC1749_001...` |
+| ceiling-untouched | offenders.json byte-unchanged | 8/10 | `go test -run TestC1749_002...` |
+| ratchet-gate | module-wide ratchet Check passes | 9/10 | `go test -run TestC1749_003...` |
+| test-files-frozen | baseline naminguard tests unmodified | 7/10 | `go test -run TestC1749_004...` |
+| behavior-preserved | `go test ./pkg/naminguard` passes | 8/10 | `go test -run TestC1749_005...` |
+| vet-clean | vet + gofmt clean | 6/10 | `go test -run TestC1749_006...` |
+| no-comments-added | commentaudit lists zero added lines | 8/10 | `go test -run TestC1749_007...` |
+| no-comments-deleted | source changed, no baseline comment lost | 7/10 | `go test -run TestC1749_008...` |
+| characterization | suite kills 5 baseline Fix mutants | 8/10 | `go test -run TestC1749_010...` |
+| scope | no protected surface touched | 6/10 | `go test -run TestC1749_013...` |
