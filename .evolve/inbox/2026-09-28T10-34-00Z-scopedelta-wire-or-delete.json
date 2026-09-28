@@ -1,0 +1,18 @@
+{
+  "id": "scopedelta-wire-or-delete",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.85,
+  "title": "Wire the declared-versus-touched check at build exit, or delete internal/scopedelta",
+  "files": [
+    "go/internal/scopedelta",
+    "go/internal/core/build_floor_reviewer.go"
+  ],
+  "summary": "From the inbox architecture review (N5). Design doc \u00a75.9 records the partition gap: a builder's edits outside its item's declared files (cycle 1718 edited a doc that then conflicted with 1719; every size-ratchet lane edits an undeclared offenders.json). internal/scopedelta (ADR-0087/0088) classifies exactly this, including ClassCrossLane, and has no importer.",
+  "acceptance": [
+    "Either the build exit reports, with a coded signal, every changed path outside the declared scope classified by scopedelta (a path in a sibling lane's declared scope flagged), with a wiring proof",
+    "Or the package is deleted with its tests and ADR-0087/0088 are amended"
+  ],
+  "created_at": "2026-09-28T10:30:00Z",
+  "source": "console, 2026-09-28, the inbox architecture review"
+}

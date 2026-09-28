@@ -1,0 +1,19 @@
+{
+  "id": "sizeratchet-allowances-not-a-shared-registry",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.88,
+  "title": "No registry every lane must edit: size-ratchet allowances stop being one shared file",
+  "files": [
+    "go/internal/sizeratchet",
+    "go/internal/rawgitratchet"
+  ],
+  "summary": "From the inbox architecture review (N3). go/internal/sizeratchet/offenders.json holds 283 exact-match allowances across 93 packages, and the ratchet refuses a shrunk function whose allowance was not lowered, so every change to a listed function edits the one file (9 commits in four hours on 2026-09-28). Two lanes that both touch it never carry an audited verdict across a rebase (treedelta is full-index): cycle 1731 re-authored after cycle 1732 for this reason. rawgitratchet/baseline.json has the same shape. The review's interim step (declare offenders.json in every pending shrink item so the planner never co-schedules two) is not taken: it would serialize the only lane-ready supply, and a co-scheduled shrink costs a re-author and a re-audit, never a FAIL.",
+  "acceptance": [
+    "Two lanes that change listed functions in different packages touch disjoint files: the allowance lives beside its package, or shrinking is allowed (ceiling semantics) and a deterministic tighten step runs at the wave boundary",
+    "A rebase of one such lane over the other is proven identical by treedelta.Identical (test)",
+    "Both ratchets still refuse growth past the allowance and a new offender"
+  ],
+  "created_at": "2026-09-28T10:30:00Z",
+  "source": "console, 2026-09-28, the inbox architecture review"
+}
