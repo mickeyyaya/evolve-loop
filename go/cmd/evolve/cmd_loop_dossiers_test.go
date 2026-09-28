@@ -192,6 +192,27 @@ func TestPublishPendingDossiers_NamesARunTheCycleStateNamesWithoutALease(t *test
 	}
 }
 
+func TestPublishPendingDossiers_HoldsWhenItCannotProveNoOtherRunIsLive(t *testing.T) {
+	r := planeWithAPendingCloseout(t, "main")
+	if err := os.WriteFile(filepath.Join(r.Dir, ".evolve", "cycle-state.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	head := r.Git("rev-parse", "HEAD")
+	var warn bytes.Buffer
+
+	publishPendingDossiers(r.Dir, &warn)
+
+	if r.Git("rev-parse", "HEAD") != head {
+		t.Fatal("a publish that could not see the plane's runs moved HEAD")
+	}
+	if _, err := os.Stat(filepath.Join(dossier.PendingDir(r.Dir), "cycle-1705.json")); err != nil {
+		t.Fatalf("the pair must stay pending: %v", err)
+	}
+	if !strings.Contains(warn.String(), "cannot prove") || !strings.Contains(warn.String(), "they stay pending") {
+		t.Fatalf("the hold must say the runs could not be read: %q", warn.String())
+	}
+}
+
 func TestLoopSummary_ASecondLoopExitingBesideALiveRunPublishesNothing(t *testing.T) {
 	r := planeWithAPendingCloseout(t, "main")
 	leaseARun(t, r.Dir, 1706, os.Getppid())
