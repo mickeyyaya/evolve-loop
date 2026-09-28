@@ -162,16 +162,32 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, mp)
 		drift = true
 	}
+	projected, pErr := projectSurfaces(projectRoot, diffs, write, stdout, stderr)
+	if pErr != nil {
+		fmt.Fprintf(stderr, "%v\n", pErr)
+		return 1
+	}
+	drift = drift || projected
+
+	if !write && drift {
+		return 2
+	}
+	if !write {
+		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all commands mirrored, Codex manifests projected, all names match dirs")
+	}
+	return 0
+}
+
+func projectSurfaces(projectRoot string, diffs []factsDiff, write bool, stdout, stderr io.Writer) (bool, error) {
+	drift := false
 	for _, d := range diffs {
 		if !d.drifted {
 			continue
 		}
 		if write {
-			if werr := atomicwrite.Bytes(d.path, []byte(d.next)); werr != nil {
-				fmt.Fprintf(stderr, "write %s: %v\n", d.path, werr)
-				return 1
+			if werr := writeGenerated(d.path, d.next, d.rel, stdout); werr != nil {
+				return false, werr
 			}
-			fmt.Fprintf(stdout, "[skills] generated %s\n", d.rel)
 		} else {
 			fmt.Fprintf(stderr, "DRIFT: %s phase-facts region is stale (run `evolve skills generate`)\n", d.rel)
 			drift = true
@@ -182,27 +198,45 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 	// commands/<name>.md so /evo:<name> appears in the Claude Code `/` menu.
 	cmdDiffs, cmdErr := commandDiffs(projectRoot)
 	if cmdErr != nil {
-		fmt.Fprintf(stderr, "%v\n", cmdErr)
-		return 1
+		return false, cmdErr
 	}
-	for _, d := range cmdDiffs {
+	cmdDrift, cmdErr := projectCommandDiffs(cmdDiffs, write, stdout, stderr)
+	if cmdErr != nil {
+		return false, cmdErr
+	}
+
+	// Codex manifest projection (cross-CLI third surface): render
+	// .codex-plugin/plugin.json + .agents/plugins/marketplace.json from the
+	// canonical .claude-plugin/plugin.json so a Codex install mirrors the Claude
+	// one from a single source.
+	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
+	if codexErr != nil {
+		return false, codexErr
+	}
+	codexDrift, codexErr := projectCommandDiffs(codexDiffs, write, stdout, stderr)
+	if codexErr != nil {
+		return false, codexErr
+	}
+	return drift || cmdDrift || codexDrift, nil
+}
+
+func projectCommandDiffs(diffs []commandDiff, write bool, stdout, stderr io.Writer) (bool, error) {
+	drift := false
+	for _, d := range diffs {
 		if !d.drifted {
 			continue
 		}
 		if write {
 			if d.orphan {
 				if rmErr := os.Remove(d.path); rmErr != nil && !os.IsNotExist(rmErr) {
-					fmt.Fprintf(stderr, "remove %s: %v\n", d.path, rmErr)
-					return 1
+					return false, fmt.Errorf("remove %s: %w", d.path, rmErr)
 				}
 				fmt.Fprintf(stdout, "[skills] reaped orphan %s\n", d.rel)
 				continue
 			}
-			if werr := atomicwrite.Bytes(d.path, []byte(d.next)); werr != nil {
-				fmt.Fprintf(stderr, "write %s: %v\n", d.path, werr)
-				return 1
+			if werr := writeGenerated(d.path, d.next, d.rel, stdout); werr != nil {
+				return false, werr
 			}
-			fmt.Fprintf(stdout, "[skills] generated %s\n", d.rel)
 		} else {
 			if d.orphan {
 				fmt.Fprintf(stderr, "DRIFT: %s is an orphaned generated command (run `evolve skills generate`)\n", d.rel)
@@ -212,39 +246,15 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 			drift = true
 		}
 	}
+	return drift, nil
+}
 
-	// Codex manifest projection (cross-CLI third surface): render
-	// .codex-plugin/plugin.json + .agents/plugins/marketplace.json from the
-	// canonical .claude-plugin/plugin.json so a Codex install mirrors the Claude
-	// one from a single source.
-	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
-	if codexErr != nil {
-		fmt.Fprintf(stderr, "%v\n", codexErr)
-		return 1
+func writeGenerated(path, next, rel string, stdout io.Writer) error {
+	if werr := atomicwrite.Bytes(path, []byte(next)); werr != nil {
+		return fmt.Errorf("write %s: %w", path, werr)
 	}
-	for _, d := range codexDiffs {
-		if !d.drifted {
-			continue
-		}
-		if write {
-			if werr := atomicwrite.Bytes(d.path, []byte(d.next)); werr != nil {
-				fmt.Fprintf(stderr, "write %s: %v\n", d.path, werr)
-				return 1
-			}
-			fmt.Fprintf(stdout, "[skills] generated %s\n", d.rel)
-		} else {
-			fmt.Fprintf(stderr, "DRIFT: %s is stale or missing (run `evolve skills generate`)\n", d.rel)
-			drift = true
-		}
-	}
-
-	if !write && drift {
-		return 2
-	}
-	if !write {
-		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all commands mirrored, Codex manifests projected, all names match dirs")
-	}
-	return 0
+	fmt.Fprintf(stdout, "[skills] generated %s\n", rel)
+	return nil
 }
 
 // Check is the read-only drift gate for in-process callers (the cycle audit):
@@ -361,16 +371,7 @@ func collectSkillFacts(projectRoot string, spec phasespec.PhaseSpec, roles map[s
 
 	// Artifact + section facts — phasecontract is the SSOT for built-in
 	// headings; FromSpec derives user-phase contracts from classify rules.
-	c, ok := phasecontract.For(spec.Name)
-	if !ok {
-		c = phasecontract.FromSpec(spec)
-		if len(spec.Outputs.Files) == 0 {
-			// FromSpec defaults to "<phase>-report.md"; for a phase that declares
-			// no output files (e.g. ship — its deliverable is the commit itself)
-			// that default would be fiction. Suppress it.
-			c.ArtifactName = ""
-		}
-	}
+	c := phaseContract(spec)
 	f.ArtifactName = c.ArtifactName
 	f.WriteTargetLabel = "cycle workspace"
 	if c.WriteTarget == phasecontract.TargetEvolveDir {
@@ -388,6 +389,20 @@ func collectSkillFacts(projectRoot string, spec phasespec.PhaseSpec, roles map[s
 		f.InputFiles = append(f.InputFiles, filepath.Base(in))
 	}
 	return f
+}
+
+func phaseContract(spec phasespec.PhaseSpec) phasecontract.Contract {
+	c, ok := phasecontract.For(spec.Name)
+	if !ok {
+		c = phasecontract.FromSpec(spec)
+		if len(spec.Outputs.Files) == 0 {
+			// FromSpec defaults to "<phase>-report.md"; for a phase that declares
+			// no output files (e.g. ship — its deliverable is the commit itself)
+			// that default would be fiction. Suppress it.
+			c.ArtifactName = ""
+		}
+	}
+	return c
 }
 
 // registryRoles reads the phase→agent/profile-name mapping from the registry's

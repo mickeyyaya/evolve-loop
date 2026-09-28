@@ -99,33 +99,41 @@ func commandDiffs(projectRoot string) ([]commandDiff, error) {
 	}
 
 	// Orphans: generated command stubs whose backing skill no longer exists.
-	cmdDir := filepath.Join(projectRoot, "commands")
-	if cmds, dirErr := os.ReadDir(cmdDir); dirErr == nil {
-		for _, c := range cmds {
-			if c.IsDir() || !strings.HasSuffix(c.Name(), ".md") {
-				continue
-			}
-			base := strings.TrimSuffix(c.Name(), ".md")
-			if backed[base] {
-				continue
-			}
-			path := filepath.Join(cmdDir, c.Name())
-			raw, readErr := os.ReadFile(path)
-			if readErr != nil || !strings.Contains(string(raw), commandGenMarker) {
-				continue // unreadable or hand-authored — never reap
-			}
-			diffs = append(diffs, commandDiff{
-				rel:     filepath.Join("commands", c.Name()),
-				path:    path,
-				next:    "",
-				drifted: true,
-				orphan:  true,
-			})
-		}
-	}
+	diffs = append(diffs, orphanCommandDiffs(projectRoot, backed)...)
 
 	sort.Slice(diffs, func(i, j int) bool { return diffs[i].rel < diffs[j].rel })
 	return diffs, nil
+}
+
+func orphanCommandDiffs(projectRoot string, backed map[string]bool) []commandDiff {
+	cmdDir := filepath.Join(projectRoot, "commands")
+	cmds, dirErr := os.ReadDir(cmdDir)
+	if dirErr != nil {
+		return nil
+	}
+	var orphans []commandDiff
+	for _, c := range cmds {
+		if c.IsDir() || !strings.HasSuffix(c.Name(), ".md") {
+			continue
+		}
+		base := strings.TrimSuffix(c.Name(), ".md")
+		if backed[base] {
+			continue
+		}
+		path := filepath.Join(cmdDir, c.Name())
+		raw, readErr := os.ReadFile(path)
+		if readErr != nil || !strings.Contains(string(raw), commandGenMarker) {
+			continue // unreadable or hand-authored — never reap
+		}
+		orphans = append(orphans, commandDiff{
+			rel:     filepath.Join("commands", c.Name()),
+			path:    path,
+			next:    "",
+			drifted: true,
+			orphan:  true,
+		})
+	}
+	return orphans
 }
 
 // RenderCommandStub produces a thin slash-command stub for a skill. It

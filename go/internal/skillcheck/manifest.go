@@ -46,24 +46,8 @@ func ManifestProblems(projectRoot string) ([]string, error) {
 		return []string{fmt.Sprintf("MANIFEST: .claude-plugin/plugin.json is not valid JSON: %v", jerr)}, nil
 	}
 
-	var problems []string
-
 	// 1. Every declared skill must be a well-formed path with a backing SKILL.md.
-	declared := map[string]bool{}
-	for _, entry := range manifest.Skills {
-		name := skillEntryName(entry)
-		if name == "" {
-			problems = append(problems, fmt.Sprintf("MANIFEST: skills[] entry %q is not a ./skills/<name>/ path", entry))
-			continue
-		}
-		if declared[name] {
-			problems = append(problems, fmt.Sprintf("MANIFEST: skills[] lists %q more than once", name))
-		}
-		declared[name] = true
-		if _, statErr := os.Stat(filepath.Join(projectRoot, "skills", name, "SKILL.md")); statErr != nil {
-			problems = append(problems, fmt.Sprintf("MANIFEST: skills[] lists %q but skills/%s/SKILL.md is missing — the install breaks", name, name))
-		}
-	}
+	problems, declared := declaredSkillProblems(projectRoot, manifest.Skills)
 
 	// 2. Every well-formed skill dir on disk must be declared — an unlisted one
 	//    is invisible to the loader ("Unknown skill").
@@ -84,7 +68,35 @@ func ManifestProblems(projectRoot string) ([]string, error) {
 	}
 
 	// 3. Every declared agent path must resolve to a file.
-	for _, entry := range manifest.Agents {
+	problems = append(problems, agentProblems(projectRoot, manifest.Agents)...)
+
+	sort.Strings(problems)
+	return problems, nil
+}
+
+func declaredSkillProblems(projectRoot string, skills []string) ([]string, map[string]bool) {
+	var problems []string
+	declared := map[string]bool{}
+	for _, entry := range skills {
+		name := skillEntryName(entry)
+		if name == "" {
+			problems = append(problems, fmt.Sprintf("MANIFEST: skills[] entry %q is not a ./skills/<name>/ path", entry))
+			continue
+		}
+		if declared[name] {
+			problems = append(problems, fmt.Sprintf("MANIFEST: skills[] lists %q more than once", name))
+		}
+		declared[name] = true
+		if _, statErr := os.Stat(filepath.Join(projectRoot, "skills", name, "SKILL.md")); statErr != nil {
+			problems = append(problems, fmt.Sprintf("MANIFEST: skills[] lists %q but skills/%s/SKILL.md is missing — the install breaks", name, name))
+		}
+	}
+	return problems, declared
+}
+
+func agentProblems(projectRoot string, agents []string) []string {
+	var problems []string
+	for _, entry := range agents {
 		rel := strings.TrimPrefix(entry, "./")
 		if rel == "" {
 			continue
@@ -93,9 +105,7 @@ func ManifestProblems(projectRoot string) ([]string, error) {
 			problems = append(problems, fmt.Sprintf("MANIFEST: agents[] lists %q but the file is missing", entry))
 		}
 	}
-
-	sort.Strings(problems)
-	return problems, nil
+	return problems
 }
 
 // skillEntryName normalizes a plugin.json skills[] entry ("./skills/loop/") to
