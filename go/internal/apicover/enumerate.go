@@ -128,42 +128,52 @@ func exportedSymbols(fset *token.FileSet, f *ast.File, file string) ([]Symbol, e
 	for _, decl := range f.Decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
-			if !d.Name.IsExported() {
-				continue
-			}
-			if d.Recv != nil {
-				recv := recvTypeName(d.Recv)
-				if recv == "" || !ast.IsExported(recv) {
-					continue // method on an unexported type is not public API
-				}
-				add(recv+"."+d.Name.Name, KindMethod, d.Pos(), d.Doc)
-				continue
-			}
-			add(d.Name.Name, KindFunc, d.Pos(), d.Doc)
+			addFuncDecl(d, add)
 		case *ast.GenDecl:
-			for _, spec := range d.Specs {
-				switch s := spec.(type) {
-				case *ast.TypeSpec:
-					if !s.Name.IsExported() {
-						continue
-					}
-					add(s.Name.Name, KindType, s.Pos(), firstDoc(s.Doc, d.Doc))
-				case *ast.ValueSpec:
-					kind := KindVar
-					if d.Tok == token.CONST {
-						kind = KindConst
-					}
-					for _, n := range s.Names {
-						if !n.IsExported() {
-							continue
-						}
-						add(n.Name, kind, n.Pos(), firstDoc(s.Doc, d.Doc))
-					}
-				}
-			}
+			addGenDecl(d, add)
 		}
 	}
 	return out, firstErr
+}
+
+type symbolAdder func(name string, kind SymbolKind, pos token.Pos, doc *ast.CommentGroup)
+
+func addFuncDecl(d *ast.FuncDecl, add symbolAdder) {
+	if !d.Name.IsExported() {
+		return
+	}
+	if d.Recv != nil {
+		recv := recvTypeName(d.Recv)
+		if recv == "" || !ast.IsExported(recv) {
+			return // method on an unexported type is not public API
+		}
+		add(recv+"."+d.Name.Name, KindMethod, d.Pos(), d.Doc)
+		return
+	}
+	add(d.Name.Name, KindFunc, d.Pos(), d.Doc)
+}
+
+func addGenDecl(d *ast.GenDecl, add symbolAdder) {
+	for _, spec := range d.Specs {
+		switch s := spec.(type) {
+		case *ast.TypeSpec:
+			if !s.Name.IsExported() {
+				continue
+			}
+			add(s.Name.Name, KindType, s.Pos(), firstDoc(s.Doc, d.Doc))
+		case *ast.ValueSpec:
+			kind := KindVar
+			if d.Tok == token.CONST {
+				kind = KindConst
+			}
+			for _, n := range s.Names {
+				if !n.IsExported() {
+					continue
+				}
+				add(n.Name, kind, n.Pos(), firstDoc(s.Doc, d.Doc))
+			}
+		}
+	}
 }
 
 // recvTypeName extracts the receiver's bare type name, unwrapping pointer and

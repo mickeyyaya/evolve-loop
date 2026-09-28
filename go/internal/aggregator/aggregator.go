@@ -92,20 +92,8 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 	if in.ReadFile == nil {
 		in.ReadFile = defaultReadFile
 	}
-	for _, w := range in.Workers {
-		info, err := os.Stat(w)
-		if err != nil {
-			logf("error: worker artifact not found: %s", w)
-			return ExitUsageErr
-		}
-		if info.Size() == 0 {
-			logf("error: worker artifact is empty: %s", w)
-			return ExitUsageErr
-		}
-		if _, err := in.ReadFile(w); err != nil {
-			logf("error: worker artifact unreadable: %s: %v", w, err)
-			return ExitUsageErr
-		}
+	if !workersReadable(in.Workers, in.ReadFile, logf) {
+		return ExitUsageErr
 	}
 	mode := ResolveMode(in.Phase)
 	if mode == ModeUnknown {
@@ -125,6 +113,39 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 	defer func() { _ = os.Remove(tmp) }()
 
 	now := in.Now().UTC().Format("2006-01-02T15:04:05Z")
+	rc, err := writeMerged(mode, tmp, in, now)
+	if err != nil {
+		logf("error: read worker: %v", err)
+		return ExitUsageErr
+	}
+
+	if err := os.Rename(tmp, in.Output); err != nil {
+		logf("error: write %s: %v", in.Output, err)
+		return ExitUsageErr
+	}
+	return rc
+}
+
+func workersReadable(workers []string, readFile func(string) ([]byte, error), logf func(string, ...any)) bool {
+	for _, w := range workers {
+		info, err := os.Stat(w)
+		if err != nil {
+			logf("error: worker artifact not found: %s", w)
+			return false
+		}
+		if info.Size() == 0 {
+			logf("error: worker artifact is empty: %s", w)
+			return false
+		}
+		if _, err := readFile(w); err != nil {
+			logf("error: worker artifact unreadable: %s: %v", w, err)
+			return false
+		}
+	}
+	return true
+}
+
+func writeMerged(mode MergeMode, tmp string, in Inputs, now string) (int, error) {
 	var rc int
 	var err error
 	switch mode {
@@ -139,16 +160,7 @@ func Aggregate(in Inputs, stderr io.Writer) int {
 	case ModeCrossCLIVote:
 		rc, err = writeCrossCLIVote(tmp, in.Workers, now, in.ReadFile)
 	}
-	if err != nil {
-		logf("error: read worker: %v", err)
-		return ExitUsageErr
-	}
-
-	if err := os.Rename(tmp, in.Output); err != nil {
-		logf("error: write %s: %v", in.Output, err)
-		return ExitUsageErr
-	}
-	return rc
+	return rc, err
 }
 
 func defaultReadFile(path string) ([]byte, error) {
@@ -359,39 +371,8 @@ func writePlanReview(out string, workers []string, now string, readFile func(str
 // ── cross-cli-vote / audit-consensus ───────────────────────────────────────
 
 func writeCrossCLIVote(out string, workers []string, now string, readFile func(string) ([]byte, error)) (int, error) {
-	anyFail := false
-	passCount := 0
-	total := 0
-	perCLI := []string{}
-	for _, w := range workers {
-		v := extractVerdict(w)
-		name := strings.TrimSuffix(filepath.Base(w), ".md")
-		verdictLabel := v
-		if verdictLabel == "" {
-			verdictLabel = "MISSING"
-		}
-		perCLI = append(perCLI, fmt.Sprintf("%s=%s", name, verdictLabel))
-		total++
-		switch v {
-		case "PASS":
-			passCount++
-		case "FAIL":
-			anyFail = true
-		}
-	}
-
-	quorum := (total + 1) / 2
-	verdict := "WARN"
-	reason := fmt.Sprintf("cross-cli-vote: %d of %d PASS (below quorum=%d); ships per fluent default unless workflow.strict_audit",
-		passCount, total, quorum)
-	if anyFail {
-		verdict = "FAIL"
-		reason = "cross-cli-vote: at least one CLI returned FAIL (veto rule)"
-	} else if passCount >= quorum {
-		verdict = "PASS"
-		reason = fmt.Sprintf("cross-cli-vote: %d of %d CLIs returned PASS (quorum=%d)",
-			passCount, total, quorum)
-	}
+	perCLI, passCount, total, anyFail := tallyCrossCLIVotes(workers)
+	verdict, reason, quorum := crossCLIDecision(passCount, total, anyFail)
 
 	failVetoActive := "no"
 	failVetoFlag := "0"
@@ -421,6 +402,43 @@ func writeCrossCLIVote(out string, workers []string, now string, readFile func(s
 		return ExitVerdictBad, nil
 	}
 	return ExitOK, nil
+}
+
+func tallyCrossCLIVotes(workers []string) (perCLI []string, passCount, total int, anyFail bool) {
+	perCLI = []string{}
+	for _, w := range workers {
+		v := extractVerdict(w)
+		name := strings.TrimSuffix(filepath.Base(w), ".md")
+		verdictLabel := v
+		if verdictLabel == "" {
+			verdictLabel = "MISSING"
+		}
+		perCLI = append(perCLI, fmt.Sprintf("%s=%s", name, verdictLabel))
+		total++
+		switch v {
+		case "PASS":
+			passCount++
+		case "FAIL":
+			anyFail = true
+		}
+	}
+	return perCLI, passCount, total, anyFail
+}
+
+func crossCLIDecision(passCount, total int, anyFail bool) (verdict, reason string, quorum int) {
+	quorum = (total + 1) / 2
+	verdict = "WARN"
+	reason = fmt.Sprintf("cross-cli-vote: %d of %d PASS (below quorum=%d); ships per fluent default unless workflow.strict_audit",
+		passCount, total, quorum)
+	if anyFail {
+		verdict = "FAIL"
+		reason = "cross-cli-vote: at least one CLI returned FAIL (veto rule)"
+	} else if passCount >= quorum {
+		verdict = "PASS"
+		reason = fmt.Sprintf("cross-cli-vote: %d of %d CLIs returned PASS (quorum=%d)",
+			passCount, total, quorum)
+	}
+	return verdict, reason, quorum
 }
 
 func appendWorkerSections(b *strings.Builder, heading string, workers []string, readFile func(string) ([]byte, error)) error {
