@@ -30,12 +30,6 @@ type resumeExecution struct {
 	preResumeHEAD     string
 	mainDirtyBaseline map[string]bool
 
-	// closeout is the cycleRun that owns this resume's timings and terminal
-	// closeout. RunCycleFromPhase's worktree-teardown defer reads its
-	// preserveWorktree / cycleCompletedNormally fields LIVE at exit — the same
-	// fields, on the same type, that RunCycle's cleanup closure reads — rather
-	// than a copy taken at some hand-placed point. run() has a pointer
-	// receiver over an addressable value, so the assignment is visible there.
 	closeout *cycleRun
 }
 
@@ -54,21 +48,11 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	preResumeHEAD := r.preResumeHEAD
 	mainDirtyBaseline := r.mainDirtyBaseline
 
-	// ADR-0044 C1 (deferred-to-C3 debt, now paid): the resume path was a
-	// SECOND recording boundary that wrote no timings/sidecars at all —
-	// resumed phases were invisible in phase-timing.json. Every terminal
-	// disposition below funnels through the same recordPhaseOutcome
-	// chokepoint RunCycle uses; the deferred writer flushes on abort too
-	// and APPEND-MERGES with the pre-crash entries (writePhaseTimings).
-	// Semantic note: PhasesRun now includes aborted-but-DISPATCHED phases on
-	// resume too (the chokepoint appends on every terminal path) — same
-	// what-actually-ran contract RunCycle adopted in Slice 1; consumers are
-	// printing/telemetry only (audited then).
 	var phaseTimings []phaseTimingEntry
 	completed := false
-	// Keep one owner for timing composition across abnormal and normal exits.
-	// Recreating cycleRun at either boundary would append the resumed segment
-	// twice and make phase-timing.json disagree with the dossier.
+	// One owner spans both abnormal and normal exits: recreating cycleRun at
+	// either boundary would append the resumed segment twice and make
+	// phase-timing.json disagree with the dossier.
 	timingOwner := &cycleRun{
 		o: o, ctx: context.Background(), req: req, cycle: cycle,
 		cs: cs, state: state, result: result,
@@ -119,11 +103,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 
 		runner, ok := o.runners[next]
 		if !ok {
-			// ADR-0044 C1 (cycle-637): a stranded successor on RESUME is a
-			// terminal disposition that must funnel through the recording
-			// chokepoint — the cycle-635 resume died FAILED_UNEXPLAINED precisely
-			// because this bare error escaped it. Record a synthetic outcome
-			// carrying the abort_reason so the outcome is FAILED_EXPLAINED.
 			noRunnerErr := fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath,
 				phaseOutcomeFrom(next, PhaseResponse{}, 0, noRunnerErr.Error(), ""))
@@ -131,21 +110,10 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 
 		cs.Phase = string(next)
-		// Stamp the per-phase wall-clock start here too (mirrors
-		// cyclerun_dispatch.go): the resume path is a first-class dispatch
-		// surface, so a resumed phase's timing record must carry started_at —
-		// a post-crash resume is exactly when latency evidence matters most.
 		cs.PhaseStartedAt = o.now().UTC().Format(time.RFC3339)
 		cs.ActiveAgent = string(next)
 		if next == PhaseAudit {
-			// Mirrors cyclerun_dispatch.go (resume-parity): a resumed audit
-			// re-dispatch supersedes any prior attempt's diagnosed-FAIL
-			// explanation — stale reasons must never mark a later FAIL as
-			// diagnosed to the ADR-0072 floor.
 			resetFloorFailReason(&cs, next)
-			// Resume-parity for the round's verdict artifacts (cycle-1603):
-			// same supersession rule as cyclerun_dispatch.go — a resumed
-			// re-audit must not replay the previous round's verdict.
 			supersedePreviousAuditRound(&cs)
 		}
 		if err := o.storage.WriteCycleState(ctx, cs); err != nil {
@@ -158,17 +126,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			}
 		}
 
-		// Resume-path parity for the audit-repair brief (review MEDIUM): the
-		// budget half was already mirrored below via consumeAuditRepairGrant, but
-		// without seeding HERE a cycle that crashed mid-repair burned an attempt
-		// and rebuilt BLIND — the exact crash-resilience case the persisted
-		// counter exists for. Same state-derived rule as the live loop.
-		// NEXT, not current: at this point `current` is the phase that ran in the
-		// PREVIOUS iteration (it is reassigned to next only at the bottom of the
-		// loop). Using it meant the first TDD dispatch after a resumed repair
-		// grant — Retro->TDD, the exact crash-resume case this exists for — saw
-		// repairSeededPhase(PhaseRetro)==false and rebuilt BLIND. Every sibling
-		// line in this block keys on next for the same reason.
 		phaseCtx := seedAuditRepairContext(ctxSnap, next, cs)
 		phaseCtx = o.seedDispatchContext(ctx, phaseCtx, next, cs, req.ProjectRoot)
 		archiveRepairPrompts(cs, next)
@@ -176,24 +133,19 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			cs.AuditRepairActive = false
 		}
 		phaseReq := PhaseRequest{
-			Cycle:       cycle,
-			AuditRound:  cs.AuditDispatches,
-			ProjectRoot: req.ProjectRoot,
-			Workspace:   cs.WorkspacePath,
-			// CB.1: the resume path is a first-class dispatch surface and must
-			// thread the persisted worktree like the RunCycle loop does — a
-			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
+			Cycle:                           cycle,
+			AuditRound:                      cs.AuditDispatches,
+			ProjectRoot:                     req.ProjectRoot,
+			Workspace:                       cs.WorkspacePath,
 			Worktree:                        cs.ActiveWorktree,
 			WorktreeBaseSHA:                 cs.WorktreeBaseSHA,
 			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
-			// CB.5: same rule for the persisted run identity (resume reuses
-			// the run-record id, so session names stay run-scoped).
-			RunID:         cs.RunID,
-			GoalHash:      req.GoalHash,
-			PreviousPhase: string(cursor.current),
-			Env:           envSnap,
-			Context:       phaseCtx,
-			Signals:       dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
+			RunID:                           cs.RunID,
+			GoalHash:                        req.GoalHash,
+			PreviousPhase:                   string(cursor.current),
+			Env:                             envSnap,
+			Context:                         phaseCtx,
+			Signals:                         dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
 		}
 		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
 		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig}
@@ -223,8 +175,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt))
 			return result, ferr
 		}
-		// Resume parity with reviewAndGuard: host normalization must finish
-		// before Build's explanation is reviewed and sealed.
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
 		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
 		if errors.Is(err, ErrAllFamiliesExhausted) {
@@ -235,23 +185,11 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
 			return result, err
 		}
-		// Resume parity with applyPostReviewGuards: a ship that PASSed and
-		// survived the review latches on the checkpoint the completion below
-		// persists, so closeout reads this cycle's own ship on either root.
 		latchShippedState(&cs, next, resp.Verdict)
 		if cs.ExplanationDocumentationVersion != 0 && next != PhaseBuild &&
 			o.worktreePhase(next) && containsString(cs.CompletedPhases, string(PhaseBuild)) {
 			requiresBuild, refreshErr := explanationdocs.RefreshResult(ctx, explanationBinding(req.ProjectRoot, cs))
 			if refreshErr != nil {
-				// Terminal exit, so it records the outcome through the C1
-				// chokepoint like its three sibling error paths above.
-				// Deliberately only the recording half of fresh's twin
-				// (cyclerun_postreview.go also feeds failure-learning here):
-				// no resume abort exit feeds failure-learning, and adding it
-				// to one arbitrary exit would spend a retro dispatch the other
-				// four do not. Returning bare left
-				// the cycle with no abort_reason on disk, which classifies
-				// FAILED_UNEXPLAINED — an operator paged with nothing to read.
 				phaseErr := fmt.Errorf("resume refresh Build explanation after %s: %w", next, refreshErr)
 				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath,
 					phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
@@ -293,12 +231,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		cursor.advance(next, resp.Verdict)
 
-		// Resume-path parity for the audit-FAIL disposition (ADR-0093). Without
-		// this branch the resume surface falls through to sm.Next(audit, FAIL) =
-		// retro, so a resumed cycle could NEVER repair — and since retro is now
-		// terminal, the retry the policy table grants would be silently
-		// unreachable on exactly the surface that exists for recovery. The live
-		// loop's branch is cyclerun_record.go; both call the same primitive.
 		if cursor.current == PhaseAudit && resp.Verdict == VerdictFAIL {
 			branch, reason, sysFail := o.decideAfterAuditFail(cs)
 			consumeAuditRepairGrant(&cs, reason)
@@ -313,46 +245,20 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			}
 		}
 
-		// History-branch gate (ADR-0058): the branch-entry CONDITION is lockstep
-		// with recordAndBranch (both key on successorStrategy == history, which
-		// owns the degrade). The branch BODY differs by design — resume takes the
-		// deterministic decideAfterRetro, whereas the live loop additionally
-		// routes via decideAfterRetroRouted at advisory stage.
 		if o.successorStrategy(cursor.current) == phasespec.BranchingHistory {
-			cs.FailedAt = state.FailedAt // S4 dossier non-progress counters (additive)
+			cs.FailedAt = state.FailedAt
 			branch, extraEnv, reason, sysFail := o.decideAfterRetro(cs, resp.Verdict, state.FailedAt)
 			for k, v := range extraEnv {
 				envSnap[k] = v
 			}
-			// Resume-path parity for the bookkeeping-regrade once-per-cycle bound
-			// (cyclerun_record.go, same recurrence class as the floor-verdict
-			// guard above): without consuming the slot HERE, a resumed cycle
-			// whose re-audit fails bookkeeping-only again regrades forever
-			// (bounded only by the resume safety counter — ~15 LLM dispatches).
-			// The next pre-phase WriteCycleState persists the consumed slot.
 			consumeBookkeepingRegradeGrant(&cs, reason)
-			// Same parity argument as the line above, for the three steps the
-			// fresh history branch (cyclerun_record.go) runs and this one did
-			// not. Order is fresh's order and it matters: both grants consume
-			// their once-per-cycle slot BEFORE the gate can prepend to reason,
-			// because a prepend breaks the prefix match each consumer keys on.
-			// consumeAuditRepairGrant is symmetry, not a behavior change:
-			// decideAfterRetro's reason vocabulary cannot carry the audit-repair
-			// prefix today, so it is inert on BOTH paths — kept so the shapes
-			// match if that vocabulary ever grows.
 			consumeAuditRepairGrant(&cs, reason)
 			reason = o.escalateRetroReasonForHistory(req.ProjectRoot, reason, state.FailedAt)
-			// S2 disposition gate: an absent or invalid disposition is
-			// surfaced loudly in RetroDecision, never silently recorded clean
-			// (the cycle-1046 gap). Without this, a resumed cycle reports a
-			// clean retro decision over a disposition nothing verified.
 			if gateErr := o.finalizeRetroCompletion(cs.WorkspacePath); gateErr != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN retro: %v\n", gateErr)
 				reason = gateErr.Error() + "; " + reason
 			}
 			result.RetroDecision = reason
-			// ADR-0072 S4: the Go floor is non-bypassable on the resume path too —
-			// a floor category halts + escalates rather than looping as task-level.
 			if sysFail != nil && result.SystemFailure == nil {
 				result.SystemFailure = sysFail
 			}
@@ -365,48 +271,13 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			}
 			cursor.schedule(branch)
 		}
-
-		// The debugger signal-branch gate (ADR-0058 S3) is intentionally NOT
-		// mirrored here. Per the ADR the debugger override is live-loop-only: of
-		// the two record/resume override sites, resume duplicates only the retro
-		// (history) override. A cycle resumed at debugger therefore terminates via
-		// Next(debugger,_)→end rather than re-running decideAfterDebugger — the
-		// unchanged pre-ADR behavior. Lifting that to resume is a separate slice,
-		// not an S3 byte-identity change.
 	}
 
 	if !cursor.reachedEnd {
-		// ADR-0044 C1, resume parity: the fresh path records an explicit abort
-		// here (orchestrator.go, recordChokepointEscape) precisely so the
-		// escape classifies FAILED_EXPLAINED instead of paging an operator
-		// with the FAILED_UNEXPLAINED alarm bucket — the cycle-492 escape.
-		// Fresh's "preserves the worktree for salvage" rationale carries over
-		// too: this return happens before completeCycle, so the closeout's
-		// cycleCompletedNormally stays false and RunCycleFromPhase's exit
-		// teardown (cycle_worktree_teardown.go) preserves the tree.
-		// Resume returned a bare error, reproducing on this path the exact
-		// defect the fresh path was fixed for. Call the SAME primitive rather
-		// than a second implementation: it records the phase outcome through
-		// the C1 chokepoint, feeds failure-learning, and marks the verdict.
-		//
-		// phaseTimings is handed to the owner and read back because
-		// recordPhaseOutcome appends through a pointer to the owner's own
-		// slice; without the round trip the deferred timing flush would write
-		// the pre-escape set and the abort would be invisible on disk.
-		// ctx is assigned deliberately and must NOT be "simplified" away. The
-		// owner is constructed with context.Background() so the timing defers
-		// survive cancellation, but recordChokepointEscape also feeds
-		// failure-learning, which DISPATCHES a retrospective agent and skips
-		// that model call only when its own ctx is already cancelled. Handing
-		// it Background would defeat that guard and spend a dispatch after an
-		// operator interrupt. The abnormal-epilogue defer is unaffected either
-		// way: it guards on the LOCAL ctx before it ever reads the owner.
-		//
-		// All four mutated fields are read back below, not just the two the
-		// escape appends to: recordFailureLearning also mutates cs (it stamps
-		// the retro phase and appends it to CompletedPhases), and the epilogue
-		// defer persists cs — so dropping the read-back would let that write
-		// clobber the retro completion it just recorded.
+		// timingOwner.ctx is reassigned to the live ctx here, replacing the
+		// context.Background() it was constructed with: recordChokepointEscape's
+		// failure-learning dispatch skips its retrospective call only when ITS
+		// ctx is already cancelled, so it must see the real, possibly-cancelled one.
 		timingOwner.ctx, timingOwner.cs, timingOwner.state = ctx, cs, state
 		timingOwner.result, timingOwner.phaseTimings = result, phaseTimings
 		timingOwner.current = cursor.current
@@ -430,13 +301,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	completed = true
 	cs.Phase, cs.ActiveAgent = string(PhaseEnd), ""
 	cs.FinalVerdict = result.FinalVerdict
-	// This terminal write is resume-only; the fresh path has nothing after
-	// completeCycle. If it fails, the closeout has already latched
-	// cycleCompletedNormally, so the exit teardown still prunes a non-FAIL
-	// tree while the checkpoint block may still be live. That is the intended
-	// direction: ship has merged the work, so the tree is spent, and a later
-	// `--resume` then fails loudly ("worktree no longer exists") instead of
-	// re-driving phases on a spent tree — which a preserved tree would invite.
 	if err := o.storage.WriteCycleState(ctx, cs); err != nil {
 		return result, fmt.Errorf("resume terminal state: %w", err)
 	}

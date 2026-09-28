@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the shipped-lane test fixture keeps git maintenance out of the background (2026-09-28)
+
+- `TestUnwindShipCommit_DeclinesWithoutMovingHEAD` failed CI on #698, a change touching neither the test nor its fixture: `t.TempDir`'s cleanup met `directory not empty` because the fixture's raw `git init` let git 2.47+ detach `git maintenance run --auto` after a commit. It is the third CI failure of the class (the dossier fixture twice).
+- `internal/core`'s shipped-lane fixture (`newLane`) takes its worktree from `gittest.Fixture`, which persists `maintenance.auto=false` and `gc.auto=0` and retries teardown; its raw-git ratchet entry is removed. Inbox item `raw-git-fixtures-migrate-to-gittest` covers the remaining 130 files.
+
+## Fixed — the durable ACS suite no longer leaks an evolve binary per run; the disk-full halt of wave 27 (2026-09-28)
+
+- Wave 27 went 0/2 on a host with 143 MiB free of 460 GiB. Both lanes' failures (a ship backstop's `no space left on device`, an audit's integration-tier gate) read as code failures. The loop was halted as a system failure and the disk freed; see docs/incidents/2026-09-28-the-disk-filled-and-two-lanes-failed-for-it.md.
+- `acs/regression/cycle1515` and `acs/cycle1498` built `evolve-under-test` into a temp dir in `TestMain`, deferred its removal, and then called `os.Exit(m.Run())`, which skips deferred calls. Each run of the durable suite (every audit's CI-parity gate, every floor, CI) leaked about 22 MB, 1,427 dirs and 32 GB in all. Both `TestMain`s now return, and Go (≥ 1.15) exits with `m.Run()`'s result. Measured: the unfixed predicate leaks one dir per run, the fixed one none.
+- New `internal/testmainexit`: `SkippedDefers` finds a `TestMain` that defers a cleanup and also calls `os.Exit` (closures excluded). `TestModuleTestMainsNeverDeferCleanupPastOsExit` runs it over every bound test file. Red first, it named exactly the two files.
+- Queued: `disk-space-preflight` (halt on low free space before any lane runs) and `gc-pipeline-temp-and-go-cache` (`evolve gc` reaps stale pipeline temp artifacts and bounds the 157 GB Go build cache).
+## Added — `acsassert.GoTests`: ACS predicates judge `go test -json` events, not printed PASS text (2026-09-28)
+
+- Salvaged from the unlanded 2026-09-14 test-campaign worktree. `pkg/acsassert.GoTests` runs the selected tests with `go test -json` and requires, for each named test, one `run` event followed by `pass`, with the package started and passed. Printed `--- PASS:` text, a prefix-colliding subtest, a skip and a swallowed failure no longer satisfy a predicate.
+- Pilots: `acs/cycle1013` and `acs/cycle1015` use it. `cmd/evolve`'s tokens-report test decodes the typed `TokensReport` and compares the exact `TripwireEvent`, replacing a "any key containing tripwire" count.
+- Review: FIX_THEN_MERGE (a `fail` event from another package failed the target's validation before the package filter) → fixed red-first (`another_package_fails_beside_a_passing_target`).
+- Docs: acs-predicate-quality-gate.md, "Structured Go-test evidence".
+## Fixed — the wave-boundary protocol named the wrong unit: one wave is `--max-cycles 1` (2026-09-28)
+
+- The runtime reference's wave-boundary protocol (added the same day) said one wave is `evolve loop --max-cycles <fleet width>`. In fleet mode each batch iteration dispatches a whole wave, so `--max-cycles` counts waves, as the fleet-planning row already said. Wave 28 was launched with `--max-cycles 2` at width 2 and started a second wave instead of stopping.
+- The protocol now launches one wave with `--max-cycles 1`, which exits after the wave without reaching a boundary refresh. It names the defect that lets a multi-wave run outlive its count (the boundary re-exec restarts the count at wave 0, inbox item `boundary-reexec-keeps-cycle-budget-and-wave-index`), and the refresh row records the same restart.
+- `evolve loop --help` says what `--max-cycles` counts: cycles when sequential, waves in fleet mode.
+
 ## Fixed — `evolve sync-main` is not blocked by an untracked file (2026-09-28)
 
 - At the wave-26 boundary the plane was 7 behind origin/main and 1 ahead (the loop's own dossier closeout), and an operator inbox item was untracked. `evolve sync-main` refused ("working tree is dirty") because its check counted untracked files, and `evolve ship --class manual`, the interface that would land the item, refuses a plane behind origin in its push repair. Each waited on the other, so the only way through was outside the interface.
@@ -178,10 +201,10 @@ Cycle 1707's tdd agent listed the tmux sessions, found its own, read its own pro
 
 - `Block(Facts)` renders five lines a tmux driver appends to the bytes it pastes: the phase and cycle; the tmux session and the command that prints it; the two prompt files and that finding them, or the session in `tmux ls`, is expected; the sole-writer fact and the standing instruction not to kill, pause or hand off the session or wait for an operator; and that instruction files addressed to the console operator describe the operator's sessions, not this one. `""` without an agent name or a session; every fact is stripped of control bytes and backticks before it is rendered. Pure, standard library only, golden-pinned, in `.apicover-enforce`.
 
-- The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 ## Added — the recovery agent's profile and persona (ADR-0106 F3, unwired, 2026-09-26)
 
 - `.evolve/profiles/deliverable-recovery.json` runs sandboxed over a read-only repository with the run directory as its only write grant, so a helper launched without a worktree is wrapped rather than unconfined. It declares no network, but the wrapper forces the network on for every dispatch today (`sandboxPrefixForLaunch`, filed as `sandbox-wrapper-forces-network-on`) and the tmux drivers enforce no tool list (filed as `tmux-drivers-ignore-profile-tool-lists`), so the filesystem grant is the boundary that holds; the test pins the forced-on launch path so it flips when the wrapper honours the declaration; `agents/evolve-deliverable-recovery.md` states the agent's identity and sole-writer fact up front (cycle 1707's TDD agent refused its own task for an hour, taking itself for an intruder) and forbids inventing, editing code, or deciding a verdict. Tests pin that no grant reaches the repository beyond the run dir or any worktree.
+- The profile runs on the codex family with claude as its fallback, as the other helpers do: the balanced-tier floor (`TestClaudeFamilyFloor`) reserves claude for judgment phases with a justification, and the recovery agent decides nothing. The first ship routed it to claude and the full floor caught it.
 
 ## Added — `internal/recoveryguard`, the kernel fence for a recovery dispatch (ADR-0106 F2, unwired, 2026-09-26)
 

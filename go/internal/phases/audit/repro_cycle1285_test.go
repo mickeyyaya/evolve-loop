@@ -10,45 +10,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// repro_cycle1285_test.go — executable reproduction of the cycle-1285
-// adversarial review's findings that live in this package (F2 HIGH, F3 MEDIUM,
-// F5 MEDIUM). Every case drives the production seam `hooks.Classify`, never a
-// helper: the committed suites are green precisely because none of them
-// constructs these inputs.
-//
-// Shared shape of the two F2 cases: the whole reconcile gate's ARMING condition
-// is `continuation.ReadManifest(req.Workspace)` — a plain 0644 file in the
-// directory the graded phase agent writes. The gate is well defended against a
-// forged disposition and undefended against never being asked to run.
-//
-// These tests are RED on the tree that produced them. They are not a style
-// preference: each asserts the posture defect_ledger.go states for its OTHER
-// inputs. A deleted ancestor ledger is already a loud warning because "one `rm`
-// outside the workspace would otherwise disarm the whole gate in silence"
-// (defect_ledger.go:336-344), and an unparseable defect-dispositions.json
-// already BLOCKS because "degrading open there would hand the gate its cheapest
-// bypass" (:458-460). The manifest — the input that decides whether the gate
-// runs at all, and the one the agent writes most directly — gets neither.
-
-// reproContinuationFixture is continuationFixture with two changes that matter
-// to the arming question:
-//
-//  1. the current workspace sits at its REAL production location,
-//     <root>/.evolve/runs/cycle-<n>, rather than an unrelated temp dir; and
-//  2. the same lineage is additionally witnessed OUT OF BAND, in the root-owned
-//     continuation registry (continuation.RegistryPath —
-//     .evolve/continuation-registry.json, the scope-id-keyed map ADR-0076 slice
-//     C G2 already writes at the preserve decision). That file is outside every
-//     per-cycle workspace, so it still names this lane's ancestor after the
-//     workspace manifest is deleted.
-//
-// The registry is what makes these cases a DEFECT rather than an over-strict
-// test: "this cycle is a continuation of cycle-N" remains knowable from a
-// non-workspace source, so a silent no-op is a choice the code makes, not a
-// limit the environment imposes.
+// reproContinuationFixture is continuationFixture with two changes that
+// matter to the arming question: the workspace sits at its real production
+// location, <root>/.evolve/runs/cycle-<n>, and the same lineage is
+// additionally witnessed out of band in the root-owned continuation registry
+// (continuation.RegistryPath), which sits outside every per-cycle workspace
+// and so still names this lane's ancestor after the workspace manifest is
+// deleted. The registry is what makes these cases a defect rather than an
+// over-strict test: the lineage remains knowable from a non-workspace
+// source, so a silent no-op is a choice the code makes, not a limit the
+// environment imposes.
 // reproScopeID is the lane's pinned todo id. It is the registry KEY and the
-// lane-scope.json entry alike — one identity, two records, which is precisely
-// the property the F2 fix depends on.
+// lane-scope.json entry alike — one identity, two records, which is
+// precisely the property this reconcile gate's arming depends on.
 const reproScopeID = "continuation-defect-ledger"
 
 func reproContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDefects []string) (string, core.PhaseRequest) {
@@ -84,17 +58,14 @@ func reproContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDe
 	writeJSON(t, filepath.Join(ws, "continuation-manifest.json"), binding)
 	writeJSON(t, continuation.RegistryPath(root), map[string]any{reproScopeID: binding})
 
-	// cycle-1287, adopting this reproducer into the tree: the fixture gained
-	// lane-scope.json, which it did not carry when it was written in the
-	// cycle-1285 workspace. This is an ADDITION of a production artifact, not a
-	// relaxation — core.materializeLaneScope pins this file into every run
-	// workspace BEFORE any phase runs, so a real graded audit always sees it,
-	// and the registry is keyed by exactly these todo ids. Without it the
-	// fixture asked the gate to recover a lineage from a root-owned map with no
-	// key to look under; arming on ANY registry entry instead would block every
-	// ordinary cycle in a project where any lane had ever preserved work, which
-	// is a worse defect than the one being fixed. Every assertion below is
-	// unchanged from the cycle-1285 original.
+	// The fixture also writes lane-scope.json: core.materializeLaneScope pins
+	// this file into every run workspace BEFORE any phase runs, so a real
+	// graded audit always sees it, and the registry is keyed by exactly these
+	// todo ids. Without it the fixture would ask the gate to recover a
+	// lineage from a root-owned map with no key to look under; arming on ANY
+	// registry entry instead would block every ordinary cycle in a project
+	// where any lane had ever preserved work, which is a worse defect than
+	// the one being fixed.
 	writeJSON(t, filepath.Join(ws, core.LaneScopeFile), map[string]any{
 		"todo_ids": []string{reproScopeID}, "goal_hash": "goal",
 	})
@@ -102,18 +73,14 @@ func reproContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDe
 	return ws, core.PhaseRequest{Cycle: thisCycle, Workspace: ws, ProjectRoot: root}
 }
 
-// -- F2 (HIGH): the arming condition is agent-writable ---------------------
+// -- the arming condition is agent-writable ---------------------------------
 
 // TestRepro1285_F2_ManifestDeletionSilentlyDisarmsTheReconcileGate — `rm` on one
 // 0644 file in the graded agent's own workspace retires every inherited OPEN
 // defect. reconcileContinuationDefects reads the manifest, gets
 // (zero, false, nil), and returns (nil, false): PASS, and not one diagnostic.
-//
-// This is the same trust class as cycle-1282's DEF-1, which that audit graded
-// CRITICAL — and strictly cheaper, because DEF-1 needed a well-formed planted
-// ledger while this needs a delete. The root-owned registry written by the
-// fixture still names cycle-1255 as this lane's ancestor, so the disarm is
-// detectable; the code simply does not look.
+// The root-owned registry written by the fixture still names the ancestor,
+// so the disarm is detectable; the code simply does not look.
 func TestRepro1285_F2_ManifestDeletionSilentlyDisarmsTheReconcileGate(t *testing.T) {
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.Remove(filepath.Join(ws, "continuation-manifest.json")); err != nil {
@@ -133,13 +100,11 @@ func TestRepro1285_F2_ManifestDeletionSilentlyDisarmsTheReconcileGate(t *testing
 
 // TestRepro1285_F2_CorruptManifestDegradesOpen — one byte of garbage in the same
 // file yields a single `warning` diagnostic and NO block, so the gate is
-// disarmed by corruption as well as by deletion.
-//
-// The asymmetry is internal to this file, not imposed from outside:
-// readDispositions blocks on an unparseable defect-dispositions.json because
-// "degrading open there would hand the gate its cheapest bypass"
-// (defect_ledger.go:458-460). Writing garbage into the manifest is cheaper still
-// and buys more — it retires every inherited defect rather than one claim.
+// disarmed by corruption as well as by deletion. The asymmetry is internal to
+// this file: readDispositions blocks on an unparseable
+// defect-dispositions.json for the same reason, but writing garbage into the
+// manifest is cheaper still and buys more — it retires every inherited
+// defect rather than one claim.
 func TestRepro1285_F2_CorruptManifestDegradesOpen(t *testing.T) {
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.WriteFile(filepath.Join(ws, "continuation-manifest.json"), []byte("{"), 0o644); err != nil {
@@ -154,7 +119,7 @@ func TestRepro1285_F2_CorruptManifestDegradesOpen(t *testing.T) {
 	}
 }
 
-// -- F3 (MEDIUM): rule 4 is case-sensitive, the filesystem is not ----------
+// -- rule 4 is case-sensitive, the filesystem is not ------------------------
 
 // caseInsensitiveVolume probes dir rather than switching on runtime.GOOS: the
 // property that matters is the volume's, and a darwin host can mount either
@@ -172,11 +137,11 @@ func caseInsensitiveVolume(t *testing.T, dir string) bool {
 }
 
 // TestRepro1285_F3_CaseVariantSelfCitationClosesInheritedDefects — evidenceResolves
-// rejects self-vouching citations with an exact-string `switch filepath.Base(clean)`
-// (defect_ledger.go:275-278) and then resolves the path with os.Lstat. On a
+// rejects self-vouching citations with an exact-string switch on
+// filepath.Base(clean) and then resolves the path with os.Lstat. On a
 // case-insensitive volume — the stated platform, darwin/APFS — those two
-// disagree: the switch misses "Defect-Ledger.json" and Lstat resolves it anyway,
-// so the gate's OWN record closes every inherited defect.
+// disagree: the switch misses "Defect-Ledger.json" and Lstat resolves it
+// anyway, so the gate's OWN record closes every inherited defect.
 //
 // The committed lock TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect
 // tests the exact-case spellings only and passes straight over this.
@@ -205,14 +170,13 @@ func TestRepro1285_F3_CaseVariantSelfCitationClosesInheritedDefects(t *testing.T
 	}
 }
 
-// -- F5 (MEDIUM): the closure gate FAILs honest reporting ------------------
+// -- the closure gate FAILs honest reporting --------------------------------
 
 // TestRepro1285_F5_QuotedDefectTextIsNotAClosureClaim — closureClaimOffenders
 // substring-matches "verified closed" per line with no notion of quoting or
-// negation. The canonical inherited defect text in this repo literally contains
-// the phrase (docs/operations/batch-integrity-review-2026-08-04.md: "the 1255-D1
-// stale-worktree CRITICAL narrowed to 'verified closed'"), so an auditor who
-// correctly reports that defect as STILL OPEN is blocked for accuracy.
+// negation. A canonical inherited defect text can literally contain the
+// phrase, so an auditor who correctly reports that defect as STILL OPEN is
+// blocked for accuracy.
 //
 // The second-order damage is worse than the availability hit: the cheapest way
 // out is to append the literal string "defect-dispositions.json" to the line,

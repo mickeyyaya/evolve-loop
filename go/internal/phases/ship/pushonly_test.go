@@ -1,10 +1,5 @@
 package ship
 
-// pushonly_test.go — pins for the sanctioned strand completion (inbox
-// ship-push-only-recovery; the 2026-08-02 dead end: GIT_PUSH_REJECTED →
-// sync-main → "nothing to ship" while ahead>0 with bare git push
-// guard-denied). See pushonly.go for the provenance model.
-
 import (
 	"context"
 	"errors"
@@ -15,8 +10,7 @@ import (
 	"testing"
 )
 
-// initPushOnlyRepo builds a repo with an origin bare remote, one pushed base
-// commit, and returns (projectRoot, run). All git identity is pinned.
+// Git identity is pinned for deterministic commits.
 func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) string) {
 	t.Helper()
 	base := t.TempDir()
@@ -39,8 +33,7 @@ func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) st
 	}
 	// -b main matters on CI: without it the bare's HEAD points at the host
 	// default (master when init.defaultBranch is unset), so a later clone
-	// checks out an unborn branch and `push origin main` finds no ref —
-	// locally masked by any global init.defaultBranch=main.
+	// checks out an unborn branch and `push origin main` finds no ref.
 	run(base, "init", "--bare", "-b", "main", remote)
 	run(base, "init", "-b", "main", root)
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("base\n"), 0o644); err != nil {
@@ -108,7 +101,6 @@ func TestPushOnly_PushesJournaledStrand(t *testing.T) {
 
 func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	root, run := initPushOnlyRepo(t)
-	// Origin moves (a console PR merge)…
 	clone := filepath.Join(filepath.Dir(root), "clone")
 	run(filepath.Dir(root), "clone", filepath.Join(filepath.Dir(root), "origin.git"), clone)
 	if err := os.WriteFile(filepath.Join(clone, "b.txt"), []byte("console\n"), 0o644); err != nil {
@@ -117,8 +109,6 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	run(clone, "add", "b.txt")
 	run(clone, "commit", "-m", "console PR")
 	run(clone, "push", "origin", "main")
-	// …while the plane holds a journaled ship commit, then reconciles via a
-	// sync-main-shaped merge (merge-only, never pushed).
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("lane\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -142,10 +132,8 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	}
 }
 
-// A merge of two LOCAL unprovenanced branches has no origin-side parent — a
-// degenerate isSyncMainMerge accepting any merge would push it (review
-// MEDIUM: the negative that separates the structural check from
-// "merges are free").
+// A merge of two LOCAL unprovenanced branches has no origin-side parent; a
+// degenerate isSyncMainMerge accepting any merge would push it.
 func TestPushOnly_LocalOnlyMergeRefuses(t *testing.T) {
 	root, run := initPushOnlyRepo(t)
 	run(root, "checkout", "-b", "side")
@@ -170,11 +158,9 @@ func TestPushOnly_LocalOnlyMergeRefuses(t *testing.T) {
 
 func TestPushOnly_StagedChangesRefuseAndNothingToPushIsClean(t *testing.T) {
 	root, run := initPushOnlyRepo(t)
-	// Nothing ahead: clean success, no mutation.
 	if _, err := pushOnlyRun(t, root); err != nil {
 		t.Fatalf("nothing-to-push must be a clean exit: %v", err)
 	}
-	// Staged work: category error.
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("staged\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -184,8 +170,6 @@ func TestPushOnly_StagedChangesRefuseAndNothingToPushIsClean(t *testing.T) {
 	}
 }
 
-// The journal is minted by finalize's success path — the wiring that makes
-// every FUTURE strand completable.
 func TestFinalize_SuccessAppendsShipJournal(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -199,7 +183,6 @@ func TestFinalize_SuccessAppendsShipJournal(t *testing.T) {
 	if !journalHasSHA(root, res.CommitSHA) {
 		t.Fatal("a successful finalize did not journal the minted commit — future strands would refuse")
 	}
-	// Dry-run mints nothing.
 	dr := Options{ProjectRoot: root, Class: ClassManual, DryRun: true}
 	res2 := RunResult{CommitSHA: "beef0000beef0000beef0000beef0000beef0000"}
 	if _, err := finalize(context.Background(), &dr, &res2, nil, "test"); err != nil {
@@ -210,12 +193,6 @@ func TestFinalize_SuccessAppendsShipJournal(t *testing.T) {
 	}
 }
 
-// TestFinalize_MintedCommitIsJournaledEvenWhenThePushFailed — the strand
-// push-only exists for (GIT_PUSH_REJECTED after the commit was minted) must be
-// journaled, or push-only refuses the very commit it was built to complete:
-// lane 1678 (2026-09-14) passed its gate, committed, had its push rejected,
-// and push-only then answered "1 ahead commit(s) lack ship provenance". The
-// journal is the record of a MINTED commit, not of a successful push.
 func TestFinalize_MintedCommitIsJournaledEvenWhenThePushFailed(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -230,7 +207,6 @@ func TestFinalize_MintedCommitIsJournaledEvenWhenThePushFailed(t *testing.T) {
 	if !journalHasSHA(root, res.CommitSHA) {
 		t.Fatal("a minted commit whose push was rejected was not journaled — push-only would refuse the strand it exists to complete")
 	}
-	// A failure BEFORE any commit was minted journals nothing.
 	none := RunResult{}
 	if _, err := finalize(context.Background(), &opts, &none, errors.New("gate red"), "test"); err == nil {
 		t.Fatal("expected the error back")

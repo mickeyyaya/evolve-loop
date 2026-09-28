@@ -1,10 +1,5 @@
 package ship
 
-// gitops_landing_test.go — ADR-0103 unit 07: the seam between the ship phase
-// and the landing leaf. One wired construction, the once-guard projected
-// through pushWithRepair, the Center threaded from Config to Options, the
-// happy path silent on the stream, the layout spelled once.
-
 import (
 	"context"
 	"os"
@@ -25,11 +20,10 @@ func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 	return c, got
 }
 
-// Test 33 — `landing.New(` is spelled in exactly ONE non-test file of the
-// module (the seam); the leaf itself spells `New(`. moduleRoot is three
-// levels up (the carryover copy hard-codes two — a copy at the wrong depth
-// scans the wrong root and passes vacuously, so the count of scanned files
-// is asserted too).
+// `landing.New(` is spelled in exactly ONE non-test file of the module (the
+// seam); the leaf itself spells `New(`. moduleRoot is three levels up — a
+// copy at the wrong depth would scan the wrong root and pass vacuously, so
+// the count of scanned files is asserted too.
 func TestLanding_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/phases/ship/gitops_landing.go"
 	offenders, scanned := nonTestSourcesMentioning(t, "landing.New(", onlySite)
@@ -83,10 +77,10 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) ([]string, i
 	return offenders, scanned
 }
 
-// Test 34 (the flip of the characterization) — a failed tracked-binary reset
-// no longer writes the raw `[ship] WARN:` line to opts.Stderr: the Center on
-// Options.Signals sees SHIP_LANDING_BINARY_RESET_FAILED under phase "ship"
-// with the run identity, and the merge still runs.
+// A failed tracked-binary reset no longer writes the raw `[ship] WARN:` line
+// to opts.Stderr: the Center on Options.Signals sees
+// SHIP_LANDING_BINARY_RESET_FAILED under phase "ship" with the run identity,
+// and the merge still runs.
 func TestWorktreeShipIntegrate_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing.T) {
 	opts, _, stderr := pinOptions(t, ClassCycle)
 	opts.RunID = "run-7"
@@ -112,13 +106,12 @@ func TestWorktreeShipIntegrate_BinaryResetFailureIsTheLandingCodeNotStderr(t *te
 	}
 }
 
-// Test 35 — pushWithRepair projects the host's once-guard: after a declined
-// repair the ledger, res.RepairAttempted and res.RepairOutcome are written
-// even though an error is returned, res.CommitSHA is untouched; a second
-// rejection in the SAME Options returns the original error with zero probes
-// (the stage re-run would otherwise repair twice); on success res.CommitSHA
-// is the landed head; PhaseResponse.Signals through addRepairSignals are
-// unchanged.
+// pushWithRepair projects the host's once-guard: after a declined repair the
+// ledger, res.RepairAttempted and res.RepairOutcome are written even though
+// an error is returned, res.CommitSHA is untouched; a second rejection in
+// the SAME Options returns the original error with zero probes (the stage
+// re-run would otherwise repair twice); on success res.CommitSHA is the
+// landed head; PhaseResponse.Signals through addRepairSignals are unchanged.
 func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 	opts, _, _ := pinOptions(t, ClassCycle)
 	r := newArgvRecorder(opts)
@@ -159,10 +152,10 @@ func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 	}
 }
 
-// Test 36 — a recording Center threaded through Options.Signals on a
-// scripted green worktree ship (run(): resolve, lock, preflight, stage,
-// commit, integrate) records ZERO events from module ship: the landing adds
-// nothing to the stream on the happy path.
+// A recording Center threaded through Options.Signals on a scripted green
+// worktree ship (run(): resolve, lock, preflight, stage, commit, integrate)
+// records ZERO events from module ship: the landing adds nothing to the
+// stream on the happy path.
 func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t *testing.T) {
 	opts, _, _ := pinOptions(t, ClassCycle)
 	c, got := recordingCenter()
@@ -185,9 +178,9 @@ func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t 
 	}
 }
 
-// Test 37 — shipOptions copies the Phase's Center into Options.Signals and
-// (*Phase).signalsWired reports it (the cycle-1064 trap: a Config field the
-// translation forgets is silently never wired).
+// shipOptions copies the Phase's Center into Options.Signals and
+// (*Phase).signalsWired reports it (a Config field the translation forgets
+// would be silently never wired).
 func TestShipOptions_ThreadsSignals(t *testing.T) {
 	c, _ := recordingCenter()
 	p := New(Config{Runner: execRunner, Signals: c})
@@ -203,9 +196,9 @@ func TestShipOptions_ThreadsSignals(t *testing.T) {
 	}
 }
 
-// Test 38 — the run-workspace layout is spelled once: no non-test ship source
-// spells "ship-binding.json" (dossier.ShipBindingFile is the spelling) and
-// neither gitops.go nor native.go spells "cycle-%d" (core.RunWorkspacePath).
+// The run-workspace layout is spelled once: no non-test ship source spells
+// "ship-binding.json" (dossier.ShipBindingFile is the spelling) and neither
+// gitops.go nor native.go spells "cycle-%d" (core.RunWorkspacePath).
 func TestShipBindingLayout_IsSpelledOnce(t *testing.T) {
 	entries, err := os.ReadDir(".")
 	if err != nil {

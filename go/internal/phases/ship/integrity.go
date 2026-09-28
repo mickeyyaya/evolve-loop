@@ -8,18 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
-// verifyNoControlPlaneEdits is the post-hoc backstop of the pipeline integrity
-// boundary (ADR-0064). The real-time role-gate hook only intercepts Edit/Write;
-// a phase could still mutate the control plane via Bash (sed -i, redirection) or
-// any non-tool channel. This gate runs at the --class cycle ship chokepoint and
-// rejects a commit whose diff touches the integrity surface (the deterministic
-// gates, metric SSOT, guards, campaign contract, grading rubrics, hook wiring) —
-// regardless of HOW the file was changed. A cycle may not edit the gate that
-// grades it.
-//
-// It runs ONLY for ClassCycle (see verifyClass), so operator-driven control-plane
-// changes shipped via `evolve ship --class manual` are exempt by construction —
-// that is the sanctioned path for hardening a gate.
+// See ADR-0064.
 func verifyNoControlPlaneEdits(ctx context.Context, opts *Options, res *RunResult) error {
 	paths, err := cycleChangedPaths(ctx, opts)
 	if err != nil {
@@ -43,12 +32,6 @@ func verifyNoControlPlaneEdits(ctx context.Context, opts *Options, res *RunResul
 	return nil
 }
 
-// cycleChangedPaths returns every path the cycle would commit: tracked changes vs
-// HEAD (modified/deleted/renamed) unioned with untracked new files — so the
-// protected-path check sees the file no matter how it was introduced. Rename
-// detection is OFF: with it on, --name-only prints only a rename's NEW path, so
-// a protected file moved to an unprotected name would pass (architecture review
-// F37 M1; the build handoff floor judges the same way).
 func cycleChangedPaths(ctx context.Context, opts *Options) ([]string, error) {
 	tracked, err := captureGitOutput(ctx, opts, "diff", "--name-only", "--no-renames", "HEAD")
 	if err != nil {

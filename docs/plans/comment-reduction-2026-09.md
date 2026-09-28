@@ -130,6 +130,9 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 64 | `internal/core`, file group 9 of 13 | 37 | 1,352 → 505 | — | on the round-7 comment PR |
 | 65 | `internal/phases/ship`, file group 1 of 4 | 38 | 1,745 → 411 | — | on the round-7 comment PR |
 | 66 | `internal/phases/audit`, file group 1 of 2 | 39 | 1,860 → 1,132 | — | on the round-7 comment PR |
+| 67 | `internal/core`, file group 10 of 13 | 32 | 1,250 → 244 | — | on the round-8 comment PR |
+| 68 | `internal/phases/ship`, file group 2 of 4 | 33 | 1,249 → 656 | — | on the round-8 comment PR |
+| 69 | `internal/phases/audit`, file group 2 of 2 | 29 | 1,220 → 823 | — | on the round-8 comment PR |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

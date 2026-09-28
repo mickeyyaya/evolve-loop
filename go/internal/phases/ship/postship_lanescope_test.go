@@ -1,16 +1,5 @@
 package ship
 
-// postship_lanescope_test.go — RED contract for the PASS half of the
-// stable-failure-identity asymmetry (inbox consumption-rides-landing-ship
-// 0.88; PR #439 fixed the FAIL half). Continuation/lane cycles carry NO
-// triage-decision.json, so a PASS ship promoted NOTHING: the landed item
-// stayed open and a full bookkeeping cycle (~25-30 min) was later spent
-// moving one JSON file ("the crosspoll PASS consumed its item in-ship while
-// the egps PASS did not"). When the decision file is ABSENT, the lane-scope
-// pin's todo_ids are the committed set — same file-absent-only rule as the
-// FAIL side (a PRESENT decision that committed zero ids keeps the declined
-// menu unpromoted).
-
 import (
 	"context"
 	"os"
@@ -49,9 +38,9 @@ func TestPromoteInbox_LaneScopeFallbackPromotesOnPass(t *testing.T) {
 	}
 }
 
-// The cycle-598 landing gate must bind the FALLBACK entry path exactly as it
-// binds the triage path (diff-review MEDIUM): an unlanded ship with a
-// lane-scope committed set promotes nothing and drains with the retry reason.
+// The landing gate must bind the FALLBACK entry path exactly as it binds the
+// triage path: an unlanded ship with a lane-scope committed set promotes
+// nothing and drains with the retry reason.
 func TestPromoteInbox_UnlandedShipSkipsLaneFallbackPromotion(t *testing.T) {
 	root := t.TempDir() // not a git repo → isLanded fails closed (not landed)
 	writeDrainCycleState(t, root, 53)

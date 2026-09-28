@@ -1,16 +1,5 @@
 //go:build integration
 
-// native_test.go — 23-case parity matrix vs ship-integration-test.sh.
-//
-// Each test case mirrors one of A, B, C, C2, D, E, F, G, H, I, J, K, L, M, N,
-// O, P, Q, R, S, T, U, V in legacy/scripts/tests/ship-integration-test.sh.
-//
-// Tests create ephemeral git repos via makeRepo() and seed audit
-// ledger entries via seedAudit(). The native Run() is invoked directly
-// (no shell-out). Each assertion mirrors the corresponding bash check.
-//
-// Requires `git` on PATH. Most tests also create a bare remote for push.
-
 package ship
 
 import (
@@ -24,13 +13,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// --- Test A: no auditor ledger entry → refuses (rc=2) ---------------
-
 func TestNative_A_NoAuditor_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "test commit"})
-	// Reclassified: no-auditor is a re-establishable precondition (not a
-	// genuine integrity breach) → ExitFailure carrying AUDIT_BINDING_NO_AUDITOR.
+	// No-auditor is a re-establishable precondition, not a genuine integrity
+	// breach, so this fails with AUDIT_BINDING_NO_AUDITOR rather than
+	// ExitIntegrity.
 	if res.ExitCode != ExitFailure {
 		t.Fatalf("want ExitFailure, got %d (err=%v, logs=%v)", res.ExitCode, err, res.Logs)
 	}
@@ -39,8 +27,6 @@ func TestNative_A_NoAuditor_Refuses(t *testing.T) {
 		t.Errorf("missing 'no Auditor' log in: %v", res.Logs)
 	}
 }
-
-// --- Test B: PASS audit + matching state → ships (rc=0) -------------
 
 func TestNative_B_PASS_AuditMatching_Ships(t *testing.T) {
 	repo := makeRepo(t)
@@ -56,8 +42,6 @@ func TestNative_B_PASS_AuditMatching_Ships(t *testing.T) {
 	}
 }
 
-// --- Test C: WARN audit ships by default (fluent) -------------------
-
 func TestNative_C_WARN_ShipsFluent(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change\n")
@@ -72,14 +56,10 @@ func TestNative_C_WARN_ShipsFluent(t *testing.T) {
 	}
 }
 
-// --- Test C2: workflow.strict_audit → WARN refused -----------------
-
 func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change strict\n")
 	seedAudit(t, repo, "WARN")
-	// Strict mode now comes from .evolve/policy.json (workflow.strict_audit), not
-	// the retired EVOLVE_STRICT_AUDIT env dial (flag-reduction, ADR-0064).
 	writeStrictAuditPolicy(t, repo)
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
@@ -93,9 +73,7 @@ func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
 	}
 }
 
-// writeStrictAuditPolicy drops a .evolve/policy.json into root that turns on the
-// strict (legacy-blocking) audit posture — the policy.json replacement for the
-// retired EVOLVE_STRICT_AUDIT env dial (flag-reduction, ADR-0064).
+// writeStrictAuditPolicy turns on the strict (legacy-blocking) audit posture.
 func writeStrictAuditPolicy(t *testing.T, root string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -107,13 +85,10 @@ func writeStrictAuditPolicy(t *testing.T, root string) {
 	}
 }
 
-// --- Test D: tree-state mismatch (modified after audit) → refuses ---
-
 func TestNative_D_TreeStateMismatch_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nversion 1 of audited content\n")
 	seedAudit(t, repo, "PASS")
-	// Mutate after audit:
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nversion 1 of audited content\nversion 2 — added after audit\n")
 	res, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "should refuse"})
 	if res.ExitCode != ExitFailure {
@@ -123,8 +98,6 @@ func TestNative_D_TreeStateMismatch_Refuses(t *testing.T) {
 		t.Errorf("missing tree-state-mismatch in: %v", res.Logs)
 	}
 }
-
-// --- Test E: HEAD moved since audit → refuses -----------------------
 
 func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
 	repo := makeRepo(t)
@@ -140,15 +113,12 @@ func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
 	}
 }
 
-// --- Test F: ship binary modified within same plugin version → refuses ---
-
 func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
 	addRemote(t, repo)
 
-	// First ship: pins SHA + version=1.0.0
 	mustWrite(t, filepath.Join(repo, "audited.txt"), "audited\n")
 	seedAudit(t, repo, "PASS")
 	res1, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "first ship"})
@@ -156,11 +126,10 @@ func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
 	}
 
-	// Tamper: modify the ship binary fixture (simulates an attacker
-	// editing ship.sh while plugin.json:version is unchanged).
+	// Simulates an attacker editing ship.sh while plugin.json:version is
+	// unchanged.
 	mustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v1\n# malicious comment\n")
 
-	// Second ship: same version, different SHA → INTEGRITY-FAIL.
 	mustWrite(t, filepath.Join(repo, "another.txt"), "another change\n")
 	seedAudit(t, repo, "PASS")
 	res2, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "second ship"})
@@ -172,14 +141,10 @@ func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 	}
 }
 
-// --- Test G: EVOLVE_BYPASS_SHIP_VERIFY=1 is silently ignored ---------
-
 func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "emergency.txt"), "emergency change\n")
 	addRemote(t, repo)
-	// EVOLVE_BYPASS_SHIP_VERIFY is silently ignored; ClassManual+AUTO_CONFIRM
-	// ships normally because of the explicit class, not the retired flag.
 	res, _ := runShip(t, repo, Options{
 		Class:            ClassManual,
 		CommitMessage:    "emergency",
@@ -192,13 +157,10 @@ func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK, got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	// ClassUsed reflects the explicit class (ClassManual), not a bridge conversion.
 	if res.ClassUsed != ClassManual {
 		t.Errorf("ClassUsed=%q, want ClassManual (set explicitly, not via bridge)", res.ClassUsed)
 	}
 }
-
-// --- Test H: --class release → ships without audit ------------------
 
 func TestNative_H_ClassRelease_ShipsNoAudit(t *testing.T) {
 	repo := makeRepo(t)
@@ -212,8 +174,6 @@ func TestNative_H_ClassRelease_ShipsNoAudit(t *testing.T) {
 		t.Errorf("missing 'class: release' log in: %v", res.Logs)
 	}
 }
-
-// --- Test I: --class manual without tty → refuses --------------------
 
 func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
 	repo := makeRepo(t)
@@ -231,8 +191,6 @@ func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
 		t.Errorf("missing tty-required message in: %v", res.Logs)
 	}
 }
-
-// --- Test J: --class manual + AUTO_CONFIRM=1 → ships -----------------
 
 func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 	repo := makeRepo(t)
@@ -254,14 +212,11 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 	}
 }
 
-// --- Test K: EVOLVE_BYPASS_SHIP_VERIFY → no deprecation log ----------
-
 func TestNative_K_BypassEnv_NoDeprecationLog(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "bridge.txt"), "bridge change\n")
 	seedAudit(t, repo, "PASS")
 	addRemote(t, repo)
-	// Flag is silently ignored — no deprecation log, ClassUsed stays ClassCycle.
 	res, _ := runShip(t, repo, Options{
 		Class:         ClassCycle,
 		CommitMessage: "legacy bypass",
@@ -278,8 +233,6 @@ func TestNative_K_BypassEnv_NoDeprecationLog(t *testing.T) {
 	}
 }
 
-// --- Test L: invalid class → rejected with rc=1 ----------------------
-
 func TestNative_L_InvalidClass_Rejected(t *testing.T) {
 	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{Class: Class("garbage"), CommitMessage: "msg"})
@@ -291,8 +244,6 @@ func TestNative_L_InvalidClass_Rejected(t *testing.T) {
 	}
 }
 
-// --- Test M: exit_code=1 + Verdict:PASS → ships ----------------------
-
 func TestNative_M_AuditorExit1_PASS_Ships(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for exit-1 test\n")
@@ -303,8 +254,6 @@ func TestNative_M_AuditorExit1_PASS_Ships(t *testing.T) {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
 }
-
-// --- Test N: exit_code=2 → refuses (anti-gaming) ---------------------
 
 func TestNative_N_AuditorExit2_Refuses(t *testing.T) {
 	repo := makeRepo(t)
@@ -319,8 +268,6 @@ func TestNative_N_AuditorExit2_Refuses(t *testing.T) {
 	}
 }
 
-// --- Test O: exit_code=0 + Verdict:FAIL → refuses --------------------
-
 func TestNative_O_VerdictFAIL_Refuses(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for verdict-fail test\n")
@@ -333,8 +280,6 @@ func TestNative_O_VerdictFAIL_Refuses(t *testing.T) {
 		t.Errorf("missing FAIL verdict diagnostic in: %v", res.Logs)
 	}
 }
-
-// --- Test P: dual-verdict (PASS + FAIL) → refuses --------------------
 
 func TestNative_P_DualVerdict_Refuses(t *testing.T) {
 	repo := makeRepo(t)
@@ -373,15 +318,12 @@ Verdict: PASS
 	}
 }
 
-// --- Test Q: plugin version bump → re-pins, ships --------------------
-
 func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
 	addRemote(t, repo)
 
-	// First ship at v1.0.0
 	mustWrite(t, filepath.Join(repo, "q1.txt"), "first audited\n")
 	seedAudit(t, repo, "PASS")
 	res1, _ := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "first ship at v1.0.0"})
@@ -403,8 +345,6 @@ func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
 	}
 }
 
-// --- Test R: legacy SHA-only pin → migrates ------------------------
-
 func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
@@ -423,7 +363,6 @@ func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	// Verify state.json now has expected_ship_version=2.0.0
 	stMap, _ := readStateMap(filepath.Join(repo, ".evolve", "state.json"))
 	if v := stateString(stMap, "expected_ship_version"); v != "2.0.0" {
 		t.Errorf("want expected_ship_version=2.0.0, got %q", v)
@@ -432,8 +371,6 @@ func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 		t.Errorf("missing migration log in: %v", res.Logs)
 	}
 }
-
-// --- Test S: cycle ship advances lastCycleNumber ---------------------
 
 func TestNative_S_CycleAdvancesLastCycleNumber(t *testing.T) {
 	repo := makeRepo(t)
@@ -456,8 +393,6 @@ func TestNative_S_CycleAdvancesLastCycleNumber(t *testing.T) {
 		t.Errorf("missing advance log in: %v", res.Logs)
 	}
 }
-
-// --- Test T: manual ship leaves lastCycleNumber unchanged ----------
 
 func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 	repo := makeRepo(t)
@@ -484,8 +419,6 @@ func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 	}
 }
 
-// --- Test U: actual-diff footer appended for cycle commit -----------
-
 func TestNative_U_ActualDiffFooter_CycleCommit(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndiff transparency test\n")
@@ -506,8 +439,6 @@ func TestNative_U_ActualDiffFooter_CycleCommit(t *testing.T) {
 		t.Errorf("missing file entries in: %s", lastMsg)
 	}
 }
-
-// --- Test V: --class release skips actual-diff footer ---------------
 
 func TestNative_V_ReleaseSkipsFooter(t *testing.T) {
 	repo := makeRepo(t)

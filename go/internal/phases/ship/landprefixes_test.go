@@ -7,19 +7,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestLandPrefixes names + exercises the live composed main-push driver
-// (apicover): both landing modes through the real PrefixQueue, pinning the
-// intent that made cycle-975's composer non-inert — in prefix-queue mode the
-// culprit lane is ejected and the innocent survivors land (verified as a
-// set), while per-lane mode keeps the legacy independent stand-or-fall
-// behavior, and an empty lane set is nil/nil in both modes.
 func TestLandPrefixes(t *testing.T) {
 	lanes := []fleet.LaneCandidate{
 		{ID: "lane-good-a", Files: []string{"a.go"}},
 		{ID: "lane-toxic", Files: []string{"b.go"}},
 		{ID: "lane-good-c", Files: []string{"c.go"}},
 	}
-	// The toxic lane fails any composed or solo set that includes it.
 	verify := func(ids []string) bool {
 		for _, id := range ids {
 			if id == "lane-toxic" {

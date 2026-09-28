@@ -1,22 +1,3 @@
-// postship_landing_test.go — RED tests for cycle-609 task
-// fix-inbox-promotion-landing-gate.
-//
-// Cycle 598 defect (inbox-promotion-requires-landed-ship.json): a ship push
-// was rejected (origin diverged), the recovery path reclassified to
-// needs-reaudit, the cycle still reported FinalVerdict PASS, and
-// promoteInbox promoted the inbox item to processed/ anyway — even though
-// `git log --all -S` over the touched path showed nothing ever landed on
-// any ref. Root cause: promoteInbox's only promotion criterion is
-// "triage-decision.json is non-nil"; it never asks whether res.CommitSHA
-// actually reached main/origin.
-//
-// Fix under test (not yet implemented — these tests MUST fail RED until
-// Builder wires a landing check, reusing the existing isAncestor helper
-// from repair.go, into promoteInbox's Promote/ReconcileSuperseded calls):
-// an unlanded commit SHA must skip promotion for BOTH the primary
-// top_n/skip_shipped loop and the superseded-reconcile path, logging a
-// "[ship] WARN: promotion skipped: unlanded" line instead of "promoted:
-// landed", and the item must NOT appear under processed/cycle-<cid>/.
 package ship
 
 import (
@@ -84,7 +65,6 @@ func itoa(n int) string {
 	return strconv.Itoa(n)
 }
 
-// TestPromoteInbox_UnlandedCommitSkipsPromotion is the primary RED case:
 // res.CommitSHA is neither an ancestor of HEAD nor found on origin (fake
 // runner reports merge-base --is-ancestor exit!=0 for every ref probed).
 // promoteInbox must NOT call Promote(..., "processed", ...) — the item
@@ -113,10 +93,9 @@ func TestPromoteInbox_UnlandedCommitSkipsPromotion(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_LandedCommitPromotes is the twin GREEN case: the exact
-// same fixture, but res.CommitSHA IS an ancestor of HEAD (merge-base
-// --is-ancestor exits 0). promoteInbox must promote normally and log
-// "promoted: landed".
+// The exact same fixture, but res.CommitSHA IS an ancestor of HEAD
+// (merge-base --is-ancestor exits 0); promoteInbox must promote normally
+// and log "promoted: landed".
 func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
 	root := t.TempDir()
 	const cid = 609
@@ -141,10 +120,8 @@ func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement: the
-// superseded-reconcile path (postship.go:133, ReconcileSuperseded) shares
-// the same defect and must get the identical landing check — an unlanded
-// commit must not retire a superseded id either.
+// The superseded-reconcile path (ReconcileSuperseded) gets the identical
+// landing check — an unlanded commit must not retire a superseded id either.
 func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) {
 	root := t.TempDir()
 	const cid = 609
@@ -195,13 +172,10 @@ func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) 
 	}
 }
 
-// TestPromoteInbox_NeedsReauditOutcomeNeverPromotes is the cycle-598
-// regression itself: RepairOutcome=="needs-reaudit" (origin diverged, the
-// landing's push repair declined to push) paired with a CommitSHA that is only a
-// local commit (not an ancestor of HEAD-on-origin — modeled here as
-// merge-base --is-ancestor failing) must never promote, regardless of
-// whether a caller upstream still considers the cycle a "PASS". The landing
-// check is the single source of truth, independent of verdict labels.
+// RepairOutcome=="needs-reaudit" (origin diverged, the landing's push repair
+// declined to push) paired with a commit that is only local (not an ancestor
+// of HEAD-on-origin) must never promote, regardless of whether a caller
+// upstream still considers the cycle a "PASS".
 func TestPromoteInbox_NeedsReauditOutcomeNeverPromotes(t *testing.T) {
 	root := t.TempDir()
 	const cid = 598

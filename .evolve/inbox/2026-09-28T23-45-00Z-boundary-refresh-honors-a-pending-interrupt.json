@@ -1,0 +1,21 @@
+{
+  "id": "boundary-refresh-honors-a-pending-interrupt",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "title": "A SIGINT that lands during a boundary refresh is lost: the refresh re-execs and the new process dispatches another wave",
+  "files": [
+    "go/internal/loopchain/refresh.go",
+    "go/cmd/evolve/cmd_loop_window.go",
+    "go/cmd/evolve/cmd_loop_chain.go"
+  ],
+  "summary": "At the wave-29 close (2026-09-28 ~23:40) the operator sent SIGINT to the loop while prepareIteration was in its boundary work. The boundary refresh was already rebuilding; it finished, re-pinned (9a1a292e -> a2a1fdb7) and re-execed the same argv. The interrupt had cancelled the old image's context, and exec discarded it, so the new process booted as a fresh run and would have dispatched another wave; a second SIGINT stopped it before cycle 1. Refresher.Refresh never consults the batch context: guards() checks lanes, the breaker and the build commit, but not an interrupt.",
+  "fix": "The refresh takes the batch context: a cancelled context skips the rebuild and the re-exec (a `skip{\"interrupted\"}` degrade), and prepareIteration re-checks ctx.Err() after the refresh returns false, so an interrupt that arrives during the rebuild ends the run with stop_reason signal instead of re-execing.",
+  "acceptance": [
+    "A refresh whose context is cancelled before the re-exec does not call ReExec and reports refreshed=false (red today: it re-execs)",
+    "prepareIteration returns the interrupt decision when the context is cancelled during the refresh",
+    "A refresh with a live context still rebuilds and re-execs as before"
+  ],
+  "created_at": "2026-09-28T23:45:00Z",
+  "source": "console, 2026-09-28, wave-29 boundary stop (the loop needed two SIGINTs)"
+}

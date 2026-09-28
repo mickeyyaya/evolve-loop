@@ -1,0 +1,20 @@
+{
+  "id": "gc-pipeline-temp-and-go-cache",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.7,
+  "title": "Nothing bounds the pipeline's disk: the Go build cache reached 157 GB and killed builds left 18 GB of go-build dirs",
+  "files": [
+    "go/cmd/evolve/cmd_gc.go",
+    "go/internal/tmuxgc"
+  ],
+  "summary": "At the wave-27 halt, ~/Library/Caches/go-build held 157 GB: Go trims only entries unused for 5 days, and the loop builds continuously (race, cover, integration, per-lane ldflags stamps). $TMPDIR held 600 go-build* work dirs from builds killed mid-run (18 GB) and about 4 GB of fixture dirs and dry-run journals. The operator had no interface to reclaim either: `evolve gc` reaps only orphaned tmux sessions. See docs/incidents/2026-09-28-the-disk-filled-and-two-lanes-failed-for-it.md.",
+  "fix": "Extend `evolve gc` (dry-run by default, reporting what it would remove) to (1) reap the pipeline's stale temp artifacts under os.TempDir() past a configured age: go-build*, acs-*, cycle-* and fixture dirs, and release-pipeline-dryrun-*.json; (2) bound the Go build cache at a configured size (`go clean -cache` when above it, only with no loop lease live). Also fix the release-pipeline dry-run journal that is written to os.TempDir() and never removed. The thresholds are policy.json config. The loop's wave boundary may call the same gc when the disk-space check warns.",
+  "acceptance": [
+    "`evolve gc --temp` lists and, with --apply, removes stale pipeline temp artifacts past the age, never a live lease's or a younger dir (red today: gc knows only tmux)",
+    "`evolve gc --go-cache` clears the cache only above the configured size and only with no live loop lease",
+    "The release dry-run journal no longer accumulates in os.TempDir()"
+  ],
+  "created_at": "2026-09-28T20:41:00Z",
+  "source": "console, 2026-09-28, the wave-27 disk-full halt"
+}

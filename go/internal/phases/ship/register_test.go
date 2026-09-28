@@ -12,11 +12,8 @@ import (
 // (intent/scout/...). The flow/dispatcher must never know HOW to construct
 // ship; it looks the factory up by name. This is the phase-agnostic invariant
 // (ADR-0035/0038): adding/owning a phase lives in the phase's package + JSON,
-// never in a dispatcher switch.
-//
-// Registration previously lived in the dispatcher (internal/cli/phasecmd);
-// ship now self-registers in its own init(). This is the permanent regression
-// guard for that invariant — the test does not import the dispatcher.
+// never in a dispatcher switch. This is the permanent regression guard for
+// that invariant — the test does not import the dispatcher.
 func TestShipSelfRegisters(t *testing.T) {
 	factory, ok := registry.For(string(core.PhaseShip))
 	if !ok {

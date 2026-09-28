@@ -1,29 +1,5 @@
 package ship
 
-// postship_closesinbox_test.go — RED contract for the wiring half of
-// consumption-rides-landing-ship (cycle 1452): a PASS ship whose diff closes an
-// inbox item consumes that item in the SAME landing, even when triage never
-// named the id.
-//
-// The live instance: schema-aligned-salvage-layer landed in #453, nothing
-// consumed its item, and wave cycle-1448 re-picked already-shipped work as live
-// scope. The defect is structural — consumption is a separate act from landing,
-// so forgetting is always possible.
-//
-// What these tests freeze (doNotModifyTests):
-//   - marker ids join the committed set through the ONE existing lifecycle seam;
-//   - they ride the EXACT cycle-598 landing gate (`isLanded`) — no new, parallel,
-//     or weaker gate: an unlanded ship consumes nothing;
-//   - a marker works with NO triage decision present (the continuation/lane
-//     shape that produced the live instance);
-//   - absence of build-report.md is not an error and does not disturb the
-//     triage-sourced promotion;
-//   - a landed ship WITHOUT a marker consumes only what triage named (the
-//     anti-over-consumption half — a diff-inference implementation fails here).
-//
-// Fixture helpers (writeDrainCycleState / writeDrainTriageDecision /
-// writeDrainInboxItem) are shared with the sibling postship drain tests.
-
 import (
 	"context"
 	"os"
@@ -56,12 +32,9 @@ func promotedPath(root string, cycleID int, id string) string {
 	return filepath.Join(root, ".evolve", "inbox", "processed", "cycle-"+strconv.Itoa(cycleID), id+".json")
 }
 
-// TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip — the
-// load-bearing case. Triage committed to ONE id; the landing also closed a
-// second item the Builder marked. Both must be consumed by this ship, not by a
-// future bookkeeping cycle. CommitSHA is empty so the landing gate fails OPEN
-// (the pre-existing "no commit recorded" contract), isolating this test to the
-// committed-set change.
+// Triage committed to ONE id; the landing also closed a second item the
+// Builder marked. Both must be consumed by this ship. CommitSHA is empty so
+// the landing gate fails OPEN, isolating this test to the committed-set change.
 func TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1452
@@ -85,10 +58,9 @@ func TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip(t *testin
 	}
 }
 
-// TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision — the exact
-// live-instance shape: a continuation/lane cycle carries NO triage-decision.json
-// and no lane-scope pin, so the promotion branch was never entered at all. A
-// marker alone must be a sufficient committed set on a landed ship.
+// A continuation/lane cycle carries NO triage-decision.json and no
+// lane-scope pin, so the promotion branch was never entered at all; a marker
+// alone must be a sufficient committed set on a landed ship.
 func TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1453
@@ -107,9 +79,9 @@ func TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision(t *testing.T
 	}
 }
 
-// TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip — the cycle-598 gate
-// must bind the marker path exactly as it binds the triage and lane-scope paths.
-// A non-git TempDir with a real-looking SHA makes isLanded fail closed.
+// The landing gate must bind the marker path exactly as it binds the triage
+// and lane-scope paths. A non-git TempDir with a real-looking SHA makes
+// isLanded fail closed.
 func TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1454
@@ -130,10 +102,9 @@ func TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems — the
-// anti-over-consumption half. A build-report with no marker must leave every
-// unnamed item open; an implementation that infers closure from the diff, the
-// cycle dir, or `connects_to` proximity fails here.
+// A build-report with no marker must leave every unnamed item open; an
+// implementation that infers closure from the diff, the cycle dir, or
+// `connects_to` proximity fails here.
 func TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1455
@@ -156,9 +127,8 @@ func TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems(t *tes
 	}
 }
 
-// TestPromoteInbox_AbsentBuildReportIsNotAnError — degrade cleanly: cycles that
-// skip the build phase have no build-report.md at all, and the triage-sourced
-// promotion must be untouched by the new read.
+// Cycles that skip the build phase have no build-report.md at all, and the
+// triage-sourced promotion must be untouched by that read.
 func TestPromoteInbox_AbsentBuildReportIsNotAnError(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1456

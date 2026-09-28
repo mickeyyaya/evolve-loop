@@ -1,0 +1,21 @@
+{
+  "id": "resume-after-a-fleet-signal-stop",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.8,
+  "title": "After a fleet wave is stopped by a signal, `evolve loop --resume` resumes an unrelated stale checkpoint instead of the stopped lanes",
+  "files": [
+    "go/internal/core/resume.go",
+    "go/cmd/evolve/cmd_loop_resume.go",
+    "go/cmd/evolve/cmd_loop_window.go"
+  ],
+  "summary": "Wave 27 (1739, 1740) was stopped by SIGINT on the disk-full halt (2026-09-28). The loop printed \"resume with: evolve loop --resume\", but a signal stop in a fleet wave writes no checkpoint, so discovery (discoverPerRunResumeState: per-run cycle-state checkpoints with a resumable reason, newest first) found neither lane. It picked cycle 1709's quota checkpoint from 2026-09-27 and began building on that day-old base until it was stopped. The two lanes' claimed items could only be returned with `evolve inbox-mover recover-orphans`, which the message never named. A resumable checkpoint also never expires, however far main has moved.",
+  "fix": "(1) A signal stop in a fleet wave either writes each unfinished lane's checkpoint (reason `signal`, resumable) or prints the true recovery: the lanes that stopped and `evolve inbox-mover recover-orphans` for their claims. It never names a resume that cannot continue them. (2) Resume refuses a checkpoint whose base is behind a later sealed cycle or older than a configured age, naming it and how to discard it (`evolve cycle reset`), instead of resuming it. (3) Discovery lists every live checkpoint it considered, so the operator sees the choice.",
+  "acceptance": [
+    "After a SIGINT mid-wave, `evolve loop --resume` continues a stopped lane or refuses naming the lanes; it never picks an older unrelated checkpoint (red: it resumed 1709)",
+    "A checkpoint older than a later sealed cycle is refused with the reset command named",
+    "The stop message names the recovery that actually applies"
+  ],
+  "created_at": "2026-09-28T21:00:00Z",
+  "source": "console, 2026-09-28, the wave-27 halt recovery"
+}

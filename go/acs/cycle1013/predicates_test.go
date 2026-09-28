@@ -13,7 +13,7 @@
 // source-grep of production code (the cycle-85 degenerate-predicate ban). Each
 // predicate runs the in-package behavioral RED tests (package main, which reaches
 // the unexported runTokensReport/renderTokensReport entry points) as a SUBPROCESS
-// and requires an explicit "--- PASS:" marker per named test. A bare exit-0 is
+// and requires structured run and PASS events per named test. A bare exit-0 is
 // rejected, so a renamed/skipped/deleted test cannot green the gate. The `-run`
 // pattern is anchored to only this task's four tests, so the package's unrelated
 // pre-existing red test (TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport)
@@ -30,7 +30,6 @@
 package cycle1013
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
@@ -39,23 +38,10 @@ import (
 const tokensPkg = "github.com/mickeyyaya/evolve-loop/go/cmd/evolve"
 
 // runTokensTest runs `go test -run <pattern> <tokensPkg>` as a subprocess
-// (verbose, no cache) and fails unless every named test reports an explicit PASS.
-// RED today: cmd_tokens.go never reads llm-calls.ndjson and renderTokensReport
-// early-returns before any tripwire text, so the in-package assertions fail and
-// `go test` exits non-zero.
+// (verbose, no cache) and fails unless every named test has structured run and PASS events.
 func runTokensTest(t *testing.T, pattern string, wantPass ...string) {
 	t.Helper()
-	stdout, stderr, code, err := acsassert.SubprocessOutput(
-		"go", "test", "-count=1", "-v", "-run", pattern, tokensPkg)
-	if code != 0 || err != nil {
-		t.Fatalf("go test -run %s %s exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s",
-			pattern, tokensPkg, code, err, stdout, stderr)
-	}
-	for _, name := range wantPass {
-		if !strings.Contains(stdout, "--- PASS: "+name) {
-			t.Errorf("%s did not report PASS (renamed, skipped, or not run):\n%s", name, stdout)
-		}
-	}
+	acsassert.GoTests(t, acsassert.GoTestSpec{Package: tokensPkg, Pattern: pattern, Names: wantPass})
 }
 
 // TestC1013_001_tripwire_surfaced_in_text_and_json — AC1+AC2. A non-claude

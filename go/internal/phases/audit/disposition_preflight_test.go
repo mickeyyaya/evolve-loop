@@ -8,30 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// disposition_preflight_test.go — RED contract for cycle-1342 Task 3
-// `disposition-completeness-preflight` (scout-report.md Finding 4).
-//
-// Today, an ancestor id with no matching claim in defect-dispositions.json
-// surfaces ONLY as a per-id fallthrough inside reconcileAgainstAncestor's
-// switch — `unaccounted = append(unaccounted, a.ID+" (no disposition)")` —
-// mixed in among every other per-id branch (FIXED-but-unresolvable,
-// DEFERRED-without-reason, unknown status). That blocks PASS correctly, but
-// there is no STRUCTURAL signal that names the disposition FILE itself as
-// absent or short of the inherited-id set — a future auditor reading
-// diagnostics sees N unrelated-looking per-id gripes, never "the file you
-// were supposed to write covers 0 of 2 ids". Finding 4 calls this a
-// pre-flight gap: nothing fails loudly, BY NAME, on the artifact's
-// completeness as a whole before grading proceeds id-by-id.
-//
-// Every assertion below reaches its subject through the REAL production
-// seam, hooks{}.Classify — the audit phase's verdict path. A helper called
-// directly would pass on dead code.
-//
-// Adversarial diversity: negative (file entirely missing), negative (file
-// present but short), edge/anti-no-op (a complete file and a non-continuation
-// cycle must trip NEITHER new message — a pre-flight that always fires
-// proves nothing).
-
 // dispositionPreflightMissing and dispositionPreflightIncomplete are the two
 // distinct, NAMED diagnostic markers this contract pins. They must not
 // collide with the existing "(no disposition)" per-id text, and must be
