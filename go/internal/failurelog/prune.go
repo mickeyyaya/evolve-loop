@@ -37,19 +37,10 @@ func PruneExpired(statePath string, now time.Time) (PruneResult, error) {
 		now = time.Now().UTC()
 	}
 
-	raw, err := os.ReadFile(statePath)
+	state, entries, err := readStateArray(statePath, "failedApproaches")
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return PruneResult{}, nil
-		}
-		return PruneResult{}, fmt.Errorf("failurelog: read state: %w", err)
+		return PruneResult{}, err
 	}
-	var state map[string]any
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return PruneResult{}, fmt.Errorf("failurelog: parse state: %w", err)
-	}
-
-	entries, _ := state["failedApproaches"].([]any)
 	if len(entries) == 0 {
 		return PruneResult{}, nil
 	}
@@ -67,20 +58,44 @@ func PruneExpired(statePath string, now time.Time) (PruneResult, error) {
 			kept = append(kept, m)
 		}
 	}
-	state["failedApproaches"] = kept
+	return writePruneResult(statePath, state, "failedApproaches", kept, before, "prune")
+}
 
+// readStateArray reads statePath and returns the parsed state plus the array
+// stored under key. Missing statePath or an absent/non-array key both return
+// (nil, nil, nil) — the safe no-op every prune function shares.
+func readStateArray(statePath, key string) (map[string]any, []any, error) {
+	raw, err := os.ReadFile(statePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("failurelog: read state: %w", err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return nil, nil, fmt.Errorf("failurelog: parse state: %w", err)
+	}
+	entries, _ := state[key].([]any)
+	return state, entries, nil
+}
+
+// writePruneResult stores kept back under key, skips the write when nothing
+// was removed (avoids mtime churn + race-on-rename for a no-op), and
+// otherwise atomically persists state. errLabel names the caller in wrapped
+// write errors.
+func writePruneResult(statePath string, state map[string]any, key string, kept []any, before int, errLabel string) (PruneResult, error) {
+	state[key] = kept
 	result := PruneResult{
 		Before:  before,
 		After:   len(kept),
 		Removed: before - len(kept),
 	}
 	if result.Removed == 0 {
-		// No change — skip the disk write so we don't churn mtime + risk
-		// race-on-rename for nothing.
 		return result, nil
 	}
 	if err := atomicWriteJSON(statePath, state); err != nil {
-		return PruneResult{}, fmt.Errorf("failurelog: prune write: %w", err)
+		return PruneResult{}, fmt.Errorf("failurelog: %s write: %w", errLabel, err)
 	}
 	return result, nil
 }
@@ -104,19 +119,10 @@ func PruneByClassification(statePath string, classes []Classification) (PruneRes
 		target[c] = struct{}{}
 	}
 
-	raw, err := os.ReadFile(statePath)
+	state, entries, err := readStateArray(statePath, "failedApproaches")
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return PruneResult{}, nil
-		}
-		return PruneResult{}, fmt.Errorf("failurelog: read state: %w", err)
+		return PruneResult{}, err
 	}
-	var state map[string]any
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return PruneResult{}, fmt.Errorf("failurelog: parse state: %w", err)
-	}
-
-	entries, _ := state["failedApproaches"].([]any)
 	if len(entries) == 0 {
 		return PruneResult{}, nil
 	}
@@ -139,16 +145,7 @@ func PruneByClassification(statePath string, classes []Classification) (PruneRes
 		}
 		kept = append(kept, m)
 	}
-	state["failedApproaches"] = kept
-
-	result := PruneResult{Before: before, After: len(kept), Removed: before - len(kept)}
-	if result.Removed == 0 {
-		return result, nil
-	}
-	if err := atomicWriteJSON(statePath, state); err != nil {
-		return PruneResult{}, fmt.Errorf("failurelog: prune-by-class write: %w", err)
-	}
-	return result, nil
+	return writePruneResult(statePath, state, "failedApproaches", kept, before, "prune-by-class")
 }
 
 // isExpired returns true when entry's expiresAt < now OR the legacy

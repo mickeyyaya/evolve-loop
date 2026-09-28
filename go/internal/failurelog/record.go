@@ -72,54 +72,76 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 	}
 	class := NormalizeLegacy(req.Classification)
 
-	// Load state.json. If missing, mirror the bash behavior (log WARN,
-	// return without recording — we don't auto-create state.json
-	// because the dispatcher's preflight is responsible for that).
-	raw, err := os.ReadFile(statePath)
+	state, err := loadRecordState(statePath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return Recorded{}, fmt.Errorf("%w at %s", ErrStateMissing, statePath)
-		}
-		return Recorded{}, fmt.Errorf("failurelog: read state: %w", err)
-	}
-
-	// Decode as map[string]any so we preserve unknown top-level keys.
-	// state.json carries many fields not modeled in core.State.
-	var state map[string]any
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return Recorded{}, fmt.Errorf("failurelog: parse state: %w", err)
-	}
-
-	// Resolve summary: explicit override > explicit path > runsDir-derived path > "".
-	summary := req.Summary
-	if summary == "" {
-		report := req.ReportPath
-		if report == "" && runsDir != "" {
-			report = filepath.Join(runsDir, fmt.Sprintf("cycle-%d", req.Cycle), "orchestrator-report.md")
-		}
-		if report != "" {
-			summary = extractSummary(report)
-		}
-		// Fall back to the reports that actually exist. orchestrator-report.md
-		// has no production writer — 0 of 241 live workspaces carry one — so
-		// this extraction has silently returned "" on every recorded failure,
-		// leaving an operator with a failure log that says nothing about the
-		// failure. The read tolerating absence is correct (a diagnostic must
-		// never brick the log); having no second source was the defect.
-		if strings.TrimSpace(summary) == "" && report != "" {
-			summary = extractSummaryForCycle(filepath.Dir(report))
-		}
+		return Recorded{}, err
 	}
 
 	entry := Recorded{
 		Cycle:          req.Cycle,
 		Classification: class,
-		Summary:        summary,
+		Summary:        resolveRecordSummary(req, runsDir),
 		RecordedAt:     now.UTC().Format(time.RFC3339),
 		ExpiresAt:      ComputeExpiresAt(class, now),
 	}
+	appendFailedApproach(state, entry, req.Cycle)
 
-	// Append + FIFO trim.
+	// Atomic write via tmp+mv.
+	if err := atomicWriteJSON(statePath, state); err != nil {
+		return Recorded{}, fmt.Errorf("failurelog: write state: %w", err)
+	}
+	return entry, nil
+}
+
+// loadRecordState reads and decodes state.json as map[string]any so unknown
+// top-level keys survive the round-trip (state.json carries many fields not
+// modeled in core.State). Missing statePath mirrors the bash behavior (log
+// WARN, return without recording — the dispatcher's preflight is responsible
+// for creating it).
+func loadRecordState(statePath string) (map[string]any, error) {
+	raw, err := os.ReadFile(statePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("%w at %s", ErrStateMissing, statePath)
+		}
+		return nil, fmt.Errorf("failurelog: read state: %w", err)
+	}
+	var state map[string]any
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return nil, fmt.Errorf("failurelog: parse state: %w", err)
+	}
+	return state, nil
+}
+
+// resolveRecordSummary picks, in order: explicit override, extraction from
+// the explicit or runsDir-derived report path, then the fallback reports a
+// cycle workspace actually has. orchestrator-report.md has no production
+// writer — 0 of 241 live workspaces carry one — so the first extraction
+// alone silently returns "" on every recorded failure; the fallback is the
+// second source that fixes that.
+func resolveRecordSummary(req RecordRequest, runsDir string) string {
+	if req.Summary != "" {
+		return req.Summary
+	}
+	report := req.ReportPath
+	if report == "" && runsDir != "" {
+		report = filepath.Join(runsDir, fmt.Sprintf("cycle-%d", req.Cycle), "orchestrator-report.md")
+	}
+	if report == "" {
+		return ""
+	}
+	summary := extractSummary(report)
+	if strings.TrimSpace(summary) == "" {
+		summary = extractSummaryForCycle(filepath.Dir(report))
+	}
+	return summary
+}
+
+// appendFailedApproach appends entry to state's failedApproaches, FIFO-trims
+// to MaxEntries, and advances lastCycleNumber. Monotonic: loop-fatal records
+// may carry an unknown cycle (0) — regressing the counter would reuse cycle
+// numbers and corrupt workspace history.
+func appendFailedApproach(state map[string]any, entry Recorded, cycle int) {
 	existing, _ := state["failedApproaches"].([]any)
 	existing = append(existing, mustMarshalToAny(entry))
 	if len(existing) > MaxEntries {
@@ -127,21 +149,9 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 	}
 	state["failedApproaches"] = existing
 
-	// Advance lastCycleNumber so the next attempt uses a fresh
-	// workspace. Bash dispatcher does this in a separate jq pass; we
-	// merge it with the failedApproaches update to atomicize both.
-	// Monotonic: loop-fatal records may carry an unknown cycle (0) —
-	// regressing the counter would reuse cycle numbers and corrupt
-	// workspace history.
-	if cur, _ := state["lastCycleNumber"].(float64); float64(req.Cycle) > cur {
-		state["lastCycleNumber"] = float64(req.Cycle)
+	if cur, _ := state["lastCycleNumber"].(float64); float64(cycle) > cur {
+		state["lastCycleNumber"] = float64(cycle)
 	}
-
-	// Atomic write via tmp+mv.
-	if err := atomicWriteJSON(statePath, state); err != nil {
-		return Recorded{}, fmt.Errorf("failurelog: write state: %w", err)
-	}
-	return entry, nil
 }
 
 var summaryFallbacks = []string{"orchestrator-report.md", "audit-report.md", "build-report.md"}
