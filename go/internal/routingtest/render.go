@@ -12,7 +12,7 @@ import (
 // when any of its fields is set; this keeps the dual renderings (Signals /
 // HandoffFiles) in lock-step.
 func (s SignalSpec) scoutPresent() bool {
-	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0 || s.ScoutBacklog > 0 || s.GoalType != "" || s.DeliverableKind != ""
+	return s.CycleSize != "" || s.ScoutItemCount > 0 || s.ScoutCarryover > 0 || s.ScoutBacklog > 0 || s.ArtifactBytes > 0 || s.GoalType != "" || s.DeliverableKind != ""
 }
 func (s SignalSpec) triagePresent() bool { return s.TriageSize != "" || s.TriageDeliverableKind != "" }
 func (s SignalSpec) buildPresent() bool {
@@ -34,6 +34,7 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 			ItemCount:         s.ScoutItemCount,
 			CarryoverCount:    s.ScoutCarryover,
 			BacklogSize:       s.ScoutBacklog,
+			ArtifactBytes:     s.ArtifactBytes,
 			Present:           true,
 		}
 	}
@@ -69,27 +70,7 @@ func (s SignalSpec) Signals() router.RoutingSignals {
 func (s SignalSpec) HandoffFiles() map[string]string {
 	out := map[string]string{}
 	if s.scoutPresent() {
-		m := map[string]interface{}{}
-		if s.CycleSize != "" {
-			m["cycle_size_estimate"] = s.CycleSize
-		}
-		if s.ScoutCarryover > 0 {
-			m["carryover_count"] = s.ScoutCarryover
-		}
-		if s.ScoutBacklog > 0 {
-			m["backlog_size"] = s.ScoutBacklog
-		}
-		if s.GoalType != "" {
-			m["goal_type"] = s.GoalType
-		}
-		if s.DeliverableKind != "" {
-			m["deliverable_kind"] = s.DeliverableKind
-		}
-		// Digest counts keys "item<digit>..." for ItemCount.
-		for i := 1; i <= s.ScoutItemCount; i++ {
-			m[fmt.Sprintf("item%d_scope", i)] = "x"
-		}
-		out["handoff-scout.json"] = mustJSON(m)
+		out["handoff-scout.json"] = mustJSON(s.scoutHandoff())
 	}
 	if s.triagePresent() {
 		tr := map[string]interface{}{"cycle_size": s.TriageSize}
@@ -125,6 +106,33 @@ func (s SignalSpec) HandoffFiles() map[string]string {
 		})
 	}
 	return out
+}
+
+func (s SignalSpec) scoutHandoff() map[string]interface{} {
+	m := map[string]interface{}{}
+	if s.CycleSize != "" {
+		m["cycle_size_estimate"] = s.CycleSize
+	}
+	if s.ScoutCarryover > 0 {
+		m["carryover_count"] = s.ScoutCarryover
+	}
+	if s.ScoutBacklog > 0 {
+		m["backlog_size"] = s.ScoutBacklog
+	}
+	if s.ArtifactBytes > 0 {
+		m["run_dir.artifact_bytes"] = s.ArtifactBytes
+	}
+	if s.GoalType != "" {
+		m["goal_type"] = s.GoalType
+	}
+	if s.DeliverableKind != "" {
+		m["deliverable_kind"] = s.DeliverableKind
+	}
+	// Digest counts keys "item<digit>..." for ItemCount.
+	for i := 1; i <= s.ScoutItemCount; i++ {
+		m[fmt.Sprintf("item%d_scope", i)] = "x"
+	}
+	return m
 }
 
 // WrappedHandoffFiles renders the fixture as the canonical ADR-0050 Phase-3

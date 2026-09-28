@@ -246,7 +246,6 @@
   "internal/releasetargets.ParseConfig": 65,
   "internal/reportdoc.readCurrentReference": 62,
   "internal/rollback.Run": 111,
-  "internal/routingtest.SignalSpec.HandoffFiles": 60,
   "internal/routingtest.runCycle": 95,
   "internal/setup.Apply": 63,
   "internal/setup.Detect": 104,
