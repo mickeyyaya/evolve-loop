@@ -1,15 +1,5 @@
 package ship
 
-// landing_pins_test.go — ADR-0103 unit 07 (the ship landing): the pre-move
-// pins over the ff-merge, the three push sites with their inline push-race
-// repair, and the ship-binding writer. The goldens under landing/testdata
-// were captured on 8e8f080f BEFORE any code moved (a throwaway recorder,
-// deleted after the capture) and are replayed here through the host and in
-// the leaf's own tests, so a transcription slip in the move is a byte diff,
-// not a review opinion. Every test is untagged and fake-only: the recorder
-// scripts git by its FULL argv (the package's scriptedRunner keys on the
-// subcommand and cannot tell `rev-parse origin/main` from `rev-parse HEAD`).
-
 import (
 	"context"
 	"encoding/json"
@@ -326,7 +316,7 @@ func pushRow(t *testing.T, site pushSiteDriver, row repairRow) goldenRow {
 		RepairAttempted: res.RepairAttempted, RepairOutcome: res.RepairOutcome, Error: goldenErrorOf(t, err)}
 }
 
-// dryRunPushSites are the sites a --dry-run row reaches the push on: the
+// dryRunApplies reports which sites a --dry-run row reaches the push on: the
 // direct path returns before its push under DryRun (gitops.go), so only the
 // worktree integrate (called after run()'s own DryRun return) and push-only
 // (native.go runs it before any DryRun gate) carry the row.
@@ -357,8 +347,8 @@ func assertRowsMatchGolden(t *testing.T, got []goldenRow, golden goldenFile) {
 }
 
 // assertGoldenError compares a ShipError with the golden's; the `step` Debug
-// key is the unit's ONE declared addition to the moved errors (07 doc §8 c)
-// and is compared by the leaf's own tests, so it is excluded here.
+// key is the unit's own declared addition to the moved errors and is
+// compared by the leaf's own tests, so it is excluded here.
 func assertGoldenError(t *testing.T, name string, got, want *goldenError) {
 	t.Helper()
 	if (got == nil) != (want == nil) {
@@ -383,10 +373,10 @@ func assertGoldenError(t *testing.T, name string, got, want *goldenError) {
 	}
 }
 
-// Test 1 — the ff-merge over reset ok/fail × merge ok/diverged × fleet on/off:
-// argv order and streams, the OK line, the class-by-fleet error and its
-// Debug keys, byte-identical to the capture. Kills: merge before reset, the
-// fleet class flipped, cycle_branch dropped, the OK line moved after the push.
+// The ff-merge over reset ok/fail × merge ok/diverged × fleet on/off: argv
+// order and streams, the OK line, the class-by-fleet error and its Debug
+// keys, byte-identical to the capture. Kills: merge before reset, the fleet
+// class flipped, cycle_branch dropped, the OK line moved after the push.
 func TestWorktreeShipIntegrate_GoldenArgvLogsAndErrors(t *testing.T) {
 	golden := loadGolden(t, "landing_integrate.golden.json")
 	var got []goldenRow
@@ -401,8 +391,8 @@ func TestWorktreeShipIntegrate_GoldenArgvLogsAndErrors(t *testing.T) {
 	assertRowsMatchGolden(t, got, golden)
 }
 
-// Test 2 — the three push sites × the repair matrix, byte-identical to the
-// capture: argv (the probes, the retry, no rebase/force), the REPAIR lines,
+// The three push sites × the repair matrix, byte-identical to the capture:
+// argv (the probes, the retry, no rebase/force), the REPAIR lines,
 // RepairAttempted/RepairOutcome, CommitSHA, and the error per site. Kills:
 // the once-guard dropped, declined building a new error, needs-reaudit made
 // transient, the retry push streamed to io.Discard, the worktree head omitted.
@@ -429,8 +419,8 @@ func TestPushSites_GoldenRejectionAndRepairMatrix(t *testing.T) {
 	}
 }
 
-// Test 3 — the binding writer's bytes (2-space indent, trailing newline, an
-// empty commit_sha still present), the 0o755 dir, no temp file left, the
+// The binding writer's bytes (2-space indent, trailing newline, an empty
+// commit_sha still present), the 0o755 dir, no temp file left, the
 // no-cycle_id error and the MkdirAll error. Kills: the newline dropped,
 // MarshalIndent → Marshal, Rename skipped.
 func TestWriteShipBinding_GoldenBytesAndAtomicity(t *testing.T) {
@@ -474,10 +464,9 @@ func TestWriteShipBinding_GoldenBytesAndAtomicity(t *testing.T) {
 	}
 }
 
-// Test 4 — the writer and the idempotency reader agree on the path: the
-// consumer pin on the run-workspace layout (core.RunWorkspacePath +
-// dossier.ShipBindingFile), green before and after the projection. Kills:
-// cycle-%d → cycle_%d at either site.
+// The writer and the idempotency reader agree on the path: the consumer pin
+// on the run-workspace layout (core.RunWorkspacePath + dossier.ShipBindingFile),
+// green before and after the projection. Kills: cycle-%d → cycle_%d at either site.
 func TestShipBinding_WriterAndIdempotencyReaderAgreeOnThePath(t *testing.T) {
 	opts, _, _ := pinOptions(t, ClassCycle)
 	opts.internalAuditBoundTreeSHA = pinTree
@@ -496,10 +485,9 @@ func TestShipBinding_WriterAndIdempotencyReaderAgreeOnThePath(t *testing.T) {
 	}
 }
 
-// Test 6 — the exit>1 rule and the two message texts of captureGitOutput:
-// a spawn error and rc=2 are GIT_IO with git_args + git_err / git_rc; rc=1
-// is success (git diff's "differences exist"). The intent moves to the leaf's
-// Capture test with the move; the host keeps its spelling.
+// The exit>1 rule and the two message texts of captureGitOutput: a spawn
+// error and rc=2 are GIT_IO with git_args + git_err / git_rc; rc=1 is
+// success (git diff's "differences exist").
 func TestCaptureGitOutput_ExitRuleAndErrorTexts(t *testing.T) {
 	opts, _, _ := pinOptions(t, ClassCycle)
 	r := newArgvRecorder(opts)

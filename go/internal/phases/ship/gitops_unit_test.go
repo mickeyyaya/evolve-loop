@@ -1,8 +1,3 @@
-// gitops_unit_test.go — seam-injected unit tests for the lowest-coverage
-// helpers in dryrun.go / gitops.go that the integration matrix doesn't
-// hit (the matrix uses real git via os/exec, which exercises end-to-end
-// happy paths but misses small branches). Phase 3 of the v12.1 plan:
-// raise ship package coverage from 53% to ≥95%.
 package ship
 
 import (
@@ -133,7 +128,6 @@ func TestTryGitOneShot_Success(t *testing.T) {
 	}
 }
 
-// TestTryGitOneShot_NonZeroExit_ReturnsEmpty — failure means empty.
 func TestTryGitOneShot_NonZeroExit_ReturnsEmpty(t *testing.T) {
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -153,7 +147,6 @@ func TestTryGitOneShot_NonZeroExit_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// TestTryGitOneShot_RunnerError_ReturnsEmpty — runner error swallowed.
 func TestTryGitOneShot_RunnerError_ReturnsEmpty(t *testing.T) {
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -190,8 +183,6 @@ func TestWriteDryRunJournal_NoOpWhenDryRunFalse(t *testing.T) {
 	}
 }
 
-// TestWriteDryRunJournal_HappyPath_WritesJSON — DryRun=true writes a
-// valid JSON file with the expected fields.
 func TestWriteDryRunJournal_HappyPath_WritesJSON(t *testing.T) {
 	root := t.TempDir()
 	r := &scriptedRunner{scripts: map[string]struct {
@@ -280,8 +271,6 @@ func TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA(t *testing.T
 	}
 }
 
-// TestWriteDryRunJournal_LogAppended — successful write appends a log
-// line announcing the journal path.
 func TestWriteDryRunJournal_LogAppended(t *testing.T) {
 	root := t.TempDir()
 	r := &scriptedRunner{}
@@ -366,8 +355,6 @@ func TestCaptureGitOutputAtDir_Exit1_NotError(t *testing.T) {
 	}
 }
 
-// TestMaybeCreateRelease_NonReleaseClass_SkipsEarly — Class=cycle skips
-// the release-creation path entirely.
 func TestMaybeCreateRelease_NonReleaseClass_SkipsEarly(t *testing.T) {
 	r := &scriptedRunner{}
 	opts := &Options{Class: Class("cycle"), ProjectRoot: t.TempDir(), Runner: r.runner()}
@@ -382,8 +369,6 @@ func TestMaybeCreateRelease_NonReleaseClass_SkipsEarly(t *testing.T) {
 	}
 }
 
-// TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues — release
-// class without a plugin.json logs a skip and returns nil (not fatal).
 func TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues(t *testing.T) {
 	r := &scriptedRunner{}
 	root := t.TempDir()
@@ -400,7 +385,6 @@ func TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues(t *testing.T) {
 	}
 }
 
-// TestScriptedRunner_DefaultExitZero — sanity test on the test helper.
 func TestScriptedRunner_DefaultExitZero(t *testing.T) {
 	r := &scriptedRunner{}
 	var stdout bytes.Buffer

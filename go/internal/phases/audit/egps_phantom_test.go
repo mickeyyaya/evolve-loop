@@ -1,16 +1,5 @@
 package audit
 
-// egps_phantom_test.go — the EGPS gate-block must carry the phantom-binding
-// cure when the classification exists.
-//
-// acssuite now names bound tests that never ran (Result.PhantomBindings). If
-// that classification dies inside acs-verdict.json while the gate still emits
-// a bare "EGPS: red_count=N", nothing changed for the operator — the exact
-// producer-with-no-consumer shape this week keeps re-finding. These pin the
-// consumer half: readACSVerdict surfaces the names, egpsRedMessage renders the
-// cure, and the classification NEVER changes the verdict (anti-gaming: a
-// phantom red is still red).
-
 import (
 	"context"
 	"os"
@@ -21,7 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The REAL cycle-1546 shape, as the new producer writes it.
+// The verdict shape as acssuite actually writes phantom-bound reds.
 const phantomVerdictJSON = `{
   "schema_version": "v11",
   "cycle": 1546,
@@ -67,8 +56,6 @@ func TestReadACSVerdict_SurfacesPhantomBindings(t *testing.T) {
 	}
 }
 
-// The message must name the phantoms AND the cure — a bare count is exactly
-// what cost the 1539-1546 streak a console forensic session.
 func TestEGPSRedMessage_PhantomsCarryTheCure(t *testing.T) {
 	msg := egpsRedMessage(2,
 		[]string{"cycle1544/TestC1544_006_ReusedSnapshotNeverBecomesTheWorktreeBase"},
@@ -87,7 +74,6 @@ func TestEGPSRedMessage_PhantomsCarryTheCure(t *testing.T) {
 	}
 }
 
-// NO-REGRESSION: without phantoms the message is byte-identical to before.
 func TestEGPSRedMessage_NoPhantomsIsByteIdentical(t *testing.T) {
 	got := egpsRedMessage(1, []string{"cycle1543/TestC1543_002_Whatever"}, nil)
 	want := "EGPS: red_count=1 [Whatever] (cycle ships only when red_count==0)"
@@ -96,8 +82,6 @@ func TestEGPSRedMessage_NoPhantomsIsByteIdentical(t *testing.T) {
 	}
 }
 
-// Anti-gaming: a verdict whose reds are ALL phantoms still blocks. The cure is
-// a correction, never a skip.
 func TestReadACSVerdict_AllPhantomRedsStillRed(t *testing.T) {
 	redCount, _, phantoms, shipEligible, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
 	if err != nil {
@@ -121,11 +105,6 @@ func contains(xs []string, want string) bool {
 	return false
 }
 
-// THE END-TO-END WIRING — through phase.Run, the path production uses. Every
-// test above builds inputs by hand, so all of them pass even if the gate call
-// site passes an empty phantom list (the mutation that survived them: seventh
-// NOT-WIRED of the week). A pre-staged phantom verdict goes in; the emitted
-// FAIL diagnostic must come out carrying the names and the cure.
 func TestRun_PhantomBindingRedEmitsTheCureInTheGateDiagnostic(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "acs-verdict.json"), []byte(phantomVerdictJSON), 0o644); err != nil {

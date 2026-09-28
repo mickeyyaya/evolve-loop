@@ -11,23 +11,12 @@ import (
 	"testing"
 )
 
-// defect_ledger_doc_example_test.go — RED contract for cycle-1403 Task 2
-// `disposition-schema-literal-example` (scout-report.md Task 2).
-//
-// agents/evolve-auditor.md tells the auditor to write
-// `{"dispositions":[{"id","status","evidence","reason"}]}` — a list of FIELD
-// NAMES, not a document. It is not valid JSON and shows no legal value for any
-// field, so the authoring agent must invent the shape; cycles 1397/1399/1400
-// each invented a different wrong one. Task 2 replaces it with a filled literal
-// example and keeps it identical to the one already in
-// docs/architecture/continuation-defect-ledger.md.
-//
-// These predicates are NOT source greps for a magic string (the cycle-85 ban).
-// They EXTRACT the documented example and run it through the production reader,
-// readDispositions — the same function the gate calls — so a doc example that
-// the gate would reject fails here. The cross-document case then compares the
-// two examples as parsed JSON, not as text, so reformatting one is fine and
-// drifting one is not.
+// These predicates are NOT source greps for a magic string. They EXTRACT the
+// documented example and run it through the production reader,
+// readDispositions — the same function the gate calls — so a doc example
+// that the gate would reject fails here. The cross-document case then
+// compares the two examples as parsed JSON, not as text, so reformatting one
+// is fine and drifting one is not.
 
 // dispositionExampleFence matches a fenced ```json block whose body mentions
 // "dispositions". Documents may carry other JSON fences; only this one is the
@@ -113,10 +102,9 @@ func TestAuditorPromptDispositionExampleIsAcceptedByProductionReader(t *testing.
 }
 
 // TestAuditorPromptAndArchDocDispositionExamplesAgree — AC9, the doc-sync half
-// (`always_full_documentation` house rule; cycle-1342 landed prompt and
-// architecture doc together for exactly this reason). Compared as PARSED JSON,
-// so reflowing or re-indenting one document is free and drifting its content is
-// not.
+// (`always_full_documentation` house rule: prompt and architecture doc land
+// together for exactly this reason). Compared as PARSED JSON, so reflowing or
+// re-indenting one document is free and drifting its content is not.
 func TestAuditorPromptAndArchDocDispositionExamplesAgree(t *testing.T) {
 	root := docExampleRepoRoot(t)
 	promptRaw := extractDispositionExample(t, root, "agents/evolve-auditor.md")

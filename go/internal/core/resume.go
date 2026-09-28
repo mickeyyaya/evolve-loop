@@ -24,40 +24,25 @@ import (
 // .evolve/cycle-state.json:checkpoint plus the cycle_id + project_root
 // the operator needs to drive the resume.
 type ResumePoint struct {
-	CycleID         int      // cycle_id at top of cycle-state.json
-	Phase           string   // checkpoint.resumeFromPhase
-	WorktreePath    string   // checkpoint.worktreePath
-	GitHead         string   // checkpoint.gitHead (at pause)
-	CompletedPhases []string // checkpoint.completedPhases
-	CostAtPause     float64  // checkpoint.costAtCheckpoint
-	Reason          string   // checkpoint.reason
-	SavedAt         string   // checkpoint.savedAt
-	AutoAttempts    int      // checkpoint.autoResumeAttempts (post-bump)
-	AutoMaxAttempts int      // checkpoint.autoResumeMaxAttempts
-	// StatePath is the cycle-state file this checkpoint was read from. For a
-	// host-global resume it is the singleton; for a checkpoint DISCOVERED in a
-	// fleet lane's per-run file it is that per-run path — and the caller must
-	// route the resumed run's own state writes back to it (via
-	// ipcenv.CycleStateFileKey), or the next pause orphans a checkpoint in the
-	// singleton all over again.
-	StatePath string
+	CycleID         int
+	Phase           string
+	WorktreePath    string
+	GitHead         string
+	CompletedPhases []string
+	CostAtPause     float64
+	Reason          string
+	SavedAt         string
+	AutoAttempts    int
+	AutoMaxAttempts int
+	StatePath       string
 }
 
 // ResumeOptions wires test seams + operator overrides for LoadResumeState.
 type ResumeOptions struct {
-	// AllowHeadMoved corresponds to EVOLVE_RESUME_ALLOW_HEAD_MOVED=1.
-	// When true, a current-HEAD vs checkpoint-HEAD mismatch is a WARN,
-	// not a hard fail.
 	AllowHeadMoved bool
-	// CurrentHead returns the current git HEAD for projectRoot. Defaults
-	// to `git rev-parse HEAD`. Tests inject deterministic values.
-	CurrentHead func(projectRoot string) (string, error)
-	// PathExists tests whether a worktree path is still on disk.
-	// Defaults to os.Stat.
-	PathExists func(path string) bool
-	// Log receives operator-facing breadcrumbs from per-run discovery (e.g.
-	// "skipping stale checkpoint X, resuming older Y"). nil discards.
-	Log io.Writer
+	CurrentHead    func(projectRoot string) (string, error)
+	PathExists     func(path string) bool
+	Log            io.Writer
 }
 
 // ErrNoCheckpoint is returned when cycle-state.json lacks a usable
@@ -70,7 +55,7 @@ var ErrStaleCheckpoint = errors.New("resume: checkpoint stale")
 
 // LoadResumeState reads .evolve/cycle-state.json under evolveDir,
 // extracts the checkpoint block, validates git HEAD + worktree, and
-// returns a ResumePoint. Mirrors resume-cycle.sh:71-110.
+// returns a ResumePoint.
 //
 // projectRoot is the writable host repo (where git lives). evolveDir is
 // typically projectRoot + "/.evolve" but is passed separately so
@@ -83,35 +68,17 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 		opts.PathExists = defaultPathExists
 	}
 
-	statePath := ResolveCycleStatePath(evolveDir) // fleet per-run override when set
+	statePath := ResolveCycleStatePath(evolveDir)
 	rp, err := loadResumeStateFrom(statePath, projectRoot, opts)
 	if err == nil {
 		return rp, nil
 	}
-	// Discovery fallback — the 2026-08-29 incident. Fleet lanes write their
-	// quota/escalation checkpoints through the SAME resolver, but with
-	// ipcenv.CycleStateFileKey set, so the checkpoint lands in the lane's
-	// per-run cycle-state file. A later host-global `evolve loop --resume`
-	// (fresh process, no override) resolved only the singleton and reported
-	// "no live checkpoint" while three live quota-likely checkpoints sat in
-	// .evolve/runs/cycle-158*/cycle-state.json — abandoning a lane that had
-	// already completed build and reached audit. The writer learned fleet
-	// isolation; the reader had not.
-	//
-	// Scope, deliberately narrow:
-	//   - only on ErrNoCheckpoint (a stale PRIMARY checkpoint is a real answer
-	//     about a real checkpoint — never scan past it);
-	//   - only when no lane override governs this evolve dir: inside a lane the
-	//     override IS the authority, and scanning siblings would let one lane
-	//     resume another's cycle.
 	if !errors.Is(err, ErrNoCheckpoint) || statePath != paths.CycleStateFileFor(evolveDir, "") {
 		return nil, err
 	}
 	rp, derr := discoverPerRunResumeState(evolveDir, projectRoot, opts)
 	if derr != nil {
 		if errors.Is(derr, errNoPerRunCandidates) {
-			// Nothing anywhere — keep the primary error, extended with where
-			// discovery looked, so the operator does not rediscover the split.
 			return nil, fmt.Errorf("%w (also scanned %s for fleet per-run checkpoints: none live)", err, filepath.Join(evolveDir, "runs"))
 		}
 		return nil, derr
@@ -123,15 +90,6 @@ func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts Resu
 // checkpoint blocks at all (as opposed to finding one that failed validation).
 var errNoPerRunCandidates = errors.New("resume: no per-run checkpoint candidates")
 
-// resumableReasons are the checkpoint reasons another process may legitimately
-// resume: the ESCALATION pauses, written once when a run deliberately stops.
-//
-// "phase-complete" is deliberately absent. PhaseBoundaryCheckpointer writes an
-// enabled phase-complete block after EVERY phase of a HEALTHY run — it is a
-// crash-recovery breadcrumb for the SAME process, and its shape defeats the
-// stale-checks (gitHead is always "", and a live lane's worktree exists), so
-// admitting it would let a host-global --resume double-drive a running lane,
-// or silently resurrect a cycle that already ran to a terminal FAIL.
 var resumableReasons = map[string]bool{
 	"quota-likely":       true,
 	"batch-cap-near":     true,
@@ -139,20 +97,6 @@ var resumableReasons = map[string]bool{
 	"stall-inactivity":   true,
 }
 
-// discoverPerRunResumeState scans evolveDir/runs/*/cycle-state.json for
-// checkpoints another process may resume: enabled, an escalation reason
-// (resumableReasons), and NO fresh lease — the run-dir heartbeat gc already
-// trusts (runlease.Fresh); a fresh lease means the lane is alive right now and
-// resuming it would double-drive the cycle. A quota-paused lane's process has
-// exited, so its heartbeat is stale and it stays discoverable.
-//
-// Candidates load newest-first (savedAt, then cycle_id) and the newest VALID
-// one wins. Lanes are independent — no supersession — so when the newest is
-// stale an older valid sibling is resumed, with a breadcrumb on opts.Log
-// naming the skipped one (the operator must learn it needs attention NOW, not
-// when a later resume trips over it). Only when every candidate fails does the
-// newest's error return — stale must say stale, because "nothing to resume"
-// tells the operator to relaunch fresh and burn the preserved progress.
 func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
 	entries, rerr := os.ReadDir(filepath.Join(evolveDir, "runs"))
 	if rerr != nil {
@@ -188,15 +132,13 @@ func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions
 			continue
 		}
 		if l, ok, _ := runlease.Read(filepath.Join(evolveDir, "runs", e.Name())); ok && runlease.Fresh(l, time.Now(), 0) {
-			continue // lane is ALIVE — never resume out from under it
+			continue
 		}
 		cands = append(cands, candidate{path: path, savedAt: strFromAny(cp["savedAt"]), cycle: intFromAny(blob["cycle_id"])})
 	}
 	if len(cands) == 0 {
 		return nil, errNoPerRunCandidates
 	}
-	// Newest first. savedAt is RFC3339, so string order IS time order; the
-	// cycle id breaks ties (two lanes checkpointed in the same second).
 	sort.Slice(cands, func(i, j int) bool {
 		if cands[i].savedAt != cands[j].savedAt {
 			return cands[i].savedAt > cands[j].savedAt
@@ -221,10 +163,9 @@ func discoverPerRunResumeState(evolveDir, projectRoot string, opts ResumeOptions
 	return nil, firstErr
 }
 
-// loadResumeStateFrom reads ONE state file, extracts the checkpoint block,
-// validates HEAD + worktree, and returns a ResumePoint. This is the former
-// body of LoadResumeState, extracted verbatim so the primary path and the
-// per-run discovery share one loader and cannot drift.
+// loadResumeStateFrom reads one state file, validates HEAD + worktree, and
+// returns a ResumePoint; the primary and per-run-discovery paths share this
+// loader so they cannot drift.
 func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -267,8 +208,8 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		return nil, fmt.Errorf("%w: checkpoint.resumeFromPhase missing", ErrStaleCheckpoint)
 	}
 
-	// HEAD validation. checkpoint.gitHead == "unknown" means the original
-	// capture failed (rare); skip validation in that case.
+	// checkpoint.gitHead == "unknown" means the original capture failed; skip
+	// validation in that case.
 	if rp.GitHead != "" && rp.GitHead != "unknown" {
 		current, err := opts.CurrentHead(projectRoot)
 		if err == nil && strings.TrimSpace(current) != rp.GitHead && !opts.AllowHeadMoved {
@@ -277,8 +218,8 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		}
 	}
 
-	// Worktree validation. Empty/null worktree path skips the check
-	// (cycle didn't use a per-cycle worktree).
+	// An empty worktree path skips the check: the cycle didn't use a
+	// per-cycle worktree.
 	if rp.WorktreePath != "" && !opts.PathExists(rp.WorktreePath) {
 		return nil, fmt.Errorf("%w: worktree %s no longer exists",
 			ErrStaleCheckpoint, rp.WorktreePath)
@@ -287,17 +228,9 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 	return rp, nil
 }
 
-// ActivateResumeStatePath points this process's cycle-state resolution at the
-// file rp's checkpoint was read from, when that differs from the current
-// resolution — the write-back half of per-run checkpoint discovery. A resumed
-// cycle that keeps writing to the host-global singleton while its checkpoint
-// lives in a per-run file re-creates the split this feature closes: its next
-// quota pause would checkpoint one place and be sought in another.
-//
-// It reuses the SAME mechanism a fleet lane uses at spawn
-// (ipcenv.CycleStateFileKey, see cyclerun.go) rather than a second channel.
-// The returned restore func puts the previous value back; a no-op restore is
-// returned when nothing needed to change.
+// ActivateResumeStatePath points this process's cycle-state resolution at
+// rp's origin file when it differs from the current resolution, returning a
+// restore func (a no-op when nothing needed to change).
 func ActivateResumeStatePath(rp *ResumePoint, evolveDir string) func() {
 	if rp == nil || rp.StatePath == "" || rp.StatePath == ResolveCycleStatePath(evolveDir) {
 		return func() {}
@@ -313,13 +246,10 @@ func ActivateResumeStatePath(rp *ResumePoint, evolveDir string) func() {
 	}
 }
 
-// RunCycleFromPhase resumes an in-flight cycle starting at the given
-// phase. Skips state-machine traversal of completedPhases and replays
-// from `phase` onward through the rest of the cycle.
-//
-// Unlike RunCycle, this method never allocates a cycle number: it completes
-// the original run and advances the completed cursor monotonically. It acquires
-// the normal storage lock before reading state and shares terminal closeout.
+// RunCycleFromPhase resumes an in-flight cycle from the given phase,
+// skipping completedPhases and replaying the rest of the cycle. Unlike
+// RunCycle it never allocates a cycle number; it shares RunCycle's storage
+// lock and terminal closeout.
 func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, resumePoint *ResumePoint) (result CycleResult, retErr error) {
 	if err := o.ensureSafeConfig(); err != nil {
 		return CycleResult{}, err
@@ -333,7 +263,6 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 		return CycleResult{}, fmt.Errorf("RunCycleFromPhase: invalid resume phase %q", resumePoint.Phase)
 	}
 
-	// Lock + state read (consistent with RunCycle's invariants).
 	release, err := o.storage.AcquireLock(ctx)
 	if err != nil {
 		return CycleResult{}, fmt.Errorf("acquire lock: %w", err)
@@ -353,16 +282,6 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	o.currentRunID.Store(cs.RunID)
 	defer o.currentRunID.Store("")
 
-	// The fourth exit action, which this path was missing entirely. Registered
-	// here so it fires in the same LIFO position as the fresh path's cleanup
-	// stack (lease stop, worktree teardown, run-ID clear, lock release). The
-	// one load-bearing relation is teardown-before-lock-release:
-	// clearActiveWorktree is a read-modify-write of the persisted cycle state
-	// and must run under the storage lock this function still holds. The
-	// closure reads the closeout cycleRun LIVE at defer time — the same
-	// preserveWorktree / cycleCompletedNormally fields RunCycle's closure
-	// reads — so a run that returns before completeCycle has decided them
-	// sees zero values and preserves, never prunes.
 	var execution resumeExecution
 	defer func() {
 		var preserve, completedNormally bool
@@ -413,12 +332,6 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	resp PhaseResponse,
 	mainDirtyBaseline map[string]bool,
 ) (PhaseResponse, error) {
-	// The skip set is the fresh loop's (cyclerun_correction.go): no reviewer,
-	// or a SKIPPED verdict. A version-0 (pre-explanation-contract) checkpoint
-	// is NOT a reason to skip — mandatoryExplanationReviewer already delegates
-	// on version 0 itself, so the former extra skip protected nothing it
-	// needed to and silently exempted every other reviewer (the contract gate,
-	// the declared-deliverables gate) for any resumed legacy cycle (ADR-0100 §4).
 	if o.reviewer == nil || resp.Verdict == VerdictSKIPPED {
 		return resp, nil
 	}
@@ -480,12 +393,10 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	return resp, nil
 }
 
-// --- helpers ---
-
 func defaultCurrentHead(projectRoot string) (string, error) {
-	// Capture (not gitexec HEAD/Output) preserves the historical UNTRIMMED return
-	// — callers receive the raw `git rev-parse HEAD` stdout (trailing newline and
-	// all), as the pre-S4.5 cmd.Output() form did.
+	// Capture, not gitexec's HEAD/Output helper, is deliberate: callers depend
+	// on the raw, untrimmed `git rev-parse HEAD` stdout, trailing newline
+	// included.
 	out, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "rev-parse", "HEAD")
 	if err != nil {
 		return "", err

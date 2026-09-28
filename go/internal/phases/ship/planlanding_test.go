@@ -8,14 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// planlanding_test.go — default-tag coverage for the PlanLanding wiring seam
-// (ADR-0069: the acs-tagged go/acs/cycle981 gate-wiring predicate does NOT run
-// under `go test ./internal/...`, so repo-wide apicover flags PlanLanding as
-// uncovered). This unit test pins the same routing contract under default tags.
-
-// TestPlanLanding_RoutesOnLandingMode pins the wiring seam: per-lane yields one
-// singleton group per lane (legacy, byte-identical), prefix-queue routes through
-// fleet.PrefixQueue, and the two modes produce observably different plans.
 func TestPlanLanding_RoutesOnLandingMode(t *testing.T) {
 	lanes := []fleet.LaneCandidate{
 		{ID: "L1", Tier: fleet.TierMaybe, Files: []string{"a/a.go"}},
@@ -41,8 +33,6 @@ func TestPlanLanding_RoutesOnLandingMode(t *testing.T) {
 	}
 }
 
-// TestPlanLanding_EmptyLanes pins the edge case: no lanes yields an empty plan in
-// both modes, never a panic.
 func TestPlanLanding_EmptyLanes(t *testing.T) {
 	perLaneCfg := policy.Policy{}.FleetConfig()
 	pqCfg := policy.Policy{Fleet: &policy.FleetPolicy{Landing: "prefix-queue"}}.FleetConfig()

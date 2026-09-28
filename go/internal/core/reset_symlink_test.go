@@ -11,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestSealCycle_SymlinkedStateLocksCanonicalTarget is the cycle-1690 pin for
-// the linkGuardDeps topology: a worktree's .evolve/state.json is a link to the
-// canonical state file. SealCycle must take the "<canonical>.lock" sidecar
-// every canonical-path writer (statemap.UpdateStateMap, storage.UpdateState)
-// contends on — never a sidecar beside the link — and its failurelog.Record +
-// RMW must write THROUGH the link, leaving it intact (the cycle-999 sever).
 func TestSealCycle_SymlinkedStateLocksCanonicalTarget(t *testing.T) {
 	// Under a live fleet lane this names the RUNNING cycle's state, which
 	// SealCycle would otherwise seal and delete.

@@ -39,7 +39,7 @@ func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
 			runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-qm", "fixture: predicate + durable acs")
 			// The cycle's worktree is what production provisions — a detached
 			// worktree of the repository — never the repository itself, which
-			// core refuses to stage or normalize (inPlaceWorktree, 2026-09-14).
+			// core refuses to stage or normalize.
 			wt := filepath.Join(t.TempDir(), "cycle-7")
 			runGit(t, repo, "worktree", "add", "--detach", "-q", wt, "HEAD")
 			ws := core.RunWorkspacePath(repo, 7)

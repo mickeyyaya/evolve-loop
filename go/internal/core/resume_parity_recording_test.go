@@ -1,21 +1,3 @@
-// resume_parity_recording_test.go — resume-path parity regressions.
-//
-// The fresh cycle path records a terminal outcome at every way a cycle can
-// end. The resume path, built as a parallel implementation, does not: three
-// of its exits return a bare error where the fresh path first records the
-// outcome and feeds failure-learning. The consequence is named in
-// recordChokepointEscape's own doc comment — an unrecorded terminal exit
-// classifies FAILED_UNEXPLAINED, "the alarm bucket (the cycle-492 escape)" —
-// so a resumed cycle that dies this way pages an operator with no diagnosable
-// reason, which is exactly the failure mode the fresh path was fixed for.
-//
-// Each test below mirrors an existing fresh-path test against
-// RunCycleFromPhase. The compatibility table in
-// docs/reports/2026-09-11-large-component-decomposition-plan.md lists the
-// fresh/resume differences that ARE intentional (parallel evaluation,
-// remediation, the debugger override, legacy contract versions); none of
-// these three is on it, and the resume code documents the debugger omission
-// inline while saying nothing about these.
 package core_test
 
 import (
@@ -29,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 )
 
-// TestRunCycleFromPhase_TransitionCycleGuard_RecordsChokepointEscape is the
-// resume mirror of TestRunCycle_TransitionCycleGuard_RecordsChokepointEscape.
-// Same contract, same C1 invariant: exhausting the bounded dispatch loop
-// without reaching PhaseEnd must record an explicit terminal abort so the
-// cycle classifies FAILED_EXPLAINED rather than landing in the
-// FAILED_UNEXPLAINED alarm bucket.
 func TestRunCycleFromPhase_TransitionCycleGuard_RecordsChokepointEscape(t *testing.T) {
 	t.Parallel()
 	projectRoot := t.TempDir()

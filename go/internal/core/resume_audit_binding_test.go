@@ -1,10 +1,5 @@
 //go:build integration
 
-// Regression test for the cycle-294 resume incident (2026-06-12): ship's
-// verifyAuditBinding reads the latest role=auditor kind=agent_subprocess
-// ledger entry. RunCycle emits it after a shippable audit, but the resume
-// path (RunCycleFromPhase) did not — so a resumed audit→ship always bound to
-// a stale entry from an earlier cycle and failed AUDIT_BINDING_HEAD_MOVED.
 package core
 
 import (
@@ -47,9 +42,6 @@ func initBindingRepo(t *testing.T, cycle string) (repo, ws string) {
 	return repo, ws
 }
 
-// TestRunCycleFromPhase_EmitsAuditBinding — resuming from PhaseAudit must
-// append the same rich auditor binding entry RunCycle does, bound to the
-// CURRENT git HEAD, or ship cannot verify the resumed audit.
 func TestRunCycleFromPhase_EmitsAuditBinding(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-7")
@@ -82,10 +74,6 @@ func TestRunCycleFromPhase_EmitsAuditBinding(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_EmitsBuildBinding — resuming from PhaseBuild must
-// append the builder provenance entry (role=builder, kind=agent_subprocess)
-// that rt-001-ledger-role-completeness + the auditor's Ledger-Verification
-// require, same as RunCycle.
 func TestRunCycleFromPhase_EmitsBuildBinding(t *testing.T) {
 	t.Parallel()
 	repo, ws := initBindingRepo(t, "cycle-8")

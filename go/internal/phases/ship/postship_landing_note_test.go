@@ -1,28 +1,3 @@
-// postship_landing_note_test.go — RED tests for cycle-752 task
-// inbox-promotion-requires-landed-ship (the residual acceptance gap).
-//
-// The landing gate itself (unlanded SHA never promotes; landed twin promotes;
-// needs-reaudit terminal never promotes) landed in a prior cycle and is
-// pinned by postship_landing_test.go — pre-existing GREEN. What the inbox
-// item's fix text still demands and the code does NOT do is the "retry note":
-//
-//	"Otherwise the item RETURNS to inbox with a retry note (mirror the
-//	 failed-cycle release path)."
-//
-// Today an unlanded ship leaves the item in processing/ and the residual
-// drain (ReleaseCycleProcessing) returns it to the inbox root with the
-// generic ledger reason "cycle-release" — byte-identical to an ordinary
-// residual drain. Nothing durable records WHY the item came back, so an
-// operator (or the next triage) cannot distinguish "ship never landed,
-// retry this" from "claimed but never committed". The cycle-598 incident
-// was only diagnosed by hand for exactly this reason.
-//
-// Fix under test (not yet implemented — the note test MUST fail RED until
-// Builder threads an unlanded-release annotation through the drain): when
-// promoteInbox skips promotion because the ship commit is unlanded, the
-// ledger entry recording each released item must carry an "unlanded" note
-// in place of (or in addition to) the generic reason. The negative twin
-// pins that an ordinary landed-cycle residual drain does NOT gain the note.
 package ship
 
 import (
@@ -51,13 +26,11 @@ func ledgerLinesFor(t *testing.T, root, taskID string) []string {
 	return out
 }
 
-// TestPromoteInbox_UnlandedReleaseCarriesRetryNote is the cycle-752 RED
-// anchor: an unlanded ship (merge-base --is-ancestor exit 1, the cycle-598
-// needs-reaudit shape) must still release the item back to the inbox root
-// (pre-existing residual-drain behavior) AND leave durable per-item evidence
-// — a ledger entry for the released item whose reason notes the unlanded
-// ship — so triage/operators can tell a delivery failure from an ordinary
-// residual drain.
+// An unlanded ship (merge-base --is-ancestor exit 1) must still release the
+// item back to the inbox root AND leave durable per-item evidence — a ledger
+// entry for the released item whose reason notes the unlanded ship — so
+// triage/operators can tell a delivery failure from an ordinary residual
+// drain.
 func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 	root := t.TempDir()
 	const cid = 752
@@ -75,14 +48,13 @@ func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 		t.Fatalf("promoteInbox: %v", err)
 	}
 
-	// Pre-existing GREEN half: the item is back at the inbox root, not
-	// stranded in processing/ and not buried in processed/.
+	// The item is back at the inbox root, not stranded in processing/ and not
+	// buried in processed/.
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "inbox", id+".json")); err != nil {
 		t.Fatalf("unlanded ship must release the item back to the inbox root: %v", err)
 	}
 
-	// RED half: the release must carry a durable unlanded note. Today the
-	// only ledger entry is the generic reason "cycle-release".
+	// The release must carry a durable unlanded note.
 	lines := ledgerLinesFor(t, root, id)
 	if len(lines) == 0 {
 		t.Fatalf("no ledger entry recorded for released item %q", id)
@@ -99,11 +71,10 @@ func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_LandedResidualReleaseKeepsGenericReason is the negative
-// twin (anti-stamp guard): a LANDED cycle whose processing/ dir holds an
-// extra residual claim (not in top_n) drains that residual with the ordinary
-// generic reason — the unlanded note must NOT appear. A stub that stamps
-// "unlanded" on every release would pass the RED anchor and must fail here.
+// A LANDED cycle whose processing/ dir holds an extra residual claim (not in
+// top_n) drains that residual with the ordinary generic reason — the
+// unlanded note must NOT appear (guards against a stub that stamps
+// "unlanded" on every release).
 func TestPromoteInbox_LandedResidualReleaseKeepsGenericReason(t *testing.T) {
 	root := t.TempDir()
 	const cid = 752

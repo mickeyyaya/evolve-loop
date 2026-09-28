@@ -1,22 +1,5 @@
 package audit
 
-// defect_ledger_annotation_prompt_test.go — RED contract for the two halves of
-// inbox disposition-skeleton-preseed + evidence-cite-annotation-tolerance
-// (2026-08-10 investigation; agents A/B: continuations 0/11 with evidence
-// rejections and MISSING dispositions as the top killers).
-//
-// Half 1 — annotation tolerance: real chains authored evidence like
-// "path.go:12-34; verified live: `go test ./...` -> PASS" and the whole claim
-// was rejected because splitEvidence ANDs EVERY ';'-fragment as a citation
-// (cycles 1393/1415). A prose fragment is an annotation, not a cite; a
-// cite-SHAPED fragment must still resolve (a typoed path may never degrade
-// into "prose"), and at least one cite-shaped fragment is still mandatory.
-//
-// Half 2 — continuations are TOLD their inherited ids: the audit prompt for a
-// continuation workspace now carries the ancestor's OPEN defect ids + texts
-// and the disposition duty, composed deterministically from the same records
-// the gate grades against (no LLM tokens; ~200 tokens per continuation audit).
-
 import (
 	"encoding/json"
 	"os"
@@ -47,7 +30,7 @@ func TestEvidenceResolves_AnnotationTolerance(t *testing.T) {
 		evidence string
 		want     bool
 	}{
-		// The cycle-1393/1415 class: real cite + prose annotation.
+		// A real cite plus a prose annotation.
 		{"cite-plus-prose", "docs/x.md:3; verified live: `go test ./...` -> PASS", true},
 		{"prose-first-then-cite", "confirmed by rerun; docs/x.md", true},
 		// Annotations alone are not evidence.

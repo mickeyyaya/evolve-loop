@@ -13,40 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// defect_ledger.go — the anti-laundering ledger
-// (batch-integrity-review-2026-08-04.md F1(i)).
-//
-// A named CRITICAL defect survived the 1255 → 1268-salvage → 1270 → 1272 chain
-// by being individually honest at every step but collectively erased: each
-// continuation narrowed, renamed, or declared-already-fixed the defect, and no
-// code anywhere required a continuation to reconcile against the ORIGINAL
-// rejecting audit's machine-readable defects[].
-//
-// Two mechanisms, both hanging off hooks.Classify (the audit verdict seam):
-//
-//  1. EMIT — a rejecting audit persists <workspace>/defect-ledger.json, one
-//     addressable OPEN entry per structured defect, text verbatim.
-//  2. RECONCILE — a continuation cycle loads its ancestor's ledger and may NOT
-//     emit PASS while any inherited OPEN entry is unaccounted for. The
-//     disposition is written back into THIS cycle's ledger, so it is visible in
-//     the audit's own artifact rather than inferable from a diff a human must
-//     run. Entries transition; they are never deleted. A ledger that shrinks is
-//     a ledger that launders.
-//
-// Degrade posture, deliberately asymmetric: a cycle that is not a continuation
-// (no manifest) or whose ancestor left no ledger is a clean no-op — the
-// overwhelming majority of cycles, and nothing to reconcile against. But a
-// MISSING disposition artifact on a real continuation is the defect itself, not
-// an environment gap, so it blocks (unlike probe_quarantine's missing-worktree
-// case, which correctly degrades open).
-//
-// Since ADR-0103 unit 09 the ledger's schema, writer, readers and the gate
-// live in internal/core/defectledger; this file is the audit package's SEAM:
-// the vocabulary projected, the ledger's ONE wired construction, the
-// request/rejection projections, the citation resolver the gate takes as a
-// Strategy, the three production spellings and the Null-Object facades the
-// by-name tests keep. Design: docs/architecture/decomposition/09-defectledger.md.
-
 // The ledger's vocabulary, projected (single source: the leaf).
 const (
 	defectLedgerFile      = defectledger.LedgerFile
@@ -82,9 +48,8 @@ type (
 )
 
 // defectLedger is the nil-safe accessor: the wired ledger New built, or the
-// Null-Object ledger for a hooks{} literal (the value receivers of Classify
-// and ComposePrompt cannot cache one). Same REAL lane-scope reader and
-// resolver either way; only the Center differs.
+// Null-Object ledger for a hooks{} literal, since Classify and ComposePrompt's
+// value receivers cannot cache one.
 func (h hooks) defectLedger() *defectledger.Ledger {
 	if h.ledger != nil {
 		return h.ledger
@@ -92,10 +57,6 @@ func (h hooks) defectLedger() *defectledger.Ledger {
 	return nullDefectLedger()
 }
 
-// wiredDefectLedger is the ONE construction of the ledger
-// (TestDefectLedgerSeam_OneConstructionSite): the real core.LaneScopeIDs (its
-// two stderr WARNs stay in core), the real citation resolver, the Center read
-// live through the accessor.
 func wiredDefectLedger(signals func() *signalcenter.Center) *defectledger.Ledger {
 	return defectledger.New(core.LaneScopeIDs, resolveEvidence, defectledger.WithSignals(signals))
 }
@@ -148,8 +109,8 @@ func inheritedDefectsPromptBlockVia(l *defectledger.Ledger, req core.PhaseReques
 	return l.PromptBlock(ledgerRequest(req))
 }
 
-// The Null-Object facades: the by-name tests and the ACS predicates keep these
-// spellings; no production caller (TestNullLedgerFacades_HaveNoProductionCaller).
+// The Null-Object facades: the by-name tests and the ACS predicates keep
+// these spellings; no production caller uses them.
 
 func emitDefectLedger(artifact string, req core.PhaseRequest) []core.Diagnostic {
 	return emitDefectLedgerVia(nullDefectLedger(), artifact, req)
@@ -173,32 +134,25 @@ func defectID(text string) string { return defectledger.ID(text) }
 // closure_claim.go's quoteClaim and the evidence-shape error.
 func truncateRunes(s string, max int) string { return defectledger.Truncate(s, max) }
 
-// evidenceResolves reports whether a closure claim's evidence names a file that
-// actually EXISTS, plus the operator-facing reason when it does not. Validating
-// evidence for non-emptiness alone accepts `evidence:"x"` and closes a CRITICAL
-// on a string nobody can follow — the unverifiable closure claim the batch
-// integrity review indicts.
+// evidenceResolves reports whether a closure claim's evidence names a file
+// that actually EXISTS, plus the operator-facing reason when it does not.
 //
 // Deliberately permissive about SHAPE, strict about WHAT IT NAMES: auditors
-// cite "path:line" and "path:line:col" as often as a bare path, and rejecting a
-// legitimate citation shape would block every future continuation.
-//
-// Existence alone was the cycle-1282 DEF-2 hole: `os.Stat` under either root,
-// plus a raw-absolute-path branch, meant `/etc/hosts` and the attacker's own
-// `defect-dispositions.json` each closed a CRITICAL. Four rules now hold:
+// cite "path:line" and "path:line:col" as often as a bare path, and rejecting
+// a legitimate citation shape would block every future continuation. Four
+// rules hold:
 //
 //  1. RELATIVE only. An absolute path names something outside the repo's
 //     accounting; `/etc/hosts` exists on every host and proves nothing.
-//  2. NO ESCAPE. After Clean, a leading ".." leaves the root — the workspace
-//     sits three levels down, so traversal is reachable, not theoretical.
+//  2. NO ESCAPE. After Clean, a leading ".." leaves the root.
 //  3. PROJECT ROOT or this lane's WORKTREE, never the workspace. A citation is
 //     resolved under the project root first and, failing that, under
-//     req.Worktree — an unmerged lane's fix is only ever in its own worktree
-//     (cycle-1340; the 1320→1330 deadlock). The workspace is still barred: it is
-//     this cycle's own agent-authored ephemera; citing it is the graded party
-//     vouching for itself. Real workspace artifacts remain citable by their
-//     path FROM the root (".evolve/runs/cycle-N/audit-report.md"), which is
-//     also what makes the citation followable by a reader who has only the repo.
+//     req.Worktree — an unmerged lane's fix is only ever in its own worktree.
+//     The workspace is still barred: it is this cycle's own agent-authored
+//     ephemera; citing it is the graded party vouching for itself. Real
+//     workspace artifacts remain citable by their path FROM the root
+//     (".evolve/runs/cycle-N/audit-report.md"), which is also what makes the
+//     citation followable by a reader who has only the repo.
 //  4. NOT THE GATE'S OWN RECORD. defect-dispositions.json / defect-ledger.json /
 //     continuation-manifest.json are the mechanism's own bookkeeping; a claim
 //     that cites them cites itself.
@@ -221,11 +175,9 @@ func evidenceResolves(evidence string, req core.PhaseRequest) (bool, string) {
 	cites := 0
 	for _, f := range frags {
 		// A ';'-joined fragment that is not cite-shaped is a prose ANNOTATION
-		// ("…; verified live: `go test` -> PASS") — cycles 1393/1415 rejected
-		// whole real claims on such fragments, accreting ledger entries faster
-		// than they closed. Annotations are ignored, never graded; every
-		// cite-SHAPED fragment must still resolve, and at least one is
-		// mandatory — prose alone stays inadmissible.
+		// ("…; verified live: `go test` -> PASS"), ignored rather than
+		// graded; every cite-SHAPED fragment must still resolve, and at
+		// least one is mandatory — prose alone stays inadmissible.
 		if !citeShaped(f) {
 			continue
 		}
@@ -278,14 +230,11 @@ func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) 
 		return false, "no evidence"
 	}
 	// Drop ONE trailing parenthetical annotation ("path:114-129 (helperName
-	// now cycle-scoped)") before locator stripping: two independent chains
-	// decorated otherwise-valid cites this way (cycles 1356/1360) and ground
-	// on "resolves to no file" every round, ACCRETING ledger entries faster
-	// than they closed. The annotation is dropped, never resolved; every
-	// rejection below still applies to the stripped path — an
-	// annotation-only cite (" (…)" with nothing before it, LastIndex 0) and
-	// a bare "(…)" (no " (" separator) fall through unchanged and fail the
-	// path checks as before.
+	// now cycle-scoped)") before locator stripping. The annotation is
+	// dropped, never resolved; every rejection below still applies to the
+	// stripped path — an annotation-only cite (" (…)" with nothing before
+	// it, LastIndex 0) and a bare "(…)" (no " (" separator) fall through
+	// unchanged and fail the path checks as before.
 	if strings.HasSuffix(path, ")") {
 		if i := strings.LastIndex(path, " ("); i > 0 {
 			path = strings.TrimSpace(path[:i])
@@ -294,9 +243,7 @@ func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) 
 	// Strip at most a ":line" and a ":col" suffix; anything else is part of the
 	// path (a Windows drive letter is not reachable here — these are repo paths).
 	// A ":line-line" RANGE counts as one locator: it is the house citation style
-	// in build and audit reports, and leaving it glued to the path made every
-	// range citation unresolvable under EVERY root (cycle-1340, defect
-	// ddda7857a — a real file, present in both roots, rejected anyway).
+	// in build and audit reports.
 	for i := 0; i < 2; i++ {
 		idx := strings.LastIndex(path, ":")
 		if idx <= 0 || !isLineLocator(path[idx+1:]) {
@@ -312,14 +259,12 @@ func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) 
 	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 		return false, fmt.Sprintf("evidence %q escapes the project root", citation)
 	}
-	// Case-INSENSITIVE (cycle-1285 F3). The rejection below and the os.Lstat
-	// two lines down must agree on what "the same file" means, and on the
-	// stated platform (darwin/APFS) Lstat resolves "Defect-Ledger.json" to
-	// defect-ledger.json while an exact-string switch does not. That gap let
-	// the gate's OWN record close every inherited defect. Comparing with
-	// EqualFold is strictly conservative: on a case-sensitive volume it can
-	// only reject a differently-cased name that was never going to be a
-	// legitimate citation anyway.
+	// Case-INSENSITIVE. This rejection and the os.Lstat two lines down must
+	// agree on what "the same file" means: on darwin/APFS, Lstat resolves
+	// "Defect-Ledger.json" to defect-ledger.json while an exact-string switch
+	// would not. Comparing with EqualFold is strictly conservative: on a
+	// case-sensitive volume it can only reject a differently-cased name that
+	// was never going to be a legitimate citation anyway.
 	base := filepath.Base(clean)
 	for _, own := range []string{defectLedgerFile, defectDispositionFile, continuation.ManifestName} {
 		if strings.EqualFold(base, own) {
@@ -331,12 +276,9 @@ func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) 
 	}
 	// Two roots, project root FIRST. A continuation lane's fix lives in the
 	// lane's own worktree and reaches the project root only when the lane
-	// merges — which is exactly what this gate blocks when the citation
-	// misses. Cycles 1320→1323→1325→1330 each cited a real, worktree-resident
-	// file and each was rejected identically: the gate demanded evidence it
-	// structurally prevented from existing. The worktree is a FALLBACK, not a
-	// replacement, and it is reached only after rules 1-4 above have already
-	// run — so a self-citation or an escape is refused under either root.
+	// merges. The worktree is a FALLBACK, not a replacement, and it is
+	// reached only after rules 1-4 above have already run — so a
+	// self-citation or an escape is refused under either root.
 	roots := []string{req.ProjectRoot}
 	if req.Worktree != "" && req.Worktree != req.ProjectRoot {
 		roots = append(roots, req.Worktree)

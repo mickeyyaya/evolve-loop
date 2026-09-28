@@ -10,15 +10,6 @@ import (
 	"testing"
 )
 
-// postship_drain_claim_test.go pins the cycle-1156 D1 *aggravator*: promoteInbox
-// used to append "[ship] OK: inbox lifecycle drain complete" unconditionally,
-// after having already logged a WARN for the very failure that stopped the
-// drain. An operator (and every log-grepping gate) read success from a cycle
-// whose lifecycle transition demonstrably did not complete. The code defect and
-// the false-success claim are separately regressible, so they are pinned
-// separately — these are the two tests the cycle-1158 eval's third score_cap
-// names as its evidence command.
-
 // writeDrainCycleState drops a cycle-state.json carrying cycle_id.
 func writeDrainCycleState(t *testing.T, root string, cycleID int) {
 	t.Helper()
@@ -67,7 +58,8 @@ func writeDrainInboxItem(t *testing.T, dir, id string) {
 
 // blockDrainPath writes a regular FILE where a directory is needed, so the
 // destination MkdirAll inside Promote fails — the infrastructure non-delivery
-// ADR-0079 decision 4 made loud.
+// this makes loud.
+// See ADR-0079.
 func blockDrainPath(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -107,11 +99,9 @@ func TestPromoteInbox_DrainFailure_NoFalseSuccessLog(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_PromoteError_StillDrainsResidualClaims: the D1 defect proper.
 // A failed committed-id promote must not skip the residual drain — the early
-// return stranded every item parked in processing/cycle-N/ (the cross-cycle
-// orphan shape of cycles 124/265/294/295/308). The residual item must be back
-// at the inbox root even though the promote failed.
+// return would strand every item parked in processing/cycle-N/. The residual
+// item must be back at the inbox root even though the promote failed.
 func TestPromoteInbox_PromoteError_StillDrainsResidualClaims(t *testing.T) {
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 43)

@@ -1,10 +1,3 @@
-// realgit_testhelpers_test.go — shared test helpers for the ship package.
-//
-// NO build tag: this file is compiled in both the fast (default) tier and the
-// integration tier. Functions that spawn real git live here so integration-tagged
-// files can call them, and pure file-system helpers (mustWrite, mustMkdir,
-// containsLog, writeAttestation) live here so untagged fast-tier files can call
-// them without pulling in the integration tag.
 package ship
 
 import (
@@ -26,8 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
-
-// --- pure file-system helpers (used by fast-tier untagged files) -----------
 
 // mustWrite creates parent dirs and writes content to path, failing the test
 // on any error.
@@ -70,19 +61,16 @@ func writeAttestation(t *testing.T, repo, treeSHA string) {
 	mustWrite(t, filepath.Join(repo, ".commit-gate", "attestation.json"), body)
 }
 
-// --- real-git helpers (called only from integration-tagged test functions) --
-
 // tempRepoDir returns a fresh temp directory for a git repo whose cleanup is
 // BEST-EFFORT — unlike t.TempDir(), a RemoveAll failure does NOT fail the test.
 //
 // On macOS CI runners, os.RemoveAll of a git work tree intermittently fails
 // with EBADF ("bad file descriptor") on .git internals (e.g. a hooks/*.sample
-// file) under -race load. With t.TempDir() that cleanup error fails an
-// otherwise-passing test and forces a full ~5-minute CI re-run (observed on
-// TestShipFromWorktree_GitAddFails_Errors, 2026-06-02). The temp dir is
-// ephemeral — CI reclaims it regardless — so best-effort removal is safe and
-// keeps a cosmetic cleanup race from gating a green build. The chmod-walk makes
-// git's 0444 pack/object files removable.
+// file) under -race load, which would otherwise fail an otherwise-passing
+// test and force a full CI re-run. The temp dir is ephemeral — CI reclaims it
+// regardless — so best-effort removal is safe and keeps a cosmetic cleanup
+// race from gating a green build. The chmod-walk makes git's 0444 pack/object
+// files removable.
 func tempRepoDir(t *testing.T) string {
 	t.Helper()
 	dir, err := os.MkdirTemp("", "shiptest-*")
@@ -355,7 +343,6 @@ func makeWorktreeScenario(t *testing.T) (string, string) {
 	addRemote(t, repo)
 	seedAudit(t, repo, "PASS")
 
-	// Create a linked worktree on a new branch.
 	wt := tempRepoDir(t)
 	runGit(t, repo, "worktree", "add", "-b", "cycle-1", wt)
 

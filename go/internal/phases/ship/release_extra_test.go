@@ -1,8 +1,3 @@
-// release_extra_test.go — covers the maybeCreateRelease branches the two
-// existing tests (no-notes early skip, missing plugin.json) don't reach:
-// the gh-invocation success path, dry-run, an unparseable version, and a
-// non-zero gh exit. gh is stubbed via a capturing CmdRunner so no real
-// GitHub call is made.
 package ship
 
 import (
