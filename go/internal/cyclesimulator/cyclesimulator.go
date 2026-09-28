@@ -63,19 +63,60 @@ func Run(in Inputs, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[simulator] "+format+"\n", args...)
 	}
 
+	if !in.validate(logf) {
+		return ExitRuntimeErr
+	}
+	in.applyDefaults()
+	in.installDefaultSeams()
+
+	if err := os.MkdirAll(in.Workspace, 0o755); err != nil {
+		logf("workspace mkdir failed: %v", err)
+		return ExitRuntimeErr
+	}
+
+	ledgerPath := filepath.Join(in.ProjectRoot, ".evolve", "ledger.jsonl")
+
+	logf("starting simulated walk for cycle %d", in.Cycle)
+
+	if rc := in.walkPipeline(ledgerPath, logf); rc != ExitOK {
+		return rc
+	}
+	shipRC, rc := in.simulateShip(logf)
+	if rc != ExitOK {
+		return rc
+	}
+	if rc := in.simulateRetrospective(ledgerPath, logf); rc != ExitOK {
+		return rc
+	}
+	in.verifyChain(logf)
+	if rc := in.writeSimReport(shipRC, logf); rc != ExitOK {
+		return rc
+	}
+
+	logf("DONE: simulated cycle %d complete", in.Cycle)
+	return ExitOK
+}
+
+type logFunc func(format string, args ...any)
+
+func (in *Inputs) validate(logf logFunc) bool {
 	// validation
 	if in.Cycle <= 0 {
 		logf("cycle must be positive integer, got: %d", in.Cycle)
-		return ExitRuntimeErr
+		return false
 	}
 	if in.Workspace == "" {
 		logf("missing workspace arg")
-		return ExitRuntimeErr
+		return false
 	}
 	if in.ProjectRoot == "" {
 		logf("missing project root (EVOLVE_PROJECT_ROOT)")
-		return ExitRuntimeErr
+		return false
 	}
+	return true
+}
+
+func (in *Inputs) applyDefaults() {
 	if in.PluginRoot == "" {
 		in.PluginRoot = in.ProjectRoot
 	}
@@ -85,7 +126,9 @@ func Run(in Inputs, stderr io.Writer) int {
 	if in.Token == "" {
 		in.Token = fmt.Sprintf("sim-token-%d-%d", in.Cycle, os.Getpid())
 	}
+}
 
+func (in *Inputs) installDefaultSeams() {
 	pluginScript := func(p string) string { return filepath.Join(in.PluginRoot, "legacy", "scripts", p) }
 
 	// default advance: shell out to cycle-state.sh
@@ -114,16 +157,9 @@ func Run(in Inputs, stderr io.Writer) int {
 			return cmd.Run()
 		}
 	}
+}
 
-	if err := os.MkdirAll(in.Workspace, 0o755); err != nil {
-		logf("workspace mkdir failed: %v", err)
-		return ExitRuntimeErr
-	}
-
-	ledgerPath := filepath.Join(in.ProjectRoot, ".evolve", "ledger.jsonl")
-
-	logf("starting simulated walk for cycle %d", in.Cycle)
-
+func (in *Inputs) walkPipeline(ledgerPath string, logf logFunc) int {
 	// pipeline: (phase, agent, artifact-writer)
 	phases := []struct {
 		phase, agent, fname string
@@ -155,20 +191,26 @@ func Run(in Inputs, stderr io.Writer) int {
 		}
 		logf("  ✓ %s → wrote %s, ledger entry", ph.phase, ph.fname)
 	}
+	return ExitOK
+}
 
+func (in *Inputs) simulateShip(logf logFunc) (shipRC, rc int) {
 	// ship phase
 	if err := in.AdvanceFn("ship", "orchestrator"); err != nil {
 		logf("FAIL: cycle-state advance to ship refused")
-		return ExitGateRefuse
+		return 0, ExitGateRefuse
 	}
 	logf("  ▶ ship phase: invoking ship.sh --dry-run")
-	shipRC, _ := in.ShipDryRunFn(fmt.Sprintf("simulator: cycle %d plumbing test", in.Cycle))
+	shipRC, _ = in.ShipDryRunFn(fmt.Sprintf("simulator: cycle %d plumbing test", in.Cycle))
 	if shipRC == 0 {
 		logf("  ✓ ship.sh --dry-run completed cleanly")
 	} else {
 		logf("  ⚠ ship.sh --dry-run exited rc=%d (acceptable for tree-state-mismatch in simulator context)", shipRC)
 	}
+	return shipRC, ExitOK
+}
 
+func (in *Inputs) simulateRetrospective(ledgerPath string, logf logFunc) int {
 	// retrospective
 	if err := in.AdvanceFn("retrospective", "retrospective"); err != nil {
 		logf("FAIL: cycle-state advance to retrospective refused")
@@ -184,7 +226,10 @@ func Run(in Inputs, stderr io.Writer) int {
 		return ExitRuntimeErr
 	}
 	logf("  ✓ retrospective → wrote retrospective-report.md, ledger entry")
+	return ExitOK
+}
 
+func (in *Inputs) verifyChain(logf logFunc) {
 	// chain verify
 	logf("verifying ledger chain post-simulation...")
 	if err := in.VerifyFn(); err == nil {
@@ -192,7 +237,9 @@ func Run(in Inputs, stderr io.Writer) int {
 	} else {
 		logf("WARN: ledger chain verification flagged anomalies (may be pre-existing; simulator did not break it)")
 	}
+}
 
+func (in *Inputs) writeSimReport(shipRC int, logf logFunc) int {
 	// simulator-report
 	reportPath := filepath.Join(in.Workspace, "simulator-report.md")
 	report := fmt.Sprintf(
@@ -206,8 +253,6 @@ func Run(in Inputs, stderr io.Writer) int {
 		logf("FAIL: writing simulator-report: %v", err)
 		return ExitRuntimeErr
 	}
-
-	logf("DONE: simulated cycle %d complete", in.Cycle)
 	return ExitOK
 }
 
@@ -289,17 +334,8 @@ simulator-cycle: kernel-plumbing validated; no semantic learning produced.
 // object has `simulated: true` and computes prev_hash from the SHA256 of the
 // last line.
 func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, projectRoot string, now func() time.Time) error {
-	artifactSHA := ""
-	if data, err := os.ReadFile(artifactPath); err == nil {
-		sum := sha256.Sum256(data)
-		artifactSHA = hex.EncodeToString(sum[:])
-	}
-	gitHEAD := runGit(projectRoot, "rev-parse", "HEAD")
-	if gitHEAD == "" {
-		gitHEAD = "unknown"
-	}
-	treeStateDiff := runGit(projectRoot, "diff", "HEAD")
-	treeStateSHA := sha256Hex(treeStateDiff)
+	artifactSHA := fileSHA256(artifactPath)
+	gitHEAD, treeStateSHA := gitTreeState(projectRoot)
 
 	prevHash, entrySeq, err := readChainLink(ledgerPath)
 	if err != nil {
@@ -335,6 +371,31 @@ func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, pr
 		return err
 	}
 
+	if err := appendLedgerLine(ledgerPath, line); err != nil {
+		return err
+	}
+	return writeLedgerTip(ledgerPath, entrySeq, line)
+}
+
+func fileSHA256(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+func gitTreeState(projectRoot string) (gitHEAD, treeStateSHA string) {
+	gitHEAD = runGit(projectRoot, "rev-parse", "HEAD")
+	if gitHEAD == "" {
+		gitHEAD = "unknown"
+	}
+	treeStateDiff := runGit(projectRoot, "diff", "HEAD")
+	return gitHEAD, sha256Hex(treeStateDiff)
+}
+
+func appendLedgerLine(ledgerPath, line string) error {
 	if err := os.MkdirAll(filepath.Dir(ledgerPath), 0o755); err != nil {
 		return err
 	}
@@ -346,10 +407,10 @@ func appendSimLedger(ledgerPath string, cycle int, role, artifactPath, token, pr
 		_ = f.Close()
 		return err
 	}
-	if err := f.Close(); err != nil {
-		return err
-	}
+	return f.Close()
+}
 
+func writeLedgerTip(ledgerPath string, entrySeq int, line string) error {
 	tipPath := filepath.Join(filepath.Dir(ledgerPath), "ledger.tip")
 	tip := fmt.Sprintf("%d:%s\n", entrySeq, sha256Hex(line))
 	tmp := tipPath + ".tmp"

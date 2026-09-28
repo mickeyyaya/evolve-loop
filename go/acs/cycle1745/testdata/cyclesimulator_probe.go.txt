@@ -1,0 +1,342 @@
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"testing"
+	"time"
+)
+
+func probeClock() time.Time {
+	return time.Date(2026, 5, 23, 12, 34, 56, 0, time.FixedZone("UTC+5", 5*3600))
+}
+
+func probeSHA(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+type probeScenario struct {
+	name string
+	run  func(t *testing.T, root string) string
+}
+
+func probeStubbed(root string, calls *[]string, refuse string, shipRC int, verifyErr error) Inputs {
+	return Inputs{
+		Cycle:       42,
+		Workspace:   filepath.Join(root, "ws"),
+		ProjectRoot: root,
+		Token:       "tok-42",
+		Now:         probeClock,
+		AdvanceFn: func(phase, agent string) error {
+			*calls = append(*calls, "advance "+phase+" "+agent)
+			if phase == refuse {
+				return errors.New("refused")
+			}
+			return nil
+		},
+		ShipDryRunFn: func(msg string) (int, error) {
+			*calls = append(*calls, "ship "+msg)
+			return shipRC, errors.New("ship error is discarded")
+		},
+		VerifyFn: func() error {
+			*calls = append(*calls, "verify")
+			return verifyErr
+		},
+	}
+}
+
+func probeRun(in Inputs, calls *[]string) string {
+	var stderr strings.Builder
+	rc := Run(in, &stderr)
+	return fmt.Sprintf("rc=%d\ncalls:\n%s\nstderr:\n%s", rc, strings.Join(*calls, "\n"), stderr.String())
+}
+
+func probeStubbedRun(refuse string, shipRC int, verifyErr error, prepare func(t *testing.T, root string)) func(t *testing.T, root string) string {
+	return func(t *testing.T, root string) string {
+		if prepare != nil {
+			prepare(t, root)
+		}
+		var calls []string
+		return probeRun(probeStubbed(root, &calls, refuse, shipRC, verifyErr), &calls)
+	}
+}
+
+func probeMkdir(rel string) func(t *testing.T, root string) {
+	return func(t *testing.T, root string) {
+		if err := os.MkdirAll(filepath.Join(root, rel), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func probeWrite(t *testing.T, path, body string, mode os.FileMode) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func probeScripts(t *testing.T, pluginRoot, logPath string) {
+	script := func(name, extra string) string {
+		return "#!/bin/bash\necho \"" + name + " $*\" >> \"" + logPath + "\"\n" + extra
+	}
+	probeWrite(t, filepath.Join(pluginRoot, "legacy", "scripts", "lifecycle", "cycle-state.sh"), script("cycle-state", "if [ \"$2\" = \"$PROBE_REFUSE\" ]; then exit 1; fi\nexit 0\n"), 0o755)
+	probeWrite(t, filepath.Join(pluginRoot, "legacy", "scripts", "lifecycle", "ship.sh"), script("ship", "exit 4\n"), 0o755)
+	probeWrite(t, filepath.Join(pluginRoot, "legacy", "scripts", "observability", "verify-ledger-chain.sh"), script("verify", "exit 1\n"), 0o755)
+}
+
+func probeDefaults(pluginRootRel, refuse string) func(t *testing.T, root string) string {
+	return func(t *testing.T, root string) string {
+		if _, err := exec.LookPath("bash"); err != nil {
+			return "skipped: no bash\n"
+		}
+		pluginRoot := filepath.Join(root, pluginRootRel)
+		probeScripts(t, pluginRoot, filepath.Join(root, "calls.log"))
+		t.Setenv("PROBE_REFUSE", refuse)
+		in := Inputs{Cycle: 7, Workspace: filepath.Join(root, "ws"), ProjectRoot: root}
+		if pluginRootRel != "" {
+			in.PluginRoot = pluginRoot
+		}
+		var stderr strings.Builder
+		rc := Run(in, &stderr)
+		return fmt.Sprintf("rc=%d\nstderr:\n%s", rc, stderr.String())
+	}
+}
+
+func probeValidation(t *testing.T, root string) string {
+	ws := filepath.Join(root, "ws")
+	cases := []Inputs{
+		{Cycle: 0, Workspace: ws, ProjectRoot: root},
+		{Cycle: -3, Workspace: ws, ProjectRoot: root},
+		{Cycle: 1, ProjectRoot: root},
+		{Cycle: 1, Workspace: ws},
+	}
+	var b strings.Builder
+	for i, in := range cases {
+		var stderr strings.Builder
+		rc := Run(in, &stderr)
+		fmt.Fprintf(&b, "case %d rc=%d stderr=%q\n", i, rc, stderr.String())
+	}
+	return b.String()
+}
+
+func probeRetroLedgerUnreadable(t *testing.T, root string) string {
+	if os.Geteuid() == 0 {
+		return "skipped: root ignores file modes\n"
+	}
+	var calls []string
+	in := probeStubbed(root, &calls, "", 0, nil)
+	ledger := filepath.Join(root, ".evolve", "ledger.jsonl")
+	in.ShipDryRunFn = func(msg string) (int, error) {
+		calls = append(calls, "ship "+msg)
+		return 0, os.Chmod(ledger, 0o000)
+	}
+	out := probeRun(in, &calls)
+	if err := os.Chmod(ledger, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+func probeRunIDStamped(t *testing.T, root string) string {
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	probeWrite(t, filepath.Join(ws, "run.json"), `{"cycle_id":42,"run_id":"01PROBERUNID0000000000000"}`, 0o644)
+	var calls []string
+	in := probeStubbed(root, &calls, "", 0, nil)
+	in.Workspace = ws
+	return probeRun(in, &calls)
+}
+
+func probeExistingLedger(t *testing.T, root string) string {
+	probeWrite(t, filepath.Join(root, ".evolve", "ledger.jsonl"), "{\"seed\":1}\n{\"seed\":2}\n", 0o644)
+	var calls []string
+	return probeRun(probeStubbed(root, &calls, "", 0, nil), &calls)
+}
+
+func probeAppend(t *testing.T, root string) string {
+	ledger := filepath.Join(root, ".evolve", "ledger.jsonl")
+	artifact := filepath.Join(root, "art", "scout-report.md")
+	probeWrite(t, artifact, "scout body\n", 0o644)
+	var b strings.Builder
+	fmt.Fprintf(&b, "missing artifact: %v\n", appendSimLedger(ledger, 7, "scout", filepath.Join(root, "absent.md"), "tok-a", root, probeClock))
+	fmt.Fprintf(&b, "present artifact: %v\n", appendSimLedger(ledger, 7, "builder", artifact, "tok-b", root, probeClock))
+	return b.String()
+}
+
+func probeAppendTipBlocked(t *testing.T, root string) string {
+	probeMkdir(filepath.Join(".evolve", "ledger.tip.tmp"))(t, root)
+	artifact := filepath.Join(root, "a.md")
+	probeWrite(t, artifact, "a\n", 0o644)
+	err := appendSimLedger(filepath.Join(root, ".evolve", "ledger.jsonl"), 3, "auditor", artifact, "tok", root, probeClock)
+	return fmt.Sprintf("err=%v\n", err != nil)
+}
+
+func probeGit(t *testing.T, dir string, args ...string) string {
+	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=probe", "-c", "user.email=probe@example.com", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null"}, args...)...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return strings.TrimRight(string(out), "\n")
+}
+
+func probeAppendInGitRepo(t *testing.T, root string) string {
+	if _, err := exec.LookPath("git"); err != nil {
+		return "skipped: no git\n"
+	}
+	repo := filepath.Join(root, "repo")
+	probeWrite(t, filepath.Join(repo, "tracked.txt"), "one\n", 0o644)
+	probeGit(t, repo, "init", "-q")
+	probeGit(t, repo, "add", "tracked.txt")
+	probeGit(t, repo, "commit", "-q", "-m", "seed")
+	probeWrite(t, filepath.Join(repo, "tracked.txt"), "one\ntwo\n", 0o644)
+	probeGit(t, repo, "add", "tracked.txt")
+	head := probeGit(t, repo, "rev-parse", "HEAD")
+	diff := probeGit(t, repo, "diff", "HEAD")
+	artifact := filepath.Join(root, "b.md")
+	probeWrite(t, artifact, "b\n", 0o644)
+	ledger := filepath.Join(root, ".evolve", "ledger.jsonl")
+	err := appendSimLedger(ledger, 5, "builder", artifact, "tok-git", repo, probeClock)
+	body, rerr := os.ReadFile(ledger)
+	if rerr != nil {
+		return fmt.Sprintf("err=%v read=%v\n", err, rerr)
+	}
+	line := strings.ReplaceAll(string(body), head, "<HEAD>")
+	line = strings.ReplaceAll(line, probeSHA(diff), "<SHA(diff HEAD)>")
+	for _, dir := range []string{repo, filepath.Join(root, ".evolve")} {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return fmt.Sprintf("err=%v\nledger=%s", err, line)
+}
+
+func probeScenarios() []probeScenario {
+	var scenarios []probeScenario
+	scenarios = append(scenarios,
+		probeScenario{"validation", probeValidation},
+		probeScenario{"full-ship-nonzero-verify-warn", probeStubbedRun("", 3, errors.New("anomaly"), nil)},
+		probeScenario{"full-clean", probeStubbedRun("", 0, nil, nil)},
+	)
+	for _, phase := range []string{"intent", "research", "build", "audit", "ship", "retrospective"} {
+		scenarios = append(scenarios, probeScenario{"refuse-" + phase, probeStubbedRun(phase, 0, nil, nil)})
+	}
+	scenarios = append(scenarios,
+		probeScenario{"workspace-is-file", probeStubbedRun("", 0, nil, func(t *testing.T, root string) { probeWrite(t, filepath.Join(root, "ws"), "x", 0o644) })},
+		probeScenario{"intent-write-fails", probeStubbedRun("", 0, nil, probeMkdir(filepath.Join("ws", "intent.md")))},
+		probeScenario{"audit-write-fails", probeStubbedRun("", 0, nil, probeMkdir(filepath.Join("ws", "audit-report.md")))},
+		probeScenario{"retro-write-fails", probeStubbedRun("", 0, nil, probeMkdir(filepath.Join("ws", "retrospective-report.md")))},
+		probeScenario{"report-write-fails", probeStubbedRun("", 0, nil, probeMkdir(filepath.Join("ws", "simulator-report.md")))},
+		probeScenario{"ledger-dir-is-file", probeStubbedRun("", 0, nil, func(t *testing.T, root string) { probeWrite(t, filepath.Join(root, ".evolve"), "x", 0o644) })},
+		probeScenario{"retro-ledger-unreadable", probeRetroLedgerUnreadable},
+		probeScenario{"run-id-stamped", probeRunIDStamped},
+		probeScenario{"existing-ledger", probeExistingLedger},
+		probeScenario{"default-seams", probeDefaults("", "none")},
+		probeScenario{"default-seams-refuse-build", probeDefaults("", "build")},
+		probeScenario{"explicit-plugin-root", probeDefaults("plugin", "none")},
+		probeScenario{"append-direct", probeAppend},
+		probeScenario{"append-tip-blocked", probeAppendTipBlocked},
+		probeScenario{"append-in-git-repo", probeAppendInGitRepo},
+	)
+	return scenarios
+}
+
+var probeTSPattern = regexp.MustCompile(`"ts":"([^"]+)"`)
+
+func probeNormalizeLedger(raw string) string {
+	lines := strings.Split(strings.TrimRight(raw, "\n"), "\n")
+	out := make([]string, len(lines))
+	for i, line := range lines {
+		norm := line
+		if i > 0 {
+			norm = strings.ReplaceAll(norm, `"prev_hash":"`+probeSHA(lines[i-1])+`"`, `"prev_hash":"<SHA(prev line)>"`)
+		}
+		var entry struct {
+			ArtifactPath string `json:"artifact_path"`
+			ArtifactSHA  string `json:"artifact_sha256"`
+		}
+		if json.Unmarshal([]byte(line), &entry) == nil && entry.ArtifactSHA != "" {
+			if data, err := os.ReadFile(entry.ArtifactPath); err == nil && probeSHA(string(data)) == entry.ArtifactSHA {
+				norm = strings.ReplaceAll(norm, entry.ArtifactSHA, "<SHA(artifact)>")
+			}
+		}
+		out[i] = norm
+	}
+	return strings.Join(out, "\n") + "\n"
+}
+
+func probeNormalizeTip(tip, ledger string) string {
+	lines := strings.Split(strings.TrimRight(ledger, "\n"), "\n")
+	return strings.ReplaceAll(tip, probeSHA(lines[len(lines)-1]), "<SHA(last line)>")
+}
+
+func probeDumpTree(t *testing.T, root string) string {
+	var b strings.Builder
+	ledgerRaw, _ := os.ReadFile(filepath.Join(root, ".evolve", "ledger.jsonl"))
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		if d.IsDir() {
+			fmt.Fprintf(&b, "dir %s\n", rel)
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Fprintf(&b, "file %s unreadable\n", rel)
+			return nil
+		}
+		body := string(data)
+		switch d.Name() {
+		case "ledger.jsonl":
+			body = probeNormalizeLedger(body)
+		case "ledger.tip":
+			body = probeNormalizeTip(body, string(ledgerRaw))
+		}
+		fmt.Fprintf(&b, "file %s\n%s\n", rel, body)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b.String()
+}
+
+func probeNormalize(s, root string) string {
+	s = strings.ReplaceAll(s, root, "<ROOT>")
+	s = regexp.MustCompile(`(sim-token-\d+)-`+fmt.Sprint(os.Getpid())+`\b`).ReplaceAllString(s, "$1-<PID>")
+	return probeTSPattern.ReplaceAllStringFunc(s, func(m string) string {
+		ts, err := time.Parse("2006-01-02T15:04:05Z", probeTSPattern.FindStringSubmatch(m)[1])
+		if err == nil && time.Since(ts).Abs() < 2*time.Hour {
+			return `"ts":"<RECENT>"`
+		}
+		return m
+	})
+}
+
+func TestACS1745Probe(t *testing.T) {
+	out := os.Getenv("ACS1745_PROBE_OUT")
+	if out == "" {
+		t.Skip("runs only under the cycle1745 differential predicate")
+	}
+	var b strings.Builder
+	for _, sc := range probeScenarios() {
+		root := t.TempDir()
+		text := sc.run(t, root) + probeDumpTree(t, root)
+		fmt.Fprintf(&b, "== %s ==\n%s", sc.name, probeNormalize(text, root))
+	}
+	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

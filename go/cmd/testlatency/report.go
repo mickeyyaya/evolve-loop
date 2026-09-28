@@ -51,17 +51,7 @@ type Report struct {
 // per-test timing. Subtests (Test contains "/") are excluded from the test
 // list and the serial-sum so parent timings are not double-counted.
 func Parse(r io.Reader) (*Report, error) {
-	pkgs := map[string]*pkgStat{}
-	get := func(name string) *pkgStat {
-		p := pkgs[name]
-		if p == nil {
-			p = &pkgStat{Pkg: name}
-			pkgs[name] = p
-		}
-		return p
-	}
-
-	var tests []testStat
+	agg := &aggregator{pkgs: map[string]*pkgStat{}}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, 16*1024*1024) // grow lazily; some Output lines are large
 	for sc.Scan() {
@@ -73,40 +63,61 @@ func Parse(r io.Reader) (*Report, error) {
 		if err := json.Unmarshal(line, &e); err != nil {
 			continue // tolerate non-event lines (build output, etc.)
 		}
-		switch e.Action {
-		case "run", "start":
-			// Register the package so a run that never reaches a terminal
-			// summary (panic / timeout / truncated stream) is detectable as
-			// Incomplete rather than vanishing from the report entirely.
-			if e.Package != "" {
-				get(e.Package)
-			}
-		case "pass", "fail", "skip":
-			if e.Test == "" { // package-level summary event
-				p := get(e.Package)
-				p.Wall = e.Elapsed
-				p.Status = e.Action
-				continue
-			}
-			if strings.Contains(e.Test, "/") {
-				continue // subtest — folded into its parent's elapsed
-			}
-			p := get(e.Package)
-			p.NumTests++
-			p.SerialSum += e.Elapsed
-			if e.Elapsed > p.SlowestSecs {
-				p.SlowestSecs = e.Elapsed
-				p.SlowestTest = e.Test
-			}
-			tests = append(tests, testStat{Pkg: e.Package, Test: e.Test, Elapsed: e.Elapsed})
-		}
+		agg.observe(e)
 	}
 	if err := sc.Err(); err != nil {
 		return nil, fmt.Errorf("scan test2json stream: %w", err)
 	}
+	return agg.report(), nil
+}
 
+type aggregator struct {
+	pkgs  map[string]*pkgStat
+	tests []testStat
+}
+
+func (agg *aggregator) get(name string) *pkgStat {
+	p := agg.pkgs[name]
+	if p == nil {
+		p = &pkgStat{Pkg: name}
+		agg.pkgs[name] = p
+	}
+	return p
+}
+
+func (agg *aggregator) observe(e event) {
+	switch e.Action {
+	case "run", "start":
+		// Register the package so a run that never reaches a terminal
+		// summary (panic / timeout / truncated stream) is detectable as
+		// Incomplete rather than vanishing from the report entirely.
+		if e.Package != "" {
+			agg.get(e.Package)
+		}
+	case "pass", "fail", "skip":
+		if e.Test == "" { // package-level summary event
+			p := agg.get(e.Package)
+			p.Wall = e.Elapsed
+			p.Status = e.Action
+			return
+		}
+		if strings.Contains(e.Test, "/") {
+			return // subtest — folded into its parent's elapsed
+		}
+		p := agg.get(e.Package)
+		p.NumTests++
+		p.SerialSum += e.Elapsed
+		if e.Elapsed > p.SlowestSecs {
+			p.SlowestSecs = e.Elapsed
+			p.SlowestTest = e.Test
+		}
+		agg.tests = append(agg.tests, testStat{Pkg: e.Package, Test: e.Test, Elapsed: e.Elapsed})
+	}
+}
+
+func (agg *aggregator) report() *Report {
 	rep := &Report{}
-	for _, p := range pkgs {
+	for _, p := range agg.pkgs {
 		rep.Packages = append(rep.Packages, *p)
 		if p.Status == "" { // started but no terminal pass/fail/skip summary
 			rep.Incomplete = append(rep.Incomplete, p.Pkg)
@@ -115,9 +126,9 @@ func Parse(r io.Reader) (*Report, error) {
 	sort.Strings(rep.Incomplete)
 	// Stable sort so packages/tests with equal timing keep a reproducible order.
 	sort.SliceStable(rep.Packages, func(i, j int) bool { return rep.Packages[i].Wall > rep.Packages[j].Wall })
-	rep.Tests = tests
+	rep.Tests = agg.tests
 	sort.SliceStable(rep.Tests, func(i, j int) bool { return rep.Tests[i].Elapsed > rep.Tests[j].Elapsed })
-	return rep, nil
+	return rep
 }
 
 // MarkdownOptions tune the rendered report.
@@ -131,6 +142,14 @@ type MarkdownOptions struct {
 // Markdown renders the report as a Markdown document.
 func (rep *Report) Markdown(o MarkdownOptions) string {
 	var b strings.Builder
+	rep.writeOverview(&b, o)
+	rep.writeSlowPackages(&b, o)
+	rep.writeSlowestTests(&b, o)
+	rep.writeOverThresholdCount(&b, o)
+	return b.String()
+}
+
+func (rep *Report) writeOverview(b *strings.Builder, o MarkdownOptions) {
 	var aggWall, aggSerial float64
 	totalTests := 0
 	for _, p := range rep.Packages {
@@ -139,19 +158,21 @@ func (rep *Report) Markdown(o MarkdownOptions) string {
 		totalTests += p.NumTests
 	}
 
-	fmt.Fprintf(&b, "# %s\n\n", o.Title)
-	fmt.Fprintf(&b, "- Packages: **%d**\n", len(rep.Packages))
-	fmt.Fprintf(&b, "- Top-level tests: **%d**\n", totalTests)
-	fmt.Fprintf(&b, "- Aggregate package wall time: **%.1fs** (sum of parallel-aware per-package times)\n", aggWall)
-	fmt.Fprintf(&b, "- Fully-serial upper bound (Σ test elapsed): **%.1fs**\n\n", aggSerial)
+	fmt.Fprintf(b, "# %s\n\n", o.Title)
+	fmt.Fprintf(b, "- Packages: **%d**\n", len(rep.Packages))
+	fmt.Fprintf(b, "- Top-level tests: **%d**\n", totalTests)
+	fmt.Fprintf(b, "- Aggregate package wall time: **%.1fs** (sum of parallel-aware per-package times)\n", aggWall)
+	fmt.Fprintf(b, "- Fully-serial upper bound (Σ test elapsed): **%.1fs**\n\n", aggSerial)
 
 	if len(rep.Incomplete) > 0 {
-		fmt.Fprintf(&b, "> ⚠ **%d package(s) had no terminal summary** (truncated stream / panic / timeout) — their wall time is missing and they are NOT counted above: %s\n\n",
+		fmt.Fprintf(b, "> ⚠ **%d package(s) had no terminal summary** (truncated stream / panic / timeout) — their wall time is missing and they are NOT counted above: %s\n\n",
 			len(rep.Incomplete), strings.Join(rep.Incomplete, ", "))
 	}
+}
 
+func (rep *Report) writeSlowPackages(b *strings.Builder, o MarkdownOptions) {
 	// Optimization targets: packages over the wall threshold.
-	fmt.Fprintf(&b, "## Slow packages (> %.1fs wall) — optimization targets\n\n", o.ThresholdPkg)
+	fmt.Fprintf(b, "## Slow packages (> %.1fs wall) — optimization targets\n\n", o.ThresholdPkg)
 	flagged := 0
 	b.WriteString("| Package | Wall (s) | Tests | Σserial (s) | Slowest test | Slowest (s) |\n")
 	b.WriteString("|---|--:|--:|--:|---|--:|\n")
@@ -160,25 +181,29 @@ func (rep *Report) Markdown(o MarkdownOptions) string {
 			continue
 		}
 		flagged++
-		fmt.Fprintf(&b, "| %s | %.2f | %d | %.2f | %s | %.2f |\n",
+		fmt.Fprintf(b, "| %s | %.2f | %d | %.2f | %s | %.2f |\n",
 			shortPkg(p.Pkg), p.Wall, p.NumTests, p.SerialSum, p.SlowestTest, p.SlowestSecs)
 	}
 	if flagged == 0 {
 		b.WriteString("| _(none)_ | | | | | |\n")
 	}
 	b.WriteString("\n")
+}
 
+func (rep *Report) writeSlowestTests(b *strings.Builder, o MarkdownOptions) {
 	// Slowest individual tests.
-	fmt.Fprintf(&b, "## Slowest %d tests\n\n", o.Top)
+	fmt.Fprintf(b, "## Slowest %d tests\n\n", o.Top)
 	b.WriteString("| Test | Package | Elapsed (s) |\n|---|---|--:|\n")
 	for i, t := range rep.Tests {
 		if i >= o.Top {
 			break
 		}
-		fmt.Fprintf(&b, "| %s | %s | %.2f |\n", t.Test, shortPkg(t.Pkg), t.Elapsed)
+		fmt.Fprintf(b, "| %s | %s | %.2f |\n", t.Test, shortPkg(t.Pkg), t.Elapsed)
 	}
 	b.WriteString("\n")
+}
 
+func (rep *Report) writeOverThresholdCount(b *strings.Builder, o MarkdownOptions) {
 	// Count of tests over the per-test threshold (regression watch).
 	over := 0
 	for _, t := range rep.Tests {
@@ -186,8 +211,7 @@ func (rep *Report) Markdown(o MarkdownOptions) string {
 			over++
 		}
 	}
-	fmt.Fprintf(&b, "_%d tests exceed the %.1fs per-test threshold._\n", over, o.ThresholdTst)
-	return b.String()
+	fmt.Fprintf(b, "_%d tests exceed the %.1fs per-test threshold._\n", over, o.ThresholdTst)
 }
 
 // shortPkg trims the module prefix for readability.
