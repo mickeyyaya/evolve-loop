@@ -61,6 +61,7 @@ type Policy struct {
 	Catalog            *CatalogPolicy            `json:"catalog,omitempty"`
 	Recovery           *RecoveryPolicy           `json:"recovery,omitempty"`
 	DocsFloor          *DocsFloorPolicy          `json:"docs_floor,omitempty"`
+	CommentFloor       *CommentFloorPolicy       `json:"comment_floor,omitempty"`
 	ACS                *ACSConfig                `json:"acs,omitempty"`
 	Paths              *PathsConfig              `json:"paths,omitempty"`
 	Worktree           *WorktreePolicy           `json:"worktree,omitempty"`
