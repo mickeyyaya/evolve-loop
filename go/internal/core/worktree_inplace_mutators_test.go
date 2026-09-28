@@ -81,7 +81,7 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 			return "recovered"
 		}},
 		{"worktreeContentSHA (git add -u)", func(t *testing.T, r inPlaceRepo) string {
-			if sha := worktreeContentSHA(ctx, r.root, r.root); sha != "" {
+			if sha := worktreeContentSHA(ctx, r.root, r.root, t.TempDir()); sha != "" {
 				t.Errorf("no content SHA is written from the operator's index, got %q", sha)
 			}
 			return "no sha"

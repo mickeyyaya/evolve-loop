@@ -133,7 +133,7 @@ func TestC1108_005_IgnoredProbeNeverOverMatches(t *testing.T) {
 // path rather than extending it.
 func TestC1108_006_ShipStagingContractStillGreen(t *testing.T) {
 	if ok, out := runGoTest(t, shipPkg,
-		"TestShipDirect_CycleClass_.*|TestShipDirect_ManualClass_EmptyManifestFallsBackToChangedSet|"+
+		"TestShipDirect_CycleClass_.*|TestShipDirect_AReportlessWorkspaceAdoptsNoPath|"+
 			"TestShipDirect_NoWorkspacePath_StillStagesExplicitly|TestShipDirect_NonReleaseClasses_NeverAddAll|"+
 			"TestShipDirect_CheckIgnoreProbeFailure_FailsOpen|TestShipFromWorktree_.*|"+
 			"TestStageExplicitPaths_AlreadyStagedDeletion"); !ok {

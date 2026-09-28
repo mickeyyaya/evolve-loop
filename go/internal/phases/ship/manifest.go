@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
@@ -39,21 +38,6 @@ import (
 //      so enforce is operator-activatable without a code edit. Default stays
 //      "shadow" — behavior-preserving.
 
-// manifestReportFiles are the phase reports whose named paths constitute the
-// cycle's declared file manifest. Both entries resolve through the phasecontract
-// SSOT. The TDD report is registered under the phase key "tdd" (its artifact
-// name diverges from the <phase>-report.md convention) — an earlier comment
-// here claimed "test" had no registry phase and kept the name as a literal, but
-// "test" was simply the wrong key, not a missing SSOT.
-//
-// ArtifactName (not ArtifactFilename) for both: every phase named here has a
-// registered artifact, so the convention fallback could only ever mask a lost
-// registration behind a plausible-but-wrong filename.
-var manifestReportFiles = []string{
-	phasecontract.ArtifactName(string(core.PhaseBuild)),
-	phasecontract.ArtifactName(string(core.PhaseTDD)),
-}
-
 // ManifestGateEnforce is the opts.ManifestGate value that switches the gate from
 // shadow (log-only) to fail-closed. Any other value (including "") is shadow.
 const ManifestGateEnforce = "enforce"
@@ -78,7 +62,7 @@ func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, workt
 	if opts.WorkspacePath == "" {
 		return nil
 	}
-	manifest := shipmanifest.Declared(opts.WorkspacePath, manifestReportFiles)
+	manifest := shipmanifest.Declared(opts.WorkspacePath, shipmanifest.ReportFiles())
 	if len(manifest) == 0 {
 		res.Logs = append(res.Logs, "[ship] manifest-gate: no readable phase reports in workspace — reconciliation skipped")
 		return nil

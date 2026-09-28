@@ -36,6 +36,7 @@ func faultRunner(failKey string, exit int, failErr error) CmdRunner {
 
 func TestShipDirect_GitAddFails_Errors(t *testing.T) {
 	repo := makeRepo(t)
+	mustWrite(t, filepath.Join(repo, "change.txt"), "a change to stage\n")
 	opts := &Options{Class: ClassManual, CommitMessage: "msg", ProjectRoot: repo,
 		Runner: faultRunner("git add", 1, nil), Stdout: io.Discard, Stderr: io.Discard}
 	err := shipDirect(context.Background(), opts, &RunResult{}, "main")

@@ -112,7 +112,7 @@ func activeWorktreeForShip(opts *Options) (worktree string, typed bool, err erro
 func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycleBranch string) ([]string, error) {
 	incomingFiles := make(map[string]bool)
 
-	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, rawPathRead("diff", "--name-only", branch, cycleBranch)...)
+	diffOut, err := captureGitOutputAtDir(ctx, opts, worktree, shipmanifest.RawPathRead("diff", "--name-only", branch, cycleBranch)...)
 	if err == nil {
 		for _, line := range strings.Split(diffOut, "\n") {
 			line = strings.TrimSpace(line)
@@ -122,7 +122,7 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 		}
 	}
 
-	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, rawPathRead("status", "--porcelain")...)
+	statusOut, err := captureGitOutputAtDir(ctx, opts, worktree, shipmanifest.RawPathRead("status", "--porcelain")...)
 	if err == nil {
 		for _, line := range strings.Split(statusOut, "\n") {
 			line = strings.TrimSpace(line)
@@ -451,114 +451,97 @@ func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args 
 	return captureGitOutput(ctx, opts, all...)
 }
 
-// rawPathRead prefixes a path-reporting git read with `-c
-// core.quotePath=false` so git emits non-ASCII paths raw;
-// shipmanifest.UnquoteGitPath covers the residue that flag does not suppress.
-func rawPathRead(args ...string) []string {
-	return append([]string{"-c", "core.quotePath=false"}, args...)
-}
-
-// stageExplicitPaths stages a non-release ship as an explicit `git add --
-// <paths>`, never a blanket `git add -A`.
 func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir string) error {
-	root := dir
-	var prefix []string
+	root, prefix := dir, []string{"-C", dir}
 	if dir == "" {
-		root = opts.ProjectRoot
-	} else {
-		prefix = []string{"-C", dir}
+		root, prefix = opts.ProjectRoot, nil
 	}
-
-	out, err := captureGitOutputAtDir(ctx, opts, root, rawPathRead("status", "--porcelain", "-uall")...)
+	read := func(args ...string) (string, error) { return captureGitOutputAtDir(ctx, opts, root, args...) }
+	sel, err := shipmanifest.Select(read, root, opts.WorkspacePath)
 	if err != nil {
 		return err
 	}
-	var manifest []string
-	if opts.WorkspacePath != "" {
-		manifest = shipmanifest.Declared(opts.WorkspacePath, manifestReportFiles)
+	logIgnored(res, sel)
+	add := &explicitAdd{ctx: ctx, opts: opts, prefix: prefix}
+	paths, refused, err := shipmanifest.StageRetrying(sel.Paths, add.attempt)
+	if len(refused) > 0 {
+		res.Logs = append(res.Logs, fmt.Sprintf(
+			"[ship] git refused %d gitignored pathspec(s) the check-ignore probe cannot see (directory-form rules); dropped and retried: %s",
+			len(sel.Paths)-len(paths), strings.Join(refused, " ")))
 	}
-	paths := shipmanifest.Stageable(out, manifest, shipmanifest.RegularFileIn(root))
-	paths = dropIgnoredPaths(ctx, opts, res, root, paths)
-
-	args := make([]string, 0, len(prefix)+3+len(paths))
-	args = append(args, prefix...)
-	// `-A` with a pathspec is a scoped sweep, never repo-wide: within these
-	// paths it stages adds, modifications and deletions idempotently. Plain
-	// `add -- <path>` fatals rc=128 on an already-staged deletion.
-	args = append(args, "add", "-A", "--")
-	args = append(args, paths...)
-	// Tee stderr into a bounded buffer so the failure reason travels in the
-	// ship error, not just the lane log.
-	var errTail bytes.Buffer
-	stderr := io.Writer(&errTail)
-	if opts.Stderr != nil {
-		stderr = io.MultiWriter(opts.Stderr, &errTail)
-	}
-	exit, runErr := opts.run(ctx, "git", args, io.Discard, stderr)
-	if runErr == nil && exit != 0 {
-		// check-ignore can miss a directory hidden by a negated parent
-		// .gitignore rule; trust git's own add refusal instead — it names the
-		// offenders. Drop exactly those and retry once.
-		if offenders := ignoredPathsFromAddRefusal(errTail.String()); len(offenders) > 0 {
-			offenderSet := make(map[string]bool, len(offenders))
-			for _, o := range offenders {
-				offenderSet[o] = true
-			}
-			retryPaths := make([]string, 0, len(paths))
-			for _, p := range paths {
-				if !offenderSet[p] {
-					retryPaths = append(retryPaths, p)
-				}
-			}
-			// A retry that would stage nothing is refused, not reported as
-			// success: an all-ignored offender set stays on the two-strikes
-			// ladder instead of silently discarding the ship's routing.
-			if len(retryPaths) > 0 && len(retryPaths) < len(paths) {
-				res.Logs = append(res.Logs, fmt.Sprintf(
-					"[ship] git refused %d gitignored pathspec(s) the check-ignore probe cannot see (directory-form rules); dropped and retrying: %s",
-					len(paths)-len(retryPaths), strings.Join(offenders, " ")))
-				retryArgs := make([]string, 0, len(prefix)+3+len(retryPaths))
-				retryArgs = append(retryArgs, prefix...)
-				retryArgs = append(retryArgs, "add", "-A", "--")
-				retryArgs = append(retryArgs, retryPaths...)
-				errTail.Reset()
-				exit, runErr = opts.run(ctx, "git", retryArgs, io.Discard, stderr)
-				paths = retryPaths
-			}
-		}
-	}
-	if runErr != nil || exit != 0 {
-		gitStderr := errTail.String()
-		tail := strings.TrimSpace(gitStderr)
-		if len(tail) > 300 {
-			tail = "…" + tail[len(tail)-300:]
-		}
-		// Two-strikes-same-pathspec: a first refusal keeps its retry (a
-		// genuinely flaky add must), but the same pathspec refused twice in a
-		// row is deterministic, not transient.
-		class := core.ShipClassTransient
-		deterministic := exit == 128 && (strings.Contains(gitStderr, "fatal: Invalid path ") ||
-			strings.Contains(gitStderr, " is outside repository at ") ||
-			strings.Contains(gitStderr, "fatal: pathspec ") && strings.Contains(gitStderr, " did not match any files")) ||
-			exit == 1 && strings.Contains(gitStderr, "The following paths are ignored by one of your .gitignore files:")
-		if deterministic || recordStageRefusal(opts.WorkspacePath, paths) {
-			class = core.ShipClassPrecondition
-		}
-		return shipErr(core.CodeGitStageFailed, class, core.StageAtomicShip,
-			fmt.Sprintf("ship: git add failed (rc=%d): %v: %s", exit, runErr, tail),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(runErr), "git_stderr", tail, "worktree", dir)
+	if err != nil {
+		return add.failure(dir, paths)
 	}
 	clearStageRefusal(opts.WorkspacePath)
 	res.Logs = append(res.Logs, fmt.Sprintf(
 		"[ship] staged %d explicit path(s) (declared manifest=%d, changed=%d) — no `git add -A`",
-		len(paths), len(manifest), len(shipmanifest.ChangedPaths(out))))
+		len(paths), len(sel.Manifest), sel.Changed))
 	return nil
 }
 
-// dropIgnoredPaths removes pathspec entries git refuses to stage: a
-// gitignored declared path makes `git add` exit 1 even though it stages the
-// rest. A broken probe fails open with the full set — it must never block
-// ship; if the refusal survives, add's own stderr travels in the ship error.
+func logIgnored(res *RunResult, sel shipmanifest.Selection) {
+	switch {
+	case sel.ProbeErr != nil:
+		res.Logs = append(res.Logs, fmt.Sprintf(
+			"[ship] WARN: check-ignore probe failed (%v) — staging the full declared set", sel.ProbeErr))
+	case len(sel.Ignored) > 0:
+		res.Logs = append(res.Logs, fmt.Sprintf(
+			"[ship] dropped %d gitignored declared path(s) from staging: %s",
+			len(sel.Ignored), strings.Join(sel.Ignored, " ")))
+	}
+}
+
+type explicitAdd struct {
+	ctx     context.Context
+	opts    *Options
+	prefix  []string
+	errTail bytes.Buffer
+	exit    int
+	runErr  error
+}
+
+func (a *explicitAdd) attempt(paths []string) (string, error) {
+	a.errTail.Reset()
+	stderr := io.Writer(&a.errTail)
+	if a.opts.Stderr != nil {
+		stderr = io.MultiWriter(a.opts.Stderr, &a.errTail)
+	}
+	// `-A` with a pathspec is a scoped sweep, never repo-wide: within these
+	// paths it stages adds, modifications and deletions idempotently. Plain
+	// `add -- <path>` fatals rc=128 on an already-staged deletion.
+	args := append(append(append([]string{}, a.prefix...), "add", "-A", "--"), paths...)
+	a.exit, a.runErr = a.opts.run(a.ctx, "git", args, io.Discard, stderr)
+	switch {
+	case a.runErr != nil:
+		return "", a.runErr
+	case a.exit != 0:
+		return a.errTail.String(), fmt.Errorf("git add exited %d", a.exit)
+	}
+	return "", nil
+}
+
+func (a *explicitAdd) failure(dir string, paths []string) error {
+	gitStderr := a.errTail.String()
+	tail := strings.TrimSpace(gitStderr)
+	if len(tail) > 300 {
+		tail = "…" + tail[len(tail)-300:]
+	}
+	// Two-strikes-same-pathspec: a first refusal keeps its retry (a
+	// genuinely flaky add must), but the same pathspec refused twice in a
+	// row is deterministic, not transient.
+	class := core.ShipClassTransient
+	deterministic := a.exit == 128 && (strings.Contains(gitStderr, "fatal: Invalid path ") ||
+		strings.Contains(gitStderr, " is outside repository at ") ||
+		strings.Contains(gitStderr, "fatal: pathspec ") && strings.Contains(gitStderr, " did not match any files")) ||
+		a.exit == 1 && strings.Contains(gitStderr, "The following paths are ignored by one of your .gitignore files:")
+	if deterministic || recordStageRefusal(a.opts.WorkspacePath, paths) {
+		class = core.ShipClassPrecondition
+	}
+	return shipErr(core.CodeGitStageFailed, class, core.StageAtomicShip,
+		fmt.Sprintf("ship: git add failed (rc=%d): %v: %s", a.exit, a.runErr, tail),
+		"git_rc", fmt.Sprintf("%d", a.exit), "git_err", errStr(a.runErr), "git_stderr", tail, "worktree", dir)
+}
+
 // stageRefusalMemoFile is where a lane remembers the pathspec its last `git
 // add` refused.
 const stageRefusalMemoFile = "ship-stage-refusal.txt"
@@ -594,43 +577,6 @@ func clearStageRefusal(workspace string) {
 		return
 	}
 	_ = os.Remove(filepath.Join(workspace, stageRefusalMemoFile))
-}
-
-func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root string, paths []string) []string {
-	if len(paths) == 0 {
-		return paths
-	}
-	probe := rawPathRead(append([]string{"check-ignore", "--"}, paths...)...)
-	out, err := captureGitOutputAtDir(ctx, opts, root, probe...)
-	if err != nil {
-		res.Logs = append(res.Logs, fmt.Sprintf(
-			"[ship] WARN: check-ignore probe failed (%v) — staging the full declared set", err))
-		return paths
-	}
-	ignored := map[string]bool{}
-	for _, p := range strings.Split(out, "\n") {
-		// Decode only genuinely quoted lines; an unquoted line names a path
-		// literally, and fuzzy-matching it would silently under-stage the ship.
-		if p = shipmanifest.UnquoteGitPath(strings.TrimSpace(p)); p != "" {
-			ignored[p] = true
-		}
-	}
-	if len(ignored) == 0 {
-		return paths
-	}
-	kept := make([]string, 0, len(paths))
-	var dropped []string
-	for _, p := range paths {
-		if ignored[p] {
-			dropped = append(dropped, p)
-			continue
-		}
-		kept = append(kept, p)
-	}
-	res.Logs = append(res.Logs, fmt.Sprintf(
-		"[ship] dropped %d gitignored declared path(s) from staging: %s",
-		len(dropped), strings.Join(dropped, " ")))
-	return kept
 }
 
 // stageReleaseSet stages the explicit release pathspec: the versionbump
@@ -743,28 +689,4 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 		}
 	}
 	return nil
-}
-
-// ignoredPathsFromAddRefusal extracts the pathspecs git names in an add
-// refusal — the lines between the ignored-files header and the first hint:.
-// Quoted lines decode through shipmanifest.UnquoteGitPath.
-func ignoredPathsFromAddRefusal(stderr string) []string {
-	const header = "The following paths are ignored by one of your .gitignore files:"
-	lines := strings.Split(stderr, "\n")
-	var out []string
-	in := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case strings.Contains(trimmed, header):
-			in = true
-		case in && strings.HasPrefix(trimmed, "hint:"):
-			return out
-		case in && trimmed != "":
-			if p := shipmanifest.UnquoteGitPath(trimmed); p != "" {
-				out = append(out, p)
-			}
-		}
-	}
-	return out
 }

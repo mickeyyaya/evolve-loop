@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
@@ -34,16 +35,17 @@ func predicateTreeFor(req core.PhaseRequest) (string, error) {
 	if req.Cycle <= 0 || req.RunID == "" || req.AuditRound <= 0 || req.Worktree == "" {
 		return "", fmt.Errorf("host predicate audit requires cycle, run, round, and worktree identity")
 	}
-	snap, err := treefence.Take(context.Background(), req.Worktree)
+	ctx := context.Background()
+	snap, err := treefence.Take(ctx, req.Worktree)
 	if err != nil {
 		return "", fmt.Errorf("capture predicate tree: %w", err)
 	}
-	tracked, err := treefence.TakeTracked(context.Background(), req.Worktree)
+	shipped, err := shipmanifest.TakeShipTree(ctx, shipmanifest.GitIn(ctx, req.Worktree), req.Worktree, req.Workspace)
 	if err != nil {
 		return "", fmt.Errorf("capture predicate ship tree: %w", err)
 	}
-	if snap.Tree != tracked.Tree {
-		return "", undeclaredInputs(snap.Differing(context.Background(), tracked))
+	if snap.Tree != shipped.Tree {
+		return "", undeclaredInputs(snap.Differing(ctx, shipped))
 	}
 	return snap.Tree, nil
 }
