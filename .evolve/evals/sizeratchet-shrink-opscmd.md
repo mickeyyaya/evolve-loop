@@ -6,7 +6,7 @@ score_cap:
   - criterion: "None of the 8 opscmd keys remain in go/internal/sizeratchet/offenders.json (a fixed function's allowance is deleted, never just lowered)"
     max_if_missing: 8
     evidence: "cd go && go test -tags acs -count=1 -run TestC1730_002_OffendersJSONHasNoOpscmdEntriesLeft ./acs/cycle1730/..."
-  - criterion: "The repo-wide sizeratchet.Check gate (every function in the module against offenders.json) reports zero problems — defeats both directions of the cheapest gaming fake (delete-without-shrink, shrink-without-delete)"
+  - criterion: "The repo-wide sizeratchet.Check gate (every function in the module against offenders.json) reports zero problems — defeats delete-without-shrink (an unlisted function past the limit); since 2026-09-28 an allowance is a ceiling, so shrink-without-delete is slack here and the _002 key-absence check catches it"
     max_if_missing: 9
     evidence: "cd go && go test -tags acs -count=1 -run TestC1730_003_ModuleWideRatchetCheckPasses ./acs/cycle1730/..."
   - criterion: "Every *_test.go under go/internal/cli/opscmd that exists at the cycle baseline (ad816b70) is unmodified and undeleted — existing tests pass unmodified; added characterization tests are allowed (criterion 2)"

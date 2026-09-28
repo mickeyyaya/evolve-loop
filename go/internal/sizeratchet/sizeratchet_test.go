@@ -7,8 +7,8 @@ import (
 )
 
 // TestRatchet_ModuleFunctionsFitTheirAllowances is the repo-wide gate: every
-// non-test function in the module is within MaxLines or its listed allowance,
-// and every listed allowance is exact.
+// non-test function in the module is within MaxLines or its listed allowance;
+// an allowance is a ceiling, so a shrunk or stale entry is slack.
 func TestRatchet_ModuleFunctionsFitTheirAllowances(t *testing.T) {
 	spans, err := Walk(moduleRoot(t))
 	if err != nil {
