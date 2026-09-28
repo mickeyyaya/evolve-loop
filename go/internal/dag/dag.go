@@ -20,29 +20,9 @@ import (
 // dependency key is not a known node, a node depends on itself, or the graph
 // contains a cycle — each makes a valid leveling impossible.
 func Levels(nodes []string, deps map[string][]string) ([][]string, error) {
-	known := make(map[string]bool, len(nodes))
-	for _, n := range nodes {
-		known[n] = true
-	}
-	indegree := make(map[string]int, len(nodes))
-	dependents := make(map[string][]string, len(nodes))
-	for _, n := range nodes {
-		indegree[n] = 0 // isolated nodes (no deps) still appear
-	}
-	for node, ds := range deps {
-		if !known[node] {
-			return nil, fmt.Errorf("dag: dependency key %q is not a known node", node)
-		}
-		for _, d := range ds {
-			if !known[d] {
-				return nil, fmt.Errorf("dag: node %q depends on unknown node %q", node, d)
-			}
-			if d == node {
-				return nil, fmt.Errorf("dag: node %q depends on itself", node)
-			}
-			dependents[d] = append(dependents[d], node)
-			indegree[node]++
-		}
+	indegree, dependents, err := dependencyEdges(nodes, deps)
+	if err != nil {
+		return nil, err
 	}
 
 	var ready []string
@@ -75,6 +55,34 @@ func Levels(nodes []string, deps map[string][]string) ([][]string, error) {
 		return nil, fmt.Errorf("dag: graph has a cycle (%d of %d nodes leveled)", placed, len(indegree))
 	}
 	return levels, nil
+}
+
+func dependencyEdges(nodes []string, deps map[string][]string) (map[string]int, map[string][]string, error) {
+	known := make(map[string]bool, len(nodes))
+	for _, n := range nodes {
+		known[n] = true
+	}
+	indegree := make(map[string]int, len(nodes))
+	dependents := make(map[string][]string, len(nodes))
+	for _, n := range nodes {
+		indegree[n] = 0 // isolated nodes (no deps) still appear
+	}
+	for node, ds := range deps {
+		if !known[node] {
+			return nil, nil, fmt.Errorf("dag: dependency key %q is not a known node", node)
+		}
+		for _, d := range ds {
+			if !known[d] {
+				return nil, nil, fmt.Errorf("dag: node %q depends on unknown node %q", node, d)
+			}
+			if d == node {
+				return nil, nil, fmt.Errorf("dag: node %q depends on itself", node)
+			}
+			dependents[d] = append(dependents[d], node)
+			indegree[node]++
+		}
+	}
+	return indegree, dependents, nil
 }
 
 // Flatten concatenates levels into a single serial topological order (level order
