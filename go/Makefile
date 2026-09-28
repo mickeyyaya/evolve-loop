@@ -35,6 +35,12 @@ DIST_TARGETS := \
 DIST_UNIVERSAL := $(DIST_DIR)/evolve-darwin-universal
 DIST_CHECKSUMS := $(DIST_DIR)/checksums.txt
 
+export GIT_CONFIG_COUNT   := 2
+export GIT_CONFIG_KEY_0   := maintenance.auto
+export GIT_CONFIG_VALUE_0 := false
+export GIT_CONFIG_KEY_1   := gc.auto
+export GIT_CONFIG_VALUE_1 := 0
+
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency cover apicover lint tidy clean help dist dist-clean \
         cover-strict apicover-enforce apicover-check \

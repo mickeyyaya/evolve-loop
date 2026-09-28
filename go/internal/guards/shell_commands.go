@@ -242,7 +242,7 @@ func (n ansiCNumeric) decode(src string) (string, int) {
 var shellAssignmentRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 
 var commandWrappers = map[string]bool{
-	"arch": true, "caffeinate": true, "command": true, "env": true, "exec": true, "nice": true,
+	"arch": true, "builtin": true, "caffeinate": true, "command": true, "env": true, "exec": true, "nice": true,
 	"nohup": true, "sudo": true, "time": true, "timeout": true, "xargs": true,
 }
 
@@ -250,8 +250,12 @@ func programName(word string) string {
 	return strings.ToLower(path.Base(word))
 }
 
+var shellReservedWords = map[string]bool{
+	"!": true, "{": true, "if": true, "then": true, "elif": true, "else": true, "do": true, "while": true, "until": true,
+}
+
 func candidateCommands(words []string) [][]string {
-	for len(words) > 0 && shellAssignmentRe.MatchString(words[0]) {
+	for len(words) > 0 && (shellAssignmentRe.MatchString(words[0]) || shellReservedWords[words[0]]) {
 		words = words[1:]
 	}
 	if len(words) == 0 {
