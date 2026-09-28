@@ -46,13 +46,13 @@ Require `headSha == $(git rev-parse origin/main)`, `status == "completed"`, `con
 evolve release-verify-clis
 ```
 
-Require **exit 0** — every CLI row plus the `binary:core-subcommands` row reports `OK`. Anything else → **STOP**; the printed table names the failing target: a CLI whose install/projection broke, or a subcommand the binary no longer answers (the *"installed skills silently break"* regression). Fix forward before publishing. CI enforces the same matrix via the `TestReleaseVerifyCLIMatrix_RealPayload` e2e test (`go` workflow), so a red here predicts a red CI on the release commit.
+Require **exit 0** — every CLI row plus the `binary:core-subcommands` row reports `OK`. Anything else → **STOP**; the printed table names the failing target: a CLI whose install/projection broke, or a subcommand the binary no longer answers (the *"installed skills silently break"* regression). Fix forward before publishing. CI enforces the same matrix via the `TestReleaseVerifyCLIMatrix_RealPayload` e2e test (the Go suite, `go.yml`, which `required CI` and `release` call), so a red here predicts a red CI on the release commit.
 
-**After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch all three workflows, then confirm the binaries actually landed:
+**After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch both workflows (`required.yml`, whose `CI required` job aggregates the Go, plugin, durable-ACS and landing suites, and `release.yml`), then confirm the binaries actually landed:
 
 ```bash
 sha=$(git rev-parse origin/main)
-for wf in go CI release; do
+for wf in required.yml release.yml; do
   rid=$(gh run list --commit "$sha" --workflow "$wf" --json databaseId -q '.[0].databaseId')
   gh run watch "$rid" --exit-status || echo "RED: $wf on $sha"
 done
@@ -63,7 +63,7 @@ gh release view --json assets -q '.assets[].name' | grep -q '\.tar\.gz$' \
 ```
 
 - **All green + binaries present → done.** Report the run URLs + the published asset count (`gh release view --json assets -q '.assets | length'`).
-- **`go`/`CI` red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/evo:publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
+- **`required.yml` red → the release is published but its CI is red.** Do **not** auto-rollback a propagated release — **fix forward**: land the CI fix on `main`, then cut the next patch (`/evo:publish <x.y.z+1>`). Report the failing job + `gh run view --log-failed` excerpt.
 - **`release` red or binaries MISSING → the release shipped without prebuilt binaries** (the one-line installer keeps working via build-from-source, just slower). Fix forward: fix `.goreleaser.yml`/`release.yml`, then `gh run rerun <release-run-id>` if the tag is intact, else cut the next patch.
 
 ## Invocation
