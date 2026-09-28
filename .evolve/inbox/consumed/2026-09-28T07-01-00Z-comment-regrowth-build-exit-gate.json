@@ -19,5 +19,7 @@
     "The plan's batch 0b row and code-comments.md Enforcement name the gate"
   ],
   "source": "wave 22 observation (2026-09-28, cycle 1730 audit H1)",
-  "priority_rationale": "A logic-correct lane FAILed its first audit on a mechanical rule; the streak goal pays for every such round"
+  "priority_rationale": "A logic-correct lane FAILed its first audit on a mechanical rule; the streak goal pays for every such round",
+  "consumed_by": "console landing feat/comment-floor-shadow (2026-09-28): SHIPPED IN SHADOW. commentFloorFailures in the build handoff floor counts the comment lines a build adds across the whole diff (commentaudit.AddedAcrossDiff; moves and renames spared), stage from policy.json comment_floor.stage (shadow default, enforce, off). Acceptance 1-4 met (shadow WARN, enforce rejection naming each line, moved comment and new package doc not counted, stage is config with both stages pinned, plan and code-comments.md updated). Enforce follows the measurement: comment-floor-enforce.",
+  "consumed_at": "2026-09-28T09:40:00Z"
 }
