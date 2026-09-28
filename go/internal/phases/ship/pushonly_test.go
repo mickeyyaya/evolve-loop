@@ -8,14 +8,15 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // Git identity is pinned for deterministic commits.
 func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) string) {
 	t.Helper()
-	base := t.TempDir()
-	root := filepath.Join(base, "repo")
-	remote := filepath.Join(base, "origin.git")
+	remote := gittest.Bare(t).Dir
+	root := gittest.Fixture(t).Dir
 	run := func(dir string, args ...string) string {
 		t.Helper()
 		cmd := exec.Command("git", args...)
@@ -28,14 +29,6 @@ func initPushOnlyRepo(t *testing.T) (string, func(dir string, args ...string) st
 		}
 		return strings.TrimSpace(string(out))
 	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	// -b main matters on CI: without it the bare's HEAD points at the host
-	// default (master when init.defaultBranch is unset), so a later clone
-	// checks out an unborn branch and `push origin main` finds no ref.
-	run(base, "init", "--bare", "-b", "main", remote)
-	run(base, "init", "-b", "main", root)
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -101,8 +94,7 @@ func TestPushOnly_PushesJournaledStrand(t *testing.T) {
 
 func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	root, run := initPushOnlyRepo(t)
-	clone := filepath.Join(filepath.Dir(root), "clone")
-	run(filepath.Dir(root), "clone", filepath.Join(filepath.Dir(root), "origin.git"), clone)
+	clone := gittest.Clone(t, run(root, "remote", "get-url", "origin")).Dir
 	if err := os.WriteFile(filepath.Join(clone, "b.txt"), []byte("console\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

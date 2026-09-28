@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// makeHermeticGitRepo creates a minimal hermetic git repository in a TempDir
+// makeHermeticGitRepo creates a minimal hermetic gittest.Fixture repository
 // with one commit tagged v0.0.1, suitable for testing git-dependent code paths
 // without depending on the operator's real repo state.
 //
@@ -18,7 +20,7 @@ func makeHermeticGitRepo(t *testing.T) string {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not on PATH — skip hermetic git tests")
 	}
-	dir := t.TempDir()
+	dir := gittest.Fixture(t).Dir
 	run := func(args ...string) {
 		t.Helper()
 		cmd := exec.Command("git", args...)
@@ -33,10 +35,6 @@ func makeHermeticGitRepo(t *testing.T) string {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
-	run("init", "-q")
-	run("config", "user.email", "test@test.com")
-	run("config", "user.name", "Test")
-
 	// Write a README and create the initial commit.
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# test\n"), 0o644); err != nil {
 		t.Fatalf("write README: %v", err)

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
@@ -96,10 +97,11 @@ func tempRepoDir(t *testing.T) string {
 //   - a stub ship-binary-fixture file (TOFU pins its SHA)
 //   - initial commit "initial test repo"
 //
-// Returns the absolute repo path. Cleanup is best-effort via tempRepoDir.
+// Returns the absolute repo path. The repo is a gittest.Fixture, so git's
+// automatic maintenance stays off and teardown is retried.
 func makeRepo(t *testing.T) string {
 	t.Helper()
-	repo := tempRepoDir(t)
+	repo := gittest.Fixture(t).Dir
 	mustWrite(t, filepath.Join(repo, ".gitignore"), ".evolve/\n")
 	mustMkdir(t, filepath.Join(repo, ".evolve", "runs", "cycle-1"))
 	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), "")
@@ -109,7 +111,6 @@ func makeRepo(t *testing.T) string {
 	// "tamper" with the ship binary modify this file directly.
 	mustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v1\n")
 
-	runGit(t, repo, "init", "-q")
 	runGit(t, repo, "config", "user.email", "test@evolve-loop.test")
 	runGit(t, repo, "config", "user.name", "Test User")
 	runGit(t, repo, "config", "core.hooksPath", "/dev/null")
@@ -123,13 +124,7 @@ func makeRepo(t *testing.T) string {
 // is fast-forward later.
 func addRemote(t *testing.T, repo string) string {
 	t.Helper()
-	bare := filepath.Join(tempRepoDir(t), "remote.git")
-	out, err := captureWithEBADFRetry(func() ([]byte, error) {
-		return exec.Command("git", "init", "-q", "--bare", bare).CombinedOutput()
-	})
-	if err != nil {
-		t.Fatalf("git init --bare: %v\n%s", err, out)
-	}
+	bare := gittest.Bare(t).Dir
 	runGit(t, repo, "remote", "add", "origin", bare)
 	runGit(t, repo, "branch", "-M", "main")
 	return bare

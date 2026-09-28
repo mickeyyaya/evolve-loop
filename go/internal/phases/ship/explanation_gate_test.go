@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestPhaseRun_MissingRequiredExplanationBlocksBeforeNativeShip(t *testing.T) {
@@ -152,19 +153,9 @@ func TestVerifyNativeExplanation_LegacyNoMarkerIgnoresSyntheticWorkspaceCycle(t 
 func TestVerifyNativeExplanation_FreezesStandaloneHostIdentity(t *testing.T) {
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
-	worktree := t.TempDir()
+	worktree := gittest.Fixture(t).Dir
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatal(err)
-	}
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"config", "user.email", "t@example.com"},
-		{"config", "user.name", "test"},
-	} {
-		cmd := exec.Command("git", append([]string{"-C", worktree}, args...)...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
 	}
 	if err := os.WriteFile(filepath.Join(worktree, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
 		t.Fatal(err)
