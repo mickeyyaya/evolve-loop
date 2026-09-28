@@ -71,19 +71,7 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 	snap.Warnings = append(snap.Warnings, h.Warnings...)
 	snap.Trend, snap.Fingerprints = h.Trend, h.Fingerprints
 
-	ids, warn := c.selectCycles(h)
-	// History limits may never hide a live lane, even when all active lanes
-	// together exceed the configured history limit.
-	selected := map[int]bool{}
-	for _, id := range ids {
-		selected[id] = true
-	}
-	for id, run := range runs {
-		if run.Running && !selected[id] {
-			ids = append(ids, id)
-		}
-	}
-	sort.Sort(sort.Reverse(sort.IntSlice(ids)))
+	ids, warn := c.renderedCycleIDs(h, runs)
 	if warn != "" {
 		snap.Warnings = append(snap.Warnings, warn)
 	}
@@ -102,6 +90,23 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 	}
 	snap.Trend.RoundHistogram = roundHistogram(snap.Cycles)
 	return snap, h.Dossiers
+}
+
+func (c *collector) renderedCycleIDs(h history, runs map[int]LoopStatus) ([]int, string) {
+	ids, warn := c.selectCycles(h)
+	// History limits may never hide a live lane, even when all active lanes
+	// together exceed the configured history limit.
+	selected := map[int]bool{}
+	for _, id := range ids {
+		selected[id] = true
+	}
+	for id, run := range runs {
+		if run.Running && !selected[id] {
+			ids = append(ids, id)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.IntSlice(ids)))
+	return ids, warn
 }
 
 // selectCycles returns the cycle ids to render, newest first: every run
