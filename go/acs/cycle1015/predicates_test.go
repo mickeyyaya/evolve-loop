@@ -19,7 +19,7 @@
 //
 //   - 001–003 run the in-package behavioral tests (package main, go/cmd/evolve,
 //     which drives runTokensReport end-to-end over a real temp .evolve/runs tree)
-//     as a SUBPROCESS and require an explicit "--- PASS:" marker for each named
+//     as a SUBPROCESS and require structured run and PASS events for each named
 //     test. A bare exit-0 is rejected, so a renamed/skipped/deleted test cannot
 //     green the gate.
 //
@@ -39,7 +39,6 @@
 package cycle1015
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
@@ -51,22 +50,12 @@ import (
 const tokensPkg = "github.com/mickeyyaya/evolve-loop/go/cmd/evolve"
 
 // runTokensTest runs `go test -run <pattern> <tokensPkg>` as a subprocess
-// (verbose, no cache) and fails unless every named test reports an explicit PASS.
-// A bare exit-0 is not enough: each wanted test must show "--- PASS: <name>", so
+// (verbose, no cache) and fails unless every named test has structured run and PASS events.
+// A bare exit-0 is not enough: each wanted test must execute and pass in the JSON event stream, so
 // a renamed, skipped, or deleted test cannot silently green the gate.
 func runTokensTest(t *testing.T, pattern string, wantPass ...string) {
 	t.Helper()
-	stdout, stderr, code, err := acsassert.SubprocessOutput(
-		"go", "test", "-count=1", "-v", "-run", pattern, tokensPkg)
-	if code != 0 || err != nil {
-		t.Fatalf("go test -run %s %s exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s",
-			pattern, tokensPkg, code, err, stdout, stderr)
-	}
-	for _, name := range wantPass {
-		if !strings.Contains(stdout, "--- PASS: "+name) {
-			t.Errorf("%s did not report PASS (renamed, skipped, or not run):\n%s", name, stdout)
-		}
-	}
+	acsassert.GoTests(t, acsassert.GoTestSpec{Package: tokensPkg, Pattern: pattern, Names: wantPass})
 }
 
 // TestC1015_001_report_surfaces_tripwire_naming_cli_agent_cycle — AC1+AC2. A
