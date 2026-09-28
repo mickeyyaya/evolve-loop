@@ -26,31 +26,13 @@ import (
 //     would silently skip the envelope floor.
 //   - A phase with no profile is skipped (we never pin what we cannot validate).
 func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicyJSON []byte, profLoader *profiles.Loader) ([]byte, error) {
-	rr := Recommend(rep, cfg)
-	var preset *Preset
-	for i := range rr.Presets {
-		if rr.Presets[i].Name == presetName {
-			preset = &rr.Presets[i]
-			break
-		}
+	preset, err := findPreset(Recommend(rep, cfg), presetName)
+	if err != nil {
+		return nil, err
 	}
-	if preset == nil {
-		return nil, fmt.Errorf("setup apply: unknown preset %q (have %s)", presetName, presetNamesOf(rr))
-	}
-
-	// Parse the existing policy losslessly (raw map — never the typed Policy,
-	// which would reorder keys and drop any unmodeled future key).
-	obj := map[string]json.RawMessage{}
-	if len(strings.TrimSpace(string(existingPolicyJSON))) > 0 {
-		if err := json.Unmarshal(existingPolicyJSON, &obj); err != nil {
-			return nil, fmt.Errorf("setup apply: existing policy.json is malformed (%w); refusing to clobber", err)
-		}
-	}
-	pins := map[string]policy.Pin{}
-	if raw, ok := obj["pins"]; ok {
-		if err := json.Unmarshal(raw, &pins); err != nil {
-			return nil, fmt.Errorf("setup apply: existing policy.json pins block is malformed (%w); refusing to clobber", err)
-		}
+	obj, pins, err := parseExistingPolicy(existingPolicyJSON)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, a := range preset.Assignments {
@@ -73,6 +55,37 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 		}
 	}
 
+	return encodePolicy(obj, pins)
+}
+
+func findPreset(rr RecommendReport, presetName string) (*Preset, error) {
+	for i := range rr.Presets {
+		if rr.Presets[i].Name == presetName {
+			return &rr.Presets[i], nil
+		}
+	}
+	return nil, fmt.Errorf("setup apply: unknown preset %q (have %s)", presetName, presetNamesOf(rr))
+}
+
+func parseExistingPolicy(existingPolicyJSON []byte) (map[string]json.RawMessage, map[string]policy.Pin, error) {
+	// Parse the existing policy losslessly (raw map — never the typed Policy,
+	// which would reorder keys and drop any unmodeled future key).
+	obj := map[string]json.RawMessage{}
+	if len(strings.TrimSpace(string(existingPolicyJSON))) > 0 {
+		if err := json.Unmarshal(existingPolicyJSON, &obj); err != nil {
+			return nil, nil, fmt.Errorf("setup apply: existing policy.json is malformed (%w); refusing to clobber", err)
+		}
+	}
+	pins := map[string]policy.Pin{}
+	if raw, ok := obj["pins"]; ok {
+		if err := json.Unmarshal(raw, &pins); err != nil {
+			return nil, nil, fmt.Errorf("setup apply: existing policy.json pins block is malformed (%w); refusing to clobber", err)
+		}
+	}
+	return obj, pins, nil
+}
+
+func encodePolicy(obj map[string]json.RawMessage, pins map[string]policy.Pin) ([]byte, error) {
 	if len(pins) == 0 {
 		delete(obj, "pins")
 	} else {

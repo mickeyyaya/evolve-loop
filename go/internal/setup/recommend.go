@@ -74,11 +74,7 @@ func Recommend(rep DetectReport, cfg PresetConfig) RecommendReport {
 	builderPS, hasBuilder := phaseByRoleOK(rep, "builder")
 	auditorPS, hasAuditor := phaseByRoleOK(rep, "auditor")
 
-	def := cfg.Default
-	if def == "" && len(cfg.Presets) > 0 {
-		def = cfg.Presets[0].Name
-	}
-	rr := RecommendReport{AvailableFamilies: avail, CrossFamilyOK: crossOK, Default: def}
+	rr := RecommendReport{AvailableFamilies: avail, CrossFamilyOK: crossOK, Default: defaultPresetName(cfg)}
 	for _, spec := range cfg.Presets {
 		p := Preset{Name: spec.Name, Description: spec.Description}
 
@@ -90,35 +86,8 @@ func Recommend(rep DetectReport, cfg PresetConfig) RecommendReport {
 		}
 
 		for _, ps := range rep.Phases {
-			tier, clamped := clampTier(biasTier(spec.TierBias, ps.DefaultTier, ps.Envelope), ps.Envelope)
-			prefBase := baseCLI(ps.DefaultCLI)
-
-			var (
-				cli      string
-				fallback bool
-				warn     string
-			)
-			switch {
-			case ps.Role == "builder" && bldFam != "":
-				cli, fallback = bldFam, bldFam != prefBase
-			case ps.Role == "auditor" && audFam != "":
-				cli, fallback = audFam, audFam != prefBase
-			default:
-				cli, fallback, warn = chooseCLI(ps.Role, prefBase, ps.AllowedCLIs, avail)
-			}
-
-			model := ""
-			if cs, ok := cliByBase[cli]; ok && cs.TierModels != nil {
-				model = cs.TierModels[tier]
-			}
-
-			a := Assignment{
-				Role: ps.Role, CLI: cli, Tier: tier, Model: model,
-				TierClamped: clamped, CLIFallback: fallback, Warning: warn,
-				DiffersFromDefault: cli != prefBase || tier != effectiveDefaultTier(ps.DefaultTier, ps.Envelope),
-				Rationale:          rationale(spec.Name, cli, tier, clamped, fallback, warn),
-			}
-			if warn != "" {
+			a := assignPhase(spec, ps, bldFam, audFam, avail, cliByBase)
+			if a.Warning != "" {
 				p.Degraded = true
 			}
 			p.Assignments = append(p.Assignments, a)
@@ -126,6 +95,45 @@ func Recommend(rep DetectReport, cfg PresetConfig) RecommendReport {
 		rr.Presets = append(rr.Presets, p)
 	}
 	return rr
+}
+
+func defaultPresetName(cfg PresetConfig) string {
+	def := cfg.Default
+	if def == "" && len(cfg.Presets) > 0 {
+		def = cfg.Presets[0].Name
+	}
+	return def
+}
+
+func assignPhase(spec PresetSpec, ps PhaseStatus, bldFam, audFam string, avail []string, cliByBase map[string]CLIStatus) Assignment {
+	tier, clamped := clampTier(biasTier(spec.TierBias, ps.DefaultTier, ps.Envelope), ps.Envelope)
+	prefBase := baseCLI(ps.DefaultCLI)
+
+	var (
+		cli      string
+		fallback bool
+		warn     string
+	)
+	switch {
+	case ps.Role == "builder" && bldFam != "":
+		cli, fallback = bldFam, bldFam != prefBase
+	case ps.Role == "auditor" && audFam != "":
+		cli, fallback = audFam, audFam != prefBase
+	default:
+		cli, fallback, warn = chooseCLI(ps.Role, prefBase, ps.AllowedCLIs, avail)
+	}
+
+	model := ""
+	if cs, ok := cliByBase[cli]; ok && cs.TierModels != nil {
+		model = cs.TierModels[tier]
+	}
+
+	return Assignment{
+		Role: ps.Role, CLI: cli, Tier: tier, Model: model,
+		TierClamped: clamped, CLIFallback: fallback, Warning: warn,
+		DiffersFromDefault: cli != prefBase || tier != effectiveDefaultTier(ps.DefaultTier, ps.Envelope),
+		Rationale:          rationale(spec.Name, cli, tier, clamped, fallback, warn),
+	}
 }
 
 // effectiveDefaultTier resolves a phase's baseline tier: its profile

@@ -593,22 +593,7 @@ func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
 
 	// Re-pin expected_ship_sha to the committed blob (best-effort: a missing
 	// state.json is not a release defect, e.g. fresh clones).
-	statePath := filepath.Join(repoRoot, ".evolve", "state.json")
-	if raw, rerr := os.ReadFile(statePath); rerr == nil {
-		var st map[string]any
-		if jerr := json.Unmarshal(raw, &st); jerr == nil {
-			if cur, _ := st["expected_ship_sha"].(string); cur != blobSHA {
-				st["expected_ship_sha"] = blobSHA
-				st["expected_ship_version"] = target
-				if body, merr := json.MarshalIndent(st, "", "  "); merr == nil {
-					tmp := statePath + ".tmp"
-					if werr := os.WriteFile(tmp, body, 0o644); werr == nil {
-						_ = os.Rename(tmp, statePath)
-					}
-				}
-			}
-		}
-	}
+	repinExpectedShipSHA(filepath.Join(repoRoot, ".evolve", "state.json"), target, blobSHA)
 
 	verOut, err := exec.Command(binAbs, "--version").CombinedOutput()
 	if err != nil {
@@ -618,12 +603,40 @@ func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
 		return fmt.Errorf("release-verify: %s --version = %q does not report target %s (ldflags stamp missing)", binRel, strings.TrimSpace(string(verOut)), target)
 	}
 
-	tag := "v" + target
+	return ensureLocalTag(repoRoot, "v"+target, commitSHA)
+}
+
+func repinExpectedShipSHA(statePath, target, blobSHA string) {
+	raw, rerr := os.ReadFile(statePath)
+	if rerr != nil {
+		return
+	}
+	var st map[string]any
+	if jerr := json.Unmarshal(raw, &st); jerr != nil {
+		return
+	}
+	if cur, _ := st["expected_ship_sha"].(string); cur == blobSHA {
+		return
+	}
+	st["expected_ship_sha"] = blobSHA
+	st["expected_ship_version"] = target
+	body, merr := json.MarshalIndent(st, "", "  ")
+	if merr != nil {
+		return
+	}
+	tmp := statePath + ".tmp"
+	if werr := os.WriteFile(tmp, body, 0o644); werr == nil {
+		_ = os.Rename(tmp, statePath)
+	}
+}
+
+func ensureLocalTag(repoRoot, tag, commitSHA string) error {
 	tagOut, _ := exec.Command("git", "-C", repoRoot, "tag", "-l", tag).Output()
-	if strings.TrimSpace(string(tagOut)) == "" {
-		if out, terr := exec.Command("git", "-C", repoRoot, "tag", tag, commitSHA).CombinedOutput(); terr != nil {
-			return fmt.Errorf("release-verify: local tag %s absent and creation failed: %v (%s)", tag, terr, strings.TrimSpace(string(out)))
-		}
+	if strings.TrimSpace(string(tagOut)) != "" {
+		return nil
+	}
+	if out, terr := exec.Command("git", "-C", repoRoot, "tag", tag, commitSHA).CombinedOutput(); terr != nil {
+		return fmt.Errorf("release-verify: local tag %s absent and creation failed: %v (%s)", tag, terr, strings.TrimSpace(string(out)))
 	}
 	return nil
 }

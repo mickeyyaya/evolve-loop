@@ -198,7 +198,24 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 	}
 
 	// CLIs — group bridge.Doctor's per-driver rows by base family.
-	rep := doctorFn(ctx)
+	clis := detectCLIs(doctorFn(ctx), capFn, env)
+
+	// Phases — current routing + profile constraints, then the user's
+	// .evolve/policy.json pins overlaid (Step 9 removed llm_config.json; profiles
+	// own the default CLI+tier and policy pins are the user-owned override layer
+	// the /setup skill writes).
+	pol, polErr := policy.Load(filepath.Join(o.EvolveDir, "policy.json"))
+	phases := detectPhases(o, env, pol, polErr)
+
+	dr := DetectReport{ScannedAt: now().UTC().Format(time.RFC3339), CLIs: clis, Phases: phases}
+	if polErr != nil {
+		dr.PolicyError = polErr.Error()
+	}
+	dr.SetupCompletedAt, dr.SetupVersion = readStateMarker(o.EvolveDir)
+	return dr
+}
+
+func detectCLIs(rep bridge.DoctorReport, capFn func(string) string, env func(string) string) []CLIStatus {
 	seen := map[string]bool{}
 	var clis []CLIStatus
 	for _, r := range rep.Results {
@@ -226,13 +243,11 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 		clis = append(clis, cs)
 	}
 	sort.Slice(clis, func(i, j int) bool { return clis[i].CLI < clis[j].CLI })
+	return clis
+}
 
-	// Phases — current routing + profile constraints, then the user's
-	// .evolve/policy.json pins overlaid (Step 9 removed llm_config.json; profiles
-	// own the default CLI+tier and policy pins are the user-owned override layer
-	// the /setup skill writes).
+func detectPhases(o DetectOptions, env func(string) string, pol policy.Policy, polErr error) []PhaseStatus {
 	profilesDir := filepath.Join(o.EvolveDir, "profiles")
-	pol, polErr := policy.Load(filepath.Join(o.EvolveDir, "policy.json"))
 	profLoader := profiles.NewFromDir(profilesDir)
 	var phases []PhaseStatus
 	for _, role := range Roles {
@@ -253,32 +268,32 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 		// policy (polErr != nil) is reported via dr.PolicyError below — skip the
 		// overlay rather than act on a partially-parsed Policy.
 		if pin, ok := pol.PinFor(role); polErr == nil && ok {
-			if pin.CLI != "" {
-				ps.CurrentCLI = pin.CLI
-			}
-			if pin.Model != "" {
-				ps.CurrentTier = pin.Model
-			}
-			ps.Source = "policy-pin"
-			if prof, err := profLoader.Get(role); err == nil {
-				if verr := policy.ValidatePin(role, pin, &prof); verr != nil {
-					ps.PinViolation = verr.Error()
-				}
-			} else {
-				// A pin for a phase with no profile can't be floor-checked — say so
-				// rather than show a false green (source=policy-pin, no violation).
-				ps.PinViolation = fmt.Sprintf("profile %s.json not found; pin cannot be validated", role)
-			}
+			ps = withPolicyPin(ps, pin, profLoader)
 		}
 		phases = append(phases, ps)
 	}
+	return phases
+}
 
-	dr := DetectReport{ScannedAt: now().UTC().Format(time.RFC3339), CLIs: clis, Phases: phases}
-	if polErr != nil {
-		dr.PolicyError = polErr.Error()
+func withPolicyPin(ps PhaseStatus, pin policy.Pin, profLoader *profiles.Loader) PhaseStatus {
+	role := ps.Role
+	if pin.CLI != "" {
+		ps.CurrentCLI = pin.CLI
 	}
-	dr.SetupCompletedAt, dr.SetupVersion = readStateMarker(o.EvolveDir)
-	return dr
+	if pin.Model != "" {
+		ps.CurrentTier = pin.Model
+	}
+	ps.Source = "policy-pin"
+	if prof, err := profLoader.Get(role); err == nil {
+		if verr := policy.ValidatePin(role, pin, &prof); verr != nil {
+			ps.PinViolation = verr.Error()
+		}
+	} else {
+		// A pin for a phase with no profile can't be floor-checked — say so
+		// rather than show a false green (source=policy-pin, no violation).
+		ps.PinViolation = fmt.Sprintf("profile %s.json not found; pin cannot be validated", role)
+	}
+	return ps
 }
 
 // authMode synthesizes the auth mode. For claude the README precedence holds

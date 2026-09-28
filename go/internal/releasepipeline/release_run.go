@@ -51,15 +51,7 @@ type releaseRun struct {
 // returned to the caller even on the two setup failures, which is why those
 // return the object rather than nil.
 func newReleaseRun(opts Options) (*releaseRun, error) {
-	r := &releaseRun{opts: opts, res: Result{Target: opts.Target}}
-
-	logw := opts.Stderr
-	if logw == nil {
-		logw = io.Discard
-	}
-	r.logf = func(format string, args ...any) {
-		fmt.Fprintf(logw, "[release-pipeline] "+format+"\n", args...)
-	}
+	r := &releaseRun{opts: opts, res: Result{Target: opts.Target}, logf: releaseLogf(opts.Stderr)}
 
 	// Argument validation (semver target).
 	if !semvercheck.IsSemver(opts.Target) {
@@ -67,17 +59,7 @@ func newReleaseRun(opts Options) (*releaseRun, error) {
 	}
 
 	// Resolve FromTag if not provided.
-	r.fromTag = opts.FromTag
-	if r.fromTag == "" {
-		if t, err := resolvePrevTag(opts.RepoRoot); err == nil && t != "" {
-			r.fromTag = t
-		} else {
-			r.logf("WARN: no previous tag found; changelog range will start from initial commit")
-			if init, err := resolveInitCommit(opts.RepoRoot); err == nil {
-				r.fromTag = init
-			}
-		}
-	}
+	r.resolveFromTag()
 
 	// Resolve now seam.
 	r.now = opts.Now
@@ -86,15 +68,7 @@ func newReleaseRun(opts Options) (*releaseRun, error) {
 	}
 
 	// Steps defaults: only overlay missing fields.
-	r.steps = applyDefaultSteps(opts.Steps)
-	// Thread StrictPass into the default preflight path. When the caller
-	// provides their own Steps.Preflight (e.g. in tests), they own strictPass.
-	if opts.Steps.Preflight == nil {
-		sp := opts.StrictPass
-		r.steps.Preflight = func(repoRoot, target string, dryRun, skipTests bool) error {
-			return runPreflightLib(repoRoot, target, dryRun, skipTests, sp)
-		}
-	}
+	r.steps = resolveSteps(opts)
 
 	r.logf("target: v%s", opts.Target)
 	r.logf("changelog range: %s..HEAD", r.fromTag)
@@ -111,6 +85,42 @@ func newReleaseRun(opts Options) (*releaseRun, error) {
 	r.res.JournalPath = journalPath
 	r.logf("journal: %s", journalPath)
 	return r, nil
+}
+
+func releaseLogf(logw io.Writer) func(string, ...any) {
+	if logw == nil {
+		logw = io.Discard
+	}
+	return func(format string, args ...any) {
+		fmt.Fprintf(logw, "[release-pipeline] "+format+"\n", args...)
+	}
+}
+
+func (r *releaseRun) resolveFromTag() {
+	r.fromTag = r.opts.FromTag
+	if r.fromTag == "" {
+		if t, err := resolvePrevTag(r.opts.RepoRoot); err == nil && t != "" {
+			r.fromTag = t
+		} else {
+			r.logf("WARN: no previous tag found; changelog range will start from initial commit")
+			if init, err := resolveInitCommit(r.opts.RepoRoot); err == nil {
+				r.fromTag = init
+			}
+		}
+	}
+}
+
+func resolveSteps(opts Options) Steps {
+	steps := applyDefaultSteps(opts.Steps)
+	// Thread StrictPass into the default preflight path. When the caller
+	// provides their own Steps.Preflight (e.g. in tests), they own strictPass.
+	if opts.Steps.Preflight == nil {
+		sp := opts.StrictPass
+		steps.Preflight = func(repoRoot, target string, dryRun, skipTests bool) error {
+			return runPreflightLib(repoRoot, target, dryRun, skipTests, sp)
+		}
+	}
+	return steps
 }
 
 // runPrePublishStep is the shape all six pre-publish steps share. journalName
@@ -182,23 +192,33 @@ func (r *releaseRun) prePublish() error {
 	// source so the marketplace binary is in sync with plugin.json:version
 	// after this release. Without this step, operators install the new
 	// plugin version but run the previous build. Best-effort in dry-run.
-	if o.DryRun {
-		r.logf("step: rebuild-binary (DRY-RUN — would run `go build -ldflags '-X …version=%s …'` -o go/evolve ./cmd/evolve from <RepoRoot>/go)", o.Target)
-		r.skipPrePublishStep("rebuild-binary")
-	} else {
-		r.logf("step: rebuild-binary")
-		if err := r.runPrePublishStep("rebuild-binary", "rebuild-binary", func() error {
-			// The literal false is carried over verbatim: this branch only
-			// runs when o.DryRun is already false, so the two are identical
-			// here and swapping in o.DryRun would be an unobservable,
-			// unmotivated edit inside a behavior-preserving change.
-			return r.steps.RebuildBinary(o.RepoRoot, o.Target, false)
-		}); err != nil {
-			return err
-		}
+	if err := r.rebuildBinary(); err != nil {
+		return err
 	}
 
 	// Step 4: release.sh consistency check (skipped in dry-run).
+	return r.releaseShCheck()
+}
+
+func (r *releaseRun) rebuildBinary() error {
+	o := r.opts
+	if o.DryRun {
+		r.logf("step: rebuild-binary (DRY-RUN — would run `go build -ldflags '-X …version=%s …'` -o go/evolve ./cmd/evolve from <RepoRoot>/go)", o.Target)
+		r.skipPrePublishStep("rebuild-binary")
+		return nil
+	}
+	r.logf("step: rebuild-binary")
+	return r.runPrePublishStep("rebuild-binary", "rebuild-binary", func() error {
+		// The literal false is carried over verbatim: this branch only
+		// runs when o.DryRun is already false, so the two are identical
+		// here and swapping in o.DryRun would be an unobservable,
+		// unmotivated edit inside a behavior-preserving change.
+		return r.steps.RebuildBinary(o.RepoRoot, o.Target, false)
+	})
+}
+
+func (r *releaseRun) releaseShCheck() error {
+	o := r.opts
 	if o.DryRun {
 		r.logf("step: release.sh-check (DRY-RUN — skipping; markers not actually bumped)")
 		r.skipPrePublishStep("release-sh-check")
