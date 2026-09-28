@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — every Make test recipe runs git with background maintenance off (2026-09-29)
+
+- The raw-git fixture flake (`t.TempDir` cleanup: `unlinkat .../.git...: directory not empty`, from git 2.47's detached `git maintenance run --auto` writing after a commit returned) failed CI four times: the dossier fixture twice, then `internal/core` on #698 and #705, each time in a change that touched neither the test nor its fixture. `internal/core` alone still holds 37 raw fixtures.
+- `go/Makefile` exports `GIT_CONFIG_COUNT` with `maintenance.auto=false` and `gc.auto=0`, so every git run under `make test`, `make test-integration` (CI and release) and `make test-e2e` sees them. `internal/gittest` fixtures already persist the same settings per repo; the raw-git ratchet keeps shrinking the raw ones (inbox item `raw-git-fixtures-migrate-to-gittest`).
+- Test: `TestMakeTestRecipes_RunGitWithBackgroundMaintenanceOff` runs a probe through the real recipes with the variables removed from its own environment (red before the export: `git config maintenance.auto = ""`). Docs: `go/docs/testing.md`.
+
 ## Fixed — a closeout no longer moves main under a sibling lane mid-wave (cycle 1704, 2026-09-28)
 
 Salvaged from the unlanded 2026-09-26 worktree (`fix/dossier-commits-at-wave-boundary`) and ported test-first onto current main. On 2026-09-26, cycle 1704 passed audit with WARN. Cycle 1705 then sealed FAIL, and its closeout committed its dossier to the plane's `main`. Ship refused 1704 (`AUDIT_BINDING_HEAD_MOVED`), and the forced re-audit rated the same bytes stricter and failed them. After a correction round, 1704 went through a rebase and a rebuild for the same bookkeeping commit.

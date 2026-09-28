@@ -32,6 +32,8 @@ cost is how it's *selected*.
 | **everything** | composed tiers | Integration with race, then E2E without race using `e2e evolve_test_phases`, then durable ACS. CI runs durable ACS in its own `ci.yml` job. | `make test-all` |
 | **spike** (manual diagnostic) | `//go:build spike` | Live-LLM diagnostics (e.g. `TestSpikeAdvisorLive` — the real advisor on Opus). **Not in CI**: expensive (real quota) and never asserts failure — a developer probe, run on demand. | `go test ./cmd/evolve/ -tags spike -run TestSpikeAdvisorLive -v -timeout 300s` |
 
+**Git's background maintenance is off in every Make recipe.** `go/Makefile` exports `GIT_CONFIG_COUNT` with `maintenance.auto=false` and `gc.auto=0`, so every git a test runs under a Make recipe (CI's `make test-integration` and `make test-e2e`, and local `make test`) sees them at command scope. From git 2.47 a commit otherwise detaches `git maintenance run --auto`, which keeps writing in a fixture's `.git` after the command returned and fails `t.TempDir`'s cleanup with `directory not empty`. That flake class failed CI four times (the dossier fixture twice, then `internal/core` on #698 and #705), in fixtures built with a raw `git init`. `internal/gittest` fixtures persist the same settings in each repo's own config, so they are quiet under a direct `go test` too; raw fixtures are quiet only under a Make recipe, which is why the raw-git ratchet still shrinks them (inbox item `raw-git-fixtures-migrate-to-gittest`). A test that sets its own `GIT_CONFIG_COUNT` overrides the recipe's. `TestMakeTestRecipes_RunGitWithBackgroundMaintenanceOff` runs a probe through the real recipes with the variables removed from its own environment.
+
 A file's build tag must sit at the very top, followed by a blank line:
 
 ```go
