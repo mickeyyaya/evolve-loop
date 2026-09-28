@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
@@ -31,13 +32,8 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	start := prep.start
 	phase := prep.phase
 	prompt := prep.prompt
-	artifactPath := prep.artifactPath
-	profilePath := prep.profilePath
 	plan := resolved.plan
 	overlayPolicy := resolved.overlayPolicy
-	permissionMode := resolved.permissionMode
-	interactivePolicy := resolved.interactivePolicy
-	sysPrompt := resolved.systemPrompt
 	model := plan.Model
 
 	fence := takeWorktreeFence(ctx, phase, req)
@@ -45,6 +41,8 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	var bres core.BridgeResponse
 	var bridgeErr error
 	var attemptLog []string
+	var wall bridgechain.WallKeeper
+	base := b.baseRequest(req, prep, resolved)
 	// The tier is passed as the model; the bridge maps it per CLI, so the runner resolves no model itself.
 	tieredRes := llmroute.DispatchTiered(plan, func(candidateCLI, tier string) (int, error) {
 		i := len(attemptLog)
@@ -60,30 +58,10 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		overlayDispatch.Signals = req.Signals
 		overlaySkills := overlayPolicy.ResolveOverlays(overlayDispatch)
 		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, overlaySkills, tier))
-		bres, bridgeErr = b.bridge.Launch(ctx, core.BridgeRequest{
-			CLI:                 candidateCLI,
-			Profile:             profilePath,
-			Model:               tier,
-			Prompt:              prompt,
-			Workspace:           req.Workspace,
-			Worktree:            req.Worktree,
-			RunID:               req.RunID,
-			ProjectRoot:         req.ProjectRoot,
-			ArtifactPath:        artifactPath,
-			SecondaryArtifacts:  secondaryArtifacts(b.hooks, req),
-			Agent:               phase,
-			Cycle:               req.Cycle,
-			BudgetScale:         req.BudgetScale,
-			RequireSandbox:      requiresExplanationSandbox(phase, req),
-			Env:                 req.Env,
-			PermissionMode:      permissionMode,
-			InteractivePolicy:   interactivePolicy,
-			SystemPrompt:        sysPrompt,
-			Skills:              overlaySkills,
-			CorrectionDirective: req.CorrectionDirective,
-			OperatorDirectives:  req.OperatorDirectives,
-			ChainAttempt:        true, // one attempt of this walk, so a chain-walking handle passes it through
-		})
+		attempt := base
+		attempt.CLI, attempt.Model, attempt.Skills = candidateCLI, tier, overlaySkills
+		bres, bridgeErr = b.bridge.Launch(ctx, attempt)
+		wall.Observe(candidateCLI+"@"+tier, bres, bridgeErr)
 		// Per attempt, so the events file cycleclassify reads describes the last CLI that ran.
 		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
@@ -98,6 +76,10 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	}, func(from, to string) {
 		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
 	})
+	if wall.Surfaces(tieredRes, bres) {
+		log.Diag().Infof("[runner] phase=%s dispatch chain exhausted after a quota wall: surfacing the wall over the last rung's exit %d, so the cycle defers\n", phase, bres.ExitCode)
+		bres, bridgeErr = wall.Surface(tieredRes, bres, bridgeErr)
+	}
 	// The terminal attempt's tier, below the resolved one after a step-down; empty only without candidates.
 	resolvedModel := tieredRes.Tier
 	if resolvedModel == "" {
@@ -117,5 +99,29 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		durationMS:       durationMS,
 		worktreeVerified: verified,
 		fenceDiagnostics: fenceDiags,
+	}
+}
+
+func (b *BaseRunner) baseRequest(req core.PhaseRequest, prep phasePreparation, resolved phaseDispatchPlan) core.BridgeRequest {
+	return core.BridgeRequest{
+		Profile:             prep.profilePath,
+		Prompt:              prep.prompt,
+		Workspace:           req.Workspace,
+		Worktree:            req.Worktree,
+		RunID:               req.RunID,
+		ProjectRoot:         req.ProjectRoot,
+		ArtifactPath:        prep.artifactPath,
+		SecondaryArtifacts:  secondaryArtifacts(b.hooks, req),
+		Agent:               prep.phase,
+		Cycle:               req.Cycle,
+		BudgetScale:         req.BudgetScale,
+		RequireSandbox:      requiresExplanationSandbox(prep.phase, req),
+		Env:                 req.Env,
+		PermissionMode:      resolved.permissionMode,
+		InteractivePolicy:   resolved.interactivePolicy,
+		SystemPrompt:        resolved.systemPrompt,
+		CorrectionDirective: req.CorrectionDirective,
+		OperatorDirectives:  req.OperatorDirectives,
+		ChainAttempt:        true,
 	}
 }

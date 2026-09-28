@@ -92,6 +92,8 @@ func TestExplanationPersonaAndSchemaContract_NoDrift(t *testing.T) {
 			"Change record:",
 			"top_n[].documentation",
 			"canonical feature docs",
+			"honest negative judgment forces the overall Audit to fail",
+			"WARN blocks shipping",
 		} {
 			if strings.Contains(body, obsolete) {
 				t.Errorf("%s retains obsolete explanation contract token %q", rel, obsolete)

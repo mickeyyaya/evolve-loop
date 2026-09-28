@@ -75,6 +75,7 @@
     }
   ],
   "stub": false,
+  "toolless": true,
   "model_tier_map": {
     "fast": "qwen3:7b",
     "balanced": "qwen3:30b",

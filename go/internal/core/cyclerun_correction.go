@@ -270,7 +270,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			if rerr != nil {
 				if isQuotaWall(rerr) {
 					recordCorrection(interaction.ResultQuotaDeferred)
-					return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+corr)
+					return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+corr, rerr)
 				}
 				recordCorrection(interaction.ResultDispatchFailed)
 				phaseErr := fmt.Errorf("phase %q correction %d dispatch failed: %w", next, corr, rerr)

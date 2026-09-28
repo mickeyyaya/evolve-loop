@@ -1,0 +1,22 @@
+{
+  "id": "explanation-correction-is-a-rung",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.85,
+  "title": "X2: a documentation correction for a verified build is a rung, not an audit round",
+  "files": [
+    "go/internal/phases/audit/explanation_review_gate.go",
+    "go/internal/core/audit_fail_decision.go",
+    "agents/evolve-auditor-reference.md",
+    "docs/architecture/logic-first-delivery-design.md"
+  ],
+  "summary": "From the inbox architecture review (N2); design doc \u00a75.6 X2 and \u00a77.7. Today an inaccurate explanation document of verified code costs a full audit-repair round (tdd, build, audit at deep tier): cycles 1712, 1719 and 1731. The auditor persona FAILs on NEEDS_CORRECTION by stated policy because nothing else corrects the document before ship. Today's route for such a FAIL, with no retry adjudicator wired in production, is the first legal retry (retry@tdd): tdd, build and audit all re-run for a document-only defect.",
+  "acceptance": [
+    "A NEEDS_CORRECTION on a build whose code the audit verified triggers one document-only correction before ship (a host rewrite for mechanical claims such as counts and paths, or a builder re-dispatch naming only the document lines), re-reviewed, with no tdd or build re-run and no audit FAIL",
+    "A review that names the code still FAILs",
+    "The rung is budgeted from config and recorded in the dossier",
+    "The auditor persona's until-X2 FAIL sentence (agents/evolve-auditor-reference.md) is removed in the same landing, so NEEDS_CORRECTION reaches the rung instead of a FAIL"
+  ],
+  "created_at": "2026-09-28T10:30:00Z",
+  "source": "console, 2026-09-28, the inbox architecture review"
+}

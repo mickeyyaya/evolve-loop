@@ -56,8 +56,8 @@ After the fix ships, the report is added to `CHANGELOG.md` under "Security" with
 These are best practices for users running evolve-loop in production-adjacent environments:
 
 1. **Never commit `.evolve/state.json` or `.evolve/ledger.jsonl`** — they're gitignored by default. They contain operator metadata and may include sensitive task context.
-2. **Run `bash scripts/observability/verify-ledger-chain.sh`** periodically to detect tampering. Add to a scheduled job for long-running deployments.
-3. **Set `EVOLVE_STRICT_AUDIT=1`** if you want WARN audits to block ship (default is fluent — WARN ships).
+2. **Run `evolve ledger verify`** periodically to detect tampering. Add to a scheduled job for long-running deployments.
+3. **Set `workflow.strict_audit: true` in `.evolve/policy.json`** if you want WARN audits to block ship (default is fluent — WARN ships).
 4. **Monitor `.evolve/release-journal/`** for unexpected releases. It's an append-only audit trail of every release-pipeline invocation.
 5. **Don't disable kernel hooks.** `EVOLVE_BYPASS_*` env vars exist for emergency operator-driven recovery only. Each bypass logs a WARN.
 6. **Keep `claude` (or `gemini` / `codex`) CLI updated.** evolve-loop's sandbox layer assumes current CLI security defaults.

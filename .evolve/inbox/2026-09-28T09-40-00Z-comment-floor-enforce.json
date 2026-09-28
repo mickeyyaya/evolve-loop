@@ -1,0 +1,22 @@
+{
+  "id": "comment-floor-enforce",
+  "created_at": "2026-09-28T09:40:00Z",
+  "title": "Turn the comment floor to enforce once shadow shows it is precise: fix raw-string and trailing-comment detection, register its Signal Center code",
+  "weight": 0.6,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/internal/commentaudit/stats.go",
+    "go/internal/core/comment_floor.go",
+    ".evolve/policy.json",
+    "docs/plans/comment-reduction-2026-09.md"
+  ],
+  "summary": "The build floor's comment check shipped in shadow (comment_floor.stage default shadow). Before enforce: (1) forEachLine is line-based, so a line inside a backquoted raw string that starts with // counts as a comment (test fixtures embed Go source), a false positive that enforce would turn into a wrong correction; reuse the go/scanner walk directive anchoring already does. (2) Trailing comments (x := 1 // note) are not counted; .go fixtures under testdata/ are not excluded; a generated file's body is counted (the directive regex matches only its header line). (3) Register the floor's WARN with the Signal Center (code, module, kind) so shadow hits are countable across lanes. (4) Measure: over at least two waves, count shadow WARNs and classify each as a real added comment or a false positive; flip .evolve/policy.json comment_floor.stage to enforce only when false positives are zero.",
+  "acceptance": [
+    "A raw-string line starting with // is not a comment and a trailing comment is, both pinned by tests over AddedComments; testdata/ fixtures and generated files' bodies are not counted",
+    "The shadow WARN is a Signal Center event with a registered code",
+    "The measurement over two waves is recorded in the comment plan, and the policy flip lands only on zero false positives"
+  ],
+  "source": "console, 2026-09-28, the comment floor's shadow landing",
+  "priority_rationale": "Enforce removes an audit round from every lane that adds comments; enforcing with a false positive would bounce correct builds"
+}

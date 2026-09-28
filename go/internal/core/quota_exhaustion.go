@@ -32,10 +32,16 @@ func allFamiliesQuotaExhausted(attemptExits []int) bool {
 }
 
 // isQuotaWall reports whether one dispatch came back walled: the runner walks
-// its whole family chain inside a single Run and returns exit 85 only when
-// every family answered with a wall, so one sample suffices here — unlike
+// its whole family chain inside a single Run and returns exit 85 when the walk
+// exhausted every family after meeting a wall, so one sample suffices here — unlike
 // allFamiliesQuotaExhausted's two-sample rule, which predates the tiered
 // chain and is kept until its tests model it.
 func isQuotaWall(err error) bool {
 	return bridgeExitCode(err) == 85
 }
+
+type quotaWall struct{ cause error }
+
+func (q quotaWall) Error() string { return q.cause.Error() }
+
+func (q quotaWall) Unwrap() []error { return []error{ErrAllFamiliesExhausted, q.cause} }

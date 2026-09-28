@@ -401,17 +401,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				rep, _ := gobridge.NewEngine(gobridge.Deps{}).Doctor(ctx, "", false)
-				seenFam := map[string]bool{}
-				for _, r := range rep.Results {
-					fam := llmroute.Family(r.CLI)
-					if seenFam[fam] || !r.Binary.Present || r.Verdict == "blocked" {
-						continue
-					}
-					seenFam[fam] = true
-					discovered = append(discovered, fam+"-tmux")
-				}
-				// The operator's family ban applies to this last-resort tail only.
-				discovered = llmroute.ExcludeFamilies(discovered, wfCfg.UniversalFallbackExclude)
+				discovered = universalFallbackTail(rep.Results, wfCfg.UniversalFallbackExclude)
 			})
 			return discovered
 		}

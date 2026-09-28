@@ -87,6 +87,7 @@ type Manifest struct {
 	// quota wall; empty disables it.
 	TransientRegex string `json:"transient_regex,omitempty"`
 	Stub           bool   `json:"stub"`
+	Toolless       bool   `json:"toolless,omitempty"`
 	// ModelTierMap translates the abstract fast|balanced|deep model tier to this CLI's concrete model id;
 	// each CLI's table is the single source of truth for that translation.
 	ModelTierMap map[string]string `json:"model_tier_map,omitempty"`

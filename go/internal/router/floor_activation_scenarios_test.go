@@ -18,8 +18,13 @@ func floorActivationCatalog() []ScenarioSpec {
 			AgentPlan(PlanRun("scout"), PlanRun("tdd"), PlanRun("build"), PlanRun("audit"), PlanRun("ship")),
 			ExpectNext("audit"), ExpectSkips("tester")),
 
-		Scenario("advisory plan inserts tester the trigger would skip",
+		Scenario("advisory plan cannot insert tester when its trigger is the whole rule",
 			Pure(), Advisory(), At("build"), Done("scout", "tdd", "build"), GreenBuild(),
+			AgentPlan(PlanRun("scout"), PlanRun("tdd"), PlanRun("build"), PlanRun("tester"), PlanRun("audit"), PlanRun("ship")),
+			ExpectNext("audit"), ExpectSkips("tester"), ExpectClamp("insert-when-gates-plan")),
+
+		Scenario("advisory plan inserts a rubric-hinted tester the trigger would skip",
+			Pure(), Advisory(), AdvisorJudgedTester(), At("build"), Done("scout", "tdd", "build"), GreenBuild(),
 			AgentPlan(PlanRun("scout"), PlanRun("tdd"), PlanRun("build"), PlanRun("tester"), PlanRun("audit"), PlanRun("ship")),
 			ExpectNext("tester"), ExpectInserts("tester")),
 
@@ -51,7 +56,7 @@ func floorActivationCatalog() []ScenarioSpec {
 			ExpectNext("audit"), ExpectClamp("floor-overrides-enable-off")),
 
 		Scenario("plan-driven phase carries a plan: reason",
-			Pure(), Advisory(), At("build"), Done("scout", "tdd", "build"), GreenBuild(),
+			Pure(), Advisory(), AdvisorJudgedTester(), At("build"), Done("scout", "tdd", "build"), GreenBuild(),
 			AgentPlan(PlanRun("scout"), PlanRun("tdd"), PlanRun("build"), PlanRun("tester"), PlanRun("audit"), PlanRun("ship")),
 			ExpectNext("tester"), ExpectReason("plan:tester")),
 	}
