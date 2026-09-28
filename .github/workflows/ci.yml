@@ -1,18 +1,23 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
   workflow_call:
+    outputs:
+      plugin_result:
+        description: Result of the required validate job
+        value: ${{ jobs.validate.outputs.result }}
+      acs_result:
+        description: Result of the required acs-durable job
+        value: ${{ jobs.acs-durable.outputs.result }}
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   validate:
+    outputs:
+      result: ${{ job.status }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +51,8 @@ jobs:
   # git history (git show origin/main:.../registry_table.go); both fail-open
   # (t.Skip) if the ref is unavailable, so the gate stays green regardless.
   acs-durable:
+    outputs:
+      result: ${{ job.status }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

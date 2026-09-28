@@ -190,7 +190,7 @@ func runCampaignRun(args []string, stdout, stderr io.Writer) int {
 	}
 	runner := func(rctx context.Context, wave []fleet.CycleSpec) []fleet.Result {
 		fmt.Fprintf(stderr, "[campaign] running wave: %d cycle(s)\n", len(wave))
-		return supervisor.Run(rctx, wave)
+		return runLanesThenPublish(rctx, supervisor, wave, *projectRoot, stderr)
 	}
 	if err := campaign.RunWaves(ctx, waves, runner, campaign.RunOptions{
 		ProgressPath: progressPath,

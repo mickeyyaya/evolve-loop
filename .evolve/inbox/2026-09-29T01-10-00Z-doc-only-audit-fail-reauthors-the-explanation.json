@@ -1,0 +1,21 @@
+{
+  "id": "doc-only-audit-fail-reauthors-the-explanation",
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "weight": 0.55,
+  "title": "An audit FAIL whose only defects are in the explanation document is classed code-audit-fail and restarts the correction at TDD",
+  "files": [
+    "go/internal/core",
+    "go/internal/explanationdocs",
+    "agents/evolve-auditor.md"
+  ],
+  "summary": "Cycle 1745 (wave 30, 2026-09-29): the auditor found the code correct (14/14 predicates, 50/50 and 30/30 mutants killed, ACS suite green) and failed the cycle only because the explanation document had two factual errors (NEEDS_CORRECTION, as the explanation-review rule requires). The verdict's failure class was code-audit-fail with both defects naming docs/explain/builds/cycle-1745-*.md, the continuation found no audit-fail-reason.json ('findings artifact ... unreadable'), and the correction round restarted at TDD. The TDD re-dispatch then wedged its claude-tmux pane (exit 81, submit_wedged) before falling back to claude-p. A correction whose every defect is in the Build's own explanation document needs only the Build explanation re-author rung.",
+  "fix": "Derive the correction's start phase from the defects, not the class label: when every defect path is the cycle's own explanation document (explanationdocs.DocumentPath), class the failure explanation-needs-correction and route the correction to the Build explanation re-author (the rung a byte-identical rebase already uses), skipping TDD and the code build. Write audit-fail-reason.json for this class too, so the continuation reads the findings.",
+  "acceptance": [
+    "An audit FAIL whose defects all name the cycle's explanation document re-dispatches only the Build explanation re-author, not TDD (red today: cycle 1745 restarted at TDD)",
+    "A FAIL with any defect outside the explanation document keeps today's routing",
+    "The continuation reads the findings artifact for a doc-only FAIL (no 'findings artifact unreadable' WARN)"
+  ],
+  "created_at": "2026-09-29T01:10:00Z",
+  "source": "console, 2026-09-29, wave-30 cycle 1745 correction round"
+}

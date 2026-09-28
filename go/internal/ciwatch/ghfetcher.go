@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
 // execCapture is the subprocess seam for NewGHFetcher; tests replace it with
@@ -24,15 +26,15 @@ type ghRun struct {
 	DatabaseID int64  `json:"databaseId"`
 }
 
-// NewGHFetcher returns the production Fetcher: it observes the newest
-// workflow run for the pushed SHA via the gh CLI (existing gh auth), and on a
-// red completed run pulls a bounded failed-job log excerpt so the escalation
-// item can name the failing test. No run visible yet reads as status
-// "queued" (the watch keeps polling until the timeout).
+// NewGHFetcher returns the production Fetcher: it observes the newest run of
+// ciparity.RequiredWorkflow for the pushed SHA via the gh CLI (existing gh
+// auth), and on a red completed run pulls a bounded failed-job log excerpt so
+// the escalation item can name the failing test. No run visible yet reads as
+// status "queued" (the watch keeps polling until the timeout).
 func NewGHFetcher(repoRoot string) Fetcher {
 	return func(ctx context.Context, sha string) (RunStatus, error) {
 		out, err := execCapture(ctx, repoRoot, "gh", "run", "list",
-			"--commit", sha, "--limit", "1",
+			"--workflow", ciparity.RequiredWorkflow, "--commit", sha, "--limit", "1",
 			"--json", "status,conclusion,url,databaseId")
 		if err != nil {
 			return RunStatus{}, fmt.Errorf("gh run list --commit %s: %w", sha, err)

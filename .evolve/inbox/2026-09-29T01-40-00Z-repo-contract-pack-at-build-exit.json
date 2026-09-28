@@ -1,0 +1,22 @@
+{
+  "id": "repo-contract-pack-at-build-exit",
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "weight": 0.55,
+  "title": "The repo-contract scanner pack runs only at ship, so a raw git test fixture passes build and two audits and fails at ship (cycle 1745)",
+  "files": [
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/core",
+    "agents/evolve-builder.md",
+    "agents/evolve-tdd-engineer.md"
+  ],
+  "summary": "Cycle 1745 (wave 30, 2026-09-29) added go/internal/cyclesimulator/characterization_test.go with a raw `git init` fixture. The build self-check ran the changed package's tests, the audit and its correction re-audit passed (the ACS suite does not run the raw-git ratchet), and only ship's repo-contract fixed scanner pack ran rawgitratchet.TestRatchet_NoNewRawGitFixtures, which went RED ('pushing would red main'); recovery routed to a re-audit (recover:precondition-reaudit). Neither the builder nor the tdd-engineer persona says fixtures use internal/gittest. The pack's suites are cheap and deterministic, so running them at build exit would have let the builder fix it before any audit.",
+  "fix": "Run the repo-contract fixed scanner pack (the same suite list ship uses, one source) at build exit as part of the build handoff floor, so a RED goes to the build correction with the failing test named, before the audit. State in the builder and tdd-engineer personas that git-backed test fixtures use gittest.Fixture / Bare / Clone (the raw-git ratchet enforces it).",
+  "acceptance": [
+    "A build that adds a raw git init fixture is corrected at build exit with the ratchet's failing test named, never reaching the audit (red today: cycle 1745 reached ship)",
+    "The pack's suite list has one home shared by the build floor and ship",
+    "The builder and tdd-engineer personas name gittest for git-backed fixtures"
+  ],
+  "created_at": "2026-09-29T01:40:00Z",
+  "source": "console, 2026-09-29, wave-30 cycle 1745 ship gate RED"
+}

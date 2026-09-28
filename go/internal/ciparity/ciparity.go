@@ -18,6 +18,8 @@ import (
 	"strings"
 )
 
+const RequiredWorkflow = "required.yml"
+
 // IntersectEnforced returns the enforced apicover package patterns that a cycle
 // actually touched — the intersection of the changed-package set with the
 // go/.apicover-enforce list. Only these need a scoped `apicover -enforce` run
