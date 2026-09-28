@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — `evolve sync-main` is not blocked by an untracked file (2026-09-28)
+
+- At the wave-26 boundary the plane was 7 behind origin/main and 1 ahead (the loop's own dossier closeout), and an operator inbox item was untracked. `evolve sync-main` refused ("working tree is dirty") because its check counted untracked files, and `evolve ship --class manual`, the interface that would land the item, refuses a plane behind origin in its push repair. Each waited on the other, so the only way through was outside the interface.
+- The dirty check now reads tracked files only (`status --porcelain --untracked-files=no`). An untracked file cannot be lost by a merge; a merge that would overwrite one is refused by git before it starts, and `mergeOrigin` reports that refusal ("git would not merge origin/main", with git's output) instead of trying to abort a merge that never began, which printed "merge conflicted AND abort failed". A case-only name collision is refused the same way on macOS (`core.ignorecase=true`) and coexists on Linux; the untracked file keeps its content either way.
+- Tests, red first: `TestSyncMain_AnUntrackedFileDoesNotBlockTheSync`, `TestSyncMain_AnUntrackedFileTheMergeWouldOverwriteRefusesCleanly` (a mutant that aborts unconditionally fails it), `TestSyncMain_ACaseCollidingUntrackedFileIsNeverOverwritten`. Size ratchet: `runSyncMain` 72 → 66.
+
 ## Fixed — the audit, the audit binding and Ship read one ship tree (F43 part 2, component 4, 2026-09-28)
 
 - Eight cycles (1626, 1647, 1674, 1684, 1685, 1694, 1705, 1735) failed their audit on "predicate execution tree includes undeclared inputs absent from the ship tree". The inputs were their own declared deliverables. The audit modelled the ship tree as the tracked set (`treefence.TakeTracked`), and the audit binding (`core.worktreeContentSHA`, `git add -u` then `write-tree`) recorded the same tracked tree, while Ship commits every path the build and TDD reports declare, tracked or not.

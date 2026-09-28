@@ -1,0 +1,21 @@
+{
+  "id": "binary-churn-discard-restores-the-rebuilt-binary",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "title": "Ship's binary churn discard is a no-op after the audit binding, so a lane that rebuilt the tracked go/evolve commits the rebuilt binary",
+  "files": [
+    "go/internal/phases/ship/gitops.go",
+    "go/internal/phases/ship/worktree_ship.go",
+    "go/internal/core/phase_bindings.go"
+  ],
+  "summary": "The audit binding (core.worktreeContentSHA) runs `git add -u` on the lane worktree's real index after the audit, which stages every tracked edit, including a go/evolve a phase rebuilt in the worktree. Ship's discardBinaryChurn then runs `git checkout -- go/evolve`, which restores the worktree file FROM THE INDEX, which already holds the rebuilt binary, so the discard does nothing and the rebuilt binary is committed (stageBinaryGuard exempts go/evolve). Found by the F43 component 4 architecture review (2026-09-28, question (d)); it predates that change, which keeps production byte-identical (Ship's worktree `add -u` sits at the binding's position, before the discard).",
+  "fix": "Decide the rule once: a tracked binary rebuilt by a phase is churn, never a deliverable, outside a release. Then normalize it BEFORE the audit (the recovery-predicate-authority doc already says 'Binary normalization must happen before Audit'), so the audit's sealed tree, the binding and Ship's commit all carry the base binary: restore go/evolve (and ShipBinaryPath) from HEAD, not from the index, at the build handoff, and drop Ship's post-binding discard or make it verify-only. Do not add a second binary list: the release pipeline's versionbump/rebuild set is the one place that names the binary.",
+  "acceptance": [
+    "A worktree whose go/evolve was rebuilt by a phase audits, binds and commits the HEAD go/evolve (red today: the committed tree carries the rebuilt binary)",
+    "The audit's sealed tree, the binding and the committed tree stay equal (the F43 invariant, TestShipFromWorktree_CommitsTheOneShipTree)",
+    "A release ship still commits its rebuilt binary (stageReleaseSet unchanged)"
+  ],
+  "created_at": "2026-09-28T18:20:00Z",
+  "source": "console, 2026-09-28, F43 component 4 architecture review (pre-existing defect, filed separately)"
+}
