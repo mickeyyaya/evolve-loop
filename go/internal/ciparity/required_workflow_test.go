@@ -54,6 +54,20 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 	}
 }
 
+func TestRequiredResult_WaitsForEveryOtherJob(t *testing.T) {
+	w := readWorkflowContract(t, "required.yml")
+	required := w.Jobs["required"]
+	var needs []string
+	if err := required.Needs.Decode(&needs); err != nil {
+		t.Fatal(err)
+	}
+	for id := range w.Jobs {
+		if id != "required" && !slices.Contains(needs, id) {
+			t.Errorf("CI required does not wait for job %q, so its failure cannot fail the result", id)
+		}
+	}
+}
+
 func TestRequiredWorkflow_ReusableSuitesAreNotDuplicated(t *testing.T) {
 	for _, name := range []string{"go.yml", "ci.yml"} {
 		w := readWorkflowContract(t, name)
