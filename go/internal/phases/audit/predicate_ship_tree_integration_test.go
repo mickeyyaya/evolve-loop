@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func gitAt(t *testing.T, dir string, args ...string) string {
@@ -35,10 +36,7 @@ func writeAt(t *testing.T, root, rel, body string) {
 
 func shipTreeFixture(t *testing.T, cycle int) (root, ws string, req core.PhaseRequest) {
 	t.Helper()
-	root = t.TempDir()
-	gitAt(t, root, "init", "-q")
-	gitAt(t, root, "config", "user.email", "t@t")
-	gitAt(t, root, "config", "user.name", "t")
+	root = gittest.Fixture(t).Dir
 	writeAt(t, root, ".gitignore", ".evolve/*\n!.evolve/evals/\n!.evolve/evals/*.md\n")
 	writeAt(t, root, "go/source.go", "package source\n")
 	gitAt(t, root, "add", "-A")

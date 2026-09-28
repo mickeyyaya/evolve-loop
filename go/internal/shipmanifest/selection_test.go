@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func writeUnder(t *testing.T, root, rel, body string) {
@@ -161,12 +163,7 @@ func TestReportFiles_AreTheBuildAndTDDReports(t *testing.T) {
 }
 
 func TestGitIn_ReadsWithoutWritingTheIndexAndTakesExitOneAsAnAnswer(t *testing.T) {
-	root := t.TempDir()
-	for _, args := range [][]string{{"init", "-q"}, {"config", "user.email", "t@t"}, {"config", "user.name", "t"}} {
-		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", args, err, out)
-		}
-	}
+	root := gittest.Fixture(t).Dir
 	writeUnder(t, root, "a.go", "package a\n")
 	if out, err := exec.Command("git", "-C", root, "add", "a.go").CombinedOutput(); err != nil {
 		t.Fatalf("git add: %v %s", err, out)

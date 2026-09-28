@@ -9,18 +9,13 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
 func gitRepo(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
-	for _, args := range [][]string{{"init", "-q"}, {"config", "user.email", "t@t"}, {"config", "user.name", "t"}} {
-		if out, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", args, err, out)
-		}
-	}
-	return root
+	return gittest.Fixture(t).Dir
 }
 
 func gitAt(t *testing.T, root string, args ...string) string {

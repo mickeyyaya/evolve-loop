@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestStageExplicitPaths_NothingSelectedStagesNothing(t *testing.T) {
@@ -27,10 +29,7 @@ func TestStageExplicitPaths_NothingSelectedStagesNothing(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
-			gitIn(t, root, "init", "-q")
-			gitIn(t, root, "config", "user.email", "t@t")
-			gitIn(t, root, "config", "user.name", "t")
+			root := gittest.Fixture(t).Dir
 			mustWrite(t, filepath.Join(root, "doomed.txt"), "x")
 			mustWrite(t, filepath.Join(root, ".gitignore"), "gen/\n")
 			gitIn(t, root, "add", "-A")
