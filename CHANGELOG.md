@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the durable ACS suite no longer leaks an evolve binary per run; the disk-full halt of wave 27 (2026-09-28)
+
+- Wave 27 went 0/2 on a host with 143 MiB free of 460 GiB. Both lanes' failures (a ship backstop's `no space left on device`, an audit's integration-tier gate) read as code failures. The loop was halted as a system failure and the disk freed; see docs/incidents/2026-09-28-the-disk-filled-and-two-lanes-failed-for-it.md.
+- `acs/regression/cycle1515` and `acs/cycle1498` built `evolve-under-test` into a temp dir in `TestMain`, deferred its removal, and then called `os.Exit(m.Run())`, which skips deferred calls. Each run of the durable suite (every audit's CI-parity gate, every floor, CI) leaked about 22 MB, 1,427 dirs and 32 GB in all. Both `TestMain`s now return, and Go (≥ 1.15) exits with `m.Run()`'s result. Measured: the unfixed predicate leaks one dir per run, the fixed one none.
+- New `internal/testmainexit`: `SkippedDefers` finds a `TestMain` that defers a cleanup and also calls `os.Exit` (closures excluded). `TestModuleTestMainsNeverDeferCleanupPastOsExit` runs it over every bound test file. Red first, it named exactly the two files.
+- Queued: `disk-space-preflight` (halt on low free space before any lane runs) and `gc-pipeline-temp-and-go-cache` (`evolve gc` reaps stale pipeline temp artifacts and bounds the 157 GB Go build cache).
+
 ## Fixed — `evolve sync-main` is not blocked by an untracked file (2026-09-28)
 
 - At the wave-26 boundary the plane was 7 behind origin/main and 1 ahead (the loop's own dossier closeout), and an operator inbox item was untracked. `evolve sync-main` refused ("working tree is dirty") because its check counted untracked files, and `evolve ship --class manual`, the interface that would land the item, refuses a plane behind origin in its push repair. Each waited on the other, so the only way through was outside the interface.
