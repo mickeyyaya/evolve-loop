@@ -158,6 +158,73 @@ func TestDocDelete_ADraftPathThroughASymlinkedDirectoryIsNotTheDraft(t *testing.
 	}
 }
 
+func TestDocDelete_ADraftThatIsASymlinkIsNotTheDraft(t *testing.T) {
+	dir := gitRepo(t, map[string]string{"docs/architecture/README.md": "a committed index\n"})
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "explain", "builds"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../architecture/README.md", filepath.Join(dir, filepath.FromSlash(ownDraft))); err != nil {
+		t.Fatal(err)
+	}
+	if dec := decide(draftCycle, dir, "rm "+ownDraft); dec.Allow {
+		t.Fatal("allowed an rm of a draft path that is a symlink to committed documentation")
+	}
+}
+
+func TestDocDelete_AnAbsentDraftIsStillItsOwnToRetract(t *testing.T) {
+	dir := laneWithADraft(t)
+	if err := os.Remove(filepath.Join(dir, filepath.FromSlash(ownDraft))); err != nil {
+		t.Fatal(err)
+	}
+	if dec := decide(draftCycle, dir, "rm -f "+ownDraft); !dec.Allow {
+		t.Fatalf("a repeated retract of the draft was denied: %s", dec.Reason)
+	}
+}
+
+func TestDocDelete_EnteringADocRootAfterAnotherCommandStillCounts(t *testing.T) {
+	dir := laneWithADraft(t)
+	for _, cmd := range []string{
+		"true; cd docs && rm -f architecture/README.md",
+		" cd docs && rm -f architecture/README.md",
+		"\tcd docs && rm -f architecture/README.md",
+		" cd knowledge-base && git rm -f cycles/cycle-1.md",
+		"set -e\n  cd docs\n  rm -f architecture/README.md",
+		"true; cd docs && mv architecture/README.md /tmp/x.md",
+		"true; pushd docs && unlink architecture/README.md",
+		"command cd docs && rm -f architecture/README.md",
+		"builtin cd docs && rm -f architecture/README.md",
+		`true; cd "docs" && rm -f architecture/README.md`,
+		"true; cd ./docs/architecture && rm -f README.md",
+		"true; cd -P docs && rm -f architecture/README.md",
+		"true; cd -- docs && rm -f architecture/README.md",
+		"{ cd docs; rm -f architecture/README.md; }",
+		"if true; then cd docs; rm -f architecture/README.md; fi",
+		"if cd docs; then rm -f architecture/README.md; fi",
+		"while cd docs; do rm -f architecture/README.md; break; done",
+		"! cd docs; rm -f architecture/README.md",
+		"for f in x; do cd docs && rm -f architecture/README.md; done",
+		"cd docs; { rm -f architecture/README.md; }",
+		"cd docs; if true; then rm -f architecture/README.md; fi",
+		"if true; then unlink docs/architecture/README.md; fi",
+		"until cd docs; do rm -f architecture/README.md; break; done",
+		"if false; then :; elif cd docs; then rm -f architecture/README.md; fi",
+		"if false; then :; else cd docs; rm -f architecture/README.md; fi",
+	} {
+		if dec := decide(draftCycle, dir, cmd); dec.Allow {
+			t.Errorf("%q allowed: it removes or moves out content inside a doc root it entered", cmd)
+		}
+	}
+	for _, cmd := range []string{
+		"true; cd go && rm -f coverage.txt",
+		"true; cd docs && ls",
+		"true; cd docs && git status",
+	} {
+		if dec := decide(draftCycle, dir, cmd); !dec.Allow {
+			t.Errorf("%q denied: it removes nothing under a doc root: %s", cmd, dec.Reason)
+		}
+	}
+}
+
 func TestDocDelete_TheArchiveAdviceKeepsTheArchiveStaged(t *testing.T) {
 	dec := decide(draftCycle, laneWithADraft(t), "rm docs/explain/builds/cycle-1-run.md")
 	if dec.Allow || !strings.Contains(dec.Reason, "git mv") {

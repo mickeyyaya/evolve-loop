@@ -4,12 +4,15 @@ package ciparity
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // These tests exercise the real Make recipes and Go coverage tools. A percentage
@@ -218,6 +221,46 @@ func TestMakeAll_ExecutesCompoundE2ETag(t *testing.T) {
 		t.Fatalf("test-all did not execute the required compound-tag case: %v\n%s", err, out)
 	}
 }
+
+func TestMakeTestRecipes_RunGitWithBackgroundMaintenanceOff(t *testing.T) {
+	for _, entry := range gittest.ConfigEnv() {
+		key, _, _ := strings.Cut(entry, "=")
+		t.Setenv(key, "")
+		if err := os.Unsetenv(key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	probe := gitMaintenanceProbe + fmt.Sprintf("\nvar maintenanceConfig = %#v\n", gittest.MaintenanceConfig())
+	for _, target := range []string{"test", "test-integration"} {
+		t.Run(target, func(t *testing.T) {
+			root := makeFixture(t)
+			writeMakeFixture(t, root, "internal/probe/probe_test.go", probe)
+			if out, err := runMakeFixture(t, root, target); err != nil {
+				t.Fatalf("%s runs git with background maintenance on: %v\n%s", target, err, out)
+			}
+		})
+	}
+}
+
+const gitMaintenanceProbe = `package probe
+
+import (
+	"os/exec"
+	"strings"
+	"testing"
+)
+
+func TestGitMaintenanceIsOff(t *testing.T) {
+	for _, kv := range maintenanceConfig {
+		out, err := exec.Command("git", "config", "--get", kv[0]).Output()
+		if got := strings.TrimSpace(string(out)); err != nil || got != kv[1] {
+			t.Errorf("git config %s = %q (%v), want %q", kv[0], got, err, kv[1])
+		}
+	}
+}
+`
 
 func makeFixture(t *testing.T) string {
 	t.Helper()
