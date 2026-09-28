@@ -19,7 +19,7 @@
 // `"caf\303\251.txt"` becomes the literal 15-byte string `caf\303\251.txt` —
 // a path that exists on no disk. That corrupted token flows into stagePathspec
 // (`git add -A -- <paths>`) and manifestCovers, so the file is silently
-// misclassified. dropIgnoredPaths (gitops.go:801) has the mirror exposure: it
+// misclassified. The ignore probe had the mirror exposure: it
 // trims whitespace only, so a quoted check-ignore line never matches the raw
 // declared path it is meant to filter, and the ignored path survives into the
 // add — reproducing the exact cycle-1101 rc=1 ship-killer for the non-ASCII
@@ -34,15 +34,14 @@
 //  3. The `status --porcelain` and `check-ignore` reads are issued with
 //     `-c core.quotePath=false`, so the common non-ASCII case never reaches
 //     the parser escaped at all.
-//  4. dropIgnoredPaths matches a quoted probe line against the raw path it is
-//     filtering (drops it), and never drops a path the probe did not name.
+//  4. The ignore probe matches a quoted probe line against the raw path it is
+//     filtering (drops it), and never drops a path the probe did not name
+//     (pinned in internal/shipmanifest/selection_test.go).
 package ship
 
 import (
 	"context"
-	"io"
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -91,111 +90,4 @@ func configArgIndex(args []string, want string) int {
 		}
 	}
 	return -1
-}
-
-// quotedIgnoreRunner is a CmdRunner whose `check-ignore` emits canned lines
-// verbatim (quoted exactly as git would), so dropIgnoredPaths is exercised
-// against real probe output rather than a pre-normalised convenience value.
-func quotedIgnoreRunner(lines ...string) (CmdRunner, *[][]string) {
-	var calls [][]string
-	runner := func(_ context.Context, name, _ string, args, _ []string,
-		_ io.Reader, stdout, _ io.Writer) (int, error) {
-		calls = append(calls, append([]string{name}, args...))
-		if name != "git" || !slices.Contains(args, "check-ignore") {
-			return 0, nil
-		}
-		if len(lines) == 0 {
-			return 1, nil // git: none of the given paths are ignored
-		}
-		if stdout != nil {
-			_, _ = io.WriteString(stdout, strings.Join(lines, "\n")+"\n")
-		}
-		return 0, nil
-	}
-	return runner, &calls
-}
-
-// TestDropIgnoredPaths_QuotePathMatchesQuotedProbeOutput — AC4, positive half.
-// An ignored non-ASCII (or quote-bearing) declared path must be dropped even
-// when git reports it C-quoted; otherwise it rides into `git add`, which exits
-// 1 on any ignored pathspec — the cycle-1101 ship-killer, narrowed to this
-// input class.
-func TestDropIgnoredPaths_QuotePathMatchesQuotedProbeOutput(t *testing.T) {
-	tests := []struct {
-		name       string
-		probeLines []string
-		paths      []string
-		want       []string
-	}{
-		{
-			name:       "octal-quoted ignored path is dropped",
-			probeLines: []string{`"caf\303\251.txt"`},
-			paths:      []string{"café.txt", "go/a.go"},
-			want:       []string{"go/a.go"},
-		},
-		{
-			name:       "quote-bearing ignored path is dropped",
-			probeLines: []string{`"we\"ird.txt"`},
-			paths:      []string{`we"ird.txt`, "go/a.go"},
-			want:       []string{"go/a.go"},
-		},
-		{
-			name:       "unquoted probe output still drops (no regression)",
-			probeLines: []string{".evolve/evals/slug.md"},
-			paths:      []string{".evolve/evals/slug.md", "go/a.go"},
-			want:       []string{"go/a.go"},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			runner, _ := quotedIgnoreRunner(tc.probeLines...)
-			opts := stageExplicitOpts(t.TempDir(), "", ClassCycle, runner)
-			res := &RunResult{}
-			got := dropIgnoredPaths(context.Background(), opts, res, opts.ProjectRoot, tc.paths)
-			if !slices.Equal(got, tc.want) {
-				t.Errorf("dropIgnoredPaths(%q) with probe %q = %q, want %q — an ignored path left in the pathspec makes `git add` exit 1 and kills the ship", tc.paths, tc.probeLines, got, tc.want)
-			}
-		})
-	}
-}
-
-// TestDropIgnoredPaths_QuotePathKeepsUnignoredPaths — AC4, NEGATIVE half and the
-// anti-over-match guard: decoding probe output must not turn the filter into a
-// fuzzy match. A probe naming a DIFFERENT path, and an empty probe result, must
-// both leave the declared set completely intact — silently dropping a declared
-// path would produce an under-staged (falsely clean) ship, which is strictly
-// worse than the refusal this function exists to prevent.
-func TestDropIgnoredPaths_QuotePathKeepsUnignoredPaths(t *testing.T) {
-	tests := []struct {
-		name       string
-		probeLines []string
-		paths      []string
-	}{
-		{
-			name:       "probe names a different quoted path",
-			probeLines: []string{`"oth\303\251r.txt"`},
-			paths:      []string{"café.txt", "go/a.go"},
-		},
-		{
-			name:       "probe names the ESCAPED spelling of a path we never declared",
-			probeLines: []string{`caf\303\251.txt`},
-			paths:      []string{"café.txt"},
-		},
-		{
-			name:       "nothing ignored",
-			probeLines: nil,
-			paths:      []string{"café.txt", `we"ird.txt`, "go/a.go"},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			runner, _ := quotedIgnoreRunner(tc.probeLines...)
-			opts := stageExplicitOpts(t.TempDir(), "", ClassCycle, runner)
-			res := &RunResult{}
-			got := dropIgnoredPaths(context.Background(), opts, res, opts.ProjectRoot, tc.paths)
-			if !slices.Equal(got, tc.paths) {
-				t.Errorf("dropIgnoredPaths(%q) with probe %q = %q, want the set unchanged — dropping an unignored declared path under-stages the ship", tc.paths, tc.probeLines, got)
-			}
-		})
-	}
 }

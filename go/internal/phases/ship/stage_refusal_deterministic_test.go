@@ -22,9 +22,12 @@ package ship
 import (
 	"context"
 	"io"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
 // stagingRefusalRunner scripts `git status --porcelain` to report the given
@@ -66,6 +69,9 @@ func stagingRefusalRunner(porcelain string) *scriptedRunner {
 func stageAndExpectFailure(t *testing.T, workspace, porcelain string) *core.ShipError {
 	t.Helper()
 	r := stagingRefusalRunner(porcelain)
+	if workspace != "" {
+		mustWrite(t, filepath.Join(workspace, "build-report.md"), "`"+strings.Join(shipmanifest.ChangedPaths(porcelain), "` `")+"`\n")
+	}
 	opts := &Options{ProjectRoot: t.TempDir(), WorkspacePath: workspace, Runner: r.runner(), Stderr: io.Discard}
 	err := stageExplicitPaths(context.Background(), opts, &RunResult{}, "")
 	if err == nil {

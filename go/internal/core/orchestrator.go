@@ -820,7 +820,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// preserved/re-dispatched worktree that still carries prior-audited
 	// content; a fresh cycle's clean worktree never matches.
 	if cr.cs.ActiveWorktree != "" {
-		if sha := worktreeContentSHA(ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree); sha != "" {
+		if sha := worktreeContentSHA(ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.cs.WorkspacePath); sha != "" {
 			baseTree := worktreeBaseTreeSHA(ctx, cr.cs.ActiveWorktree, cr.cs.WorktreeBaseSHA)
 			if !verdictcache.ProbeEligible(baseTree, sha) {
 				// An untouched/fresh worktree skips the lookup to prevent

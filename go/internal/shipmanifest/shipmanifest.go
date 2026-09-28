@@ -179,15 +179,10 @@ func sortedKeys(set map[string]bool) []string {
 //   - plus every changed path the manifest covers by directory prefix (a new
 //     file under a declared directory is part of the declared change).
 //
-// Fallbacks — staging must never silently become a no-op, which would produce a
-// false clean exit / empty ship, and must never fall back to `-A`:
-//   - no manifest (no workspace, or no readable phase reports) → the full
-//     porcelain changed set;
-//   - a manifest that covers nothing that changed → likewise the changed set.
+// No manifest, or one that covers nothing, selects nothing: the tracked edits
+// ship through the audit binding's `add -u`, and adopting every changed path
+// instead would carry untracked residue into the binding (cycle 1594).
 func pathspec(manifest, changed []string, isFile func(string) bool) []string {
-	if len(manifest) == 0 {
-		return changed
-	}
 	staged := map[string]bool{}
 	for _, d := range manifest {
 		// Defense in depth vs extractReportPaths' own filter: a manifest entry
@@ -203,15 +198,11 @@ func pathspec(manifest, changed []string, isFile func(string) bool) []string {
 		}
 	}
 	// changed comes from `git status --porcelain` at the tree root — always
-	// repo-relative by construction (same trust the len==0 and empty-staged
-	// fallbacks below already place in it), so no isRepoRelative re-check.
+	// repo-relative by construction, so no isRepoRelative re-check.
 	for _, c := range changed {
 		if manifestCovers(manifest, c) {
 			staged[c] = true
 		}
-	}
-	if len(staged) == 0 {
-		return changed
 	}
 	return sortedKeys(staged)
 }

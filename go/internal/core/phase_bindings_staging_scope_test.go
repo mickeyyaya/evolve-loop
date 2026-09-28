@@ -72,7 +72,7 @@ func TestWorktreeContentSHA_ExcludesUnrelatedUntrackedResidue(t *testing.T) {
 	// every class of stray file.
 	writeFile(t, filepath.Join(repo, "foreign-residue.txt"), "must not enter the audit binding\n")
 
-	tree := worktreeContentSHA(context.Background(), "", repo)
+	tree := worktreeContentSHA(context.Background(), "", repo, t.TempDir())
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree — the identity must still resolve")
 	}
@@ -95,7 +95,7 @@ func TestWorktreeContentSHA_StagesDeclaredNewFile(t *testing.T) {
 	// Declared = the builder put it in the lane's index.
 	gitOut(t, repo, "add", declared)
 
-	tree := worktreeContentSHA(context.Background(), "", repo)
+	tree := worktreeContentSHA(context.Background(), "", repo, t.TempDir())
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree")
 	}
@@ -115,7 +115,7 @@ func TestWorktreeContentSHA_CapturesUnstagedTrackedModification(t *testing.T) {
 	repo := stagingScopeRepo(t)
 	writeFile(t, filepath.Join(repo, "base.txt"), "base\nunstaged tracked edit\n")
 
-	tree := worktreeContentSHA(context.Background(), "", repo)
+	tree := worktreeContentSHA(context.Background(), "", repo, t.TempDir())
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree")
 	}
@@ -140,7 +140,7 @@ func TestWorktreeContentSHA_ResidueOnlyWorktreeKeepsBaseIdentity(t *testing.T) {
 	writeFile(t, filepath.Join(repo, "coverage.core476.func.txt"), "regenerated build output\n")
 	writeFile(t, filepath.Join(repo, ".evolve-scratch-residue.txt"), "another lane's scratch\n")
 
-	tree := worktreeContentSHA(context.Background(), "", repo)
+	tree := worktreeContentSHA(context.Background(), "", repo, t.TempDir())
 	if tree == "" {
 		t.Fatal("worktreeContentSHA returned an empty tree — residue-only must still resolve an identity")
 	}

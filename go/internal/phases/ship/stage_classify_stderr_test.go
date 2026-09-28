@@ -38,6 +38,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
 // classifyStageRunner scripts the three git calls stageExplicitPaths makes:
@@ -82,7 +83,7 @@ func stageWithGitFailure(t *testing.T, porcelain, addStderr string, addExit int,
 	t.Helper()
 	opts := &Options{
 		ProjectRoot:   t.TempDir(),
-		WorkspacePath: t.TempDir(), // fresh workspace ⇒ this is always strike ONE
+		WorkspacePath: writeWorkspaceReports(t, shipmanifest.ChangedPaths(porcelain)...), // fresh workspace ⇒ this is always strike ONE
 		Runner:        classifyStageRunner(porcelain, addStderr, addExit, addErr),
 		Stderr:        io.Discard,
 	}
@@ -211,7 +212,7 @@ func TestStageFailureClassification_PreservesCapturedStderr(t *testing.T) {
 func TestStageFailureClassification_TwoStrikesStillApplies(t *testing.T) {
 	const porcelain = " M docs/architecture/control-flags.md\n"
 	const unknown = "error: something nobody has catalogued yet\n"
-	ws := t.TempDir()
+	ws := writeWorkspaceReports(t, shipmanifest.ChangedPaths(porcelain)...)
 
 	stage := func() *core.ShipError {
 		opts := &Options{

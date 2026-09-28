@@ -52,7 +52,6 @@
   "internal/core/covering_tests_truncation_log_test.go": 1,
   "internal/core/cycle_source_integration_test.go": 2,
   "internal/core/cyclerun_remediate_explanation_test.go": 1,
-  "internal/core/dossier_producer_test.go": 1,
   "internal/core/failure_advisor_coverage_test.go": 2,
   "internal/core/materialization_correction_delivery_test.go": 1,
   "internal/core/orchestrator_auditleak_test.go": 2,

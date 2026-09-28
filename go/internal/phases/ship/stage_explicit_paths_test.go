@@ -257,34 +257,24 @@ func TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll(t *testing.T) {
 	}
 }
 
-// TestShipDirect_ManualClass_EmptyManifestFallsBackToChangedSet — H2: with no
-// readable phase reports the declared manifest is empty; staging must fall
-// back to the porcelain changed set, never to `add -A` and never to nothing
-// (a silent skip produces a false clean exit / empty ship).
-func TestShipDirect_ManualClass_EmptyManifestFallsBackToChangedSet(t *testing.T) {
+// TestShipDirect_AReportlessWorkspaceAdoptsNoPath — H2 under the F43 contract:
+// with no readable phase reports the declared manifest is empty, so no path is
+// adopted and no `git add` runs at all; never `add -A`, and never an empty
+// `add -A --`, which stages the whole tree.
+func TestShipDirect_AReportlessWorkspaceAdoptsNoPath(t *testing.T) {
 	root := stageExplicitTree(t)
-	emptyWS := t.TempDir() // no build-report.md / test-report.md
+	emptyWS := t.TempDir()
 	cap := &porcelainCapture{porcelain: " M go/internal/phases/ship/gitops.go\n?? docs/new-note.md\n"}
 	opts := stageExplicitOpts(root, emptyWS, ClassManual, cap.runner())
 
 	if err := shipDirect(context.Background(), opts, &RunResult{}, "main"); err != nil {
 		t.Fatalf("shipDirect(manual): %v", err)
 	}
-
 	if call := cap.unscopedAddAll(); call != nil {
-		t.Errorf("RED: manifest-empty fallback used `git add -A` (%v) — must fall back to the porcelain changed set", call)
+		t.Errorf("a report-less workspace never falls back to `git add -A`: %v", call)
 	}
-	pathspec, sawAdd := cap.addPathspec()
-	if !sawAdd {
-		t.Fatal("manifest-empty ship never invoked git add — staging must not be silently skipped (false clean exit)")
-	}
-	if len(pathspec) == 0 {
-		t.Fatal("manifest-empty fallback staged an EMPTY pathspec — that ships nothing while reporting success")
-	}
-	for _, want := range []string{"go/internal/phases/ship/gitops.go", "docs/new-note.md"} {
-		if !slices.Contains(pathspec, want) {
-			t.Errorf("changed path %q missing from fallback pathspec %v", want, pathspec)
-		}
+	if pathspec, sawAdd := cap.addPathspec(); sawAdd {
+		t.Fatalf("a cycle whose reports declare nothing adopts no path (its tracked edits ship through the audit binding's add -u; an empty `git add -A --` would stage the whole tree): %v", pathspec)
 	}
 }
 

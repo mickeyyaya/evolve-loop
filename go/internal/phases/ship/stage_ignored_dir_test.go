@@ -6,7 +6,7 @@ package ship
 //
 // Defect, proven against real git: `git check-ignore` reports NOTHING for a
 // DIRECTORY path (either slash form) when the ignore rule is the `dir/` form
-// (.gitignore `.evolve/inbox/processed/`), so dropIgnoredPaths keeps the
+// (.gitignore `.evolve/inbox/processed/`), so the ignore probe keeps the
 // declared directory and `git add -A -- <dir>` refuses rc=1 ("The following
 // paths are ignored…"). Three lanes hit the identical refusal → identical
 // fingerprint ×3 → pipeline-blocker halt.
@@ -22,57 +22,6 @@ import (
 	"strings"
 	"testing"
 )
-
-func TestIgnoredPathsFromAddRefusal_ParsesTheOffenderList(t *testing.T) {
-	t.Parallel()
-	stderr := "The following paths are ignored by one of your .gitignore files:\n" +
-		".evolve/inbox/processed\n" +
-		".evolve/inbox/rejected\n" +
-		"hint: Use -f if you really want to add them.\n" +
-		"hint: Disable this message with \"git config set advice.addIgnoredFile false\"\n"
-	got := ignoredPathsFromAddRefusal(stderr)
-	if len(got) != 2 || got[0] != ".evolve/inbox/processed" || got[1] != ".evolve/inbox/rejected" {
-		t.Fatalf("offenders = %v, want the two paths git named", got)
-	}
-}
-
-func TestIgnoredPathsFromAddRefusal_NoHeaderMeansNoOffenders(t *testing.T) {
-	t.Parallel()
-	for _, stderr := range []string{
-		"",
-		"fatal: Invalid path '/go'\n",
-		"hint: Use -f if you really want to add them.\n", // hint without header
-	} {
-		if got := ignoredPathsFromAddRefusal(stderr); len(got) != 0 {
-			t.Errorf("stderr %q must yield no offenders, got %v — a fuzzy parse would silently under-stage unrelated failures", stderr, got)
-		}
-	}
-}
-
-// Quoted (non-ASCII) offender lines decode through the same shipmanifest.UnquoteGitPath the
-// rest of the staging onion uses (cycle-1108 contract holds here too).
-func TestIgnoredPathsFromAddRefusal_DecodesQuotedPaths(t *testing.T) {
-	t.Parallel()
-	stderr := "The following paths are ignored by one of your .gitignore files:\n" +
-		`"caf\303\251-dir"` + "\n" +
-		"hint: Use -f if you really want to add them.\n"
-	got := ignoredPathsFromAddRefusal(stderr)
-	if len(got) != 1 || got[0] != "café-dir" {
-		t.Fatalf("quoted offender must decode to the on-disk path: %v", got)
-	}
-}
-
-func TestIgnoredPathsFromAddRefusal_StopsAtTheFirstHint(t *testing.T) {
-	t.Parallel()
-	stderr := "The following paths are ignored by one of your .gitignore files:\n" +
-		"real-offender\n" +
-		"hint: Use -f if you really want to add them.\n" +
-		"not-an-offender\n"
-	got := ignoredPathsFromAddRefusal(stderr)
-	if len(got) != 1 || got[0] != "real-offender" {
-		t.Fatalf("parse must stop at the hint boundary: %v", got)
-	}
-}
 
 // TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec — the
 // behavioral crux of layer 4: a pathspec the check-ignore probe is BLIND to
