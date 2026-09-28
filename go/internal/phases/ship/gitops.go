@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitprefixgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
@@ -116,7 +117,7 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 		for _, line := range strings.Split(diffOut, "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" {
-				incomingFiles[unquoteGitPath(line)] = true
+				incomingFiles[shipmanifest.UnquoteGitPath(line)] = true
 			}
 		}
 	}
@@ -128,7 +129,7 @@ func detectColliders(ctx context.Context, opts *Options, worktree, branch, cycle
 			if len(line) > 3 {
 				status := line[:2]
 				if !strings.Contains(status, "D") { // "D" marks a deleted path; it cannot collide with a ff-merge.
-					path := unquoteGitPath(line[3:])
+					path := shipmanifest.UnquoteGitPath(line[3:])
 					incomingFiles[path] = true
 				}
 			}
@@ -451,8 +452,8 @@ func captureGitOutputAtDir(ctx context.Context, opts *Options, dir string, args 
 }
 
 // rawPathRead prefixes a path-reporting git read with `-c
-// core.quotePath=false` so git emits non-ASCII paths raw; unquoteGitPath
-// (manifest.go) covers the residue that flag does not suppress.
+// core.quotePath=false` so git emits non-ASCII paths raw;
+// shipmanifest.UnquoteGitPath covers the residue that flag does not suppress.
 func rawPathRead(args ...string) []string {
 	return append([]string{"-c", "core.quotePath=false"}, args...)
 }
@@ -472,27 +473,11 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 	if err != nil {
 		return err
 	}
-	changed := porcelainChangedPaths(out)
-
 	var manifest []string
 	if opts.WorkspacePath != "" {
-		manifest = declaredManifest(opts.WorkspacePath)
+		manifest = shipmanifest.Declared(opts.WorkspacePath, manifestReportFiles)
 	}
-	paths := stagePathspec(manifest, changed, func(rel string) bool {
-		fi, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
-		return statErr == nil && fi.Mode().IsRegular()
-	})
-	// Drop paths gone from both the worktree and the index: naming one is a
-	// fatal rc=128 that kills the whole staging call. See stagedGonePaths for
-	// the two porcelain shapes that produce it.
-	gone := stagedGonePaths(out)
-	kept := paths[:0]
-	for _, p := range paths {
-		if !gone[p] {
-			kept = append(kept, p)
-		}
-	}
-	paths = kept
+	paths := shipmanifest.Stageable(out, manifest, shipmanifest.RegularFileIn(root))
 	paths = dropIgnoredPaths(ctx, opts, res, root, paths)
 
 	args := make([]string, 0, len(prefix)+3+len(paths))
@@ -566,7 +551,7 @@ func stageExplicitPaths(ctx context.Context, opts *Options, res *RunResult, dir 
 	clearStageRefusal(opts.WorkspacePath)
 	res.Logs = append(res.Logs, fmt.Sprintf(
 		"[ship] staged %d explicit path(s) (declared manifest=%d, changed=%d) — no `git add -A`",
-		len(paths), len(manifest), len(changed)))
+		len(paths), len(manifest), len(shipmanifest.ChangedPaths(out))))
 	return nil
 }
 
@@ -626,7 +611,7 @@ func dropIgnoredPaths(ctx context.Context, opts *Options, res *RunResult, root s
 	for _, p := range strings.Split(out, "\n") {
 		// Decode only genuinely quoted lines; an unquoted line names a path
 		// literally, and fuzzy-matching it would silently under-stage the ship.
-		if p = unquoteGitPath(strings.TrimSpace(p)); p != "" {
+		if p = shipmanifest.UnquoteGitPath(strings.TrimSpace(p)); p != "" {
 			ignored[p] = true
 		}
 	}
@@ -762,7 +747,7 @@ func discardBinaryChurn(ctx context.Context, opts *Options, dir string) error {
 
 // ignoredPathsFromAddRefusal extracts the pathspecs git names in an add
 // refusal — the lines between the ignored-files header and the first hint:.
-// Quoted lines decode through unquoteGitPath.
+// Quoted lines decode through shipmanifest.UnquoteGitPath.
 func ignoredPathsFromAddRefusal(stderr string) []string {
 	const header = "The following paths are ignored by one of your .gitignore files:"
 	lines := strings.Split(stderr, "\n")
@@ -776,7 +761,7 @@ func ignoredPathsFromAddRefusal(stderr string) []string {
 		case in && strings.HasPrefix(trimmed, "hint:"):
 			return out
 		case in && trimmed != "":
-			if p := unquoteGitPath(trimmed); p != "" {
+			if p := shipmanifest.UnquoteGitPath(trimmed); p != "" {
 				out = append(out, p)
 			}
 		}

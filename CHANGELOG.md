@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — Ship's path selection is its own package, the one source of "which paths Ship commits" (F43 part 2, component 2, 2026-09-28)
+
+- The audit refused eight cycles' own deliverables as "undeclared inputs" because it modelled the ship tree as tracked files only, while Ship commits the paths the build and TDD reports declare (design doc §5.12). To let the audit bind the tree Ship will commit without importing the ship phase, Ship's pure path selection moved, unchanged, from `internal/phases/ship/manifest.go` into `internal/shipmanifest`: `Declared`, `ChangedPaths`, `OutOfManifest`, `UnquoteGitPath`, and `Stageable`, the one composition (the pathspec itself is unexported, so no caller composes the steps differently) (changed paths, pathspec, minus staged deletions and rename sources) Ship now stages from, with `RegularFileIn` the one file rule.
+- 17 tests moved under their original names; `TestStageable_IsThePathspecShipStages` pins the contract the audit will rely on (a declared directory takes only what it covers, the cycle-645 leak; a covers-nothing fallback; a both-deleted conflict stays named), killing three mutants the moved suites let survive. Two historical predicates (cycles 1108, 1469) now run the moved tests where they live instead of passing on "no tests to run".
+- Reviews: combined code/Go reviewer PASS (every moved body identical modulo renames); architecture reviewer FIX_THEN_MERGE (the gone-path drop was still composed in ship; four surviving mutants) -> `Stageable`.
+
 ## Fixed — an advisor plan runs a trigger-gated phase only when its trigger fires (the wave-24 P0 T4, ADR-0052 amendment, 2026-09-28)
 
 - Cycle 1733 (wave 24), a size-ratchet refactor lane whose scout reported `goal_type: refactor`, ran fault-localization and bug-reproduction, and failed inside bug-reproduction. Both phases declare `insert_when: scout.goal_type == bugfix` (or a failure class), but at `EVOLVE_DYNAMIC_ROUTING=advisory` the advisor's whole-cycle plan drove every optional phase, and `router.shouldRunFromPlan` checked `skip_when` and never `insert_when`. The advisor plans before scout, from the wave goal, so it cannot evaluate a scout-keyed trigger itself. Cycles 1721–1732 ran bug-reproduction in 10 and fault-localization in 8 non-bugfix cycles.
