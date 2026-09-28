@@ -49,6 +49,7 @@ type snapshotMode uint8
 const (
 	allFiles snapshotMode = iota
 	trackedFiles
+	declaredFiles
 )
 
 // TakeTracked records the tracked/staged ship tree without adopting untracked
@@ -58,11 +59,22 @@ func TakeTracked(ctx context.Context, worktree string) (Snapshot, error) {
 	if strings.TrimSpace(worktree) == "" {
 		return Snapshot{}, fmt.Errorf("treefence: worktree path required")
 	}
-	tree, err := writeTreeMode(ctx, worktree, trackedFiles)
+	tree, err := writeTreeMode(ctx, worktree, trackedFiles, nil)
 	if err != nil {
 		return Snapshot{}, err
 	}
 	return Snapshot{Worktree: worktree, Tree: tree, mode: trackedFiles}, nil
+}
+
+func TakeStaged(ctx context.Context, worktree string, pathspec []string) (Snapshot, error) {
+	if strings.TrimSpace(worktree) == "" {
+		return Snapshot{}, fmt.Errorf("treefence: worktree path required")
+	}
+	tree, err := writeTreeMode(ctx, worktree, declaredFiles, pathspec)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return Snapshot{Worktree: worktree, Tree: tree, mode: declaredFiles}, nil
 }
 
 // Result reports what Restore had to undo.
@@ -91,7 +103,10 @@ func Take(ctx context.Context, worktree string) (Snapshot, error) {
 // attempted even when one fails; the failures are joined and returned so the
 // caller reports each by name.
 func (s Snapshot) Restore(ctx context.Context) (Result, error) {
-	after, err := writeTreeMode(ctx, s.Worktree, s.mode)
+	if s.mode != allFiles {
+		return Result{}, errNotRestorable
+	}
+	after, err := writeTree(ctx, s.Worktree)
 	if err != nil {
 		return Result{}, err
 	}
@@ -138,7 +153,7 @@ func (s Snapshot) partition(paths []string) (fenced, kept []string) {
 }
 
 func (s Snapshot) verify(ctx context.Context) error {
-	tree, err := writeTreeMode(ctx, s.Worktree, s.mode)
+	tree, err := writeTree(ctx, s.Worktree)
 	if err != nil || tree == s.Tree {
 		return err
 	}
@@ -218,10 +233,12 @@ func pruneEmptyParents(root, dir string) {
 // ignore rules respected — into a tree object via a throwaway index seeded
 // from the real one (so only changed paths are re-hashed).
 func writeTree(ctx context.Context, worktree string) (string, error) {
-	return writeTreeMode(ctx, worktree, allFiles)
+	return writeTreeMode(ctx, worktree, allFiles, nil)
 }
 
-func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode) (string, error) {
+var errNotRestorable = errors.New("treefence: only a full snapshot restores a worktree")
+
+func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode, declared []string) (string, error) {
 	tmp, err := os.MkdirTemp("", "treefence-index-*")
 	if err != nil {
 		return "", fmt.Errorf("treefence: temp index: %w", err)
@@ -240,22 +257,33 @@ func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode) (str
 			indexErr = os.WriteFile(index, data, 0o644)
 		}
 	}
-	if mode == trackedFiles && indexErr != nil {
-		return "", fmt.Errorf("treefence: tracked snapshot requires a complete real-index seed: %w", indexErr)
+	if mode != allFiles && indexErr != nil {
+		return "", fmt.Errorf("treefence: this snapshot requires a complete real-index seed: %w", indexErr)
 	}
 	env := []string{"GIT_INDEX_FILE=" + index}
-	addMode := "-A"
-	if mode == trackedFiles {
-		addMode = "-u"
-	}
-	if _, err := git(ctx, worktree, env, "add", addMode, "--", "."); err != nil {
-		return "", err
+	if add := addArgs(mode, declared); add != nil {
+		if _, err := git(ctx, worktree, env, add...); err != nil {
+			return "", err
+		}
 	}
 	out, err := git(ctx, worktree, env, "write-tree")
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+func addArgs(mode snapshotMode, declared []string) []string {
+	switch {
+	case mode == trackedFiles:
+		return []string{"add", "-u", "--", "."}
+	case mode == declaredFiles && len(declared) == 0:
+		return nil
+	case mode == declaredFiles:
+		return append([]string{"add", "-A", "--"}, declared...)
+	default:
+		return []string{"add", "-A", "--", "."}
+	}
 }
 
 // writeFromTree restores one path's content and mode from the snapshot tree.
