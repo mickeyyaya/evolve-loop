@@ -101,7 +101,8 @@ type PhaseRequest struct {
 	// any write the agent made in between is reported and undone. Derived
 	// from the orchestrator's write-permission predicate at dispatch, never
 	// set by a phase.
-	WorktreeReadOnly bool `json:"worktree_read_only,omitempty"`
+	WorktreeReadOnly      bool     `json:"worktree_read_only,omitempty"`
+	WorktreeWritablePaths []string `json:"worktree_writable_paths,omitempty"`
 	// WorktreeVerified is local classification evidence set by BaseRunner only
 	// after restoring its snapshot. It never crosses the subprocess envelope.
 	WorktreeVerified bool `json:"-"`

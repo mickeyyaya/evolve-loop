@@ -40,7 +40,7 @@ func (o *Orchestrator) resumeFleetRebaseAfterDebugger(ctx context.Context, proje
 	if err := carryResolvedTree(ctx, cs.ActiveWorktree, gitCapture, fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)); err != nil {
 		return o.abortRebaseReentry(cycle, *cs, "carry the resolved tree: "+err.Error())
 	}
-	ok, conflict := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
+	ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
 	switch {
 	case ok:
 	case conflict:
@@ -76,6 +76,13 @@ func (o *Orchestrator) abortRebaseReentry(cycle int, cs CycleState, reason strin
 // the ship's own code, and the conflict is the rebase's reclassification of it.
 func fleetRebaseRecovery(code string) bool {
 	return code == string(CodeGitFleetRebaseNeeded) || code == string(CodeGitFleetRebaseConflict)
+}
+
+func worktreeWritablePaths(next Phase, cs CycleState) []string {
+	if next != PhaseDebugger || !fleetRebaseRecovery(cs.ShipRecoveryCode) {
+		return nil
+	}
+	return cs.ShipRecoveryConflicts
 }
 
 // earliestPhase keeps the debugger's own target when it lies upstream of the routed phase, so a Build or Audit

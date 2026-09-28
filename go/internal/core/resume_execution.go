@@ -184,7 +184,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			// thread the persisted worktree like the RunCycle loop does — a
 			// resumed phase with Worktree="" runs cwd=main-tree (cycle-280 class).
 			Worktree:                        cs.ActiveWorktree,
-			WorktreeReadOnly:                o.worktreeReadOnly(next),
 			WorktreeBaseSHA:                 cs.WorktreeBaseSHA,
 			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
 			// CB.5: same rule for the persisted run identity (resume reuses
@@ -196,6 +195,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			Context:       phaseCtx,
 			Signals:       dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
 		}
+		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
 		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {

@@ -1,0 +1,23 @@
+{
+  "id": "worktree-fence-one-value",
+  "created_at": "2026-09-28T09:10:00Z",
+  "title": "Every dispatch root takes the worktree fence from one projection, and the fence is one value that cannot be half-set",
+  "weight": 0.7,
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "files": [
+    "go/internal/core/failure_learning.go",
+    "go/cmd/evolve/cmd_campaign.go",
+    "go/internal/core/phase.go",
+    "go/internal/core/routing_dispatch.go",
+    "go/internal/treefence/fence.go"
+  ],
+  "summary": "From the architecture review of the fleet-rebase debugger fix (2026-09-28). withWorktreeFence sets WorktreeReadOnly and WorktreeWritablePaths for the orchestrator's live, resume and evaluate-batch dispatch, but two roots still derive the fence on their own: failure_learning.go builds the out-of-band retro request with a Worktree and no fence fields, so that retro runs unfenced (retro.go calls treefence.Begin with readOnly=false), and cmd/evolve/cmd_campaign.go derives WorktreeReadOnly itself. The pair also admits an invalid state: WorktreeReadOnly=false with writable paths set (cyclerun_remediate.go flips ReadOnly on a copied request), and the debugger prompt promises a fence from the writable paths alone. Make the fence one value (for example PhaseRequest.WorktreeFence{Writable []string}, nil meaning unfenced) projected by one function every root calls.",
+  "acceptance": [
+    "The out-of-band retro dispatch is fenced like every other read-only phase, pinned by a test that drives it with a writing agent",
+    "Every PhaseRequest builder, campaign included, takes the fence from the one projection; a test enumerates the builders",
+    "A request cannot carry writable paths without a fence; the type makes the half-set state unrepresentable"
+  ],
+  "source": "console, 2026-09-28, architecture review of fix/debugger-writes-its-rebase-resolution",
+  "priority_rationale": "An unfenced retro can change the tree a later ship binds; a half-set fence is a latent trust-boundary bug"
+}

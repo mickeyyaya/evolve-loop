@@ -39,8 +39,9 @@ import (
 type Snapshot struct {
 	Worktree string
 	// Tree is the git tree object id the working tree hashed to.
-	Tree string
-	mode snapshotMode
+	Tree     string
+	mode     snapshotMode
+	writable map[string]bool
 }
 
 type snapshotMode uint8
@@ -69,6 +70,7 @@ type Result struct {
 	// Restored lists the worktree-relative paths written back or removed,
 	// sorted. Empty means the phase left the tree byte-identical.
 	Restored []string
+	Kept     []string
 }
 
 // Take snapshots the worktree. An empty path or a non-repository is an error,
@@ -100,6 +102,8 @@ func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	added, keptAdded := s.partition(added)
+	changed, keptChanged := s.partition(changed)
 	var errs []error
 	// Removals first: a path the phase turned from a file into a directory
 	// (or the reverse) has to be cleared before its other form is written
@@ -117,7 +121,37 @@ func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	}
 	restored := append(append(make([]string, 0, len(added)+len(changed)), added...), changed...)
 	sort.Strings(restored)
-	return Result{Restored: restored}, errors.Join(errs...)
+	kept := append(keptAdded, keptChanged...)
+	sort.Strings(kept)
+	return Result{Restored: restored, Kept: kept}, errors.Join(errs...)
+}
+
+func (s Snapshot) partition(paths []string) (fenced, kept []string) {
+	for _, rel := range paths {
+		if s.writable[rel] {
+			kept = append(kept, rel)
+		} else {
+			fenced = append(fenced, rel)
+		}
+	}
+	return fenced, kept
+}
+
+func (s Snapshot) verify(ctx context.Context) error {
+	tree, err := writeTreeMode(ctx, s.Worktree, s.mode)
+	if err != nil || tree == s.Tree {
+		return err
+	}
+	added, changed, err := s.diff(ctx, tree)
+	if err != nil {
+		return err
+	}
+	for _, rel := range append(added, changed...) {
+		if !s.writable[rel] {
+			return fmt.Errorf("treefence: restored content differs from dispatch snapshot")
+		}
+	}
+	return nil
 }
 
 // diff lists the paths the phase added (to remove) and the paths it modified,
@@ -307,7 +341,7 @@ type Fence struct {
 
 // Begin takes the fence for a read-only dispatch. A source writer (readOnly
 // false) or a dispatch without a worktree gets an inert fence.
-func Begin(ctx context.Context, worktree string, readOnly bool) *Fence {
+func Begin(ctx context.Context, worktree string, readOnly bool, writable ...string) *Fence {
 	if !readOnly || worktree == "" {
 		return &Fence{}
 	}
@@ -315,7 +349,19 @@ func Begin(ctx context.Context, worktree string, readOnly bool) *Fence {
 	if err != nil {
 		return &Fence{takeErr: err}
 	}
+	snap.writable = writableSet(writable)
 	return &Fence{snap: &snap}
+}
+
+func writableSet(paths []string) map[string]bool {
+	if len(paths) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(paths))
+	for _, rel := range paths {
+		set[filepath.ToSlash(rel)] = true
+	}
+	return set
 }
 
 // Outcome is what End did, rendered by Diagnostics for the phase response.
@@ -326,6 +372,7 @@ type Outcome struct {
 	// Restored lists the paths written back or removed (also on a partial
 	// failure — the caller reports both halves).
 	Restored []string
+	Kept     []string
 	// TakeErr is set when the fence was wanted but could not be taken; the
 	// phase ran unfenced.
 	TakeErr error
@@ -349,13 +396,9 @@ func (f *Fence) End(ctx context.Context) Outcome {
 	if err == nil {
 		// Restoration can reveal additions hidden by the phase's temporary
 		// .gitignore changes. Authenticate the final tree, not just write success.
-		var tree string
-		tree, err = writeTreeMode(ctx, f.snap.Worktree, f.snap.mode)
-		if err == nil && tree != f.snap.Tree {
-			err = fmt.Errorf("treefence: restored content differs from dispatch snapshot")
-		}
+		err = f.snap.verify(ctx)
 	}
-	return Outcome{Verified: err == nil, Restored: res.Restored, RestoreErr: err}
+	return Outcome{Verified: err == nil, Restored: res.Restored, Kept: res.Kept, RestoreErr: err}
 }
 
 // listMax bounds the restored-path list carried on a diagnostic.
@@ -380,6 +423,11 @@ func (o Outcome) Diagnostics(phase string) []cyclestate.Diagnostic {
 		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(
 			"worktree fence: read-only phase %s wrote %d path(s) into its worktree; restored to the dispatched tree: %s%s",
 			phase, len(o.Restored), strings.Join(shown, ", "), more)})
+	}
+	if len(o.Kept) > 0 {
+		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(
+			"worktree fence: phase %s kept its writes to the %d path(s) this dispatch may write: %s",
+			phase, len(o.Kept), strings.Join(o.Kept, ", "))})
 	}
 	if o.RestoreErr != nil {
 		out = append(out, cyclestate.Diagnostic{Severity: "warning", Message: fmt.Sprintf(
