@@ -377,20 +377,8 @@ func psmasSkipSet(in RouteInput) map[string]bool {
 func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clamp) {
 	enable := enableOf(in.Cfg, phase)
 
-	if isMandatory(in.Cfg, phase) {
-		if enable == config.EnableOff {
-			return true, false, &Clamp{Rule: "mandatory-never-skipped", Proposed: phase + "=off", Forced: phase + "=on"}
-		}
-		return true, false, nil
-	}
-
-	if rule, ok := in.Cfg.Conditional[phase]; ok {
-		if evalCondRule(in.Signals, rule) {
-			if enable == config.EnableOff {
-				return true, false, &Clamp{Rule: "conditional-mandatory-pin", Proposed: phase + "=off", Forced: phase + "=on"}
-			}
-			return true, false, nil
-		}
+	if run, clamp, pinned := mandatoryPhaseRun(in, phase, enable); pinned {
+		return run, false, clamp
 	}
 
 	// A phase whose persona doc is absent would only dispatch a skip. Core lists
@@ -402,19 +390,7 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 	// At Advisory and above, the pre-clamped plan drives every non-mandatory
 	// phase; below that, or with no plan, the trigger path runs.
 	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil {
-		runs := planRuns(in.Plan, phase)
-		// A configured skip_when gates the plan. Floor phases are exempt so the
-		// gate can never bypass the floor.
-		if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, in.Cfg.Triggers[phase]) {
-			return false, true, &Clamp{Rule: "skip-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
-		}
-		if runs && enable == config.EnableOff {
-			return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
-		}
-		if runs && enable == config.EnableContent && optionalUsed >= in.Cfg.MaxInsertions && !isFloorPhase(phase) {
-			return false, true, &Clamp{Rule: "max-insertions-cap", Proposed: phase + "=insert", Forced: phase + "=skip"}
-		}
-		return runs, true, nil
+		return shouldRunFromPlan(in, phase, enable, optionalUsed)
 	}
 
 	switch enable {
@@ -428,6 +404,43 @@ func shouldRun(in RouteInput, phase string, optionalUsed int) (bool, bool, *Clam
 		}
 		return triggerFires(in.Signals, in.Cfg.Triggers[phase]), true, nil
 	}
+}
+
+// mandatoryPhaseRun reports the pinned decision for a phase that is unconditionally mandatory or made
+// mandatory by a firing conditional rule; pinned is false when neither applies and the caller must keep
+// evaluating.
+func mandatoryPhaseRun(in RouteInput, phase string, enable config.Enable) (bool, *Clamp, bool) {
+	if isMandatory(in.Cfg, phase) {
+		if enable == config.EnableOff {
+			return true, &Clamp{Rule: "mandatory-never-skipped", Proposed: phase + "=off", Forced: phase + "=on"}, true
+		}
+		return true, nil, true
+	}
+	if rule, ok := in.Cfg.Conditional[phase]; ok && evalCondRule(in.Signals, rule) {
+		if enable == config.EnableOff {
+			return true, &Clamp{Rule: "conditional-mandatory-pin", Proposed: phase + "=off", Forced: phase + "=on"}, true
+		}
+		return true, nil, true
+	}
+	return false, nil, false
+}
+
+// shouldRunFromPlan resolves shouldRun's Advisory-and-above branch, where the pre-clamped plan drives the
+// decision for every non-mandatory phase.
+func shouldRunFromPlan(in RouteInput, phase string, enable config.Enable, optionalUsed int) (bool, bool, *Clamp) {
+	runs := planRuns(in.Plan, phase)
+	// A configured skip_when gates the plan. Floor phases are exempt so the
+	// gate can never bypass the floor.
+	if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, in.Cfg.Triggers[phase]) {
+		return false, true, &Clamp{Rule: "skip-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
+	}
+	if runs && enable == config.EnableOff {
+		return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
+	}
+	if runs && enable == config.EnableContent && optionalUsed >= in.Cfg.MaxInsertions && !isFloorPhase(phase) {
+		return false, true, &Clamp{Rule: "max-insertions-cap", Proposed: phase + "=insert", Forced: phase + "=skip"}
+	}
+	return runs, true, nil
 }
 
 // skipWhenFires reports whether any skip_when clause holds; the trigger path and the plan gate share it.

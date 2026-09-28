@@ -19,51 +19,67 @@ func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	done := toSet(completed)
 
 	if done["scout"] {
-		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-scout.json"); ok {
-			raw = unwrapPayload(raw)
-			sig.Scout = extractScout(raw)
-			sig.foldGeneric("scout", raw)
-		} else {
-			sig.Scout = scoutFromReportFallback(workspace, &sig.DigestDegraded)
-		}
+		digestScout(workspace, &sig)
 	}
 	if done["triage"] {
-		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-triage.json"); ok {
-			raw = unwrapPayload(raw)
-			sig.Triage = extractTriage(raw)
-			sig.foldGeneric("triage", raw)
-		} else {
-			sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
-		}
-		if decision, ok := digestTriageDecision(workspace, &sig.DigestDegraded); ok {
-			sig.Triage.CommittedCount = decision.committedCount
-			sig.Triage.commitmentKnown = true
-			sig.Triage.UnifiedSize = decision.unifiedSize
-			sig.Triage.UnifiedMemberCount = decision.unifiedMemberCount
-		}
+		digestTriagePhase(workspace, &sig)
 	}
 	if done["build"] {
-		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-build.json", "handoff-builder.json"); ok {
-			raw = unwrapPayload(raw)
-			sig.Build = extractBuild(raw)
-			sig.foldGeneric("build", raw)
-		} else {
-			sig.Build = buildFromGitFallback(workspace, &sig.DigestDegraded)
-		}
+		digestBuildPhase(workspace, &sig)
 	}
 	if done["audit"] {
-		if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-audit.json", "handoff-auditor.json"); ok {
-			raw = unwrapPayload(raw)
-			sig.Audit = extractAudit(raw)
-			sig.foldGeneric("audit", raw)
-		} else {
-			sig.Audit = auditFromACSVerdictFallback(workspace, &sig.DigestDegraded)
-		}
+		digestAuditPhase(workspace, &sig)
 	}
 	for _, phase := range completed {
 		sig.foldFailureSentinel(workspace, phase)
 	}
 	return sig, nil
+}
+
+func digestScout(workspace string, sig *RoutingSignals) {
+	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-scout.json"); ok {
+		raw = unwrapPayload(raw)
+		sig.Scout = extractScout(raw)
+		sig.foldGeneric("scout", raw)
+	} else {
+		sig.Scout = scoutFromReportFallback(workspace, &sig.DigestDegraded)
+	}
+}
+
+func digestTriagePhase(workspace string, sig *RoutingSignals) {
+	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-triage.json"); ok {
+		raw = unwrapPayload(raw)
+		sig.Triage = extractTriage(raw)
+		sig.foldGeneric("triage", raw)
+	} else {
+		sig.Triage = triageFromReportFallback(workspace, &sig.DigestDegraded)
+	}
+	if decision, ok := digestTriageDecision(workspace, &sig.DigestDegraded); ok {
+		sig.Triage.CommittedCount = decision.committedCount
+		sig.Triage.commitmentKnown = true
+		sig.Triage.UnifiedSize = decision.unifiedSize
+		sig.Triage.UnifiedMemberCount = decision.unifiedMemberCount
+	}
+}
+
+func digestBuildPhase(workspace string, sig *RoutingSignals) {
+	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-build.json", "handoff-builder.json"); ok {
+		raw = unwrapPayload(raw)
+		sig.Build = extractBuild(raw)
+		sig.foldGeneric("build", raw)
+	} else {
+		sig.Build = buildFromGitFallback(workspace, &sig.DigestDegraded)
+	}
+}
+
+func digestAuditPhase(workspace string, sig *RoutingSignals) {
+	if raw, ok := readFirstTracked(workspace, &sig.DigestDegraded, "handoff-audit.json", "handoff-auditor.json"); ok {
+		raw = unwrapPayload(raw)
+		sig.Audit = extractAudit(raw)
+		sig.foldGeneric("audit", raw)
+	} else {
+		sig.Audit = auditFromACSVerdictFallback(workspace, &sig.DigestDegraded)
+	}
 }
 
 // triageDecisionDigest is what routing reads from triage-decision.json.
