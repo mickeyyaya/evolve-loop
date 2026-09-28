@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the doc guard sees a `cd` into a doc root after another command (2026-09-29)
+
+- A post-merge security audit of the doc guard found that entering a doc root counted only when `cd` or `pushd` began the raw command text: the pattern was anchored at `^cd`, and each command's text keeps the blanks after the `;`, `&&` or newline before it. `true; cd docs && rm -f README.md`, `set -e` followed by an indented `cd docs`, and `true; cd docs && mv README.md /tmp/` were allowed. The hole predates this week's hardening; every earlier test began with `cd`.
+- Entering is read from the command's words, like every other verb: `cd` or `pushd` naming a doc root, through `candidateCommands`, so `command cd docs` and `builtin cd docs` count as well (`builtin` joins the wrapper list). The anchored `cdDocsRe` is gone.
+- The draft exception refuses a draft path that is not a regular file; a symlinked draft was allowed, though `rm` removes only the link.
+- Its review found every word-read verb missed behind a shell reserved word (`{ cd docs; rm …; }`, `if cd docs; then rm …; fi`, `! cd docs; …`, `cd docs; { rm …; }`); `candidateCommands` now skips `!`, `{`, `if`, `then`, `elif`, `else`, `do`, `while` and `until` before a command, in the one place every verb reads.
+- Tests: `TestDocDelete_EnteringADocRootAfterAnotherCommandStillCounts` (25 denied forms, 3 allowed), `TestDocDelete_ADraftThatIsASymlinkIsNotTheDraft`, `TestDocDelete_AnAbsentDraftIsStillItsOwnToRetract`, red first; 8 mutants each die. A directory whose name hides a doc root (a symlink named `mirror`) stays a documented limit: only names are checked.
+
 ## Fixed — a closeout no longer moves main under a sibling lane mid-wave (cycle 1704, 2026-09-28)
 
 Salvaged from the unlanded 2026-09-26 worktree (`fix/dossier-commits-at-wave-boundary`) and ported test-first onto current main. On 2026-09-26, cycle 1704 passed audit with WARN. Cycle 1705 then sealed FAIL, and its closeout committed its dossier to the plane's `main`. Ship refused 1704 (`AUDIT_BINDING_HEAD_MOVED`), and the forced re-audit rated the same bytes stricter and failed them. After a correction round, 1704 went through a rebase and a rebuild for the same bookkeeping commit.
