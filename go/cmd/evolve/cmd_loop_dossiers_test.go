@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
@@ -110,6 +112,73 @@ func TestPublishPendingDossiers_HoldsThePairsUnlessThePlaneHasOriginsHistory(t *
 	}
 }
 
+func leaseARun(t *testing.T, root string, cycle, ownerPID int) {
+	t.Helper()
+	runDir := cycleWorkspace(root, cycle)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "run.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := runlease.Write(runDir, runlease.Lease{RunID: "run-" + strconv.Itoa(cycle), OwnerPID: ownerPID}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPublishPendingDossiers_RefusesWhileAnotherRunIsLive(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		owner     func(t *testing.T) int
+		published bool
+	}{
+		{"a live run another process owns", func(*testing.T) int { return os.Getppid() }, false},
+		{"the caller's own run", func(*testing.T) int { return os.Getpid() }, true},
+		{"a sealed lane whose process exited", iscsExitedPID, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := planeWithAPendingCloseout(t, "main")
+			leaseARun(t, r.Dir, 1706, tc.owner(t))
+			head := r.Git("rev-parse", "HEAD")
+			var warn bytes.Buffer
+
+			publishPendingDossiers(r.Dir, &warn)
+
+			if got := r.Git("show", "--name-only", "--format=%s", "HEAD"); (got == closeoutCommit) != tc.published {
+				t.Fatalf("published = %v, want %v; warn=%q", got == closeoutCommit, tc.published, warn.String())
+			}
+			if tc.published {
+				return
+			}
+			if r.Git("rev-parse", "HEAD") != head {
+				t.Fatal("a held publish moved HEAD")
+			}
+			if _, err := os.Stat(filepath.Join(dossier.PendingDir(r.Dir), "cycle-1705.json")); err != nil {
+				t.Fatalf("a held pair must stay pending: %v", err)
+			}
+			if !strings.Contains(warn.String(), "another run is live") || !strings.Contains(warn.String(), "they stay pending") {
+				t.Fatalf("the hold must say why and keep the pairs: %q", warn.String())
+			}
+		})
+	}
+}
+
+func TestLoopSummary_ASecondLoopExitingBesideALiveRunPublishesNothing(t *testing.T) {
+	r := planeWithAPendingCloseout(t, "main")
+	leaseARun(t, r.Dir, 1706, os.Getppid())
+	head := r.Git("rev-parse", "HEAD")
+	lr := &loopResult{StopReason: "owned_by_live_run", classifyRoot: r.Dir}
+
+	lr.emit(io.Discard)
+
+	if r.Git("rev-parse", "HEAD") != head {
+		t.Fatal("a loop that found another run live committed a pending closeout under it")
+	}
+	if _, err := os.Stat(filepath.Join(dossier.PendingDir(r.Dir), "cycle-1705.json")); err != nil {
+		t.Fatalf("the pair must stay pending for the live run's own boundary: %v", err)
+	}
+}
+
 func TestPublishPendingDossiers_OutsideACheckoutLeavesThePairsPendingSilently(t *testing.T) {
 	root := t.TempDir()
 	if err := writePendingCloseout(root); err != nil {
@@ -176,6 +245,8 @@ func TestPrepareIteration_PublishesPendingCloseoutsOntoTheSyncedPlane(t *testing
 	if err := writePendingCloseout(plane.Dir); err != nil {
 		t.Fatal(err)
 	}
+	leaseARun(t, plane.Dir, 1704, os.Getpid())
+	leaseARun(t, plane.Dir, 1705, iscsExitedPID(t))
 	evolveDir := filepath.Join(plane.Dir, ".evolve")
 	var console bytes.Buffer
 	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: plane.Dir, EvolveDir: evolveDir},

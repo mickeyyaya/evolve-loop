@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
@@ -27,6 +28,10 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 		return
 	}
 	if _, err := plane.Classify(projectRoot); err != nil {
+		return
+	}
+	if busy := anotherRunLive(projectRoot); busy != "" {
+		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %s — they stay pending\n", busy)
 		return
 	}
 	release, err := flock.Lock(flock.ShipLockPath(projectRoot))
@@ -47,6 +52,17 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 	if len(res.Published) > 0 || len(res.Skipped) > 0 || len(res.Failed) > 0 {
 		fmt.Fprintf(warn, "[dossier] pending dossiers: published cycles %v; half pairs %v; refused or failed %d\n", res.Published, res.Skipped, len(res.Failed))
 	}
+}
+
+func anotherRunLive(projectRoot string) string {
+	active, err := loopchain.FleetLaneActive(paths.EvolveDirOf(projectRoot))
+	if err != nil {
+		return fmt.Sprintf("cannot prove that no other run is live (%v)", err)
+	}
+	if active {
+		return "another run is live on this plane (a fresh run lease held by another live process)"
+	}
+	return ""
 }
 
 func hasPendingDossiers(projectRoot string, warn io.Writer) bool {
