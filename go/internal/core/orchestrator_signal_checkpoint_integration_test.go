@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -20,9 +21,10 @@ func TestRunCycle_InterruptPreservesIntegrationBranchForResume(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
-	t.Setenv("GIT_CONFIG_COUNT", "0")
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	for _, entry := range append(gittest.ConfigEnv(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1") {
+		key, value, _ := strings.Cut(entry, "=")
+		t.Setenv(key, value)
+	}
 
 	w := fixtures.NewWorkspace(t).
 		WithFiles(map[string]string{".gitignore": ".evolve/\n.test-worktrees/\n"}).
