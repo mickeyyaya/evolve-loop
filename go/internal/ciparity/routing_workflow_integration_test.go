@@ -113,7 +113,7 @@ func routingPathCases() []routingCase {
 		{"renamed_document_to_source", []string{"go/renamed.go"}, "docs/reports/existing.md", true, false},
 		{"unusual_names", []string{"landing/a\nb\tc file.txt", "docs/reports/note with spaces.md"}, "", false, true},
 	}
-	for _, path := range []string{".github/workflows/go.yml", ".github/workflows/required.yml", ".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/landing-pages.yml", ".github/workflows/landing-validation.yml", ".goreleaser.yml", ".evolve/policy.json", ".evolve/phases/a.json", ".evolve/profiles/a.json", ".claude-plugin/plugin.json", "install.sh", "README.md", "docs/architecture/phase-registry.json", "config/new.yaml", "future-module/new.rs"} {
+	for _, path := range []string{".github/workflows/go.yml", ".github/workflows/required.yml", ".github/workflows/ci.yml", ".github/workflows/release.yml", ".github/workflows/landing-pages.yml", ".github/workflows/landing-validation.yml", ".goreleaser.yml", ".evolve/policy.json", ".evolve/phases/a.json", ".evolve/profiles/a.json", ".claude-plugin/plugin.json", "install.sh", "README.md", "docs/architecture/phase-registry.json", "docs/architecture/note.md", "docs/incidents/note.md", "config/new.yaml", "future-module/new.rs"} {
 		cases = append(cases, routingCase{path, []string{path}, "", true, true})
 	}
 	return cases
