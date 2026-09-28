@@ -102,9 +102,13 @@ func TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd(t *testing.T) {
 	if last.markerPresent {
 		t.Errorf("the batch-end gcHookFn invocation still saw cycle-state.json on disk (calls=%+v) — the plan requires finalize FIRST, then the hook, so the sweep observes a finalized batch", *calls)
 	}
+	want := filepath.Join(gcManifestDir(evolveDir), "batch-end")
+	if last.workspace != want {
+		t.Errorf("batch-end gcHookFn workspace = %q, want %q (a runs/cycle-N target pollutes the next cycle's workspace; the shared GC root would overwrite the pre-batch manifest)", last.workspace, want)
+	}
 	runsDir := filepath.Join(projectRoot, ".evolve", "runs")
-	if last.workspace == "" || !strings.HasPrefix(filepath.Clean(last.workspace), filepath.Clean(runsDir)) {
-		t.Errorf("batch-end gcHookFn workspace = %q, want a cycle workspace under %q (the manifests must land in this batch's run dir)", last.workspace, runsDir)
+	if strings.HasPrefix(filepath.Clean(last.workspace), filepath.Clean(runsDir)) {
+		t.Errorf("batch-end gcHookFn workspace = %q must NOT be under %q (a cycle run dir)", last.workspace, runsDir)
 	}
 }
 

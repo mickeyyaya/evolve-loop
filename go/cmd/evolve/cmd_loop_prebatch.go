@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -16,14 +17,14 @@ func prepareFreshBatch(
 	deps orchDeps,
 	lr *loopResult,
 	stdout, stderr io.Writer,
-) (lastCycle int, exitCode int, halt bool) {
+) (exitCode int, halt bool) {
 	// A stale binary must not run recovery logic; a successful refresh re-execs
 	// and never returns.
 	bootBinaryRefreshFn(cfg, stderr)
 	if br := bootRecoverFn(ctx, cfg, deps.Ledger, stderr); br.HaltSelfSHA {
 		lr.StopReason = "self_sha_boot_halt"
 		lr.emit(stdout)
-		return 0, 2, true
+		return 2, true
 	}
 
 	if !cfg.ForceFresh {
@@ -37,7 +38,7 @@ func prepareFreshBatch(
 					fmt.Fprintln(stderr, "[loop]   • or let it finish — do NOT `evolve cycle reset` or `pkill` a live run (Ctrl-C lets it checkpoint).")
 					lr.StopReason = "owned_by_live_run"
 					lr.emit(stdout)
-					return 0, 2, true
+					return 2, true
 				}
 			}
 			if csErr != nil {
@@ -50,19 +51,18 @@ func prepareFreshBatch(
 			fmt.Fprintln(stderr, "[loop]   (or pass --force-fresh to start fresh and overwrite — history NOT sealed)")
 			lr.StopReason = "unfinished_cycle"
 			lr.emit(stdout)
-			return 0, 2, true
+			return 2, true
 		}
 	}
 
 	if loopPreflightHalts(cfg, stderr) {
 		lr.StopReason = "preflight_failed"
 		lr.emit(stdout)
-		return 0, 2, true
+		return 2, true
 	}
 
 	// Drains worktrees a prior crashed batch left finalized; this batch's own
 	// finalized worktrees are handled by the end sweep.
-	last, _ := readLastCycleNumber(context.Background(), deps.Storage)
-	gcHookFn(cfg, cycleWorkspace(cfg.ProjectRoot, last+1), stderr)
-	return last, 0, false
+	gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "pre-batch"), stderr)
+	return 0, false
 }

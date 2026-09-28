@@ -88,3 +88,35 @@ func TestArchivePollutedWorkspace_NotADirReturnsNoOp(t *testing.T) {
 		t.Errorf("non-dir should not error, got %v", err)
 	}
 }
+
+func TestC1735_004_ArchivePollutedWorkspaceStillArchivesGCManifestOnlyDir(t *testing.T) {
+	ws := t.TempDir()
+	for _, name := range []string{"gc-shadow-manifest.json", "workspace-gc-manifest.json"} {
+		if err := os.WriteFile(filepath.Join(ws, name), []byte("{}"), 0o644); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	now := func() time.Time { return time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC) }
+	if err := archivePollutedWorkspace(ws, now); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	if _, err := os.Stat(ws); !os.IsNotExist(err) {
+		t.Errorf("a workspace holding only GC manifests must still be archived; stat err=%v", err)
+	}
+	if _, err := os.Stat(ws + ".polluted-20260928T120000.000000000"); err != nil {
+		t.Errorf("expected polluted archive: %v", err)
+	}
+}
+
+func TestC1735_005_ArchivePollutedWorkspaceIgnoresLaneScopeOnly(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte("{}"), 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if err := archivePollutedWorkspace(ws, time.Now); err != nil {
+		t.Fatalf("archive: %v", err)
+	}
+	if _, err := os.Stat(ws); err != nil {
+		t.Errorf("a lane-scope-only workspace is not pollution and must stay: %v", err)
+	}
+}

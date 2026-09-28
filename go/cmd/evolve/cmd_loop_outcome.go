@@ -177,6 +177,10 @@ func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stde
 	fmt.Fprintf(stderr, "[gc] worktree enforce: applied %d items\n", len(manifest.Items))
 }
 
+func gcManifestDir(evolveDir string) string {
+	return filepath.Join(evolveDir, "gc")
+}
+
 // worktreeGCOptions is the single construction site shared by the in-loop
 // hook and the operator command (`evolve gc`, cmd_gc.go), so both sweeps aim
 // at the same worktree base and carry the same policy.
@@ -392,15 +396,4 @@ func lastCycleIn(lr loopResult) int {
 		return lr.Cycles[n-1].Cycle
 	}
 	return 0
-}
-
-// batchEndGCCycle never returns zero, which names no real run dir.
-func batchEndGCCycle(lr loopResult, startNext int) int {
-	if n := lastCycleIn(lr); n > 0 {
-		return n
-	}
-	if startNext > 0 {
-		return startNext
-	}
-	return 1
 }

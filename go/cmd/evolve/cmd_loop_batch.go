@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
@@ -13,17 +14,16 @@ import (
 )
 
 type loopBatchCoordinator struct {
-	ctx              context.Context
-	cfg              loopConfig
-	deps             orchDeps
-	orch             loopCycleRunner
-	cycleEnv         map[string]string
-	cycleContext     map[string]string
-	result           *loopResult
-	workflow         policy.WorkflowConfig
-	lastBeforeGCHook int
-	stdout           io.Writer
-	stderr           io.Writer
+	ctx          context.Context
+	cfg          loopConfig
+	deps         orchDeps
+	orch         loopCycleRunner
+	cycleEnv     map[string]string
+	cycleContext map[string]string
+	result       *loopResult
+	workflow     policy.WorkflowConfig
+	stdout       io.Writer
+	stderr       io.Writer
 	// waveEngine is lazily built by wave().
 	// See ADR-0103.
 	waveEngine *loopwave.Engine
@@ -33,7 +33,6 @@ func (b *loopBatchCoordinator) run() int {
 	cfg := b.cfg
 	deps := b.deps
 	lr := b.result
-	lastBeforeGCHook := b.lastBeforeGCHook
 	stdout := b.stdout
 	stderr := b.stderr
 	wc := b.workflow
@@ -129,7 +128,7 @@ iterations:
 		return 2
 	}
 	finalizeCompletedCycle(cfg, stderr)
-	gcHookFn(cfg, cycleWorkspace(cfg.ProjectRoot, batchEndGCCycle(*lr, lastBeforeGCHook+1)), stderr)
+	gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "batch-end"), stderr)
 	lr.emit(stdout)
 	// rc=3 signals a batch that completed but absorbed a recoverable failure
 	// or a continued verdict-FAIL, so CI can distinguish it from a clean run.
