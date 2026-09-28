@@ -25,19 +25,10 @@ func PruneExpiredCarryoverTodos(statePath string, now time.Time) (PruneResult, e
 		now = time.Now().UTC()
 	}
 
-	raw, err := os.ReadFile(statePath)
+	state, entries, err := readStateArray(statePath, "carryoverTodos")
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return PruneResult{}, nil
-		}
-		return PruneResult{}, fmt.Errorf("failurelog: read state: %w", err)
+		return PruneResult{}, err
 	}
-	var state map[string]any
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return PruneResult{}, fmt.Errorf("failurelog: parse state: %w", err)
-	}
-
-	entries, _ := state["carryoverTodos"].([]any)
 	if len(entries) == 0 {
 		return PruneResult{}, nil
 	}
@@ -55,22 +46,7 @@ func PruneExpiredCarryoverTodos(statePath string, now time.Time) (PruneResult, e
 			kept = append(kept, m)
 		}
 	}
-	state["carryoverTodos"] = kept
-
-	result := PruneResult{
-		Before:  before,
-		After:   len(kept),
-		Removed: before - len(kept),
-	}
-	if result.Removed == 0 {
-		// No change — skip the disk write (mirrors PruneExpired: don't churn
-		// mtime + risk race-on-rename for nothing).
-		return result, nil
-	}
-	if err := atomicWriteJSON(statePath, state); err != nil {
-		return PruneResult{}, fmt.Errorf("failurelog: prune carryover write: %w", err)
-	}
-	return result, nil
+	return writePruneResult(statePath, state, "carryoverTodos", kept, before, "prune carryover")
 }
 
 // DefaultCarryoverBackfillTTL is the conservative TTL stamped on legacy

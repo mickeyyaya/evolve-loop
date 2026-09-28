@@ -113,38 +113,14 @@ func Plan(opts Options) (Manifest, error) {
 
 	// Rule 1: run-dir retention ladder. Newest KeepFull are kept in full;
 	// beyond that, dead runs age into archive then delete. Live always kept.
-	for i, r := range sortRunsNewestFirst(opts.Runs) {
-		if r.Live || i < pol.Runs.KeepFull {
-			continue
-		}
-		age := ageDays(now(), r.ModTime)
-		switch {
-		case pol.Runs.DeleteAfterDays > 0 && age > float64(pol.Runs.DeleteAfterDays):
-			add(r.Path, ActionDelete, "runs.delete_after_days")
-		case pol.Runs.ArchiveAfterDays > 0 && age > float64(pol.Runs.ArchiveAfterDays):
-			add(r.Path, ActionArchive, "runs.archive_after_days")
-		}
-	}
+	planRunLadder(opts.Runs, pol, now, add)
 
 	// Rule 2: tracker .ephemeral subtrees inside KEPT runs (pruneephemeral's
 	// phase 1, generalized). Runs already planned away take their .ephemeral
 	// with them, so only un-planned runs are scanned. LIVE runs are skipped
 	// entirely — the hard rule covers their subtrees too (deleting a running
 	// session's tracker state would corrupt it).
-	planned := make(map[string]bool, len(items))
-	for _, it := range items {
-		planned[it.Path] = true
-	}
-	for _, r := range opts.Runs {
-		if r.Live || planned[r.Path] {
-			continue
-		}
-		eph := filepath.Join(r.Path, ".ephemeral")
-		if info, err := os.Stat(eph); err == nil && info.IsDir() &&
-			ageDays(now(), info.ModTime()) > float64(pol.TrackerTTLDays) {
-			add(eph, ActionDelete, "tracker_ttl_days")
-		}
-	}
+	planTrackerTTL(opts.Runs, items, pol, now, add)
 
 	// Rule 3: operator-salvage TTL (top-level entries by mtime).
 	for _, e := range dirEntriesOlderThan(filepath.Join(opts.EvolveDir, "operator-salvage"), now(), pol.SalvageTTLDays, nil) {
@@ -162,6 +138,38 @@ func Plan(opts Options) (Manifest, error) {
 
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
 	return Manifest{Items: items}, nil
+}
+
+func planRunLadder(runs []RunDir, pol Policy, now func() time.Time, add func(string, Action, string)) {
+	for i, r := range sortRunsNewestFirst(runs) {
+		if r.Live || i < pol.Runs.KeepFull {
+			continue
+		}
+		age := ageDays(now(), r.ModTime)
+		switch {
+		case pol.Runs.DeleteAfterDays > 0 && age > float64(pol.Runs.DeleteAfterDays):
+			add(r.Path, ActionDelete, "runs.delete_after_days")
+		case pol.Runs.ArchiveAfterDays > 0 && age > float64(pol.Runs.ArchiveAfterDays):
+			add(r.Path, ActionArchive, "runs.archive_after_days")
+		}
+	}
+}
+
+func planTrackerTTL(runs []RunDir, items []Item, pol Policy, now func() time.Time, add func(string, Action, string)) {
+	planned := make(map[string]bool, len(items))
+	for _, it := range items {
+		planned[it.Path] = true
+	}
+	for _, r := range runs {
+		if r.Live || planned[r.Path] {
+			continue
+		}
+		eph := filepath.Join(r.Path, ".ephemeral")
+		if info, err := os.Stat(eph); err == nil && info.IsDir() &&
+			ageDays(now(), info.ModTime()) > float64(pol.TrackerTTLDays) {
+			add(eph, ActionDelete, "tracker_ttl_days")
+		}
+	}
 }
 
 // dirEntriesOlderThan lists direct children of dir whose mtime is older than
@@ -228,32 +236,38 @@ func Apply(evolveDir string, m Manifest) error {
 				errs = append(errs, fmt.Errorf("gc: delete %s: %w", it.Path, err))
 			}
 		case ActionArchive:
-			base := filepath.Base(it.Path)
-			archiveDir := filepath.Join(evolveDir, "archive", "runs")
-			dst := filepath.Join(archiveDir, base)
-			if err := os.MkdirAll(archiveDir, 0o755); err != nil {
-				errs = append(errs, fmt.Errorf("gc: archive mkdir for %s: %w", it.Path, err))
-				continue
-			}
-			// Never overwrite an existing archive entry — disambiguate with a
-			// numeric suffix (deterministic, no clock dependency).
-			for n := 1; ; n++ {
-				if _, err := os.Lstat(dst); err != nil {
-					break
-				}
-				dst = filepath.Join(archiveDir, base+"."+strconv.Itoa(n))
-			}
-			// Rename requires src and dst on the same filesystem; both live
-			// under .evolve so this holds unless an operator mounts
-			// .evolve/archive separately — then this surfaces as EXDEV.
-			if err := os.Rename(it.Path, dst); err != nil {
-				errs = append(errs, fmt.Errorf("gc: archive %s → %s: %w", it.Path, dst, err))
+			if err := archiveItem(evolveDir, it.Path); err != nil {
+				errs = append(errs, err)
 			}
 		default:
 			errs = append(errs, fmt.Errorf("gc: unknown action %q for %s", it.Action, it.Path))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func archiveItem(evolveDir, path string) error {
+	base := filepath.Base(path)
+	archiveDir := filepath.Join(evolveDir, "archive", "runs")
+	dst := filepath.Join(archiveDir, base)
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		return fmt.Errorf("gc: archive mkdir for %s: %w", path, err)
+	}
+	// Never overwrite an existing archive entry — disambiguate with a
+	// numeric suffix (deterministic, no clock dependency).
+	for n := 1; ; n++ {
+		if _, err := os.Lstat(dst); err != nil {
+			break
+		}
+		dst = filepath.Join(archiveDir, base+"."+strconv.Itoa(n))
+	}
+	// Rename requires src and dst on the same filesystem; both live
+	// under .evolve so this holds unless an operator mounts
+	// .evolve/archive separately — then this surfaces as EXDEV.
+	if err := os.Rename(path, dst); err != nil {
+		return fmt.Errorf("gc: archive %s → %s: %w", path, dst, err)
+	}
+	return nil
 }
 
 // protected reports whether path may never be acted on: quarantine is

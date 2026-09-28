@@ -266,25 +266,52 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 	if err != nil {
 		return WorktreeManifest{}, err
 	}
-	mergedOut, err := o.git(o.ProjectRoot, "branch", "--merged", "HEAD")
+	merged, err := o.mergedBranches()
 	if err != nil {
 		return WorktreeManifest{}, err
+	}
+	items, pool, seenBranch, err := o.scanWorktrees(porcelain, merged)
+	if err != nil {
+		return WorktreeManifest{}, err
+	}
+
+	// KeepRecent: retain the newest N eligible candidates by mtime.
+	items = append(items, removalItems(pool, o.Policy.KeepRecent)...)
+
+	// Branch backlog: cycle-* branches with no worktree entry at all.
+	orphans, err := o.orphanBranchItems(merged, seenBranch)
+	if err != nil {
+		return WorktreeManifest{}, err
+	}
+	items = append(items, orphans...)
+
+	sortWorktreeItems(items)
+	return WorktreeManifest{Items: items}, nil
+}
+
+func (o WorktreeOptions) mergedBranches() (map[string]bool, error) {
+	mergedOut, err := o.git(o.ProjectRoot, "branch", "--merged", "HEAD")
+	if err != nil {
+		return nil, err
 	}
 	merged := map[string]bool{}
 	for _, b := range parseBranchList(mergedOut) {
 		merged[b] = true
 	}
+	return merged, nil
+}
 
+type eligible struct {
+	path, branch string
+	mtime        time.Time
+}
+
+func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool) ([]WorktreeItem, []eligible, map[string]bool, error) {
 	minAge := time.Duration(o.Policy.MinAgeMinutes) * time.Minute
 	now := o.now()
 
 	var items []WorktreeItem
 	seenBranch := map[string]bool{}
-
-	type eligible struct {
-		path, branch string
-		mtime        time.Time
-	}
 	var pool []eligible
 
 	for _, e := range parseWorktreePorcelain(porcelain) {
@@ -306,7 +333,7 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 		}
 		dirty, err := o.isDirty(path)
 		if err != nil {
-			return WorktreeManifest{}, err
+			return nil, nil, nil, err
 		}
 		if dirty {
 			items = append(items, WorktreeItem{Path: path, Branch: e.branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"})
@@ -316,20 +343,29 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 			items = append(items, WorktreeItem{Path: path, Branch: e.branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"})
 			continue
 		}
-		info, err := os.Stat(path)
-		if err != nil {
-			continue
+		if c, ok := eligibleAfterGrace(path, e.branch, now, minAge); ok {
+			pool = append(pool, c)
 		}
-		if minAge > 0 && now.Sub(info.ModTime()) < minAge {
-			continue // MinAgeMinutes grace
-		}
-		pool = append(pool, eligible{path: path, branch: e.branch, mtime: info.ModTime()})
 	}
+	return items, pool, seenBranch, nil
+}
 
-	// KeepRecent: retain the newest N eligible candidates by mtime.
+func eligibleAfterGrace(path, branch string, now time.Time, minAge time.Duration) (eligible, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return eligible{}, false
+	}
+	if minAge > 0 && now.Sub(info.ModTime()) < minAge {
+		return eligible{}, false // MinAgeMinutes grace
+	}
+	return eligible{path: path, branch: branch, mtime: info.ModTime()}, true
+}
+
+func removalItems(pool []eligible, keepRecent int) []WorktreeItem {
 	sort.Slice(pool, func(i, j int) bool { return pool[i].mtime.After(pool[j].mtime) })
+	var items []WorktreeItem
 	for i, c := range pool {
-		if i < o.Policy.KeepRecent {
+		if i < keepRecent {
 			continue
 		}
 		items = append(items,
@@ -337,12 +373,15 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 			WorktreeItem{Path: c.path, Branch: c.branch, Action: WorktreeActionDeleteBranch, Reason: "merged, clean, dead"},
 		)
 	}
+	return items
+}
 
-	// Branch backlog: cycle-* branches with no worktree entry at all.
+func (o WorktreeOptions) orphanBranchItems(merged, seenBranch map[string]bool) ([]WorktreeItem, error) {
 	backlogOut, err := o.git(o.ProjectRoot, "branch", "--list", "cycle-*")
 	if err != nil {
-		return WorktreeManifest{}, err
+		return nil, err
 	}
+	var items []WorktreeItem
 	for _, b := range parseBranchList(backlogOut) {
 		if !strings.HasPrefix(b, "cycle-") || seenBranch[b] {
 			continue
@@ -353,9 +392,7 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 			items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch (no worktree)"})
 		}
 	}
-
-	sortWorktreeItems(items)
-	return WorktreeManifest{Items: items}, nil
+	return items, nil
 }
 
 func sortWorktreeItems(items []WorktreeItem) {
@@ -389,11 +426,28 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	}
 	defer release()
 
+	// Pass 1: TOCTOU re-check every worktree-backed target before any mutation.
+	refused, errs := o.refuseChangedTargets(m.Items)
+
+	// Pass 2a: remove worktrees FIRST. git refuses `branch -d` on a branch
+	// still checked out in a linked worktree, so the dir must go before its
+	// branch.
+	didRemove, removeErrs := o.removeWorktrees(m.Items, refused)
+	errs = append(errs, removeErrs...)
+	// Pass 2b: delete branches (their worktrees, if any, are now gone).
+	errs = append(errs, o.deleteBranches(m.Items, refused)...)
+	if didRemove {
+		if _, err := o.git(o.ProjectRoot, "worktree", "prune"); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (o WorktreeOptions) refuseChangedTargets(items []WorktreeItem) (map[string]bool, []error) {
 	var errs []error
 	refused := map[string]bool{}
-
-	// Pass 1: TOCTOU re-check every worktree-backed target before any mutation.
-	for _, it := range m.Items {
+	for _, it := range items {
 		if it.Path == "" || refused[it.Path] {
 			continue
 		}
@@ -416,12 +470,13 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 			errs = append(errs, fmt.Errorf("gc: refuse %s: became dirty between plan and apply", it.Path))
 		}
 	}
+	return refused, errs
+}
 
-	// Pass 2a: remove worktrees FIRST. git refuses `branch -d` on a branch
-	// still checked out in a linked worktree, so the dir must go before its
-	// branch.
+func (o WorktreeOptions) removeWorktrees(items []WorktreeItem, refused map[string]bool) (bool, []error) {
+	var errs []error
 	didRemove := false
-	for _, it := range m.Items {
+	for _, it := range items {
 		if it.Action != WorktreeActionRemove || refused[it.Path] {
 			continue
 		}
@@ -431,8 +486,12 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 		}
 		didRemove = true
 	}
-	// Pass 2b: delete branches (their worktrees, if any, are now gone).
-	for _, it := range m.Items {
+	return didRemove, errs
+}
+
+func (o WorktreeOptions) deleteBranches(items []WorktreeItem, refused map[string]bool) []error {
+	var errs []error
+	for _, it := range items {
 		if it.Action != WorktreeActionDeleteBranch {
 			continue
 		}
@@ -443,10 +502,5 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 			errs = append(errs, err)
 		}
 	}
-	if didRemove {
-		if _, err := o.git(o.ProjectRoot, "worktree", "prune"); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
+	return errs
 }
