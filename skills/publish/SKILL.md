@@ -32,10 +32,10 @@ When the user types `/evo:publish 18.5.0` (or similar), invoke the go-native rel
 **Before** invoking the pipeline — base CI must be green (catches *"releasing from an already-red `main`"*, the v20.1.0 trigger):
 
 ```bash
-gh run list --branch main --limit 1 --json headSha,status,conclusion,url
+gh run list --workflow required.yml --branch main --limit 1 --json headSha,status,conclusion,url
 ```
 
-Require `headSha == $(git rev-parse origin/main)`, `status == "completed"`, `conclusion == "success"`. Anything else → **STOP** with the run URL:
+The query is scoped to `required.yml`, whose `CI required` job aggregates every suite: the newest run of any workflow can be a green `landing-pages` run that hides a red or running `required CI`. Require `headSha == $(git rev-parse origin/main)`, `status == "completed"`, `conclusion == "success"`. Anything else → **STOP** with the run URL:
 - *in-progress* → wait for it.
 - *failure* → fix `main` green first.
 - *stale SHA / local `main` ahead of `origin`* → you'd publish commits CI has never seen; **push `main` and let CI run first**, then release. (This is the same gate [`/evo:release`](../release/SKILL.md) runs; it is hoisted here so `/evo:publish`-direct callers are protected too.)

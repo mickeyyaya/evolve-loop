@@ -111,7 +111,7 @@ func TestLandingWorkflow_TestsPullRequestsBeforeBuild(t *testing.T) {
 		t.Error("site build does not depend on successful module tests")
 	}
 	const shared = "./.github/workflows/landing-validation.yml"
-	if w.Jobs["test"].Uses != shared || readWorkflowContract(t, "required.yml").Jobs["landing"].Uses != shared {
+	if w.Jobs["test"].Uses != shared || readWorkflowContract(t, RequiredWorkflow).Jobs["landing"].Uses != shared {
 		t.Error("Pages and required PR checks must share landing validation")
 	}
 	validation := readWorkflowContract(t, "landing-validation.yml")

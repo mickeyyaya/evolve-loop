@@ -120,7 +120,7 @@ func routingPathCases() []routingCase {
 }
 
 func TestRequiredRouting_ConsumedPathsAndExplicitDocumentationSkips(t *testing.T) {
-	step := workflowStep(t, "required.yml", "changes", "paths")
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	for _, tc := range routingPathCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			dir, base := routingRepo(t)
@@ -153,7 +153,7 @@ func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
 	routingGit(t, dir, "checkout", "-q", "main")
 	routingFile(t, dir, "landing/base-only.html")
 	base := routingCommit(t, dir)
-	got, err := routingOutput(t, dir, workflowStep(t, "required.yml", "changes", "paths").Run, "pull_request", base, head)
+	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "pull_request", base, head)
 	if err != nil || got != "go=true\nlanding=false\n" {
 		t.Fatalf("PR route included unrelated base changes: %q, %v", got, err)
 	}
@@ -161,7 +161,7 @@ func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
 
 func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing.T) {
 	dir, head := routingRepo(t)
-	step := workflowStep(t, "required.yml", "changes", "paths")
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	cases := []struct {
 		name, event, base, head string
 		pass                    bool
@@ -194,7 +194,7 @@ func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing
 
 func TestRequiredRouting_GitFailuresStopWithoutShellErrexit(t *testing.T) {
 	dir, head := routingRepo(t)
-	step := workflowStep(t, "required.yml", "changes", "paths")
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	for _, tc := range []struct{ name, prefix, event, base, head string }{
 		{"diff_missing_base", "", "push", strings.Repeat("f", 40), head},
 		{"diff_missing_head", "", "push", head, strings.Repeat("f", 40)},

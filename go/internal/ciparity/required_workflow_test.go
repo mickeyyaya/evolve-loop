@@ -7,7 +7,7 @@ import (
 )
 
 func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
-	w := readWorkflowContract(t, "required.yml")
+	w := readWorkflowContract(t, RequiredWorkflow)
 	for _, event := range []string{"push", "pull_request", "workflow_dispatch"} {
 		on, ok := w.On[event]
 		if !ok || len(on.Paths) != 0 || len(on.PathsIgnore) != 0 {
@@ -55,7 +55,7 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 }
 
 func TestRequiredResult_WaitsForEveryOtherJob(t *testing.T) {
-	w := readWorkflowContract(t, "required.yml")
+	w := readWorkflowContract(t, RequiredWorkflow)
 	required := w.Jobs["required"]
 	var needs []string
 	if err := required.Needs.Decode(&needs); err != nil {
@@ -94,7 +94,7 @@ func workflowStep(t *testing.T, workflow, job, id string) workflowStepContract {
 }
 
 func TestRequiredResult_ConsumesEachReusableJobResult(t *testing.T) {
-	step := workflowStep(t, "required.yml", "required", "result")
+	step := workflowStep(t, RequiredWorkflow, "required", "result")
 	if step.If != "" || step.ContinueOnError != "" {
 		t.Fatal("the result step may not be skipped or continue after failure")
 	}

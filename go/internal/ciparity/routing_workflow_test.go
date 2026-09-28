@@ -6,13 +6,13 @@ import (
 )
 
 func TestRequiredRouting_UsesHostEventAndPublishesBothDecisions(t *testing.T) {
-	w := readWorkflowContract(t, "required.yml")
+	w := readWorkflowContract(t, RequiredWorkflow)
 	for _, suite := range []string{"go", "landing"} {
 		if w.Jobs["changes"].Outputs[suite] != "${{ steps.paths.outputs."+suite+" }}" {
 			t.Errorf("%s routing is not bound to computed paths", suite)
 		}
 	}
-	step := workflowStep(t, "required.yml", "changes", "paths")
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
 	for name, want := range map[string]string{
 		"EVENT_NAME": "${{ github.event_name }}",
 		"BASE_SHA":   "${{ github.event.pull_request.base.sha || github.event.before }}",

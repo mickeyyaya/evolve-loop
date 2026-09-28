@@ -12,7 +12,7 @@ import (
 )
 
 func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
-	step := workflowStep(t, "required.yml", "required", "result")
+	step := workflowStep(t, RequiredWorkflow, "required", "result")
 	bindings := map[string]string{
 		"ROUTE_RESULT": "${{ needs.changes.result }}", "VALIDATE_RESULT": "${{ needs.validate.result }}",
 		"GO_REQUIRED": "${{ needs.changes.outputs.go }}", "GO_RESULT": "${{ needs.go.result }}",

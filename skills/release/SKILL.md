@@ -30,9 +30,9 @@ Run in order. Any **FAIL** → print the reason and stop (do not delegate to `/e
    Non-zero exit → stop.
 3. **Gap 1 — CI green on `main` HEAD** (requires `gh`; if absent, report "cannot verify CI" and stop):
    ```bash
-   gh run list --branch main --limit 1 --json headSha,status,conclusion,url
+   gh run list --workflow required.yml --branch main --limit 1 --json headSha,status,conclusion,url
    ```
-   Confirm `headSha` matches `git rev-parse origin/main`, `status == "completed"`, `conclusion == "success"`. Anything else (in-progress, failure, stale SHA) → stop with the run URL.
+   The query is scoped to `required.yml` (its `CI required` job aggregates every suite), because the newest run of any workflow can be a green `landing-pages` run that hides a red or running `required CI`. Confirm `headSha` matches `git rev-parse origin/main`, `status == "completed"`, `conclusion == "success"`. Anything else (in-progress, failure, stale SHA) → stop with the run URL.
 4. **Gap 2 — no WIP/fixup commits since the last tag**:
    ```bash
    git log "$(git describe --tags --abbrev=0)..HEAD" --format=%s
