@@ -49,7 +49,7 @@
   "cmd/evolve.runSyncMain": 72,
   "cmd/evolve.salvageProbeDiagnostics": 61,
   "cmd/evolve.setupLatestReport": 52,
-  "cmd/evolve.wireOrchestratorDeps": 320,
+  "cmd/evolve.wireOrchestratorDeps": 310,
   "cmd/evolve.writePipelineEscalation": 62,
   "cmd/testlatency.Parse": 69,
   "cmd/testlatency.Report.Markdown": 60,

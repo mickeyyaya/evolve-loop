@@ -47,8 +47,8 @@ func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 	if rc != ExitBadFlags {
 		t.Errorf("rc=%d, want %d (ExitBadFlags)", rc, ExitBadFlags)
 	}
-	if !strings.Contains(stderr.String(), "source-writing phase") {
-		t.Errorf("stderr missing the 'source-writing phase' explanation: %q", stderr.String())
+	if !strings.Contains(stderr.String(), "cannot run worktree phase") {
+		t.Errorf("stderr missing the 'cannot run worktree phase' explanation: %q", stderr.String())
 	}
 	// Defensive: the error message names the phase + worktree so an operator
 	// auditing logs can find the misassigned phase quickly.
