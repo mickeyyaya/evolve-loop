@@ -5,7 +5,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
@@ -32,10 +31,7 @@ func (execGit) ChangedFiles(base string) ([]string, error) {
 }
 
 func (execGit) Show(base, path string) ([]byte, error) {
-	if _, err := git("cat-file", "-e", base+":"+path); err != nil {
-		return nil, fs.ErrNotExist
-	}
-	return git("show", base+":"+path)
+	return commentaudit.ReadAtBase(git, base)(path)
 }
 
 func git(args ...string) ([]byte, error) {
