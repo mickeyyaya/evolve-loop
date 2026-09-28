@@ -8,13 +8,11 @@ import (
 	"testing"
 )
 
-// rawConfig reads a key the way production code in a fixture sees it: a plain
-// git in the repo, without the helper.
 func rawConfig(t *testing.T, dir, key string) string {
 	t.Helper()
-	out, err := exec.Command("git", "-C", dir, "config", "--get", key).Output()
+	out, err := exec.Command("git", "-C", dir, "config", "--local", "--get", key).Output()
 	if err != nil {
-		t.Fatalf("git config --get %s in %s: %v", key, dir, err)
+		t.Fatalf("git config --local --get %s in %s: %v", key, dir, err)
 	}
 	return strings.TrimSpace(string(out))
 }
