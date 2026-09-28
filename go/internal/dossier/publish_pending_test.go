@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
@@ -18,12 +19,15 @@ func planeWithPendingDossier(t *testing.T) *gittest.Repo {
 	}
 	r.Git("add", "README.md")
 	r.Git("commit", "-q", "-m", "base")
-	d := &Dossier{Cycle: 7, Goal: "pending closeout", FinalVerdict: VerdictPass,
-		Phases: []PhaseRecord{{Name: "build", Verdict: VerdictPass}}}
-	if err := Write(d, PendingDir(r.Dir), false); err != nil {
+	if err := Write(pendingCloseout(), PendingDir(r.Dir), false); err != nil {
 		t.Fatal(err)
 	}
 	return r
+}
+
+func pendingCloseout() *Dossier {
+	return &Dossier{Cycle: 7, Goal: "pending closeout", FinalVerdict: VerdictPass,
+		Phases: []PhaseRecord{{Name: "build", Verdict: VerdictPass}}}
 }
 
 func corpusFile(root, name string) string { return filepath.Join(CyclesDir(root), name) }
@@ -151,6 +155,90 @@ func TestPublishPending_AFailedCommitKeepsThePairPendingAndTheCorpusClean(t *tes
 	if _, err := os.Stat(filepath.Join(PendingDir(r.Dir), "cycle-7.md")); err != nil {
 		t.Fatalf("the pair left the pending dir although it was not committed: %v", err)
 	}
+}
+
+func TestPublishPending_NeverOverwritesARecordTheCorpusAlreadyHolds(t *testing.T) {
+	earlier := &Dossier{Cycle: 7, Goal: "an earlier record", FinalVerdict: VerdictWarn,
+		Phases: []PhaseRecord{{Name: "build", Verdict: VerdictWarn}}}
+	cases := map[string]func(t *testing.T, root string){
+		"a different committed record": func(t *testing.T, root string) {
+			if err := Write(earlier, CyclesDir(root), true); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"half of the same record": func(t *testing.T, root string) {
+			if err := Write(pendingCloseout(), CyclesDir(root), false); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(corpusFile(root, "cycle-7.md")); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}
+	for name, seed := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := planeWithPendingDossier(t)
+			seed(t, r.Dir)
+			head := r.Git("rev-parse", "HEAD")
+			before := corpusBytes(t, r.Dir)
+
+			res, err := PublishPending(r.Dir, io.Discard)
+
+			if err != nil || len(res.Published) != 0 || res.Failed[7] == nil || !strings.Contains(res.Failed[7].Error(), "corpus") {
+				t.Fatalf("PublishPending = (%+v, %v), want cycle 7 refused because the corpus holds it", res, err)
+			}
+			if r.Git("rev-parse", "HEAD") != head {
+				t.Fatal("a refused pair moved HEAD")
+			}
+			if after := corpusBytes(t, r.Dir); !reflect.DeepEqual(after, before) {
+				t.Fatalf("the corpus changed: %q, was %q", after, before)
+			}
+			if _, err := os.Stat(filepath.Join(PendingDir(r.Dir), "cycle-7.json")); err != nil {
+				t.Fatalf("a refused pair must stay pending: %v", err)
+			}
+		})
+	}
+}
+
+func TestPublishPending_ClearsAPendingCopyTheCorpusAlreadyHoldsWithoutACommit(t *testing.T) {
+	r := planeWithPendingDossier(t)
+	if _, err := PublishPending(r.Dir, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(pendingCloseout(), PendingDir(r.Dir), false); err != nil {
+		t.Fatal(err)
+	}
+	head := r.Git("rev-parse", "HEAD")
+	committed, err := os.Stat(corpusFile(r.Dir, "cycle-7.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := PublishPending(r.Dir, io.Discard)
+
+	if err != nil || !reflect.DeepEqual(res.Published, []int{7}) || len(res.Failed) != 0 {
+		t.Fatalf("PublishPending = (%+v, %v), want the leftover copy cleared", res, err)
+	}
+	if r.Git("rev-parse", "HEAD") != head {
+		t.Fatal("clearing a copy the corpus already holds must not commit")
+	}
+	if now, err := os.Stat(corpusFile(r.Dir, "cycle-7.json")); err != nil || !os.SameFile(committed, now) {
+		t.Fatalf("the corpus record was rewritten: %v", err)
+	}
+	if entries, _ := os.ReadDir(PendingDir(r.Dir)); len(entries) != 0 {
+		t.Fatalf("the leftover copy is still pending: %v", entries)
+	}
+}
+
+func corpusBytes(t *testing.T, root string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	for _, name := range []string{"cycle-7.json", "cycle-7.md"} {
+		if b, err := os.ReadFile(corpusFile(root, name)); err == nil {
+			out[name] = string(b)
+		}
+	}
+	return out
 }
 
 func appendTo(t *testing.T, path, text string) {

@@ -89,29 +89,59 @@ func publishPair(projectRoot string, n int) error {
 	if mdB, err = markdownWriteWouldRender(n, jsonB, mdB); err != nil {
 		return err
 	}
-	prior, err := snapshot(corpus, base)
-	if err != nil {
+	held, err := corpusHoldsPair(corpus, base, jsonB, mdB)
+	if err != nil || held {
 		return err
 	}
+	return commitIntoCorpus(projectRoot, corpus, base, jsonB, mdB)
+}
+
+func corpusHoldsPair(corpus, base string, jsonB, mdB []byte) (bool, error) {
+	identical := 0
+	for i, ext := range []string{".json", ".md"} {
+		want := [][]byte{jsonB, mdB}[i]
+		got, err := os.ReadFile(filepath.Join(corpus, base+ext))
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+		case err != nil:
+			return false, fmt.Errorf("dossier: read corpus %s%s: %w", base, ext, err)
+		case !bytes.Equal(got, want):
+			return false, fmt.Errorf("dossier: the corpus already holds a different %s%s; the pending pair is refused", base, ext)
+		default:
+			identical++
+		}
+	}
+	if identical == 1 {
+		return false, fmt.Errorf("dossier: the corpus holds half of %s; the pending pair is refused", base)
+	}
+	return identical == 2, nil
+}
+
+func commitIntoCorpus(projectRoot, corpus, base string, jsonB, mdB []byte) error {
 	if err := os.MkdirAll(corpus, 0o755); err != nil {
 		return err
 	}
-	if err := errors.Join(atomicwrite.Bytes(filepath.Join(corpus, base+".json"), jsonB), atomicwrite.Bytes(filepath.Join(corpus, base+".md"), mdB)); err != nil {
-		return errors.Join(err, prior.restore())
+	jsonPath, mdPath := filepath.Join(corpus, base+".json"), filepath.Join(corpus, base+".md")
+	err := errors.Join(atomicwrite.Bytes(jsonPath, jsonB), atomicwrite.Bytes(mdPath, mdB))
+	if err == nil {
+		err = commitPairGit(gitexec.Default(projectRoot), filepath.ToSlash(filepath.Join("knowledge-base", "cycles", base)))
 	}
-	if err := commitPairGit(gitexec.Default(projectRoot), filepath.ToSlash(filepath.Join("knowledge-base", "cycles", base))); err != nil {
-		return errors.Join(err, prior.restore())
+	if err != nil {
+		return errors.Join(err, removeIfPresent(jsonPath), removeIfPresent(mdPath))
 	}
 	return nil
 }
 
 func removePending(pending string, n int) error {
 	base := filepath.Join(pending, fmt.Sprintf("cycle-%d", n))
-	mdErr := os.Remove(base + ".md")
-	if errors.Is(mdErr, fs.ErrNotExist) {
-		mdErr = nil
+	return errors.Join(os.Remove(base+".json"), removeIfPresent(base+".md"))
+}
+
+func removeIfPresent(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
-	return errors.Join(os.Remove(base+".json"), mdErr)
+	return nil
 }
 
 func markdownWriteWouldRender(n int, jsonB, mdB []byte) ([]byte, error) {
@@ -134,36 +164,4 @@ func markdownWriteWouldRender(n int, jsonB, mdB []byte) ([]byte, error) {
 		return nil, fmt.Errorf("dossier: pending cycle-%d is not what Write renders for it", n)
 	}
 	return wantMD, nil
-}
-
-type corpusSnapshot struct {
-	paths []string
-	bytes [][]byte
-}
-
-func snapshot(corpus, base string) (corpusSnapshot, error) {
-	var s corpusSnapshot
-	for _, ext := range []string{".json", ".md"} {
-		p := filepath.Join(corpus, base+ext)
-		b, err := os.ReadFile(p)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return s, fmt.Errorf("dossier: snapshot %s: %w", p, err)
-		}
-		s.paths, s.bytes = append(s.paths, p), append(s.bytes, b)
-	}
-	return s, nil
-}
-
-func (s corpusSnapshot) restore() error {
-	var errs []error
-	for i, p := range s.paths {
-		if s.bytes[i] == nil {
-			if err := os.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				errs = append(errs, err)
-			}
-			continue
-		}
-		errs = append(errs, atomicwrite.Bytes(p, s.bytes[i]))
-	}
-	return errors.Join(errs...)
 }
