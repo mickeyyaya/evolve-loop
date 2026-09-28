@@ -24,6 +24,17 @@ All notable changes to this project will be documented in this file.
 - The runtime reference's wave-boundary protocol (added the same day) said one wave is `evolve loop --max-cycles <fleet width>`. In fleet mode each batch iteration dispatches a whole wave, so `--max-cycles` counts waves, as the fleet-planning row already said. Wave 28 was launched with `--max-cycles 2` at width 2 and started a second wave instead of stopping.
 - The protocol now launches one wave with `--max-cycles 1`, which exits after the wave without reaching a boundary refresh. It names the defect that lets a multi-wave run outlive its count (the boundary re-exec restarts the count at wave 0, inbox item `boundary-reexec-keeps-cycle-budget-and-wave-index`), and the refresh row records the same restart.
 - `evolve loop --help` says what `--max-cycles` counts: cycles when sequential, waves in fleet mode.
+## Fixed — a closeout no longer moves main under a sibling lane mid-wave (cycle 1704, 2026-09-28)
+
+Salvaged from the unlanded 2026-09-26 worktree (`fix/dossier-commits-at-wave-boundary`) and ported test-first onto current main. On 2026-09-26, cycle 1704 passed audit with WARN. Cycle 1705 then sealed FAIL, and its closeout committed its dossier to the plane's `main`. Ship refused 1704 (`AUDIT_BINDING_HEAD_MOVED`), and the forced re-audit rated the same bytes stricter and failed them. After a correction round, 1704 went through a rebase and a rebuild for the same bookkeeping commit.
+
+- A fleet lane writes its closeout dossier to `.evolve/dossiers-pending/`, which is host-only and gitignored, with no git-mutation lock and no commit. A sequential cycle still commits at once.
+- Pending dossiers are published when no lane runs: after the plane sync at each wave boundary, on every loop exit (before the spine fail-open rollup reads the corpus), and after `evolve fleet` and each `evolve campaign run` wave return (`publishPendingDossiers` → `dossier.PublishPending`). The publish holds the shared git-mutation lock and commits only onto a plane current with or ahead of origin/main; otherwise the pairs stay pending with a WARN naming the relation.
+- `PublishPending` publishes a pair only if it is exactly what `Write` renders for the dossier its JSON holds, filed under that dossier's cycle, and it completes a pair whose markdown half a crash lost. A refused pair or a failed commit restores the corpus and stays pending.
+- The dossier destination is a root decision (`WithDossierDestination`: committed, files-only for `--simulate`, pending for a fleet lane). It replaces `WithDossierCommit`.
+- A first design exempted corpus files from leak recovery. Security review blocked it: an agent-planted pair would have reached `main` unreviewed.
+- Size ratchet: `prepareIteration` 55 → 48 (the wave-binary resolution moved to `resolveWaveBinary`); `runFleet` and `runCampaignRun` unchanged, since both route their lanes through `runLanesThenPublish`.
+- Record: `docs/incidents/2026-09-26-a-failed-cycles-closeout-moved-main-under-a-passed-sibling.md`.
 
 ## Fixed — `evolve sync-main` is not blocked by an untracked file (2026-09-28)
 
