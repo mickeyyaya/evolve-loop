@@ -4,11 +4,13 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
 // initConflictRebaseRepoT is initCleanRebaseRepoT with one overlapping file: main and the cycle both rewrite
@@ -164,6 +166,49 @@ func TestRecoverFromShipError_ADebuggerResolvedConflictReentersTheRebaseNotAStal
 	}
 	if exec.Command("git", "-C", dir, "cat-file", "-e", "HEAD:docs/debugger-scratch.md").Run() == nil {
 		t.Fatal("the debugger's untracked scratch file rode the carrier into the shipped tree")
+	}
+}
+
+type fencedDebugger struct {
+	inner    *resolvingDebugger
+	writable []string
+	kept     []string
+}
+
+func (d *fencedDebugger) Name() string { return string(core.PhaseDebugger) }
+func (d *fencedDebugger) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+	d.writable = req.WorktreeWritablePaths
+	fence := treefence.Begin(ctx, req.Worktree, req.WorktreeReadOnly, req.WorktreeWritablePaths...)
+	resp, err := d.inner.Run(ctx, req)
+	d.kept = fence.End(ctx).Kept
+	return resp, err
+}
+
+func TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile(t *testing.T) {
+	f := newConflictFixture(t, "peer line\n", nil)
+	fenced := &fencedDebugger{inner: f.dbg}
+	o := core.NewOrchestrator(&recStorage{}, &fakeLedger{}, newRunners(map[core.Phase]core.PhaseRunner{
+		core.PhaseShip:     f.ship,
+		core.PhaseAudit:    f.audit,
+		core.PhaseBuild:    f.build,
+		core.PhaseTDD:      f.tdd,
+		core.PhaseDebugger: fenced,
+	}), core.WithWorktreeProvisioner(fixedWorktree{dir: f.dir}))
+
+	if err := runCompositionCycle(t, o); err != nil {
+		t.Fatalf("a conflict the fenced debugger resolved must ship: %v", err)
+	}
+	if f.ship.calls != 2 || !f.ship.landedOn[1] {
+		t.Fatalf("ship calls = %d landedOn = %v, want the second ship to land on main", f.ship.calls, f.ship.landedOn)
+	}
+	if !reflect.DeepEqual(fenced.writable, []string{"shared.md"}) || !reflect.DeepEqual(fenced.kept, []string{"shared.md"}) {
+		t.Fatalf("debugger writable = %v kept = %v, want both [shared.md]", fenced.writable, fenced.kept)
+	}
+	if out := runGitT(t, f.dir, "show", "HEAD:shared.md"); out != "peer line\n" {
+		t.Fatalf("the shipped tree must carry the resolution the fence kept: shared.md = %q", out)
+	}
+	if f.build.calls != 2 || f.audit.calls != 2 {
+		t.Fatalf("calls build=%d audit=%d, want 2/2: the kept resolution changed bytes, so it is re-authored and re-audited before it ships", f.build.calls, f.audit.calls)
 	}
 }
 

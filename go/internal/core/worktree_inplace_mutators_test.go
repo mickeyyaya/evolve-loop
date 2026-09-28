@@ -97,9 +97,9 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 			return "refused"
 		}},
 		{"rebaseCycleBranchOntoMain", func(t *testing.T, r inPlaceRepo) string {
-			ok, conflict := rebaseCycleBranchOntoMain(ctx, r.root, r.root)
-			if ok || conflict {
-				t.Errorf("the operator's tree is never rebased, got ok=%v conflict=%v", ok, conflict)
+			ok, conflicts := rebaseCycleBranchOntoMain(ctx, r.root, r.root)
+			if ok || len(conflicts) > 0 {
+				t.Errorf("the operator's tree is never rebased, got ok=%v conflict=%v", ok, conflicts)
 			}
 			return "refused"
 		}},

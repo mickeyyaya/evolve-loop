@@ -178,6 +178,9 @@ func (hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 			fmt.Fprintf(&b, "- %s: %s\n", f.k, f.v)
 		}
 	}
+	if len(req.WorktreeWritablePaths) > 0 {
+		fmt.Fprintf(&b, "- conflicted_paths: %s\n", strings.Join(req.WorktreeWritablePaths, ", "))
+	}
 	return b.String()
 }
 

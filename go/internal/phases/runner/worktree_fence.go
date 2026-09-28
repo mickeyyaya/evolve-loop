@@ -12,7 +12,7 @@ import (
 // writer or without a worktree) and logs an untakeable one at once.
 // See ADR-0097.
 func takeWorktreeFence(ctx context.Context, phase string, req core.PhaseRequest) *treefence.Fence {
-	f := treefence.Begin(ctx, req.Worktree, req.WorktreeReadOnly)
+	f := treefence.Begin(ctx, req.Worktree, req.WorktreeReadOnly, req.WorktreeWritablePaths...)
 	if err := f.TakeErr(); err != nil {
 		log.Diag().Warnf("[runner] WARN worktree fence phase=%s: snapshot failed (%v) — the tree this phase hands downstream is unverified\n", phase, err)
 	}

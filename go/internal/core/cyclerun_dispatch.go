@@ -133,7 +133,6 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		ProjectRoot:                     cr.req.ProjectRoot,
 		Workspace:                       cr.cs.WorkspacePath,
 		Worktree:                        phaseWorktree,
-		WorktreeReadOnly:                cr.o.worktreeReadOnly(next),
 		WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
 		ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
 		RunID:                           cr.cs.RunID,
@@ -147,6 +146,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		// for every phase this cycle); empty ⇒ byte-identical dispatch.
 		OperatorDirectives: cr.directivesSet.Merged,
 	}
+	phaseReq = cr.o.withWorktreeFence(phaseReq, next, cr.cs)
 	// Project this phase's clamped {cli,tier} plan proposal onto the
 	// dispatched request ONLY under model_routing=auto — the mode gate that
 	// distinguishes "auto applies" from "advisory logs, never applies" (the

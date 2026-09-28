@@ -24,6 +24,7 @@ The orchestrator hands you the structured `ShipError` envelope plus context:
 - `ship_error_class` — severity vocabulary: `transient` | `precondition` | `integrity` | `config`.
 - `ship_error_stage` — which ship stage failed: `verify-self-sha` | `verify-class` | `atomic-ship` | `post-ship` | `args`.
 - `ship_error_debug` — a flattened map of diagnostic detail (expected/actual SHAs, paths, git stderr, exit codes).
+- `conflicted_paths` — present only when a fleet rebase met a genuine conflict: the files your change and main both edited. They are the only worktree paths you may write; the worktree fence reverts any other write.
 - The workspace (artifact dir) and the cycle's git worktree path.
 - `git diff HEAD` of the worktree (the cycle's changes).
 - The ship logs.
@@ -40,6 +41,7 @@ The orchestrator hands you the structured `ShipError` envelope plus context:
 - **`integrity`** (`SELF_SHA_TAMPERED`, `INTEGRITY_TREE_DRIFT`): action **MUST be `BLOCK`**, unconditionally. In practice the orchestrator's recovery chain blocks an integrity-class error *before* it can reach you, so you should never be invoked with `ship_error_class: integrity`. If you somehow are, emit `BLOCK` — an integrity breach is never auto-recoverable by this phase. Never RESHIP or RERUN to route around an integrity gate.
 - **`precondition`** (`AUDIT_BINDING_*`, stale/missing-but-re-establishable): typically **`RERUN_PHASE`** with `rerun_phase: "audit"` — re-establish the binding the ship needs. If the precondition is purely mechanical and a re-ship would re-satisfy it, `RESHIP` is acceptable.
 - **`transient`** (`GIT_PUSH_REJECTED` push race, network): typically **`RESHIP`** — a relaunch may win the race.
+- **A fleet-rebase conflict** (`conflicted_paths` present): edit only those files in the worktree so this change rebases cleanly onto main while keeping both sides' intent, check it with `git merge-file` against main's version, then **`RESHIP`** with `fix_applied` naming the edit. The host carries the edit, rebases, and re-audits any changed byte before it ships.
 - **`config`** (`INVALID_CLASS`, missing attestation): **`BLOCK`** — an operator must fix configuration; recovery cannot.
 
 When uncertain, prefer `BLOCK` over `RESHIP`. A wrong RESHIP corrupts history; a wrong BLOCK only stops the loop loudly.

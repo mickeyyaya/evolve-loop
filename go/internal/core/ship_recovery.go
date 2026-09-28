@@ -74,7 +74,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			}
 		}
 		unwound := cs.ExplanationDocumentationVersion > 0 && !predictedConflict && o.unwindBeforeFleetRebase(ctx, projectRoot, cycle, *cs)
-		ok, conflict := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
+		ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
 		// Pend whatever the replay did: an aborted replay leaves the carrier, and pending it restores the
 		// audited shape the debugger and a re-ship expect.
 		if unwound {
@@ -315,17 +315,17 @@ const maxRebaseContinueSteps = 100
 // from the merged source: the re-audit re-binds the regenerated tree, so the
 // ship-time tree-SHA binding (ship/gitops.go) still holds — integrity-safe. A
 // conflict touching any NON-derived path (genuine overlapping work, incl. the
-// SSOT itself) returns conflict=true → the debugger. Infra failures and failed
-// regenerations return (false,false). The in-progress rebase is always aborted on
+// SSOT itself) returns those non-derived paths → the debugger. Infra failures and failed
+// regenerations return (false,nil). The in-progress rebase is always aborted on
 // a non-ok return so the worktree is left clean. An empty worktree returns
-// (false,false) — a degraded run never rebases.
-func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string) (ok bool, conflict bool) {
+// (false,nil) — a degraded run never rebases.
+func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string) (ok bool, conflicts []string) {
 	if worktree == "" {
-		return false, false
+		return false, nil
 	}
 	if inPlaceWorktree(worktree, projectRoot) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet rebase refused: the active worktree is the project root — a cycle never rebases the operator's tree\n")
-		return false, false
+		return false, nil
 	}
 	return rebaseWithDerivedRegen(ctx, worktree, gitCapture, regenerateDerivedArtifact, isDerivedArtifact)
 }
@@ -333,7 +333,7 @@ func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string
 // rebaseWithDerivedRegen is the testable core of the fleet rebase recovery (Humble
 // Object): pure orchestration over an injected git runner + regenerator. See
 // rebaseCycleBranchOntoMain for the contract.
-func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, regen regenFn, isDerived func(string) bool) (ok bool, conflict bool) {
+func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, regen regenFn, isDerived func(string) bool) (ok bool, conflicts []string) {
 	// abort cleans up an in-progress rebase. It runs under a DETACHED context so a
 	// cancelled ctx (per-cycle deadline / SIGINT mid-rebase) can never leave the
 	// worktree half-rebased — the work calls below use ctx (cancellation interrupts
@@ -344,14 +344,14 @@ func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, reg
 		_, _, _ = git(cctx, worktree, "rebase", "--abort")
 	}
 	if _, exit, err := git(ctx, worktree, "rebase", "main"); err == nil && exit == 0 {
-		return true, false
+		return true, nil
 	}
 	// The rebase paused or failed. A genuine conflict leaves unmerged paths; none
 	// means an infra failure (not a conflict) — abort and let the cycle fail.
 	if len(unmergedRebasePaths(ctx, worktree, git)) == 0 {
 		abort()
 		fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s onto main failed without conflicts (infra); aborted\n", worktree)
-		return false, false
+		return false, nil
 	}
 	for step := 0; step < maxRebaseContinueSteps; step++ {
 		unmerged := unmergedRebasePaths(ctx, worktree, git)
@@ -359,30 +359,28 @@ func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, reg
 			// A replayed commit became empty after resolution (a peer already made the
 			// same change) → skip it; the rebase proceeds to the next commit.
 			if _, c, e := git(ctx, worktree, "rebase", "--skip"); e == nil && c == 0 {
-				return true, false
+				return true, nil
 			}
 			continue
 		}
 		// Classify the WHOLE set before touching anything: if any conflict is on a
 		// non-derived path we abort without regenerating its derived siblings, since
 		// the rebase aborts anyway and a partial regen would be wasted.
-		for _, p := range unmerged {
-			if !isDerived(p) {
-				abort()
-				fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: non-derived conflict on %s (overlapping work) → debugger\n", worktree, p)
-				return false, true
-			}
+		if genuine := nonDerivedPaths(unmerged, isDerived); len(genuine) > 0 {
+			abort()
+			fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: non-derived conflict on %s (overlapping work) → debugger\n", worktree, strings.Join(genuine, ", "))
+			return false, genuine
 		}
 		for _, p := range unmerged {
 			if rerr := regen(ctx, worktree, p); rerr != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: regenerate %s failed: %v; aborting\n", worktree, p, rerr)
 				abort()
-				return false, false
+				return false, nil
 			}
 			if _, c, e := git(ctx, worktree, "add", "--", p); e != nil || c != 0 {
 				fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: git add %s failed (rc=%d, err=%v); aborting\n", worktree, p, c, e)
 				abort()
-				return false, false
+				return false, nil
 			}
 			fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s: regenerated derived projection %s from merged source\n", worktree, p)
 		}
@@ -391,24 +389,39 @@ func rebaseWithDerivedRegen(ctx context.Context, worktree string, git gitFn, reg
 		// `--continue` means a SUBSEQUENT replayed commit conflicts (or emptied) — the
 		// loop re-classifies it; exit 0 means the entire replay finished.
 		if _, c, e := git(ctx, worktree, "-c", "core.editor=true", "rebase", "--continue"); e == nil && c == 0 {
-			return true, false
+			return true, nil
 		}
 	}
 	abort()
 	fmt.Fprintf(os.Stderr, "[orchestrator] fleet rebase of %s exceeded %d replay steps; aborted\n", worktree, maxRebaseContinueSteps)
-	return false, false
+	return false, nil
+}
+
+func nonDerivedPaths(paths []string, isDerived func(string) bool) []string {
+	var genuine []string
+	for _, p := range paths {
+		if !isDerived(p) {
+			genuine = append(genuine, p)
+		}
+	}
+	return genuine
+}
+
+func rebaseRecordingConflicts(ctx context.Context, projectRoot string, cs *CycleState) (ok, conflict bool) {
+	ok, conflicts := rebaseCycleBranchOntoMain(ctx, projectRoot, cs.ActiveWorktree)
+	cs.ShipRecoveryConflicts = conflicts
+	return ok, len(conflicts) > 0
 }
 
 // unmergedRebasePaths returns the repo-relative paths with conflict markers
-// (--diff-filter=U) during an in-progress rebase, one per line. The outer
-// TrimSpace drops the trailing newline; git path entries carry no interior
-// whitespace, so no per-line trimming is needed.
+// (--diff-filter=U) during an in-progress rebase, NUL-separated and unquoted,
+// so each path is byte-for-byte what the worktree fence's diff-tree reports.
 func unmergedRebasePaths(ctx context.Context, worktree string, git gitFn) []string {
-	out, _, _ := git(ctx, worktree, "diff", "--name-only", "--diff-filter=U")
+	out, _, _ := git(ctx, worktree, "diff", "--name-only", "--diff-filter=U", "-z")
 	var paths []string
-	for _, l := range strings.Split(strings.TrimSpace(out), "\n") {
-		if l != "" {
-			paths = append(paths, l)
+	for _, p := range strings.Split(out, "\x00") {
+		if p != "" {
+			paths = append(paths, p)
 		}
 	}
 	return paths
