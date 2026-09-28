@@ -1,0 +1,21 @@
+{
+  "id": "insert-when-fields-need-a-producer",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "weight": 0.62,
+  "title": "Phase validation rejects an insert_when field that no typed signal or earlier phase output produces",
+  "files": [
+    "go/internal/phasespec",
+    "go/internal/router/condition.go",
+    ".evolve/phases"
+  ],
+  "summary": "From the architecture review of the wave-24 P0 T4 (2026-09-28). Since the plan clamp (insert-when-gates-plan) a trigger with no rubric_hint is a phase's whole admission rule at advisory, so a trigger that reads a signal nothing emits makes its phase unreachable. Four do today: changelog-sync and post-ship-monitor read ship.class (ship's PASS response leaves Signals nil unless a repair ran), context-condense reads run_dir.artifact_bytes, preliminary-study reads campaign.mode. None of the 67 recent plans chose them, so the impact is zero today (latent).",
+  "fix": "Validate each phase.json insert_when/skip_when field against the typed RoutingSignals fields plus the outputs.signals an earlier phase in the order declares; an unproduced field is a validation error with the phase and field named. Then either emit the four signals (ship.class from the ship response, run_dir.artifact_bytes from the digest, campaign.mode from the campaign) or re-key the four triggers.",
+  "acceptance": [
+    "RED first: a fixture phase whose insert_when reads a field no typed signal or earlier output declares fails validation naming the phase and the field",
+    "The checked-in registry validates clean: each of the four phases reads a produced signal or has its trigger re-keyed",
+    "A routing test shows changelog-sync admitted at advisory when its signal is produced"
+  ],
+  "created_at": "2026-09-28T13:40:00Z",
+  "source": "console, 2026-09-28, the architecture review of the wave-24 P0 T4 (the plan clamp)"
+}

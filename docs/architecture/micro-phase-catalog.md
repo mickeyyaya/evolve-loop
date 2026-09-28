@@ -157,6 +157,8 @@ The advisor classifies the cycle goal (classify-then-route — Anthropic/LangGra
 
 Recipes are guidance, not law: the advisor may mix rows (e.g. a security-relevant refactor takes threat-model + behavior-lock), and `ClampPlanToFloor` clamps everything.
 
+Since 2026-09-28 the router enforces the drop: a planned phase whose `insert_when` is its whole rule (no `rubric_hint`) runs only when the trigger fires at its turn in the walk ([dynamic-phase-routing.md](dynamic-phase-routing.md), the phase registry section). Mixing rows still works wherever a row's triggers fire, such as threat-model on a refactor that scout marks `security_relevant`.
+
 ### 4.2 Config change
 
 `phase-registry.json` config block: raise `max_optional_insertions` **4 → 6** (refactor recipe needs 6). Config-only.

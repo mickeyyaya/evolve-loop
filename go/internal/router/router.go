@@ -429,10 +429,14 @@ func mandatoryPhaseRun(in RouteInput, phase string, enable config.Enable) (bool,
 // decision for every non-mandatory phase.
 func shouldRunFromPlan(in RouteInput, phase string, enable config.Enable, optionalUsed int) (bool, bool, *Clamp) {
 	runs := planRuns(in.Plan, phase)
+	block := in.Cfg.Triggers[phase]
 	// A configured skip_when gates the plan. Floor phases are exempt so the
 	// gate can never bypass the floor.
-	if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, in.Cfg.Triggers[phase]) {
+	if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, block) {
 		return false, true, &Clamp{Rule: "skip-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
+	}
+	if runs && insertWhenGatesPlan(in.Signals, phase, enable, block) {
+		return false, true, &Clamp{Rule: "insert-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
 	}
 	if runs && enable == config.EnableOff {
 		return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
@@ -451,6 +455,10 @@ func skipWhenFires(sig RoutingSignals, block config.RoutingBlock) bool {
 		}
 	}
 	return false
+}
+
+func insertWhenGatesPlan(sig RoutingSignals, phase string, enable config.Enable, block config.RoutingBlock) bool {
+	return enable == config.EnableContent && !isFloorPhase(phase) && block.TriggerIsTheWholeRule() && !triggerFires(sig, block)
 }
 
 // triggerFires evaluates a RoutingBlock's insert_when (OR) minus skip_when (OR).
