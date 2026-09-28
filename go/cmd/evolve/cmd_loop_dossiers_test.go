@@ -213,6 +213,56 @@ func TestPublishPendingDossiers_HoldsWhenItCannotProveNoOtherRunIsLive(t *testin
 	}
 }
 
+func TestPublishPendingDossiers_ReChecksForALiveRunOnceItHoldsTheLock(t *testing.T) {
+	r := planeWithAPendingCloseout(t, "main")
+	previous := dossierPublishLock
+	dossierPublishLock = func(root string) (func(), error) {
+		leaseARun(t, root, 1706, os.Getppid())
+		return previous(root)
+	}
+	t.Cleanup(func() { dossierPublishLock = previous })
+	head := r.Git("rev-parse", "HEAD")
+	var warn bytes.Buffer
+
+	publishPendingDossiers(r.Dir, &warn)
+
+	if r.Git("rev-parse", "HEAD") != head {
+		t.Fatal("a run that went live while the publish waited for the lock had main moved under it")
+	}
+	if _, err := os.Stat(filepath.Join(dossier.PendingDir(r.Dir), "cycle-1705.json")); err != nil {
+		t.Fatalf("the pair must stay pending: %v", err)
+	}
+	if !strings.Contains(warn.String(), "another run is live") || !strings.Contains(warn.String(), "they stay pending") {
+		t.Fatalf("the hold under the lock must say why: %q", warn.String())
+	}
+}
+
+func TestPublishPendingDossiers_WithAnotherRunLiveNeverWaitsOnTheGitMutationLock(t *testing.T) {
+	r := planeWithAPendingCloseout(t, "main")
+	leaseARun(t, r.Dir, 1706, os.Getppid())
+	release, err := flock.Lock(flock.ShipLockPath(r.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	var warn bytes.Buffer
+	done := make(chan struct{})
+
+	go func() {
+		publishPendingDossiers(r.Dir, &warn)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("publishPendingDossiers queued behind a live run's git-mutation lock instead of holding its pairs")
+	}
+	if !strings.Contains(warn.String(), "another run is live") {
+		t.Fatalf("the hold must say why: %q", warn.String())
+	}
+}
+
 func TestLoopSummary_ASecondLoopExitingBesideALiveRunPublishesNothing(t *testing.T) {
 	r := planeWithAPendingCloseout(t, "main")
 	leaseARun(t, r.Dir, 1706, os.Getppid())

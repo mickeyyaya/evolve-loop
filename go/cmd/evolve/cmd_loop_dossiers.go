@@ -17,6 +17,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
+var dossierPublishLock = func(projectRoot string) (func(), error) {
+	return flock.Lock(flock.ShipLockPath(projectRoot))
+}
+
 func runLanesThenPublish(ctx context.Context, sup *fleet.Supervisor, specs []fleet.CycleSpec, projectRoot string, warn io.Writer) []fleet.Result {
 	results := sup.Run(ctx, specs)
 	publishPendingDossiers(paths.AbsoluteRoot("the project root", projectRoot, nil), warn)
@@ -34,7 +38,7 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %s — they stay pending\n", busy)
 		return
 	}
-	release, err := flock.Lock(flock.ShipLockPath(projectRoot))
+	release, err := dossierPublishLock(projectRoot)
 	if err != nil {
 		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: git-mutation lock: %v — they stay pending\n", err)
 		return
@@ -74,6 +78,9 @@ func hasPendingDossiers(projectRoot string, warn io.Writer) bool {
 }
 
 func publishHold(projectRoot string) string {
+	if busy := anotherRunLive(projectRoot); busy != "" {
+		return busy
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), waveSyncTimeout)
 	defer cancel()
 	g := gitexec.Default(projectRoot)
