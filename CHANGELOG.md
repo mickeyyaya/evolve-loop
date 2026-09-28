@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a closeout no longer moves main under a sibling lane mid-wave (cycle 1704, 2026-09-28)
+
+Salvaged from the unlanded 2026-09-26 worktree (`fix/dossier-commits-at-wave-boundary`) and ported test-first onto current main. On 2026-09-26, cycle 1704 passed audit with WARN. Cycle 1705 then sealed FAIL, and its closeout committed its dossier to the plane's `main`. Ship refused 1704 (`AUDIT_BINDING_HEAD_MOVED`), and the forced re-audit rated the same bytes stricter and failed them. After a correction round, 1704 went through a rebase and a rebuild for the same bookkeeping commit.
+
+- A fleet lane writes its closeout dossier to `.evolve/dossiers-pending/`, which is host-only and gitignored, with no git-mutation lock and no commit. A sequential cycle still commits at once.
+- Pending dossiers are published only when no other run is live: after the plane sync at each wave boundary, on every loop exit (before the spine fail-open rollup reads the corpus), and after `evolve fleet` and each `evolve campaign run` wave return (`publishPendingDossiers` → `dossier.PublishPending`).
+  - The publisher itself refuses while another process's run is live on the plane, so a second `evolve loop`, a stray `--resume`, or a fleet or campaign beside a loop cannot commit a closeout under a live sibling. It asks before the git-mutation lock and again once it holds it. The WARN names the blocking run dir and why (`loopchain.LiveSiblingRun`: "live pid N", "no readable lease" for a stale run `cycle-state.json` names), and points at `evolve cycle reset` for a stale one; a plane whose runs cannot be read holds too.
+  - It holds the shared git-mutation lock and commits only onto a plane current with or ahead of origin/main; otherwise the pairs stay pending with a WARN naming the reason.
+- `PublishPending` publishes a pair only if it is exactly what `Write` renders for the dossier its JSON holds, filed under that dossier's cycle, and it completes a pair whose markdown half a crash lost.
+  - A pending half that is not a regular file (a symlink, say) is refused.
+  - It never writes over a record: a corpus file with different bytes, or half a record, is refused. A byte-identical record is not rewritten; it is committed if untracked, and the pending copy is cleared.
+  - A refused pair stays pending with its reason in `Failed`; a failed write or commit removes what it wrote.
+- The dossier destination is a root decision (`WithDossierDestination`: committed, files-only for `--simulate`, pending for a fleet lane). It replaces `WithDossierCommit`.
+- A first design exempted corpus files from leak recovery. Security review blocked it: an agent-planted pair would have reached `main` unreviewed.
+- Size ratchet: `prepareIteration` 55 → 48 (the wave-binary resolution moved to `resolveWaveBinary`, now its only home: the batch-start copy is gone, `loopBatchCoordinator.run` 108 → 100); `runFleet` and `runCampaignRun` unchanged, since both route their lanes through `runLanesThenPublish`.
+- Record: `docs/incidents/2026-09-26-a-failed-cycles-closeout-moved-main-under-a-passed-sibling.md`.
+
 ## Fixed — the shipped-lane test fixture keeps git maintenance out of the background (2026-09-28)
 
 - `TestUnwindShipCommit_DeclinesWithoutMovingHEAD` failed CI on #698, a change touching neither the test nor its fixture: `t.TempDir`'s cleanup met `directory not empty` because the fixture's raw `git init` let git 2.47+ detach `git maintenance run --auto` after a commit. It is the third CI failure of the class (the dossier fixture twice).

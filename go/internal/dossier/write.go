@@ -3,6 +3,7 @@ package dossier
 import (
 	"context"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -76,7 +77,7 @@ func commitPairGit(g gitexec.Git, base string) error {
 		return nil
 	}
 
-	msg := fmt.Sprintf("dossier: %s closeout", base)
+	msg := fmt.Sprintf("dossier: %s closeout", path.Base(base))
 	var lastErr error
 	for attempt := 1; attempt <= commitMaxAttempts; attempt++ {
 		_, stderr, code, err := g.Capture(ctx, "commit", "-m", msg, "--", jsonName, mdName)
@@ -103,7 +104,7 @@ func unstagePair(ctx context.Context, g gitexec.Git, jsonName, mdName string) {
 	_ = g.Run(ctx, "reset", "--", jsonName, mdName)
 }
 
-// commitFailure renders a commit failure with git's stderr, so the sweep can
+// commitFailure renders a commit failure with git's stderr, so the caller can
 // log the real cause.
 func commitFailure(base string, code int, stderr string, err error) error {
 	if err != nil {

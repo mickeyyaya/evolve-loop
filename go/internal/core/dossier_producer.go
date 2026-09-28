@@ -22,7 +22,7 @@ type cycleDossierParams struct {
 	VerdictsNotAdopted []VerdictNotAdopted
 	SpineFailOpens     []SpineFailOpen
 	PhaseTimings       []phaseTimingEntry
-	FilesOnly          bool
+	Destination        DossierDestination
 }
 
 func defaultGitMutationLock(projectRoot string) (func(), error) {
@@ -41,7 +41,8 @@ func dossierVerdict(outcome string) string {
 }
 
 // writeCycleDossier builds and persists the closeout dossier for one completed
-// cycle to <projectRoot>/knowledge-base/cycles/cycle-N.{json,md}. goal must be
+// cycle as cycle-N.{json,md} in the corpus (knowledge-base/cycles), or in the
+// pending dir the loop publishes from, as p.Destination says. goal must be
 // non-blank; callers fall back to the goal hash when there is no human-readable
 // text. Returns an error the best-effort caller logs; it never panics.
 func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
@@ -62,18 +63,21 @@ func writeCycleDossier(lock gitMutationLocker, p cycleDossierParams) error {
 	if err != nil {
 		return fmt.Errorf("build dossier: %w", err)
 	}
-	dir := dossier.CyclesDir(p.ProjectRoot)
+	dir, commit := dossier.CyclesDir(p.ProjectRoot), p.Destination == DossierCommitted
+	if p.Destination == DossierPending {
+		dir = dossier.PendingDir(p.ProjectRoot)
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("dossier dir: %w", err)
 	}
-	if lock != nil && !p.FilesOnly {
+	if lock != nil && commit {
 		if release, lerr := lock(p.ProjectRoot); lerr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN dossier git-mutation lock: %v (proceeding unserialized; a concurrent index collision would skip this dossier)\n", lerr)
 		} else {
 			defer release()
 		}
 	}
-	if err := dossier.Write(d, dir, !p.FilesOnly); err != nil {
+	if err := dossier.Write(d, dir, commit); err != nil {
 		return fmt.Errorf("write dossier: %w", err)
 	}
 	return nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
@@ -68,14 +67,6 @@ func (b *loopBatchCoordinator) run() int {
 		fmt.Fprintf(stderr, "[loop] WARN: fleet: %s\n", w)
 	}
 	var waveBinPath string
-	if shouldRunWave(fleetCfg) || shouldRunPool(fleetCfg) {
-		if bp, err := os.Executable(); err == nil {
-			waveBinPath = bp
-		} else {
-			fmt.Fprintf(stderr, "[loop] WARN: fleet: cannot resolve binary for fleet dispatch, staying sequential: %v\n", err)
-			fleetCfg.Count = 1
-		}
-	}
 
 	// starvationTracker is held across the whole batch loop so a starved
 	// streak spans waves; a sequential (Count==1) batch never touches it.
