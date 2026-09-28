@@ -1,7 +1,10 @@
 package guards
 
 import (
+	"path"
+	"regexp"
 	"strings"
+	"unicode"
 )
 
 // shellCommand is one simple command the shell runs: its text for verb matching and its words, unquoted,
@@ -91,6 +94,10 @@ func (s *shellScanner) scanUnquoted(c *scanContext) {
 		s.skipComment()
 	case ch == '\'':
 		s.singleQuoted(c)
+	case ch == '$' && s.peek(1) == '\'':
+		s.ansiCQuoted(c)
+	case ch == '$' && s.peek(1) == '"':
+		s.i++
 	case ch == '"':
 		c.inDquote = true
 		c.cmd.quote('"')
@@ -163,6 +170,135 @@ func (s *shellScanner) singleQuoted(c *scanContext) {
 	c.cmd.literal(body)
 	c.cmd.quote('\'')
 	s.i += end + 2
+}
+
+func (s *shellScanner) ansiCQuoted(c *scanContext) {
+	body, width := ansiCBody(s.src[s.i+2:])
+	c.cmd.quote('\'')
+	c.cmd.literal(body)
+	c.cmd.quote('\'')
+	s.i += 2 + width
+}
+
+func ansiCBody(src string) (string, int) {
+	var body strings.Builder
+	i := 0
+	for i < len(src) && src[i] != '\'' {
+		if src[i] != '\\' || i+1 == len(src) {
+			body.WriteByte(src[i])
+			i++
+			continue
+		}
+		decoded, width := ansiCEscape(src[i+1:])
+		body.WriteString(decoded)
+		i += 1 + width
+	}
+	return body.String(), min(i+1, len(src))
+}
+
+var ansiCSingle = map[byte]string{
+	'a': "\a", 'b': "\b", 'e': "\x1b", 'E': "\x1b", 'f': "\f", 'n': "\n", 'r': "\r",
+	't': "\t", 'v': "\v", '\\': "\\", '\'': "'", '"': "\"", '?': "?",
+}
+
+type ansiCNumeric struct {
+	digits, base int
+	isRune       bool
+}
+
+var ansiCNumerics = map[byte]ansiCNumeric{'x': {2, 16, false}, 'u': {4, 16, true}, 'U': {8, 16, true}}
+
+var ansiCOctal = ansiCNumeric{digits: 3, base: 8}
+
+func ansiCEscape(src string) (string, int) {
+	if decoded, ok := ansiCSingle[src[0]]; ok {
+		return decoded, 1
+	}
+	if spec, ok := ansiCNumerics[src[0]]; ok {
+		if decoded, width := spec.decode(src[1:]); width > 0 {
+			return decoded, 1 + width
+		}
+	} else if decoded, width := ansiCOctal.decode(src); width > 0 {
+		return decoded, width
+	}
+	return "\\" + src[:1], 1
+}
+
+func (n ansiCNumeric) decode(src string) (string, int) {
+	value, width := 0, 0
+	for width < len(src) && width < n.digits {
+		digit := strings.IndexRune("0123456789abcdef"[:n.base], unicode.ToLower(rune(src[width])))
+		if digit < 0 {
+			break
+		}
+		value, width = value*n.base+digit, width+1
+	}
+	if n.isRune {
+		return string(rune(value)), width
+	}
+	return string([]byte{byte(value)}), width
+}
+
+var shellAssignmentRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
+var commandWrappers = map[string]bool{
+	"arch": true, "caffeinate": true, "command": true, "env": true, "exec": true, "nice": true,
+	"nohup": true, "sudo": true, "time": true, "timeout": true, "xargs": true,
+}
+
+func programName(word string) string {
+	return strings.ToLower(path.Base(word))
+}
+
+func candidateCommands(words []string) [][]string {
+	for len(words) > 0 && shellAssignmentRe.MatchString(words[0]) {
+		words = words[1:]
+	}
+	if len(words) == 0 {
+		return nil
+	}
+	if !commandWrappers[programName(words[0])] {
+		return [][]string{words}
+	}
+	candidates := make([][]string, 0, len(words)-1)
+	for i := 1; i < len(words); i++ {
+		candidates = append(candidates, words[i:])
+	}
+	return candidates
+}
+
+func anyCommand(words []string, runs func(name string, args []string) bool) bool {
+	for _, c := range candidateCommands(words) {
+		if runs(programName(c[0]), c[1:]) {
+			return true
+		}
+	}
+	return false
+}
+
+// gitOptionsWithValue are git's global options that take the next word as their value.
+var gitOptionsWithValue = map[string]bool{
+	"-C": true, "-c": true, "--git-dir": true, "--work-tree": true,
+	"--namespace": true, "--super-prefix": true, "--config-env": true,
+}
+
+func gitSubcommand(args []string) string {
+	if i := gitSubcommandIndex(args); i >= 0 {
+		return args[i]
+	}
+	return ""
+}
+
+func gitSubcommandIndex(args []string) int {
+	for i := 0; i < len(args); i++ {
+		if !strings.HasPrefix(args[i], "-") {
+			return i
+		}
+		if gitOptionsWithValue[args[i]] {
+			i++
+		}
+	}
+	return -1
 }
 
 func (s *shellScanner) escaped(c *scanContext) {
