@@ -290,11 +290,70 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
 - `make apicover-check` and `make cover-strict` — hard API and enrolled package
   coverage gates; the separate 85% function diagnostics remain advisory.
 
-`ci.yml` runs plugin validation and durable ACS. `release.yml` calls both reusable
-Go and general CI workflows on the tagged revision, and publication depends on
-both succeeding. `landing-pages.yml` tests/vets the separate landing module
-before building; pull requests build without publishing Pages. Go workflow
-filters include release configuration and workflow definitions consumed by tests.
+`ci.yml` runs plugin validation (`validate`) and durable ACS (`acs-durable`).
+Neither `go.yml` nor `ci.yml` triggers on a push or pull request of its own;
+both keep `workflow_call` and `workflow_dispatch`.
+
+`.github/workflows/required.yml` (workflow `required CI`) is the one unfiltered
+entry point for every pull request and for pushes to `main` and
+`go-rewrite-phase-1`. Its jobs:
+
+- `changes` diffs the event locally (PR: merge-base to head; push: before to
+  head; `--no-renames`, NUL-delimited) and selects the optional suites. A Git
+  failure or an invalid commit ID fails the job; manual runs, initial pushes and
+  empty diffs select everything. After a force-push the `before` commit is
+  unreachable, so routing fails closed and `CI required` stays red until a
+  manual `workflow_dispatch` run of `required CI` posts a green result.
+- `validate` calls `ci.yml` on every event, documentation-only changes included.
+- `go` calls `go.yml` when `go/`, `skills/`, `agents/` or any unlisted path
+  changed. `landing` calls `landing-validation.yml` when `landing/`,
+  `docs/explain/` or any unlisted path changed. Markdown under `docs/reports/`,
+  `docs/research/` and `docs/private/` is the only explicit skip of both;
+  other `docs/` Markdown runs both, because Go tests read some of it (for
+  example `docs/incidents/`).
+  Everything else, including `.github/`, `.evolve/`, `.goreleaser.yml` and
+  `install.sh`, runs both. Go tests read these inputs: `skills/` through
+  `TestSkills_NoDrift`, `agents/` through the persona size budgets
+  (`TestPersonaStopCriterionDedupe_*`), `.evolve/phases/` through
+  `TestPhaseCatalog_*`, `.evolve/profiles/` through `TestSmoke_RealProfiles`
+  and `TestRepoPersonaProfilePairing`, and the workflows through `ciparity`.
+  The durable ACS predicates that read `docs/research/` Markdown run in
+  `acs-durable`, which runs on every event.
+- `CI required` runs with `if: always()` after all four. It passes only when
+  routing and the `validate` call succeeded, `validate` and `acs-durable`
+  each reported `success` through `ci.yml`'s outputs, and each optional suite
+  either ran and succeeded or was deliberately unselected. A selected suite
+  needs both its call result (`needs.go.result`, which fails when any matrix
+  leg fails) and its inner job's `job.status` output, which is empty when the
+  inner job was skipped. An unselected suite must be `skipped` with an empty
+  output. A failed, cancelled, skipped or missing required job fails it
+  (`TestRequiredResult_RejectsMissingOrUnsuccessfulWork`). Every other job in
+  `required.yml` must be in its `needs`
+  (`TestRequiredResult_WaitsForEveryOtherJob` derives the set from the YAML).
+
+Through the reusable calls, the check names carry the caller's prefix:
+`plugin and durable ACS / validate`, `plugin and durable ACS / acs-durable`,
+`go / build + test (Go) (<os>, <go>)` and `landing / test landing module`.
+The job `CI required` (not the workflow name `required CI`) is the stable
+check name for a branch rule. Tools that read the CI verdict of a commit
+(`releasepreflight`, `ciwatch`, the `/evo:publish` and `/evo:release` skills)
+query `gh run list --workflow required.yml`, named once in Go as
+`ciparity.RequiredWorkflow`; the newest run of any workflow can be a green
+`landing-pages` run that hides a red `required CI`.
+
+`ciparity`'s `required_workflow_test.go`, `routing_workflow_test.go` and the
+integration-tagged
+`required_result_integration_test.go` and `routing_workflow_integration_test.go`
+pin the graph and execute the exact routing and result scripts from the YAML.
+The design is
+[test-ci-required-results-design-2026-09-14.md](../../docs/reports/test-ci-required-results-design-2026-09-14.md).
+
+`release.yml` calls both reusable Go and general CI workflows on the tagged
+revision, and publication depends on both succeeding. `landing-pages.yml`
+(push to `main` and manual only) calls the shared read-only
+`landing-validation.yml`, which tests, vets and renders the landing module and
+uploads `landing-dist`; its build job deploys that artifact. Pull requests
+validate the landing module through `required CI` and never deploy.
 
 For test refactors, follow the [design and preservation protocol](../../docs/architecture/test-refactoring-design-2026-09-14.md):
 new defect assertions fail first, existing behavior stays green, renamed cases

@@ -6,10 +6,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
@@ -222,4 +224,22 @@ func TestNewGHFetcher_ParsesRunListAndFailedLog(t *testing.T) {
 			t.Errorf("status = %+v, want failure + extracted failing test", st)
 		}
 	})
+}
+
+func TestNewGHFetcher_ReadsTheRequiredWorkflowRun(t *testing.T) {
+	orig := execCapture
+	t.Cleanup(func() { execCapture = orig })
+	execCapture = func(_ context.Context, _, _ string, args ...string) ([]byte, error) {
+		if slices.Contains(args, "view") {
+			return []byte("--- FAIL: TestRequiredOnly (0.01s)\n"), nil
+		}
+		if i := slices.Index(args, "--workflow"); i >= 0 && i+1 < len(args) && args[i+1] == ciparity.RequiredWorkflow {
+			return []byte(`[{"status":"completed","conclusion":"failure","url":"https://ci/required","databaseId":7}]`), nil
+		}
+		return []byte(`[{"status":"completed","conclusion":"success","url":"https://ci/landing-pages","databaseId":8}]`), nil
+	}
+	st, err := NewGHFetcher(".")(context.Background(), "abc")
+	if err != nil || st.Conclusion != "failure" || st.RunURL != "https://ci/required" || st.FailingTest != "TestRequiredOnly" {
+		t.Fatalf("fetch = %+v, %v; want the required workflow's red run, not a newer green run of another workflow", st, err)
+	}
 }

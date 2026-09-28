@@ -321,9 +321,9 @@ func (r *releaseRun) complete() {
 	r.logf("journal: %s", r.journalPath)
 	// GitHub CI is intentionally NOT checked here: this pipeline is self-contained
 	// and gh-free (headless/cron-safe). A green pipeline therefore does NOT imply a
-	// green `go`/`CI` workflow on the pushed commit (the v20.1.0 false-success: the
+	// green `required CI` workflow on the pushed commit (the v20.1.0 false-success: the
 	// release exited 0 while the released commit's apicover gate was red). Disclose
 	// the gap loudly; CI-gating lives in the /publish skill (pre-release CI-green
 	// check + post-release CI watch).
-	r.logf("NOTE: GitHub CI is NOT verified by this pipeline — confirm the `go` and `CI` workflows are green on the release commit (e.g. `gh run watch`), or publish via /publish (which watches CI).")
+	r.logf("NOTE: GitHub CI is NOT verified by this pipeline — confirm the `required CI` workflow (its `CI required` job) is green on the release commit (e.g. `gh run watch`), or publish via /publish (which watches CI).")
 }
