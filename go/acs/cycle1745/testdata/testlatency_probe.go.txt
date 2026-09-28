@@ -1,0 +1,106 @@
+import (
+	"errors"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"testing"
+)
+
+type probeFailingReader struct{ sent bool }
+
+func (r *probeFailingReader) Read(p []byte) (int, error) {
+	if r.sent {
+		return 0, errors.New("probe read failure")
+	}
+	r.sent = true
+	return copy(p, `{"Action":"pass","Package":"x/partial","Elapsed":1}`+"\n"), nil
+}
+
+func probeStreams() []struct{ name, body string } {
+	bigOutput := `{"Action":"output","Package":"x/zeta","Output":"` + strings.Repeat("a", 100*1024) + `"}`
+	rich := strings.Join([]string{
+		`{"Action":"start","Package":"x/startonly"}`,
+		`{"Action":"run","Package":"x/zeta","Test":"TestZ"}`,
+		`{"Action":"run","Package":"x/alpha","Test":"TestA"}`,
+		`{"Action":"run","Package":"","Test":"TestNoPkg"}`,
+		bigOutput,
+		`{"Action":"pass","Package":"example.com/m/p1","Test":"TestTieA","Elapsed":2.5}`,
+		`{"Action":"pass","Package":"example.com/m/p1","Test":"TestTieB","Elapsed":2.5}`,
+		`{"Action":"pass","Package":"example.com/m/p1","Test":"TestTieB/sub","Elapsed":9}`,
+		`{"Action":"fail","Package":"example.com/m/p1","Test":"TestFail","Elapsed":1.0}`,
+		`{"Action":"skip","Package":"example.com/m/p1","Test":"TestSkip","Elapsed":0}`,
+		`{"Action":"fail","Package":"example.com/m/p1","Elapsed":6.25}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow","Elapsed":12.5}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestFast","Elapsed":0.1}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Elapsed":12.7}`,
+		`{"Action":"skip","Package":"x/skipped","Elapsed":3.0}`,
+		`{"Action":"pass","Package":"x/threshold","Test":"TestAtThreshold","Elapsed":1.0}`,
+		`{"Action":"pass","Package":"x/threshold","Elapsed":5.0}`,
+		`not-json build noise`,
+		`{"Action":"pass","Package": broken`,
+		``,
+	}, "\n")
+	classic := strings.Join([]string{
+		`{"Action":"run","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow"}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow","Elapsed":12.5}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestSlow/sub","Elapsed":12.4}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Test":"TestFast","Elapsed":0.1}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/bridge","Elapsed":12.7}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Test":"TestTiny","Elapsed":0.01}`,
+		`{"Action":"pass","Package":"github.com/mickeyyaya/evolve-loop/go/internal/budget","Elapsed":0.4}`,
+	}, "\n")
+	onlyIncomplete := `{"Action":"start","Package":"x/second"}` + "\n" + `{"Action":"start","Package":"x/first"}` + "\n"
+	tooLong := `{"Action":"output","Package":"x/huge","Output":"` + strings.Repeat("b", 17*1024*1024) + `"}` + "\n"
+	return []struct{ name, body string }{
+		{"rich", rich},
+		{"classic", classic},
+		{"only-incomplete", onlyIncomplete},
+		{"empty", ""},
+		{"too-long", tooLong},
+	}
+}
+
+var probeOptions = []MarkdownOptions{
+	{Title: "Probe", Top: 3, ThresholdPkg: 5, ThresholdTst: 1},
+	{Title: "All", Top: 100, ThresholdPkg: 0, ThresholdTst: 0},
+	{Title: "None", Top: 0, ThresholdPkg: 100, ThresholdTst: 100},
+}
+
+func probeDumpReport(b *strings.Builder, rep *Report) {
+	pkgs := append(rep.Packages[:0:0], rep.Packages...)
+	sort.Slice(pkgs, func(i, j int) bool { return pkgs[i].Pkg < pkgs[j].Pkg })
+	for _, p := range pkgs {
+		fmt.Fprintf(b, "package %+v\n", p)
+	}
+	for _, ts := range rep.Tests {
+		fmt.Fprintf(b, "test %+v\n", ts)
+	}
+	fmt.Fprintf(b, "incomplete %q\n", rep.Incomplete)
+}
+
+func TestACS1745Probe(t *testing.T) {
+	out := os.Getenv("ACS1745_PROBE_OUT")
+	if out == "" {
+		t.Skip("runs only under the cycle1745 differential predicate")
+	}
+	var b strings.Builder
+	for _, s := range probeStreams() {
+		fmt.Fprintf(&b, "== stream %s ==\n", s.name)
+		rep, err := Parse(strings.NewReader(s.body))
+		if err != nil {
+			fmt.Fprintf(&b, "error: %v\nrep nil: %v\n", err, rep == nil)
+			continue
+		}
+		probeDumpReport(&b, rep)
+		for _, o := range probeOptions {
+			fmt.Fprintf(&b, "-- markdown %+v --\n%s", o, rep.Markdown(o))
+		}
+	}
+	rep, err := Parse(&probeFailingReader{})
+	fmt.Fprintf(&b, "== failing reader ==\nerror: %v\nis probe failure: %v\nrep nil: %v\n", err, err != nil && strings.Contains(err.Error(), "probe read failure"), rep == nil)
+	fmt.Fprintf(&b, "== empty report ==\n%s", (&Report{}).Markdown(MarkdownOptions{Title: "Empty", Top: 5, ThresholdPkg: 1, ThresholdTst: 1}))
+	if err := os.WriteFile(out, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
