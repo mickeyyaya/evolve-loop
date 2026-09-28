@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - The draft exception refuses a draft path that is not a regular file; a symlinked draft was allowed, though `rm` removes only the link.
 - Its review found every word-read verb missed behind a shell reserved word (`{ cd docs; rm …; }`, `if cd docs; then rm …; fi`, `! cd docs; …`, `cd docs; { rm …; }`); `candidateCommands` now skips `!`, `{`, `if`, `then`, `elif`, `else`, `do`, `while` and `until` before a command, in the one place every verb reads.
 - Tests: `TestDocDelete_EnteringADocRootAfterAnotherCommandStillCounts` (25 denied forms, 3 allowed), `TestDocDelete_ADraftThatIsASymlinkIsNotTheDraft`, `TestDocDelete_AnAbsentDraftIsStillItsOwnToRetract`, red first; 8 mutants each die. A directory whose name hides a doc root (a symlink named `mirror`) stays a documented limit: only names are checked.
+
 ## Fixed — every Make test recipe runs git with background maintenance off (2026-09-29)
 
 - The raw-git fixture flake (`t.TempDir` cleanup: `unlinkat .../.git...: directory not empty`, from git 2.47's detached `git maintenance run --auto` writing after a commit returned) failed CI four times: the dossier fixture twice, then `internal/core` on #698 and #705, each time in a change that touched neither the test nor its fixture. `internal/core` alone still holds 37 raw fixtures.
