@@ -83,14 +83,8 @@ type BuildOpts struct {
 // With no per-phase evidence it records one evidence-unavailable WARN phase
 // rather than invent a phase verdict.
 func Build(cycle int, opts BuildOpts) (*Dossier, error) {
-	if cycle <= 0 {
-		return nil, fmt.Errorf("dossier: Build: cycle must be >= 1, got %d", cycle)
-	}
-	if strings.TrimSpace(opts.WorkspacePath) == "" {
-		return nil, fmt.Errorf("dossier: Build: WorkspacePath must not be blank")
-	}
-	if strings.TrimSpace(opts.Goal) == "" {
-		return nil, fmt.Errorf("dossier: Build: Goal must not be blank")
+	if err := validateBuildInputs(cycle, opts); err != nil {
+		return nil, err
 	}
 	verdict, err := resolveBuildVerdict(opts.FinalVerdict)
 	if err != nil {
@@ -124,22 +118,39 @@ func Build(cycle int, opts BuildOpts) (*Dossier, error) {
 	// Validate requires a FAIL to carry a defect and a carryover. These point at
 	// the audit artifacts rather than invent specifics.
 	if verdict == VerdictFail {
-		d.Defects = []Defect{{
-			ID:       "audit-fail",
-			Severity: "HIGH",
-			Summary:  fmt.Sprintf("cycle did not pass audit; see %s + acs-verdict.json", auditArtifactName()),
-			Fix:      "address the audit findings recorded for this cycle",
-		}}
-		d.Carryover = []Carryover{{
-			ID:       "address-audit-findings",
-			Action:   fmt.Sprintf("resolve the audit findings that failed cycle %d", cycle),
-			Priority: "high",
-		}}
-		if rec, ok := failureRecord(opts.WorkspacePath, cycle); ok {
-			d.Failure = rec
-		}
+		recordAuditFailure(d, cycle, opts.WorkspacePath)
 	}
 	return d, nil
+}
+
+func validateBuildInputs(cycle int, opts BuildOpts) error {
+	if cycle <= 0 {
+		return fmt.Errorf("dossier: Build: cycle must be >= 1, got %d", cycle)
+	}
+	if strings.TrimSpace(opts.WorkspacePath) == "" {
+		return fmt.Errorf("dossier: Build: WorkspacePath must not be blank")
+	}
+	if strings.TrimSpace(opts.Goal) == "" {
+		return fmt.Errorf("dossier: Build: Goal must not be blank")
+	}
+	return nil
+}
+
+func recordAuditFailure(d *Dossier, cycle int, workspace string) {
+	d.Defects = []Defect{{
+		ID:       "audit-fail",
+		Severity: "HIGH",
+		Summary:  fmt.Sprintf("cycle did not pass audit; see %s + acs-verdict.json", auditArtifactName()),
+		Fix:      "address the audit findings recorded for this cycle",
+	}}
+	d.Carryover = []Carryover{{
+		ID:       "address-audit-findings",
+		Action:   fmt.Sprintf("resolve the audit findings that failed cycle %d", cycle),
+		Priority: "high",
+	}}
+	if rec, ok := failureRecord(workspace, cycle); ok {
+		d.Failure = rec
+	}
 }
 
 // resolveBuildVerdict defaults an empty verdict to PASS and rejects anything

@@ -83,6 +83,42 @@ func requireDir(label, path string) error {
 
 func loadPair(cycle int, dossiersDir, runsDir string) (*pair, *exclusion) {
 	runDir := filepath.Join(runsDir, fmt.Sprintf("cycle-%d", cycle))
+	shadow, ex := loadShadow(runDir, cycle)
+	if ex != nil {
+		return nil, ex
+	}
+	d, ex := loadDossier(dossiersDir, cycle)
+	if ex != nil {
+		return nil, ex
+	}
+	classes, err := readClasses(filepath.Join(runDir, "audit-fail-reason.json"))
+	if err != nil {
+		return nil, excluded(cycle, "malformed-fail-reason", err)
+	}
+	gate := "PASS"
+	if len(shadow.OverrodeBy) > 0 {
+		gate = "FAIL"
+	}
+	return &pair{
+		cycle:        cycle,
+		narrative:    strings.TrimSpace(shadow.NarrativeVerdict),
+		chain:        strings.TrimSpace(shadow.ChainVerdict),
+		gate:         gate,
+		shipped:      shippedVerdict(shadow, d),
+		overriddenBy: strings.Join(shadow.OverrodeBy, ", "),
+		classes:      classes,
+	}, nil
+}
+
+func shippedVerdict(shadow *auditchain.ShadowRecord, d *dossier.Dossier) string {
+	shipped := strings.TrimSpace(shadow.ShippedVerdict)
+	if shipped == "" {
+		shipped = d.FinalVerdict
+	}
+	return shipped
+}
+
+func loadShadow(runDir string, cycle int) (*auditchain.ShadowRecord, *exclusion) {
 	shadowRaw, err := os.ReadFile(filepath.Join(runDir, auditchain.ShadowRecordFile))
 	if err != nil {
 		reason := "malformed-shadow"
@@ -98,7 +134,10 @@ func loadPair(cycle int, dossiersDir, runsDir string) (*pair, *exclusion) {
 		}
 		return nil, excluded(cycle, "malformed-shadow", err)
 	}
+	return &shadow, nil
+}
 
+func loadDossier(dossiersDir string, cycle int) (*dossier.Dossier, *exclusion) {
 	dossierRaw, err := os.ReadFile(filepath.Join(dossiersDir, fmt.Sprintf("cycle-%d.json", cycle)))
 	if err != nil {
 		reason := "malformed-dossier"
@@ -114,28 +153,7 @@ func loadPair(cycle int, dossiersDir, runsDir string) (*pair, *exclusion) {
 		}
 		return nil, excluded(cycle, "malformed-dossier", err)
 	}
-
-	classes, err := readClasses(filepath.Join(runDir, "audit-fail-reason.json"))
-	if err != nil {
-		return nil, excluded(cycle, "malformed-fail-reason", err)
-	}
-	shipped := strings.TrimSpace(shadow.ShippedVerdict)
-	if shipped == "" {
-		shipped = d.FinalVerdict
-	}
-	gate := "PASS"
-	if len(shadow.OverrodeBy) > 0 {
-		gate = "FAIL"
-	}
-	return &pair{
-		cycle:        cycle,
-		narrative:    strings.TrimSpace(shadow.NarrativeVerdict),
-		chain:        strings.TrimSpace(shadow.ChainVerdict),
-		gate:         gate,
-		shipped:      shipped,
-		overriddenBy: strings.Join(shadow.OverrodeBy, ", "),
-		classes:      classes,
-	}, nil
+	return d, nil
 }
 
 func validShadow(s auditchain.ShadowRecord, cycle int) bool {
@@ -191,71 +209,91 @@ func excluded(cycle int, reason string, err error) *exclusion {
 }
 
 func render(pairs []pair, exclusions []exclusion) []byte {
+	var b bytes.Buffer
+	writeRules(&b, len(pairs), len(exclusions))
+	writeMatrix(&b, pairs)
+	writeDefectClasses(&b, pairs)
+	writeForceOverrides(&b, pairs)
+	writeValidPairs(&b, pairs)
+	writeExclusions(&b, exclusions)
+	return b.Bytes()
+}
+
+func writeRules(b *bytes.Buffer, pairCount, exclusionCount int) {
+	fmt.Fprintln(b, "# Auditor Calibration Report")
+	fmt.Fprintln(b)
+	fmt.Fprintln(b, "Sample rule: canonical `cycle-N` directories under the runs directory, each paired with its committed dossier.")
+	fmt.Fprintln(b, "Exclusion rule: missing or malformed pair artifacts are counted and listed; they never enter the agreement matrix.")
+	fmt.Fprintln(b, "Interpretation rule: the gate is FAIL when a deterministic override is recorded, otherwise PASS. This report does not recommend changing a persona rubric from a single anecdote.")
+	fmt.Fprintln(b)
+	fmt.Fprintf(b, "Valid pairs: %d\n", pairCount)
+	fmt.Fprintf(b, "Excluded: %d\n", exclusionCount)
+}
+
+func writeMatrix(b *bytes.Buffer, pairs []pair) {
 	matrix := make(map[[2]string]int)
-	classCounts := make(map[string]int)
 	for _, p := range pairs {
 		matrix[[2]string{p.narrative, p.gate}]++
+	}
+	fmt.Fprintln(b, "\n## Narrative × Deterministic Gate Matrix")
+	fmt.Fprintln(b, "| Narrative | Gate | Count |")
+	fmt.Fprintln(b, "|---|---|---:|")
+	for _, narrative := range []string{"PASS", "WARN", "FAIL"} {
+		for _, gate := range []string{"PASS", "FAIL"} {
+			if count := matrix[[2]string{narrative, gate}]; count > 0 {
+				fmt.Fprintf(b, "| %s | %s | %d |\n", narrative, gate, count)
+			}
+		}
+	}
+}
+
+func writeDefectClasses(b *bytes.Buffer, pairs []pair) {
+	classCounts := make(map[string]int)
+	for _, p := range pairs {
 		for _, class := range p.classes {
 			classCounts[class]++
 		}
 	}
-
-	var b bytes.Buffer
-	fmt.Fprintln(&b, "# Auditor Calibration Report")
-	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "Sample rule: canonical `cycle-N` directories under the runs directory, each paired with its committed dossier.")
-	fmt.Fprintln(&b, "Exclusion rule: missing or malformed pair artifacts are counted and listed; they never enter the agreement matrix.")
-	fmt.Fprintln(&b, "Interpretation rule: the gate is FAIL when a deterministic override is recorded, otherwise PASS. This report does not recommend changing a persona rubric from a single anecdote.")
-	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "Valid pairs: %d\n", len(pairs))
-	fmt.Fprintf(&b, "Excluded: %d\n", len(exclusions))
-
-	fmt.Fprintln(&b, "\n## Narrative × Deterministic Gate Matrix")
-	fmt.Fprintln(&b, "| Narrative | Gate | Count |")
-	fmt.Fprintln(&b, "|---|---|---:|")
-	for _, narrative := range []string{"PASS", "WARN", "FAIL"} {
-		for _, gate := range []string{"PASS", "FAIL"} {
-			if count := matrix[[2]string{narrative, gate}]; count > 0 {
-				fmt.Fprintf(&b, "| %s | %s | %d |\n", narrative, gate, count)
-			}
-		}
-	}
-
-	fmt.Fprintln(&b, "\n## Defect Classes")
-	fmt.Fprintln(&b, "| Class | Count |")
-	fmt.Fprintln(&b, "|---|---:|")
+	fmt.Fprintln(b, "\n## Defect Classes")
+	fmt.Fprintln(b, "| Class | Count |")
+	fmt.Fprintln(b, "|---|---:|")
 	classes := make([]string, 0, len(classCounts))
 	for class := range classCounts {
 		classes = append(classes, class)
 	}
 	sort.Strings(classes)
 	for _, class := range classes {
-		fmt.Fprintf(&b, "| %s | %d |\n", markdownCell(class), classCounts[class])
+		fmt.Fprintf(b, "| %s | %d |\n", markdownCell(class), classCounts[class])
 	}
+}
 
-	fmt.Fprintln(&b, "\n## Force Overrides")
-	fmt.Fprintln(&b, "| Cycle | Narrative | Shipped | Overrode By |")
-	fmt.Fprintln(&b, "|---:|---|---|---|")
+func writeForceOverrides(b *bytes.Buffer, pairs []pair) {
+	fmt.Fprintln(b, "\n## Force Overrides")
+	fmt.Fprintln(b, "| Cycle | Narrative | Shipped | Overrode By |")
+	fmt.Fprintln(b, "|---:|---|---|---|")
 	for _, p := range pairs {
 		if p.overriddenBy != "" {
-			fmt.Fprintf(&b, "| %d | %s | %s | %s |\n", p.cycle, p.narrative, p.shipped, markdownCell(p.overriddenBy))
+			fmt.Fprintf(b, "| %d | %s | %s | %s |\n", p.cycle, p.narrative, p.shipped, markdownCell(p.overriddenBy))
 		}
 	}
+}
 
-	fmt.Fprintln(&b, "\n## Valid Pairs")
-	fmt.Fprintln(&b, "| Cycle | Narrative | Chain | Gate | Shipped | Overrode By | Defect Classes |")
-	fmt.Fprintln(&b, "|---:|---|---|---|---|---|---|")
+func writeValidPairs(b *bytes.Buffer, pairs []pair) {
+	fmt.Fprintln(b, "\n## Valid Pairs")
+	fmt.Fprintln(b, "| Cycle | Narrative | Chain | Gate | Shipped | Overrode By | Defect Classes |")
+	fmt.Fprintln(b, "|---:|---|---|---|---|---|---|")
 	for _, p := range pairs {
-		fmt.Fprintf(&b, "| %d | %s | %s | %s | %s | %s | %s |\n", p.cycle, p.narrative, p.chain, p.gate, p.shipped, markdownCell(p.overriddenBy), markdownCell(strings.Join(p.classes, ", ")))
+		fmt.Fprintf(b, "| %d | %s | %s | %s | %s | %s | %s |\n", p.cycle, p.narrative, p.chain, p.gate, p.shipped, markdownCell(p.overriddenBy), markdownCell(strings.Join(p.classes, ", ")))
 	}
+}
 
-	fmt.Fprintln(&b, "\n## Exclusions")
-	fmt.Fprintln(&b, "| Cycle | Reason | Detail |")
-	fmt.Fprintln(&b, "|---:|---|---|")
+func writeExclusions(b *bytes.Buffer, exclusions []exclusion) {
+	fmt.Fprintln(b, "\n## Exclusions")
+	fmt.Fprintln(b, "| Cycle | Reason | Detail |")
+	fmt.Fprintln(b, "|---:|---|---|")
 	for _, ex := range exclusions {
-		fmt.Fprintf(&b, "| %d | %s | %s |\n", ex.cycle, ex.reason, markdownCell(ex.detail))
+		fmt.Fprintf(b, "| %d | %s | %s |\n", ex.cycle, ex.reason, markdownCell(ex.detail))
 	}
-	return b.Bytes()
 }
 
 func markdownCell(s string) string {
