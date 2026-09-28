@@ -1,6 +1,6 @@
 # Logic-first delivery — design document
 
-- **Status:** living document, kept current with every landing. Last updated 2026-09-28 14:56.
+- **Status:** living document, kept current with every landing. Last updated 2026-09-28 15:14.
 - **Status:** living document, kept current with every landing. Last updated 2026-09-28 14:14.
 - **Decision record:** [ADR-0106](adr/0106-logic-first-delivery.md). **Policy:** [operating-policy §0](../operations/operating-policy.md).
 - **Landings:** the design in #655 (merged `5600b77a`; it replaced #653 after a CHANGELOG conflict); the first code train in #656 (merged; eight commits, replacing #654 the same way); ADR-0105 B1 in #652 (merged `e5af27fe`).
@@ -282,6 +282,20 @@ A first design staged each phase's declared outputs through a new registry field
 | 4 | `predicateTreeFor` compares `Take` against `TakeStaged`; replays of 1694 and 1735 pass, an undeclared file is refused by name; with it, Ship's empty-pathspec guard (its `git add -A --` stages the whole tree when every selected path was dropped) and one shared ignored-path filter with its retry | designed |
 | 5 | the report list derives from the registry's `writes_source` phases instead of a Go list | designed |
 
+### 5.13 The size ratchet is a ceiling (wave 25, cycle 1735)
+
+Cycle 1735's diff shrank three functions listed in `go/internal/sizeratchet/offenders.json` by one line each and did not lower their allowances. The ratchet required an allowance to be lowered exactly whenever its function shrank. The lane's audits did not run the module-wide check; after a fleet rebase, cycle 1736's peer predicate (`TestC1736_003`, the module-wide `Check`) did, the re-audit went red, the repair budget was already spent, and the cycle failed. The failure was process, not logic: the ratchet's own message named the exact edit.
+
+A first design had the host lower shrunk allowances at the build handoff. The design review rejected it: the build floor is a check, not a writer; `offenders.json` is material to the explanation contract, so a host write forces a Build re-author; and every lane that writes the file breaks the byte-identical rebase proof and conflicts with a peer on adjacent lines, the defect already filed as `sizeratchet-allowances-not-a-shared-registry`. The fix moves the rule instead: an allowance is a ceiling. Growth past it, and a new function past 50 lines, still fail; a shrunk, healed or deleted offender's entry is slack that passes.
+
+| Id | Component | Status |
+|---|---|---|
+| R1 | `sizeratchet.Check` treats an allowance as a ceiling; the cycle-1726 predicates and the evals follow; the pending shrink items leave `offenders.json` alone | built (this landing) |
+| R2 | pure `Tighten` and a byte-stable `Encode` (`json.MarshalIndent(m, "", "  ") + "\n"` reproduces today's file) | designed |
+| R3 | `evolve sizeratchet tighten [--check]`, run at the wave boundary: the one writer of `offenders.json` | designed |
+| R4 | a build-floor no-growth check against the base (the `commentaudit.ReadAtBase` pattern), so a function cannot regrow into its slack before a tighten | designed |
+| R5 | one exported offenders-path constant (written three ways today) and one 50-line cap (`test/structure/limits.go` duplicates it with `>=`) | designed |
+
 ## 6. Decision tables
 
 ### 6.1 Routing by violation code (`deliverable`, beside the codes)
@@ -414,7 +428,7 @@ Status: **shipped** (commit on a branch, PR open or merged) · **built** (green 
 | A1 | a predicate that runs tests by name fails when a name matches no test, so a rename or deletion cannot turn it vacuous; the 26 stale names found at review are repointed or retired | designed (§5.10) | `pkg/acsassert`, `go/acs` |
 | A2 | a superseded attempt's artifacts follow one retention rule: its predicate package is archived with its explanation document, never landed beside the shipping cycle's | designed (§5.10) | `internal/phases/ship`, the continuation carry |
 | G1 | the phase personas carry the no-comments rule, so lanes stop adding what the comment campaign removes | designed (§5.10) | `agents/`, the engineering-craft skill |
-| G2 | the function-size limit is one repo-wide ratchet instead of a test per package | designed (§5.10) | a lint step |
+| G2 | the function-size limit is one repo-wide ratchet instead of a test per package | built (cycle 1726); since 2026-09-28 an allowance is a ceiling (§5.13) | a lint step |
 | G3 | a class ticket closes on an enforced invariant: a ratchet refuses a new raw git fixture outside `internal/gittest` | designed (§5.10) | a repo-contract test |
 
 ## 8. Interfaces
@@ -638,4 +652,5 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-28 | §5.11 T4 built: the plan path evaluates a trigger that is a phase's whole admission rule (`insert_when` with no `rubric_hint`) at the phase's turn and skips a planned phase whose trigger does not fire (`insert-when-gates-plan`); two floor-activation scenarios that pinned the old contract (a plan inserts tester its trigger would skip) are rewritten; ADR-0052 amended |
 | 2026-09-28 | §5.11 T3 built and §5.4 revised: a standing authority block (`phaseidentity.Authority()`) is claude-tmux's system prompt (`--append-system-prompt-file`, manifest param `system_prompt_file`, `LaunchIntent`/`Realization.SystemPromptFile`) and is pasted by CLIs without the channel; the per-dispatch facts block still ends every paste. The first cut put the whole identity block in the system prompt; the architecture review found that a per-dispatch system prompt defeats ADR-0071's cache-stable system prompt and breaks this section's placement rule, so the block was split. The filed fix (a typed authorizing line) was dropped on 1734's evidence: its pane refused the typed nudge too |
 | 2026-09-28 | §5.12 F43: the audit's ship tree is Ship's own selection. Component 2 built (`internal/shipmanifest`, `Stageable`, `RegularFileIn`); components 3–5 designed. A first design (a registry staging effect) was rejected by review as a second declared-outputs list |
+| 2026-09-28 | §5.13: the size ratchet is a ceiling (cycle 1735 failed on three one-line shrinks whose allowances it had not lowered). R1 built; the boundary tighten, the no-growth check and the single constants designed. A host writer at the build handoff was rejected by review as a shared-registry writer |
 | 2026-09-28 | The auditor persona states the rules the code applies, each pinned with the behavior it describes: WARN ships under the fluent default (only `workflow.strict_audit` refuses it), an added comment is a LOW, advisory finding and the auditor never asks for one, and `NEEDS_CORRECTION`, which the gate records as an advisory (ADR-0102), stays the auditor's FAIL by stated policy until X2's document-only rung exists, with the FAIL naming only the document. §5.6 corrected: the persona, not ADR-0102, makes it a FAIL. From the inbox architecture review of 2026-09-28, which also filed N1–N6 |
