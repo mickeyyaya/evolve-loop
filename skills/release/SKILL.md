@@ -12,7 +12,7 @@ argument-hint: "<target-version> [--dry-run]"
 
 `evolve release-preflight` already gates: clean tree, attached branch, semver bump, recent audit PASS, gate-test suites. `evolve release-consistency` already verifies the 6 version markers (plugin.json, marketplace.json, README, CHANGELOG, SKILL headings). Neither checks whether **GitHub CI is actually green on the commit you're about to release from**, nor screens for accidental WIP commits. This skill closes exactly those gaps — nothing more.
 
-> Defense-in-depth: [`/evo:publish`](../publish/SKILL.md) now performs the same pre-release CI-green check itself (so a direct `/evo:publish` call is still gated) **and** adds a post-release watch of the released commit's `go`/`CI` workflows. Running `/evo:release` first stays the recommended path; `evolve release` (the raw binary) is `gh`-free and only prints a "CI not verified" advisory.
+> Defense-in-depth: [`/evo:publish`](../publish/SKILL.md) now performs the same pre-release CI-green check itself (so a direct `/evo:publish` call is still gated) **and** adds a post-release watch of the released commit's `required CI` and `release` workflows. Running `/evo:release` first stays the recommended path; `evolve release` (the raw binary) is `gh`-free and only prints a "CI not verified" advisory.
 
 ## Procedure
 
@@ -30,9 +30,9 @@ Run in order. Any **FAIL** → print the reason and stop (do not delegate to `/e
    Non-zero exit → stop.
 3. **Gap 1 — CI green on `main` HEAD** (requires `gh`; if absent, report "cannot verify CI" and stop):
    ```bash
-   gh run list --branch main --limit 1 --json headSha,status,conclusion,url
+   gh run list --workflow required.yml --branch main --limit 1 --json headSha,status,conclusion,url
    ```
-   Confirm `headSha` matches `git rev-parse origin/main`, `status == "completed"`, `conclusion == "success"`. Anything else (in-progress, failure, stale SHA) → stop with the run URL.
+   The query is scoped to `required.yml` (its `CI required` job aggregates every suite), because the newest run of any workflow can be a green `landing-pages` run that hides a red or running `required CI`. Confirm `headSha` matches `git rev-parse origin/main`, `status == "completed"`, `conclusion == "success"`. Anything else (in-progress, failure, stale SHA) → stop with the run URL.
 4. **Gap 2 — no WIP/fixup commits since the last tag**:
    ```bash
    git log "$(git describe --tags --abbrev=0)..HEAD" --format=%s

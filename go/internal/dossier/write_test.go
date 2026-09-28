@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func initGitRepo(t *testing.T, dir string) {
@@ -70,5 +73,23 @@ func TestWrite(t *testing.T) {
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("Write: expected %s to exist: %v", name, err)
 		}
+	}
+}
+
+func TestCommitPairGit_ANestedPairIsCommittedUnderItsCycleName(t *testing.T) {
+	r := gittest.Fixture(t)
+	d := &Dossier{Cycle: 9, Goal: "nested pathspec", FinalVerdict: VerdictPass,
+		Phases: []PhaseRecord{{Name: "build", Verdict: VerdictPass}}}
+	if err := Write(d, CyclesDir(r.Dir), false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := commitPairGit(gitexec.Default(r.Dir), "knowledge-base/cycles/cycle-9")
+
+	if err != nil {
+		t.Fatalf("commitPairGit: %v", err)
+	}
+	if got := r.Git("show", "--name-only", "--format=%s", "HEAD"); got != "dossier: cycle-9 closeout\n\nknowledge-base/cycles/cycle-9.json\nknowledge-base/cycles/cycle-9.md" {
+		t.Fatalf("HEAD = %q, want the pair committed as cycle-9's closeout", got)
 	}
 }

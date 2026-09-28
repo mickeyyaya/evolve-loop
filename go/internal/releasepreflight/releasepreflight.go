@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
@@ -285,20 +286,20 @@ func defaultSimulationRunner(repoRoot string) error {
 	return nil
 }
 
-// defaultCIConclusion resolves HEAD and asks gh for the newest workflow run
-// on that commit. Every lookup failure (not a git repo, gh missing or
-// unauthenticated, unparsable output) degrades to the unavailable sentinel
-// (Conclusion "") rather than an error — the gate must never block a release
-// on absent tooling, only on a PRESENT non-green verdict. A visible run that
-// has not completed reads as "pending" (hard-fails: wait for CI or override).
+// defaultCIConclusion resolves HEAD and asks gh for the newest
+// ciparity.RequiredWorkflow run on that commit. Every lookup failure (no git
+// repo, gh missing or unauthenticated, unparsable output) degrades to the
+// unavailable sentinel (Conclusion "") rather than an error: the gate never
+// blocks a release on absent tooling, only on a PRESENT non-green verdict. A
+// run that has not completed reads as "pending" (hard-fails: wait or override).
 func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	head, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return CIRunStatus{}, nil
 	}
 	sha := strings.TrimSpace(string(head))
-	cmd := exec.Command("gh", "run", "list", "--commit", sha, "--limit", "1",
-		"--json", "status,conclusion,url")
+	cmd := exec.Command("gh", "run", "list", "--workflow", ciparity.RequiredWorkflow,
+		"--commit", sha, "--limit", "1", "--json", "status,conclusion,url")
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()
 	if err != nil {

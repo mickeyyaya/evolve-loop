@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -123,5 +124,50 @@ func TestRunLoop_InBatchDigestsStillHalt(t *testing.T) {
 
 	if !strings.Contains(stderr.String(), haltMarker) {
 		t.Fatalf("3x identical-fingerprint digests minted INSIDE the batch (above both counters) must still halt — the window fix must not weaken Rule B's sensitivity; stderr=%q", stderr.String())
+	}
+}
+
+func TestPrepareIteration_ResolvesTheFleetBinaryWhenThePolicyAsksForAFleet(t *testing.T) {
+	root, evolveDir := iscsProject(t)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"fleet":{"count":2}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st := &fixtures.FakeStorage{State: core.State{LastCycleNumber: iscsLastCycle, LastAllocatedCycleNumber: iscsLastCycle}}
+	b, console := iscsCoordinator(root, evolveDir, st)
+	b.cycleEnv = map[string]string{"EVOLVE_CLI_HEALTH": "0"}
+	fc, bin := policy.FleetConfig{Count: 1}, ""
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d := b.prepareIteration(0, &fc, &bin, iscsLastCycle)
+	b.deps.Signals.Flush()
+
+	if d.flow != batchProceed || fc.Count != 2 || bin != self {
+		t.Fatalf("flow=%v count=%d binary=%q, want batchProceed, count 2 and %q; console:\n%s", d.flow, fc.Count, bin, self, console.String())
+	}
+}
+
+func TestTheFleetBinaryFallbackHasOneHome(t *testing.T) {
+	sources, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var homes []string
+	for _, f := range sources {
+		if strings.HasSuffix(f, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(src), "cannot resolve binary for fleet dispatch") {
+			homes = append(homes, f)
+		}
+	}
+	if len(homes) != 1 || homes[0] != "cmd_loop_window.go" {
+		t.Fatalf("resolving the fleet binary, or falling back to sequential, must live only in prepareIteration's resolveWaveBinary (cmd_loop_window.go); found it in %v", homes)
 	}
 }

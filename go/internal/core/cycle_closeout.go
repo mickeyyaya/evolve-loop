@@ -26,8 +26,8 @@ func (cr *cycleRun) completeCycle() error {
 	// abnormalEpilogue.
 	// See ADR-0101.
 	cr.emitCycleClose(cr.result, "cycleRun.completeCycle")
-	// ADR-0055: emit this completed cycle's closeout dossier to
-	// <ProjectRoot>/knowledge-base/cycles/cycle-N.json. Best-effort — the cycle
+	// ADR-0055: emit this completed cycle's closeout dossier; a fleet lane's goes
+	// to the pending dir instead of the corpus (dossierDestination). Best-effort — the cycle
 	// has already finalized, so a closeout-artifact write error must not fail it
 	// (presence is enforced separately by `evolve dossier verify` against the
 	// policy floor). Goal text comes from Context["goal"]; falls back to the goal
@@ -62,7 +62,7 @@ func (cr *cycleRun) recordPlannedNoWorkOutcome() {
 // dossier's inputs — the normal closeout and the abnormal epilogue differ
 // only in the outcome they record. Goal text comes from Context["goal"] and
 // falls back to the goal hash so the dossier's required Goal is never blank;
-// the root's WithDossierCommit decision becomes the producer's FilesOnly.
+// the root's WithDossierDestination decision becomes the producer's Destination.
 func (cr *cycleRun) dossierParams(outcome string) cycleDossierParams {
 	goal := cr.req.Context["goal"]
 	if goal == "" {
@@ -80,6 +80,13 @@ func (cr *cycleRun) dossierParams(outcome string) cycleDossierParams {
 		VerdictsNotAdopted: cr.result.VerdictsNotAdopted,
 		SpineFailOpens:     cr.result.SpineFailOpens,
 		PhaseTimings:       cr.flushPhaseTimings(),
-		FilesOnly:          !cr.o.dossierCommit,
+		Destination:        cr.dossierDestination(),
 	}
+}
+
+func (cr *cycleRun) dossierDestination() DossierDestination {
+	if cr.o.dossierDestination == DossierCommitted && fleetMode(cr.req.Env) {
+		return DossierPending
+	}
+	return cr.o.dossierDestination
 }

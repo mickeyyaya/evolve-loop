@@ -78,6 +78,9 @@ func (lr *loopResult) emit(w io.Writer) {
 	// len(lr.Cycles) > 0: a fleet batch runs every cycle in a lane subprocess
 	// and appends nothing to lr.Cycles, yet those are precisely the batches
 	// whose fail-opens need counting.
+	if lr.classifyRoot != "" {
+		publishPendingDossiers(lr.classifyRoot, os.Stderr)
+	}
 	if lr.SpineFailOpens == nil {
 		lr.SpineFailOpens = spineFailOpenRollup(lr.Cycles, lr.classifyRoot, lr.batchFirstCycle, os.Stderr)
 	}

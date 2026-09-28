@@ -98,6 +98,10 @@ func TestDocDelete_EverythingElseUnderTheDocRootsStaysProtected(t *testing.T) {
 		"rm ./" + ownDraft,
 		"rm " + filepath.Join(dir, ownDraft),
 		"rm DOCS/explain/builds/cycle-1-run.md",
+		"git --no-pager rm -f -q " + ownDraft,
+		"git -C docs rm -f -q " + ownDraft,
+		"GIT_WORK_TREE=docs git rm -f -q " + ownDraft,
+		"/bin/rm " + ownDraft,
 		"rm docs/architecture/readme.md",
 		"rm -rf docs",
 		"rm -rf knowledge-base",
@@ -169,5 +173,104 @@ func TestDocDelete_TheDraftNameMustNotAliasACommittedFile(t *testing.T) {
 	nested := gitRepo(t, map[string]string{"sub/" + ownDraft: "committed under a nested docs root\n"})
 	if dec := decide(draftCycle, filepath.Join(nested, "sub"), "rm "+ownDraft); dec.Allow {
 		t.Error("allowed an rm whose operand is relative to a subdirectory, where it names committed documentation")
+	}
+}
+
+func TestDocDelete_EvasionsThatBashStillResolvesToTheDocRootsAreDenied(t *testing.T) {
+	dir := laneWithADraft(t)
+	for _, cmd := range []string{
+		"rm doc''s/architecture/README.md",
+		`rm do\cs/architecture/README.md`,
+		`rm "docs"/architecture/README.md`,
+		"unlink docs/architecture/README.md",
+		"find docs/architecture -name README.md -delete",
+		`find docs -name README.md -exec rm {} \;`,
+		"git clean -fdx docs",
+		"mv doc''s/architecture/README.md /tmp/x.md",
+		"git mv doc''s/architecture/README.md /tmp/x.md",
+		"git mv docs/architecture/README.md /tmp/x.md",
+		"git --no-pager mv doc''s/architecture/README.md /tmp/x.md",
+		"mv -t /tmp docs/architecture/README.md",
+		"mv --target-directory=/tmp docs/architecture/README.md",
+		"mv --target=/tmp docs/architecture/README.md",
+		"mv -T doc''s/architecture/README.md /tmp/x.md",
+		"mv -- doc''s/architecture/README.md /tmp/x.md",
+		"mv -- -x/../doc''s/architecture/README.md /tmp/x.md",
+		`find docs -name README.md -exec /bin/rm {} \;`,
+		`find docs -name README.md -execdir rm {} +`,
+		"find $'docs' -name README.md -delete",
+		`find $'\x64ocs' -name README.md -delete`,
+		`find $'\144ocs' -name README.md -delete`,
+		`find $'\x44OCS' -name README.md -delete`,
+		"mv $'docs'/architecture/README.md /tmp/x.md",
+		`cd $'\x44ocs' && rm architecture/README.md`,
+		"git rm -f -q " + ownDraft + "; unlink docs/architecture/README.md",
+		"/usr/bin/unlink docs/architecture/README.md",
+		"FOO=1 unlink docs/architecture/README.md",
+		"/usr/bin/find docs -name README.md -delete",
+		"/usr/bin/git clean -fdx docs",
+		"/bin/rm doc''s/architecture/README.md",
+		"/bin/mv doc''s/architecture/README.md /tmp/x.md",
+		"command rm doc''s/architecture/README.md",
+		"env rm doc''s/architecture/README.md",
+		"MV docs/architecture/README.md /tmp/x.md",
+		"Unlink docs/architecture/README.md",
+		`find docs -name README.md -ok rm {} \;`,
+		`find docs -name README.md -okdir rm {} \;`,
+		`find docs -name README.md -exec unlink {} \;`,
+		`find docs -name README.md -exec env rm {} \;`,
+		"mv -t/tmp docs/architecture/README.md",
+		"mv -S.t docs/architecture/README.md /tmp/x.md",
+		"mv -fS .t docs/architecture/README.md /tmp/x.md",
+		`rm $'\U00000064'ocs/architecture/README.md`,
+		`find $'\U00000064ocs' -name README.md -delete`,
+		`mv $'\U00000064ocs'/architecture/README.md /tmp/x.md`,
+		`git -C $'\x64ocs' rm -q architecture/README.md`,
+		`find $"docs" -name README.md -exec rm {} \;`,
+		`git clean -fdx $"docs"`,
+		`unlink $"docs"/architecture/README.md`,
+		"mv -St docs/architecture/README.md /tmp/x.md",
+		"env -u FOO unlink docs/architecture/README.md",
+		"env -u PATH rm docs/architecture/README.md",
+		"env --unset PATH rm doc''s/architecture/README.md",
+		"exec -a fakename rm doc''s/architecture/README.md",
+		"exec -a x unlink docs/architecture/README.md",
+		"env -u FOO find docs -delete",
+		"sudo unlink docs/architecture/README.md",
+		"sudo -u root rm doc''s/architecture/README.md",
+		"timeout 5 unlink docs/architecture/README.md",
+		"nice -n 5 find docs -delete",
+		"xargs rm docs/architecture/README.md",
+		"xargs unlink docs/architecture/README.md",
+		"sudo git -C docs mv architecture/README.md /tmp/x.md",
+		"sudo mv doc''s/architecture/README.md /tmp/x.md",
+		"sudo -u mv -t docs/x mv doc''s/architecture/README.md /tmp/y.md",
+		"caffeinate unlink docs/architecture/README.md",
+		"arch -arm64 find docs -delete",
+	} {
+		if dec := decide(draftCycle, dir, cmd); dec.Allow {
+			t.Errorf("%q allowed: bash resolves it to a removal under a doc root", cmd)
+		}
+	}
+	for _, cmd := range []string{
+		"find . -name '*.tmp' -delete",
+		"unlink /tmp/lane.sock",
+		"mv docs/architecture/README.md docs/private/research/archived-2026-09-26/README.md",
+		"mv -t docs/private/research/archived-2026-09-26 docs/architecture/README.md",
+		"find docs -name rm",
+		`find . -name '*.tmp' -exec /bin/rm {} \;`,
+		`printf $'docs\n'`,
+		"grep -rn unlink docs/architecture",
+		"mv -S.bak docs/architecture/README.md docs/private/research/archived-2026-09-26/README.md",
+		"git -c core.quotepath=off status docs",
+		"mv --suffix docs README.md /tmp/x.md",
+		"mv --su docs README.md /tmp/x.md",
+		"find . -exec grep -l docs {} +",
+		"time go test ./internal/guards/",
+		"xargs grep -l unlink",
+	} {
+		if dec := decide(draftCycle, dir, cmd); !dec.Allow {
+			t.Errorf("%q denied: it removes nothing under a doc root: %s", cmd, dec.Reason)
+		}
 	}
 }

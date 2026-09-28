@@ -219,8 +219,7 @@ type Orchestrator struct {
 
 	gitMutationLock gitMutationLocker
 
-	// dossierCommit selects whether the closeout dossier is git-committed; see WithDossierCommit.
-	dossierCommit bool
+	dossierDestination DossierDestination
 
 	// gitDirtyPaths returns the set of modified tracked paths in the main
 	// repo's working directory; the tree-diff guard snapshots this before and
@@ -673,7 +672,6 @@ func NewOrchestrator(storage Storage, ledger Ledger, runners map[Phase]PhaseRunn
 		now:                        time.Now,
 		gitHEAD:                    defaultGitHEAD,
 		gitMutationLock:            defaultGitMutationLock,
-		dossierCommit:              true,
 		gitDirtyPaths:              defaultGitDirtyPaths,
 		worktree:                   gitWorktree{},
 		strategy:                   router.StaticPreset{},
@@ -953,10 +951,14 @@ OuterLoop:
 	return cr.result, nil
 }
 
-// WithDossierCommit decides whether each cycle's closeout dossier is
-// git-committed into the project root (the production default) or only
-// written — the --simulate root's contract, since a no-LLM plumbing walk
-// must never mutate the operator's repository.
-func WithDossierCommit(commit bool) Option {
-	return func(o *Orchestrator) { o.dossierCommit = commit }
+type DossierDestination int
+
+const (
+	DossierCommitted DossierDestination = iota
+	DossierFilesOnly
+	DossierPending
+)
+
+func WithDossierDestination(d DossierDestination) Option {
+	return func(o *Orchestrator) { o.dossierDestination = d }
 }

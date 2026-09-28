@@ -78,43 +78,44 @@ func RebuiltBinary(projectRoot string) (string, error) {
 	return target, nil
 }
 
-// FleetLaneActive reports whether a SIBLING fleet lane holds a live run under
-// evolveDir. Discovery is gc.Discover, the lease-aware run-dir scan the
-// retention engine owns; the lease of each Live dir is then re-read here for
-// the two questions retention never asks — whose is it, and is the owner
-// alive? A run dir is a sibling when its lease is not this process's own
-// (runlease.Lease.OwnerPID == os.Getpid(): the whole chain runs in one process
-// and every lease it writes carries its pid, while a different lane is by
-// construction a different process — cycle 1364) AND its owner is live
-// (runlease.OwnerLive: a sealed lane's lease outlives its process and stays
-// fresh for a TTL — 2026-09-15, twice, with no lane running). Retention keeps
-// its TTL-only Live on purpose (it errs toward keeping dirs). A dir Live
-// through gc's other liveness source (the current workspace, no fresh lease)
-// has no pid to compare and is NOT excluded — the fail-safe posture. A
-// discovery error is unverifiable safety state.
+// FleetLaneActive reports whether LiveSiblingRun finds a live sibling run under evolveDir.
 func FleetLaneActive(evolveDir string) (active bool, err error) {
+	_, active, err = LiveSiblingRun(evolveDir)
+	return active, err
+}
+
+type SiblingRun struct {
+	Dir    string
+	Reason string
+}
+
+func LiveSiblingRun(evolveDir string) (SiblingRun, bool, error) {
 	dirs, err := gc.Discover(evolveDir, gc.DiscoverOptions{})
 	if err != nil {
-		return false, fmt.Errorf("chain boundary fleet-lane discovery: %w", err)
+		return SiblingRun{}, false, fmt.Errorf("chain boundary fleet-lane discovery: %w", err)
 	}
-	selfPID := os.Getpid()
 	for _, d := range dirs {
 		if !d.Live {
 			continue
 		}
-		if lease, ok, lerr := runlease.Read(d.Path); lerr == nil && ok {
-			if lease.OwnerPID == selfPID {
-				continue
-			}
-			// A sealed lane's lease outlives its process (the writer stops
-			// heartbeating at exit; the file stays fresh for a TTL): the
-			// owner's liveness decides, not the timestamp. An ownerless
-			// lease cannot be probed and stays a sibling.
-			if !runlease.OwnerLive(lease, time.Now(), 0, runlease.PIDAlive) {
-				continue
-			}
+		if reason := siblingReason(d.Path); reason != "" {
+			return SiblingRun{Dir: d.Path, Reason: reason}, true, nil
 		}
-		return true, nil
 	}
-	return false, nil
+	return SiblingRun{}, false, nil
+}
+
+func siblingReason(runDir string) string {
+	lease, ok, err := runlease.Read(runDir)
+	switch {
+	case err != nil:
+		return fmt.Sprintf("no readable lease (%v)", err)
+	case !ok:
+		return "no readable lease"
+	case lease.OwnerPID == os.Getpid(), !runlease.OwnerLive(lease, time.Now(), 0, runlease.PIDAlive):
+		return ""
+	case lease.OwnerPID == 0:
+		return "a fresh lease with no owner pid"
+	}
+	return fmt.Sprintf("live pid %d", lease.OwnerPID)
 }
