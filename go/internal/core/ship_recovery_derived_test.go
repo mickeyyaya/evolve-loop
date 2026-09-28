@@ -59,9 +59,9 @@ func TestRebaseWithDerivedRegen_CleanRebase(t *testing.T) {
 		return "", 0, nil
 	}}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("want (true,false), got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("want (true,false), got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 0 {
 		t.Fatalf("regen must not run on a clean rebase, ran for %v", *got)
@@ -76,7 +76,7 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 		case j == "rebase main":
 			return "", 1, nil // conflict
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return cflags + "\n", 0, nil
+			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "add -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
@@ -86,9 +86,9 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("want (true,false), got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("want (true,false), got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 1 || (*got)[0] != cflags {
 		t.Fatalf("regen paths = %v, want [%s]", *got, cflags)
@@ -112,7 +112,7 @@ func TestRebaseWithDerivedRegen_NonDerivedConflict_AbortsToDebugger(t *testing.T
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return "go/internal/flagregistry/registry_table.go\n", 0, nil
+			return "go/internal/flagregistry/registry_table.go\x00", 0, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
 		}
@@ -120,9 +120,9 @@ func TestRebaseWithDerivedRegen_NonDerivedConflict_AbortsToDebugger(t *testing.T
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if ok || !conflict {
-		t.Fatalf("want (false,true) for a real SSOT conflict, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if ok || len(conflicts) == 0 {
+		t.Fatalf("want (false,true) for a real SSOT conflict, got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 0 {
 		t.Fatalf("regen must NOT run on a non-derived conflict, ran for %v", *got)
@@ -141,7 +141,7 @@ func TestRebaseWithDerivedRegen_MixedConflict_Aborts(t *testing.T) {
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			// one derived + one real conflict in the same step
-			return cflags + "\ngo/internal/core/orchestrator.go\n", 0, nil
+			return cflags + "\x00go/internal/core/orchestrator.go\x00", 0, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
 		}
@@ -149,9 +149,9 @@ func TestRebaseWithDerivedRegen_MixedConflict_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if ok || !conflict {
-		t.Fatalf("want (false,true) when ANY conflict is non-derived, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if ok || len(conflicts) == 0 {
+		t.Fatalf("want (false,true) when ANY conflict is non-derived, got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 0 {
 		t.Fatalf("regen must not run when the set is not all-derived, ran for %v", *got)
@@ -167,7 +167,7 @@ func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return cflags + "\n", 0, nil
+			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "add -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
@@ -181,9 +181,9 @@ func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("want (true,false) across multiple derived-conflict commits, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("want (true,false) across multiple derived-conflict commits, got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 2 {
 		t.Fatalf("regen should run once per conflicting commit, ran %d time(s)", len(*got))
@@ -198,7 +198,7 @@ func TestRebaseWithDerivedRegen_RegenFails_Aborts(t *testing.T) {
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return cflags + "\n", 0, nil
+			return cflags + "\x00", 0, nil
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
 		}
@@ -206,9 +206,9 @@ func TestRebaseWithDerivedRegen_RegenFails_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, _ := recordingRegen(cflags) // regen fails for control-flags.md
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if ok || conflict {
-		t.Fatalf("want (false,false) on regen failure (infra, not overlap), got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if ok || len(conflicts) > 0 {
+		t.Fatalf("want (false,false) on regen failure (infra, not overlap), got (%v,%v)", ok, conflicts)
 	}
 	if !g.ran("rebase", "--abort") {
 		t.Fatal("must abort when regeneration fails")
@@ -231,9 +231,9 @@ func TestRebaseWithDerivedRegen_InfraFailureNoUnmerged_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if ok || conflict {
-		t.Fatalf("want (false,false) for an infra failure with no conflicts, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if ok || len(conflicts) > 0 {
+		t.Fatalf("want (false,false) for an infra failure with no conflicts, got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 0 {
 		t.Fatal("regen must not run on an infra failure")
@@ -253,7 +253,7 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 			// pre-loop + first loop step see the conflict; after the (empty) continue
 			// the commit has no unmerged paths.
 			if diffCalls <= 2 {
-				return cflags + "\n", 0, nil
+				return cflags + "\x00", 0, nil
 			}
 			return "", 0, nil
 		case strings.HasPrefix(j, "add -- "):
@@ -267,9 +267,9 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, _ := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("want (true,false) when an emptied commit is skipped, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("want (true,false) when an emptied commit is skipped, got (%v,%v)", ok, conflicts)
 	}
 	if !g.ran("rebase", "--skip") {
 		t.Fatal("must `rebase --skip` a commit emptied by resolution")
@@ -284,7 +284,7 @@ func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return cflags + "\n", 0, nil // perpetual derived conflict
+			return cflags + "\x00", 0, nil // perpetual derived conflict
 		case strings.HasPrefix(j, "add -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
@@ -296,9 +296,9 @@ func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if ok || conflict {
-		t.Fatalf("want (false,false) at the replay-step bound, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if ok || len(conflicts) > 0 {
+		t.Fatalf("want (false,false) at the replay-step bound, got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != maxRebaseContinueSteps {
 		t.Fatalf("expected regen once per bounded step (%d), got %d", maxRebaseContinueSteps, len(*got))
@@ -356,7 +356,7 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 		case j == "rebase main":
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
-			return cflags + "\n", 0, nil
+			return cflags + "\x00", 0, nil
 		case strings.HasPrefix(j, "add -- "):
 			return "", 1, nil // staging the regenerated file fails
 		case strings.Contains(j, "rebase --abort"):
@@ -366,9 +366,9 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if ok || conflict {
-		t.Fatalf("want (false,false) when `git add` fails, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if ok || len(conflicts) > 0 {
+		t.Fatalf("want (false,false) when `git add` fails, got (%v,%v)", ok, conflicts)
 	}
 	if len(*got) != 1 {
 		t.Fatalf("regen should run once before the failed add, got %d", len(*got))
@@ -379,9 +379,9 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 }
 
 func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
-	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", "")
-	if ok || conflict {
-		t.Fatalf("empty worktree must return (false,false), got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", "")
+	if ok || len(conflicts) > 0 {
+		t.Fatalf("empty worktree must return (false,false), got (%v,%v)", ok, conflicts)
 	}
 }
 
@@ -391,9 +391,9 @@ func TestRebaseCycleBranchOntoMain_EmptyWorktree(t *testing.T) {
 // rebaseCycleBranchOntoMain end-to-end against real git.
 func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
 	dir := initConflictRepo(t, "foo.go")
-	ok, conflict := rebaseCycleBranchOntoMain(context.Background(), "", dir)
-	if ok || !conflict {
-		t.Fatalf("a non-derived conflict must route to the debugger: got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", dir)
+	if ok || len(conflicts) == 0 {
+		t.Fatalf("a non-derived conflict must route to the debugger: got (%v,%v)", ok, conflicts)
 	}
 	out, _, _ := gitCapture(context.Background(), dir, "status", "--porcelain")
 	if strings.TrimSpace(out) != "" {
@@ -411,9 +411,9 @@ func TestRebaseWithDerivedRegen_RealGit_DerivedConflict(t *testing.T) {
 	regen := func(_ context.Context, wt, p string) error {
 		return os.WriteFile(filepath.Join(wt, p), []byte("regenerated\nshared\n"), 0o644)
 	}
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), dir, gitCapture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("real-git derived conflict should auto-resolve: got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), dir, gitCapture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("real-git derived conflict should auto-resolve: got (%v,%v)", ok, conflicts)
 	}
 	out, _, _ := gitCapture(context.Background(), dir, "status", "--porcelain")
 	if strings.TrimSpace(out) != "" {
@@ -477,7 +477,7 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			diffCalls++
 			if diffCalls <= 2 { // pre-loop + first step see the conflict
-				return cflags + "\n", 0, nil
+				return cflags + "\x00", 0, nil
 			}
 			return "", 0, nil // emptied after resolution
 		case strings.HasPrefix(j, "add -- "):
@@ -495,9 +495,9 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, _ := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("want (true,false) after a retried skip, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("want (true,false) after a retried skip, got (%v,%v)", ok, conflicts)
 	}
 	if skips < 2 {
 		t.Fatalf("expected the skip to be retried, skips=%d", skips)
@@ -516,11 +516,11 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 			diffN++
 			switch diffN {
 			case 1, 2: // pre-loop + first step: conflict on the doc
-				return cflags + "\n", 0, nil
+				return cflags + "\x00", 0, nil
 			case 3: // the resolution emptied the commit → triggers --skip
 				return "", 0, nil
 			default: // the skip landed on a NEW commit that also conflicts on the doc
-				return cflags + "\n", 0, nil
+				return cflags + "\x00", 0, nil
 			}
 		case strings.HasPrefix(j, "add -- "):
 			return "", 0, nil
@@ -538,9 +538,9 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflict := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
-	if !ok || conflict {
-		t.Fatalf("want (true,false) for skip-fail then a new derived resolve, got (%v,%v)", ok, conflict)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	if !ok || len(conflicts) > 0 {
+		t.Fatalf("want (true,false) for skip-fail then a new derived resolve, got (%v,%v)", ok, conflicts)
 	}
 	if skipN < 1 {
 		t.Fatal("expected at least one failed --skip")

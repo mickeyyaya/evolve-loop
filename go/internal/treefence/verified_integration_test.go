@@ -21,6 +21,19 @@ func TestFenceVerificationRejectsIgnoreRuleEvasion(t *testing.T) {
 	}
 }
 
+func TestFenceVerificationRejectsIgnoreRuleEvasionBesideAWritablePath(t *testing.T) {
+	dir := initRepo(t)
+	ctx := context.Background()
+	f := Begin(ctx, dir, true, "src/mat.go")
+	write(t, dir, "src/mat.go", "package src // the debugger's resolution\n")
+	write(t, dir, ".gitignore", "bin/\nsrc/hidden_probe_test.go\n")
+	write(t, dir, "src/hidden_probe_test.go", "package src // auditor probe\n")
+	out := f.End(ctx)
+	if _, err := os.Stat(filepath.Join(dir, "src/hidden_probe_test.go")); err == nil && out.Verified {
+		t.Fatalf("verified=true while a hidden probe survives beside the kept writable path: %+v", out)
+	}
+}
+
 func TestFenceFailedRestoreCannotVerify(t *testing.T) {
 	dir := initRepo(t)
 	fence := Begin(context.Background(), dir, true)

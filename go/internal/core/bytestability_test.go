@@ -55,6 +55,7 @@ var additiveCycleStateKeys = []string{
 	"final_verdict",
 	"shipped",
 	"ship_recovery_code",
+	"ship_recovery_conflicts",
 	"audit_decline_reason",
 }
 

@@ -17,5 +17,7 @@
     "go/.apicover-enforce merge=union moves from .repo.git/info/attributes into the versioned .gitattributes."
   ],
   "source": "wave 21 observation (2026-09-28, cycle 1725)",
-  "priority_rationale": "wave 21 boundary 2026-09-28: every genuine rebase conflict between parallel lanes currently ends its cycle; B5 was built for exactly this and cannot run"
+  "priority_rationale": "wave 21 boundary 2026-09-28: every genuine rebase conflict between parallel lanes currently ends its cycle; B5 was built for exactly this and cannot run",
+  "consumed_by": "console landing fix/debugger-writes-its-rebase-resolution (2026-09-28): FIXED. The rebase returns its non-derived conflicted paths; CycleState.ShipRecoveryConflicts records them; PhaseRequest.WorktreeWritablePaths hands them to the fleet-rebase debugger alone (live and resume); treefence keeps writes to exactly those paths and reverts every other; the prompt and persona name them. Acceptance 1 and 2: TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile drives a genuine conflict through a debugger held by the production fence and ships the resolved tree. Acceptance 3 landed in #680 (.gitattributes union).",
+  "consumed_at": "2026-09-28T08:45:00Z"
 }

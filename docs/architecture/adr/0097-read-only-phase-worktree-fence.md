@@ -50,6 +50,21 @@ ran `sandbox=false`.
    section prose when no `Evidence` field exists. The substance rule (every reference cited
    at a concrete line; `Status` must be one of two words) is unchanged.
 
+6. **Writable paths (2026-09-28).** A dispatch may name `PhaseRequest.WorktreeWritablePaths`.
+   The fence keeps writes to exactly those paths (`Outcome.Kept`, a `warning` diagnostic that
+   names them), restores every other write, and verifies that the final tree differs from the
+   snapshot only on them. One dispatch names any: the debugger of a fleet-rebase recovery, whose
+   writable paths are the non-derived conflicts the rebase recorded
+   (`CycleState.ShipRecoveryConflicts`). `withWorktreeFence` sets both fence fields
+   (`WorktreeReadOnly` and `WorktreeWritablePaths`) on the orchestrator's live, resume and
+   evaluate-batch dispatch. Two roots still derive the fence on their own: the out-of-band
+   retro request (`failure_learning.go`, which today dispatches unfenced) and `evolve campaign`;
+   the inbox item `worktree-fence-one-value` routes them through the same projection. The
+   conflicted paths are read with `git diff --name-only -z`, so each is byte-for-byte the
+   path the fence's `diff-tree -z` reports, however unusual its characters ([ADR-0105](0105-identity-preserving-fleet-rebase.md) B5). The resolution is
+   still judged downstream: a changed byte fails B3's identity proof, so the change is re-authored
+   and re-audited before it ships.
+
 ## Alternatives considered
 
 - **Make the OS sandbox mandatory for read-only phases.** Right layer for defence in depth,
@@ -87,3 +102,8 @@ worktree-mutating bridge), `internal/treefence/fence_test.go`,
 `internal/reportdoc/review_fields_test.go` (the three real sections, verbatim, under
 `testdata/`), `internal/phases/audit/audit_test.go::TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt`,
 `internal/phases/retro/retro_test.go::TestValidateExplanationReview_ListValuedEvidence`.
+Writable paths: `internal/treefence/writable_test.go`,
+`internal/phases/runner/worktree_fence_writable_test.go::TestRun_ADispatchKeepsItsWritesToThePathsItMayWrite`,
+`internal/core/worktree_writable_paths_test.go` (the eligibility table and the resume dispatch),
+`internal/core/ship_recovery_debugger_test.go::TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile`
+(a genuine conflict through a debugger held by the production fence, shipped on main).

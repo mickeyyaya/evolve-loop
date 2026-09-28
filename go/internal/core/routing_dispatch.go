@@ -235,6 +235,12 @@ func (o *Orchestrator) worktreePhase(p Phase) bool {
 // write.
 func (o *Orchestrator) worktreeReadOnly(p Phase) bool { return !o.worktreePhase(p) }
 
+func (o *Orchestrator) withWorktreeFence(req PhaseRequest, next Phase, cs CycleState) PhaseRequest {
+	req.WorktreeReadOnly = o.worktreeReadOnly(next)
+	req.WorktreeWritablePaths = worktreeWritablePaths(next, cs)
+	return req
+}
+
 // leakRecoverablePhase reports whether next is eligible for main-tree leak
 // recovery. It is the UNION of the fixed active-worktree set (LeakRecoverablePhase
 // — triage/audit/scout/bug-reproduction/tdd/build) with worktreePhase, so a user

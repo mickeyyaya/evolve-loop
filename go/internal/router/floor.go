@@ -22,56 +22,23 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 	if plan == nil {
 		return nil, nil
 	}
-	// Re-assert the evaluator rather than trust policy.FloorPhases to have added it.
-	if !slices.Contains(floor, EvaluatorFloorPhase) {
-		floor = append([]string(nil), floor...)
-		floor = append(floor, EvaluatorFloorPhase)
-	}
+	floor = withEvaluatorFloor(floor)
 	entries, clamps := dropUnknownPhases(in, plan)
 	out := &PhasePlan{
 		Entries:    entries,
 		MintPhases: plan.MintPhases,
 	}
-	// A validated unified commitment makes these two design phases deep work.
-	// Empty means absent or rejected, preserving triage's fail-open behavior.
-	if in.Signals.Triage.UnifiedSize != "" {
-		for i := range out.Entries {
-			e := &out.Entries[i]
-			if (e.Phase != "plan-review" && e.Phase != "build-planner") || e.Tier == "deep" {
-				continue
-			}
-			proposed := e.Phase + "=tier:" + e.Tier
-			e.Tier = "deep"
-			clamps = append(clamps, Clamp{
-				Phase:    e.Phase,
-				Rule:     "unified-commitment-planning-tier",
-				Proposed: proposed,
-				Forced:   e.Phase + "=tier:deep",
-			})
-		}
-	}
-
-	force := func(phase string, rule string) {
-		if planRuns(out, phase) {
-			return
-		}
-		ensureRun(out, phase)
-		clamps = append(clamps, Clamp{
-			Rule:     rule,
-			Proposed: phase + "=skip",
-			Forced:   phase + "=run",
-		})
-	}
+	clamps = append(clamps, promoteUnifiedCommitmentTier(in, out)...)
 
 	if intentRequired {
-		force("intent", "require-intent")
+		forcePhase(out, &clamps, "intent", "require-intent")
 	}
 
 	// Built work may not strand unreviewed or unshipped. Forcing ship makes the
 	// plan ship-bound, so the ship floor below completes the set.
 	if planRuns(out, "build") {
-		force(EvaluatorFloorPhase, "build-requires-"+EvaluatorFloorPhase)
-		force("ship", "build-requires-ship")
+		forcePhase(out, &clamps, EvaluatorFloorPhase, "build-requires-"+EvaluatorFloorPhase)
+		forcePhase(out, &clamps, "ship", "build-requires-ship")
 	}
 
 	// A no-build, no-ship investigation cycle is legitimate and stays unconstrained.
@@ -82,13 +49,60 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 	for _, phase := range floor {
 		if phase == "tdd" {
 			if tddPinned(in) {
-				force("tdd", "ship-requires-tdd")
+				forcePhase(out, &clamps, "tdd", "ship-requires-tdd")
 			}
 			continue
 		}
-		force(phase, "ship-requires-"+phase)
+		forcePhase(out, &clamps, phase, "ship-requires-"+phase)
 	}
 	return out, clamps
+}
+
+// withEvaluatorFloor re-asserts the evaluator rather than trusting policy.FloorPhases to have added it.
+func withEvaluatorFloor(floor []string) []string {
+	if slices.Contains(floor, EvaluatorFloorPhase) {
+		return floor
+	}
+	floor = append([]string(nil), floor...)
+	return append(floor, EvaluatorFloorPhase)
+}
+
+// promoteUnifiedCommitmentTier makes plan-review and build-planner deep work when a validated unified
+// commitment is present. Empty UnifiedSize means absent or rejected, preserving triage's fail-open
+// behavior.
+func promoteUnifiedCommitmentTier(in RouteInput, out *PhasePlan) []Clamp {
+	if in.Signals.Triage.UnifiedSize == "" {
+		return nil
+	}
+	var clamps []Clamp
+	for i := range out.Entries {
+		e := &out.Entries[i]
+		if (e.Phase != "plan-review" && e.Phase != "build-planner") || e.Tier == "deep" {
+			continue
+		}
+		proposed := e.Phase + "=tier:" + e.Tier
+		e.Tier = "deep"
+		clamps = append(clamps, Clamp{
+			Phase:    e.Phase,
+			Rule:     "unified-commitment-planning-tier",
+			Proposed: proposed,
+			Forced:   e.Phase + "=tier:deep",
+		})
+	}
+	return clamps
+}
+
+// forcePhase ensures phase runs in plan, appending one Clamp when it had to force it on.
+func forcePhase(plan *PhasePlan, clamps *[]Clamp, phase, rule string) {
+	if planRuns(plan, phase) {
+		return
+	}
+	ensureRun(plan, phase)
+	*clamps = append(*clamps, Clamp{
+		Rule:     rule,
+		Proposed: phase + "=skip",
+		Forced:   phase + "=run",
+	})
 }
 
 // DropUnknownPhaseRule is the clamp rule recorded when the floor removes an entry outside the known-phase set.
