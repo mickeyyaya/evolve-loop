@@ -17,6 +17,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
+var fleetLaunchFactory = execCycleLaunch
+
 // loadPlanSpecs parses an `evolve fleet --plan` backlog into up to `count`
 // disjoint-scoped cycle specs stamped with goalHash; the second return is the
 // deferred backlog for a later wave.
@@ -69,7 +71,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	sup := &fleet.Supervisor{
 		Concurrency: concurrency,
-		Launch:      execCycleLaunch(binPath, simulate, "", goalHash, "", stdout, stderr),
+		Launch:      fleetLaunchFactory(binPath, simulate, "", goalHash, "", stdout, stderr),
 	}
 	if err := sup.Validate(); err != nil {
 		fmt.Fprintf(stderr, "evolve fleet: %v\n", err)

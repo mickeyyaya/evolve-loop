@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
-	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 const closeoutCommit = "dossier: cycle-1705 closeout\n\nknowledge-base/cycles/cycle-1705.json\nknowledge-base/cycles/cycle-1705.md"
@@ -287,12 +286,31 @@ func TestCampaignRun_PublishesTheWavesPendingCloseouts(t *testing.T) {
 	}
 }
 
-func TestRunFleet_RunsItsLanesThroughThePublishingRunner(t *testing.T) {
-	n, err := acsassert.CountInGoFunc("cmd_fleet.go", "runFleet", "runLanesThenPublish(")
-	if err != nil || n != 1 {
-		t.Fatalf("runFleet must run its lanes through runLanesThenPublish once, got %d (%v)", n, err)
+func TestRunFleet_PublishesTheLanesPendingCloseoutsInItsWorkingTree(t *testing.T) {
+	plane := gitPlane(t, "main")
+	previous := fleetLaunchFactory
+	fleetLaunchFactory = func(string, bool, string, string, string, io.Writer, io.Writer) fleet.LaunchFn {
+		return func(context.Context, fleet.CycleSpec) (int, error) {
+			return 0, writePendingCloseout(plane.Dir)
+		}
 	}
-	if n, _ := acsassert.CountInGoFunc("cmd_fleet.go", "runFleet", "sup.Run("); n != 0 {
-		t.Fatalf("runFleet must not run its lanes around the publishing runner, found %d direct sup.Run call(s)", n)
+	t.Cleanup(func() { fleetLaunchFactory = previous })
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(plane.Dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+	var stdout, stderr bytes.Buffer
+
+	code := runFleet([]string{"--count", "1", "--goal-hash", "fleet-publish"}, strings.NewReader(""), &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("runFleet = %d, want 0; stderr=%s", code, stderr.String())
+	}
+	if got := plane.Git("show", "--name-only", "--format=%s", "HEAD"); got != closeoutCommit {
+		t.Fatalf("HEAD = %q, want the lanes' pending closeout published once they returned", got)
 	}
 }
