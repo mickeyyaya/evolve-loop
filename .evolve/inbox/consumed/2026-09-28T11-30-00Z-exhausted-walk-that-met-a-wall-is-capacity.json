@@ -1,0 +1,22 @@
+{
+  "id": "exhausted-walk-that-met-a-wall-is-capacity",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.92,
+  "title": "An exhausted dispatch walk that met a quota wall is a capacity outcome, whatever the rung order",
+  "files": [
+    "go/internal/llmroute/tier_fallback.go",
+    "go/internal/phases/runner/dispatch.go",
+    "go/internal/core/quota_exhaustion.go"
+  ],
+  "summary": "From wave 24 (cycles 1733, 1734; design doc §5.11 T2). The runner surfaces the last rung's error (llmroute.DispatchTiered returns the last launch), and core.isQuotaWall defers only on exit 85. With the incapable ollama rung gone (T1), a walk [claude 81, codex 85] ends on the wall and defers, but [codex 85, claude 81] (codex's bench expired between walks) ends on claude's stall and FAILs, although no capable family could run the phase. The retrospectives of 1687 and 1734 name this.",
+  "acceptance": [
+    "A walk that exhausted every candidate on fallback-trigger exits, at least one of them a quota wall, surfaces as a capacity outcome and the cycle defers (all_families_exhausted), for either rung order (tests)",
+    "A walk whose last capable rung failed for a non-trigger reason still surfaces that reason",
+    "The Signal Center line names every rung's exit"
+  ],
+  "created_at": "2026-09-28T11:30:00Z",
+  "source": "console, 2026-09-28, the wave-24 P0 (cycles 1733, 1734)",
+  "consumed_by": "console landing fix/chain-plans-only-capable-drivers (2026-09-28): BUILT in the same landing that filed it. DispatchTiered.Walled + bridgechain.WallKeeper (runner and bridge handle alike) surface the wall of an exhausted walk whatever the rung order, naming every rung; a walk with no wall, or a non-trigger failure after a wall, still surfaces its own error; the quota pause carries the named walk into the quota.paused Signal Center line. Tests: TestDispatchTiered_AnExhaustedWalkThatMetAWallIsWalled, TestWallKeeper_SurfacesTheWallOfAWalledWalkNamingEveryRung, TestWalking_*, TestRun_AnExhaustedWalkThatMetAWallSurfacesTheWall, TestRun_AWallThenARealFailureSurfacesTheFailure.",
+  "consumed_at": "2026-09-28T12:10:00Z"
+}

@@ -33,6 +33,7 @@ The loop guard counts every match of the same rule across the launch, not consec
 
 Rule selection:
 
+- **A manifest declares what its driver cannot do.** `toolless: true` (ollama-tmux) means the CLI has no tool use and cannot write a worktree artifact; `HasToolUse` is the one predicate over it, failing closed (a CLI whose manifest does not load has no proven tool use), used by the ollama launch guard and by the universal-fallback tail. Every lane phase runs in its worktree (CB.1), so the guard refuses a lane phase for want of tool use, not because the phase writes source. Pinned by `TestHasToolUse_FollowsTheDriverManifest`.
 - The first manifest rule whose regex matches wins, so manifest order is part of the contract. A rule with `tail_lines` matches only the tail of the capture, where a live modal sits.
 - An `escalate` match on a busy pane is skipped: a CLI cannot be blocked on a prompt while it is generating, so the match is the agent quoting a banner ([ADR-0047](../adr/0047-surface-classification-and-channel-separation.md)). Only `escalate` is gated; approvals and menus render beside their own "esc to cancel".
 - A `once: true` rule fires one time. Its dismissed text lingers in the re-captured scrollback, so later matches are skipped without counting toward the loop guard, and the scan continues so a new prompt still fires.

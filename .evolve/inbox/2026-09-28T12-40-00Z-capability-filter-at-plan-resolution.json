@@ -1,0 +1,19 @@
+{
+  "id": "capability-filter-at-plan-resolution",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.86,
+  "title": "Every dispatch chain drops a CLI without tool use at plan resolution, whatever named it (profile, override, advisor, pin)",
+  "files": [
+    "go/internal/phases/runner/routing.go",
+    "go/internal/llmroute",
+    "go/internal/bridgechain/bridgechain.go"
+  ],
+  "summary": "From the architecture review of the wave-24 P0 (2026-09-28). The universal-fallback tail now holds only CLIs with tool use (bridge.HasToolUse), but four other sources can still put ollama-tmux into a lane phase's chain: a profile's cli or cli_fallback, an EVOLVE_* CLI override, an advisor-proposed CLI, and a policy pin. Its launch refusal (exit 10) is a non-trigger, so the walk ends there and the cycle FAILs. None names ollama today (latent).",
+  "acceptance": [
+    "Plan resolution drops a toolless candidate for a worktree phase next to llmroute.Probe, for the runner's and the bridge handle's walks alike (test per source)",
+    "A chain left with no candidate fails loudly naming the dropped CLIs"
+  ],
+  "created_at": "2026-09-28T12:40:00Z",
+  "source": "console, 2026-09-28, the wave-24 P0 and its architecture review"
+}
