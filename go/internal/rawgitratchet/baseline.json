@@ -71,7 +71,6 @@
   "internal/core/ship_recovery_debugger_test.go": 1,
   "internal/core/ship_recovery_derived_test.go": 2,
   "internal/core/ship_recovery_explanation_test.go": 1,
-  "internal/core/ship_recovery_lane_fixture_test.go": 1,
   "internal/core/verdict_cache_put_base_test.go": 1,
   "internal/core/worktree_base_test.go": 1,
   "internal/core/worktree_clean_test.go": 1,
