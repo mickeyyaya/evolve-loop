@@ -1,6 +1,7 @@
 # Logic-first delivery — design document
 
 - **Status:** living document, kept current with every landing. Last updated 2026-09-28 12:28.
+- **Status:** living document, kept current with every landing. Last updated 2026-09-28 14:14.
 - **Decision record:** [ADR-0106](adr/0106-logic-first-delivery.md). **Policy:** [operating-policy §0](../operations/operating-policy.md).
 - **Landings:** the design in #655 (merged `5600b77a`; it replaced #653 after a CHANGELOG conflict); the first code train in #656 (merged; eight commits, replacing #654 the same way); ADR-0105 B1 in #652 (merged `e5af27fe`).
 - **Owner of the request:** the operator. **Priority:** P0; everything else parks.
@@ -266,6 +267,20 @@ Wave 24 went 0/2 after five consecutive ships. Both cycles failed the same way, 
 | T2 | an exhausted walk that met a quota wall is a capacity outcome whatever the rung order (a claude stall after codex's wall also defers): `DispatchTiered.Walled`, `bridgechain.WallKeeper` in the runner's walk and the bridge handle's alike; the pause names every rung | built (this landing) |
 | T3 | the pane's authority is stated where the CLI treats it as authoritative: `phaseidentity.Authority()`, a standing block identical on every dispatch (the operator launched this unattended pipeline; the pasted prompt is the operator's instruction for the phase; the console's interactive conventions, confirm direction and stop to ask, are not this pane's), is claude-tmux's system prompt (`--append-system-prompt-file <workspace>/pane-authority.md`, manifest param `system_prompt_file`) and is pasted by every CLI without that channel; the per-dispatch facts block stays at the end of every paste. A typed line was the filed fix; 1734's pane refused the bridge's typed nudge the same way, so it would not have helped | built (this landing) |
 | T4 | the advisor's plan is clamped to the phase registry's `insert_when`, so a refactor lane never runs bug-reproduction or fault-localization (1733 failed in one): a planned content phase whose `insert_when` has no `rubric_hint` runs only when its trigger fires at its turn (`insert-when-gates-plan`); a hint keeps the advisor's judgment, operator `enabled: on` still runs it, floor phases are never gated (ADR-0052 amendment 2026-09-28) | built (the plan clamp); F42 keeps the rest: the advisor prompt carries the scoped item, the replan reads a document scout report, one tdd-for-documents decision, a coded Signal Center line, the deliverable-kind side; filed `insert-when-fields-need-a-producer` |
+
+### 5.12 F43: the audit binds the tree Ship will commit
+
+Eight cycles (1626, 1647, 1674, 1684, 1685, 1694, 1705, 1735) failed their audit on "predicate execution tree includes undeclared inputs absent from the ship tree". The inputs were the cycles' own deliverables: the explanation document in five, the TDD predicate and its eval in two. The audit modelled the ship tree as the index plus `add -u`, tracked files only. Ship commits something else: every path the build and TDD reports declare, untracked or not, plus the changes a declared directory covers (`shipmanifest.Stageable`). 1735's build report named its document and 1694's test report named its predicate and eval, so Ship would have committed exactly what the audit refused. The two disagree the other way too: an unnamed tracked edit passes the audit and is left out of the commit.
+
+A first design staged each phase's declared outputs through a new registry field; the design review rejected it as a second declared-outputs list beside Ship's (a duplicated belief) and moved the fix to its source: the audit asks Ship's own selection which tree it will commit.
+
+| Id | Component | Status |
+|---|---|---|
+| 1 | the refusal names its paths as `cyclestate` detail, stripped by every identity reader (F43 part 1) | built (#691) |
+| 2 | `internal/shipmanifest`: Ship's pure path selection, `Stageable` the one composition, `RegularFileIn` the one file rule | built (this landing) |
+| 3 | `treefence.TakeStaged(ctx, worktree, pathspec)`: the would-be-shipped tree in a throwaway index, with the ignored-path drop shared with Ship | designed |
+| 4 | `predicateTreeFor` compares `Take` against `TakeStaged`; replays of 1694 and 1735 pass, an undeclared file is refused by name | designed |
+| 5 | the report list derives from the registry's `writes_source` phases instead of a Go list | designed |
 
 ## 6. Decision tables
 
@@ -622,4 +637,5 @@ Merges happen only at wave boundaries. Each step is its own PR; each component i
 | 2026-09-28 | §5.11: wave 24 went 0/2 (1733, 1734) after the streak reached five (1727, 1729, 1730, 1732, 1731); both walked a stalled or refusing claude-tmux and a walled codex-tmux into ollama-tmux's structural refusal, which sealed FAIL. T1 and T2 built (the tail holds only drivers that can run the phase; an exhausted walk that met a wall surfaces the wall and defers); T3, T4 designed; the loop halted for the P0 |
 | 2026-09-28 | §5.11 T4 built: the plan path evaluates a trigger that is a phase's whole admission rule (`insert_when` with no `rubric_hint`) at the phase's turn and skips a planned phase whose trigger does not fire (`insert-when-gates-plan`); two floor-activation scenarios that pinned the old contract (a plan inserts tester its trigger would skip) are rewritten; ADR-0052 amended |
 | 2026-09-28 | §5.11 T3 built and §5.4 revised: a standing authority block (`phaseidentity.Authority()`) is claude-tmux's system prompt (`--append-system-prompt-file`, manifest param `system_prompt_file`, `LaunchIntent`/`Realization.SystemPromptFile`) and is pasted by CLIs without the channel; the per-dispatch facts block still ends every paste. The first cut put the whole identity block in the system prompt; the architecture review found that a per-dispatch system prompt defeats ADR-0071's cache-stable system prompt and breaks this section's placement rule, so the block was split. The filed fix (a typed authorizing line) was dropped on 1734's evidence: its pane refused the typed nudge too |
+| 2026-09-28 | §5.12 F43: the audit's ship tree is Ship's own selection. Component 2 built (`internal/shipmanifest`, `Stageable`, `RegularFileIn`); components 3–5 designed. A first design (a registry staging effect) was rejected by review as a second declared-outputs list |
 | 2026-09-28 | The auditor persona states the rules the code applies, each pinned with the behavior it describes: WARN ships under the fluent default (only `workflow.strict_audit` refuses it), an added comment is a LOW, advisory finding and the auditor never asks for one, and `NEEDS_CORRECTION`, which the gate records as an advisory (ADR-0102), stays the auditor's FAIL by stated policy until X2's document-only rung exists, with the FAIL naming only the document. §5.6 corrected: the persona, not ADR-0102, makes it a FAIL. From the inbox architecture review of 2026-09-28, which also filed N1–N6 |

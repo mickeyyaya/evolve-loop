@@ -30,6 +30,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
 // consumeCommittedItems moves this cycle's committed inbox items into the
@@ -404,7 +405,7 @@ func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir,
 	if gitDir != "" {
 		args = append(args, "-C", gitDir)
 	}
-	// rawPathRead/unquoteGitPath (cycle-1108): without them a non-ASCII byte in
+	// rawPathRead/shipmanifest.UnquoteGitPath (cycle-1108): without them a non-ASCII byte in
 	// an item filename comes back C-quoted, never matches the sanctioned set,
 	// and false-refuses a legitimate consumption ship (review M4).
 	args = append(args, rawPathRead("diff-tree", "-r", "--name-only", boundTree, actualTree)...)
@@ -414,7 +415,7 @@ func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir,
 	}
 	var offenders []string
 	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
-		p := unquoteGitPath(strings.TrimSpace(line))
+		p := shipmanifest.UnquoteGitPath(strings.TrimSpace(line))
 		if p == "" {
 			continue
 		}

@@ -318,6 +318,8 @@
 ./internal/treestate
 # treedelta — the byte-exact change between a base and a tree; the carry across a rebase (ADR-0105 B3/B4) proves identity with it.
 ./internal/treedelta
+# shipmanifest — the one selection of "which paths Ship commits": declared report manifest, porcelain parsing, the staging pathspec.
+./internal/shipmanifest
 
 # bash->Go migration Wave B1 (2026-06-18): commit-gate-runner.sh ported to a
 # native gate (lang-detect + reviewer precondition + lint lanes + tree-SHA-bound

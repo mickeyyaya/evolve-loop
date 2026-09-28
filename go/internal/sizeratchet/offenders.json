@@ -217,7 +217,7 @@
   "internal/phases/ship.retireCommittedCarryover": 52,
   "internal/phases/ship.runPersonaLint": 66,
   "internal/phases/ship.shipDirect": 121,
-  "internal/phases/ship.stageExplicitPaths": 110,
+  "internal/phases/ship.stageExplicitPaths": 94,
   "internal/phases/ship.verifyAuditBinding": 107,
   "internal/phases/ship.verifyCommitGateAttestation": 55,
   "internal/phases/ship.verifyManualConfirm": 68,

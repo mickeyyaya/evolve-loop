@@ -1,4 +1,4 @@
-package ship
+package shipmanifest
 
 import (
 	"reflect"
@@ -11,7 +11,7 @@ import (
 // strings.Trim(token, ".") on the matched token, so the ./-prefixed prose the
 // ADR-0076 slice-B mandate puts in EVERY build-report ("$ ./go/bin/evolve
 // selfcheck build") became the ABSOLUTE-looking manifest entry
-// "/go/bin/evolve". stagePathspec's isFile filter resolved it INSIDE the
+// "/go/bin/evolve". Pathspec's isFile filter resolved it INSIDE the
 // worktree (filepath.Join(root, "/go/bin/evolve")), so it survived into
 // `git add -A -- /go/bin/evolve ...` → git canonicalized the absolute path →
 // `fatal: Invalid path '/go': No such file or directory` (rc=128, reproduced
@@ -105,13 +105,13 @@ func TestIsRepoRelative(t *testing.T) {
 func TestStagePathspec_RejectsNonRelativeManifestEntries(t *testing.T) {
 	manifest := []string{"/go/bin/evolve", "/go/evolve", "../outside.go", "go/internal/ok.go"}
 	changed := []string{"go/internal/ok.go"}
-	got := stagePathspec(manifest, changed, func(rel string) bool { return true })
+	got := pathspec(manifest, changed, func(rel string) bool { return true })
 	for _, p := range got {
 		if strings.HasPrefix(p, "/") || strings.HasPrefix(p, "../") {
-			t.Fatalf("stagePathspec passed non-relative entry into git argv: %q (full: %v)", p, got)
+			t.Fatalf("Pathspec passed non-relative entry into git argv: %q (full: %v)", p, got)
 		}
 	}
 	if !reflect.DeepEqual(got, []string{"go/internal/ok.go"}) {
-		t.Fatalf("stagePathspec = %v, want [go/internal/ok.go]", got)
+		t.Fatalf("Pathspec = %v, want [go/internal/ok.go]", got)
 	}
 }

@@ -13,7 +13,7 @@
 //  1. Neither shipDirect nor shipFromWorktree invokes `git add -A` for
 //     ClassCycle / ClassManual — staging is an explicit `git add -- <paths>`.
 //  2. The staged path list is the DECLARED manifest (build-report.md +
-//     test-report.md, the set declaredManifest already computes for the
+//     test-report.md, the set shipmanifest.Declared computes for the
 //     manifest gate) when the workspace has readable phase reports.
 //  3. When no manifest is readable (no workspace, or no reports), staging
 //     falls back to the porcelain-status changed set — it must NOT silently

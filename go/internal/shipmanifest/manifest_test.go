@@ -1,4 +1,4 @@
-package ship
+package shipmanifest
 
 import (
 	"reflect"
@@ -50,10 +50,10 @@ func TestOutOfManifest_FlagsUndeclaredPaths(t *testing.T) {
 		"go/internal/recurrence/digest_test.go", // inherited orphan — undeclared
 	}
 	manifest := []string{"go/internal/core/worktree_clean.go"}
-	got := outOfManifest(changed, manifest)
+	got := OutOfManifest(changed, manifest)
 	want := []string{"go/internal/recurrence/digest_test.go"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("outOfManifest = %v, want %v", got, want)
+		t.Fatalf("OutOfManifest = %v, want %v", got, want)
 	}
 }
 
@@ -67,11 +67,11 @@ func TestOutOfManifest_InManifestDiffHasNoFalsePositive(t *testing.T) {
 		"go/internal/core/worktree.go",
 		"docs/adr", // directory entry covers children by prefix
 	}
-	if got := outOfManifest(changed, manifest); len(got) != 0 {
-		t.Fatalf("outOfManifest false positive: %v", got)
+	if got := OutOfManifest(changed, manifest); len(got) != 0 {
+		t.Fatalf("OutOfManifest false positive: %v", got)
 	}
 	// Prefix must be component-wise: docs/adr does NOT cover docs/adr-other.md.
-	if got := outOfManifest([]string{"docs/adr-other.md"}, manifest); len(got) != 1 {
+	if got := OutOfManifest([]string{"docs/adr-other.md"}, manifest); len(got) != 1 {
 		t.Fatalf("prefix match leaked across path component: %v", got)
 	}
 }

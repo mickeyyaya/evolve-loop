@@ -49,7 +49,7 @@ func TestIgnoredPathsFromAddRefusal_NoHeaderMeansNoOffenders(t *testing.T) {
 	}
 }
 
-// Quoted (non-ASCII) offender lines decode through the same unquoteGitPath the
+// Quoted (non-ASCII) offender lines decode through the same shipmanifest.UnquoteGitPath the
 // rest of the staging onion uses (cycle-1108 contract holds here too).
 func TestIgnoredPathsFromAddRefusal_DecodesQuotedPaths(t *testing.T) {
 	t.Parallel()
