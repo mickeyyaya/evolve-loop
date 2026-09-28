@@ -52,13 +52,13 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	porcelain, err := git("status", "--porcelain")
+	porcelain, err := git("status", "--porcelain", "--untracked-files=no")
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve sync-main: git status failed: %v\n%s", err, porcelain)
 		return 1
 	}
 	if strings.TrimSpace(porcelain) != "" {
-		fmt.Fprintf(stderr, "evolve sync-main: refused — working tree is dirty; commit or stash first:\n%s", porcelain)
+		fmt.Fprintf(stderr, "evolve sync-main: refused — tracked files have uncommitted changes; commit or stash first:\n%s", porcelain)
 		return 1
 	}
 
@@ -74,18 +74,30 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if out, err := git("merge", "--no-edit", "origin/"+branch); err != nil {
-		if _, aerr := git("merge", "--abort"); aerr != nil {
-			fmt.Fprintf(stderr, "evolve sync-main: merge conflicted AND abort failed: %v\n%s", aerr, out)
-			return 1
-		}
-		fmt.Fprintf(stderr, "evolve sync-main: refused — merging origin/%s conflicts with local history (aborted cleanly, tree unchanged).\n", branch)
-		fmt.Fprintln(stderr, "evolve sync-main:   • resolve manually, or re-audit the local commit on the new base.")
-		return 1
+	if code := mergeOrigin(git, branch, stderr); code != 0 {
+		return code
 	}
 
 	fmt.Fprintf(stdout, "sync-main: reconciled local %s with origin/%s (merge only; nothing pushed).\n", branch, branch)
 	return 0
+}
+
+func mergeOrigin(git func(...string) (string, error), branch string, stderr io.Writer) int {
+	out, err := git("merge", "--no-edit", "origin/"+branch)
+	if err == nil {
+		return 0
+	}
+	if _, inProgress := git("rev-parse", "-q", "--verify", "MERGE_HEAD"); inProgress != nil {
+		fmt.Fprintf(stderr, "evolve sync-main: refused — git would not merge origin/%s:\n%s", branch, out)
+		return 1
+	}
+	if _, aerr := git("merge", "--abort"); aerr != nil {
+		fmt.Fprintf(stderr, "evolve sync-main: merge conflicted AND abort failed: %v\n%s", aerr, out)
+		return 1
+	}
+	fmt.Fprintf(stderr, "evolve sync-main: refused — merging origin/%s conflicts with local history (aborted cleanly, tree unchanged).\n", branch)
+	fmt.Fprintln(stderr, "evolve sync-main:   • resolve manually, or re-audit the local commit on the new base.")
+	return 1
 }
 
 // Matches gc.discover's minimal cycle_id/workspace schema rather than

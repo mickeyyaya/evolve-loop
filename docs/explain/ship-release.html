@@ -36,7 +36,7 @@ table{border-collapse:collapse;width:100%;font-size:.88em}td,th{border:1px solid
 </table>
 <ul>
 <li><b>The attestation chokepoint</b>: bare <code>git commit/push</code> is hook-denied; ship commits internally, so the Go-side check (<code>phases/ship/commitgate.go:79-135</code>) is the single enforcement point — missing/stale attestation refuses the ship. Reviewers become durable <code>Reviewed-by:</code> trailers.</li>
-<li><b>sync-main</b>: merge-only reconciliation of diverged main (no rebase, no force, no push); refuses on live leases or dirty trees.</li>
+<li><b>sync-main</b>: merge-only reconciliation of diverged main (no rebase, no force, no push); refuses on live leases or uncommitted tracked changes (an untracked file never blocks it; a merge that would overwrite one is refused by git, tree unchanged).</li>
 <li><b>Release pipeline</b> (<code>releasepipeline.go:199</code>): preflight → changelog-gen → version-bump → <b>rebuild-binary</b> → consistency → atomic ship → marketplace-poll → release-verify, journaled per attempt for rollback. Preflight is 5 counted steps PLUS a hard release-commit CI gate (cycle-748, after v22.0.0 was cut on red CI).</li>
 </ul>
 <div class="callout drift"><b>The smoking gun (queued: ship-manual-deletes-running-binary, 0.94)</b> — <code>discardBinaryChurn</code> runs on the manual-ship SUCCESS path (<code>gitops.go:210</code>); with <code>ShipBinaryPath</code> never set it resolves <code>os.Executable()</code> and <code>os.Remove</code>s the untracked <code>go/bin/evolve</code> (<code>gitops.go:774</code>) — the very binary all five trust hooks resolve first. Every manual ship silently degrades the kernel to the stale tracked fallback until a rebuild. Observed live twice on 2026-07-12; undocumented anywhere.</div>

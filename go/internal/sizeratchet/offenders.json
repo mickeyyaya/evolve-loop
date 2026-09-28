@@ -46,7 +46,7 @@
   "cmd/evolve.runSubagentResolveTier": 60,
   "cmd/evolve.runSubagentRun": 77,
   "cmd/evolve.runSubagentValidateProfile": 55,
-  "cmd/evolve.runSyncMain": 72,
+  "cmd/evolve.runSyncMain": 66,
   "cmd/evolve.salvageProbeDiagnostics": 61,
   "cmd/evolve.setupLatestReport": 52,
   "cmd/evolve.wireOrchestratorDeps": 310,
