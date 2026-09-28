@@ -8,24 +8,15 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // initDossierRepo makes root a git working tree so writeCycleDossier's commit
 // (dossier.Write(..., true)) has a repo to add+commit into. Production always
 // runs against the git main tree; the tests mirror that precondition.
-func initDossierRepo(t *testing.T, root string) {
+func initDossierRepo(t *testing.T) string {
 	t.Helper()
-	for _, args := range [][]string{
-		{"init"},
-		{"config", "user.email", "test@example.com"},
-		{"config", "user.name", "test"},
-	} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = root
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
+	return gittest.Fixture(t).Dir
 }
 
 func TestDossierVerdict_MapsCycleOutcomes(t *testing.T) {
@@ -48,8 +39,7 @@ func TestDossierVerdict_MapsCycleOutcomes(t *testing.T) {
 }
 
 func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := t.TempDir()
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: ws, Cycle: 7, Goal: "improve X", RunID: "run-ulid", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
@@ -74,8 +64,7 @@ func TestWriteCycleDossier_WritesValidArtifact(t *testing.T) {
 }
 
 func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 8, Goal: "fix Y", RunID: "run2", Outcome: VerdictFAIL}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}
@@ -92,8 +81,7 @@ func TestWriteCycleDossier_FailOutcomeRecordsDefect(t *testing.T) {
 // Regression: the tree-diff guard trips on any untracked
 // knowledge-base/cycles/* pair left behind.
 func TestWriteCycleDossier_LeavesCleanTree(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 537, Goal: "closeout", RunID: "run3", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}

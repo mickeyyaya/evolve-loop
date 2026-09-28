@@ -18,8 +18,7 @@ const systemFailureKey = "system_failure"
 // a hand-rolled call is not mistaken for wired.
 func closeoutRun(t *testing.T, cycle int, fixture string) (*cycleRun, string) {
 	t.Helper()
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	var ws string
 	if fixture == "" {
 		ws = t.TempDir()
@@ -138,8 +137,7 @@ func goldenPassDossierParams(projectRoot string) cycleDossierParams {
 }
 
 func TestDossierSystemFailure_OrdinaryPassStaysByteClean(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, goldenPassDossierParams(root)); err != nil {
 		t.Fatalf("writeCycleDossier: %v", err)
 	}

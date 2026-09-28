@@ -63,8 +63,7 @@ func readDossierPair(t *testing.T, root string, cycle int) (map[string]any, stri
 }
 
 func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := t.TempDir()
 	reasons := []string{
 		"EGPS gate blocked ship: red_count=2 (TestCN_004_Contract)",
@@ -105,8 +104,7 @@ func TestDossierFailure_FailCarriesIdentity(t *testing.T) {
 }
 
 func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := t.TempDir()
 	var reasons []string
 	for i := 0; i < 7; i++ {
@@ -141,8 +139,7 @@ func TestDossierFailure_ReasonsTruncatedAndCapped(t *testing.T) {
 }
 
 func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	if err := writeCycleDossier(nil, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 11, Goal: "fix V", RunID: "run11", Outcome: VerdictFAIL}); err != nil {
 		t.Fatalf("writeCycleDossier must not fail on absent failure artifacts: %v", err)
 	}
@@ -167,8 +164,7 @@ func TestDossierFailure_AbsentArtifactsDegrade(t *testing.T) {
 }
 
 func TestDossierFailure_PassKeepsShape(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := t.TempDir()
 	writeFailureArtifacts(t, ws, []string{"stale reason from a retried attempt"})
 

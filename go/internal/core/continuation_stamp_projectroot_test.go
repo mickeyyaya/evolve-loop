@@ -11,8 +11,7 @@ import (
 )
 
 func TestStampContinuation_NeverSnapshotsTheProjectRoot(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	alias := filepath.Join(t.TempDir(), "alias")
 	if err := os.Symlink(root, alias); err != nil {
 		t.Fatal(err)

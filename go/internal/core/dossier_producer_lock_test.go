@@ -39,8 +39,7 @@ func (s *mutexSpyLocker) acquire(projectRoot string) (func(), error) {
 }
 
 func TestWriteCycleDossier_AcquiresGitMutationLock(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	spy := &mutexSpyLocker{}
 
 	if err := writeCycleDossier(spy.acquire, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 11, Goal: "wire the lock", RunID: "run", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
@@ -60,8 +59,7 @@ func TestWriteCycleDossier_ConcurrentLanesEachAcquireAndRelease(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make([]error, lanes)
 	for i := 0; i < lanes; i++ {
-		root := t.TempDir()
-		initDossierRepo(t, root)
+		root := initDossierRepo(t)
 		wg.Add(1)
 		go func(i int, root string) {
 			defer wg.Done()
@@ -84,8 +82,7 @@ func TestWriteCycleDossier_ConcurrentLanesEachAcquireAndRelease(t *testing.T) {
 }
 
 func TestWriteCycleDossier_LockError_FailsOpen(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	spy := &mutexSpyLocker{failErr: errors.New("flock unavailable")}
 
 	if err := writeCycleDossier(spy.acquire, cycleDossierParams{ProjectRoot: root, WorkspacePath: t.TempDir(), Cycle: 12, Goal: "fail open", RunID: "run", Outcome: CycleOutcomeShippedViaBuild}); err != nil {
@@ -119,8 +116,7 @@ func TestDefaultGitMutationLock_LocksShipIntegratorFile(t *testing.T) {
 }
 
 func TestWriteCycleDossier_ConcurrentRealRepo_BothLand(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	var wg sync.WaitGroup
 	errs := make([]error, 2)
 	for i := 0; i < 2; i++ {
