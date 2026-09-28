@@ -61,6 +61,7 @@ func (b *loopBatchCoordinator) prepareIteration(
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: 2}
 	}
+	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
 
 	*fleetConfig = loopwave.ReloadFleetConfig(b.cfg.EvolveDir, *fleetConfig, b.stderr)
 	if maybeRefreshChainBoundaryWithSignals(b.cfg, iteration+1, b.stderr, b.deps.Signals) {
@@ -72,16 +73,21 @@ func (b *loopBatchCoordinator) prepareIteration(
 		return batchDecision{flow: batchReturn}
 	}
 
-	if (shouldRunWave(*fleetConfig) || shouldRunPool(*fleetConfig)) && *waveBinary == "" {
-		binary, err := os.Executable()
-		if err != nil {
-			fmt.Fprintf(b.stderr, "[loop] WARN: fleet: cannot resolve binary for fleet dispatch, staying sequential: %v\n", err)
-			fleetConfig.Count = 1
-		} else {
-			*waveBinary = binary
-		}
-	}
+	b.resolveWaveBinary(fleetConfig, waveBinary)
 	return batchDecision{flow: batchProceed}
+}
+
+func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig, waveBinary *string) {
+	if !(shouldRunWave(*fleetConfig) || shouldRunPool(*fleetConfig)) || *waveBinary != "" {
+		return
+	}
+	binary, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: cannot resolve binary for fleet dispatch, staying sequential: %v\n", err)
+		fleetConfig.Count = 1
+		return
+	}
+	*waveBinary = binary
 }
 
 // interruptReturn reports a SIGINT/SIGTERM caught at one of prepareIteration's

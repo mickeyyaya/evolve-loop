@@ -103,7 +103,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			specs[i] = fleet.CycleSpec{GoalHash: goalHash}
 		}
 	}
-	results := sup.Run(context.Background(), specs)
+	results := runLanesThenPublish(context.Background(), sup, specs, "", stderr)
 
 	failed := 0
 	for _, r := range results {
