@@ -77,14 +77,16 @@ func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "acs-cycle1515-bin-")
 	if err != nil {
 		buildErr = fmt.Sprintf("mktemp for evolve build: %v", err)
-		os.Exit(m.Run())
+		m.Run()
+		return
 	}
 	defer os.RemoveAll(dir)
 
 	goMod, err := moduleRoot()
 	if err != nil {
 		buildErr = err.Error()
-		os.Exit(m.Run())
+		m.Run()
+		return
 	}
 	bin := filepath.Join(dir, "evolve-under-test")
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/evolve")
@@ -94,7 +96,7 @@ func TestMain(m *testing.M) {
 	} else {
 		evolveBin = bin
 	}
-	os.Exit(m.Run())
+	m.Run()
 }
 
 // moduleRoot returns <worktree>/go by walking up from the predicate package
