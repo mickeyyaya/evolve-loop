@@ -93,28 +93,42 @@ func RebuiltBinary(projectRoot string) (string, error) {
 // has no pid to compare and is NOT excluded — the fail-safe posture. A
 // discovery error is unverifiable safety state.
 func FleetLaneActive(evolveDir string) (active bool, err error) {
+	_, active, err = LiveSiblingRun(evolveDir)
+	return active, err
+}
+
+type SiblingRun struct {
+	Dir    string
+	Reason string
+}
+
+func LiveSiblingRun(evolveDir string) (SiblingRun, bool, error) {
 	dirs, err := gc.Discover(evolveDir, gc.DiscoverOptions{})
 	if err != nil {
-		return false, fmt.Errorf("chain boundary fleet-lane discovery: %w", err)
+		return SiblingRun{}, false, fmt.Errorf("chain boundary fleet-lane discovery: %w", err)
 	}
-	selfPID := os.Getpid()
 	for _, d := range dirs {
 		if !d.Live {
 			continue
 		}
-		if lease, ok, lerr := runlease.Read(d.Path); lerr == nil && ok {
-			if lease.OwnerPID == selfPID {
-				continue
-			}
-			// A sealed lane's lease outlives its process (the writer stops
-			// heartbeating at exit; the file stays fresh for a TTL): the
-			// owner's liveness decides, not the timestamp. An ownerless
-			// lease cannot be probed and stays a sibling.
-			if !runlease.OwnerLive(lease, time.Now(), 0, runlease.PIDAlive) {
-				continue
-			}
+		if reason := siblingReason(d.Path); reason != "" {
+			return SiblingRun{Dir: d.Path, Reason: reason}, true, nil
 		}
-		return true, nil
 	}
-	return false, nil
+	return SiblingRun{}, false, nil
+}
+
+func siblingReason(runDir string) string {
+	lease, ok, err := runlease.Read(runDir)
+	switch {
+	case err != nil:
+		return fmt.Sprintf("no readable lease (%v)", err)
+	case !ok:
+		return "no readable lease"
+	case lease.OwnerPID == os.Getpid(), !runlease.OwnerLive(lease, time.Now(), 0, runlease.PIDAlive):
+		return ""
+	case lease.OwnerPID == 0:
+		return "a fresh lease with no owner pid"
+	}
+	return fmt.Sprintf("live pid %d", lease.OwnerPID)
 }
