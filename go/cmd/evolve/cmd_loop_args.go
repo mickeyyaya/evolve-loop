@@ -49,7 +49,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	fs.StringVar(&goalHash, "goal-hash", "", "explicit 64-char (or 8-char prefix) SHA256 of goal; mutually exclusive with --goal-text")
 	fs.StringVar(&goalText, "goal-text", "", "goal text; hashed via goalhash.Compute (normalize+SHA256)")
 	fs.StringVar(&strategy, "strategy", "", "balanced|innovate|harden|repair|ultrathink|autoresearch (default: balanced)")
-	fs.IntVar(&maxCyclesFlag, "max-cycles", 0, "maximum cycles to run (default 1; aliased by --cycles)")
+	fs.IntVar(&maxCyclesFlag, "max-cycles", 0, "maximum iterations to run: cycles when sequential, waves of fleet.count lanes in fleet mode (default 1; aliased by --cycles)")
 	fs.IntVar(&cyclesFlag, "cycles", 0, "alias for --max-cycles")
 	fs.BoolVar(&resume, "resume", false, "locate and resume most-recent checkpointed cycle (protocol lands in M3)")
 	fs.BoolVar(&dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
