@@ -35,28 +35,7 @@ func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
 		return res, fmt.Errorf("dossier: sweep: enumerate tree: %w", err)
 	}
 
-	type pair struct{ json, md string }
-	pairs := map[int]*pair{}
-	for _, p := range dirty {
-		m := orphanPair.FindStringSubmatch(p)
-		if m == nil {
-			continue
-		}
-		n, convErr := strconv.Atoi(m[2])
-		if convErr != nil {
-			continue
-		}
-		pp := pairs[n]
-		if pp == nil {
-			pp = &pair{}
-			pairs[n] = pp
-		}
-		if m[3] == "json" {
-			pp.json = p
-		} else {
-			pp.md = p
-		}
-	}
+	pairs := groupOrphanPairs(dirty)
 
 	cycles := make([]int, 0, len(pairs))
 	for n := range pairs {
@@ -79,4 +58,31 @@ func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
 		res.Recommitted = append(res.Recommitted, n)
 	}
 	return res, nil
+}
+
+type orphanPairPaths struct{ json, md string }
+
+func groupOrphanPairs(dirty []string) map[int]*orphanPairPaths {
+	pairs := map[int]*orphanPairPaths{}
+	for _, p := range dirty {
+		m := orphanPair.FindStringSubmatch(p)
+		if m == nil {
+			continue
+		}
+		n, convErr := strconv.Atoi(m[2])
+		if convErr != nil {
+			continue
+		}
+		pp := pairs[n]
+		if pp == nil {
+			pp = &orphanPairPaths{}
+			pairs[n] = pp
+		}
+		if m[3] == "json" {
+			pp.json = p
+		} else {
+			pp.md = p
+		}
+	}
+	return pairs
 }

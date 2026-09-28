@@ -38,24 +38,9 @@ type Config struct {
 // Cancellation surfaces as the code-2 measurement error with ctx.Err() in the
 // chain, so callers can distinguish infra interruption from a real finding.
 func Run(ctx context.Context, cfg Config, w io.Writer) (int, error) {
-	// Join coverage to symbols on the import-path-qualified path + line. A method
-	// prints under its bare name in `go tool cover -func`, so name-keying is
-	// impossible; the qualified path:line is exact and collision-free across
-	// packages that share a filename (config.go, doc.go, …).
-	coverByPath := map[string]float64{}
-	if cfg.CoverPath != "" {
-		f, err := os.Open(cfg.CoverPath)
-		if err != nil {
-			return 2, err
-		}
-		defer func() { _ = f.Close() }() // read-only file; close error is not actionable
-		entries, err := ParseCoverFunc(f)
-		if err != nil {
-			return 2, err
-		}
-		for _, e := range entries {
-			coverByPath[e.Path+":"+strconv.Itoa(e.Line)] = e.Pct
-		}
+	coverByPath, err := loadCoverByPath(cfg.CoverPath)
+	if err != nil {
+		return 2, err
 	}
 
 	totalProblems := 0
@@ -63,47 +48,81 @@ func Run(ctx context.Context, cfg Config, w io.Writer) (int, error) {
 		if err := ctx.Err(); err != nil {
 			return 2, err
 		}
-		syms, err := Enumerate(ctx, dir)
+		problems, err := measureDir(ctx, cfg, dir, coverByPath, w)
 		if err != nil {
 			return 2, err
 		}
-		named, err := NamesReferencedInTests(ctx, dir)
-		if err != nil {
-			return 2, err
-		}
-		imp, err := packageImportPath(dir)
-		if err != nil {
-			return 2, err
-		}
-		coverPct := map[string]float64{}
-		for _, s := range syms {
-			if s.Kind != KindFunc && s.Kind != KindMethod {
-				continue
-			}
-			key := imp + "/" + s.File + ":" + strconv.Itoa(s.Line)
-			if pct, ok := coverByPath[key]; ok {
-				coverPct[s.Name] = pct
-			}
-		}
-		rep := Classify(syms, named, coverPct)
-		if changed, scoped := cfg.ChangedFilesByDir[dir]; scoped {
-			var pre []Symbol
-			rep, pre = splitPreExisting(rep, changed)
-			printReport(w, dir, rep, cfg.RequireDoc, syms)
-			if len(pre) > 0 {
-				printList(w, "PRE-EXISTING DEBT (files untouched by this change — WARN only, pay down separately):", pre)
-			}
-			totalProblems += len(rep.Uncovered) + len(rep.FalseGreens)
-			continue
-		}
-		printReport(w, dir, rep, cfg.RequireDoc, syms)
-		totalProblems += len(rep.Uncovered) + len(rep.FalseGreens)
+		totalProblems += problems
 	}
 
 	if cfg.Enforce && totalProblems > 0 {
 		return 1, nil
 	}
 	return 0, nil
+}
+
+func loadCoverByPath(coverPath string) (map[string]float64, error) {
+	// Join coverage to symbols on the import-path-qualified path + line. A method
+	// prints under its bare name in `go tool cover -func`, so name-keying is
+	// impossible; the qualified path:line is exact and collision-free across
+	// packages that share a filename (config.go, doc.go, …).
+	coverByPath := map[string]float64{}
+	if coverPath != "" {
+		f, err := os.Open(coverPath)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = f.Close() }() // read-only file; close error is not actionable
+		entries, err := ParseCoverFunc(f)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range entries {
+			coverByPath[e.Path+":"+strconv.Itoa(e.Line)] = e.Pct
+		}
+	}
+	return coverByPath, nil
+}
+
+func measureDir(ctx context.Context, cfg Config, dir string, coverByPath map[string]float64, w io.Writer) (int, error) {
+	syms, err := Enumerate(ctx, dir)
+	if err != nil {
+		return 0, err
+	}
+	named, err := NamesReferencedInTests(ctx, dir)
+	if err != nil {
+		return 0, err
+	}
+	imp, err := packageImportPath(dir)
+	if err != nil {
+		return 0, err
+	}
+	rep := Classify(syms, named, coverPctByName(syms, imp, coverByPath))
+	if changed, scoped := cfg.ChangedFilesByDir[dir]; scoped {
+		var pre []Symbol
+		rep, pre = splitPreExisting(rep, changed)
+		printReport(w, dir, rep, cfg.RequireDoc, syms)
+		if len(pre) > 0 {
+			printList(w, "PRE-EXISTING DEBT (files untouched by this change — WARN only, pay down separately):", pre)
+		}
+		return len(rep.Uncovered) + len(rep.FalseGreens), nil
+	}
+	printReport(w, dir, rep, cfg.RequireDoc, syms)
+	return len(rep.Uncovered) + len(rep.FalseGreens), nil
+}
+
+func coverPctByName(syms []Symbol, imp string, coverByPath map[string]float64) map[string]float64 {
+	coverPct := map[string]float64{}
+	for _, s := range syms {
+		if s.Kind != KindFunc && s.Kind != KindMethod {
+			continue
+		}
+		key := imp + "/" + s.File + ":" + strconv.Itoa(s.Line)
+		if pct, ok := coverByPath[key]; ok {
+			coverPct[s.Name] = pct
+		}
+	}
+	return coverPct
 }
 
 // packageImportPath derives the import path of the package rooted at dir by
