@@ -35,6 +35,8 @@ import (
 
 const shipPkg = "github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 
+const manifestPkg = "github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
+
 // runGoTest shells `go test -run '^(<pattern>)$' -count=1 <pkg>` and reports
 // whether it exited cleanly plus the combined output. -count=1 defeats the test
 // cache so the predicate always exercises current source. A compile failure in
@@ -60,7 +62,7 @@ func runGoTest(t *testing.T, pkg, pattern string) (ok bool, out string) {
 // and BOTH sides of a quoted rename must all round-trip to the literal on-disk
 // path. Until they do, the token ship stages is a string no file bears.
 func TestC1108_001_PorcelainDecodesQuotedPaths(t *testing.T) {
-	ok, out := runGoTest(t, shipPkg, "TestPorcelainChangedPaths_QuotePathUnescapesNonASCII")
+	ok, out := runGoTest(t, manifestPkg, "TestPorcelainChangedPaths_QuotePathUnescapesNonASCII")
 	if !ok {
 		t.Errorf("porcelain classification still yields git's C-quoted escape text instead of the "+
 			"real path — a changed file whose name needs quoting matches no manifest entry and "+
@@ -75,7 +77,7 @@ func TestC1108_001_PorcelainDecodesQuotedPaths(t *testing.T) {
 // must decode byte-identically to today. This is the predicate that fails if
 // Builder "fixes" quoting by unescaping unconditionally.
 func TestC1108_002_AsciiClassificationUnchanged(t *testing.T) {
-	ok, out := runGoTest(t, shipPkg, "TestPorcelainChangedPaths_QuotePathAsciiUnchanged")
+	ok, out := runGoTest(t, manifestPkg, "TestPorcelainChangedPaths_QuotePathAsciiUnchanged")
 	if !ok {
 		t.Errorf("the unquote change altered ASCII path classification — mangling the overwhelmingly "+
 			"common case is a worse regression than the bug it fixes:\n%s", out)
@@ -133,9 +135,12 @@ func TestC1108_006_ShipStagingContractStillGreen(t *testing.T) {
 	if ok, out := runGoTest(t, shipPkg,
 		"TestShipDirect_CycleClass_.*|TestShipDirect_ManualClass_EmptyManifestFallsBackToChangedSet|"+
 			"TestShipDirect_NoWorkspacePath_StillStagesExplicitly|TestShipDirect_NonReleaseClasses_NeverAddAll|"+
-			"TestShipDirect_CheckIgnoreProbeFailure_FailsOpen|TestShipFromWorktree_.*|TestStagePathspec_.*|"+
-			"TestIsRepoRelative|TestExtractReportPaths_.*|TestStageExplicitPaths_AlreadyStagedDeletion"); !ok {
+			"TestShipDirect_CheckIgnoreProbeFailure_FailsOpen|TestShipFromWorktree_.*|"+
+			"TestStageExplicitPaths_AlreadyStagedDeletion"); !ok {
 		t.Errorf("the ship staging contract (explicit pathspec / repo-relative filter / ignored-path "+
 			"drop / staged-deletion handling) regressed:\n%s", out)
+	}
+	if ok, out := runGoTest(t, manifestPkg, "TestStagePathspec_.*|TestIsRepoRelative|TestExtractReportPaths_.*"); !ok {
+		t.Errorf("the ship path-selection contract (pathspec / repo-relative filter / report paths) regressed:\n%s", out)
 	}
 }

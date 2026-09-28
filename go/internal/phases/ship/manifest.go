@@ -3,17 +3,12 @@ package ship
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
 
 // manifest.go — ship-bind tree-manifest reconciliation (shadow + enforce).
@@ -32,7 +27,7 @@ import (
 //
 // BEFORE enabling enforce in production (the deferred policy.json→Options
 // wiring), prerequisites (2026-07-14 review):
-//   1. DONE (2026-07-14): pathToken (below) now also extracts bare root-level
+//   1. DONE (2026-07-14): shipmanifest's pathToken now also extracts bare root-level
 //      filenames (CHANGELOG.md, go.mod) via an extension allow-list, so a legit
 //      root-file change is no longer a FALSE-BLOCK under enforce.
 //   2. DONE (cycle-1064): the enforce branch carries the dedicated
@@ -59,326 +54,6 @@ var manifestReportFiles = []string{
 	phasecontract.ArtifactName(string(core.PhaseTDD)),
 }
 
-// bareRootFileExts is the extension allow-list for bare root-level filenames
-// (no '/'). Kept to the extensions the repo actually tracks at its root or that
-// a phase report legitimately names as a bare file.
-const bareRootFileExts = `go|mod|sum|md|json|ya?ml|txt|toml|lock|sh`
-
-// pathToken matches repo-relative path-like tokens: EITHER a slashed path, OR a
-// bare root-level filename carrying one of the known source/doc extensions
-// (bareRootFileExts). The slash form is loose on purpose; the bare form is
-// gated by an extension allow-list so prose tokens with an incidental dot
-// ("cfg.Now", version "1.0", "e.g.") do NOT match — the false-positive risk a
-// naive `\w+\.\w+` would create. Files with no extension (Makefile, LICENSE) or
-// a leading dot (.goreleaser.yml) are out of scope: extractReportPaths's
-// left-boundary check makes them a CLEAN non-match (not a truncation). Declare
-// such files via a slashed path or an explicit manifest entry if enforce needs.
-var pathToken = regexp.MustCompile(
-	`[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_.-]+)+` +
-		`|[A-Za-z0-9_][A-Za-z0-9_-]*\.(?:` + bareRootFileExts + `)\b`)
-
-// isPathContinuationByte reports whether b could be the interior of a path/word
-// token (word char, '.', '-', or '/'). Used as a manual left-boundary check:
-// RE2 has no lookbehind, so without it the bare-filename alternative would start
-// matching INSIDE a larger token — e.g. truncating ".goreleaser.yml" to a bogus
-// "goreleaser.yml" that can never cover the real dotfile path.
-func isPathContinuationByte(b byte) bool {
-	return b == '.' || b == '-' || b == '/' || b == '_' ||
-		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
-}
-
-// extractReportPaths pulls the repo-relative path tokens out of a phase
-// report's markdown (tables, backticks, JSON blocks all reduce to tokens).
-func extractReportPaths(md string) []string {
-	seen := map[string]bool{}
-	for _, loc := range pathToken.FindAllStringIndex(md, -1) {
-		start, end := loc[0], loc[1]
-		// Reject a match whose left edge sits inside a larger token (a legit path
-		// token begins at string start or just after a separator). This makes
-		// leading-dot files a CLEAN non-match rather than a silent truncation.
-		if start > 0 && isPathContinuationByte(md[start-1]) {
-			continue
-		}
-		// Trailing dots are sentence punctuation. Leading "./" is the explicit
-		// relative prefix ("$ ./go/bin/evolve selfcheck build" — the slice-B
-		// pre-flight line every build-report carries) and normalizes to the
-		// repo-relative path. A blind Trim(m, ".") here turned that token into
-		// the ABSOLUTE pathspec "/go/bin/evolve" → `git add` fatal rc=128
-		// ("Invalid path '/go'") → cycle-1098's audited-PASS work stranded.
-		m := strings.TrimRight(md[start:end], ".")
-		for strings.HasPrefix(m, "./") {
-			m = m[2:]
-		}
-		// A residual leading ".." is either a repo escape ("../x") or ellipsis
-		// punctuation glued to a token ("...x/y.go", "..foo/bar") — never a
-		// declarable repo path. Dropping beats the old blind Trim, which
-		// mangled these into plausible-but-wrong entries.
-		if strings.HasPrefix(m, "..") || !isRepoRelative(m) {
-			continue // absolute or repo-escaping — never a manifest entry
-		}
-		seen[m] = true
-	}
-	out := make([]string, 0, len(seen))
-	for p := range seen {
-		out = append(out, p)
-	}
-	sort.Strings(out)
-	return out
-}
-
-// declaredManifest is the union of paths named in the workspace's phase
-// reports. Empty when no report is readable — the caller must then skip
-// reconciliation (no manifest ≠ empty manifest).
-func declaredManifest(workspacePath string) []string {
-	seen := map[string]bool{}
-	fold := func(ws string) {
-		for _, f := range manifestReportFiles {
-			b, err := os.ReadFile(filepath.Join(ws, f))
-			if err != nil {
-				continue
-			}
-			for _, p := range extractReportPaths(string(b)) {
-				seen[p] = true
-			}
-		}
-	}
-	fold(workspacePath)
-	// ADR-0076 slice C: a continuation cycle re-exposes the PRIOR attempt's
-	// files at ship time, but this cycle's reports declare only what the
-	// resuming builder re-touched. The adoption seam copies the continuation
-	// manifest into this workspace; union the prior attempt's declarations
-	// (sibling run dir, keyed by its cycle) so enforce mode never fails closed
-	// on legitimately resumed work. One hop only — a re-FAILed continuation's
-	// next manifest points at the latest attempt, whose reports accumulate the
-	// same union at ITS ship.
-	if c, ok, _ := continuation.ReadManifest(workspacePath); ok && c.Cycle > 0 {
-		fold(filepath.Join(filepath.Dir(workspacePath), fmt.Sprintf("cycle-%d", c.Cycle)))
-	}
-	out := make([]string, 0, len(seen))
-	for p := range seen {
-		out = append(out, p)
-	}
-	sort.Strings(out)
-	return out
-}
-
-// isRepoRelative reports whether p can be handed to git as a repo-relative
-// pathspec. Absolute ("/go/evolve") and repo-escaping ("../x", including
-// interior escapes like "a/../../etc/x" — git: "is outside repository",
-// rc=128) entries are the cycle-1098 `git add` fatal class: git canonicalizes
-// them against the FILESYSTEM, not the repo root. The check runs on the
-// path.Clean'd form so interior ".." segments cannot smuggle an escape past a
-// prefix test. SSOT for the extraction filter (extractReportPaths) and the
-// staging seam (stagePathspec).
-func isRepoRelative(p string) bool {
-	if p == "" || strings.HasPrefix(p, "/") {
-		return false
-	}
-	c := path.Clean(p)
-	return c != "" && c != "." && !strings.HasPrefix(c, "/") &&
-		c != ".." && !strings.HasPrefix(c, "../")
-}
-
-// manifestCovers reports whether some manifest entry covers p — exactly, or as
-// a directory prefix. SSOT for the coverage predicate shared by the gate
-// (outOfManifest) and explicit staging (stagePathspec).
-func manifestCovers(manifest []string, p string) bool {
-	for _, m := range manifest {
-		if p == m || strings.HasPrefix(p, strings.TrimSuffix(m, "/")+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-// outOfManifest returns the changed paths not covered by the manifest, where
-// a manifest entry covers a changed path exactly or as a directory prefix.
-func outOfManifest(changed, manifest []string) []string {
-	var extras []string
-	for _, c := range changed {
-		if !manifestCovers(manifest, c) {
-			extras = append(extras, c)
-		}
-	}
-	sort.Strings(extras)
-	return extras
-}
-
-// unquoteGitPath decodes one C-quoted path token from git's output into the
-// literal on-disk path. SSOT for every reader that classifies paths out of git
-// output (porcelainChangedPaths here, dropIgnoredPaths' ignored set in
-// gitops.go) — the isRepoRelative/manifestCovers shared-helper pattern.
-//
-// git quotes a path (core.quotePath, default true) whenever it contains a
-// non-ASCII byte, a quote, a backslash, or a control char, escaping the payload
-// with the SAME grammar Go string literals use: `\\`, `\"`, `\t`/`\n`/`\r`/…,
-// and per-BYTE octal `\NNN` (`café.txt` → `"caf\303\251.txt"`, two escapes for
-// one rune). strconv.Unquote is therefore the exact decoder, not an
-// approximation. Cycle-1108: leaving it undecoded yielded the 15-byte literal
-// `caf\303\251.txt`, a path that exists on no disk — it matched no manifest
-// entry and staged nothing.
-//
-// Decoding is CONDITIONAL on the token being wrapped in quotes on both ends:
-// an unquoted token is a path git did not escape, so its backslashes are
-// literal (`not\quoted.txt`) and touching it would corrupt the common case. A
-// token that fails to decode is likewise returned verbatim — never dropped.
-func unquoteGitPath(tok string) string {
-	if len(tok) < 2 || tok[0] != '"' || tok[len(tok)-1] != '"' {
-		return tok
-	}
-	if p, err := strconv.Unquote(tok); err == nil {
-		return p
-	}
-	return tok
-}
-
-func splitPorcelainRename(path string) []string {
-	for i := 0; i < len(path); i++ {
-		if path[i] == '"' {
-			for i++; i < len(path); i++ {
-				if path[i] == '\\' {
-					i++
-					continue
-				}
-				if path[i] == '"' {
-					break
-				}
-			}
-			continue
-		}
-		if strings.HasPrefix(path[i:], " -> ") {
-			return []string{path[:i], path[i+4:]}
-		}
-	}
-	return []string{path}
-}
-
-// porcelainChangedPaths parses `git status --porcelain` output into the sorted
-// set of repo-relative paths it names. A rename entry ("R  old -> new") yields
-// BOTH sides, so an explicit staging pathspec records the deletion as well as
-// the addition. Quoted entries are decoded (unquoteGitPath) so a non-ASCII path
-// is classified as the file that exists on disk.
-func porcelainChangedPaths(out string) []string {
-	seen := map[string]bool{}
-	for _, line := range strings.Split(out, "\n") {
-		if len(line) <= 3 {
-			continue
-		}
-		for _, part := range splitPorcelainRename(line[3:]) {
-			if p := unquoteGitPath(strings.TrimSpace(part)); p != "" {
-				seen[p] = true
-			}
-		}
-	}
-	return sortedKeys(seen)
-}
-
-// stagedGonePaths returns the paths a `git add` pathspec must NOT name, because
-// they exist in neither the worktree nor the index under that name. Naming one
-// is fatal rc=128 ("did not match any files") and git fails the ENTIRE add, so
-// one such path fails the whole ship.
-//
-// Two porcelain shapes produce it, and they are spelled differently — which is
-// why this is a function and not a one-line prefix check:
-//
-//	"D  <path>"           a staged deletion, worktree side clean
-//	"R  <old> -> <new>"   a staged rename; <old> is gone, <new> is a real file
-//
-// Only the INDEX column (line[0]) decides. An unstaged deletion (" D") still
-// has an index entry for `add` to remove, so it stays in the pathspec. A copy
-// ("C  <src> -> <dst>") leaves <src> on disk, so it is not gone. "DD" is the
-// both-deleted MERGE CONFLICT state, where `git add <path>` is the resolution
-// and must not be filtered — hence the "D " prefix test rather than line[0]=='D'.
-//
-// The rename shape is the one that was missing, and it is not reachable from
-// the deletion shape: porcelain NEVER reports a staged move as "D  <old>" plus
-// "A  <new>", so a filter that knows only "D " misses every move. Inbox
-// reconciliation produces moves by construction — an item is rewritten with one
-// field appended and relocated to consumed/, which git scores as a rename — and
-// this had been carried as an operator gotcha ("ship-staging RENAME rc=128")
-// rather than fixed, failing every boundary ship that consumed a queue item.
-func stagedGonePaths(porcelain string) map[string]bool {
-	gone := map[string]bool{}
-	for _, line := range strings.Split(porcelain, "\n") {
-		if len(line) <= 3 {
-			continue
-		}
-		// unquoteGitPath: keys are compared against the DECODED paths
-		// stagePathspec produced, so a quoted entry must decode too.
-		switch {
-		case strings.HasPrefix(line, "D "):
-			gone[unquoteGitPath(strings.TrimSpace(line[3:]))] = true
-		case line[0] == 'R':
-			if parts := splitPorcelainRename(line[3:]); len(parts) == 2 {
-				gone[unquoteGitPath(strings.TrimSpace(parts[0]))] = true
-			}
-		}
-	}
-	return gone
-}
-
-// sortedKeys renders a path set as a sorted slice.
-func sortedKeys(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for p := range set {
-		out = append(out, p)
-	}
-	sort.Strings(out)
-	return out
-}
-
-// stagePathspec computes the explicit `git add -- <paths>` pathspec for a
-// non-release ship (cycle-1067, `ship-stage-explicit-paths`): the DECLARED
-// manifest, not `git add -A`, decides what a cycle/manual ship binds — so a
-// sibling lane's untracked leak (cycle-645) can no longer ride into the commit.
-//
-// The set is:
-//   - every declared entry that is a real file on disk (isFile) or that git
-//     reports as changed (so a DELETED declared path still stages its deletion);
-//   - plus every changed path the manifest covers by directory prefix (a new
-//     file under a declared directory is part of the declared change).
-//
-// Fallbacks — staging must never silently become a no-op, which would produce a
-// false clean exit / empty ship, and must never fall back to `-A`:
-//   - no manifest (no workspace, or no readable phase reports) → the full
-//     porcelain changed set;
-//   - a manifest that covers nothing that changed → likewise the changed set.
-func stagePathspec(manifest, changed []string, isFile func(string) bool) []string {
-	if len(manifest) == 0 {
-		return changed
-	}
-	changedSet := map[string]bool{}
-	for _, c := range changed {
-		changedSet[c] = true
-	}
-	staged := map[string]bool{}
-	for _, d := range manifest {
-		// Defense in depth vs extractReportPaths' own filter: a manifest entry
-		// from an older serialized source (a pre-fix continuation union) must
-		// still never reach git argv as an absolute/escaping pathspec — the
-		// isFile probe resolves such entries INSIDE root (filepath.Join swallows
-		// the leading slash), so it cannot be the guard.
-		if !isRepoRelative(d) {
-			continue
-		}
-		if changedSet[d] || isFile(d) {
-			staged[d] = true
-		}
-	}
-	// changed comes from `git status --porcelain` at the tree root — always
-	// repo-relative by construction (same trust the len==0 and empty-staged
-	// fallbacks below already place in it), so no isRepoRelative re-check.
-	for _, c := range changed {
-		if manifestCovers(manifest, c) {
-			staged[c] = true
-		}
-	}
-	if len(staged) == 0 {
-		return changed
-	}
-	return sortedKeys(staged)
-}
-
 // ManifestGateEnforce is the opts.ManifestGate value that switches the gate from
 // shadow (log-only) to fail-closed. Any other value (including "") is shadow.
 const ManifestGateEnforce = "enforce"
@@ -403,14 +78,14 @@ func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, workt
 	if opts.WorkspacePath == "" {
 		return nil
 	}
-	manifest := declaredManifest(opts.WorkspacePath)
+	manifest := shipmanifest.Declared(opts.WorkspacePath, manifestReportFiles)
 	if len(manifest) == 0 {
 		res.Logs = append(res.Logs, "[ship] manifest-gate: no readable phase reports in workspace — reconciliation skipped")
 		return nil
 	}
 	changedSet := map[string]bool{}
 	if out, err := captureGitOutputAtDir(ctx, opts, worktree, "status", "--porcelain", "-uall"); err == nil {
-		for _, p := range porcelainChangedPaths(out) {
+		for _, p := range shipmanifest.ChangedPaths(out) {
 			changedSet[p] = true
 		}
 	}
@@ -426,7 +101,7 @@ func reconcileManifest(ctx context.Context, opts *Options, res *RunResult, workt
 		changed = append(changed, p)
 	}
 	sort.Strings(changed)
-	extras := outOfManifest(changed, manifest)
+	extras := shipmanifest.OutOfManifest(changed, manifest)
 	if len(extras) == 0 {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] manifest-gate: OK — all %d bound path(s) covered by the declared build/TDD manifest", len(changed)))
 		return nil

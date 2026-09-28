@@ -26,7 +26,7 @@ func TruncateRunes(s string, max int) string { return textcap.TruncateRunes(s, m
 // the message capped at MaxSummaryRunes with the truncation marker (a
 // different rule from CapRunes' ellipsis — both preserved).
 func Summary(cycle int, phase cyclestate.Phase, err error) string {
-	msg := err.Error()
+	msg := cyclestate.WithoutDetail(err.Error())
 	r := []rune(msg)
 	if len(r) > MaxSummaryRunes {
 		msg = string(r[:MaxSummaryRunes]) + " ...[truncated]"

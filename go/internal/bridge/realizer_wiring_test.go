@@ -69,7 +69,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "claude-tmux",
 			binary: "claude",
 			marker: "❯",
-			want:   "claude --model sonnet --dangerously-skip-permissions --exclude-dynamic-system-prompt-sections --disable-slash-commands --setting-sources project --plugin-dir .evolve/plugin",
+			want:   "claude --model sonnet --dangerously-skip-permissions --append-system-prompt-file {identity} --exclude-dynamic-system-prompt-sections --disable-slash-commands --setting-sources project --plugin-dir .evolve/plugin",
 			absent: []string{"--no-session-persistence"},
 		},
 		{
@@ -125,8 +125,9 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			}
 
 			got := launchedCmd(tmux, tc.binary)
-			if got != tc.want {
-				t.Fatalf("launch cmd:\n got: %q\nwant: %q\nsentKeys=%v", got, tc.want, tmux.sentKeys)
+			want := strings.ReplaceAll(tc.want, "{identity}", shellQuotePOSIX(filepath.Join(ws, "pane-authority.md")))
+			if got != want {
+				t.Fatalf("launch cmd:\n got: %q\nwant: %q\nsentKeys=%v", got, want, tmux.sentKeys)
 			}
 			joined := strings.Join(tmux.sentKeys, " ")
 			for _, leak := range tc.absent {

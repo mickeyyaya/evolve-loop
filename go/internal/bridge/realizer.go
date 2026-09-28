@@ -72,15 +72,9 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	realizeScalar(&r, m, "permission", intent.Permission)
 	realizeScalar(&r, m, "settings_scope", intent.SettingsScope)
 	realizeScalar(&r, m, "effort", intent.Effort)
+	realizeSystemPromptFile(&r, m, intent.SystemPromptFile)
 
-	// session_mode → controller lifecycle (never a CLI flag for a REPL).
-	if spec, ok := m.Params["session_mode"]; ok && spec.Channel == "controller" && intent.SessionMode != "" {
-		if name, named := strings.CutPrefix(intent.SessionMode, "named:"); named {
-			r.SessionName = name
-		} else if intent.SessionMode == "ephemeral" {
-			r.Ephemeral = true
-		}
-	}
+	realizeSessionMode(&r, m, intent.SessionMode)
 
 	// allowed_tools → a multi-value flag: the flag once, then every tool
 	// (claude's `--allowedTools Read Write`).
@@ -106,6 +100,27 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	r.LaunchFlags = dedupeLaunchFlags(combinedFlags)
 	r.modelDispatchEffect = modelDispatchFromFinalizedFlags(m.CLI, trustedFlags, r.LaunchFlags)
 	return r
+}
+
+func realizeSessionMode(r *Realization, m Manifest, mode string) {
+	spec, ok := m.Params["session_mode"]
+	if !ok || spec.Channel != "controller" || mode == "" {
+		return
+	}
+	if name, named := strings.CutPrefix(mode, "named:"); named {
+		r.SessionName = name
+	} else if mode == "ephemeral" {
+		r.Ephemeral = true
+	}
+}
+
+func realizeSystemPromptFile(r *Realization, m Manifest, path string) {
+	spec, ok := m.Params["system_prompt_file"]
+	if !ok || spec.Channel != "flag" || spec.Flag == "" || path == "" {
+		return
+	}
+	r.LaunchFlags = append(r.LaunchFlags, spec.Flag, path)
+	r.SystemPromptFile = path
 }
 
 // dedupeLaunchFlags returns a copy of in with subsequent duplicate units
