@@ -230,6 +230,38 @@ func TestPublishPending_ClearsAPendingCopyTheCorpusAlreadyHoldsWithoutACommit(t 
 	}
 }
 
+func TestPublishPending_RefusesAPendingHalfThatIsNotARegularFile(t *testing.T) {
+	for _, name := range []string{"cycle-7.json", "cycle-7.md"} {
+		t.Run(name, func(t *testing.T) {
+			r := planeWithPendingDossier(t)
+			pending := filepath.Join(PendingDir(r.Dir), name)
+			elsewhere := filepath.Join(t.TempDir(), name)
+			if err := os.Rename(pending, elsewhere); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(elsewhere, pending); err != nil {
+				t.Fatal(err)
+			}
+			head := r.Git("rev-parse", "HEAD")
+
+			res, err := PublishPending(r.Dir, io.Discard)
+
+			if err != nil || len(res.Published) != 0 || res.Failed[7] == nil || !strings.Contains(res.Failed[7].Error(), "not a regular file") {
+				t.Fatalf("PublishPending = (%+v, %v), want the symlinked half refused", res, err)
+			}
+			if r.Git("rev-parse", "HEAD") != head {
+				t.Fatal("a refused pair moved HEAD")
+			}
+			if _, err := os.Stat(CyclesDir(r.Dir)); !os.IsNotExist(err) {
+				t.Fatalf("a refused pair reached the corpus: %v", err)
+			}
+			if _, err := os.Lstat(pending); err != nil {
+				t.Fatalf("a refused pair must stay pending: %v", err)
+			}
+		})
+	}
+}
+
 func corpusBytes(t *testing.T, root string) map[string]string {
 	t.Helper()
 	out := map[string]string{}

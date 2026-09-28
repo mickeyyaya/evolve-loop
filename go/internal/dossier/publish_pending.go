@@ -78,13 +78,13 @@ func pendingCycles(entries []fs.DirEntry) ([]int, map[int]bool) {
 func publishPair(projectRoot string, n int) error {
 	base := fmt.Sprintf("cycle-%d", n)
 	pending, corpus := PendingDir(projectRoot), CyclesDir(projectRoot)
-	jsonB, err := os.ReadFile(filepath.Join(pending, base+".json"))
+	jsonB, err := readPendingFile(filepath.Join(pending, base+".json"))
 	if err != nil {
-		return fmt.Errorf("dossier: read pending %s.json: %w", base, err)
+		return err
 	}
-	mdB, err := os.ReadFile(filepath.Join(pending, base+".md"))
+	mdB, err := readPendingFile(filepath.Join(pending, base+".md"))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("dossier: read pending %s.md: %w", base, err)
+		return err
 	}
 	if mdB, err = markdownWriteWouldRender(n, jsonB, mdB); err != nil {
 		return err
@@ -94,6 +94,21 @@ func publishPair(projectRoot string, n int) error {
 		return err
 	}
 	return commitIntoCorpus(projectRoot, corpus, base, jsonB, mdB)
+}
+
+func readPendingFile(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, fmt.Errorf("dossier: read pending %s: %w", filepath.Base(path), err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("dossier: pending %s is not a regular file (%s)", filepath.Base(path), info.Mode().Type())
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("dossier: read pending %s: %w", filepath.Base(path), err)
+	}
+	return b, nil
 }
 
 func corpusHoldsPair(corpus, base string, jsonB, mdB []byte) (bool, error) {
