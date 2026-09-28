@@ -8,21 +8,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// defect_ledger_schema_inline_test.go — RED contract for cycle-1403 Task 3
-// `disposition-parse-error-surfaced-inline` (scout-report.md Task 3).
-//
-// Today a rejected defect-dispositions.json yields the raw encoding/json error
-// ("cannot unmarshal number into Go struct field …") and nothing else. The
-// agent that must re-author the file on the next dispatch does not read Go, so
-// the diagnostic names the failure without naming the remedy. Task 3 makes the
-// rejection self-sufficient: the message carries the literal schema the file
-// was supposed to match.
-//
-// Both cases drive hooks{}.Classify, the production verdict seam.
-//
-// Adversarial diversity: positive (the unparseable branch gains the schema) and
-// negative (the MISSING branch is a DIFFERENT operator action — author the file
-// — and must not be relabelled as a parse failure by this change).
+// A rejected defect-dispositions.json must be self-sufficient: the raw
+// encoding/json error alone names the failure without naming the remedy, so
+// the diagnostic must also carry the literal schema the file was supposed to
+// match. Both cases below drive hooks{}.Classify, the production verdict
+// seam.
 
 // dispositionSchemaTokens are the field names the inline schema must carry. The
 // contract is on the field vocabulary, not on one exact punctuation of it: any

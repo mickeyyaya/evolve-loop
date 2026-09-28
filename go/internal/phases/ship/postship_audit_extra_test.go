@@ -1,7 +1,3 @@
-// postship_audit_extra_test.go — covers the promoteInbox promote path
-// (triage-decision.json present with IDs) and findLatestAudit edge cases
-// (missing ledger, alien/non-auditor lines) not hit by the existing no-op
-// and integration tests.
 package ship
 
 import (
@@ -46,7 +42,6 @@ func TestPromoteInbox_ProjectsDecisionFromReport(t *testing.T) {
 	if !containsLog(*res, "projected triage-decision.json for cycle 7") {
 		t.Errorf("expected projection log, got: %v", res.Logs)
 	}
-	// The projected companion must be persisted.
 	if _, err := readStateMap(filepath.Join(root, ".evolve", "runs", "cycle-7", "triage-decision.json")); err != nil {
 		t.Errorf("projected companion not written: %v", err)
 	}

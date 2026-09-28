@@ -1,17 +1,3 @@
-// native.go — entry point for the native Go ship implementation.
-//
-// This is the sole ship path — the Go replacement for the now-removed
-// legacy/scripts/lifecycle/ship.sh shell-out.
-//
-// The native Run() reproduces the full ship.sh state machine:
-//  1. arg parse (--class, --dry-run, commit message)
-//  2. self-SHA TOFU (verify.go)
-//  3. class-aware verification (audit.go for cycle, prompt for manual, skip for release/trivial)
-//  4. atomic ship: stage + commit + ff-merge (if worktree) + push + optional gh release (gitops.go)
-//  5. post-ship: lastCycleNumber bump, inbox lifecycle, post-cycle SHA repin
-//
-// The 23-case parity matrix in native_test.go pins behavior against the
-// bash ship-integration-test.sh suite.
 package ship
 
 import (
@@ -50,12 +36,8 @@ func (c Class) IsValid() bool {
 	return false
 }
 
-// ExitCode bins ship.sh exit semantics:
-//
-//	0  — shipped
-//	1  — runtime failure (bad args, missing binary, git fail)
-//	2  — integrity failure (audit binding, manual-confirm refused, SHA-pin tamper)
-//	127 — required binary missing (git, jq, sha256sum/shasum)
+// ExitCode bins ship.sh exit semantics (0 shipped, 1 runtime failure,
+// 2 integrity failure, 127 required binary missing).
 type ExitCode int
 
 const (
@@ -68,7 +50,6 @@ const (
 // Options captures every external knob ship.sh exposes. Tests construct
 // these directly; CLI builds them from flags/env.
 type Options struct {
-	// Class is the commit lifecycle (cycle/manual/release/trivial).
 	Class Class
 
 	// CommitMessage is the user-supplied commit body (footer appended later).
@@ -82,27 +63,21 @@ type Options struct {
 	BypassCommitGate bool
 	BypassPrefixGate bool
 	// PushOnly pushes an already-committed, provenance-verified ahead set and
-	// does nothing else — the sanctioned completion for a GIT_PUSH_REJECTED →
-	// sync-main strand (see pushonly.go). Mutually exclusive with new work:
-	// staged changes refuse.
+	// nothing else (pushonly.go); staged changes refuse.
 	PushOnly bool
 
 	// ProjectRoot is the writable side — where git lives, where .evolve/ writes go.
 	ProjectRoot string
 
-	// WorkspacePath is this run's per-cycle workspace (<ProjectRoot>/.evolve/runs/
-	// cycle-<N>/). When set, ship reads run-defining inputs (active_worktree,
-	// cycle_id) from <WorkspacePath>/run.json — the per-run mirror of
-	// cycle-state.json (CB.4) — instead of the host-global cycle-state.json, so a
-	// concurrent cycle can't make ship integrate the WRONG run (ADR-0049 S3 / gap
-	// G3). Empty (standalone `evolve ship`) → the global file. Set by the ship
-	// PhaseRunner from PhaseRequest.Workspace.
+	// WorkspacePath is this run's per-cycle workspace
+	// (<ProjectRoot>/.evolve/runs/cycle-<N>/); empty means a standalone
+	// `evolve ship` uses the global cycle-state.json.
+	// See ADR-0049.
 	WorkspacePath string
 
-	// Cycle explanation identity is copied from the host-owned PhaseRequest by
-	// the Phase adapter. Direct CLI calls leave these zero and the native gate
-	// resolves them from host-global cycle-state.json. They must never be
-	// populated from the Builder-writable workspace/run.json mirror.
+	// Cycle explanation identity comes from the host-owned PhaseRequest, never
+	// the Builder-writable workspace/run.json mirror; direct CLI calls leave it
+	// zero and the native gate resolves it from cycle-state.json.
 	CycleID                         int
 	AuditRound                      int
 	ActiveWorktree                  string
@@ -111,20 +86,16 @@ type Options struct {
 	BuildExplanation                *phaseio.ExplanationView
 	RequireBuildExplanationHandoff  bool
 
-	// ManifestGate is the ship-hygiene gate mode for the worktree ship path.
-	// "" (default) = SHADOW: log out-of-manifest paths, never block — behavior-
-	// preserving. "enforce" = FAIL-CLOSED: refuse to commit any path no phase
-	// report (build-report/test-report) declared; under a fleet these are
-	// typically a sibling lane's untracked leak (cycle-645) whose commit reddens
-	// main. Config-sourced (policy.json), never a code literal — the
-	// policy→Options wiring is a follow-up; today only tests set enforce.
+	// ManifestGate is the ship-hygiene gate mode for the worktree ship path:
+	// "" (default) is SHADOW (log out-of-manifest paths, never block);
+	// "enforce" is FAIL-CLOSED (refuse to commit any path no phase report
+	// declared). Config-sourced (policy.json); today only tests set enforce.
 	ManifestGate string
 
-	// RunID is this run's event-sourced identity (CA.5). When set, the
-	// audit→ship binding lookup (findLatestAudit) prefers the auditor ledger
-	// entry stamped with THIS RunID over a concurrent run's later entry
-	// (ADR-0049 S4 / gap G5). Empty (standalone / legacy) → latest auditor
-	// entry, as before. Set by the ship PhaseRunner from PhaseRequest.RunID.
+	// RunID is this run's event-sourced identity. When set, the audit→ship
+	// binding lookup (findLatestAudit) prefers the ledger entry stamped with
+	// THIS RunID over a concurrent run's later entry.
+	// See ADR-0049.
 	RunID string
 
 	// PluginRoot is the read-only side — where .claude-plugin/plugin.json lives.
@@ -144,8 +115,9 @@ type Options struct {
 	Env map[string]string
 
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
-	// parse (ADR-0050 §3.10 Slice 6). At >= StageEnforce parseVerdicts is
-	// sentinel-first; the zero value (StageOff) keeps the prose parse — byte-identical.
+	// parse. At >= StageEnforce parseVerdicts is sentinel-first; StageOff (the
+	// zero value) keeps the prose parse.
+	// See ADR-0050.
 	PhaseIO config.Stage
 
 	// Stdin/Stdout/Stderr default to the real streams when nil.
@@ -160,41 +132,17 @@ type Options struct {
 	// inject a fake; production wiring uses execRunner.
 	Runner CmdRunner
 
-	// internalAuditBoundTreeSHA is a WRITE-ONCE audit witness: audit.go is
-	// the SOLE authorized writer (it sets the field after parsing
-	// audit-report.md / the ledger binding entry — see audit.go:124-127).
-	// gitops.go READS it to enforce both the pre-commit tree-SHA binding
-	// check (gitops.go:407-409) and the post-push integrity guard
-	// (gitops.go:493-497), and to stamp the ship-binding.json sidecar
-	// (gitops.go:528). Do NOT reassign it anywhere else — a post-audit
-	// rebind (e.g. to a post-merge tree) silently disarms both guards and
-	// corrupts the forensic sidecar (cycle-583, rejected). This invariant
-	// is mechanically pinned by TestInternalAuditBoundTreeSHA_OnlyAssignedInAuditGo
-	// (audit_bound_witness_test.go), which turns RED on any second assignment
-	// site in this package. Not part of the public API.
 	internalAuditBoundTreeSHA string
 	internalAuditArtifactSHA  string
 
-	// internalConsumedPaths is the exact set of repo-relative paths the ship's
-	// OWN in-commit inbox consumption staged (consume.go — the one mutation
-	// the ship performs by design AFTER the audit bound the tree). The two
-	// tree-drift integrity checks accept a bound-vs-actual mismatch IFF the
-	// tree delta is a subset of these paths (cycle-1506: consumption made
-	// every PASS ship of an inbox-claimed item refuse at the pre-commit
-	// check). Written ONLY by consumeCommittedItems; any other writer
-	// re-opens a smuggling channel through the drift tolerance.
 	internalConsumedPaths []string
 
-	// repairAttempted is the repair ladder's once-per-code-per-Run guard
-	// (repair.go). Lazily initialized by attemptRepair and by the push step's
-	// projection (pushWithRepair, gitops_landing.go) when its repair ran.
+	// repairAttempted is the repair ladder's once-per-code-per-Run guard.
 	repairAttempted map[core.ShipErrorCode]bool
 
-	// shipLock is the test seam for the ADR-0049 S5 integrator lock
-	// (gap G1): the BLOCKING flock acquired around the shared-main
-	// integration critical section (collider scan → ff-merge → push →
-	// post-push verify) in shipFromWorktree. nil → flock.Lock on
-	// <ProjectRoot>/.evolve/ship.lock. Signature mirrors flock.Lock.
+	// shipLock is the test seam for the integrator lock; nil defaults to
+	// flock.Lock on <ProjectRoot>/.evolve/ship.lock. Signature mirrors
+	// flock.Lock.
 	shipLock func(path string) (release func(), err error)
 
 	// Signals is the root's Signal Center the landing's ship.warning events
@@ -204,8 +152,7 @@ type Options struct {
 	// Null Object — the warnings are dropped, never a panic.
 	Signals *signalcenter.Center
 
-	// land is the unit-07 landing, lazily built and cached on this Options
-	// value by landing() (gitops_landing.go) — one wired construction per Run.
+	// land is the landing, lazily built and cached by landing() (gitops_landing.go).
 	land *landing.Landing
 }
 
@@ -223,34 +170,26 @@ type RunResult struct {
 	CommitSHA  string
 	ClassUsed  Class
 	Provenance string
-	Logs       []string // human-readable [ship] log lines
-	DryRunPath string   // non-empty when DryRun=1 and journal was written
+	Logs       []string
+	DryRunPath string // non-empty when DryRun=1 and journal was written
 
-	// RepairAttempted/RepairOutcome surface the repair ladder (ADR-0039 §8):
-	// the ShipError code a typed repair was attempted for, and its outcome
-	// (e.g. "repinned-verified-rebuild", "resume-pushed", "push-retried",
-	// "colliders-healed:…", "needs-reaudit", "declined"). Empty when no
-	// repair fired. When multiple repairs fire in one Run (e.g. a healed
-	// stale pin followed by a push retry) this records the LAST attempt —
-	// the full per-attempt trail lives in Logs and the ShipError Debug map.
-	// Mirrored as ship.repair_* signals by the PhaseRunner.
+	// RepairAttempted/RepairOutcome surface the repair ladder: the ShipError
+	// code a typed repair was attempted for, and its outcome (e.g.
+	// "repinned-verified-rebuild", "resume-pushed", "push-retried",
+	// "colliders-healed:…", "needs-reaudit", "declined"); empty when no
+	// repair fired. Multiple repairs in one Run record only the LAST
+	// attempt — the full trail lives in Logs and the ShipError Debug map.
+	// See ADR-0039.
 	RepairAttempted string
 	RepairOutcome   string
 }
 
-// Run executes the ship lifecycle end-to-end. Caller-supplied opts drive
-// behavior; missing fields are resolved from env/defaults.
-//
-// This is the public entry point for both the cmd_ship.go CLI surface
-// and the PhaseRunner dispatcher in ship.go.
-//
-// On success: ExitCode=0, CommitSHA populated for non-dry-run cycle/manual/release classes.
-// On integrity failure: ExitCode=2 with structured Logs explaining the refusal.
-// On runtime failure: ExitCode=1 with the underlying err returned.
+// Run executes the ship lifecycle end-to-end; missing Options fields are
+// resolved from env/defaults.
 func Run(ctx context.Context, opts Options) (RunResult, error) {
 	res := RunResult{ClassUsed: opts.Class}
 
-	// 0. Validate inputs. Push-only commits nothing, so it carries no message.
+	// Push-only commits nothing, so it carries no message.
 	if opts.CommitMessage == "" && !opts.PushOnly {
 		return res, shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
 			"ship: commit message required")
@@ -265,7 +204,6 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 			"ship: ProjectRoot required")
 	}
 
-	// Defaults.
 	if opts.Stdin == nil {
 		opts.Stdin = os.Stdin
 	}
@@ -295,24 +233,21 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		), "verify-explanation-documentation")
 	}
 
-	// 1. Self-SHA TOFU verification. Writes state.json on first-run /
-	// version-bump / legacy migration. INTEGRITY-FAILs on same-version
-	// SHA mismatch. The repair ladder (ADR-0039 §8) may heal a stale pin
-	// (verified rebuild of committed source) and re-run the check once.
+	// Self-SHA TOFU verification; the repair ladder may heal a stale pin and
+	// retry once.
 	if _, err := runStageWithRepair(ctx, &opts, &res, func() error {
 		return verifySelfSHA(ctx, &opts, &res)
 	}); err != nil {
 		return finalize(ctx, &opts, &res, err, "verify-self-sha")
 	}
 
-	// 1.2 Push-only recovery: after self-SHA integrity, before any class
-	// machinery — there is no new work to verify, only an attested strand to
-	// complete (pushonly.go owns the provenance refusals).
+	// Push-only recovery runs after self-SHA integrity but before class
+	// machinery: there is no new work to verify, only an attested strand to
+	// complete (pushonly.go).
 	if opts.PushOnly {
 		return finalize(ctx, &opts, &res, runPushOnly(ctx, &opts, &res), "push-only")
 	}
 
-	// 1.5 Check post-push idempotency.
 	if opts.Class == ClassCycle {
 		commitSHA, idempotent, err := checkPostPushIdempotency(ctx, &opts)
 		if err == nil && idempotent {
@@ -325,11 +260,8 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		}
 	}
 
-	// 2. Class-aware pre-flight (audit-binding, kernel checks, or interactive
-	// confirm). The repair ladder may COMPLETE the ship here: an
-	// AUDIT_BINDING_HEAD_MOVED whose HEAD already carries the audit-bound
-	// tree (the cycle-246 merged-but-unpushed death) closes with a push-only
-	// resume — in that case the mutate stage below is skipped.
+	// Class-aware pre-flight; a HEAD-already-bound AUDIT_BINDING_HEAD_MOVED may
+	// complete the ship via a push-only resume, skipping the mutate stage below.
 	resumed, err := runStageWithRepair(ctx, &opts, &res, func() error {
 		return verifyClass(ctx, &opts, &res)
 	})
@@ -343,8 +275,8 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 	}
 	res.Logs = append(res.Logs, "[ship] provenance: "+res.Provenance)
 
-	// 3. Atomic ship (commit + push + optional gh release). A collider
-	// repair (quarantine/remove) re-runs this stage exactly once.
+	// Atomic ship (commit + push + optional gh release); a collider repair
+	// re-runs this stage exactly once.
 	if !resumed {
 		if _, err := runStageWithRepair(ctx, &opts, &res, func() error {
 			return atomicShip(ctx, &opts, &res)
@@ -353,7 +285,6 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 		}
 	}
 
-	// 4. Post-ship hooks (lastCycleNumber, inbox lifecycle, post-cycle repin).
 	if err := postShip(ctx, &opts, &res); err != nil {
 		// Post-ship errors are non-fatal: the commit is already on remote.
 		res.Logs = append(res.Logs, "[ship] WARN: post-ship hook error: "+err.Error())
@@ -369,16 +300,8 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 // dry-run journal if applicable. Returns the result + a (possibly nil)
 // error suitable for the caller.
 func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exitReason string) (RunResult, error) {
-	// Durable per-commit ship provenance (pushonly.go): every MINTED commit is
-	// journaled — on the success path AND on a failure after the commit (a
-	// rejected push). The journal records that a sanctioned ship minted the
-	// commit, not that its push succeeded: the GIT_PUSH_REJECTED strand is the
-	// very case `evolve ship --push-only` completes, and it refused lane 1678's
-	// commit by name (2026-09-14) because the journal was written only on
-	// success. Push-only itself is exempt (review MEDIUM): it mints nothing,
-	// and journaling its HEAD would record commits this plane never shipped
-	// (e.g. a console-merged commit after a nothing-to-push clean exit) into
-	// the very trust anchor future pushes consult.
+	// Every MINTED commit is journaled, on success or after a rejected push
+	// (pushonly.go); push-only itself mints nothing so it is exempt.
 	if res.CommitSHA != "" && !opts.DryRun && !opts.PushOnly {
 		appendShipJournal(opts.ProjectRoot, res.CommitSHA, opts.Class)
 	}
@@ -387,10 +310,6 @@ func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exi
 		writeDryRunJournal(ctx, opts, res, exitReason)
 		return *res, err
 	}
-	// The exit code is keyed off the structured error's Class, not the Go
-	// type: Class=integrity → ExitIntegrity; every other class (and any plain
-	// error) → ExitFailure. The orchestrator does the richer routing off the
-	// recovered ShipError (Code/Class/Stage/Debug).
 	if se, ok := core.AsShipError(err); ok && se.Class == core.ShipClassIntegrity {
 		res.ExitCode = ExitIntegrity
 		res.Logs = append(res.Logs, "[ship] INTEGRITY-FAIL: "+err.Error())
@@ -402,8 +321,6 @@ func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exi
 	return *res, err
 }
 
-// envBool reads an env var from Opts.Env (with os.Getenv fallback) and
-// reports whether it equals "1".
 func (o *Options) envBool(key string) bool {
 	if v, ok := o.Env[key]; ok {
 		return v == "1"
@@ -411,7 +328,6 @@ func (o *Options) envBool(key string) bool {
 	return os.Getenv(key) == "1"
 }
 
-// envStr reads an env var from Opts.Env (with os.Getenv fallback).
 func (o *Options) envStr(key string) string {
 	if v, ok := o.Env[key]; ok {
 		return v

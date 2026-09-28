@@ -10,24 +10,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// defect_ledger_adversarial_test.go — the cycle-1282 audit's PoCs promoted from
-// a throwaway `-overlay` into the tree. That audit's finding was not that the
-// code was sloppy; it was that every committed suite was green because none of
-// them constructed adversarial input. These do. They are regression locks: each
-// FAILED on the pre-fix tree and names the defect it pins.
-
 // passingReport is the narrative-PASS artifact shape used by every case here.
 func passingReport() string {
 	return "# Audit Report\n\n## Verdict\n**PASS**\n\n" +
 		`<!-- evolve-verdict: {"phase":"audit","verdict":"PASS","schema_version":1} -->` + "\n"
 }
 
-// TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition — cycle-1282 DEF-1
-// (CRITICAL). The graded phase agent may write inside `.evolve/runs/cycle-N/`,
-// so reading disposition state out of THIS cycle's own ledger let one file
-// write close three inherited CRITICALs with no disposition artifact at all —
-// and, because the merge keyed on ID alone, substitute the planted row's TEXT
-// for the inherited defect's under the real id.
+// TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition — the graded
+// phase agent may write inside `.evolve/runs/cycle-N/`, so reading
+// disposition state out of THIS cycle's own ledger would let one file write
+// close inherited CRITICALs with no disposition artifact at all, and, since
+// the merge keys on ID alone, substitute the planted row's TEXT for the
+// inherited defect's under the real id.
 func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	planted := []any{}
@@ -62,10 +56,10 @@ func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
 	}
 }
 
-// TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect — cycle-1282 DEF-2
-// (HIGH). evidenceResolves only os.Stat'd the citation under either root, with
-// a raw-absolute branch, so `/etc/hosts` and the attacker's own disposition
-// file each closed a CRITICAL. Existence is necessary, not sufficient.
+// TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect — evidenceResolves
+// must do more than os.Stat the citation under either root: existence alone
+// would let `/etc/hosts` or the attacker's own disposition file close a
+// CRITICAL. Existence is necessary, not sufficient.
 func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -77,11 +71,10 @@ func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 		{"the continuation manifest", "continuation-manifest.json", false},
 		{"the ledger the gate itself writes", ledgerFile, false},
 		{"traversal out of the roots", "../../../../../../etc/hosts", false},
-		// The three bookkeeping names PLANTED in the tree (unit-09 review, test
-		// 49's sibling): the bare-name rows above never reach rule 4 — the
-		// workspace is outside the root, so rule 3 already rejects them — and
-		// a denylist row could vanish unnoticed. A real file at each name is
-		// rejected ONLY by rule 4.
+		// The three bookkeeping names PLANTED in the tree: the bare-name rows
+		// above never reach rule 4 — the workspace is outside the root, so
+		// rule 3 already rejects them — and a denylist row could vanish
+		// unnoticed. A real file at each name is rejected ONLY by rule 4.
 		{"a planted continuation manifest in the tree", "docs/" + continuation.ManifestName, true},
 		{"a planted disposition file in the tree", "docs/" + dispositionFile + ":3", true},
 		{"a planted ledger in the tree", "docs/" + ledgerFile, true},
@@ -108,10 +101,10 @@ func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 	}
 }
 
-// TestAdversarial_ShadowedIDIsLoudAndBlocking — cycle-1282 DEF-3 (MEDIUM). A
-// 4-byte defectID is ~2^32 from a chosen second preimage, and the merge index
-// resolved a duplicated id to the LAST row, shadowing the inherited entry. The
-// id is now 16 bytes, the FIRST row wins the index, and a text mismatch on an
+// TestAdversarial_ShadowedIDIsLoudAndBlocking — a 4-byte defectID is ~2^32
+// from a chosen second preimage, and a merge index that resolves a
+// duplicated id to the LAST row would shadow the inherited entry. The id is
+// 16 bytes, the FIRST row wins the index, and a text mismatch on an
 // inherited id blocks instead of silently rewriting the record.
 func TestAdversarial_ShadowedIDIsLoudAndBlocking(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
@@ -139,9 +132,9 @@ func TestAdversarial_ShadowedIDIsLoudAndBlocking(t *testing.T) {
 	}
 }
 
-// TestDefectID_IsWideEnoughToResistASecondPreimage — DEF-3's width half. 4 bytes
-// is brute-forceable over agent-chosen defect text, while the comment claimed
-// "two different defects never share one".
+// TestDefectID_IsWideEnoughToResistASecondPreimage — 4 bytes is
+// brute-forceable over agent-chosen defect text, so the id must be wide
+// enough that two different defects cannot share one.
 func TestDefectID_IsWideEnoughToResistASecondPreimage(t *testing.T) {
 	id := defectID("some defect text")
 	if len(id) != 33 { // "d" + 16 bytes hex
@@ -152,9 +145,9 @@ func TestDefectID_IsWideEnoughToResistASecondPreimage(t *testing.T) {
 	}
 }
 
-// TestEmitDefectLedger_CapsUnboundedDefects — cycle-1282 DEF-6 (LOW). The
-// verdict sentinel is agent-authored; neither the defect count nor the per-line
-// length was bounded. The cap must RECORD the overflow, never erase it.
+// TestEmitDefectLedger_CapsUnboundedDefects — the verdict sentinel is
+// agent-authored, so neither the defect count nor the per-line length can be
+// trusted to stay bounded. The cap must RECORD the overflow, never erase it.
 func TestEmitDefectLedger_CapsUnboundedDefects(t *testing.T) {
 	ws := t.TempDir()
 	defects := make([]string, defectLedgerMaxEntries+20)

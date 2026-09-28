@@ -8,30 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// defect_ledger_evidence_shape_test.go — RED contract for cycle-1403 Task 1
-// `disposition-evidence-tolerant-unmarshal` (scout-report.md Task 1).
-//
-// The live failure. Cycle-1399's auditor wrote a defect-dispositions.json whose
-// `evidence` was a JSON ARRAY of citations. `defectDispositionDoc.Evidence` is
-// typed `string` (defect_ledger.go:89), so encoding/json rejected the whole
-// document — `json: cannot unmarshal array into Go struct field
-// .dispositions.evidence of type string` — and readDispositions blocked the
-// cycle on "unparseable". The auditor had done the work and cited it; the gate
-// could not read the claim. #419 (`fdc9c3e3`) tolerated a *decorated* cite
-// string and is orthogonal: it never touches the JSON type.
-//
 // Contract shape. Every case reaches its subject through the REAL production
 // seam, hooks{}.Classify — the audit verdict path — never readDispositions
 // directly: a decoder that parses an array while the gate still blocks would be
 // a fix nobody can use.
-//
-// NOTE TO BUILDER — join-and-forget is NOT a fix. scout-report Task 1 suggested
-// joining array elements with "; ". A joined "a.go:1; b.go:2" is not a path, so
-// evidenceResolves (defect_ledger.go:267) rejects it and the cycle blocks
-// anyway — the operator-visible behaviour would be unchanged. AC2 below is
-// stated at the verdict, not at the decoder, precisely so a cosmetic join
-// cannot satisfy it: an array of RESOLVABLE cites must produce PASS. Whether
-// you resolve each element or teach evidenceResolves to split is your call.
 //
 // Adversarial diversity (skills/adversarial-testing §6):
 //   - regression  — the string shape that works today must keep working.
@@ -41,12 +21,12 @@ import (
 //   - edge        — an empty array on a FIXED claim is "no evidence", still a
 //     block.
 //   - negative    — a shape that is neither string nor array (an object) must
-//     still be rejected outright; no silent degrade to "" (cycle-1285 F2).
+//     still be rejected outright; no silent degrade to "".
 
 // evidenceUnparseableMarker is the substring readDispositions uses for the
-// blocking parse-failure diagnostic (defect_ledger.go:667-670). Several cases
-// below assert its ABSENCE: after the fix, an array-shaped file is a file the
-// gate read, whatever it then decides about the claim.
+// blocking parse-failure diagnostic. Several cases below assert its ABSENCE:
+// after the fix, an array-shaped file is a file the gate read, whatever it
+// then decides about the claim.
 const evidenceUnparseableMarker = "is unparseable"
 
 // oneDefect is the inherited-defect text used by every case here. One defect
@@ -74,11 +54,11 @@ func TestClassify_DispositionEvidenceStringShapeAccepted(t *testing.T) {
 	}
 }
 
-// TestClassify_DispositionEvidenceArrayShapeAccepted — AC2, THE CRUX, and the
-// exact cycle-1399 reproduction. `evidence` is a JSON array of two citations,
-// both resolving to real files. The gate must read the file (no "unparseable")
-// and honour the closure (PASS). RED today: encoding/json refuses the document
-// before any resolution logic runs.
+// TestClassify_DispositionEvidenceArrayShapeAccepted — AC2, THE CRUX.
+// `evidence` is a JSON array of two citations, both resolving to real files.
+// The gate must read the file (no "unparseable") and honour the closure
+// (PASS). RED today: encoding/json refuses the document before any
+// resolution logic runs.
 func TestClassify_DispositionEvidenceArrayShapeAccepted(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite1 := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
@@ -153,8 +133,7 @@ func TestClassify_DispositionEvidenceEmptyArrayOnFixedStillBlocks(t *testing.T) 
 // TestClassify_DispositionEvidenceObjectShapeStillBlocks — NEGATIVE. Neither
 // string nor array-of-strings: an object. This must keep hitting the
 // unparseable path and BLOCK. Silently degrading an unrecognised shape to ""
-// is the cycle-1285 F2 posture violation ("degrading open there would hand the
-// gate its cheapest bypass", defect_ledger.go:653-655).
+// would hand the gate its cheapest bypass.
 func TestClassify_DispositionEvidenceObjectShapeStillBlocks(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{

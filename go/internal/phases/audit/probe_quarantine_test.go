@@ -1,21 +1,5 @@
 package audit
 
-// probe_quarantine_test.go — the observer must not perturb the observed
-// system. The adversarial auditor legitimately writes probe tests to try to
-// refute the build (cycles 1115/1117: TestZZAudit_QuoteSpillSuppressed,
-// TestZZAuditProbe_BulletBannerSuppressed) — but it wrote them INTO the
-// package under test, so the EGPS run inherited the probes' engineered
-// failures as if the BUILDER had regressed a sibling: auditor-graded PASS
-// alongside a red gate, a false cycle FAIL. The probes were then discarded
-// with the worktree, leaving the finding unrecoverable.
-//
-// quarantineAuditProbes runs after the auditor agent and before acssuite.Run:
-// untracked *_test.go files created SINCE the audit agent was dispatched
-// (mtime after the audit-prompt artifact — builder files predate it) are
-// PRESERVED into the run dir and REMOVED from the tree, loudly. The safe
-// probe idiom remains `go test -overlay` (cycle-1106's PoCA/PoCB), which
-// never touches the tree at all.
-
 import (
 	"bytes"
 	"os"
@@ -60,9 +44,6 @@ func probeRepo(t *testing.T) (worktree, workspace string, cutoff time.Time) {
 	return worktree, workspace, cutoff
 }
 
-// TestQuarantineAuditProbes_PreservesAndExcludesAuditAuthoredTests pins all
-// three obligations at once: the probe leaves the tree, lands in the run dir,
-// and the action is loudly logged.
 func TestQuarantineAuditProbes_PreservesAndExcludesAuditAuthoredTests(t *testing.T) {
 	worktree, workspace, cutoff := probeRepo(t)
 	var log bytes.Buffer
@@ -99,8 +80,6 @@ func TestQuarantineAuditProbes_LeavesBuilderWorkAlone(t *testing.T) {
 	}
 }
 
-// TestQuarantineAuditProbes_NoProbesIsANoOp (negative): the common case must
-// touch nothing and log nothing.
 func TestQuarantineAuditProbes_NoProbesIsANoOp(t *testing.T) {
 	worktree, workspace, _ := probeRepo(t)
 	var log bytes.Buffer
@@ -136,8 +115,8 @@ func TestQuarantineAuditProbes_CommittedFilesNeverTouched(t *testing.T) {
 	}
 }
 
-// TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined (review M9): a
-// preserved continuation worktree's pre-loop `git add -A` stages a prior
+// TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined: a preserved
+// continuation worktree's pre-loop `git add -A` stages a prior
 // attempt's probe, so it arrives as `A `-status, not `??`. Staged-NEW is
 // still new — it must quarantine like an untracked probe.
 func TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined(t *testing.T) {
@@ -196,12 +175,12 @@ func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
 	}
 }
 
-// TestQuarantineProbesForRequest_AnchorSurvivesRedispatch (diff-review HIGH):
-// bridge.Engine.Launch rewrites audit-prompt.txt on EVERY dispatch, so a
-// re-dispatched audit gets a NEWER anchor than a dead first attempt's leftover
-// probe — mtime-vs-latest-prompt would classify the probe as builder work and
-// leave it to poison the gate (the 1115/1117 shape, reopened). The anchor must
-// be the FIRST dispatch of the cycle, persisted across attempts.
+// TestQuarantineProbesForRequest_AnchorSurvivesRedispatch: bridge.Engine.Launch
+// rewrites audit-prompt.txt on EVERY dispatch, so a re-dispatched audit gets a
+// NEWER anchor than a dead first attempt's leftover probe — mtime-vs-latest-
+// prompt would classify the probe as builder work and leave it to poison the
+// gate. The anchor must be the FIRST dispatch of the cycle, persisted across
+// attempts.
 func TestQuarantineProbesForRequest_AnchorSurvivesRedispatch(t *testing.T) {
 	worktree, workspace, _ := probeRepo(t)
 	workspace = filepath.Join(workspace, "runs", "cycle-9999")

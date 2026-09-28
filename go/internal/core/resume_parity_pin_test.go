@@ -6,18 +6,10 @@ import (
 	"testing"
 )
 
-// resume_parity_pin_test.go pins the post-dispatch recording parity this slice
-// restores, in the same shape the package already uses for resume-parity
-// invariants (see TestAuditRepairBrief_SeededOnBothDispatchSurfaces).
-//
-// Scope note, because it is the whole reason this is a pin and not a sweep:
-// only exits AFTER a phase has been dispatched have an outcome to record. The
-// loop's pre-dispatch failures — transition resolution, Build-context sealing,
-// the cycle-state write, the boundary checkpoint — legitimately return bare,
-// since no phase ran and inventing an outcome for one would be a false record.
-// An earlier version of this test walked every `return result, err` in the
-// loop and flagged all eight; four of those were pre-dispatch and the check
-// was a false-RED gate. Scope matters more than coverage here.
+// This test pins post-dispatch recording only: a pre-dispatch failure
+// (transition resolution, Build-context sealing, the cycle-state write, the
+// boundary checkpoint) legitimately returns bare, since no phase ran and
+// inventing an outcome for one would be a false record.
 func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 	body, err := os.ReadFile("resume_execution.go")
 	if err != nil {
@@ -26,9 +18,8 @@ func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 	src := string(body)
 
 	// Each entry names a post-dispatch terminal exit and the text that proves
-	// it records before returning. The refresh-error exit is the one this
-	// slice added; the other three are its siblings, pinned so a future edit
-	// cannot quietly drop one back to a bare return.
+	// it records before returning, pinned so a future edit cannot quietly
+	// drop one back to a bare return.
 	for _, pin := range []struct{ what, evidence string }{
 		{"the non-canonical-verdict exit", `phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt)`},
 		{"the deliverable-review exit", `phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt)`},
@@ -39,13 +30,11 @@ func TestResumePostDispatchExits_RecordTheirOutcome(t *testing.T) {
 		}
 	}
 
-	// The post-Build refresh exit needs a POSITIONAL check, not a substring.
-	// Its record uses `phaseErr.Error()` — the same spelling as the
-	// dispatch-error exit above it — so a substring pin passes on that
-	// sibling's call and cannot fail when this one regresses. The first
-	// version of this pin did exactly that: it was decorative for the one fix
-	// it was written to guard. Assert the record sits BETWEEN this exit's own
-	// wrapper and its return instead.
+	// The post-Build refresh exit needs a positional check, not a substring:
+	// its record uses phaseErr.Error(), the same spelling as the
+	// dispatch-error exit above it, so a substring pin would pass on that
+	// sibling's call and never catch a regression here. Assert the record
+	// sits between this exit's own wrapper and its return instead.
 	wrapper := strings.Index(src, `"resume refresh Build explanation after %s: %w"`)
 	if wrapper < 0 {
 		t.Fatal("the post-Build refresh exit no longer exists in the form this pin tracks — re-derive the pin rather than deleting it")

@@ -180,8 +180,6 @@ func TestResumeLifecycle_QuotaExhaustionDefersWithoutTerminalDossier(t *testing.
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("quota pause not typed as resumable: %+v %v", result, err)
 	}
-	// ADR-0101 S2a: the resume root reaches the same quota.paused producer
-	// (pauseForQuota), and a pause never seals the cycle.
 	if paused := eventsOfKind(*got, signalcenter.KindQuotaPaused); len(paused) != 1 || paused[0].Phase != "audit" || paused[0].Origin != "cycleRun.pauseForQuota" {
 		t.Fatalf("the resume root emits exactly one quota.paused for the paused phase: %+v", paused)
 	}

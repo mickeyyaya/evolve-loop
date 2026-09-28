@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 const (
@@ -64,17 +65,11 @@ func newCommittedLane(t *testing.T, lanePath string, lane, peer laneEdit) *shipp
 func newLane(t *testing.T, lanePath string, lane, peer laneEdit, consumes bool) *shippedLane {
 	t.Helper()
 	root := t.TempDir()
-	fx := &shippedLane{t: t, root: root, worktree: filepath.Join(root, "worktree"), workspace: filepath.Join(root, ".evolve", "runs", "cycle-42")}
-	for _, dir := range []string{fx.worktree, fx.workspace} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
+	fx := &shippedLane{t: t, root: root, worktree: gittest.Fixture(t).Dir, workspace: filepath.Join(root, ".evolve", "runs", "cycle-42")}
+	if err := os.MkdirAll(fx.workspace, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	fx.git("init", "-q")
-	fx.git("config", "user.email", "t@example.com")
-	fx.git("config", "user.name", "test")
 	fx.git("config", "commit.gpgsign", "false")
-	fx.git("checkout", "-q", "-b", "main")
 	fx.write("base.txt", "base\n")
 	fx.write("shared.txt", sharedText(0, ""))
 	fx.write(inboxItem, itemBody)

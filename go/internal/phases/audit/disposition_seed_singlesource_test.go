@@ -1,15 +1,13 @@
 package audit
 
-// disposition_seed_singlesource_test.go — pins core's disposition-skeleton
-// preseed against THIS package's gate (ADR-0084 I2: writer and reader of a
-// machine-graded artifact bind against each other). core cannot import audit,
-// so its seeder re-reads the ledger wire shape; this test feeds one real
-// document through both sides and proves:
-//  1. same OPEN id set: every OPEN ancestor entry gets exactly one seeded row;
-//  2. honest gate semantics on an UNTOUCHED skeleton: the preflight sees the
-//     file as present and covering (never MISSING/INCOMPLETE), while the
-//     per-id reconcile still blocks every seeded id by name — a seed the
-//     auditor ignores can never launder a defect.
+// This test pins core's disposition-skeleton preseed against this package's
+// gate: the writer and reader of a machine-graded artifact must bind against
+// each other. core cannot import audit, so its seeder re-reads the ledger
+// wire shape; this test feeds one real document through both sides and
+// proves the OPEN id set matches and an untouched skeleton still blocks
+// every seeded id by name — a seed the auditor ignores can never launder a
+// defect.
+// See ADR-0084.
 
 import (
 	"os"

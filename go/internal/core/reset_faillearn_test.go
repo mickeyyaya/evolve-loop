@@ -1,14 +1,5 @@
 package core
 
-// reset_faillearn_test.go — failure-floor Phase 2 (inbox
-// retro-always-invariant, gap 2 / cycle-244 reproduction): `evolve cycle
-// reset` must LEARN, not just archive. The seal writes a deterministic
-// retrospective into the sealed archive dir, a failure-lesson YAML into
-// instincts/lessons/, and appends an operator-reset failedApproaches
-// entry — with the failedApproaches append ordered BEFORE the seal's own
-// final state.json write (which stays the canonical last writer of
-// lastCycleNumber / currentBatch / lastUpdated).
-
 import (
 	"context"
 	"os"
@@ -62,9 +53,6 @@ func TestSealCycle_AppendsOperatorResetFailedApproach(t *testing.T) {
 		t.Fatalf("SealCycle: %v", err)
 	}
 
-	// Ordering pin (load-bearing): the failedApproaches entry must be
-	// visible in the FINAL state.json — i.e. failurelog.Record ran before
-	// the seal's own read-modify-write, which stays the last writer.
 	sm := readJSONMap(t, filepath.Join(ev, "state.json"))
 	fa, _ := sm["failedApproaches"].([]any)
 	if len(fa) != 1 {
@@ -77,7 +65,6 @@ func TestSealCycle_AppendsOperatorResetFailedApproach(t *testing.T) {
 	if got := strFromAny(entry["summary"]); !strings.Contains(got, "scout") {
 		t.Errorf("summary = %q, want the sealed phase mentioned", got)
 	}
-	// The seal's own writes must still win on its keys.
 	if got := intFromAny(sm["lastCycleNumber"]); got != 108 {
 		t.Errorf("lastCycleNumber = %d, want 108", got)
 	}

@@ -12,30 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 )
 
-// defect_ledger_prescription_test.go — RED contract for cycle-1327's
-// `audit-warn-prescription-gate` (batch-integrity-review-2026-08-04.md F3,
-// weight 0.91).
-//
-// Reuse, not a parallel mechanism: emitDefectLedger already fires on WARN
-// (audit.go:395) and reconcileAgainstAncestor is already generic over "an OPEN
-// entry with an id and text" (defect_ledger.go:322-367). This file pins the
-// ONE missing step — emitDefectLedger must also source
-// Failure.Prescription — plus proves the existing reconcile/evidence gates
-// apply unmodified to a prescription-sourced entry, and that an ordinary,
-// prescription-less WARN is byte-for-byte unchanged (the regression guard
-// against widening the ledger trigger into every narrative WARN).
-//
-// Prescription-sourced text carries a "PRESCRIPTION: " prefix (scout report
-// Hypothesis 2) so an operator reading defect-ledger.json can distinguish "what
-// was wrong" (a defect) from "a foreseen risk's named fix" (a prescription)
-// without a second ledger or a schema-breaking Kind field.
-
 const prescriptionTagPrefix = carryover.PrescriptionPrefix // the unit's vocabulary, the consumer pin
 
 // warnReportWithPrescription renders an audit-report.md whose evolve-verdict
-// sentinel is WARN, carries the given prescription strings and zero defects —
-// the exact cycle-1258 shape (a foreseen risk, not a defect) that
-// emitDefectLedger currently drops on the floor.
+// sentinel is WARN, carrying the given prescription strings and zero defects
+// (a foreseen risk, not a defect).
 func warnReportWithPrescription(prescriptions ...string) string {
 	p, _ := json.Marshal(prescriptions)
 	return "# Audit Report\n\n## Verdict\n**WARN**\n\n" +

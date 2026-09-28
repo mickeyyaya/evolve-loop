@@ -665,3 +665,5 @@
 ./internal/sizeratchet
 # rawgitratchet — ratchet refusing new raw git fixtures in tests outside internal/gittest; baseline.json may only shrink.
 ./internal/rawgitratchet
+# testmainexit — finds TestMain functions whose deferred cleanup os.Exit skips (a leaked temp dir per run).
+./internal/testmainexit

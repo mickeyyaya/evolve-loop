@@ -1,12 +1,5 @@
 package audit
 
-// secondary_artifacts_test.go — pins the arming condition of the audit
-// SecondaryArtifacts hook (Phase B; adversarial-review HIGH: an untested
-// conditional lets a degenerate implementation — inverted stat check or an
-// unconditional return — pass the suite while either holding EVERY ordinary
-// audit to its artifact timeout or silently regressing the 1397-1429
-// continuation cutoff).
-
 import (
 	"os"
 	"path/filepath"

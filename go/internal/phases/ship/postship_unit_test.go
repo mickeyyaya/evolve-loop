@@ -1,15 +1,3 @@
-// postship_unit_test.go — behavioral tests for the post-ship side-effects
-// in postship.go that the integration matrix under-exercises:
-//
-//   - advanceLastCycleNumber (postship.go) — gap #5: the
-//     state.json:lastCycleNumber ↔ cycle-state.json:cycle_id invariant.
-//     The load-bearing contract is FIELD PRESERVATION: advancing the
-//     counter must not drop sibling state.json fields (the bash impl uses
-//     `jq '. + {k:v}'`, which merges; a Go regression to a typed struct
-//     would silently drop unknown keys → state drift).
-//   - repinPostCycle (postship.go) — TOFU self-update when the shipped
-//     commit changed the ship binary itself.
-//   - promoteInbox (postship.go) — inbox lifecycle skip paths.
 package ship
 
 import (
@@ -20,10 +8,7 @@ import (
 	"testing"
 )
 
-// --- advanceLastCycleNumber (gap #5) -------------------------------------
-
-// TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings is the gap-#5
-// invariant. Given a state.json with several pre-existing fields and a
+// Given a state.json with several pre-existing fields and a
 // cycle-state.json:cycle_id, advancing the counter must (a) set
 // lastCycleNumber = cycle_id and (b) leave EVERY other field intact.
 func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
@@ -52,7 +37,6 @@ func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
 	if n, _ := stateInt(got, "lastCycleNumber"); n != 8 {
 		t.Errorf("lastCycleNumber = %d, want 8", n)
 	}
-	// Field-preservation invariant — the whole point of gap #5.
 	if stateString(got, "expected_ship_sha") != "deadbeef" {
 		t.Errorf("expected_ship_sha dropped during counter advance: %v", got["expected_ship_sha"])
 	}
@@ -82,8 +66,6 @@ func TestAdvanceLastCycleNumber_NoCycleIDIsNoop(t *testing.T) {
 	}
 }
 
-// --- repinPostCycle ------------------------------------------------------
-
 // TestRepinPostCycle_NoopWhenSHAMatches: when the binary's current SHA
 // already equals state.json:expected_ship_sha, repin is a no-op.
 func TestRepinPostCycle_NoopWhenSHAMatches(t *testing.T) {
@@ -105,7 +87,6 @@ func TestRepinPostCycle_NoopWhenSHAMatches(t *testing.T) {
 	if err := repinPostCycle(opts, res); err != nil {
 		t.Fatalf("repinPostCycle: %v", err)
 	}
-	// No TOFU log line when nothing changed.
 	for _, l := range res.Logs {
 		if strings.Contains(l, "TOFU") {
 			t.Errorf("unexpected TOFU repin log when SHA matched: %q", l)
@@ -146,8 +127,6 @@ func TestRepinPostCycle_RepinsOnSHAChange(t *testing.T) {
 	}
 }
 
-// --- promoteInbox --------------------------------------------------------
-
 // TestPromoteInbox_NoCycleIDIsNoop: without cycle_id, promote returns nil
 // silently (no triage lookup attempted).
 func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
@@ -161,8 +140,7 @@ func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
 
 // TestPromoteInbox_NoTriageDecisionStillDrains: cycle_id present but no
 // triage-decision.json ⇒ promote-to-processed is skipped (logged) but the
-// residual drain STILL runs (no early-return strand). Corrected from the
-// pre-fix behavior where a missing companion skipped everything.
+// residual drain STILL runs (no early-return strand).
 func TestPromoteInbox_NoTriageDecisionStillDrains(t *testing.T) {
 	root := t.TempDir()
 	mustWriteState(t, filepath.Join(root, ".evolve", "cycle-state.json"), map[string]any{"cycle_id": float64(8)})
@@ -177,8 +155,6 @@ func TestPromoteInbox_NoTriageDecisionStillDrains(t *testing.T) {
 		t.Errorf("residual drain must still run when triage-decision.json is absent; got %v", res.Logs)
 	}
 }
-
-// --- helpers -------------------------------------------------------------
 
 func mustWriteState(t *testing.T, path string, m map[string]any) {
 	t.Helper()

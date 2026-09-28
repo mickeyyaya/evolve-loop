@@ -1,9 +1,5 @@
 package core
 
-// retry_adjudicator_agent_test.go — the parse contract. Every malformed shape must
-// yield nil, because nil means "use the policy default" and that is the property
-// keeping this agent an enhancement rather than a precondition.
-
 import (
 	"os"
 	"path/filepath"
@@ -53,8 +49,6 @@ func TestParseAdjudication(t *testing.T) {
 	}
 }
 
-// stdout is preferred, but the artifact on disk is the fallback — the agent may
-// write its answer to the contracted path rather than echoing it.
 func TestParseAdjudication_FallsBackToTheArtifact(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "failure-adjudication.json")
@@ -69,8 +63,6 @@ func TestParseAdjudication_FallsBackToTheArtifact(t *testing.T) {
 	}
 }
 
-// A nil bridge must be a no-op, not a panic: the composition root may wire this
-// adjudicator before a bridge exists.
 func TestBridgeRetryAdjudicator_NilBridgeIsANoOp(t *testing.T) {
 	a := NewBridgeRetryAdjudicator(nil, AgentIdentity{}, t.TempDir())
 
@@ -79,15 +71,8 @@ func TestBridgeRetryAdjudicator_NilBridgeIsANoOp(t *testing.T) {
 	}
 }
 
-// The persona/profile/artifact TRIPLE must agree. Getting this wrong is the drift
-// class this whole redesign kept uncovering — a gate looking for `failure-lesson*`
-// while the persona wrote `inst-L*`, a config knob reaching no composition root —
-// and it caught me here too: the profile was first named `failure-adjudication`
-// against a persona named `failure-adjudicator`, which the repo's pairing guard
-// correctly reported would die exit=10 at launch.
-//
-// Only the profile PATH is checkable from this package; the persona↔profile pairing
-// itself is enforced by phasecoherence.TestRepoPersonaProfilePairing.
+// Only the profile path is checkable from this package; the persona↔profile
+// pairing itself is enforced by phasecoherence.TestRepoPersonaProfilePairing.
 func TestAdjudicatorProfilePathMatchesTheShippedProfile(t *testing.T) {
 	root := repoRootForTest(t)
 	a := &bridgeRetryAdjudicator{root: root}
@@ -98,12 +83,8 @@ func TestAdjudicatorProfilePathMatchesTheShippedProfile(t *testing.T) {
 	}
 }
 
-// WithRetryAdjudicator must reach the field, and the production adjudicator must
-// satisfy the RetryAdjudicator interface. Both are exported surface, so both need
-// a named test — the apicover Phase-5 gate enforces that, and it has caught an
-// unwired export in this subsystem before.
 func TestWithRetryAdjudicator(t *testing.T) {
-	var _ RetryAdjudicator = (*bridgeRetryAdjudicator)(nil) // compile-time contract
+	var _ RetryAdjudicator = (*bridgeRetryAdjudicator)(nil)
 	want := NewBridgeRetryAdjudicator(nil, AgentIdentity{}, "")
 
 	o := NewOrchestrator(nil, nil, nil, WithRetryAdjudicator(want))
@@ -111,16 +92,11 @@ func TestWithRetryAdjudicator(t *testing.T) {
 	if o.retryAdjudicator == nil {
 		t.Fatal("WithRetryAdjudicator did not reach the field; the adjudicator would never be consulted")
 	}
-	// And the zero-option default must be nil — policy alone decides until an
-	// adjudicator is explicitly injected.
 	if plain := NewOrchestrator(nil, nil, nil); plain.retryAdjudicator != nil {
 		t.Error("an un-optioned orchestrator must have no adjudicator; judgment is opt-in")
 	}
 }
 
-// The reason lastBalancedSpan is used instead of a naive first-'{'/last-'}' slice:
-// an artifact carrying reasoning prose plus the answer, or any stray trailing
-// brace, must still yield the FINAL object rather than discarding a valid answer.
 func TestParseAdjudication_RecoversTheLastObjectAmongSeveral(t *testing.T) {
 	raw := `{"note":"my first draft, ignore"}` + "\n" +
 		`Some reasoning about the failure. Consider {this} aside.` + "\n" +

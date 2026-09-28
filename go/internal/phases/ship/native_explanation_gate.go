@@ -56,18 +56,16 @@ func verifyNativeExplanation(ctx context.Context, opts *Options) error {
 		ContractVersion: version,
 	}
 	// The activation belt lives in explanationdocs (single home; audit runs
-	// the same check — architecture review 2026-09-01). Inactive means the
-	// host AGREES this is a legacy cycle; a ship that still demands the
-	// handoff keeps its refusal.
+	// the same check). Inactive means the host agrees this is a legacy
+	// cycle; a ship that still demands the handoff keeps its refusal.
 	hostActive, err := explanationdocs.CrossCheckActivation(binding)
 	if err != nil {
 		return err
 	}
 	if !hostActive {
-		// Genuine legacy — the host agrees. A Require=true refusal here would
-		// be dead code: ship.go derives RequireBuildExplanationHandoff from
-		// version != 0, and the belt already refused every inactive+version!=0
-		// identity (2026-09-01 re-review wiring proof).
+		// A Require=true refusal here would be dead code: ship.go derives
+		// RequireBuildExplanationHandoff from version != 0, and the belt
+		// already refused every inactive+version!=0 identity.
 		return nil
 	}
 	var verified *phaseio.ExplanationView

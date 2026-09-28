@@ -11,37 +11,15 @@ import (
 // directive injected into the phase re-dispatch (## Correction prompt block).
 func composeCorrection(reason, remediation string) string {
 	head := "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" + reason
-	// Gate-authored remedy: the rejecting gate is the only component that knows
-	// what "fixed" looks like for its own violation, so when it says, we relay it
-	// verbatim instead of guessing. Critically this branch does NOT emit "Do not
-	// change unrelated files" — a remediation exists precisely for violations
-	// whose remedy is to CREATE an artifact the deliverable itself is not, and
-	// that clause forbade the fix (Gate A recovered 0 of 4 times in production).
-	// The no-collateral intent is preserved, scoped to the remedy.
 	if remediation != "" {
 		return head + "\n\n" + remediation +
 			"\n\nThen finish. Change nothing else beyond what this remedy requires."
 	}
-	// Default: the artifact exists at the contracted path but is malformed. This
-	// is the class the wording was written for and is byte-identical to before
-	// remediation existed.
 	return head +
 		"\n\nFix the deliverable so it satisfies the contract — write it at the EXACT contracted path " +
 		"with all required sections / valid structure — then finish. Do not change unrelated files."
 }
 
-// backoffSleep is the sleep seam for executeRetryBackoff. Production uses the
-// real time.Sleep; the core test suite swaps in a no-op (see TestMain) so the
-// ~13 retry/transient/backfill/timeout tests don't each sleep the multi-second
-// backoff for real — the single highest-leverage knob for core-suite latency
-// (~254s → ~8s). Set once before any test runs, so concurrent reads by parallel
-// tests are safe.
-//
-// Why a package var and not an Orchestrator field (the `now` convention)?
-// executeRetryBackoff is a free function, and — decisively — only TestMain can
-// zero a package var for the WHOLE suite. A per-instance field would force every
-// retry test (and every future one) to inject a no-op at construction, which is
-// the exact per-test churn this seam removes.
 var backoffSleep = time.Sleep
 
 func executeRetryBackoff(attempt, base int) {
@@ -93,12 +71,6 @@ func bridgeExitCode(err error) int {
 	return 0
 }
 
-// maxRecoveryDepth bounds advisor-driven ship-error recovery per cycle
-// (Component #5/#7). Ship is a pure executor: a structured ShipError is
-// resolved by routing to a recovery phase (re-audit / retry-ship / debugger),
-// not by aborting. This caps ship→recover→ship so a persistent blocker cannot
-// loop forever; on exhaustion the orchestrator aborts loud with the accumulated
-// ShipError. A safety invariant, not a flag (the outer safety<32 loop backstops).
 const maxRecoveryDepth = 2
 
 // phaseTimingEntry records per-phase latency + outcome for phase-timing.json.

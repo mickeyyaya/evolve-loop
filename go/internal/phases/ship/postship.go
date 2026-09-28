@@ -1,7 +1,3 @@
-// postship.go — post-ship hooks: lastCycleNumber advance, inbox
-// lifecycle promote, post-cycle self-update SHA repin.
-//
-// Mirrors ship.sh sections 7-9 trailing logic (lines 843-958).
 package ship
 
 import (
@@ -64,8 +60,8 @@ func retireCommittedCarryover(opts *Options, res *RunResult, cid int, committedI
 		return
 	}
 	var retiredCount int
-	// Same shared lock every other state.json RMW takes (ADR-0049 S2 / G2), so
-	// a concurrent allocator write can neither lose nor be lost to this one.
+	// Same shared lock every other state.json RMW takes (ADR-0049), so a
+	// concurrent allocator write can neither lose nor be lost to this one.
 	if err := withStateLock(stPath, func() error {
 		stMap, err := readStateMap(stPath)
 		if err != nil {
@@ -108,14 +104,8 @@ func retireCommittedCarryover(opts *Options, res *RunResult, cid int, committedI
 
 // advanceLastCycleNumber reads cycle-state.json:cycle_id and writes it
 // into state.json:lastCycleNumber atomically. Only fires for class=cycle.
-//
-// This is the v8.34.0 fix for stuck-counter: pre-v8.34, only failure
-// paths wrote lastCycleNumber, so successful ships left the counter at
-// the previous cycle → dispatcher's next iteration computed
-// ran_cycle = last_before + 1 = the SAME cycle just shipped → 5-repeat
-// circuit-breaker fired prematurely on legitimate runs.
 func advanceLastCycleNumber(opts *Options, res *RunResult) error {
-	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
+	csPath := opts.cycleStateFile() // run-scoped (cycle_id); see ADR-0049.
 	stPath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
 	csMap, err := readStateMap(csPath)
 	if err != nil {
@@ -126,10 +116,10 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 		// No cycle_id → nothing to advance. Bash silently skips.
 		return nil
 	}
-	// ADR-0049 S2 / G2: serialize the state.json RMW under the shared lock so
-	// it can't lose (or be lost to) a concurrent allocator/UpdateState write.
-	// Preserve the pre-lock contract: a READ error propagates (fail ship);
-	// only a write/lock error is the non-fatal WARN.
+	// Serialize the state.json RMW under the shared lock so it can't lose (or
+	// be lost to) a concurrent allocator/UpdateState write; a READ error
+	// propagates (fail ship), only a write/lock error is the non-fatal WARN.
+	// See ADR-0049.
 	var readErr error
 	lockErr := withStateLock(stPath, func() error {
 		stMap, err := readStateMap(stPath)
@@ -151,13 +141,11 @@ func advanceLastCycleNumber(opts *Options, res *RunResult) error {
 	return nil
 }
 
-// promoteInbox calls the inboxmover Go library directly (v11.8.1+; prior
-// versions shelled out to legacy/scripts/lifecycle/inbox-mover.sh). Moves
-// shipped inbox tasks to processed/. Best-effort: failures log WARN and
-// don't block ship (Layer 1 idempotency catches residual in next cycle's
-// Triage).
+// promoteInbox calls the inboxmover Go library directly. Moves shipped
+// inbox tasks to processed/. Best-effort: failures log WARN and don't
+// block ship (Layer 1 idempotency catches residual in next cycle's Triage).
 func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
-	csPath := opts.cycleStateFile() // ADR-0049 S3 / G3: run-scoped (cycle_id)
+	csPath := opts.cycleStateFile() // run-scoped (cycle_id); see ADR-0049.
 	csMap, err := readStateMap(csPath)
 	if err != nil {
 		return err
@@ -171,11 +159,11 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		Stderr:      opts.Stderr,
 	}
 
-	// Promote top_n[] + skip_shipped[] to processed/. The companion the agent is
-	// instructed to emit is in practice almost never written (cycles 308/316/
-	// 320-322 all missing it), so triageDecisionBytes DETERMINISTICALLY PROJECTS
-	// it from triage-report.md when absent — single source, guaranteed present
-	// (triage-decision-json-not-emitted; ADR-0047 single-source-with-projection).
+	// Promote top_n[] + skip_shipped[] to processed/. The companion the agent
+	// is instructed to emit is in practice almost never written, so
+	// triageDecisionBytes deterministically projects it from triage-report.md
+	// when absent — single source, guaranteed present.
+	// See ADR-0047.
 	cycleDir := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid))
 	body, logLine := triageDecisionBytes(cycleDir, cid)
 	res.Logs = append(res.Logs, logLine)
@@ -188,45 +176,28 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	// seam below. Empty when the landing gate refuses promotion, so the seam
 	// degrades to a pure residual drain.
 	var committedIDs []string
-	// PASS half of the stable-failure-identity rule (PR #439 closed the FAIL
-	// half): continuation/lane cycles carry NO triage decision, so a PASS ship
-	// promoted nothing and a full bookkeeping cycle was later spent moving one
-	// JSON file. File-ABSENT only — a present decision that committed zero ids
-	// keeps the declined menu unpromoted.
+	// File-ABSENT only: continuation/lane cycles carry NO triage decision, and
+	// a present decision that committed zero ids keeps the declined menu
+	// unpromoted.
 	var laneFallbackIDs []string
 	if body == nil {
 		if laneFallbackIDs = cycleoutcome.LaneScopeIDs(cycleDir); len(laneFallbackIDs) > 0 {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: no triage decision for cycle %d — committed set from lane-scope pin: %v", cid, laneFallbackIDs))
 		}
 	}
-	// Consumption rides the landing (consumption-rides-landing-ship): the ids the
-	// Builder line-anchored as closed by THIS diff. Before this, consuming an item
-	// was a separate act from the ship that closed it, so forgetting was always
-	// possible — #453 landed schema-aligned-salvage-layer with its item left open
-	// and wave cycle-1448 re-picked already-shipped work as live scope. The marker
-	// is additive to the triage/lane sources and rides the SAME landing gate
-	// below; an absent build-report.md (build-skipped cycles) reads as no claim,
-	// never an error.
+	// Consumption rides the landing: the ids the Builder line-anchored as
+	// closed by THIS diff. The marker is additive to the triage/lane sources
+	// and rides the SAME landing gate below; an absent build-report.md
+	// (build-skipped cycles) reads as no claim, never an error.
 	markerIDs := inboxmover.ClosesInboxIDs(readBuildReport(cycleDir))
 	if len(markerIDs) > 0 {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: build-report Closes-Inbox marker for cycle %d: %v", cid, markerIDs))
 	}
 	if body != nil || len(laneFallbackIDs) > 0 || len(markerIDs) > 0 {
-		// Landing gate (cycle-598 regression, inbox-promotion-requires-landed-ship):
-		// promote to processed/ ONLY when the ship commit actually reached durable
-		// history (ancestor of HEAD or origin/<branch>). Cycle 598's push was
-		// rejected (origin diverged), the recovery reclassified to needs-reaudit,
-		// yet promoteInbox promoted the item anyway because its only gate was
-		// "triage-decision.json present". The landing check is the single source of
-		// truth, independent of any verdict/outcome label. An unlanded commit leaves
-		// items in processing/ — the residual drain below releases them for the next
-		// cycle's triage to re-scan, so nothing is silently lost.
-		//
-		// Fail-open when res.CommitSHA is empty: the gate catches a commit that
-		// EXISTS but failed to reach durable history (the cycle-598 shape). An
-		// absent SHA is a different, pre-existing state (no commit recorded) with
-		// no signal to gate on — promoting it preserves the cycle-308 residual-drain
-		// contract rather than newly stranding correctly-shipped work.
+		// The landing check (isLanded) is the single source of truth for
+		// promotion, independent of any verdict/outcome label; an absent
+		// res.CommitSHA fails open (no commit recorded, not evidence of an
+		// unlanded push). See this package's design notes.
 		if res.CommitSHA != "" && !isLanded(ctx, opts, res.CommitSHA) {
 			unlandedShip = true
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
@@ -236,12 +207,11 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 			// in-commit consumption so the two resolutions cannot drift apart.
 			committedIDs = committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS")
 			// Reconcile superseded[] — inbox items whose work shipped under a
-			// DIFFERENT id (cycle 544 shipped as recover-ship-fleet-starvation-
-			// observer, stranding loop-self-prioritize-unmet-fleet-concurrency).
-			// extractIDs only walks top_n/skip_shipped, so these orphans were never
-			// retired; ReconcileSuperseded retires them by id alone. Best-effort.
-			// Gated by the same landing check — an unlanded commit must not retire a
-			// superseded id either (scout Beyond-the-Ask Hypothesis 2).
+			// DIFFERENT id than the one tracked. extractIDs only walks
+			// top_n/skip_shipped, so these orphans are never otherwise
+			// retired; ReconcileSuperseded retires them by id alone.
+			// Best-effort. Gated by the same landing check — an unlanded
+			// commit must not retire a superseded id either.
 			if retired, rErr := inboxmover.ReconcileSuperseded(mvOpts, inboxmover.SupersededInboxIDs(body), "processed", inboxmover.PromoteOpts{
 				Cycle:     fmt.Sprintf("%d", cid),
 				CommitSHA: commitShort,
@@ -261,27 +231,23 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 
 	// ALWAYS drain residual claims: every item still in processing/cycle-<cid>/
 	// is released back to the inbox root so the next cycle's triage re-scans it
-	// (Step 0a reads only inbox/ root, maxdepth 1). This MUST run even when
-	// triage-decision.json is absent — the early-return that used to skip it
-	// stranded EVERY claimed item invisibly (inbox-promote-on-ship-missing;
-	// orphans across cycles 124/265/294/295/308).
+	// (Step 0a reads only inbox/ root, maxdepth 1). This runs even when
+	// triage-decision.json is absent.
 	//
 	// When the landing gate above refused promotion (unlanded ship commit),
 	// the drain is a delivery-failure retry, not an ordinary residual drain —
 	// the ledger reason carries "unlanded" so triage/operators can tell them
-	// apart without hand forensics (cycle-598, inbox-promotion-requires-
-	// landed-ship). A landed cycle's residuals keep the generic reason.
+	// apart without hand forensics. A landed cycle's residuals keep the
+	// generic reason.
 	releaseReason := ""
 	if unlandedShip {
 		releaseReason = "cycle-release-unlanded-ship-retry"
 	}
-	// ONE lifecycle seam (menu-pass-promotes-committed-ids): promoting the
-	// committed ids and draining the residual claims are the two halves of a
-	// single PASS transition, so they go through ApplyCycleOutcome together
-	// rather than as an ad-hoc promote loop plus a separate release call. A
-	// menu that ships N items in one commit now promotes exactly those N ids in
-	// code — cycle-1147 shipped 3 and promoted 0 because the promote was prose
-	// the agent never executed.
+	// ONE lifecycle seam: promoting the committed ids and draining the
+	// residual claims are the two halves of a single PASS transition, so they
+	// go through ApplyCycleOutcome together rather than as an ad-hoc promote
+	// loop plus a separate release call — a menu that ships N items in one
+	// commit promotes exactly those N ids in code, not in agent-authored prose.
 	if or, outcomeErr := inboxmover.ApplyCycleOutcome(mvOpts, inboxmover.CycleOutcome{
 		Cycle:        cid,
 		Passed:       true,
@@ -290,9 +256,8 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		Reason:       releaseReason,
 	}); outcomeErr != nil {
 		// The "drain complete" line is a SUCCESS claim and stays inside the
-		// success branch: emitting it unconditionally after a WARN told
-		// operators (and every log-grepping gate) that the lifecycle drain
-		// completed on a run where part of it demonstrably did not.
+		// success branch: emitting it after a WARN would tell operators (and
+		// every log-grepping gate) the drain completed when part of it did not.
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox outcome apply for cycle %d: %v", cid, outcomeErr))
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox lifecycle drain INCOMPLETE for cycle %d — items may remain in processing/ for re-triage", cid))
 	} else {
@@ -311,8 +276,7 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 // history — an ancestor of local HEAD, or of origin/<branch>. Reuses the
 // existing isAncestor helper (repair.go, git merge-base --is-ancestor) rather
 // than duplicating an ancestry probe. An empty sha is never landed (nothing to
-// verify). See promoteInbox's landing gate for the cycle-598 regression this
-// guards against.
+// verify).
 func isLanded(ctx context.Context, opts *Options, sha string) bool {
 	if strings.TrimSpace(sha) == "" {
 		return false
@@ -402,44 +366,23 @@ func extractIDs(body []byte) []string {
 }
 
 // committedInboxIDs is the SINGLE resolver for "which inbox ids did this cycle
-// close". Both consumption sites use it: the in-commit consumption
-// (consume.go, so the retirement rides the landing) and the post-ship promotion
-// below. They diverged for eight cycles — consume.go read triage top_n alone
-// while this file already resolved three sources — and that asymmetry is why a
-// carryover-driven lane could land a PASS ship that closed an item and leave it
-// pickable, because its triage ids never match the inbox file's own id.
-//
-// Precedence is the PER-ID rule documented inside the body (lane-scope-union,
-// cycle-1515/1552): triage's committed set always counts; the lane's ASSIGNED
-// scope ids join it unless triage deferred them or declined the whole menu;
-// and the build-report Closes-Inbox marker always unions in — the id nobody
-// named at dispatch is exactly the one that used to survive its own landing.
-// The declined-menu contract (present decision, zero committed, id
-// unmentioned -> stays open) is preserved verbatim and pinned at both sites.
+// close" (see this package's design notes for the precedence rule). Both
+// consumption sites use it: the in-commit consumption (consume.go, so the
+// retirement rides the landing) and the post-ship promotion below.
 func committedInboxIDs(cycleDir string, body []byte, landedPASS bool) []string {
-	// consumption-id-linkage-lane-scope-union (0.86; burns: cycle-1515 triage
-	// DECOMPOSED the assigned id into sub-ids top_n named instead, cycle-1552
-	// triage DROPPED it as already-shipped with top_n:[] while build shipped
-	// the implementation anyway): triage's bookkeeping must not defeat the
-	// in-commit consumption of a PASS landing. The assigned lane-scope ids
-	// join the committed set under a per-id rule that keeps every prior pin:
-	//   - triage DEFERRED the id           -> stays pickable (postponed;
-	//     the remainder rides carryover)
-	//   - triage DROPPED the id            -> consumes (an affirmative close;
-	//     the carryover twin is already retired on the same signal)
-	//   - the decision committed ANY work  -> scope ids consume (fleet lanes
-	//     scout only their scope, so committed work is scope-derived — the
-	//     cycle-1515 decomposition shape)
-	//   - decision present, zero committed, id unmentioned -> stays open (the
-	//     declined-menu contract: lane-scope must not override an explicit
-	//     empty commitment; see TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen)
+	// Triage's bookkeeping must not defeat the in-commit consumption of a
+	// PASS landing. The assigned lane-scope ids join the committed set under
+	// a per-id rule (see this package's design notes):
+	//   - triage DEFERRED the id           -> stays pickable
+	//   - triage DROPPED the id            -> consumes
+	//   - the decision committed ANY work  -> scope ids consume
+	//   - decision present, zero committed, id unmentioned -> stays open
 	ids := inboxmover.CommittedIDs(body)
 	if !landedPASS {
 		// A non-PASS verdict (FAIL, an unfinished suite, or unknown evidence)
-		// leaves work pickable (consume.go's own contract), so the NEW
-		// scope/dropped widening is PASS-only. The long-standing nil-body fallback (continuation/lane
-		// cycles carry no decision at all) predates the verdict gate and is
-		// preserved verbatim — it was never verdict-conditioned.
+		// leaves work pickable, so the scope/dropped widening below is
+		// PASS-only; a nil body (continuation/lane cycles carry no decision)
+		// falls back to the lane-scope ids regardless.
 		if body == nil {
 			ids = cycleoutcome.LaneScopeIDs(cycleDir)
 		}
@@ -464,10 +407,9 @@ func committedInboxIDs(cycleDir string, body []byte, landedPASS bool) []string {
 	scopeIDs := cycleoutcome.LaneScopeIDs(cycleDir)
 	// Named-engagement discriminator: lane scopes are multi-item MENUS, and
 	// triage may commit a subset and leave menu mates pending as dispatchable
-	// backlog (triagecap lane_menu contract). If triage engaged the scope BY
-	// NAME (scope ∩ committed non-empty), only the named scope ids consume —
-	// an unmentioned menu mate stays pickable. Only when the committed set
-	// names NO scope id (the cycle-1515 rename/decomposition shape) does the
+	// backlog. If triage engaged the scope BY NAME (scope ∩ committed
+	// non-empty), only the named scope ids consume — an unmentioned menu mate
+	// stays pickable. Only when the committed set names NO scope id does the
 	// whole non-deferred scope ride the landing.
 	engagedByName := false
 	for _, id := range scopeIDs {
@@ -493,8 +435,6 @@ func committedInboxIDs(cycleDir string, body []byte, landedPASS bool) []string {
 // repinPostCycle handles the case where the just-shipped commit
 // modified the ship binary itself. The on-disk SHA has changed; the
 // next cycle's TOFU would fail. Re-pin to the new SHA.
-//
-// Mirrors ship.sh lines 947-958.
 func repinPostCycle(opts *Options, res *RunResult) error {
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
@@ -520,8 +460,9 @@ func repinPostCycle(opts *Options, res *RunResult) error {
 	}
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
-	// ADR-0049 S2 / G2: serialize the whole read→check→write under the shared
-	// state.json lock. Any error (lock/read/write) propagates, as before.
+	// Serialize the whole read→check→write under the shared state.json lock;
+	// any error (lock/read/write) propagates.
+	// See ADR-0049.
 	return withStateLock(statePath, func() error {
 		stMap, err := readStateMap(statePath)
 		if err != nil {

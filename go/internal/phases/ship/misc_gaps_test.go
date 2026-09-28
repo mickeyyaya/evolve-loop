@@ -1,10 +1,5 @@
 //go:build integration
 
-// misc_gaps_test.go — covers the remaining uncovered branches across
-// verifyClass (ClassRelease, ClassTrivial, invalid), postShip (non-cycle,
-// non-dryrun cycle success), Run (BYPASS_SHIP_VERIFY), writeShipBinding
-// (no cycle_id), currentBranch (runner error), buildDiffFooterAtDir
-// (empty files → empty footer), and pluginVersion (invalid JSON).
 package ship
 
 import (
@@ -16,8 +11,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
-
-// --- verifyClass -----------------------------------------------------------
 
 // TestVerifyClass_Release_LogsAndReturnsNil: ClassRelease logs two skip
 // lines and returns nil (pipeline-internal path — no audit check).
@@ -71,8 +64,6 @@ func TestVerifyClass_Trivial_MissingCycleState_Errors(t *testing.T) {
 		t.Fatal("missing cycle-state.json must error")
 	}
 }
-
-// --- postShip (non-cycle path) ---------------------------------------------
 
 // TestPostShip_NonCycleClass_OnlyLogsDone: for ClassRelease, postShip
 // skips advance/promote/repin entirely and just logs the DONE line.
@@ -136,8 +127,6 @@ func TestPostShip_ClassCycle_AdvancesAndLogs(t *testing.T) {
 	}
 }
 
-// --- Run: BYPASS_SHIP_VERIFY bridge removed --------------------------------
-
 // TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge: EVOLVE_BYPASS_SHIP_VERIFY
 // is silently ignored — the retired bridge no longer re-classifies ClassCycle
 // to ClassManual. ClassCycle proceeds as ClassCycle.
@@ -158,7 +147,6 @@ func TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge(t *testing.T) {
 			"EVOLVE_BYPASS_PREFIX_GATE": "1",
 		},
 	})
-	// Flag is silently ignored: ClassCycle stays ClassCycle (no bridge conversion).
 	if res.ClassUsed == ClassManual {
 		t.Errorf("ClassUsed=%q, flag must not bridge to ClassManual anymore", res.ClassUsed)
 	}
@@ -167,14 +155,11 @@ func TestRun_BypassShipVerify_FlagSilentlyIgnored_NoBridge(t *testing.T) {
 	}
 }
 
-// --- writeShipBinding: no cycle_id -----------------------------------------
-
 // TestWriteShipBinding_NoCycleID_Errors: when cycle-state.json has no
 // cycle_id field, writeShipBinding must return a plain "no cycle_id" error
 // (not panic, not silently skip the file write).
 func TestWriteShipBinding_NoCycleID_Errors(t *testing.T) {
 	root := t.TempDir()
-	// cycle-state.json with no cycle_id key.
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"phase":"ship"}`)
 	opts := &Options{ProjectRoot: root}
 	err := writeShipBinding(opts, "abc123tree", "abc123commit")
@@ -190,15 +175,12 @@ func TestWriteShipBinding_NoCycleID_Errors(t *testing.T) {
 // exist → readStateMap returns empty map → no cycle_id → error.
 func TestWriteShipBinding_MissingCycleState_Errors(t *testing.T) {
 	root := t.TempDir()
-	// No cycle-state.json created.
 	opts := &Options{ProjectRoot: root}
 	err := writeShipBinding(opts, "tree", "commit")
 	if err == nil {
 		t.Fatal("missing cycle-state.json must return error")
 	}
 }
-
-// --- currentBranch: runner error -------------------------------------------
 
 // TestCurrentBranch_RunnerError_Propagates: when the Runner itself returns
 // an error (not just a non-zero exit code), currentBranch must propagate it.
@@ -217,8 +199,6 @@ func TestCurrentBranch_RunnerError_Propagates(t *testing.T) {
 		t.Fatal("runner error in symbolic-ref must propagate")
 	}
 }
-
-// --- buildDiffFooterAtDir: empty staged diff → empty footer ----------------
 
 // TestBuildDiffFooterAtDir_EmptyDiff_ReturnsEmptyString: when the staged
 // area has no files changed, buildDiffFooterAtDir returns an empty footer
@@ -243,8 +223,6 @@ func TestBuildDiffFooterAtDir_EmptyDiff_ReturnsEmptyString(t *testing.T) {
 	}
 }
 
-// --- pluginVersion: invalid JSON path --------------------------------------
-
 // TestPluginVersion_InvalidJSON_ReturnsEmpty: a plugin.json that contains
 // invalid JSON must return "" (not panic, not error-out).
 func TestPluginVersion_InvalidJSON_ReturnsEmpty(t *testing.T) {
@@ -254,8 +232,6 @@ func TestPluginVersion_InvalidJSON_ReturnsEmpty(t *testing.T) {
 		t.Errorf("invalid JSON must yield empty version; got %q", got)
 	}
 }
-
-// --- verifyManualConfirm: non-tty stdin blocks (IntegrityError) -------------
 
 // TestVerifyManualConfirm_NonTTY_IntegrityError: when git diff --cached has
 // staged changes and EVOLVE_SHIP_AUTO_CONFIRM is not set, but stdin is not a
@@ -277,7 +253,7 @@ func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 	// full-diff calls ignore the exit code (impl checks only err), so this one
 	// entry drives the whole verifyManualConfirm flow up to the isTerminal check.
 
-	// Use a bytes.Buffer (not os.Stdin) so isTerminal returns false.
+	// Use a strings.Reader (not os.Stdin) so isTerminal returns false.
 	var stdinBuf strings.Builder
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
@@ -288,8 +264,6 @@ func TestVerifyManualConfirm_NonTTY_IntegrityError(t *testing.T) {
 	err := verifyManualConfirm(context.Background(), opts, &RunResult{})
 	wantShipErr(t, err, core.CodeManualNotTTY, core.ShipClassConfig, "not a tty")
 }
-
-// --- verifyAuditBinding: TreeStateSHA mismatch (uncommitted changes) --------
 
 // TestVerifyAuditBinding_TreeMismatch_IntegrityError: HEAD matches but the
 // working tree has uncommitted changes since audit (tree-state SHA mismatch).

@@ -8,13 +8,12 @@ import (
 	"testing"
 )
 
-// defect_ledger_schema_singlesource_test.go — the third leg of the doc-sync
-// contract (cycle-1403). AC9 already holds agents/evolve-auditor.md and
-// docs/architecture/continuation-defect-ledger.md to each other; this holds the
-// GO constant echoed inline on rejection (dispositionSchemaExample) to the same
-// document. Without it the two docs could stay in lockstep while the message an
-// agent actually reads at the moment of failure drifted away from both — which
-// is the failure mode this cycle exists to close, one level down.
+// A separate check holds agents/evolve-auditor.md and
+// docs/architecture/continuation-defect-ledger.md to each other; this holds
+// the GO constant echoed inline on rejection (dispositionSchemaExample) to
+// the same document. Without it the two docs could stay in lockstep while
+// the message an agent actually reads at the moment of failure drifted away
+// from both.
 func TestDispositionSchemaExampleMatchesDocumentedExample(t *testing.T) {
 	root := docExampleRepoRoot(t)
 	docRaw := extractDispositionExample(t, root, "docs/architecture/continuation-defect-ledger.md")

@@ -9,25 +9,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// defect_ledger_worktree_evidence_test.go — RED contract for cycle-1340
-// `defect-ledger-worktree-evidence-fallback` (the sole top_n card).
-//
-// The defect this pins (scout Finding 1): evidenceResolves
-// (defect_ledger.go:253-300) resolves every closure citation with a single
-// os.Lstat under req.ProjectRoot. A continuation LANE's own fix lives in its
-// own still-open worktree and reaches the project root only when the lane
-// merges — which is precisely what this gate blocks. Cycles 1320 → 1323 →
-// 1325 → 1330 each cited the same two real, worktree-resident files and each
-// was rejected with the identical "resolves to no file under the project
-// root" message: the gate demands evidence it structurally prevents from
-// existing. P0, cycles_unpicked=5+.
-//
-// The fix (Task 1): when the project-root Lstat misses AND req.Worktree != "",
-// retry under req.Worktree — the SHIPPED-TREE root already threaded to every
-// phase (core/phase.go:81-91). Every existing rejection stays: absolute paths,
-// escapes, non-regular files, and the self-citation guard (rule 4) must reject
-// worktree-resident citations exactly as they reject project-root ones, or the
-// fallback reopens the self-vouching hole cycle-1285 F3 closed.
+// A continuation LANE's own fix lives in its own still-open worktree and
+// reaches the project root only when the lane merges — which is precisely
+// what evidenceResolves' single project-root Lstat blocks. The fix: when the
+// project-root Lstat misses AND req.Worktree != "", retry under req.Worktree
+// — the SHIPPED-TREE root already threaded to every phase. Every existing
+// rejection stays: absolute paths, escapes, non-regular files, and the
+// self-citation guard must reject worktree-resident citations exactly as
+// they reject project-root ones, or the fallback reopens the self-vouching
+// hole the basename denylist closes.
 //
 // Every assertion below reaches its subject through the REAL production seam,
 // hooks{}.Classify — the audit phase's verdict path. evidenceResolves is
@@ -40,9 +30,9 @@ import (
 // one restated).
 
 // worktreeContinuationFixture extends continuationFixture with a populated
-// req.Worktree — the lane's own SHIPPED-TREE root, distinct from ProjectRoot,
-// which is exactly the 1320→1330 shape (fix committed in the lane's worktree,
-// not yet merged to the project root).
+// req.Worktree — the lane's own SHIPPED-TREE root, distinct from ProjectRoot:
+// a fix committed in the lane's worktree but not yet merged to the project
+// root.
 func worktreeContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDefects []string) (string, string, core.PhaseRequest) {
 	t.Helper()
 	ws, req := continuationFixture(t, ancestorCycle, thisCycle, openDefects)
@@ -51,11 +41,10 @@ func worktreeContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, ope
 	return ws, wt, req
 }
 
-// TestClassify_WorktreeResidentEvidenceClosesADefect — POSITIVE, the P0 repro.
-// The lane cites go/cmd/evolve/cmd_loop_chain_boundaryrefresh_shortsha_test.go
-// (cycle-1323's actual citation). The file exists in the lane's worktree and
-// NOT under the project root, because the merge that would put it there is
-// what this gate is blocking. Today: rejected, cycle cannot PASS, forever.
+// TestClassify_WorktreeResidentEvidenceClosesADefect — POSITIVE. The lane
+// cites a real file that exists in the lane's worktree and NOT under the
+// project root, because the merge that would put it there is what this gate
+// is blocking. Without the fallback: rejected, cycle cannot PASS, forever.
 func TestClassify_WorktreeResidentEvidenceClosesADefect(t *testing.T) {
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	// Materialize the citation in the WORKTREE only — never under ProjectRoot.
@@ -114,7 +103,7 @@ func TestClassify_EvidenceAbsentFromBothRootsStillBlocks(t *testing.T) {
 
 // TestClassify_WorktreeSelfCitationStillRejected — NEGATIVE, the hole the
 // fallback could reopen. The gate's own bookkeeping is rejected by basename
-// (rule 4, EqualFold, cycle-1285 F3). A lane may not evade that by planting
+// (rule 4, EqualFold). A lane may not evade that by planting
 // defect-ledger.json in its worktree instead of the project root. The graded
 // agent WRITES its own worktree, so this is the cheapest bypass of the fix.
 func TestClassify_WorktreeSelfCitationStillRejected(t *testing.T) {
@@ -161,13 +150,12 @@ func TestClassify_WorktreeEvidenceCannotEscapeRoot(t *testing.T) {
 	}
 }
 
-// TestClassify_LineRangeCitationResolves — the SECOND live instance of the
-// same deadlock, found while reproducing it. Defect ddda7857a (inherited by
-// this lane from 1325) cites "go/cmd/evolve/cmd_loop_chain.go:570-588": a real
-// file, present under BOTH roots, rejected anyway. The suffix stripper takes
-// only ":<digits>", so a ":<line>-<line>" RANGE stays glued to the path and no
-// Lstat can ever succeed. The worktree fallback alone does not close the P0 —
-// this citation misses under both roots for a reason the fallback cannot fix.
+// TestClassify_LineRangeCitationResolves — a citation like
+// "go/cmd/evolve/cmd_loop_chain.go:570-588" names a real file, present under
+// BOTH roots, yet a suffix stripper that only takes ":<digits>" leaves a
+// ":<line>-<line>" RANGE glued to the path so no Lstat can ever succeed. The
+// worktree fallback alone does not fix this — the citation misses under both
+// roots for a reason the fallback cannot address.
 //
 // Ranges are the house citation style (build/audit reports cite them
 // everywhere), so this is the common case, not an exotic one.

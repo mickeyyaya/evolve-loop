@@ -1,16 +1,5 @@
 //go:build integration
 
-// gitops_lock_test.go — cycle 815 coverage for the shipDirect ship-lock gap
-// (fleet-ship-git-index-lock-serialization). ADR-0049 S5's acquireShipLock
-// (gap G1) was wired into shipFromWorktree only (see worktree_test.go's
-// TestShipFromWorktree_AcquiresAndReleasesShipLock); shipDirect — the
-// non-worktree path used by manual ships, release ships, and any cycle ship
-// without a live worktree — ran git add -A / commit / push against
-// opts.ProjectRoot's index with no lock acquisition anywhere. These tests
-// pin AC1 (shipDirect acquires+releases opts.acquireShipLock() around its
-// git-mutating section, non-dry-run) and AC2 (dry-run acquires zero locks),
-// mirroring the injected shipLock seam pattern already used for
-// shipFromWorktree.
 package ship
 
 import (
@@ -20,10 +9,8 @@ import (
 	"testing"
 )
 
-// TestShipDirect_AcquiresAndReleasesShipLock pins AC1: shipDirect must hold
-// the integrator lock across its add -A -> commit -> push critical section
-// and release it exactly once. RED until acquireShipLock is wired into
-// shipDirect (acquired=0 today).
+// shipDirect must hold the integrator lock across its add -A -> commit ->
+// push critical section and release it exactly once.
 func TestShipDirect_AcquiresAndReleasesShipLock(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "manual.txt"), "manual change\n")
@@ -54,11 +41,10 @@ func TestShipDirect_AcquiresAndReleasesShipLock(t *testing.T) {
 	}
 }
 
-// TestShipDirect_DryRun_SkipsShipLock pins AC2: a dry-run shipDirect mutates
-// nothing, so it must acquire zero locks (keeps dry-run pure + never creates
-// the lock file), matching the existing shipFromWorktree convention. Calls
-// shipDirect directly (bypassing Run()'s manual-class TTY gate), mirroring
-// dryrun_branches_test.go's TestShipDirect_DryRun_LogsAndNoCommit.
+// A dry-run shipDirect mutates nothing, so it must acquire zero locks (keeps
+// dry-run pure + never creates the lock file), matching the existing
+// shipFromWorktree convention. Calls shipDirect directly (bypassing Run()'s
+// manual-class TTY gate).
 func TestShipDirect_DryRun_SkipsShipLock(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)

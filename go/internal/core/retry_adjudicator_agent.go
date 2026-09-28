@@ -9,23 +9,6 @@ import (
 	"strings"
 )
 
-// retry_adjudicator_agent.go — the bridge-dispatched RetryAdjudicator.
-//
-// Built exactly like FailureAdvisor and PhaseAdvisor: bridge-dispatched,
-// persona-injected, strict-JSON-parsed. It differs from them in one deliberate
-// way, and that difference is the whole safety argument.
-//
-// FailureAdvisor returns an ERROR on any failure so the caller escalates. This
-// adjudicator returns NIL instead, because nil is a working answer here: the
-// deterministic policy has already decided what is legal, and clampAdjudication
-// turns a nil proposal into the policy default. The agent can only ever narrow a
-// choice among options Go already permitted — it can never grant a retry policy
-// forbids, exceed MaxRetries, or overturn the ADR-0072 floor.
-//
-// That is why this is not another proxy-as-verdict. The failure mode of ADR-0092
-// was an agent artifact being a PRECONDITION for a decision; here it is an
-// enhancement to one that already works without it.
-
 // bridgeRetryAdjudicator dispatches the failure-adjudication persona at the tier
 // its phase config declares.
 type bridgeRetryAdjudicator struct {
@@ -41,17 +24,12 @@ func NewBridgeRetryAdjudicator(b Bridge, identity AgentIdentity, projectRoot str
 	return &bridgeRetryAdjudicator{bridge: b, identity: identity, root: projectRoot}
 }
 
-// adjudicationWire is the strict JSON contract the persona must emit. Kept
-// separate from the internal `adjudication` type so a wire change cannot silently
-// alter the decision vocabulary.
 type adjudicationWire struct {
 	Action        string `json:"action"`
 	ReentryPhase  string `json:"reentry_phase"`
 	Justification string `json:"justification"`
 }
 
-// Adjudicate proposes an action. EVERY failure path returns nil, which
-// clampAdjudication reads as "use the policy default" — never as "block".
 func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *adjudication {
 	if a == nil || a.bridge == nil || cs.WorkspacePath == "" {
 		return nil
@@ -96,13 +74,6 @@ func parseAdjudication(stdout, artifactPath string) *adjudication {
 		}
 		raw = string(b)
 	}
-	// lastBalancedSpan, not a naive first-'{'/last-'}' slice: the sibling
-	// parseProposal in phase_advisor.go rejects that approach in its own doc
-	// comment because a span from the first brace to the last one swallows any
-	// earlier object — reasoning prose, an example, a stray trailing '}' — and
-	// then fails to parse, DISCARDING a valid final answer. It is depth- and
-	// string-literal-aware and picks the last balanced object. Reusing it keeps one
-	// JSON-extraction behaviour in this package instead of two.
 	start, end, ok := lastBalancedSpan(raw, '{', '}')
 	if !ok {
 		return nil

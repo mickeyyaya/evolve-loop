@@ -15,30 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// probe_quarantine.go — the observer must not perturb the observed system.
-//
-// The adversarial auditor legitimately authors probe tests to refute a build,
-// but writing them INTO the package under test poisons the EGPS run: any
-// predicate that shells `go test` over that package inherits the probe's
-// engineered failure as a builder regression (cycles 1115/1117 — auditor
-// verdict PASS/"Not FAIL" beside a red gate). The probes were then discarded
-// with the worktree, so the auditor's own finding was unrecoverable.
-//
-// New-since-dispatch *_test.go files (the audit-prompt artifact's mtime is
-// the dispatch anchor — engine.go writes it at dispatch; builder files
-// predate it) are PRESERVED under <workspace>/audit-probes/ and removed from
-// the tree, one loud log line each. Tracked files are never touched, and
-// go/acs/ is exempt (deleting the cycle's predicate package would nuke the
-// gate itself — an auditor edit there is a different violation with a
-// different guard). The sanctioned probe idiom remains `go test -overlay`
-// (cycle-1106), which never writes the tree.
-//
-// Known limitation (adversarial review H1): the anchor is AUDIT dispatch, so
-// a probe the adversarial-review phase left behind earlier is classified as
-// builder work. That phase deletes its probes per its own persona; the
-// residual risk is documented there rather than guessed at here — a wrong
-// guess would quarantine bug-reproduction's legitimate repro tests.
-
 // auditProbesDir is the workspace subdirectory that preserves quarantined
 // probes — the durable record of what the auditor tried.
 const auditProbesDir = "audit-probes"
@@ -54,8 +30,7 @@ const quarantineGitTimeout = 30 * time.Second
 // anchorFileName persists the FIRST audit dispatch time across retries:
 // bridge.Engine.Launch rewrites audit-prompt.txt on EVERY dispatch, so
 // anchoring on the latest prompt mtime would classify a dead first attempt's
-// leftover probe as pre-dispatch builder work (diff-review HIGH — the
-// 1115/1117 shape reopened on every audit retry).
+// leftover probe as pre-dispatch builder work.
 const anchorFileName = ".dispatch-anchor"
 
 // quarantineProbesForRequest is the Classify call site. No worktree → nothing
@@ -103,12 +78,11 @@ func firstDispatchAnchor(workspace string, promptMtime time.Time) time.Time {
 }
 
 // quarantineAuditProbes preserves-then-removes audit-authored probe tests from
-// worktree, returning the repo-relative paths it moved. Failure split
-// (adversarial review H3): a git-status failure degrades OPEN with a loud log
-// — a .git/index.lock race must not hard-fail the cycle this change exists to
-// protect; but once a probe IS detected, any preserve/remove error fails
-// loudly — silently leaving it poisons the gate, silently dropping it
-// destroys auditor evidence.
+// worktree, returning the repo-relative paths it moved. Failure split: a
+// git-status failure degrades OPEN with a loud log — a .git/index.lock race
+// must not hard-fail the cycle this exists to protect; but once a probe IS
+// detected, any preserve/remove error fails loudly — silently leaving it
+// poisons the gate, silently dropping it destroys auditor evidence.
 func quarantineAuditProbes(worktree, workspace string, dispatchedAt time.Time, log io.Writer) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), quarantineGitTimeout)
 	defer cancel()
@@ -160,10 +134,10 @@ func preserveThenRemove(src, dst string) error {
 // newTestFilePath parses one `git status --porcelain -uall` line, returning
 // the path when it is a NEW *_test.go outside go/acs/: untracked (`??`) or
 // added-not-yet-committed (`A`-status — a preserved continuation worktree's
-// pre-loop `git add -A` stages a prior attempt's leftovers, review M9). Path
-// extraction goes through gitexec.PorcelainPath, the documented SSOT (a
-// hand-rolled parse dropped git-quoted paths — silently missing exactly the
-// files this exists to catch).
+// pre-loop `git add -A` stages a prior attempt's leftovers). Path extraction
+// goes through gitexec.PorcelainPath, the documented SSOT: a hand-rolled parse
+// dropped git-quoted paths, silently missing exactly the files this exists to
+// catch.
 func newTestFilePath(line string) (string, bool) {
 	if len(line) < 4 {
 		return "", false
