@@ -61,6 +61,11 @@ func TestTakeStaged_IsTheRealIndexPlusTheDeclaredPaths(t *testing.T) {
 	if _, err := withStaged.Restore(ctx); err == nil {
 		t.Fatal("a staged snapshot never restores a worktree: only a full snapshot knows every path")
 	}
+	if tracked, err := TakeTracked(ctx, root); err != nil {
+		t.Fatal(err)
+	} else if _, err := tracked.Restore(ctx); err == nil {
+		t.Fatal("a tracked snapshot never restores a worktree either")
+	}
 	if _, err := git(ctx, root, nil, "rm", "-q", "--cached", "notes.txt"); err != nil {
 		t.Fatal(err)
 	}

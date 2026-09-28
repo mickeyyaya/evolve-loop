@@ -1,6 +1,6 @@
 # Logic-first delivery — design document
 
-- **Status:** living document, kept current with every landing. Last updated 2026-09-28 12:28.
+- **Status:** living document, kept current with every landing. Last updated 2026-09-28 14:56.
 - **Status:** living document, kept current with every landing. Last updated 2026-09-28 14:14.
 - **Decision record:** [ADR-0106](adr/0106-logic-first-delivery.md). **Policy:** [operating-policy §0](../operations/operating-policy.md).
 - **Landings:** the design in #655 (merged `5600b77a`; it replaced #653 after a CHANGELOG conflict); the first code train in #656 (merged; eight commits, replacing #654 the same way); ADR-0105 B1 in #652 (merged `e5af27fe`).
@@ -277,9 +277,9 @@ A first design staged each phase's declared outputs through a new registry field
 | Id | Component | Status |
 |---|---|---|
 | 1 | the refusal names its paths as `cyclestate` detail, stripped by every identity reader (F43 part 1) | built (#691) |
-| 2 | `internal/shipmanifest`: Ship's pure path selection, `Stageable` the one composition, `RegularFileIn` the one file rule | built (this landing) |
-| 3 | `treefence.TakeStaged(ctx, worktree, pathspec)`: the would-be-shipped tree in a throwaway index, with the ignored-path drop shared with Ship | designed |
-| 4 | `predicateTreeFor` compares `Take` against `TakeStaged`; replays of 1694 and 1735 pass, an undeclared file is refused by name | designed |
+| 2 | `internal/shipmanifest`: Ship's pure path selection, `Stageable` the one composition, `RegularFileIn` the one file rule | built (#692) |
+| 3 | `treefence.TakeStaged(ctx, worktree, pathspec)`: the would-be-shipped tree in a throwaway index (a real-index seed required; an empty pathspec adds nothing; `Restore` refuses any but a full snapshot) | built (#693) |
+| 4 | `predicateTreeFor` compares `Take` against `TakeStaged`; replays of 1694 and 1735 pass, an undeclared file is refused by name; with it, Ship's empty-pathspec guard (its `git add -A --` stages the whole tree when every selected path was dropped) and one shared ignored-path filter with its retry | designed |
 | 5 | the report list derives from the registry's `writes_source` phases instead of a Go list | designed |
 
 ## 6. Decision tables
