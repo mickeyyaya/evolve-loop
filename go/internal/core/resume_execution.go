@@ -206,7 +206,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		// pauseForQuota records through dispatch, so the resume's own accumulators go in and come back.
 		pauseOnQuotaWall := func() {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
-			err = dispatch.pauseForQuota(next, resp, attempts)
+			err = dispatch.pauseForQuota(next, resp, attempts, err)
 			result, phaseTimings = dispatch.result, dispatch.phaseTimings
 		}
 		if errors.Is(err, ErrAllFamiliesExhausted) {

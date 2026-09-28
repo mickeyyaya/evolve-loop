@@ -75,6 +75,9 @@ func TestRunCycle_AllFamilies85_CheckpointsAndDefers(t *testing.T) {
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("err=%v, want errors.Is ErrAllFamiliesExhausted", err)
 	}
+	if !strings.Contains(err.Error(), "bridge: launch exit=85") {
+		t.Fatalf("the pause must carry the dispatch's own error naming its walk: %v", err)
+	}
 	var clf *ErrCycleLevelFailure
 	if !errors.As(err, &clf) {
 		t.Errorf("err=%v, want ErrCycleLevelFailure wrapping (loop recoverable branch consumes it)", err)

@@ -183,7 +183,7 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 			attemptExits = append(attemptExits, bridgeExitCode(err))
 			if attempt >= maxAttempts || !IsInfraTeardownError(err) {
 				if opts.quotaExhausted != nil && opts.quotaExhausted(attemptExits) {
-					return resp, attempt, fmt.Errorf("phase %s: %w", phase, ErrAllFamiliesExhausted)
+					return resp, attempt, fmt.Errorf("phase %s: %w", phase, quotaWall{err})
 				}
 				// Hook order mirrors the sequential loop: reconstruct the
 				// artifact if possible, else degrade an optional off-floor

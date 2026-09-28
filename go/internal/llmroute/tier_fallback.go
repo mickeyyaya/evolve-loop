@@ -38,6 +38,7 @@ type TieredDispatchResult struct {
 	Tier     string   // the tier the terminal result ran at
 	Attempts []string // every launch as "cli@tier", in order
 	Err      error    // nil on success; the terminal attempt's error otherwise
+	Walled   bool
 }
 
 // DispatchTiered runs Dispatch per tier, stepping down (via optional onStepDown) only when every attempt exited 85.
@@ -52,6 +53,7 @@ func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err 
 	var attempts []string
 	var cli, tier string
 	var err error
+	sawWall := false
 	for i, t := range tiers {
 		tier = t
 		allQuota := true
@@ -64,6 +66,8 @@ func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err 
 			}
 			if exitCode != exitQuotaExhausted {
 				allQuota = false
+			} else {
+				sawWall = true
 			}
 		}
 		if !allQuota || i == len(tiers)-1 {
@@ -73,5 +77,5 @@ func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err 
 			onStepDown(tier, tiers[i+1])
 		}
 	}
-	return TieredDispatchResult{CLI: cli, Tier: tier, Attempts: attempts, Err: err}
+	return TieredDispatchResult{CLI: cli, Tier: tier, Attempts: attempts, Err: err, Walled: sawWall}
 }

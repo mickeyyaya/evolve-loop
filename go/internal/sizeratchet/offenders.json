@@ -201,7 +201,7 @@
   "internal/phases/audit.oneEvidenceResolves": 90,
   "internal/phases/debugger.Classify": 54,
   "internal/phases/retro.Phase.Run": 159,
-  "internal/phases/runner.BaseRunner.dispatchPhaseAttempts": 97,
+  "internal/phases/runner.BaseRunner.dispatchPhaseAttempts": 78,
   "internal/phases/runner.BaseRunner.preparePhaseExecution": 90,
   "internal/phases/runner.BaseRunner.resolveDispatchPlan": 89,
   "internal/phases/scout.hooks.ComposePrompt": 69,

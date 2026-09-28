@@ -320,3 +320,39 @@ func TestRun_FallbackOnArtifactTimeout_CarriesVerdictCostDuration(t *testing.T) 
 		t.Errorf("DurationMS=%v, want >0", resp.DurationMS)
 	}
 }
+
+func TestRun_AnExhaustedWalkThatMetAWallSurfacesTheWall(t *testing.T) {
+	hooks := &fakeHooks{phase: "auditor", agent: "evolve-auditor", model: "sonnet", prompt: "x"}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"codex-tmux":  {resp: core.BridgeResponse{ExitCode: 85}, err: errors.New("bridge: launch exit=85: quota wall")},
+			"claude-tmux": {resp: core.BridgeResponse{ExitCode: 81}, err: errors.New("bridge: launch exit=81: artifact timeout")},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
+	r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-auditor", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+
+	if err == nil || !strings.Contains(err.Error(), "exit=85") || !strings.Contains(err.Error(), "claude-tmux") || len(sb.calls) != 2 {
+		t.Fatalf("a walk that met a wall and ended on a stall must surface the wall, naming every rung, so the cycle defers; err=%v calls=%v", err, sb.calls)
+	}
+}
+
+func TestRun_AWallThenARealFailureSurfacesTheFailure(t *testing.T) {
+	hooks := &fakeHooks{phase: "auditor", agent: "evolve-auditor", model: "sonnet", prompt: "x"}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"codex-tmux":  {resp: core.BridgeResponse{ExitCode: 85}, err: errors.New("bridge: launch exit=85: quota wall")},
+			"claude-tmux": {resp: core.BridgeResponse{ExitCode: 3}, err: errors.New("bridge: launch exit=3: the phase failed")},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
+	r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-auditor", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+
+	if err == nil || !strings.Contains(err.Error(), "exit=3") || strings.Contains(err.Error(), "exit=85") {
+		t.Fatalf("a real failure after a wall stays the verdict, never a deferral: err=%v", err)
+	}
+}
