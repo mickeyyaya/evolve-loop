@@ -83,6 +83,7 @@ type ScoutSignals struct {
 	ItemCount         int    // itemN_* blocks: scope breadth
 	CarryoverCount    int
 	BacklogSize       int
+	ArtifactBytes     int
 	Present           bool
 }
 

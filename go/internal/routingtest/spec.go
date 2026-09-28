@@ -90,6 +90,7 @@ type SignalSpec struct {
 	ScoutItemCount int
 	ScoutCarryover int
 	ScoutBacklog   int // scout.backlog_size (queued work breadth)
+	ArtifactBytes  int
 	// ADR-0099 deliverable-kind signals (scout declares, triage is authoritative).
 	GoalType              string // scout.goal_type
 	DeliverableKind       string // scout.deliverable_kind ("code"|"document")

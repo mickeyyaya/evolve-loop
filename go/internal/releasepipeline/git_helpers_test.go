@@ -4,9 +4,11 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// initTempRepoWithTag creates an isolated git repository in a fresh t.TempDir(),
+// initTempRepoWithTag creates an isolated git repository (a gittest.Fixture),
 // makes one commit, and tags it. It returns the repo path. Using an isolated
 // repo keeps the test independent of the live repository's tag set — the
 // cautionary failure this replaces was a *_ValidGitRepo test that `git describe`'d
@@ -17,7 +19,7 @@ func initTempRepoWithTag(t *testing.T, tag string) string {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skipf("git not on PATH: %v", err)
 	}
-	dir := t.TempDir()
+	dir := gittest.Fixture(t).Dir
 	run := func(args ...string) {
 		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 		// Quiet, deterministic identity so the commit succeeds in any environment.
@@ -29,7 +31,6 @@ func initTempRepoWithTag(t *testing.T, tag string) string {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
-	run("init")
 	run("commit", "--allow-empty", "-m", "initial")
 	run("tag", tag)
 	return dir

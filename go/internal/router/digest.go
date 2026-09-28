@@ -334,6 +334,7 @@ func extractScout(raw []byte) ScoutSignals {
 	s.DeliverableKind = NormalizeDeliverableKind(kind)
 	_ = json.Unmarshal(top["carryover_count"], &s.CarryoverCount)
 	_ = json.Unmarshal(top["backlog_size"], &s.BacklogSize)
+	_ = json.Unmarshal(top["run_dir.artifact_bytes"], &s.ArtifactBytes)
 	for k := range top {
 		// itemN_* blocks measure scope breadth.
 		if strings.HasPrefix(k, "item") && hasDigitAfterPrefix(k, "item") {

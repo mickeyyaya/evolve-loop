@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func TestDefaultReleaseVerify_RelativeRepoRoot(t *testing.T) {
@@ -49,9 +51,8 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		t.Skip("git not on PATH")
 	}
 
-	repoRoot := t.TempDir()
-
-	// 1. git init
+	// 1. git repo
+	repoRoot := gittest.Fixture(t).Dir
 	runGit := func(args ...string) string {
 		cmd := exec.Command("git", append([]string{"-C", repoRoot}, args...)...)
 		cmd.Env = append(cmd.Environ(),
@@ -64,7 +65,6 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		}
 		return strings.TrimSpace(string(out))
 	}
-	runGit("init")
 
 	// 2. Setup mock executable under go/evolve
 	goDir := filepath.Join(repoRoot, "go")

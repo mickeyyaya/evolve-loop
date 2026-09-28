@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func gitIn(t *testing.T, dir string, args ...string) {
@@ -24,10 +26,7 @@ func gitIn(t *testing.T, dir string, args ...string) {
 }
 
 func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
-	root := t.TempDir()
-	gitIn(t, root, "init", "-q")
-	gitIn(t, root, "config", "user.email", "t@t")
-	gitIn(t, root, "config", "user.name", "t")
+	root := gittest.Fixture(t).Dir
 	if err := os.WriteFile(filepath.Join(root, "doomed.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -66,10 +65,7 @@ func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 // match any files`. This has been carried as a known operator gotcha
 // ("ship-staging RENAME rc=128") instead of being fixed.
 func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
-	root := t.TempDir()
-	gitIn(t, root, "init", "-q")
-	gitIn(t, root, "config", "user.email", "t@t")
-	gitIn(t, root, "config", "user.name", "t")
+	root := gittest.Fixture(t).Dir
 	// Content long enough that git scores old→new as a rename, not add+delete.
 	body := []byte("{\n  \"id\": \"some-item\",\n  \"weight\": 0.85,\n  \"title\": \"a queued item with enough body to score as a rename\"\n}\n")
 	if err := os.MkdirAll(filepath.Join(root, "inbox"), 0o755); err != nil {

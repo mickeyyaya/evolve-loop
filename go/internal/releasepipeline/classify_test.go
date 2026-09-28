@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // initClassifyRepo builds an isolated repo with a known tag/commit chain for the
@@ -17,7 +19,7 @@ func initClassifyRepo(t *testing.T) string {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skipf("git not on PATH: %v", err)
 	}
-	dir := t.TempDir()
+	dir := gittest.Fixture(t).Dir
 	git := func(args ...string) {
 		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 		cmd.Env = append(cmd.Environ(),
@@ -36,7 +38,6 @@ func initClassifyRepo(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	git("init")
 	write("go/x.go", "package p\n")
 	git("add", "-A")
 	git("commit", "-m", "go change")

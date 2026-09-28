@@ -42,6 +42,8 @@ func TestSignalSpec_DualRenderingAgree(t *testing.T) {
 		{ScoutBacklog: 7},                    // backlog-only scout fixture
 		{DiffLOC: 540, BuildVerdict: "PASS"}, // diff_loc-only build fixture
 		{CycleSize: "large", ScoutBacklog: 12, ScoutCarryover: 3, DiffLOC: 800, FilesTouched: 6, BuildVerdict: "PASS"}, // both new fields + neighbors
+		{ArtifactBytes: 4096}, // artifact_bytes-only scout fixture
+		{CycleSize: "medium", ScoutBacklog: 9, ScoutCarryover: 2, ArtifactBytes: 1 << 20},
 		{}, // empty fixture → all roles absent
 	}
 	for i, f := range fixtures {
@@ -75,6 +77,8 @@ func TestSignalSpec_WrappedDualRenderingAgree(t *testing.T) {
 		{ScoutBacklog: 7},
 		{DiffLOC: 540, BuildVerdict: "PASS"},
 		{CycleSize: "large", ScoutBacklog: 12, ScoutCarryover: 3, DiffLOC: 800, FilesTouched: 6, BuildVerdict: "PASS"},
+		{ArtifactBytes: 4096},
+		{CycleSize: "medium", ScoutBacklog: 9, ScoutCarryover: 2, ArtifactBytes: 1 << 20},
 		{}, // empty fixture → all roles absent
 	}
 	for i, f := range fixtures {
@@ -87,6 +91,26 @@ func TestSignalSpec_WrappedDualRenderingAgree(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("fixture %d: wrapped Digest != Signals\n got=%+v\nwant=%+v", i, got, want)
 		}
+	}
+}
+
+// TestSignalSpec_ArtifactBytesReachesBothRenderings guards the keystone against
+// a vacuous pass: parity also holds when both renderings drop the field, so the
+// fixture's value must itself survive the pure rendering and the Digest read.
+func TestSignalSpec_ArtifactBytesReachesBothRenderings(t *testing.T) {
+	const want = 4096
+	f := SignalSpec{ArtifactBytes: want}
+	pure := f.Signals()
+	if !pure.Scout.Present || pure.Scout.ArtifactBytes != want {
+		t.Errorf("Signals().Scout = %+v, want Present with ArtifactBytes=%d", pure.Scout, want)
+	}
+	ws := seedWorkspace(t, t.TempDir(), 1, f.HandoffFiles())
+	got, err := router.Digest(ws, presentRoles(f))
+	if err != nil {
+		t.Fatalf("Digest: %v", err)
+	}
+	if !got.Scout.Present || got.Scout.ArtifactBytes != want {
+		t.Errorf("Digest().Scout = %+v, want Present with ArtifactBytes=%d", got.Scout, want)
 	}
 }
 
