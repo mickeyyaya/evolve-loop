@@ -155,10 +155,40 @@ func TestPublishPendingDossiers_RefusesWhileAnotherRunIsLive(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(dossier.PendingDir(r.Dir), "cycle-1705.json")); err != nil {
 				t.Fatalf("a held pair must stay pending: %v", err)
 			}
-			if !strings.Contains(warn.String(), "another run is live") || !strings.Contains(warn.String(), "they stay pending") {
-				t.Fatalf("the hold must say why and keep the pairs: %q", warn.String())
+			for _, want := range []string{"another run is live", cycleWorkspace(r.Dir, 1706), "live pid " + strconv.Itoa(os.Getppid()), "evolve cycle reset", "they stay pending"} {
+				if !strings.Contains(warn.String(), want) {
+					t.Fatalf("the hold must name the run, the reason and the clearing action (%q): %q", want, warn.String())
+				}
 			}
 		})
+	}
+}
+
+func TestPublishPendingDossiers_NamesARunTheCycleStateNamesWithoutALease(t *testing.T) {
+	r := planeWithAPendingCloseout(t, "main")
+	runDir := cycleWorkspace(r.Dir, 1706)
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "run.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	state := `{"cycle_id":1706,"workspace_path":` + strconv.Quote(runDir) + `}`
+	if err := os.WriteFile(filepath.Join(r.Dir, ".evolve", "cycle-state.json"), []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	head := r.Git("rev-parse", "HEAD")
+	var warn bytes.Buffer
+
+	publishPendingDossiers(r.Dir, &warn)
+
+	if r.Git("rev-parse", "HEAD") != head {
+		t.Fatal("a held publish moved HEAD")
+	}
+	for _, want := range []string{runDir, "no readable lease", "evolve cycle reset", "they stay pending"} {
+		if !strings.Contains(warn.String(), want) {
+			t.Fatalf("the hold must name the stale run and how to clear it (%q): %q", want, warn.String())
+		}
 	}
 }
 

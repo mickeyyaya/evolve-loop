@@ -55,12 +55,12 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 }
 
 func anotherRunLive(projectRoot string) string {
-	active, err := loopchain.FleetLaneActive(paths.EvolveDirOf(projectRoot))
+	run, active, err := loopchain.LiveSiblingRun(paths.EvolveDirOf(projectRoot))
 	if err != nil {
 		return fmt.Sprintf("cannot prove that no other run is live (%v)", err)
 	}
 	if active {
-		return "another run is live on this plane (a fresh run lease held by another live process)"
+		return fmt.Sprintf("another run is live on this plane: %s (%s); let it finish, or clear a stale one with `evolve cycle reset`", run.Dir, run.Reason)
 	}
 	return ""
 }
