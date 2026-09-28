@@ -126,6 +126,19 @@ func (s Snapshot) Restore(ctx context.Context) (Result, error) {
 	return Result{Restored: restored, Kept: kept}, errors.Join(errs...)
 }
 
+func (s Snapshot) Differing(ctx context.Context, base Snapshot) ([]string, error) {
+	if s.Tree == base.Tree {
+		return nil, nil
+	}
+	added, changed, err := base.diff(ctx, s.Tree)
+	if err != nil {
+		return nil, err
+	}
+	paths := append(added, changed...)
+	sort.Strings(paths)
+	return paths, nil
+}
+
 func (s Snapshot) partition(paths []string) (fenced, kept []string) {
 	for _, rel := range paths {
 		if s.writable[rel] {
