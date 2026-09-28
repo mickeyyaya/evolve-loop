@@ -50,8 +50,7 @@ func TestWithDossierCommit_IsTheRootsKnob(t *testing.T) {
 		{"simulate root writes only", []Option{WithDossierCommit(false)}, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			root := t.TempDir()
-			initDossierRepo(t, root)
+			root := initDossierRepo(t)
 			before := gitCommitCount(t, root)
 			opts := append([]Option{WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()})}, tc.opts...)
 			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), opts...)

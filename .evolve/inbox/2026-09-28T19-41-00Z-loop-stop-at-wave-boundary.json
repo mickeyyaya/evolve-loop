@@ -1,0 +1,21 @@
+{
+  "id": "loop-stop-at-wave-boundary",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "title": "A multi-wave loop has no interface to stop after the current wave; operators SIGINT it from a hand-rolled watcher",
+  "files": [
+    "go/cmd/evolve/cmd_loop_window.go",
+    "go/internal/loopchain/inbox.go",
+    "go/internal/paths/paths.go"
+  ],
+  "summary": "Console PRs must merge only between waves, so the operator needs the running loop to stop cleanly at the next wave boundary. `.evolve/loop-stop` brakes only a chained loop (`--until-inbox-empty`) at a batch boundary; a `--max-cycles N` run spanning several waves has no brake, so the console tailed the log for the wave-close line and sent SIGINT to the exact pid (a session script). The interim is one wave per run (`--max-cycles` = fleet width). Found 2026-09-28 (gap G3).",
+  "fix": "Honor the existing brake at wave boundaries too: the multi-wave window checks paths.LoopStopFile before launching the next wave and ends the run with stop_reason `brake` (no new wave, the finished wave sealed). One brake file for both boundaries, no new flag. Document `touch .evolve/loop-stop` as the stop-after-this-wave control in runtime-reference.md.",
+  "acceptance": [
+    "A multi-wave run with .evolve/loop-stop present ends after the running wave with stop_reason brake, launching no further wave (red today: it launches the next wave)",
+    "A chained run still stops at its batch boundary",
+    "runtime-reference.md names the brake as the stop-after-this-wave control"
+  ],
+  "created_at": "2026-09-28T19:41:00Z",
+  "source": "console, 2026-09-28, interface-discipline inventory at the wave-26 boundary (gap G3)"
+}

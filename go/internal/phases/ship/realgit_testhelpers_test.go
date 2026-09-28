@@ -183,7 +183,7 @@ func seedAudit(t *testing.T, repo, verdict string, optOverrides ...map[string]st
 	}
 	// Model Builder explicitly staging its intended fixture inputs before Audit.
 	runGit(t, testedRoot, "add", "-A")
-	snap, err := treefence.TakeTracked(context.Background(), testedRoot)
+	snap, err := treefence.TakeStaged(context.Background(), testedRoot, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

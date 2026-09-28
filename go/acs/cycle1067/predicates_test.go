@@ -77,12 +77,18 @@ func TestC1067_001_CycleShipStagesDeclaredPathsNotAddAll(t *testing.T) {
 	runGoTest(t, "TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll")
 }
 
-// TestC1067_002_EmptyManifestFallsBackToChangedSetNeverSkips — AC2 (H2): with
-// no readable phase reports, and with no WorkspacePath at all, staging falls
-// back to the porcelain changed set. A fix that silently skips staging (empty
-// pathspec → false clean exit / empty ship) fails here.
-func TestC1067_002_EmptyManifestFallsBackToChangedSetNeverSkips(t *testing.T) {
-	runGoTest(t, "TestShipDirect_ManualClass_EmptyManifestFallsBackToChangedSet")
+// TestC1067_002_AReportlessWorkspaceAdoptsNoPathAndNoWorkspaceStagesTheChangedSet
+// — AC2 (H2), moved to the F43 contract (2026-09-28, design §5.12 component 4):
+// with no WorkspacePath (an operator's manual ship) staging is still the
+// porcelain changed set. A workspace whose reports declare nothing adopts no
+// path and never runs an empty `git add -A --` (which stages the whole tree):
+// its tracked edits ship through the audit binding's `add -u`, and adopting
+// every changed path would carry untracked residue into the binding (cycle
+// 1594). An audited cycle cannot reach Ship with only undeclared untracked
+// work: the audit refuses those inputs by name, so the empty-ship worry this
+// predicate was written for is answered upstream.
+func TestC1067_002_AReportlessWorkspaceAdoptsNoPathAndNoWorkspaceStagesTheChangedSet(t *testing.T) {
+	runGoTest(t, "TestShipDirect_AReportlessWorkspaceAdoptsNoPath")
 	runGoTest(t, "TestShipDirect_NoWorkspacePath_StillStagesExplicitly")
 }
 

@@ -23,8 +23,7 @@ type inPlaceRepo struct {
 
 func newInPlaceRepo(t *testing.T) inPlaceRepo {
 	t.Helper()
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	r := inPlaceRepo{root: root, unformatted: "package seed\n\nfunc   Ugly( ) int {\n\treturn   1\n}\n", edit: "seed\noperator's uncommitted edit\n"}
 	for rel, content := range map[string]string{"go/go.mod": "module example.com/seed\n\ngo 1.24\n", "go/seed.go": r.unformatted, "README.md": "seed\n"} {
 		p := filepath.Join(root, rel)
@@ -81,7 +80,7 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 			return "recovered"
 		}},
 		{"worktreeContentSHA (git add -u)", func(t *testing.T, r inPlaceRepo) string {
-			if sha := worktreeContentSHA(ctx, r.root, r.root); sha != "" {
+			if sha := worktreeContentSHA(ctx, r.root, r.root, t.TempDir()); sha != "" {
 				t.Errorf("no content SHA is written from the operator's index, got %q", sha)
 			}
 			return "no sha"

@@ -44,7 +44,7 @@ func TestVerdictCacheProbeEligibilityWiring(t *testing.T) {
 				}
 			}
 			ctx := context.Background()
-			candidate := worktreeContentSHA(ctx, repo, wt)
+			candidate := worktreeContentSHA(ctx, repo, wt, t.TempDir())
 			base := worktreeBaseTreeSHA(ctx, wt, "")
 			if candidate == "" || base == "" {
 				t.Fatalf("content identities unresolved: candidate=%q base=%q", candidate, base)

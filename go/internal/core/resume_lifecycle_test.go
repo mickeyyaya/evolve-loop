@@ -18,8 +18,7 @@ import (
 // Real filesystem/git closeout; runners replace external agents only.
 func resumedLifecycleFixture(t *testing.T) (*Orchestrator, *fakeStorage, CycleRequest, *ResumePoint) {
 	t.Helper()
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := RunWorkspacePath(root, 7)
 	if err := os.MkdirAll(ws, 0755); err != nil {
 		t.Fatal(err)
@@ -65,8 +64,7 @@ func TestResumeLifecycle_CloseoutRecordsLearningAndRejectsReplay(t *testing.T) {
 }
 
 func TestResumeLifecycle_EmptyTriageStopsBeforeImplementation(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := RunWorkspacePath(root, 7)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
@@ -348,8 +346,7 @@ func TestResumeLifecycle_RecurrenceUsesPersistedLaneScope(t *testing.T) {
 }
 
 func TestResumeLifecycle_FreshQuotaPauseIsNotTerminalFailure(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	runners := buildRunners(nil)
 	runners[PhaseScout] = &fakeRunner{name: "scout", failErr: wrapTransient(85), failUntil: 99}
 	st := &fakeStorage{}

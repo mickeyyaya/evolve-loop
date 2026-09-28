@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
@@ -123,7 +124,7 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// auditor's own HEAD^{tree}, which can never equal it. Best-effort: empty
 	// means ship falls back to the auditor's value. No commit is made
 	// (write-tree only); ship re-stages anyway.
-	worktreeTree := worktreeContentSHA(ctx, projectRoot, worktree)
+	worktreeTree := worktreeContentSHA(ctx, projectRoot, worktree, workspace)
 	// `git diff HEAD` returns exit 1 when differences exist — not an error;
 	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
 	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
@@ -180,30 +181,42 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	}
 }
 
-// worktreeContentSHA stages tracked worktree changes while retaining already
-// staged new files, then writes a tree object (git write-tree) — the content
-// identity of the cycle's declared changes. Unstaged untracked files are not
-// adopted. It is the SINGLE source for both the audit binding's WorktreeTreeSHA
-// (recordAuditBinding) and the ADR-0048 Slice B verdict-cache key, so the value
-// recorded and the value looked up are computed identically. Best-effort:
-// returns "" when worktree is empty or git fails (callers degrade — ship falls
-// back to the auditor comment; the cache simply does not record/match).
-func worktreeContentSHA(ctx context.Context, projectRoot, worktree string) string {
+// worktreeContentSHA stages tracked worktree changes in the real index, then
+// returns the tree Ship will commit (shipmanifest.TakeShipTree): the index,
+// every tracked edit, and the paths the cycle's reports declare, untracked or
+// not. Undeclared untracked files are not adopted. It is the SINGLE source for
+// the audit binding's WorktreeTreeSHA (recordAuditBinding), the composition
+// entries' TreeStateSHA and the ADR-0048 Slice B verdict-cache key, and it is
+// the tree the audit seals, so every value recorded, looked up and verified
+// is computed identically. Best-effort: returns "" when the worktree or the
+// workspace is empty or git fails (callers degrade — ship falls back to the
+// auditor comment; the cache simply does not record/match).
+func worktreeContentSHA(ctx context.Context, projectRoot, worktree, workspace string) string {
 	// The operator's index is never staged by a cycle (inPlaceWorktree): the
 	// binding degrades to empty and ship falls back to the auditor's value.
-	if worktree == "" || inPlaceWorktree(worktree, projectRoot) {
+	if worktree == "" || workspace == "" || inPlaceWorktree(worktree, projectRoot) {
 		return ""
 	}
 	if _, _, aerr := gitCapture(ctx, worktree, "add", "-u"); aerr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git add -u failed: %v\n", aerr)
 		return ""
 	}
-	wt, code, werr := gitCapture(ctx, worktree, "write-tree")
-	if werr != nil || code != 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: git write-tree failed (rc=%d): %v\n", code, werr)
+	snap, err := shipmanifest.TakeShipTree(ctx, gitReadIn(ctx, worktree), worktree, workspace)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree content SHA: ship tree: %v\n", err)
 		return ""
 	}
-	return strings.TrimSpace(wt)
+	return snap.Tree
+}
+
+func gitReadIn(ctx context.Context, dir string) shipmanifest.GitRead {
+	return func(args ...string) (string, error) {
+		out, code, err := gitCapture(ctx, dir, args...)
+		if err == nil && code > 1 {
+			err = fmt.Errorf("git %s exited %d", strings.Join(args, " "), code)
+		}
+		return out, err
+	}
 }
 
 // worktreeBaseTreeSHA resolves the tree SHA of the base commit for the worktree.

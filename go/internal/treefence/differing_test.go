@@ -11,7 +11,7 @@ import (
 func TestSnapshot_DifferingNamesThePathsBeyondItsBase(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
-	tracked, err := TakeTracked(ctx, root)
+	tracked, err := TakeStaged(ctx, root, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

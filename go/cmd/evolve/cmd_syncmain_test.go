@@ -262,3 +262,71 @@ func TestSyncMain_RefusesCleanlyOnConflict(t *testing.T) {
 		t.Errorf("origin main ref must never change, even on a conflict abort: before=%s after=%s", bareHeadBefore, got)
 	}
 }
+
+func TestSyncMain_AnUntrackedFileDoesNotBlockTheSync(t *testing.T) {
+	repo, bare := smInitRepoWithRemote(t)
+	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
+	item := filepath.Join(repo, "operator-inbox-item.json")
+	if err := os.WriteFile(item, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errb bytes.Buffer
+	if code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb); code != 0 {
+		t.Fatalf("an untracked file is not local work git's merge can lose, so it never blocks the sync; exit %d\nstderr=%s", code, errb.String())
+	}
+	if _, err := os.Stat(filepath.Join(repo, "remote-change.txt")); err != nil {
+		t.Errorf("origin's change is merged: %v", err)
+	}
+	if b, err := os.ReadFile(item); err != nil || string(b) != "{}\n" {
+		t.Errorf("the untracked file survives the sync untouched: %q %v", b, err)
+	}
+	if p := smPorcelain(t, repo); p != "?? operator-inbox-item.json\n" && p != "?? operator-inbox-item.json" {
+		t.Errorf("the untracked file stays untracked and the tree is otherwise clean: %q", p)
+	}
+}
+
+func TestSyncMain_AnUntrackedFileTheMergeWouldOverwriteRefusesCleanly(t *testing.T) {
+	repo, bare := smInitRepoWithRemote(t)
+	smRemoteCommit(t, bare, "incoming.txt", "from origin\n")
+	local := filepath.Join(repo, "incoming.txt")
+	if err := os.WriteFile(local, []byte("operator's own copy\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	headBefore := smHead(t, repo)
+
+	var out, errb bytes.Buffer
+	if code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb); code == 0 {
+		t.Fatalf("a merge that would overwrite an untracked file is refused\nstdout=%s", out.String())
+	}
+	if got := smHead(t, repo); got != headBefore {
+		t.Errorf("HEAD is unchanged on refusal: before=%s after=%s", headBefore, got)
+	}
+	if b, err := os.ReadFile(local); err != nil || string(b) != "operator's own copy\n" {
+		t.Errorf("the untracked file is never overwritten: %q %v", b, err)
+	}
+	if smMergeHeadExists(repo) {
+		t.Error("no merge is left in progress")
+	}
+	if msg := errb.String(); !strings.Contains(msg, "would not merge") || strings.Contains(msg, "abort failed") {
+		t.Errorf("the refusal says git would not merge and quotes it, never a failed abort of a merge that never started: %s", msg)
+	}
+}
+
+func TestSyncMain_ACaseCollidingUntrackedFileIsNeverOverwritten(t *testing.T) {
+	repo, bare := smInitRepoWithRemote(t)
+	smRemoteCommit(t, bare, "incoming.txt", "from origin\n")
+	local := filepath.Join(repo, "INCOMING.txt")
+	if err := os.WriteFile(local, []byte("operator's own copy\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out, errb bytes.Buffer
+	code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb)
+	if b, err := os.ReadFile(local); err != nil || string(b) != "operator's own copy\n" {
+		t.Fatalf("an untracked file whose name differs only in case from an incoming path keeps its content, whether git refuses the merge (a case-insensitive filesystem) or adds the path beside it (exit %d): %q %v\nstderr=%s", code, b, err, errb.String())
+	}
+	if smMergeHeadExists(repo) {
+		t.Error("no merge is left in progress")
+	}
+}

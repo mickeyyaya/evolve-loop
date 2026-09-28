@@ -405,10 +405,10 @@ func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir,
 	if gitDir != "" {
 		args = append(args, "-C", gitDir)
 	}
-	// rawPathRead/shipmanifest.UnquoteGitPath (cycle-1108): without them a non-ASCII byte in
+	// shipmanifest.RawPathRead/UnquoteGitPath (cycle-1108): without them a non-ASCII byte in
 	// an item filename comes back C-quoted, never matches the sanctioned set,
 	// and false-refuses a legitimate consumption ship (review M4).
-	args = append(args, rawPathRead("diff-tree", "-r", "--name-only", boundTree, actualTree)...)
+	args = append(args, shipmanifest.RawPathRead("diff-tree", "-r", "--name-only", boundTree, actualTree)...)
 	var out strings.Builder
 	if exit, err := opts.run(ctx, "git", args, &out, io.Discard); err != nil || exit != 0 {
 		return false, ""

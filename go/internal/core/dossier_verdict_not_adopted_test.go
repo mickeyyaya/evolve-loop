@@ -20,8 +20,7 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 		t.Fatalf("the non-adopted retro verdict must be recorded (never dropped — cycle-802); got %+v", r.VerdictsNotAdopted)
 	}
 
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	ws := t.TempDir()
 	writeFailureArtifacts(t, ws, []string{"audit FAIL: two defects"})
 	if err := writeCycleDossier(nil, cycleDossierParams{
@@ -49,8 +48,7 @@ func TestDossier_RetroThatRanIsNotRecordedAsSkipped(t *testing.T) {
 }
 
 func TestDossier_AbnormalExitStillRecordsATrueSkip(t *testing.T) {
-	root := t.TempDir()
-	initDossierRepo(t, root)
+	root := initDossierRepo(t)
 	skipped := []SkippedPhase{{Phase: "closeout", Reason: "abnormal exit in phase build"}}
 
 	if err := writeCycleDossier(nil, cycleDossierParams{

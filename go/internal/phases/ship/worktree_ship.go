@@ -104,8 +104,22 @@ func (s *worktreeShip) preflight() error {
 	return reconcileManifest(s.ctx, s.opts, s.result, s.worktree, s.branch, s.cycleBranch)
 }
 
+func (s *worktreeShip) stageTrackedEdits() error {
+	var errTail strings.Builder
+	exit, err := s.opts.run(s.ctx, "git", []string{"-C", s.worktree, "add", "-u"}, io.Discard, &errTail)
+	if err != nil || exit != 0 {
+		return shipErr(core.CodeGitStageFailed, core.ShipClassTransient, core.StageAtomicShip,
+			fmt.Sprintf("ship: git add failed (rc=%d): %v: add -u: %s", exit, err, strings.TrimSpace(errTail.String())),
+			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "worktree", s.worktree)
+	}
+	return nil
+}
+
 func (s *worktreeShip) prepareChanges() (worktreeChangeState, error) {
 	if !s.opts.DryRun {
+		if err := s.stageTrackedEdits(); err != nil {
+			return worktreeNoChanges, err
+		}
 		_ = discardBinaryChurn(s.ctx, s.opts, s.worktree)
 		consumeCommittedItems(s.ctx, s.opts, s.result, s.worktree)
 		if err := stageExplicitPaths(s.ctx, s.opts, s.result, s.worktree); err != nil {

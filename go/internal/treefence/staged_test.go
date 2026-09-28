@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestTakeStaged_IsTheRealIndexPlusTheDeclaredPaths(t *testing.T) {
+func TestTakeStaged_IsTheRealIndexEveryTrackedEditAndTheDeclaredPaths(t *testing.T) {
 	root := initRepo(t)
 	ctx := context.Background()
 	index := filepath.Join(root, ".git", "index")
@@ -22,17 +22,22 @@ func TestTakeStaged_IsTheRealIndexPlusTheDeclaredPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	both, err := TakeStaged(ctx, root, []string{"src/new_test.go", "src/mat.go"})
-	if err != nil || both.Tree != full.Tree {
-		t.Fatalf("declaring every change stages the full tree (%v): %s vs %s", err, both.Tree, full.Tree)
+	declared, err := TakeStaged(ctx, root, []string{"src/new_test.go"})
+	if err != nil || declared.Tree != full.Tree {
+		t.Fatalf("the declared untracked file plus every tracked edit is the full tree (%v): %s vs %s", err, declared.Tree, full.Tree)
 	}
-	onlyNew, err := TakeStaged(ctx, root, []string{"src/new_test.go"})
-	if err != nil || onlyNew.Tree == full.Tree {
-		t.Fatalf("an undeclared tracked edit stays out of the staged tree (%v)", err)
+	none, err := TakeStaged(ctx, root, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	tracked, err := TakeTracked(ctx, root)
-	if err != nil || onlyNew.Tree == tracked.Tree {
-		t.Fatalf("the staged tree is neither the full nor the tracked tree: it holds the declared new file without the undeclared edit (%v)", err)
+	if none.Tree == full.Tree {
+		t.Fatal("an undeclared untracked file never enters the staged tree")
+	}
+	if got, err := git(ctx, root, nil, "show", none.Tree+":src/mat.go"); err != nil || !strings.Contains(got, "builder change") {
+		t.Fatalf("an unstaged tracked edit is in the staged tree, as the audit binding's add -u stages it (%v): %q", err, got)
+	}
+	if _, err := git(ctx, root, nil, "show", none.Tree+":src/new_test.go"); err == nil {
+		t.Fatal("an empty pathspec adds the tracked edits only, never the untracked file")
 	}
 	if after, err := os.ReadFile(index); err != nil || string(after) != string(before) {
 		t.Fatalf("the staged snapshot never touches the real index (%v)", err)
@@ -43,16 +48,9 @@ func TestTakeStaged_IsTheRealIndexPlusTheDeclaredPaths(t *testing.T) {
 	if _, err := git(ctx, root, nil, "add", "notes.txt"); err != nil {
 		t.Fatal(err)
 	}
-	stagedIndex, err := os.ReadFile(index)
+	withStaged, err := TakeStaged(ctx, root, []string{"src/new_test.go"})
 	if err != nil {
 		t.Fatal(err)
-	}
-	withStaged, err := TakeStaged(ctx, root, []string{"src/new_test.go", "src/mat.go"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if after, err := os.ReadFile(index); err != nil || string(after) != string(stagedIndex) {
-		t.Fatalf("the staged snapshot never touches a real index that already stages a path (%v)", err)
 	}
 	withAll, err := Take(ctx, root)
 	if err != nil || withStaged.Tree != withAll.Tree {
@@ -61,29 +59,32 @@ func TestTakeStaged_IsTheRealIndexPlusTheDeclaredPaths(t *testing.T) {
 	if _, err := withStaged.Restore(ctx); err == nil {
 		t.Fatal("a staged snapshot never restores a worktree: only a full snapshot knows every path")
 	}
-	if tracked, err := TakeTracked(ctx, root); err != nil {
-		t.Fatal(err)
-	} else if _, err := tracked.Restore(ctx); err == nil {
-		t.Fatal("a tracked snapshot never restores a worktree either")
-	}
-	if _, err := git(ctx, root, nil, "rm", "-q", "--cached", "notes.txt"); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Remove(filepath.Join(root, "notes.txt")); err != nil {
-		t.Fatal(err)
-	}
-	none, err := TakeStaged(ctx, root, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	head, err := git(ctx, root, nil, "rev-parse", "HEAD^{tree}")
-	if err != nil || none.Tree != strings.TrimSpace(head) {
-		t.Fatalf("an empty pathspec adds nothing, never the whole tree (%v): %s vs HEAD %s", err, none.Tree, head)
-	}
 	if err := os.Remove(index); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := TakeStaged(ctx, root, []string{"src/new_test.go"}); err == nil {
 		t.Fatal("a staged snapshot without a readable real index is a refusal, never a narrowed tree")
+	}
+	if _, err := TakeStaged(ctx, "", nil); err == nil {
+		t.Fatal("an empty worktree path is refused")
+	}
+	if _, err := TakeStaged(ctx, t.TempDir(), nil); err == nil {
+		t.Fatal("a non-repository is refused")
+	}
+}
+
+func TestTakeStaged_ADeclaredFileDeletedButNotStagedIsADeletion(t *testing.T) {
+	root := initRepo(t)
+	ctx := context.Background()
+	if err := os.Remove(filepath.Join(root, "src", "keep.go")); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := TakeStaged(ctx, root, []string{"src/keep.go", "src/new_test.go"})
+	if err != nil {
+		t.Fatalf("a declared file removed with plain rm is a deletion to stage, not a pathspec that matches nothing: %v", err)
+	}
+	full, err := Take(ctx, root)
+	if err != nil || snap.Tree != full.Tree {
+		t.Fatalf("the declared deletion, the declared new file and the tracked edit are the full tree (%v): %s vs %s", err, snap.Tree, full.Tree)
 	}
 }

@@ -5,7 +5,6 @@
       "name": "direct/push-ok",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -28,7 +27,6 @@
       "name": "direct/fetch-rc1",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -63,7 +61,6 @@
       "name": "direct/fetch-spawn-error",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -98,7 +95,6 @@
       "name": "direct/origin-ref-error",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -134,7 +130,6 @@
       "name": "direct/head-error",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -164,7 +159,6 @@
       "name": "direct/already-pushed",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -192,7 +186,6 @@
       "name": "direct/ancestor-retry-ok",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -222,7 +215,6 @@
       "name": "direct/ancestor-retry-rc1",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -261,7 +253,6 @@
       "name": "direct/diverged",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",
@@ -299,7 +290,6 @@
       "name": "direct/once-guard-preset",
       "argv": [
         "-C \u003croot\u003e -c core.quotePath=false status --porcelain -uall [capture]",
-        "add -A -- [other]",
         "diff --cached --name-only [capture]",
         "diff --cached --quiet [discard]",
         "diff --cached --name-status [capture]",

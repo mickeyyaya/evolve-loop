@@ -100,7 +100,11 @@ func TestBeginPredicateEvidence_UnstagedInputsRefuseAudit(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "helper.go"), []byte("package source\nfunc helper() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err = beginPredicateEvidence(core.PhaseRequest{Cycle: 1, RunID: "run-1", AuditRound: 1, Worktree: root})
+	ws := t.TempDir()
+	if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte("Added `source.go`.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = beginPredicateEvidence(core.PhaseRequest{Cycle: 1, RunID: "run-1", AuditRound: 1, Worktree: root, Workspace: ws})
 	if err == nil {
 		t.Fatal("undeclared helper can affect execution but would be absent from the ship tree")
 	}

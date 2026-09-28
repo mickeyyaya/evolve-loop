@@ -48,23 +48,8 @@ type snapshotMode uint8
 
 const (
 	allFiles snapshotMode = iota
-	trackedFiles
 	declaredFiles
 )
-
-// TakeTracked records the tracked/staged ship tree without adopting untracked
-// execution inputs or mutating the real index. Its seed must be readable:
-// unlike add -A, add -u cannot reconstruct a missing or partial index.
-func TakeTracked(ctx context.Context, worktree string) (Snapshot, error) {
-	if strings.TrimSpace(worktree) == "" {
-		return Snapshot{}, fmt.Errorf("treefence: worktree path required")
-	}
-	tree, err := writeTreeMode(ctx, worktree, trackedFiles, nil)
-	if err != nil {
-		return Snapshot{}, err
-	}
-	return Snapshot{Worktree: worktree, Tree: tree, mode: trackedFiles}, nil
-}
 
 func TakeStaged(ctx context.Context, worktree string, pathspec []string) (Snapshot, error) {
 	if strings.TrimSpace(worktree) == "" {
@@ -274,7 +259,7 @@ func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode, decl
 		return "", fmt.Errorf("treefence: this snapshot requires a complete real-index seed: %w", indexErr)
 	}
 	env := []string{"GIT_INDEX_FILE=" + index}
-	if add := addArgs(mode, declared); add != nil {
+	for _, add := range addArgs(mode, declared) {
 		if _, err := git(ctx, worktree, env, add...); err != nil {
 			return "", err
 		}
@@ -286,16 +271,14 @@ func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode, decl
 	return strings.TrimSpace(out), nil
 }
 
-func addArgs(mode snapshotMode, declared []string) []string {
+func addArgs(mode snapshotMode, declared []string) [][]string {
 	switch {
-	case mode == trackedFiles:
-		return []string{"add", "-u", "--", "."}
 	case mode == declaredFiles && len(declared) == 0:
-		return nil
+		return [][]string{{"add", "-u", "--", "."}}
 	case mode == declaredFiles:
-		return append([]string{"add", "-A", "--"}, declared...)
+		return [][]string{append([]string{"add", "-A", "--"}, declared...), {"add", "-u", "--", "."}}
 	default:
-		return []string{"add", "-A", "--", "."}
+		return [][]string{{"add", "-A", "--", "."}}
 	}
 }
 

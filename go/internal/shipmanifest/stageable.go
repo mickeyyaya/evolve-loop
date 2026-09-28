@@ -6,7 +6,10 @@ import (
 )
 
 func Stageable(porcelain string, manifest []string, isFile func(string) bool) []string {
-	paths := pathspec(manifest, ChangedPaths(porcelain), isFile)
+	return withoutGone(porcelain, pathspec(manifest, ChangedPaths(porcelain), isFile))
+}
+
+func withoutGone(porcelain string, paths []string) []string {
 	gone := gonePaths(porcelain)
 	kept := make([]string, 0, len(paths))
 	for _, p := range paths {
