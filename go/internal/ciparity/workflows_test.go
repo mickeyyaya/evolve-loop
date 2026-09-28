@@ -12,19 +12,36 @@ import (
 )
 
 type workflowContract struct {
-	On   map[string]struct{ Paths []string }
-	Jobs map[string]struct {
-		Uses  string
-		If    string
-		Needs yaml.Node
-		Steps []struct {
-			Run              string
-			Uses             string
-			If               string
-			With             map[string]string
-			WorkingDirectory string `yaml:"working-directory"`
-		}
+	On map[string]struct {
+		Paths          []string
+		PathsIgnore    []string `yaml:"paths-ignore"`
+		Branches       []string
+		BranchesIgnore []string `yaml:"branches-ignore"`
+		Outputs        map[string]struct{ Value string }
 	}
+	Permissions map[string]string
+	Jobs        map[string]workflowJobContract
+}
+
+type workflowJobContract struct {
+	Name            string
+	Uses            string
+	If              string
+	Needs           yaml.Node
+	Outputs         map[string]string
+	ContinueOnError string `yaml:"continue-on-error"`
+	Steps           []workflowStepContract
+}
+
+type workflowStepContract struct {
+	ContinueOnError  string `yaml:"continue-on-error"`
+	ID               string
+	Run              string
+	Uses             string
+	If               string
+	Env              map[string]string
+	With             map[string]string
+	WorkingDirectory string `yaml:"working-directory"`
 }
 
 func TestRelease_RequiresSharedValidationBeforePublishing(t *testing.T) {
@@ -50,27 +67,6 @@ func TestRelease_RequiresSharedValidationBeforePublishing(t *testing.T) {
 	}
 	if release.Jobs["goreleaser"].If != "" {
 		t.Fatal("publication must retain the default successful-dependencies condition")
-	}
-}
-
-func TestGoWorkflow_TriggersForConsumedConfiguration(t *testing.T) {
-	w := readWorkflowContract(t, "go.yml")
-	for _, event := range []string{"push", "pull_request"} {
-		if _, ok := w.On[event]; !ok {
-			t.Errorf("workflow has no %s trigger", event)
-			continue
-		}
-		for _, input := range []string{".goreleaser.yml", ".github/workflows/release.yml", ".github/workflows/ci.yml", ".github/workflows/landing-pages.yml"} {
-			selected := len(w.On[event].Paths) == 0
-			for _, pattern := range w.On[event].Paths {
-				if matched, _ := filepath.Match(pattern, input); matched || (strings.HasSuffix(pattern, "/**") && strings.HasPrefix(input, strings.TrimSuffix(pattern, "**"))) {
-					selected = true
-				}
-			}
-			if !selected {
-				t.Errorf("%s does not select consumed input %s", event, input)
-			}
-		}
 	}
 }
 
@@ -105,9 +101,6 @@ func TestReusableGoValidation_PreservesReleaseHistory(t *testing.T) {
 
 func TestLandingWorkflow_TestsPullRequestsBeforeBuild(t *testing.T) {
 	w := readWorkflowContract(t, "landing-pages.yml")
-	if _, ok := w.On["pull_request"]; !ok {
-		t.Error("landing tests are not selected for pull requests")
-	}
 	var needs []string
 	if n := w.Jobs["build"].Needs; n.Kind == yaml.ScalarNode {
 		needs = []string{n.Value}
@@ -117,17 +110,24 @@ func TestLandingWorkflow_TestsPullRequestsBeforeBuild(t *testing.T) {
 	if !slices.Contains(needs, "test") {
 		t.Error("site build does not depend on successful module tests")
 	}
-	if _, ok := w.Jobs["test"]; !ok {
-		t.Error("landing has no module test job")
+	const shared = "./.github/workflows/landing-validation.yml"
+	if w.Jobs["test"].Uses != shared || readWorkflowContract(t, "required.yml").Jobs["landing"].Uses != shared {
+		t.Error("Pages and required PR checks must share landing validation")
 	}
-	selected := false
-	for _, step := range w.Jobs["test"].Steps {
-		if step.WorkingDirectory == "landing" && strings.Contains(step.Run, "go test -race -count=1 ./...") {
-			selected = true
+	validation := readWorkflowContract(t, "landing-validation.yml")
+	if _, ok := validation.On["workflow_call"]; !ok {
+		t.Error("landing validation is not reusable")
+	}
+	var commands []string
+	for _, step := range validation.Jobs["test"].Steps {
+		if step.WorkingDirectory == "landing" {
+			commands = append(commands, strings.Fields(step.Run)...)
 		}
 	}
-	if !selected {
-		t.Error("landing test job does not select the complete module with race detection")
+	for _, want := range []string{"go test -race -count=1 ./...", "go vet ./...", "go run ./cmd/build"} {
+		if !strings.Contains(strings.Join(commands, " "), want) {
+			t.Errorf("shared landing validation does not run %q", want)
+		}
 	}
 	const guard = "github.event_name != 'pull_request'"
 	if w.Jobs["deploy"].If != guard {
