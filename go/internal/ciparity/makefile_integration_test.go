@@ -232,7 +232,7 @@ func TestMakeTestRecipes_RunGitWithBackgroundMaintenanceOff(t *testing.T) {
 	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	probe := gitMaintenanceProbe + fmt.Sprintf("\nvar maintenanceConfig = %#v\n", gittest.MaintenanceConfig)
+	probe := gitMaintenanceProbe + fmt.Sprintf("\nvar maintenanceConfig = %#v\n", gittest.MaintenanceConfig())
 	for _, target := range []string{"test", "test-integration"} {
 		t.Run(target, func(t *testing.T) {
 			root := makeFixture(t)

@@ -21,7 +21,7 @@ func rawConfig(t *testing.T, dir, key string) string {
 
 func assertPersistsMaintenanceConfig(t *testing.T, dir string) {
 	t.Helper()
-	for _, kv := range MaintenanceConfig {
+	for _, kv := range MaintenanceConfig() {
 		if got := rawConfig(t, dir, kv[0]); got != kv[1] {
 			t.Errorf("%s: %s = %q in the repo's own config, want %q", dir, kv[0], got, kv[1])
 		}
@@ -79,7 +79,7 @@ func TestBareAndClone_CarryTheFixtureConfig(t *testing.T) {
 
 func TestMaintenanceConfig_TurnsBackgroundMaintenanceOff(t *testing.T) {
 	got := map[string]string{}
-	for _, kv := range MaintenanceConfig {
+	for _, kv := range MaintenanceConfig() {
 		got[kv[0]] = kv[1]
 	}
 	for key, want := range map[string]string{"maintenance.auto": "false", "gc.auto": "0"} {
@@ -89,16 +89,25 @@ func TestMaintenanceConfig_TurnsBackgroundMaintenanceOff(t *testing.T) {
 	}
 }
 
+func TestMaintenanceConfig_ReturnsACopyCallersCannotMutate(t *testing.T) {
+	want := slices.Clone(MaintenanceConfig())
+	first := MaintenanceConfig()
+	first[0][1] = "mutated"
+	if second := MaintenanceConfig(); !slices.Equal(second, want) {
+		t.Errorf("MaintenanceConfig() = %v after a caller mutated an earlier result, want %v", second, want)
+	}
+}
+
 func TestConfigEnv_ReplacesAmbientCommandScopeWithMaintenanceConfigAndExtras(t *testing.T) {
 	extra := [2]string{"core.hooksPath", "/nonexistent/hooks"}
-	tableLen := len(MaintenanceConfig) + 1
+	tableLen := len(MaintenanceConfig()) + 1
 	stray := strconv.Itoa(tableLen)
 	t.Setenv("GIT_CONFIG_COUNT", strconv.Itoa(tableLen+1))
 	t.Setenv("GIT_CONFIG_KEY_"+stray, "ambient.stray")
 	t.Setenv("GIT_CONFIG_VALUE_"+stray, "leaked")
 	env := append(os.Environ(), ConfigEnv(extra)...)
 
-	for _, kv := range append(slices.Clone(MaintenanceConfig), extra) {
+	for _, kv := range append(MaintenanceConfig(), extra) {
 		if got, err := commandScopeConfig(t, env, kv[0]); err != nil || got != kv[1] {
 			t.Errorf("git under ConfigEnv: %s = %q (%v), want %q", kv[0], got, err, kv[1])
 		}

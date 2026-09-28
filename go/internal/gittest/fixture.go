@@ -28,16 +28,20 @@ const (
 	teardownBackoff  = 10 * time.Millisecond
 )
 
-var MaintenanceConfig = [][2]string{
+var maintenanceConfig = [][2]string{
 	{"maintenance.auto", "false"},
 	{"gc.auto", "0"},
+}
+
+func MaintenanceConfig() [][2]string {
+	return slices.Clone(maintenanceConfig)
 }
 
 // quietConfig is written into every fixture repo's own config. maintenance.auto
 // stops the detached maintenance child (gc.auto=0 alone does not); gc.auto=0
 // covers gits older than 2.47, whose commit runs `gc --auto` directly. The
 // identity makes commits work on a runner with no global identity.
-var quietConfig = slices.Concat(MaintenanceConfig, [][2]string{
+var quietConfig = slices.Concat(maintenanceConfig, [][2]string{
 	{"user.name", "gittest"},
 	{"user.email", "gittest@example.com"},
 })
@@ -80,7 +84,7 @@ func Clone(tb testing.TB, src string) *Repo {
 }
 
 func ConfigEnv(extra ...[2]string) []string {
-	pairs := slices.Concat(MaintenanceConfig, extra)
+	pairs := slices.Concat(maintenanceConfig, extra)
 	env := []string{"GIT_CONFIG_COUNT=" + strconv.Itoa(len(pairs))}
 	for i, kv := range pairs {
 		n := strconv.Itoa(i)
