@@ -1,11 +1,5 @@
 package audit
 
-// defect_ledger_seam_test.go — ADR-0103 unit 09: the audit package's seam onto
-// internal/core/defectledger — the Null-Object facades carry the REAL lane-scope
-// reader and resolver, Config.Signals reaches the ledger, ONE construction
-// site, the production spellings, and the ordered signal stream a blocked
-// continuation leaves.
-
 import (
 	"go/ast"
 	"go/parser"
@@ -38,10 +32,11 @@ func streamOf(events []signalcenter.Event) string {
 	return strings.Join(parts, " ")
 }
 
-// Test 40 — the free facade runs on a Null-Object ledger built with the REAL
-// core.LaneScopeIDs: the cycle-1285 F2 fixture (registry + lane-scope pin,
-// manifest deleted) still blocks with the registry finding. A source scan
-// pins that the one wired construction spells the real collaborators.
+// TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback — the free facade
+// runs on a Null-Object ledger built with the REAL core.LaneScopeIDs: a
+// manifest-deleted continuation fixture (registry + lane-scope pin) still
+// blocks with the registry finding. A source scan pins that the one wired
+// construction spells the real collaborators.
 func TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback(t *testing.T) {
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.Remove(filepath.Join(ws, "continuation-manifest.json")); err != nil {
@@ -60,10 +55,10 @@ func TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback(t *testing.T) {
 	}
 }
 
-// Test 41 — Config.Signals reaches the ledger through newHooks (the ONE hooks
-// literal New builds); a wired Classify on the F2 fixture records
-// AUDIT_LEDGER_MANIFEST_MISSING and keeps the verdict and diagnostics
-// byte-identical to the null path.
+// TestAuditConfig_SignalsReachTheLedger — Config.Signals reaches the ledger
+// through newHooks (the ONE hooks literal New builds); a wired Classify on
+// the manifest-deleted fixture records AUDIT_LEDGER_MANIFEST_MISSING and
+// keeps the verdict and diagnostics byte-identical to the null path.
 func TestAuditConfig_SignalsReachTheLedger(t *testing.T) {
 	acc, got := recordingAccessor()
 	if !newHooks(Config{Signals: acc}).ledger.SignalsWired() {
@@ -91,8 +86,9 @@ func TestAuditConfig_SignalsReachTheLedger(t *testing.T) {
 	}
 }
 
-// Test 42 — ONE construction site (the seam file), the production sites use
-// the wired ledger, and the Null-Object facades have no production caller.
+// TestDefectLedgerSeam_OneConstructionSite pins the ONE construction site
+// (the seam file); the production sites use the wired ledger, and the
+// Null-Object facades have no production caller.
 func TestDefectLedgerSeam_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/phases/audit/defect_ledger.go"
 	if offenders := auditNonTestSourcesMentioning(t, "defectledger.New(", onlySite); len(offenders) > 0 {
@@ -167,10 +163,11 @@ func auditNonTestSourcesMentioning(t *testing.T, needle, allowed string) []strin
 	return offenders
 }
 
-// Test 43 — the exact ordered {module, kind, code} stream a Classify leaves:
-// a blocked continuation with an absent dispositions file and two OPEN
-// inherited rows; a non-continuation FAIL; an overflowing rejection; an emit
-// read fault (the disposition.go warn text once, no second code).
+// TestClassify_LedgerStreamSequenceOnABlockedContinuation pins the exact
+// ordered {module, kind, code} stream a Classify leaves: a blocked
+// continuation with an absent dispositions file and two OPEN inherited rows;
+// a non-continuation FAIL; an overflowing rejection; an emit read fault (the
+// disposition.go warn text once, no second code).
 func TestClassify_LedgerStreamSequenceOnABlockedContinuation(t *testing.T) {
 	acc, got := recordingAccessor()
 	wired := hooks{ledger: wiredDefectLedger(acc)}
@@ -228,8 +225,8 @@ func diagnosticContaining(diags []core.Diagnostic, needle string) core.Diagnosti
 	return core.Diagnostic{}
 }
 
-// Test 49 — review fold (architecture HIGH/MEDIUM): the three artifact names
-// the gate reads have ONE production spelling each — the ledger and the
+// TestArtifactNames_HaveOneProductionSpellingEach pins that the three
+// artifact names the gate reads have ONE production spelling each — the
 // dispositions file in the leaf's schema.go, the manifest in
 // continuation.go — and every other non-test file in the module names them
 // through the owner (defectDispositionFile, continuation.ManifestName). A

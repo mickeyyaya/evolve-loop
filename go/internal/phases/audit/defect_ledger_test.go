@@ -11,20 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// defect_ledger_test.go — RED contract for cycle-1279 Tasks 1 and 2
-// (`continuation-defect-ledger-emit`, `continuation-audit-disposition-diff`;
-// batch-integrity-review-2026-08-04.md F1 solution bullet i).
-//
-// The defect this pins: a named CRITICAL defect survived the
-// 1255 → 1268-salvage → 1270 → 1272 chain by being individually honest at
-// every step but collectively erased — each continuation narrowed, renamed, or
-// declared-already-fixed the defect, and NO code anywhere required a
-// continuation to reconcile against the ORIGINAL rejecting audit's
-// machine-readable `defects[]`.
-//
 // Two mechanisms are pinned, both through the REAL production seam
-// (`hooks.Classify` — the audit phase's verdict path, the same entry
-// quarantineProbesForRequest hangs off at audit.go:169). A helper called
+// (`hooks.Classify` — the audit phase's verdict path). A helper called
 // directly would pass on dead code; every assertion below reaches its subject
 // from Classify.
 //
@@ -65,9 +53,9 @@ type ledgerDoc struct {
 
 // failingReportWithDefects renders an audit report whose evolve-verdict
 // sentinel carries a structured failure block — the exact artifact shape
-// extractAuditVerdict already parses (audit.go:394, via
-// phasecontract.ParseVerdictSentinel), so the ledger writer sources its defects
-// from real production input rather than a test-only side channel.
+// extractAuditVerdict already parses via phasecontract.ParseVerdictSentinel,
+// so the ledger writer sources its defects from real production input rather
+// than a test-only side channel.
 func failingReportWithDefects(defects ...string) string {
 	q, _ := json.Marshal(defects)
 	return "# Audit Report\n\n## Verdict\n**FAIL**\n\n" +
@@ -241,11 +229,11 @@ var laundered = []string{
 	"ScratchCwd follows a symlink outside the worktree",
 }
 
-// TestClassify_ContinuationCannotPassWithUnaccountedDefect — the crux. This is
-// the 1255→1272 chain in miniature: the continuation genuinely fixes two of the
-// three inherited defects, narrates PASS, and the EGPS gate is green. Today
-// that ships and the third defect is laundered. It must NOT be able to PASS,
-// and the gap must be named BY ID.
+// TestClassify_ContinuationCannotPassWithUnaccountedDefect — the crux: the
+// continuation genuinely fixes two of the three inherited defects, narrates
+// PASS, and the EGPS gate is green. Without this gate that ships and the
+// third defect is laundered. It must NOT be able to PASS, and the gap must
+// be named BY ID.
 func TestClassify_ContinuationCannotPassWithUnaccountedDefect(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -273,10 +261,9 @@ func TestClassify_ContinuationCannotPassWithUnaccountedDefect(t *testing.T) {
 // that shrinks is a ledger that launders.
 func TestClassify_ContinuationLedgerRetainsEveryEntry(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
-	// cycle-1282 D3: a closure claim's evidence must RESOLVE to a real file, so
-	// the fixture now materializes the artifacts it cites (evidenceFile lives in
-	// defect_ledger_hardening_test.go). This strengthens the fixture; the
-	// assertions below are unchanged.
+	// A closure claim's evidence must RESOLVE to a real file, so the fixture
+	// materializes the artifacts it cites (evidenceFile lives in
+	// defect_ledger_hardening_test.go).
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
 			map[string]any{"id": "d1", "status": "FIXED", "evidence": evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")},

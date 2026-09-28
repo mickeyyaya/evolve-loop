@@ -13,7 +13,7 @@ import (
 
 // manifestLeakOpts builds a reconcileManifest fixture whose declared manifest
 // covers docs/declared.md while `git status --porcelain -uall` reports an
-// UNDECLARED untracked file — the cross-lane leak shape (cycle-645).
+// UNDECLARED untracked file — the cross-lane leak shape.
 func manifestLeakOpts(t *testing.T) *Options {
 	t.Helper()
 	ws := t.TempDir()
@@ -27,12 +27,10 @@ func manifestLeakOpts(t *testing.T) *Options {
 	return &Options{WorkspacePath: ws, ProjectRoot: t.TempDir(), Runner: runner, Stdout: io.Discard, Stderr: io.Discard}
 }
 
-// TestReconcileManifest_EnforceCarriesManifestGateCode is the cycle-1064 crux
-// for dedicated-manifest-gate-error-code: the enforce-mode block must surface
-// the DEDICATED core.CodeManifestGate, never the generic CodeGitStageFailed a
-// real failing `git add` also emits. Ledger/debugger triage keys off Code, so
-// the reuse makes an integrity block indistinguishable from a transient git
-// failure (GIT_STAGE_FAILED is class TRANSIENT in the code table).
+// The enforce-mode block must surface the DEDICATED core.CodeManifestGate,
+// never the generic CodeGitStageFailed a real failing `git add` also emits.
+// Ledger/debugger triage keys off Code, so reuse would make an integrity
+// block indistinguishable from a transient git failure.
 func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
 	opts := manifestLeakOpts(t)
 	opts.ManifestGate = ManifestGateEnforce
@@ -51,7 +49,6 @@ func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
 	if se.Code == core.CodeGitStageFailed {
 		t.Errorf("Code must not remain the generic %q", core.CodeGitStageFailed)
 	}
-	// The rest of the structured signal must be preserved, not regressed.
 	if se.Class != core.ShipClassPrecondition || se.Stage != core.StageAtomicShip {
 		t.Errorf("class/stage = %q/%q, want %q/%q", se.Class, se.Stage, core.ShipClassPrecondition, core.StageAtomicShip)
 	}
@@ -63,11 +60,10 @@ func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
 	}
 }
 
-// TestReconcileManifest_ShadowUnaffectedByCodeChange is the regression/negative
-// axis: introducing the dedicated code must not disturb the SHADOW path, which
-// still returns nil and only logs. A fix that made shadow start returning a
-// MANIFEST_GATE error would block every cycle today (the gate is permanently
-// shadow in production).
+// Introducing the dedicated code must not disturb the SHADOW path, which
+// still returns nil and only logs; shadow returning a MANIFEST_GATE error
+// would block every cycle today, since the gate is permanently shadow in
+// production.
 func TestReconcileManifest_ShadowUnaffectedByCodeChange(t *testing.T) {
 	for _, mode := range []string{"", "shadow"} {
 		opts := manifestLeakOpts(t)

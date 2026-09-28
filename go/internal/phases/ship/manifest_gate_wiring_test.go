@@ -16,12 +16,9 @@ func noopRunner(ctx context.Context, name, cwd string, args, env []string, stdin
 	return 0, nil
 }
 
-// TestShipOptions_ThreadsManifestGate is the cycle-1064 wiring crux: the ship
-// PhaseRunner's PhaseRequest→Options translation must carry the config-sourced
-// manifest-gate mode. Today Options.ManifestGate is never assigned at the sole
-// production construction site (ship.go runNative), so the dial is permanently
-// "" (shadow) no matter what policy.json says — the gate is unreachable short of
-// a code edit.
+// TestShipOptions_ThreadsManifestGate pins that the ship PhaseRunner's
+// PhaseRequest→Options translation carries the config-sourced manifest-gate
+// mode.
 //
 // The translation is asserted through the exported constructor + the
 // shipOptions seam (the extracted Options literal runNative uses), so the test
@@ -44,7 +41,6 @@ func TestShipOptions_ThreadsManifestGate(t *testing.T) {
 		if opts.ManifestGate != tc.want {
 			t.Errorf("%s: Options.ManifestGate = %q, want %q", tc.name, opts.ManifestGate, tc.want)
 		}
-		// Regression axis: the other translated fields must not be disturbed.
 		if opts.ProjectRoot != req.ProjectRoot || opts.WorkspacePath != req.Workspace ||
 			opts.RunID != req.RunID || opts.PluginRoot != "/plugin" ||
 			opts.CommitMessage != "evolve-cycle 1064" || opts.Class != ClassCycle ||
@@ -54,8 +50,7 @@ func TestShipOptions_ThreadsManifestGate(t *testing.T) {
 	}
 }
 
-// TestManifestGate_PolicyToBlockEndToEnd closes the two halves into one chain:
-// a policy.json `gates.manifest_gate: "enforce"` resolves through
+// A policy.json `gates.manifest_gate: "enforce"` resolves through
 // GatesConfig(), threads into the ship Options, and actually BLOCKS an
 // out-of-manifest path with the dedicated code. The shadow row is the negative
 // axis — the same chain with the default value must NOT block.

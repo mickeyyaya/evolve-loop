@@ -1,11 +1,5 @@
 //go:build integration
 
-// Coverage tests for core.RunCycleFromPhase + helpers — drives 62.1%
-// baseline toward ≥95%. Exercises:
-//   - RunCycleFromPhase happy + error paths (0% baseline)
-//   - defaultCurrentHead / defaultPathExists (0% baseline)
-//   - intFromAny / floatFromAny nil/wrong-type edge cases
-//   - decideAfterRetro HOLD branch
 package core
 
 import (
@@ -18,7 +12,6 @@ import (
 	"testing"
 )
 
-// TestRunCycleFromPhase_NilResumePoint covers the input-validation guard.
 func TestRunCycleFromPhase_NilResumePoint(t *testing.T) {
 	t.Parallel()
 	o := mustBuildOrchestrator(t)
@@ -28,7 +21,6 @@ func TestRunCycleFromPhase_NilResumePoint(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_InvalidPhase covers the phase-validation guard.
 func TestRunCycleFromPhase_InvalidPhase(t *testing.T) {
 	t.Parallel()
 	o := mustBuildOrchestrator(t)
@@ -39,7 +31,6 @@ func TestRunCycleFromPhase_InvalidPhase(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_PhaseEndInvalid — PhaseEnd cannot be a resume target.
 func TestRunCycleFromPhase_PhaseEndInvalid(t *testing.T) {
 	t.Parallel()
 	o := mustBuildOrchestrator(t)
@@ -50,7 +41,6 @@ func TestRunCycleFromPhase_PhaseEndInvalid(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_HappyPath drives a real resumption from PhaseBuild.
 func TestRunCycleFromPhase_HappyPath(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{
@@ -58,7 +48,7 @@ func TestRunCycleFromPhase_HappyPath(t *testing.T) {
 		cycleState: CycleState{CycleID: 5, WorkspacePath: "/tmp/ws"},
 	}
 	ldgr := &fakeLedger{}
-	runners := buildRunners(nil) // all PASS
+	runners := buildRunners(nil)
 	o := NewOrchestrator(st, ldgr, runners)
 	res, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
@@ -105,14 +95,6 @@ func TestRunCycleFromPhase_RejectsCheckpointIdentityMismatch(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted pins the resume-correctness
-// fix: an advisor-inserted phase (e.g. "mutation-gate") is registered in o.runners
-// at runtime via MintPhase but is NOT one of the 13 spine phases Phase.IsValid()
-// recognizes. The cycle-295 checkpoint-preservation fix makes resumeFromPhase
-// record such a phase, so RunCycleFromPhase must ACCEPT a startPhase found in
-// o.runners (not reject it as "invalid resume phase"). Behavioral assertion: the
-// inserted runner is actually dispatched (Run called) — proof the guard let it
-// through. RED baseline: the guard rejects before the lock, so calls == 0.
 func TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted(t *testing.T) {
 	t.Parallel()
 	const inserted = Phase("mutation-gate") // registered at runtime, not spine-valid
@@ -125,16 +107,13 @@ func TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted(t *testing.T) {
 	}
 	runners := buildRunners(nil)
 	insertedRunner := &fakeRunner{name: string(inserted)}
-	runners[inserted] = insertedRunner // advisor-minted runner present in the map
+	runners[inserted] = insertedRunner
 	o := NewOrchestrator(st, &fakeLedger{}, runners)
 
 	_, err := o.RunCycleFromPhase(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 	}, &ResumePoint{Phase: string(inserted), CycleID: 5})
 
-	// The inserted phase has no state-machine transition, so the cycle may stop
-	// with a downstream transition error AFTER dispatching it — that's expected.
-	// The contract under test is only that the guard ACCEPTED it and dispatched.
 	if insertedRunner.calls == 0 {
 		t.Fatalf("RED: inserted phase %q in o.runners was rejected by the resume guard "+
 			"(runner never dispatched); RunCycleFromPhase err=%v", inserted, err)
@@ -144,10 +123,6 @@ func TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_PhaseStartRejected pins the negative axis parity with the
-// existing PhaseEnd guard: PhaseStart is registered nowhere as a resumable target
-// and must be rejected even though IsValid() accepts it. (PhaseEnd rejection is
-// covered by TestRunCycleFromPhase_PhaseEndInvalid; this is its PhaseStart twin.)
 func TestRunCycleFromPhase_PhaseStartRejected(t *testing.T) {
 	t.Parallel()
 	o := mustBuildOrchestrator(t)
@@ -158,7 +133,6 @@ func TestRunCycleFromPhase_PhaseStartRejected(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_MissingRunner covers the no-runner-registered branch.
 func TestRunCycleFromPhase_MissingRunner(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{
@@ -178,7 +152,6 @@ func TestRunCycleFromPhase_MissingRunner(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_LedgerError covers the ledger-append error path.
 func TestRunCycleFromPhase_LedgerError(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{
@@ -196,8 +169,6 @@ func TestRunCycleFromPhase_LedgerError(t *testing.T) {
 	}
 }
 
-// TestDefaultCurrentHead_RealRepo exercises defaultCurrentHead in a real
-// ephemeral git repo (0% baseline → covered).
 func TestDefaultCurrentHead_RealRepo(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -222,7 +193,6 @@ func TestDefaultCurrentHead_RealRepo(t *testing.T) {
 	}
 }
 
-// TestDefaultCurrentHead_NotARepo covers the error branch.
 func TestDefaultCurrentHead_NotARepo(t *testing.T) {
 	t.Parallel()
 	if _, err := defaultCurrentHead(t.TempDir()); err == nil {
@@ -230,7 +200,6 @@ func TestDefaultCurrentHead_NotARepo(t *testing.T) {
 	}
 }
 
-// TestDefaultPathExists covers both true/false branches.
 func TestDefaultPathExists(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
@@ -242,7 +211,6 @@ func TestDefaultPathExists(t *testing.T) {
 	}
 }
 
-// TestIntFromAny_AllTypes covers the int/float64/default branches.
 func TestIntFromAny_AllTypes(t *testing.T) {
 	t.Parallel()
 	if intFromAny(float64(42)) != 42 {
@@ -259,7 +227,6 @@ func TestIntFromAny_AllTypes(t *testing.T) {
 	}
 }
 
-// TestFloatFromAny_AllTypes covers float64/int/default branches.
 func TestFloatFromAny_AllTypes(t *testing.T) {
 	t.Parallel()
 	if floatFromAny(float64(1.5)) != 1.5 {
@@ -276,7 +243,6 @@ func TestFloatFromAny_AllTypes(t *testing.T) {
 	}
 }
 
-// TestStrFromAny covers the assertion-fails branch.
 func TestStrFromAny_Wrong(t *testing.T) {
 	t.Parallel()
 	if got := strFromAny(42); got != "" {
@@ -287,22 +253,17 @@ func TestStrFromAny_Wrong(t *testing.T) {
 	}
 }
 
-// TestDecideAfterRetro_AllBranches covers HOLD/FAST-FAIL and verdict branches.
 func TestDecideAfterRetro_AllBranches(t *testing.T) {
 	t.Parallel()
 	o := mustBuildOrchestrator(t)
-	// PASS verdict → ship branch
 	branch, _, _, _ := o.decideAfterRetro(CycleState{}, VerdictPASS, nil)
-	_ = branch // ship or end depending on state machine
-	// FAIL verdict → tdd or end
+	_ = branch
 	branch, _, _, _ = o.decideAfterRetro(CycleState{}, VerdictFAIL, nil)
 	_ = branch
-	// WARN verdict — also exercises a code path
 	branch, _, _, _ = o.decideAfterRetro(CycleState{}, VerdictWARN, nil)
 	_ = branch
 }
 
-// TestLoadResumeState_InvalidJSON covers the json.Unmarshal error path.
 func TestLoadResumeState_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -335,5 +296,4 @@ func mustBuildOrchestrator(t *testing.T) *Orchestrator {
 	return o
 }
 
-// ensure unused imports don't trip lints
 var _ = errors.New

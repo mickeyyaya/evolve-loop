@@ -1,26 +1,12 @@
 package audit
 
-// integration_tier_orchestration_test.go — cycle-1554 RED contract for
-// `integration-tier-contention-retake-accountability` (inbox
-// pipeline-defect-pipeline-blocker, P0).
-//
 // ciparity_unit_test.go already proves CheckIntegrationTier itself returns
 // (nil, flake-error) on red-then-green and (offenders, nil) on red-then-red.
-// That is necessary but not sufficient: nothing in the suite wires the
-// PRODUCTION integrationTierCheckDefault (the function NewDefaultWithStageCompact
-// actually installs at audit.go:816/862, as h.integrationTierCheck) through the
-// real hooks.Classify orchestration and asserts on the AUDIT VERDICT the gate
-// produces. audit_verdict_conflict_gates_test.go exercises Classify's
-// override/no-override wiring, but only via hand-authored offenders(...)/
-// cannotRun(...) stand-ins for h.integrationTierCheck — never the real
-// red-then-green-retake logic. A regression that broke the seam between
-// CheckIntegrationTier's return shape and applyCIGate's (cerr!=nil ⇒ WARN,
-// offenders>0 ⇒ FAIL) branching — e.g. a future refactor that stopped mapping
-// the flake error into a could-not-run WARN — would pass every existing test
-// in this package while silently turning every contention flake into a false
-// audit FAIL (or laundering a genuine red-then-red into a WARN). These two
-// tests close that gap: same subprocess-level fixtures as ciparity_unit_test.go,
-// but driven through the real Classify orchestration.
+// That is necessary but not sufficient: nothing else in the suite wires the
+// PRODUCTION integrationTierCheckDefault through the real hooks.Classify
+// orchestration and asserts on the AUDIT VERDICT the gate produces. These
+// tests close that gap: the same subprocess-level fixtures as
+// ciparity_unit_test.go, but driven through the real Classify orchestration.
 
 import (
 	"context"
@@ -136,9 +122,8 @@ func TestAuditOrchestration_IntegrationTier_RetakeInfraFailure_FallsBackNotLaund
 // TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn —
 // a retake killed by its budget with NO recognizable verdict in the truncated
 // output is not a judgment: it must degrade to the fail-open WARN, never a
-// red-twice FAIL (2026-09-01: the re-widened tier scope makes the deadline a
-// live path, and integrationTierTimeout became a var to make this testable —
-// the same rationale as apicoverTimeout).
+// red-twice FAIL. integrationTierTimeout is a var so the deadline path is
+// testable, the same rationale as apicoverTimeout.
 func TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn(t *testing.T) {
 	req := tierFixture(t)
 	oldBudget := integrationTierTimeout

@@ -12,15 +12,14 @@ import (
 )
 
 // validateExplanationReview applies audit's policy around the shared review
-// contract (explanationdocs.ValidateReviewedHandoff). Since 2026-09-13
-// (ADR-0102, operator decision) the reviewer's reasoning is the gate and the
-// section's shape is advisory: the returned advisories ride the phase record
-// as warnings and never touch the verdict. The error — the only blocking
-// outcome — is reserved for a missing reasoning (the Evidence floor; a
-// missing or duplicated review section is no review text at all), a missing
-// Build delivery reviewed as anything but FAIL, and host-side defects in the
-// handoff itself. Before this, cycles 1638 and 1640 (2026-09-13) were burned
-// by a PASS narrative overridden on citation form alone.
+// contract (explanationdocs.ValidateReviewedHandoff): the reviewer's
+// reasoning is the gate and the section's shape is advisory — the returned
+// advisories ride the phase record as warnings and never touch the verdict.
+// The error — the only blocking outcome — is reserved for a missing
+// reasoning (the Evidence floor; a missing or duplicated review section is no
+// review text at all), a missing Build delivery reviewed as anything but
+// FAIL, and host-side defects in the handoff itself.
+// See ADR-0102.
 func validateExplanationReview(report string, req core.PhaseRequest) (advisories []string, err error) {
 	if req.ExplanationDocumentationVersion == 0 {
 		return nil, nil

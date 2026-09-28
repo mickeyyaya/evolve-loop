@@ -13,14 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestVerifyNoControlPlaneEdits_RejectsGateEdit is the cycle-20 regression at the
-// ship boundary: a --class cycle commit whose diff touches a gate file is
-// rejected with CodeControlPlaneViolation — even though the file was changed by a
-// non-tool channel (here a direct write, mimicking a Bash `sed -i` bypass of the
-// real-time role-gate hook).
 func TestVerifyNoControlPlaneEdits_RejectsGateEdit(t *testing.T) {
 	repo := makeRepo(t)
-	// The exact cycle-20 attack surface: the gate that grades the cycle.
 	mustWrite(t, filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go"),
 		"package flagreaders\n// tampered by a cycle\n")
 	opts := &Options{ProjectRoot: repo, Class: ClassCycle, Runner: execRunner}
@@ -35,8 +29,6 @@ func TestVerifyNoControlPlaneEdits_RejectsGateEdit(t *testing.T) {
 	}
 }
 
-// TestVerifyNoControlPlaneEdits_RejectsUntrackedGate covers a NEW protected file
-// (untracked) created by a cycle, not just a modification of an existing one.
 func TestVerifyNoControlPlaneEdits_RejectsUntrackedGate(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "go/internal/guards/sneaky.go"),
@@ -48,8 +40,6 @@ func TestVerifyNoControlPlaneEdits_RejectsUntrackedGate(t *testing.T) {
 	}
 }
 
-// TestVerifyNoControlPlaneEdits_AllowsNormalSource confirms the boundary does not
-// over-block: an ordinary source change passes cleanly.
 func TestVerifyNoControlPlaneEdits_AllowsNormalSource(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "go/internal/widget/widget.go"),
@@ -64,10 +54,6 @@ func TestVerifyNoControlPlaneEdits_AllowsNormalSource(t *testing.T) {
 	}
 }
 
-// TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface (architecture
-// review F37 M1): a staged `git mv` of a protected file to an unprotected name
-// is judged by its OLD path — with rename detection on, `git diff --name-only`
-// printed only the new one and the tripwire passed.
 func TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface(t *testing.T) {
 	repo := makeRepo(t)
 	gate := filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go")
@@ -87,17 +73,12 @@ func TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface(t *testing.T) {
 	}
 }
 
-// TestVerifyNoControlPlaneEdits_RejectsTrackedGateModification is the precise
-// cycle-20 scenario: an EXISTING tracked gate file is MODIFIED (not newly
-// created), exercising the `git diff --name-only HEAD` path rather than the
-// untracked `ls-files --others` path.
 func TestVerifyNoControlPlaneEdits_RejectsTrackedGateModification(t *testing.T) {
 	repo := makeRepo(t)
 	gate := filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go")
 	mustWrite(t, gate, "package flagreaders\n// original\n")
 	runGit(t, repo, "add", "-A")
 	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "add gate")
-	// Modify the now-tracked gate — the exact cycle-20 attack.
 	mustWrite(t, gate, "package flagreaders\n// tampered by a cycle\n")
 	opts := &Options{ProjectRoot: repo, Class: ClassCycle, Runner: execRunner}
 	var res RunResult

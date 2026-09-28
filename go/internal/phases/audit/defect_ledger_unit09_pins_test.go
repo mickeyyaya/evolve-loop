@@ -1,10 +1,8 @@
 package audit
 
-// defect_ledger_unit09_pins_test.go — ADR-0103 unit 09, step 1: the pre-move
-// pins on the host's order and the gate's hidden couplings, written and green
-// on 8e8f080f BEFORE the ledger moved into internal/core/defectledger, each
-// proven red against its named mutant (design §6 tests 1-5). Every case drives
-// the production seam hooks.Classify.
+// These pin the host's order and the gate's hidden couplings, each proven
+// red against its named mutant. Every case drives the production seam
+// hooks.Classify.
 
 import (
 	"os"
@@ -25,10 +23,9 @@ func ledgerDiagnostics(diags []core.Diagnostic) []string {
 	return out
 }
 
-// Test 1 — the recorded ceiling (defect_ledger.go's laneRegistryBinding doc):
-// a manifest-less workspace whose lane-scope pin is garbage arms NOTHING from
-// the registry, even though the registry binds the lane. The coupling to
-// core.LaneScopeIDs is pinned BEFORE it goes behind dependency injection.
+// TestClassify_LaneScopeMalformedDisarmsTheRegistryFallback pins the recorded
+// ceiling: a manifest-less workspace whose lane-scope pin is garbage arms
+// NOTHING from the registry, even though the registry binds the lane.
 // Mutant: laneRegistryBinding consults the registry under a hard-coded id.
 func TestClassify_LaneScopeMalformedDisarmsTheRegistryFallback(t *testing.T) {
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
@@ -47,9 +44,10 @@ func TestClassify_LaneScopeMalformedDisarmsTheRegistryFallback(t *testing.T) {
 	}
 }
 
-// Test 2 — Classify's order: reconcile (the merge write-back) runs BEFORE emit
-// (this cycle's own rejection), so the written ledger reads current rows,
-// then the inherited rows, then the rows this cycle raised.
+// TestClassify_ReconcilePrecedesEmit_OwnDefectsAppendAfterInherited pins
+// Classify's order: reconcile (the merge write-back) runs BEFORE emit (this
+// cycle's own rejection), so the written ledger reads current rows, then the
+// inherited rows, then the rows this cycle raised.
 // Mutant: finalize (emit) hoisted above reconcileContinuation in Classify.
 func TestClassify_ReconcilePrecedesEmit_OwnDefectsAppendAfterInherited(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
@@ -77,8 +75,9 @@ func TestClassify_ReconcilePrecedesEmit_OwnDefectsAppendAfterInherited(t *testin
 	}
 }
 
-// Test 3 — finalize's order: the ledger is emitted BEFORE the predicate
-// evidence is sealed, so the seal covers the final ledger state.
+// TestFinalize_EmitsTheLedgerBeforeTheSealCoversIt pins finalize's order: the
+// ledger is emitted BEFORE the predicate evidence is sealed, so the seal
+// covers the final ledger state.
 // Mutant: the seal hoisted above the emit in finalize.
 func TestFinalize_EmitsTheLedgerBeforeTheSealCoversIt(t *testing.T) {
 	ws := t.TempDir()
@@ -109,10 +108,10 @@ func TestFinalize_EmitsTheLedgerBeforeTheSealCoversIt(t *testing.T) {
 	}
 }
 
-// Test 4 — arming order: a corrupt manifest blocks with the manifest
-// diagnostic BEFORE the registry is consulted; the registry-binding finding
-// never fires beside it. Mutant: the registry consulted before the manifest
-// error is examined.
+// TestClassify_CorruptManifestBlocksEvenWithAHealthyRegistry pins the arming
+// order: a corrupt manifest blocks with the manifest diagnostic BEFORE the
+// registry is consulted; the registry-binding finding never fires beside it.
+// Mutant: the registry consulted before the manifest error is examined.
 func TestClassify_CorruptManifestBlocksEvenWithAHealthyRegistry(t *testing.T) {
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.WriteFile(filepath.Join(ws, "continuation-manifest.json"), []byte("{"), 0o644); err != nil {
@@ -128,8 +127,9 @@ func TestClassify_CorruptManifestBlocksEvenWithAHealthyRegistry(t *testing.T) {
 	}
 }
 
-// Test 5 — the merge index: the FIRST current row wins on a duplicated id; a
-// later duplicate is neither the index target nor rewritten.
+// TestClassify_FirstRowWinsOnDuplicateIds pins the merge index: the FIRST
+// current row wins on a duplicated id; a later duplicate is neither the
+// index target nor rewritten.
 // Mutant: the duplicate `continue` in the index loop removed.
 func TestClassify_FirstRowWinsOnDuplicateIds(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, []string{"text A"})

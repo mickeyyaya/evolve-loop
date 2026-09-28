@@ -1,11 +1,5 @@
 package core
 
-// retro_routed_test.go — failure floor Phase 3, orchestrator half: at
-// Stage>=Advisory the retro failure branch goes through the routing
-// strategy (advisor failure vocabulary, BLOCK floor intact) and emits a
-// routing-decision artifact — failure branches get the same forensic
-// trail as happy-path transitions.
-
 import (
 	"context"
 	"os"
@@ -48,9 +42,6 @@ func TestDecideAfterRetro_EmitsRoutingDecisionArtifact(t *testing.T) {
 	}
 }
 
-// Renamed from TestDecideAfterRetro_PassArmShipsWithoutArtifact. The PASS arm no
-// longer ships and IS a failure branch, so it consults the router and records a
-// routing decision like every other failure branch.
 func TestDecideAfterRetroRouted_PassArmIsAFailureBranch(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
@@ -77,9 +68,6 @@ func (s fixedNextStrategy) Recover(in router.RouteInput) router.RouterDecision {
 	return router.Recover(in)
 }
 
-// The SM has no retro→fault-localization edge yet: a routed insert is
-// clamped to the legal retry target (tdd) — kernel disposes — and the
-// clamp is visible in the artifact.
 func TestDecideAfterRetro_InsertClampedToLegalRetry(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}
@@ -99,8 +87,6 @@ func TestDecideAfterRetro_InsertClampedToLegalRetry(t *testing.T) {
 	}
 }
 
-// A non-insert illegal phase must NOT upgrade the deterministic branch —
-// it clamps back to the kernel baseline (end here), never to a retry.
 func TestDecideAfterRetro_ArbitraryIllegalPhaseClampsToBaseline(t *testing.T) {
 	t.Parallel()
 	led := &fakeLedger{}

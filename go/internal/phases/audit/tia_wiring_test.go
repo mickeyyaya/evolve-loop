@@ -1,28 +1,15 @@
 package audit
 
-// tia_wiring_test.go — the REACHABILITY proof for cycle-1260 Task 1
-// (`egps-regression-tia-shadow-wiring`).
-//
-// A seam whose only caller is a test is dead code. internal/regressiontia can
-// be perfectly unit-tested and still never run in production, which is exactly
-// the defect this cycle fixes: changedpkgs.ImporterClosure shipped GREEN in
-// cycle-1253 with ZERO callers, so the reverse-dependency widening that would
-// have caught the cycle-1250 router/routingtest miss never executed once.
-//
-// These tests therefore drive generateACSVerdict — the real audit-phase
-// function that runs the EGPS suite (audit.go:638, calling acssuite.Run at
-// :651) — and never call regressiontia directly. The shadow decision must be
-// emitted from THAT path or not at all.
+// These tests drive generateACSVerdict — the real audit-phase function that
+// runs the EGPS suite — and never call regressiontia directly: a seam whose
+// only caller is a test is dead code, so the shadow decision must be emitted
+// from that path or not at all.
 //
 // Root is a bare temp dir with no go.mod, so acssuite's Go lane is a fast
 // no-op (hasGoACSTree false → zero predicates → generateACSVerdict returns
 // early without writing a verdict). The TIA emission must happen BEFORE that
 // early return: the evidence is about which packages the cycle touched, not
 // about whether the suite found predicates.
-//
-// RED today: internal/regressiontia does not exist and nothing in audit.go
-// emits the artifact, so this file fails to COMPILE — a hard non-zero exit,
-// never a silent pass.
 
 import (
 	"encoding/json"

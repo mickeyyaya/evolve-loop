@@ -1,17 +1,5 @@
 package ship
 
-// postship_carryover_retire_test.go — WIRING PROOF for cycle-1440 task
-// `carryover-pass-retirement`.
-//
-// core.RetireCarryoverTodos passing its unit tests proves nothing on its own: a
-// seam whose only caller is a test is dead code. These tests drive the PRODUCTION
-// PASS-closeout caller (promoteInbox) end to end and assert the observable side
-// effect on .evolve/state.json, so they stay RED until a real production path
-// reaches the retirement seam.
-//
-// Deliberately asserts the STATE, not the call: any implementation that retires
-// the committed ids at PASS closeout satisfies it.
-
 import (
 	"context"
 	"encoding/json"
@@ -64,8 +52,7 @@ func hasID(ids []string, want string) bool {
 	return false
 }
 
-// TestPromoteInbox_LandedPassRetiresCommittedCarryover is the primary wiring
-// proof: a LANDED PASS closeout whose triage decision committed <id> must leave
+// A LANDED PASS closeout whose triage decision committed <id> must leave
 // state.json without that carryover entry — and with every other entry intact.
 func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	root := t.TempDir()
@@ -91,10 +78,9 @@ func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_UnlandedPassKeepsCarryover is the negative twin: promotion is
-// already gated on the ship commit reaching durable history (cycle-598), and
-// retirement must obey the same gate. An unlanded commit that retired the todo
-// would erase the only record of work that never shipped.
+// Promotion is already gated on the ship commit reaching durable history,
+// and retirement must obey the same gate: an unlanded commit that retired
+// the todo would erase the only record of work that never shipped.
 func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1440
@@ -115,9 +101,9 @@ func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 	}
 }
 
-// TestPromoteInbox_NoStateFileIsNoOp is the edge case: a project with no
-// .evolve/state.json (fresh checkout, or a lane whose state lives elsewhere)
-// must not error the whole PASS closeout over bookkeeping.
+// A project with no .evolve/state.json (fresh checkout, or a lane whose
+// state lives elsewhere) must not error the whole PASS closeout over
+// bookkeeping.
 func TestPromoteInbox_NoStateFileIsNoOp(t *testing.T) {
 	root := t.TempDir()
 	const cid = 1440

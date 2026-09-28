@@ -8,21 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// defect_ledger_cite_annotation_test.go — the decorated-cite long-tail
-// (2026-08-06, evidence-cite-annotation-tolerance).
-//
-// Two independent chains decorated otherwise-VALID path:range cites with a
-// trailing parenthetical annotation and ground on "resolves to no file":
-// cycle-1356 "go/internal/phases/triage/triage.go:114-129
-// (carryforwardCandidatesTimestamp...)" and cycle-~1360
-// "go/internal/core/runlease_hook.go:56-73 (stale lease)". The annotation is
-// reasonable agent output, not gaming — but evidenceResolves strips only
-// numeric :suffixes, so the whole decorated string stats as a nonexistent
-// path and the agent, believing its cite correct, re-decorates every round
-// (the accretion grind). Tolerance: ONE trailing " (…)" group is DROPPED
-// before resolution. Every anti-gaming rejection must survive: the stripped
-// path still has to be a real, repo-relative, non-self-vouching regular file.
-
 // TestClassify_AnnotatedRangeCiteCloses — POSITIVE, the live fixture shape.
 func TestClassify_AnnotatedRangeCiteCloses(t *testing.T) {
 	ws, wt, req := worktreeContinuationFixture(t, 1350, 1356, []string{"carryforward candidates timestamp is stale"})

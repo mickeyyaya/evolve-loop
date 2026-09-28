@@ -1,15 +1,5 @@
 package core
 
-// resume_review_parity_test.go — ADR-0100 §4: the resume loop's review skip
-// set is identical to the fresh loop's.
-//
-// reviewResumedDeliverable skipped review entirely when the checkpoint's
-// ExplanationDocumentationVersion was 0 ("legacy checkpoints retain their
-// historical behavior"). The explanation reviewer already delegates on
-// version 0 (mandatoryExplanationReviewer), so that skip protected nothing
-// it needed to — and it silently exempted every OTHER reviewer (the contract
-// gate, the declared-deliverables gate) for any resumed legacy cycle.
-
 import (
 	"context"
 	"os"
@@ -77,12 +67,6 @@ func TestDeclaredDeliverablesGateWired(t *testing.T) {
 	}
 }
 
-// TestBuildFloorReviewer_LegacyCheckpointVersionZeroIsExempt pins the other
-// version-consuming reviewer: with the resume skip gone, a legacy (version-0)
-// checkpoint now reaches the production build-floor reviewer, whose
-// explanation check must treat 0 as "contract not active" (explanationdocs.
-// CheckBuild returns nil when the binding is inactive) rather than as a
-// contract the cycle never had.
 func TestBuildFloorReviewer_LegacyCheckpointVersionZeroIsExempt(t *testing.T) {
 	r := NewBuildFloorReviewer(nil) // no deterministic checks: only the explanation floor could reject
 	res := r.Review(context.Background(), ReviewInput{

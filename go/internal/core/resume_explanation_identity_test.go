@@ -81,8 +81,8 @@ func TestRunCycleFromPhase_RecoversSecondCrashAfterRebaseCheckpointThroughBuild(
 		// before the forced Build could replace the stale old-base snapshot.
 		WorktreeBaseSHA: newBase, ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
 	}}
-	// Resume now advances a durable checkpoint before dispatch. Materialize the
-	// memory-storage fixture's checkpoint, matching the production caller.
+	// Materialize the memory-storage fixture's checkpoint file, matching what
+	// the production caller writes before dispatch.
 	writeStateFile(t, filepath.Join(root, ".evolve"), storage.cycleState)
 	builder := &rebaseRecoveryBuilder{}
 	runners := buildRunners(nil)

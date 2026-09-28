@@ -8,12 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// The audit is told the failurelog vocabulary (13 classes) while the retry
-// table is keyed by the policy vocabulary (7 categories); before this join the
-// envelope looked a failurelog spelling up in the policy table and declined
-// "unrecognised class" for words the prompt itself recommended (architecture
-// review of F19). One projection joins the two, and the decline reason says
-// which of the three things happened.
 func TestPolicyCategoryFor_JoinsEveryKnownClassificationOrSaysNone(t *testing.T) {
 	pol := policy.DefaultSystemFailurePolicy()
 	for _, c := range failurelog.KnownClassifications() {

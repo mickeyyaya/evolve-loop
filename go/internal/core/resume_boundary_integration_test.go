@@ -105,8 +105,6 @@ func TestResumeBoundaryCheckpointer_FailureStopsDispatchAndPreservesPause(t *tes
 	if raw, err := os.ReadFile(pendingPath); err != nil || string(raw) != "package feature\n" {
 		t.Errorf("checkpoint refusal discarded preserved work: content=%q err=%v", raw, err)
 	}
-	// Failure still receives ordinary terminal diagnostics; it must not invent
-	// a successful phase completion or suppress the checkpoint write error.
 	raw, err := os.ReadFile(filepath.Join(dossier.CyclesDir(w.Root), "cycle-7.json"))
 	if err != nil {
 		t.Fatal(err)

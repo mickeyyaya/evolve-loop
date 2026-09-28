@@ -8,24 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// retry_envelope.go — what the DETERMINISTIC policy declares legal after an audit
-// FAIL. A Specification: a pure predicate, no I/O, so the same answer comes out on
-// the live, routed and resume paths and one table can pin every branch.
-//
-// It makes ADR-0072's category table the single retry authority. That table has
-// always declared
-//
-//	CategoryCodeAuditFail: {Level: LevelTask, Action: ActionRetryWithFix,
-//	                        FixType: "address-audit-findings", MaxRetries: 2}
-//
-// while `fp.Categories[...]` was read in exactly one place, only for Level —
-// Action, MaxRetries and FixType were consumed nowhere. ADR-0092 then built a
-// parallel knob and a disposition-prose eligibility rule beside it, arriving at
-// the same cap of 2 independently. One authority now, not two.
-//
-// The envelope only says what is LEGAL. Choosing among legal actions is the
-// adjudicator's job, and it can never widen this set.
-
 // retryAction is the closed vocabulary of dispositions after an audit FAIL.
 // Declared as consts rather than string literals at call sites: a literal that
 // drifts from its reader is exactly how the retro gate came to look for
@@ -78,9 +60,6 @@ func declineOnly(reason string) retryEnvelope {
 
 // computeRetryEnvelope applies the deterministic policy.
 func computeRetryEnvelope(in retryEnvelopeInput) retryEnvelope {
-	// Gate 1 parity: a deterministic floor candidate ends the conversation before
-	// any class lookup, so a broken pipeline cannot buy a retry by declaring a
-	// friendly class.
 	if in.DeterministicFloorCandidate != "" {
 		return retryEnvelope{
 			Halt:   true,
@@ -88,19 +67,11 @@ func computeRetryEnvelope(in retryEnvelopeInput) retryEnvelope {
 		}
 	}
 
-	// Normalize before lookup: the audit writes a free-form class string, and the
-	// repo runs TWO vocabularies — policy uses infra-systemic/transport-hang while
-	// failurelog uses infrastructure-systemic/exit-transport-hang, and legacy
-	// "audit-fail"/"FAIL" both mean code-audit-fail. Every sibling consumer
-	// normalizes; skipping it here would silently decline a retryable class
-	// (architect review M4).
 	class := failurelog.NormalizeLegacy(in.DeclaredClass)
 	if class == failurelog.UnknownClassification {
 		if strings.TrimSpace(in.DeclaredClass) == "" {
 			return declineOnly("audit declared no failure class; nothing to base a retry on")
 		}
-		// Unreachable behind the deliverables gate (failure_class_unknown) for
-		// the audit; kept as the second line of defense for every other caller.
 		return declineOnly("audit declared a class outside the vocabulary: " + in.DeclaredClass)
 	}
 	declared := policyCategoryFor(class)
@@ -111,14 +82,6 @@ func computeRetryEnvelope(in retryEnvelopeInput) retryEnvelope {
 	if !known {
 		return declineOnly("policy table has no row for category " + declared + " (declared class " + string(class) + ")")
 	}
-	// NOTE: a system-level declared class does NOT halt here (architect review H4).
-	// Both pre-existing floor gates require IsFloor, and gate 2 was deliberately
-	// narrowed to lose against a contradicting disposition. Minting a new halt from
-	// an agent-written class — with no floor check and no corroboration — would
-	// reintroduce the very disease this redesign cures, and would let non-floor
-	// system categories (transport-hang, non-progress) stop the batch on prose.
-	// Declining routes to retro, where the full two-gate floor decides. Only the
-	// DETERMINISTIC candidate halts at this chokepoint.
 	if cat.Level == policy.LevelSystem {
 		return declineOnly("declared class " + declared + " is system-level; the retro floor gates adjudicate it")
 	}
@@ -149,8 +112,8 @@ type adjudication struct {
 
 // adjudicationNeeded reports whether there is genuinely a choice to make.
 // Judgment costs a deep-tier dispatch, so it is paid only where more than one
-// action is legal — Core Agent Rule 5 (LLM cycles for qualitative work; the rest
-// is deterministic code) and the tiered-detector pattern from the 2026 literature.
+// action is legal — Core Agent Rule 5 (LLM cycles for qualitative work; the
+// rest is deterministic code).
 func adjudicationNeeded(env retryEnvelope) bool {
 	return !env.Halt && len(env.Legal) > 1
 }
@@ -165,23 +128,17 @@ func defaultAction(env retryEnvelope) retryAction {
 	return env.Legal[0]
 }
 
-// clampAdjudication binds a proposal to the envelope, returning the action to take
-// and whether the proposal had to be overridden.
-//
-// NULL OBJECT: a nil, unjustified, or out-of-vocabulary proposal yields the policy
-// default rather than "no decision". No agent artifact is load-bearing here — the
-// ADR-0092 failure (retry reachable on 3 of 16 cycles because the artifact was
-// usually missing) is designed out rather than mitigated.
-//
-// The clamp is one-directional by construction: an adjudicator may always choose a
-// MORE conservative action within the envelope, and can never reach outside it.
+// clampAdjudication binds a proposal to the envelope, returning the action to
+// take and whether the proposal had to be overridden. A nil, unjustified, or
+// out-of-vocabulary proposal yields the policy default (Null Object) rather
+// than "no decision". The clamp is one-directional by construction: an
+// adjudicator may always choose a MORE conservative action within the
+// envelope, and can never reach outside it.
 func clampAdjudication(env retryEnvelope, adj *adjudication) (retryAction, bool) {
 	fallback := defaultAction(env)
 	if adj == nil {
 		return fallback, false // absence is not a clamp; nothing was overridden
 	}
-	// An unjustified proposal is not usable input: this phase exists for its
-	// reasoning, not for its verdict word.
 	if strings.TrimSpace(adj.Justification) == "" {
 		return fallback, true
 	}
@@ -193,15 +150,6 @@ func clampAdjudication(env retryEnvelope, adj *adjudication) (retryAction, bool)
 	return fallback, true
 }
 
-// policyCategoryFor is the ONE join between the two failure vocabularies: the
-// failurelog Classification an agent declares (13 classes; the vocabulary the
-// audit contract block renders and the deliverables gate enforces) and the
-// policy category the failure_policy table is keyed by (7 categories). Every
-// KnownClassification either joins to a category the default table knows or
-// to "" — a failure no rebuild repairs (human abort, operator reset, an
-// integrity breach, a ship-gate config, a transient outage, a rejected intent,
-// a fatal loop), which the envelope declines by name rather than as
-// "unrecognised". Pinned by TestPolicyCategoryFor_JoinsEveryKnownClassificationOrSaysNone.
 func policyCategoryFor(c failurelog.Classification) string {
 	switch c {
 	case failurelog.InfrastructureSystemic:

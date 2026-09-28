@@ -1,20 +1,5 @@
 package audit
 
-// defect_ledger_evidence_edge_test.go — edge-case pins for the cycle-1403
-// tolerant-evidence fix (#422), added after the 2026-08-09 zero-ship batch
-// postmortem (docs/incidents/2026-08-09-zero-ship-batch.md). The base suite
-// (defect_ledger_evidence_shape_test.go) pins string/array/empty/object
-// shapes; these cases close the corners the adversarial review left
-// UNVERIFIED or noted as untested:
-//   - mixed-type array (["cite", 42]) — encoding/json rejects mid-decode;
-//     must fail CLOSED, never PASS, never crash.
-//   - null evidence on FIXED — "evidence": null decodes to the zero value;
-//     must be treated as no evidence.
-//   - whitespace-only string — trim must not admit "   " as a citation.
-//   - literal "; " inside ONE string — the join token doubles as a split
-//     token, so a semicolon-joined pair behaves exactly like the array form:
-//     both halves must resolve (stricter-never-looser, pinned both ways).
-
 import (
 	"path/filepath"
 	"strings"
