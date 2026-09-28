@@ -111,4 +111,16 @@ Consumers of the old workflow names moved with the change: the `/evo:publish` sk
 
 Workflow validation: `actionlint` is not installed on the porting host. Every workflow parsed with Python `yaml.safe_load`, and a graph check found every `needs` target and every local `uses` callee (each with `workflow_call`), `if: ${{ always() }}` on `CI required`, and each aggregator output bound to the child job's `job.status`. `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12` over all six workflows, with shellcheck on `PATH`, exited 0. The landing module's commands from `landing-validation.yml` passed locally: 103 test events, vet clean, 25 rendered files.
 
-Review notes kept as follow-ups rather than changed here: `go.yml`'s `result` output comes from a matrix job, so it reflects whichever leg wrote last; the three legs are covered by `needs.go.result`, which the aggregator also requires. `internal/gittest` passes the ambient `GIT_*` environment to its own git calls, which is why `workflowTestEnv` exists. `internal/ciwatch`, `internal/releasepreflight` and the two skills' pre-release check read the newest run of any workflow for a commit (`--limit 1`) rather than `required CI`.
+Review notes kept as follow-ups rather than changed here: `go.yml`'s `result` output comes from a matrix job, so it reflects whichever leg wrote last; the three legs are covered by `needs.go.result`, which the aggregator also requires. `internal/gittest` passes the ambient `GIT_*` environment to its own git calls, which is why `workflowTestEnv` exists.
+
+### Second review round, 2026-09-29
+
+The code review (APPROVE-WITH-MINOR) and the architecture review (FIX_THEN_MERGE) named two surviving mutants and three smaller gaps. Each fix was shown red first; the mutant counts come from `go test -count=1 -tags integration ./internal/ciparity/`.
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| [HIGH] M1: a job added to `required.yml` but left out of `CI required`'s `needs` kept the result green; the dependency test pinned a literal list | `TestRequiredResult_WaitsForEveryOtherJob`: `needs(required)` must contain every other job key, read from the YAML | Before: M1 survived (exit 0, 187 pass events). After: HEAD passes; M1 killed by exactly that test |
+| [HIGH] M2: widening the docs skip to `docs/*.md` passed every test, although Go tests read `docs/incidents/` Markdown | Routing cases `docs/architecture/note.md` and `docs/incidents/note.md` must run both suites | Before: M2 survived (exit 0, 187 pass events). After: HEAD passes; M2 killed by the two new subtests |
+| [MEDIUM] Release gates read the newest run of any workflow, so a green `landing-pages` run could hide a red or running `required CI` | `ciparity.RequiredWorkflow`; `releasepreflight.defaultCIConclusion` and `ciwatch.NewGHFetcher` pass `--workflow` with it; both skills' pre-release checks query `--workflow required.yml` | A fake `gh` answering scoped queries with the required run and others with a green `landing-pages` run: both new tests red before, green after |
+| [MEDIUM] The routing script nested five deep | Early exits; at most two levels | 43 + 147 integration tests pass; old and new scripts agree on all 18 side-by-side runs |
+| [MINOR] The force-push trade-off was not stated | Stated in the design's routing contract and in `go/docs/testing.md` | — |

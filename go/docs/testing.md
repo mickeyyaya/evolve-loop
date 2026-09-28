@@ -301,12 +301,16 @@ entry point for every pull request and for pushes to `main` and
 - `changes` diffs the event locally (PR: merge-base to head; push: before to
   head; `--no-renames`, NUL-delimited) and selects the optional suites. A Git
   failure or an invalid commit ID fails the job; manual runs, initial pushes and
-  empty diffs select everything.
+  empty diffs select everything. After a force-push the `before` commit is
+  unreachable, so routing fails closed and `CI required` stays red until a
+  manual `workflow_dispatch` run of `required CI` posts a green result.
 - `validate` calls `ci.yml` on every event, documentation-only changes included.
 - `go` calls `go.yml` when `go/`, `skills/`, `agents/` or any unlisted path
   changed. `landing` calls `landing-validation.yml` when `landing/`,
   `docs/explain/` or any unlisted path changed. Markdown under `docs/reports/`,
-  `docs/research/` and `docs/private/` is the only explicit skip of both.
+  `docs/research/` and `docs/private/` is the only explicit skip of both;
+  other `docs/` Markdown runs both, because Go tests read some of it (for
+  example `docs/incidents/`).
   Everything else, including `.github/`, `.evolve/`, `.goreleaser.yml` and
   `install.sh`, runs both. Go tests read these inputs: `skills/` through
   `TestSkills_NoDrift`, `agents/` through the persona size budgets
@@ -323,14 +327,22 @@ entry point for every pull request and for pushes to `main` and
   leg fails) and its inner job's `job.status` output, which is empty when the
   inner job was skipped. An unselected suite must be `skipped` with an empty
   output. A failed, cancelled, skipped or missing required job fails it
-  (`TestRequiredResult_RejectsMissingOrUnsuccessfulWork`).
+  (`TestRequiredResult_RejectsMissingOrUnsuccessfulWork`). Every other job in
+  `required.yml` must be in its `needs`
+  (`TestRequiredResult_WaitsForEveryOtherJob` derives the set from the YAML).
 
 Through the reusable calls, the check names carry the caller's prefix:
 `plugin and durable ACS / validate`, `plugin and durable ACS / acs-durable`,
 `go / build + test (Go) (<os>, <go>)` and `landing / test landing module`.
 The job `CI required` (not the workflow name `required CI`) is the stable
-check name for a branch rule. `ciparity`'s `required_workflow_test.go`,
-`routing_workflow_test.go` and the integration-tagged
+check name for a branch rule. Tools that read the CI verdict of a commit
+(`releasepreflight`, `ciwatch`, the `/evo:publish` and `/evo:release` skills)
+query `gh run list --workflow required.yml`, named once in Go as
+`ciparity.RequiredWorkflow`; the newest run of any workflow can be a green
+`landing-pages` run that hides a red `required CI`.
+
+`ciparity`'s `required_workflow_test.go`, `routing_workflow_test.go` and the
+integration-tagged
 `required_result_integration_test.go` and `routing_workflow_integration_test.go`
 pin the graph and execute the exact routing and result scripts from the YAML.
 The design is

@@ -22,6 +22,8 @@ The aggregator requires route and reusable plugin/ACS success. For each optional
 
 Git computes changes locally after full-history checkout, avoiding GitHub API pagination/path-filter limits. PRs compare merge-base to the PR head; pushes compare the event's before/head commits. Both sides of renames are included by disabling rename detection. NUL-delimited names preserve spaces, tabs, and newlines. Missing/invalid objects or Git command failures fail routing. Empty diffs, initial pushes, and manual runs execute both modules.
 
+Force-push trade-off (stated 2026-09-28): after a force-push to `main` or `go-rewrite-phase-1`, `github.event.before` names the overwritten tip, which the full-history checkout can no longer reach. `git diff` fails, routing fails closed, and `CI required` is red for that push, even when every suite would pass. This is deliberate: without the old tip, routing cannot prove which paths changed, so it does not guess a skip. To get a green result, run `required CI` manually (`workflow_dispatch`) on the same branch; a manual run selects every suite and posts a new `CI required` check on the same commit. Pull-request routing does not use `event.before`: it diffs the merge-base of the PR's base and head, both of which the checked-out merge commit contains, so a force-pushed PR branch routes normally.
+
 | Changed paths | Go matrix | Landing validation |
 |---|---|---|
 | `go/**`, `skills/**`, `agents/**` | Run | Skip |
