@@ -35,7 +35,6 @@ const docRoot = `(?i:docs|knowledge-base)`
 
 var (
 	rmDocsRe      = regexp.MustCompile(`(?im)\brm\b[^\n]*(^|[\s'"/{,():])` + docRoot + `([/\s'"},)]|$)`)
-	cdDocsRe      = regexp.MustCompile(`(?i)^(cd|pushd)\s(|[^\n]*[\s'"/])` + docRoot + `([/\s'"]|$)`)
 	docDirRe      = regexp.MustCompile(`(^|/)` + docRoot + `(/|$)`)
 	wordDocRootRe = regexp.MustCompile(`(^|[/:(){,])` + docRoot + `([/,}]|$)`)
 	mvDocsRe      = regexp.MustCompile(`(?im)\bmv\b[ \t]+([^\s]+)[ \t]+([^\s]+)`)
@@ -99,7 +98,7 @@ func (d *DocDelete) removesUnderADocRoot(ctx context.Context, cwd, cmd string, c
 	}
 	entered, touches := false, false
 	for _, c := range cmds {
-		if cdDocsRe.MatchString(c.text) {
+		if anyCommand(c.words, entersADocRoot) {
 			entered = true
 		}
 		deletes := removes(c.words)
@@ -112,6 +111,10 @@ func (d *DocDelete) removesUnderADocRoot(ctx context.Context, cwd, cmd string, c
 		touches = true
 	}
 	return touches && cwdInsideADocRoot(ctx, cwd)
+}
+
+func entersADocRoot(name string, args []string) bool {
+	return (name == "cd" || name == "pushd") && namesADocRoot(args)
 }
 
 func namesADocRoot(words []string) bool {
@@ -345,7 +348,7 @@ func rmArgs(words []string) ([]string, bool) {
 
 // neverCommitted reports whether cwd is the repository root, HEAD holds nothing named draft (compared
 // case-folded), and every directory on draft's path is a real directory: a symlinked parent would resolve
-// the name somewhere else.
+// the name somewhere else. A draft that exists must be a regular file.
 func neverCommitted(ctx context.Context, cwd, draft string) bool {
 	if cwd == "" {
 		return false
@@ -363,6 +366,9 @@ func neverCommitted(ctx context.Context, cwd, draft string) bool {
 		if p == folded || strings.HasPrefix(p, folded+"/") {
 			return false
 		}
+	}
+	if info, err := os.Lstat(filepath.Join(cwd, filepath.FromSlash(draft))); err == nil && !info.Mode().IsRegular() {
+		return false
 	}
 	for dir := path.Dir(draft); dir != "."; dir = path.Dir(dir) {
 		info, err := os.Lstat(filepath.Join(cwd, filepath.FromSlash(dir)))
