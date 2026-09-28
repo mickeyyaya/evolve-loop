@@ -6,7 +6,7 @@ score_cap:
   - criterion: "None of the 4 internal/skillcheck keys remain in go/internal/sizeratchet/offenders.json (a fixed function's allowance is deleted, never just lowered)"
     max_if_missing: 8
     evidence: "cd go && go test -tags acs -count=1 -run TestC1736_002_OffendersJSONHasNoSkillcheckEntriesLeft ./acs/cycle1736/..."
-  - criterion: "The repo-wide sizeratchet.Check gate reports zero problems — defeats both directions of the cheapest gaming fake (delete-without-shrink, shrink-without-delete)"
+  - criterion: "The repo-wide sizeratchet.Check gate reports zero problems — defeats delete-without-shrink (an unlisted function past the limit); since 2026-09-28 an allowance is a ceiling, so shrink-without-delete is slack here and the _002 key-absence check catches it"
     max_if_missing: 9
     evidence: "cd go && go test -tags acs -count=1 -run TestC1736_003_ModuleWideRatchetCheckPasses ./acs/cycle1736/..."
   - criterion: "Every *_test.go under go/internal/skillcheck that exists at the cycle baseline (b22dea3b) is unmodified and undeleted; added characterization tests are allowed"

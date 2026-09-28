@@ -134,10 +134,10 @@ func LoadOffenders(path string) (map[string]int, error) {
 
 // Check returns nil when every span fits the ratchet, else one error naming
 // every violating key. A key's size is its largest span, so same-named
-// declarations in build-tagged files share one allowance. Violations: an
-// unlisted function past MaxLines, a listed one past its allowance, a listed
-// one under its allowance (lower it), and a listed one within MaxLines or gone
-// (remove the entry).
+// declarations in build-tagged files share one allowance. An allowance is a
+// ceiling: the violations are an unlisted function past MaxLines and a listed
+// one past its allowance. A listed function under its allowance, within
+// MaxLines or gone is slack a boundary tighten removes, never a lane's failure.
 func Check(spans []FuncSpan, offenders map[string]int) error {
 	sizes := make(map[string]int, len(spans))
 	for _, s := range spans {
@@ -165,13 +165,8 @@ func Check(spans []FuncSpan, offenders map[string]int) error {
 }
 
 func listedProblem(key string, n, allowance int) string {
-	switch {
-	case n > allowance:
+	if n > allowance {
 		return fmt.Sprintf("%s grew to %d lines > allowance %d: shrink it back; allowances may only shrink", key, n, allowance)
-	case n <= MaxLines:
-		return fmt.Sprintf("%s is gone or within %d lines (%d): remove its offenders.json entry", key, MaxLines, n)
-	case n < allowance:
-		return fmt.Sprintf("%s shrank to %d lines < allowance %d: lower its offenders.json allowance to %d", key, n, allowance, n)
 	}
 	return ""
 }

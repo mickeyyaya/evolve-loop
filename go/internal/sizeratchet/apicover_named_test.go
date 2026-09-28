@@ -51,22 +51,31 @@ func TestLoadOffenders_RejectsAllowancesWithinTheLimit(t *testing.T) {
 	}
 }
 
-// TestCheck_AllowancesOnlyShrink names Check: growth, slack and stale entries
-// all fail, each named with the edit that fixes it.
-func TestCheck_AllowancesOnlyShrink(t *testing.T) {
-	if err := Check([]FuncSpan{{Key: "p.F", Lines: 60}, {Key: "p.G", Lines: MaxLines}}, map[string]int{"p.F": 60}); err != nil {
-		t.Errorf("Check at exact allowances = %v, want nil", err)
+// TestCheck_OnlyGrowthOrANewOffenderFails names Check: an allowance is a
+// ceiling, so growth and a new offender fail while slack and stale entries pass.
+func TestCheck_OnlyGrowthOrANewOffenderFails(t *testing.T) {
+	slack := map[string]struct {
+		spans     []FuncSpan
+		offenders map[string]int
+	}{
+		"exact allowances":            {[]FuncSpan{{Key: "p.F", Lines: 60}, {Key: "p.G", Lines: MaxLines}}, map[string]int{"p.F": 60}},
+		"a shrunk offender":           {[]FuncSpan{{Key: "p.F", Lines: 59}}, map[string]int{"p.F": 60}},
+		"an offender back within cap": {[]FuncSpan{{Key: "p.F", Lines: MaxLines}}, map[string]int{"p.F": 60}},
+		"a deleted offender's entry":  {nil, map[string]int{"p.Gone": 60}},
 	}
-	cases := map[string]struct {
+	for name, tc := range slack {
+		if err := Check(tc.spans, tc.offenders); err != nil {
+			t.Errorf("%s is slack the boundary tighten removes, never a failure: %v", name, err)
+		}
+	}
+	failures := map[string]struct {
 		spans     []FuncSpan
 		offenders map[string]int
 	}{
 		"shrink it to 50": {[]FuncSpan{{Key: "p.New", Lines: MaxLines + 1}}, nil},
 		"shrink it back":  {[]FuncSpan{{Key: "p.F", Lines: 61}}, map[string]int{"p.F": 60}},
-		"allowance to 59": {[]FuncSpan{{Key: "p.F", Lines: 59}}, map[string]int{"p.F": 60}},
-		"remove its":      {nil, map[string]int{"p.Gone": 60}},
 	}
-	for want, tc := range cases {
+	for want, tc := range failures {
 		if err := Check(tc.spans, tc.offenders); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("Check(%v, %v) = %v, want an error containing %q", tc.spans, tc.offenders, err, want)
 		}

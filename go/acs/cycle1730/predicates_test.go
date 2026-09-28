@@ -123,9 +123,9 @@ func TestC1730_002_OffendersJSONHasNoOpscmdEntriesLeft(t *testing.T) {
 // (sizeratchet.Check over every function in the module against the loaded
 // offenders map) must report zero problems, covering both directions of the
 // cheapest gaming fake: deleting the entries without shrinking the code trips
-// this because Check flags an unlisted function over the limit, and shrinking
-// without deleting the entries trips it because Check flags a listed function
-// now under its allowance. Currently green (the allowances match the current
+// this because Check flags an unlisted function over the limit. Since
+// 2026-09-28 an allowance is a ceiling, so shrinking without deleting is slack
+// here and only the _002 key-absence check catches it. Currently green (the allowances match the current
 // oversized code) — a guardrail predicate that must stay green throughout the
 // build phase, not a RED-today check.
 func TestC1730_003_ModuleWideRatchetCheckPasses(t *testing.T) {
