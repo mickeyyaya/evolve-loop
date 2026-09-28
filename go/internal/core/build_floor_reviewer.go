@@ -59,6 +59,7 @@ func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
 	// The docs floor only WARNs: an undocumented architecture change is an auditor finding, never a handoff REJECT.
 	docsFloorWarn(in, paths)
+	out = append(out, commentFloorFailures(ctx, in)...)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
@@ -68,10 +69,7 @@ func ProtectedSurfaceFloorChecks(member func(string) bool) BuildFloorCheckFn {
 		if in.Worktree == "" {
 			return nil
 		}
-		base := in.WorktreeBaseSHA
-		if base == "" {
-			base = "HEAD"
-		}
+		base := floorBase(in)
 		// Rename detection is off, so a file moved out of the surface is judged by its old path too.
 		return protectedSurfaceFailures(changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames"), member, base)
 	}

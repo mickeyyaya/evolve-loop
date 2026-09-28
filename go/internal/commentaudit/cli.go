@@ -29,11 +29,11 @@ func Main(args []string, stdout, stderr io.Writer, git Git) int {
 	case "rank":
 		return rank(args[1:], stdout, stderr)
 	case "check":
-		return listAdded("check", AddedNarrative, "narrative comments", args[1:], stdout, stderr, git)
+		return listAdded("check", narrativeRule, "narrative comments", args[1:], stdout, stderr, git)
 	case "verify":
 		return verify(args[1:], stdout, stderr, git)
 	case "comments":
-		return listAdded("comments", AddedComments, "comments", args[1:], stdout, stderr, git)
+		return listAdded("comments", commentsRule, "comments", args[1:], stdout, stderr, git)
 	}
 	fmt.Fprintln(stderr, usage)
 	return 2
@@ -137,24 +137,20 @@ func verify(args []string, stdout, stderr io.Writer, git Git) int {
 	return 0
 }
 
-func listAdded(name string, added func(before, after []byte) []string, what string, args []string, stdout, stderr io.Writer, git Git) int {
+func listAdded(name string, r rule, what string, args []string, stdout, stderr io.Writer, git Git) int {
 	d, code := loadDiff(name, args, stderr, git)
 	if code != 0 {
 		return code
 	}
-	found := 0
-	for _, f := range d.files {
-		b, a, err := readBoth(d.before, d.after, f)
-		if err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		for _, line := range added(b, a) {
-			fmt.Fprintf(stdout, "%s: %s\n", f, line)
-			found++
-		}
+	added, err := r.acrossDiff(d.files, d.before, d.after)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
-	if found > 0 {
+	for _, c := range added {
+		fmt.Fprintf(stdout, "%s: %s\n", c.File, c.Line)
+	}
+	if len(added) > 0 {
 		return 1
 	}
 	fmt.Fprintf(stdout, "no %s added in %d changed Go file(s)\n", what, len(d.files))
