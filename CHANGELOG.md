@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the shipped-lane test fixture keeps git maintenance out of the background (2026-09-28)
+
+- `TestUnwindShipCommit_DeclinesWithoutMovingHEAD` failed CI on #698, a change touching neither the test nor its fixture: `t.TempDir`'s cleanup met `directory not empty` because the fixture's raw `git init` let git 2.47+ detach `git maintenance run --auto` after a commit. It is the third CI failure of the class (the dossier fixture twice).
+- `internal/core`'s shipped-lane fixture (`newLane`) takes its worktree from `gittest.Fixture`, which persists `maintenance.auto=false` and `gc.auto=0` and retries teardown; its raw-git ratchet entry is removed. Inbox item `raw-git-fixtures-migrate-to-gittest` covers the remaining 130 files.
+
 ## Fixed — the durable ACS suite no longer leaks an evolve binary per run; the disk-full halt of wave 27 (2026-09-28)
 
 - Wave 27 went 0/2 on a host with 143 MiB free of 460 GiB. Both lanes' failures (a ship backstop's `no space left on device`, an audit's integration-tier gate) read as code failures. The loop was halted as a system failure and the disk freed; see docs/incidents/2026-09-28-the-disk-filled-and-two-lanes-failed-for-it.md.
