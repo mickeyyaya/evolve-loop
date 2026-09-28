@@ -41,8 +41,12 @@ current host values:
 - Evidence: docs/explain/builds/cycle-42-run-42.md:1 accurately explains the behavior implemented at config/app.yaml:1
 ```
 
-Use `NEEDS_CORRECTION` whenever the prose is inaccurate or incomplete; this
-honest negative judgment forces the overall Audit to fail. For an invalid or
+Use `NEEDS_CORRECTION` whenever the prose is inaccurate or incomplete. The gate
+records `NEEDS_CORRECTION` as an advisory (ADR-0102), so the verdict is yours: make
+it FAIL, because until a document-only correction rung exists the audit-repair round
+is the only path that corrects the document before it ships. In the FAIL reason,
+name only the document (its path and the inaccurate lines), so the repair round's
+defects name only the document. For an invalid or
 missing host handoff, use `Status: FAIL` and concrete evidence. A host integrity
 failure cannot be overridden by narrative `VERIFIED`. A version-zero legacy
 cycle has no explanation-review obligation.

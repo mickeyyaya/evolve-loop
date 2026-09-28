@@ -235,6 +235,24 @@ func TestClassify_MissingExplanationReviewStillBlocksAndACompleteOnePasses(t *te
 	}
 }
 
+func needsCorrectionReview() (string, core.PhaseRequest) {
+	req := core.PhaseRequest{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		BuildExplanationState:           core.BuildExplanationAvailable,
+		BuildExplanation: &phaseio.ExplanationView{
+			Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md",
+			DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
+		},
+	}
+	return `## Explanation Documentation
+- Status: NEEDS_CORRECTION
+- Build status: required
+- Document: docs/explain/builds/cycle-42.md
+- Document SHA256: sha
+- Evidence: docs/explain/builds/cycle-42.md:1 misstates the branch behavior implemented at go/app.go:19
+`, req
+}
+
 func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgment(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
@@ -254,13 +272,7 @@ func TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgmen
 	if _, err := validateExplanationReview(weak, req); err == nil || !strings.Contains(err.Error(), "concrete") {
 		t.Fatalf("token evidence was accepted — the reasoning floor is the one rule left (ADR-0102): %v", err)
 	}
-	negative := `## Explanation Documentation
-- Status: NEEDS_CORRECTION
-- Build status: required
-- Document: docs/explain/builds/cycle-42.md
-- Document SHA256: sha
-- Evidence: docs/explain/builds/cycle-42.md:1 misstates the branch behavior implemented at go/app.go:19
-`
+	negative, req := needsCorrectionReview()
 	advisories, err := validateExplanationReview(negative, req)
 	if err != nil || !containsAdvisory(advisories, "NEEDS_CORRECTION") || containsAdvisory(advisories, "Status must") {
 		t.Fatalf("the reviewer's negative judgment is an advisory, never a block (ADR-0102): advisories=%v err=%v", advisories, err)

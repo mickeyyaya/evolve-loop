@@ -1,0 +1,19 @@
+{
+  "id": "auditor-persona-rules-from-one-source",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.9,
+  "title": "The auditor's prompt states the WARN, comment and explanation-review rules by projection from their one source, not restated prose",
+  "files": [
+    "agents/evolve-auditor.md",
+    "agents/evolve-auditor-reference.md",
+    "go/internal/phases/audit",
+    "go/internal/phasecontract"
+  ],
+  "summary": "From the inbox architecture review of 2026-09-28 (N1). The persona restated three rules the code had since changed (WARN blocking ship, the comment convention, NEEDS_CORRECTION forcing FAIL); the 2026-09-28 landing corrected the text and pinned it with phrase tests, but the rules still live twice (code and prose). Project them into the dispatched audit prompt from one source (a phasecontract or convention constant) so a code change cannot leave the prompt stale. The explanation rule's switch to advisory in practice belongs to explanation-correction-is-a-rung.",
+  "acceptance": [
+    "The dispatched audit-prompt.txt carries the WARN ship rule, the comment rule and the explanation-review rule rendered from one source, and a prompt-content test fails if a stale phrasing reappears"
+  ],
+  "created_at": "2026-09-28T10:30:00Z",
+  "source": "console, 2026-09-28, the inbox architecture review"
+}
