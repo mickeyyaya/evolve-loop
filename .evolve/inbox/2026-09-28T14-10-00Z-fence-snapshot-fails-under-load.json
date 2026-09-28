@@ -1,0 +1,20 @@
+{
+  "id": "fence-snapshot-fails-under-load",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.7,
+  "title": "A read-only phase's worktree fence degrades to unchecked when its snapshot fails under load, and the fence test that shows it flakes without saying why",
+  "files": [
+    "go/internal/treefence/fence.go",
+    "go/internal/core/ship_recovery_debugger_test.go"
+  ],
+  "summary": "TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile failed three times under load on 2026-09-28 (twice during the #684 fence work, once in the shipmanifest floor while two reviewers ran ship's 181 s suite): 'debugger writable = [shared.md] kept = [], want both [shared.md]'. It passes alone (5/5, and 21/21 earlier). Mechanism: treefence.Begin returns an inert Fence{takeErr} when Take fails, End then reports Outcome{TakeErr} with nothing kept or restored, and the phase's worktree writes go unchecked; production surfaces only a WARNING diagnostic ('snapshot unavailable … worktree writes by this phase were not checked'). The test's fencedDebugger ignores Outcome.TakeErr, so the flake never names the failure, and why Take fails under load (git index lock contention, a context deadline, a temp-index race) is unknown.",
+  "fix": "(1) Make the flake diagnosable: the test fails with Outcome.TakeErr when it is set, instead of an empty kept list. (2) Reproduce under the load that produced it (run the core package beside ship's suite, or with -cpu and -race) and find why treefence.Take fails. (3) Decide by policy whether a read-only phase whose fence cannot snapshot may run unfenced with a warning, or must retry the snapshot or refuse the dispatch, and project that one decision into the runner and the docs (ADR-0097).",
+  "acceptance": [
+    "The fence test reports Outcome.TakeErr when the snapshot failed (red on an injected Take failure)",
+    "The cause of Take failing under load is named with a reproduction, and fixed or bounded",
+    "A read-only phase never runs with an unchecked fence silently: the policy is stated in ADR-0097 and pinned by a runner test"
+  ],
+  "created_at": "2026-09-28T14:10:00Z",
+  "source": "console, 2026-09-28, the shipmanifest extraction floor (third occurrence of the fence test flake under load)"
+}

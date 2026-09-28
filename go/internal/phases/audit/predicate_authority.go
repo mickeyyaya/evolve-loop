@@ -2,12 +2,15 @@ package audit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
@@ -40,9 +43,25 @@ func predicateTreeFor(req core.PhaseRequest) (string, error) {
 		return "", fmt.Errorf("capture predicate ship tree: %w", err)
 	}
 	if snap.Tree != tracked.Tree {
-		return "", fmt.Errorf("predicate execution tree includes undeclared inputs absent from the ship tree; explicitly stage intended Build files or remove the inputs, then re-run Audit")
+		return "", undeclaredInputs(snap.Differing(context.Background(), tracked))
 	}
 	return snap.Tree, nil
+}
+
+const undeclaredInputsShown = 20
+
+func undeclaredInputs(paths []string, listErr error) error {
+	detail := ""
+	switch {
+	case listErr != nil:
+		detail = "the paths could not be listed: " + listErr.Error()
+	case len(paths) > undeclaredInputsShown:
+		detail = fmt.Sprintf("%s, and %d more", strings.Join(paths[:undeclaredInputsShown], ", "), len(paths)-undeclaredInputsShown)
+	default:
+		detail = strings.Join(paths, ", ")
+	}
+	return errors.New(cyclestate.WithDetail("predicate execution tree includes undeclared inputs absent from the ship tree; "+
+		"explicitly stage intended Build files or remove the inputs, then re-run Audit", detail))
 }
 
 func beginPredicateEvidence(req core.PhaseRequest) (func() error, error) {

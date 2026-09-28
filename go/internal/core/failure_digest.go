@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
@@ -77,6 +78,7 @@ func classifyPreClass(reasonLower string) string {
 // failure is returned as an error.
 func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (FailureDigest, error) {
 	phase, reasons := readAuditFailReason(workspace)
+	reasons = withoutDetails(reasons)
 	joined := strings.ToLower(strings.Join(reasons, "\n"))
 	preClass := classifyPreClass(joined)
 
@@ -147,11 +149,20 @@ var cycleNumberToken = regexp.MustCompile(`(?i)\bcycle[ -]\d+(?:-\d+)*`)
 // collapse into each other.
 var attemptDenominatorToken = regexp.MustCompile(`(?i)\b(attempt|retry)\s+\d+\s*(?:/|of)\s*\d+`)
 
+func withoutDetails(reasons []string) []string {
+	out := make([]string, len(reasons))
+	for i, r := range reasons {
+		out[i] = cyclestate.WithoutDetail(r)
+	}
+	return out
+}
+
 // normalizeReasonForFingerprint projects a reason onto its defect identity.
 // Display and identity are two projections of the one reason string: the
 // digest, the dossier and audit-fail-reason.json all keep the reason
 // verbatim — only the hash input is normalized.
 func normalizeReasonForFingerprint(reason string) string {
+	reason = cyclestate.WithoutDetail(reason)
 	reason = narrativeVerdictToken.ReplaceAllString(reason, "narrative=<verdict>")
 	reason = cycleNumberToken.ReplaceAllString(reason, "cycle-N")
 	reason = attemptDenominatorToken.ReplaceAllString(reason, "${1} <n>/<n>")

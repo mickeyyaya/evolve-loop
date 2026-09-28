@@ -3,12 +3,13 @@ package bridge
 // LaunchIntent is the high-level, CLI-agnostic launch description. Zero-value
 // fields are "unset" and realize to nothing.
 type LaunchIntent struct {
-	ModelTier     string // abstract tier: haiku | sonnet | opus
-	Permission    string // bypass | plan | default
-	SettingsScope string // project | all
-	SessionMode   string // "ephemeral" | "named:<name>"
-	Effort        string
-	AllowedTools  []string
+	ModelTier        string // abstract tier: haiku | sonnet | opus
+	Permission       string // bypass | plan | default
+	SettingsScope    string // project | all
+	SessionMode      string // "ephemeral" | "named:<name>"
+	Effort           string
+	AllowedTools     []string
+	SystemPromptFile string
 	// RawByCLI is the per-CLI escape hatch for CLI-specific argv with no high-level intent; a claude-only
 	// raw flag never reaches agy/codex.
 	RawByCLI map[string][]string
@@ -27,7 +28,8 @@ type Realization struct {
 	// ModelOmitted is the model value the realizer suppressed because it was still an abstract vocabulary
 	// token rather than a concrete model id (empty when nothing was suppressed); drivers log it so a launch
 	// that fell back to the CLI's own default isn't reported as the requested tier.
-	ModelOmitted string
+	ModelOmitted     string
+	SystemPromptFile string
 	// modelDispatchEffect retains selector, ambiguity and argv-terminator provenance from the final
 	// deduplicated LaunchFlags; drivers apply it to their own base selector at the invocation boundary.
 	modelDispatchEffect modelDispatch

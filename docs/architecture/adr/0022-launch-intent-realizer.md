@@ -265,3 +265,7 @@ deprecation warning names each offending file by cli for surfacing.
 | `go/internal/bridge/manifest_v1_compat_test.go` (new) | 4-case suite pinning v1→v2 translation, partial-keys handling, v2-direct loading, custom-key pass-through. |
 | `go/internal/bridge/realizer_test.go` | `TierAliases:` field rename → `ModelTierMap:` (6 sites). |
 | `go/internal/resolvellm/resolvellm_test.go` | Test rename + sentinel-default value updates. |
+
+## Amendment (2026-09-28) — a system prompt channel
+
+`LaunchIntent.SystemPromptFile` names a file the CLI reads as an appended system prompt. A manifest declares the channel as the param `system_prompt_file` (`{"channel": "flag", "flag": "--append-system-prompt-file"}`); only claude-tmux does. The realizer renders the flag and sets `Realization.SystemPromptFile` only when the manifest declares the channel and the intent names a file, so a CLI without the channel never sees the flag, and the driver reads the realization to decide whether the phase identity rides the system prompt or the paste. The bridge sets the file to `<workspace>/pane-authority.md` for a dispatch with an agent (`launchIntentFor`) and writes `phaseidentity.Authority()` there, a statement identical on every dispatch, so the system prompt stays byte-stable across spawns (ADR-0071). An empirical probe on 2026-09-28 (claude 2.1.283) confirmed the flag applies in the interactive REPL. Design record: [logic-first-delivery-design.md §5.11](../logic-first-delivery-design.md) (T3).
