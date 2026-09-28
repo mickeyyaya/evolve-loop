@@ -32,12 +32,12 @@ type ollamaTmuxDriver struct{}
 
 func (ollamaTmuxDriver) Name() string { return "ollama-tmux" }
 
-func (ollamaTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
-	// cfg.Worktree is non-empty only when the orchestrator marks this phase a
-	// writer (core/worktree.go:WorktreePhase, or PhaseSpec.WritesSource).
-	if cfg.Worktree != "" {
-		fmt.Fprintf(deps.Stderr, "[ollama-tmux] cannot run source-writing phase %q: ollama-tmux has no tool use (no Bash/Edit/Write). Pick claude-tmux / codex-tmux / agy-tmux for writers.\n", cfg.Agent)
-		return ExitBadFlags, fmt.Errorf("ollama-tmux: source-writing phase %q rejected (worktree=%s)", cfg.Agent, cfg.Worktree)
+func (d ollamaTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
+	// Every lane phase runs in its worktree (CB.1), so cfg.Worktree marks a lane
+	// phase, not a writer; a CLI without tool use can write none of their artifacts.
+	if cfg.Worktree != "" && !HasToolUse(d.Name()) {
+		fmt.Fprintf(deps.Stderr, "[ollama-tmux] cannot run worktree phase %q: ollama-tmux has no tool use (no Bash/Edit/Write). Pick claude-tmux / codex-tmux / agy-tmux.\n", cfg.Agent)
+		return ExitBadFlags, fmt.Errorf("ollama-tmux: worktree phase %q rejected: no tool use (worktree=%s)", cfg.Agent, cfg.Worktree)
 	}
 	model := cfg.Model
 	if model == "" {

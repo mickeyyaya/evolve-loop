@@ -1,0 +1,18 @@
+{
+  "id": "claude-tmux-typed-authorizing-turn",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.88,
+  "title": "The claude-tmux driver sends one typed authorizing line after the pasted prompt, so the agent does not decline it as untrusted",
+  "files": [
+    "go/internal/bridge/human_input.go",
+    "go/internal/bridge/phaseidentity"
+  ],
+  "summary": "From cycle 1734 (wave 24; design doc §5.11 T3). The claude agent read the whole bracketed-paste prompt as untrusted pasted text and refused to write triage-report.md, and refused the one-shot nudge the same way; the bridge treated the idle pane as a stall (exit 81 after 900s). The identity block (P3) sits inside the paste, so it cannot authorize it.",
+  "acceptance": [
+    "After the bracketed paste, the driver sends one fixed user-typed line naming the phase and cycle that asks the agent to carry out the pasted prompt (driver test pins the keystrokes)",
+    "A replay of 1734's triage prompt through the driver yields a written triage-report.md, not a refusal"
+  ],
+  "created_at": "2026-09-28T11:30:00Z",
+  "source": "console, 2026-09-28, the wave-24 P0 (cycles 1733, 1734)"
+}

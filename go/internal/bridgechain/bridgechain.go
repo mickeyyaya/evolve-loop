@@ -91,10 +91,10 @@ func New(inner core.Bridge, resolve PlanResolver, opts ...Option) *Walking {
 func (w *Walking) Probe(ctx context.Context) (core.BridgeProbe, error) { return w.inner.Probe(ctx) }
 
 // Launch walks the chain for req. A request marked ChainAttempt (one attempt of
-// a caller's own walk) is handed to the inner bridge untouched. The final
-// attempt's response and error are what the caller sees, exactly as the runner
-// returns its final attempt; a legitimate FAIL (a non-trigger exit) never
-// routes to another CLI.
+// a caller's own walk) is handed to the inner bridge untouched. The caller sees
+// what the runner's walk returns (WallKeeper): the final attempt, or the quota
+// wall of a walk that ran out after meeting one; a legitimate FAIL (a
+// non-trigger exit) never routes to another CLI.
 func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	if req.ChainAttempt || w.resolve == nil {
 		return w.inner.Launch(ctx, req)
@@ -112,7 +112,8 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	var last core.BridgeResponse
 	var lastErr error
 	var attempts []string
-	llmroute.DispatchTiered(plan, func(cli, tier string) (int, error) {
+	var keeper WallKeeper
+	walk := llmroute.DispatchTiered(plan, func(cli, tier string) (int, error) {
 		attempt := req
 		attempt.CLI, attempt.ChainAttempt = cli, true
 		if tier != "" {
@@ -124,6 +125,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		}
 		start := w.now()
 		last, lastErr = w.inner.Launch(ctx, attempt)
+		keeper.Observe(cli+"@"+tier, last, lastErr)
 		attempts = append(attempts, fmt.Sprintf("%s@%s=%d", cli, tier, last.ExitCode))
 		if last.ExitCode == exitQuota && w.bench != nil {
 			w.bench(req.ProjectRoot, req.Workspace, cli, start, req.Env)
@@ -132,7 +134,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	}, func(from, to string) {
 		w.logf("[bridge-chain] agent=%s tier step-down %s -> %s (every CLI at %s exited %d)\n", req.Agent, from, to, from, exitQuota)
 	})
-	return last, lastErr
+	return keeper.Surface(walk, last, lastErr)
 }
 
 // DefaultPlanResolver resolves a launch's chain the way the runner resolves a

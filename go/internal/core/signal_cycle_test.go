@@ -116,7 +116,7 @@ func TestPauseForQuota_EmitsQuotaPausedFromTheSeamBothRootsShare(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithSignalCenter(c))
 	cr := &cycleRun{o: o, ctx: context.Background(), cycle: 1601, req: CycleRequest{ProjectRoot: t.TempDir()},
 		cs: CycleState{Phase: string(PhaseBuild), WorkspacePath: t.TempDir(), RunID: "run-1601"}}
-	err := cr.pauseForQuota(PhaseBuild, PhaseResponse{Phase: string(PhaseBuild)}, 3)
+	err := cr.pauseForQuota(PhaseBuild, PhaseResponse{Phase: string(PhaseBuild)}, 3, wrapTransient(85))
 	if !errors.Is(err, ErrAllFamiliesExhausted) {
 		t.Fatalf("the pause keeps its typed sentinel: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestPauseForQuota_EmitsQuotaPausedFromTheSeamBothRootsShare(t *testing.T) {
 	}
 	e := paused[0]
 	if e.Severity != signalcenter.SeverityWarn || e.Code != CodeQuotaPaused || e.Cycle != 1601 || e.Phase != "build" || e.RunID != "run-1601" ||
-		e.Origin != "cycleRun.pauseForQuota" || !strings.Contains(e.Reason, "exit=85 across 3 attempts") || e.Fields["phase"] != "build" {
+		e.Origin != "cycleRun.pauseForQuota" || !strings.Contains(e.Reason, "ended on a quota wall across 3 attempts (bridge: launch exit=85") || e.Fields["phase"] != "build" {
 		t.Errorf("a quota pause is a WARN naming the paused phase with the one error text the ledger carries: %+v", e)
 	}
 	before := len(*got)

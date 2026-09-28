@@ -262,7 +262,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// sibling never reaches here all-85 (the sibling attempt's exit
 				// differs), so normal failover is unchanged.
 				if retryHooks.quotaExhausted(attemptExits) {
-					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt)
+					return dispatchResult{}, loopAbort, cr.pauseForQuota(next, resp, attempt, err)
 				}
 				// Backfill: when exhaustion is specifically due to ErrArtifactTimeout,
 				// try to reconstruct the artifact from stdout.clean.txt before aborting.

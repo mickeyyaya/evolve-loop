@@ -32,7 +32,7 @@ var explanationLifecycleAssignPins = []struct {
 }{
 	{"../core/orchestrator.go", "NewOrchestrator", "explanationContractVersion", "explanationdocs.CurrentContractVersion"},
 	{"../core/cyclerun.go", "newCycleRun", "ExplanationDocumentationVersion", "o.explanationContractVersion"},
-	{"../phases/runner/dispatch.go", "dispatchPhaseAttempts", "RequireSandbox", "requiresExplanationSandbox"},
+	{"../phases/runner/dispatch.go", "baseRequest", "RequireSandbox", "requiresExplanationSandbox"},
 }
 
 func TestBuildExplanationLifecycleWiring(t *testing.T) {

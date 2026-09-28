@@ -1,0 +1,19 @@
+{
+  "id": "deferred-fleet-lane-releases-its-claim",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.84,
+  "title": "A fleet lane that defers on a quota wall releases its inbox claim, so the item is re-offered instead of stranded in processing",
+  "files": [
+    "go/internal/core/cyclerun_epilogue.go",
+    "go/internal/core/quota_pause.go",
+    "go/internal/inboxmover"
+  ],
+  "summary": "From the wave-24 P0 (2026-09-28). A cycle that ends on ErrAllFamiliesExhausted skips the FAIL closeout (abnormalEpilogue returns early: a resumable pause), so its claim stays in inbox/processing/cycle-N and its worktree is preserved. The sequential loop resumes such a cycle; a fleet lane is never resumed, so with codex walled until 2026-10-14 every claude stall that defers strands an item the planner will not offer again.",
+  "acceptance": [
+    "A deferred fleet lane's claim returns to pending with a note naming the deferral, and the next wave can plan it (test)",
+    "The sequential loop's resumable pause keeps its checkpoint and claim, unchanged"
+  ],
+  "created_at": "2026-09-28T12:40:00Z",
+  "source": "console, 2026-09-28, the wave-24 P0 and its architecture review"
+}

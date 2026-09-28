@@ -146,7 +146,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	}
 	if rerr != nil {
 		if isQuotaWall(rerr) {
-			return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+round)
+			return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+round, rerr)
 		}
 		note := fmt.Sprintf("%s: round %d re-run dispatch-failed", next, round)
 		cr.result.Remediations = append(cr.result.Remediations, note)

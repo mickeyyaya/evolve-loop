@@ -8,8 +8,8 @@ import (
 
 // pauseForQuota records a resumable resource pause. Both dispatch entrypoints
 // preserve the same checkpoint and classification rather than creating a FAIL.
-func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int) error {
-	phaseErr := fmt.Errorf("phase %s: %w: every family in the fallback chain returned exit=85 across %d attempts; checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt)
+func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int, cause error) error {
+	phaseErr := fmt.Errorf("phase %s: %w: the dispatch ended on a quota wall across %d attempts (%v); checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt, cause)
 	// The pause is the quota.paused signal (WARN); the sink renders it — this
 	// seam is the one both dispatch roots reach.
 	cr.emitQuotaPaused(next, phaseErr)
