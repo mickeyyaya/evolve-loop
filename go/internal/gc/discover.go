@@ -91,23 +91,9 @@ func Discover(evolveDir string, o DiscoverOptions) ([]RunDir, error) {
 	var out []RunDir
 	for _, e := range entries {
 		dir := filepath.Join(runsDir, e.Name())
-		var info os.FileInfo
-		if e.IsDir() {
-			info, err = e.Info()
-			if err != nil {
-				continue
-			}
-		} else {
-			// Possibly a symlink to a run dir (an operator alias for a
-			// relocated run). Stat follows it; loose files and dangling
-			// links at runs/ root are not runs. Skipping symlinked runs
-			// here would make them INVISIBLE — absent from discovery and
-			// therefore from the keep_full/liveness protections.
-			st, serr := os.Stat(dir)
-			if serr != nil || !st.IsDir() {
-				continue
-			}
-			info = st
+		info, ok := runDirInfo(dir, e)
+		if !ok {
+			continue
 		}
 		if !hasRunMarker(dir) && !refs[dir] {
 			continue // no evidence — leave it alone
@@ -119,6 +105,23 @@ func Discover(evolveDir string, o DiscoverOptions) ([]RunDir, error) {
 		})
 	}
 	return out, nil
+}
+
+func runDirInfo(dir string, e os.DirEntry) (os.FileInfo, bool) {
+	if e.IsDir() {
+		info, err := e.Info()
+		return info, err == nil
+	}
+	// Possibly a symlink to a run dir (an operator alias for a
+	// relocated run). Stat follows it; loose files and dangling
+	// links at runs/ root are not runs. Skipping symlinked runs
+	// here would make them INVISIBLE — absent from discovery and
+	// therefore from the keep_full/liveness protections.
+	st, serr := os.Stat(dir)
+	if serr != nil || !st.IsDir() {
+		return nil, false
+	}
+	return st, true
 }
 
 func hasRunMarker(dir string) bool {
