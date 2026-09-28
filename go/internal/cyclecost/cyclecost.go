@@ -83,15 +83,8 @@ var maxScannerBufBytes = 1 << 24 // 16MB
 // fine and just cost nothing" (unlikely but possible with a fully-
 // cached repeat invocation).
 func SummarizeCycle(workspace string, cycle int) (Summary, error) {
-	info, err := os.Stat(workspace)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return Summary{Cycle: cycle}, ErrNoWorkspace
-		}
-		return Summary{Cycle: cycle}, fmt.Errorf("stat workspace: %w", err)
-	}
-	if !info.IsDir() {
-		return Summary{Cycle: cycle}, ErrNoWorkspace
+	if err := statWorkspace(workspace); err != nil {
+		return Summary{Cycle: cycle}, err
 	}
 
 	logs, err := globFn(filepath.Join(workspace, "*-events.ndjson"))
@@ -130,14 +123,34 @@ func SummarizeCycle(workspace string, cycle int) (Summary, error) {
 		summary.Phases = append(summary.Phases, pc)
 	}
 	sort.Slice(summary.Phases, func(i, j int) bool { return summary.Phases[i].Phase < summary.Phases[j].Phase })
-	for _, pc := range summary.Phases {
-		summary.Total.CostUSD += pc.CostUSD
-		summary.Total.CacheReadInputTokens += pc.CacheReadInputTokens
-		summary.Total.CacheCreationInputTokens += pc.CacheCreationInputTokens
-		summary.Total.OutputTokens += pc.OutputTokens
-		summary.Total.InputTokens += pc.InputTokens
-	}
+	summary.Total = sumPhaseCosts(summary.Phases)
 	return summary, nil
+}
+
+func statWorkspace(workspace string) error {
+	info, err := os.Stat(workspace)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ErrNoWorkspace
+		}
+		return fmt.Errorf("stat workspace: %w", err)
+	}
+	if !info.IsDir() {
+		return ErrNoWorkspace
+	}
+	return nil
+}
+
+func sumPhaseCosts(phases []PhaseCost) PhaseCost {
+	var total PhaseCost
+	for _, pc := range phases {
+		total.CostUSD += pc.CostUSD
+		total.CacheReadInputTokens += pc.CacheReadInputTokens
+		total.CacheCreationInputTokens += pc.CacheCreationInputTokens
+		total.OutputTokens += pc.OutputTokens
+		total.InputTokens += pc.InputTokens
+	}
+	return total
 }
 
 // ParseEventsLog is the exported entrypoint to the single canonical
@@ -194,6 +207,25 @@ func parseEventsLog(logPath string) (PhaseCost, bool) {
 	// Allow long lines — a result envelope can embed large payloads.
 	scanner.Buffer(make([]byte, 1<<10), maxScannerBufBytes)
 
+	last, found := lastResultEnvelope(scanner)
+	if err := scanner.Err(); err != nil {
+		return PhaseCost{}, false
+	}
+	if !found {
+		return PhaseCost{}, false
+	}
+
+	return PhaseCost{
+		Phase:                    phase,
+		CostUSD:                  last.Data.CostUSD,
+		CacheReadInputTokens:     last.Data.Tokens.CacheR,
+		CacheCreationInputTokens: last.Data.Tokens.CacheC,
+		OutputTokens:             last.Data.Tokens.Out,
+		InputTokens:              last.Data.Tokens.In,
+	}, true
+}
+
+func lastResultEnvelope(scanner *bufio.Scanner) (eventEnvelope, bool) {
 	var last eventEnvelope
 	var found bool
 	for scanner.Scan() {
@@ -217,21 +249,7 @@ func parseEventsLog(logPath string) (PhaseCost, bool) {
 			found = true
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return PhaseCost{}, false
-	}
-	if !found {
-		return PhaseCost{}, false
-	}
-
-	return PhaseCost{
-		Phase:                    phase,
-		CostUSD:                  last.Data.CostUSD,
-		CacheReadInputTokens:     last.Data.Tokens.CacheR,
-		CacheCreationInputTokens: last.Data.Tokens.CacheC,
-		OutputTokens:             last.Data.Tokens.Out,
-		InputTokens:              last.Data.Tokens.In,
-	}, true
+	return last, found
 }
 
 // usageSidecarSuffix is the per-phase filename suffix core.recordPhaseOutcome

@@ -65,15 +65,7 @@ type outcomeRollup struct {
 // salvage counters) for the batch report. Read failures degrade toward
 // FAILED_UNEXPLAINED — an unreadable record cannot explain anything.
 func ClassifyOutcome(workspace string) (Outcome, string) {
-	var timing []phasetiming.Entry
-	timingPresent := false
-	if entries, err := phasetiming.Read(workspace); err == nil {
-		timingPresent, timing = true, entries
-	} else if !os.IsNotExist(err) {
-		// Present but unreadable: it still marks the cycle as having run
-		// phases; an unparseable record explains nothing (unchanged contract).
-		timingPresent = true
-	}
+	timing, timingPresent := readTiming(workspace)
 
 	// SHIPPED: any ship dispatch with verdict PASS. Scanned over ALL
 	// entries (the timing file is an append-merge log: a failed attempt
@@ -84,17 +76,8 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 		}
 	}
 
-	// SALVAGED: the I2 ladder's salvage rung ran AND an artifact appeared.
-	// The v1 rollup has independent counters (no rung×result join), so this
-	// is a conjunction heuristic — good enough for the soak instrument;
-	// tighten when the rollup grows a joined counter.
-	if raw, err := os.ReadFile(filepath.Join(workspace, "interaction-summary.json")); err == nil {
-		var r outcomeRollup
-		if json.Unmarshal(raw, &r) == nil &&
-			r.ByRung["salvage"] > 0 && r.ByResult["artifact_appeared"] > 0 {
-			return OutcomeSalvaged, fmt.Sprintf("correction-ladder salvage produced the artifact (salvage=%d, artifact_appeared=%d)",
-				r.ByRung["salvage"], r.ByResult["artifact_appeared"])
-		}
+	if detail, ok := salvageDetail(workspace); ok {
+		return OutcomeSalvaged, detail
 	}
 
 	// DEFERRED: the abort reason carries the all-families quota-exhaustion
@@ -113,6 +96,44 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 		}
 	}
 
+	if detail, ok := failVerdictDetail(timing); ok {
+		return OutcomeFailedExplained, detail
+	}
+
+	if !timingPresent {
+		return OutcomeFailedExplained, "cycle initialization failed before phase timing was recorded"
+	}
+
+	return OutcomeFailedUnexplained, "no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint"
+}
+
+func readTiming(workspace string) ([]phasetiming.Entry, bool) {
+	entries, err := phasetiming.Read(workspace)
+	if err == nil {
+		return entries, true
+	}
+	// Present but unreadable: it still marks the cycle as having run
+	// phases; an unparseable record explains nothing (unchanged contract).
+	return nil, !os.IsNotExist(err)
+}
+
+func salvageDetail(workspace string) (string, bool) {
+	// SALVAGED: the I2 ladder's salvage rung ran AND an artifact appeared.
+	// The v1 rollup has independent counters (no rung×result join), so this
+	// is a conjunction heuristic — good enough for the soak instrument;
+	// tighten when the rollup grows a joined counter.
+	if raw, err := os.ReadFile(filepath.Join(workspace, "interaction-summary.json")); err == nil {
+		var r outcomeRollup
+		if json.Unmarshal(raw, &r) == nil &&
+			r.ByRung["salvage"] > 0 && r.ByResult["artifact_appeared"] > 0 {
+			return fmt.Sprintf("correction-ladder salvage produced the artifact (salvage=%d, artifact_appeared=%d)",
+				r.ByRung["salvage"], r.ByResult["artifact_appeared"]), true
+		}
+	}
+	return "", false
+}
+
+func failVerdictDetail(timing []phasetiming.Entry) (string, bool) {
 	// FAILED_EXPLAINED: a phase recorded verdict FAIL. The audit-FAIL →
 	// retro → end terminal is a normal COMPLETION, not an abort — the C1
 	// chokepoint never fires and no abort_reason exists — but the recorded
@@ -122,15 +143,10 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 	for _, e := range timing {
 		if e.Verdict == "FAIL" {
 			if msgs := cyclestate.ErrorMessages(e.Diagnostics); len(msgs) > 0 {
-				return OutcomeFailedExplained, fmt.Sprintf("phase %s recorded verdict FAIL: %s (no abort — cycle completed through its failure path)", e.Phase, strings.Join(msgs, "; "))
+				return fmt.Sprintf("phase %s recorded verdict FAIL: %s (no abort — cycle completed through its failure path)", e.Phase, strings.Join(msgs, "; ")), true
 			}
-			return OutcomeFailedExplained, fmt.Sprintf("phase %s recorded verdict FAIL (no abort — cycle completed through its failure path)", e.Phase)
+			return fmt.Sprintf("phase %s recorded verdict FAIL (no abort — cycle completed through its failure path)", e.Phase), true
 		}
 	}
-
-	if !timingPresent {
-		return OutcomeFailedExplained, "cycle initialization failed before phase timing was recorded"
-	}
-
-	return OutcomeFailedUnexplained, "no ship PASS, no salvage, no recorded abort_reason — a terminal path escaped the C1 chokepoint"
+	return "", false
 }

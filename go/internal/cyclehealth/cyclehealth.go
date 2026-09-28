@@ -94,6 +94,22 @@ func Check(opts Options) (Report, error) {
 		SignalsRun:  signalNames(),
 	}
 
+	report.Anomalies = runSignals(opts)
+
+	for _, a := range report.Anomalies {
+		if a.Severity == SeverityFatal {
+			report.OverallFatal = true
+			break
+		}
+	}
+
+	if err := writeReport(opts.Workspace, report); err != nil {
+		return report, fmt.Errorf("cyclehealth: write report: %w", err)
+	}
+	return report, nil
+}
+
+func runSignals(opts Options) []Anomaly {
 	// Each signal appends zero or more Anomaly entries.
 	signals := []signalCheck{
 		checkWorkspaceArtifacts,
@@ -110,21 +126,11 @@ func Check(opts Options) (Report, error) {
 		checkSelfHealEvents,
 		checkDossierCommitment,
 	}
+	var anomalies []Anomaly
 	for _, sc := range signals {
-		report.Anomalies = append(report.Anomalies, sc(opts)...)
+		anomalies = append(anomalies, sc(opts)...)
 	}
-
-	for _, a := range report.Anomalies {
-		if a.Severity == SeverityFatal {
-			report.OverallFatal = true
-			break
-		}
-	}
-
-	if err := writeReport(opts.Workspace, report); err != nil {
-		return report, fmt.Errorf("cyclehealth: write report: %w", err)
-	}
-	return report, nil
+	return anomalies
 }
 
 // signalCheck is the per-signal contract. Each returns the anomalies
