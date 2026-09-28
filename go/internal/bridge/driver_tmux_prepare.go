@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/phaseidentity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -42,28 +43,21 @@ func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch)
 		return prep, ExitBadFlags, fmt.Errorf("%s %w", prep.prefix, err)
 	}
 
+	prep.namedExists = reportNamedSession(ctx, deps, lp, prep.prefix)
+	prep.resolvedPromptFile = filepath.Join(cfg.Workspace, "resolved-prompt.txt")
+	facts := identityFacts(cfg, lp.session, prep.resolvedPromptFile)
+	authority, err := stateAuthority(cfg.Realization.SystemPromptFile)
+	if err != nil {
+		return prep, ExitBadFlags, fmt.Errorf("%s write system prompt: %w", prep.prefix, err)
+	}
 	if !lp.bootOnly {
 		prompt, err := preparePrompt(cfg, deps)
 		if err != nil {
 			return prep, ExitBadFlags, err
 		}
-		prep.resolvedPromptFile = filepath.Join(cfg.Workspace, "resolved-prompt.txt")
-		prompt = withIdentity(prompt, phaseidentity.Facts{
-			Agent: cfg.Agent, Cycle: cfg.Cycle, Session: lp.session,
-			PromptFile: cfg.PromptFile, PastedFile: prep.resolvedPromptFile, Artifact: writtenArtifact(cfg),
-		})
-		prep.resolvedPrompt = prompt
-		if err := os.WriteFile(prep.resolvedPromptFile, []byte(prompt+"\n"), 0o644); err != nil {
+		prep.resolvedPrompt = withIdentity(prompt, authority, facts)
+		if err := os.WriteFile(prep.resolvedPromptFile, []byte(prep.resolvedPrompt+"\n"), 0o644); err != nil {
 			return prep, ExitBadFlags, fmt.Errorf("%s write resolved prompt: %w", prep.prefix, err)
-		}
-	}
-
-	if lp.named {
-		prep.namedExists = deps.Tmux.HasSession(ctx, lp.session)
-		if prep.namedExists {
-			fmt.Fprintf(deps.Stderr, "%s RESUME: reattaching to existing named session '%s'\n", prep.prefix, lp.session)
-		} else {
-			fmt.Fprintf(deps.Stderr, "%s CREATE-NAMED: new named session '%s' (persists on exit for resume)\n", prep.prefix, lp.session)
 		}
 	}
 	if prep.namedExists && sandboxRequiredButUnavailable(deps, cfg, false) {
@@ -81,12 +75,42 @@ func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch)
 	return prep, ExitOK, nil
 }
 
-func withIdentity(prompt string, f phaseidentity.Facts) string {
-	block := phaseidentity.Block(f)
-	if block == "" {
+func reportNamedSession(ctx context.Context, deps Deps, lp tmuxLaunch, prefix string) bool {
+	if !lp.named {
+		return false
+	}
+	exists := deps.Tmux.HasSession(ctx, lp.session)
+	if exists {
+		fmt.Fprintf(deps.Stderr, "%s RESUME: reattaching to existing named session '%s'\n", prefix, lp.session)
+	} else {
+		fmt.Fprintf(deps.Stderr, "%s CREATE-NAMED: new named session '%s' (persists on exit for resume)\n", prefix, lp.session)
+	}
+	return exists
+}
+
+func identityFacts(cfg *Config, session, pastedFile string) string {
+	return phaseidentity.Block(phaseidentity.Facts{
+		Agent: cfg.Agent, Cycle: cfg.Cycle, Session: session,
+		PromptFile: cfg.PromptFile, PastedFile: pastedFile, Artifact: writtenArtifact(cfg),
+	})
+}
+
+func stateAuthority(systemPromptFile string) (string, error) {
+	if systemPromptFile == "" {
+		return phaseidentity.Authority(), nil
+	}
+	return "", atomicwrite.Bytes(systemPromptFile, []byte(phaseidentity.Authority()))
+}
+
+func withIdentity(prompt, authority, facts string) string {
+	if facts == "" {
 		return prompt
 	}
-	return strings.TrimRight(prompt, "\n") + "\n\n" + strings.TrimRight(block, "\n")
+	blocks := strings.TrimRight(facts, "\n")
+	if authority != "" {
+		blocks = strings.TrimRight(authority, "\n") + "\n\n" + blocks
+	}
+	return strings.TrimRight(prompt, "\n") + "\n\n" + blocks
 }
 
 func writtenArtifact(cfg *Config) string {

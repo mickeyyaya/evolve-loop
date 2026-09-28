@@ -54,35 +54,28 @@ func TestC1726_002_ListedOffenderGrowingPastItsAllowanceFails(t *testing.T) {
 	requireNames(t, "listed offender grown by one line", err, []string{"ship.consume"}, []string{"ship.stage"})
 }
 
-func TestC1726_003_AllowancesOnlyShrinkAndStaleEntriesFail(t *testing.T) {
-	cases := []struct {
-		name      string
+func TestC1726_003_AnAllowanceIsACeilingAndSlackPasses(t *testing.T) {
+	for name, tc := range map[string]struct {
 		spans     []sizeratchet.FuncSpan
 		offenders map[string]int
-		want      []string
-		notWant   []string
 	}{
-		{"shrunk offender must lower its allowance", spans("a.Shrunk", 59), map[string]int{"a.Shrunk": 60}, []string{"a.Shrunk"}, nil},
-		{"offender back within the limit must leave the list", spans("a.Healed", 50), map[string]int{"a.Healed": 60}, []string{"a.Healed"}, nil},
-		{"deleted offender must leave the list", nil, map[string]int{"a.Deleted": 80}, []string{"a.Deleted"}, nil},
-		{"every violation is reported", spans("a.Fresh", 51, "a.Grew", 71, "a.Steady", 60),
-			map[string]int{"a.Grew": 70, "a.Steady": 60, "a.Deleted": 80},
-			[]string{"a.Fresh", "a.Grew", "a.Deleted"}, []string{"a.Steady"}},
-		{"a same-key twin cannot grow past the allowance", spans("a.Twin", 60, "a.Twin", 62), map[string]int{"a.Twin": 61}, []string{"a.Twin"}, nil},
+		"a shrunk offender keeps its allowance": {spans("a.Shrunk", 59), map[string]int{"a.Shrunk": 60}},
+		"an offender back within the limit":     {spans("a.Healed", 50), map[string]int{"a.Healed": 60}},
+		"a deleted offender's entry":            {nil, map[string]int{"a.Deleted": 80}},
+		"same-key twins within the allowance":   {spans("a.Twin", 60, "a.Twin", 61), map[string]int{"a.Twin": 61}},
+		"an empty tree with an empty list":      {nil, nil},
+	} {
+		if err := sizeratchet.Check(tc.spans, tc.offenders); err != nil {
+			t.Errorf("%s is slack a boundary tighten removes, never a failure: %v", name, err)
+		}
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			requireNames(t, tc.name, sizeratchet.Check(tc.spans, tc.offenders), tc.want, tc.notWant)
-		})
-	}
-	// The allowance of a key shared by same-name twins (build-tagged files)
-	// is its largest span, so the shorter twin is not reported as slack.
-	if err := sizeratchet.Check(spans("a.Twin", 60, "a.Twin", 61), map[string]int{"a.Twin": 61}); err != nil {
-		t.Errorf("same-key twins within the allowance were rejected: %v", err)
-	}
-	if err := sizeratchet.Check(nil, nil); err != nil {
-		t.Errorf("an empty tree with an empty list was rejected: %v", err)
-	}
+	requireNames(t, "every violation is reported", sizeratchet.Check(spans("a.Fresh", 51, "a.Grew", 71, "a.Steady", 60),
+		map[string]int{"a.Grew": 70, "a.Steady": 60, "a.Deleted": 80}),
+		[]string{"a.Fresh", "a.Grew"}, []string{"a.Steady", "a.Deleted"})
+	requireNames(t, "a same-key twin cannot grow past the allowance", sizeratchet.Check(spans("a.Twin", 60, "a.Twin", 62), map[string]int{"a.Twin": 61}),
+		[]string{"a.Twin"}, nil)
+	requireNames(t, "a grown twin fails whatever the walk order", sizeratchet.Check(spans("a.Twin", 62, "a.Twin", 60), map[string]int{"a.Twin": 61}),
+		[]string{"a.Twin"}, nil)
 }
 
 func TestC1726_004_WalkMeasuresEveryNonTestFunctionUnderTheRoot(t *testing.T) {
@@ -166,7 +159,7 @@ func TestC1726_005_LoadOffendersReadsTheFlatListAndRejectsBadInput(t *testing.T)
 	}
 }
 
-func TestC1726_006_CheckedInListIsExactlyTheLiveOffenderCensus(t *testing.T) {
+func TestC1726_006_CheckedInListCoversEveryLiveOffenderAtOrAboveItsSize(t *testing.T) {
 	repo := acsassert.RepoRoot(t)
 	modRoot := filepath.Join(repo, "go")
 	requireTracked(t, repo, offendersFile)
@@ -176,15 +169,17 @@ func TestC1726_006_CheckedInListIsExactlyTheLiveOffenderCensus(t *testing.T) {
 	}
 	census := liveOffenderCensus(t, modRoot)
 	t.Logf("independent census: %d functions over %d lines; list holds %d entries", len(census), 50, len(listed))
-	if diff := diffCensus(census, listed); diff != "" {
-		t.Errorf("%s is not the live offender census at exact sizes (census -> list):\n%s", offendersFile, diff)
+	for key, size := range census {
+		if allowance, ok := listed[key]; !ok || allowance < size {
+			t.Errorf("%s does not cover live offender %s at %d lines (allowance %d, listed %v)", offendersFile, key, size, allowance, ok)
+		}
 	}
 	for _, key := range []string{
 		"internal/phases/ship.consumeCommittedItems", "internal/phases/ship.itemConsumer.stage",
 		"internal/phases/ship.stageExplicitPaths", "internal/bridge.codexDriver.Launch", "internal/bridge.claudePDriver.Launch",
 	} {
-		if _, ok := listed[key]; !ok {
-			t.Errorf("known offender %s is not listed", key)
+		if _, ok := listed[key]; !ok || census[key] <= 50 {
+			t.Errorf("known offender %s must be listed and measured as a live offender (listed %v, census %d lines)", key, ok, census[key])
 		}
 	}
 	walked, err := sizeratchet.Walk(modRoot)

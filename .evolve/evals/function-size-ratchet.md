@@ -6,9 +6,9 @@ score_cap:
   - criterion: "A listed offender that grows one line past its checked-in allowance fails the ratchet; one at its allowance passes"
     max_if_missing: 8
     evidence: "cd go && go test -count=1 -run '^TestC1726_002_ListedOffenderGrowingPastItsAllowanceFails$' -tags acs ./acs/cycle1726/"
-  - criterion: "Allowances only shrink: a shrunk offender must lower its allowance, a healed or deleted offender must leave the list, and every violation is reported at once"
+  - criterion: "An allowance is a ceiling (2026-09-28): a shrunk, healed or deleted offender's entry is slack that passes, a new offender or growth past an allowance fails, and every violation is reported at once"
     max_if_missing: 7
-    evidence: "cd go && go test -count=1 -run '^TestC1726_003_AllowancesOnlyShrinkAndStaleEntriesFail$' -tags acs ./acs/cycle1726/"
+    evidence: "cd go && go test -count=1 -run '^TestC1726_003_AnAllowanceIsACeilingAndSlackPasses$' -tags acs ./acs/cycle1726/"
   - criterion: "Walk measures every non-test function declaration (doc comment excluded, any build constraint) under the root, keys methods by receiver, skips vendor/testdata/dot/underscore dirs, and errors on unparsable source"
     max_if_missing: 7
     evidence: "cd go && go test -count=1 -run '^TestC1726_004_WalkMeasuresEveryNonTestFunctionUnderTheRoot$' -tags acs ./acs/cycle1726/"
@@ -17,7 +17,7 @@ score_cap:
     evidence: "cd go && go test -count=1 -run '^TestC1726_005_LoadOffendersReadsTheFlatListAndRejectsBadInput$' -tags acs ./acs/cycle1726/"
   - criterion: "The checked-in go/internal/sizeratchet/offenders.json is tracked and equals an independent go/ast census of every current offender at its exact size"
     max_if_missing: 8
-    evidence: "cd go && go test -count=1 -run '^TestC1726_006_CheckedInListIsExactlyTheLiveOffenderCensus$' -tags acs ./acs/cycle1726/"
+    evidence: "cd go && go test -count=1 -run '^TestC1726_006_CheckedInListCoversEveryLiveOffenderAtOrAboveItsSize$' -tags acs ./acs/cycle1726/"
   - criterion: "The package's own tests, run with CI's tags, pass a copy of the module and fail it once a new 51-line function lands or consumeCommittedItems grows one line"
     max_if_missing: 9
     evidence: "cd go && go test -count=1 -run '^TestC1726_007_CIRatchetTestFailsOnARealModuleRegression$' -tags acs ./acs/cycle1726/"
@@ -52,10 +52,10 @@ score_cap:
 |---|---|---|---|
 | new-offender | unlisted 51-line function fails; 50 passes | 8/10 | `TestC1726_001_NewFunctionPastFiftyLinesFailsAndExactlyFiftyPasses` |
 | growth | listed offender +1 line fails | 8/10 | `TestC1726_002_ListedOffenderGrowingPastItsAllowanceFails` |
-| shrink-only | slack/stale entries fail; collect-all | 7/10 | `TestC1726_003_AllowancesOnlyShrinkAndStaleEntriesFail` |
+| ceiling | slack/stale entries pass; new offenders and growth fail; collect-all | 7/10 | `TestC1726_003_AnAllowanceIsACeilingAndSlackPasses` |
 | walk-scope | repo-wide non-test walk, receiver keys, skip rules, parse errors | 7/10 | `TestC1726_004_WalkMeasuresEveryNonTestFunctionUnderTheRoot` |
 | list-input | LoadOffenders boundary validation | 5/10 | `TestC1726_005_LoadOffendersReadsTheFlatListAndRejectsBadInput` |
-| seeded-list | checked-in list == independent live census | 8/10 | `TestC1726_006_CheckedInListIsExactlyTheLiveOffenderCensus` |
+| seeded-list | the checked-in list covers every live offender at or above its size | 8/10 | `TestC1726_006_CheckedInListCoversEveryLiveOffenderAtOrAboveItsSize` |
 | ci-reachability | CI-run test fails on a real planted regression | 9/10 | `TestC1726_007_CIRatchetTestFailsOnARealModuleRegression` |
 | apicover | package graduates into the enforced apicover set | 6/10 | `TestC1726_008_SizeratchetGraduatesIntoTheApicoverEnforcedSet` |
 | durable-green | ratchet green under the CI recipe | 9/10 | `go test -tags integration ./internal/sizeratchet/` |

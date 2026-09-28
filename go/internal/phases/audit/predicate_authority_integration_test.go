@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
@@ -102,6 +103,9 @@ func TestBeginPredicateEvidence_UnstagedInputsRefuseAudit(t *testing.T) {
 	_, err = beginPredicateEvidence(core.PhaseRequest{Cycle: 1, RunID: "run-1", AuditRound: 1, Worktree: root})
 	if err == nil {
 		t.Fatal("undeclared helper can affect execution but would be absent from the ship tree")
+	}
+	if !strings.Contains(err.Error(), "helper.go") {
+		t.Fatalf("the refusal must name the undeclared input so a repair can stage or remove it: %v", err)
 	}
 	after, err := os.ReadFile(filepath.Join(root, ".git", "index"))
 	if err != nil {

@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,19 +30,46 @@ func pastedIdentity(t *testing.T, fx launchFixture, stderr string) (pasted strin
 	})
 }
 
-func TestTmuxDispatch_PastedPromptEndsWithTheAgentsIdentity(t *testing.T) {
+func launchLine(t *testing.T, tmux *fakeTmux) string {
+	t.Helper()
+	for _, keys := range tmux.sentKeys {
+		if strings.Contains(keys, "claude ") || strings.HasSuffix(keys, "claude") {
+			return keys
+		}
+	}
+	t.Fatalf("no claude launch line among the typed keys: %q", tmux.sentKeys)
+	return ""
+}
+
+func TestTmuxDispatch_ClaudeStatesItsAuthorityAsItsSystemPrompt(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "plan")
-	_, stderr := runTmux(t, fx, &fakeTmux{}, nil, "--agent=tdd", "--cycle=1707", "--worktree="+t.TempDir())
+	tmux := &fakeTmux{}
+	_, stderr := runTmux(t, fx, tmux, nil, "--agent=tdd", "--cycle=1707", "--worktree="+t.TempDir())
 	pasted, want := pastedIdentity(t, fx, stderr)
-	if !strings.HasSuffix(pasted, "\n\n"+want) {
-		t.Fatalf("the pasted bytes must end with the identity block for this session:\n%s\nwant suffix:\n%s", pasted, want)
+	authorityFile := filepath.Join(fx.ws, "pane-authority.md")
+	stated, err := os.ReadFile(authorityFile)
+	if err != nil || string(stated) != phaseidentity.Authority() {
+		t.Fatalf("the system prompt file must hold the standing authority (err=%v):\n%s", err, stated)
+	}
+	if line := launchLine(t, tmux); !strings.Contains(line, "--append-system-prompt-file") || !strings.Contains(line, authorityFile) {
+		t.Fatalf("claude must launch with the authority as its system prompt: %q", line)
 	}
 	body, _ := os.ReadFile(fx.promptFile)
-	if !strings.HasPrefix(pasted, strings.TrimRight(string(body), "\n")) {
-		t.Fatalf("the composed prompt must still come first, unchanged:\n%s", pasted)
+	if pasted != strings.TrimRight(string(body), "\n")+"\n\n"+strings.TrimRight(want, "\n")+"\n" {
+		t.Fatalf("the paste is the composed prompt and this dispatch's facts, without the authority:\n%s", pasted)
 	}
-	if strings.Count(pasted, phaseidentity.Heading) != 1 {
-		t.Fatalf("one identity block, not %d", strings.Count(pasted, phaseidentity.Heading))
+}
+
+func TestTmuxDispatch_ABootSmokeWithARealizedFileStillWritesTheFileItLaunchesWith(t *testing.T) {
+	ws := t.TempDir()
+	authorityFile := filepath.Join(ws, "pane-authority.md")
+	cfg := &Config{Workspace: ws, Agent: "tdd", Realization: RealizeFor("claude-tmux", LaunchIntent{SystemPromptFile: authorityFile})}
+	deps, _ := bootSmokeDeps(&fakeTmux{paneSeq: []string{"❯"}})
+	if rc, _ := BootSmokeTest(context.Background(), "claude-tmux", cfg, deps); rc != ExitOK {
+		t.Fatalf("rc = %d, want ExitOK", rc)
+	}
+	if stated, err := os.ReadFile(authorityFile); err != nil || string(stated) != phaseidentity.Authority() {
+		t.Fatalf("a launch line that names the system prompt file needs the file (err=%v): %q", err, stated)
 	}
 }
 
@@ -51,6 +79,9 @@ func TestTmuxDispatch_IdentityIsStatedForEveryTmuxCLI(t *testing.T) {
 	pasted, want := pastedIdentity(t, fx, stderr)
 	if !strings.HasSuffix(pasted, "\n\n"+want) {
 		t.Fatalf("codex-tmux must state the identity too:\n%s\nwant suffix:\n%s", pasted, want)
+	}
+	if !strings.Contains(pasted, "\n\n"+strings.TrimRight(phaseidentity.Authority(), "\n")+"\n\n"+want) {
+		t.Fatalf("a CLI without a system prompt channel pastes the authority before the facts:\n%s", pasted)
 	}
 }
 
@@ -71,7 +102,11 @@ func TestTmuxDispatch_StdoutCompletionClaimsNoArtifact(t *testing.T) {
 
 func TestTmuxDispatch_NoAgentNameMeansNoIdentity(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "plan")
-	runTmux(t, fx, &fakeTmux{}, nil, "--worktree="+t.TempDir())
+	tmux := &fakeTmux{}
+	runTmux(t, fx, tmux, nil, "--worktree="+t.TempDir())
+	if line := launchLine(t, tmux); strings.Contains(line, "--append-system-prompt-file") {
+		t.Fatalf("a pane with no phase launches with no system prompt file: %q", line)
+	}
 	raw, err := os.ReadFile(filepath.Join(fx.ws, "resolved-prompt.txt"))
 	if err != nil {
 		t.Fatal(err)

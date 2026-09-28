@@ -14,5 +14,7 @@
     "A replay of 1734's triage prompt through the driver yields a written triage-report.md, not a refusal"
   ],
   "created_at": "2026-09-28T11:30:00Z",
-  "source": "console, 2026-09-28, the wave-24 P0 (cycles 1733, 1734)"
+  "source": "console, 2026-09-28, the wave-24 P0 (cycles 1733, 1734)",
+  "consumed_by": "console landing fix/pane-identity-is-system-level (2026-09-28): BUILT, redesigned on the evidence. 1734's pane refused the bridge's typed nudge as well, so a typed line would not have authorized the paste; a standing authority block (phaseidentity.Authority: the pasted prompt is the operator's instruction; the console's interactive conventions are not this pane's) is claude-tmux's system prompt (--append-system-prompt-file, manifest param system_prompt_file) and is pasted by CLIs without that channel; the per-dispatch facts still end every paste.",
+  "consumed_at": "2026-09-28T13:30:00Z"
 }

@@ -46,6 +46,8 @@ import (
 // — flaky-predicate-shape rules.
 const shipPkg = "./internal/phases/ship"
 
+const manifestPkg = "./internal/shipmanifest"
+
 // redContractFiles are the RED contract this cycle authored. They must be
 // present on disk AND shippable (not gitignored) — see assertShippable for why
 // tracking itself is the wrong assertion at audit time (cycle-93).
@@ -60,8 +62,13 @@ var redContractFiles = []string{
 // main tree, a worktree, and each fleet lane).
 func runShipTests(t *testing.T, root, pattern string) (string, int) {
 	t.Helper()
+	return runPkgTests(t, root, shipPkg, pattern)
+}
+
+func runPkgTests(t *testing.T, root, pkg, pattern string) (string, int) {
+	t.Helper()
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
-		"go", "test", "-C", filepath.Join(root, "go"), shipPkg, "-run", pattern, "-count=1")
+		"go", "test", "-C", filepath.Join(root, "go"), pkg, "-run", pattern, "-count=1")
 	out := stdout + stderr
 	if code == -1 {
 		t.Fatalf("could not run `go test -run %s`: %v\n%s", pattern, err, out)
@@ -130,7 +137,7 @@ func TestC1469_002_RenameArrowParsedStructurally(t *testing.T) {
 		"TestPorcelainChangedPaths_RenameArrowMalformedIsSafe",
 		"TestPorcelainChangedPaths_OrdinaryRenameArrowUnchanged",
 	} {
-		out, code := runShipTests(t, root, "^"+name+"$")
+		out, code := runPkgTests(t, root, manifestPkg, "^"+name+"$")
 		if code != 0 {
 			t.Errorf("%s RED (exit %d) — a quoted rename endpoint holding the delimiter is still torn into unbalanced-quote fragments, which `git add` rejects rc=128 and which fails the whole staging:\n%s", name, code, out)
 		}
@@ -149,8 +156,10 @@ func TestC1469_002_RenameArrowParsedStructurally(t *testing.T) {
 func TestC1469_003_ExistingQuotePathAndStagingContractsHold(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 
+	if out, code := runPkgTests(t, root, manifestPkg, "TestPorcelainChangedPaths_QuotePath"); code != 0 {
+		t.Errorf("pre-existing contract %q regressed (exit %d):\n%s", "TestPorcelainChangedPaths_QuotePath", code, out)
+	}
 	for _, pattern := range []string{
-		"TestPorcelainChangedPaths_QuotePath",
 		"TestStageExplicitPaths_QuotePathDisabledOnGitReads",
 		"TestDropIgnoredPaths_QuotePath",
 		"TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll",

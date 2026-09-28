@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -117,17 +118,6 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 	// from this rather than constructing model/permission flags inline, so a claude-origin profile's raw
 	// flags realize only for the matching CLI. permMode is still carried on Config for the safety gates and
 	// the headless claude-p driver.
-	sessionMode := "ephemeral"
-	if sessionName != "" {
-		sessionMode = "named:" + sessionName
-	}
-	intent := LaunchIntent{
-		ModelTier:   effectiveModel,
-		Permission:  permissionIntent(permMode),
-		SessionMode: sessionMode,
-		Effort:      prof.effortForTier(effectiveModel),
-		RawByCLI:    prof.ExtraFlagsByCLI,
-	}
 
 	cfg := Config{
 		CLI:                raw.cli,
@@ -154,10 +144,10 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		RequireSandbox:     raw.requireSandbox,
 		AllowedTools:       prof.AllowedTools,
 		ExtraFlags:         raw.extra,
-		Realization:        RealizeFor(raw.cli, intent),
 		AnthropicBaseURL:   raw.anthropicBaseURL,
 		ArtifactTimeoutS:   artifactTimeoutS,
 	}
+	cfg.Realization = RealizeFor(raw.cli, launchIntentFor(&cfg, prof))
 	if prof.Sandbox != nil {
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
 		if prof.Sandbox.Enabled {
@@ -267,6 +257,25 @@ func (r rawLaunch) missingRequired() []string {
 	check(r.stderrLog, "--stderr-log/STDERR_LOG")
 	check(r.artifact, "--artifact/ARTIFACT_PATH")
 	return m
+}
+
+const paneAuthorityFile = "pane-authority.md"
+
+func launchIntentFor(cfg *Config, prof Profile) LaunchIntent {
+	intent := LaunchIntent{
+		ModelTier:   cfg.Model,
+		Permission:  permissionIntent(cfg.PermissionMode),
+		SessionMode: "ephemeral",
+		Effort:      prof.effortForTier(cfg.Model),
+		RawByCLI:    prof.ExtraFlagsByCLI,
+	}
+	if cfg.SessionName != "" {
+		intent.SessionMode = "named:" + cfg.SessionName
+	}
+	if cfg.Agent != "" {
+		intent.SystemPromptFile = filepath.Join(cfg.Workspace, paneAuthorityFile)
+	}
+	return intent
 }
 
 // parseLaunchArgs initializes raw fields from env fallbacks then applies flags (flags win); it supports

@@ -90,6 +90,10 @@
     "session_mode": {
       "channel": "controller"
     },
+    "system_prompt_file": {
+      "channel": "flag",
+      "flag": "--append-system-prompt-file"
+    },
     "allowed_tools": {
       "channel": "flag",
       "flag": "--allowedTools"

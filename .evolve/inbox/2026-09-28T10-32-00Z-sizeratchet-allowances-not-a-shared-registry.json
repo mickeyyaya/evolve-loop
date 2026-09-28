@@ -15,5 +15,6 @@
     "Both ratchets still refuse growth past the allowance and a new offender"
   ],
   "created_at": "2026-09-28T10:30:00Z",
-  "source": "console, 2026-09-28, the inbox architecture review"
+  "source": "console, 2026-09-28, the inbox architecture review",
+  "fix": " Partly resolved 2026-09-28 (fix/sizeratchet-is-a-ceiling): an allowance is now a ceiling, so no lane needs to write offenders.json to pass (shrinks and stale entries are slack); the remaining work is the single writer: a boundary `evolve sizeratchet tighten` (pure Tighten + a byte-stable Encode; json.MarshalIndent(m, \"\", \"  \") + \"\\n\" reproduces today's file) and a build-floor no-growth check against the base (commentaudit.ReadAtBase pattern), then one exported offenders path constant (today written three ways) and one 50-line cap (test/structure/limits.go duplicates it with >=)."
 }
