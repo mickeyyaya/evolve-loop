@@ -160,6 +160,8 @@ Preserve a minimum-version compatibility lane where intended while adding a curr
 
 Use stable required job names and an always-reporting result aggregator in an **unfiltered workflow**, with conditional expensive jobs inside it. An aggregator inside a workflow-level path filter cannot report when the whole workflow is skipped. Test routing for source, tests, profiles, schemas, fixture files, gate lists, go.mod/go.sum, Makefile, workflow-only and landing-only changes. Keep full validation for release and foundational harness changes until impact selection proves parity in shadow runs.
 
+Status 2026-09-28: `.github/workflows/required.yml` implements this aggregator as the `CI required` job; see the [design](../reports/test-ci-required-results-design-2026-09-14.md) and [implementation](../reports/test-ci-required-results-implementation-2026-09-14.md) reports. No branch rule requires it yet.
+
 ## Implementation slices and exit criteria
 
 These are independent, reviewable changes, not one bulk rewrite. Correctness comes before speed measurements.
