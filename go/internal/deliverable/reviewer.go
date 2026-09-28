@@ -177,6 +177,10 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		}
 	}
 
+	return r.violationResult(check, in, res, bp)
+}
+
+func (r *Reviewer) violationResult(check gatesignal.Check, in core.ReviewInput, res Result, bp string) core.ReviewResult {
 	reason := summarize(in.Phase, res)
 
 	// The size gate is warn-only below its own enforce; a co-occurring real violation still blocks.

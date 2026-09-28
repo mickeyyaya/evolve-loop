@@ -182,19 +182,8 @@ func readPlan(set mandatorySet, ws string, cs CycleSummary, loop LoopStatus, str
 	current := cs.CurrentPhase
 	plan := &PhasePlan{Mandatory: set.mandatory}
 	last, rounds, order := runOrder(phaseHistory(cs, outcomes), current, running)
-	frontier := -1 // walk position of the furthest ordered phase the cycle reached
-	for _, p := range order {
-		if pos := set.position(p); pos > frontier {
-			frontier = pos
-		}
-	}
-	required := map[string]bool{}
-	for _, p := range set.mandatory {
-		required[p] = true
-		if _, ran := last[p]; !ran && p != current {
-			order = append(order, p)
-		}
-	}
+	frontier := walkFrontier(set, order)
+	order, required := scheduleMandatory(set, last, current, order)
 	held := map[string]bool{} // everything the sequence holds: ran, ongoing, or scheduled by the floor
 	for _, p := range order {
 		held[p] = true
@@ -224,6 +213,27 @@ func readPlan(set mandatorySet, ws string, cs CycleSummary, loop LoopStatus, str
 	plan.AdvisorProposed, plan.AdvisorSkips, plan.AdvisorOverridden, advisorWarn = advisorProposal(ws, held, last)
 	warn(advisorWarn)
 	return plan, warnings
+}
+
+func walkFrontier(set mandatorySet, order []string) int {
+	frontier := -1 // walk position of the furthest ordered phase the cycle reached
+	for _, p := range order {
+		if pos := set.position(p); pos > frontier {
+			frontier = pos
+		}
+	}
+	return frontier
+}
+
+func scheduleMandatory(set mandatorySet, last map[string]PhaseRun, current string, order []string) ([]string, map[string]bool) {
+	required := map[string]bool{}
+	for _, p := range set.mandatory {
+		required[p] = true
+		if _, ran := last[p]; !ran && p != current {
+			order = append(order, p)
+		}
+	}
+	return order, required
 }
 
 // runOrder folds the phase history into its last run per phase, its round

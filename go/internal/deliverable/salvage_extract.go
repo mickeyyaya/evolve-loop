@@ -36,24 +36,7 @@ func verdictCandidates(content string, stringAware bool) []verdictSpan {
 	for i := 0; i < len(content); i++ {
 		ch := content[i]
 		if !stringAware {
-			switch ch {
-			case '{':
-				if depth == 0 {
-					start = i
-				}
-				depth++
-			case '}':
-				if depth == 0 {
-					continue
-				}
-				depth--
-				if depth == 0 && start >= 0 {
-					if verdictKeyRE.MatchString(content[start : i+1]) {
-						out = append(out, verdictSpan{start: start, end: i + 1})
-					}
-					start = -1
-				}
-			}
+			depth, start, out = balanceBrace(content, i, depth, start, out)
 			continue
 		}
 		if inStr {
@@ -70,28 +53,36 @@ func verdictCandidates(content string, stringAware bool) []verdictSpan {
 		switch ch {
 		case '"':
 			inStr = true
-		case '{':
-			if depth == 0 {
-				start = i
-			}
-			depth++
-		case '}':
-			if depth == 0 {
-				continue
-			}
-			depth--
-			if depth == 0 && start >= 0 {
-				if verdictKeyRE.MatchString(content[start : i+1]) {
-					out = append(out, verdictSpan{start: start, end: i + 1})
-				}
-				start = -1
-			}
+		default:
+			depth, start, out = balanceBrace(content, i, depth, start, out)
 		}
 	}
 	if depth > 0 && start >= 0 && verdictKeyRE.MatchString(content[start:]) {
 		out = append(out, verdictSpan{start: start, end: -1})
 	}
 	return out
+}
+
+func balanceBrace(content string, i, depth, start int, out []verdictSpan) (int, int, []verdictSpan) {
+	switch content[i] {
+	case '{':
+		if depth == 0 {
+			start = i
+		}
+		depth++
+	case '}':
+		if depth == 0 {
+			return depth, start, out
+		}
+		depth--
+		if depth == 0 && start >= 0 {
+			if verdictKeyRE.MatchString(content[start : i+1]) {
+				out = append(out, verdictSpan{start: start, end: i + 1})
+			}
+			start = -1
+		}
+	}
+	return depth, start, out
 }
 
 // candidateCount is the max of three readings (string-aware, brace-only, stateless key count): each stateful scan
@@ -232,33 +223,8 @@ func recordSalvageApplied(roots phasecontract.Roots, phase string, pattern Salva
 
 // SalvageSummaryLine renders "Salvaged verdicts: N (breakdown)" for this run from the salvage-applied sidecar, or "" at zero.
 func SalvageSummaryLine(evolveDir string) string {
-	// Streamed, not slurped: this runs on every salvage over a never-rotated sidecar.
-	f, err := os.Open(filepath.Join(evolveDir, salvageAppliedFile))
-	if err != nil {
-		return ""
-	}
-	defer func() { _ = f.Close() }()
-	type appliedRec struct{ pattern, run string }
-	recs := make([]appliedRec, 0, 8)
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := sc.Text()
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		var m struct {
-			Pattern string `json:"pattern"`
-			Run     string `json:"run"`
-		}
-		if json.Unmarshal([]byte(line), &m) != nil {
-			// A torn record is skipped by the total and the breakdown alike, since both come from recs.
-			continue
-		}
-		recs = append(recs, appliedRec{pattern: m.Pattern, run: m.Run})
-	}
-	// An unread tail would make the count a partial total, so the line is omitted.
-	if sc.Err() != nil {
+	recs, ok := readSalvageApplied(evolveDir)
+	if !ok {
 		return ""
 	}
 	// Scope to this run's records; a legacy sidecar with no run ids reports the whole file.
@@ -288,6 +254,40 @@ func SalvageSummaryLine(evolveDir string) string {
 		parts = append(parts, fmt.Sprintf("%s=%d", p, counts[p]))
 	}
 	return fmt.Sprintf("Salvaged verdicts: %d (%s)", len(recs), strings.Join(parts, ", "))
+}
+
+type appliedRec struct{ pattern, run string }
+
+func readSalvageApplied(evolveDir string) ([]appliedRec, bool) {
+	// Streamed, not slurped: this runs on every salvage over a never-rotated sidecar.
+	f, err := os.Open(filepath.Join(evolveDir, salvageAppliedFile))
+	if err != nil {
+		return nil, false
+	}
+	defer func() { _ = f.Close() }()
+	recs := make([]appliedRec, 0, 8)
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for sc.Scan() {
+		line := sc.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var m struct {
+			Pattern string `json:"pattern"`
+			Run     string `json:"run"`
+		}
+		if json.Unmarshal([]byte(line), &m) != nil {
+			// A torn record is skipped by the total and the breakdown alike, since both come from recs.
+			continue
+		}
+		recs = append(recs, appliedRec{pattern: m.Pattern, run: m.Run})
+	}
+	// An unread tail would make the count a partial total, so the line is omitted.
+	if sc.Err() != nil {
+		return nil, false
+	}
+	return recs, true
 }
 
 // salvageRunID tags this process's records; the renderer runs in the process that appended them.

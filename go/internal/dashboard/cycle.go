@@ -189,45 +189,7 @@ func callForPhaseWindow(
 		if window.indistinguishable {
 			return llmCall{}, -1, false
 		}
-		var selected llmCall
-		var selectedAt time.Time
-		selectedIndex := -1
-		for index, call := range calls {
-			if _, alreadyUsed := used[index]; alreadyUsed {
-				continue
-			}
-			terminal := parseTime(call.EndedAt)
-			if terminal.IsZero() {
-				terminal = parseTime(call.TS)
-			}
-			if terminal.IsZero() || terminal.Before(window.start) || terminal.After(window.end) {
-				continue
-			}
-			callStart := parseTime(call.StartedAt)
-			if !callStart.IsZero() && (callStart.Before(window.start) || callStart.After(window.end)) {
-				continue
-			}
-			// A legacy call with no start time inside the previous phase's
-			// whole-second overlap could have terminated either round. Withhold
-			// it from the later round just as nextStart withholds it from the
-			// earlier round.
-			if callStart.IsZero() && !window.previousEnd.IsZero() &&
-				!terminal.Before(window.start) && !terminal.After(window.previousEnd) {
-				continue
-			}
-			// Whole-second phase records can overlap at a repeated phase's
-			// boundary. A call that starts in the later round belongs there; a
-			// timestamp-only legacy call at or after that boundary is ambiguous
-			// and is likewise withheld from the earlier round.
-			if !window.nextStart.IsZero() && !terminal.Before(window.nextStart) &&
-				(callStart.IsZero() || !callStart.Before(window.nextStart)) {
-				continue
-			}
-			if selectedAt.IsZero() || terminal.After(selectedAt) {
-				selected, selectedAt, selectedIndex = call, terminal, index
-			}
-		}
-		if !selectedAt.IsZero() {
+		if selected, selectedIndex, ok := latestCallInWindow(window, calls, used); ok {
 			return selected, selectedIndex, true
 		}
 		// A timestamped ledger that does not overlap this entry carries no safe
@@ -245,6 +207,48 @@ func callForPhaseWindow(
 		}
 	}
 	return llmCall{}, -1, false
+}
+
+func latestCallInWindow(window phaseCallWindow, calls []llmCall, used map[int]struct{}) (llmCall, int, bool) {
+	var selected llmCall
+	var selectedAt time.Time
+	selectedIndex := -1
+	for index, call := range calls {
+		if _, alreadyUsed := used[index]; alreadyUsed {
+			continue
+		}
+		terminal := parseTime(call.EndedAt)
+		if terminal.IsZero() {
+			terminal = parseTime(call.TS)
+		}
+		if terminal.IsZero() || terminal.Before(window.start) || terminal.After(window.end) {
+			continue
+		}
+		callStart := parseTime(call.StartedAt)
+		if !callStart.IsZero() && (callStart.Before(window.start) || callStart.After(window.end)) {
+			continue
+		}
+		// A legacy call with no start time inside the previous phase's
+		// whole-second overlap could have terminated either round. Withhold
+		// it from the later round just as nextStart withholds it from the
+		// earlier round.
+		if callStart.IsZero() && !window.previousEnd.IsZero() &&
+			!terminal.Before(window.start) && !terminal.After(window.previousEnd) {
+			continue
+		}
+		// Whole-second phase records can overlap at a repeated phase's
+		// boundary. A call that starts in the later round belongs there; a
+		// timestamp-only legacy call at or after that boundary is ambiguous
+		// and is likewise withheld from the earlier round.
+		if !window.nextStart.IsZero() && !terminal.Before(window.nextStart) &&
+			(callStart.IsZero() || !callStart.Before(window.nextStart)) {
+			continue
+		}
+		if selectedAt.IsZero() || terminal.After(selectedAt) {
+			selected, selectedAt, selectedIndex = call, terminal, index
+		}
+	}
+	return selected, selectedIndex, !selectedAt.IsZero()
 }
 
 func countPhase(phases []string, name string) int {
