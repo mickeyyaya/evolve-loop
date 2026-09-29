@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -30,8 +31,18 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	ctx, cancel := context.WithTimeout(context.Background(), orphanGCTimeout)
 	defer cancel()
 
+	failed := gcSessions(ctx, *dryRun, stdout, stderr)
+	failed = gcSockets(ctx, *dryRun, stdout, stderr) || failed
+	failed = gcWorkspaceSweep(ctx, *projectRoot, *dryRun, stdout, stderr) != 0 || failed
+	if failed {
+		return 1
+	}
+	return 0
+}
+
+func gcSessions(ctx context.Context, dryRun bool, stdout, stderr io.Writer) bool {
 	var rep swarm.OrphanReapReport
-	if *dryRun {
+	if dryRun {
 		// A no-op killer turns the sweep into a preview: the report's Killed
 		// list is exactly what a real run would reap.
 		noop := func(_ context.Context, _ string) error { return nil }
@@ -52,10 +63,13 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, e := range rep.Errors {
 		fmt.Fprintf(stderr, "evolve gc: error: %s\n", e)
 	}
+	return len(rep.Errors) > 0
+}
 
+func gcSockets(ctx context.Context, dryRun bool, stdout, stderr io.Writer) bool {
 	// Also sweep whole per-run tmux sockets a crashed loop left behind.
 	var srep swarm.OrphanSocketReport
-	if *dryRun {
+	if dryRun {
 		noopKill := func(_ context.Context, _ string) error { return nil }
 		srep = swarm.ReapOrphanSockets(ctx, swarm.ExecListBridgeSockets, swarm.ExecPidAlive, noopKill)
 		fmt.Fprintf(stdout, "evolve gc --dry-run: %d dead per-run socket(s) would be reaped\n", len(srep.Killed))
@@ -69,13 +83,25 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, e := range srep.Errors {
 		fmt.Fprintf(stderr, "evolve gc: socket error: %s\n", e)
 	}
+	return len(srep.Errors) > 0
+}
 
-	wrc := gcWorkspaceSweep(*projectRoot, *dryRun, stdout, stderr)
-
-	if len(rep.Errors) > 0 || len(srep.Errors) > 0 || wrc != 0 {
-		return 1
+func gcCycleProcesses(ctx context.Context, opts gc.WorktreeOptions, dryRun bool, stdout, stderr io.Writer) bool {
+	kill := func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) }
+	verb, line := "terminated", "evolve gc: terminated %d finished-cycle orphan process(es)\n"
+	if dryRun {
+		kill = func(int) error { return nil }
+		verb, line = "WOULD-TERMINATE", "evolve gc --dry-run: %d finished-cycle orphan process(es) would be terminated\n"
 	}
-	return 0
+	rep := gc.ReapFinishedCycleOrphans(ctx, opts, kill)
+	fmt.Fprintf(stdout, line, len(rep.Reaped))
+	for _, p := range rep.Reaped {
+		fmt.Fprintf(stdout, "  %s pid=%d cwd=%s\n", verb, p.Pid, p.Cwd)
+	}
+	for _, e := range rep.Errors {
+		fmt.Fprintf(stderr, "evolve gc: process error: %s\n", e)
+	}
+	return len(rep.Errors) > 0
 }
 
 // gcWorkspaceSweep runs the worktree+branch backlog sweep for an operator.
@@ -84,7 +110,7 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // only plans deletes for merged, clean, dead worktrees/branches and flags the
 // rest; this command prints flags but never upgrades one to a deletion.
 // Returns non-zero only when the plan itself failed.
-func gcWorkspaceSweep(projectRoot string, dryRun bool, stdout, stderr io.Writer) int {
+func gcWorkspaceSweep(ctx context.Context, projectRoot string, dryRun bool, stdout, stderr io.Writer) int {
 	projectRoot, code, ok := resolveGCProjectRoot(projectRoot, dryRun, stderr)
 	if !ok {
 		return code
@@ -99,6 +125,14 @@ func gcWorkspaceSweep(projectRoot string, dryRun bool, stdout, stderr io.Writer)
 		wpol = pol.GC.Worktrees
 	}
 	opts := worktreeGCOptions(projectRoot, evolveDir, wpol)
+	procFailed := gcCycleProcesses(ctx, opts, dryRun, stdout, stderr)
+	if rc := gcWorktrees(opts, dryRun, stdout, stderr); rc != 0 || procFailed {
+		return 1
+	}
+	return 0
+}
+
+func gcWorktrees(opts gc.WorktreeOptions, dryRun bool, stdout, stderr io.Writer) int {
 	manifest, err := gc.PlanWorktrees(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve gc: workspace sweep plan failed: %v\n", err)
