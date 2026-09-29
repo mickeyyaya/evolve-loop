@@ -48,22 +48,9 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 	if loopchain.BrakeEngaged(b.cfg.EvolveDir) {
 		return b.brakeStop(iteration)
 	}
-
-	// An interrupt that landed during the probes must not dispatch a wave
-	// that would be cancelled at spawn.
-	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
-		return b.interruptReturn(iteration, "during the pre-wave probes ")
+	if decision, stop := b.runPreWave(iteration); stop {
+		return decision
 	}
-	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
-		b.result.StopReason = "plane_diverged_halt"
-		if errors.Is(halt, errMainCIRed) {
-			b.result.StopReason = "main_ci_red_halt"
-		}
-		emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.prepareIteration", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
-		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
-		return batchDecision{flow: batchReturn, exitCode: 2}
-	}
-	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
 
 	*fleetConfig = loopwave.ReloadFleetConfig(b.cfg.EvolveDir, *fleetConfig, b.stderr)
 	if b.maybeRefreshChainBoundaryAtWave(iteration) {
@@ -80,6 +67,32 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 
 	b.resolveWaveBinary(fleetConfig, waveBinary)
 	return batchDecision{flow: batchProceed}
+}
+
+func (b *loopBatchCoordinator) runPreWave(iteration int) (batchDecision, bool) {
+	if b.preWave != nil {
+		return b.preWave(iteration)
+	}
+	return b.probeSyncAndPublish(iteration)
+}
+
+func (b *loopBatchCoordinator) probeSyncAndPublish(iteration int) (batchDecision, bool) {
+	// An interrupt that landed during the probes must not dispatch a wave
+	// that would be cancelled at spawn.
+	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
+		return b.interruptReturn(iteration, "during the pre-wave probes "), true
+	}
+	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
+		b.result.StopReason = "plane_diverged_halt"
+		if errors.Is(halt, errMainCIRed) {
+			b.result.StopReason = "main_ci_red_halt"
+		}
+		emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.probeSyncAndPublish", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
+		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
+		return batchDecision{flow: batchReturn, exitCode: 2}, true
+	}
+	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
+	return batchDecision{flow: batchProceed}, false
 }
 
 func (b *loopBatchCoordinator) maybeRefreshChainBoundaryAtWave(iteration int) bool {

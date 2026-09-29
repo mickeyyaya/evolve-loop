@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -157,5 +159,49 @@ func TestLoopStop_ResolvesTheRootLikeSyncMainAndRefusesStrayArguments(t *testing
 	}
 	if c := lookupCommand("loop-stop"); c == nil {
 		t.Error("loop-stop is in the command table")
+	}
+}
+
+func TestRunLoop_ABrakeAtTheBoundaryConsultsNoRefresh(t *testing.T) {
+	projectRoot := t.TempDir()
+	evolveDir := filepath.Join(projectRoot, ".evolve")
+	writeLoopFinalizeFixture(t, evolveDir, 5, 5)
+	if err := os.WriteFile(paths.LoopStopPath(evolveDir), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	consulted := 0
+	u13StubRefresh(t, func() bool { consulted++; return false })
+	orch := &brakeOrch{evolveDir: evolveDir}
+
+	_, stdout, _ := runBrakeLoop(t, projectRoot, orch)
+
+	if consulted != 0 || !strings.Contains(stdout, `"stop_reason": "loop_operator_brake"`) {
+		t.Fatalf("the brake stops before the boundary refresh is consulted: consulted=%d\n%s", consulted, stdout)
+	}
+}
+
+func TestPrepareIteration_ABrakeStopsBeforeThePreWaveWorkAndTheRefresh(t *testing.T) {
+	root, evolveDir, _ := brhProject(t, "STALE_PIN", "REBUILT-BINARY-BYTES")
+	if err := os.WriteFile(paths.LoopStopPath(evolveDir), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	consulted := 0
+	u13StubRefresh(t, func() bool { consulted++; return false })
+	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{ProjectRoot: root, EvolveDir: evolveDir}, result: &loopResult{}, stdout: io.Discard, stderr: io.Discard}
+	b.deps.Signals = newRootSignalCenter(root, evolveDir, io.Discard)
+	b.deps.Storage = &fixtures.FakeStorage{}
+	preWave := 0
+	b.preWave = func(int) (batchDecision, bool) { preWave++; return batchDecision{flow: batchProceed}, false }
+	fc, bin := policy.FleetConfig{Count: 1}, ""
+
+	d := b.prepareIteration(1, &fc, &bin, 0)
+	if d.flow != batchStopIterations || b.result.StopReason != loopOperatorBrakeStop || preWave != 0 || consulted != 0 {
+		t.Fatalf("the brake stops before the probes, the plane sync, the dossier publish and the refresh: flow=%v stop=%q preWave=%d refresh=%d", d.flow, b.result.StopReason, preWave, consulted)
+	}
+	if err := os.Remove(paths.LoopStopPath(evolveDir)); err != nil {
+		t.Fatal(err)
+	}
+	if d := b.prepareIteration(1, &fc, &bin, 0); d.flow != batchProceed || preWave != 1 || consulted != 1 {
+		t.Errorf("released, the boundary runs the pre-wave work once, then the refresh: flow=%v preWave=%d refresh=%d", d.flow, preWave, consulted)
 	}
 }

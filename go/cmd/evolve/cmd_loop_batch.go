@@ -28,6 +28,7 @@ type loopBatchCoordinator struct {
 	// waveEngine is lazily built by wave().
 	// See ADR-0103.
 	waveEngine *loopwave.Engine
+	preWave    func(iteration int) (batchDecision, bool)
 }
 
 func (b *loopBatchCoordinator) run() int {
