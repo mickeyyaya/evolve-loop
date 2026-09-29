@@ -110,31 +110,35 @@ func Verify(opts Options) (Result, error) {
 	res := Result{Path: opts.Path, Verdict: "PASS"}
 	ctx := context.Background()
 	for _, script := range scripts {
-		stdout, stderr, exit, runErr := runner(ctx, opts.Workspace, script)
-		cr := CommandResult{
-			Command:  script,
-			Stdout:   stdout,
-			Stderr:   stderr,
-			ExitCode: exit,
-		}
-		if runErr != nil {
-			cr.Reason = fmt.Sprintf("runner error: %v", runErr)
+		cr := runScript(ctx, runner, opts.Workspace, script, expect)
+		if !cr.Passed {
 			res.Verdict = "FAIL"
-			res.Commands = append(res.Commands, cr)
-			continue
-		}
-		if reason := matchExpectations(cr, expect); reason != "" {
-			cr.Reason = reason
-			res.Verdict = "FAIL"
-		} else if reason := executionEvidenceReason(cr); reason != "" {
-			cr.Reason = reason
-			res.Verdict = "FAIL"
-		} else {
-			cr.Passed = true
 		}
 		res.Commands = append(res.Commands, cr)
 	}
 	return res, nil
+}
+
+func runScript(ctx context.Context, runner CmdRunner, workspace, script string, expect Expectations) CommandResult {
+	stdout, stderr, exit, runErr := runner(ctx, workspace, script)
+	cr := CommandResult{
+		Command:  script,
+		Stdout:   stdout,
+		Stderr:   stderr,
+		ExitCode: exit,
+	}
+	if runErr != nil {
+		cr.Reason = fmt.Sprintf("runner error: %v", runErr)
+		return cr
+	}
+	if reason := matchExpectations(cr, expect); reason != "" {
+		cr.Reason = reason
+	} else if reason := executionEvidenceReason(cr); reason != "" {
+		cr.Reason = reason
+	} else {
+		cr.Passed = true
+	}
+	return cr
 }
 
 // matchExpectations checks one script's outcome against the parsed

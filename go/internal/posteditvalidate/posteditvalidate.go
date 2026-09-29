@@ -68,7 +68,20 @@ func Run(opts Options) Result {
 		res.WarnEmitted = true
 		fmt.Fprintf(logw, "[postedit-validate] "+format+"\n", args...)
 	}
+	logf := guardsLogger(opts)
 
+	filePath, skipKind := resolveTarget(opts, logf)
+	res.FilePath = filePath
+	if skipKind != "" {
+		res.Kind = skipKind
+		return res
+	}
+
+	res.Kind, res.OK = validateFile(opts, filePath, logf, warnLLM)
+	return res
+}
+
+func guardsLogger(opts Options) func(format string, args ...any) {
 	// Resolve guards.log path.
 	guardsLog := opts.GuardsLog
 	if guardsLog == "" && opts.ProjectRoot != "" {
@@ -78,55 +91,58 @@ func Run(opts Options) Result {
 	if now == nil {
 		now = time.Now
 	}
-	logf := func(format string, args ...any) {
+	return func(format string, args ...any) {
 		appendGuardsLog(guardsLog, now(), fmt.Sprintf(format, args...))
 	}
+}
 
+func resolveTarget(opts Options, logf func(string, ...any)) (filePath, skipKind string) {
 	if len(opts.Payload) == 0 {
 		logf("no-payload; skip")
-		res.Kind = "skip"
-		return res
+		return "", "skip"
 	}
 
 	if opts.Bypass {
 		logf("WARN: --bypass active; bypassing")
-		res.Kind = "bypass"
-		return res
+		return "", "bypass"
 	}
 
-	filePath := extractFilePath(opts.Payload)
+	filePath = extractFilePath(opts.Payload)
 	if filePath == "" {
 		logf("no file_path in payload; skip")
-		res.Kind = "skip"
-		return res
+		return "", "skip"
 	}
-	res.FilePath = filePath
 
 	if info, err := os.Stat(filePath); err != nil || info.IsDir() {
 		logf("file does not exist (deleted?): %s; skip", filePath)
-		res.Kind = "skip"
-		return res
+		return filePath, "skip"
 	}
+	return filePath, ""
+}
 
+func resolveValidators(opts Options) (vJSON, vBash, vPy func(string) (bool, string)) {
 	// Resolve validator defaults.
-	vJSON := opts.ValidateJSON
+	vJSON = opts.ValidateJSON
 	if vJSON == nil {
 		vJSON = defaultValidateJSON
 	}
-	vBash := opts.ValidateBash
+	vBash = opts.ValidateBash
 	if vBash == nil {
 		vBash = defaultValidateBash
 	}
-	vPy := opts.ValidatePy
+	vPy = opts.ValidatePy
 	if vPy == nil {
 		vPy = defaultValidatePy
 	}
+	return vJSON, vBash, vPy
+}
 
+func validateFile(opts Options, filePath string, logf, warnLLM func(string, ...any)) (kind string, ok bool) {
+	vJSON, vBash, vPy := resolveValidators(opts)
+	var errMsg string
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".json":
-		res.Kind = "json"
-		ok, errMsg := vJSON(filePath)
-		res.OK = ok
+		ok, errMsg = vJSON(filePath)
 		if ok {
 			logf("OK: %s (json)", filePath)
 		} else {
@@ -134,10 +150,9 @@ func Run(opts Options) Result {
 			warnLLM("WARN: just-edited file %s does NOT parse as valid JSON: %s", filePath, errMsg)
 			warnLLM("  Re-read and fix before continuing. Emergency bypass: --bypass.")
 		}
+		return "json", ok
 	case ".sh":
-		res.Kind = "sh"
-		ok, errMsg := vBash(filePath)
-		res.OK = ok
+		ok, errMsg = vBash(filePath)
 		if ok {
 			logf("OK: %s (bash syntax)", filePath)
 		} else {
@@ -146,10 +161,9 @@ func Run(opts Options) Result {
 			warnLLM("  Common causes: bash 4+ features (declare -A, mapfile) on a 3.2 target; unbalanced quotes; missing fi/done.")
 			warnLLM("  Re-read and fix before continuing. Emergency bypass: --bypass.")
 		}
+		return "sh", ok
 	case ".py":
-		res.Kind = "py"
-		ok, errMsg := vPy(filePath)
-		res.OK = ok
+		ok, errMsg = vPy(filePath)
 		if ok {
 			logf("OK: %s (py_compile)", filePath)
 			// Clean up __pycache__ left behind by py_compile.
@@ -159,11 +173,10 @@ func Run(opts Options) Result {
 			warnLLM("WARN: just-edited file %s has a Python compile error: %s", filePath, errMsg)
 			warnLLM("  Re-read and fix before continuing. Emergency bypass: --bypass.")
 		}
+		return "py", ok
 	default:
-		res.Kind = "noop"
-		res.OK = true
+		return "noop", true
 	}
-	return res
 }
 
 // --- Payload parsing -------------------------------------------------------

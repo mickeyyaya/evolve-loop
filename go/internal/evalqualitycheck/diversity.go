@@ -76,27 +76,12 @@ func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 		if opts.Slug != "" && !strings.Contains(name, opts.Slug) {
 			continue
 		}
-		path := filepath.Join(opts.EvalDir, name)
-		f, err := os.Open(path)
+		ed, hasCmds, err := fingerprintEval(filepath.Join(opts.EvalDir, name))
 		if err != nil {
-			return DiversityResult{}, fmt.Errorf("evalqualitycheck: open %s: %w", path, err)
+			return DiversityResult{}, err
 		}
-		cmds, scanErr := scanBashCommands(f)
-		_ = f.Close()
-		if scanErr != nil {
-			return DiversityResult{}, fmt.Errorf("evalqualitycheck: scan %s: %w", path, scanErr)
-		}
-		if len(cmds) == 0 {
+		if !hasCmds {
 			continue
-		}
-		ed := EvalDiversity{Path: path}
-		for _, c := range cmds {
-			if negativeCaseRE.MatchString(c) {
-				ed.HasNegative = true
-			}
-			if edgeCaseRE.MatchString(c) {
-				ed.HasEdge = true
-			}
 		}
 		res.EvalCount++
 		if ed.HasNegative {
@@ -113,6 +98,31 @@ func CheckDiversity(opts DiversityOptions) (DiversityResult, error) {
 
 	res.Level, res.Reasons = scoreDiversity(res)
 	return res, nil
+}
+
+func fingerprintEval(path string) (EvalDiversity, bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return EvalDiversity{}, false, fmt.Errorf("evalqualitycheck: open %s: %w", path, err)
+	}
+	cmds, scanErr := scanBashCommands(f)
+	_ = f.Close()
+	if scanErr != nil {
+		return EvalDiversity{}, false, fmt.Errorf("evalqualitycheck: scan %s: %w", path, scanErr)
+	}
+	if len(cmds) == 0 {
+		return EvalDiversity{}, false, nil
+	}
+	ed := EvalDiversity{Path: path}
+	for _, c := range cmds {
+		if negativeCaseRE.MatchString(c) {
+			ed.HasNegative = true
+		}
+		if edgeCaseRE.MatchString(c) {
+			ed.HasEdge = true
+		}
+	}
+	return ed, true, nil
 }
 
 // scoreDiversity gates on negative cases only; edge-case detection is keyword-based and too noisy to gate.
