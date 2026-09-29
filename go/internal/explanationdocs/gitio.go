@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
@@ -272,7 +271,7 @@ func ArchiveUnpublishedContinuationRecords(ctx context.Context, worktree, baseSH
 	if err != nil {
 		return nil, err
 	}
-	archiveDir := filepath.ToSlash(filepath.Join("docs", "private", "research", "archived-"+time.Now().UTC().Format("2006-01-02"), "unshipped-build-explanations"))
+	archiveDir := filepath.ToSlash(filepath.Join(archiveDateDir(), "unshipped-build-explanations"))
 	archiveAbs, err := ensureRealSubdirectories(worktree, archiveDir)
 	if err != nil {
 		return nil, err
