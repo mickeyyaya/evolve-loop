@@ -166,7 +166,11 @@ change the retry verdict.
   downgrade a sealed contract through mutable cycle state.
 - Continuation adoption archives unpublished ancestor cycle records under
   `docs/private/research/archived-YYYY-MM-DD/unshipped-build-explanations/`
-  before the new run may author its own canonical record.
+  before the new run may author its own canonical record. The ancestor's own
+  predicate package (`go/acs/cycle<M>`, absent at the base) follows the same
+  retention rule and moves to
+  `docs/private/research/archived-YYYY-MM-DD/superseded-predicate-packages/`
+  (design A2), so the new run's gates never execute a contract it does not own.
 - A failure before Build has no explanation deliverable yet. A failure after
   Build with a missing or invalid handoff is a correction-required defect.
 
