@@ -8,21 +8,19 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 )
 
 func archiveDateDir() string {
 	return filepath.Join("docs", "private", "research", "archived-"+time.Now().UTC().Format("2006-01-02"))
 }
 
-func ArchiveSupersededPredicatePackages(ctx context.Context, worktree, baseSHA string, cycle int) ([]string, error) {
+func ArchiveSupersededPredicatePackages(ctx context.Context, worktree, baseSHA string, ancestors func(changed []string) []string) ([]string, error) {
 	paths, err := changedSince(ctx, worktree, baseSHA)
 	if err != nil {
 		return nil, err
 	}
 	var archived, stagePaths []string
-	for _, dir := range acssuite.AncestorCyclePackages(paths, cycle) {
+	for _, dir := range ancestors(paths) {
 		exists, err := existsAtBase(ctx, worktree, baseSHA, dir)
 		if err != nil {
 			return nil, err

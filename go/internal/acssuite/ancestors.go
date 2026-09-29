@@ -1,24 +1,26 @@
 package acssuite
 
 import (
-	"regexp"
 	"sort"
 	"strings"
 )
 
-var cyclePackageFileRe = regexp.MustCompile(`^go/(acs/cycle\d+)/`)
-
-func AncestorCyclePackages(added []string, cycle int) []string {
-	own := strings.TrimPrefix(CyclePackage(cycle), "./")
+func AncestorCyclePackages(changed []string, cycle int) []string {
 	seen := map[string]bool{}
 	var out []string
-	for _, path := range added {
-		m := cyclePackageFileRe.FindStringSubmatch(path)
-		if m == nil || m[1] == own || seen[m[1]] {
+	for _, path := range changed {
+		rest, ok := strings.CutPrefix(path, "go/acs/")
+		if !ok {
 			continue
 		}
-		seen[m[1]] = true
-		out = append(out, "go/"+m[1])
+		name, _, nested := strings.Cut(rest, "/")
+		n, canonical := canonicalCyclePackageNumber(name)
+		dir := "go/acs/" + name
+		if !nested || !canonical || n == cycle || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		out = append(out, dir)
 	}
 	sort.Strings(out)
 	return out

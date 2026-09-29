@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
@@ -16,7 +17,9 @@ func (cr *cycleRun) prepareAdoptedTree(wt, base string) error {
 	if len(archived) > 0 {
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: archived %d unshipped ancestor explanation record(s) before Build\n", cr.cycle, len(archived))
 	}
-	packages, err := explanationdocs.ArchiveSupersededPredicatePackages(cr.ctx, wt, base, cr.cycle)
+	packages, err := explanationdocs.ArchiveSupersededPredicatePackages(cr.ctx, wt, base, func(changed []string) []string {
+		return acssuite.AncestorCyclePackages(changed, cr.cycle)
+	})
 	if err != nil {
 		return fmt.Errorf("continuation superseded predicate archive: %w", err)
 	}
