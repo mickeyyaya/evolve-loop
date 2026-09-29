@@ -66,9 +66,9 @@ diff path (tried literally first, so a real path whose name holds braces stays
 citable), or a directory (also written `dir/...` or `dir/**`), glob
 (`go/acs/cycle1768/*_test.go`) or brace list (`go/acs/{cycle9,cycle1768}/…`) that
 covers at least one diff path. A citation covering no diff path is rejected, and so
-is a brace list with an empty alternative, an unclosed brace, or more expansions
-than `maxCitationPatterns` allows: those cover nothing, so a typo can never widen
-into a bare prefix. A pattern is only ever a citation: every
+is a brace list with an empty alternative, a nested brace, an unclosed brace, or
+more expansions than `maxCitationPatterns` allows: those cover nothing, so a typo
+can never widen into a bare prefix or mis-parse into some other diff path. A pattern is only ever a citation: every
 material path still needs its own exact entry, so one broad glob can never stand
 in for the per-path explanations the contract requires (2026-09-30, after cycles
 1765 and 1768 each lost a correction round to a directory or glob citation).

@@ -55,9 +55,9 @@ func TestChangedAreaFailures_AMaterialPathNeedsItsOwnEntryEvenUnderACoveringGlob
 func TestChangedAreaFailures_AMalformedBraceListCoversNothing(t *testing.T) {
 	material := "- `go/internal/phasecoherence/coherence.go` — splits checkAll into named steps under the 50-line limit\n"
 	for name, citation := range map[string]string{
-		"an empty alternative never collapses to a bare prefix": "go/{fake,phantom,}",
-		"a nested brace list": "go/acs/{cycle1768,{cycle1,cycle2}}/predicates_test.go",
-		"an unclosed brace":   "go/acs/{cycle1768/predicates_test.go",
+		"an empty alternative never collapses to a bare prefix":           "go/{fake,phantom,}",
+		"a nested brace list, even one whose mis-parse names a diff path": "go/acs/{x,{cycle1768,y}}/predicates_test.go",
+		"an unclosed brace": "go/acs/{cycle1768/predicates_test.go",
 	} {
 		section := material + "- `" + citation + "` — a citation whose brace list is malformed\n"
 

@@ -82,7 +82,11 @@ func expandFirstGroup(s string) (expanded []string, ok, grouped bool) {
 		return nil, false, true
 	}
 	end += open
-	for _, alt := range strings.Split(s[open+1:end], ",") {
+	body := s[open+1 : end]
+	if strings.Contains(body, "{") {
+		return nil, false, true
+	}
+	for _, alt := range strings.Split(body, ",") {
 		if alt == "" {
 			return nil, false, true
 		}
