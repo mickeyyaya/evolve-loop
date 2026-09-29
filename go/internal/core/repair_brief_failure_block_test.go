@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -120,5 +121,42 @@ func TestRepairRoundDispatch_AnAgentGradedFailBriefsTheDefectsWithoutAWarn(t *te
 		if brief := reqs[len(reqs)-1].Context[CtxKeyAuditRepairFindings]; !strings.Contains(brief, "- H1 caller-proof hard floor violated\n") {
 			t.Errorf("the repair-round %s was not briefed with the failure block's defect:\n%s", p, brief)
 		}
+	}
+}
+
+func TestComposeRepairBrief_TheDedupeCoversExactlyTheBriefedFindings(t *testing.T) {
+	var issues strings.Builder
+	issues.WriteString("# Audit Report\n\n## Verdict\n\n**FAIL**\n\n## Issues\n")
+	for i := 1; i <= maxBriefFindings+1; i++ {
+		fmt.Fprintf(&issues, "\n### H%d (HIGH) — defect number %d is unaddressed\nb\n", i, i)
+	}
+	ws := t.TempDir()
+	writeAuditReportWithDefects(t, ws, issues.String(),
+		"defect number 1 is unaddressed",
+		"h2 DEFECT NUMBER 2 IS UNADDRESSED",
+		fmt.Sprintf("H%d defect number %d is unaddressed", maxBriefFindings+1, maxBriefFindings+1),
+	)
+
+	brief, _ := composeQuietly(t, CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1})
+
+	for _, restated := range []string{"- defect number 1 is unaddressed", "- h2 DEFECT NUMBER 2"} {
+		if strings.Contains(brief, restated) {
+			t.Errorf("%q restates a briefed finding (bare title; id and title in another case) and must be dropped:\n%s", restated, brief)
+		}
+	}
+	beyond := fmt.Sprintf("- H%d defect number %d is unaddressed", maxBriefFindings+1, maxBriefFindings+1)
+	if !strings.Contains(brief, beyond) {
+		t.Errorf("finding %d is past the brief's %d, so the defect restating it must stay:\n%s", maxBriefFindings+1, maxBriefFindings, brief)
+	}
+}
+
+func TestComposeRepairBrief_AFailureBlockEveryDefectOfWhichIsBriefedAddsNoSection(t *testing.T) {
+	ws := t.TempDir()
+	writeAuditReportWithDefects(t, ws, briefRound1, "M1: explanation names an area not in the diff")
+
+	brief, _ := composeQuietly(t, CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1})
+
+	if strings.Contains(brief, "audit defects") || !strings.HasPrefix(brief, "auditor findings (audit round 1") {
+		t.Fatalf("with every defect already briefed, the brief must open on the findings with no empty defects header:\n%s", brief)
 	}
 }
