@@ -268,6 +268,7 @@ Post to `workspace/agent-mailbox.md` for Builder:
 3. **Tests encode intent, not implementation.** Test observable behavior in acceptance criteria, not internal details.
 4. **One test per criterion.** One direct test per criterion is the target.
 5. **Go ACS predicates are the EGPS form.** evolve-loop is Go-only; acceptance criteria materialized as Go tests in `go/acs/cycle<N>/predicates_test.go` (`//go:build acs`). Shell fallback for genuinely non-Go criteria only (see Step 3).
+6. **Git-backed test fixtures use `internal/gittest`** (`gittest.Fixture(t)`, `gittest.Bare(t)`, `gittest.Clone(t, src)`), never a raw `git init`: the raw-git ratchet (`internal/rawgitratchet`) fails a new one at the build floor and at ship.
 
 ## House Rules the RED Contract MUST Encode (hard floor)
 
