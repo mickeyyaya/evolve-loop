@@ -10,6 +10,13 @@
     "token_telemetry_campaign",
     "system_failure_policy"
   ],
+  "files": [
+    "go/internal/llmroute/tier_fallback.go",
+    "go/internal/bridgechain/bridgechain.go",
+    "go/internal/phases/runner/dispatch.go",
+    "go/internal/core/ports.go",
+    "go/internal/bridge/exitcodes.go"
+  ],
   "created_at": "2026-07-18T10:15:00Z",
   "evidence": "go-review of feat/within-tier-model-fallback (2026-07-18): core/ports.go BridgeResponse (no serving-model field); internal/phases/runner/runner.go:644-645,801 (ResolvedModel from tieredRes.Tier, pre-dispatch); internal/bridge/engine.go call site discards dispatchModelFailover `used`; internal/bridge/model_failover.go:38 (advances on ExitUnknownPrompt); go/internal/bridge/exitcodes.go:32 + driver_tmux_repl.go:647-649,694-698 (85 dual-purpose); engine.go recordTokenUsage writes req.Attempt.",
   "fix": "(1) Add core.BridgeResponse.ResolvedModel (concrete serving model); engine sets it from dispatchModelFailover's `used`; runner prefers bres.ResolvedModel over the tier when non-empty for PhaseResponse.ResolvedModel + the dossier — CAREFUL: this changes ResolvedModel semantics from tier-name to concrete-model; audit consumers first. (2) Split the 85 space (or thread a reason code) so model-failover advances ONLY on the genuine-quota-wall variant, not the interactive-prompt escalation — coordinate with the CLI/tier-fallback layer which shares the ambiguity. (3) Add a model_index (or per-model sub-attempt) to the llm-calls.ndjson S3 record so a Launch's model-chain steps are distinguishable from CLI/tier retries.",

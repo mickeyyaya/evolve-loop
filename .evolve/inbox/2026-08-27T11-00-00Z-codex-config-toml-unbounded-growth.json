@@ -8,6 +8,12 @@
     "go/internal/bridge/capture_models.go",
     "go/internal/bridge/doctor.go"
   ],
+  "files": [
+    "go/internal/bridge/codex_pretrust.go",
+    "go/internal/bridge/main_test.go (new)",
+    "go/cmd/evolve/main_test.go",
+    "go/cmd/evolve/cmd_models_live.go"
+  ],
   "created_at": "2026-08-27T11:00:00Z",
   "priority_class": "performance",
   "priority_rationale": "inbox review 2026-09-27: It grows about 40% a month from our own test runs and makes every new-worktree codex dispatch rewrite 18.7 MB under a fleet-wide lock. Any link to codex boot timeouts is unproven.",
