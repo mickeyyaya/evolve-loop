@@ -16,5 +16,11 @@
     "The release dry-run journal no longer accumulates in os.TempDir()"
   ],
   "created_at": "2026-09-28T20:41:00Z",
-  "source": "console, 2026-09-28, the wave-27 disk-full halt"
+  "source": "console, 2026-09-28, the wave-27 disk-full halt",
+  "consumed": {
+    "at": "2026-09-29T15:59:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "feat/gc-releases-unneeded-resources: evolve gc trims go build cache entries unused past gc.go_cache_ttl_hours (Go's own trim criterion, policy horizon; chosen over a size-bounded go clean -cache gated on no live lease, because the age trim is safe mid-wave and keeps hot entries) and removes stale pipeline temp artifacts by exact name shape past gc.temp_ttl_hours (go-build<N>, acs[-cycle]<N>-*, cycle<N>-*, release-pipeline-dryrun-*.json; Test* dropped in review as no ownership proof in a shared temp dir); a release dry run overwrites one <tmp>/release-pipeline-dryrun-<version>.json instead of one file per process. The CLI keeps its existing semantics (an explicit run applies, --dry-run previews) rather than the item's --temp/--go-cache/--apply flags."
+  }
 }

@@ -58,7 +58,7 @@ var commands = []subcommand{
 	{Name: "continuation", Summary: "Inspect/release scope-keyed continuation bindings (continuation list | continuation release <scope-id>)", Run: runContinuation},
 	{Name: "carryover", Summary: "Apply a reviewed keep/drop/cluster decisions file to state.json:carryoverTodos via the sanctioned locked RMW path (carryover apply-decisions)", Run: runCarryover},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
-	{Name: "gc", Summary: "Reap orphaned tmux sessions whose creator PID is dead (gc [--dry-run])", Run: runGC},
+	{Name: "gc", Summary: "Release what finished cycles left behind: tmux sessions/sockets, orphan processes, worktrees, run dirs, go build cache (gc --project-root <dir> [--dry-run])", Run: runGC},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "loop-stop", Summary: "Stop a running loop after its current wave: engage the .evolve/loop-stop brake (loop-stop [--release] [--project-root P])", Run: runLoopStop},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},

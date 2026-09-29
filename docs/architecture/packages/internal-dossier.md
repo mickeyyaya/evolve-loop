@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`internal/dossier` owns the committed per-cycle record, `knowledge-base/cycles/cycle-N.{json,md}`. It holds the `Dossier` type and its `Validate` trust boundary, `Build` (a projection of the cycle's evidence), the JSON and markdown renderers, `Write` (an atomic write plus a scoped git commit), `PendingDir` and `PublishPending` (a fleet lane's closeout, published at the wave boundary), `SweepOrphans` (recovery of uncommitted pairs), and the corpus readers `ReadCommitted`, `PhaseSkipEvidence` and `RollupSpineFailOpens`.
+`internal/dossier` owns the committed per-cycle record, `knowledge-base/cycles/cycle-N.{json,md}`. It holds the `Dossier` type and its `Validate` trust boundary, `Build` (a projection of the cycle's evidence), the JSON and markdown renderers, `Write` (an atomic write plus a scoped git commit), `PendingDir` and `PublishPending` (a fleet lane's closeout, published at the wave boundary), `ClosedOut` and `ClosedOutAt` (whether, and since when, a cycle has a published or pending dossier), `SweepOrphans` (recovery of uncommitted pairs), and the corpus readers `ReadCommitted`, `PhaseSkipEvidence` and `RollupSpineFailOpens`.
 
 ## Design
 
@@ -41,6 +41,7 @@
   - The corpus itself never holds an uncommitted pair, so the leak classifier needs no exemption, and an agent-planted pair is still relocated for review.
 - **`SweepOrphans`** finds dirty `cycle-N.{json,md}` paths through `gitexec.DirtyPaths`, pairs them by cycle number, recommits each complete pair through `commitPairGit`, and skips half pairs, since a lone file is a partial write from a killed writer. A per-pair failure is logged to `logw` with the cycle number and git's error, recorded in `Failed`, and the sweep moves on.
 - **`CyclesDir` is the one spelling of the corpus path** for the producer, the chronicle seed, `ReadCommitted`, `evolve dossier verify` and the dashboard's ship-rate history. `internal/contextfillcorrelate` still joins the path inline, because it is a leaf package that does not import `dossier`; carry it along on any move.
+- **A dossier is the durable record that a cycle finished.** `ClosedOut` checks `CyclesDir` and then `PendingDir`, because a fleet lane's dossier waits in the pending dir until the wave boundary publishes it. `internal/gc` uses it to tell a sealed run's stale `run.json` pointer from a live one, and to prove that a leftover process or tree belongs to a finished cycle. `ClosedOutAt` returns the file's mtime. A published dossier's mtime is its checkout or merge time, at or after the closeout, so an age measured from it is a lower bound (`TestClosedOut_APublishedOrPendingDossierClosesTheCycle`, `TestClosedOutAt_ReportsWhenTheDossierLanded`).
 - **`SpineFailOpenRollup` uses snake_case JSON tags** to match the loop summary's `spine_fail_opens` block and the dossier's own fields.
 
 ## Invariants
