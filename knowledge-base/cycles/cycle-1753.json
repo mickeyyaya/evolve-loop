@@ -1,0 +1,305 @@
+{
+  "schema_version": 2,
+  "cycle": 1753,
+  "run_id": "01M3NQMDQRJ75X5EYH1XAW6P3V",
+  "goal": "Pipeline-health verification, wave 36 (2026-09-29, on main 8520e757, the sixteenth wave with ADR-0106 W3 live (wave 21 shipped 1721-1724, 1726 and 1727; wave 22 shipped 1729 and 1730; wave 23 shipped 1731 and 1732; wave 24 sealed 1733 and 1734 FAIL on a toolless tail rung's refusal while codex was walled, fixed; wave 25 shipped 1736 and sealed 1735 FAIL after its repair budget was spent, when a fleet rebase exposed three shrunk functions whose size-ratchet allowances it had not lowered; wave 26 shipped 1738 and 1737, 1737 after two explanation-document repairs and a fleet-rebase re-author; wave 27 (1739, 1740) was halted as a system failure when the host disk filled, nothing sealed, and both items returned to the queue; wave 28 shipped 1741 and 1742; wave 29 shipped 1743 and 1744, both through the fleet-rebase recovery; wave 30 shipped 1746 and 1745, 1745 through a doc-only correction, a repo-contract correction and a fleet rebase; wave 31 shipped 1747 (after a correction) and 1748 (the raw-git fixture migration), and the pending-dossier publish ran live: both closeouts were published together at the wave's end, so no closeout moved main under a running lane; wave 32's fleet plan came up empty after wave 31 consumed its decision, so it ran one sequential cycle, 1749, which shipped with six gates passed and none corrected; wave 33 again planned no lanes, since 170 of 171 inbox items are console-owned, and its sequential cycle 1750 shipped after one corrected gate; wave 34's sequential cycle 1751 shipped the same way, and wave 35's cycle 1752 shipped after a correction round) (one dispatchability rule: the plan, the prunes, the refill, the launch gate, the triage menu, `evolve inbox batches` and the sequential no-work check all ask inboxmover's one rule from one root, so the plan never offers a lane the gate refuses and a wave that launches nothing is not a wave) and after the 2026-09-27 inbox curation (25 fixed or obsolete items retired with evidence, 7 duplicates merged, every live item re-weighted by stability, debuggability and performance), and the third wave with the carry live (ADR-0105 B3/B4 = ADR-0106 P1: a ship that meets a moved main, rebases byte-identically and rebinds its explanation ships on the verdict it already earned, with the record chained in the ledger and re-proven by ship, instead of a second audit) beside F7, B5, X3, Q3, R1, R2, W1, H1b, X1, P3, Q1 and Q2: a test-only Build that explains itself anyway is verified, not refused (only foreign cycle records are immutable, in every branch); a capacity wall in the sequential loop pauses the loop before it records a failed approach or runs the failure closeout; a top_n card that names a protected surface is moved by the host into escalate_block and the item routed to the console by the planned no-work closeout, never the cycle's FAIL, and the triage prompt lists the protected surfaces; a shipped or declined id no inbox item backs leaves a retirement record (processed/ or rejected/cycle-N) and is never re-pinned; an empty optional bucket in triage-report.md is no cards; .evolve/inbox/ records are non-material to the explanation document, so no floor asks a builder to describe the ship's consumption stamp; and every tmux phase pane's resolved-prompt.txt ends with the identity statement (\"## Who you are (stated by the evolve bridge)\") and its pane exports CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false before the launch; a quota wall met on a correction re-dispatch, a remediation re-run or a resumed review leaves the cycle DEFERRED (all_families_exhausted in the ledger, no failure digest, no retrospective), never FAIL; a login prompt benches the family with operator_action in cli-health.json and no second dispatch goes into it). Work the highest-weight lane-eligible inbox items end-to-end — claim, tdd, build, audit, ship — with full phase integrity, on the fixed plane. That includes everything waves 3–14 verified, and the fixes on this main:\n- (P3) an agent that inspects its pane finds its own session, its prompt files and the sole-writer fact stated in the prompt it was given; a stdout-completion phase is told the bridge reads its pane;\n- (Q1) a walled correction re-dispatch is the same deferral as a walled first dispatch;\n- (Q2) a credential wall is benched until a probe after the operator's login clears it; the bench lines name the fix;\n- (P4, H1, H2, from wave 14) an exit-85 escalation carries its pattern in cause_code; the host derives triage-decision.json from the report before any judge;\n- (W1, H1b, X1, from wave 15) a lane pinned to an id no inbox item backs ends once, with a record; a `## superseded` with nothing under it derives to []; the explanation floor never names an inbox record as a material path;\n- (R1, R2, from wave 16) a card on a protected surface is a route, not a verdict: the cycle ends planned no-work (or continues on its other cards) and the item arrives console-manual with the lane's reason;\n- (F7, from wave 18) a named red in the ship's importer backstop re-runs its package by itself before it is the lane's RED; green by itself is flake evidence (`SHIP_BACKSTOP_FLAKE` in the Signal Center, \"evidence, not proof\" in the log) and the ship proceeds; still red is the lane's RED;\n- (B5, from wave 18) a debugger that resolves a fleet-rebase conflict hands the tree back to the rebase: the log says \"debugger resolved the fleet-rebase conflict; re-entering the fleet rebase on the resolved tree\", then the carry, the rebind or \"Build re-authors the explanation\" — never a reship or a re-audit on the base the ship diverged from;\n- (X3, from wave 18) a Build whose diff is non-material (tests, docs, evals, predicates) and whose report declares its own explanation document REQUIRED passes the floor with an empty material set; one that declares NOT_APPLICABLE beside an undeclared own record passes with the record kept as documentation; only a changed FOREIGN cycle record is refused (\"published cycle records are immutable\"); `bridge/channel.TestChannel_EndToEnd` no longer depends on a 10 ms window under the ship backstop's load;\n- (Q3, from wave 18) a sequential-loop cycle walled on capacity stops with `stop_reason: quota-pause`, exit 5, `recoverable_failures` 0 and no entry in failedApproaches;\n- (W3, from wave 20) every planned lane launches: no `freshness gate skipped` line for a lane the plan itself chose, no `wave N: 0/0 lanes ok`; a wave with nothing dispatchable takes the min-width repair and the empty-backlog path (`LOOP_WAVE_EMPTY_PLAN cause=empty_backlog`) and counts toward work-supply starvation; the triage prompt lists items waiting on an unlanded dependency under `dependency_blocked` and never offers them; a sequential cycle whose triage commits nothing over console-owned or waiting work ends planned no-work, never `triage-empty-commitment-claimable-work`, even when an inbox item carries a trimmed title or a duplicate id (only an unreadable inbox file is unread work);\n- (B5 follow-up, from wave 21) a cycle the debugger ends (a BLOCK, or a fleet-rebase re-entry that aborts) ends FAIL with a ship fail reason, so the failure walk releases its claim and the verdict-coherence floor reads it as diagnosed; the append-only go/.apicover-enforce merges as a union, so two lanes that each add an enforced package no longer conflict at the fleet rebase;\n- (lane work, from wave 21) the size ratchet's lane-writable offenders are lane items: each shrinks its package's listed functions to 50 lines or fewer by behavior-preserving extraction, with characterization tests first where a function is unpinned, and drops their entries from go/internal/sizeratchet/offenders.json;\n- (craft, from wave 22) new and changed code carries no comments: the builder persona and docs/conventions/code-comments.md allow only machine-read comments (directives, markers, generated headers) and a new package's one-line doc; names, signatures, test names and the package's design notes carry the intent, and `go run ./cmd/commentaudit comments -base \u003cbase\u003e \u003cdirs\u003e` exits 0 on the cycle's diff before the audit;\n- (B5 fence, from wave 23) a fleet-rebase conflict's debugger may write exactly the conflicted paths: its prompt lists them as conflicted_paths, the worktree fence keeps its writes to them (\"kept its writes to the N path(s) this dispatch may write\") and reverts every other, and the resolved tree rejoins the rebase, is re-authored and re-audited, and ships — never \"the conflict survived the debugger's resolution\" on a resolution the debugger made;\n- (carry, from wave 22) a byte-identical rebase whose audit was bound while main had moved still carries: no \"identity carry declined: the audited worktree stood on\" for a change authored on the base the audited worktree stood on;\n- (T1, from wave 24) the dispatch chain plans only drivers that can run the phase: the universal fallback tail skips absent, blocked and toolless drivers (ollama-tmux declares `toolless` in its manifest), so a worktree phase never ends on \"cannot run worktree phase … no tool use\";\n- (T2, from wave 24) a dispatch walk that runs out after meeting a quota wall is capacity, not a failure: the runner and the bridge handle surface the wall (\"the dispatch walk \u003crung=exit -\u003e …\u003e met a quota wall before its last rung failed\"), the cycle pauses DEFERRED with the named walk in the pause and the quota.paused line, and no FAIL seals on the last rung's stall or refusal;\n- (size ratchet, from wave 25) an allowance in go/internal/sizeratchet/offenders.json is a ceiling: a lane never edits that file; a shrunk or deleted function's entry is slack a boundary tighten removes, and only a new function past 50 lines or a listed one past its allowance fails, so refactor growth away instead of raising anything;\n- (T3, from wave 24) a claude-tmux pane launches with a standing authority statement as its system prompt (`--append-system-prompt-file \u003cworkspace\u003e/pane-authority.md`): the pasted prompt is the operator's instruction for the phase, and the console's interactive conventions (confirm direction, stop and ask) are not the pane's; the per-dispatch facts still end every resolved-prompt.txt;\n- (F43 part 1, from wave 25) the audit's predicate-tree refusal names every undeclared input it found (the first 20 and a count), so a repair stages or removes exactly those paths;\n- (F43 part 2, from wave 26) the audit, the audit binding and Ship read one ship tree (shipmanifest.TakeShipTree: the index, every tracked edit, and the paths the build and TDD reports declare): an explanation document, a TDD predicate or an eval the reports name ships whether or not the lane staged it, and the audit runs on it; an undeclared tracked edit ships and is audited; only an untracked input no report names is refused by name; a declared file removed with plain rm ships its deletion; a workspace whose reports name nothing adopts no path, and an empty selection stages nothing (design doc §5.12);\n- (T4, from wave 24) an advisor plan runs a trigger-gated phase only when its trigger fires: a refactor, feature or document lane never runs fault-localization or bug-reproduction unless its scout declares goal_type bugfix or a failure class fires; the routing decision records `insert-when-gates-plan` for each planned phase it skips, and a rubric-hinted phase (architecture-design) stays the advisor's judgment;\n- (comment floor, from wave 24) the build handoff floor counts the comments a build adds with the console rule and, in `shadow` (the compiled default), WARNs on the phase log; the auditor reports each added comment as a LOW, advisory finding, and a WARN verdict still ships under the fluent default;\n- (dossier, from wave 31) a fleet lane's closeout dossier is written to .evolve/dossiers-pending/ and published by the loop at the wave boundary and on exit, never committed mid-wave, so a sibling's closeout no longer moves main under an in-flight lane; the publish refuses while another run is live and names it;\n- (fixtures, from wave 31) git-backed test fixtures use internal/gittest (Fixture, Bare, Clone), never a raw `git init`: ship's repo-contract pack runs the raw-git ratchet and refuses a new raw fixture; a test that sets its own GIT_CONFIG_COUNT builds it with gittest.ConfigEnv so git's background maintenance stays off (every Make test recipe exports it too);\n- (doc guard, from wave 31) a Build retracts its own never-committed explanation draft only with exactly `rm \u003cdraft\u003e` or `git rm -f -q \u003cdraft\u003e`; any other removal or move of doc content is denied, however it is quoted or wrapped;\n- (acsassert, from wave 30) an ACS predicate that proves Go tests ran and passed calls `acsassert.GoTests` (it runs `go test -json` and requires, for each named test, one run event then pass, with the package started and passed), never a grep of printed `--- PASS:` text;\n- (TestMain, from wave 30) an acs TestMain returns after `m.Run()` instead of calling `os.Exit`, so its deferred cleanup (a built binary, a temp dir) runs;\n- (P1, from wave 17) a byte-identical rebase after a peer's landing carries its audited verdict to ship: the log says \"rebase is byte-identical: the audited verdict carries, shipping without a second audit\" and ship's binding log names the carry; a carry the host or ship cannot prove is the old path, a second audit.\n\nEarlier fixes still in force: a worktree ship binds its own tree (#648); routing never sends a lane work its builder's sandbox forbids; a lane's cycle-state override applies only inside its own evolve dir; a Build may `git rm` its own never-committed explanation draft (#651); the explanation contract can move base without a Build when the host proves the change byte-identical (#649).\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree it ships;\n- disposition the cycle's OWN defect ledger as well as inherited ids;\n- record a terminal outcome on every exit;\n- never modify a protected control-plane file by any tool;\n- leave no stale worktree behind.\n\nPipeline-integrity items and items whose fix surface is protected are console-owned, not lane work. ADR-0099 document deliverables are eligible. The measure of this wave is consecutive shipped cycles, with every fix above live: the goal of six in a row is met, and the streak entering this wave is 15 (1736, 1738, 1737, 1741, 1742, 1743, 1744, 1746, 1745, 1747, 1748, 1749, 1750, 1751, 1752). Keep every cycle shipping.",
+  "final_verdict": "PASS",
+  "commit_sha": "3c1dd732998f6ac5776fe0c18598aed993eb005f",
+  "tree_sha": "67ec025d6a605f14a3cd05c533874c298cc7e4e6",
+  "tasks": [
+    "shrink-carryover-apply",
+    "shrink-gc-workspace-sweep"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 127264,
+      "started_at": "2026-09-29T04:44:51Z",
+      "ended_at": "2026-09-29T04:47:00Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 26,
+        "output": 9159,
+        "cache_read": 1028749,
+        "cache_write": 96839
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 54232,
+      "started_at": "2026-09-29T04:47:33Z",
+      "ended_at": "2026-09-29T04:48:28Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 2181,
+        "cache_read": 288739,
+        "cache_write": 37170
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 106762,
+      "started_at": "2026-09-29T04:48:28Z",
+      "ended_at": "2026-09-29T04:50:16Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 24,
+        "output": 8306,
+        "cache_read": 449386,
+        "cache_write": 49660
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 208328,
+      "started_at": "2026-09-29T04:50:16Z",
+      "ended_at": "2026-09-29T04:53:45Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 40,
+        "output": 16572,
+        "cache_read": 1669561,
+        "cache_write": 101925
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 362884,
+      "started_at": "2026-09-29T04:53:45Z",
+      "ended_at": "2026-09-29T04:59:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 72,
+        "output": 32866,
+        "cache_read": 4028293,
+        "cache_write": 149882
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 599771,
+      "started_at": "2026-09-29T04:59:49Z",
+      "ended_at": "2026-09-29T05:11:32Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 100,
+        "output": 26013,
+        "cache_read": 5086503,
+        "cache_write": 80721
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 391125,
+      "started_at": "2026-09-29T05:12:06Z",
+      "ended_at": "2026-09-29T05:21:20Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 62,
+        "output": 32614,
+        "cache_read": 2971680,
+        "cache_write": 97973
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 391170,
+      "started_at": "2026-09-29T05:22:14Z",
+      "ended_at": "2026-09-29T05:28:46Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 52,
+        "output": 39050,
+        "cache_read": 3147074,
+        "cache_write": 129428
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 235206,
+      "started_at": "2026-09-29T05:28:46Z",
+      "ended_at": "2026-09-29T05:34:17Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 20,
+        "output": 6870,
+        "cache_read": 720487,
+        "cache_write": 55984
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 296480,
+      "started_at": "2026-09-29T05:34:51Z",
+      "ended_at": "2026-09-29T05:42:22Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 52,
+        "output": 23945,
+        "cache_read": 2572241,
+        "cache_write": 94648
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 569450,
+      "started_at": "2026-09-29T05:42:58Z",
+      "ended_at": "2026-09-29T05:52:29Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 60,
+        "output": 55336,
+        "cache_read": 3789063,
+        "cache_write": 147426
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 365315,
+      "started_at": "2026-09-29T05:52:29Z",
+      "ended_at": "2026-09-29T06:00:07Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 32,
+        "output": 12668,
+        "cache_read": 1324040,
+        "cache_write": 73555
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 261916,
+      "started_at": "2026-09-29T06:00:35Z",
+      "ended_at": "2026-09-29T06:07:32Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 50,
+        "output": 16890,
+        "cache_read": 2432551,
+        "cache_write": 88621
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 105298,
+      "started_at": "2026-09-29T06:08:04Z",
+      "ended_at": "2026-09-29T06:09:50Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 4075201,
+    "phase_count": 14,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 599771,
+    "by_archetype_ms": {
+      "build": 1200292,
+      "control": 105298,
+      "evaluate": 1157849,
+      "plan": 1611762
+    },
+    "total_tokens": {
+      "input": 598,
+      "output": 282470,
+      "cache_read": 29508367,
+      "cache_write": 1203832
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 152,
+        "output": 45551,
+        "cache_read": 7131030,
+        "cache_write": 210260
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 204,
+        "output": 90021,
+        "cache_read": 9646033,
+        "cache_write": 383167
+      },
+      "plan": {
+        "input": 242,
+        "output": 146898,
+        "cache_read": 12731304,
+        "cache_write": 610405
+      }
+    },
+    "wasted_tokens": {
+      "input": 114,
+      "output": 56559,
+      "cache_read": 5543921,
+      "cache_write": 192621
+    },
+    "cache_hit_ratio": 0.9999797349720669,
+    "hot_phase_count": 13,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "fault-localization",
+      "bug-reproduction",
+      "tdd",
+      "build",
+      "audit",
+      "tdd",
+      "build",
+      "audit",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  }
+}
