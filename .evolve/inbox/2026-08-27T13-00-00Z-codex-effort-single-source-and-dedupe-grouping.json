@@ -9,6 +9,12 @@
     "go/internal/bridge/realizer.go",
     "docs/architecture/cli-capability-matrix.md"
   ],
+  "files": [
+    "go/internal/bridge/driver_codex.go",
+    "go/internal/bridge/realizer.go",
+    "go/internal/bridge/manifests/codex.json",
+    "docs/architecture/cli-capability-matrix.md"
+  ],
   "created_at": "2026-08-27T13:00:00Z",
   "priority_class": "hygiene",
   "priority_rationale": "inbox review 2026-09-27: A single-source cleanup on rarely taken paths, plus one latent mis-grouping that is unreachable today."

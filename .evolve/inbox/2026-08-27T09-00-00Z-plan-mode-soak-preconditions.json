@@ -9,6 +9,12 @@
     "go/internal/bridge/manifests/codex-tmux.json",
     "go/internal/bridge/driver_codex.go"
   ],
+  "files": [
+    "go/internal/bridge/manifests/codex-tmux.json",
+    "go/internal/bridge/autorespond.go",
+    "go/internal/bridge/autorespond_planmode_test.go",
+    "go/internal/bridge/driver_codex.go"
+  ],
   "created_at": "2026-08-27T09:00:00Z",
   "priority_class": "feature",
   "priority_rationale": "inbox review 2026-09-27: A bright-line checklist for an unscheduled change; it guards a risk nobody is taking yet."

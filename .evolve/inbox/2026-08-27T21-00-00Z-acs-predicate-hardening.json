@@ -4,6 +4,17 @@
   "weight": 0.6,
   "title": "Sweep: acs predicate hardening (20 auditor prescriptions amortised)",
   "summary": "ACS predicate authoring and shared acsassert helpers: end-of-options handling, uniqueness-checked lookups, satisfiability, scoped selection. Amortised from 20 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "files": [
+    "go/internal/acssuite/acssuite.go",
+    "go/cmd/evolve/cmd_acs.go",
+    "go/pkg/acsassert/assertions.go",
+    "go/acs/cycle1437/predicates_test.go",
+    "go/acs/cycle1510/predicates_test.go",
+    "go/acs/cycle1518/predicates_test.go",
+    "go/acs/cycle1544/predicates_test.go",
+    "go/acs/cycle1546/predicates_test.go",
+    "go/acs/cycle1547/predicates_test.go"
+  ],
   "prescriptions": [
     {
       "origin_id": "d58e5d3800af6f11f9478e4a32cc3b907",

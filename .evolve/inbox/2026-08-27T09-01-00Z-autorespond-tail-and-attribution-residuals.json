@@ -9,6 +9,12 @@
     "go/internal/bridge/human_input.go",
     "go/internal/bridge/exhaustion_drift.go"
   ],
+  "files": [
+    "go/internal/bridge/autorespond.go",
+    "go/internal/bridge/human_input.go",
+    "go/internal/bridge/exhaustion_drift.go",
+    "go/internal/bridge/manifests/claude-tmux.json"
+  ],
   "created_at": "2026-08-27T09:01:00Z",
   "priority_class": "debuggability",
   "priority_rationale": "inbox review 2026-09-27: It skews the outcome evidence that auto-enforce promotion reads, and it leaves a reworded vendor dialog to surface as an unexplained hang."
