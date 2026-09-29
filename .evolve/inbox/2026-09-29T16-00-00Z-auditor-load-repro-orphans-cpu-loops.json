@@ -1,0 +1,19 @@
+{
+  "id": "auditor-load-repro-orphans-cpu-loops",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "title": "An auditor's load reproduction left 14 CPU busy loops running for 47 minutes after its phase",
+  "files": [
+    "agents/evolve-auditor.md",
+    "go/internal/bridge"
+  ],
+  "summary": "Cycle 1762's auditor reproduced a macOS flake 'alongside hw.ncpu busy loops (sh -c while :; do :; done)' and never stopped them. The 14 loops were reparented to pid 1 when the phase's tmux pane ended, ran at ~85% CPU each (load average 118), and starved the cycle's own host predicate run, whose apicover scope then produced no results. `evolve gc` now terminates orphans whose cwd is inside a finished cycle's tree, but only when the operator runs it, and the loops outlive the phase that started them.",
+  "fix": "Two layers. (1) The auditor persona (and any phase allowed to generate load) bounds background load: `timeout N` around each loop, and kills what it started before writing its report. (2) The bridge, at phase end, signals every process whose cwd is inside the phase's worktree and is no longer attached to a live pane (the same ownership proof gc uses), so no phase's background work outlives it.",
+  "acceptance": [
+    "A phase that backgrounds a busy loop and exits leaves no process running in its worktree (red today)",
+    "The auditor persona's load-reproduction guidance names the bound and the cleanup"
+  ],
+  "created_at": "2026-09-29T16:00:00Z",
+  "source": "console, 2026-09-29, the evolve gc build (feat/gc-releases-unneeded-resources)"
+}
