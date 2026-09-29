@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -99,11 +100,15 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 // goTestExcludedByBuildTags). The subprocess env is scrubbed (ipcenv.Scrub)
 // so the campaign's runtime flags don't flip env-sensitive tests. A bounded
 // timeout keeps a wedged test from hanging the build phase.
+func taggedTestArgs(pkg string, tags []string) []string {
+	return []string{"test", "-count=1", "-timeout", ciparity.ACSDurableTimeout.String(), "-tags", strings.Join(tags, ","), pkg}
+}
+
 // realGoUnitTestTagged is realGoUnitTest with `-tags`: a tag-gated package is
 // invisible to the default context, so its tests run only when asked for by
 // the tags its files declare.
 func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []string) (output string, passed bool) {
-	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", "-tags", strings.Join(tags, ","), pkg)
+	cmd := exec.CommandContext(ctx, "go", taggedTestArgs(pkg, tags)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.CombinedOutput()

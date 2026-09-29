@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the build floor runs an added predicate package under the CI-parity gate's budget, not 120 s (cycle 1763, 2026-09-30)
+
+- Wave 43's lane 1763 wrote a predicate that runs its own `-count=50 -race` stability bound, as its inbox item's acceptance asks. The build floor's tagged self-check ran added predicate packages with `-timeout 120s`, while the audit's CI-parity gate gives the same predicates 8 minutes (`ciparitygate.DefaultTimeouts().ACSDurable`). The floor killed the predicate, so the lane edited `core/phase_bindings_selfcheck.go` to 480 s. It then failed the explanation's completeness check on that unexplained pipeline edit; a lane had been pushed into editing a gate by two budgets for one predicate. With 1761, 1762 and 1764 it was the fourth consecutive FAIL.
+- `ciparity.ACSDurableTimeout` (8 min) is now the one budget: `ciparitygate.DefaultTimeouts` reads it, and the floor's tagged run builds its arguments with it (`taggedTestArgs`). The untagged self-check of changed packages keeps `-timeout 120s`, the alarm ADR-0083 chose for a slow ordinary package; a predicate package is a different kind of run, bounded downstream by the same 8 minutes.
+- Tests, red first: `TestACSDurableTimeout_IsTheBudgetTheCIParityGateGivesPredicates` pins that the gate reads the shared budget, and `TestTaggedTestArgs_RunAPredicatePackageUnderTheCIParityBudget` pins the floor's `-timeout`. Both kill their mutants (a gate budget that drifts; a floor budget cut to a quarter).
+
 ## Fixed — continuation adoption archives the ancestor's own predicate package, so a retry never runs a contract it does not own (design A2, cycle 1764, 2026-09-30)
 
 - Wave 43's lane 1764 adopted cycle 1761's continuation and failed at the build handoff floor: the snapshot still held 1761's own predicate package `go/acs/cycle1761`, the floor's added-test self-check ran it, and its allow-list fence diffed against 1761's base, so every file main had gained since (the release, the gc landing, the dossiers) read as the lane's. No build could fix that; the item would have failed on every retry until quarantine. With 1761 and 1762 it was the third consecutive FAIL, so the loop stopped for this fix.
