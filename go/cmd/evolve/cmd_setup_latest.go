@@ -33,44 +33,47 @@ func setupLatestReport(ctx context.Context, rep setup.DetectReport, catTiers map
 		wg.Add(1)
 		go func(i int, c setup.CLIStatus) {
 			defer wg.Done()
-			tierModel := func(tier string) string {
-				if cat, ok := catTiers[c.CLI]; ok && cat[tier] != "" {
-					return cat[tier]
-				}
-				return c.TierModels[tier]
-			}
-			row := setup.FamilyLatest{CLI: c.CLI, CurrentDeepModel: tierModel("deep")}
-			cctx, cancel := context.WithTimeout(ctx, setupLatestProbeTimeout)
-			defer cancel()
-			ids, err := lister.List(cctx, c.CLI)
-			if err != nil {
-				row.Error = err.Error()
-				rows[i] = row
-				return
-			}
-			row.Candidates = len(ids)
-			for _, tier := range latestProbeTiers {
-				current := tierModel(tier)
-				if current == "" || current == tier {
-					continue
-				}
-				latest, stale, observed := setup.ComputeLatest(current, ids, fresh[c.CLI])
-				if tier == "deep" {
-					row.LatestModel, row.CurrentSeenLive = latest, observed
-				}
-				switch {
-				case stale:
-					row.StaleTiers = append(row.StaleTiers, setup.TierStale{Tier: tier, Current: current, Latest: latest})
-				case !observed:
-					row.UnverifiedTiers = append(row.UnverifiedTiers, tier)
-				}
-			}
-			row.MapStale = len(row.StaleTiers) > 0
-			rows[i] = row
+			rows[i] = probeCLILatest(ctx, c, catTiers, lister, fresh)
 		}(i, c)
 	}
 	wg.Wait()
 	return setup.LatestReport{Source: "live", CLIs: rows}
+}
+
+func probeCLILatest(ctx context.Context, c setup.CLIStatus, catTiers map[string]map[string]string, lister modelquery.Lister, fresh map[string]modelquery.FreshnessPolicy) setup.FamilyLatest {
+	tierModel := func(tier string) string {
+		if cat, ok := catTiers[c.CLI]; ok && cat[tier] != "" {
+			return cat[tier]
+		}
+		return c.TierModels[tier]
+	}
+	row := setup.FamilyLatest{CLI: c.CLI, CurrentDeepModel: tierModel("deep")}
+	cctx, cancel := context.WithTimeout(ctx, setupLatestProbeTimeout)
+	defer cancel()
+	ids, err := lister.List(cctx, c.CLI)
+	if err != nil {
+		row.Error = err.Error()
+		return row
+	}
+	row.Candidates = len(ids)
+	for _, tier := range latestProbeTiers {
+		current := tierModel(tier)
+		if current == "" || current == tier {
+			continue
+		}
+		latest, stale, observed := setup.ComputeLatest(current, ids, fresh[c.CLI])
+		if tier == "deep" {
+			row.LatestModel, row.CurrentSeenLive = latest, observed
+		}
+		switch {
+		case stale:
+			row.StaleTiers = append(row.StaleTiers, setup.TierStale{Tier: tier, Current: current, Latest: latest})
+		case !observed:
+			row.UnverifiedTiers = append(row.UnverifiedTiers, tier)
+		}
+	}
+	row.MapStale = len(row.StaleTiers) > 0
+	return row
 }
 
 type perCLIScratchLister struct {

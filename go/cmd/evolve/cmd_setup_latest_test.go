@@ -181,3 +181,82 @@ func TestSetupLatestReport_VanishedBalancedTierIsNamedUnverified(t *testing.T) {
 		t.Errorf("the vanished balanced model must be NAMED unverified: %+v", row)
 	}
 }
+
+func probeCodexStatus() setup.CLIStatus {
+	return setup.CLIStatus{CLI: "codex", Verdict: "ready", TierModels: map[string]string{"deep": "gpt-5.5"}}
+}
+
+func TestProbeCLILatest_StaleCurrentMarksTierStale(t *testing.T) {
+	t.Parallel()
+	fl := &fakeLister{lists: map[string][]string{"codex": {"gpt-5.6", "gpt-5.5", "gpt-4o"}}}
+	row := probeCLILatest(context.Background(), probeCodexStatus(), nil, fl, nil)
+	if row.CLI != "codex" || row.Error != "" || row.Candidates != 3 {
+		t.Fatalf("a successful probe carries its CLI, no error and every candidate: %+v", row)
+	}
+	if row.CurrentDeepModel != "gpt-5.5" || row.LatestModel != "gpt-5.6" || !row.CurrentSeenLive {
+		t.Errorf("the deep tier anchors current/latest/observed: %+v", row)
+	}
+	if !row.MapStale || len(row.StaleTiers) != 1 || row.StaleTiers[0] != (setup.TierStale{Tier: "deep", Current: "gpt-5.5", Latest: "gpt-5.6"}) {
+		t.Errorf("a fresher live model must mark the deep tier stale with its pair: %+v", row)
+	}
+	if len(row.UnverifiedTiers) != 0 {
+		t.Errorf("an observed tier is never unverified: %+v", row)
+	}
+}
+
+func TestProbeCLILatest_ListerErrorSkipsTierComputation(t *testing.T) {
+	t.Parallel()
+	fl := &fakeLister{
+		lists: map[string][]string{"codex": {"gpt-5.6"}},
+		errs:  map[string]error{"codex": errors.New("tmux capture timed out")},
+	}
+	row := probeCLILatest(context.Background(), probeCodexStatus(), nil, fl, nil)
+	if row.Error != "tmux capture timed out" {
+		t.Fatalf("the lister's error must be the row's error: %+v", row)
+	}
+	if row.CLI != "codex" || row.CurrentDeepModel != "gpt-5.5" {
+		t.Errorf("a failed probe still names its CLI and current deep model: %+v", row)
+	}
+	if row.Candidates != 0 || row.LatestModel != "" || row.CurrentSeenLive || row.MapStale || len(row.StaleTiers) != 0 || len(row.UnverifiedTiers) != 0 {
+		t.Errorf("a failed probe must skip tier computation entirely: %+v", row)
+	}
+}
+
+func TestProbeCLILatest_EmptyCandidatesNeverStale(t *testing.T) {
+	t.Parallel()
+	fl := &fakeLister{lists: map[string][]string{"codex": {}}}
+	row := probeCLILatest(context.Background(), probeCodexStatus(), nil, fl, nil)
+	if row.Error != "" || row.Candidates != 0 {
+		t.Fatalf("an empty listing is a successful probe with zero candidates: %+v", row)
+	}
+	if row.MapStale || len(row.StaleTiers) != 0 || row.CurrentSeenLive {
+		t.Errorf("nothing live can make a tier stale or observed: %+v", row)
+	}
+	if len(row.UnverifiedTiers) != 1 || row.UnverifiedTiers[0] != "deep" {
+		t.Errorf("a real current model absent from an empty listing is named unverified: %+v", row)
+	}
+}
+
+func TestProbeCLILatest_CatalogTierOverridesManifest(t *testing.T) {
+	t.Parallel()
+	fl := &fakeLister{lists: map[string][]string{"codex": {"gpt-5.6"}}}
+	catTiers := map[string]map[string]string{"codex": {"deep": "gpt-5.6"}}
+	row := probeCLILatest(context.Background(), probeCodexStatus(), catTiers, fl, nil)
+	if row.CurrentDeepModel != "gpt-5.6" || row.MapStale || !row.CurrentSeenLive {
+		t.Errorf("the catalog tier replaces the manifest baseline: %+v", row)
+	}
+}
+
+func TestProbeCLILatest_UsesTheCLIsOwnFreshnessPolicy(t *testing.T) {
+	t.Parallel()
+	fl := &fakeLister{lists: map[string][]string{"claude": {"opus", "opus-4.5"}}}
+	c := setup.CLIStatus{CLI: "claude", Verdict: "ready", TierModels: map[string]string{"deep": "opus-4.6"}}
+	fresh := map[string]modelquery.FreshnessPolicy{
+		"codex":  {},
+		"claude": {PreferAlias: true, AliasIDs: []string{"opus"}},
+	}
+	row := probeCLILatest(context.Background(), c, nil, fl, fresh)
+	if row.LatestModel != "opus" || !row.MapStale {
+		t.Errorf("the probe must apply fresh[c.CLI] (claude's alias policy): %+v", row)
+	}
+}

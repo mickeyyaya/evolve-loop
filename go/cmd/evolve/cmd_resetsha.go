@@ -26,21 +26,11 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if projectRoot == "" {
-		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
+	absRoot, err := resetSHAProjectRoot(projectRoot, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve reset-sha: %v\n", err)
+		return 1
 	}
-	if projectRoot == "" {
-		var err error
-		if projectRoot, err = os.Getwd(); err != nil {
-			fmt.Fprintf(stderr, "evolve reset-sha: cwd: %v\n", err)
-			return 1
-		}
-	}
-	// Mirrors runShipCmd: an absolute root keeps this aligned with the
-	// audit/commit-gate paths; RepinShipSHA's IsAbs guard is the terminal check.
-	absRoot := paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
-		fmt.Fprintf(stderr, "evolve reset-sha: WARN: %s\n", m)
-	})
 
 	runningSHA, err := selfsha.Running()
 	if err != nil {
@@ -65,4 +55,22 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "reset-sha: re-pinned expected_ship_sha %.12s -> %.12s (authorized: %s)\n",
 		res.OldSHA, res.NewSHA, res.Authorized)
 	return 0
+}
+
+// Mirrors runShipCmd: an absolute root keeps this aligned with the
+// audit/commit-gate paths; RepinShipSHA's IsAbs guard is the terminal check.
+func resetSHAProjectRoot(projectRoot string, stderr io.Writer) (string, error) {
+	if projectRoot == "" {
+		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
+	}
+	if projectRoot == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("cwd: %w", err)
+		}
+		projectRoot = cwd
+	}
+	return paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve reset-sha: WARN: %s\n", m)
+	}), nil
 }
