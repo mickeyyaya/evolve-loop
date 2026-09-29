@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -318,7 +319,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	// The prompt partition sees only inbox items, but a top_n card can come from the scout or a
 	// fleet todo, so every card's files are judged again here with the lane predicate.
 	if cards := protectedTopNCards(body, h.forbidden); len(cards) > 0 {
-		if err := routeProtectedCards(filepath.Join(req.Workspace, "triage-decision.json"), cards); err != nil {
+		if err := routeProtectedCards(filepath.Join(req.Workspace, "triage-decision.json"), cards, boundItems(req.Workspace)); err != nil {
 			return core.VerdictFAIL, []core.Diagnostic{{
 				Severity: cyclestate.SeverityError,
 				Message: fmt.Sprintf("top_n card %q names protected surface %q and its console route could not be recorded: %v",
@@ -386,6 +387,11 @@ type Config struct {
 	CompactPrompts bool
 	// LaneForbidden marks the declared paths no lane can change; nil judges protected surface only.
 	LaneForbidden func(string) bool
+}
+
+func boundItems(workspace string) []string {
+	ids, _ := committedset.Committed(workspace)
+	return ids
 }
 
 func hooksFor(c Config) hooks { return hooks{forbidden: c.LaneForbidden} }

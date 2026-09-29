@@ -4,16 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
 // protectedCard is a top_n card whose files name a lane-forbidden path.
-type protectedCard struct{ ID, Path string }
+type protectedCard struct{ ID, Path, Via string }
 
 // protectedTopNCards returns every top_n card that names a lane-forbidden path, in report order; a nil
 // forbidden judges by manifest membership.
@@ -69,7 +71,7 @@ func consoleRouteReason(path string) string {
 
 // routeProtectedCards moves each card out of the decision's top_n into escalate_block with the
 // console-route reason, so the item is answered and never committed; every other key is kept.
-func routeProtectedCards(decisionPath string, cards []protectedCard) error {
+func routeProtectedCards(decisionPath string, cards []protectedCard, bound []string) error {
 	for _, c := range cards {
 		if c.ID == "" {
 			return fmt.Errorf("route protected cards: the card naming %s has no id", c.Path)
@@ -98,12 +100,43 @@ func routeProtectedCards(decisionPath string, cards []protectedCard) error {
 			return fmt.Errorf("route protected cards: card %q is not in the decision's top_n", c.ID)
 		}
 	}
+	routed := cards
+	if len(kept) == 0 {
+		routed = withBoundItem(cards, bound, raw)
+	}
 	fields["top_n"], _ = json.Marshal(kept)
-	fields["escalate_block"], _ = json.Marshal(appendEscalations(escalations, escalated, cards))
+	fields["escalate_block"], _ = json.Marshal(appendEscalations(escalations, escalated, routed))
 	if err := atomicwrite.JSON(decisionPath, fields); err != nil {
 		return fmt.Errorf("route protected cards: %w", err)
 	}
 	return nil
+}
+
+func withBoundItem(cards []protectedCard, bound []string, decision []byte) []protectedCard {
+	if len(cards) == 0 || len(bound) != 1 {
+		return cards
+	}
+	id := bound[0]
+	if answersFor(decision, id) || slices.ContainsFunc(cards, func(c protectedCard) bool { return c.ID == id }) {
+		return cards
+	}
+	return append(slices.Clip(cards), protectedCard{ID: id, Path: cards[0].Path, Via: cards[0].ID})
+}
+
+func (c protectedCard) routeReason() string {
+	if c.Via == "" {
+		return consoleRouteReason(c.Path)
+	}
+	return fmt.Sprintf("%s (the lane's item, answered for by routed card %q)", consoleRouteReason(c.Path), c.Via)
+}
+
+func answersFor(decision []byte, id string) bool {
+	for _, d := range committedset.DispositionsFrom(decision) {
+		if d.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // removeRoutedCards drops every top_n card whose id is one of cards and reports the ids it dropped.
@@ -143,7 +176,7 @@ func appendEscalations(escalations []json.RawMessage, escalated map[string]bool,
 		entry, _ := json.Marshal(struct {
 			TaskID string `json:"task_id"`
 			Reason string `json:"reason"`
-		}{c.ID, consoleRouteReason(c.Path)})
+		}{c.ID, c.routeReason()})
 		escalations = append(escalations, entry)
 		escalated[c.ID] = true
 	}
