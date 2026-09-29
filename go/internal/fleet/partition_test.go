@@ -1,7 +1,11 @@
 package fleet
 
 import (
+	"errors"
+	"io/fs"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -335,4 +339,94 @@ func TestPlanFromTriage_CommittedFloorsKeepIdIsland(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("two distinct committed floors at count=2 must spread to 2 lanes, got %d", len(specs))
 	}
+}
+
+func assertGraphBuckets(t *testing.T, buckets [][]Todo, deferred []Todo, wantBuckets [][]string, wantDeferred []string) {
+	t.Helper()
+	got := make([][]string, len(buckets))
+	for i, b := range buckets {
+		got[i] = bucketIDs(b)
+	}
+	if !reflect.DeepEqual(got, wantBuckets) || !reflect.DeepEqual(bucketIDs(deferred), wantDeferred) {
+		t.Fatalf("buckets=%v deferred=%v, want buckets=%v deferred=%v", got, bucketIDs(deferred), wantBuckets, wantDeferred)
+	}
+}
+
+func TestPartitionGraph_BucketCountBelowOne_ClampsToOneBucket(t *testing.T) {
+	for _, n := range []int{0, -1} {
+		buckets, deferred, err := PartitionGraph([]Todo{{ID: "gz", Files: []string{"go.mod"}}}, n, "../..")
+		if err != nil {
+			t.Fatalf("n=%d: PartitionGraph: %v", n, err)
+		}
+		assertGraphBuckets(t, buckets, deferred, [][]string{{"gz"}}, []string{})
+	}
+}
+
+func TestPartitionGraph_PackageSetFailure_WrapsItsCauseAndReturnsNothing(t *testing.T) {
+	todos := []Todo{
+		{ID: "gz", Files: []string{"go.mod"}},
+		{ID: "missing", Files: []string{"internal/no-such-package/missing.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err == nil {
+		t.Fatal("a missing file must fail the partition")
+	}
+	if !errors.Is(err, fs.ErrNotExist) || !strings.Contains(err.Error(), "todo missing") {
+		t.Errorf("error must name the todo and wrap its cause: %v", err)
+	}
+	if buckets != nil || deferred != nil {
+		t.Errorf("a failed partition returns no partial result: buckets=%v deferred=%v", buckets, deferred)
+	}
+}
+
+func TestPartitionGraph_GlobalZoneTodoInBucketZero_PullsLaterTodosIntoIt(t *testing.T) {
+	todos := []Todo{
+		{ID: "gz", Files: []string{"go.mod"}},
+		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	assertGraphBuckets(t, buckets, deferred, [][]string{{"gz", "a"}, {}}, []string{})
+}
+
+func TestPartitionGraph_GlobalZoneTodo_ClaimsTheBucketItJoins(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "gz", Files: []string{"go.sum"}},
+		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	assertGraphBuckets(t, buckets, deferred, [][]string{{"a", "gz", "b"}, {}}, []string{})
+}
+
+func TestPartitionGraph_TodoConflictingWithTwoBuckets_IsDeferred(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
+		{ID: "both", Files: []string{"internal/acsrunner/runner.go", "internal/fleet/partition.go"}},
+		{ID: "gz", Files: []string{"go.mod"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	assertGraphBuckets(t, buckets, deferred, [][]string{{"a"}, {"b"}}, []string{"both", "gz"})
+}
+
+func TestPartitionGraph_PackageOwnership_FollowsTheChosenBucket(t *testing.T) {
+	todos := []Todo{
+		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
+		{ID: "b2", Files: []string{"internal/fleet/packagegraph.go"}},
+	}
+	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
+	if err != nil {
+		t.Fatalf("PartitionGraph: %v", err)
+	}
+	assertGraphBuckets(t, buckets, deferred, [][]string{{"a"}, {"b", "b2"}}, []string{})
 }

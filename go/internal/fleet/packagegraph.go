@@ -82,21 +82,7 @@ func PartitionGraph(todos []Todo, n int, repoRoot string) (buckets [][]Todo, def
 			return nil, nil, fmt.Errorf("PartitionGraph: todo %s: %w", td.ID, perr)
 		}
 
-		owning := map[int]bool{}
-		for pkg := range pkgs {
-			if b, ok := owner[pkg]; ok {
-				owning[b] = true
-			}
-		}
-		if isGZ {
-			for i, b := range buckets {
-				if len(b) > 0 {
-					owning[i] = true
-				}
-			}
-		} else if gzBucket >= 0 {
-			owning[gzBucket] = true
-		}
+		owning := resolveOwningBuckets(pkgs, owner, buckets, isGZ, gzBucket)
 
 		var chosen int
 		switch len(owning) {
@@ -117,6 +103,25 @@ func PartitionGraph(todos []Todo, n int, repoRoot string) (buckets [][]Todo, def
 		}
 	}
 	return buckets, deferred, nil
+}
+
+func resolveOwningBuckets(pkgs map[string]bool, owner map[string]int, buckets [][]Todo, isGZ bool, gzBucket int) map[int]bool {
+	owning := map[int]bool{}
+	for pkg := range pkgs {
+		if b, ok := owner[pkg]; ok {
+			owning[b] = true
+		}
+	}
+	if isGZ {
+		for i, b := range buckets {
+			if len(b) > 0 {
+				owning[i] = true
+			}
+		}
+	} else if gzBucket >= 0 {
+		owning[gzBucket] = true
+	}
+	return owning
 }
 
 // splitGlobalZone separates global-zone files, which have no package to resolve, from package-graph files.

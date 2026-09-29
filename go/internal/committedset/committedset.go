@@ -164,24 +164,7 @@ func Dispositions(workspace string) []Disposition {
 // failure as a deferral, so a deferred id is still owed work. A malformed
 // decision answers for nothing.
 func DispositionsFrom(body []byte) []Disposition {
-	var decision struct {
-		EscalateBlock []struct {
-			TaskID    string `json:"task_id"`
-			Reason    string `json:"reason"`
-			FailCount int    `json:"fail_count"`
-		} `json:"escalate_block"`
-		SkipRejected []struct {
-			TaskID string `json:"task_id"`
-		} `json:"skip_rejected"`
-		SkipShipped []struct {
-			TaskID string `json:"task_id"`
-			GitSHA string `json:"git_sha"`
-		} `json:"skip_shipped"`
-		Dropped []struct {
-			ID     string `json:"id"`
-			Reason string `json:"reason"`
-		} `json:"dropped"`
-	}
+	var decision answeringBuckets
 	if json.Unmarshal(body, &decision) != nil {
 		return nil
 	}
@@ -219,6 +202,25 @@ func DispositionsFrom(body []byte) []Disposition {
 		}
 	}
 	return out
+}
+
+type answeringBuckets struct {
+	EscalateBlock []struct {
+		TaskID    string `json:"task_id"`
+		Reason    string `json:"reason"`
+		FailCount int    `json:"fail_count"`
+	} `json:"escalate_block"`
+	SkipRejected []struct {
+		TaskID string `json:"task_id"`
+	} `json:"skip_rejected"`
+	SkipShipped []struct {
+		TaskID string `json:"task_id"`
+		GitSHA string `json:"git_sha"`
+	} `json:"skip_shipped"`
+	Dropped []struct {
+		ID     string `json:"id"`
+		Reason string `json:"reason"`
+	} `json:"dropped"`
 }
 
 // readJSON decodes one workspace artifact. Absent, unreadable or malformed all

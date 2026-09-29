@@ -80,3 +80,34 @@ func TestDispositionsFrom_ReadsTheDecisionBody(t *testing.T) {
 		t.Fatalf("a malformed body answers for nothing: %+v", got)
 	}
 }
+
+func TestDispositionsFrom_AWellFormedDecisionWithAMistypedFieldAnswersForNothing(t *testing.T) {
+	body := `{"escalate_block":[{"task_id":"a","reason":"r"}],"dropped":[{"id":"b","reason":7}]}`
+	if got := DispositionsFrom([]byte(body)); got != nil {
+		t.Fatalf("a decision that fails to decode answers for nothing, even for its well-typed buckets: %+v", got)
+	}
+}
+
+func TestDispositionsFrom_TrimsIDsEvidenceAndShas(t *testing.T) {
+	got := DispositionsFrom([]byte(`{
+		"escalate_block":[
+			{"task_id":" padded-reason ","reason":" console-routed ","fail_count":3},
+			{"task_id":"blank-reason","reason":"   "},
+			{"task_id":"negative-count","fail_count":-2}
+		],
+		"skip_rejected":[{"task_id":" rejected "}],
+		"skip_shipped":[{"task_id":"padded-sha","git_sha":" abc123 "},{"task_id":"blank-sha","git_sha":"  "}],
+		"dropped":[{"id":" dropped ","reason":"  superseded  "}]
+	}`))
+	want := []Disposition{
+		{ID: "padded-reason", Bucket: "escalate_block", Reason: "console-routed"},
+		{ID: "blank-reason", Bucket: "escalate_block", Reason: "escalated without a stated reason"},
+		{ID: "negative-count", Bucket: "escalate_block", Reason: "escalated without a stated reason"},
+		{ID: "rejected", Bucket: "skip_rejected", Reason: "triage reported an earlier rejection (inbox/rejected)"},
+		{ID: "padded-sha", Bucket: "skip_shipped", Reason: "git_sha abc123"},
+		{ID: "dropped", Bucket: "dropped", Reason: "superseded"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("DispositionsFrom =\n %+v\nwant\n %+v", got, want)
+	}
+}
