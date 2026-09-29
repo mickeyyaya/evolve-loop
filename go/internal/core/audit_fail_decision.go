@@ -17,7 +17,7 @@ func reentryPhase(a retryAction) (Phase, bool) {
 	switch a {
 	case retryActionRetryTDD:
 		return PhaseTDD, true
-	case retryActionRetryBuild:
+	case retryActionRetryBuild, retryActionReauthorExplanation:
 		return PhaseBuild, true
 	default:
 		return PhaseRetro, false
@@ -30,17 +30,8 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 	d := buildFailureDossier(cs, VerdictFAIL, o.failurePolicy)
 	_ = writeFailureDossier(cs.WorkspacePath, d) // per-cycle forensics; best-effort
 
-	declared := ""
-	if fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit)); ok {
-		declared = fb.Class
-	}
-
-	env := computeRetryEnvelope(retryEnvelopeInput{
-		DeterministicFloorCandidate: d.FloorCandidate,
-		DeclaredClass:               declared,
-		Attempts:                    cs.AuditRepairAttempts,
-		Policy:                      o.failurePolicy,
-	})
+	env, fb := o.auditFailEnvelope(cs, d.FloorCandidate)
+	declared := fb.Class
 
 	if env.Halt {
 		// A halted cycle still gets its retro post-mortem; the signal is what stops the loop.
@@ -67,12 +58,32 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 		suffix = " [adjudicated: " + proposal.Justification + "]"
 	}
 
+	if action == retryActionReauthorExplanation {
+		recordExplanationRound(cs, fb)
+	}
 	if next, isRetry := reentryPhase(action); isRetry {
 		o.emitAuditRepairDecision(cs, next, declared, env.Reason+suffix)
 		return next, auditRepairReasonPrefix + string(action) + ": " + env.Reason + suffix, nil
 	}
 	o.emitAuditRepairDecision(cs, PhaseRetro, declared, env.Reason+suffix)
 	return PhaseRetro, auditDeclineReasonPrefix + env.Reason + suffix, nil
+}
+
+func (o *Orchestrator) auditFailEnvelope(cs CycleState, floorCandidate string) (retryEnvelope, *phasecontract.FailureBlock) {
+	fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
+	if !ok {
+		fb = &phasecontract.FailureBlock{}
+	}
+	env := computeRetryEnvelope(retryEnvelopeInput{
+		DeterministicFloorCandidate: floorCandidate,
+		DeclaredClass:               fb.Class,
+		Attempts:                    cs.AuditRepairAttempts,
+		Policy:                      o.failurePolicy,
+	})
+	if _, explanationOnly := explanationCorrectionDocument(cs, fb); explanationOnly {
+		env = explanationCorrectionEnvelope(env)
+	}
+	return env, fb
 }
 
 // emitAuditRepairDecision emits one signal: WARN when the repair round is declined, INFO when granted.

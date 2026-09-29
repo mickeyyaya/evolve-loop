@@ -38,6 +38,9 @@ cycle's artifacts. Then ask, in this order:
      forced to address them rather than re-earning the verdict.
    - The tests are right and the change is wrong → `retry@build`: cheaper, and
      re-running the test-first phase would add nothing.
+   - The list offers `retry@explanation` → the host found every defect in the
+     cycle's own explanation document (`explanation-needs-correction`), so the only
+     legal re-entry is Build re-authoring that document; TDD is not on offer.
 
 2. **Would a rebuild actually change the outcome?** A defect in the environment,
    in an unsatisfiable predicate, or in a role-gated file the builder cannot touch

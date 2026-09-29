@@ -24,6 +24,8 @@ const (
 	// retryActionDecline ends the cycle through the terminal retro. It is always
 	// legal: declining to retry is never unsafe.
 	retryActionDecline retryAction = "decline"
+
+	retryActionReauthorExplanation retryAction = "retry@explanation"
 )
 
 // retryEnvelopeInput inverts every I/O concern out of the rule. The policy is
