@@ -317,7 +317,9 @@ func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
 
 	// Keep the observer's own events file growing throughout.
 	stopWriter := make(chan struct{})
+	writerDone := make(chan struct{})
 	go func() {
+		defer close(writerDone)
 		tick := time.NewTicker(5 * time.Millisecond)
 		defer tick.Stop()
 		for {
@@ -334,7 +336,10 @@ func TestWatch_ObserverEventsFileDoesNotMaskStall(t *testing.T) {
 			}
 		}
 	}()
-	defer close(stopWriter)
+	defer func() {
+		close(stopWriter)
+		<-writerDone
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
