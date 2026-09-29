@@ -131,26 +131,8 @@ func Validate(srcDir string, out io.Writer) ValidateResult {
 	// (ci.yml step 4 — the bash loop over agents/evolve-*.md.)
 	validateAgentFrontmatter(srcDir, &res, out)
 
-	// Loop skill files: existence only. (ci.yml step 5.)
-	for _, skill := range loopSkillFiles {
-		path := filepath.Join(srcDir, "skills", "loop", skill)
-		if !fileExists(path) {
-			fmt.Fprintf(out, "FAIL: skills/loop/%s not found\n", skill)
-			res.Errors++
-			continue
-		}
-		fmt.Fprintf(out, "OK: skills/loop/%s\n", skill)
-	}
-
-	// Reference docs: existence only. (ci.yml step 6.)
-	for _, doc := range referenceDocs {
-		if !fileExists(filepath.Join(srcDir, doc)) {
-			fmt.Fprintf(out, "FAIL: %s not found\n", doc)
-			res.Errors++
-			continue
-		}
-		fmt.Fprintf(out, "OK: %s\n", doc)
-	}
+	validateSkillFiles(srcDir, &res, out)
+	validateReferenceDocs(srcDir, &res, out)
 
 	res.Agents = len(globAgentsIn(filepath.Join(srcDir, "agents")))
 	res.Skills = len(globSkills(srcDir))
@@ -160,6 +142,28 @@ func Validate(srcDir string, out io.Writer) ValidateResult {
 	fmt.Fprintf(out, "EVOLVE_LOOP_SKILLS=%d\n", res.Skills)
 	fmt.Fprintf(out, "EVOLVE_LOOP_ERRORS=%d\n", res.Errors)
 	return res
+}
+
+func validateSkillFiles(srcDir string, res *ValidateResult, out io.Writer) {
+	for _, skill := range loopSkillFiles {
+		if !fileExists(filepath.Join(srcDir, "skills", "loop", skill)) {
+			fmt.Fprintf(out, "FAIL: skills/loop/%s not found\n", skill)
+			res.Errors++
+			continue
+		}
+		fmt.Fprintf(out, "OK: skills/loop/%s\n", skill)
+	}
+}
+
+func validateReferenceDocs(srcDir string, res *ValidateResult, out io.Writer) {
+	for _, doc := range referenceDocs {
+		if !fileExists(filepath.Join(srcDir, doc)) {
+			fmt.Fprintf(out, "FAIL: %s not found\n", doc)
+			res.Errors++
+			continue
+		}
+		fmt.Fprintf(out, "OK: %s\n", doc)
+	}
 }
 
 // validateManifestFields asserts plugin.json carries every required top-level

@@ -100,38 +100,10 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 	if strings.TrimSpace(opts.InboxDir) == "" {
 		return rec, errors.New("ciwatch: InboxDir required")
 	}
-	now := opts.Now
-	if now == nil {
-		now = time.Now
-	}
-	sleep := opts.Sleep
-	if sleep == nil {
-		sleep = time.Sleep
-	}
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = 900 * time.Second
-	}
-	poll := opts.Poll
-	if poll <= 0 {
-		poll = 30 * time.Second
-	}
-
-	deadline := now().Add(timeout)
-	var st RunStatus
-	for {
-		var err error
-		st, err = opts.Fetch(ctx, opts.SHA)
-		if err != nil {
-			return rec, fmt.Errorf("ciwatch: fetch run status for %s: %w", opts.SHA, err)
-		}
-		if st.Status == StatusCompleted {
-			break
-		}
-		if now().Add(poll).After(deadline) {
-			return rec, fmt.Errorf("%w: sha=%s last status=%q", ErrWatchTimeout, opts.SHA, st.Status)
-		}
-		sleep(poll)
+	opts = resolveWatchDefaults(opts)
+	st, err := pollUntilComplete(ctx, opts)
+	if err != nil {
+		return rec, err
 	}
 
 	rec = dossier.CIWatchRecord{
@@ -139,7 +111,7 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 		Conclusion:  st.Conclusion,
 		RunURL:      st.RunURL,
 		FailingTest: st.FailingTest,
-		CheckedAt:   now().UTC().Format(time.RFC3339),
+		CheckedAt:   opts.Now().UTC().Format(time.RFC3339),
 	}
 	if opts.WorkspaceDir != "" {
 		if err := writeVerdict(opts.WorkspaceDir, rec); err != nil {
@@ -147,11 +119,44 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 		}
 	}
 	if st.Conclusion != ConclusionSuccess {
-		if err := fileEscalation(opts, st, now().UTC()); err != nil {
+		if err := fileEscalation(opts, st, opts.Now().UTC()); err != nil {
 			return rec, err
 		}
 	}
 	return rec, nil
+}
+
+func resolveWatchDefaults(opts Options) Options {
+	if opts.Now == nil {
+		opts.Now = time.Now
+	}
+	if opts.Sleep == nil {
+		opts.Sleep = time.Sleep
+	}
+	if opts.Timeout <= 0 {
+		opts.Timeout = 900 * time.Second
+	}
+	if opts.Poll <= 0 {
+		opts.Poll = 30 * time.Second
+	}
+	return opts
+}
+
+func pollUntilComplete(ctx context.Context, opts Options) (RunStatus, error) {
+	deadline := opts.Now().Add(opts.Timeout)
+	for {
+		st, err := opts.Fetch(ctx, opts.SHA)
+		if err != nil {
+			return RunStatus{}, fmt.Errorf("ciwatch: fetch run status for %s: %w", opts.SHA, err)
+		}
+		if st.Status == StatusCompleted {
+			return st, nil
+		}
+		if opts.Now().Add(opts.Poll).After(deadline) {
+			return RunStatus{}, fmt.Errorf("%w: sha=%s last status=%q", ErrWatchTimeout, opts.SHA, st.Status)
+		}
+		opts.Sleep(opts.Poll)
+	}
 }
 
 // writeVerdict records the CI verdict artifact atomically (tmp + rename) so a
