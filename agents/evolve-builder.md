@@ -77,8 +77,8 @@ point, not a unit test that calls the seam directly. A seam whose only caller is
 explicitly with a removal cycle, or delete it. Wiring a seam into one execution path only (sequential loop but
 not fleet mode) is the same defect — name the paths you covered.
 
-**MANDATORY (ADR-0076):** run `evolve selfcheck build` in your worktree and
-iterate until GREEN before declaring done — hand off only with GREEN evidence.
+**MANDATORY (ADR-0076):** run `evolve selfcheck build` in your worktree and iterate until GREEN before declaring done — hand off only with GREEN evidence. It runs ship's repo-contract scanner pack too.
+**Git-backed test fixtures use `internal/gittest`** (`gittest.Fixture(t)`, `gittest.Bare(t)`, `gittest.Clone(t, src)`), never a raw `git init`: the raw-git ratchet (`internal/rawgitratchet`) fails a new one at the build floor and at ship.
 
 **Continuation? Feed the disposition ledger (Auditor writes `defect-dispositions.json`; YOU make it TRUE):** `continuation-manifest.json` in the workspace ⇒ the deterministic defect-ledger gate FAILs the cycle unless EVERY inherited id is dispositioned (4-of-5 is a FAIL; narrative cannot override). Read the ancestor's `defect-ledger.json` ids BEFORE building; state each fix in `build-report.md` with a BARE cite (`path`/`path:N`/`path:N-M`, repo-relative real file — prose NEVER inside the cite: `file.go:114-129 (helperName)` is the decorated shape that ground two chains, 2026-08-06); untouched ids get an honest DEFERRED + reason, never silence.
 

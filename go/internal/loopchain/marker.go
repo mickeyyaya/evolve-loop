@@ -33,13 +33,14 @@ type RefreshLogEntry struct {
 	NewSHA          string `json:"new_sha,omitempty"`
 }
 
-// attempt is the re-exec loop breaker's wire shape: the running build commit
-// that triggered a refresh; a LATER attempt carrying the SAME commit means the
-// previous re-exec came back on a binary that had not moved.
+// attempt is the breaker marker: the build commit a refresh re-execed away
+// from, plus the wave boundary's handoff (pid, waves_done) until it is taken.
 type attempt struct {
 	RunningCommit string `json:"running_commit"`
 	Batch         int    `json:"batch"`
 	Timestamp     string `json:"timestamp"`
+	PID           int    `json:"pid,omitempty"`
+	WavesDone     int    `json:"waves_done,omitempty"`
 }
 
 // alreadyAttempted reports whether a refresh was already performed for
@@ -61,10 +62,9 @@ func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 	return rec.RunningCommit == runningCommit
 }
 
-// recordAttempt persists the marker for runningCommit, arming the breaker
-// against the next boundary.
+// recordAttempt arms the breaker for runningCommit and records any handoff.
 func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
-	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339)})
+	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoff.PID, WavesDone: r.opts.handoff.WavesDone})
 	if err == nil {
 		err = os.WriteFile(filepath.Join(r.roots.EvolveDir, r.opts.attemptFile), buf, 0o644)
 	}
@@ -72,6 +72,33 @@ func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
 		return fmt.Errorf("write boundary-refresh attempt marker: %w", err)
 	}
 	return nil
+}
+
+type Claim struct {
+	PID    int
+	Commit string
+	At     time.Time
+}
+
+func TakeHandoff(attemptPath string, c Claim) (int, error) {
+	raw, err := os.ReadFile(attemptPath)
+	if err != nil {
+		return 0, nil
+	}
+	var rec attempt
+	if json.Unmarshal(raw, &rec) != nil || !rec.handsOffTo(c) {
+		return 0, nil
+	}
+	buf, _ := json.Marshal(attempt{RunningCommit: rec.RunningCommit, Batch: rec.Batch, Timestamp: rec.Timestamp})
+	if err := os.WriteFile(attemptPath, buf, 0o644); err != nil {
+		return 0, fmt.Errorf("consume the boundary re-exec handoff: %w", err)
+	}
+	return rec.WavesDone, nil
+}
+
+func (a attempt) handsOffTo(c Claim) bool {
+	armed, err := time.Parse(time.RFC3339, a.Timestamp)
+	return err == nil && a.PID != 0 && a.PID == c.PID && a.RunningCommit != c.Commit && c.At.Sub(armed) <= handoffMaxAge
 }
 
 // appendLog appends one audit record. Best-effort: a failure here must not
@@ -129,3 +156,5 @@ func LastRefreshLogEntry(logPath string) (*RefreshLogEntry, error) {
 	}
 	return nil, nil
 }
+
+const handoffMaxAge = 5 * time.Minute

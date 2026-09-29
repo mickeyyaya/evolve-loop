@@ -79,7 +79,7 @@ func TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor(t *testing.T) {
 			}
 		}
 	}
-	if len(refs) != 1 || !strings.HasPrefix(refs[0], "cmd_cycle_config.go: ") || !strings.Contains(refs[0], "return append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)") {
+	if len(refs) != 1 || !strings.HasPrefix(refs[0], "cmd_cycle_config.go: ") || !strings.Contains(refs[0], "out := append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)") {
 		t.Fatalf("core.DefaultBuildFloorChecks must be referenced only by the production composition; got %v", refs)
 	}
 }

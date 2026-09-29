@@ -75,6 +75,7 @@ func runFallbackCycle(t *testing.T, cfg fallbackCfg) {
 		// (the fallback) is uninjected and succeeds.
 		fmt.Sprintf("FAKE_CLI_CLAUDE_EXIT=%d", cfg.PrimaryExitCode),
 	)
+	env = append(env, isolatedHome(t)...)
 
 	args := []string{"cycle", "run",
 		"--project-root", projRoot,

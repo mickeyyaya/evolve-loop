@@ -659,6 +659,8 @@
 ./internal/auditledger
 # lanerouting — the one predicate for "no lane can change this path": protected surface OR the build profile's sandbox deny list.
 ./internal/lanerouting
+# repocontract — the one decision on whether ship's repo-contract fixed scanner pack runs for a tree (gate word and evolve-loop's module); consumers: the ship gate and the build floor.
+./internal/repocontract
 # gittest — the one owner of git-backed test fixtures: quiet-maintenance repos, retried teardown that names its holder.
 ./internal/gittest
 # sizeratchet — the one repo-wide 50-line function limit: a go/ast walk against a checked-in offender list that may only shrink.

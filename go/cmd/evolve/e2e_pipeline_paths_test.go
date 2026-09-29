@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -19,7 +20,7 @@ import (
 // .evolve/policy.json with workflow.strict_audit:true into the project root.
 const strictPolicyMarker = "TEST_WRITE_STRICT_POLICY=1"
 
-func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) []ledgerEntry {
+func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) ([]ledgerEntry, error) {
 	t.Helper()
 	projRoot := setupTempProject(t, repoRoot)
 
@@ -35,6 +36,7 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		// gate's own classification is pinned by TestSandboxGate_* in internal/bridge.
 		"EVOLVE_SANDBOX=off",
 	)
+	env = append(env, isolatedHome(t)...)
 	for _, e := range extraEnv {
 		if e == strictPolicyMarker {
 			policyPath := filepath.Join(projRoot, ".evolve", "policy.json")
@@ -59,7 +61,51 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	out, err := runWithTimeout(cmd, 300*time.Second)
 	t.Logf("cycle run (%s) err=%v\n%s", goalHash, err, lastN(out, 1200))
 
-	return readLedger(t, projRoot)
+	return readLedger(t, projRoot), err
+}
+
+func isolatedHome(t *testing.T) []string {
+	t.Helper()
+	keys := []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOENV"}
+	out, err := exec.Command("go", append([]string{"env"}, keys...)...).Output()
+	if err != nil {
+		t.Fatalf("go env: %v", err)
+	}
+	values := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(values) != len(keys) {
+		t.Fatalf("go env %v printed %d line(s): %q", keys, len(values), out)
+	}
+	env := []string{"HOME=" + t.TempDir()}
+	for i, key := range keys {
+		env = append(env, key+"="+values[i])
+	}
+	return env
+}
+
+func TestIsolatedHome_AnEmptyHomeThatKeepsTheParentsGoCaches(t *testing.T) {
+	env := append(os.Environ(), isolatedHome(t)...)
+	run := func(name string, args ...string) string {
+		cmd := exec.Command(name, args...)
+		cmd.Env = env
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("%s %v: %v", name, args, err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	home := run("sh", "-c", "printf %s \"$HOME\"")
+	if home == "" || home == os.Getenv("HOME") {
+		t.Fatalf("a cycle's HOME must be its own, not the host's (%q); got %q", os.Getenv("HOME"), home)
+	}
+	if entries, err := os.ReadDir(home); err != nil || len(entries) != 0 {
+		t.Fatalf("the cycle's HOME starts empty, like CI's; entries=%v err=%v", entries, err)
+	}
+	for _, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
+		parent, _ := exec.Command("go", "env", key).Output()
+		if got := run("go", "env", key); got != strings.TrimSpace(string(parent)) {
+			t.Errorf("%s under the isolated HOME = %q, want the parent's %q, or every go test in the cycle starts cold", key, got, strings.TrimSpace(string(parent)))
+		}
+	}
 }
 
 func lastN(s string, n int) string {
@@ -88,7 +134,7 @@ func mustBuildPipelineBins(t *testing.T) (evolveBin, fakeBin, repoRoot string) {
 
 func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
-	entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2efail",
+	entries, _ := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2efail",
 		"FAKE_CLI_AUDIT_VERDICT=FAIL")
 
 	if !ledgerHasRole(entries, "audit") {
@@ -106,15 +152,18 @@ func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 
 	t.Run("fluent_ships", func(t *testing.T) {
-		entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnfluent",
+		entries, runErr := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnfluent",
 			"FAKE_CLI_AUDIT_VERDICT=WARN")
 		if !ledgerHasRole(entries, "ship") {
 			t.Errorf("audit WARN with no strict policy should proceed to the ship phase (fluent); ledger roles=%v", ledgerRoles(entries))
 		}
+		if runErr != nil {
+			t.Errorf("a fluent WARN cycle ships, so the cycle run succeeds; reaching the ship phase and failing there is not a ship: %v", runErr)
+		}
 	})
 
 	t.Run("strict_blocks", func(t *testing.T) {
-		entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnstrict",
+		entries, _ := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnstrict",
 			"FAKE_CLI_AUDIT_VERDICT=WARN", strictPolicyMarker)
 		if ledgerHasRole(entries, "ship") {
 			t.Errorf("audit WARN with workflow.strict_audit must be promoted to FAIL and NOT reach the ship phase; ledger roles=%v", ledgerRoles(entries))
@@ -127,7 +176,7 @@ func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 
 func TestE2EPipeline_IntentPhase_RunsAndShips(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
-	entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2eintent",
+	entries, runErr := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2eintent",
 		"EVOLVE_REQUIRE_INTENT=1")
 
 	if !ledgerHasRole(entries, "intent") {
@@ -135,5 +184,8 @@ func TestE2EPipeline_IntentPhase_RunsAndShips(t *testing.T) {
 	}
 	if !ledgerHasRole(entries, "ship") {
 		t.Errorf("intent-gated happy-path cycle should reach the ship phase; ledger roles=%v", ledgerRoles(entries))
+	}
+	if runErr != nil {
+		t.Errorf("a happy-path cycle ships, so the cycle run succeeds; reaching the ship phase and failing there is not a ship: %v", runErr)
 	}
 }
