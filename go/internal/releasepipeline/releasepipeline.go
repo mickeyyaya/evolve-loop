@@ -17,7 +17,9 @@
 //  6. marketplace-poll                         [Go: marketplacepoll.Run]
 //     on failure → auto-rollback               [Go: rollback.Run]
 //
-// Journal: .evolve/release-journal/<version>-<ts>.json — one file per attempt.
+// Journal: .evolve/release-journal/<version>-<ts>.json — one file per attempt;
+// a dry run leaves the repo untouched and overwrites one
+// <tmp>/release-pipeline-dryrun-<version>.json per version.
 // rollback.Run reads it to know what to undo.
 //
 // Exit codes (cmd layer maps from sentinel errors):
@@ -257,24 +259,28 @@ func initJournal(opts Options, fromTag string, startedAt time.Time) (*Journal, s
 		StartedAt: startedAt.UTC().Format(time.RFC3339),
 		Steps:     []StepRecord{},
 	}
-	var path string
-	if opts.DryRun {
-		path = filepath.Join(os.TempDir(), fmt.Sprintf("release-pipeline-dryrun-%d.json", os.Getpid()))
-	} else {
-		dir := opts.JournalDir
-		if dir == "" {
-			dir = filepath.Join(opts.RepoRoot, ".evolve", "release-journal")
-		}
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return j, "", err
-		}
-		ts := startedAt.UTC().Format("20060102T150405Z")
-		path = filepath.Join(dir, fmt.Sprintf("%s-%s.json", opts.Target, ts))
+	path := journalPath(opts, startedAt)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return j, "", err
 	}
 	if err := writeJournal(j, path); err != nil {
 		return j, path, err
 	}
 	return j, path, nil
+}
+
+func journalPath(opts Options, startedAt time.Time) string {
+	dir := opts.JournalDir
+	if opts.DryRun {
+		if dir == "" {
+			dir = os.TempDir()
+		}
+		return filepath.Join(dir, fmt.Sprintf("release-pipeline-dryrun-%s.json", opts.Target))
+	}
+	if dir == "" {
+		dir = filepath.Join(opts.RepoRoot, ".evolve", "release-journal")
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s-%s.json", opts.Target, startedAt.UTC().Format("20060102T150405Z")))
 }
 
 func writeJournal(j *Journal, path string) error {

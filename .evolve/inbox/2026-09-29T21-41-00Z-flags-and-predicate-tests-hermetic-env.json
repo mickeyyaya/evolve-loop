@@ -1,0 +1,19 @@
+{
+  "id": "flags-and-predicate-tests-hermetic-env",
+  "kind": "bug",
+  "priority_class": "stability",
+  "weight": 0.55,
+  "title": "TestFlags* and TestPredicateEnv_AllBranches go red whenever a lane's EVOLVE_WORKTREE_ROOT reaches the test run",
+  "files": [
+    "go/cmd/evolve/cmd_flags_test.go",
+    "go/internal/acssuite/acssuite_adversarial_test.go"
+  ],
+  "summary": "C6 scrubbed the carry's composed gates, but any lane phase that runs go test (TDD, build self-checks) still inherits the lane's EVOLVE_WORKTREE_ROOT: TestFlagsGenerateThenCheck_RoundTrip / TestFlagsCheck_DriftExitsTwo resolve their root through sourceRoot(), which prefers it (so generate can write docs/architecture/control-flags.md into the lane worktree), and TestPredicateEnv_AllBranches builds its env from os.Environ(). Reproduced deterministically with EVOLVE_WORKTREE_ROOT set.",
+  "fix": "Make the tests hermetic: seedFlagsProject sets EVOLVE_WORKTREE_ROOT to empty (t.Setenv) and the predicateEnv test clears it before asserting.",
+  "acceptance": [
+    "EVOLVE_WORKTREE_ROOT=/elsewhere go test -run 'TestFlags|TestPredicateEnv_AllBranches' passes",
+    "generate never writes outside the test's temp root"
+  ],
+  "created_at": "2026-09-29T21:41:00Z",
+  "source": "console, 2026-09-29, C6 reproduction + architecture review (M4)"
+}

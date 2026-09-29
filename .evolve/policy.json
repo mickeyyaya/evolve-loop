@@ -20,7 +20,7 @@
   "cli_health": {
     "proactive_probe": true
   },
-  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout, parallel-evaluate rollout, per-phase CLI/model pins).",
+  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout, parallel-evaluate rollout, per-phase CLI/model pins, gc retention horizons).",
   "disposition": {
     "stage": "enforce"
   },
@@ -39,6 +39,16 @@
       "enforced_since_cycle": 2
     }
   ],
+  "gc": {
+    "go_cache_ttl_hours": 24,
+    "runs": {
+      "delete_after_days": 14
+    },
+    "temp_ttl_hours": 24,
+    "worktrees": {
+      "salvage_after_hours": 24
+    }
+  },
   "parallel_evaluate": {
     "stage": "shadow",
     "concurrency": 3

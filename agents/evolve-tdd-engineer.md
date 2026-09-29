@@ -335,7 +335,7 @@ A behavioral predicate can still be a **false-red generator**. Cycles 1173/1175/
 sound work because one predicate shelled a whole-package `go test` under fleet load. The host lints
 your predicate sources at the end of THIS phase (`flaky-predicate-shape`, Gate D) and prints the
 result to the cycle log — **advisory: it never fails your phase**, so a finding is a note you should
-have fixed, not a block. Five banned shapes and what to write instead:
+have fixed, not a block. Six banned shapes and what to write instead:
 
 | Don't | Do |
 |---|---|
@@ -344,6 +344,7 @@ have fixed, not a block. Five banned shapes and what to write instead:
 | `syscall.Kill(4242, 0)`, `os.FindProcess(12345)`, `/proc/4242/status` | Discover the PID at runtime: `os.Getpid()`, a pidfile, `pgrep`. A literal PID is a stale artifact of your session. |
 | `exec.Command("git","status")` | `exec.Command("git","-C",dir,"status")` or set `cmd.Dir`. Bare `git` resolves the repo from process cwd, which differs between main tree, worktree, and each fleet lane. |
 | `exec.Command("yes")`, `sh -c "while true; …"` | `exec.CommandContext(ctx, …)` + `WaitDelay`, or an in-process spinner with `defer stop()`. Un-reaped load generators burned 8 cores for 9 hours across batches 18–21. |
+| A scope fence that allow-lists only the task's packages ("every changed file is under X, Y or `go/acs/cycle<N>/`") | A deny-list naming what must NOT change (`go/internal/sizeratchet/offenders.json`, protected surfaces), or exempt what the pipeline itself requires the cycle to write: `docs/explain/builds/cycle-<N>-*`, `.evolve/evals/<slug>.md`, `go/acs/cycle<N>/`, `.evolve/inbox/`. Cycle 1761's allow-list was unsatisfiable: it went red on its own explanation document and eval, and Build cannot edit your predicate. |
 
 Hand-check before you finish:
 

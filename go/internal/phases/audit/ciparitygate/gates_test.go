@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -34,7 +35,7 @@ func TestCodes_TenRegisteredUnderModuleAuditWithDocs(t *testing.T) {
 	if DefaultTimeouts() != want {
 		t.Errorf("DefaultTimeouts() = %+v, want %+v", DefaultTimeouts(), want)
 	}
-	if got := strings.Join(tierEnvAllowlist, " "); got != golden(t, "argv.golden.txt")["tier.env_allowlist"] {
+	if got := strings.Join(ciparity.CIEnvAllowlist, " "); got != golden(t, "argv.golden.txt")["tier.env_allowlist"] {
 		t.Errorf("allowlist drifted: %q", got)
 	}
 }
