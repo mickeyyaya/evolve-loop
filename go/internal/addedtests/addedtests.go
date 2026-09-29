@@ -83,26 +83,7 @@ func BuildTags(path string) (tags []string, runnable bool, err error) {
 	if err != nil || match {
 		return nil, match, err
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, false, err
-	}
-	defer func() { _ = f.Close() }()
-	var expr constraint.Expr
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if constraint.IsGoBuild(line) {
-			expr, err = constraint.Parse(line)
-			break
-		}
-		if line != "" && !strings.HasPrefix(line, "//") {
-			break
-		}
-	}
-	if scanErr := sc.Err(); scanErr != nil {
-		return nil, false, scanErr
-	}
+	expr, err := goBuildExpr(path)
 	if err != nil || expr == nil {
 		return nil, false, err
 	}
@@ -132,6 +113,30 @@ func BuildTags(path string) (tags []string, runnable bool, err error) {
 		}
 	}
 	return nil, false, nil
+}
+
+func goBuildExpr(path string) (constraint.Expr, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	var expr constraint.Expr
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if constraint.IsGoBuild(line) {
+			expr, err = constraint.Parse(line)
+			break
+		}
+		if line != "" && !strings.HasPrefix(line, "//") {
+			break
+		}
+	}
+	if scanErr := sc.Err(); scanErr != nil {
+		return nil, scanErr
+	}
+	return expr, err
 }
 
 func collectTags(expr constraint.Expr, tags map[string]bool) {

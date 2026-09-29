@@ -83,29 +83,30 @@ func Aggregate(records []Record) []Performance {
 		acc.finish()
 		out = append(out, acc.row)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.CLI != b.CLI {
-			return a.CLI < b.CLI
-		}
-		if a.Model != b.Model {
-			return a.Model < b.Model
-		}
-		if a.RequestedModel != b.RequestedModel {
-			return a.RequestedModel < b.RequestedModel
-		}
-		if a.DispatchSource != b.DispatchSource {
-			return a.DispatchSource < b.DispatchSource
-		}
-		if a.MeasurementSource != b.MeasurementSource {
-			return a.MeasurementSource < b.MeasurementSource
-		}
-		if a.TimingScope != b.TimingScope {
-			return a.TimingScope < b.TimingScope
-		}
-		return a.Outcome < b.Outcome
-	})
+	sort.Slice(out, func(i, j int) bool { return lessPerformance(out[i], out[j]) })
 	return out
+}
+
+func lessPerformance(a, b Performance) bool {
+	if a.CLI != b.CLI {
+		return a.CLI < b.CLI
+	}
+	if a.Model != b.Model {
+		return a.Model < b.Model
+	}
+	if a.RequestedModel != b.RequestedModel {
+		return a.RequestedModel < b.RequestedModel
+	}
+	if a.DispatchSource != b.DispatchSource {
+		return a.DispatchSource < b.DispatchSource
+	}
+	if a.MeasurementSource != b.MeasurementSource {
+		return a.MeasurementSource < b.MeasurementSource
+	}
+	if a.TimingScope != b.TimingScope {
+		return a.TimingScope < b.TimingScope
+	}
+	return a.Outcome < b.Outcome
 }
 
 func (a *performanceAccumulator) add(rec Record) {

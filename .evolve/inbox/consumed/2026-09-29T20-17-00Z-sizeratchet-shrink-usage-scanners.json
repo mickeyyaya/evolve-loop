@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Behavior is unchanged: the packages' existing tests pass unmodified; a function without a test that pins its behavior gets a characterization test first, red on a mutant.",
+    "No comments are added (docs/conventions/code-comments.md); names carry the intent.",
+    "The shrunk functions measure 50 lines or fewer (sizeratchet.Walk); offenders.json is left unchanged and the module-wide ratchet stays green"
+  ],
+  "consumed": {
+    "at": "2026-09-29T23:55:05Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-09-29T20:17:00Z",
+  "files": [
+    "go/internal/tokenusage",
+    "go/internal/llmcalls",
+    "go/internal/changedpkgs",
+    "go/internal/addedtests"
+  ],
+  "id": "sizeratchet-shrink-usage-scanners",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "priority_rationale": "wave 40 boundary 2026-09-29: waves 39-40 exhausted lane supply (168 of 169 items console-owned; 1758 was planned no-work); real clean-code debt on non-protected leaf packages, lane-sized and behavior-preserving",
+  "source": "size ratchet live measurement at the wave-40 boundary (sizeratchet.Walk rules, main 6cc69ccc)",
+  "summary": "The repo-wide size ratchet (go/internal/sizeratchet) lists every function over 50 lines with an allowance that may only shrink. Measured on main 6cc69ccc (2026-09-29), these are the live offenders in go/internal/tokenusage, go/internal/llmcalls, go/internal/changedpkgs, go/internal/addedtests: internal/tokenusage.ScanConfigRoot (60 lines, go/internal/tokenusage/scanner.go); internal/llmcalls.Aggregate (53 lines, go/internal/llmcalls/aggregate.go); internal/changedpkgs.DirectImporters (79 lines, go/internal/changedpkgs/direct_importers.go); internal/addedtests.BuildTags (56 lines, go/internal/addedtests/addedtests.go). Each should do one thing at one level of abstraction (Clean Code, skills/engineering-craft/references/clean-code.md): extract named steps until every function is 50 lines or fewer, with behavior unchanged. An allowance is a ceiling (since 2026-09-28): this lane shrinks the functions and leaves their offenders.json entries as slack for the boundary tighten; it does not edit offenders.json.",
+  "title": "Shrink the 4 functions in go/internal/tokenusage, go/internal/llmcalls, go/internal/changedpkgs, go/internal/addedtests over the 50-line limit",
+  "weight": 0.55
+}

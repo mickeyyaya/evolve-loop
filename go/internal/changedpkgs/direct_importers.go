@@ -1,6 +1,7 @@
 package changedpkgs
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -33,7 +34,19 @@ func DirectImporters(repoRoot string, pkgPatterns []string) []string {
 	if len(targets) == 0 {
 		return nil
 	}
+	importers := importersOf(moduleDir, targets, inputs)
+	if len(importers) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(importers))
+	for rel := range importers {
+		out = append(out, "./"+rel)
+	}
+	sort.Strings(out)
+	return out
+}
 
+func importersOf(moduleDir string, targets map[string]string, inputs map[string]struct{}) map[string]struct{} {
 	fset := token.NewFileSet()
 	importers := map[string]struct{}{}
 	// An unreadable subtree or unparseable file contributes no importers; the corpus fails open.
@@ -64,31 +77,29 @@ func DirectImporters(repoRoot string, pkgPatterns []string) []string {
 		if _, isInput := inputs[rel]; isInput {
 			return nil
 		}
-		for _, spec := range file.Imports {
-			if spec == nil || spec.Path == nil {
-				continue
-			}
-			// Exact match, never prefix: ".../internal/foobar" is a different package.
-			path, uerr := strconv.Unquote(spec.Path.Value)
-			if uerr != nil {
-				continue
-			}
-			if _, hit := targets[path]; hit {
-				importers[rel] = struct{}{}
-				break
-			}
+		if importsTarget(file, targets) {
+			importers[rel] = struct{}{}
 		}
 		return nil
 	})
-	if len(importers) == 0 {
-		return nil
+	return importers
+}
+
+func importsTarget(file *ast.File, targets map[string]string) bool {
+	for _, spec := range file.Imports {
+		if spec == nil || spec.Path == nil {
+			continue
+		}
+		// Exact match, never prefix: ".../internal/foobar" is a different package.
+		path, uerr := strconv.Unquote(spec.Path.Value)
+		if uerr != nil {
+			continue
+		}
+		if _, hit := targets[path]; hit {
+			return true
+		}
 	}
-	out := make([]string, 0, len(importers))
-	for rel := range importers {
-		out = append(out, "./"+rel)
-	}
-	sort.Strings(out)
-	return out
+	return false
 }
 
 // modulePathOf reads the module path from moduleDir/go.mod; false when there is no readable module.

@@ -95,21 +95,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 			return nil
 		}
 		matched = true
-		for _, ln := range lines {
-			if ln.Type != "assistant" || ln.Message.Usage == nil || ln.Message.ID == "" {
-				continue
-			}
-			if !withinWindow(ln.Timestamp, w) {
-				continue
-			}
-			u := ln.Message.Usage
-			perMsg[ln.Message.ID] = cyclestate.TokenUsage{
-				Input:      u.Input,
-				Output:     u.Output,
-				CacheRead:  u.CacheRead,
-				CacheWrite: u.CacheWrite,
-			}
-		}
+		recordAssistantUsage(perMsg, lines, w)
 		return nil
 	})
 	if err != nil {
@@ -135,6 +121,24 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 		}
 	}
 	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage}, nil
+}
+
+func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []transcriptLine, w Window) {
+	for _, ln := range lines {
+		if ln.Type != "assistant" || ln.Message.Usage == nil || ln.Message.ID == "" {
+			continue
+		}
+		if !withinWindow(ln.Timestamp, w) {
+			continue
+		}
+		u := ln.Message.Usage
+		perMsg[ln.Message.ID] = cyclestate.TokenUsage{
+			Input:      u.Input,
+			Output:     u.Output,
+			CacheRead:  u.CacheRead,
+			CacheWrite: u.CacheWrite,
+		}
+	}
 }
 
 // readLines skips unparseable lines and returns nil for a file it cannot open.
