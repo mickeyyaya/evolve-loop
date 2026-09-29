@@ -172,6 +172,7 @@ func gcRunDirs(evolveDir string, pol gc.Policy, dryRun bool, stdout, stderr io.W
 	}
 	if err := gc.Apply(evolveDir, m); err != nil {
 		fmt.Fprintf(stderr, "evolve gc: run-dir retention partial: %v\n", err)
+		return true
 	}
 	return false
 }

@@ -57,3 +57,22 @@ func TestRunGC_AppliesTheRunDirRetentionLadder(t *testing.T) {
 		}
 	}
 }
+
+func TestRunGC_ARunDirRetentionCannotDeleteFailsTheRun(t *testing.T) {
+	projectRoot, _, _ := gcWorktreeEnv(t, "")
+	gcFakeGoCache(t)
+	gcAgedRunDirs(t, projectRoot, 12)
+	gcWritePolicy(t, projectRoot, `{"runs":{"delete_after_days":14}}`)
+	runs := filepath.Join(projectRoot, ".evolve", "runs")
+	if err := os.Chmod(runs, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(runs, 0o755) })
+
+	var stdout, stderr bytes.Buffer
+	rc := runGC([]string{"--project-root", projectRoot}, nil, &stdout, &stderr)
+
+	if rc != 1 || !strings.Contains(stderr.String(), "run-dir retention partial") {
+		t.Errorf("rc=%d stderr=%q: a deletion the retention step could not perform must fail the run", rc, stderr.String())
+	}
+}

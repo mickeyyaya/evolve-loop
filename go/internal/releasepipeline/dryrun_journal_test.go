@@ -11,6 +11,7 @@ import (
 func TestRun_ADryRunReusesOneTempJournalPerVersionInsteadOfOnePerProcess(t *testing.T) {
 	perProcess := filepath.Join(os.TempDir(), fmt.Sprintf("release-pipeline-dryrun-%d.json", os.Getpid()))
 	_ = os.Remove(perProcess)
+	t.Cleanup(func() { _ = os.Remove(filepath.Join(os.TempDir(), "release-pipeline-dryrun-1.2.3.json")) })
 
 	res, err := Run(Options{
 		Target:      "1.2.3",

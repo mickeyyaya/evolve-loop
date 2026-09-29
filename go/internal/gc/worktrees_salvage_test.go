@@ -125,6 +125,9 @@ func TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch(t *testing
 	repo.Git("-C", wt, "commit", "-q", "-am", "lane work")
 	writeFile(t, filepath.Join(wt, "f.txt"), "base\nlane edit\nuncommitted edit\n")
 	writeFile(t, filepath.Join(wt, "sub", "new.txt"), "untracked\n")
+	if err := os.Symlink("new.txt", filepath.Join(wt, "sub", "link")); err != nil {
+		t.Fatal(err)
+	}
 	tip := repo.Git("rev-parse", "cycle-cd3ae73e-1677")
 	now := time.Now()
 	closeOutCycle(t, repo.Dir, 1677, now.Add(-30*time.Hour))
@@ -160,6 +163,35 @@ func TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch(t *testing
 	}
 	if got := untarFile(t, filepath.Join(salvage, "untracked.tgz"), "sub/new.txt"); got != "untracked\n" {
 		t.Errorf("untracked archive holds sub/new.txt = %q", got)
+	}
+	if got := untarLink(t, filepath.Join(salvage, "untracked.tgz"), "sub/link"); got != "new.txt" {
+		t.Errorf("untracked symlink archived with target %q, want the link itself (new.txt), never its dereferenced content", got)
+	}
+}
+
+func untarLink(t *testing.T, archive, name string) string {
+	t.Helper()
+	f, err := os.Open(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			return ""
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if hdr.Name == name && hdr.Typeflag == tar.TypeSymlink {
+			return hdr.Linkname
+		}
 	}
 }
 
