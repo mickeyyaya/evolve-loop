@@ -129,70 +129,65 @@ func binaryRow(missing []string) cliVerify {
 	}
 }
 
+func installClaudeDep(srcDir, home string) error {
+	res, err := installer.Install(srcDir, home, io.Discard)
+	if err != nil {
+		return fmt.Errorf("claude install: %w", err)
+	}
+	if res.Agents == 0 || res.Skills == 0 {
+		return fmt.Errorf("empty install (agents=%d skills=%d)", res.Agents, res.Skills)
+	}
+	return nil
+}
+
+func projectTargetDryRunDep(srcDir, target string) error {
+	rc := runSkillsPublish(srcDir, publishConfig{
+		Targets: []string{target},
+		DryRun:  true,
+	}, io.Discard, io.Discard)
+	if rc != 0 {
+		return fmt.Errorf("projection failed (rc=%d)", rc)
+	}
+	return nil
+}
+
+func assertGeminiPayloadPresentDep(srcDir string) error {
+	payloadPaths := []string{"skills", filepath.Join(".claude-plugin", "plugin.json")}
+	for _, rel := range payloadPaths {
+		if _, err := os.Stat(filepath.Join(srcDir, rel)); err != nil {
+			return fmt.Errorf("payload missing %s: %w", rel, err)
+		}
+	}
+	return nil
+}
+
+func binaryAnswersSubcommandDep(binPath, sub string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binPath, sub, "--help")
+	var stderr bytes.Buffer
+	cmd.Stdout = io.Discard
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return fmt.Errorf("run %q %s: %w", binPath, sub, err)
+		}
+	}
+	if strings.Contains(stderr.String(), fmt.Sprintf("unknown command %q", sub)) {
+		return fmt.Errorf("binary does not recognize subcommand %q", sub)
+	}
+	return nil
+}
+
 // defaultMatrixDeps wires the real install/projection/exec effects used by the
 // release flow.
 func defaultMatrixDeps() matrixDeps {
 	return matrixDeps{
-		installClaude: func(srcDir, home string) error {
-			res, err := installer.Install(srcDir, home, io.Discard)
-			if err != nil {
-				return fmt.Errorf("claude install: %w", err)
-			}
-			if res.Agents == 0 || res.Skills == 0 {
-				return fmt.Errorf("empty install (agents=%d skills=%d)", res.Agents, res.Skills)
-			}
-			return nil
-		},
-		projectTarget: func(srcDir, target string) error {
-			// DryRun renders the projection without shelling out to codex/agy,
-			// so this stays deterministic and side-effect-free.
-			rc := runSkillsPublish(srcDir, publishConfig{
-				Targets: []string{target},
-				DryRun:  true,
-			}, io.Discard, io.Discard)
-			if rc != 0 {
-				return fmt.Errorf("projection failed (rc=%d)", rc)
-			}
-			return nil
-		},
-		geminiLayout: func(srcDir string) error {
-			// Gemini discovers skills in-repo; assert the canonical payload
-			// sources exist.
-			payloadPaths := []string{"skills", filepath.Join(".claude-plugin", "plugin.json")}
-			for _, rel := range payloadPaths {
-				if _, err := os.Stat(filepath.Join(srcDir, rel)); err != nil {
-					return fmt.Errorf("payload missing %s: %w", rel, err)
-				}
-			}
-			return nil
-		},
-		binAnswers: func(binPath, sub string) error {
-			// Signal is the dispatcher's `unknown command "<name>"` stderr
-			// message (main.go), NOT the exit code: a registered command is
-			// dispatched to its handler, which may reject --help with its own
-			// non-zero exit (10/1/…) yet is still wired. --help is the safest
-			// probe arg (flag-parsing handlers reject it before doing real
-			// work); the timeout guards a handler that hangs on startup.
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, binPath, sub, "--help")
-			var stderr bytes.Buffer
-			cmd.Stdout = io.Discard
-			cmd.Stderr = &stderr
-			// A start failure (binary missing/not executable) means the smoke
-			// never ran — fail loudly rather than silently passing. Exit-code
-			// errors from a dispatched handler are *exec.ExitError and expected.
-			if err := cmd.Run(); err != nil {
-				var exitErr *exec.ExitError
-				if !errors.As(err, &exitErr) {
-					return fmt.Errorf("run %q %s: %w", binPath, sub, err)
-				}
-			}
-			if strings.Contains(stderr.String(), fmt.Sprintf("unknown command %q", sub)) {
-				return fmt.Errorf("binary does not recognize subcommand %q", sub)
-			}
-			return nil
-		},
+		installClaude: installClaudeDep,
+		projectTarget: projectTargetDryRunDep,
+		geminiLayout:  assertGeminiPayloadPresentDep,
+		binAnswers:    binaryAnswersSubcommandDep,
 	}
 }
 

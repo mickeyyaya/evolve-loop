@@ -386,33 +386,32 @@ type quotaPause struct {
 // Returns (zero, false) on any failure path (missing file, malformed
 // JSON, wrong reason, or checkpoint disabled) — quota-pause is an
 // opt-in signal, not an error condition.
-func detectQuotaPause(evolveDir string) (quotaPause, bool) {
-	path := core.ResolveCycleStatePath(evolveDir) // fleet per-run override when set
+func loadActiveQuotaLikelyCheckpoint(evolveDir string) (blob, checkpoint map[string]any, ok bool) {
+	path := core.ResolveCycleStatePath(evolveDir)
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return quotaPause{}, false
+		return nil, nil, false
 	}
-	var blob map[string]any
 	if err := json.Unmarshal(raw, &blob); err != nil {
-		return quotaPause{}, false
+		return nil, nil, false
 	}
 	cp, ok := blob["checkpoint"].(map[string]any)
 	if !ok {
-		return quotaPause{}, false
+		return nil, nil, false
 	}
 	enabled, _ := cp["enabled"].(bool)
 	if !enabled {
-		return quotaPause{}, false
+		return nil, nil, false
 	}
 	reason, _ := cp["reason"].(string)
 	if reason != "quota-likely" {
-		return quotaPause{}, false
+		return nil, nil, false
 	}
-	qp := quotaPause{
-		MaxAttempts: 3, // default when autoResumeMaxAttempts is absent
-	}
-	// cycle_id has float64 dynamic type from JSON. Fall back to
-	// blob["cycle"] (top-level) if cycle_id absent.
+	return blob, cp, true
+}
+
+func quotaPauseFromCheckpoint(blob, cp map[string]any) quotaPause {
+	qp := quotaPause{MaxAttempts: 3}
 	if v, ok := blob["cycle_id"].(float64); ok {
 		qp.Cycle = int(v)
 	} else if v, ok := blob["cycle"].(float64); ok {
@@ -421,10 +420,6 @@ func detectQuotaPause(evolveDir string) (quotaPause, bool) {
 	if v, ok := cp["quotaResetAt"].(string); ok {
 		qp.WakeAt = v
 	}
-	// An ABSENT and an explicitly-EMPTY source both read as "unknown": the
-	// checkpointer now always stamps a real source (internal/checkpoint
-	// withQuotaReset), but a legacy pre-fix block carries "" and printing
-	// `source=` would leave an operator unable to tell missing from meaningless.
 	if v, ok := cp["quotaResetSource"].(string); ok && v != "" {
 		qp.Source = v
 	} else {
@@ -436,7 +431,15 @@ func detectQuotaPause(evolveDir string) (quotaPause, bool) {
 	if v, ok := cp["autoResumeMaxAttempts"].(float64); ok {
 		qp.MaxAttempts = int(v)
 	}
-	return qp, true
+	return qp
+}
+
+func detectQuotaPause(evolveDir string) (quotaPause, bool) {
+	blob, cp, ok := loadActiveQuotaLikelyCheckpoint(evolveDir)
+	if !ok {
+		return quotaPause{}, false
+	}
+	return quotaPauseFromCheckpoint(blob, cp), true
 }
 
 // dirExists is a tiny helper for the best-effort emit path. Returns
