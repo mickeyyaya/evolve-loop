@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the TDD persona bans the allow-list scope fence that cycle 1761 could never satisfy (2026-09-29)
+
+- Wave 42's lane 1761 (`sizeratchet-shrink-eval-validators`) sealed FAIL after two build-floor correction rounds. Its TDD predicate `TestC1761_009_OnlyTargetPackagesTouched` allow-listed only the three target packages and `go/acs/cycle1761/`, so it went red on files the pipeline itself requires the cycle to write: the Build's explanation document (`docs/explain/builds/cycle-1761-*`) and TDD's own eval (`.evolve/evals/<slug>.md`). Build cannot edit a TDD predicate, so the corrections could not converge (the retro's root cause, confirmed from the lessons digest). Cycle 1760's fence, a deny-list, passed.
+- `agents/evolve-tdd-engineer.md` Predicate Reliability (kept in compact mode) gains a sixth banned shape: a scope fence that allow-lists only the task's packages. Instead, name what must not change (a deny-list: `go/internal/sizeratchet/offenders.json`, protected surfaces), or exempt the cycle's required artifacts: `docs/explain/builds/cycle-<N>-*`, `.evolve/evals/<slug>.md`, `go/acs/cycle<N>/`, `.evolve/inbox/`.
+- Filed: `build-floor-routes-tdd-predicate-defects-to-tdd`. The build-floor correction re-dispatched Build twice for a defect only TDD can fix; a byte-identical, TDD-owned predicate failure should route to TDD, or to the operator.
+
 ## Fixed — the host records how triage ended the cycle at the C1 chokepoint: a claim-failed lane charges its pins, a planned no-work end is NO_WORK (R1c, 2026-09-29)
 
 - Two host terminations escaped ADR-0044's C1 invariant (every terminal path records a ship PASS, a salvage or an abort reason). The claim-failed FAIL and the planned no-work end both left triage's own PASS as the last entry of `phase-timing.json`. Cycle 1757's claim-failed lane therefore classified `integrity-breach` (replayed from its workspace): `FailureInputsFor` marked it system-level, the drain released the item and bumped nothing, and the FAIL closeout's committed set was the empty `top_n` anyway. A 2026-08-10 review had read an empty `top_n` as "declined", before F30 made a decline an answer. Cycle 1758, wave 40's planned no-work sequential cycle, paged `FAILED_UNEXPLAINED` and self-filed a HIGH inbox defect (weight 0.8) that the next wave's lanes would have drawn.
