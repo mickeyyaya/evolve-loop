@@ -61,7 +61,8 @@ import (
 
 // repoContractPackages are the repo-wide guard suites whose breakage turned
 // main red. Kept to the incident-proven set deliberately: every addition
-// costs every ship wall-time and must carry the same FP≈0 property. The raw
+// costs wall-time at every ship, every build handoff and every `evolve
+// selfcheck build`, and must carry the same FP≈0 property. The raw
 // git fixture ratchet is a source scan of the tracked test files (one git
 // ls-files, about a second) and is here because a lane adding a raw fixture
 // changes neither its package nor an importer, so no other backstop would run
@@ -134,8 +135,12 @@ func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Write
 }
 
 func RunRepoContractPack(ctx context.Context, root string) (reds []string, err error) {
-	o := repoContractTestFn(ctx, filepath.Join(root, "go"), io.Discard)
+	o := repoContractTestFn(ctx, repoContractModuleDir(root), io.Discard)
 	return o.failedNames(), o.err
+}
+
+func repoContractModuleDir(root string) string {
+	return filepath.Join(root, "go")
 }
 
 func repoContractSuiteNames() []string {
@@ -383,7 +388,7 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 			return nil
 		}
 	}
-	moduleDir := filepath.Join(root, "go")
+	moduleDir := repoContractModuleDir(root)
 	out := stderr
 	if scan := openScanLog(workspace, stderr); scan != nil {
 		// Close error deliberately dropped: the scan log is best-effort
