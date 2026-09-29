@@ -16,16 +16,25 @@ import (
 // byte budget (maxFindingsBytes) still applies after.
 const maxBriefFindings = 8
 
+const (
+	findingsLead          = "fix THESE"
+	findingsLeadAfterGate = "fix THESE; the gate reasons above are their symptoms"
+)
+
 // composeRepairBrief renders the repair brief for a cycle in an audit-repair
 // round: gate reasons (absent a gate record, the audit's failure-block defects),
 // then the rejecting round's auditor findings. Empty when there is nothing to tell.
 func composeRepairBrief(cs CycleState) string {
 	findings := actionableAuditFindings(cs.WorkspacePath)
+	lead := findingsLead
+	if len(cs.AuditFailReasons) > 0 {
+		lead = findingsLeadAfterGate
+	}
 	var parts []string
-	if reasons := auditRejectionReasons(cs, findings[:min(len(findings), maxBriefFindings)]); reasons != "" {
+	if reasons := auditRejectionReasons(cs, briefedFindings(findings)); reasons != "" {
 		parts = append(parts, reasons)
 	}
-	if brief := renderAuditorFindings(cs.WorkspacePath, cs.AuditDispatches, findings); brief != "" {
+	if brief := renderAuditorFindings(cs.WorkspacePath, cs.AuditDispatches, findings, lead); brief != "" {
 		parts = append(parts, brief)
 	}
 	if len(parts) == 0 {
@@ -81,7 +90,7 @@ func alphanumericKey(s string) string {
 // builder must act on. round is the audit dispatch count (the live report's
 // round number); the previous archive is round-1.
 func auditorFindingsBrief(workspace string, round int) string {
-	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace))
+	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace), findingsLead)
 }
 
 func actionableAuditFindings(workspace string) []reportdoc.Finding {
@@ -99,7 +108,11 @@ func actionableAuditFindings(workspace string) []reportdoc.Finding {
 	return actionable(reportdoc.Findings(string(current)))
 }
 
-func renderAuditorFindings(workspace string, round int, findings []reportdoc.Finding) string {
+func briefedFindings(findings []reportdoc.Finding) []reportdoc.Finding {
+	return findings[:min(len(findings), maxBriefFindings)]
+}
+
+func renderAuditorFindings(workspace string, round int, findings []reportdoc.Finding, lead string) string {
 	if len(findings) == 0 {
 		return ""
 	}
@@ -112,13 +125,10 @@ func renderAuditorFindings(workspace string, round int, findings []reportdoc.Fin
 			}
 		}
 	}
+	shown := briefedFindings(findings)
 	var b strings.Builder
-	fmt.Fprintf(&b, "auditor findings (audit round %d — fix THESE; the gate reasons above are their symptoms):\n", round)
-	for i, f := range findings {
-		if i >= maxBriefFindings {
-			fmt.Fprintf(&b, "- … %d more finding(s) in %s\n", len(findings)-i, reportName)
-			break
-		}
+	fmt.Fprintf(&b, "auditor findings (audit round %d — %s):\n", round, lead)
+	for _, f := range shown {
 		label := f.Severity
 		if f.ID != "" {
 			label = f.ID + " (" + f.Severity + ")"
@@ -128,6 +138,9 @@ func renderAuditorFindings(workspace string, round int, findings []reportdoc.Fin
 			b.WriteString("  [PERSISTED from the previous round — your last repair did not address this]")
 		}
 		b.WriteByte('\n')
+	}
+	if more := len(findings) - len(shown); more > 0 {
+		fmt.Fprintf(&b, "- … %d more finding(s) in %s\n", more, reportName)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

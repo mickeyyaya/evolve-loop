@@ -155,6 +155,9 @@ func TestComposeRepairBrief_TheDedupeCoversExactlyTheBriefedFindings(t *testing.
 	if !strings.Contains(brief, beyond) {
 		t.Errorf("finding %d is past the brief's %d, so the defect restating it must stay:\n%s", maxBriefFindings+1, maxBriefFindings, brief)
 	}
+	if !strings.Contains(brief, "- … 1 more finding(s) in audit-report.md") || strings.Contains(brief, fmt.Sprintf("H%d (HIGH)", maxBriefFindings+1)) {
+		t.Errorf("the brief lists %d findings and counts the rest:\n%s", maxBriefFindings, brief)
+	}
 }
 
 func TestComposeRepairBrief_AFailureBlockEveryDefectOfWhichIsBriefedAddsNoSection(t *testing.T) {
@@ -190,5 +193,20 @@ func TestComposeRepairBrief_TheRunnersReasonsNotTheWorkspaceFileDecideTheGateSlo
 	cs.WorkspacePath, cs.AuditFailReasons = unwritten, []string{"EGPS: acs-verdict.json ship_eligible=false"}
 	if brief, _ := composeQuietly(t, cs); !strings.HasPrefix(brief, "failed phase: audit\n- EGPS: acs-verdict.json ship_eligible=false\n\n") || strings.Contains(brief, defect) {
 		t.Errorf("the runner's reasons lead the brief even when their best-effort record was never written:\n%s", brief)
+	}
+}
+
+func TestComposeRepairBrief_TheFindingsHeaderNamesGateReasonsOnlyWhenTheyLead(t *testing.T) {
+	ws := t.TempDir()
+	writeAuditReportWithDefects(t, ws, briefRound1, "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
+	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
+
+	for name, brief := range map[string]string{
+		"the failure block's defects": composeRepairBrief(cs),
+		"the standing findings":       auditorFindingsBrief(ws, 1),
+	} {
+		if !strings.Contains(brief, "auditor findings (audit round 1 — fix THESE):") || strings.Contains(brief, "gate reasons") {
+			t.Errorf("with %s the header must not call anything above it gate reasons or symptoms:\n%s", name, brief)
+		}
 	}
 }
