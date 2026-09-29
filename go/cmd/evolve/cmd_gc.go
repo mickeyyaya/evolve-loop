@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // runGC implements `evolve gc [--dry-run]`.
@@ -120,17 +122,56 @@ func gcWorkspaceSweep(ctx context.Context, projectRoot string, dryRun bool, stdo
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve gc: WARN: policy load failed: %v; using zero-value gc policy\n", err)
 	}
-	var wpol gc.WorktreesPolicy
+	var gcPol gc.Policy
 	if pol.GC != nil {
-		wpol = pol.GC.Worktrees
+		gcPol = *pol.GC
 	}
-	opts := worktreeGCOptions(projectRoot, evolveDir, wpol)
-	procFailed := gcCycleProcesses(ctx, opts, dryRun, stdout, stderr)
-	if rc := gcWorktrees(opts, dryRun, stdout, stderr); rc != 0 || procFailed {
+	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees)
+	failed := gcCycleProcesses(ctx, opts, dryRun, stdout, stderr)
+	failed = gcWorktrees(opts, dryRun, stdout, stderr) != 0 || failed
+	failed = gcGoCache(ctx, gcPol.GoCacheTTLHours, dryRun, stdout, stderr) || failed
+	if failed {
 		return 1
 	}
 	return 0
 }
+
+func gcGoCache(ctx context.Context, ttlHours int, dryRun bool, stdout, stderr io.Writer) bool {
+	if ttlHours <= 0 {
+		fmt.Fprintf(stdout, "evolve gc: go build cache trim off (gc.go_cache_ttl_hours unset)\n")
+		return false
+	}
+	dir, err := gcGoCacheDir(ctx)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: go build cache trim skipped: %v\n", err)
+		return true
+	}
+	rep := gc.TrimGoCache(dir, time.Now().Add(-time.Duration(ttlHours)*time.Hour), !dryRun)
+	if dryRun {
+		fmt.Fprintf(stdout, "evolve gc --dry-run: %d go build cache file(s) would be trimmed (%s unused > %dh in %s)\n", rep.Files, gcSize(rep.Bytes), ttlHours, dir)
+	} else {
+		fmt.Fprintf(stdout, "evolve gc: trimmed %d go build cache file(s) (%s unused > %dh in %s)\n", rep.Files, gcSize(rep.Bytes), ttlHours, dir)
+	}
+	for _, e := range rep.Errors {
+		fmt.Fprintf(stderr, "evolve gc: go build cache error: %s\n", e)
+	}
+	return len(rep.Errors) > 0
+}
+
+func gcGoCacheDir(ctx context.Context) (string, error) {
+	var out strings.Builder
+	code, err := sysexec.DefaultRunner(ctx, "go", "", []string{"env", "GOCACHE"}, nil, nil, &out, nil)
+	if err != nil || code != 0 {
+		return "", fmt.Errorf("go env GOCACHE: exit %d: %v", code, err)
+	}
+	dir := strings.TrimSpace(out.String())
+	if dir == "" || dir == "off" {
+		return "", fmt.Errorf("GOCACHE is %q", dir)
+	}
+	return dir, nil
+}
+
+func gcSize(b int64) string { return fmt.Sprintf("%.2f GB", float64(b)/1e9) }
 
 func gcWorktrees(opts gc.WorktreeOptions, dryRun bool, stdout, stderr io.Writer) int {
 	manifest, err := gc.PlanWorktrees(opts)

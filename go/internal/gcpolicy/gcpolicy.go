@@ -27,7 +27,8 @@ type Policy struct {
 	LogsTTLDays int `json:"logs_ttl_days,omitempty"`
 	// TrackerTTLDays prunes <run-dir>/.ephemeral subtrees of KEPT runs.
 	// Default 7 (mirrors pruneephemeral).
-	TrackerTTLDays int `json:"tracker_ttl_days,omitempty"`
+	TrackerTTLDays  int `json:"tracker_ttl_days,omitempty"`
+	GoCacheTTLHours int `json:"go_cache_ttl_hours,omitempty"`
 	// Worktrees is the retention grace for the worktree+branch backlog sweep
 	// (S4); consumed by PlanWorktrees. Zero value = no KeepRecent/MinAge grace.
 	Worktrees WorktreesPolicy `json:"worktrees,omitempty"`
