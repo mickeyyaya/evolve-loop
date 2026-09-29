@@ -21,6 +21,20 @@ All notable changes to this project will be documented in this file.
 - Tests, red first: `TestRouteProtectedCards_AnEmptiedSingleItemLaneAnswersForItsPin`, `TestRouteProtectedCards_ThePinIsAnsweredOnlyWhenTheRouteEmptiesASingleItemLane` (four cases), `TestRouteProtectedCards_APinThatIsTheRoutedCardIsEscalatedOnce`, `TestWithBoundItem_TheItemJoinsOnceWithTheFirstRoutedCard` (first card's path and id, the caller's slice untouched, no duplicate), `TestTriageClassify_APinTriageDeferredStaysOwedWork`, and `TestTriageClassify_AnAliasCardOnAProtectedSurfaceAnswersTheLanesPin`, which replays 1757's decision through `router.Digest`. The downstream half keeps its pins (`TestRunCycle_LaneThatAnswersForItsScopeEndsPlannedNoWork`, `TestApplyNoWork_HandsTheLanesAnsweredItemToTheConsole`). Every guard's removal is a killed mutant.
 - Review: the architecture review (HIGH, a disguised flag argument) moved the emptied check into `routeProtectedCards`, projected the binding from `committedset.Committed` so a deferred pin is not routed, and named the card in the reason.
 - Docs: design §5.7 R1b, §7.8, §8; the 2026-09-14 incident's R1 note; the factory-rules refusal row.
+## Added — `evolve inbox route-console`, the operator's console route (2026-09-29)
+
+- Cycle 1757 (wave 39) found that `goal-text-has-no-selection-authority` must be fixed in `go/internal/loopwave/loopwave.go`, a protected surface its declared files never named. The lane could not route the item: its escalation named the scout's alias, not the pinned id (fixed separately in the triage route). The operator could not route it either. `inboxmover.RouteConsole` had no CLI verb, and the only alternative was editing tracked inbox JSON by hand, which the rule that every control goes through a published interface forbids.
+- `evolve inbox route-console <id> <reason> <cycle>` (`go/cmd/evolve/cmd_inbox_route_console.go`) routes a pending item in the inbox root through `inboxmover.RouteConsole` unchanged. It writes `route: console-manual`, the trimmed `routed_reason`, `routed_cycle` and `routed_at`, plus the `route-console` ledger line, and every later lane's `claim` refuses the item (exit 3).
+- It belongs to the operator family `evolve inbox`, not `evolve inbox-mover`. The triage profile allowlists all of `evolve inbox-mover` for its claim floor, so a route verb there would have granted an LLM phase the operator's authority (architecture review).
+- An item under a lane's claim is refused whatever cycle is named, because the mover's own ownership check compares only the cycle it is handed, and an operator could name the live lane's cycle.
+- Exit codes: 10 for usage (a missing argument, a blank id or reason, a negative or non-numeric cycle), 1 for an id the root does not hold or one held by a claim, 2 when the inbox could not be read or the route could not be recorded. Run it at a wave boundary, since the item is a tracked file.
+- Tests, red first, through `runInbox`:
+  - `TestCmd_InboxRouteConsole_ALaneCanNoLongerClaimTheItem` routes, reads the item back and proves `claim` exits 3.
+  - `TestCmd_InboxRouteConsole_RefusesAMalformedRequest` covers five cases.
+  - `TestCmd_InboxRouteConsole_RefusesAnItemNoRootHolds` covers a live claim, left unchanged, and an unknown id.
+  - `TestCmd_InboxRouteConsole_AFailedRewriteIsExitTwo`, `TestCmd_InboxRouteConsole_AnUnreadableInboxIsAFaultNotAnUnknownID` and `TestCmd_InboxUsageNamesRouteConsole` cover the rest. The `inbox` registry summary now names every verb.
+- Mutation sweep: 6 of 7 killed. The seventh was a branch reachable only if a lane claims the item between the check and the write; it was removed, so that race exits 2 with the mover's own message.
+- Docs: `docs/operations/runtime-reference.md` (operator commands), `docs/architecture/packages/cmd-evolve.md`.
 
 ## Fixed — an audit FAIL that names only the explanation document re-authors it at Build, not TDD (cycle 1745, 2026-09-29)
 
