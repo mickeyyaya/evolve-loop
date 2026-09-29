@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -21,7 +22,7 @@ import (
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve gc", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	dryRun := fs.Bool("dry-run", false, "preview only: list the orphan sessions and workspace (worktree/branch) items that WOULD be reaped, mutating nothing")
+	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, worktrees and branches, run dirs, go build cache entries), mutating nothing")
 	// The back-quoted `dir` is the flag package's argument placeholder (it
 	// renders as "-project-root dir"); no other back-quotes here, or the first
 	// one would be consumed as the placeholder instead.
@@ -132,10 +133,14 @@ func gcWorkspaceSweep(ctx context.Context, projectRoot string, dryRun bool, stdo
 		gcPol = *pol.GC
 	}
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees)
+	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	failed := gcCycleProcesses(ctx, opts, dryRun, stdout, stderr)
 	failed = gcWorktrees(opts, dryRun, stdout, stderr) != 0 || failed
 	failed = gcRunDirs(evolveDir, gcPol, dryRun, stdout, stderr) || failed
 	failed = gcGoCache(ctx, gcPol.GoCacheTTLHours, dryRun, stdout, stderr) || failed
+	if !dryRun && freeErr == nil {
+		gcReportDiskFree(projectRoot, before, stdout, stderr)
+	}
 	if failed {
 		return 1
 	}
@@ -203,6 +208,15 @@ func gcGoCacheDir(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("GOCACHE is %q", dir)
 	}
 	return dir, nil
+}
+
+func gcReportDiskFree(path string, before uint64, stdout, stderr io.Writer) {
+	after, err := looppreflight.DiskFreeBytes(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: disk free after the run unreadable: %v\n", err)
+		return
+	}
+	fmt.Fprintf(stdout, "evolve gc: disk free %s → %s (net released %s)\n", gcSize(int64(before)), gcSize(int64(after)), gcSize(int64(after)-int64(before)))
 }
 
 func gcSize(b int64) string { return fmt.Sprintf("%.2f GB", float64(b)/1e9) }

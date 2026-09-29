@@ -82,3 +82,20 @@ func TestRunGC_LeavesTheGoBuildCacheAloneWithoutAPolicyTTL(t *testing.T) {
 		t.Errorf("the skipped trim is not reported:\n%s", stdout.String())
 	}
 }
+
+func TestRunGC_ReportsFreeDiskBeforeAndAfterARealRunOnly(t *testing.T) {
+	projectRoot, _, _ := gcWorktreeEnv(t, "")
+	gcFakeGoCache(t)
+
+	var stdout, stderr bytes.Buffer
+	runGC([]string{"--dry-run", "--project-root", projectRoot}, nil, &stdout, &stderr)
+	if strings.Contains(stdout.String(), "disk free") {
+		t.Errorf("a preview released nothing, so it must not report a disk delta:\n%s", stdout.String())
+	}
+
+	stdout.Reset()
+	runGC([]string{"--project-root", projectRoot}, nil, &stdout, &stderr)
+	if !strings.Contains(stdout.String(), "evolve gc: disk free ") || !strings.Contains(stdout.String(), "released") {
+		t.Errorf("the real run does not report the disk it freed:\n%s\nstderr=%s", stdout.String(), stderr.String())
+	}
+}

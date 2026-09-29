@@ -49,7 +49,9 @@ Commands:
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
   branches   Audit/prune superseded orphan cycle-* branches
               ( branches audit | branches prune [--dry-run=false] )
-  gc         Reap orphaned tmux sessions whose creator PID is dead ( gc [--dry-run] )
+  gc         Release what finished cycles left behind: tmux sessions/sockets,
+              orphan processes, worktrees, run dirs, go build cache
+              ( gc --project-root P [--dry-run] )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N [strategy] "goal" )
   loop-stop  Stop a running loop after its current wave; --release lifts the brake
               ( loop-stop [--release] [--project-root P] )
