@@ -55,7 +55,8 @@ type WorktreesPolicy struct {
 	KeepRecent int `json:"keep_recent,omitempty"`
 	// MinAgeMinutes: a candidate younger than this is never touched — the grace
 	// window that covers the create -> lease-write race.
-	MinAgeMinutes int `json:"min_age_minutes,omitempty"`
+	MinAgeMinutes     int `json:"min_age_minutes,omitempty"`
+	SalvageAfterHours int `json:"salvage_after_hours,omitempty"`
 }
 
 // WithDefaults returns a copy of p with every zero-value retention knob

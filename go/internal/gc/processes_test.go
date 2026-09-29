@@ -34,7 +34,7 @@ func TestFinishedCycleOrphans_TakesOnlyOrphansWhoseCwdIsInsideAFinishedCycleTree
 	base := filepath.Join(root, ".evolve", "worktrees")
 	closed := filepath.Join(base, "cycle-cd3ae73e-1762")
 	live := filepath.Join(base, "cycle-cd3ae73e-1763")
-	for _, d := range []string{filepath.Join(closed, "go"), live, filepath.Join(base, "lane-notes")} {
+	for _, d := range []string{filepath.Join(closed, "go"), live, filepath.Join(base, "lane-notes"), filepath.Join(base, "scratch-1762")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -59,6 +59,7 @@ func TestFinishedCycleOrphans_TakesOnlyOrphansWhoseCwdIsInsideAFinishedCycleTree
 		{"orphan in the operator's console", Process{Pid: 15, Ppid: 1, Cwd: filepath.Join(root, "console")}, false},
 		{"orphan at the worktree base itself", Process{Pid: 16, Ppid: 1, Cwd: base}, false},
 		{"orphan in a non-cycle directory under the base", Process{Pid: 17, Ppid: 1, Cwd: filepath.Join(base, "lane-notes")}, false},
+		{"orphan in a numbered non-cycle directory sharing a closed-out cycle's number", Process{Pid: 19, Ppid: 1, Cwd: filepath.Join(base, "scratch-1762")}, false},
 		{"orphan in a sibling whose name only shares the base prefix", Process{Pid: 18, Ppid: 1, Cwd: base + "-old/cycle-cd3ae73e-1700"}, false},
 	}
 	for _, tc := range cases {

@@ -63,7 +63,8 @@ const (
 	// never removed (preserves ship-fail evidence).
 	WorktreeActionFlagDirty WorktreeAction = "flag-dirty"
 	// WorktreeActionFlagUnmerged flags an unmerged branch; it is never deleted.
-	WorktreeActionFlagUnmerged WorktreeAction = "flag-unmerged"
+	WorktreeActionFlagUnmerged  WorktreeAction = "flag-unmerged"
+	WorktreeActionSalvageRemove WorktreeAction = "salvage-remove"
 )
 
 // WorktreeItem is one planned action. Path is empty for a branch-only backlog
@@ -341,12 +342,8 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		if dirty {
-			items = append(items, WorktreeItem{Path: path, Branch: e.branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"})
-			continue
-		}
-		if !merged[e.branch] {
-			items = append(items, WorktreeItem{Path: path, Branch: e.branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"})
+		if dirty || !merged[e.branch] {
+			items = append(items, o.keptOrSalvaged(path, e.branch, dirty))
 			continue
 		}
 		if c, ok := eligibleAfterGrace(path, e.branch, now, minAge); ok {
@@ -354,6 +351,29 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 		}
 	}
 	return items, pool, seenBranch, nil
+}
+
+func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) WorktreeItem {
+	if age, ok := o.finishedFor(path); ok && o.Policy.SalvageAfterHours > 0 && age >= time.Duration(o.Policy.SalvageAfterHours)*time.Hour {
+		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove,
+			Reason: fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour))}
+	}
+	if dirty {
+		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
+	}
+	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"}
+}
+
+func (o WorktreeOptions) finishedFor(path string) (time.Duration, bool) {
+	n, ok := leafCycleNumber(filepath.Base(path))
+	if !ok {
+		return 0, false
+	}
+	at, ok := dossier.ClosedOutAt(o.ProjectRoot, n)
+	if !ok {
+		return 0, false
+	}
+	return o.now().Sub(at), true
 }
 
 func eligibleAfterGrace(path, branch string, now time.Time, minAge time.Duration) (eligible, bool) {
@@ -440,6 +460,9 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	// branch.
 	didRemove, removeErrs := o.removeWorktrees(m.Items, refused)
 	errs = append(errs, removeErrs...)
+	didSalvage, salvageErrs := o.salvageRemoveWorktrees(m.Items)
+	errs = append(errs, salvageErrs...)
+	didRemove = didRemove || didSalvage
 	// Pass 2b: delete branches (their worktrees, if any, are now gone).
 	errs = append(errs, o.deleteBranches(m.Items, refused)...)
 	if didRemove {
