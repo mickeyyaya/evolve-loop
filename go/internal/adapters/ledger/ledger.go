@@ -321,8 +321,12 @@ func (l *FileLedger) checkTip(lastSeq int, lastSha string) error {
 	if err != nil {
 		return fmt.Errorf("%w: tip read: %v", core.ErrLedgerChainBroken, err)
 	}
+	return compareTip(string(tip), lastSeq, lastSha)
+}
+
+func compareTip(tip string, lastSeq int, lastSha string) error {
 	wantTip := fmt.Sprintf("%d:%s", lastSeq, lastSha)
-	if string(tip) != wantTip {
+	if tip != wantTip {
 		return fmt.Errorf("%w: tip mismatch (have %q want %q)", core.ErrLedgerChainBroken, tip, wantTip)
 	}
 	return nil
