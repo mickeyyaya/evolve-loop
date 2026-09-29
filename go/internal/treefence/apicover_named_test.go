@@ -62,4 +62,21 @@ func TestAPICoverNamedExports(t *testing.T) {
 	if (*Fence)(nil).TakeErr() != nil || len((*Fence)(nil).End(ctx).Restored) != 0 {
 		t.Fatal("a nil fence is inert")
 	}
+
+	// TakeStaged + Snapshot.Differing: an untracked file is beyond the staged base.
+	staged := initRepo(t)
+	base, err := TakeStaged(ctx, staged, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	full, err := Take(ctx, staged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := full.Differing(ctx, base); err != nil || len(got) != 1 || got[0] != "src/new_test.go" {
+		t.Fatalf("Differing = %v %v, want [src/new_test.go]", got, err)
+	}
+	if _, err := base.Restore(ctx); err == nil {
+		t.Fatal("a staged snapshot must not restore a worktree")
+	}
 }

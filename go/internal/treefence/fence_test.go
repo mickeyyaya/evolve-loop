@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // initRepo makes a repo with one commit, an ignore rule, and a pending
@@ -220,6 +221,79 @@ func TestRestore_PrunesDirectoriesThePhaseCreated(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "src")); err != nil {
 		t.Error("a pre-existing directory must survive the prune")
+	}
+}
+
+// TestFenceEnd_DistinguishesInertTakeErrFromGenuineEmptyRestore: both an
+// inert fence and a clean restore report an empty Kept; TakeErr and Verified
+// tell them apart.
+func TestFenceEnd_DistinguishesInertTakeErrFromGenuineEmptyRestore(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("inert fence (Take failed) sets TakeErr and never verifies", func(t *testing.T) {
+		t.Parallel()
+		f := Begin(ctx, t.TempDir(), true) // not a repository: Take must fail
+		out := f.End(ctx)
+		if out.TakeErr == nil {
+			t.Fatal("TakeErr = nil, want non-nil for an inert fence (Take failed against a non-repository)")
+		}
+		if len(out.Kept) != 0 {
+			t.Fatalf("Kept = %v, want empty: an inert fence never took a snapshot to restore from", out.Kept)
+		}
+		if out.Verified {
+			t.Fatal("Verified = true, want false: an inert fence cannot authenticate a worktree it never snapshotted")
+		}
+	})
+
+	t.Run("genuine restore that verifies and keeps nothing has no TakeErr", func(t *testing.T) {
+		t.Parallel()
+		dir := initRepo(t)
+		f := Begin(ctx, dir, true) // no writable paths: nothing may be kept
+		out := f.End(ctx)
+		if out.TakeErr != nil {
+			t.Fatalf("TakeErr = %v, want nil: Take succeeded against a real repository", out.TakeErr)
+		}
+		if !out.Verified {
+			t.Fatal("Verified = false, want true: a clean worktree restores and verifies cleanly")
+		}
+		if len(out.Kept) != 0 {
+			t.Fatalf("Kept = %v, want empty: the dispatch made no writable-path changes to keep", out.Kept)
+		}
+	})
+}
+
+func TestFenceEnd_KeepsASameSizeRewriteInTheRealIndexsTimestampTick(t *testing.T) {
+	ctx := context.Background()
+	dir := initRepo(t)
+	git := func(args ...string) {
+		t.Helper()
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	tick := time.Now().Add(-time.Hour).Truncate(time.Second)
+	stamp := func(rel string) {
+		t.Helper()
+		if err := os.Chtimes(filepath.Join(dir, rel), tick, tick); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("config", "core.trustctime", "false")
+	write(t, dir, "shared.md", "lane line\n")
+	stamp("shared.md")
+	git("add", "shared.md")
+	stamp(".git/index")
+
+	f := Begin(ctx, dir, true, "shared.md")
+	write(t, dir, "shared.md", "peer line\n")
+	stamp("shared.md")
+	out := f.End(ctx)
+
+	if out.TakeErr != nil || out.RestoreErr != nil {
+		t.Fatalf("TakeErr = %v RestoreErr = %v, want both nil", out.TakeErr, out.RestoreErr)
+	}
+	if len(out.Kept) != 1 || out.Kept[0] != "shared.md" {
+		t.Fatalf("Kept = %v, want [shared.md]: the same-size rewrite in the real index's tick was read as clean from a stale stat", out.Kept)
 	}
 }
 

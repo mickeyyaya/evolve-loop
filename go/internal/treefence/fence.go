@@ -249,11 +249,7 @@ func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode, decl
 		if !filepath.IsAbs(realPath) {
 			realPath = filepath.Join(worktree, realPath)
 		}
-		var data []byte
-		data, indexErr = os.ReadFile(realPath)
-		if indexErr == nil {
-			indexErr = os.WriteFile(index, data, 0o644)
-		}
+		indexErr = copyIndex(realPath, index)
 	}
 	if mode != allFiles && indexErr != nil {
 		return "", fmt.Errorf("treefence: this snapshot requires a complete real-index seed: %w", indexErr)
@@ -269,6 +265,21 @@ func writeTreeMode(ctx context.Context, worktree string, mode snapshotMode, decl
 		return "", err
 	}
 	return strings.TrimSpace(out), nil
+}
+
+func copyIndex(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		return err
+	}
+	return os.Chtimes(dst, info.ModTime(), info.ModTime())
 }
 
 func addArgs(mode snapshotMode, declared []string) [][]string {

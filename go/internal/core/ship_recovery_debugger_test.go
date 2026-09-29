@@ -2,6 +2,8 @@ package core_test
 
 import (
 	"context"
+	"errors"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
@@ -9,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
@@ -29,6 +32,9 @@ func initConflictRebaseRepoT(t *testing.T) string {
 	runGitT(t, dir, "config", "user.email", "t@example.com")
 	runGitT(t, dir, "config", "user.name", "test")
 	runGitT(t, dir, "config", "commit.gpgsign", "false")
+	for _, kv := range gittest.MaintenanceConfig() {
+		runGitT(t, dir, "config", kv[0], kv[1])
+	}
 	write("base.txt", "base\n")
 	write("shared.md", "base line\n")
 	runGitT(t, dir, "add", "-A")
@@ -173,6 +179,7 @@ type fencedDebugger struct {
 	inner    *resolvingDebugger
 	writable []string
 	kept     []string
+	outcome  treefence.Outcome
 }
 
 func (d *fencedDebugger) Name() string { return string(core.PhaseDebugger) }
@@ -180,7 +187,8 @@ func (d *fencedDebugger) Run(ctx context.Context, req core.PhaseRequest) (core.P
 	d.writable = req.WorktreeWritablePaths
 	fence := treefence.Begin(ctx, req.Worktree, req.WorktreeReadOnly, req.WorktreeWritablePaths...)
 	resp, err := d.inner.Run(ctx, req)
-	d.kept = fence.End(ctx).Kept
+	d.outcome = fence.End(ctx)
+	d.kept = d.outcome.Kept
 	return resp, err
 }
 
@@ -202,13 +210,147 @@ func TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflicted
 		t.Fatalf("ship calls = %d landedOn = %v, want the second ship to land on main", f.ship.calls, f.ship.landedOn)
 	}
 	if !reflect.DeepEqual(fenced.writable, []string{"shared.md"}) || !reflect.DeepEqual(fenced.kept, []string{"shared.md"}) {
-		t.Fatalf("debugger writable = %v kept = %v, want both [shared.md]", fenced.writable, fenced.kept)
+		t.Fatalf("debugger writable = %v kept = %v, want both [shared.md] (fence TakeErr = %v RestoreErr = %v Verified = %v)",
+			fenced.writable, fenced.kept, fenced.outcome.TakeErr, fenced.outcome.RestoreErr, fenced.outcome.Verified)
 	}
 	if out := runGitT(t, f.dir, "show", "HEAD:shared.md"); out != "peer line\n" {
 		t.Fatalf("the shipped tree must carry the resolution the fence kept: shared.md = %q", out)
 	}
 	if f.build.calls != 2 || f.audit.calls != 2 {
 		t.Fatalf("calls build=%d audit=%d, want 2/2: the kept resolution changed bytes, so it is re-authored and re-audited before it ships", f.build.calls, f.audit.calls)
+	}
+}
+
+// gitShimForcingTreefenceWriteTreeFailure puts a `git` on PATH that fails every
+// write-tree against treefence's throwaway index, so the fence's Take fails the
+// way it does on macOS CI.
+func gitShimForcingTreefenceWriteTreeFailure(t *testing.T) string {
+	return gitShimFailingTreefenceWriteTreeWhen(t, "true", "gitShimForcingTreefenceWriteTreeFailure: forced write-tree failure")
+}
+
+// gitShimFailingTreefenceWriteTreeWhen returns a directory holding a `git` that
+// fails a write-tree against treefence's throwaway index (GIT_INDEX_FILE under
+// a "treefence-index-*" temp dir) with stderr "fatal: <cause>" whenever the
+// shell test guard holds in git's working directory, and runs the real git for
+// everything else.
+func gitShimFailingTreefenceWriteTreeWhen(t *testing.T, guard, cause string) string {
+	t.Helper()
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatalf("git not on PATH: %v", err)
+	}
+	dir := t.TempDir()
+	script := "#!/bin/sh\n" +
+		"case \"$GIT_INDEX_FILE\" in\n" +
+		"  */treefence-index-*)\n" +
+		"    if [ \"$1\" = \"write-tree\" ] && " + guard + "; then\n" +
+		"      echo 'fatal: " + cause + "' >&2\n" +
+		"      exit 128\n" +
+		"    fi\n" +
+		"    ;;\n" +
+		"esac\n" +
+		"exec \"" + realGit + "\" \"$@\"\n"
+	shim := filepath.Join(dir, "git")
+	if err := os.WriteFile(shim, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// TestFencedDebugger_ExposesTakeErrWhenFenceGoesInert: when the fence's Take
+// fails, fencedDebugger keeps the whole treefence.Outcome, so TakeErr is there
+// to report, not only an empty Kept.
+func TestFencedDebugger_ExposesTakeErrWhenFenceGoesInert(t *testing.T) {
+	f := newConflictFixture(t, "peer line\n", nil)
+	fenced := &fencedDebugger{inner: f.dbg}
+
+	shimDir := gitShimForcingTreefenceWriteTreeFailure(t)
+	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	req := core.PhaseRequest{Worktree: f.dir, WorktreeReadOnly: true, WorktreeWritablePaths: []string{"shared.md"}}
+	if _, err := fenced.Run(context.Background(), req); err != nil {
+		t.Fatalf("fencedDebugger.Run: %v", err)
+	}
+
+	if fenced.outcome.TakeErr == nil {
+		t.Fatalf("outcome.TakeErr = nil, want non-nil: the fence's Take failed (forced write-tree failure) and the dispatcher must be able to name why kept ended up empty, not just observe an empty Kept")
+	}
+	if len(fenced.outcome.Kept) != 0 {
+		t.Fatalf("outcome.Kept = %v, want empty: an inert fence (Take failed) never took a snapshot to restore from", fenced.outcome.Kept)
+	}
+}
+
+// TestRecoverFromShipError_TheFenceKeepsTestNamesTheFenceErrorWhenKeptIsEmpty
+// runs the fence-keeps test in a child process with git shimmed so the fence
+// fails, and requires the child's own failure message to name the fence error
+// that left kept empty: the field and the error text, not just "kept = []".
+func TestRecoverFromShipError_TheFenceKeepsTestNamesTheFenceErrorWhenKeptIsEmpty(t *testing.T) {
+	const target = "TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile"
+	cases := []struct {
+		name, guard, cause, field string
+	}{
+		{"take fails", "true", "forced take-time write-tree failure", "TakeErr"},
+		// The debugger's scratch file exists only after the fence's Take and before its Restore removes it.
+		{"restore fails", "[ -e docs/debugger-scratch.md ]", "forced restore-time write-tree failure", "RestoreErr"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			shimDir := gitShimFailingTreefenceWriteTreeWhen(t, tc.guard, tc.cause)
+			cmd := exec.Command(os.Args[0], "-test.run", "^"+target+"$", "-test.count=1")
+			cmd.Env = append(os.Environ(), "PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+			out, err := cmd.CombinedOutput()
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
+				t.Fatalf("%s with the fence's %s forced to fail: err = %v, want a test failure — an inert fence cannot keep [shared.md]\n%s", target, tc.field, err, out)
+			}
+			blocks := testMessageBlocks(string(out), "ship_recovery_debugger_test.go:")
+			for _, b := range blocks {
+				if strings.Contains(b, tc.field) && strings.Contains(b, tc.cause) {
+					return
+				}
+			}
+			t.Fatalf("%s failed without naming the fence's %s (%q) in its own failure message; messages:\n%s", target, tc.field, tc.cause, strings.Join(blocks, "\n"))
+		})
+	}
+}
+
+// testMessageBlocks returns each message `go test` printed from file, with its
+// indented continuation lines.
+func testMessageBlocks(out, file string) []string {
+	var blocks []string
+	var cur []string
+	flush := func() {
+		if cur != nil {
+			blocks = append(blocks, strings.Join(cur, "\n"))
+			cur = nil
+		}
+	}
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case strings.HasPrefix(strings.TrimLeft(line, " "), file):
+			flush()
+			cur = []string{line}
+		case cur != nil && strings.HasPrefix(line, "        "):
+			cur = append(cur, line)
+		default:
+			flush()
+		}
+	}
+	flush()
+	return blocks
+}
+
+// TestInitConflictRebaseRepoT_DisablesBackgroundMaintenance: the conflict
+// fixture sets gittest.MaintenanceConfig, so no detached `git maintenance`
+// child can touch .git/index while the fence snapshots it.
+func TestInitConflictRebaseRepoT_DisablesBackgroundMaintenance(t *testing.T) {
+	dir := initConflictRebaseRepoT(t)
+	for _, kv := range [][2]string{{"maintenance.auto", "false"}, {"gc.auto", "0"}} {
+		key, want := kv[0], kv[1]
+		out, _ := exec.Command("git", "-C", dir, "config", "--get", key).Output()
+		if got := strings.TrimSpace(string(out)); got != want {
+			t.Fatalf("git config --get %s = %q, want %q: initConflictRebaseRepoT must route through gittest.MaintenanceConfig so its own commits (and treefence's throwaway-index write-tree) cannot race background git maintenance on macOS CI (fence-kept-empty-macos-ci-flake)", key, got, want)
+		}
 	}
 }
 
