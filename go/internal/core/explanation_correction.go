@@ -72,8 +72,6 @@ func recordExplanationCorrection(workspace string, defects []string) error {
 	return nil
 }
 
-const retryActionReauthorExplanation retryAction = "retry@explanation"
-
 func explanationCorrectionEnvelope(env retryEnvelope) retryEnvelope {
 	if !slices.Contains(env.Legal, retryActionRetryBuild) {
 		return env
