@@ -76,11 +76,13 @@ type Diagnostic struct {
 	Subject string `json:"subject,omitempty"`
 }
 
-// The triage gate's refusal codes: the reasons triage.Classify itself FAILs a cycle, not the agent's verdict.
+// The triage refusal codes: the reasons triage.Classify itself FAILs a cycle, not the agent's verdict,
+// and TRIAGE_SCOPE_UNANSWERED, the host's claim-failed ending of a lane, recorded at C1 by the closeout.
 const (
 	DiagCodeTriageProtectedSurface  = "TRIAGE_PROTECTED_SURFACE"
 	DiagCodeTriageTopNEmpty         = "TRIAGE_TOPN_EMPTY"
 	DiagCodeTriageCommitmentInvalid = "TRIAGE_COMMITMENT_INVALID"
+	DiagCodeTriageScopeUnanswered   = "TRIAGE_SCOPE_UNANSWERED"
 )
 
 // Severity values of Diagnostic; only SeverityError entries are a phase's reasons for a FAIL verdict.
@@ -128,7 +130,7 @@ func RefusalDisposition(code string) Disposition {
 	switch code {
 	case DiagCodeTriageProtectedSurface:
 		return Disposition{TaskLevel: true, RouteConsole: true}
-	case DiagCodeTriageTopNEmpty:
+	case DiagCodeTriageTopNEmpty, DiagCodeTriageScopeUnanswered:
 		return Disposition{TaskLevel: true}
 	default:
 		return Disposition{}

@@ -26,6 +26,7 @@ func TestDiagCodes_TriageRefusalVocabulary(t *testing.T) {
 		DiagCodeTriageProtectedSurface:  "TRIAGE_PROTECTED_SURFACE",
 		DiagCodeTriageTopNEmpty:         "TRIAGE_TOPN_EMPTY",
 		DiagCodeTriageCommitmentInvalid: "TRIAGE_COMMITMENT_INVALID",
+		DiagCodeTriageScopeUnanswered:   "TRIAGE_SCOPE_UNANSWERED",
 	}
 	for got, spelled := range want {
 		if got != spelled {
@@ -58,6 +59,7 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		{DiagCodeTriageProtectedSurface, true, true},
 		{DiagCodeTriageTopNEmpty, true, false},
 		{DiagCodeTriageCommitmentInvalid, false, false},
+		{DiagCodeTriageScopeUnanswered, true, false},
 		{"", false, false},
 		{"SOMETHING_NEW", false, false},
 	}
@@ -67,5 +69,11 @@ func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 		if d.TaskLevel != c.task || d.RouteConsole != c.route {
 			t.Errorf("RefusalDisposition(%q) = %+v, want task=%v route=%v", c.code, d, c.task, c.route)
 		}
+	}
+}
+
+func TestCycleTerminationTriageClaimFailed_IsTheSealedSpelling(t *testing.T) {
+	if CycleTerminationTriageClaimFailed != "triage-empty-commitment-claimable-work" {
+		t.Errorf("the sealed termination reason is %q", CycleTerminationTriageClaimFailed)
 	}
 }

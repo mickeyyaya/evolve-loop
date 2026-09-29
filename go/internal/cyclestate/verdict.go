@@ -15,6 +15,8 @@ const ClassificationMidExecutionFail = "cycle-mid-execution-fail"
 // CycleTerminationTriageNoWork marks a cycle whose Triage committed zero tasks and ended before any implementation phase.
 const CycleTerminationTriageNoWork = "triage-empty-commitment"
 
+const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
+
 // CycleOutcome constants are the cycle-level FinalVerdict labels, distinct from the per-phase verdicts.
 // SHIPPED_VIA_BUILD needs this cycle's own ship PASS; main HEAD movement is never evidence, since sibling lanes move it.
 const (
