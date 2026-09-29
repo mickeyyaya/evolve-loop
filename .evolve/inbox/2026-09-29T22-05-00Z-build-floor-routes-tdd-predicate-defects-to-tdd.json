@@ -1,0 +1,19 @@
+{
+  "id": "build-floor-routes-tdd-predicate-defects-to-tdd",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.7,
+  "title": "The build-floor correction re-dispatches Build for a defect in a TDD-owned predicate, which Build cannot fix",
+  "files": [
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/core/cyclerun_correction.go"
+  ],
+  "summary": "Cycle 1761 (wave 42): the build handoff floor rejected the deliverable because TDD's own predicate TestC1761_009_OnlyTargetPackagesTouched stayed red; the predicate was unsatisfiable (an allow-list scope fence that excluded the pipeline's required explanation document and eval). The correction loop re-dispatched Build twice with the same byte-identical predicate failure and the cycle sealed FAIL. Build may not edit go/acs/cycle<N>/ (TDD owns the RED contract), so the loop could never converge (retro lesson inst-L1761b).",
+  "fix": "When a build-floor failure is a TDD-authored predicate in go/acs/cycle<N>/ and the failure repeats byte-identically across a Build correction (or the predicate's premise is contradicted by a pipeline-required artifact), route the correction to TDD (re-author the predicate) or to the operator — never a second Build re-dispatch for the same predicate defect.",
+  "acceptance": [
+    "A repeated TDD-predicate failure at the build floor routes to TDD, not Build (red on the cycle-1761 shape)",
+    "A predicate failure Build can fix still corrects at Build"
+  ],
+  "created_at": "2026-09-29T22:05:00Z",
+  "source": "console, 2026-09-29, cycle 1761 retro (inst-L1761b)"
+}
