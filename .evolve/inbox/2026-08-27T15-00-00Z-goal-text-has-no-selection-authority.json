@@ -11,6 +11,10 @@
     ".evolve/runs/cycle-1575",
     ".evolve/inbox/2026-08-27T19-40-00Z-spine-dispatches-build-after-empty-triage.json"
   ],
+  "files": [
+    "go/cmd/evolve/cmd_loop.go",
+    "go/cmd/evolve/cmd_loop_args.go"
+  ],
   "created_at": "2026-08-27T15:00:00Z",
   "priority_class": "debuggability",
   "priority_rationale": "inbox review 2026-09-27: An operator directive that is silently inert costs a batch before anyone notices, and option (c), failing loud at launch, is cheap."

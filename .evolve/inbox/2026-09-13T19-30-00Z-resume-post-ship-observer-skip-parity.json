@@ -11,6 +11,10 @@
     "go/internal/core/evaluate_batch_retry_parity_test.go",
     "docs/incidents/2026-09-12-shipped-via-build-sibling-landing.md"
   ],
+  "files": [
+    "go/internal/core/resume_execution.go",
+    "go/internal/core/evaluate_batch_retry_parity_test.go"
+  ],
   "created_at": "2026-09-13T19:30:00Z",
   "priority_class": "stability",
   "priority_rationale": "inbox review 2026-09-27: A resumed cycle that has already shipped aborts abnormally on a best-effort memo failure. It is latent but more reachable now that capacity walls pause and resume, and the fix is one hook plus a parity test."
