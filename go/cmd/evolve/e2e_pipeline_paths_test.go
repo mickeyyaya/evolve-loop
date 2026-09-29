@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -35,6 +36,7 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 		// gate's own classification is pinned by TestSandboxGate_* in internal/bridge.
 		"EVOLVE_SANDBOX=off",
 	)
+	env = append(env, isolatedHome(t)...)
 	for _, e := range extraEnv {
 		if e == strictPolicyMarker {
 			policyPath := filepath.Join(projRoot, ".evolve", "policy.json")
@@ -60,6 +62,50 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	t.Logf("cycle run (%s) err=%v\n%s", goalHash, err, lastN(out, 1200))
 
 	return readLedger(t, projRoot), err
+}
+
+func isolatedHome(t *testing.T) []string {
+	t.Helper()
+	keys := []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOENV"}
+	out, err := exec.Command("go", append([]string{"env"}, keys...)...).Output()
+	if err != nil {
+		t.Fatalf("go env: %v", err)
+	}
+	values := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(values) != len(keys) {
+		t.Fatalf("go env %v printed %d line(s): %q", keys, len(values), out)
+	}
+	env := []string{"HOME=" + t.TempDir()}
+	for i, key := range keys {
+		env = append(env, key+"="+values[i])
+	}
+	return env
+}
+
+func TestIsolatedHome_AnEmptyHomeThatKeepsTheParentsGoCaches(t *testing.T) {
+	env := append(os.Environ(), isolatedHome(t)...)
+	run := func(name string, args ...string) string {
+		cmd := exec.Command(name, args...)
+		cmd.Env = env
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("%s %v: %v", name, args, err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	home := run("sh", "-c", "printf %s \"$HOME\"")
+	if home == "" || home == os.Getenv("HOME") {
+		t.Fatalf("a cycle's HOME must be its own, not the host's (%q); got %q", os.Getenv("HOME"), home)
+	}
+	if entries, err := os.ReadDir(home); err != nil || len(entries) != 0 {
+		t.Fatalf("the cycle's HOME starts empty, like CI's; entries=%v err=%v", entries, err)
+	}
+	for _, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH"} {
+		parent, _ := exec.Command("go", "env", key).Output()
+		if got := run("go", "env", key); got != strings.TrimSpace(string(parent)) {
+			t.Errorf("%s under the isolated HOME = %q, want the parent's %q, or every go test in the cycle starts cold", key, got, strings.TrimSpace(string(parent)))
+		}
+	}
 }
 
 func lastN(s string, n int) string {
