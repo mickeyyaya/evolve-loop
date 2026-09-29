@@ -159,22 +159,8 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 		return carryoverApplyResult{}, fmt.Errorf("read state %s: %w", statePath, err)
 	}
 
-	// An unlocked pre-read only skips a no-op write; UpdateStateMap re-reads
-	// under the lock, so it is never a correctness gate.
-	if pre, err := statemap.ReadStateMap(statePath); err == nil {
-		found := false
-		entries, _ := pre["carryoverTodos"].([]any)
-		for _, e := range entries {
-			if m, ok := e.(map[string]any); ok {
-				if id, _ := m["id"].(string); remove[id] != "" {
-					found = true
-					break
-				}
-			}
-		}
-		if !found {
-			return carryoverApplyResult{Before: len(entries), After: len(entries)}, nil
-		}
+	if res, ok := carryoverNoOpFastPath(statePath, remove); ok {
+		return res, nil
 	}
 
 	var res carryoverApplyResult
@@ -202,4 +188,27 @@ func applyCarryoverDecisions(statePath string, doc carryoverDecisionsDoc) (carry
 		state["carryoverTodos"] = kept
 	})
 	return res, err
+}
+
+// carryoverNoOpFastPath does an unlocked pre-read to short-circuit a no-op
+// apply; UpdateStateMap re-reads under the lock, so this is never a
+// correctness gate. ok=false (on a read error or a matching removal id)
+// means the caller must fall through to the locked update.
+func carryoverNoOpFastPath(statePath string, remove map[string]string) (carryoverApplyResult, bool) {
+	if _, err := os.Stat(statePath); err != nil {
+		return carryoverApplyResult{}, false
+	}
+	pre, err := statemap.ReadStateMap(statePath)
+	if err != nil {
+		return carryoverApplyResult{}, false
+	}
+	entries, _ := pre["carryoverTodos"].([]any)
+	for _, e := range entries {
+		if m, ok := e.(map[string]any); ok {
+			if id, _ := m["id"].(string); remove[id] != "" {
+				return carryoverApplyResult{}, false
+			}
+		}
+	}
+	return carryoverApplyResult{Before: len(entries), After: len(entries)}, true
 }
