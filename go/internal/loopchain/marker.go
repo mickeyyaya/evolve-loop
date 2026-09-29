@@ -35,11 +35,14 @@ type RefreshLogEntry struct {
 
 // attempt is the re-exec loop breaker's wire shape: the running build commit
 // that triggered a refresh; a LATER attempt carrying the SAME commit means the
-// previous re-exec came back on a binary that had not moved.
+// previous re-exec came back on a binary that had not moved. PID is the
+// re-exec handoff (WithHandoff): present only until the replacement image
+// takes it (TakeHandoff).
 type attempt struct {
 	RunningCommit string `json:"running_commit"`
 	Batch         int    `json:"batch"`
 	Timestamp     string `json:"timestamp"`
+	PID           int    `json:"pid,omitempty"`
 }
 
 // alreadyAttempted reports whether a refresh was already performed for
@@ -62,9 +65,10 @@ func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 }
 
 // recordAttempt persists the marker for runningCommit, arming the breaker
-// against the next boundary.
+// against the next boundary and, under WithHandoff, the pid the replacement
+// image resumes under.
 func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
-	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339)})
+	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoffPID})
 	if err == nil {
 		err = os.WriteFile(filepath.Join(r.roots.EvolveDir, r.opts.attemptFile), buf, 0o644)
 	}
@@ -72,6 +76,23 @@ func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
 		return fmt.Errorf("write boundary-refresh attempt marker: %w", err)
 	}
 	return nil
+}
+
+func TakeHandoff(attemptPath string, pid int, runningCommit string) (int, error) {
+	raw, err := os.ReadFile(attemptPath)
+	if err != nil {
+		return 0, nil
+	}
+	var rec attempt
+	if json.Unmarshal(raw, &rec) != nil || rec.PID == 0 || rec.PID != pid || rec.RunningCommit == runningCommit || rec.Batch < 1 {
+		return 0, nil
+	}
+	rec.PID = 0
+	buf, _ := json.Marshal(rec)
+	if err := os.WriteFile(attemptPath, buf, 0o644); err != nil {
+		return 0, fmt.Errorf("consume the boundary re-exec handoff: %w", err)
+	}
+	return rec.Batch - 1, nil
 }
 
 // appendLog appends one audit record. Best-effort: a failure here must not

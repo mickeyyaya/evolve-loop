@@ -37,7 +37,8 @@ var (
 	chainBoundaryRepinProvenanceFn = defaultChainBoundaryRepinProvenance
 	// chainReExecTargetFn resolves the executable the refresh re-execs into.
 	chainReExecTargetFn = defaultChainReExecTarget
-	// chainBoundaryRefreshAttemptFile is the on-disk re-exec loop breaker.
+	// chainBoundaryRefreshAttemptFile is the on-disk re-exec loop breaker and
+	// the wave boundary's re-exec handoff.
 	chainBoundaryRefreshAttemptFile = loopchain.AttemptFile
 	// chainRebuildFn is the seam over the sanctioned rebuild recipe.
 	chainRebuildFn = defaultChainRebuild
@@ -99,7 +100,7 @@ func defaultChainReExec(argv0 string, argv, envv []string) error {
 
 // wiredRefresher is the one loopchain.NewRefresher( site: every package var
 // is read inside its closure, so a swap between calls is always seen.
-func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Center) *loopchain.Refresher {
+func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Center, extra ...loopchain.Option) *loopchain.Refresher {
 	deps := loopchain.RefreshDeps{
 		RunningCommit: func() string { return chainRunningCommitFn() },
 		Ahead:         func(root, commit string) (bool, error) { return chainBoundaryAheadFn(root, commit) },
@@ -114,9 +115,11 @@ func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Cent
 		Flush:   signals.Flush,
 		ReExec:  func(argv0 string, argv, envv []string) error { return chainReExecFn(argv0, argv, envv) },
 	}
-	return loopchain.NewRefresher(loopchain.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}, deps, stderr,
+	opts := append([]loopchain.Option{
 		loopchain.WithSignals(func() *signalcenter.Center { return signals }),
-		loopchain.WithMarkerFiles(chainBoundaryRefreshAttemptFile, chainBoundaryRefreshLogFile))
+		loopchain.WithMarkerFiles(chainBoundaryRefreshAttemptFile, chainBoundaryRefreshLogFile),
+	}, extra...)
+	return loopchain.NewRefresher(loopchain.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}, deps, stderr, opts...)
 }
 
 // maybeRefreshChainBoundaryWithSignals runs the boundary refresh for
@@ -125,9 +128,12 @@ func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Cent
 // only BETWEEN batches; every failure degrades to refreshed=false and the
 // current binary keeps running — never a halt. ctx is the batch's signal
 // context; the Driver passes context.Background() because between batches no
-// signal context is registered and a SIGINT ends the process outright.
-func maybeRefreshChainBoundaryWithSignals(ctx context.Context, cfg loopConfig, batch int, stderr io.Writer, signals *signalcenter.Center) (refreshed bool) {
-	return wiredRefresher(cfg, stderr, signals).Refresh(ctx, batch)
+// signal context is registered and a SIGINT ends the process outright. The
+// wave boundary passes loopchain.WithHandoff so the replacement image resumes
+// the batch's wave index (loopBatchCoordinator.resumeAt); the Driver does not,
+// since a chain boundary starts its next batch at wave 0 anyway.
+func maybeRefreshChainBoundaryWithSignals(ctx context.Context, cfg loopConfig, batch int, stderr io.Writer, signals *signalcenter.Center, extra ...loopchain.Option) (refreshed bool) {
+	return wiredRefresher(cfg, stderr, signals, extra...).Refresh(ctx, batch)
 }
 
 // maybeRefreshChainBoundary is the by-name test facade: the same refresh

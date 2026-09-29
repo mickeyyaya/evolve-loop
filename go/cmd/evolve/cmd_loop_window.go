@@ -66,7 +66,7 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
 
 	*fleetConfig = loopwave.ReloadFleetConfig(b.cfg.EvolveDir, *fleetConfig, b.stderr)
-	if maybeRefreshChainBoundaryWithSignals(b.ctx, b.cfg, iteration+1, b.stderr, b.deps.Signals) {
+	if maybeRefreshChainBoundaryWithSignals(b.ctx, b.cfg, iteration+1, b.stderr, b.deps.Signals, loopchain.WithHandoff(os.Getpid())) {
 		b.result.StopReason = "loop_boundary_refresh_reexec"
 		if entry, err := lastChainBoundaryRefreshLogEntry(b.cfg.EvolveDir); err == nil {
 			b.result.BoundaryRefresh = entry

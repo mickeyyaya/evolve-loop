@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -94,7 +96,7 @@ func (b *loopBatchCoordinator) run() int {
 	}
 
 iterations:
-	for i := 0; i < effectiveMax; i++ {
+	for i := b.resumeAt(effectiveMax); i < effectiveMax; i++ {
 		switch decision := b.prepareIteration(i, &fleetCfg, &waveBinPath, batchStartCycle); decision.flow {
 		case batchStopIterations:
 			break iterations
@@ -130,4 +132,16 @@ iterations:
 		return 3
 	}
 	return 0
+}
+
+func (b *loopBatchCoordinator) resumeAt(effectiveMax int) int {
+	done, err := loopchain.TakeHandoff(filepath.Join(b.cfg.EvolveDir, chainBoundaryRefreshAttemptFile), os.Getpid(), chainRunningCommitFn())
+	if err != nil {
+		fmt.Fprintf(b.stderr, "[loop] WARN: boundary re-exec handoff not honoured (%v) — starting at wave 0 with the full budget\n", err)
+		return 0
+	}
+	if done > 0 {
+		fmt.Fprintf(b.stderr, "[loop] boundary re-exec: continuing at wave %d — %d of %d iterations ran before the re-exec, %d left\n", done, done, effectiveMax, max(effectiveMax-done, 0))
+	}
+	return done
 }

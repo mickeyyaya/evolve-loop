@@ -44,7 +44,8 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeChainBatchError, "a chained batch exited with a non-continuable rc (not 0/3/5) and the chain stopped, propagating rc; the batch's own signals name the failure (an rc=2 batch may have emitted none); fields.batch, rc, stop_reason=chain_batch_error")
 }
 
-// The on-disk names under .evolve/: the re-exec loop breaker marker and the
+// The on-disk names under .evolve/: the re-exec loop breaker marker (which
+// also carries the wave boundary's pid-keyed re-exec handoff) and the
 // additive boundary-refresh audit trail; the authorization class the trail
 // stamps (distinguishable from state.json's own two-value Authorized enum).
 const (
@@ -66,6 +67,7 @@ type options struct {
 	now         func() time.Time
 	attemptFile string
 	logFile     string
+	handoffPID  int
 }
 
 // Option configures a Refresher or a Driver at construction.
@@ -95,6 +97,10 @@ func WithNow(now func() time.Time) Option {
 // (relative to EvolveDir); production uses AttemptFile and LogFile.
 func WithMarkerFiles(attempt, log string) Option {
 	return func(o *options) { o.attemptFile, o.logFile = attempt, log }
+}
+
+func WithHandoff(pid int) Option {
+	return func(o *options) { o.handoffPID = pid }
 }
 
 func (o options) center() *signalcenter.Center {

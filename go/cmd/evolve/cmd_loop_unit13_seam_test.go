@@ -173,7 +173,7 @@ func TestChainEngines_OneConstructionSite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(src), "maybeRefreshChainBoundaryWithSignals(b.ctx, b.cfg, iteration+1, b.stderr, b.deps.Signals)") {
+	if !strings.Contains(string(src), "maybeRefreshChainBoundaryWithSignals(b.ctx, b.cfg, iteration+1, b.stderr, b.deps.Signals, loopchain.WithHandoff(os.Getpid()))") {
 		t.Error("the coordinator passes the batch Center to the refresh (never the 3-arg facade)")
 	}
 	if offenders := nonTestSourcesMentioningU13(t, "maybeRefreshChainBoundary(", seam); len(offenders) > 0 {
