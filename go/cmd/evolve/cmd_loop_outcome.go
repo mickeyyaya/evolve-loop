@@ -124,12 +124,9 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 }
 
 func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {
-	runs, err := gc.Discover(cfg.EvolveDir, gc.DiscoverOptions{})
-	if err != nil {
+	manifest, err := planRunDirGC(cfg.EvolveDir, gcPol, func(err error) {
 		fmt.Fprintf(stderr, "[gc] WARN: discover failed: %v; writing empty manifest\n", err)
-		runs = nil
-	}
-	manifest, err := gc.Plan(gc.Options{EvolveDir: cfg.EvolveDir, Runs: runs, Policy: gcPol})
+	})
 	if err != nil {
 		fmt.Fprintf(stderr, "[gc] WARN: plan failed: %v\n", err)
 		return
@@ -187,6 +184,15 @@ func gcManifestDir(evolveDir string) string {
 // worktreeGCOptions is the single construction site shared by the in-loop
 // hook and the operator command (`evolve gc`, cmd_gc.go), so both sweeps aim
 // at the same worktree base and carry the same policy.
+func planRunDirGC(evolveDir string, pol gc.Policy, discoverFailed func(error)) (gc.Manifest, error) {
+	runs, err := gc.Discover(evolveDir, gc.DiscoverOptions{})
+	if err != nil {
+		discoverFailed(err)
+		runs = nil
+	}
+	return gc.Plan(gc.Options{EvolveDir: evolveDir, Runs: runs, Policy: pol})
+}
+
 func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy) gc.WorktreeOptions {
 	return gc.WorktreeOptions{
 		ProjectRoot:  projectRoot,

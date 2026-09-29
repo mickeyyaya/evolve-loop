@@ -17,7 +17,7 @@ type TempReapReport struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
-func ReapPipelineTemp(dir string, cutoff time.Time, apply bool) TempReapReport {
+func ReapPipelineTemp(dir string, cutoff time.Time, removeAll func(string) error) TempReapReport {
 	var rep TempReapReport
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -34,11 +34,9 @@ func ReapPipelineTemp(dir string, cutoff time.Time, apply bool) TempReapReport {
 		}
 		p := filepath.Join(dir, e.Name())
 		size := treeSize(p)
-		if apply {
-			if err := os.RemoveAll(p); err != nil {
-				rep.Errors = append(rep.Errors, err.Error())
-				continue
-			}
+		if err := removeAll(p); err != nil {
+			rep.Errors = append(rep.Errors, err.Error())
+			continue
 		}
 		rep.Entries++
 		rep.Bytes += size

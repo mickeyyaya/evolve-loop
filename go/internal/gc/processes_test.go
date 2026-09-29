@@ -31,10 +31,12 @@ func TestParseCwdListing_ReadsEachProcessPidParentAndCwd(t *testing.T) {
 func TestFinishedCycleOrphans_TakesOnlyOrphansWhoseCwdIsInsideAFinishedCycleTree(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	base := filepath.Join(root, ".evolve", "worktrees")
+	evolveDir := filepath.Join(root, ".evolve")
+	base := filepath.Join(evolveDir, "worktrees")
 	closed := filepath.Join(base, "cycle-cd3ae73e-1762")
 	live := filepath.Join(base, "cycle-cd3ae73e-1763")
-	for _, d := range []string{filepath.Join(closed, "go"), live, filepath.Join(base, "lane-notes"), filepath.Join(base, "scratch-1762")} {
+	resumed := filepath.Join(base, "cycle-cd3ae73e-1745")
+	for _, d := range []string{filepath.Join(closed, "go"), live, resumed, filepath.Join(base, "lane-notes"), filepath.Join(base, "scratch-1762")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -42,10 +44,15 @@ func TestFinishedCycleOrphans_TakesOnlyOrphansWhoseCwdIsInsideAFinishedCycleTree
 	if err := os.MkdirAll(dossier.CyclesDir(root), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dossier.CyclesDir(root), "cycle-1762.json"), []byte(`{}`), 0o644); err != nil {
+	for _, c := range []string{"cycle-1762.json", "cycle-1745.json"} {
+		if err := os.WriteFile(filepath.Join(dossier.CyclesDir(root), c), []byte(`{}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(evolveDir, "cycle-state.json"), []byte(`{"active_worktree":"`+resumed+`"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	o := WorktreeOptions{ProjectRoot: root, WorktreeBase: base}
+	o := WorktreeOptions{ProjectRoot: root, WorktreeBase: base, EvolveDir: evolveDir, PidAlive: func(int) bool { return false }}
 	cases := []struct {
 		name string
 		p    Process
@@ -55,6 +62,7 @@ func TestFinishedCycleOrphans_TakesOnlyOrphansWhoseCwdIsInsideAFinishedCycleTree
 		{"orphan in a subdirectory of a closed-out tree", Process{Pid: 11, Ppid: 1, Cwd: filepath.Join(closed, "go")}, true},
 		{"orphan whose cycle tree was already removed", Process{Pid: 12, Ppid: 1, Cwd: filepath.Join(base, "cycle-cd3ae73e-1700")}, true},
 		{"orphan inside a live cycle's tree", Process{Pid: 13, Ppid: 1, Cwd: live}, false},
+		{"orphan inside a resumed cycle's tree that already has its FAIL dossier", Process{Pid: 20, Ppid: 1, Cwd: resumed}, false},
 		{"attached process inside a closed-out tree", Process{Pid: 14, Ppid: 4242, Cwd: closed}, false},
 		{"orphan in the operator's console", Process{Pid: 15, Ppid: 1, Cwd: filepath.Join(root, "console")}, false},
 		{"orphan at the worktree base itself", Process{Pid: 16, Ppid: 1, Cwd: base}, false},
@@ -77,7 +85,7 @@ func TestReapFinishedCycleOrphans_SignalsEachOwnedOrphanAndReportsFailures(t *te
 	gone := filepath.Join(base, "cycle-cd3ae73e-1700")
 	listing := "p20\nR1\nfcwd\nn" + gone + "\np21\nR1\nfcwd\nn" + gone + "/go\np22\nR1\nfcwd\nn" + root + "/console\n"
 	var lsofArgs []string
-	o := WorktreeOptions{ProjectRoot: root, WorktreeBase: base, Exec: func(_ context.Context, name, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+	o := WorktreeOptions{ProjectRoot: root, WorktreeBase: base, EvolveDir: filepath.Join(root, ".evolve"), Exec: func(_ context.Context, name, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
 		lsofArgs = append([]string{name}, args...)
 		_, _ = io.WriteString(stdout, listing)
 		return 0, nil

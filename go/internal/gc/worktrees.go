@@ -1,34 +1,5 @@
 package gc
 
-// worktrees.go — Slice S4 of docs/plans/workspace-hygiene-2026-07.md: a
-// gc-sibling Plan/Apply planner that drains the ACCUMULATED worktree+branch
-// backlog (65 worktrees / 106 never-deleted cycle-* branches at audit time)
-// that S1 (pid-aware lease staleness) and S3 (in-cycle branch deletion) do not
-// retroactively clean up. It mirrors gc.go's Plan/Apply shape: PlanWorktrees is
-// the pure dry-run (never mutates), ApplyWorktrees executes under
-// .evolve/ship.lock with a per-item TOCTOU re-check.
-//
-// Evidence pipeline (evidence-based, never name-parsed):
-//   - `git worktree list --porcelain` (in ProjectRoot) is the source of truth
-//     for registered worktrees and their branch (the "branch refs/heads/<name>"
-//     line, NOT the directory leaf).
-//   - a candidate is a worktree whose directory is a direct child of
-//     WorktreeBase AND whose leaf carries the "cycle-" prefix.
-//   - merged  = the branch is listed by `git branch --merged HEAD`.
-//   - dirty   = `git status --porcelain` (run IN the worktree dir) is non-empty.
-//   - live    = ANY of: a fresh runlease.OwnerLive lease at
-//     <EvolveDir>/runs/cycle-<N>/.lease (N = the leaf's trailing numeric
-//     segment after stripping a "-integration" / "-w<digits>" swarm suffix);
-//     <EvolveDir>/cycle-state.json's active_worktree equals the path; any
-//     <EvolveDir>/runs/*/run.json's active_worktree equals the path.
-//   - a cycle-* branch with NO worktree entry (the literal worktree/branch skew)
-//     is swept purely on the merged/unmerged split — no liveness check, nothing
-//     to remove, delete-branch (merged) or flag-unmerged (unmerged) only.
-//
-// Safety invariants (also pinned by worktrees_fuzz_test.go against random
-// populations): a live, dirty, or unmerged candidate is NEVER removed and its
-// branch is NEVER deleted.
-
 import (
 	"bufio"
 	"context"
@@ -223,8 +194,8 @@ func activeWorktreeMatches(jsonPath, wtPath string) bool {
 }
 
 func (o WorktreeOptions) runClosedOut(runDir string) bool {
-	n, err := strconv.Atoi(strings.TrimPrefix(runDir, "cycle-"))
-	return err == nil && dossier.ClosedOut(o.ProjectRoot, n)
+	n, ok := leafCycleNumber(runDir)
+	return ok && dossier.ClosedOut(o.ProjectRoot, n)
 }
 
 // isLive proves a worktree is genuinely in-flight via any of the three
@@ -435,8 +406,10 @@ func sortWorktreeItems(items []WorktreeItem) {
 
 // ApplyWorktrees executes a manifest under .evolve/ship.lock. Every
 // worktree-backed target is re-checked (TOCTOU) immediately before mutation: a
-// target that became live or dirty since Plan is refused and reported, never
-// removed. Removal is non-force `git worktree remove`; branch deletion is
+// target that became live since Plan is refused and reported, and so is a
+// plain-remove target that became dirty. A plain remove is a non-force
+// `git worktree remove`; a salvage-remove writes the salvage, re-checks
+// liveness, and only then removes with --force; branch deletion is
 // `git branch -d` (never -D); a single trailing `git worktree prune` reconciles
 // the whole batch.
 func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
@@ -460,7 +433,7 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	// branch.
 	didRemove, removeErrs := o.removeWorktrees(m.Items, refused)
 	errs = append(errs, removeErrs...)
-	didSalvage, salvageErrs := o.salvageRemoveWorktrees(m.Items)
+	didSalvage, salvageErrs := o.salvageRemoveWorktrees(m.Items, refused)
 	errs = append(errs, salvageErrs...)
 	didRemove = didRemove || didSalvage
 	// Pass 2b: delete branches (their worktrees, if any, are now gone).
@@ -480,12 +453,15 @@ func (o WorktreeOptions) refuseChangedTargets(items []WorktreeItem) (map[string]
 		if it.Path == "" || refused[it.Path] {
 			continue
 		}
-		if it.Action != WorktreeActionRemove && it.Action != WorktreeActionDeleteBranch {
+		if it.Action != WorktreeActionRemove && it.Action != WorktreeActionDeleteBranch && it.Action != WorktreeActionSalvageRemove {
 			continue
 		}
 		if o.isLive(it.Path) {
 			refused[it.Path] = true
 			errs = append(errs, fmt.Errorf("gc: refuse %s: became live between plan and apply", it.Path))
+			continue
+		}
+		if it.Action == WorktreeActionSalvageRemove {
 			continue
 		}
 		dirty, derr := o.isDirty(it.Path)

@@ -3,6 +3,7 @@ package gc
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -253,5 +254,32 @@ func TestApplyWorktrees_AFailedSalvageKeepsTheTree(t *testing.T) {
 	}
 	if n := e.git.callCount("worktree remove"); n != 0 {
 		t.Errorf("%d worktree removals ran for %s although its salvage failed", n, filepath.Base(wt))
+	}
+}
+
+func TestApplyWorktrees_ATreeThatTurnsLiveDuringItsSalvageIsKept(t *testing.T) {
+	e := newWorktreesTestEnv(t)
+	wt := e.addWorktree("cycle-cd3ae73e-1677", "cycle-cd3ae73e-1677", 48*time.Hour, true, false)
+	closeOutCycle(t, e.projectRoot, 1677, e.now.Add(-30*time.Hour))
+	o := e.opts()
+	o.Policy.SalvageAfterHours = 24
+	m, err := PlanWorktrees(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.Exec = func(ctx context.Context, name, dir string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
+		if len(args) > 0 && args[0] == "ls-files" {
+			e.writeLease(1677, runlease.Lease{RunID: "cycle-1677"}, time.Minute)
+		}
+		return e.git.run(ctx, name, dir, args, env, in, out, errw)
+	}
+
+	err = ApplyWorktrees(o, m)
+
+	if err == nil || !strings.Contains(err.Error(), "became live during its salvage") {
+		t.Errorf("ApplyWorktrees err = %v, want the mid-salvage liveness refusal", err)
+	}
+	if n := e.git.callCount("worktree remove"); n != 0 {
+		t.Errorf("%d worktree removals ran for %s after it turned live mid-salvage", n, filepath.Base(wt))
 	}
 }

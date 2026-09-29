@@ -39,7 +39,7 @@ func TestReapPipelineTemp_RemovesOnlyStalePipelineArtifacts(t *testing.T) {
 		}
 	}
 
-	rep := ReapPipelineTemp(dir, now.Add(-24*time.Hour), true)
+	rep := ReapPipelineTemp(dir, now.Add(-24*time.Hour), os.RemoveAll)
 
 	if rep.Entries != 6 || rep.Bytes != 60 || len(rep.Errors) != 0 {
 		t.Errorf("report = %+v, want 6 entries / 60 bytes / no errors", rep)
@@ -62,7 +62,7 @@ func TestReapPipelineTemp_APreviewRemovesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rep := ReapPipelineTemp(dir, time.Now().Add(-24*time.Hour), false)
+	rep := ReapPipelineTemp(dir, time.Now().Add(-24*time.Hour), func(string) error { return nil })
 
 	if rep.Entries != 1 {
 		t.Errorf("preview counted %d entries, want 1", rep.Entries)

@@ -11,19 +11,19 @@ import (
 	"strings"
 )
 
-func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem) (bool, []error) {
+func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused map[string]bool) (bool, []error) {
 	var errs []error
 	did := false
 	for _, it := range items {
-		if it.Action != WorktreeActionSalvageRemove {
-			continue
-		}
-		if o.isLive(it.Path) {
-			errs = append(errs, fmt.Errorf("gc: refuse %s: became live between plan and apply", it.Path))
+		if it.Action != WorktreeActionSalvageRemove || refused[it.Path] {
 			continue
 		}
 		if err := o.salvageWorktree(it.Path, it.Branch); err != nil {
 			errs = append(errs, fmt.Errorf("gc: refuse %s: salvage failed, tree kept: %w", it.Path, err))
+			continue
+		}
+		if o.isLive(it.Path) {
+			errs = append(errs, fmt.Errorf("gc: refuse %s: became live during its salvage, tree kept", it.Path))
 			continue
 		}
 		if _, err := o.git(o.ProjectRoot, "worktree", "remove", "--force", it.Path); err != nil {
@@ -36,7 +36,7 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem) (bool, []e
 }
 
 func (o WorktreeOptions) salvageWorktree(path, branch string) error {
-	dir := filepath.Join(o.EvolveDir, "operator-salvage", filepath.Base(path))
+	dir := filepath.Join(operatorSalvageDir(o.EvolveDir), filepath.Base(path))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create salvage dir: %w", err)
 	}
@@ -114,3 +114,5 @@ func addTarEntry(tw *tar.Writer, root, name string) error {
 	_, err = io.Copy(tw, src)
 	return err
 }
+
+func operatorSalvageDir(evolveDir string) string { return filepath.Join(evolveDir, "operator-salvage") }

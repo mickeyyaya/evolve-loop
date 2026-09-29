@@ -22,6 +22,7 @@ func goCacheFixture(t *testing.T, now time.Time) (string, map[string]bool) {
 		"tmp/scratch-d":   old,
 		"0g/notahash-d":   old,
 		"ab/ab77.partial": old,
+		"fuzz/0a1b-a":     old,
 	}
 	want := map[string]bool{"00/0a1b-a": true, "00/0a1b-d": true, "ff/ff01-a": true}
 	for name, mtime := range files {
@@ -39,7 +40,7 @@ func TestTrimGoCache_RemovesOnlyEntriesUnusedSinceTheCutoff(t *testing.T) {
 	now := time.Date(2026, 9, 29, 23, 0, 0, 0, time.UTC)
 	dir, want := goCacheFixture(t, now)
 
-	rep := TrimGoCache(dir, now.Add(-24*time.Hour), true)
+	rep := TrimGoCache(dir, now.Add(-24*time.Hour), os.Remove)
 
 	if rep.Files != len(want) || rep.Bytes != int64(10*len(want)) || len(rep.Errors) != 0 {
 		t.Fatalf("report = %+v, want %d files / %d bytes / no errors", rep, len(want), 10*len(want))
@@ -57,7 +58,7 @@ func TestTrimGoCache_RemovesOnlyEntriesUnusedSinceTheCutoff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, kept := range []string{"ab/ab77-d", "trim.txt", "README", "testexpire.txt", "tmp/scratch-d", "0g/notahash-d", "ab/ab77.partial"} {
+	for _, kept := range []string{"ab/ab77-d", "trim.txt", "README", "testexpire.txt", "tmp/scratch-d", "0g/notahash-d", "ab/ab77.partial", "fuzz/0a1b-a"} {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(kept))); err != nil {
 			t.Errorf("%s was removed: only a hash subdirectory's -a/-d entries past the cutoff may go", kept)
 		}
@@ -69,7 +70,7 @@ func TestTrimGoCache_APreviewCountsTheSameEntriesAndRemovesNothing(t *testing.T)
 	now := time.Date(2026, 9, 29, 23, 0, 0, 0, time.UTC)
 	dir, want := goCacheFixture(t, now)
 
-	rep := TrimGoCache(dir, now.Add(-24*time.Hour), false)
+	rep := TrimGoCache(dir, now.Add(-24*time.Hour), func(string) error { return nil })
 
 	if rep.Files != len(want) {
 		t.Errorf("preview counted %d files, want %d", rep.Files, len(want))
@@ -83,7 +84,7 @@ func TestTrimGoCache_APreviewCountsTheSameEntriesAndRemovesNothing(t *testing.T)
 
 func TestTrimGoCache_AMissingCacheIsReportedNotIgnored(t *testing.T) {
 	t.Parallel()
-	rep := TrimGoCache(filepath.Join(t.TempDir(), "absent"), time.Now(), true)
+	rep := TrimGoCache(filepath.Join(t.TempDir(), "absent"), time.Now(), os.Remove)
 
 	if len(rep.Errors) != 1 {
 		t.Errorf("Errors = %v, want the unreadable cache dir named", rep.Errors)

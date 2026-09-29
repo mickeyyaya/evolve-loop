@@ -19,6 +19,10 @@
 //   - ledger.jsonl / ledger.tip / ledger-segments/** are never touched
 //     (append-only tamper-evident history; sealing is L3.3's job).
 //   - a LIVE run dir is never touched, no matter its age.
+//
+// The package also sweeps cycle worktrees, finished cycles' orphan processes,
+// the Go build cache and pipeline temp artifacts; the design notes and the
+// invariants of every sweep are in docs/architecture/packages/internal-gc.md.
 package gc
 
 import (
@@ -123,7 +127,7 @@ func Plan(opts Options) (Manifest, error) {
 	planTrackerTTL(opts.Runs, items, pol, now, add)
 
 	// Rule 3: operator-salvage TTL (top-level entries by mtime).
-	for _, e := range dirEntriesOlderThan(filepath.Join(opts.EvolveDir, "operator-salvage"), now(), pol.SalvageTTLDays, nil) {
+	for _, e := range dirEntriesOlderThan(operatorSalvageDir(opts.EvolveDir), now(), pol.SalvageTTLDays, nil) {
 		add(e, ActionDelete, "salvage_ttl_days")
 	}
 

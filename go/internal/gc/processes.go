@@ -56,10 +56,11 @@ func (o WorktreeOptions) finishedCycleTree(cwd string) bool {
 		return false
 	}
 	n, ok := leafCycleNumber(leaf)
-	if !strings.HasPrefix(leaf, "cycle-") || !ok {
+	tree := filepath.Join(o.WorktreeBase, leaf)
+	if !strings.HasPrefix(leaf, "cycle-") || !ok || o.isLive(tree) {
 		return false
 	}
-	if _, err := os.Stat(filepath.Join(o.WorktreeBase, leaf)); os.IsNotExist(err) {
+	if _, err := os.Stat(tree); os.IsNotExist(err) {
 		return true
 	}
 	return dossier.ClosedOut(o.ProjectRoot, n)

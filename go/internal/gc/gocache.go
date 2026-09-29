@@ -17,7 +17,7 @@ type CacheTrimReport struct {
 	Errors []string `json:"errors,omitempty"`
 }
 
-func TrimGoCache(dir string, cutoff time.Time, apply bool) CacheTrimReport {
+func TrimGoCache(dir string, cutoff time.Time, remove func(string) error) CacheTrimReport {
 	var rep CacheTrimReport
 	shards, err := os.ReadDir(dir)
 	if err != nil {
@@ -26,17 +26,21 @@ func TrimGoCache(dir string, cutoff time.Time, apply bool) CacheTrimReport {
 	}
 	for _, s := range shards {
 		if s.IsDir() && goCacheShardRe.MatchString(s.Name()) {
-			trimShard(filepath.Join(dir, s.Name()), cutoff, apply, &rep)
+			shard := trimShard(filepath.Join(dir, s.Name()), cutoff, remove)
+			rep.Files += shard.Files
+			rep.Bytes += shard.Bytes
+			rep.Errors = append(rep.Errors, shard.Errors...)
 		}
 	}
 	return rep
 }
 
-func trimShard(shard string, cutoff time.Time, apply bool, rep *CacheTrimReport) {
+func trimShard(shard string, cutoff time.Time, remove func(string) error) CacheTrimReport {
+	var rep CacheTrimReport
 	entries, err := os.ReadDir(shard)
 	if err != nil {
 		rep.Errors = append(rep.Errors, fmt.Sprintf("read %s: %v", shard, err))
-		return
+		return rep
 	}
 	for _, e := range entries {
 		if e.IsDir() || !goCacheEntryRe.MatchString(e.Name()) {
@@ -46,13 +50,12 @@ func trimShard(shard string, cutoff time.Time, apply bool, rep *CacheTrimReport)
 		if err != nil || !info.ModTime().Before(cutoff) {
 			continue
 		}
-		if apply {
-			if err := os.Remove(filepath.Join(shard, e.Name())); err != nil && !os.IsNotExist(err) {
-				rep.Errors = append(rep.Errors, err.Error())
-				continue
-			}
+		if err := remove(filepath.Join(shard, e.Name())); err != nil && !os.IsNotExist(err) {
+			rep.Errors = append(rep.Errors, err.Error())
+			continue
 		}
 		rep.Files++
 		rep.Bytes += info.Size()
 	}
+	return rep
 }
