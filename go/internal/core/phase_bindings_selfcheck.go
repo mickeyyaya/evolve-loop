@@ -13,7 +13,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -95,7 +95,7 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 }
 
 func taggedTestArgs(pkg string, tags []string) []string {
-	return []string{"test", "-count=1", "-timeout", ciparity.ACSDurableTimeout.String(), "-tags", strings.Join(tags, ","), pkg}
+	return []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", strings.Join(tags, ","), pkg}
 }
 
 // realGoUnitTestTagged is realGoUnitTest with `-tags`: a tag-gated package is

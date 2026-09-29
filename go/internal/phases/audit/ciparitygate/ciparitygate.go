@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -98,7 +97,7 @@ type Timeouts struct {
 // DefaultTimeouts are the production budgets (compiled defaults, never env
 // toggles; a policy.json home is follow-up 14-2).
 func DefaultTimeouts() Timeouts {
-	return Timeouts{GoVet: 4 * time.Minute, ACSDurable: ciparity.ACSDurableTimeout, Apicover: 8 * time.Minute, TierAttempt: 15 * time.Minute, TierLockWait: 5 * time.Minute}
+	return Timeouts{GoVet: 4 * time.Minute, ACSDurable: 8 * time.Minute, Apicover: 8 * time.Minute, TierAttempt: 15 * time.Minute, TierLockWait: 5 * time.Minute}
 }
 
 // ChangedSetFunc is the change-set Strategy: (pkgs, derivable) for a cycle,

@@ -4,17 +4,14 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 )
 
-func TestTaggedTestArgs_RunAPredicatePackageUnderTheCIParityBudget(t *testing.T) {
-	args := taggedTestArgs("./acs/cycle1763", []string{"acs"})
+func TestTaggedTestArgs_RunAnAddedPackageUnderShipsBackstopBudget(t *testing.T) {
+	got := taggedTestArgs("./acs/cycle1763", []string{"acs"})
 
-	i := slices.Index(args, "-timeout")
-	if i < 0 || i+1 >= len(args) || args[i+1] != ciparity.ACSDurableTimeout.String() {
-		t.Fatalf("args = %v, want -timeout %s: the floor must not kill a predicate the CI-parity gate budgets that long (cycle 1763 edited the floor's 120s to 480s to survive)", args, ciparity.ACSDurableTimeout)
-	}
-	if !slices.Equal(args[len(args)-3:], []string{"-tags", "acs", "./acs/cycle1763"}) {
-		t.Errorf("args = %v, want the tags then the package last", args)
+	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", "acs", "./acs/cycle1763"}
+	if !slices.Equal(got, want) {
+		t.Errorf("args = %v, want %v: the floor runs the added package exactly as its twin, ship's added-test backstop, does, never under a stricter deadline (at 120s the floor killed cycle 1763's own -count=50 -race predicate and the lane edited the floor to survive)", got, want)
 	}
 }
