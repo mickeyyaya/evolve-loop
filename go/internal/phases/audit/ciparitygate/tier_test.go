@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
 // Test 20 (moved intent: audit/ciparity_unit_test.go:421) — every attempt runs
@@ -35,7 +36,7 @@ func TestTierAttempts_ScrubbedEnvIsCapturedOnceAndIdenticalOnBothAttempts(t *tes
 		t.Errorf("scrubbed env: %v", first)
 	}
 	rank := map[string]int{}
-	for i, k := range tierEnvAllowlist {
+	for i, k := range ciparity.CIEnvAllowlist {
 		rank[k] = i
 	}
 	last := -1
