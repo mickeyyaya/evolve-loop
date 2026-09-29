@@ -67,7 +67,7 @@ type options struct {
 	now         func() time.Time
 	attemptFile string
 	logFile     string
-	handoffPID  int
+	handoff     Handoff
 }
 
 // Option configures a Refresher or a Driver at construction.
@@ -99,8 +99,13 @@ func WithMarkerFiles(attempt, log string) Option {
 	return func(o *options) { o.attemptFile, o.logFile = attempt, log }
 }
 
-func WithHandoff(pid int) Option {
-	return func(o *options) { o.handoffPID = pid }
+type Handoff struct {
+	PID       int
+	WavesDone int
+}
+
+func WithHandoff(h Handoff) Option {
+	return func(o *options) { o.handoff = h }
 }
 
 func (o options) center() *signalcenter.Center {

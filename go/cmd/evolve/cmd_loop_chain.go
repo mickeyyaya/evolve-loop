@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -133,6 +134,14 @@ func maybeRefreshChainBoundary(cfg loopConfig, batch int, stderr io.Writer) (ref
 	return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch)
 }
 
+func takeReexecHandoff(evolveDir string, stderr io.Writer) int {
+	done, err := loopchain.TakeHandoff(filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile), loopchain.Claim{PID: os.Getpid(), Commit: chainRunningCommitFn(), At: time.Now()})
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: boundary re-exec handoff not honoured (%v) — starting at wave 0 with the full budget\n", err)
+	}
+	return done
+}
+
 // lastChainBoundaryRefreshLogEntry reads the audit trail's LAST entry —
 // nil-when-clean (a missing, empty or unparseable file is (nil, nil)).
 func lastChainBoundaryRefreshLogEntry(evolveDir string) (*chainBoundaryRefreshLogEntry, error) {
@@ -159,8 +168,14 @@ func chainContinueDecision(rc int) (reason string, exit int, stop bool) {
 // same config every time, the Center-bearing refresh, the audit trail, the
 // fleet width read to record it, and the checkpoint's quota-pause block.
 func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer, signals *signalcenter.Center) *loopchain.Driver {
+	next := cfg
 	deps := loopchain.DriverDeps{
-		Batch:       func() int { signals.Flush(); return runLoopBatchFn(cfg, stdin, stdout, stderr) },
+		Batch: func() int {
+			signals.Flush()
+			batchCfg := next
+			next.ResumeWaves = 0
+			return runLoopBatchFn(batchCfg, stdin, stdout, stderr)
+		},
 		Refresh:     func(batch int) bool { return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch) },
 		LastRefresh: func() (*chainBoundaryRefreshLogEntry, error) { return lastChainBoundaryRefreshLogEntry(cfg.EvolveDir) },
 		FleetWidth:  func() int { return loadFleetConfig(cfg.EvolveDir).Count },

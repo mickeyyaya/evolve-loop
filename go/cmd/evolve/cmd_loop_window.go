@@ -96,7 +96,7 @@ func (b *loopBatchCoordinator) probeSyncAndPublish(iteration int) (batchDecision
 }
 
 func (b *loopBatchCoordinator) maybeRefreshChainBoundaryAtWave(iteration int) bool {
-	return wiredRefresher(b.cfg, b.stderr, b.deps.Signals, loopchain.WithHandoff(os.Getpid())).Refresh(b.ctx, iteration+1)
+	return wiredRefresher(b.cfg, b.stderr, b.deps.Signals, loopchain.WithHandoff(loopchain.Handoff{PID: os.Getpid(), WavesDone: iteration})).Refresh(b.ctx, iteration+1)
 }
 
 func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {

@@ -43,6 +43,7 @@ type attempt struct {
 	Batch         int    `json:"batch"`
 	Timestamp     string `json:"timestamp"`
 	PID           int    `json:"pid,omitempty"`
+	WavesDone     int    `json:"waves_done,omitempty"`
 }
 
 // alreadyAttempted reports whether a refresh was already performed for
@@ -68,7 +69,7 @@ func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 // against the next boundary and, under WithHandoff, the pid the replacement
 // image resumes under.
 func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
-	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoffPID})
+	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoff.PID, WavesDone: r.opts.handoff.WavesDone})
 	if err == nil {
 		err = os.WriteFile(filepath.Join(r.roots.EvolveDir, r.opts.attemptFile), buf, 0o644)
 	}
@@ -78,21 +79,31 @@ func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
 	return nil
 }
 
-func TakeHandoff(attemptPath string, pid int, runningCommit string) (int, error) {
+type Claim struct {
+	PID    int
+	Commit string
+	At     time.Time
+}
+
+func TakeHandoff(attemptPath string, c Claim) (int, error) {
 	raw, err := os.ReadFile(attemptPath)
 	if err != nil {
 		return 0, nil
 	}
 	var rec attempt
-	if json.Unmarshal(raw, &rec) != nil || rec.PID == 0 || rec.PID != pid || rec.RunningCommit == runningCommit || rec.Batch < 1 {
+	if json.Unmarshal(raw, &rec) != nil || !rec.handsOffTo(c) {
 		return 0, nil
 	}
-	rec.PID = 0
-	buf, _ := json.Marshal(rec)
+	buf, _ := json.Marshal(attempt{RunningCommit: rec.RunningCommit, Batch: rec.Batch, Timestamp: rec.Timestamp})
 	if err := os.WriteFile(attemptPath, buf, 0o644); err != nil {
 		return 0, fmt.Errorf("consume the boundary re-exec handoff: %w", err)
 	}
-	return rec.Batch - 1, nil
+	return rec.WavesDone, nil
+}
+
+func (a attempt) handsOffTo(c Claim) bool {
+	armed, err := time.Parse(time.RFC3339, a.Timestamp)
+	return err == nil && a.PID != 0 && a.PID == c.PID && a.RunningCommit != c.Commit && c.At.Sub(armed) <= handoffMaxAge
 }
 
 // appendLog appends one audit record. Best-effort: a failure here must not
@@ -150,3 +161,5 @@ func LastRefreshLogEntry(logPath string) (*RefreshLogEntry, error) {
 	}
 	return nil, nil
 }
+
+const handoffMaxAge = 5 * time.Minute

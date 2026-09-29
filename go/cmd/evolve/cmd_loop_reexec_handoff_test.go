@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func handoffProject(t *testing.T) (root, evolveDir string) {
@@ -21,6 +22,21 @@ func handoffProject(t *testing.T) (root, evolveDir string) {
 		t.Fatal(err)
 	}
 	return root, evolveDir
+}
+
+func writeHandoff(t *testing.T, evolveDir string, pid int, age time.Duration) string {
+	t.Helper()
+	marker := filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile)
+	u13WriteJSON(t, marker, map[string]any{"running_commit": "cafebabe1234deadbeef", "batch": 7, "timestamp": time.Now().Add(-age).UTC().Format(time.RFC3339), "pid": pid, "waves_done": 1})
+	return marker
+}
+
+func writeChainPolicy(t *testing.T, evolveDir string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"dispatch":{"policy":"off"},"chain":{"max_batches":2}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	u13WriteJSON(t, filepath.Join(evolveDir, "inbox", "pending.json"), map[string]any{"id": "pending"})
 }
 
 func stubLaneActive(t *testing.T, active *bool) {
@@ -84,7 +100,7 @@ func TestRunLoop_ABoundaryReExecKeepsTheWaveIndexAndTheRemainingBudget(t *testin
 
 func TestRunLoop_AHandoffArmedByAnotherProcessIsNotInherited(t *testing.T) {
 	root, evolveDir := handoffProject(t)
-	u13WriteJSON(t, filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile), map[string]any{"running_commit": "cafebabe1234deadbeef", "batch": 2, "timestamp": "2026-09-29T10:00:00Z", "pid": os.Getpid() + 1})
+	writeHandoff(t, evolveDir, os.Getpid()+1, 0)
 	u13StubRefresh(t, func() bool { return false })
 	chainRunningCommitFn = func() string { return "0ddba11beef0" }
 	orch := &brakeOrch{evolveDir: evolveDir}
@@ -101,8 +117,7 @@ func TestRunLoop_AHandoffThatCannotBeConsumedIsNotHonouredAndSaysSo(t *testing.T
 		t.Skip("root writes through a read-only file")
 	}
 	root, evolveDir := handoffProject(t)
-	marker := filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile)
-	u13WriteJSON(t, marker, map[string]any{"running_commit": "cafebabe1234deadbeef", "batch": 2, "timestamp": "2026-09-29T10:00:00Z", "pid": os.Getpid()})
+	marker := writeHandoff(t, evolveDir, os.Getpid(), 0)
 	if err := os.Chmod(marker, 0o444); err != nil {
 		t.Fatal(err)
 	}
@@ -114,5 +129,73 @@ func TestRunLoop_AHandoffThatCannotBeConsumedIsNotHonouredAndSaysSo(t *testing.T
 
 	if orch.calls != 3 || !strings.Contains(stderr, "[loop] WARN: boundary re-exec handoff not honoured") {
 		t.Errorf("an unconsumable handoff starts at wave 0 with the full budget and says so: ran %d\n%s", orch.calls, stderr)
+	}
+}
+
+func TestRunLoop_AStaleHandoffIsNotHonoured(t *testing.T) {
+	root, evolveDir := handoffProject(t)
+	writeHandoff(t, evolveDir, os.Getpid(), time.Hour)
+	u13StubRefresh(t, func() bool { return false })
+	chainRunningCommitFn = func() string { return "0ddba11beef0" }
+	orch := &brakeOrch{evolveDir: evolveDir}
+
+	_, _, stderr := runBrakeLoop(t, root, orch)
+
+	if orch.calls != 3 || strings.Contains(stderr, "boundary re-exec: continuing") {
+		t.Errorf("a pid-matching handoff older than the bound starts at wave 0 with the full budget: ran %d\n%s", orch.calls, stderr)
+	}
+}
+
+func TestRunLoopChain_TheHandoffIsTakenOnceAtBootAndResumesOnlyTheFirstBatch(t *testing.T) {
+	root, evolveDir := handoffProject(t)
+	writeChainPolicy(t, evolveDir)
+	writeHandoff(t, evolveDir, os.Getpid(), 0)
+	u13StubRefresh(t, func() bool { return false })
+	chainRunningCommitFn = func() string { return "0ddba11beef0" }
+	orch := &brakeOrch{evolveDir: evolveDir}
+
+	_, _, stderr := runBrakeLoop(t, root, orch, "--until-inbox-empty")
+
+	if orch.calls != 2+3 || strings.Count(stderr, "boundary re-exec: continuing at wave 1") != 1 {
+		t.Errorf("batch 1 resumes after its one completed wave (2 of 3 run), batch 2 runs its full 3: ran %d\n%s", orch.calls, stderr)
+	}
+}
+
+func TestRunLoopChain_AnUnconsumableHandoffIsRefusedOnceAtBoot(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes through a read-only file")
+	}
+	root, evolveDir := handoffProject(t)
+	writeChainPolicy(t, evolveDir)
+	if err := os.Chmod(writeHandoff(t, evolveDir, os.Getpid(), 0), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	u13StubRefresh(t, func() bool { return false })
+	chainRunningCommitFn = func() string { return "0ddba11beef0" }
+	orch := &brakeOrch{evolveDir: evolveDir}
+
+	_, _, stderr := runBrakeLoop(t, root, orch, "--until-inbox-empty")
+
+	if orch.calls != 3+3 || strings.Count(stderr, "boundary re-exec handoff not honoured") != 1 {
+		t.Errorf("the handoff is read once, at boot, and neither batch resumes: ran %d\n%s", orch.calls, stderr)
+	}
+}
+
+func TestRunLoop_AChainBoundaryReExecArmsNoHandoff(t *testing.T) {
+	root, evolveDir := handoffProject(t)
+	writeChainPolicy(t, evolveDir)
+	u13StubRefresh(t, func() bool { return true })
+	laneActive := false
+	stubLaneActive(t, &laneActive)
+	orch := &brakeOrch{evolveDir: evolveDir}
+
+	_, stdout, stderr := runBrakeLoop(t, root, orch, "--until-inbox-empty")
+
+	raw, err := os.ReadFile(filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile))
+	if err != nil || !strings.Contains(stdout, `"chain_stop_reason": "chain_boundary_refresh_reexec"`) {
+		t.Fatalf("the chain boundary refreshed and armed the breaker: %v\n%s\n%s", err, stdout, stderr)
+	}
+	if strings.Contains(string(raw), `"pid"`) || strings.Contains(string(raw), `"waves_done"`) {
+		t.Errorf("a chain-boundary re-exec arms no wave handoff: %s", raw)
 	}
 }
