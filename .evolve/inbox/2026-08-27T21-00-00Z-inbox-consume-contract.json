@@ -4,6 +4,12 @@
   "weight": 0.6,
   "title": "Sweep: inbox consume contract (14 auditor prescriptions amortised)",
   "summary": "Inbox consume/retire contract: consumedRecord typing, id resolution, uniqueness, lifecycle transitions. Amortised from 14 content-hash carryoverTodos that were unreachable by any operator directive: their ids were 32-char hashes, so goal-text could never name them and triage could not prioritise them (all 144 were stamped priority=high, which is the same as none being high). Queue audit 2026-08-27. Member prescriptions verbatim below; work them as one sweep, smallest-blast-radius first, and retire the group when the theme is clean.",
+  "files": [
+    "go/internal/inboxmover/lifecycle/release.go",
+    "go/internal/inboxmover/closesmarker.go",
+    "go/internal/inboxmover/consumed_record.go (new)",
+    "go/acs/cycle1452/predicates_test.go"
+  ],
   "prescriptions": [
     {
       "origin_id": "d66740f97d5885c26660914ece9f493e4",

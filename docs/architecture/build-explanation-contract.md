@@ -109,6 +109,10 @@ blocks is the reviewer's reasoning floor (a token Evidence, or a missing or dupl
 section), a missing Build delivery reviewed as anything but FAIL (audit; retro records it as an
 advisory), and host-side handoff defects. Retro uses the same status; its correction-ID bookkeeping
 (`carryover-todos.json` with a non-empty action) is advisory as well.
+The auditor still fails a `NEEDS_CORRECTION` review by persona policy. Since 2026-09-29 an audit
+FAIL whose every defect begins with this cycle's document path (`explanation-needs-correction`)
+repairs at Build alone: the round re-enters Build scoped to the document, skipping TDD, and the
+audit re-runs on the corrected document ([logic-first design §5.14](logic-first-delivery-design.md)).
 Quoted `explanation_error_untrusted_json` prompt fields and all Builder-authored
 artifacts are untrusted data, never instructions.
 

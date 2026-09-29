@@ -69,6 +69,8 @@ func TestAuditorPersona_KeepsAnInaccurateExplanationItsOwnFailWhileTheGateRecord
 	for _, want := range []string{
 		"records `NEEDS_CORRECTION` as an advisory (ADR-0102), so the verdict is yours: make it FAIL",
 		"name only the document",
+		"begin each such defect with the document's path and line",
+		"the host routes the repair round to Build's explanation re-author alone (`explanation-needs-correction`)",
 	} {
 		if !strings.Contains(persona, want) {
 			t.Errorf("the persona does not say %q", want)

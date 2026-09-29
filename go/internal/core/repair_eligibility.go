@@ -40,6 +40,8 @@ const CtxKeyStandingAuditFindings = "standing_audit_findings"
 // retro-routed re-entry so the prompt can name why no direct repair ran.
 const CtxKeyAuditDeclineReason = "audit_decline_reason"
 
+const CtxKeyExplanationReauthor = "explanation_reauthor_document"
+
 // consumeAuditRepairGrant records decideAfterAuditFail's disposition on
 // persisted cycle state — it is the ONE latch for both branches: a grant
 // ("audit-repair: …") spends a retry attempt and marks the repair round
@@ -78,7 +80,8 @@ func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) m
 		return base
 	}
 	if cs.AuditRepairActive {
-		return withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
+		out := withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
+		return withContext(out, CtxKeyExplanationReauthor, explanationReauthorScope(next, cs))
 	}
 	if cs.ShipRecoveryCode == "" && !retroRouted(cs) {
 		return base

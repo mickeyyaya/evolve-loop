@@ -1,0 +1,21 @@
+{
+  "id": "repair-brief-reads-the-failure-block-for-every-agent-graded-fail",
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "weight": 0.4,
+  "title": "An agent-graded audit FAIL's repair round WARNs 'findings artifact unreadable' and briefs the builder without the failure block's defects",
+  "files": [
+    "go/internal/core/repair_brief.go",
+    "go/internal/core/continuation_stamp.go",
+    "go/internal/core/failure_digest.go"
+  ],
+  "summary": "The repair brief (composeRepairBrief) reads the audit's reasons only from audit-fail-reason.json, which a runner gate writes (persistFloorFailReasons) and, since the doc-only landing (logic-first design §5.14, X2a), the explanation-needs-correction route writes. For every other agent-graded audit FAIL the file is absent, so readContinuationFindings WARNs 'continuation: findings artifact ... unreadable' on each tdd/build dispatch of the round, and the brief carries only the report's findings table (auditorFindingsBrief), not the verdict sentinel's failure-block defects, which are the auditor's machine-readable reasons. The X2a architecture review (2026-09-29) also noted that the X2a record makes a re-author Build that dies before the re-audit digest from the audit's defects rather than the Build error, the same as a floor record already does.",
+  "fix": "Have composeRepairBrief read phasecontract.ReadFailureBlock(workspace, audit).Defects for an agent-graded FAIL when audit-fail-reason.json is absent (and treat an absent file as expected there, not a WARN), deduplicated against auditorFindingsBrief's titles. Then decide whether the X2a record is still needed for the brief, or only for a continuation's FindingsPath, and whether ensureFailureDigest should prefer the failing phase's own error over a record another phase wrote.",
+  "acceptance": [
+    "A repair round after an agent-graded code-audit-fail with no gate reasons briefs tdd/build with the failure block's defects and logs no 'findings artifact unreadable' WARN",
+    "A runner-downgraded FAIL's brief is unchanged (gate reasons first)",
+    "The failure digest of a phase that dies inside a repair round names that phase's failure, or the design states why it does not"
+  ],
+  "created_at": "2026-09-29T07:25:00Z",
+  "source": "console, 2026-09-29, architecture review of the doc-only-audit-fail-reauthors-the-explanation landing"
+}
