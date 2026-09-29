@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
 func TestRecordExplanationCorrection_TheContinuationReadsTheDefects(t *testing.T) {
@@ -46,6 +48,18 @@ func TestRecordExplanationCorrection_TheNextAuditDispatchRetiresTheRecord(t *tes
 
 	if _, err := os.Stat(filepath.Join(ws, "audit-fail-reason.json")); !os.IsNotExist(err) {
 		t.Fatalf("the re-audit must not inherit the corrected round's record: stat err = %v", err)
+	}
+}
+
+func TestRecordExplanationRound_AnUnwritableWorkspaceWarnsNamingTheClass(t *testing.T) {
+	cs := CycleState{CycleID: correctionCycle, WorkspacePath: filepath.Join(t.TempDir(), "absent")}
+
+	stderr := captureStderr(t, func() {
+		recordExplanationRound(cs, &phasecontract.FailureBlock{Defects: cycle1745Defects})
+	})
+
+	if !strings.Contains(stderr, "WARN cycle 1745 "+explanationNeedsCorrection) {
+		t.Fatalf("a record the re-author will not see must be said on stderr, got:\n%s", stderr)
 	}
 }
 

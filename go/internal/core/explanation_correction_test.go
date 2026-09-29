@@ -40,6 +40,8 @@ func TestExplanationCorrectionDocument_LabelledAndQuotedLocationsStillNameTheDoc
 		"M1: `" + correctionDocument + "#L41` names the wrong caller",
 		"/Users/op/runtime/.evolve/worktrees/cycle-1745/" + correctionDocument + ":8 is stale",
 		"./" + correctionDocument + ":8 is stale",
+		"H1 (e.g. the line count) " + correctionDocument + ":8 is stale",
+		"H1 i.e. 2.5 of 3 claims: " + correctionDocument + ":8 is stale",
 	} {
 		fb := &phasecontract.FailureBlock{Class: "code-audit-fail", Defects: []string{defect}}
 		if _, ok := explanationCorrectionDocument(correctionState(), fb); !ok {
@@ -57,6 +59,7 @@ func TestExplanationCorrectionDocument_ADefectOutsideTheDocumentKeepsTheRepairRo
 		{"one code defect beside a document defect", correctionState(), []string{cycle1745Defects[0], "H1: go/internal/cyclesimulator/characterization_test.go:263-281 builds a raw git repo"}},
 		{"a code location that cites the document afterwards", correctionState(), []string{"H1: go/internal/core/x.go:12 contradicts " + correctionDocument + ":3"}},
 		{"a bare report file before the document", correctionState(), []string{"M1: build-report.md:227 and " + correctionDocument + ":55-56 claim a pure straight-cut move"}},
+		{"a one-letter extension before the document", correctionState(), []string{"M1: probe.c:12 contradicts " + correctionDocument + ":3"}},
 		{"a document defect with no path at all", correctionState(), []string{"M1: explanation doc :97 claims only date-carrying ids see different output"}},
 		{"another cycle's document", correctionState(), []string{"docs/explain/builds/cycle-1744-01m3mak46kk0havqvsbxmhaq4q.md:8 is stale"}},
 		{"another run's document for the same cycle", correctionState(), []string{"docs/explain/builds/cycle-1745-01m3zzzzzzzzzzzzzzzzzzzzzz.md:8 is stale"}},

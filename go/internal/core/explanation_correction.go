@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -39,11 +40,17 @@ func defectLocation(defect string) string {
 	for _, field := range strings.Fields(defect) {
 		token := strings.Trim(field, defectTokenPunctuation)
 		token = strings.Trim(defectLineLocator.ReplaceAllString(token, ""), defectTokenPunctuation)
-		if strings.Contains(token, "/") || path.Ext(token) != "" {
+		if pathLike(token) {
 			return token
 		}
 	}
 	return ""
+}
+
+func pathLike(token string) bool {
+	ext := path.Ext(token)
+	stem := strings.TrimSuffix(token, ext)
+	return strings.Contains(token, "/") || (len(stem) > 1 && len(ext) > 1 && unicode.IsLetter(rune(ext[1])))
 }
 
 func namesDocument(location, document string) bool {
