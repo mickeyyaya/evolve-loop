@@ -133,8 +133,8 @@ func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Write
 	return runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
 }
 
-func RunRepoContractPack(ctx context.Context, moduleDir string) (reds []string, err error) {
-	o := repoContractTestFn(ctx, moduleDir, io.Discard)
+func RunRepoContractPack(ctx context.Context, root string) (reds []string, err error) {
+	o := repoContractTestFn(ctx, filepath.Join(root, "go"), io.Discard)
 	return o.failedNames(), o.err
 }
 

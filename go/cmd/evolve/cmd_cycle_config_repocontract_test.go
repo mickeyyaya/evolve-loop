@@ -29,13 +29,13 @@ func TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName(t
 	var ranIn []string
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
-	repoContractPack = func(_ context.Context, moduleDir string) ([]string, error) {
-		ranIn = append(ranIn, moduleDir)
+	repoContractPack = func(_ context.Context, root string) ([]string, error) {
+		ranIn = append(ranIn, root)
 		return []string{red}, errors.New("exit status 1")
 	}
 	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Worktree: wt})
-	if len(ranIn) != 1 || ranIn[0] != filepath.Join(wt, "go") {
-		t.Fatalf("the production floor runs the repo-contract pack once in the worktree's module; ran in %v", ranIn)
+	if len(ranIn) != 1 || ranIn[0] != wt {
+		t.Fatalf("the production floor runs the repo-contract pack once, handed the build worktree; ran in %v", ranIn)
 	}
 	if !strings.Contains(strings.Join(got, "\n"), "TestRatchet_NoNewRawGitFixtures") {
 		t.Fatalf("the production floor names the pack's red test; got %v", got)

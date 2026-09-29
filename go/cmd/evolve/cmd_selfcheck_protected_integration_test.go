@@ -52,6 +52,9 @@ func TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest(
 		t.Fatal(err)
 	}
 
+	prev := repoContractPack
+	t.Cleanup(func() { repoContractPack = prev })
+	repoContractPack = func(context.Context, string) ([]string, error) { return nil, nil }
 	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{
 		Phase: string(core.PhaseBuild), Worktree: wt, WorktreeBaseSHA: base, Workspace: ws,
 	})

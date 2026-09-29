@@ -17,8 +17,8 @@ type fakeRepoContractPack struct {
 	dirs []string
 }
 
-func (f *fakeRepoContractPack) run(_ context.Context, moduleDir string) ([]string, error) {
-	f.dirs = append(f.dirs, moduleDir)
+func (f *fakeRepoContractPack) run(_ context.Context, root string) ([]string, error) {
+	f.dirs = append(f.dirs, root)
 	return f.reds, f.err
 }
 
@@ -44,11 +44,11 @@ func TestRepoContractFloorChecks_ARawGitFixtureIsCorrectedAtBuildExitByTheRatche
 	if res.Approve || !res.Retry {
 		t.Fatalf("a red repo-contract pack goes back to the build correction; got Approve=%v Retry=%v", res.Approve, res.Retry)
 	}
-	if !strings.Contains(res.Reason, "TestRatchet_NoNewRawGitFixtures") || !strings.Contains(res.Reason, "repo-contract scanner pack") {
+	if !strings.Contains(res.Reason, "TestRatchet_NoNewRawGitFixtures") || !strings.Contains(res.Reason, "repo-contract scanner pack") || !strings.Contains(res.Reason, "go test -count=1 <package>") {
 		t.Fatalf("the correction names the pack and the ratchet's failing test; got %q", res.Reason)
 	}
-	if len(pack.dirs) != 1 || pack.dirs[0] != filepath.Join(wt, "go") {
-		t.Fatalf("the pack runs once in the build worktree's module; ran in %v", pack.dirs)
+	if len(pack.dirs) != 1 || pack.dirs[0] != wt {
+		t.Fatalf("the pack runs once, handed the build worktree so ship picks its module exactly as the gate does; ran in %v", pack.dirs)
 	}
 }
 
@@ -72,7 +72,7 @@ func TestRepoContractFloorChecks_GreenOrAnUnnamedExitPassesTheHandoff(t *testing
 
 func TestRepoContractFloorChecks_FollowsTheShipGatesDial(t *testing.T) {
 	wt := worktreeWithModule(t)
-	for word, wantRun := range map[string]bool{"off": false, "enforce": true, "": true} {
+	for word, wantRun := range map[string]bool{"off": false, "enforce": true, "": true, "shadwo": true, "{not json": true} {
 		root := t.TempDir()
 		if word != "" {
 			writePolicyGate(t, root, word)
@@ -85,6 +85,15 @@ func TestRepoContractFloorChecks_FollowsTheShipGatesDial(t *testing.T) {
 	}
 }
 
+func TestRepoContractFloorChecks_WithoutAProjectRootTheWorktreesPolicyDecides(t *testing.T) {
+	wt := t.TempDir()
+	writePolicyGate(t, wt, "off")
+	pack := ratchetRedPack()
+	if got := RepoContractFloorChecks(pack.run)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: wt}); len(got) != 0 || len(pack.dirs) != 0 {
+		t.Fatalf("selfcheck passes no project root, so the worktree's gates.repo_contract_gate off must still skip the pack; got %v, ran in %v", got, pack.dirs)
+	}
+}
+
 func writePolicyGate(t *testing.T, root, word string) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve")
@@ -92,6 +101,9 @@ func writePolicyGate(t *testing.T, root, word string) {
 		t.Fatal(err)
 	}
 	body := `{"gates":{"repo_contract_gate":"` + word + `"}}`
+	if strings.HasPrefix(word, "{") {
+		body = word
+	}
 	if err := os.WriteFile(filepath.Join(dir, "policy.json"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

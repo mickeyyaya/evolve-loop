@@ -11,12 +11,12 @@ const ratchetRed = "github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet.
 
 func TestRunRepoContractPack_RunsTheGatesOwnPackAndNamesItsReds(t *testing.T) {
 	dirs := swapRepoContractTest(t, redPack(ratchetRed))
-	reds, err := RunRepoContractPack(context.Background(), "/lane/go")
+	reds, err := RunRepoContractPack(context.Background(), "/lane")
 	if err == nil || len(reds) != 1 || reds[0] != ratchetRed {
 		t.Fatalf("a red pack names its failing test with the run error; got reds=%v err=%v", reds, err)
 	}
 	if len(*dirs) != 1 || (*dirs)[0] != "/lane/go" {
-		t.Fatalf("the build floor's run must go through the ship gate's own pack seam, once, in the module dir it names; ran in %v", *dirs)
+		t.Fatalf("the build floor's run must go through the ship gate's own pack seam, once, in the tree's go/ module exactly as the gate does; ran in %v", *dirs)
 	}
 }
 
