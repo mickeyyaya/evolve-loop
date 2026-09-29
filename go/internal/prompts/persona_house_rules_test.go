@@ -60,6 +60,18 @@ func TestPersonaHouseRules_CallerProof(t *testing.T) {
 	}
 }
 
+func TestPersonaHouseRules_GitBackedFixturesUseGittest(t *testing.T) {
+	root := acsassert.RepoRoot(t)
+	for _, name := range houseRulePersonas {
+		body := strings.ToLower(alwaysOnBody(t, filepath.Join(root, "agents", name)))
+		for _, want := range []string{"internal/gittest", "gittest.fixture", "gittest.bare", "gittest.clone", "raw `git init`", "rawgitratchet"} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s (always-on body) must carry the git-fixture requirement token %q", name, want)
+			}
+		}
+	}
+}
+
 func TestPersonaHouseRules_StayWithinLineBudget(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	total := 0

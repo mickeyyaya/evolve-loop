@@ -46,6 +46,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -54,13 +55,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 // repoContractPackages are the repo-wide guard suites whose breakage turned
 // main red. Kept to the incident-proven set deliberately: every addition
-// costs every ship wall-time and must carry the same FP≈0 property. The raw
+// costs wall-time at every ship, every build handoff and every `evolve
+// selfcheck build`, and must carry the same FP≈0 property. The raw
 // git fixture ratchet is a source scan of the tracked test files (one git
 // ls-files, about a second) and is here because a lane adding a raw fixture
 // changes neither its package nor an importer, so no other backstop would run
@@ -85,8 +88,9 @@ const scanLogName = "ship-repocontract-scan.log"
 // EMPTY failures is the ambiguous case: the toolchain exited nonzero
 // without any guard suite reporting a violation.
 type packOutcome struct {
-	failures []packFailure
-	err      error
+	failures   []packFailure
+	failureLog string
+	err        error
 }
 
 // packFailure is one classified failure: a named test of a package, or a build failure (Test empty).
@@ -130,6 +134,26 @@ var repoContractTestFn = defaultRepoContractTest
 
 func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Writer) packOutcome {
 	return runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
+}
+
+func RunRepoContractPack(ctx context.Context, root string) (reds []string, diagnostic string, err error) {
+	var out strings.Builder
+	o := repoContractTestFn(ctx, repocontract.ModuleDir(root), &out)
+	switch {
+	case o.realRed():
+		return o.failedNames(), o.failureLog, o.err
+	case o.green():
+		return nil, "", nil
+	}
+	return nil, out.String(), o.err
+}
+
+func repoContractSuiteNames() []string {
+	names := make([]string, 0, len(repoContractPackages))
+	for _, pattern := range repoContractPackages {
+		names = append(names, path.Base(strings.TrimSuffix(pattern, "/...")))
+	}
+	return names
 }
 
 func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Writer, packages []string) packOutcome {
@@ -241,13 +265,13 @@ func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []
 		return packOutcome{err: fmt.Errorf("go test start: %w", err)}
 	}
 	// Drain to completion BEFORE Wait: an undrained pipe deadlocks the child.
-	failed := classifyPackEvents(stdout, out)
-	return packOutcome{failures: failed, err: cmd.Wait()}
+	failed, failureLog := classifyPackEvents(stdout, out)
+	return packOutcome{failures: failed, failureLog: failureLog, err: cmd.Wait()}
 }
 
 // classifyPackEvents streams a `go test -json` event feed, teeing the
 // human-readable Output text to tee (that is what lands in the scan log) and
-// collecting the names of genuinely failing tests.
+// collecting the names of genuinely failing tests and their own output.
 //
 // The classification is deliberately conservative in ONE direction: a
 // package-level fail with no test name is recorded only when the output marks
@@ -258,8 +282,9 @@ func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []
 // Lines that are not JSON objects are teed verbatim and skipped rather than
 // aborting the scan — a stray non-event line must not blind the classifier to
 // the real failures after it.
-func classifyPackEvents(r io.Reader, tee io.Writer) []packFailure {
+func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
 	var failed []packFailure
+	failureLog := newPackFailureLog()
 	// A single compile break surfaces TWICE — once as a `build-fail` action
 	// (which carries no package on go1.26) and once as the `FAIL pkg [build
 	// failed]` output line — so build failures are collected per package and
@@ -271,17 +296,13 @@ func classifyPackEvents(r io.Reader, tee io.Writer) []packFailure {
 	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024) // guard suites emit long lines
 	for sc.Scan() {
 		line := sc.Bytes()
-		var ev struct {
-			Action  string `json:"Action"`
-			Package string `json:"Package"`
-			Test    string `json:"Test"`
-			Output  string `json:"Output"`
-		}
+		var ev packEvent
 		if err := json.Unmarshal(line, &ev); err != nil {
 			writeTee(tee, string(line)+"\n")
 			continue
 		}
 		writeTee(tee, ev.Output)
+		failureLog.note(ev)
 		switch {
 		case ev.Action == "fail" && ev.Test != "":
 			failed = append(failed, packFailure{Package: ev.Package, Test: ev.Test})
@@ -312,7 +333,63 @@ func classifyPackEvents(r io.Reader, tee io.Writer) []packFailure {
 	if unattributedBuildFail && len(pkgs) == 0 {
 		failed = append(failed, packFailure{Package: "[build failed] (package unattributed)"})
 	}
-	return failed
+	return failed, failureLog.text.String()
+}
+
+type packEvent struct {
+	Action      string `json:"Action"`
+	Package     string `json:"Package"`
+	Test        string `json:"Test"`
+	Output      string `json:"Output"`
+	ImportPath  string `json:"ImportPath"`
+	FailedBuild string `json:"FailedBuild"`
+}
+
+type packFailureLog struct {
+	pending map[string]*strings.Builder
+	named   map[string]bool
+	text    strings.Builder
+}
+
+func newPackFailureLog() *packFailureLog {
+	return &packFailureLog{pending: map[string]*strings.Builder{}, named: map[string]bool{}}
+}
+
+func (l *packFailureLog) note(ev packEvent) {
+	key := ev.Package + "\x00" + ev.Test
+	switch {
+	case ev.Action == "build-output":
+		l.hold(ev.ImportPath, ev.Output)
+	case ev.Action == "output":
+		l.hold(key, ev.Output)
+	case ev.Action == "fail" && ev.Test != "":
+		l.named[ev.Package] = true
+		l.flush(key)
+	case ev.Action == "fail":
+		l.flush(ev.FailedBuild)
+		if l.named[ev.Package] {
+			delete(l.pending, key)
+		}
+		l.flush(key)
+	case ev.Action == "pass" || ev.Action == "skip":
+		delete(l.pending, key)
+	}
+}
+
+func (l *packFailureLog) hold(key, output string) {
+	b := l.pending[key]
+	if b == nil {
+		b = &strings.Builder{}
+		l.pending[key] = b
+	}
+	b.WriteString(output)
+}
+
+func (l *packFailureLog) flush(key string) {
+	if b := l.pending[key]; b != nil {
+		l.text.WriteString(b.String())
+		delete(l.pending, key)
+	}
 }
 
 // lockedWriter serializes the two writers the pack runner points at ONE
@@ -362,14 +439,10 @@ func runRepoContractGate(ctx context.Context, gate, root, workspace string, stde
 // <workspace>/ship-repocontract-scan.log. Empty workspace degrades to
 // stderr-only diagnostics — a missing run dir must never block a ship.
 func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer, cleared func([]string)) error {
-	if gate != "enforce" {
-		if gate != "" && gate != "off" {
-			fmt.Fprintf(stderr, "[ship] repo-contract gate: unknown stage %q — treating as enforce (a typo must not silently disable a red-main guard)\n", gate)
-		} else {
-			return nil
-		}
+	if !repocontract.GateOn(gate) {
+		return nil
 	}
-	moduleDir := filepath.Join(root, "go")
+	moduleDir := repocontract.ModuleDir(root)
 	out := stderr
 	if scan := openScanLog(workspace, stderr); scan != nil {
 		// Close error deliberately dropped: the scan log is best-effort
@@ -377,15 +450,7 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 		defer func() { _ = scan.Close() }()
 		out = io.MultiWriter(stderr, scan)
 	}
-	// Header first, so the artifact is non-empty and self-identifying even on
-	// a green run — the green baseline is what disproves a false RED.
-	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
-		repoContractTestTimeout,
-		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
-
-	if err := runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
-		return repoContractTestFn(ctx, moduleDir, out)
-	}); err != nil {
+	if err := runFixedPack(ctx, out, gate, root, baseRef, workspace); err != nil {
 		return err
 	}
 
@@ -394,6 +459,26 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 		return err
 	}
 	return runImporterBackstop(ctx, out, root, moduleDir, workspace, files, untagged, cleared)
+}
+
+func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, workspace string) error {
+	runs, note := repocontract.PackRuns(gate, root)
+	moduleDir := repocontract.ModuleDir(root)
+	if !runs {
+		fmt.Fprintf(out, "[ship] repo-contract scanner pack skipped (module %s, changes vs %s): %s\n", moduleDir, baseRef, note)
+		return nil
+	}
+	if note != "" {
+		fmt.Fprintf(out, "[ship] repo-contract gate: %s\n", note)
+	}
+	// Header first, so the artifact is non-empty and self-identifying even on
+	// a green run — the green baseline is what disproves a false RED.
+	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
+		repoContractTestTimeout,
+		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
+	return runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
+		return repoContractTestFn(ctx, moduleDir, out)
+	})
 }
 
 // runAddedTestBackstop is the second gate layer: it derives the gate's seed
@@ -539,7 +624,7 @@ func contractRed(packName string, o packOutcome) error {
 	detail := packName
 	switch packName {
 	case "scanner pack":
-		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest, rawgitratchet)"
+		detail = "fixed scanner pack (" + strings.Join(repoContractSuiteNames(), ", ") + ")"
 	case "importer backstop":
 		detail = "importer backstop (the packages that import what this ship changes)"
 	}

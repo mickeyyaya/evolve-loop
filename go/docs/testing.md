@@ -235,8 +235,11 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
    permanent cases. Keep incident context in comments/history. Preserve existing
    ACS names and migrate every selecting caller before renaming a legacy case.
 3. **No live-repo / runtime-state dependence.** A test must construct its own
-   isolated state (`t.TempDir()` + `git init`) rather than reading the live
-   repository or `.evolve/runs/`. Determinism is non-negotiable.
+   isolated state (`t.TempDir()`, and for a git repo `gittest.Fixture(t)`,
+   `gittest.Bare(t)` or `gittest.Clone(t, src)` from `internal/gittest`, never a
+   raw `git init`) rather than reading the live repository or `.evolve/runs/`.
+   Determinism is non-negotiable. `internal/rawgitratchet` refuses a new raw
+   fixture at the build handoff floor and again at ship.
 
    > **Cautionary example.** `TestResolvePrevTag_ValidGitRepo` originally
    > `git describe`'d the *live* worktree and asserted a `v*` tag. It broke the
