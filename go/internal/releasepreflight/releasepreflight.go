@@ -458,19 +458,9 @@ func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time
 		return res, nil
 	}
 
-	var candidate *auditledger.Entry
-	for i := range rows {
-		if rows[i].ArtifactPath == "" {
-			res.phantomCount++
-			continue
-		}
-		if _, err := os.Stat(rows[i].ArtifactPath); err == nil {
-			candidate = &rows[i]
-			res.artifact = rows[i].ArtifactPath
-			break
-		}
-		res.phantomCount++
-	}
+	candidate, artifact, phantom := selectAuditCandidate(rows)
+	res.artifact = artifact
+	res.phantomCount = phantom
 	if candidate == nil {
 		// Audit artifacts GC'd (all-phantom) or none usable → signal unavailable,
 		// advisory (not a failed audit). CI-green is the authoritative gate.
@@ -485,75 +475,103 @@ func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time
 	}
 	verdict, ok := extractVerdict(string(artifactBody), strict)
 	if !ok {
-		// Cycle-1571 H4. A non-acceptable verdict vetoes the release only when
-		// the audit actually examined what is being released. Before PR #503 a
-		// FAILed cycle wrote no auditor entry, so this branch was effectively
-		// unreachable; #503 made FAIL entries exist, and the newest is routinely
-		// a FAILed lane cycle with no bearing on the release. Vetoing on that is
-		// false, and it contradicts this step's own determinism rule, which
-		// advisory-skips a MISSING audit precisely because CI-green on the
-		// release commit is authoritative.
-		//
-		// TWO discriminators are needed, and head alone is NOT enough — the
-		// first draft of this fix assumed a lane audit binds a lane worktree
-		// head, and that is false: recordAuditBinding resolves git_head with
-		// `rev-parse HEAD` against the PROJECT ROOT, so every concurrent lane
-		// records main's tip. Verified in the runtime ledger: cycles 1572, 1573
-		// and 1574 all carry git_head 31ae6518, each with a distinct
-		// worktree_tree_sha. Scoping on head alone would still have vetoed the
-		// very release that motivated this change.
-		//
-		//   1. a different git_head  ⇒ it audited another commit entirely;
-		//   2. a worktree_tree_sha   ⇒ a cycle/lane audit, not an audit of the
-		//      committed tree.
-		//
-		// On (2), precisely: this is NOT a delta marker. worktreeContentSHA runs
-		// `git add -A; git write-tree`, which yields a tree even for a clean
-		// worktree, so EVERY orchestrator cycle audit records one. It is absent
-		// because the other writer — subagent/run.go, the manual
-		// `evolve subagent run auditor` release audit — never emits it. So the
-		// field identifies which writer produced the entry, which is exactly the
-		// cut wanted here: a manual audit of the released commit keeps its veto.
-		// Anyone later tempted to stamp worktree_tree_sha on run.go's entry
-		// should know it would make release audits look like cycle audits and
-		// silently re-open this hole.
-		//
-		// An audit of the release commit itself has neither, so its rejection
-		// still blocks. An unresolvable releaseHead keeps the conservative
-		// block: we cannot prove the failing audit is unrelated, so we do not
-		// assume it — scoping is never a bypass.
-		auditedHead := candidate.GitHEAD
-		scopedOut := releaseHead != "" &&
-			((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(*candidate))
-		if scopedOut {
-			res.verdict = auditVerdictScopedOut
-			res.auditedHead = auditedHead
-			return res, nil
-		}
-		if strict {
-			return res, fmt.Errorf("EVOLVE_RELEASE_STRICT_PASS=1 and most recent audit-report.md does not declare 'Verdict: PASS' (%s)",
-				res.artifact)
-		}
-		return res, fmt.Errorf("most recent audit-report.md does not declare 'Verdict: PASS' or 'Verdict: WARN' (%s)",
-			res.artifact)
+		return scopedOutOrFail(res, *candidate, releaseHead, strict)
 	}
 	res.verdict = verdict
 
-	// Age check.
+	age, err := auditAge(*candidate, now)
+	res.age = age
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func selectAuditCandidate(rows []auditledger.Entry) (candidate *auditledger.Entry, artifact string, phantom int) {
+	for i := range rows {
+		if rows[i].ArtifactPath == "" {
+			phantom++
+			continue
+		}
+		if _, err := os.Stat(rows[i].ArtifactPath); err == nil {
+			return &rows[i], rows[i].ArtifactPath, phantom
+		}
+		phantom++
+	}
+	return nil, "", phantom
+}
+
+// Cycle-1571 H4. A non-acceptable verdict vetoes the release only when
+// the audit actually examined what is being released. Before PR #503 a
+// FAILed cycle wrote no auditor entry, so this branch was effectively
+// unreachable; #503 made FAIL entries exist, and the newest is routinely
+// a FAILed lane cycle with no bearing on the release. Vetoing on that is
+// false, and it contradicts this step's own determinism rule, which
+// advisory-skips a MISSING audit precisely because CI-green on the
+// release commit is authoritative.
+//
+// TWO discriminators are needed, and head alone is NOT enough — the
+// first draft of this fix assumed a lane audit binds a lane worktree
+// head, and that is false: recordAuditBinding resolves git_head with
+// `rev-parse HEAD` against the PROJECT ROOT, so every concurrent lane
+// records main's tip. Verified in the runtime ledger: cycles 1572, 1573
+// and 1574 all carry git_head 31ae6518, each with a distinct
+// worktree_tree_sha. Scoping on head alone would still have vetoed the
+// very release that motivated this change.
+//
+//   1. a different git_head  ⇒ it audited another commit entirely;
+//   2. a worktree_tree_sha   ⇒ a cycle/lane audit, not an audit of the
+//      committed tree.
+//
+// On (2), precisely: this is NOT a delta marker. worktreeContentSHA runs
+// `git add -A; git write-tree`, which yields a tree even for a clean
+// worktree, so EVERY orchestrator cycle audit records one. It is absent
+// because the other writer — subagent/run.go, the manual
+// `evolve subagent run auditor` release audit — never emits it. So the
+// field identifies which writer produced the entry, which is exactly the
+// cut wanted here: a manual audit of the released commit keeps its veto.
+// Anyone later tempted to stamp worktree_tree_sha on run.go's entry
+// should know it would make release audits look like cycle audits and
+// silently re-open this hole.
+//
+// An audit of the release commit itself has neither, so its rejection
+// still blocks. An unresolvable releaseHead keeps the conservative
+// block: we cannot prove the failing audit is unrelated, so we do not
+// assume it — scoping is never a bypass.
+
+func scopedOutOrFail(res auditResult, candidate auditledger.Entry, releaseHead string, strict bool) (auditResult, error) {
+	auditedHead := candidate.GitHEAD
+	scopedOut := releaseHead != "" &&
+		((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(candidate))
+	if scopedOut {
+		res.verdict = auditVerdictScopedOut
+		res.auditedHead = auditedHead
+		return res, nil
+	}
+	if strict {
+		return res, fmt.Errorf("EVOLVE_RELEASE_STRICT_PASS=1 and most recent audit-report.md does not declare 'Verdict: PASS' (%s)",
+			res.artifact)
+	}
+	return res, fmt.Errorf("most recent audit-report.md does not declare 'Verdict: PASS' or 'Verdict: WARN' (%s)",
+		res.artifact)
+}
+
+// Age check.
+func auditAge(candidate auditledger.Entry, now time.Time) (time.Duration, error) {
 	if candidate.TS == "" {
-		return res, errors.New("ledger entry missing ts")
+		return 0, errors.New("ledger entry missing ts")
 	}
 	ts, err := time.Parse(time.RFC3339, candidate.TS)
 	if err != nil {
 		// Bash fallback: missing/unparseable ts → skip age check (return ok).
-		return res, nil
+		return 0, nil
 	}
-	res.age = now.Sub(ts)
-	if res.age >= MaxAuditAge {
-		return res, fmt.Errorf("audit is %ds old (>%ds); re-run Auditor",
-			int(res.age.Seconds()), int(MaxAuditAge.Seconds()))
+	age := now.Sub(ts)
+	if age >= MaxAuditAge {
+		return age, fmt.Errorf("audit is %ds old (>%ds); re-run Auditor",
+			int(age.Seconds()), int(MaxAuditAge.Seconds()))
 	}
-	return res, nil
+	return age, nil
 }
 
 // extractVerdict returns ("PASS"|"WARN", true) on a match. Accepts both

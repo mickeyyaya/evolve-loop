@@ -100,23 +100,10 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 	} else if changed {
 		res.Modified = append(res.Modified, ".claude-plugin/marketplace.json")
 	}
-	// .codex-plugin/plugin.json is a generated mirror of the Claude manifest
-	// (skillcheck Codex projection); bump its version in lockstep so a release
-	// never leaves the Codex install surface stale. Tolerated-absent: a checkout
-	// without the generated file is skipped, not failed.
-	if paths.CodexPluginJSON != "" {
-		if _, statErr := os.Stat(paths.CodexPluginJSON); statErr != nil {
-			// Absent → generated mirror not in this checkout; skip. Any other
-			// stat error (permission, unreadable parent) must fail loudly, never
-			// silently leave the Codex surface on a stale version.
-			if !errors.Is(statErr, os.ErrNotExist) {
-				return res, fmt.Errorf("versionbump: stat %s: %w", paths.CodexPluginJSON, statErr)
-			}
-		} else if changed, err := BumpJSONVersion(paths.CodexPluginJSON, target, dryRun); err != nil {
-			return res, err
-		} else if changed {
-			res.Modified = append(res.Modified, ".codex-plugin/plugin.json")
-		}
+	if label, err := bumpCodexPlugin(paths.CodexPluginJSON, target, dryRun); err != nil {
+		return res, err
+	} else if label != "" {
+		res.Modified = append(res.Modified, label)
 	}
 	if changed, err := BumpSkillHeading(paths.SkillMD, mm, dryRun); err != nil {
 		return res, err
@@ -134,6 +121,33 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 		res.Modified = append(res.Modified, "README.md (history)")
 	}
 	return res, nil
+}
+
+// .codex-plugin/plugin.json is a generated mirror of the Claude manifest
+// (skillcheck Codex projection); bump its version in lockstep so a release
+// never leaves the Codex install surface stale. Tolerated-absent: a checkout
+// without the generated file is skipped, not failed.
+func bumpCodexPlugin(path, target string, dryRun bool) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	if _, statErr := os.Stat(path); statErr != nil {
+		// Absent → generated mirror not in this checkout; skip. Any other
+		// stat error (permission, unreadable parent) must fail loudly, never
+		// silently leave the Codex surface on a stale version.
+		if !errors.Is(statErr, os.ErrNotExist) {
+			return "", fmt.Errorf("versionbump: stat %s: %w", path, statErr)
+		}
+		return "", nil
+	}
+	changed, err := BumpJSONVersion(path, target, dryRun)
+	if err != nil {
+		return "", err
+	}
+	if changed {
+		return ".codex-plugin/plugin.json", nil
+	}
+	return "", nil
 }
 
 // --- JSON version bumps ---

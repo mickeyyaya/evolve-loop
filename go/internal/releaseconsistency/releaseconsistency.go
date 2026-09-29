@@ -112,6 +112,28 @@ func Run(opts Options) (Result, error) {
 	res.Target = target
 	res.MajorMinor = majorMinor(target)
 
+	logChecklistHeader(logw, target, canonical)
+	checks := buildChecks(opts, target, res.MajorMinor)
+	results, errs := runChecks(logw, checks)
+	res.Checks = results
+	res.Errors = errs
+
+	fmt.Fprintln(logw, "")
+	if res.Errors > 0 {
+		fmt.Fprintf(logw, "FAILED: %d issue(s) found. Fix before releasing.\n", res.Errors)
+		return res, fmt.Errorf("%w: %d marker(s)", ErrInconsistent, res.Errors)
+	}
+	fmt.Fprintln(logw, "PASSED: All version references are consistent.")
+	return res, nil
+}
+
+type checkSpec struct {
+	file        string
+	description string
+	check       func() Check
+}
+
+func logChecklistHeader(logw io.Writer, target, canonical string) {
 	fmt.Fprintln(logw, "")
 	fmt.Fprintln(logw, "=== evolve-loop release checklist ===")
 	fmt.Fprintln(logw, "")
@@ -122,12 +144,10 @@ func Run(opts Options) (Result, error) {
 	}
 	fmt.Fprintln(logw, "")
 	fmt.Fprintln(logw, "--- Version strings ---")
+}
 
-	checks := []struct {
-		file        string
-		description string
-		check       func() Check
-	}{
+func buildChecks(opts Options, target, majorMinor string) []checkSpec {
+	return []checkSpec{
 		{".claude-plugin/plugin.json", "plugin.json version",
 			func() Check {
 				return checkJSONVersion(opts.ProjectRoot, ".claude-plugin/plugin.json", "plugin.json version", target)
@@ -141,19 +161,23 @@ func Run(opts Options) (Result, error) {
 				return checkJSONVersionIfPresent(opts.ProjectRoot, ".codex-plugin/plugin.json", "codex plugin.json version (generated mirror)", target)
 			}},
 		{"skills/loop/SKILL.md", "SKILL.md heading (major.minor)",
-			func() Check { return checkSkillHeading(opts.ProjectRoot, res.MajorMinor) }},
+			func() Check { return checkSkillHeading(opts.ProjectRoot, majorMinor) }},
 		{"README.md", "README.md current version table",
-			func() Check { return checkReadmeCurrent(opts.ProjectRoot, res.MajorMinor) }},
+			func() Check { return checkReadmeCurrent(opts.ProjectRoot, majorMinor) }},
 		{"CHANGELOG.md", fmt.Sprintf("CHANGELOG.md entry for %s", target),
 			func() Check {
 				return checkContains(opts.ProjectRoot, "CHANGELOG.md", "["+target+"]", fmt.Sprintf("CHANGELOG.md entry for %s", target))
 			}},
-		{"README.md", fmt.Sprintf("README.md version history row for v%s", res.MajorMinor),
+		{"README.md", fmt.Sprintf("README.md version history row for v%s", majorMinor),
 			func() Check {
-				return checkContains(opts.ProjectRoot, "README.md", "v"+res.MajorMinor, fmt.Sprintf("README.md version history row for v%s", res.MajorMinor))
+				return checkContains(opts.ProjectRoot, "README.md", "v"+majorMinor, fmt.Sprintf("README.md version history row for v%s", majorMinor))
 			}},
 	}
+}
 
+func runChecks(logw io.Writer, checks []checkSpec) ([]Check, int) {
+	var results []Check
+	errs := 0
 	contentMarkerStart := 5 // version markers 0-4 (plugin, marketplace, codex, SKILL, README); 5 = CHANGELOG, 6 = README history
 	for i, c := range checks {
 		if i == contentMarkerStart {
@@ -161,29 +185,22 @@ func Run(opts Options) (Result, error) {
 			fmt.Fprintln(logw, "--- Required content ---")
 		}
 		ch := c.check()
-		res.Checks = append(res.Checks, ch)
+		results = append(results, ch)
 		switch ch.Status {
 		case "OK":
 			fmt.Fprintf(logw, "OK       %s — %s (%s)\n", ch.File, ch.Description, ch.Found)
 		case "MISSING":
 			fmt.Fprintf(logw, "MISSING  %s — %s\n", ch.File, ch.Description)
-			res.Errors++
+			errs++
 		case "NO_MATCH":
 			fmt.Fprintf(logw, "NO MATCH %s — %s\n", ch.File, ch.Description)
-			res.Errors++
+			errs++
 		case "MISMATCH":
 			fmt.Fprintf(logw, "MISMATCH %s — found: %s, expected: %s\n", ch.File, ch.Found, ch.Expected)
-			res.Errors++
+			errs++
 		}
 	}
-
-	fmt.Fprintln(logw, "")
-	if res.Errors > 0 {
-		fmt.Fprintf(logw, "FAILED: %d issue(s) found. Fix before releasing.\n", res.Errors)
-		return res, fmt.Errorf("%w: %d marker(s)", ErrInconsistent, res.Errors)
-	}
-	fmt.Fprintln(logw, "PASSED: All version references are consistent.")
-	return res, nil
+	return results, errs
 }
 
 // --- Per-check helpers -----------------------------------------------------

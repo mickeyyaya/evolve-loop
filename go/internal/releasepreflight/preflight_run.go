@@ -85,6 +85,11 @@ func resolve(opts Options) (resolved, error) {
 		ciConclusion:     opts.CIConclusion,
 		headSHA:          opts.HeadSHA,
 	}
+	r.applyDefaults()
+	return r, nil
+}
+
+func (r *resolved) applyDefaults() {
 	if r.pluginJSONPath == "" {
 		r.pluginJSONPath = filepath.Join(r.repoRoot, ".claude-plugin", "plugin.json")
 	}
@@ -115,7 +120,6 @@ func resolve(opts Options) (resolved, error) {
 	if r.headSHA == nil {
 		r.headSHA = defaultHeadSHA
 	}
-	return r, nil
 }
 
 // preflightRun is one Run's resolved inputs, its log sink, and the Result it

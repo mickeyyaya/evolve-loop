@@ -87,15 +87,9 @@ func ParseConfig(path string) (Config, error) {
 	}
 
 	cfg := Config{
-		ChecksumsName: doc.Checksum.NameTemplate,
+		ChecksumsName: resolveChecksumsName(doc),
 		RepoOwner:     doc.Release.GitHub.Owner,
 		RepoName:      doc.Release.GitHub.Name,
-	}
-	// goreleaser defaults checksum.name_template to "checksums.txt" when omitted,
-	// so the published asset is named checksums.txt regardless — default to it
-	// here too rather than spuriously reporting the checksums row missing.
-	if cfg.ChecksumsName == "" {
-		cfg.ChecksumsName = "checksums.txt"
 	}
 	if len(doc.Archives) > 0 {
 		cfg.ArchiveNameTemplate = doc.Archives[0].NameTemplate
@@ -104,42 +98,75 @@ func ParseConfig(path string) (Config, error) {
 		}
 	}
 
+	targets, err := collectBuildTargets(doc)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Targets = appendUniversalDarwin(targets, doc)
+	if len(cfg.Targets) == 0 {
+		return Config{}, fmt.Errorf("goreleaser config %s declares zero build targets", path)
+	}
+	return cfg, nil
+}
+
+// goreleaser defaults checksum.name_template to "checksums.txt" when omitted,
+// so the published asset is named checksums.txt regardless — default to it
+// here too rather than spuriously reporting the checksums row missing.
+func resolveChecksumsName(doc goreleaserDoc) string {
+	if doc.Checksum.NameTemplate != "" {
+		return doc.Checksum.NameTemplate
+	}
+	return "checksums.txt"
+}
+
+func collectBuildTargets(doc goreleaserDoc) ([]Target, error) {
+	var targets []Target
 	seen := map[string]bool{}
 	for _, b := range doc.Builds {
 		for _, tgt := range b.Targets {
 			goos, arch, ok := splitTarget(tgt)
 			if !ok {
-				return Config{}, fmt.Errorf("malformed target %q (want <os>_<arch>)", tgt)
+				return nil, fmt.Errorf("malformed target %q (want <os>_<arch>)", tgt)
 			}
 			key := goos + "_" + arch
 			if seen[key] {
 				continue
 			}
 			seen[key] = true
-			cfg.Targets = append(cfg.Targets, Target{OS: goos, Arch: arch})
+			targets = append(targets, Target{OS: goos, Arch: arch})
 		}
 	}
-	// A universal_binaries block publishes one lipo'd macOS artifact whose
-	// archive goreleaser names with .Arch="all". Surface it as a target so the
-	// gate requires evolve_darwin_all.tar.gz present — the single macOS
-	// fingerprint. Deduped like the rest; darwin is implied (universal is macOS).
-	if len(doc.UniversalBinaries) > 0 {
-		if !seen["darwin_all"] {
-			seen["darwin_all"] = true
-			cfg.Targets = append(cfg.Targets, Target{OS: "darwin", Arch: "all"})
-		}
-		// replace:true means goreleaser drops the per-arch darwin archives and
-		// ships only the universal — so the gate must not require the per-arch
-		// ones. (Our single build merges every darwin arch into the universal;
-		// drop all real darwin arches, keeping the "all" target just added.)
-		if anyReplace(doc.UniversalBinaries) {
-			cfg.Targets = dropPerArchDarwin(cfg.Targets)
+	return targets, nil
+}
+
+// A universal_binaries block publishes one lipo'd macOS artifact whose
+// archive goreleaser names with .Arch="all". Surface it as a target so the
+// gate requires evolve_darwin_all.tar.gz present — the single macOS
+// fingerprint. Deduped like the rest; darwin is implied (universal is macOS).
+func appendUniversalDarwin(targets []Target, doc goreleaserDoc) []Target {
+	if len(doc.UniversalBinaries) == 0 {
+		return targets
+	}
+	if !hasTarget(targets, "darwin", "all") {
+		targets = append(targets, Target{OS: "darwin", Arch: "all"})
+	}
+	// replace:true means goreleaser drops the per-arch darwin archives and
+	// ships only the universal — so the gate must not require the per-arch
+	// ones. (Our single build merges every darwin arch into the universal;
+	// drop all real darwin arches, keeping the "all" target just added.)
+	if anyReplace(doc.UniversalBinaries) {
+		targets = dropPerArchDarwin(targets)
+	}
+	return targets
+}
+
+func hasTarget(targets []Target, goos, arch string) bool {
+	for _, t := range targets {
+		if t.OS == goos && t.Arch == arch {
+			return true
 		}
 	}
-	if len(cfg.Targets) == 0 {
-		return Config{}, fmt.Errorf("goreleaser config %s declares zero build targets", path)
-	}
-	return cfg, nil
+	return false
 }
 
 // universalBinary is one universal_binaries entry from .goreleaser.yml.
