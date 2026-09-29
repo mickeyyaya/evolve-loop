@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a Changed Areas citation that covers diff paths is accepted; a material path still needs its own entry (cycles 1765 and 1768, 2026-09-30)
+
+- The explanation check read each Changed Areas path literally and rejected any that was not an exact Build-diff path. Builders keep citing their predicate package as a directory or glob: cycle 1765 cited `go/acs/cycle1765` (wave 44) and cycle 1768 cited `go/acs/cycle1768/*_test.go` (wave 45). Each citation named real Build content, yet each cost a full builder re-dispatch through the correction ladder: a format miss handled as a logic defect.
+- `changedAreaFailures` (extracted from `validateDocument`, which drops from 62 to 44 lines, so its size-ratchet allowance is removed) accepts a cited directory, glob or brace list when it covers at least one diff path (`coversAnyChangedPath`). A citation covering nothing is still "not in the Build diff".
+- Narrower than the inbox item proposed: a pattern never credits the material paths it covers. Every material path still needs its own exact entry, so one broad glob (``- `go` — changes``) can never stand in for the per-path explanations the contract exists to force.
+- Tests, red first: a directory, a glob and a brace list covering diff paths pass; a glob covering nothing fails with the same message; a material path under a covering glob still fails. Mutation sweep 5/5 killed. Consumes inbox `changed-areas-accepts-a-covering-dir-or-glob`.
+
 ## Fixed — the build floor runs an added test package under its twin's budget, ship's added-test backstop, not 120 s (cycle 1763, 2026-09-30)
 
 - Wave 43's lane 1763 wrote a predicate that runs its own `-count=50 -race` stability bound, as its inbox item's acceptance asks. The build floor's tagged self-check ran added test packages with `-timeout 120s`, while its declared twin, ship's added-test backstop, runs the same package with `-timeout 20m`. The floor killed the predicate, so the lane edited `core/phase_bindings_selfcheck.go` to 480 s. It then failed the explanation's completeness check on that unexplained pipeline edit; a lane had been pushed into editing a gate by two budgets for one run. With 1761, 1762 and 1764 it was the fourth consecutive FAIL.

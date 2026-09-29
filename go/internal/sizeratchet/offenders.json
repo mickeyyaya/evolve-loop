@@ -162,7 +162,6 @@
   "internal/explanationdocs.ArchiveUnpublishedContinuationRecords": 57,
   "internal/explanationdocs.currentDiffState": 56,
   "internal/explanationdocs.untrackedContentSHA256": 53,
-  "internal/explanationdocs.validateDocument": 62,
   "internal/explanationdocs.verifyResolvedV1": 70,
   "internal/failureadapter.Decide": 127,
   "internal/fanoutdispatch.Run": 165,

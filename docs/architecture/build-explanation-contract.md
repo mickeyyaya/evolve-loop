@@ -61,7 +61,13 @@ level-two sections exactly once:
 8. `Limitations`
 
 `Changed Areas` has one ``- `<repo-relative path>` — what changed and why``
-entry for every material path. Paths outside the Build diff are rejected.
+entry for every material path. A cited path must name Build content: an exact
+diff path, or a directory, glob (`go/acs/cycle1768/*_test.go`) or brace list
+(`go/acs/{cycle1768,cycle9}/…`) that covers at least one diff path. A citation
+covering no diff path is rejected. A pattern is only ever a citation: every
+material path still needs its own exact entry, so one broad glob can never stand
+in for the per-path explanations the contract requires (2026-09-30, after cycles
+1765 and 1768 each lost a correction round to a directory or glob citation).
 
 The host classifies documentation, knowledge-base files, eval definitions, ACS
 predicates, testdata, unambiguous test files and the inbox lifecycle records under
