@@ -1,9 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
 	"path"
 	"regexp"
 	"slices"
@@ -21,7 +18,7 @@ const defectTokenPunctuation = "`'\"()[]{}<>,;:."
 var defectLineLocator = regexp.MustCompile(`(?::\d+(?:[-,:]\d+)*|#L\d+(?:-L?\d+)?)$`)
 
 func explanationCorrectionDocument(cs CycleState, fb *phasecontract.FailureBlock) (string, bool) {
-	if fb == nil || len(fb.Defects) == 0 || len(cs.AuditFailReasons) > 0 {
+	if fb == nil || len(fb.Defects) == 0 || runnerDiagnosedAudit(cs) {
 		return "", false
 	}
 	document, err := explanationdocs.DocumentPath(cs.CycleID, cs.RunID)
@@ -57,21 +54,6 @@ func namesDocument(location, document string) bool {
 	return location == document || strings.HasSuffix(location, "/"+document)
 }
 
-func recordExplanationCorrection(workspace string, defects []string) error {
-	reasons := make([]string, len(defects))
-	for i, defect := range defects {
-		reasons[i] = explanationNeedsCorrection + ": " + defect
-	}
-	b, err := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: string(PhaseAudit), Reasons: reasons})
-	if err != nil {
-		return fmt.Errorf("record explanation correction: %w", err)
-	}
-	if err := writeArtifactAtomically(floorFailReasonPath(workspace, PhaseAudit), b); err != nil {
-		return fmt.Errorf("record explanation correction: %w", err)
-	}
-	return nil
-}
-
 func explanationCorrectionEnvelope(env retryEnvelope) retryEnvelope {
 	if !slices.Contains(env.Legal, retryActionRetryBuild) {
 		return env
@@ -89,10 +71,4 @@ func explanationReauthorScope(next Phase, cs CycleState) string {
 	fb, _ := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
 	document, _ := explanationCorrectionDocument(cs, fb)
 	return document
-}
-
-func recordExplanationRound(cs CycleState, fb *phasecontract.FailureBlock) {
-	if err := recordExplanationCorrection(cs.WorkspacePath, fb.Defects); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d %s: %v; the re-author reads the audit report alone\n", cs.CycleID, explanationNeedsCorrection, err)
-	}
 }

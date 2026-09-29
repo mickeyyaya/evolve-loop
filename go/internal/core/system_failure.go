@@ -69,6 +69,10 @@ func persistFloorFailReasons(cs *CycleState, phase Phase, diags []Diagnostic) {
 	_ = os.WriteFile(path, b, 0o644)
 }
 
+func runnerDiagnosedAudit(cs CycleState) bool {
+	return len(cs.AuditFailReasons) > 0
+}
+
 // resetFloorFailReason clears a phase's recorded downgrade explanation — called
 // at every dispatch of the phase, so a re-dispatch (ship-error recovery
 // re-audit, debugger RERUN_PHASE) can never inherit a stale explanation from a

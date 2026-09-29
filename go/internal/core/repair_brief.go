@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
@@ -15,16 +16,26 @@ import (
 // byte budget (maxFindingsBytes) still applies after.
 const maxBriefFindings = 8
 
+const (
+	findingsLead          = "fix THESE"
+	findingsLeadAfterGate = "fix THESE; the gate reasons above are their symptoms"
+)
+
 // composeRepairBrief renders the repair brief for a cycle in an audit-repair
-// round: gate reasons, then the rejecting round's auditor findings, then the
-// persisted set. Empty when there is nothing at all to tell.
+// round: gate reasons (absent a gate record, the audit's failure-block defects),
+// then the rejecting round's auditor findings. Empty when there is nothing to tell.
 func composeRepairBrief(cs CycleState) string {
-	var parts []string
-	if gate := readContinuationFindings(filepath.Join(cs.WorkspacePath, "audit-fail-reason.json")); gate != "" {
-		parts = append(parts, gate)
+	findings := actionableAuditFindings(cs.WorkspacePath)
+	lead := findingsLead
+	if runnerDiagnosedAudit(cs) {
+		lead = findingsLeadAfterGate
 	}
-	if findings := auditorFindingsBrief(cs.WorkspacePath, cs.AuditDispatches); findings != "" {
-		parts = append(parts, findings)
+	var parts []string
+	if reasons := auditRejectionReasons(cs, briefedFindings(findings)); reasons != "" {
+		parts = append(parts, reasons)
+	}
+	if brief := renderAuditorFindings(cs.WorkspacePath, cs.AuditDispatches, findings, lead); brief != "" {
+		parts = append(parts, brief)
 	}
 	if len(parts) == 0 {
 		return ""
@@ -32,26 +43,78 @@ func composeRepairBrief(cs CycleState) string {
 	return truncateFindings(strings.Join(parts, "\n\n"))
 }
 
+func auditRejectionReasons(cs CycleState, briefed []reportdoc.Finding) string {
+	if runnerDiagnosedAudit(cs) {
+		return renderFailReasons(string(PhaseAudit), cs.AuditFailReasons)
+	}
+	fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
+	if !ok {
+		return ""
+	}
+	var lines []string
+	for _, defect := range fb.Defects {
+		if defect = strings.TrimSpace(defect); defect != "" && !restatesAFinding(defect, briefed) {
+			lines = append(lines, "- "+defect)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return "audit defects (the verdict's failure block, class " + fb.Class + "):\n" + strings.Join(lines, "\n")
+}
+
+func restatesAFinding(defect string, briefed []reportdoc.Finding) bool {
+	key := alphanumericKey(defect)
+	for _, f := range briefed {
+		for _, form := range []string{f.Title, f.ID + f.Title, f.ID + f.Severity + f.Title} {
+			if key == alphanumericKey(form) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func alphanumericKey(s string) string {
+	return strings.Map(func(r rune) rune {
+		r = unicode.ToLower(r)
+		if 'a' <= r && r <= 'z' || '0' <= r && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
+}
+
 // auditorFindingsBrief reads the live audit report (the round that just
 // rejected) and the previous round's archive, and renders the findings the
 // builder must act on. round is the audit dispatch count (the live report's
 // round number); the previous archive is round-1.
 func auditorFindingsBrief(workspace string, round int) string {
+	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace), findingsLead)
+}
+
+func actionableAuditFindings(workspace string) []reportdoc.Finding {
 	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	current, err := os.ReadFile(filepath.Join(workspace, reportName))
 	if err != nil {
-		// Absence is legitimate (the audit crashed before writing a report);
-		// anything else is the "looked in the wrong place" class the gate reader
-		// beside this one (readContinuationFindings) already reports — same posture.
+		// Absence is legitimate (the audit crashed before writing a report).
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-repair: %s unreadable (%v) — builder gets no auditor findings\n", reportName, err)
 		}
-		return ""
+		return nil
 	}
-	findings := actionable(reportdoc.Findings(string(current)))
+	return actionable(reportdoc.Findings(string(current)))
+}
+
+func briefedFindings(findings []reportdoc.Finding) []reportdoc.Finding {
+	return findings[:min(len(findings), maxBriefFindings)]
+}
+
+func renderAuditorFindings(workspace string, round int, findings []reportdoc.Finding, lead string) string {
 	if len(findings) == 0 {
 		return ""
 	}
+	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	persisted := map[string]bool{}
 	if round > 1 {
 		if prev, err := os.ReadFile(filepath.Join(workspace, phasecontract.RoundArchiveFilename(reportName, round-1))); err == nil {
@@ -60,13 +123,10 @@ func auditorFindingsBrief(workspace string, round int) string {
 			}
 		}
 	}
+	shown := briefedFindings(findings)
 	var b strings.Builder
-	fmt.Fprintf(&b, "auditor findings (audit round %d — fix THESE; the gate reasons above are their symptoms):\n", round)
-	for i, f := range findings {
-		if i >= maxBriefFindings {
-			fmt.Fprintf(&b, "- … %d more finding(s) in %s\n", len(findings)-i, reportName)
-			break
-		}
+	fmt.Fprintf(&b, "auditor findings (audit round %d — %s):\n", round, lead)
+	for _, f := range shown {
 		label := f.Severity
 		if f.ID != "" {
 			label = f.ID + " (" + f.Severity + ")"
@@ -76,6 +136,9 @@ func auditorFindingsBrief(workspace string, round int) string {
 			b.WriteString("  [PERSISTED from the previous round — your last repair did not address this]")
 		}
 		b.WriteByte('\n')
+	}
+	if more := len(findings) - len(shown); more > 0 {
+		fmt.Fprintf(&b, "- … %d more finding(s) in %s\n", more, reportName)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

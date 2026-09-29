@@ -58,6 +58,8 @@ Cycle 1714 (wave 16) met the same shape on an item with no declared files and pa
 [inbox]        inbox.warning WARN INBOX_ITEM_ROUTED_CONSOLE cycle=N origin=Mover.RouteConsole — route-console: '<id>' is now console-manual — lane triage (cycle N) escalate_block: protected-surface: <path> …
 ```
 
+Cycle 1757 (wave 39, 2026-09-29) found the gap in that route: the one card of a lane pinned to `goal-text-has-no-selection-authority` was named `goal-text-selection-authority` (the scout's slug), so the escalation answered for the alias and not the pin, and the lane sealed FAIL (`triage-empty-commitment-claimable-work`) with the item unrouted and unbumped. When the route empties the `top_n` of a lane bound to one undeferred item, the host now escalates that item too, with a reason naming the card that caused it (design §5.7 R1b).
+
 The failure path in the table above now handles only the fail-closed case (a route the host could not record, which still seals FAIL with the code). Design: [logic-first-delivery-design.md](../architecture/logic-first-delivery-design.md) §5.7.
 
 ## Mitigation applied on the plane before the fix landed
