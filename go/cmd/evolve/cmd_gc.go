@@ -117,6 +117,11 @@ func gcWorkspaceSweep(ctx context.Context, projectRoot string, dryRun bool, stdo
 	if !ok {
 		return code
 	}
+	projectRoot, err := filepath.Abs(projectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: resolve --project-root: %v\n", err)
+		return 1
+	}
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
 	if err != nil {
@@ -129,11 +134,40 @@ func gcWorkspaceSweep(ctx context.Context, projectRoot string, dryRun bool, stdo
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees)
 	failed := gcCycleProcesses(ctx, opts, dryRun, stdout, stderr)
 	failed = gcWorktrees(opts, dryRun, stdout, stderr) != 0 || failed
+	failed = gcRunDirs(evolveDir, gcPol, dryRun, stdout, stderr) || failed
 	failed = gcGoCache(ctx, gcPol.GoCacheTTLHours, dryRun, stdout, stderr) || failed
 	if failed {
 		return 1
 	}
 	return 0
+}
+
+func gcRunDirs(evolveDir string, pol gc.Policy, dryRun bool, stdout, stderr io.Writer) bool {
+	runs, err := gc.Discover(evolveDir, gc.DiscoverOptions{})
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: run-dir retention skipped: %v\n", err)
+		return true
+	}
+	m, err := gc.Plan(gc.Options{EvolveDir: evolveDir, Runs: runs, Policy: pol})
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: run-dir retention plan failed: %v\n", err)
+		return true
+	}
+	prefix, verb := "evolve gc: applying", ""
+	if dryRun {
+		prefix, verb = "evolve gc --dry-run:", "WOULD-"
+	}
+	fmt.Fprintf(stdout, "%s run-dir retention — %d item(s)\n", prefix, len(m.Items))
+	for _, it := range m.Items {
+		fmt.Fprintf(stdout, "  %s%s %s (%s)\n", verb, strings.ToUpper(string(it.Action)), it.Path, it.Rule)
+	}
+	if dryRun {
+		return false
+	}
+	if err := gc.Apply(evolveDir, m); err != nil {
+		fmt.Fprintf(stderr, "evolve gc: run-dir retention partial: %v\n", err)
+	}
+	return false
 }
 
 func gcGoCache(ctx context.Context, ttlHours int, dryRun bool, stdout, stderr io.Writer) bool {
