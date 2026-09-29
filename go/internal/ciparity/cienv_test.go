@@ -15,3 +15,16 @@ func TestCIEnv_KeepsOnlyTheAllowlistInItsOrder(t *testing.T) {
 		t.Errorf("CIEnv = %v, want %v: the allowlist in its order, never the lane's runtime state", got, want)
 	}
 }
+
+func TestCIEnv_PassesEveryAllowlistedKeyThrough(t *testing.T) {
+	t.Parallel()
+	var environ, want []string
+	for _, k := range CIEnvAllowlist {
+		environ = append(environ, k+"=v-"+k)
+		want = append(want, k+"=v-"+k)
+	}
+
+	if got := CIEnv(append(environ, "EVOLVE_FLEET=1")); !reflect.DeepEqual(got, want) {
+		t.Errorf("CIEnv = %v, want every allowlisted key in order and nothing else", got)
+	}
+}
