@@ -3,6 +3,7 @@ package gc
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -41,8 +42,8 @@ func TestReapPipelineTemp_RemovesOnlyStalePipelineArtifacts(t *testing.T) {
 
 	rep := ReapPipelineTemp(dir, now.Add(-24*time.Hour), os.RemoveAll)
 
-	if rep.Entries != 6 || rep.Bytes != 60 || len(rep.Errors) != 0 {
-		t.Errorf("report = %+v, want 6 entries / 60 bytes / no errors", rep)
+	if want := (TempReapReport{Entries: 6, Bytes: 60}); !reflect.DeepEqual(rep, want) {
+		t.Errorf("report = %+v, want %+v", rep, want)
 	}
 	for name, e := range entries {
 		_, err := os.Stat(filepath.Join(dir, name))

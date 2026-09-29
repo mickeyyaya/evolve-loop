@@ -40,3 +40,28 @@ func TestIsLive_AClosedOutRunsStalePointerDoesNotKeepItsWorktreeLive(t *testing.
 		t.Error("cycle 1762 has no dossier: its run.json still protects its worktree")
 	}
 }
+
+func TestIsLive_ANonCycleRunDirsPointerIsNeverDiscountedByACycleDossier(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	wt := filepath.Join(evolveDir, "worktrees", "cycle-cd3ae73e-1700")
+	runJSON := filepath.Join(evolveDir, "runs", "reset-sealed-1700", "run.json")
+	if err := os.MkdirAll(filepath.Dir(runJSON), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(runJSON, []byte(`{"active_worktree":"`+wt+`"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dossier.CyclesDir(root), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dossier.CyclesDir(root), "cycle-1700.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	o := WorktreeOptions{ProjectRoot: root, EvolveDir: evolveDir, PidAlive: func(int) bool { return false }}
+
+	if !o.isLive(wt) {
+		t.Error("a run dir without the cycle- prefix names no cycle, so cycle 1700's dossier must not discount its pointer")
+	}
+}

@@ -3,6 +3,7 @@ package gc
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -42,8 +43,8 @@ func TestTrimGoCache_RemovesOnlyEntriesUnusedSinceTheCutoff(t *testing.T) {
 
 	rep := TrimGoCache(dir, now.Add(-24*time.Hour), os.Remove)
 
-	if rep.Files != len(want) || rep.Bytes != int64(10*len(want)) || len(rep.Errors) != 0 {
-		t.Fatalf("report = %+v, want %d files / %d bytes / no errors", rep, len(want), 10*len(want))
+	if wantRep := (CacheTrimReport{Files: len(want), Bytes: int64(10 * len(want))}); !reflect.DeepEqual(rep, wantRep) {
+		t.Fatalf("report = %+v, want %+v", rep, wantRep)
 	}
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {

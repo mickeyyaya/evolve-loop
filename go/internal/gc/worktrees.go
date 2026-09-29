@@ -195,7 +195,7 @@ func activeWorktreeMatches(jsonPath, wtPath string) bool {
 
 func (o WorktreeOptions) runClosedOut(runDir string) bool {
 	n, ok := leafCycleNumber(runDir)
-	return ok && dossier.ClosedOut(o.ProjectRoot, n)
+	return ok && strings.HasPrefix(runDir, "cycle-") && dossier.ClosedOut(o.ProjectRoot, n)
 }
 
 // isLive proves a worktree is genuinely in-flight via any of the three

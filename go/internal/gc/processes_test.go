@@ -104,8 +104,8 @@ func TestReapFinishedCycleOrphans_SignalsEachOwnedOrphanAndReportsFailures(t *te
 	if !reflect.DeepEqual(signaled, []int{20, 21}) {
 		t.Fatalf("signaled %v, want [20 21]: only the orphans inside the finished tree, never the console process", signaled)
 	}
-	if len(rep.Reaped) != 1 || rep.Reaped[0].Pid != 20 {
-		t.Errorf("Reaped = %+v, want only pid 20 (pid 21's signal failed)", rep.Reaped)
+	if want := (ProcessReapReport{Reaped: []Process{{Pid: 20, Ppid: 1, Cwd: gone}}}); !reflect.DeepEqual(rep.Reaped, want.Reaped) {
+		t.Errorf("Reaped = %+v, want %+v (pid 21's signal failed)", rep.Reaped, want.Reaped)
 	}
 	if len(rep.Errors) != 1 || !strings.Contains(rep.Errors[0], "21") {
 		t.Errorf("Errors = %v, want the pid 21 failure named", rep.Errors)

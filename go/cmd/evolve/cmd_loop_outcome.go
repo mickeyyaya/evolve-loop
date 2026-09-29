@@ -181,9 +181,6 @@ func gcManifestDir(evolveDir string) string {
 	return filepath.Join(evolveDir, "gc")
 }
 
-// worktreeGCOptions is the single construction site shared by the in-loop
-// hook and the operator command (`evolve gc`, cmd_gc.go), so both sweeps aim
-// at the same worktree base and carry the same policy.
 func planRunDirGC(evolveDir string, pol gc.Policy, discoverFailed func(error)) (gc.Manifest, error) {
 	runs, err := gc.Discover(evolveDir, gc.DiscoverOptions{})
 	if err != nil {
@@ -193,6 +190,9 @@ func planRunDirGC(evolveDir string, pol gc.Policy, discoverFailed func(error)) (
 	return gc.Plan(gc.Options{EvolveDir: evolveDir, Runs: runs, Policy: pol})
 }
 
+// worktreeGCOptions is the single construction site shared by the in-loop
+// hook and the operator command (`evolve gc`, cmd_gc.go), so both sweeps aim
+// at the same worktree base and carry the same policy.
 func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy) gc.WorktreeOptions {
 	return gc.WorktreeOptions{
 		ProjectRoot:  projectRoot,
