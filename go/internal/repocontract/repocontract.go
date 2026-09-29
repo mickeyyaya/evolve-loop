@@ -6,10 +6,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 )
 
-const evolveLoopModule = "github.com/mickeyyaya/evolve-loop/go"
+type thisPackage struct{}
+
+func evolveLoopModule() string {
+	module, _, _ := strings.Cut(reflect.TypeOf(thisPackage{}).PkgPath(), "/internal/")
+	return module
+}
 
 func ModuleDir(root string) string {
 	return filepath.Join(root, "go")
@@ -23,8 +29,8 @@ func PackRuns(gate, root string) (runs bool, note string) {
 	if !GateOn(gate) {
 		return false, ""
 	}
-	if dir := ModuleDir(root); modulePath(filepath.Join(dir, "go.mod")) != evolveLoopModule {
-		return false, fmt.Sprintf("%s does not declare %s, so the fixed scanner pack's guard suites are not in this tree; the pack is skipped", dir, evolveLoopModule)
+	if dir := ModuleDir(root); modulePath(filepath.Join(dir, "go.mod")) != evolveLoopModule() {
+		return false, fmt.Sprintf("%s does not declare %s, so the fixed scanner pack's guard suites are not in this tree; the pack is skipped", dir, evolveLoopModule())
 	}
 	if gate != "enforce" {
 		return true, fmt.Sprintf("unknown stage %q — treating as enforce (a typo must not silently disable a red-main guard)", gate)
@@ -38,12 +44,8 @@ func modulePath(goMod string) string {
 		return ""
 	}
 	for _, line := range strings.Split(string(data), "\n") {
-		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module ")
-		if !ok {
-			continue
-		}
-		if fields := strings.Fields(rest); len(fields) > 0 {
-			return strings.Trim(fields[0], `"`)
+		if fields := strings.Fields(line); len(fields) > 1 && fields[0] == "module" {
+			return strings.Trim(fields[1], "\"`")
 		}
 	}
 	return ""

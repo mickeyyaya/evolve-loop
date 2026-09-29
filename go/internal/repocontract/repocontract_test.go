@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 func treeDeclaring(t *testing.T, goMod string) string {
@@ -43,9 +45,24 @@ func TestPackRuns_OnlyInEvolveLoopsOwnModuleWhileTheGateIsOn(t *testing.T) {
 }
 
 func TestPackRuns_ReadsTheModuleLineAsGoWritesIt(t *testing.T) {
-	root := treeDeclaring(t, "// a header comment\nmodule \"github.com/mickeyyaya/evolve-loop/go\" // quoted, with a trailing comment\n\ngo 1.23\n")
+	for name, goMod := range map[string]string{
+		"space":                       "module github.com/mickeyyaya/evolve-loop/go\n",
+		"tab":                         "module\tgithub.com/mickeyyaya/evolve-loop/go\n",
+		"runs of blanks":              "module \t  github.com/mickeyyaya/evolve-loop/go  \n",
+		"quoted, with a comment":      "// a header comment\nmodule \"github.com/mickeyyaya/evolve-loop/go\" // trailing\n",
+		"raw string":                  "module `github.com/mickeyyaya/evolve-loop/go`\n",
+		"indented after a blank line": "\n  module github.com/mickeyyaya/evolve-loop/go\n",
+	} {
+		if runs, note := PackRuns("enforce", treeDeclaring(t, goMod+"\ngo 1.23\n")); !runs || note != "" {
+			t.Errorf("%s: %q is evolve-loop's module line; got (%v, %q)", name, goMod, runs, note)
+		}
+	}
+}
+
+func TestPackRuns_RunsInThisRepositorysOwnTree(t *testing.T) {
+	root := acsassert.RepoRoot(t)
 	if runs, note := PackRuns("enforce", root); !runs || note != "" {
-		t.Fatalf("a quoted module path with a trailing comment is still evolve-loop's module; got (%v, %q)", runs, note)
+		t.Fatalf("the real tree %s must run the pack, or the fixed pack goes quiet in the live loop; got (%v, %q)", root, runs, note)
 	}
 }
 
