@@ -28,12 +28,7 @@ type batchDecision struct {
 
 // prepareIteration refreshes every batch-wide input at the only safe boundary:
 // after the previous window drained and before the next dispatch begins.
-func (b *loopBatchCoordinator) prepareIteration(
-	iteration int,
-	fleetConfig *policy.FleetConfig,
-	waveBinary *string,
-	batchStartCycle int,
-) batchDecision {
+func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *policy.FleetConfig, waveBinary *string, batchStartCycle int) batchDecision {
 	if b.ctx.Err() != nil {
 		return b.interruptReturn(iteration, "")
 	}
@@ -64,13 +59,16 @@ func (b *loopBatchCoordinator) prepareIteration(
 	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
 
 	*fleetConfig = loopwave.ReloadFleetConfig(b.cfg.EvolveDir, *fleetConfig, b.stderr)
-	if maybeRefreshChainBoundaryWithSignals(b.cfg, iteration+1, b.stderr, b.deps.Signals) {
+	if maybeRefreshChainBoundaryWithSignals(b.ctx, b.cfg, iteration+1, b.stderr, b.deps.Signals) {
 		b.result.StopReason = "loop_boundary_refresh_reexec"
 		if entry, err := lastChainBoundaryRefreshLogEntry(b.cfg.EvolveDir); err == nil {
 			b.result.BoundaryRefresh = entry
 		}
 		b.result.emit(b.stdout)
 		return batchDecision{flow: batchReturn}
+	}
+	if b.ctx.Err() != nil {
+		return b.interruptReturn(iteration, "during the boundary refresh ")
 	}
 
 	b.resolveWaveBinary(fleetConfig, waveBinary)
@@ -91,8 +89,9 @@ func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig
 }
 
 // interruptReturn reports a SIGINT/SIGTERM caught at one of prepareIteration's
-// two check points ("" at entry, or "during the pre-wave probes " after them)
-// and returns the batchDecision that stops the batch cleanly.
+// three check points ("" at entry, "during the pre-wave probes " after them,
+// or "during the boundary refresh " after a refresh that did not re-exec) and
+// returns the batchDecision that stops the batch cleanly.
 func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batchDecision {
 	signalStop(b.stdout, b.stderr, b.result, fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1))
 	return batchDecision{flow: batchReturn, exitCode: 130}

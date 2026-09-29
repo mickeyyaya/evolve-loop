@@ -1,6 +1,7 @@
 package loopchain
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -60,12 +61,15 @@ type skip struct {
 }
 
 // Refresh runs the boundary-refresh sequence for boundary `batch` as a
-// Template Method: guards (ahead-check, fleet-lane guard, loop breaker) →
-// rebuildAndRepin (rebuild, re-exec target, provenance-gated re-pin, audit
-// log) → armAndExec (argv, arm the breaker, flush, exec). Every degrade is
-// ONE LOOP_BOUNDARY_REFRESH_SKIPPED naming its step; not-ahead is silent.
-func (r *Refresher) Refresh(batch int) (refreshed bool) {
-	commit, ahead, s := r.guards()
+// Template Method: guards (ahead-check, fleet-lane guard, loop breaker,
+// pending interrupt) → rebuildAndRepin (rebuild, interrupt re-check, re-exec
+// target, provenance-gated re-pin, audit log) → armAndExec (interrupt
+// re-check, argv, arm the breaker, flush, exec). ctx is the caller's
+// interrupt source: a cancelled ctx at any of the three checks skips the
+// rest, so an interrupt is never lost to the exec. Every degrade is ONE
+// LOOP_BOUNDARY_REFRESH_SKIPPED naming its step; not-ahead is silent.
+func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) {
+	commit, ahead, s := r.guards(ctx)
 	if s != nil {
 		return r.skipped(batch, commit, s)
 	}
@@ -73,11 +77,11 @@ func (r *Refresher) Refresh(batch int) (refreshed bool) {
 		return false
 	}
 	fmt.Fprintf(r.stderr, "[chain] boundary-refresh: HEAD has advanced past the running binary's build commit (%.12s) — rebuilding\n", commit)
-	target, res, s := r.rebuildAndRepin(batch)
+	target, res, s := r.rebuildAndRepin(ctx, batch)
 	if s != nil {
 		return r.skipped(batch, commit, s)
 	}
-	if s := r.armAndExec(batch, commit, target, res); s != nil {
+	if s := r.armAndExec(ctx, batch, commit, target, res); s != nil {
 		return r.skipped(batch, commit, s)
 	}
 	return true
@@ -86,10 +90,11 @@ func (r *Refresher) Refresh(batch int) (refreshed bool) {
 // guards resolves the running commit and refuses before any rebuild: an
 // ahead-check error, an active sibling lane (or an unverifiable check — not
 // proof the plane is idle; the standing rule is NEVER rebuild the plane
-// binary mid-batch), and the loop breaker (a second attempt carrying the
+// binary mid-batch), the loop breaker (a second attempt carrying the
 // same build commit means the previous re-exec came back on a binary that
-// had not moved — refuse rather than livelock at zero batches).
-func (r *Refresher) guards() (commit string, ahead bool, s *skip) {
+// had not moved — refuse rather than livelock at zero batches), and an
+// interrupt already pending.
+func (r *Refresher) guards(ctx context.Context) (commit string, ahead bool, s *skip) {
 	commit = r.deps.RunningCommit()
 	ahead, err := r.deps.Ahead(r.roots.ProjectRoot, commit)
 	if err != nil {
@@ -106,10 +111,11 @@ func (r *Refresher) guards() (commit string, ahead bool, s *skip) {
 	if r.alreadyAttempted(commit) {
 		return commit, true, &skip{"breaker", fmt.Sprintf("REFUSED — a refresh was already performed for build commit %.12s and the running binary still reports it; the rebuild did not move the binary. Continuing on the current binary rather than re-execing again (see .evolve/%s)", commit, r.opts.attemptFile), nil}
 	}
-	return commit, true, nil
+	return commit, true, interrupted(ctx)
 }
 
-// rebuildAndRepin rebuilds, resolves the re-exec target BEFORE the re-pin
+// rebuildAndRepin rebuilds, re-checks for an interrupt that arrived during
+// the rebuild, resolves the re-exec target BEFORE the re-pin
 // (if there is nothing safe to come back on, the pin must stay), then re-pins
 // through phaseintegrity.RepinIfDrifted — the ONE shared detect-drift +
 // provenance-gate + re-pin path the boot healer and the post-build re-pin
@@ -117,9 +123,12 @@ func (r *Refresher) guards() (commit string, ahead bool, s *skip) {
 // unverified provenance refuses and leaves the pin untouched. The audit
 // entry is appended right after the pin moves (its failure is its own code
 // and never aborts — the pin already moved).
-func (r *Refresher) rebuildAndRepin(batch int) (target string, res phaseintegrity.RepinResult, s *skip) {
+func (r *Refresher) rebuildAndRepin(ctx context.Context, batch int) (target string, res phaseintegrity.RepinResult, s *skip) {
 	if err := r.deps.Rebuild(r.roots.ProjectRoot); err != nil {
 		return "", res, &skip{"rebuild", fmt.Sprintf("rebuild failed (%v) — skipping refresh, continuing on the current binary", err), err}
+	}
+	if s := interrupted(ctx); s != nil {
+		return "", res, s
 	}
 	target, err := r.deps.ReExecTarget(r.roots.ProjectRoot)
 	if err != nil {
@@ -137,12 +146,16 @@ func (r *Refresher) rebuildAndRepin(batch int) (target string, res phaseintegrit
 	return target, res, nil
 }
 
-// armAndExec resolves the argv, arms the breaker BEFORE the exec (a
+// armAndExec re-checks for an interrupt (the last point before the process
+// image is replaced), resolves the argv, arms the breaker BEFORE the exec (a
 // successful exec never returns, so anything written after it never
 // happens), flushes the Center so no queued signal is lost to the exec, and
 // replaces the process image. The audit entry lands before the argv check
 // (Q-C2): an empty argv leaves a log entry with no re-exec.
-func (r *Refresher) armAndExec(batch int, commit, target string, res phaseintegrity.RepinResult) *skip {
+func (r *Refresher) armAndExec(ctx context.Context, batch int, commit, target string, res phaseintegrity.RepinResult) *skip {
+	if s := interrupted(ctx); s != nil {
+		return s
+	}
 	argv := r.deps.Argv()
 	if len(argv) == 0 {
 		return &skip{"argv", "empty re-exec argv — skipping refresh", nil}
@@ -154,6 +167,13 @@ func (r *Refresher) armAndExec(batch int, commit, target string, res phaseintegr
 	r.deps.Flush()
 	if err := r.deps.ReExec(target, argv, r.deps.Environ()); err != nil {
 		return &skip{"reexec", fmt.Sprintf("re-exec failed (%v) — continuing on the current binary", err), err}
+	}
+	return nil
+}
+
+func interrupted(ctx context.Context) *skip {
+	if err := ctx.Err(); err != nil {
+		return &skip{"interrupted", fmt.Sprintf("interrupted (%v) — skipping the refresh without a re-exec, so the pending interrupt stops the loop on the current binary", err), err}
 	}
 	return nil
 }

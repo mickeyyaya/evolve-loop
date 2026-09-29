@@ -7,7 +7,9 @@
 // defers on the quota wall, anything else stops and propagates). The
 // Refresher is the boundary binary refresh (cycle 1314): ahead-check →
 // fleet-lane guard → loop breaker → rebuild → re-exec target → provenance-
-// gated re-pin → audit log → arm the breaker → flush the Center → exec. Both
+// gated re-pin → audit log → arm the breaker → flush the Center → exec, with
+// the caller's interrupt checked before the rebuild, after it and before the
+// exec (a pending SIGINT is never lost to the new process image). Both
 // take their process collaborators explicitly (the batch, the rebuild, the
 // exec, the running commit, the quota-pause reader) so the leaf is core-free
 // and the host's package-var test seams project into them at call time.
@@ -22,7 +24,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The unit's codes: the ten refresh degrade branches under ONE code naming
+// The unit's codes: the eleven refresh degrade branches under ONE code naming
 // the step, the audit failure, and the chain's four boundary conditions.
 const (
 	CodeBoundaryRefreshSkipped     signalcenter.Code = "LOOP_BOUNDARY_REFRESH_SKIPPED"
@@ -34,7 +36,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeBoundaryRefreshSkipped, "the boundary binary refresh degraded to 'continue on the current binary' at fields.step (ahead_check | lane_check | lane_active | breaker | rebuild | target | repin | argv | arm | reexec): the ahead-check errored, a sibling fleet lane held a fresh lease (or the check was unverifiable), the loop breaker refused a second refresh for the same build commit, `make -C go build` failed, no executable at go/bin/evolve, the state.json re-pin was refused, the re-exec argv was empty, the breaker marker could not be written, or exec failed; fields.batch, commit (the running build commit), error")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeBoundaryRefreshSkipped, "the boundary binary refresh degraded to 'continue on the current binary' at fields.step (ahead_check | lane_check | lane_active | breaker | interrupted | rebuild | target | repin | argv | arm | reexec): the ahead-check errored, a sibling fleet lane held a fresh lease (or the check was unverifiable), the loop breaker refused a second refresh for the same build commit, an interrupt (SIGINT/SIGTERM) was pending before the rebuild, after it or before the exec (no re-exec, so the loop stops on the signal), `make -C go build` failed, no executable at go/bin/evolve, the state.json re-pin was refused, the re-exec argv was empty, the breaker marker could not be written, or exec failed; fields.batch, commit (the running build commit), error")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeBoundaryRefreshAuditFailed, "the boundary-refresh-log.jsonl audit entry could not be appended AFTER the state.json pin had already moved; the refresh continues to re-exec — the pin and the audit trail now disagree; fields.batch, path, error")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeChainInboxItemInvalid, "a root-level .evolve/inbox/*.json did not parse as an inbox item (no object with a non-empty id) and is NOT counted as pending work — usually a real todo lost to a typo; fields.batch, name, path")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeChainQuotaDefer, "a chained batch exited with the resumable rc=5 quota-pause code; the chain defers instead of relaunching into the wall (resume with evolve loop --resume); fields.batch, cycle, wake_at, source are the checkpoint block's (empty when no block is on disk)")

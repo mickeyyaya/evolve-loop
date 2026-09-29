@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -122,9 +123,11 @@ func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Cent
 // boundary `batch` reporting through signals — the production spelling
 // (cmd_loop_window.go's prepareIteration and the chain Driver). It is called
 // only BETWEEN batches; every failure degrades to refreshed=false and the
-// current binary keeps running — never a halt.
-func maybeRefreshChainBoundaryWithSignals(cfg loopConfig, batch int, stderr io.Writer, signals *signalcenter.Center) (refreshed bool) {
-	return wiredRefresher(cfg, stderr, signals).Refresh(batch)
+// current binary keeps running — never a halt. ctx is the batch's signal
+// context; the Driver passes context.Background() because between batches no
+// signal context is registered and a SIGINT ends the process outright.
+func maybeRefreshChainBoundaryWithSignals(ctx context.Context, cfg loopConfig, batch int, stderr io.Writer, signals *signalcenter.Center) (refreshed bool) {
+	return wiredRefresher(cfg, stderr, signals).Refresh(ctx, batch)
 }
 
 // maybeRefreshChainBoundary is the by-name test facade: the same refresh
@@ -136,7 +139,7 @@ func maybeRefreshChainBoundaryWithSignals(cfg loopConfig, batch int, stderr io.W
 func maybeRefreshChainBoundary(cfg loopConfig, batch int, stderr io.Writer) (refreshed bool) {
 	signals := newRootSignalCenter(cfg.ProjectRoot, cfg.EvolveDir, stderr)
 	defer signals.Flush()
-	return maybeRefreshChainBoundaryWithSignals(cfg, batch, stderr, signals)
+	return maybeRefreshChainBoundaryWithSignals(context.Background(), cfg, batch, stderr, signals)
 }
 
 // lastChainBoundaryRefreshLogEntry reads the audit trail's LAST entry —
@@ -166,8 +169,10 @@ func chainContinueDecision(rc int) (reason string, exit int, stop bool) {
 // fleet width read to record it, and the checkpoint's quota-pause block.
 func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer, signals *signalcenter.Center) *loopchain.Driver {
 	deps := loopchain.DriverDeps{
-		Batch:       func() int { signals.Flush(); return runLoopBatchFn(cfg, stdin, stdout, stderr) },
-		Refresh:     func(batch int) bool { return maybeRefreshChainBoundaryWithSignals(cfg, batch, stderr, signals) },
+		Batch: func() int { signals.Flush(); return runLoopBatchFn(cfg, stdin, stdout, stderr) },
+		Refresh: func(batch int) bool {
+			return maybeRefreshChainBoundaryWithSignals(context.Background(), cfg, batch, stderr, signals)
+		},
 		LastRefresh: func() (*chainBoundaryRefreshLogEntry, error) { return lastChainBoundaryRefreshLogEntry(cfg.EvolveDir) },
 		FleetWidth:  func() int { return loadFleetConfig(cfg.EvolveDir).Count },
 		QuotaPause: func() (loopchain.QuotaPause, bool) {
