@@ -152,6 +152,20 @@ func Dispositions(workspace string) []Disposition {
 	return DispositionsFrom(body)
 }
 
+func Unanswered(workspace string) []string {
+	answered := map[string]bool{}
+	for _, d := range Dispositions(workspace) {
+		answered[d.ID] = true
+	}
+	var owed []string
+	for _, id := range LanePin(workspace) {
+		if !answered[id] {
+			owed = append(owed, id)
+		}
+	}
+	return owed
+}
+
 // DispositionsFrom returns every id a triage decision answered for, one entry
 // per id, the most severe bucket first: escalate_block → skip_rejected →
 // skip_shipped → dropped (an integrity escalation is never masked by a drop's

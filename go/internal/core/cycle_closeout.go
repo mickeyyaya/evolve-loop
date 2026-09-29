@@ -3,6 +3,10 @@ package core
 import (
 	"fmt"
 	"os"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
 // completeCycle is the terminal lifecycle for both entrypoints. Resume must
@@ -47,6 +51,8 @@ func (cr *cycleRun) recordPlannedNoWorkOutcome() {
 		!cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases) &&
 		phasesEndAtTriageWithoutImplementation(cr.result.PhasesRun) {
 		cr.result.FinalVerdict = VerdictFAIL
+		cr.recordTriageEnding(VerdictFAIL, cycleTerminationTriageClaimFailed,
+			append(triageErrorDiagnostics(cr.phaseTimings), scopeUnansweredDiagnostics(cr.cs.WorkspacePath)...))
 		return
 	}
 	if cr.result.TerminationReason != CycleTerminationTriageNoWork ||
@@ -56,6 +62,41 @@ func (cr *cycleRun) recordPlannedNoWorkOutcome() {
 		return
 	}
 	cr.result.FinalVerdict = VerdictSKIPPED
+	cr.recordTriageEnding(VerdictSKIPPED, CycleTerminationTriageNoWork, nil)
+}
+
+func (cr *cycleRun) recordTriageEnding(verdict, reason string, diags []Diagnostic) {
+	cr.o.recordHostEnding(&cr.phaseTimings,
+		phaseOutcomeFrom(PhaseTriage, PhaseResponse{Phase: string(PhaseTriage), Verdict: verdict, Diagnostics: diags}, 0, reason, ""))
+}
+
+func triageErrorDiagnostics(timings []phaseTimingEntry) []Diagnostic {
+	for i := len(timings) - 1; i >= 0; i-- {
+		if timings[i].Phase != string(PhaseTriage) {
+			continue
+		}
+		var errs []Diagnostic
+		for _, d := range timings[i].Diagnostics {
+			if d.Severity == cyclestate.SeverityError {
+				errs = append(errs, d)
+			}
+		}
+		return errs
+	}
+	return nil
+}
+
+func scopeUnansweredDiagnostics(workspace string) []Diagnostic {
+	owed := committedset.Unanswered(workspace)
+	if len(owed) == 0 {
+		return nil
+	}
+	return []Diagnostic{{
+		Severity: cyclestate.SeverityError,
+		Code:     cyclestate.DiagCodeTriageScopeUnanswered,
+		Subject:  strings.Join(owed, ","),
+		Message:  "triage committed nothing and left the lane's pinned items unanswered: " + strings.Join(owed, ", "),
+	}}
 }
 
 // dossierParams is the ONE projection of a cycleRun into the closeout
