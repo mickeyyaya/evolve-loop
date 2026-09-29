@@ -19,7 +19,7 @@ import (
 // .evolve/policy.json with workflow.strict_audit:true into the project root.
 const strictPolicyMarker = "TEST_WRITE_STRICT_POLICY=1"
 
-func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) []ledgerEntry {
+func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, extraEnv ...string) ([]ledgerEntry, error) {
 	t.Helper()
 	projRoot := setupTempProject(t, repoRoot)
 
@@ -59,7 +59,7 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	out, err := runWithTimeout(cmd, 300*time.Second)
 	t.Logf("cycle run (%s) err=%v\n%s", goalHash, err, lastN(out, 1200))
 
-	return readLedger(t, projRoot)
+	return readLedger(t, projRoot), err
 }
 
 func lastN(s string, n int) string {
@@ -88,7 +88,7 @@ func mustBuildPipelineBins(t *testing.T) (evolveBin, fakeBin, repoRoot string) {
 
 func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
-	entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2efail",
+	entries, _ := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2efail",
 		"FAKE_CLI_AUDIT_VERDICT=FAIL")
 
 	if !ledgerHasRole(entries, "audit") {
@@ -106,15 +106,18 @@ func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 
 	t.Run("fluent_ships", func(t *testing.T) {
-		entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnfluent",
+		entries, runErr := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnfluent",
 			"FAKE_CLI_AUDIT_VERDICT=WARN")
 		if !ledgerHasRole(entries, "ship") {
 			t.Errorf("audit WARN with no strict policy should proceed to the ship phase (fluent); ledger roles=%v", ledgerRoles(entries))
 		}
+		if runErr != nil {
+			t.Errorf("a fluent WARN cycle ships, so the cycle run succeeds; reaching the ship phase and failing there is not a ship: %v", runErr)
+		}
 	})
 
 	t.Run("strict_blocks", func(t *testing.T) {
-		entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnstrict",
+		entries, _ := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2ewarnstrict",
 			"FAKE_CLI_AUDIT_VERDICT=WARN", strictPolicyMarker)
 		if ledgerHasRole(entries, "ship") {
 			t.Errorf("audit WARN with workflow.strict_audit must be promoted to FAIL and NOT reach the ship phase; ledger roles=%v", ledgerRoles(entries))
@@ -127,7 +130,7 @@ func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 
 func TestE2EPipeline_IntentPhase_RunsAndShips(t *testing.T) {
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
-	entries := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2eintent",
+	entries, runErr := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2eintent",
 		"EVOLVE_REQUIRE_INTENT=1")
 
 	if !ledgerHasRole(entries, "intent") {
@@ -135,5 +138,8 @@ func TestE2EPipeline_IntentPhase_RunsAndShips(t *testing.T) {
 	}
 	if !ledgerHasRole(entries, "ship") {
 		t.Errorf("intent-gated happy-path cycle should reach the ship phase; ledger roles=%v", ledgerRoles(entries))
+	}
+	if runErr != nil {
+		t.Errorf("a happy-path cycle ships, so the cycle run succeeds; reaching the ship phase and failing there is not a ship: %v", runErr)
 	}
 }
