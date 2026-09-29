@@ -76,6 +76,7 @@ func TestRunGC_ExplicitRunPreservesUnmergedBranch(t *testing.T) {
 }
 
 func TestRunGC_MutatingRunRefusesWithoutProjectRoot(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	var stdout, stderr bytes.Buffer
 	rc := runGC([]string{}, nil, &stdout, &stderr)
 
