@@ -62,9 +62,12 @@ level-two sections exactly once:
 
 `Changed Areas` has one ``- `<repo-relative path>` — what changed and why``
 entry for every material path. A cited path must name Build content: an exact
-diff path, or a directory, glob (`go/acs/cycle1768/*_test.go`) or brace list
-(`go/acs/{cycle1768,cycle9}/…`) that covers at least one diff path. A citation
-covering no diff path is rejected. A pattern is only ever a citation: every
+diff path (tried literally first, so a real path whose name holds braces stays
+citable), or a directory (also written `dir/...` or `dir/**`), glob
+(`go/acs/cycle1768/*_test.go`) or brace list (`go/acs/{cycle9,cycle1768}/…`) that
+covers at least one diff path. A citation covering no diff path is rejected, and so
+is a brace list with an empty alternative, an unclosed brace, or more than 64
+expansions: those cover nothing, so a typo can never widen into a bare prefix. A pattern is only ever a citation: every
 material path still needs its own exact entry, so one broad glob can never stand
 in for the per-path explanations the contract requires (2026-09-30, after cycles
 1765 and 1768 each lost a correction round to a directory or glob citation).
@@ -80,7 +83,7 @@ material change because the host derives the path set from Git.
 
 A builder that explains a non-material diff anyway is not refused: a `REQUIRED`
 declaration naming the cycle's own record is verified like any explanation (the
-material set is empty, so `Changed Areas` may cite only paths in the diff), and a
+material set is empty, so `Changed Areas` may cite only Build content: exact diff paths or patterns that cover them), and a
 `NOT_APPLICABLE` declaration beside an undeclared own record passes with the
 record kept as documentation: its content is not validated (no section or path
 check reads it, and no review is owed to it), and once landed it is a published
