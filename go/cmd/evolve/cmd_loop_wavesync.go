@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -112,10 +113,46 @@ func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, w
 	// CHANGES would be overwritten — a normal runtime state (rebuilt-binary
 	// churn) that must be named as such, never as divergence (whose "next
 	// ship reconciles" remedy is the stowaway class).
-	if _, stderr, code, err := g.Capture(sctx, "merge", "--ff-only", "origin/main"); err != nil || code != 0 {
-		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", code, strings.TrimSpace(stderr))
+	if !fastForwardMain(sctx, g, warn) {
 		return false, nil
 	}
 	fmt.Fprintf(warn, "[loop] wave-boundary sync: fast-forwarded main to origin/main (%.12s)\n", rel.Remote)
 	return true, nil
+}
+
+func fastForwardMain(ctx context.Context, g gitexec.Git, warn io.Writer) bool {
+	_, stderr, code, err := g.Capture(ctx, "merge", "--ff-only", "origin/main")
+	if err == nil && code == 0 {
+		return true
+	}
+	fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", code, strings.TrimSpace(stderr))
+	if blocking := blockingInboxFiles(ctx, g); len(blocking) > 0 {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %d plane-side inbox file(s) block it: %s — discard the plane copy once origin holds everything it carries, then run evolve sync-main (runtime-reference: the console route at a boundary)\n", len(blocking), strings.Join(blocking, ", "))
+	}
+	return false
+}
+
+const inboxPathspec = ".evolve/inbox/"
+
+func blockingInboxFiles(ctx context.Context, g gitexec.Git) []string {
+	local, _, code, err := g.Capture(ctx, "status", "--porcelain", "-z", "--untracked-files=all", "--", inboxPathspec)
+	if err != nil || code != 0 {
+		return nil
+	}
+	remote, _, code, err := g.Capture(ctx, "diff", "-z", "--no-renames", "--name-only", "HEAD", "origin/main", "--", inboxPathspec)
+	if err != nil || code != 0 {
+		return nil
+	}
+	changed := map[string]bool{}
+	for _, path := range strings.Split(remote, "\x00") {
+		changed[path] = true
+	}
+	var blocking []string
+	for _, entry := range strings.Split(local, "\x00") {
+		if len(entry) > 3 && entry[1] != 'D' && changed[entry[3:]] {
+			blocking = append(blocking, entry[3:])
+		}
+	}
+	sort.Strings(blocking)
+	return blocking
 }
