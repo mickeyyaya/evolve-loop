@@ -1,0 +1,20 @@
+{
+  "id": "gc-treats-sealed-cycles-as-live",
+  "kind": "bug",
+  "priority_class": "stability",
+  "weight": 0.66,
+  "title": "evolve gc reaps no cycle worktree: every sealed cycle's run.json keeps active_worktree, so gc reads it as live",
+  "files": [
+    "go/internal/gc/worktrees.go",
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "summary": "2026-09-29 storage cleanup: .evolve/worktrees held 87 cycle worktrees (7.3 GB) and `evolve gc --dry-run` planned 0 removals and flagged none. WorktreeOptions.isLive treats a worktree as live when any .evolve/runs/*/run.json names it as active_worktree, and a sealed cycle's run.json keeps that pointer forever (cycles 1601, 1700, 1740 checked), so every preserved worktree is excluded before the dirty/unmerged/merged rules run. The operator reclaimed 6.7 GB with `evolve worktree cleanup -cycle N` per cycle after saving dirty state to backups by hand.",
+  "fix": "A run is live only while it is unsealed and its lease/pid is alive (or the cycle-state names it as the active cycle); a sealed run's active_worktree never protects its worktree. Then the existing rules apply: merged+clean+dead → remove; dirty/unmerged → flag. Consider an operator path for sealed, unmerged, unbound worktrees older than N days that saves the uncommitted state (patch + untracked archive) before removal, and never touches a continuation-bound worktree.",
+  "acceptance": [
+    "A sealed cycle's worktree with a stale run.json active_worktree is not live (red today)",
+    "A continuation-bound worktree is never reaped",
+    "`evolve gc --dry-run` on a plane with old sealed cycles plans or flags each of them"
+  ],
+  "created_at": "2026-09-29T22:30:00Z",
+  "source": "console, 2026-09-29 storage cleanup"
+}
