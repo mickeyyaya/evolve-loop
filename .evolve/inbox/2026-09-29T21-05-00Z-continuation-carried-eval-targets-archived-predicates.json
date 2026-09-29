@@ -1,0 +1,20 @@
+{
+  "id": "continuation-carried-eval-targets-archived-predicates",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.55,
+  "title": "A continuation's carried eval still names the ancestor's predicate package, which adoption now archives (A2 follow-up)",
+  "files": [
+    "go/internal/core/continuation_ancestor_predicates.go",
+    "agents/evolve-tdd-engineer.md",
+    ".evolve/evals"
+  ],
+  "summary": "Since design A2 (PR #732, 2026-09-30) adoption archives the ancestor's own go/acs/cycle<M>. The item's eval (.evolve/evals/<slug>.md) is item-scoped and carried across attempts, and its evidence commands name the ancestor's package: cycle 1765's first audit FAILed because all nine score_cap evidence commands ran ./acs/cycle1761 TestC1761_* (directory gone) and the prose still cited cycle 1761 and its base. Before A2 those commands silently ran the stale ancestor predicates; A2 made it loud. The auditor's repair re-pointed them and 1765 shipped on its third audit round, a round the pipeline could have saved.",
+  "fix": "At adoption, beside the predicate archive, re-point the carried eval's evidence to this cycle's package (./acs/cycle<M> -> ./acs/cycle<N>, TestC<M>_ -> TestC<N>_) as a staged, logged rewrite, or have the tdd phase of an adopting cycle re-author the eval's evidence block as part of its contract; either way a build floor check names an eval evidence command that targets a package absent from the tree before the audit sees it.",
+  "acceptance": [
+    "An adopting cycle's eval evidence commands name only its own predicate package (red today: they name the ancestor's)",
+    "A build floor check rejects an eval evidence command whose package is absent from the tree, with the exact line"
+  ],
+  "created_at": "2026-09-29T21:05:00Z",
+  "source": "console, 2026-09-30 wave-44 audit of cycle 1765 (A2 follow-up; the A2 architecture review left the eval's scope open)"
+}
