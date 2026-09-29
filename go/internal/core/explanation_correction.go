@@ -1,6 +1,8 @@
 package core
 
 import (
+	"encoding/json"
+	"fmt"
 	"path"
 	"regexp"
 	"strings"
@@ -8,6 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
+
+const explanationNeedsCorrection = "explanation-needs-correction"
 
 const defectTokenPunctuation = "`'\"()[]{}<>,;:."
 
@@ -42,4 +46,19 @@ func defectLocation(defect string) string {
 
 func namesDocument(location, document string) bool {
 	return location == document || strings.HasSuffix(location, "/"+document)
+}
+
+func recordExplanationCorrection(workspace string, defects []string) error {
+	reasons := make([]string, len(defects))
+	for i, defect := range defects {
+		reasons[i] = explanationNeedsCorrection + ": " + defect
+	}
+	b, err := json.Marshal(auditFailReason{SchemaVersion: 1, Phase: string(PhaseAudit), Reasons: reasons})
+	if err != nil {
+		return fmt.Errorf("record explanation correction: %w", err)
+	}
+	if err := writeArtifactAtomically(floorFailReasonPath(workspace, PhaseAudit), b); err != nil {
+		return fmt.Errorf("record explanation correction: %w", err)
+	}
+	return nil
 }
