@@ -40,6 +40,9 @@ func worktreeWithModule(t *testing.T) string {
 	if err := os.MkdirAll(filepath.Join(wt, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(wt, "go", "go.mod"), []byte("module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return wt
 }
 

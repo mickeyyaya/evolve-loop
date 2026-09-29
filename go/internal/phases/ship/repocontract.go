@@ -55,6 +55,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -137,7 +138,7 @@ func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Write
 
 func RunRepoContractPack(ctx context.Context, root string) (reds []string, diagnostic string, err error) {
 	var out strings.Builder
-	o := repoContractTestFn(ctx, repoContractModuleDir(root), &out)
+	o := repoContractTestFn(ctx, repocontract.ModuleDir(root), &out)
 	switch {
 	case o.realRed():
 		return o.failedNames(), o.failureLog, o.err
@@ -145,10 +146,6 @@ func RunRepoContractPack(ctx context.Context, root string) (reds []string, diagn
 		return nil, "", nil
 	}
 	return nil, out.String(), o.err
-}
-
-func repoContractModuleDir(root string) string {
-	return filepath.Join(root, "go")
 }
 
 func repoContractSuiteNames() []string {
@@ -442,14 +439,10 @@ func runRepoContractGate(ctx context.Context, gate, root, workspace string, stde
 // <workspace>/ship-repocontract-scan.log. Empty workspace degrades to
 // stderr-only diagnostics — a missing run dir must never block a ship.
 func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer, cleared func([]string)) error {
-	if gate != "enforce" {
-		if gate != "" && gate != "off" {
-			fmt.Fprintf(stderr, "[ship] repo-contract gate: unknown stage %q — treating as enforce (a typo must not silently disable a red-main guard)\n", gate)
-		} else {
-			return nil
-		}
+	if !repocontract.GateOn(gate) {
+		return nil
 	}
-	moduleDir := repoContractModuleDir(root)
+	moduleDir := repocontract.ModuleDir(root)
 	out := stderr
 	if scan := openScanLog(workspace, stderr); scan != nil {
 		// Close error deliberately dropped: the scan log is best-effort
@@ -457,15 +450,7 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 		defer func() { _ = scan.Close() }()
 		out = io.MultiWriter(stderr, scan)
 	}
-	// Header first, so the artifact is non-empty and self-identifying even on
-	// a green run — the green baseline is what disproves a false RED.
-	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
-		repoContractTestTimeout,
-		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
-
-	if err := runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
-		return repoContractTestFn(ctx, moduleDir, out)
-	}); err != nil {
+	if err := runFixedPack(ctx, out, gate, root, baseRef, workspace); err != nil {
 		return err
 	}
 
@@ -481,6 +466,26 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 // build tags its files declare. Returns the seed and the untagged groups'
 // patterns so the importer backstop (the third layer) neither re-derives the
 // seed nor re-runs those packages in the same build context.
+func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, workspace string) error {
+	runs, note := repocontract.PackRuns(gate, root)
+	moduleDir := repocontract.ModuleDir(root)
+	if !runs {
+		fmt.Fprintf(out, "[ship] repo-contract scanner pack skipped (module %s, changes vs %s): %s\n", moduleDir, baseRef, note)
+		return nil
+	}
+	if note != "" {
+		fmt.Fprintf(out, "[ship] repo-contract gate: %s\n", note)
+	}
+	// Header first, so the artifact is non-empty and self-identifying even on
+	// a green run — the green baseline is what disproves a false RED.
+	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
+		repoContractTestTimeout,
+		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
+	return runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
+		return repoContractTestFn(ctx, moduleDir, out)
+	})
+}
+
 func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
 	files, err = changedFilesTwice(out, root, baseRef)
 	if err != nil {

@@ -189,7 +189,7 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testing.T) {
 	t.Run("fixed pack RED still names every guard suite", func(t *testing.T) {
 		swapRepoContractTest(t, redPack("internal/phasespec.TestCatalogParity"))
-		err := runRepoContractGate(context.Background(), "enforce", t.TempDir(), t.TempDir(), io.Discard)
+		err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), t.TempDir(), io.Discard)
 		if err == nil {
 			t.Fatal("fixed-pack RED must fail the ship")
 		}

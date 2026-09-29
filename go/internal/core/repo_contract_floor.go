@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 )
 
 const repoContractFloorDeadline = 120 * time.Second
@@ -17,7 +18,14 @@ type RepoContractPackFn func(ctx context.Context, root string) (reds []string, d
 
 func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 	return func(ctx context.Context, in ReviewInput) []string {
-		if in.Worktree == "" || repoContractGateOff(in) {
+		if in.Worktree == "" {
+			return nil
+		}
+		runs, note := repocontract.PackRuns(repoContractGate(in), in.Worktree)
+		if note != "" {
+			fmt.Fprintf(os.Stderr, "[build-floor] repo-contract floor: %s\n", note)
+		}
+		if !runs {
 			return nil
 		}
 		runCtx, cancel := context.WithTimeout(ctx, repoContractFloorDeadline)
@@ -33,7 +41,7 @@ func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 	}
 }
 
-func repoContractGateOff(in ReviewInput) bool {
+func repoContractGate(in ReviewInput) string {
 	root := in.ProjectRoot
 	if root == "" {
 		root = in.Worktree
@@ -42,5 +50,5 @@ func repoContractGateOff(in ReviewInput) bool {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN repo-contract floor could not read the policy (%v); it runs the pack as enforce\n", err)
 	}
-	return p.GatesConfig().RepoContractGate == "off"
+	return p.GatesConfig().RepoContractGate
 }
