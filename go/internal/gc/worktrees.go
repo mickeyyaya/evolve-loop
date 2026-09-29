@@ -44,6 +44,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -220,6 +221,11 @@ func activeWorktreeMatches(jsonPath, wtPath string) bool {
 	return m.ActiveWorktree != "" && samePath(m.ActiveWorktree, wtPath)
 }
 
+func (o WorktreeOptions) runClosedOut(runDir string) bool {
+	n, err := strconv.Atoi(strings.TrimPrefix(runDir, "cycle-"))
+	return err == nil && dossier.ClosedOut(o.ProjectRoot, n)
+}
+
 // isLive proves a worktree is genuinely in-flight via any of the three
 // evidence sources; used both by Plan and by Apply's TOCTOU re-check.
 func (o WorktreeOptions) isLive(path string) bool {
@@ -232,7 +238,7 @@ func (o WorktreeOptions) isLive(path string) bool {
 			if !e.IsDir() {
 				continue
 			}
-			if activeWorktreeMatches(filepath.Join(runsDir, e.Name(), "run.json"), path) {
+			if activeWorktreeMatches(filepath.Join(runsDir, e.Name(), "run.json"), path) && !o.runClosedOut(e.Name()) {
 				return true
 			}
 		}
