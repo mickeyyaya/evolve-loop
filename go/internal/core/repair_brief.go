@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
@@ -16,15 +17,16 @@ import (
 const maxBriefFindings = 8
 
 // composeRepairBrief renders the repair brief for a cycle in an audit-repair
-// round: gate reasons, then the rejecting round's auditor findings, then the
-// persisted set. Empty when there is nothing at all to tell.
+// round: gate reasons (absent a gate record, the audit's failure-block defects),
+// then the rejecting round's auditor findings. Empty when there is nothing to tell.
 func composeRepairBrief(cs CycleState) string {
+	findings := actionableAuditFindings(cs.WorkspacePath)
 	var parts []string
-	if gate := readContinuationFindings(filepath.Join(cs.WorkspacePath, "audit-fail-reason.json")); gate != "" {
-		parts = append(parts, gate)
+	if reasons := auditRejectionReasons(cs.WorkspacePath, findings[:min(len(findings), maxBriefFindings)]); reasons != "" {
+		parts = append(parts, reasons)
 	}
-	if findings := auditorFindingsBrief(cs.WorkspacePath, cs.AuditDispatches); findings != "" {
-		parts = append(parts, findings)
+	if brief := renderAuditorFindings(cs.WorkspacePath, cs.AuditDispatches, findings); brief != "" {
+		parts = append(parts, brief)
 	}
 	if len(parts) == 0 {
 		return ""
@@ -32,11 +34,58 @@ func composeRepairBrief(cs CycleState) string {
 	return truncateFindings(strings.Join(parts, "\n\n"))
 }
 
+func auditRejectionReasons(workspace string, briefed []reportdoc.Finding) string {
+	record := floorFailReasonPath(workspace, PhaseAudit)
+	if _, err := os.Stat(record); !os.IsNotExist(err) {
+		return readContinuationFindings(record)
+	}
+	fb, ok := phasecontract.ReadFailureBlock(workspace, string(PhaseAudit))
+	if !ok {
+		return ""
+	}
+	var lines []string
+	for _, defect := range fb.Defects {
+		if defect = strings.TrimSpace(defect); defect != "" && !restatesAFinding(defect, briefed) {
+			lines = append(lines, "- "+defect)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	return "audit defects (the verdict's failure block, class " + fb.Class + "):\n" + strings.Join(lines, "\n")
+}
+
+func restatesAFinding(defect string, briefed []reportdoc.Finding) bool {
+	key := alphanumericKey(defect)
+	for _, f := range briefed {
+		for _, form := range []string{f.Title, f.ID + f.Title, f.ID + f.Severity + f.Title} {
+			if key == alphanumericKey(form) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func alphanumericKey(s string) string {
+	return strings.Map(func(r rune) rune {
+		r = unicode.ToLower(r)
+		if 'a' <= r && r <= 'z' || '0' <= r && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
+}
+
 // auditorFindingsBrief reads the live audit report (the round that just
 // rejected) and the previous round's archive, and renders the findings the
 // builder must act on. round is the audit dispatch count (the live report's
 // round number); the previous archive is round-1.
 func auditorFindingsBrief(workspace string, round int) string {
+	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace))
+}
+
+func actionableAuditFindings(workspace string) []reportdoc.Finding {
 	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	current, err := os.ReadFile(filepath.Join(workspace, reportName))
 	if err != nil {
@@ -46,12 +95,16 @@ func auditorFindingsBrief(workspace string, round int) string {
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-repair: %s unreadable (%v) — builder gets no auditor findings\n", reportName, err)
 		}
-		return ""
+		return nil
 	}
-	findings := actionable(reportdoc.Findings(string(current)))
+	return actionable(reportdoc.Findings(string(current)))
+}
+
+func renderAuditorFindings(workspace string, round int, findings []reportdoc.Finding) string {
 	if len(findings) == 0 {
 		return ""
 	}
+	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	persisted := map[string]bool{}
 	if round > 1 {
 		if prev, err := os.ReadFile(filepath.Join(workspace, phasecontract.RoundArchiveFilename(reportName, round-1))); err == nil {
