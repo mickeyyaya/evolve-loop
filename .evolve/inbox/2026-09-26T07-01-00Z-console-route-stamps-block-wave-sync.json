@@ -7,9 +7,9 @@
   "summary": "F30 architecture review M3 (+ m7). RouteConsole rewrites the item in place (lifecycle/route.go), and inbox root files are tracked. When the console later retires or edits that item on origin, the plane's wave-boundary merge --ff-only refuses and the loop plans against a stale local main (cmd_loop_wavesync.go 'local tracked changes block the fast-forward'). The protected-surface breaker and failure_count bumps always had this shape; F30's no-work hand-off makes it routine. Lanes are unaffected (they base on origin), but the plane's own tree — the inbox triage reads, policy, the binary-refresh HEAD — goes stale.",
   "fix": "Now: (a) wave-sync names the routed inbox files when they are what blocks the fast-forward; (b) document the console retirement procedure as a plane-side step at a wave boundary (verify, land via the curation PR, discard the plane copy). Durable (an ADR-0074 follow-up): keep route stamps out of tracked files — e.g. a gitignored sidecar the console partition and the claim floor read. m7: when routing a skip_shipped or close-class drop, put the landing probe's result (lifecycle WithLanded) into routed_reason so the console confirms in batches — never auto-retire (a landed sha proves the commit exists, not that it implements the item).",
   "acceptance": [
-    "A wave-boundary fast-forward blocked by routed inbox files names them (unit pin on the sync's WARN)",
-    "The console retirement procedure is in docs/operations (plane-side, at a boundary)",
-    "Route stamps no longer dirty tracked files (sidecar) — or an ADR records why not"
+    "Route stamps no longer dirty tracked files (a gitignored sidecar the console partition and the claim floor read) — or an ADR records why not (a tracked route is reviewable and shared; a sidecar is local to one plane)",
+    "If the ADR keeps tracked stamps: the land-and-discard steps get a CLI home (e.g. `evolve sync-main` treats plane-side inbox dirt whose content already equals origin/main as clean), so no boundary needs raw git",
+    "m7: a skip_shipped or close-class route carries the landing probe's result (lifecycle WithLanded) in routed_reason, so the console confirms in batches — never auto-retire"
   ],
   "files": [
     "go/cmd/evolve/cmd_loop_wavesync.go",
@@ -18,5 +18,6 @@
   "created_at": "2026-09-26T07:01:00Z",
   "source": "console-f30-architecture-review",
   "priority_class": "stability",
-  "priority_rationale": "inbox review 2026-09-27: This curation will edit tracked inbox items on origin while the plane already holds conflicting stamps, so the next boundary sync can stall and the loop would plan against a stale main."
+  "priority_rationale": "inbox review 2026-09-27: This curation will edit tracked inbox items on origin while the plane already holds conflicting stamps, so the next boundary sync can stall and the loop would plan against a stale main.",
+  "notes": "2026-09-29 (fix/wavesync-names-inbox-stamps): the 'Now' half landed — (a) the wave-boundary sync names the plane-side inbox files that block its fast-forward, computed from git plumbing (the plane's own changes ∩ origin's changes under .evolve/inbox/, NUL-separated), with a cause-neutral remedy; (b) docs/operations/runtime-reference.md documents the console route at a boundary and a per-cause decision table. Open: the durable half and m7."
 }

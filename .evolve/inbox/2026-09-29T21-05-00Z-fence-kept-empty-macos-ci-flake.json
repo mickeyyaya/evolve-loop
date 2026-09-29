@@ -1,0 +1,19 @@
+{
+  "id": "fence-kept-empty-macos-ci-flake",
+  "kind": "bug",
+  "priority_class": "stability",
+  "weight": 0.62,
+  "title": "TestRecoverFromShipError_TheFenceKeepsTheDebuggersResolutionOfTheConflictedFile flakes on macOS CI with kept = [] (2 occurrences)",
+  "files": [
+    "go/internal/core/ship_recovery_debugger_test.go",
+    "go/internal/treefence/fence.go"
+  ],
+  "summary": "Failed twice on macos-latest go1.23 on 2026-09-29, both times in PRs that never touch core or treefence: train #721 (run 36550234640) and #725 (run 36565868172). The signature both times: 'debugger writable = [shared.md] kept = [], want both [shared.md]', and the cycle still shipped the resolution, so the fence reported nothing kept while nothing was reverted. It passes 30/30 locally on macOS and in the local integration tier. The debugger rewrites a conflicted file to content of a different size, so a racy-git stat cache in writeTreeMode's copied temp index cannot explain it. The likelier reading is an inert fence: Take or writeTree failed at Begin (Outcome.TakeErr set, Kept nil), for example on contention with background git maintenance in a fixture that does not set gittest.MaintenanceConfig, or the snapshot saw an index state the rebase recovery left mid-way. Each occurrence costs a ~12 minute CI rerun.",
+  "fix": "Reproduce under CI's constraint first (macOS, -race, the package's parallel load): have the fixture record Outcome.TakeErr / RestoreErr and fail with them when set, so the next occurrence names its cause; then fix the cause (the fixture's git config, or the fence's handling of a mid-rebase index) rather than retrying.",
+  "acceptance": [
+    "A failure of this test names the fence's TakeErr/RestoreErr when kept is empty",
+    "The root cause is fixed and the test is stable under -count=50 -race on macOS"
+  ],
+  "created_at": "2026-09-29T21:05:00Z",
+  "source": "console, 2026-09-29, CI flake classification (second occurrence, CLAUDE.md: 2+ ⇒ regression item)"
+}
