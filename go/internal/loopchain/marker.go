@@ -33,11 +33,8 @@ type RefreshLogEntry struct {
 	NewSHA          string `json:"new_sha,omitempty"`
 }
 
-// attempt is the re-exec loop breaker's wire shape: the running build commit
-// that triggered a refresh; a LATER attempt carrying the SAME commit means the
-// previous re-exec came back on a binary that had not moved. PID is the
-// re-exec handoff (WithHandoff): present only until the replacement image
-// takes it (TakeHandoff).
+// attempt is the breaker marker: the build commit a refresh re-execed away
+// from, plus the wave boundary's handoff (pid, waves_done) until it is taken.
 type attempt struct {
 	RunningCommit string `json:"running_commit"`
 	Batch         int    `json:"batch"`
@@ -65,9 +62,7 @@ func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 	return rec.RunningCommit == runningCommit
 }
 
-// recordAttempt persists the marker for runningCommit, arming the breaker
-// against the next boundary and, under WithHandoff, the pid the replacement
-// image resumes under.
+// recordAttempt arms the breaker for runningCommit and records any handoff.
 func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
 	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoff.PID, WavesDone: r.opts.handoff.WavesDone})
 	if err == nil {

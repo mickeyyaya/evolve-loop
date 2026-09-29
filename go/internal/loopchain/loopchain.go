@@ -7,9 +7,7 @@
 // defers on the quota wall, anything else stops and propagates). The
 // Refresher is the boundary binary refresh (cycle 1314): ahead-check →
 // fleet-lane guard → loop breaker → rebuild → re-exec target → provenance-
-// gated re-pin → audit log → arm the breaker → flush the Center → exec, with
-// the caller's interrupt checked before the rebuild, after it and before the
-// exec (a pending SIGINT is never lost to the new process image). Both
+// gated re-pin → audit log → arm the breaker → flush the Center → exec. Both
 // take their process collaborators explicitly (the batch, the rebuild, the
 // exec, the running commit, the quota-pause reader) so the leaf is core-free
 // and the host's package-var test seams project into them at call time.
@@ -44,8 +42,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeChainBatchError, "a chained batch exited with a non-continuable rc (not 0/3/5) and the chain stopped, propagating rc; the batch's own signals name the failure (an rc=2 batch may have emitted none); fields.batch, rc, stop_reason=chain_batch_error")
 }
 
-// The on-disk names under .evolve/: the re-exec loop breaker marker (which
-// also carries the wave boundary's pid-keyed re-exec handoff) and the
+// The on-disk names under .evolve/: the re-exec loop breaker marker and the
 // additive boundary-refresh audit trail; the authorization class the trail
 // stamps (distinguishable from state.json's own two-value Authorized enum).
 const (

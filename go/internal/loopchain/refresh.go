@@ -60,14 +60,9 @@ type skip struct {
 	err    error
 }
 
-// Refresh runs the boundary-refresh sequence for boundary `batch` as a
-// Template Method: guards (ahead-check, fleet-lane guard, loop breaker,
-// pending interrupt) → rebuildAndRepin (rebuild, interrupt re-check, re-exec
-// target, provenance-gated re-pin, audit log) → armAndExec (interrupt
-// re-check, argv, arm the breaker, flush, exec). ctx is the caller's
-// interrupt source: a cancelled ctx at any of the three checks skips the
-// rest, so an interrupt is never lost to the exec. Every degrade is ONE
-// LOOP_BOUNDARY_REFRESH_SKIPPED naming its step; not-ahead is silent.
+// Refresh runs guards → rebuildAndRepin → armAndExec for boundary `batch`,
+// degrading every refusal, a cancelled ctx included, to one
+// LOOP_BOUNDARY_REFRESH_SKIPPED and refreshed=false.
 func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) {
 	commit, ahead, s := r.guards(ctx)
 	if s != nil {
@@ -87,13 +82,8 @@ func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) {
 	return true
 }
 
-// guards resolves the running commit and refuses before any rebuild: an
-// ahead-check error, an active sibling lane (or an unverifiable check — not
-// proof the plane is idle; the standing rule is NEVER rebuild the plane
-// binary mid-batch), the loop breaker (a second attempt carrying the
-// same build commit means the previous re-exec came back on a binary that
-// had not moved — refuse rather than livelock at zero batches), and an
-// interrupt already pending.
+// guards refuses before any rebuild on an ahead-check error, a live or
+// unverifiable sibling lane, the loop breaker, or a pending interrupt.
 func (r *Refresher) guards(ctx context.Context) (commit string, ahead bool, s *skip) {
 	commit = r.deps.RunningCommit()
 	ahead, err := r.deps.Ahead(r.roots.ProjectRoot, commit)
@@ -114,15 +104,8 @@ func (r *Refresher) guards(ctx context.Context) (commit string, ahead bool, s *s
 	return commit, true, interrupted(ctx)
 }
 
-// rebuildAndRepin rebuilds, re-checks for an interrupt that arrived during
-// the rebuild, resolves the re-exec target BEFORE the re-pin
-// (if there is nothing safe to come back on, the pin must stay), then re-pins
-// through phaseintegrity.RepinIfDrifted — the ONE shared detect-drift +
-// provenance-gate + re-pin path the boot healer and the post-build re-pin
-// use: it hashes the REBUILT binary and consults a REAL provenance closure;
-// unverified provenance refuses and leaves the pin untouched. The audit
-// entry is appended right after the pin moves (its failure is its own code
-// and never aborts — the pin already moved).
+// rebuildAndRepin rebuilds, re-checks the interrupt, and resolves the re-exec
+// target before the provenance-gated re-pin and its audit entry.
 func (r *Refresher) rebuildAndRepin(ctx context.Context, batch int) (target string, res phaseintegrity.RepinResult, s *skip) {
 	if err := r.deps.Rebuild(r.roots.ProjectRoot); err != nil {
 		return "", res, &skip{"rebuild", fmt.Sprintf("rebuild failed (%v) — skipping refresh, continuing on the current binary", err), err}
@@ -146,12 +129,8 @@ func (r *Refresher) rebuildAndRepin(ctx context.Context, batch int) (target stri
 	return target, res, nil
 }
 
-// armAndExec re-checks for an interrupt (the last point before the process
-// image is replaced), resolves the argv, arms the breaker BEFORE the exec (a
-// successful exec never returns, so anything written after it never
-// happens), flushes the Center so no queued signal is lost to the exec, and
-// replaces the process image. The audit entry lands before the argv check
-// (Q-C2): an empty argv leaves a log entry with no re-exec.
+// armAndExec re-checks the interrupt, then arms the breaker and flushes the
+// Center before the exec, because a successful exec never returns.
 func (r *Refresher) armAndExec(ctx context.Context, batch int, commit, target string, res phaseintegrity.RepinResult) *skip {
 	if s := interrupted(ctx); s != nil {
 		return s

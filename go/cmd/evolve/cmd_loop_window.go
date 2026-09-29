@@ -118,10 +118,8 @@ func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig
 	*waveBinary = binary
 }
 
-// interruptReturn reports a SIGINT/SIGTERM caught at one of prepareIteration's
-// three check points ("" at entry, "during the pre-wave probes " after them,
-// or "during the boundary refresh " after a refresh that did not re-exec) and
-// returns the batchDecision that stops the batch cleanly.
+// interruptReturn reports a SIGINT/SIGTERM caught at an iteration boundary
+// check point and returns the decision that stops the batch cleanly.
 func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batchDecision {
 	signalStop(b.stdout, b.stderr, b.result, fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1))
 	return batchDecision{flow: batchReturn, exitCode: 130}

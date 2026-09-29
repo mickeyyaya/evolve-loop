@@ -20,8 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// chainBrakeFile is the operator brake: `evolve loop-stop` (or `touch
-// .evolve/loop-stop`) and the chain stops at the next boundary.
+// chainBrakeFile is the operator brake `evolve loop-stop` writes.
 const chainBrakeFile = paths.LoopStopFile
 
 // The test seams — every one a package var the chain suites swap between
@@ -38,8 +37,7 @@ var (
 	chainBoundaryRepinProvenanceFn = defaultChainBoundaryRepinProvenance
 	// chainReExecTargetFn resolves the executable the refresh re-execs into.
 	chainReExecTargetFn = defaultChainReExecTarget
-	// chainBoundaryRefreshAttemptFile is the on-disk re-exec loop breaker and
-	// the wave boundary's re-exec handoff.
+	// chainBoundaryRefreshAttemptFile is the breaker and re-exec handoff marker.
 	chainBoundaryRefreshAttemptFile = loopchain.AttemptFile
 	// chainRebuildFn is the seam over the sanctioned rebuild recipe.
 	chainRebuildFn = defaultChainRebuild
@@ -165,8 +163,9 @@ func chainContinueDecision(rc int) (reason string, exit int, stop bool) {
 }
 
 // wiredChain is the one loopchain.NewDriver( site: the real batch over the
-// same config every time, the Center-bearing refresh, the audit trail, the
-// fleet width read to record it, and the checkpoint's quota-pause block.
+// same config every time (only the first carries the boot's re-exec resume),
+// the Center-bearing refresh, the audit trail, the fleet width read to record
+// it, and the checkpoint's quota-pause block.
 func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer, signals *signalcenter.Center) *loopchain.Driver {
 	next := cfg
 	deps := loopchain.DriverDeps{
