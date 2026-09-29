@@ -85,19 +85,9 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 // rest; this command prints flags but never upgrades one to a deletion.
 // Returns non-zero only when the plan itself failed.
 func gcWorkspaceSweep(projectRoot string, dryRun bool, stdout, stderr io.Writer) int {
-	if projectRoot == "" {
-		if !dryRun {
-			fmt.Fprintf(stderr, "evolve gc: mutating run refused: --project-root must be explicitly set\n")
-			return 1
-		}
-		// For --dry-run only, cwd is allowed: unlike runWorktreeGC, a mutating
-		// sweep requires explicit aim, not whatever repo we happen to be standing in.
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprintf(stderr, "evolve gc: workspace sweep skipped: no --project-root and cwd is unreadable: %v\n", err)
-			return 1
-		}
-		projectRoot = cwd
+	projectRoot, code, ok := resolveGCProjectRoot(projectRoot, dryRun, stderr)
+	if !ok {
+		return code
 	}
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	pol, err := policy.Load(filepath.Join(evolveDir, "policy.json"))
@@ -143,6 +133,27 @@ func gcWorkspaceSweep(projectRoot string, dryRun bool, stdout, stderr io.Writer)
 	}
 	fmt.Fprintf(stdout, "evolve gc: workspace sweep applied\n")
 	return 0
+}
+
+// resolveGCProjectRoot resolves --project-root for a workspace sweep: an
+// explicit value always passes through; an empty value on a mutating run is
+// refused (a sweep requires explicit aim, not whatever repo we happen to be
+// standing in), while --dry-run alone may fall back to cwd. ok=false means
+// the caller must return code immediately.
+func resolveGCProjectRoot(projectRoot string, dryRun bool, stderr io.Writer) (string, int, bool) {
+	if projectRoot != "" {
+		return projectRoot, 0, true
+	}
+	if !dryRun {
+		fmt.Fprintf(stderr, "evolve gc: mutating run refused: --project-root must be explicitly set\n")
+		return "", 1, false
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc: workspace sweep skipped: no --project-root and cwd is unreadable: %v\n", err)
+		return "", 1, false
+	}
+	return cwd, 0, true
 }
 
 // gcWorktreeItemLabel renders an item's identity: branch-only backlog entries
