@@ -45,68 +45,77 @@ func Check(opts Options) ([]Violation, error) {
 	var violations []Violation
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		n := entry.Name()
-		if !strings.HasSuffix(n, ".md") || !strings.HasPrefix(n, "evolve-") {
-			continue
-		}
-		name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
-
-		profile, err := loader.Get(name)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				// -reference personas are documentation and dispatch: none personas run
-				// outside the profile system; every other unpaired persona WARNs.
-				if !strings.HasSuffix(name, "-reference") && !dispatchNone(opts, name) {
-					violations = append(violations, Violation{
-						Persona:  name,
-						Kind:     "unpaired",
-						Severity: "WARN",
-						Message:  "mismatch: persona agents/evolve-" + name + ".md has no profile .evolve/profiles/" + name + ".json — undispatchable (dies exit=10 at launch if routed)",
-					})
-				}
-				continue
-			}
-			return nil, err
-		}
-
-		if len(profile.AllowedTools) == 0 {
-			// An absent or empty allowed_tools means no constraint, not "nothing allowed".
-			continue
-		}
-
-		persona, err := personaContents(opts, name)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
-				continue
-			}
-			return nil, err
-		}
-
-		fm, _, err := prompts.ParseFrontmatter(persona)
+		vs, err := checkPersonaEntry(opts, loader, entry)
 		if err != nil {
 			return nil, err
 		}
-		if fm == nil {
-			continue
-		}
-
-		toolsVal, ok := fm["tools"]
-		if !ok {
-			continue
-		}
-
-		toolsSlice, ok := toolsVal.([]string)
-		if !ok {
-			continue
-		}
-
-		violations = append(violations, checkToolsCoherence(name, toolsSlice, profile.AllowedTools)...)
+		violations = append(violations, vs...)
 	}
 
 	return violations, nil
+}
+
+func checkPersonaEntry(opts Options, loader *profiles.Loader, entry fs.DirEntry) ([]Violation, error) {
+	if entry.IsDir() {
+		return nil, nil
+	}
+	n := entry.Name()
+	if !strings.HasSuffix(n, ".md") || !strings.HasPrefix(n, "evolve-") {
+		return nil, nil
+	}
+	name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
+
+	profile, err := loader.Get(name)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return unpairedViolations(opts, name), nil
+		}
+		return nil, err
+	}
+
+	if len(profile.AllowedTools) == 0 {
+		return nil, nil
+	}
+
+	persona, err := personaContents(opts, name)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	fm, _, err := prompts.ParseFrontmatter(persona)
+	if err != nil {
+		return nil, err
+	}
+	if fm == nil {
+		return nil, nil
+	}
+
+	toolsVal, ok := fm["tools"]
+	if !ok {
+		return nil, nil
+	}
+
+	toolsSlice, ok := toolsVal.([]string)
+	if !ok {
+		return nil, nil
+	}
+
+	return checkToolsCoherence(name, toolsSlice, profile.AllowedTools), nil
+}
+
+func unpairedViolations(opts Options, name string) []Violation {
+	if strings.HasSuffix(name, "-reference") || dispatchNone(opts, name) {
+		return nil
+	}
+	return []Violation{{
+		Persona:  name,
+		Kind:     "unpaired",
+		Severity: "WARN",
+		Message:  "mismatch: persona agents/evolve-" + name + ".md has no profile .evolve/profiles/" + name + ".json — undispatchable (dies exit=10 at launch if routed)",
+	}}
 }
 
 // dispatchNone reports whether the persona opts out of profile pairing with `dispatch: none`.

@@ -30,85 +30,89 @@ func CheckArtifactNames(opts Options) ([]Violation, error) {
 	var violations []Violation
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		n := entry.Name()
-		if !strings.HasSuffix(n, ".md") || !strings.HasPrefix(n, "evolve-") {
-			continue
-		}
-		name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
-
-		profile, err := loader.Get(name)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				continue
-			}
-			return nil, err
-		}
-
-		persona, err := personaContents(opts, name)
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
-				continue
-			}
-			return nil, err
-		}
-
-		fm, _, err := prompts.ParseFrontmatter(persona)
+		v, err := checkArtifactNameEntry(opts, loader, entry)
 		if err != nil {
 			return nil, err
 		}
-		if fm == nil {
-			continue
-		}
-
-		outputFormatVal, ok := fm["output-format"]
-		if !ok {
-			continue
-		}
-
-		outputFormatStr, ok := outputFormatVal.(string)
-		if !ok {
-			continue
-		}
-
-		// Both sides compare by basename: a persona token may be dir-qualified
-		// ("learn/reflector-synthesis.md").
-		declared := path.Base(firstMdToken(outputFormatStr))
-		if declared == "." {
-			continue
-		}
-
-		if profile.OutputArtifact == "" {
-			violations = append(violations, Violation{
-				Persona:  name,
-				Kind:     "mismatch",
-				Severity: "WARN",
-				Message:  fmt.Sprintf("mismatch: persona declares output artifact %q but profile has no output_artifact field", declared),
-			})
-			continue
-		}
-
-		profileArtifact := path.Base(profile.OutputArtifact)
-
-		// Beside a non-.md deliverable (memo's carryover-todos.json), the persona's
-		// first .md token names a secondary artifact, so there is nothing to compare.
-		if path.Ext(profile.OutputArtifact) != ".md" {
-			continue
-		}
-
-		if declared != profileArtifact {
-			violations = append(violations, Violation{
-				Persona:  name,
-				Kind:     "mismatch",
-				Severity: "WARN",
-				Message:  fmt.Sprintf("mismatch: persona declares output artifact %q but profile specifies %q", declared, profileArtifact),
-			})
+		if v != nil {
+			violations = append(violations, *v)
 		}
 	}
 
 	return violations, nil
+}
+
+func checkArtifactNameEntry(opts Options, loader *profiles.Loader, entry fs.DirEntry) (*Violation, error) {
+	if entry.IsDir() {
+		return nil, nil
+	}
+	n := entry.Name()
+	if !strings.HasSuffix(n, ".md") || !strings.HasPrefix(n, "evolve-") {
+		return nil, nil
+	}
+	name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
+
+	profile, err := loader.Get(name)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	persona, err := personaContents(opts, name)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	fm, _, err := prompts.ParseFrontmatter(persona)
+	if err != nil {
+		return nil, err
+	}
+	if fm == nil {
+		return nil, nil
+	}
+
+	outputFormatStr, ok := fm["output-format"].(string)
+	if !ok {
+		return nil, nil
+	}
+
+	declared := path.Base(firstMdToken(outputFormatStr))
+	if declared == "." {
+		return nil, nil
+	}
+
+	return artifactNameViolation(name, declared, profile.OutputArtifact), nil
+}
+
+func artifactNameViolation(name, declared, outputArtifact string) *Violation {
+	if outputArtifact == "" {
+		return &Violation{
+			Persona:  name,
+			Kind:     "mismatch",
+			Severity: "WARN",
+			Message:  fmt.Sprintf("mismatch: persona declares output artifact %q but profile has no output_artifact field", declared),
+		}
+	}
+
+	if path.Ext(outputArtifact) != ".md" {
+		return nil
+	}
+
+	profileArtifact := path.Base(outputArtifact)
+	if declared == profileArtifact {
+		return nil
+	}
+	return &Violation{
+		Persona:  name,
+		Kind:     "mismatch",
+		Severity: "WARN",
+		Message:  fmt.Sprintf("mismatch: persona declares output artifact %q but profile specifies %q", declared, profileArtifact),
+	}
 }
 
 func firstMdToken(s string) string {
