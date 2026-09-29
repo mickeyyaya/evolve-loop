@@ -18,7 +18,7 @@ const defectTokenPunctuation = "`'\"()[]{}<>,;:."
 var defectLineLocator = regexp.MustCompile(`(?::\d+(?:[-,:]\d+)*|#L\d+(?:-L?\d+)?)$`)
 
 func explanationCorrectionDocument(cs CycleState, fb *phasecontract.FailureBlock) (string, bool) {
-	if fb == nil || len(fb.Defects) == 0 || len(cs.AuditFailReasons) > 0 {
+	if fb == nil || len(fb.Defects) == 0 || runnerDiagnosedAudit(cs) {
 		return "", false
 	}
 	document, err := explanationdocs.DocumentPath(cs.CycleID, cs.RunID)

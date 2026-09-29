@@ -27,7 +27,7 @@ const (
 func composeRepairBrief(cs CycleState) string {
 	findings := actionableAuditFindings(cs.WorkspacePath)
 	lead := findingsLead
-	if len(cs.AuditFailReasons) > 0 {
+	if runnerDiagnosedAudit(cs) {
 		lead = findingsLeadAfterGate
 	}
 	var parts []string
@@ -44,7 +44,7 @@ func composeRepairBrief(cs CycleState) string {
 }
 
 func auditRejectionReasons(cs CycleState, briefed []reportdoc.Finding) string {
-	if len(cs.AuditFailReasons) > 0 {
+	if runnerDiagnosedAudit(cs) {
 		return renderFailReasons(string(PhaseAudit), cs.AuditFailReasons)
 	}
 	fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
@@ -97,9 +97,7 @@ func actionableAuditFindings(workspace string) []reportdoc.Finding {
 	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	current, err := os.ReadFile(filepath.Join(workspace, reportName))
 	if err != nil {
-		// Absence is legitimate (the audit crashed before writing a report);
-		// anything else is the "looked in the wrong place" class the gate reader
-		// beside this one (readContinuationFindings) already reports — same posture.
+		// Absence is legitimate (the audit crashed before writing a report).
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-repair: %s unreadable (%v) — builder gets no auditor findings\n", reportName, err)
 		}
