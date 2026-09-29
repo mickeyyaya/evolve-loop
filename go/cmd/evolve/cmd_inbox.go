@@ -12,7 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// runInbox dispatches `evolve inbox <quarantine|ack-fingerprint|consume|batches>`.
+// runInbox dispatches `evolve inbox <quarantine|ack-fingerprint|consume|route-console|batches>`.
 // The batches path routes to the deterministic backlog classifier
 // (internal/inboxbatch) — the operator view of the SAME grouping the triage
 // prompt receives, so "why did triage batch these?" is answerable from the
@@ -27,8 +27,11 @@ func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "consume" {
 		return runInboxConsume(args[1:], stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "route-console" {
+		return runInboxRouteConsole(args[1:], stdout, stderr)
+	}
 	if len(args) < 1 || args[0] != "batches" {
-		fmt.Fprintln(stderr, "usage: evolve inbox <batches|quarantine|ack-fingerprint|consume> ...")
+		fmt.Fprintln(stderr, "usage: evolve inbox <batches|quarantine|ack-fingerprint|consume|route-console> ...")
 		return 10
 	}
 	return runInboxBatches(args[1:], stdout, stderr)
