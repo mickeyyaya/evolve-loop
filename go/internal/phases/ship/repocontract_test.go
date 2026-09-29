@@ -409,7 +409,7 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 	}, "\n")
 
 	var tee strings.Builder
-	got := classifyPackEvents(strings.NewReader(feed), &tee)
+	got, _ := classifyPackEvents(strings.NewReader(feed), &tee)
 
 	if len(got) != 2 {
 		t.Fatalf("expected exactly 2 classified failures (one test, one build), got %v", got)
@@ -434,7 +434,7 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 // instead of blocking the ship.
 func TestClassifyPackEvents_AmbiguousFeedNamesNothing(t *testing.T) {
 	feed := `{"Action":"output","Package":"p/profiles","Output":"signal: killed\n"}`
-	if got := classifyPackEvents(strings.NewReader(feed), io.Discard); len(got) != 0 {
+	if got, _ := classifyPackEvents(strings.NewReader(feed), io.Discard); len(got) != 0 {
 		t.Fatalf("an OOM-killed run names no failing test; got %v", got)
 	}
 }

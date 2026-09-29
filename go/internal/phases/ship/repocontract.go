@@ -87,8 +87,9 @@ const scanLogName = "ship-repocontract-scan.log"
 // EMPTY failures is the ambiguous case: the toolchain exited nonzero
 // without any guard suite reporting a violation.
 type packOutcome struct {
-	failures []packFailure
-	err      error
+	failures   []packFailure
+	failureLog string
+	err        error
 }
 
 // packFailure is one classified failure: a named test of a package, or a build failure (Test empty).
@@ -260,13 +261,13 @@ func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []
 		return packOutcome{err: fmt.Errorf("go test start: %w", err)}
 	}
 	// Drain to completion BEFORE Wait: an undrained pipe deadlocks the child.
-	failed := classifyPackEvents(stdout, out)
-	return packOutcome{failures: failed, err: cmd.Wait()}
+	failed, failureLog := classifyPackEvents(stdout, out)
+	return packOutcome{failures: failed, failureLog: failureLog, err: cmd.Wait()}
 }
 
 // classifyPackEvents streams a `go test -json` event feed, teeing the
 // human-readable Output text to tee (that is what lands in the scan log) and
-// collecting the names of genuinely failing tests.
+// collecting the names of genuinely failing tests and their own output.
 //
 // The classification is deliberately conservative in ONE direction: a
 // package-level fail with no test name is recorded only when the output marks
@@ -277,8 +278,9 @@ func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []
 // Lines that are not JSON objects are teed verbatim and skipped rather than
 // aborting the scan — a stray non-event line must not blind the classifier to
 // the real failures after it.
-func classifyPackEvents(r io.Reader, tee io.Writer) []packFailure {
+func classifyPackEvents(r io.Reader, tee io.Writer) ([]packFailure, string) {
 	var failed []packFailure
+	failureLog := newPackFailureLog()
 	// A single compile break surfaces TWICE — once as a `build-fail` action
 	// (which carries no package on go1.26) and once as the `FAIL pkg [build
 	// failed]` output line — so build failures are collected per package and
@@ -290,17 +292,13 @@ func classifyPackEvents(r io.Reader, tee io.Writer) []packFailure {
 	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024) // guard suites emit long lines
 	for sc.Scan() {
 		line := sc.Bytes()
-		var ev struct {
-			Action  string `json:"Action"`
-			Package string `json:"Package"`
-			Test    string `json:"Test"`
-			Output  string `json:"Output"`
-		}
+		var ev packEvent
 		if err := json.Unmarshal(line, &ev); err != nil {
 			writeTee(tee, string(line)+"\n")
 			continue
 		}
 		writeTee(tee, ev.Output)
+		failureLog.note(ev)
 		switch {
 		case ev.Action == "fail" && ev.Test != "":
 			failed = append(failed, packFailure{Package: ev.Package, Test: ev.Test})
@@ -331,7 +329,63 @@ func classifyPackEvents(r io.Reader, tee io.Writer) []packFailure {
 	if unattributedBuildFail && len(pkgs) == 0 {
 		failed = append(failed, packFailure{Package: "[build failed] (package unattributed)"})
 	}
-	return failed
+	return failed, failureLog.text.String()
+}
+
+type packEvent struct {
+	Action      string `json:"Action"`
+	Package     string `json:"Package"`
+	Test        string `json:"Test"`
+	Output      string `json:"Output"`
+	ImportPath  string `json:"ImportPath"`
+	FailedBuild string `json:"FailedBuild"`
+}
+
+type packFailureLog struct {
+	pending map[string]*strings.Builder
+	named   map[string]bool
+	text    strings.Builder
+}
+
+func newPackFailureLog() *packFailureLog {
+	return &packFailureLog{pending: map[string]*strings.Builder{}, named: map[string]bool{}}
+}
+
+func (l *packFailureLog) note(ev packEvent) {
+	key := ev.Package + "\x00" + ev.Test
+	switch {
+	case ev.Action == "build-output":
+		l.hold(ev.ImportPath, ev.Output)
+	case ev.Action == "output":
+		l.hold(key, ev.Output)
+	case ev.Action == "fail" && ev.Test != "":
+		l.named[ev.Package] = true
+		l.flush(key)
+	case ev.Action == "fail":
+		l.flush(ev.FailedBuild)
+		if l.named[ev.Package] {
+			delete(l.pending, key)
+		}
+		l.flush(key)
+	case ev.Action == "pass" || ev.Action == "skip":
+		delete(l.pending, key)
+	}
+}
+
+func (l *packFailureLog) hold(key, output string) {
+	b := l.pending[key]
+	if b == nil {
+		b = &strings.Builder{}
+		l.pending[key] = b
+	}
+	b.WriteString(output)
+}
+
+func (l *packFailureLog) flush(key string) {
+	if b := l.pending[key]; b != nil {
+		l.text.WriteString(b.String())
+		delete(l.pending, key)
+	}
 }
 
 // lockedWriter serializes the two writers the pack runner points at ONE
