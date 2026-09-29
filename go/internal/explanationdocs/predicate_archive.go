@@ -49,6 +49,9 @@ func ArchiveSupersededPredicatePackages(ctx context.Context, worktree, baseSHA s
 
 func archivePredicatePackage(worktree, dir string) (string, error) {
 	src := filepath.Join(worktree, filepath.FromSlash(dir))
+	if err := requireRealDirectory(src, "superseded predicate package "+dir); err != nil {
+		return "", err
+	}
 	archiveDir := filepath.ToSlash(filepath.Join(archiveDateDir(), "superseded-predicate-packages"))
 	archiveAbs, err := ensureRealSubdirectories(worktree, archiveDir)
 	if err != nil {
