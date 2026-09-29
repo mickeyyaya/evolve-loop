@@ -46,6 +46,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -130,6 +131,19 @@ var repoContractTestFn = defaultRepoContractTest
 
 func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Writer) packOutcome {
 	return runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
+}
+
+func RunRepoContractPack(ctx context.Context, moduleDir string) (reds []string, err error) {
+	o := repoContractTestFn(ctx, moduleDir, io.Discard)
+	return o.failedNames(), o.err
+}
+
+func repoContractSuiteNames() []string {
+	names := make([]string, 0, len(repoContractPackages))
+	for _, pattern := range repoContractPackages {
+		names = append(names, path.Base(strings.TrimSuffix(pattern, "/...")))
+	}
+	return names
 }
 
 func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Writer, packages []string) packOutcome {
@@ -539,7 +553,7 @@ func contractRed(packName string, o packOutcome) error {
 	detail := packName
 	switch packName {
 	case "scanner pack":
-		detail = "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest, rawgitratchet)"
+		detail = "fixed scanner pack (" + strings.Join(repoContractSuiteNames(), ", ") + ")"
 	case "importer backstop":
 		detail = "importer backstop (the packages that import what this ship changes)"
 	}
