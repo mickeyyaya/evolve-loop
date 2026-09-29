@@ -1,0 +1,18 @@
+{
+  "id": "changed-areas-accepts-a-covering-dir-or-glob",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "title": "Changed Areas rejects a cited directory or glob that covers diff paths; builders lose a correction round to it (3 lanes)",
+  "files": [
+    "go/internal/explanationdocs/explanationdocs.go"
+  ],
+  "summary": "validateRequired reads each Changed Areas bullet's backticked path literally and rejects any that is not an exact Build-diff path ('cited path X is not in the Build diff'). Builders keep citing their predicate package as a directory or glob: cycle 1765 cited go/acs/cycle1765 (wave 44), cycle 1768 cited go/acs/cycle1768/*_test.go (wave 45), and 1765 also cited a brace path {cycle1761,cycle1764}. Each costs a full builder re-dispatch through the correction ladder for a format miss, not a logic defect.",
+  "fix": "A code-owned recovery rung (logic over format): expand a cited directory, glob or brace list against the Build diff; accept the entry when it covers at least one diff path (and credit each covered material path with that entry's explanation); reject only a citation that covers no diff path. Keep the exact-path rule for everything else.",
+  "acceptance": [
+    "A Changed Areas entry citing go/acs/cycle1768/*_test.go (or the directory) passes when the diff holds files under it (red today)",
+    "A citation covering no diff path is still rejected with the same message"
+  ],
+  "created_at": "2026-09-29T21:25:00Z",
+  "source": "console, 2026-09-30 wave-45 build floor of cycle 1768 (and wave 44's 1765)"
+}
