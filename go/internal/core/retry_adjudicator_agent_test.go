@@ -115,8 +115,8 @@ func TestParseAdjudication_RecoversTheLastObjectAmongSeveral(t *testing.T) {
 
 func TestBridgeRetryAdjudicator_PromptCarriesTheAuditsReasonsFromTheOneReader(t *testing.T) {
 	agentGraded := auditFailFixture(t, "code-audit-fail", "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
-	gated := auditFailFixture(t, "code-audit-fail", "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
-	writeAuditFailReason(t, gated, "audit", "EGPS: acs-verdict.json ship_eligible=false")
+	gated := CycleState{WorkspacePath: auditFailFixture(t, "code-audit-fail", "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")}
+	downgradeAudit(t, &gated, "EGPS: acs-verdict.json ship_eligible=false")
 	a := &bridgeRetryAdjudicator{}
 
 	var prompt string
@@ -130,7 +130,7 @@ func TestBridgeRetryAdjudicator_PromptCarriesTheAuditsReasonsFromTheOneReader(t 
 	if !strings.Contains(prompt, "- go/internal/decisionsample/sample.go:14 exports Pick") {
 		t.Errorf("the adjudicator was not shown the failure block's defects:\n%s", prompt)
 	}
-	gatedPrompt := a.composePrompt(CycleState{WorkspacePath: gated}, retryEnvelope{}, "adjudication.json")
+	gatedPrompt := a.composePrompt(gated, retryEnvelope{}, "adjudication.json")
 	if !strings.Contains(gatedPrompt, "failed phase: audit\n- EGPS: acs-verdict.json ship_eligible=false") || strings.Contains(gatedPrompt, "sample.go:14") {
 		t.Errorf("a gate record must stay the adjudicator's reasons, ahead of the failure block:\n%s", gatedPrompt)
 	}

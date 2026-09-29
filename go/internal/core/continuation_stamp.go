@@ -171,10 +171,13 @@ func readContinuationFindings(path string) string {
 	// back to the raw body.
 	var a auditFailReason
 	if json.Unmarshal(body, &a) == nil && len(a.Reasons) > 0 {
-		rendered := "failed phase: " + a.Phase + "\n- " + strings.Join(a.Reasons, "\n- ")
-		return truncateFindings(rendered)
+		return renderFailReasons(a.Phase, a.Reasons)
 	}
 	return truncateFindings(strings.TrimSpace(string(body)))
+}
+
+func renderFailReasons(phase string, reasons []string) string {
+	return truncateFindings("failed phase: " + phase + "\n- " + strings.Join(reasons, "\n- "))
 }
 
 // truncateFindings bounds the findings text with an explicit marker, because

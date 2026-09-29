@@ -3,9 +3,12 @@ package core
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -16,6 +19,15 @@ func writeAuditReportWithDefects(t *testing.T, ws, findings string, defects ...s
 	sentinel := phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL",
 		&phasecontract.FailureBlock{Class: "code-audit-fail", Defects: defects})
 	writeBriefFixture(t, ws, phasecontract.ArtifactFilename(string(PhaseAudit)), findings+"\n"+sentinel+"\n")
+}
+
+func downgradeAudit(t *testing.T, cs *CycleState, reasons ...string) {
+	t.Helper()
+	diags := make([]Diagnostic, len(reasons))
+	for i, reason := range reasons {
+		diags[i] = Diagnostic{Severity: cyclestate.SeverityError, Message: reason}
+	}
+	persistFloorFailReasons(cs, PhaseAudit, diags)
 }
 
 func composeQuietly(t *testing.T, cs CycleState) (string, string) {
@@ -75,24 +87,19 @@ func TestComposeRepairBrief_ADefectTheBriefedFindingsCarryIsNotRepeated(t *testi
 }
 
 func TestComposeRepairBrief_AGateRecordKeepsTodaysBriefOverTheFailureBlock(t *testing.T) {
-	withBlock, plain := t.TempDir(), t.TempDir()
-	for _, ws := range []string{withBlock, plain} {
-		writeAuditFailReason(t, ws, "audit", "EGPS: acs-verdict.json ship_eligible=false")
-	}
-	writeAuditReportWithDefects(t, withBlock, briefRound1, "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
-	writeBriefFixture(t, plain, phasecontract.ArtifactFilename(string(PhaseAudit)), briefRound1)
-	cs := CycleState{AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
+	ws := t.TempDir()
+	writeAuditReportWithDefects(t, ws, briefRound1, "go/internal/decisionsample/sample.go:14 exports Pick with no production caller")
+	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
+	downgradeAudit(t, &cs, "EGPS: acs-verdict.json ship_eligible=false")
 
-	cs.WorkspacePath = withBlock
 	got := composeRepairBrief(cs)
-	cs.WorkspacePath = plain
-	want := composeRepairBrief(cs)
 
+	want := "failed phase: audit\n- EGPS: acs-verdict.json ship_eligible=false\n\n" +
+		"auditor findings (audit round 1 — fix THESE; the gate reasons above are their symptoms):\n" +
+		"- H1 (HIGH) — caller-proof hard floor violated: decisionsample exports have no callers\n" +
+		"- M1 (MEDIUM) — explanation names an area not in the diff"
 	if got != want {
-		t.Fatalf("a runner-downgraded FAIL's brief must be today's (gate reasons, then findings):\ngot:\n%s\nwant:\n%s", got, want)
-	}
-	if !strings.HasPrefix(got, "failed phase: audit\n- EGPS: acs-verdict.json ship_eligible=false") {
-		t.Fatalf("the gate reasons must lead the brief:\n%s", got)
+		t.Fatalf("a runner-downgraded FAIL's brief must be today's, byte for byte (gate reasons, then findings; no failure block):\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
 
@@ -158,5 +165,30 @@ func TestComposeRepairBrief_AFailureBlockEveryDefectOfWhichIsBriefedAddsNoSectio
 
 	if strings.Contains(brief, "audit defects") || !strings.HasPrefix(brief, "auditor findings (audit round 1") {
 		t.Fatalf("with every defect already briefed, the brief must open on the findings with no empty defects header:\n%s", brief)
+	}
+}
+
+func TestComposeRepairBrief_TheRunnersReasonsNotTheWorkspaceFileDecideTheGateSlot(t *testing.T) {
+	defect := "go/internal/decisionsample/sample.go:14 exports Pick with no production caller"
+	stale, unreadable, unwritten := t.TempDir(), t.TempDir(), t.TempDir()
+	writeAuditFailReason(t, stale, "build", agentGradedRouterReason("build"))
+	if err := os.Mkdir(filepath.Join(unreadable, "audit-fail-reason.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, ws := range []string{stale, unreadable, unwritten} {
+		writeAuditReportWithDefects(t, ws, briefRound1, defect)
+	}
+	cs := CycleState{AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
+
+	for name, ws := range map[string]string{"another phase's leftover record": stale, "a record that cannot be read": unreadable} {
+		cs.WorkspacePath = ws
+		brief, stderr := composeQuietly(t, cs)
+		if strings.Contains(stderr, "unreadable") || !strings.Contains(brief, "- "+defect) || strings.Contains(brief, "failed phase") {
+			t.Errorf("%s with no runner diagnosis must brief the failure block, quietly:\nstderr=%q\n%s", name, stderr, brief)
+		}
+	}
+	cs.WorkspacePath, cs.AuditFailReasons = unwritten, []string{"EGPS: acs-verdict.json ship_eligible=false"}
+	if brief, _ := composeQuietly(t, cs); !strings.HasPrefix(brief, "failed phase: audit\n- EGPS: acs-verdict.json ship_eligible=false\n\n") || strings.Contains(brief, defect) {
+		t.Errorf("the runner's reasons lead the brief even when their best-effort record was never written:\n%s", brief)
 	}
 }

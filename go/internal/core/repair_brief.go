@@ -22,7 +22,7 @@ const maxBriefFindings = 8
 func composeRepairBrief(cs CycleState) string {
 	findings := actionableAuditFindings(cs.WorkspacePath)
 	var parts []string
-	if reasons := auditRejectionReasons(cs.WorkspacePath, findings[:min(len(findings), maxBriefFindings)]); reasons != "" {
+	if reasons := auditRejectionReasons(cs, findings[:min(len(findings), maxBriefFindings)]); reasons != "" {
 		parts = append(parts, reasons)
 	}
 	if brief := renderAuditorFindings(cs.WorkspacePath, cs.AuditDispatches, findings); brief != "" {
@@ -34,12 +34,11 @@ func composeRepairBrief(cs CycleState) string {
 	return truncateFindings(strings.Join(parts, "\n\n"))
 }
 
-func auditRejectionReasons(workspace string, briefed []reportdoc.Finding) string {
-	record := floorFailReasonPath(workspace, PhaseAudit)
-	if _, err := os.Stat(record); !os.IsNotExist(err) {
-		return readContinuationFindings(record)
+func auditRejectionReasons(cs CycleState, briefed []reportdoc.Finding) string {
+	if len(cs.AuditFailReasons) > 0 {
+		return renderFailReasons(string(PhaseAudit), cs.AuditFailReasons)
 	}
-	fb, ok := phasecontract.ReadFailureBlock(workspace, string(PhaseAudit))
+	fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
 	if !ok {
 		return ""
 	}

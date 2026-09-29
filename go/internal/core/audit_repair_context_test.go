@@ -28,9 +28,8 @@ func TestSeedAuditRepairContext(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			writeAuditFailReason(t, dir, "audit", "EGPS: red_count=1 [record_absent_from_inbox_root_exactly_once]")
-			cs := CycleState{WorkspacePath: dir, AuditRepairAttempts: tc.attempts, AuditRepairActive: tc.active}
+			cs := CycleState{WorkspacePath: t.TempDir(), AuditRepairAttempts: tc.attempts, AuditRepairActive: tc.active}
+			downgradeAudit(t, &cs, "EGPS: red_count=1 [record_absent_from_inbox_root_exactly_once]")
 
 			got := seedAuditRepairContext(map[string]string{"keep": "me"}, tc.next, cs)
 
@@ -55,11 +54,13 @@ func TestSeedAuditRepairContext_MissingArtifactDegradesQuietly(t *testing.T) {
 }
 
 func TestSeedAuditRepairContext_DoesNotMutateCallerMap(t *testing.T) {
-	dir := t.TempDir()
-	writeAuditFailReason(t, dir, "audit", "x")
+	cs := CycleState{WorkspacePath: t.TempDir(), AuditRepairAttempts: 1, AuditRepairActive: true}
+	downgradeAudit(t, &cs, "x")
 	original := map[string]string{"a": "b"}
 
-	_ = seedAuditRepairContext(original, PhaseBuild, CycleState{WorkspacePath: dir, AuditRepairAttempts: 1, AuditRepairActive: true})
+	if seeded := seedAuditRepairContext(original, PhaseBuild, cs); seeded[CtxKeyAuditRepairFindings] == "" {
+		t.Fatal("the fixture must seed a brief, or the leak check below proves nothing")
+	}
 
 	if _, leaked := original[CtxKeyAuditRepairFindings]; leaked {
 		t.Error("seedAuditRepairContext mutated the caller's map; the brief would leak into later phases")
@@ -117,8 +118,9 @@ func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *te
 	if _, ok := seedAuditRepairContext(base, PhaseAudit, cs)[CtxKeyStandingAuditFindings]; ok {
 		t.Error("the audit re-reads its own report; it is never seeded")
 	}
-	writeAuditFailReason(t, dir, "audit", "EGPS: red_count=1 [x]")
-	rejected := seedAuditRepairContext(base, PhaseBuild, CycleState{WorkspacePath: dir, AuditDispatches: 4, AuditRepairActive: true, AuditRepairAttempts: 1, ShipRecoveryCode: "GIT_FLEET_REBASE_NEEDED"})
+	grant := CycleState{WorkspacePath: dir, AuditDispatches: 4, AuditRepairActive: true, AuditRepairAttempts: 1, ShipRecoveryCode: "GIT_FLEET_REBASE_NEEDED"}
+	downgradeAudit(t, &grant, "EGPS: red_count=1 [x]")
+	rejected := seedAuditRepairContext(base, PhaseBuild, grant)
 	if rejected[CtxKeyAuditRepairFindings] == "" || rejected[CtxKeyStandingAuditFindings] != "" {
 		t.Errorf("a rejection grant is the repair path and outranks standing findings: %v", rejected)
 	}
