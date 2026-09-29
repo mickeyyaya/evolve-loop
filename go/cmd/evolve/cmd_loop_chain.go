@@ -19,8 +19,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// chainBrakeFile is the operator brake: `touch .evolve/loop-stop` and the
-// chain stops at the next boundary.
+// chainBrakeFile is the operator brake: `evolve loop-stop` (or `touch
+// .evolve/loop-stop`) and the chain stops at the next boundary.
 const chainBrakeFile = paths.LoopStopFile
 
 // The test seams — every one a package var the chain suites swap between

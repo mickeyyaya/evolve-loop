@@ -51,6 +51,8 @@ Commands:
               ( branches audit | branches prune [--dry-run=false] )
   gc         Reap orphaned tmux sessions whose creator PID is dead ( gc [--dry-run] )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N [strategy] "goal" )
+  loop-stop  Stop a running loop after its current wave; --release lifts the brake
+              ( loop-stop [--release] [--project-root P] )
   ship       Atomic commit + push (native; v11.3.0)
               ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )
   bridge     Native-Go multi-CLI agent bridge

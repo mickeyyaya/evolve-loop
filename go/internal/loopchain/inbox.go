@@ -74,8 +74,9 @@ func isInboxItemFile(path string) bool {
 }
 
 // BrakeEngaged reports whether the operator dropped the `.evolve/loop-stop`
-// brake file: the chain stops at the next boundary (the in-flight batch is
-// never interrupted — SIGINT does that, and still checkpoints).
+// brake file: a batch stops at its next wave boundary and the chain at its
+// next batch boundary (the in-flight wave is never interrupted — SIGINT does
+// that, and still checkpoints).
 func BrakeEngaged(evolveDir string) bool {
 	_, err := os.Stat(paths.LoopStopPath(evolveDir))
 	return err == nil

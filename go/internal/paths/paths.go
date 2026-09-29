@@ -195,11 +195,13 @@ func AbsoluteRoot(label, p string, warn func(string)) string {
 	return abs
 }
 
-// LoopStopFile is the operator brake marker under .evolve/: `touch
-// .evolve/loop-stop` stops a chained loop at the next batch boundary. Presence
-// is the whole signal (zero bytes). The loop's chain driver (cmd_loop_chain.go)
-// and read-only observers (internal/dashboard) both resolve it through
-// LoopStopPath so the name has exactly one home.
+// LoopStopFile is the operator brake marker under .evolve/: `evolve
+// loop-stop` (or `touch .evolve/loop-stop`) stops a running loop at its next
+// wave boundary and a chained loop at its next batch boundary. Presence is
+// the whole signal (the verb writes a timestamp line; zero bytes works too).
+// The loop's batch and chain driver (via loopchain.BrakeEngaged), the
+// loop-stop verb and read-only observers (internal/dashboard) all resolve it
+// through LoopStopPath so the name has exactly one home.
 const LoopStopFile = "loop-stop"
 
 // LoopStopPath returns the brake marker's path under evolveDir.

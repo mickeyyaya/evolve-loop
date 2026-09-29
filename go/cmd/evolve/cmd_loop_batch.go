@@ -95,7 +95,10 @@ func (b *loopBatchCoordinator) run() int {
 
 iterations:
 	for i := 0; i < effectiveMax; i++ {
-		if decision := b.prepareIteration(i, &fleetCfg, &waveBinPath, batchStartCycle); decision.flow == batchReturn {
+		switch decision := b.prepareIteration(i, &fleetCfg, &waveBinPath, batchStartCycle); decision.flow {
+		case batchStopIterations:
+			break iterations
+		case batchReturn:
 			return decision.exitCode
 		}
 		switch decision := b.dispatchFleetIteration(i, fleetCfg, waveBinPath, &starvationTracker); decision.flow {

@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -26,6 +28,8 @@ type batchDecision struct {
 	exitCode int
 }
 
+const loopOperatorBrakeStop = "loop_operator_brake"
+
 // prepareIteration refreshes every batch-wide input at the only safe boundary:
 // after the previous window drained and before the next dispatch begins.
 func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *policy.FleetConfig, waveBinary *string, batchStartCycle int) batchDecision {
@@ -40,6 +44,9 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 		b.result.StopReason = "pipeline_blocker_halt"
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: exitCode}
+	}
+	if loopchain.BrakeEngaged(b.cfg.EvolveDir) {
+		return b.brakeStop(iteration)
 	}
 
 	// An interrupt that landed during the probes must not dispatch a wave
@@ -73,6 +80,12 @@ func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *poli
 
 	b.resolveWaveBinary(fleetConfig, waveBinary)
 	return batchDecision{flow: batchProceed}
+}
+
+func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {
+	fmt.Fprintf(b.stderr, "[loop] operator brake %s is engaged — stopping before cycle %d; release it with: evolve loop-stop --release\n", paths.LoopStopPath(b.cfg.EvolveDir), iteration+1)
+	b.result.StopReason = loopOperatorBrakeStop
+	return batchDecision{flow: batchStopIterations}
 }
 
 func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig, waveBinary *string) {
