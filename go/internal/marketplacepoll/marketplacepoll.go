@@ -140,19 +140,46 @@ func DefaultReleaseSh(repoRoot, target string) error {
 // validation of those happens here and surfaces as ErrRuntime.
 func Run(opts Options) (Result, error) {
 	res := Result{}
+	if err := validateMarketplacePollOptions(opts); err != nil {
+		return res, err
+	}
 
-	// Validate semver target.
+	now, sleep, pull, releaseSh, logf := resolveMarketplacePollSeams(opts)
+
+	if opts.DryRun {
+		logDryRunPoll(opts, logf)
+		return res, nil
+	}
+
+	if err := validateMarketplaceDir(opts.MarketplaceDir); err != nil {
+		return res, err
+	}
+
+	res, err := pollForConvergence(opts, now, sleep, pull, logf)
+	if err != nil {
+		return res, err
+	}
+
+	if err := refreshInstalledPlugins(&res, opts, releaseSh, logf); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func validateMarketplacePollOptions(opts Options) error {
 	if !semvercheck.IsSemver(opts.Target) {
-		return res, fmt.Errorf("%w: target version not semver: %s", ErrRuntime, opts.Target)
+		return fmt.Errorf("%w: target version not semver: %s", ErrRuntime, opts.Target)
 	}
 	if opts.MaxWait <= 0 {
-		return res, fmt.Errorf("%w: MaxWait must be > 0", ErrRuntime)
+		return fmt.Errorf("%w: MaxWait must be > 0", ErrRuntime)
 	}
 	if opts.PollInterval <= 0 {
-		return res, fmt.Errorf("%w: PollInterval must be > 0", ErrRuntime)
+		return fmt.Errorf("%w: PollInterval must be > 0", ErrRuntime)
 	}
+	return nil
+}
 
-	// Seam defaults.
+func resolveMarketplacePollSeams(opts Options) (func() time.Time, func(time.Duration), func(string) error, func(string, string) error, func(string, ...any)) {
 	now := opts.Now
 	if now == nil {
 		now = time.Now
@@ -173,28 +200,31 @@ func Run(opts Options) (Result, error) {
 	if logw == nil {
 		logw = io.Discard
 	}
-
 	logf := func(format string, args ...any) {
 		fmt.Fprintf(logw, "[marketplace-poll] "+format+"\n", args...)
 	}
+	return now, sleep, pull, releaseSh, logf
+}
 
-	// Dry-run: announce intent and return.
-	if opts.DryRun {
-		logf("DRY-RUN: would poll %s for version=%s", opts.MarketplaceDir, opts.Target)
-		logf("DRY-RUN: max_wait=%s poll_interval=%s", opts.MaxWait, opts.PollInterval)
-		logf("DRY-RUN: on success would invoke release.sh %s", opts.Target)
-		return res, nil
-	}
+func logDryRunPoll(opts Options, logf func(string, ...any)) {
+	logf("DRY-RUN: would poll %s for version=%s", opts.MarketplaceDir, opts.Target)
+	logf("DRY-RUN: max_wait=%s poll_interval=%s", opts.MaxWait, opts.PollInterval)
+	logf("DRY-RUN: on success would invoke release.sh %s", opts.Target)
+}
 
-	// Validate marketplace dir exists.
-	if info, err := os.Stat(opts.MarketplaceDir); err != nil || !info.IsDir() {
-		return res, fmt.Errorf("%w: marketplace dir not found: %s", ErrRuntime, opts.MarketplaceDir)
+func validateMarketplaceDir(dir string) error {
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return fmt.Errorf("%w: marketplace dir not found: %s", ErrRuntime, dir)
 	}
-	if _, err := os.Stat(pluginJSONPath(opts.MarketplaceDir)); err != nil {
-		return res, fmt.Errorf("%w: marketplace dir has no .claude-plugin/plugin.json: %s",
-			ErrRuntime, opts.MarketplaceDir)
+	if _, err := os.Stat(pluginJSONPath(dir)); err != nil {
+		return fmt.Errorf("%w: marketplace dir has no .claude-plugin/plugin.json: %s",
+			ErrRuntime, dir)
 	}
+	return nil
+}
 
+func pollForConvergence(opts Options, now func() time.Time, sleep func(time.Duration), pull func(string) error, logf func(string, ...any)) (Result, error) {
+	res := Result{}
 	start := now()
 	deadline := start.Add(opts.MaxWait)
 	logf("polling %s for version=%s (max_wait=%s, interval=%s)",
@@ -202,7 +232,7 @@ func Run(opts Options) (Result, error) {
 
 	for {
 		res.Attempts++
-		_ = pull(opts.MarketplaceDir) // bash swallows pull errors
+		_ = pull(opts.MarketplaceDir)
 
 		current, _ := ReadMarketplaceVersion(opts.MarketplaceDir)
 		res.FinalVersion = current
@@ -211,7 +241,7 @@ func Run(opts Options) (Result, error) {
 			res.Elapsed = now().Sub(start)
 			logf("OK: marketplace converged to v%s after %s (attempt %d)",
 				opts.Target, res.Elapsed.Round(time.Second), res.Attempts)
-			break
+			return res, nil
 		}
 
 		if !now().Before(deadline) {
@@ -232,16 +262,16 @@ func Run(opts Options) (Result, error) {
 			res.Attempts, displayed, opts.PollInterval)
 		sleep(opts.PollInterval)
 	}
+}
 
-	// Cache-refresh ordering fix: invoke release.sh now that we know
-	// the marketplace is converged.
+func refreshInstalledPlugins(res *Result, opts Options, releaseSh func(string, string) error, logf func(string, ...any)) error {
 	logf("running release.sh %s to refresh installed_plugins.json...", opts.Target)
 	if err := releaseSh(opts.RepoRoot, opts.Target); err != nil {
 		logf("WARN: release.sh exited non-zero — manually verify installed_plugins.json")
 		logf("  bash legacy/scripts/utility/release.sh %s", opts.Target)
-		return res, fmt.Errorf("%w: %v", ErrRuntime, err)
+		return fmt.Errorf("%w: %v", ErrRuntime, err)
 	}
 	res.ReleaseShRunOK = true
 	logf("DONE: marketplace + installed_plugins.json refreshed to v%s", opts.Target)
-	return res, nil
+	return nil
 }

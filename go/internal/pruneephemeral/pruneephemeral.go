@@ -56,20 +56,9 @@ func Run(opts Options) (Result, error) {
 	if opts.ProjectRoot == "" {
 		return res, fmt.Errorf("pruneephemeral: ProjectRoot required")
 	}
-	runsDir := opts.RunsDir
-	if runsDir == "" {
-		runsDir = filepath.Join(opts.ProjectRoot, ".evolve", "runs")
-	}
-	dispatchLogsDir := opts.DispatchLogsDir
-	if dispatchLogsDir == "" {
-		dispatchLogsDir = filepath.Join(opts.ProjectRoot, ".evolve", "dispatch-logs")
-	}
-	if opts.TrackerTTL <= 0 {
-		opts.TrackerTTL = 7 * 24 * time.Hour
-	}
-	if opts.DispatchLogTTL <= 0 {
-		opts.DispatchLogTTL = 30 * 24 * time.Hour
-	}
+	runsDir, dispatchLogsDir := resolvePruneDirs(opts)
+	opts.TrackerTTL = defaultDuration(opts.TrackerTTL, 7*24*time.Hour)
+	opts.DispatchLogTTL = defaultDuration(opts.DispatchLogTTL, 30*24*time.Hour)
 	now := opts.Now
 	if now == nil {
 		now = time.Now
@@ -78,92 +67,132 @@ func Run(opts Options) (Result, error) {
 	if logw == nil {
 		logw = io.Discard
 	}
-	logf := func(format string, args ...any) {
-		if opts.Quiet {
-			return
-		}
-		fmt.Fprintf(logw, "[prune-ephemeral] "+format+"\n", args...)
-	}
+	logf := newPruneLogger(logw, opts.Quiet)
 
 	cutoffTracker := now().Add(-opts.TrackerTTL)
 	cutoffLog := now().Add(-opts.DispatchLogTTL)
 
-	// Phase 1: .ephemeral/ subtrees under cycle-N/ (maxdepth 3).
-	if info, err := os.Stat(runsDir); err == nil && info.IsDir() {
-		entries, _ := os.ReadDir(runsDir)
-		for _, cycleEntry := range entries {
-			if !cycleEntry.IsDir() {
-				continue
-			}
-			cycleDir := filepath.Join(runsDir, cycleEntry.Name())
-			ephemeralDir := filepath.Join(cycleDir, ".ephemeral")
-			info, err := os.Stat(ephemeralDir)
-			if err != nil || !info.IsDir() {
-				continue
-			}
-			if !info.ModTime().Before(cutoffTracker) {
-				continue
-			}
-			if opts.DryRun {
-				logf("DRY-RUN would remove %s", ephemeralDir)
-			} else {
-				if err := os.RemoveAll(ephemeralDir); err == nil {
-					logf("removed %s", ephemeralDir)
-				} else {
-					logf("WARN: failed to remove %s: %v", ephemeralDir, err)
-					continue
-				}
-			}
-			res.EphemeralPaths = append(res.EphemeralPaths, ephemeralDir)
-			res.EphemeralPruned++
-		}
-	}
+	res.EphemeralPaths, res.EphemeralPruned = pruneEphemeralDirs(runsDir, cutoffTracker, opts.DryRun, logf)
+	res.LogPaths, res.LogFilesPruned = pruneDispatchLogs(dispatchLogsDir, cutoffLog, opts.DryRun, logf)
 
-	// Phase 2: batch-*.log files under .evolve/dispatch-logs/ (maxdepth 1).
-	if info, err := os.Stat(dispatchLogsDir); err == nil && info.IsDir() {
-		entries, _ := os.ReadDir(dispatchLogsDir)
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			if !strings.HasPrefix(name, "batch-") || !strings.HasSuffix(name, ".log") {
-				continue
-			}
-			path := filepath.Join(dispatchLogsDir, name)
-			info, err := os.Stat(path)
-			if err != nil || !info.Mode().IsRegular() {
-				continue
-			}
-			if !info.ModTime().Before(cutoffLog) {
-				continue
-			}
-			if opts.DryRun {
-				logf("DRY-RUN would remove %s", path)
-			} else {
-				if err := os.Remove(path); err == nil {
-					logf("removed %s", path)
-				} else {
-					logf("WARN: failed to remove %s: %v", path, err)
-					continue
-				}
-			}
-			res.LogPaths = append(res.LogPaths, path)
-			res.LogFilesPruned++
-		}
-	}
+	logPruneSummary(opts, res, logw, logf)
+	return res, nil
+}
 
-	// Summary.
+func resolvePruneDirs(opts Options) (runsDir, dispatchLogsDir string) {
+	runsDir = opts.RunsDir
+	if runsDir == "" {
+		runsDir = filepath.Join(opts.ProjectRoot, ".evolve", "runs")
+	}
+	dispatchLogsDir = opts.DispatchLogsDir
+	if dispatchLogsDir == "" {
+		dispatchLogsDir = filepath.Join(opts.ProjectRoot, ".evolve", "dispatch-logs")
+	}
+	return runsDir, dispatchLogsDir
+}
+
+func defaultDuration(d, fallback time.Duration) time.Duration {
+	if d <= 0 {
+		return fallback
+	}
+	return d
+}
+
+func newPruneLogger(logw io.Writer, quiet bool) func(string, ...any) {
+	return func(format string, args ...any) {
+		if quiet {
+			return
+		}
+		fmt.Fprintf(logw, "[prune-ephemeral] "+format+"\n", args...)
+	}
+}
+
+func pruneEphemeralDirs(runsDir string, cutoff time.Time, dryRun bool, logf func(string, ...any)) ([]string, int) {
+	paths := []string{}
+	count := 0
+	info, err := os.Stat(runsDir)
+	if err != nil || !info.IsDir() {
+		return paths, count
+	}
+	entries, _ := os.ReadDir(runsDir)
+	for _, cycleEntry := range entries {
+		if !cycleEntry.IsDir() {
+			continue
+		}
+		cycleDir := filepath.Join(runsDir, cycleEntry.Name())
+		ephemeralDir := filepath.Join(cycleDir, ".ephemeral")
+		info, err := os.Stat(ephemeralDir)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+		if !info.ModTime().Before(cutoff) {
+			continue
+		}
+		if dryRun {
+			logf("DRY-RUN would remove %s", ephemeralDir)
+		} else {
+			if err := os.RemoveAll(ephemeralDir); err == nil {
+				logf("removed %s", ephemeralDir)
+			} else {
+				logf("WARN: failed to remove %s: %v", ephemeralDir, err)
+				continue
+			}
+		}
+		paths = append(paths, ephemeralDir)
+		count++
+	}
+	return paths, count
+}
+
+func pruneDispatchLogs(dispatchLogsDir string, cutoff time.Time, dryRun bool, logf func(string, ...any)) ([]string, int) {
+	paths := []string{}
+	count := 0
+	info, err := os.Stat(dispatchLogsDir)
+	if err != nil || !info.IsDir() {
+		return paths, count
+	}
+	entries, _ := os.ReadDir(dispatchLogsDir)
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.HasPrefix(name, "batch-") || !strings.HasSuffix(name, ".log") {
+			continue
+		}
+		path := filepath.Join(dispatchLogsDir, name)
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		if !info.ModTime().Before(cutoff) {
+			continue
+		}
+		if dryRun {
+			logf("DRY-RUN would remove %s", path)
+		} else {
+			if err := os.Remove(path); err == nil {
+				logf("removed %s", path)
+			} else {
+				logf("WARN: failed to remove %s: %v", path, err)
+				continue
+			}
+		}
+		paths = append(paths, path)
+		count++
+	}
+	return paths, count
+}
+
+func logPruneSummary(opts Options, res Result, logw io.Writer, logf func(string, ...any)) {
 	if opts.Quiet {
-		// Quiet mode: only emit one line if anything was actually pruned.
 		if res.EphemeralPruned > 0 || res.LogFilesPruned > 0 {
 			fmt.Fprintf(logw, "[prune-ephemeral] pruned %d ephemeral dirs, %d log files\n",
 				res.EphemeralPruned, res.LogFilesPruned)
 		}
-	} else {
-		logf("summary: ephemeral=%d log_files=%d (dry_run=%v, ttl_days=%d / %d)",
-			res.EphemeralPruned, res.LogFilesPruned, opts.DryRun,
-			int(opts.TrackerTTL.Hours()/24), int(opts.DispatchLogTTL.Hours()/24))
+		return
 	}
-	return res, nil
+	logf("summary: ephemeral=%d log_files=%d (dry_run=%v, ttl_days=%d / %d)",
+		res.EphemeralPruned, res.LogFilesPruned, opts.DryRun,
+		int(opts.TrackerTTL.Hours()/24), int(opts.DispatchLogTTL.Hours()/24))
 }

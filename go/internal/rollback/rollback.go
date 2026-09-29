@@ -179,14 +179,7 @@ func dryRunSteps(logf func(string, ...any)) Steps {
 // Run executes the rollback pipeline. Returns Result and error.
 func Run(opts Options) (Result, error) {
 	res := Result{Reason: opts.Reason, DryRun: opts.DryRun}
-
-	logw := opts.Stderr
-	if logw == nil {
-		logw = io.Discard
-	}
-	logf := func(format string, args ...any) {
-		fmt.Fprintf(logw, "[rollback] "+format+"\n", args...)
-	}
+	logf := newRollbackLogger(opts.Stderr)
 
 	if opts.JournalPath == "" {
 		return res, fmt.Errorf("%w: JournalPath required", ErrJournalNotFound)
@@ -211,38 +204,57 @@ func Run(opts Options) (Result, error) {
 		now = time.Now
 	}
 
-	// Pick step implementations.
-	steps := opts.Steps
-	if opts.DryRun {
-		steps = dryRunSteps(logf)
-	} else {
-		if steps.GhDeleteRelease == nil {
-			steps.GhDeleteRelease = defaultGhDeleteRelease
-		}
-		if steps.DeleteRemoteTag == nil {
-			steps.DeleteRemoteTag = defaultDeleteRemoteTag
-		}
-		if steps.RevertAndShip == nil {
-			steps.RevertAndShip = defaultRevertAndShip
-		}
-	}
+	steps := resolveRollbackSteps(opts, logf)
+	runRollbackSteps(&res, steps, opts, j, reason, logf)
 
-	// Step 1: GitHub release delete.
+	res.LedgerEntryJSON = buildRollbackLedgerEntry(j, reason, res, now)
+	writeRollbackLedger(opts, res.LedgerEntryJSON, logf)
+
+	return finalizeRollbackResult(&res, j, opts.DryRun, logf)
+}
+
+func newRollbackLogger(stderr io.Writer) func(string, ...any) {
+	logw := stderr
+	if logw == nil {
+		logw = io.Discard
+	}
+	return func(format string, args ...any) {
+		fmt.Fprintf(logw, "[rollback] "+format+"\n", args...)
+	}
+}
+
+func resolveRollbackSteps(opts Options, logf func(string, ...any)) Steps {
+	if opts.DryRun {
+		return dryRunSteps(logf)
+	}
+	steps := opts.Steps
+	if steps.GhDeleteRelease == nil {
+		steps.GhDeleteRelease = defaultGhDeleteRelease
+	}
+	if steps.DeleteRemoteTag == nil {
+		steps.DeleteRemoteTag = defaultDeleteRemoteTag
+	}
+	if steps.RevertAndShip == nil {
+		steps.RevertAndShip = defaultRevertAndShip
+	}
+	return steps
+}
+
+func runRollbackSteps(res *Result, steps Steps, opts Options, j Journal, reason string, logf func(string, ...any)) {
 	logf("step 1: delete GitHub release %s", j.Tag)
 	res.ReleaseDelete = steps.GhDeleteRelease(j.Tag)
 	logf("  → %s", res.ReleaseDelete)
 
-	// Step 2: remote tag delete.
 	logf("step 2: delete remote tag %s", j.Tag)
 	res.TagDelete = steps.DeleteRemoteTag(opts.RepoRoot, j.Tag)
 	logf("  → %s", res.TagDelete)
 
-	// Step 3: revert + ship.
 	logf("step 3: create revert commit + push via ship.sh")
 	res.Revert = steps.RevertAndShip(opts.RepoRoot, j.CommitSHA, reason, j.Version)
 	logf("  → %s", res.Revert)
+}
 
-	// Append ledger entry (dry-run skips disk write).
+func buildRollbackLedgerEntry(j Journal, reason string, res Result, now func() time.Time) string {
 	entry := LedgerEntry{
 		Timestamp:     now().UTC().Format(time.RFC3339),
 		Version:       j.Version,
@@ -252,28 +264,31 @@ func Run(opts Options) (Result, error) {
 		ReleaseDelete: res.ReleaseDelete,
 		TagDelete:     res.TagDelete,
 		Revert:        res.Revert,
-		DryRun:        opts.DryRun,
+		DryRun:        res.DryRun,
 	}
 	ledgerJSON, _ := json.Marshal(entry)
-	res.LedgerEntryJSON = string(ledgerJSON)
+	return string(ledgerJSON)
+}
 
-	if !opts.DryRun {
-		ledgerPath := opts.LedgerPath
-		if ledgerPath == "" {
-			ledgerPath = filepath.Join(opts.RepoRoot, ".evolve", "release-rollbacks.jsonl")
-		}
-		if err := appendLedger(ledgerPath, ledgerJSON); err != nil {
-			logf("WARN: failed to append rollback ledger: %v", err)
-		}
-	} else {
-		logf("DRY-RUN: would append to ledger: %s", string(ledgerJSON))
-	}
-
-	// Overall success determination — MEDIUM-1 fix.
+func writeRollbackLedger(opts Options, ledgerJSON string, logf func(string, ...any)) {
 	if opts.DryRun {
+		logf("DRY-RUN: would append to ledger: %s", ledgerJSON)
+		return
+	}
+	ledgerPath := opts.LedgerPath
+	if ledgerPath == "" {
+		ledgerPath = filepath.Join(opts.RepoRoot, ".evolve", "release-rollbacks.jsonl")
+	}
+	if err := appendLedger(ledgerPath, []byte(ledgerJSON)); err != nil {
+		logf("WARN: failed to append rollback ledger: %v", err)
+	}
+}
+
+func finalizeRollbackResult(res *Result, j Journal, dryRun bool, logf func(string, ...any)) (Result, error) {
+	if dryRun {
 		logf("DONE: dry-run complete for v%s", j.Version)
 		res.OverallSucceeded = true
-		return res, nil
+		return *res, nil
 	}
 	if res.Revert == "reverted" &&
 		res.ReleaseDelete != "failed" &&
@@ -281,11 +296,11 @@ func Run(opts Options) (Result, error) {
 		logf("DONE: rollback complete for v%s (release_delete=%s, tag_delete=%s, revert=%s)",
 			j.Version, res.ReleaseDelete, res.TagDelete, res.Revert)
 		res.OverallSucceeded = true
-		return res, nil
+		return *res, nil
 	}
 	logf("PARTIAL: rollback incomplete (release_delete=%s, tag_delete=%s, revert=%s)",
 		res.ReleaseDelete, res.TagDelete, res.Revert)
-	return res, fmt.Errorf("%w (release_delete=%s, tag_delete=%s, revert=%s)",
+	return *res, fmt.Errorf("%w (release_delete=%s, tag_delete=%s, revert=%s)",
 		ErrPartial, res.ReleaseDelete, res.TagDelete, res.Revert)
 }
 
