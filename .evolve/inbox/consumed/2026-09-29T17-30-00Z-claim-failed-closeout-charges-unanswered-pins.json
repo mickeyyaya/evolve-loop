@@ -16,5 +16,7 @@
     "A deferred pin is still owed work and is bumped, not routed"
   ],
   "created_at": "2026-09-29T17:30:00Z",
-  "source": "console, 2026-09-29, cycle 1757 deep-dive and the R1b architecture review (MEDIUM 3)"
+  "source": "console, 2026-09-29, cycle 1757 deep-dive and the R1b architecture review (MEDIUM 3)",
+  "consumed_by": "console landing fix/claim-failed-charges-unanswered-pins (2026-09-29): BUILT (R1c). The claim-failed and planned no-work endings escaped the ADR-0044 C1 chokepoint (triage's PASS stayed the last entry), so 1757 classified integrity-breach (system-level: release, no bump) and 1758 paged FAILED_UNEXPLAINED. The closeout now records each ending via Recorder.RecordEnding (no PhasesRun, no sidecar): claim-failed = triage FAIL with triage's own error diagnostics first, then (lane only) TRIAGE_SCOPE_UNANSWERED naming the unanswered pins (task-level); no-work = triage SKIPPED; cyclehealth NO_WORK arm. ApplyFailure charges committedset.Unanswered (pin minus answers; deferred = owed). A zero-attempt record no longer erases a usage sidecar. A seal-reading design was rejected in architecture review (listeners never decide). Acceptance: multi-item lanes charge each unanswered pin; R1b single-item planned no-work unchanged; a deferred pin is bumped, not routed; sequential claim-failed keeps its classification.",
+  "consumed_at": "2026-09-29T19:00:00Z"
 }

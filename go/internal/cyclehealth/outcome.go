@@ -20,8 +20,8 @@ import (
 )
 
 // Outcome is the cycle-ending taxonomy. Batch targets: SHIPPED ≥ 60%;
-// SHIPPED+SALVAGED+FAILED_EXPLAINED = 100%; FAILED_UNEXPLAINED = 0, alarmed
-// (it means a terminal path escaped the C1 chokepoint — file a defect).
+// SHIPPED+SALVAGED+FAILED_EXPLAINED+DEFERRED+NO_WORK = 100%; FAILED_UNEXPLAINED = 0,
+// alarmed (it means a terminal path escaped the C1 chokepoint — file a defect).
 type Outcome string
 
 const (
@@ -41,6 +41,7 @@ const (
 	// checkpoint, and aborted resumable. Not a failure of the change under
 	// test — the work is preserved for `evolve loop --resume`.
 	OutcomeDeferred Outcome = "DEFERRED"
+	OutcomeNoWork   Outcome = "NO_WORK"
 )
 
 // abortReasonDeferredPrefix mirrors core's abortReasonAllFamiliesExhausted via
@@ -86,6 +87,12 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 	for _, e := range timing {
 		if strings.HasPrefix(e.AbortReason, abortReasonDeferredPrefix) {
 			return OutcomeDeferred, e.AbortReason
+		}
+	}
+
+	for _, e := range timing {
+		if e.AbortReason == cyclestate.CycleTerminationTriageNoWork {
+			return OutcomeNoWork, "planned no-work: " + e.AbortReason
 		}
 	}
 

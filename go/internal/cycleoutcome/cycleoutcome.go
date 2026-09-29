@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -85,20 +86,9 @@ func ApplyFailure(in FailureInputs) (inboxmover.OutcomeResult, error) {
 	if stderr == nil {
 		stderr = io.Discard
 	}
-	// Continuation/retry cycles carry NO triage-decision.json (the
-	// continuation path binds the task directly), so the committed set
-	// resolved nil and the durable failure_count was never bumped — after 15
-	// FAILs every live inbox item sat at 0 and the TaskRetryCeiling
-	// quarantine + deep-escalation governors were unreachable (2026-08-10
-	// investigation). The lane-scope pin is the worked set on those cycles.
-	// File-ABSENT, not merely empty (diff-review MEDIUM): a fresh cycle whose
-	// triage legitimately committed zero ids must not have its lane-scope menu
-	// blamed for the failure — the pinned items were explicitly declined.
 	committed := CommittedIDsFor(in.Workspace)
 	if len(committed) == 0 {
-		if _, statErr := os.Stat(filepath.Join(in.Workspace, "triage-decision.json")); os.IsNotExist(statErr) {
-			committed = LaneScopeIDs(in.Workspace)
-		}
+		committed = committedset.Unanswered(in.Workspace)
 	}
 	opts := inboxmover.Options{
 		ProjectRoot: in.ProjectRoot,
