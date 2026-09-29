@@ -76,6 +76,10 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	}
 }
 
+func (o *Orchestrator) recordHostEnding(timings *[]phaseTimingEntry, out recovery.PhaseOutcome) {
+	o.recorder().RecordEnding(timings, out)
+}
+
 // flushPhaseTimings composes and persists this cycle's phase-timing log
 // exactly once and returns the composed set; calling it again returns the
 // cached set without re-appending.

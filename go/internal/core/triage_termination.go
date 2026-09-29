@@ -4,11 +4,12 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-const cycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
+const cycleTerminationTriageClaimFailed = cyclestate.CycleTerminationTriageClaimFailed
 
 // triageTermination is the host's terminal decision after Triage. Phase
 // artifacts supply evidence through router.Digest; the host combines that
@@ -44,8 +45,7 @@ func (o *Orchestrator) triageTermination(projectRoot, workspace string, cycle in
 }
 
 func unansweredClaimableWork(projectRoot, workspace string, cycle int, menu LaneMenuFn) bool {
-	scope := LaneScopeIDs(workspace)
-	if len(scope) == 0 {
+	if len(committedset.LanePin(workspace)) == 0 {
 		return hasClaimableInboxWork(projectRoot, cycle, menu)
 	}
 	inbox := filepath.Join(projectRoot, ".evolve", "inbox")
@@ -57,14 +57,7 @@ func unansweredClaimableWork(projectRoot, workspace string, cycle int, menu Lane
 	if err != nil {
 		return true
 	}
-	answered := map[string]bool{}
-	for _, d := range committedset.Dispositions(workspace) {
-		answered[d.ID] = true
-	}
-	for _, id := range scope {
-		if answered[id] {
-			continue
-		}
+	for _, id := range committedset.Unanswered(workspace) {
 		if pending[id] || claimed[id] || rootUnreadable || claimUnreadable {
 			return true
 		}
