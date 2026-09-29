@@ -232,8 +232,8 @@ func TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged(t *testi
 	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
 		t.Fatalf("FF over conflicting local changes must not report synced: %s", warn.String())
 	}
-	if s := warn.String(); !strings.Contains(s, "local tracked changes block") || strings.Contains(s, "diverged") {
-		t.Errorf("blocked-by-dirt must be named as such, never as divergence: %q", s)
+	if s := warn.String(); !strings.Contains(s, "local tracked changes block") || strings.Contains(s, "diverged") || strings.Contains(s, "inbox file(s)") {
+		t.Errorf("blocked-by-dirt must be named as such, never as divergence, and names no inbox file: %q", s)
 	}
 }
 
@@ -254,5 +254,107 @@ func TestSyncMainAtWaveBoundary_LocalAheadOnlyIsNotReportedAsFastForward(t *test
 	}
 	if !strings.Contains(s, "AHEAD") || !strings.Contains(s, "1 commit") {
 		t.Errorf("local-ahead must be named with its count: %q", s)
+	}
+}
+
+func commitOnOrigin(t *testing.T, origin, rel, body string) {
+	t.Helper()
+	c := filepath.Join(t.TempDir(), "console")
+	gitrun(t, filepath.Dir(c), "clone", "-q", origin, c)
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(c, rel)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(c, rel), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitrun(t, c, "add", rel)
+	gitrun(t, c, "commit", "-q", "-m", "curate "+rel)
+	gitrun(t, c, "push", "-q", "origin", "main")
+}
+
+func TestSyncMainAtWaveBoundary_NamesTheInboxStampsThatBlockIt(t *testing.T) {
+	origin, runtime := syncFixture(t)
+	item := filepath.Join(".evolve", "inbox", "routed.json")
+	retired := filepath.Join(".evolve", "inbox", "retired.json")
+	untouched := filepath.Join(".evolve", "inbox", "untouched.json")
+	for _, rel := range []string{item, retired, untouched} {
+		commitOnOrigin(t, origin, rel, `{"id":"`+filepath.Base(rel)+`"}`)
+	}
+	gitrun(t, runtime, "pull", "-q", "--ff-only", "origin", "main")
+	for _, rel := range []string{item, retired, untouched} {
+		if err := os.WriteFile(filepath.Join(runtime, rel), []byte(`{"route":"console-manual"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commitOnOrigin(t, origin, item, `{"id":"routed","weight":0.5}`)
+	retireOnOrigin(t, origin, retired)
+	var warn bytes.Buffer
+
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+		t.Fatalf("a stamped inbox item blocks the fast-forward: %s", warn.String())
+	}
+
+	s := warn.String()
+	if !strings.Contains(s, "2 plane-side inbox file(s) block it: .evolve/inbox/retired.json, .evolve/inbox/routed.json") || !strings.Contains(s, "discard the plane copy") {
+		t.Errorf("the blocking inbox files are named with the cause-neutral remedy: %q", s)
+	}
+	if strings.Contains(s, "untouched.json") {
+		t.Errorf("a plane-side stamp origin never touched does not block, so it is never named: %q", s)
+	}
+}
+
+func retireOnOrigin(t *testing.T, origin, rel string) {
+	t.Helper()
+	c := filepath.Join(t.TempDir(), "console")
+	gitrun(t, filepath.Dir(c), "clone", "-q", origin, c)
+	consumed := filepath.Join(filepath.Dir(rel), "consumed", filepath.Base(rel))
+	if err := os.MkdirAll(filepath.Join(c, filepath.Dir(consumed)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitrun(t, c, "mv", rel, consumed)
+	gitrun(t, c, "commit", "-q", "-m", "retire "+rel)
+	gitrun(t, c, "push", "-q", "origin", "main")
+}
+
+func TestSyncMainAtWaveBoundary_NonInboxDirtNamesNoInboxFile(t *testing.T) {
+	origin, runtime := syncFixture(t)
+	policy := filepath.Join(".evolve", "policy.json")
+	commitOnOrigin(t, origin, policy, `{}`)
+	gitrun(t, runtime, "pull", "-q", "--ff-only", "origin", "main")
+	if err := os.WriteFile(filepath.Join(runtime, policy), []byte(`{"local":true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commitOnOrigin(t, origin, policy, `{"fleet":{}}`)
+	var warn bytes.Buffer
+
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+		t.Fatalf("dirt blocks the fast-forward: %s", warn.String())
+	}
+	if s := warn.String(); !strings.Contains(s, "local tracked changes block") || strings.Contains(s, "inbox file(s)") {
+		t.Errorf("dirt outside the inbox is never named as inbox stamps: %q", s)
+	}
+}
+
+func TestSyncMainAtWaveBoundary_APlaneCreatedFileIsNamedAPlaneDeletedOneIsNot(t *testing.T) {
+	origin, runtime := syncFixture(t)
+	moved := filepath.Join(".evolve", "inbox", "moved.json")
+	commitOnOrigin(t, origin, moved, `{"id":"moved"}`)
+	gitrun(t, runtime, "pull", "-q", "--ff-only", "origin", "main")
+	if err := os.Remove(filepath.Join(runtime, moved)); err != nil {
+		t.Fatal(err)
+	}
+	filed := filepath.Join(".evolve", "inbox", "filed.json")
+	if err := os.WriteFile(filepath.Join(runtime, filed), []byte(`{"id":"filed"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commitOnOrigin(t, origin, filed, `{"id":"filed","weight":0.5}`)
+	commitOnOrigin(t, origin, moved, `{"id":"moved","weight":0.5}`)
+	var warn bytes.Buffer
+
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+		t.Fatalf("the untracked file blocks the fast-forward: %s", warn.String())
+	}
+	if s := warn.String(); !strings.Contains(s, "1 plane-side inbox file(s) block it: .evolve/inbox/filed.json") {
+		t.Errorf("the plane-created file is named, the file the plane's mover moved away is not: %q", s)
 	}
 }
