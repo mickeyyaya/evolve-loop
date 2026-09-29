@@ -120,26 +120,22 @@ func (r *Recorder) center() *signalcenter.Center {
 // skipped with a signal when the workspace is empty, because filepath.Join
 // on "" is CWD-relative and once leaked sidecars into the test tree.
 func (r *Recorder) Record(result *cyclestate.CycleResult, timings *[]phasetiming.Entry, workspace string, out recovery.PhaseOutcome) {
-	out.EndedAt = r.now().UTC().Format(time.RFC3339)
-	out.Archetype = r.archetype(out.Phase)
+	out = r.stamp(out)
 	result.PhasesRun = append(result.PhasesRun, cyclestate.Phase(out.Phase))
-	fillRatio, windowHot := contextFillFor(out)
-	*timings = append(*timings, phasetiming.Entry{
-		Phase: out.Phase, DurationMS: out.DurationMS, BootMS: out.BootMS, Verdict: out.Verdict, CostUSD: out.CostUSD,
-		StartedAt: out.StartedAt, EndedAt: out.EndedAt, Archetype: out.Archetype, AttemptCount: out.AttemptCount,
-		AbortReason: out.AbortReason, ModelSource: out.ModelSource, ResolvedModel: out.ResolvedModel,
-		Tokens: out.Tokens, Diagnostics: out.Diagnostics, ContextFillRatio: fillRatio, ContextWindowHot: windowHot,
-	})
+	*timings = append(*timings, timingEntry(out))
 	r.emit(result.Cycle, out)
 	if workspace == "" {
 		r.warn("Recorder.Record", result.Cycle, out.Phase, CodeSidecarSkipped, "empty workspace: "+out.Phase+"-usage.json not written, the in-memory record kept", nil)
+		return
+	}
+	path := UsageSidecarPath(workspace, out.Phase)
+	if out.AttemptCount == 0 && sidecarExists(path) {
 		return
 	}
 	sidecar := UsageSidecar{
 		Phase: out.Phase, CostUSD: out.CostUSD, DurationMS: out.DurationMS, AttemptCount: out.AttemptCount, Verdict: out.Verdict,
 		StartedAt: out.StartedAt, EndedAt: out.EndedAt, Archetype: out.Archetype, AbortReason: out.AbortReason, Tokens: out.Tokens,
 	}
-	path := UsageSidecarPath(workspace, out.Phase)
 	// A plain struct fails to encode only on a non-finite float (a NaN cost
 	// from an upstream defect); writing the nil result would truncate the
 	// sidecar silently, so the failure is a signal and nothing is written.
@@ -151,6 +147,31 @@ func (r *Recorder) Record(result *cyclestate.CycleResult, timings *[]phasetiming
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		r.warn("Recorder.Record", result.Cycle, out.Phase, CodeSidecarWriteFailed, "usage sidecar write failed: "+err.Error(), map[string]string{"path": path})
 	}
+}
+
+func (r *Recorder) RecordEnding(timings *[]phasetiming.Entry, out recovery.PhaseOutcome) {
+	*timings = append(*timings, timingEntry(r.stamp(out)))
+}
+
+func (r *Recorder) stamp(out recovery.PhaseOutcome) recovery.PhaseOutcome {
+	out.EndedAt = r.now().UTC().Format(time.RFC3339)
+	out.Archetype = r.archetype(out.Phase)
+	return out
+}
+
+func timingEntry(out recovery.PhaseOutcome) phasetiming.Entry {
+	fillRatio, windowHot := contextFillFor(out)
+	return phasetiming.Entry{
+		Phase: out.Phase, DurationMS: out.DurationMS, BootMS: out.BootMS, Verdict: out.Verdict, CostUSD: out.CostUSD,
+		StartedAt: out.StartedAt, EndedAt: out.EndedAt, Archetype: out.Archetype, AttemptCount: out.AttemptCount,
+		AbortReason: out.AbortReason, ModelSource: out.ModelSource, ResolvedModel: out.ResolvedModel,
+		Tokens: out.Tokens, Diagnostics: out.Diagnostics, ContextFillRatio: fillRatio, ContextWindowHot: windowHot,
+	}
+}
+
+func sidecarExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // WritePhaseTimings persists phase-timing.json atomically with APPEND-MERGE
