@@ -6,6 +6,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -48,8 +49,11 @@ func wireBridgeStages(br bridgeStageSink, cfg config.RoutingConfig) {
 // runs first, before go test can leave untracked files behind. A named func,
 // so the wiring pin's pointer identifies it.
 func productionBuildFloorChecks(ctx context.Context, in core.ReviewInput) []string {
-	return append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)
+	out := append(core.ProtectedSurfaceFloorChecks(guards.IsProtectedSurface)(ctx, in), core.DefaultBuildFloorChecks(ctx, in)...)
+	return append(out, core.RepoContractFloorChecks(repoContractPack)(ctx, in)...)
 }
+
+var repoContractPack core.RepoContractPackFn = ship.RunRepoContractPack
 
 // parseGateStage maps a gate word onto off/shadow/enforce, silently: an unknown
 // word is off. It stays silent until its two readers' dials become PolicyStages
