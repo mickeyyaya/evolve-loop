@@ -1,0 +1,20 @@
+{
+  "id": "chain-reexec-keeps-batch-budget",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.35,
+  "title": "A chain-boundary re-exec restarts the chain's batch count and max_batches",
+  "files": [
+    "go/internal/loopchain/driver.go",
+    "go/cmd/evolve/cmd_loop_chain.go",
+    "go/internal/loopchain/marker.go"
+  ],
+  "summary": "PR #712 made a wave-boundary re-exec resume the batch's wave index (a pid-keyed handoff with waves_done, taken once at boot). A chain-boundary re-exec (the chain Driver's refresh between batches) still starts the new process's chain at batch 0 with the full max_batches, so a long --until-inbox-empty chain whose batches keep landing go/ changes can run past its runaway backstop. max_batches is a backstop, not the operator budget, and the brake and inbox-empty stops still apply, so this is low severity.",
+  "fix": "Carry the chain's completed-batch count across its re-exec the same way the wave handoff does: a dedicated marker field written only by the chain boundary, taken once at boot into loopConfig, honoured by the Driver's first boundary.",
+  "acceptance": [
+    "A chain re-exec after k batches resumes at batch k with max_batches-k left (red today: it restarts at 0)",
+    "A wave-boundary handoff and a chain handoff never read each other's field"
+  ],
+  "created_at": "2026-09-29T13:30:00Z",
+  "source": "console, 2026-09-29, #712 architecture review (deferred gap 1)"
+}
