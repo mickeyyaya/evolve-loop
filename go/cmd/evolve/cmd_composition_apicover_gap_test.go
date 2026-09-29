@@ -65,7 +65,7 @@ func UncoveredExport() string { return "uncovered" }
 			"KNOWN BUG (percycle-audit-apicover-newexport-parity): "+
 				"`make -C go %s` (the recipe composedGateTargets[\"apicover\"] binds — "+
 				"the same command internal/core/composition_carryforward.go's "+
-				"runComposedGates relies on before letting a fleet-rebase carry-forward "+
+				"composedGatesTo relies on before letting a fleet-rebase carry-forward "+
 				"reship without a full re-audit) exited 0 (reported PASS) even though "+
 				"package %s contains an exported symbol (UncoveredExport) with zero test "+
 				"references and zero executed coverage.\n\n"+

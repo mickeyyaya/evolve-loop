@@ -23,6 +23,23 @@ All notable changes to this project will be documented in this file.
 - Tests: `TestSyncMainAtWaveBoundary_NamesTheInboxStampsThatBlockIt` (real git: a curated item and a retired item are named, an untouched stamp is not) `TestSyncMainAtWaveBoundary_NonInboxDirtNamesNoInboxFile` and `…APlaneCreatedFileIsNamedAPlaneDeletedOneIsNot`. The existing `…DirtyTrackedFileWarnsBlockedNotDiverged` now also asserts no inbox line. Six mutants killed (two found by the confirmation round).
 - Inbox: `console-route-stamps-block-wave-sync` stays open, with `notes` and a trimmed `acceptance`: route stamps out of tracked files (or an ADR saying why not), a CLI home for land-and-discard, and m7.
 
+## Fixed — the carry's composed-tree gates run in the CI environment, so lane state no longer fails them (C6, 2026-09-29)
+
+- A byte-identical fleet rebase ships on the verdict it already earned (ADR-0105 carry), but only after the composed-tree gates (`compile`, `test`, `acs`, `apicover`) pass on the rebased tree. `runComposedGates` (`go/cmd/evolve/cmd_composition_wiring.go`) ran `make -C go <target>` with the lane's full environment and threw the output away. The audit's own CI-parity gate scrubs exactly that environment ("EVOLVE_*, BRIDGE_* and tmux state must not reach env-sensitive tests").
+- The result: `identity carry declined: composed-tree gates not green: [test]` 14 times in waves 27–41, against 18 carries. Every decline paid a deep-tier re-audit (about 8 minutes) that then passed, and the log never said why. Wave 41's cycle 1760 was the latest.
+- Reproduced on a clean main: `make test` with a lane-shaped environment exits 2. The failures are deterministic per test whenever `EVOLVE_WORKTREE_ROOT` reaches the run:
+  - `TestFlagsGenerateThenCheck_RoundTrip` and `TestFlagsCheck_DriftExitsTwo` resolve their root through `sourceRoot()`, which prefers the lane's `EVOLVE_WORKTREE_ROOT`. So `generate` could also write `docs/architecture/control-flags.md` into the lane worktree, the very tree the carry was proving.
+  - `TestPredicateEnv_AllBranches` builds its environment from `os.Environ()` and inherits the variable.
+- The same target is green in the CI environment. Why 18 carries passed while 14 declined is unverified; the likely split is whether the variable was in the orchestrator's environment at carry time.
+- One allowlist now serves both gate runners. `ciparity.CIEnvAllowlist` and the pure `ciparity.CIEnv(environ)` moved out of `ciparitygate` (`tierEnvAllowlist`/`cleanEnv`; the allowlist golden is unchanged), and each composed gate runs with `ciparity.CIEnv(os.Environ())`.
+- A failing gate now prints `composed-tree gate <name> (make <target>) failed in <worktree>: <err>` and the last 20 lines of its own output. The output is held in a 64 KiB tail (`tailWriter`), not the whole run. `composedGatesTo(log)` replaces the runner, so the log sink is a parameter rather than a package variable.
+- Tests, red first:
+  - `TestRunComposedGates_RunsInTheCIEnvAndNamesAFailingGate`: a fixture worktree whose `test` target fails when `EVOLVE_LANE_PROBE` reaches it, whose `build` target needs `HOME` (an emptied environment fails), and whose `apicover-enforce` fails with a named test.
+  - `TestCIEnv_KeepsOnlyTheAllowlistInItsOrder` and `TestOutputTail_KeepsTheLastLines`.
+  - Seven mutants killed: the inherited or emptied environment, the tail taking the head, the byte cap keeping the oldest bytes, the worktree dropped from the header, and two more.
+- Follow-ups filed: `composed-gate-decline-coded-signal` (one coded Signal Center event per decline, with the failing gate's detail) and `flags-and-predicate-tests-hermetic-env` (the tests stop honoring a lane's `EVOLVE_WORKTREE_ROOT`, so a lane's own `go test` stops going red on it).
+- Docs: design §5.8 C6 and the history.
+
 ## Fixed — every agent-graded audit FAIL's repair round is briefed with the failure block's defects, without the "findings artifact unreadable" WARN (2026-09-29)
 
 - The repair brief (`composeRepairBrief`, `go/internal/core/repair_brief.go`) read the audit's reasons only from `audit-fail-reason.json`. A runner gate writes that file (`persistFloorFailReasons`), and since the doc-only landing (#714, logic-first design §5.14, X2a) so did the explanation-needs-correction route. For every other agent-graded audit FAIL the file was absent, so each tdd/build dispatch of the round logged "continuation: findings artifact … audit-fail-reason.json unreadable", and the brief carried the report's findings table alone, not the verdict sentinel's failure-block defects, which are the auditor's own list.
