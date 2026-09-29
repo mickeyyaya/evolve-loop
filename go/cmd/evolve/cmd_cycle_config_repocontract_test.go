@@ -29,9 +29,9 @@ func TestProductionBuildFloorChecks_CorrectsARedRepoContractPackByTheTestsName(t
 	var ranIn []string
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
-	repoContractPack = func(_ context.Context, root string) ([]string, error) {
+	repoContractPack = func(_ context.Context, root string) ([]string, string, error) {
 		ranIn = append(ranIn, root)
-		return []string{red}, errors.New("exit status 1")
+		return []string{red}, "", errors.New("exit status 1")
 	}
 	got := productionBuildFloorChecks(context.Background(), core.ReviewInput{Phase: string(core.PhaseBuild), Worktree: wt})
 	if len(ranIn) != 1 || ranIn[0] != wt {

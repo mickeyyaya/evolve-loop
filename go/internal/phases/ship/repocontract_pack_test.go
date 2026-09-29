@@ -9,25 +9,37 @@ import (
 
 const ratchetRed = "github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet.TestRatchet_NoNewRawGitFixtures"
 
+const ratchetMessage = "internal/cyclesimulator/characterization_test.go builds a raw git repo (1 init sites) outside internal/gittest"
+
 func TestRunRepoContractPack_RunsTheGatesOwnPackAndNamesItsReds(t *testing.T) {
-	dirs := swapRepoContractTest(t, redPack(ratchetRed))
-	reds, err := RunRepoContractPack(context.Background(), "/lane")
+	red := redPack(ratchetRed)
+	red.failureLog = "    rawgitratchet_test.go:49: " + ratchetMessage + "\n"
+	dirs := swapRepoContractTest(t, red)
+	reds, diagnostic, err := RunRepoContractPack(context.Background(), "/lane")
 	if err == nil || len(reds) != 1 || reds[0] != ratchetRed {
 		t.Fatalf("a red pack names its failing test with the run error; got reds=%v err=%v", reds, err)
+	}
+	if !strings.Contains(diagnostic, ratchetMessage) {
+		t.Fatalf("a red's diagnostic is the failing tests' own output; got %q", diagnostic)
 	}
 	if len(*dirs) != 1 || (*dirs)[0] != "/lane/go" {
 		t.Fatalf("the build floor's run must go through the ship gate's own pack seam, once, in the tree's go/ module exactly as the gate does; ran in %v", *dirs)
 	}
 }
 
-func TestRunRepoContractPack_GreenNamesNothingAndAnUnnamedExitKeepsItsError(t *testing.T) {
+func TestRunRepoContractPack_NamesRedsOnlyForTheGatesRealRed(t *testing.T) {
 	swapRepoContractTest(t, greenPack())
-	if reds, err := RunRepoContractPack(context.Background(), "/m"); err != nil || len(reds) != 0 {
-		t.Fatalf("a green pack is no red and no error; got reds=%v err=%v", reds, err)
+	if reds, diagnostic, err := RunRepoContractPack(context.Background(), "/m"); err != nil || len(reds) != 0 || diagnostic != "" {
+		t.Fatalf("a green pack is no red, no diagnostic and no error; got reds=%v diagnostic=%q err=%v", reds, diagnostic, err)
+	}
+	swapRepoContractTest(t, packOutcome{failures: []packFailure{packFailureOf("pkg.TestX")}})
+	if reds, _, err := RunRepoContractPack(context.Background(), "/m"); err != nil || len(reds) != 0 {
+		t.Fatalf("named failures with a clean exit are green by the gate's rule (realRed), so they name nothing; got reds=%v err=%v", reds, err)
 	}
 	swapRepoContractTest(t, ambiguousPack())
-	if reds, err := RunRepoContractPack(context.Background(), "/m"); err == nil || len(reds) != 0 {
-		t.Fatalf("an exit that names no test keeps its error and names nothing, so the caller can tell infra from a contract red; got reds=%v err=%v", reds, err)
+	reds, diagnostic, err := RunRepoContractPack(context.Background(), "/m")
+	if err == nil || err.Error() != "signal: killed" || len(reds) != 0 || !strings.Contains(diagnostic, scanChatter) {
+		t.Fatalf("an exit that names no test keeps its own error and carries the pack's own output; got reds=%v diagnostic=%q err=%v", reds, diagnostic, err)
 	}
 }
 
