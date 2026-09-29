@@ -18,6 +18,6 @@
   ],
   "created_at": "2026-09-28T23:45:00Z",
   "source": "console, 2026-09-28, wave-29 boundary stop (the loop needed two SIGINTs)",
-  "consumed_by": "console landing fix/loop-controls (2026-09-29): BUILT. Refresher.Refresh takes the batch context and checks it before the rebuild, after it and before the exec (step=interrupted, no re-exec, no breaker marker); prepareIteration re-checks b.ctx after a refresh that did not re-exec and ends the run with stop_reason signal (exit 130). The chain Driver passes context.Background(): between batches no signal handler is registered, so a SIGINT ends the process.",
+  "consumed_by": "console landing fix/loop-controls (2026-09-29): BUILT. Refresher.Refresh takes the batch context and checks it before the rebuild, after it and before the exec (step=interrupted, no re-exec, no breaker marker); prepareIteration re-checks b.ctx after a refresh that did not re-exec and ends the run with stop_reason signal (exit 130). The chain Driver's refresh runs outside any batch, where no signal handler is registered, so a SIGINT there ends the process; a SIGINT caught during a batch's closeout now makes the batch exit 130, so a chained run stops.",
   "consumed_at": "2026-09-29T00:00:00Z"
 }
