@@ -18,5 +18,7 @@
     "The builder and tdd-engineer personas name gittest for git-backed fixtures"
   ],
   "created_at": "2026-09-29T01:40:00Z",
-  "source": "console, 2026-09-29, wave-30 cycle 1745 ship gate RED"
+  "source": "console, 2026-09-29, wave-30 cycle 1745 ship gate RED",
+  "consumed_by": "console landing fix/repo-contract-pack-at-build-exit (2026-09-29): BUILT. The build handoff floor runs ship's repo-contract fixed pack at build exit: productionBuildFloorChecks appends core.RepoContractFloorChecks(repoContractPack), repoContractPack = ship.RunRepoContractPack, so the suite list and its runner keep one home in internal/phases/ship/repocontract.go (core cannot import ship; the composition root injects it like guards.IsProtectedSurface). A named red rejects the handoff and the build correction names the failing test before any audit; an unnamed exit WARNs and passes (ship retries it and classes it infra). Stage: ship's own dial gates.repo_contract_gate (compiled default enforce), no new key. The builder and tdd-engineer personas name internal/gittest (Fixture, Bare, Clone) for git-backed fixtures.",
+  "consumed_at": "2026-09-29T11:30:00Z"
 }
