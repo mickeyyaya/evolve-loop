@@ -58,9 +58,6 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 		suffix = " [adjudicated: " + proposal.Justification + "]"
 	}
 
-	if action == retryActionReauthorExplanation {
-		recordExplanationRound(cs, fb)
-	}
 	if next, isRetry := reentryPhase(action); isRetry {
 		o.emitAuditRepairDecision(cs, next, declared, env.Reason+suffix)
 		return next, auditRepairReasonPrefix + string(action) + ": " + env.Reason + suffix, nil

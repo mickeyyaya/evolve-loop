@@ -2,6 +2,10 @@ package core
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -64,8 +68,8 @@ func TestRunCycle_AnExplanationOnlyAuditFailReDispatchesOnlyTheBuildReauthor(t *
 	if round[CtxKeyExplanationReauthor] != audit.document {
 		t.Errorf("the re-author dispatch was not scoped to %q: %q", audit.document, round[CtxKeyExplanationReauthor])
 	}
-	if !strings.Contains(round[CtxKeyAuditRepairFindings], explanationNeedsCorrection+": "+audit.document+":8") {
-		t.Errorf("the re-author was not handed the recorded findings:\n%s", round[CtxKeyAuditRepairFindings])
+	if !strings.Contains(round[CtxKeyAuditRepairFindings], "- "+audit.document+":8 states 9 lines") {
+		t.Errorf("the re-author was not handed the failure block's defects:\n%s", round[CtxKeyAuditRepairFindings])
 	}
 }
 
@@ -79,5 +83,48 @@ func TestRunCycle_AMixedAuditFailStillRestartsAtTDD(t *testing.T) {
 	}
 	if _, scoped := build.requests[1].Context[CtxKeyExplanationReauthor]; scoped {
 		t.Error("a mixed repair round was scoped to the explanation document")
+	}
+}
+
+type reauthorDyingBuilder struct {
+	calls     int
+	workspace string
+}
+
+func (b *reauthorDyingBuilder) Name() string { return string(PhaseBuild) }
+
+func (b *reauthorDyingBuilder) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	b.calls++
+	b.workspace = req.Workspace
+	if req.Context[CtxKeyExplanationReauthor] != "" {
+		return PhaseResponse{}, errors.New("re-author build: bridge exited 81 (submit_wedged)")
+	}
+	return PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
+}
+
+func TestRunCycle_AReauthorBuildThatDiesIsDigestedFromItsOwnFailure(t *testing.T) {
+	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
+	runners[PhaseAudit] = &explanationAuditRunner{t: t, defects: func(document string) []string {
+		return []string{document + ":8 states 9 lines; the ratchet scanner measures 8"}
+	}}
+	builder := &reauthorDyingBuilder{}
+	runners[PhaseBuild] = builder
+	o := NewOrchestrator(&fakeStorage{state: State{}}, &fakeLedger{}, runners)
+
+	_, _ = o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
+
+	if builder.calls < 2 {
+		t.Fatalf("build dispatched %d time(s); the re-author round never ran", builder.calls)
+	}
+	raw, err := os.ReadFile(filepath.Join(builder.workspace, "failure-digest.json"))
+	if err != nil {
+		t.Fatalf("no failure digest for the dead re-author: %v", err)
+	}
+	var digest FailureDigest
+	if err := json.Unmarshal(raw, &digest); err != nil {
+		t.Fatalf("failure digest: %v", err)
+	}
+	if !strings.HasPrefix(digest.Fingerprint, string(PhaseBuild)+"|") {
+		t.Fatalf("fingerprint %q names another phase's failure; the re-author Build died and must be digested as build", digest.Fingerprint)
 	}
 }

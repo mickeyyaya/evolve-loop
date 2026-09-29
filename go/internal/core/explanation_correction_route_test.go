@@ -58,20 +58,24 @@ func TestDecideAfterAuditFail_AMixedFailKeepsTDD(t *testing.T) {
 	}
 }
 
-func TestDecideAfterAuditFail_AnExplanationOnlyFailRecordsItsFindings(t *testing.T) {
+func TestDecideAfterAuditFail_AnExplanationOnlyFailBriefsItsDefectsWithoutARecord(t *testing.T) {
 	cs := explanationRouteState(t, 0, cycle1745Defects...)
 
 	explanationRouteOrchestrator(nil).decideAfterAuditFail(cs)
 
-	var findings string
-	stderr := captureStderr(t, func() {
-		findings = readContinuationFindings(filepath.Join(cs.WorkspacePath, "audit-fail-reason.json"))
-	})
-	if strings.Contains(stderr, "unreadable") {
-		t.Fatalf("the continuation WARNs the findings artifact is unreadable after a doc-only FAIL:\n%s", stderr)
+	if _, err := os.Stat(filepath.Join(cs.WorkspacePath, "audit-fail-reason.json")); !os.IsNotExist(err) {
+		t.Fatalf("the failure block is the defects' one record; a copy in audit-fail-reason.json would digest a dying re-author as the audit: stat err = %v", err)
 	}
-	if !strings.Contains(findings, explanationNeedsCorrection+": "+cycle1745Defects[1]) {
-		t.Fatalf("the recorded findings lack the audit's defect:\n%s", findings)
+	cs.AuditRepairActive = true
+	var brief string
+	stderr := captureStderr(t, func() { brief = composeRepairBrief(cs) })
+	if strings.Contains(stderr, "unreadable") {
+		t.Fatalf("the re-author's brief WARNs the findings artifact is unreadable:\n%s", stderr)
+	}
+	for _, defect := range cycle1745Defects {
+		if !strings.Contains(brief, "- "+defect) {
+			t.Errorf("the re-author's brief lacks the audit's defect %q:\n%s", defect, brief)
+		}
 	}
 }
 
