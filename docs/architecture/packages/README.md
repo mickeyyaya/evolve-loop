@@ -37,6 +37,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/phaseobserver` | watches one running phase for stalls and dead processes | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/loopwave` | plans, gates and launches each fleet wave | [internal-loopwave.md](internal-loopwave.md) |
 | `internal/dossier` | writes, commits and reads the per-cycle dossier record | [internal-dossier.md](internal-dossier.md) |
+| `internal/gc` | decides which resources finished cycles left behind are garbage, and releases them | [internal-gc.md](internal-gc.md) |
 | `internal/lanerouting` | the one routing predicate: protected surface or a path the build profile's sandbox denies | [internal-lanerouting.md](internal-lanerouting.md) |
 | `internal/phasecontract` | the single registry of each phase's deliverable contract: artifact, sections, verdicts and owed files | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/treedelta` | the byte-exact change between a base and a tree, the proof a carry across a rebase rests on | [internal-treedelta.md](internal-treedelta.md) |

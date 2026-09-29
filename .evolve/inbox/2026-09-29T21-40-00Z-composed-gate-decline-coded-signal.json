@@ -1,0 +1,20 @@
+{
+  "id": "composed-gate-decline-coded-signal",
+  "kind": "hardening",
+  "priority_class": "debuggability",
+  "weight": 0.5,
+  "title": "A declined carry names its failing composed gate in one coded Signal Center event, not untagged stderr",
+  "files": [
+    "go/cmd/evolve/cmd_composition_wiring.go",
+    "go/internal/core/identity_carry_forward.go",
+    "go/internal/core/composition_carryforward.go"
+  ],
+  "summary": "C6 (2026-09-29) made a failing composed-tree gate print its name, target, worktree and output tail to stderr, but the gate runner still flattens each result to the string \"fail\" in a map[string]string, and core prints the decline separately, so with several lanes in one loop log the two lines cannot be tied to a cycle (architecture review M3).",
+  "fix": "Have the runner return per-gate status plus the tail, and have core emit one coded Signal Center event per decline carrying the cycle, the failing gates and the tail (precedent: C5's ORCHESTRATOR_REBASE_REENTRY_ABORTED).",
+  "acceptance": [
+    "A carry decline is one coded event naming the cycle, each failing gate and its output tail",
+    "No untagged multi-line stderr block remains for a decline"
+  ],
+  "created_at": "2026-09-29T21:40:00Z",
+  "source": "console, 2026-09-29, C6 architecture review (M3)"
+}

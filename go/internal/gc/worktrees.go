@@ -1,34 +1,5 @@
 package gc
 
-// worktrees.go — Slice S4 of docs/plans/workspace-hygiene-2026-07.md: a
-// gc-sibling Plan/Apply planner that drains the ACCUMULATED worktree+branch
-// backlog (65 worktrees / 106 never-deleted cycle-* branches at audit time)
-// that S1 (pid-aware lease staleness) and S3 (in-cycle branch deletion) do not
-// retroactively clean up. It mirrors gc.go's Plan/Apply shape: PlanWorktrees is
-// the pure dry-run (never mutates), ApplyWorktrees executes under
-// .evolve/ship.lock with a per-item TOCTOU re-check.
-//
-// Evidence pipeline (evidence-based, never name-parsed):
-//   - `git worktree list --porcelain` (in ProjectRoot) is the source of truth
-//     for registered worktrees and their branch (the "branch refs/heads/<name>"
-//     line, NOT the directory leaf).
-//   - a candidate is a worktree whose directory is a direct child of
-//     WorktreeBase AND whose leaf carries the "cycle-" prefix.
-//   - merged  = the branch is listed by `git branch --merged HEAD`.
-//   - dirty   = `git status --porcelain` (run IN the worktree dir) is non-empty.
-//   - live    = ANY of: a fresh runlease.OwnerLive lease at
-//     <EvolveDir>/runs/cycle-<N>/.lease (N = the leaf's trailing numeric
-//     segment after stripping a "-integration" / "-w<digits>" swarm suffix);
-//     <EvolveDir>/cycle-state.json's active_worktree equals the path; any
-//     <EvolveDir>/runs/*/run.json's active_worktree equals the path.
-//   - a cycle-* branch with NO worktree entry (the literal worktree/branch skew)
-//     is swept purely on the merged/unmerged split — no liveness check, nothing
-//     to remove, delete-branch (merged) or flag-unmerged (unmerged) only.
-//
-// Safety invariants (also pinned by worktrees_fuzz_test.go against random
-// populations): a live, dirty, or unmerged candidate is NEVER removed and its
-// branch is NEVER deleted.
-
 import (
 	"bufio"
 	"context"
@@ -44,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -62,7 +34,8 @@ const (
 	// never removed (preserves ship-fail evidence).
 	WorktreeActionFlagDirty WorktreeAction = "flag-dirty"
 	// WorktreeActionFlagUnmerged flags an unmerged branch; it is never deleted.
-	WorktreeActionFlagUnmerged WorktreeAction = "flag-unmerged"
+	WorktreeActionFlagUnmerged  WorktreeAction = "flag-unmerged"
+	WorktreeActionSalvageRemove WorktreeAction = "salvage-remove"
 )
 
 // WorktreeItem is one planned action. Path is empty for a branch-only backlog
@@ -220,6 +193,11 @@ func activeWorktreeMatches(jsonPath, wtPath string) bool {
 	return m.ActiveWorktree != "" && samePath(m.ActiveWorktree, wtPath)
 }
 
+func (o WorktreeOptions) runClosedOut(runDir string) bool {
+	n, ok := leafCycleNumber(runDir)
+	return ok && strings.HasPrefix(runDir, "cycle-") && dossier.ClosedOut(o.ProjectRoot, n)
+}
+
 // isLive proves a worktree is genuinely in-flight via any of the three
 // evidence sources; used both by Plan and by Apply's TOCTOU re-check.
 func (o WorktreeOptions) isLive(path string) bool {
@@ -232,7 +210,7 @@ func (o WorktreeOptions) isLive(path string) bool {
 			if !e.IsDir() {
 				continue
 			}
-			if activeWorktreeMatches(filepath.Join(runsDir, e.Name(), "run.json"), path) {
+			if activeWorktreeMatches(filepath.Join(runsDir, e.Name(), "run.json"), path) && !o.runClosedOut(e.Name()) {
 				return true
 			}
 		}
@@ -335,12 +313,8 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		if dirty {
-			items = append(items, WorktreeItem{Path: path, Branch: e.branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"})
-			continue
-		}
-		if !merged[e.branch] {
-			items = append(items, WorktreeItem{Path: path, Branch: e.branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"})
+		if dirty || !merged[e.branch] {
+			items = append(items, o.keptOrSalvaged(path, e.branch, dirty))
 			continue
 		}
 		if c, ok := eligibleAfterGrace(path, e.branch, now, minAge); ok {
@@ -348,6 +322,29 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 		}
 	}
 	return items, pool, seenBranch, nil
+}
+
+func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) WorktreeItem {
+	if age, ok := o.finishedFor(path); ok && o.Policy.SalvageAfterHours > 0 && age >= time.Duration(o.Policy.SalvageAfterHours)*time.Hour {
+		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove,
+			Reason: fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour))}
+	}
+	if dirty {
+		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
+	}
+	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"}
+}
+
+func (o WorktreeOptions) finishedFor(path string) (time.Duration, bool) {
+	n, ok := leafCycleNumber(filepath.Base(path))
+	if !ok {
+		return 0, false
+	}
+	at, ok := dossier.ClosedOutAt(o.ProjectRoot, n)
+	if !ok {
+		return 0, false
+	}
+	return o.now().Sub(at), true
 }
 
 func eligibleAfterGrace(path, branch string, now time.Time, minAge time.Duration) (eligible, bool) {
@@ -409,8 +406,10 @@ func sortWorktreeItems(items []WorktreeItem) {
 
 // ApplyWorktrees executes a manifest under .evolve/ship.lock. Every
 // worktree-backed target is re-checked (TOCTOU) immediately before mutation: a
-// target that became live or dirty since Plan is refused and reported, never
-// removed. Removal is non-force `git worktree remove`; branch deletion is
+// target that became live since Plan is refused and reported, and so is a
+// plain-remove target that became dirty. A plain remove is a non-force
+// `git worktree remove`; a salvage-remove writes the salvage, re-checks
+// liveness, and only then removes with --force; branch deletion is
 // `git branch -d` (never -D); a single trailing `git worktree prune` reconciles
 // the whole batch.
 func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
@@ -434,6 +433,9 @@ func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	// branch.
 	didRemove, removeErrs := o.removeWorktrees(m.Items, refused)
 	errs = append(errs, removeErrs...)
+	didSalvage, salvageErrs := o.salvageRemoveWorktrees(m.Items, refused)
+	errs = append(errs, salvageErrs...)
+	didRemove = didRemove || didSalvage
 	// Pass 2b: delete branches (their worktrees, if any, are now gone).
 	errs = append(errs, o.deleteBranches(m.Items, refused)...)
 	if didRemove {
@@ -451,12 +453,15 @@ func (o WorktreeOptions) refuseChangedTargets(items []WorktreeItem) (map[string]
 		if it.Path == "" || refused[it.Path] {
 			continue
 		}
-		if it.Action != WorktreeActionRemove && it.Action != WorktreeActionDeleteBranch {
+		if it.Action != WorktreeActionRemove && it.Action != WorktreeActionDeleteBranch && it.Action != WorktreeActionSalvageRemove {
 			continue
 		}
 		if o.isLive(it.Path) {
 			refused[it.Path] = true
 			errs = append(errs, fmt.Errorf("gc: refuse %s: became live between plan and apply", it.Path))
+			continue
+		}
+		if it.Action == WorktreeActionSalvageRemove {
 			continue
 		}
 		dirty, derr := o.isDirty(it.Path)

@@ -1,0 +1,19 @@
+{
+  "id": "build-floor-rejection-classifies-as-system-level",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.72,
+  "title": "A build-floor rejection after its corrections releases the item unbumped: the retro's PASS is the last C1 entry and the rejection carries no code",
+  "files": [
+    "go/internal/cycleclassify/classify.go",
+    "go/internal/core/cyclerun_correction.go"
+  ],
+  "summary": "Cycle 1761 (wave 42) failed when the build handoff floor rejected the deliverable after 2 corrections. Its C1 record: build PASS with abort_reason 'review gate: phase \"build\" deliverable rejected after 2 correction(s)…' and no error code, then retro PASS as the last entry. cycleclassify reads only the last entry's error codes, so the failure is not task-level, FailureInputsFor marks it system-level, and the ledger shows 'cycle-failure-release' with failure_count unset: the item can be redrawn without ever reaching the quarantine ceiling. R1c (#724) fixed this class for the triage endings only. Nuance: 1761's own cause was an unsatisfiable TDD predicate (a pipeline/persona defect, #728), so whether the item or the pipeline pays should follow the correction's diagnosis, not the absence of a code.",
+  "fix": "Record the build-floor rejection at C1 with a coded diagnostic (and read the failing phase's entry, not the retro's, when classifying); decide task- vs system-level from the rejection's cause (a TDD-owned predicate defect is the pipeline's; a build that cannot meet a satisfiable contract is the item's).",
+  "acceptance": [
+    "A 1761-shaped workspace (build floor rejected after corrections, retro last) classifies from the build's coded entry, not the retro's PASS (red today)",
+    "The item is bumped when the build could not meet a satisfiable contract, and not when the predicate was defective"
+  ],
+  "created_at": "2026-09-29T22:45:00Z",
+  "source": "console, 2026-09-29, failed-cycle investigation (cycle 1761)"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "inbox-consume-records-resolution",
+  "kind": "feature",
+  "priority_class": "stability",
+  "weight": 0.35,
+  "title": "`evolve inbox consume` cannot record the consumed stamp every console consumption carries",
+  "files": [
+    "go/cmd/evolve/cmd_inbox_consume.go"
+  ],
+  "summary": "Console consumptions carry a `consumed` object ({at, via, cycle, resolution}) on the moved item. `evolve inbox consume <item-path>` moves the item and acks its fingerprint but writes no stamp, so the operator edits the moved JSON by hand after the CLI, which is outside the interface.",
+  "fix": "Add `--resolution <text>` (and `--cycle`, default console) to `evolve inbox consume`; it writes consumed{at (UTC), via: console-manual, cycle, resolution} in the same operation as the move.",
+  "acceptance": [
+    "`evolve inbox consume <item> --resolution X` leaves the item in consumed/ with the stamp (red today)"
+  ],
+  "created_at": "2026-09-29T16:00:00Z",
+  "source": "console, 2026-09-29, the evolve gc build (feat/gc-releases-unneeded-resources)"
+}

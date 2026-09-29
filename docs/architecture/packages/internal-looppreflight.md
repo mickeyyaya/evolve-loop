@@ -48,6 +48,7 @@
 - **The gate never blocks a batch on its own tooling.** `defaultPhaseRoutingWarnings` swallows a catalog-load error, matching `DiscoverUserSpecs`' "missing dir, no specs" posture. A disk-probe error skips the low-disk warning (the probe is unsupported off darwin and linux).
 - **Drift baselines converge.** A first batch with no cache passes and records the baseline. A corrupt cache fails open and is overwritten. The cache is saved on every run, so a stable version stops warning after one batch. Pinned by `TestVersionDrift_NoWarnWhenNoPriorRecord`, `TestVersionDrift_CorruptedCacheFailsOpen` and `TestVersionDrift_UpdatedCacheReflectsCurrentInventory`.
 - **The low-disk threshold is 500 MiB.** Below it, the bridge's per-cycle worktrees and scrollback logs risk ENOSPC mid-cycle. `statfs` block sizes of zero or less are rejected, so an unchecked cast cannot wrap into a huge "ample disk" value.
+- **The disk-free probe has one implementation.** `DiskFreeBytes` exports the same probe, including its stub for platforms without `statfs`, so `evolve gc` can report the disk it released without a second `statfs` wrapper (`TestDiskFreeBytes_MeasuresTheFilesystemHoldingThePath`).
 - **External contracts on the source.** `go/acs/cycle2` requires `checks.go` to call `ReapOrphans` and not to contain the text `stale bridge tmux session(s)`. `checks.go` and `drivers.go` are on the integrity surface (`internal/guards/integrity_surface.go`), because they hold the pre-spend required-sandbox halt and the sandbox-enabled profile discovery behind it.
 
 ## Findings

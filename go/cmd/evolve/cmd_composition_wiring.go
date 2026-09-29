@@ -16,9 +16,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
@@ -35,7 +37,7 @@ import (
 func compositionOptions() []core.Option {
 	return []core.Option{
 		core.WithCompositionVerdictWriter(writeCompositionVerdict),
-		core.WithCompositionGateRunner(runComposedGates),
+		core.WithCompositionGateRunner(composedGatesTo(os.Stderr)),
 		core.WithCompositionSnapshot(readCompositionSnapshot),
 	}
 }
@@ -74,28 +76,67 @@ var composedGateTargets = map[string]string{
 	"apicover": "apicover-enforce",
 }
 
-// runComposedGates re-runs the full native gate set against the composed
+// composedGatesTo re-runs the full native gate set against the composed
 // (rebased) worktree and records "pass"/"fail" per gate. Gates follow the
 // TREE: even when the audit verdict follows the change across a clean rebase,
 // every required gate must be green on the composed tree before the verdict
 // carries forward. Any non-zero exit → "fail" → MissingComposedGates trips →
 // full re-audit.
-func runComposedGates(ctx context.Context, worktree string) map[string]string {
-	results := make(map[string]string, len(ciparity.RequiredComposedGates))
-	for _, gate := range ciparity.RequiredComposedGates {
-		target, ok := composedGateTargets[gate]
-		if !ok {
-			continue // unmapped ⇒ absent ⇒ fail-closed via MissingComposedGates
+func composedGatesTo(log io.Writer) func(ctx context.Context, worktree string) map[string]string {
+	return func(ctx context.Context, worktree string) map[string]string {
+		run := composedGateRun{log: log, worktree: worktree}
+		results := make(map[string]string, len(ciparity.RequiredComposedGates))
+		for _, gate := range ciparity.RequiredComposedGates {
+			target, ok := composedGateTargets[gate]
+			if !ok {
+				continue // unmapped ⇒ absent ⇒ fail-closed via MissingComposedGates
+			}
+			results[gate] = run.gate(ctx, gate, target)
 		}
-		cmd := exec.CommandContext(ctx, "make", "-C", "go", target)
-		cmd.Dir = worktree
-		if err := cmd.Run(); err != nil {
-			results[gate] = "fail"
-			continue
-		}
-		results[gate] = "pass"
+		return results
 	}
-	return results
+}
+
+type composedGateRun struct {
+	log      io.Writer
+	worktree string
+}
+
+func (r composedGateRun) gate(ctx context.Context, gate, target string) string {
+	tail := newTailWriter(64 * 1024)
+	cmd := exec.CommandContext(ctx, "make", "-C", "go", target)
+	cmd.Dir = r.worktree
+	cmd.Env = ciparity.CIEnv(os.Environ())
+	cmd.Stdout, cmd.Stderr = tail, tail
+	err := cmd.Run()
+	if err == nil {
+		return "pass"
+	}
+	fmt.Fprintf(r.log, "[orchestrator] composed-tree gate %s (make %s) failed in %s: %v\n%s\n", gate, target, r.worktree, err, tail.lastLines(20))
+	return "fail"
+}
+
+type tailWriter struct {
+	buf []byte
+	max int
+}
+
+func newTailWriter(max int) *tailWriter { return &tailWriter{max: max} }
+
+func (t *tailWriter) Write(p []byte) (int, error) {
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > t.max {
+		t.buf = t.buf[len(t.buf)-t.max:]
+	}
+	return len(p), nil
+}
+
+func (t *tailWriter) lastLines(n int) string {
+	all := strings.Split(strings.TrimRight(string(t.buf), "\n"), "\n")
+	if len(all) > n {
+		all = all[len(all)-n:]
+	}
+	return strings.Join(all, "\n")
 }
 
 // readCompositionSnapshot captures what the bound audit reviewed BEFORE a
