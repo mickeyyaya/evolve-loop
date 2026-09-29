@@ -96,3 +96,15 @@ matters most — the specific finding — was dropped in transit. A weaker model
 - Remaining gaps from the research (R3–R8: build-exit deterministic floor, inlined contract,
   harness-minted completion, capability-aware scaffolding, learning re-entry, verifier
   isolation) are filed as inbox items on the runtime plane.
+
+**Update (2026-09-29).** R2's "gate reasons" slot had nothing to show for an agent-graded FAIL: no
+runner gate wrote `audit-fail-reason.json`, so each dispatch of the round WARNed that the file
+was unreadable, and the brief carried the findings table alone. `auditRejectionReasons` now fills
+that slot from the runner's reasons (`CycleState.AuditFailReasons`, not the file) when a gate
+diagnosed the FAIL, with the brief byte-identical to before, and otherwise with the verdict
+sentinel's failure-block defects, dropping a defect that restates a finding the brief lists. The
+findings header's "the gate reasons above are their symptoms" now appears only when gate reasons
+lead. Pinned by `TestComposeRepairBrief_AnAgentGradedFailBriefsItsFailureBlockDefects`,
+`TestRepairRoundDispatch_AnAgentGradedFailBriefsTheDefectsWithoutAWarn` and
+`TestComposeRepairBrief_AGateRecordKeepsTodaysBriefOverTheFailureBlock`; see the logic-first
+design, §5.14 (X2a.5).

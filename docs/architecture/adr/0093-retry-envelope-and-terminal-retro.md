@@ -141,3 +141,11 @@ gate diagnosed the FAIL, the host narrows a granted envelope to `retry@explanati
 legal. The class is `explanation-needs-correction`, derived from the defects, not declared,
 and the policy row and budget stay `code-audit-fail`'s. Cycle 1745 motivated it: a
 document-only FAIL re-ran TDD and the whole build. See the logic-first design, §5.14.
+
+**Update (2026-09-29, X2a.5).** Decision 4 names `audit-fail-reason.json` as the within-cycle
+feedback, but that file is the runner gate's record, and an agent-graded FAIL writes none. The
+repair brief and the adjudicator's prompt now read the runner's reasons (`CycleState.AuditFailReasons`,
+the in-memory twin of that file) when a gate diagnosed the FAIL, and otherwise the verdict
+sentinel's failure-block defects, the auditor's own list, through one function
+(`auditRejectionReasons`). The explanation-only route no longer copies its defects into the file.
+See the logic-first design, §5.14.

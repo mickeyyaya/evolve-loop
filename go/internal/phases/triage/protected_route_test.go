@@ -57,7 +57,7 @@ func TestRouteProtectedCards_MovesTheCardOutOfTopNIntoEscalateBlock(t *testing.T
 	path := writeDecision(t, t.TempDir(), `{"cycle":1714,"top_n":[{"id":"binaryguard-bypass","files":["go/internal/binaryguard/guard.go"]},{"id":"innocent-task","files":["go/internal/foo/foo.go"]}],"deferred":[{"id":"later"}],"escalate_block":[{"task_id":"earlier","reason":"fail_count 3"}],"phase_skip":[]}`)
 	cards := []protectedCard{{ID: "binaryguard-bypass", Path: "go/internal/binaryguard/guard.go"}}
 
-	if err := routeProtectedCards(path, cards); err != nil {
+	if err := routeProtectedCards(path, cards, nil); err != nil {
 		t.Fatalf("routeProtectedCards: %v", err)
 	}
 
@@ -78,7 +78,7 @@ func TestRouteProtectedCards_MovesTheCardOutOfTopNIntoEscalateBlock(t *testing.T
 		t.Errorf("every other key is kept: %v", d)
 	}
 
-	if err := routeProtectedCards(path, cards); err != nil {
+	if err := routeProtectedCards(path, cards, nil); err != nil {
 		t.Fatal(err)
 	}
 	if again := readDecision(t, path); len(again["escalate_block"].([]any)) != 2 {
@@ -90,10 +90,10 @@ func TestRouteProtectedCards_RefusesAnAbsentOrMalformedDecision(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	cards := []protectedCard{{ID: "x", Path: "go/internal/guards/role.go"}}
-	if err := routeProtectedCards(filepath.Join(ws, "triage-decision.json"), cards); err == nil {
+	if err := routeProtectedCards(filepath.Join(ws, "triage-decision.json"), cards, nil); err == nil {
 		t.Error("no decision to record the route in is a fault")
 	}
-	if err := routeProtectedCards(writeDecision(t, ws, "not json"), cards); err == nil {
+	if err := routeProtectedCards(writeDecision(t, ws, "not json"), cards, nil); err == nil {
 		t.Error("a decision that cannot be read is a fault")
 	}
 }
@@ -159,14 +159,14 @@ func TestRouteProtectedCards_RefusesACardWithoutAnIDAndKeepsIDLessEntries(t *tes
 	t.Parallel()
 	path := writeDecision(t, t.TempDir(), `{"top_n":[{"id":"innocent-task"},{"files":["go/internal/foo/foo.go"]},{"id":"binaryguard-bypass"}]}`)
 
-	if err := routeProtectedCards(path, []protectedCard{{ID: "", Path: "go/internal/guards/role.go"}}); err == nil {
+	if err := routeProtectedCards(path, []protectedCard{{ID: "", Path: "go/internal/guards/role.go"}}, nil); err == nil {
 		t.Fatal("a card with no id cannot be routed by id: a fault, never a sweep of every id-less entry")
 	}
 	if d := readDecision(t, path); len(d["top_n"].([]any)) != 3 {
 		t.Errorf("a refused route writes nothing: %v", d["top_n"])
 	}
 
-	if err := routeProtectedCards(path, []protectedCard{{ID: "binaryguard-bypass", Path: "go/internal/binaryguard/guard.go"}}); err != nil {
+	if err := routeProtectedCards(path, []protectedCard{{ID: "binaryguard-bypass", Path: "go/internal/binaryguard/guard.go"}}, nil); err != nil {
 		t.Fatal(err)
 	}
 	d := readDecision(t, path)
@@ -197,7 +197,7 @@ func TestRouteProtectedCards_RefusesACardTheDecisionDoesNotCommit(t *testing.T) 
 	path := writeDecision(t, t.TempDir(), `{"top_n":[{"id":"other"}],"escalate_block":[]}`)
 	before, _ := os.ReadFile(path)
 
-	err := routeProtectedCards(path, []protectedCard{{ID: "ghost", Path: "go/internal/guards/role.go"}})
+	err := routeProtectedCards(path, []protectedCard{{ID: "ghost", Path: "go/internal/guards/role.go"}}, nil)
 
 	if err == nil {
 		t.Fatal("a card the decision never committed cannot be moved out of it: the report and its decision disagree, a fault")

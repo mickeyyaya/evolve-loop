@@ -1,0 +1,20 @@
+{
+  "id": "claim-failed-closeout-charges-unanswered-pins",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.45,
+  "title": "A lane that seals triage-empty-commitment-claimable-work charges and routes nothing, so its pins are redrawn every wave",
+  "files": [
+    "go/internal/cycleoutcome/cycleoutcome.go",
+    "go/internal/core/triage_termination.go"
+  ],
+  "summary": "Cycle 1757 sealed FAIL triage-empty-commitment-claimable-work with its pinned item neither routed nor bumped: the FAIL closeout's committed set (CommittedIDsFor) reads the decision's top_n only and falls back to the lane pin only when triage-decision.json is absent, so a present decision with an empty top_n charges nobody. R1b (2026-09-29) closes the single-item-lane case where the host's protected route emptied top_n, but a lane pinned to several items whose cards were all routed, or any lane whose triage left its pins unanswered, still ends FAIL with no failure_count bump and no route. The item never reaches the quarantine ceiling and is redrawn every wave.",
+  "fix": "On this termination reason, charge the lane's unanswered pins through the existing committedset.Committed precedence (pin minus deferred, minus answered dispositions): bump each toward the S5 ceiling, or route it when the decision's escalations name a protected surface.",
+  "acceptance": [
+    "A lane pinned to two items whose cards were both routed to the console ends with each pin bumped or routed (red today: neither)",
+    "A single-item lane under R1b keeps its planned no-work end and console route",
+    "A deferred pin is still owed work and is bumped, not routed"
+  ],
+  "created_at": "2026-09-29T17:30:00Z",
+  "source": "console, 2026-09-29, cycle 1757 deep-dive and the R1b architecture review (MEDIUM 3)"
+}
