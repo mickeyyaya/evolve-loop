@@ -65,6 +65,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/cyclerun_postreview.go", Rationale: "fresh-cycle post-Build explanation refresh call site (applyPostReviewGuards -> explanationdocs.RefreshResult); carved out of cyclerun_review.go by #549"},
 	{Fragment: "/go/internal/core/cyclerun_remediate.go", Rationale: "Build explanation correction and remediation projection"},
 	{Fragment: "/go/internal/core/continuation_stamp.go", Rationale: "continuation explanation-history ownership transition"},
+	{Fragment: "/go/internal/core/continuation_ancestor_predicates.go", Rationale: "continuation archives the ancestor's explanation records and predicate package (design A2)"},
 	{Fragment: "/go/internal/core/evaluate_batch.go", Rationale: "parallel evaluator explanation handoff projection"},
 	{Fragment: "/go/internal/core/failure_learning.go", Rationale: "failed-cycle explanation handoff projection"},
 	{Fragment: "/go/internal/core/errors.go", Rationale: "the Bridge port's error sentinels and the integrity predicates on them (ErrArtifactTimeout, isArtifactTimeout — the timeout-only gate unit 02 injects — IsInfraTeardownError, IsOptionalSkippableError)"},
