@@ -23,7 +23,7 @@ func TestComposePrompt_AnExplanationReauthorScopesTheRoundToTheDocument(t *testi
 		t.Fatalf("the re-author scope must precede the repair findings it scopes (section %d, repair %d):\n%s", section, repair, out)
 	}
 	scope := out[section:repair]
-	for _, want := range []string{"Edit only " + reauthorDocument, "leave code and tests unchanged", "The audit re-runs on the corrected document"} {
+	for _, want := range []string{"Edit only " + reauthorDocument, "rewrite `build-report.md`", "the rewrite completes this dispatch", "leave code and tests unchanged", "The audit re-runs on the corrected document"} {
 		if !strings.Contains(scope, want) {
 			t.Errorf("the re-author section lacks %q:\n%s", want, scope)
 		}
