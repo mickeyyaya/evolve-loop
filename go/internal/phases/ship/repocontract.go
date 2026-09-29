@@ -461,11 +461,6 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 	return runImporterBackstop(ctx, out, root, moduleDir, workspace, files, untagged, cleared)
 }
 
-// runAddedTestBackstop is the second gate layer: it derives the gate's seed
-// (the tree's changes vs baseRef) and runs every ADDED test package under the
-// build tags its files declare. Returns the seed and the untagged groups'
-// patterns so the importer backstop (the third layer) neither re-derives the
-// seed nor re-runs those packages in the same build context.
 func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, workspace string) error {
 	runs, note := repocontract.PackRuns(gate, root)
 	moduleDir := repocontract.ModuleDir(root)
@@ -486,6 +481,11 @@ func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, works
 	})
 }
 
+// runAddedTestBackstop is the second gate layer: it derives the gate's seed
+// (the tree's changes vs baseRef) and runs every ADDED test package under the
+// build tags its files declare. Returns the seed and the untagged groups'
+// patterns so the importer backstop (the third layer) neither re-derives the
+// seed nor re-runs those packages in the same build context.
 func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
 	files, err = changedFilesTwice(out, root, baseRef)
 	if err != nil {
