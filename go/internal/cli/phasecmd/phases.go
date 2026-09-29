@@ -82,35 +82,11 @@ func phasesList(project string, stdout, stderr io.Writer) int {
 
 // phasesValidate prints per-phase verdicts on stdout (machine-readable) and discovery warnings on stderr.
 func phasesValidate(project, profileDir string, args []string, stdout, stderr io.Writer) int {
-	strictProvenance := false
-	var cleanArgs []string
-	for _, arg := range args {
-		if arg == "--strict-provenance" {
-			strictProvenance = true
-		} else {
-			cleanArgs = append(cleanArgs, arg)
-		}
-	}
-	args = cleanArgs
-
+	strictProvenance, args := splitStrictProvenance(args)
 	if profileDir == "" {
 		profileDir = filepath.Join(project, ".evolve", "profiles")
 	}
-
-	provenanceFailed := false
-	loader := profiles.NewFromDir(profileDir)
-	pnames, err := loader.List()
-	if err == nil {
-		for _, pname := range pnames {
-			p, err := loader.Get(pname)
-			if err == nil && p.GeneratedFrom == "" {
-				fmt.Fprintf(stdout, "WARN: profile %s missing generated_from\n", pname)
-				if strictProvenance {
-					provenanceFailed = true
-				}
-			}
-		}
-	}
+	pnames, provenanceFailed := warnMissingProvenance(profileDir, strictProvenance, stdout)
 
 	user, _, warns := phasespec.DiscoverUserSpecsFromRoots(phasespec.Roots(project))
 	for _, w := range warns {
@@ -129,18 +105,7 @@ func phasesValidate(project, profileDir string, args []string, stdout, stderr io
 
 	failed := false
 	if len(user) > 0 {
-		for _, s := range user {
-			violations := phasespec.ValidateUserSpec(s)
-			if len(violations) == 0 {
-				fmt.Fprintf(stdout, "OK    %s\n", s.Name)
-				continue
-			}
-			failed = true
-			fmt.Fprintf(stdout, "FAIL  %s\n", s.Name)
-			for _, v := range violations {
-				fmt.Fprintf(stdout, "        - %s\n", v)
-			}
-		}
+		failed = reportUserSpecVerdicts(user, stdout)
 	} else if len(args) == 0 && len(pnames) == 0 {
 		fmt.Fprintln(stdout, "no user phases to validate")
 	}
@@ -149,6 +114,51 @@ func phasesValidate(project, profileDir string, args []string, stdout, stderr io
 		return 2
 	}
 	return 0
+}
+
+func splitStrictProvenance(args []string) (strictProvenance bool, cleanArgs []string) {
+	for _, arg := range args {
+		if arg == "--strict-provenance" {
+			strictProvenance = true
+		} else {
+			cleanArgs = append(cleanArgs, arg)
+		}
+	}
+	return strictProvenance, cleanArgs
+}
+
+func warnMissingProvenance(profileDir string, strictProvenance bool, stdout io.Writer) (pnames []string, provenanceFailed bool) {
+	loader := profiles.NewFromDir(profileDir)
+	pnames, err := loader.List()
+	if err != nil {
+		return pnames, false
+	}
+	for _, pname := range pnames {
+		p, err := loader.Get(pname)
+		if err == nil && p.GeneratedFrom == "" {
+			fmt.Fprintf(stdout, "WARN: profile %s missing generated_from\n", pname)
+			if strictProvenance {
+				provenanceFailed = true
+			}
+		}
+	}
+	return pnames, provenanceFailed
+}
+
+func reportUserSpecVerdicts(user []phasespec.PhaseSpec, stdout io.Writer) (failed bool) {
+	for _, s := range user {
+		violations := phasespec.ValidateUserSpec(s)
+		if len(violations) == 0 {
+			fmt.Fprintf(stdout, "OK    %s\n", s.Name)
+			continue
+		}
+		failed = true
+		fmt.Fprintf(stdout, "FAIL  %s\n", s.Name)
+		for _, v := range violations {
+			fmt.Fprintf(stdout, "        - %s\n", v)
+		}
+	}
+	return failed
 }
 
 func phasesCheckCoherence(project, profileDir, personaOverride string, args []string, stdout, stderr io.Writer) int {

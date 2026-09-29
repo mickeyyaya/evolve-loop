@@ -23,16 +23,7 @@ import (
 // Exit: 0 well-formed, 1 confirmed violation, 2 infra ambiguity (callers fail open), 10 usage error.
 // See ADR-0034.
 func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
-	// Take the phase positional first, then flag-parse the rest, so both --flag value and --flag=value work.
-	var phaseArg string
-	var flags []string
-	for _, a := range args {
-		if phaseArg == "" && !strings.HasPrefix(a, "-") {
-			phaseArg = a
-			continue
-		}
-		flags = append(flags, a)
-	}
+	phaseArg, flags := splitPhaseArg(args)
 	if phaseArg == "" {
 		fmt.Fprintf(stderr, "evolve phase verify: missing phase name\n")
 		return 10
@@ -59,28 +50,48 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	if *evolveDir == "" {
 		*evolveDir = filepath.Join(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
 	}
-	roots := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
-	// The gate judges explanation sections and declared effects from the cycle state, so the self-check
-	// must too. Without it the section check is skipped, and an effect cannot be judged: verify exits 2.
-	needsSections, needsEffects := len(contract.ExplanationSections) > 0, len(contract.Effects) > 0
-	if needsSections || needsEffects {
-		state, problem := persistedCycleState(*workspace, *evolveDir)
-		if problem != "" && needsSections {
-			fmt.Fprintf(stderr, "phase verify: WARN %s — the explanation-documentation section check is skipped; the host gate will still apply it\n", problem)
-		}
-		if problem != "" && needsEffects {
-			fmt.Fprintf(stderr, "phase verify: WARN %s — the declared effect cannot be judged without the cycle, so verify aborts; the host gate will still apply it\n", problem)
-		}
-		roots.ExplanationDocumentationVersion = state.ExplanationDocumentationVersion
-		roots.Cycle = state.CycleID
-	}
+	roots := withCycleState(phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}, contract, stderr)
 	res, err := verifyDeliverable(phase, roots, resolver)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve phase verify: %v\n", err)
 		return 2
 	}
+	return reportVerifyResult(phase, res, *asJSON, stdout, stderr)
+}
 
-	if *asJSON {
+func splitPhaseArg(args []string) (phaseArg string, flags []string) {
+	// Take the phase positional first, then flag-parse the rest, so both --flag value and --flag=value work.
+	for _, a := range args {
+		if phaseArg == "" && !strings.HasPrefix(a, "-") {
+			phaseArg = a
+			continue
+		}
+		flags = append(flags, a)
+	}
+	return phaseArg, flags
+}
+
+func withCycleState(roots phasecontract.Roots, contract phasecontract.Contract, stderr io.Writer) phasecontract.Roots {
+	// The gate judges explanation sections and declared effects from the cycle state, so the self-check
+	// must too. Without it the section check is skipped, and an effect cannot be judged: verify exits 2.
+	needsSections, needsEffects := len(contract.ExplanationSections) > 0, len(contract.Effects) > 0
+	if !needsSections && !needsEffects {
+		return roots
+	}
+	state, problem := persistedCycleState(roots.Workspace, roots.EvolveDir)
+	if problem != "" && needsSections {
+		fmt.Fprintf(stderr, "phase verify: WARN %s — the explanation-documentation section check is skipped; the host gate will still apply it\n", problem)
+	}
+	if problem != "" && needsEffects {
+		fmt.Fprintf(stderr, "phase verify: WARN %s — the declared effect cannot be judged without the cycle, so verify aborts; the host gate will still apply it\n", problem)
+	}
+	roots.ExplanationDocumentationVersion = state.ExplanationDocumentationVersion
+	roots.Cycle = state.CycleID
+	return roots
+}
+
+func reportVerifyResult(phase string, res deliverable.Result, asJSON bool, stdout, stderr io.Writer) int {
+	if asJSON {
 		buf, _ := json.MarshalIndent(res, "", "  ")
 		fmt.Fprintln(stdout, string(buf))
 	} else if res.OK {

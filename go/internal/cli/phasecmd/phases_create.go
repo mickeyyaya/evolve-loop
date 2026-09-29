@@ -45,26 +45,11 @@ type mintSpec struct {
 
 // phasesCreate implements `evolve phases create`; it exits 0 created, 1 I/O error, 2 validation or collision, 10 usage.
 func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("phases create", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	specArg := fs.String("spec", "", "phase.json content: a file path, or - for stdin")
-	personaArg := fs.String("persona", "", "persona body for agents/<agent>.md: a file path, or - for stdin")
-	mintArg := fs.String("mint", "", "advisor MintSpec JSON to promote: a file path, or - for stdin")
-	rootArg := fs.String("root", "", "discovery root to write the phase into (default: first EVOLVE_PHASE_ROOTS entry)")
-	if err := fs.Parse(args); err != nil {
-		return 10
+	flags, code := parseCreateFlags(args, stderr)
+	if code != 0 {
+		return code
 	}
-
-	if (*specArg == "") == (*mintArg == "") { // exactly one of --spec/--mint
-		fmt.Fprintln(stderr, "usage: evolve phases create --spec <file|-> [--persona <file|->] | --mint <file|->")
-		return 10
-	}
-	if stdinCount(*specArg, *personaArg, *mintArg) > 1 {
-		fmt.Fprintln(stderr, "at most one of --spec/--persona/--mint may read stdin (-)")
-		return 10
-	}
-
-	spec, personaBody, errs, code := loadCreateInputs(*specArg, *personaArg, *mintArg, stdin, stderr)
+	spec, personaBody, errs, code := loadCreateInputs(flags.spec, flags.persona, flags.mint, stdin, stderr)
 	if code != 0 {
 		return code
 	}
@@ -79,52 +64,92 @@ func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr
 
 	roots := phasespec.Roots(project)
 	if collision := findCollision(project, roots, spec.Name); collision != "" {
-		return emitEnvelope(stdout, createEnvelopeOut{
-			OK: false, Phase: spec.Name, Errors: []string{collision}, Hint: createHint,
-		}, 2)
+		return emitEnvelope(stdout, createEnvelopeOut{OK: false, Phase: spec.Name, Errors: []string{collision}, Hint: createHint}, 2)
 	}
-
-	// The spec is untrusted LLM input: the persona path must stay inside agents/ and never
-	// overwrite another phase's persona.
 	personaPath := filepath.Join(project, "agents", spec.AgentName()+".md")
-	if agentsDir := filepath.Join(project, "agents") + string(filepath.Separator); !strings.HasPrefix(personaPath, agentsDir) {
-		return emitEnvelope(stdout, createEnvelopeOut{
-			OK: false, Phase: spec.Name,
-			Errors: []string{fmt.Sprintf("agent %q resolves outside agents/ — refusing", spec.AgentName())},
-			Hint:   createHint,
-		}, 2)
+	refusal, warning := checkPersonaPath(project, personaPath, spec.AgentName(), personaBody != "")
+	if refusal != "" {
+		return emitEnvelope(stdout, createEnvelopeOut{OK: false, Phase: spec.Name, Errors: []string{refusal}, Hint: createHint}, 2)
 	}
-	if personaBody != "" {
-		if _, err := os.Stat(personaPath); err == nil {
-			return emitEnvelope(stdout, createEnvelopeOut{
-				OK: false, Phase: spec.Name,
-				Errors: []string{fmt.Sprintf("persona %s already exists — refusing to overwrite", relTo(project, personaPath))},
-				Hint:   createHint,
-			}, 2)
-		}
-	} else if _, err := os.Stat(personaPath); os.IsNotExist(err) {
-		warnings = append(warnings, fmt.Sprintf("no persona supplied and %s does not exist — the phase will have no prompt until one is added", relTo(project, personaPath)))
+	if warning != "" {
+		warnings = append(warnings, warning)
 	}
 
-	// Write phase.json, then the persona, rolling back on a persona failure. Check-then-write is not
-	// atomic across concurrent invocations, which is accepted for a single-operator CLI.
-	targetRoot, ok := resolveTargetRoot(*rootArg, project, roots)
+	targetRoot, ok := resolveTargetRoot(flags.root, project, roots)
 	if !ok {
-		fmt.Fprintf(stderr, "--root %q is neither a configured discovery root (EVOLVE_PHASE_ROOTS) nor inside the project\n", *rootArg)
+		fmt.Fprintf(stderr, "--root %q is neither a configured discovery root (EVOLVE_PHASE_ROOTS) nor inside the project\n", flags.root)
 		return 10
 	}
+	phasePath, code := writePhaseFiles(targetRoot, spec, personaPath, personaBody, stderr)
+	if code != 0 {
+		return code
+	}
+
+	rebuilt, warnings := rebuildInventory(project, roots, warnings)
+	out := createdEnvelope(project, spec, phasePath, rebuilt, warnings)
+	if personaBody != "" {
+		out.Persona = relTo(project, personaPath)
+	}
+	return emitEnvelope(stdout, out, 0)
+}
+
+type createFlags struct {
+	spec, persona, mint, root string
+}
+
+func parseCreateFlags(args []string, stderr io.Writer) (createFlags, int) {
+	fs := flag.NewFlagSet("phases create", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	specArg := fs.String("spec", "", "phase.json content: a file path, or - for stdin")
+	personaArg := fs.String("persona", "", "persona body for agents/<agent>.md: a file path, or - for stdin")
+	mintArg := fs.String("mint", "", "advisor MintSpec JSON to promote: a file path, or - for stdin")
+	rootArg := fs.String("root", "", "discovery root to write the phase into (default: first EVOLVE_PHASE_ROOTS entry)")
+	if err := fs.Parse(args); err != nil {
+		return createFlags{}, 10
+	}
+
+	if (*specArg == "") == (*mintArg == "") { // exactly one of --spec/--mint
+		fmt.Fprintln(stderr, "usage: evolve phases create --spec <file|-> [--persona <file|->] | --mint <file|->")
+		return createFlags{}, 10
+	}
+	if stdinCount(*specArg, *personaArg, *mintArg) > 1 {
+		fmt.Fprintln(stderr, "at most one of --spec/--persona/--mint may read stdin (-)")
+		return createFlags{}, 10
+	}
+	return createFlags{spec: *specArg, persona: *personaArg, mint: *mintArg, root: *rootArg}, 0
+}
+
+func checkPersonaPath(project, personaPath, agentName string, hasPersonaBody bool) (refusal, warning string) {
+	// The spec is untrusted LLM input: the persona path must stay inside agents/ and never
+	// overwrite another phase's persona.
+	if agentsDir := filepath.Join(project, "agents") + string(filepath.Separator); !strings.HasPrefix(personaPath, agentsDir) {
+		return fmt.Sprintf("agent %q resolves outside agents/ — refusing", agentName), ""
+	}
+	if hasPersonaBody {
+		if _, err := os.Stat(personaPath); err == nil {
+			return fmt.Sprintf("persona %s already exists — refusing to overwrite", relTo(project, personaPath)), ""
+		}
+	} else if _, err := os.Stat(personaPath); os.IsNotExist(err) {
+		return "", fmt.Sprintf("no persona supplied and %s does not exist — the phase will have no prompt until one is added", relTo(project, personaPath))
+	}
+	return "", ""
+}
+
+func writePhaseFiles(targetRoot string, spec phasespec.PhaseSpec, personaPath, personaBody string, stderr io.Writer) (phasePath string, code int) {
+	// Write phase.json, then the persona, rolling back on a persona failure. Check-then-write is not
+	// atomic across concurrent invocations, which is accepted for a single-operator CLI.
 	specJSON, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		fmt.Fprintf(stderr, "marshal spec: %v\n", err)
-		return 1
+		return "", 1
 	}
 	phaseDir := filepath.Join(targetRoot, spec.Name)
 	_, statErr := os.Stat(phaseDir)
 	dirCreatedByUs := os.IsNotExist(statErr)
-	phasePath := filepath.Join(phaseDir, "phase.json")
+	phasePath = filepath.Join(phaseDir, "phase.json")
 	if err := atomicwrite.Bytes(phasePath, specJSON); err != nil {
 		fmt.Fprintf(stderr, "write %s: %v\n", phasePath, err)
-		return 1
+		return "", 1
 	}
 	if personaBody != "" {
 		if err := atomicwrite.Bytes(personaPath, []byte(personaBody)); err != nil {
@@ -135,37 +160,39 @@ func phasesCreate(project string, args []string, stdin io.Reader, stdout, stderr
 				_ = os.Remove(phasePath)
 			}
 			fmt.Fprintf(stderr, "write %s: %v\n", personaPath, err)
-			return 1
+			return "", 1
 		}
 	}
+	return phasePath, 0
+}
 
+func rebuildInventory(project string, roots, warnings []string) (bool, []string) {
 	// Make the phase visible to the next cycle immediately.
 	invRes, invErr := phaseinventory.Build(phaseinventory.Options{
 		ProjectRoot: project, Roots: roots, NowFn: time.Now, Force: true,
 	})
 	if invErr != nil {
-		warnings = append(warnings, fmt.Sprintf("inventory rebuild failed (%v) — run `evolve phase-inventory build --force`", invErr))
+		return false, append(warnings, fmt.Sprintf("inventory rebuild failed (%v) — run `evolve phase-inventory build --force`", invErr))
 	}
+	return !invRes.CacheHit, warnings
+}
 
+func createdEnvelope(project string, spec phasespec.PhaseSpec, phasePath string, inventoryRebuilt bool, warnings []string) createEnvelopeOut {
 	contract := phasecontract.FromSpec(spec)
 	sections := make([]string, 0, len(contract.Sections))
 	for _, s := range contract.Sections {
 		sections = append(sections, s.Canonical)
 	}
-	out := createEnvelopeOut{
+	return createEnvelopeOut{
 		OK:               true,
 		Phase:            spec.Name,
 		Artifact:         contract.ArtifactName,
 		RequiredSections: sections,
 		EmitsVerdict:     len(contract.Verdicts) > 0,
 		PhaseJSON:        relTo(project, phasePath),
-		InventoryRebuilt: invErr == nil && !invRes.CacheHit,
+		InventoryRebuilt: inventoryRebuilt,
 		Warnings:         warnings,
 	}
-	if personaBody != "" {
-		out.Persona = relTo(project, personaPath)
-	}
-	return emitEnvelope(stdout, out, 0)
 }
 
 const createHint = "fix errors and re-run: evolve phases create --spec -"
