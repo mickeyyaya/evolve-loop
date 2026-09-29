@@ -133,3 +133,11 @@ Re-running the same judge on the same artifact until it relents is forbidden, wh
 adjudicator's reasoning, and with no adjudicator wired it always defaults to tdd. That is
 deliberate — the conservative, more thorough path — but it means the cheaper `retry@build`
 route is unused until the persona is dispatched in production.
+
+**Update (2026-09-29).** One class no longer waits for the adjudicator. When every defect
+in the audit's failure block locates in the cycle's own explanation document and no runner
+gate diagnosed the FAIL, the host narrows a granted envelope to `retry@explanation` or
+`decline`; `retry@explanation` re-enters Build to re-author the document, and TDD is not
+legal. The class is `explanation-needs-correction`, derived from the defects, not declared,
+and the policy row and budget stay `code-audit-fail`'s. Cycle 1745 motivated it: a
+document-only FAIL re-ran TDD and the whole build. See the logic-first design, §5.14.
