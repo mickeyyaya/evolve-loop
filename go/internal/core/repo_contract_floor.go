@@ -6,9 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
+
+const repoContractFloorDeadline = 120 * time.Second
 
 type RepoContractPackFn func(ctx context.Context, root string) (reds []string, diagnostic string, err error)
 
@@ -17,10 +20,12 @@ func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 		if in.Worktree == "" || repoContractGateOff(in) {
 			return nil
 		}
-		reds, diagnostic, err := run(ctx, in.Worktree)
+		runCtx, cancel := context.WithTimeout(ctx, repoContractFloorDeadline)
+		defer cancel()
+		reds, diagnostic, err := run(runCtx, in.Worktree)
 		if len(reds) == 0 {
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "[build-floor] WARN repo-contract scanner pack exited nonzero naming no test (%v); ship's gate runs the pack again before it pushes:\n%s\n", err, floorFailureDiagnostic(diagnostic))
+				fmt.Fprintf(os.Stderr, "[build-floor] WARN repo-contract scanner pack exited nonzero naming no test (%v; the floor's deadline is %s); ship's gate runs the pack again before it pushes:\n%s\n", err, repoContractFloorDeadline, floorFailureDiagnostic(diagnostic))
 			}
 			return nil
 		}

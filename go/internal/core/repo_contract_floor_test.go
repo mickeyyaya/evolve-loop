@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const ratchetRedName = "github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet.TestRatchet_NoNewRawGitFixtures"
@@ -88,6 +89,45 @@ func TestRepoContractFloorChecks_AnyNamedRedCorrectsTheBuild(t *testing.T) {
 	got := RepoContractFloorChecks(pack.run)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
 	if len(got) != 1 || !strings.Contains(got[0], "pkg.TestX") {
 		t.Fatalf("ship names reds only for its real red, so the floor branches on the names alone; got %v", got)
+	}
+}
+
+func TestRepoContractFloorChecks_RunsThePackUnderItsOwnDeadline(t *testing.T) {
+	var remaining time.Duration
+	var hasDeadline bool
+	run := func(ctx context.Context, _ string) ([]string, string, error) {
+		var deadline time.Time
+		deadline, hasDeadline = ctx.Deadline()
+		remaining = time.Until(deadline)
+		return nil, "", nil
+	}
+	RepoContractFloorChecks(run)(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
+	if repoContractFloorDeadline != 120*time.Second {
+		t.Fatalf("the floor's deadline follows the floor's go test convention (120s), not ship's 20m; got %s", repoContractFloorDeadline)
+	}
+	if !hasDeadline || remaining <= 0 || remaining > repoContractFloorDeadline {
+		t.Fatalf("the pack runs under the floor's own deadline even when the caller set none; deadline=%v remaining=%s", hasDeadline, remaining)
+	}
+}
+
+func TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	blocking := func(ctx context.Context, _ string) ([]string, string, error) {
+		<-ctx.Done()
+		return nil, "partial output before the kill\n", ctx.Err()
+	}
+	var got []string
+	stderr := captureStderr(t, func() {
+		got = RepoContractFloorChecks(blocking)(ctx, ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
+	})
+	if len(got) != 0 {
+		t.Fatalf("a kill names nothing, so the floor passes the handoff and ship stays the authority; got %v", got)
+	}
+	for _, want := range []string{"WARN repo-contract scanner pack", "context deadline exceeded", repoContractFloorDeadline.String(), "partial output before the kill"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("the deadline WARN names %q; stderr=%q", want, stderr)
+		}
 	}
 }
 
