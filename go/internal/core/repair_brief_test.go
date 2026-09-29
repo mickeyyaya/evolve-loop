@@ -30,12 +30,13 @@ func writeBriefFixture(t *testing.T, ws, name, body string) {
 
 func TestComposeRepairBrief_GateReasonsThenFindingsThenPersisted(t *testing.T) {
 	ws := t.TempDir()
-	writeAuditFailReason(t, ws, "audit", "EGPS: acs-verdict.json ship_eligible=false")
 	auditName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	writeBriefFixture(t, ws, phasecontract.RoundArchiveFilename(auditName, 1), briefRound1)
 	writeBriefFixture(t, ws, auditName, briefRound2)
+	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 2, AuditDispatches: 2}
+	downgradeAudit(t, &cs, "EGPS: acs-verdict.json ship_eligible=false")
 
-	brief := composeRepairBrief(CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 2, AuditDispatches: 2})
+	brief := composeRepairBrief(cs)
 	gate := strings.Index(brief, "EGPS: acs-verdict.json ship_eligible=false")
 	h1 := strings.Index(brief, "H1 (HIGH) — caller-proof hard floor violated for the second consecutive round")
 	h2 := strings.Index(brief, "H2 (HIGH) — a scout-selected slug has no eval")
