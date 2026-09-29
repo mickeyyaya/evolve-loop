@@ -187,12 +187,15 @@ var socketGlob = func() ([]string, error) {
 // ExecListBridgeSockets is the production SocketLister.
 func ExecListBridgeSockets() ([]string, error) { return socketGlob() }
 
-// ExecKillServer is the production ServerKiller: it refuses an empty socket name, and a missing server counts as success.
+// ExecKillServer is the production ServerKiller: it refuses an empty socket name, kills the server, and removes its socket file; a missing server or file counts as success.
 func ExecKillServer(ctx context.Context, socket string) error {
 	if socket == "" {
 		return fmt.Errorf("refusing kill-server with an empty socket name")
 	}
 	_ = tmuxRun(ctx, "-L", socket, "kill-server")
+	if err := os.Remove(filepath.Join(tmuxSocketDir(), socket)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove dead socket %s: %w", socket, err)
+	}
 	return nil
 }
 
