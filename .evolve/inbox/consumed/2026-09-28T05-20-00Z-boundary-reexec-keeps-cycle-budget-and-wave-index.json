@@ -16,5 +16,7 @@
     "A test re-execs through the chainReExecArgvFn seam after one completed wave and asserts the next wave's index is 1 and the remaining budget is max-1."
   ],
   "source": "wave 21 observation (2026-09-28)",
-  "priority_rationale": "wave 21 boundary 2026-09-28: the operator cannot tell waves apart in the log or the Signal Center, and --max-cycles is not a bound while ships land"
+  "priority_rationale": "wave 21 boundary 2026-09-28: the operator cannot tell waves apart in the log or the Signal Center, and --max-cycles is not a bound while ships land",
+  "consumed_by": "console landing fix/loop-controls (2026-09-29): BUILT for the wave boundary. The breaker marker the wave-boundary refresh arms also records the pid and the completed-wave count in their own fields (loopchain.WithHandoff; pid, waves_done; syscall.Exec keeps the pid). runLoop takes it once at boot, before the chain/batch split (loopchain.TakeHandoff): honoured only for the same pid, a different build commit and an arm at most five minutes old; the run resumes at the completed-wave index with the remaining budget (a chained run's first batch only) and the record is consumed. No new flag or env var; a chain-boundary re-exec arms no handoff. Not covered: a chain-boundary re-exec still restarts the chain's own batch count and max_batches.",
+  "consumed_at": "2026-09-29T00:00:00Z"
 }

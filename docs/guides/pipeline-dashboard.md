@@ -74,8 +74,8 @@ Top to bottom is the triage order:
 
 ## What it deliberately does not do
 
-- Write anything (no brake toggle, no inbox edits) — use `touch .evolve/loop-stop` and
-  `evolve inbox …`.
+- Write anything (no brake toggle, no inbox edits) — use `evolve loop-stop` (the running
+  loop finishes its wave and exits; `--release` lifts the brake) and `evolve inbox …`.
 - Render markdown or load a chart library — escaped text and plain DOM only.
 - Replace `evolve cycle timing`, `evolve soak-report`, `evolve ledger tail` — it renders the
   same files; those remain the scripted surfaces.
