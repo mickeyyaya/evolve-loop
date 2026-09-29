@@ -151,10 +151,11 @@ type RefreshDeps struct {
     ReExec        func(argv0 string, argv, envv []string) error                           // host adapter, REQUIRED
 }
 type Roots struct { ProjectRoot, EvolveDir string }
-type Option func(*options) // shared: WithSignals(func() *Center), WithNow(func() time.Time), WithMarkerFiles(attempt, log string) — warn is POSITIONAL (critic G3)
+type Option func(*options) // shared: WithSignals(func() *Center), WithNow(func() time.Time), WithMarkerFiles(attempt, log string), WithHandoff(pid int) (2026-09-29, §11) — warn is POSITIONAL (critic G3)
 type Refresher struct { /* roots; deps; stderr io.Writer; opts */ }
 func NewRefresher(roots Roots, deps RefreshDeps, warn io.Writer, opts ...Option) *Refresher
-func (r *Refresher) Refresh(batch int) (refreshed bool) // guards → rebuildAndRepin → armAndExec; Flush immediately before ReExec
+func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) // guards → rebuildAndRepin → armAndExec; Flush immediately before ReExec; ctx checked before the rebuild, after it and before the exec (2026-09-29, §11)
+func TakeHandoff(attemptPath string, pid int, runningCommit string) (int, error) // the wave-boundary re-exec handoff (2026-09-29, §11)
 func (r *Refresher) SignalsWired() bool
 func GitAhead(projectRoot, runningCommit string) (bool, error)
 func GitProvenance(runningCommit func() string) func(projectRoot string) (string, phaseintegrity.ProvenanceVerified)
@@ -346,3 +347,11 @@ Forty-six build-confirmed mutants killed by name (each a one-line edit; the name
 The whole-module floor is the orchestrator's and is recorded at landing.
 
 `cmd_loop_wave.go`: 689 → 155 lines; `cmd_loop_chain.go`: 718 → 226; the leaves 6 + 7 production files (847 + 849 lines), every function < 50 lines; host net ≈ −1,000 lines.
+
+## 11. Amendments (2026-09-29): the loop controls
+
+One console landing (three components, branch `fix/loop-controls`) changed the Refresher's contract; the sections above keep the landed design.
+
+- **`Refresh(ctx, batch)`** (inbox item `boundary-refresh-honors-a-pending-interrupt`). The refresh takes the caller's context as its interruption source (the Go idiom; every other Refresher input is a construction seam, the interrupt is per call). A cancelled context is checked in `guards` (a pending interrupt skips the rebuild), after the rebuild (before the re-pin) and at the top of `armAndExec` (before the breaker is armed and the image replaced), each as one `LOOP_BOUNDARY_REFRESH_SKIPPED` with the eleventh step `interrupted`. The host's `prepareIteration` passes the batch's signal context and re-checks it after a refresh that did not re-exec; the Driver passes `context.Background()` (between batches no signal handler is registered, so a SIGINT ends the process). `DriverDeps.Refresh` is unchanged.
+- **`WithHandoff(pid)` / `TakeHandoff(path, pid, runningCommit)`** (inbox item `boundary-reexec-keeps-cycle-budget-and-wave-index`). The breaker marker gains an `omitempty` `pid`: only the wave boundary stamps it, so the marker bytes and the golden are unchanged without the option. `TakeHandoff` honours the record only for the same pid running a different build commit (the exec replaced the image), returns `batch - 1` (the completed iterations) and consumes the handoff by rewriting the record without the pid, leaving the breaker's `running_commit` intact. The coordinator starts its iteration loop there with the remaining budget. The Driver stamps no handoff; a chain-boundary re-exec still restarts the chain's batch count and `max_batches`.
+- **The brake at the wave boundary** (inbox item `loop-stop-at-wave-boundary`). `BrakeEngaged` is now also read by the coordinator at every iteration's start (`loop_operator_brake`), so a chain stops after the wave in flight; the Driver's precedence (brake > refresh > drained inbox > cap) is unchanged. `evolve loop-stop [--release]` writes and removes the file.

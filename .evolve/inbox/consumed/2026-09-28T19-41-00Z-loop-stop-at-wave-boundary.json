@@ -17,5 +17,7 @@
     "runtime-reference.md names the brake as the stop-after-this-wave control"
   ],
   "created_at": "2026-09-28T19:41:00Z",
-  "source": "console, 2026-09-28, interface-discipline inventory at the wave-26 boundary (gap G3)"
+  "source": "console, 2026-09-28, interface-discipline inventory at the wave-26 boundary (gap G3)",
+  "consumed_by": "console landing fix/loop-controls (2026-09-29): BUILT. prepareIteration honours the existing brake (loopchain.BrakeEngaged) at every iteration's start, the first included, before the probes and any refresh; the run ends with stop_reason loop_operator_brake after the ordinary closeout (finalize, batch-end sweep, dossiers published on exit). A chained run stops the batch at its wave boundary and the chain at its batch boundary. New verb `evolve loop-stop` engages the brake (timestamp line) and `evolve loop-stop --release` removes it; runtime-reference.md's wave-boundary protocol stops with it and launches after the release.",
+  "consumed_at": "2026-09-29T00:00:00Z"
 }
