@@ -176,7 +176,7 @@ func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Write
 // while a genuine deadlock is still bounded rather than left to the ship's own
 // context. Raising a deadline can only turn a timeout into a real verdict; it
 // can never turn a failing test green.
-const repoContractTestTimeout = "20m"
+const repoContractTestTimeout = addedtests.PackageTimeout
 
 // repoContractTestArgs builds the gate's `go test` argv. Split out from the
 // runner so the flags the gate depends on are assertable without exec'ing go.

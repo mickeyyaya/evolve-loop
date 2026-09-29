@@ -1,0 +1,19 @@
+{
+  "id": "comment-floor-skips-the-research-archive",
+  "kind": "bug",
+  "priority_class": "hygiene",
+  "weight": 0.4,
+  "title": "The build comment floor counts archived superseded predicate files as the build's new comments",
+  "files": [
+    "go/internal/core/comment_floor.go",
+    "go/internal/commentaudit/across.go",
+    "go/internal/explanationdocs/predicate_archive.go"
+  ],
+  "summary": "Since continuation adoption archives the ancestor's own go/acs/cycle<M> under docs/private/research/archived-<date>/superseded-predicate-packages/ (design A2, 2026-09-30), those .go files are added paths in the adopting cycle's diff. commentaudit's added-comment scan filters by the .go suffix only, so every comment in the archived predicates counts as 'the build adds N comment line(s)'. Not a regression (the same lines counted at go/acs/cycle<M> before) and the floor is in shadow, but under comment_floor.stage=enforce it would force the builder to edit the archive, the same dead end cycle 1764 hit.",
+  "fix": "Export the archive root from explanationdocs as its single spelling and exclude it from the comment floor's path set (and any other added-file scanner that is not module-scoped).",
+  "acceptance": [
+    "An adopting build whose only added .go files are the archived ancestor predicates reports 0 added comment lines (red today)"
+  ],
+  "created_at": "2026-09-29T19:30:00Z",
+  "source": "console, 2026-09-30 architecture review of the A2 fix (MEDIUM-3)"
+}

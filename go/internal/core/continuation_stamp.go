@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
-	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
@@ -246,12 +245,8 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 		return fmt.Errorf("continuation from cycle %d: %w", c.Cycle, err)
 	}
 	cr.cs.WorktreeBaseSHA = base
-	archived, err := explanationdocs.ArchiveUnpublishedContinuationRecords(cr.ctx, wt, base)
-	if err != nil {
-		return fmt.Errorf("continuation unpublished explanation archive: %w", err)
-	}
-	if len(archived) > 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d continuation: archived %d unshipped ancestor explanation record(s) before Build\n", cr.cycle, len(archived))
+	if err := cr.prepareAdoptedTree(wt, base); err != nil {
+		return err
 	}
 	if err := cr.o.storage.WriteCycleState(cr.ctx, cr.cs); err != nil {
 		return fmt.Errorf("continuation cycle-state persist after adoption: %w", err)
