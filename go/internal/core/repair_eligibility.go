@@ -80,7 +80,8 @@ func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) m
 		return base
 	}
 	if cs.AuditRepairActive {
-		return withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
+		out := withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
+		return withContext(out, CtxKeyExplanationReauthor, explanationReauthorScope(next, cs))
 	}
 	if cs.ShipRecoveryCode == "" && !retroRouted(cs) {
 		return base

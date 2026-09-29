@@ -3,8 +3,10 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -61,4 +63,31 @@ func recordExplanationCorrection(workspace string, defects []string) error {
 		return fmt.Errorf("record explanation correction: %w", err)
 	}
 	return nil
+}
+
+const retryActionReauthorExplanation retryAction = "retry@explanation"
+
+func explanationCorrectionEnvelope(env retryEnvelope) retryEnvelope {
+	if !slices.Contains(env.Legal, retryActionRetryBuild) {
+		return env
+	}
+	return retryEnvelope{
+		Legal:  []retryAction{retryActionReauthorExplanation, retryActionDecline},
+		Reason: env.Reason + "; every defect names the cycle's explanation document (" + explanationNeedsCorrection + "): Build re-authors it, TDD and the code build are skipped",
+	}
+}
+
+func explanationReauthorScope(next Phase, cs CycleState) string {
+	if next != PhaseBuild {
+		return ""
+	}
+	fb, _ := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
+	document, _ := explanationCorrectionDocument(cs, fb)
+	return document
+}
+
+func recordExplanationRound(cs CycleState, fb *phasecontract.FailureBlock) {
+	if err := recordExplanationCorrection(cs.WorkspacePath, fb.Defects); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d %s: %v; the re-author reads the audit report alone\n", cs.CycleID, explanationNeedsCorrection, err)
+	}
 }
