@@ -8,7 +8,6 @@
   "cmd/evolve.loopBatchCoordinator.run": 109,
   "cmd/evolve.parsePublishFlags": 67,
   "cmd/evolve.prepareFreshBatch": 56,
-  "cmd/evolve.runACSSuite": 51,
   "cmd/evolve.runBridge": 232,
   "cmd/evolve.runBridgeIntrospect": 69,
   "cmd/evolve.runBridgeRecipeRun": 71,
@@ -146,7 +145,6 @@
   "internal/core.resumeExecution.run": 404,
   "internal/cyclecost.SummarizeCycle": 57,
   "internal/cyclecost.parseEventsLog": 54,
-  "internal/cyclehealth.Check": 51,
   "internal/cyclehealth.ClassifyOutcome": 70,
   "internal/cycleoutcome.ApplyFailure": 60,
   "internal/cyclesimulator.Run": 152,
@@ -256,7 +254,6 @@
   "internal/verifyeval.Verify": 53,
   "internal/verifyeval.shellWords": 51,
   "internal/versionbump.Run": 52,
-  "pkg/naminguard.Fix": 51,
   "pkg/phaseproto.SubprocessRunner.Run": 56,
   "test/fixtures.FakeExec.Run": 56
 }

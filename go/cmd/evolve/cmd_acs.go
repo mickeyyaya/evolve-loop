@@ -111,14 +111,7 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve acs suite: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "[acs suite] cycle=%d verdict=%s green=%d red=%d skip=%d total=%d (cycle=%d regression=%d red-team=%d)\n",
-		v.Cycle, v.Verdict, v.GreenCount, v.RedCount, v.SkipCount, v.PredicateSuite.Total,
-		v.PredicateSuite.ThisCycleCount, v.PredicateSuite.RegressionSuiteCount, v.PredicateSuite.RedTeamCount)
-	for _, r := range v.Results {
-		if r.ResultStr == "red" {
-			fmt.Fprintf(stdout, "  RED %s (exit=%d)\n", r.ACID, r.ExitCode)
-		}
-	}
+	printACSSuiteVerdict(stdout, v)
 	if writeJSON {
 		dst, wErr := acssuite.WriteVerdict(evolveDir, v)
 		if wErr != nil {
@@ -131,6 +124,17 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	return 0
+}
+
+func printACSSuiteVerdict(stdout io.Writer, v acssuite.Verdict) {
+	fmt.Fprintf(stdout, "[acs suite] cycle=%d verdict=%s green=%d red=%d skip=%d total=%d (cycle=%d regression=%d red-team=%d)\n",
+		v.Cycle, v.Verdict, v.GreenCount, v.RedCount, v.SkipCount, v.PredicateSuite.Total,
+		v.PredicateSuite.ThisCycleCount, v.PredicateSuite.RegressionSuiteCount, v.PredicateSuite.RedTeamCount)
+	for _, r := range v.Results {
+		if r.ResultStr == "red" {
+			fmt.Fprintf(stdout, "  RED %s (exit=%d)\n", r.ACID, r.ExitCode)
+		}
+	}
 }
 
 func runACSRun(args []string, stdout, stderr io.Writer) int {
