@@ -119,7 +119,7 @@ func TestRepoContractGate_OffSkips(t *testing.T) {
 }
 
 func TestRepoContractGate_EnforceGreenPasses(t *testing.T) {
-	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
 	dirs := swapRepoContractTest(t, greenPack())
 	if err := runRepoContractGate(context.Background(), "enforce", repo, "", io.Discard); err != nil {
 		t.Fatalf("green pack must pass: %v", err)
@@ -131,7 +131,7 @@ func TestRepoContractGate_EnforceGreenPasses(t *testing.T) {
 
 func TestRepoContractGate_EnforceRedFailsWithDedicatedCode(t *testing.T) {
 	swapRepoContractTest(t, redPack("pkg.TestGuard"))
-	err := runRepoContractGate(context.Background(), "enforce", "/lane", "", io.Discard)
+	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
 	if err == nil {
 		t.Fatal("RED pack must fail the ship")
 	}
@@ -145,7 +145,7 @@ func TestRepoContractGate_EnforceRedFailsWithDedicatedCode(t *testing.T) {
 }
 
 func TestRepoContractGate_UnknownStageFailsTowardEnforce(t *testing.T) {
-	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
 	dirs := swapRepoContractTest(t, greenPack())
 	var warn strings.Builder
 	if err := runRepoContractGate(context.Background(), "shadwo", repo, "", &warn); err != nil {
@@ -180,7 +180,7 @@ func TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry(t *testing.T)
 	// Second outcome is GREEN on purpose: if the gate wrongly retried a real
 	// RED, it would return nil and this test would catch the laundering.
 	dirs := swapRepoContractTest(t, redPack("internal/profiles.TestTrackedProfilesBound"), greenPack())
-	err := runRepoContractGate(context.Background(), "enforce", "/lane", "", io.Discard)
+	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
 	if err == nil {
 		t.Fatal("a genuine test failure must FAIL the ship, never be retried into a pass")
 	}
@@ -202,7 +202,7 @@ func TestRepoContractGate_RealTestFailureIsContractRedWithoutRetry(t *testing.T)
 // MUST proceed. This is exactly what would have unblocked the audit-green
 // cycles 1402/1403/1405.
 func TestRepoContractGate_TransientFailureRetriesOnceThenShips(t *testing.T) {
-	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
 	dirs := swapRepoContractTest(t, ambiguousPack(), greenPack())
 	if err := runRepoContractGate(context.Background(), "enforce", repo, "", io.Discard); err != nil {
 		t.Fatalf("an unclassifiable failure that clears on retry must NOT block the ship, got %v", err)
@@ -219,7 +219,7 @@ func TestRepoContractGate_TransientFailureRetriesOnceThenShips(t *testing.T) {
 // satisfy this alongside AC2 and AC3.
 func TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns(t *testing.T) {
 	dirs := swapRepoContractTest(t, ambiguousPack(), ambiguousPack())
-	err := runRepoContractGate(context.Background(), "enforce", "/lane", "", io.Discard)
+	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
 	if err == nil {
 		t.Fatal("a pack that never ran green must not be allowed to ship")
 	}
@@ -242,7 +242,7 @@ func TestRepoContractGate_PersistentAmbiguityIsInfraClassedExactlyTwoRuns(t *tes
 // persistence is the exact gap that made cycle-1403 undiagnosable: proving a
 // RED false needs the green baseline from the same artifact path.
 func TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns(t *testing.T) {
-	repo := makeRepo(t) // the seed reads the tree; a fake path is an INFRA discovery failure
+	repo := repoDeclaring(t, evolveLoopGoMod) // the seed reads the tree; a fake path is an INFRA discovery failure
 	for _, tc := range []struct {
 		name    string
 		outcome packOutcome
@@ -278,7 +278,7 @@ func TestRepoContractGate_ScanLogPersistedOnGreenAndRedRuns(t *testing.T) {
 // worktree re-run to diagnose cycle-1402.
 func TestRepoContractGate_RedErrorMessageNamesFailingTests(t *testing.T) {
 	swapRepoContractTest(t, redPack("internal/profiles.TestTrackedProfilesBound", "internal/routingtest.TestRenderParity"))
-	err := runRepoContractGate(context.Background(), "enforce", "/lane", "", io.Discard)
+	err := runRepoContractGate(context.Background(), "enforce", evolveLoopLane(t), "", io.Discard)
 	if err == nil {
 		t.Fatal("RED pack must fail the ship")
 	}
@@ -409,7 +409,7 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 	}, "\n")
 
 	var tee strings.Builder
-	got := classifyPackEvents(strings.NewReader(feed), &tee)
+	got, _ := classifyPackEvents(strings.NewReader(feed), &tee)
 
 	if len(got) != 2 {
 		t.Fatalf("expected exactly 2 classified failures (one test, one build), got %v", got)
@@ -434,7 +434,7 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 // instead of blocking the ship.
 func TestClassifyPackEvents_AmbiguousFeedNamesNothing(t *testing.T) {
 	feed := `{"Action":"output","Package":"p/profiles","Output":"signal: killed\n"}`
-	if got := classifyPackEvents(strings.NewReader(feed), io.Discard); len(got) != 0 {
+	if got, _ := classifyPackEvents(strings.NewReader(feed), io.Discard); len(got) != 0 {
 		t.Fatalf("an OOM-killed run names no failing test; got %v", got)
 	}
 }
@@ -452,14 +452,14 @@ func TestRunNative_RepoContractGateReceivesRunWorkspace(t *testing.T) {
 	resp, err := p.runNative(context.Background(), core.PhaseRequest{
 		Cycle:       1409,
 		Workspace:   ws,
-		ProjectRoot: "/lane",
+		ProjectRoot: evolveLoopLane(t),
 	}, "msg", time.Now())
 
 	if err == nil {
 		t.Fatal("runNative must surface the gate block")
 	}
-	if !strings.Contains(err.Error(), "repo-contract gate") {
-		t.Fatalf("error must come from the gate, got %v", err)
+	if !strings.Contains(err.Error(), "repo-contract gate") || !strings.Contains(err.Error(), "TestPairing") {
+		t.Fatalf("error must come from the gate's faked red pack, got %v", err)
 	}
 	if resp.Verdict == core.VerdictPASS {
 		t.Fatalf("gate block must not report PASS, got %q", resp.Verdict)

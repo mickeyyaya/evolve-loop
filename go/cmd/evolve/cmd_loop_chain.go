@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -18,8 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
-// chainBrakeFile is the operator brake: `touch .evolve/loop-stop` and the
-// chain stops at the next boundary.
+// chainBrakeFile is the operator brake `evolve loop-stop` writes.
 const chainBrakeFile = paths.LoopStopFile
 
 // The test seams — every one a package var the chain suites swap between
@@ -36,7 +37,7 @@ var (
 	chainBoundaryRepinProvenanceFn = defaultChainBoundaryRepinProvenance
 	// chainReExecTargetFn resolves the executable the refresh re-execs into.
 	chainReExecTargetFn = defaultChainReExecTarget
-	// chainBoundaryRefreshAttemptFile is the on-disk re-exec loop breaker.
+	// chainBoundaryRefreshAttemptFile is the breaker and re-exec handoff marker.
 	chainBoundaryRefreshAttemptFile = loopchain.AttemptFile
 	// chainRebuildFn is the seam over the sanctioned rebuild recipe.
 	chainRebuildFn = defaultChainRebuild
@@ -98,7 +99,7 @@ func defaultChainReExec(argv0 string, argv, envv []string) error {
 
 // wiredRefresher is the one loopchain.NewRefresher( site: every package var
 // is read inside its closure, so a swap between calls is always seen.
-func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Center) *loopchain.Refresher {
+func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Center, extra ...loopchain.Option) *loopchain.Refresher {
 	deps := loopchain.RefreshDeps{
 		RunningCommit: func() string { return chainRunningCommitFn() },
 		Ahead:         func(root, commit string) (bool, error) { return chainBoundaryAheadFn(root, commit) },
@@ -113,30 +114,30 @@ func wiredRefresher(cfg loopConfig, stderr io.Writer, signals *signalcenter.Cent
 		Flush:   signals.Flush,
 		ReExec:  func(argv0 string, argv, envv []string) error { return chainReExecFn(argv0, argv, envv) },
 	}
-	return loopchain.NewRefresher(loopchain.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}, deps, stderr,
+	opts := append([]loopchain.Option{
 		loopchain.WithSignals(func() *signalcenter.Center { return signals }),
-		loopchain.WithMarkerFiles(chainBoundaryRefreshAttemptFile, chainBoundaryRefreshLogFile))
-}
-
-// maybeRefreshChainBoundaryWithSignals runs the boundary refresh for
-// boundary `batch` reporting through signals — the production spelling
-// (cmd_loop_window.go's prepareIteration and the chain Driver). It is called
-// only BETWEEN batches; every failure degrades to refreshed=false and the
-// current binary keeps running — never a halt.
-func maybeRefreshChainBoundaryWithSignals(cfg loopConfig, batch int, stderr io.Writer, signals *signalcenter.Center) (refreshed bool) {
-	return wiredRefresher(cfg, stderr, signals).Refresh(batch)
+		loopchain.WithMarkerFiles(chainBoundaryRefreshAttemptFile, chainBoundaryRefreshLogFile),
+	}, extra...)
+	return loopchain.NewRefresher(loopchain.Roots{ProjectRoot: cfg.ProjectRoot, EvolveDir: cfg.EvolveDir}, deps, stderr, opts...)
 }
 
 // maybeRefreshChainBoundary is the by-name test facade: the same refresh
 // over a throwaway root Center on stderr (the ONE sink topology), so the
 // suites that assert a rendered degrade line keep reading it.
 //
-// Deprecated: production passes the batch Center through
-// maybeRefreshChainBoundaryWithSignals.
+// Deprecated: production refreshes through wiredRefresher with its own Center.
 func maybeRefreshChainBoundary(cfg loopConfig, batch int, stderr io.Writer) (refreshed bool) {
 	signals := newRootSignalCenter(cfg.ProjectRoot, cfg.EvolveDir, stderr)
 	defer signals.Flush()
-	return maybeRefreshChainBoundaryWithSignals(cfg, batch, stderr, signals)
+	return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch)
+}
+
+func takeReexecHandoff(evolveDir string, stderr io.Writer) int {
+	done, err := loopchain.TakeHandoff(filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile), loopchain.Claim{PID: os.Getpid(), Commit: chainRunningCommitFn(), At: time.Now()})
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: boundary re-exec handoff not honoured (%v) — starting at wave 0 with the full budget\n", err)
+	}
+	return done
 }
 
 // lastChainBoundaryRefreshLogEntry reads the audit trail's LAST entry —
@@ -162,12 +163,19 @@ func chainContinueDecision(rc int) (reason string, exit int, stop bool) {
 }
 
 // wiredChain is the one loopchain.NewDriver( site: the real batch over the
-// same config every time, the Center-bearing refresh, the audit trail, the
-// fleet width read to record it, and the checkpoint's quota-pause block.
+// same config every time (only the first carries the boot's re-exec resume),
+// the Center-bearing refresh, the audit trail, the fleet width read to record
+// it, and the checkpoint's quota-pause block.
 func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, stderr io.Writer, signals *signalcenter.Center) *loopchain.Driver {
+	next := cfg
 	deps := loopchain.DriverDeps{
-		Batch:       func() int { signals.Flush(); return runLoopBatchFn(cfg, stdin, stdout, stderr) },
-		Refresh:     func(batch int) bool { return maybeRefreshChainBoundaryWithSignals(cfg, batch, stderr, signals) },
+		Batch: func() int {
+			signals.Flush()
+			batchCfg := next
+			next.ResumeWaves = 0
+			return runLoopBatchFn(batchCfg, stdin, stdout, stderr)
+		},
+		Refresh:     func(batch int) bool { return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch) },
 		LastRefresh: func() (*chainBoundaryRefreshLogEntry, error) { return lastChainBoundaryRefreshLogEntry(cfg.EvolveDir) },
 		FleetWidth:  func() int { return loadFleetConfig(cfg.EvolveDir).Count },
 		QuotaPause: func() (loopchain.QuotaPause, bool) {

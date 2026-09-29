@@ -54,6 +54,7 @@ type loopConfig struct {
 	ChainMode         bool              `json:"chain_mode,omitempty"`
 	PerAgentCLI       map[string]string `json:"per_agent_cli,omitempty"`
 	PerAgentModel     map[string]string `json:"per_agent_model,omitempty"`
+	ResumeWaves       int               `json:"-"`
 }
 
 // emitSignalStop assumes the caller polled ctx.Err() before the cycle error,
@@ -77,6 +78,7 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if rc != 0 {
 		return rc
 	}
+	cfg.ResumeWaves = takeReexecHandoff(cfg.EvolveDir, stderr)
 	chainCfg := loadChainConfig(cfg.EvolveDir)
 	cfg.ChainMode = cfg.ChainMode || chainCfg.Enabled
 

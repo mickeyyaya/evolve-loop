@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -26,14 +28,11 @@ type batchDecision struct {
 	exitCode int
 }
 
+const loopOperatorBrakeStop = "loop_operator_brake"
+
 // prepareIteration refreshes every batch-wide input at the only safe boundary:
 // after the previous window drained and before the next dispatch begins.
-func (b *loopBatchCoordinator) prepareIteration(
-	iteration int,
-	fleetConfig *policy.FleetConfig,
-	waveBinary *string,
-	batchStartCycle int,
-) batchDecision {
+func (b *loopBatchCoordinator) prepareIteration(iteration int, fleetConfig *policy.FleetConfig, waveBinary *string, batchStartCycle int) batchDecision {
 	if b.ctx.Err() != nil {
 		return b.interruptReturn(iteration, "")
 	}
@@ -46,25 +45,15 @@ func (b *loopBatchCoordinator) prepareIteration(
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: exitCode}
 	}
-
-	// An interrupt that landed during the probes must not dispatch a wave
-	// that would be cancelled at spawn.
-	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
-		return b.interruptReturn(iteration, "during the pre-wave probes ")
+	if loopchain.BrakeEngaged(b.cfg.EvolveDir) {
+		return b.brakeStop(iteration)
 	}
-	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
-		b.result.StopReason = "plane_diverged_halt"
-		if errors.Is(halt, errMainCIRed) {
-			b.result.StopReason = "main_ci_red_halt"
-		}
-		emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.prepareIteration", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
-		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
-		return batchDecision{flow: batchReturn, exitCode: 2}
+	if decision, stop := b.runPreWave(iteration); stop {
+		return decision
 	}
-	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
 
 	*fleetConfig = loopwave.ReloadFleetConfig(b.cfg.EvolveDir, *fleetConfig, b.stderr)
-	if maybeRefreshChainBoundaryWithSignals(b.cfg, iteration+1, b.stderr, b.deps.Signals) {
+	if b.maybeRefreshChainBoundaryAtWave(iteration) {
 		b.result.StopReason = "loop_boundary_refresh_reexec"
 		if entry, err := lastChainBoundaryRefreshLogEntry(b.cfg.EvolveDir); err == nil {
 			b.result.BoundaryRefresh = entry
@@ -72,9 +61,48 @@ func (b *loopBatchCoordinator) prepareIteration(
 		b.result.emit(b.stdout)
 		return batchDecision{flow: batchReturn}
 	}
+	if b.ctx.Err() != nil {
+		return b.interruptReturn(iteration, "during the boundary refresh ")
+	}
 
 	b.resolveWaveBinary(fleetConfig, waveBinary)
 	return batchDecision{flow: batchProceed}
+}
+
+func (b *loopBatchCoordinator) runPreWave(iteration int) (batchDecision, bool) {
+	if b.preWave != nil {
+		return b.preWave(iteration)
+	}
+	return b.probeSyncAndPublish(iteration)
+}
+
+func (b *loopBatchCoordinator) probeSyncAndPublish(iteration int) (batchDecision, bool) {
+	// An interrupt that landed during the probes must not dispatch a wave
+	// that would be cancelled at spawn.
+	if err := runPreWaveProbes(b.ctx, b.cfg.ProjectRoot, b.cfg.EvolveDir, b.cycleEnv, b.stderr); err != nil {
+		return b.interruptReturn(iteration, "during the pre-wave probes "), true
+	}
+	if _, halt := syncMainFromOriginAtWaveBoundary(b.ctx, b.cfg.ProjectRoot, b.stderr); halt != nil {
+		b.result.StopReason = "plane_diverged_halt"
+		if errors.Is(halt, errMainCIRed) {
+			b.result.StopReason = "main_ci_red_halt"
+		}
+		emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.probeSyncAndPublish", CodeLoopHalt, halt.Error(), map[string]string{"stop_reason": b.result.StopReason})
+		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
+		return batchDecision{flow: batchReturn, exitCode: 2}, true
+	}
+	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
+	return batchDecision{flow: batchProceed}, false
+}
+
+func (b *loopBatchCoordinator) maybeRefreshChainBoundaryAtWave(iteration int) bool {
+	return wiredRefresher(b.cfg, b.stderr, b.deps.Signals, loopchain.WithHandoff(loopchain.Handoff{PID: os.Getpid(), WavesDone: iteration})).Refresh(b.ctx, iteration+1)
+}
+
+func (b *loopBatchCoordinator) brakeStop(iteration int) batchDecision {
+	fmt.Fprintf(b.stderr, "[loop] operator brake %s is engaged — stopping before cycle %d; release it with: evolve loop-stop --release\n", paths.LoopStopPath(b.cfg.EvolveDir), iteration+1)
+	b.result.StopReason = loopOperatorBrakeStop
+	return batchDecision{flow: batchStopIterations}
 }
 
 func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig, waveBinary *string) {
@@ -90,9 +118,8 @@ func (b *loopBatchCoordinator) resolveWaveBinary(fleetConfig *policy.FleetConfig
 	*waveBinary = binary
 }
 
-// interruptReturn reports a SIGINT/SIGTERM caught at one of prepareIteration's
-// two check points ("" at entry, or "during the pre-wave probes " after them)
-// and returns the batchDecision that stops the batch cleanly.
+// interruptReturn reports a SIGINT/SIGTERM caught at an iteration boundary
+// check point and returns the decision that stops the batch cleanly.
 func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batchDecision {
 	signalStop(b.stdout, b.stderr, b.result, fmt.Sprintf("%sbefore cycle %d — stopping", when, iteration+1))
 	return batchDecision{flow: batchReturn, exitCode: 130}

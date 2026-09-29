@@ -2,6 +2,7 @@ package loopchain
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -254,7 +255,7 @@ func TestRefresh_EveryDegradeBranchIsOneCodedWarnNamingItsStep(t *testing.T) {
 		t.Run(c.section, func(t *testing.T) {
 			f := newRefreshFixture(t)
 			opts := c.fault(f)
-			if f.refresher(opts...).Refresh(7) {
+			if f.refresher(opts...).Refresh(context.Background(), 7) {
 				t.Fatal("a degrade branch never reports refreshed=true")
 			}
 			ev := f.sig.only(t, CodeBoundaryRefreshSkipped)
@@ -286,13 +287,13 @@ func TestRefresh_EveryDegradeBranchIsOneCodedWarnNamingItsStep(t *testing.T) {
 func TestRefresh_NotAheadAndEmptyCommitAreSilent(t *testing.T) {
 	f := newRefreshFixture(t)
 	f.deps.Ahead = func(string, string) (bool, error) { f.order = append(f.order, "ahead"); return false, nil }
-	if f.refresher().Refresh(1) || len(*f.sig.events) != 0 || f.stderr.Len() != 0 || strings.Join(f.order, ",") != "ahead" {
+	if f.refresher().Refresh(context.Background(), 1) || len(*f.sig.events) != 0 || f.stderr.Len() != 0 || strings.Join(f.order, ",") != "ahead" {
 		t.Errorf("not ahead: zero events, zero stderr, nothing beyond Ahead: %v %v %q", f.sig.codes(), f.order, f.stderr.String())
 	}
 	f = newRefreshFixture(t)
 	f.deps.RunningCommit = func() string { return "" }
 	f.deps.Ahead = GitAhead // the real check: an empty commit is a quiet no-op, no git subprocess
-	if f.refresher().Refresh(1) || len(*f.sig.events) != 0 || f.stderr.Len() != 0 {
+	if f.refresher().Refresh(context.Background(), 1) || len(*f.sig.events) != 0 || f.stderr.Len() != 0 {
 		t.Errorf("an empty commit is a silent no-op: %v %q", f.sig.codes(), f.stderr.String())
 	}
 }
@@ -315,7 +316,7 @@ func TestRefresh_SuccessLogsArmsFlushesThenExecs(t *testing.T) {
 			seen = append(seen, "armed-before-flush")
 		}
 	}
-	if !f.refresher().Refresh(7) {
+	if !f.refresher().Refresh(context.Background(), 7) {
 		t.Fatalf("the refresh fires: %s / %s", f.stderr.String(), f.sig.console.String())
 	}
 	if got := strings.Join(f.order, ","); got != "ahead,lane,rebuild,provenance,argv,flush,reexec" {
@@ -354,7 +355,7 @@ func TestRefresh_AuditWriteFailureIsItsOwnCodeAndTheExecStillHappens(t *testing.
 	if err := os.Mkdir(filepath.Join(f.evolveDir, "log-dir"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if !f.refresher(WithMarkerFiles(AttemptFile, "log-dir")).Refresh(7) {
+	if !f.refresher(WithMarkerFiles(AttemptFile, "log-dir")).Refresh(context.Background(), 7) {
 		t.Fatalf("the refresh still fires: %s", f.sig.console.String())
 	}
 	ev := f.sig.only(t, CodeBoundaryRefreshAuditFailed)
@@ -378,10 +379,10 @@ func TestRefresh_BreakerRefusesTheSameCommitTwice(t *testing.T) {
 	if wrapLogWrite(nil) != nil || wrapLogWrite(errors.New("x")) == nil {
 		t.Error("wrapLogWrite passes nil through and names a failure")
 	}
-	if !r.Refresh(1) {
+	if !r.Refresh(context.Background(), 1) {
 		t.Fatal("the first refresh proceeds")
 	}
-	if r.Refresh(2) {
+	if r.Refresh(context.Background(), 2) {
 		t.Error("the same commit twice is refused")
 	}
 	if ev := f.sig.only(t, CodeBoundaryRefreshSkipped); ev.Fields["step"] != "breaker" || !strings.Contains(ev.Reason, "(see .evolve/"+AttemptFile+")") {
@@ -395,7 +396,7 @@ func TestRefresh_BreakerRefusesTheSameCommitTwice(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(f.root, "go", "bin", "evolve"), []byte("REBUILT-AGAIN"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if !f.refresher().Refresh(3) {
+	if !f.refresher().Refresh(context.Background(), 3) {
 		t.Error("a moved commit re-arms the breaker")
 	}
 	if err := os.WriteFile(filepath.Join(f.evolveDir, AttemptFile), []byte("{corrupt"), 0o644); err != nil {
@@ -404,14 +405,14 @@ func TestRefresh_BreakerRefusesTheSameCommitTwice(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(f.root, "go", "bin", "evolve"), []byte("REBUILT-THRICE"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if !f.refresher().Refresh(4) {
+	if !f.refresher().Refresh(context.Background(), 4) {
 		t.Error("a corrupt marker never refuses a legitimate refresh")
 	}
 	other := f.refresher(WithMarkerFiles("other-attempt.json", "other-log.jsonl"))
 	if err := os.WriteFile(filepath.Join(f.root, "go", "bin", "evolve"), []byte("REBUILT-4"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if !other.Refresh(5) {
+	if !other.Refresh(context.Background(), 5) {
 		t.Error("WithMarkerFiles points the breaker at its own files")
 	}
 	if _, err := os.Stat(filepath.Join(f.evolveDir, "other-attempt.json")); err != nil {

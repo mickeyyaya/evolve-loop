@@ -113,6 +113,7 @@ func runOneCycle(t *testing.T, cfg cycleRunConfig) {
 			"BRIDGE_CODEX_BINARY="+cfg.FakeBin,
 			"BRIDGE_AGY_BINARY="+cfg.FakeBin,
 		)
+		env = append(env, isolatedHome(t)...)
 	} else {
 		if _, err := exec.LookPath(liveBinaryName(cfg.CLI)); err != nil {
 			t.Skipf("live mode: %s binary not on PATH (%v); skipping", cfg.CLI, err)
