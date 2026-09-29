@@ -86,8 +86,7 @@ func (f *FakeExec) Run(_ context.Context, name, dir string, args, env []string,
 		stdinErr = err
 	}
 
-	f.mu.Lock()
-	f.Calls = append(f.Calls, ExecCall{
+	resp := f.recordAndResolve(ExecCall{
 		Name:  name,
 		Dir:   dir,
 		Args:  append([]string(nil), args...),
@@ -95,14 +94,6 @@ func (f *FakeExec) Run(_ context.Context, name, dir string, args, env []string,
 		Stdin: in,
 		Key:   key,
 	})
-	resp, ok := f.Scripts[key]
-	if !ok {
-		resp, ok = f.Scripts[name] // name-only fallback
-	}
-	if !ok {
-		resp = f.Default
-	}
-	f.mu.Unlock()
 
 	// Fail loudly rather than silently truncating: a stdin reader that errors
 	// is a test-setup bug, surfaced here as an unrecoverable run error. The
@@ -123,6 +114,20 @@ func (f *FakeExec) Run(_ context.Context, name, dir string, args, env []string,
 		return -1, resp.Err
 	}
 	return resp.ExitCode, nil
+}
+
+func (f *FakeExec) recordAndResolve(call ExecCall) ExecResponse {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Calls = append(f.Calls, call)
+	resp, ok := f.Scripts[call.Key]
+	if !ok {
+		resp, ok = f.Scripts[call.Name] // name-only fallback
+	}
+	if !ok {
+		resp = f.Default
+	}
+	return resp
 }
 
 // CallKeys returns the resolved command keys in call order — the ergonomic

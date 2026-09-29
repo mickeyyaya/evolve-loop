@@ -148,16 +148,7 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	// Mirror s.Enable into WorkflowConfig.PhaseEnables so orchestrator-level
 	// intent-gate logic (cyclerun.go) sees the same enables as the router.
 	if len(s.Enable) > 0 {
-		phaseEnables := make(map[string]string, len(s.Enable))
-		for phase, e := range s.Enable {
-			switch e {
-			case config.EnableOn:
-				phaseEnables[phase] = "on"
-			case config.EnableOff:
-				phaseEnables[phase] = "off"
-			}
-		}
-		opts = append(opts, core.WithWorkflowConfig(policy.WorkflowConfig{PhaseEnables: phaseEnables}))
+		opts = append(opts, core.WithWorkflowConfig(policy.WorkflowConfig{PhaseEnables: phaseEnablesOf(s.Enable)}))
 	}
 
 	projectRoot := initScenarioRepo(t)
@@ -185,6 +176,11 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 	}
 	decisions := readRoutingDecisions(t, ws)
 
+	assertCycleExpectations(t, s, res, decisions, led, agent)
+}
+
+func assertCycleExpectations(t *testing.T, s ScenarioSpec, res core.CycleResult, decisions []router.RouterDecision, led *fixtures.FakeLedger, agent *scriptedProposer) {
+	t.Helper()
 	if s.Expect.PhaseSequence != nil {
 		assertPhaseSeq(t, res.PhasesRun, s.Expect.PhaseSequence)
 	}
@@ -222,6 +218,19 @@ func runCycle(t *testing.T, s ScenarioSpec) {
 			t.Errorf("Proposer invoked at %v, want exactly %v (hybrid cadence)", agent.seen, s.Expect.ProposeAt)
 		}
 	}
+}
+
+func phaseEnablesOf(enable map[string]config.Enable) map[string]string {
+	phaseEnables := make(map[string]string, len(enable))
+	for phase, e := range enable {
+		switch e {
+		case config.EnableOn:
+			phaseEnables[phase] = "on"
+		case config.EnableOff:
+			phaseEnables[phase] = "off"
+		}
+	}
+	return phaseEnables
 }
 
 // initScenarioRepo returns the root of a committed scenario repo built through

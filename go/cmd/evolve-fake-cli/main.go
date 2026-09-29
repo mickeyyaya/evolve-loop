@@ -144,52 +144,11 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 		}
 	}
 
-	var (
-		prompt        string
-		outputLastMsg string
-		isCodexExec   bool
-		hasPromptFlag bool
-		skipPerms     bool
-	)
-
-	i := 0
-	for i < len(args) {
-		a := args[i]
-		switch {
-		case a == "-p" && i+1 < len(args):
-			prompt = args[i+1]
-			hasPromptFlag = true
-			i += 2
-		case a == "--output-last-message" && i+1 < len(args):
-			outputLastMsg = args[i+1]
-			i += 2
-		case a == "exec":
-			isCodexExec = true
-			i++
-		case a == "-m" && i+1 < len(args):
-			// codex model flag; we don't use it but must consume the value.
-			i += 2
-		case a == "--model" && i+1 < len(args):
-			i += 2
-		case a == "--allowedTools":
-			// claude consumes a single value here; consume the next non-flag.
-			i++
-			if i < len(args) && !strings.HasPrefix(args[i], "--") {
-				i++
-			}
-		case a == "--dangerously-skip-permissions":
-			skipPerms = true
-			i++
-		case strings.HasPrefix(a, "--"):
-			// Unknown flag with `=value` form, or boolean. Best-effort consume.
-			i++
-		default:
-			i++
-		}
-	}
+	flags := scanFlags(args)
+	prompt := flags.prompt
 
 	// Codex pipes the prompt on stdin.
-	if isCodexExec && stdin != nil {
+	if flags.isCodexExec && stdin != nil {
 		buf, err := io.ReadAll(stdin)
 		if err != nil {
 			return Invocation{}, fmt.Errorf("read stdin: %w", err)
@@ -203,33 +162,83 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 	// the "unknown" sentinel into the parse layer.
 	phase := detectPhaseFromPrompt(prompt)
 
-	artifactPath := outputLastMsg
+	artifactPath := flags.outputLastMsg
 	if artifactPath == "" {
 		artifactPath = resolveArtifactPath(prompt, phase)
 	}
 
-	// Infer CLI family for per-CLI exit injection: codex `exec`, then agy
-	// (-p + skip-permissions), else claude (-p). agy is checked before the
-	// plain -p case because agy also passes -p.
-	style := "claude"
-	switch {
-	case isCodexExec:
-		style = "codex"
-	case skipPerms:
-		style = "agy"
-	}
-
 	// A tmux/REPL launch carries neither -p nor codex `exec`. (--version is
 	// handled by the early-exit scan above and never reaches here.)
-	interactive := !hasPromptFlag && !isCodexExec
+	interactive := !flags.hasPromptFlag && !flags.isCodexExec
 
 	return Invocation{
 		ArtifactPath: artifactPath,
 		Phase:        phase,
 		Prompt:       prompt,
-		Style:        style,
+		Style:        flags.style(),
 		Interactive:  interactive,
 	}, nil
+}
+
+type argFlags struct {
+	prompt        string
+	outputLastMsg string
+	isCodexExec   bool
+	hasPromptFlag bool
+	skipPerms     bool
+}
+
+func scanFlags(args []string) argFlags {
+	var f argFlags
+	i := 0
+	for i < len(args) {
+		a := args[i]
+		switch {
+		case a == "-p" && i+1 < len(args):
+			f.prompt = args[i+1]
+			f.hasPromptFlag = true
+			i += 2
+		case a == "--output-last-message" && i+1 < len(args):
+			f.outputLastMsg = args[i+1]
+			i += 2
+		case a == "exec":
+			f.isCodexExec = true
+			i++
+		case a == "-m" && i+1 < len(args):
+			// codex model flag; we don't use it but must consume the value.
+			i += 2
+		case a == "--model" && i+1 < len(args):
+			i += 2
+		case a == "--allowedTools":
+			// claude consumes a single value here; consume the next non-flag.
+			i++
+			if i < len(args) && !strings.HasPrefix(args[i], "--") {
+				i++
+			}
+		case a == "--dangerously-skip-permissions":
+			f.skipPerms = true
+			i++
+		case strings.HasPrefix(a, "--"):
+			// Unknown flag with `=value` form, or boolean. Best-effort consume.
+			i++
+		default:
+			i++
+		}
+	}
+	return f
+}
+
+// Infer CLI family for per-CLI exit injection: codex `exec`, then agy
+// (-p + skip-permissions), else claude (-p). agy is checked before the
+// plain -p case because agy also passes -p.
+func (f argFlags) style() string {
+	switch {
+	case f.isCodexExec:
+		return "codex"
+	case f.skipPerms:
+		return "agy"
+	}
+	return "claude"
 }
 
 // detectPhaseFromPrompt scans the prompt for the agent heading line.
@@ -306,15 +315,7 @@ func detectPhase(artifactPath string) string {
 // An empty/unknown verdict is treated as PASS by the caller (auditVerdict).
 func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 	out := map[string]string{}
-	// Proof-of-read: real agents copy the workspace's challenge token into the
-	// report verbatim ("A report without it is rejected and re-dispatched").
-	// The token file lives beside the artifact in the run workspace.
-	token := ""
-	if raw, err := os.ReadFile(filepath.Join(filepath.Dir(mainPath), "challenge-token.txt")); err == nil {
-		if t := strings.TrimSpace(string(raw)); t != "" {
-			token = "<!-- challenge-token: " + t + " -->\n"
-		}
-	}
+	token := challengeTokenLine(mainPath)
 
 	switch phase {
 	case "intent":
@@ -338,39 +339,7 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		out[mainPath] = "# Build Report\n\n## Files Modified\n- file.go (synthetic)\n\n" +
 			explanationdocs.RenderNotApplicableDeclaration("synthetic e2e build; the base-bound diff contains no material changes")
 	case "audit":
-		redCount := 0
-		if verdict == "FAIL" {
-			redCount = 1
-		}
-		var failure *phasecontract.FailureBlock
-		if verdict == "WARN" || verdict == "FAIL" {
-			failure = &phasecontract.FailureBlock{
-				Class:         "code-audit-fail",
-				Defects:       []string{"synthetic e2e " + verdict + " finding"},
-				EvidencePaths: []string{"audit-report.md"},
-			}
-		}
-		// Emit BOTH the prose heading and the machine-readable sentinel: at
-		// EVOLVE_PHASE_IO=enforce (the default since the 3.10 cutover) the sentinel
-		// is mandatory for the audit verdict parse, so a prose-only fake report
-		// would fail audit and the happy-path pipeline would never reach ship.
-		// The explanation-review audit gate (validateExplanationReview) records
-		// the review's shape as advisories since ADR-0102 and still blocks on a
-		// missing reasoning or a missing delivery: when the contract is active
-		// the audit report must independently review the Build handoff. The
-		// synthetic build declares NOT_APPLICABLE (no material diff), so the
-		// faithful review is VERIFIED with Build status not_applicable, no
-		// Document fields, and concrete >=20-char Evidence.
-		out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n"+
-			"## Explanation Documentation\n- Status: VERIFIED\n- Build status: not_applicable\n"+
-			"- Evidence: reviewed the NOT_APPLICABLE declaration in build-report.md against the empty base-bound diff\n"+
-			"%s\n", verdict, verdict, phasecontract.RenderVerdictSentinelWithFailure("audit", verdict, failure))
-		// Preserve the fake's candidate artifact for CLI-shape tests. It is not
-		// host evidence: native Audit retires it before executing the committed
-		// predicate fixture and sealing its own complete result.
-		acsPath := filepath.Join(filepath.Dir(mainPath), "acs-verdict.json")
-		out[acsPath] = fmt.Sprintf(`{"schema_version":"1.0","verdict":%q,"ship_eligible":%t,"red_count":%d,"yellow_count":0,"green_count":1}`,
-			verdict, verdict != "FAIL", redCount) + "\n"
+		out = auditArtifacts(mainPath, verdict)
 	case "retro":
 		out[mainPath] = "# Retrospective\n\n## Lessons\n- synthetic lesson learned\n"
 		lessonPath := filepath.Join(filepath.Dir(mainPath), "failure-lesson-1.yaml")
@@ -382,6 +351,58 @@ func artifactsFor(phase, mainPath, verdict string) (map[string]string, error) {
 		out[mainPath] = token + out[mainPath]
 	}
 	return out, nil
+}
+
+// Proof-of-read: real agents copy the workspace's challenge token into the
+// report verbatim ("A report without it is rejected and re-dispatched").
+// The token file lives beside the artifact in the run workspace.
+func challengeTokenLine(mainPath string) string {
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(mainPath), "challenge-token.txt"))
+	if err != nil {
+		return ""
+	}
+	if t := strings.TrimSpace(string(raw)); t != "" {
+		return "<!-- challenge-token: " + t + " -->\n"
+	}
+	return ""
+}
+
+func auditArtifacts(mainPath, verdict string) map[string]string {
+	redCount := 0
+	if verdict == "FAIL" {
+		redCount = 1
+	}
+	var failure *phasecontract.FailureBlock
+	if verdict == "WARN" || verdict == "FAIL" {
+		failure = &phasecontract.FailureBlock{
+			Class:         "code-audit-fail",
+			Defects:       []string{"synthetic e2e " + verdict + " finding"},
+			EvidencePaths: []string{"audit-report.md"},
+		}
+	}
+	// Emit BOTH the prose heading and the machine-readable sentinel: at
+	// EVOLVE_PHASE_IO=enforce (the default since the 3.10 cutover) the sentinel
+	// is mandatory for the audit verdict parse, so a prose-only fake report
+	// would fail audit and the happy-path pipeline would never reach ship.
+	// The explanation-review audit gate (validateExplanationReview) records
+	// the review's shape as advisories since ADR-0102 and still blocks on a
+	// missing reasoning or a missing delivery: when the contract is active
+	// the audit report must independently review the Build handoff. The
+	// synthetic build declares NOT_APPLICABLE (no material diff), so the
+	// faithful review is VERIFIED with Build status not_applicable, no
+	// Document fields, and concrete >=20-char Evidence.
+	out := map[string]string{}
+	out[mainPath] = fmt.Sprintf("# Audit Report\n\n## Verdict\n**%s**\n\nSynthetic %s verdict.\n"+
+		"## Explanation Documentation\n- Status: VERIFIED\n- Build status: not_applicable\n"+
+		"- Evidence: reviewed the NOT_APPLICABLE declaration in build-report.md against the empty base-bound diff\n"+
+		"%s\n", verdict, verdict, phasecontract.RenderVerdictSentinelWithFailure("audit", verdict, failure))
+	// Preserve the fake's candidate artifact for CLI-shape tests. It is not
+	// host evidence: native Audit retires it before executing the committed
+	// predicate fixture and sealing its own complete result.
+	acsPath := filepath.Join(filepath.Dir(mainPath), "acs-verdict.json")
+	out[acsPath] = fmt.Sprintf(`{"schema_version":"1.0","verdict":%q,"ship_eligible":%t,"red_count":%d,"yellow_count":0,"green_count":1}`,
+		verdict, verdict != "FAIL", redCount) + "\n"
+	return out
 }
 
 // auditVerdict reads FAKE_CLI_AUDIT_VERDICT and normalises it to one of
