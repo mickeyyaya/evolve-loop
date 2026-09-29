@@ -458,34 +458,6 @@ func validateDocument(body string, cycle int, baseSHA string, changed, material 
 	return append(failures, changedAreaFailures(sections["Changed Areas"], changed, material)...)
 }
 
-func changedAreaEntries(body string) (map[string]string, []string) {
-	entries := map[string]string{}
-	var failures []string
-	for _, raw := range strings.Split(body, "\n") {
-		line := strings.TrimSpace(raw)
-		if !strings.HasPrefix(line, "- `") {
-			continue
-		}
-		rest := strings.TrimPrefix(line, "- `")
-		end := strings.Index(rest, "`")
-		if end < 0 {
-			continue
-		}
-		path := normalize(rest[:end])
-		explanation := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(rest[end+1:]), "—-:"))
-		if !validRelative(path) {
-			failures = append(failures, "Explanation Documentation: Changed Areas contains an invalid repo-relative path")
-			continue
-		}
-		if len(explanation) < 10 {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas path %s needs a what/why explanation", path))
-			continue
-		}
-		entries[path] = explanation
-	}
-	return entries, failures
-}
-
 func readBuildReport(workspace string) (string, error) {
 	for _, rel := range []string{"build-report.md", "deliverables/build-report.md"} {
 		body, _, err := readRegularWithin(workspace, rel)
