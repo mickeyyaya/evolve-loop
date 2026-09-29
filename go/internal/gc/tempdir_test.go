@@ -22,6 +22,7 @@ func TestReapPipelineTemp_RemovesOnlyStalePipelineArtifacts(t *testing.T) {
 		"cycle1498-evolve-bin4242":              {stale, true},
 		"TestRawFixturePattern_LosesRace99":     {stale, true},
 		"release-pipeline-dryrun-81632.json":    {stale, true},
+		"release-pipeline-dryrun-22.26.0.json":  {stale, true},
 		"go-build7654321":                       {fresh, false},
 		"com.apple.launchd.x":                   {stale, false},
 		"tmpabc123":                             {stale, false},
@@ -40,8 +41,8 @@ func TestReapPipelineTemp_RemovesOnlyStalePipelineArtifacts(t *testing.T) {
 
 	rep := ReapPipelineTemp(dir, now.Add(-24*time.Hour), true)
 
-	if rep.Entries != 6 || rep.Bytes != 60 || len(rep.Errors) != 0 {
-		t.Errorf("report = %+v, want 6 entries / 60 bytes / no errors", rep)
+	if rep.Entries != 7 || rep.Bytes != 70 || len(rep.Errors) != 0 {
+		t.Errorf("report = %+v, want 7 entries / 70 bytes / no errors", rep)
 	}
 	for name, e := range entries {
 		_, err := os.Stat(filepath.Join(dir, name))

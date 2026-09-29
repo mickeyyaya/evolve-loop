@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var pipelineTempRe = regexp.MustCompile(`^(go-build\d+|acs(-cycle)?\d+-.+|cycle\d+-.+|Test.+|release-pipeline-dryrun-\d+\.json)$`)
+var pipelineTempRe = regexp.MustCompile(`^(go-build\d+|acs(-cycle)?\d+-.+|cycle\d+-.+|Test.+|release-pipeline-dryrun-.+\.json)$`)
 
 type TempReapReport struct {
 	Entries int      `json:"entries"`
