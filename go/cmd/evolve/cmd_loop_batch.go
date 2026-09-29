@@ -125,9 +125,17 @@ iterations:
 	finalizeCompletedCycle(cfg, stderr)
 	gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "batch-end"), stderr)
 	lr.emit(stdout)
+	return b.batchExitCode()
+}
+
+func (b *loopBatchCoordinator) batchExitCode() int {
+	if b.ctx.Err() != nil {
+		fmt.Fprintln(b.stderr, "[loop] received interrupt (SIGINT/SIGTERM) during the batch closeout; the batch completed — exiting 130 so a chained run stops")
+		return 130
+	}
 	// rc=3 signals a batch that completed but absorbed a recoverable failure
 	// or a continued verdict-FAIL, so CI can distinguish it from a clean run.
-	if lr.RecoverableFailures > 0 || lr.ContinuedFailures > 0 {
+	if b.result.RecoverableFailures > 0 || b.result.ContinuedFailures > 0 {
 		return 3
 	}
 	return 0
