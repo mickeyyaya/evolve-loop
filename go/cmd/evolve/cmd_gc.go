@@ -138,6 +138,7 @@ func gcWorkspaceSweep(ctx context.Context, projectRoot string, dryRun bool, stdo
 	failed = gcWorktrees(opts, dryRun, stdout, stderr) != 0 || failed
 	failed = gcRunDirs(evolveDir, gcPol, dryRun, stdout, stderr) || failed
 	failed = gcGoCache(ctx, gcPol.GoCacheTTLHours, dryRun, stdout, stderr) || failed
+	failed = gcPipelineTemp(gcPol.TempTTLHours, dryRun, stdout, stderr) || failed
 	if !dryRun && freeErr == nil {
 		gcReportDiskFree(projectRoot, before, stdout, stderr)
 	}
@@ -193,6 +194,24 @@ func gcGoCache(ctx context.Context, ttlHours int, dryRun bool, stdout, stderr io
 	}
 	for _, e := range rep.Errors {
 		fmt.Fprintf(stderr, "evolve gc: go build cache error: %s\n", e)
+	}
+	return len(rep.Errors) > 0
+}
+
+func gcPipelineTemp(ttlHours int, dryRun bool, stdout, stderr io.Writer) bool {
+	if ttlHours <= 0 {
+		fmt.Fprintf(stdout, "evolve gc: pipeline temp sweep off (gc.temp_ttl_hours unset)\n")
+		return false
+	}
+	dir := os.TempDir()
+	rep := gc.ReapPipelineTemp(dir, time.Now().Add(-time.Duration(ttlHours)*time.Hour), !dryRun)
+	if dryRun {
+		fmt.Fprintf(stdout, "evolve gc --dry-run: %d stale pipeline temp artifact(s) would be removed (%s unused > %dh in %s)\n", rep.Entries, gcSize(rep.Bytes), ttlHours, dir)
+	} else {
+		fmt.Fprintf(stdout, "evolve gc: removed %d stale pipeline temp artifact(s) (%s unused > %dh in %s)\n", rep.Entries, gcSize(rep.Bytes), ttlHours, dir)
+	}
+	for _, e := range rep.Errors {
+		fmt.Fprintf(stderr, "evolve gc: temp error: %s\n", e)
 	}
 	return len(rep.Errors) > 0
 }

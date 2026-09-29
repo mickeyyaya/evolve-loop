@@ -29,6 +29,7 @@ type Policy struct {
 	// Default 7 (mirrors pruneephemeral).
 	TrackerTTLDays  int `json:"tracker_ttl_days,omitempty"`
 	GoCacheTTLHours int `json:"go_cache_ttl_hours,omitempty"`
+	TempTTLHours    int `json:"temp_ttl_hours,omitempty"`
 	// Worktrees is the retention grace for the worktree+branch backlog sweep
 	// (S4); consumed by PlanWorktrees. Zero value = no KeepRecent/MinAge grace.
 	Worktrees WorktreesPolicy `json:"worktrees,omitempty"`
