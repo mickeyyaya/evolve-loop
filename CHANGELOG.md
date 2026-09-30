@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — code carries no comments: the commit gate refuses an added comment, and every loop skill and persona states the rule (2026-09-30)
+
+- The operator's rule (2026-09-30): "Add system level policy for evo loop skill and project to set the rule that it is forbidden to write comments; code should explain itself."
+- **The commit gate refuses a commit that adds a comment** (`refuseAddedComments`, before the review waiver). It uses `commentaudit.AddedAcrossDiff`, the rule the build floor applies, reading HEAD through `commentaudit.ReadAtBase`. It names each added line and writes no attestation. This closes a hole: a comment-only *addition* is AST-equivalent, so it could ride the comment-only review waiver.
+  - A comment moved between files is not added, `git mv` included. The change is listed with `--no-renames` through the listing the waiver now shares.
+  - An unreadable HEAD, or a change that cannot be listed, is a fault (`ExitGitFatal`), never a new file.
+- **`commentaudit`, the shared rule:**
+  - a rewrite of an existing package doc is not an added comment;
+  - comments are Go scanner tokens, so a `//` line inside a string-literal fixture is not a comment;
+  - files under `testdata/` are inputs and `vendor/` is third-party code, so both are skipped (a vendored-module refresh would otherwise be refused with no way to comply);
+  - a spared package doc may not grow past three lines, or past its previous length.
+  - comments are read on physical lines, so a `//line` directive hides no later comment;
+  - the refusal lists the change with `-z`, so a non-ASCII path is read, not quoted past the `.go` check.
+- **The rule in every skill and persona:**
+  - the evo loop skill gains *Code carries no comments (system policy)*;
+  - AGENTS.md gains cross-CLI invariant 10;
+  - the debugger, bug-reproduction, test-amplification and tdd-engineer personas and the build, tdd, refactor and minimalism skills state it.
+
+  The tdd-engineer persona had allowed a fixture comment and showed two comments in its example; both are gone. The allowed set is listed only in the convention.
+- **Loop lanes, not yet enforced:** the build floor's `comment_floor` stays `shadow` (it WARNs).
+  - The architecture review found that enforcing it now would stall the loop. The floor scans the whole diff, the TDD phase writes the predicate files, and the builder may not edit them; 10 of the last 15 cycles' predicate files hold comments the floor counts.
+  - The next change gives the TDD phase its own comment floor and keeps its files out of the build floor's scan; then this project sets `enforce`.
+  - The compiled default stays `shadow` for other projects, whose license headers and generated code a blanket refusal would break.
+- Tests, red first:
+  - `TestRun_ACommitThatAddsACommentIsRefused`;
+  - `TestRun_WhatAToolReadsIsNotAnAddedComment`;
+  - `TestRefuseAddedComments_ARenamedCommentedFileAddsNoComment` (a real `git mv`);
+  - `TestRefuseAddedComments_AnUnreadableHeadIsAFaultNotANewFile`;
+  - `TestRefuseAddedComments_AnUnlistableChangeIsAFault`;
+  - `TestAddedComments_RewritingAnExistingPackageDocAddsNothing`;
+  - `TestAddedComments_ALineInARawStringIsNotAComment`;
+  - `TestAddedAcrossDiff_SkipsTestdata` and `TestAddedAcrossDiff_SkipsVendoredCode`;
+  - `TestAddedComments_ARewrittenPackageDocMayNotGrowIntoNarrative`;
+  - `TestAddedComments_ACommentTrailingARawStringIsNotAWholeLineComment`.
+
+  The gate's golden fixture no longer edits a doc comment.
+
 ## Fixed — a lane ship can no longer break a whole-tree test that only main ran (2026-09-30)
 
 - Cycle 1779's lane ship (`461aa782a`) grew `cmd/evolve.runCycleRun` to 91 lines (allowance 86) and `runCycleHealth` to 51 (limit 50). The ship's gates passed and main's required CI went red, so every open PR inherited the failure.

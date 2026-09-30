@@ -51,11 +51,11 @@ func TestGolden_GoPipelineWritesByteExactAttestation(t *testing.T) {
 	}
 	runGit("init", "-q")
 	writeFile(t, filepath.Join(dir, "go.mod"), "module example.com/golden\n\ngo 1.22\n")
-	writeFile(t, filepath.Join(dir, "lib.go"), "package golden\n\n// Add returns a+b.\nfunc Add(a, b int) int { return a + b }\n")
+	writeFile(t, filepath.Join(dir, "lib.go"), "package golden\n\nfunc Add(a, b int) int { return a + b }\n")
 	writeFile(t, filepath.Join(dir, "lib_test.go"), "package golden\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(1, 2) != 3 {\n\t\tt.Fatal(\"bad\")\n\t}\n}\n")
 	runGit("add", "go.mod", "lib.go", "lib_test.go")
 	runGit("commit", "-q", "-m", "init")
-	writeFile(t, filepath.Join(dir, "lib.go"), "package golden\n\n// Add returns the sum a+b.\nfunc Add(a, b int) int { return a + b }\n")
+	writeFile(t, filepath.Join(dir, "lib.go"), "package golden\n\nfunc Add(a, b int) int { return b + a }\n")
 
 	attDir := filepath.Join(dir, "att")
 	o := Options{

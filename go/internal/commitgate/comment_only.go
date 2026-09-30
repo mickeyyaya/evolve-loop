@@ -12,16 +12,12 @@ import (
 )
 
 func (o Options) reviewWaiver(ctx context.Context) (waived, refused string) {
-	out, _, code, err := sysexec.Capture(ctx, o.Runner, o.RepoRoot, "git", "diff", "--name-only", "--no-renames", "HEAD")
-	if err != nil || code > 1 {
+	paths, err := o.changeListing(ctx)
+	if err != nil {
 		return "", "the change could not be listed"
 	}
 	proven := 0
-	for _, line := range strings.Split(out, "\n") {
-		path := strings.TrimSpace(line)
-		if path == "" {
-			continue
-		}
+	for _, path := range paths {
 		if reason := o.notWaivable(ctx, path); reason != "" {
 			return "", path + ": " + reason
 		}

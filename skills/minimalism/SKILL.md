@@ -36,6 +36,7 @@ The ladder is a reflex, not a research project. The first lazy solution that wor
   simple reads as intent, not ignorance:
   - `// minimal: global lock; per-key locks if throughput matters`
   - `# minimal: O(n²) scan, fine for <1k rows; index if it grows`
+- No comments beyond what a tool reads (the `minimal:` marker above is one): names, types and small functions say the rest ([code-comments convention](../../docs/conventions/code-comments.md)).
 - Complex request? Ship the lazy version and question the rest in the same response: "Did X; Y covers
   it. Need full X? Say so." Never stall on an answer you can default.
 
