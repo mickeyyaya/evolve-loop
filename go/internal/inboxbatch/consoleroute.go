@@ -13,12 +13,16 @@ const pipelineKindPrefix = "pipeline-"
 // KindPipelineRepair is the kind the loop's halt escalation autofiles; the halt writer shares this symbol.
 const KindPipelineRepair = pipelineKindPrefix + "repair"
 
+func IsConsoleRoute(route string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(route)), consoleRoutePrefix)
+}
+
 // ConsoleRouted reports whether the item is operator-owned and why; a nil isProtected disables only surface rules.
 // route:"lane" relaxes a heuristic derivation for operator-authored items only.
 // See ADR-0074.
 func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	route := strings.ToLower(strings.TrimSpace(it.Route))
-	if strings.HasPrefix(route, consoleRoutePrefix) {
+	if IsConsoleRoute(route) {
 		return true, "route:" + route
 	}
 	surface := protectedDerivation(it, isProtected)

@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "faillearn and ciwatch items are written by the filing writer (red: each writes its JSON itself)",
+    "A minted item that repeats a filed id is still an idempotent skip, not a failure",
+    "Two concurrent mints of one id file exactly one item (a race test with the lock)",
+    "Each minter's degraded path is unchanged when the writer refuses or faults"
+  ],
+  "connects_to": [
+    "inbox-add-cli",
+    "operator-inbox-verbs-reachable-from-non-claude-phases"
+  ],
+  "created_at": "2026-09-30T09:27:23Z",
+  "files": [
+    "go/internal/faillearn/inbox.go",
+    "go/internal/ciwatch/ciwatch.go",
+    "go/internal/inboxmover/lifecycle/file.go"
+  ],
+  "fix": "Keep File's rules strict and move the minters: each mints the full shape (summary, fix, acceptance) and files through File, or through a library function File and the minters share that lives beside inboxbatch.Item, so the minters need no Mover. A lane-side minter must take the inbox `.bump.lock` (verifylock.AcquireAt, as inboxmover/root_failure.go does) around the id scan and the link, since several lanes can mint at once.",
+  "id": "retro-minting-files-through-inbox-add",
+  "kind": "refactor",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, split from inbox-add-cli acceptance 3 and the architecture review of `evolve inbox add`",
+  "summary": "`evolve inbox add` (lifecycle.(*Mover).File) is the operator's filing writer: it validates against the readers' schema, refuses a duplicate or retired id, an unknown dependency and a lifecycle-owned field, and never overwrites a file. The two kernel minters still write items directly and in other shapes: faillearn writes id/title/weight/kind/priority/files/injected_by (no summary, fix or acceptance), ciwatch writes no fix and no acceptance. Readers must keep tolerating those shapes until both converge. Acceptance 3 of inbox-add-cli, split out when the verb landed; the architecture review of the verb found the second minter and the race below.",
+  "title": "The kernel minters (faillearn's retrospective floor, ciwatch) write inbox JSON themselves instead of through the filing writer",
+  "weight": 0.45
+}
