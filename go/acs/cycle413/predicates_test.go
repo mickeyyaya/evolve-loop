@@ -1,41 +1,5 @@
 //go:build acs
 
-// Package cycle413 materializes the cycle-413 acceptance criteria for three prompt-optimization tasks:
-//   - strip-ondemand-heading-prefix-match (Task A)
-//   - compact-prompts-config-enable (Task B)
-//   - real-doc-ondemand-strip-guard (Task C)
-//
-// Goal: activate the doubly-dormant CompactPrompts lever — fix the heading match
-// (exact equality → line-anchored prefix) and wire the config knob so ~23 KB of
-// on-demand reference tail is stripped from per-cycle agent dispatches.
-//
-// AC map (1:1 with scout-report.md top_n; R9.3 floor-binding):
-//
-//	strip-ondemand-heading-prefix-match:
-//	  AC1 production heading "## Reference Index (Layer 3, on-demand)" triggers strip  → C413_001 (RED)
-//	  AC2 inline mention of production heading does NOT trigger strip (negative)        → C413_002 (pre-existing GREEN)
-//	  AC3 bare "## Reference Index" heading still stripped after fix (edge/OOD)        → C413_003 (pre-existing GREEN)
-//
-//	compact-prompts-config-enable:
-//	  AC1 RoutingConfig has CompactPrompts bool field                                   → C413_004 (RED)
-//	  AC2 config.Load populates CompactPrompts from registry workflow.compact_prompts   → C413_005 (RED)
-//	  AC3 no literal CompactPrompts: true in phase constructors (anti-gaming)           → C413_006 (pre-existing GREEN, config-check)
-//
-//	real-doc-ondemand-strip-guard:
-//	  AC1 realdoc_strip_test.go exists and is git-tracked                              → C413_007 (RED)
-//	  AC2 StripOnDemandSections on real auditor doc shrinks body ≥ 4096 bytes          → C413_008 (RED)
-//	  AC3 tdd-engineer doc returned unchanged (no Reference Index tail, negative)      → C413_009 (pre-existing GREEN)
-//
-// Adversarial diversity (per SKILL §6):
-//
-//	Negative: production heading as inline mention → C413_002 (no-op must NOT strip);
-//	          literal CompactPrompts: true present → C413_006; no-op leaves auditor body unchanged → C413_008.
-//	Edge/OOD: bare heading still works after prefix change → C413_003;
-//	          tdd-engineer has no heading → C413_009.
-//	Semantic:  reflection-based field presence (C413_004) vs. config-load value (C413_005) are distinct behaviors.
-//
-// Deferred (zero predicates per R9.3): B1 (externalize tdd/triage on-demand content),
-// B2 (per-cycle context injection audit).
 package cycle413
 
 import (
@@ -50,15 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Task A: strip-ondemand-heading-prefix-match
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestC413_001_StripProductionHeadingWithSuffix asserts that
-// prompts.StripOnDemandSections strips the real production heading
-// "## Reference Index (Layer 3, on-demand)" from a body.
-// RED: current impl uses exact equality (== "## Reference Index") which never
-// matches the parenthesized production form — the body is returned unchanged.
 func TestC413_001_StripProductionHeadingWithSuffix(t *testing.T) {
 	const body = "# Agent\n\nBody content.\n\n## Reference Index (Layer 3, on-demand)\n\n- ref one\n- ref two\n"
 	const want = "# Agent\n\nBody content.\n\n"
@@ -68,10 +23,6 @@ func TestC413_001_StripProductionHeadingWithSuffix(t *testing.T) {
 	}
 }
 
-// TestC413_002_InlineProductionHeadingMentionNotStripped asserts that a
-// mid-line mention of the production heading does NOT trigger a strip.
-// Negative test: a naive strings.Contains impl would strip, breaking mid-body prose.
-// pre-existing GREEN: current exact-equality impl never matches mid-line text.
 func TestC413_002_InlineProductionHeadingMentionNotStripped(t *testing.T) {
 	const body = "See ## Reference Index (Layer 3, on-demand) for details.\nMore content.\n"
 	got := prompts.StripOnDemandSections(body)
@@ -80,10 +31,6 @@ func TestC413_002_InlineProductionHeadingMentionNotStripped(t *testing.T) {
 	}
 }
 
-// TestC413_003_ExactBareHeadingStillStripped asserts backward compatibility:
-// the original bare "## Reference Index" heading (no suffix) still triggers a strip
-// after the prefix-match change. Edge/OOD: ensures the fix doesn't break the old form.
-// pre-existing GREEN: current exact-equality impl handles this correctly.
 func TestC413_003_ExactBareHeadingStillStripped(t *testing.T) {
 	const body = "# Agent\n\nBody.\n\n## Reference Index\n\n- ref\n"
 	const want = "# Agent\n\nBody.\n\n"
@@ -93,14 +40,6 @@ func TestC413_003_ExactBareHeadingStillStripped(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Task B: compact-prompts-config-enable
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestC413_004_CompactPromptsFieldInRoutingConfig asserts that
-// config.RoutingConfig has a CompactPrompts bool field. Uses reflection so the
-// package compiles even when the field is absent; the runtime assertion fails.
-// RED: RoutingConfig has no CompactPrompts field — reflect.Value is invalid.
 func TestC413_004_CompactPromptsFieldInRoutingConfig(t *testing.T) {
 	rt := reflect.TypeOf(config.RoutingConfig{})
 	field, ok := rt.FieldByName("CompactPrompts")
@@ -112,12 +51,6 @@ func TestC413_004_CompactPromptsFieldInRoutingConfig(t *testing.T) {
 	}
 }
 
-// TestC413_005_ConfigLoadPopulatesCompactPrompts asserts that config.Load,
-// given a registry with workflow.compact_prompts=true, returns a RoutingConfig
-// with CompactPrompts=true. Exercises the full registry-parse → field-populate pipeline.
-// RED: (a) field absent → reflect.Value invalid, OR (b) field present but Load
-//
-//	doesn't parse workflow.compact_prompts → value remains false.
 func TestC413_005_ConfigLoadPopulatesCompactPrompts(t *testing.T) {
 	regJSON := `{"config":{"dynamic_routing":"enforce","workflow":{"compact_prompts":true}},"phases":[]}`
 	f := filepath.Join(t.TempDir(), "registry.json")
@@ -138,16 +71,10 @@ func TestC413_005_ConfigLoadPopulatesCompactPrompts(t *testing.T) {
 	}
 }
 
-// TestC413_006_NoCompactPromptsLiteralInPhaseConstructors asserts that no
-// phase constructor hard-codes CompactPrompts: true as a Go struct literal.
-// The setting MUST flow from config injection, not be a hard-coded pin.
 // acs-predicate: config-check — inherent source invariant: literal pins bypass config.
-// Test files are excluded (they pin true intentionally for unit-test setup).
-// pre-existing GREEN: field doesn't exist yet; no production literal can exist.
 func TestC413_006_NoCompactPromptsLiteralInPhaseConstructors(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	phasesDir := filepath.Join(root, "go", "internal", "phases")
-	// grep exits 0 if matches found, 1 if not. Filter out _test.go lines.
 	stdout, _, code, _ := acsassert.SubprocessOutput("grep", "-rEn", `CompactPrompts:\s*true`, phasesDir)
 	if code == 0 {
 		for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
@@ -156,16 +83,8 @@ func TestC413_006_NoCompactPromptsLiteralInPhaseConstructors(t *testing.T) {
 			}
 		}
 	}
-	// exit 1 = no matches = correct invariant
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Task C: real-doc-ondemand-strip-guard
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestC413_007_RealDocStripGuardFileExistsAndTracked asserts that the real-doc
-// strip guard test file exists on disk and is git-tracked in the worktree.
-// RED: go/internal/prompts/realdoc_strip_test.go has not been created yet.
 func TestC413_007_RealDocStripGuardFileExistsAndTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rel := filepath.Join("go", "internal", "prompts", "realdoc_strip_test.go")
@@ -178,12 +97,6 @@ func TestC413_007_RealDocStripGuardFileExistsAndTracked(t *testing.T) {
 	}
 }
 
-// TestC413_008_RealAuditorDocStripsAtLeast4096Bytes asserts that
-// StripOnDemandSections applied to the real agents/evolve-auditor.md body
-// reduces it by at least 4096 bytes. Exercises the system under test against
-// the shipped document (not a fixture), pinning the heading convention.
-// RED: current exact-equality impl never matches "## Reference Index (Layer 3, on-demand)"
-// → reduction = 0 bytes → 0 < 4096 → FAIL.
 func TestC413_008_RealAuditorDocStripsAtLeast4096Bytes(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	data, err := os.ReadFile(filepath.Join(root, "agents", "evolve-auditor.md"))
@@ -196,25 +109,12 @@ func TestC413_008_RealAuditorDocStripsAtLeast4096Bytes(t *testing.T) {
 	}
 	stripped := prompts.StripOnDemandSections(body)
 	reduction := len(body) - len(stripped)
-	// Recalibrated 2026-08-10 (was 4096, latent-red since #434): that floor
-	// fossilized the auditor's operational tail below a mid-file marker —
-	// the persona-strip lobotomy incident. The marker now sits at EOF; the
-	// predicate keeps pinning the heading-prefix match against the real doc.
 	if reduction < 256 {
 		t.Errorf("auditor doc stripped only %d bytes (want ≥256: the marker tail); heading mismatch?\n  body=%d stripped=%d", reduction, len(body), len(stripped))
 	}
 }
 
-// TestC413_009_TDDEngineerDocReturnedUnchanged asserts that a marker-less body
-// (originally the then-marker-less tdd-engineer.md) is returned byte-for-byte unchanged by
-// StripOnDemandSections. Negative/edge: confirms strip is a no-op when heading absent.
-// pre-existing GREEN: no heading in tdd-engineer.md; returns unchanged in both impls.
 func TestC413_009_TDDEngineerDocReturnedUnchanged(t *testing.T) {
-	// Re-anchored 2026-08-10 (persona-strip lobotomy incident): this predicate
-	// pinned tdd-engineer.md as marker-LESS (strip must be a no-op on the real
-	// doc) — contradicting cycle-415's marker requirement (latent-vs-CI, the
-	// incident's root-cause shape) and today's EOF marker. The no-op-when-
-	// heading-absent edge it exercised is preserved on a fixture body.
 	fixture := "# Agent\n\nOperational content, no reference-index heading.\n"
 	if stripped := prompts.StripOnDemandSections(fixture); stripped != fixture {
 		t.Errorf("marker-less body was incorrectly stripped:\n  original=%d bytes\n  stripped=%d bytes\n  (docs with no Reference Index heading must be unchanged)", len(fixture), len(stripped))

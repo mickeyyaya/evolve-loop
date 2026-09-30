@@ -1,11 +1,5 @@
 //go:build acs
 
-// Package cycle1701 materialises the acceptance criteria for
-// audit-binding-report-comment-fallback-is-dead-code: the auditor-report
-// `audit_bound_tree_sha:` comment must stop being a source for the ship
-// package's audit-bound tree, leaving the ledger's worktree_tree_sha as the
-// single binding. Each predicate drives verifyAuditBinding (or scans the ship
-// package's parsed source) through one named in-package test.
 package cycle1701
 
 import (
@@ -18,12 +12,8 @@ import (
 
 const shipPkg = "./internal/phases/ship"
 
-// goDir is the worktree's Go module root, so the shelled tests compile the
-// cycle's tree rather than main's copy.
 func goDir(t *testing.T) string { return filepath.Join(acsassert.RepoRoot(t), "go") }
 
-// runShipTest runs one named integration-tier test in the ship package and
-// requires a real PASS line, so a renamed or skipped test cannot pass silently.
 func runShipTest(t *testing.T, name string) {
 	t.Helper()
 	stdout, stderr, code, err := acsassert.SubprocessOutput(

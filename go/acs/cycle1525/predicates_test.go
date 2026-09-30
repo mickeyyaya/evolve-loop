@@ -1,19 +1,5 @@
 //go:build acs
 
-// Package cycle1525 materializes the cycle-1525 acceptance criterion for the
-// fleet-scoped task `cap-audit-report-length`: doc/code drift protection for
-// the whole-report size budget introduced in the cycle-1522 salvage
-// (audit_report_length_test.go / audit.go:auditReportMaxBytes).
-//
-// Everything else this task's eval pins (cap-exists, overflow-recorded,
-// non-lossy, no-regression — .evolve/evals/cap-audit-report-length.md) is
-// already covered, live and GREEN, by
-// go/internal/phases/audit/audit_report_length_test.go's TestAuditReportLength
-// table (verified pre-existing GREEN this cycle, see test-report.md). The one
-// AC that eval pins but no test file yet materializes is criterion 5,
-// "doc-code-sync": agents/evolve-auditor-reference.md must document the SAME
-// numeric budget the gate enforces (auditReportMaxBytes in
-// internal/phases/audit/audit.go). This predicate is that missing piece.
 package cycle1525
 
 import (
@@ -26,16 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC1525_001_DocCapMatchesCodeCap cross-references the numeric budget
-// documented in agents/evolve-auditor-reference.md against the live
-// auditReportMaxBytes constant in internal/phases/audit/audit.go. It is a
-// static-text comparison, not a subprocess/behavioral call — there is no
-// runtime seam to drive for "does the doc match the code" — so it is declared
-// as a waived config-check predicate (cycle-85 classification table) rather
-// than dressed up as a fake behavioral test. It still FAILS the moment either
-// side drifts, which is the load-bearing property: bumping the code constant
-// without updating the doc (or vice versa) breaks this predicate immediately.
-//
 // acs-predicate: config-check
 func TestC1525_001_DocCapMatchesCodeCap(t *testing.T) {
 	root := acsassert.RepoRoot(t)
@@ -62,10 +38,6 @@ func TestC1525_001_DocCapMatchesCodeCap(t *testing.T) {
 	}
 }
 
-// extractInt reads path, matches re against its content, and parses capture
-// group idx as an integer. Fails the test (not the predicate silently) when
-// the file is missing, the pattern doesn't match, or the capture isn't
-// numeric — a shape change on either side of the doc/code pair must be loud.
 func extractInt(t *testing.T, path string, re *regexp.Regexp, idx int) int {
 	t.Helper()
 	if !acsassert.FileExists(t, path) {

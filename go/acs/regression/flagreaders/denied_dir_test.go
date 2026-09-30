@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// The audit phase's sandbox denies docs/private; the repo-wide shell scan
-// must skip a denied directory instead of failing the gate (cycles 1676/1679).
 func TestScanTextTree_SkipsASandboxDeniedDirectory(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permission bits — nothing to deny")

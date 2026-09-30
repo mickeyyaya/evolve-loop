@@ -1,35 +1,5 @@
 //go:build acs
 
-// Package cycle1189 materialises the cycle-1189 acceptance criteria for the
-// three fleet-scoped tasks triage committed to this lane:
-//
-//   - loop-base-divergence-boot-halt   → boot HALTs loud when the local base has
-//     diverged from / fallen behind origin/<base>, naming `evolve sync-main`
-//   - bridgewatch-follow-event-sync-fix → the macOS-flaky follow test waits on an
-//     event with a >=10s deadline instead of a bare 10ms sleep in a 200ms window
-//   - ledger-verify-seal-anchor-fix     → Verify walks from the last `reset-seal-*`
-//     operator entry forward; a pre-seal break is informational, a post-seal
-//     break is still BROKEN
-//
-// (`codegraph-blast-radius-context-for-scout-audit-review` is `## deferred` this
-// cycle, so per R9.3 it gets ZERO predicates here.)
-//
-// Predicate strategy — every load-bearing assertion EXERCISES the system under
-// test, never greps production source for a magic string (the cycle-85
-// degenerate-predicate ban):
-//
-//   - 001/002 build a REAL git fixture (bare origin + clone) and call
-//     looppreflight.Run through its exported seams: behind-origin must HALT with
-//     the reconcile instruction (001), in-sync must NOT halt (002, the
-//     anti-blanket-halt negative). Both are name-agnostic — they assert on
-//     Run's Result, so Builder is free to name the new check/seam anything.
-//   - 003 runs the real flaky test as a subprocess under `-race -count=25`; a
-//     wait that is still time-window-bound stays flaky and reds here. 004 is the
-//     structural companion (deadline >=10s, no bare unconditional sleep).
-//   - 005/006 drive the REAL ledger: append a chain, corrupt a line, write a
-//     `reset-seal-*` operator entry, and assert Verify's verdict. 006 is the
-//     crux anti-no-op: a break AFTER the seal must still return
-//     core.ErrLedgerChainBroken, so "make Verify always return nil" fails.
 package cycle1189
 
 import (
@@ -54,17 +24,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// reconcileInstruction is the operator command the halt MUST name (inbox item:
-// "HALTs loud with the reconcile instruction"). Asserting on the instruction —
-// not on a check name — keeps the predicate free of Builder's naming choices.
 const reconcileInstruction = "evolve sync-main"
 
-// ---------------------------------------------------------------------------
-// Task 1 — loop-base-divergence-boot-halt
-// ---------------------------------------------------------------------------
-
-// git runs a git command in dir, failing the test on error. Fixtures are built
-// with real git so the check under test sees a real repo/remote topology.
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -81,7 +42,6 @@ func git(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-// commitPush writes a file in dir and pushes it to origin/main.
 func commitPush(t *testing.T, dir, file, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, file), []byte(body), 0o644); err != nil {
@@ -92,11 +52,6 @@ func commitPush(t *testing.T, dir, file, body string) {
 	git(t, dir, "push", "origin", "main")
 }
 
-// baseFixture builds a bare origin plus a working clone. When behind is true a
-// SECOND clone pushes an extra commit to origin, so the returned working clone's
-// local main is strictly behind origin/main WITHOUT having fetched it — exactly
-// the stale-base topology that produced the cycle-969 GIT_PUSH_REJECTED. Returns
-// the working clone path (the ProjectRoot handed to Run).
 func baseFixture(t *testing.T, behind bool) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -117,17 +72,10 @@ func baseFixture(t *testing.T, behind bool) string {
 		other := filepath.Join(root, "other")
 		git(t, root, "clone", origin, other)
 		commitPush(t, other, "ahead.txt", "ahead\n")
-		// `work` deliberately does NOT fetch: the check under test must do the
-		// fetch itself before deciding.
 	}
 	return work
 }
 
-// greenOptions returns a looppreflight.Options on which every PRE-EXISTING check
-// passes, so any halt observed by 001/002 is attributable to the new base
-// divergence check alone. Mirrors internal goodPipelineOptions using only
-// EXPORTED seams. OrphanKill is stubbed to a no-op: the default is a real tmux
-// kill and the ACS suite runs while live lanes hold tmux sessions.
 func greenOptions(t *testing.T, projectRoot string) looppreflight.Options {
 	t.Helper()
 	return looppreflight.Options{
@@ -159,8 +107,6 @@ func greenOptions(t *testing.T, projectRoot string) looppreflight.Options {
 	}
 }
 
-// haltText concatenates the message+detail of every HALT-level check, so the
-// assertion binds to the halt's CONTENT and not to a check name Builder picks.
 func haltText(r looppreflight.Result) string {
 	var b strings.Builder
 	for _, c := range r.Checks {
@@ -171,12 +117,6 @@ func haltText(r looppreflight.Result) string {
 	return b.String()
 }
 
-// TestC1189_001_BootHaltsWhenBaseDivergedFromOrigin — AC (loop-base-divergence-
-// boot-halt), positive half. With a real repo whose local main is BEHIND
-// origin/main, looppreflight.Run must return a HALT result and the halt text
-// must name the `evolve sync-main` reconcile instruction. Behavioural: it calls
-// the real preflight against a real remote; today no check fetches origin, so
-// Run returns non-halting and this predicate is RED.
 func TestC1189_001_BootHaltsWhenBaseDivergedFromOrigin(t *testing.T) {
 	work := baseFixture(t, true)
 
@@ -192,11 +132,6 @@ func TestC1189_001_BootHaltsWhenBaseDivergedFromOrigin(t *testing.T) {
 	}
 }
 
-// TestC1189_002_BootDoesNotHaltWhenBaseInSync — AC (loop-base-divergence-boot-
-// halt), NEGATIVE half and the anti-gaming guard. An in-sync clone must NOT
-// halt: a check that halts unconditionally (or that treats "no upstream commits"
-// as divergence) would bench every healthy loop boot. Currently pre-existing
-// GREEN — it exists to stay green through the fix.
 func TestC1189_002_BootDoesNotHaltWhenBaseInSync(t *testing.T) {
 	work := baseFixture(t, false)
 
@@ -209,27 +144,12 @@ func TestC1189_002_BootDoesNotHaltWhenBaseInSync(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task 2 — bridgewatch-follow-event-sync-fix
-// ---------------------------------------------------------------------------
-
-// followTestName is the flaky test the fix must stabilise.
 const followTestName = "TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines"
 
-// bridgeWatchTestPath is the file that owns it.
 const bridgeWatchTestPath = "go/cmd/evolve/cmd_bridge_watch_test.go"
 
-// followRepeatCount is the repeat factor for the stability run. Scout's
-// acceptance names -count=50; 25 keeps the audit lane's wall-clock bounded while
-// still exercising the window ~25x (a 200ms-window race reproduces well inside
-// that, and did on the macOS runner).
 const followRepeatCount = 25
 
-// TestC1189_003_BridgeWatchFollowTestIsStableUnderRepeat — AC (bridgewatch-
-// follow-event-sync-fix), the behavioural crux. Runs the REAL test under
-// `-race -count=25`; a wait that still depends on a fixed 10ms sleep landing
-// inside a 200ms deadline flakes here. Nothing about this can be satisfied by
-// editing a comment.
 func TestC1189_003_BridgeWatchFollowTestIsStableUnderRepeat(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -252,9 +172,6 @@ func TestC1189_003_BridgeWatchFollowTestIsStableUnderRepeat(t *testing.T) {
 	}
 }
 
-// goFuncBody returns the source text of the named top-level func in path, using
-// brace matching from the func's opening brace. Used by 004 to scope structural
-// assertions to ONE function instead of the whole file.
 func goFuncBody(t *testing.T, path, name string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -289,16 +206,6 @@ func goFuncBody(t *testing.T, path, name string) string {
 
 var secondsDeadlineRe = regexp.MustCompile(`context\.WithTimeout\([^,]+,\s*(\d+)\s*\*\s*time\.Second\s*\)`)
 
-// TestC1189_004_BridgeWatchFollowWaitIsEventDriven — AC (bridgewatch-follow-
-// event-sync-fix), the structural companion to 003. Two requirements from the
-// acceptance criteria, both scoped to the one function:
-//
-//	(a) the deadline is >= 10s (not the old 200ms window);
-//	(b) no BARE sleep — a time.Sleep may survive only as the tick inside a poll
-//	    loop, never as an unconditional pre-append wait.
-//
-// This closes the hole where 003 could pass by luck on a fast runner while the
-// fixed-window design survives.
 func TestC1189_004_BridgeWatchFollowWaitIsEventDriven(t *testing.T) {
 	path := filepath.Join(acsassert.RepoRoot(t), bridgeWatchTestPath)
 	body := goFuncBody(t, path, followTestName)
@@ -315,15 +222,8 @@ func TestC1189_004_BridgeWatchFollowWaitIsEventDriven(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task 3 — ledger-verify-seal-anchor-fix
-// ---------------------------------------------------------------------------
-
-// sealKindPrefix is the operator entry kind Verify must resolve as the walk
-// anchor (inbox item: "last `reset-seal-*` operator entry").
 const sealKindPrefix = "reset-seal-"
 
-// newFixtureLedger returns a FileLedger over a fresh .evolve dir plus that dir.
 func newFixtureLedger(t *testing.T) (*ledger.FileLedger, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), ".evolve")
@@ -333,7 +233,6 @@ func newFixtureLedger(t *testing.T) (*ledger.FileLedger, string) {
 	return ledger.New(dir), dir
 }
 
-// appendN appends n well-formed chained entries.
 func appendN(t *testing.T, l *ledger.FileLedger, n int, kind string) {
 	t.Helper()
 	for i := 0; i < n; i++ {
@@ -343,9 +242,6 @@ func appendN(t *testing.T, l *ledger.FileLedger, n int, kind string) {
 	}
 }
 
-// corruptLine rewrites line index (0-based) of the ledger file in place, keeping
-// byte length irrelevant — the point is that its SHA no longer matches the
-// prev_hash the NEXT line recorded, i.e. a real chain break at that seam.
 func corruptLine(t *testing.T, evolveDir string, index int) {
 	t.Helper()
 	path := filepath.Join(evolveDir, "ledger.jsonl")
@@ -363,23 +259,15 @@ func corruptLine(t *testing.T, evolveDir string, index int) {
 	}
 }
 
-// TestC1189_005_LedgerVerifyGreenWhenBreakPrecedesSealAnchor — AC (ledger-verify-
-// seal-anchor-fix), positive half. Topology: valid chain → a break → a
-// `reset-seal-*` operator entry → more valid entries. Because the damage lies
-// BEFORE the operator's seal anchor, Verify must walk from that anchor forward
-// and return nil (the sealed prefix is informational, not BROKEN). Today Verify
-// walks from line 1 and cries wolf on the ancient break → RED.
 func TestC1189_005_LedgerVerifyGreenWhenBreakPrecedesSealAnchor(t *testing.T) {
 	l, dir := newFixtureLedger(t)
 	appendN(t, l, 4, "phase")
-	// Break at line index 1: line 2's recorded prev_hash no longer matches.
 	corruptLine(t, dir, 1)
 
 	if err := l.Verify(context.Background()); err == nil {
 		t.Fatalf("fixture invalid: an un-sealed pre-existing break must be BROKEN before the anchor is written (got nil)")
 	}
 
-	// Operator seals: everything at/below here is accepted by sign-off.
 	if err := l.Append(context.Background(), core.LedgerEntry{
 		Role: "operator", Cycle: 1189, Kind: sealKindPrefix + "cycle1189",
 		Message: "operator sign-off: historical damage preserved, chain resumes here",
@@ -393,11 +281,6 @@ func TestC1189_005_LedgerVerifyGreenWhenBreakPrecedesSealAnchor(t *testing.T) {
 	}
 }
 
-// TestC1189_006_LedgerVerifyStillBrokenWhenBreakFollowsSealAnchor — AC (ledger-
-// verify-seal-anchor-fix), NEGATIVE half and the crux anti-no-op predicate. Same
-// seal topology, but the damage lands AFTER the seal anchor. Verify MUST still
-// return core.ErrLedgerChainBroken: an implementation that "fixes" 005 by
-// short-circuiting Verify to nil whenever a seal entry exists fails here.
 func TestC1189_006_LedgerVerifyStillBrokenWhenBreakFollowsSealAnchor(t *testing.T) {
 	l, dir := newFixtureLedger(t)
 	appendN(t, l, 3, "phase")
@@ -408,8 +291,6 @@ func TestC1189_006_LedgerVerifyStillBrokenWhenBreakFollowsSealAnchor(t *testing.
 		t.Fatalf("append seal entry: %v", err)
 	}
 	appendN(t, l, 4, "phase")
-	// Lines 0..2 phases, line 3 seal, lines 4..7 phases. Corrupt line 5 —
-	// strictly AFTER the anchor.
 	corruptLine(t, dir, 5)
 
 	err := l.Verify(context.Background())

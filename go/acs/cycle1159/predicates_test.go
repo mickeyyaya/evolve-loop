@@ -1,17 +1,5 @@
 //go:build acs
 
-// Package cycle1159 encodes the cycle-1159 acceptance criteria: three
-// "landed test-green but never wired into the real call site" defects from the
-// fleet-scoped backlog.
-//
-//	001/002 — workspace-hygiene S5: runGCHook must default an absent gc.mode to
-//	          shadow and must actually invoke the S4 worktree/branch sweep.
-//	003     — menu pass must preserve an already-committed id prefix.
-//	004     — the cycle-962 carry-forward classifier must stay wired into the
-//	          fleet-rebase recovery path AND keep its three-verdict semantics.
-//
-// Every predicate here exercises the system under test (runs the hook, calls the
-// selector, classifies a real git repo) — no source-grep-only assertions.
 package cycle1159
 
 import (
@@ -28,9 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// goTest runs `go test` for pkg inside the worktree's go/ module and returns
-// combined output plus success. The cmd/evolve hook is package main, so it can
-// only be exercised through its own test binary.
 func goTest(t *testing.T, root, pkg string, runRegex string) (string, bool) {
 	t.Helper()
 	cmd := exec.Command("go", "test", "-count=1", "-run", runRegex, pkg)
@@ -39,8 +24,6 @@ func goTest(t *testing.T, root, pkg string, runRegex string) (string, bool) {
 	return string(out), err == nil
 }
 
-// gitIn runs git in dir with a hermetic config so the predicate never depends
-// on the operator's global git settings.
 func gitIn(t *testing.T, dir string, args ...string) (string, bool) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -68,11 +51,6 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-// TestC1159_001_GCHookDefaultsToShadowAndSweepsWorktrees drives the REAL
-// runGCHook through its own package test binary: absent gc.mode resolves to
-// shadow, shadow publishes the S5 workspace manifest without mutating, enforce
-// actually deletes the merged orphan branch, and an explicit off still opts out
-// (the anti-"always sweep" negative).
 func TestC1159_001_GCHookDefaultsToShadowAndSweepsWorktrees(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	const runRegex = "^TestRunGCHook_(DefaultModeIsShadow|ShadowWritesWorkspaceManifest|EnforceAppliesWorktreeSweep|ExplicitOffSkipsWorktreeSweep|NonGitProjectRootIsFailOpen)$"
@@ -85,11 +63,6 @@ func TestC1159_001_GCHookDefaultsToShadowAndSweepsWorktrees(t *testing.T) {
 	}
 }
 
-// TestC1159_002_GCWorktreeSweepHasProductionCaller is the wiring proof for S5:
-// gc.PlanWorktrees/gc.ApplyWorktrees must be reachable from production code, not
-// only from their own unit tests (the S4 "green unit, absent integration" gap).
-// The behavioral half lives in 001; this predicate pins that the capability is
-// reachable at all, which a passing unit test alone cannot show.
 func TestC1159_002_GCWorktreeSweepHasProductionCaller(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, fn := range []string{"PlanWorktrees", "ApplyWorktrees"} {
@@ -110,10 +83,6 @@ func TestC1159_002_GCWorktreeSweepHasProductionCaller(t *testing.T) {
 	}
 }
 
-// TestC1159_003_MenuPassPreservesCommittedIds calls the real selector against a
-// real inbox dir: a LOW-weight committed candidate must lead the menus even when
-// the backlog holds higher-weight work, and a nil prefix must leave the legacy
-// selection untouched (the anti-no-op negative — "always prepend" fails it).
 func TestC1159_003_MenuPassPreservesCommittedIds(t *testing.T) {
 	evolveDir := t.TempDir()
 	inbox := filepath.Join(evolveDir, "inbox")
@@ -141,7 +110,6 @@ func TestC1159_003_MenuPassPreservesCommittedIds(t *testing.T) {
 		t.Errorf("lane 0 rep = %q, want committed id \"c1\" — a committed id must never be displaced by a higher-weight backlog item", got)
 	}
 
-	// Negative: an empty prefix must reproduce the committed-blind selection.
 	backlog := triagecap.ReadInboxBacklog(evolveDir, nil)
 	want := render(triagecap.ExpandWithClusterMates(triagecap.SelectFleetWidthTopN(backlog, 2), backlog, 4))
 	if got := render(triagecap.SelectWaveSeedMenus(evolveDir, nil, 2, 4, nil)); got != want {
@@ -161,10 +129,6 @@ func render(menus [][]triagecap.FleetCandidate) string {
 	return strings.Join(lanes, " | ")
 }
 
-// TestC1159_004_FleetRebaseClassifierWiredAndCorrect pins the carry-forward
-// classifier on both axes the wiring-proof policy demands: it BEHAVES correctly
-// on a real repo across all three verdicts (a conflict must never be reported as
-// already-landed), and it has a real non-test caller in the recovery path.
 func TestC1159_004_FleetRebaseClassifierWiredAndCorrect(t *testing.T) {
 	repo := t.TempDir()
 	mustGit(t, repo, "init", "-b", "main")
@@ -172,13 +136,11 @@ func TestC1159_004_FleetRebaseClassifierWiredAndCorrect(t *testing.T) {
 	mustGit(t, repo, "add", "f.txt")
 	mustGit(t, repo, "commit", "-m", "base")
 
-	// clean: touches a different file, not on main.
 	mustGit(t, repo, "checkout", "-b", "clean")
 	writeFile(t, filepath.Join(repo, "g.txt"), "new\n")
 	mustGit(t, repo, "add", "g.txt")
 	mustGit(t, repo, "commit", "-m", "clean work")
 
-	// conflict: rewrites f.txt from the same base main also rewrites.
 	mustGit(t, repo, "checkout", "-b", "conflict", "main")
 	writeFile(t, filepath.Join(repo, "f.txt"), "candidate side\n")
 	mustGit(t, repo, "add", "f.txt")
@@ -189,7 +151,6 @@ func TestC1159_004_FleetRebaseClassifierWiredAndCorrect(t *testing.T) {
 	mustGit(t, repo, "add", "f.txt")
 	mustGit(t, repo, "commit", "-m", "main edit")
 
-	// landed: a branch pointing at main is a strict ancestor → superseded.
 	mustGit(t, repo, "branch", "landed", "main")
 
 	ctx := context.Background()
@@ -212,7 +173,6 @@ func TestC1159_004_FleetRebaseClassifierWiredAndCorrect(t *testing.T) {
 		}
 	}
 
-	// Wiring proof: a non-test production caller must exist.
 	root := acsassert.RepoRoot(t)
 	cmd := exec.Command("grep", "-rl", "--include=*.go", "ClassifyFleetRebaseCandidate", "cmd", "internal")
 	cmd.Dir = filepath.Join(root, "go")

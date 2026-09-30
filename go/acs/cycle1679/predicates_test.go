@@ -1,51 +1,5 @@
 //go:build acs
 
-// Package cycle1679 materialises the cycle-1679 acceptance criteria for the one
-// fleet-scoped task pinned to this lane: `crossartifact-invariant-stack`.
-//
-// WHAT THE CONTRACT ACTUALLY IS. The lane's inbox record
-// (.evolve/inbox/processing/cycle-1679/2026-08-04T07-11-00Z-crossartifact-invariant-stack.json)
-// carries TWO halves in its `fix` field, and `connects_to` names both homes:
-//
-//	"SWE-agent rule enforced: each invariant ships ADVISORY until its
-//	 false-positive rate is evidenced ~0 (the 1054/1060 breaker lesson), then
-//	 graduates to blocking. DOCS per 3.8 into
-//	 docs/research/deliverable-alignment-2026-08/README.md."
-//
-//	connects_to: ["go/internal/coherence/",
-//	              "docs/research/deliverable-alignment-2026-08/README.md"]
-//
-// The CODE half is already landed on this branch and green — verified this
-// phase, not assumed: internal/coherence/crossartifact.go implements all four
-// invariants, internal/core/crossartifact_invariants.go:36 records them, and
-// cyclerun.go:241 is the production caller. Predicates 001-003 pin that behaviour
-// so it cannot silently regress; they are expected PRE-EXISTING GREEN and are
-// declared as such in test-report.md rather than deleted (a landed contract that
-// stops being checked is how a shipped invariant rots).
-//
-// The DOCS half has never landed, and that is this cycle's real RED. §6 of the
-// README ("Experience record for the new moves (to be extended per §3.8)") holds
-// 6.1, 6.2 and 6.3 — there is no 6.x entry for item rank 5. Line 140's portfolio
-// row still reads "**NEW — filed 0.85**" and line 124 still calls the stack
-// "partial (`coherence`)", both stale against code that exists. Because the doc
-// deliverable its own acceptance contract names was never written, the item's
-// acceptance is unmet, so it is re-claimed every cycle: the identical record sits
-// unconsumed in .evolve/inbox/processing/cycle-<N>/ for 1601 through 1679.
-// Predicates 004-005 are the RED that ends that streak.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - NEGATIVE : 002 breaks each invariant class one at a time and demands that
-//     class be named — an aggregate that returns "ok" for everything, or
-//     "violated" for everything, fails it.
-//   - EDGE/OOD : 003 drives the empty workspace and demands `indeterminate`,
-//     never `violated` — the property that keeps an advisory's false-positive
-//     rate at zero, which is the inbox record's own graduation condition.
-//   - SEMANTIC : 004 does not merely look for a heading; it demands the §6.4
-//     body carry the Issue/Gap/Solution/Measured shape 6.1-6.3 use, be
-//     git-TRACKED (a gitignored doc is dropped at ship — the cycle-93 lesson),
-//     and that every repo path it cites RESOLVE ON DISK. That last check is the
-//     README being held to the same referenced-paths-exist invariant the feature
-//     it documents enforces on everyone else.
 package cycle1679
 
 import (
@@ -64,10 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// alignmentREADME is the doc deliverable the inbox record's `fix` field names.
 const alignmentREADME = "docs/research/deliverable-alignment-2026-08/README.md"
 
-// allFour is the aggregate's declared, stable invariant order.
 var allFour = []string{
 	coherence.InvariantVerdictAgreement,
 	coherence.InvariantTestCounts,
@@ -75,9 +27,6 @@ var allFour = []string{
 	coherence.InvariantPhaseOrder,
 }
 
-// writeAudit writes an audit-report.md carrying a REAL canonical evolve-verdict
-// sentinel, built with encoding/json so the fixture is the shape phasecontract
-// actually parses (never hand-spelled).
 func writeAudit(t *testing.T, dir, verdict string, evidencePaths []string) {
 	t.Helper()
 	payload := map[string]any{"phase": "audit", "verdict": verdict, "schema_version": 1}
@@ -104,9 +53,6 @@ func writeRaw(t *testing.T, dir, name, body string) {
 	}
 }
 
-// acsBody builds an acs-verdict.json in the live acssuite.Verdict shape: the
-// claimed summary counts up top, the independently parsed runner results below,
-// so a fixture can make the claim disagree with its own evidence.
 func acsBody(t *testing.T, verdict string, total, green, red, skip int, results []string) string {
 	t.Helper()
 	rows := make([]map[string]any, 0, len(results))
@@ -146,8 +92,6 @@ func writeTiming(t *testing.T, dir string, phases [][3]string) {
 	writeRaw(t, dir, "phase-timing.json", string(b))
 }
 
-// coherentWorkspace is the all-green fixture: agreeing verdicts, counts that
-// survive a recount, a cited path that exists, a forward-running phase chain.
 func coherentWorkspace(t *testing.T) (workspace, worktree string) {
 	t.Helper()
 	workspace, worktree = t.TempDir(), t.TempDir()
@@ -173,14 +117,6 @@ func find(t *testing.T, r coherence.InvariantReport, name string) coherence.Inva
 	return coherence.Invariant{}
 }
 
-// ---------------------------------------------------------------------------
-// AC1 — one deterministic suite evaluates all four invariant classes from
-// independent on-disk evidence and returns an aggregate with named violations.
-// ---------------------------------------------------------------------------
-
-// TestC1679_001_SuiteReportsAllFourInvariantsOnACoherentWorkspace is the
-// positive pole. Without it, an implementation that answered "violated" to
-// everything would satisfy every negative predicate below.
 func TestC1679_001_SuiteReportsAllFourInvariantsOnACoherentWorkspace(t *testing.T) {
 	ws, wt := coherentWorkspace(t)
 	got := coherence.CheckCrossArtifactInvariants(ws, wt)
@@ -197,10 +133,6 @@ func TestC1679_001_SuiteReportsAllFourInvariantsOnACoherentWorkspace(t *testing.
 	}
 }
 
-// TestC1679_002_EachInvariantClassIsIndependentlyFalsifiable breaks ONE source
-// of evidence at a time and demands the matching class be named. This is the
-// anti-no-op predicate: a suite that only reads the embedded sentinel cannot
-// pass the count, path and ordering cases.
 func TestC1679_002_EachInvariantClassIsIndependentlyFalsifiable(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -218,7 +150,6 @@ func TestC1679_002_EachInvariantClassIsIndependentlyFalsifiable(t *testing.T) {
 			name: "claimed counts contradict the parsed results",
 			want: coherence.InvariantTestCounts,
 			corrupt: func(t *testing.T, ws, wt string) {
-				// Claims zero red while its own results carry one — the cycle-1673 M1 shape.
 				writeRaw(t, ws, "acs-verdict.json", acsBody(t, "PASS", 3, 3, 0, 0, []string{"green", "green", "red"}))
 			},
 		},
@@ -265,9 +196,6 @@ func TestC1679_002_EachInvariantClassIsIndependentlyFalsifiable(t *testing.T) {
 	}
 }
 
-// TestC1679_003_AbsentArtifactsAreIndeterminateNeverViolated pins the inbox
-// record's graduation condition: an advisory that fires on ABSENCE earns a
-// false-positive rate and gets switched off (the 1054/1060 breaker lesson).
 func TestC1679_003_AbsentArtifactsAreIndeterminateNeverViolated(t *testing.T) {
 	empty, wt := t.TempDir(), t.TempDir()
 	got := coherence.CheckCrossArtifactInvariants(empty, wt)
@@ -284,20 +212,7 @@ func TestC1679_003_AbsentArtifactsAreIndeterminateNeverViolated(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// The DOCS half of the acceptance contract — this cycle's real RED.
-// ---------------------------------------------------------------------------
-
-// TestC1679_004_ExperienceRecordLandedAndItsCitationsResolve is the deliverable
-// the inbox record's `fix` field names ("DOCS per 3.8 into
-// docs/research/deliverable-alignment-2026-08/README.md").
-//
 // acs-predicate: config-check — the deliverable for this AC IS document content,
-// so the document is the system under test. It is NOT a bare magic-string grep:
-// the section must carry the Issue/Gap/Solution/Measured shape §6.1-6.3 use, the
-// file must be git-TRACKED, and every repo path the section cites must RESOLVE
-// ON DISK — the same referenced-paths-exist invariant the documented feature
-// enforces on everyone else. A one-line heading satisfies none of that.
 func TestC1679_004_ExperienceRecordLandedAndItsCitationsResolve(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	abs := filepath.Join(root, alignmentREADME)
@@ -307,12 +222,10 @@ func TestC1679_004_ExperienceRecordLandedAndItsCitationsResolve(t *testing.T) {
 	}
 	body := string(raw)
 
-	// The file must be tracked — a gitignored doc is silently dropped at ship.
 	if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", alignmentREADME); code != 0 {
 		t.Errorf("RED: %s is untracked — it would be dropped at ship (cycle-93)", alignmentREADME)
 	}
 
-	// A §6.x experience record naming the cross-artifact stack must exist.
 	head := regexp.MustCompile(`(?m)^### 6\.\d+ .*[Cc]ross-artifact.*$`)
 	loc := head.FindStringIndex(body)
 	if loc == nil {
@@ -321,7 +234,6 @@ func TestC1679_004_ExperienceRecordLandedAndItsCitationsResolve(t *testing.T) {
 			"this entry per §3.8", alignmentREADME)
 	}
 
-	// Scope to that subsection: from its heading to the next '### ' or '## '.
 	rest := body[loc[1]:]
 	if next := regexp.MustCompile(`(?m)^#{2,3} `).FindStringIndex(rest); next != nil {
 		rest = rest[:next[0]]
@@ -332,7 +244,6 @@ func TestC1679_004_ExperienceRecordLandedAndItsCitationsResolve(t *testing.T) {
 		}
 	}
 
-	// Every repo path the entry cites must resolve on disk.
 	cited := regexp.MustCompile(`go/(?:internal|cmd|acs|pkg)/[A-Za-z0-9_./-]+\.go`).FindAllString(rest, -1)
 	if len(cited) == 0 {
 		t.Errorf("RED: the §6.x entry cites no implementation file — an experience record with no Solution citation")
@@ -346,13 +257,7 @@ func TestC1679_004_ExperienceRecordLandedAndItsCitationsResolve(t *testing.T) {
 	}
 }
 
-// TestC1679_005_PortfolioAndLayerRowsNoLongerMarkTheStackNewOrPartial closes the
-// staleness half: two rows still describe the stack as unbuilt while the code is
-// landed, wired and green.
-//
 // acs-predicate: config-check — document content is the deliverable (see 004).
-// Each assertion is scoped to the ONE row that must change, so an unrelated edit
-// elsewhere in the README can neither satisfy nor break it.
 func TestC1679_005_PortfolioAndLayerRowsNoLongerMarkTheStackNewOrPartial(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, alignmentREADME))
@@ -382,63 +287,18 @@ func TestC1679_005_PortfolioAndLayerRowsNoLongerMarkTheStackNewOrPartial(t *test
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AUDIT REPAIR (round 2) — the two defects the auditor named, as RED tests.
-//
-// H1 -> 006. `TestC1676_006_MaterializedEvalIsDurableAndBehavioral` is RED in
-// the shipped tree: it requires the eval it grades to carry >=4 `[code]`
-// behavioural checks, and .evolve/evals/crossartifact-invariant-stack.md
-// carries zero. BOTH sides are added paths in this diff, so this is the lane's
-// own inconsistency. The frozen predicate is NOT the thing to change — 23 live
-// evals already carry `score_cap` frontmatter AND `### ACn: … [code]` sections
-// (docs/eval-grader-best-practices.md §"Recognized grader formats";
-// .evolve/evals/retro-delivery-format-binding.md:49 is the canonical shape), so
-// the eval is simply missing its code-graded half.
-//
-// M1 -> 007. The cycle claimed a verification it never ran, "and no gate before
-// ship could have caught it". The remedy cannot be report prose — a predicate
-// that greps build-report.md for an invocation string is exactly the gameable
-// grep cycle-85 forbids, and the cycle-75 lesson is that Builder-authored
-// verification prose must never be the load-bearing evidence. So 007 RUNS the
-// ship-time added-test backstop DURING the cycle: it re-derives the same seed
-// (go/**/*_test.go the tree ADDS), groups by declared build tags and executes
-// each group, mirroring internal/phases/ship/repocontract.go:353
-// addedTestPackageGroups. A claim cannot outrun evidence the gate itself
-// produces.
-//
-// Flaky-shape contract (Gate D): no `/...` sweep and no known-slow suite named
-// — the run set is the diff's own added packages, which after self-exclusion is
-// `./acs/cycle1676` alone (4.5s measured); every git call is `-C` anchored and
-// every go call is `go -C` anchored, so cwd never decides the answer; no
-// wall-clock bounds, no literal PIDs, no un-reaped load generators.
-// ---------------------------------------------------------------------------
-
 const (
-	// selfPkg is THIS package. 007 must never run it: a test that shells
-	// `go test` on its own package recurses until the process dies.
 	selfPkg = "./acs/cycle1679"
 
-	// gradingPredicate is the frozen added predicate the auditor found RED,
-	// and gradedEval is the added eval it grades. The pair must agree.
 	gradingPredicate = "TestC1676_006_MaterializedEvalIsDurableAndBehavioral"
 	gradedEvalPkg    = "./acs/cycle1676"
 )
 
-// goModRoot anchors every `go` invocation at the lane's module root, so a
-// predicate resolves the same package patterns from the main tree, this
-// worktree, or any fleet lane's cwd.
 func goModRoot(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// TestC1679_006_AddedEvalAndItsGradingPredicateAgreeInTheShippedTree — audit H1.
-//
-// This does not restate 006's assertions (that would be a second copy to drift);
-// it RUNS the real frozen predicate over the real eval and requires it to pass.
-// Asserting on the `--- PASS:` line rather than exit 0 is load-bearing: a `-run`
-// pattern that matches NO test exits 0 with "no tests to run", so a renamed or
-// deleted predicate would otherwise false-GREEN this check.
 func TestC1679_006_AddedEvalAndItsGradingPredicateAgreeInTheShippedTree(t *testing.T) {
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
 		"go", "-C", goModRoot(t), "test", "-tags", "acs", "-count=1", "-v",
@@ -461,8 +321,6 @@ func TestC1679_006_AddedEvalAndItsGradingPredicateAgreeInTheShippedTree(t *testi
 	}
 }
 
-// collectTags walks a parsed //go:build expression and records every tag it
-// names, mirroring internal/phases/ship/repocontract.go collectBuildTags.
 func collectTags(e constraint.Expr, set map[string]bool) {
 	switch v := e.(type) {
 	case *constraint.TagExpr:
@@ -478,9 +336,6 @@ func collectTags(e constraint.Expr, set map[string]bool) {
 	}
 }
 
-// buildTagsOf returns the build tags a Go file's //go:build line declares, and
-// whether the file is runnable here (a requires_tmux file is excluded by the
-// production gate on this host, so it is excluded here too).
 func buildTagsOf(t *testing.T, abs string) (tags []string, runnable bool) {
 	t.Helper()
 	f, err := os.Open(abs)
@@ -500,8 +355,6 @@ func buildTagsOf(t *testing.T, abs string) (tags []string, runnable bool) {
 			}
 			break
 		}
-		// Stop at the first line that is neither blank nor a comment: the
-		// build constraint must precede the package clause.
 		if line != "" && !strings.HasPrefix(line, "//") {
 			break
 		}
@@ -510,7 +363,7 @@ func buildTagsOf(t *testing.T, abs string) (tags []string, runnable bool) {
 		t.Fatalf("scan %s: %v", abs, err)
 	}
 	if expr == nil {
-		return nil, true // untagged: runs in the default build context
+		return nil, true
 	}
 	set := map[string]bool{}
 	collectTags(expr, set)
@@ -524,11 +377,6 @@ func buildTagsOf(t *testing.T, abs string) (tags []string, runnable bool) {
 	return tags, true
 }
 
-// addedGoTestFiles re-derives the ship gate's seed: the `go/**/*_test.go` files
-// this tree ADDS. Both halves matter — the branch-point diff still reports the
-// lane's tests as added once they are committed, and the porcelain half catches
-// them while they are still staged or untracked (a lane's new test is untracked
-// until the ship stages it, which is the case the production gate calls out).
 func addedGoTestFiles(t *testing.T, root string) []string {
 	t.Helper()
 	seen := map[string]bool{}
@@ -559,7 +407,6 @@ func addedGoTestFiles(t *testing.T, root string) []string {
 			if len(line) < 4 {
 				continue
 			}
-			// XY<space>path; an added file is staged-A or untracked.
 			if strings.HasPrefix(line, "A") || strings.HasPrefix(line, "??") {
 				add(line[3:])
 			}
@@ -574,36 +421,6 @@ func addedGoTestFiles(t *testing.T, root string) []string {
 	return paths
 }
 
-// TestC1679_007_EveryAddedGoTestPackageIsGreenBeforeShip — audit M1.
-//
-// The ship-time added-test backstop is the gate that caught H1, and it fires at
-// push, after the cycle's budget is spent. This runs that same gate DURING the
-// cycle, from the same seed, so "the added packages are green" is a claim the
-// cycle cannot make without the evidence having been produced.
-//
-// Scope is the TAG-GUARDED added packages, and that is the whole point rather
-// than a shortcut. An untagged added test (internal/coherence,
-// internal/core) already runs in the `go test -count=1 ./...` every cycle owes
-// the Go conventions, so it was never the hole. A `//go:build acs` package is
-// invisible to every ordinary run — which is precisely how
-// go/acs/cycle1676/predicates_test.go reached ship red while a report claimed
-// it verified. Narrowing here also keeps the flaky-shape contract: the run set
-// is one small package, not the 89s ./internal/core suite the full seed pulls
-// in (cycles 1173/1175/1178 FAILed on sound work for exactly that).
-//
-// The empty-seed case is RED, not a silent pass: this diff demonstrably adds
-// two tag-guarded test packages, so a discovery that finds none means the
-// discovery broke. A vacuous green here would reproduce the exact M1 shape it
-// exists to close.
-// recordedAddedTests is the lane's own added test files — the DURABLE seed.
-// The live seed (addedGoTestFiles: the diff against the merge base plus the
-// working tree) is what proves the claim while the lane is unmerged; once the
-// lane's commit is on main that diff is empty by construction, and a durable
-// predicate that fatals on it is red on every clean checkout (2026-09-15,
-// research F21: RED on main c5883955 in every whole-module floor). On a
-// merged tree the predicate verifies its recorded set instead — the same
-// tag-guarded packages, executed the same way — so the proof M1 demanded
-// never goes vacuous and never depends on the lane's tree state.
 var recordedAddedTests = []string{
 	"go/acs/cycle1676/predicates_test.go",
 	"go/acs/cycle1679/predicates_test.go",
@@ -622,15 +439,13 @@ func TestC1679_007_EveryAddedGoTestPackageIsGreenBeforeShip(t *testing.T) {
 		t.Logf("live added-test seed empty (the lane's commit is on main) — verifying the recorded added set %v", added)
 	}
 
-	// Group added packages by the build tags their files declare, exactly as
-	// internal/phases/ship/repocontract.go addedTestPackageGroups does.
 	pkgsByTagKey := map[string]map[string]bool{}
 	tagsByKey := map[string][]string{}
 	var excluded, untagged []string
 	for _, rel := range added {
 		pkg := "./" + filepath.ToSlash(filepath.Dir(strings.TrimPrefix(rel, "go/")))
 		if pkg == selfPkg {
-			continue // never recurse into this predicate's own package
+			continue
 		}
 		tags, runnable := buildTagsOf(t, filepath.Join(root, rel))
 		if !runnable {
@@ -638,8 +453,6 @@ func TestC1679_007_EveryAddedGoTestPackageIsGreenBeforeShip(t *testing.T) {
 			continue
 		}
 		if len(tags) == 0 {
-			// Already exercised by the mandatory `go test -count=1 ./...`;
-			// re-running it here buys nothing and drags in the slow suites.
 			untagged = append(untagged, pkg)
 			continue
 		}
@@ -693,16 +506,11 @@ func TestC1679_007_EveryAddedGoTestPackageIsGreenBeforeShip(t *testing.T) {
 	}
 }
 
-// numberWords maps the spelled-out forms an explanation document may use for a
-// small count back to digits, so the claim is compared numerically rather than
-// by matching one blessed spelling.
 var numberWords = map[string]int{
 	"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
 	"six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
 }
 
-// parseCount reads a count written either as digits ("7") or as an English word
-// ("seven"), returning false when the token is neither.
 func parseCount(tok string) (int, bool) {
 	tok = strings.ToLower(strings.Trim(tok, "*_`.,"))
 	if n, ok := numberWords[tok]; ok {
@@ -715,24 +523,9 @@ func parseCount(tok string) (int, bool) {
 	return 0, false
 }
 
-// TestC1679_008_ExplanationDocumentCountsAgreeWithTheShippedTree — audit M1.
-//
-// The explanation document is cycle-OWNED narrative, and M1 caught it asserting
-// "this cycle's five acceptance predicates are 5/5 PASS" over a tree carrying
-// seven, two of them RED. That is the claim-discrepancy class the explanation
-// contract exists to catch, and nothing graded it — the document was left at its
-// round-1 text while TDD round 2 added 006/007.
-//
-// Both sides of the comparison are derived from reality: the actual count is
-// parsed out of the predicate file's own declarations, and the claimed count is
-// parsed out of the document's prose. A magic string cannot satisfy it — the
-// only way to green is for the narrative's arithmetic to match the tree's. The
-// document is located by GLOB rather than by a pinned ULID filename so a
-// regenerated explanation is still graded instead of silently skipped.
 func TestC1679_008_ExplanationDocumentCountsAgreeWithTheShippedTree(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 
-	// Actual: count this cycle's predicate declarations in the shipped file.
 	predFile := filepath.Join(root, "go", "acs", "cycle1679", "predicates_test.go")
 	src, err := os.ReadFile(predFile)
 	if err != nil {
@@ -763,15 +556,12 @@ func TestC1679_008_ExplanationDocumentCountsAgreeWithTheShippedTree(t *testing.T
 		if readErr != nil {
 			t.Fatalf("read %s: %v", rel, readErr)
 		}
-		// Collapse whitespace so a claim wrapped across lines ("five acceptance\n
-		// predicates") is still matched as one phrase.
 		flat := strings.Join(strings.Fields(string(raw)), " ")
 
-		// Claim form A: "<n> acceptance predicates".
 		for _, m := range regexp.MustCompile(`(?i)(\S+) acceptance predicates`).FindAllStringSubmatch(flat, -1) {
 			claimed, ok := parseCount(m[1])
 			if !ok {
-				continue // e.g. "the acceptance predicates" — no number claimed
+				continue
 			}
 			if claimed != actual {
 				t.Errorf("RED (audit M1): %s claims %q but the shipped tree carries %d "+
@@ -781,7 +571,6 @@ func TestC1679_008_ExplanationDocumentCountsAgreeWithTheShippedTree(t *testing.T
 			}
 		}
 
-		// Claim form B: "... predicates are N/M PASS".
 		for _, m := range regexp.MustCompile(`(?i)predicates are (\d+)/(\d+) PASS`).FindAllStringSubmatch(flat, -1) {
 			passed, total := 0, 0
 			fmt.Sscanf(m[1], "%d", &passed)

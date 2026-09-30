@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle98 ports the cycle-98 ACS predicates (5 bash files).
-// Subjects: triage phase-skip schema, orchestrator phase-skip precedence,
-// phase-gate forward-skip-under-flag, no-role-execution invariant.
 package cycle98
 
 import (
@@ -13,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC98_001_TriageSchemaDocumentsPhaseSkip ports cycle-98/001.
 func TestC98_001_TriageSchemaDocumentsPhaseSkip(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	triage := filepath.Join(root, "agents", "evolve-triage.md")
@@ -25,7 +21,6 @@ func TestC98_001_TriageSchemaDocumentsPhaseSkip(t *testing.T) {
 	}
 }
 
-// TestC98_002_OrchestratorHonorsPhaseSkipWithPrecedence ports cycle-98/002.
 func TestC98_002_OrchestratorHonorsPhaseSkipWithPrecedence(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	orch := filepath.Join(root, "agents", "evolve-orchestrator.md")
@@ -37,7 +32,6 @@ func TestC98_002_OrchestratorHonorsPhaseSkipWithPrecedence(t *testing.T) {
 	}
 }
 
-// TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag ports cycle-98/003.
 func TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
@@ -49,7 +43,6 @@ func TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag(t *testing.T) {
 	}
 }
 
-// TestC98_004_PhaseSkippedImpliesNoRoleExecution ports cycle-98/004.
 func TestC98_004_PhaseSkippedImpliesNoRoleExecution(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
@@ -61,15 +54,12 @@ func TestC98_004_PhaseSkippedImpliesNoRoleExecution(t *testing.T) {
 	}
 }
 
-// TestC98_005_DefaultOffNoPhaseSkippedBaseline ports cycle-98/005.
 func TestC98_005_DefaultOffNoPhaseSkippedBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	claudeMd := filepath.Join(root, "CLAUDE.md")
 	if _, err := os.Stat(claudeMd); err != nil {
 		t.Skip("CLAUDE.md missing — skip")
 	}
-	// Soft check — only validate when the flag is documented in CLAUDE.md.
-	// CLAUDE.md may have evolved past the cycle-98 era and dropped the row.
 	if !acsassert.FileContainsAny(claudeMd, "EVOLVE_PSMAS_SKIP") {
 		t.Skip("EVOLVE_PSMAS_SKIP not in CLAUDE.md (may be archived) — skip")
 	}

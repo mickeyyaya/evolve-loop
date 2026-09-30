@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle1750 pins the shrink of dag.Levels to the size ratchet, and keeps the already-shrunk cyclehealth.Check and naminguard.Fix as they are.
 package cycle1750
 
 import (
@@ -217,7 +216,6 @@ func TestC1750_007_NoCommentLinesAdded(t *testing.T) {
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1750_008_DagSourceChangedWithoutLosingAComment(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

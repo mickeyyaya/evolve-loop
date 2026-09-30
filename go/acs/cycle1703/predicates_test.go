@@ -1,16 +1,5 @@
 //go:build acs
 
-// Package cycle1703 materialises the acceptance criteria for
-// multi-member-file-scope-advisory: once a multi-member lane's declared set
-// reconciles with the committed set, the TDD scope gate must still judge the
-// authored test files against the union of every member's scout targetFiles,
-// advisory only, while single-member lanes keep today's advisory unchanged.
-//
-// Predicates 001-004 drive the shipping reviewer (topngate.NewReviewer at the
-// enforce stage, the constructor cmd_cycle wires) over synthetic phase
-// deliverables and assert on its verdict and its stderr logf seam. Predicate
-// 005 runs the package's vet and race suite, and requires the named
-// in-package regression tests to PASS.
 package cycle1703
 
 import (
@@ -43,8 +32,6 @@ type scoutTask struct {
 	targetFiles []string
 }
 
-// lane is one TDD-boundary workspace: what triage committed, what scout
-// declared per task, and what the TDD handoff declared and authored.
 type lane struct {
 	committed []string
 	scout     []scoutTask
@@ -110,7 +97,6 @@ func writeJSON(t *testing.T, dir, name string, v any) {
 	writeFile(t, dir, name, string(body))
 }
 
-// twoMembers commits alpha and beta, each declaring its own package.
 func twoMembers(declared []string, authored ...string) lane {
 	return lane{
 		committed: []string{alpha, beta},
@@ -120,8 +106,6 @@ func twoMembers(declared []string, authored ...string) lane {
 	}
 }
 
-// review runs the shipping reviewer at enforce and returns its verdict plus
-// everything it wrote to the stderr logf seam.
 func review(t *testing.T, workspace string) (res core.ReviewResult, logged string) {
 	t.Helper()
 	r, w, err := os.Pipe()

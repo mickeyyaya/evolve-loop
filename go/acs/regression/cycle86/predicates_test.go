@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle86 ports the cycle-86 ACS predicates (5 bash files).
 package cycle86
 
 import (
@@ -11,15 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// pathExists is a small helper; acsassert.FileExists logs an error on
-// miss and we sometimes want quiet skip-on-miss.
 func pathExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
 
-// TestC86_CarryoverShipRefusedDismissed ports pred-carryover-ship-refused-dismissed.sh.
-// state.json:carryoverTodos[] does not contain id=abnormal-ship-refused-c86.
 func TestC86_CarryoverShipRefusedDismissed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
@@ -31,7 +26,6 @@ func TestC86_CarryoverShipRefusedDismissed(t *testing.T) {
 	}
 }
 
-// TestC86_CarryoverTurnOverrunDismissed ports pred-carryover-turn-overrun-dismissed.sh.
 func TestC86_CarryoverTurnOverrunDismissed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
@@ -43,7 +37,6 @@ func TestC86_CarryoverTurnOverrunDismissed(t *testing.T) {
 	}
 }
 
-// TestC86_InboxC2C4Processed ports pred-inbox-c2-c4-processed.sh.
 func TestC86_InboxC2C4Processed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -60,37 +53,25 @@ func TestC86_InboxC2C4Processed(t *testing.T) {
 			t.Errorf("%s: still in root inbox", rootFile)
 		}
 		if !pathExists(procFile) {
-			// Skip on fresh checkouts where cycle-86 hasn't run.
 			t.Skipf("%s: not found in processed/ (cycle-86 not run)", procFile)
 		}
 	}
 }
 
-// TestC86_NoNewTestBuildAbnormal ports pred-no-new-test-build-abnormal.sh.
-// Skips when no cycle-86 abnormal-events.jsonl exists (trivially green).
-// The bash predicate uses jq --slurp to filter event_type ∈
-// {ship-refused, turn-overrun} AND .details matches agent=…. The Go
-// port can't do per-row filtering without parsing NDJSON, so it skips
-// when both substring classes are present (likely false-positive) and
-// defers to the bash predicate for authoritative judgment.
 func TestC86_NoNewTestBuildAbnormal(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	log := filepath.Join(root, ".evolve", "runs", "cycle-86", "abnormal-events.jsonl")
 	if !pathExists(log) {
-		return // trivially green per bash
+		return
 	}
 	hasForbiddenAgent := acsassert.FileContainsAny(log,
 		"agent=tdd-engineer", "agent=builder", "agent=tester")
 	hasForbiddenEvent := acsassert.FileContainsAny(log, "ship-refused", "turn-overrun")
 	if hasForbiddenAgent && hasForbiddenEvent {
-		// Substring co-occurrence isn't proof of co-row presence; defer
-		// to the bash predicate's structured jq filter.
 		t.Skipf("%s: substring co-occurrence of forbidden agent+event — bash predicate authoritative for per-row check", log)
 	}
 }
 
-// TestC86_RegressionSuite86Passes ports pred-regression-suite-86-passes.sh.
-// Asserts presence of the 5 sub-predicates (bash counterpart executes them).
 func TestC86_RegressionSuite86Passes(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	suiteDir := filepath.Join(root, "acs", "regression-suite", "cycle-86")

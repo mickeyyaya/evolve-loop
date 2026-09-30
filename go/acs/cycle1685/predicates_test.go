@@ -1,62 +1,5 @@
 //go:build acs
 
-// Package cycle1685 materialises the cycle-1685 acceptance criteria for the one
-// fleet-scoped inbox id `evalgate-selectedslugs-nil-blindness` (scout task
-// `evalgate-parse-miss-vs-convergence-signal`).
-//
-// The defect. `evalgate.SelectedSlugs` collapses two categorically different
-// zero-slug scout-report shapes into the same `nil`:
-//
-//  1. genuine convergence — no "## Selected Tasks" section at all (nothing was
-//     claimed; fail-open is CORRECT here), and
-//  2. format drift — a "## Selected Tasks" section that IS present with real
-//     task prose whose slug is stated in a form `slugLineRE` does not
-//     recognise, so it parses to zero slugs (the cycle-1570 shape: scout
-//     selected `config-gate-default-policy-authority`, no eval file, and Gate
-//     A's fail-open path let it through to surface three phases later as an
-//     audit H1).
-//
-// Gate A's `check()` — the only seam an agent or operator actually sees —
-// returns ("", false) for BOTH, so nothing distinguishes "nothing to check"
-// from "something to check that we failed to read".
-//
-// The accepted fix is a new exported `SelectedTasksParseMiss(report string) bool`
-// scoped strictly to the bounded "## Selected Tasks" section, surfaced through
-// Gate A as an ADVISORY WARN. It is deliberately NOT a new hard block: blocking
-// every zero-slug report would false-block every genuine convergence cycle and
-// contradict the package's own documented fail-open-on-ambiguity contract.
-//
-// Predicate strategy — every predicate exercises the system under test (the
-// cycle-85 degenerate-predicate ban):
-//
-//   - 001-005 CALL the detector on real report bodies and assert its boolean.
-//     001 is the crux positive; 002/003/004/005 are the negatives and the
-//     section-bounding edges that a no-op `return true` would fail.
-//   - 006 is the CALLER PROOF: it drives the real production reviewer
-//     (`evalgate.NewReviewer(...).Review(...)`, the core.WithReviewer seam) and
-//     asserts the advisory actually reaches Gate A's emitted log line. A
-//     detector nothing calls from production is dead code, and a predicate that
-//     only calls it directly would pass on dead code.
-//   - 007 pins the contract the fix must NOT break: silence on genuine
-//     convergence, and the pre-existing HARD BLOCK on a selected slug with no
-//     eval file still fires at enforce.
-//   - 008 closes the apicover false-green hole (internal/evalgate is enrolled
-//     in go/.apicover-enforce) using apicover's own AST detector.
-//   - 009 proves the durable eval's three `[code]` grader tests actually RAN
-//     and passed — `go test -run <name>` that matches NOTHING still exits 0,
-//     which is the vacuous-pass hole those graders would otherwise carry — and
-//     that the files carrying them are git-TRACKED (a gitignored test file is
-//     dropped at ship: the cycle-92 shape).
-//   - 010 is the no-regression floor for the package.
-//   - 011-012 materialise the standing audit finding M1 (audit round 1). They are
-//     the ONE class in this file that asserts on a prose deliverable, because the
-//     remedy M1 asks for IS prose: the explanation document must state the
-//     advisory's aggregate measured operating point instead of the marginal
-//     contribution of one formatting variant. They carry an explicit
-//     `// acs-predicate: config-check` waiver and are NOT bare greps — 011 parses
-//     the numerator/denominator/percentage out of the document and re-derives the
-//     arithmetic, so pasting the pre-existing `12 of 84` / `one cycle in seven`
-//     figures cannot satisfy them.
 package cycle1685
 
 import (
@@ -80,26 +23,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// cycle1570Report is the REAL incident shape, reproduced verbatim from this
-// cycle's bug-reproduction phase: a "## Selected Tasks" section holding genuine
-// task prose for `config-gate-default-policy-authority`, whose slug is stated as
-// free prose ("Task slug: ...") rather than the "- **Slug:** <kebab>" bullet the
-// parser requires. Neither empty nor absent — and it parses to zero slugs.
 const cycle1570Report = "# Scout Report\n\n## Selected Tasks\n\n" +
 	"### Task 1: Config gate default policy authority\n" +
 	"Task slug: config-gate-default-policy-authority\n" +
 	"- **Type:** bug\n- **Complexity:** S\n\n" +
 	"No eval file was authored for this task; the slug is only named in prose above.\n"
 
-// evalgatePkgDir is the package under test, resolved from the repo root.
 func evalgatePkgDir(root string) string { return filepath.Join(root, "go", "internal", "evalgate") }
 
-// TestC1685_001_ParseMissTrueOnCycle1570Shape is the crux: the detector must
-// return true for a Selected Tasks section that has real content the parser
-// could not read. Asserts the fixture PREMISE first (this shape really does
-// still parse to zero slugs) so a future parser change that stops reproducing
-// the incident fails loudly here instead of the predicate quietly testing
-// nothing.
 func TestC1685_001_ParseMissTrueOnCycle1570Shape(t *testing.T) {
 	if got := evalgate.SelectedSlugs(cycle1570Report); got != nil {
 		t.Fatalf("fixture premise broken: the cycle-1570 shape must still parse to ZERO slugs for this predicate to exercise the reported bug; SelectedSlugs()=%v", got)
@@ -109,10 +40,6 @@ func TestC1685_001_ParseMissTrueOnCycle1570Shape(t *testing.T) {
 	}
 }
 
-// TestC1685_002_ParseMissFalseOnGenuineConvergence is the primary negative: a
-// report that claims no work must NOT be flagged. A detector that returns true
-// here would fire on every converged cycle and reintroduce exactly the
-// false-blocking risk the fail-open contract exists to avoid.
 func TestC1685_002_ParseMissFalseOnGenuineConvergence(t *testing.T) {
 	cases := []struct{ name, report string }{
 		{"no Selected Tasks section at all", "## Gap Analysis\nNothing to do.\n"},
@@ -129,10 +56,6 @@ func TestC1685_002_ParseMissFalseOnGenuineConvergence(t *testing.T) {
 	}
 }
 
-// TestC1685_003_ParseMissFalseOnWellFormedSelections pins the healthy path: a
-// section the parser CAN read is not drift. The last case is the eval's explicit
-// negative — a malformed Decision Trace block must not leak into a signal that
-// is scoped to the Selected Tasks section only.
 func TestC1685_003_ParseMissFalseOnWellFormedSelections(t *testing.T) {
 	cases := []struct{ name, report string }{
 		{
@@ -167,10 +90,6 @@ func TestC1685_003_ParseMissFalseOnWellFormedSelections(t *testing.T) {
 	}
 }
 
-// TestC1685_004_ParseMissFalseOnContentlessSection is the boundary the scout
-// acceptance calls out by name: a heading with only blank lines or comments
-// under it is still convergence, not drift. A naive "heading present and zero
-// slugs" implementation passes 001-003 and fails here.
 func TestC1685_004_ParseMissFalseOnContentlessSection(t *testing.T) {
 	cases := []struct{ name, report string }{
 		{"heading then EOF", "## Selected Tasks\n"},
@@ -188,10 +107,6 @@ func TestC1685_004_ParseMissFalseOnContentlessSection(t *testing.T) {
 	}
 }
 
-// TestC1685_005_ParseMissIsSectionBounded proves the signal honours the same
-// "## " bound selectedTaskSlugs already uses: prose in a LATER section must not
-// make an empty Selected Tasks section look like drift, and a drifted section
-// must still be caught when another section follows it.
 func TestC1685_005_ParseMissIsSectionBounded(t *testing.T) {
 	outsideOnly := "## Selected Tasks\n\n## Deferred\n\n### Task 1: Elsewhere\n" +
 		"Task slug: lives-in-another-section\nreal prose that is not in the bounded body\n"
@@ -209,12 +124,6 @@ func TestC1685_005_ParseMissIsSectionBounded(t *testing.T) {
 	}
 }
 
-// TestC1685_006_AdvisoryReachesGateAThroughTheProductionReviewer is the caller
-// proof. It does NOT call the detector: it drives evalgate.NewReviewer — the
-// object the orchestrator mounts at core.WithReviewer — and asserts the
-// parse-miss actually surfaces on Gate A's emitted log line, which is the only
-// channel an operator or agent ever sees. A detector wired into nothing would
-// pass 001-005 and fail here.
 func TestC1685_006_AdvisoryReachesGateAThroughTheProductionReviewer(t *testing.T) {
 	root, ws := t.TempDir(), t.TempDir()
 	writeScoutReport(t, ws, cycle1570Report)
@@ -240,10 +149,6 @@ func TestC1685_006_AdvisoryReachesGateAThroughTheProductionReviewer(t *testing.T
 	}
 }
 
-// TestC1685_007_GateABlockingContractPreserved pins both halves of what the fix
-// must not disturb: Gate A stays SILENT on a genuine convergence report (an
-// advisory that fires every cycle is noise, not signal), and the pre-existing
-// hard block on a selected slug with no eval file still fires at enforce.
 func TestC1685_007_GateABlockingContractPreserved(t *testing.T) {
 	t.Run("silent on genuine convergence", func(t *testing.T) {
 		root, ws := t.TempDir(), t.TempDir()
@@ -277,10 +182,6 @@ func TestC1685_007_GateABlockingContractPreserved(t *testing.T) {
 	})
 }
 
-// TestC1685_008_NewExportIsNamedAndDocumented closes the apicover false-green
-// hole: internal/evalgate is enrolled in go/.apicover-enforce, so an export that
-// no test in the package NAMES reds `make apicover-enforce` for the whole tree.
-// The check runs apicover's own AST detector rather than re-implementing it.
 func TestC1685_008_NewExportIsNamedAndDocumented(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	if !acsassert.FileContains(t, filepath.Join(root, "go", ".apicover-enforce"), "./internal/evalgate") {
@@ -307,13 +208,6 @@ func TestC1685_008_NewExportIsNamedAndDocumented(t *testing.T) {
 	}
 }
 
-// TestC1685_009_EvalGraderTestsRanPassedAndAreTracked proves the durable eval's
-// three [code] graders are not vacuous. `go test -run <name>` whose pattern
-// matches NOTHING still exits 0, so each grader is re-run here and the "--- PASS:
-// <name>" line is required. It also pins the REAL incident slug as the fixture
-// (not a synthetic stand-in, which the eval demands by name) and asserts the
-// files carrying these tests are git-TRACKED — a gitignored test file is silently
-// dropped at ship.
 func TestC1685_009_EvalGraderTestsRanPassedAndAreTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -358,10 +252,6 @@ func TestC1685_009_EvalGraderTestsRanPassedAndAreTracked(t *testing.T) {
 	}
 }
 
-// TestC1685_010_EvalgatePackageGreenAndGofmtClean is the no-regression floor:
-// the whole package (including the pre-existing TestSelectedSlugs and
-// TestSlugParserContract that pin the fail-open contract and the scout template
-// tokens) stays green, and the tree stays formatted.
 func TestC1685_010_EvalgatePackageGreenAndGofmtClean(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -380,10 +270,6 @@ func TestC1685_010_EvalgatePackageGreenAndGofmtClean(t *testing.T) {
 	}
 }
 
-// writeScoutReport places body at the artifact name the scout phase really
-// writes, resolved from the phasecontract registry (the same SSOT Gate A reads
-// through) so a registry rename cannot leave this predicate writing a file the
-// gate no longer looks for.
 func writeScoutReport(t *testing.T, workspace, body string) {
 	t.Helper()
 	name := phasecontract.ArtifactName(string(core.PhaseScout))
@@ -395,9 +281,6 @@ func writeScoutReport(t *testing.T, workspace, body string) {
 	}
 }
 
-// captureStderr runs fn with os.Stderr redirected to a pipe and returns what was
-// written. reviewer.logf writes its gate lines to os.Stderr at call time, so this
-// is how the production advisory is observed without re-implementing the gate.
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -422,9 +305,6 @@ func captureStderr(t *testing.T, fn func()) string {
 	return out
 }
 
-// runIn executes one command with an explicit working directory — never the
-// process cwd, which differs between the main tree, the cycle worktree and each
-// fleet lane.
 func runIn(t *testing.T, dir, name string, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
 	var outBuf, errBuf strings.Builder
@@ -441,7 +321,6 @@ func runIn(t *testing.T, dir, name string, args ...string) (stdout, stderr strin
 	return outBuf.String(), errBuf.String(), code
 }
 
-// packageSources returns the contents of every .go file directly in dir.
 func packageSources(t *testing.T, dir string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -462,8 +341,6 @@ func packageSources(t *testing.T, dir string) []string {
 	return out
 }
 
-// sourcesNaming returns the paths of files in dir whose name ends with suffix
-// and whose contents mention needle.
 func sourcesNaming(t *testing.T, dir, suffix, needle string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -487,46 +364,19 @@ func sourcesNaming(t *testing.T, dir, suffix, needle string) []string {
 	return out
 }
 
-// The advisory's operating point, measured 2026-09-15 over
-// `.evolve/runs/cycle-16*/scout-report.md` by calling the shipped detector on
-// each report: 84 reports carry a "## Selected Tasks" section (all of them),
-// SelectedTasksParseMiss fires on 59 of those (70.2%), and 56 of the 59 have an
-// entirely empty SelectedSlugs union — i.e. Gate A really was checking nothing
-// on those cycles, which is what makes the number a finding rather than noise.
-// For context the pre-fix pattern fired on 71 of 84 (84.5%), so the backtick
-// widening rescued exactly 12 reports (71-59), matching the document's own
-// "12 of 84" claim.
 const (
 	measuredParseMissFires = 59
 	measuredReportCorpus   = 84
 	measuredEmptyUnion     = 56
 )
 
-// numOfDenRE matches a stated fraction in prose: "59 of 84", "59 of the 84",
-// or "59/84".
 var numOfDenRE = regexp.MustCompile(`(\d{1,4})\s*(?:/|of\s+(?:the\s+)?)\s*(\d{1,4})`)
 
-// percentRE matches a stated percentage, with or without a decimal part.
 var percentRE = regexp.MustCompile(`(\d{1,3}(?:\.\d+)?)\s*%`)
 
-// isoDateRE matches the YYYY-MM-DD measurement stamp this diff already uses in
-// slugs.go ("measured 2026-09-15").
 var isoDateRE = regexp.MustCompile(`\d{4}-\d{2}-\d{2}`)
 
-// TestC1685_011_ExplanationStatesMeasuredOperatingPoint materialises standing
-// audit finding M1. The explanation document must state the advisory's AGGREGATE
-// operating point — the rate at which the signal actually speaks — not only the
-// marginal contribution of the backticked-slug variant.
-//
 // acs-predicate: config-check
-//
-// Waiver rationale: the remedy M1 asks for is a prose correction to a tracked
-// deliverable, so the document's text IS the system under test and there is no
-// other seam to drive — the cycle-85 "magic string is not the fix" hazard does
-// not apply, because here the string is precisely the fix. It is still not a
-// bare grep: the numerator, denominator and percentage are parsed out of the
-// document and the percentage is RE-DERIVED from the fraction, so the
-// pre-existing "12 of 84 / one cycle in seven" figures cannot satisfy it.
 func TestC1685_011_ExplanationStatesMeasuredOperatingPoint(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path, doc := explanationDoc(t, root)
@@ -558,9 +408,6 @@ func TestC1685_011_ExplanationStatesMeasuredOperatingPoint(t *testing.T) {
 			100*float64(measuredParseMissFires)/float64(measuredReportCorpus), measuredEmptyUnion)
 	}
 
-	// The percentage must be re-derivable from the fraction the document itself
-	// states — a stated rate that does not match its own numerator/denominator is
-	// the same class of misleading-but-individually-true number M1 is about.
 	want := 100 * float64(measuredParseMissFires) / float64(measuredReportCorpus)
 	var matched bool
 	var seen []string
@@ -584,8 +431,6 @@ func TestC1685_011_ExplanationStatesMeasuredOperatingPoint(t *testing.T) {
 		t.Errorf("the operating-point paragraph carries no YYYY-MM-DD measurement date, so a future reader cannot tell what the number was true of (slugs.go already uses this convention):\n%s", stated)
 	}
 
-	// The empty-union subset is what makes the rate a finding rather than noise:
-	// on those cycles Gate A was genuinely checking nothing.
 	var unionStated bool
 	for _, para := range splitParagraphs(doc) {
 		if !strings.Contains(para, strconv.Itoa(measuredEmptyUnion)) {
@@ -602,18 +447,7 @@ func TestC1685_011_ExplanationStatesMeasuredOperatingPoint(t *testing.T) {
 	}
 }
 
-// TestC1685_012_ExplanationDropsConditionalFraming is M1's second half: the
-// Limitations section presents the every-cycle warning as a hypothetical future
-// while the persona is already drifting on ~7 of every 10 cycles, and the
-// one-cycle-in-seven figure is offered as the advisory's fire rate when it is
-// only the marginal contribution of one formatting variant.
-//
 // acs-predicate: config-check
-//
-// Waiver rationale: as for 011 — the deliverable under test is prose. The
-// assertions are negative (a specific misleading framing must be GONE) and
-// conditional (a figure may stay only if it is labelled for what it is), neither
-// of which a magic string can satisfy.
 func TestC1685_012_ExplanationDropsConditionalFraming(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	_, doc := explanationDoc(t, root)
@@ -631,8 +465,6 @@ func TestC1685_012_ExplanationDropsConditionalFraming(t *testing.T) {
 		t.Errorf("Limitations discusses the un-escalated repeat warning without stating the measured rate it is a limitation OF:\n%s", limitations)
 	}
 
-	// The marginal figure may remain, but only labelled as marginal. Left bare it
-	// is the single fire-rate number in the document and reads as the advisory's.
 	marginalRE := regexp.MustCompile(`(?i)one\s+cycle\s+in\s+seven|1\s+cycle\s+in\s+7|cycle\s+in\s+seven`)
 	for _, para := range splitParagraphs(doc) {
 		if !marginalRE.MatchString(para) {
@@ -645,9 +477,6 @@ func TestC1685_012_ExplanationDropsConditionalFraming(t *testing.T) {
 	}
 }
 
-// explanationDoc resolves this cycle's build explanation document by glob rather
-// than by its ULID-suffixed name, so a regenerated document does not silently
-// leave these predicates reading a file that no longer exists.
 func explanationDoc(t *testing.T, root string) (path, content string) {
 	t.Helper()
 	matches, err := filepath.Glob(filepath.Join(root, "docs", "explain", "builds", "cycle-1685-*.md"))
@@ -664,15 +493,10 @@ func explanationDoc(t *testing.T, root string) (path, content string) {
 	return matches[0], string(body)
 }
 
-// splitParagraphs splits markdown into blank-line-delimited blocks, which is the
-// unit a hard-wrapped prose claim actually occupies.
 func splitParagraphs(doc string) []string {
 	return regexp.MustCompile(`\n\s*\n`).Split(doc, -1)
 }
 
-// sectionBody returns the text under heading up to the next "## " heading (or
-// EOF) — the same bounding rule the package under test applies to its own
-// sections.
 func sectionBody(doc, heading string) string {
 	start := strings.Index(doc, heading)
 	if start < 0 {
@@ -685,67 +509,18 @@ func sectionBody(doc, heading string) string {
 	return body
 }
 
-// --- audit round 2, finding H1 -----------------------------------------------
-//
-// The round-1 diff attached a NEUTRALITY CLAIM to the `slugLineRE` widening and
-// shipped it in three places: the production comment (slugs.go), the explanation
-// document (twice) and build-report.md. It said: "every one of those 12 also
-// carries a '## Decision Trace' naming the same slugs, so the union
-// SelectedSlugs returns is unchanged and no report becomes newly blockable."
-//
-// What round 1 measured was HEADING PRESENCE — all 12 do carry a
-// "## Decision Trace". What it CLAIMED was union equality, which was never
-// measured. Re-measured 2026-09-15 by calling the shipped SelectedSlugs on every
-// `.evolve/runs/cycle-16*/scout-report.md` and comparing against the
-// pre-widening pattern copied verbatim from `git show HEAD:...slugs.go`:
-//
-//	84  reports carry a "## Selected Tasks" section
-//	12  state the slug in the backticked form (the document's own figure)
-//	 6  return a DIFFERENT union — all six empty -> non-empty
-//	 2  of those six become newly BLOCKABLE at Gate A / StageEnforce, the newly
-//	    parsed slug having no eval file at either root evalFilePath checks:
-//	      cycle-1664 -> settle-wait-stability-shortcircuit
-//	      cycle-1669 -> verdict-tool-call-claudep
-//
-// The cause is the one the audit names: those reports DO carry a
-// "## Decision Trace", but it states the selection as a "selected_tasks" string
-// array rather than the decisionTrace[].finalDecision shape decisionTraceSelected
-// reads, so the trace supplies nothing and the backticked bullet is the slug's
-// only source.
-//
-// The widening is therefore a deliberate CAPABILITY INCREASE — Gate A now
-// catching two genuinely missing evals is the gate doing its cycle-166 job — and
-// NOT a neutral edit. 013/014 pin that behaviour hermetically so a later "fix"
-// cannot quietly revert the widening instead of correcting the sentence;
-// 015/016/017 require the repo to STATE the measured effect and to make the
-// statement executable. build-report.md, the third site, is gitignored and lives
-// outside the worktree, so it is dispositioned manual+checklist to the Auditor
-// rather than pinned by a predicate reading an unreachable path.
 const (
-	measuredUnionDeltaReports = 6 // of measuredReportCorpus (84), all empty -> non-empty
-	measuredNewlyBlockable    = 2 // of those 6, newly blockable at StageEnforce
+	measuredUnionDeltaReports = 6
+	measuredNewlyBlockable    = 2
 )
 
-// measuredNewlyBlockableEvidence is the concrete falsifying evidence: the two
-// reports whose newly parsed slug has no eval file. Naming them is what makes
-// the corrected claim re-derivable by the next reader instead of re-asserted.
 var measuredNewlyBlockableEvidence = map[string]string{
 	"cycle-1664": "settle-wait-stability-shortcircuit",
 	"cycle-1669": "verdict-tool-call-claudep",
 }
 
-// preWideningSlugLineRE is slugLineRE exactly as it stood at HEAD before this
-// cycle's widening (`git show HEAD:go/internal/evalgate/slugs.go`, line 96). It
-// is the counterfactual arm: the production parser cannot be swapped back at
-// run time, so proving a behavioural DELTA hermetically needs a local copy of
-// what the old pattern matched.
 var preWideningSlugLineRE = regexp.MustCompile(`(?m)^[*\-]\s*\*\*Slug:\*\*\s*([a-z0-9][a-z0-9-]*)`)
 
-// cycle1664Report and cycle1669Report reproduce the two REAL reports that
-// falsify the neutrality claim, each keeping the two properties that matter: the
-// slug appears ONLY as a backticked "- **Slug:**" bullet, and the
-// "## Decision Trace" is present but states its selection as a "selected_tasks"
-// array, which decisionTraceSelected does not read.
 const cycle1664Report = "# Scout Report — Cycle 1664\n\n" +
 	"## Selected Tasks\n\n" +
 	"### Task 1: settle-wait stability short-circuit\n" +
@@ -769,11 +544,6 @@ const cycle1669Report = "# Scout Report — Cycle 1669\n\n" +
 	"  \"deferred\": [\"extend-structured-verdict-to-codex-agy\"]\n" +
 	"}\n```\n"
 
-// preWideningUnion returns the slugs the PRE-widening parser would have found.
-// Both fixtures carry exactly one "- **Slug:**" bullet and it sits inside the
-// Selected Tasks section, so matching over the whole report is equivalent to
-// production's bounded match here — 013 asserts that equivalence by requiring
-// the shipped parser to return exactly the one expected slug.
 func preWideningUnion(report string) []string {
 	var out []string
 	for _, m := range preWideningSlugLineRE.FindAllStringSubmatch(report, -1) {
@@ -783,31 +553,15 @@ func preWideningUnion(report string) []string {
 	return out
 }
 
-// TestC1685_013_BacktickWideningIsNotUnionNeutral falsifies the shipped claim
-// behaviourally and hermetically: on both real reports the trace supplies
-// NOTHING, the pre-widening pattern matches NOTHING, and the shipped
-// SelectedSlugs returns the slug — so the union it returns is demonstrably NOT
-// unchanged by the widening.
-//
-// It is expected to be pre-existing GREEN: the defect H1 names is the false
-// SENTENCE, not the behaviour. Its job is to make the corrected sentence
-// durable — a later "repair" that reverts the widening to make the neutrality
-// claim true again fails here, and should, because reverting would restore a
-// spurious parse-miss WARN on 12 of 84 reports and re-hide the two genuinely
-// missing evals Gate A now catches.
 func TestC1685_013_BacktickWideningIsNotUnionNeutral(t *testing.T) {
 	for _, tc := range []struct{ cycle, slug, report string }{
 		{"cycle-1664", measuredNewlyBlockableEvidence["cycle-1664"], cycle1664Report},
 		{"cycle-1669", measuredNewlyBlockableEvidence["cycle-1669"], cycle1669Report},
 	} {
 		t.Run(tc.cycle, func(t *testing.T) {
-			// Premise 1: the report carries the "## Decision Trace" whose mere
-			// presence was round 1's stated evidence for neutrality.
 			if !strings.Contains(tc.report, "## Decision Trace") {
 				t.Fatalf("fixture premise broken: %s no longer carries a \"## Decision Trace\" — the claim under test was ABOUT reports that carry one", tc.cycle)
 			}
-			// Premise 2: the pre-widening pattern found nothing here, so this
-			// report really is one the widening changed.
 			if before := preWideningUnion(tc.report); len(before) != 0 {
 				t.Fatalf("fixture premise broken: the pre-widening pattern already matched %v in %s, so this report cannot demonstrate a widening delta", before, tc.cycle)
 			}
@@ -823,14 +577,6 @@ func TestC1685_013_BacktickWideningIsNotUnionNeutral(t *testing.T) {
 	}
 }
 
-// TestC1685_014_BacktickedSlugWithNoEvalNewlyBlocksGateA is the caller proof for
-// the half of the claim that says "no report becomes newly blockable". It drives
-// the production reviewer (evalgate.NewReviewer, the core.WithReviewer seam) at
-// StageEnforce over an A/B pair that differs ONLY by the backticked slug bullet:
-// with the bullet Gate A BLOCKS, without it Gate A fail-opens. That delta is
-// precisely "newly blockable", proven without touching the gitignored corpus.
-//
-// Also expected pre-existing GREEN, and kept for the same reason as 013.
 func TestC1685_014_BacktickedSlugWithNoEvalNewlyBlocksGateA(t *testing.T) {
 	review := func(t *testing.T, report string) core.ReviewResult {
 		t.Helper()
@@ -847,8 +593,6 @@ func TestC1685_014_BacktickedSlugWithNoEvalNewlyBlocksGateA(t *testing.T) {
 			report = cycle1669Report
 		}
 		t.Run(cycle, func(t *testing.T) {
-			// B arm: the same report with the slug bullet removed — what the
-			// pre-widening parser effectively saw. Gate A had nothing to check.
 			without := regexp.MustCompile("(?m)^- \\*\\*Slug:\\*\\*.*\n").ReplaceAllString(report, "")
 			if strings.Contains(without, "**Slug:**") {
 				t.Fatalf("counterfactual arm still carries a Slug bullet — the A/B pair is not isolated to the widening")
@@ -860,8 +604,6 @@ func TestC1685_014_BacktickedSlugWithNoEvalNewlyBlocksGateA(t *testing.T) {
 				t.Fatalf("Gate A BLOCKED the counterfactual arm (reason=%q) — without a parsed slug it must fail open, so this pair cannot show a *newly* blockable report", res.Reason)
 			}
 
-			// A arm: the real report. The widening parses the slug, it has no
-			// eval file, and Gate A blocks where it previously fail-opened.
 			res := review(t, report)
 			if res.Approve {
 				t.Fatalf("Gate A APPROVED %s, whose backticked slug %q has no eval file — then the widening really would be blocking-neutral and H1's measurement would be wrong; re-measure before editing any claim", cycle, slug)
@@ -873,11 +615,6 @@ func TestC1685_014_BacktickedSlugWithNoEvalNewlyBlocksGateA(t *testing.T) {
 	}
 }
 
-// falsifiedNeutralityClaims are the assertions H1 proved false. Each must be
-// GONE from every deliverable that carried it. They are matched as assertions,
-// not as topics: "is NOT blocking-neutral" and "was not measured blocking-
-// neutral" do not match, so the corrected sentence is free to use the same
-// vocabulary as the sentence it replaces.
 var falsifiedNeutralityClaims = []struct {
 	what string
 	re   *regexp.Regexp
@@ -889,8 +626,6 @@ var falsifiedNeutralityClaims = []struct {
 	{"the claim that no gate's blocking behaviour changes", regexp.MustCompile(`(?i)\bno\s+gate'?s?\s+blocking\s+behaviou?r\s+changes\b`)},
 }
 
-// correctedClaimGuidance is the exact remedy, quoted in every failure message so
-// the rebuild is not left guessing at the shape that satisfies these predicates.
 const correctedClaimGuidance = "" +
 	"H1 remedy — replace the falsified neutrality claim with the MEASURED effect. Measured 2026-09-15 by\n" +
 	"calling the shipped SelectedSlugs on every .evolve/runs/cycle-16*/scout-report.md and comparing it\n" +
@@ -902,7 +637,6 @@ const correctedClaimGuidance = "" +
 	"than a regression (Gate A catching a genuinely missing eval is its cycle-166 job), and name the two\n" +
 	"reports so the next reader can re-derive it instead of trusting it."
 
-// assertNoFalsifiedClaim fails for each falsified assertion still present in doc.
 func assertNoFalsifiedClaim(t *testing.T, label, doc string) {
 	t.Helper()
 	for _, c := range falsifiedNeutralityClaims {
@@ -913,10 +647,6 @@ func assertNoFalsifiedClaim(t *testing.T, label, doc string) {
 	}
 }
 
-// statesFraction reports whether any blank-line-delimited block of doc states
-// num/den as a fraction ("6 of 84", "6 of the 84", "6/84") while also mentioning
-// every required word — so a bare digit elsewhere in the document cannot satisfy
-// the check.
 func statesFraction(doc string, num, den int, mustMention ...string) (string, bool) {
 	for _, para := range splitParagraphs(doc) {
 		low := strings.ToLower(para)
@@ -938,8 +668,6 @@ func statesFraction(doc string, num, den int, mustMention ...string) (string, bo
 	return "", false
 }
 
-// precedingComment returns the contiguous "//" comment block immediately above
-// decl in src — the scope a claim about that declaration actually occupies.
 func precedingComment(src, decl string) string {
 	i := strings.Index(src, decl)
 	if i < 0 {
@@ -960,18 +688,7 @@ func precedingComment(src, decl string) string {
 	return strings.Join(block, "\n")
 }
 
-// TestC1685_015_SlugsGoStatesTheMeasuredBlockingEffect materialises H1 at the
-// first of the three sites: the production comment that originated the claim.
-//
 // acs-predicate: config-check
-//
-// Waiver rationale: H1's defect IS a sentence — a false claim shipped in a
-// comment — so the text is the system under test and there is no other seam to
-// drive. It is not a bare grep in either direction: the load-bearing assertions
-// are NEGATIVE (a specific falsified assertion must be GONE, which no magic
-// string can satisfy), and the positive half requires the measured fraction and
-// the two named counterexamples, which 013/014 independently prove by running
-// the parser and the production reviewer.
 func TestC1685_015_SlugsGoStatesTheMeasuredBlockingEffect(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path := filepath.Join(evalgatePkgDir(root), "slugs.go")
@@ -1009,15 +726,7 @@ func TestC1685_015_SlugsGoStatesTheMeasuredBlockingEffect(t *testing.T) {
 	}
 }
 
-// TestC1685_016_ExplanationStatesTheMeasuredBlockingEffect materialises H1 at
-// the second site. The document carries the claim TWICE — once in the body
-// paragraph about the widening and once in "## Compatibility" — and both must go.
-//
 // acs-predicate: config-check
-//
-// Waiver rationale: as for 015 — the deliverable under test is prose, the
-// load-bearing assertions are negative, and the positive half demands figures
-// 013/014 prove behaviourally.
 func TestC1685_016_ExplanationStatesTheMeasuredBlockingEffect(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path, doc := explanationDoc(t, root)
@@ -1054,16 +763,6 @@ func TestC1685_016_ExplanationStatesTheMeasuredBlockingEffect(t *testing.T) {
 	}
 }
 
-// TestC1685_017_WideningEffectIsPinnedByATrackedInPackageTest is the durable
-// half of H1's remedy, and the lesson under it: the round-1 claim was never
-// RUN. A corrected sentence that is still only a sentence is the same artifact
-// one measurement later — the next reader has no way to re-derive it, and the
-// gitignored corpus it was measured over is not in the repo.
-//
-// So the corrected claim must be carried by a git-TRACKED test inside the
-// package it is a claim about, which asserts the widening's effect hermetically
-// and passes. The `--- PASS:` line is required because `go test -run <name>`
-// whose pattern matches NOTHING still exits 0 — the vacuous-pass hole.
 func TestC1685_017_WideningEffectIsPinnedByATrackedInPackageTest(t *testing.T) {
 	const name = "TestSlugLineWideningIsNotBlockingNeutral"
 	root := acsassert.RepoRoot(t)

@@ -1,25 +1,5 @@
 //go:build acs
 
-// Package cycle1729 materialises raw-git-fixture-ratchet: a repo-contract test
-// fails on a new raw git init in a test outside internal/gittest, and the
-// existing call sites are listed and may only shrink.
-//
-// Pinned contract:
-//
-//   - the ratchet is the default (untagged) test suite of go/internal/rawgitratchet,
-//     and its list of existing call sites is go/internal/rawgitratchet/baseline.json;
-//   - it binds the module's git-TRACKED test files (index-staged counts as
-//     tracked), so an untracked file never reds it (ADR-0084 I1), and it binds
-//     every on-disk test file when the module is not in a git work tree;
-//   - a violation fails a named test whose output names the file by its
-//     module-relative path;
-//   - the list is per file and per call site: a new site in a listed file fails,
-//     and a migrated file must leave the list;
-//   - a ship.repoContractPackages entry reaches the package, and the package is
-//     apicover-clean and enrolled in go/.apicover-enforce.
-//
-// Every negative predicate runs the real ratchet against a copy of the module
-// in t.TempDir(); the worktree is never modified.
 package cycle1729
 
 import (
@@ -48,11 +28,9 @@ const (
 	ratchetPkg    = "./internal/rawgitratchet"
 	baselineRel   = "internal/rawgitratchet/baseline.json"
 	scratchDir    = "internal/zzrawgitratchet"
-	mirrorMaxFile = 1 << 20 // skips build outputs such as the evolve binary
+	mirrorMaxFile = 1 << 20
 )
 
-// The git binary name and the init subcommand are assembled at run time so this
-// file holds no raw-init shape of its own for the ratchet to list.
 var (
 	gitBin   = "gi" + "t"
 	gitWord  = strconv.Quote(gitBin)
@@ -77,8 +55,6 @@ func TestScratchLiteralInit(t *testing.T) {
 }
 `
 
-// wrappedInit is the dominant existing shape: a local helper spawns git and the
-// test hands it the init subcommand.
 const wrappedInit = `package @PKG@
 
 import (
@@ -100,8 +76,6 @@ func TestScratchWrappedInit(t *testing.T) {
 }
 `
 
-// extraInit is appended to a listed file: one more call site in a file the
-// list already names.
 const extraInit = `
 func zzExtraRawGitFixture(dir string) error {
 	return exec.Command(@GIT@, @INIT@, "-q", dir).Run()
@@ -126,16 +100,12 @@ func requireRatchetPackage(t *testing.T, goDir string) {
 	}
 }
 
-// mirror is a copy of the module. repo is nil for a copy outside any git work
-// tree; ceiling stops git discovery from climbing above the copy.
 type mirror struct {
 	goDir   string
 	ceiling string
 	repo    *gittest.Repo
 }
 
-// gitMirror copies the module into a fresh repository and stages every file,
-// so the copy's tracked set is the tree a ship would land.
 func gitMirror(t *testing.T, src string) mirror {
 	t.Helper()
 	r := gittest.Fixture(t)
@@ -145,7 +115,6 @@ func gitMirror(t *testing.T, src string) mirror {
 	return mirror{goDir: dst, ceiling: realDir(t, filepath.Dir(r.Dir)), repo: r}
 }
 
-// plainMirror copies the module to a directory that is not in any git work tree.
 func plainMirror(t *testing.T, src string) mirror {
 	t.Helper()
 	parent := filepath.Join(t.TempDir(), "plain")
@@ -208,8 +177,6 @@ func copyFile(src, dst string, perm fs.FileMode) error {
 	return out.Close()
 }
 
-// write puts src at the module-relative path rel, checked to be valid Go first;
-// stage adds it to the copy's index.
 func (m mirror) write(t *testing.T, rel, src string, stage bool) {
 	t.Helper()
 	if _, err := parser.ParseFile(token.NewFileSet(), rel, src, 0); err != nil {
@@ -232,9 +199,6 @@ func (m mirror) stage(t *testing.T, rel string) {
 	m.repo.Git("add", "--", "go/"+rel)
 }
 
-// remove deletes a module-relative file the way a migration lands: from the
-// work tree and the index (-f because the copy's content is staged, never
-// committed).
 func (m mirror) remove(t *testing.T, rel string) {
 	t.Helper()
 	m.repo.Git("rm", "-q", "-f", "--", "go/"+rel)
@@ -258,7 +222,6 @@ func runGo(t *testing.T, ceiling string, args ...string) (string, int) {
 	return string(out), ee.ExitCode()
 }
 
-// runRatchet runs the ratchet package's default suite, uncached and verbose.
 func runRatchet(t *testing.T, goDir, ceiling string) (string, int) {
 	t.Helper()
 	return runGo(t, ceiling, "test", "-C", goDir, "-count=1", "-v", ratchetPkg)
@@ -271,8 +234,6 @@ func expectPass(t *testing.T, what, out string, code int) {
 	}
 }
 
-// expectCaught asserts a named test of the ratchet failed — not the build — and
-// that the output names every file in files.
 func expectCaught(t *testing.T, what, out string, code int, files ...string) {
 	t.Helper()
 	if code == 0 {
@@ -288,9 +249,6 @@ func expectCaught(t *testing.T, what, out string, code int, files ...string) {
 	}
 }
 
-// literalSites returns the module-relative test files outside internal/gittest
-// that spell a raw init as exec.Command(git, init, ...) — sites any detector
-// must list. It skips the test when none remain.
 func literalSites(t *testing.T, goDir string) []string {
 	t.Helper()
 	gittestDir := filepath.Join(goDir, "internal", "gittest")
@@ -441,7 +399,6 @@ func TestC1729_010_ModuleOutsideGitBindsEveryTestFile(t *testing.T) {
 	expectCaught(t, "raw init in a module outside git", out, code, scratchDir+"/plain_init_test.go")
 }
 
-// repoContractPackages reads the ship gate's fixed package list from its source.
 func repoContractPackages(t *testing.T, goDir string) []string {
 	t.Helper()
 	path := filepath.Join(goDir, "internal", "phases", "ship", "repocontract.go")
@@ -547,7 +504,6 @@ func TestC1729_012_PackageIsApicoverCleanAndEnrolled(t *testing.T) {
 	goDir := moduleDir(t)
 	requireRatchetPackage(t, goDir)
 	// acs-predicate: config-check — enrolment is a line in the gate's SSOT; the
-	// apicover run below carries the behavioral weight.
 	enrolled := false
 	body, err := os.ReadFile(filepath.Join(goDir, ".apicover-enforce"))
 	if err != nil {

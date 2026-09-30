@@ -19,10 +19,6 @@ func moduleRoot(t *testing.T) string {
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// runNamedGoTestFamily runs the cmd/evolve package -run-narrowed to pattern and
-// requires every one of names to show a "--- PASS:" line in the -v output —
-// AC4 (full existing subtest family passes) plus AC5 (a named negative/edge
-// subtest survives), in one narrowed subprocess invocation per function.
 func runNamedGoTestFamily(t *testing.T, pattern string, names []string) {
 	t.Helper()
 	cmd := exec.Command("go", "test", "-count=1", "-v", "-run", pattern, cmdEvolvePkg)
@@ -117,10 +113,6 @@ func TestC1751_006_OffendersJSONDropsDetectQuotaPause(t *testing.T) {
 	}
 }
 
-// TestC1751_007_ParseLoopArgsTestFamilyPasses drives the real go test binary
-// over every existing TestParseLoopArgs_* subtest (cmd/evolve package), pinning
-// TestParseLoopArgs_MalformedCLIFlagRejected as the required negative/edge
-// case (AC5) alongside full-family regression coverage (AC4).
 func TestC1751_007_ParseLoopArgsTestFamilyPasses(t *testing.T) {
 	runNamedGoTestFamily(t, "^TestParseLoopArgs_", []string{
 		"TestParseLoopArgs_GoalSources",
@@ -145,8 +137,6 @@ func TestC1751_007_ParseLoopArgsTestFamilyPasses(t *testing.T) {
 	})
 }
 
-// TestC1751_008_DefaultMatrixDepsTestFamilyPasses pins
-// TestVerifyReleaseCLIMatrix_AllFailVisible as the required negative case.
 func TestC1751_008_DefaultMatrixDepsTestFamilyPasses(t *testing.T) {
 	runNamedGoTestFamily(t, "^TestVerifyReleaseCLIMatrix_", []string{
 		"TestVerifyReleaseCLIMatrix_AllPass",
@@ -156,8 +146,6 @@ func TestC1751_008_DefaultMatrixDepsTestFamilyPasses(t *testing.T) {
 	})
 }
 
-// TestC1751_009_DetectQuotaPauseTestFamilyPasses pins
-// TestDetectQuotaPause_EmptySourceReadsAsUnknown as the required edge case.
 func TestC1751_009_DetectQuotaPauseTestFamilyPasses(t *testing.T) {
 	runNamedGoTestFamily(t, "^TestDetectQuotaPause_", []string{
 		"TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource",
@@ -168,9 +156,6 @@ func TestC1751_009_DetectQuotaPauseTestFamilyPasses(t *testing.T) {
 	})
 }
 
-// TestC1751_010_BuildAndVetClean asserts the module still builds and vets
-// clean after the three extractions (AC3) — a compile-time proof that
-// behavior-preserving extraction did not break the package.
 func TestC1751_010_BuildAndVetClean(t *testing.T) {
 	root := moduleRoot(t)
 	build := exec.Command("go", "build", "./...")

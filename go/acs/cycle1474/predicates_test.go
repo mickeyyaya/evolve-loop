@@ -1,29 +1,5 @@
 //go:build acs
 
-// Package cycle1474 materialises the cycle-1474 acceptance criteria for the two
-// fleet-scoped pipeline tasks pinned to this lane:
-//
-//   - worktree-retry-diagnostic-integrity   → the shared `git worktree add`
-//     retry must keep BOTH the initiating and the terminal failure, and must
-//     announce contention BEFORE it pays the backoff.
-//   - worktree-provisioning-cause-fingerprint → a failed worktree provision must
-//     put its git cause into the cycle's failure record, so the recorded
-//     identity names the provisioning failure instead of the downstream
-//     source-phase refusal it caused.
-//
-// Predicate strategy — every predicate DRIVES the production seam in-process and
-// asserts on returned values or emitted artifacts; none greps source (the
-// cycle-85 degenerate-predicate ban):
-//
-//   - 001/002 call gitexec.Git.AddWorktreeWithRetry directly with a scripted
-//     runner and assert on what it returns / the order it calls back.
-//   - 003/004 run the REAL core.Orchestrator.RunCycle with a provisioner that
-//     fails, then read the cycle's own workspace and the REAL
-//     core.AssembleFailureDigest — the same assembler production uses.
-//   - 005 is the negative axis: a clean provision must fabricate no failure.
-//
-// No `go test` subprocess, no whole-package sweep, no wall-clock bound, no
-// literal PID: all five are in-process and deterministic.
 package cycle1474
 
 import (
@@ -43,11 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// --- task 1: worktree-retry-diagnostic-integrity ---------------------------
-
-// mixedFailRunner scripts the recorded two-failure sequence: attempt 1 is the
-// live collision shape (rc=255, EMPTY stderr), attempt 2 is the permanent
-// rc=128 that first failure caused.
 func mixedFailRunner(attempts *int) sysexec.RunFunc {
 	return func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, _, stderr io.Writer) (int, error) {
 		if len(args) >= 2 && args[0] == "worktree" && args[1] == "add" {
@@ -64,10 +35,6 @@ func mixedFailRunner(attempts *int) sysexec.RunFunc {
 	}
 }
 
-// TestC1474_001_RetryPreservesInitiatingFailure — a transient rc=255 followed by
-// a different terminal failure must leave BOTH recoverable from the returned
-// diagnostic. The first attempt has no stderr, so its exit code is the only
-// evidence it happened at all.
 func TestC1474_001_RetryPreservesInitiatingFailure(t *testing.T) {
 	attempts := 0
 	g := gitexec.Git{Dir: t.TempDir(), Exec: mixedFailRunner(&attempts)}
@@ -93,9 +60,6 @@ func TestC1474_001_RetryPreservesInitiatingFailure(t *testing.T) {
 	}
 }
 
-// TestC1474_002_RetryAnnouncesBeforeBackoff — OnRetry exists so a caller can
-// announce contention WHILE it is happening; a lane stuck inside the 2s/4s
-// ladder must not be silent until the sleep completes.
 func TestC1474_002_RetryAnnouncesBeforeBackoff(t *testing.T) {
 	attempts := 0
 	var events []string
@@ -128,10 +92,6 @@ func TestC1474_002_RetryAnnouncesBeforeBackoff(t *testing.T) {
 	}
 }
 
-// --- task 2: worktree-provisioning-cause-fingerprint -----------------------
-
-// scriptedWorktree is a core.WorktreeProvisioner whose Create outcome is
-// scripted. Cleanup is a no-op: nothing is ever really provisioned.
 type scriptedWorktree struct {
 	path      string
 	createErr error
@@ -148,9 +108,6 @@ func (w *scriptedWorktree) Create(_ string, _ int) (string, error) {
 
 func (w *scriptedWorktree) Cleanup(_, _ string) error { return nil }
 
-// runProvisionCycle runs one REAL cycle through the production RunCycle path
-// with the scripted provisioning outcome, and returns the cycle number and the
-// workspace the run actually used.
 func runProvisionCycle(t *testing.T, createErr error) (int, string) {
 	t.Helper()
 	st := &fixtures.FakeStorage{State: core.State{LastCycleNumber: 1473}}
@@ -172,9 +129,6 @@ func runProvisionCycle(t *testing.T, createErr error) (int, string) {
 	return res.Cycle, ws
 }
 
-// workspaceMentions reports whether ANY artifact the cycle emitted carries the
-// token. Format-agnostic: the requirement is that the cause is persisted where
-// the failure surfaces read, not that it lands in one named file.
 func workspaceMentions(t *testing.T, workspace, token string) bool {
 	t.Helper()
 	found := false
@@ -192,8 +146,6 @@ func workspaceMentions(t *testing.T, workspace, token string) bool {
 	return found
 }
 
-// TestC1474_003_ProvisioningCausePersistedInCycleRecord — the git cause must
-// outlive the orchestrator's stderr and land in the cycle's own record.
 func TestC1474_003_ProvisioningCausePersistedInCycleRecord(t *testing.T) {
 	const cause = "ACS1474-CAUSE-A: git worktree add rc=255 (lock held)"
 	_, ws := runProvisionCycle(t, errors.New(cause))
@@ -203,10 +155,6 @@ func TestC1474_003_ProvisioningCausePersistedInCycleRecord(t *testing.T) {
 	}
 }
 
-// TestC1474_004_ProvisioningCauseDrivesFailureDigestIdentity — read through the
-// REAL assembler: the identity must be content-bearing, must separate two
-// different causes, and must be deterministic for the same cause (otherwise the
-// identical-fingerprint breaker cannot see recurrence).
 func TestC1474_004_ProvisioningCauseDrivesFailureDigestIdentity(t *testing.T) {
 	digestOf := func(cause string) core.FailureDigest {
 		t.Helper()
@@ -233,10 +181,6 @@ func TestC1474_004_ProvisioningCauseDrivesFailureDigestIdentity(t *testing.T) {
 	}
 }
 
-// TestC1474_005_CleanProvisioningAddsNoFabricatedFailure is the negative axis
-// and the anti-gaming guard: an implementation that unconditionally stamps a
-// provisioning reason would satisfy 003/004 while inventing a failure on every
-// healthy cycle.
 func TestC1474_005_CleanProvisioningAddsNoFabricatedFailure(t *testing.T) {
 	cycle, ws := runProvisionCycle(t, nil)
 

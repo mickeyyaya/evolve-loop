@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle1723 holds the acceptance predicates for `commentaudit comments -base <ref>`.
 package cycle1723
 
 import (

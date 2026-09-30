@@ -1,50 +1,5 @@
 //go:build acs
 
-// Package cycle1205 materialises the cycle-1205 acceptance criteria for this
-// lane's single fleet-scoped task:
-//
-//   - rootcause-rule-regression-test → pin DefaultRules() against reintroducing
-//     the cycle-1204 audit-REJECTED root-cause binding design.
-//
-// Why the task is a guard-rail, not a feature test. Cycle-1204 proposed a
-// `rootCauseRule` that bound inbox items by exact string equality on a
-// free-form prose field and placed it in DefaultRules() (default-on). The audit
-// rejected it: D1 — measured against the 67 live .evolve/inbox items, all 20
-// non-empty root_cause values were unique prose (median 317 bytes), so the rule
-// was a NO-OP on real data; D2 — it carried neither of the discriminative guards
-// its siblings have (hubAreaMaxItems ceiling, minAreaDepth floor), so a future
-// normalising producer would collapse the campaign-less backlog into one
-// over-fused cluster. The production code never landed, so there is no feature
-// to regression-test; the regression worth writing is defensive — DefaultRules()
-// must stay the bounded structural signals (campaign, file-area), and none of
-// them may bind items on a shared free-form prose field.
-//
-// Predicate strategy — every predicate below EXERCISES the system under test
-// (calls DefaultRules()/Rule.Edges, or runs the package's tests as a
-// subprocess); none is a source-grep of production text (the cycle-85
-// degenerate-predicate ban).
-//
-//   - 001 (AC2) calls DefaultRules() and asserts the rule set IS exactly the
-//     structural rules AND produces zero edges for items whose only
-//     commonality is an identical free-form prose field.
-//   - 002 (AC4, negative) case/whitespace-varied prose must also bind nothing —
-//     the "a normaliser lands upstream" failure mode of D2.
-//   - 003 (AC5, edge) empty prose on every item — zero edges.
-//   - 004 (AC1) runs the real package test suite and requires the NAMED
-//     regression test to have actually run and PASSED (a `-run` pattern that
-//     matches nothing also exits 0 — the "--- PASS:" line is what rules that
-//     no-op out).
-//   - 005 (AC3) the CRUX anti-no-op predicate: it MUTATES rules.go in memory
-//     (go build -overlay) to reintroduce the rejected 4th prose-binding rule and
-//     requires the new regression test to FAIL on that mutant. A guard that
-//     cannot fail on the exact design it exists to reject is decoration. A
-//     control run under the same overlay pins that the mutant still compiles,
-//     so the FAIL is attributable to the guard and not to a broken build.
-//
-// Predicates 001-003 pin the CURRENT, audited state of production code and are
-// green before Builder writes anything (recorded as pre-existing GREEN in
-// test-report.md); 004 and 005 are RED until the regression test file lands at
-// go/internal/inboxbatch/rules_rootcause_regression_test.go.
 package cycle1205
 
 import (
@@ -61,24 +16,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// regressionTestName is the test the scout/triage contract commits to; the
-// overlay-mutation predicate and the suite predicate both key off it.
 const regressionTestName = "TestDefaultRules_DoesNotBindOnRootCauseProse"
 
-// regressionTestRelPath is Builder's deliverable — the package placement is
-// load-bearing (white-box access to campaignRule/fileAreaRule).
 const regressionTestRelPath = "go/internal/inboxbatch/rules_rootcause_regression_test.go"
 
-// wantRuleTypes is the audited DefaultRules() composition: campaign and
-// file-area edges — both bounded (campaign is an explicit operator declaration;
-// fileArea has both a hub ceiling and a depth floor). The dependency rule was
-// removed in cycle 1724: under ADR-0106 W3 a dependent is never on the same
-// lane menu as its unlanded dependency, so dep edges could not bind.
 var wantRuleTypes = []string{"inboxbatch.campaignRule", "inboxbatch.fileAreaRule"}
 
-// TestC1205_001_DefaultRulesStaysBoundedStructuralRules is AC2: the rule set is
-// exactly the structural signals, and a shared free-form prose field binds
-// nothing through any of them.
 func TestC1205_001_DefaultRulesStaysBoundedStructuralRules(t *testing.T) {
 	rules := inboxbatch.DefaultRules()
 	if got := len(rules); got != len(wantRuleTypes) {
@@ -93,10 +36,6 @@ func TestC1205_001_DefaultRulesStaysBoundedStructuralRules(t *testing.T) {
 		}
 	}
 
-	// Behavioural half: items whose ONLY commonality is identical free-form
-	// prose (Title is the closest live analogue of the proposed root_cause
-	// field — unstructured, author-written, not an enum). No Campaign, no
-	// Files: the structural rules have nothing to bind on.
 	const prose = "verdict incoherence under contention: the tier reported RED because SubstantiveError was never populated"
 	items := []inboxbatch.Item{
 		{ID: "a-item", Title: prose},
@@ -110,10 +49,6 @@ func TestC1205_001_DefaultRulesStaysBoundedStructuralRules(t *testing.T) {
 	}
 }
 
-// TestC1205_002_ProseVariantsBindNothing is AC4 (negative axis): the guard must
-// hold for prose that differs only in case and whitespace. This is the shape a
-// future normalising producer for root_cause-like fields would emit, i.e. the
-// exact input that would have tripped D2's over-fusion.
 func TestC1205_002_ProseVariantsBindNothing(t *testing.T) {
 	rules := inboxbatch.DefaultRules()
 	items := []inboxbatch.Item{
@@ -129,10 +64,6 @@ func TestC1205_002_ProseVariantsBindNothing(t *testing.T) {
 	}
 }
 
-// TestC1205_003_EmptyProseBindsNothing is AC5 (edge axis): the degenerate case
-// where every item's prose field is empty or whitespace-only must yield zero
-// edges rather than fusing the whole set on "" (the classic empty-key
-// map-bucket collapse).
 func TestC1205_003_EmptyProseBindsNothing(t *testing.T) {
 	rules := inboxbatch.DefaultRules()
 	items := []inboxbatch.Item{
@@ -147,11 +78,6 @@ func TestC1205_003_EmptyProseBindsNothing(t *testing.T) {
 	}
 }
 
-// TestC1205_004_RegressionTestLandsGreenInTheNormalSuite is AC1: the inboxbatch
-// package suite passes WITH the new regression test, and the named test really
-// ran. Requiring the "--- PASS:" line is the anti-no-op: `go test -run <absent
-// pattern>` also exits 0, so exit code alone cannot distinguish "passed" from
-// "never existed".
 func TestC1205_004_RegressionTestLandsGreenInTheNormalSuite(t *testing.T) {
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
 
@@ -171,14 +97,6 @@ func TestC1205_004_RegressionTestLandsGreenInTheNormalSuite(t *testing.T) {
 	}
 }
 
-// TestC1205_005_RegressionTestFailsOnTheRejectedDesign is AC3 and the crux
-// anti-no-op predicate: the guard must be LOAD-BEARING inside
-// go/internal/inboxbatch. rules.go is mutated in memory (`go test -overlay`,
-// nothing written into the tree) to reintroduce the cycle-1204 rejected design —
-// another default-on rule binding items by exact match on a free-form prose field
-// — and the regression test must FAIL on it. The control run under the same
-// overlay proves the mutant compiles, so a FAIL is attributable to the guard
-// rather than to a broken build.
 func TestC1205_005_RegressionTestFailsOnTheRejectedDesign(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -190,9 +108,6 @@ func TestC1205_005_RegressionTestFailsOnTheRejectedDesign(t *testing.T) {
 
 	overlay := writeProseRuleOverlay(t, goDir)
 
-	// Control: a rule-set-independent test in the same package must still pass
-	// under the overlay. If this fails, the mutant did not compile and the
-	// guard run below would fail for the wrong reason.
 	const controlTest = "TestFileArea_RequiresMinimumDepthToBeDiscriminative"
 	stdout, stderr, code := goTest(t, goDir, nil, "-count=1", "-overlay="+overlay, "-run", "^"+controlTest+"$", "./internal/inboxbatch/")
 	if code != 0 {
@@ -200,7 +115,6 @@ func TestC1205_005_RegressionTestFailsOnTheRejectedDesign(t *testing.T) {
 			"predicate to be meaningful\nstdout:\n%s\nstderr:\n%s", controlTest, code, tail(stdout), tail(stderr))
 	}
 
-	// The guard run: the regression test MUST reject the mutant.
 	stdout, stderr, code = goTest(t, goDir, nil, "-count=1", "-v", "-overlay="+overlay, "-run", "^"+regressionTestName+"$", "./internal/inboxbatch/")
 	if code == 0 {
 		t.Fatalf("%s PASSED against a DefaultRules() that reintroduces the rejected free-form-prose rule — "+
@@ -213,9 +127,6 @@ func TestC1205_005_RegressionTestFailsOnTheRejectedDesign(t *testing.T) {
 	}
 }
 
-// --- helpers -------------------------------------------------------------
-
-// allEdges unions every rule's edges, mirroring what Classify consumes.
 func allEdges(rules []inboxbatch.Rule, items []inboxbatch.Item) []inboxbatch.Edge {
 	var edges []inboxbatch.Edge
 	for _, r := range rules {
@@ -224,16 +135,10 @@ func allEdges(rules []inboxbatch.Rule, items []inboxbatch.Item) []inboxbatch.Edg
 	return edges
 }
 
-// ruleTypeName renders a Rule's concrete type as package.Type. The rule types
-// are unexported, so %T is the only handle a predicate outside the package has.
 func ruleTypeName(r inboxbatch.Rule) string {
 	return strings.TrimPrefix(fmt.Sprintf("%T", r), "*")
 }
 
-// writeProseRuleOverlay builds an in-memory mutant of rules.go that adds the
-// rejected prose-binding rule to DefaultRules(), and returns the path of the
-// `go build -overlay` JSON describing the substitution. Nothing is written into
-// the repository tree (t.TempDir only) — worktree isolation is preserved.
 func writeProseRuleOverlay(t *testing.T, goDir string) string {
 	t.Helper()
 	rulesPath := filepath.Join(goDir, "internal", "inboxbatch", "rules.go")
@@ -266,11 +171,6 @@ func writeProseRuleOverlay(t *testing.T, goDir string) string {
 	return overlayPath
 }
 
-// proseRuleSrc is the cycle-1204 audit-REJECTED design, reconstructed ONLY as an
-// in-memory mutant for predicate 005. It binds items by exact match on a
-// free-form prose field with no ceiling and no floor — D1 (no-op on real,
-// all-unique prose) and D2 (total fusion once the values normalise) in ten
-// lines. It must never exist in the tree.
 const proseRuleSrc = `
 
 type proseRule struct{}
@@ -292,9 +192,6 @@ func (proseRule) Edges(items []Item) []Edge {
 }
 `
 
-// goTest runs the go tool in dir and returns stdout, stderr and the exit code.
-// acsassert.SubprocessOutput cannot set a working directory, and every
-// invocation here must run inside the worktree's go module.
 func goTest(t *testing.T, dir string, env []string, args ...string) (string, string, int) {
 	t.Helper()
 	cmd := exec.Command("go", append([]string{"test"}, args...)...)
@@ -318,8 +215,6 @@ func goTest(t *testing.T, dir string, env []string, args ...string) (string, str
 	return sout.String(), serr.String(), code
 }
 
-// tail trims long tool output to the last few KB so a failure message stays
-// readable in the audit transcript.
 func tail(s string) string {
 	const max = 4000
 	if len(s) <= max {

@@ -1,35 +1,5 @@
 //go:build acs
 
-// Package cycle1062 materialises the cycle-1062 acceptance criteria for the
-// single fleet-scoped task pinned to this lane:
-//
-//	chronicle-s6-escalation-boundary
-//	  → superseded_by: failure-disposition-router (S4 boundary applier)
-//
-// Because the parent design states "S4 MUST NOT land before S3's staging
-// exists", scout materialised the committed task as two dependency-ordered
-// halves, both of which these predicates gate:
-//
-//	Task 1  disposition-router-s3-floors-and-staging   → go/internal/dispositionrouter
-//	Task 2  disposition-router-s4-boundary-applier     → go/internal/recurrence/apply.go
-//	                                                     + go/cmd/evolve/cmd_loop.go call site
-//
-// Predicate strategy — every predicate here EXERCISES the system under test
-// (calls the production function against a t.TempDir() fixture and asserts on
-// its return value or its real on-disk side effect), never a source-grep of
-// production code (the cycle-85 degenerate-predicate ban). Predicates 001-004
-// drive `dispositionrouter` directly; 005-009 drive `recurrence.ApplyBoundary` directly;
-// 010 shells the loop-boundary wiring test so the cmd_loop call site is proven
-// by execution, not by a magic string.
-//
-// RED shape this cycle: the `dispositionrouter` package and `recurrence.ApplyBoundary` do
-// not exist yet, so the package fails to COMPILE — the correct RED for a
-// not-yet-built API (go/acs/README.md: a predicate package that fails to
-// compile is a hard suite error, never a silent PASS).
-//
-// Isolation: no predicate reads or writes the live repo tree. Every inbox,
-// escalations-staging and report path is rooted in t.TempDir(), per the cycle
-// goal constraint that tests must never mutate the live tree.
 package cycle1062
 
 import (
@@ -45,13 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ---------------------------------------------------------------------------
-// fixtures
-// ---------------------------------------------------------------------------
-
-// writeInboxItem writes an OPEN inbox item carrying id/pattern/weight at the
-// top level of inboxDir (the dispatchable location — a CLAIMED item lives under
-// inboxDir/processing/cycle-<N>/ instead, per inboxmover.Claim).
 func writeInboxItem(t *testing.T, inboxDir, id, pattern string, weight float64) string {
 	t.Helper()
 	if err := os.MkdirAll(inboxDir, 0o755); err != nil {
@@ -73,10 +36,6 @@ func writeInboxItem(t *testing.T, inboxDir, id, pattern string, weight float64) 
 	return path
 }
 
-// claimInboxItem moves an open item into inboxDir/processing/cycle-<cycle>/,
-// reproducing inboxmover.Claim's os.Rename exactly — the race the chronicle-s6
-// spec pins: an applier that re-files or bumps a CLAIMED item resurrects it into
-// double work across fleet lanes.
 func claimInboxItem(t *testing.T, inboxDir, openPath, cycle string) string {
 	t.Helper()
 	destDir := filepath.Join(inboxDir, "processing", "cycle-"+cycle)
@@ -90,8 +49,6 @@ func claimInboxItem(t *testing.T, inboxDir, openPath, cycle string) string {
 	return dest
 }
 
-// stageEscalate stages one "escalate" intent (bump an existing open item) via
-// the PRODUCTION staging writer, so the applier consumes exactly what S3 emits.
 func stageEscalate(t *testing.T, escDir string, cycle int, pattern, itemID string, count int, weight float64) {
 	t.Helper()
 	if _, err := dispositionrouter.StageIntent(escDir, dispositionrouter.Intent{
@@ -107,8 +64,6 @@ func stageEscalate(t *testing.T, escDir string, cycle int, pattern, itemID strin
 	}
 }
 
-// stageAutofile stages one "autofile" intent (no open item exists for the
-// pattern, so the recurrence must land on the queue as a NEW item).
 func stageAutofile(t *testing.T, escDir string, cycle int, pattern, itemID string, count int, weight float64) {
 	t.Helper()
 	if _, err := dispositionrouter.StageIntent(escDir, dispositionrouter.Intent{
@@ -124,7 +79,6 @@ func stageAutofile(t *testing.T, escDir string, cycle int, pattern, itemID strin
 	}
 }
 
-// applyOpts builds the boundary-applier options for a temp fixture root.
 func applyOpts(root string, cycle int, shadow bool) recurrence.ApplyOptions {
 	return recurrence.ApplyOptions{
 		InboxDir:        filepath.Join(root, "inbox"),
@@ -137,9 +91,6 @@ func applyOpts(root string, cycle int, shadow bool) recurrence.ApplyOptions {
 	}
 }
 
-// itemWeight reads the "weight" field of the inbox item whose "id" == id,
-// searching the whole inbox tree (open items and claimed items alike).
-// ok=false when no item with that id exists anywhere.
 func itemWeight(t *testing.T, inboxDir, id string) (weight float64, path string, ok bool) {
 	t.Helper()
 	_ = filepath.Walk(inboxDir, func(p string, info os.FileInfo, err error) error {
@@ -163,8 +114,6 @@ func itemWeight(t *testing.T, inboxDir, id string) (weight float64, path string,
 	return weight, path, ok
 }
 
-// openItemCount counts dispatchable (top-level) inbox items — claimed items
-// under processing/ are excluded, matching what a fleet lane can draw.
 func openItemCount(t *testing.T, inboxDir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(inboxDir)
@@ -180,15 +129,6 @@ func openItemCount(t *testing.T, inboxDir string) int {
 	return n
 }
 
-// ---------------------------------------------------------------------------
-// S3 — router floors + staging (Task 1)
-// ---------------------------------------------------------------------------
-
-// TestC1062_001_RouterFloorForcesConsoleForGuardAbort — AC: the deterministic
-// floor forces console routing for the guard-abort pre-class (a severed
-// statemap is operator-owned; a lane must never draw it). Behavioural: calls
-// dispositionrouter.Decide and asserts the returned Route/Forced, so a stub that returns a
-// zero Decision fails.
 func TestC1062_001_RouterFloorForcesConsoleForGuardAbort(t *testing.T) {
 	d := dispositionrouter.Decide("guard-abort", 1, "queue")
 	if d.Route != "console" {
@@ -201,16 +141,11 @@ func TestC1062_001_RouterFloorForcesConsoleForGuardAbort(t *testing.T) {
 		t.Errorf("forced Decision carries an empty Reason; the floor must say why")
 	}
 
-	// Negative / semantic contrast: an ordinary class at recurrence 1 must NOT
-	// be force-consoled, else the floor is a blanket console-everything no-op.
 	if q := dispositionrouter.Decide("verdict-fail", 1, "queue"); q.Route != "queue" || q.Forced {
 		t.Errorf("Decide(verdict-fail, 1, queue) = {Route:%q Forced:%v}, want {queue false}", q.Route, q.Forced)
 	}
 }
 
-// TestC1062_002_RouterFloorForcesConsoleAtRecurrenceThree — AC: recurrence >= 3
-// forces console regardless of pre-class (a defect that survived two fixes is
-// no longer a lane-sized task). Boundary-exact: 2 must NOT force, 3 must.
 func TestC1062_002_RouterFloorForcesConsoleAtRecurrenceThree(t *testing.T) {
 	if d := dispositionrouter.Decide("verdict-fail", 3, "queue"); d.Route != "console" || !d.Forced {
 		t.Errorf("Decide(verdict-fail, 3, queue) = {Route:%q Forced:%v}, want {console true}", d.Route, d.Forced)
@@ -218,24 +153,17 @@ func TestC1062_002_RouterFloorForcesConsoleAtRecurrenceThree(t *testing.T) {
 	if d := dispositionrouter.Decide("verdict-fail", 9, "queue"); d.Route != "console" || !d.Forced {
 		t.Errorf("Decide(verdict-fail, 9, queue) = {Route:%q Forced:%v}, want {console true}", d.Route, d.Forced)
 	}
-	// Edge: one below the floor must stay on the queue.
 	if d := dispositionrouter.Decide("verdict-fail", 2, "queue"); d.Route != "queue" || d.Forced {
 		t.Errorf("Decide(verdict-fail, 2, queue) = {Route:%q Forced:%v}, want {queue false} (floor is >=3)", d.Route, d.Forced)
 	}
 }
 
-// TestC1062_003_RouterLLMMayRaiseNeverLowerForcedRouting — AC: the advisory LLM
-// route may RAISE queue→console, but may never LOWER a floor-forced console to
-// queue. This is the anti-gaming pin: an implementation that simply trusts the
-// llmRoute argument fails the lowering case.
 func TestC1062_003_RouterLLMMayRaiseNeverLowerForcedRouting(t *testing.T) {
-	// Raise: no floor fires, advisory says console → console (not forced).
 	raised := dispositionrouter.Decide("verdict-fail", 1, "console")
 	if raised.Route != "console" {
 		t.Errorf("advisory raise ignored: Decide(verdict-fail, 1, console).Route = %q, want \"console\"", raised.Route)
 	}
 
-	// Lower (negative test): floor forced console, advisory says queue → console.
 	for _, tc := range []struct {
 		preClass   string
 		recurrence int
@@ -250,19 +178,11 @@ func TestC1062_003_RouterLLMMayRaiseNeverLowerForcedRouting(t *testing.T) {
 		}
 	}
 
-	// Edge: an empty/unknown advisory route must not corrupt the outcome.
 	if d := dispositionrouter.Decide("verdict-fail", 1, ""); d.Route != "queue" {
 		t.Errorf("Decide(verdict-fail, 1, \"\").Route = %q, want \"queue\" (empty advisory is a no-op)", d.Route)
 	}
 }
 
-// TestC1062_004_StagedIntentNeverWritesInboxMidFlight — AC (race-proven,
-// carried verbatim from chronicle-s6): S3 stages intents to
-// .evolve/escalations/pending-actions.jsonl and MUST NOT write .evolve/inbox/
-// mid-flight, where a write would race inboxmover.Claim's os.Rename and
-// resurrect a claimed item into double work. Behavioural: calls StageIntent
-// against a temp root and asserts (a) the JSONL record round-trips and (b) the
-// inbox tree is byte-identical afterwards.
 func TestC1062_004_StagedIntentNeverWritesInboxMidFlight(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
@@ -290,7 +210,6 @@ func TestC1062_004_StagedIntentNeverWritesInboxMidFlight(t *testing.T) {
 		t.Errorf("StageIntent path = %q, want %q", staged, want)
 	}
 
-	// (a) the staged record is real, parseable JSONL carrying the intent.
 	raw, err := os.ReadFile(staged)
 	if err != nil {
 		t.Fatalf("staged file not readable: %v", err)
@@ -307,7 +226,6 @@ func TestC1062_004_StagedIntentNeverWritesInboxMidFlight(t *testing.T) {
 		t.Errorf("staged intent round-trip = %+v, want ItemID=recurring-defect Action=escalate Recurrence=4", got)
 	}
 
-	// (b) the inbox is untouched — the race pin.
 	after, err := os.ReadFile(openPath)
 	if err != nil {
 		t.Fatalf("seeded inbox item disappeared during staging: %v", err)
@@ -320,14 +238,6 @@ func TestC1062_004_StagedIntentNeverWritesInboxMidFlight(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// S4 — boundary applier (Task 2, subsumes chronicle-s6-escalation-boundary)
-// ---------------------------------------------------------------------------
-
-// TestC1062_005_ApplyEscalationIdempotentPerCycleStamp — AC: applying the same
-// staged intent twice in the same cycle escalates EXACTLY once (per-cycle
-// idempotency stamp). Behavioural: runs ApplyBoundary twice and asserts the
-// second run bumps nothing and leaves the weight where the first run left it.
 func TestC1062_005_ApplyEscalationIdempotentPerCycleStamp(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
@@ -363,18 +273,12 @@ func TestC1062_005_ApplyEscalationIdempotentPerCycleStamp(t *testing.T) {
 	}
 }
 
-// TestC1062_006_ApplyEscalationNeverLowersWeight — AC (negative test): an
-// intent whose computed target is BELOW the item's current weight must leave
-// the weight alone. An applier that blindly assigns the computed target
-// silently demotes an already-hot item; this is the strongest anti-no-op pin
-// on the escalation math.
 func TestC1062_006_ApplyEscalationNeverLowersWeight(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
 	escDir := filepath.Join(root, "escalations")
 	const hot = 0.97
 	writeInboxItem(t, inboxDir, "already-hot", "pattern:hot", hot)
-	// Recurrence 2 from a stale base of 0.50 computes ~0.53 — far below 0.97.
 	stageEscalate(t, escDir, 1062, "pattern:hot", "already-hot", 2, 0.50)
 
 	res, err := recurrence.ApplyBoundary(applyOpts(root, 1062, false))
@@ -390,11 +294,6 @@ func TestC1062_006_ApplyEscalationNeverLowersWeight(t *testing.T) {
 	}
 }
 
-// TestC1062_007_PlanEscalationSkipsClaimedItems — AC (race-proven, verbatim
-// from chronicle-s6): an item already CLAIMED by a fleet lane (moved under
-// inbox/processing/cycle-N/ by inboxmover.Claim) must be skipped, never bumped
-// and never re-filed at the top level — re-filing resurrects it into double
-// work across lanes.
 func TestC1062_007_PlanEscalationSkipsClaimedItems(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
@@ -427,11 +326,6 @@ func TestC1062_007_PlanEscalationSkipsClaimedItems(t *testing.T) {
 	}
 }
 
-// TestC1062_008_ShadowStageWritesReportOnly — AC: shadow stage (the compiled
-// default for this design) writes the escalation report artifact and performs
-// ZERO inbox mutation. Behavioural: runs ApplyBoundary with Shadow=true and
-// asserts the report exists AND both the escalate and autofile paths left the
-// inbox exactly as seeded.
 func TestC1062_008_ShadowStageWritesReportOnly(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
@@ -467,7 +361,6 @@ func TestC1062_008_ShadowStageWritesReportOnly(t *testing.T) {
 		t.Errorf("report = {cycle:%d shadow:%v}, want {1062 true}", report.Cycle, report.Shadow)
 	}
 
-	// Zero inbox mutation: no new item filed, no weight moved.
 	if n := openItemCount(t, inboxDir); n != before {
 		t.Errorf("shadow run changed open inbox item count %d → %d; shadow must not mutate the inbox", before, n)
 	}
@@ -479,13 +372,6 @@ func TestC1062_008_ShadowStageWritesReportOnly(t *testing.T) {
 	}
 }
 
-// TestC1062_009_AutofileGoesThroughRetrofile — AC: the autofile path is wired
-// through the existing (until now caller-less) retrofile package rather than a
-// hand-rolled second filer — retrofile gains its first production caller.
-// Behavioural: an enforce-stage apply of an autofile intent must produce a real
-// inbox item bearing retrofile's own emitted shape (auto-retro-<cycle>-<id>.json
-// with injected_by=retro-preventive-actions-autofiler), which only
-// retrofile.FileActions writes.
 func TestC1062_009_AutofileGoesThroughRetrofile(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
@@ -533,8 +419,6 @@ func TestC1062_009_AutofileGoesThroughRetrofile(t *testing.T) {
 		t.Errorf("filed item recurrence = %d, want 3 (the recurrence count must reach the queue)", item.Recurrence)
 	}
 
-	// Idempotency across the same cycle: re-applying must not double-file
-	// (retrofile's own dedup, exercised through the boundary applier).
 	again, err := recurrence.ApplyBoundary(applyOpts(root, 1062, false))
 	if err != nil {
 		t.Fatalf("ApplyBoundary (re-apply): %v", err)
@@ -544,14 +428,6 @@ func TestC1062_009_AutofileGoesThroughRetrofile(t *testing.T) {
 	}
 }
 
-// TestC1062_010_LoopBoundaryWiringExecutes — AC: the applier is actually CALLED
-// at the cmd_loop per-iteration boundary (after dispatchIteration returns with
-// no lanes in flight), not merely defined. Executing the loop-boundary test is
-// the wiring proof — a source-grep for the call site would pass on a commented
-// reference, so this predicate shells the real test binary instead.
-//
-// Guards against the empty-selector trap: `go test -run <missing>` exits 0 with
-// "no tests to run", so the predicate asserts the named test actually RAN.
 func TestC1062_010_LoopBoundaryWiringExecutes(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	pkgDir := filepath.Join(root, "go", "cmd", "evolve")

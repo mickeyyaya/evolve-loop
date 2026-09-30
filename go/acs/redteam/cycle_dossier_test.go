@@ -1,9 +1,5 @@
 //go:build acs
 
-// RED note: this file references dossier.BuildOpts which does not exist yet
-// (D2 is a prerequisite for D3). The compile error is the intended RED
-// signal. Builder implements dossier.Build/BuildOpts in D2, after which
-// these three tests compile and should PASS (or SKIP on a fresh clone).
 package redteam
 
 import (
@@ -16,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestCycleDossier validates that every JSON file in knowledge-base/cycles/
-// unmarshals into a well-formed Dossier (Validate() passes). Skips when the
-// directory is absent (fresh clone / no shipped dossiers yet).
 func TestCycleDossier(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	cyclesDir := filepath.Join(root, "knowledge-base", "cycles")
@@ -50,32 +43,20 @@ func TestCycleDossier(t *testing.T) {
 	}
 }
 
-// TestCycleDossier_MissingDossier verifies the checker detects a completed
-// cycle that has no dossier file. It constructs a synthetic scenario by
-// creating a BuildOpts pointing to a temp workspace without any dossier JSON,
-// then confirming Build returns an error or the result fails Validate (the
-// "missing dossier" detection path). RED: BuildOpts doesn't exist yet.
 func TestCycleDossier_MissingDossier(t *testing.T) {
 	dir := t.TempDir()
-	// Build with an empty workspace — no ledger, no reports, no prior dossier.
 	d, err := dossier.Build(99, dossier.BuildOpts{
 		WorkspacePath: dir,
 		Goal:          "synthetic missing-dossier scenario",
 	})
 	if err != nil {
-		// Build returning an error on a missing/incomplete workspace is acceptable.
 		return
 	}
-	// If Build succeeded, it must produce a structurally valid dossier with
-	// at least the cycle number and goal intact; an empty/zero dossier fails Validate.
 	if err := d.Validate(); err == nil && d.FinalVerdict == "" {
 		t.Errorf("Build on empty workspace produced a dossier with no FinalVerdict — missing-dossier detection may be absent")
 	}
 }
 
-// TestCycleDossier_SkipsInProgress skips validation when the current cycle is
-// still in flight (cycle-state.json Phase != "" indicates active). This
-// prevents false failures during a running cycle.
 func TestCycleDossier_SkipsInProgress(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	if r := os.Getenv("EVOLVE_PROJECT_ROOT"); r != "" {
@@ -98,7 +79,6 @@ func TestCycleDossier_SkipsInProgress(t *testing.T) {
 	if cs.Phase != "" {
 		t.Skipf("cycle in-progress (phase=%q) — dossier closeout check deferred", cs.Phase)
 	}
-	// Cycle completed: validate the dossier for the last cycle exists.
 	cyclesDir := filepath.Join(root, "knowledge-base", "cycles")
 	if _, err := os.ReadDir(cyclesDir); os.IsNotExist(err) {
 		t.Skip("knowledge-base/cycles/ absent — no shipped dossiers yet")

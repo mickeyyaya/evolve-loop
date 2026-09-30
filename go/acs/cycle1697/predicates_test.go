@@ -1,42 +1,5 @@
 //go:build acs
 
-// Package cycle1697 materialises the acceptance criteria of the one
-// fleet-scoped task pinned to this lane: `dead-red-acs-corpus-cleanup`
-// (.evolve/inbox/processing/cycle-1697/2026-08-04T05-03-00Z-dead-red-acs-corpus-cleanup.json;
-// triage top_n: delete go/acs/cycle1257 + go/acs/cycle1259 predicate files and
-// extend F5 of docs/operations/batch-integrity-review-2026-08-04.md in place).
-//
-// THE DEFECT. fcdd466e shipped go/acs/cycle1257/predicates_test.go and
-// go/acs/cycle1259/predicates_test.go from cycles whose audits FAILED. They
-// grade an abandoned acssuite-internal selection design (the phantom
-// GoLaneSelection and Run-stage unit tests) that never existed at any commit —
-// the token is never spelled literally in this file, so 001's corpus scan
-// covers this package too — so they are red by
-// construction: at this cycle's base f341bc89, `go test -tags acs` reports 5
-// FAIL in cycle1257 and 2 FAIL in cycle1259 — FAIL, not SKIP.
-//
-// MEASURED PREMISE CORRECTION. The inbox asks to "verify the EGPS
-// skipped_count drops". It cannot: EGPS (acssuite.goLanePatterns,
-// go/internal/acssuite/acssuite.go:379-395) runs only the current cycle, the
-// regression set and redteam — never a historical cycle dir — and the two
-// packages FAIL rather than SKIP. skipped_count is invariant under this change
-// by construction, so a predicate demanding a drop would be permanently RED
-// (the cycle-644 unsatisfiable-AC shape). The honest measurable is that the
-// dead packages no longer resolve at all (001); the F5 closure must record the
-// skipped_count outcome (002), and the Auditor checks it is recorded truthfully.
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - POSITIVE : 001 — the Go toolchain no longer resolves either dead package
-//     (directory gone / no Go files). A tombstone, a skip-guarded shell or a
-//     renamed copy still lists test functions and FAILS; a package that fails
-//     to compile is never read as "removed".
-//   - DOCS     : 002 — F5 extended in place: exactly one F5 heading, F6 still
-//     next, Issue/Gap/Solution intact, and a Closure block citing both deleted
-//     paths, the closing cycle and the skipped_count outcome (config-check).
-//   - NEGATIVE : 003 — the change set deletes both dead files, touches no other
-//     go/acs file (over-deletion / collateral edits FAIL), touches no protected
-//     control-plane surface (guards.IsProtectedSurface, the production SSOT),
-//     and is non-vacuous.
 package cycle1697
 
 import (
@@ -55,21 +18,14 @@ import (
 
 const (
 	reviewDocRel = "docs/operations/batch-integrity-review-2026-08-04.md"
-	// ownDirRel is this cycle's own predicate package — the one go/acs path
-	// the lane may add besides deleting the two dead files.
-	ownDirRel = "go/acs/cycle1697/"
+	ownDirRel    = "go/acs/cycle1697/"
 )
 
-// deadPackages are the two red-by-construction predicate packages the task
-// removes: the module-relative pattern `go test` resolves, and the tracked file.
 var deadPackages = []struct{ pkg, file string }{
 	{"./acs/cycle1257", "go/acs/cycle1257/predicates_test.go"},
 	{"./acs/cycle1259", "go/acs/cycle1259/predicates_test.go"},
 }
 
-// goTestList runs `go test -tags acs -count=1 -list . <pkg>` for ONE named
-// package from the module dir — compile and enumerate only; no predicate in
-// the listed package executes. Returns the combined output and exit code.
 func goTestList(t *testing.T, root, pkg string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("go", "test", "-tags", "acs", "-count=1", "-list", ".", pkg)
@@ -86,7 +42,6 @@ func goTestList(t *testing.T, root, pkg string) (string, int) {
 	return "", -1
 }
 
-// listedTests returns the test function names a `go test -list` run printed.
 func listedTests(out string) []string {
 	var names []string
 	for _, line := range strings.Split(out, "\n") {
@@ -97,16 +52,6 @@ func listedTests(out string) []string {
 	return names
 }
 
-// -----------------------------------------------------------------------------
-// AC1 — the dead-red packages are gone from the predicate corpus.
-// -----------------------------------------------------------------------------
-
-// TestC1697_001_DeadRedPackagesNoLongerResolve drives the Go toolchain against
-// each dead package. The only passing outcome is the package being gone
-// (`directory not found` / `no Go files`): a package that still lists test
-// functions is the dead-red corpus still shipped, and any other nonzero exit
-// (a compile error, an infra failure) fails loudly rather than reading as a
-// removal.
 func TestC1697_001_DeadRedPackagesNoLongerResolve(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, d := range deadPackages {
@@ -122,9 +67,6 @@ func TestC1697_001_DeadRedPackagesNoLongerResolve(t *testing.T) {
 		}
 	}
 
-	// Auxiliary (not load-bearing): no predicate source left anywhere in the
-	// corpus grades the phantom machinery — the dead files were not merely moved.
-	// The token is assembled so this file never matches itself.
 	phantom := "TestGoLane" + "Selection_"
 	corpus := filepath.Join(root, "go", "acs")
 	err := filepath.WalkDir(corpus, func(p string, d fs.DirEntry, walkErr error) error {
@@ -148,17 +90,7 @@ func TestC1697_001_DeadRedPackagesNoLongerResolve(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC3 — F5 of the batch-integrity review is extended in place with closure.
-// -----------------------------------------------------------------------------
-
-// TestC1697_002_F5ExtendedInPlaceWithClosure pins the docs half of the task:
-// the existing F5 issue/gap/solution section gains closure evidence without
-// being duplicated, rewritten or moved.
-//
 // acs-predicate: config-check — the F5 record is operator-facing documentation
-// no executable system consumes; its structure IS the contract (the inbox's
-// operator DOCS REQUIRED directive). The Auditor reviews the closure's content.
 func TestC1697_002_F5ExtendedInPlaceWithClosure(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -211,10 +143,10 @@ func TestC1697_002_F5ExtendedInPlaceWithClosure(t *testing.T) {
 	}
 	closure := strings.Join(body[closureAt:], "\n")
 	for _, want := range []string{
-		"go/acs/cycle1257", // the first deleted package, cited by path
-		"go/acs/cycle1259", // the second deleted package, cited by path
-		"1697",             // the cycle that closed F5
-		"skipped_count",    // the Solution's verification step, answered
+		"go/acs/cycle1257",
+		"go/acs/cycle1259",
+		"1697",
+		"skipped_count",
 	} {
 		if !strings.Contains(closure, want) {
 			t.Errorf("F5 closure does not cite %q:\n%s", want, closure)
@@ -231,17 +163,6 @@ func hasLinePrefix(lines []string, prefix string) bool {
 	return false
 }
 
-// -----------------------------------------------------------------------------
-// AC4 + scope — the change set is exactly the cleanup, and spares the control
-// plane.
-// -----------------------------------------------------------------------------
-
-// TestC1697_003_ChangeSetDeletesOnlyDeadCorpusAndSparesProtectedSurface is the
-// negative half. Non-vacuous: both dead files must be DELETED in the lane's
-// change set. Over-deletion: no other go/acs path may be touched besides this
-// cycle's own predicate package. Protected surface: no changed path may be
-// classified protected by guards.IsProtectedSurface — the same classifier the
-// role guard enforces, so the predicate cannot drift from the manifest.
 func TestC1697_003_ChangeSetDeletesOnlyDeadCorpusAndSparesProtectedSurface(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	changes := changeSet(t, root)
@@ -270,9 +191,6 @@ func TestC1697_003_ChangeSetDeletesOnlyDeadCorpusAndSparesProtectedSurface(t *te
 	}
 }
 
-// changeSet maps each path the lane changed to a git status letter (D, M, A):
-// committed since the nearest fork point with main / origin/main, overlaid with
-// the working tree — so it holds whether or not the Builder has committed.
 func changeSet(t *testing.T, root string) map[string]string {
 	t.Helper()
 	base := forkPoint(t, root)
@@ -311,8 +229,6 @@ func changeSet(t *testing.T, root string) map[string]string {
 	return changes
 }
 
-// forkPoint is the nearest merge-base of HEAD with main / origin/main, so a
-// lagging remote ref never drags sibling lanes' landed work into the diff.
 func forkPoint(t *testing.T, root string) string {
 	t.Helper()
 	var bases []string
@@ -326,7 +242,6 @@ func forkPoint(t *testing.T, root string) string {
 	}
 	base := bases[0]
 	for _, cand := range bases[1:] {
-		// Prefer the nearer fork point: cand is nearer when base is its ancestor.
 		if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "merge-base", "--is-ancestor", base, cand); code == 0 {
 			base = cand
 		}

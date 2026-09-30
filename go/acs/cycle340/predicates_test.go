@@ -1,29 +1,5 @@
 //go:build acs
 
-// Package cycle340 materializes the cycle-340 acceptance criteria for the two
-// committed top_n tasks (driver-agnostic model-routing campaign):
-//
-//	T1  substitutability-at-parity-acceptance-test — add TestSpineSubstitutabilityAtParity
-//	    to go/internal/profiles/driver_agnostic_test.go; fixture covers codex/agy/ollama
-//	    × fast/balanced/deep tiers; asserts non-empty Lookup() for each spine phase at
-//	    its canonical tier; uses t.Errorf (not t.Skip) for lookup failures.
-//
-//	T2  fix-profiles-agents-md-vendor-tier-docs — update .evolve/profiles/AGENTS.md
-//	    "Model selection" table row for model_tier_default to replace legacy vendor names
-//	    (haiku/sonnet/opus) with canonical tiers (fast/balanced/deep); add prohibition note.
-//
-// Predicates are BEHAVIORAL where possible (cycle-85 lesson). C340_001 runs the
-// real test subprocess. C340_002 and C340_003 are config-check waivers on the
-// test contract file (the test file IS the deliverable). C340_004 and C340_005
-// are config-check waivers on a documentation file.
-//
-// AC map (1:1 with triage-report.md top_n items):
-//
-//	T1.pass     TestSpineSubstitutabilityAtParity passes in profiles pkg     → C340_001
-//	T1.drivers  fixture covers codex, agy, ollama drivers                    → C340_002
-//	T1.errorf   function uses t.Errorf not t.Skip for lookup failures        → C340_003
-//	T2.no-vendor no haiku/sonnet/opus in model_tier_default row              → C340_004
-//	T2.canonical canonical tiers (fast/balanced/deep) appear in row          → C340_005
 package cycle340
 
 import (
@@ -36,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC340_001_SpineSubstitutabilityAtParityTestPasses verifies that
-// TestSpineSubstitutabilityAtParity exists and passes in go/internal/profiles/.
-// Behavioral: runs the go test subprocess and asserts the PASS line appears.
-// RED: function does not exist yet → no "--- PASS: TestSpineSubstitutabilityAtParity" line.
 func TestC340_001_SpineSubstitutabilityAtParityTestPasses(t *testing.T) {
 	dir := filepath.Join(acsassert.RepoRoot(t), "go")
 	out, _, code, err := acsassert.SubprocessOutput(
@@ -59,11 +31,7 @@ func TestC340_001_SpineSubstitutabilityAtParityTestPasses(t *testing.T) {
 	}
 }
 
-// TestC340_002_SpineSubstitutabilityFixtureCoversAltDrivers verifies that the
-// substitutability test fixture covers codex, agy, and ollama drivers inside
-// the function body of TestSpineSubstitutabilityAtParity.
 // acs-predicate: config-check — the deliverable IS the test contract file.
-// RED: TestSpineSubstitutabilityAtParity does not exist → CountInGoFunc errors.
 func TestC340_002_SpineSubstitutabilityFixtureCoversAltDrivers(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -80,10 +48,7 @@ func TestC340_002_SpineSubstitutabilityFixtureCoversAltDrivers(t *testing.T) {
 	}
 }
 
-// TestC340_003_SpineSubstitutabilityUsesErrorfNotSkip verifies that
-// TestSpineSubstitutabilityAtParity uses t.Errorf for lookup failures, not t.Skip.
 // acs-predicate: config-check — the criterion IS the function body contract.
-// RED: TestSpineSubstitutabilityAtParity does not yet exist → CountInGoFunc errors.
 func TestC340_003_SpineSubstitutabilityUsesErrorfNotSkip(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -105,11 +70,7 @@ func TestC340_003_SpineSubstitutabilityUsesErrorfNotSkip(t *testing.T) {
 	}
 }
 
-// TestC340_004_AgentsMdNoVendorNamesInModelTierDefaultRow verifies that the
-// model_tier_default documentation row in .evolve/profiles/AGENTS.md no longer
-// lists vendor model names (haiku/sonnet/opus).
 // acs-predicate: config-check — the criterion IS a documentation row assertion.
-// RED: AGENTS.md model_tier_default row currently says "haiku, sonnet, opus".
 func TestC340_004_AgentsMdNoVendorNamesInModelTierDefaultRow(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -135,10 +96,7 @@ func TestC340_004_AgentsMdNoVendorNamesInModelTierDefaultRow(t *testing.T) {
 	}
 }
 
-// TestC340_005_AgentsMdCanonicalTiersInModelTierDefaultRow verifies that the
-// model_tier_default row in AGENTS.md now documents canonical tiers (fast/balanced/deep).
 // acs-predicate: config-check — the criterion IS a documentation row assertion.
-// RED: current row uses only vendor names, not canonical tiers.
 func TestC340_005_AgentsMdCanonicalTiersInModelTierDefaultRow(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)

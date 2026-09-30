@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle87 ports the cycle-87 ACS predicates (8 bash files).
-// Subjects: kb-search behavior, research-quota gate behavior, profile JSON validation.
 package cycle87
 
 import (
@@ -13,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC87_KbSearchFixture ports pred-kb-search-fixture.sh.
 func TestC87_KbSearchFixture(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "research", "kb-search.sh")
@@ -22,7 +19,6 @@ func TestC87_KbSearchFixture(t *testing.T) {
 	}
 }
 
-// TestC87_KbSearchGrepFallback ports pred-kb-search-grep-fallback.sh.
 func TestC87_KbSearchGrepFallback(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "research", "kb-search.sh")
@@ -34,8 +30,6 @@ func TestC87_KbSearchGrepFallback(t *testing.T) {
 	}
 }
 
-// TestC87_ProfilesJsonValidate ports pred-profiles-json-validate.sh.
-// All .evolve/profiles/*.json must parse as JSON.
 func TestC87_ProfilesJsonValidate(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profilesDir := filepath.Join(root, ".evolve", "profiles")
@@ -63,7 +57,6 @@ func TestC87_ProfilesJsonValidate(t *testing.T) {
 	}
 }
 
-// TestC87_ResearchQuotaConcurrentNoLoss ports pred-research-quota-concurrent-no-loss.sh.
 func TestC87_ResearchQuotaConcurrentNoLoss(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "hooks", "research-quota-gate.sh")
@@ -75,7 +68,6 @@ func TestC87_ResearchQuotaConcurrentNoLoss(t *testing.T) {
 	}
 }
 
-// TestC87_ResearchQuotaDeepFlag ports pred-research-quota-deep-flag.sh.
 func TestC87_ResearchQuotaDeepFlag(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "hooks", "research-quota-gate.sh")
@@ -87,7 +79,6 @@ func TestC87_ResearchQuotaDeepFlag(t *testing.T) {
 	}
 }
 
-// TestC87_ResearchQuotaGateArithmetic ports pred-research-quota-gate-arithmetic.sh.
 func TestC87_ResearchQuotaGateArithmetic(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "hooks", "research-quota-gate.sh")
@@ -99,7 +90,6 @@ func TestC87_ResearchQuotaGateArithmetic(t *testing.T) {
 	}
 }
 
-// TestC87_ResearchQuotaHookDisabled ports pred-research-quota-hook-disabled.sh.
 func TestC87_ResearchQuotaHookDisabled(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "hooks", "research-quota-gate.sh")
@@ -111,7 +101,6 @@ func TestC87_ResearchQuotaHookDisabled(t *testing.T) {
 	}
 }
 
-// TestC87_RunCycleResetsResearchUsage ports pred-run-cycle-resets-research-usage.sh.
 func TestC87_RunCycleResetsResearchUsage(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{

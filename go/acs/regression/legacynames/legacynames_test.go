@@ -1,18 +1,5 @@
 //go:build acs
 
-// Package legacynames is the durable, config-driven regression guard that no
-// dead naming token from a plugin/skill/repo rename survives in any tracked
-// file. It replaces hand-written per-token tests with one scan driven by
-// .evolve/naming.json — the single source of truth shared with `evolve release`
-// preflight and the `evolve names` command. To guard a new dead token, add a
-// forbidden row to the manifest; do NOT add a test here.
-//
-// acs-tagged like every go/acs/regression predicate; CI runs it via
-//
-//	go test -count=1 -tags acs ./acs/regression/...
-//
-// It is a test-only package outside ./internal/..., so it needs no
-// .apicover-enforce enrollment (same as acs/regression/pluginnamespace).
 package legacynames
 
 import (
@@ -34,9 +21,6 @@ func loadManifest(t *testing.T) (*naminguard.Manifest, string) {
 	return m, root
 }
 
-// TestNoForbiddenTokens is the guard: any tracked file containing a dead naming
-// token fails CI. This is exactly what would have caught the hyphen-less 404
-// slug that lingered in README + landing content after the repo rename.
 func TestNoForbiddenTokens(t *testing.T) {
 	m, root := loadManifest(t)
 	vs, err := naminguard.Scan(root, m)
@@ -53,8 +37,6 @@ func TestNoForbiddenTokens(t *testing.T) {
 	}
 }
 
-// TestManifestValidates pins that the SSOT is well-formed: a broken or empty
-// manifest must fail loudly here, never silently turn the guard into a no-op.
 func TestManifestValidates(t *testing.T) {
 	m, _ := loadManifest(t)
 	if err := m.Validate(); err != nil {

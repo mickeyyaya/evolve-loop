@@ -1,22 +1,5 @@
 //go:build acs
 
-// Package cycle419 — amplification tests added by the Test Amplifier phase.
-//
-// Anti-bias: designed strictly from build-report.md (file list + preservation
-// claims) without reading the implementation files. Targets:
-//
-//  1. agents/evolve-auditor.md — ZERO TDD predicates per R9.3 (bonus task
-//     trim-auditor-prompt-rationale not in triage top_n). Amplification covers
-//     all 11 behavioral elements the build report claims to have preserved.
-//  2. agents/evolve-scout.md edge cases — tight-coupling phrase identified in
-//     build-report.md § Discovery Scan ("eval materialization gate" at line 141)
-//     and challenge-token mandatory-context integrity.
-//
-// Amplification test naming: Amp419_A## (auditor), Amp419_S## (scout edge).
-// Signals:
-//
-//	amplify.tests_added = 15
-//	amplify.failures_found = (set at runtime)
 package cycle419
 
 import (
@@ -29,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// auditorContent reads evolve-auditor.md and returns raw bytes, frontmatter map,
-// and parsed body. Mirrors scoutContent in predicates_test.go.
 func auditorContent(t *testing.T) (raw []byte, fm map[string]any, body string) {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -46,20 +27,12 @@ func auditorContent(t *testing.T) (raw []byte, fm map[string]any, body string) {
 	return raw, fm, body
 }
 
-// =================== AMPLIFY — agents/evolve-auditor.md ===================
-// Build: trim-auditor-prompt-rationale (bonus task, NOT in triage top_n)
-// Baseline: 289 lines / 18102 bytes → claimed 274 lines / 17353 bytes.
-// Build-report preserved: frontmatter, all 25 ## headings, Anti-Bias/SURE,
-// Challenge Token Verification, EGPS Verdict Computation, red_count, STOP
-// CRITERION, Completion Gates, handoff-auditor.json, Constitutional checklist.
-
-// TestAmp419_A01_AuditorLineCountAtFloor asserts auditor ≤274 lines after trim.
 func TestAmp419_A01_AuditorLineCountAtFloor(t *testing.T) {
 	raw, _, _ := auditorContent(t)
 	lines := strings.Split(string(raw), "\n")
 	n := len(lines)
 	if n > 0 && lines[n-1] == "" {
-		n-- // match wc -l: trailing newline not counted
+		n--
 	}
 	const maxLines = 274
 	if n > maxLines {
@@ -68,7 +41,6 @@ func TestAmp419_A01_AuditorLineCountAtFloor(t *testing.T) {
 	}
 }
 
-// TestAmp419_A02_AuditorByteCountReduced asserts byte count < 18102 (baseline).
 func TestAmp419_A02_AuditorByteCountReduced(t *testing.T) {
 	raw, _, _ := auditorContent(t)
 	const baselineBytes = 18102
@@ -78,7 +50,6 @@ func TestAmp419_A02_AuditorByteCountReduced(t *testing.T) {
 	}
 }
 
-// TestAmp419_A03_AuditorFrontmatterPreserved asserts required frontmatter fields.
 func TestAmp419_A03_AuditorFrontmatterPreserved(t *testing.T) {
 	_, fm, _ := auditorContent(t)
 	if fm == nil {
@@ -105,8 +76,6 @@ func TestAmp419_A03_AuditorFrontmatterPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A04_AuditorAntiBiasProtocolPreserved asserts Anti-Bias Protocol
-// and SURE pipeline keywords survived the rationale trim.
 func TestAmp419_A04_AuditorAntiBiasProtocolPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	for _, phrase := range []string{"Anti-Bias", "SURE"} {
@@ -116,8 +85,6 @@ func TestAmp419_A04_AuditorAntiBiasProtocolPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A05_AuditorEGPSAndVerdictRulesPreserved asserts EGPS computation
-// and the red_count verdict rule survived.
 func TestAmp419_A05_AuditorEGPSAndVerdictRulesPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	for _, phrase := range []string{"EGPS", "red_count"} {
@@ -128,8 +95,6 @@ func TestAmp419_A05_AuditorEGPSAndVerdictRulesPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A06_AuditorChallengeTokenVerificationPreserved asserts the
-// Challenge Token Verification section survived.
 func TestAmp419_A06_AuditorChallengeTokenVerificationPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	hasChallengeToken := strings.Contains(body, "Challenge Token") ||
@@ -140,8 +105,6 @@ func TestAmp419_A06_AuditorChallengeTokenVerificationPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A07_AuditorHandoffJsonPreserved asserts handoff-auditor.json
-// reference survived (output contract).
 func TestAmp419_A07_AuditorHandoffJsonPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	if !strings.Contains(body, "handoff-auditor.json") {
@@ -149,8 +112,6 @@ func TestAmp419_A07_AuditorHandoffJsonPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A08_AuditorCompletionGatesPreserved asserts Completion Gates
-// section survived.
 func TestAmp419_A08_AuditorCompletionGatesPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	hasGates := strings.Contains(body, "Completion Gate") ||
@@ -160,7 +121,6 @@ func TestAmp419_A08_AuditorCompletionGatesPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A09_AuditorStopCriterionPreserved asserts STOP CRITERION survived.
 func TestAmp419_A09_AuditorStopCriterionPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	if !strings.Contains(body, "STOP") {
@@ -168,8 +128,6 @@ func TestAmp419_A09_AuditorStopCriterionPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A10_AuditorConstitutionalChecklistPreserved asserts the
-// Constitutional audit checklist survived.
 func TestAmp419_A10_AuditorConstitutionalChecklistPreserved(t *testing.T) {
 	_, _, body := auditorContent(t)
 	hasConstitutional := strings.Contains(body, "Constitutional") ||
@@ -179,8 +137,6 @@ func TestAmp419_A10_AuditorConstitutionalChecklistPreserved(t *testing.T) {
 	}
 }
 
-// TestAmp419_A11_AuditorNoDuplicateHeadings asserts no ## heading appears more
-// than once. Build report claims all 25 ## occurrences preserved.
 func TestAmp419_A11_AuditorNoDuplicateHeadings(t *testing.T) {
 	_, _, body := auditorContent(t)
 	seen := make(map[string]int)
@@ -198,8 +154,6 @@ func TestAmp419_A11_AuditorNoDuplicateHeadings(t *testing.T) {
 	}
 }
 
-// TestAmp419_A12_AuditorAntiGamingFloor asserts ≥200 lines (guards against
-// gaming A01 by deleting behavioral rules instead of prose).
 func TestAmp419_A12_AuditorAntiGamingFloor(t *testing.T) {
 	raw, _, _ := auditorContent(t)
 	lines := strings.Split(string(raw), "\n")
@@ -214,12 +168,6 @@ func TestAmp419_A12_AuditorAntiGamingFloor(t *testing.T) {
 	}
 }
 
-// ============= AMPLIFY — agents/evolve-scout.md edge cases =============
-// Edge cases NOT covered by C419_001–C419_008.
-
-// TestAmp419_S09_ScoutEvalMaterializationGatePhrase asserts the exact phrase
-// "eval materialization gate" is present (build-report discovery scan: tight
-// coupling at line ~141; AC6 relies on this exact phrase after §9 condensation).
 func TestAmp419_S09_ScoutEvalMaterializationGatePhrase(t *testing.T) {
 	_, _, body := scoutContent(t)
 	if !strings.Contains(body, "eval materialization gate") {
@@ -229,12 +177,9 @@ func TestAmp419_S09_ScoutEvalMaterializationGatePhrase(t *testing.T) {
 	}
 }
 
-// TestAmp419_S10_ScoutChallengeTokenMandatoryContext asserts challenge-token
-// appears with an action-verb instruction (not stripped to a bare keyword).
 func TestAmp419_S10_ScoutChallengeTokenMandatoryContext(t *testing.T) {
 	_, _, body := scoutContent(t)
 	if !strings.Contains(body, "challenge-token") {
-		// Already caught by AC5; log for completeness.
 		t.Errorf("challenge-token absent from scout body — already caught by AC5")
 		return
 	}
@@ -248,10 +193,6 @@ func TestAmp419_S10_ScoutChallengeTokenMandatoryContext(t *testing.T) {
 	}
 }
 
-// TestAmp419_S11_AuditPhaseSuiteGreenAfterAuditorTrim asserts the audit phase
-// test suite still passes after the bonus auditor-prompt trim.
-// Distinct from AC8 (which covers ./internal/prompts/... + ./internal/phases/scout/...
-// but NOT ./internal/phases/audit/...).
 func TestAmp419_S11_AuditPhaseSuiteGreenAfterAuditorTrim(t *testing.T) {
 	dir := goDir(t)
 	_, stderr, code, err := acsassert.SubprocessOutput(

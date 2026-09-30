@@ -1,59 +1,5 @@
 //go:build acs
 
-// Package cycle1262 materialises the cycle-1262 acceptance criteria for the
-// three tasks this fleet lane committed in triage `## top_n`:
-//
-//	worktree-path-propagation-fallback     (S — predicates 001-002)
-//	config-single-authority-sweep-alias    (S — predicates 003-004)
-//	llmroute-dispatch-unification          (M — predicate  005)
-//
-// The two `## deferred` items (`config-single-authority-sweep-gatestage`,
-// `worktree-path-propagation-fallback-fullaudit`) and the one `## dropped` item
-// (`egps-regression-tia-shadow-wiring`, verified already landed at
-// audit.go:699-703) carry ZERO predicates, per the R9.3 floor-binding rule: a
-// predicate may only gate work this cycle committed to.
-//
-// # Task 1 — the silent worktree fallback
-//
-// `subagent.Run` (run.go:336-338) does
-// `worktreePath := req.WorktreePath; if worktreePath == "" { worktreePath = req.ProjectRoot }`
-// and then exports that value as the adapter's `WORKTREE_PATH`. When an
-// orchestrator forgets to propagate the lane worktree, the agent silently runs
-// against the MAIN repo root — the exact shape that trips the tree-diff guard
-// and kills a lane, with no signal anywhere saying the fallback fired. The
-// committed fix is the cheap one the inbox item accepts: keep the fallback
-// (nothing may break) but make it LOUD via the already-existing
-// `RunResult.Warns` channel.
-//
-// # Task 2 — the antigravity→agy alias, three times
-//
-// `if cli == "antigravity" { cli = "agy" }` is copy-pasted at run.go:246,
-// dispatchparallel.go:124 and validateprofile.go:137. Three copies of a naming
-// authority is three places to drift. The fix centralises it as
-// `detectcli.Canonical(cli string) string` — the package that already owns CLI
-// identity — and calls it from all three sites.
-//
-// # Task 3 — dispatch-parallel's invented CLI
-//
-// `subagent` imports ZERO `llmroute` symbols; `dispatchparallel.go:120-122`
-// resolves its CLI by regex-scraping the profile body and then falling back to
-// the bare literal `"claude"`. Every sibling entry point (`Run`,
-// `ValidateProfile`) resolves through the shared resolver and FAILS LOUDLY when
-// nothing resolves. Predicate 005 pins the invariant both fix branches share:
-// dispatch-parallel must never invent a CLI out of a hardcoded literal.
-//
-// # Predicate strategy
-//
-// Every predicate drives an EXPORTED production entry — `subagent.Run`,
-// `subagent.ValidateProfile`, `subagent.DispatchParallel` — through its real
-// seams and asserts on what that entry returned or on the value it handed a
-// downstream collaborator. None greps production source (the cycle-85
-// degenerate-predicate ban): a `FileContains` over run.go would pass the moment
-// the implementer typed the magic string, whether or not the warn ever reaches
-// a caller. None sweeps `/...`, shells a 40s+ suite, hardcodes a PID, runs bare
-// `git`, or spawns an un-reaped load generator (the flaky-shape bans). The one
-// subprocess predicate (004) is scoped to a SINGLE named package whose measured
-// wall-clock is 0.7s.
 package cycle1262
 
 import (
@@ -75,19 +21,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// dispatchProfile is a minimally valid parallel-eligible profile. cliField is
-// spliced in verbatim so a caller can omit the `"cli"` key entirely — the
-// no-CLI-declared case predicate 005 turns on.
 func dispatchProfile(cliField string) string {
 	return `{"role":"scout",` + cliField +
 		`"parallel_eligible":true,` +
 		`"parallel_subtasks":[{"name":"codebase","prompt_template":"scan {cycle}"}]}`
 }
 
-// runFixture returns a RunOptions whose every seam succeeds, plus the recorder
-// the adapter env lands in. cli is what the LLM resolver reports. The captured
-// env is the wiring proof for Task 1: WORKTREE_PATH is only meaningful if the
-// value Run computed actually reaches the adapter.
 func runFixture(t *testing.T, cli string, env *map[string]string) subagent.RunOptions {
 	t.Helper()
 	now := time.Date(2026, 8, 4, 5, 0, 0, 0, time.UTC)
@@ -133,8 +72,6 @@ func runFixture(t *testing.T, cli string, env *map[string]string) subagent.RunOp
 	}
 }
 
-// runOnce drives the production entry and returns the result plus the adapter
-// env it exported. worktree is passed through verbatim (empty ⇒ the fallback).
 func runOnce(t *testing.T, worktree string) (subagent.RunResult, map[string]string) {
 	t.Helper()
 	root := t.TempDir()
@@ -160,10 +97,6 @@ func runOnce(t *testing.T, worktree string) (subagent.RunResult, map[string]stri
 	return res, env
 }
 
-// fallbackWarn returns the first warn that names the worktree fallback, or "".
-// A warn qualifies only if it names BOTH the env var the agent will actually
-// see and the path it silently fell back to — a bare "warning" string tells an
-// operator nothing about which lane is about to run against the main tree.
 func fallbackWarn(warns []string, projectRoot string) string {
 	for _, w := range warns {
 		if strings.Contains(w, "WORKTREE_PATH") && strings.Contains(w, projectRoot) {
@@ -173,18 +106,6 @@ func fallbackWarn(warns []string, projectRoot string) string {
 	return ""
 }
 
-// -----------------------------------------------------------------------------
-// AC1 / AC2 — Task 1: the ProjectRoot fallback must be loud, and ONLY when it
-// actually fires.
-// -----------------------------------------------------------------------------
-
-// TestC1262_001_WorktreeFallbackEmitsWarn is the Task-1 crux.
-//
-// A RunRequest with no WorktreePath makes the agent run against the repo root.
-// That must still happen (the fallback is deliberate — removing it would break
-// every non-worktree dispatch), but it must announce itself on RunResult.Warns,
-// the channel callers already log. The env assertion is the other half: a warn
-// that fired while the adapter got some OTHER path would be a lie.
 func TestC1262_001_WorktreeFallbackEmitsWarn(t *testing.T) {
 	res, env := runOnce(t, "")
 
@@ -200,13 +121,6 @@ func TestC1262_001_WorktreeFallbackEmitsWarn(t *testing.T) {
 	}
 }
 
-// TestC1262_002_NoWarnWhenWorktreeSupplied is the anti-no-op negative.
-//
-// An implementer can satisfy 001 by appending the warn unconditionally. That
-// would fire on every correctly-propagated dispatch in the fleet, and a warning
-// that is always on is a warning nobody reads. The healthy path must be silent,
-// and the supplied worktree — not the project root — must be what the adapter
-// receives.
 func TestC1262_002_NoWarnWhenWorktreeSupplied(t *testing.T) {
 	worktree := t.TempDir()
 	res, env := runOnce(t, worktree)
@@ -221,25 +135,6 @@ func TestC1262_002_NoWarnWhenWorktreeSupplied(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC3 / AC4 — Task 2: one canonicaliser, reached from all three dispatch entry
-// points, and graduated under the repo-wide apicover gate.
-// -----------------------------------------------------------------------------
-
-// TestC1262_003_CanonicalIsTheSoleAliasAuthority pins the new SSOT and proves
-// every production path reaches it.
-//
-// The direct table is the contract: `antigravity` maps to `agy`, and NOTHING
-// else moves — a canonicaliser that rewrites more than the one documented alias
-// is a new bug wearing a refactor's clothes, and `""` must stay `""` so the
-// downstream "cli unresolved" guards still fire.
-//
-// The two dispatch assertions are the wiring proof. `Run` and `ValidateProfile`
-// both surface the resolved CLI on their result, so feeding each `antigravity`
-// and asserting `agy` proves the centralised function is reached from the real
-// entry point rather than merely existing beside three surviving inline copies.
-// (The third call site, dispatch-parallel, is covered by predicate 005, which
-// observes the CLI it hands the capability inspector.)
 func TestC1262_003_CanonicalIsTheSoleAliasAuthority(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
 		{"antigravity", "agy"},
@@ -301,15 +196,6 @@ func TestC1262_003_CanonicalIsTheSoleAliasAuthority(t *testing.T) {
 	}
 }
 
-// TestC1262_004_DetectcliStaysApicoverEnrolled is the house-rule floor.
-//
-// `./internal/detectcli` is listed in go/.apicover-enforce (line 112), so it is
-// gated HARD in CI: adding an exported symbol that no test NAMES and EXECUTES
-// turns main red for everyone. Task 2 adds exactly such a symbol, so the
-// enrollment obligation is part of this cycle's acceptance criteria, not a
-// follow-up. This predicate runs the real gate — the same `apicover.Run` the CI
-// step drives — over a coverage profile measured from the one named package
-// (0.7s measured; no `/...` sweep, no 40s suite).
 func TestC1262_004_DetectcliStaysApicoverEnrolled(t *testing.T) {
 	const pkg = "./internal/detectcli"
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
@@ -345,14 +231,6 @@ func TestC1262_004_DetectcliStaysApicoverEnrolled(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC5 — Task 3: dispatch-parallel must not invent a CLI.
-// -----------------------------------------------------------------------------
-
-// dispatchCLI drives DispatchParallel and returns the CLI it handed the
-// capability inspector — the first downstream consumer of its resolution — plus
-// any setup error. Failures after Step 4 are irrelevant here: the resolution
-// under test has already been observed by then.
 func dispatchCLI(t *testing.T, profile string) (string, error) {
 	t.Helper()
 	ws := t.TempDir()
@@ -380,23 +258,6 @@ func dispatchCLI(t *testing.T, profile string) (string, error) {
 	return seen, err
 }
 
-// TestC1262_005_DispatchParallelNeverInventsCLI pins the invariant both fix
-// branches of the chooser-vs-passthrough question must satisfy.
-//
-// dispatchparallel.go:120-122 currently reads
-// `cli := matchField(profileBody, reFieldCLI); if cli == "" { cli = "claude" }`.
-// That literal is a second, divergent routing authority: `Run` and
-// `ValidateProfile` both return "cli unresolved for agent %s" in the same
-// situation, so a profile that resolves nowhere gets a hard error on one path
-// and a silent claude on the other. Whichever verdict the investigation
-// reaches — chooser (route through the shared resolver) or passthrough (consume
-// the parent's already-resolved CLI) — the hardcoded literal must go, and an
-// unresolvable CLI must surface as a loud error rather than an invented default.
-//
-// The two positives are the no-regression floor: a profile that DOES declare a
-// CLI keeps it, and `antigravity` still canonicalises to `agy` — this is the
-// third call site of Task 2's centralised authority, proven from the production
-// entry rather than by grepping for the deleted inline block.
 func TestC1262_005_DispatchParallelNeverInventsCLI(t *testing.T) {
 	if got, err := dispatchCLI(t, dispatchProfile("")); err == nil {
 		t.Errorf("DispatchParallel accepted a profile declaring no cli and proceeded with %q — the hardcoded \"claude\" fallback (dispatchparallel.go:120-122) is still the resolution authority; an unresolvable CLI must error like Run/ValidateProfile do", got)

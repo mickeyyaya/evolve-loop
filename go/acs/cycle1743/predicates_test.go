@@ -1,10 +1,5 @@
 //go:build acs
 
-// Package cycle1743 holds the acceptance predicates for
-// sizeratchet-shrink-dossier-auditcalibration: four oversized functions in
-// go/internal/auditcalibration and go/internal/dossier shrink to
-// sizeratchet.MaxLines with offenders.json untouched, behavior pinned by
-// characterization tests, and no comment added or lost.
 package cycle1743
 
 import (
@@ -202,7 +197,6 @@ func (g worktreeGit) Show(base, path string) ([]byte, error) {
 func (g worktreeGit) Root() (string, error) { return g.root, nil }
 
 // acs-predicate: config-check — the doc comment text IS the contract under
-// test (comments have no runtime behavior); parsed with go/parser, not grepped.
 func TestC1743_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	current := map[string]string{}
@@ -232,7 +226,6 @@ func TestC1743_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1743_010_NoBaselineCommentDeleted(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

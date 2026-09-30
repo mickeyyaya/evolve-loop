@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle90 ports the cycle-90 ACS predicates (5 bash files).
 package cycle90
 
 import (
@@ -11,32 +10,25 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC90_001_ExpectedShipShaRefreshed ports cycle-90/001.
 func TestC90_001_ExpectedShipShaRefreshed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
 	if _, err := os.Stat(state); err != nil {
 		t.Skip("state.json missing — skip")
 	}
-	// The TOFU pin pattern — state.json should support expected_ship_sha key
-	// (either present, or commented out / deleted between cycles)
 	_ = state
 }
 
-// TestC90_002_OrphanWorktreesPruned ports cycle-90/002.
 func TestC90_002_OrphanWorktreesPruned(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	worktreeDir := filepath.Join(root, ".evolve", "worktrees")
 	if _, err := os.Stat(worktreeDir); err != nil {
 		t.Skip("worktrees dir missing — skip")
 	}
-	// Soft check: pruning is an ongoing maintenance task
 	_ = worktreeDir
 }
 
-// TestC90_003_ReleaseTagsBackfilled ports cycle-90/003.
 func TestC90_003_ReleaseTagsBackfilled(t *testing.T) {
-	// CHANGELOG.md should have entries for all major versions
 	root := acsassert.RepoRoot(t)
 	changelog := filepath.Join(root, "CHANGELOG.md")
 	if _, err := os.Stat(changelog); err != nil {
@@ -47,7 +39,6 @@ func TestC90_003_ReleaseTagsBackfilled(t *testing.T) {
 	}
 }
 
-// TestC90_004_KnowledgeStewardshipRule ports cycle-90/004.
 func TestC90_004_KnowledgeStewardshipRule(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -66,7 +57,6 @@ func TestC90_004_KnowledgeStewardshipRule(t *testing.T) {
 	t.Logf("no knowledge-stewardship rule documented at accepted paths")
 }
 
-// TestC90_005_DocDeletionGuardHook ports cycle-90/005.
 func TestC90_005_DocDeletionGuardHook(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	guard := filepath.Join(root, "legacy", "scripts", "hooks", "doc-deletion-guard.sh")

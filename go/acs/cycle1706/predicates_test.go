@@ -1,31 +1,5 @@
 //go:build acs
 
-// Package cycle1706 materialises the acceptance criteria for
-// tempdir-cleanup-vs-git-flake (triage slug gittest-fixture-centralize): a
-// named helper, internal/gittest, owns git-fixture creation and teardown, the
-// named flaky tests build their repos through it, a teardown that races a late
-// writer retries instead of failing the test, and a teardown that cannot finish
-// names the process holding the fixture.
-//
-// Pinned API (the smallest surface the criteria need; add more freely):
-//
-//	func Fixture(tb testing.TB) *Repo         // an initialized, committable work tree
-//	type Repo struct{ Dir string; ... }       // the work-tree root
-//	func (r *Repo) Git(args ...string) string // git in Dir, trimmed output, tb failure on error
-//
-// The predicates:
-//
-//   - 001 positive: a committable repo that is gone once its test ends.
-//   - 002 negative: an unwritable root and a failing git call both fail loudly.
-//   - 003 root cause: no fixture repo can spawn a DETACHED auto-maintenance
-//     child, through the helper or through a raw git (production code).
-//   - 004 caller proof: the named tests' commits/fetches run in quiet repos.
-//   - 005 the race itself: teardown outlasts a writer that outlives its test.
-//   - 006/007 retry exhaustion names the holder, or says the diagnostic is
-//     unavailable — never a bare path.
-//   - 008 the -count=20 -race stress run of the affected tests (this platform).
-//   - 009 new-package graduation: enrolled in go/.apicover-enforce, every
-//     export named, executed and documented.
 package cycle1706
 
 import (
@@ -50,13 +24,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// The pinned constructor signature: testing.TB, like kerneltest.Load, so a
-// benchmark or a recording fake can drive it.
 var _ func(testing.TB) *gittest.Repo = gittest.Fixture
 
-// The sighted tests: TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck
-// (PR #548), TestEngine_RunAllExecutesPureAndCycleSpecs (PR #545), and the
-// startref fixture the inbox record names beside them.
 const (
 	corePkg        = "./internal/core"
 	coreRun        = "^(TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck|TestLaneStartRef_IntegrationHeadAuthority)$"
@@ -65,10 +34,6 @@ const (
 	gittestPkg     = "./internal/gittest"
 )
 
-// --- fakeTB — observes a helper's failure path without failing the predicate ---
-
-// fakeTB records failures, logs and cleanups; everything else (TempDir, Name,
-// Setenv, …) delegates to the real test, so real TempDir cleanup still runs.
 type fakeTB struct {
 	testing.TB
 	mu       sync.Mutex
@@ -138,8 +103,6 @@ func (f *fakeTB) transcript() string {
 	return strings.Join(f.lines, "\n")
 }
 
-// runCleanups runs the recorded cleanups last-in-first-out, each on its own
-// goroutine, as testing does at the end of a test.
 func (f *fakeTB) runCleanups() {
 	f.mu.Lock()
 	fns := f.cleanups
@@ -150,8 +113,6 @@ func (f *fakeTB) runCleanups() {
 	}
 }
 
-// within runs fn on its own goroutine so a FailNow/SkipNow (runtime.Goexit)
-// ends only fn, exactly as it would end a real test body.
 func within(fn func()) {
 	done := make(chan struct{})
 	go func() {
@@ -161,10 +122,6 @@ func within(fn func()) {
 	<-done
 }
 
-// --- shared fixtures ---
-
-// isolateGitConfig makes the global git config exactly `global` and drops the
-// system config, so no developer or CI setting can mask (or supply) behaviour.
 func isolateGitConfig(t *testing.T, global string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "gitconfig")
@@ -175,9 +132,6 @@ func isolateGitConfig(t *testing.T, global string) {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 }
 
-// hostileMaintenance is the default git ≥2.47 behaviour spelled out: every
-// commit/fetch spawns `git maintenance run --auto --detach`, a child that
-// outlives the git call that started it.
 const hostileMaintenance = "[maintenance]\n\tauto = true\n\tautoDetach = true\n[gc]\n\tautoDetach = true\n"
 
 func skipIfRoot(t *testing.T) {
@@ -187,8 +141,6 @@ func skipIfRoot(t *testing.T) {
 	}
 }
 
-// rawGit runs git WITHOUT the helper — the way production code under test
-// reaches a fixture repo.
 func rawGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	out, errOut, code, err := acsassert.SubprocessOutput("git", append([]string{"-C", dir}, args...)...)
@@ -206,10 +158,6 @@ func gitBool(v string) bool {
 	return true
 }
 
-// detachesMaintenance replays git's own prepare_auto_maintenance decision over
-// `git config --list` output (last occurrence wins, a bare key means true):
-// maintenance.auto=false runs nothing; otherwise maintenance.autoDetach, then
-// gc.autoDetach, decide whether the child detaches (default: it does).
 func detachesMaintenance(configList string) (bool, string) {
 	last := map[string]string{}
 	for _, line := range strings.Split(configList, "\n") {
@@ -233,8 +181,6 @@ func detachesMaintenance(configList string) (bool, string) {
 	return true, "maintenance.auto, maintenance.autoDetach and gc.autoDetach all default (detached child)"
 }
 
-// mentionsPath accepts the path as given or symlink-resolved (/var vs
-// /private/var on macOS, as lsof prints it).
 func mentionsPath(msg, path string) bool {
 	if strings.Contains(msg, path) {
 		return true
@@ -243,10 +189,6 @@ func mentionsPath(msg, path string) bool {
 	return err == nil && strings.Contains(msg, resolved)
 }
 
-// irremovable plants a read-only subdirectory holding a file inside the
-// fixture: every RemoveAll attempt fails (EACCES) until it is restored. On
-// darwin the file is also user-immutable (EPERM), so a teardown that chmods its
-// way through still cannot finish.
 func irremovable(t *testing.T, repoDir string) string {
 	t.Helper()
 	locked := filepath.Join(repoDir, "c1706-held")
@@ -289,12 +231,6 @@ func fixtureVia(t *testing.T, f *fakeTB) *gittest.Repo {
 	return repo
 }
 
-// --- 001-002 — the helper's own contract ---
-
-// TestC1706_001_FixtureBuildsACommittableRepoGoneAtTestEnd: a fixture is a
-// real work tree rooted at Dir, commits with no ambient identity (CI runners
-// have none), two fixtures never share a tree, and the tree is gone once the
-// test that built it ends.
 func TestC1706_001_FixtureBuildsACommittableRepoGoneAtTestEnd(t *testing.T) {
 	isolateGitConfig(t, "")
 	var dirs []string
@@ -334,9 +270,6 @@ func TestC1706_001_FixtureBuildsACommittableRepoGoneAtTestEnd(t *testing.T) {
 	}
 }
 
-// TestC1706_002_FixtureAndGitFailLoudly: an unwritable root and a failing git
-// command must each FAIL the test with a message — never a skip, never a
-// silently returned zero Repo, never a swallowed error.
 func TestC1706_002_FixtureAndGitFailLoudly(t *testing.T) {
 	isolateGitConfig(t, "")
 	skipIfRoot(t)
@@ -376,18 +309,8 @@ func TestC1706_002_FixtureAndGitFailLoudly(t *testing.T) {
 	})
 }
 
-// --- 003-004 — no git child outlives a fixture git call ---
-
 var detachedChildRE = regexp.MustCompile(`(?m)run_command:.*\bmaintenance run\b.*\s--detach(\s|$)`)
 
-// TestC1706_003_FixtureReposNeverDetachBackgroundMaintenance: from git 2.47 a
-// commit or fetch spawns `git maintenance run --auto --detach`, a background
-// git process working in .git/objects after the command returned (gc.auto=0
-// does NOT stop the spawn — only maintenance.auto=false, or autoDetach=false,
-// does). Against a global config that asks for detaching, a fixture repo must
-// keep that child quiet (a) through the helper, (b) for a raw git in the repo —
-// production code under test commits inside fixtures without the helper — and
-// (c) observably, when git's trace reaches the helper's children.
 func TestC1706_003_FixtureReposNeverDetachBackgroundMaintenance(t *testing.T) {
 	isolateGitConfig(t, hostileMaintenance)
 	ok := t.Run("fixture", func(st *testing.T) {
@@ -418,9 +341,6 @@ func TestC1706_003_FixtureReposNeverDetachBackgroundMaintenance(t *testing.T) {
 	}
 }
 
-// gitShim is a PATH-first `git` that records, for every commit/fetch (the
-// commands that start auto-maintenance), git's own view of the three knobs in
-// that invocation's repo and scope, then execs the real git unchanged.
 const gitShim = `#!/bin/bash
 real='%s'
 log="${EVOLVE_C1706_GITLOG:-}"
@@ -448,8 +368,6 @@ fi
 exec "$real" "$@"
 `
 
-// shimRecordDetaches turns one shim line into config --list shape and replays
-// git's decision over it.
 func shimRecordDetaches(line string) (bool, string) {
 	var list []string
 	for _, field := range strings.Split(line, "\t")[1:] {
@@ -460,12 +378,6 @@ func shimRecordDetaches(line string) (bool, string) {
 	return detachesMaintenance(strings.Join(list, "\n"))
 }
 
-// TestC1706_004_NamedTestsBuildTheirReposThroughTheHelper is the caller proof:
-// it runs the REAL flaky tests (both sightings plus the startref fixture) with
-// the shim first on PATH and requires every commit and fetch they make —
-// fixture code and the production code under test alike — to run in a repo
-// that cannot detach a maintenance child. A test still on a bare t.TempDir()
-// plus raw git commits in an unhardened repo and fails here.
 func TestC1706_004_NamedTestsBuildTheirReposThroughTheHelper(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -484,15 +396,11 @@ func TestC1706_004_NamedTestsBuildTheirReposThroughTheHelper(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(shimDir, "git"), []byte(fmt.Sprintf(gitShim, realGit)), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Hermetic: a developer's global maintenance.auto=false would pass this
-	// vacuously. Identity mirrors a developer machine so unrelated commits work.
 	isolateGitConfig(t, hostileMaintenance+"[user]\n\tname = c1706\n\temail = c1706@example.com\n")
 	t.Run(corePkg, func(t *testing.T) { shimmedGoTest(t, goDir, shimDir, coreRun, corePkg) })
 	t.Run(routingtestPkg, func(t *testing.T) { shimmedGoTest(t, goDir, shimDir, routingtestRun, routingtestPkg) })
 }
 
-// shimmedGoTest runs one package's named tests with the git shim first on
-// PATH, requires each named test to PASS, then judges every recorded call.
 func shimmedGoTest(t *testing.T, goDir, shimDir, run, pkg string) {
 	t.Helper()
 	logPath := filepath.Join(t.TempDir(), "git-calls.tsv")
@@ -507,8 +415,6 @@ func shimmedGoTest(t *testing.T, goDir, shimDir, run, pkg string) {
 	assertQuietRepos(t, logPath)
 }
 
-// assertNamedPasses requires at least `want` PASS lines for every test name in
-// an anchored `^(A|B)$` run pattern — a -run matching nothing exits 0.
 func assertNamedPasses(t *testing.T, out, run string, want int) {
 	t.Helper()
 	for _, name := range strings.Split(strings.Trim(run, "^$()"), "|") {
@@ -537,13 +443,6 @@ func assertQuietRepos(t *testing.T, logPath string) {
 	}
 }
 
-// --- 005-007 — teardown: outlast a late writer, else name the holder ---
-
-// lateWriter keeps rewriting a few files inside .git/objects until the
-// teardown removes its sentinel (a file it never rewrites, so the first removal
-// pass always takes it), then makes ONE more write — a git child finishing
-// after its parent returned — and stops. It never recreates anything above its
-// own leaf directory, so once it stops a retried RemoveAll always succeeds.
 type lateWriter struct {
 	cancel     context.CancelFunc
 	done       chan struct{}
@@ -572,8 +471,6 @@ func startLateWriter(t *testing.T, objects string) *lateWriter {
 				_ = os.WriteFile(filepath.Join(leaf, "tmp_obj_late"), []byte("late"), 0o644)
 				return
 			}
-			// Any error here means the teardown is mid-removal of the leaf
-			// (ENOENT, or EINVAL on darwin); the sentinel check decides.
 			if os.WriteFile(filepath.Join(leaf, "tmp_obj_"+strconv.Itoa(i%8)), []byte("pack"), 0o644) == nil {
 				w.wrote.Add(1)
 			}
@@ -588,11 +485,6 @@ func (w *lateWriter) stop() {
 	<-w.done
 }
 
-// TestC1706_005_TeardownOutlastsAWriterThatOutlivesItsTest is the flake in
-// miniature and deterministic: the test body returns while a writer is still
-// putting entries into .git/objects. t.TempDir's single RemoveAll turns that
-// into `unlinkat …/.git/objects: directory not empty`; the helper's bounded
-// retry must absorb it — the test passes and the tree is gone.
 func TestC1706_005_TeardownOutlastsAWriterThatOutlivesItsTest(t *testing.T) {
 	isolateGitConfig(t, "")
 	var dir string
@@ -617,10 +509,6 @@ func TestC1706_005_TeardownOutlastsAWriterThatOutlivesItsTest(t *testing.T) {
 	}
 }
 
-// TestC1706_006_RetryExhaustionNamesTheHoldingProcess: when the tree cannot be
-// removed, the failure must name who holds it — here a `sleep` whose cwd is
-// inside the fixture — by PID, alongside the path. (lsof exits 1 even when it
-// prints holders; parse its output, not its status.)
 func TestC1706_006_RetryExhaustionNamesTheHoldingProcess(t *testing.T) {
 	isolateGitConfig(t, "")
 	skipIfRoot(t)
@@ -658,9 +546,6 @@ func TestC1706_006_RetryExhaustionNamesTheHoldingProcess(t *testing.T) {
 	}
 }
 
-// TestC1706_007_UnavailableDiagnosticIsStatedNotOmitted: with no lsof on PATH
-// (non-POSIX, or a slim image) the failure still carries the path and says
-// "diagnostic unavailable" — never a silent path-only message.
 func TestC1706_007_UnavailableDiagnosticIsStatedNotOmitted(t *testing.T) {
 	isolateGitConfig(t, "")
 	skipIfRoot(t)
@@ -691,12 +576,6 @@ func TestC1706_007_UnavailableDiagnosticIsStatedNotOmitted(t *testing.T) {
 	}
 }
 
-// --- 008-009 — stress run and new-package graduation ---
-
-// TestC1706_008_StressRunOfTheAffectedTestsIsGreen is the inbox's stress
-// criterion on THIS platform (the Linux half is the PR's CI run): -race
-// -count=20 of the two sighted tests, the startref fixture and the helper's own
-// suite, each package alone, green and free of the cleanup signature.
 func TestC1706_008_StressRunOfTheAffectedTestsIsGreen(t *testing.T) {
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
 	t.Logf("platform: %s/%s", runtime.GOOS, runtime.GOARCH)
@@ -710,8 +589,6 @@ func TestC1706_008_StressRunOfTheAffectedTestsIsGreen(t *testing.T) {
 		assertStressGreen(t, stdout+stderr, code, err, routingtestPkg)
 		assertNamedPasses(t, stdout+stderr, routingtestRun, 20)
 	})
-	// No -v here: the helper's own suite may legitimately t.Log a simulated
-	// cleanup failure, which -v would print into the signature scan.
 	t.Run(gittestPkg, func(t *testing.T) {
 		stdout, stderr, code, err := acsassert.SubprocessOutput("go", "test", "-C", goDir, "-race", "-count=20", "-run", ".", gittestPkg)
 		out := stdout + stderr
@@ -734,9 +611,6 @@ func assertStressGreen(t *testing.T, out string, code int, err error, pkg string
 	}
 }
 
-// TestC1706_009_GittestGraduatesUnderApicover: a new internal package must be
-// enrolled in go/.apicover-enforce with every export named by a test, executed
-// (no false-green) and documented — or it aborts the build for the whole tree.
 func TestC1706_009_GittestGraduatesUnderApicover(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")

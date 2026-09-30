@@ -1,10 +1,5 @@
 //go:build acs
 
-// Package cycle1702 materialises the acceptance criteria for
-// acs-cycle50-predicates-point-at-a-moved-file: ACS predicates that read a
-// source file must resolve it at its current location, and an acsassert read of
-// a path that does not exist must say the file may have moved instead of
-// surfacing a bare "no such file" error.
 package cycle1702
 
 import (
@@ -26,12 +21,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// goDir is the worktree's Go module root, so the shelled tests compile the
-// cycle's tree rather than main's copy.
 func goDir(t *testing.T) string { return filepath.Join(acsassert.RepoRoot(t), "go") }
 
-// runACSTests runs the named predicates of one ACS package and requires a real
-// PASS line for each, so a deleted, renamed or skipped predicate cannot pass.
 func runACSTests(t *testing.T, pkg string, names ...string) {
 	t.Helper()
 	args := []string{"test", "-C", goDir(t), "-tags", "acs", "-count=1", "-v"}
@@ -49,7 +40,6 @@ func runACSTests(t *testing.T, pkg string, names ...string) {
 	}
 }
 
-// recordingTB captures acsassert failure messages without failing the caller.
 type recordingTB struct{ msgs []string }
 
 func (r *recordingTB) Errorf(format string, args ...any) {
@@ -57,13 +47,10 @@ func (r *recordingTB) Errorf(format string, args ...any) {
 }
 func (r *recordingTB) Helper() {}
 
-// hintText is every recorded message with the probed path removed, so a path
-// component can never supply the "moved" wording on its own.
 func (r *recordingTB) hintText(path string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.Join(r.msgs, "\n"), path, "<path>"))
 }
 
-// sourceReaders are the acsassert helpers that resolve a source path.
 var sourceReaders = []struct {
 	name string
 	call func(tb acsassert.TB, path string) bool
@@ -74,15 +61,12 @@ var sourceReaders = []struct {
 	{"FileMatchesRegex", func(tb acsassert.TB, p string) bool { return acsassert.FileMatchesRegex(tb, p, `needle`) }},
 }
 
-// joinTarget is one filepath.Join(<repo root>, "lit", ...) call in a predicate file.
 type joinTarget struct {
 	file, fn string
 	line     int
 	rel      string
 }
 
-// rootIdents names the identifiers a function body binds to the repo root:
-// any variable assigned from a call to a function named RepoRoot/repoRoot.
 func rootIdents(body *ast.BlockStmt) map[string]bool {
 	ids := map[string]bool{}
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -109,8 +93,6 @@ func rootIdents(body *ast.BlockStmt) map[string]bool {
 	return ids
 }
 
-// repoJoins returns every filepath.Join whose first argument is a repo-root
-// identifier and whose remaining arguments are all string literals.
 func repoJoins(t *testing.T, path string) []joinTarget {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -159,9 +141,6 @@ func repoJoins(t *testing.T, path string) []joinTarget {
 	return out
 }
 
-// staleGoJoins sweeps every cycle and regression predicate file under root and
-// returns the Go-source join targets that do not exist, plus how many predicate
-// files and Go-source targets it examined.
 func staleGoJoins(t *testing.T, root string) (missing []string, files, goTargets int) {
 	t.Helper()
 	var paths []string
@@ -188,7 +167,6 @@ func staleGoJoins(t *testing.T, root string) (missing []string, files, goTargets
 	return missing, len(paths), goTargets
 }
 
-// joinsIn returns the Go-source join targets of one predicate function.
 func joinsIn(t *testing.T, file, fn string) []string {
 	t.Helper()
 	var rels []string
@@ -201,8 +179,6 @@ func joinsIn(t *testing.T, file, fn string) []string {
 	return rels
 }
 
-// TestC1702_001_Cycle50SuiteGreen: `go test -count=1 -tags acs ./acs/cycle50`
-// exits 0 with both release-preflight predicates actually passing.
 func TestC1702_001_Cycle50SuiteGreen(t *testing.T) {
 	runACSTests(t, "./acs/cycle50")
 	runACSTests(t, "./acs/cycle50",
@@ -210,8 +186,6 @@ func TestC1702_001_Cycle50SuiteGreen(t *testing.T) {
 		"TestC50B_005_StrictPassFlag_RegisteredInPreflight")
 }
 
-// repointed lists every predicate that read a file the cmd/evolve
-// decomposition renamed, with the path it must now resolve.
 var repointed = []struct {
 	pkg, fn string
 	want    []string
@@ -227,9 +201,6 @@ var repointed = []struct {
 	{"cycle11", "TestC11_005_InactivityEnvReadsGoneFromPhaseWatchdogCmd", []string{"go/internal/cli/phasecmd/phase_watchdog.go"}},
 }
 
-// TestC1702_002_RepointedPredicatesResolveTheRenamedFile: each predicate that
-// read a renamed cmd/evolve file now names the file's current location, not
-// some other existing file.
 func TestC1702_002_RepointedPredicatesResolveTheRenamedFile(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, r := range repointed {
@@ -262,8 +233,6 @@ func contains(xs []string, x string) bool {
 	return false
 }
 
-// TestC1702_003_RepointedSiblingPredicatesPass: the same stale-path class in
-// cycles 47, 48, 11 and 31 now passes when run through the real ACS runner.
 func TestC1702_003_RepointedSiblingPredicatesPass(t *testing.T) {
 	byPkg := map[string][]string{}
 	for _, r := range repointed {
@@ -282,9 +251,6 @@ func TestC1702_003_RepointedSiblingPredicatesPass(t *testing.T) {
 	}
 }
 
-// TestC1702_004_NotExistReadHintsAtRelocation: every acsassert helper that
-// resolves a source path fails a missing path with a message that names the
-// moved-file possibility and still names the path it tried.
 func TestC1702_004_NotExistReadHintsAtRelocation(t *testing.T) {
 	gone := filepath.Join(t.TempDir(), "cmd", "evolve", "cmd_gone.go")
 	for _, h := range sourceReaders {
@@ -305,9 +271,6 @@ func TestC1702_004_NotExistReadHintsAtRelocation(t *testing.T) {
 	}
 }
 
-// TestC1702_005_HintOnlyForNotExist: the moved-file hint fires only when the
-// path does not exist — a content mismatch or a non-ENOENT read error keeps its
-// plain message, and a satisfied assertion logs nothing.
 func TestC1702_005_HintOnlyForNotExist(t *testing.T) {
 	dir := t.TempDir()
 	plain := filepath.Join(dir, "plain.go")
@@ -351,9 +314,6 @@ func TestC1702_005_HintOnlyForNotExist(t *testing.T) {
 	}
 }
 
-// TestC1702_006_NoPredicateJoinsAMissingGoFile: a sweep of every cycle and
-// regression predicate file finds no repo-root Go-source path that no longer
-// exists.
 func TestC1702_006_NoPredicateJoinsAMissingGoFile(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	missing, files, goTargets := staleGoJoins(t, root)
@@ -366,8 +326,6 @@ func TestC1702_006_NoPredicateJoinsAMissingGoFile(t *testing.T) {
 	}
 }
 
-// TestC1702_007_SweepDetectsAStaleJoin: the sweep reports a repo-root join to a
-// missing Go file and ignores one that exists or that joins a non-root base.
 func TestC1702_007_SweepDetectsAStaleJoin(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "go", "live"), 0o755); err != nil {
@@ -401,12 +359,8 @@ func TestC9_001(t *testing.T) {
 	}
 }
 
-// fileReadCalls are the os functions through which an acsassert helper resolves a path.
 var fileReadCalls = map[string]bool{"ReadFile": true, "Stat": true, "Lstat": true, "Open": true, "ReadDir": true}
 
-// pathReaders parses the non-test sources of package acsassert and returns its
-// exported functions that read a file, split by whether the signature can carry
-// a failure message (a TB parameter or an error result) or can only return a value.
 func pathReaders(t *testing.T) (messaging, silent []string) {
 	t.Helper()
 	srcs, err := filepath.Glob(filepath.Join(goDir(t), "pkg", "acsassert", "*.go"))
@@ -476,8 +430,6 @@ func carriesMessage(ft *ast.FuncType) bool {
 	return false
 }
 
-// readerProbe calls one acsassert reader on path and returns whether it
-// reported success, the failure text it produced, and its error, if it returns one.
 type readerProbe func(path string) (ok bool, msg string, err error)
 
 func tbProbe(call func(acsassert.TB, string) bool) readerProbe {
@@ -488,7 +440,6 @@ func tbProbe(call func(acsassert.TB, string) bool) readerProbe {
 	}
 }
 
-// messagingProbes has one probe per acsassert reader that can report a failure message.
 var messagingProbes = map[string]readerProbe{
 	"FileExists":       tbProbe(func(tb acsassert.TB, p string) bool { return acsassert.FileExists(tb, p) }),
 	"FileContains":     tbProbe(func(tb acsassert.TB, p string) bool { return acsassert.FileContains(tb, p, "needle") }),
@@ -507,10 +458,6 @@ func mentionsMoved(msg, path string) bool {
 	return strings.Contains(strings.ToLower(strings.ReplaceAll(msg, path, "<path>")), "moved")
 }
 
-// TestC1702_008_EveryMessageCarryingReaderHintsAtRelocation: every exported
-// acsassert function that reads a path and can report a failure (a TB parameter
-// or an error result) fails a missing path with the path, the moved-file
-// possibility, and, for an error result, an error chain that is still fs.ErrNotExist.
 func TestC1702_008_EveryMessageCarryingReaderHintsAtRelocation(t *testing.T) {
 	messaging, _ := pathReaders(t)
 	probed := make([]string, 0, len(messagingProbes))
@@ -540,10 +487,6 @@ func TestC1702_008_EveryMessageCarryingReaderHintsAtRelocation(t *testing.T) {
 	}
 }
 
-// TestC1702_009_ErrorAndJSONReadersHintOnlyForNotExist: CountInGoFunc and
-// JSONFieldEquals keep their plain failure for an existing path (missing
-// function, unparsable source, invalid JSON, absent key, value mismatch, a
-// directory) and report success without a message when satisfied.
 func TestC1702_009_ErrorAndJSONReadersHintOnlyForNotExist(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src.go")
@@ -603,10 +546,6 @@ func TestC1702_009_ErrorAndJSONReadersHintOnlyForNotExist(t *testing.T) {
 	}
 }
 
-// TestC1702_010_FollowUpInboxItemCoversTheSilentReaders: the acsassert path
-// readers whose signature cannot carry a message (value-only results, no TB)
-// are named in the acceptance of an inbox item that declares go/pkg/acsassert,
-// loaded through the real inbox loader, so the gap is queued rather than dropped.
 func TestC1702_010_FollowUpInboxItemCoversTheSilentReaders(t *testing.T) {
 	_, silent := pathReaders(t)
 	if len(silent) == 0 {

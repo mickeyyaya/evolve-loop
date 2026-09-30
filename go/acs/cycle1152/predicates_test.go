@@ -1,57 +1,5 @@
 //go:build acs
 
-// Package cycle1152 materialises the acceptance criteria for the single task
-// triage committed to THIS cycle:
-//
-//   - artifact-name-ssot-remaining-callsites → route every remaining
-//     hand-rolled report-filename literal in go/internal through the
-//     phasecontract SSOT (ArtifactName / ArtifactFilename), completing the
-//     migration cycle-1145 started and cycle-1149 left half-done.
-//
-// The deferred id (artifact-name-ssot-grep-guard) carries ZERO predicates —
-// R9.3: predicates bind only to triage-committed work, and a predicate gating
-// deferred work starves the committed task (the cycle-280 failure mode).
-//
-// Continuation context (ADR-0076). This worktree is a salvage continuation of
-// cycle-1149, which already migrated SIX of the eight target files
-// (consensusdispatch, core/phase_bindings, core/build_removal_check,
-// coherence, phases/audit, phases/build). TWO literals survive and are what
-// this cycle must close:
-//
-//	go/internal/phases/tdd/tdd.go:38      — the ArtifactFilename hook returns
-//	                                        the literal, though the file already
-//	                                        imports phasecontract.
-//	go/internal/phases/ship/manifest.go:53 — the manifest list, whose comment
-//	                                        wrongly claims "test" has no
-//	                                        registry phase (it does: "tdd").
-//
-// Predicate strategy. This is a pure refactor: the literals currently EQUAL
-// the registry's values, so no runtime observation can distinguish "reads the
-// SSOT" from "carries an equal copy" — duplication is inherently a source-level
-// property. The suite therefore pairs the two axes so neither half is gameable
-// alone (go/acs/README.md sanctioned absence-check form, and the cycle-1147
-// 001+005 precedent for this same task family):
-//
-//   - 001 is BEHAVIORAL over the SSOT itself. It calls ArtifactName /
-//     ArtifactFilename and asserts their return values, including the phases
-//     whose registry name DIVERGES from the "<phase>-report.md" convention.
-//     It is the pairing anchor: a builder who greens 002-004 by deleting or
-//     renaming the registry's tdd contract fails here.
-//   - 002 is the duplication-ABSENCE check over the two surviving call sites.
-//     RED today at both.
-//   - 003 is the repo-wide invariant AC, enforced by PARSING go/internal with
-//     go/parser and inspecting string literal AST nodes — not grep. Prose in
-//     comments and error messages that merely mentions a report name is
-//     correctly ignored; only a literal that IS the filename trips it. RED
-//     today with exactly the two findings above.
-//   - 004 is the anti-gaming NEGATIVE half. The obvious wrong fix — replacing
-//     the literal with the hand-rolled `phase + "-report.md"` convention —
-//     would green 002/003 while silently breaking tdd (whose registry name is
-//     "test-report.md", not "tdd-report.md"). 004 rejects that fix, and also
-//     pins the six files cycle-1149 already migrated so the salvaged work
-//     cannot regress inside this cycle.
-//   - 005 is BEHAVIORAL over the toolchain: `go build ./...` must succeed,
-//     materialising the "no new import cycles" criterion.
 package cycle1152
 
 import (
@@ -71,10 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// reportNames are the phase-report filenames the registry owns. Assembled from
-// the registry at init rather than typed, so this predicate file does not itself
-// contain the literals it forbids (a self-trip against 003's own scan, which
-// deliberately does not exempt go/acs).
 var reportNames = map[string]string{
 	string(core.PhaseScout): phasecontract.ArtifactName(string(core.PhaseScout)),
 	string(core.PhaseTDD):   phasecontract.ArtifactName(string(core.PhaseTDD)),
@@ -82,14 +26,11 @@ var reportNames = map[string]string{
 	string(core.PhaseAudit): phasecontract.ArtifactName(string(core.PhaseAudit)),
 }
 
-// remainingCallSites are the two files still carrying a hand-rolled literal.
 var remainingCallSites = []string{
 	"go/internal/phases/tdd/tdd.go",
 	"go/internal/phases/ship/manifest.go",
 }
 
-// alreadyMigrated are the six files cycle-1149 salvaged. 004 pins them so this
-// cycle cannot regress work it inherited.
 var alreadyMigrated = []string{
 	"go/internal/consensusdispatch/consensusdispatch.go",
 	"go/internal/core/phase_bindings.go",
@@ -99,21 +40,7 @@ var alreadyMigrated = []string{
 	"go/internal/phases/build/build.go",
 }
 
-// TestC1152_001_registry_is_the_artifact_name_ssot is the behavioral anchor.
-//
-// The whole task rests on one claim: the registry ALREADY knows every report
-// filename, so no consumer needs its own copy. This predicate proves that claim
-// by calling the SSOT — in particular for "tdd", whose registry name is
-// "test-report.md". ship/manifest.go:49 currently asserts the opposite in a
-// comment ("'test' has no registry phase, so its report name has no SSOT to
-// resolve against"); that comment is factually wrong and this predicate is the
-// refutation.
-//
-// Behavioral: cannot be greened by adding a magic string anywhere — the
-// registry entries must exist and resolve.
 func TestC1152_001_registry_is_the_artifact_name_ssot(t *testing.T) {
-	// The divergent phases: registry name != "<phase>-report.md". These are the
-	// reason hand-rolling the convention is a BUG and not merely duplication.
 	divergent := []struct{ phase, want string }{
 		{string(core.PhaseTDD), "test-report.md"},
 		{"retro", "retrospective-report.md"},
@@ -132,8 +59,6 @@ func TestC1152_001_registry_is_the_artifact_name_ssot(t *testing.T) {
 		}
 	}
 
-	// Convention-matching phases must keep resolving identically, so completing
-	// the migration is behaviour-preserving everywhere except tdd.
 	for _, tc := range []struct{ phase, want string }{
 		{string(core.PhaseScout), "scout-report.md"},
 		{string(core.PhaseBuild), "build-report.md"},
@@ -144,10 +69,6 @@ func TestC1152_001_registry_is_the_artifact_name_ssot(t *testing.T) {
 		}
 	}
 
-	// Edge / OOD: NoArtifact and unregistered phases. ArtifactName carries the
-	// "no registered artifact" distinction as ""; ArtifactFilename supplies the
-	// convention instead. A call site that needs to TELL THEM APART must use
-	// ArtifactName, so this distinction has to survive the migration.
 	if got := phasecontract.ArtifactName("ship"); got != "" {
 		t.Errorf("ArtifactName(\"ship\") = %q, want \"\" — ship is NoArtifact (its result is a pushed commit)", got)
 	}
@@ -160,11 +81,6 @@ func TestC1152_001_registry_is_the_artifact_name_ssot(t *testing.T) {
 	}
 }
 
-// TestC1152_002_remaining_callsites_resolve_through_ssot is the duplication
-// absence check over the two files this cycle must fix.
-//
-// Paired with 001: greening this by deleting the registry's tdd contract fails
-// 001, so the two cannot be satisfied together by anything except the real fix.
 func TestC1152_002_remaining_callsites_resolve_through_ssot(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, rel := range remainingCallSites {
@@ -187,18 +103,6 @@ func TestC1152_002_remaining_callsites_resolve_through_ssot(t *testing.T) {
 	}
 }
 
-// TestC1152_003_no_report_filename_literals_outside_phasecontract is the
-// repo-wide invariant AC and the regression guard against this drift class
-// recurring a third time (cycle-1145 → cycle-1149 → here).
-//
-// It PARSES every non-test .go file under go/internal and inspects string
-// literal AST nodes, so a comment or an error message that merely mentions a
-// report name — of which the tree has dozens, legitimately — is not a finding.
-// Only a literal whose value IS the filename counts: that is a path being
-// constructed, which is exactly what must route through the registry.
-//
-// The phasecontract package is exempt: it is the SSOT and the one place the
-// names are allowed to be typed.
 func TestC1152_003_no_report_filename_literals_outside_phasecontract(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	internal := filepath.Join(root, "go", "internal")
@@ -214,7 +118,6 @@ func TestC1152_003_no_report_filename_literals_outside_phasecontract(t *testing.
 			return err
 		}
 		if d.IsDir() {
-			// The SSOT itself is the one sanctioned declaration site.
 			if d.Name() == "phasecontract" {
 				return fs.SkipDir
 			}
@@ -226,7 +129,7 @@ func TestC1152_003_no_report_filename_literals_outside_phasecontract(t *testing.
 		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		file, perr := parser.ParseFile(fset, path, nil, 0) // 0 ⇒ comments dropped
+		file, perr := parser.ParseFile(fset, path, nil, 0)
 		if perr != nil {
 			t.Errorf("parse %s: %v", path, perr)
 			return nil
@@ -264,22 +167,9 @@ func TestC1152_003_no_report_filename_literals_outside_phasecontract(t *testing.
 	}
 }
 
-// TestC1152_004_no_handrolled_convention_and_no_regression is the negative,
-// anti-gaming half.
-//
-// The tempting wrong fix for tdd.go is `string(core.PhaseTDD) + "-report.md"`,
-// which greens 002 and 003 while producing "tdd-report.md" — a file the agent
-// never writes, which is precisely the exit-81 timeout the tdd.go doc comment
-// records as already having happened once. This predicate forbids that shape at
-// the migrated sites.
-//
-// It also pins the six files cycle-1149 already migrated: they must still call
-// the SSOT and must not have reacquired a literal. Without this, "completing the
-// migration" could silently trade one set of literals for another.
 func TestC1152_004_no_handrolled_convention_and_no_regression(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 
-	// Assembled at runtime so this file does not contain the fragment it forbids.
 	const suffix = "-report.md"
 	forbidden := []string{`+ "` + suffix + `"`, `+"` + suffix + `"`}
 
@@ -315,12 +205,6 @@ func TestC1152_004_no_handrolled_convention_and_no_regression(t *testing.T) {
 	}
 }
 
-// TestC1152_005_repo_builds materialises the "no new import cycles" criterion.
-// phasecontract is a leaf-ish package, but adding an import to ship/manifest.go
-// or tdd.go is the one way this task could introduce a cycle, and the compiler
-// is the only authority on that.
-//
-// Behavioral: runs the real toolchain and asserts its exit code.
 func TestC1152_005_repo_builds(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	if _, err := exec.LookPath("go"); err != nil {
@@ -334,8 +218,6 @@ func TestC1152_005_repo_builds(t *testing.T) {
 	}
 }
 
-// readSource reads a repo-relative source file, reporting rather than fataling
-// so one missing file does not mask findings in the others.
 func readSource(t *testing.T, root, rel string) (string, bool) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(root, rel))
@@ -346,9 +228,6 @@ func readSource(t *testing.T, root, rel string) (string, bool) {
 	return string(data), true
 }
 
-// containsStringLiteral reports whether src declares want as a Go string
-// literal. Parsing (not substring search) is what keeps the dozens of legitimate
-// prose mentions in comments and error messages from registering as findings.
 func containsStringLiteral(t *testing.T, rel, src, want string) bool {
 	t.Helper()
 	fset := token.NewFileSet()

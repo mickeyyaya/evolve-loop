@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle74 ports the cycle-74 ACS predicate (1 bash file).
 package cycle74
 
 import (
@@ -11,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestC74_AssertIntentStopCriterion ports cycle-74/assert-intent-stop-criterion.sh.
 func TestC74_AssertIntentStopCriterion(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	intent := filepath.Join(root, "agents", "evolve-intent.md")

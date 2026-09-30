@@ -1,15 +1,5 @@
 //go:build acs
 
-// Package cycle1715 materialises the acceptance criteria for
-// acs-cycle1529-doc-only-predicate-diffs-against-local-main:
-// TestC1529_004_ClosureStaysDocOnly must judge cycle 1529's own closure
-// commit range, not the checkout's drift from the live `main` ref.
-//
-// Each predicate compiles the real cycle1529 predicate package and runs
-// TestC1529_004 inside a throwaway git repository that borrows this
-// repository's objects through alternates, so the verdict under test is the
-// predicate's own. The fixture checks out go/internal/bridge only (sparse),
-// and every ref or replace object it writes stays in the fixture.
 package cycle1715
 
 import (
@@ -25,17 +15,11 @@ import (
 
 const (
 	c1529Predicate = "TestC1529_004_ClosureStaysDocOnly"
-	// c1529Ship is cycle 1529's evolve-cycle ship commit on main's
-	// first-parent chain; c1529Base is its parent. Their diff is the
-	// closure the predicate vouches for (four files, none under
-	// go/internal/bridge).
-	c1529Ship = "57e227c1e36f33562c922dcdf2546b160739e45d"
-	c1529Base = "19b427c4214e1ad6f84239cd1781f592b0faec22"
-	probeFile = "go/internal/bridge/zz_c1529_range_probe.go"
+	c1529Ship      = "57e227c1e36f33562c922dcdf2546b160739e45d"
+	c1529Base      = "19b427c4214e1ad6f84239cd1781f592b0faec22"
+	probeFile      = "go/internal/bridge/zz_c1529_range_probe.go"
 )
 
-// redirectingGitVars would point a child git away from the fixture or turn
-// replace objects off.
 var redirectingGitVars = map[string]bool{
 	"GIT_DIR":                          true,
 	"GIT_WORK_TREE":                    true,
@@ -58,8 +42,6 @@ func childEnv(extra ...string) []string {
 	return append(env, extra...)
 }
 
-// git runs git in dir. A non-zero exit is a fixture fault, not a verdict,
-// so it aborts the predicate.
 func git(t *testing.T, dir string, env []string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
@@ -76,7 +58,6 @@ func git(t *testing.T, dir string, env []string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// c1529Binary compiles ./acs/cycle1529 from this checkout.
 func c1529Binary(t *testing.T, root string) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "cycle1529.test")
@@ -88,9 +69,6 @@ func c1529Binary(t *testing.T, root string) string {
 	return bin
 }
 
-// runC1529 runs TestC1529_004 from bin with fx as its working directory —
-// the predicate resolves its repo root from there — and returns "PASS",
-// "FAIL", or "" when it reported neither (skipped, renamed, not run).
 func runC1529(t *testing.T, bin, fx string) (verdict, output string) {
 	t.Helper()
 	cmd := exec.Command(bin, "-test.run", "^"+c1529Predicate+"$", "-test.v", "-test.count=1")
@@ -111,8 +89,6 @@ func runC1529(t *testing.T, bin, fx string) (verdict, output string) {
 	return "", output
 }
 
-// newFixture returns a repository sharing root's objects, with `main` at
-// root's HEAD checked out and only go/internal/bridge on disk.
 func newFixture(t *testing.T, root string) (fx, head string) {
 	t.Helper()
 	fx = filepath.Join(t.TempDir(), "repo")
@@ -133,7 +109,6 @@ func newFixture(t *testing.T, root string) (fx, head string) {
 	return fx, head
 }
 
-// bridgeSources lists n non-test Go sources under go/internal/bridge at rev.
 func bridgeSources(t *testing.T, fx, rev string, n int) []string {
 	t.Helper()
 	var files []string
@@ -149,8 +124,6 @@ func bridgeSources(t *testing.T, fx, rev string, n int) []string {
 	return nil
 }
 
-// commitWith writes a commit whose tree is treeish's with path set to
-// content and whose parent is parent. It never touches fx's own index.
 func commitWith(t *testing.T, fx, treeish, parent, path, content string) string {
 	t.Helper()
 	scratch := t.TempDir()
@@ -179,9 +152,6 @@ func appendTo(t *testing.T, fx, rel, line string) {
 	}
 }
 
-// TestC1715_001_LaterBridgeChangeDoesNotFailC1529Closure is AC2's first
-// half and AC1: bridge changes that are not cycle 1529's leave its closure
-// predicate green, whichever side of the `main` ref they sit on.
 func TestC1715_001_LaterBridgeChangeDoesNotFailC1529Closure(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	bin := c1529Binary(t, root)
@@ -223,10 +193,6 @@ func TestC1715_001_LaterBridgeChangeDoesNotFailC1529Closure(t *testing.T) {
 	})
 }
 
-// TestC1715_002_BridgeChangeInsideC1529RangeStillFails is AC2's second half
-// and AC1's negative axis. A replace object makes cycle 1529's ship commit
-// carry a bridge source, with no drift from main: the predicate must pass
-// on the real range and fail on the altered one, naming the file.
 func TestC1715_002_BridgeChangeInsideC1529RangeStillFails(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	bin := c1529Binary(t, root)

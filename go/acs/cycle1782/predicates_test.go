@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle1782 materialises the acceptance criteria of the two fleet-lane
-// tasks: starvation-compares-sized-width and disk-space-preflight.
 package cycle1782
 
 import (
@@ -116,8 +114,6 @@ func TestC1782_006_BootPassesAtAndAboveFloor(t *testing.T) {
 	}
 }
 
-// Wiring proof: the production callers (boot preflight, wave boundary, starvation observer)
-// reach the new seams. Narrow -run over one package; no whole-repo sweep.
 func TestC1782_007_ProductionCallersReachTheSeams(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)

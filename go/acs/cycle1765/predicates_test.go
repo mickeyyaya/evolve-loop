@@ -1,17 +1,5 @@
 //go:build acs
 
-// Package cycle1765 pins the behavior-preserving shrink of
-// posteditvalidate.Run, evalqualitycheck.CheckDiversity and verifyeval.Verify
-// to the 50-line function-size ratchet (sizeratchet-shrink-eval-validators).
-//
-// The shrink itself landed on this branch before this cycle started (a
-// salvage snapshot carried the extraction forward from an earlier attempt at
-// this same fleet-scoped item, then this branch merged origin/main on top).
-// These predicates therefore verify the AC set against baseCommit, the point
-// this branch diverged from origin/main — not against an in-cycle "before"
-// state — so most assertions below are pre-existing GREEN rather than RED at
-// authoring time; see test-report.md's Coverage Map for the per-criterion
-// disposition.
 package cycle1765
 
 import (
@@ -29,9 +17,6 @@ import (
 )
 
 const (
-	// baseCommit is the merge-base of this branch with origin/main at TDD
-	// authoring time (2026-09-30): the boundary between "main's state" and
-	// "this lane's diff", not an arbitrary point in this branch's own history.
 	baseCommit   = "156ee9aba02a05829d81d7f783f456bfd86c9420"
 	offendersRel = "go/internal/sizeratchet/offenders.json"
 	evalRel      = ".evolve/evals/sizeratchet-shrink-eval-validators.md"
@@ -57,14 +42,6 @@ var acPredicates = []string{
 	"TestC1765_009_OnlyTargetPackagesTouched",
 }
 
-// exemptPrefixes are pipeline-required artifact paths this lane's diff
-// against baseCommit legitimately touches beyond the three target packages:
-// this cycle's own predicate package, the permanent eval file the AC
-// authority lives in, build/closeout explanations, the prior attempt's
-// archived predicate packages (A2 continuation-retirement), and knowledge
-// base cycle summaries. A deny-list, not an allow-list of the task's own
-// packages: cycle-1761's allow-list style scope fence went red on its own
-// pipeline-required explanation/eval writes (flaky-predicate-shape lesson).
 var exemptPrefixes = []string{
 	"go/acs/cycle1765/",
 	"go/acs/cycle1761/",
@@ -108,9 +85,6 @@ func walkModule(t *testing.T) []sizeratchet.FuncSpan {
 	return spans
 }
 
-// TestC1765_001_ThreeTargetFunctionsFitTheRatchetLimit is the primary AC
-// signal: each of the three offender functions must measure at most
-// sizeratchet.MaxLines (50).
 func TestC1765_001_ThreeTargetFunctionsFitTheRatchetLimit(t *testing.T) {
 	sizes := map[string]int{}
 	for _, s := range walkModule(t) {
@@ -134,10 +108,6 @@ func TestC1765_001_ThreeTargetFunctionsFitTheRatchetLimit(t *testing.T) {
 	}
 }
 
-// TestC1765_002_OffendersJSONLeftUnchanged guards the AC "offenders.json
-// entries for these three keys are left byte-unchanged": an allowance is a
-// ceiling, so a shrunk function's entry is slack a future boundary-tighten
-// removes, never this lane's job.
 func TestC1765_002_OffendersJSONLeftUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	diff, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", baseCommit, "--", offendersRel)
@@ -158,10 +128,6 @@ func TestC1765_002_OffendersJSONLeftUnchanged(t *testing.T) {
 	}
 }
 
-// TestC1765_003_ModuleWideRatchetCheckPasses is the module-wide equivalent of
-// 001: sizeratchet.Check must report zero violations (the three functions'
-// offenders.json entries stay listed but under their allowance, which Check
-// treats as slack, not a failure).
 func TestC1765_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 	offenders, err := sizeratchet.LoadOffenders(offendersPath(t))
 	if err != nil {
@@ -172,10 +138,6 @@ func TestC1765_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 	}
 }
 
-// TestC1765_004_BaselineTestFilesUnchanged guards "behavior unchanged:
-// existing tests in all three packages pass unmodified" — no baseline
-// _test.go file may be edited or deleted; a new characterization test (if
-// any) belongs in a new file.
 func TestC1765_004_BaselineTestFilesUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, dir := range packageDirs {
@@ -189,9 +151,6 @@ func TestC1765_004_BaselineTestFilesUnchanged(t *testing.T) {
 	}
 }
 
-// TestC1765_005_TargetPackageTestsPass drives the real system: the existing
-// test suites in all three packages (which already exercise every branch of
-// Run/CheckDiversity/Verify per the scout report) must exit 0.
 func TestC1765_005_TargetPackageTestsPass(t *testing.T) {
 	for _, dir := range packageDirs {
 		if r := execGo(goModuleDir(t), "test", "-count=1", "./"+dir); r.err != nil || r.code != 0 {
@@ -231,8 +190,6 @@ func TestC1765_006_TargetPackagesVetAndGofmtClean(t *testing.T) {
 	}
 }
 
-// TestC1765_007_NoCommentLinesAdded guards "no comments added
-// (docs/conventions/code-comments.md) — names/signatures carry intent."
 func TestC1765_007_NoCommentLinesAdded(t *testing.T) {
 	git := worktreeGit{root: acsassert.RepoRoot(t)}
 	changed, err := git.ChangedFiles(baseCommit)
@@ -260,7 +217,6 @@ func TestC1765_007_NoCommentLinesAdded(t *testing.T) {
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1765_008_NoCommentsLostFromShrunkFunctions(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}
@@ -297,11 +253,6 @@ func TestC1765_008_NoCommentsLostFromShrunkFunctions(t *testing.T) {
 	}
 }
 
-// TestC1765_009_OnlyTargetPackagesTouched guards the scout's file scope: this
-// hygiene lane touches only the three named packages (source or their own
-// tests), plus pipeline-required artifacts the harness itself writes every
-// cycle. A deny-list of what must NOT be touched, not an allow-list of the
-// task's own packages (see exemptPrefixes doc comment).
 func TestC1765_009_OnlyTargetPackagesTouched(t *testing.T) {
 	changed, err := (worktreeGit{root: acsassert.RepoRoot(t)}).ChangedFiles(baseCommit)
 	if err != nil {
@@ -380,7 +331,6 @@ func TestC1765_010_EvalEvidenceRunsTheLivePredicates(t *testing.T) {
 }
 
 // acs-predicate: config-check — the eval's text is the permanent acceptance
-// record; its cited base is graded against the base the predicates diff from.
 func TestC1765_011_EvalCitesTheLiveBaseAndPackage(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, evalRel))
@@ -440,7 +390,6 @@ func TestC1765_012_ExplanationDocVerificationCommandsResolve(t *testing.T) {
 }
 
 // acs-predicate: config-check — the explanation document is prose; each claim
-// is graded against the code it describes, not merely grepped.
 func TestC1765_013_ExplanationDocClaimsMatchTheCode(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path, doc, err := readExplanationDoc(root, thisCycle)

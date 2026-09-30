@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle80 ports the cycle-80 ACS predicates (3 bash files).
 package cycle80
 
 import (
@@ -12,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestC80_AcTableInBuildReport ports cycle-80/assert-ac-table-in-build-report.sh.
-// Asserts the AC-TABLE anchors + harness-stamp exist in the cycle-80 build-report.
 func TestC80_AcTableInBuildReport(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, ".evolve", "runs", "cycle-80", "build-report.md")
@@ -31,8 +28,6 @@ func TestC80_AcTableInBuildReport(t *testing.T) {
 	}
 }
 
-// TestC80_BuilderWriteToAcTableDenied ports cycle-80/assert-builder-write-to-ac-table-denied.sh.
-// Verifies role-gate.sh has the AC-TABLE anchor deny logic.
 func TestC80_BuilderWriteToAcTableDenied(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "guards", "role-gate.sh")
@@ -50,7 +45,6 @@ func TestC80_BuilderWriteToAcTableDenied(t *testing.T) {
 	}
 }
 
-// TestC80_HarnessExists ports cycle-80/assert-harness-exists.sh.
 func TestC80_HarnessExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	harness := filepath.Join(root, "legacy", "scripts", "lifecycle", "build-report-ac-verify.sh")

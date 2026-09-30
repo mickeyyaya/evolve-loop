@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle1760 pins the shrinks of releasepreflight.resolve,
-// releasepreflight.checkRecentAudit, releaseconsistency.Run,
-// releasetargets.ParseConfig and versionbump.Run to the size ratchet.
 package cycle1760
 
 import (
@@ -47,8 +44,6 @@ var (
 	targets                  = []target{resolveTarget, checkRecentAuditTarget, releaseconsistencyTarget, parseConfigTarget, versionbumpTarget}
 )
 
-// protectedPrefixes are surfaces this hygiene lane must never touch — the
-// ship-gate/orchestrator seams, not the leaf packages named in the inbox item.
 var protectedPrefixes = []string{
 	"go/cmd/evolve",
 	"go/internal/core",
@@ -214,7 +209,6 @@ func TestC1760_007_NoCommentLinesAdded(t *testing.T) {
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1760_008_NoCommentsLostFromShrunkFunctions(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

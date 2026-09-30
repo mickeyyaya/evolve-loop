@@ -1,14 +1,5 @@
 //go:build acs
 
-// Package cycle1773 pins branches-prune-aborts-on-checked-out-branch:
-// `evolve branches prune` keeps a superseded ref that is checked out in a
-// worktree (kept-checked-out) or named by a continuation binding (kept-bound)
-// without ever issuing `git branch -D` for it, reports any other refused
-// delete per ref (kept-delete-failed), and continues the walk. The behavioral
-// cases live beside their production seams — the scripted-git tests in
-// go/internal/core/prune_superseded_orphans_test.go and the real-git CLI tests
-// in go/cmd/evolve/cmd_branches_test.go; each predicate runs its named cases
-// and fails unless every one executes and passes.
 package cycle1773
 
 import (

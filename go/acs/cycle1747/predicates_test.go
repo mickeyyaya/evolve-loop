@@ -1,10 +1,5 @@
 //go:build acs
 
-// Package cycle1747 holds the acceptance predicates for re-landing the
-// run_dir.artifact_bytes scout signal through routingtest's dual-rendering
-// path: SignalSpec carries the value, Signals() and HandoffFiles() both emit
-// it, and router.Digest reads it from the scout handoff instead of computing
-// it from the run directory.
 package cycle1747
 
 import (
@@ -26,14 +21,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// The field is reached by reflection so each predicate compiles before the
-// field exists and fails with its own reason rather than one shared build error.
 const artifactBytesField = "ArtifactBytes"
 
 const artifactBytesKey = "run_dir.artifact_bytes"
 
-// junkBytes is far larger than any value the fixtures use, so a Digest that
-// sums the run directory can never coincide with the handoff's value.
 const junkBytes = 256 << 10
 
 func specWithArtifactBytes(t *testing.T, base routingtest.SignalSpec, n int) routingtest.SignalSpec {

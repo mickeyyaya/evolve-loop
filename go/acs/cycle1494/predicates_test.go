@@ -1,42 +1,5 @@
 //go:build acs
 
-// Package cycle1494 materialises the cycle-1494 acceptance criteria for the one
-// fleet-scoped task pinned to this lane, `sleep-time-kb-consolidation`.
-//
-// SCOPE NOTE (why this is not the Scout plan verbatim). The premise-challenge
-// gate returned FAIL/BLOCK on the plan as framed, and this phase re-probed and
-// CONFIRMED its two fatal seam findings before authoring:
-//
-//   - `research.maxResults = 5` (go/internal/research/filekb.go:21) has exactly
-//     one production consumer — `Orchestrator.recallForPlan`
-//     (go/internal/core/routing_dispatch.go:281), the ADVISOR's recall memory.
-//     Scout receives no KB injection at all, so a "Scout top-k" framed against
-//     this seam moves no Scout tokens and would silently NARROW advisor
-//     failure-recall. The criteria below therefore make the bound TYPED POLICY
-//     with the default HELD AT 5 — reproducible tuning, zero behaviour change.
-//   - memo does NOT write the lessons corpus (agents/evolve-memo.md:19,91,133;
-//     .evolve/profiles/memo.json allows Write only to carryover-todos.json and
-//     memo.md). The REAL Go lesson-write seam is
-//     `faillearn.WriteArtifacts` (go/internal/faillearn/writer.go:41, line 59),
-//     reached from three production call sites
-//     (cmd/evolve/cmd_loop_outcome.go:452, internal/core/failure_learning.go:477,
-//     internal/core/reset.go:248). The novelty gate is materialised THERE, so a
-//     passing predicate cannot be vacuous against an ungated production path.
-//
-// The inbox item's warm-start-brief criterion is NOT materialised this cycle;
-// test-report.md records that omission and its reason explicitly rather than
-// minting a second, competing brief contract next to the existing (dead)
-// operator→scout one.
-//
-// Predicate strategy — every predicate invokes the system under test in-process
-// and asserts on returned values or real on-disk side effects (the cycle-85
-// degenerate-predicate ban): no source greps as the load-bearing check, no
-// `go test` subprocess, no whole-package sweep, no wall-clock bound, no literal
-// PID, no bare `git` against process cwd. 005 is the one structural predicate —
-// the composition root lives in `package main` (cmd/evolve), which cannot be
-// imported and whose whole-package `go test` is a banned flaky shape, so it is
-// asserted over the parsed AST (not a text grep) and Builder must additionally
-// name the caller file:line in build-report.md.
 package cycle1494
 
 import (
@@ -56,16 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ---------------------------------------------------------------------------
-// Task A — kb-recall-k-policy: the KB recall bound becomes typed policy with the
-// default HELD at 5 (behaviour-preserving), clamped against operator typos, and
-// derived from policy at the composition root instead of a compiled constant.
-// ---------------------------------------------------------------------------
-
-// TestC1494_001_ResearchRecallKDefaultsToFive pins the behaviour-preservation
-// contract: an absent "research" block must resolve to the value the compiled
-// constant carries today (5), so introducing the knob cannot narrow advisor
-// failure-recall on any existing install.
 func TestC1494_001_ResearchRecallKDefaultsToFive(t *testing.T) {
 	got := policy.Policy{}.ResearchConfig().RecallK
 	if got != 5 {
@@ -73,10 +26,6 @@ func TestC1494_001_ResearchRecallKDefaultsToFive(t *testing.T) {
 	}
 }
 
-// TestC1494_002_ResearchRecallKClampsMalformedConfig drives the resolver across
-// the operator-typo shapes. Absent/zero/negative/out-of-range must fall back to
-// the visible built-in; an in-range value must override. Malformed config that
-// silently disarms or unbounds recall is the failure mode being excluded.
 func TestC1494_002_ResearchRecallKClampsMalformedConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -96,10 +45,6 @@ func TestC1494_002_ResearchRecallKClampsMalformedConfig(t *testing.T) {
 	}
 }
 
-// TestC1494_003_FileKBHonoursConfiguredRecall proves the bound is actually
-// enforced by the KB and that narrowing is a strict PREFIX of the existing
-// deterministic ranking — i.e. the k highest-ranked lessons, not an arbitrary
-// subset. Behavioural: builds a real corpus on disk and runs the real Lookup.
 func TestC1494_003_FileKBHonoursConfiguredRecall(t *testing.T) {
 	root := writeLessonCorpus(t, 7)
 
@@ -125,12 +70,6 @@ func TestC1494_003_FileKBHonoursConfiguredRecall(t *testing.T) {
 	}
 }
 
-// TestC1494_004_FileKBDefaultConstructorRecallUnchanged is the negative /
-// anti-regression half: the existing constructor — the one the advisor path
-// uses when no policy is supplied — must keep returning 5, and a non-positive
-// recall must fall back to that default rather than returning zero lessons
-// (a zero-recall KB silently disables recall memory, the exact degradation the
-// premise-challenge flagged).
 func TestC1494_004_FileKBDefaultConstructorRecallUnchanged(t *testing.T) {
 	root := writeLessonCorpus(t, 7)
 
@@ -153,15 +92,6 @@ func TestC1494_004_FileKBDefaultConstructorRecallUnchanged(t *testing.T) {
 	}
 }
 
-// TestC1494_005_KBCompositionRootDerivesRecallFromPolicy is the WIRING proof: a
-// policy knob whose value never reaches the production KB construction is dead
-// config, and every predicate above would still pass. cmd/evolve is `package
-// main` (unimportable) and its whole-package `go test` is a banned flaky shape,
-// so this asserts over the PARSED AST of the composition root: the argument to
-// core.WithKB must be a KB constructed with a recall argument that is itself a
-// call expression (a policy-derived resolution), never a literal constant.
-//
-// Builder must ALSO name the caller file:line in build-report.md.
 func TestC1494_005_KBCompositionRootDerivesRecallFromPolicy(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	src := filepath.Join(root, "go", "cmd", "evolve", "cmd_cycle.go")
@@ -205,15 +135,6 @@ func TestC1494_005_KBCompositionRootDerivesRecallFromPolicy(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task B — kb-novelty-gate: near-duplicate suppression on the REAL Go
-// lesson-write seam (faillearn.WriteArtifacts), threshold from typed policy.
-// ---------------------------------------------------------------------------
-
-// TestC1494_006_NoveltyThresholdDefaultsAndClamps pins the second typed knob.
-// A similarity threshold is only meaningful inside (0,1]: 0 would suppress
-// every write (evidence loss) and >1 would suppress none (gate disarmed), and
-// both are typo shapes an operator would never intend.
 func TestC1494_006_NoveltyThresholdDefaultsAndClamps(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -233,13 +154,6 @@ func TestC1494_006_NoveltyThresholdDefaultsAndClamps(t *testing.T) {
 	}
 }
 
-// TestC1494_007_NoveltyGateSuppressesNearDuplicateLesson is the inbox item's
-// literal regression: "identical observation twice -> one write". The two
-// events differ ONLY in cycle number, so faillearn's own id derivation
-// ("cycle-N-<scope>-<slug>") gives them DIFFERENT filenames — writeIfAbsent's
-// exact-path dedupe cannot catch it, which is why the corpus grows unbounded
-// today. Behavioural: runs the real production writer against a real directory
-// and counts what actually landed on disk.
 func TestC1494_007_NoveltyGateSuppressesNearDuplicateLesson(t *testing.T) {
 	lessonsDir := t.TempDir()
 	runDir := t.TempDir()
@@ -261,9 +175,6 @@ func TestC1494_007_NoveltyGateSuppressesNearDuplicateLesson(t *testing.T) {
 	}
 }
 
-// TestC1494_008_NoveltyGateRetainsDistinctLesson is the negative test that keeps
-// the gate honest: a gate that suppresses everything trivially passes 007 while
-// destroying the corpus. A materially different failure must still be written.
 func TestC1494_008_NoveltyGateRetainsDistinctLesson(t *testing.T) {
 	lessonsDir := t.TempDir()
 
@@ -278,12 +189,6 @@ func TestC1494_008_NoveltyGateRetainsDistinctLesson(t *testing.T) {
 	}
 }
 
-// TestC1494_009_NoveltyGateMalformedCorpusEntryIsNonDestructive is the edge/OOD
-// case. Corpus rot is real (parseLessonFile documents it). A gate that treats an
-// unparseable neighbour as a reason to drop the incoming lesson would delete the
-// very failure evidence it exists to preserve; a gate that rewrites or removes
-// the rotten file would destroy an operator's data. Neither is permitted: the
-// new lesson lands, and the malformed bytes are left exactly as found.
 func TestC1494_009_NoveltyGateMalformedCorpusEntryIsNonDestructive(t *testing.T) {
 	lessonsDir := t.TempDir()
 	rotten := filepath.Join(lessonsDir, "rotten.yaml")
@@ -308,12 +213,6 @@ func TestC1494_009_NoveltyGateMalformedCorpusEntryIsNonDestructive(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// fixtures
-// ---------------------------------------------------------------------------
-
-// recallQuery is the query every recall predicate scores against. Shared so the
-// bounded and unbounded rankings are comparable.
 func recallQuery() research.Query {
 	return research.Query{
 		Source:      "build",
@@ -323,9 +222,6 @@ func recallQuery() research.Query {
 	}
 }
 
-// writeLessonCorpus writes n distinct, all-matching lessons into a fresh temp
-// dir and returns it. Confidence descends with the index so the deterministic
-// ranking has a stable, non-tied order the prefix assertion can rely on.
 func writeLessonCorpus(t *testing.T, n int) string {
 	t.Helper()
 	root := t.TempDir()
@@ -350,8 +246,6 @@ func writeLessonCorpus(t *testing.T, n int) string {
 	return root
 }
 
-// duplicateEvent renders the SAME observation at a different cycle number — the
-// shape that defeats writeIfAbsent's exact-path dedupe today.
 func duplicateEvent(cycle int) faillearn.FailureEvent {
 	return faillearn.FailureEvent{
 		Cycle:          cycle,
@@ -365,8 +259,6 @@ func duplicateEvent(cycle int) faillearn.FailureEvent {
 	}
 }
 
-// distinctEvent is a materially different failure: different phase, different
-// classification, different summary vocabulary.
 func distinctEvent(cycle int) faillearn.FailureEvent {
 	return faillearn.FailureEvent{
 		Cycle:          cycle,
@@ -380,8 +272,6 @@ func distinctEvent(cycle int) faillearn.FailureEvent {
 	}
 }
 
-// countLessonFiles counts the *.yaml lessons actually on disk — the corpus as
-// research.listLessonFiles would see it.
 func countLessonFiles(t *testing.T, dir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(dir)

@@ -1,21 +1,5 @@
 //go:build acs
 
-// Package cycle1717 materialises the acceptance criteria for
-// task-contract-refs-parity: the Task Contract's refs (core.taskItemRefs) and
-// the committed set (core.ContractTaskIDs) are ONE projection — committedset —
-// and ctx fleet_scope_paths only places a committed member's inbox record.
-//
-// 001 drives the real core.Orchestrator.RunCycle with a request-context fleet
-// scope and no lane pin while triage decides a different id, and asserts every
-// dispatched tdd/build/audit Task Contract names exactly ContractTaskIDs.
-// 002-004 bind the frozen in-package core tests (taskItemRefs is unexported)
-// by their `--- PASS:` markers from ONE -race, -run-narrowed run of
-// ./internal/core; 003 also walks taskItemRefs's static call graph; 004 runs
-// go vet.
-//
-// Reachability probe (cycle-644 rule): internal/core already imports
-// committedset (task_contract.go), and acs/cycle1717 -> core/fixtures is a
-// leaf import, so no pin here can demand an import cycle.
 package cycle1717
 
 import (
@@ -38,7 +22,6 @@ import (
 
 const corePkg = "./internal/core"
 
-// parityRows is the frozen shared table of TestTaskItemRefs_ContractTaskIDsParity.
 var parityRows = []string{
 	"pin",
 	"pin_wins_over_decision_and_deferral_subtracts",
@@ -70,8 +53,6 @@ var pathRows = []string{
 
 var renderRows = []string{"lane_pin", "decision_only", "deferral_under_a_pin", "deferral_in_a_decision"}
 
-// renderingTests are the existing tests that pin the rendered block for a lane
-// pin, a decision-only cycle and a deferral, on both dispatch surfaces.
 var renderingTests = []string{
 	"TestSeedTaskContract_RendersIdenticallyForPinDecisionAndDeferral",
 	"TestTaskItemRefs_PathsThenScopeThenTriage",
@@ -85,10 +66,6 @@ var renderingTests = []string{
 	"TestSeedTaskContract_DocumentCycle",
 	"TestComposeTaskContract_VerbatimAcceptanceAndLoudGaps",
 }
-
-// ---------------------------------------------------------------------------
-// One bound run of the frozen core tests, shared by 002-004.
-// ---------------------------------------------------------------------------
 
 type boundRun struct {
 	out  string
@@ -127,8 +104,6 @@ func coreBoundRun(t *testing.T) boundRun {
 	return bound
 }
 
-// requirePass fails unless the bound run reports `--- PASS: <name> (` for the
-// test and every listed subtest (a renamed, deleted or skipped row is RED).
 func requirePass(t *testing.T, run boundRun, test string, rows ...string) {
 	t.Helper()
 	names := []string{test}
@@ -153,17 +128,11 @@ func trimTail(s string) string {
 	return "…" + s[len(s)-max:]
 }
 
-// ---------------------------------------------------------------------------
-// 001 — the production dispatch path.
-// ---------------------------------------------------------------------------
-
 type tempWorktree struct{ path string }
 
 func (w *tempWorktree) Create(string, int) (string, error) { return w.path, nil }
 func (w *tempWorktree) Cleanup(string, string) error       { return nil }
 
-// gitRepo returns a temp dir holding one empty commit (the Build explanation
-// contract needs a resolvable base SHA). Every git call is -C-anchored.
 func gitRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -185,8 +154,6 @@ func writeItem(t *testing.T, dir, id, body string) string {
 	return p
 }
 
-// decidingTriage writes triage's structured decision into the cycle workspace,
-// as the real triage phase does, then records the dispatch.
 type decidingTriage struct {
 	*fixtures.FakeRunner
 	decision string
@@ -202,8 +169,6 @@ func (r *decidingTriage) Run(ctx context.Context, req core.PhaseRequest) (core.P
 	return r.FakeRunner.Run(ctx, req)
 }
 
-// contractObserver snapshots the committed set from the dispatched workspace
-// at dispatch time, beside the Task Contract block the request carried.
 type contractObserver struct {
 	*fixtures.FakeRunner
 	mu        sync.Mutex
@@ -219,7 +184,6 @@ func (r *contractObserver) Run(ctx context.Context, req core.PhaseRequest) (core
 	return r.FakeRunner.Run(ctx, req)
 }
 
-// headerIDs returns the ids of a rendered block's "### <id> — " headers.
 func headerIDs(block string) []string {
 	var ids []string
 	for _, line := range strings.Split(block, "\n") {
@@ -251,9 +215,6 @@ func TestC1717_001_DispatchedTaskContractNamesTheCommittedSetNotTheStaleScope(t 
 	o := core.NewOrchestrator(&fixtures.FakeStorage{}, &fixtures.FakeLedger{}, runners,
 		core.WithScopePathResolver(func(_, id string) string { return paths[id] }),
 		core.WithWorktreeProvisioner(&tempWorktree{path: gitRepo(t)}))
-	// A request-context fleet scope with no EVOLVE_FLEET_SCOPE env pins nothing
-	// to disk (cyclerun's legacy snapshot path), so it goes stale once triage
-	// commits to a different id.
 	if _, err := o.RunCycle(context.Background(), core.CycleRequest{
 		ProjectRoot: t.TempDir(), GoalHash: "c1717",
 		Context: map[string]string{"fleet_scope": "stale-scope-item"},
@@ -286,27 +247,15 @@ func TestC1717_001_DispatchedTaskContractNamesTheCommittedSetNotTheStaleScope(t 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 002 — AC1: the parity guard exists, covers the shared table, and holds.
-// ---------------------------------------------------------------------------
-
 func TestC1717_002_ParityGuardHoldsForEverySharedFixture(t *testing.T) {
 	requirePass(t, coreBoundRun(t), "TestTaskItemRefs_ContractTaskIDsParity", parityRows...)
 }
 
-// ---------------------------------------------------------------------------
-// 003 — AC2: membership from committedset; fleet_scope_paths places records only.
-// ---------------------------------------------------------------------------
-
-// coreFunc is one func/method body of package core with the import names its
-// file declares.
 type coreFunc struct {
 	body    *ast.BlockStmt
 	imports map[string]bool
 }
 
-// parseCore maps each func/method name in package core's non-test sources to
-// its bodies.
 func parseCore(t *testing.T) map[string][]coreFunc {
 	t.Helper()
 	dir := filepath.Join(goDir(t), "internal", "core")
@@ -343,8 +292,6 @@ func parseCore(t *testing.T) map[string][]coreFunc {
 	return funcs
 }
 
-// reach walks the same-package call graph from root and reports every core
-// func/method it reaches and every imported package it references.
 func reach(funcs map[string][]coreFunc, root string) (reached, pkgs map[string]bool) {
 	reached, pkgs = map[string]bool{root: true}, map[string]bool{}
 	queue := []string{root}
@@ -392,10 +339,6 @@ func TestC1717_003_TaskItemRefsMembershipComesFromCommittedset(t *testing.T) {
 		t.Errorf("RED: deferredTaskIDs is still declared — the duplicate deferral reader must be folded into committedset.Deferred")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 004 — AC3: identical rendering, vet and -race green.
-// ---------------------------------------------------------------------------
 
 func TestC1717_004_TaskContractRendersIdenticallyAndCoreIsVetAndRaceGreen(t *testing.T) {
 	vet := exec.Command("go", "vet", corePkg, "./internal/committedset")

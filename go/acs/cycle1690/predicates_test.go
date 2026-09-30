@@ -1,62 +1,5 @@
 //go:build acs
 
-// Package cycle1690 materialises the cycle-1690 acceptance criteria for the one
-// fleet-scoped inbox id `statejson-latent-unresolved-writers` (scout tasks
-// `statemap-export-resolve-write-target` and `failurelog-symlink-resolve-writes`).
-//
-// The defect (latent, cycle-999 class). A worktree's .evolve/state.json is an
-// ABSOLUTE symlink to the canonical host state file (core/worktree.go
-// linkGuardDeps). statemap.WriteStateMap/UpdateStateMap already resolve that
-// link before they lock and before they tmp+rename, so the link survives and
-// cross-tree writers share ONE "<canonical>.lock" sidecar. Two writers do not:
-//
-//  1. core.SealCycle locks flock.WithPathLock(<evolveDir>/state.json) on the
-//     UNRESOLVED path, so a seal through a linked evolve dir takes a sidecar no
-//     canonical-path writer ever takes — the cross-tree lock unification does
-//     not cover it (lost update).
-//  2. every failurelog state writer (Record, PruneExpired,
-//     PruneByClassification, PruneExpiredCarryoverTodos,
-//     BackfillLegacyCarryoverExpiry, IncrementCarryoverUnpicked) tmp+renames
-//     the raw path, which REPLACES the link with a regular file — the cycle-999
-//     sever, after which every mutation strands in a detached copy.
-//
-// The accepted fix: export statemap.ResolveWriteTarget (same bounded,
-// dangling-tolerant semantics as the unexported helper) and route both writers
-// through it.
-//
-// Predicate strategy — every predicate exercises the system under test (the
-// cycle-85 degenerate-predicate ban); every fixture lives under t.TempDir()
-// (the worktree's own .evolve/state.json IS a live link to the host state
-// file, so no predicate may ever touch a repo-relative .evolve path):
-//
-//   - 001 CALLS ResolveWriteTarget over every link shape and asserts the final
-//     target, including the dangling tail and a bounded symlink loop; it also
-//     proves the export agrees with the write target WriteStateMap really uses.
-//   - 002 runs apicover's own AST + coverage detectors over the enrolled
-//     statemap package (a new export no test names hard-fails
-//     `make apicover-enforce` for the whole tree).
-//   - 003/004/007 drive the PRODUCTION caller core.SealCycle: 003 observes which
-//     "<path>.lock" sidecar it takes (the flock convention's own side effect),
-//     004 proves it actually serializes with a canonical-path writer holding
-//     that lock mid-RMW, 007 is the uncontended end-to-end cycle-999 shape.
-//   - 005 drives all six failurelog writers through absolute, relative and
-//     two-hop links (plus a regular-file baseline) and asserts every hop
-//     survives and the canonical file carries the write.
-//   - 006 is the negative edge: a dangling link must be left untouched by every
-//     failurelog writer (Record keeps its ErrStateMissing contract — it never
-//     auto-creates state.json).
-//   - 008 proves the durable in-package regression tests the eval files name
-//     actually RAN, passed, and are git-tracked (a `-run` pattern matching
-//     nothing exits 0 — the vacuous-pass hole).
-//   - 009 is the no-regression floor for the three touched packages.
-//   - 010/011 are the audit-round-1 repair (M1). The lane item's how_to_apply
-//     step (3) — the sweep of other atomicwrite users writing linkable .evolve/
-//     state — was deferred in prose only, and a PASS landing consumes the whole
-//     lane item (ship/postship.go committedInboxIDs, the cycle-1515
-//     decomposition shape). 010 runs that consume through the ship's own
-//     exported readers and resolver and requires a tracked follow-up record
-//     that survives it; 011 requires the explanation Limitations to state the
-//     consume and cite that record by an id the resolver finds.
 package cycle1690
 
 import (
@@ -83,29 +26,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// sealCycleID is the in-progress cycle every SealCycle fixture seals.
 const sealCycleID = 42
 
-// sealHangBound converts a SealCycle that never returns into a NAMED failure
-// instead of a 10-minute go-test timeout. It is deliberately generous: it can
-// only fire on a genuine hang — e.g. a failurelog writer that starts taking the
-// state lock itself and so re-enters the lock SealCycle already holds (flock is
-// per open file description, so that self-deadlocks).
 const sealHangBound = 60 * time.Second
 
-// fixedNow is the clock every writer fixture runs at; the seeded entries expire
-// long before it.
 var fixedNow = time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
 
-// ---------------------------------------------------------------------------
-// 001-002 — the export
-// ---------------------------------------------------------------------------
-
-// TestC1690_001_ResolveWriteTargetFollowsChainsToFinalTarget pins the exported
-// resolver's semantics: bounded, dangling-tolerant, relative- and
-// absolute-link aware. A no-op `return path` fails every link row; an
-// EvalSymlinks-style resolver fails the dangling row (it errors on a missing
-// tail instead of returning it).
 func TestC1690_001_ResolveWriteTargetFollowsChainsToFinalTarget(t *testing.T) {
 	type row struct {
 		name  string
@@ -137,7 +63,7 @@ func TestC1690_001_ResolveWriteTargetFollowsChainsToFinalTarget(t *testing.T) {
 			return link, []string{target}
 		}},
 		{"dangling link resolves to the missing final hop (never errors)", func(t *testing.T, root string) (string, []string) {
-			target := filepath.Join(mkdir(t, filepath.Join(root, "canon")), "state.json") // never written
+			target := filepath.Join(mkdir(t, filepath.Join(root, "canon")), "state.json")
 			link := symlink(t, target, filepath.Join(root, "wt", "state.json"))
 			return link, []string{target}
 		}},
@@ -159,8 +85,6 @@ func TestC1690_001_ResolveWriteTargetFollowsChainsToFinalTarget(t *testing.T) {
 		})
 	}
 
-	// The export must BE the write target WriteStateMap uses — not a second,
-	// drifting copy of the logic.
 	t.Run("agrees with WriteStateMap's actual write-through target", func(t *testing.T) {
 		root := t.TempDir()
 		writeFile(t, filepath.Join(root, "canon", "state.json"), "{}")
@@ -170,8 +94,6 @@ func TestC1690_001_ResolveWriteTargetFollowsChainsToFinalTarget(t *testing.T) {
 			t.Fatalf("WriteStateMap(%s): %v", link, err)
 		}
 		resolved := resolveWithin(t, link)
-		// Reading through a link would pass on a no-op resolver, so the resolved
-		// path must itself be the REGULAR file WriteStateMap renamed into place.
 		if fi, err := os.Lstat(resolved); err != nil || !fi.Mode().IsRegular() {
 			t.Fatalf("ResolveWriteTarget(%s) = %s, which is not the regular file WriteStateMap wrote (err=%v)", link, resolved, err)
 		}
@@ -181,12 +103,6 @@ func TestC1690_001_ResolveWriteTargetFollowsChainsToFinalTarget(t *testing.T) {
 	})
 }
 
-// TestC1690_002_ResolveWriteTargetIsANamedDocumentedCoveredExport closes the
-// apicover hole: internal/adapters/statemap is enrolled in go/.apicover-enforce,
-// so a new export that no package test NAMES — or names but never executes —
-// hard-fails `make apicover-enforce` for the whole tree. It runs apicover's own
-// detectors (the CI recipe: integration-tagged coverage + Run with Enforce)
-// rather than re-implementing them.
 func TestC1690_002_ResolveWriteTargetIsANamedDocumentedCoveredExport(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -223,8 +139,6 @@ func TestC1690_002_ResolveWriteTargetIsANamedDocumentedCoveredExport(t *testing.
 		t.Errorf("no _test.go in internal/adapters/statemap names ResolveWriteTarget — an enrolled package's unnamed export hard-fails `make apicover-enforce`")
 	}
 
-	// The exact CI gate, scoped to this one package: named-but-never-executed
-	// (false-green) and unnamed exports both fail Enforce.
 	cov := filepath.Join(t.TempDir(), "coverage.txt")
 	if out, errOut, code := runIn(t, goDir, "go", "test", "-count=1", "-tags", "integration", "-coverprofile="+cov, "./internal/adapters/statemap"); code != 0 {
 		t.Fatalf("go test -coverprofile ./internal/adapters/statemap exited %d\nstdout:\n%s\nstderr:\n%s", code, out, errOut)
@@ -241,17 +155,6 @@ func TestC1690_002_ResolveWriteTargetIsANamedDocumentedCoveredExport(t *testing.
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 003-004, 007 — the production caller core.SealCycle
-// ---------------------------------------------------------------------------
-
-// TestC1690_003_SealCycleLocksTheResolvedCanonicalSidecar observes the lock
-// SealCycle takes through the "<datafile>.lock" sidecar convention
-// (adapters/flock/withpath.go — the single documented single-writer contract):
-// sealing through a linked evolve dir must take the CANONICAL file's sidecar,
-// and must not take one beside the link (that is the unresolved-path lock no
-// canonical-path writer ever contends on). The dangling row covers the
-// provisioning window where the canonical file does not exist yet.
 func TestC1690_003_SealCycleLocksTheResolvedCanonicalSidecar(t *testing.T) {
 	for _, dangling := range []bool{false, true} {
 		t.Run(fmt.Sprintf("dangling=%v", dangling), func(t *testing.T) {
@@ -276,17 +179,6 @@ func TestC1690_003_SealCycleLocksTheResolvedCanonicalSidecar(t *testing.T) {
 	}
 }
 
-// TestC1690_004_SealCycleSerializesWithACanonicalWriter is the cross-tree
-// lost-update the unresolved lock allows. A canonical-path writer
-// (statemap.UpdateStateMap — it resolves then locks "<canonical>.lock") pauses
-// mid-RMW holding its lock; SealCycle runs through the worktree view. With the
-// fix SealCycle blocks until the writer releases, then re-reads and lands on
-// top, so BOTH writes survive. Without it SealCycle completes inside the
-// window and the paused writer's stale snapshot clobbers the seal.
-//
-// Timing only bounds how long the predicate waits to OBSERVE an early
-// completion; a slow host can make the RED case look blocked (a false green),
-// never make a correct implementation fail. 003 is the deterministic backstop.
 func TestC1690_004_SealCycleSerializesWithACanonicalWriter(t *testing.T) {
 	fx := newSealFixture(t, true, true)
 
@@ -299,7 +191,7 @@ func TestC1690_004_SealCycleSerializesWithACanonicalWriter(t *testing.T) {
 			m["canonicalWriter"] = "landed"
 		})
 	}()
-	<-entered // the canonical writer holds "<canonical>.lock" and has read its snapshot
+	<-entered
 
 	sealErr := make(chan error, 1)
 	go func() { sealErr <- sealCycle(fx.opts()) }()
@@ -310,7 +202,6 @@ func TestC1690_004_SealCycleSerializesWithACanonicalWriter(t *testing.T) {
 		<-writerErr
 		t.Fatalf("SealCycle returned (err=%v) while a canonical-path writer held %s.lock mid-RMW — the seal does not contend on the canonical lock, so the paused writer's stale snapshot will clobber it", err, fx.canonical)
 	case <-time.After(750 * time.Millisecond):
-		// SealCycle is (correctly) blocked on the canonical lock.
 	}
 	close(release)
 
@@ -339,12 +230,6 @@ func TestC1690_004_SealCycleSerializesWithACanonicalWriter(t *testing.T) {
 	assertLinkIntact(t, fx.link, fx.linkTarget)
 }
 
-// TestC1690_007_SealCycleEndToEndKeepsTheLinkAndLandsOnCanonical is the
-// uncontended cycle-999 shape through the production caller: SealCycle's
-// failurelog.Record and its own RMW both write the state file, and today
-// Record's raw tmp+rename replaces the worktree link with a regular file, so
-// the seal's lastCycleNumber / failedApproaches strand in a detached copy.
-// Both link encodings are covered (absolute is what linkGuardDeps creates).
 func TestC1690_007_SealCycleEndToEndKeepsTheLinkAndLandsOnCanonical(t *testing.T) {
 	for _, absolute := range []bool{true, false} {
 		t.Run(fmt.Sprintf("absolute=%v", absolute), func(t *testing.T) {
@@ -371,15 +256,6 @@ func TestC1690_007_SealCycleEndToEndKeepsTheLinkAndLandsOnCanonical(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 005-006 — every failurelog state writer
-// ---------------------------------------------------------------------------
-
-// TestC1690_005_FailurelogWritersWriteThroughSymlinkedState drives all six
-// exported failurelog state writers (each owns one raw atomicWriteJSON site)
-// through every link shape. Every hop must still be the same link afterwards
-// and the canonical file must carry the writer's mutation. The regular-file row
-// is the baseline the fix must not break.
 func TestC1690_005_FailurelogWritersWriteThroughSymlinkedState(t *testing.T) {
 	for _, w := range stateWriters() {
 		for _, shape := range linkShapes() {
@@ -410,11 +286,6 @@ func TestC1690_005_FailurelogWritersWriteThroughSymlinkedState(t *testing.T) {
 	}
 }
 
-// TestC1690_006_FailurelogDanglingLinkIsLeftUntouched is the negative edge: no
-// failurelog writer auto-creates state.json (Record's documented contract —
-// preflight owns creation; TestRecord_StateMissing pins the error), so a link
-// whose canonical target does not exist yet must be left exactly as it is: no
-// regular file replacing the link, no file materialized at the target.
 func TestC1690_006_FailurelogDanglingLinkIsLeftUntouched(t *testing.T) {
 	for _, w := range stateWriters() {
 		t.Run(w.name, func(t *testing.T) {
@@ -438,23 +309,12 @@ func TestC1690_006_FailurelogDanglingLinkIsLeftUntouched(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 008-009 — durable evidence and the no-regression floor
-// ---------------------------------------------------------------------------
-
-// durableTests are the in-package regression tests the cycle's eval files name
-// as permanent evidence. ACS predicates are cycle-scoped; these are what later
-// cycles replay.
 var durableTests = []struct{ pkg, name string }{
 	{"internal/adapters/statemap", "TestResolveWriteTarget"},
 	{"internal/core", "TestSealCycle_SymlinkedStateLocksCanonicalTarget"},
 	{"internal/failurelog", "TestStateWriters_PreserveSymlinkedStatePath"},
 }
 
-// TestC1690_008_DurableRegressionTestsRanPassedAndAreTracked proves the eval
-// graders are not vacuous: each named test is re-run and its "--- PASS: <name>"
-// line required (a -run pattern that matches nothing still exits 0), and the
-// file declaring it is git-TRACKED (an unadded test file is dropped at ship).
 func TestC1690_008_DurableRegressionTestsRanPassedAndAreTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -485,10 +345,6 @@ func TestC1690_008_DurableRegressionTestsRanPassedAndAreTracked(t *testing.T) {
 	}
 }
 
-// TestC1690_009_TouchedPackagesGreenVetAndGofmtClean is the no-regression
-// floor: each touched package's suite stays green (core narrowed to its
-// seal/reset family — the whole core suite is a 40s+ fleet-load flake source),
-// go vet is clean, and the three trees are gofmt-clean.
 func TestC1690_009_TouchedPackagesGreenVetAndGofmtClean(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -498,8 +354,6 @@ func TestC1690_009_TouchedPackagesGreenVetAndGofmtClean(t *testing.T) {
 	if out, errOut, code := runIn(t, goDir, "go", "test", "-count=1", "./internal/failurelog"); code != 0 {
 		t.Errorf("go test ./internal/failurelog exited %d\nstdout:\n%s\nstderr:\n%s", code, out, errOut)
 	}
-	// Built inline (not through runIn's variadic argv) so the flaky-shape lint
-	// can see the -run narrowing on the known-slow core suite.
 	coreSeal := exec.CommandContext(context.Background(), "go", "test", "-count=1", "-run", "^Test(SealCycle|AutosealStaleMarker|MarkerShouldAutoseal)", "./internal/core")
 	if out, errOut, code := runCmd(t, goDir, coreSeal); code != 0 {
 		t.Errorf("go test -run <seal/reset family> ./internal/core exited %d\nstdout:\n%s\nstderr:\n%s", code, out, errOut)
@@ -517,17 +371,8 @@ func TestC1690_009_TouchedPackagesGreenVetAndGofmtClean(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 010-011 — audit round 1 repair (M1): the deferred how_to_apply step (3)
-// ---------------------------------------------------------------------------
-
-// laneItemID is the one fleet-scoped inbox id this lane is bound to.
 const laneItemID = "statejson-latent-unresolved-writers"
 
-// laneScopeJSON and triageDecisionJSON are this cycle's workspace
-// lane-scope.json and triage-decision.json (ids only): the inputs the ship
-// closeout's committedInboxIDs (ship/postship.go) reads. Triage does not re-run
-// in an audit-repair round, so the set they imply is fixed for this cycle.
 const (
 	laneScopeJSON      = `{"todo_ids":["statejson-latent-unresolved-writers"]}`
 	triageDecisionJSON = `{"cycle":1690,
@@ -535,21 +380,10 @@ const (
   "deferred":[],"dropped":[],"skip_shipped":[]}`
 )
 
-// TestC1690_010_DeferredStepThreeHasAFollowUpThatSurvivesThePASSLanding pins
-// M1's structural half. Triage committed how_to_apply (1) and (2) under two
-// decomposed ids and deferred (3) in prose only; top_n names no scope id, so a
-// PASS landing consumes the WHOLE lane item. Step (3) therefore needs its own
-// tracked inbox record — a distinct id, lineage to the lane item, the
-// atomicwrite sweep as its subject, acceptance a Task Contract can project —
-// and that record must survive this cycle's consume. A record filed under a
-// consumed id (or never tracked) vanishes with the parent.
 func TestC1690_010_DeferredStepThreeHasAFollowUpThatSurvivesThePASSLanding(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	consumed := passLandingConsumedIDs(t)
 
-	// Negative control: the simulation really consumes the lane item (the
-	// lifecycle the Limitations section misstated) and anything filed under a
-	// committed id — so the survival rows below cannot pass vacuously.
 	t.Run("PASS landing consumes the lane item and any committed-id namesake", func(t *testing.T) {
 		inbox := mkdir(t, filepath.Join(t.TempDir(), "inbox"))
 		writeFile(t, filepath.Join(inbox, "2026-07-21T09-30-00Z-"+laneItemID+".json"), `{"id":"`+laneItemID+`"}`)
@@ -602,11 +436,6 @@ func TestC1690_010_DeferredStepThreeHasAFollowUpThatSurvivesThePASSLanding(t *te
 	}
 }
 
-// TestC1690_011_ExplanationLimitationsStateTheConsumeAndCiteTheFollowUp pins
-// M1's prose half. The Limitations section said step (3) "stays open on the
-// inbox record", but a PASS landing consumes that record. The corrected section
-// must drop the claim, say the lane item is consumed, and cite the step-(3)
-// follow-up by an id the ship's own resolver finds in the tracked inbox.
 func TestC1690_011_ExplanationLimitationsStateTheConsumeAndCiteTheFollowUp(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	docs, err := filepath.Glob(filepath.Join(root, "docs", "explain", "builds", "cycle-1690-*.md"))
@@ -654,11 +483,6 @@ func TestC1690_011_ExplanationLimitationsStateTheConsumeAndCiteTheFollowUp(t *te
 	}
 }
 
-// passLandingConsumedIDs is the widest id set this cycle's PASS landing can
-// consume, read through the same exported readers the ship closeout uses:
-// triage's committed ids plus every non-deferred lane-scope id (top_n names no
-// scope id — the cycle-1515 decomposition shape — so the whole scope rides the
-// landing). A Closes-Inbox marker could only widen it; none may name step (3).
 func passLandingConsumedIDs(t *testing.T) []string {
 	t.Helper()
 	ws := t.TempDir()
@@ -681,9 +505,6 @@ func passLandingConsumedIDs(t *testing.T) []string {
 	return ids
 }
 
-// consumeFromInbox removes every record the ship's id→file resolver
-// (inboxmover.FindFileByTaskID, consume.go) maps a consumed id to — the move
-// out of the inbox root a PASS landing makes.
 func consumeFromInbox(t *testing.T, inbox string, ids []string) {
 	t.Helper()
 	for _, id := range ids {
@@ -700,9 +521,6 @@ func consumeFromInbox(t *testing.T, inbox string, ids []string) {
 	}
 }
 
-// inboxIDs lists the ids the batch loader sees in one inbox dir. Its warnings
-// are not failures: a malformed record is skipped (and so absent from the ids),
-// and an overlength title is only truncated.
 func inboxIDs(t *testing.T, inbox string) []string {
 	t.Helper()
 	items, _, err := inboxbatch.LoadDir(inbox)
@@ -716,18 +534,12 @@ func inboxIDs(t *testing.T, inbox string) []string {
 	return ids
 }
 
-// stepThreeFollowUp is one tracked inbox record that files how_to_apply
-// step (3) as its own item.
 type stepThreeFollowUp struct {
-	rel  string // repo-relative, slash-separated
+	rel  string
 	raw  []byte
 	item inboxbatch.Item
 }
 
-// stepThreeFollowUps returns every TRACKED record in the inbox root — or in
-// consumed/ when a LATER cycle consumed it — whose id is not the lane item's
-// and whose text names both the lane item (lineage) and atomicwrite (the
-// sweep's subject). A record this cycle consumed does not count.
 func stepThreeFollowUps(t *testing.T, root string) []stepThreeFollowUp {
 	t.Helper()
 	out, errOut, code := runIn(t, root, "git", "-C", root, "ls-files", "--", ".evolve/inbox")
@@ -742,7 +554,7 @@ func stepThreeFollowUps(t *testing.T, root string) []stepThreeFollowUp {
 		}
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		if err != nil {
-			continue // tracked in the index but deleted on disk: not a live record
+			continue
 		}
 		text := strings.ToLower(string(raw))
 		if !strings.Contains(text, laneItemID) || !strings.Contains(text, "atomicwrite") {
@@ -761,8 +573,6 @@ func stepThreeFollowUps(t *testing.T, root string) []stepThreeFollowUp {
 	return found
 }
 
-// consumedByThisCycle reports whether a record carries the consume annotation
-// consume.go stamps with this cycle's id.
 func consumedByThisCycle(raw []byte) bool {
 	var doc struct {
 		Consumed struct {
@@ -772,14 +582,6 @@ func consumedByThisCycle(raw []byte) bool {
 	return json.Unmarshal(raw, &doc) == nil && fmt.Sprint(doc.Consumed.Cycle) == "1690"
 }
 
-// ---------------------------------------------------------------------------
-// fixtures
-// ---------------------------------------------------------------------------
-
-// seedState gives every failurelog writer exactly one unit of work: one expired
-// infrastructure-transient failedApproach, one expired carryover todo and one
-// legacy (expiresAt-less) todo, plus an unmodelled operator key that must
-// survive every write.
 const seedState = `{
   "lastCycleNumber": 41,
   "operatorOwnedKey": "must-survive",
@@ -793,8 +595,6 @@ const seedState = `{
   ]
 }`
 
-// stateWriter adapts one exported failurelog writer to a common shape: run
-// returns the writer's own "work done" count, check inspects the canonical file.
 type stateWriter struct {
 	name      string
 	run       func(statePath string) (int, error)
@@ -863,7 +663,6 @@ func stateWriters() []stateWriter {
 	}
 }
 
-// hop is one link in a chain and the exact Readlink target it must keep.
 type hop struct{ path, target string }
 
 type linkShape struct {
@@ -894,20 +693,15 @@ func linkShapes() []linkShape {
 	}
 }
 
-// sealFixture is a canonical .evolve holding the real state.json and a
-// worktree-view .evolve (cycle-state.json + run workspace) whose state.json is
-// a link to it — the linkGuardDeps topology, entirely under t.TempDir().
 type sealFixture struct {
-	evolveDir  string // the worktree-view evolve dir SealCycle is pointed at
-	link       string // <evolveDir>/state.json
-	linkTarget string // the link's exact Readlink value
-	canonical  string // the canonical state.json the link resolves to
+	evolveDir  string
+	link       string
+	linkTarget string
+	canonical  string
 }
 
 func newSealFixture(t *testing.T, seedCanonical, absolute bool) sealFixture {
 	t.Helper()
-	// ResolveCycleStatePath honours this override; under a live cycle it names
-	// the REAL run's cycle-state, which SealCycle would then seal and delete.
 	t.Setenv("EVOLVE_CYCLE_STATE_FILE", "")
 
 	root := t.TempDir()
@@ -943,7 +737,6 @@ func (fx sealFixture) opts() core.SealOptions {
 	}
 }
 
-// noopLedger satisfies SealCycle's unexported ledgerAppender structurally.
 type noopLedger struct{}
 
 func (noopLedger) Append(context.Context, core.LedgerEntry) error { return nil }
@@ -953,7 +746,6 @@ func sealCycle(opts core.SealOptions) error {
 	return err
 }
 
-// sealWithin runs SealCycle and converts a hang into a named failure.
 func sealWithin(t *testing.T, opts core.SealOptions) error {
 	t.Helper()
 	done := make(chan error, 1)
@@ -967,8 +759,6 @@ func sealWithin(t *testing.T, opts core.SealOptions) error {
 	}
 }
 
-// resolveWithin calls the export and converts a hang (an unbounded chain walk
-// on the loop row) into a named failure.
 func resolveWithin(t *testing.T, path string) string {
 	t.Helper()
 	done := make(chan string, 1)
@@ -981,10 +771,6 @@ func resolveWithin(t *testing.T, path string) string {
 		return ""
 	}
 }
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 func mkdir(t *testing.T, dir string) string {
 	t.Helper()
@@ -1012,8 +798,6 @@ func symlink(t *testing.T, target, link string) string {
 	return link
 }
 
-// assertLinkIntact fails when path is no longer a symlink to want — the
-// cycle-999 sever is exactly a rename replacing the link with a regular file.
 func assertLinkIntact(t *testing.T, path, want string) {
 	t.Helper()
 	fi, err := os.Lstat(path)
@@ -1030,10 +814,6 @@ func assertLinkIntact(t *testing.T, path, want string) {
 	}
 }
 
-// samePathAny reports whether got names the same location as any of want. Only
-// the PARENT directory is canonicalised (t.TempDir sits under a symlinked
-// /var on macOS); the final component is compared literally, so a resolver that
-// stops one hop early still fails.
 func samePathAny(t *testing.T, got string, want []string) bool {
 	t.Helper()
 	g := canonDir(t, got)
@@ -1100,8 +880,6 @@ func hasFailedApproach(m map[string]any, cycle int, class string) bool {
 	return false
 }
 
-// testFilesMatching returns the _test.go files directly in dir whose source
-// matches re.
 func testFilesMatching(t *testing.T, dir string, re *regexp.Regexp) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -1125,18 +903,11 @@ func testFilesMatching(t *testing.T, dir string, re *regexp.Regexp) []string {
 	return out
 }
 
-// runIn executes one command with an explicit working directory — never the
-// process cwd, which differs between the main tree, the cycle worktree and each
-// fleet lane. EVOLVE_CYCLE_STATE_FILE is stripped from the child's environment:
-// the fleet orchestrator os.Setenv's it to the live lane's cycle-state
-// (core/cyclerun.go), and the core seal tests this file shells would otherwise
-// seal and os.Remove the RUNNING cycle's state.
 func runIn(t *testing.T, dir, name string, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
 	return runCmd(t, dir, exec.CommandContext(context.Background(), name, args...))
 }
 
-// runCmd runs a prepared command under runIn's dir and environment rules.
 func runCmd(t *testing.T, dir string, cmd *exec.Cmd) (stdout, stderr string, code int) {
 	t.Helper()
 	var outBuf, errBuf strings.Builder
