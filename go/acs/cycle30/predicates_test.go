@@ -1,74 +1,5 @@
 //go:build acs
 
-// Package cycle30 materializes the cycle-30 acceptance criteria for:
-//
-//	recovery-retry-config-cluster-30 — remove 6 EVOLVE_PHASE/RETRY/CONTRACT/SKIP
-//	flags by migrating 4 into policy.RetryConfig (Configuration Object, cluster 8)
-//	and dead-sweeping 2 comment-only flags:
-//	  - EVOLVE_PHASE_MAX_ATTEMPTS         → RetryConfig.PhaseMaxAttempts (default 2)
-//	  - EVOLVE_RETRY_BACKOFF_BASE_S       → RetryConfig.RetryBackoffBaseS (default 5)
-//	  - EVOLVE_PHASE_LATENCY_CEILING_S    → RetryConfig.PhaseLatencyCeilingS (default 900)
-//	  - EVOLVE_CONTRACT_CORRECTION_RETRIES → RetryConfig.ContractCorrectionRetries (default 2)
-//	  - EVOLVE_PHASE_LATENCY_CEILING      → dead sweep (comment-only in cyclehealth.go:20)
-//	  - EVOLVE_SKIP_CYCLE_HEALTH          → dead sweep (comment-only in cyclehealth.go:24)
-//	Lower FlagCeiling 115→109; regenerate docs/architecture/control-flags.md.
-//
-// AC map (1:1 with triage top_n, scout-report.md ACs):
-//
-//	recovery-retry-config-cluster-30:
-//	  AC1  6 flags absent from Lookup              → C30_001 (behavioral)
-//	  AC2  Registry row count == 109               → C30_002 (behavioral, count)
-//	  AC3  FlagCeiling const == 109                → C30_003 (config-check, waiver)
-//	  AC4  No envchain key constants in prod Go    → C30_004 (config-check, waiver)
-//	  AC5  policy.RetryConfig struct + method      → C30_005 (behavioral + reflect)
-//	  AC6  EVOLVE_WORKTREE_PATH still registered   → C30_006 (behavioral, PRE-EXISTING GREEN)
-//	  AC7  flagreaders guard green                 → manual+checklist (see below)
-//	  AC8  control-flags.md has no removed rows    → C30_008 (config-check, waiver)
-//	  NEG1 Resolver fns deleted from retry_backoff → C30_NEG1 (config-check, waiver)
-//	  NEG2 cyclehealth.go stops direct env read    → C30_NEG2 (config-check, waiver)
-//
-// ACs with manual+checklist disposition:
-//
-//	AC7 (flagreaders guard green): `go test -tags acs ./acs/regression/flagreaders/...`
-//	    Checklist for Auditor:
-//	    (a) no compile errors with -tags acs on the cycle30 package;
-//	    (b) exit 0 from `go test -tags acs ./acs/regression/flagreaders/...`;
-//	    (c) no literal string "EVOLVE_PHASE_MAX_ATTEMPTS", "EVOLVE_RETRY_BACKOFF_BASE_S",
-//	        "EVOLVE_PHASE_LATENCY_CEILING_S", or "EVOLVE_CONTRACT_CORRECTION_RETRIES"
-//	        in any non-test, non-registry Go file
-//	        (grep -rn 'EVOLVE_PHASE_MAX_ATTEMPTS\|EVOLVE_RETRY_BACKOFF_BASE_S\|
-//	         EVOLVE_PHASE_LATENCY_CEILING_S\|EVOLVE_CONTRACT_CORRECTION_RETRIES'
-//	         go/ --include='*.go'
-//	        | grep -v '_test.go' | grep -v 'registry_table.go'
-//	        | grep -v 'acs/cycle30' → 0 matches);
-//	    (d) EVOLVE_PHASE_LATENCY_CEILING and EVOLVE_SKIP_CYCLE_HEALTH are also absent
-//	        from all production Go (they were comment-only; no env reads to clean up).
-//
-// Adversarial diversity (SKILL §6):
-//
-//	Negative:  C30_001 — 6 flags must be ABSENT from Lookup (if Builder misses
-//	           one, Lookup returns ok=true and the test fails immediately).
-//	           C30_004 — envchain key constant definitions must be ABSENT from
-//	           envchain/keys.go (if Builder only removes the registry row without
-//	           deleting the key constant, the literal stays and this fails).
-//	           C30_NEG1 — resolve functions must be ABSENT from retry_backoff.go
-//	           (if Builder only removes the env read but leaves the resolve fn, this fails).
-//	           C30_NEG2 — cyclehealth.go direct env read via KeyPhaseLatencyCeilingS
-//	           must be ABSENT (if Builder only removes the registry row and key constant
-//	           but forgets the cyclehealth.go call site, this fails).
-//	Edge/OOD:  C30_002 checks exact count 109; both over-removal (< 109) and
-//	           under-removal (> 109) fail.
-//	Lexical:   Lookup / len / FileContains / FileNotContains / reflect —
-//	           distinct assertion verbs across the suite.
-//	Semantic:  registry-absence, row-count, ceiling-const, no-key-constants,
-//	           retry-config-struct, worktree-path-present, doc-absence,
-//	           resolver-fn-deleted, cyclehealth-env-read-deleted — 9 distinct behaviors.
-//
-// Floor binding (R9.3): predicates authored only for the committed top_n task
-// (recovery-retry-config-cluster-30). Deferred tasks (BYPASS cluster, etc.) get
-// zero predicates.
-//
-// 1:1 enforcement: predicate=9, manual+checklist=1, unverifiable-remove=0 → total AC=10 ✓
 package cycle30
 
 import (
@@ -81,13 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// retryFlags is the canonical list of 6 flags that cycle-30 removes:
-//   - EVOLVE_CONTRACT_CORRECTION_RETRIES: migrated to policy.RetryConfig.ContractCorrectionRetries
-//   - EVOLVE_PHASE_LATENCY_CEILING:       dead sweep (comment-only, no Go reader)
-//   - EVOLVE_PHASE_LATENCY_CEILING_S:     migrated to policy.RetryConfig.PhaseLatencyCeilingS
-//   - EVOLVE_PHASE_MAX_ATTEMPTS:          migrated to policy.RetryConfig.PhaseMaxAttempts
-//   - EVOLVE_RETRY_BACKOFF_BASE_S:        migrated to policy.RetryConfig.RetryBackoffBaseS
-//   - EVOLVE_SKIP_CYCLE_HEALTH:           dead sweep (comment-only, no Go reader)
 var retryFlags = []string{
 	"EVOLVE_CONTRACT_CORRECTION_RETRIES",
 	"EVOLVE_PHASE_LATENCY_CEILING",
@@ -97,20 +21,6 @@ var retryFlags = []string{
 	"EVOLVE_SKIP_CYCLE_HEALTH",
 }
 
-// TestC30_001_RetryFlagsAbsentFromRegistry verifies that all 6 recovery/retry
-// flags are no longer registered after Builder removes their rows from registry_table.go.
-//
-// Covers AC1. The 6 flags span two removal patterns:
-//   - EVOLVE_PHASE_MAX_ATTEMPTS, EVOLVE_RETRY_BACKOFF_BASE_S, EVOLVE_PHASE_LATENCY_CEILING_S,
-//     EVOLVE_CONTRACT_CORRECTION_RETRIES: config-object migration to policy.RetryConfig
-//   - EVOLVE_PHASE_LATENCY_CEILING, EVOLVE_SKIP_CYCLE_HEALTH: dead sweep (comment-only)
-//
-// BEHAVIORAL: calls flagregistry.Lookup() for each flag — the production SSOT.
-// A source edit alone cannot satisfy this; the registry row must be absent for
-// Lookup to return ok=false.
-//
-// RED: all 6 flags are currently registered (FlagCeiling=115); each Lookup
-// returns (flag, true).
 func TestC30_001_RetryFlagsAbsentFromRegistry(t *testing.T) {
 	for _, name := range retryFlags {
 		if f, ok := flagregistry.Lookup(name); ok {
@@ -122,32 +32,7 @@ func TestC30_001_RetryFlagsAbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// TestC30_004_NoEnvKeyConstantsInProductionGo verifies that the envchain key
-// constant definitions for the 4 migrated flags have been deleted from
-// envchain/keys.go, and that the call sites in retry_backoff.go and
-// cyclehealth.go no longer reference those constants.
-//
-// Covers AC4. Config-check waiver: FileNotContains asserts structural absence
-// of the exact envchain key constant names. The 4 constants live in one file
-// (envchain/keys.go) and their call sites span two files:
-//   - envchain/keys.go:     KeyPhaseMaxAttempts, KeyRetryBackoffBaseS,
-//     KeyPhaseLatencyCeilingS, KeyContractCorrectionRetries
-//   - core/retry_backoff.go:      KeyPhaseMaxAttempts, KeyRetryBackoffBaseS,
-//     KeyContractCorrectionRetries
-//   - cyclehealth/cyclehealth.go: KeyPhaseLatencyCeilingS
-//
 // acs-predicate: config-check
-//
-// RED:
-//
-//	envchain/keys.go:18  defines KeyPhaseMaxAttempts = "EVOLVE_PHASE_MAX_ATTEMPTS"
-//	envchain/keys.go:22  defines KeyRetryBackoffBaseS = "EVOLVE_RETRY_BACKOFF_BASE_S"
-//	envchain/keys.go:27  defines KeyPhaseLatencyCeilingS = "EVOLVE_PHASE_LATENCY_CEILING_S"
-//	envchain/keys.go:33  defines KeyContractCorrectionRetries = "EVOLVE_CONTRACT_CORRECTION_RETRIES"
-//	core/retry_backoff.go:19      calls envchain.IntMin(envchain.KeyPhaseMaxAttempts, ...)
-//	core/retry_backoff.go:41      calls envchain.Int(envchain.KeyContractCorrectionRetries, ...)
-//	core/retry_backoff.go:54      calls envchain.Int(envchain.KeyRetryBackoffBaseS, ...)
-//	cyclehealth/cyclehealth.go:465 calls envchain.IntMin(envchain.KeyPhaseLatencyCeilingS, ...)
 func TestC30_004_NoEnvKeyConstantsInProductionGo(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -189,32 +74,7 @@ func TestC30_004_NoEnvKeyConstantsInProductionGo(t *testing.T) {
 	}
 }
 
-// TestC30_005_RetryConfigStructExistsInPolicy verifies that:
-//
-//  1. policy.Policy has a Retry field (reflect check — fails at runtime when
-//     the field is absent, giving a precise per-test failure message without
-//     a whole-file compile error).
-//  2. The Retry field is a pointer type (*RetryPolicy).
-//  3. The pointed-to struct has PhaseMaxAttempts int, RetryBackoffBaseS int,
-//     PhaseLatencyCeilingS int, and ContractCorrectionRetries int sub-fields —
-//     the typed replacements for the deleted envchain reads.
-//  4. RetryConfig() resolver returns correct defaults when Policy.Retry == nil:
-//     PhaseMaxAttempts=2, RetryBackoffBaseS=5, PhaseLatencyCeilingS=900,
-//     ContractCorrectionRetries=2 (matching the deleted envchain Def* constants).
-//  5. Empty RetryPolicy{} also yields the same defaults (zero-value int → default).
-//
-// Covers AC5. BEHAVIORAL: reflect.FieldByName traverses the production type
-// system and a direct resolver call returns computed values; a magic-string
-// source edit cannot satisfy this — the struct and fields must actually exist
-// for reflect to find them and the resolver must compute the right defaults.
-//
-// RED:
-//
-//	policy.Policy has no Retry field → reflect returns ok=false at the first check.
-//	(post-field-add) RetryPolicy lacks required fields → inner checks fail.
-//	(post-struct-add) RetryConfig() defaults don't match spec → final checks fail.
 func TestC30_005_RetryConfigStructExistsInPolicy(t *testing.T) {
-	// Check Policy has Retry field.
 	pInfo, ok := reflect.TypeOf(policy.Policy{}).FieldByName("Retry")
 	if !ok {
 		t.Fatalf("RED: policy.Policy.Retry field missing.\n" +
@@ -227,7 +87,6 @@ func TestC30_005_RetryConfigStructExistsInPolicy(t *testing.T) {
 			pInfo.Type.Kind())
 	}
 
-	// Navigate to the RetryPolicy struct type via the pointer's element type.
 	retryType := pInfo.Type.Elem()
 	intFields := []string{"PhaseMaxAttempts", "RetryBackoffBaseS", "PhaseLatencyCeilingS", "ContractCorrectionRetries"}
 	for _, fname := range intFields {
@@ -241,7 +100,6 @@ func TestC30_005_RetryConfigStructExistsInPolicy(t *testing.T) {
 		}
 	}
 
-	// Verify RetryConfig() resolver returns correct defaults when Retry == nil.
 	rc := policy.Policy{}.RetryConfig()
 	if rc.PhaseMaxAttempts != 2 {
 		t.Errorf("RED: RetryConfig().PhaseMaxAttempts = %d, want 2 (matches legacy EVOLVE_PHASE_MAX_ATTEMPTS default).",
@@ -260,8 +118,6 @@ func TestC30_005_RetryConfigStructExistsInPolicy(t *testing.T) {
 			rc.ContractCorrectionRetries)
 	}
 
-	// Edge/OOD: empty RetryPolicy{} (all int fields == 0) must also resolve to
-	// the same defaults (zero int → fall through to default).
 	rc2 := policy.Policy{Retry: &policy.RetryPolicy{}}.RetryConfig()
 	if rc2.PhaseMaxAttempts != 2 {
 		t.Errorf("edge: empty RetryPolicy{}.PhaseMaxAttempts resolved to %d, want 2.\n"+
@@ -285,17 +141,6 @@ func TestC30_005_RetryConfigStructExistsInPolicy(t *testing.T) {
 	}
 }
 
-// TestC30_006_WorktreePathStillRegistered is the non-repeat guard: verifies that
-// EVOLVE_WORKTREE_PATH was NOT accidentally removed as part of the recovery-retry
-// cluster sweep. Cycles 17, 18, and 19 all failed with FAIL (audit H1) when a
-// Builder removed WORKTREE_PATH — this predicate closes that regression surface.
-//
-// Covers AC6 (FORBIDDEN-REPEAT guard). BEHAVIORAL: calls flagregistry.Lookup —
-// the test fails if Builder removes the row (Lookup returns ok=false).
-//
-// PRE-EXISTING GREEN: WORKTREE_PATH is currently in the registry (StatusInternal);
-// this test is GREEN before Builder makes any changes. It stays GREEN only if
-// Builder does NOT touch the WORKTREE_PATH row.
 func TestC30_006_WorktreePathStillRegistered(t *testing.T) {
 	if _, ok := flagregistry.Lookup("EVOLVE_WORKTREE_PATH"); !ok {
 		t.Errorf("RED: flagregistry.Lookup(%q) returned ok=false — WORKTREE_PATH was removed.\n"+
@@ -305,17 +150,7 @@ func TestC30_006_WorktreePathStillRegistered(t *testing.T) {
 	}
 }
 
-// TestC30_008_ControlFlagsMdHasNoRemovedRows verifies that the generated doc
-// docs/architecture/control-flags.md has no entries for any of the 6 removed
-// flags after the registry rows are removed and the doc regenerated via
-// 'evolve flags generate'.
-//
-// Covers AC8. The doc is generated from the flagregistry (source of truth);
-// absence follows from C30_001 (rows removed) plus regeneration.
-//
 // acs-predicate: config-check — doc regeneration is a required build step.
-//
-// RED: control-flags.md currently has entries for all 6 removed flags.
 func TestC30_008_ControlFlagsMdHasNoRemovedRows(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -330,24 +165,7 @@ func TestC30_008_ControlFlagsMdHasNoRemovedRows(t *testing.T) {
 	}
 }
 
-// TestC30_NEG1_NoResidualResolverFunctionsInRetryBackoff is the anti-gaming
-// predicate that verifies retry_backoff.go no longer contains the three private
-// resolver function definitions that previously wrapped the envchain reads.
-//
-// Anti-gaming rationale (cycle-8/cycle-85 lesson): a Builder could delete the
-// registry rows and envchain constants while RENAMING (not deleting) the resolver
-// functions, or leaving them as dead code. C30_004 catches the key-constant
-// call sites; NEG1 adds a second layer by asserting the resolver function BODIES
-// are gone — even if only renamed or stubbed — confirming the env-read logic was
-// truly removed, not hidden.
-//
 // acs-predicate: config-check
-//
-// RED:
-//
-//	retry_backoff.go:18  defines "func resolvePhaseMaxAttempts("
-//	retry_backoff.go:40  defines "func resolveContractCorrectionRetries("
-//	retry_backoff.go:53  defines "func resolveRetryBackoffBase("
 func TestC30_NEG1_NoResidualResolverFunctionsInRetryBackoff(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -366,22 +184,7 @@ func TestC30_NEG1_NoResidualResolverFunctionsInRetryBackoff(t *testing.T) {
 	}
 }
 
-// TestC30_NEG2_NoCycleHealthDirectEnvRead verifies that cyclehealth.go no longer
-// contains a direct per-phase env-key read via envchain.PhaseEnvKey — the
-// perPhaseCeiling helper that read EVOLVE_<PHASE>_LATENCY_CEILING_S per-phase env
-// vars must be simplified to return the global ceiling directly (BA1: zero-behavior-
-// change simplification per scout-report.md hypothesis BA1).
-//
-// Anti-gaming rationale: C30_004 confirms KeyPhaseLatencyCeilingS (the global read)
-// is gone; NEG2 confirms the per-phase read via PhaseEnvKey is also gone. A Builder
-// who only removes the global read but leaves the perPhaseCeiling env read open would
-// pass C30_004 but fail this predicate — closing the second env-read gaming surface.
-//
 // acs-predicate: config-check
-//
-// RED: cyclehealth.go:487 contains `envchain.PhaseEnvKey(phase, "LATENCY_CEILING_S")`
-// inside perPhaseCeiling(). After migration the function must return globalCeiling
-// directly without any envchain read.
 func TestC30_NEG2_NoCycleHealthDirectEnvRead(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)

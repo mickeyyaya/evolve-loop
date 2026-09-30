@@ -1,11 +1,5 @@
 //go:build acs
 
-// Package cycle2 materializes the cycle-2 acceptance criteria for:
-//
-//   - sessionreaper-orphan-reap: Tier-3 liveness orphan reaper (Slice 3,
-//     concurrency-arch-slices campaign). New leaf pkg internal/sessionreaper
-//     with ReapOrphans function, replacement of the looppreflight glob-WARN,
-//     and `evolve swarm reap-orphans` CLI operator backstop.
 package cycle2
 
 import (
@@ -17,12 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// --- Task: sessionreaper-orphan-reap ---
-
-// TestC2_001_SessionreaperPackageExistsAndTracked asserts that
-// go/internal/sessionreaper/sessionreaper.go was created in the worktree
-// and is git-tracked. A gitignored file is silently dropped at ship
-// (cycle-93 lesson).
 func TestC2_001_SessionreaperPackageExistsAndTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rel := filepath.Join("go", "internal", "sessionreaper", "sessionreaper.go")
@@ -35,9 +23,6 @@ func TestC2_001_SessionreaperPackageExistsAndTracked(t *testing.T) {
 	}
 }
 
-// TestC2_002_SessionreaperExportsCompile asserts that all four exports named in
-// AC1 (ReapOrphans, Options, Report, OrphanReap) are present by running go build.
-// A missing export is a compile error — behavioral proof the API contract holds.
 func TestC2_002_SessionreaperExportsCompile(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -52,11 +37,6 @@ func TestC2_002_SessionreaperExportsCompile(t *testing.T) {
 	}
 }
 
-// TestC2_003_FreshLeaseSkippedTestPasses runs TestReapOrphans_FreshLeaseSkipped
-// under -race and asserts: (a) the test executed (anti-no-op guard: `go test -run`
-// on a missing test exits 0 silently), (b) exit 0, (c) no DATA RACE.
-// This is the safety-invariant predicate: a live peer's sessions must NEVER be
-// killed — fake TmuxKiller must record zero calls for the fresh-lease run.
 func TestC2_003_FreshLeaseSkippedTestPasses(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -80,9 +60,6 @@ func TestC2_003_FreshLeaseSkippedTestPasses(t *testing.T) {
 	}
 }
 
-// TestC2_004_StaleLeaseReapedTestPasses runs TestReapOrphans_StaleLeaseReaped
-// under -race and asserts it passes. The positive behavioral test: a stale-lease
-// run's sessions MUST be passed to the killer (non-zero kill count).
 func TestC2_004_StaleLeaseReapedTestPasses(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -106,10 +83,6 @@ func TestC2_004_StaleLeaseReapedTestPasses(t *testing.T) {
 	}
 }
 
-// TestC2_005_MissingRegistryIsZeroActivityTestPasses runs
-// TestReapOrphans_MissingRegistryIsZeroActivity: absent tmux-sessions.jsonl must
-// be a zero-activity success (no error, no crash). Mirrors swarm.ReapRunSessions'
-// MissingRegistry contract.
 func TestC2_005_MissingRegistryIsZeroActivityTestPasses(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -130,9 +103,6 @@ func TestC2_005_MissingRegistryIsZeroActivityTestPasses(t *testing.T) {
 	}
 }
 
-// TestC2_006_AbsentLeaseIsStaleTestPasses runs TestReapOrphans_AbsentLeaseIsStale:
-// a missing .lease file must be treated as stale (fail-closed; reap proceeds)
-// rather than live (fail-open; reap skipped). Unknown = reapable.
 func TestC2_006_AbsentLeaseIsStaleTestPasses(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -153,27 +123,14 @@ func TestC2_006_AbsentLeaseIsStaleTestPasses(t *testing.T) {
 	}
 }
 
-// TestC2_007_LooppreflightGlobWarnRemovedAndReapOrphansWired asserts two things:
-// (1) the old server-wide glob-WARN for stale sessions is removed — it's a
-// latent footgun (could enumerate live peers' sessions) and incapable of safe
-// reaping; (2) ReapOrphans is called in checks.go instead.
-//
-// Mixed: FileNotContains removes the footgun assertion; FileMatchesRegex
-// confirms wiring. The behavioral side is covered by TestC2_008.
 // acs-predicate: config-check — source-wiring assertion is inherently a
-// file-presence check.
 func TestC2_007_LooppreflightGlobWarnRemovedAndReapOrphansWired(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	checksPath := filepath.Join(root, "go", "internal", "looppreflight", "checks.go")
-	// Negative axis: the old glob-WARN string must be absent.
 	acsassert.FileNotContains(t, checksPath, "stale bridge tmux session(s)")
-	// Positive axis: ReapOrphans call must be present.
 	acsassert.FileMatchesRegex(t, checksPath, `ReapOrphans`)
 }
 
-// TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring runs the looppreflight
-// integration test suite to confirm the ReapOrphans wiring is correct and no
-// regressions were introduced. Behavioral: exercises the actual checks.go code.
 func TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -189,10 +146,6 @@ func TestC2_008_LooppreflightTestsPassAfterReapOrphansWiring(t *testing.T) {
 	}
 }
 
-// TestC2_009_SwarmReapOrphansDryRunSucceeds builds the evolve binary and runs
-// `evolve swarm reap-orphans --dry-run`. Exit 0 proves the subcommand is
-// registered and functional. --dry-run injects a no-op killer so no real sessions
-// are touched.
 func TestC2_009_SwarmReapOrphansDryRunSucceeds(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -208,13 +161,7 @@ func TestC2_009_SwarmReapOrphansDryRunSucceeds(t *testing.T) {
 	}
 }
 
-// TestC2_010_ApiCoverEnforceContainsSessionreaper asserts ./internal/sessionreaper
-// is enrolled in go/.apicover-enforce. Enrollment is mandatory for every new
-// internal package (TestApicoverEnforce_CoversEveryInternalPackage gate, cycle-131
-// lesson: a new pkg not enrolled fails the completeness invariant at ship).
-//
 // acs-predicate: config-check — enrollment verification is inherently a
-// file-presence check; the behavioral gate is TestC2_011.
 func TestC2_010_ApiCoverEnforceContainsSessionreaper(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	enforcePath := filepath.Join(root, "go", ".apicover-enforce")
@@ -222,10 +169,6 @@ func TestC2_010_ApiCoverEnforceContainsSessionreaper(t *testing.T) {
 	acsassert.FileContains(t, enforcePath, "./internal/sessionreaper")
 }
 
-// TestC2_011_ApiCoverEnforceTestPasses runs TestApicoverEnforce_CoversEveryInternalPackage
-// which is the completeness gate: every internal pkg enrolled in .apicover-enforce
-// must have named coverage tests in the same package. This fails until
-// sessionreaper's apicover_named_test.go names every export.
 func TestC2_011_ApiCoverEnforceTestPasses(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -245,10 +188,6 @@ func TestC2_011_ApiCoverEnforceTestPasses(t *testing.T) {
 	}
 }
 
-// TestC2_012_SessionreaperCoverageAtLeast85Pct runs the integration test suite
-// with -coverprofile and asserts coverage >= 85% for the sessionreaper package.
-// A package below the threshold cannot ship per the AC10 gate (apicover-enforce
-// checks coverage profiles).
 func TestC2_012_SessionreaperCoverageAtLeast85Pct(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")

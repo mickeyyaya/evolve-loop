@@ -1,16 +1,5 @@
 //go:build acs
 
-// Package cycle1727 materialises the acceptance criteria of
-// audit-deadline-kill-test-flakes-under-load: the killedAtDeadline
-// synchronization that ended the deadline-kill flake must be locked in by a
-// regression test (TestDecideTier_DeadlineHitRequiresSynchronizedCtx, package
-// audit) that fails deterministically when the helper stops waiting on
-// ctx.Done(), and that reaches the production deadline read in
-// ciparitygate.runAttempt through the real integration-tier seam.
-//
-// The mutants (002, 003) are build-time `go test -overlay` replacements
-// written under t.TempDir() — nothing in the worktree is modified, and the
-// protected ciparitygate sources are only ever read.
 package cycle1727
 
 import (
@@ -30,15 +19,12 @@ const (
 	baseCommit     = "a4d083e6"
 )
 
-// testEvent is the subset of a `go test -json` record the predicates read.
 type testEvent struct {
 	Action string
 	Test   string
 	Output string
 }
 
-// goTestRun holds one `go test -json` invocation: its exit code, per-test
-// pass/fail counts for top-level tests, and the raw output for diagnostics.
 type goTestRun struct {
 	code   int
 	passes map[string]int
@@ -51,8 +37,6 @@ func goModuleDir(t *testing.T) string {
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// runAuditTests runs `go test -json` over the ONE audit package, optionally
-// under an overlay, and tallies the top-level test verdicts.
 func runAuditTests(t *testing.T, overlay, runPattern string, count int) goTestRun {
 	t.Helper()
 	args := []string{"-C", goModuleDir(t), "test", "-json", "-count=" + strconv.Itoa(count), "-run", runPattern}
@@ -87,8 +71,6 @@ func tail(s string, n int) string {
 	return "…" + s[len(s)-n:]
 }
 
-// writeOverlay writes a `go build -overlay` file mapping each real source path
-// to its mutant under dir.
 func writeOverlay(t *testing.T, dir string, replace map[string]string) string {
 	t.Helper()
 	body, err := json.Marshal(map[string]map[string]string{"Replace": replace})
@@ -102,9 +84,6 @@ func writeOverlay(t *testing.T, dir string, replace map[string]string) string {
 	return path
 }
 
-// desynchronizedHelperMutant finds the audit package's killedAtDeadline and
-// returns (source path, mutant body) with its `<-ctx.Done()` wait removed —
-// the pre-fix, raced runner shape.
 func desynchronizedHelperMutant(t *testing.T) (string, string) {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join(goModuleDir(t), auditPkgRel, "*_test.go"))
@@ -143,8 +122,6 @@ func desynchronizedHelperMutant(t *testing.T) (string, string) {
 	return "", ""
 }
 
-// TestC1727_001_RegressionTestPassesRepeatedly — the new regression test
-// exists in package audit, is not gitignored, and passes 20/20 consecutive runs.
 func TestC1727_001_RegressionTestPassesRepeatedly(t *testing.T) {
 	const runs = 20
 	got := runAuditTests(t, "", "^"+regressionTest+"$", runs)
@@ -172,10 +149,6 @@ func TestC1727_001_RegressionTestPassesRepeatedly(t *testing.T) {
 	t.Errorf("RED: %s passed but no %s/*_test.go declares it", regressionTest, auditPkgRel)
 }
 
-// TestC1727_002_RegressionTestDeterministicallyCatchesDesynchronizedHelper —
-// with killedAtDeadline's `<-ctx.Done()` removed (the raced shape), the
-// regression test must FAIL on every one of 5 runs: detection may not depend
-// on losing a timer race.
 func TestC1727_002_RegressionTestDeterministicallyCatchesDesynchronizedHelper(t *testing.T) {
 	const runs = 5
 	src, mutant := desynchronizedHelperMutant(t)
@@ -191,10 +164,6 @@ func TestC1727_002_RegressionTestDeterministicallyCatchesDesynchronizedHelper(t 
 	}
 }
 
-// TestC1727_003_RegressionTestDrivesProductionDeadlineRead — reachability
-// proof: when ciparitygate.runAttempt stops recognising DeadlineExceeded, the
-// regression test must FAIL, which only a test driving the real
-// integration-tier seam (not the helper in isolation) can notice.
 func TestC1727_003_RegressionTestDrivesProductionDeadlineRead(t *testing.T) {
 	const (
 		runs     = 3
@@ -221,8 +190,6 @@ func TestC1727_003_RegressionTestDrivesProductionDeadlineRead(t *testing.T) {
 	}
 }
 
-// TestC1727_004_DeadlineKillTestsGreenOver50Runs — the inbox item's literal
-// bar: every DeadlineKill test passes 50/50 consecutive runs.
 func TestC1727_004_DeadlineKillTestsGreenOver50Runs(t *testing.T) {
 	const runs = 50
 	got := runAuditTests(t, "", "DeadlineKill", runs)
@@ -236,8 +203,6 @@ func TestC1727_004_DeadlineKillTestsGreenOver50Runs(t *testing.T) {
 	}
 }
 
-// TestC1727_005_ProductionCiparityCodeUnchanged — the fix is test-only: the
-// protected ciparity seam and gate package carry no diff against the cycle base.
 func TestC1727_005_ProductionCiparityCodeUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	paths := []string{"go/" + auditPkgRel + "/ciparity.go", "go/" + auditPkgRel + "/ciparitygate"}
@@ -254,8 +219,6 @@ func TestC1727_005_ProductionCiparityCodeUnchanged(t *testing.T) {
 	}
 }
 
-// TestC1727_006_AuditPackageFormattedAndVetClean — no gofmt or vet regression
-// in the audit package.
 func TestC1727_006_AuditPackageFormattedAndVetClean(t *testing.T) {
 	goDir := goModuleDir(t)
 	unformatted, stderr, code, err := acsassert.SubprocessOutput("gofmt", "-l", filepath.Join(goDir, auditPkgRel))

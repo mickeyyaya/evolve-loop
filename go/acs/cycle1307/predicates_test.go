@@ -1,37 +1,5 @@
 //go:build acs
 
-// Package cycle1307 materialises the cycle-1307 acceptance criteria for the one
-// fleet-scoped task pinned to this lane:
-//
-//	sentinel-parse-tail-anchor → anchor evolve-verdict sentinel extraction at the
-//	TAIL (last parseable candidate) in ONE shared implementation used by both
-//	phasecontract sentinel parsing and deliverable verification, carrying the
-//	cycle-1298 regression fixture (5 quoted decoys + 1 real tail sentinel), AND
-//	documenting the rule in the operator-facing contract doc.
-//
-// State this cycle inherited (scout-report): the CODE half is already shipped on
-// this branch — ParseVerdictSentinelFull walks candidates from the end
-// (sentinel.go:90-98) and the fixture + unit tests are green. The predicates
-// below therefore split into two groups on purpose:
-//
-//   - 001-004 are BEHAVIOURAL guards on the shipped semantics. They are expected
-//     PRE-EXISTING GREEN and exist so a Builder that touches sentinel.go this
-//     cycle (five sibling lanes received the identical inbox item — collision is
-//     live) cannot silently regress first-match selection.
-//   - 005 is the RED one: docs/architecture/deliverable-contract.md, the
-//     connects_to target the inbox item named, has ZERO mention of tail-anchored
-//     selection. That is this cycle's outstanding work.
-//
-// Predicate strategy — every behavioural predicate drives the real function or
-// the real production entry point (deliverable.Verify) and asserts on its return
-// value, never a source-grep of production code (the cycle-85 degenerate-
-// predicate ban). 001 additionally carries an ANTI-VACUITY arm: it recomputes
-// the OLD first-match selection over the same live fixture and asserts it gives
-// the WRONG answer, so the predicate cannot pass on a repo where the fix was
-// reverted. 004 is the wiring proof: it reaches the parser through
-// deliverable.Verify — the entry the contract gate actually calls — not through
-// phasecontract directly, so a tail-anchored parser with no production reader
-// still fails it.
 package cycle1307
 
 import (
@@ -47,21 +15,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// fixtureRelPath is the cycle-1298 regression artifact the inbox item demanded
-// be captured: the real adversarial-review report whose prose quotes the
-// sentinel shape five times before emitting the genuine FAIL at the tail.
 const fixtureRelPath = "go/internal/phasecontract/testdata/cycle1298-quoted-decoys.md"
 
-// docRelPath is the operator-facing SSOT the inbox item named as connects_to.
 const docRelPath = "docs/architecture/deliverable-contract.md"
 
-// sentinelRE mirrors the production candidate regex. It exists ONLY to recompute
-// the pre-fix FIRST-match selection for the anti-vacuity arm of 001 — never as a
-// substitute for calling the real parser.
 var sentinelRE = regexp.MustCompile(`<!--\s*evolve-verdict:\s*(\{.*?\})\s*-->`)
 
-// firstMatchVerdict is the selection ParseVerdictSentinelFull used BEFORE the
-// fix: take the first structural match and give up if it does not unmarshal.
 func firstMatchVerdict(content string) (string, bool) {
 	m := sentinelRE.FindStringSubmatch(content)
 	if m == nil {
@@ -76,12 +35,6 @@ func firstMatchVerdict(content string) (string, bool) {
 	return s.Verdict, true
 }
 
-// TestC1307_001_TailAnchoredSelectionOnLiveCycle1298Fixture is the crux
-// behavioural predicate: the shared parser, run over the LIVE cycle-1298 report,
-// must return the genuine tail verdict (FAIL, class gate_bypass) rather than any
-// of the five decoys its prose quotes. The second arm proves the predicate is
-// not vacuous — the retired first-match selection returns a DIFFERENT verdict on
-// these exact bytes, so this test can only pass on a tail-anchored parser.
 func TestC1307_001_TailAnchoredSelectionOnLiveCycle1298Fixture(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, fixtureRelPath))
@@ -101,15 +54,11 @@ func TestC1307_001_TailAnchoredSelectionOnLiveCycle1298Fixture(t *testing.T) {
 		t.Errorf("failure block = %+v, want class %q from the tail sentinel", s.Failure, "gate_bypass")
 	}
 
-	// Anti-vacuity: the retired selection must disagree on these same bytes.
 	if v, ok := firstMatchVerdict(content); ok && v == s.Verdict {
 		t.Errorf("first-match selection also returns %q on this fixture — the fixture no longer discriminates tail-anchored from first-match selection", v)
 	}
 }
 
-// TestC1307_002_MalformedEarlierDecoyDoesNotBlankTail is the elided-JSON shape
-// that circuit-opened the gate in cycle-1298: an earlier candidate that does not
-// unmarshal must be SKIPPED, not treated as fatal for the whole read.
 func TestC1307_002_MalformedEarlierDecoyDoesNotBlankTail(t *testing.T) {
 	doc := strings.Join([]string{
 		"# Adversarial Review",
@@ -129,10 +78,6 @@ func TestC1307_002_MalformedEarlierDecoyDoesNotBlankTail(t *testing.T) {
 	}
 }
 
-// TestC1307_003_AllCandidatesInvalidReturnsNotOK is the NEGATIVE arm: skipping
-// invalid candidates must not degrade into inventing a verdict. A document whose
-// every candidate is malformed or verdict-less yields ok=false so the caller
-// falls back to its legacy prose parser (tolerant reader).
 func TestC1307_003_AllCandidatesInvalidReturnsNotOK(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -151,17 +96,6 @@ func TestC1307_003_AllCandidatesInvalidReturnsNotOK(t *testing.T) {
 	}
 }
 
-// TestC1307_004_DeliverableGateReachesTailAnchoredParser is the WIRING PROOF.
-// It never calls phasecontract: it drives deliverable.Verify — the entry the
-// contract gate calls in production — over a real on-disk audit-report.md and
-// asserts the failure-context check judged the TAIL sentinel.
-//
-// The fixture discriminates by construction: the earlier (quoted, decoy)
-// sentinel is a FAIL with NO failure block, the tail sentinel is a clean PASS.
-// A first-match reader judges the decoy and raises failure_context_missing; a
-// tail-anchored reader judges the PASS and raises nothing. The inverse case then
-// proves the check still BITES (a real FAIL without a block is still caught), so
-// the first arm cannot pass merely because the check is dead.
 func TestC1307_004_DeliverableGateReachesTailAnchoredParser(t *testing.T) {
 	decoy := "Quoted contract example in prose: " +
 		phasecontract.RenderVerdictSentinelWithFailure("audit", "FAIL", nil)
@@ -206,13 +140,7 @@ func TestC1307_004_DeliverableGateReachesTailAnchoredParser(t *testing.T) {
 	}
 }
 
-// TestC1307_005_ContractDocDocumentsTailAnchoring is this cycle's RED predicate.
-// The operator SSOT must explain the tail-anchoring rule, name the incident that
-// motivated it, and point at the regression fixture — otherwise the next author
-// of a sentinel reader re-derives first-match selection and re-breaks the gate.
-//
 // acs-predicate: config-check — the deliverable of this criterion IS operator
-// prose, so document content is the system under test, not a proxy for it.
 func TestC1307_005_ContractDocDocumentsTailAnchoring(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path := filepath.Join(root, docRelPath)

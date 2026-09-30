@@ -1,55 +1,5 @@
 //go:build acs
 
-// Package cycle1180 materialises the cycle-1180 acceptance criteria for the two
-// triage-COMMITTED (## top_n) fleet-scoped tasks pinned to this lane:
-//
-//   - wave-lane-task-quarantine-dead   → a FAILED WAVE LANE must move its
-//     triage-committed ids through the ADR-0072 S5 failure lifecycle
-//     (failure_count bump → quarantine at ceiling), and a quarantined id must
-//     then read as CONSUMED at dispatch so it stops being re-picked.
-//   - wave-planner-pass-scope-prune    → the wave SEED must drop carried-over
-//     committed ids that the inbox lifecycle has already consumed.
-//
-// (workspace-hygiene-s5-wiring-shadow-default was DROPPED by triage as
-// already-landed — no predicate here, per R9.3 predicates-bind-to-committed-work.)
-//
-// What is actually broken today (verified in this worktree, not assumed):
-//
-//  1. cmd_loop.go's WAVE branch (cmd_loop.go:596-604) only COUNTS failed lanes
-//     and logs "N/M lanes ok". The sequential branch (cmd_loop.go:722-732) is
-//     the ONLY caller of inboxmover.ApplyCycleOutcome's FAIL path, and
-//     fleet.Result{Index,ExitCode,Err} carries neither the lane's cycle number
-//     nor its workspace — so nothing can apply a lane's verdict from there.
-//     Fleet-dispatched work therefore never bumps failure_count and the S5
-//     retry ceiling is structurally unreachable (batch-14: cycles 1137/1139/
-//     1142/1143 all FAILed on the same ids with failure_count stuck at 0).
-//     The PASS half already lives INSIDE the cycle process
-//     (internal/phases/ship/postship.go:188) — the FAIL half must be its
-//     symmetric, equally importable sibling. Predicates 002/003 pin that seam.
-//  2. inboxmover.ResolveDispatchState (dispatchstate.go:41-58) classifies
-//     inbox root / processing / processed / rejected / retry — but NOT
-//     quarantine/. A quarantined id falls through to StateUnknown, which the
-//     dispatch freshness gate fails OPEN on (cmd_loop_wave.go:323-324) — so
-//     quarantine, even once reachable, would not stop re-dispatch. Predicate
-//     001 pins it.
-//  3. triagecap.WidenTopNToFleetWidth (topn_width.go:96-97) copies the
-//     carried-over `committed` slice through VERBATIM, and SelectWaveSeedMenus
-//     (lane_menu.go:103-109) hands it straight to the wave plan. An id already
-//     consumed at an earlier wave is re-pinned into a later lane-scope.json —
-//     the cycle-1116 re-pin of tdd-topn-binding-gate (consumed at cycle-1113).
-//     Predicate 004 pins it.
-//
-// Predicate strategy — every predicate DRIVES the system under test over an
-// isolated temp tree and asserts on the resulting on-disk lifecycle state or
-// return value. There is not one source-grep assertion in this file (the
-// cycle-85 degenerate-predicate ban): adding a magic string to a source file
-// greens nothing here.
-//
-// Diversity: 001 asserts a state classification, 002 the positive bump +
-// quarantine transition, 003 the NEGATIVE half (uncommitted menu ids and
-// system-level failures must stay inert — the anti-over-quarantine guard), 004
-// the prune plus its fail-open edge (an id with no lifecycle evidence at all
-// must survive).
 package cycle1180
 
 import (
@@ -65,12 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// --- fixture helpers --------------------------------------------------------
-
-// newProject builds an isolated project root with an empty .evolve/inbox/ and
-// returns (projectRoot, inboxDir). Every predicate gets its own tree: the
-// lifecycle is filesystem-shaped, so a shared root would let one predicate's
-// moves leak into another's assertions.
 func newProject(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -81,8 +25,6 @@ func newProject(t *testing.T) (string, string) {
 	return root, inbox
 }
 
-// writeItem drops an inbox item JSON carrying id (plus optional weight and a
-// pre-existing failure_count) into dir, mirroring .evolve/inbox/ naming.
 func writeItem(t *testing.T, dir, id string, failureCount int, weight float64) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -106,9 +48,6 @@ func writeItem(t *testing.T, dir, id string, failureCount int, weight float64) s
 	return path
 }
 
-// writeTriageDecision writes the workspace's triage-decision.json — the ONE
-// artifact inboxmover.CommittedIDs reads to learn "what this cycle worked".
-// The failure seam must key off this file, not off the lane's whole menu.
 func writeTriageDecision(t *testing.T, workspace string, topN []string) {
 	t.Helper()
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -127,8 +66,6 @@ func writeTriageDecision(t *testing.T, workspace string, topN []string) {
 	}
 }
 
-// testOpts roots inboxmover at root with the landing gate stubbed to "landed":
-// the real gate shells out to git, which is noise in a temp dir.
 func testOpts(root string, stderr io.Writer) inboxmover.Options {
 	return inboxmover.Options{
 		ProjectRoot: root,
@@ -137,8 +74,6 @@ func testOpts(root string, stderr io.Writer) inboxmover.Options {
 	}
 }
 
-// findItem returns the path of the file directly under dir whose JSON .id == id,
-// or "". Non-recursive by design: each lifecycle destination is a flat dir.
 func findItem(t *testing.T, dir, id string) string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -164,8 +99,6 @@ func findItem(t *testing.T, dir, id string) string {
 	return ""
 }
 
-// failureCountOf reads the durable failure_count off an item JSON; absent is 0,
-// the same reading bumpFailureCount uses.
 func failureCountOf(t *testing.T, path string) int {
 	t.Helper()
 	body, err := os.ReadFile(path)
@@ -181,7 +114,6 @@ func failureCountOf(t *testing.T, path string) int {
 	return doc.FailureCount
 }
 
-// ids flattens lane menus to a flat id set for membership assertions.
 func ids(menus [][]triagecap.FleetCandidate) map[string]bool {
 	out := map[string]bool{}
 	for _, menu := range menus {
@@ -192,21 +124,6 @@ func ids(menus [][]triagecap.FleetCandidate) map[string]bool {
 	return out
 }
 
-// --- 001: quarantined ids read as CONSUMED at dispatch ----------------------
-
-// TestC1180_001_QuarantinedIdIsConsumedAtDispatch drives the real dispatch-state
-// resolver over a tree whose only evidence for the id is .evolve/inbox/quarantine/.
-//
-// Today ResolveDispatchState never looks in quarantine/, so it returns
-// StateUnknown — and the wave freshness gate treats unknown as FRESH (fail-open,
-// cmd_loop_wave.go:323). That makes quarantine cosmetic: a poison todo parked by
-// the S5 ceiling is still launchable. The criterion is that quarantine is a
-// CONSUMED lifecycle state, reported as such (state string "quarantine") so the
-// gate's default branch skips the lane with a legible reason.
-//
-// Negative half in the same predicate: an id with NO lifecycle evidence anywhere
-// must STILL resolve unknown — the fail-open posture that keeps non-inbox-backed
-// planned ids launchable must not be collateral damage of the fix.
 func TestC1180_001_QuarantinedIdIsConsumedAtDispatch(t *testing.T) {
 	root, inbox := newProject(t)
 	writeItem(t, filepath.Join(inbox, "quarantine"), "poison-todo", 3, 0.9)
@@ -220,30 +137,11 @@ func TestC1180_001_QuarantinedIdIsConsumedAtDispatch(t *testing.T) {
 		t.Errorf("ResolveDispatchState(quarantined id).State = %q; want \"quarantine\" so the gate's skip reason names the real cause", ds.State)
 	}
 
-	// Fail-open must survive: no evidence anywhere ⇒ unknown ⇒ launchable.
 	if got := inboxmover.ResolveDispatchState(testOpts(root, io.Discard), "never-filed").State; got != inboxmover.StateUnknown {
 		t.Errorf("ResolveDispatchState(id with no lifecycle evidence).State = %q; want %q — a planned id that is not inbox-backed must never be false-skipped", got, inboxmover.StateUnknown)
 	}
 }
 
-// --- 002: a FAILED lane walks its committed ids toward quarantine -----------
-
-// TestC1180_002_LaneFailureBumpsAndQuarantines is the cycle-1180 CRUX for
-// wave-lane-task-quarantine-dead.
-//
-// It drives the importable failure-closeout seam — the symmetric sibling of the
-// PASS half already living inside the cycle process (phases/ship/postship.go) —
-// over a temp project, three times in a row against a ceiling of 3, and asserts
-// the durable lifecycle actually moves:
-//
-//	FAIL #1 → failure_count 1, released to the inbox root (still re-pickable)
-//	FAIL #2 → failure_count 2, still at the root
-//	FAIL #3 → at the ceiling ⇒ the item is in .evolve/inbox/quarantine/, GONE
-//	          from the root, and reported in OutcomeResult.Quarantined
-//
-// A seam that merely releases (today's whole-batch behavior) fails at FAIL #1;
-// one that bumps but never routes to quarantine fails at FAIL #3. Nothing here
-// passes on an unfixed tree, and no source string can green it.
 func TestC1180_002_LaneFailureBumpsAndQuarantines(t *testing.T) {
 	root, inbox := newProject(t)
 	writeItem(t, inbox, "poison-todo", 0, 0.9)
@@ -276,7 +174,6 @@ func TestC1180_002_LaneFailureBumpsAndQuarantines(t *testing.T) {
 			continue
 		}
 
-		// At the ceiling: quarantined, not released.
 		if path := findItem(t, inbox, "poison-todo"); path != "" {
 			t.Errorf("attempt %d (ceiling %d): 'poison-todo' is STILL at the inbox root (%s); at the ceiling it must be parked in quarantine/ so it stops being re-picked", attempt, ceiling, filepath.Base(path))
 		}
@@ -289,21 +186,7 @@ func TestC1180_002_LaneFailureBumpsAndQuarantines(t *testing.T) {
 	}
 }
 
-// --- 003: menu semantics + system-level failures stay INERT (negative) ------
-
-// TestC1180_003_UncommittedMenuAndSystemFailuresStayInert is the anti-over-
-// quarantine half of wave-lane-task-quarantine-dead (its menu-semantics guard).
-//
-// Since PR #366 a wave lane CLAIMS a whole menu but triage commits only a subset.
-// Bumping the whole menu on FAIL would walk healthy backlog toward quarantine on
-// failures of an unrelated task — the exact inverse defect. Two negatives:
-//
-//	(a) an id present in the lane's inbox but ABSENT from triage-decision.json's
-//	    top_n must end with failure_count 0 and stay at the inbox root;
-//	(b) a SYSTEM-level failure (ADR-0072 S3 — quota storm, forged verdict) must
-//	    bump NOTHING, not even the committed id: it is not the task's fault.
 func TestC1180_003_UncommittedMenuAndSystemFailuresStayInert(t *testing.T) {
-	// (a) uncommitted menu id is inert on a task-level FAIL.
 	root, inbox := newProject(t)
 	writeItem(t, inbox, "worked-todo", 0, 0.9)
 	writeItem(t, inbox, "menu-only-todo", 0, 0.8)
@@ -314,7 +197,7 @@ func TestC1180_003_UncommittedMenuAndSystemFailuresStayInert(t *testing.T) {
 		ProjectRoot: root,
 		Workspace:   workspace,
 		Cycle:       1180,
-		Ceiling:     1, // ceiling 1: any bump quarantines, making leakage loud
+		Ceiling:     1,
 		SystemLevel: false,
 		Reason:      "cycle-failure-release",
 		Stderr:      io.Discard,
@@ -336,7 +219,6 @@ func TestC1180_003_UncommittedMenuAndSystemFailuresStayInert(t *testing.T) {
 		t.Errorf("committed 'worked-todo' was NOT quarantined at ceiling 1; the committed id is precisely the one that must move")
 	}
 
-	// (b) system-level failure bumps nothing at all.
 	sysRoot, sysInbox := newProject(t)
 	writeItem(t, sysInbox, "worked-todo", 0, 0.9)
 	sysWorkspace := filepath.Join(sysRoot, ".evolve", "runs", "cycle-1181")
@@ -362,28 +244,10 @@ func TestC1180_003_UncommittedMenuAndSystemFailuresStayInert(t *testing.T) {
 	}
 }
 
-// --- 004: the wave seed prunes already-consumed carried-over ids ------------
-
-// TestC1180_004_WaveSeedPrunesConsumedCommittedIds pins
-// wave-planner-pass-scope-prune against the real seed seam.
-//
-// SelectWaveSeedMenus takes the prior decision's `committed` candidates and
-// (via WidenTopNToFleetWidth) copies them into the wave plan verbatim. An id
-// consumed at an earlier wave is therefore re-pinned into a later
-// lane-scope.json — cycle-1116 re-pinned tdd-topn-binding-gate after cycle-1113
-// consumed it. The criterion: the SEED itself must drop candidates the inbox
-// lifecycle has already consumed (processed/, and quarantine/ once 001 lands),
-// so the plan artifact is honest rather than relying on the launch-time gate.
-//
-// Fail-open edge, asserted in the same predicate: a carried-over id with NO
-// lifecycle evidence at all (not inbox-backed — a synthetic or externally
-// sourced card) must SURVIVE the prune. A prune that drops everything it cannot
-// resolve would starve every wave, so this negative is load-bearing.
 func TestC1180_004_WaveSeedPrunesConsumedCommittedIds(t *testing.T) {
 	root, inbox := newProject(t)
 	evolveDir := filepath.Join(root, ".evolve")
 
-	// Pending backlog (the widen source) + the two consumed carry-overs.
 	writeItem(t, inbox, "fresh-a", 0, 0.9)
 	writeItem(t, inbox, "fresh-b", 0, 0.8)
 	writeItem(t, filepath.Join(inbox, "processed"), "consumed-todo", 0, 0.95)

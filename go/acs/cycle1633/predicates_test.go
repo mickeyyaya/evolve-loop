@@ -1,90 +1,5 @@
 //go:build acs
 
-// Package cycle1633 materializes the acceptance criteria for the single
-// triage-committed task of this fleet lane:
-//
-//   - triage-unified-solution-synthesis → a validated, evidence-cited UNIFIED
-//     commitment at the inboxbatch/triage seam that fails OPEN to independent
-//     top_n selection, and is projected ONLY when valid: a small commitment
-//     pins plan-review + build-planner through the phase registry, a large one
-//     emits an ADR-0054 campaign plan. Per-member acceptance stays separate
-//     (members ⊆ top_n; every member keeps its own acceptance contract).
-//
-// The second lane-scoped id, overlay-family-name-transport-ambiguity, was
-// dropped by triage as already shipped (797b8518 — verified an ancestor of
-// this tree; its five llmroute tests pass here). R9.3 forbids predicates for
-// non-top_n work, so nothing below binds to it.
-//
-// Provenance: cycle 1629 built this exact contract to 20/20 predicates GREEN
-// and an auditor-narrative PASS; the deterministic explanation-documentation
-// gate forced FAIL on a path:line citation gap (audit-fail-reason.json), not
-// on the code. Its snapshot (b5b2b669, branch cycle-cd3ae73e-1629) is the
-// salvage source. This package re-pins the SAME wire contract so the salvaged
-// implementation satisfies it, with one deliberate narrowing: 015 asserts
-// wave membership through the existing fleet.CycleSpec.Scope, so the fix
-// needs NO edit under go/internal/fleet (the file the 1629 gate tripped on).
-//
-// The contract pinned here (every symbol below is RED — the package does not
-// compile until Builder provides it):
-//
-//	inboxbatch.UnifiedMember{ID, Evidence string}            json: id, evidence
-//	inboxbatch.UnifiedCommitment{RootCauseHypothesis string   json: root_cause_hypothesis
-//	                             SharedSeam string            json: shared_seam
-//	                             DesignRequirements []string  json: design_requirements
-//	                             Members []UnifiedMember}     json: members
-//	func (c UnifiedCommitment) Validate(items []Item) error   nil ⇔ credible
-//	func (c UnifiedCommitment) Size() string                  "small" | "large"
-//	                                                          (len(Members) <= DefaultMaxItems ⇒ small)
-//	router.TriageSignals.UnifiedSize string                   "" when absent/invalid
-//	router.TriageSignals.UnifiedMemberCount int
-//	routing field "triage.unified_size" (registry conditional_mandatory)
-//	campaign.PlanFromUnifiedCommitment(c, items) (*campaign.Plan, error)
-//
-// triage-decision.json carries the agent's claim under the top-level key
-// "unified_commitment". The triage PHASE (hooks.Classify, reached through the
-// real runner) is the production validator: an invalid claim keeps verdict
-// PASS (fail-open to the independent top_n), surfaces a diagnostic, and leaves
-// NO unified signal for the router; a valid claim is projected by
-// router.Digest.
-//
-// Predicate strategy — every predicate exercises the system under test (a
-// direct call on the typed seam, the REAL triage runner driven by a fake
-// core.Bridge, router.Digest/Route over the REAL phase registry, or a real
-// emitted campaign-plan.json), never a source grep (the cycle-85 ban):
-//
-//   - 001–007: the typed contract — accept the complete/evidence-cited case;
-//     reject missing evidence, unknown member, duplicate member, incomplete
-//     shape, heterogeneous members (distinct campaigns / mixed deliverable
-//     kinds — the forced-unification failure mode); size boundary pinned to
-//     inboxbatch.DefaultMaxItems.
-//   - 008: regression — the deterministic batch rules are untouched (a
-//     commitment is a triage-declared artifact, not an inferred grouping rule).
-//   - 009–011: the triage seam through the production runner — fail-open on an
-//     invalid claim, projection of a valid small claim, rejection of a member
-//     outside top_n (per-member acceptance stays separate).
-//   - 012–014: the routing projection over the REAL phase registry — a small
-//     commitment pins plan-review and build-planner even against an advisor
-//     plan that declined them (Plan != nil bypasses insert_when; only
-//     conditional_mandatory survives — router.shouldRun), and build-planner's
-//     own ShouldSkip agrees; the no-commitment baseline is unchanged.
-//   - 015–016: the campaign route — a large commitment projects to a Verify()-
-//     clean campaign.Plan honoring member deps AND each member's own
-//     acceptance contract; an invalid one is refused; the triage runner EMITS
-//     campaign-plan.json in the workspace for large claims only.
-//   - 017: this package is git-tracked (cycle-93: untracked predicates are
-//     dropped at ship; cycle-1623 audit M1 recurrence).
-//
-// Adversarial axes (skills/adversarial-testing §6): NEGATIVE — 002/003/004/
-// 005/006/009/011 and the invalid-claim half of 015 reject; a no-op that
-// accepts everything fails them. EDGE — blank strings, zero/one member, exactly
-// DefaultMaxItems vs DefaultMaxItems+1, a member outside top_n. SEMANTIC —
-// validation (001–007), classifier isolation (008), phase fail-open (009–011),
-// routing (012–014) and campaign projection (015–016) are five distinct
-// behaviors, not one restated.
-//
-// Flaky-shape hygiene: no whole-package `go test` subprocesses, no wall-clock
-// bounds, no literal PIDs, no bare `git` (every git call is -C rooted), no
-// load generators.
 package cycle1633
 
 import (
@@ -108,13 +23,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-// threeItems is a homogeneous small backlog: three code items, no campaign,
-// disjoint file areas (so no mechanical rule binds them — the synthesis seam is
-// the ONLY thing that can unify them).
 func threeItems() []inboxbatch.Item {
 	return []inboxbatch.Item{
 		{ID: "alpha", Title: "alpha", Weight: 0.8, Files: []string{"go/internal/alpha/a.go"}},
@@ -123,10 +31,6 @@ func threeItems() []inboxbatch.Item {
 	}
 }
 
-// chainItems returns n code items delta1..deltaN where delta<k> depends on
-// delta<k-1> — a dependency chain the campaign waves must honor. Every item
-// carries its OWN acceptance criterion so the campaign projection can be
-// checked for per-member contract retention (no blended contract).
 func chainItems(n int) []inboxbatch.Item {
 	items := make([]inboxbatch.Item, 0, n)
 	for i := 1; i <= n; i++ {
@@ -145,8 +49,6 @@ func chainItems(n int) []inboxbatch.Item {
 	return items
 }
 
-// completeCommitment is the positive fixture: every field present, every
-// member evidence-cited, every member a known item.
 func completeCommitment(items []inboxbatch.Item) inboxbatch.UnifiedCommitment {
 	members := make([]inboxbatch.UnifiedMember, 0, len(items))
 	for _, it := range items {
@@ -163,9 +65,6 @@ func completeCommitment(items []inboxbatch.Item) inboxbatch.UnifiedCommitment {
 	}
 }
 
-// decisionJSON renders a triage-decision.json body: the independent top_n over
-// topN ids plus an optional unified_commitment object. json.Marshal on the typed
-// struct pins the wire field names the Builder's JSON tags must produce.
 func decisionJSON(t *testing.T, topN []string, c *inboxbatch.UnifiedCommitment) string {
 	t.Helper()
 	top := make([]map[string]string, 0, len(topN))
@@ -183,8 +82,6 @@ func decisionJSON(t *testing.T, topN []string, c *inboxbatch.UnifiedCommitment) 
 	return string(raw)
 }
 
-// reportMD renders a minimal but contract-complete triage-report.md whose
-// ## top_n lists ids (cycle_size medium keeps tdd pinned, matching production).
 func reportMD(topN []string) string {
 	var b strings.Builder
 	b.WriteString("cycle_size_estimate: medium\ndeliverable_kind: code\n\n## top_n\n")
@@ -195,8 +92,6 @@ func reportMD(topN []string) string {
 	return b.String()
 }
 
-// fakeBridge is the minimal core.Bridge: it writes the scripted triage report
-// and decision into the workspace, exactly where the real agent would.
 type fakeBridge struct{ report, decision string }
 
 func (b *fakeBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -217,8 +112,6 @@ func (b *fakeBridge) Probe(context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// writeInbox materializes items as .evolve/inbox/<id>.json under a temp project
-// root and returns that root — the inbox the triage phase validates against.
 func writeInbox(t *testing.T, items []inboxbatch.Item) string {
 	t.Helper()
 	proj := t.TempDir()
@@ -238,9 +131,6 @@ func writeInbox(t *testing.T, items []inboxbatch.Item) string {
 	return proj
 }
 
-// runTriage drives the REAL triage phase runner (triage.New → BaseRunner.Run →
-// hooks.Classify) over a temp project whose inbox holds items, with the fake
-// bridge writing report+decision. Returns the response and the workspace.
 func runTriage(t *testing.T, items []inboxbatch.Item, topN []string, c *inboxbatch.UnifiedCommitment) (core.PhaseResponse, string) {
 	t.Helper()
 	proj := writeInbox(t, items)
@@ -259,8 +149,6 @@ func runTriage(t *testing.T, items []inboxbatch.Item, topN []string, c *inboxbat
 	return resp, ws
 }
 
-// digestTriage projects the workspace's triage artifacts through the production
-// router digest — the ONE reader the routing kernel uses.
 func digestTriage(t *testing.T, ws string) router.RoutingSignals {
 	t.Helper()
 	sig, err := router.Digest(ws, []string{"triage"})
@@ -270,8 +158,6 @@ func digestTriage(t *testing.T, ws string) router.RoutingSignals {
 	return sig
 }
 
-// realRegistryConfig loads the REAL phase registry (docs/architecture/
-// phase-registry.json under the worktree) — the config-first wiring surface.
 func realRegistryConfig(t *testing.T) config.RoutingConfig {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -279,9 +165,6 @@ func realRegistryConfig(t *testing.T) config.RoutingConfig {
 	return cfg
 }
 
-// declinedPlan is an advisor plan that runs the spine but DECLINES plan-review
-// and build-planner — the production shape a conditional pin must beat
-// (Plan != nil bypasses insert_when; only conditional_mandatory survives).
 func declinedPlan() *router.PhasePlan {
 	return &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true}, {Phase: "triage", Run: true},
@@ -291,10 +174,6 @@ func declinedPlan() *router.PhasePlan {
 	}}
 }
 
-// walkPhases follows router.Route from `from` until it reaches "build" or
-// "end" (or 16 steps), returning every phase it visits in order. Robust to
-// extra inserts the Builder may add: the assertions check membership, not the
-// exact next hop.
 func walkPhases(cfg config.RoutingConfig, sig router.RoutingSignals, plan *router.PhasePlan, from string, completed []string) []string {
 	var visited []string
 	cur := from
@@ -340,10 +219,6 @@ func memberIDs(items []inboxbatch.Item) []string {
 	return ids
 }
 
-// ---------------------------------------------------------------------------
-// 001–007: the typed contract at the inboxbatch seam
-// ---------------------------------------------------------------------------
-
 func TestC1633_001_UnifiedCommitmentAcceptsCompleteEvidenceCitedMembers(t *testing.T) {
 	items := threeItems()
 	c := completeCommitment(items)
@@ -386,7 +261,7 @@ func TestC1633_003_UnifiedCommitmentRejectsUnknownMember(t *testing.T) {
 func TestC1633_004_UnifiedCommitmentRejectsDuplicateMember(t *testing.T) {
 	items := threeItems()
 	c := completeCommitment(items)
-	c.Members = append(c.Members, c.Members[0]) // alpha twice
+	c.Members = append(c.Members, c.Members[0])
 	err := c.Validate(items)
 	if err == nil {
 		t.Fatal("a duplicated member id must be rejected (double-counting one item as two closures)")
@@ -420,17 +295,12 @@ func TestC1633_005_UnifiedCommitmentRejectsIncompleteShape(t *testing.T) {
 			}
 		})
 	}
-	// The zero value is the degenerate incomplete shape.
 	if err := (inboxbatch.UnifiedCommitment{}).Validate(items); err == nil {
 		t.Error("zero-value commitment must be rejected")
 	}
 }
 
 func TestC1633_006_UnifiedCommitmentRejectsHeterogeneousMembers(t *testing.T) {
-	// Distinct non-empty campaigns are the operator's explicit "two
-	// initiatives" partition — Classify never merges them on an inferred
-	// signal, and a synthesis claim must not either (forced unification of
-	// unrelated items is THE failure mode this task pins against).
 	t.Run("distinct campaigns", func(t *testing.T) {
 		items := threeItems()
 		items[0].Campaign = "retry-2026-08"
@@ -440,8 +310,6 @@ func TestC1633_006_UnifiedCommitmentRejectsHeterogeneousMembers(t *testing.T) {
 			t.Fatal("members spanning two distinct non-empty campaigns must be rejected as heterogeneous")
 		}
 	})
-	// Same campaign (or none) on every member stays homogeneous — the guard
-	// must not reject the legitimate case.
 	t.Run("one campaign is homogeneous", func(t *testing.T) {
 		items := threeItems()
 		for i := range items {
@@ -452,8 +320,6 @@ func TestC1633_006_UnifiedCommitmentRejectsHeterogeneousMembers(t *testing.T) {
 			t.Fatalf("members sharing one campaign must validate; got %v", err)
 		}
 	})
-	// A cycle has ONE authoritative deliverable kind (ADR-0099); a code item
-	// and a document item cannot be one solution.
 	t.Run("mixed deliverable kinds", func(t *testing.T) {
 		items := threeItems()
 		items[1].DeliverableKind = "document"
@@ -465,8 +331,6 @@ func TestC1633_006_UnifiedCommitmentRejectsHeterogeneousMembers(t *testing.T) {
 }
 
 func TestC1633_007_UnifiedCommitmentSizeBoundaryIsDefaultMaxItems(t *testing.T) {
-	// The small/large boundary reuses the batch cap (one cycle's pipeline
-	// carries at most DefaultMaxItems related items) — no second constant.
 	small := chainItems(inboxbatch.DefaultMaxItems)
 	cs := completeCommitment(small)
 	if err := cs.Validate(small); err != nil {
@@ -485,18 +349,7 @@ func TestC1633_007_UnifiedCommitmentSizeBoundaryIsDefaultMaxItems(t *testing.T) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 008: regression — mechanical batching is untouched by synthesis
-// ---------------------------------------------------------------------------
-
 func TestC1633_008_DefaultBatchRulesUnchangedBySynthesis(t *testing.T) {
-	// A unified commitment is a triage-declared artifact validated AFTER
-	// classification; it must not become a grouping Rule. Three items with no
-	// campaign, disjoint areas and no deps stay three batches under the default
-	// rule set, and the rule set is still the two structural signals, campaign
-	// and file-area (rules_rootcause_regression_test.go forbids a prose
-	// root-cause rule; the dep rule was removed in cycle 1724 as unreachable
-	// under ADR-0106 W3).
 	if got := len(inboxbatch.DefaultRules()); got != 2 {
 		t.Errorf("DefaultRules must remain the 2 structural signals (campaign, file-area); got %d", got)
 	}
@@ -505,10 +358,6 @@ func TestC1633_008_DefaultBatchRulesUnchangedBySynthesis(t *testing.T) {
 		t.Errorf("unrelated items must stay independent batches: got %d, want 3", len(batches))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 009–011: the triage seam through the production runner
-// ---------------------------------------------------------------------------
 
 func TestC1633_009_TriagePhaseFailsOpenOnInvalidCommitment(t *testing.T) {
 	items := threeItems()
@@ -550,12 +399,9 @@ func TestC1633_010_TriagePhaseProjectsValidSmallCommitment(t *testing.T) {
 }
 
 func TestC1633_011_TriagePhaseRejectsMemberOutsideTopN(t *testing.T) {
-	// The Task Contract (ADR-0098) projects acceptance per top_n id. A member
-	// the decision did not commit has no separate acceptance reference, so the
-	// ONE solution could not be graded against it — reject, fail open.
 	items := threeItems()
 	c := completeCommitment(items)
-	resp, ws := runTriage(t, items, []string{"alpha", "beta"}, &c) // gamma claimed, not committed
+	resp, ws := runTriage(t, items, []string{"alpha", "beta"}, &c)
 	if resp.Verdict != core.VerdictPASS {
 		t.Fatalf("verdict=%q, want PASS (fail-open); diags=%v", resp.Verdict, resp.Diagnostics)
 	}
@@ -571,10 +417,6 @@ func TestC1633_011_TriagePhaseRejectsMemberOutsideTopN(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 012–014: routing projection over the REAL phase registry
-// ---------------------------------------------------------------------------
-
 func TestC1633_012_SmallCommitmentPinsPlanReviewViaRegistry(t *testing.T) {
 	items := threeItems()
 	c := completeCommitment(items)
@@ -585,15 +427,11 @@ func TestC1633_012_SmallCommitmentPinsPlanReviewViaRegistry(t *testing.T) {
 	if !contains(visited, "plan-review") {
 		t.Errorf("a validated small commitment must pin plan-review even against an advisor plan that declined it; walk visited %v", visited)
 	}
-	// Baseline: the same walk with NO commitment does not reach plan-review.
 	_, ws0 := runTriage(t, items, []string{"alpha", "beta", "gamma"}, nil)
 	base := walkPhases(cfg, digestTriage(t, ws0), declinedPlan(), "triage", []string{"scout", "triage"})
 	if contains(base, "plan-review") {
 		t.Errorf("no commitment must leave routing unchanged (plan-review not pinned); baseline walk visited %v", base)
 	}
-	// Symmetry lock (cycle-1638 audit H1): the plan-review half must never fork
-	// from the build-planner half on size. A LARGE commitment pins plan-review
-	// for the same reason 013 now pins build-planner.
 	large := chainItems(inboxbatch.DefaultMaxItems + 1)
 	cl := completeCommitment(large)
 	_, wsL := runTriage(t, large, memberIDs(large), &cl)
@@ -618,21 +456,6 @@ func TestC1633_013_SmallCommitmentPinsBuildPlannerViaRegistry(t *testing.T) {
 	if contains(base, "build-planner") {
 		t.Errorf("no commitment must leave build-planner opt-in (skipped); baseline walk visited %v", base)
 	}
-	// RECONCILED by TDD in cycle-1638 (audit round 1, H1). This block formerly
-	// asserted the INVERSE — "only SMALL commitments route through
-	// build-planner" — which projected how_to_apply step (3)'s EXECUTION split
-	// ("small unified fix = one cycle; large = emit an ADR-0054 campaign plan")
-	// onto ROUTING, a distinction the directive does not make there. Step (2) is
-	// unqualified by size: "a unified commitment routes through
-	// buildplanner+plan-review at deep tier"
-	// (.evolve/inbox/consumed/2026-07-21T02-00-00Z-triage-unified-solution-synthesis.json:30).
-	// The large commitment is the highest-blast-radius design the loop commits,
-	// so it is the LAST one that may escape planning. The size split stays where
-	// the directive puts it — in what execution EMITS — and 015/016 pin that
-	// campaign-plan half. Both ACS packages are added by this same diff
-	// (`git cat-file -e 4c58eb6d:go/acs/cycle1633/predicates_test.go` → absent),
-	// so this is one author reconciling their own contract, not a superseded
-	// inheritance.
 	large := chainItems(inboxbatch.DefaultMaxItems + 1)
 	cl := completeCommitment(large)
 	_, wsL := runTriage(t, large, memberIDs(large), &cl)
@@ -643,14 +466,9 @@ func TestC1633_013_SmallCommitmentPinsBuildPlannerViaRegistry(t *testing.T) {
 	if got := walkPhases(cfg, sigL, declinedPlan(), "tdd", done); !contains(got, "build-planner") {
 		t.Errorf("a validated LARGE unified commitment must ALSO pin build-planner — the campaign path is the one design that must not outrun planning (how_to_apply step 2 names both planning phases without a size qualifier); walk from tdd visited %v", got)
 	}
-	// The campaign route is the EXECUTION half and is unaffected: 015/016 pin
-	// that a large commitment still projects a Verify()-clean campaign plan.
 }
 
 func TestC1633_014_BuildPlannerPhaseRunsForSmallCommitment(t *testing.T) {
-	// The runner consults Skipper.ShouldSkip before dispatch: a router pin is
-	// dead wiring if the phase then skips itself. Real repo root ⇒ the real
-	// registry + policy; the workspace carries the validated commitment.
 	root := acsassert.RepoRoot(t)
 	items := threeItems()
 	c := completeCommitment(items)
@@ -666,10 +484,6 @@ func TestC1633_014_BuildPlannerPhaseRunsForSmallCommitment(t *testing.T) {
 		t.Error("build-planner must stay opt-in (skipped) when no commitment is present")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 015–016: the campaign route for large commitments
-// ---------------------------------------------------------------------------
 
 func TestC1633_015_LargeCommitmentProjectsToVerifiedCampaignPlan(t *testing.T) {
 	items := chainItems(inboxbatch.DefaultMaxItems + 1)
@@ -687,9 +501,6 @@ func TestC1633_015_LargeCommitmentProjectsToVerifiedCampaignPlan(t *testing.T) {
 	if len(plan.Cycles) != len(items) {
 		t.Fatalf("one cycle per member: got %d, want %d", len(plan.Cycles), len(items))
 	}
-	// Per-member acceptance is RETAINED, not blended: every member's own
-	// criterion must be the contract of its own cycle (the "ONE solution must
-	// satisfy EVERY member item's ACs" half of the operator directive).
 	byID := map[string]string{}
 	for _, cy := range plan.Cycles {
 		byID[cy.ID] = cy.OutputContract
@@ -708,10 +519,6 @@ func TestC1633_015_LargeCommitmentProjectsToVerifiedCampaignPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Waves: %v", err)
 	}
-	// delta<k> depends on delta<k-1>: a dependency chain must serialize into
-	// one member per wave, in order — member deps are honored, not flattened.
-	// Membership is read from the EXISTING fleet.CycleSpec.Scope (todo ids the
-	// wave's cycle owns) — no new fleet field is required for this pin.
 	if len(waves) != len(items) {
 		t.Errorf("a %d-long dep chain must yield %d waves; got %d", len(items), len(items), len(waves))
 	}
@@ -721,7 +528,6 @@ func TestC1633_015_LargeCommitmentProjectsToVerifiedCampaignPlan(t *testing.T) {
 			t.Errorf("wave %d must hold exactly one cycle scoped to %q; got %+v", i+1, want, w)
 		}
 	}
-	// The campaign route never launders an invalid claim.
 	bad := completeCommitment(items)
 	bad.Members[0].Evidence = ""
 	if _, err := campaign.PlanFromUnifiedCommitment(bad, items); err == nil {
@@ -761,7 +567,6 @@ func TestC1633_016_TriagePhaseEmitsCampaignPlanForLargeCommitment(t *testing.T) 
 			t.Errorf("emitted plan must carry every member as a cycle; missing %q in %v", id, got)
 		}
 	}
-	// Small commitments do NOT emit a campaign plan (one cycle is the route).
 	small := threeItems()
 	cs := completeCommitment(small)
 	_, wsS := runTriage(t, small, []string{"alpha", "beta", "gamma"}, &cs)
@@ -769,10 +574,6 @@ func TestC1633_016_TriagePhaseEmitsCampaignPlanForLargeCommitment(t *testing.T) 
 		t.Error("a SMALL commitment must not emit campaign-plan.json")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 017: ship-tree tracking of this package (cycle-93 / cycle-1623 M1)
-// ---------------------------------------------------------------------------
 
 func TestC1633_017_CycleACSPackageIsGitTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)

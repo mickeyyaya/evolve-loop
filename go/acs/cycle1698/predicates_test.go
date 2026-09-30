@@ -1,35 +1,5 @@
 //go:build acs
 
-// Package cycle1698 materialises the acceptance criteria of the one
-// fleet-scoped task pinned to this lane: `unify-auditor-ledger-readers`
-// (.evolve/inbox/processing/cycle-1698/2026-08-27T06-00-00Z-unify-auditor-ledger-readers.json;
-// triage top_n). Three readers each re-declare the auditor ledger row and
-// their own scan — ship.findLatestAudit (internal/phases/ship/audit.go),
-// cmd/evolve latestAuditEntry (cmd_composition_wiring.go) and
-// releasepreflight.checkRecentAudit (a raw-line regex walk). The task folds
-// them onto one leaf helper, internal/auditledger, with a typed
-// ErrNoAuditorForRun sentinel each consumer maps onto its own vocabulary.
-// redteamcheck is out of scope (cycle-scoped, all roles, no run scoping).
-//
-// PINNED HELPER SURFACE (the minimum every consumer needs; nothing more):
-//
-//	auditledger.LatestAuditorEntry(ledgerPath, runID string) (Entry|*Entry, error)
-//	auditledger.ErrNoAuditorForRun   — an error value for errors.Is
-//	Entry fields RunID, GitHEAD, ArtifactPath
-//
-// ADVERSARIAL DIVERSITY (skills/adversarial-testing §6):
-//   - POSITIVE : 001 — run-scoped binding, latest-any without a run, the
-//     kind+role row identity, alien lines skipped, structured (not regex) parse.
-//   - NEGATIVE : 002 — every "no bindable row" shape is the typed sentinel and
-//     the foreign refusal names the refused entry; 008 — redteamcheck untouched
-//     and the change set is non-vacuous.
-//   - EDGE     : 003 — a missing ledger and an unreadable ledger stay
-//     distinguishable from a miss; the release preflight keeps its advisory NONE.
-//   - WIRING   : 005/006/007 — every consumer imports the helper, none re-declares
-//     the row schema or regex, and the production caller releasepreflight.Run
-//     binds exactly the row the helper binds.
-//   - FLOOR    : 004 leaf, 009 stale TODO, 010 apicover graduation, 011 the
-//     touched packages' own suites.
 package cycle1698
 
 import (
@@ -64,17 +34,12 @@ const (
 	helperDirRel = "go/internal/auditledger/"
 )
 
-// consumers are the three duplicate readers: the module-relative package the
-// go tool resolves, and its directory under go/.
 var consumers = []struct{ pkg, dir string }{
 	{"./internal/phases/ship", "internal/phases/ship"},
 	{"./cmd/evolve", "cmd/evolve"},
 	{"./internal/releasepreflight", "internal/releasepreflight"},
 }
 
-// ledgerLineFragments are the raw-line spellings of auditor-row fields a
-// regex/substring reader needs; a consumer that still carries one is still
-// parsing the row itself.
 var ledgerLineFragments = []string{
 	`"role":"auditor"`,
 	`"artifact_path":"`,
@@ -117,8 +82,6 @@ func jsonString(t *testing.T, s string) string {
 	return string(b)
 }
 
-// runGo runs the go tool from the module dir and returns stdout, stderr and
-// the exit code; a tool that cannot start fails the predicate loudly.
 func runGo(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()
 	cmd := exec.Command("go", args...)
@@ -137,9 +100,6 @@ func runGo(t *testing.T, args ...string) (string, string, int) {
 	return "", "", -1
 }
 
-// runPreflight drives the production entry point releasepreflight.Run with
-// every non-ledger step stubbed green, so step 4 (the auditor-row read) is the
-// only live input.
 func runPreflight(t *testing.T, ledgerPath string) (releasepreflight.Result, error) {
 	t.Helper()
 	repo := t.TempDir()
@@ -162,15 +122,6 @@ func runPreflight(t *testing.T, ledgerPath string) (releasepreflight.Result, err
 	})
 }
 
-// -----------------------------------------------------------------------------
-// AC1 — the helper exists and owns the scan + run-scope predicate.
-// -----------------------------------------------------------------------------
-
-// TestC1698_001_LatestAuditorEntryBindsThisRunsAuditorRow pins the scan every
-// consumer delegates to: newest-first, the row identity kind=agent_subprocess
-// AND role=auditor, run-scoped when a run id is given, latest-any without one,
-// forward-compatible over alien lines, and a structured JSON parse (the
-// whitespace row is invisible to a raw-line regex reader).
 func TestC1698_001_LatestAuditorEntryBindsThisRunsAuditorRow(t *testing.T) {
 	cases := []struct {
 		name, runID, wantRun, wantHead, wantArtifact string
@@ -235,16 +186,6 @@ func TestC1698_001_LatestAuditorEntryBindsThisRunsAuditorRow(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC4 — negative: no bindable row is the typed sentinel, with forensics.
-// -----------------------------------------------------------------------------
-
-// TestC1698_002_NoBindableAuditorRowIsTheTypedSentinel covers every miss shape.
-// Each must be errors.Is(ErrNoAuditorForRun) — the one value ship maps to
-// AUDIT_BINDING_NO_AUDITOR and composition fails closed on — and never read as
-// a missing ledger. The foreign-run refusal must carry the refused entry (its
-// run id and git_head) so an operator sees what would have been bound
-// (cycle-1571 H3).
 func TestC1698_002_NoBindableAuditorRowIsTheTypedSentinel(t *testing.T) {
 	cases := []struct {
 		name, runID string
@@ -293,15 +234,6 @@ func TestC1698_002_NoBindableAuditorRowIsTheTypedSentinel(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC5 — edge: an absent/unreadable ledger keeps each consumer's semantics.
-// -----------------------------------------------------------------------------
-
-// TestC1698_003_MissingLedgerStaysDistinguishableFromAMiss: ship maps an absent
-// ledger to AUDIT_BINDING_NO_LEDGER and an unreadable one to a transient
-// STATE_IO, while releasepreflight treats absence as advisory NONE. The helper
-// must keep both distinguishable from the miss sentinel, and the preflight's
-// production path must keep its advisory verdict.
 func TestC1698_003_MissingLedgerStaysDistinguishableFromAMiss(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "nonexistent", "ledger.jsonl")
 	for _, runID := range []string{"", "MINE"} {
@@ -316,7 +248,7 @@ func TestC1698_003_MissingLedgerStaysDistinguishableFromAMiss(t *testing.T) {
 		}
 	}
 
-	unreadable := t.TempDir() // a directory: present, but ReadFile fails
+	unreadable := t.TempDir()
 	_, err := auditledger.LatestAuditorEntry(unreadable, "MINE")
 	switch {
 	case err == nil:
@@ -334,10 +266,6 @@ func TestC1698_003_MissingLedgerStaysDistinguishableFromAMiss(t *testing.T) {
 	}
 }
 
-// TestC1698_004_HelperIsALeafOwningNoConsumerVocabulary: the helper may not
-// depend on any consumer or on core (whose ship error codes are ship's
-// vocabulary) — the leaf shape of internal/treestate. A helper that did would
-// either cycle with its consumers or return consumer-specific errors.
 func TestC1698_004_HelperIsALeafOwningNoConsumerVocabulary(t *testing.T) {
 	out, errOut, code := runGo(t, "list", "-deps", "-f", "{{.ImportPath}}", "./internal/auditledger")
 	if code != 0 {
@@ -358,13 +286,6 @@ func TestC1698_004_HelperIsALeafOwningNoConsumerVocabulary(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC2 — all three consumers delegate.
-// -----------------------------------------------------------------------------
-
-// TestC1698_005_EveryConsumerImportsTheHelper asks the go tool for each
-// consumer's non-test imports. The compiler rejects unused imports, so an
-// import of the helper is a use of it.
 func TestC1698_005_EveryConsumerImportsTheHelper(t *testing.T) {
 	for _, c := range consumers {
 		out, errOut, code := runGo(t, "list", "-f", `{{join .Imports "\n"}}`, c.pkg)
@@ -384,7 +305,6 @@ func TestC1698_005_EveryConsumerImportsTheHelper(t *testing.T) {
 	}
 }
 
-// jsonTagNames returns the json field names a struct type declares.
 func jsonTagNames(st *ast.StructType) map[string]bool {
 	names := map[string]bool{}
 	for _, f := range st.Fields.List {
@@ -401,10 +321,6 @@ func jsonTagNames(st *ast.StructType) map[string]bool {
 	return names
 }
 
-// TestC1698_006_ConsumersRedeclareNoLedgerRowSchema parses every non-test file
-// of the three consumers: no struct may re-declare the ledger row (json tags
-// role AND kind), and no string literal may carry a raw-line field spelling a
-// regex/substring reader needs. Either one is a second copy of the row schema.
 func TestC1698_006_ConsumersRedeclareNoLedgerRowSchema(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, c := range consumers {
@@ -448,8 +364,6 @@ func TestC1698_006_ConsumersRedeclareNoLedgerRowSchema(t *testing.T) {
 	}
 }
 
-// assertPreflightAgrees drives releasepreflight.Run over ledger and requires
-// it to bind exactly the row auditledger binds, with a PASS verdict.
 func assertPreflightAgrees(t *testing.T, ledger, wantArtifact string) {
 	t.Helper()
 	e, err := auditledger.LatestAuditorEntry(ledger, "")
@@ -469,11 +383,6 @@ func assertPreflightAgrees(t *testing.T, ledger, wantArtifact string) {
 	}
 }
 
-// TestC1698_007_ReleasePreflightBindsTheSameAuditorRowAsTheHelper is the
-// behavioral delegation proof through the production caller: for the same
-// ledger bytes, releasepreflight.Run must pick the row the helper picks. The
-// two shapes are exactly where a private raw-line reader diverges — it misses
-// a whitespace-formatted row and it takes any line mentioning the auditor role.
 func TestC1698_007_ReleasePreflightBindsTheSameAuditorRowAsTheHelper(t *testing.T) {
 	now := jsonString(t, time.Now().UTC().Format(time.RFC3339))
 
@@ -497,13 +406,6 @@ func TestC1698_007_ReleasePreflightBindsTheSameAuditorRowAsTheHelper(t *testing.
 	})
 }
 
-// -----------------------------------------------------------------------------
-// AC3 — redteamcheck is out of scope; the lane is non-vacuous.
-// -----------------------------------------------------------------------------
-
-// changeSet maps each path the lane changed to a git status letter: committed
-// since the nearest fork point with main / origin/main, overlaid with the
-// working tree — so it holds whether or not the Builder has committed.
 func changeSet(t *testing.T, root string) map[string]string {
 	t.Helper()
 	base := forkPoint(t, root)
@@ -540,7 +442,6 @@ func changeSet(t *testing.T, root string) map[string]string {
 	return changes
 }
 
-// forkPoint is the nearest merge-base of HEAD with main / origin/main.
 func forkPoint(t *testing.T, root string) string {
 	t.Helper()
 	var bases []string
@@ -561,10 +462,6 @@ func forkPoint(t *testing.T, root string) string {
 	return base
 }
 
-// TestC1698_008_RedteamcheckIsOutOfScopeAndUntouched: redteamcheck answers a
-// different question (did every role report this cycle), so the lane must not
-// edit it or route it through the run-scoped helper — and the lane must
-// actually have added the helper package.
 func TestC1698_008_RedteamcheckIsOutOfScopeAndUntouched(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	changes := changeSet(t, root)
@@ -591,16 +488,7 @@ func TestC1698_008_RedteamcheckIsOutOfScopeAndUntouched(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// AC6 — the stale TODO is gone.
-// -----------------------------------------------------------------------------
-
-// TestC1698_009_StaleMergeConcurrencyTODOIsGone: the TODO asked to fold the
-// readers "if a third consumer appears"; once folded it is false. It must not
-// survive in the file it annotated nor move anywhere else in the Go tree.
-//
 // acs-predicate: config-check — a code comment has no behavior to exercise;
-// its absence is the criterion.
 func TestC1698_009_StaleMergeConcurrencyTODOIsGone(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	marker := "TODO(merge-" + "concurrency-2026)"
@@ -633,15 +521,6 @@ func TestC1698_009_StaleMergeConcurrencyTODOIsGone(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// House rule 1 — new-package graduation into the repo-wide apicover gate.
-// -----------------------------------------------------------------------------
-
-// TestC1698_010_HelperGraduatesIntoTheApicoverGate: a new internal package must
-// be enrolled in go/.apicover-enforce with every export documented, named by a
-// package test and executed. It runs apicover's own detectors over the
-// integration-tagged coverage profile (the CI recipe) rather than
-// re-implementing them, and checks the package files are not gitignored.
 func TestC1698_010_HelperGraduatesIntoTheApicoverGate(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -715,14 +594,6 @@ func readFile(t *testing.T, path string) string {
 	return string(raw)
 }
 
-// -----------------------------------------------------------------------------
-// AC7 — the touched packages' own suites stay green.
-// -----------------------------------------------------------------------------
-
-// TestC1698_011_TouchedPackageSuitesStayGreen runs each touched package's own
-// tests, one package per invocation, narrowed where the package is a heavy
-// suite. `-v` output must show at least one PASS: a -run pattern matching
-// nothing exits 0 and proves nothing.
 func TestC1698_011_TouchedPackageSuitesStayGreen(t *testing.T) {
 	runs := []struct {
 		name string

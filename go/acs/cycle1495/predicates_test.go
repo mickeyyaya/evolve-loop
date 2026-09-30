@@ -1,30 +1,5 @@
 //go:build acs
 
-// Package cycle1495 materialises the cycle-1495 acceptance criteria for the one
-// fleet-scoped inbox item pinned to this lane, `verdict-cache-fresh-base-collision`,
-// which triage split into two coupled tasks:
-//
-//   - verdict-cache-empty-worktree-miss (CONSUMER): a clean/fresh worktree —
-//     one whose staged content is identical to its base commit's tree — must not
-//     produce an ADR-0048 Slice B shadow verdict-cache reuse match. Every sibling
-//     fleet lane cut from the same base carries that identity, so a match there is
-//     cross-lane contamination, not conserved work.
-//   - verdict-cache-empty-worktree-projection (PRODUCER): the audit-binding cache
-//     projection must apply the SAME no-delta rule, so a no-op audit cannot seed
-//     the very entry a later clean lane collides with.
-//
-// Predicate strategy (the cycle-85 degenerate-predicate ban): every predicate
-// below drives a REAL production seam — 001/002 run `core.Orchestrator.RunCycle`
-// against an on-disk git repo so the pre-loop probe executes exactly as it does
-// in production; 003/004 run the same entry point with an audit runner that
-// emits a real audit-report.md, so `recordAuditBinding`'s projection executes
-// and the on-disk `.evolve/verdict-cache.json` is asserted as a real side effect. No source grep
-// carries any assertion. Each suppression predicate is paired with a CHANGED
-// control (002, 004) so a blanket "disable the cache" implementation fails.
-//
-// Reliability (flaky-predicate-shape rules): no `go test` subprocess, no `/...`
-// sweep, no wall-clock deadline, no literal PID; every `git` invocation is
-// `git -C <dir>` against a `t.TempDir()` repo, never process cwd.
 package cycle1495
 
 import (
@@ -41,18 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
-// ---------------------------------------------------------------------------
-// Task 1 — verdict-cache-empty-worktree-miss (CONSUMER: the pre-loop probe)
-// ---------------------------------------------------------------------------
-
-// TestC1495_001_CleanWorktreeProducesNoShadowReuseMatch pins AC-1a: a clean
-// staged worktree cannot produce a shadow reuse match, EVEN when the verdict
-// cache already holds an entry under that exact tree SHA (the fresh-base
-// collision the incident records). The probe must report the lookup as
-// suppressed and NOT matched, and the tdd/build/audit phases must still run.
-//
-// Anti-vacuity: the cache is deliberately SEEDED at the fresh-base tree, so a
-// miss here can only come from the guard, never from an empty cache.
 func TestC1495_001_CleanWorktreeProducesNoShadowReuseMatch(t *testing.T) {
 	repo := initProbeRepo(t)
 	treeSHA := stageAndWriteTree(t, repo)
@@ -74,10 +37,6 @@ func TestC1495_001_CleanWorktreeProducesNoShadowReuseMatch(t *testing.T) {
 	assertPhasesRan(t, runners)
 }
 
-// TestC1495_002_ChangedWorktreeKeepsCacheEligibility pins AC-1b — the CHANGED
-// control that rejects a blanket cache disable. A worktree with a real delta
-// still has a content identity distinct from its base, so the normal lookup
-// path must remain available and a seeded entry under that identity must match.
 func TestC1495_002_ChangedWorktreeKeepsCacheEligibility(t *testing.T) {
 	repo := initProbeRepo(t)
 	writeFile(t, filepath.Join(repo, "changed.txt"), "a real delta")
@@ -103,18 +62,6 @@ func TestC1495_002_ChangedWorktreeKeepsCacheEligibility(t *testing.T) {
 	assertPhasesRan(t, runners)
 }
 
-// ---------------------------------------------------------------------------
-// Task 2 — verdict-cache-empty-worktree-projection (PRODUCER: audit binding)
-// ---------------------------------------------------------------------------
-
-// TestC1495_003_NoDiffAuditDoesNotSeedCacheEntry pins AC-2a: an audit that ran
-// over a worktree with no delta against its base must NOT write a verdict-cache
-// entry. Producer and consumer share one rule, so a no-op audit cannot seed the
-// entry a later clean lane collides with.
-//
-// Anti-vacuity: the predicate first proves the audit binding ACTUALLY ran (the
-// role=auditor ledger entry with a worktree tree SHA is present). A cycle that
-// simply never reached the binding would otherwise "pass" trivially.
 func TestC1495_003_NoDiffAuditDoesNotSeedCacheEntry(t *testing.T) {
 	repo := initProbeRepo(t)
 	treeSHA := stageAndWriteTree(t, repo)
@@ -134,10 +81,6 @@ func TestC1495_003_NoDiffAuditDoesNotSeedCacheEntry(t *testing.T) {
 	}
 }
 
-// TestC1495_004_ChangedAuditStillRecordsBoundTreeIdentity pins AC-2b — the
-// CHANGED control for the producer. A real delta must still be projected into
-// the cache under EXACTLY the tree identity the audit binding recorded (the
-// single-source invariant: recorded key == looked-up key).
 func TestC1495_004_ChangedAuditStillRecordsBoundTreeIdentity(t *testing.T) {
 	repo := initProbeRepo(t)
 	writeFile(t, filepath.Join(repo, "changed.txt"), "a real delta")
@@ -161,13 +104,6 @@ func TestC1495_004_ChangedAuditStillRecordsBoundTreeIdentity(t *testing.T) {
 	}
 }
 
-// TestC1495_005_ProbeEligibleSharedPredicateEdges pins the edge/OOD axis of the
-// shared guard both call sites read: no content identity is never eligible, a
-// candidate equal to a RESOLVED base is never eligible, a differing candidate
-// is eligible, and an UNRESOLVABLE base ("") leaves the candidate eligible
-// (absence of a base identity is not evidence of freshness — the pre-guard
-// behaviour is deliberately frozen there). Behavioural: it calls the function
-// and asserts its return value.
 func TestC1495_005_ProbeEligibleSharedPredicateEdges(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -188,10 +124,6 @@ func TestC1495_005_ProbeEligibleSharedPredicateEdges(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Fixture + harness (leaf package: no shared fixtures, per go/acs/README.md)
-// ---------------------------------------------------------------------------
-
 const probeCycle = 1495
 
 type probeObservation struct {
@@ -201,9 +133,6 @@ type probeObservation struct {
 	matched bool
 }
 
-// runProbeCycle drives the REAL orchestrator over repo (used as both project
-// root and worktree) and returns what the production pre-loop verdict-cache
-// probe observed.
 func runProbeCycle(t *testing.T, repo string) (probeObservation, map[core.Phase]core.PhaseRunner) {
 	t.Helper()
 	var obs probeObservation
@@ -224,9 +153,6 @@ func runProbeCycle(t *testing.T, repo string) (probeObservation, map[core.Phase]
 	return obs, runners
 }
 
-// runBindingCycle drives the same production entry point but returns the ledger
-// so the audit binding (and therefore the cache projection that rides it) can
-// be asserted.
 func runBindingCycle(t *testing.T, repo string) (probeObservation, map[core.Phase]core.PhaseRunner, *probeLedger) {
 	t.Helper()
 	var obs probeObservation
@@ -248,8 +174,6 @@ func runBindingCycle(t *testing.T, repo string) (probeObservation, map[core.Phas
 	return obs, runners, led
 }
 
-// auditBindingTreeSHA returns the worktree tree SHA recorded by the production
-// audit binding, or "" when no binding entry was appended.
 func auditBindingTreeSHA(t *testing.T, led *probeLedger) string {
 	t.Helper()
 	for _, e := range led.snapshot() {
@@ -269,8 +193,6 @@ func assertPhasesRan(t *testing.T, runners map[core.Phase]core.PhaseRunner) {
 	}
 }
 
-// initProbeRepo creates an ephemeral git repo with one commit and `.evolve/`
-// gitignored, so workspace artifacts never perturb the worktree tree identity.
 func initProbeRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
@@ -295,8 +217,6 @@ func seedVerdictCache(t *testing.T, repo, treeSHA string) {
 	}
 }
 
-// stageAndWriteTree reproduces the production content identity (git add -A +
-// git write-tree) so the predicate can name the exact key under test.
 func stageAndWriteTree(t *testing.T, repo string) string {
 	t.Helper()
 	git(t, repo, "add", "-A")
@@ -327,8 +247,6 @@ func writeFile(t *testing.T, path, body string) {
 		t.Fatal(err)
 	}
 }
-
-// --- minimal ports (leaf package: cannot reuse core's package-internal fakes) ---
 
 type probeStorage struct {
 	mu         sync.Mutex
@@ -393,11 +311,6 @@ type probeRunner struct {
 func (r *probeRunner) Name() string { return r.name }
 func (r *probeRunner) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
 	r.calls++
-	// The audit phase must leave its report on disk: production's
-	// recordAuditBinding reads it and bails (no binding, no cache projection)
-	// when it is absent, which would make the projection predicates vacuous.
-	// It cannot be pre-seeded — the orchestrator archives a pre-populated
-	// workspace as polluted before the run.
 	if r.name == string(core.PhaseAudit) && req.Workspace != "" {
 		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
 			return core.PhaseResponse{}, err

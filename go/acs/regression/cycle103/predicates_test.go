@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle103 ports the cycle-103 ACS predicates (9 bash files).
-// Subject: build-planner phase introduction (Opt C build-plan rollout).
 package cycle103
 
 import (
@@ -15,14 +13,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC103_001_BuildPlannerPersonaExists ports cycle-103/001.
 func TestC103_001_BuildPlannerPersonaExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	persona := filepath.Join(root, "agents", "evolve-build-planner.md")
 	if _, err := os.Stat(persona); err != nil {
 		t.Skip("evolve-build-planner.md missing — skip cycle-103-001")
 	}
-	// YAML frontmatter must have name, model (tier-1|opus), tools
 	raw, err := os.ReadFile(persona)
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -39,7 +35,6 @@ func TestC103_001_BuildPlannerPersonaExists(t *testing.T) {
 	}
 }
 
-// TestC103_002_BuildPlannerProfileValid ports cycle-103/002.
 func TestC103_002_BuildPlannerProfileValid(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "build-planner.json")
@@ -72,7 +67,6 @@ func TestC103_002_BuildPlannerProfileValid(t *testing.T) {
 	}
 }
 
-// TestC103_003_PhaseRegistryIncludesBuildPlanner ports cycle-103/003.
 func TestC103_003_PhaseRegistryIncludesBuildPlanner(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	reg := filepath.Join(root, "docs", "architecture", "phase-registry.json")
@@ -87,7 +81,6 @@ func TestC103_003_PhaseRegistryIncludesBuildPlanner(t *testing.T) {
 	}
 }
 
-// TestC103_004_ListPhaseOrderIncludesBuildPlanner ports cycle-103/004.
 func TestC103_004_ListPhaseOrderIncludesBuildPlanner(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "dispatch", "list-phase-order.sh")
@@ -99,7 +92,6 @@ func TestC103_004_ListPhaseOrderIncludesBuildPlanner(t *testing.T) {
 	}
 }
 
-// TestC103_005_SubagentRunAllowlistIncludesBuildPlanner ports cycle-103/005.
 func TestC103_005_SubagentRunAllowlistIncludesBuildPlanner(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
@@ -111,7 +103,6 @@ func TestC103_005_SubagentRunAllowlistIncludesBuildPlanner(t *testing.T) {
 	}
 }
 
-// TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner ports cycle-103/006.
 func TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	script := filepath.Join(root, "legacy", "scripts", "guards", "phase-gate-precondition.sh")
@@ -123,7 +114,6 @@ func TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner(t *testing.T) {
 	}
 }
 
-// TestC103_007_GateFunctionsPresent ports cycle-103/007.
 func TestC103_007_GateFunctionsPresent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
@@ -140,8 +130,6 @@ func TestC103_007_GateFunctionsPresent(t *testing.T) {
 	}
 }
 
-// TestC103_008_ShadowCycleDoesNotProduceBuildPlan ports cycle-103/008.
-// Smoke: EVOLVE_BUILD_PLANNER=0 means shadow (no build-plan.md). Source check.
 func TestC103_008_ShadowCycleDoesNotProduceBuildPlan(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	persona := filepath.Join(root, "agents", "evolve-build-planner.md")
@@ -153,7 +141,6 @@ func TestC103_008_ShadowCycleDoesNotProduceBuildPlan(t *testing.T) {
 	}
 }
 
-// TestC103_009_Adr0019ExistsAndComplete ports cycle-103/009.
 func TestC103_009_Adr0019ExistsAndComplete(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	adr := filepath.Join(root, "docs", "architecture", "adr", "0019-build-planner-phase.md")

@@ -1,41 +1,5 @@
 //go:build acs
 
-// Package cycle1435 encodes the cycle-1435 ACS predicates for the two tasks
-// triage committed from inbox item `ledger-fleet-concurrency-chain`:
-//
-//   - console-ledger-rebaseline-live — the root-cause code (flock-serialized
-//     append, anchor-ambiguity rejection, `evolve ledger rebaseline`) already
-//     shipped, but the LIVE console-plane ledger was never repaired:
-//     `evolve ledger verify --deep` against the project-root `.evolve/` exits 2
-//     with `BROKEN: line 114368 prev_hash mismatch`. The deliverable is an
-//     operator action (run rebaseline against the real file) plus its evidence
-//     artifact, not a source patch.
-//   - ledger-tip-witness-doc — `knowledge/architecture/state-and-ledger.md`
-//     documents `Append`'s tip rewrite but never states that `Verify`'s `want`
-//     tip is `walkChain`'s re-derived `lastSha` from `effectiveAnchorSHA`
-//     forward, NOT a raw `ledger.tip` sidecar read.
-//
-// Predicate shape notes:
-//   - 001 drives the REAL compiled `evolve` CLI (go/cmd/evolve) against the real
-//     project-root state directory — the wiring proof: a `Rebaseline` that was
-//     never invoked against the live file leaves it RED.
-//   - 002 is the anti-no-op guard for 001. 001 could be "greened" by neutering
-//     verify itself, so 002 plants a known break in a synthetic ledger and
-//     requires verify --deep to still exit non-zero and still say BROKEN.
-//   - 004 pins the byte-for-byte sha256 of the ledger's first 114400 lines,
-//     measured at RED time (35510006 bytes). Rebaseline is append-only by
-//     construction; a rewrite/truncate "repair" must fail this.
-//   - 005 is the only content-shaped predicate (a doc criterion) and carries an
-//     explicit `acs-predicate: config-check` waiver plus a git-tracking check.
-//   - Flaky-shape rules observed: no `./...` sweep, no whole-package `go test`
-//     inside a predicate, no wall-clock bound, no literal PID, no bare `git`
-//     (every git call is `git -C`), no load generator. One `go build
-//     ./cmd/evolve`, done once for the whole package.
-//
-// `.evolve/ledger.jsonl` and `.evolve/ledger-rebaseline.json` are BOTH gitignored
-// (`.gitignore:35 .evolve/*`) — they are runtime state, so the cycle-93
-// "assert git-tracked too" rule deliberately applies only to the doc target
-// (005), never to the ledger artifacts.
 package cycle1435
 
 import (
@@ -52,33 +16,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// zeroSeed is the prev_hash of a genesis ledger line (ledger.ZeroSeed). Copied
-// as a literal rather than imported so this predicate package stays a leaf.
 const zeroSeed = "0000000000000000000000000000000000000000000000000000000000000000"
 
-// rebaselineKind is ledger.RebaselineKind (resetSealKindPrefix + "rebaseline",
-// go/internal/adapters/ledger/rebaseline.go:37). Literal for leaf-ness.
 const rebaselineKind = "reset-seal-rebaseline"
 
-// operatorRole is the Role stamped on the seal (anchor.go:66).
 const operatorRole = "operator"
 
-// Prefix pin for 004, measured live at RED time on 2026-08-11:
-//
-//	head -n 114400 .evolve/ledger.jsonl | shasum -a 256
-//	  -> b7088c02441445f50ce8cf8d48dfff7d74663429e450dabc401f566c1a291c43
-//	head -n 114400 .evolve/ledger.jsonl | wc -c  -> 35510006
-//
-// The break verify reports (line 114368) lies inside this prefix, so the pin
-// covers the damaged region rebaseline must PRESERVE rather than rewrite.
 const (
 	prefixLines = 114400
 	prefixBytes = 35510006
 	prefixSHA   = "b7088c02441445f50ce8cf8d48dfff7d74663429e450dabc401f566c1a291c43"
 )
 
-// inboxID and cycleTag must both appear in the operator note so the bulk trust
-// decision is attributable to this item and this cycle.
 const (
 	inboxID  = "ledger-fleet-concurrency-chain"
 	cycleTag = "1435"
@@ -91,9 +40,6 @@ var (
 	buildCode int
 )
 
-// stateRoot resolves the STATE root: the ACS suite exports EVOLVE_PROJECT_ROOT
-// pointing at MAIN even when predicates run from a worktree (issue #12), because
-// `.evolve/` runtime data lives on main. Falls back to the repo root.
 func stateRoot(t *testing.T) string {
 	t.Helper()
 	if r := os.Getenv("EVOLVE_PROJECT_ROOT"); r != "" {
@@ -102,9 +48,6 @@ func stateRoot(t *testing.T) string {
 	return acsassert.RepoRoot(t)
 }
 
-// evolveBin compiles the real `evolve` binary once per test binary and returns
-// its path. Driving the compiled CLI — not the ledger package — is what makes
-// 001/002/006 wiring proofs rather than library unit tests.
 func evolveBin(t *testing.T) string {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -131,9 +74,6 @@ func evolveBin(t *testing.T) string {
 	return binPath
 }
 
-// runEvolve invokes the compiled binary with an explicit working directory: a
-// bare invocation resolves relative paths from process cwd, which differs
-// between the main tree, the worktree, and each fleet lane.
 func runEvolve(t *testing.T, dir string, args ...string) (string, int) {
 	t.Helper()
 	cmd := exec.Command(evolveBin(t), args...)
@@ -154,9 +94,6 @@ func lineSHA(b []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// writeSyntheticLedger materializes a small, correctly chained ledger.jsonl +
-// ledger.tip in a fresh temp dir. When breakAt >= 0 the prev_hash of that line
-// index is corrupted, planting exactly the failure shape the live file has.
 func writeSyntheticLedger(t *testing.T, n, breakAt int) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -217,9 +154,6 @@ func itoa(n int) string {
 	return string(d)
 }
 
-// TestC1435_001_ConsoleLedgerDeepVerifyGreen is the load-bearing predicate for
-// task console-ledger-rebaseline-live: the LIVE console-plane ledger must
-// deep-verify. RED at authoring time (exit 2, "line 114368 prev_hash mismatch").
 func TestC1435_001_ConsoleLedgerDeepVerifyGreen(t *testing.T) {
 	root := stateRoot(t)
 	evolveDir := filepath.Join(root, ".evolve")
@@ -231,17 +165,11 @@ func TestC1435_001_ConsoleLedgerDeepVerifyGreen(t *testing.T) {
 		t.Errorf("RED: `evolve ledger verify --deep` on the live console ledger exited %d, want 0.\n%s", code, out)
 		return
 	}
-	// Guard against a vacuous green: a verify that printed nothing recognisable
-	// is not proof the deep path ran.
 	if !strings.Contains(out, "OK:") {
 		t.Errorf("RED: verify exited 0 but did not report OK — suspicious output:\n%s", out)
 	}
 }
 
-// TestC1435_002_DeepVerifyStillDetectsPlantedBreak is the anti-no-op guard for
-// 001: 001 could be greened by weakening verify itself, so this plants a known
-// prev_hash break in a synthetic ledger and requires the same command to reject
-// it. Expected pre-existing GREEN — its job is to STAY green.
 func TestC1435_002_DeepVerifyStillDetectsPlantedBreak(t *testing.T) {
 	dir := writeSyntheticLedger(t, 6, 3)
 	out, code := runEvolve(t, dir, "ledger", "verify", "--deep", "--evolve-dir", filepath.Join(dir, ".evolve"))
@@ -253,12 +181,6 @@ func TestC1435_002_DeepVerifyStillDetectsPlantedBreak(t *testing.T) {
 	}
 }
 
-// TestC1435_003_RebaselineSealBoundToEvidenceArtifact requires that the repair
-// was performed by the real, attributable operator action: an in-band
-// `reset-seal-rebaseline` entry authored by role=operator sits in the live
-// ledger, its note names this inbox item and cycle, and the evidence artifact
-// `.evolve/ledger-rebaseline.json` records the SAME note. Binding the two means
-// the artifact cannot be hand-written independently of the ledger action.
 func TestC1435_003_RebaselineSealBoundToEvidenceArtifact(t *testing.T) {
 	root := stateRoot(t)
 	ledgerPath := filepath.Join(root, ".evolve", "ledger.jsonl")
@@ -280,7 +202,7 @@ func TestC1435_003_RebaselineSealBoundToEvidenceArtifact(t *testing.T) {
 			continue
 		}
 		if e.Kind == rebaselineKind && e.Role == operatorRole {
-			sealNote = e.Message // last match wins: the most recent seal
+			sealNote = e.Message
 		}
 	}
 	if sealNote == "" {
@@ -308,11 +230,6 @@ func TestC1435_003_RebaselineSealBoundToEvidenceArtifact(t *testing.T) {
 	}
 }
 
-// TestC1435_004_LedgerPrefixPreservedByteForByte proves the repair was
-// append-only: the first 114400 lines (which contain the damaged region at line
-// 114368) must be byte-identical to the RED-time measurement. A destructive
-// rebuild, truncation, or hand-edit of the damaged line fails here even though
-// it would green 001. Expected pre-existing GREEN — its job is to STAY green.
 func TestC1435_004_LedgerPrefixPreservedByteForByte(t *testing.T) {
 	root := stateRoot(t)
 	ledgerPath := filepath.Join(root, ".evolve", "ledger.jsonl")
@@ -342,16 +259,9 @@ func TestC1435_004_LedgerPrefixPreservedByteForByte(t *testing.T) {
 	}
 }
 
-// TestC1435_005_TipWitnessDocumented covers task ledger-tip-witness-doc.
-//
 // acs-predicate: config-check — the criterion IS documentation content
-// ("the architecture doc states the tip-witness semantics"), so there is no
-// system to invoke; the waiver is declared per the cycle-85 rule rather than
-// dressing a grep up as behavior. It is strengthened two ways: the doc must
-// name the whole re-derivation chain (not one magic token), and it must be
-// git-tracked (cycle-93: a gitignored doc silently vanishes at ship).
 func TestC1435_005_TipWitnessDocumented(t *testing.T) {
-	root := acsassert.RepoRoot(t) // SOURCE root: the doc is a worktree artifact
+	root := acsassert.RepoRoot(t)
 	rel := filepath.Join("knowledge", "architecture", "state-and-ledger.md")
 	path := filepath.Join(root, rel)
 	if !acsassert.FileExists(t, path) {
@@ -367,10 +277,6 @@ func TestC1435_005_TipWitnessDocumented(t *testing.T) {
 	}
 }
 
-// TestC1435_006_RebaselineRefusesUnattributedNote is the negative/edge axis for
-// the operator gate the live repair relies on: an empty note must be refused,
-// writing nothing, so the seal in 003 can never be an anonymous trust decision.
-// Expected pre-existing GREEN — its job is to STAY green.
 func TestC1435_006_RebaselineRefusesUnattributedNote(t *testing.T) {
 	dir := writeSyntheticLedger(t, 4, -1)
 	evolveDir := filepath.Join(dir, ".evolve")
@@ -382,8 +288,6 @@ func TestC1435_006_RebaselineRefusesUnattributedNote(t *testing.T) {
 	if code == 0 {
 		t.Errorf("RED: `ledger rebaseline` with no --note exited 0 — the operator gate is missing.\n%s", out)
 	}
-	// Refusing must also mean writing nothing: a partial append would leave an
-	// unattributed seal behind.
 	after, err := os.ReadFile(filepath.Join(evolveDir, "ledger.jsonl"))
 	if err != nil {
 		t.Fatalf("re-read fixture ledger: %v", err)

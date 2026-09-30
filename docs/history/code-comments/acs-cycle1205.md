@@ -66,3 +66,88 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // overlay proves the mutant compiles, so a FAIL is attributable to the guard
 // rather than to a broken build.
 ```
+
+## go/acs bulk strip (2026-10-01)
+
+### `go/acs/cycle1205/predicates_test.go:3` — above `package cycle1205`
+
+```text
+// Package cycle1205 materialises the cycle-1205 acceptance criteria for this
+// lane's single fleet-scoped task:
+//
+//   - rootcause-rule-regression-test → pin DefaultRules() against reintroducing
+//     the cycle-1204 audit-REJECTED root-cause binding design.
+//
+// Why the task is a guard-rail, not a feature test. Cycle-1204 proposed a
+// `rootCauseRule` that bound inbox items by exact string equality on a
+// free-form prose field and placed it in DefaultRules() (default-on). The audit
+// rejected it: D1 — measured against the 67 live .evolve/inbox items, all 20
+// non-empty root_cause values were unique prose (median 317 bytes), so the rule
+// was a NO-OP on real data; D2 — it carried neither of the discriminative guards
+// its siblings have (hubAreaMaxItems ceiling, minAreaDepth floor), so a future
+// normalising producer would collapse the campaign-less backlog into one
+// over-fused cluster. The production code never landed, so there is no feature
+// to regression-test; the regression worth writing is defensive — DefaultRules()
+// must stay the bounded structural signals (campaign, file-area), and none of
+// them may bind items on a shared free-form prose field.
+//
+// Predicate strategy — every predicate below EXERCISES the system under test
+// (calls DefaultRules()/Rule.Edges, or runs the package's tests as a
+// subprocess); none is a source-grep of production text (the cycle-85
+// degenerate-predicate ban).
+//
+//   - 001 (AC2) calls DefaultRules() and asserts the rule set IS exactly the
+//     structural rules AND produces zero edges for items whose only
+//     commonality is an identical free-form prose field.
+//   - 002 (AC4, negative) case/whitespace-varied prose must also bind nothing —
+//     the "a normaliser lands upstream" failure mode of D2.
+//   - 003 (AC5, edge) empty prose on every item — zero edges.
+//   - 004 (AC1) runs the real package test suite and requires the NAMED
+//     regression test to have actually run and PASSED (a `-run` pattern that
+//     matches nothing also exits 0 — the "--- PASS:" line is what rules that
+//     no-op out).
+//   - 005 (AC3) the CRUX anti-no-op predicate: it MUTATES rules.go in memory
+//     (go build -overlay) to reintroduce the rejected 4th prose-binding rule and
+//     requires the new regression test to FAIL on that mutant. A guard that
+//     cannot fail on the exact design it exists to reject is decoration. A
+//     control run under the same overlay pins that the mutant still compiles,
+//     so the FAIL is attributable to the guard and not to a broken build.
+//
+// Predicates 001-003 pin the CURRENT, audited state of production code and are
+// green before Builder writes anything (recorded as pre-existing GREEN in
+// test-report.md); 004 and 005 are RED until the regression test file lands at
+// go/internal/inboxbatch/rules_rootcause_regression_test.go.
+```
+
+### `go/acs/cycle1205/predicates_test.go:72` — above `var wantRuleTypes = []string{"inboxbatch.campaignRule", "inboxbatch.fileAreaRule"}`
+
+```text
+// wantRuleTypes is the audited DefaultRules() composition: campaign and
+// file-area edges — both bounded (campaign is an explicit operator declaration;
+// fileArea has both a hub ceiling and a depth floor). The dependency rule was
+// removed in cycle 1724: under ADR-0106 W3 a dependent is never on the same
+// lane menu as its unlanded dependency, so dep edges could not bind.
+```
+
+### `go/acs/cycle1205/predicates_test.go:174` — above `func TestC1205_005_RegressionTestFailsOnTheRejectedDesign(t *testing.T) {`
+
+```text
+// TestC1205_005_RegressionTestFailsOnTheRejectedDesign is AC3 and the crux
+// anti-no-op predicate: the guard must be LOAD-BEARING inside
+// go/internal/inboxbatch. rules.go is mutated in memory (`go test -overlay`,
+// nothing written into the tree) to reintroduce the cycle-1204 rejected design —
+// another default-on rule binding items by exact match on a free-form prose field
+// — and the regression test must FAIL on it. The control run under the same
+// overlay proves the mutant compiles, so a FAIL is attributable to the guard
+// rather than to a broken build.
+```
+
+### `go/acs/cycle1205/predicates_test.go:269` — above `const proseRuleSrc = '`
+
+```text
+// proseRuleSrc is the cycle-1204 audit-REJECTED design, reconstructed ONLY as an
+// in-memory mutant for predicate 005. It binds items by exact match on a
+// free-form prose field with no ceiling and no floor — D1 (no-op on real,
+// all-unique prose) and D2 (total fusion once the values normalise) in ten
+// lines. It must never exist in the tree.
+```

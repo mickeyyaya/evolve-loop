@@ -1,40 +1,5 @@
 //go:build acs
 
-// Package cycle1272 materialises the cycle-1272 acceptance criteria for the one
-// task triage committed to `## top_n`:
-//
-//	close-out-cycle1272-fleet-scope-verification  → CHANGELOG.md gains a dated
-//	entry recording that both fleet-scope todo-ids
-//	(infra-teardown-predicate-single-source, retro-fleet-worktree-dispatch) were
-//	found already-implemented and verified-closed in cycle-1272, citing
-//	TestInfraTeardownUnion_SpelledExactlyOnce and
-//	TestRetroWorktree_FleetScratchCwdSatisfiesBridgeGuardPredicate as the proof.
-//
-// The two dropped todo-ids get ZERO predicates (R9.3 floor-binding: predicates
-// bind only to triage-committed work).
-//
-// Predicate-quality note (cycle-85 ban). The deliverable of this task IS a
-// documentation artifact, so 001/004 necessarily read the emitted CHANGELOG.md —
-// that is an assertion on a real emitted artifact, not a source-grep standing in
-// for behaviour. The degenerate failure mode the ban targets (add a magic string
-// to production source and the predicate greens regardless of the fix) is closed
-// here by 002 and 003, which refuse to let the entry's CLAIM be decorative:
-//
-//   - 002 resolves every cited test name to a real `func Test…` definition in the
-//     tree — a fabricated citation FAILS (negative axis).
-//   - 003 is the crux: it RUNS both cited tests and requires `--- PASS: <name>`
-//     in the verbose output, so a CHANGELOG entry claiming closure while the
-//     proving tests are red — or while `-run` matched nothing at all — cannot
-//     pass. Documenting a false closure is exactly the defect worth catching.
-//   - 004 pins the entry against the duplicated-bullet corruption already
-//     visible in the 22.13.1 section of this same file (edge axis).
-//
-// Roots: CHANGELOG.md and the Go tree are both read under acsassert.RepoRoot(t)
-// (the cycle worktree), where Builder writes. Their absence is a FAILURE, not a
-// skip. The 003 subprocess narrows each invocation to ONE named package with an
-// anchored `-run` (≈2s each measured at RED) per the flaky-predicate-shape rules
-// — no `./...` sweep, no wall-clock bound, no literal PID, and `cmd.Dir` is set
-// explicitly rather than inherited from the lane's cwd.
 package cycle1272
 
 import (
@@ -48,19 +13,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// changelogRelPath is the single targetFile scout named for this task.
 const changelogRelPath = "CHANGELOG.md"
 
-// fleetScopeTodoIDs are the two todo-ids pinned to this lane whose closure the
-// entry must record. Both must land in the SAME entry — a closure note split
-// across two unrelated release sections does not document a joint verification.
 var fleetScopeTodoIDs = []string{
 	"infra-teardown-predicate-single-source",
 	"retro-fleet-worktree-dispatch",
 }
 
-// citedTest binds each todo-id to the test scout named as its proof, plus the
-// package that test lives in. 003 runs exactly these.
 type citedTest struct {
 	todoID   string
 	testName string
@@ -80,9 +39,6 @@ var citedTests = []citedTest{
 	},
 }
 
-// closureMarkers are the accepted spellings of "these were found already done",
-// case-folded. The entry must say the items were VERIFIED CLOSED, not merely
-// mention them (a bare mention would let a re-listing of open backlog pass).
 var closureMarkers = []string{
 	"already-implemented",
 	"already implemented",
@@ -92,9 +48,6 @@ var closureMarkers = []string{
 	"already landed",
 }
 
-// changelogBlocks splits CHANGELOG.md into top-level `## ` sections, each block
-// being the heading line plus its body. Text before the first heading (the file
-// preamble) is dropped: an entry must live under a dated section.
 func changelogBlocks(t *testing.T) []string {
 	t.Helper()
 	path := filepath.Join(acsassert.RepoRoot(t), changelogRelPath)
@@ -122,8 +75,6 @@ func changelogBlocks(t *testing.T) []string {
 	return blocks
 }
 
-// closureBlocks returns the sections naming BOTH fleet-scope todo-ids. Exactly
-// one is expected; the helper returns all so callers can report over/under-count.
 func closureBlocks(t *testing.T) []string {
 	t.Helper()
 	var hits []string
@@ -142,12 +93,7 @@ func closureBlocks(t *testing.T) []string {
 	return hits
 }
 
-// TestC1272_001_ChangelogRecordsBothFleetScopeIDsInOneEntry is the happy path:
-// a single CHANGELOG section names both todo-ids, both proving tests, and the
-// cycle it was verified in.
-//
 // acs-predicate: doc-artifact — the deliverable IS the CHANGELOG text; the
-// claim it makes is separately exercised by 002 and 003.
 func TestC1272_001_ChangelogRecordsBothFleetScopeIDsInOneEntry(t *testing.T) {
 	hits := closureBlocks(t)
 	if len(hits) != 1 {
@@ -177,14 +123,13 @@ func TestC1272_001_ChangelogRecordsBothFleetScopeIDsInOneEntry(t *testing.T) {
 	}
 }
 
-// goTestFuncsInTree collects every `func TestX(` name defined under go/.
 func goTestFuncsInTree(t *testing.T) map[string]string {
 	t.Helper()
 	root := filepath.Join(acsassert.RepoRoot(t), "go")
 	defs := map[string]string{}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // unreadable subtree is not this predicate's concern
+			return nil
 		}
 		if d.IsDir() {
 			if d.Name() == ".git" || d.Name() == "vendor" || d.Name() == "testdata" {
@@ -216,9 +161,6 @@ func goTestFuncsInTree(t *testing.T) map[string]string {
 	return defs
 }
 
-// TestC1272_002_CitedTestsAreNotFabricated is the negative axis: an entry may
-// not cite evidence that does not exist. Every test name the closure entry names
-// must resolve to a real `func Test…` definition in the tree.
 func TestC1272_002_CitedTestsAreNotFabricated(t *testing.T) {
 	hits := closureBlocks(t)
 	if len(hits) != 1 {
@@ -243,10 +185,6 @@ func TestC1272_002_CitedTestsAreNotFabricated(t *testing.T) {
 	}
 }
 
-// TestC1272_003_CitedTestsActuallyPass is the crux. The entry asserts both items
-// are closed; this predicate makes that claim load-bearing by RUNNING each cited
-// test in its own package and requiring an explicit `--- PASS: <name>` line, so
-// a `-run` pattern that matched nothing cannot green vacuously.
 func TestC1272_003_CitedTestsActuallyPass(t *testing.T) {
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
 	for _, ct := range citedTests {
@@ -254,7 +192,7 @@ func TestC1272_003_CitedTestsActuallyPass(t *testing.T) {
 		t.Run(ct.testName, func(t *testing.T) {
 			cmd := exec.Command("go", "test", "-count=1", "-v",
 				"-run", "^"+ct.testName+"$", ct.pkg)
-			cmd.Dir = goDir // never inherit the lane's cwd
+			cmd.Dir = goDir
 			out, err := cmd.CombinedOutput()
 			text := string(out)
 			if err != nil {
@@ -268,11 +206,6 @@ func TestC1272_003_CitedTestsActuallyPass(t *testing.T) {
 	}
 }
 
-// TestC1272_004_ClosureEntryHasNoDuplicatedBullets is the edge axis: the 22.13.1
-// section of this same file already carries a verbatim duplicated bullet, so the
-// corruption is real, not hypothetical. Every non-empty content line in the new
-// entry must be unique.
-//
 // acs-predicate: doc-artifact — structural check on the emitted deliverable.
 func TestC1272_004_ClosureEntryHasNoDuplicatedBullets(t *testing.T) {
 	hits := closureBlocks(t)

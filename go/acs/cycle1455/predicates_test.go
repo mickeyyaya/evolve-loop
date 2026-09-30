@@ -1,43 +1,5 @@
 //go:build acs
 
-// Package cycle1455 materialises the cycle-1455 acceptance criteria for the one
-// fleet-scoped todo-id pinned to this lane, `context-fill-telemetry-and-cap` —
-// specifically its live follow-on defect `contextfill-ratio-over-100pct`
-// (inbox 2026-08-12, weight 0.75, pipeline-repair).
-//
-// The defect: `tokenusage.ScanConfigRoot` sums EVERY assistant turn's
-// Input+CacheRead+CacheWrite into one grand total (scanner.go:147-153), and
-// `DefaultResolver` feeds that summed total into `FillPct` against a
-// SINGLE-turn 200K effective window (defaultresolver.go:38). Each turn's own
-// cache_read_input_tokens already carries that turn's whole prior context, so
-// summing turn N with turn N+1 re-counts the same context once per turn. Live
-// symptom, twice in one monitored wave: scout 566.9%, triage 114.3%.
-//
-// Predicate strategy — every predicate below EXERCISES the system (the cycle-85
-// degenerate-predicate ban); not one greps source:
-//
-//   - 001 drives the real production resolver over a real multi-turn transcript
-//     fixture and asserts the reading is the terminal/peak turn's, naming the
-//     summed (190) and first-turn (35) wrong answers explicitly.
-//   - 002 is the anti-overfit half: `Result.Usage` is the COST number and
-//     summing turns is CORRECT for it. A fix that greens 001 by making the
-//     scanner stop summing reds 002.
-//   - 003 is the negative case: an honest single-turn overrun must stay
-//     unclamped and legible at 120%, not summed to 175% and not flattened to
-//     100% (fillpct.go's own documented promise).
-//   - 004 is the anti-false-positive edge: three modest turns sum past the 60%
-//     warn line while the real reading is 47% — the WARN must go silent.
-//   - 005 is the sentinel edge: zero in-window turns means nothing OBSERVED the
-//     context; reading that as a measured 0% makes the launch look permanently
-//     empty.
-//   - 006 shells ONE named package (never a `./...` sweep, per the
-//     flaky-predicate-shape rules) to pin no-regression across the existing
-//     scanner/fillpct/defaultresolver/apicover suites.
-//
-// Every fixture grows monotonically — real transcripts do, context only
-// accumulates within a phase — so the terminal turn IS the peak turn and either
-// extraction satisfies these predicates. What they rule out is the sum, the
-// first turn, and the mean.
 package cycle1455
 
 import (
@@ -53,15 +15,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// claudeWindow is the conservative effective context window fillpct.go pins for
-// the claude family; every percentage below is against it.
 const claudeWindow = 200_000
 
-// pctTolerance is the float comparison slack for percentage assertions.
 const pctTolerance = 0.05
 
-// assistantTurn renders one assistant transcript line with the four usage
-// counters a real Claude Code transcript reports.
 func assistantTurn(id string, input, output, cacheRead, cacheWrite int) string {
 	return `{"type":"assistant","message":{"id":"` + id + `","usage":{` +
 		`"input_tokens":` + strconv.Itoa(input) +
@@ -70,9 +27,6 @@ func assistantTurn(id string, input, output, cacheRead, cacheWrite int) string {
 		`,"cache_creation_input_tokens":` + strconv.Itoa(cacheWrite) + `}}}`
 }
 
-// transcriptFixture writes a config root holding one transcript whose first
-// user message carries artifactPath (the primary attribution key) followed by
-// the given assistant lines, and returns that root.
 func transcriptFixture(t *testing.T, artifactPath string, turns []string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -88,9 +42,6 @@ func transcriptFixture(t *testing.T, artifactPath string, turns []string) string
 	return root
 }
 
-// inflatedTurns is the 566.9%-class reproducer: prompt-side totals of
-// 70_000 / 130_000 / 180_000. Summed they are 380_000 (190% — the bug); the
-// terminal (== peak) turn is 180_000, a plausible 90%.
 func inflatedTurns() []string {
 	return []string{
 		assistantTurn("m1", 5_000, 1_000, 60_000, 5_000),
@@ -99,9 +50,6 @@ func inflatedTurns() []string {
 	}
 }
 
-// resolve drives the real production resolver — the same closure both
-// composition roots (adapters/bridge and subagent) wire into
-// gobridge.Deps.TokenResolver — over a fixture root.
 func resolve(t *testing.T, root, artifactPath string, w tokenusage.Window) tokenusage.Result {
 	t.Helper()
 	w.Driver = "claude-tmux"
@@ -113,9 +61,6 @@ func resolve(t *testing.T, root, artifactPath string, w tokenusage.Window) token
 	return got
 }
 
-// TestC1455_001_FillPctIsOneTurnNotTheSumOfTurns is the load-bearing predicate.
-// 90% is the terminal turn's own occupancy; 190% is the summed artefact this
-// cycle removes.
 func TestC1455_001_FillPctIsOneTurnNotTheSumOfTurns(t *testing.T) {
 	const artifact = "/ws/cycle-1455/scout-report.md"
 	got := resolve(t, transcriptFixture(t, artifact, inflatedTurns()), artifact, tokenusage.Window{})
@@ -136,10 +81,6 @@ func TestC1455_001_FillPctIsOneTurnNotTheSumOfTurns(t *testing.T) {
 	}
 }
 
-// TestC1455_002_SummedUsageSurvivesForCostAccounting is the anti-overfit half:
-// Result.Usage is the cost/spend figure and summing turns is correct for it. A
-// fix that repairs fill% by making the scanner stop summing would silently
-// under-report every cycle's spend.
 func TestC1455_002_SummedUsageSurvivesForCostAccounting(t *testing.T) {
 	const artifact = "/ws/cycle-1455/scout-report.md"
 	root := transcriptFixture(t, artifact, inflatedTurns())
@@ -153,11 +94,6 @@ func TestC1455_002_SummedUsageSurvivesForCostAccounting(t *testing.T) {
 	}
 }
 
-// TestC1455_003_HonestOverrunStaysUnclampedAndLegible is the negative case. A
-// genuine single-turn overrun (240_000 prompt-side tokens against the
-// deliberately-conservative 200K window) is a REAL signal — fillpct.go promises
-// over-full readings are not clamped. Removing the summation inflation must not
-// also flatten honest overruns to 100%.
 func TestC1455_003_HonestOverrunStaysUnclampedAndLegible(t *testing.T) {
 	const artifact = "/ws/cycle-1455/build-report.md"
 	root := transcriptFixture(t, artifact, []string{
@@ -181,10 +117,6 @@ func TestC1455_003_HonestOverrunStaysUnclampedAndLegible(t *testing.T) {
 	}
 }
 
-// TestC1455_004_CorrectedReadingDoesNotFalsePositiveTheWarn is the
-// anti-false-positive edge. Three modest turns (42_000 / 62_000 / 94_000) sum to
-// 198_000 — 99%, well past the 60% warn line — while the terminal turn is only
-// 47%. Today this launch warns spuriously; after the fix it must be silent.
 func TestC1455_004_CorrectedReadingDoesNotFalsePositiveTheWarn(t *testing.T) {
 	const artifact = "/ws/cycle-1455/audit-report.md"
 	root := transcriptFixture(t, artifact, []string{
@@ -202,12 +134,6 @@ func TestC1455_004_CorrectedReadingDoesNotFalsePositiveTheWarn(t *testing.T) {
 	}
 }
 
-// TestC1455_005_ZeroObservedTurnsDegradeToTheSentinel is the
-// sentinel-preservation edge. A transcript that attributes to the launch but
-// whose assistant turns all fall OUTSIDE the launch window observed no context
-// at all — reading that as a measured 0% would make the launch look like an
-// empty context forever. It must degrade to the documented negative sentinel,
-// in the same vocabulary the uncovered-driver path already uses.
 func TestC1455_005_ZeroObservedTurnsDegradeToTheSentinel(t *testing.T) {
 	const artifact = "/ws/cycle-1455/test-report.md"
 	root := transcriptFixture(t, artifact, []string{
@@ -232,12 +158,6 @@ func TestC1455_005_ZeroObservedTurnsDegradeToTheSentinel(t *testing.T) {
 	}
 }
 
-// TestC1455_006_TokenusageSuiteStaysGreen pins no-regression across the
-// package's existing scanner / fillpct / defaultresolver / apicover suites —
-// including the repo-wide apicover gate's named-symbol requirement, which bites
-// if the fix introduces a new exported symbol without naming it in
-// apicover_named_test.go (tokenusage is enrolled at .apicover-enforce:410).
-// ONE named package, never a `./...` sweep (flaky-predicate-shape rules).
 func TestC1455_006_TokenusageSuiteStaysGreen(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	stdout, stderr, code, err := acsassert.SubprocessOutput(

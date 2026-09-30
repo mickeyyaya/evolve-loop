@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle1753 ports the cycle-1753 ACS predicates.
 package cycle1753
 
 import (
@@ -21,9 +20,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// funcLineSpan returns the literal line count of funcName in path, from its
-// `func` keyword through its closing brace inclusive — the same measure the
-// size-ratchet offenders.json ceiling is expressed in.
 func funcLineSpan(t *testing.T, path, funcName string) int {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -151,8 +147,6 @@ var (
 	countWords     = map[string]int{"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 )
 
-// testFileShape is what a test file actually declares: its top-level Test
-// functions and whether it builds a case table ([]struct / map[K]struct).
 type testFileShape struct {
 	subject, rel string
 	testFuncs    int
@@ -242,8 +236,6 @@ func mentionsTestFile(block string, s testFileShape) bool {
 	return strings.Contains(block, s.subject) || strings.Contains(block, path.Base(s.rel))
 }
 
-// assertedTableClaim returns the first table-driven wording in block that is
-// not negated ("no case table", "not table-driven"), or "".
 func assertedTableClaim(block string) string {
 	for _, loc := range tableClaimRE.FindAllStringIndex(block, -1) {
 		if !claimNegatedRE.MatchString(block[max(0, loc[0]-30):loc[0]]) {
@@ -265,9 +257,6 @@ func claimedTestCounts(block string) []int {
 	return counts
 }
 
-// testShapeClaimFindings reports every block of text that describes one of
-// the observed test files as table-driven when it holds no case table, or
-// gives it a test count other than the one it declares.
 func testShapeClaimFindings(rel, text string, shapes []testFileShape) []string {
 	var findings []string
 	for _, block := range docBlocks(text) {
@@ -365,9 +354,6 @@ var (
 	suiteScopesRE         = regexp.MustCompile(`\(cycle=(\d+)[,;]?\s+regression=(\d+)[,;]?\s+red-team=(\d+)\)`)
 )
 
-// declaredPredicates counts the predicates in the files matching glob by the
-// rule the acs suite inventory uses: top-level Test functions other than
-// TestMain whose name does not continue in lower case.
 func declaredPredicates(t *testing.T, root, glob string) int {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join(root, filepath.FromSlash(glob)))
@@ -407,8 +393,6 @@ func verificationSection(doc string) (string, bool) {
 	return section, true
 }
 
-// suiteClaimFindings checks one `evolve acs suite` result line: its figures
-// must add up, and its cycle scope must be the cycle's declared predicates.
 func suiteClaimFindings(rel, line string, cyclePredicates int) []string {
 	fields := map[string]string{}
 	for _, m := range suiteFieldRE.FindAllStringSubmatch(line, -1) {
@@ -446,8 +430,6 @@ func suiteClaimFindings(rel, line string, cyclePredicates int) []string {
 	return findings
 }
 
-// verificationCountFindings checks the predicate and suite counts the doc's
-// Verification section reports against the cycle's declared predicates.
 func verificationCountFindings(rel, doc string, cyclePredicates int) []string {
 	section, ok := verificationSection(doc)
 	if !ok {

@@ -1,55 +1,5 @@
 //go:build acs
 
-// Package cycle1301 materialises the cycle-1301 acceptance criteria for the one
-// fleet-scoped task pinned to this lane:
-//
-//	T1 demotion-ledger-remedy-status-field
-//	(todo-id demotion-ledger-records-salvage-attempted-vs-no-remedy-possible)
-//
-// What the cycle must deliver. The demotion ledger record — the JSON the
-// triage capacity clamp auto-files at .evolve/inbox/auto-heuristic-demotion-
-// triagecap-c<older>-c<newer>.json when the identical-rejection pattern fires
-// (ADR-0046 Layer 2, go/internal/triagecap/demotion.go) — today carries only a
-// prose `action` narrative. Nothing on the record says whether a salvage of the
-// underlying gate defect was ATTEMPTED or whether the loop concluded NO REMEDY
-// was possible; commit 29915424 had to explain two gate demotions in a queue
-// chore commit body because the ledger itself cannot answer that. This cycle
-// adds an explicit, caller-declared `remedy_status` field with a closed
-// vocabulary {pending, salvage_attempted, no_remedy_possible} and an honest
-// default (`pending` at file time — the demotion just fired, no remedy decision
-// has been made yet), never a silent blank and never an unvalidated string.
-//
-// Predicate strategy — every predicate exercises real behaviour, never a source
-// grep (the cycle-85 degenerate-predicate ban):
-//
-//   - 001 is the WIRING PROOF and the crux: it drives the REAL production
-//     caller — triagecap.NewReviewer(config.StageEnforce).Review(...) over a
-//     temp project whose state.json replays the 301/302 identical-rejection
-//     pair — and asserts the ledger file the reviewer itself wrote carries
-//     remedy_status=="pending". A predicate that called the record builder
-//     directly would pass on dead code; this one stays RED until reviewer.go's
-//     call site actually threads the field through.
-//   - 002 is the regression guard: the SAME reviewer-written file must keep
-//     every pre-existing field (id, action, priority, weight, relieved_cycle,
-//     evidence_pointer, injected_by) at its current shape and value. An
-//     additive field must not disturb what the ledger already promised.
-//   - 003 pins the closed vocabulary and the normalisation contract through the
-//     exported seam triagecap.NormalizeRemedyStatus: the three canonical values
-//     survive verbatim; blank, unknown, wrong-case and whitespace-padded input
-//     fall back to pending and are NEVER echoed verbatim (the negative case).
-//   - 004 pins that the record BUILDER honours an explicitly declared terminal
-//     outcome: a record built with salvage_attempted / no_remedy_possible
-//     marshals those exact strings into the `remedy_status` JSON key, and a
-//     junk status is normalised rather than written through.
-//
-// Fixture note: predicates 001/002 deliberately use the package's REAL seams
-// (KnownPackages / readWindow / readFailedApproaches over a temp project root)
-// rather than the in-package unexported test hooks — the external package can
-// only reach the production constructor, which is exactly the reachability
-// property being proven. The temp root holds no Go packages, so floor counting
-// falls back to the min-1 prose rule: three floor-bearing ## top_n items count
-// 3 against a cap of 2 (window K=1 ⇒ Cap=ceil(1.25)=2), which puts Review on
-// its rejection path and therefore into the demotion consult.
 package cycle1301
 
 import (
@@ -65,19 +15,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// Verbatim rejection summaries from state.json:failedApproaches, cycles
-// 301/302 — the same corpus demotion_test.go replays. Both carry the gate
-// marker ("triage overpacked") and the phase marker ("during triage:"), and
-// differ only by same-magnitude jitter (6 vs 7 floors), so they collapse to one
-// reason template and the demotion fires.
 const (
 	summary301 = `cycle 301 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 6 committed coverage floors exceed the capacity cap 5 (= ceil(1.25×K), K=4 observed floors/turn over 1 shipped cycles). Re-emit the triage report keeping at most 5 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 	summary302 = `cycle 302 failed during triage: review gate: phase "triage" deliverable rejected after 2 correction(s): triage overpacked: 7 committed coverage floors exceed the capacity cap 5 (= ceil(1.25×K), K=4 observed floors/turn over 1 shipped cycles). Re-emit the triage report keeping at most 5 coverage floors in ## top_n and move the remaining floor work to ## deferred — deferred items carry over to the next cycle automatically.`
 )
 
-// overpackedArtifact is a ## top_n whose three floor-bearing items each carry a
-// ≥-marked target percent, so each counts one floor under the min-1 aggregate
-// rule (no known packages resolve in a temp project root).
 const overpackedArtifact = `## top_n (commit to THIS cycle)
 - coverage-a: push swarmrunner coverage to ≥98%
 - coverage-b: push bridge coverage to ≥98%
@@ -86,10 +28,6 @@ const overpackedArtifact = `## top_n (commit to THIS cycle)
 ## deferred (carry to NEXT cycle's carryoverTodos)
 `
 
-// demotedLedgerRecord drives the real production reviewer through its demotion
-// path and returns the parsed ledger JSON the reviewer itself auto-filed. Any
-// deviation (reviewer approved without demoting, no file written, more than one
-// file) fails here rather than surfacing as a confusing field assertion.
 func demotedLedgerRecord(t *testing.T) map[string]any {
 	t.Helper()
 	root := t.TempDir()
@@ -141,10 +79,6 @@ func demotedLedgerRecord(t *testing.T) map[string]any {
 	return rec
 }
 
-// TestC1301_001_LedgerRecordCarriesPendingRemedyStatus is the wiring proof: the
-// field must be written by the PRODUCTION path (reviewer.go's demotion call
-// site), and its file-time value must be the honest default `pending` — never
-// absent, never blank. AC1 + AC2.
 func TestC1301_001_LedgerRecordCarriesPendingRemedyStatus(t *testing.T) {
 	rec := demotedLedgerRecord(t)
 
@@ -165,9 +99,6 @@ func TestC1301_001_LedgerRecordCarriesPendingRemedyStatus(t *testing.T) {
 	}
 }
 
-// TestC1301_002_LedgerRecordPreservesExistingFields is the regression guard: the
-// new field is ADDITIVE. Every field the ledger already promised keeps its
-// shape and value through the same production write. AC3.
 func TestC1301_002_LedgerRecordPreservesExistingFields(t *testing.T) {
 	rec := demotedLedgerRecord(t)
 
@@ -201,11 +132,6 @@ func TestC1301_002_LedgerRecordPreservesExistingFields(t *testing.T) {
 	}
 }
 
-// TestC1301_003_RemedyStatusVocabularyIsClosed pins the closed vocabulary and
-// the normalisation contract. The negative half is the load-bearing one: an
-// unknown or malformed status must NEVER be written through verbatim — it falls
-// back to pending, so the ledger can only ever say one of three things. AC1 +
-// AC4 (negative / edge / OOD).
 func TestC1301_003_RemedyStatusVocabularyIsClosed(t *testing.T) {
 	if triagecap.RemedyPending != "pending" ||
 		triagecap.RemedySalvageAttempted != "salvage_attempted" ||
@@ -240,11 +166,6 @@ func TestC1301_003_RemedyStatusVocabularyIsClosed(t *testing.T) {
 	}
 }
 
-// TestC1301_004_ExplicitTerminalOutcomesReachTheRecord pins the whole point of
-// the field: the two TERMINAL outcomes a caller may declare — salvage attempted
-// vs no remedy possible — must reach the ledger's wire form exactly, through
-// the same builder the production writer uses, while junk is normalised. AC1 +
-// AC4 (semantic diversity: three distinct declared outcomes, one rejection).
 func TestC1301_004_ExplicitTerminalOutcomesReachTheRecord(t *testing.T) {
 	const detail = "identical rejection template in cycles 301 and 302 (hash deadbeefdeadbeef)"
 
@@ -272,8 +193,6 @@ func TestC1301_004_ExplicitTerminalOutcomesReachTheRecord(t *testing.T) {
 			if got := decoded["remedy_status"]; got != tc.want {
 				t.Errorf("remedy_status = %v, want %q (declared %q)", got, tc.want, tc.in)
 			}
-			// The declared outcome must not cost the record its identity or
-			// its relief bookkeeping.
 			if got := decoded["id"]; got != "auto-heuristic-demotion-triagecap-c301-c302" {
 				t.Errorf("id = %v, want the pair-identity slug", got)
 			}

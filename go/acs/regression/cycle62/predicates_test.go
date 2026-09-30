@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle62 ports the cycle-62 ACS predicates (7 bash files).
-// Subjects: post-mortem cycle-61, gemini native-block, classifier role-log scan,
-// scout grounding, audit citations, CLI resolution, memo tools.
 package cycle62
 
 import (
@@ -13,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC62_049_PostmortemCycle61Shipped ports cycle-62/049.
 func TestC62_049_PostmortemCycle61Shipped(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -29,7 +25,6 @@ func TestC62_049_PostmortemCycle61Shipped(t *testing.T) {
 	t.Skip("no cycle-61 postmortem at accepted paths")
 }
 
-// TestC62_050_GeminiNativeBlockShipped ports cycle-62/050.
 func TestC62_050_GeminiNativeBlockShipped(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -46,7 +41,6 @@ func TestC62_050_GeminiNativeBlockShipped(t *testing.T) {
 	t.Logf("no gemini native-block marker")
 }
 
-// TestC62_051_ClassifierScansRoleLogs ports cycle-62/051.
 func TestC62_051_ClassifierScansRoleLogs(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -63,7 +57,6 @@ func TestC62_051_ClassifierScansRoleLogs(t *testing.T) {
 	t.Logf("no classifier role-log scan marker")
 }
 
-// TestC62_052_ScoutFindingsGrounded ports cycle-62/052.
 func TestC62_052_ScoutFindingsGrounded(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
@@ -75,7 +68,6 @@ func TestC62_052_ScoutFindingsGrounded(t *testing.T) {
 	}
 }
 
-// TestC62_053_AuditCitationsInDiff ports cycle-62/053.
 func TestC62_053_AuditCitationsInDiff(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	auditor := filepath.Join(root, "agents", "evolve-auditor.md")
@@ -87,7 +79,6 @@ func TestC62_053_AuditCitationsInDiff(t *testing.T) {
 	}
 }
 
-// TestC62_054_CliResolutionAutoRendered ports cycle-62/054.
 func TestC62_054_CliResolutionAutoRendered(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -102,14 +93,11 @@ func TestC62_054_CliResolutionAutoRendered(t *testing.T) {
 	t.Skip("no CLI resolver found")
 }
 
-// TestC62_055_MemoNoShellRedirectTools ports cycle-62/055.
 func TestC62_055_MemoNoShellRedirectTools(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "memo.json")
 	if _, err := os.Stat(profile); err != nil {
 		t.Skip("memo profile missing — skip")
 	}
-	// Memo profile should NOT include Bash with shell redirect capability
-	// (tools list should not include arbitrary shell)
 	_ = profile
 }

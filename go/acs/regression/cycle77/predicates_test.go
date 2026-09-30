@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle77 ports the cycle-77 ACS predicates (1 bash file, 4 ACs).
 package cycle77
 
 import (
@@ -13,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestC77_001_AuditorColdMoveStage8 ports cycle-77/001.
-// AC1: auditor persona ≤ 300 lines (≥10% reduction from 333)
-// AC2: reference doc has "## Section: output-template"
-// AC3: auditor pointer references reference/output-template
-// AC4: ADR-0015 exists and ≤ 200 lines
 func TestC77_001_AuditorColdMoveStage8(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	auditor := filepath.Join(root, "agents", "evolve-auditor.md")

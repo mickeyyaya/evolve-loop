@@ -1,22 +1,5 @@
 //go:build acs
 
-// Package cycle1748 materialises raw-git-fixtures-migrate-to-gittest for the
-// internal/phases/ship and internal/releasepipeline slices.
-//
-// Pinned contract, per slice:
-//
-//   - every target test file leaves go/internal/rawgitratchet/baseline.json,
-//     the ratchet's scanner finds no raw git init site left in it, and
-//     TestRatchet_NoNewRawGitFixtures passes;
-//   - the slice's tests pass under go test -count=1, and every repository they
-//     commit, fetch, merge or push in under the test temp root carries the
-//     gittest fixture config (maintenance.auto=false, gc.auto=0), so no
-//     detached maintenance child is left writing when t.TempDir() is removed.
-//
-// The second half is observed, not read from source: the tests run with a git
-// shim first on PATH that records, after each successful commit, fetch, merge
-// or push, the config of the repository the command touched. A control proves
-// the probe tells a raw fixture from a quiet one.
 package cycle1748
 
 import (
@@ -44,9 +27,6 @@ const (
 	shipPkg     = "./internal/phases/ship"
 	releasePkg  = "./internal/releasepipeline"
 
-	// shipRemoteAnchor is a default-build ship test that builds its repo with
-	// makeRepo and its origin with addRemote, then ships and pushes; the target
-	// files declare no test that reaches addRemote.
 	shipRemoteAnchor = "TestShip_CommitMessage_TypedVsMap"
 )
 
@@ -70,7 +50,6 @@ func moduleDir(t *testing.T) string {
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// tail keeps a failure message readable when go test prints a lot.
 func tail(s string) string {
 	const n = 6000
 	if len(s) <= n {
@@ -79,9 +58,6 @@ func tail(s string) string {
 	return "...\n" + s[len(s)-n:]
 }
 
-// requireLeftRatchet asserts each file still exists, is no longer listed in
-// the baseline, and holds no raw init site by the ratchet's own scanner; then
-// runs the ratchet's named test.
 func requireLeftRatchet(t *testing.T, files []string) {
 	t.Helper()
 	goDir := moduleDir(t)
@@ -118,7 +94,6 @@ func requireLeftRatchet(t *testing.T, files []string) {
 	}
 }
 
-// testNames returns the top-level Test functions declared in files.
 func testNames(t *testing.T, goDir string, files []string) []string {
 	t.Helper()
 	var names []string
@@ -146,18 +121,12 @@ func runPattern(names []string) string {
 	return "^(" + strings.Join(quoted, "|") + ")$"
 }
 
-// gitOp is one successful maintenance-triggering git command: the subcommand,
-// the config of the repository it touched, and that repository's git dir.
 type gitOp struct {
 	sub, maintenanceAuto, gcAuto, gitDir string
 }
 
 func (o gitOp) quiet() bool { return o.maintenanceAuto == "false" && o.gcAuto == "0" }
 
-// shimScript runs the real git, then, for a successful commit, merge, fetch,
-// pull, am, rebase, cherry-pick, revert or push, appends the touched
-// repository's maintenance.auto, gc.auto and absolute git dir to the log. A
-// push is judged at its destination, where receive-pack runs auto maintenance.
 const shimScript = `#!@BASH@
 set -uo pipefail
 real=@REAL@
@@ -204,11 +173,6 @@ exit 0
 
 func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
-// runUnderProbe runs `go test -count=1 -v [-run pattern] pkg` in dir with the
-// git shim first on PATH and TMPDIR inside a probe directory, and returns the
-// output and the git ops that touched a repository under that TMPDIR. The
-// probe directory is removed best-effort: a raw fixture's detached
-// maintenance child may still be writing in it.
 func runUnderProbe(t *testing.T, dir, pkg, pattern string, env ...string) (string, []gitOp, error) {
 	t.Helper()
 	realGit, err := exec.LookPath("git")
@@ -269,9 +233,6 @@ func runUnderProbe(t *testing.T, dir, pkg, pattern string, env ...string) (strin
 	return string(out), ops, runErr
 }
 
-// requireQuietFixtures runs pkg's tests (narrowed to names when given) under
-// the probe and asserts they pass, the named ones each pass, no TempDir
-// removal failed, and every observed git op ran in a quiet repository.
 func requireQuietFixtures(t *testing.T, pkg, pattern string, mustPass []string) {
 	t.Helper()
 	out, ops, err := runUnderProbe(t, moduleDir(t), pkg, pattern)
@@ -329,9 +290,6 @@ func TestC1748_004_ReleasePipelineFixtureReposKeepMaintenanceOff(t *testing.T) {
 	requireQuietFixtures(t, releasePkg, "", names)
 }
 
-// controlModule is a throwaway module with one raw fixture and one that
-// persists the gittest config; both clean up best-effort so the raw one's
-// maintenance child cannot fail the control.
 const controlModule = `package probecontrol
 
 import (

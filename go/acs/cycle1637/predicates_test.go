@@ -1,70 +1,5 @@
 //go:build acs
 
-// Package cycle1637 materializes the acceptance criteria for the single
-// triage-committed task of this fleet lane (ADR-0076 continuation of cycle
-// 1633's salvage snapshot 26680b3e):
-//
-//   - triage-unified-solution-synthesis → a validated, evidence-cited UNIFIED
-//     commitment at the inboxbatch/triage seam that fails OPEN to independent
-//     top_n selection, keeps per-member acceptance separate, closes members
-//     TRANSACTIONALLY with landing, and is projected ONLY when valid.
-//
-// The second lane-scoped id, overlay-family-name-transport-ambiguity, was
-// dropped by triage as already shipped (skip_shipped 797b8518 — an ancestor
-// of this tree). R9.3 forbids predicates for non-top_n work, so nothing below
-// binds to it.
-//
-// Provenance. Cycle 1633 built the contract to 17/17 predicates GREEN
-// (go/acs/cycle1633 — still in this tree and GREEN at RED time) and FAILed
-// only on the explanation-documentation citation gate. This package does NOT
-// re-pin that contract line by line; 006 re-runs the whole cycle1633 package
-// as ONE named-package `go test` so the salvaged behavior stays enforced in
-// this cycle's audit without duplicating 750 lines. What this package ADDS are
-// the two defects the salvage still carries — both found by driving the
-// PRODUCTION callers, not by re-reading the code:
-//
-//  1. HETEROGENEITY HOLE (bug-reproduction phase, this cycle):
-//     inboxbatch.UnifiedCommitment.Validate only adds NON-EMPTY campaigns to
-//     its comparison set, so {unscoped, campaign:"X"} passes as homogeneous.
-//     The mechanical campaignRule (inboxbatch/rules.go) never binds an
-//     unscoped item to a campaign item — the operator's explicit partition —
-//     so a synthesis claim must not either. 001 pins the typed seam, 002 the
-//     REAL triage runner (fail-open, loud, independent top_n preserved).
-//  2. CLAIM-STATE HOLE (production reachability): the triage persona's Step
-//     0a.4 (`evolve inbox-mover claim "$id" "$CYCLE"`, agents/evolve-triage.md)
-//     moves every selected item from .evolve/inbox/ to processing/cycle-N/
-//     DURING the phase, before hooks.Classify runs processUnifiedCommitment.
-//     That validator loads inboxbatch.LoadDir(<root>/.evolve/inbox) — the
-//     ROOT only (LoadDir skips subdirs) — so every legitimate member is
-//     "not a known inbox item" and the feature can never project in a live
-//     cycle (this cycle's own record sits in processing/cycle-1637/). 003
-//     drives the runner with members in the persona's post-claim state and
-//     requires projection; its negatives forbid the naive "glob every
-//     lifecycle dir" fix (processed/ = already landed; processing/cycle-<other>
-//     = another lane's claim — unifying either double-closes an item).
-//
-// The remaining predicates are reachability proofs the 1633 set never pinned:
-// 004 closes the transactional-closure half of the operator directive at the
-// ONE lifecycle seam ship uses (inboxmover.CommittedIDs over the runner-
-// emitted decision → ApplyCycleOutcome PASS promotes every member, FAIL
-// promotes none); 005 is the anti-gaming half — router.Digest routes ONLY on
-// the projection the triage phase computed, never on an agent-forged one.
-//
-// Every predicate exercises the system under test (a direct call on the typed
-// seam, the REAL triage runner via triage.New + a fake core.Bridge,
-// router.Digest, inboxmover.ApplyCycleOutcome, or a one-package go test), never
-// a source grep (the cycle-85 ban). Adversarial axes (skills/adversarial-
-// testing §6): NEGATIVE — 001, 002, the three rejection subtests of 003, the
-// FAIL half of 004, every subtest of 005. EDGE — a single unscoped member among
-// campaign members, a member at the inbox root beside claimed siblings,
-// member_count forged to 99. SEMANTIC — validation (001), phase fail-open
-// (002), lifecycle-state resolution (003), landing closure (004), routing
-// trust boundary (005), prior-contract regression (006) are distinct
-// behaviors.
-//
-// Flaky-shape hygiene: the ONE `go test` subprocess names a single package
-// (./acs/cycle1633/), no wall-clock bounds, no literal PIDs, every git call is
-// -C rooted, no load generators.
 package cycle1637
 
 import (
@@ -88,17 +23,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// thisCycle is the cycle number the runner is driven with; the persona's claim
-// step writes processing/cycle-<thisCycle>/ for exactly this number.
 const thisCycle = 1637
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-// threeItems is a homogeneous small backlog: three code items, no campaign,
-// disjoint file areas — nothing mechanical binds them, so the synthesis seam is
-// the only thing that can unify them.
 func threeItems() []inboxbatch.Item {
 	return []inboxbatch.Item{
 		{ID: "alpha", Title: "alpha", Weight: 0.8, Files: []string{"go/internal/alpha/a.go"}, Acceptance: []string{"alpha keeps its own AC"}},
@@ -107,8 +33,6 @@ func threeItems() []inboxbatch.Item {
 	}
 }
 
-// completeCommitment is the positive fixture: every field present, every
-// member evidence-cited, every member a known item.
 func completeCommitment(items []inboxbatch.Item) inboxbatch.UnifiedCommitment {
 	members := make([]inboxbatch.UnifiedMember, 0, len(items))
 	for _, it := range items {
@@ -125,10 +49,6 @@ func completeCommitment(items []inboxbatch.Item) inboxbatch.UnifiedCommitment {
 	}
 }
 
-// decisionDoc renders a triage-decision.json body: the independent top_n over
-// topN ids plus any extra top-level fields (unified_commitment, a forged
-// unified_projection, …). json.Marshal on the typed struct pins the wire field
-// names the JSON tags must produce.
 func decisionDoc(t *testing.T, topN []string, extra map[string]any) string {
 	t.Helper()
 	top := make([]map[string]string, 0, len(topN))
@@ -146,8 +66,6 @@ func decisionDoc(t *testing.T, topN []string, extra map[string]any) string {
 	return string(raw)
 }
 
-// reportMD renders a minimal but contract-complete triage-report.md whose
-// ## top_n lists ids (cycle_size medium keeps tdd pinned, matching production).
 func reportMD(topN []string) string {
 	var b strings.Builder
 	b.WriteString("cycle_size_estimate: medium\ndeliverable_kind: code\n\n## top_n\n")
@@ -158,8 +76,6 @@ func reportMD(topN []string) string {
 	return b.String()
 }
 
-// fakeBridge is the minimal core.Bridge: it writes the scripted triage report
-// and decision into the workspace, exactly where the real agent would.
 type fakeBridge struct{ report, decision string }
 
 func (b *fakeBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -180,16 +96,10 @@ func (b *fakeBridge) Probe(context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// placement maps an item id to the inbox lifecycle dir (relative to
-// .evolve/inbox) it is written into; ids absent from the map land at the root
-// ("") — the pending state.
 type placement map[string]string
 
-// inboxRootDir names the inbox root placement.
 const inboxRootDir = ""
 
-// writeInbox materializes items under a temp project root's .evolve/inbox/,
-// each in the lifecycle dir its placement names, and returns that root.
 func writeInbox(t *testing.T, items []inboxbatch.Item, where placement) string {
 	t.Helper()
 	proj := t.TempDir()
@@ -209,10 +119,6 @@ func writeInbox(t *testing.T, items []inboxbatch.Item, where placement) string {
 	return proj
 }
 
-// runTriageAt drives the REAL triage phase runner (triage.New → BaseRunner.Run
-// → hooks.Classify → processUnifiedCommitment) over a temp project whose inbox
-// holds items in the given placement, with the fake bridge writing report +
-// decision. Returns the response, the project root and the workspace.
 func runTriageAt(t *testing.T, items []inboxbatch.Item, where placement, topN []string, extra map[string]any) (core.PhaseResponse, string, string) {
 	t.Helper()
 	proj := writeInbox(t, items, where)
@@ -231,8 +137,6 @@ func runTriageAt(t *testing.T, items []inboxbatch.Item, where placement, topN []
 	return resp, proj, ws
 }
 
-// runTriage is runTriageAt with every item pending at the inbox root and the
-// commitment (when non-nil) declared under "unified_commitment".
 func runTriage(t *testing.T, items []inboxbatch.Item, topN []string, c *inboxbatch.UnifiedCommitment) (core.PhaseResponse, string, string) {
 	t.Helper()
 	var extra map[string]any
@@ -242,8 +146,6 @@ func runTriage(t *testing.T, items []inboxbatch.Item, topN []string, c *inboxbat
 	return runTriageAt(t, items, placement{}, topN, extra)
 }
 
-// digestTriage projects the workspace's triage artifacts through the production
-// router digest — the ONE reader the routing kernel uses.
 func digestTriage(t *testing.T, ws string) router.RoutingSignals {
 	t.Helper()
 	sig, err := router.Digest(ws, []string{"triage"})
@@ -279,10 +181,6 @@ func memberIDs(items []inboxbatch.Item) []string {
 	return ids
 }
 
-// assertRejectedFailOpen is the fail-open shape every rejection must take: the
-// phase still PASSes (independent top_n stands), the rejection is LOUD, the
-// router sees NO unified signal, the independent commitment count is intact,
-// and no campaign plan was emitted for the rejected claim.
 func assertRejectedFailOpen(t *testing.T, resp core.PhaseResponse, ws string, wantCommitted int, mustMention string) {
 	t.Helper()
 	if resp.Verdict != core.VerdictPASS {
@@ -306,21 +204,10 @@ func assertRejectedFailOpen(t *testing.T, resp core.PhaseResponse, ws string, wa
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 001–002: the heterogeneity hole — unscoped + campaign members are NOT one
-// initiative (bug-reproduction phase, cycle 1637)
-// ---------------------------------------------------------------------------
-
 func TestC1637_001_UnifiedCommitmentRejectsMixedCampaignMembership(t *testing.T) {
-	// The mechanical campaignRule binds ONLY items sharing a non-empty
-	// campaign: an unscoped item is never grouped with a campaign item, because
-	// the campaign field is the operator's explicit "this is one initiative"
-	// partition. A synthesis claim spanning that partition is heterogeneous —
-	// forced unification of unrelated items is THE failure mode this task pins
-	// against — and must be refused for the campaign reason, by the typed seam.
 	cases := []struct {
 		name      string
-		campaigns []string // per item, "" = unscoped
+		campaigns []string
 	}{
 		{"unscoped first, campaign second", []string{"", "pipeline-integrity", ""}},
 		{"campaign first, unscoped second", []string{"pipeline-integrity", "", ""}},
@@ -342,7 +229,6 @@ func TestC1637_001_UnifiedCommitmentRejectsMixedCampaignMembership(t *testing.T)
 			}
 		})
 	}
-	// Positive controls: the guard must not reject the two legitimate shapes.
 	t.Run("all unscoped is homogeneous", func(t *testing.T) {
 		items := threeItems()
 		if err := completeCommitment(items).Validate(items); err != nil {
@@ -361,12 +247,6 @@ func TestC1637_001_UnifiedCommitmentRejectsMixedCampaignMembership(t *testing.T)
 }
 
 func TestC1637_002_TriagePhaseFailsOpenOnHeterogeneousBacklog(t *testing.T) {
-	// Reachability: the same hole through the PRODUCTION validator
-	// (hooks.Classify → processUnifiedCommitment via triage.New(...).Run) — a
-	// heterogeneous backlog must yield independent commitments, loudly, with the
-	// independent top_n untouched. Two heterogeneity axes, both through the
-	// runner: the campaign partition (the hole) and the deliverable kind
-	// (ADR-0099 — regression guard for the salvaged half).
 	t.Run("unscoped member beside a campaign member", func(t *testing.T) {
 		items := threeItems()
 		items[1].Campaign = "pipeline-integrity"
@@ -383,20 +263,11 @@ func TestC1637_002_TriagePhaseFailsOpenOnHeterogeneousBacklog(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 003: the claim-state hole — members the persona already claimed into
-// processing/cycle-<N>/ are STILL known inbox items
-// ---------------------------------------------------------------------------
-
 func TestC1637_003_TriagePhaseValidatesMembersClaimedIntoThisCyclesProcessingDir(t *testing.T) {
 	thisLane := filepath.Join("processing", fmt.Sprintf("cycle-%d", thisCycle))
 	items := threeItems()
 	ids := memberIDs(items)
 
-	// The persona's Step 0a.4 leaves EVERY selected item in
-	// processing/cycle-<N>/ before the decision is written — the state the
-	// production validator actually meets. A complete, evidence-cited claim
-	// over those members must project.
 	t.Run("all members claimed by this cycle", func(t *testing.T) {
 		c := completeCommitment(items)
 		resp, _, ws := runTriageAt(t, items, placement{"alpha": thisLane, "beta": thisLane, "gamma": thisLane}, ids,
@@ -416,9 +287,6 @@ func TestC1637_003_TriagePhaseValidatesMembersClaimedIntoThisCyclesProcessingDir
 		}
 	})
 
-	// Edge: a member still pending at the root beside claimed siblings (the
-	// claim for one id failed non-fatally, persona Step 0a.4's WARN path) is
-	// still a known item — resolution is per member, not per directory.
 	t.Run("root and claimed members mixed", func(t *testing.T) {
 		c := completeCommitment(items)
 		resp, _, ws := runTriageAt(t, items, placement{"alpha": inboxRootDir, "beta": thisLane, "gamma": thisLane}, ids,
@@ -431,9 +299,6 @@ func TestC1637_003_TriagePhaseValidatesMembersClaimedIntoThisCyclesProcessingDir
 		}
 	})
 
-	// Negatives — the fix must resolve the LIFECYCLE STATE, not glob every
-	// subdirectory: an already-landed item and another lane's claim are not
-	// unifiable (either would double-close an item).
 	t.Run("member already landed in processed/ is rejected", func(t *testing.T) {
 		c := completeCommitment(items)
 		resp, _, ws := runTriageAt(t, items, placement{"alpha": thisLane, "beta": thisLane, "gamma": filepath.Join("processed", "cycle-1600")}, ids,
@@ -448,19 +313,7 @@ func TestC1637_003_TriagePhaseValidatesMembersClaimedIntoThisCyclesProcessingDir
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 004: transactional closure — members close together WITH landing, through
-// the ONE lifecycle seam ship uses
-// ---------------------------------------------------------------------------
-
 func TestC1637_004_LandedDecisionClosesEveryMemberTransactionally(t *testing.T) {
-	// ship (internal/phases/ship/postship.go) and the console closeout
-	// (internal/cycleoutcome) both derive the worked set from
-	// inboxmover.CommittedIDs(triage-decision.json) and apply it through
-	// inboxmover.ApplyCycleOutcome. The decision the triage phase EMITS (it
-	// rewrites the file to add unified_projection) must still carry every
-	// member in that worked set, and the outcome seam must then promote ALL
-	// members on a landed PASS and NONE on a FAIL — no partial closure.
 	const landedSHA = "abc1234"
 	items := threeItems()
 	ids := memberIDs(items)
@@ -488,9 +341,6 @@ func TestC1637_004_LandedDecisionClosesEveryMemberTransactionally(t *testing.T) 
 		}
 		return res
 	}
-	// stage runs the real triage over a fresh project and copies the EMITTED
-	// decision beside the inbox so the outcome seam reads exactly what ship
-	// would.
 	stage := func(t *testing.T) string {
 		t.Helper()
 		resp, proj, ws := runTriage(t, items, ids, &c)
@@ -520,9 +370,6 @@ func TestC1637_004_LandedDecisionClosesEveryMemberTransactionally(t *testing.T) 
 			if !contains(res.Promoted, id) {
 				t.Errorf("member %q must be promoted with the landing; Promoted=%v", id, res.Promoted)
 			}
-			// A processed promotion carrying a ship SHA is named <sha8>-<base>
-			// (inboxmover.promoteDestPath) — the landing evidence travels with
-			// the file.
 			if _, err := os.Stat(filepath.Join(processedDir(proj), landedSHA+"-"+id+".json")); err != nil {
 				t.Errorf("member %q must be in processed/cycle-%d after landing: %v", id, thisCycle, err)
 			}
@@ -540,25 +387,16 @@ func TestC1637_004_LandedDecisionClosesEveryMemberTransactionally(t *testing.T) 
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 005: the routing trust boundary — only the triage-computed projection routes
-// ---------------------------------------------------------------------------
-
 func TestC1637_005_RouterRoutesOnlyOnTheValidatedProjection(t *testing.T) {
 	items := threeItems()
 	ids := memberIDs(items)
 
-	// (a) A projection with no commitment behind it is a spoof: the phase
-	// clears it, loudly, and the router sees nothing.
 	t.Run("forged projection without a commitment is cleared", func(t *testing.T) {
 		resp, _, ws := runTriageAt(t, items, placement{}, ids,
 			map[string]any{"unified_projection": map[string]any{"size": "small", "member_count": 3}})
 		assertRejectedFailOpen(t, resp, ws, 3, "")
 	})
 
-	// (b) A forged projection beside a VALID claim is overwritten by the
-	// computed one — size and member count come from the validator, never
-	// from the agent.
 	t.Run("forged projection beside a valid claim is recomputed", func(t *testing.T) {
 		c := completeCommitment(items)
 		resp, _, ws := runTriageAt(t, items, placement{}, ids, map[string]any{
@@ -577,9 +415,6 @@ func TestC1637_005_RouterRoutesOnlyOnTheValidatedProjection(t *testing.T) {
 		}
 	})
 
-	// (c) A raw claim the triage phase never validated (no runner, no
-	// projection) is invisible to the router: Digest reads the projection, not
-	// the claim.
 	t.Run("raw claim without the triage phase does not route", func(t *testing.T) {
 		ws := t.TempDir()
 		c := completeCommitment(items)
@@ -598,9 +433,6 @@ func TestC1637_005_RouterRoutesOnlyOnTheValidatedProjection(t *testing.T) {
 		}
 	})
 
-	// (d) The signal exists only AFTER triage completes — a validated
-	// projection in a workspace whose triage is not yet in the completed set
-	// routes nothing.
 	t.Run("projection is not read before triage completes", func(t *testing.T) {
 		c := completeCommitment(items)
 		_, _, ws := runTriage(t, items, ids, &c)
@@ -614,20 +446,12 @@ func TestC1637_005_RouterRoutesOnlyOnTheValidatedProjection(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 006: the salvaged contract stays enforced — cycle 1633's predicate package
-// (typed contract, fail-open runner, registry pins, campaign route) runs GREEN
-// as ONE named package in this cycle's audit
-// ---------------------------------------------------------------------------
-
 func TestC1637_006_SalvagedCycle1633ContractStaysGreen(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	pkgDir := filepath.Join(root, "go", "acs", "cycle1633")
 	if !acsassert.FileExists(t, filepath.Join(pkgDir, "predicates_test.go")) {
 		t.Fatalf("the salvaged predicate package must stay in the tree: %s", pkgDir)
 	}
-	// One named package, -count=1 (the acs packages read the live tree), no
-	// sweep — the shape the flaky-predicate lint permits.
 	cmd := exec.Command("go", "test", "-tags", "acs", "-count=1", "./acs/cycle1633/")
 	cmd.Dir = filepath.Join(root, "go")
 	out, err := cmd.CombinedOutput()
@@ -638,10 +462,6 @@ func TestC1637_006_SalvagedCycle1633ContractStaysGreen(t *testing.T) {
 		t.Errorf("expected an `ok` line from the cycle1633 package; got:\n%s", out)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 007: ship-tree tracking of this package (cycle-93 / cycle-1623 M1)
-// ---------------------------------------------------------------------------
 
 func TestC1637_007_CycleACSPackageIsGitTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)

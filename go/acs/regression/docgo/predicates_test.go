@@ -1,14 +1,5 @@
 //go:build acs
 
-// Package docgo is the ship-gate predicate enforcing the decoupling campaign's
-// documentation invariant: EVERY ./internal/... package must carry a substantive
-// package doc comment ("// Package <name> …", in any non-test .go file —
-// conventionally doc.go). A module's doc comment is the contract surface a
-// decoupled package exposes; an undocumented package is an under-defined one, so
-// "every module has a clear what/how/why definition" is enforced here, per
-// cycle, not left to review. The allowed-missing SSOT (go/.docgo-allow-missing)
-// is a shrink-only debt list — EMPTY means full coverage. Mirrors the apicover
-// completeness predicate (COMPLETE here; CI need not re-run a build).
 package docgo
 
 import (
@@ -27,11 +18,6 @@ import (
 
 const minDocWords = commentaudit.MinPackageDocWords
 
-// TestDocGo_EveryInternalPackageDocumented asserts every internal package has a
-// substantive package doc comment, allowing only the packages explicitly listed
-// in .docgo-allow-missing (the shrink-only debt list). It also flags stale
-// allow-missing entries (now-documented or non-existent packages) so the list
-// can only ratchet toward empty.
 func TestDocGo_EveryInternalPackageDocumented(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -54,7 +40,6 @@ func TestDocGo_EveryInternalPackageDocumented(t *testing.T) {
 		}
 	}
 
-	// Completeness: every undocumented package must be allow-listed.
 	var regress []string
 	for p := range undocumented {
 		if !allow[p] {
@@ -67,7 +52,6 @@ func TestDocGo_EveryInternalPackageDocumented(t *testing.T) {
 			len(regress), minDocWords, strings.Join(regress, "\n  "))
 	}
 
-	// Ratchet: allow-missing must list only still-undocumented REAL packages.
 	var stale []string
 	for p := range allow {
 		switch {
@@ -83,8 +67,6 @@ func TestDocGo_EveryInternalPackageDocumented(t *testing.T) {
 	}
 }
 
-// packageDirs returns every directory under internalDir that holds at least one
-// non-test .go file (i.e. a real package), skipping testdata trees.
 func packageDirs(t *testing.T, internalDir string) map[string]bool {
 	t.Helper()
 	dirs := map[string]bool{}
@@ -110,8 +92,6 @@ func packageDirs(t *testing.T, internalDir string) map[string]bool {
 	return dirs
 }
 
-// packageDocumented reports whether any non-test .go file in dir carries a
-// package doc comment with at least minDocWords words.
 func packageDocumented(dir string) bool {
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, dir, func(fi fs.FileInfo) bool {
@@ -130,15 +110,13 @@ func packageDocumented(dir string) bool {
 	return false
 }
 
-// readAllowMissing reads the .docgo-allow-missing SSOT (one "./internal/foo" per
-// line; # comments + blanks ignored) into a set.
 func readAllowMissing(t *testing.T, goDir string) map[string]bool {
 	t.Helper()
 	allow := map[string]bool{}
 	data, err := os.ReadFile(filepath.Join(goDir, ".docgo-allow-missing"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return allow // absent ⇒ no exceptions ⇒ full coverage required
+			return allow
 		}
 		t.Fatalf("read .docgo-allow-missing: %v", err)
 	}

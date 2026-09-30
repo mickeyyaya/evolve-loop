@@ -17,9 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// targetOffenders are the eight go/internal/failurelog and go/internal/router
-// entries the task requires shrinking to sizeratchet.MaxLines or fewer and
-// dropping from offenders.json (inbox sizeratchet-shrink-failurelog-router).
 var targetOffenders = []string{
 	"internal/failurelog.PruneByClassification",
 	"internal/failurelog.PruneExpired",
@@ -81,7 +78,6 @@ func TestC1731_003_FailurelogRouterSuitesStillPass(t *testing.T) {
 	}
 }
 
-// countWords maps the spelled-out counts the explanation document uses to their values.
 var countWords = map[string]int{"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8}
 
 const countWord = `(one|two|three|four|five|six|seven|eight)`

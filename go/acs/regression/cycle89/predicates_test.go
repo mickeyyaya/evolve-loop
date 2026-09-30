@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle89 ports the cycle-89 ACS predicates (4 bash files).
 package cycle89
 
 import (
@@ -11,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC89_PersonaKbFirstPointer ports cycle-89/001.
-// Personas must reference kb-search.sh / KB-first research policy.
 func TestC89_PersonaKbFirstPointer(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
@@ -24,7 +21,6 @@ func TestC89_PersonaKbFirstPointer(t *testing.T) {
 	}
 }
 
-// TestC89_OnlineResearcherReferenceDoc ports cycle-89/002.
 func TestC89_OnlineResearcherReferenceDoc(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -40,7 +36,6 @@ func TestC89_OnlineResearcherReferenceDoc(t *testing.T) {
 	t.Skip("no online-researcher reference doc — purged in cycle-88")
 }
 
-// TestC89_ClaudeMdResearchEnvVars ports cycle-89/003.
 func TestC89_ClaudeMdResearchEnvVars(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	runtimeRef := filepath.Join(root, "docs/operations/runtime-reference.md")
@@ -58,14 +53,12 @@ func TestC89_ClaudeMdResearchEnvVars(t *testing.T) {
 	}
 }
 
-// TestC89_ResearchToolAdrExists ports cycle-89/004.
 func TestC89_ResearchToolAdrExists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	adrDir := filepath.Join(root, "docs", "architecture", "adr")
 	if _, err := os.Stat(adrDir); err != nil {
 		t.Skip("adr dir missing — skip")
 	}
-	// Some ADR should reference research-tool / online-researcher purge
 	entries, _ := os.ReadDir(adrDir)
 	for _, e := range entries {
 		if e.IsDir() {

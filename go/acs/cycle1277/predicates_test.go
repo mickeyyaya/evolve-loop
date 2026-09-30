@@ -1,50 +1,5 @@
 //go:build acs
 
-// Package cycle1277 materialises the cycle-1277 acceptance criteria.
-//
-// Fleet scope pins this lane to one todo-id, `retro-fleet-stale-worktree-fallback`,
-// and triage committed exactly one task from it (`triage-report.md` ## top_n):
-//
-//	wire-c1270-stale-worktree-regression → 001, 002, 003 (+ 004 as anti-goal)
-//
-// The subject is NOT the fix. Cycle-1255 defect D1 (CRITICAL — "retroWorktree
-// gates the scratch-cwd fallback on req.Worktree != "", so a torn-down lane's
-// stale worktree loses its retro") is landed at go/internal/phases/retro/retro.go
-// and proven end-to-end by TestC1270_006/007. The subject is that the proof does
-// not RUN: CI's durable ACS gate walks exactly one glob —
-//
-//	.github/workflows/ci.yml:57  →  go test -count=1 -tags acs ./acs/regression/...
-//	go/Makefile:108 (test-acs-durable) → the same command
-//
-// — and `go/acs/cycle1270` sits outside it, an orphaned sibling under go/acs/
-// alongside ~250 other never-promoted cycle packages. So the D1 guard is
-// green-by-skip: it passes when someone runs it by hand and enforces nothing.
-//
-// That distinction is what these predicates are built to catch, and it is why
-// none of them asserts on the CONTENT of the moved file. A predicate that
-// grepped `go/acs/regression/cycle1270/predicates_test.go` for a test name would
-// pass on a hand-copied stub that never executes; 001 and 003 instead RUN the
-// CI-enforced command and require the real `--- PASS:` lines for the two named
-// tests, so a stub, an empty file, or a `-run` pattern that matches nothing all
-// stay RED. `go test -run` exits 0 while printing "no tests to run", so exit
-// status alone is not evidence here and is never the sole assertion.
-//
-// 002 is the negative half: the failure mode of a "move" is a COPY. A duplicated
-// package leaves the orphan in place (still unenforced, now divergent) while the
-// promoted copy goes green, so the predicate demands exactly one declaration
-// site for TestC1270_006 across the whole go/acs tree, on disk AND in the git
-// index, plus all nine TestC1270_* functions at the new site — a cherry-picked
-// two-test extract is a different artifact than the one cycle-1270 shipped.
-//
-// 004 is an anti-goal and is expected GREEN at RED time (recorded as
-// pre-existing GREEN in test-report.md). This task wires coverage; it must not
-// re-touch the fix. If the retro fallback contract regresses while the wiring
-// lands, 004 says so.
-//
-// No new package under ./internal/... is created here (go/acs/regression/cycle1270
-// is test-only, outside ./internal/...), so ADR-0069's repo-wide apicover
-// enrollment does not apply — the same exemption acs/regression/noorphan and
-// acs/regression/flagreaders document.
 package cycle1277
 
 import (
@@ -58,30 +13,19 @@ import (
 )
 
 const (
-	// promotedPkg is the CI-reachable location the cycle-1270 predicates must end up in.
-	promotedPkg = "go/acs/regression/cycle1270"
-	// orphanPkg is the never-promoted location they must leave behind entirely.
-	orphanPkg = "go/acs/cycle1270"
-	// promotedImportPath is promotedPkg as a module-relative package pattern.
+	promotedPkg        = "go/acs/regression/cycle1270"
+	orphanPkg          = "go/acs/cycle1270"
 	promotedImportPath = "./acs/regression/cycle1270"
 
 	d1MintTest     = "TestC1270_006_MintedScratchCwdClearsTheFleetGuard"
 	d1DispatchTest = "TestC1270_007_RetroFleetDispatchCarriesLaneWorktreeEndToEnd"
 )
 
-// goDir returns <repo>/go, the directory every `go` invocation below runs in.
-// Every subprocess sets cmd.Dir explicitly: this suite runs from the main tree,
-// from a cycle worktree, and from each fleet lane, so process cwd is never a
-// reliable anchor for module-relative package paths.
 func goDir(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// runGo runs `go <args...>` in <repo>/go and returns combined output plus the
-// exit code. Combined output is deliberate: `go vet` and build failures land on
-// stderr, and a compile error in a sibling regression package must be visible in
-// the failure message rather than swallowed.
 func runGo(t *testing.T, args ...string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("go", args...)
@@ -96,36 +40,10 @@ func runGo(t *testing.T, args ...string) (string, int) {
 	return string(out), code
 }
 
-// TestC1277_001_D1ProofExecutesUnderTheCIEnforcedGlob is the criterion:
-// TestC1270_006/007 execute under the glob CI actually walks.
-//
-// It establishes that in three linked steps rather than by shelling the durable
-// tier's whole-subtree sweep. Running `go test ./acs/regression/...` here would
-// be the most literal restatement of the CI command, but it is also the shape
-// the host's flaky-predicate lint bans on evidence — a recursive sweep inside a
-// cycle predicate is contention-sensitive under fleet load and produced the
-// false REDs of cycles 1173/1175/1178. Sidestepping that lint by splitting the
-// pattern string would be worse than either option, so the coverage claim is
-// decomposed into checks that each stand on their own:
-//
-//  1. the enforced command really is `-tags acs ./acs/regression/...`, read out
-//     of CI's own config and the Makefile target rather than assumed;
-//  2. the promoted package resolves as a real acs-tagged package at a path that
-//     glob covers (`go list`, one named package — a directory of .go files that
-//     do not build, or whose build tag was lost, does not resolve);
-//  3. the two D1 tests actually PASS there.
-//
-// Step 3 asserts on the `--- PASS:` lines, not the exit code. `go test -run`
-// with a pattern that matches nothing exits 0 while printing "testing: warning:
-// no tests to run" — which is exactly today's state, and exactly what a
-// hand-copied stub would leave behind. Exit code alone would score that green.
 func TestC1277_001_D1ProofExecutesUnderTheCIEnforcedGlob(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	const enforcedGlob = "./acs/regression/..."
 
-	// 1. The gate CI runs, from CI's own files. If either drifts to a different
-	//    glob, "under acs/regression/" stops meaning "enforced" and this whole
-	//    predicate's premise is stale — fail loudly rather than pass on it.
 	for _, f := range []string{".github/workflows/ci.yml", "go/Makefile"} {
 		p := filepath.Join(root, f)
 		if !acsassert.FileContains(t, p, "-tags acs "+enforcedGlob) {
@@ -134,7 +52,6 @@ func TestC1277_001_D1ProofExecutesUnderTheCIEnforcedGlob(t *testing.T) {
 		}
 	}
 
-	// 2. The promoted package resolves under that glob's root.
 	out, code := runGo(t, "list", "-tags", "acs", promotedImportPath)
 	if code != 0 {
 		t.Fatalf("%s does not resolve as a Go package (exit %d) — the cycle-1270 predicates are "+
@@ -145,7 +62,6 @@ func TestC1277_001_D1ProofExecutesUnderTheCIEnforcedGlob(t *testing.T) {
 		t.Fatalf("go list resolved %s to %q, want a package under acs/regression/", promotedImportPath, got)
 	}
 
-	// 3. The two D1 tests pass there.
 	pattern := "^(" + d1MintTest + "|" + d1DispatchTest + ")$"
 	out, code = runGo(t, "test", "-count=1", "-tags", "acs", "-run", pattern, "-v", promotedImportPath)
 	if code != 0 {
@@ -165,15 +81,6 @@ func TestC1277_001_D1ProofExecutesUnderTheCIEnforcedGlob(t *testing.T) {
 	}
 }
 
-// TestC1277_002_OrphanLocationIsGoneNotDuplicated is the negative half: a move,
-// not a copy.
-//
-// Three distinct ways the wiring can be faked, each checked:
-//   - the orphan stays on disk (proof duplicated, orphan still unenforced),
-//   - the orphan stays in the git index while gone from disk (CI checks out the
-//     index, so a disk-only delete regrows the duplicate on a fresh clone),
-//   - only the two D1 tests are extracted (the promoted package is then a
-//     different artifact than the one cycle-1270 shipped and audited).
 func TestC1277_002_OrphanLocationIsGoneNotDuplicated(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 
@@ -215,9 +122,6 @@ func TestC1277_002_OrphanLocationIsGoneNotDuplicated(t *testing.T) {
 	}
 }
 
-// runGitLsFiles lists index entries under pathspec. `git -C` is mandatory: bare
-// `git` resolves the repo from process cwd, which differs between the main tree,
-// a cycle worktree, and each fleet lane.
 func runGitLsFiles(t *testing.T, root, pathspec string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("git", "-C", root, "ls-files", "--", pathspec)
@@ -231,7 +135,6 @@ func runGitLsFiles(t *testing.T, root, pathspec string) (string, int) {
 	return strings.TrimSpace(string(out)), code
 }
 
-// declarationSites walks dir and returns every .go file containing needle.
 func declarationSites(t *testing.T, dir, needle string) []string {
 	t.Helper()
 	var hits []string
@@ -257,12 +160,6 @@ func declarationSites(t *testing.T, dir, needle string) []string {
 	return hits
 }
 
-// TestC1277_003_PromotedPackageVetsAndPassesInPlace closes the gap 001 cannot:
-// 001 narrows with -run, so it never exercises the other seven cycle-1270
-// predicates that ride along with the move. This runs the promoted package
-// whole — one named package, never a ./... sweep — and vets it, so a package
-// clause, import path, or build-tag left inconsistent by the move is caught
-// here instead of on CI.
 func TestC1277_003_PromotedPackageVetsAndPassesInPlace(t *testing.T) {
 	pkg := promotedImportPath
 
@@ -285,17 +182,6 @@ func TestC1277_003_PromotedPackageVetsAndPassesInPlace(t *testing.T) {
 	}
 }
 
-// TestC1277_004_RetroFallbackContractStillHolds is an ANTI-GOAL and is expected
-// GREEN at RED time (see test-report.md "pre-existing GREEN").
-//
-// Scout's third criterion is that retro.go is not re-touched: the D1 fix is
-// landed and correct, and this task wires its coverage rather than revisiting
-// it. Stated as a behavioural guard rather than a diff check, because "did not
-// change" is not the property that matters — "still holds" is. It drives the
-// three named contract tests the D1 predicate itself joins: the fleet mint must
-// satisfy the bridge guard's own predicate, the fallback must never resolve to
-// the shared main tree or the dispatching process cwd, and a provisioned
-// worktree must pass through verbatim.
 func TestC1277_004_RetroFallbackContractStillHolds(t *testing.T) {
 	names := []string{
 		"TestRetroWorktree_FleetScratchCwdSatisfiesBridgeGuardPredicate",

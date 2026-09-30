@@ -1,36 +1,5 @@
 //go:build acs
 
-// Package cycle1111 materialises the cycle-1111 acceptance criteria for the one
-// fleet-scoped task pinned to this lane:
-//
-//	tdd-file-scope-binding-check → extend tddScopeGate with a second,
-//	independent, ADVISORY file-scope overlap check.
-//
-// The gap. tddScopeGate today compares only PROSE labels: test-report.md's
-// "## Task: <slug>" against triage-report.md's "## top_n" slugs. Both drift
-// cases are advisory (cycles 916 + 1012 false rejections), and the gate's own
-// comments (gate.go:73-75, 132-135) name the missing complement as "the queued
-// construction-level check" — the committed item's DECLARED file scope
-// (scout-report.md's "**targetFiles:**" line) vs what TDD actually authored.
-// A deliverable can carry exactly the right label and touch nothing the
-// committed item names; today that passes silently.
-//
-// Predicate strategy — every predicate drives the SHIPPING code path
-// (topngate.NewReviewer(...).Review, the same constructor cmd_cycle.go wires)
-// against a synthetic workspace, and asserts on the reviewer's real outputs:
-// the ReviewResult and the structured logf seam it writes to os.Stderr. No
-// predicate greps production source, so adding a magic string cannot green
-// them (the cycle-85 degenerate-predicate ban).
-//
-//   - 001 is the crux: right label, disjoint file scope → the advisory MUST be
-//     emitted and the review MUST still approve at enforce.
-//   - 002 is the anti-false-positive: the normal shape (Scout names the
-//     production file, TDD authors the sibling _test.go) must stay SILENT —
-//     an advisory that fires every healthy cycle is noise, not a signal.
-//   - 003 is the fail-open case: no scout-report.md → no declared scope → no
-//     new signal, per this gate family's ambiguity-favours-pass convention.
-//   - 004 is the anti-overcorrection guard: the one FATAL case (authoring
-//     under an empty ## top_n) must still abort at enforce.
 package cycle1111
 
 import (
@@ -47,13 +16,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/topngate"
 )
 
-// fileScopeMarker is the greppable token the new advisory must carry so
-// operators can find it in the reviewer's structured logf seam.
 const fileScopeMarker = "file scope"
 
-// writeWorkspace lays down the three phase deliverables tddScopeGate reads.
-// An empty topN/targetFiles/testFiles slice omits the corresponding entries; a
-// nil scoutSlug omits scout-report.md entirely.
 func writeWorkspace(t *testing.T, topN []string, scoutSlug string, targetFiles []string, claimed string, testFiles []string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -104,9 +68,6 @@ func writeFile(t *testing.T, dir, name, body string) {
 	}
 }
 
-// reviewTDD runs the SHIPPING reviewer over the workspace's tdd deliverable at
-// the strictest stage and returns both observable outputs: whether the cycle
-// was approved, and everything the reviewer wrote to its structured logf seam.
 func reviewTDD(t *testing.T, workspace string) (approve bool, reason, logged string) {
 	t.Helper()
 	r, w, err := os.Pipe()
@@ -134,11 +95,6 @@ func reviewTDD(t *testing.T, workspace string) (approve bool, reason, logged str
 	return res.Approve, res.Reason, logged
 }
 
-// TestC1111_001_FileScopeDriftEmitsAdvisoryWithoutBlocking is the crux: the
-// claimed label matches the committed top_n exactly (so every pre-existing
-// check passes silently) while the authored file lives in a tree the committed
-// item never declares. That is the wrong-work shape the slug comparison
-// provably cannot see.
 func TestC1111_001_FileScopeDriftEmitsAdvisoryWithoutBlocking(t *testing.T) {
 	ws := writeWorkspace(t,
 		[]string{"tdd-file-scope-binding-check"},
@@ -162,11 +118,6 @@ func TestC1111_001_FileScopeDriftEmitsAdvisoryWithoutBlocking(t *testing.T) {
 	}
 }
 
-// TestC1111_002_MatchingScopeStaysSilent is the anti-false-positive predicate.
-// The healthy shape is Scout naming the PRODUCTION file and TDD authoring the
-// sibling _test.go — same directory, same scope. An advisory that fires here
-// would fire on essentially every cycle and be worthless as a signal. This
-// predicate fails a blanket "always warn" implementation of 001.
 func TestC1111_002_MatchingScopeStaysSilent(t *testing.T) {
 	ws := writeWorkspace(t,
 		[]string{"committed-slug"},
@@ -184,13 +135,10 @@ func TestC1111_002_MatchingScopeStaysSilent(t *testing.T) {
 	}
 }
 
-// TestC1111_003_MissingScoutReportFailsOpen pins the ambiguity convention: no
-// scout-report.md means no declared scope, which is missing evidence rather
-// than evidence of a violation. It must produce no new signal at all.
 func TestC1111_003_MissingScoutReportFailsOpen(t *testing.T) {
 	ws := writeWorkspace(t,
 		[]string{"committed-slug"},
-		"", // no scout-report.md
+		"",
 		nil,
 		"committed-slug",
 		[]string{"go/internal/tokenresolver/resolver_test.go"},
@@ -204,12 +152,9 @@ func TestC1111_003_MissingScoutReportFailsOpen(t *testing.T) {
 	}
 }
 
-// TestC1111_004_EmptyTopNStillBlocks is the anti-overcorrection guard: the one
-// unambiguous FATAL case (triage committed nothing, TDD authored anyway) must
-// survive the new advisory path untouched.
 func TestC1111_004_EmptyTopNStillBlocks(t *testing.T) {
 	ws := writeWorkspace(t,
-		nil, // triage committed nothing
+		nil,
 		"orphan-task",
 		[]string{"go/internal/topngate/gate.go"},
 		"orphan-task",

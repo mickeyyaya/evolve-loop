@@ -1,36 +1,5 @@
 //go:build acs
 
-// Package cycle1158 materialises
-// .evolve/evals/land-cycle-1156-lifecycle-seam-with-audit-fixes.md — the eval
-// cycle 1158 authored for the four defects the cycle-1156 audit raised against
-// `inboxmover.ApplyCycleOutcome`, the single cycle-outcome lifecycle seam.
-//
-// Cycle 1158 ended WARN on an unrelated `debugger` phase failure before it could
-// write this file, so all seven `score_cap` entries have been pointing at a Go
-// package that did not exist: every cap was live against a missing target and
-// therefore unenforceable. This package closes that gap. Predicate numbering is
-// fixed by the eval's evidence commands (TestC1158_001..007) — a rename leaves
-// the corresponding cap unenforceable again.
-//
-//	001 — D1 (BLOCKING): a PASS-path promote error still drains residual claims
-//	002 — D1: the promote loop attempts EVERY committed id after a failure
-//	003 — D1 aggravator: the ship phase never claims a drain it did not complete
-//	004 — D2: a system-level FAIL never bumps the durable failure_count (AC4)
-//	005 — D2 twin: a task-level FAIL still bumps it (the S5 ceiling stays live)
-//	006 — D3: the production-dead lifecycle surface is retired
-//	007 — D4: ADR-0079 records the ClaimLaneScope shared-root mutation risk
-//
-// # Predicate quality (cycle-85 ban)
-//
-// None of these is satisfiable by adding a magic string to a source file. 001,
-// 002, 004 and 005 drive the real `ApplyCycleOutcome` over temp trees and assert
-// on where items physically land and what their durable `failure_count` says;
-// 003 runs the ship package's own regression tests as a subprocess and asserts
-// on their per-test verdicts; 006 reflects over the real `CycleOutcome` type and
-// asks the Go toolchain for the package's actual exported API. 007 is the single
-// content assertion and is legitimate: the ADR prose IS the deliverable for D4,
-// and `go/acs/cycle1160`'s predicate 005 pins the behaviour that prose describes
-// so the two cannot drift.
 package cycle1158
 
 import (
@@ -48,12 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// --- fixture helpers --------------------------------------------------------
-
-// newInbox builds an isolated project root with an empty .evolve/inbox/ and
-// returns (projectRoot, inboxDir). The lifecycle is filesystem-shaped, so every
-// predicate gets its own tree — a shared root would let one predicate's moves
-// leak into another's assertions.
 func newInbox(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -64,8 +27,6 @@ func newInbox(t *testing.T) (string, string) {
 	return root, inbox
 }
 
-// writeItem drops an inbox item JSON carrying id (and an optional pre-existing
-// failure_count) into dir, mirroring the real .evolve/inbox/ naming convention.
 func writeItem(t *testing.T, dir, id string, failureCount int) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -86,8 +47,6 @@ func writeItem(t *testing.T, dir, id string, failureCount int) string {
 	return path
 }
 
-// testOpts returns Options rooted at root with the landing gate stubbed to
-// "landed": the real gate shells out to git, which is noise for a temp dir.
 func testOpts(root string, stderr io.Writer) inboxmover.Options {
 	return inboxmover.Options{
 		ProjectRoot: root,
@@ -96,9 +55,6 @@ func testOpts(root string, stderr io.Writer) inboxmover.Options {
 	}
 }
 
-// blockDir writes a regular FILE where a directory is needed, so the
-// destination MkdirAll inside Promote fails — the infrastructure non-delivery
-// ADR-0079 made loud.
 func blockDir(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -109,8 +65,6 @@ func blockDir(t *testing.T, path string) {
 	}
 }
 
-// findItem returns the path of the file directly under dir whose JSON .id == id,
-// or "". Non-recursive by design: each lifecycle destination is a flat dir.
 func findItem(t *testing.T, dir, id string) string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -136,8 +90,6 @@ func findItem(t *testing.T, dir, id string) string {
 	return ""
 }
 
-// failureCountOf reads the durable failure_count off an item JSON. Absent reads
-// as 0 — the same reading bumpFailureCount uses.
 func failureCountOf(t *testing.T, path string) int {
 	t.Helper()
 	body, err := os.ReadFile(path)
@@ -153,15 +105,11 @@ func failureCountOf(t *testing.T, path string) int {
 	return doc.FailureCount
 }
 
-// goDir returns <repo>/go, the module root every toolchain subprocess runs in
-// via `go -C`. RepoRoot resolves the WORKTREE — where this cycle's edits live.
 func goDir(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// acsSubprocess wraps the subprocess call so a missing toolchain SKIPs rather
-// than red-failing the suite (the ACS runner may execute on a bare export).
 func acsSubprocess(t *testing.T, name string, args ...string) (string, string, int, error) {
 	t.Helper()
 	stdout, stderr, code, err := acsassert.SubprocessOutput(name, args...)
@@ -171,17 +119,6 @@ func acsSubprocess(t *testing.T, name string, args ...string) (string, string, i
 	return stdout, stderr, code, err
 }
 
-// --- D1: the PASS path must never early-return past the drain ---------------
-
-// Criterion (cap 9/10, BLOCKING): "A PASS-path promote error still drains
-// residual claims back to the inbox root (no early return)."
-//
-// The cycle-1156 defect was a bare `return` inside the PASS promote loop. One
-// unwritable processed/cycle-N/ stranded not just the failing id but every item
-// already parked in processing/cycle-N/, reintroducing the cross-cycle orphan
-// shape of cycles 124/265/294/295/308 that promoteInbox's own invariant comment
-// forbids. The contract is BOTH halves at once: the error still reaches the
-// caller, AND the drain has already run by the time it does.
 func TestC1158_001_pass_promote_error_still_drains_residual_claims(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1158")
@@ -199,7 +136,6 @@ func TestC1158_001_pass_promote_error_still_drains_residual_claims(t *testing.T)
 	if !errors.Is(err, inboxmover.ErrMvFailed) {
 		t.Fatalf("ApplyCycleOutcome err = %v; want an ErrMvFailed-wrapping error — a non-delivery must still reach the caller", err)
 	}
-	// The half that regressed: the drain ran anyway.
 	if findItem(t, inbox, "residual-task") == "" {
 		t.Errorf("residual-task was not drained back to the inbox root: an early return on the first failed promote strands every claimed item, which is the cross-cycle orphan shape (124/265/294/295/308) the drain exists to prevent")
 	}
@@ -213,14 +149,6 @@ func TestC1158_001_pass_promote_error_still_drains_residual_claims(t *testing.T)
 	}
 }
 
-// Criterion (cap 8/10): "The PASS promote loop attempts every committed id even
-// after an earlier one fails."
-//
-// 001 proves the drain still runs; this proves the LOOP itself continued. The
-// distinction matters because `break`-then-drain would green 001 while silently
-// skipping every id after the first failure. The joined error must therefore
-// name BOTH ids — errors.Join over per-id `promote %q` wrappers is the observable
-// that only a completed loop can produce.
 func TestC1158_002_pass_promote_attempts_every_committed_id(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1158")
@@ -245,15 +173,6 @@ func TestC1158_002_pass_promote_attempts_every_committed_id(t *testing.T) {
 	}
 }
 
-// Criterion (cap 8/10): "The ship phase never logs 'inbox lifecycle drain
-// complete' when the drain did not run."
-//
-// The aggravator half of D1: postship.go appended the OK line unconditionally,
-// right after the WARN for the failure that stopped the drain, so an operator
-// read success from a cycle whose lifecycle transition demonstrably did not
-// complete. The behaviour lives in an internal package, so this predicate runs
-// that package's own regression tests as a subprocess and asserts on their
-// per-test verdicts — the eval's third score_cap names exactly this command.
 func TestC1158_003_ship_never_claims_a_drain_it_did_not_complete(t *testing.T) {
 	mod := goDir(t)
 	names := []string{
@@ -272,21 +191,6 @@ func TestC1158_003_ship_never_claims_a_drain_it_did_not_complete(t *testing.T) {
 	}
 }
 
-// --- D2: ADR-0072 AC4, and its anti-overcorrection twin ---------------------
-
-// Criterion (cap 7/10): "A system-level FAIL never increments the durable
-// failure_count (ADR-0072 AC4)."
-//
-// This seam is what first makes bumpFailureCount reachable for wave lanes, so an
-// ungated bump lets the documented recurring quota-storm class (cycles
-// 1077-1096) walk healthy committed ids toward TaskRetryCeiling — after which a
-// single later task-level FAIL quarantines a backlog that never failed on its
-// own merits. systemLevel gates the BUMP, not merely the quarantine decision.
-//
-// The fixture is the exact boundary: failure_count 1 against ceiling 2, so an
-// ungated bump would both increment AND quarantine. Asserting on the durable
-// count (not just "did it quarantine") is what separates a real AC4 gate from a
-// gate applied only at the quarantine branch.
 func TestC1158_004_system_level_failure_never_bumps_failure_count(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1158")
@@ -314,20 +218,10 @@ func TestC1158_004_system_level_failure_never_bumps_failure_count(t *testing.T) 
 	}
 }
 
-// Criterion (cap 7/10, anti-overcorrection twin of 004): "A task-level FAIL
-// still increments failure_count (the S5 ceiling stays reachable)."
-//
-// The cheap way to green 004 is to delete the bump — which re-opens
-// `wave-lane-task-quarantine-dead` exactly, the defect this whole seam exists to
-// close. Same fixture, same boundary, systemLevel false: the count must reach
-// the ceiling and the item must park in quarantine/ rather than return to the
-// root where the next triage would re-pick it.
 func TestC1158_005_task_level_failure_still_bumps_failure_count(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1158")
 	writeItem(t, procDir, "poison-task", 1)
-	// A committed id that is NOT at the ceiling: it must bump and release, so
-	// this predicate also proves the bump is per-item, not a blanket park.
 	writeItem(t, procDir, "healthy-task", 0)
 
 	if _, err := inboxmover.ApplyCycleOutcome(testOpts(root, io.Discard), inboxmover.CycleOutcome{
@@ -356,28 +250,11 @@ func TestC1158_005_task_level_failure_still_bumps_failure_count(t *testing.T) {
 	}
 }
 
-// --- D3 / D4: the cheap half of the audit -----------------------------------
-
-// Criterion (cap 5/10): "The production-dead lifecycle surface
-// (CycleOutcome.LaneIDs, ReleaseCycleProcessingWithQuarantine) is retired."
-//
-// `LaneIDs` had zero production readers, so it advertised a lane-scope contract
-// ApplyCycleOutcome does not implement: a caller could pass the full menu scope
-// and reasonably expect the uncommitted remainder to be handled, when in fact
-// everything is derived from CommittedIDs plus the on-disk processing/cycle-N/
-// contents. `ReleaseCycleProcessingWithQuarantine` had zero production callers
-// and drained the whole dir with no committed-set filter — a second public door
-// into the lifecycle ApplyCycleOutcome now owns (never_duplicate_centralize).
-//
-// Reflection over the real type and `go doc` on the real package — not a source
-// grep — so neither a comment-out nor a renamed-but-present symbol satisfies it.
 func TestC1158_006_dead_lifecycle_surface_retired(t *testing.T) {
 	typ := reflect.TypeOf(inboxmover.CycleOutcome{})
 	if _, found := typ.FieldByName("LaneIDs"); found {
 		t.Errorf("inboxmover.CycleOutcome still declares LaneIDs: a field only tests write is a claim about the lifecycle the lifecycle does not honour (audit D3)")
 	}
-	// The fields the seam actually reads must survive the retirement — the
-	// obvious overcorrection is to prune the struct too far.
 	for _, f := range []string{"Cycle", "Passed", "CommittedIDs", "CommitSHA", "Reason", "Ceiling", "SystemLevel"} {
 		if _, found := typ.FieldByName(f); !found {
 			t.Errorf("inboxmover.CycleOutcome lost load-bearing field %q: the retirement must remove the dead surface, not the seam's real inputs", f)
@@ -390,9 +267,6 @@ func TestC1158_006_dead_lifecycle_surface_retired(t *testing.T) {
 		t.Errorf("inboxmover still exports ReleaseCycleProcessingWithQuarantine:\n%s\nzero production callers, no committed-set filter — a second public door into the lifecycle ApplyCycleOutcome owns (audit D3)", stdout)
 	}
 
-	// The retirement is only real if the packages that used the retired surface
-	// still COMPILE against the migrated API: an ACS package that fails to build
-	// is a hard suite error, never a silent PASS.
 	for _, pkg := range []string{"./acs/cycle1156", "./acs/cycle1157"} {
 		_, stderr, vetCode, _ := acsSubprocess(t, "go", "-C", mod, "vet", "-tags", "acs", pkg)
 		if vetCode != 0 {
@@ -401,17 +275,6 @@ func TestC1158_006_dead_lifecycle_surface_retired(t *testing.T) {
 	}
 }
 
-// Criterion (cap 4/10): "ADR-0079 records the ClaimLaneScope shared-inbox-root
-// mutation as an accepted risk."
-//
-// ADR-0079 argues (correctly) that claiming at outcome time rather than at
-// dispatch avoids starving triage. What it never said is the cost: the claim
-// moves files OUT of the shared inbox root while sibling lanes are live, and
-// triage reads that root with no lane isolation (triage.go:113). At the standing
-// fleet width of 3 a sibling's triage can miss an item for one cycle.
-//
-// The bounding-mechanism requirement is what stops this from being a one-liner:
-// a risk paragraph naming no mechanism is not an accepted risk, it is a shrug.
 func TestC1158_007_adr0079_documents_shared_root_mutation_risk(t *testing.T) {
 	adr := filepath.Join(acsassert.RepoRoot(t), "docs", "architecture", "adr",
 		"0079-cycle-outcome-inbox-lifecycle-seam.md")
@@ -425,7 +288,6 @@ func TestC1158_007_adr0079_documents_shared_root_mutation_risk(t *testing.T) {
 	body := string(raw)
 	lower := strings.ToLower(body)
 
-	// A locatable section, not a sentence smuggled into Consequences.
 	if !regexp.MustCompile(`(?mi)^#{2,4} .*risk`).MatchString(body) {
 		t.Errorf("ADR-0079 has no heading naming a risk: the D4 acknowledgement must be a locatable section, not an aside")
 	}
@@ -433,7 +295,6 @@ func TestC1158_007_adr0079_documents_shared_root_mutation_risk(t *testing.T) {
 		t.Errorf(`ADR-0079 never says "accepted risk": D4 asked for an explicit acceptance, so a later reader can tell a considered trade-off from an oversight`)
 	}
 
-	// What mutates what.
 	for _, needle := range []struct{ term, why string }{
 		{"claimlanescope", "the function that performs the shared-root mutation"},
 		{"inbox root", "the shared surface it mutates"},
@@ -450,7 +311,6 @@ func TestC1158_007_adr0079_documents_shared_root_mutation_risk(t *testing.T) {
 		t.Errorf("ADR-0079 does not characterise the miss window: an accepted risk with no stated blast radius cannot be re-evaluated later")
 	}
 
-	// Both bounding mechanisms — what makes it ACCEPTED rather than merely admitted.
 	if !regexp.MustCompile(`(?i)(residual )?drain`).MatchString(body) {
 		t.Errorf("ADR-0079 does not cite the residual drain as a bounding mechanism: it is what self-heals the claim after one cycle")
 	}

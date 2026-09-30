@@ -1,12 +1,5 @@
 //go:build acs
 
-// Package cycle1737 holds the acceptance predicates for gc-manifests-out-of-cycle-run-dirs:
-// the pre-batch and batch-end GC sweeps publish their manifests under .evolve/gc/<stage>,
-// never into a cycle run dir that archivePollutedWorkspace would archive; the guard keeps
-// archiving any non-lane-scope file; the diff keeps the module-wide size ratchet green
-// without editing offenders.json; and the explanation document reports the pre-fix
-// behavior that a faithful restore of the pre-fix code actually shows, including where
-// the workspace guard kept the batch-end sweep from overwriting the pre-batch manifest.
 package cycle1737
 
 import (
@@ -46,7 +39,6 @@ const (
 	explainDocGlob = "docs/explain/builds/cycle-1737-*.md"
 )
 
-// preFixLoopSources are the production files the fix changed (paths relative to go/).
 var preFixLoopSources = []string{
 	"cmd/evolve/cmd_loop.go",
 	"cmd/evolve/cmd_loop_batch.go",
@@ -54,12 +46,10 @@ var preFixLoopSources = []string{
 	"cmd/evolve/cmd_loop_prebatch.go",
 }
 
-// mutant rewrites one source line of the module (paths relative to go/) for a -overlay run.
 type mutant struct {
 	src, anchor, replacement string
 }
 
-// Each revert restores a GC call site's pre-fix target: the run dir of the cycle after the last one.
 var (
 	preBatchRevert = mutant{
 		src:         "cmd/evolve/cmd_loop_prebatch.go",
@@ -71,7 +61,6 @@ var (
 		anchor:      `gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "batch-end"), stderr)`,
 		replacement: `gcHookFn(cfg, filepath.Clean(cycleWorkspace(cfg.ProjectRoot, lastCycleIn(*lr)+1)), stderr)`,
 	}
-	// guardAllowlistsGCManifests is the rejected design: teach the guard to skip GC filenames.
 	guardAllowlistsGCManifests = mutant{
 		src:         "internal/core/workspace_guard.go",
 		anchor:      `if e.Name() != LaneScopeFile {`,
@@ -95,8 +84,6 @@ func testContext(t *testing.T) context.Context {
 	return ctx
 }
 
-// overlayOf writes each mutant's rewritten file plus a go -overlay manifest under
-// t.TempDir(), so no worktree file is touched.
 func overlayOf(t *testing.T, mutants ...mutant) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -119,16 +106,11 @@ func overlayOf(t *testing.T, mutants ...mutant) string {
 	return writeOverlay(t, dir, replace)
 }
 
-// guardSources hold the workspace guard and the cycle-init call that runs it before a
-// cycle's first phase; the pre-fix loop ran them unchanged only if they match preFixBase.
 var guardSources = []string{
 	"go/internal/core/workspace_guard.go",
 	"go/internal/core/cyclerun.go",
 }
 
-// faithfulPreFixOverlay restores every production file the fix changed from preFixBase.
-// The only addition is a gcManifestDir stub, so the current graders compile against them.
-// extra adds probe files (module path -> source) on top of the restored base.
 func faithfulPreFixOverlay(t *testing.T, extra map[string]string) string {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -172,7 +154,6 @@ type goTestRun struct {
 	code int
 }
 
-// runGraders runs the named tests of ONE package; an empty overlay means none.
 func runGraders(t *testing.T, overlay, pkg string, names ...string) goTestRun {
 	t.Helper()
 	cmd := exec.CommandContext(testContext(t), "go", "test", "-count=1", "-v", "-overlay="+overlay,
@@ -210,8 +191,6 @@ func requirePass(t *testing.T, run goTestRun, names ...string) {
 	}
 }
 
-// requireKilled asserts each grader RAN and FAILED under the mutant; a compile
-// failure reports no --- FAIL line, so it never counts as a kill.
 func requireKilled(t *testing.T, label string, run goTestRun, names ...string) {
 	t.Helper()
 	failed := false
@@ -278,7 +257,6 @@ func TestC1737_004_ModuleWideSizeRatchetHoldsWithoutEditingOffenders(t *testing.
 	}
 }
 
-// preFixTruth is what the faithful pre-fix base does, observed by running the graders on it.
 type preFixTruth struct {
 	failing           []string
 	batchEndSinkCycle string
@@ -359,8 +337,6 @@ var (
 	failClaimRE       = regexp.MustCompile(`(?i)\bfail(s|ed|ing)?\b`)
 )
 
-// docSentences splits markdown at blank lines, headings, list items and table rows,
-// then at sentence-ending punctuation.
 func docSentences(doc string) []string {
 	var blocks, cur []string
 	flush := func() {
@@ -456,9 +432,6 @@ func TestC1737_005_ExplanationDocMatchesFaithfulPreFixBase(t *testing.T) {
 	}
 }
 
-// overwriteTruth is where the pre-fix batch-end sweep could overwrite the pre-batch
-// manifest: observed on the faithful pre-fix base, and on the workspace guard that the
-// pre-fix loop ran unchanged between the two sweeps.
 type overwriteTruth struct {
 	preBatchSinkCycle  string
 	batchEndSinkCycle  string
@@ -466,9 +439,6 @@ type overwriteTruth struct {
 	guardArchivesFirst bool
 }
 
-// noCycleProbeSource asks the restored pre-fix batchEndGCCycle where a batch that ran no
-// cycles sent its batch-end manifest; startNext is the pre-batch sink's cycle, which is
-// the lastBeforeGCHook+1 the pre-fix call site passed.
 func noCycleProbeSource(startNext string) string {
 	return `package main
 
@@ -544,10 +514,6 @@ func docClauses(doc string) []string {
 	return clauses
 }
 
-// overwriteClaimFindings reports a clause that has the batch-end sweep overwrite the
-// pre-batch manifest in a batch that ran cycles, when the guard archived that run dir
-// before the batch-end sweep wrote. It also reports a Summary and Rationale that never
-// scope the pre-fix overwrite to a batch that ran no cycles, when that is where it happened.
 func overwriteClaimFindings(doc string, truth overwriteTruth) []string {
 	sharedInLoop := truth.preBatchSinkCycle == truth.batchEndSinkCycle
 	var findings []string

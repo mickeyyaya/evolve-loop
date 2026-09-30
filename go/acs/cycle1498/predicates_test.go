@@ -1,30 +1,5 @@
 //go:build acs
 
-// Package cycle1498 materialises the cycle-1498 acceptance criteria for the one
-// fleet-scoped task pinned to this lane, `retire-consumed-fleet-alias`: retire
-// the consumed fleet alias `pipeline-defect-pipeline-blocker` through the
-// EXISTING reviewed/locked `evolve carryover apply-decisions` path rather than a
-// prompt-side suppression rule or a hand edit of state.json.
-//
-// Predicate strategy (the cycle-85 degenerate-predicate ban): predicates 001-003
-// drive the REAL production caller — the `evolve` CLI entry point
-// (`cmd/evolve` dispatch table → runCarryover → runCarryoverApplyDecisions →
-// applyCarryoverDecisions) — against an on-disk state.json fixture, and assert on
-// exit code plus the resulting on-disk bytes. No source grep carries any
-// assertion. The binary under test is BUILT FROM THIS WORKTREE'S SOURCE in
-// TestMain, never the pre-existing `go/evolve` artifact, so a regression the
-// builder introduces in cmd_carryover.go turns these predicates RED instead of
-// passing against a stale binary.
-//
-// Predicate 004 is the task's declared verifiableBy: the named regression test
-// must exist in `go/cmd/evolve/cmd_carryover_test.go` and PASS. It asserts on the
-// `--- PASS: <exact name>` line rather than the exit code, because `go test -run`
-// with a pattern that matches nothing exits 0 — the vacuous-green trap.
-//
-// Reliability (flaky-predicate-shape rules): no `/...` sweep, no whole-package
-// `go test` (004 is narrowed by an anchored `-run`), no wall-clock deadline, no
-// literal PID; every subprocess is given absolute paths or an explicit cmd.Dir,
-// never process cwd.
 package cycle1498
 
 import (
@@ -39,23 +14,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// consumedFleetAlias is the exact id the lane is authorized to retire.
 const consumedFleetAlias = "pipeline-defect-pipeline-blocker"
 
-// liveSibling is an unrelated, still-live carryover item that MUST survive every
-// retirement apply — the anti-overreach control that fails a blanket prune or a
-// substring filter.
 const liveSibling = "todo-live-unrelated-sibling"
 
-// namedRegressionTest is the task's declared verifiableBy target.
 const namedRegressionTest = "TestCarryoverApplyDecisions_DropsConsumedFleetAlias"
 
-// evolveBin is the CLI built from THIS worktree's source in TestMain.
 var evolveBin string
 
-// buildErr is non-empty when the worktree build failed; every predicate fails
-// loudly with it rather than silently skipping (a predicate that cannot run is
-// never a PASS).
 var buildErr string
 
 func TestMain(m *testing.M) {
@@ -67,7 +33,6 @@ func TestMain(m *testing.M) {
 	}
 	defer os.RemoveAll(dir)
 
-	// Resolve the worktree's go/ module root without depending on process cwd.
 	goMod, err := moduleRoot()
 	if err != nil {
 		buildErr = err.Error()
@@ -85,11 +50,8 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-// moduleRoot returns <worktree>/go using the same repo-root resolution the rest
-// of the ACS suite uses. RepoRoot needs a *testing.T, so TestMain walks up from
-// the predicate file's own directory instead.
 func moduleRoot() (string, error) {
-	wd, err := os.Getwd() // go test runs the binary in the package dir: <root>/go/acs/cycle1498
+	wd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("getwd: %w", err)
 	}
@@ -118,10 +80,6 @@ func requireBinary(t *testing.T) string {
 	return evolveBin
 }
 
-// writeAliasFixture writes a state.json holding the consumed alias plus an
-// unrelated live sibling, and returns its path. The sibling's action text
-// MENTIONS the alias on purpose: a retirement that matches on text instead of id
-// would delete it and fail the anti-overreach assertion.
 func writeAliasFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -148,8 +106,6 @@ func writeAliasFixture(t *testing.T) string {
 	return path
 }
 
-// writeDecisions writes a reviewed decisions doc and returns its path.
-// aliasReason is placed verbatim so a caller can exercise the empty-reason guard.
 func writeDecisions(t *testing.T, aliasReason string) string {
 	t.Helper()
 	doc := map[string]any{
@@ -170,9 +126,6 @@ func writeDecisions(t *testing.T, aliasReason string) string {
 	return path
 }
 
-// carryoverIDs decodes state.json and returns the resident carryover ids. It
-// fatals when the file is not valid JSON, which is itself an assertion (the
-// idempotency criterion requires the file stay parseable).
 func carryoverIDs(t *testing.T, statePath string) map[string]bool {
 	t.Helper()
 	raw, err := os.ReadFile(statePath)
@@ -194,7 +147,6 @@ func carryoverIDs(t *testing.T, statePath string) map[string]bool {
 	return ids
 }
 
-// applyRetirement runs the real CLI entry point against the fixture.
 func applyRetirement(t *testing.T, statePath, decisionsPath string) (stdout, stderr string, code int) {
 	t.Helper()
 	bin := requireBinary(t)
@@ -206,9 +158,6 @@ func applyRetirement(t *testing.T, statePath, decisionsPath string) (stdout, std
 	return stdout, stderr, code
 }
 
-// TestC1498_001_AliasDropRemovesOnlyTheNamedAlias — AC1. A reviewed `drop`
-// decision applied through the real CLI removes the consumed fleet alias and
-// leaves the unrelated live sibling (and unmodelled state keys) intact.
 func TestC1498_001_AliasDropRemovesOnlyTheNamedAlias(t *testing.T) {
 	statePath := writeAliasFixture(t)
 	decisionsPath := writeDecisions(t, "consumed fleet alias; residual shipped")
@@ -241,18 +190,13 @@ func TestC1498_001_AliasDropRemovesOnlyTheNamedAlias(t *testing.T) {
 	}
 }
 
-// TestC1498_002_EmptyReasonDropIsRejectedBeforeAnyWrite — AC2, NEGATIVE. An
-// unjustified (whitespace-only reason) drop of the alias must be refused with a
-// non-zero exit AND leave state.json byte-identical: validation runs before the
-// lock is taken. This is the anti-hand-edit guard; without it an unreviewed
-// retirement could silently prune live carryover context.
 func TestC1498_002_EmptyReasonDropIsRejectedBeforeAnyWrite(t *testing.T) {
 	statePath := writeAliasFixture(t)
 	before, err := os.ReadFile(statePath)
 	if err != nil {
 		t.Fatalf("read state: %v", err)
 	}
-	decisionsPath := writeDecisions(t, "   ") // whitespace-only == unjustified
+	decisionsPath := writeDecisions(t, "   ")
 
 	stdout, stderr, code := applyRetirement(t, statePath, decisionsPath)
 	if code == 0 {
@@ -275,9 +219,6 @@ func TestC1498_002_EmptyReasonDropIsRejectedBeforeAnyWrite(t *testing.T) {
 	}
 }
 
-// TestC1498_003_RepeatedAliasDropIsIdempotent — AC3. Re-applying the same
-// reviewed decision is harmless: exit 0, the file stays valid JSON, the alias
-// stays gone, and the live sibling is never collaterally removed by the repeat.
 func TestC1498_003_RepeatedAliasDropIsIdempotent(t *testing.T) {
 	statePath := writeAliasFixture(t)
 	decisionsPath := writeDecisions(t, "consumed fleet alias; residual shipped")
@@ -291,7 +232,7 @@ func TestC1498_003_RepeatedAliasDropIsIdempotent(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("second (idempotent) apply exited %d, want 0 (stderr=%s)", code, stderr)
 	}
-	second := carryoverIDs(t, statePath) // fatals if the repeat left torn/invalid JSON
+	second := carryoverIDs(t, statePath)
 
 	if len(first) != len(second) {
 		t.Errorf("repeat apply changed the carryover count %d→%d (not idempotent)", len(first), len(second))
@@ -307,21 +248,12 @@ func TestC1498_003_RepeatedAliasDropIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestC1498_004_NamedRegressionTestExistsAndPasses — AC4, the task's declared
-// verifiableBy. The regression pin must live with the command it protects
-// (go/cmd/evolve/cmd_carryover_test.go) so it runs in normal CI, not only in this
-// cycle's ACS lane.
-//
-// The assertion is on the `--- PASS: <name>` line, NOT the exit code: `go test
-// -run` with a pattern matching nothing exits 0, so an exit-code check would go
-// vacuously green while the test is still absent.
 func TestC1498_004_NamedRegressionTestExistsAndPasses(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	testFile := filepath.Join(root, "go", "cmd", "evolve", "cmd_carryover_test.go")
 	if !acsassert.FileExists(t, testFile) {
 		t.Fatalf("RED: %s missing", testFile)
 	}
-	// Tracking check (cycle-93): an untracked test file is dropped at ship.
 	if _, _, code, _ := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch",
 		"go/cmd/evolve/cmd_carryover_test.go"); code != 0 {
 		t.Errorf("RED: go/cmd/evolve/cmd_carryover_test.go is untracked — it would be dropped at ship")

@@ -1,16 +1,5 @@
 //go:build acs
 
-// Package cycle1718 materialises the acceptance criteria for
-// profiles-test-hygiene.
-//
-// The fixture predicates compile ./internal/profiles with -trimpath. Under
-// -trimpath runtime.Caller reports module-relative file paths, so the tests'
-// runtime.Caller-anchored profiles directory resolves to
-// github.com/mickeyyaya/evolve-loop/.evolve/profiles relative to the test
-// binary's working directory. Each fixture lays the repository's tracked
-// profiles out under that prefix and decides which of them git tracks, so the
-// verdict under test is the real test's own, over a profile set no phase
-// sandbox forbids writing.
 package cycle1718
 
 import (
@@ -36,18 +25,13 @@ import (
 const (
 	fallbackTest  = "TestEveryAgentProfileHasAFallbackChain"
 	oldRouterTest = "TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy"
-	// fixtureRepo is the repository root a -trimpath build of
-	// ./internal/profiles resolves: the module path minus its "/go" suffix.
-	fixtureRepo = "github.com/mickeyyaya/evolve-loop"
-	stubName    = "zz-untracked-stub-c1718"
-	rescueDoc   = "docs/operations/rescue-branch-disposition-2026-06-07.md"
+	fixtureRepo   = "github.com/mickeyyaya/evolve-loop"
+	stubName      = "zz-untracked-stub-c1718"
+	rescueDoc     = "docs/operations/rescue-branch-disposition-2026-06-07.md"
 )
 
-// stubPayload is a runtime-minted-style profile: dispatchable (cli set, name
-// set so Loader.List keeps it) and missing the cli_fallback the test demands.
 const stubPayload = `{"name":"` + stubName + `","role":"stub","cli":"claude-tmux","model_tier_default":"fast"}`
 
-// redirectingGitVars would point a child git away from the fixture.
 var redirectingGitVars = map[string]bool{
 	"GIT_DIR":                          true,
 	"GIT_WORK_TREE":                    true,
@@ -69,7 +53,6 @@ func childEnv(extra ...string) []string {
 	return append(env, extra...)
 }
 
-// git runs git in dir. A non-zero exit is a fixture fault, not a verdict.
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
@@ -86,7 +69,6 @@ func git(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// profilesTestBinary compiles ./internal/profiles's tests from root with -trimpath.
 func profilesTestBinary(t *testing.T, root string) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "profiles.test")
@@ -98,11 +80,6 @@ func profilesTestBinary(t *testing.T, root string) string {
 	return bin
 }
 
-// newFixture copies root's git-tracked .evolve/profiles into a fresh directory
-// laid out for the -trimpath binary and returns fx, the binary's working
-// directory, and repo, the repository root it resolves. With tracked, repo is
-// a git repository whose index holds every copied profile — the index is what
-// git ls-files, and so the tracked-set filter, reads.
 func newFixture(t *testing.T, root string, tracked bool) (fx, repo string) {
 	t.Helper()
 	fx, err := filepath.EvalSymlinks(t.TempDir())
@@ -141,9 +118,6 @@ func writeStub(t *testing.T, repo string) {
 	}
 }
 
-// runTest runs one top-level test from bin in fx, with git discovery fenced at
-// fx, and returns "PASS", "FAIL", or "" when it reported neither (skipped,
-// renamed, not run).
 func runTest(t *testing.T, bin, fx, name string) (verdict, output string) {
 	t.Helper()
 	cmd := exec.Command(bin, "-test.run", "^"+name+"$", "-test.v", "-test.count=1")
@@ -203,8 +177,6 @@ func TestC1718_003_FallbackChainBindsEveryProfileWithoutGit(t *testing.T) {
 
 var namedHelperRE = regexp.MustCompile(`(?m)^func .*ProfilesDir\(t \*testing\.T\) string`)
 
-// profilesDirHelpers returns the package's funcs named like a profiles-dir
-// helper, and the funcs that resolve .evolve through runtime.Caller.
 func profilesDirHelpers(t *testing.T, pkgDir string) (named, resolvers []string) {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join(pkgDir, "*.go"))
@@ -263,8 +235,6 @@ func mentionsEvolveDir(body *ast.BlockStmt) bool {
 }
 
 // acs-predicate: config-check — "grep finds one profiles-dir helper" is a
-// source-structure criterion; the go test half proves the surviving helper
-// still resolves the live profiles for the retargeted effort matrix.
 func TestC1718_004_OneProfilesDirHelper(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	named, resolvers := profilesDirHelpers(t, filepath.Join(root, "go", "internal", "profiles"))
@@ -290,7 +260,6 @@ func listTests(t *testing.T, bin string) []string {
 	return strings.Fields(stdout)
 }
 
-// rewriteRouter writes router.json with field replaced (orig when value is nil).
 func rewriteRouter(t *testing.T, path string, orig []byte, field string, value any) {
 	t.Helper()
 	body := orig
@@ -310,8 +279,6 @@ func rewriteRouter(t *testing.T, path string, orig []byte, field string, value a
 	}
 }
 
-// pinsRouter reports whether test passes on the real router profile and fails
-// both when the router leaves agy-tmux and when its fallback leaves claude-tmux.
 func pinsRouter(t *testing.T, bin, fx, routerPath string, orig []byte, test string) bool {
 	t.Helper()
 	defer rewriteRouter(t, routerPath, orig, "", nil)
@@ -377,7 +344,6 @@ func TestC1718_005_RouterTestNameStatesItsAssertion(t *testing.T) {
 }
 
 // acs-predicate: config-check — documentation accuracy criterion; the
-// Loader.Get half pins the behavior the corrected doc must describe.
 func TestC1718_006_RescueDocStatesMainExpandsAllowedTools(t *testing.T) {
 	dir := t.TempDir()
 	for name, body := range map[string]string{

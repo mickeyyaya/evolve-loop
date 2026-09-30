@@ -1,32 +1,5 @@
 //go:build acs
 
-// Package cycle1292 materialises the cycle-1292 acceptance criteria for the
-// single fleet-scoped lane pinned to this cycle (inbox item
-// `continuation-defect-ledger`, fifth hop of the 1279 → 1282 → 1285/1287 → 1290
-// → 1292 chain). It closes the two defects the immediate ancestor's disposition
-// ledger carried forward OPEN (`.evolve/runs/cycle-1290/defect-dispositions.json`):
-//
-//   - 1290-D2 → the partial-write OVERCLAIM. writeInboxItems writes one file per
-//     item and returns on the FIRST failure, so items before the failing one are
-//     already on disk; preserveDiagnosis nonetheless lists every configured item
-//     as "still UNQUEUED" in retrospective-unqueued.md.
-//   - 1290-D1 → the UNBACKED DEFERRAL. Both governed documents assert 1287-F2 was
-//     "queued as audit-eval-existence-path-convention", and no such item exists
-//     in .evolve/inbox — an unbacked claim inside the very lane that exists to
-//     catch unbacked claims.
-//
-// Predicate strategy. 001/002 drive the production entry point
-// (faillearn.WriteArtifacts) from OUTSIDE the package and assert on the emitted
-// artifact's content, so they survive both cheap gaming moves at once: deleting
-// the in-package reproducer, and asserting `err != nil` without ever reading the
-// artifact. 003 then requires the in-package reproducer to be tree-resident and
-// run-and-pass together with the pre-existing 1287/1290 invariants — greening 001
-// by weakening inbox_transactional_test.go or inbox_failure_degraded_test.go is
-// the fix being wrong, not the contract being met. 004 drives the REAL inbox
-// consumer (inboxbatch.LoadDir) rather than stat-ing a filename, because the
-// defect is "the claim is unbacked", and a file the loader drops backs nothing.
-// Subprocess predicates run ONE named package under an explicit -run expression
-// with per-name PASS accounting, per the flaky-predicate-shape rules.
 package cycle1292
 
 import (
@@ -42,20 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// deferralItemSlug is the id the two governed documents promise is queued. The
-// claim is only true when an inbox item the loader can actually parse carries it.
 const deferralItemSlug = "audit-eval-existence-path-convention"
 
-// goTestRun runs ONE named package under an explicit -run expression built from
-// the exact test names given, and requires EVERY named test to have executed and
-// PASSED.
-//
-// Per-name accounting, not exit code alone: `go test -run TestThatDoesNotExist
-// ./pkg` exits 0 with a warning, and an alternation where only some names exist
-// exits 0 with no warning at all — so an exit-code predicate greens on a tree
-// that deleted the very tests it exists to protect. `go -C <dir>` anchors the
-// invocation to the worktree under test rather than the process cwd, which
-// differs between the main tree, a worktree, and each fleet lane.
 func goTestRun(t *testing.T, root, pkg string, names ...string) {
 	t.Helper()
 	anchored := make([]string, 0, len(names))
@@ -97,10 +58,6 @@ func ledgerItems() []faillearn.InboxItem {
 	}
 }
 
-// unqueuedSection isolates the "still UNQUEUED" list from the degraded artifact.
-// Section-scoped, never whole-file: the artifact embeds the rendered
-// retrospective, whose defect text can legitimately mention an item id, so a
-// whole-file Contains would green on the very overclaim under test.
 func unqueuedSection(t *testing.T, body string) string {
 	t.Helper()
 	lines := strings.Split(body, "\n")
@@ -124,9 +81,6 @@ func unqueuedSection(t *testing.T, body string) string {
 	return strings.Join(out, "\n")
 }
 
-// TestC1292_001_PartialInboxWriteNamesOnlyUnqueuedItems is the primary predicate
-// for 1290-D2. An id collision on item 2-of-3 leaves item 1 on disk; the degraded
-// artifact must name items 2 and 3 and must NOT name item 1.
 func TestC1292_001_PartialInboxWriteNamesOnlyUnqueuedItems(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
 	inboxDir := filepath.Join(t.TempDir(), "inbox")
@@ -134,8 +88,6 @@ func TestC1292_001_PartialInboxWriteNamesOnlyUnqueuedItems(t *testing.T) {
 		t.Fatalf("prepare inbox dir: %v", err)
 	}
 	items := ledgerItems()
-	// A DIFFERENT item already filed under item 2's id — the cycle-1282 DEF-4
-	// collision rule refuses to drop ours, which fails the write at index 1.
 	collision, err := json.MarshalIndent(faillearn.InboxItem{ID: items[1].ID, Title: "filed by another lane", Weight: 0.5, Kind: "chore", Priority: "L", InjectedBy: "other-lane"}, "", "  ")
 	if err != nil {
 		t.Fatalf("encode colliding item: %v", err)
@@ -170,15 +122,8 @@ func TestC1292_001_PartialInboxWriteNamesOnlyUnqueuedItems(t *testing.T) {
 	}
 }
 
-// TestC1292_002_TotalInboxFailureStillNamesEveryItem is the boundary predicate:
-// when the inbox directory itself is unwritable NOTHING reached the queue, so the
-// correct list is every item. Guards the wrong fix that assumes "everything
-// before the error index succeeded" or simply drops the first entry.
 func TestC1292_002_TotalInboxFailureStillNamesEveryItem(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
-	// A regular file where the inbox DIRECTORY must go: MkdirAll and create both
-	// fail ENOTDIR. Deterministic, and not defeated by a root CI runner the way a
-	// chmod-based injection would be.
 	blocked := filepath.Join(t.TempDir(), "inbox")
 	if err := os.WriteFile(blocked, []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("prepare blocked inbox path: %v", err)
@@ -200,19 +145,12 @@ func TestC1292_002_TotalInboxFailureStillNamesEveryItem(t *testing.T) {
 	}
 }
 
-// TestC1292_003_ReproducerAndPriorInvariantsRunAndPass requires the in-package
-// reproducer for 1290-D2 to be tree-resident and executing (the cycle-1285
-// lesson: a red reproducer minted and abandoned in the same cycle protects
-// nothing), AND the pre-existing 1287/1290 invariants to still pass. Greening
-// 001 by weakening the transactional or degraded-arm locks fails here.
 func TestC1292_003_ReproducerAndPriorInvariantsRunAndPass(t *testing.T) {
 	goTestRun(t, acsassert.RepoRoot(t), "./internal/faillearn",
-		// cycle-1292 reproducer (1290-D2)
 		"TestWriteArtifacts_PartialWriteNamesOnlyUnqueuedItems",
 		"TestWriteArtifacts_PartialWriteItemRejectionNamesOnlyUnqueuedItems",
 		"TestWriteArtifacts_PartialWrite_TotalFailureNamesEveryItem",
 		"TestWriteArtifacts_PartialWrite_FirstItemFailsNamesEveryItem",
-		// pre-existing invariants that must survive the fix
 		"TestWriteArtifacts_InboxFailureWritesUnqueuedRetro",
 		"TestWriteArtifacts_InboxFailureDegradedRetroIsIdempotent",
 		"TestWriteArtifacts_SuccessMintsNoUnqueuedMarker",
@@ -220,11 +158,6 @@ func TestC1292_003_ReproducerAndPriorInvariantsRunAndPass(t *testing.T) {
 	)
 }
 
-// TestC1292_004_DeferralClaimIsBackedByALoadableInboxItem is the predicate for
-// 1290-D1. It drives the REAL consumer — inboxbatch.LoadDir, the loader the
-// triage path uses — rather than stat-ing a filename: the defect is that a
-// documented deferral is unbacked, and an item the loader drops or parses into an
-// empty shell backs nothing (the cycle-1190 dropped-field shape).
 func TestC1292_004_DeferralClaimIsBackedByALoadableInboxItem(t *testing.T) {
 	dir := filepath.Join(acsassert.RepoRoot(t), ".evolve", "inbox")
 	items, warnings, err := inboxbatch.LoadDir(dir)
@@ -260,13 +193,7 @@ func TestC1292_004_DeferralClaimIsBackedByALoadableInboxItem(t *testing.T) {
 	}
 }
 
-// TestC1292_005_GovernedDocsRecordTheLedgerContinuation requires both governed
-// documents to carry the 1290-D1/1290-D2 continuation record, so the next hop
-// reads the resolution from the documents rather than re-deriving it — the whole
-// point of the ledger.
-//
 // acs-predicate: config-check — a documentation criterion has no runtime surface
-// to exercise; the artifact's presence and shape IS the requirement.
 func TestC1292_005_GovernedDocsRecordTheLedgerContinuation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, doc := range []string{

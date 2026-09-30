@@ -1,51 +1,5 @@
 //go:build acs
 
-// Package cycle1140 materialises the cycle-1140 acceptance criteria for the two
-// fleet-scoped `## top_n` tasks pinned to this lane:
-//
-//   - phasecontract-role-artifact-ssot        (merges artifact-name-ssot-retro-backfill
-//   - required-roles-ssot)
-//   - optional-phase-ev-gating-by-cycle-class
-//
-// The deferred task (`triage-unified-solution-synthesis`) gets ZERO predicates
-// here — R9.3: predicates bind only to triage-committed work.
-//
-// # Predicate strategy
-//
-// Every predicate CALLS the system under test and asserts on its return value
-// or side effect — never a source-grep of production code (the cycle-85
-// degenerate-predicate ban). Concretely:
-//
-//   - 001 calls phasecontract.For() and asserts on the returned Contract, plus a
-//     negative lookup so a fail-open registry cannot satisfy it.
-//   - 002 drives the REAL backfill.TryExtract code path over a temp workspace,
-//     with the artifact filename SOURCED FROM phasecontract — so the two
-//     independent filename declarations (backfill.phaseHeaders and
-//     core.backfillArtifactPath) are pinned to the registry rather than to each
-//     other. Includes an unknown-phase negative.
-//   - 003 derives the required-role vocabulary from phasecontract.RequiredRoles()
-//     and feeds a synthesized ledger to the REAL consumer
-//     (redteamcheck.LedgerRoleCompleteness), asserting complete⇒pass and
-//     role-removed⇒error. The consumer's own literal is thereby forced to agree
-//     with the registry.
-//   - 004 calls router.Route() on a trivial-class cycle whose advisor plan runs
-//     an optional phase, and asserts the phase is SKIPPED — plus the two
-//     anti-overreach negatives (non-trivial class still runs it; a floor phase is
-//     never skipped by the same rule).
-//
-// # Test contract for Builder (do NOT modify this file)
-//
-// Predicate 003 requires one NEW exported accessor — the SSOT surface the
-// required-roles half of task 1 exists to create:
-//
-//	// package phasecontract
-//	func RequiredRoles() []string   // canonical roles every completed cycle must ledger
-//
-// Until it exists this package does not compile, which is the intended RED for
-// the SSOT criterion (go/acs/README.md: a predicate package that fails to
-// compile is a HARD suite error, never a silent PASS). Builder implements the
-// accessor and re-points cyclehealth/redteamcheck/ledgerverify at it; the
-// literal `[]string{"scout", "builder", "auditor"}` sites go away.
 package cycle1140
 
 import (
@@ -63,16 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// ---------------------------------------------------------------------------
-// Task 1 — phasecontract-role-artifact-ssot
-// ---------------------------------------------------------------------------
-
-// TestC1140_001_RetroAndBuildPlannerRegisteredInPhaseContract pins AC-1: the two
-// phases that have real artifacts and real backfill paths but are ABSENT from
-// phasecontract.Contracts() (contract_registry.go:121-175) must be registered,
-// with the artifact names the rest of the pipeline already writes/reads.
-//
-// RED today: For("retro") and For("build-planner") both return ok==false.
 func TestC1140_001_RetroAndBuildPlannerRegisteredInPhaseContract(t *testing.T) {
 	cases := []struct {
 		phase        string
@@ -106,22 +50,12 @@ func TestC1140_001_RetroAndBuildPlannerRegisteredInPhaseContract(t *testing.T) {
 		}
 	}
 
-	// NEGATIVE (anti-no-op): registering by making For() fail open — returning a
-	// synthesized default for any name — would satisfy the loop above while
-	// destroying the registry's meaning. An unregistered phase must still miss.
 	if c, ok := phasecontract.For("no-such-phase-c1140"); ok {
 		t.Errorf("phasecontract.For(\"no-such-phase-c1140\") = (%+v, true), want ok==false — "+
 			"the registry must not fail open", c)
 	}
 }
 
-// TestC1140_002_BackfillWritesTheArtifactNamePhaseContractDeclares pins AC-2:
-// backfill's per-phase filename must AGREE with the registry, proved by running
-// the real extraction and asserting the file the registry names is the file that
-// appears with the content preserved.
-//
-// RED today: For() misses both phases, so artifactName is "" and the write
-// target is a bare directory — the extraction cannot land at the declared name.
 func TestC1140_002_BackfillWritesTheArtifactNamePhaseContractDeclares(t *testing.T) {
 	cases := []struct {
 		phase  string
@@ -170,9 +104,6 @@ func TestC1140_002_BackfillWritesTheArtifactNamePhaseContractDeclares(t *testing
 		}
 	}
 
-	// EDGE/NEGATIVE (anti-no-op): a phase backfill knows nothing about must still
-	// extract nothing. A TryExtract rewritten to "write whatever is in clean.txt"
-	// would pass the positives above and fail here.
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "nope-stdout.clean.txt"),
 		[]byte("# Not A Known Header\n"+strings.Repeat("x\n", 40)), 0o644); err != nil {
@@ -191,17 +122,6 @@ func TestC1140_002_BackfillWritesTheArtifactNamePhaseContractDeclares(t *testing
 	}
 }
 
-// TestC1140_003_RequiredRoleVocabularyIsSingleSourced pins AC-3: the
-// "what counts as a complete cycle" role vocabulary must come from ONE place.
-// Four independent declarations exist today (ledgerverify/verify.go:53,
-// cyclehealth/cyclehealth.go:203, redteamcheck/redteamcheck.go:108 inline, plus
-// cyclehealth's requiredArtifacts sibling at :152).
-//
-// The predicate derives the role set from the registry accessor and drives a
-// REAL consumer with it — so a consumer that keeps its own literal and drifts
-// from the registry fails here, which is the whole point of the SSOT fix.
-//
-// RED today: phasecontract.RequiredRoles does not exist (compile failure).
 func TestC1140_003_RequiredRoleVocabularyIsSingleSourced(t *testing.T) {
 	roles := phasecontract.RequiredRoles()
 	if len(roles) < 3 {
@@ -214,9 +134,6 @@ func TestC1140_003_RequiredRoleVocabularyIsSingleSourced(t *testing.T) {
 		}
 	}
 
-	// POSITIVE: a ledger carrying exactly the registry's roles must satisfy the
-	// live consumer. If redteamcheck still demands a role the registry does not
-	// declare, this fails — the drift the SSOT fix removes.
 	full := filepath.Join(t.TempDir(), "ledger.jsonl")
 	writeLedger(t, full, 1140, roles)
 	if _, err := redteamcheck.LedgerRoleCompleteness(full); err != nil {
@@ -225,9 +142,6 @@ func TestC1140_003_RequiredRoleVocabularyIsSingleSourced(t *testing.T) {
 			"registry", roles, err)
 	}
 
-	// NEGATIVE: dropping any single registry-declared role must still be caught.
-	// This is the anti-no-op axis — an accessor that returns junk roles, or a
-	// consumer relaxed into accepting anything, passes the positive and fails here.
 	for _, drop := range roles {
 		partial := filepath.Join(t.TempDir(), "ledger.jsonl")
 		writeLedger(t, partial, 1140, without(roles, drop))
@@ -238,15 +152,6 @@ func TestC1140_003_RequiredRoleVocabularyIsSingleSourced(t *testing.T) {
 	}
 }
 
-// TestC1140_006_CycleHealthAcceptsBothLedgerKinds pins the dual-kind acceptance
-// the `required-roles-ssot` inbox item claimed was broken and that scout's
-// live-code read found already working: cyclehealth's role completeness must
-// count a role whether the ledger recorded it as `agent_subprocess` (bash
-// dispatcher) or `phase` (Go-native orchestrator).
-//
-// GREEN today — a PIN, not a bug-fix RED (scout Beyond-the-Ask hypothesis 2). It
-// fails if the task-1 SSOT migration reintroduces a Kind filter, or if
-// cyclehealth's role set drifts from phasecontract.RequiredRoles().
 func TestC1140_006_CycleHealthAcceptsBothLedgerKinds(t *testing.T) {
 	roles := phasecontract.RequiredRoles()
 	const cycle = 1140
@@ -264,8 +169,6 @@ func TestC1140_006_CycleHealthAcceptsBothLedgerKinds(t *testing.T) {
 		}
 	}
 
-	// NEGATIVE (anti-no-op): completeness must still be enforced — a signal that
-	// never reports would pass both positives above.
 	ws := t.TempDir()
 	writeLedgerKind(t, filepath.Join(ws, "ledger.jsonl"), cycle, without(roles, roles[0]), "phase")
 	rep, err := cyclehealth.Check(cyclehealth.Options{Cycle: cycle, Workspace: ws})
@@ -278,23 +181,9 @@ func TestC1140_006_CycleHealthAcceptsBothLedgerKinds(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task 2 — optional-phase-ev-gating-by-cycle-class
-// ---------------------------------------------------------------------------
-
-// TestC1140_004_TrivialCycleSkipsAdvisorInsertedOptionalPhases pins task 2:
-// declarative skip_when conditions (phase-catalog `routing.skip_when` /
-// policy.json — CONFIG, never a Go literal) must gate advisor-plan-driven
-// optional-phase insertion, so a trivial-class cycle does not burn the measured
-// 0.83M-1.67M cache-read tokens per optional phase.
-//
-// RED today: router.shouldRun's Advisory+plan branch returns planRuns() directly
-// and never consults Cfg.Triggers[phase].SkipWhen — the plan wins unconditionally
-// for every non-mandatory phase.
 func TestC1140_004_TrivialCycleSkipsAdvisorInsertedOptionalPhases(t *testing.T) {
 	const optional = "coverage-gate"
 
-	// SKIP path: trivial class + a configured skip_when on the optional phase.
 	dec := routeWith(t, "trivial", config.RoutingBlock{
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},
 	})
@@ -307,8 +196,6 @@ func TestC1140_004_TrivialCycleSkipsAdvisorInsertedOptionalPhases(t *testing.T) 
 			"artifact must cite the skip, not silently drop it)", dec.SkipPhases, optional)
 	}
 
-	// NON-REGRESSION (semantic axis): the SAME config on a non-trivial cycle must
-	// still run the phase. Guards against a fix that just disables the optionals.
 	dec = routeWith(t, "medium", config.RoutingBlock{
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},
 	})
@@ -321,9 +208,6 @@ func TestC1140_004_TrivialCycleSkipsAdvisorInsertedOptionalPhases(t *testing.T) 
 			optional, dec.SkipPhases)
 	}
 
-	// EDGE (anti-overreach): no skip_when configured ⇒ the advisor's plan still
-	// governs, even on a trivial cycle. The gate is config-driven, not a
-	// hardcoded trivial-class blanket.
 	dec = routeWith(t, "trivial", config.RoutingBlock{})
 	if dec.NextPhase != optional {
 		t.Errorf("router.Route NextPhase = %q with NO skip_when configured, want %q — the gate "+
@@ -331,14 +215,6 @@ func TestC1140_004_TrivialCycleSkipsAdvisorInsertedOptionalPhases(t *testing.T) 
 	}
 }
 
-// TestC1140_005_CycleClassGateNeverSkipsFloorPhases is the integrity-floor
-// negative for task 2: `ship ⇒ build ∧ audit ∧ (tdd unless trivial)` is
-// non-configurable. A skip_when aimed at a floor phase must be refused even on a
-// trivial cycle — otherwise the new gate becomes a floor bypass.
-//
-// GREEN today by construction (mandatory phases short-circuit before Triggers is
-// ever consulted). It is a PIN, not a bug-fix RED: it fails the moment the task-2
-// gate is wired in a way that reaches a floor phase.
 func TestC1140_005_CycleClassGateNeverSkipsFloorPhases(t *testing.T) {
 	dec := routeWithTarget(t, "trivial", "audit", config.RoutingBlock{
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},
@@ -352,25 +228,13 @@ func TestC1140_005_CycleClassGateNeverSkipsFloorPhases(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-// routeWith builds a minimal Advisory-stage RouteInput whose advisor plan runs
-// "coverage-gate" between build and audit, with the given cycle class and
-// trigger block, and returns the router's decision.
 func routeWith(t *testing.T, cycleSize string, block config.RoutingBlock) router.RouterDecision {
 	t.Helper()
 	return routeWithTarget(t, cycleSize, "coverage-gate", block)
 }
 
-// routeWithTarget is routeWith with the trigger block attached to an arbitrary
-// phase (used to aim a skip_when at a floor phase in predicate 005).
 func routeWithTarget(t *testing.T, cycleSize, target string, block config.RoutingBlock) router.RouterDecision {
 	t.Helper()
-	// When the trigger block is aimed at a LATER phase (the floor-phase case),
-	// the advisor's plan declines the earlier optional so the walk actually
-	// reaches the target instead of stopping at coverage-gate.
 	runOptional := target == "coverage-gate"
 	in := router.RouteInput{
 		Current:   "build",
@@ -396,15 +260,11 @@ func routeWithTarget(t *testing.T, cycleSize, target string, block config.Routin
 	return router.Route(in, nil)
 }
 
-// writeLedger emits a minimal ledger.jsonl: one agent_subprocess entry per role
-// plus the cycle_terminal entry redteamcheck needs to pick the cycle.
 func writeLedger(t *testing.T, path string, cycle int, roles []string) {
 	t.Helper()
 	writeLedgerKind(t, path, cycle, roles, "agent_subprocess")
 }
 
-// writeLedgerKind is writeLedger with the ledger `kind` under test (the bash
-// dispatcher records agent_subprocess; the Go orchestrator records phase).
 func writeLedgerKind(t *testing.T, path string, cycle int, roles []string, kind string) {
 	t.Helper()
 	var b strings.Builder
@@ -429,8 +289,6 @@ func writeLedgerKind(t *testing.T, path string, cycle int, roles []string, kind 
 	}
 }
 
-// anomaliesFor returns the messages of every anomaly the report raised for one
-// signal name.
 func anomaliesFor(rep cyclehealth.Report, signal string) []string {
 	var out []string
 	for _, a := range rep.Anomalies {

@@ -27,8 +27,6 @@ const (
 	pinnedPruneephemeralAllowance  = 117
 	pinnedMarketplacepollAllowance = 107
 
-	// baseCommit is this cycle's worktree HEAD before any build commit — the
-	// pre-refactor baseline commentaudit diffs against.
 	baseCommit = "b401e73d"
 )
 
@@ -74,9 +72,6 @@ func TestC1759_003_MarketplacepollRunFitsSizeRatchet(t *testing.T) {
 	}
 }
 
-// TestC1759_004_OffendersJSONAllowancesUnchanged pins the three offender
-// ceilings this lane is explicitly forbidden from editing (allowance is a
-// ceiling, not a target — the shrink must land under the existing entries).
 func TestC1759_004_OffendersJSONAllowancesUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	offenders, err := sizeratchet.LoadOffenders(filepath.Join(root, "go", "internal", "sizeratchet", "offenders.json"))
@@ -112,11 +107,6 @@ func TestC1759_005_TargetPackagesTestsPassUnmodified(t *testing.T) {
 	}
 }
 
-// TestC1759_006_NoCommentsAddedToShrunkPackages exercises the repo's own
-// grader for "no comments are added" in-process — commentaudit.Main, i.e.
-// `commentaudit comments -base <baseCommit> <pkg dir>` — against each shrunk
-// package. It lists every non-directive comment line the diff adds and exits
-// 1 when any exist.
 func TestC1759_006_NoCommentsAddedToShrunkPackages(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, dir := range []string{
@@ -133,8 +123,6 @@ func TestC1759_006_NoCommentsAddedToShrunkPackages(t *testing.T) {
 	}
 }
 
-// worktreeGit is cmd/commentaudit's git view, pinned to one work tree with
-// `git -C` instead of the process cwd.
 type worktreeGit struct{ root string }
 
 func (g worktreeGit) run(args ...string) ([]byte, error) {

@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle1716 ports the cycle-1716 ACS predicates.
 package cycle1716
 
 import (
@@ -14,11 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC1716_001_AcsassertCheckedReadersNameMovedFile drives the real
-// go/pkg/acsassert unit suite (the production caller of the new API) rather
-// than re-asserting the behavior in-process, so a checked-reader
-// implementation that only satisfies a predicate calling it directly (and
-// not the package's own contract tests) still fails here.
 func TestC1716_001_AcsassertCheckedReadersNameMovedFile(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")

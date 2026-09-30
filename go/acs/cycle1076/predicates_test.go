@@ -1,19 +1,5 @@
 //go:build acs
 
-// Package cycle1076 materialises the cycle-1076 acceptance criteria for the one
-// fleet-scoped task pinned to this lane (inbox item `tdd-topn-binding-gate`,
-// acceptance criterion 2):
-//
-//   - build-selfcheck-removal-claim-check → a build-report.md claiming a file
-//     removal that did NOT happen must fail build-selfcheck deterministically.
-//     Part 1 of the inbox item (topngate's triage→TDD scope binding) is already
-//     shipped; predicate 004 pins it as a no-regression guard.
-//
-// Predicate strategy — every predicate EXERCISES the system under test (the
-// cycle-85 degenerate-predicate ban): 001/002/003 drive the real
-// core.RemovalClaimFailures / core.DefaultBuildFloorChecks / the real
-// buildFloorReviewer in-process against temp-dir fixtures; 004 shells the
-// topngate package's behavioural unit tests. No predicate asserts on source text.
 package cycle1076
 
 import (
@@ -27,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// fixture builds a workspace+worktree pair with a build report claiming the
-// removal of claimed, and with present materialised as real files under the
-// worktree (so a claim naming one of them is FALSE).
 func fixture(t *testing.T, claimed, present []string) core.ReviewInput {
 	t.Helper()
 	root := t.TempDir()
@@ -60,10 +43,6 @@ func fixture(t *testing.T, claimed, present []string) core.ReviewInput {
 	return core.ReviewInput{Phase: string(core.PhaseBuild), Workspace: ws, Worktree: wt}
 }
 
-// TestC1076_001_FalseRemovalClaimIsDetected is the crux: the cycle-660 shape —
-// a report claiming a scaffold was "already removed" while the file is still in
-// the worktree — must yield a failure naming that path. The honest-removal half
-// pins the other direction (no false blocking).
 func TestC1076_001_FalseRemovalClaimIsDetected(t *testing.T) {
 	const p = "go/acs/cycle660/predicates_test.go"
 
@@ -81,11 +60,6 @@ func TestC1076_001_FalseRemovalClaimIsDetected(t *testing.T) {
 	}
 }
 
-// TestC1076_002_CheckIsWiredIntoProductionFloorEngine is the wiring proof: the
-// check must run inside DefaultBuildFloorChecks (the engine actually injected at
-// the composition root), not merely exist as a callable function. The fixture
-// worktree is not a git repo, so zero changed packages are derived — the exact
-// early-return path a false claim would otherwise hide behind.
 func TestC1076_002_CheckIsWiredIntoProductionFloorEngine(t *testing.T) {
 	const p = "stale/scaffold.go"
 	got := core.DefaultBuildFloorChecks(context.Background(), fixture(t, []string{p}, []string{p}))
@@ -97,9 +71,6 @@ func TestC1076_002_CheckIsWiredIntoProductionFloorEngine(t *testing.T) {
 	}
 }
 
-// TestC1076_003_FalseClaimRejectsTheBuildDeliverable exercises the real
-// reviewer: "fails deterministically" means Approve==false with the offending
-// path in the reason, while an honest report still approves.
 func TestC1076_003_FalseClaimRejectsTheBuildDeliverable(t *testing.T) {
 	r := core.NewBuildFloorReviewer(core.DefaultBuildFloorChecks)
 	const p = "stale/scaffold.go"
@@ -115,8 +86,6 @@ func TestC1076_003_FalseClaimRejectsTheBuildDeliverable(t *testing.T) {
 	}
 }
 
-// TestC1076_004_TopnGateUnitsStillGreen pins Part 1 of the inbox item (already
-// shipped) as a no-regression guard: this cycle must not touch topngate.
 func TestC1076_004_TopnGateUnitsStillGreen(t *testing.T) {
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
@@ -130,9 +99,6 @@ func TestC1076_004_TopnGateUnitsStillGreen(t *testing.T) {
 	}
 }
 
-// TestC1076_006_GoVetClean pins the exported-signature discipline the
-// exhaustion_campaign lesson mandates for any new exported symbol: `go vet`
-// must stay clean repo-wide after the new check lands.
 func TestC1076_006_GoVetClean(t *testing.T) {
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
 	stdout, stderr, code, err := acsassert.SubprocessOutput("go", "vet", "-C", goDir, "./...")
@@ -145,10 +111,6 @@ func TestC1076_006_GoVetClean(t *testing.T) {
 	}
 }
 
-// TestC1076_005_CoreUnitsGreenIncludingRemovalCheck runs the task's own unit
-// lane through the production package: the table-driven contract must be present
-// AND passing (a deleted or renamed test exits 0 with no PASS line — that is a
-// failure here, not a silent green).
 func TestC1076_005_CoreUnitsGreenIncludingRemovalCheck(t *testing.T) {
 	goDir := filepath.Join(acsassert.RepoRoot(t), "go")
 	const name = "TestBuildFloorReviewer_RemovalClaimNotActuallyRemoved"

@@ -1,51 +1,5 @@
 //go:build acs
 
-// Package cycle1666 materializes the acceptance criteria of the ONE inbox item
-// this fleet lane committed (lane-scope.json todo_ids ∩ triage-report.md
-// ## top_n) — and nothing else (R9.3):
-//
-//	dossier-corpus-carries-retro-mislabel  (medium, weight 0.84, defect)
-//
-// The lane's second scoped id, lost-ship-dossier-evidence, was triage-DROPPED
-// (stale-consumed: its only record is .evolve/inbox/consumed/…, shipped
-// 2026-09-13) and gets ZERO predicates here.
-//
-// The defect. PR #389 made the retro-skip mislabel fix FORWARD-ONLY: a
-// pre-fix dossier whose `skipped_phases:[{phase:retro,reason:FAIL}]` means
-// "retro RAN and its verdict was declined" is byte-for-byte the same shape as
-// a post-fix dossier whose identical entry means "retro did not run". 134
-// committed records (cycles 823-1217) carry that mislabel; the ledger holds a
-// {role:retro, kind:agent_subprocess} receipt for every one of them, while
-// their run dirs are gone. The remedy chosen is the inbox record's option
-// (b): a `schema_version` discriminator on every new record, and a corpus
-// seam that refuses to read a legacy entry as a skip — never the backfill.
-//
-// AC map (1:1 with test-report.md ## AC-Materialization):
-//
-//	AC1 a count of affected dossiers, derived not estimated, with the
-//	    artifact cross-check that proves each one's retro really ran     → 001
-//	AC2 the discriminator (not the backfill), choice justified in the
-//	    commit body — the corpus is left untouched                        → 002
-//	AC3 TestSchema_NoDrift stays green: the field on BOTH sides           → 003
-//	AC4 a consumer-side test proving a pre-fix record is not treated as
-//	    evidence retro was skipped                                       → 004
-//
-// Adversarial axes (skills/adversarial-testing §6). NEGATIVE: 002's
-// no-rewrite pin over the real corpus (a backfill greens 001 and 004 and
-// fails this), the absent-corpus exit in 001's binding, the legacy
-// never-trusted rows in 004's binding. EDGE/OOD: wrong-cycle receipt, corrupt
-// ledger line, empty run dir, nil record, empty phase name. SEMANTIC: derived
-// count (001), forward-only stamp + untouched history (002), schema lockstep
-// (003), consumer degrade (004) — four distinct behaviours.
-//
-// Flaky-shape contract: ONE named package per invocation, always -run
-// narrowed (cmd/evolve is a known-slow suite), no wall-clock bounds, no
-// literal PIDs, every git call is -C anchored.
-//
-// Reachability probe (cycle-644 rule): this package imports only
-// pkg/acsassert and the standard library — a leaf. The frozen bindings are
-// in-package (internal/dossier) or in package main (cmd/evolve, which already
-// imports internal/dossier via cmd_dossier.go) — no new import edge is pinned.
 package cycle1666
 
 import (
@@ -69,18 +23,8 @@ const (
 	dossierPkg = "github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	cmdPkg     = "github.com/mickeyyaya/evolve-loop/go/cmd/evolve"
 
-	// legacyRetroSkipFloor is the derived (not estimated) size of the affected
-	// legacy set at RED time: 134 unversioned records carrying a retro
-	// skipped_phases entry, cycles 823-1217, every one with a ledger receipt.
-	// Legacy history is frozen — the count can only grow (an unversioned record
-	// written by a pre-fix binary during this batch) — so fewer means the
-	// corpus was rewritten.
 	legacyRetroSkipFloor = 134
 )
-
-// ---------------------------------------------------------------------------
-// Harness: the real CLI, built once (the cycle-1648/1659 TestMain shape).
-// ---------------------------------------------------------------------------
 
 var (
 	evolveBin      string
@@ -108,7 +52,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// repoRootFromCwd mirrors acsassert.RepoRoot for TestMain (no *testing.T yet).
 func repoRootFromCwd() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -129,13 +72,6 @@ func evolveBinary(t *testing.T) string {
 	return evolveBin
 }
 
-// assertSuiteTestsPass shells `go test [-tags T] -run '^(names)$' -count=1 -v
-// pkg` against ONE named package and requires EVERY name to print a
-// `--- PASS: <name>` line. Asserting on the PASS line, never exit 0, is
-// load-bearing: a pattern matching NO test exits 0 with "no tests to run",
-// so a still-missing binding would false-GREEN. The two argv shapes are
-// spelled out as literal calls so the flaky-shape lint sees the -run
-// narrowing one hop into this helper.
 func assertSuiteTestsPass(t *testing.T, tags, pkg string, names ...string) {
 	t.Helper()
 	pattern := "^(" + strings.Join(names, "|") + ")$"
@@ -162,14 +98,6 @@ func assertSuiteTestsPass(t *testing.T, tags, pkg string, names ...string) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Independent derivation over the REAL corpus — the oracle 001 compares the
-// CLI against. Written from the wire (map[string]any), never from the
-// package under test, so the two derivations share no code.
-// ---------------------------------------------------------------------------
-
-// legacyRetroSkipCycles returns, ascending, every cycle whose committed
-// dossier has NO schema_version and names retro in skipped_phases.
 func legacyRetroSkipCycles(t *testing.T, root string) []int {
 	t.Helper()
 	dir := filepath.Join(root, "knowledge-base", "cycles")
@@ -211,10 +139,6 @@ func legacyRetroSkipCycles(t *testing.T, root string) []int {
 	return out
 }
 
-// retroRanReceipts returns the set of cycles for which an execution receipt
-// proves retro ran: a retro report in the cycle's run dir, or a ledger
-// {role:retro, kind:agent_subprocess} entry. An absent ledger or runs dir
-// simply contributes nothing.
 func retroRanReceipts(t *testing.T, root string, cycles []int) map[int]bool {
 	t.Helper()
 	got := map[int]bool{}
@@ -260,15 +184,6 @@ type mislabelReport struct {
 	Uncorroborated []int `json:"uncorroborated"`
 }
 
-// TestC1666_001_DerivedAffectedCountCrossChecksArtifacts — AC1. The binding
-// tests drive `evolve dossier retro-mislabel` through the real dispatcher over
-// a six-record fixture corpus (both receipt sources, wrong-cycle receipt, a
-// versioned skip, a verdict-not-adopted retro, a read-only guarantee, and the
-// absent-corpus loud failure). Then the SAME command runs over the real
-// corpus and must agree with an independent wire-level derivation: every
-// candidate classified exactly once, mislabeled == candidates with a receipt.
-// The number the Builder reports in build-report.md is this command's output,
-// not a string-match estimate.
 func TestC1666_001_DerivedAffectedCountCrossChecksArtifacts(t *testing.T) {
 	assertSuiteTestsPass(t, "", cmdPkg,
 		"TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts",
@@ -321,16 +236,12 @@ func nonNil(s []int) []int {
 	return s
 }
 
-// gitC runs git anchored to dir and returns trimmed stdout.
 func gitC(t *testing.T, dir string, args ...string) (string, error) {
 	t.Helper()
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
 	return strings.TrimSpace(string(out)), err
 }
 
-// laneBase is the commit the lane's worktree forked from main at (falls back
-// to HEAD when main is unreachable, which makes the diff checks trivially
-// green — logged, never silent).
 func laneBase(t *testing.T, root string) string {
 	t.Helper()
 	base, err := gitC(t, root, "merge-base", "main", "HEAD")
@@ -341,14 +252,6 @@ func laneBase(t *testing.T, root string) string {
 	return base
 }
 
-// TestC1666_002_DiscriminatorStampedForwardOnlyAndHistoryUntouched — AC2.
-// The bindings pin the wire: Build stamps `schema_version` == CurrentSchemaVersion
-// (>= 2) on every new record; a legacy record parses as version 0 and is NOT
-// stamped when re-rendered. The corpus half is the NEGATIVE: the inbox record
-// forbids the backfill alongside the discriminator, so no tracked dossier may
-// be MODIFIED on this lane (added ones are sibling lanes' closeouts) and the
-// legacy retro-skip set must be at least its RED-time size. The commit-body
-// justification is the Auditor's checklist item (manual+checklist).
 func TestC1666_002_DiscriminatorStampedForwardOnlyAndHistoryUntouched(t *testing.T) {
 	assertSuiteTestsPass(t, "", dossierPkg,
 		"TestSchemaVersion_BuildStampsTheDiscriminator",
@@ -368,8 +271,6 @@ func TestC1666_002_DiscriminatorStampedForwardOnlyAndHistoryUntouched(t *testing
 	}
 }
 
-// goldenMinusVersion parses a golden JSON record and drops schema_version so
-// two goldens can be compared on everything else.
 func goldenMinusVersion(t *testing.T, raw []byte, label string) (map[string]any, any, bool) {
 	t.Helper()
 	var m map[string]any
@@ -381,13 +282,6 @@ func goldenMinusVersion(t *testing.T, raw []byte, label string) (map[string]any,
 	return m, v, stamped
 }
 
-// TestC1666_003_SchemaLockstepAndGoldensChangeOnlyByTheStamp — AC3. The
-// schema drift guard is bidirectional, so the field must land on BOTH sides
-// (TestSchema_NoDrift + the by-name integer/not-required pin). The stamp
-// changes every produced record's bytes, so the two producer goldens the
-// cycle-1663 floor froze MUST be regenerated — legitimately, and ONLY by the
-// added `schema_version` line: each golden minus that key must equal the
-// lane-base golden minus that key, and the core byte-pins must print PASS.
 func TestC1666_003_SchemaLockstepAndGoldensChangeOnlyByTheStamp(t *testing.T) {
 	assertSuiteTestsPass(t, "", dossierPkg,
 		"TestSchema_NoDrift",
@@ -425,15 +319,6 @@ func TestC1666_003_SchemaLockstepAndGoldensChangeOnlyByTheStamp(t *testing.T) {
 	}
 }
 
-// TestC1666_004_ConsumerRefusesLegacyRetroSkipAsEvidence — AC4. The binding
-// tests drive dossier.PhaseSkipEvidence, the ONE sanctioned corpus read of a
-// skipped_phases entry: a legacy record's retro entry is Contradicted when a
-// receipt proves retro ran (run-dir report, pre-rename report, or the ledger
-// receipt) and Unverified when nothing survives — never Trusted; a versioned
-// record's entry is Trusted; no entry / nil record / empty phase is None.
-// Caller proof (house rule 2): the seam must be reached from a PRODUCTION
-// file (the retro-mislabel audit is its first caller) — a call site that is
-// only ever a test is dead code.
 func TestC1666_004_ConsumerRefusesLegacyRetroSkipAsEvidence(t *testing.T) {
 	assertSuiteTestsPass(t, "", dossierPkg,
 		"TestPhaseSkipEvidence_LegacyRetroSkipIsNeverTrusted",

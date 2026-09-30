@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle1752 pins the shrinks of fleet.PartitionGraph and committedset.DispositionsFrom to the size ratchet.
 package cycle1752
 
 import (

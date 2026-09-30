@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle1774 holds the acceptance predicates for isolating the
-// go/cmd/evolve suite from the host's tmux socket directory.
 package cycle1774
 
 import (
@@ -23,13 +21,8 @@ import (
 
 const cmdEvolvePkg = "github.com/mickeyyaya/evolve-loop/go/cmd/evolve"
 
-// canarySocket matches the orphan-socket sweep's per-run pattern with an owner
-// PID above every OS's pid_max, so the sweep always judges it dead.
 const canarySocket = "evolve-bridge-p999999999"
 
-// sweepReachers are tests that run the loop's real orphan-socket sweep: the five
-// the inbox record names, plus those whose setup never calls installStubDeps.
-// Each must execute and pass, so skipping a test cannot pass for isolating it.
 var sweepReachers = []string{
 	"TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd",
 	"TestRunLoopBatch_SignalExitSkipsBatchEndGCHook",
@@ -58,9 +51,6 @@ type testEvent struct {
 	Output  string
 }
 
-// childEnv scrubs the harness's EVOLVE_ keys, points TMUX_TMPDIR at the stand-in
-// host dir, and drops TMUX/TMUX_PANE so the child cannot reach the operator's
-// tmux server through an inherited $TMUX.
 func childEnv(tmuxTmp string) []string {
 	var env []string
 	for _, kv := range ipcenv.Scrub(os.Environ()) {
@@ -73,8 +63,6 @@ func childEnv(tmuxTmp string) []string {
 	return append(env, "TMUX_TMPDIR="+tmuxTmp)
 }
 
-// runCmdEvolve runs the go/cmd/evolve package (every test when runPattern is
-// empty) with TMUX_TMPDIR set to tmuxTmp and returns its `go test -json` events.
 func runCmdEvolve(t *testing.T, tmuxTmp, runPattern string) []testEvent {
 	t.Helper()
 	ctx := context.Background()
@@ -112,8 +100,6 @@ func runCmdEvolve(t *testing.T, tmuxTmp, runPattern string) []testEvent {
 	return events
 }
 
-// suiteCompleted reports an error unless the package ran to a terminal verdict
-// without a panic or timeout, which would leave later tests unexecuted.
 func suiteCompleted(events []testEvent) error {
 	started, terminal := false, ""
 	for _, ev := range events {
@@ -141,8 +127,6 @@ func suiteCompleted(events []testEvent) error {
 	return nil
 }
 
-// notPassed lists every named test that did not execute and pass, with the
-// tail of its output.
 func notPassed(events []testEvent, names []string) []string {
 	final := map[string]string{}
 	output := map[string]*strings.Builder{}

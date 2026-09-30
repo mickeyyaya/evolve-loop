@@ -1,9 +1,5 @@
 //go:build acs
 
-// Package cycle1779 encodes cycle 1779's acceptance: the cycle-run quota
-// closeout parity, the cmd/evolve silent-policy and count-pin repairs, and the
-// topngate TDD scope fail-open. Each behavioral predicate runs the named
-// frozen tests of ONE package, narrowed with -run.
 package cycle1779
 
 import (
@@ -91,7 +87,6 @@ func TestC1779_005_ReleaseBinaryGoEvolveIsNotDeleted(t *testing.T) {
 }
 
 // acs-predicate: config-check — the criterion is that the explanation stops
-// calling the release binary a stray build output.
 func TestC1779_006_ExplanationDoesNotClaimGoEvolveIsStray(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	docs, err := filepath.Glob(filepath.Join(root, "docs", "explain", "builds", "cycle-1779-*.md"))
