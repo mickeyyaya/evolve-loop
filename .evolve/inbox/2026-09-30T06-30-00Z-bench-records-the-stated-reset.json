@@ -1,0 +1,22 @@
+{
+  "id": "bench-records-the-stated-reset",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "weight": 0.3,
+  "title": "A benched CLI family's provider-stated reset is only free text in the evidence; the canary, preflight and advisor show the capped day, so a two-week wall reads as 'benched until tomorrow' every day",
+  "files": [
+    "go/internal/clihealth/clihealth.go",
+    "go/internal/clihealth/resetparse.go",
+    "go/cmd/evolve/cli_health_canary.go",
+    "go/internal/looppreflight/clihealth.go",
+    "go/internal/core/advisor/context.go"
+  ],
+  "summary": "Since 2026-09-30 ParseResetHint reads a dated wall ('try again at Oct 14th, 2026 4:13 PM') and caps benched_until at resetHintCap (a day) so the canary re-checks a long wall daily and notices an early lift; the bench's Evidence keeps the banner (truncated at 160 runes). The stated reset itself is not a field: the canary's 'still walled … re-benched until' line, the preflight cli-health detail and the advisor's CLI-health section all print the capped instant, so an operator or the advisor sees a two-week wall as one day, every day (architecture review of the dated-hint fix, MEDIUM-2). OperatorAction must not carry it: that field means a wall no canary clears on its own.",
+  "fix": "Split the uncapped parse out of ParseResetHint, add Entry.StatedReset (json stated_reset, omitempty) beside BenchedUntil, and print it in the canary's still-walled line, the preflight detail and the advisor's CLI-health section.",
+  "acceptance": [
+    "A dated wall's bench records stated_reset at the provider's instant while benched_until stays capped at a day",
+    "The canary's still-walled line and the advisor's CLI-health section name the stated reset"
+  ],
+  "created_at": "2026-09-30T06:30:00Z",
+  "source": "console, 2026-09-30 architecture review of the dated reset-hint fix (MEDIUM-2)"
+}
