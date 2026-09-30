@@ -143,3 +143,24 @@ func TestMover_RouteLane_RefusesAnItemItCannotJudge(t *testing.T) {
 		t.Errorf("an unjudged item was rewritten or recorded:\n%s\nledger=%+v", after, rec.records)
 	}
 }
+
+func TestMover_RouteLane_ARewriteFaultLeavesTheItemAndTheLedgerAlone(t *testing.T) {
+	inbox := newInbox(t)
+	path := filepath.Join(inbox, "x.json")
+	writeItem(t, path, `{"id":"x","kind":"pipeline-repair"}`)
+	before, _ := os.ReadFile(path)
+	rec := &recordingAppender{}
+	if err := os.Chmod(inbox, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
+
+	_, err := New(inbox, rec).RouteLane("x", "operator")
+
+	if err == nil || errors.Is(err, ErrNotFound) || errors.Is(err, ErrConsoleRouted) {
+		t.Errorf("err = %v, want the rewrite fault itself", err)
+	}
+	if after, _ := os.ReadFile(path); !bytes.Equal(before, after) || len(rec.records) != 0 {
+		t.Errorf("a failed rewrite changed the item or recorded a route:\n%s\nledger=%+v", after, rec.records)
+	}
+}

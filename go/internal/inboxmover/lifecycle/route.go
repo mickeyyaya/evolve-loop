@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -74,31 +73,32 @@ func (m *Mover) RouteLane(taskID, reason string) (RouteResult, error) {
 	if err != nil {
 		return res, err
 	}
-	body, err := os.ReadFile(loc.Path)
-	if err != nil {
-		return res, fmt.Errorf("route-lane: read %s: %w", loc.Path, err)
-	}
-	item, ok := routingItem(body)
-	if !ok {
-		return res, fmt.Errorf("route-lane: %s is not a well-formed inbox item, so its route cannot be judged", loc.Path)
-	}
-	item.Route = inboxbatch.RouteLaneValue
-	if routed, why := inboxbatch.ConsoleRouted(item, m.isProtected); routed {
-		return res, fmt.Errorf("%w: %s stays operator-owned: %s", ErrConsoleRouted, taskID, why)
-	}
 	stamp := m.now().UTC().Format(time.RFC3339)
-	if err := rewriteItemJSON(loc.Path, body, func(it map[string]json.RawMessage) {
+	admit := func(body []byte) error { return m.admitToLanes(taskID, loc.Path, body) }
+	if err := updateAdmittedItemJSON(loc.Path, admit, func(it map[string]json.RawMessage) {
 		it["route"] = jsonString(inboxbatch.RouteLaneValue)
 		it["routed_reason"] = jsonString(reason)
 		it["routed_at"] = jsonString(stamp)
 		delete(it, "routed_cycle")
 	}); err != nil {
-		return res, fmt.Errorf("route-lane: rewrite %s: %w", loc.Path, err)
+		return res, fmt.Errorf("route-lane: %s: %w", loc.Path, err)
 	}
 	res.Path = loc.Path
 	m.linef("routed %s: %s", inboxbatch.RouteLaneValue, filepath.Base(loc.Path))
 	m.ledgerLine(ledgerEntry{Action: "route-lane", TaskID: taskID, Reason: reason})
 	return res, nil
+}
+
+func (m *Mover) admitToLanes(taskID, path string, body []byte) error {
+	item, ok := routingItem(body)
+	if !ok {
+		return fmt.Errorf("%s is not a well-formed inbox item, so its route cannot be judged", path)
+	}
+	item.Route = inboxbatch.RouteLaneValue
+	if routed, why := inboxbatch.ConsoleRouted(item, m.isProtected); routed {
+		return fmt.Errorf("%w: %s stays operator-owned: %s", ErrConsoleRouted, taskID, why)
+	}
+	return nil
 }
 
 func (m *Mover) locateForRouteLane(taskID string) (Location, error) {

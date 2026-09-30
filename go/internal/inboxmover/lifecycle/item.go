@@ -149,14 +149,17 @@ func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 
 // UpdateItemJSON atomically rewrites an item with mutate applied to its top-level fields; mutate must not retain the map.
 func UpdateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
+	return updateAdmittedItemJSON(path, func([]byte) error { return nil }, mutate)
+}
+
+func updateAdmittedItemJSON(path string, admit func(body []byte) error, mutate func(m map[string]json.RawMessage)) error {
 	body, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	return rewriteItemJSON(path, body, mutate)
-}
-
-func rewriteItemJSON(path string, body []byte, mutate func(m map[string]json.RawMessage)) error {
+	if err := admit(body); err != nil {
+		return err
+	}
 	var item map[string]json.RawMessage
 	if err := json.Unmarshal(body, &item); err != nil {
 		return err
