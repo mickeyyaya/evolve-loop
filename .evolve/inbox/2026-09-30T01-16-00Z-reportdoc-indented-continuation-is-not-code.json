@@ -1,0 +1,20 @@
+{
+  "id": "reportdoc-indented-continuation-is-not-code",
+  "kind": "bug",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "title": "reportdoc hides every line indented four spaces or by a tab as code, so a list item's deep continuation or a 4-space sub-bullet never reaches a section reader",
+  "files": [
+    "go/internal/reportdoc/reportdoc.go",
+    "go/internal/explanationdocs/changed_areas.go"
+  ],
+  "summary": "visibleLinesIdx (go/internal/reportdoc/reportdoc.go:422) drops any line for which isIndentedCode (:473) holds, a leading tab or four spaces, whatever precedes it. CommonMark says an indented code block cannot interrupt a paragraph, and that a list item's content is indented to its content column, so a Changed Areas bullet wrapped as ``- `a.go` —`` then `    splits checkAll…` loses its explanation before changedAreaItems sees it, and the build floor still asks for a what/why. The Changed Areas list-item fix (2026-09-30) covers continuations indented fewer than four spaces and documents the limit in docs/architecture/build-explanation-contract.md; builders do write 4-space continuations (an accepted auditledger build explanation has three). visibleLinesIdx is the one fence/comment state machine every report validator shares, including verdict parsing, where hiding an indented example is deliberate, so the fix is its own component with its own review, not a change inside the explanation reader (architecture review of the list-item fix, HIGH-4).",
+  "fix": "Treat an indented line as a paragraph or list-item continuation when the previous visible line is non-blank text (CommonMark: indented code cannot interrupt a paragraph), keeping a line after a blank line or a fence as code; prove no report validator's verdict or section parsing changes on the checked-in report corpus.",
+  "acceptance": [
+    "A Changed Areas bullet whose explanation continues on a 4-space-indented line passes validateDocument (red today)",
+    "An indented block after a blank line is still hidden as code, and every existing reportdoc and verdict-parsing test stays green",
+    "The contract's 'indented fewer than four spaces' limit is removed in the same change"
+  ],
+  "created_at": "2026-09-30T01:16:00Z",
+  "source": "console, 2026-09-30 architecture review of the Changed Areas list-item fix (HIGH-4)"
+}
