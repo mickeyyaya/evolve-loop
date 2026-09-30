@@ -225,3 +225,21 @@ func Check(sites, baseline map[string]int) error {
 	return errors.New("rawgitratchet: raw git fixture ratchet violated (the list lives in go/internal/rawgitratchet/baseline.json and may only shrink):\n  " +
 		strings.Join(problems, "\n  "))
 }
+
+const BaselineRelPath = "internal/rawgitratchet/baseline.json"
+
+func Scan(root string) (note string, err error) {
+	files, note, err := BoundTestFiles(root)
+	if err != nil {
+		return note, err
+	}
+	sites, err := Sites(root, files)
+	if err != nil {
+		return note, err
+	}
+	baseline, err := LoadBaseline(filepath.Join(root, filepath.FromSlash(BaselineRelPath)))
+	if err != nil {
+		return note, err
+	}
+	return note, Check(sites, baseline)
+}

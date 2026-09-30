@@ -170,3 +170,17 @@ func listedProblem(key string, n, allowance int) string {
 	}
 	return ""
 }
+
+const OffendersRelPath = "internal/sizeratchet/offenders.json"
+
+func Scan(root string) error {
+	spans, err := Walk(root)
+	if err != nil {
+		return err
+	}
+	offenders, err := LoadOffenders(filepath.Join(root, filepath.FromSlash(OffendersRelPath)))
+	if err != nil {
+		return err
+	}
+	return Check(spans, offenders)
+}

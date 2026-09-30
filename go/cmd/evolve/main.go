@@ -142,6 +142,11 @@ v12.1 utilities + composition:
   compose                   Ad-hoc phase composition bypassing the
                               state machine ( compose --phases <p1,p2,...>
                               [--ship-anyway] [--dry-run] )
+  clihealth                 CLI quota/credential benches
+                              ( clihealth list [--json] [--project-root DIR]
+                              | clihealth clear <family> [--project-root DIR] )
+  ratchet                   Function-size + raw-git-fixture ratchets
+                              ( ratchet check [size|rawgit] [--root DIR] )
   context-fill              Context-window fill telemetry; correlates each
                               cycle's peak per-phase fill ratio against its
                               dossier final verdict (read-only)

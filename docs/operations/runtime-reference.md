@@ -2,6 +2,11 @@
 
 > Moved verbatim out of the root [CLAUDE.md](../../CLAUDE.md) on 2026-06-05 to keep it under the 40k-char context limit. CLAUDE.md carries the digest; **this file is the canonical full detail** for the env-var table, operator commands, ship classes, and the publishing pipeline. The docs-contract test (`go/cmd/evolve/docs_contract_test.go`) scans BOTH files, so new `EVOLVE_*` vars may be documented here.
 
+## Operator verbs: clihealth and ratchet
+
+- `evolve clihealth list [--json] [--project-root DIR]` (also spelled `evolve cli-health`) prints the active CLI-family benches from `.evolve/cli-health.json` (family, reason, `benched_until`); `--json` prints an array, `[]` when none. `evolve clihealth clear <family> [--project-root DIR]` removes that one bench; a family list does not show (never benched, or its bench expired) exits 1 and touches nothing. Both run over `clihealth.Store.Active` / `Clear` (`go/cmd/evolve/cmd_clihealth.go`).
+- `evolve ratchet check [size|rawgit] [--root DIR]` runs the function-size ratchet and the raw-git-fixture ratchet, or only the named one, through `sizeratchet.Scan` and `rawgitratchet.Scan`; the packages' repo-wide gate tests call the same `Scan`. It exits 1 naming each violation, 0 when clean, and 2 on an unknown selector or an extra argument. It never edits `offenders.json` or `baseline.json` (`go/cmd/evolve/cmd_ratchet.go`).
+
 ## Autonomous execution (bypass-permissions / yolo / auto-approve) — full text
 
 When operating in autonomous mode, AGENTS.md Rule 4 ("stop and ask") is overridden. All 8 items below remain **mandatory** — bypass means "don't ask the user," not "skip integrity checks."
