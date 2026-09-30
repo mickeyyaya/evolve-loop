@@ -1,18 +1,1 @@
-{
-  "id": "repo-contract-cancel-orphans-test-binary",
-  "kind": "pipeline-repair",
-  "priority_class": "performance",
-  "weight": 0.35,
-  "title": "A cancelled repo-contract pack kills the go command but orphans its test binary until the binary's own 20m timeout",
-  "files": [
-    "go/internal/phases/ship/repocontract.go"
-  ],
-  "summary": "runGoTestJSON runs `go test -json` with exec.CommandContext, which kills only the direct `go` process. Measured 2026-09-29 with a throwaway probe: a pack over a 20s test, cancelled at a 4s deadline, returned at 4.006s (realRed=false, err \"signal: killed\") while its test binary lived on with PPID 1 (`slowprobe.test -test.timeout=20m`). A silent or deadlocked guard suite would keep running until its own -test.timeout (20m). Ship's gate cancels the same way; the build floor's new 120s deadline (repoContractFloorDeadline) makes the path reachable at any handoff whose pack runs past 120s, one orphan per handoff and per correction.",
-  "fix": "Run the pack's `go` in its own process group and kill the group on cancel (cmd.SysProcAttr Setpgid plus cmd.Cancel sending SIGKILL to -pgid, with WaitDelay as the repo's other launchers use), in a unix/other file split like internal/runlease/pidalive_unix.go and pidalive_other.go, since windows is a release target.",
-  "acceptance": [
-    "A pack cancelled by its context leaves no test binary running (probe: pgrep for the test binary after the cancel is empty)",
-    "Ship's gate and the build floor keep their classification: a cancel still names nothing"
-  ],
-  "created_at": "2026-09-29T12:00:00Z",
-  "source": "console, 2026-09-29, review follow-up M2 on fix/repo-contract-pack-at-build-exit (deadline probe)"
-}
+{"acceptance":["A pack cancelled by its context leaves no test binary running (probe: pgrep for the test binary after the cancel is empty)","Ship's gate and the build floor keep their classification: a cancel still names nothing"],"created_at":"2026-09-29T12:00:00Z","files":["go/internal/phases/ship/repocontract.go"],"fix":"Run the pack's `go` in its own process group and kill the group on cancel (cmd.SysProcAttr Setpgid plus cmd.Cancel sending SIGKILL to -pgid, with WaitDelay as the repo's other launchers use), in a unix/other file split like internal/runlease/pidalive_unix.go and pidalive_other.go, since windows is a release target.","id":"repo-contract-cancel-orphans-test-binary","kind":"pipeline-repair","priority_class":"performance","route":"lane","routed_at":"2026-09-30T09:02:14Z","routed_reason":"operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop","source":"console, 2026-09-29, review follow-up M2 on fix/repo-contract-pack-at-build-exit (deadline probe)","summary":"runGoTestJSON runs `go test -json` with exec.CommandContext, which kills only the direct `go` process. Measured 2026-09-29 with a throwaway probe: a pack over a 20s test, cancelled at a 4s deadline, returned at 4.006s (realRed=false, err \"signal: killed\") while its test binary lived on with PPID 1 (`slowprobe.test -test.timeout=20m`). A silent or deadlocked guard suite would keep running until its own -test.timeout (20m). Ship's gate cancels the same way; the build floor's new 120s deadline (repoContractFloorDeadline) makes the path reachable at any handoff whose pack runs past 120s, one orphan per handoff and per correction.","title":"A cancelled repo-contract pack kills the go command but orphans its test binary until the binary's own 20m timeout","weight":0.35}
