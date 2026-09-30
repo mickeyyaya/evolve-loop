@@ -1,0 +1,19 @@
+{
+  "id": "preflight-warns-when-claude-code-lags",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "title": "Loop preflight should warn when the installed Claude Code lags its latest release: the claude tiers are aliases, so a pinned build silently runs an older model",
+  "files": [
+    "go/internal/looppreflight/checks.go",
+    "go/internal/looppreflight/clihealth.go"
+  ],
+  "summary": "The loop's claude tiers are aliases (fast=haiku, balanced=sonnet, deep=opus) that resolve inside the installed Claude Code build. The operator keeps autoUpdates=false (Claude Code updates broke the bridge at 2.1.193 and 2.1.195), so the build is pinned by design. On 2026-09-30 that pin (2.1.283, 2026-09-25) meant every balanced phase ran claude-sonnet-5 for two days after Claude Code 2.1.284 (2026-09-28) made Sonnet 5.5 (claude-sonnet-5-5) the sonnet default; nothing in the pipeline noticed. Fixed by hand with `claude update` (2.1.285) and verified with `evolve doctor live claude-tmux` plus a --model sonnet probe reporting claude-sonnet-5-5.",
+  "fix": "Add a WARN-only preflight check comparing `claude --version` with the latest published release (cached, network-tolerant: a failed lookup is not a warning), naming the gap and the verify-then-update procedure (`claude update`, then `evolve doctor live claude-tmux`); never auto-update.",
+  "acceptance": [
+    "Preflight WARNs, without blocking, when the installed Claude Code is behind the latest published release",
+    "A failed release lookup produces no warning and no delay beyond a short timeout"
+  ],
+  "created_at": "2026-09-30T07:21:00Z",
+  "source": "console, 2026-09-30 operator question (Sonnet 5.5 not picked up)"
+}
