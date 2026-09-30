@@ -2,7 +2,7 @@
 
 Code explains itself. **New and changed code carries no comments** (the operator's rule, 2026-09-27): the reader learns the *what* from names, types and small functions, the *why* from tests and `docs/`. The only comments new code may carry are the machine-read ones in the table below and the package doc `go/acs/regression/docgo` enforces. Existing code has the same target (the operator's rule, 2026-09-30): **zero comments beyond those**, reached by the comment-reduction workstream. This follows *Clean Code*: a comment is a failure to express the intent in code, and doc comments on nonpublic code are noise — everything under `internal/` and `cmd/` is nonpublic by construction. Existing comments are the comment-reduction workstream's to remove, never deleted piecemeal inside a feature change.
 
-This rule applies to every Go file, test files included, and to every author: people, the console, and every loop phase.
+This rule applies to every Go file, test files included, and to every author: people, the console, and every loop phase. The decision behind it, with the alternatives considered, is [ADR-0111](../architecture/adr/0111-code-carries-no-comments.md).
 
 ## What a comment may say
 

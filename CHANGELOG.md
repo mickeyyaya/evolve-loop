@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
   - `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod` and `TestPackProblems` pin each shape, the negative ones included (a string prefix test, a climb from another directory, a call at the module root, a fixture loop naming `go.mod`, a stale record).
   - 13 large packages with seam tests are recorded as waiting for test-level selection (inbox `repo-contract-test-level-selection`).
   - The detector is in the pack, so it runs before main.
-- `runCycleRun` parses its flags in `parseCycleRunFlags` into a `cycleRunFlags` value and builds its request with `cycleRunFlags.request(projectRoot, environ)`. It is now 62 lines, and its allowance tightens from 86 to 62. `runCycleHealth` resolves its root in `cycleHealthRoot` (44 lines).
+- `runCycleRun` parses its flags in `parseCycleRunFlags` into a `cycleRunFlags` value and builds its request with `cycleRunFlags.request(projectRoot, environ)`. It is now 62 lines, and its allowance tightens from 86 to 62. `runCycleHealth` resolves its root in the new `cycleHealthRoot` and is now 44 lines.
 - New tests pin the flag parsing, the request's goal text, bypass and EVOLVE_ env, `--simulate` never wiring the production orchestrator, and the root resolution. Mutation sweeps killed every mutant the architecture reviews raised, on both the moved lines and the detector.
 - The docs name `repocontract.Packages()` instead of restating the list. The new `docs/architecture/packages/internal-repocontract.md` holds the pack's rationale (moved out of a code comment), the detection rule and its limits.
 

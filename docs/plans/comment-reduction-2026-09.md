@@ -81,6 +81,8 @@ The editor prompt forbids git mutation and is scoped to its batch.
 
 ## Progress
 
+What each round found beyond the comments themselves is written up per round: [round 12 findings](../reports/comment-round-12-findings-2026-09-30.md). The decision record is [ADR-0111](../architecture/adr/0111-code-carries-no-comments.md).
+
 Go files is each batch's count of changed Go files. The landing proof's verified count must equal the sum over the landed batches.
 
 | Batch | Scope | Go files | Comment lines before → after | Narrative before → after | Status |

@@ -163,3 +163,15 @@ approaches / decision / results / retro) — lives at
 | [research/ship-rate-harness-reliability-2026-09-02-sources.md](research/ship-rate-harness-reliability-2026-09-02-sources.md) | Literature survey, 60 sources: SWE-agent ACI ablations, self-repair limits, architect/editor split, best-of-N with verifiers, over-claiming incentives, deterministic hooks, verifier isolation, cascades. |
 | [research/pipeline-dashboard-patterns-2026-09-02.md](research/pipeline-dashboard-patterns-2026-09-02.md) | UI/observability patterns (~45 sources) behind ADR-0095: trace/session model, lanes not trees, immutable retry rounds, Sentry-style fingerprint groups, SSE mechanics for a Go single binary. |
 | [superpowers/specs/2026-09-02-ship-rate-harness-and-pipeline-dashboard-design.md](superpowers/specs/2026-09-02-ship-rate-harness-and-pipeline-dashboard-design.md) | The design spec (both sub-projects, TDD protocol, named patterns, clean-code limits). |
+
+## 2026-09-30 — comment policy, whole-tree tests, inbox and CLI coverage
+
+| Document | What it records |
+|---|---|
+| [research/cli-coverage-inventory-2026-09-30.md](research/cli-coverage-inventory-2026-09-30.md) | Which of 147 core functions the published `evolve` CLI runs today (64 fully, 36 partly, 47 not at all), with file:line evidence per row, and the 50 CLI requests it produced (PR #750). |
+| [reports/inbox-review-2026-09-30.md](reports/inbox-review-2026-09-30.md) | Why the loop's queue planned 0 batches from 183 items, the per-item verdicts of a six-agent re-verification against main, and the drain that reopened it to 29 batches (PRs #745, #747). |
+| [reports/comment-round-12-findings-2026-09-30.md](reports/comment-round-12-findings-2026-09-30.md) | The 43 findings of comment reduction round 12 (PR #749), including two `scopedelta` security holes, and the inbox item that carries each. |
+| [incidents/2026-09-30-a-lane-ship-grew-a-function-past-the-size-ratchet.md](incidents/2026-09-30-a-lane-ship-grew-a-function-past-the-size-ratchet.md) | Cycle 1779's lane ship turned main red through a whole-tree test its change scope never selected; the class fix (PR #751). |
+| [architecture/adr/0110-whole-tree-tests-run-before-main.md](architecture/adr/0110-whole-tree-tests-run-before-main.md) | Decision: every test that reads the whole tree runs before main, and an AST detector keeps the scanner pack complete. |
+| [architecture/adr/0111-code-carries-no-comments.md](architecture/adr/0111-code-carries-no-comments.md) | Decision: code carries no comments; what they said moves to code, tests, design notes and the history archive; the commit gate refuses an added comment (PRs #746, #749, #753). |
+
