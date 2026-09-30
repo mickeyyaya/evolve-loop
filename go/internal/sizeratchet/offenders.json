@@ -173,7 +173,6 @@
   "internal/inboxmover.ApplyCycleOutcome": 68,
   "internal/installer.Validate": 58,
   "internal/ledgerverify.VerifyCycle": 63,
-  "internal/llmcalls.Aggregate": 53,
   "internal/looppreflight.checkCLIVersionFreeze": 87,
   "internal/looppreflight.checkHostCapabilities": 64,
   "internal/looppreflight.resolve": 130,
@@ -251,8 +250,6 @@
   "internal/tokenusage.ScanConfigRoot": 60,
   "internal/triagecap.CapReviewer.Review": 62,
   "internal/verifyeval.Verify": 53,
-  "internal/verifyeval.shellWords": 51,
-  "internal/versionbump.Run": 52,
   "pkg/phaseproto.SubprocessRunner.Run": 56,
   "test/fixtures.FakeExec.Run": 56
 }
