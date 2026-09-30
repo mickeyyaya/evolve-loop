@@ -152,33 +152,51 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func runCycleRun(args []string, stdout, stderr io.Writer) int {
+type cycleRunFlags struct {
+	projectRoot, goalHash, goalText, evolveDir string
+	simulate, bypassPolicy                     bool
+}
+
+func parseCycleRunFlags(args []string, stderr io.Writer) (cycleRunFlags, bool) {
+	var f cycleRunFlags
 	fs := flag.NewFlagSet("evolve cycle run", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var (
-		projectRoot  string
-		goalHash     string
-		goalText     string
-		evolveDir    string
-		simulate     bool
-		bypassPolicy bool
-	)
-	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
-	fs.StringVar(&goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
-	fs.StringVar(&goalText, "goal", "", "human-readable goal text (threaded to Scout + the routing advisor as Context[\"goal\"]); optional")
-	fs.StringVar(&evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
-	fs.BoolVar(&simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
-	fs.BoolVar(&bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
+	fs.StringVar(&f.projectRoot, "project-root", ".", "absolute path to the project root (default cwd)")
+	fs.StringVar(&f.goalHash, "goal-hash", "", "8-char SHA256 of the goal (required)")
+	fs.StringVar(&f.goalText, "goal", "", "human-readable goal text (threaded to Scout + the routing advisor as Context[\"goal\"]); optional")
+	fs.StringVar(&f.evolveDir, "evolve-dir", "", "path to .evolve/ state directory (default <project-root>/.evolve)")
+	fs.BoolVar(&f.simulate, "simulate", false, "no-LLM walk: every phase returns PASS without calling out (for parity-audit harness)")
+	fs.BoolVar(&f.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase this run (operator escape hatch)")
 	args = stripRemovedBudgetFlags(args, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
 	if err := fs.Parse(args); err != nil {
-		return 10
+		return f, false
 	}
-	if goalHash == "" {
+	if f.goalHash == "" {
 		fmt.Fprintln(stderr, "evolve cycle run: --goal-hash is required")
+		return f, false
+	}
+	return f, true
+}
+
+func (f cycleRunFlags) request(projectRoot string, environ []string) core.CycleRequest {
+	return core.CycleRequest{
+		ProjectRoot:           projectRoot,
+		GoalHash:              f.goalHash,
+		Env:                   filterEvolveEnv(environ),
+		Context:               cycleContext(f.goalHash, f.goalText),
+		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
+		BypassPolicy:          f.bypassPolicy,
+	}
+}
+
+func runCycleRun(args []string, stdout, stderr io.Writer) int {
+	f, ok := parseCycleRunFlags(args, stderr)
+	if !ok {
 		return 10
 	}
+	projectRoot, evolveDir := f.projectRoot, f.evolveDir
 	// Absolutize before deriving any path: a relative root makes worktree-phase
 	// artifact paths diverge between the agent's cwd and the bridge's.
 	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
@@ -192,12 +210,12 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	if !simulate {
+	if !f.simulate {
 		gcOrphanSessions("cycle-start", stderr)
 	}
 
 	var d orchDeps
-	if simulate {
+	if f.simulate {
 		d = wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	} else {
 		d = wireOrchestratorDepsFn(projectRoot, evolveDir, stderr)
@@ -205,15 +223,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
 	defer d.Signals.Flush()
-	cycleEnv := filterEvolveEnv(os.Environ())
-	result, err := orch.RunCycle(context.Background(), core.CycleRequest{
-		ProjectRoot:           projectRoot,
-		GoalHash:              goalHash,
-		Env:                   cycleEnv,
-		Context:               cycleContext(goalHash, goalText),
-		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
-		BypassPolicy:          bypassPolicy,
-	})
+	result, err := orch.RunCycle(context.Background(), f.request(projectRoot, os.Environ()))
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		var lr loopResult
 		lr.emitQuotaPause(loopConfig{EvolveDir: evolveDir}, result.Cycle, stdout, stderr)
