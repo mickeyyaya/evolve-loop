@@ -219,6 +219,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ORCHESTRATOR_PHASE_ABORTED` | the cycle aborted after this phase's outcome (review reject, guard, persistence); the abort reason is in fields.abort_reason |
 | `ORCHESTRATOR_PHASE_VERDICT_FAIL` | a phase recorded verdict FAIL; the reason is the phase's own error-severity diagnostics |
 | `ORCHESTRATOR_PHASE_VERDICT_WARN` | a phase recorded verdict WARN; the reason carries its error-severity diagnostics, if any |
+| `ORCHESTRATOR_PLAN_PHASE_GATED` | the phase registry removed a phase the advisor's plan runs, at that phase's turn in the walk: its declared skip_when fired (rule skip-when-gates-plan, e.g. a bugfix phase on a deliverable_kind=document cycle) or its insert_when, its whole admission rule, did not fire (rule insert-when-gates-plan); fields.phase, rule, next_phase; the walk continues and routing-decision-<n>.json keeps the clamp |
 | `ORCHESTRATOR_QUOTA_PAUSED` | every CLI family is quota-exhausted; the cycle is paused at the named phase and resumable |
 | `ORCHESTRATOR_REBASE_REENTRY_ABORTED` | after a debugger resolved a fleet-rebase conflict, the host could not carry, rebase, pend or route the resolved tree (the reason names which), or the recovery budget was spent; the cycle ended instead of a reship on the base the ship diverged from |
 | `ORCHESTRATOR_SYSTEM_FAILURE` | an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor |

@@ -1,6 +1,10 @@
 package router
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+)
 
 // EvaluatorFloorPhase is the floor phase no configuration can remove; policy holds a pinned twin.
 // See ADR-0060.
@@ -48,7 +52,7 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 
 	for _, phase := range floor {
 		if phase == "tdd" {
-			if tddPinned(in) {
+			if TddPinned(in.Cfg, in.Signals) {
 				forcePhase(out, &clamps, "tdd", "ship-requires-tdd")
 			}
 			continue
@@ -165,10 +169,9 @@ func ensureRun(plan *PhasePlan, phase string) {
 	})
 }
 
-// tddPinned evaluates the same conditional rule as shouldRun's TDD pin; with no rule, tdd stays pinned.
-func tddPinned(in RouteInput) bool {
-	if rule, ok := in.Cfg.Conditional["tdd"]; ok {
-		return evalCondRule(in.Signals, rule)
+func TddPinned(cfg config.RoutingConfig, sig RoutingSignals) bool {
+	if rule, ok := cfg.Conditional["tdd"]; ok {
+		return evalCondRule(sig, rule)
 	}
 	return true
 }

@@ -635,6 +635,7 @@ func (o *Orchestrator) advisorPlanInput(ctx context.Context, current string, sig
 		Catalog:           withoutCards(phaseCardsFromCatalog(o.catalog), unavailable),
 		OnDemandPhases:    withoutNames(onDemandCatalogNames(o.catalog), unavailable),
 		GoalText:          req.Context["goal"],
+		LaneItems:         o.laneItemsForAdvisor(req.ProjectRoot, cs.WorkspacePath),
 		CarryoverTodos:    carryoverTodosForAdvisor(state.CarryoverTodos),
 		BenchedCLIs:       benchedCLIs,
 		UnavailablePhases: unavailable,

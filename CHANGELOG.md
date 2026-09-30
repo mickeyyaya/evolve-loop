@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a document lane is routed as a document: the bugfix phases declare they do not admit it, the advisor plans from the lane's item, the re-plan counts scout's tasks, and tdd is decided once (2026-10-01)
+
+- **What was wrong.** Cycle 1692, the first live ADR-0099 document deliverable (lane `netflix-margin-device-experience`, scout `goal_type: strategy-options`, `deliverable_kind: document`), was planned scout → triage → premise-challenge → fault-localization → bug-reproduction → tdd → build → error-handling-scan. Four defects:
+  - the advisor planned before scout from the wave's goal text; the lane's item, named in `lane-scope.json` before any phase ran, never reached its prompt;
+  - nothing declared that a bugfix phase does not admit a document. The 2026-09-28 `insert-when-gates-plan` clamp keys on the trigger, so a document lane whose scout declares `goal_type: bugfix` would still run fault-localization and bug-reproduction;
+  - the post-scout re-plan read `scout.item_count=0` and proposed ending the cycle as no-work. The scout report fallback never counted tasks, so every report-only cycle, code or document, digested 0 (1692, 1770, 1774, 1779 and 1780 each got an "end cycle early" re-plan); only the re-plan's shadow stage kept those cycles alive;
+  - the tdd decision was recorded `forced-on:tdd` although the plan ran it, while the item's acceptance said tdd does not run for a document; the 1692 audit graded that routing decision as a lane defect (M3).
+- **What changed.**
+  - Every bugfix-category phase declares in its own `phase.json` that it does not admit a document: `routing.skip_when` gains `{"field": "deliverable_kind", "op": "eq", "value": "document"}` for fault-localization (now also categorized `bugfix`), bug-reproduction, error-handling-scan, flake-rerun-scan and incident-postmortem. The existing `skip-when-gates-plan` gate removes them from a document lane's plan; the router holds no list of its own.
+  - A registry gate that removes a planned phase (`skip-when-gates-plan` or `insert-when-gates-plan`) raises `ORCHESTRATOR_PLAN_PHASE_GATED` (WARN, kind `advisor.warning`, fields `phase`, `rule`, `next_phase`) where the routing decision is recorded. The two rule names are exported from `router`, and their clamps now carry `Phase`.
+  - The advisor's plan and re-plan input carry `RouteInput.LaneItems`, read from the lane pin and each item's live inbox record (id, kind, deliverable kind, acceptance). The kind is normalized, so an unknown word is no declaration, and an undeclared kind inherits `.evolve/domain.json`; one function, `resolveDeliverableKind`, owns that declared > domain default > `code` precedence for both the lane items and the dispatch signal. The prompt renders them under "Lane scope" after the goal, capped at its own named bound (`maxLaneScopeRunes`, 4000, beside the goal's cap: the advisor's prompt caps have no config home); an unresolvable item is named with the reason. The rubric now projects every `skip_when` as a skip line.
+  - The scout report fallback counts `ItemCount` as the `### ` task headings under `## Selected Tasks` (or `## Proposed Tasks`); a "None." section counts 0. The headings come from `phasecontract.SelectedTasks`, a named section that `Scout.Sections` and scout's backlog check also use, so no reader indexes `Scout.Sections` by position. The re-plan stays `shadow`.
+  - tdd for a document is decided once, in the registry's `conditional_mandatory.tdd`: released, not forbidden (ADR-0099 amendment 2026-10-01). A phase the plan runs records `plan:<phase>`; `forced-on:<phase>` now appears only on the trigger path. A document cycle's Task Contract states the rule and its result for the cycle, computed by the new `router.TddPinned`, which the floor clamp also calls directly, so no acceptance grades tdd's routing. The loaded config always carries a tdd rule (`config.defaults` seeds it; the registry and env only replace it), so the line has no "no rule" branch. `config.CondRule.String` renders the rule in the registry's spelling.
+- **Tests, red first:**
+  - `TestDigest_ScoutReportFallback_CountsCycle1692DocumentTask` (on 1692's `scout-report.md`, `go/internal/router/testdata/cycle1692-scout-report.md`) and `TestDigest_ScoutReportFallback_ItemCountIsTheSelectedTaskHeadings`;
+  - `TestDocumentLane_NeverDispatchesTheBugfixPhasesOnCycle1692sPlan` (the real registry and the real `.evolve/phases` on 1692's plan, for `strategy-options` and `bugfix`), `TestDocumentLane_TheGateIsThePhaseJSONDeclarationNotAGoList`, `TestBugfixCategoryPhases_DeclareTheyDoNotAdmitADocument`, `TestDocumentLane_Cycle1692TddDecisionIsNotRecordedForcedOn` (1692's decision-6 shape) and `TestRoute_LaneItemsAreAdvisorContextTheWalkIgnores`;
+  - `TestWriteRoutingContext_RendersTheLaneItemTheCycleIsPinnedTo`, `TestWriteRoutingContext_AnUnresolvedLaneItemSaysWhy`, `TestWriteRoutingContext_NoLaneItemsRendersNoLaneSection`, `TestWriteRubricLines_ProjectsADeclaredSkipWhen`;
+  - `TestPlanCycle_TheAdvisorPlanPromptCarriesTheLanesScopedItem` (through `RunCycle` and the planner seam), `TestPlanCycle_AnUnresolvableLaneItemIsNamedInThePlanPrompt`, `TestLaneItem_TheDeclaredKindIsNormalizedAndAnUnknownWordFallsToTheProjectDefault`, `TestResolveDeliverableKind_DeclaredBeatsTheDomainDefaultWhichBeatsCode`;
+  - `TestWriteRoutingContext_ALaneSectionLongerThanTheLaneCapIsCapped`, `TestSelectedTasks_IsTheScoutReportsTasksSection`;
+  - `TestRecordRoutingDecision_ARegistryGatedPlannedPhaseEmitsACodedSignal` (pins the kind `advisor.warning` as well as code, severity and module), `TestRecordRoutingDecision_AClampThatRemovesNoPlannedPhaseEmitsNoGateSignal`;
+  - `TestSeedTaskContract_DocumentCycleStatesTddFromTheRegistryRule`, `TestSeedTaskContract_ARegistryThatPinsTddForDocumentsSaysSo`;
+  - API pins written with the extraction: `TestTddPinned_TheRegistryRuleReleasesADocumentAndATrivialCycle`, `TestCondRuleString_ReproducesTheRegistryExpression`.
+  - Mutation sweep: 15 of 15 mutants killed by a named test. The review fixes ran 10 more, all killed: the signal's kind swapped to `gate.corrected`; the lane section uncapped; the Task Contract's rule text dropped; the digest reading the wrong section; `SelectedTasks` losing its legacy alias; the floor evaluating tdd on empty signals; and in `resolveDeliverableKind` the normalization skipped, the precedence inverted, the lane items denied the domain default and `dispatchSignals` reading it ungated.
+- **Docs:** ADR-0099 amendment (2026-10-01); `internal-router.md`, `internal-core.md`, `internal-core-advisor.md`, `internal-config.md`, `internal-phasecontract.md`; `dynamic-phase-routing.md`; `runtime-reference.md` (Document-lane routing row); `signal-center-design.md` (`advisor.warning` row); `signal-codes.md` (regenerated); `logic-first-delivery-design.md` (§5.11 T4 and its change log).
+- Consumes inbox `document-lane-planned-bugfix-phases`.
+
 ## Added — `commentaudit strip`: comments are removed by a tool, and a Clean Code review decides how the code must change to read without them (2026-09-30)
 
 - The operator's goal (2026-09-30): "remove all comments from the code and refactor the code to be clear and self-explanatory". Editor rounds had removed comments a few directories at a time, and about 88,000 comment lines remained.
@@ -63,7 +89,6 @@ All notable changes to this project will be documented in this file.
   - `TestWriteHistoryArchive_RewritesTheIndexAfterAFailedAppend`;
   - `TestMain_HistoryResolvesARelativeOutAgainstTheRepoRoot`;
   - `TestIsNarrative_CountsPullRequestsCommitsReleasesAndRounds`.
-
 ## Changed — code carries no comments: the commit gate refuses an added comment, and every loop skill and persona states the rule (2026-09-30)
 
 - The operator's rule (2026-09-30): "Add system level policy for evo loop skill and project to set the rule that it is forbidden to write comments; code should explain itself."

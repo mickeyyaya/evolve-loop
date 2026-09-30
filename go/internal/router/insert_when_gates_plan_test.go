@@ -63,7 +63,7 @@ func TestShouldRun_APlannedPhaseWhoseTriggerDoesNotFireIsSkipped(t *testing.T) {
 		if !contains(dec.SkipPhases, phase) {
 			t.Errorf("SkipPhases = %v, want %s skipped on a refactor lane", dec.SkipPhases, phase)
 		}
-		if !clampForces(dec, "insert-when-gates-plan", phase+"=skip") {
+		if !clampForces(dec, RuleInsertWhenGatesPlan, phase+"=skip") {
 			t.Errorf("Clamps = %+v, want insert-when-gates-plan forcing %s=skip", dec.Clamps, phase)
 		}
 	}
@@ -74,7 +74,7 @@ func TestShouldRun_APlannedPhaseWhoseTriggerFiresRuns(t *testing.T) {
 	if dec.NextPhase != "fault-localization" {
 		t.Fatalf("NextPhase = %q, want fault-localization on a bugfix lane", dec.NextPhase)
 	}
-	if clampForces(dec, "insert-when-gates-plan", "fault-localization=skip") {
+	if clampForces(dec, RuleInsertWhenGatesPlan, "fault-localization=skip") {
 		t.Errorf("a firing trigger was clamped: %+v", dec.Clamps)
 	}
 }
