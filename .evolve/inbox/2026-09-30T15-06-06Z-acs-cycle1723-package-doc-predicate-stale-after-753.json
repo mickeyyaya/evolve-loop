@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "go test -tags acs ./acs/cycle1723/ passes on main, or the package is archived under docs/private/research/archived-<date>/superseded-predicate-packages/ with a README row naming the superseding change (#753) and where its still-valid predicates are now covered",
+    "No predicate in the package asserts the pre-#753 package-doc rule"
+  ],
+  "created_at": "2026-09-30T16:40:00Z",
+  "files": [
+    "go/acs/cycle1723"
+  ],
+  "fix": "Update TestC1723_003 to #753's rule (a new file's package doc, or a rewrite of an existing one, is spared while it stays within three lines or its old length), or archive the package if the rule it pinned is fully superseded; the same class as retire-comment-pinning-cycle-predicates.",
+  "id": "acs-cycle1723-package-doc-predicate-stale-after-753",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, architecture review of the comment history archive (declined finding)",
+  "summary": "TestC1723_003_CommentsExemptsOnlyANewFilesPackageDoc in go/acs/cycle1723 fails on main at f27afd8b: #753 changed the package-doc rule of `commentaudit comments` (a rewrite of an existing package doc is spared too), and this predicate still asserts the older expectation. Per-cycle predicates re-run only when a lane touches their packages, so it is a latent trap for any lane that changes go/internal/commentaudit. Same class as the inbox item retire-comment-pinning-cycle-predicates, which does not list cycle1723.",
+  "title": "Update or archive go/acs/cycle1723's package-doc predicate, which #753's rule made stale",
+  "weight": 0.45
+}
