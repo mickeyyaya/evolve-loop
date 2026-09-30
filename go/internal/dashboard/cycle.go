@@ -175,10 +175,8 @@ func callForPhaseWindow(
 		if selected, selectedIndex, ok := latestCallInWindow(window, calls, used); ok {
 			return selected, selectedIndex, true
 		}
-		for _, call := range calls {
-			if !parseTime(call.EndedAt).IsZero() || !parseTime(call.TS).IsZero() {
-				return llmCall{}, -1, false
-			}
+		if hasTimestampedCall(calls) {
+			return llmCall{}, -1, false
 		}
 	}
 	index := occurrence - 1
@@ -188,6 +186,15 @@ func callForPhaseWindow(
 		}
 	}
 	return llmCall{}, -1, false
+}
+
+func hasTimestampedCall(calls []llmCall) bool {
+	for _, call := range calls {
+		if !parseTime(call.EndedAt).IsZero() || !parseTime(call.TS).IsZero() {
+			return true
+		}
+	}
+	return false
 }
 
 func latestCallInWindow(window phaseCallWindow, calls []llmCall, used map[int]struct{}) (llmCall, int, bool) {
@@ -209,12 +216,14 @@ func latestCallInWindow(window phaseCallWindow, calls []llmCall, used map[int]st
 		if !callStart.IsZero() && (callStart.Before(window.start) || callStart.After(window.end)) {
 			continue
 		}
-		if callStart.IsZero() && !window.previousEnd.IsZero() &&
-			!terminal.Before(window.start) && !terminal.After(window.previousEnd) {
+		mayBelongToPreviousRound := callStart.IsZero() && !window.previousEnd.IsZero() &&
+			!terminal.Before(window.start) && !terminal.After(window.previousEnd)
+		if mayBelongToPreviousRound {
 			continue
 		}
-		if !window.nextStart.IsZero() && !terminal.Before(window.nextStart) &&
-			(callStart.IsZero() || !callStart.Before(window.nextStart)) {
+		mayBelongToNextRound := !window.nextStart.IsZero() && !terminal.Before(window.nextStart) &&
+			(callStart.IsZero() || !callStart.Before(window.nextStart))
+		if mayBelongToNextRound {
 			continue
 		}
 		if selectedAt.IsZero() || terminal.After(selectedAt) {

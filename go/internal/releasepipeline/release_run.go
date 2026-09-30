@@ -77,9 +77,9 @@ func (r *releaseRun) resolveFromTag() {
 func resolveSteps(opts Options) Steps {
 	steps := applyDefaultSteps(opts.Steps)
 	if opts.Steps.Preflight == nil {
-		sp := opts.StrictPass
+		strictPass := opts.StrictPass
 		steps.Preflight = func(repoRoot, target string, dryRun, skipTests bool) error {
-			return runPreflightLib(repoRoot, target, dryRun, skipTests, sp)
+			return runPreflightLib(repoRoot, target, dryRun, skipTests, strictPass)
 		}
 	}
 	return steps
@@ -148,8 +148,9 @@ func (r *releaseRun) rebuildBinary() error {
 		return nil
 	}
 	r.logf("step: rebuild-binary")
+	const dryRun = false
 	return r.runPrePublishStep("rebuild-binary", "rebuild-binary", func() error {
-		return r.steps.RebuildBinary(o.RepoRoot, o.Target, false)
+		return r.steps.RebuildBinary(o.RepoRoot, o.Target, dryRun)
 	})
 }
 

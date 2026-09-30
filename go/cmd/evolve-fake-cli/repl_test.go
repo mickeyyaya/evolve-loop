@@ -108,10 +108,10 @@ func TestRunREPL_AuditVerdictInjection(t *testing.T) {
 func TestRunREPL_EOFFallback_WritesFromAbsolutePath(t *testing.T) {
 	ws := t.TempDir()
 	artifact := filepath.Join(ws, "scout-report.md")
-	prompt := "# Evolve Scout\n\nplease write " + artifact + "\n"
+	promptWithoutWorkspaceLine := "# Evolve Scout\n\nplease write " + artifact + "\n"
 	var stdout, stderr bytes.Buffer
 
-	rc := runREPL(strings.NewReader(prompt), &stdout, &stderr, "PASS")
+	rc := runREPL(strings.NewReader(promptWithoutWorkspaceLine), &stdout, &stderr, "PASS")
 
 	if rc != 0 {
 		t.Fatalf("rc=%d stderr=%s", rc, stderr.String())
@@ -165,7 +165,8 @@ func TestWriteArtifacts_UnwritableDestination_Errors(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
 
-	err := writeArtifacts(map[string]string{filepath.Join(ro, "out.md"): "x"})
+	fileDirectlyInReadOnlyDir := filepath.Join(ro, "out.md")
+	err := writeArtifacts(map[string]string{fileDirectlyInReadOnlyDir: "x"})
 
 	if err == nil {
 		t.Fatal("writeArtifacts should error writing into a read-only directory")
@@ -224,10 +225,10 @@ func TestRun_ExitInjectionScopedToStyle(t *testing.T) {
 	t.Setenv("FAKE_CLI_CODEX_EXIT", "81")
 	dir := t.TempDir()
 	artifact := filepath.Join(dir, "scout-report.md")
-	args := []string{"-p", "write to " + artifact + " please", "--model", "sonnet"}
+	claudeStyleArgs := []string{"-p", "write to " + artifact + " please", "--model", "sonnet"}
 
 	var stdout, stderr bytes.Buffer
-	if rc := run(args, bytes.NewReader(nil), &stdout, &stderr); rc != 0 {
+	if rc := run(claudeStyleArgs, bytes.NewReader(nil), &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc=%d, want 0 (codex injection must not affect claude); stderr=%s", rc, stderr.String())
 	}
 	if _, err := os.Stat(artifact); err != nil {

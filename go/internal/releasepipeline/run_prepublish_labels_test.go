@@ -129,10 +129,11 @@ func TestRun_PrePublishStepFailure_WrapsLabelAndJournals(t *testing.T) {
 }
 
 func TestRun_DryRun_StepLedgerExact(t *testing.T) {
+	journalDirNotSharedWithOtherDryRuns := t.TempDir()
 	res, err := Run(Options{
 		Target:      "1.2.3",
 		RepoRoot:    t.TempDir(),
-		JournalDir:  t.TempDir(),
+		JournalDir:  journalDirNotSharedWithOtherDryRuns,
 		FromTag:     "v1.2.2",
 		DryRun:      true,
 		MaxPollWait: time.Second,
@@ -191,14 +192,14 @@ func TestReleaseNotes_BannerOnlyWhenNotesExist(t *testing.T) {
 	})
 
 	t.Run("a real entry is prefixed with the release-class banner", func(t *testing.T) {
-		repo := t.TempDir()
+		nonGitRepo := t.TempDir()
 		body := "# Changelog\n\n## [1.2.3] - 2026-05-24\n\n### Added\n\n- Feature A\n"
-		if err := os.WriteFile(filepath.Join(repo, "CHANGELOG.md"), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(nonGitRepo, "CHANGELOG.md"), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		var logged []string
 		r := &releaseRun{
-			opts:    Options{RepoRoot: repo, Target: "1.2.3"},
+			opts:    Options{RepoRoot: nonGitRepo, Target: "1.2.3"},
 			fromTag: "v1.2.2",
 			logf:    func(f string, a ...any) { logged = append(logged, fmt.Sprintf(f, a...)) },
 		}

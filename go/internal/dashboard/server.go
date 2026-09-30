@@ -66,8 +66,8 @@ type Server struct {
 	subMu sync.Mutex
 	subs  map[chan uint64]struct{}
 
-	hostMu sync.RWMutex
-	hosts  map[string]bool
+	hostMu     sync.RWMutex
+	boundHosts map[string]bool
 
 	mux *http.ServeMux
 }
@@ -75,8 +75,8 @@ type Server struct {
 func New(root string, opts Options) *Server {
 	opts = opts.withDefaults()
 	col := newCollector(root)
-	col.maxCycles, col.env = opts.MaxCycles, opts.Env
-	s := &Server{root: root, opts: opts, col: col, subs: map[chan uint64]struct{}{}, hosts: map[string]bool{}}
+	col.maxCycles, col.operatorEnv = opts.MaxCycles, opts.Env
+	s := &Server{root: root, opts: opts, col: col, subs: map[chan uint64]struct{}{}, boundHosts: map[string]bool{}}
 	s.mux = http.NewServeMux()
 	s.routes()
 	return s
@@ -124,7 +124,7 @@ func (s *Server) hostAllowed(hostport string) bool {
 	default:
 		s.hostMu.RLock()
 		defer s.hostMu.RUnlock()
-		return s.hosts[host]
+		return s.boundHosts[host]
 	}
 }
 
@@ -134,7 +134,7 @@ func (s *Server) allowHost(addr string) {
 		return
 	}
 	s.hostMu.Lock()
-	s.hosts[host] = true
+	s.boundHosts[host] = true
 	s.hostMu.Unlock()
 }
 
@@ -269,17 +269,12 @@ func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cs = assignState(cs, snap.Loop)
-	mandatory, mw := readMandatory(s.root, s.col.env)
+	mandatory, mw := readMandatory(s.root, s.col.operatorEnv)
 	warns = append(warns, mw...)
 	var pw []string
 	cs.Plan, pw = readPlan(mandatory, core.RunWorkspacePath(s.root, id), cs, snap.Loop, s.col.streams)
 	warns = append(warns, pw...)
-	for _, summary := range snap.Cycles {
-		if summary.ID == id {
-			cs.State, cs.StateName, cs.CurrentPhase, cs.Plan = summary.State, summary.StateName, summary.CurrentPhase, summary.Plan
-			break
-		}
-	}
+	cs = withBoardLaneStatus(cs, snap.Cycles)
 	arts, err := ListArtifacts(s.root, id)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		warns = append(warns, fmt.Sprintf("artifacts: %v", err))
@@ -289,6 +284,16 @@ func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
 		primary = auditReportName
 	}
 	writeJSON(w, cycleDetail{Cycle: cs, Artifacts: arts, PrimaryReport: primary, Warnings: warns})
+}
+
+func withBoardLaneStatus(cs CycleSummary, board []CycleSummary) CycleSummary {
+	for _, summary := range board {
+		if summary.ID == cs.ID {
+			cs.State, cs.StateName, cs.CurrentPhase, cs.Plan = summary.State, summary.StateName, summary.CurrentPhase, summary.Plan
+			break
+		}
+	}
+	return cs
 }
 
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {

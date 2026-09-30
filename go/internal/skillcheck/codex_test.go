@@ -133,7 +133,8 @@ func TestCodexManifestDiffs_DriftLifecycle(t *testing.T) {
 }
 
 func TestCodexManifestDiffs_ToleratedAbsentSource(t *testing.T) {
-	diffs, err := codexManifestDiffs(t.TempDir())
+	rootWithoutClaudeManifest := t.TempDir()
+	diffs, err := codexManifestDiffs(rootWithoutClaudeManifest)
 	if err != nil {
 		t.Fatalf("absent Claude manifest must be tolerated, got: %v", err)
 	}

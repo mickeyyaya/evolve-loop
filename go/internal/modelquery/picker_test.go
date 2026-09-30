@@ -71,8 +71,9 @@ func TestParseAgyPicker(t *testing.T) {
 }
 
 func TestParseClaudePicker(t *testing.T) {
+	wantModelFamilies := []string{"opus", "sonnet", "haiku"}
 	got := parseClaudePicker(claudePickerPane)
-	assertIDs(t, got, []string{"opus", "sonnet", "haiku"})
+	assertIDs(t, got, wantModelFamilies)
 }
 
 func TestParsersIgnoreChromeAndEmpty(t *testing.T) {

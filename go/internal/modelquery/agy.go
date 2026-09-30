@@ -32,8 +32,9 @@ func (l AgyLister) List(ctx context.Context, _ string) ([]string, error) {
 func parseAgyModels(out string) []string {
 	var names []string
 	for _, line := range strings.Split(out, "\n") {
-		id, display, ok := strings.Cut(line, "\t")
-		if !ok || !agyModelID.MatchString(strings.TrimSpace(id)) {
+		id, display, hasTab := strings.Cut(line, "\t")
+		isModelRow := hasTab && agyModelID.MatchString(strings.TrimSpace(id))
+		if !isModelRow {
 			continue
 		}
 		if name := strings.TrimSpace(display); name != "" {

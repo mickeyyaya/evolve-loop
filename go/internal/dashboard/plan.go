@@ -25,6 +25,8 @@ const (
 	stepSkipped   = "skipped"
 )
 
+const notInWalk = -1
+
 type mandatorySet struct {
 	mandatory   []string
 	conditional map[string]bool
@@ -56,7 +58,7 @@ func (m mandatorySet) position(phase string) int {
 			return i
 		}
 	}
-	return -1
+	return notInWalk
 }
 
 type streamReader struct {
@@ -149,9 +151,9 @@ func readPlan(set mandatorySet, ws string, cs CycleSummary, loop LoopStatus, str
 	last, rounds, order := runOrder(phaseHistory(cs, outcomes), current, running)
 	frontier := walkFrontier(set, order)
 	order, required := scheduleMandatory(set, last, current, order)
-	held := map[string]bool{}
+	inSequence := map[string]bool{}
 	for _, p := range order {
-		held[p] = true
+		inSequence[p] = true
 	}
 	for _, p := range order {
 		step := PlanStep{Phase: p, Optional: !required[p] && !set.conditional[p], Conditional: set.conditional[p], GateVerified: gates[p]}
@@ -175,13 +177,13 @@ func readPlan(set mandatorySet, ws string, cs CycleSummary, loop LoopStatus, str
 	}
 	plan.Total = len(plan.Steps)
 	var advisorWarn string
-	plan.AdvisorProposed, plan.AdvisorSkips, plan.AdvisorOverridden, advisorWarn = advisorProposal(ws, held, last)
+	plan.AdvisorProposed, plan.AdvisorSkips, plan.AdvisorOverridden, advisorWarn = advisorProposal(ws, inSequence, last)
 	warn(advisorWarn)
 	return plan, warnings
 }
 
 func walkFrontier(set mandatorySet, order []string) int {
-	frontier := -1
+	frontier := notInWalk
 	for _, p := range order {
 		if pos := set.position(p); pos > frontier {
 			frontier = pos
@@ -243,7 +245,7 @@ func verdictStatus(verdict string) string {
 	return StateIncomplete
 }
 
-func advisorProposal(ws string, held map[string]bool, ran map[string]PhaseRun) (proposed, skips, overridden []string, warn string) {
+func advisorProposal(ws string, inSequence map[string]bool, ran map[string]PhaseRun) (proposed, skips, overridden []string, warn string) {
 	var entries []router.PhasePlanEntry
 	for _, name := range []string{replanFile, planFile} {
 		ok, err := readJSON(filepath.Join(ws, name), &entries)
@@ -255,11 +257,11 @@ func advisorProposal(ws string, held map[string]bool, ran map[string]PhaseRun) (
 		}
 	}
 	for _, e := range entries {
-		_, did := ran[e.Phase]
+		_, didRun := ran[e.Phase]
 		switch {
-		case e.Run && !held[e.Phase]:
+		case e.Run && !inSequence[e.Phase]:
 			proposed = append(proposed, e.Phase)
-		case !e.Run && did:
+		case !e.Run && didRun:
 			overridden = append(overridden, e.Phase)
 		case !e.Run:
 			skips = append(skips, e.Phase)

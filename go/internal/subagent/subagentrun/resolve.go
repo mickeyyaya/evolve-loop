@@ -54,7 +54,8 @@ func legacyAdapterPath(adaptersDir, cli string) string {
 }
 
 func (d *Dispatcher) resolveTier(req Request, id identity, p *plan) error {
-	if p.model != "" {
+	routerResolvedTier := p.model != ""
+	if routerResolvedTier {
 		return nil
 	}
 	model, err := d.deps.ResolveTier(TierRequest{

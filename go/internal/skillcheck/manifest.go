@@ -13,7 +13,8 @@ func ManifestProblems(projectRoot string) ([]string, error) {
 	manifestPath := filepath.Join(projectRoot, ".claude-plugin", "plugin.json")
 	raw, err := os.ReadFile(manifestPath)
 	if err != nil {
-		if os.IsNotExist(err) {
+		isNotAPluginTree := os.IsNotExist(err)
+		if isNotAPluginTree {
 			return nil, nil
 		}
 		return []string{fmt.Sprintf("MANIFEST: cannot read .claude-plugin/plugin.json: %v", err)}, nil

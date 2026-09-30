@@ -75,7 +75,7 @@ func TestRegistryRoles_ValidArrayFormat(t *testing.T) {
 	}
 }
 
-func TestRegistryRoles_EntryWithEmptyRole(t *testing.T) {
+func TestRegistryRoles_EntryWithEmptyRole_DoesNotPanic(t *testing.T) {
 	tmp := t.TempDir()
 	regDir := filepath.Join(tmp, "docs", "architecture")
 	if err := os.MkdirAll(regDir, 0o755); err != nil {
@@ -170,15 +170,15 @@ func TestCollectSkillFacts_PhaseNamePropagated(t *testing.T) {
 }
 
 func TestPersonaPath_NotFound(t *testing.T) {
-	root := t.TempDir()
+	rootWithoutPersonas := t.TempDir()
 	spec := phasespec.PhaseSpec{Name: "my-phase"}
-	path := personaPath(root, spec, "builder")
+	path := personaPath(rootWithoutPersonas, spec, "builder")
 	if path != "" {
 		t.Errorf("expected empty path when no persona file exists; got %q", path)
 	}
 }
 
-func TestPersonaPath_EmptyRole(t *testing.T) {
+func TestPersonaPath_EmptyRole_DoesNotPanic(t *testing.T) {
 	root := t.TempDir()
 	spec := phasespec.PhaseSpec{Name: "some-phase"}
 	path := personaPath(root, spec, "")
@@ -257,7 +257,7 @@ func TestSpliceMarkedRegion_BeginWithoutEnd(t *testing.T) {
 	}
 }
 
-func TestRun_CheckMode_PhaseNotInRegistry(t *testing.T) {
+func TestRun_CheckMode_PhaseNotInRegistry_DoesNotPanic(t *testing.T) {
 	tmp := prepareSkillsTree(t)
 	extra := filepath.Join(tmp, "skills", "adv-test-phase-not-in-registry")
 	if err := os.MkdirAll(extra, 0o755); err != nil {

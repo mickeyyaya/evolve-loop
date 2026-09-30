@@ -144,7 +144,7 @@ func (p *preflightRun) stepBranchAttached() error {
 	if err != nil {
 		return fmt.Errorf("%w: step 2 git error: %v", ErrCheckFailed, err)
 	}
-	if branch == "" {
+	if branch == detachedHEADBranch {
 		return fmt.Errorf("%w: detached HEAD — checkout a branch first", ErrCheckFailed)
 	}
 	p.logf("OK: on branch %s", branch)
@@ -259,7 +259,7 @@ func (p *preflightRun) gateReleaseCommitCI() error {
 	}
 	p.res.CIConclusion = ci.Conclusion
 	switch {
-	case ci.Conclusion == "":
+	case ci.Conclusion == ciConclusionUnavailable:
 		p.logf("advisory: remote CI conclusion unavailable (no run visible / gh unavailable) — /publish's CI-green check remains authoritative")
 	case ci.Conclusion == "success":
 		p.logf("OK: release-commit CI conclusion=success %s", ci.RunURL)

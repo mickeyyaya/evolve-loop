@@ -93,10 +93,7 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer)
 		CLI: cli, Candidates: ids,
 		Policy: deps.Freshness[cli], Tiers: modelcatalog.CanonicalTiers,
 	})
-	if prior, ok := deps.Prior.CLIs[cli]; ok &&
-		prior.CandidatesHash != "" && prior.CandidatesHash == fp &&
-		prior.Source == modelcatalog.SourceLive &&
-		coversCanonicalTiers(prior.TierModels) {
+	if prior, ok := deps.Prior.CLIs[cli]; ok && isReusablePrior(prior, fp) {
 		return prior.TierModels, ids, fp
 	}
 	mapped, err := deps.Classifier.Classify(ctx, cli, ids)
@@ -105,6 +102,12 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer)
 		return nil, ids, ""
 	}
 	return CompleteTiers(PromoteLatest(mapped, ids, deps.Freshness[cli])), ids, fp
+}
+
+func isReusablePrior(prior modelcatalog.CLIEntry, fp string) bool {
+	return prior.CandidatesHash != "" && prior.CandidatesHash == fp &&
+		prior.Source == modelcatalog.SourceLive &&
+		coversCanonicalTiers(prior.TierModels)
 }
 
 func coversCanonicalTiers(tiers map[string]string) bool {

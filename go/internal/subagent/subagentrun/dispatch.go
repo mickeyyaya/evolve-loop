@@ -87,7 +87,8 @@ func (d *Dispatcher) hashArtifact(req Request, id identity, artifact, verdict st
 	if err == nil {
 		return sha
 	}
-	if verdict != VerdictIntegrityFail {
+	passedIntegrityLadder := verdict != VerdictIntegrityFail
+	if passedIntegrityLadder {
 		d.warn(id, req.Cycle, CodeArtifactHashFailed, `artifact hash failed; ledger stamps artifact_sha256="": `+err.Error(),
 			map[string]string{"step": "hash", "artifact": artifact})
 	}

@@ -53,8 +53,7 @@ func ParseChainBlock(content string) (Chain, error) {
 
 	var c Chain
 	for i, raw := range strings.Split(rest[:end], "\n") {
-		line := strings.TrimSpace(raw)
-		line = strings.TrimSpace(strings.Trim(line, "|"))
+		line := stripMarkdownTablePipes(strings.TrimSpace(raw))
 		if line == "" {
 			continue
 		}
@@ -77,4 +76,8 @@ func ParseChainBlock(content string) (Chain, error) {
 		return nil, fmt.Errorf("auditchain: chain block is empty — an empty chain is not a clean one")
 	}
 	return c, nil
+}
+
+func stripMarkdownTablePipes(row string) string {
+	return strings.TrimSpace(strings.Trim(row, "|"))
 }

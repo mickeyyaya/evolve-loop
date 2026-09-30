@@ -10,7 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-func mixedFailRunner(attempts *int) sysexec.RunFunc {
+func transientThenPermanentAddRunner(attempts *int) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if len(args) >= 2 && args[0] == "worktree" && args[1] == "add" {
 			*attempts++
@@ -28,7 +28,7 @@ func mixedFailRunner(attempts *int) sysexec.RunFunc {
 
 func TestAddWorktreeWithRetry_PreservesFirstFailure(t *testing.T) {
 	attempts := 0
-	g := Git{Dir: "/repo", Exec: mixedFailRunner(&attempts)}
+	g := Git{Dir: "/repo", Exec: transientThenPermanentAddRunner(&attempts)}
 
 	_, stderr, code, _ := g.AddWorktreeWithRetry(context.Background(),
 		WorktreeAddRetry{

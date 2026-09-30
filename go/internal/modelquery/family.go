@@ -11,6 +11,8 @@ var familyTokens = []struct {
 	{"gemini", []string{"gemini"}},
 }
 
+const unknownFamily = ""
+
 func FamilyOf(id string) string {
 	lower := strings.ToLower(id)
 	for _, fam := range familyTokens {
@@ -20,11 +22,12 @@ func FamilyOf(id string) string {
 			}
 		}
 	}
-	return ""
+	return unknownFamily
 }
 
 func FilterByFamily(ids []string, allowed ...string) []string {
-	if len(allowed) == 0 {
+	isUnconstrained := len(allowed) == 0
+	if isUnconstrained {
 		return ids
 	}
 	allow := make(map[string]bool, len(allowed))

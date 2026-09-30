@@ -40,15 +40,19 @@ func (o Options) reviewersSatisfied(langs []string, res *Result) bool {
 func normalizeReviewers(csv string) map[string]bool {
 	set := map[string]bool{}
 	for _, r := range strings.Split(csv, ",") {
-		if i := strings.LastIndex(r, ":"); i >= 0 {
-			r = r[i+1:]
-		}
-		r = stripWhitespace(r)
+		r = stripWhitespace(stripNamespacePrefix(r))
 		if r != "" {
 			set[r] = true
 		}
 	}
 	return set
+}
+
+func stripNamespacePrefix(reviewer string) string {
+	if i := strings.LastIndex(reviewer, ":"); i >= 0 {
+		return reviewer[i+1:]
+	}
+	return reviewer
 }
 
 func capSatisfied(set map[string]bool, synonyms []string) bool {

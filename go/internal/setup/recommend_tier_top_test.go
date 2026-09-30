@@ -27,7 +27,7 @@ func TestClampTier_EnvelopeMinTop_ClampsUpToTopNotEmpty(t *testing.T) {
 
 func TestRecommend_MaxQualityBiasesToTop(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "top", []string{"all"}, ""),
+		profilePhase("scout", "claude-tmux", "sonnet", "balanced", "balanced", "top", []string{"all"}, ""),
 	)
 	if got := asg(t, presetByName(t, Recommend(rep, builtinPresets), "max-quality"), "scout").Tier; got != "top" {
 		t.Errorf(`max-quality tier = %q, want "top" (envelope max)`, got)

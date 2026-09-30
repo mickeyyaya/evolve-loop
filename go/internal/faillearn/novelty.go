@@ -73,7 +73,8 @@ func tokenizeObservation(s string) []string {
 	})
 	out := make([]string, 0, len(fields))
 	for _, f := range fields {
-		if strings.IndexFunc(f, func(r rune) bool { return r >= 'a' && r <= 'z' }) < 0 {
+		isPureDigits := strings.IndexFunc(f, func(r rune) bool { return r >= 'a' && r <= 'z' }) < 0
+		if isPureDigits {
 			continue
 		}
 		out = append(out, f)

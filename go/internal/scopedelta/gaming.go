@@ -28,6 +28,10 @@ type Corroboration struct {
 	CoverageLine string `json:"coverage_line,omitempty"`
 }
 
+func (c Class) isMechanicallyEstablished() bool {
+	return c == ClassClosure || c == ClassInScope
+}
+
 func (c Corroboration) present() bool {
 	return (c.FailsWithout && strings.TrimSpace(c.Command) != "") ||
 		strings.TrimSpace(c.QueuedItemID) != "" ||
@@ -67,8 +71,9 @@ func SurfaceOf(p string) Surface {
 			return SurfaceSignal
 		}
 	}
-	if strings.Contains(p, "/gate") || strings.HasSuffix(base, "_gate.go") ||
-		strings.Contains(p, "/phases/ship/") || strings.Contains(p, "repocontract") {
+	isGateImplementation := strings.Contains(p, "/gate") || strings.HasSuffix(base, "_gate.go") ||
+		strings.Contains(p, "/phases/ship/") || strings.Contains(p, "repocontract")
+	if isGateImplementation {
 		return SurfaceSignal
 	}
 	return SurfaceSubject
@@ -78,7 +83,7 @@ func Admissible(e Entry) error {
 	if e.Disposition != DispositionKeep {
 		return nil
 	}
-	if e.Class == ClassClosure || e.Class == ClassInScope {
+	if e.Class.isMechanicallyEstablished() {
 		return nil
 	}
 	if SurfaceOf(e.Path) == SurfaceSignal && e.Effect == EffectUnknown {
@@ -97,13 +102,13 @@ func Admissible(e Entry) error {
 }
 
 func GamingSignals(entries []Entry) []string {
-	const floor = 3
-	if len(entries) < floor {
+	const minEntriesForMajority = 3
+	if len(entries) < minEntriesForMajority {
 		return nil
 	}
 	var signalPaths, loosening, uncorroboratedKeeps int
 	for _, e := range entries {
-		if e.Class == ClassClosure || e.Class == ClassInScope {
+		if e.Class.isMechanicallyEstablished() {
 			continue
 		}
 		if SurfaceOf(e.Path) == SurfaceSignal {
@@ -117,13 +122,13 @@ func GamingSignals(entries []Entry) []string {
 		}
 	}
 	var out []string
-	if signalPaths*2 > len(entries) {
+	if isMajority(signalPaths, len(entries)) {
 		out = append(out, fmt.Sprintf("signal-heavy delta: %d of %d out-of-scope paths edit the judging apparatus rather than the code being judged", signalPaths, len(entries)))
 	}
-	if loosening*2 > len(entries) {
+	if isMajority(loosening, len(entries)) {
 		out = append(out, fmt.Sprintf("loosening pattern: %d of %d changes move the bar DOWN — the direction nobody takes to make their own work harder", loosening, len(entries)))
 	}
-	if uncorroboratedKeeps*2 > len(entries) {
+	if isMajority(uncorroboratedKeeps, len(entries)) {
 		out = append(out, fmt.Sprintf("narrative-only deltas: %d of %d keeps rest on the author's account with nothing outside it", uncorroboratedKeeps, len(entries)))
 	}
 	return out

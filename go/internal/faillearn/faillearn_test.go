@@ -135,14 +135,15 @@ func TestRenderLessonYAML_Deterministic(t *testing.T) {
 }
 
 func TestSummaryTruncation(t *testing.T) {
+	const multiByteRune = "日"
 	ev := fixtureEvent()
-	ev.Summary = strings.Repeat("日", 600)
+	ev.Summary = strings.Repeat(multiByteRune, 600)
 
 	md := string(RenderRetrospectiveMarkdown(ev))
-	if strings.Contains(md, strings.Repeat("日", 501)) {
+	if strings.Contains(md, strings.Repeat(multiByteRune, 501)) {
 		t.Error("markdown summary not truncated to 500 runes")
 	}
-	if !strings.Contains(md, strings.Repeat("日", 500)) {
+	if !strings.Contains(md, strings.Repeat(multiByteRune, 500)) {
 		t.Error("markdown summary over-truncated below 500 runes")
 	}
 

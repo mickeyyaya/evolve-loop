@@ -24,7 +24,8 @@ func WriteArtifacts(ev FailureEvent, runDir, lessonsDir string, opts ...Option) 
 
 	id, lesson := RenderLessonYAML(ev)
 
-	if runDir != "" {
+	hasCycleWorkspace := runDir != ""
+	if hasCycleWorkspace {
 		if _, err := writeIfAbsent(filepath.Join(runDir, "retrospective-report.md"), RenderRetrospectiveMarkdown(ev)); err != nil {
 			return fmt.Errorf("faillearn: write retrospective: %w", err)
 		}
@@ -39,7 +40,8 @@ func WriteArtifacts(ev FailureEvent, runDir, lessonsDir string, opts ...Option) 
 }
 
 func (c writeConfig) preserveDiagnosis(ev FailureEvent, runDir string, cause error) error {
-	if runDir == "" {
+	hasCycleWorkspace := runDir != ""
+	if !hasCycleWorkspace {
 		return cause
 	}
 	var b bytes.Buffer

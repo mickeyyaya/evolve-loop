@@ -7,10 +7,11 @@ import (
 
 func TestSurfaceOf_SeparatesTheJudgedFromTheJudging(t *testing.T) {
 	t.Parallel()
+	const productCodeBesideItsTest = "go/internal/deliverable/reviewer.go"
 	signal := []string{
 		"go/internal/deliverable/reviewer_test.go",
 		"go/acs/cycle1441/predicates_test.go",
-		"go/internal/deliverable/reviewer.go",
+		productCodeBesideItsTest,
 		"agents/evolve-auditor.md",
 		".evolve/policy.json",
 		".evolve/bad-verdict-baseline.jsonl",
@@ -18,12 +19,12 @@ func TestSurfaceOf_SeparatesTheJudgedFromTheJudging(t *testing.T) {
 		".evolve/runs/cycle-1450/audit-report.md",
 	}
 	subject := []string{
-		"go/internal/deliverable/reviewer.go",
+		productCodeBesideItsTest,
 		"go/internal/salvage/extract.go",
 		"docs/architecture/adr/0087-x.md",
 	}
 	for _, p := range signal {
-		if p == "go/internal/deliverable/reviewer.go" {
+		if p == productCodeBesideItsTest {
 			continue
 		}
 		if got := SurfaceOf(p); got != SurfaceSignal {

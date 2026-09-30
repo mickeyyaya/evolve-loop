@@ -12,8 +12,8 @@ func TestDefaultRebuildBinary_NonDryRun_BadSourceDir(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not on PATH")
 	}
-	dir := t.TempDir()
-	err := defaultRebuildBinary(dir, "9.9.9", false)
+	repoWithoutGoSource := t.TempDir()
+	err := defaultRebuildBinary(repoWithoutGoSource, "9.9.9", false)
 	if err == nil {
 		t.Fatal("defaultRebuildBinary with empty source dir: want error, got nil")
 	}

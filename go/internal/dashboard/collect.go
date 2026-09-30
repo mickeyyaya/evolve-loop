@@ -20,11 +20,11 @@ const defaultMaxCycles = 40
 var workspaceDir = regexp.MustCompile(`^cycle-(\d+)$`)
 
 type collector struct {
-	root      string
-	cache     *dossierCache
-	streams   *streamReader
-	maxCycles int
-	env       map[string]string
+	root        string
+	cache       *dossierCache
+	streams     *streamReader
+	maxCycles   int
+	operatorEnv map[string]string
 }
 
 func newCollector(root string) *collector {
@@ -63,7 +63,7 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 		snap.Warnings = append(snap.Warnings, warn)
 	}
 	snap.Cycles = make([]CycleSummary, 0, len(ids))
-	mandatory, w := readMandatory(c.root, c.env)
+	mandatory, w := readMandatory(c.root, c.operatorEnv)
 	snap.Warnings = append(snap.Warnings, w...)
 	for _, id := range ids {
 		cs, w := readCycle(c.root, id, h.Dossiers[id])

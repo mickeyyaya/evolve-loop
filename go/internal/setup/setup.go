@@ -158,27 +158,27 @@ func detectCLIs(rep bridge.DoctorReport, capFn func(string) string, env func(str
 	seen := map[string]bool{}
 	var clis []CLIStatus
 	for _, r := range rep.Results {
-		b := baseCLI(r.CLI)
-		if seen[b] {
+		family := baseCLI(r.CLI)
+		if seen[family] {
 			continue
 		}
-		seen[b] = true
+		seen[family] = true
 		cs := CLIStatus{
-			CLI:              b,
+			CLI:              family,
 			BinaryPresent:    r.Binary.Present,
 			BinaryPath:       r.Binary.Path,
 			AuthConfigured:   r.Auth.Configured,
-			AuthMode:         authMode(b, r.Auth, env),
+			AuthMode:         authMode(family, r.Auth, env),
 			SubscriptionType: r.Auth.SubscriptionType,
 			Verdict:          r.Verdict,
 			EnvWarnings:      r.EnvWarnings,
 		}
 		if r.Binary.Present {
-			cs.CapabilityTier = capFn(b)
+			cs.CapabilityTier = capFn(family)
 		} else {
 			cs.CapabilityTier = "n/a"
 		}
-		cs.TierModels = tierModelsFor(b)
+		cs.TierModels = tierModelsFor(family)
 		clis = append(clis, cs)
 	}
 	sort.Slice(clis, func(i, j int) bool { return clis[i].CLI < clis[j].CLI })

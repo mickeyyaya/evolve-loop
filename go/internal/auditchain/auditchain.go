@@ -164,7 +164,7 @@ func Diagnose(c Chain) []string {
 	return out
 }
 
-func setLink(c Chain, id LinkID, st Status, finding string) Chain {
+func withLink(c Chain, id LinkID, st Status, finding string) Chain {
 	out := make(Chain, len(c))
 	copy(out, c)
 	for i := range out {

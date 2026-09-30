@@ -15,15 +15,15 @@ import (
 )
 
 type hooks struct {
-	spec       phasespec.PhaseSpec
-	promptBody string
+	spec             phasespec.PhaseSpec
+	inlinePromptBody string
 }
 
 func (h hooks) PhaseName() string       { return h.spec.Name }
 func (h hooks) AgentPromptName() string { return h.spec.AgentName() }
 func (h hooks) DefaultModel() string    { return h.spec.ModelOrDefault() }
 
-func (h hooks) InlinePromptBody() (string, bool) { return h.promptBody, h.promptBody != "" }
+func (h hooks) InlinePromptBody() (string, bool) { return h.inlinePromptBody, h.inlinePromptBody != "" }
 
 func (h hooks) ArtifactFilename(_ core.PhaseRequest) string {
 	if files := h.spec.Outputs.Files; len(files) > 0 && files[0] != "" {
@@ -45,14 +45,14 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	o := evaluate(artifact, h.spec.Classify)
-	rec, ok := shadowRecord(req.Cycle, h.spec.Name, sentinelStageOf(h.spec.Classify), o)
-	if err := writeVerdictShadow(req.Workspace, rec, ok); err != nil {
+	rec, optedIn := shadowRecord(req.Cycle, h.spec.Name, sentinelStageOf(h.spec.Classify), o)
+	if err := writeVerdictShadow(req.Workspace, rec, optedIn); err != nil {
 		o.diags = append(o.diags, core.Diagnostic{
 			Severity: "warn",
 			Message:  "verdict_from_sentinel: shadow record not written: " + err.Error(),
 		})
 	}
-	return o.effective, o.diags, h.spec.OnPass
+	return o.effectiveVerdict, o.diags, h.spec.OnPass
 }
 
 func sentinelStageOf(rules *phasespec.ClassifyRules) string {
@@ -64,20 +64,20 @@ func sentinelStageOf(rules *phasespec.ClassifyRules) string {
 
 func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, []core.Diagnostic) {
 	o := evaluate(artifact, rules)
-	return o.effective, o.diags
+	return o.effectiveVerdict, o.diags
 }
 
 type classifyOutcome struct {
-	structural string
-	sentinel   string
-	consulted  bool
-	present    bool
-	effective  string
-	diags      []core.Diagnostic
+	structuralVerdict string
+	sentinelVerdict   string
+	sentinelConsulted bool
+	sentinelPresent   bool
+	effectiveVerdict  string
+	diags             []core.Diagnostic
 }
 
 func structuralOnly(verdict string, diags []core.Diagnostic) classifyOutcome {
-	return classifyOutcome{structural: verdict, effective: verdict, diags: diags}
+	return classifyOutcome{structuralVerdict: verdict, effectiveVerdict: verdict, diags: diags}
 }
 
 func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
@@ -118,7 +118,7 @@ func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
 		}
 		verdict = rules.VerdictOnPass
 	}
-	return applySentinelStage(classifyOutcome{structural: verdict, effective: verdict}, artifact, rules.VerdictFromSentinel)
+	return applySentinelStage(classifyOutcome{structuralVerdict: verdict, effectiveVerdict: verdict}, artifact, rules.VerdictFromSentinel)
 }
 
 func hasSection(artifact, section string) bool {
@@ -133,12 +133,13 @@ func hasSection(artifact, section string) bool {
 
 func stripHeadingMarker(s string) string {
 	s = strings.TrimSpace(s)
-	i := 0
-	for i < len(s) && s[i] == '#' {
-		i++
+	hashes := 0
+	for hashes < len(s) && s[hashes] == '#' {
+		hashes++
 	}
-	if i > 0 && i < len(s) && (s[i] == ' ' || s[i] == '\t') {
-		return strings.TrimSpace(s[i:])
+	isHeadingMarker := hashes > 0 && hashes < len(s) && (s[hashes] == ' ' || s[hashes] == '\t')
+	if isHeadingMarker {
+		return strings.TrimSpace(s[hashes:])
 	}
 	return s
 }
@@ -157,7 +158,7 @@ type Phase struct{ *runner.BaseRunner }
 func New(spec phasespec.PhaseSpec, c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:            hooks{spec: spec, promptBody: c.PromptBody},
+			Hooks:            hooks{spec: spec, inlinePromptBody: c.PromptBody},
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
 			HostEffects:      c.HostEffects,

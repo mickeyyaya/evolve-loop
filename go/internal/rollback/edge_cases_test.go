@@ -74,11 +74,11 @@ func TestReadJournal_MissingBranch(t *testing.T) {
 func TestRun_AppendLedgerFailWarns(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
 
-	blockerDir := filepath.Join(repo, "blocker")
-	if err := os.WriteFile(blockerDir, []byte("x"), 0o644); err != nil {
+	blockerFile := filepath.Join(repo, "blocker")
+	if err := os.WriteFile(blockerFile, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	badLedger := filepath.Join(blockerDir, "subdir", "ledger.jsonl")
+	badLedger := filepath.Join(blockerFile, "subdir", "ledger.jsonl")
 
 	var buf strings.Builder
 	sw := stringWriter{&buf}

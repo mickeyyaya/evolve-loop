@@ -26,6 +26,15 @@ All notable changes to this project will be documented in this file.
   - `TestCmd_InboxAdd_*` (4).
 - The architecture review blocked the first draft: the filename stamp was a third literal, a filing fault's exit 2 was unpinned, an authored console route was refused, six mutants survived, the owned-field list had drifted and a design note overstated the invariant. All are fixed. Mutation sweeps: 14 of 14, then the reviewer's six survivors plus four new-rule mutants, 10 of 10, killed. The sweep also showed a self-dependency check was dead (an unfiled id cannot satisfy `deps`), so the check was removed. `internal/inboxmover/lifecycle` stays at 100% statement coverage (`cover-strict`).
 - `inbox-add-cli` is consumed in this change. Its third criterion, the retrospective's minting through the same writer, is filed as its own item through `evolve inbox add` itself.
+## Changed — a deleted comment leaves self-explaining code (comment round 12, 2026-09-30)
+
+- The operator's rule (2026-09-30): "Make sure when we removed comments, code is lean enough to explain itself without comments."
+- `docs/conventions/code-comments.md` gains *What a deleted comment leaves behind*. Where a deleted comment said what the code does or what a value means, the same change makes the code say it: an unexported rename, an extracted function or named condition, a named constant, or a small type. It is behaviour-preserving, adds no comment, and never changes the value of a tag, flag, string or error text.
+- The batch protocol gains the step *Make the code say it*, and Phase 2f applies it to rounds 1–11.
+- Round 12 lands as two commits:
+  - the AST-proven comment-only commit: 228 files, 7,820 → 67 comment lines, and 17 new package design-notes pages;
+  - a reviewed refactor commit of 82 files. Six agents, one per group, made the code say what about 140 deleted comments had said, for example `porcelainStatusPrefixLen`, `isAtOrUnderAny`, `isReusablePrior`, `withLink`, `configReleaseSinceLastBinaryRelease` and `ciConclusionUnavailable`.
+- About 2,500 other deleted comments needed nothing: they were history, restatements, or design reasons now in the notes.
 
 ## Added — `evolve inbox route-lane`, the operator's lane route (2026-09-30)
 

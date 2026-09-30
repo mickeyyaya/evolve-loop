@@ -225,9 +225,9 @@ func TestRun_WriteMode_RewritesDrift(t *testing.T) {
 }
 
 func TestRun_InvalidRoot(t *testing.T) {
-	tmp := t.TempDir()
+	rootWithoutRegistry := t.TempDir()
 	var stdout, stderr strings.Builder
-	code := Run(tmp, false, &stdout, &stderr)
+	code := Run(rootWithoutRegistry, false, &stdout, &stderr)
 	if code != 1 {
 		t.Fatalf("Run invalid root: exit %d, want 1; stderr=%q", code, stderr.String())
 	}

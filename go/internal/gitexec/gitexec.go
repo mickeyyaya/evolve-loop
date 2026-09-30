@@ -13,6 +13,12 @@ import (
 
 const gitBin = "git"
 
+const (
+	porcelainStatusPrefixLen = len("XY ")
+	minPorcelainLineLen      = porcelainStatusPrefixLen + 1
+	porcelainRenameArrow     = " -> "
+)
+
 type Git struct {
 	Dir  string
 	Exec sysexec.RunFunc
@@ -49,7 +55,7 @@ func (g Git) DirtyPaths(ctx context.Context) ([]string, error) {
 	}
 	set := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
-		if len(line) < 4 {
+		if len(line) < minPorcelainLineLen {
 			continue
 		}
 		set[PorcelainPath(line)] = true
@@ -66,22 +72,22 @@ func (g Git) DirtyPaths(ctx context.Context) ([]string, error) {
 }
 
 func PorcelainPath(line string) string {
-	if len(line) < 4 {
+	if len(line) < minPorcelainLineLen {
 		return ""
 	}
-	p := strings.TrimSpace(line[3:])
-	if i := strings.Index(p, " -> "); i >= 0 {
-		p = p[i+4:]
+	p := strings.TrimSpace(line[porcelainStatusPrefixLen:])
+	if i := strings.Index(p, porcelainRenameArrow); i >= 0 {
+		p = p[i+len(porcelainRenameArrow):]
 	}
 	return strings.Trim(p, "\"")
 }
 
 func PorcelainOldPath(line string) string {
-	if len(line) < 4 {
+	if len(line) < minPorcelainLineLen {
 		return ""
 	}
-	p := strings.TrimSpace(line[3:])
-	i := strings.Index(p, " -> ")
+	p := strings.TrimSpace(line[porcelainStatusPrefixLen:])
+	i := strings.Index(p, porcelainRenameArrow)
 	if i < 0 {
 		return ""
 	}

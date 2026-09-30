@@ -16,7 +16,7 @@ func famBlocked(cli string) CLIStatus {
 var claudeTM = map[string]string{"fast": "haiku", "balanced": "sonnet", "deep": "opus"}
 var codexTM = map[string]string{"fast": "gpt-5.4-mini", "balanced": "gpt-5.4", "deep": "gpt-5.5"}
 
-func ph(role, defCLI, defTier, min, def, max string, allowed []string, crossWith string) PhaseStatus {
+func profilePhase(role, defCLI, defTier, min, def, max string, allowed []string, crossWith string) PhaseStatus {
 	return PhaseStatus{
 		Role: role, Source: "profile",
 		CurrentCLI: defCLI, CurrentTier: defTier,
@@ -74,9 +74,9 @@ func TestRecommend_EmptyReport_ThreePresets(t *testing.T) {
 
 func TestRecommend_RecommendedTierIsProfileDefault(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("scout", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),
-		ph("triage", "claude-tmux", "haiku", "fast", "fast", "deep", []string{"all"}, ""),
-		ph("auditor", "claude-tmux", "opus", "fast", "deep", "deep", []string{"all"}, ""),
+		profilePhase("scout", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("triage", "claude-tmux", "haiku", "fast", "fast", "deep", []string{"all"}, ""),
+		profilePhase("auditor", "claude-tmux", "opus", "fast", "deep", "deep", []string{"all"}, ""),
 	)
 	rec := presetByName(t, Recommend(rep, builtinPresets), "recommended")
 	want := map[string]string{"scout": "balanced", "triage": "fast", "auditor": "deep"}
@@ -89,7 +89,7 @@ func TestRecommend_RecommendedTierIsProfileDefault(t *testing.T) {
 
 func TestRecommend_ClampTierToEnvelopeMax(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("x", "claude-tmux", "opus", "fast", "balanced", "balanced", []string{"all"}, ""),
+		profilePhase("x", "claude-tmux", "opus", "fast", "balanced", "balanced", []string{"all"}, ""),
 	)
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "x")
 	if a.Tier != "balanced" || !a.TierClamped {
@@ -99,7 +99,7 @@ func TestRecommend_ClampTierToEnvelopeMax(t *testing.T) {
 
 func TestRecommend_NoEnvelopePassThrough(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("build-planner", "claude-tmux", "sonnet", "", "", "", nil, ""),
+		profilePhase("build-planner", "claude-tmux", "sonnet", "", "", "", nil, ""),
 	)
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "build-planner")
 	if a.Tier != "balanced" || a.TierClamped {
@@ -109,8 +109,8 @@ func TestRecommend_NoEnvelopePassThrough(t *testing.T) {
 
 func TestRecommend_EconomyBiasesDown(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("a", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),
-		ph("b", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("a", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("b", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	eco := presetByName(t, Recommend(rep, builtinPresets), "economy")
 	if got := asg(t, eco, "a").Tier; got != "fast" {
@@ -123,7 +123,7 @@ func TestRecommend_EconomyBiasesDown(t *testing.T) {
 
 func TestRecommend_EconomyMinEqMaxStays(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, ""),
+		profilePhase("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, ""),
 	)
 	if got := asg(t, presetByName(t, Recommend(rep, builtinPresets), "economy"), "auditor").Tier; got != "deep" {
 		t.Errorf("economy fixed-envelope tier = %q, want deep", got)
@@ -132,7 +132,7 @@ func TestRecommend_EconomyMinEqMaxStays(t *testing.T) {
 
 func TestRecommend_MaxQualityBiasesUp(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	if got := asg(t, presetByName(t, Recommend(rep, builtinPresets), "max-quality"), "scout").Tier; got != "deep" {
 		t.Errorf("max-quality tier = %q, want deep (envelope max)", got)
@@ -141,7 +141,7 @@ func TestRecommend_MaxQualityBiasesUp(t *testing.T) {
 
 func TestRecommend_MaxQualityDefaultEqMaxStays(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("tester", "claude-tmux", "sonnet", "balanced", "balanced", "balanced", []string{"all"}, ""),
+		profilePhase("tester", "claude-tmux", "sonnet", "balanced", "balanced", "balanced", []string{"all"}, ""),
 	)
 	if got := asg(t, presetByName(t, Recommend(rep, builtinPresets), "max-quality"), "tester").Tier; got != "balanced" {
 		t.Errorf("max-quality tier = %q, want balanced", got)
@@ -150,7 +150,7 @@ func TestRecommend_MaxQualityDefaultEqMaxStays(t *testing.T) {
 
 func TestRecommend_ZeroFamiliesDegraded(t *testing.T) {
 	rep := mkReport([]CLIStatus{famBlocked("claude"), famBlocked("codex")},
-		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	rr := Recommend(rep, builtinPresets)
 	if rr.CrossFamilyOK {
@@ -171,8 +171,8 @@ func TestRecommend_ZeroFamiliesDegraded(t *testing.T) {
 
 func TestRecommend_OneFamilySingleFamily(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famBlocked("codex")},
-		ph("builder", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
-		ph("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, "builder"),
+		profilePhase("builder", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
+		profilePhase("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, "builder"),
 	)
 	rr := Recommend(rep, builtinPresets)
 	if rr.CrossFamilyOK {
@@ -193,8 +193,8 @@ func TestRecommend_OneFamilySingleFamily(t *testing.T) {
 
 func TestRecommend_TwoFamiliesCrossFamily(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
-		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
-		ph("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, "builder"),
+		profilePhase("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
+		profilePhase("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, "builder"),
 	)
 	rr := Recommend(rep, builtinPresets)
 	if !rr.CrossFamilyOK {
@@ -212,8 +212,8 @@ func TestRecommend_TwoFamiliesCrossFamily(t *testing.T) {
 
 func TestRecommend_CrossFamilyForcedSame(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
-		ph("builder", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude"}, "auditor"),
-		ph("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"claude"}, "builder"),
+		profilePhase("builder", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude"}, "auditor"),
+		profilePhase("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"claude"}, "builder"),
 	)
 	rec := presetByName(t, Recommend(rep, builtinPresets), "recommended")
 	b, a := asg(t, rec, "builder"), asg(t, rec, "auditor")
@@ -227,7 +227,7 @@ func TestRecommend_CrossFamilyForcedSame(t *testing.T) {
 
 func TestRecommend_PreferredUnavailableFallsBack(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM), famBlocked("claude")},
-		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "scout")
 	if a.CLI != "codex" || !a.CLIFallback {
@@ -240,7 +240,7 @@ func TestRecommend_PreferredUnavailableFallsBack(t *testing.T) {
 
 func TestRecommend_AllowedRestrictedToUnavailableWarns(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM), famBlocked("claude")},
-		ph("tdd-engineer", "claude-tmux", "opus", "deep", "deep", "deep", []string{"claude"}, ""),
+		profilePhase("tdd-engineer", "claude-tmux", "opus", "deep", "deep", "deep", []string{"claude"}, ""),
 	)
 	rr := Recommend(rep, builtinPresets)
 	a := asg(t, presetByName(t, rr, "recommended"), "tdd-engineer")
@@ -254,7 +254,7 @@ func TestRecommend_AllowedRestrictedToUnavailableWarns(t *testing.T) {
 
 func TestRecommend_AllowedAllPicksAvailable(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("agy", map[string]string{"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"})},
-		ph("intent", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, ""),
+		profilePhase("intent", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, ""),
 	)
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "intent")
 	if a.CLI != "agy" || a.Warning != "" {
@@ -264,7 +264,7 @@ func TestRecommend_AllowedAllPicksAvailable(t *testing.T) {
 
 func TestRecommend_ModelFromTierModels(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM)},
-		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"codex"}, ""),
+		profilePhase("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"codex"}, ""),
 	)
 	rr := Recommend(rep, builtinPresets)
 	if got := asg(t, presetByName(t, rr, "recommended"), "builder").Model; got != "gpt-5.4" {
@@ -277,9 +277,9 @@ func TestRecommend_ModelFromTierModels(t *testing.T) {
 
 func TestRecommend_Deterministic(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
-		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
-		ph("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, "builder"),
-		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
+		profilePhase("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, "builder"),
+		profilePhase("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	a, _ := json.Marshal(Recommend(rep, builtinPresets))
 	b, _ := json.Marshal(Recommend(rep, builtinPresets))
@@ -297,7 +297,7 @@ func TestRecommend_CustomPresetConfig_UpAndMin(t *testing.T) {
 		},
 	}
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("scout", "claude-tmux", "fast", "fast", "fast", "deep", []string{"all"}, ""),
+		profilePhase("scout", "claude-tmux", "fast", "fast", "fast", "deep", []string{"all"}, ""),
 	)
 	rr := Recommend(rep, cfg)
 	if rr.Default != "rich" || len(rr.Presets) != 2 {
@@ -313,7 +313,7 @@ func TestRecommend_CustomPresetConfig_UpAndMin(t *testing.T) {
 
 func TestRecommend_EmptyDefaultTier_NoSpuriousDiff(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("x", "claude-tmux", "", "balanced", "balanced", "deep", []string{"all"}, ""),
+		profilePhase("x", "claude-tmux", "", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "x")
 	if a.DiffersFromDefault {
@@ -323,7 +323,7 @@ func TestRecommend_EmptyDefaultTier_NoSpuriousDiff(t *testing.T) {
 
 func TestRecommend_DiffersFromDefault(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM)},
-		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"codex"}, ""),
+		profilePhase("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"codex"}, ""),
 	)
 	rr := Recommend(rep, builtinPresets)
 	if asg(t, presetByName(t, rr, "recommended"), "builder").DiffersFromDefault {

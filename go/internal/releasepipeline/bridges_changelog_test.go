@@ -89,7 +89,8 @@ func TestRunChangelogGenLib_VerifyToRefFails(t *testing.T) {
 func TestRunChangelogGenLib_DryRun(t *testing.T) {
 	dir := makeHermeticGitRepo(t)
 
-	err := runChangelogGenLib(dir, "v0.0.1", "HEAD", "2.0.0", true)
+	const dryRun = true
+	err := runChangelogGenLib(dir, "v0.0.1", "HEAD", "2.0.0", dryRun)
 	if err != nil {
 		t.Errorf("runChangelogGenLib dry-run: want nil, got %v", err)
 	}
@@ -102,7 +103,8 @@ func TestRunChangelogGenLib_DryRun(t *testing.T) {
 func TestRunChangelogGenLib_LiveWrite(t *testing.T) {
 	dir := makeHermeticGitRepo(t)
 
-	err := runChangelogGenLib(dir, "v0.0.1", "HEAD", "2.0.0", false)
+	const dryRun = false
+	err := runChangelogGenLib(dir, "v0.0.1", "HEAD", "2.0.0", dryRun)
 	if err != nil {
 		t.Fatalf("runChangelogGenLib live write: %v", err)
 	}

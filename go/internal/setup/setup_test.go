@@ -45,11 +45,12 @@ func fixtureRepo(t *testing.T) (project, evolveDir string) {
 }
 
 func fakeDoctor(ctx context.Context) bridge.DoctorReport {
+	sameFamilyAsClaudeTmux := bridge.DoctorResult{CLI: "claude-p", Binary: bridge.BinaryInfo{Present: true, Path: "/usr/local/bin/claude"}, Auth: bridge.AuthInfo{Configured: true}, Verdict: "ready"}
 	return bridge.DoctorReport{
 		ScannedAt: "2026-01-01T00:00:00Z",
 		Results: []bridge.DoctorResult{
 			{CLI: "claude-tmux", Binary: bridge.BinaryInfo{Present: true, Path: "/usr/local/bin/claude"}, Auth: bridge.AuthInfo{Configured: true, Source: "file:credentials.json"}, Verdict: "ready"},
-			{CLI: "claude-p", Binary: bridge.BinaryInfo{Present: true, Path: "/usr/local/bin/claude"}, Auth: bridge.AuthInfo{Configured: true}, Verdict: "ready"},
+			sameFamilyAsClaudeTmux,
 			{CLI: "codex-tmux", Binary: bridge.BinaryInfo{Present: true, Path: "/usr/local/bin/codex"}, Auth: bridge.AuthInfo{Configured: true, SubscriptionType: "chatgpt-account"}, Verdict: "ready"},
 			{CLI: "gemini", Binary: bridge.BinaryInfo{Present: false}, Auth: bridge.AuthInfo{}, Verdict: "blocked"},
 		},
@@ -121,7 +122,8 @@ func TestTierModelsFor(t *testing.T) {
 
 func TestDetect(t *testing.T) {
 	project, evolveDir := fixtureRepo(t)
-	writeFile(t, filepath.Join(evolveDir, "llm_config.json"), `{
+	legacyLLMConfigDetectIgnores := filepath.Join(evolveDir, "llm_config.json")
+	writeFile(t, legacyLLMConfigDetectIgnores, `{
 	  "schema_version": 2,
 	  "phases": {
 	    "builder": {"cli":"claude","tier":"balanced","model":"sonnet"},
@@ -298,7 +300,8 @@ func TestCapTierFromManifest(t *testing.T) {
 		t.Errorf("absent manifest: got %q, want full (Inspect defaults true)", got)
 	}
 
-	if err := os.MkdirAll(filepath.Join(dir, "perl.capabilities.json"), 0o755); err != nil {
+	unreadableManifestIsADirectory := filepath.Join(dir, "perl.capabilities.json")
+	if err := os.MkdirAll(unreadableManifestIsADirectory, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if got := capTierFromManifest(dir, "perl"); got != "unknown" {
@@ -352,10 +355,11 @@ func TestDetect_DefaultSeams(t *testing.T) {
 
 func TestDetect_NilDoctorAndCapTierSeams(t *testing.T) {
 	project, evolveDir := fixtureRepo(t)
+	emptyAdaptersDir := t.TempDir()
 	rep := Detect(context.Background(), DetectOptions{
 		ProjectRoot: project,
 		EvolveDir:   evolveDir,
-		AdaptersDir: t.TempDir(),
+		AdaptersDir: emptyAdaptersDir,
 	})
 	if rep.ScannedAt == "" {
 		t.Error("default Now seam should stamp ScannedAt")

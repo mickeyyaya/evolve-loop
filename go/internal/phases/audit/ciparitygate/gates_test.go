@@ -107,7 +107,8 @@ func TestGates_CleanRunEmitsNothing_AndEveryFailEmitsOneGateFailed(t *testing.T)
 		t.Fatal(err)
 	}
 	red := func(ctx context.Context, name, dir string, args, env []string, in io.Reader, so, se io.Writer) (int, error) {
-		if args[0] == "vet" || (args[0] == "test" && args[1] != "-tags") {
+		isApicoverCoverageRun := args[0] == "test" && args[1] == "-tags"
+		if args[0] == "vet" || (args[0] == "test" && !isApicoverCoverageRun) {
 			_, _ = io.WriteString(so, "--- FAIL: TestGenuine (0.01s)\nFAIL\tpkg\t2.0s\n")
 			return 1, nil
 		}
@@ -151,7 +152,7 @@ func TestSignals_NullObjectLiveAccessorAndStreamGolden(t *testing.T) {
 		t.Fatal("the test must hold the retake lock")
 	}
 	defer release()
-	clock := func() (func() time.Time, func(time.Duration)) {
+	lockTimesOutAfterOnePoll := func() (func() time.Time, func(time.Duration)) {
 		tick := 0
 		base := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
 		return func() time.Time { tick++; return base.Add(time.Duration(tick-1) * 3 * time.Minute) }, func(time.Duration) {}
@@ -161,7 +162,7 @@ func TestSignals_NullObjectLiveAccessorAndStreamGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	fn, _, _ = seqRunFunc(t, script)
-	now, sleep := clock()
+	now, sleep := lockTimesOutAfterOnePoll()
 	g, events := observed(t, fn, fixedSet("./internal/widget/..."), WithClock(now, sleep))
 	if _, err := g.IntegrationTier(Request{5, root, root, wsFile}); err == nil || !strings.Contains(err.Error(), "integration-tier.log unavailable") {
 		t.Fatalf("flake absorbed with no log: %v", err)
@@ -184,7 +185,7 @@ func TestSignals_NullObjectLiveAccessorAndStreamGolden(t *testing.T) {
 
 	ws := t.TempDir()
 	logDuringWait := ""
-	now, _ = clock()
+	now, _ = lockTimesOutAfterOnePoll()
 	fn, _, _ = seqRunFunc(t, script)
 	g = New(fn, fixedSet("./internal/widget/..."), WithClock(now, func(time.Duration) {
 		b, _ := os.ReadFile(filepath.Join(ws, "integration-tier.log"))

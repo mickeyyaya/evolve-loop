@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -36,16 +37,19 @@ func TestOffenderLines_MarkersFallbackAndCap(t *testing.T) {
 }
 
 func TestOffenderLines_DropsPassingTestChatter(t *testing.T) {
-	out := strings.Join([]string{
+	chatter := []string{
 		"[orchestrator] WARN phase scout attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)",
 		"    --check               warn if changes introduce conflict markers or whitespace errors",
 		"    highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff",
 		"audit verdict=FAIL: something quoted by a passing test",
+	}
+	realFailureMarkers := []string{
 		"--- FAIL: TestRealThing (0.03s)",
 		"panic: runtime error: index out of range",
 		"FAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/core\t55.2s",
 		"apicover -enforce measurement error: go.mod not found above /x",
-	}, "\n")
+	}
+	out := strings.Join(slices.Concat(chatter, realFailureMarkers), "\n")
 	got := offenderLines(out)
 	if len(got) != 4 {
 		t.Fatalf("got %d offender lines %v, want exactly the 4 real failure markers", len(got), got)

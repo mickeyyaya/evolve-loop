@@ -59,7 +59,8 @@ func New(c Config) *Phase {
 func (p *Phase) Name() string { return phaseName }
 
 func retroWorktree(req core.PhaseRequest) string {
-	if !fleetMode(req) || gobridge.IsDir(req.Worktree) {
+	bridgeGuardAcceptsWorktree := !fleetMode(req) || gobridge.IsDir(req.Worktree)
+	if bridgeGuardAcceptsWorktree {
 		return req.Worktree
 	}
 	return gobridge.ScratchCwd(req.Workspace, "retro-scratch-cwd")
@@ -115,15 +116,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 			haveProf = true
 		}
 	}
-	cli := req.Env["EVOLVE_CLI"]
-	if cli == "" {
-		if haveProf && prof.CLI != "" {
-			cli = prof.CLI
-		}
-	}
-	if cli == "" {
-		cli = "claude-tmux"
-	}
+	cli := resolveCLI(req.Env["EVOLVE_CLI"], prof.CLI)
 
 	model := p.model
 	if model == "auto" {
@@ -213,6 +206,16 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	}, nil
 }
 
+func resolveCLI(envCLI, profileCLI string) string {
+	switch {
+	case envCLI != "":
+		return envCLI
+	case profileCLI != "":
+		return profileCLI
+	}
+	return "claude-tmux"
+}
+
 func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {
 	if req.ExplanationDocumentationVersion == 0 {
 		req.BuildExplanationState = core.BuildExplanationLegacy
@@ -278,8 +281,8 @@ func matchesCycleLesson(name, prefix string) bool {
 	if len(name) == len(prefix) {
 		return true
 	}
-	c := name[len(prefix)]
-	return c < '0' || c > '9'
+	charAfterCycle := name[len(prefix)]
+	return charAfterCycle < '0' || charAfterCycle > '9'
 }
 
 func hasFailureLesson(projectRoot, ws string, cycle int) bool {
@@ -297,6 +300,10 @@ func hasFailureLesson(projectRoot, ws string, cycle int) bool {
 			}
 		}
 	}
+	return hasLegacyWorkspaceFailureLesson(ws)
+}
+
+func hasLegacyWorkspaceFailureLesson(ws string) bool {
 	entries, err := os.ReadDir(ws)
 	if err != nil {
 		return false

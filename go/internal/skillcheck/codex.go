@@ -126,7 +126,8 @@ func marshalManifest(v any) ([]byte, error) {
 func codexManifestDiffs(projectRoot string) ([]commandDiff, error) {
 	meta, err := loadClaudePluginMeta(projectRoot)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		isNotAnEvoPluginRepo := errors.Is(err, os.ErrNotExist)
+		if isNotAnEvoPluginRepo {
 			return nil, nil
 		}
 		return nil, err

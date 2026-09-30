@@ -6,7 +6,8 @@ import (
 )
 
 func TestLoadPresets_EmbeddedDefault(t *testing.T) {
-	cfg, err := LoadPresets(t.TempDir())
+	evolveDirWithoutOverride := t.TempDir()
+	cfg, err := LoadPresets(evolveDirWithoutOverride)
 	if err != nil {
 		t.Fatalf("LoadPresets default: %v", err)
 	}

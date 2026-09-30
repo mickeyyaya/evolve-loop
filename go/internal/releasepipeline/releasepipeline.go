@@ -285,7 +285,8 @@ func extractReleaseNotes(repoRoot, target string) string {
 	inBlock := false
 	var out []string
 	for _, line := range lines {
-		if strings.HasPrefix(line, "## [") {
+		isEntryHeading := strings.HasPrefix(line, "## [")
+		if isEntryHeading {
 			if inBlock {
 				break
 			}
@@ -319,11 +320,13 @@ const fingerprintsSection = "## Fingerprints (corporate approval)\n\n" +
 	"(one request per adopted version; the pin re-adopts automatically on first run)."
 
 func defaultFullDryRunPreflight(repoRoot, target string) error {
-	return runPreflightLib(repoRoot, target, true, true, true)
+	const dryRun, skipTests, strictPass = true, true, true
+	return runPreflightLib(repoRoot, target, dryRun, skipTests, strictPass)
 }
 
 func defaultPreflight(repoRoot, target string, dryRun, skipTests bool) error {
-	return runPreflightLib(repoRoot, target, dryRun, skipTests, false)
+	const strictPass = false
+	return runPreflightLib(repoRoot, target, dryRun, skipTests, strictPass)
 }
 
 func defaultChangelogGen(repoRoot, fromRef, toRef, target string, dryRun bool) error {

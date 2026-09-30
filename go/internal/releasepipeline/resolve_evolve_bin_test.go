@@ -127,7 +127,8 @@ func TestResolveEvolveBin_RepoBinBeatsTrackedGoEvolve(t *testing.T) {
 }
 
 func TestDefaultRebuildBinary_DryRunIsNoop(t *testing.T) {
-	err := defaultRebuildBinary(t.TempDir(), "9.9.9", true)
+	repoWithoutGoSource := t.TempDir()
+	err := defaultRebuildBinary(repoWithoutGoSource, "9.9.9", true)
 	if err != nil {
 		t.Errorf("defaultRebuildBinary(dryRun=true) = %v, want nil", err)
 	}

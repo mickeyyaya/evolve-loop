@@ -106,7 +106,11 @@ func (goBuildMetadataRule) Covers(p string, in Scope) bool {
 	default:
 		return false
 	}
-	for _, d := range in.Declared {
+	return in.touchesGo()
+}
+
+func (s Scope) touchesGo() bool {
+	for _, d := range s.Declared {
 		if strings.HasSuffix(d, ".go") {
 			return true
 		}
@@ -114,21 +118,22 @@ func (goBuildMetadataRule) Covers(p string, in Scope) bool {
 	return false
 }
 
-func (s Scope) InScope(p string) bool { return matchesAny(p, s.Declared) }
+func (s Scope) InScope(p string) bool { return isAtOrUnderAny(p, s.Declared) }
 
-func (s Scope) isProtected(p string) bool { return matchesAny(p, s.Protected) }
+func (s Scope) isProtected(p string) bool { return isAtOrUnderAny(p, s.Protected) }
 
-func (s Scope) belongsToSiblingLane(p string) bool { return matchesAny(p, s.LaneOthers) }
+func (s Scope) belongsToSiblingLane(p string) bool { return isAtOrUnderAny(p, s.LaneOthers) }
 
-func matchesAny(p string, set []string) bool {
-	for _, s := range set {
-		if s == "" {
+func isAtOrUnderAny(p string, roots []string) bool {
+	for _, root := range roots {
+		if root == "" {
 			continue
 		}
-		if p == strings.TrimSuffix(s, "/") {
+		root = strings.TrimSuffix(root, "/")
+		if p == root {
 			return true
 		}
-		if strings.HasPrefix(p, strings.TrimSuffix(s, "/")+"/") {
+		if strings.HasPrefix(p, root+"/") {
 			return true
 		}
 	}
@@ -260,11 +265,13 @@ func Summarize(entries []Entry) Summary {
 			s.Refused++
 		}
 	}
-	if n := s.ByClass[ClassMisunderstood]; n > 0 && n*2 > len(entries) {
+	if isMajority(s.ByClass[ClassMisunderstood], len(entries)) {
 		s.TaskStatementSuspect = true
 	}
 	return s
 }
+
+func isMajority(part, total int) bool { return part*2 > total }
 
 type AccountResult struct {
 	Unaccounted []string

@@ -31,7 +31,8 @@ func parseOllamaList(out string) []string {
 			continue
 		}
 		name := fields[0]
-		if name == "NAME" {
+		isHeaderRow := name == "NAME"
+		if isHeaderRow {
 			continue
 		}
 		ids = append(ids, name)

@@ -81,7 +81,8 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 		if rel == "." {
 			relPkg = "./."
 		}
-		if strings.HasPrefix(relPkg, "./acs/") {
+		isACSPredicatePackage := strings.HasPrefix(relPkg, "./acs/")
+		if isACSPredicatePackage {
 			continue
 		}
 		keySet[pkgKey{mod, relPkg}] = true

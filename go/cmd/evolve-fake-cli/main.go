@@ -147,9 +147,7 @@ func scanFlags(args []string) argFlags {
 		case a == "exec":
 			f.isCodexExec = true
 			i++
-		case a == "-m" && i+1 < len(args):
-			i += 2
-		case a == "--model" && i+1 < len(args):
+		case (a == "-m" || a == "--model") && i+1 < len(args):
 			i += 2
 		case a == "--allowedTools":
 			i++
@@ -158,8 +156,6 @@ func scanFlags(args []string) argFlags {
 			}
 		case a == "--dangerously-skip-permissions":
 			f.skipPerms = true
-			i++
-		case strings.HasPrefix(a, "--"):
 			i++
 		default:
 			i++

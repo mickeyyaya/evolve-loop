@@ -21,7 +21,7 @@ var ErrArtifactNotAllowed = errors.New("dashboard: artifact name not allowed")
 
 var ErrArtifactTooLarge = errors.New("dashboard: artifact exceeds size cap")
 
-var artifactName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*\.(md|json|txt|ndjson|log|yaml|yml)$`)
+var allowedArtifactName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*\.(md|json|txt|ndjson|log|yaml|yml)$`)
 
 type ArtifactInfo struct {
 	Name    string    `json:"name"`
@@ -36,7 +36,7 @@ func ListArtifacts(root string, cycle int) ([]ArtifactInfo, error) {
 	}
 	out := make([]ArtifactInfo, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() || !artifactName.MatchString(e.Name()) {
+		if e.IsDir() || !allowedArtifactName.MatchString(e.Name()) {
 			continue
 		}
 		info, err := e.Info()
@@ -50,7 +50,7 @@ func ListArtifacts(root string, cycle int) ([]ArtifactInfo, error) {
 }
 
 func ReadArtifact(root string, cycle int, name string) ([]byte, error) {
-	if !artifactName.MatchString(name) || strings.Contains(name, "..") {
+	if !allowedArtifactName.MatchString(name) || strings.Contains(name, "..") {
 		return nil, ErrArtifactNotAllowed
 	}
 	path := filepath.Join(core.RunWorkspacePath(root, cycle), name)

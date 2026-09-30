@@ -342,7 +342,8 @@ func phaseContract(spec phasespec.PhaseSpec) phasecontract.Contract {
 	c, ok := phasecontract.For(spec.Name)
 	if !ok {
 		c = phasecontract.FromSpec(spec)
-		if len(spec.Outputs.Files) == 0 {
+		declaresNoOutputFiles := len(spec.Outputs.Files) == 0
+		if declaresNoOutputFiles {
 			c.ArtifactName = ""
 		}
 	}
@@ -409,7 +410,8 @@ func alternatesOf(s phasecontract.Section) []string {
 }
 
 func spliceGeneratedRegion(doc, block string) (string, error) {
-	return SpliceMarkedRegion(doc, block, factsBegin, factsEnd, "\n## Composition")
+	const insertBeforeCompositionSection = "\n## Composition"
+	return SpliceMarkedRegion(doc, block, factsBegin, factsEnd, insertBeforeCompositionSection)
 }
 
 func SpliceMarkedRegion(doc, block, beginMarker, endMarker, fallbackAnchor string) (string, error) {

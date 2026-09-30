@@ -35,25 +35,26 @@ func (l HelpEffortLister) ListEfforts(ctx context.Context, cli string) ([]string
 
 func parseEffortEnum(help string) []string {
 	lines := strings.Split(help, "\n")
-	start := -1
+	effortFlagLine := -1
 	for i, ln := range lines {
 		if effortFlag.MatchString(strings.TrimSpace(ln)) {
-			start = i
+			effortFlagLine = i
 			break
 		}
 	}
-	if start < 0 {
+	if effortFlagLine < 0 {
 		return nil
 	}
-	block := []string{lines[start]}
-	for _, ln := range lines[start+1:] {
+	flagBlock := []string{lines[effortFlagLine]}
+	for _, ln := range lines[effortFlagLine+1:] {
 		t := strings.TrimSpace(ln)
-		if t == "" || flagStart.MatchString(t) {
+		endsFlagBlock := t == "" || flagStart.MatchString(t)
+		if endsFlagBlock {
 			break
 		}
-		block = append(block, t)
+		flagBlock = append(flagBlock, t)
 	}
-	return firstEnumIn(strings.Join(block, " "))
+	return firstEnumIn(strings.Join(flagBlock, " "))
 }
 
 func firstEnumIn(s string) []string {
@@ -74,9 +75,13 @@ func firstEnumIn(s string) []string {
 	}
 }
 
+const minEnumTokens = 2
+
+func isEnumSeparator(r rune) bool { return r == ',' || r == '|' }
+
 func enumTokens(inner string) []string {
-	fields := strings.FieldsFunc(inner, func(r rune) bool { return r == ',' || r == '|' })
-	if len(fields) < 2 {
+	fields := strings.FieldsFunc(inner, isEnumSeparator)
+	if len(fields) < minEnumTokens {
 		return nil
 	}
 	out := make([]string, 0, len(fields))

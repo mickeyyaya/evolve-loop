@@ -23,11 +23,11 @@ func sortFindings(fs []Finding) {
 
 func diffRounds(prev, cur []Finding) (resolved, fresh, carried int) {
 	byKey := make(map[string]int, len(prev))
-	byID := make(map[string]int, len(prev))
+	byIDAndSeverity := make(map[string]int, len(prev))
 	for i, f := range prev {
 		byKey[reportdoc.FindingKey(f.Title)] = i
 		if f.ID != "" {
-			byID[f.ID+"|"+f.Severity] = i
+			byIDAndSeverity[f.ID+"|"+f.Severity] = i
 		}
 	}
 	used := make([]bool, len(prev))
@@ -45,7 +45,7 @@ func diffRounds(prev, cur []Finding) (resolved, fresh, carried int) {
 			continue
 		}
 		if f.ID != "" {
-			i, ok = byID[f.ID+"|"+f.Severity]
+			i, ok = byIDAndSeverity[f.ID+"|"+f.Severity]
 			if claim(i, ok) {
 				carried++
 				continue

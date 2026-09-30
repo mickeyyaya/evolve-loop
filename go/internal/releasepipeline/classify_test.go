@@ -170,7 +170,8 @@ func TestReleaseClassBanner_Wording(t *testing.T) {
 }
 
 func TestReleaseClassBanner_FailsClosed(t *testing.T) {
-	banner, err := releaseClassBanner(t.TempDir(), "22.3.0", "v22.2.0")
+	nonGitDir := t.TempDir()
+	banner, err := releaseClassBanner(nonGitDir, "22.3.0", "v22.2.0")
 	if err == nil {
 		t.Fatal("want a git error from a non-git dir, got nil")
 	}

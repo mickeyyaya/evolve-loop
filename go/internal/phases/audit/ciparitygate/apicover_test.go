@@ -145,7 +145,8 @@ func TestEnforceVerdict_PureTableAndMeasureInterruption(t *testing.T) {
 
 	root, goDir := enforcedFixture(t, "package p\n\nfunc Exported() {}\n")
 	timeouts := DefaultTimeouts()
-	timeouts.Apicover = -time.Nanosecond
+	const ctxBornExpired = -time.Nanosecond
+	timeouts.Apicover = ctxBornExpired
 	g, events := observed(t, pipelineRunner(goDir, 0, ""), fixedSet("./internal/p/..."), WithTimeouts(timeouts))
 	off, err = g.ApicoverEnforce(tierRequest(root, ""))
 	if off != nil || err == nil || !errors.Is(err, context.DeadlineExceeded) || err.Error() != g1["apicover.measure_interrupted"] {

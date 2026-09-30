@@ -89,7 +89,8 @@ func orphanCommandDiffs(projectRoot string, backed map[string]bool) []commandDif
 		}
 		path := filepath.Join(cmdDir, c.Name())
 		raw, readErr := os.ReadFile(path)
-		if readErr != nil || !strings.Contains(string(raw), commandGenMarker) {
+		isGeneratedStub := readErr == nil && strings.Contains(string(raw), commandGenMarker)
+		if !isGeneratedStub {
 			continue
 		}
 		orphans = append(orphans, commandDiff{

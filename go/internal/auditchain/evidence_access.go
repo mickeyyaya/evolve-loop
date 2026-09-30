@@ -84,22 +84,23 @@ func ConcludeWithEvidence(c Chain, phase string, given []string) Conclusion {
 	}
 	downgraded := make(Chain, len(c))
 	copy(downgraded, c)
-	var affected []string
+	var downgradedLinks []string
 	for i, l := range downgraded {
 		if l.Status != StatusCoherent {
 			continue
 		}
 		for _, src := range linkEvidence[l.ID] {
-			if !absent[src] || conditionalEvidence[src] {
+			isWithheld := absent[src] && !conditionalEvidence[src]
+			if !isWithheld {
 				continue
 			}
 			downgraded[i].Status = StatusUnverifiable
 			downgraded[i].Finding = fmt.Sprintf("reported coherent, but %s was not supplied to this phase — downgraded: %s", src, l.Finding)
-			affected = append(affected, string(l.ID))
+			downgradedLinks = append(downgradedLinks, string(l.ID))
 			break
 		}
 	}
-	if len(affected) == 0 {
+	if len(downgradedLinks) == 0 {
 		out := Conclude(c)
 		out.Rationale = fmt.Sprintf("evidence not supplied to %s: %s (no link lost every source; conclusion stands). %s",
 			phase, strings.Join(missing, ", "), out.Rationale)
@@ -107,6 +108,6 @@ func ConcludeWithEvidence(c Chain, phase string, given []string) Conclusion {
 	}
 	out := Conclude(downgraded)
 	out.Rationale = fmt.Sprintf("evidence not supplied to %s: %s (links downgraded: %s). %s",
-		phase, strings.Join(missing, ", "), strings.Join(affected, ", "), out.Rationale)
+		phase, strings.Join(missing, ", "), strings.Join(downgradedLinks, ", "), out.Rationale)
 	return out
 }

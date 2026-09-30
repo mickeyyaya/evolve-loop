@@ -403,13 +403,13 @@ func TestEvaluateClassify_Enforce_HonorsSKIPPED(t *testing.T) {
 }
 
 func TestHooksClassify_UnwritableWorkspaceIsReportedNotSwallowed(t *testing.T) {
-	blocked := filepath.Join(t.TempDir(), "not-a-dir")
-	if err := os.WriteFile(blocked, []byte("x"), 0o644); err != nil {
+	fileAsWorkspace := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(fileAsWorkspace, []byte("x"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 	h := hooks{spec: phasespec.PhaseSpec{Name: "premise-challenge", Classify: premiseRules(SentinelStageShadow)}}
 
-	verdict, diags, _ := h.Classify(realPremiseChallengeFAIL(t), core.PhaseRequest{Cycle: 1528, Workspace: blocked}, core.BridgeResponse{})
+	verdict, diags, _ := h.Classify(realPremiseChallengeFAIL(t), core.PhaseRequest{Cycle: 1528, Workspace: fileAsWorkspace}, core.BridgeResponse{})
 
 	if verdict != core.VerdictPASS {
 		t.Fatalf("a failed measurement must never change the verdict it measures; got %q", verdict)

@@ -21,27 +21,33 @@ type ReleaseClassification struct {
 type goChangedProbe func(fromRef, toRef string) (bool, error)
 
 func classifyRelease(target, prevTag string, olderTags []string, changed goChangedProbe) (ReleaseClassification, error) {
-	if prevTag == "" {
+	isFirstRelease := prevTag == ""
+	if isFirstRelease {
 		return ReleaseClassification{Class: BinaryRelease, SinceVersion: target}, nil
 	}
-	ch, err := changed(prevTag, "HEAD")
+	binaryChanged, err := changed(prevTag, "HEAD")
 	if err != nil {
 		return ReleaseClassification{}, err
 	}
-	if ch {
+	if binaryChanged {
 		return ReleaseClassification{Class: BinaryRelease, SinceVersion: target}, nil
 	}
-	tags := append([]string{prevTag}, olderTags...)
-	for i := 0; i+1 < len(tags); i++ {
-		ch, err := changed(tags[i+1], tags[i])
+	return configReleaseSinceLastBinaryRelease(append([]string{prevTag}, olderTags...), changed)
+}
+
+func configReleaseSinceLastBinaryRelease(newestFirst []string, changed goChangedProbe) (ReleaseClassification, error) {
+	for i := 0; i+1 < len(newestFirst); i++ {
+		newer, older := newestFirst[i], newestFirst[i+1]
+		binaryChanged, err := changed(older, newer)
 		if err != nil {
 			return ReleaseClassification{}, err
 		}
-		if ch {
-			return ReleaseClassification{Class: ConfigRelease, SinceVersion: tags[i]}, nil
+		if binaryChanged {
+			return ReleaseClassification{Class: ConfigRelease, SinceVersion: newer}, nil
 		}
 	}
-	return ReleaseClassification{Class: ConfigRelease, SinceVersion: tags[len(tags)-1]}, nil
+	earliest := newestFirst[len(newestFirst)-1]
+	return ReleaseClassification{Class: ConfigRelease, SinceVersion: earliest}, nil
 }
 
 func releaseClassBanner(repoRoot, target, prevTag string) (string, error) {

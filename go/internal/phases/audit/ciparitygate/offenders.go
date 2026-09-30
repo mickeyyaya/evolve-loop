@@ -7,14 +7,25 @@ import (
 
 var goCompilerDiagRe = regexp.MustCompile(`^\S+\.go:\d+(:\d+)?:`)
 
+const (
+	goBuildFailurePackageHeader    = "# "
+	apicoverUncoveredMarker        = "UNCOVERED"
+	apicoverMeasurementErrorMarker = "measurement error"
+)
+
+const (
+	markerlessFallbackTailLines = 6
+	maxOffenderLines            = 12
+)
+
 func offenderMarkerLine(ln string) bool {
 	return strings.HasPrefix(ln, "--- FAIL") ||
 		strings.HasPrefix(ln, "FAIL") ||
 		strings.HasPrefix(ln, "panic:") ||
-		strings.HasPrefix(ln, "# ") ||
+		strings.HasPrefix(ln, goBuildFailurePackageHeader) ||
 		strings.Contains(ln, "import cycle") ||
-		strings.Contains(ln, "UNCOVERED") ||
-		strings.Contains(ln, "measurement error") ||
+		strings.Contains(ln, apicoverUncoveredMarker) ||
+		strings.Contains(ln, apicoverMeasurementErrorMarker) ||
 		goCompilerDiagRe.MatchString(ln)
 }
 
@@ -40,7 +51,7 @@ func offenderLines(out string) []string {
 		}
 	}
 	if len(keep) == 0 {
-		start := len(all) - 6
+		start := len(all) - markerlessFallbackTailLines
 		if start < 0 {
 			start = 0
 		}
@@ -50,8 +61,8 @@ func offenderLines(out string) []string {
 			}
 		}
 	}
-	if len(keep) > 12 {
-		keep = keep[len(keep)-12:]
+	if len(keep) > maxOffenderLines {
+		keep = keep[len(keep)-maxOffenderLines:]
 	}
 	return keep
 }

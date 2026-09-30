@@ -9,9 +9,9 @@ import (
 )
 
 type tierLog struct {
-	workspace string
-	args      []string
-	path      string
+	workspace   string
+	args        []string
+	writtenPath string
 }
 
 func (l *tierLog) target() string { return filepath.Join(l.workspace, "integration-tier.log") }
@@ -29,7 +29,7 @@ func (l *tierLog) append(n int, note string, a attempt) error {
 	defer func() { _ = f.Close() }()
 	_, err = f.WriteString(entry)
 	if err == nil {
-		l.path = p
+		l.writtenPath = p
 	}
 	return err
 }

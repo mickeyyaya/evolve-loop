@@ -58,7 +58,8 @@ func (c writeConfig) writeInboxItems() error {
 		if rerr != nil {
 			return fmt.Errorf("faillearn: inbox item %s already exists but cannot be read to confirm it matches: %w", it.ID, rerr)
 		}
-		if !bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(body)) {
+		isIdempotentRetry := bytes.Equal(bytes.TrimSpace(existing), bytes.TrimSpace(body))
+		if !isIdempotentRetry {
 			return fmt.Errorf("faillearn: inbox item %s already exists at %s with DIFFERENT content — refusing to drop the remediation item %q; resolve the id collision", it.ID, path, it.Title)
 		}
 	}

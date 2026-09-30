@@ -94,19 +94,19 @@ func (g *Gates) retake(req Request, dir string, args []string, run sysexec.RunFu
 	if second.err == nil {
 		g.logAttempt(req, log, 2, " (serialized retake"+lockNote+")", second)
 	}
-	d := decideTier(first, second, log.path, g.timeouts.TierAttempt)
+	d := decideTier(first, second, log.writtenPath, g.timeouts.TierAttempt)
 	switch d.code {
 	case CodeTierRetakeExecFailed:
-		g.warn(gateTier, req, d.code, "serialized retake could not run: "+second.err.Error(), "err", second.err.Error(), "log", log.path)
+		g.warn(gateTier, req, d.code, "serialized retake could not run: "+second.err.Error(), "err", second.err.Error(), "log", log.writtenPath)
 	case CodeTierFlakeAbsorbed:
-		g.warn(gateTier, req, d.code, d.err.Error(), "attempt1_exit", strconv.Itoa(first.code), "log", log.path, "lock_note", lockNote)
+		g.warn(gateTier, req, d.code, d.err.Error(), "attempt1_exit", strconv.Itoa(first.code), "log", log.writtenPath, "lock_note", lockNote)
 	case CodeTierDeadlineNoVerdict:
-		g.warn(gateTier, req, d.code, d.err.Error(), "budget", g.timeouts.TierAttempt.String(), "log", log.path, "lock_note", lockNote)
+		g.warn(gateTier, req, d.code, d.err.Error(), "budget", g.timeouts.TierAttempt.String(), "log", log.writtenPath, "lock_note", lockNote)
 	}
 	if d.err != nil {
 		return nil, d.err
 	}
-	return g.failed(gateTier, req, d.cause, d.offenders, "log", log.path), nil
+	return g.failed(gateTier, req, d.cause, d.offenders, "log", log.writtenPath), nil
 }
 
 type tierDecision struct {

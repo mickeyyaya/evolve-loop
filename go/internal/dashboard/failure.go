@@ -141,12 +141,12 @@ func readAuditRounds(ws string) ([]AuditRound, []string) {
 			Findings: findings, Resolved: resolved, New: fresh, Carried: carried})
 		prev = findings
 	}
-	last := 0
+	highestArchivedIndex := 0
 	for _, a := range archives {
 		add(a.index, a.name)
-		last = a.index
+		highestArchivedIndex = a.index
 	}
-	add(last+1, auditReportName)
+	add(highestArchivedIndex+1, auditReportName)
 	return rounds, warnings
 }
 

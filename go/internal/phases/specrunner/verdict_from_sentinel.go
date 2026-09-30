@@ -19,15 +19,17 @@ const (
 
 const verdictShadowRecordPrefix = "judgment-verdict-shadow"
 
+func portableFilenameRune(r rune) rune {
+	switch {
+	case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+		return r
+	default:
+		return '_'
+	}
+}
+
 func VerdictShadowRecordFile(phase string) string {
-	safe := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
-			return r
-		default:
-			return '_'
-		}
-	}, phase)
+	safe := strings.Map(portableFilenameRune, phase)
 	if safe == "" {
 		safe = "unnamed"
 	}
@@ -59,7 +61,7 @@ func applySentinelStage(o classifyOutcome, artifact, stage string) classifyOutco
 				stage, SentinelStageOff, SentinelStageShadow, SentinelStageEnforce),
 		}))
 	}
-	o.consulted = true
+	o.sentinelConsulted = true
 
 	stated, ok := phasecontract.ParseVerdictSentinel(artifact)
 	switch {
@@ -78,16 +80,16 @@ func applySentinelStage(o classifyOutcome, artifact, stage string) classifyOutco
 		return o
 	}
 
-	o.sentinel, o.present = stated, true
+	o.sentinelVerdict, o.sentinelPresent = stated, true
 	if stage == SentinelStageEnforce {
-		o.effective = stated
+		o.effectiveVerdict = stated
 		return o
 	}
-	if stated != o.effective {
+	if stated != o.effectiveVerdict {
 		o.diags = append(o.diags, core.Diagnostic{
 			Severity: "warn",
 			Message: fmt.Sprintf("verdict_from_sentinel=shadow: phase stated %s, cycle routed %s — recorded, not enforced",
-				stated, o.effective),
+				stated, o.effectiveVerdict),
 		})
 	}
 	return o
@@ -108,12 +110,12 @@ func shadowRecord(cycle int, phase, stage string, o classifyOutcome) (VerdictSha
 		Cycle:             cycle,
 		Phase:             phase,
 		Stage:             stage,
-		StructuralVerdict: o.structural,
-		SentinelConsulted: o.consulted,
-		SentinelPresent:   o.present,
-		SentinelVerdict:   o.sentinel,
-		EffectiveVerdict:  o.effective,
-		WouldFlip:         o.present && o.sentinel != o.effective,
+		StructuralVerdict: o.structuralVerdict,
+		SentinelConsulted: o.sentinelConsulted,
+		SentinelPresent:   o.sentinelPresent,
+		SentinelVerdict:   o.sentinelVerdict,
+		EffectiveVerdict:  o.effectiveVerdict,
+		WouldFlip:         o.sentinelPresent && o.sentinelVerdict != o.effectiveVerdict,
 	}
 	rec.Rationale = shadowRationale(rec)
 	return rec, true
@@ -141,8 +143,8 @@ func knownSentinelStage(s string) bool {
 	return s == SentinelStageOff || s == SentinelStageShadow || s == SentinelStageEnforce
 }
 
-func writeVerdictShadow(workspace string, rec VerdictShadowRecord, ok bool) error {
-	if !ok || workspace == "" {
+func writeVerdictShadow(workspace string, rec VerdictShadowRecord, optedIn bool) error {
+	if !optedIn || workspace == "" {
 		return nil
 	}
 	return atomicwrite.JSON(filepath.Join(workspace, VerdictShadowRecordFile(rec.Phase)), rec)

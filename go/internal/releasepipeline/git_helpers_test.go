@@ -30,8 +30,8 @@ func initTempRepoWithTag(t *testing.T, tag string) string {
 }
 
 func TestResolvePrevTag_NonGitDir(t *testing.T) {
-	dir := t.TempDir()
-	tag, err := resolvePrevTag(dir)
+	nonGitDir := t.TempDir()
+	tag, err := resolvePrevTag(nonGitDir)
 	if err == nil {
 		t.Errorf("resolvePrevTag in non-git dir: want error, got tag=%q err=nil", tag)
 	}

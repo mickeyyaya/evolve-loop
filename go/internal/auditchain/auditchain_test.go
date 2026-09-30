@@ -79,8 +79,8 @@ func TestValidate_EveryLinkMustCiteSomethingCheckable(t *testing.T) {
 
 func TestValidate_RejectsDuplicateAndUnknownLinks(t *testing.T) {
 	t.Parallel()
-	c := append(fullChain(), coherent(LinkDelivery))
-	if errs := Validate(c); len(errs) == 0 {
+	duplicated := append(fullChain(), coherent(LinkDelivery))
+	if errs := Validate(duplicated); len(errs) == 0 {
 		t.Error("a duplicated link lets one relationship be reported twice with different statuses")
 	}
 	if errs := Validate(Chain{{ID: "invented", Status: StatusCoherent, Finding: "f", Citation: "c"}}); len(errs) == 0 {
@@ -98,29 +98,29 @@ func TestDiagnose_NamesTheHumanRecognisableFailure(t *testing.T) {
 		{
 			name: "derailed",
 			mut: func(c Chain) Chain {
-				return setLink(c, LinkDelivery, StatusIncoherent, "implements a cache; the intent asked for a retry budget")
+				return withLink(c, LinkDelivery, StatusIncoherent, "implements a cache; the intent asked for a retry budget")
 			},
 			want: "derailed",
 		},
 		{
 			name: "specious",
 			mut: func(c Chain) Chain {
-				return setLink(c, LinkNarrative, StatusIncoherent, "build report claims a fix the diff does not contain")
+				return withLink(c, LinkNarrative, StatusIncoherent, "build report claims a fix the diff does not contain")
 			},
 			want: "specious",
 		},
 		{
 			name: "paradoxical",
 			mut: func(c Chain) Chain {
-				c = setLink(c, LinkSpecification, StatusIncoherent, "acceptance criteria no longer encoded by the tests")
-				return setLink(c, LinkImplementation, StatusCoherent, "implementation satisfies the tests as they now stand")
+				c = withLink(c, LinkSpecification, StatusIncoherent, "acceptance criteria no longer encoded by the tests")
+				return withLink(c, LinkImplementation, StatusCoherent, "implementation satisfies the tests as they now stand")
 			},
 			want: "paradoxical",
 		},
 		{
 			name: "deceptive",
 			mut: func(c Chain) Chain {
-				return setLink(c, LinkEvidence, StatusIncoherent, "the cited green run is the agent's own transcript, not an executed gate")
+				return withLink(c, LinkEvidence, StatusIncoherent, "the cited green run is the agent's own transcript, not an executed gate")
 			},
 			want: "deceptive",
 		},
@@ -142,8 +142,8 @@ func TestDiagnose_NamesTheHumanRecognisableFailure(t *testing.T) {
 
 func TestDiagnose_ParadoxRequiresTheContradiction(t *testing.T) {
 	t.Parallel()
-	c := setLink(fullChain(), LinkSpecification, StatusIncoherent, "criteria not encoded")
-	c = setLink(c, LinkImplementation, StatusIncoherent, "and the code does not satisfy them either")
+	c := withLink(fullChain(), LinkSpecification, StatusIncoherent, "criteria not encoded")
+	c = withLink(c, LinkImplementation, StatusIncoherent, "and the code does not satisfy them either")
 	if got := strings.Join(Diagnose(c), " "); strings.Contains(got, "paradox") {
 		t.Errorf("two plain failures are not a paradox; got %q", got)
 	}

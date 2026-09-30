@@ -201,7 +201,8 @@ func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
 
 func TestTruncate_LongStringTruncates(t *testing.T) {
 	t.Parallel()
-	got := truncate("ααααα", 3)
+	fiveTwoByteRunes := "ααααα"
+	got := truncate(fiveTwoByteRunes, 3)
 	want := "ααα" + "…"
 	if got != want {
 		t.Errorf("truncate = %q, want %q", got, want)

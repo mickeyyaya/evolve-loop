@@ -105,7 +105,8 @@ func RenderLessonYAML(ev FailureEvent) (id string, body []byte) {
 }
 
 func StructuredDefects(ev FailureEvent) []string {
-	if len(ev.Defects) == 1 && ev.Defects[0] == ev.Summary {
+	defectsOnlyEchoSummary := len(ev.Defects) == 1 && ev.Defects[0] == ev.Summary
+	if defectsOnlyEchoSummary {
 		return nil
 	}
 	return ev.Defects

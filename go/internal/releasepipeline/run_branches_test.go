@@ -64,11 +64,11 @@ func TestRun_FromTagAutoResolved_ValidRepo(t *testing.T) {
 }
 
 func TestRun_FromTagAutoResolved_NonGitDir(t *testing.T) {
-	dir := t.TempDir()
+	nonGitDir := t.TempDir()
 
 	res, err := Run(Options{
 		Target:      "99.0.0",
-		RepoRoot:    dir,
+		RepoRoot:    nonGitDir,
 		FromTag:     "",
 		MaxPollWait: time.Second,
 		Steps:       allOkSteps(),

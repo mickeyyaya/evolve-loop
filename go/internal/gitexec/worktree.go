@@ -45,10 +45,12 @@ func (g Git) AddWorktreeWithRetry(ctx context.Context, r WorktreeAddRetry, args 
 		if err == nil && exitCode == 0 {
 			return stdout, stderr, exitCode, nil
 		}
-		if attempt == DefaultWorktreeAddAttempts-1 {
+		isLastAttempt := attempt == DefaultWorktreeAddAttempts-1
+		if isLastAttempt {
 			break
 		}
-		if r.Retryable != nil && !r.Retryable(exitCode, stderr) {
+		isPermanentFailure := r.Retryable != nil && !r.Retryable(exitCode, stderr)
+		if isPermanentFailure {
 			break
 		}
 		if firstFailure == "" {

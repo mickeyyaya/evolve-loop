@@ -40,4 +40,4 @@
 - Before `verdict_from_sentinel`, a judgment phase that stated FAIL, with a well-formed machine sentinel, classified PASS on structure alone and the cycle ran on; the loop paid for the dispatch and discarded its conclusion. The measured counts are in ADR-0091.
 - `TestHooksClassify_WritesTheShadowRecordForAnOptedInPhase` is the wiring proof: a mutation that stops `Classify` writing the record survived the component tests.
 - `TestEvaluateClassify_OmittedKeyEqualsExplicitOff` cannot prove byte-identity with the legacy classifier, because `SentinelStageOff` is the zero value and the two rule structs are equal; `TestHooksClassify_OptedOutPhaseIsUnchanged` is the byte-identity pin.
-- `shadowRecordsIn` globs for records instead of stat'ing one expected name, because a dropped `ok` guard writes a zero-value record under a different filename.
+- `shadowRecordsIn` globs for records instead of stat'ing one expected name, because a dropped `optedIn` guard writes a zero-value record under a different filename.

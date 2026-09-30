@@ -11,13 +11,15 @@ import (
 
 const replBootMarkers = "❯ › ? for shortcuts >>> evolve-fake-repl-ready"
 
+const maxPastedPromptLineBytes = 1 << 20
+
 func runREPL(stdin io.Reader, stdout, stderr io.Writer, verdict string) int {
 	fmt.Fprintln(stdout, replBootMarkers)
 
 	var buf strings.Builder
-	acted := false
+	servedAnyTurn := false
 	sc := bufio.NewScanner(stdin)
-	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	sc.Buffer(make([]byte, 0, 64*1024), maxPastedPromptLineBytes)
 	for sc.Scan() {
 		line := sc.Text()
 		buf.WriteString(line)
@@ -32,20 +34,24 @@ func runREPL(stdin io.Reader, stdout, stderr io.Writer, verdict string) int {
 			continue
 		}
 		if emitREPLArtifacts(phase, artifactPath, verdict, stdout, stderr) {
-			acted = true
+			servedAnyTurn = true
 		}
 		fmt.Fprintln(stdout, replBootMarkers)
 		buf.Reset()
 	}
 
-	if !acted {
-		if phase := detectPhaseFromPrompt(buf.String()); phase != "" {
-			if artifactPath := resolveArtifactPath(buf.String(), phase); artifactPath != "" {
-				emitREPLArtifacts(phase, artifactPath, verdict, stdout, stderr)
-			}
-		}
+	if !servedAnyTurn {
+		serveOnceAtEOF(buf.String(), verdict, stdout, stderr)
 	}
 	return 0
+}
+
+func serveOnceAtEOF(prompt, verdict string, stdout, stderr io.Writer) {
+	if phase := detectPhaseFromPrompt(prompt); phase != "" {
+		if artifactPath := resolveArtifactPath(prompt, phase); artifactPath != "" {
+			emitREPLArtifacts(phase, artifactPath, verdict, stdout, stderr)
+		}
+	}
 }
 
 func emitREPLArtifacts(phase, artifactPath, verdict string, stdout, stderr io.Writer) bool {

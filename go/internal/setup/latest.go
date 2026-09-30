@@ -29,19 +29,19 @@ func ComputeLatest(current string, candidates []string, fp modelquery.FreshnessP
 	if current == "" {
 		return "", false, false
 	}
-	key := modelquery.LineageKey(current)
-	bucket := []string{current}
+	currentLineage := modelquery.LineageKey(current)
+	sameLineage := []string{current}
 	for _, id := range candidates {
 		if id == current {
 			observed = true
 			continue
 		}
-		if modelquery.LineageKey(id) == key {
-			bucket = append(bucket, id)
+		if modelquery.LineageKey(id) == currentLineage {
+			sameLineage = append(sameLineage, id)
 			observed = true
 		}
 	}
-	latest = fp.Freshest(bucket)
+	latest = fp.Freshest(sameLineage)
 	if latest == "" {
 		latest = current
 	}

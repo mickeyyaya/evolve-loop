@@ -7,17 +7,18 @@ func TestScope_InScope_DirectoryPrefixesAndExactPaths(t *testing.T) {
 	s := Scope{Declared: []string{"go/internal/salvage/extract.go", "docs/research/"}}
 
 	for _, tc := range []struct {
+		name string
 		path string
 		want bool
 	}{
-		{"go/internal/salvage/extract.go", true},
-		{"docs/research/README.md", true},
-		{"docs/research/deep/notes.md", true},
-		{"go/internal/salvage/extract_x.go", false},
-		{"docs/researchers/other.md", false},
+		{"exact path", "go/internal/salvage/extract.go", true},
+		{"under the declared prefix", "docs/research/README.md", true},
+		{"nested under the declared prefix", "docs/research/deep/notes.md", true},
+		{"sibling file sharing the name prefix", "go/internal/salvage/extract_x.go", false},
+		{"sibling dir sharing the name prefix", "docs/researchers/other.md", false},
 	} {
 		if got := s.InScope(tc.path); got != tc.want {
-			t.Errorf("InScope(%q) = %v, want %v", tc.path, got, tc.want)
+			t.Errorf("%s: InScope(%q) = %v, want %v", tc.name, tc.path, got, tc.want)
 		}
 	}
 }

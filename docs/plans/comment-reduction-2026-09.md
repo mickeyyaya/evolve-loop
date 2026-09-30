@@ -15,6 +15,7 @@
 | 2c | The one-line *whys* kept because no test pins them | Each is filed as an inbox item to pin the invariant with a test; the comment goes in that item's change. An item on a protected surface is console-owned, like the rest of this workstream; the others are lane-sized work for the loop. |
 | 2d | The per-cycle predicate packages `go/acs/cycle*` (494 files, 42,863 comment lines) | Editor rounds; a predicate's intent lives in its cycle's eval and reports, so there is little to capture. Four older predicates still require a doc on a named export (`acs/cycle1706` line 774, `cycle1698` line 673, `cycle1690` line 215, `cycle1685` line 306); they run again only when a lane changes their packages, so each is updated or archived in the same change that deletes the docs it reads (2a/2b) |
 | 2e | Regrowth | Set `comment_floor.stage` to `enforce` in `.evolve/policy.json`, so a lane build that adds a comment is corrected before its audit; see [Guard against regrowth](#guard-against-regrowth) |
+| 2f | Rounds 1–11 (batches 1–78), reduced before the self-explanation step existed | The same self-explanation pass per package, landed as reviewed refactor commits |
 
 ## Baseline
 
@@ -54,6 +55,7 @@ Each batch covers one package, or one file group of a large package.
    - **One batch at a time:** apply, prove, commit, then apply the next. `git apply --3way` stages its result and ship stages every changed file, so two applied batches can only land as one commit.
    - **Merge at a wave boundary only, after the full CI-parity floor.** Comment PRs merge after that boundary's feature train, then rebase and re-prove. The workstream always yields: lane PRs never rebase onto a comment PR mid-wave.
    - **Choosing a batch.** Skip files that an open PR, a carried-over or stranded lane, or an in-flight decomposition unit will touch. Comment edits next to code edits conflict textually.
+7. **Make the code say it** (from round 12). After the comment-only commit lands on the round's branch, a second agent per group reads what that commit deleted (`git show` of it) and, where a deleted comment said what the code does and the code no longer shows it, makes the code say it ([What a deleted comment leaves behind](../conventions/code-comments.md#what-a-deleted-comment-leaves-behind)). Steps 3 to 5 apply to the comment-only commit only: this pass changes code, so it is its own commit in the same PR, reviewed by the simplifier, the architecture reviewer and the Go reviewer, with the full floor. The editors' comment-only state is snapshotted first (`git stash create` plus a local ref), so the refactor delta is a clean diff against it.
 
 The editor prompt forbids git mutation and is scoped to its batch.
 

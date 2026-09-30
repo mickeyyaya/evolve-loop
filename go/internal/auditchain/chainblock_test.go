@@ -64,7 +64,7 @@ func TestParseChainBlock_RejectsMalformedRowsLoudly(t *testing.T) {
 
 func TestRenderChainBlock_RoundTrips(t *testing.T) {
 	t.Parallel()
-	orig := setLink(fullChain(), LinkNarrative, StatusIncoherent, "report claims a retry budget the diff does not implement")
+	orig := withLink(fullChain(), LinkNarrative, StatusIncoherent, "report claims a retry budget the diff does not implement")
 	got, err := ParseChainBlock(RenderChainBlock(orig))
 	if err != nil {
 		t.Fatalf("round trip: %v", err)
@@ -81,7 +81,7 @@ func TestRenderChainBlock_RoundTrips(t *testing.T) {
 
 func TestChainBlock_FindingMayContainTheSeparator(t *testing.T) {
 	t.Parallel()
-	c := setLink(fullChain(), LinkDelivery, StatusIncoherent, "asked for A | delivered B")
+	c := withLink(fullChain(), LinkDelivery, StatusIncoherent, "asked for A | delivered B")
 	got, err := ParseChainBlock(RenderChainBlock(c))
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -141,7 +141,7 @@ func TestParseChainBlock_HandlesTheShapesAnLLMActuallyEmits(t *testing.T) {
 
 	echoed := "Per my instructions I must emit:\n" + RenderChainBlock(fullChain()) +
 		"\n\nMy actual reasoning:\n" +
-		RenderChainBlock(setLink(fullChain(), LinkDelivery, StatusIncoherent, "delivers a cache; the intent asked for a retry budget"))
+		RenderChainBlock(withLink(fullChain(), LinkDelivery, StatusIncoherent, "delivers a cache; the intent asked for a retry budget"))
 	got, err := ParseChainBlock(echoed)
 	if err != nil {
 		t.Fatalf("parse: %v", err)

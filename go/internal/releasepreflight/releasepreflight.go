@@ -56,6 +56,8 @@ type CIRunStatus struct {
 	RunURL     string
 }
 
+const ciConclusionUnavailable = ""
+
 type Result struct {
 	StepsPassed     int
 	StepsTotal      int
@@ -119,6 +121,8 @@ func ExtractJSONVersion(jsonPath string) (string, error) {
 	return m[1], nil
 }
 
+const gitDiffQuietDirtyExitCode = 1
+
 func defaultGitClean(repoRoot string) (bool, error) {
 	cmd := exec.Command("git", "-C", repoRoot, "diff", "--quiet", "HEAD")
 	err := cmd.Run()
@@ -126,7 +130,7 @@ func defaultGitClean(repoRoot string) (bool, error) {
 		return true, nil
 	}
 	if exitErr, ok := err.(*exec.ExitError); ok {
-		if exitErr.ExitCode() == 1 {
+		if exitErr.ExitCode() == gitDiffQuietDirtyExitCode {
 			return false, nil
 		}
 		return false, fmt.Errorf("git diff failed: %v", err)
@@ -142,11 +146,13 @@ func defaultHeadSHA(repoRoot string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+const detachedHEADBranch = ""
+
 func defaultCurrentBranch(repoRoot string) (string, error) {
 	cmd := exec.Command("git", "-C", repoRoot, "symbolic-ref", "--short", "HEAD")
 	out, err := cmd.Output()
 	if err != nil {
-		return "", nil
+		return detachedHEADBranch, nil
 	}
 	return strings.TrimSpace(string(out)), nil
 }
@@ -201,7 +207,7 @@ func defaultSimulationRunner(repoRoot string) error {
 func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	head, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
-		return CIRunStatus{}, nil
+		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	sha := strings.TrimSpace(string(head))
 	cmd := exec.Command("gh", "run", "list", "--workflow", ciparity.RequiredWorkflow,
@@ -209,7 +215,7 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()
 	if err != nil {
-		return CIRunStatus{}, nil
+		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	var runs []struct {
 		Status     string `json:"status"`
@@ -217,7 +223,7 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 		URL        string `json:"url"`
 	}
 	if json.Unmarshal(out, &runs) != nil || len(runs) == 0 {
-		return CIRunStatus{}, nil
+		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	if runs[0].Status != "completed" {
 		return CIRunStatus{Conclusion: "pending", RunURL: runs[0].URL}, nil
@@ -357,9 +363,9 @@ func selectAuditCandidate(rows []auditledger.Entry) (candidate *auditledger.Entr
 
 func scopedOutOrFail(res auditResult, candidate auditledger.Entry, releaseHead string, strict bool) (auditResult, error) {
 	auditedHead := candidate.GitHEAD
-	scopedOut := releaseHead != "" &&
-		((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(candidate))
-	if scopedOut {
+	releaseHeadKnown := releaseHead != ""
+	auditedAnotherCommit := auditedHead != "" && auditedHead != releaseHead
+	if releaseHeadKnown && (auditedAnotherCommit || auditedUncommittedWork(candidate)) {
 		res.verdict = auditVerdictScopedOut
 		res.auditedHead = auditedHead
 		return res, nil
@@ -401,12 +407,18 @@ func extractVerdict(body string, strict bool) (string, bool) {
 		v := strings.ToUpper(m[1])
 		return v, true
 	}
+	return headingFormVerdict(body, strict)
+}
+
+const verdictHeadingLookaheadLines = 5
+
+func headingFormVerdict(body string, strict bool) (string, bool) {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		if !verdictHeadingRE.MatchString(line) {
 			continue
 		}
-		for j := i + 1; j <= i+5 && j < len(lines); j++ {
+		for j := i + 1; j <= i+verdictHeadingLookaheadLines && j < len(lines); j++ {
 			line := lines[j]
 			if boldPassRE.MatchString(line) || strings.TrimSpace(line) == "PASS" {
 				return "PASS", true

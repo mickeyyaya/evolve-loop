@@ -601,10 +601,15 @@ func writeRetroProfileDoc(t *testing.T, projectRoot, body string) {
 	}
 }
 
-func runRetroForModel(t *testing.T, cfgModel, profile string) core.BridgeRequest {
+func isolateFromAmbientProfileRoots(t *testing.T) {
 	t.Helper()
 	t.Setenv("EVOLVE_PLUGIN_ROOT", "")
 	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+}
+
+func runRetroForModel(t *testing.T, cfgModel, profile string) core.BridgeRequest {
+	t.Helper()
+	isolateFromAmbientProfileRoots(t)
 
 	projectRoot := t.TempDir()
 	writeRetroProfileDoc(t, projectRoot, profile)
@@ -656,8 +661,7 @@ func TestRun_AutoModel_ProfileWithoutTier_ResolvesToDefaultNotAuto(t *testing.T)
 }
 
 func TestRun_AutoModel_NoProfile_NeverDispatchesSentinel(t *testing.T) {
-	t.Setenv("EVOLVE_PLUGIN_ROOT", "")
-	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	isolateFromAmbientProfileRoots(t)
 	projectRoot := t.TempDir()
 
 	fb := &fakeBridge{

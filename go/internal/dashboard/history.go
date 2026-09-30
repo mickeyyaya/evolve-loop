@@ -142,9 +142,9 @@ func computeTrend(cycles []int, ds map[int]*dossier.Dossier) Trend {
 			t.Shipped++
 		}
 	}
-	t.ShipRateAll = rate(points, len(points))
-	t.ShipRateLast20 = rate(points, 20)
-	t.ShipRateLast50 = rate(points, 50)
+	t.ShipRateAll = shipRateOfLast(points, len(points))
+	t.ShipRateLast20 = shipRateOfLast(points, 20)
+	t.ShipRateLast50 = shipRateOfLast(points, 50)
 	if len(points) > trendPointCap {
 		points = points[len(points)-trendPointCap:]
 	}
@@ -152,7 +152,7 @@ func computeTrend(cycles []int, ds map[int]*dossier.Dossier) Trend {
 	return t
 }
 
-func rate(points []TrendPoint, n int) float64 {
+func shipRateOfLast(points []TrendPoint, n int) float64 {
 	if n > len(points) {
 		n = len(points)
 	}
@@ -170,12 +170,12 @@ func rate(points []TrendPoint, n int) float64 {
 
 func computeFingerprints(cycles []int, ds map[int]*dossier.Dossier) []FingerprintStat {
 	stats := map[string]*FingerprintStat{}
-	lastShipped := 0
+	lastShippedCycle := 0
 	var order []string
 	for _, c := range cycles {
 		d := ds[c]
 		if shipped(d) {
-			lastShipped = c
+			lastShippedCycle = c
 			continue
 		}
 		if d.Failure == nil || d.Failure.Fingerprint == "" {
@@ -187,7 +187,7 @@ func computeFingerprints(cycles []int, ds map[int]*dossier.Dossier) []Fingerprin
 			s = &FingerprintStat{Fingerprint: fp, PreClass: d.Failure.PreClass, FirstCycle: c}
 			stats[fp] = s
 			order = append(order, fp)
-		} else if lastShipped > s.LastCycle {
+		} else if lastShippedCycle > s.LastCycle {
 			s.Regressed = true
 		}
 		s.Count++

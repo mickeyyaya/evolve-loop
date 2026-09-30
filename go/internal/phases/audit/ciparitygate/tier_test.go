@@ -137,7 +137,8 @@ func TestTierLog_FailuresAreCodedAndTheEarlierPointerStands(t *testing.T) {
 	calls := 0
 	g, events = observed(t, func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
 		calls++
-		if calls == 2 {
+		retakeStarting := calls == 2
+		if retakeStarting {
 			if err := os.Remove(logPath); err != nil {
 				t.Fatal(err)
 			}
@@ -192,12 +193,12 @@ func TestAcquireLock_TableOverAnInjectedClock(t *testing.T) {
 	}
 	rel3()
 
-	file := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+	fileAsRoot := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(fileAsRoot, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	*events = nil
-	rel4, note4 := g.acquireLock(gateTier, Request{1, file, "", ""})
+	rel4, note4 := g.acquireLock(gateTier, Request{1, fileAsRoot, "", ""})
 	rel4()
 	if !strings.HasPrefix(note4, ", lock unavailable: flock mkdir: ") {
 		t.Fatalf("unusable root: note=%q", note4)

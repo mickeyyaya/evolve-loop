@@ -29,7 +29,8 @@ func TestWriteArtifacts_PublishedArtifactsHaveMode0644(t *testing.T) {
 			paths = append(paths, filepath.Join(lessonsDir, e.Name()))
 		}
 	}
-	if len(paths) != 4 {
+	const reportPlusTwoInboxItemsPlusLesson = 4
+	if len(paths) != reportPlusTwoInboxItemsPlusLesson {
 		t.Fatalf("expected 4 published artifacts to stat, got %d (%v)", len(paths), paths)
 	}
 

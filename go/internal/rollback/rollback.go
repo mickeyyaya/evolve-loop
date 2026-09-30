@@ -79,6 +79,16 @@ type LedgerEntry struct {
 	DryRun        bool   `json:"dry_run"`
 }
 
+const (
+	stepDeleted           = "deleted"
+	stepNotPresent        = "not-present"
+	stepFailed            = "failed"
+	stepSkipped           = "skipped"
+	stepDryRunOK          = "dry-run-ok"
+	stepReverted          = "reverted"
+	stepRevertedLocalOnly = "local-only"
+)
+
 func ReadJournal(path string) (Journal, error) {
 	var j Journal
 	body, err := os.ReadFile(path)
@@ -118,17 +128,17 @@ func dryRunSteps(logf func(string, ...any)) Steps {
 	return Steps{
 		GhDeleteRelease: func(tag string) string {
 			logf("DRY-RUN: would gh release delete %s --yes", tag)
-			return "dry-run-ok"
+			return stepDryRunOK
 		},
 		DeleteRemoteTag: func(_, tag string) string {
 			logf("DRY-RUN: would git push origin :refs/tags/%s", tag)
-			return "dry-run-ok"
+			return stepDryRunOK
 		},
 		RevertAndShip: func(_, sha, reason, version string) string {
 			logf("DRY-RUN: would git revert --no-edit %s", sha)
 			logf("DRY-RUN: would evolve ship --class manual \"revert: %s [rollback of v%s]\"",
 				reason, version)
-			return "dry-run-ok"
+			return stepDryRunOK
 		},
 	}
 }
@@ -246,9 +256,9 @@ func finalizeRollbackResult(res *Result, j Journal, dryRun bool, logf func(strin
 		res.OverallSucceeded = true
 		return *res, nil
 	}
-	if res.Revert == "reverted" &&
-		res.ReleaseDelete != "failed" &&
-		res.TagDelete != "failed" {
+	if res.Revert == stepReverted &&
+		res.ReleaseDelete != stepFailed &&
+		res.TagDelete != stepFailed {
 		logf("DONE: rollback complete for v%s (release_delete=%s, tag_delete=%s, revert=%s)",
 			j.Version, res.ReleaseDelete, res.TagDelete, res.Revert)
 		res.OverallSucceeded = true
@@ -284,15 +294,15 @@ func appendLedger(path string, line []byte) (err error) {
 
 func defaultGhDeleteRelease(tag string) string {
 	if _, err := exec.LookPath("gh"); err != nil {
-		return "skipped"
+		return stepSkipped
 	}
 	if err := exec.Command("gh", "release", "view", tag).Run(); err != nil {
-		return "not-present"
+		return stepNotPresent
 	}
 	if err := exec.Command("gh", "release", "delete", tag, "--yes").Run(); err != nil {
-		return "failed"
+		return stepFailed
 	}
-	return "deleted"
+	return stepDeleted
 }
 
 func defaultDeleteRemoteTag(repoRoot, tag string) string {
@@ -304,13 +314,13 @@ func deleteRemoteTagWith(g gitexec.Git, tag string) string {
 	out, _, _, _ := g.Capture(ctx, "ls-remote", "--tags", "origin", "refs/tags/"+tag)
 	if !strings.Contains(out, tag) {
 		_ = g.Run(ctx, "tag", "-d", tag)
-		return "not-present"
+		return stepNotPresent
 	}
 	if err := g.Run(ctx, "push", "origin", ":refs/tags/"+tag); err != nil {
-		return "failed"
+		return stepFailed
 	}
 	_ = g.Run(ctx, "tag", "-d", tag)
-	return "deleted"
+	return stepDeleted
 }
 
 func defaultRevertAndShip(repoRoot, commitSHA, reason, version string) string {
@@ -319,21 +329,21 @@ func defaultRevertAndShip(repoRoot, commitSHA, reason, version string) string {
 
 func revertAndShipWith(g gitexec.Git, repoRoot, commitSHA, reason, version string) string {
 	if err := g.Run(context.Background(), "revert", "--no-edit", commitSHA); err != nil {
-		return "failed"
+		return stepFailed
 	}
 	msg := fmt.Sprintf("revert: %s [rollback of v%s]", reason, version)
 	binPath := resolveEvolveBinForRollback(repoRoot)
 	if binPath == "" {
-		return "local-only"
+		return stepRevertedLocalOnly
 	}
 	cmd := exec.Command(binPath, "ship", "--class", "manual", msg)
 	cmd.Env = append(os.Environ(),
 		"EVOLVE_SHIP_AUTO_CONFIRM=1",
 	)
 	if err := cmd.Run(); err != nil {
-		return "local-only"
+		return stepRevertedLocalOnly
 	}
-	return "reverted"
+	return stepReverted
 }
 
 func resolveEvolveBinForRollback(repoRoot string) string {

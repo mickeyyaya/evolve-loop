@@ -14,7 +14,7 @@ func TestShadow_RecordsTheThreeStatesARolloutProduces(t *testing.T) {
 		t.Errorf("a coherent chain beside a PASS narrative must record agreement, got %+v", agree)
 	}
 
-	broken := setLink(fullChain(), LinkNarrative, StatusIncoherent, "claims a fix the diff lacks")
+	broken := withLink(fullChain(), LinkNarrative, StatusIncoherent, "claims a fix the diff lacks")
 	dis := Shadow(7, "audit", RenderChainBlock(broken), "PASS", full)
 	if dis.Agrees || dis.ChainVerdict != string(VerdictFAIL) {
 		t.Errorf("a PASS narrative over an incoherent link must record DISAGREEMENT, got %+v", dis)
