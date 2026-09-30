@@ -14,5 +14,11 @@
     "A citation covering no diff path is still rejected with the same message"
   ],
   "created_at": "2026-09-29T21:25:00Z",
-  "source": "console, 2026-09-30 wave-45 build floor of cycle 1768 (and wave 44's 1765)"
+  "source": "console, 2026-09-30 wave-45 build floor of cycle 1768 (and wave 44's 1765)",
+  "consumed": {
+    "at": "2026-09-29T23:31:00Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fix/changed-areas-accepts-a-covering-dir-or-glob: changedAreaFailures accepts a cited directory, glob or brace list that covers at least one Build-diff path; a citation covering nothing is still rejected. Deliberately narrower than this item's fix: a pattern never credits the material paths it covers, so every material path still needs its own exact entry (one broad glob cannot stand in for the per-path explanations)."
+  }
 }
