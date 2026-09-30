@@ -1,15 +1,5 @@
 package core
 
-// worktree_base_test.go — cycle-1544, the reuse → base-capture seam.
-//
-// A reused worktree's HEAD can be an ADR-0076 salvage snapshot. Recording that
-// SHA as WorktreeBaseSHA makes base and preserved work the SAME commit, so
-// normalizeWorktreeToBase soft-resets onto the snapshot and the salvaged diff
-// reads as empty — the work salvage exists to protect normalizes away to
-// nothing. The guard walks back to the first non-snapshot ancestor, and ONLY
-// for a snapshot HEAD: an unconditional walk-back would re-base every ordinary
-// lane, which is the wider defect the second test bounds.
-//
 // These run against a REAL git repo, because the whole seam is a git ancestry
 // question and a faked runner would prove only that the fake agrees with itself.
 
@@ -65,10 +55,6 @@ func gitRepoWithCommits(t *testing.T) (dir string, commit func(subject string, b
 	return dir, commit
 }
 
-// AC7. A reused worktree sitting on a salvage snapshot (two of them, because a
-// lane that re-failed stacks one per attempt) must resolve to the real work
-// underneath — never to the snapshot itself, which is what made normalization
-// discard the preserved diff.
 func TestWorktreeReuseBase_SalvageSnapshotHEADResolvesToFirstNonSalvageAncestor(t *testing.T) {
 	wt, commit := gitRepoWithCommits(t)
 	commit("initial")
@@ -136,9 +122,6 @@ func TestWorktreeReuseBase_StackedSalvageSnapshotsResolveToTheCommitBeneathAll(t
 	}
 }
 
-// AC8, the blast-radius bound. Ordinary reuse — the overwhelmingly common case
-// — must capture HEAD verbatim. A guard that walked back an ancestor
-// unconditionally would pass AC7 and silently re-base every normal lane.
 func TestWorktreeReuseBase_OrdinaryHEADIsRecordedVerbatim(t *testing.T) {
 	wt, commit := gitRepoWithCommits(t)
 	commit("initial")
@@ -167,10 +150,6 @@ func TestWorktreeReuseBase_CommitMentioningSalvageInBodyIsNotTreatedAsASnapshot(
 	}
 }
 
-// AC9, fail loudly. A chain that is snapshots all the way down has no honest
-// base. Falling back to the snapshot reproduces the defect; falling back to an
-// empty base disables normalization entirely (cyclerun.go:501-505). Both are
-// silent, so the guard must error instead.
 func TestWorktreeReuseBase_UnresolvableSnapshotAncestorFailsLoudly(t *testing.T) {
 	wt, commit := gitRepoWithCommits(t)
 	commit(salvageSnapshotSubject)
@@ -188,10 +167,6 @@ func TestWorktreeReuseBase_UnresolvableSnapshotAncestorFailsLoudly(t *testing.T)
 	}
 }
 
-// An unresolvable snapshot is unsafe at the production seam too: continuing
-// with an empty WorktreeBaseSHA disables normalization and makes the preserved
-// work invisible to the next audit. newCycleRun must surface that provisioning
-// failure instead of merely logging it and dispatching source-writing phases.
 func TestNewCycleRun_UnresolvableSnapshotBaseFailsProvisioning(t *testing.T) {
 	wt, commit := gitRepoWithCommits(t)
 	commit(salvageSnapshotSubject)
@@ -258,16 +233,6 @@ func TestWorktreeReuseBase_ProvisioningPathRecordsGuardedBaseInCycleState(t *tes
 	}
 }
 
-// TestWorktreeReuseBase_UnreadableAncestryRecordsHEADVerbatim — the fail-OPEN
-// branch: HEAD resolves but its ancestry cannot be read (here: HEAD is a
-// grafted/garbage ref the log walk rejects). The guard can only justify walking
-// when it can positively identify a salvage snapshot; unreadable subjects mean
-// "record verbatim, WARN", never "record empty" — an empty base disables
-// normalization, the outcome the pre-guard code itself called worse. This is
-// also the seam TestVerdictCacheCollisionRegression's missing-base scenario
-// constructs by stubbing rev-parse HEAD: capture must go through rev-parse and
-// survive a failed walk, or that regression's scenario silently stops existing
-// (which is exactly how PR #486's first CI run went red).
 func TestWorktreeReuseBase_UnreadableAncestryRecordsHEADVerbatim(t *testing.T) {
 	wt, commit := gitRepoWithCommits(t)
 	commit("ordinary work")

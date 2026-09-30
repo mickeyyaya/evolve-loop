@@ -2,16 +2,8 @@ package flagregistry
 
 import "testing"
 
-// TestDeadFlagsSweep_Gone is the regression test for cycle-2 dead-flag-sweep.
-// It asserts that every flag retired from registry_table.go in this cycle is
-// truly absent from the registry — Lookup must return ok=false for each name.
-//
-// RED: all 18 entries are still registered in registry_table.go (Lookup returns
-// ok=true), so each sub-test fails until Builder removes the rows.
-//
-// This test lives in the flagregistry package (not go/acs/cycle2/) so it runs
-// under `go test ./internal/flagregistry/...` without the `acs` build tag —
-// providing a fast, permanent regression guard in normal CI.
+// TestDeadFlagsSweep_Gone lives in this package rather than behind an acs
+// build tag, so it runs in normal CI as a permanent regression guard.
 func TestDeadFlagsSweep_Gone(t *testing.T) {
 	removed := []string{
 		"EVOLVE_ANCHOR_EXTRACT",

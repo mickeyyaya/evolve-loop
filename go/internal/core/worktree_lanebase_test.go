@@ -8,28 +8,6 @@ import (
 	"testing"
 )
 
-// worktree_lanebase_test.go — RED tests for cycle-1196 task
-// `lane-base-fetch-origin-main` (todo id
-// loop-must-base-lanes-on-origin-main-not-stale-local).
-//
-// gitWorktree.Create bases every new lane branch on the LOCAL HEAD of
-// projectRoot (`git worktree add -B <branch> <wt> HEAD`, worktree.go:97) with
-// zero fetch/origin interaction anywhere in the file. In a multi-lane fleet the
-// local checkout drifts behind origin/main as sibling lanes land work, so each
-// new lane silently forks from a stale tip — re-introducing already-fixed
-// defects and inflating ship-time merge conflicts.
-//
-// Contract these tests pin:
-//  1. origin exists  → fetch the remote tip in projectRoot BEFORE `worktree
-//     add`, and cut the branch from the FETCHED ref (origin/main or
-//     FETCH_HEAD), never the literal local "HEAD".
-//  2. no origin      → no fetch, explicit local-HEAD fallback still succeeds
-//     (isolated/local-only repos and test fixtures must not break).
-//  3. fetch fails    → fail loudly: return a wrapped error and do NOT fall back
-//     to the stale local tip (no `worktree add` at all).
-//  4. reuse path     → an existing valid worktree is still reused with no fetch
-//     and no add (regression guard on worktree.go:74-90).
-//
 // Uses the package gitRunner seam (git_seam_test.go / worktree_branchdelete_test.go
 // style) — package core cannot import test/fixtures.FakeExec (import cycle).
 
@@ -107,13 +85,6 @@ func laneBaseProvisioner(t *testing.T) (gitWorktree, string) {
 	return gitWorktree{baseOverride: filepath.Join(t.TempDir(), "worktrees")}, t.TempDir()
 }
 
-// TestGitWorktree_Create_FetchesOriginBeforeBasingLane is the headline
-// criterion: with an origin remote configured, Create must fetch the upstream
-// tip in projectRoot and cut the lane branch from that FETCHED ref, so a lane
-// provisioned while the local checkout is behind origin/main still starts from
-// current main.
-//
-// RED today: worktree.go:97 passes the literal "HEAD" and no fetch is ever run.
 func TestGitWorktree_Create_FetchesOriginBeforeBasingLane(t *testing.T) {
 	f := &laneBaseFake{hasOrigin: true}
 	useLaneBaseFake(t, f)
@@ -160,10 +131,6 @@ func TestGitWorktree_Create_FetchesOriginBeforeBasingLane(t *testing.T) {
 	}
 }
 
-// TestGitWorktree_Create_NoOriginFallsBackToLocalHEAD is the edge/OOD case:
-// isolated repos (local-only dev checkouts, several test fixtures) have no
-// origin. Create must then skip the fetch entirely and keep the documented
-// local-HEAD basing — a hard failure here would break every remoteless repo.
 func TestGitWorktree_Create_NoOriginFallsBackToLocalHEAD(t *testing.T) {
 	f := &laneBaseFake{hasOrigin: false}
 	useLaneBaseFake(t, f)
@@ -190,11 +157,6 @@ func TestGitWorktree_Create_NoOriginFallsBackToLocalHEAD(t *testing.T) {
 	}
 }
 
-// TestGitWorktree_Create_FetchFailureIsFatal is the NEGATIVE test and the
-// strongest anti-no-op signal: an implementation that fetches "best-effort" and
-// silently continues from the stale local tip reproduces the exact defect this
-// task closes. With origin present and the fetch failing, Create must return a
-// wrapped error and must NOT provision anything.
 func TestGitWorktree_Create_FetchFailureIsFatal(t *testing.T) {
 	f := &laneBaseFake{hasOrigin: true, fetchRC: 128}
 	useLaneBaseFake(t, f)
@@ -212,10 +174,6 @@ func TestGitWorktree_Create_FetchFailureIsFatal(t *testing.T) {
 	}
 }
 
-// TestGitWorktree_Create_ReuseSkipsFetch guards the existing idempotent-reuse
-// contract (worktree.go:74-90): a valid worktree for the cycle is returned
-// as-is on resume/retry. Re-basing (or re-fetching) a live lane mid-cycle would
-// discard in-progress work, so the fetch must be confined to the CREATE path.
 func TestGitWorktree_Create_ReuseSkipsFetch(t *testing.T) {
 	f := &laneBaseFake{hasOrigin: true}
 	useLaneBaseFake(t, f)

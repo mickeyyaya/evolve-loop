@@ -2,15 +2,6 @@
 
 package core
 
-// CB.4 (concurrency campaign): guard hooks inside a cycle worktree must read
-// the run's OWN state. linkGuardDeps therefore points the worktree's
-// .evolve/cycle-state.json symlink at the run workspace's run.json (the
-// WriteCycleState dual-write mirror), NOT at the host-global
-// cycle-state.json — the global file holds whichever concurrent run wrote
-// last. state.json and ledger.jsonl stay host-global: the per-run events
-// ledger is CC.1; retargeting the ledger link before it exists would have
-// the chain guard verifying an empty file (a vacuous pass).
-
 import (
 	"encoding/json"
 	"os"
@@ -92,7 +83,7 @@ func TestGitWorktree_GuardStateIsRunScoped(t *testing.T) {
 		t.Errorf("worktree guard state = cycle %d phase %q; want own run (cycle 77 phase \"build\") — global state leaked in", cs.CycleID, cs.Phase)
 	}
 
-	// state.json + ledger.jsonl stay host-global until CC.1 (per-run events).
+	// state.json and ledger.jsonl stay host-global.
 	for _, f := range []string{"state.json", "ledger.jsonl"} {
 		got, err := os.Readlink(filepath.Join(wt, ".evolve", f))
 		if err != nil {

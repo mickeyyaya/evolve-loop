@@ -1,19 +1,6 @@
 // Package flagregistry is the declarative SSOT for every EVOLVE_* control
-// flag across all reader surfaces (Go production code, Go test seams, and
-// the bash skill/agent/commit-gate surface). It exists to end the
-// 252-actual-vs-93-documented drift (L2, concurrency-factory plan):
-// `evolve flags generate` projects the registry into the marker region of
-// docs/architecture/control-flags.md and `evolve flags check` fails on
-// drift, so a flag can no longer ship undocumented.
-//
-// Metadata ONLY — the registry never funnels env reads through config.Load:
-// subprocess-reads-env is a deliberate architecture property (the bridge
-// subprocess and bash adapters read their own env).
-//
-// registry_table.go (the data) was seeded mechanically from the 2026-06-11
-// inventory (grep over go/ + agents/ + skills/ + commit-gate/ + legacy/ +
-// control-flags.md) and is maintained by hand from then on — add a row when
-// you add a flag; the drift test (L2.3) catches omissions.
+// flag across every reader surface — Go, Go tests, and the bash adapters.
+// See docs/architecture/packages/internal-flagregistry.md.
 package flagregistry
 
 import (
@@ -26,24 +13,20 @@ import (
 type Status string
 
 const (
-	// StatusActive — read in production code and operator-facing; do not
-	// remove without a deprecation window.
+	// StatusActive is read in production and operator-facing; do not remove it without a deprecation window.
 	StatusActive Status = "active"
-	// StatusDeprecated — still honored (often via a bridge that maps it to
-	// its replacement) but emits a WARN; scheduled for removal.
+	// StatusDeprecated is still honored, often via a bridge to its replacement, but emits a WARN; scheduled for removal.
 	StatusDeprecated Status = "deprecated"
-	// StatusDead — no reader on any surface; safe to delete mentions.
+	// StatusDead has no reader on any surface; safe to delete its mentions.
 	StatusDead Status = "dead"
-	// StatusInternal — read by production code but set by the runner itself
-	// (subprocess injection / plumbing); not an operator dial.
+	// StatusInternal is read by production code but set by the runner itself (subprocess injection or plumbing), not an operator dial.
 	StatusInternal Status = "internal"
-	// StatusTestSeam — read only by _test.go files; never set in production.
+	// StatusTestSeam is read only by _test.go files; never set in production.
 	StatusTestSeam Status = "test-seam"
 )
 
-// Flag is one registry row. Kind/Default are optional metadata (empty =
-// unspecified); Cluster mirrors the control-flags.md section the flag is
-// documented under.
+// Flag is one registry row; Kind and Default are optional metadata, and
+// Cluster mirrors the control-flags.md section the flag is documented under.
 type Flag struct {
 	Name       string
 	Status     Status
@@ -55,12 +38,8 @@ type Flag struct {
 	RemoveIn   string
 }
 
-// ClusterCoreInfra marks the irreducible process-config flags — writable /
-// read-only roots and test-harness mode — that are NOT operator feature dials
-// and are never consolidated away. The flag-reduction campaign metric
-// (LiveFeatureFlags) excludes them: driving them to zero is neither possible
-// nor desirable. Keep this string identical to the Cluster value on those rows;
-// TestIsCoreInfra_ClusterMarkerConstMatchesData guards the two against drift.
+// ClusterCoreInfra marks flags that are process configuration, not operator
+// feature dials; LiveFeatureFlags excludes them.
 const ClusterCoreInfra = "Core Infrastructure (never consolidate)"
 
 // IsCoreInfra reports whether f is an irreducible core-infrastructure flag
@@ -69,13 +48,7 @@ func IsCoreInfra(f Flag) bool { return f.Cluster == ClusterCoreInfra }
 
 // LiveFeatureFlags returns the operator-facing feature flags still read in
 // production: StatusActive minus core-infrastructure. This is the SSOT metric
-// the flag-reduction campaign drives toward zero (no_feature_flags goal —
-// cross-component behavior belongs in policy.json/DI/Strategy, not an env dial).
-//
-// Deprecated / internal / test-seam / dead rows are excluded: deprecating a flag
-// removes its live os.Getenv reader, so the row no longer counts toward the
-// metric even though its tombstone remains in All for back-compat documentation.
-// The result preserves All's by-Name sort.
+// the flag-reduction campaign drives toward zero (the no_feature_flags goal).
 func LiveFeatureFlags() []Flag {
 	out := make([]Flag, 0, len(All))
 	for _, f := range All {
@@ -96,8 +69,7 @@ func Lookup(name string) (Flag, bool) {
 }
 
 // RenderIndex renders the full registry as the markdown table projected
-// into control-flags.md's generated marker region. Deterministic: All is
-// sorted and the renderer is pure.
+// into control-flags.md's generated marker region.
 func RenderIndex() string {
 	var b strings.Builder
 	b.WriteString("Complete flag index — generated from `go/internal/flagregistry` (SSOT). Edit the registry, then run `evolve flags generate`; do not edit this table by hand.\n\n")
@@ -110,8 +82,6 @@ func RenderIndex() string {
 	return b.String()
 }
 
-// cell makes one table cell GFM-safe (pipes escaped, newlines collapsed);
-// empty renders as an em-dash.
 func cell(s string) string {
 	if s == "" {
 		return "—"
@@ -120,8 +90,6 @@ func cell(s string) string {
 	return strings.ReplaceAll(s, "\n", " ")
 }
 
-// renderDoc folds ReplacedBy/RemoveIn into the purpose column and keeps the
-// cell table-safe.
 func renderDoc(f Flag) string {
 	doc := f.Doc
 	if f.ReplacedBy != "" {

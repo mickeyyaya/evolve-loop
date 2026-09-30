@@ -1,14 +1,5 @@
 package core
 
-// verdict_distinguisher_test.go — cycle-1054/1060 pin: two DIFFERENT tasks'
-// agent-graded audit FAILs shared one fingerprint because the verdict-path
-// fallback reason was a constant string — three would falsely trip the
-// identical-fingerprint breaker rule. The fallback must fold in per-failure
-// content that is STABLE across recurrences of the same defect (task ids,
-// report defect head) but differs across different defects. Cycle numbers are
-// deliberately excluded — they would make every fingerprint unique and blind
-// the breaker to real repeats.
-
 import (
 	"os"
 	"path/filepath"

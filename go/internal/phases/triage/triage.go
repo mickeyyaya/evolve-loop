@@ -1,16 +1,7 @@
-// Package triage implements the cycle-scope task-selection phase. The
-// phase boilerplate lives in internal/phases/runner; this file only
-// encodes triage-specific variation points.
-//
-// Skip semantics (Skipper interface):
-//   - EVOLVE_TRIAGE_DISABLE=1 → SKIPPED, NextPhase=tdd, no bridge call
-//
-// Verdict mapping:
-//   - empty artifact → FAIL
-//   - missing "## top_n" heading → FAIL
-//   - empty "## top_n" plus explicit triage-decision.json top_n:[] → PASS
-//   - "## top_n" with no items and no explicit empty decision → FAIL
-//   - "## top_n" with ≥1 list item → PASS
+// Package triage implements the cycle-scope task-selection phase. The phase
+// boilerplate lives in internal/phases/runner; this file only encodes
+// triage-specific variation points. See
+// docs/architecture/packages/internal-phases-triage.md.
 package triage
 
 import (
@@ -57,10 +48,8 @@ func (hooks) AgentPromptName() string                     { return "evolve-triag
 func (hooks) ArtifactFilename(_ core.PhaseRequest) string { return "triage-report.md" }
 func (hooks) DefaultModel() string                        { return "auto" }
 
-// ShouldSkip delegates the enable/skip decision to the central PhasePolicy
-// (config.Load is the sole reader of EVOLVE_TRIAGE_DISABLE), instead of
-// reading the env flag literal here. Legacy posture preserved: triage runs
-// unless disabled.
+// ShouldSkip delegates to the central PhasePolicy (config.Load reads
+// EVOLVE_TRIAGE_DISABLE) rather than reading the env flag here.
 func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Diagnostic) {
 	if router.PolicyForProject(req.ProjectRoot, req.Env).ShouldRunPhase(string(core.PhaseTriage)) {
 		return false, "", "", nil
@@ -71,8 +60,6 @@ func (hooks) ShouldSkip(req core.PhaseRequest) (bool, string, string, []core.Dia
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
-	// ADR-0050 §3.10 Slice 2: typed envelope at enforce, legacy Context below it
-	// (byte-identical — Active() is false unless enforce).
 	carryover := req.Context["carryover_summary"]
 	if req.Input.Active() {
 		carryover = req.Input.CycleInputs().Carryover()
@@ -80,65 +67,24 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if carryover != "" {
 		fmt.Fprintf(&b, "- carryover_summary: %s\n", carryover)
 	}
-	// ADR-0049 E: under `evolve fleet --plan` this cycle is one of several running
-	// concurrently, each assigned a DISJOINT set of tasks. Steer selection to ONLY
-	// the assigned ids so two cycles never pick work touching the same files.
-	// Resolution + control-char sanitization live in runner.LaneScope (shared
-	// with scout/build/tdd since cycle-776).
 	if scope := runner.LaneScope(req); scope != "" {
 		fmt.Fprintf(&b, "- fleet_scope: this is one of several concurrent cycles; select ONLY tasks whose id is in this assigned set, ignore all others: %s\n", scope)
 	}
-	// Chronicle S3 (digest stage=enforce): the orchestrator seeds
-	// Context["recent_outcomes"] with the recent-outcomes digest at cycle
-	// start. Appended AFTER the stable prefix lines (cache-friendly ordering);
-	// absent/empty key keeps the prompt byte-identical (shadow/off pin).
 	if ro := req.Context["recent_outcomes"]; ro != "" {
 		fmt.Fprintf(&b, "- recent_outcomes: %s\n", ro)
 	}
-	// ADR-0099 slice 2: the project's default deliverable kind (.evolve/domain.json).
-	// Triage's `deliverable_kind:` header is the AUTHORITATIVE kind, so triage
-	// must see the default a task inherits when it declares none.
 	if kind := req.Context[core.CtxKeyDeliverableKindDefault]; kind != "" {
 		fmt.Fprintf(&b, "- deliverable_kind_default: %s\n", kind)
 	}
 	if root := req.Context[core.CtxKeyDeliverableRoot]; root != "" {
 		fmt.Fprintf(&b, "- deliverable_root: %s\n", root)
 	}
-	// Inbox batch classifier (2026-07-16): one-item-per-cycle consumption pays
-	// the full pipeline per item, so internal/inboxbatch DETERMINISTICALLY
-	// groups the backlog by campaign / package area / explicit links (Core
-	// Rule 5 — grouping is mechanical Go; only the PICK stays LLM judgment).
-	// Rendered last (the section varies as items land — keeps the stable
-	// prefix cache-friendly); an empty/missing/unreadable inbox keeps the
-	// prompt byte-identical (fail-open: a broken backlog must not block
-	// triage, which still reads the inbox directly).
 	if section := inboxBatchesSection(req.ProjectRoot, h.forbidden); section != "" {
 		b.WriteString(section)
 	}
-	// F40 (cycle 1691): the drift since each fleet-scoped item was filed, so a
-	// stale premise is dropped here rather than built. Lane-only (a sequential
-	// cycle stays byte-identical); bounded and fail-open (premise_drift.go).
 	if section := premiseDriftSection(context.Background(), req.ProjectRoot, runner.LaneScope(req)); section != "" {
 		b.WriteString(section)
 	}
-	// Carry-forward candidate filter (cycle 1325, inbox item
-	// scout-carryforward-real-cherrypick-filter): cycle-962 built a
-	// deterministic, zero-LLM landability screen
-	// (core.CarryforwardCandidateLandable) but never wired it into triage's
-	// own candidate-selection path, leaving it a second, uninvoked oracle
-	// while the LLM kept picking from raw `git merge-tree`'s 1-arg
-	// non-3-way form (cycle-826: mis-selected an already-superseded orphan).
-	// Rendered last for the same reason as inbox_batches; "main" matches
-	// the base every other production caller of the carryforward filter
-	// family uses (ClassifyFleetRebaseCandidate call sites).
-	//
-	// Bounded (cycle-1356, closing inherited defect d803ddb6 — a prior
-	// cycle-1343 disposition claimed this was already bounded; it was not):
-	// context.Background() would let one slow/hung `git merge-tree` per
-	// branch stall prompt composition on triage's critical path
-	// indefinitely, so the call is wrapped in a deadline sized for the
-	// worst case the section itself caps (carryforwardCandidatesMaxBranches
-	// branches probed at a few hundred ms of git subprocess work each).
 	ctx, cancel := context.WithTimeout(context.Background(), carryforwardCandidatesTimeout)
 	defer cancel()
 	if section := CarryforwardCandidatesSection(ctx, req.ProjectRoot, "main"); section != "" {
@@ -147,36 +93,13 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-// carryforwardCandidatesTimeout bounds the context ComposePrompt hands
-// CarryforwardCandidatesSection — sized for carryforwardCandidatesMaxBranches
-// branches at a few hundred ms of `git merge-tree` work each (cycle-1356,
-// closing inherited defect d803ddb6: this advisory section must never stall
-// triage's critical path on an unbounded git subprocess sweep).
 const carryforwardCandidatesTimeout = 8 * time.Second
 
-// carryforwardCandidatesMaxBranches caps how many local cycle-* branches
-// CarryforwardCandidatesSection probes with core.CarryforwardCandidateLandable
-// (each probe is a real `git merge-tree` dry-run — not free). Branches are
-// examined newest-committed-first so the cap drops the stalest candidates,
-// never the freshest (sibling inboxBatchesSection caps via
-// inboxbatch.DefaultMaxItems for the same reason: an uncapped local sweep
-// grows linearly with the branch set and was measured at 150+ branches /
-// 10s+ of blocking git work — cycle-1343 defect dba64c28 / d803ddb6).
 const carryforwardCandidatesMaxBranches = 40
 
 // CarryforwardCandidatesSection renders the deterministic carry-forward
-// candidate list for the triage prompt: the local `cycle-*` branches in dir
-// that core.CarryforwardCandidateLandable reports landable onto base (a real
-// 3-way merge dry-run, not already superseded) — the exact cycle-962 filter
-// left uninvoked. Fail-open like inboxBatchesSection: an unresolved dir/base,
-// a git-infrastructure error, or zero landable candidates all render "",
-// never blocking triage (which still runs its own selection independently).
-//
-// Bounded (cycle-1356): branches are listed newest-committed-first and
-// probing stops after carryforwardCandidatesMaxBranches — truncation is
-// surfaced via a trailing "(partial: N of M branches probed)" line, never
-// silent, so an operator/auditor can tell the list is incomplete without
-// re-deriving the branch count by hand.
+// candidate list for the triage prompt: local cycle-* branches under dir
+// landable onto base, fail-open to "" on any error or when none qualify.
 func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string {
 	if dir == "" || base == "" {
 		return ""
@@ -280,7 +203,6 @@ func dependencyBlockedNote(reasons []string) string {
 		len(reasons), strings.Join(reasons, "; "))
 }
 
-// protectedSurfaceFragments lists the manifest's fragments as the prompt names them.
 func protectedSurfaceFragments() []string {
 	out := make([]string, 0, len(guards.ProtectedSurfaceManifest))
 	for _, e := range guards.ProtectedSurfaceManifest {
@@ -290,7 +212,6 @@ func protectedSurfaceFragments() []string {
 }
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
-	// EvaluateClassify handles the empty-artifact and section-presence checks.
 	verdict, diags := specrunner.EvaluateClassify(artifact, &phasespec.ClassifyRules{
 		RequireSections: []string{phasecontract.Triage.Sections[0].Canonical},
 		FailIfEmpty:     true,
@@ -306,9 +227,6 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			return core.VerdictPASS, nil, string(core.PhaseTDD)
 		}
 	}
-	// A missing section or an uncorroborated empty report is incomplete. The
-	// decision sidecar must contain an explicit JSON array; router.Digest keeps
-	// null, malformed, and missing commitments unknown.
 	if !hasSection || !listItemRE.MatchString(body) {
 		return core.VerdictFAIL, []core.Diagnostic{{
 			Severity: "error",
@@ -316,8 +234,6 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 			Code:     cyclestate.DiagCodeTriageTopNEmpty,
 		}}, string(core.PhaseTDD)
 	}
-	// The prompt partition sees only inbox items, but a top_n card can come from the scout or a
-	// fleet todo, so every card's files are judged again here with the lane predicate.
 	if cards := protectedTopNCards(body, h.forbidden); len(cards) > 0 {
 		if err := routeProtectedCards(filepath.Join(req.Workspace, "triage-decision.json"), cards, boundItems(req.Workspace)); err != nil {
 			return core.VerdictFAIL, []core.Diagnostic{{
@@ -341,9 +257,8 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	return core.VerdictPASS, append(diags, unifiedDiags...), string(core.PhaseTDD)
 }
 
-// topNSectionBody returns the ## top_n section content (everything after the
-// heading up to the next "## " heading or end of artifact), or ok=false when
-// no "## top_n" heading is present. trimmed must already be whitespace-trimmed.
+// topNSectionBody returns the ## top_n section body, or ok=false when the
+// heading is absent. trimmed must already be whitespace-trimmed.
 func topNSectionBody(trimmed string) (body string, ok bool) {
 	loc := topNHeadingRE.FindStringIndex(trimmed)
 	if loc == nil {
@@ -357,33 +272,28 @@ func topNSectionBody(trimmed string) (body string, ok bool) {
 }
 
 // topNItemIDRE captures the id token of a "- id: description ..." top_n list
-// item (the same id shape triage-report.md's real output and every existing
-// fixture use).
+// item — the shape triage-report.md's real output uses.
 var topNItemIDRE = regexp.MustCompile(`(?m)^[-*]\s+([^:\n]+):`)
 
-// filesFieldRE matches a top_n card's files= field in either the brace-
-// delimited encoding inboxbatch.RenderMarkdown emits (files={a;b;c}) or the
-// bare, comma-terminated encoding real cycle output also uses (files=a;b;c).
 var filesFieldRE = regexp.MustCompile(`files=(?:\{([^}]*)\}|([^,\n]*))`)
 
-// Config holds the dependencies for constructing a triage Phase: the bridge
-// used to dispatch the agent, the prompt loader, an optional clock, and the
-// PhaseIO stage.
+// Config holds the dependencies for constructing a triage Phase.
 type Config struct {
 	Bridge  core.Bridge
 	Prompts *prompts.Loader
 	// ContractVerifier is the deliverables gate's verifier accessor for the
-	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
-	// and engine (research F22). nil = the catalog-aware default.
+	// verdict engine (runner.Options.ContractVerifier); nil uses the
+	// catalog-aware default.
 	ContractVerifier func() runner.ContractVerifier
 	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
-	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung (ADR-0050
-	// §3.10 Slice 1). Zero value (StageOff) = byte-identical.
+	// PhaseIO threads the EVOLVE_PHASE_IO stage into the reconcile rung; the
+	// zero value (StageOff) is byte-identical.
+	// See ADR-0050.
 	PhaseIO config.Stage
-	// CompactPrompts strips the on-demand reference tail from the disk-loaded agent
-	// doc before dispatch. Value flows from workflow.compact_prompts (policy.json);
-	// never set to a bare literal here (standing rule: phase-settings-from-config).
+	// CompactPrompts strips the on-demand reference tail from the disk-loaded
+	// agent doc before dispatch; it flows from workflow.compact_prompts
+	// (policy.json), never a literal here.
 	CompactPrompts bool
 	// LaneForbidden marks the declared paths no lane can change; nil judges protected surface only.
 	LaneForbidden func(string) bool

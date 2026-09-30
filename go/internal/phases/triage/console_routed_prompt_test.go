@@ -1,10 +1,5 @@
 package triage
 
-// console_routed_prompt_test.go — RED contract for ADR-0074 I1 at the
-// visibility seam: a console-routed inbox item must not be OFFERED to lane
-// triage at all (an LLM cannot mis-pick what it never sees), and the exclusion
-// must be loud in the prompt so triage knows operator-owned work exists.
-
 import (
 	"strings"
 	"testing"
@@ -13,8 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
-// Explicitly routed items disappear from the batch section and surface only in
-// the console_routed exclusion note.
 func TestTriageComposePrompt_ExcludesConsoleRoutedItems(t *testing.T) {
 	root := t.TempDir()
 	writeInboxItem(t, root, "a.json", `{"id":"lane-work","weight":0.9,"campaign":"camp-x"}`)
@@ -35,10 +28,8 @@ func TestTriageComposePrompt_ExcludesConsoleRoutedItems(t *testing.T) {
 	}
 }
 
-// Derived exclusion uses the REAL guards predicate — pins that a protected
-// fix surface (role.go was cycle-1036's burn) auto-routes without any route
-// field. Guards-manifest membership is asserted first so a manifest change
-// surfaces here as a loud pin move, not a silent pass.
+// Guards-manifest membership is asserted first so a manifest change surfaces
+// as a loud pin move, not a silent pass.
 func TestTriageComposePrompt_ProtectedFixSurfaceAutoExcluded(t *testing.T) {
 	if !guards.IsProtectedSurface("go/internal/guards/role.go") {
 		t.Fatal("pin moved: go/internal/guards/role.go no longer on ProtectedSurfaceManifest — update this test AND the routing rationale")
@@ -53,7 +44,6 @@ func TestTriageComposePrompt_ProtectedFixSurfaceAutoExcluded(t *testing.T) {
 	}
 }
 
-// The empty-inbox byte-identity pin must survive the partition wiring.
 func TestTriageComposePrompt_PartitionKeepsEmptyInboxByteIdentity(t *testing.T) {
 	root := t.TempDir()
 	req := core.PhaseRequest{ProjectRoot: root}

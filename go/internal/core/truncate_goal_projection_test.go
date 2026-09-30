@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
-// ADR-0103 unit 04: truncateGoal and maxGoalTextChars are CONSUMERS of the
-// advisor's cap — the judge's goal section and the task-recall digest render
-// the advisor's bound with textcap's rule, so neither core facade can silently
-// re-implement either.
 func TestTruncateGoal_ProjectsTheAdvisorCap(t *testing.T) {
 	long := strings.Repeat("g", maxGoalTextChars+7)
 	if got, want := truncateGoal("  "+long+"  "), advisor.TruncateGoal(long); got != want {

@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// Observer and inactivity tuning moved to policy.ObserverPolicy. Keeping any
-// of the retired names in the registry would recreate a second configuration
-// surface.
 func TestAmplify_ObserverInactivityFlagsRetired(t *testing.T) {
 	for _, name := range []string{
 		"EVOLVE_INACTIVITY_DISABLE",
@@ -30,8 +27,6 @@ func TestAmplify_ObserverInactivityFlagsRetired(t *testing.T) {
 	}
 }
 
-// Future observer flags that are deliberately registered must retain cluster
-// metadata for generated documentation.
 func TestAmplify_AllActiveObserverFlagsHaveCluster(t *testing.T) {
 	for _, f := range All {
 		if !strings.Contains(f.Name, "OBSERVER") || f.Status != StatusActive {

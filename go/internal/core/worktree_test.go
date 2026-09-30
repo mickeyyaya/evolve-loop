@@ -45,20 +45,9 @@ func chdirTempNonGit(t *testing.T) string {
 	return dir
 }
 
-// TestGitWorktree_RelativeBaseRefused: a RELATIVE EVOLVE_WORKTREE_BASE must
-// be refused with an "absolute" error BEFORE any MkdirAll/git runs, so a
-// relative base can never silently create worktree dirs under the cwd.
-// Mirrors the swarm/provision.go addWorktree guard added in cycle 294.
-//
-// RED today: gitWorktree.Create has no IsAbs guard — it MkdirAll's the
-// relative base and then `git -C <root> worktree add` fails with a *git*
-// message that does NOT mention "absolute", so the discriminating
-// assertion fails.
 func TestGitWorktree_RelativeBaseRefused(t *testing.T) {
 	chdirTempNonGit(t)
-	const relBase = "relative-base-probe" // relative → the bug class
-	// base override (policy.json worktree.base) injected via the struct field —
-	// the EVOLVE_WORKTREE_BASE env read was removed (flag-reduction, ADR-0064).
+	const relBase = "relative-base-probe"
 	g := gitWorktree{baseOverride: relBase}
 	wt, err := g.Create(".", 1)
 	if err == nil {
@@ -67,20 +56,11 @@ func TestGitWorktree_RelativeBaseRefused(t *testing.T) {
 	if !strings.Contains(strings.ToLower(err.Error()), "absolute") {
 		t.Errorf("RED: guard absent — error %q does not indicate the worktree base must be absolute", err.Error())
 	}
-	// No filesystem side effect: the guard must fire before MkdirAll, so the
-	// relative base dir must not exist under the (temp) cwd.
 	if _, statErr := os.Stat(relBase); !errors.Is(statErr, os.ErrNotExist) {
 		t.Errorf("RED: relative base dir %q was created (stat err=%v) — guard did not fire before MkdirAll", relBase, statErr)
 	}
 }
 
-// TestGitWorktree_RelativeProjectRootRefused: with EVOLVE_WORKTREE_BASE
-// unset and a relative projectRoot, base = "<root>/.evolve/worktrees" is
-// itself relative and must also be refused. This is the live-default path
-// (no env override) and the one that silently created dirs in the cwd.
-//
-// RED today: no guard → MkdirAll(".evolve/worktrees") then a git error
-// lacking "absolute".
 func TestGitWorktree_RelativeProjectRootRefused(t *testing.T) {
 	chdirTempNonGit(t)
 	// No base override → base() falls back to <root>/.evolve/worktrees.
@@ -118,9 +98,6 @@ func (f *fakeWorktree) Cleanup(_, worktree string) error {
 	return nil
 }
 
-// TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases proves the fix: the
-// orchestrator provisions a worktree once per cycle, passes it as cwd to the
-// source-writing phases (tdd, build) only, and cleans it up on exit.
 func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 9}} // cycle 10
 	led := &fakeLedger{}
@@ -139,10 +116,6 @@ func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 		t.Fatalf("Cleanup = %v, want [/tmp/wt/cycle-10]", wt.cleaned)
 	}
 
-	// Post-CB.1: EVERY phase runs with cwd=worktree — source writers so their
-	// edits land where the role-gate permits, audit so its verification
-	// commands inspect the builder's pending work (issue #9), and the
-	// read-only spine so no phase subprocess has the live main tree as cwd.
 	for _, p := range []Phase{PhaseTDD, PhaseBuild, PhaseAudit, PhaseScout, PhaseTriage} {
 		fr := runners[p].(*fakeRunner)
 		if len(fr.requests) == 0 {
@@ -154,10 +127,6 @@ func TestOrchestrator_ProvisionsWorktree_PassesToSourcePhases(t *testing.T) {
 	}
 }
 
-// TestOrchestrator_WorktreeProvisionFailure_BestEffort proves provisioning is
-// best-effort: on Create failure the cycle still runs, no Worktree is passed
-// (source phases will be role-gate-denied — loud, not silent), and Cleanup is
-// not called for a worktree that was never created.
 func TestOrchestrator_WorktreeProvisionFailure_BestEffort(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}

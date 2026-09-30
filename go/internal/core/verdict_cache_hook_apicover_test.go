@@ -7,12 +7,9 @@ import (
 )
 
 // TestWithVerdictCacheLookupHook_AppliesObserver names AND executes
-// WithVerdictCacheLookupHook in the DEFAULT (untagged) build. The option's only
-// other users are `integration`-tagged tests, so the repo-wide apicover gate
-// (ADR-0069) scored it FALSE-GREEN — named by a test but 0% executed. This test
-// applies the returned Option to an Orchestrator and drives the installed hook,
-// pinning that the option actually reaches o.verdictCacheLookupHook, the field
-// the pre-loop shadow probe calls (orchestrator.go).
+// WithVerdictCacheLookupHook in the default (untagged) build: the option's
+// other users are all integration-tagged, so the repo-wide apicover gate would
+// otherwise score it false-green (named by a test but never executed).
 func TestWithVerdictCacheLookupHook_AppliesObserver(t *testing.T) {
 	var o Orchestrator
 	if o.verdictCacheLookupHook != nil {

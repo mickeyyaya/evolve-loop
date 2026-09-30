@@ -2,15 +2,6 @@ package core
 
 import "testing"
 
-// transition_oracle_test.go — the byte-identity ORACLE for the transition kernel
-// (ADR-0058). It FREEZES the current behavior of NewStateMachine().Next and
-// CanTransition, captured from HEAD (main abf787ff, 2026-06-21), so every
-// subsequent slice that makes the kernel config-driven can prove it changed
-// NOTHING observable. This is the trust anchor for the phase-agnostic-flow
-// refactor: it MUST stay byte-identical green across S0..S7. A diff here is a
-// behavior change in the integrity-floor transition logic and must be
-// deliberate, reviewed, and re-frozen — never silently.
-
 // oracleCell is one frozen Next() outcome: the successor phase and the exact
 // error string ("" means nil error).
 type oracleCell struct {
@@ -65,20 +56,11 @@ var legalityGolden = map[Phase][]Phase{
 	PhaseTDD:          {PhaseBuildPlanner, PhaseBuild},
 	PhaseBuildPlanner: {PhaseBuild},
 	PhaseBuild:        {PhaseAudit},
-	// DELIBERATE WIDENING (retry + retro redesign, 2026-08-28). PhaseTDD and
-	// PhaseBuild are the audit-FAIL re-entry edges: a TASK-level rejection — per
-	// the ADR-0072 failure_policy category table, which has always declared
-	// code-audit-fail as {task, retry-with-fix, MaxRetries: 2} — re-enters the dev
-	// cycle in the SAME cycle instead of tearing it down. Reachable only through
-	// decideAfterAuditFail, which evaluates the deterministic floor FIRST, so a
-	// floor category halts before either edge is offered. This anchor is
-	// config-independent on purpose: widening it must be an explicit edit like
-	// this one, never a side effect of a config change.
-	PhaseAudit:    {PhaseShip, PhaseRetro, PhaseTDD, PhaseBuild},
-	PhaseRetro:    {PhaseShip, PhaseTDD, PhaseEnd, PhaseAudit},
-	PhaseShip:     {PhaseEnd, PhaseDebugger, PhaseAudit, PhaseBuild, PhaseTDD, PhaseShip},
-	PhaseDebugger: {PhaseShip, PhaseAudit, PhaseBuild, PhaseTDD, PhaseEnd},
-	PhaseEnd:      {},
+	PhaseAudit:        {PhaseShip, PhaseRetro, PhaseTDD, PhaseBuild},
+	PhaseRetro:        {PhaseShip, PhaseTDD, PhaseEnd, PhaseAudit},
+	PhaseShip:         {PhaseEnd, PhaseDebugger, PhaseAudit, PhaseBuild, PhaseTDD, PhaseShip},
+	PhaseDebugger:     {PhaseShip, PhaseAudit, PhaseBuild, PhaseTDD, PhaseEnd},
+	PhaseEnd:          {},
 }
 
 func assertNextCell(t *testing.T, p Phase, v string, want oracleCell) {
@@ -96,8 +78,6 @@ func assertNextCell(t *testing.T, p Phase, v string, want oracleCell) {
 	}
 }
 
-// TestTransitionKernelOracle_Next freezes every Next(phase,verdict) outcome
-// (successor phase + verbatim error string) over the full cross product.
 func TestTransitionKernelOracle_Next(t *testing.T) {
 	t.Parallel()
 	for p, want := range nextGoldenLinear {
@@ -114,8 +94,6 @@ func TestTransitionKernelOracle_Next(t *testing.T) {
 	}
 }
 
-// TestTransitionKernelOracle_Legality freezes CanTransition over the full
-// Phase×Phase matrix — proves the legality graph stays byte-untouched.
 func TestTransitionKernelOracle_Legality(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()

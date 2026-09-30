@@ -8,29 +8,12 @@ import (
 	"sort"
 )
 
-// worktree_clean.go — clean-HEAD assertion for REUSED per-cycle worktrees.
-//
-// Cycle-653 incident (fix of record = the cycle-584 lesson's prescribed gate,
-// never landed until now): a reused worktree carried a prior failed attempt's
-// uncommitted orphan RED test; ship binds the whole `git diff HEAD` tree, so
-// the inherited dirt fails (or ships) the cycle regardless of any phase's
-// notion of scope — cycle 653 would have PASSed in isolation. Family:
-// cycle-24, -93, -365, -584, -645, -653.
-//
-// Policy (single mechanism, applied only on the gitWorktree.Create REUSE
-// branch — a fresh `worktree add ... HEAD` is clean by construction, and the
-// resume path (RunCycleFromPhase) never calls Create, so preserved mid-cycle
-// work is untouched): dirty paths are MOVED to a per-cycle quarantine dir for
-// salvage (never deleted), then the worktree is hard-reset to HEAD. Fail-loud:
-// any quarantine/reset failure aborts provisioning rather than handing a
-// dirty worktree to the cycle.
 // minimal: the inbox item's alternative "cut a fresh worktree instead" mode is
 // deliberately not implemented — quarantine+reset satisfies every acceptance
 // criterion, and a config knob selecting between two equivalent outcomes would
 // be flag sprawl (no-feature-flags rule). Upgrade path: a policy.json
 // worktree.dirty block if a second behavior is ever genuinely needed.
 
-// quarantineDir is where a cycle's evicted worktree dirt is preserved.
 func quarantineDir(projectRoot string, cycle int) string {
 	return filepath.Join(projectRoot, ".evolve", "quarantine", fmt.Sprintf("cycle-%d", cycle))
 }

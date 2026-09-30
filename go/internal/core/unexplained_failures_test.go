@@ -1,15 +1,5 @@
 package core
 
-// Cycle-1044/1045/1047 (batch-6 live-fire): three DIFFERENT failures each
-// wrote no failure-reason artifact, collapsed to the identical empty-evidence
-// fingerprint "|unknown|e30d…", and tripped the identical-fingerprint breaker
-// rule with a wrong diagnosis. Two contracts pinned here:
-//  (1) every retro path supplies fallback evidence, so distinct failures get
-//      DISTINCT fingerprints (the F8 principle: a failure mode must emit its
-//      reason into an artifact);
-//  (2) the breaker names the degenerate empty-evidence case honestly as an
-//      unexplained-failures diagnosability halt, never "identical defects".
-
 import (
 	"encoding/json"
 	"os"

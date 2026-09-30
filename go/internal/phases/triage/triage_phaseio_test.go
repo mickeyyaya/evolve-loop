@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// ADR-0050 §3.10 Slice 2: triage reads carryover_summary + fleet_scope from the
-// typed envelope at enforce (req.Input.Active()) and the legacy Context below it.
-
 func TestTriage_ComposePrompt_TypedEqualsMap(t *testing.T) {
 	const carry, scope = "carried: finish the digest fallback", "id-1,id-2"
 	ctx := map[string]string{"carryover_summary": carry, "fleet_scope": scope}
@@ -29,8 +26,6 @@ func TestTriage_ComposePrompt_TypedEqualsMap(t *testing.T) {
 	}
 }
 
-// At enforce both fields come from the typed envelope even with no Context (proves
-// the typed source is consulted); fleet_scope keeps the sanitize wrapping.
 func TestTriage_ComposePrompt_EnforceReadsTyped(t *testing.T) {
 	req := core.PhaseRequest{
 		Input: phaseio.NewPhaseInput(phaseio.PhaseInputInit{
@@ -42,8 +37,8 @@ func TestTriage_ComposePrompt_EnforceReadsTyped(t *testing.T) {
 	if !strings.Contains(got, "- carryover_summary: C-typed") {
 		t.Errorf("carryover not read from typed envelope: %q", got)
 	}
-	// Tie the value to the fleet_scope bullet's rendered tail so the assertion can
-	// only pass if id-9 flowed through the fleet_scope path (not some other bullet).
+	// Asserts against the fleet_scope bullet's tail so the check only passes
+	// if id-9 came through fleet_scope.
 	if !strings.Contains(got, "ignore all others: id-9") {
 		t.Errorf("fleet_scope not read from typed envelope: %q", got)
 	}

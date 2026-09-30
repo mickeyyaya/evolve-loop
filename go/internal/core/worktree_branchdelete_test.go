@@ -6,13 +6,6 @@ import (
 	"testing"
 )
 
-// worktree_branchdelete_test.go — RED tests for S3 (workspace-hygiene-2026-07
-// plan): gitWorktree.Cleanup must delete the cycle's own branch AFTER removing
-// its worktree, but only when merged (`git branch -d`, never `-D` — git's own
-// merged-check is the safety net, per the plan's stated design). Cleanup
-// currently only does `worktree remove --force` + RemoveAll — zero branch
-// deletion logic (verified live at worktree.go:147-159).
-//
 // Uses the gitCall/useFakeGit-style seam from git_seam_test.go (package core
 // cannot import test/fixtures.FakeExec — that would be an import cycle).
 
@@ -47,9 +40,6 @@ func useBranchDeleteFake(t *testing.T, f *branchDeleteFake) {
 	t.Cleanup(func() { gitRunner = orig })
 }
 
-// TestCleanup_DeletesMergedCycleBranch proves Cleanup deletes the cycle's own
-// branch (leaf name of the worktree path, the runscope invariant) AFTER the
-// worktree is removed, via a non-force `git branch -d` run in projectRoot.
 func TestCleanup_DeletesMergedCycleBranch(t *testing.T) {
 	f := &branchDeleteFake{branchDeleteRC: 0} // merged → -d succeeds
 	useBranchDeleteFake(t, f)
@@ -81,10 +71,6 @@ func TestCleanup_DeletesMergedCycleBranch(t *testing.T) {
 	}
 }
 
-// TestCleanup_UnmergedBranchSurvives_WarnsOnly proves an unmerged branch is
-// left alone: `git branch -d` refusing (rc=1) must NOT be escalated to a
-// force `-D`, and Cleanup must still return nil (best-effort, matches the
-// existing worktree-remove-failure contract).
 func TestCleanup_UnmergedBranchSurvives_WarnsOnly(t *testing.T) {
 	f := &branchDeleteFake{branchDeleteRC: 1} // unmerged → -d refuses
 	useBranchDeleteFake(t, f)

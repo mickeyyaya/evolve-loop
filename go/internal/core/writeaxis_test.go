@@ -1,13 +1,5 @@
 package core
 
-// writeaxis_test.go — PA-DDK DDK-7b (ADR-0060). The source-write axis (which
-// phases write into the cycle worktree) is now declared in the registry via
-// `writes_source`, with the WorktreePhase literal as the catalog-less floor for
-// the role-gate. This test pins that the two AGREE for every core phase — so the
-// config declaration and the security-boundary literal can never silently drift.
-// Rename-proof: it iterates whatever the loaded registry contains; no phase name
-// is hardcoded.
-
 import (
 	"testing"
 

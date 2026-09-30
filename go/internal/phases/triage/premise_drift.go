@@ -1,16 +1,5 @@
 package triage
 
-// premise_drift.go — F40 (cycle 1691). Lane 1691 committed an item filed
-// 2026-08-16 whose premise #535 had made unreachable on 2026-09-09; the builder
-// "fixed" a non-bug, opened a fail-open, and the audit caught it a full cycle
-// later. Six commits had touched the item's own declared files after it was
-// filed and #535 touched its package — evidence nothing put in front of
-// triage. The host gathers that drift here (Core Rule 5: the evidence is
-// mechanical, the judgment stays triage's), so a stale premise is dropped at
-// triage — where a drop ends a lane as planned no-work and hands the item to
-// the console (F30) — instead of costing a build, an audit and a repair round.
-// Drift is evidence to re-verify, not a verdict: most drifted items still hold.
-
 import (
 	"context"
 	"fmt"
@@ -25,8 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// The section is bounded like the carry-forward sweep: git work on triage's
-// critical path must never stall prompt composition.
+// Bounded like the carry-forward sweep: git work here must never stall
+// prompt composition.
 const (
 	premiseDriftMaxItems   = 5               // a lane's scope (one item, or a small menu); the cap guards a runaway scope
 	premiseDriftMaxCommits = 5               // declared-path commits listed per item (newest first)
@@ -39,16 +28,6 @@ const (
 // not be gathered — silence would read as "no drift".
 const premiseDriftUnavailable = "drift unavailable (git failed or timed out)\n"
 
-// premiseDriftSection renders, for each fleet-scoped inbox item, the evidence
-// a premise re-check needs: the commits since the item was filed that name its
-// id (a ship that consumed it lists the item's consumed file in its "## Actual
-// diff" footer — phases/ship/gitops.go), that touched its declared
-// paths, and — by subject — that touched only their packages, plus the
-// declared paths no longer at HEAD. The item is found wherever triage's claim
-// left it (the inbox root or a processing/ claim dir — inboxmover.Locate), so a
-// re-dispatched triage sees the same evidence. Fail-open like the sibling
-// sections: no scope, an unknown item or one with no filing date renders
-// nothing; a git failure renders a visible "drift unavailable" line.
 func premiseDriftSection(ctx context.Context, projectRoot, scope string) string {
 	ids := premiseDriftScope(scope)
 	if projectRoot == "" || len(ids) == 0 {
@@ -69,7 +48,6 @@ func premiseDriftSection(ctx context.Context, projectRoot, scope string) string 
 	return "- premise_drift: evidence to re-verify, not a verdict — the code these scoped items name has changed since they were filed. Most drifted items still hold: re-check each premise at HEAD before claiming it (Step 0b), and drop one only with cited evidence (`stale: <sha or file:line>`):\n" + lines.String()
 }
 
-// premiseDriftScope splits the lane's comma-separated scope into ids.
 func premiseDriftScope(scope string) []string {
 	var ids []string
 	for _, id := range strings.Split(scope, ",") {
@@ -80,7 +58,6 @@ func premiseDriftScope(scope string) []string {
 	return ids
 }
 
-// locateItem loads an inbox item wherever it is — the root or any claim dir.
 func locateItem(inboxDir, id string) (inboxbatch.Item, bool) {
 	loc, err := inboxmover.Locate(inboxDir, id)
 	if err != nil {
@@ -90,7 +67,6 @@ func locateItem(inboxDir, id string) (inboxbatch.Item, bool) {
 	return it, err == nil
 }
 
-// itemDrift is one item's drift bullet, or "" when it has none.
 func itemDrift(ctx context.Context, root string, it inboxbatch.Item) string {
 	since := it.FiledAt()
 	if since.IsZero() {
@@ -122,9 +98,6 @@ func itemDrift(ctx context.Context, root string, it inboxbatch.Item) string {
 	return head + strings.Join(parts, " | ") + "\n"
 }
 
-// declaredDrift is the declared-surface half of an item's drift: commits on
-// its declared paths, package-only commits beside them, and the declared paths
-// no longer at HEAD. ok is false when git failed or the deadline ran out.
 func declaredDrift(ctx context.Context, root string, since time.Time, declared []string) (parts []string, ok bool) {
 	onDeclared, ok := commitsSince(ctx, root, since, nil, declared)
 	if !ok {
@@ -154,9 +127,6 @@ func declaredDrift(ctx context.Context, root string, since time.Time, declared [
 
 type driftCommit struct{ hash, date, subject string }
 
-// commitsSince lists the commits since `since` (committer date — the one git's
-// --since filters on, and the one displayed) matching extra log arguments
-// and/or touching paths, newest first. ok is false on a git failure.
 func commitsSince(ctx context.Context, root string, since time.Time, extra, paths []string) ([]driftCommit, bool) {
 	args := append([]string{"log", "--since=" + since.UTC().Format(time.RFC3339), "--format=%h%x09%cd%x09%s", "--date=short"}, extra...)
 	if len(paths) > 0 {
@@ -177,7 +147,6 @@ func commitsSince(ctx context.Context, root string, since time.Time, extra, path
 	return commits, true
 }
 
-// listCommits renders up to limit commits, noting how many more there are.
 func listCommits(commits []driftCommit, limit int) string {
 	shown := make([]string, 0, limit+1)
 	for _, c := range commits[:min(len(commits), limit)] {
@@ -189,7 +158,6 @@ func listCommits(commits []driftCommit, limit int) string {
 	return strings.Join(shown, "; ")
 }
 
-// without returns the commits in all that are not in listed.
 func without(all, listed []driftCommit) []driftCommit {
 	seen := make(map[string]bool, len(listed))
 	for _, c := range listed {
@@ -204,11 +172,6 @@ func without(all, listed []driftCommit) []driftCommit {
 	return out
 }
 
-// repoPaths splits declared paths into clean repo-relative ones (queried) and
-// ones that escape the repository — absolute, or leading ".." once cleaned —
-// which are reported, never queried: git rejects an out-of-repo pathspec,
-// which would blank the whole item's evidence, and nothing outside the
-// repository is ever examined (go-review MAJOR).
 func repoPaths(declared []string) (inRepo, outside []string) {
 	for _, p := range declared {
 		c := path.Clean(p)
@@ -224,20 +187,10 @@ func repoPaths(declared []string) (inRepo, outside []string) {
 	return inRepo, outside
 }
 
-// idMentionPattern is the extended regex a commit message must match to NAME
-// the id: the id not glued to a longer word on either side, so "warn-gap"
-// never counts "warn-gap-v2" or "xwarn-gap" — while a stamped filename
-// ("...00Z-warn-gap.json") still matches. Ids are kebab-case; QuoteMeta keeps
-// any other character literal.
 func idMentionPattern(id string) string {
 	return `(^|[^a-z0-9])` + regexp.QuoteMeta(id) + `([^a-z0-9-]|$)`
 }
 
-// packageDirs are the directories holding the declared FILES — the recall aid
-// for an invalidating change beside the named file. A declared directory is
-// already queried as itself; a parent shallower than two segments ("go/",
-// "docs/") would put the whole tree's churn in front of triage, so it is
-// skipped.
 func packageDirs(declared []string) []string {
 	var dirs []string
 	seen := map[string]bool{}
@@ -255,11 +208,6 @@ func packageDirs(declared []string) []string {
 	return dirs
 }
 
-// vanishedAtHEAD are the (repo-relative) declared paths with no object in
-// HEAD's tree. It asks git (`cat-file -e HEAD:<path>`) — the same source the
-// log queries read — never the working tree's filesystem. ok is false when the
-// deadline cut the check short, so a timeout is never reported as a vanished
-// path.
 func vanishedAtHEAD(ctx context.Context, root string, declared []string) (gone []string, ok bool) {
 	head := exec.CommandContext(ctx, "git", "rev-parse", "--quiet", "--verify", "HEAD^{tree}")
 	head.Dir = root
@@ -279,8 +227,6 @@ func vanishedAtHEAD(ctx context.Context, root string, declared []string) (gone [
 	return gone, true
 }
 
-// promptSafe applies the one control-character rule (inboxbatch.StripControl)
-// and caps the text in runes.
 func promptSafe(s string) string {
 	s = inboxbatch.StripControl(s)
 	if r := []rune(s); len(r) > premiseDriftTextLen {

@@ -22,15 +22,6 @@ type probeRunner struct {
 
 func (p *probeRunner) PersonaAvailable() error { return p.persona }
 
-// TestAdvisorPlanInput_ListsPhasesWithMissingPersona — 2026-09-09 token-waste
-// root cause #2: the advisor kept selecting optional phases whose persona doc
-// does not exist; each selection cost a dispatch, a skip and (before the
-// deterministic-learning fix) a retrospective agent. The orchestrator asks
-// every OPTIONAL runner for its persona at plan time and hands the absent
-// ones to the router as environmental context, so the advisor never sees them
-// as selectable and the floor clamp drops them if proposed anyway. Mandatory
-// and floor phases are not probed: their absence must stay a loud dispatch
-// failure, never a silent exclusion.
 func TestAdvisorPlanInput_ListsPhasesWithMissingPersona(t *testing.T) {
 	runners := buildRunners(nil)
 	runners[Phase("amplify-tests")] = &probeRunner{fakeRunner: &fakeRunner{name: "amplify-tests"},
@@ -65,9 +56,6 @@ func TestAdvisorPlanInput_ListsPhasesWithMissingPersona(t *testing.T) {
 	}
 }
 
-// TestWriteRoutingContext_UnavailablePhasesAreNamedNotOffered: the advisor
-// prompt drops a persona-less phase from the selectable list and names it in
-// its own section, so the advisor cannot propose it from memory.
 func TestWriteRoutingContext_UnavailablePhasesAreNamedNotOffered(t *testing.T) {
 	in := router.RouteInput{
 		Cfg:               config.RoutingConfig{Triggers: map[string]config.RoutingBlock{"amplify-tests": {}, "coverage-gate": {}}},

@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// hasClaimableInboxWork decides whether an empty triage commitment is the
-// planner's fault (claimable work existed) or the honest state of the queue.
-// Research F25 (wave 6, cycle 1688): pipeline-* items are console-owned by
-// the ADR-0074 classifier, so a queue holding only those is NOT claimable
-// work — a lane cannot claim them, and blaming triage for leaving them would
-// route a cycle to the claim-failed termination for work no lane may do.
 func TestHasClaimableInboxWork_ConsoleOwnedKindsAreNotClaimable(t *testing.T) {
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")

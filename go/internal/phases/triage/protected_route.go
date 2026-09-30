@@ -14,11 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
-// protectedCard is a top_n card whose files name a lane-forbidden path.
 type protectedCard struct{ ID, Path, Via string }
 
-// protectedTopNCards returns every top_n card that names a lane-forbidden path, in report order; a nil
-// forbidden judges by manifest membership.
 func protectedTopNCards(body string, forbidden func(string) bool) []protectedCard {
 	if forbidden == nil {
 		forbidden = guards.IsProtectedSurface
@@ -35,7 +32,6 @@ func protectedTopNCards(body string, forbidden func(string) bool) []protectedCar
 	return cards
 }
 
-// forbiddenFileOf returns the first path of a card's files= field that forbidden judges lane-forbidden.
 func forbiddenFileOf(line string, forbidden func(string) bool) (string, bool) {
 	filesMatch := filesFieldRE.FindStringSubmatch(line)
 	if filesMatch == nil {
@@ -64,13 +60,10 @@ func cardIDOf(line string) string {
 	return ""
 }
 
-// consoleRouteReason is the escalation reason of a card the host routes to the console.
 func consoleRouteReason(path string) string {
 	return fmt.Sprintf("protected-surface: %s — control-plane changes go through the console route (operator-gated), not lane top_n", path)
 }
 
-// routeProtectedCards moves each card out of the decision's top_n into escalate_block with the
-// console-route reason, so the item is answered and never committed; every other key is kept.
 func routeProtectedCards(decisionPath string, cards []protectedCard, bound []string) error {
 	for _, c := range cards {
 		if c.ID == "" {
@@ -139,7 +132,6 @@ func answersFor(decision []byte, id string) bool {
 	return false
 }
 
-// removeRoutedCards drops every top_n card whose id is one of cards and reports the ids it dropped.
 func removeRoutedCards(topN []json.RawMessage, cards []protectedCard) ([]json.RawMessage, map[string]bool) {
 	routed := map[string]bool{}
 	for _, c := range cards {
@@ -158,7 +150,6 @@ func removeRoutedCards(topN []json.RawMessage, cards []protectedCard) ([]json.Ra
 	return kept, removed
 }
 
-// escalatedIDs indexes the task ids already in escalate_block.
 func escalatedIDs(escalations []json.RawMessage) map[string]bool {
 	out := map[string]bool{}
 	for _, e := range escalations {
@@ -167,7 +158,6 @@ func escalatedIDs(escalations []json.RawMessage) map[string]bool {
 	return out
 }
 
-// appendEscalations adds a console-route entry for each card not already escalated.
 func appendEscalations(escalations []json.RawMessage, escalated map[string]bool, cards []protectedCard) []json.RawMessage {
 	for _, c := range cards {
 		if escalated[c.ID] {
@@ -183,7 +173,6 @@ func appendEscalations(escalations []json.RawMessage, escalated map[string]bool,
 	return escalations
 }
 
-// rawArray decodes an absent or null field as an empty array.
 func rawArray(raw json.RawMessage) ([]json.RawMessage, error) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil, nil
@@ -193,7 +182,6 @@ func rawArray(raw json.RawMessage) ([]json.RawMessage, error) {
 	return out, err
 }
 
-// rawField reads one string field of a raw JSON object; anything else reads as "".
 func rawField(obj json.RawMessage, key string) string {
 	var m map[string]json.RawMessage
 	if json.Unmarshal(obj, &m) != nil {
@@ -204,7 +192,6 @@ func rawField(obj json.RawMessage, key string) string {
 	return s
 }
 
-// routedCardDiagnostics is one warning per routed card, naming the card and its route.
 func routedCardDiagnostics(cards []protectedCard) []core.Diagnostic {
 	out := make([]core.Diagnostic, 0, len(cards))
 	for _, c := range cards {
