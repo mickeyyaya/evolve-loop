@@ -10,36 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
-// preflight_run.go holds Run's execution shape: the resolved seam snapshot,
-// the parameter object each step mutates, and the ordered table those steps
-// are driven from. Run itself stays in releasepreflight.go as the package's
-// public facade; this file is what it delegates to.
-//
-// Before this, Run was one 252-line procedure carrying eight seams (four
-// resolved eagerly at the top, four lazily mid-function), seven separate
-// `opts.DryRun` reads, and seven scattered `res.StepsPassed++` sites. Step
-// ORDER — which failure surfaces first when several would fail — was
-// structural, expressible only by reading the whole body top to bottom.
-// It is now a table a test asserts equality against (see
-// TestRun_FirstFailingStepWins).
-//
-// Shape notes, so a later reader does not "tidy" away something load-bearing:
-//   - The CI hard-gate and the advisory simulation are explicit calls AFTER
-//     the table, not entries in it. Both are documented as not counting
-//     toward StepsPassed/StepsTotal (the 5-step back-compat contract), and
-//     folding them in would need a per-entry "counted" flag — a policy bit
-//     for two cases, which is how a named stage list turns into a generic
-//     middleware framework.
-//   - Every step keeps its own log lines and its own dry-run branch inline.
-//     Step 3 deliberately has NO dry-run branch (pinned by
-//     TestRun_DryRun_SemverBumpStillEnforced).
-//   - Error strings are reproduced verbatim: the existing suite asserts them
-//     by substring, so their wording is a de-facto contract.
-
-// resolved is Options with every path default and all eight seams filled in
-// once, at the outer boundary. Resolution ASSIGNS func values and never
-// invokes them, so a nil seam under DryRun/SkipTests is still never called —
-// the contract TestRun_DryRunWithNilSeams pins.
 type resolved struct {
 	target         string
 	repoRoot       string
@@ -61,8 +31,6 @@ type resolved struct {
 	headSHA          func(string) (string, error)
 }
 
-// resolve fills in Options' defaults. The RepoRoot check is the one failure
-// that can happen before any step runs.
 func resolve(opts Options) (resolved, error) {
 	if opts.RepoRoot == "" {
 		return resolved{}, fmt.Errorf("%w: RepoRoot required", ErrCheckFailed)
@@ -122,9 +90,6 @@ func (r *resolved) applyDefaults() {
 	}
 }
 
-// preflightRun is one Run's resolved inputs, its log sink, and the Result it
-// is populating. Step methods mutate res and return the ErrCheckFailed-wrapped
-// error Run surfaces unchanged.
 type preflightRun struct {
 	o    resolved
 	res  Result
@@ -144,10 +109,6 @@ func newPreflightRun(o resolved, stderr io.Writer) *preflightRun {
 	}
 }
 
-// preflightSteps is the COUNTED, ordered contract: StepsTotal is its length
-// and StepsPassed advances once per step that returns nil. Order is the
-// contract TestRun_FirstFailingStepWins asserts; reordering these entries
-// changes which failure an operator sees first.
 var preflightSteps = []func(*preflightRun) error{
 	(*preflightRun).stepTreeClean,
 	(*preflightRun).stepBranchAttached,
@@ -190,10 +151,6 @@ func (p *preflightRun) stepBranchAttached() error {
 	return nil
 }
 
-// stepSemverBump deliberately has NO dry-run branch: a dry run still reads
-// plugin.json and still rejects an invalid bump, so an operator learns about
-// a bad target before anything else runs. Pinned by
-// TestRun_DryRun_SemverBumpStillEnforced.
 func (p *preflightRun) stepSemverBump() error {
 	p.logf("step 3: target version %s > current?", p.o.target)
 	if _, _, _, ok := ParseSemver(p.o.target); !ok {
@@ -226,8 +183,6 @@ func (p *preflightRun) stepRecentAudit() error {
 		p.logf("DRY-RUN: would check %s for recent auditor PASS", p.o.ledgerPath)
 		return nil
 	}
-	// Resolution failure is not fatal: an empty head simply keeps step 4's
-	// conservative branch, which is the same posture as before this scoping.
 	releaseHead, headErr := p.o.headSHA(p.o.repoRoot)
 	if headErr != nil {
 		p.logf("advisory: could not resolve the release commit (%v) — a failing audit will be treated as blocking", headErr)
@@ -243,16 +198,9 @@ func (p *preflightRun) stepRecentAudit() error {
 	p.res.PhantomEntries = auditRes.phantomCount
 	switch auditRes.verdict {
 	case auditVerdictScopedOut:
-		// An audit exists and did not pass, but it did not examine this
-		// release commit's committed tree. Name the artifact and both
-		// commits: reporting it as "no audit" would misdirect an operator
-		// debugging a blocked release toward a missing-artifact hunt.
 		p.logf("advisory: the most recent audit (%s) did not pass, but it did not audit this release commit's tree (audited %s, releasing %s) — CI-green on the release commit is the authoritative gate (/publish). Not treating it as a veto.",
 			auditRes.artifact, shortSHA(auditRes.auditedHead), shortSHA(releaseHead))
 	case auditVerdictNone:
-		// Determinism: no on-disk audit available in this worktree (clean
-		// checkout / CI / GC'd artifacts). The authoritative release gate is
-		// CI-green on the release commit (enforced by /publish) — advisory only.
 		p.logf("advisory: no on-disk audit in this worktree — CI-green on the release commit is the authoritative gate (/publish). Skipping the audit-PASS check.")
 	default:
 		if auditRes.phantomCount > 0 {
@@ -266,10 +214,6 @@ func (p *preflightRun) stepRecentAudit() error {
 	return nil
 }
 
-// stepGateSuites runs the gate-test suites and, on the real path only, the
-// naming sub-check. The step counts as passed only after BOTH come back
-// clean — the same semantics as the three separate StepsPassed++ sites it
-// replaces (skip-tests, dry-run, and the end of the real branch).
 func (p *preflightRun) stepGateSuites() error {
 	p.logf("step 5: gate-test suites green?")
 	if p.o.skipTests {
@@ -290,10 +234,6 @@ func (p *preflightRun) stepGateSuites() error {
 	}
 	p.logf("OK: all %d gate-test suites green", len(DefaultGateTestSuites))
 
-	// Step 5 sub-check: no dead naming tokens survive in tracked files.
-	// Shares the legacynames acs gate's scanner + SSOT (.evolve/naming.json),
-	// so a release can't ship a rename that left a 404 slug / dead command
-	// behind. No-ops when the repo has no manifest.
 	p.logf("  scanning for dead naming tokens (.evolve/naming.json)...")
 	vs, err := p.o.nameGuard(p.o.repoRoot)
 	if err != nil {
@@ -307,15 +247,6 @@ func (p *preflightRun) stepGateSuites() error {
 	return nil
 }
 
-// gateReleaseCommitCI is the release-commit CI hard-gate (cycle-748,
-// push-ci-watch-remote-parity): the remote go CI run for HEAD must be
-// conclusion=success before tagging (v22.0.0 was cut on red CI). It does NOT
-// count toward StepsPassed/StepsTotal (back-compat with the 5-step
-// contract), which is why it is called after the table rather than listed in
-// it. An UNAVAILABLE verdict (no repo, gh missing, no run visible) is
-// advisory-skipped — same determinism rule as auditVerdictNone — but a
-// present non-success verdict hard-fails unless AllowRedCI is explicitly set,
-// and an override is always logged loudly and recorded in Result.CIOverridden.
 func (p *preflightRun) gateReleaseCommitCI() error {
 	p.logf("release-commit CI conclusion green?")
 	if p.o.dryRun {
@@ -343,11 +274,6 @@ func (p *preflightRun) gateReleaseCommitCI() error {
 	return nil
 }
 
-// adviseSimulation is the advisory auto-respond simulation suite (v12.1.5+).
-// It does NOT count toward StepsPassed/StepsTotal and never returns
-// ErrCheckFailed — a failure is logged as WARN and recorded in the tri-state
-// Result.SimulationAdvisoryOK (nil = not run). Promotes to a required step in
-// v12.2.0, at which point it becomes a preflightSteps entry.
 func (p *preflightRun) adviseSimulation() {
 	if p.o.skipTests {
 		p.logf("advisory: auto-respond simulation suite — skipped (--skip-tests)")

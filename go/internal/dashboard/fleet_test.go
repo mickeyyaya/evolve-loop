@@ -22,8 +22,6 @@ func TestServer_FleetPhaseUpdateRefreshesSnapshot(t *testing.T) {
 	s := New(root, Options{Now: func() time.Time { return now }})
 	_, before := s.current()
 	path := filepath.Join(core.RunWorkspacePath(root, 1), core.CycleStateFile)
-	// Update the existing file without changing its directory or lease. Both
-	// phase names have the same length, so size alone cannot detect the change.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

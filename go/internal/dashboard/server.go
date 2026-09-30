@@ -22,30 +22,16 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
-// DefaultAddr is the loopback listen address `evolve dashboard` binds when
-// --addr is not given. Loopback only: the page renders LLM-authored text and
-// the server has no authentication.
 const DefaultAddr = "127.0.0.1:8090"
 
-// contentSecurityPolicy is the shell page's CSP: same-origin scripts, styles
-// and fetches only; no framing, no base-URI or form-action rewriting.
 const contentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 
-// Options configures a Server. Zero values select the defaults.
 type Options struct {
-	// PollInterval is how often the poller checks the project root for change
-	// (default 2s). Tests shorten it.
 	PollInterval time.Duration
-	// Now is the clock (default time.Now).
-	Now func() time.Time
-	// MaxCycles bounds the board's cycle list (default 40).
-	MaxCycles int
-	// KeepAlive is the SSE comment-ping period (default 15s).
-	KeepAlive time.Duration
-	// Env is the operator's environment as the loop's floor reads it
-	// (EVOLVE_MANDATORY_PHASES, EVOLVE_USE_PHASE_REGISTRY, …): injected by the
-	// command, never read from the process here. nil reflects no overrides.
-	Env map[string]string
+	Now          func() time.Time
+	MaxCycles    int
+	KeepAlive    time.Duration
+	Env          map[string]string
 }
 
 func (o Options) withDefaults() Options {
@@ -64,16 +50,11 @@ func (o Options) withDefaults() Options {
 	return o
 }
 
-// Server serves the dashboard for one project root. It is read-only: every
-// handler is GET, no handler writes under the root.
 type Server struct {
 	root string
 	opts Options
 	col  *collector
 
-	// refreshMu serialises refresh, so racing callers (Run's startup poll and
-	// on-demand readers) see each other's publish and never re-bump seq for
-	// the same fingerprint.
 	refreshMu sync.Mutex
 
 	mu       sync.RWMutex
@@ -85,18 +66,12 @@ type Server struct {
 	subMu sync.Mutex
 	subs  map[chan uint64]struct{}
 
-	// hosts are the Host header values accepted besides loopback names: the
-	// host part of the address Serve bound (an operator who binds a LAN
-	// address has opted in to that name). Guards against DNS rebinding, which
-	// would otherwise make a visited page same-origin with this server.
 	hostMu sync.RWMutex
 	hosts  map[string]bool
 
 	mux *http.ServeMux
 }
 
-// New builds a Server over root. Call Run (or ListenAndServe) to start the
-// change poller; Handler serves without it, rebuilding the snapshot on demand.
 func New(root string, opts Options) *Server {
 	opts = opts.withDefaults()
 	col := newCollector(root)
@@ -107,9 +82,6 @@ func New(root string, opts Options) *Server {
 	return s
 }
 
-// Snapshot is the whole picture at now through this server's collector — the
-// `--snapshot` form, so the printed model reflects the same injected
-// environment the served one does.
 func (s *Server) Snapshot(now time.Time) *Snapshot {
 	snap, _ := s.col.collect(now)
 	return snap
@@ -125,14 +97,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /events", s.handleEvents)
 }
 
-// Handler returns the HTTP handler (for tests and embedding): the Host guard
-// in front of the routes.
 func (s *Server) Handler() http.Handler { return s.hostGuard(s.mux) }
 
-// hostGuard rejects requests whose Host is neither a loopback name nor the
-// bound address (421 Misdirected Request). A DNS-rebinding page cannot
-// forge Host to a loopback literal, so this is the read boundary the
-// loopback bind alone does not provide.
 func (s *Server) hostGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !s.hostAllowed(r.Host) {
@@ -143,9 +109,6 @@ func (s *Server) hostGuard(next http.Handler) http.Handler {
 	})
 }
 
-// normaliseHost extracts the host part of a host[:port] value, strips IPv6
-// brackets and lower-cases it, so hostAllowed and allowHost compare hosts the
-// same way.
 func normaliseHost(hostport string) string {
 	host := hostport
 	if h, _, err := net.SplitHostPort(hostport); err == nil {
@@ -165,7 +128,6 @@ func (s *Server) hostAllowed(hostport string) bool {
 	}
 }
 
-// allowHost admits the host part of a bound listen address.
 func (s *Server) allowHost(addr string) {
 	host := normaliseHost(addr)
 	if host == "" {
@@ -176,8 +138,6 @@ func (s *Server) allowHost(addr string) {
 	s.hostMu.Unlock()
 }
 
-// Run polls the project root until ctx is cancelled, rebuilding the snapshot
-// and notifying SSE subscribers whenever the change fingerprint moves.
 func (s *Server) Run(ctx context.Context) {
 	s.refresh()
 	ticker := time.NewTicker(s.opts.PollInterval)
@@ -192,9 +152,6 @@ func (s *Server) Run(ctx context.Context) {
 	}
 }
 
-// ListenAndServe binds addr, runs the poller, and serves until ctx is
-// cancelled. WriteTimeout stays zero on purpose: a server-wide write deadline
-// would kill the SSE stream.
 func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -203,11 +160,9 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 	return s.Serve(ctx, ln)
 }
 
-// Serve is ListenAndServe over an existing listener (tests bind :0). ctx is
-// installed as every request's BaseContext, so cancelling it ends open SSE
-// streams and lets Shutdown complete instead of timing out behind them.
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	s.allowHost(ln.Addr().String())
+	// WriteTimeout stays zero: a server-wide write deadline would kill the SSE stream.
 	srv := &http.Server{
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -228,9 +183,6 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	return nil
 }
 
-// refresh recomputes the fingerprint and, when it moved or nothing has been
-// published yet, rebuilds the snapshot and publishes the new sequence number.
-// An unchanged root never publishes twice, whichever caller gets there first.
 func (s *Server) refresh() {
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
@@ -250,8 +202,6 @@ func (s *Server) refresh() {
 	s.publish(seq)
 }
 
-// current returns the latest snapshot and the dossiers it was built from,
-// building one if the poller has not run yet (Handler used without Run).
 func (s *Server) current() (*Snapshot, uint64) {
 	snap, _, seq := s.currentEpoch()
 	return snap, seq
@@ -290,17 +240,11 @@ func (s *Server) handleSnapshot(w http.ResponseWriter, _ *http.Request) {
 	}{seq, snap})
 }
 
-// cycleDetail is the /api/cycle/{id} payload: one cycle read fresh from its
-// workspace, joined to the dossier of the snapshot's epoch (or a single-file
-// read when the board's cap excluded it), plus its readable artifacts.
 type cycleDetail struct {
-	Cycle     CycleSummary   `json:"cycle"`
-	Artifacts []ArtifactInfo `json:"artifacts"`
-	// PrimaryReport names the artifact the page opens first: the audit report
-	// on a failed cycle, the build report otherwise — registry-derived names,
-	// so the client never spells them.
-	PrimaryReport string   `json:"primary_report"`
-	Warnings      []string `json:"warnings,omitempty"`
+	Cycle         CycleSummary   `json:"cycle"`
+	Artifacts     []ArtifactInfo `json:"artifacts"`
+	PrimaryReport string         `json:"primary_report"`
+	Warnings      []string       `json:"warnings,omitempty"`
 }
 
 func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
@@ -330,8 +274,6 @@ func (s *Server) handleCycle(w http.ResponseWriter, r *http.Request) {
 	var pw []string
 	cs.Plan, pw = readPlan(mandatory, core.RunWorkspacePath(s.root, id), cs, snap.Loop, s.col.streams)
 	warns = append(warns, pw...)
-	// The board's summary carries the per-lane status (and so the plan's
-	// ongoing phase and its start); a cap-excluded cycle keeps the fresh read.
 	for _, summary := range snap.Cycles {
 		if summary.ID == id {
 			cs.State, cs.StateName, cs.CurrentPhase, cs.Plan = summary.State, summary.StateName, summary.CurrentPhase, summary.Plan
@@ -367,8 +309,6 @@ func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "read failed", http.StatusInternalServerError)
 		return
 	}
-	// Always plain text: the bytes are LLM-authored and must never be
-	// interpreted as markup by the browser.
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	_, _ = w.Write(body)

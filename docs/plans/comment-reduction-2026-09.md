@@ -153,6 +153,12 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 76 | `internal/core`, file group 13 of 13 | 38 | 1,047 → 241 | — | on the round-11 comment PR |
 | 77 | `internal/flagregistry`, all files (1 of 1) | 9 | 240 → 39 | — | on the round-11 comment PR |
 | 78 | `internal/phases/triage`, all files (1 of 1) | 16 | 385 → 56 | — | on the round-11 comment PR |
+| 79 | `internal/modelquery`, `internal/phases/specrunner`, all files (5 decision-surface files deferred: a test hashes their bytes) | 33 | 1,139 → 6 | — | on the round-12 comment PR |
+| 80 | `internal/releasepipeline`, `internal/skillcheck`, `cmd/evolve-fake-cli`, all files | 37 | 1,374 → 15 | — | on the round-12 comment PR |
+| 81 | `internal/faillearn`, `internal/setup`, `internal/phases/retro`, all files | 39 | 1,397 → 15 | — | on the round-12 comment PR |
+| 82 | `internal/phases/audit/ciparitygate`, `internal/auditchain`, `internal/rollback`, all files | 42 | 1,300 → 12 | — | on the round-12 comment PR |
+| 83 | `internal/releasepreflight`, `internal/subagent/subagentrun`, `internal/commitgate`, all files | 38 | 1,345 → 9 | — | on the round-12 comment PR |
+| 84 | `internal/dashboard`, `internal/scopedelta`, `internal/gitexec`, all files | 39 | 1,265 → 10 | — | on the round-12 comment PR |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

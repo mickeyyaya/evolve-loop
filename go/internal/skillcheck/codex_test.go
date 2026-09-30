@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// writeClaudeManifest drops a minimal canonical Claude plugin.json — the single
-// source the Codex projection reads.
 func writeClaudeManifest(t *testing.T, root string) {
 	t.Helper()
 	pj := `{
@@ -31,7 +29,6 @@ func writeClaudeManifest(t *testing.T, root string) {
 	}
 }
 
-// genCodex writes the rendered manifests to disk (simulating `skills generate`).
 func genCodex(t *testing.T, root string) {
 	t.Helper()
 	diffs, err := codexManifestDiffs(root)
@@ -48,9 +45,6 @@ func genCodex(t *testing.T, root string) {
 	}
 }
 
-// TestRenderCodexPluginManifest_SourcedFromClaude — every shared field traces to
-// the Claude manifest (single source); Codex-only fields are the projection
-// constants. Version especially must come from source (the D3 drift risk).
 func TestRenderCodexPluginManifest_SourcedFromClaude(t *testing.T) {
 	meta := claudePluginMeta{
 		Name: "evo", Version: "9.9.9", Description: "d",
@@ -82,9 +76,6 @@ func TestRenderCodexPluginManifest_SourcedFromClaude(t *testing.T) {
 	}
 }
 
-// TestRenderCodexMarketplace_StrictSchemaConformance — Codex's .strict()
-// marketplace schema rejects authentication "NONE"; the projection must emit a
-// valid enum and the repo-root source.path.
 func TestRenderCodexMarketplace_StrictSchemaConformance(t *testing.T) {
 	b, err := renderCodexMarketplace(claudePluginMeta{Name: "evo"})
 	if err != nil {
@@ -112,8 +103,6 @@ func TestRenderCodexMarketplace_StrictSchemaConformance(t *testing.T) {
 	}
 }
 
-// TestCodexManifestDiffs_DriftLifecycle — both manifests read as drifted when
-// missing and in-sync once generated, so `skills generate`/`check` behave.
 func TestCodexManifestDiffs_DriftLifecycle(t *testing.T) {
 	root := t.TempDir()
 	writeClaudeManifest(t, root)
@@ -143,11 +132,8 @@ func TestCodexManifestDiffs_DriftLifecycle(t *testing.T) {
 	}
 }
 
-// TestCodexManifestDiffs_ToleratedAbsentSource — a checkout without the
-// canonical Claude manifest is not an evo plugin repo; the projection must
-// no-op (nil, nil), never fault the whole `skills check` run.
 func TestCodexManifestDiffs_ToleratedAbsentSource(t *testing.T) {
-	diffs, err := codexManifestDiffs(t.TempDir()) // no .claude-plugin/plugin.json
+	diffs, err := codexManifestDiffs(t.TempDir())
 	if err != nil {
 		t.Fatalf("absent Claude manifest must be tolerated, got: %v", err)
 	}
@@ -156,9 +142,6 @@ func TestCodexManifestDiffs_ToleratedAbsentSource(t *testing.T) {
 	}
 }
 
-// TestCodexManifestDiffs_DetectsVersionDrift is the D3 guard: a Codex manifest
-// whose version no longer matches the Claude source is flagged as drift (the
-// exact stale-version condition `skills check` must catch in CI).
 func TestCodexManifestDiffs_DetectsVersionDrift(t *testing.T) {
 	root := t.TempDir()
 	writeClaudeManifest(t, root)

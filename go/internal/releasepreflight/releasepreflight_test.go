@@ -17,13 +17,6 @@ import (
 
 var osExec = osexec.Command
 
-// makeRepo sets up a minimal preflight-compatible repo fixture matching
-// the bash test helper. Returns the repo dir; cleanup is t.TempDir-managed.
-//
-// The isolated project root + .evolve/ scaffolding come from
-// fixtures.NewWorkspace (replacing the hand-rolled t.TempDir + MkdirAll
-// dance); the preflight-specific files (plugin.json, audit-report.md, ledger)
-// are seeded through the workspace's relative-path writers.
 func makeRepo(t *testing.T, version string) string {
 	t.Helper()
 	auditRel := filepath.Join(".evolve", "runs", "cycle-99", "audit-report.md")
@@ -42,7 +35,6 @@ func makeRepo(t *testing.T, version string) string {
 	return ws.Root
 }
 
-// stubOpts returns Options pre-wired with passing seams for a happy-path repo.
 func stubOpts(repo, target string) Options {
 	return Options{
 		Target:         target,
@@ -55,7 +47,6 @@ func stubOpts(repo, target string) Options {
 	}
 }
 
-// === Test 1: happy path → no error ==========================================
 func TestRun_HappyPath(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	var buf bytes.Buffer
@@ -77,10 +68,6 @@ func TestRun_HappyPath(t *testing.T) {
 	}
 }
 
-// === Naming guard (step-5 sub-check) ========================================
-
-// stepFiveOpts wires past steps 1-4 and the gate suites so a test can exercise
-// the step-5 naming sub-check in isolation.
 func stepFiveOpts(repo, target string) Options {
 	o := stubOpts(repo, target)
 	o.SkipTests = false
@@ -115,8 +102,6 @@ func TestRun_NamingGuardCleanPasses(t *testing.T) {
 	}
 }
 
-// A scanner error (e.g. a malformed manifest) must fail the preflight, not be
-// swallowed — this covers the err != nil branch of the step-5 naming sub-check.
 func TestRun_NamingGuardErrorFails(t *testing.T) {
 	opts := stepFiveOpts(makeRepo(t, "1.0.0"), "1.0.1")
 	opts.NameGuard = func(string) ([]naminguard.Violation, error) {
@@ -131,7 +116,6 @@ func TestRun_NamingGuardErrorFails(t *testing.T) {
 	}
 }
 
-// === Test 2: dirty tree → ErrCheckFailed ====================================
 func TestRun_DirtyTree(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	opts := stubOpts(r, "1.0.1")
@@ -145,7 +129,6 @@ func TestRun_DirtyTree(t *testing.T) {
 	}
 }
 
-// === Test 3: detached HEAD → ErrCheckFailed =================================
 func TestRun_DetachedHEAD(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	opts := stubOpts(r, "1.0.1")
@@ -159,7 +142,6 @@ func TestRun_DetachedHEAD(t *testing.T) {
 	}
 }
 
-// === Test 4: invalid semver target → ErrCheckFailed =========================
 func TestRun_InvalidSemverTarget(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	opts := stubOpts(r, "not-a-version")
@@ -169,7 +151,6 @@ func TestRun_InvalidSemverTarget(t *testing.T) {
 	}
 }
 
-// === Test 5: target equals current → ErrCheckFailed =========================
 func TestRun_NoOpBump(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	opts := stubOpts(r, "1.0.0")
@@ -182,7 +163,6 @@ func TestRun_NoOpBump(t *testing.T) {
 	}
 }
 
-// === Test 6: downgrade → ErrCheckFailed =====================================
 func TestRun_Downgrade(t *testing.T) {
 	r := makeRepo(t, "2.0.0")
 	opts := stubOpts(r, "1.5.0")
@@ -195,11 +175,6 @@ func TestRun_Downgrade(t *testing.T) {
 	}
 }
 
-// === Test 7: missing ledger → ADVISORY (deterministic release) ==============
-// Determinism fix: a release from a clean checkout / CI / fresh worktree (no
-// ledger) must NOT be blocked — the audit signal is unavailable, not failed, and
-// CI-green on the release commit is the authoritative gate (/publish). Preflight
-// passes with step 4 advisory.
 func TestRun_MissingLedger(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	os.Remove(filepath.Join(r, ".evolve", "ledger.jsonl"))
@@ -216,15 +191,12 @@ func TestRun_MissingLedger(t *testing.T) {
 	}
 }
 
-// === Test 8: audit verdict WARN → blocked in strict mode ====================
 func TestRun_WarnVerdict_NonStrict(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
-	// Rewrite audit-report to WARN.
 	auditPath := filepath.Join(r, ".evolve", "runs", "cycle-99", "audit-report.md")
 	if err := os.WriteFile(auditPath, []byte("# Audit\n\nVerdict: WARN\n"), 0o644); err != nil {
 		t.Fatalf("rewrite: %v", err)
 	}
-	// Non-strict (default): WARN should pass.
 	opts := stubOpts(r, "1.0.1")
 	res, err := Run(opts)
 	if err != nil {
@@ -252,7 +224,6 @@ func TestRun_WarnVerdict_Strict(t *testing.T) {
 	}
 }
 
-// === Test 9: --dry-run honors no-execute ===================================
 func TestRun_DryRun(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	gitCalls := 0
@@ -280,7 +251,6 @@ func TestRun_DryRun(t *testing.T) {
 	}
 }
 
-// === Test 10: --skip-tests bypasses step 5 only =============================
 func TestRun_SkipTests(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	gateCalls := 0
@@ -305,18 +275,14 @@ func TestRun_SkipTests(t *testing.T) {
 	}
 }
 
-// === Advisory simulation step (v12.1.5) =====================================
-// Table-driven: covers skip, dry-run, pass, fail-but-advisory. Asserts that
-// no path returns ErrCheckFailed (advisory) and that SimulationAdvisoryOK
-// is nil/true/false as appropriate. Verifies StepsPassed stays 5.
 func TestRun_SimulationAdvisory(t *testing.T) {
 	cases := []struct {
 		name       string
 		skipTests  bool
 		dryRun     bool
 		simErr     error
-		wantSimOK  *bool  // nil = skipped; true = pass; false = warn
-		wantLogHas string // substring expected on stderr
+		wantSimOK  *bool
+		wantLogHas string
 	}{
 		{name: "skip-tests skips advisory", skipTests: true, wantSimOK: nil, wantLogHas: "skipped (--skip-tests)"},
 		{name: "dry-run skips advisory", dryRun: true, wantSimOK: nil, wantLogHas: "skipped (dry-run)"},
@@ -358,13 +324,10 @@ func TestRun_SimulationAdvisory(t *testing.T) {
 
 func ptrBool(b bool) *bool { return &b }
 
-// === Phantom-entry handling: walks past entries with missing artifacts ======
 func TestRun_PhantomEntries(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	auditPath := filepath.Join(r, ".evolve", "runs", "cycle-99", "audit-report.md")
 	now := time.Now().UTC().Format(time.RFC3339)
-	// Two phantom entries (missing artifact) followed by one valid (older).
-	// Reverse-order traversal must skip the phantoms and accept the valid.
 	ledger := strings.Join([]string{
 		fmt.Sprintf(`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"%s"}`, now, auditPath),
 		fmt.Sprintf(`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"/tmp/doesnotexist-1.md"}`, now),
@@ -387,11 +350,9 @@ func TestRun_PhantomEntries(t *testing.T) {
 	}
 }
 
-// === Old audit (>7 days) → ErrCheckFailed ==================================
 func TestRun_StaleAudit(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	auditPath := filepath.Join(r, ".evolve", "runs", "cycle-99", "audit-report.md")
-	// 8 days ago.
 	staleTs := time.Now().Add(-8 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	ledger := fmt.Sprintf(
 		`{"ts":"%s","role":"auditor","kind":"agent_subprocess","artifact_path":"%s"}`+"\n",
@@ -410,7 +371,6 @@ func TestRun_StaleAudit(t *testing.T) {
 	}
 }
 
-// === Gate-test failure propagates ===========================================
 func TestRun_GateTestFailure(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	opts := stubOpts(r, "1.0.1")
@@ -430,9 +390,6 @@ func TestRun_GateTestFailure(t *testing.T) {
 	}
 }
 
-// TestDefaultGateTestSuites_AreGoPackages guards against regressing to the
-// deleted legacy/scripts/tests/*.sh paths: v12 removed the bash suites, so the
-// preflight gate must run Go test packages (./internal/...), not dead shells.
 func TestDefaultGateTestSuites_AreGoPackages(t *testing.T) {
 	if len(DefaultGateTestSuites) == 0 {
 		t.Fatal("no gate-test suites configured")
@@ -447,9 +404,6 @@ func TestDefaultGateTestSuites_AreGoPackages(t *testing.T) {
 	}
 }
 
-// TestStripBypassEnv ensures the gate-test runner drops the ship/role-gate
-// bypass vars so the guard DENY-tests stay hermetic regardless of the
-// operator's session env (e.g. a dev's settings.local.json sets them).
 func TestStripBypassEnv(t *testing.T) {
 	in := []string{"PATH=/bin", "EVOLVE_BYPASS_SHIP_GATE=1", "HOME=/h", "EVOLVE_BYPASS_ROLE_GATE=1", "FOO=bar"}
 	got := stripBypassEnv(in)
@@ -467,7 +421,6 @@ func TestStripBypassEnv(t *testing.T) {
 	}
 }
 
-// === Verdict heading form (## Verdict\n**PASS**) is accepted ===============
 func TestRun_HeadingVerdictForm(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	auditPath := filepath.Join(r, ".evolve", "runs", "cycle-99", "audit-report.md")
@@ -485,15 +438,12 @@ func TestRun_HeadingVerdictForm(t *testing.T) {
 	}
 }
 
-// === No RepoRoot → ErrCheckFailed (programmer error) =======================
 func TestRun_NoRepoRoot(t *testing.T) {
 	_, err := Run(Options{Target: "1.0.0"})
 	if !errors.Is(err, ErrCheckFailed) {
 		t.Fatalf("err = %v, want ErrCheckFailed", err)
 	}
 }
-
-// === Unit tests for helpers =================================================
 
 func TestParseSemver(t *testing.T) {
 	cases := []struct {
@@ -506,7 +456,7 @@ func TestParseSemver(t *testing.T) {
 		{"1.2.3", 1, 2, 3, true},
 		{"11.7.2", 11, 7, 2, true},
 		{"0.0.0", 0, 0, 0, true},
-		{"1.2.3-alpha", 1, 2, 3, true}, // tail allowed
+		{"1.2.3-alpha", 1, 2, 3, true},
 		{"v1.2.3", 0, 0, 0, false},
 		{"1.2", 0, 0, 0, false},
 		{"garbage", 0, 0, 0, false},
@@ -571,38 +521,20 @@ func TestExtractVerdict(t *testing.T) {
 		{"heading WARN strict-rejected", "## Verdict\n\n**WARN**\n", true, "", false},
 		{"no verdict", "lorem ipsum\n", false, "", false},
 		{"heading PASS too far", "## Verdict\n\n\n\n\n\n**PASS**\n", false, "", false},
-		// Bare-line heading form — the cycle-249 release-blocker shape
-		// (auditor wrote `## Verdict\nPASS` without bold).
 		{"heading bare PASS", "## Verdict\nPASS\n\n**Confidence:** 0.97\n", false, "PASS", true},
 		{"heading bare WARN non-strict", "## Verdict\nWARN\n", false, "WARN", true},
 		{"heading bare WARN strict-rejected", "## Verdict\nWARN\n", true, "", false},
 		{"heading bare FAIL not accepted", "## Verdict\nFAIL\n", false, "", false},
 		{"bare PASS inside sentence not accepted", "## Verdict\nAll tests PASS here\n", false, "", false},
 		{"heading bare PASS too far", "## Verdict\n\n\n\n\n\nPASS\n", false, "", false},
-		// Machine-readable marker (the SSOT the auditor emits) — parsed first,
-		// immune to prose variation. This is the cycle-480 release-blocker shape:
-		// the prose is `**PASS.**` (trailing period in the bold), which the prose
-		// forms below miss, but the marker is unambiguous.
 		{"marker PASS with trailing-period prose", "## Verdict\n\n**PASS.** The change is correct.\n\n<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n", false, "PASS", true},
 		{"marker WARN non-strict", "<!-- evolve-verdict: {\"verdict\":\"WARN\"} -->\n", false, "WARN", true},
 		{"marker WARN strict-rejected", "<!-- evolve-verdict: {\"verdict\":\"WARN\"} -->\n", true, "", false},
-		// A FAIL marker must block even when stray prose says PASS — the marker
-		// wins and there is no fall-through to the prose scan.
 		{"marker FAIL blocks despite prose PASS", "<!-- evolve-verdict: {\"verdict\":\"FAIL\"} -->\n\n## Verdict\n\n**PASS**\n", false, "", false},
-		// Prose hardening (markerless legacy report): bold PASS with a trailing
-		// period is still a PASS.
 		{"heading bold PASS trailing period no marker", "## Verdict\n\n**PASS.** Correct and minimal.\n", false, "PASS", true},
-		// Multiple markers: the LAST (the report's own final verdict) wins — a
-		// quoted earlier PASS must NOT silence a later FAIL.
 		{"marker last wins PASS-before-FAIL blocks", "## Context\nPrior: <!-- evolve-verdict: {\"verdict\":\"PASS\"} -->\n\n## Verdict\n<!-- evolve-verdict: {\"verdict\":\"FAIL\"} -->\n", false, "", false},
-		// ...and a quoted earlier FAIL must NOT block the report's own later PASS.
 		{"marker last wins FAIL-before-PASS accepts", "## Context\nPrior: <!-- evolve-verdict: {\"verdict\":\"FAIL\"} -->\n\n## Verdict\n<!-- evolve-verdict: {\"verdict\":\"PASS\"} -->\n", false, "PASS", true},
-		// Nested JSON before "verdict" must still parse (regex captures to `-->`,
-		// then JSON-decodes — not a brace-class scrape).
 		{"marker nested json parsed", "<!-- evolve-verdict: {\"meta\":{\"cycle\":480},\"verdict\":\"PASS\"} -->\n", false, "PASS", true},
-		// A `-->` literal INSIDE a JSON string value must not truncate the capture
-		// and silently drop the marker: the FAIL here must still block despite the
-		// prose **PASS** (a latent bypass the `}`-anchored capture closes).
 		{"marker arrow in json string still read", "## Verdict\n\n**PASS**\n\n<!-- evolve-verdict: {\"note\":\"see diff -->\",\"verdict\":\"FAIL\"} -->\n", false, "", false},
 	}
 	for _, tc := range cases {
@@ -615,7 +547,6 @@ func TestExtractVerdict(t *testing.T) {
 	}
 }
 
-// defaultGitClean / defaultCurrentBranch on a real fixture (integration-light).
 func TestDefaultGitClean_OnRealRepo(t *testing.T) {
 	d := t.TempDir()
 	mustRunBash(t, "git -C "+d+" init -q -b main")
@@ -624,12 +555,10 @@ func TestDefaultGitClean_OnRealRepo(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	mustRunBash(t, "git -C "+d+" add x.txt && git -C "+d+" commit -q -m init")
-	// Clean state.
 	ok, err := defaultGitClean(d)
 	if err != nil || !ok {
 		t.Errorf("clean tree = (%v, %v), want (true, nil)", ok, err)
 	}
-	// Dirty state.
 	if err := os.WriteFile(filepath.Join(d, "x.txt"), []byte("changed"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -656,7 +585,6 @@ func TestDefaultCurrentBranch_OnRealRepo(t *testing.T) {
 	}
 }
 
-// mustRunBash is a tiny helper for integration-light tests that need real git.
 func mustRunBash(t *testing.T, cmdline string) {
 	t.Helper()
 	out, err := osExec("bash", "-c", cmdline).CombinedOutput()

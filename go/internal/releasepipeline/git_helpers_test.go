@@ -8,12 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// initTempRepoWithTag creates an isolated git repository (a gittest.Fixture),
-// makes one commit, and tags it. It returns the repo path. Using an isolated
-// repo keeps the test independent of the live repository's tag set — the
-// cautionary failure this replaces was a *_ValidGitRepo test that `git describe`'d
-// the live worktree and broke when a non-semver tag (pre-consolidation-*) shadowed
-// the expected v* tag. Tests must never depend on live-repo or runtime state.
 func initTempRepoWithTag(t *testing.T, tag string) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -22,7 +16,6 @@ func initTempRepoWithTag(t *testing.T, tag string) string {
 	dir := gittest.Fixture(t).Dir
 	run := func(args ...string) {
 		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		// Quiet, deterministic identity so the commit succeeds in any environment.
 		cmd.Env = append(cmd.Environ(),
 			"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
 			"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
@@ -36,22 +29,14 @@ func initTempRepoWithTag(t *testing.T, tag string) string {
 	return dir
 }
 
-// === resolvePrevTag — error branch returns ("", err) =======================
-
-// TestResolvePrevTag_NonGitDir exercises the error path in resolvePrevTag:
-// when git -C <dir> describe fails (not a git repo), the function propagates
-// the error and the caller falls through to resolveInitCommit.
 func TestResolvePrevTag_NonGitDir(t *testing.T) {
-	dir := t.TempDir() // plain directory, not a git repo
+	dir := t.TempDir()
 	tag, err := resolvePrevTag(dir)
 	if err == nil {
 		t.Errorf("resolvePrevTag in non-git dir: want error, got tag=%q err=nil", tag)
 	}
 }
 
-// TestResolvePrevTag_ValidGitRepo exercises the success path against an ISOLATED
-// temp repo with exactly one known tag, so the assertion is deterministic and
-// does not depend on the live repository's tag set.
 func TestResolvePrevTag_ValidGitRepo(t *testing.T) {
 	repo := initTempRepoWithTag(t, "v1.2.3")
 	tag, err := resolvePrevTag(repo)
@@ -63,10 +48,6 @@ func TestResolvePrevTag_ValidGitRepo(t *testing.T) {
 	}
 }
 
-// === resolveInitCommit — error and empty-result branches ===================
-
-// TestResolveInitCommit_NonGitDir exercises the error branch: git rev-list
-// fails on a directory that is not a git repository.
 func TestResolveInitCommit_NonGitDir(t *testing.T) {
 	dir := t.TempDir()
 	commit, err := resolveInitCommit(dir)
@@ -75,8 +56,6 @@ func TestResolveInitCommit_NonGitDir(t *testing.T) {
 	}
 }
 
-// TestResolveInitCommit_ValidGitRepo exercises the happy path: a real repo
-// returns a non-empty SHA on the first line.
 func TestResolveInitCommit_ValidGitRepo(t *testing.T) {
 	repo := findRepoRoot(t)
 	commit, err := resolveInitCommit(repo)
@@ -88,10 +67,6 @@ func TestResolveInitCommit_ValidGitRepo(t *testing.T) {
 	}
 }
 
-// === currentBranch — error branch returns "unknown" ========================
-
-// TestCurrentBranch_NonGitDir exercises the error branch: git symbolic-ref
-// fails on a non-git directory, so the function returns "unknown" with nil error.
 func TestCurrentBranch_NonGitDir(t *testing.T) {
 	dir := t.TempDir()
 	branch, err := currentBranch(dir)
@@ -103,8 +78,6 @@ func TestCurrentBranch_NonGitDir(t *testing.T) {
 	}
 }
 
-// TestCurrentBranch_ValidGitRepo exercises the success branch: a real repo
-// returns a non-empty branch name.
 func TestCurrentBranch_ValidGitRepo(t *testing.T) {
 	repo := findRepoRoot(t)
 	branch, err := currentBranch(repo)
@@ -116,12 +89,6 @@ func TestCurrentBranch_ValidGitRepo(t *testing.T) {
 	}
 }
 
-// findRepoRoot resolves the enclosing git repository's top level from the
-// test's working directory (the package dir). git handles both normal clones
-// and linked worktrees. The *_ValidGitRepo / *_RealRepo tests need real git
-// history + a buildable module, so the test is skipped when not run inside a
-// git checkout (e.g. a source tarball) rather than failing on a path that only
-// exists on one machine.
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
 	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()

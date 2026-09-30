@@ -9,22 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// Apply merges the chosen preset into an existing policy.json as per-phase pins
-// and returns the new policy bytes. It is pure given its inputs (the cmd layer
-// does the disk read/write), and it is the GATE that refuses to persist an
-// illegal config: a degraded preset, a malformed existing policy, or a pin that
-// breaches the floor all return an error with NO bytes.
-//
-// Merge semantics:
-//   - Lossless: the existing policy is round-tripped through a raw map, so foreign
-//     top-level keys (floor, cli_health, version, …) and foreign pins survive.
-//   - Minimal: a pin is emitted ONLY where the assignment differs from the profile
-//     default; a phase that matches its default has any stale Role pin removed
-//     (so re-applying a lighter preset cleanly drops a heavier one's upgrades).
-//   - Pins store the abstract TIER (fast|balanced|deep), never the native model id
-//     — policy.ValidatePin ranks pin.Model via TierRank; a native id ranks 0 and
-//     would silently skip the envelope floor.
-//   - A phase with no profile is skipped (we never pin what we cannot validate).
 func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicyJSON []byte, profLoader *profiles.Loader) ([]byte, error) {
 	preset, err := findPreset(Recommend(rep, cfg), presetName)
 	if err != nil {
@@ -42,7 +26,7 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 		}
 		prof, perr := profLoader.Get(a.Role)
 		if perr != nil {
-			continue // no profile → leave any existing pin untouched; never pin what we can't validate
+			continue
 		}
 		if a.DiffersFromDefault {
 			pin := policy.Pin{CLI: a.CLI, Model: a.Tier}
@@ -68,8 +52,6 @@ func findPreset(rr RecommendReport, presetName string) (*Preset, error) {
 }
 
 func parseExistingPolicy(existingPolicyJSON []byte) (map[string]json.RawMessage, map[string]policy.Pin, error) {
-	// Parse the existing policy losslessly (raw map — never the typed Policy,
-	// which would reorder keys and drop any unmodeled future key).
 	obj := map[string]json.RawMessage{}
 	if len(strings.TrimSpace(string(existingPolicyJSON))) > 0 {
 		if err := json.Unmarshal(existingPolicyJSON, &obj); err != nil {

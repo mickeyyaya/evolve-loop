@@ -2,9 +2,6 @@ package modelquery
 
 import "testing"
 
-// TestNewestInLineage_PicksHighestVersionAcrossFormats pins the D2 "newest-wins"
-// examples verbatim from the latest-model-preference inbox spec: within one
-// lineage, the numerically-newest id wins regardless of input order.
 func TestNewestInLineage_PicksHighestVersionAcrossFormats(t *testing.T) {
 	cases := []struct {
 		name string
@@ -26,9 +23,6 @@ func TestNewestInLineage_PicksHighestVersionAcrossFormats(t *testing.T) {
 	}
 }
 
-// TestNewestInLineage_RejectsNaiveLexicographicOrdering is the anti-no-op
-// negative case: a naive string sort/compare ranks "4.9" above "4.10" because
-// '9' > '1' as characters. A genuine numeric-version comparator must not.
 func TestNewestInLineage_RejectsNaiveLexicographicOrdering(t *testing.T) {
 	ids := []string{"opus-4.9", "opus-4.10"}
 	got := NewestInLineage(ids)
@@ -37,10 +31,6 @@ func TestNewestInLineage_RejectsNaiveLexicographicOrdering(t *testing.T) {
 	}
 }
 
-// TestNewestInLineage_IgnoresMiniSuffixWhenComparingVersions checks the -mini
-// suffix (a capability variant marker, not a version token) does not break
-// version extraction, and the full id string (including -mini) is returned
-// unmodified.
 func TestNewestInLineage_IgnoresMiniSuffixWhenComparingVersions(t *testing.T) {
 	ids := []string{"gpt-5.4-mini", "gpt-5.5-mini"}
 	got := NewestInLineage(ids)
@@ -49,10 +39,6 @@ func TestNewestInLineage_IgnoresMiniSuffixWhenComparingVersions(t *testing.T) {
 	}
 }
 
-// TestNewestInLineage_EffortParentheticalTieFallsBackToInputOrder checks that
-// "(High)"/"(Thinking)" effort-variant parentheticals are ignored for version
-// extraction; when the resulting versions tie, the first input id wins
-// (deterministic fallback to classifier/original order, never a crash).
 func TestNewestInLineage_EffortParentheticalTieFallsBackToInputOrder(t *testing.T) {
 	ids := []string{"Gemini 3.1 Pro (High)", "Gemini 3.1 Pro (Thinking)"}
 	got := NewestInLineage(ids)
@@ -61,10 +47,6 @@ func TestNewestInLineage_EffortParentheticalTieFallsBackToInputOrder(t *testing.
 	}
 }
 
-// TestNewestInLineage_UnversionedFallsBackAndNeverCrashes covers the OOD edge:
-// a versionless id never outranks a versioned one, and an all-unversioned or
-// empty input degrades gracefully to the classifier/original order instead of
-// panicking.
 func TestNewestInLineage_UnversionedFallsBackAndNeverCrashes(t *testing.T) {
 	if got := NewestInLineage([]string{"latest", "gpt-5.5"}); got != "gpt-5.5" {
 		t.Errorf("versioned id should beat unversioned: got %q, want %q", got, "gpt-5.5")
@@ -80,9 +62,6 @@ func TestNewestInLineage_UnversionedFallsBackAndNeverCrashes(t *testing.T) {
 	}
 }
 
-// TestNewestInLineage_VersionDecidesBeforeDate: the version is read with the
-// date run removed and decides first; a date only orders equal versions that
-// are both dated, and an undated/dated tie keeps the first-listed id.
 func TestNewestInLineage_VersionDecidesBeforeDate(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

@@ -7,12 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
-// TestBuildClassifyPrompt_CoversEveryCanonicalTier: the prompt's tier block
-// and JSON template are GENERATED from modelcatalog.CanonicalTiers, so a
-// canonical tier can never again be silently omitted (the original prompt
-// hardcoded fast/balanced/deep and every refresh deleted tier_models.top).
-// Iterates the live vocabulary rather than hardcoding it — a future fifth
-// tier is covered automatically.
 func TestBuildClassifyPrompt_CoversEveryCanonicalTier(t *testing.T) {
 	t.Parallel()
 	prompt := buildClassifyPrompt("codex", []string{"gpt-5.5", "gpt-5.5-mini"})
@@ -29,10 +23,6 @@ func TestBuildClassifyPrompt_CoversEveryCanonicalTier(t *testing.T) {
 	}
 }
 
-// TestCompleteTiers_NearestNeighbourLadder: a tier the classifier omitted is
-// filled from its nearest present neighbour in CanonicalTiers order,
-// preferring the more-capable side on distance ties. Completion only reuses
-// ids sanitizeTierMap already validated — it never invents one.
 func TestCompleteTiers_NearestNeighbourLadder(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -73,7 +63,6 @@ func TestCompleteTiers_NearestNeighbourLadder(t *testing.T) {
 			}
 		}
 	}
-	// Purity: input map is never mutated.
 	in := map[string]string{"deep": "only"}
 	CompleteTiers(in)
 	if len(in) != 1 {

@@ -51,7 +51,6 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		t.Skip("git not on PATH")
 	}
 
-	// 1. git repo
 	repoRoot := gittest.Fixture(t).Dir
 	runGit := func(args ...string) string {
 		cmd := exec.Command("git", append([]string{"-C", repoRoot}, args...)...)
@@ -66,7 +65,6 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		return strings.TrimSpace(string(out))
 	}
 
-	// 2. Setup mock executable under go/evolve
 	goDir := filepath.Join(repoRoot, "go")
 	if err := os.MkdirAll(goDir, 0755); err != nil {
 		t.Fatal(err)
@@ -80,19 +78,16 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 3. Commit go/evolve to git
 	runGit("add", "go/evolve")
 	runGit("commit", "-m", "add mock binary")
 	commitSHA := runGit("rev-parse", "HEAD")
 
-	// Calculate the expected blob SHA
 	diskBytes, err := os.ReadFile(binAbs)
 	if err != nil {
 		t.Fatal(err)
 	}
 	blobSHA := fmt.Sprintf("%x", sha256.Sum256(diskBytes))
 
-	// 4. Setup state.json to test the expected_ship_sha repinning
 	evolveDir := filepath.Join(repoRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0755); err != nil {
 		t.Fatal(err)
@@ -111,13 +106,11 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 5. Run defaultReleaseVerify
 	err = defaultReleaseVerify(repoRoot, "1.2.3", commitSHA)
 	if err != nil {
 		t.Fatalf("defaultReleaseVerify failed: %v", err)
 	}
 
-	// 6. Verify state.json was updated
 	updatedBytes, err := os.ReadFile(statePath)
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +129,6 @@ func TestDefaultReleaseVerify_Success(t *testing.T) {
 		t.Errorf("other_field was lost or modified: %v", updatedState["other_field"])
 	}
 
-	// 7. Verify tag v1.2.3 was created
 	tags := runGit("tag", "-l", "v1.2.3")
 	if tags != "v1.2.3" {
 		t.Errorf("expected tag v1.2.3 to be created, got list: %q", tags)

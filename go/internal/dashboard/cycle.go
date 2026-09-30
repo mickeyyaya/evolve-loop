@@ -17,15 +17,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// triageDecisionFile is the triage agent's companion deliverable (written
-// beside triage-report.md per agents/evolve-triage.md); cycleoutcome,
-// triagecap and inboxmover read the same name.
 const triageDecisionFile = "triage-decision.json"
 
-// readJSON decodes path into v. Absent ⇒ (false, nil): the ordinary sparse
-// workspace shape, silent. Present but unreadable or unparsable ⇒ (false, err)
-// so the caller can surface it in Warnings — a half-written
-// failure-decision.json must never look like "no failure recorded yet".
 func readJSON(path string, v any) (bool, error) {
 	buf, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -40,7 +33,6 @@ func readJSON(path string, v any) (bool, error) {
 	return true, nil
 }
 
-// readJSONWarn is readJSON with the error rendered as a warning line.
 func readJSONWarn(path string, v any, warnings *[]string) bool {
 	ok, err := readJSON(path, v)
 	if err != nil {
@@ -49,16 +41,12 @@ func readJSONWarn(path string, v any, warnings *[]string) bool {
 	return ok
 }
 
-// triageDecision is the slice of triage-decision.json the dashboard shows.
 type triageDecision struct {
 	TopN []struct {
 		ID string `json:"id"`
 	} `json:"top_n"`
 }
 
-// readCycle assembles one cycle from its run workspace (when present) and its
-// committed dossier (when present). State is assigned afterwards by
-// assignState, because it depends on the loop's live status.
 func readCycle(root string, id int, d *dossier.Dossier) (CycleSummary, []string) {
 	cs := CycleSummary{ID: id}
 	var warnings []string
@@ -78,7 +66,6 @@ func readCycle(root string, id int, d *dossier.Dossier) (CycleSummary, []string)
 	return cs, warnings
 }
 
-// readWorkspace fills the workspace-derived fields of cs.
 func readWorkspace(ws string, cs *CycleSummary) []string {
 	var warnings []string
 	var run cyclestate.CycleState
@@ -116,10 +103,6 @@ func readWorkspace(ws string, cs *CycleSummary) []string {
 	return warnings
 }
 
-// phaseRuns turns timing entries into PhaseRuns in run order, numbers each
-// phase's occurrence, and joins the final attempt whose terminal timestamp lies
-// inside that phase window. This prevents retries in round one from shifting
-// every later repeated phase's model attribution.
 func phaseRuns(entries []phasetiming.Entry, calls []llmCall) []PhaseRun {
 	sort.SliceStable(entries, func(i, j int) bool {
 		return parseTime(entries[i].StartedAt).Before(parseTime(entries[j].StartedAt))
@@ -192,8 +175,6 @@ func callForPhaseWindow(
 		if selected, selectedIndex, ok := latestCallInWindow(window, calls, used); ok {
 			return selected, selectedIndex, true
 		}
-		// A timestamped ledger that does not overlap this entry carries no safe
-		// association; leave routing blank instead of borrowing another round.
 		for _, call := range calls {
 			if !parseTime(call.EndedAt).IsZero() || !parseTime(call.TS).IsZero() {
 				return llmCall{}, -1, false
@@ -228,18 +209,10 @@ func latestCallInWindow(window phaseCallWindow, calls []llmCall, used map[int]st
 		if !callStart.IsZero() && (callStart.Before(window.start) || callStart.After(window.end)) {
 			continue
 		}
-		// A legacy call with no start time inside the previous phase's
-		// whole-second overlap could have terminated either round. Withhold
-		// it from the later round just as nextStart withholds it from the
-		// earlier round.
 		if callStart.IsZero() && !window.previousEnd.IsZero() &&
 			!terminal.Before(window.start) && !terminal.After(window.previousEnd) {
 			continue
 		}
-		// Whole-second phase records can overlap at a repeated phase's
-		// boundary. A call that starts in the later round belongs there; a
-		// timestamp-only legacy call at or after that boundary is ambiguous
-		// and is likewise withheld from the earlier round.
 		if !window.nextStart.IsZero() && !terminal.Before(window.nextStart) &&
 			(callStart.IsZero() || !callStart.Before(window.nextStart)) {
 			continue
@@ -261,9 +234,6 @@ func countPhase(phases []string, name string) int {
 	return n
 }
 
-// assignState derives the closed-vocabulary state type and its human name.
-// "halted" is the ADR-0072 SYSTEM level (policy.LevelSystem), never a literal;
-// the brake and the running cycle both come from the loop status.
 func assignState(cs CycleSummary, loop LoopStatus) CycleSummary {
 	switch {
 	case loop.Running && loop.CycleID == cs.ID:

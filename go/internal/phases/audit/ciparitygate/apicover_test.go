@@ -14,14 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 )
 
-// Test 26 (moved intent: audit/ciparity_unit_test.go:237-245 and the pre-move
-// pins TestApicoverGates_MissingEnforceListWinsOverUnderivable /
-// TestChangedSetUnderivable_SeverityAsymmetryBytes) — the shared prologue's
-// order and the cycle-581 severity asymmetry: no module → (nil, nil); no
-// .apicover-enforce + underivable → (nil, nil) (the read precedes the
-// derivable check); enforce file + underivable → exactly the golden D1 / D2
-// offender, ONE GATE_FAILED{cause=underivable} and NO CHANGESET_UNDERIVABLE;
-// touched∩enforced empty → (nil, nil).
 func TestApicoverEnforce_InputsOrderAndSeverity(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	g, events := observed(t, fakeRunFunc(0, "", "", nil), underivableSet())
@@ -66,8 +58,6 @@ func TestApicoverEnforce_InputsOrderAndSeverity(t *testing.T) {
 	}
 }
 
-// Test 27 — each pre-verdict step failure is fail-open with the golden text
-// and ONE GATE_STEP_FAILED naming the step; an empty `go list` is a silent no-op.
 func TestApicoverEnforce_PreStepFailuresCodedByStep(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, goDir := enforcedFixture(t, "package p\n\nfunc Exported() {}\n")
@@ -125,7 +115,7 @@ func TestApicoverEnforce_PreStepFailuresCodedByStep(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	g, events = observed(t, fakeRunFunc(0, "", "", nil), fixedSet("./internal/p/...")) // go list prints nothing
+	g, events = observed(t, fakeRunFunc(0, "", "", nil), fixedSet("./internal/p/..."))
 	if off, err := g.ApicoverEnforce(req); off != nil || err != nil || len(*events) != 0 {
 		t.Errorf("empty go list: (%v, %v) events=%v, want a silent no-op", off, err, codesOf(*events))
 	}
@@ -134,9 +124,6 @@ func TestApicoverEnforce_PreStepFailuresCodedByStep(t *testing.T) {
 	}
 }
 
-// Test 28 (moved: audit/ciparity_apicover_ctx_test.go) — enforceVerdict is a
-// pure table; a ctx interruption of the in-process measurement fails OPEN with
-// the context error in the chain and ONE GATE_STEP_FAILED{step=measure}.
 func TestEnforceVerdict_PureTableAndMeasureInterruption(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	if off, err := enforceVerdict(0, nil, ""); off != nil || err != nil {
@@ -158,7 +145,7 @@ func TestEnforceVerdict_PureTableAndMeasureInterruption(t *testing.T) {
 
 	root, goDir := enforcedFixture(t, "package p\n\nfunc Exported() {}\n")
 	timeouts := DefaultTimeouts()
-	timeouts.Apicover = -time.Nanosecond // ctx born expired: the fake pre-steps ignore it; apicover.Run must not
+	timeouts.Apicover = -time.Nanosecond
 	g, events := observed(t, pipelineRunner(goDir, 0, ""), fixedSet("./internal/p/..."), WithTimeouts(timeouts))
 	off, err = g.ApicoverEnforce(tierRequest(root, ""))
 	if off != nil || err == nil || !errors.Is(err, context.DeadlineExceeded) || err.Error() != g1["apicover.measure_interrupted"] {
@@ -169,11 +156,6 @@ func TestEnforceVerdict_PureTableAndMeasureInterruption(t *testing.T) {
 	}
 }
 
-// Test 29 (moved intent: audit/ciparity_unit_test.go:250-363) — apicover runs
-// IN-PROCESS: an uncovered export → the golden offenders + ONE
-// GATE_FAILED{cause=apicover}; no executable file is created anywhere under
-// the worktree and the scratch profile files are removed; an unparseable
-// package → a measurement-error FAIL (offenders, nil), never a WARN.
 func TestApicoverEnforce_InProcessLeavesNoBinaryOrScratchAndCatchesAnUncoveredExport(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, goDir := enforcedFixture(t, "package p\n\n// Exported is public but no test names it → uncovered.\nfunc Exported() {}\n")
@@ -218,7 +200,6 @@ func TestApicoverEnforce_InProcessLeavesNoBinaryOrScratchAndCatchesAnUncoveredEx
 	}
 }
 
-// executableFiles returns the regular files under root with any exec bit set.
 func executableFiles(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
@@ -237,12 +218,6 @@ func executableFiles(t *testing.T, root string) map[string]bool {
 	return out
 }
 
-// Test 30 (moved: audit/ciparity_newpkg_test.go:196-221) — a test-only
-// ungraduated package is not an offender: ONE GRADUATION_DEFERRED{pkg, dir},
-// zero bytes on stderr, an empty (non-nil, as before) offender list; a
-// production package → exactly the golden prescriptive offender and ONE
-// GATE_FAILED{cause=ungraduated}; go/cmd/... is never flagged; the pure split
-// returns both halves.
 func TestApicoverGraduation_DeferredIsCodedNotPrinted(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, goDir := enforcedFixture(t, "package p\n")

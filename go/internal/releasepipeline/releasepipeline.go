@@ -1,34 +1,6 @@
-// Package releasepipeline ports legacy/scripts/release-pipeline.sh.
-//
-// Self-healing release pipeline driver — the single declarative entry point
-// for "publish a new release." Composes the 5 already-ported release Go
-// libraries (releasepreflight, changeloggen, versionbump, marketplacepoll,
-// rollback) plus shell-outs to release.sh (consistency check) and ship.sh
-// (atomic commit+push+gh-release-create) into the full pipeline.
-//
-// Lifecycle (each step is a no-op when DryRun):
-//
-//  0. (optional) full-dry-run preflight        [Go dry-run rehearsal; only when RequirePreflight]
-//  1. release preflight (5 gates)              [Go: releasepreflight.Run]
-//  2. changelog-gen                            [Go: changeloggen.Run]
-//  3. version-bump                             [Go: versionbump.Run]
-//  4. release.sh consistency check             [bash: legacy/scripts/utility/release.sh]
-//  5. ship.sh --class release                  [bash: legacy/scripts/lifecycle/ship.sh]
-//  6. marketplace-poll                         [Go: marketplacepoll.Run]
-//     on failure → auto-rollback               [Go: rollback.Run]
-//
-// Journal: .evolve/release-journal/<version>-<ts>.json — one file per attempt;
-// a dry run leaves the repo untouched and overwrites one
-// <tmp>/release-pipeline-dryrun-<version>.json per version.
-// rollback.Run reads it to know what to undo.
-//
-// Exit codes (cmd layer maps from sentinel errors):
-//
-//	0  — published + propagated successfully
-//	1  — pre-publish step failed (preflight, bump, changelog, release.sh)
-//	2  — ship.sh failed (nothing went out; no rollback needed)
-//	3  — post-publish (poll/refresh) failed; auto-rollback ran or was skipped
-//	10 — invalid arguments (handled in cmd layer)
+// Package releasepipeline drives `evolve release`: preflight, changelog, version
+// bump, binary rebuild, ship, marketplace poll and release verify, with
+// auto-rollback. See docs/architecture/packages/internal-releasepipeline.md.
 package releasepipeline
 
 import (
@@ -44,70 +16,43 @@ import (
 	"time"
 )
 
-// Sentinel errors. The cmd layer maps these to exit codes.
 var (
 	ErrPrePublishFailed  = errors.New("releasepipeline: pre-publish step failed")
 	ErrShipFailed        = errors.New("releasepipeline: ship.sh failed")
 	ErrPostPublishFailed = errors.New("releasepipeline: post-publish step failed")
 )
 
-// Steps is the injectable composition of step functions. Each returns the
-// step status (used for journal logging and overall outcome reporting).
-// Defaults call into the real Go libraries / bash scripts.
 type Steps struct {
-	// FullDryRunPreflight runs when RequirePreflight is true (step 0).
 	FullDryRunPreflight func(repoRoot, target string) error
 
-	Preflight    func(repoRoot, target string, dryRun, skipTests bool) error
-	ChangelogGen func(repoRoot, fromRef, toRef, target string, dryRun bool) error
-	VersionBump  func(repoRoot, target string, dryRun bool) error
-	// RebuildBinary runs `go build` with the Makefile-equivalent ldflags
-	// (pkg/version.version=<target> + commit + builtAt, from <RepoRoot>/go,
-	// output go/evolve) so the binary tracked at go/evolve is in sync with
-	// the version-bumped release AND self-reports the target version.
-	// Without this step, `evolve release X.Y.Z` ships source but leaves
-	// the marketplace binary frozen at the previous build. Source incident:
-	// v12.2.1 shipped source 2026-05-26 but marketplace binary stayed at
-	// v12.1.1 (2026-05-25). The Ship step (--class release) stages the
-	// rebuilt binary as part of the explicit release set.
+	Preflight       func(repoRoot, target string, dryRun, skipTests bool) error
+	ChangelogGen    func(repoRoot, fromRef, toRef, target string, dryRun bool) error
+	VersionBump     func(repoRoot, target string, dryRun bool) error
 	RebuildBinary   func(repoRoot, target string, dryRun bool) error
-	ReleaseSh       func(repoRoot, target string) error // consistency check
+	ReleaseSh       func(repoRoot, target string) error
 	Ship            func(repoRoot, msg, releaseNotes string) (newSHA string, err error)
 	MarketplacePoll func(repoRoot, target string, maxWait time.Duration) error
 	Rollback        func(repoRoot, journalPath, reason string) error
-	// ReleaseVerify is the terminal self-consistency proof (inbox
-	// release-rebuild-binary-not-committed, v18.3.0→v18.5.0 recurrence):
-	// tracked go/evolve on disk == the blob at <commitSHA>:go/evolve ==
-	// state.json:expected_ship_sha (re-pinned to the committed blob when
-	// stale — releases never went through repinPostCycle, which is
-	// cycle-class-only), `go/evolve --version` contains <target>, and the
-	// local tag v<target> exists at the release commit (created when the
-	// gh-side release left it remote-only). Failure → post-publish error
-	// (auto-rollback unless --no-rollback).
-	ReleaseVerify func(repoRoot, target, commitSHA string) error
+	ReleaseVerify   func(repoRoot, target, commitSHA string) error
 }
 
-// Options drives a Run() invocation.
 type Options struct {
-	Target     string
-	RepoRoot   string
-	DryRun     bool
-	NoRollback bool
-	SkipTests  bool
-	// StrictPass bool — reject WARN verdicts in preflight (treat WARN as FAIL).
-	// Set by the --strict-pass CLI flag on `evolve release` and `evolve release-preflight`.
+	Target           string
+	RepoRoot         string
+	DryRun           bool
+	NoRollback       bool
+	SkipTests        bool
 	StrictPass       bool
 	RequirePreflight bool
 	MaxPollWait      time.Duration
-	FromTag          string // optional; auto-derived from `git describe --tags --abbrev=0` if empty
-	JournalDir       string // defaulted to <RepoRoot>/.evolve/release-journal
+	FromTag          string
+	JournalDir       string
 	Stderr           io.Writer
 
 	Now   func() time.Time
 	Steps Steps
 }
 
-// Result captures per-step outcomes + the final journal path.
 type Result struct {
 	Target            string
 	JournalPath       string
@@ -118,9 +63,6 @@ type Result struct {
 	RollbackErr       error
 }
 
-// Journal is the on-disk per-publish record. release-pipeline.sh stores
-// {version, tag, commit_sha, branch, release_url, started_at, completed_at,
-// steps}. We mirror that schema for rollback.ReadJournal compat.
 type Journal struct {
 	Version     string       `json:"version"`
 	Tag         string       `json:"tag"`
@@ -132,7 +74,6 @@ type Journal struct {
 	Steps       []StepRecord `json:"steps"`
 }
 
-// StepRecord is one entry in journal.steps[].
 type StepRecord struct {
 	Step      string `json:"step"`
 	Status    string `json:"status"`
@@ -140,8 +81,6 @@ type StepRecord struct {
 	Timestamp string `json:"timestamp"`
 }
 
-// DefaultSteps wires real Go libraries / shell-outs for production use.
-// Callers should NOT use DefaultSteps in tests — pass injected stubs via Options.Steps.
 func DefaultSteps() Steps {
 	return Steps{
 		FullDryRunPreflight: defaultFullDryRunPreflight,
@@ -157,9 +96,6 @@ func DefaultSteps() Steps {
 	}
 }
 
-// applyDefaultSteps returns s with any nil function field replaced by the
-// corresponding DefaultSteps() implementation. Callers in tests supply stubs;
-// production callers supply a zero Steps{} and get the full default set.
 func applyDefaultSteps(s Steps) Steps {
 	d := DefaultSteps()
 	if s.FullDryRunPreflight == nil {
@@ -195,7 +131,6 @@ func applyDefaultSteps(s Steps) Steps {
 	return s
 }
 
-// Run executes the pipeline. Returns Result + error mapped to bash exit codes.
 func Run(opts Options) (Result, error) {
 	r, err := newReleaseRun(opts)
 	if err != nil {
@@ -209,9 +144,6 @@ func Run(opts Options) (Result, error) {
 		return r.res, err
 	}
 	if !shipped {
-		// The dry run's clean stop: ship() has already logged DRY RUN
-		// COMPLETE, and post-publish must not run against a release that was
-		// never pushed.
 		return r.res, nil
 	}
 	if err := r.postPublish(); err != nil {
@@ -221,10 +153,6 @@ func Run(opts Options) (Result, error) {
 	return r.res, nil
 }
 
-// failPostPublish records a failed post-publish step (the commit is already
-// pushed), runs the auto-rollback unless --no-rollback, and returns the
-// ErrPostPublishFailed result. Shared by marketplace-poll and release-verify
-// so the rollback semantics cannot drift between them.
 func failPostPublish(res *Result, journal *Journal, journalPath string, opts Options, steps Steps,
 	logf func(string, ...any), now func() time.Time, stepName, reasonPrefix string, err error) (Result, error) {
 	appendStep(journal, journalPath, stepName, "fail", err.Error(), now())
@@ -247,8 +175,6 @@ func failPostPublish(res *Result, journal *Journal, journalPath string, opts Opt
 	res.RollbackTriggered = true
 	return *res, wrapped
 }
-
-// --- Journal helpers ------------------------------------------------------
 
 func initJournal(opts Options, fromTag string, startedAt time.Time) (*Journal, string, error) {
 	branch, _ := currentBranch(opts.RepoRoot)
@@ -321,8 +247,6 @@ func setJournalField(j *Journal, path, field, value string) {
 	_ = writeJournal(j, path)
 }
 
-// --- git helpers -----------------------------------------------------------
-
 func resolvePrevTag(repoRoot string) (string, error) {
 	out, err := exec.Command("git", "-C", repoRoot, "describe", "--tags", "--abbrev=0").Output()
 	if err != nil {
@@ -351,11 +275,6 @@ func currentBranch(repoRoot string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// --- CHANGELOG extraction --------------------------------------------------
-
-// extractReleaseNotes reads everything between `## [<target>]` and the next
-// `## [` heading. Used to populate EVOLVE_SHIP_RELEASE_NOTES for ship.sh.
-// Empty result is acceptable (ship still proceeds, just without notes).
 func extractReleaseNotes(repoRoot, target string) string {
 	body, err := os.ReadFile(filepath.Join(repoRoot, "CHANGELOG.md"))
 	if err != nil {
@@ -368,7 +287,7 @@ func extractReleaseNotes(repoRoot, target string) string {
 	for _, line := range lines {
 		if strings.HasPrefix(line, "## [") {
 			if inBlock {
-				break // next entry — stop
+				break
 			}
 			if strings.HasPrefix(line, header) {
 				inBlock = true
@@ -381,19 +300,11 @@ func extractReleaseNotes(repoRoot, target string) string {
 	}
 	notes := strings.TrimSpace(strings.Join(out, "\n"))
 	if notes == "" {
-		// Entry not found / empty — keep the empty result (ship proceeds without
-		// notes) and do NOT emit a lone Fingerprints section.
 		return ""
 	}
 	return notes + "\n\n" + fingerprintsSection
 }
 
-// fingerprintsSection is appended to every non-empty release-notes body
-// (one-binary S2). It points corporate operators at the single macOS fingerprint
-// — the universal evolve_darwin_all.tar.gz — and the checksums.txt asset for
-// approval requests. Static text (goreleaser computes the actual SHA256s AFTER
-// notes are generated, so the literal hashes live in the checksums.txt asset,
-// not here).
 const fingerprintsSection = "## Fingerprints (corporate approval)\n\n" +
 	"The recommended macOS artifact is the universal `evolve_darwin_all.tar.gz` " +
 	"(a lipo'd x86_64 + arm64 fat binary) — one fingerprint covering both Intel " +
@@ -407,46 +318,22 @@ const fingerprintsSection = "## Fingerprints (corporate approval)\n\n" +
 	"3. Submit the universal binary's SHA256 as the one macOS approval fingerprint " +
 	"(one request per adopted version; the pin re-adopts automatically on first run)."
 
-// --- Default step implementations ------------------------------------------
-
-// defaultFullDryRunPreflight runs the Go-native preflight gates in dry-run,
-// strict mode as a pre-mutation rehearsal (step 0, opt-in via
-// --require-preflight). It REPLACES the deleted
-// legacy/scripts/release/full-dry-run.sh (script→Go migration, ADR-0062/T1.3):
-// the dead script had made --require-preflight an unconditional hard-fail. The
-// real test suite runs at the step-1 preflight, so the rehearsal sets
-// skipTests=true to stay fast and avoid double-running it; dryRun=true mutates
-// nothing; strictPass=true keeps the rehearsal at least as strict as step 1.
 func defaultFullDryRunPreflight(repoRoot, target string) error {
-	return runPreflightLib(repoRoot, target, true /*dryRun*/, true /*skipTests*/, true /*strictPass*/)
+	return runPreflightLib(repoRoot, target, true, true, true)
 }
 
-// defaultPreflight calls releasepreflight.Run with strictPass=false.
-// Production callers that need strictPass inject a closure via Run()'s
-// opts.Steps.Preflight-nil check, which captures opts.StrictPass.
 func defaultPreflight(repoRoot, target string, dryRun, skipTests bool) error {
 	return runPreflightLib(repoRoot, target, dryRun, skipTests, false)
 }
 
-// defaultChangelogGen calls changeloggen.WriteEntry.
 func defaultChangelogGen(repoRoot, fromRef, toRef, target string, dryRun bool) error {
 	return runChangelogGenLib(repoRoot, fromRef, toRef, target, dryRun)
 }
 
-// defaultVersionBump calls versionbump.Run.
 func defaultVersionBump(repoRoot, target string, dryRun bool) error {
 	return runVersionBumpLib(repoRoot, target, dryRun)
 }
 
-// defaultRebuildBinary runs `go build -o go/evolve ./cmd/evolve` from
-// <repoRoot>/go with the Makefile-equivalent ldflags (pkg/version.version =
-// target, .commit = short HEAD, .builtAt = now) so the rebuilt binary
-// self-reports the release it belongs to — release-verify asserts exactly
-// that. The output path go/evolve is the marketplace-tracked binary
-// location (matches the find-expression in skills/loop/SKILL.md).
-// Returns nil for dryRun (the orchestration layer also skips, but defense
-// in depth in case it's called directly). Test seam: callers in tests
-// can pass a fake function via Steps.RebuildBinary.
 func defaultRebuildBinary(repoRoot, target string, dryRun bool) error {
 	if dryRun {
 		return nil
@@ -468,7 +355,6 @@ func defaultRebuildBinary(repoRoot, target string, dryRun bool) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("go build: %w (stderr: %s)", err, strings.TrimSpace(stderr.String()))
 	}
-	// Sanity check that the binary actually exists where we asked.
 	binPath := filepath.Join(repoRoot, "go", "evolve")
 	if _, err := os.Stat(binPath); err != nil {
 		return fmt.Errorf("post-build stat %s: %w", binPath, err)
@@ -476,20 +362,10 @@ func defaultRebuildBinary(repoRoot, target string, dryRun bool) error {
 	return nil
 }
 
-// defaultReleaseSh calls the releaseconsistency Go library directly
-// (v11.8.2+; prior versions shelled out to legacy/scripts/utility/release.sh).
-// The cache-refresh half of the bash release.sh is intentionally not
-// reproduced here — that's environment-specific and removed entirely in
-// v12.0.0; the in-pipeline cache flow is handled by marketplace-poll.
 func defaultReleaseSh(repoRoot, target string) error {
 	return runReleaseConsistencyLib(repoRoot, target)
 }
 
-// defaultShip invokes the native evolve binary's ship subcommand
-// (v11.8.3+; prior versions shelled out to legacy/scripts/lifecycle/ship.sh).
-// Resolves the binary path via EVOLVE_GO_BIN, then <repoRoot>/go/bin/evolve,
-// then <repoRoot>/go/evolve (what rebuild-binary produces), then `evolve` on PATH.
-// Returns the new HEAD SHA after the commit lands.
 func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	binPath := resolveEvolveBin(repoRoot)
 	if binPath == "" {
@@ -500,7 +376,7 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	cmd.Env = append(os.Environ(),
 		// SSOT IPC-protocol-allowed: releasepipeline → evolve-ship subprocess
 		"EVOLVE_"+"SHIP_RELEASE_NOTES="+releaseNotes,
-		"EVOLVE_SHIP_AUTO_CONFIRM=1", // releasepipeline is non-interactive
+		"EVOLVE_SHIP_AUTO_CONFIRM=1",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("evolve ship: %v (output: %s)", err, strings.TrimSpace(string(out)))
@@ -512,18 +388,6 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	return strings.TrimSpace(string(headOut)), nil
 }
 
-// resolveEvolveBin returns a path to the native evolve binary, or "" if none is
-// callable. Resolution order:
-//
-//  1. EVOLVE_GO_BIN (if set + executable)
-//  2. <repoRoot>/go/bin/evolve (the gitignored local build — make build / runtime hooks)
-//  3. <repoRoot>/go/evolve (the tracked binary defaultRebuildBinary produces)
-//  4. `evolve` on PATH
-//
-// Step 3 is essential: the release's rebuild-binary step builds to
-// <repoRoot>/go/evolve (`go build -o evolve`, cwd go/), so the very next step
-// (ship) must resolve it there. Without it, a release on a host with no prior
-// `make build` failed "binary not found" one step after building the binary.
 func resolveEvolveBin(repoRoot string) string {
 	if p := os.Getenv("EVOLVE_GO_BIN"); p != "" && isExecutableFile(p) {
 		return p
@@ -540,14 +404,11 @@ func resolveEvolveBin(repoRoot string) string {
 	return ""
 }
 
-// isExecutableFile reports whether path exists and has any execute bit set.
 func isExecutableFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode()&0o111 != 0
 }
 
-// defaultMarketplacePoll calls marketplacepoll.Run with the default
-// marketplace directory (~/.claude/plugins/marketplaces/evo).
 func defaultMarketplacePoll(repoRoot, target string, maxWait time.Duration) error {
 	marketplaceDir := ""
 	if home, err := os.UserHomeDir(); err == nil {
@@ -556,26 +417,11 @@ func defaultMarketplacePoll(repoRoot, target string, maxWait time.Duration) erro
 	return runMarketplacePollLib(repoRoot, target, maxWait, marketplaceDir)
 }
 
-// defaultRollback calls rollback.Run.
 func defaultRollback(repoRoot, journalPath, reason string) error {
 	return runRollbackLib(repoRoot, journalPath, reason)
 }
 
-// defaultReleaseVerify is the terminal release self-consistency proof
-// (inbox release-rebuild-binary-not-committed acceptance):
-//
-//  1. sha256(disk go/evolve) == sha256(blob <commitSHA>:go/evolve) — the
-//     binary the release built is the binary the release committed. This is
-//     the structural check that failed silently in v18.3.0 and v18.5.0.
-//  2. state.json:expected_ship_sha == that sha. Releases never pass through
-//     repinPostCycle (cycle-class-only), so a stale pin here is expected on
-//     every release — re-pin to the committed blob and log, don't fail.
-//  3. `go/evolve --version` contains the target (the ldflags stamp).
-//  4. Local tag v<target> exists; `gh release create` tags remote-only, so
-//     create the local tag at the release commit when absent.
 func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
-	// Guard: binAbs is EXECUTED below; a relative repoRoot would make that a
-	// CWD-dependent execution (review MEDIUM-1).
 	if !filepath.IsAbs(repoRoot) {
 		return fmt.Errorf("release-verify: repoRoot must be absolute, got %q", repoRoot)
 	}
@@ -597,8 +443,6 @@ func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
 		return fmt.Errorf("release-verify: disk %s (%.12s…) != committed blob (%.12s…) — the released binary is not what was committed", binRel, diskSHA, blobSHA)
 	}
 
-	// Re-pin expected_ship_sha to the committed blob (best-effort: a missing
-	// state.json is not a release defect, e.g. fresh clones).
 	repinExpectedShipSHA(filepath.Join(repoRoot, ".evolve", "state.json"), target, blobSHA)
 
 	verOut, err := exec.Command(binAbs, "--version").CombinedOutput()

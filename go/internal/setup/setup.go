@@ -1,12 +1,6 @@
-// Package setup powers the `evolve setup` onboarding subcommand: the
-// deterministic core behind the in-session /setup skill.
-//
-//   - Detect  — aggregate per-CLI auth/binary/capability (reuse bridge.Doctor +
-//     capability.Inspect) + per-phase current routing (resolvellm.Resolve) +
-//     per-phase constraints (profile envelope / cross-family / allowed_clis).
-//   - Complete — stamp the first-run marker into state.json via a LOSSLESS
-//     raw-merge (never core.State WriteState, which drops unmodeled keys like
-//     expected_ship_sha).
+// Package setup powers `evolve setup` onboarding: CLI and routing detection,
+// preset recommendation, policy pin application and the first-run marker.
+// See docs/architecture/packages/internal-setup.md.
 package setup
 
 import (
@@ -26,27 +20,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
-// Version is the onboarding schema version stamped by Complete.
 const Version = 1
 
-// Roles are the phase agents the setup flow configures, in pipeline order.
-// Each is resolvable by resolvellm.Resolve and has a <role>.json profile.
 var Roles = []string{
 	"intent", "scout", "triage", "plan-reviewer", "tdd-engineer",
 	"build-planner", "builder", "tester", "auditor", "orchestrator",
 	"retrospective", "memo",
 }
 
-// --- CLI-name normalization ---
-
-// baseCLI strips driver suffixes: claude-tmux/claude-p → claude, codex-tmux →
-// codex, agy-tmux → agy.
 func baseCLI(cli string) string {
 	return strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(cli), "-tmux"), "-p")
 }
 
-// capManifest maps a base CLI to its capability-manifest stem (agy's manifest
-// file is antigravity.capabilities.json).
 func capManifest(base string) string {
 	if base == "agy" {
 		return "antigravity"
@@ -54,15 +39,8 @@ func capManifest(base string) string {
 	return base
 }
 
-// abstractTiers is the canonical vocabulary used end-to-end in the
-// pipeline: profile model_tier_default, profile model_tier_envelope, the
-// model_tier_map keys in each manifest, and resolvellm sentinel defaults.
-// One source of truth, no cross-pollination.
 var abstractTiers = []string{"fast", "balanced", "deep", "top"}
 
-// familyDriverManifest maps a base CLI family to the bridge manifest that
-// carries its model_tier_map (the interactive -tmux drivers are the multi-
-// CLI defaults; the headless variants declare no map and resolve through the same family table).
 func familyDriverManifest(base string) string {
 	switch base {
 	case "claude":
@@ -75,19 +53,11 @@ func familyDriverManifest(base string) string {
 	return base
 }
 
-// tierModelsFor resolves the abstract {fast,balanced,deep,top} tiers → this CLI's
-// NATIVE model identifier via the bridge manifest's model_tier_map (the
-// single source of truth — e.g. agy deep→Gemini 3.1 Pro (High), codex deep→
-// the family manifest's deep model, claude balanced→sonnet). When the manifest declares no entry
-// for an abstract tier, the abstract name passes through as the model
-// identifier (identity fallback — useful for legacy manifests still on the
-// v1 schema during the deprecation window). Honors operator manifest
-// overrides via bridge.LoadManifest.
 func tierModelsFor(base string) map[string]string {
 	man, err := bridge.LoadManifest(familyDriverManifest(base))
 	out := make(map[string]string, len(abstractTiers))
 	for _, tier := range abstractTiers {
-		model := tier // identity fallback if manifest missing the entry
+		model := tier
 		if err == nil {
 			if v, ok := man.ModelTierMap[tier]; ok && v != "" {
 				model = v
@@ -98,48 +68,30 @@ func tierModelsFor(base string) map[string]string {
 	return out
 }
 
-// --- Detect ---
-
-// Envelope mirrors a profile's model_tier_envelope (fast/balanced/deep).
 type Envelope struct {
 	Min     string `json:"min,omitempty"`
 	Default string `json:"default,omitempty"`
 	Max     string `json:"max,omitempty"`
 }
 
-// CLIStatus is one detected CLI family's onboarding-relevant status.
 type CLIStatus struct {
-	CLI              string   `json:"cli"` // base family: claude|codex|gemini|agy
-	BinaryPresent    bool     `json:"binary_present"`
-	BinaryPath       string   `json:"binary_path,omitempty"`
-	AuthConfigured   bool     `json:"auth_configured"`
-	AuthMode         string   `json:"auth_mode"` // SUBSCRIPTION_OAUTH|API_KEY|CUSTOM_PROXY|SUBSCRIPTION|MISCONFIGURED
-	SubscriptionType string   `json:"subscription_type,omitempty"`
-	CapabilityTier   string   `json:"capability_tier"` // full|delegated|n/a
-	Verdict          string   `json:"verdict"`         // ready|warning|blocked
-	EnvWarnings      []string `json:"env_warnings,omitempty"`
-	// TierModels maps each abstract tier (fast|balanced|deep) to THIS CLI's
-	// native model (e.g. agy deep→Gemini 3.1 Pro (High), codex deep→the family manifest's deep model), surfaced by
-	// the /setup skill so per-phase routing is self-documenting; the realizer
-	// resolves the same via tier_aliases.
-	TierModels map[string]string `json:"tier_models,omitempty"`
+	CLI              string            `json:"cli"`
+	BinaryPresent    bool              `json:"binary_present"`
+	BinaryPath       string            `json:"binary_path,omitempty"`
+	AuthConfigured   bool              `json:"auth_configured"`
+	AuthMode         string            `json:"auth_mode"`
+	SubscriptionType string            `json:"subscription_type,omitempty"`
+	CapabilityTier   string            `json:"capability_tier"`
+	Verdict          string            `json:"verdict"`
+	EnvWarnings      []string          `json:"env_warnings,omitempty"`
+	TierModels       map[string]string `json:"tier_models,omitempty"`
 }
 
-// PhaseStatus is one phase agent's current routing + constraints. Source is
-// "profile" for the profile default or "policy-pin" when a .evolve/policy.json
-// pin overrides it. PinViolation is non-empty when that pin breaches the floor
-// (cli ∉ allowed_clis, or model tier outside the envelope) — surfaced so the
-// /setup onboarding loop can fix the offending pin before it hard-fails dispatch.
 type PhaseStatus struct {
-	Role        string `json:"role"`
-	CurrentCLI  string `json:"current_cli,omitempty"`
-	CurrentTier string `json:"current_tier,omitempty"`
-	Source      string `json:"source"`
-	// DefaultCLI/DefaultTier are the PROFILE defaults (profile cli +
-	// model_tier_default), carried independently of any policy-pin overlay so the
-	// deterministic recommender (Recommend) can compute "differs from default"
-	// without re-loading the profile. Unpinned phases have these == Current*;
-	// pinned phases keep the profile default here while Current* shows the pin.
+	Role            string   `json:"role"`
+	CurrentCLI      string   `json:"current_cli,omitempty"`
+	CurrentTier     string   `json:"current_tier,omitempty"`
+	Source          string   `json:"source"`
 	DefaultCLI      string   `json:"default_cli,omitempty"`
 	DefaultTier     string   `json:"default_tier,omitempty"`
 	Envelope        Envelope `json:"envelope"`
@@ -148,22 +100,15 @@ type PhaseStatus struct {
 	PinViolation    string   `json:"pin_violation,omitempty"`
 }
 
-// DetectReport is the digest the /setup skill consumes.
 type DetectReport struct {
 	ScannedAt        string        `json:"scanned_at"`
 	CLIs             []CLIStatus   `json:"clis"`
 	Phases           []PhaseStatus `json:"phases"`
 	SetupCompletedAt string        `json:"setup_completed_at,omitempty"`
 	SetupVersion     int           `json:"setup_version,omitempty"`
-	// PolicyError is non-empty when .evolve/policy.json exists but is malformed.
-	// A malformed policy disables pin overlay (the floor still applies at
-	// dispatch); surfaced so onboarding can fix the JSON rather than silently
-	// ignore the user's pins.
-	PolicyError string `json:"policy_error,omitempty"`
+	PolicyError      string        `json:"policy_error,omitempty"`
 }
 
-// DetectOptions configures Detect. Seams (Env/Doctor/CapTier/Now) keep the
-// detection deterministic + offline in tests.
 type DetectOptions struct {
 	ProjectRoot string
 	EvolveDir   string
@@ -171,11 +116,10 @@ type DetectOptions struct {
 	AdaptersDir string
 	Env         func(string) string
 	Now         func() time.Time
-	Doctor      func(ctx context.Context) bridge.DoctorReport // default: bridge.NewEngine(Deps{}).Doctor(ctx,"",false)
-	CapTier     func(base string) string                      // default: capability.Inspect under AdaptersDir
+	Doctor      func(ctx context.Context) bridge.DoctorReport
+	CapTier     func(base string) string
 }
 
-// Detect assembles the onboarding digest.
 func Detect(ctx context.Context, o DetectOptions) DetectReport {
 	env := o.Env
 	if env == nil {
@@ -197,13 +141,8 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 		capFn = func(base string) string { return capTierFromManifest(o.AdaptersDir, base) }
 	}
 
-	// CLIs — group bridge.Doctor's per-driver rows by base family.
 	clis := detectCLIs(doctorFn(ctx), capFn, env)
 
-	// Phases — current routing + profile constraints, then the user's
-	// .evolve/policy.json pins overlaid (Step 9 removed llm_config.json; profiles
-	// own the default CLI+tier and policy pins are the user-owned override layer
-	// the /setup skill writes).
 	pol, polErr := policy.Load(filepath.Join(o.EvolveDir, "policy.json"))
 	phases := detectPhases(o, env, pol, polErr)
 
@@ -255,18 +194,12 @@ func detectPhases(o DetectOptions, env func(string) string, pol policy.Policy, p
 		if res, err := resolvellm.Resolve(role, resolvellm.Options{
 			ProjectRoot: o.ProjectRoot, PluginRoot: o.PluginRoot, Env: env,
 		}); err == nil {
-			// Step 9: resolvellm emits a tier, never an exact model.
 			ps.CurrentCLI, ps.CurrentTier, ps.Source = res.CLI, res.ModelTier, res.Source
 		}
 		if pc, ok := readProfileConstraints(profilesDir, role); ok {
 			ps.Envelope, ps.CrossFamilyWith, ps.AllowedCLIs = pc.Envelope, pc.CrossFamilyWith, pc.AllowedCLIs
 			ps.DefaultCLI, ps.DefaultTier = pc.DefaultCLI, pc.DefaultTier
 		}
-		// Overlay the policy pin (the dispatch resolver honors it absolutely) and
-		// validate it against the same floor dispatch enforces, so onboarding can
-		// fix a breaching pin before it hard-fails a real cycle. A malformed
-		// policy (polErr != nil) is reported via dr.PolicyError below — skip the
-		// overlay rather than act on a partially-parsed Policy.
 		if pin, ok := pol.PinFor(role); polErr == nil && ok {
 			ps = withPolicyPin(ps, pin, profLoader)
 		}
@@ -289,15 +222,11 @@ func withPolicyPin(ps PhaseStatus, pin policy.Pin, profLoader *profiles.Loader) 
 			ps.PinViolation = verr.Error()
 		}
 	} else {
-		// A pin for a phase with no profile can't be floor-checked — say so
-		// rather than show a false green (source=policy-pin, no violation).
 		ps.PinViolation = fmt.Sprintf("profile %s.json not found; pin cannot be validated", role)
 	}
 	return ps
 }
 
-// authMode synthesizes the auth mode. For claude the README precedence holds
-// (proxy > api-key > oauth > misconfigured); other CLIs are file-subscription.
 func authMode(base string, auth bridge.AuthInfo, env func(string) string) string {
 	if base == "claude" {
 		switch {
@@ -331,15 +260,12 @@ func capTierFromManifest(adaptersDir, base string) string {
 	return "delegated"
 }
 
-// profileConstraints is the per-phase onboarding view read from a <role>.json
-// profile: the kernel-clamp guardrails (envelope/cross-family/allowed_clis) plus
-// the profile DEFAULTS (cli + model_tier_default) the recommender baselines on.
 type profileConstraints struct {
 	Envelope        Envelope
 	CrossFamilyWith string
 	AllowedCLIs     []string
-	DefaultCLI      string // profile.cli (raw driver name, e.g. "agy-tmux")
-	DefaultTier     string // profile.model_tier_default
+	DefaultCLI      string
+	DefaultTier     string
 }
 
 func readProfileConstraints(profilesDir, role string) (profileConstraints, bool) {
@@ -379,17 +305,11 @@ func readStateMarker(evolveDir string) (string, int) {
 	return m.SetupCompletedAt, m.SetupVersion
 }
 
-// --- Complete ---
-
-// CompleteOptions configures Complete.
 type CompleteOptions struct {
 	EvolveDir string
 	Now       func() time.Time
 }
 
-// Complete stamps setupCompletedAt + setupVersion into state.json via a
-// LOSSLESS raw-merge — preserving unmodeled keys (e.g. expected_ship_sha) that
-// core.State's WriteState would drop.
 func Complete(o CompleteOptions) (string, error) {
 	now := o.Now
 	if now == nil {
@@ -421,7 +341,7 @@ func Complete(o CompleteOptions) (string, error) {
 	if err := os.WriteFile(tmp, out, 0o644); err != nil {
 		return "", fmt.Errorf("setup complete: write temp: %w", err)
 	}
-	defer func() { _ = os.Remove(tmp) }() // best-effort cleanup; no-op once the rename succeeds
+	defer func() { _ = os.Remove(tmp) }()
 	if err := os.Rename(tmp, path); err != nil {
 		return "", fmt.Errorf("setup complete: atomic rename: %w", err)
 	}

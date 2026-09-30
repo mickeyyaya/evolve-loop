@@ -14,23 +14,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// dossierFile matches knowledge-base/cycles/cycle-<N>.json.
 var dossierFile = regexp.MustCompile(`^cycle-(\d+)\.json$`)
 
-// trendPointCap bounds the per-cycle verdict strip the page draws.
 const trendPointCap = 120
 
-// dossierFileName is the committed dossier's file name for a cycle (the
-// producer's naming; used for the single-cycle fallback read).
 func dossierFileName(cycle int) string { return fmt.Sprintf("cycle-%d.json", cycle) }
 
-// dossierCache memoises parsed dossiers by (name, mtime, size) so a snapshot
-// rebuild re-parses only files that changed. ~1,800 committed dossiers would
-// otherwise be re-read on every poll tick.
 type dossierCache struct {
 	mu      sync.Mutex
 	entries map[string]cachedDossier
-	parses  int // test observability: how many parses have happened
+	parses  int
 }
 
 type cachedDossier struct {
@@ -43,9 +36,6 @@ func newDossierCache() *dossierCache {
 	return &dossierCache{entries: map[string]cachedDossier{}}
 }
 
-// load returns the parsed dossier at path, from cache when the file is
-// byte-identical by (mtime, size). A parse error is returned every time until
-// the file changes; it is never cached as a dossier.
 func (c *dossierCache) load(path string, info os.FileInfo) (*dossier.Dossier, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -65,10 +55,6 @@ func (c *dossierCache) load(path string, info os.FileInfo) (*dossier.Dossier, er
 	return d, nil
 }
 
-// loadCycle reads one cycle's dossier by name (the detail-page fallback for a
-// cycle the board's cap excluded). Absent ⇒ (nil, nil); present but
-// unreadable or torn ⇒ (nil, err) so the caller can surface it — the same
-// absent-vs-corrupt split readJSON makes.
 func (c *dossierCache) loadCycle(root string, cycle int) (*dossier.Dossier, error) {
 	path := filepath.Join(dossier.CyclesDir(root), dossierFileName(cycle))
 	info, err := os.Stat(path)
@@ -85,19 +71,13 @@ func (c *dossierCache) loadCycle(root string, cycle int) (*dossier.Dossier, erro
 	return d, nil
 }
 
-// history is what the committed dossiers say about the past.
 type history struct {
 	Trend        Trend
 	Fingerprints []FingerprintStat
-	// Dossiers is keyed by cycle so cycle summaries can pick theirs up.
-	Dossiers map[int]*dossier.Dossier
-	Warnings []string
+	Dossiers     map[int]*dossier.Dossier
+	Warnings     []string
 }
 
-// readHistory scans dossier.CyclesDir. A missing directory is an empty
-// history; an unreadable directory or a malformed dossier is a warning, never
-// a failure — and never silently "no history" (the ship-rate tile would then
-// read 0 % over 0 cycles for a repo with 1,800 records).
 func readHistory(root string, cache *dossierCache) history {
 	h := history{Dossiers: map[int]*dossier.Dossier{}}
 	dir := dossier.CyclesDir(root)
@@ -140,8 +120,6 @@ func sortedCycles(ds map[int]*dossier.Dossier) []int {
 	return out
 }
 
-// shipped is the durable "did it land" predicate: a PASS verdict, or a WARN
-// verdict that still recorded a commit. FAIL never ships.
 func shipped(d *dossier.Dossier) bool {
 	switch d.FinalVerdict {
 	case dossier.VerdictPass:
@@ -174,7 +152,6 @@ func computeTrend(cycles []int, ds map[int]*dossier.Dossier) Trend {
 	return t
 }
 
-// rate is the shipped fraction over the last n points (0 when there are none).
 func rate(points []TrendPoint, n int) float64 {
 	if n > len(points) {
 		n = len(points)
@@ -191,12 +168,9 @@ func rate(points []TrendPoint, n int) float64 {
 	return float64(shippedN) / float64(n)
 }
 
-// computeFingerprints groups FAIL dossiers by failure identity, most recent
-// last-seen first. Regressed = the fingerprint came back after a shipped cycle
-// that sits between two of its occurrences.
 func computeFingerprints(cycles []int, ds map[int]*dossier.Dossier) []FingerprintStat {
 	stats := map[string]*FingerprintStat{}
-	lastShipped := 0 // most recent shipped cycle seen so far in ascending order
+	lastShipped := 0
 	var order []string
 	for _, c := range cycles {
 		d := ds[c]

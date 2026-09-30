@@ -11,31 +11,6 @@ import (
 	"time"
 )
 
-// run_prepublish_labels_test.go pins what the six pre-publish steps put in
-// front of an operator when one fails, and what a dry run records. The
-// existing suite covers WHICH step ran and in what ORDER (TestRun_HappyPath's
-// slice equality, TestRun_RebuildBinaryStepInvokedBeforeShip,
-// TestRun_ReleaseVerify_RunsAfterPollWithShipSHA) but not the two things a
-// mechanical extraction of the repeated block is most likely to get subtly
-// wrong:
-//
-//  1. THE LABELS. Each block carries TWO names — the journal/Result step name
-//     and the error-message label — and for two of the six they deliberately
-//     DIFFER ("full-dry-run-preflight" vs "full-dry-run preflight";
-//     "release-sh-check" vs "release.sh consistency"). A helper that collapses
-//     them to one parameter silently renames half the operator-facing surface.
-//     This is not hypothetical: the sibling releasepreflight slice shipped two
-//     error-string drifts, one of which no test caught because the assertion
-//     used a looser substring than the message.
-//  2. THE JOURNAL NOTE. The failure record stores the RAW step error, not the
-//     ErrPrePublishFailed-wrapped one. Passing the wrapped error is the
-//     natural mistake when the wrap moves into a helper.
-//
-// Plus the dry-run ledger: three steps are journaled "skipped-dry-run" and
-// deliberately do NOT appear in StepsCompleted.
-
-// stepFailure returns Steps where exactly one step fails, so a test can assert
-// what that failure looks like end to end.
 func stepFailure(failing string, boom error) Steps {
 	s := allOkSteps()
 	switch failing {
@@ -68,10 +43,6 @@ func readJournalAt(t *testing.T, path string) Journal {
 	return j
 }
 
-// TestRun_PrePublishStepFailure_WrapsLabelAndJournals pins, for every
-// pre-publish step: the exact wrapped error text, the sentinel, the Result
-// ledger on both sides, and the journal's failure record (including that its
-// Note is the step's own error, unwrapped).
 func TestRun_PrePublishStepFailure_WrapsLabelAndJournals(t *testing.T) {
 	boom := errors.New("simulated")
 	for _, tc := range []struct {
@@ -115,7 +86,7 @@ func TestRun_PrePublishStepFailure_WrapsLabelAndJournals(t *testing.T) {
 				Target:           "1.2.3",
 				RepoRoot:         t.TempDir(),
 				FromTag:          "v1.2.2",
-				RequirePreflight: true, // so step 0 is in play for every row
+				RequirePreflight: true,
 				MaxPollWait:      time.Second,
 				Now:              fixedNow(t),
 				Steps:            stepFailure(tc.journalName, boom),
@@ -123,8 +94,6 @@ func TestRun_PrePublishStepFailure_WrapsLabelAndJournals(t *testing.T) {
 			if err == nil {
 				t.Fatalf("want %s to fail, got nil", tc.journalName)
 			}
-			// The label is operator-facing: it is what `evolve release` prints
-			// and the only clue to WHICH step broke. Exact, not substring.
 			if err.Error() != tc.wantErr {
 				t.Errorf("err = %q\nwant %q", err.Error(), tc.wantErr)
 			}
@@ -149,8 +118,6 @@ func TestRun_PrePublishStepFailure_WrapsLabelAndJournals(t *testing.T) {
 			if last.Status != "fail" {
 				t.Errorf("journal last status = %q, want fail", last.Status)
 			}
-			// The RAW step error, not the wrapped one: the journal is the
-			// forensic record of what the step itself reported.
 			if last.Note != "simulated" {
 				t.Errorf("journal note = %q, want the step's own error %q", last.Note, "simulated")
 			}
@@ -161,15 +128,7 @@ func TestRun_PrePublishStepFailure_WrapsLabelAndJournals(t *testing.T) {
 	}
 }
 
-// TestRun_DryRun_StepLedgerExact pins the dry-run ledger precisely: the three
-// mutating steps are journaled "skipped-dry-run" and deliberately absent from
-// StepsCompleted, the run stops at ship, and nothing downstream is recorded.
 func TestRun_DryRun_StepLedgerExact(t *testing.T) {
-	// JournalDir is pinned to this test's own TempDir on purpose: a dry run
-	// otherwise journals to os.TempDir()/release-pipeline-dryrun-<pid>.json,
-	// which every dry-run test in the binary shares. This is the first test
-	// to assert the journal's contents EXACTLY, so it is the one that would
-	// go flaky the day someone adds t.Parallel() to a sibling.
 	res, err := Run(Options{
 		Target:      "1.2.3",
 		RepoRoot:    t.TempDir(),
@@ -220,16 +179,6 @@ func TestRun_DryRun_StepLedgerExact(t *testing.T) {
 	}
 }
 
-// TestReleaseNotes_BannerOnlyWhenNotesExist covers the two branches the
-// extraction exposed. They were always there — inline inside Run, where their
-// statements counted toward a large covered function — but nothing exercised
-// them, so isolating releaseNotes dropped package coverage. That is the
-// extraction doing its job: a branch nobody tested is now visible as one.
-//
-// The contract: an empty changelog entry yields empty notes and NO banner (the
-// banner would otherwise be a header with nothing under it, and the
-// Fingerprints section has the same non-empty guard); a real entry gets the
-// release-class banner prepended, separated by a blank line.
 func TestReleaseNotes_BannerOnlyWhenNotesExist(t *testing.T) {
 	t.Run("no changelog entry yields no notes and no banner", func(t *testing.T) {
 		r := &releaseRun{
@@ -257,17 +206,9 @@ func TestReleaseNotes_BannerOnlyWhenNotesExist(t *testing.T) {
 		if !strings.Contains(notes, "Feature A") {
 			t.Errorf("releaseNotes lost the changelog body: %q", notes)
 		}
-		// Assert the banner by its actual prefix, which every variant in
-		// classify.go shares. An earlier version of this test inferred the
-		// banner's presence from the notes NOT starting with the changelog
-		// body — which was fixture-coincidental and would have passed even if
-		// the banner were replaced by arbitrary text.
 		if !strings.HasPrefix(notes, "**Release class:") {
 			t.Errorf("notes not prefixed by a release-class banner: %q", notes)
 		}
-		// repo is not a git repo, so classification fails and the banner is
-		// stamped fail-closed — the documented posture — and the failure is
-		// logged rather than silently dropped.
 		var warned bool
 		for _, l := range logged {
 			if strings.Contains(l, "release-class classification failed") {

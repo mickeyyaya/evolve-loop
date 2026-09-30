@@ -17,8 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 10 — the ten codes are registered under module audit with docs, the
-// five budgets and the twelve allowlist keys are the pre-extraction values.
 func TestCodes_TenRegisteredUnderModuleAuditWithDocs(t *testing.T) {
 	codes := []signalcenter.Code{CodeChangeSetUnderivable, CodeGateStepFailed, CodeGateFailed, CodeTierEnvExclusiveSkipped,
 		CodeTierFlakeAbsorbed, CodeTierDeadlineNoVerdict, CodeTierRetakeExecFailed, CodeTierLockUnavailable, CodeTierLogWriteFailed, CodeGraduationDeferred}
@@ -40,10 +38,6 @@ func TestCodes_TenRegisteredUnderModuleAuditWithDocs(t *testing.T) {
 	}
 }
 
-// Test 11 — Request has exactly the four declared fields: a positional
-// literal is a build break when a field is added, so the host projection is
-// revisited instead of silently passing a zero value. The two root rules are
-// distinct and named.
 func TestRequest_HasExactlyTheDeclaredFields(t *testing.T) {
 	r := Request{7, "/project", "/worktree", "/workspace"}
 	if r.root() != "/worktree" || r.lockRoot() != "/project" {
@@ -61,7 +55,6 @@ func TestRequest_HasExactlyTheDeclaredFields(t *testing.T) {
 	}
 }
 
-// enforcedFixture is a go module with ./internal/p enforced and holding src.
 func enforcedFixture(t *testing.T, src string) (root, goDir string) {
 	t.Helper()
 	root, goDir = goWorktree(t)
@@ -77,8 +70,6 @@ func enforcedFixture(t *testing.T, src string) (root, goDir string) {
 	return root, goDir
 }
 
-// pipelineRunner fakes the toolchain forks: `go list` answers with the
-// fixture's package dir; every other command exits with code and out.
 func pipelineRunner(goDir string, code int, out string) func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
 	return func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
 		if args[0] == "list" {
@@ -90,9 +81,6 @@ func pipelineRunner(goDir string, code int, out string) func(context.Context, st
 	}
 }
 
-// Test 31 — (a) a clean five-gate run emits NOTHING and writes nothing to
-// stderr; (b) every FAIL emits exactly one GATE_FAILED with gate, cause,
-// offenders == len and first == offenders[0].
 func TestGates_CleanRunEmitsNothing_AndEveryFailEmitsOneGateFailed(t *testing.T) {
 	root, goDir := enforcedFixture(t, "package p\n\nfunc helper() {}\n")
 	g, events := observed(t, pipelineRunner(goDir, 0, ""), fixedSet("./internal/p/..."))
@@ -118,8 +106,6 @@ func TestGates_CleanRunEmitsNothing_AndEveryFailEmitsOneGateFailed(t *testing.T)
 	if err := os.WriteFile(filepath.Join(goDir, "internal", "brandnew", "x.go"), []byte("package brandnew\n\nfunc Exported() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// vet, acs-durable and the tier are red; apicover's pre-steps stay green
-	// so the in-process measurement is what finds the uncovered export.
 	red := func(ctx context.Context, name, dir string, args, env []string, in io.Reader, so, se io.Writer) (int, error) {
 		if args[0] == "vet" || (args[0] == "test" && args[1] != "-tags") {
 			_, _ = io.WriteString(so, "--- FAIL: TestGenuine (0.01s)\nFAIL\tpkg\t2.0s\n")
@@ -144,13 +130,6 @@ func TestGates_CleanRunEmitsNothing_AndEveryFailEmitsOneGateFailed(t *testing.T)
 	}
 }
 
-// Test 32 — the Null Object and the live accessor: no option, or an accessor
-// returning nil, → SignalsWired false and the gate runs to its golden
-// verdict; a recording Center on a red-then-green tier under a held lock
-// (timed out on the injected clock) with an unwritable Workspace yields the
-// ordered stream golden G5 — the attempt-1 write PRECEDES the lock wait — and
-// every event carries module, kind, severity, origin, phase and cycle. On a
-// writable Workspace the sleep hook sees attempt 1 on disk during the wait.
 func TestSignals_NullObjectLiveAccessorAndStreamGolden(t *testing.T) {
 	root, _ := goWorktree(t)
 	script := []step{{1, "--- FAIL: TestFlaky (0.00s)\nFAIL\tpkg\t1.0s\n"}, {0, "ok\n"}}
@@ -175,7 +154,7 @@ func TestSignals_NullObjectLiveAccessorAndStreamGolden(t *testing.T) {
 	clock := func() (func() time.Time, func(time.Duration)) {
 		tick := 0
 		base := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
-		return func() time.Time { tick++; return base.Add(time.Duration(tick-1) * 3 * time.Minute) }, func(time.Duration) {} // deadline now+5m; one 3 m step polls once, the next times out
+		return func() time.Time { tick++; return base.Add(time.Duration(tick-1) * 3 * time.Minute) }, func(time.Duration) {}
 	}
 	wsFile := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(wsFile, []byte("x"), 0o644); err != nil {
@@ -219,10 +198,6 @@ func TestSignals_NullObjectLiveAccessorAndStreamGolden(t *testing.T) {
 	}
 }
 
-// Test 39 (review fold — architecture LOW 4) — warn's kv are key/value PAIRS,
-// a programming contract like the nil runner: an odd trailing key panics at
-// the producer (before any event is emitted) instead of silently dropping a
-// field a triage would then never see.
 func TestWarn_OddTrailingKeyPanicsBeforeEmitting(t *testing.T) {
 	g, events := observed(t, nil, nil)
 	defer func() {

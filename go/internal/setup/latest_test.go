@@ -1,14 +1,5 @@
 package setup
 
-// latest_test.go — the read-only "is a newer model live on the bridge" probe
-// behind `evolve setup latest` (operator directive: /evo:setup must check the
-// latest GPT-class model the CLI bridge actually offers and present it as an
-// option, instead of trusting the possibly-stale catalog/manifest tier map).
-//
-// Pure core only: candidates + current dispatch model + the CLI's freshness
-// policy in, (latest, stale) out. The live capture and the catalog read are
-// the cmd adapter's job.
-
 import (
 	"encoding/json"
 	"strings"
@@ -35,9 +26,6 @@ func TestComputeLatest_CurrentAlreadyFreshestIsNotStale(t *testing.T) {
 	}
 }
 
-// A newer model in a DIFFERENT lineage must not mark the map stale: promotion
-// never crosses buckets (the modelquery.PromoteLatest invariant, held here
-// too) — "there is a newer o-series" says nothing about the gpt-5 line.
 func TestComputeLatest_OtherLineageNeverPromotes(t *testing.T) {
 	t.Parallel()
 	if latest, stale, observed := ComputeLatest("gpt-5.5", []string{"o5", "claude-x"}, modelquery.FreshnessPolicy{}); stale || latest != "gpt-5.5" || observed {
@@ -45,9 +33,6 @@ func TestComputeLatest_OtherLineageNeverPromotes(t *testing.T) {
 	}
 }
 
-// Alias-resolving CLIs (claude: bare "opus" tracks the newest release at
-// launch) prefer the alias over any concrete id — caching a concrete version
-// would freeze what the alias already outruns.
 func TestComputeLatest_AliasPreferredWhenPolicySaysSo(t *testing.T) {
 	t.Parallel()
 	fp := modelquery.FreshnessPolicy{PreferAlias: true, AliasIDs: []string{"opus"}}
@@ -64,9 +49,6 @@ func TestComputeLatest_EmptyCurrentIsInert(t *testing.T) {
 	}
 }
 
-// The tier WORD itself (the identity fallback when a manifest has no map)
-// must read as never-observed — "deep is the freshest in its line" was a
-// fabricated verdict the live smoke surfaced (review finding).
 func TestComputeLatest_TierWordFallbackIsNotObserved(t *testing.T) {
 	t.Parallel()
 	if _, stale, observed := ComputeLatest("deep", []string{"qwen3", "llama4"}, modelquery.FreshnessPolicy{}); stale || observed {
@@ -74,8 +56,6 @@ func TestComputeLatest_TierWordFallbackIsNotObserved(t *testing.T) {
 	}
 }
 
-// TestFamilyLatestAndLatestReport_AreTheWireShape names the two exported
-// types (apicover) and pins the JSON keys the /evo:setup skill reads.
 func TestFamilyLatestAndLatestReport_AreTheWireShape(t *testing.T) {
 	t.Parallel()
 	rep := LatestReport{Source: "live", CLIs: []FamilyLatest{{

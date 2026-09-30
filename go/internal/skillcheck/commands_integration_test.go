@@ -7,11 +7,8 @@ import (
 	"testing"
 )
 
-// TestRun_GenerateWritesCommandStubs proves `skills generate` materializes a
-// commands/<name>.md for every skill (delegating to evo:<name>), and that a
-// follow-up check is clean — the projection is idempotent.
 func TestRun_GenerateWritesCommandStubs(t *testing.T) {
-	tmp := prepareSkillsTree(t) // skills present, commands/ absent
+	tmp := prepareSkillsTree(t)
 	var out, errBuf strings.Builder
 	if code := Run(tmp, true, &out, &errBuf); code != 0 {
 		t.Fatalf("generate: exit %d\nstderr:\n%s", code, errBuf.String())
@@ -32,7 +29,6 @@ func TestRun_GenerateWritesCommandStubs(t *testing.T) {
 	}
 }
 
-// TestRun_CheckDetectsMissingCommand: deleting a generated stub trips the gate.
 func TestRun_CheckDetectsMissingCommand(t *testing.T) {
 	tmp := prepareSkillsTree(t)
 	var out, errBuf strings.Builder
@@ -52,20 +48,17 @@ func TestRun_CheckDetectsMissingCommand(t *testing.T) {
 	}
 }
 
-// TestRun_OrphanCommand: a generated stub whose skill no longer exists is
-// flagged by check and reaped by generate; a hand-authored command (no marker)
-// is never touched.
 func TestRun_OrphanCommand(t *testing.T) {
 	tmp := prepareSkillsTree(t)
 	var out, errBuf strings.Builder
 	if code := Run(tmp, true, &out, &errBuf); code != 0 {
 		t.Fatalf("generate: exit %d", code)
 	}
-	orphan := filepath.Join(tmp, "commands", "ghost.md") // generated marker, skill removed
+	orphan := filepath.Join(tmp, "commands", "ghost.md")
 	if err := os.WriteFile(orphan, []byte(RenderCommandStub("ghost", "x", "")), 0o644); err != nil {
 		t.Fatalf("write orphan: %v", err)
 	}
-	hand := filepath.Join(tmp, "commands", "handmade.md") // no marker — must survive
+	hand := filepath.Join(tmp, "commands", "handmade.md")
 	if err := os.WriteFile(hand, []byte("---\ndescription: mine\n---\nhand-authored\n"), 0o644); err != nil {
 		t.Fatalf("write hand: %v", err)
 	}
@@ -89,18 +82,12 @@ func TestRun_OrphanCommand(t *testing.T) {
 	}
 }
 
-// TestRun_LegacyPrefixedStubReaped pins the /evo-<name> → /evo:<name> migration:
-// a legacy evo-<skill>.md stub (the pre-namespace convention, marker-bearing) must
-// be reaped by generate even though the skill still exists, because the skill now
-// projects to the BARE <skill>.md. Without this, every old evo-*.md would linger
-// and surface as a stale /evo:evo-<name> double-namespaced duplicate.
 func TestRun_LegacyPrefixedStubReaped(t *testing.T) {
 	tmp := prepareSkillsTree(t)
 	var out, errBuf strings.Builder
 	if code := Run(tmp, true, &out, &errBuf); code != 0 {
 		t.Fatalf("generate: exit %d", code)
 	}
-	// loop is a live skill; plant the legacy prefixed stub alongside the new bare one.
 	legacy := filepath.Join(tmp, "commands", "evo-loop.md")
 	if err := os.WriteFile(legacy, []byte(RenderCommandStub("loop", "x", "")), 0o644); err != nil {
 		t.Fatalf("write legacy stub: %v", err)

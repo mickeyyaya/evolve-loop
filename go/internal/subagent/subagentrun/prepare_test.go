@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// Test 29 — the artifact placement table: workers under the workspace, the
-// template expanded under the root, an absolute template kept, an empty
-// template proceeds with "" (quirk Q1).
 func TestPrepare_ArtifactPathTable(t *testing.T) {
 	f := newFixture(t)
 	if got := ResolveArtifactPath("", 7, f.root); got != "" {
@@ -49,8 +46,6 @@ func TestPrepare_ArtifactPathTable(t *testing.T) {
 	}
 }
 
-// Test 30 — a regular file where the artifact directory goes is
-// `mkdir artifact dir: <err>` with step=artifact_dir.
 func TestPrepare_MkdirErrorIsPrepareFailed(t *testing.T) {
 	f := newFixture(t)
 	if err := os.WriteFile(filepath.Join(f.root, ".evolve"), []byte("x"), 0o644); err != nil {
@@ -66,8 +61,6 @@ func TestPrepare_MkdirErrorIsPrepareFailed(t *testing.T) {
 	}
 }
 
-// Test 31 — the token: the override verbatim without touching the entropy,
-// a mint of 16 hex, the entropy error, the unprefixed short-read text.
 func TestMintToken_LengthRandErrPartialReadAndOverride(t *testing.T) {
 	tok, err := MintToken(func(b []byte) (int, error) {
 		for i := range b {
@@ -101,8 +94,6 @@ func TestMintToken_LengthRandErrPartialReadAndOverride(t *testing.T) {
 	}
 }
 
-// Test 32 — the git fallback: an error or an empty value stamps "unknown"
-// and is ONE GIT_STATE_UNKNOWN; both present is silent.
 func TestPrepare_GitStateUnknownSignalsOnce(t *testing.T) {
 	f := newFixture(t)
 	cases := []struct {
@@ -143,7 +134,6 @@ func TestPrepare_GitStateUnknownSignalsOnce(t *testing.T) {
 	}
 }
 
-// Test 33 — a failing prompt reader is `read prompt: <err>` with step=prompt.
 func TestPrepare_PromptReadError(t *testing.T) {
 	f := newFixture(t)
 	d, r := observed(t, happyDeps(t))

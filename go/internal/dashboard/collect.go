@@ -15,40 +15,27 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// defaultMaxCycles bounds the cycle list the board renders. Every cycle with
-// a run workspace on disk is always included; dossier-only history fills the
-// remainder, newest first.
 const defaultMaxCycles = 40
 
-// workspaceDir matches a live run workspace name. `cycle-N.polluted-<stamp>`
-// (a quarantined duplicate) and `archive/` are deliberately excluded.
 var workspaceDir = regexp.MustCompile(`^cycle-(\d+)$`)
 
-// collector holds the caches a repeated collect reuses between poll ticks.
 type collector struct {
 	root      string
 	cache     *dossierCache
 	streams   *streamReader
 	maxCycles int
-	env       map[string]string // the operator's environment (Options.Env); nil = no overrides
+	env       map[string]string
 }
 
 func newCollector(root string) *collector {
 	return &collector{root: root, cache: newDossierCache(), streams: newStreamReader(), maxCycles: defaultMaxCycles}
 }
 
-// Collect reads the project root once and returns the whole picture with no
-// operator environment injected (the mandatory set is the registry's alone);
-// the server keeps a collector so unchanged dossiers are not re-parsed on
-// every tick, and Server.Snapshot is the one-shot form that carries the env.
 func Collect(root string, now time.Time) *Snapshot {
 	snap, _ := newCollector(root).collect(now)
 	return snap
 }
 
-// collect builds the snapshot and returns the dossier map it was built from,
-// so the detail handler can serve a cycle from the same epoch without a second
-// scan of the corpus.
 func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier) {
 	snap := &Snapshot{GeneratedAt: now, Root: c.root}
 	var warns []string
@@ -94,8 +81,6 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 
 func (c *collector) renderedCycleIDs(h history, runs map[int]LoopStatus) ([]int, string) {
 	ids, warn := c.selectCycles(h)
-	// History limits may never hide a live lane, even when all active lanes
-	// together exceed the configured history limit.
 	selected := map[int]bool{}
 	for _, id := range ids {
 		selected[id] = true
@@ -109,8 +94,6 @@ func (c *collector) renderedCycleIDs(h history, runs map[int]LoopStatus) ([]int,
 	return ids, warn
 }
 
-// selectCycles returns the cycle ids to render, newest first: every run
-// workspace, then the newest dossier-only cycles up to maxCycles.
 func (c *collector) selectCycles(h history) ([]int, string) {
 	set := map[int]bool{}
 	wsIDs, warn := workspaceCycles(c.root)
@@ -132,12 +115,8 @@ func (c *collector) selectCycles(h history) ([]int, string) {
 	return ids, warn
 }
 
-// runsDir is <root>/.evolve/runs, the parent of every run workspace.
 func runsDir(root string) string { return filepath.Join(paths.EvolveDirOf(root), "runs") }
 
-// workspaceCycles lists the live run workspace ids under .evolve/runs/. A
-// missing directory is the empty project; an unreadable one is reported — a
-// silent nil would empty the board AND freeze the change fingerprint.
 func workspaceCycles(root string) ([]int, string) {
 	dir := runsDir(root)
 	entries, err := os.ReadDir(dir)
@@ -157,10 +136,6 @@ func workspaceCycles(root string) ([]int, string) {
 	return ids, ""
 }
 
-// roundHistogram buckets CLOSED cycles that still have a workspace by the
-// number of audit rounds they took, with how many of each shipped — the
-// convergence view of the repair loop. Dossiers do not record rounds, so the
-// histogram is bounded to the workspaces still on disk.
 func roundHistogram(cycles []CycleSummary) []RoundBucket {
 	buckets := map[int]*RoundBucket{}
 	for _, cs := range cycles {

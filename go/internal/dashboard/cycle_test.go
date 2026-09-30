@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// writeWorkspace seeds a cycle run workspace with the artifacts a finished
-// cycle leaves behind, in their live shapes: run.json (cyclestate.CycleState),
-// phase-timing.json ([]phasetiming.Entry), llm-calls.ndjson,
-// triage-decision.json.
 func writeWorkspace(t *testing.T, root string, id int, timing []phasetiming.Entry, rounds int) string {
 	t.Helper()
 	ws := core.RunWorkspacePath(root, id)

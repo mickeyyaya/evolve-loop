@@ -1,48 +1,22 @@
 package scopedelta
 
-// gaming_test.go — how the adjudication tells MEANINGFUL out-of-scope work
-// apart from work that is gaming its own evaluation.
-//
-// The premise the rest of this package rests on: a justification is authored by
-// the party that benefits from it, so no criterion built on reading the
-// justification survives a better-written one. The discriminators here are
-// therefore all relationships between the change and something the producing
-// agent does NOT control.
-//
-//	D1 counterfactual necessity — does anything fail WITHOUT it?
-//	D2 signal vs subject       — does it edit the thing being judged, or the
-//	                             apparatus doing the judging?
-//	D3 direction of effect     — does it LOOSEN the bar or tighten it?
-//	D4 corroboration           — does anything the agent did not author agree?
-//
-// The honest limit is stated in the code: none of this decides whether an
-// uncorroborated claim is TRUE. It decides what may ship on the strength of it,
-// and the default for the undecidable case is CARVE — preserve, do not ship —
-// so a missed gaming attempt gains nothing and a missed meaningful change loses
-// nothing but time.
-
 import (
 	"strings"
 	"testing"
 )
 
-// --- D2: what a path DOES in the pipeline -------------------------------
-
 func TestSurfaceOf_SeparatesTheJudgedFromTheJudging(t *testing.T) {
 	t.Parallel()
 	signal := []string{
-		"go/internal/deliverable/reviewer_test.go", // a test
-		"go/acs/cycle1441/predicates_test.go",      // an acceptance predicate
-		"go/internal/deliverable/reviewer.go",      // wait: product code, see subject
-		"agents/evolve-auditor.md",                 // the persona that grades
-		".evolve/policy.json",                      // the dials the gates read
-		".evolve/bad-verdict-baseline.jsonl",       // evidence a report cites
-		"go/internal/phases/ship/repocontract.go",  // a gate
-		".evolve/runs/cycle-1450/audit-report.md",  // the graded artifact itself
+		"go/internal/deliverable/reviewer_test.go",
+		"go/acs/cycle1441/predicates_test.go",
+		"go/internal/deliverable/reviewer.go",
+		"agents/evolve-auditor.md",
+		".evolve/policy.json",
+		".evolve/bad-verdict-baseline.jsonl",
+		"go/internal/phases/ship/repocontract.go",
+		".evolve/runs/cycle-1450/audit-report.md",
 	}
-	// reviewer.go is product code — it is judged, not judging. Kept in the list
-	// above deliberately to force the distinction to be about ROLE, not about
-	// which package a file lives in.
 	subject := []string{
 		"go/internal/deliverable/reviewer.go",
 		"go/internal/salvage/extract.go",
@@ -63,12 +37,6 @@ func TestSurfaceOf_SeparatesTheJudgedFromTheJudging(t *testing.T) {
 	}
 }
 
-// --- D3: the direction that matters -------------------------------------
-
-// Nobody games by raising their own bar. A change that LOOSENS the apparatus
-// judging the change is the strongest single signal available, and it is the
-// one case where the justification is irrelevant: an agent that needs a weaker
-// test to pass has told us what it could not do.
 func TestAdmissible_LooseningTheJudgingApparatusIsNeverKeptOnTheProducersWord(t *testing.T) {
 	t.Parallel()
 	e := Entry{
@@ -83,15 +51,12 @@ func TestAdmissible_LooseningTheJudgingApparatusIsNeverKeptOnTheProducersWord(t 
 	if err := Admissible(e); err == nil {
 		t.Error("a KEEP that LOOSENS the apparatus judging this very change was admitted on the producer's adjudication — that is the shape of every test-weakening")
 	}
-	// Even fully corroborated, it may be preserved and escalated, never kept.
 	e.Disposition = DispositionCarve
 	e.PatchRef = "p"
 	if err := Admissible(e); err != nil {
 		t.Errorf("carving a loosening change is the right disposition, got %v", err)
 	}
 
-	// Tightening is the mirror image: it raises the bar the agent is held to,
-	// so it is admissible on ordinary corroboration.
 	e = Entry{
 		Path: "go/acs/cycle1441/predicates_test.go", Class: ClassDiscovered,
 		Disposition: DispositionKeep, Effect: EffectTightens,
@@ -103,11 +68,6 @@ func TestAdmissible_LooseningTheJudgingApparatusIsNeverKeptOnTheProducersWord(t 
 	}
 }
 
-// --- D1 + D4: the claim must cost something to make ----------------------
-
-// "I found a real bug" is unfalsifiable from the text. It becomes checkable the
-// moment the agent has to name what fails without the change — a counterfactual
-// it can only produce by actually having done the work.
 func TestAdmissible_KeepRequiresCorroborationFromOutsideTheAuthor(t *testing.T) {
 	t.Parallel()
 	base := Entry{
@@ -119,23 +79,18 @@ func TestAdmissible_KeepRequiresCorroborationFromOutsideTheAuthor(t *testing.T) 
 		t.Error("an uncorroborated KEEP shipped on narrative alone — the one thing an agent can always produce")
 	}
 
-	// A named, executed counterfactual is corroboration: the command and its
-	// direction are checkable by someone else.
 	withProof := base
 	withProof.Corroboration = Corroboration{FailsWithout: true, Command: "go test ./internal/router/ -run TestPick_EmptyCandidates"}
 	if err := Admissible(withProof); err != nil {
 		t.Errorf("a counterfactual-backed keep is exactly what meaningful work looks like: %v", err)
 	}
 
-	// So is a pre-existing queued item: the finding was known BEFORE this agent
-	// claimed it, so the claim is not self-minted.
 	withItem := base
 	withItem.Corroboration = Corroboration{QueuedItemID: "router-empty-candidate-nil-deref"}
 	if err := Admissible(withItem); err != nil {
 		t.Errorf("a keep corroborated by a pre-existing item must be admissible: %v", err)
 	}
 
-	// A claimed counterfactual with no command is not a counterfactual.
 	hollow := base
 	hollow.Corroboration = Corroboration{FailsWithout: true}
 	if err := Admissible(hollow); err == nil {
@@ -143,9 +98,6 @@ func TestAdmissible_KeepRequiresCorroborationFromOutsideTheAuthor(t *testing.T) 
 	}
 }
 
-// Computed closure needs no corroboration: the closure RULE is the thing the
-// agent does not control, so demanding a second proof would only tax the one
-// class that is already mechanically established.
 func TestAdmissible_ComputedClosureNeedsNoFurtherProof(t *testing.T) {
 	t.Parallel()
 	e := Entry{
@@ -157,11 +109,6 @@ func TestAdmissible_ComputedClosureNeedsNoFurtherProof(t *testing.T) {
 	}
 }
 
-// --- The population view: gaming is rarely a single instance -------------
-
-// One "I fixed an adjacent bug" is unfalsifiable. Twenty of them, all editing
-// the apparatus, all loosening, is a pattern no single adjudication can see —
-// which is why the shape of the whole delta is reported, not just each entry.
 func TestGamingSignals_SurfaceThePatternNoSingleEntryShows(t *testing.T) {
 	t.Parallel()
 	entries := []Entry{
@@ -179,14 +126,10 @@ func TestGamingSignals_SurfaceThePatternNoSingleEntryShows(t *testing.T) {
 		t.Errorf("a signal-heavy delta must be named; got %q", joined)
 	}
 
-	// A clean delta says nothing — no zero-noise, or the signal stops meaning
-	// anything.
 	if s := GamingSignals([]Entry{{Path: "x.go", Class: ClassDiscovered, Disposition: DispositionCarve, Reason: "r", PatchRef: "p"}}); len(s) != 0 {
 		t.Errorf("an ordinary delta must raise nothing, got %v", s)
 	}
 }
-
-// --- Wiring the discriminators into the one blocking seam ---------------
 
 func TestAccount_InadmissibleKeepsBlockTheShip(t *testing.T) {
 	t.Parallel()
@@ -203,12 +146,6 @@ func TestAccount_InadmissibleKeepsBlockTheShip(t *testing.T) {
 	}
 }
 
-// --- Second-review BLOCK: the hinge was not enforced at the admitting seam --
-
-// The cheapest bypass in the package was one string field: declare
-// Class:"closure" and the whole evidence layer is skipped. Classify enforces
-// "closure is computed, never claimed" — but nothing forced an adjudication
-// record through Classify, and Admissible read the declared field.
 func TestAccount_DeclaredClosureIsReDerived(t *testing.T) {
 	t.Parallel()
 	scope := Scope{Cycle: 1450, Declared: []string{"go/internal/salvage/extract.go"}}
@@ -221,7 +158,6 @@ func TestAccount_DeclaredClosureIsReDerived(t *testing.T) {
 	if res.OK() {
 		t.Error("a self-declared closure that NO rule covers was admitted — that is the anti-gaming hinge bypassed by one string field")
 	}
-	// The genuine article still passes: a rule actually covers it.
 	res = Account([]string{"go/internal/salvage/extract.go", "go/internal/salvage/extract_test.go"},
 		scope, DefaultClosureRules(),
 		[]Entry{{Path: "go/internal/salvage/extract_test.go", Class: ClassClosure,
@@ -231,9 +167,6 @@ func TestAccount_DeclaredClosureIsReDerived(t *testing.T) {
 	}
 }
 
-// The mirror failure: in-scope work is not a delta and must never be asked to
-// corroborate itself, or the fix for false-REDs becomes a false-RED generator
-// on every honest cycle.
 func TestAdmissible_InScopeWorkIsNeverAskedToCorroborate(t *testing.T) {
 	t.Parallel()
 	e := Entry{Path: "go/internal/salvage/extract.go", Class: ClassInScope,
@@ -243,8 +176,6 @@ func TestAdmissible_InScopeWorkIsNeverAskedToCorroborate(t *testing.T) {
 	}
 }
 
-// An unset direction on a signal-surface KEEP must not read as a safe one:
-// omission is the cheapest possible claim, and EffectUnknown is the zero value.
 func TestAdmissible_UnknownDirectionOnASignalSurfaceIsNotSafe(t *testing.T) {
 	t.Parallel()
 	e := Entry{Path: "go/acs/cycle1450/predicates_test.go", Class: ClassDiscovered,
@@ -255,8 +186,6 @@ func TestAdmissible_UnknownDirectionOnASignalSurfaceIsNotSafe(t *testing.T) {
 	}
 }
 
-// One test edit is ordinary work. The majority rule degenerated to a presence
-// rule at len==1, so the commonest honest delta tripped the alarm.
 func TestGamingSignals_DoNotFireOnTheModalHonestDelta(t *testing.T) {
 	t.Parallel()
 	only := []Entry{{Path: "go/internal/salvage/extract_test.go", Class: ClassClosure,
@@ -266,8 +195,6 @@ func TestGamingSignals_DoNotFireOnTheModalHonestDelta(t *testing.T) {
 	}
 }
 
-// Two entries for one path with contradictory dispositions both validated, and
-// whichever the consumer read first decided what shipped.
 func TestAccount_RefusesContradictoryDuplicateDecisions(t *testing.T) {
 	t.Parallel()
 	res := Account([]string{"x.go"}, Scope{Cycle: 1}, DefaultClosureRules(), []Entry{

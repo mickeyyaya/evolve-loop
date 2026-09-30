@@ -11,17 +11,10 @@ import (
 	"time"
 )
 
-// ledger_test.go — the host's ten direct ledger-writer tests moved (ADR-0103
-// unit 16 D5) with their callee adapted from writeSubprocessLedger(path, e,
-// now) error to the dispatcher-owned appendLedger(path, e) (op, err): the
-// clock is the dispatcher's, the op is asserted.
-
 func fixedNowFn() func() time.Time {
 	return func() time.Time { return time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC) }
 }
 
-// writer is a dispatcher whose only live collaborators are the clock and the
-// ledger opener.
 func writer(t *testing.T, opts ...Option) *Dispatcher {
 	t.Helper()
 	return New(Deps{}, append([]Option{WithClock(fixedNowFn())}, opts...)...)
@@ -40,10 +33,6 @@ func writeAndRead(t *testing.T, e ledgerEntry) string {
 	return strings.TrimSpace(string(b))
 }
 
-// Test 45 — the line, the tip and the chain are byte-identical to the goldens
-// captured on the pre-extraction writer; the run id rides as an argument
-// (format verbs stay literal), is omitted when empty and decodes for the
-// binding readers.
 func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 	dir := t.TempDir()
 	ledger := filepath.Join(dir, "ledger.jsonl")
@@ -73,7 +62,6 @@ func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 		t.Fatal("renderLedgerLine is the pure line")
 	}
 
-	// The host's runid_stamp_test.go intents.
 	line := writeAndRead(t, ledgerEntry{Cycle: 1519, Role: "auditor", ExitCode: 0, RunID: "01M09657TDN6Q1VMJK1XKYR376"})
 	if !strings.Contains(line, `"run_id":"01M09657TDN6Q1VMJK1XKYR376"`) {
 		t.Errorf("ledger line carries no run_id — a run-scoped binding lookup can never match it.\nline: %s", line)
@@ -104,7 +92,6 @@ func TestLedger_LineGoldenChainAndRunID(t *testing.T) {
 	}
 }
 
-// failingWriter is an io.WriteCloser double whose write or close fails.
 type failingWriter struct{ write, close error }
 
 func (w failingWriter) Write(p []byte) (int, error) {
@@ -115,9 +102,6 @@ func (w failingWriter) Write(p []byte) (int, error) {
 }
 func (w failingWriter) Close() error { return w.close }
 
-// Test 46 — every failing op returns its BARE error with the op named
-// (the host's five writer tests as subtests, plus write and close through an
-// injected opener); the tip is written after the line.
 func TestLedger_EveryOpFailureIsBareTextWithTheOpInFields(t *testing.T) {
 	entry := ledgerEntry{Cycle: 1, Role: "scout", Model: "sonnet", ChallengeToken: "tok"}
 	cases := []struct {
@@ -170,8 +154,6 @@ func TestLedger_EveryOpFailureIsBareTextWithTheOpInFields(t *testing.T) {
 			}
 		})
 	}
-	// The wall-clock intent of the host's nil-clock test: no WithClock ⇒ a
-	// parseable timestamp of today.
 	p := filepath.Join(t.TempDir(), "ledger.jsonl")
 	if op, err := New(Deps{}).appendLedger(p, entry); err != nil {
 		t.Fatalf("%s: %v", op, err)
@@ -188,8 +170,6 @@ func TestLedger_EveryOpFailureIsBareTextWithTheOpInFields(t *testing.T) {
 	}
 }
 
-// Test 47 — the rendered key set never carries worktree_tree_sha (the
-// release preflight's negative contract), whatever the field permutation.
 func TestLedger_NeverCarriesWorktreeTreeSHA(t *testing.T) {
 	for _, e := range []ledgerEntry{{}, {RunID: "r"}, {Cycle: 1, Role: "scout", Model: "m", ExitCode: 1, DurationS: "1", ArtifactPath: "/a", ArtifactSHA256: "s", ChallengeToken: "t", GitHEAD: "h", TreeStateSHA: "t", QualityTier: "full", RunID: "r"}} {
 		line := renderLedgerLine(e, "2026-05-23T17:00:00Z", 0, LedgerZeroSeed)
@@ -203,8 +183,6 @@ func TestLedger_NeverCarriesWorktreeTreeSHA(t *testing.T) {
 	}
 }
 
-// Test 48 — the pure helpers: the quality tier, the escaper, the hash, the
-// chain link's seed / empty / last-line / seq.
 func TestQualityTier(t *testing.T) {
 	tests := []struct {
 		bn, ps bool

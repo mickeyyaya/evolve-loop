@@ -12,33 +12,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
-// run_stage_order_test.go characterizes three properties of Run that the
-// existing suite leaves unpinned, all of which a stage-table extraction could
-// silently break:
-//
-//  1. ORDER — which step fails FIRST when several would fail. The existing
-//     failure tests each poison one step against an otherwise-valid repo, so
-//     none of them proves step 1 runs before step 3 reads plugin.json.
-//  2. StepsPassed ON FAILURE — Result's doc comment promises it is "populated
-//     even on failure for diagnostics", but every existing assertion is
-//     against a SUCCESSFUL run (== 5), so the counter could stop advancing on
-//     the failure path unnoticed.
-//  3. DRY-RUN REACH of step 3 — it is the one step with no dry-run branch, and
-//     nothing currently proves that is deliberate rather than an oversight.
-//
-// These are characterization tests: they assert what Run does TODAY, so the
-// refactor that follows is provably behavior-preserving.
-
-// seamCounters records which seams a Run actually reached. A step that must
-// not have been reached has a zero count — that is the order proof.
 type seamCounters struct {
 	gitClean, branch, headSHA, gate, nameGuard, ci, simulation int
 }
 
-// poisonedOpts builds a repo whose every seam AFTER failAt would fail loudly
-// if reached, with the named step rigged to fail. Steps before failAt pass.
-// The counters let a test assert not just WHICH error surfaced but that the
-// later seams were never consulted.
 func poisonedOpts(t *testing.T, failAt string) (Options, *seamCounters) {
 	t.Helper()
 	repo := makeRepo(t, "1.0.0")
@@ -56,7 +33,7 @@ func poisonedOpts(t *testing.T, failAt string) (Options, *seamCounters) {
 		CurrentBranch: func(string) (string, error) {
 			c.branch++
 			if failAt == "step2" {
-				return "", nil // detached
+				return "", nil
 			}
 			return "main", nil
 		},
@@ -93,19 +70,12 @@ func poisonedOpts(t *testing.T, failAt string) (Options, *seamCounters) {
 
 	switch failAt {
 	case "step3":
-		// Remove plugin.json so step 3 cannot read the current version.
 		if err := os.Remove(filepath.Join(repo, ".claude-plugin", "plugin.json")); err != nil {
 			t.Fatal(err)
 		}
 	case "step3b":
-		o.Target = "1.0.0" // equal to current: nothing to bump
+		o.Target = "1.0.0"
 	case "step4":
-		// Age the ledger entry past MaxAuditAge so step 4 rejects it. Match the
-		// "ts" FIELD rather than a byte offset: an offset would silently rewrite
-		// the wrong bytes (never erroring, since the slice you extracted always
-		// matches itself) the moment makeRepo reorders its JSON or switches to
-		// RFC3339Nano, and the resulting failure would look like an unrelated
-		// ledger-parse error rather than a broken fixture.
 		stale := time.Now().UTC().Add(-(MaxAuditAge + 48*time.Hour)).Format(time.RFC3339)
 		ledgerPath := filepath.Join(repo, ".evolve", "ledger.jsonl")
 		body, err := os.ReadFile(ledgerPath)
@@ -121,25 +91,15 @@ func poisonedOpts(t *testing.T, failAt string) (Options, *seamCounters) {
 		}
 	}
 	if failAt == "step5" || failAt == "step5b" || failAt == "ci" {
-		o.SkipTests = false // step 5 must actually run its suites + naming scan
+		o.SkipTests = false
 	}
 	return o, c
 }
 
-// errTestFailure is a plain sentinel, matching how every other stub seam in
-// this package signals failure (errors.New, six call sites across
-// releasepreflight_test.go and extra_coverage_test.go). It never reaches the
-// caller's Unwrap chain — stepGateSuites formats it with %v, not %w — so a
-// bespoke error type would buy nothing.
 var errTestFailure = errors.New("gate suite blew up")
 
-// tsField matches the ledger entry's timestamp FIELD, so aging a fixture does
-// not depend on makeRepo's private JSON field order.
 var tsField = regexp.MustCompile(`"ts":"[^"]*"`)
 
-// TestRun_FirstFailingStepWins pins the ORDER of Run's steps at the public
-// seam: with every step rigged to fail, the EARLIEST one must be the error
-// that surfaces, and no seam belonging to a later step may be consulted.
 func TestRun_FirstFailingStepWins(t *testing.T) {
 	for _, tc := range []struct {
 		failAt      string
@@ -147,10 +107,6 @@ func TestRun_FirstFailingStepWins(t *testing.T) {
 		unreachable func(*seamCounters) (string, int)
 	}{
 		{"step1", "uncommitted", func(c *seamCounters) (string, int) { return "branch", c.branch }},
-		// "detached HEAD", not the looser "detached": the phrasing reaches the
-		// operator verbatim through the CLI's `[preflight] FAIL: %v`, so it is
-		// observable behavior, not log wording. A decomposition that rewrites
-		// it from memory (this one did, once) must fail here.
 		{"step2", "detached HEAD", func(c *seamCounters) (string, int) { return "headSHA", c.headSHA }},
 		{"step3", "plugin.json missing", func(c *seamCounters) (string, int) { return "headSHA", c.headSHA }},
 		{"step3b", "nothing to bump", func(c *seamCounters) (string, int) { return "headSHA", c.headSHA }},
@@ -175,9 +131,6 @@ func TestRun_FirstFailingStepWins(t *testing.T) {
 	}
 }
 
-// TestRun_StepsPassedOnFailure_CountsStepsReached pins Result's documented
-// "populated even on failure for diagnostics" contract: StepsPassed must
-// report how far the run actually got, and StepsTotal must always be set.
 func TestRun_StepsPassedOnFailure_CountsStepsReached(t *testing.T) {
 	for _, tc := range []struct {
 		failAt string
@@ -208,11 +161,6 @@ func TestRun_StepsPassedOnFailure_CountsStepsReached(t *testing.T) {
 	}
 }
 
-// TestRun_DryRun_SemverBumpStillEnforced pins that step 3 is deliberately the
-// one step with NO dry-run branch: a dry run still reads plugin.json and still
-// rejects an invalid bump. Every seam is nil, so an accidental seam call would
-// surface as a different error (a real git invocation against a non-repo),
-// which makes this test sensitive to that too.
 func TestRun_DryRun_SemverBumpStillEnforced(t *testing.T) {
 	for _, tc := range []struct {
 		name, target, wantErr string
@@ -239,8 +187,6 @@ func TestRun_DryRun_SemverBumpStillEnforced(t *testing.T) {
 		})
 	}
 
-	// And the positive case: a VALID bump under dry-run reaches the end with
-	// every step counted and the current version recorded.
 	res, err := Run(Options{Target: "1.0.1", RepoRoot: makeRepo(t, "1.0.0"), DryRun: true})
 	if err != nil {
 		t.Fatalf("valid dry run err = %v", err)

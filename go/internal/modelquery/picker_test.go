@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// The fixtures below are verbatim captures of each CLI's /model picker pane
-// (tmux capture-pane), collected live on 2026-06-01. They are the ground-truth
-// regression corpus for the per-CLI parsers.
-
 const codexPickerPane = `╭──────────────────────────────────────────────╮
 │ >_ OpenAI Codex (v0.135.0)                   │
 │ model:     gpt-5.5 medium   /model to change │
@@ -75,8 +71,6 @@ func TestParseAgyPicker(t *testing.T) {
 }
 
 func TestParseClaudePicker(t *testing.T) {
-	// claude's picker labels are aliases + model versions; the dispatch-usable
-	// identifier is the model family (claude --model accepts opus|sonnet|haiku).
 	got := parseClaudePicker(claudePickerPane)
 	assertIDs(t, got, []string{"opus", "sonnet", "haiku"})
 }

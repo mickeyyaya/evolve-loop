@@ -13,11 +13,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// update regenerates golden files: go test ./internal/faillearn/ -run Golden -update
 var update = flag.Bool("update", false, "update golden files")
 
-// fixtureEvent is the canonical cycle-243 reproduction (retro bridge
-// exit=81) used across render tests. Fixed Now keeps output byte-stable.
 func fixtureEvent() FailureEvent {
 	return FailureEvent{
 		Cycle:          243,
@@ -64,9 +61,6 @@ func TestRenderLessonYAML_GoldenBytes(t *testing.T) {
 	assertGolden(t, filepath.Join("testdata", "lesson_golden.yaml"), body)
 }
 
-// The lessons corpus parser (research.parseLessonFile) unmarshals
-// []lessonYAML — a single-mapping render would be invisible to KB
-// recall. The rendered body MUST be a YAML list.
 func TestRenderLessonYAML_IsYAMLList(t *testing.T) {
 	_, body := RenderLessonYAML(fixtureEvent())
 
@@ -142,7 +136,6 @@ func TestRenderLessonYAML_Deterministic(t *testing.T) {
 
 func TestSummaryTruncation(t *testing.T) {
 	ev := fixtureEvent()
-	// 600 multi-byte runes prove rune (not byte) truncation.
 	ev.Summary = strings.Repeat("日", 600)
 
 	md := string(RenderRetrospectiveMarkdown(ev))

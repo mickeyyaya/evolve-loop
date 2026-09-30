@@ -1,18 +1,5 @@
 package auditchain
 
-// evidence_access_test.go — the precondition the chain rests on: a phase that
-// JUDGES must be handed what the phases before it produced.
-//
-// A reviewer asked to rule on a diff alone cannot see derailment (needs the
-// intent), speciousness (needs the build report), the paradox (needs the tests
-// AND the criteria they were supposed to encode), or deception (needs the gate
-// outputs). Withholding those artifacts does not make the audit stricter — it
-// makes it guess, and a guess that must produce a verdict produces PASS.
-//
-// So entitlement is a CONTRACT, not a convenience: every judging phase declares
-// what it must be able to read, and a dispatch that omits one is a pipeline
-// defect rather than a thinner prompt.
-
 import (
 	"strings"
 	"testing"
@@ -20,14 +7,11 @@ import (
 
 func TestJudgingPhases_CoverEveryPhaseThatRulesOnAnother(t *testing.T) {
 	t.Parallel()
-	// Every phase whose output is a judgement about work someone else did.
 	for _, p := range []string{"audit", "adversarial-review", "coverage-gate", "plan-review", "inherited-defect-reconcile", "retrospective"} {
 		if !IsJudging(p) {
 			t.Errorf("%q rules on another phase's work and must be treated as judging — otherwise it is asked for a verdict without the evidence for one", p)
 		}
 	}
-	// Producing phases are not judging: handing them the full prior corpus
-	// would be cost with no decision attached.
 	for _, p := range []string{"scout", "tdd", "build", "ship", "memo"} {
 		if IsJudging(p) {
 			t.Errorf("%q produces work rather than ruling on it; entitlement is about deciding, not about seniority", p)
@@ -41,14 +25,11 @@ func TestRequiredEvidence_EachLinkHasSomethingToReadItFrom(t *testing.T) {
 	if len(ev) == 0 {
 		t.Fatal("the audit was entitled to nothing — the chain would have to be narrated rather than walked")
 	}
-	// The chain is only walkable if every required link has an artifact behind
-	// it. This is the property that makes the two designs one design.
 	for _, id := range RequiredLinks() {
 		if _, ok := EvidenceFor(id); !ok {
 			t.Errorf("link %s has no declared evidence source — an auditor could only assert it", id)
 		}
 	}
-	// And everything a link needs must actually be in the entitlement.
 	entitled := map[string]bool{}
 	for _, a := range ev {
 		entitled[a] = true
@@ -63,9 +44,6 @@ func TestRequiredEvidence_EachLinkHasSomethingToReadItFrom(t *testing.T) {
 	}
 }
 
-// A non-judging phase gets nothing extra: the entitlement must not become a
-// blanket "everyone reads everything", which is how prompts grow until they are
-// truncated — this repo lost 15 of 30 cycles to a prompt that was silently cut.
 func TestRequiredEvidence_IsScopedToJudgingPhases(t *testing.T) {
 	t.Parallel()
 	if got := RequiredEvidence("build"); len(got) != 0 {
@@ -73,10 +51,6 @@ func TestRequiredEvidence_IsScopedToJudgingPhases(t *testing.T) {
 	}
 }
 
-// The dispatch check: what a judging phase was ACTUALLY given, versus what it
-// was entitled to. A missing artifact is named, because the failure it causes
-// downstream (an unverifiable link, or worse an asserted one) is invisible at
-// the point it happens.
 func TestMissingEvidence_NamesWhatTheJudgeWasNotGiven(t *testing.T) {
 	t.Parallel()
 	given := []string{"build-report.md", "acs-verdict.json"}
@@ -85,31 +59,20 @@ func TestMissingEvidence_NamesWhatTheJudgeWasNotGiven(t *testing.T) {
 		t.Fatal("a judging phase dispatched without the tests or the triage decision reported no gap")
 	}
 	joined := strings.Join(missing, ",")
-	// A REQUIRED artifact that was withheld must be named.
 	if !strings.Contains(joined, "covering-tests.md") {
 		t.Errorf("a withheld required artifact must be named; got %v", missing)
 	}
-	// UPDATED, declared: intent.md is CONDITIONAL — written only when the
-	// intent phase runs. The first live cycles (1444/1445) had
-	// `intent_required:false`, so naming its absence reported a gap for a file
-	// nobody was supposed to produce. "Not applicable" is not "withheld", and
-	// conflating them is how a measurement becomes a constant.
 	if strings.Contains(joined, "intent.md") {
 		t.Errorf("a conditionally-produced artifact must not be reported as a withholding; got %v", missing)
 	}
-	// Fully supplied: nothing missing.
 	if m := MissingEvidence("audit", RequiredEvidence("audit")); len(m) != 0 {
 		t.Errorf("a fully-supplied judge reported gaps: %v", m)
 	}
-	// Not judging: never a gap, whatever it was given.
 	if m := MissingEvidence("build", nil); len(m) != 0 {
 		t.Errorf("a producing phase cannot be short of judging evidence: %v", m)
 	}
 }
 
-// An unread entitlement is worth nothing, so the absence has to reach the
-// verdict rather than sit in a log: a chain assembled without the evidence for
-// a link cannot report that link as coherent.
 func TestConcludeWithEvidence_UnsuppliedLinksCannotBeCoherent(t *testing.T) {
 	t.Parallel()
 	c := fullChain()
@@ -120,27 +83,17 @@ func TestConcludeWithEvidence_UnsuppliedLinksCannotBeCoherent(t *testing.T) {
 	if !strings.Contains(got.Rationale, "not supplied") {
 		t.Errorf("the rationale must say the evidence was missing, not merely that something failed; got %q", got.Rationale)
 	}
-	// Fully supplied and coherent still passes — the check must not become a
-	// second, unconditional blocker.
 	if got := ConcludeWithEvidence(c, "audit", RequiredEvidence("audit")); got.Verdict != VerdictPASS {
 		t.Errorf("a fully-supplied coherent chain must PASS, got %s (%s)", got.Verdict, got.Rationale)
 	}
 }
 
-// TestChainShape_NamesEveryLinkAndItsConclusionType pins the two links the
-// behavioural suite reaches only through RequiredLinks(), and the Conclusion
-// type the caller destructures. Not ceremony: the first two links are where a
-// task gets quietly restated into something easier, which is the failure that
-// leaves no trace in the diff at all.
 func TestChainShape_NamesEveryLinkAndItsConclusionType(t *testing.T) {
 	t.Parallel()
-	// LinkIntentFidelity is the only check standing between "the item asked for
-	// X" and an intent that asked for something smaller.
 	srcs, ok := EvidenceFor(LinkIntentFidelity)
 	if !ok || len(srcs) == 0 {
 		t.Error("intent-fidelity must be read from an artifact — a restated task is invisible in the diff")
 	}
-	// LinkSelection catches the cycle that solved a different queued item.
 	if srcs, ok := EvidenceFor(LinkSelection); !ok || len(srcs) == 0 {
 		t.Error("selection-fidelity must be read from the triage decision")
 	}
@@ -153,22 +106,8 @@ func TestChainShape_NamesEveryLinkAndItsConclusionType(t *testing.T) {
 	}
 }
 
-// TestConcludeWithEvidence_ALinkWithASurvivingSourceIsNotDowngraded — found by
-// the FIRST live cycles (1444/1445), which is the point of a shadow stage.
-//
-// Both recorded `missing_evidence: [intent.md]` on cycles whose run.json says
-// `intent_required: false` — the intent phase never ran, so the artifact is
-// legitimately ABSENT rather than withheld. The downgrade fired on "any listed
-// source missing", so every such cycle reported an evidence gap for a file
-// nobody was supposed to produce.
-//
-// The rule that matches how the links are actually written: the sources of a
-// link are ALTERNATIVES. intent-fidelity can be answered from intent.md OR the
-// scout report. A link is only unverifiable when NOTHING it could be read from
-// was supplied.
 func TestConcludeWithEvidence_ALinkWithASurvivingSourceIsNotDowngraded(t *testing.T) {
 	t.Parallel()
-	// Everything the audit is entitled to EXCEPT intent.md — the live shape.
 	var given []string
 	for _, a := range RequiredEvidence("audit") {
 		if a != "intent.md" {
@@ -180,8 +119,6 @@ func TestConcludeWithEvidence_ALinkWithASurvivingSourceIsNotDowngraded(t *testin
 		t.Errorf("a coherent chain was downgraded to %s because one of a link's ALTERNATIVE sources was absent: %s", got.Verdict, got.Rationale)
 	}
 
-	// The teeth must survive: a link whose sources are ALL absent is still
-	// unverifiable, because nobody was in a position to check it.
 	var blind []string
 	for _, a := range RequiredEvidence("audit") {
 		if a != "acs-verdict.json" && a != "coverage-gate-report.md" {

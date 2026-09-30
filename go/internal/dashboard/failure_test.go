@@ -105,8 +105,6 @@ func TestReadFailure_SingleRoundReportOnly(t *testing.T) {
 	}
 }
 
-// A torn or corrupt failure artifact must surface as a warning, never as
-// "nothing recorded yet" — the panel is the operator's 30-second triage.
 func TestReadFailure_TornArtifactIsWarnedNotSilent(t *testing.T) {
 	t.Parallel()
 	ws := core.RunWorkspacePath(t.TempDir(), 9)
@@ -121,7 +119,6 @@ func TestReadFailure_TornArtifactIsWarnedNotSilent(t *testing.T) {
 	}
 }
 
-// The round archives are read by the registry-derived name the writer uses.
 func TestReadAuditRounds_UsesRegistryArchiveNames(t *testing.T) {
 	t.Parallel()
 	ws := core.RunWorkspacePath(t.TempDir(), 4)
@@ -131,16 +128,12 @@ func TestReadAuditRounds_UsesRegistryArchiveNames(t *testing.T) {
 	if len(rounds) != 2 || rounds[0].Verdict != "FAIL" || len(rounds[1].Findings) != 2 {
 		t.Fatalf("rounds = %+v", rounds)
 	}
-	// A verdict sentinel outranks the prose grammar, as in the audit gate.
 	writeFile(t, filepath.Join(ws, auditReportName), final+"\n"+phasecontract.RenderVerdictSentinel("audit", "WARN")+"\n")
 	if got, _ := readAuditRounds(ws); got[1].Verdict != "WARN" {
 		t.Fatalf("sentinel must win: %+v", got[1])
 	}
 }
 
-// Archive indices are not contiguous when a dispatch died before writing its
-// report: round2 + live with no round1 must label the rounds 2 and 3 and diff
-// against the round that exists, never collapse to a single "r1".
 func TestReadAuditRounds_NonContiguousArchiveIndices(t *testing.T) {
 	t.Parallel()
 	ws := core.RunWorkspacePath(t.TempDir(), 8)

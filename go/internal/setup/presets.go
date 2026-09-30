@@ -8,19 +8,12 @@ import (
 	"path/filepath"
 )
 
-// PresetSpec is one named preset's definition from the public preset config
-// (presets.json / .evolve/setup-presets.json). TierBias is a generic strategy
-// the recommender interprets — "default" (profile default), "down" (one tier
-// cheaper), "up" (one tier richer), "min"/"max" (envelope floor/ceiling) — so
-// preset behavior is data, never hardcoded in Go.
 type PresetSpec struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	TierBias    string `json:"tier_bias"`
 }
 
-// PresetConfig is the public, exposed preset-definition file. Default names the
-// preset the UI pre-selects.
 type PresetConfig struct {
 	Default string       `json:"default"`
 	Presets []PresetSpec `json:"presets"`
@@ -29,8 +22,6 @@ type PresetConfig struct {
 //go:embed presets.json
 var presetsDefaultJSON []byte
 
-// builtinPresets is the shipped default, parsed once at init. A malformed
-// embedded default is a build-time programming error, so it panics (fail loud).
 var builtinPresets = mustBuiltinPresets()
 
 func mustBuiltinPresets() PresetConfig {
@@ -41,13 +32,8 @@ func mustBuiltinPresets() PresetConfig {
 	return cfg
 }
 
-// presetOverrideFile is the per-repo override the user may drop to customize
-// presets without editing the shipped default.
 const presetOverrideFile = "setup-presets.json"
 
-// LoadPresets resolves the active preset config: the per-repo override
-// .evolve/setup-presets.json when present + valid, else the shipped default.
-// A present-but-malformed/invalid override is an error (never silently ignored).
 func LoadPresets(evolveDir string) (PresetConfig, error) {
 	if evolveDir == "" {
 		return builtinPresets, nil
@@ -67,8 +53,6 @@ func LoadPresets(evolveDir string) (PresetConfig, error) {
 	return cfg, nil
 }
 
-// parsePresets unmarshals + validates a preset config (shared by the embedded
-// default and the override path).
 func parsePresets(b []byte) (PresetConfig, error) {
 	var cfg PresetConfig
 	if err := json.Unmarshal(b, &cfg); err != nil {
@@ -80,9 +64,6 @@ func parsePresets(b []byte) (PresetConfig, error) {
 	return cfg, nil
 }
 
-// knownTierBias is the generic strategy vocabulary the recommender interprets.
-// Empty means "default" (profile default). An override using anything else is a
-// typo and is rejected at load rather than silently treated as "default".
 var knownTierBias = map[string]bool{
 	"": true, "default": true, "down": true, "up": true, "min": true, "max": true,
 }

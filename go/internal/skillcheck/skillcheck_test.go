@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// repoRoot locates the repo root from this file (go/internal/skillcheck/ →
-// three levels up) and skips when skills/ is absent (vendored/partial checkout).
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -23,9 +21,6 @@ func repoRoot(t *testing.T) string {
 	return root
 }
 
-// TestCheck_CleanRepoNoDrift: the live repo's SKILL.md regions are in sync with
-// the SSOTs, so the audit-facing Check returns no drift. This is the in-process
-// equivalent of the CI `evolve skills check` gate.
 func TestCheck_CleanRepoNoDrift(t *testing.T) {
 	drift, err := Check(repoRoot(t))
 	if err != nil {
@@ -36,9 +31,6 @@ func TestCheck_CleanRepoNoDrift(t *testing.T) {
 	}
 }
 
-// TestCheck_DetectsMutatedRegion: a hand edit inside a generated phase-facts
-// region must surface in Check's drift list (keyed by the SKILL.md rel-path),
-// so the cycle audit FAILs a cycle that drifted a SKILL.md.
 func TestCheck_DetectsMutatedRegion(t *testing.T) {
 	root := repoRoot(t)
 	tmp := t.TempDir()
@@ -77,9 +69,6 @@ func TestCheck_DetectsMutatedRegion(t *testing.T) {
 	}
 }
 
-// TestSpliceGeneratedRegion_Idempotent pins replace-in-place semantics: a second
-// splice of the same block is a byte-level no-op, and content outside the
-// markers survives verbatim. (Moved here with the splice logic from cmd/evolve.)
 func TestSpliceGeneratedRegion_Idempotent(t *testing.T) {
 	doc := "---\nname: x\n---\n\nintro prose\n\n## Composition\n\ntail\n"
 	block := factsBegin + " test -->\nBODY\n" + factsEnd + "\n"
@@ -107,7 +96,6 @@ func TestSpliceGeneratedRegion_Idempotent(t *testing.T) {
 	}
 }
 
-// TestSpliceGeneratedRegion_CorruptMarkers errors on BEGIN without END.
 func TestSpliceGeneratedRegion_CorruptMarkers(t *testing.T) {
 	doc := "intro\n" + factsBegin + " broken -->\nno end marker\n"
 	if _, err := spliceGeneratedRegion(doc, "block\n"); err == nil {
@@ -115,8 +103,6 @@ func TestSpliceGeneratedRegion_CorruptMarkers(t *testing.T) {
 	}
 }
 
-// TestSpliceGeneratedRegion_MultiplePairs errors when a second BEGIN exists
-// (e.g. a botched manual merge) instead of leaving an orphaned stale region.
 func TestSpliceGeneratedRegion_MultiplePairs(t *testing.T) {
 	pair := factsBegin + " a -->\nold\n" + factsEnd + "\n"
 	doc := "intro\n" + pair + "middle\n" + pair + "tail\n"
@@ -157,8 +143,6 @@ func copyTree(t *testing.T, src, dst string) {
 	}
 }
 
-// prepareSkillsTree copies the minimal SSOT files needed by Run/Check into a
-// new temp dir and returns the dir. All TestRun_* tests use this to share setup.
 func prepareSkillsTree(t *testing.T) string {
 	t.Helper()
 	root := repoRoot(t)
@@ -171,8 +155,6 @@ func prepareSkillsTree(t *testing.T) string {
 	return tmp
 }
 
-// mutateBuildSkill mutates the skills/build/SKILL.md in the given root to
-// create a detectable drift, returning the path. Skips when the heading is absent.
 func mutateBuildSkill(t *testing.T, root string) string {
 	t.Helper()
 	target := filepath.Join(root, "skills", "build", "SKILL.md")
@@ -220,7 +202,6 @@ func TestRun_WriteMode_RewritesDrift(t *testing.T) {
 	tmp := prepareSkillsTree(t)
 	target := mutateBuildSkill(t, tmp)
 	original := func() []byte {
-		// capture the pre-mutation content by reading from the real repo
 		root := repoRoot(t)
 		b, err := os.ReadFile(filepath.Join(root, "skills", "build", "SKILL.md"))
 		if err != nil {
@@ -244,7 +225,7 @@ func TestRun_WriteMode_RewritesDrift(t *testing.T) {
 }
 
 func TestRun_InvalidRoot(t *testing.T) {
-	tmp := t.TempDir() // empty dir — no phase-registry.json
+	tmp := t.TempDir()
 	var stdout, stderr strings.Builder
 	code := Run(tmp, false, &stdout, &stderr)
 	if code != 1 {
@@ -252,11 +233,8 @@ func TestRun_InvalidRoot(t *testing.T) {
 	}
 }
 
-// TestRun_CheckMode_FrontmatterNameDrift — a skill whose SKILL.md name !=
-// dir name must surface as a DRIFT: message on stderr (exit 2).
 func TestRun_CheckMode_FrontmatterNameDrift(t *testing.T) {
 	tmp := prepareSkillsTree(t)
-	// Add an extra skill whose frontmatter name does not match the dir name.
 	extraDir := filepath.Join(tmp, "skills", "extra-skill")
 	if err := os.MkdirAll(extraDir, 0o755); err != nil {
 		t.Fatal(err)

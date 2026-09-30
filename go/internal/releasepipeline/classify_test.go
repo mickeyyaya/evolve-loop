@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-// initClassifyRepo builds an isolated repo with a known tag/commit chain for the
-// git-backed helpers: v1.0.0 (touches go/), v1.0.1 (touches README only), v1.1.0
-// (touches go/). Returns the repo dir. Skips if git is unavailable.
 func initClassifyRepo(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -53,8 +50,6 @@ func initClassifyRepo(t *testing.T) string {
 	return dir
 }
 
-// TestGitPathsChanged_RealRepo pins the two-dot diff scoping: go/ changed between
-// v1.0.1 and v1.1.0 but NOT between v1.0.0 and v1.0.1 (docs-only).
 func TestGitPathsChanged_RealRepo(t *testing.T) {
 	repo := initClassifyRepo(t)
 	if ch, err := gitPathsChanged(repo, "v1.0.0", "v1.0.1", "go"); err != nil || ch {
@@ -68,8 +63,6 @@ func TestGitPathsChanged_RealRepo(t *testing.T) {
 	}
 }
 
-// TestGitOlderTags_RealRepo pins the sort + strictly-older filter: older than
-// v1.1.0 is [v1.0.1, v1.0.0] newest-first; older than v1.0.0 is empty.
 func TestGitOlderTags_RealRepo(t *testing.T) {
 	repo := initClassifyRepo(t)
 	got := gitOlderTags(repo, "v1.1.0")
@@ -82,8 +75,6 @@ func TestGitOlderTags_RealRepo(t *testing.T) {
 	}
 }
 
-// probeFromMap builds a goChangedProbe from a "from..to" -> changed map; an
-// unlisted pair defaults to false (no change).
 func probeFromMap(m map[string]bool) goChangedProbe {
 	return func(from, to string) (bool, error) {
 		return m[from+".."+to], nil
@@ -109,14 +100,12 @@ func TestClassifyRelease(t *testing.T) {
 		{
 			name:   "no binary change, prev tag was a binary-release -> config since prev",
 			target: "22.2.1", prevTag: "v22.2.0", older: []string{"v22.1.0"},
-			changed:   map[string]bool{"v22.1.0..v22.2.0": true}, // v22.2.0 changed the binary
+			changed:   map[string]bool{"v22.1.0..v22.2.0": true},
 			wantClass: ConfigRelease, wantSince: "v22.2.0",
 		},
 		{
 			name:   "no binary change across two config releases -> traces to the real binary-release",
 			target: "22.2.3", prevTag: "v22.2.2", older: []string{"v22.2.1", "v22.2.0", "v22.1.0"},
-			// v22.2.0 introduced the fingerprint (changed vs v22.1.0); v22.2.1 and
-			// v22.2.2 are config releases → the fingerprint traces back to v22.2.0.
 			changed:   map[string]bool{"v22.1.0..v22.2.0": true},
 			wantClass: ConfigRelease, wantSince: "v22.2.0",
 		},
@@ -129,7 +118,7 @@ func TestClassifyRelease(t *testing.T) {
 		{
 			name:   "config release, only the prev tag known -> traces to prev",
 			target: "22.2.1", prevTag: "v22.2.0", older: nil,
-			changed:   map[string]bool{}, // nothing changed anywhere
+			changed:   map[string]bool{},
 			wantClass: ConfigRelease, wantSince: "v22.2.0",
 		},
 	}
@@ -149,8 +138,6 @@ func TestClassifyRelease(t *testing.T) {
 	}
 }
 
-// TestReleaseClassification_Fields names the ReleaseClassification result type
-// (classifyRelease returns it via inference elsewhere) and pins its two fields.
 func TestReleaseClassification_Fields(t *testing.T) {
 	c := ReleaseClassification{Class: BinaryRelease, SinceVersion: "22.3.0"}
 	if c.Class != BinaryRelease {
@@ -161,8 +148,6 @@ func TestReleaseClassification_Fields(t *testing.T) {
 	}
 }
 
-// TestClassifyRelease_ProbeError surfaces a git failure rather than silently
-// misclassifying (a wrong "config-release" could skip a needed approval).
 func TestClassifyRelease_ProbeError(t *testing.T) {
 	boom := func(_, _ string) (bool, error) { return false, errors.New("git boom") }
 	if _, err := classifyRelease("22.3.0", "v22.2.0", nil, boom); err == nil {
@@ -170,10 +155,7 @@ func TestClassifyRelease_ProbeError(t *testing.T) {
 	}
 }
 
-// TestReleaseClassBanner_Wording pins the operator-facing banner text for both
-// classes so the approval-relevant phrasing can't silently drift.
 func TestReleaseClassBanner_Wording(t *testing.T) {
-	// Config-release banner: names the class and says no new approval is needed.
 	got := bannerFor(ConfigRelease, "22.1.0")
 	if !strings.Contains(got, "config-release") || !strings.Contains(got, "unchanged since v22.1.0") {
 		t.Errorf("config banner wrong: %q", got)
@@ -181,17 +163,12 @@ func TestReleaseClassBanner_Wording(t *testing.T) {
 	if !strings.Contains(got, "no new corporate approval") {
 		t.Errorf("config banner should say no approval needed: %q", got)
 	}
-	// Binary-release banner: names the class and the approval requirement.
 	gotB := bannerFor(BinaryRelease, "")
 	if !strings.Contains(gotB, "binary-release") || !strings.Contains(gotB, "approval") {
 		t.Errorf("binary banner wrong: %q", gotB)
 	}
 }
 
-// TestReleaseClassBanner_FailsClosed: a git error must not drop the
-// classification silently — releaseClassBanner returns the fail-closed
-// "unavailable" banner (steering the operator to assume approval is needed) AND
-// the error (so the pipeline logs it). A non-git dir forces the git failure.
 func TestReleaseClassBanner_FailsClosed(t *testing.T) {
 	banner, err := releaseClassBanner(t.TempDir(), "22.3.0", "v22.2.0")
 	if err == nil {

@@ -6,15 +6,6 @@ import (
 	"testing"
 )
 
-// TestCoverageProfile_RunsGoTestUnderTheScrubbedEnv — the apicover step's
-// coverage run is a `go test` of the lane's own packages, spawned from the
-// lane process exactly like the tier step, and it must carry the same
-// scrubbed allowlist env. Inheriting os.Environ() leaks EVOLVE_CYCLE_STATE_FILE
-// and EVOLVE_FLEET into core's env-sensitive tests and the step fails on every
-// audit (wave 2, 2026-09-14: AUDIT_CIPARITY_GATE_STEP_FAILED cover_run on
-// cycles 1673 and 1676 — the leak the ship gate had, #615, on the audit's
-// spawn site). The tier step scrubs (TestTierAttempts_ScrubbedEnv…); this pins
-// the coverage run to the same contract: an explicit env, allowlist only.
 func TestCoverageProfile_RunsGoTestUnderTheScrubbedEnv(t *testing.T) {
 	t.Setenv("EVOLVE_LEAK_CANARY", "1")
 	root, goDir := goWorktree(t)

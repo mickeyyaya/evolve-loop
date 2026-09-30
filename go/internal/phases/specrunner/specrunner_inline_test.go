@@ -11,17 +11,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// TestRun_InlinePrompt_NoDiskFile proves a minted phase can ship its prompt
-// in-band via Config.PromptBody: with an EMPTY prompts loader (no
-// agents/*.md), the phase still dispatches because the runner uses the
-// inline body instead of reading from disk.
 func TestRun_InlinePrompt_NoDiskFile(t *testing.T) {
 	spec := phasespec.PhaseSpec{
 		Name:     "minted-reviewer",
 		Classify: &phasespec.ClassifyRules{RequireSections: []string{"## Notes"}, VerdictOnPass: core.VerdictPASS},
 	}
 	fb := &fakeBridge{writeArtifact: "# minted\n## Notes\n- ok\n"}
-	emptyLoader := prompts.NewFromFS(fstest.MapFS{}) // any disk read would error
+	emptyLoader := prompts.NewFromFS(fstest.MapFS{})
 	phase := New(spec, Config{Bridge: fb, Prompts: emptyLoader, PromptBody: "INLINE PERSONA"})
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
@@ -36,8 +32,6 @@ func TestRun_InlinePrompt_NoDiskFile(t *testing.T) {
 	}
 }
 
-// TestRun_NoInline_LoadsFromDisk proves the default path is unchanged: with
-// PromptBody empty, the phase loads agents/<agent>.md exactly as before.
 func TestRun_NoInline_LoadsFromDisk(t *testing.T) {
 	spec := phasespec.PhaseSpec{
 		Name:     "disk-phase",

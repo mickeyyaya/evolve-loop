@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// --- test helpers (synthetic DetectReport literals — Recommend is pure over a
-// DetectReport, so these tests need NO filesystem, clock, or network) ---
-
 func famReady(cli string, tm map[string]string) CLIStatus {
 	return CLIStatus{CLI: cli, BinaryPresent: true, AuthConfigured: true, Verdict: "ready", TierModels: tm}
 }
@@ -16,12 +13,9 @@ func famBlocked(cli string) CLIStatus {
 	return CLIStatus{CLI: cli, Verdict: "blocked", CapabilityTier: "n/a"}
 }
 
-// claudeTM/codexTM mirror tierModelsFor's real maps so model-resolution asserts
-// are realistic without loading manifests.
 var claudeTM = map[string]string{"fast": "haiku", "balanced": "sonnet", "deep": "opus"}
 var codexTM = map[string]string{"fast": "gpt-5.4-mini", "balanced": "gpt-5.4", "deep": "gpt-5.5"}
 
-// ph builds a profile-sourced PhaseStatus (Default* == Current*, source profile).
 func ph(role, defCLI, defTier, min, def, max string, allowed []string, crossWith string) PhaseStatus {
 	return PhaseStatus{
 		Role: role, Source: "profile",
@@ -59,8 +53,6 @@ func asg(t *testing.T, p Preset, role string) Assignment {
 	return Assignment{}
 }
 
-// 1. Shape: an empty report still yields the three named presets in order, with
-// recommended as the default and no available families.
 func TestRecommend_EmptyReport_ThreePresets(t *testing.T) {
 	rr := Recommend(DetectReport{}, builtinPresets)
 	if len(rr.Presets) != 3 {
@@ -80,8 +72,6 @@ func TestRecommend_EmptyReport_ThreePresets(t *testing.T) {
 	}
 }
 
-// 2. The recommended preset's tier baseline is the PROFILE default tier
-// (canonicalized), NOT a hardcoded role→tier table.
 func TestRecommend_RecommendedTierIsProfileDefault(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("scout", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),
@@ -97,7 +87,6 @@ func TestRecommend_RecommendedTierIsProfileDefault(t *testing.T) {
 	}
 }
 
-// 3. A tier above the envelope max is clamped down and flagged.
 func TestRecommend_ClampTierToEnvelopeMax(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("x", "claude-tmux", "opus", "fast", "balanced", "balanced", []string{"all"}, ""),
@@ -108,7 +97,6 @@ func TestRecommend_ClampTierToEnvelopeMax(t *testing.T) {
 	}
 }
 
-// 4. A phase with no envelope passes the default tier through unchanged.
 func TestRecommend_NoEnvelopePassThrough(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("build-planner", "claude-tmux", "sonnet", "", "", "", nil, ""),
@@ -119,11 +107,10 @@ func TestRecommend_NoEnvelopePassThrough(t *testing.T) {
 	}
 }
 
-// 5. Economy biases one tier-rank down, floored at envelope.min.
 func TestRecommend_EconomyBiasesDown(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("a", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),     // floor fast → fast
-		ph("b", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""), // floor balanced → balanced
+		ph("a", "claude-tmux", "sonnet", "fast", "balanced", "deep", []string{"all"}, ""),
+		ph("b", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
 	)
 	eco := presetByName(t, Recommend(rep, builtinPresets), "economy")
 	if got := asg(t, eco, "a").Tier; got != "fast" {
@@ -134,7 +121,6 @@ func TestRecommend_EconomyBiasesDown(t *testing.T) {
 	}
 }
 
-// 6. Economy on a fixed (min==max) envelope stays put.
 func TestRecommend_EconomyMinEqMaxStays(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("auditor", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, ""),
@@ -144,7 +130,6 @@ func TestRecommend_EconomyMinEqMaxStays(t *testing.T) {
 	}
 }
 
-// 7. Max-quality biases up to the envelope max.
 func TestRecommend_MaxQualityBiasesUp(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
@@ -154,7 +139,6 @@ func TestRecommend_MaxQualityBiasesUp(t *testing.T) {
 	}
 }
 
-// 8. Max-quality where default==max has no room up; stays.
 func TestRecommend_MaxQualityDefaultEqMaxStays(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("tester", "claude-tmux", "sonnet", "balanced", "balanced", "balanced", []string{"all"}, ""),
@@ -164,7 +148,6 @@ func TestRecommend_MaxQualityDefaultEqMaxStays(t *testing.T) {
 	}
 }
 
-// 9. Zero authed families: all presets degraded, every assignment warns, no panic.
 func TestRecommend_ZeroFamiliesDegraded(t *testing.T) {
 	rep := mkReport([]CLIStatus{famBlocked("claude"), famBlocked("codex")},
 		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
@@ -186,7 +169,6 @@ func TestRecommend_ZeroFamiliesDegraded(t *testing.T) {
 	}
 }
 
-// 10. Exactly one family: single-family routing is legitimate, NOT a warning.
 func TestRecommend_OneFamilySingleFamily(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famBlocked("codex")},
 		ph("builder", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
@@ -209,8 +191,6 @@ func TestRecommend_OneFamilySingleFamily(t *testing.T) {
 	}
 }
 
-// 11. Two families: builder and auditor are split across families (adversarial),
-// preferring each profile's default family when available.
 func TestRecommend_TwoFamiliesCrossFamily(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
 		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
@@ -230,7 +210,6 @@ func TestRecommend_TwoFamiliesCrossFamily(t *testing.T) {
 	}
 }
 
-// 12. Two families but allow-lists force the same family — no crash, same family.
 func TestRecommend_CrossFamilyForcedSame(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
 		ph("builder", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude"}, "auditor"),
@@ -246,7 +225,6 @@ func TestRecommend_CrossFamilyForcedSame(t *testing.T) {
 	}
 }
 
-// 13. Preferred CLI unavailable → falls back to an available allowed family.
 func TestRecommend_PreferredUnavailableFallsBack(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM), famBlocked("claude")},
 		ph("scout", "claude-tmux", "sonnet", "balanced", "balanced", "deep", []string{"all"}, ""),
@@ -260,7 +238,6 @@ func TestRecommend_PreferredUnavailableFallsBack(t *testing.T) {
 	}
 }
 
-// 14. allowed_clis restricted to an unavailable family → warn + degraded.
 func TestRecommend_AllowedRestrictedToUnavailableWarns(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM), famBlocked("claude")},
 		ph("tdd-engineer", "claude-tmux", "opus", "deep", "deep", "deep", []string{"claude"}, ""),
@@ -275,7 +252,6 @@ func TestRecommend_AllowedRestrictedToUnavailableWarns(t *testing.T) {
 	}
 }
 
-// 15. allowed_clis ["all"] picks the only available family even if pref differs.
 func TestRecommend_AllowedAllPicksAvailable(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("agy", map[string]string{"fast": "gemini-3.5-flash", "balanced": "gemini-3.5-flash", "deep": "gemini-3.5-flash"})},
 		ph("intent", "claude-tmux", "opus", "deep", "deep", "deep", []string{"all"}, ""),
@@ -286,7 +262,6 @@ func TestRecommend_AllowedAllPicksAvailable(t *testing.T) {
 	}
 }
 
-// 16. Model id is resolved from the chosen CLI's TierModels at the chosen tier.
 func TestRecommend_ModelFromTierModels(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM)},
 		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"codex"}, ""),
@@ -300,8 +275,6 @@ func TestRecommend_ModelFromTierModels(t *testing.T) {
 	}
 }
 
-// 17. Deterministic: same input → byte-identical JSON across runs (guards
-// map-iteration nondeterminism in family/CLI selection).
 func TestRecommend_Deterministic(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
 		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"claude", "codex"}, "auditor"),
@@ -315,10 +288,6 @@ func TestRecommend_Deterministic(t *testing.T) {
 	}
 }
 
-// A custom PresetConfig exercises the "up" and "min" tier-bias strategies (the
-// shipped default only uses default/down/max) and constructs PresetConfig +
-// PresetSpec directly — proving the config-driven interpreter handles the full
-// bias vocabulary.
 func TestRecommend_CustomPresetConfig_UpAndMin(t *testing.T) {
 	cfg := PresetConfig{
 		Default: "rich",
@@ -342,10 +311,6 @@ func TestRecommend_CustomPresetConfig_UpAndMin(t *testing.T) {
 	}
 }
 
-// 18b. A profile that omits model_tier_default (empty DefaultTier) must NOT
-// spuriously report DiffersFromDefault in the recommended preset — else apply
-// would emit a redundant pin. The effective default (envelope.default/balanced)
-// is the comparison basis, matching biasTier.
 func TestRecommend_EmptyDefaultTier_NoSpuriousDiff(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
 		ph("x", "claude-tmux", "", "balanced", "balanced", "deep", []string{"all"}, ""),
@@ -356,8 +321,6 @@ func TestRecommend_EmptyDefaultTier_NoSpuriousDiff(t *testing.T) {
 	}
 }
 
-// 18. DiffersFromDefault: false when the assignment equals the profile default,
-// true when a preset moves it.
 func TestRecommend_DiffersFromDefault(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("codex", codexTM)},
 		ph("builder", "codex-tmux", "sonnet", "balanced", "balanced", "deep", []string{"codex"}, ""),

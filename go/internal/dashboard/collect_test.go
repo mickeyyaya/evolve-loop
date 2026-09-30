@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// seedProject builds a small but complete project root: three closed cycles
-// (PASS, FAIL, PASS — the last with a workspace), one in-flight cycle with a
-// fresh lease, a quarantined duplicate workspace and an archive dir to ignore,
-// and two inbox items.
 func seedProject(t *testing.T, now time.Time) string {
 	t.Helper()
 	root := t.TempDir()
@@ -96,7 +92,6 @@ func TestCollect_CapKeepsNewestDossiersAndEveryWorkspace(t *testing.T) {
 	for i := 1; i <= 60; i++ {
 		writeDossier(t, root, passDossier(i))
 	}
-	// An OLD cycle with a workspace must survive the cap.
 	if err := os.MkdirAll(core.RunWorkspacePath(root, 2), 0o755); err != nil {
 		t.Fatal(err)
 	}

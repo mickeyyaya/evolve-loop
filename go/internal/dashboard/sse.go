@@ -17,10 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// fingerprint summarises "has anything the page shows changed" from mtimes and
-// sizes, without reading content. Directory mtimes move on create/rename
-// (every atomic write); the current cycle's append-only files are covered by
-// size so an in-place append is seen too.
 func fingerprint(root string) string {
 	var b strings.Builder
 	evolveDir := paths.EvolveDirOf(root)
@@ -57,7 +53,6 @@ func fingerprint(root string) string {
 	return b.String()
 }
 
-// subscribe registers an SSE subscriber; the returned func unsubscribes.
 func (s *Server) subscribe() (chan uint64, func()) {
 	ch := make(chan uint64, 8)
 	s.subMu.Lock()
@@ -70,9 +65,6 @@ func (s *Server) subscribe() (chan uint64, func()) {
 	}
 }
 
-// publish fans a sequence number out to every subscriber without blocking:
-// a slow reader that has not drained its buffer simply misses an intermediate
-// notice, and re-fetches the newest snapshot on the next one.
 func (s *Server) publish(seq uint64) {
 	s.subMu.Lock()
 	defer s.subMu.Unlock()
@@ -84,15 +76,6 @@ func (s *Server) publish(seq uint64) {
 	}
 }
 
-// handleEvents is the one Server-Sent-Events stream per page. Frames:
-//
-//	event: snapshot\nid: <seq>\ndata: {"seq":<seq>}\n\n
-//
-// plus `: ping` comments every KeepAlive so proxies and ssh tunnels keep the
-// connection open. The client re-fetches /api/snapshot on each notice; the
-// frame itself stays tiny. The loop ends when the request context ends — the
-// client disconnected, or Serve's context was cancelled (it is the request's
-// BaseContext), so shutdown never leaves a stream goroutine behind.
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	rc := http.NewResponseController(w)
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -101,11 +84,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
+	// Subscribe before current(): a publish in between is never lost, and seq <= last drops its echo.
 	ch, unsubscribe := s.subscribe()
 	defer unsubscribe()
-	// current() may build the first snapshot on demand and publish it to the
-	// channel just subscribed above; `last` de-duplicates so the client sees
-	// each sequence number once (a repeated id would read as a phantom change).
 	_, last := s.current()
 	if !writeSSE(w, rc, last) {
 		return

@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// applyFixture builds a real DetectReport over fixtureRepo (claude+codex ready,
-// gemini blocked) so the report's per-phase constraints MATCH the on-disk
-// profiles that ValidatePin reads — the production invariant.
 func applyFixture(t *testing.T) (DetectReport, *profiles.Loader) {
 	t.Helper()
 	project, evolveDir := fixtureRepo(t)
@@ -53,7 +50,6 @@ func parsePins(t *testing.T, b []byte) map[string]policy.Pin {
 	return pins
 }
 
-// 1. Unknown preset → error naming the valid set; no bytes.
 func TestApply_UnknownPreset_Errors(t *testing.T) {
 	rep, loader := applyFixture(t)
 	out, err := Apply(rep, builtinPresets, "turbo", nil, loader)
@@ -65,8 +61,6 @@ func TestApply_UnknownPreset_Errors(t *testing.T) {
 	}
 }
 
-// 2. Empty policy + recommended → only the DIFFERING phases are pinned; phases
-// equal to their profile default (scout) are NOT restated.
 func TestApply_EmptyPolicy_WritesOnlyDifferingPins(t *testing.T) {
 	rep, loader := applyFixture(t)
 	out, err := Apply(rep, builtinPresets, "recommended", nil, loader)
@@ -85,7 +79,6 @@ func TestApply_EmptyPolicy_WritesOnlyDifferingPins(t *testing.T) {
 	}
 }
 
-// 3. Lossless merge preserves foreign top-level keys (real policy.json shape).
 func TestApply_LosslessMerge_PreservesForeignKeys(t *testing.T) {
 	rep, loader := applyFixture(t)
 	existing := `{
@@ -108,7 +101,6 @@ func TestApply_LosslessMerge_PreservesForeignKeys(t *testing.T) {
 	}
 }
 
-// 4. A pre-existing pin for a NON-Role phase survives untouched.
 func TestApply_PreservesForeignPins(t *testing.T) {
 	rep, loader := applyFixture(t)
 	existing := `{"pins":{"deploy":{"cli":"claude","model":"deep"}}}`
@@ -122,8 +114,6 @@ func TestApply_PreservesForeignPins(t *testing.T) {
 	}
 }
 
-// 5. Re-applying recommended after max-quality removes the upgraded pins it no
-// longer needs (idempotent convergence, no stale pins).
 func TestApply_ReapplyRecommendedClearsUpgrade(t *testing.T) {
 	rep, loader := applyFixture(t)
 	hi, err := Apply(rep, builtinPresets, "max-quality", nil, loader)
@@ -145,7 +135,6 @@ func TestApply_ReapplyRecommendedClearsUpgrade(t *testing.T) {
 	}
 }
 
-// 6. Malformed existing policy → refuse (no partial/clobbering write).
 func TestApply_MalformedExisting_Refuses(t *testing.T) {
 	rep, loader := applyFixture(t)
 	out, err := Apply(rep, builtinPresets, "recommended", []byte(`{not json`), loader)
@@ -157,7 +146,6 @@ func TestApply_MalformedExisting_Refuses(t *testing.T) {
 	}
 }
 
-// 7. Every emitted pin passes policy.ValidatePin against its profile.
 func TestApply_EmittedPinsPassValidatePin(t *testing.T) {
 	rep, loader := applyFixture(t)
 	out, err := Apply(rep, builtinPresets, "max-quality", nil, loader)
@@ -176,7 +164,6 @@ func TestApply_EmittedPinsPassValidatePin(t *testing.T) {
 	}
 }
 
-// 8. A degraded preset (no families authed) is refused, never persisted.
 func TestApply_DegradedPreset_Refuses(t *testing.T) {
 	project, evolveDir := fixtureRepo(t)
 	rep := Detect(context.Background(), DetectOptions{
@@ -191,8 +178,6 @@ func TestApply_DegradedPreset_Refuses(t *testing.T) {
 	}
 }
 
-// 9. A pin stores the abstract TIER, never the native model id (else ValidatePin's
-// envelope check silently bypasses the floor — see policy.ValidatePin/TierRank).
 func TestApply_PinStoresTierNotNativeModel(t *testing.T) {
 	rep, loader := applyFixture(t)
 	out, err := Apply(rep, builtinPresets, "recommended", nil, loader)
@@ -205,7 +190,6 @@ func TestApply_PinStoresTierNotNativeModel(t *testing.T) {
 	}
 }
 
-// 10. Cross-family pins are legal and split across families.
 func TestApply_CrossFamilyPinsLegal(t *testing.T) {
 	rep, loader := applyFixture(t)
 	out, err := Apply(rep, builtinPresets, "recommended", nil, loader)

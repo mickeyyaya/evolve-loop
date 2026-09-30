@@ -7,14 +7,6 @@ import (
 	"strconv"
 )
 
-// Dispatch is the `evolve subagent run` execution path in named steps: admit
-// → resolve → prepare → the effective worktree → stage the prompt → exec →
-// record. Statements move, values and their order do not — every error text,
-// the prompt, the adapter env, the Warns channel, the verdict wiring and the
-// ledger line are byte-identical to the host's former Run; the run id is
-// resolved once, as admission's last act, instead of at the ledger step, and
-// the identity is complete from here on. The prompt temp file lives exactly
-// as long as the exec.
 func (d *Dispatcher) Dispatch(ctx context.Context, req Request) (Outcome, error) {
 	id, err := d.admit(req)
 	if err != nil {
@@ -38,14 +30,6 @@ func (d *Dispatcher) Dispatch(ctx context.Context, req Request) (Outcome, error)
 	return d.record(req, id, p, prov, x, warns)
 }
 
-// worktreeFor is step 12's first half: the Warns channel (the capability
-// warns, then the fallback sentence) and the effective worktree. The
-// ProjectRoot fallback is deliberate — a non-worktree dispatch has no lane
-// worktree and must still run — but it is never what a FLEET lane wants: an
-// orchestrator that forgot to propagate WorktreePath silently points the
-// agent at the main repo tree, the shape the tree-diff guard kills a lane
-// for. The sentence stays on the Warns channel callers already print, and the
-// same fallback is BRIDGE_SUBAGENT_WORKTREE_FALLBACK on the stream.
 func (d *Dispatcher) worktreeFor(req Request, id identity, capWarns []string) (string, []string) {
 	warns := append([]string(nil), capWarns...)
 	worktree := req.WorktreePath
@@ -58,9 +42,6 @@ func (d *Dispatcher) worktreeFor(req Request, id identity, capWarns []string) (s
 	return worktree, warns
 }
 
-// stage materialises the prompt through the stager; a failure is ONE
-// BRIDGE_SUBAGENT_PREPARE_FAILED whose op names the syscall when the stager
-// says.
 func (d *Dispatcher) stage(req Request, id identity, prov provenance) (string, func(), error) {
 	path, cleanup, err := d.stager.Stage(prov.prompt)
 	if err != nil {
@@ -75,21 +56,12 @@ func (d *Dispatcher) stage(req Request, id identity, prov provenance) (string, f
 	return path, cleanup, nil
 }
 
-// execute is step 12's second half: the two clock reads bracket exactly the
-// adapter call.
 func (d *Dispatcher) execute(ctx context.Context, env AdapterEnv) execution {
 	start := d.now()
 	exitCode, execErr := d.deps.Adapter.Exec(ctx, env)
 	return execution{exitCode: exitCode, execErr: execErr, durationMS: d.now().Sub(start).Milliseconds()}
 }
 
-// record is steps 13-14: the verification ladder (its diagnostics and rung
-// carried on the Outcome instead of dropped), the artifact hash, the ONE
-// outcome signal of a non-PASS run, then the ledger line — written whenever a
-// ledger path is set, even on an adapter error, whose error masks the exec
-// error exactly as before. The outcome signal precedes the ledger append so a
-// ledger failure cannot hide an adapter failure on the stream (signals are not
-// the ledger); the error-return order is unchanged.
 func (d *Dispatcher) record(req Request, id identity, p plan, prov provenance, x execution, warns []string) (Outcome, error) {
 	out := Outcome{CLI: p.cli, Model: p.model, ArtifactPath: prov.artifactPath, ChallengeToken: prov.token,
 		ExitCode: x.exitCode, DurationMS: x.durationMS, Warns: warns}
@@ -110,10 +82,6 @@ func (d *Dispatcher) record(req Request, id identity, p plan, prov provenance, x
 	return out, nil
 }
 
-// hashArtifact is step 13's second half: the artifact's sha256, "" when it
-// cannot be read. A hash failure is BRIDGE_SUBAGENT_ARTIFACT_HASH_FAILED only
-// when the artifact stood the ladder (PASS or FAIL) — on INTEGRITY_FAIL the
-// rung already names the artifact fault.
 func (d *Dispatcher) hashArtifact(req Request, id identity, artifact, verdict string) string {
 	sha, err := d.hash(artifact)
 	if err == nil {
@@ -126,11 +94,6 @@ func (d *Dispatcher) hashArtifact(req Request, id identity, artifact, verdict st
 	return ""
 }
 
-// signalOutcome emits the ONE outcome signal of a non-PASS run: an adapter
-// error is BRIDGE_SUBAGENT_ADAPTER_EXEC_FAILED carrying what the ladder found;
-// otherwise an INTEGRITY_FAIL is BRIDGE_SUBAGENT_ARTIFACT_INTEGRITY_FAIL with
-// its rung and the ladder's diagnostic, and a FAIL over a sound artifact is
-// BRIDGE_SUBAGENT_VERDICT_FAIL with the exit code. A PASS emits nothing.
 func (d *Dispatcher) signalOutcome(req Request, id identity, p plan, prov provenance, x execution, out Outcome) {
 	fields := map[string]string{"exit_code": strconv.Itoa(x.exitCode), "cli": p.cli, "artifact": prov.artifactPath}
 	switch {
@@ -149,9 +112,6 @@ func (d *Dispatcher) signalOutcome(req Request, id identity, p plan, prov proven
 	}
 }
 
-// entryOf is the ledger record of one run: the FULL agent name as the role,
-// the integer-truncated duration as a string, the git state and the quality
-// tier, and the run id resolved after the gate.
 func entryOf(req Request, id identity, p plan, prov provenance, x execution, out Outcome) ledgerEntry {
 	return ledgerEntry{
 		Cycle:          req.Cycle,

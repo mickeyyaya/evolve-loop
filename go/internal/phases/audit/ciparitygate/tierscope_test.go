@@ -1,8 +1,5 @@
 package ciparitygate
 
-// tierscope_test.go — the integration tier's scope (tierscope.go): the pure
-// split, the env-exclusive record table and the whole-suite fallback.
-
 import (
 	"context"
 	"io"
@@ -10,11 +7,6 @@ import (
 	"testing"
 )
 
-// Test 17 (moved: audit/ciparity_unit_test.go:133-157 + the mixed branch) —
-// tierScope is PURE: bridge-only → the golden env-exclusive error and ONE
-// TIER_ENV_EXCLUSIVE_SKIPPED{scope=all}; mixed → only the runnable remainder,
-// in order, ONE {scope=mixed} and ZERO bytes on stderr; /acs/ dropped; ./... →
-// the whole module.
 func TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	if scoped, ex, whole := tierScope([]string{"./internal/bridge/..."}); len(scoped) != 0 || len(ex) != 1 || whole {
@@ -27,7 +19,6 @@ func TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr(t *testing.T) {
 		t.Error("./... anywhere → the whole module")
 	}
 
-	// An acs-only scope skips the tier silently: nothing runs, nothing is emitted.
 	acsOnly, acsEvents := observed(t, fakeRunFunc(1, "", "must not run", nil), fixedSet("./acs/regression/..."))
 	if off, err := acsOnly.IntegrationTier(tierRequest(func() string { r, _ := goWorktree(t); return r }(), "")); off != nil || err != nil || len(*acsEvents) != 0 {
 		t.Errorf("acs-only scope: (%v, %v) events=%v, want a silent skip", off, err, codesOf(*acsEvents))
@@ -67,8 +58,6 @@ func TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr(t *testing.T) {
 	}
 }
 
-// Test 18 — moved verbatim from audit/envexclusive_bridge_test.go (the
-// TestIntegrationTierScope_* pair re-spelled onto tierScope / IntegrationTier).
 func TestEnvExclusive_BridgeIsExcluded(t *testing.T) {
 	for _, p := range []string{"./internal/bridge/...", "internal/bridge", "github.com/mickeyyaya/evolve-loop/go/internal/bridge"} {
 		if !envExclusivePkg(p) {
@@ -86,8 +75,6 @@ func TestEnvExclusive_OnlyBridge(t *testing.T) {
 	}
 }
 
-// The backstop claim must be per-package-honest: bridge's note must say the
-// requireTmux subset runs only on a quiet host, and must NOT say CI covers it.
 func TestEnvExclusive_BackstopNoteIsHonestForBridge(t *testing.T) {
 	note := envExclusiveBackstopNote([]string{"./internal/bridge/...", "internal/bridge"})
 	if strings.Contains(note, "CI's isolated integration-tier step covers internal/bridge") {
@@ -104,9 +91,6 @@ func TestEnvExclusive_BackstopNoteIsHonestForBridge(t *testing.T) {
 	}
 }
 
-// TestEnvExclusive_EntriesDeclareNoCIBackstop is the RULE, expressed over the
-// record table so it needs no package names and cannot fossilize: a package may
-// be env-exclusive ONLY when CI provides no backstop.
 func TestEnvExclusive_EntriesDeclareNoCIBackstop(t *testing.T) {
 	if len(tierEnvExclusive) == 0 {
 		t.Fatal("the record table is empty — if the last exclusion was removed on purpose, retire this guard deliberately, not by vacuity")
@@ -124,8 +108,6 @@ func TestEnvExclusive_EntriesDeclareNoCIBackstop(t *testing.T) {
 	}
 }
 
-// THE WIRING: the note must reach the EMITTED error — the string an operator
-// and the WARN diagnostic actually see — not merely exist as a correct helper.
 func TestIntegrationTierScope_ErrorCarriesTheHonestBackstop(t *testing.T) {
 	root, _ := goWorktree(t)
 	_, err := New(fakeRunFunc(0, "", "", nil), fixedSet("./internal/bridge/...")).IntegrationTier(tierRequest(root, ""))
@@ -141,9 +123,6 @@ func TestIntegrationTierScope_ErrorCarriesTheHonestBackstop(t *testing.T) {
 	}
 }
 
-// TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594 is the INSTANCE
-// regression for the incident: the three packages whose fossilized skip cost
-// 2.5 days of red main must stay in the lane tier scope.
 func TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594(t *testing.T) {
 	changed := []string{"./internal/core/...", "./cmd/evolve/...", "./internal/phases/ship/..."}
 	scoped, _, _ := tierScope(changed)
@@ -152,9 +131,6 @@ func TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594(t *testing.T) {
 	}
 }
 
-// Test 19 — the whole-suite fallback lists the module, drops /acs/ and the
-// env-exclusive full import paths, and fails OPEN with the golden text + ONE
-// GATE_STEP_FAILED{step=tier_list} when `go list` fails.
 func TestWholeSuite_ListsFiltersAndFailsOpen(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, _ := goWorktree(t)

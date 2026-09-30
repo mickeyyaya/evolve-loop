@@ -1,9 +1,5 @@
 package ciparitygate
 
-// apicover_named_test.go — names and exercises every export of the unit
-// (the acs/regression/apicover completeness predicate and `apicover -enforce`
-// count package-local tests only).
-
 import (
 	"testing"
 	"time"
@@ -36,7 +32,7 @@ func TestApicoverNamed_EveryExportIsNamedAndExercised(t *testing.T) {
 		"GoVet": gates.GoVet, "ACSDurable": gates.ACSDurable, "IntegrationTier": gates.IntegrationTier,
 		"ApicoverEnforce": gates.ApicoverEnforce, "ApicoverGraduation": gates.ApicoverGraduation,
 	} {
-		if off, err := gate(req); off != nil || err != nil { // no go.mod under /w → every gate is a silent no-op
+		if off, err := gate(req); off != nil || err != nil {
 			t.Errorf("%s on a module-less request = (%v, %v)", name, off, err)
 		}
 	}
