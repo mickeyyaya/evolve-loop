@@ -2,6 +2,7 @@ package commentaudit
 
 import (
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"io/fs"
 	"path"
@@ -58,13 +59,26 @@ func AddedNarrative(before, after []byte) []string {
 	return subtract(commentLines(after, isNarrative), commentLines(before, isNarrative))
 }
 
-// AddedComments returns the non-directive comment lines after adds to before, sparing a new file's package doc.
+const maxPackageDocLines = 3
+
 func AddedComments(before, after []byte) []string {
 	held := commentLines(before, isPlain)
-	if before == nil {
-		held = packageDoc(after)
+	if sparesPackageDoc(before, after) {
+		held = append(held, packageDoc(after)...)
 	}
 	return subtract(commentLines(after, isPlain), held)
+}
+
+func sparesPackageDoc(before, after []byte) bool {
+	limit := maxPackageDocLines
+	if before != nil {
+		existing := len(packageDoc(before))
+		if existing == 0 {
+			return false
+		}
+		limit = max(limit, existing)
+	}
+	return len(packageDoc(after)) <= limit
 }
 
 func isPlain(line string) bool {
@@ -113,18 +127,35 @@ func packageDoc(src []byte) []string {
 }
 
 func forEachLine(src []byte, visit func(line string, isComment bool)) {
-	inBlock := false
-	for _, line := range strings.Split(string(src), "\n") {
-		line = strings.TrimSpace(line)
-		isComment := inBlock || strings.HasPrefix(line, "//") || strings.HasPrefix(line, "/*")
-		if strings.HasPrefix(line, "/*") {
-			inBlock = true
+	isCommentLine := wholeLineCommentLines(src)
+	for i, line := range strings.Split(string(src), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			visit(line, isCommentLine[i+1])
 		}
-		if inBlock && strings.Contains(line, "*/") {
-			inBlock = false
-		}
-		if line != "" {
-			visit(line, isComment)
+	}
+}
+
+func wholeLineCommentLines(src []byte) map[int]bool {
+	fset := token.NewFileSet()
+	file := fset.AddFile("", fset.Base(), len(src))
+	var s scanner.Scanner
+	s.Init(file, src, nil, scanner.ScanComments)
+	commentLines := map[int]bool{}
+	lastCodeLine := 0
+	for {
+		pos, tok, lit := s.Scan()
+		switch {
+		case tok == token.EOF:
+			return commentLines
+		case tok == token.COMMENT && file.PositionFor(pos, false).Line != lastCodeLine:
+			first := file.PositionFor(pos, false).Line
+			for line := first; line <= first+strings.Count(lit, "\n"); line++ {
+				commentLines[line] = true
+			}
+		case tok == token.STRING:
+			lastCodeLine = file.PositionFor(pos, false).Line + strings.Count(lit, "\n")
+		case tok != token.COMMENT:
+			lastCodeLine = file.PositionFor(pos, false).Line
 		}
 	}
 }

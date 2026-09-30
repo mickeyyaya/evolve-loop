@@ -44,14 +44,14 @@ func runWaiverCase(t *testing.T, c waiverCase) *Result {
 		c.noRenames = c.files
 	}
 	rules := []scriptRule{
-		{matchPrefix: "git diff --name-only --no-renames HEAD", stdout: c.noRenames},
+		{matchPrefix: "git diff --name-only --no-renames -z HEAD", stdout: strings.ReplaceAll(c.noRenames, "\n", "\x00")},
 		{matchPrefix: "git diff --name-only HEAD", stdout: c.files},
 	}
 	for _, p := range strings.Fields(c.noRenames + " " + c.files + " " + c.filesFlag) {
 		if body, ok := c.atHead[p]; ok {
-			rules = append(rules, scriptRule{matchPrefix: "git show HEAD:" + p, stdout: body})
+			rules = append(rules, scriptRule{matchPrefix: "git show HEAD:" + p, stdout: body}, scriptRule{matchPrefix: "git cat-file -e HEAD:" + p})
 		} else {
-			rules = append(rules, scriptRule{matchPrefix: "git show HEAD:" + p, exit: 128})
+			rules = append(rules, scriptRule{matchPrefix: "git show HEAD:" + p, exit: 128}, scriptRule{matchPrefix: "git cat-file -e HEAD:" + p, exit: 128})
 		}
 	}
 	rules = append(rules,

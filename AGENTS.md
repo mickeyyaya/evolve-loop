@@ -46,6 +46,12 @@ The auditor profile defaults to Opus, but the native diff-complexity check (`go/
 
 Enforced by the doc-deletion guard (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; PreToolUse kernel hook): blocks `rm`/`mv` that would remove committed content from `docs/**` or `knowledge-base/**` unless the destination lands under `docs/` (archive with `git mv` into `docs/private/research/archived-YYYY-MM-DD/`, so the archived copy stays staged; `knowledge-base/` is deliberately NOT a valid destination). The one exception: a Build may `git rm` the active cycle's own explanation document (`docs/explain/builds/cycle-<N>-<run>.md`) when it was never committed. Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
 
+### 10. Code carries no comments; it explains itself (2026-09-30)
+
+> Every agent, phase and person writes code with no comments. Names, types, small functions and test names say what the code does; a design reason goes to the package's notes under `docs/architecture/packages/`. Only the comments a tool reads survive; [the code-comments convention](docs/conventions/code-comments.md) is the one list of them. When a comment is removed, the code must say what it said.
+
+The commit gate (`evolve commit-gate run`) refuses a commit that adds a comment. Loop lanes: the build handoff floor counts the comments a build adds (`comment_floor`); its rollout stage is kept in [the code-comments convention](docs/conventions/code-comments.md).
+
 ## 12 Core agent rules
 
 Behavioral rules every agent must follow regardless of CLI. Where the kernel hooks above catch *structural* breaches, these catch *judgment* breaches. In bypass-permissions / autonomous mode, rule 4 ("stop and ask") is overridden — make the reasonable call and continue. All other rules apply unconditionally.

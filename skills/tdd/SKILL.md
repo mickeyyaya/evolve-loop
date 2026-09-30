@@ -28,6 +28,8 @@ description: Use when the plan-review verdict is PROCEED (or plan-review is disa
 | 3 | Document the test contract in `<workspace>/tdd-contract.md` | Contract written |
 | 4 | Append section to `<workspace>/team-context.md` | Bus updated for Builder |
 
+**Comments:** code written in this phase carries none; names, types and test names say it, and the build floor counts an added comment ([code-comments convention](../../docs/conventions/code-comments.md)).
+
 ## RED requirement
 
 Tests MUST fail when run against the current codebase. A test that passes immediately is NOT a TDD contract — it does not exercise the new behavior. Builder will refuse to start without confirmed RED state.

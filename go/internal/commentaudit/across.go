@@ -29,7 +29,7 @@ func (r rule) acrossDiff(files []string, before, after func(string) ([]byte, err
 	var added []Added
 	removed := map[string]int{}
 	for _, f := range files {
-		if !strings.HasSuffix(f, ".go") {
+		if !strings.HasSuffix(f, ".go") || isOutsideProjectCode(f) {
 			continue
 		}
 		b, a, err := readBoth(before, after, f)
@@ -68,4 +68,8 @@ func ReadAtBase(run func(args ...string) ([]byte, error), base string) func(stri
 		}
 		return nil, fs.ErrNotExist
 	}
+}
+
+func isOutsideProjectCode(path string) bool {
+	return strings.Contains("/"+path, "/testdata/") || strings.Contains("/"+path, "/vendor/")
 }

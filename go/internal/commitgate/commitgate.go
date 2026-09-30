@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
-	"github.com/mickeyyaya/evolve-loop/go/internal/binaryguard"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
@@ -64,15 +63,8 @@ func (o Options) Run(ctx context.Context) *Result {
 		res.ExitCode = code
 		return res
 	}
-	if offenders, err := binaryguard.Scan(o.RepoRoot, files, binaryguard.DefaultThresholdBytes); err != nil {
-		res.log("binary guard: %v", err)
-		res.ExitCode = ExitGitFatal
-		return res
-	} else if len(offenders) > 0 {
-		for _, off := range offenders {
-			res.log("REJECTED: %s is a %d-byte compiled executable — never commit build artifacts (add it to .gitignore).", off.Path, off.Size)
-		}
-		res.ExitCode = ExitFail
+	if code := o.refuseWhatNeverCommits(ctx, files, res); code != ExitPass {
+		res.ExitCode = code
 		return res
 	}
 	langs := detectLangs(files)

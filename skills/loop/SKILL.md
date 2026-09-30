@@ -89,6 +89,10 @@ The rest of this file (architecture, model routing, phase docs) is reference mat
 
 > **v8.13.2 / v12.0.0**: self-healing release pipeline. For version-bump releases use `evolve release <version>` (native Go). The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `evolve ship`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
+## Code carries no comments (system policy)
+
+Every phase that writes code writes none: the code explains itself through names, types, small functions and test names, and a design reason goes to the package's notes under `docs/architecture/packages/`. Only the comments a tool reads survive; [the code-comments convention](../../docs/conventions/code-comments.md) lists them. The build handoff floor counts the comments a build adds (`comment_floor` in `.evolve/policy.json`: `shadow` WARNs, the default; `enforce` sends the build back for correction before its audit), the auditor reports any that reach it, and the commit gate refuses a console commit that adds one.
+
 ## Shared Agent Values
 
 The following JSON block is the canonical state initialization for the evolve-loop. Agents must use these field names when reading from or writing to `state.json`.

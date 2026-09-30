@@ -26,6 +26,8 @@ description: Use after tdd has written RED tests and the contract is in team-con
 | 3 | Run regression suite (`legacy/scripts/utility/run-all-regression-tests.sh`) | No new regressions |
 | 4 | Write `<workspace>/build-report.md` | Report present + fresh + token-bound |
 
+**Comments:** code written in this phase carries none; names, types and test names say it, and the build floor counts an added comment ([code-comments convention](../../docs/conventions/code-comments.md)).
+
 ## Single-writer invariant
 
 Builder runs in a dedicated worktree. Concurrent builders are STRUCTURALLY blocked because:
