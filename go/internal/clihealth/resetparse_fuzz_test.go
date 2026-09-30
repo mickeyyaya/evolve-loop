@@ -40,6 +40,9 @@ func FuzzParseResetHint(f *testing.F) {
 		"try again in -5 minutes",
 		"try again at 6:11 AM\x00\xff",
 		"try again in 999999999999999999999 hours",
+		codexDatedWall,
+		"try again at Feb 30th, 2027 4:13 PM",
+		"try again at Jan 1st, 2027 13:13 PM",
 	} {
 		f.Add(seed)
 	}
