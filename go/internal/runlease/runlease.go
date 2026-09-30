@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 )
 
@@ -162,4 +163,36 @@ func OwnerLive(l Lease, now time.Time, ttl time.Duration, alive func(int) bool) 
 		return true
 	}
 	return alive(l.OwnerPID)
+}
+
+type LiveRun struct {
+	Dir   string
+	Lease Lease
+}
+
+func LiveOwner(runDir string, now time.Time) (Lease, bool) {
+	l, ok, err := Read(runDir)
+	if err != nil || !ok || !OwnerLive(l, now, DefaultTTL, PIDAlive) {
+		return Lease{}, false
+	}
+	return l, true
+}
+
+func LiveRuns(runsDir string, now time.Time) []LiveRun {
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		return nil
+	}
+	var live []LiveRun
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		dir := filepath.Join(runsDir, e.Name())
+		if l, ok := LiveOwner(dir, now); ok {
+			live = append(live, LiveRun{Dir: dir, Lease: l})
+		}
+	}
+	sort.Slice(live, func(i, j int) bool { return live[i].Dir < live[j].Dir })
+	return live
 }

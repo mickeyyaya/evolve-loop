@@ -53,8 +53,11 @@ Commands:
               orphan processes, worktrees, run dirs, go build cache
               ( gc --project-root P [--dry-run] )
   loop       Drive the cycle dispatcher loop ( loop --max-cycles N [strategy] "goal" )
-  loop-stop  Stop a running loop after its current wave; --release lifts the brake
-              ( loop-stop [--release] [--project-root P] )
+  loop-stop  Stop a running loop after its current wave; --release lifts the brake,
+              --wait blocks until no run lease is live
+              ( loop-stop [--release | --wait [--timeout D]] [--project-root P] )
+  status     Read-only report: loop, cycles, ship streak, open PRs, failing CI jobs
+              ( status [--json] [--project-root P] )
   ship       Atomic commit + push (native; v11.3.0)
               ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )
   bridge     Native-Go multi-CLI agent bridge

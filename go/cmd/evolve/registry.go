@@ -61,6 +61,7 @@ var commands = []subcommand{
 	{Name: "gc", Summary: "Release what finished cycles left behind: tmux sessions/sockets, orphan processes, worktrees, run dirs, go build cache (gc --project-root <dir> [--dry-run])", Run: runGC},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
 	{Name: "loop-stop", Summary: "Stop a running loop after its current wave: engage the .evolve/loop-stop brake (loop-stop [--release] [--project-root P])", Run: runLoopStop},
+	{Name: "status", Summary: "Read-only report: loop, cycles, ship streak, open PRs with check state, failing CI jobs on main (status [--json] [--project-root P])", Run: runStatus},
 	{Name: "ship", Summary: "Atomic commit + push", Run: runShipCmd},
 	{Name: "reset-sha", Summary: "Re-pin the ship-gate binary SHA to the running binary (provenance-gated; --operator to override)", Run: runResetSHA},
 	{Name: "sync-main", Summary: "Reconcile a locally-diverged main with origin via merge only (never rebase/force-push/push); refuses on live lease or dirty tree", Run: runSyncMain},

@@ -33,36 +33,44 @@ type ghRun struct {
 // status "queued" (the watch keeps polling until the timeout).
 func NewGHFetcher(repoRoot string) Fetcher {
 	return func(ctx context.Context, sha string) (RunStatus, error) {
-		out, err := execCapture(ctx, repoRoot, "gh", "run", "list",
-			"--workflow", ciparity.RequiredWorkflow, "--commit", sha, "--limit", "1",
-			"--json", "status,conclusion,url,databaseId")
-		if err != nil {
-			return RunStatus{}, fmt.Errorf("gh run list --commit %s: %w", sha, err)
-		}
-		var runs []ghRun
-		if err := json.Unmarshal(out, &runs); err != nil {
-			return RunStatus{}, fmt.Errorf("gh run list output: %w", err)
-		}
-		if len(runs) == 0 {
-			return RunStatus{Status: "queued"}, nil
-		}
-		r := runs[0]
-		st := RunStatus{Status: r.Status, Conclusion: r.Conclusion, RunURL: r.URL}
-		if r.Status == StatusCompleted && r.Conclusion != ConclusionSuccess {
-			st.FailingTest, st.LogExcerpt = failedLogSummary(ctx, repoRoot, r.DatabaseID)
-		}
-		return st, nil
+		return latestRequiredRun(ctx, repoRoot, "--commit", sha)
 	}
+}
+
+func LatestRequiredRunOnBranch(ctx context.Context, repoRoot, branch string) (RunStatus, error) {
+	return latestRequiredRun(ctx, repoRoot, "--branch", branch)
+}
+
+func latestRequiredRun(ctx context.Context, repoRoot, filter, value string) (RunStatus, error) {
+	out, err := execCapture(ctx, repoRoot, "gh", "run", "list",
+		"--workflow", ciparity.RequiredWorkflow, filter, value, "--limit", "1",
+		"--json", "status,conclusion,url,databaseId")
+	if err != nil {
+		return RunStatus{}, fmt.Errorf("gh run list %s %s: %w", filter, value, err)
+	}
+	var runs []ghRun
+	if err := json.Unmarshal(out, &runs); err != nil {
+		return RunStatus{}, fmt.Errorf("gh run list output: %w", err)
+	}
+	if len(runs) == 0 {
+		return RunStatus{Status: "queued"}, nil
+	}
+	r := runs[0]
+	st := RunStatus{Status: r.Status, Conclusion: r.Conclusion, RunURL: r.URL}
+	if r.Status == StatusCompleted && r.Conclusion != ConclusionSuccess {
+		st.FailingTest, st.LogExcerpt, st.FailingJobs = failedLogSummary(ctx, repoRoot, r.DatabaseID)
+	}
+	return st, nil
 }
 
 // failedLogSummary best-effort extracts the first failing test name plus a
 // bounded excerpt from the run's failed-job logs. Any gh error degrades to
 // empty values — the escalation item still files, pointing at the run URL.
-func failedLogSummary(ctx context.Context, repoRoot string, runID int64) (string, string) {
+func failedLogSummary(ctx context.Context, repoRoot string, runID int64) (string, string, []string) {
 	out, err := execCapture(ctx, repoRoot, "gh", "run", "view",
 		fmt.Sprintf("%d", runID), "--log-failed")
 	if err != nil {
-		return "", ""
+		return "", "", nil
 	}
 	excerpt := string(out)
 	if len(excerpt) > maxLogExcerpt {
@@ -77,5 +85,19 @@ func failedLogSummary(ctx context.Context, repoRoot string, runID int64) (string
 			}
 		}
 	}
-	return failing, excerpt
+	return failing, excerpt, failedJobNames(string(out))
+}
+
+func failedJobNames(log string) []string {
+	var jobs []string
+	seen := map[string]bool{}
+	for _, line := range strings.Split(log, "\n") {
+		name, _, tabbed := strings.Cut(line, "\t")
+		if !tabbed || name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		jobs = append(jobs, name)
+	}
+	return jobs
 }

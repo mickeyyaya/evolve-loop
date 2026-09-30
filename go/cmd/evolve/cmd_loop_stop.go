@@ -1,28 +1,53 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+)
+
+const (
+	loopStopDefaultWait = 10 * time.Minute
+	loopStopWaitPoll    = 200 * time.Millisecond
+	loopStopUsage       = "usage: evolve loop-stop [--release | --wait [--timeout D]] [--project-root P]"
 )
 
 func runLoopStop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve loop-stop", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var projectRoot string
-	var release bool
+	var release, wait bool
+	var timeout time.Duration
 	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.BoolVar(&release, "release", false, "remove the brake so the next evolve loop launch runs")
+	fs.BoolVar(&wait, "wait", false, "after engaging the brake, block until no run lease is live")
+	fs.DurationVar(&timeout, "timeout", loopStopDefaultWait, "with --wait: give up after this long (exit 1, brake kept)")
 	if err := fs.Parse(args); err != nil {
 		return 1
 	}
 	if fs.NArg() > 0 {
-		fmt.Fprintf(stderr, "evolve loop-stop: unexpected argument %q (usage: evolve loop-stop [--release] [--project-root P])\n", fs.Arg(0))
+		fmt.Fprintf(stderr, "evolve loop-stop: unexpected argument %q (%s)\n", fs.Arg(0), loopStopUsage)
+		return 1
+	}
+	timeoutSet := false
+	fs.Visit(func(f *flag.Flag) { timeoutSet = timeoutSet || f.Name == "timeout" })
+	switch {
+	case wait && release:
+		fmt.Fprintf(stderr, "evolve loop-stop: --wait and --release are mutually exclusive (%s)\n", loopStopUsage)
+		return 10
+	case timeoutSet && !wait:
+		fmt.Fprintf(stderr, "evolve loop-stop: --timeout requires --wait (%s)\n", loopStopUsage)
+		return 1
+	case wait && timeout <= 0:
+		fmt.Fprintf(stderr, "evolve loop-stop: --timeout must be positive, got %s\n", timeout)
 		return 1
 	}
 	root, err := loopStopRoot(projectRoot, stderr)
@@ -34,7 +59,63 @@ func runLoopStop(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if release {
 		return releaseLoopStop(brake, stdout, stderr)
 	}
-	return engageLoopStop(brake, time.Now(), stdout, stderr)
+	if rc := engageLoopStop(brake, time.Now(), stdout, stderr); rc != 0 || !wait {
+		return rc
+	}
+	runsDir := filepath.Join(paths.EvolveDirOf(root), "runs")
+	return waitForIdleLoop(runsDir, timeout, loopStopWaitPoll, time.Now, time.Sleep, stdout, stderr)
+}
+
+func waitForIdleLoop(runsDir string, timeout, poll time.Duration, now func() time.Time, sleep func(time.Duration), stdout, stderr io.Writer) int {
+	deadline := now().Add(timeout)
+	shown := map[string]string{}
+	for {
+		live := runlease.LiveRuns(runsDir, now())
+		if len(live) == 0 {
+			fmt.Fprintln(stdout, "loop-stop: no run lease is live; the loop is idle")
+			return 0
+		}
+		for _, r := range live {
+			reportLiveRunPhase(stdout, r, shown)
+		}
+		if !now().Before(deadline) {
+			for _, r := range live {
+				fmt.Fprintf(stderr, "evolve loop-stop: timed out after %s: run %s still live (%s); the brake stays engaged\n", timeout, r.Lease.RunID, r.Dir)
+			}
+			return 1
+		}
+		sleep(poll)
+	}
+}
+
+func reportLiveRunPhase(w io.Writer, r runlease.LiveRun, shown map[string]string) {
+	phase := liveRunPhase(r.Dir)
+	if _, seen := shown[r.Dir]; phase == "" && seen {
+		return
+	}
+	if phase == "" {
+		phase = "unknown"
+	}
+	key := r.Lease.RunID + "/" + phase
+	if shown[r.Dir] == key {
+		return
+	}
+	shown[r.Dir] = key
+	fmt.Fprintf(w, "loop-stop: waiting on run %s (%s) in phase %s\n", r.Lease.RunID, filepath.Base(r.Dir), phase)
+}
+
+func liveRunPhase(runDir string) string {
+	b, err := os.ReadFile(filepath.Join(runDir, "run.json"))
+	if err != nil {
+		return ""
+	}
+	var run struct {
+		Phase string `json:"phase"`
+	}
+	if json.Unmarshal(b, &run) != nil {
+		return ""
+	}
+	return run.Phase
 }
 
 func loopStopRoot(projectRoot string, stderr io.Writer) (string, error) {

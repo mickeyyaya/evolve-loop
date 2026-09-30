@@ -3,6 +3,7 @@ package runlease
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -285,5 +286,41 @@ func TestWriter_PerInstanceSeamsAreIsolated(t *testing.T) {
 	}
 	if !bRenamed {
 		t.Error("writer b must use its own rename seam")
+	}
+}
+
+func TestLiveRuns_ReportsOnlyFreshLiveOwnerLeases(t *testing.T) {
+	runs := t.TempDir()
+	finished := exec.Command("true")
+	if err := finished.Run(); err != nil {
+		t.Fatal(err)
+	}
+	mk := func(name string, l Lease, at time.Time) string {
+		d := filepath.Join(runs, name)
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := Write(d, l, at); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	liveDir := mk("cycle-1", Lease{RunID: "live", OwnerPID: os.Getpid()}, t0)
+	staleDir := mk("cycle-2", Lease{RunID: "stale", OwnerPID: os.Getpid()}, t0.Add(-2*DefaultTTL))
+	deadDir := mk("cycle-3", Lease{RunID: "deadpid", OwnerPID: finished.Process.Pid}, t0)
+	if err := os.MkdirAll(filepath.Join(runs, "cycle-4"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var got []LiveRun = LiveRuns(runs, t0)
+	if len(got) != 1 || got[0].Dir != liveDir || got[0].Lease.RunID != "live" {
+		t.Fatalf("LiveRuns = %+v, want only %s", got, liveDir)
+	}
+	for dir, want := range map[string]bool{liveDir: true, staleDir: false, deadDir: false, filepath.Join(runs, "cycle-4"): false} {
+		if l, ok := LiveOwner(dir, t0); ok != want || (ok && l.RunID != "live") {
+			t.Errorf("LiveOwner(%s) = %+v, %v; want live=%v", dir, l, ok, want)
+		}
+	}
+	if none := LiveRuns(filepath.Join(runs, "absent"), t0); len(none) != 0 {
+		t.Fatalf("missing runs dir must yield no live runs, got %+v", none)
 	}
 }

@@ -32,6 +32,7 @@ func TestAPICoverNamedExports(t *testing.T) {
 		_ Trend           = snap.Trend
 		_ []TrendPoint    = snap.Trend.Points
 		_ []RoundBucket   = snap.Trend.RoundHistogram
+		_ *ZeroShipRun    = snap.Trend.LastZeroShipRun
 		_ FingerprintStat = snap.Fingerprints[0]
 	)
 	for _, st := range []string{StateRunning, StatePass, StateWarn, StateFail, StateHalted, StateIncomplete} {

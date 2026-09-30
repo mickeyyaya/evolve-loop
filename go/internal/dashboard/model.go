@@ -140,13 +140,21 @@ type AuditRound struct {
 }
 
 type Trend struct {
-	Points         []TrendPoint  `json:"points"`
-	Closed         int           `json:"closed"`
-	Shipped        int           `json:"shipped"`
-	ShipRateLast20 float64       `json:"ship_rate_last_20"`
-	ShipRateLast50 float64       `json:"ship_rate_last_50"`
-	ShipRateAll    float64       `json:"ship_rate_all"`
-	RoundHistogram []RoundBucket `json:"round_histogram"`
+	Points          []TrendPoint  `json:"points"`
+	Closed          int           `json:"closed"`
+	Shipped         int           `json:"shipped"`
+	ShipRateLast20  float64       `json:"ship_rate_last_20"`
+	ShipRateLast50  float64       `json:"ship_rate_last_50"`
+	ShipRateAll     float64       `json:"ship_rate_all"`
+	RoundHistogram  []RoundBucket `json:"round_histogram"`
+	ShipStreak      int           `json:"ship_streak"`
+	LastZeroShipRun *ZeroShipRun  `json:"last_zero_ship_run"`
+}
+
+type ZeroShipRun struct {
+	FirstCycle int `json:"first_cycle"`
+	LastCycle  int `json:"last_cycle"`
+	Length     int `json:"length"`
 }
 
 type TrendPoint struct {

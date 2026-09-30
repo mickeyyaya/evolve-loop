@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -102,5 +103,45 @@ func TestDossierCache_ReusesUnchangedFile(t *testing.T) {
 	h := readHistory(root, c)
 	if h.Trend.Shipped != 0 {
 		t.Fatalf("cache served the stale PASS after the file changed")
+	}
+}
+
+func TestComputeTrend_ShipStreakCountsBackFromTheNewestCycleOverTheFullHistory(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name       string
+		oldest     string
+		wantStreak int
+		wantRun    *ZeroShipRun
+	}{
+		{"empty", "", 0, nil},
+		{"all-shipped", "PPP", 3, nil},
+		{"newest-unshipped", "PPF", 0, &ZeroShipRun{FirstCycle: 3, LastCycle: 3, Length: 1}},
+		{"most-recent-run-only", "FPFFP", 1, &ZeroShipRun{FirstCycle: 3, LastCycle: 4, Length: 2}},
+		{"warn-without-commit-breaks", "PwP", 1, &ZeroShipRun{FirstCycle: 2, LastCycle: 2, Length: 1}},
+		{"beyond-the-point-cap", "F" + strings.Repeat("P", trendPointCap+5), trendPointCap + 5, &ZeroShipRun{FirstCycle: 1, LastCycle: 1, Length: 1}},
+	}
+	for _, c := range cases {
+		ds := map[int]*dossier.Dossier{}
+		for i, o := range c.oldest {
+			d := &dossier.Dossier{Cycle: i + 1, FinalVerdict: dossier.VerdictFail}
+			switch o {
+			case 'P':
+				d.FinalVerdict, d.CommitSHA = dossier.VerdictPass, "abc"
+			case 'w':
+				d.FinalVerdict = dossier.VerdictWarn
+			}
+			ds[i+1] = d
+		}
+		got := computeTrend(sortedCycles(ds), ds)
+		if got.ShipStreak != c.wantStreak {
+			t.Errorf("%s: ShipStreak=%d want %d", c.name, got.ShipStreak, c.wantStreak)
+		}
+		switch {
+		case c.wantRun == nil && got.LastZeroShipRun != nil:
+			t.Errorf("%s: LastZeroShipRun=%+v want nil", c.name, *got.LastZeroShipRun)
+		case c.wantRun != nil && (got.LastZeroShipRun == nil || *got.LastZeroShipRun != *c.wantRun):
+			t.Errorf("%s: LastZeroShipRun=%v want %+v", c.name, got.LastZeroShipRun, *c.wantRun)
+		}
 	}
 }

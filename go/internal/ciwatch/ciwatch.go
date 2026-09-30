@@ -51,7 +51,8 @@ type RunStatus struct {
 	// FailingTest is the best-effort failing job/test name on a red run.
 	FailingTest string
 	// LogExcerpt is a bounded excerpt of the failing job's log.
-	LogExcerpt string
+	LogExcerpt  string
+	FailingJobs []string
 }
 
 // Fetcher returns the current CI run status for a pushed SHA. Tests inject

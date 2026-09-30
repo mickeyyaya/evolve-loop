@@ -145,11 +145,27 @@ func computeTrend(cycles []int, ds map[int]*dossier.Dossier) Trend {
 	t.ShipRateAll = shipRateOfLast(points, len(points))
 	t.ShipRateLast20 = shipRateOfLast(points, 20)
 	t.ShipRateLast50 = shipRateOfLast(points, 50)
+	t.ShipStreak, t.LastZeroShipRun = shipStreak(points)
 	if len(points) > trendPointCap {
 		points = points[len(points)-trendPointCap:]
 	}
 	t.Points = points
 	return t
+}
+
+func shipStreak(points []TrendPoint) (int, *ZeroShipRun) {
+	i := len(points) - 1
+	for i >= 0 && points[i].Shipped {
+		i--
+	}
+	streak, end := len(points)-1-i, i
+	for i >= 0 && !points[i].Shipped {
+		i--
+	}
+	if end < 0 {
+		return streak, nil
+	}
+	return streak, &ZeroShipRun{FirstCycle: points[i+1].Cycle, LastCycle: points[end].Cycle, Length: end - i}
 }
 
 func shipRateOfLast(points []TrendPoint, n int) float64 {

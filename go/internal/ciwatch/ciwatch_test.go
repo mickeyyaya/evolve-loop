@@ -243,3 +243,36 @@ func TestNewGHFetcher_ReadsTheRequiredWorkflowRun(t *testing.T) {
 		t.Fatalf("fetch = %+v, %v; want the required workflow's red run, not a newer green run of another workflow", st, err)
 	}
 }
+
+func TestLatestRequiredRunOnBranch_NamesTheFailingJobsOfTheBranchRun(t *testing.T) {
+	orig := execCapture
+	t.Cleanup(func() { execCapture = orig })
+	var listArgs []string
+	execCapture = func(_ context.Context, _, _ string, args ...string) ([]byte, error) {
+		if slices.Contains(args, "view") {
+			return []byte("unit (ubuntu-latest)\trun\t--- FAIL: TestA (0.01s)\nunit (ubuntu-latest)\trun\tmore\ncontract-scan\tscan\tboom\nno tab here\n"), nil
+		}
+		listArgs = args
+		return []byte(`[{"status":"completed","conclusion":"failure","url":"https://ci/main","databaseId":9}]`), nil
+	}
+	st, err := LatestRequiredRunOnBranch(context.Background(), ".", "main")
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if i := slices.Index(listArgs, "--branch"); i < 0 || listArgs[i+1] != "main" || !slices.Contains(listArgs, ciparity.RequiredWorkflow) {
+		t.Errorf("run list args = %v, want the required workflow filtered to --branch main", listArgs)
+	}
+	if want := []string{"unit (ubuntu-latest)", "contract-scan"}; !slices.Equal(st.FailingJobs, want) {
+		t.Errorf("FailingJobs = %v, want %v", st.FailingJobs, want)
+	}
+	if st.FailingTest != "TestA" || st.RunURL != "https://ci/main" {
+		t.Errorf("status = %+v, want failing test TestA on https://ci/main", st)
+	}
+
+	execCapture = func(_ context.Context, _, _ string, _ ...string) ([]byte, error) {
+		return nil, errors.New("gh: not logged in")
+	}
+	if _, err := LatestRequiredRunOnBranch(context.Background(), ".", "main"); err == nil || !strings.Contains(err.Error(), "--branch main") {
+		t.Errorf("gh failure must propagate naming the branch filter, got %v", err)
+	}
+}

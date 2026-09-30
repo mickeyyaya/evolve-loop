@@ -45,7 +45,7 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if ws := liveLeaseWorkspace(absRoot); ws != "" {
-		if lease, ok, _ := runlease.Read(ws); ok && runlease.OwnerLive(lease, time.Now(), 0, pidAlive) {
+		if lease, ok := runlease.LiveOwner(ws, time.Now()); ok {
 			fmt.Fprintf(stderr, "evolve sync-main: refused — a run lease is live (pid %d, heartbeat fresh); another evolve loop owns this tree.\n", lease.OwnerPID)
 			fmt.Fprintln(stderr, "evolve sync-main:   • let it finish, or `evolve loop --resume` to attach, then retry.")
 			return 1
