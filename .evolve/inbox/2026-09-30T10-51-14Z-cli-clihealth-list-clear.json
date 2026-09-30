@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve cli-health list --json` prints each benched family with benched_until (red: unknown command)",
+    "`evolve cli-health clear codex` removes the bench, so the next preflight reads the family as healthy",
+    "clear on a family that is not benched exits 1"
+  ],
+  "connects_to": [
+    "bench-records-the-stated-reset"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/clihealth",
+    "go/cmd/evolve/cli_health_canary.go"
+  ],
+  "fix": "Add `evolve cli-health list [--json]`, which prints family, reason, evidence, benched_until and operator action from Store.Active. Add `evolve cli-health clear <family> [--reason T]`, which calls Store.Clear and appends an operator record like the canary's. Clearing a family that is not benched exits 1. Exit 2 on state I/O. Document both in runtime-reference.md's operator commands.",
+  "id": "cli-clihealth-list-clear",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "clihealth.Store records benched families (quota walls, boot strikes). Store.Clear (internal/clihealth/clihealth.go:230) is called only by the loop's launch canary (cli_health_canary.go:52,62). When a wall lifts early, which the operator can confirm with `evolve doctor live`, the family stays benched until the next launch's canary. No command shows which families are benched, why, or until when.",
+  "title": "A benched CLI family can be inspected or lifted only by reading the cli-health state file or waiting for a launch's canary; add `evolve cli-health list|clear`",
+  "weight": 0.4
+}

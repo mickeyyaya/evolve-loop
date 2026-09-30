@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "No go/acs predicate asserts comment presence or exact source text",
+    "The archived packages are listed with the reason in the archive README"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/acs/cycle1741",
+    "go/acs/cycle1742",
+    "go/acs/cycle1759",
+    "go/acs/cycle1770",
+    "go/acs/cycle50"
+  ],
+  "fix": "Archive each such predicate package under docs/private/research/archived-*/superseded-predicate-packages/ (the A2 convention), recording why, or rewrite a still-valuable behavioural predicate to assert behaviour.",
+  "id": "retire-comment-pinning-cycle-predicates",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "Several per-cycle predicates assert that comments were not deleted or added (TestC1741_010, TestC1742_008/_010, TestC1759_006, TestC1770_002/_005) or anchor on exact source text the self-explanation pass changed (TestC1742_011/_012, TestC50B_006). Some already fail at HEAD; they re-run only when a lane changes their packages, so they are latent traps for the zero-comment campaign (plan Phase 2d).",
+  "title": "Retire the historical cycle predicates that pin comment text or source anchors (cycles 1741, 1742, 1759, 1770, 50)",
+  "weight": 0.3
+}

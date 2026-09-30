@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`evolve cycle reaudit --cycle N` on a fixture whose base moved rebases, audits, and records a verdict that ship's binding accepts (red: unknown subcommand)",
+    "A rebase conflict or a live run lease exits 1 with the reason and leaves the worktree unchanged",
+    "The verb and the recovery chain call one re-audit function (test)"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/internal/core/ship_recovery.go",
+    "go/internal/core/resume.go"
+  ],
+  "fix": "Add `evolve cycle reaudit --cycle N`, which runs the recovery chain's needs-reaudit path. It rebases the cycle's worktree onto the current base, runs the audit phase with the cycle's derived request and host seams, and records the verdict where ship's audit binding reads it. It never ships. A rebase conflict or a live run lease exits 1 and leaves the worktree unchanged. The verb and the recovery chain call one re-audit function. Document it in runtime-reference.md's ship self-healing section.",
+  "id": "cli-cycle-reaudit",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "A cycle whose passed audit went stale when main moved is re-audited only inside ship's recovery chain (the `needs-reaudit` outcome, runtime-reference.md:248), which runs only when a resume reaches ship. `evolve cycle` offers run, reset, timing and outputs (cmd_cycle.go:70-76); none re-audits cycle N on the current base. The operator either resumes and hopes the chain takes that branch, or rebases the worktree by hand and feeds `evolve phase audit` a hand-written PhaseRequest, which skips the CI-parity seams the cycle's audit applies.",
+  "title": "No verb re-audits one cycle on the current base; the operator resumes and hopes, or hand-builds an audit PhaseRequest",
+  "weight": 0.35
+}

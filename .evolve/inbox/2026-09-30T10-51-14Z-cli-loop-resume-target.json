@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "`evolve loop --resume --cycle N` with two live checkpoints resumes N, not the newer one (red: flag provided but not defined)",
+    "--cycle naming a cycle without a checkpoint exits 1 and lists the live checkpoints",
+    "--from-phase after the checkpointed phase, or outside the cycle's plan, exits 10"
+  ],
+  "connects_to": [
+    "resume-after-a-fleet-signal-stop"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_resume.go",
+    "go/cmd/evolve/cmd_loop_args.go",
+    "go/internal/core/resume.go"
+  ],
+  "fix": "Add `--cycle N` and `--from-phase P` to `evolve loop --resume`. --cycle restricts discovery to cycle N's checkpoint through a ResumeOptions filter, so discovery stays one function; when N has no checkpoint it exits 1 listing the live ones. --from-phase restarts RunCycleFromPhase at P when P is at or before the checkpointed phase in that cycle's plan; a phase outside the plan or after the checkpoint exits 10. Either flag without --resume exits 10. Document both flags in runtime-reference.md's operator commands.",
+  "id": "cli-loop-resume-target",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve loop --resume` calls core.LoadResumeState with empty ResumeOptions (cmd_loop_resume.go:25), and discovery takes the newest resumable per-run checkpoint (core/resume.go:79, discoverPerRunResumeState). No flag names a cycle or a phase. On 2026-09-28 a signal-stopped fleet wave resumed cycle 1709's day-old checkpoint instead of its stopped lanes (inbox resume-after-a-fleet-signal-stop). Resuming a specific cycle, or restarting one from an earlier phase, takes `evolve cycle reset` and a fresh launch, which throws the checkpoint away.",
+  "title": "`evolve loop --resume` always takes the newest checkpoint; add `--cycle N` and `--from-phase P` so the operator resumes the cycle they mean",
+  "weight": 0.45
+}

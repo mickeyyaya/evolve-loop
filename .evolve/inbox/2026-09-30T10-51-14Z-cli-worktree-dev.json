@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "`evolve worktree create --dev t --branch b` makes dev/t on branch b at origin/main (red: flag provided but not defined)",
+    "`evolve worktree cleanup --dev t` refuses a dirty tree or an unmerged branch with exit 1, and removes a merged tree together with its branch",
+    "A squash-merged PR counts as merged (a fake gh reports it merged)"
+  ],
+  "connects_to": [
+    "worktree-gc-respects-continuations"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_worktree.go",
+    "go/internal/gitexec"
+  ],
+  "fix": "Add `--dev <task>` to `evolve worktree create`, with `--branch B` and base origin/main after a fetch; it places the tree under the hub's dev/ and builds the binary. Add `--dev <task>` to `evolve worktree cleanup`; it removes dev/<task> and its branch only when the tree is clean and the branch's PR is merged or its head is in origin/main. A dirty tree or an unmerged branch exits 1 naming the cause; an existing task or branch on create exits 1; git I/O exits 2. Update workspace-layout.md and runtime-reference.md.",
+  "id": "cli-worktree-dev",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "The worktree verbs are per-cycle: `create --cycle N` and `cleanup --cycle N` (cmd_worktree.go:43-47, 64, 129). For console work, workspace-layout.md:18 has the operator run `git worktree add dev/<task> -b <branch> origin/main` and then `make -C go build` (:38). After the merge the operator removes the tree with `git worktree remove` and `git branch -D` (:36), first checking by hand that the PR merged, since git does not count a squash-merged branch as merged.",
+  "title": "Console dev worktrees are created and removed with raw git; add `evolve worktree create --dev` and `evolve worktree cleanup --dev`",
+  "weight": 0.5
+}

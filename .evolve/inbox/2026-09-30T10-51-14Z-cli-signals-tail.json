@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve signals tail --cycle N` on a fixture stream prints its phase outcomes and the ship.landed line in order (red: usage error)",
+    "Without --cycle it merges the live wave's lanes by timestamp; --kind ship.landed filters to ship lines",
+    "--follow prints an event appended after the command started"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_signals.go",
+    "go/internal/signalcenter"
+  ],
+  "fix": "Add `evolve signals tail [--follow] [--cycle N] [--kind K] [--code C] [--json]`. It merges the streams of the live wave's cycles (or of cycle N) in time order and prints one line per event: cycle, lane, kind, code, phase, and the verdict or landed SHA. --follow keeps reading new lines, and new cycles' streams, until the run ends. It is read-only: exit 0; exit 1 when --cycle names no stream; exit 2 on I/O. Document it in runtime-reference.md as the way to watch a wave.",
+  "id": "cli-signals-tail",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "Each cycle's Signal Center stream (runs/cycle-N/signals.ndjson, internal/signalcenter/event.go:216) carries phase.outcome, ship.landed, ship.error, cycle.sealed, loop.wave and loop.halt events with their codes. `evolve signals` only generates and checks the code-registry doc (cmd_signals.go:18-30). The loop log has no per-lane ship line, so to relay a wave's progress the operator greps each lane's stream and the loop log by hand.",
+  "title": "Watching a running wave (phases, ship verdicts, halts, Signal Center codes) means grepping each lane's signals.ndjson; add `evolve signals tail`",
+  "weight": 0.65
+}

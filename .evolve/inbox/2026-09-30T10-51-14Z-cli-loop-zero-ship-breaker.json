@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A loop fixture with two consecutive zero-ship waves halts with the zero-ship code before launching a third (red: it launches the third)",
+    "A wave with one ship resets the count; SKIPPED no-work lanes count as zero-ship",
+    "The threshold is read from policy.json with a documented compiled default"
+  ],
+  "connects_to": [
+    "no-work-hand-off-rate-alarm"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/internal/core/blocker_breaker.go",
+    "go/cmd/evolve/cmd_loop_blockerbreaker.go",
+    "go/internal/loopwave",
+    "go/internal/policy"
+  ],
+  "fix": "Add a zero-ship rule beside the blocker breaker's consecutive-failures rule. It counts consecutive waves (fleet mode) or cycles (sequential) that landed no ship. At `failure_policy.thresholds.zero_ship_halt` (policy config with a compiled default of 2, never a literal at the call site) it halts the run as a system failure with a Signal Center code and auto-files the P0 item that every ADR-0072 halt files. The wave engine reports each wave's ship count to it. Update operating-policy.md \u00a74.1 to say the rule is compiled, and document the threshold in runtime-reference.md.",
+  "id": "cli-loop-zero-ship-breaker",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "operating-policy.md \u00a74.1 (lines 166-178) makes two consecutive zero-ship cycles a SYSTEM-fail halt (ADR-0072) and says 'No Go code counts zero-ship cycles'; the console operator applies the rule. The nearest compiled rules fire later: the blocker breaker halts after consecutive failing cycles (core/blocker_breaker.go, default ceiling 3), and goal_stall files an item after 3 empty or 5 non-shipping cycles. A run of SKIPPED no-work lanes, or mixed EMPTY and FAIL outcomes, trips neither, so an unattended loop keeps launching unproductive waves.",
+  "title": "Two consecutive zero-ship waves should halt the loop, but no code counts them: the operator watches every wave and stops the loop by hand",
+  "weight": 0.7
+}

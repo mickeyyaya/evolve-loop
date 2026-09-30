@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`evolve dossier publish` commits a fixture's pending pair and leaves a half pair, as the loop exit does (red: unknown subcommand \"publish\")",
+    "With a live run lease it exits 1 naming the run and publishes nothing",
+    "--dry-run changes nothing and lists what would publish"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_dossier.go",
+    "go/cmd/evolve/cmd_loop_dossiers.go",
+    "go/internal/dossier"
+  ],
+  "fix": "Add `evolve dossier publish [--dry-run] [--project-root P]`, which runs the checks publishPendingDossiers runs and then dossier.PublishPending. The checks move into one function that the loop exit and the verb both call. --dry-run lists the pending cycles, the half pairs, and why a publish would be held. Exit 0 when it publishes or nothing is pending; exit 1 when held (live run, lock busy, publish hold), naming the reason; exit 2 on I/O. Document it in runtime-reference.md's boundary procedure.",
+  "id": "cli-dossier-publish",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "publishPendingDossiers (cmd_loop_dossiers.go:30) commits the closeouts in .evolve/dossiers-pending through dossier.PublishPending, under the ship lock, the live-run check and the publish hold. It runs only when a fleet run's lanes finish. When a loop is killed or crashes, the pending pairs stay until the next launch, and the operator either launches to flush them or commits the files with raw git, which bypasses those checks. `evolve dossier` offers verify and retro-mislabel only (cmd_dossier.go:21-23).",
+  "title": "Pending dossier closeouts publish only when a loop run exits; after a killed loop they wait for the next launch or raw git, so add `evolve dossier publish`",
+  "weight": 0.45
+}

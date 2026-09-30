@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "`evolve ship --class manual --paths a.go` in a tree that also has an untracked b.go commits a.go only (red: flag provided but not defined)",
+    "An attestation bound to a different staged set is refused, as today",
+    "`evolve ship --class manual --dry-run --paths a.go` prints a.go as the staged set and changes nothing"
+  ],
+  "connects_to": [
+    "ship-addall-staging-surface"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/cmd_ship.go",
+    "go/internal/phases/ship/verify.go",
+    "go/internal/phases/ship/commitgate.go",
+    "go/internal/commitgate",
+    "go/internal/cli/guardcmd"
+  ],
+  "fix": "Add `--paths p1,p2,\u2026` to `evolve ship --class manual`. It stages exactly those paths (git add -- <paths>, deletions included) and verifies the commit-gate attestation against that staged tree. A path outside the repo, or one that matches nothing, exits 10. `evolve commit-gate run --paths` stages the same set, so the attestation binds it. Without --paths the behaviour is unchanged. --dry-run prints the path set it would stage, with or without --paths. Update skills/commit/SKILL.md and runtime-reference.md's ship classes.",
+  "id": "cli-ship-manual-paths",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "verifyManualConfirm runs `git add -A` before committing (internal/phases/ship/verify.go:181), and the /commit skill stages with `git add -A` (skills/commit/SKILL.md:15) because the manual ship commits the whole tree. The standing rule is to stage explicit paths. A console commit in a tree with unrelated residue therefore either ships the residue or needs a raw `git add <paths>` in a tree that happens to be clean otherwise. `ship --dry-run` runs the checks but does not list what it would stage.",
+  "title": "`evolve ship --class manual` stages the whole tree; add `--paths` to ship only the named files, and make --dry-run print the staged set",
+  "weight": 0.5
+}

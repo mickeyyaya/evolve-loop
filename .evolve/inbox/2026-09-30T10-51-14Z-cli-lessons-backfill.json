@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve lessons backfill` on a fixture corpus prints the pattern counts and writes nothing (red: unknown subcommand \"backfill\")",
+    "--write produces a ledger that `lessons recurrence` renders with the same counts",
+    "Skipped malformed files are listed"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_lessons.go",
+    "go/internal/recurrence"
+  ],
+  "fix": "Add `evolve lessons backfill [--write]`. It runs BackfillFromLessons over the lesson corpus and prints per-pattern counts and the skipped files. --write replaces the ledger atomically with the result. Exit 0; exit 2 when the lessons directory is unreadable. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-lessons-backfill",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve lessons recurrence` renders .evolve/recurrence-ledger.json (cmd_lessons.go:29-40). recurrence.BackfillFromLessons seeds a ledger from .evolve/instincts/lessons/*.yaml and tolerates both lesson shapes (internal/recurrence/backfill.go:41), but only tests call it. A missing, reset or damaged ledger undercounts every historical pattern, and no command rebuilds it.",
+  "title": "The recurrence ledger cannot be rebuilt from the lesson corpus, and BackfillFromLessons exists with no caller; add `evolve lessons backfill`",
+  "weight": 0.2
+}
