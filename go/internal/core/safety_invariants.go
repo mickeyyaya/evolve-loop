@@ -19,15 +19,9 @@ import (
 func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat phasespec.Catalog) []string {
 	var violations []string
 
-	// Branch-target legality: a phase's verdict-branch targets (on_pass /
-	// on_fail) must resolve to a known phase AND be a legal successor. Config
-	// may only SELECT among already-legal edges, never invent one, enforced
-	// as a data check rather than by a hardcoded graph.
+	// Branch targets must be known, legal successors: config selects among legal edges, never invents one.
 	// See ADR-0058.
 	for _, name := range cat.Names() {
-		// Names() and Get() read the same map populated together by phasespec.Load,
-		// so a name from Names() always resolves; a zero spec (empty branches) would
-		// be harmless here regardless.
 		spec, _ := cat.Get(name)
 		from := phaseFromRouter(name)
 		for _, b := range []struct{ label, target string }{
@@ -48,10 +42,7 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Spine-edge legality: a config-declared spine (cfg.SpineOrder) must
-	// resolve to known phases and every consecutive edge must be a legal
-	// transition — a spine cannot route around an anchor via an illegal jump
-	// (scout→ship), since Next walks the spine without re-checking CanTransition.
+	// A config spine must join known phases by legal edges: Next walks it without re-checking CanTransition.
 	for _, n := range cfg.SpineOrder {
 		if phaseFromRouter(n) == "" {
 			violations = append(violations, fmt.Sprintf("spine_order phase %q resolves to no known phase", n))
@@ -66,11 +57,7 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Legal-successors resolvability: a config legality graph
-	// (config.legal_successors) must name only known phases on BOTH sides.
-	// legalGraphFrom silently drops an unresolvable name, so a typo would degrade
-	// the graph with no load error — report it loudly (mirrors the on_pass/on_fail
-	// "no known phase" check). Sentinels start/end/debugger resolve via phaseFromRouter.
+	// legalGraphFrom silently drops an unknown name, so an unresolvable legal_successors entry is reported here.
 	for from, tos := range cfg.LegalSuccessors {
 		if phaseFromRouter(from) == "" {
 			violations = append(violations, fmt.Sprintf("legal_successors phase %q resolves to no known phase", from))
@@ -82,9 +69,7 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Floor-gate verdict safety: a mandatory phase whose artifact gate
-	// constrains the verdict may only accept SHIPPABLE verdicts (PASS/WARN).
-	// This stops a config from weakening the floor to ship a FAILed evaluation.
+	// A mandatory phase's verdict gate may accept only shippable verdicts.
 	for _, name := range cfg.Mandatory {
 		spec, ok := cat.Get(name)
 		if !ok || spec.Gate == nil {
@@ -97,36 +82,14 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Floor-evaluator existence ("F⊆M"): the ship floor is only real if SOME
-	// mandatory phase gates on a shippable verdict — a mandatory EVALUATOR
-	// must exist. Without it an operator can drop the evaluator from
-	// mandatory_phases and SpineSatisfiedUpTo admits ship with no verdict
-	// gate (the runtime anchor goes inert — see
-	// TestSpineSatisfiedUpTo_ConfigurableMandatoryWeakensGate). Phase-
-	// agnostic: quantified over mandatory phases' gates, never a phase name. The
-	// floor-gate check above forbids a NON-shippable mandatory gate; this forbids
-	// the ABSENCE of one (and a presence-only gate with empty verdict_in, which a
-	// FAIL verdict would otherwise slip through).
+	// Some mandatory phase must gate on a shippable verdict, judged only when the catalog describes a mandatory phase.
 	// See ADR-0060.
-	//
-	// Only judged when the catalog is AUTHORITATIVE over the floor — it describes
-	// at least one mandatory phase. The real composition root always passes the
-	// full registry catalog, and a production tamper (dropping the evaluator from
-	// mandatory) leaves the other mandatory phases described, so the check still
-	// fires. A synthetic/empty catalog (unit tests of orchestration mechanics)
-	// cannot describe the evaluator's gate, so judging it would false-positive.
-	//
-	// evals (the floor evaluator SET) is computed once here and reused by the
-	// graph-dominance check below: existence needs its size, dominance needs the set.
 	evals := mandatoryEvaluators(cfg, cat)
 	if catalogDescribesAnyMandatory(cfg, cat) && len(evals) == 0 {
 		violations = append(violations, "no mandatory phase gates on a shippable verdict (PASS/WARN) — the ship floor has no mandatory evaluator; ship could proceed without a verdict gate")
 	}
 
-	// Anchor reachability: every configured-mandatory anchor must be reachable
-	// from the start node. A stranded anchor cannot gate the floor, so a
-	// config that marks an unreachable phase mandatory is a silent floor hole.
-	// A graph with no start node at all is itself a structural violation.
+	// Every mandatory anchor must be reachable from start; a stranded anchor is a silent floor hole.
 	if sm != nil {
 		start := sm.sourceNode()
 		if start == "" {
@@ -140,19 +103,7 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 				}
 			}
 
-			// Evaluator-dominance (the load-bearing half made a load-time
-			// check): every start→ship path must traverse a floor
-			// evaluator. The evaluator SET is identified by role (mandatory phases
-			// gating a shippable verdict) and the ship sink by role — the LAST
-			// mandatory anchor, which is the ship terminal by registry convention
-			// (mandatoryAnchorsFor preserves cfg.Order, so anchors are ordered and the
-			// terminal is last). If the sink is still reachable with the WHOLE
-			// evaluator set deleted from the graph, some path reaches ship without an
-			// evaluator — the verdict floor is bypassable at the graph level (e.g. a
-			// legal_successors edge straight to ship). Phase-agnostic; never a phase
-			// name. All-anchor dominance (a non-evaluator anchor like a triage step)
-			// stays runtime-backstopped by SpineSatisfiedUpTo — only the evaluator
-			// carries the verdict floor, so only it is proven here at load.
+			// Every start→ship path must traverse a floor evaluator: ship stays unreachable with the evaluator set removed.
 			// See ADR-0060.
 			if len(evals) > 0 && len(anchors) > 0 {
 				sink := anchors[len(anchors)-1]
