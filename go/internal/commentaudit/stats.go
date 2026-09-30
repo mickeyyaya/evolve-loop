@@ -30,8 +30,6 @@ var (
 // goReferenceDate is the layout Go formats dates with, not a date in history.
 const goReferenceDate = "2006-01-02"
 
-// isNarrative reports whether a comment line carries project history; a bare
-// `See ADR-NNNN.` pointer is allowed by the convention and is not history.
 func isNarrative(line string) bool {
 	return historyMarker.MatchString(strings.ReplaceAll(line, goReferenceDate, "")) || caseMarker.MatchString(line) ||
 		(adrMention.MatchString(line) && !adrPointer.MatchString(line))

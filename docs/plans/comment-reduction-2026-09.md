@@ -2,7 +2,19 @@
 
 **Goal:** every Go file meets [the code-comment convention](../conventions/code-comments.md). Knowledge the comments carry moves to `docs/` first. No behavior changes along the way.
 
+**Target (the operator's rule, 2026-09-30): zero comments** beyond the ones something reads: toolchain directives, generated-file headers, `Deprecated:` and `Output:` lines, machine-read markers, and the package doc `docgo` enforces. Exported identifiers' docs are no longer kept, and `commentaudit verify` accepts their deletion.
+
 **Owner:** console. This is a refactor of protected surfaces, so it runs outside loop lanes and lands at wave boundaries.
+
+## Phase 2: to zero (2026-09-30)
+
+| Step | Scope | How |
+|---|---|---|
+| 2a | Directories no batch has touched (214 directories, 1,504 files, 29,636 comment lines outside `acs/`, measured on main b67e0bb3) | Editor rounds as in the batch protocol below, several editors per round on disjoint directories, now deleting exported docs too |
+| 2b | Directories an earlier batch finished under the old rule | One sweep deleting the exported docs and pointers those batches kept |
+| 2c | The one-line *whys* kept because no test pins them | Each is filed as an inbox item to pin the invariant with a test; the comment goes in that item's change. An item on a protected surface is console-owned, like the rest of this workstream; the others are lane-sized work for the loop. |
+| 2d | The per-cycle predicate packages `go/acs/cycle*` (494 files, 42,863 comment lines) | Editor rounds; a predicate's intent lives in its cycle's eval and reports, so there is little to capture. Four older predicates still require a doc on a named export (`acs/cycle1706` line 774, `cycle1698` line 673, `cycle1690` line 215, `cycle1685` line 306); they run again only when a lane changes their packages, so each is updated or archived in the same change that deletes the docs it reads (2a/2b) |
+| 2e | Regrowth | Set `comment_floor.stage` to `enforce` in `.evolve/policy.json`, so a lane build that adds a comment is corrected before its audit; see [Guard against regrowth](#guard-against-regrowth) |
 
 ## Baseline
 
@@ -31,7 +43,7 @@ Each batch covers one package, or one file group of a large package.
 
 1. **Capture.** An editor agent reads the batch and lists every comment that carries knowledge not already in `docs/`: design rationale, a finding, an invariant's reason. It writes each one into the package's design notes, `docs/architecture/packages/<dir>.md`, which has Purpose, Design, Invariants and Findings sections. It links an existing ADR or incident instead of repeating it, and the batch adds its row to `docs/architecture/packages/README.md`. As batches land, their Findings sections are gathered into one pipeline findings report under `docs/research/`.
 2. **Reduce.** The same agent rewrites the comments to the convention. It never touches code.
-3. **Prove comment-only.** `go run ./cmd/commentaudit verify -base HEAD <batch dirs>` must pass. That means an identical position-free AST, every directive and marker kept, no exported doc deleted, and no file added or deleted.
+3. **Prove comment-only.** `go run ./cmd/commentaudit verify -base HEAD <batch dirs>` must pass. That means an identical position-free AST, every directive and marker kept, and no file added or deleted.
 4. **Test.** Run `gofmt -l`, `go vet`, `golangci-lint run` and `go test -count=1` on the batch's packages, then `make -C go test-acs-durable`. The durable tier holds the gates that read comments across the repo: `docgo` for package docs and `envtaint` for its marker. A test that reads a comment fails here, and that comment is restored.
 5. **No review for a proven batch.** The proof in step 3 is stronger than a reader, so a batch that passes it lands without a reviewer. The commit gate accepts the same proof. A batch that also touches code gets code-simplifier and a reviewer as usual; that includes a conflict resolution that changes a code line. The editor reports code problems it finds, and they are filed as inbox items rather than fixed in the batch.
 6. **Land.** Editors share one working worktree, but batches land from a separate landing worktree. A manual ship with no workspace manifest stages every changed file (`ship.stageExplicitPaths`), so committing in the shared tree would sweep up batches still in flight.
@@ -64,7 +76,6 @@ The editor prompt forbids git mutation and is scoped to its batch.
   - Measure false positives during shadow before enforcing. "incident" is also a domain term (the observer's incidents), and "cycle 1" can describe runtime behavior. Keep exemptions as config data, never flags.
   - Register the gate's WARN code, module and kind with the Signal Center.
   - Extend the loop's auditor and adversarial-review personas to flag new narrative comments, once the gate exists.
-
 
 ## Progress
 

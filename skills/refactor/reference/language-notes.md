@@ -32,7 +32,7 @@ description: Reference doc.
 | Interfaces | Extract Interface → define small interfaces at the consumer side |
 | Error handling | When simplifying conditionals, preserve explicit error handling (no swallowing) |
 | Packages | When extracting classes, prefer package-level organization over deep nesting |
-| Exported names | Extracted public functions must have doc comments |
+| Exported names | An extracted function gets no doc comment: its name and signature state the contract ([code-comments.md](../../../docs/conventions/code-comments.md)) |
 
 ## Java
 
