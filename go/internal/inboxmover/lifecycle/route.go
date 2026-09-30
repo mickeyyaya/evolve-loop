@@ -2,10 +2,13 @@ package lifecycle
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // RouteConsoleValue is the route RouteConsole writes and the claim floor refuses.
@@ -62,6 +65,56 @@ func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, err
 		reason: fmt.Sprintf("route-console: '%s' is now %s — %s", taskID, RouteConsoleValue, reason),
 		fields: map[string]string{"task_id": taskID, "path": loc.Path, "reason": reason, "step": "route"}})
 	return res, nil
+}
+
+func (m *Mover) RouteLane(taskID, reason string) (RouteResult, error) {
+	res := RouteResult{}
+	loc, err := m.locateForRouteLane(taskID)
+	if err != nil {
+		return res, err
+	}
+	stamp := m.now().UTC().Format(time.RFC3339)
+	admit := func(body []byte) error { return m.admitToLanes(taskID, loc.Path, body) }
+	if err := updateAdmittedItemJSON(loc.Path, admit, func(it map[string]json.RawMessage) {
+		it["route"] = jsonString(inboxbatch.RouteLaneValue)
+		it["routed_reason"] = jsonString(reason)
+		it["routed_at"] = jsonString(stamp)
+		delete(it, "routed_cycle")
+	}); err != nil {
+		return res, fmt.Errorf("route-lane: %s: %w", loc.Path, err)
+	}
+	res.Path = loc.Path
+	m.linef("routed %s: %s", inboxbatch.RouteLaneValue, filepath.Base(loc.Path))
+	m.ledgerLine(ledgerEntry{Action: "route-lane", TaskID: taskID, Reason: reason})
+	return res, nil
+}
+
+func (m *Mover) admitToLanes(taskID, path string, body []byte) error {
+	item, ok := routingItem(body)
+	if !ok {
+		return fmt.Errorf("%s is not a well-formed inbox item, so its route cannot be judged", path)
+	}
+	item.Route = inboxbatch.RouteLaneValue
+	if routed, why := inboxbatch.ConsoleRouted(item, m.isProtected); routed {
+		return fmt.Errorf("%w: %s stays operator-owned: %s", ErrConsoleRouted, taskID, why)
+	}
+	return nil
+}
+
+func (m *Mover) locateForRouteLane(taskID string) (Location, error) {
+	if taskID == "" {
+		return Location{}, fmt.Errorf("%w: route-lane requires task_id", ErrBadArgs)
+	}
+	loc, err := Locate(m.inboxDir, taskID)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return loc, fmt.Errorf("%w: %s", ErrNotFound, taskID)
+	case err != nil:
+		return loc, fmt.Errorf("route-lane: locate %s: %w", taskID, err)
+	case loc.Cycle != 0:
+		return loc, fmt.Errorf("%w: %s (held by cycle %d)", ErrNotFound, taskID, loc.Cycle)
+	}
+	return loc, nil
 }
 
 func jsonString(s string) json.RawMessage {

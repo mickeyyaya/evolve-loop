@@ -1,0 +1,22 @@
+{
+  "id": "operator-inbox-verbs-reachable-from-non-claude-phases",
+  "kind": "security",
+  "priority_class": "security",
+  "weight": 0.45,
+  "title": "The operator's inbox verbs (route-lane, route-console, consume) are kept from LLM phases only by claude-tmux's allowed_tools; a codex, agy or ollama triage could run them",
+  "files": [
+    ".evolve/profiles/triage.json",
+    "go/internal/bridge/realizer.go"
+  ],
+  "summary": "cmd-evolve.md says no LLM phase is granted an operator's route because the triage profile allowlists only `evolve inbox-mover`. But only the claude-tmux manifest passes allowed_tools to its CLI (bridge/realizer.go); codex-tmux, codex, agy and ollama never receive the allowlist, and the triage sandbox's write_subpaths include .evolve/inbox. So a codex-driven triage could run `evolve inbox route-lane` (relaxing an operator-authored console item into lane work) or `route-console`, or write item JSON directly; the ledger line would fail (the sandbox denies .evolve/ledger.jsonl) and drop to a stderr WARN, leaving no durable evidence. Predates route-lane (route-console and raw writes share it); traced from config by the 2026-09-30 architecture review, not reproduced.",
+  "fix": "Make the boundary structural, not a per-driver tool list: either narrow the triage sandbox's inbox writes to the claim move (processing/cycle-N), or have the operator verbs refuse inside a phase (a cycle-active or phase environment marker the bridge sets), with a coded refusal.",
+  "acceptance": [
+    "A test proving `evolve inbox route-lane` and `route-console` refuse when run inside a phase environment, or that the triage sandbox cannot write an inbox-root item",
+    "cmd-evolve.md's claim that no LLM phase holds an operator's route is true for every driver family"
+  ],
+  "connects_to": [
+    "tmux-drivers-ignore-profile-tool-lists"
+  ],
+  "created_at": "2026-09-30T08:10:00Z",
+  "source": "console, 2026-09-30 architecture review of evolve inbox route-lane"
+}

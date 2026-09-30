@@ -258,6 +258,10 @@ func ReconcileSuperseded(opts Options, supersededIDs []string, newState string, 
 // RouteResult is the leaf's route receipt (the rewritten item's path).
 type RouteResult = lifecycle.RouteResult
 
+func RouteLane(opts Options, taskID, reason string) (RouteResult, error) {
+	return opts.mover().RouteLane(taskID, reason)
+}
+
 // RouteConsole rewrites the item in place as route:console-manual, so the claim floor refuses every later lane.
 func RouteConsole(opts Options, taskID, reason string, cycle int) (RouteResult, error) {
 	return opts.mover().RouteConsole(taskID, reason, cycle)
