@@ -95,7 +95,7 @@ Per criterion, write a test that:
 1. **Directly encodes** criterion — test name matches criterion language
 2. **Fails immediately** — production code absent, test MUST fail
 3. **Fails for right reason** — "file not found" or "assertion error", not syntax error
-4. **Explains itself** — its name states the intent. No narrative comments, cycle numbers or history in the test; a comment only for a non-obvious fixture choice ([code-comments convention](../docs/conventions/code-comments.md))
+4. **Explains itself** — its name states the intent, and a fixture's purpose is in its variable name. The test carries no comments at all (only a machine-read `// acs-predicate:` marker, which a tool reads); no cycle numbers or history ([code-comments convention](../docs/conventions/code-comments.md))
 
 **Test naming convention:**
 ```
@@ -395,17 +395,15 @@ func TestC<N>_001_TriageHasPriorityFloor(t *testing.T) {
 ```go
 func TestC<N>_001_TriagePromotesHighOperatorTodos(t *testing.T) {
     root := acsassert.RepoRoot(t)
-    fixture := filepath.Join(t.TempDir(), "carryoverTodos.json")
-    // Set up the bug scenario: a HIGH operator todo among MEDIUM goal-derived.
-    if err := os.WriteFile(fixture, []byte(`[
+    highOperatorTodoAmongGoalTodos := filepath.Join(t.TempDir(), "carryoverTodos.json")
+    if err := os.WriteFile(highOperatorTodoAmongGoalTodos, []byte(`[
       {"id":"op-1","priority":"HIGH","source":"operator"},
       {"id":"goal-1","priority":"MEDIUM","source":"goal"}
     ]`), 0o644); err != nil {
         t.Fatal(err)
     }
-    // Run the actual system; assert on observable output.
     out, _, code, err := acsassert.SubprocessOutput(
-        filepath.Join(root, "go", "evolve"), "triage", "--top-n", "3", "--input", fixture)
+        filepath.Join(root, "go", "evolve"), "triage", "--top-n", "3", "--input", highOperatorTodoAmongGoalTodos)
     if err != nil || code != 0 {
         t.Fatalf("triage exit=%d: %v", code, err)
     }

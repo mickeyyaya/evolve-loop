@@ -14,7 +14,7 @@
 | 2b | Directories an earlier batch finished under the old rule | One sweep deleting the exported docs and pointers those batches kept |
 | 2c | The one-line *whys* kept because no test pins them | Each is filed as an inbox item to pin the invariant with a test; the comment goes in that item's change. An item on a protected surface is console-owned, like the rest of this workstream; the others are lane-sized work for the loop. |
 | 2d | The per-cycle predicate packages `go/acs/cycle*` (494 files, 42,863 comment lines) | Editor rounds; a predicate's intent lives in its cycle's eval and reports, so there is little to capture. Four older predicates still require a doc on a named export (`acs/cycle1706` line 774, `cycle1698` line 673, `cycle1690` line 215, `cycle1685` line 306); they run again only when a lane changes their packages, so each is updated or archived in the same change that deletes the docs it reads (2a/2b) |
-| 2e | Regrowth | Set `comment_floor.stage` to `enforce` in `.evolve/policy.json`, so a lane build that adds a comment is corrected before its audit; see [Guard against regrowth](#guard-against-regrowth) |
+| 2e | Regrowth | The commit gate refuses a console commit that adds a comment (2026-09-30). For lanes: give the TDD phase its own comment floor and keep its predicate files out of the build floor's scan (the builder may not edit them), then set `comment_floor.stage` to `enforce` in `.evolve/policy.json`; see [Guard against regrowth](#guard-against-regrowth) |
 | 2f | Rounds 1–11 (batches 1–78), reduced before the self-explanation step existed | The same self-explanation pass per package, landed as reviewed refactor commits |
 
 ## Baseline

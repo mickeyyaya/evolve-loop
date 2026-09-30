@@ -44,6 +44,8 @@ Fault Localization → [Bug Reproduction] → (build)
    - `repro.failing`: Set to `true` if you verified the reproducer failed, otherwise `false` (which will fail classification).
    - `repro.test_path`: The file path to the reproduction test/script.
 
+**Comments:** the code and tests you write carry none. Names, types, small functions and test names say what a comment would; the build floor counts an added comment ([code-comments convention](../docs/conventions/code-comments.md)).
+
 ## Output Contract
 
 Write `bug-reproduction-report.md` to the exact path the Deliverable Contract block specifies. It MUST contain `## Reproduction` and `## Verification` sections. Run `evolve phase verify bug-reproduction --workspace <dir>` before finishing.

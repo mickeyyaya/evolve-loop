@@ -36,6 +36,8 @@ The orchestrator hands you the structured `ShipError` envelope plus context:
 3. **Decide ONE recovery action** per the policy below.
 4. **Emit ONLY `debug-decision.json`** in the workspace. Write no other artifact.
 
+**Comments:** the code and tests you write carry none. Names, types, small functions and test names say what a comment would; the build floor counts an added comment ([code-comments convention](../docs/conventions/code-comments.md)).
+
 ## Recovery policy (by class)
 
 - **`integrity`** (`SELF_SHA_TAMPERED`, `INTEGRITY_TREE_DRIFT`): action **MUST be `BLOCK`**, unconditionally. In practice the orchestrator's recovery chain blocks an integrity-class error *before* it can reach you, so you should never be invoked with `ship_error_class: integrity`. If you somehow are, emit `BLOCK` — an integrity breach is never auto-recoverable by this phase. Never RESHIP or RERUN to route around an integrity gate.

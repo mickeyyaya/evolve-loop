@@ -1,0 +1,99 @@
+package commentaudit
+
+import (
+	"slices"
+	"strings"
+	"testing"
+)
+
+func TestAddedComments_RewritingAnExistingPackageDocAddsNothing(t *testing.T) {
+	before := []byte("// Package p does x for the loop.\npackage p\n")
+	after := []byte("// Package p does y for the loop.\npackage p\n")
+
+	if got := AddedComments(before, after); got != nil {
+		t.Errorf("AddedComments = %v, want nil: a package doc rewritten in place is still the package doc", got)
+	}
+	if got := AddedComments([]byte("package p\n"), after); !slices.Equal(got, []string{"// Package p does y for the loop."}) {
+		t.Errorf("a package doc added to a file that had none: AddedComments = %v, want it counted", got)
+	}
+}
+
+func TestAddedComments_ALineInARawStringIsNotAComment(t *testing.T) {
+	after := []byte("package p\n\nconst fixture = `\n// not a comment, a fixture line\n/* nor this */\n`\n\nfunc f() {\n\t// a real comment\n}\n")
+
+	if got := AddedComments([]byte("package p\n"), after); !slices.Equal(got, []string{"// a real comment"}) {
+		t.Errorf("AddedComments = %v, want only the real comment", got)
+	}
+}
+
+func TestAddedAcrossDiff_SkipsTestdata(t *testing.T) {
+	read := func(src string) func(string) ([]byte, error) {
+		return func(string) ([]byte, error) { return []byte(src), nil }
+	}
+	added, err := AddedAcrossDiff([]string{"go/internal/x/testdata/fixture.go"}, read("package x\n"), read("package x\n\n// an input the test reads\nfunc F() {}\n"))
+
+	if err != nil || len(added) != 0 {
+		t.Errorf("AddedAcrossDiff = (%v, %v), want testdata fixtures skipped", added, err)
+	}
+}
+
+func TestAddedComments_ACommentTrailingARawStringIsNotAWholeLineComment(t *testing.T) {
+	after := []byte("package p\n\nvar fixture = `a\nb` // trailing the closing backtick\n")
+
+	if got := AddedComments([]byte("package p\n"), after); got != nil {
+		t.Errorf("AddedComments = %v, want nil: the comment trails code on the literal's closing line", got)
+	}
+}
+
+func TestAddedComments_ARewrittenPackageDocMayNotGrowIntoNarrative(t *testing.T) {
+	before := []byte("// Package p does x for the loop.\npackage p\n")
+	grown := []byte("// Package p does x for the loop.\n// It began in cycle 12.\n// Then it grew.\n// And grew.\npackage p\n")
+
+	if got := AddedComments(before, grown); len(got) == 0 {
+		t.Errorf("a package doc grown past three lines: AddedComments = %v, want the growth counted", got)
+	}
+}
+
+func TestAddedAcrossDiff_SkipsVendoredCode(t *testing.T) {
+	read := func(src string) func(string) ([]byte, error) {
+		return func(string) ([]byte, error) { return []byte(src), nil }
+	}
+	added, err := AddedAcrossDiff([]string{"go/vendor/gopkg.in/yaml.v3/yaml.go"}, read("package yaml\n"), read("package yaml\n\n// third-party documentation\nfunc F() {}\n"))
+
+	if err != nil || len(added) != 0 {
+		t.Errorf("AddedAcrossDiff = (%v, %v), want vendored code skipped", added, err)
+	}
+}
+
+func TestAddedComments_APackageDocIsSparedUpToThreeLines(t *testing.T) {
+	threeLines := "// Package p does x for the loop.\n// It also does y for the loop.\n// And z for the loop.\npackage p\n"
+	fourLines := strings.TrimSuffix(threeLines, "package p\n") + "// And w for the loop.\npackage p\n"
+
+	if got := AddedComments(nil, []byte(threeLines)); got != nil {
+		t.Errorf("a new file's three-line package doc: AddedComments = %v, want nil", got)
+	}
+	if got := AddedComments(nil, []byte(fourLines)); len(got) == 0 {
+		t.Error("a new file's four-line package doc must be counted")
+	}
+	if got := AddedComments([]byte("// Package p does x for the loop.\npackage p\n"), []byte(threeLines)); got != nil {
+		t.Errorf("a one-line doc rewritten to three lines: AddedComments = %v, want nil", got)
+	}
+}
+
+func TestAddedComments_AnUnchangedCommentBesideASparedPackageDocIsHeld(t *testing.T) {
+	before := []byte("// Package p does x for the loop.\npackage p\n\n// legacy note stays.\nfunc f() {}\n")
+	after := []byte("// Package p does x for the loop.\npackage p\n\n// legacy note stays.\nfunc f() { _ = 1 }\n")
+
+	if got := AddedComments(before, after); got != nil {
+		t.Errorf("AddedComments = %v, want nil: the legacy note was already there", got)
+	}
+}
+
+func TestAddedComments_ALineDirectiveHidesNoLaterComment(t *testing.T) {
+	before := []byte("package p\n\nfunc f() {}\n")
+	after := []byte("package p\n\n//line other.go:100\nfunc f() {}\n\n// real comment after\nfunc g() {}\n")
+
+	if got := AddedComments(before, after); !slices.Contains(got, "// real comment after") {
+		t.Errorf("AddedComments = %v, want the comment after the //line directive counted", got)
+	}
+}

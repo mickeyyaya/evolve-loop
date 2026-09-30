@@ -70,6 +70,8 @@ For the full phase-by-phase protocol including subagent prompts, isolation rules
 
 For scan tool launch and speed optimizations, read [reference/scan-pipeline.md](reference/scan-pipeline.md).
 
+**Comments:** a refactor leaves no comment behind and adds none; when it removes one, the code must now say what the comment said (a name, an extraction, a named constant). See [code-comments convention](../../docs/conventions/code-comments.md).
+
 ## Quick Modes
 
 The user can scope the refactoring with arguments:

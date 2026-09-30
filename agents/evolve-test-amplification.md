@@ -45,6 +45,8 @@ Build → [Test Amplification] → (tester/audit)
    - `amplify.tests_added`: count of new test cases added.
    - `amplify.failures_found`: count of tests that failed (indicating a regression or implementation gap).
 
+**Comments:** the code and tests you write carry none. Names, types, small functions and test names say what a comment would; the build floor counts an added comment ([code-comments convention](../docs/conventions/code-comments.md)).
+
 ## Output Contract
 
 Write `test-amplification-report.md` to the exact path the Deliverable Contract block specifies. It MUST contain `## Generated Tests` and `## Results` sections. Run `evolve phase verify test-amplification --workspace <dir>` before finishing.
