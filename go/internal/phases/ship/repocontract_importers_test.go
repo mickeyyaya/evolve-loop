@@ -1,14 +1,5 @@
 package ship
 
-// repocontract_importers_test.go — the importer backstop and the gate's seed.
-// A lane's own package tests are green, but a package that IMPORTS what the
-// lane changed asserts the old contract and goes red on main's CI (cycle
-// 1657/1659: the lane renamed a stop in internal/core; internal/deliverable's
-// e2e test, untouched, redded main from 4db205a8 until #590). The gate now
-// runs the reverse-dependency closure of every changed package — read from
-// the WORKING TREE of the tree that will land, never from an index the ship
-// has not yet populated — before a ship may land.
-
 import (
 	"context"
 	"fmt"
@@ -141,8 +132,8 @@ func TestRepoContractGate_DiscoveryFailureIsInfra(t *testing.T) {
 
 // The wiring proof: a cycle ship's changes live in the LANE WORKTREE, and
 // the gate must test that tree against the worktree's base. The project root
-// (main's pre-landing tree) is untouched here — a gate that ran there, as it
-// did until 2026-09-14, passes green and lets the red importer land.
+// (main's pre-landing tree) is untouched here — a gate that ran there passes
+// green and lets the red importer land.
 func TestRunNative_GateTestsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
 	repo, _ := importerFixture(t)
 	base := runGitOut(t, repo, "rev-parse", "HEAD")

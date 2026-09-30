@@ -7,13 +7,11 @@ import (
 	"testing"
 )
 
-// TestWriteCachePrefix_ByteParityWithBash diffs Go output against a fixture
-// rendered by a standalone bash replica of _write_cache_prefix (see
-// testdata/cache-prefix.golden). If you change renderCachePrefix's layout,
-// regenerate the fixture via the script in this directory's README. A
-// drifted golden file means the bash callers and Go callers would write
-// different cache prefixes — breaking Anthropic prompt-cache reuse across
-// the v11.x bridge period when both implementations may coexist.
+// TestWriteCachePrefix_ByteParityWithBash diffs Go output against the fixed
+// golden file testdata/cache-prefix.golden. A drifted golden means
+// renderCachePrefix's layout changed — regenerate it deliberately when that
+// is intended; an unintended drift would break Anthropic prompt-cache reuse
+// across sibling fan-out workers.
 func TestWriteCachePrefix_ByteParityWithBash(t *testing.T) {
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "cache.md")

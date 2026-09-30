@@ -740,8 +740,8 @@ func TestChangedWorktreePaths_RealGit(t *testing.T) {
 	}
 	git("add", "-A")
 	git("commit", "-m", "base")
-	// A tracked edit AND an untracked new file must both be reported (the untracked
-	// case is the H1-class gap: a cycle ADDING a registry file must still regen).
+	// A tracked edit AND an untracked new file must both be reported: a cycle
+	// ADDING a registry file must still regen.
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

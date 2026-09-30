@@ -7,10 +7,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// ADR-0050 §3.10 Slice 6: at enforce the ship gate's verdict parse is sentinel-first
-// — the single-valued evolve-verdict sentinel is authoritative and the prose regex
-// (which can match multiple verdict words and trip the dual-verdict guard) is gated
-// off. Below enforce parseVerdicts stays prose-only — byte-identical.
+// See ADR-0050.
+// At enforce the ship gate's verdict parse is sentinel-first — the
+// single-valued evolve-verdict sentinel is authoritative and the prose regex
+// (which can match multiple verdict words and trip the dual-verdict guard)
+// is gated off. Below enforce parseVerdicts stays prose-only — byte-identical.
 
 // The sentinel wins over a conflicting prose verdict at enforce; below enforce the
 // prose verdict is what's read (the sentinel JSON does not trip the prose regex).

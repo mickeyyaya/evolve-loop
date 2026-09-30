@@ -1,7 +1,5 @@
 package core
 
-// apicover naming cover for the ScopePathProbe wiring window.
-
 import "testing"
 
 func TestScopePathProbe_NilResolverReportsUnwired(t *testing.T) {

@@ -15,16 +15,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// ValidateProfileRequest captures every input cmd_validate_profile reads
-// from argv + environment. ProfilesDir + AdaptersDir mirror the bash
-// EVOLVE_PROFILES_DIR_OVERRIDE + EVOLVE_ADAPTERS_DIR_OVERRIDE knobs.
+// ValidateProfileRequest captures every input the validate pipeline reads
+// from argv and the environment.
 //
-// CapabilityDir is intentionally separate from AdaptersDir: bash uses
-// REAL_ADAPTERS_DIR (script-relative, override-immune) for capability
-// manifest lookups so test seams can't lie about installed capabilities.
-// Go callers SHOULD set CapabilityDir to the real plugin install path —
-// the CLI does this automatically. When CapabilityDir is empty, it
-// defaults to AdaptersDir so unit tests have one less knob to set.
+// CapabilityDir is intentionally separate from AdaptersDir: it should be
+// the real, override-immune plugin install path for capability manifest
+// lookups, so test seams can't lie about installed capabilities. Callers
+// SHOULD set it to the real plugin install path — the CLI does this
+// automatically. When empty, it defaults to AdaptersDir so unit tests have
+// one less knob to set.
 type ValidateProfileRequest struct {
 	Agent           string
 	ProfilesDir     string // immutable plugin profiles dir (.evolve/profiles)
@@ -42,11 +41,11 @@ type ValidateProfileOptions struct {
 	ReadProfile       func(path string) (string, error)
 	ResolveLLM        func(agent string) (resolvellm.Result, error)
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
-	// ExecAdapter runs the bash adapter with VALIDATE_ONLY=1. Returns the
-	// CLI's exit code + any execution error. Tests supply a fake.
+	// ExecAdapter runs the adapter with VALIDATE_ONLY=1. Returns the CLI's
+	// exit code + any execution error. Tests supply a fake.
 	ExecAdapter func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
-	// AdapterExists tests whether the adapter script exists + is executable.
-	// Defaults to os.Stat + executable-bit check.
+	// AdapterExists tests whether the resolved cli has a registered bridge
+	// driver. Defaults to defaultAdapterExists.
 	AdapterExists func(path string) bool
 	// WriteFile writes the dispatch plan log. Defaults to os.WriteFile.
 	WriteFile func(path string, data []byte, mode os.FileMode) error
@@ -57,7 +56,7 @@ type ValidateProfileOptions struct {
 type ValidateProfileResult struct {
 	CLI              string
 	Model            string
-	CLIResolutionSrc string // source from resolvellm.Resolve ("profile" since Step 9 removed llm_config)
+	CLIResolutionSrc string // source from resolvellm.Resolve, or "profile" as a fallback
 	Warns            []string
 	AdapterOverrides AdapterOverrides
 	AdapterExitCode  int
@@ -125,7 +124,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	if llmErr == nil && llm.CLI != "" {
 		cli = llm.CLI
 		source = llm.Source
-		resolvedModel = llm.ModelTier // Step 9: resolvellm emits only a tier
+		resolvedModel = llm.ModelTier // resolvellm emits only a tier
 	} else {
 		// Fall through to profile.
 		cli = matchField(profileBody, reFieldCLI)
@@ -182,8 +181,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 		}
 	}
 
-	// Build adapter env. Mirrors lines 575-589 of subagent-run.sh — every
-	// VALIDATE_ONLY=1 invocation expects this exact env surface.
+	// Every VALIDATE_ONLY=1 invocation expects this exact env surface.
 	artifactTemplate := matchField(profileBody, reFieldOutputArtifact)
 	artifactPath := resolveArtifactPath(artifactTemplate, 0, req.ProjectRoot)
 	worktreePath := req.WorktreePath
@@ -193,7 +191,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	env := map[string]string{
 		"PROFILE_PATH":                 profilePath,
 		"RESOLVED_MODEL":               model,
-		"PROMPT_FILE":                  "", // caller may want to inject; bash mktemps
+		"PROMPT_FILE":                  "", // validate-only never reads the prompt
 		"CYCLE":                        "0",
 		"WORKSPACE_PATH":               filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-0"),
 		"WORKTREE_PATH":                worktreePath,
@@ -219,16 +217,12 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	return res, nil
 }
 
-// capBoolEnv mirrors bash's `"true"`/`"false"` env emission for booleans
-// (the leaf's BoolEnv).
+// capBoolEnv renders a bool as the "true"/"false" env-var strings adapters
+// expect.
 func capBoolEnv(v bool) string { return subagentrun.BoolEnv(v) }
 
 // adapterOverridesRE captures `"adapter_overrides":{ ... }` and inside that
-// the entry for the resolved cli. Bash uses jq:
-//
-//	.adapter_overrides."${vp_cli}" | .tools / .extra_flags | tojson
-//
-// We rebuild with a narrower regex pair.
+// the entry for the resolved cli.
 var (
 	toolsArrayRE      = regexp.MustCompile(`"tools"\s*:\s*(\[[^\]]*\])`)
 	extraFlagsArrayRE = regexp.MustCompile(`"extra_flags"\s*:\s*(\[[^\]]*\])`)
@@ -285,18 +279,16 @@ func capabilityExtractObject(body, name string) (string, bool) {
 	return "", false
 }
 
-// defaultResolveLLM bridges to resolvellm.Resolve, which reads the per-phase
-// profile (Step 9 removed the llm_config.json layer entirely).
+// defaultResolveLLM bridges to resolvellm.Resolve, which reads the
+// per-phase profile directly; there is no llm_config.json layer.
 func defaultResolveLLM(agent string) (resolvellm.Result, error) {
 	return resolvellm.Resolve(agent, resolvellm.Options{})
 }
 
 // defaultAdapterExists is the validate pipeline's path-shaped seam default:
-// ValidateProfile still composes the legacy <AdaptersDir>/<cli>.sh path
-// (:146) and this default recovers <cli> from its base name before asking
-// driverExists — the one place a file name is still decoded. The run path's
-// seam receives the cli itself (RunOptions.AdapterExists → driverExists);
-// folding this twin onto that shape is unit-16 follow-up 16-9. Kept
+// ValidateProfile still composes the legacy <AdaptersDir>/<cli>.sh path, and
+// this default recovers <cli> from its base name before asking
+// driverExists — the one place a file name is still decoded. Kept
 // injectable so tests can still stub it.
 func defaultAdapterExists(path string) bool {
 	return driverExists(strings.TrimSuffix(filepath.Base(path), ".sh"))

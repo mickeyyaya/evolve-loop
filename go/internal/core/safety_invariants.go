@@ -8,26 +8,22 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// ValidateSafetyInvariants is the phase-agnostic load-time trust anchor
-// (ADR-0060). As the transition kernel becomes data-driven (PA-DDK), the
-// legality graph and gates move into config; the floor's non-gameability can no
-// longer rest on a hardcoded graph literal. This validator replaces it: it
-// HARD-checks that the transition graph + config preserve the ship floor,
-// quantified over the graph and config ROLES (mandatory anchors, verdict
-// branches) — never phase-name literals — so an operator may rename any phase
-// without weakening the floor. Returns human-readable violations; empty == safe.
-//
-// DDK-1 lands the two invariants checkable before the graph/gates are
-// config-driven; DDK-4/DDK-5 extend it with the artifact-gate and
-// path-dominance invariants as those fields go live, so each check lands BEFORE
-// its corresponding config-flip and the floor is never unguarded.
+// ValidateSafetyInvariants is the phase-agnostic load-time trust anchor. The
+// legality graph and gates live in config, so the floor's non-gameability
+// cannot rest on a hardcoded graph literal; this validator HARD-checks that
+// the transition graph + config preserve the ship floor, quantified over the
+// graph and config ROLES (mandatory anchors, verdict branches) — never
+// phase-name literals — so an operator may rename any phase without
+// weakening the floor. Returns human-readable violations; empty == safe.
+// See ADR-0060.
 func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat phasespec.Catalog) []string {
 	var violations []string
 
-	// I8 — branch-target legality: a phase's verdict-branch targets (on_pass /
-	// on_fail) must resolve to a known phase AND be a legal successor. Config may
-	// only SELECT among already-legal edges, never invent one (ADR-0058 §1, now
-	// enforced as a data check rather than by a hardcoded graph).
+	// Branch-target legality: a phase's verdict-branch targets (on_pass /
+	// on_fail) must resolve to a known phase AND be a legal successor. Config
+	// may only SELECT among already-legal edges, never invent one, enforced
+	// as a data check rather than by a hardcoded graph.
+	// See ADR-0058.
 	for _, name := range cat.Names() {
 		// Names() and Get() read the same map populated together by phasespec.Load,
 		// so a name from Names() always resolves; a zero spec (empty branches) would
@@ -52,8 +48,8 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Spine-edge legality (PA-DDK DDK-3): a config-declared spine (cfg.SpineOrder)
-	// must resolve to known phases and every consecutive edge must be a legal
+	// Spine-edge legality: a config-declared spine (cfg.SpineOrder) must
+	// resolve to known phases and every consecutive edge must be a legal
 	// transition — a spine cannot route around an anchor via an illegal jump
 	// (scout→ship), since Next walks the spine without re-checking CanTransition.
 	for _, n := range cfg.SpineOrder {
@@ -70,8 +66,8 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Legal-successors resolvability (PA-DDK DDK-5 hardening): a config legality
-	// graph (config.legal_successors) must name only known phases on BOTH sides.
+	// Legal-successors resolvability: a config legality graph
+	// (config.legal_successors) must name only known phases on BOTH sides.
 	// legalGraphFrom silently drops an unresolvable name, so a typo would degrade
 	// the graph with no load error — report it loudly (mirrors the on_pass/on_fail
 	// "no known phase" check). Sentinels start/end/debugger resolve via phaseFromRouter.
@@ -86,8 +82,8 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Floor-gate verdict safety (PA-DDK DDK-4): a mandatory phase whose artifact
-	// gate constrains the verdict may only accept SHIPPABLE verdicts (PASS/WARN).
+	// Floor-gate verdict safety: a mandatory phase whose artifact gate
+	// constrains the verdict may only accept SHIPPABLE verdicts (PASS/WARN).
 	// This stops a config from weakening the floor to ship a FAILed evaluation.
 	for _, name := range cfg.Mandatory {
 		spec, ok := cat.Get(name)
@@ -101,16 +97,17 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		}
 	}
 
-	// Floor-evaluator existence (PA-DDK DDK-5 hardening — the operative half of
-	// ADR-0060 §4 "F⊆M"): the ship floor is only real if SOME mandatory phase
-	// gates on a shippable verdict — a mandatory EVALUATOR must exist. Without it
-	// an operator can drop the evaluator from mandatory_phases and
-	// SpineSatisfiedUpTo admits ship with no verdict gate (the runtime anchor goes
-	// inert — see TestSpineSatisfiedUpTo_ConfigurableMandatoryWeakensGate). Phase-
+	// Floor-evaluator existence ("F⊆M"): the ship floor is only real if SOME
+	// mandatory phase gates on a shippable verdict — a mandatory EVALUATOR
+	// must exist. Without it an operator can drop the evaluator from
+	// mandatory_phases and SpineSatisfiedUpTo admits ship with no verdict
+	// gate (the runtime anchor goes inert — see
+	// TestSpineSatisfiedUpTo_ConfigurableMandatoryWeakensGate). Phase-
 	// agnostic: quantified over mandatory phases' gates, never a phase name. The
 	// floor-gate check above forbids a NON-shippable mandatory gate; this forbids
 	// the ABSENCE of one (and a presence-only gate with empty verdict_in, which a
 	// FAIL verdict would otherwise slip through).
+	// See ADR-0060.
 	//
 	// Only judged when the catalog is AUTHORITATIVE over the floor — it describes
 	// at least one mandatory phase. The real composition root always passes the
@@ -126,9 +123,9 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 		violations = append(violations, "no mandatory phase gates on a shippable verdict (PASS/WARN) — the ship floor has no mandatory evaluator; ship could proceed without a verdict gate")
 	}
 
-	// I9 — anchor reachability: every configured-mandatory anchor must be
-	// reachable from the start node. A stranded anchor cannot gate the floor, so
-	// a config that marks an unreachable phase mandatory is a silent floor hole.
+	// Anchor reachability: every configured-mandatory anchor must be reachable
+	// from the start node. A stranded anchor cannot gate the floor, so a
+	// config that marks an unreachable phase mandatory is a silent floor hole.
 	// A graph with no start node at all is itself a structural violation.
 	if sm != nil {
 		start := sm.sourceNode()
@@ -143,8 +140,8 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 				}
 			}
 
-			// Evaluator-dominance (ADR-0060 §4 I1/I2, the load-bearing half made a
-			// load-time check): every start→ship path must traverse a floor
+			// Evaluator-dominance (the load-bearing half made a load-time
+			// check): every start→ship path must traverse a floor
 			// evaluator. The evaluator SET is identified by role (mandatory phases
 			// gating a shippable verdict) and the ship sink by role — the LAST
 			// mandatory anchor, which is the ship terminal by registry convention
@@ -156,6 +153,7 @@ func ValidateSafetyInvariants(sm *StateMachine, cfg config.RoutingConfig, cat ph
 			// name. All-anchor dominance (a non-evaluator anchor like a triage step)
 			// stays runtime-backstopped by SpineSatisfiedUpTo — only the evaluator
 			// carries the verdict floor, so only it is proven here at load.
+			// See ADR-0060.
 			if len(evals) > 0 && len(anchors) > 0 {
 				sink := anchors[len(anchors)-1]
 				if sm.reachableAvoiding(start, evals)[sink] {
@@ -210,9 +208,9 @@ func mandatoryEvaluators(cfg config.RoutingConfig, cat phasespec.Catalog) map[Ph
 }
 
 // reachableFrom returns the set of phases reachable from start via legal
-// transitions. Pure graph analysis (no phase-name literals) — it tracks the
-// config-driven graph once DDK-5 lands. The visited set makes it safe on the
-// cyclic transition graph (ship→ship, audit→ship).
+// transitions. Pure graph analysis (no phase-name literals) over the
+// config-driven graph. The visited set makes it safe on the cyclic
+// transition graph (ship→ship, audit→ship).
 func (sm *StateMachine) reachableFrom(start Phase) map[Phase]bool {
 	reach := map[Phase]bool{}
 	var walk func(p Phase)

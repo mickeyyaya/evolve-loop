@@ -1,11 +1,5 @@
 //go:build integration
 
-// shiperror_mapping_test.go — focused proof that the ship phase emits the
-// structured core.ShipError protocol end-to-end: each representative failure
-// site is recoverable via core.AsShipError with the correct Code + Class, and
-// the finalize() exit-code mapping keys off Class (integrity → ExitIntegrity;
-// everything else → ExitFailure). Complements the per-branch coverage tests by
-// pinning the FULL Run() boundary for the four classes called out in the plan.
 package ship
 
 import (
@@ -17,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestShipError_AuditBindingHeadMoved proves a HEAD-moved audit binding flows
-// out of Run() as a recoverable precondition ShipError (NOT integrity) and
-// maps to ExitFailure.
 func TestShipError_AuditBindingHeadMoved(t *testing.T) {
 	repo := makeRepo(t)
 	// Seed audit against a HEAD that does not match the repo's current HEAD.
@@ -32,7 +23,6 @@ func TestShipError_AuditBindingHeadMoved(t *testing.T) {
 	if se.Stage != core.StageVerifyClass {
 		t.Errorf("want Stage=verify-class, got %s", se.Stage)
 	}
-	// Debug must carry the diagnostic SHAs as separate keys (not just in Message).
 	if se.Debug["audited"] == "" || se.Debug["current"] == "" {
 		t.Errorf("Debug must carry audited+current HEADs; got %v", se.Debug)
 	}
@@ -41,8 +31,6 @@ func TestShipError_AuditBindingHeadMoved(t *testing.T) {
 	}
 }
 
-// TestShipError_EGPSRedCount proves a non-zero EGPS red_count surfaces as a
-// precondition ShipError naming the RED predicate IDs in Debug.
 func TestShipError_EGPSRedCount(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\negps red change\n")
@@ -66,9 +54,6 @@ func TestShipError_EGPSRedCount(t *testing.T) {
 	}
 }
 
-// TestShipError_GitPushRejected proves a push failure surfaces as a transient
-// ShipError carrying the git rc/stderr in Debug. We force the failure with a
-// fault runner that fails only `git push`.
 func TestShipError_GitPushRejected(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\npush reject change\n")
@@ -92,7 +77,6 @@ func TestShipError_GitPushRejected(t *testing.T) {
 	}
 }
 
-// A forged audit tree is now refused by the predicate precondition before merge.
 func TestShipError_PredicateTreeDrift(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)

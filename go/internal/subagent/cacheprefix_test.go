@@ -292,7 +292,7 @@ func (w *failingWriter) Write(p []byte) (int, error) {
 }
 
 // TestRenderCachePrefix_WriteError covers the io.WriteString failure branch
-// (cacheprefix.go:102) by injecting a writer that fails on the first part.
+// by injecting a writer that fails on the first part.
 func TestRenderCachePrefix_WriteError(t *testing.T) {
 	err := renderCachePrefix(&failingWriter{failAfter: 0}, CachePrefixRequest{
 		Cycle: 1, Agent: "scout", Workspace: "/ws",
@@ -317,9 +317,9 @@ func TestRenderCachePrefix_WriteErrorMidStream(t *testing.T) {
 	}
 }
 
-// TestWriteCachePrefix_CreateError covers the os.Create failure branch
-// (cacheprefix.go:68) — OutPath points at an existing directory, so Create
-// fails even though MkdirAll of its parent succeeds.
+// TestWriteCachePrefix_CreateError covers the os.Create failure branch:
+// OutPath points at an existing directory, so Create fails even though
+// MkdirAll of its parent succeeds.
 func TestWriteCachePrefix_CreateError(t *testing.T) {
 	tmp := t.TempDir()
 	// OutPath is the tmp dir itself; filepath.Dir(tmp) exists so MkdirAll

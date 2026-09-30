@@ -1,11 +1,5 @@
 package ship
 
-// stage_deleted_test.go — boundary-flow pin: stageExplicitPaths must stage
-// cleanly when a changed path is a DELETION that is already staged (the
-// operator flow stages explicit paths → commit-gate → ship re-stages; plain
-// `git add -- <deleted+staged>` fatals rc=128 "pathspec did not match any
-// files", which broke every boundary ship after the explicit-paths rework).
-
 import (
 	"context"
 	"os"
@@ -56,14 +50,6 @@ func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 // rename as `R  old -> new`, never as `D  old`, so the "D " filter does not
 // see the source path — yet the source is gone from the worktree AND from the
 // index under its old name, which is exactly the rc=128 condition.
-//
-// Real trigger (2026-07-30 console): reconciling the inbox moves each consumed
-// item from .evolve/inbox/<ts>-<id>.json to .evolve/inbox/consumed/<date>-<id>.json
-// with one field appended, so git's similarity detection reports renames rather
-// than delete+add, and every boundary ship carrying a consumed item died on
-// `fatal: pathspec '.evolve/inbox/…-spine-failopen-telemetry.json' did not
-// match any files`. This has been carried as a known operator gotcha
-// ("ship-staging RENAME rc=128") instead of being fixed.
 func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
 	root := gittest.Fixture(t).Dir
 	// Content long enough that git scores old→new as a rename, not add+delete.

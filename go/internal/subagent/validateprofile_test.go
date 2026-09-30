@@ -63,10 +63,10 @@ func TestValidateProfile_HappyPath(t *testing.T) {
 }
 
 // TestValidateProfile_NilOptionsWireDefaults covers the six `if opts.X == nil`
-// default-wiring branches (validateprofile.go:85-102). Passing a zero
-// ValidateProfileOptions forces every default to be installed; the call then
-// fails at the real defaultReadProfile (missing file) — the point is that the
-// default seams are exercised, not that the validation succeeds.
+// default-wiring branches. Passing a zero ValidateProfileOptions forces
+// every default to be installed; the call then fails at the real
+// defaultReadProfile (missing file) — the point is that the default seams
+// are exercised, not that the validation succeeds.
 func TestValidateProfile_NilOptionsWireDefaults(t *testing.T) {
 	_, err := ValidateProfile(context.Background(), ValidateProfileRequest{
 		Agent:       "scout",

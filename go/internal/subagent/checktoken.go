@@ -6,18 +6,16 @@ import (
 	"os"
 )
 
-// CheckTokenResult mirrors the bash cmd_check_token verdict — either OK or
-// INTEGRITY_FAIL. Reason carries the human-readable message bash printed to
-// stderr; callers can format it however they like.
+// CheckTokenResult is either OK or INTEGRITY_FAIL. Reason carries a
+// human-readable message; callers can format it however they like.
 type CheckTokenResult struct {
 	OK     bool
 	Reason string
 }
 
 // CheckToken validates that the artifact at path exists and contains the
-// challenge token. Mirrors cmd_check_token at subagent-run.sh:597 — exit 2
-// on missing file or absent token, exit 0 + log on success. We return a
-// struct so the CLI shim can map to exit codes without re-deciding.
+// challenge token. Returns a struct so the CLI shim can map to exit codes
+// without re-deciding.
 func CheckToken(artifactPath, token string) CheckTokenResult {
 	body, err := os.ReadFile(artifactPath)
 	if err != nil {

@@ -1,11 +1,5 @@
 //go:build integration
 
-// Tests for the ship phase dispatcher (ship.go). The ship phase now runs
-// the native Go shipper unconditionally (native.go); the full ship state
-// machine is exercised by native_test.go and dispatch_test.go. These tests
-// cover the phase-level invariants that are independent of the native
-// state machine: the runner-required guard, default commit-message
-// synthesis, the phase name, and the production execRunner seam.
 package ship
 
 import (

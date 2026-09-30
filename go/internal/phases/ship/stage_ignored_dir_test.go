@@ -1,21 +1,5 @@
 package ship
 
-// stage_ignored_dir_test.go — layer 4 of the staging onion (after cycle-1098
-// rc=128 absolute-pathspec, cycle-1101 rc=1 ignored-path, cycle-1108
-// quotepath): the 2026-08-14 batch halt, fingerprint ship|unknown|99c38818.
-//
-// Defect, proven against real git: `git check-ignore` reports NOTHING for a
-// DIRECTORY path (either slash form) when the ignore rule is the `dir/` form
-// (.gitignore `.evolve/inbox/processed/`), so the ignore probe keeps the
-// declared directory and `git add -A -- <dir>` refuses rc=1 ("The following
-// paths are ignored…"). Three lanes hit the identical refusal → identical
-// fingerprint ×3 → pipeline-blocker halt.
-//
-// The fix refuses to re-implement ignore semantics a third time: git's own
-// refusal stderr NAMES the offending pathspecs verbatim — parse them, drop
-// them (loudly), retry the add ONCE. Git stays the single source of truth for
-// what is ignored, for every rule form, forever.
-
 import (
 	"context"
 	"slices"
@@ -23,12 +7,12 @@ import (
 	"testing"
 )
 
-// TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec — the
-// behavioral crux of layer 4: a pathspec the check-ignore probe is BLIND to
-// (directory-form rule) but git add refuses must not kill the ship. Git names
-// it in the refusal; the stager drops exactly that, retries once, and the
-// legit path lands. Modeled through the fake runner so the contract holds for
-// ANY producer that puts a probe-blind path into the pathspec.
+// TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec: a pathspec
+// the check-ignore probe is BLIND to (a directory-form rule) but git add
+// refuses must not kill the ship — git names it in the refusal, the stager
+// drops exactly that, retries once, and the legit path lands. Modeled
+// through the fake runner so the contract holds for any producer that puts a
+// probe-blind path into the pathspec.
 func TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec(t *testing.T) {
 	root := stageExplicitTree(t)
 	blind := ".evolve/inbox/processed"

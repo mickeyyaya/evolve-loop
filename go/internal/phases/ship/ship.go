@@ -21,36 +21,34 @@ import (
 
 const phaseName = string(core.PhaseShip)
 
-// CmdRunner is the subprocess injection seam. It is an alias of the single
-// canonical command-execution seam (sysexec.RunFunc); production wiring uses
-// sysexec.DefaultRunner, tests inject fixtures.FakeExec. The alias keeps the
-// `ship.CmdRunner` name at call sites while collapsing onto the one seam.
+// CmdRunner is the subprocess injection seam, an alias of sysexec.RunFunc.
 type CmdRunner = sysexec.RunFunc
 
 type Config struct {
 	Runner CmdRunner
 	NowFn  func() time.Time
+	// See ADR-0050.
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
-	// parse (ADR-0050 §3.10 Slice 6). Zero value (StageOff) = byte-identical
-	// (prose parse). Set by the composition root (cmd_cycle.go) from cfg.PhaseIO.
+	// parse. Zero value (StageOff) = byte-identical (prose parse); set by the
+	// composition root (cmd_cycle.go) from cfg.PhaseIO.
 	PhaseIO config.Stage
 	// ManifestGate threads the policy.json `gates.manifest_gate` rollout dial
 	// (policy.GatesConfig().ManifestGate) into Options.ManifestGate for the
-	// ship-bind manifest reconciliation (cycle-1064). Raw resolved stage string,
-	// not a config.Stage, because manifest.go's seam is value-compared against
+	// ship-bind manifest reconciliation. Raw resolved stage string, not a
+	// config.Stage, because manifest.go's seam is value-compared against
 	// ManifestGateEnforce. Zero value "" = shadow (byte-identical).
 	ManifestGate string
 	// RepoContractGate threads policy.json gates.repo_contract_gate into the
 	// ship-time repo-contract scanner pack (repocontract.go). Zero value ""
 	// = off for construction-site safety; the cmd_cycle wiring test asserts
 	// the production site threads the resolved default ("enforce") so the
-	// cycle-1064 silently-unwired trap cannot recur.
+	// gate cannot be silently left unwired.
 	RepoContractGate string
-	// Signals is the root's Signal Center (ADR-0103 unit 07): the landing's
-	// ship.warning events reach it through Options.Signals. The orchestrator
-	// root (cmd_cycle.go) passes its Center; the `evolve phase ship` registry
-	// factory leaves it nil (the Null Object — a subprocess root has no
-	// Center yet, 07-F10).
+	// See ADR-0103.
+	// Signals is the root's Signal Center. The landing's ship.warning events
+	// reach it through Options.Signals. The orchestrator root (cmd_cycle.go)
+	// passes its Center; the `evolve phase ship` registry factory leaves it
+	// nil (a subprocess root has no Center yet).
 	Signals *signalcenter.Center
 }
 
@@ -74,10 +72,11 @@ func New(c Config) *Phase {
 
 func (p *Phase) Name() string { return phaseName }
 
+// See ADR-0103.
 // signalsWired reports whether the phase carries a Signal Center for the
-// landing's warnings — the in-package wiring test's handle (ADR-0103 unit
-// 07; unexported: its only consumer is TestShipOptions_ThreadsSignals, and the
-// composition root pins its own site by source scan).
+// landing's warnings — the in-package wiring test's handle. Unexported: its
+// only consumer is TestShipOptions_ThreadsSignals, and the composition root
+// pins its own site by source scan.
 func (p *Phase) signalsWired() bool { return p.signals != nil }
 
 // defaultCommitMessage synthesizes a deterministic cycle commit message when
@@ -85,10 +84,11 @@ func (p *Phase) signalsWired() bool { return p.signals != nil }
 // `evolve cycle run` uses (cmd_cycle.go), plus the cycle number for traceable
 // git history.
 func defaultCommitMessage(req core.PhaseRequest) string {
-	// ADR-0099 slice 2: a document cycle lands under `solution(<slug>)` so the
-	// commit-prefix vocabulary names the deliverable it carries (the kernel's
-	// own digest of the triage header decides the kind; the triage decision
-	// names the slugs). Code cycles keep the legacy message byte-identical.
+	// See ADR-0099.
+	// A document cycle lands under `solution(<slug>)` so the commit-prefix
+	// vocabulary names the deliverable it carries (the kernel's own digest of
+	// the triage header decides the kind; the triage decision names the
+	// slugs). Code cycles keep the legacy message byte-identical.
 	if core.DocumentCycle(req.Workspace) {
 		if ids := core.BoundTaskIDs(req.Workspace); len(ids) > 0 {
 			// One slug in the scope (the prefix grammar admits [a-z0-9-] only);
@@ -113,17 +113,13 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	}
 	// An explicit Context["commit_message"] always wins. When absent, synthesize
 	// a deterministic message from the cycle identity rather than failing the
-	// ship (single seam, cycle-147 lesson): `evolve cycle run` populates this
-	// Context key but the autonomous-loop construction path (cmd_loop.go
-	// buildCycleContext) does not, so erroring here silently sank EVERY loop
-	// cycle at the ship step once the audit gate finally let cycles reach ship
-	// (cycle-150). Defaulting here covers all current and future callers; the
-	// manual `evolve ship` CLI always passes an explicit message and is
-	// unaffected.
-	// ADR-0050 §3.10 Slice 4: read commit_message from the typed envelope at
-	// enforce, the legacy Context map below it (byte-identical — Active() is false
-	// unless enforce). The empty→defaultCommitMessage fallback below covers both
-	// paths, so an active envelope with no commit message still synthesizes one.
+	// ship: the autonomous-loop construction path does not always populate this
+	// Context key, and the manual `evolve ship` CLI always passes an explicit
+	// message and is unaffected.
+	// See ADR-0050.
+	// Read commit_message from the typed envelope at enforce, the legacy
+	// Context map otherwise (byte-identical — Active() is false unless
+	// enforce); the empty→defaultCommitMessage fallback covers both.
 	msg := req.Context["commit_message"]
 	if req.Input.Active() {
 		msg = req.Input.CycleInputs().CommitMessage()
@@ -141,25 +137,24 @@ func NewWithDefaultRunner() *Phase {
 	return NewWithDefaultRunnerStage(config.StageOff)
 }
 
-// NewWithDefaultRunnerStage is NewWithDefaultRunner plus the EVOLVE_PHASE_IO stage
-// (ADR-0050 §3.10 Slice 6). The composition root (cmd_cycle.go) passes cfg.PhaseIO
-// so the audit-binding verdict parse is sentinel-first at >= StageEnforce.
+// See ADR-0050.
+// NewWithDefaultRunnerStage is NewWithDefaultRunner plus the EVOLVE_PHASE_IO
+// stage. The composition root (cmd_cycle.go) passes cfg.PhaseIO so the
+// audit-binding verdict parse is sentinel-first at >= StageEnforce.
 // NewWithDefaultRunner stays as the StageOff (byte-identical) convenience.
 func NewWithDefaultRunnerStage(stage config.Stage) *Phase {
 	return New(Config{Runner: sysexec.DefaultRunner, PhaseIO: stage})
 }
 
 // shipOptions is the PhaseRequest → Options translation, extracted from
-// runNative so the sole production construction site is directly testable
-// (cycle-1064: Options.ManifestGate was silently never assigned here, leaving
-// the manifest gate permanently shadow no matter what policy.json said).
+// runNative so the sole production construction site is directly testable.
 func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 	return Options{
 		Class:                           ClassCycle, // PhaseRunner only invokes for cycle commits
 		CommitMessage:                   msg,
 		ProjectRoot:                     req.ProjectRoot,
-		WorkspacePath:                   req.Workspace, // ADR-0049 S3 / G3: run-scope ship's reads
-		RunID:                           req.RunID,     // ADR-0049 S4 / G5: run-scope the audit binding
+		WorkspacePath:                   req.Workspace, // See ADR-0049: run-scope ship's reads
+		RunID:                           req.RunID,     // See ADR-0049: run-scope the audit binding
 		CycleID:                         req.Cycle,
 		AuditRound:                      req.AuditRound,
 		ActiveWorktree:                  req.Worktree,
@@ -169,10 +164,10 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		RequireBuildExplanationHandoff:  req.ExplanationDocumentationVersion != 0,
 		PluginRoot:                      req.Env["EVOLVE_PLUGIN_ROOT"],
 		Env:                             req.Env,
-		PhaseIO:                         p.phaseIO, // ADR-0050 §3.10 Slice 6: sentinel-first verdict parse at enforce
+		PhaseIO:                         p.phaseIO, // See ADR-0050: sentinel-first verdict parse at enforce
 		ManifestGate:                    p.manifestGate,
 		Runner:                          p.runner,
-		Signals:                         p.signals, // ADR-0103 unit 07: the landing's ship.warning events reach the root's Center
+		Signals:                         p.signals, // See ADR-0103: the landing's ship.warning events reach the root's Center
 	}
 }
 
@@ -183,8 +178,7 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	// RED in this lane must fail the ship here, not on main (repocontract.go).
 	// req.Workspace is the run dir: the gate tees the scanner output there
 	// (ship-repocontract-scan.log) on green AND red runs. Threading it here is
-	// the load-bearing half — a log seam reachable only from a test is dead
-	// code (the cycle-1064 manifest-gate anti-trap, applied to this parameter).
+	// the load-bearing half — a log seam reachable only from a test is dead code.
 	opts := p.shipOptions(req, msg)
 	gateRoot, baseRef, rerr := repoContractGateRoot(&opts)
 	if rerr != nil {
@@ -249,9 +243,10 @@ func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string
 	}, nil
 }
 
-// addRepairSignals mirrors the repair ladder's observability fields
-// (ADR-0039 §8) onto the generic signal plane — present on both PASS
-// (self-healed) and FAIL (repair declined) responses.
+// See ADR-0039.
+// addRepairSignals mirrors the repair ladder's observability fields onto the
+// generic signal plane — present on both PASS (self-healed) and FAIL
+// (repair declined) responses.
 func addRepairSignals(signals map[string]any, res RunResult) {
 	if res.RepairAttempted != "" {
 		signals["ship.repair_attempted"] = res.RepairAttempted
@@ -259,13 +254,14 @@ func addRepairSignals(signals map[string]any, res RunResult) {
 	}
 }
 
+// See ADR-0035, ADR-0038.
 // init self-registers the ship phase factory with the phase registry, like
 // every other built-in phase. The subprocess dispatcher (internal/cli/phasecmd)
-// resolves phases by name and never constructs ship directly — keeping the flow
-// phase-agnostic (ADR-0035/0038). The orchestrator's in-process path
-// (cmd_cycle.go) builds ship with a stage-threaded constructor; this registry
-// factory serves the `evolve phase ship` subprocess entrypoint with the
-// default (StageOff) runner, matching the prior phasecmd wiring byte-for-byte.
+// resolves phases by name and never constructs ship directly — keeping the
+// flow phase-agnostic. The orchestrator's in-process path (cmd_cycle.go)
+// builds ship with a stage-threaded constructor; this registry factory
+// serves the `evolve phase ship` subprocess entrypoint with the default
+// (StageOff) runner, matching the prior phasecmd wiring byte-for-byte.
 func init() {
 	registry.Register(string(core.PhaseShip), func(_ core.PhaseRequest) core.PhaseRunner {
 		return NewWithDefaultRunner()
@@ -275,9 +271,7 @@ func init() {
 // repoContractGateRoot is the gate's projection of landingTree — the tree the
 // ship will land, tested against the base its changes are measured from: the
 // worktree's base SHA when the ship lands from a worktree and knows it, else
-// HEAD. Until 2026-09-14 the gate ran in req.ProjectRoot, main's pre-landing
-// tree, so on every lane ship it tested a tree without the lane's changes.
-// An unresolvable typed worktree fails closed here with the same
+// HEAD. An unresolvable typed worktree fails closed here with the same
 // CodeWorktreeResolve atomicShip raises: the gate never tests the project
 // root in the lane's stead and reports a misleading green.
 func repoContractGateRoot(opts *Options) (root, baseRef string, err error) {

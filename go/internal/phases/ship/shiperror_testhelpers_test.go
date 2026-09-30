@@ -1,10 +1,3 @@
-// shiperror_testhelpers_test.go — shared assertion helpers for the structured
-// ship-error protocol (core.ShipError). Replaces the legacy `var ie
-// *IntegrityError; errors.As(err, &ie)` pattern: most ship-refusal sites are
-// now NON-integrity classes (precondition/config/transient), so they return a
-// bare *core.ShipError that does not match *IntegrityError. These helpers
-// recover the structured error and assert Code/Class while preserving the
-// original tests' message-containment intent.
 package ship
 
 import (

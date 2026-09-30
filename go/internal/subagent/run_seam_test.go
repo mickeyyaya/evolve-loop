@@ -1,9 +1,5 @@
 package subagent
 
-// run_seam_test.go — ADR-0103 unit 16 step 3: the seam between the host's
-// RunOptions bag and the subagentrun dispatcher — one construction, one
-// projection each way, the Center forwarded, every facade projecting the leaf.
-
 import (
 	"context"
 	"encoding/json"
@@ -21,7 +17,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// Test 52 — the dispatcher is constructed in exactly ONE non-test file.
+// TestSubagentRun_OneConstructionSite pins that the dispatcher is
+// constructed in exactly ONE non-test file.
 func TestSubagentRun_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/subagent/run.go"
 	if offenders := nonTestSourcesMentioning(t, "subagentrun.New(", onlySite); len(offenders) > 0 {
@@ -69,9 +66,10 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	return offenders
 }
 
-// Test 53 — one Run drives each of the twelve live seams exactly once
-// (WriteFile is dead); the request projection carries every field, PluginRoot
-// excluded; the result projection carries the nine fields with Stderr "".
+// TestRun_FacadeProjectsEverySeamByName pins that one Run drives each of the
+// twelve live seams exactly once (WriteFile is dead); the request
+// projection carries every field, PluginRoot excluded; the result
+// projection carries the nine fields with Stderr "".
 func TestRun_FacadeProjectsEverySeamByName(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	calls := map[string]int{}
@@ -145,8 +143,8 @@ func TestRun_FacadeProjectsEverySeamByName(t *testing.T) {
 	}
 }
 
-// Test 54 — Run over runHappyOpts is field for field the RunResult captured
-// on the pre-extraction code.
+// TestRun_OverRunHappyOptsIsFieldForFieldTheSameAsBefore pins Run over
+// runHappyOpts field-for-field against the golden RunResult.
 func TestRun_OverRunHappyOptsIsFieldForFieldTheSameAsBefore(t *testing.T) {
 	root, ws, _ := unit16Dirs(t)
 	res, err := Run(context.Background(), RunRequest{Agent: "scout", Cycle: 5, WorkspacePath: ws, ProfilesDir: "/p", AdaptersDir: "/a", ProjectRoot: root, PluginRoot: root, PromptReader: strings.NewReader("Do the thing.\n"), AdversarialAudit: true}, runHappyOpts(t))
@@ -163,11 +161,11 @@ func TestRun_OverRunHappyOptsIsFieldForFieldTheSameAsBefore(t *testing.T) {
 	}
 }
 
-// Test 55 — the exec seam carries the Center: execAdapterDepsWith sets it on
-// the one-arg execAdapterDeps (whose spelling the tokenresolver wiring pins),
-// nil is today's Deps, adapterOf picks the bridge adapter for a nil
-// ExecAdapter and the func seam otherwise, and execAdapter builds its engine
-// from execAdapterDepsWith (the wiring proof).
+// TestExecAdapterDepsWith_CarriesTheCenter pins that the exec seam carries
+// the Center: execAdapterDepsWith sets it on execAdapterDeps, nil is the
+// plain Deps, adapterOf picks the bridge adapter for a nil ExecAdapter and
+// the func seam otherwise, and execAdapter builds its engine from
+// execAdapterDepsWith.
 func TestExecAdapterDepsWith_CarriesTheCenter(t *testing.T) {
 	c := signalcenter.New()
 	env := map[string]string{"HOME": t.TempDir()}
@@ -205,8 +203,8 @@ func TestExecAdapterDepsWith_CarriesTheCenter(t *testing.T) {
 	}
 }
 
-// Test 56 — every host facade projects the leaf on one input (the consumer
-// pins; keeps ./internal/subagent's apicover row green).
+// TestHostFacades_ProjectTheLeaf pins that every host facade projects the
+// leaf on one input (keeps ./internal/subagent's apicover row green).
 func TestHostFacades_ProjectTheLeaf(t *testing.T) {
 	if VerdictPASS != subagentrun.VerdictPASS || VerdictFAIL != subagentrun.VerdictFAIL || VerdictIntegrityFail != subagentrun.VerdictIntegrityFail ||
 		ArtifactMaxAge != subagentrun.ArtifactMaxAge || ChallengeTokenBytes != subagentrun.ChallengeTokenBytes || ErrInProcessDispatchBanned != subagentrun.ErrInProcessDispatchBanned || ledgerZeroSeed != subagentrun.LedgerZeroSeed {
@@ -263,7 +261,8 @@ func TestHostFacades_ProjectTheLeaf(t *testing.T) {
 	}
 }
 
-// Test 57 — RunOptions.Signals reaches the leaf; a nil one is safe.
+// TestRun_SignalsFieldReachesTheLeafAndNilIsSafe pins that RunOptions.Signals
+// reaches the leaf; a nil one is safe.
 func TestRun_SignalsFieldReachesTheLeafAndNilIsSafe(t *testing.T) {
 	_, ws, worktree := unit16Dirs(t)
 	c := signalcenter.New()
@@ -285,12 +284,11 @@ func TestRun_SignalsFieldReachesTheLeafAndNilIsSafe(t *testing.T) {
 	}
 }
 
-// Test 65 (review fold, architecture M2) — RunOptions.AdapterExists receives
-// the cli (its func type is unchanged, so every by-name binder compiles and,
-// ignoring its argument, behaves as before) and its production default is
-// driver presence BY CLI: a path is not a cli, nothing decodes a file name on
-// the run path — kills `bind the path-decoding validate default to the run
-// path`, `compose the .sh path for the seam`.
+// TestRun_AdapterExistsSeamReceivesTheCLIAndDefaultsToDriverPresence pins
+// that RunOptions.AdapterExists receives the cli (its func type is
+// unchanged, so every by-name binder compiles and, ignoring its argument,
+// behaves as before) and its production default is driver presence BY CLI:
+// a path is not a cli, nothing decodes a file name on the run path.
 func TestRun_AdapterExistsSeamReceivesTheCLIAndDefaultsToDriverPresence(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	opts := runHappyOpts(t)
@@ -311,15 +309,13 @@ func TestRun_AdapterExistsSeamReceivesTheCLIAndDefaultsToDriverPresence(t *testi
 	}
 }
 
-// Test 66 (review fold, architecture M1) — the adapter-env contract has ONE
-// typed home, subagentrun.AdapterEnv.Map(); ValidateProfile's literal map is
-// its named twin until follow-up 16-9 folds it onto an AdapterEnv with a
-// ValidateOnly axis. Until then this pin keeps the two key sets from
-// drifting: the validate-only env is exactly Map()'s keys minus the run-only
-// CHALLENGE_TOKEN (and never EVOLVE_PROJECT_ROOT — the twin's two gaps 16-9
-// decides), VALIDATE_ONLY the one axis ("1" vs "0"). A key added to either
-// side goes red here — kills `a key added to Map()`, `VALIDATE_ONLY dropped
-// from the twin`.
+// TestValidateProfile_EnvIsTheLeafsWireMinusTheRunOnlyKeys pins that the
+// adapter-env contract has ONE typed home, subagentrun.AdapterEnv.Map();
+// ValidateProfile's literal map is its named twin, so this pin keeps the two
+// key sets from drifting: the validate-only env is exactly Map()'s keys
+// minus the run-only CHALLENGE_TOKEN (and never EVOLVE_PROJECT_ROOT),
+// VALIDATE_ONLY the one axis ("1" vs "0"). A key added to either side goes
+// red here.
 func TestValidateProfile_EnvIsTheLeafsWireMinusTheRunOnlyKeys(t *testing.T) {
 	opts := happyOpts(`{"cli":"claude","model_tier_default":"sonnet","output_artifact":"x.md"}`, "claude")
 	var got map[string]string

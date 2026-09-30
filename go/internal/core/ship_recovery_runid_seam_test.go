@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Fresh explanation contracts deliberately supersede the legacy composition
-// carry-forward shortcut: a new base invalidates the Build-authored rationale,
-// so recovery must rebuild and re-audit even when the lane patch-id is stable.
-// The direct run-ID wiring proof lives in composition_carryforward_wired_test.
-
 func TestFreshExplanationRebase_BypassesLegacyCompositionCarryForward(t *testing.T) {
 	dir, preDiff := initCleanRebaseRepoT(t)
 	patchID, err := ledger.PatchID(preDiff)

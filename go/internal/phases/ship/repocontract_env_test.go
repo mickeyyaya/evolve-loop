@@ -12,13 +12,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest reproduces lane
-// 1677's false RED (2026-09-14): a fleet lane exports EVOLVE_FLEET=1 and
-// EVOLVE_CYCLE_STATE_FILE=<its own run dir> process-wide, and the repo-contract
-// gate's `go test` inherited both — so cmd/evolve's cycle-reset lease tests,
-// guards' "outside a cycle" tests and ship's fleet-off goldens failed in the
-// lane worktree while passing in CI and in a clean shell. The gate must hand
-// `go test` the environment CI has: the lane's IPC namespace scrubbed.
+// TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest: a fleet lane
+// exports its own IPC env (fleet flag, cycle-state-file path) process-wide,
+// and the gate's `go test` must not inherit it — env-sensitive tests would
+// fail in the lane worktree while passing in CI and in a clean shell. The
+// gate must hand `go test` the environment CI has: the lane's IPC namespace
+// scrubbed.
 func TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 	t.Setenv(ipcenv.CycleStateFileKey, "/runs/cycle-1677/cycle-state.json")

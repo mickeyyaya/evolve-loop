@@ -18,11 +18,11 @@ func ResolveCycleStatePath(evolveDir string) string {
 }
 
 // RunStateFile is the per-run mirror of cycle-state.json inside the run
-// workspace (CB.4, concurrency campaign). The storage adapter dual-writes
-// every WriteCycleState here; the worktree provisioner symlinks the cycle
-// worktree's .evolve/cycle-state.json at it, so guard hooks running inside
-// the worktree read the run's OWN state — under concurrent runs the global
-// cycle-state.json holds whichever run wrote last.
+// workspace. The storage adapter dual-writes every WriteCycleState here; the
+// worktree provisioner symlinks the cycle worktree's .evolve/cycle-state.json
+// at it, so guard hooks running inside the worktree read the run's OWN state
+// — under concurrent runs the global cycle-state.json holds whichever run
+// wrote last.
 const RunStateFile = "run.json"
 
 // RunIDFromWorkspace resolves the run identity recorded in a run workspace's
@@ -30,12 +30,10 @@ const RunStateFile = "run.json"
 // uses to stamp run_id, so the identity ship's run-scoped binding lookup keys on
 // has one derivation rather than one per writer.
 //
-// Cycle-1571 H1: PR #503 made run_id load-bearing at the ship gate (a binding
-// lookup refuses an entry that is not THIS run's), on the premise that every
-// recorder already stamped it. Three of the four agent_subprocess writers did
-// not — they run in a separate process from the orchestrator, so the in-memory
-// currentRunID that stampingLedger uses is simply unavailable to them. The run
-// workspace they are already handed carries the id on disk.
+// Some agent-subprocess writers run in a separate process from the
+// orchestrator, so the in-memory currentRunID that stampingLedger uses is
+// simply unavailable to them; the run workspace they are already handed
+// carries the id on disk instead.
 //
 // Fail-SOFT by design: an unresolvable id returns "" and the caller OMITS the
 // field rather than stamping an empty identity. The fail-CLOSED half belongs to
@@ -49,9 +47,7 @@ func RunIDFromWorkspace(workspace string) string {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		// A missing run.json is legitimate (standalone dispatch outside a cycle);
-		// anything else — a permission error, a truncated read — is a real fault
-		// that would otherwise be indistinguishable from "no run id yet", which
-		// is the same asserted-not-verified shape that produced this defect.
+		// any other read error is a real fault, not "no run id yet".
 		if !os.IsNotExist(err) {
 			fmt.Fprintf(os.Stderr, "[core] WARN run-id resolve: read %s: %v (entry will be written unstamped and cannot be bound)\n", path, err)
 		}
@@ -67,19 +63,19 @@ func RunIDFromWorkspace(workspace string) string {
 	return probe.RunID
 }
 
-// CycleStateFile is the global per-cycle state file under .evolve/. The single
-// home for the filename (was a string literal repeated across storage /
-// checkpoint / inboxmover / resume / reset). Every read-modify-writer of this
-// file serializes on the sidecar "<dir>/cycle-state.json.lock" via
-// flock.WithPathLock (ADR-0049 G7) so concurrent fleet cycles never lose each
-// other's update.
+// CycleStateFile is the global per-cycle state file under .evolve/, the
+// single home for the filename. Every read-modify-writer of this file
+// serializes on the sidecar "<dir>/cycle-state.json.lock" via
+// flock.WithPathLock so concurrent fleet cycles never lose each other's
+// update.
+// See ADR-0049.
 const CycleStateFile = "cycle-state.json"
 
 // RunWorkspacePath is core's single spelling of a cycle's run-workspace
 // directory, <projectRoot>/.evolve/runs/cycle-<N> — a projection of
-// paths.RunWorkspace, the layout's one home (ADR-0103 unit 09). Phase
-// artifacts, the tmux session registry (CB.5) and the run.json guard mirror
-// (CB.4) all live here.
+// paths.RunWorkspace, the layout's one home. Phase artifacts, the tmux
+// session registry and the run.json guard mirror all live here.
+// See ADR-0103.
 func RunWorkspacePath(projectRoot string, cycle int) string {
 	return paths.RunWorkspace(projectRoot, cycle)
 }

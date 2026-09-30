@@ -1,35 +1,5 @@
 package ship
 
-// stage_classify_stderr_test.go — RED contract for cycle-1473 task
-// `gitstage-deterministic-classification`.
-//
-// Defect (cycle-1098 and cycle-1101, both live): stageExplicitPaths assigns
-// core.ShipClassTransient to the FIRST `git add` failure unconditionally, so the
-// recovery ladder re-dispatched a byte-identical add twice for failures git had
-// already declared unwinnable — an absolute pathspec (`fatal: Invalid path
-// '/go/bin/evolve'`, rc=128) and a gitignore refusal (`The following paths are
-// ignored …`, rc=1). Pure retry burn, and the failure digest recorded a
-// "transient" that was nothing of the sort.
-//
-// Contract under test (RED until Builder adds the classifier): the recovery
-// class is derived from the CAPTURED git stderr plus the exit code BEFORE the
-// two-strikes fallback runs.
-//
-//	rc=128 + `fatal: Invalid path …`                     → non-transient
-//	rc=128 + `… is outside repository at …`              → non-transient
-//	rc=128 + `fatal: pathspec … did not match any files` → non-transient
-//	rc=1   + `The following paths are ignored …`         → non-transient
-//	rc=128 + `Unable to create … index.lock: File exists` → TRANSIENT (contention)
-//	any unrecognised stderr                               → TRANSIENT (degrade)
-//
-// Trust boundary (the load-bearing negative, from the scout's beyond-the-ask
-// hypothesis): the classifier reads opts-captured `git_stderr` ONLY, never the
-// message Go composes around it — so an error-wrapper edit can never move a
-// failure between recovery routes. TestStageFailureClassification/
-// go_error_text_alone_does_not_classify pins that: the deterministic phrase is
-// present in the Go error (and therefore in ShipError.Message) while git's own
-// stderr is empty, and the class must stay transient.
-
 import (
 	"context"
 	"errors"
@@ -204,11 +174,11 @@ func TestStageFailureClassification_PreservesCapturedStderr(t *testing.T) {
 	}
 }
 
-// TestStageFailureClassification_TwoStrikesStillApplies is the regression guard
-// for the cycle-1440 router that already ships: an UNRECOGNISED refusal keeps
-// its first retry and still escalates on the second consecutive attempt with the
-// same pathspec. The new stderr classifier must sit in FRONT of that rule, not
-// replace it.
+// TestStageFailureClassification_TwoStrikesStillApplies is the regression
+// guard for the router that already ships: an UNRECOGNISED refusal keeps its
+// first retry and still escalates on the second consecutive attempt with the
+// same pathspec. The new stderr classifier must sit in FRONT of that rule,
+// not replace it.
 func TestStageFailureClassification_TwoStrikesStillApplies(t *testing.T) {
 	const porcelain = " M docs/architecture/control-flags.md\n"
 	const unknown = "error: something nobody has catalogued yet\n"

@@ -13,9 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestSubagentRun_RecordsUsage — S5, token-telemetry. Run() must copy the
-// bridge response's token usage into Result.Tokens (covers the adapter-bypass
-// path). Previously only CostUSD survived; per-run token counts were dropped.
+// TestSubagentRun_RecordsUsage: Run() must copy the bridge response's token
+// usage into Result.Tokens (covers the adapter-bypass path).
 func TestSubagentRun_RecordsUsage(t *testing.T) {
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	want := core.TokenUsage{Input: 900, Output: 120, CacheRead: 40, CacheWrite: 8}

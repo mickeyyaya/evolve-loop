@@ -1,18 +1,3 @@
-// stage_ignored_paths_test.go — regression lock for the cycle-1101 ship fatal
-// (2026-07-27, batch-12 attempt-2): the eval-quality contract makes every
-// test-report declare its eval file (`.evolve/evals/<slug>.md`), and .evolve/*
-// is gitignored BY DESIGN (runtime state, never committed). The declared
-// manifest therefore always contains an ignored path, and `git add -A --
-// <paths>` REFUSES with rc=1 ("The following paths are ignored by one of your
-// .gitignore files") — it stages the legit paths and STILL exits 1, so every
-// green cycle aborted at ship after two futile "transient" retries. Layer 2 of
-// the staging onion: cycle-1098's absolute-pathspec rc=128 fatal (fixed at
-// d202aeb6) fired first and masked this one.
-//
-// Contract: stageExplicitPaths pre-filters the pathspec through
-// `git check-ignore` — ignored entries are dropped and logged, never handed to
-// `git add`. A broken check-ignore probe fails OPEN (full set, loud log): a
-// probe failure must not block ship.
 package ship
 
 import (
@@ -23,13 +8,10 @@ import (
 	"testing"
 )
 
-// TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths — the crux: a
-// declared-but-gitignored eval path never reaches the `git add` argv; the
-// declared source paths still do.
 func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
 	root := stageExplicitTree(t)
-	// The eval file exists in the tree (isFile passes — that is how it slipped
-	// into the pathspec on cycle-1101).
+	// The eval file exists in the tree (isFile passes — that is how it slips
+	// into the pathspec).
 	evalRel := ".evolve/evals/persona-budget-inlane-gate.md"
 	mustWrite(t, filepath.Join(root, filepath.FromSlash(evalRel)), "# eval\n")
 	ws := writeWorkspaceReports(t,
@@ -69,9 +51,8 @@ func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
 	}
 }
 
-// TestShipDirect_CheckIgnoreProbeFailure_FailsOpen — a broken probe (rc>1)
-// must not block staging: the full declared set flows through unchanged (the
-// add's own stderr now travels in the ship error if the refusal survives),
+// TestShipDirect_CheckIgnoreProbeFailure_FailsOpen: a broken probe (rc>1)
+// must not block staging — the full declared set flows through unchanged,
 // and the probe failure is logged.
 func TestShipDirect_CheckIgnoreProbeFailure_FailsOpen(t *testing.T) {
 	root := stageExplicitTree(t)

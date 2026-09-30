@@ -23,19 +23,6 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, verdict string, si
 		}
 		return false
 	}
-	// Skip-advance: when the static successor is a phase the router has
-	// declined (dec.SkipPhases — e.g. an EnableOff optional like build-planner,
-	// or a plan veto), advance to the next NON-skipped phase so the spine-decline
-	// fallback below never lands on a vetoed phase (cycle-238 D1).
-	//
-	// GUARD (cycle-240 e2e regression): nextInOrder reads o.cfg.Order, which is
-	// EMPTY when no phase-registry.json is present (the e2e fixtures, and any
-	// repo without the registry). An empty/exhausted order makes nextInOrder
-	// return PhaseEnd, which would silently rewrite staticNext to "end" — turning
-	// "skip this optional phase" into "terminate the cycle before build/audit/
-	// ship". Only advance while the order can name a real successor; if it yields
-	// PhaseEnd we cannot trust it, so keep the original staticNext (the cand
-	// override + downstream gates still drive forward exactly as pre-regression).
 	advanced := false
 	for isSkipped(staticNext) {
 		nxt := o.nextInOrder(staticNext)
@@ -50,12 +37,6 @@ func (o *Orchestrator) enforceNext(current, staticNext Phase, verdict string, si
 	if cand == "" || cand == staticNext {
 		return staticNext, advanced
 	}
-	// Early-exit (guarded scout/triage→end): an explicit empty commitment is a
-	// deterministic no-work result; other end proposals remain governed by
-	// CanTerminateEarly, which rejects ship-intended cycles. This deliberately
-	// precedes (and skips) the
-	// SpineSatisfiedUpTo(end) gate — which would require build+audit — because a
-	// no-ship early-exit legitimately happens before those anchors run.
 	if cand == PhaseEnd {
 		if current == PhaseTriage {
 			if terminal := decideTriageTermination(verdict, sig); terminal.stop {
@@ -111,17 +92,12 @@ func (o *Orchestrator) candidatePhase(s string) Phase {
 // SpineSatisfiedUpTo independently guards the mandatory anchors, so an optional
 // insertion between anchors cannot skip the spine or reach ship illegitimately.
 func (o *Orchestrator) transitionLegal(from, cand Phase) bool {
-	// Decision-only edges are legal in the graph but NOT proposable by the routing
-	// advisor — see decisionOnlyEdge. Checked before the built-in delegate so the
-	// advisor cannot reach them by any route.
 	if decisionOnlyEdge(from, cand) {
 		return false
 	}
 	if from.IsValid() && cand.IsValid() {
-		return o.sm.CanTransition(from, cand) // both built-in: hardcoded graph
+		return o.sm.CanTransition(from, cand)
 	}
-	// At least one endpoint is NOT a built-in phase — validate via order
-	// forward-progress (both-built-in edges took the sm.CanTransition branch above).
 	// A user-phase candidate must be optional (the floor). Leapfrogging a
 	// mandatory anchor is independently blocked by SpineSatisfiedUpTo in the caller.
 	if !cand.IsValid() {
@@ -175,13 +151,6 @@ func (o *Orchestrator) registerMintedPhases(plan *router.PhasePlan) {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN minted phase %q routing: %s\n", spec.Name, w)
 		}
 		o.runners[p] = runner
-		// Publish the LIVE catalog so consumers holding a resolver bound over the
-		// cycle-START catalog value re-bind (the bridge's deliverable-contract
-		// resolver, cmd_cycle.go). Catalog.Merge returns a NEW value over a NEW
-		// map, so without this the minted phase is invisible to contract injection
-		// for the rest of the cycle — cycle-1424's naked dispatch and its 600s
-		// artifact timeout. Fired only AFTER a mint fully succeeds: a rejected or
-		// colliding mint continues above and publishes nothing (no routable ghost).
 		if o.catalogPublisher != nil {
 			o.catalogPublisher(o.catalog)
 		}
@@ -215,9 +184,6 @@ func orderIndex(order []string, phase string) int {
 // role-gate, tree-diff guard, and build-commit normalize key off. Built-in
 // tdd/build always do; a user phase does iff its spec sets writes_source.
 // Method form (vs the free WorktreePhase) so it consults the injected catalog.
-// Since CB.1 this no longer selects the subprocess cwd — every phase runs
-// cwd=worktree (see the phaseWorktree assignment in the dispatch loop); this
-// predicate is purely about write PERMISSION.
 func (o *Orchestrator) worktreePhase(p Phase) bool {
 	if WorktreePhase(p) {
 		return true
@@ -242,11 +208,8 @@ func (o *Orchestrator) withWorktreeFence(req PhaseRequest, next Phase, cs CycleS
 }
 
 // leakRecoverablePhase reports whether next is eligible for main-tree leak
-// recovery. It is the UNION of the fixed active-worktree set (LeakRecoverablePhase
-// — triage/audit/scout/bug-reproduction/tdd/build) with worktreePhase, so a user
-// phase that opts into source writes via its spec (writes_source) keeps the
-// recovery it had before cycle-564 while the four non-source-writing built-ins
-// gain it. Distinct from worktreePhase (write PERMISSION) by design.
+// recovery: the union of the fixed active-worktree set (LeakRecoverablePhase)
+// with worktreePhase.
 func (o *Orchestrator) leakRecoverablePhase(p Phase) bool {
 	return LeakRecoverablePhase(p) || o.worktreePhase(p)
 }
@@ -255,10 +218,11 @@ func (o *Orchestrator) leakRecoverablePhase(p Phase) bool {
 // The router speaks canonical "retrospective"/"end"; core uses "retro"/
 // PhaseEnd. An unknown string yields "" so enforceNext declines it.
 //
-// The core↔registry vocabulary skew this bridges is a DECIDED permanent boundary
-// (ADR-0060 §57), not debt: do NOT "unify" PhaseRetro's wire string — "retro" is
-// the trust-kernel serialized identity in state.json/ledger (pinned by
+// The core↔registry vocabulary skew this bridges is a DECIDED permanent
+// boundary. Do NOT "unify" PhaseRetro's wire string — "retro" is the
+// trust-kernel serialized identity in state.json/ledger (pinned by
 // cyclestate.TestPhaseConstants), so the converter stays; the rename does not.
+// See ADR-0060.
 func phaseFromRouter(s string) Phase {
 	switch s {
 	case "retrospective":
@@ -277,17 +241,18 @@ func phaseFromRouter(s string) Phase {
 // the core↔router vocabulary skew (PhaseRetro stringifies to "retro" but the
 // registry names the phase "retrospective"). It is the inverse of
 // phaseFromRouter's alias cases — used by specFor so a descriptor lookup cannot
-// silently miss on the skew and fall through to a wrong edge (ADR-0058). The skew
-// is a decided permanent boundary (ADR-0060 §57); this converter is the accepted
-// solution, not a deferred unification.
+// silently miss on the skew and fall through to a wrong edge. The skew is a
+// decided permanent boundary.
+// See ADR-0058, ADR-0060.
 func canonicalCatalogName(p Phase) string {
-	// ONE rule, owned by phasecontract (ADR-0100): the registry key for a
-	// core phase name. Keeping a second copy here is how an alias added to
-	// one side silently ungated a phase on the other.
+	// ONE rule, owned by phasecontract: the registry key for a core phase
+	// name. Keeping a second copy here is how an alias added to one side
+	// silently ungated a phase on the other.
+	// See ADR-0100.
 	return phasecontract.RegistryKey(string(p))
 }
 
-// recallForPlan builds the WS2 recall-memory context for the advisor's plan: the
+// recallForPlan builds the recall-memory context for the advisor's plan: the
 // short reason of the most recent failure and the prior lessons that match it.
 // It is the orchestrator's I/O (a KB lookup), kept out of the pure advisor so the
 // advisor only renders. Returns ("", nil) when no KB is wired or there is no
@@ -323,7 +288,7 @@ func (o *Orchestrator) recallForPlan(ctx context.Context, history []FailedRecord
 }
 
 // resolvedShipFloor returns the integrity floor to clamp the advisor's plan to:
-// the user-configured floor (WS4) when set, else the router's safe structural
+// the user-configured floor when set, else the router's safe structural
 // default ({tdd,build,audit}). The router self-seals the non-removable evaluator
 // either way, so this never returns a floor that could reach ship without audit.
 func (o *Orchestrator) resolvedShipFloor() []string {
@@ -335,8 +300,8 @@ func (o *Orchestrator) resolvedShipFloor() []string {
 
 // phaseCardsFromCatalog projects the composable phases (Plan/Build/Evaluate
 // archetypes) of the catalog into advisor-facing PhaseCards, so the advisor can
-// SELECT a pre-defined phase instead of minting a new one (WS3: prefer reuse —
-// DRY at the agent level). Control-archetype phases (ship/retro/memo/debugger)
+// SELECT a pre-defined phase instead of minting a new one (prefer reuse — DRY
+// at the agent level). Control-archetype phases (ship/retro/memo/debugger)
 // are kernel-managed, not advisor-composed, so they are omitted. Order follows
 // the catalog's registry order for a deterministic, prompt-cache-friendly result.
 func phaseCardsFromCatalog(cat phasespec.Catalog) []router.PhaseCard {
@@ -423,8 +388,8 @@ func backfillArtifactPath(workspacePath, phase string) string {
 
 // onDemandCatalogNames lists the phases that declined a SELECT slot, in catalog
 // order. Rendered as ONE line beneath the menu: the point of declining is to
-// stop 53 cards crowding out 12 enriched slots, so re-listing them as cards
-// would undo the fix. Control phases are absent here for the same reason they
+// stop excess cards crowding out the enriched slots, so re-listing them as
+// cards would undo the fix. Control phases are absent here for the same reason they
 // are absent from the menu — they are kernel-managed, never advisor-composed.
 func onDemandCatalogNames(cat phasespec.Catalog) []string {
 	var out []string

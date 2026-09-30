@@ -7,11 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// TestResolveCycleStatePath_FleetOverrideAndDefault names ResolveCycleStatePath
-// for apicover and exercises both branches: unset ⇒ the host-global default
-// (<evolveDir>/cycle-state.json, byte-identical to the sequential loop); the
-// fleet per-run override (ipcenv.CycleStateFileKey) ⇒ that absolute path
-// verbatim, so two concurrent lanes never share the host singleton.
 func TestResolveCycleStatePath_FleetOverrideAndDefault(t *testing.T) {
 	dir := t.TempDir()
 	if got, want := ResolveCycleStatePath(dir), filepath.Join(dir, CycleStateFile); got != want {

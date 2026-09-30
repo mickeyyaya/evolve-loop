@@ -46,12 +46,12 @@ func shipFromWorktreeOpts(repo string, env map[string]string) *Options {
 	}
 }
 
-// TestShipFromWorktree_FleetMode_DivergedFFMerge_SignalsRebase pins ADR-0049 S5b:
-// under fleet mode a ff-merge divergence (a peer cycle moved main) is the
-// EXPECTED concurrency case, not a terminal failure — ship signals
-// GIT_FLEET_REBASE_NEEDED (transient) so the orchestrator rebases + re-verifies
-// the merged tree and re-ships. RED before the fleet branch (returns the
-// terminal GIT_FF_MERGE_DIVERGED), GREEN after.
+// See ADR-0049.
+// TestShipFromWorktree_FleetMode_DivergedFFMerge_SignalsRebase: under fleet
+// mode a ff-merge divergence (a peer cycle moved main) is the EXPECTED
+// concurrency case, not a terminal failure — ship signals
+// GIT_FLEET_REBASE_NEEDED (transient) so the orchestrator rebases +
+// re-verifies the merged tree and re-ships.
 func TestShipFromWorktree_FleetMode_DivergedFFMerge_SignalsRebase(t *testing.T) {
 	repo := makeRepo(t)
 	wt := divergedWorktree(t, repo)
