@@ -1,17 +1,1 @@
-{
-  "id": "claim-floor-refuses-waiting-items",
-  "created_at": "2026-09-27T23:30:00Z",
-  "title": "The claim floor refuses an item whose declared dependency has not landed",
-  "weight": 0.9,
-  "kind": "pipeline-repair",
-  "priority_class": "stability",
-  "files": [
-    "go/internal/inboxmover"
-  ],
-  "summary": "ADR-0106 W3 stopped offering dependency-blocked items in every menu, but nothing enforces it where the pick becomes a claim: a triage run that names a waiting id anyway (from a scout report, carryover, or the dependency_blocked note) builds ahead of its dependency. Design doc §7.7 W7.",
-  "acceptance": [
-    "inboxmover's claim floor refuses a pending item whose PendingDispatchability is not dispatchable, naming the blocker, as it already refuses a console-routed item."
-  ],
-  "source": "inbox review 2026-09-27 (design doc §7.7 W7)",
-  "priority_rationale": "inbox review 2026-09-27: the claim floor is the last line against building ahead of an unlanded dependency, and nothing enforces it there today"
-}
+{"acceptance":["inboxmover's claim floor refuses a pending item whose PendingDispatchability is not dispatchable, naming the blocker, as it already refuses a console-routed item."],"created_at":"2026-09-27T23:30:00Z","files":["go/internal/inboxmover"],"id":"claim-floor-refuses-waiting-items","kind":"pipeline-repair","priority_class":"stability","priority_rationale":"inbox review 2026-09-27: the claim floor is the last line against building ahead of an unlanded dependency, and nothing enforces it there today","route":"lane","routed_at":"2026-09-30T09:02:14Z","routed_reason":"operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop","source":"inbox review 2026-09-27 (design doc §7.7 W7)","summary":"ADR-0106 W3 stopped offering dependency-blocked items in every menu, but nothing enforces it where the pick becomes a claim: a triage run that names a waiting id anyway (from a scout report, carryover, or the dependency_blocked note) builds ahead of its dependency. Design doc §7.7 W7.","title":"The claim floor refuses an item whose declared dependency has not landed","weight":0.9}
