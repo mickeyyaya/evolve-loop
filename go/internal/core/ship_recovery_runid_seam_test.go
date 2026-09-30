@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -43,7 +44,7 @@ func TestFreshExplanationRebase_BypassesLegacyCompositionCarryForward(t *testing
 				PatchID:      patchID,
 			}, nil
 		}),
-		core.WithCompositionGateRunner(func(context.Context, string) map[string]string { return greenComposedGateResults() }),
+		core.WithCompositionGateRunner(func(context.Context, string) map[string]ciparity.GateOutcome { return greenComposedGateResults() }),
 		core.WithCompositionVerdictWriter(func(string, core.CompositionVerdictInput) error { return nil }),
 	)
 

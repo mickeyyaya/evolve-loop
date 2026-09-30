@@ -44,12 +44,13 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 	if err != nil || !identical {
 		return decline("the pended change is not byte for byte the audited one (err=%v)", err)
 	}
-	gates, ok := o.gatesOnIntactTree(ctx, worktree, tree1)
+	gates, outcomes, ok := o.gatesOnIntactTree(ctx, worktree, tree1)
 	if !ok {
 		return decline("the composed-tree gates did not leave the tree as they found it")
 	}
 	if missing := ciparity.MissingComposedGates(gates); missing != nil {
-		return decline("composed-tree gates not green: %v", missing)
+		o.declineComposedGates(cycle, cs, "Orchestrator.identityCarryForward", "identity carry", missing, outcomes)
+		return false
 	}
 	patchID, err := compositionPatchID(audited)
 	if err != nil {
@@ -84,16 +85,16 @@ func (o *Orchestrator) carriedAudit(ctx context.Context, runID, base0 string) (a
 
 // gatesOnIntactTree runs the composed-tree gates under the fence and reports them only when the tree they ran on
 // is the tree ship will commit.
-func (o *Orchestrator) gatesOnIntactTree(ctx context.Context, worktree, tree string) (map[string]string, bool) {
+func (o *Orchestrator) gatesOnIntactTree(ctx context.Context, worktree, tree string) (map[string]string, map[string]ciparity.GateOutcome, bool) {
 	fence := treefence.Begin(ctx, worktree, true)
-	gates := o.compositionGateRunner(ctx, worktree)
+	gates, outcomes := o.runGateSet(ctx, worktree)
 	outcome := fence.End(ctx)
 	if outcome.TakeErr != nil || outcome.RestoreErr != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	after, err := gitStdout(ctx, gitCapture, worktree, "write-tree")
 	if err != nil || after != tree {
-		return nil, false
+		return nil, nil, false
 	}
-	return gates, true
+	return gates, outcomes, true
 }

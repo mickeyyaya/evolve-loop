@@ -36,7 +36,7 @@
 //     (core.CompositionAuditSnapshot, error)) — captures the lane's
 //     pre-rebase audited state.
 //     - core.WithCompositionGateRunner(func(ctx, worktree string)
-//     map[string]string) — runs the full native composed-tree gate set
+//     map[string]ciparity.GateOutcome) — runs the full native composed-tree gate set
 //     (ciparity.RequiredComposedGates) on the rebased tree.
 //     - core.WithCompositionVerdictWriter(func(ledgerPath string,
 //     in core.CompositionVerdictInput) error) — persists the entry.
@@ -148,10 +148,10 @@ func (r *countingRunner) Run(_ context.Context, req core.PhaseRequest) (core.Pha
 
 // greenComposedGateResults returns an all-PASS result for every gate
 // ciparity.RequiredComposedGates requires.
-func greenComposedGateResults() map[string]string {
-	out := map[string]string{}
+func greenComposedGateResults() map[string]ciparity.GateOutcome {
+	out := map[string]ciparity.GateOutcome{}
 	for _, g := range ciparity.RequiredComposedGates {
-		out[g] = "pass"
+		out[g] = ciparity.GateOutcome{Status: "pass"}
 	}
 	return out
 }
@@ -220,7 +220,7 @@ type compositionCycleFixture struct {
 func newCompositionFixture(
 	repoDir string,
 	snap func(context.Context, string, string) (core.CompositionAuditSnapshot, error),
-	gates func(context.Context, string) map[string]string,
+	gates func(context.Context, string) map[string]ciparity.GateOutcome,
 	write func(string, core.CompositionVerdictInput) error,
 ) compositionCycleFixture {
 	ship := &shipErrorStub{
@@ -276,7 +276,7 @@ func TestRecoverFromShipError_CleanRebase_RebuildsBaseBoundExplanationBeforeReau
 				PatchID:      patchID,
 			}, nil
 		},
-		func(context.Context, string) map[string]string { return greenComposedGateResults() },
+		func(context.Context, string) map[string]ciparity.GateOutcome { return greenComposedGateResults() },
 		func(ledgerPath string, in core.CompositionVerdictInput) error {
 			wrote = append(wrote, in)
 			return nil
@@ -315,7 +315,7 @@ func TestRecoverFromShipError_CleanRebase_PatchIdDriftFallsBackToFullAudit(t *te
 				PatchID:      "0000000000000000000000000000000000dead", // deliberately wrong
 			}, nil
 		},
-		func(context.Context, string) map[string]string { return greenComposedGateResults() },
+		func(context.Context, string) map[string]ciparity.GateOutcome { return greenComposedGateResults() },
 		func(ledgerPath string, in core.CompositionVerdictInput) error {
 			wrote = append(wrote, in)
 			return nil
@@ -359,9 +359,9 @@ func TestRecoverFromShipError_CleanRebase_MissingComposedGateFallsBackToFullAudi
 				PatchID:      patchID,
 			}, nil
 		},
-		func(context.Context, string) map[string]string {
+		func(context.Context, string) map[string]ciparity.GateOutcome {
 			red := greenComposedGateResults()
-			red["apicover"] = "fail" // one required gate is red
+			red["apicover"] = ciparity.GateOutcome{Status: "fail"} // one required gate is red
 			return red
 		},
 		func(ledgerPath string, in core.CompositionVerdictInput) error {
@@ -402,7 +402,7 @@ func TestRecoverFromShipError_CleanRebase_WriterFailureFallsBackToFullAudit(t *t
 				PatchID:      patchID,
 			}, nil
 		},
-		func(context.Context, string) map[string]string { return greenComposedGateResults() },
+		func(context.Context, string) map[string]ciparity.GateOutcome { return greenComposedGateResults() },
 		func(string, core.CompositionVerdictInput) error {
 			return errWriteBoom
 		},

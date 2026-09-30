@@ -26,3 +26,22 @@ func MissingComposedGates(results map[string]string) []string {
 	}
 	return missing
 }
+
+// GateOutcome is one composed-tree gate's result: its pass/fail Status plus
+// the captured output Tail when it failed, so a decline can quote what the
+// gate actually printed instead of naming only the bare status.
+type GateOutcome struct {
+	Status string
+	Tail   string
+}
+
+// GateStatuses projects a GateOutcome map down to the status-only shape
+// MissingComposedGates and the ledger's GateResults still expect, so neither
+// needs to change when the gate runner starts carrying tails too.
+func GateStatuses(results map[string]GateOutcome) map[string]string {
+	statuses := make(map[string]string, len(results))
+	for gate, outcome := range results {
+		statuses[gate] = outcome.Status
+	}
+	return statuses
+}

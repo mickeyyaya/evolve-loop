@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
 func TestCompositionSnapshot_ReceivesCycleRunID(t *testing.T) {
@@ -14,7 +16,7 @@ func TestCompositionSnapshot_ReceivesCycleRunID(t *testing.T) {
 			got = runID
 			return CompositionAuditSnapshot{}, errors.New("stop after observing binding")
 		}),
-		WithCompositionGateRunner(func(context.Context, string) map[string]string { return nil }),
+		WithCompositionGateRunner(func(context.Context, string) map[string]ciparity.GateOutcome { return nil }),
 		WithCompositionVerdictWriter(func(string, CompositionVerdictInput) error { return nil }),
 	)
 	if o.compositionCarryForward(context.Background(), 1, CycleState{ActiveWorktree: "unused", RunID: want}, "") {
@@ -31,7 +33,7 @@ func TestOrchestrator_CompositionFastPathWired(t *testing.T) {
 	dummySnapshot := func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error) {
 		return CompositionAuditSnapshot{}, nil
 	}
-	dummyGateRunner := func(ctx context.Context, worktree string) map[string]string { return nil }
+	dummyGateRunner := func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome { return nil }
 	dummyWriter := func(ledgerPath string, in CompositionVerdictInput) error { return nil }
 
 	bare := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))

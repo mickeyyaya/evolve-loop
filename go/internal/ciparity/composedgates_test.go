@@ -34,3 +34,22 @@ func TestMissingComposedGates_FullNativeGateSet(t *testing.T) {
 		t.Fatalf("nil gate map must report the full required set, got %v", got)
 	}
 }
+
+// TestGateStatuses_ProjectsStatusOnly names GateOutcome and GateStatuses
+// (composed-gate-decline-coded-signal, cycle 1772): a gate runner widened to
+// carry each gate's captured output tail must still be able to derive the
+// status-only map MissingComposedGates and the ledger's GateResults expect.
+func TestGateStatuses_ProjectsStatusOnly(t *testing.T) {
+	outcomes := map[string]GateOutcome{
+		"compile": {Status: "pass"},
+		"test":    {Status: "fail", Tail: "boom"},
+	}
+	got := GateStatuses(outcomes)
+	want := map[string]string{"compile": "pass", "test": "fail"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("GateStatuses(%+v) = %v, want %v", outcomes, got, want)
+	}
+	if got := GateStatuses(nil); len(got) != 0 {
+		t.Fatalf("GateStatuses(nil) = %v, want empty", got)
+	}
+}

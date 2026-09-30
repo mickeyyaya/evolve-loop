@@ -82,10 +82,10 @@ var composedGateTargets = map[string]string{
 // every required gate must be green on the composed tree before the verdict
 // carries forward. Any non-zero exit → "fail" → MissingComposedGates trips →
 // full re-audit.
-func composedGatesTo(log io.Writer) func(ctx context.Context, worktree string) map[string]string {
-	return func(ctx context.Context, worktree string) map[string]string {
+func composedGatesTo(log io.Writer) func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome {
+	return func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome {
 		run := composedGateRun{log: log, worktree: worktree}
-		results := make(map[string]string, len(ciparity.RequiredComposedGates))
+		results := make(map[string]ciparity.GateOutcome, len(ciparity.RequiredComposedGates))
 		for _, gate := range ciparity.RequiredComposedGates {
 			target, ok := composedGateTargets[gate]
 			if !ok {
@@ -102,7 +102,7 @@ type composedGateRun struct {
 	worktree string
 }
 
-func (r composedGateRun) gate(ctx context.Context, gate, target string) string {
+func (r composedGateRun) gate(ctx context.Context, gate, target string) ciparity.GateOutcome {
 	tail := newTailWriter(64 * 1024)
 	cmd := exec.CommandContext(ctx, "make", "-C", "go", target)
 	cmd.Dir = r.worktree
@@ -110,10 +110,10 @@ func (r composedGateRun) gate(ctx context.Context, gate, target string) string {
 	cmd.Stdout, cmd.Stderr = tail, tail
 	err := cmd.Run()
 	if err == nil {
-		return "pass"
+		return ciparity.GateOutcome{Status: "pass"}
 	}
-	fmt.Fprintf(r.log, "[orchestrator] composed-tree gate %s (make %s) failed in %s: %v\n%s\n", gate, target, r.worktree, err, tail.lastLines(20))
-	return "fail"
+	fmt.Fprintf(r.log, "[orchestrator] composed-tree gate %s (make %s) failed in %s: %v; its output tail rides in the %s event\n", gate, target, r.worktree, err, core.CodeComposedGateDeclined)
+	return ciparity.GateOutcome{Status: "fail", Tail: tail.lastLines(20)}
 }
 
 type tailWriter struct {

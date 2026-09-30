@@ -27,11 +27,11 @@ func TestRunComposedGates_RunsInTheCIEnvAndNamesAFailingGate(t *testing.T) {
 
 	results := composedGatesTo(&log)(context.Background(), worktree)
 
-	if results["compile"] != "pass" || results["test"] != "pass" || results["acs"] != "pass" {
+	if results["compile"].Status != "pass" || results["test"].Status != "pass" || results["acs"].Status != "pass" {
 		t.Errorf("results = %v; a gate run in the lane's env went red on lane state (the 14 declined carries of waves 27-41)", results)
 	}
-	if results["apicover"] != "fail" || !strings.Contains(log.String(), "apicover") || !strings.Contains(log.String(), "TestExportedThingIsCovered") || !strings.Contains(log.String(), worktree) {
-		t.Errorf("results = %v log = %q; a failing gate names itself and its own output", results, log.String())
+	if results["apicover"].Status != "fail" || !strings.Contains(results["apicover"].Tail, "TestExportedThingIsCovered") || !strings.Contains(log.String(), "apicover") || !strings.Contains(log.String(), worktree) {
+		t.Errorf("results = %v log = %q; a failing gate names itself in the log and carries its own output in its outcome", results, log.String())
 	}
 }
 

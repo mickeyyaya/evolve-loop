@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,80 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
+
+// CodeComposedGateDeclined marks a composed-tree gate decline at any of the three
+// MissingComposedGates trip sites (RUNG 0 compositionCarryForward, RUNG 2
+// scopedMergeCarryForward, the ADR-0105 B3 identityCarryForward): a required gate did not
+// report "pass" on the composed tree, so the cycle falls back to a full re-audit instead of
+// carrying the audit verdict forward. Mirrors CodeRebaseReentryAborted's precedent
+// (ship_recovery_debugger.go).
+const CodeComposedGateDeclined signalcenter.Code = "ORCHESTRATOR_COMPOSED_GATE_DECLINED"
+
+func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeComposedGateDeclined,
+		"a composed-tree gate did not report pass at a MissingComposedGates trip site (RUNG 0 compositionCarryForward, RUNG 2 scopedMergeCarryForward or the ADR-0105 B3 identityCarryForward); fields.tail_<gate> carries each failing gate's output tail and the cycle falls back to a full re-audit instead of carrying the audit verdict forward")
+}
+
+const signalFieldRunes = 512
+
+type gateOutcomeSinkKey struct{}
+
+func publishGateOutcomes(ctx context.Context, outcomes map[string]ciparity.GateOutcome) {
+	if sink, ok := ctx.Value(gateOutcomeSinkKey{}).(*map[string]ciparity.GateOutcome); ok {
+		*sink = outcomes
+	}
+}
+
+func (o *Orchestrator) runGateSet(ctx context.Context, worktree string) (map[string]string, map[string]ciparity.GateOutcome) {
+	sink := new(map[string]ciparity.GateOutcome)
+	statuses := o.compositionGateRunner(context.WithValue(ctx, gateOutcomeSinkKey{}, sink), worktree)
+	return statuses, *sink
+}
+
+func (o *Orchestrator) declineComposedGates(cycle int, cs CycleState, origin, label string, missing []string, outcomes map[string]ciparity.GateOutcome) {
+	gates := strings.Join(missing, ",")
+	fields := map[string]string{}
+	for _, gate := range missing {
+		if tail := outcomes[gate].Tail; tail != "" {
+			fields["tail_"+gate] = boundedTail(tail, signalcenter.MaxLineBytes/2/len(missing))
+		}
+	}
+	o.signals.Emit(signalcenter.Event{
+		Cycle: cycle, RunID: cs.RunID, Module: signalcenter.ModuleOrchestrator,
+		Origin: origin, Kind: signalcenter.KindGateRejected, Severity: signalcenter.SeverityWarn,
+		Code: CodeComposedGateDeclined, Reason: "composed-tree gates not green (" + gates + ")", Fields: fields,
+	})
+	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d %s: composed-tree gates not green (%s), %s; falling back to full re-audit\n", cycle, label, gates, CodeComposedGateDeclined)
+}
+
+func boundedTail(tail string, maxJSONBytes int) string {
+	runes := []rune(strings.ToValidUTF8(tail, "\uFFFD"))
+	const marker = "…"
+	budget, keep := maxJSONBytes-len(marker), len(runes)
+	for used := 0; keep > 0; keep-- {
+		quoted, _ := json.Marshal(string(runes[keep-1]))
+		if used+len(quoted)-2 > budget || len(runes)-keep+1 > signalFieldRunes-1 {
+			break
+		}
+		used += len(quoted) - 2
+	}
+	if keep == 0 {
+		return string(runes)
+	}
+	return marker + string(runes[keep:])
+}
+
+func (o *Orchestrator) runComposedGates(ctx context.Context, cycle int, cs CycleState, worktree, origin, label string) (map[string]string, bool) {
+	gateResults, outcomes := o.runGateSet(ctx, worktree)
+	missing := ciparity.MissingComposedGates(gateResults)
+	if missing == nil {
+		return gateResults, true
+	}
+	o.declineComposedGates(cycle, cs, origin, label, missing, outcomes)
+	return nil, false
+}
 
 // CompositionAuditSnapshot is what the bound audit reviewed before a peer moved main.
 type CompositionAuditSnapshot struct {
@@ -43,9 +117,19 @@ func WithCompositionSnapshot(fn func(ctx context.Context, worktree, runID string
 	return func(o *Orchestrator) { o.compositionSnapshot = fn }
 }
 
-// WithCompositionGateRunner injects the composed-tree gate run over the rebased worktree; nil keeps the fast path off.
-func WithCompositionGateRunner(fn func(ctx context.Context, worktree string) map[string]string) Option {
-	return func(o *Orchestrator) { o.compositionGateRunner = fn }
+// WithCompositionGateRunner injects the composed-tree gate run over the rebased worktree; nil keeps the fast
+// path off. fn returns each gate's status AND its captured output tail; orchestrator.go's compositionGateRunner
+// field itself keeps its pre-existing status-only map[string]string shape (a protected control-plane surface
+// this ticket does not touch), so this Option projects statuses via ciparity.GateStatuses and hands the full
+// outcomes back to the caller through the per-call sink runGateSet/publishGateOutcomes install.
+func WithCompositionGateRunner(fn func(ctx context.Context, worktree string) map[string]ciparity.GateOutcome) Option {
+	return func(o *Orchestrator) {
+		o.compositionGateRunner = func(ctx context.Context, worktree string) map[string]string {
+			outcomes := fn(ctx, worktree)
+			publishGateOutcomes(ctx, outcomes)
+			return ciparity.GateStatuses(outcomes)
+		}
+	}
 }
 
 // WithCompositionVerdictWriter injects the composition-verdict ledger writer; nil keeps the fast path off.
@@ -89,9 +173,8 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: composed patch-id %s does not match audited %s (semantic drift); falling back to full re-audit\n", patchID, snap.PatchID)
 		return false
 	}
-	gateResults := o.compositionGateRunner(ctx, worktree)
-	if missing := ciparity.MissingComposedGates(gateResults); missing != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: composed-tree gates not green (%s); falling back to full re-audit\n", strings.Join(missing, ","))
+	gateResults, ok := o.runComposedGates(ctx, cycle, cs, worktree, "Orchestrator.compositionCarryForward", "composition carry-forward")
+	if !ok {
 		return false
 	}
 	gitHead, _, _ := gitCapture(ctx, worktree, "rev-parse", "HEAD")
@@ -176,9 +259,8 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: resolution patch-id does not match audited change (unverified); falling back to full re-audit\n")
 		return false
 	}
-	gateResults := o.compositionGateRunner(ctx, worktree)
-	if missing := ciparity.MissingComposedGates(gateResults); missing != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: composed-tree gates not green (%s); falling back to full re-audit\n", strings.Join(missing, ","))
+	gateResults, ok := o.runComposedGates(ctx, cycle, cs, worktree, "Orchestrator.scopedMergeCarryForward", "scoped merge review")
+	if !ok {
 		return false
 	}
 	gitHead, _, _ := gitCapture(ctx, worktree, "rev-parse", "HEAD")

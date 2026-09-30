@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type carryHarness struct {
@@ -15,16 +16,17 @@ type carryHarness struct {
 	gatesOn     string
 	written     []CompositionVerdictInput
 	writtenTo   string
-	gates       map[string]string
+	gates       map[string]ciparity.GateOutcome
 	writeErr    error
 	snapErr     error
 	duringGates func()
+	signals     *signalcenter.Center
 }
 
-func allComposedGatesPass() map[string]string {
-	out := map[string]string{}
+func allComposedGatesPass() map[string]ciparity.GateOutcome {
+	out := map[string]ciparity.GateOutcome{}
 	for _, g := range ciparity.RequiredComposedGates {
-		out[g] = "pass"
+		out[g] = ciparity.GateOutcome{Status: "pass"}
 	}
 	return out
 }
@@ -47,10 +49,11 @@ func (h *carryHarness) auditRow() LedgerEntry {
 func (h *carryHarness) route(t *testing.T, rows ...LedgerEntry) (Phase, bool, CycleState) {
 	t.Helper()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: rows}, buildRunners(nil),
+		WithSignalCenter(h.signals),
 		WithCompositionSnapshot(func(context.Context, string, string) (CompositionAuditSnapshot, error) {
 			return CompositionAuditSnapshot{LaneAuditRef: "audit-ref"}, nil
 		}),
-		WithCompositionGateRunner(func(_ context.Context, worktree string) map[string]string {
+		WithCompositionGateRunner(func(_ context.Context, worktree string) map[string]ciparity.GateOutcome {
 			h.gatesOn = worktree
 			if h.duringGates != nil {
 				h.duringGates()
@@ -137,7 +140,7 @@ func TestRouteRebasedExplanation_ACarryThatCannotBeProvenReturnsToAudit(t *testi
 		}},
 		"no audit row names a tree": {func(h *carryHarness) []LedgerEntry { return nil }},
 		"a composed gate is red": {func(h *carryHarness) []LedgerEntry {
-			h.gates["test"] = "fail"
+			h.gates["test"] = ciparity.GateOutcome{Status: "fail"}
 			return []LedgerEntry{h.auditRow()}
 		}},
 		"the record cannot be written": {func(h *carryHarness) []LedgerEntry {
