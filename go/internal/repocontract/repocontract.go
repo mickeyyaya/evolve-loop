@@ -1,5 +1,5 @@
-// Package repocontract is the one decision on whether ship's repo-contract
-// fixed scanner pack runs for a tree, shared by ship's gate and the build floor.
+// Package repocontract owns ship's repo-contract fixed scanner pack: its suite
+// list and whether it runs for a tree, shared by ship's gate and the build floor.
 package repocontract
 
 import (
@@ -15,6 +15,23 @@ type thisPackage struct{}
 func evolveLoopModule() string {
 	module, _, _ := strings.Cut(reflect.TypeOf(thisPackage{}).PkgPath(), "/internal/")
 	return module
+}
+
+func Packages() []string {
+	return []string{
+		"./internal/phasespec/...",
+		"./internal/profiles/...",
+		"./internal/phasecoherence/...",
+		"./internal/routingtest/...",
+		"./internal/rawgitratchet/...",
+		"./internal/sizeratchet/...",
+		"./internal/testmainexit/...",
+		"./internal/repocontract/...",
+		"./internal/policy/...",
+		"./internal/guards/...",
+		"./internal/acssuite/...",
+		"./internal/fleet/...",
+	}
 }
 
 func ModuleDir(root string) string {
