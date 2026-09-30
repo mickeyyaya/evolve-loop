@@ -1,10 +1,5 @@
 package core
 
-// size_budget_test.go — ADR-0076 slice A consumption pins: the cycle-size
-// multiplier scales the correction limit (clamped at the policy ceiling) and
-// the build launch's artifact budget via PhaseRequest.BudgetScale. Absent /
-// unknown size = 1.0 = byte-identical legacy behavior.
-
 import (
 	"testing"
 

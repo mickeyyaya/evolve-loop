@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// goLine builds one `go test -json` NDJSON event line.
 func goLine(pkg, test, action string) string {
 	// Elapsed only matters on terminal actions; a fixed value is fine for tests.
 	switch action {
@@ -22,7 +21,6 @@ func goLine(pkg, test, action string) string {
 	}
 }
 
-// goStream joins event lines into an NDJSON blob.
 func goStream(lines ...string) string { return strings.Join(lines, "\n") + "\n" }
 
 const acsPkgBase = "github.com/mickeyyaya/evolve-loop/go/acs/"
@@ -56,9 +54,6 @@ type goSeamOut struct {
 	err error
 }
 
-// TestGoLane_GoGreenGoFail_Verdict is the KEYSTONE: a green + a failing Go
-// predicate produce red_count==1, FAIL, not ship-eligible — a Go predicate
-// failure blocks the gate.
 func TestGoLane_GoGreenGoFail_Verdict(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(
@@ -79,8 +74,6 @@ func TestGoLane_GoGreenGoFail_Verdict(t *testing.T) {
 	}
 }
 
-// TestGoLane_GoSkip_NeitherGreenNorRed — a SKIP-action Go test is counted skip,
-// preserving the gate invariant (skip ≠ red).
 func TestGoLane_GoSkip_NeitherGreenNorRed(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(
@@ -98,8 +91,6 @@ func TestGoLane_GoSkip_NeitherGreenNorRed(t *testing.T) {
 	}
 }
 
-// TestGoLane_Classification — a Go test in the current cycle's package counts
-// this-cycle; one in another cycle's package counts regression.
 func TestGoLane_Classification(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(
@@ -115,8 +106,6 @@ func TestGoLane_Classification(t *testing.T) {
 	}
 }
 
-// TestGoLane_RedTeamClassification — a Go test in the redteam package is flagged
-// IsRedTeam and bucketed under RedTeamCount.
 func TestGoLane_RedTeamClassification(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(goLine(acsPkgBase+"redteam", "TestRT001_Foo", "pass"))
@@ -132,8 +121,6 @@ func TestGoLane_RedTeamClassification(t *testing.T) {
 	}
 }
 
-// TestGoLane_PackageQualifiedDedup — the same test name in two packages must
-// stay two distinct results (the acsrunner bare-Test keying would collide them).
 func TestGoLane_PackageQualifiedDedup(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(
@@ -152,8 +139,6 @@ func TestGoLane_PackageQualifiedDedup(t *testing.T) {
 	}
 }
 
-// TestGoLane_NoScopePresent_EmptyPass — with no GoExec seam and no Go module /
-// acs subtree under Root, the lane is a no-op → an empty PASS verdict.
 func TestGoLane_NoScopePresent_EmptyPass(t *testing.T) {
 	root := t.TempDir()
 	v, err := Run(Options{Root: root, Cycle: 1}) // no GoExec, no go/ subtree
@@ -165,9 +150,6 @@ func TestGoLane_NoScopePresent_EmptyPass(t *testing.T) {
 	}
 }
 
-// TestGoLane_CompileError_HardError — the gate-integrity case: a non-compiling
-// Go predicate package yields zero test events + a nonzero exit. Run MUST return
-// an error (never a silent PASS), so a broken predicate pkg cannot clear the gate.
 func TestGoLane_CompileError_HardError(t *testing.T) {
 	root := t.TempDir()
 	// Build failure: go emits package-level build-output (no Test field) + nonzero exit.
@@ -178,8 +160,6 @@ func TestGoLane_CompileError_HardError(t *testing.T) {
 	}
 }
 
-// TestGoLane_GreenInvariantPreserved — on an all-green verdict, no green result
-// carries an evidence excerpt (the existing invariant), and verdict PASS.
 func TestGoLane_GreenInvariantPreserved(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_002_Ok", "pass"))
@@ -197,9 +177,6 @@ func TestGoLane_GreenInvariantPreserved(t *testing.T) {
 	}
 }
 
-// TestParseGoTestJSON_PackageQualifiedKeys — white-box: the same test name in
-// two packages produces two Results with distinct ACIDs (dir-qualified), and a
-// fail carries an evidence excerpt while a pass does not.
 func TestParseGoTestJSON_PackageQualifiedKeys(t *testing.T) {
 	raw := goStream(
 		goLine(acsPkgBase+"cycle9", "TestX", "pass"),
@@ -227,9 +204,6 @@ func TestParseGoTestJSON_PackageQualifiedKeys(t *testing.T) {
 	}
 }
 
-// TestGoLane_RegressionScope — the Go lane runs the regression scope every
-// cycle (not just the current cycle). A failing regression predicate blocks the
-// gate even when the current-cycle scope is clean.
 func TestGoLane_RegressionScope(t *testing.T) {
 	root := t.TempDir()
 	regRaw := goStream(goLine(acsPkgBase+"regression/cycle84", "TestC84_002_CarryoverTodosCleared", "fail"))
@@ -247,8 +221,6 @@ func TestGoLane_RegressionScope(t *testing.T) {
 	}
 }
 
-// TestGoLane_RedteamScope — the Go lane runs the redteam scope every cycle; its
-// results are classified IsRedTeam.
 func TestGoLane_RedteamScope(t *testing.T) {
 	root := t.TempDir()
 	rtRaw := goStream(goLine(acsPkgBase+"redteam", "TestRT001_LedgerRoleCompleteness", "pass"))
@@ -263,10 +235,6 @@ func TestGoLane_RedteamScope(t *testing.T) {
 	}
 }
 
-// TestGoLane_PerScopeCompileError — a compile error in ONE scope (regression)
-// is a HARD error even though another scope (current cycle) ran fine. This pins
-// the per-scope hard-gate: scopes run as separate `go test` invocations so a
-// broken regression package cannot hide behind the current cycle's events.
 func TestGoLane_PerScopeCompileError(t *testing.T) {
 	root := t.TempDir()
 	v := map[string]goSeamOut{
@@ -279,10 +247,6 @@ func TestGoLane_PerScopeCompileError(t *testing.T) {
 	}
 }
 
-// TestParseGoTestJSON_ScanErrorFailsLoud — a single line larger than the
-// scanner buffer (bufio.ErrTooLong) must NOT silently truncate the stream (which
-// could drop a later FAIL and weaken the gate). parseGoTestJSON emits a synthetic
-// RED so the verdict blocks loudly on a partial parse.
 func TestParseGoTestJSON_ScanErrorFailsLoud(t *testing.T) {
 	// One JSON line whose Output exceeds the 1MB max-token buffer → scan error.
 	huge := `{"Action":"output","Package":"` + acsPkgBase + `cycle9","Test":"TestC9_001","Output":"` +
@@ -299,12 +263,6 @@ func TestParseGoTestJSON_ScanErrorFailsLoud(t *testing.T) {
 	}
 }
 
-// TestGoLane_CurrentCycleScope — the default lane (no seam) is scoped to the
-// current cycle's Go package. With a real Go module + acs subtree present (and a
-// cycle5 package) but NO package for the current cycle (9) and no regression /
-// redteam dir, every scope is absent → the lane is a no-op (not a hard error):
-// an empty PASS verdict. This is what keeps bit-rotted historical predicates out
-// of the gate.
 func TestGoLane_CurrentCycleScope(t *testing.T) {
 	root := t.TempDir()
 	goDir := filepath.Join(root, "go")

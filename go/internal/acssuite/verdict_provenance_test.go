@@ -1,12 +1,5 @@
 package acssuite
 
-// verdict_provenance_test.go — cycle-1434 (ADR-0072 halt): a verdict minted
-// under the WRONG state root red'd 3 predicates the correct-root run showed
-// green, and the artifact recorded nothing about which roots it was minted
-// under — the misdiagnosis was invisible from the file. Every verdict now
-// stamps suite_root/project_root; readers treat ABSENCE as "unstamped"
-// (pre-stamp verdicts stay honored), never as a mismatch.
-
 import (
 	"encoding/json"
 	"os"

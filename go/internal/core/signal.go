@@ -1,14 +1,5 @@
 package core
 
-// signal.go — ADR-0101 S1: the orchestrator is a registered LISTENER of the
-// Signal Center, and the ADR-0044 C1 chokepoint (recordPhaseOutcome) is the
-// first PRODUCER. Listeners observe, never decide: the summary kept here is
-// reporting evidence; verdicts, transitions and halts stay with the floors.
-//
-// Lock order: the Center holds no lock while delivering, so observeSignal
-// takes only signalMu; no orchestrator path holds signalMu across an Emit,
-// and observeSignal never emits (no feedback loops).
-
 import (
 	"strconv"
 	"strings"
@@ -25,9 +16,7 @@ const (
 	CodePhaseVerdictWarn signalcenter.Code = "ORCHESTRATOR_PHASE_VERDICT_WARN"
 	CodePhaseAborted     signalcenter.Code = "ORCHESTRATOR_PHASE_ABORTED"
 	// CodeAuditRepairDeclined / CodeAuditRepairGranted: decideAfterAuditFail's
-	// verdict on an audit FAIL — the decision that sent cycle 1684 through a
-	// full retrospective before a retry was invisible when its invented class
-	// declined the direct grant.
+	// verdict on an audit FAIL.
 	CodeAuditRepairDeclined signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_DECLINED"
 	CodeAuditRepairGranted  signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_GRANTED"
 )
@@ -60,7 +49,7 @@ func WithSignalCenter(c *signalcenter.Center) Option {
 func (o *Orchestrator) SignalCenterWired() bool { return o.signals != nil }
 
 // SignalSummary is the CURRENT cycle's view: signals by severity and kind and
-// the last INCIDENT. It is what "closely monitor the loop" means in code.
+// the last INCIDENT.
 func (o *Orchestrator) SignalSummary() signalcenter.Summary {
 	o.signalMu.Lock()
 	defer o.signalMu.Unlock()
@@ -77,11 +66,9 @@ func (o *Orchestrator) observeSignal(e signalcenter.Event) {
 	o.signalSummary.Observe(e)
 }
 
-// emitPhaseOutcome is the C1 chokepoint's producer: one phase.outcome (or
-// phase.aborted) per terminal disposition, on both dispatch roots. PASS and
-// SKIPPED are INFO; WARN and FAIL are WARN with the phase's own reason
-// (verdictReason — the same rendering the seal and the floor error use); an abort after the
-// verdict is phase.aborted WARN carrying both. A nil Center is a no-op.
+// emitPhaseOutcome is the Signal Center's phase-outcome producer: one
+// phase.outcome (or phase.aborted) per terminal disposition, on both dispatch
+// roots. A nil Center is a no-op.
 func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 	e := signalcenter.Event{
 		Cycle: cycle, RunID: o.signalRunID(), Phase: out.Phase, Attempt: out.AttemptCount,
@@ -93,7 +80,7 @@ func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 		},
 	}
 	if codes := cyclestate.ErrorCodes(out.Diagnostics); len(codes) > 0 {
-		e.Fields["diagnostic_codes"] = strings.Join(codes, ",") // the phase's own gate codes (cyclestate.DiagCode*)
+		e.Fields["diagnostic_codes"] = strings.Join(codes, ",")
 	}
 	switch {
 	case out.AbortReason != "":
@@ -108,8 +95,9 @@ func (o *Orchestrator) emitPhaseOutcome(cycle int, out recovery.PhaseOutcome) {
 	o.signals.Emit(e)
 }
 
-// CodeGateCorrection is the correction ladder's code (ADR-0101 S2b): one
-// gate.corrected INFO per rung the orchestrator runs after a gate rejection.
+// CodeGateCorrection is the correction ladder's code: one gate.corrected INFO
+// per rung the orchestrator runs after a gate rejection.
+// See ADR-0101.
 const CodeGateCorrection signalcenter.Code = "ORCHESTRATOR_GATE_CORRECTION"
 
 func init() {
@@ -132,10 +120,8 @@ type gateCorrection struct {
 	reason       string // the rejection being corrected
 }
 
-// emitGateCorrection is the ladder's producer on both dispatch roots: the
-// fresh loop's reviewWithCorrections and the resume root's
-// reviewResumedDeliverable name themselves as origin. The correction ordinal
-// has ONE home, fields.correction. A nil Center is a no-op.
+// emitGateCorrection is the ladder's producer on both dispatch roots; the
+// correction ordinal has one home, fields.correction. A nil Center is a no-op.
 func (o *Orchestrator) emitGateCorrection(gc gateCorrection) {
 	o.signals.Emit(signalcenter.Event{
 		Cycle: gc.cycle, RunID: o.signalRunID(), Phase: string(gc.phase),

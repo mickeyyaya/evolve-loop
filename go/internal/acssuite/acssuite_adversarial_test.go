@@ -1,10 +1,5 @@
 package acssuite
 
-// acssuite_adversarial_test.go — cycle-281 test amplification.
-// Targets uncovered branches: cycleNumFromDir (66.7%), goLaneTimeout (62.5%),
-// predicateEnv (66.7%), goLanePatterns (50.0%), excerpt (75.0%),
-// WriteVerdict (83.3%), changedPackagesForCycle (28.6%).
-
 import (
 	"context"
 	"encoding/json"
@@ -17,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// TestCycleNumFromDir_BoundaryAndInvalid — adversarial: exhaustive boundary
-// and invalid inputs for the cycle number parser.
 func TestCycleNumFromDir_BoundaryAndInvalid(t *testing.T) {
 	cases := []struct {
 		dir    string
@@ -50,8 +43,6 @@ func TestCycleNumFromDir_BoundaryAndInvalid(t *testing.T) {
 	}
 }
 
-// TestGoLaneTimeout_AllBranches — adversarial: exercises the three branches of
-// goLaneTimeout (opts>0 wins, cfg.GoTimeoutS>0 wins, zero cfg falls back).
 func TestGoLaneTimeout_AllBranches(t *testing.T) {
 	t.Run("opts > 0 wins over cfg and default", func(t *testing.T) {
 		got := goLaneTimeout(15*time.Second, policy.ACSConfig{GoTimeoutS: 3600})
@@ -85,7 +76,6 @@ func TestGoLaneTimeout_AllBranches(t *testing.T) {
 	})
 }
 
-// TestExcerpt_AllBranches — adversarial: empty, at limit, and over limit.
 func TestExcerpt_AllBranches(t *testing.T) {
 	t.Run("empty string returns empty", func(t *testing.T) {
 		if got := excerpt(""); got != "" {
@@ -118,11 +108,6 @@ func TestExcerpt_AllBranches(t *testing.T) {
 		}
 	})
 	t.Run("string over limit gets tail-truncated with leading ellipsis", func(t *testing.T) {
-		// AMENDED with the tail-anchoring fix (false-red hardening, 2026-07-27):
-		// the ellipsis moved from suffix to PREFIX because excerpt now keeps the
-		// END of over-limit output — go-test failure detail accumulates at the
-		// tail, and head-keeping is what destroyed the failing-test identity of
-		// cycles 1107/1116/1123. Same truncation-marker contract, opposite anchor.
 		long := "HEAD" + strings.Repeat("x", evidenceMax+50) + "TAIL"
 		got := excerpt(long)
 		if !strings.Contains(got, "…") {
@@ -187,7 +172,6 @@ func TestPredicate(t *testing.T) {}
 	}
 }
 
-// TestPredicateEnv_AllBranches — adversarial: verify every env injection path.
 func TestPredicateEnv_AllBranches(t *testing.T) {
 	t.Run("empty projectRoot and nil pkgs: neither var injected", func(t *testing.T) {
 		env := predicateEnv("", "", nil)
@@ -196,7 +180,6 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 				t.Errorf("nil pkgs must not inject CHANGED_PACKAGES; got %q", e)
 			}
 			if strings.HasPrefix(e, "EVOLVE_PROJECT_ROOT=") {
-				// empty root must not inject the var
 				v := strings.TrimPrefix(e, "EVOLVE_PROJECT_ROOT=")
 				if v == "" {
 					t.Errorf("empty projectRoot must not inject EVOLVE_PROJECT_ROOT; got %q", e)
@@ -258,8 +241,6 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 	})
 }
 
-// TestWriteVerdict_RoundTripAdversarial — adversarial: write a Verdict and
-// read it back; the round-trip must be faithful and path under the cycle dir.
 func TestWriteVerdict_RoundTripAdversarial(t *testing.T) {
 	evolveDir := t.TempDir()
 	v := Verdict{
@@ -291,8 +272,6 @@ func TestWriteVerdict_RoundTripAdversarial(t *testing.T) {
 	}
 }
 
-// TestChangedPackagesForCycle_NilOnMissingInputs — adversarial: empty root and
-// nonexistent root both return nil (best-effort, never an error).
 func TestChangedPackagesForCycle_NilOnMissingInputs(t *testing.T) {
 	if got := changedPackagesForCycle("", 42); got != nil {
 		t.Errorf("empty projectRoot must return nil; got %v", got)
@@ -302,8 +281,6 @@ func TestChangedPackagesForCycle_NilOnMissingInputs(t *testing.T) {
 	}
 }
 
-// TestGoLanePatterns_NoACSTree — adversarial: a module dir with no acs/
-// subtree at all must return an empty pattern slice without panicking.
 func TestGoLanePatterns_NoACSTree(t *testing.T) {
 	dir := t.TempDir()
 	pats := goLanePatterns(dir, 1)
@@ -312,9 +289,6 @@ func TestGoLanePatterns_NoACSTree(t *testing.T) {
 	}
 }
 
-// TestGoLanePatterns_CycleAndRegressionPresent — adversarial: when both the
-// cycle package dir and a regression sub-package dir exist, both patterns are
-// included.
 func TestGoLanePatterns_CycleAndRegressionPresent(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "acs", "cycle5"), 0o755); err != nil {
@@ -341,8 +315,6 @@ func TestGoLanePatterns_CycleAndRegressionPresent(t *testing.T) {
 	}
 }
 
-// TestGoLanePatterns_OnlyRedteamPresent — adversarial: no cycle dir, no
-// regression, but redteam dir exists → exactly the redteam pattern.
 func TestGoLanePatterns_OnlyRedteamPresent(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "acs", "redteam"), 0o755); err != nil {

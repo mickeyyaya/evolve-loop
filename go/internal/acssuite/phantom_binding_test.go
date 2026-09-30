@@ -1,32 +1,13 @@
 package acssuite
 
-// phantom_binding_test.go — a red whose bound test NEVER RAN must say so, with
-// the exact names.
-//
-// The 1539-1546 streak's dominant class (inbox
-// phantom-binding-predicates-absorb-continuation-chains): cycle-1544's
-// predicates bound BY NAME to tests a continuation cycle later renamed. The
-// bound names stopped resolving, `go test -run` printed "no tests to run", the
-// predicate red'd forever, and the red surfaced as a bare EGPS red_count no one
-// could act on. The cure was a 2-line binding repoint (PR #486) — but nothing
-// on disk said so; the diagnosis took a console session.
-//
-// Classification authority is FailingTests (extracted from the FULL output
-// before the excerpt cap, precisely so truncation cannot destroy identity —
-// cycles 1107/1116/1123): a name the predicate reports as did-NOT-pass that is
-// ALSO absent from the failing set never ran at all. That covers both the
-// all-phantom shape ("no tests to run") and the partial shape (siblings ran,
-// the renamed one silently didn't). A bound test that exists and FAILS is not
-// a phantom and must classify exactly as today.
-
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 )
 
-// The REAL cycle-1546 evidence shape, verbatim from its acs-verdict.json lanes:
-// both bound names renamed, nothing matched, go test printed "no tests to run".
+// Verbatim real evidence: both bound names renamed, nothing matched, go test
+// printed "no tests to run".
 const cycle1546PhantomOutput = `=== RUN   TestC1544_006_ReusedSnapshotNeverBecomesTheWorktreeBase
     predicates_test.go:73: binding test TestWorktreeReuseBase_SnapshotHeadResolvesToFirstNonSnapshotAncestor did NOT pass in internal/core (missing, failing, or hidden behind a build tag). exit=0
 combined go-test output:
@@ -43,9 +24,6 @@ func TestPhantomBindings_RealCycle1546ShapeIsClassified(t *testing.T) {
 	}
 }
 
-// A bound test that EXISTS and FAILS is a real red, not a phantom — classifying
-// it as one would tell the builder to repoint a binding whose target is fine,
-// and would hand the gate's anti-gaming design an exception it must not have.
 func TestPhantomBindings_FailingBoundTestIsNotAPhantom(t *testing.T) {
 	out := `    predicates_test.go:73: binding test TestRealThing_Works did NOT pass in internal/core (missing, failing, or hidden behind a build tag). exit=1
 --- FAIL: TestRealThing_Works (0.01s)
@@ -71,7 +49,6 @@ func TestPhantomBindings_PartialPhantomIsCaught(t *testing.T) {
 	}
 }
 
-// Ordinary output with no binding-assert vocabulary classifies nothing.
 func TestPhantomBindings_OrdinaryRedIsUntouched(t *testing.T) {
 	out := "--- FAIL: TestSomething (0.1s)\n    x_test.go:9: boom\n"
 	if got := phantomBindings(out, extractFailingTests(out)); len(got) != 0 {
@@ -79,7 +56,6 @@ func TestPhantomBindings_OrdinaryRedIsUntouched(t *testing.T) {
 	}
 }
 
-// Dedup + determinism: the same phantom reported twice names once, order kept.
 func TestPhantomBindings_DedupedAndOrdered(t *testing.T) {
 	out := `binding test TestB_Two did NOT pass in internal/core (missing
 binding test TestA_One did NOT pass in internal/core (missing
@@ -92,9 +68,6 @@ no tests to run
 	}
 }
 
-// THE WIRING: a red flowing through parseGoTestJSON — the real go-test-JSON
-// ingestion path — carries the classification on its Result. A correct
-// classifier nothing records is this week's signature defect.
 func TestParseGoTestJSON_RedCarriesPhantomBindings(t *testing.T) {
 	ev := func(action, out string) string {
 		e := map[string]string{"Action": action, "Package": "github.com/x/go/acs/cycle1544",
@@ -123,7 +96,6 @@ func TestParseGoTestJSON_RedCarriesPhantomBindings(t *testing.T) {
 	}
 }
 
-// A GREEN result must never carry phantom chrome — no output is even retained.
 func TestParseGoTestJSON_GreenCarriesNoPhantoms(t *testing.T) {
 	stream := `{"Action":"run","Package":"p","Test":"TestOK"}
 {"Action":"pass","Package":"p","Test":"TestOK"}`
@@ -133,13 +105,10 @@ func TestParseGoTestJSON_GreenCarriesNoPhantoms(t *testing.T) {
 	}
 }
 
-// M5's kill, both halves. The classification must be computed from the FULL
-// output with the FULL failing set — not from the truncated excerpt with no
-// failing set. Half one: a bound name that also appears as `--- FAIL:` in the
-// stream is a FAILING test, and the record path must not call it a phantom.
-// Half two: the binding vocabulary buried beyond the excerpt cap must still
-// classify — head+tail excerpting destroying identity is the exact class
-// FailingTests was built to survive (cycles 1107/1116/1123).
+// Classification must be computed from the FULL output and FULL failing set,
+// not the truncated excerpt: a bound name that also appears as `--- FAIL:` in
+// the stream is a failing test, and the binding vocabulary buried beyond the
+// excerpt cap must still classify.
 func TestParseGoTestJSON_RecordUsesFullOutputAndFailingSet(t *testing.T) {
 	ev := func(test, action, out string) string {
 		e := map[string]string{"Action": action, "Package": "p", "Test": test}

@@ -9,14 +9,12 @@ import (
 
 func TestCanTransition_WidenedSkipEdges(t *testing.T) {
 	sm := NewStateMachine()
-	// Trivial-cycle skip paths are now legal.
 	if !sm.CanTransition(PhaseScout, PhaseBuild) {
 		t.Errorf("scout→build should be legal (trivial-cycle tdd skip)")
 	}
 	if !sm.CanTransition(PhaseTriage, PhaseBuild) {
 		t.Errorf("triage→build should be legal")
 	}
-	// Existing invariant preserved: build→ship is NOT a legal direct edge.
 	if sm.CanTransition(PhaseBuild, PhaseShip) {
 		t.Errorf("build→ship must remain illegal (audit is mandatory between)")
 	}
@@ -74,7 +72,6 @@ func TestSpineSatisfiedUpTo_ConfigurableMandatoryWeakensGate(t *testing.T) {
 	sig := router.RoutingSignals{
 		Scout: router.ScoutSignals{Present: true},
 		Build: router.BuildSignals{Present: true},
-		// audit absent
 	}
 	if !sm.SpineSatisfiedUpTo(PhaseShip, sig, weak) {
 		t.Errorf("with audit removed from mandatory set, ship gate should not require audit artifact")

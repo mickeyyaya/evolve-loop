@@ -39,11 +39,6 @@ func documentWorkspace(t *testing.T, kind string) string {
 	return ws
 }
 
-// TestSolutionFloorChecks — ADR-0099 slice 2: the build handoff floor judges a
-// document cycle's solutions/<slug>/ deterministically (the ONE engine,
-// internal/solutioncheck) and stays silent for code cycles. The kind and the
-// bound slugs come from the kernel's own reads (report headers + triage
-// decision), never from the builder's report.
 func TestSolutionFloorChecks(t *testing.T) {
 	fn := SolutionFloorChecks(documentSpec())
 	ctx := context.Background()
@@ -55,7 +50,6 @@ func TestSolutionFloorChecks(t *testing.T) {
 		t.Fatalf("document cycle with no deliverable must be rejected naming the slug; got %v", fails)
 	}
 
-	// A complete deliverable passes.
 	for rel, body := range map[string]string{
 		"options/1-a.md":              "# A\n\n+0.6pp see assumptions-and-evidence.md\n",
 		"options/2-b.md":              "# B\n\n+0.5pp see assumptions-and-evidence.md\n",
@@ -74,18 +68,14 @@ func TestSolutionFloorChecks(t *testing.T) {
 		t.Fatalf("complete deliverable must pass the floor; got %v", fails)
 	}
 
-	// A code cycle never consults the solution contract.
 	if fails := fn(ctx, ReviewInput{Phase: string(PhaseBuild), Workspace: documentWorkspace(t, "code"), Worktree: t.TempDir()}); fails != nil {
 		t.Fatalf("code cycle must be untouched by the solution floor; got %v", fails)
 	}
-	// Only the build phase is judged.
 	if fails := fn(ctx, ReviewInput{Phase: string(PhaseTDD), Workspace: ws, Worktree: t.TempDir()}); fails != nil {
 		t.Fatalf("non-build phase must be untouched; got %v", fails)
 	}
 }
 
-// TestDocumentCycle: the ONE classification ship and the audit gate both
-// defer to instead of each re-deriving it from router.Digest.
 func TestDocumentCycle(t *testing.T) {
 	if DocumentCycle("") {
 		t.Error("empty workspace ⇒ false")
@@ -98,8 +88,6 @@ func TestDocumentCycle(t *testing.T) {
 	}
 }
 
-// TestSolutionViolations: the shared engine SolutionFloorChecks and the audit
-// gate both call — nil for a code cycle, the stringified failures otherwise.
 func TestSolutionViolations(t *testing.T) {
 	ws := documentWorkspace(t, "document")
 	wt := t.TempDir()
@@ -111,8 +99,6 @@ func TestSolutionViolations(t *testing.T) {
 	}
 }
 
-// TestChainBuildFloorChecks: the production engine composes the solution floor
-// AFTER the existing checks — both lists reach the correction ladder.
 func TestChainBuildFloorChecks(t *testing.T) {
 	a := func(context.Context, ReviewInput) []string { return []string{"first"} }
 	b := func(context.Context, ReviewInput) []string { return nil }
@@ -123,8 +109,6 @@ func TestChainBuildFloorChecks(t *testing.T) {
 	}
 }
 
-// TestSolutionViolations_EmptyBindingIsLoud: a document cycle bound to no task
-// (empty or absent triage decision) is a violation, never a silent clean pass.
 func TestSolutionViolations_EmptyBindingIsLoud(t *testing.T) {
 	ws := documentWorkspace(t, "document")
 	writeWS(t, ws, "triage-decision.json", `{"top_n":[]}`)
@@ -138,16 +122,11 @@ func TestSolutionViolations_EmptyBindingIsLoud(t *testing.T) {
 	if got := SolutionViolations(ws, t.TempDir(), "", documentSpec()); len(got) != 1 {
 		t.Fatalf("absent decision must be one loud violation; got %v", got)
 	}
-	// The floor projection carries it.
 	if got := SolutionFloorChecks(documentSpec())(context.Background(), ReviewInput{Phase: string(PhaseBuild), Workspace: ws, Worktree: t.TempDir()}); len(got) != 1 {
 		t.Fatalf("floor must surface the empty binding; got %v", got)
 	}
 }
 
-// TestSeedTaskContract_DocumentCycle: the Task Contract block carries the
-// item's deliverable kind and the expected solutions/<id>/ path, and skips the
-// Go predicate inventory (there is no ACS suite for a document deliverable —
-// the floor is `evolve solution check`).
 func TestSeedTaskContract_DocumentCycle(t *testing.T) {
 	dir := t.TempDir()
 	item := writeItem(t, dir, "netflix-margin", `{"id":"netflix-margin","title":"Netflix margin","deliverable_kind":"document","acceptance":["two options compared"]}`)
@@ -168,14 +147,12 @@ func TestSeedTaskContract_DocumentCycle(t *testing.T) {
 	if strings.Contains(block, "TestShouldNotAppear") {
 		t.Errorf("document cycle must not render the Go predicate inventory:\n%s", block)
 	}
-	// A code cycle keeps the inventory.
 	code := o.seedTaskContract(context.Background(), map[string]string{"fleet_scope_paths": "netflix-margin=" + item}, PhaseBuild, CycleState{CycleID: 7, WorkspacePath: documentWorkspace(t, "code")}, dir)
 	if !strings.Contains(code[CtxKeyTaskContract], "TestShouldNotAppear") {
 		t.Errorf("code cycle must render the predicate inventory:\n%s", code[CtxKeyTaskContract])
 	}
 }
 
-// TestBoundTaskIDs names the exported reader ship uses for the commit prefix.
 func TestBoundTaskIDs(t *testing.T) {
 	ws := documentWorkspace(t, "document")
 	if ids := BoundTaskIDs(ws); len(ids) != 1 || ids[0] != "netflix-margin" {
@@ -186,8 +163,6 @@ func TestBoundTaskIDs(t *testing.T) {
 	}
 }
 
-// TestSeedDomainDefault: .evolve/domain.json reaches scout/triage as the default
-// kind; other phases and projects without the file are byte-identical.
 func TestSeedDomainDefault(t *testing.T) {
 	root := t.TempDir()
 	if got := seedDomainDefault(map[string]string{"goal": "g"}, PhaseScout, root); got[CtxKeyDeliverableKindDefault] != "" {
@@ -207,8 +182,6 @@ func TestSeedDomainDefault(t *testing.T) {
 	}
 }
 
-// TestSeedDomainDefault_MalformedIsLoudNotSilent: a domain.json that exists but
-// cannot be parsed must not silently make a writing project a code project.
 func TestSeedDomainDefault_MalformedIsLoudNotSilent(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -223,10 +196,6 @@ func TestSeedDomainDefault_MalformedIsLoudNotSilent(t *testing.T) {
 	}
 }
 
-// TestSeedDeliverableRoot: the registry's document root reaches the
-// kind-declaring phases (whose prompts carry no Task Contract) as
-// `deliverable_root`, so their prose never restates the configured root; a
-// later phase reads it from the rendered contract instead.
 func TestSeedDeliverableRoot(t *testing.T) {
 	base := map[string]string{"goal": "g"}
 	if got := seedDeliverableRoot(base, PhaseScout, "solutions"); got[CtxKeyDeliverableRoot] != "solutions" || got["goal"] != "g" {

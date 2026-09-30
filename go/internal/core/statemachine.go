@@ -12,7 +12,7 @@ import (
 // runtime authority for "is this transition legal?" and "given a
 // PASS/FAIL verdict, what runs next?".
 //
-// The graph (see parent plan §2 and §4 Phase 1 #9):
+// The graph:
 //
 //	start ──┬─→ intent ──→ scout
 //	        └─→ scout
@@ -26,38 +26,26 @@ import (
 //	        └─→ end     (BLOCK)
 //	ship  → end
 type StateMachine struct {
-	// allowed[from] is the set of legal `to` phases. As of PA-DDK DDK-5 this
-	// graph is config-DRIVEN (registry config.legal_successors, injected via
-	// WithLegalGraph); the literal default below is the byte-identical fallback
-	// when no config supplies it. The trust anchor is no longer the literal — it
-	// is ValidateSafetyInvariants, the phase-agnostic load-time validator the
-	// composition root HARD-fails on (ADR-0060 §1a). Config can declare any graph;
-	// the validator rejects any graph that could ship without the floor.
+	// allowed[from] is the set of legal `to` phases; config-driven via
+	// WithLegalGraph, with the literal below as the byte-identical fallback.
 	allowed map[Phase]map[Phase]bool
 	// specFor resolves a phase's descriptor so Next can read its verdict-branch
-	// config (OnPass/OnFail). nil ⇒ Next degrades to the literal table. Injected
-	// by the orchestrator (which owns the catalog) via WithCatalog.
+	// config (OnPass/OnFail). nil ⇒ Next degrades to the literal table.
 	specFor func(Phase) (phasespec.PhaseSpec, bool)
-	// spine is the config-declared linear successor sequence (registry
-	// config.spine_order, PA-DDK DDK-3). Empty ⇒ the canonical spineOrder literal
-	// (the byte-identical fallback for catalog-less SMs / a registry that omits
-	// it). Injected via WithSpine at the composition root.
+	// spine is the config-declared linear successor sequence. Empty ⇒ the
+	// canonical spineOrder literal.
 	spine []Phase
 }
 
-// spineOrder is the canonical linear successor sequence — the mandatory-default
-// spine the state machine walks for any phase that is not a verdict branch
-// (audit), a control sentinel (retro/debugger), or the intent-independent start
-// edge. spineNext walks it so the LINEAR transition is a data lookup, not a
-// per-phase switch (ADR-0058 S5). Like the legality graph (§1) it is a config-
-// INDEPENDENT trust anchor: config SELECTS among already-legal edges
-// (on_pass/on_fail), it can never move the spine itself. NB: this is NOT
-// cfg.Order — cfg.Order interleaves optional insertions (spec-verify, tester, …)
-// the static spine skips; reproducing the literal spine needs its own SSOT.
+// spineOrder is the canonical linear successor sequence the state machine
+// walks for any phase that is not a verdict branch (audit), a control
+// sentinel (retro/debugger), or the intent-independent start edge. This is
+// NOT cfg.Order — cfg.Order interleaves optional insertions (spec-verify,
+// tester, …) the static spine skips.
 //
-// audit appears so build→audit resolves, but its OWN successor is never taken via
-// spineNext: Next intercepts audit in the explicit switch (the verdict branch)
-// before the spine walk. end is the terminal waypoint for ship→end.
+// audit appears so build→audit resolves, but its OWN successor is never taken
+// via spineNext: Next intercepts audit in the explicit switch before the
+// spine walk. end is the terminal waypoint for ship→end.
 var spineOrder = []Phase{
 	PhaseIntent,
 	PhaseScout,
@@ -70,9 +58,8 @@ var spineOrder = []Phase{
 	PhaseEnd,
 }
 
-// effectiveSpine is the config-declared spine (sm.spine) when present, else the
-// canonical spineOrder literal — the byte-identical fallback that keeps
-// catalog-less SMs and a registry omitting config.spine_order unchanged.
+// effectiveSpine is the config-declared spine (sm.spine) when present, else
+// the canonical spineOrder literal.
 func (sm *StateMachine) effectiveSpine() []Phase {
 	if len(sm.spine) > 0 {
 		return sm.spine
@@ -93,8 +80,8 @@ func (sm *StateMachine) spineNext(p Phase) (Phase, bool) {
 	return "", false
 }
 
-// WithSpine injects the config-declared linear spine (PA-DDK DDK-3). An empty
-// order leaves the SM on the canonical spineOrder literal.
+// WithSpine injects the config-declared linear spine. An empty order leaves
+// the SM on the canonical spineOrder literal.
 func (sm *StateMachine) WithSpine(order []Phase) *StateMachine {
 	sm.spine = order
 	return sm
@@ -102,8 +89,8 @@ func (sm *StateMachine) WithSpine(order []Phase) *StateMachine {
 
 // spinePhasesFrom converts config phase names (registry vocabulary, e.g.
 // "retrospective"/"end") to the kernel's Phase spine, denormalizing through
-// phaseFromRouter. Empty/unknown names are dropped; an empty result leaves the
-// SM on the canonical literal (PA-DDK DDK-3).
+// phaseFromRouter. Empty/unknown names are dropped; an empty result leaves
+// the SM on the canonical literal.
 func spinePhasesFrom(names []string) []Phase {
 	var out []Phase
 	for _, n := range names {
@@ -115,13 +102,13 @@ func spinePhasesFrom(names []string) []Phase {
 }
 
 // legalGraphFrom builds the kernel legality graph from the registry's
-// config.legal_successors map (PA-DDK DDK-5). Both keys and successor names
-// denormalize through phaseFromRouter (registry vocab → core.Phase, e.g.
+// config.legal_successors map. Both keys and successor names denormalize
+// through phaseFromRouter (registry vocab → core.Phase, e.g.
 // "retrospective"→retro), so the graph spans the sentinels (start/end/debugger)
-// the registry phases[] array does not list. Returns nil for an empty map — the
-// signal to WithLegalGraph to keep the literal default. Unresolvable names are
-// dropped here; ValidateSafetyInvariants reports them as violations against the
-// source config so the drop is never silent at load.
+// the registry phases[] array does not list. Returns nil for an empty map —
+// the signal to WithLegalGraph to keep the literal default. Unresolvable names
+// are dropped here; ValidateSafetyInvariants reports them as violations
+// against the source config so the drop is never silent at load.
 func legalGraphFrom(successors map[string][]string) map[Phase]map[Phase]bool {
 	if len(successors) == 0 {
 		return nil
@@ -143,9 +130,8 @@ func legalGraphFrom(successors map[string][]string) map[Phase]map[Phase]bool {
 	return graph
 }
 
-// WithLegalGraph injects the config-driven legality graph (PA-DDK DDK-5). A nil/
-// empty graph leaves the SM on its literal `allowed` default — the byte-identical
-// fallback for catalog-less SMs and a registry omitting config.legal_successors.
+// WithLegalGraph injects the config-driven legality graph. A nil/empty graph
+// leaves the SM on its literal `allowed` default.
 func (sm *StateMachine) WithLegalGraph(graph map[Phase]map[Phase]bool) *StateMachine {
 	if len(graph) > 0 {
 		sm.allowed = graph
@@ -155,10 +141,8 @@ func (sm *StateMachine) WithLegalGraph(graph map[Phase]map[Phase]bool) *StateMac
 
 // WithCatalog gives the StateMachine config-driven transition resolution: a
 // phase whose descriptor declares on_pass/on_fail resolves its verdict branch
-// from config instead of a hardcoded phase-name case (ADR-0058). When unset
-// (bare unit-test SMs) or when a phase declares no on_pass/on_fail, Next
-// degrades to the exact literal table — so the kernel stays byte-identical for
-// catalog-less orchestrators and a registry missing the fields.
+// from config instead of a hardcoded phase-name case. When unset, or when a
+// phase declares no on_pass/on_fail, Next degrades to the exact literal table.
 func (sm *StateMachine) WithCatalog(specFor func(Phase) (phasespec.PhaseSpec, bool)) *StateMachine {
 	sm.specFor = specFor
 	return sm
@@ -168,71 +152,31 @@ func (sm *StateMachine) WithCatalog(specFor func(Phase) (phasespec.PhaseSpec, bo
 // transition table.
 func NewStateMachine() *StateMachine {
 	a := map[Phase]map[Phase]bool{
-		// Dynamic routing widens the spine with trivial-cycle skip edges
-		// (scout/triage → build when tdd is skipped on a trivial cycle). The
-		// canonical order is unchanged; these only make the skip paths LEGAL so
-		// the router's enforce-mode decisions validate via CanTransition.
-		PhaseStart:  {PhaseIntent: true, PhaseScout: true},
-		PhaseIntent: {PhaseScout: true},
-		// scout/triage → end are the guarded EARLY-EXIT edges (no-ship
-		// convergence, e.g. scout found nothing to do). They are structurally
-		// legal so CanTransition passes, but the SEMANTIC authority is
-		// CanTerminateEarly — the orchestrator must consult it (a ship-intended
-		// cycle can never take these edges). See CanTerminateEarly.
+		PhaseStart:        {PhaseIntent: true, PhaseScout: true},
+		PhaseIntent:       {PhaseScout: true},
 		PhaseScout:        {PhaseTriage: true, PhaseTDD: true, PhaseBuild: true, PhaseEnd: true},
 		PhaseTriage:       {PhaseTDD: true, PhaseBuild: true, PhaseEnd: true},
 		PhaseTDD:          {PhaseBuildPlanner: true, PhaseBuild: true},
 		PhaseBuildPlanner: {PhaseBuild: true},
 		PhaseBuild:        {PhaseAudit: true},
-		// PhaseTDD/PhaseBuild are the audit-FAIL RE-ENTRY edges: a task-level
-		// rejection re-enters the dev cycle in the same cycle rather than tearing
-		// it down (see audit_fail_decision.go). They are legal ONLY through
-		// decideAfterAuditFail, which computes the deterministic policy envelope
-		// first — the ADR-0072 floor is evaluated before either edge can be taken.
-		PhaseAudit: {PhaseShip: true, PhaseRetro: true, PhaseTDD: true, PhaseBuild: true},
-		// retro→audit is the bookkeeping-regrade micro-cycle edge (bounded to
-		// once per cycle by CycleState.BookkeepingRegradeAttempted): a FAIL
-		// explained ONLY by bookkeeping gates re-runs audit on the same
-		// snapshot instead of burning a continuation lane. Same shape as the
-		// ship→audit recovery edge below; audit→ship remains artifact-gated,
-		// so the edge cannot weaken the integrity floor.
-		PhaseRetro: {PhaseShip: true, PhaseTDD: true, PhaseEnd: true, PhaseAudit: true},
-		// Ship can hand off to a recovery phase when it returns a structured
-		// ShipError (advisor-recommended recovery, Component #6/#7): the
-		// recovery Chain-of-Responsibility may route a precondition error to
-		// re-run audit, a transient error to retry ship, or any unknown error
-		// to the debugger. PhaseEnd is the success successor (and the
-		// integrity-breach / recovery-exhausted abort target).
-		PhaseShip: {PhaseEnd: true, PhaseDebugger: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseShip: true},
-		// Debugger recovery routes: re-attempt ship, or re-run an upstream
-		// phase to re-establish a stale precondition, or give up (end). Edges
-		// are legal; the actual choice comes from the debug-decision the
-		// orchestrator reads (decideAfterDebugger), like the retro branch.
-		PhaseDebugger: {PhaseShip: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseEnd: true},
-		PhaseEnd:      {},
+		PhaseAudit:        {PhaseShip: true, PhaseRetro: true, PhaseTDD: true, PhaseBuild: true},
+		PhaseRetro:        {PhaseShip: true, PhaseTDD: true, PhaseEnd: true, PhaseAudit: true},
+		PhaseShip:         {PhaseEnd: true, PhaseDebugger: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseShip: true},
+		PhaseDebugger:     {PhaseShip: true, PhaseAudit: true, PhaseBuild: true, PhaseTDD: true, PhaseEnd: true},
+		PhaseEnd:          {},
 	}
 	return &StateMachine{allowed: a}
 }
 
-// CanTerminateEarly reports whether the cycle may legally END now from `from` —
-// i.e. the advisor proposes a no-ship convergence cycle and there is no further
-// work to evaluate. It is the SEMANTIC gate on the guarded scout/triage→end
-// edges (CanTransition reports structural legality; this reports whether taking
-// the edge is permitted).
-//
-// The invariant it defends: early-exit is ONLY ever a no-ship convergence. A
-// ship-intended cycle (shipPlanned) can NEVER terminate early — it must satisfy
-// the full integrity floor (build ∧ audit) and reach ship through the normal
-// spine. And only the pre-build decision points (scout, triage) may terminate
-// early: past build, real work exists and must be evaluated, not abandoned.
-// Together these guarantee no path lands at `end` having intended to ship
-// without a real, audit-bound build.
+// CanTerminateEarly reports whether the cycle may legally END now from `from`
+// — i.e. the advisor proposes a no-ship convergence cycle and there is no
+// further work to evaluate. It is the SEMANTIC gate on the guarded
+// scout/triage→end edges (CanTransition reports structural legality; this
+// reports whether taking the edge is permitted).
 func (sm *StateMachine) CanTerminateEarly(from Phase, shipPlanned bool) bool {
 	if shipPlanned {
 		return false
 	}
-	// Config-driven early-exit set (PA-DDK DDK-7): a phase's descriptor may declare
-	// early_exit explicitly; unset (nil) degrades to the literal pre-build set.
 	if sm.specFor != nil {
 		if spec, ok := sm.specFor(from); ok && spec.EarlyExit != nil {
 			return *spec.EarlyExit
@@ -272,13 +216,6 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 	if !current.IsValid() {
 		return "", fmt.Errorf("%w: %s", ErrPhaseInvalid, current)
 	}
-	// Config-driven verdict branch (ADR-0058): a phase whose descriptor declares
-	// on_pass/on_fail resolves its successor from the verdict via config, not a
-	// hardcoded phase-name case. Targets are denormalized through phaseFromRouter
-	// (registry vocab → core.Phase). The legality graph still gates the chosen
-	// edge downstream, so config can only pick an already-legal successor. Absent
-	// a catalog (bare SM) or the fields, control falls through to the literal
-	// table below — byte-identical, as the transition oracle proves.
 	if sm.specFor != nil {
 		if spec, ok := sm.specFor(current); ok && spec.OnPass != "" && spec.OnFail != "" {
 			switch verdict {
@@ -297,14 +234,10 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 			}
 		}
 	}
-	// Non-linear cases the spine table cannot express, handled explicitly:
 	switch current {
 	case PhaseStart:
-		// Intent-independent by design (NextFromStart, not Next, gates intent).
 		return PhaseScout, nil
 	case PhaseAudit:
-		// Verdict branch — the literal fallback when no catalog declares
-		// on_pass/on_fail (the config branch above handles the wired case).
 		switch verdict {
 		case VerdictPASS, VerdictWARN:
 			return PhaseShip, nil
@@ -314,35 +247,24 @@ func (sm *StateMachine) Next(current Phase, verdict string) (Phase, error) {
 			return "", fmt.Errorf("%w: audit verdict %q", ErrTransitionInvalid, verdict)
 		}
 	case PhaseDebugger, PhaseRetro:
-		// Decision/failure-adapter driven (RESHIP / RERUN_PHASE / BLOCK and the
-		// retro recovery): the orchestrator overrides via scheduledNext. Default
-		// end so callers can override explicitly.
 		return PhaseEnd, nil
 	case PhaseEnd:
 		return "", fmt.Errorf("%w: end is terminal", ErrTransitionInvalid)
 	}
-	// Linear spine (ADR-0058 S5): the successor is the next entry in the canonical
-	// spine table — a data walk, byte-identical to the former per-phase switch.
 	if next, ok := sm.spineNext(current); ok {
 		return next, nil
 	}
 	return "", fmt.Errorf("%w: no successor for %s", ErrTransitionInvalid, current)
 }
 
-// mandatoryAnchorsFor is the spine-anchor ORDER, derived ENTIRELY from config
-// (ADR-0058 S6): the mandatory phases in the configured order. No phase is a Go
-// literal here — an operator sets the spine anchors purely by editing the
-// registry's phase order / mandatory_phases. effectiveOrder falls back to
-// cfg.Mandatory when no registry order is loaded, so the floor always has anchors.
+// mandatoryAnchorsFor is the spine-anchor order, derived entirely from
+// config: the mandatory phases in the configured order.
 func mandatoryAnchorsFor(cfg config.RoutingConfig) []Phase {
 	var anchors []Phase
 	for _, name := range effectiveOrder(cfg) {
 		if !isConfiguredMandatory(cfg, name) {
 			continue
 		}
-		// Only built-in phases carry artifact-gate semantics; an unrecognized
-		// mandatory name (a user phase) maps to "" — skip it rather than seed the
-		// anchor list with an empty no-op Phase.
 		if p := phaseFromRouter(name); p != "" {
 			anchors = append(anchors, p)
 		}
@@ -351,10 +273,8 @@ func mandatoryAnchorsFor(cfg config.RoutingConfig) []Phase {
 }
 
 // effectiveOrder is the phase sequence the floor positions anchors against:
-// cfg.Order when the registry supplies one, else cfg.Mandatory (so a registry-
-// less SM still orders its anchors). Pure config — no hardcoded phase order.
-// NB: distinct from router.effectiveOrder, whose fallback is the router's
-// canonicalOrder; the floor falls back to cfg.Mandatory.
+// cfg.Order when the registry supplies one, else cfg.Mandatory. NB: distinct
+// from router.effectiveOrder, whose fallback is the router's canonicalOrder.
 func effectiveOrder(cfg config.RoutingConfig) []string {
 	if len(cfg.Order) > 0 {
 		return cfg.Order
@@ -362,36 +282,18 @@ func effectiveOrder(cfg config.RoutingConfig) []string {
 	return cfg.Mandatory
 }
 
-// SpineSatisfiedUpTo is the artifact-backed structural gate: an ANCHOR target may
-// run only if every configured-mandatory anchor ordered BEFORE it has produced a
-// real handoff artifact this cycle (Audit additionally requires a PASS/WARN
-// verdict). A non-anchor target is unconstrained here — the spine floor gates
-// only the mandatory anchors; the router's plan + legality gate guard optional/
-// user insertions, and CanTerminateEarly gates end.
-//
-// Because it keys off RoutingSignals.<X>.Present — digested from real on-disk
-// handoffs — the orchestrator cannot reach Ship by merely claiming Audit passed;
-// a real audit artifact with a shippable verdict must exist. This is the
-// non-gameable floor that survives whichever routing Strategy is selected. The
-// anchor SET and ORDER are config-driven (mandatoryAnchorsFor); only HOW a
-// handoff is verified (anchorArtifactPresent) is fixed verification logic — an
-// anchor with no declared check (e.g. a never-skip triage) is a no-op.
+// SpineSatisfiedUpTo is the artifact-backed structural gate: an anchor target
+// may run only if every configured-mandatory anchor ordered before it has
+// produced a real handoff artifact this cycle (Audit additionally requires a
+// PASS/WARN verdict). A non-anchor target is unconstrained here.
 func (sm *StateMachine) SpineSatisfiedUpTo(target Phase, sig router.RoutingSignals, cfg config.RoutingConfig) bool {
 	_, unsatisfied := sm.UnsatisfiedSpineAnchor(target, sig, cfg)
 	return !unsatisfied
 }
 
-// UnsatisfiedSpineAnchor is SpineSatisfiedUpTo's REPORTER: it returns the FIRST
-// mandatory predecessor anchor of target whose handoff artifact is missing, and
-// whether such an anchor exists. It is the exact complement of the gate — both
-// walk the same anchor list through the same gateSatisfied check, so a reporter
-// that names an anchor the gate would have accepted (or stays silent where the
-// gate blocks) is impossible by construction.
-//
-// The fail-open WARN and its cycle-1166 telemetry need the CAUSE, not just the
-// fact: "ship proceeded with build's report missing" groups by cause, while
-// "ship proceeded" does not. The FIRST unsatisfied anchor is the right one to
-// report — a later anchor is usually missing only BECAUSE the earlier one is.
+// UnsatisfiedSpineAnchor is SpineSatisfiedUpTo's reporter: it returns the
+// first mandatory predecessor anchor of target whose handoff artifact is
+// missing, and whether such an anchor exists.
 func (sm *StateMachine) UnsatisfiedSpineAnchor(target Phase, sig router.RoutingSignals, cfg config.RoutingConfig) (Phase, bool) {
 	anchors := mandatoryAnchorsFor(cfg)
 	ti := -1
@@ -402,7 +304,7 @@ func (sm *StateMachine) UnsatisfiedSpineAnchor(target Phase, sig router.RoutingS
 		}
 	}
 	if ti < 0 {
-		return "", false // non-anchor target: not gated by the spine floor
+		return "", false
 	}
 	for i := 0; i < ti; i++ {
 		if !sm.gateSatisfied(anchors[i], sig) {
@@ -412,12 +314,10 @@ func (sm *StateMachine) UnsatisfiedSpineAnchor(target Phase, sig router.RoutingS
 	return "", false
 }
 
-// gateSatisfied reports whether anchor's artifact floor holds against the digest
-// (PA-DDK DDK-4). When the catalog declares the anchor's gate THRESHOLDS
+// gateSatisfied reports whether anchor's artifact floor holds against the
+// digest. When the catalog declares the anchor's gate thresholds
 // (requires_present / verdict_in), those config values decide; otherwise the
-// literal anchorArtifactPresent map is the byte-identical fallback. The digest
-// (which signal proves the handoff) stays trusted Go — only the thresholds are
-// config (ADR-0060).
+// literal anchorArtifactPresent map is the byte-identical fallback.
 func (sm *StateMachine) gateSatisfied(anchor Phase, sig router.RoutingSignals) bool {
 	if sm.specFor != nil {
 		if spec, ok := sm.specFor(anchor); ok && spec.Gate != nil {
@@ -434,10 +334,8 @@ func (sm *StateMachine) gateSatisfied(anchor Phase, sig router.RoutingSignals) b
 	return anchorArtifactPresent(anchor, sig)
 }
 
-// digestSignalFor reads an anchor's (present, verdict) from the trusted on-disk
-// signal digest. This phase→signal mapping is the VERIFICATION layer, kept in Go
-// by design (ADR-0060): config sets the gate thresholds, code reads the
-// objective artifacts. An anchor with no digest slot is treated as present.
+// digestSignalFor reads an anchor's (present, verdict) from the trusted
+// on-disk signal digest. An anchor with no digest slot is treated as present.
 func digestSignalFor(anchor Phase, sig router.RoutingSignals) (present bool, verdict string) {
 	switch anchor {
 	case PhaseScout:
@@ -447,9 +345,8 @@ func digestSignalFor(anchor Phase, sig router.RoutingSignals) (present bool, ver
 	case PhaseAudit:
 		return sig.Audit.Present, sig.Audit.Verdict
 	}
-	// Fail CLOSED: an anchor with a config gate but no Go digest reader must not
-	// silently pass — it forces the reader to be implemented (anti-fabrication).
-	// Unconfigured anchors never reach here (they take the literal fallback).
+	// Fail closed: an anchor with a config gate but no Go digest reader must
+	// not silently pass — it forces the reader to be implemented.
 	return false, ""
 }
 
@@ -464,7 +361,7 @@ func anchorArtifactPresent(anchor Phase, sig router.RoutingSignals) bool {
 	case PhaseAudit:
 		return sig.Audit.Present && (sig.Audit.Verdict == VerdictPASS || sig.Audit.Verdict == VerdictWARN)
 	case PhaseShip:
-		return true // ship has no pre-artifact of its own
+		return true
 	}
 	return true
 }

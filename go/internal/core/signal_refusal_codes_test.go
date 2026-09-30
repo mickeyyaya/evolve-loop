@@ -1,11 +1,5 @@
 package core
 
-// signal_refusal_codes_test.go — the C1 chokepoint's phase.outcome WARN carries
-// the phase's error-severity diagnostic CODES as fields.diagnostic_codes, so
-// the console line and the durable stream name the class of a FAIL beside its
-// prose ("… diagnostic_codes=TRIAGE_PROTECTED_SURFACE"); an uncoded FAIL
-// carries no such field (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
-
 import (
 	"context"
 	"testing"

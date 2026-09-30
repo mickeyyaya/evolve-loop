@@ -1,14 +1,3 @@
-// verify.go — self-SHA TOFU + class-aware verification.
-//
-// Mirrors ship.sh sections 1 (lines 221-292) and 2 (lines 294-394):
-//
-//   - verifySelfSHA: version-aware TOFU pin of the ship binary's SHA.
-//     5 paths: first-run pin, same-version-same-SHA pass,
-//     same-version-different-SHA integrity-fail, no-version legacy
-//     migration, plugin-version-change re-pin.
-//
-//   - verifyClass: cycle → audit-binding, manual → interactive y/N,
-//     release → skip-with-log, trivial → cycle_size_estimate + critical-paths.
 package ship
 
 import (
@@ -28,7 +17,6 @@ import (
 // SSOT IPC-protocol-allowed: releasepipeline/rollback→ship subprocess
 const envShipAutoConfirm = "EVOLVE_" + "SHIP_AUTO_CONFIRM"
 
-// sha256File computes the SHA256 of a file's contents in hex.
 func sha256File(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -42,20 +30,6 @@ func sha256File(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// verifySelfSHA implements ship.sh's version-aware TOFU.
-//
-// Five branches:
-//
-//  1. no expected_ship_sha           → first run; pin both fields
-//  2. expected matches actual:
-//     - no expected_ship_version     → schema migration; pin version
-//     - expected_ship_version set    → clean pass
-//  3. expected != actual:
-//     - no expected_ship_version     → legacy SHA-only pin; migrate (re-pin)
-//     - expected_ship_version != current → plugin update; re-pin
-//     - same version, different SHA  → INTEGRITY-FAIL (real tampering)
-//
-// The state.json mutation preserves every other field (map-based).
 func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
@@ -75,9 +49,9 @@ func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 	pluginVer := pluginVersion(opts.PluginRoot)
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
-	// ADR-0049 S2 / G2: hold the shared state.json lock across the whole TOFU
-	// read→decide→repin so a concurrent allocator/UpdateState write can't
-	// interleave (stale-pin / lost-update). No-op under the whole-cycle lock.
+	// Holds the shared state.json lock across the whole TOFU read→decide→repin
+	// so a concurrent allocator/UpdateState write cannot interleave.
+	// See ADR-0049.
 	release, lockErr := lockStateFile(statePath)
 	if lockErr != nil {
 		return shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageVerifySelfSHA,
@@ -128,15 +102,8 @@ func verifySelfSHA(_ context.Context, opts *Options, res *RunResult) error {
 	}
 }
 
-// IntegrityError is a thin, backward-compatible wrapper around a
-// *core.ShipError. Historically it signaled an exit-code-2 refusal; it is now
-// retained ONLY so the large existing test corpus that does
-// `errors.As(err, &ie)` + reads `ie.Msg` keeps compiling. The authoritative
-// failure protocol is the wrapped *core.ShipError: its Class drives the
-// exit-code mapping in finalize() (Class=integrity → ExitIntegrity; everything
-// else → ExitFailure) and is recoverable end-to-end via core.AsShipError.
-//
-// Construct via shipErr(); never instantiate this struct directly in new code.
+// IntegrityError wraps a *core.ShipError for legacy exit-code-2 matching;
+// construct only via shipErr.
 type IntegrityError struct {
 	Msg string          // human text (== wrapped ShipError.Message)
 	se  *core.ShipError // the authoritative structured error
@@ -158,14 +125,8 @@ func (e *IntegrityError) Unwrap() error {
 	return e.se
 }
 
-// shipErr builds a *core.ShipError and, when the class is integrity, also wraps
-// it in an *IntegrityError so legacy `errors.As(err, *IntegrityError)` callers
-// still match. For non-integrity classes it returns the bare *core.ShipError
-// (those sites were previously plain fmt.Errorf and never matched
-// *IntegrityError, so no wrapping is needed for back-compat).
-//
-// Either way the result is recoverable via core.AsShipError, and finalize()
-// keys the exit code off the ShipError's Class.
+// shipErr builds a *core.ShipError, wrapping it in *IntegrityError only when
+// class is ShipClassIntegrity (see IntegrityError).
 func shipErr(code core.ShipErrorCode, class core.ShipErrorClass, stage core.ShipStage, message string, debugKV ...string) error {
 	se := core.NewShipError(code, class, stage, message, debugKV...)
 	if class == core.ShipClassIntegrity {
@@ -174,18 +135,12 @@ func shipErr(code core.ShipErrorCode, class core.ShipErrorClass, stage core.Ship
 	return se
 }
 
-// verifyClass runs the per-class pre-flight (audit-binding for cycle;
-// interactive confirm for manual; kernel checks for trivial; log-only
-// for release).
-//
-// Sets res.Provenance and may stage worktree changes (manual class).
+// verifyClass may stage worktree changes: verifyManualConfirm runs `git add -A`.
 func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 	switch opts.Class {
 	case ClassCycle:
 		res.Logs = append(res.Logs, "[ship] class: cycle (audit-bound)")
 		res.Provenance = "cycle (audit-verified)"
-		// Integrity boundary backstop (ADR-0064): a cycle may not commit changes
-		// to the pipeline control plane that grades it, by any channel.
 		if err := verifyNoControlPlaneEdits(ctx, opts, res); err != nil {
 			return err
 		}
@@ -206,8 +161,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyManualConfirm(ctx, opts, res); err != nil {
 			return err
 		}
-		// Hard gate: interactive commits must carry a fresh commit-gate review
-		// attestation. Runs after verifyManualConfirm's `git add -A` so the SHA
+		// Runs after verifyManualConfirm's `git add -A` so the attestation's SHA
 		// reflects the staged tree. Bypassed by Options.BypassCommitGate.
 		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
 			return err
@@ -222,8 +176,6 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		"ship: invalid class "+string(opts.Class), "class", string(opts.Class))
 }
 
-// verifyManualConfirm implements the --class manual interactive y/N
-// prompt with envShipAutoConfirm bypass.
 func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) error {
 	// Stage everything so diff --cached reflects what will ship.
 	exitCode, err := opts.run(ctx, "git", []string{"add", "-A"}, io.Discard, opts.Stderr)
@@ -232,14 +184,12 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 			fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exitCode, err),
 			"git_rc", fmt.Sprintf("%d", exitCode), "git_err", errStr(err))
 	}
-	// Check if there's anything staged.
 	exitCode, err = opts.run(ctx, "git", []string{"diff", "--cached", "--quiet"}, io.Discard, io.Discard)
 	if err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			"ship: git diff --cached --quiet failed: "+err.Error(), "git_err", err.Error())
 	}
 	if exitCode == 0 {
-		// Nothing staged.
 		res.Logs = append(res.Logs, "[ship] no staged changes; nothing to ship")
 		return errEmptyDiff
 	}
@@ -250,7 +200,6 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 		return nil
 	}
 
-	// Print the diff stat + first 80 lines of diff.
 	fmt.Fprintln(opts.Stderr)
 	fmt.Fprintln(opts.Stderr, "=== git diff --cached --stat ===")
 	if _, err := opts.run(ctx, "git", []string{"diff", "--cached", "--stat"}, opts.Stderr, opts.Stderr); err != nil {
@@ -259,7 +208,6 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	}
 	fmt.Fprintln(opts.Stderr)
 	fmt.Fprintln(opts.Stderr, "=== git diff --cached (first 80 lines) ===")
-	// Capture into a buffer, truncate to 80 lines.
 	var diffBuf strings.Builder
 	if _, err := opts.run(ctx, "git", []string{"diff", "--cached"}, &diffBuf, io.Discard); err != nil {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
@@ -272,7 +220,7 @@ func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) err
 	fmt.Fprintln(opts.Stderr, strings.Join(lines, "\n"))
 	fmt.Fprintln(opts.Stderr)
 
-	// Refuse if stdin is not a tty (LLM agents cannot answer this).
+	// LLM agents cannot answer an interactive prompt; refuse when stdin isn't a tty.
 	if !isTerminal(opts.Stdin) {
 		return shipErr(core.CodeManualNotTTY, core.ShipClassConfig, core.StageVerifyClass,
 			fmt.Sprintf("--class manual requires interactive stdin (not a tty). Set %s=1 for non-interactive use (CI), or run from a real terminal.", envShipAutoConfirm))
@@ -301,8 +249,6 @@ type cleanExitError struct{}
 
 func (*cleanExitError) Error() string { return "no staged changes (clean exit)" }
 
-// isTerminal reports whether r is os.Stdin AND attached to a TTY.
-// Conservative: anything else (test stdin, bytes.Buffer, /dev/null) is non-tty.
 func isTerminal(r io.Reader) bool {
 	f, ok := r.(*os.File)
 	if !ok {
@@ -315,16 +261,6 @@ func isTerminal(r io.Reader) bool {
 	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
-// verifyTrivial implements --class trivial:
-//
-//  1. cycle-state.json:cycle_size_estimate must equal "trivial"
-//  2. No pipeline-critical paths in the staged/working diff
-//
-// Pipeline-critical paths (cannot bypass audit):
-//
-//	agents/, .agents/, skills/, legacy/scripts/lifecycle/,
-//	legacy/scripts/guards/, legacy/scripts/dispatch/, .evolve/profiles/,
-//	.claude-plugin/
 func verifyTrivial(ctx context.Context, opts *Options, res *RunResult) error {
 	csPath := filepath.Join(opts.ProjectRoot, ".evolve", "cycle-state.json")
 	csMap, err := readStateMap(csPath)
@@ -339,7 +275,6 @@ func verifyTrivial(ctx context.Context, opts *Options, res *RunResult) error {
 			"cycle_size_estimate", est)
 	}
 
-	// Gather staged + unstaged + untracked file lists.
 	stagedOut, err := captureGitOutput(ctx, opts, "diff", "--cached", "--name-only")
 	if err != nil {
 		return err
@@ -395,7 +330,6 @@ func verifyTrivial(ctx context.Context, opts *Options, res *RunResult) error {
 	return nil
 }
 
-// errStr renders err for a Debug-map value; "" when nil.
 func errStr(err error) string {
 	if err == nil {
 		return ""
@@ -403,7 +337,6 @@ func errStr(err error) string {
 	return err.Error()
 }
 
-// splitNonEmpty splits s on newlines, dropping empty entries.
 func splitNonEmpty(s string) []string {
 	out := []string{}
 	for _, line := range strings.Split(s, "\n") {

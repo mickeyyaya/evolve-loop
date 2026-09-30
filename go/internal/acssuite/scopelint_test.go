@@ -1,15 +1,5 @@
 package acssuite
 
-// scopelint_test.go — whole-suite meta-predicates are the false-red AMPLIFIER.
-// Cycles 1107/1115/1116/1117/1123 each failed on ONE predicate of the shape
-// "go test <core+bridge+recovery> stays green": any contamination anywhere in
-// those suites (an auditor probe, the shared /tmp/p root, a sibling lane)
-// reads as a builder regression. Whole-repo staleness is the regression
-// suite's job (195 predicates, every cycle) — a cycle predicate re-sweeping
-// packages the cycle never touched is pure duplication with a false-red
-// surface. The lint demotes such predicates to SKIP (never RED — a lint
-// false-positive must not be able to fail a cycle), loudly, in the verdict.
-
 import (
 	"os"
 	"path/filepath"
@@ -47,9 +37,6 @@ func TestC9999_002_own_predicates(t *testing.T) {
 }
 `
 
-// TestLintPredicateScope_FlagsPackagesOutsideTouchedSet pins the core rule:
-// a predicate naming a package the cycle never touched is flagged; scoped and
-// own-acs-dir references are not.
 func TestLintPredicateScope_FlagsPackagesOutsideTouchedSet(t *testing.T) {
 	dir := writeCyclePredicates(t, outOfScopeSrc)
 	findings, err := LintPredicateScope(dir, []string{"./internal/bridge/..."})
@@ -72,10 +59,6 @@ func TestLintPredicateScope_FlagsPackagesOutsideTouchedSet(t *testing.T) {
 	}
 }
 
-// TestLintPredicateScope_ModulePathConstIsInScopeWhenTouched (negative twin of
-// the const case): the same const-carried module path must be IN scope when
-// its package is touched — resolution must normalize module paths and ./
-// patterns to the same key.
 func TestLintPredicateScope_ModulePathConstIsInScopeWhenTouched(t *testing.T) {
 	dir := writeCyclePredicates(t, outOfScopeSrc)
 	findings, err := LintPredicateScope(dir, []string{"./internal/bridge/...", "./internal/core/..."})
@@ -87,9 +70,6 @@ func TestLintPredicateScope_ModulePathConstIsInScopeWhenTouched(t *testing.T) {
 	}
 }
 
-// TestLintPredicateScope_EmptyTouchedSetLintsNothing: with no handoff there is
-// no scope to judge against; the lint must stand down rather than guess (a
-// wrong guess here would demote a legitimate gate).
 func TestLintPredicateScope_EmptyTouchedSetLintsNothing(t *testing.T) {
 	dir := writeCyclePredicates(t, outOfScopeSrc)
 	findings, err := LintPredicateScope(dir, nil)
@@ -101,9 +81,6 @@ func TestLintPredicateScope_EmptyTouchedSetLintsNothing(t *testing.T) {
 	}
 }
 
-// TestLintPredicateScope_IgnoresNonPatternStrings (anti-false-positive): prose,
-// file paths, and URLs must never be mistaken for package patterns — a lint
-// false-positive demotes a real gate.
 func TestLintPredicateScope_IgnoresNonPatternStrings(t *testing.T) {
 	dir := writeCyclePredicates(t, `package cycle9999
 
@@ -125,11 +102,6 @@ func TestC9999_003_prose(t *testing.T) {
 	}
 }
 
-// TestRunGoTest_DemotesOutOfScopeMetaPredicateToSkip is the WIRING proof at
-// the verdict level: an out-of-scope predicate that would have been RED lands
-// as SKIP with a loud note, and the verdict PASSes on the cycle's real
-// predicates — the 1123 shape (auditor PASS + one broad red) becomes a
-// truthful PASS instead of a false FAIL.
 func TestRunGoTest_DemotesOutOfScopeMetaPredicateToSkip(t *testing.T) {
 	root := t.TempDir()
 	modDir := filepath.Join(root, "go")
@@ -143,8 +115,8 @@ func TestRunGoTest_DemotesOutOfScopeMetaPredicateToSkip(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cycleDir, "predicates_test.go"), []byte(outOfScopeSrc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Touched set injected via the git seam (production derives it from git,
-	// never the agent-written handoff — gate-weakening review finding).
+	// Touched set injected via the git seam: production derives it from git,
+	// never the agent-written handoff.
 	injectTouched(t, []string{"./internal/bridge/..."})
 
 	raw := goStream(
@@ -191,11 +163,6 @@ func injectTouched(t *testing.T, touched []string) {
 	t.Cleanup(func() { scopeLintChangedPackages = orig })
 }
 
-// TestRunGoTest_DemotionFloorCancelsWhenAllOwnPredicatesWouldSkip pins the
-// gate-weakening guard from adversarial review: if every live own predicate is
-// out-of-scope, demotion is CANCELLED — a stray broad literal in each
-// predicate must not let a cycle ship with zero live own predicates (a real
-// red would vanish with them).
 func TestRunGoTest_DemotionFloorCancelsWhenAllOwnPredicatesWouldSkip(t *testing.T) {
 	root := t.TempDir()
 	modDir := filepath.Join(root, "go")

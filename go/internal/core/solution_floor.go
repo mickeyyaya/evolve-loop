@@ -7,16 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
 )
 
-// solution_floor.go — ADR-0099 slice 2: the document deliverable's deterministic
-// handoff floor. A `document` cycle delivers <root>/<slug>/ (candidate options +
-// recommendation + assumptions-and-evidence); the ONE engine that judges its
-// shape (internal/solutioncheck) is projected here as a BuildFloorCheckFn so the
-// E2 correction ladder fixes a malformed deliverable in-phase, exactly as the Go
-// floors do for code. The kind and the bound slugs come from the kernel's own
-// reads — the triage-authoritative report header and the triage decision —
-// never from the builder's report. SolutionViolations is the single
-// classification + collection every projection (floor, audit gate) calls.
-
 // CtxKeyDeliverableKindDefault carries the project's default deliverable kind
 // (.evolve/domain.json) to the scout/triage prompts, so a task that declares
 // no kind inherits the project's.
@@ -48,12 +38,7 @@ func ChainBuildFloorChecks(fns ...BuildFloorCheckFn) BuildFloorCheckFn {
 }
 
 // SolutionViolations judges every bound task's deliverable for a document
-// cycle: nil for a code cycle; otherwise one line per contract violation. The
-// tree is the worktree when the cycle has one, else the project root (degraded
-// provisioning) — the ONE tree-resolution rule for the floor and the audit
-// gate. A document cycle that binds NO task is itself a violation: the
-// contract cannot be verified for any deliverable, and "nothing to check" must
-// never read as "checked, clean" (the topngate class).
+// cycle: nil for a code cycle; otherwise one line per contract violation.
 func SolutionViolations(workspace, worktree, projectRoot string, spec config.DeliverableKindSpec) []string {
 	if !DocumentCycle(workspace) {
 		return nil
@@ -75,10 +60,8 @@ func SolutionViolations(workspace, worktree, projectRoot string, spec config.Del
 	return out
 }
 
-// DocumentCycle reports whether the cycle's authoritative deliverable kind (the
-// kernel's own digest of the scout/triage report headers) is document — the
-// single classification predicate the floor, the audit gate, the task contract
-// and ship share.
+// DocumentCycle reports whether the cycle's authoritative deliverable kind is
+// document.
 func DocumentCycle(workspace string) bool {
 	if workspace == "" {
 		return false
@@ -86,9 +69,8 @@ func DocumentCycle(workspace string) bool {
 	return kindSignals(workspace).DeliverableKind() == config.DeliverableKindDocument
 }
 
-// seedDispatchContext is the ONE place both dispatch surfaces (the live loop
-// and resume) enrich a phase's context from the cycle's records: the Task
-// Contract (ADR-0098) and the project's default deliverable kind (ADR-0099).
+// seedDispatchContext is the one place both dispatch surfaces enrich a
+// phase's context from the cycle's records.
 func (o *Orchestrator) seedDispatchContext(ctx context.Context, base map[string]string, next Phase, cs CycleState, projectRoot string) map[string]string {
 	out := o.seedTaskContract(ctx, base, next, cs, projectRoot)
 	out = seedDomainDefault(out, next, projectRoot)
@@ -98,10 +80,8 @@ func (o *Orchestrator) seedDispatchContext(ctx context.Context, base map[string]
 	return out
 }
 
-// CtxKeyDeliverableRoot carries the registry's document deliverable root
-// (deliverable_kinds.document.root) to the kind-declaring phases, whose
-// prompts carry no Task Contract block — so a scout's files= paths and a
-// triage bullet name the ONE configured root, never a remembered one.
+// CtxKeyDeliverableRoot carries the registry's document deliverable root to
+// the kind-declaring phases, whose prompts carry no Task Contract block.
 const CtxKeyDeliverableRoot = "deliverable_root"
 
 // seedDeliverableRoot adds the configured root to a kind-declaring phase's
@@ -119,10 +99,7 @@ func seedDeliverableRoot(base map[string]string, next Phase, root string) map[st
 }
 
 // seedDomainDefault adds the project's default deliverable kind to the scout
-// and triage dispatch context when .evolve/domain.json declares one — the
-// first Go reader of that file. Other phases and projects without the file are
-// untouched; a file that exists but cannot be parsed is reported loudly and
-// leaves the default absent (the code side), never a silent reclassification.
+// and triage dispatch context when .evolve/domain.json declares one.
 func seedDomainDefault(base map[string]string, next Phase, projectRoot string) map[string]string {
 	if !kindDeclaringPhase(next) {
 		return base

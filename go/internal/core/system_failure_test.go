@@ -10,14 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// ADR-0072 S3: the Go floor. A recorded-negative cycle whose on-disk artifacts
-// are green is verdict-incoherence (the pipeline forged the verdict) → HALT.
-// A recorded-negative with a RED artifact is a genuine task failure → nil.
-
-// writeVerdicts writes a FULLY-VALID audit-report.md (the required ## Verdict
-// section + a PASS-vocabulary sentinel) plus the acs-verdict.json. The forgery
-// (halt) path is driven by an injected okStubVerifier returning ok=false or by an
-// unconfigured (nil) verifier — independent of the on-disk report's shape.
+// writeVerdicts writes a fully-valid audit-report.md (the required ## Verdict
+// section + a PASS-vocabulary sentinel) plus the acs-verdict.json.
 func writeVerdicts(t *testing.T, dir, audit, acs string) {
 	t.Helper()
 	if audit != "" {
@@ -34,11 +28,8 @@ func writeVerdicts(t *testing.T, dir, audit, acs string) {
 }
 
 // okStubVerifier is a controllable ContractVerifier double: VerifyDeliverable
-// returns ok verbatim, so a test can drive the reconcile-vs-halt branch off the
-// deliverable's well-formedness INDEPENDENTLY of the (green) verdict sentinel —
-// proving detectVerdictIncoherence keys off the FULL Verify, not ReadCycleVerdicts's
-// cheap sentinel parse. (Distinct from correction_ladder_test.go's path-aware
-// fakeVerifier — this one needs no filesystem fixture.)
+// returns ok verbatim, distinct from correction_ladder_test.go's path-aware
+// fakeVerifier — this one needs no filesystem fixture.
 type okStubVerifier struct{ ok bool }
 
 func (v okStubVerifier) VerifyDeliverable(_ context.Context, _ ReviewInput) (ContractVerification, error) {
@@ -46,13 +37,9 @@ func (v okStubVerifier) VerifyDeliverable(_ context.Context, _ ReviewInput) (Con
 }
 
 func TestDetectVerdictIncoherence_ForgedVerdict_Halts(t *testing.T) {
-	// No ContractVerifier configured → DeliverableValid can never be proven → the
-	// pre-fix conservative halt: green sentinels with no way to verify the
-	// deliverable is a forged verdict, not a reconcile. (The reconcile self-heal is
-	// exercised with an injected verifier in TestDetectVerdictIncoherence_ReconcileUsesFullVerify.)
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
-	writeVerdicts(t, dir, "PASS", "PASS") // green artifacts
+	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 1, WorkspacePath: dir}
 
 	sig, reconciled := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL)
@@ -79,10 +66,6 @@ func TestDetectVerdictIncoherence_SilentNoShip_DefersToOrchestrator(t *testing.T
 	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 2, WorkspacePath: dir}
 
-	// The "silent no-ship" (CycleOutcomeSkippedUnknown) is NOT hard-halted by
-	// the deterministic floor — a benign no-op cycle can also produce it, so the
-	// floor stays narrow (recorded FAIL/WARN only) and leaves the ambiguous skip
-	// to the orchestrator's judgment layer (S4). No false-halt on a benign skip.
 	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, CycleOutcomeSkippedUnknown); sig != nil {
 		t.Errorf("silent no-ship must NOT hard-halt (deferred to orchestrator), got %+v", sig)
 	}
@@ -91,7 +74,7 @@ func TestDetectVerdictIncoherence_SilentNoShip_DefersToOrchestrator(t *testing.T
 func TestDetectVerdictIncoherence_GenuineFail_NoHalt(t *testing.T) {
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
-	writeVerdicts(t, dir, "FAIL", "PASS") // RED audit artifact = genuine failure
+	writeVerdicts(t, dir, "FAIL", "PASS")
 	cs := CycleState{CycleID: 3, WorkspacePath: dir}
 
 	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig != nil {
@@ -99,17 +82,6 @@ func TestDetectVerdictIncoherence_GenuineFail_NoHalt(t *testing.T) {
 	}
 }
 
-// TestDetectVerdictIncoherence_ReconcileUsesFullVerify — the clean-exit-late-write
-// self-heal, proven to key off the FULL deliverable.Verify chain (the injected
-// ContractVerifier) and NOT the cheap ParseVerdictSentinel read. Both fixtures
-// have the IDENTICAL green audit+acs sentinels (so ReadCycleVerdicts sees
-// audit=PASS, acs=PASS in both) — only the verifier's OK differs: OK=true →
-// reconcile (nil signal), OK=false → still halt. If the code trusted the sentinel
-// alone, both would resolve the same way; that they diverge proves the branch
-// keys off the full Verify. The real verifier (deliverable.NewVerifierWithCatalog
-// Stage) is wired at the composition root and its correctness is covered by the
-// deliverable package's own tests; core cannot import it (import cycle), so the
-// unit-level proof uses the injected double.
 func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
 	newOrch := func(verifyOK bool) *Orchestrator {
 		return &Orchestrator{
@@ -118,8 +90,6 @@ func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
 		}
 	}
 
-	// Green sentinels + a deliverable that FULLY verifies → benign late-write race
-	// → reconcile (nil signal, reconciled=true).
 	valid := t.TempDir()
 	writeVerdicts(t, valid, "PASS", "PASS")
 	sig, reconciled := newOrch(true).detectVerdictIncoherence(context.Background(), CycleState{CycleID: 1, WorkspacePath: valid}, VerdictFAIL)
@@ -127,8 +97,6 @@ func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
 		t.Errorf("green artifacts + valid deliverable must reconcile (nil signal), got sig=%+v reconciled=%v", sig, reconciled)
 	}
 
-	// IDENTICAL green sentinels but the deliverable does NOT verify (a malformed
-	// report merely tagged with a PASS sentinel) → genuine forgery → still halt.
 	forged := t.TempDir()
 	writeVerdicts(t, forged, "PASS", "PASS")
 	sig, reconciled = newOrch(false).detectVerdictIncoherence(context.Background(), CycleState{CycleID: 2, WorkspacePath: forged}, VerdictFAIL)
@@ -141,7 +109,6 @@ func TestDetectVerdictIncoherence_ReconcileUsesFullVerify(t *testing.T) {
 }
 
 func TestWithFailurePolicy_InjectsResolvedPolicy(t *testing.T) {
-	// Names WithFailurePolicy + the SystemFailureSignal alias (apicover).
 	o := &Orchestrator{}
 	WithFailurePolicy(policy.DefaultSystemFailurePolicy())(o)
 	if !o.failurePolicy.IsFloor(policy.CategoryVerdictIncoherence) {
@@ -164,18 +131,10 @@ func TestDetectVerdictIncoherence_PassVerdict_NoHalt(t *testing.T) {
 	}
 }
 
-// TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt — the cycle-930/931/932
-// false-HALT regression. The audit agent writes a PASS report + green ACS, but a
-// runner-side CI-parity gate (the integration tier) legitimately downgrades the
-// verdict to FAIL; the record chokepoint stamps the reasons into ORCHESTRATOR
-// MEMORY (cs.AuditFailReasons). That FAIL is DIAGNOSED — a coherent task-level
-// outcome (retro + continue), NOT a forged verdict — so the floor must NOT halt.
-// Before this fix, detectVerdictIncoherence never populated SubstantiveError, so
-// every diagnosed gate-downgrade with green artifacts halted the whole batch.
 func TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt(t *testing.T) {
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
-	writeVerdicts(t, dir, "PASS", "PASS") // green artifacts (the agent's own view)
+	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 932, WorkspacePath: dir,
 		AuditFailReasons: []string{"the integration tier (`go test -tags integration`) reported 12 offender(s)"}}
 
@@ -184,21 +143,10 @@ func TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt(t *testing.T) {
 	}
 }
 
-// TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts — the trust
-// boundary (go-review HIGH): the workspace is agent-writable, so a
-// <phase>-fail-reason.json dropped there by ANY writer — a prompt-injected
-// auditor, a later phase sharing the workspace — must NOT be able to talk the
-// floor out of halting. Only the orchestrator's in-memory cs.AuditFailReasons
-// (set at the verdict-record chokepoint) marks a FAIL as explained; the file is
-// forensic output, never floor input.
 func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing.T) {
-	// A deliverable that does NOT verify (ok=false) is the genuine forgery under
-	// test; the point is that an agent-writable reason file cannot rescue it.
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
-	// A perfectly VALID reason file, planted in the workspace — but no
-	// orchestrator-memory record of a diagnosed downgrade.
 	if err := os.WriteFile(filepath.Join(dir, "audit-fail-reason.json"),
 		[]byte(`{"schema_version":1,"phase":"audit","reasons":["EGPS: red_count=1"]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -210,13 +158,7 @@ func TestDetectVerdictIncoherence_WorkspaceReasonFileAlone_StillHalts(t *testing
 	}
 }
 
-// TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts — defensive: a
-// record call whose diagnostics carry NO error severity explains nothing, so
-// the forged-verdict floor keeps halting (warning-only diags never suppress).
 func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
-	// Deliverable does not verify (ok=false) → the forgery signature stands; the
-	// point is that warning-only diags explain nothing (SubstantiveError stays
-	// false), so they never suppress the halt.
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
@@ -230,20 +172,10 @@ func TestDetectVerdictIncoherence_WarningOnlyDiags_StillHalts(t *testing.T) {
 	}
 }
 
-// TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt — cycle-1329
-// (pipeline-defect-pipeline-blocker, scout Task 1). The audit + ACS both
-// recorded PASS (161/161 green), but the SHIP phase legitimately rejected the
-// cycle post-audit (REPO_CONTRACT_GATE: "repo-contract scanner pack RED ...
-// pushing would red main"). That is a real, explained ship-phase failure — a
-// coherent task-level outcome (retro + continue) — NOT a forged verdict.
-// Before this fix, SubstantiveError was computed from cs.AuditFailReasons
-// alone, so this exact shape (green audit + green ACS + recorded FAIL) was
-// indistinguishable from cycles 862→899's genuine forgery and halted the
-// batch (3x identical-fingerprint recurrence, ship|unknown|76d0f4fca190).
 func TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt(t *testing.T) {
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy()}
 	dir := t.TempDir()
-	writeVerdicts(t, dir, "PASS", "PASS") // audit-report PASS + acs-verdict.json PASS, exactly cycle-1329's shape
+	writeVerdicts(t, dir, "PASS", "PASS")
 	cs := CycleState{CycleID: 1329, WorkspacePath: dir,
 		ShipFailReasons: []string{
 			"repo-contract scanner pack RED in the lane worktree (exit status 1) — pushing would red main; " +
@@ -256,18 +188,11 @@ func TestDetectVerdictIncoherence_ShipPhaseExplainedFail_NoHalt(t *testing.T) {
 	}
 }
 
-// TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField —
-// regression guard: adding the ship-phase carrier must not disturb the
-// existing audit-phase-only signal. AuditFailReasons alone (ShipFailReasons
-// empty/nil) still suppresses the halt exactly as the cycles-930/931/932 fix
-// already covers (TestDetectVerdictIncoherence_DiagnosedGateFail_NoHalt);
-// this test additionally pins that an EMPTY ShipFailReasons never itself
-// contributes a false explanation when AuditFailReasons is also empty.
 func TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField(t *testing.T) {
 	o := &Orchestrator{failurePolicy: policy.DefaultSystemFailurePolicy(), contractVerifier: okStubVerifier{ok: false}}
 	dir := t.TempDir()
 	writeVerdicts(t, dir, "PASS", "PASS")
-	cs := CycleState{CycleID: 1330, WorkspacePath: dir} // both AuditFailReasons and ShipFailReasons nil/empty
+	cs := CycleState{CycleID: 1330, WorkspacePath: dir}
 
 	if sig, _ := o.detectVerdictIncoherence(context.Background(), cs, VerdictFAIL); sig == nil {
 		t.Fatal("with neither AuditFailReasons nor ShipFailReasons populated, an unexplained FAIL with green " +
@@ -275,10 +200,6 @@ func TestDetectVerdictIncoherence_AuditPhaseBehaviorUnchangedByShipField(t *test
 	}
 }
 
-// TestRecordFloorVerdictFailure_PersistsAuditFailReason — the wiring: the shared
-// floor-verdict recorder (live loop + resume path) must stamp the downgrade
-// reasons into cs.AuditFailReasons (the coherence floor's authoritative source)
-// AND write the forensic workspace file (the untruncated "why" for retros).
 func TestRecordFloorVerdictFailure_PersistsAuditFailReason(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	dir := t.TempDir()
@@ -300,13 +221,6 @@ func TestRecordFloorVerdictFailure_PersistsAuditFailReason(t *testing.T) {
 	}
 }
 
-// TestPersistFloorFailReasons_ClobberAndReset — staleness (go-review
-// MEDIUM-HIGH): audit can be re-dispatched within one cycle (ship-error
-// recovery re-audit, debugger RERUN_PHASE). A superseding record with no
-// error-severity diags must CLOBBER the prior explanation (memory + file), and
-// the dispatch-time reset must clear both — a stale explanation from a
-// superseded attempt must never mark a later, differently-caused FAIL as
-// diagnosed.
 func TestPersistFloorFailReasons_ClobberAndReset(t *testing.T) {
 	dir := t.TempDir()
 	cs := &CycleState{CycleID: 8, WorkspacePath: dir}
@@ -316,7 +230,6 @@ func TestPersistFloorFailReasons_ClobberAndReset(t *testing.T) {
 		t.Fatalf("setup: first record must set memory+file; got mem=%v file=%v", cs.AuditFailReasons, readFloorFailReasons(dir, PhaseAudit))
 	}
 
-	// Superseding record with warning-only diags → both carriers cleared.
 	persistFloorFailReasons(cs, PhaseAudit, []Diagnostic{{Severity: "warning", Message: "gate skipped"}})
 	if cs.AuditFailReasons != nil {
 		t.Errorf("superseding warning-only record must clobber cs.AuditFailReasons, got %v", cs.AuditFailReasons)
@@ -325,7 +238,6 @@ func TestPersistFloorFailReasons_ClobberAndReset(t *testing.T) {
 		t.Errorf("superseding warning-only record must remove the forensic file, got %v", got)
 	}
 
-	// Re-record, then the dispatch-time reset clears both again.
 	persistFloorFailReasons(cs, PhaseAudit, []Diagnostic{{Severity: "error", Message: "go vet reported 1 issue"}})
 	resetFloorFailReason(cs, PhaseAudit)
 	if cs.AuditFailReasons != nil || readFloorFailReasons(dir, PhaseAudit) != nil {

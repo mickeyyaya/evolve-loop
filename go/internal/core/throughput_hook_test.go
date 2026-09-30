@@ -2,11 +2,6 @@ package core
 
 import "testing"
 
-// R9.1 (concurrency-factory plan): the throughput-recorder seam. The
-// orchestrator records observed builder throughput (coverage floors passed
-// per cycle) ONLY for cycles that actually shipped — that is what makes the
-// window an honest capacity signal for the R9.2 clamp.
-
 func TestShippedOutcome(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -30,9 +25,6 @@ func TestShippedOutcome(t *testing.T) {
 	}
 }
 
-// TestThroughputRecorderWired_Probe: nil seam (default) reports unwired;
-// WithThroughputRecorder flips the probe — the composition-root wiring test
-// in cmd/evolve asserts the production root passes it.
 func TestThroughputRecorderWired_Probe(t *testing.T) {
 	bare := &Orchestrator{}
 	if bare.ThroughputRecorderWired() {
@@ -45,11 +37,6 @@ func TestThroughputRecorderWired_Probe(t *testing.T) {
 	}
 }
 
-// TestIsShippingVerdict_WholeOutcomeVocabulary walks every label the
-// ADR-0079 outcome vocabulary can put in CycleResult.FinalVerdict. The
-// allowlist shape is load-bearing: SKIPPED_UNKNOWN once fell through a
-// denylist-shaped breaker, so an unrecognised label must classify as
-// NON-shipping rather than defaulting to "shipped".
 func TestIsShippingVerdict_WholeOutcomeVocabulary(t *testing.T) {
 	tests := []struct {
 		verdict string
@@ -73,11 +60,6 @@ func TestIsShippingVerdict_WholeOutcomeVocabulary(t *testing.T) {
 	}
 }
 
-// TestIsShippingVerdict_IsTheOneDefinitionShippedOutcomeUses pins the
-// coupling that justifies exporting it: with HEAD moved, shippedOutcome must
-// agree with IsShippingVerdict on EVERY label. cmd/evolve's non-progress
-// breaker consumes the same function negated, so a divergence here is a
-// divergence between the throughput window and the breaker.
 func TestIsShippingVerdict_IsTheOneDefinitionShippedOutcomeUses(t *testing.T) {
 	for _, v := range []string{
 		VerdictPASS, VerdictFAIL, VerdictWARN,

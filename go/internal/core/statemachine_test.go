@@ -4,17 +4,6 @@ import (
 	"testing"
 )
 
-// Phase transition graph encoded by NewStateMachine:
-//
-//	(start)  → intent? → scout → triage → tdd → build-planner → build → audit
-//	                                                                      ├─ ship  (PASS / WARN per EGPS)
-//	                                                                      └─ retro → ship (recovered) | end (BLOCK)
-//	                                                                      └─ retro → tdd (RETRY)
-//	build-planner is skipped (SKIPPED verdict) when EVOLVE_BUILD_PLANNER != "1".
-//
-// The transition table is the source of truth; tests validate every
-// edge listed in §2 of the parent plan + the failure-adapter PROCEED/
-// RETRY/BLOCK semantics.
 func TestStateMachine_CanTransition_Allowed(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()
@@ -22,21 +11,21 @@ func TestStateMachine_CanTransition_Allowed(t *testing.T) {
 		from, to Phase
 	}{
 		{PhaseStart, PhaseIntent},
-		{PhaseStart, PhaseScout}, // intent optional
+		{PhaseStart, PhaseScout},
 		{PhaseIntent, PhaseScout},
 		{PhaseScout, PhaseTriage},
-		{PhaseScout, PhaseTDD}, // triage may be skipped (EVOLVE_TRIAGE_DISABLE)
+		{PhaseScout, PhaseTDD},
 		{PhaseTriage, PhaseTDD},
 		{PhaseTDD, PhaseBuildPlanner},
-		{PhaseTDD, PhaseBuild}, // direct edge kept for skip-through CanTransition checks
+		{PhaseTDD, PhaseBuild},
 		{PhaseBuildPlanner, PhaseBuild},
 		{PhaseBuild, PhaseAudit},
 		{PhaseAudit, PhaseShip},
 		{PhaseAudit, PhaseRetro},
-		{PhaseRetro, PhaseShip}, // retro recovered → ship
-		{PhaseRetro, PhaseTDD},  // retro retry → re-enter loop
+		{PhaseRetro, PhaseShip},
+		{PhaseRetro, PhaseTDD},
 		{PhaseShip, PhaseEnd},
-		{PhaseRetro, PhaseEnd}, // retro BLOCK → end
+		{PhaseRetro, PhaseEnd},
 	}
 	for _, edge := range allowed {
 		t.Run(string(edge.from)+"→"+string(edge.to), func(t *testing.T) {
@@ -53,16 +42,13 @@ func TestStateMachine_CanTransition_Disallowed(t *testing.T) {
 	denied := []struct {
 		from, to Phase
 	}{
-		{PhaseStart, PhaseShip},  // can't ship without building
-		{PhaseStart, PhaseBuild}, // skipping scout/tdd
-		{PhaseBuild, PhaseShip},  // must audit first
-		{PhaseScout, PhaseAudit}, // skipping tdd+build
-		{PhaseEnd, PhaseShip},    // terminal
-		{PhaseEnd, PhaseStart},   // terminal
-		{PhaseShip, PhaseRetro},  // already shipped
-		// NOTE: triage→build and scout→build are now LEGAL — dynamic routing
-		// skips tdd on trivial cycles (tdd is conditional-mandatory, not a hard
-		// gate). The artifact-backed SpineSatisfiedUpTo gate enforces the spine.
+		{PhaseStart, PhaseShip},
+		{PhaseStart, PhaseBuild},
+		{PhaseBuild, PhaseShip},
+		{PhaseScout, PhaseAudit},
+		{PhaseEnd, PhaseShip},
+		{PhaseEnd, PhaseStart},
+		{PhaseShip, PhaseRetro},
 	}
 	for _, edge := range denied {
 		t.Run(string(edge.from)+"→"+string(edge.to), func(t *testing.T) {
@@ -73,8 +59,6 @@ func TestStateMachine_CanTransition_Disallowed(t *testing.T) {
 	}
 }
 
-// Next determines the post-phase target based on Verdict + caller hints.
-// Audit verdict drives the most important branch (ship vs retro).
 func TestStateMachine_Next(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()

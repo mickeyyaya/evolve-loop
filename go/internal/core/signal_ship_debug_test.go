@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// ADR-0103 unit 07 — the ONE ship.error producer projects shiperr.SignalDebugKeys
-// from the ShipError's Debug map into Event.Fields when non-empty (the triage
-// whitelist: step, git_rc, worktree, branch, cycle_branch, repair_outcome) and
-// never any other Debug key; a Debug without them leaves the fields as before.
 func TestEmitShipError_ProjectsSignalDebugKeys(t *testing.T) {
 	t.Parallel()
 	c, got := recordingCenter()

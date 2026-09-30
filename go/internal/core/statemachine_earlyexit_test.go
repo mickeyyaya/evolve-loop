@@ -2,9 +2,6 @@ package core
 
 import "testing"
 
-// TestCanTerminateEarly covers the early-exit predicate: the advisor may end a
-// cycle early ONLY as a no-ship convergence (e.g. scout found nothing), and
-// NEVER as a path that reaches end having intended to ship.
 func TestCanTerminateEarly(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()
@@ -31,9 +28,6 @@ func TestCanTerminateEarly(t *testing.T) {
 	}
 }
 
-// TestEarlyExitEdgesAreStructurallyLegal confirms the guarded scout/triage→end
-// edges exist in the allow-list (so the orchestrator's CanTransition check
-// passes once CanTerminateEarly has authorized the hop).
 func TestEarlyExitEdgesAreStructurallyLegal(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()
@@ -45,10 +39,6 @@ func TestEarlyExitEdgesAreStructurallyLegal(t *testing.T) {
 	}
 }
 
-// TestEarlyExit_NeverShipsWithoutFloor is the property guard: across every
-// (from, shipPlanned) combination the predicate authorizes, a ship-intended
-// cycle is NEVER allowed to terminate early. This is the safety invariant the
-// kernel must defend — early-exit can only ever drop a no-ship cycle.
 func TestEarlyExit_NeverShipsWithoutFloor(t *testing.T) {
 	t.Parallel()
 	sm := NewStateMachine()
