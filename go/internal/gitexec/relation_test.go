@@ -35,8 +35,6 @@ func relCommit(t *testing.T, dir, name string) {
 	relGit(t, dir, "commit", "-q", "-m", "add "+name)
 }
 
-// relationFixture: a bare origin with one commit on main, a seed clone that
-// can advance origin, and the checkout under test.
 func relationFixture(t *testing.T) (seed, checkout string) {
 	t.Helper()
 	origin := filepath.Join(t.TempDir(), "origin.git")
@@ -55,8 +53,6 @@ func relationFixture(t *testing.T) (seed, checkout string) {
 	return seed, checkout
 }
 
-// TestRelationToRemote_FourKinds pins the single main-relation resolver the
-// wave boundary and the lane base share (2026-09-09 token-waste root cause #3).
 func TestRelationToRemote_FourKinds(t *testing.T) {
 	ctx := context.Background()
 	for _, tc := range []struct {
@@ -96,8 +92,6 @@ func TestRelationToRemote_FourKinds(t *testing.T) {
 	}
 }
 
-// TestRelationToRemote_UnknownRefIsAnError: no guessing — an unresolvable
-// remote ref is reported, never classified.
 func TestRelationToRemote_UnknownRefIsAnError(t *testing.T) {
 	_, checkout := relationFixture(t)
 	if _, err := (Git{Dir: checkout, Exec: sysexec.DefaultRunner}).RelationToRemote(context.Background(), "origin/nope"); err == nil {
@@ -105,8 +99,6 @@ func TestRelationToRemote_UnknownRefIsAnError(t *testing.T) {
 	}
 }
 
-// TestMainRelation_ZeroValueString: the rendered sentence never panics or
-// lies on an unresolved relation.
 func TestMainRelation_ZeroValueString(t *testing.T) {
 	var rel MainRelation
 	if got := rel.String(); !strings.Contains(got, "unknown") {
@@ -114,9 +106,6 @@ func TestMainRelation_ZeroValueString(t *testing.T) {
 	}
 }
 
-// TestRelationToRemote_UnparseableCountsAreAnError: "nothing here guesses a
-// state" — a rev-list count that is not two integers is an error, never a
-// silent zero that could reclassify AHEAD as BEHIND.
 func TestRelationToRemote_UnparseableCountsAreAnError(t *testing.T) {
 	fake := func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
 		switch {

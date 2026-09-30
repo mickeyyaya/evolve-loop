@@ -7,29 +7,8 @@ import (
 	"testing"
 )
 
-// writer_mode_test.go — RED contract for cycle-1290 T1
-// (`faillearn-publish-mode-parity`, cycle-1287 audit defects[0] / F1 MEDIUM).
-//
-// The defect: writeIfAbsent publishes through os.CreateTemp (mode 0600) + os.Link
-// with no Chmod, while internal/atomicwrite.Bytes documents and enforces 0644 for
-// every other published runtime artifact. So the failure floor's OWN artifacts —
-// retrospective-report.md, lessons/*.yaml, .evolve/inbox/*.json — land 0600: read
-// only by the uid that minted them, while other fleet lanes and the operator are
-// the intended readers. Nothing in the tree pins the mode today, which is why the
-// 1285 stat-then-write → link-publish rewrite could drop it silently.
-//
-// publishedMode is the contract constant: the same literal atomicwrite.Bytes
-// applies. It is spelled out here rather than imported so faillearn stays a leaf
-// package (stdlib + yaml.v3) in test builds too; the parity is asserted against
-// atomicwrite's documented value, cited at atomicwrite.go:61-63.
 const publishedMode fs.FileMode = 0o644
 
-// TestWriteArtifacts_PublishedArtifactsHaveMode0644 is the primary criterion. It
-// drives the real production entry point (WriteArtifacts — the same call
-// core.writeDeterministicLearning makes) and stats every artifact the call
-// publishes, so it fails on the shipped defect rather than on a re-implementation
-// of it. An explicit Chmod is required for this to green: os.CreateTemp's 0600 is
-// not umask-derived, so no runner configuration can make the current code pass.
 func TestWriteArtifacts_PublishedArtifactsHaveMode0644(t *testing.T) {
 	runDir, lessonsDir, inboxDir := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "inbox")
 
@@ -50,7 +29,8 @@ func TestWriteArtifacts_PublishedArtifactsHaveMode0644(t *testing.T) {
 			paths = append(paths, filepath.Join(lessonsDir, e.Name()))
 		}
 	}
-	if len(paths) != 4 { // report + 2 inbox items + 1 lesson
+	const reportPlusTwoInboxItemsPlusLesson = 4
+	if len(paths) != reportPlusTwoInboxItemsPlusLesson {
 		t.Fatalf("expected 4 published artifacts to stat, got %d (%v)", len(paths), paths)
 	}
 
@@ -67,10 +47,6 @@ func TestWriteArtifacts_PublishedArtifactsHaveMode0644(t *testing.T) {
 	}
 }
 
-// TestWriteArtifacts_ModeParityAlsoHoldsWithoutTheInboxOption covers the three
-// option-free production callers (core/failure_learning.go, core/reset.go,
-// cmd/evolve/cmd_loop_outcome.go): they publish the report and the lesson through
-// the same path, so the fix must not be scoped to the inbox arm.
 func TestWriteArtifacts_ModeParityAlsoHoldsWithoutTheInboxOption(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
 
@@ -86,12 +62,6 @@ func TestWriteArtifacts_ModeParityAlsoHoldsWithoutTheInboxOption(t *testing.T) {
 	}
 }
 
-// TestWriteArtifacts_ExistingArtifactModeIsNotRewritten is the edge/OOD case and
-// the guard against the over-broad fix. writeIfAbsent's contract is "an existing
-// richer artifact wins"; a fix that chmods the DESTINATION instead of the temp
-// file would also rewrite a pre-existing operator- or LLM-authored file's mode,
-// which is a different (and unasked-for) behaviour change. The mode contract is
-// about files this call CREATES.
 func TestWriteArtifacts_ExistingArtifactModeIsNotRewritten(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
 
@@ -99,7 +69,7 @@ func TestWriteArtifacts_ExistingArtifactModeIsNotRewritten(t *testing.T) {
 	if err := os.WriteFile(report, []byte("# richer LLM-authored retrospective\n"), 0o600); err != nil {
 		t.Fatalf("seed existing retrospective: %v", err)
 	}
-	if err := os.Chmod(report, 0o600); err != nil { // defeat any umask interference on the seed
+	if err := os.Chmod(report, 0o600); err != nil {
 		t.Fatalf("chmod seed: %v", err)
 	}
 

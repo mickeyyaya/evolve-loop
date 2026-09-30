@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// redCIOpts wires a happy-path repo whose release-commit CI verdict is a
-// faked red run — no network, no live gh (AC2 of push-ci-watch-remote-parity,
-// cycle-748).
 func redCIOpts(t *testing.T) (Options, *bytes.Buffer) {
 	t.Helper()
 	opts := stubOpts(makeRepo(t, "1.0.0"), "1.0.1")
@@ -21,10 +18,6 @@ func redCIOpts(t *testing.T) (Options, *bytes.Buffer) {
 	return opts, &buf
 }
 
-// TestRun_RefusesTagOnRedReleaseCommitCI pins the hard-gate: when the release
-// commit's go CI run conclusion is not success, preflight refuses (v22.0.0
-// was cut on red CI; this makes that structurally impossible without an
-// explicit override).
 func TestRun_RefusesTagOnRedReleaseCommitCI(t *testing.T) {
 	opts, buf := redCIOpts(t)
 	_, err := Run(opts)
@@ -38,7 +31,6 @@ func TestRun_RefusesTagOnRedReleaseCommitCI(t *testing.T) {
 		t.Errorf("err = %v, want the override flag named for the operator", err)
 	}
 
-	// A pending (not yet completed) run must also refuse — "pushed" is not "green".
 	opts2, _ := redCIOpts(t)
 	opts2.CIConclusion = func(string) (CIRunStatus, error) {
 		return CIRunStatus{Conclusion: "pending", RunURL: "https://x/runs/9"}, nil
@@ -47,7 +39,6 @@ func TestRun_RefusesTagOnRedReleaseCommitCI(t *testing.T) {
 		t.Errorf("pending CI: err = %v, want ErrCheckFailed", err)
 	}
 
-	// Green CI passes the gate.
 	opts3, _ := redCIOpts(t)
 	opts3.CIConclusion = func(string) (CIRunStatus, error) {
 		return CIRunStatus{Conclusion: "success"}, nil
@@ -60,8 +51,6 @@ func TestRun_RefusesTagOnRedReleaseCommitCI(t *testing.T) {
 		t.Errorf("green CI: Result = {CIConclusion:%q CIOverridden:%v}, want success/false", res.CIConclusion, res.CIOverridden)
 	}
 
-	// Unavailable verdict (no run visible / gh absent) is advisory-skipped —
-	// the determinism rule: absent tooling never blocks, only a present red does.
 	opts4, buf4 := redCIOpts(t)
 	opts4.CIConclusion = func(string) (CIRunStatus, error) { return CIRunStatus{}, nil }
 	if _, err := Run(opts4); err != nil {
@@ -69,9 +58,6 @@ func TestRun_RefusesTagOnRedReleaseCommitCI(t *testing.T) {
 	}
 }
 
-// TestRun_CIOverrideAllowsRedCIAndLogsLoudly pins the override edge: the
-// explicit operator flag lets a red-CI release proceed, is visible in the
-// preflight log (never silent), and is recorded in the Result.
 func TestRun_CIOverrideAllowsRedCIAndLogsLoudly(t *testing.T) {
 	opts, buf := redCIOpts(t)
 	opts.AllowRedCI = true

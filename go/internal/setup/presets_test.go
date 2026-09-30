@@ -5,10 +5,9 @@ import (
 	"testing"
 )
 
-// 1. With no override, LoadPresets returns the shipped (embedded) default: the
-// three named presets with their bias strategies.
 func TestLoadPresets_EmbeddedDefault(t *testing.T) {
-	cfg, err := LoadPresets(t.TempDir()) // no setup-presets.json in this dir
+	evolveDirWithoutOverride := t.TempDir()
+	cfg, err := LoadPresets(evolveDirWithoutOverride)
 	if err != nil {
 		t.Fatalf("LoadPresets default: %v", err)
 	}
@@ -27,7 +26,6 @@ func TestLoadPresets_EmbeddedDefault(t *testing.T) {
 	}
 }
 
-// 2. A per-repo .evolve/setup-presets.json overrides the shipped default.
 func TestLoadPresets_OverrideWins(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeFile(t, filepath.Join(evolveDir, "setup-presets.json"), `{
@@ -43,7 +41,6 @@ func TestLoadPresets_OverrideWins(t *testing.T) {
 	}
 }
 
-// 3. A malformed override is surfaced, not silently ignored.
 func TestLoadPresets_MalformedOverride_Errors(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeFile(t, filepath.Join(evolveDir, "setup-presets.json"), `{not json`)
@@ -52,7 +49,6 @@ func TestLoadPresets_MalformedOverride_Errors(t *testing.T) {
 	}
 }
 
-// 4. An override whose default names no defined preset is rejected.
 func TestLoadPresets_InvalidDefaultName_Errors(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeFile(t, filepath.Join(evolveDir, "setup-presets.json"), `{
@@ -64,7 +60,6 @@ func TestLoadPresets_InvalidDefaultName_Errors(t *testing.T) {
 	}
 }
 
-// 5. An override with no presets is rejected.
 func TestLoadPresets_EmptyPresets_Errors(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeFile(t, filepath.Join(evolveDir, "setup-presets.json"), `{"default":"","presets":[]}`)
@@ -73,8 +68,6 @@ func TestLoadPresets_EmptyPresets_Errors(t *testing.T) {
 	}
 }
 
-// 5b. An override with an unknown tier_bias strategy is rejected at load
-// (operator typo caught loudly, not silently treated as "default").
 func TestLoadPresets_UnknownTierBias_Errors(t *testing.T) {
 	evolveDir := t.TempDir()
 	writeFile(t, filepath.Join(evolveDir, "setup-presets.json"), `{
@@ -85,8 +78,6 @@ func TestLoadPresets_UnknownTierBias_Errors(t *testing.T) {
 	}
 }
 
-// 6. The SHIPPED default (embedded presets.json) must itself parse + validate —
-// a CI guard so a broken default can never ship.
 func TestBuiltinPresetsValid(t *testing.T) {
 	cfg, err := LoadPresets("")
 	if err != nil {

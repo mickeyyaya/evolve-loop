@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// fakeCapturer returns a canned pane per CLI, or an error if set.
 type fakeCapturer struct {
 	panes map[string]string
 	err   error
@@ -71,7 +70,6 @@ func TestRecipeListerNilCapturer(t *testing.T) {
 }
 
 func TestRecipeListerCustomParsers(t *testing.T) {
-	// The parser registry is overridable (open for extension).
 	l := RecipeLister{
 		Capturer: fakeCapturer{panes: map[string]string{"x": "anything"}},
 		Parsers:  map[string]PickerParser{"x": func(string) []string { return []string{"only-model"} }},

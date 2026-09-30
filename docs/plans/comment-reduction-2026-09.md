@@ -15,6 +15,7 @@
 | 2c | The one-line *whys* kept because no test pins them | Each is filed as an inbox item to pin the invariant with a test; the comment goes in that item's change. An item on a protected surface is console-owned, like the rest of this workstream; the others are lane-sized work for the loop. |
 | 2d | The per-cycle predicate packages `go/acs/cycle*` (494 files, 42,863 comment lines) | Editor rounds; a predicate's intent lives in its cycle's eval and reports, so there is little to capture. Four older predicates still require a doc on a named export (`acs/cycle1706` line 774, `cycle1698` line 673, `cycle1690` line 215, `cycle1685` line 306); they run again only when a lane changes their packages, so each is updated or archived in the same change that deletes the docs it reads (2a/2b) |
 | 2e | Regrowth | Set `comment_floor.stage` to `enforce` in `.evolve/policy.json`, so a lane build that adds a comment is corrected before its audit; see [Guard against regrowth](#guard-against-regrowth) |
+| 2f | Rounds 1–11 (batches 1–78), reduced before the self-explanation step existed | The same self-explanation pass per package, landed as reviewed refactor commits |
 
 ## Baseline
 
@@ -54,6 +55,7 @@ Each batch covers one package, or one file group of a large package.
    - **One batch at a time:** apply, prove, commit, then apply the next. `git apply --3way` stages its result and ship stages every changed file, so two applied batches can only land as one commit.
    - **Merge at a wave boundary only, after the full CI-parity floor.** Comment PRs merge after that boundary's feature train, then rebase and re-prove. The workstream always yields: lane PRs never rebase onto a comment PR mid-wave.
    - **Choosing a batch.** Skip files that an open PR, a carried-over or stranded lane, or an in-flight decomposition unit will touch. Comment edits next to code edits conflict textually.
+7. **Make the code say it** (from round 12). After the comment-only commit lands on the round's branch, a second agent per group reads what that commit deleted (`git show` of it) and, where a deleted comment said what the code does and the code no longer shows it, makes the code say it ([What a deleted comment leaves behind](../conventions/code-comments.md#what-a-deleted-comment-leaves-behind)). Steps 3 to 5 apply to the comment-only commit only: this pass changes code, so it is its own commit in the same PR, reviewed by the simplifier, the architecture reviewer and the Go reviewer, with the full floor. The editors' comment-only state is snapshotted first (`git stash create` plus a local ref), so the refactor delta is a clean diff against it.
 
 The editor prompt forbids git mutation and is scoped to its batch.
 
@@ -153,6 +155,12 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 76 | `internal/core`, file group 13 of 13 | 38 | 1,047 → 241 | — | on the round-11 comment PR |
 | 77 | `internal/flagregistry`, all files (1 of 1) | 9 | 240 → 39 | — | on the round-11 comment PR |
 | 78 | `internal/phases/triage`, all files (1 of 1) | 16 | 385 → 56 | — | on the round-11 comment PR |
+| 79 | `internal/modelquery`, `internal/phases/specrunner`, all files (5 decision-surface files deferred: a test hashes their bytes) | 33 | 1,139 → 6 | — | on the round-12 comment PR |
+| 80 | `internal/releasepipeline`, `internal/skillcheck`, `cmd/evolve-fake-cli`, all files | 37 | 1,374 → 15 | — | on the round-12 comment PR |
+| 81 | `internal/faillearn`, `internal/setup`, `internal/phases/retro`, all files | 39 | 1,397 → 15 | — | on the round-12 comment PR |
+| 82 | `internal/phases/audit/ciparitygate`, `internal/auditchain`, `internal/rollback`, all files | 42 | 1,300 → 12 | — | on the round-12 comment PR |
+| 83 | `internal/releasepreflight`, `internal/subagent/subagentrun`, `internal/commitgate`, all files | 38 | 1,345 → 9 | — | on the round-12 comment PR |
+| 84 | `internal/dashboard`, `internal/scopedelta`, `internal/gitexec`, all files | 39 | 1,265 → 10 | — | on the round-12 comment PR |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

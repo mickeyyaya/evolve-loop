@@ -11,11 +11,6 @@ import (
 	"strings"
 )
 
-// prepare is steps 8-11: the artifact path (workers override the profile
-// template) and its directory, the challenge token (the parent-dictated
-// override or a fresh mint), the git state the ledger stamps, the prompt
-// read and its composition. Each failure is ONE BRIDGE_SUBAGENT_PREPARE_FAILED
-// naming its step; the git fallback is BRIDGE_SUBAGENT_GIT_STATE_UNKNOWN.
 func (d *Dispatcher) prepare(ctx context.Context, req Request, id identity, p plan) (provenance, error) {
 	prov := provenance{artifactPath: artifactPathFor(req, id, p.profile.OutputArtifact)}
 	if err := os.MkdirAll(filepath.Dir(prov.artifactPath), 0o755); err != nil {
@@ -44,9 +39,6 @@ func (d *Dispatcher) prepare(ctx context.Context, req Request, id identity, p pl
 	return prov, nil
 }
 
-// artifactPathFor is step 8's placement rule: a worker writes under
-// <workspace>/workers/<agent>.md; everything else expands the profile's
-// template (an empty template yields "" and the run proceeds — quirk Q1).
 func artifactPathFor(req Request, id identity, template string) string {
 	if id.worker != "" {
 		return filepath.Join(req.WorkspacePath, "workers", req.Agent+".md")
@@ -54,8 +46,6 @@ func artifactPathFor(req Request, id identity, template string) string {
 	return ResolveArtifactPath(template, req.Cycle, req.ProjectRoot)
 }
 
-// token is step 9's first half: the parent-dictated override verbatim, else
-// a fresh mint from the dispatcher's entropy.
 func (d *Dispatcher) token(req Request) (string, error) {
 	if req.ChallengeTokenOverride != "" {
 		return req.ChallengeTokenOverride, nil
@@ -63,10 +53,6 @@ func (d *Dispatcher) token(req Request) (string, error) {
 	return MintToken(d.rand)
 }
 
-// gitState is step 9's second half: the port's head and tree-diff sha with
-// every empty value stamped "unknown" (the chain-hashed line is unchanged).
-// An error or a substitution is ONE BRIDGE_SUBAGENT_GIT_STATE_UNKNOWN naming
-// what was unavailable — the silent discard before unit 16.
 func (d *Dispatcher) gitState(ctx context.Context, req Request, id identity) (head, tree string) {
 	head, tree, err := d.deps.GitState(ctx, req.ProjectRoot)
 	var causes []string
@@ -86,9 +72,6 @@ func (d *Dispatcher) gitState(ctx context.Context, req Request, id identity) (he
 	return head, tree
 }
 
-// MintToken returns 16 lowercase hex chars (ChallengeTokenBytes random bytes
-// encoded) from rng; a short read is an error. The dispatcher's default rng
-// is crypto/rand — a nil rng is a programming error.
 func MintToken(rng func([]byte) (int, error)) (string, error) {
 	buf := make([]byte, ChallengeTokenBytes)
 	n, err := rng(buf)
@@ -101,9 +84,6 @@ func MintToken(rng func([]byte) (int, error)) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// ResolveArtifactPath expands {cycle} in the profile's output_artifact
-// template and returns an absolute path under projectRoot. Returns "" when
-// the template is empty (profile has no defined artifact).
 func ResolveArtifactPath(template string, cycle int, projectRoot string) string {
 	if template == "" {
 		return ""

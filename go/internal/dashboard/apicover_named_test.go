@@ -13,17 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// TestAPICoverNamedExports names and EXERCISES every exported symbol of this
-// package (ADR-0069 new-package graduation) through the shapes its real
-// consumer — cmd_dashboard.go — relies on: the one-shot Collect for
-// --snapshot, New/Options/Server for the served mode, the artifact reader the
-// detail page calls, and the closed state vocabulary the page colours by.
 func TestAPICoverNamedExports(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
 	root := seedProject(t, now)
 
-	// Collect + the Snapshot tree.
 	snap := Collect(root, now)
 	var (
 		_ Snapshot        = *snap
@@ -49,7 +43,6 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatalf("states: %s %s", snap.Cycles[0].State, snap.Cycles[2].State)
 	}
 
-	// Artifacts.
 	list, err := ListArtifacts(root, 3)
 	if err != nil || len(list) == 0 {
 		t.Fatalf("ListArtifacts: %v %d", err, len(list))
@@ -66,7 +59,6 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatalf("cap: %v", err)
 	}
 
-	// Server: New, Options, Handler, Run, Serve, ListenAndServe, DefaultAddr.
 	if DefaultAddr == "" || DefaultAddr[:10] != "127.0.0.1:" {
 		t.Fatalf("DefaultAddr must be loopback: %q", DefaultAddr)
 	}

@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestResult_RunBadTargetReturnsSeededResult names the releasepipeline.Result
-// type (Run returns it but the bare type is never named in a test) and pins that
-// Run threads opts.Target into the returned Result even on the earliest
-// (semver-validation) failure path, before any pipeline step runs.
 func TestResult_RunBadTargetReturnsSeededResult(t *testing.T) {
 	var got Result
 	got, err := Run(Options{Target: "not-semver"})

@@ -7,33 +7,24 @@ import (
 	"strings"
 )
 
-// RelationKind classifies the local checkout's history against a remote ref.
 type RelationKind string
 
 const (
-	RelationCurrent  RelationKind = "current"  // HEAD == remote
-	RelationBehind   RelationKind = "behind"   // HEAD is an ancestor of remote (fast-forwardable)
-	RelationAhead    RelationKind = "ahead"    // remote is an ancestor of HEAD (unpublished local commits)
-	RelationDiverged RelationKind = "diverged" // neither contains the other
+	RelationCurrent  RelationKind = "current"
+	RelationBehind   RelationKind = "behind"
+	RelationAhead    RelationKind = "ahead"
+	RelationDiverged RelationKind = "diverged"
 )
 
-// MainRelation is the ONE resolution of "where is the local main relative to
-// origin/main" — the wave boundary (fast-forward or not, halt or not) and the
-// lane base (which ref a fresh lane starts from) both read this struct and
-// render its String, so the two can never disagree on the state or the words
-// (2026-09-09 token-waste root cause #3).
 type MainRelation struct {
 	Kind   RelationKind
-	Local  string // HEAD sha
-	Remote string // remote ref sha
-	Ahead  int    // commits on HEAD not on remote
-	Behind int    // commits on remote not on HEAD
-	Ref    string // the remote ref compared against (e.g. "origin/main")
+	Local  string
+	Remote string
+	Ahead  int
+	Behind int
+	Ref    string
 }
 
-// RelationToRemote resolves HEAD against remoteRef (already fetched by the
-// caller). Every git failure is an error — the callers decide their own
-// fail-open disposition; nothing here guesses a state.
 func (g Git) RelationToRemote(ctx context.Context, remoteRef string) (MainRelation, error) {
 	rel := MainRelation{Ref: remoteRef}
 	local, _, code, err := g.Capture(ctx, "rev-parse", "HEAD")
@@ -72,7 +63,6 @@ func (g Git) RelationToRemote(ctx context.Context, remoteRef string) (MainRelati
 	return rel, nil
 }
 
-// String renders the relation in the one sentence both consumers print.
 func (r MainRelation) String() string {
 	switch r.Kind {
 	case RelationCurrent:

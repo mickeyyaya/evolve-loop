@@ -8,34 +8,15 @@ import (
 	"strconv"
 )
 
-// decisionVersion namespaces the fingerprint to the CURRENT classification +
-// promotion algorithm. Bump it by hand whenever buildClassifyPrompt, the tier
-// vocabulary semantics, or the PromoteLatest/CompleteTiers algorithm changes —
-// that is what makes the reuse gate correct rather than merely fast: without
-// it, an algorithm fix would be silently reused away for every CLI whose id
-// list happens to be unchanged.
 const decisionVersion = "v2"
 
-// FingerprintInput is everything the classify+promote decision depends on for
-// one CLI. Two equal fingerprints mean the decision inputs are identical and
-// the prior tier map may be reused without a classifier call.
 type FingerprintInput struct {
-	// CLI is the base CLI name the candidates belong to.
-	CLI string
-	// Candidates are the family-filtered model ids offered to the classifier.
-	// Order-insensitive: pane order is presentation, not identity.
+	CLI        string
 	Candidates []string
-	// Policy is the CLI's freshness policy (part of the promotion decision).
-	Policy FreshnessPolicy
-	// Tiers is the canonical tier vocabulary the prompt asks for.
-	Tiers []string
+	Policy     FreshnessPolicy
+	Tiers      []string
 }
 
-// Fingerprint renders in canonically ("sha256:<hex>"). Every field and every
-// list member is length-prefixed and NUL-separated, so adjacent values cannot
-// be re-split into a colliding rendering (agy ids contain spaces and parens —
-// a bare separator join would be ambiguous). Candidates and Tiers are sorted
-// on copies; the caller's slices are never mutated.
 func Fingerprint(in FingerprintInput) string {
 	h := sha256.New()
 	writeField := func(s string) {

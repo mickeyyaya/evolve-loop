@@ -111,8 +111,6 @@ func TestServer_ArtifactEndpointIsPlainTextAndGuarded(t *testing.T) {
 	}
 }
 
-// readSSEEvent reads frames until one `event: snapshot` block completes and
-// returns its id line.
 func readSSEEvent(t *testing.T, r *bufio.Reader, deadline time.Time) string {
 	t.Helper()
 	var id string
@@ -153,13 +151,11 @@ func TestServer_SSEPushesOnChangeAndKeepsAlive(t *testing.T) {
 	r := bufio.NewReader(resp.Body)
 	first := readSSEEvent(t, r, time.Now().Add(3*time.Second))
 
-	// Mutate the inbox: the fingerprint moves, the poller rebuilds, a new id arrives.
 	writeInboxItem(t, filepath.Join(root, ".evolve", "inbox"), "b.json", `{"id":"b","title":"B","weight":0.9}`)
 	second := readSSEEvent(t, r, time.Now().Add(3*time.Second))
 	if second == first {
 		t.Fatalf("no new snapshot id after a change (first=%s second=%s)", first, second)
 	}
-	// Keep-alive comment arrives while nothing changes.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		line, err := r.ReadString('\n')
@@ -178,7 +174,6 @@ func TestServer_UnchangedRootDoesNotBumpSeq(t *testing.T) {
 	const poll = 10 * time.Millisecond
 	now := time.Now()
 	s := New(seedProject(t, now), Options{PollInterval: poll, Now: func() time.Time { return now }})
-	// Subscribe before Run starts, so the poller's first publication cannot be missed.
 	published, unsubscribe := s.subscribe()
 	defer unsubscribe()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -191,7 +186,6 @@ func TestServer_UnchangedRootDoesNotBumpSeq(t *testing.T) {
 		t.Fatal("the poller never published the first snapshot")
 	}
 	_, seq1 := s.current()
-	// Several poll ticks over the unchanged root must publish nothing.
 	select {
 	case seq := <-published:
 		t.Fatalf("seq %d published without a change", seq)
@@ -223,7 +217,6 @@ func TestServer_ConcurrentOnDemandReadersPublishOnce(t *testing.T) {
 			t.Fatalf("reader %d saw seq %d, want 1: every early reader of an unchanged root shares one publish (all: %v)", i, seq, seqs)
 		}
 	}
-	// Run's startup refresh of the same unchanged root must not publish again.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	s.Run(ctx)
@@ -267,9 +260,6 @@ func TestServer_ServeStopsOnContextCancel(t *testing.T) {
 	}
 }
 
-// The loopback bind is not a read boundary on its own: a DNS-rebinding page
-// becomes same-origin with 127.0.0.1:8090. Only loopback names and the bound
-// address are accepted as Host.
 func TestServer_HostGuardRejectsRebinding(t *testing.T) {
 	t.Parallel()
 	_, ts, _ := newTestServer(t, t.TempDir(), time.Now())
@@ -287,8 +277,6 @@ func TestServer_HostGuardRejectsRebinding(t *testing.T) {
 	}
 }
 
-// A cycle the board's cap excluded is still served by /api/cycle/{id} from
-// its committed dossier.
 func TestServer_CycleDetailServesCapExcludedDossier(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -308,9 +296,6 @@ func TestServer_CycleDetailServesCapExcludedDossier(t *testing.T) {
 	}
 }
 
-// A cap-excluded cycle whose committed dossier is torn (and whose workspace is
-// gone) must answer with the warning, not a bare 404 — the absent-vs-corrupt
-// split the rest of the package makes.
 func TestServer_CycleDetailWarnsOnTornCapExcludedDossier(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -331,8 +316,6 @@ func TestServer_CycleDetailWarnsOnTornCapExcludedDossier(t *testing.T) {
 	}
 }
 
-// Cancelling Serve's context must end an OPEN SSE stream (it is the request's
-// BaseContext), so Shutdown completes instead of timing out behind it.
 func TestServer_ServeCancelClosesOpenSSEStream(t *testing.T) {
 	t.Parallel()
 	s := New(t.TempDir(), Options{PollInterval: 10 * time.Millisecond, KeepAlive: 20 * time.Millisecond})
@@ -359,7 +342,6 @@ func TestServer_ServeCancelClosesOpenSSEStream(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Serve did not return after cancel")
 	}
-	// The stream itself must be closed by the server, not left to the client.
 	streamClosed := make(chan struct{})
 	go func() {
 		for {

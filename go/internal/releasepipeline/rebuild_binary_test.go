@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-// TestRun_RebuildBinaryStepInvokedBeforeShip is the regression for
-// v12.2.1 bug #2: `evolve release X.Y.Z` previously shipped source
-// only, leaving the marketplace binary frozen at the previous build.
-// The pipeline now runs RebuildBinary between version-bump and
-// release-sh-check, BEFORE ship's `git add -A` picks up the new bytes.
 func TestRun_RebuildBinaryStepInvokedBeforeShip(t *testing.T) {
 	var order []string
 	rec := func(name string) func() {
@@ -119,9 +114,6 @@ func TestRun_RebuildBinarySkippedInDryRun(t *testing.T) {
 	}
 }
 
-// TestDefaultSteps_WiresRebuildBinary asserts the production default
-// includes rebuild-binary so operators using `evolve release X.Y.Z`
-// without injected Steps get the fix automatically.
 func TestDefaultSteps_WiresRebuildBinary(t *testing.T) {
 	d := DefaultSteps()
 	if d.RebuildBinary == nil {

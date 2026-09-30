@@ -1,10 +1,3 @@
-// release_verify_test.go — RED contract for the terminal release-verify step
-// (inbox release-rebuild-binary-not-committed acceptance, v18.3.0→v18.5.0
-// recurrence): after `evolve release X.Y.Z`, the release must be PROVEN
-// self-consistent — tracked go/evolve on disk == the blob in the release
-// commit == state.json:expected_ship_sha, `go/evolve --version` reports
-// X.Y.Z, and the local tag vX.Y.Z exists at the release commit. A failing
-// verify is a post-publish failure: auto-rollback unless --no-rollback.
 package releasepipeline
 
 import (
@@ -14,7 +7,6 @@ import (
 	"time"
 )
 
-// withReleaseVerify clones allOkSteps and records ReleaseVerify invocations.
 func withReleaseVerify(rec *[][3]string, fail error) Steps {
 	s := allOkSteps()
 	s.ReleaseVerify = func(repoRoot, target, commitSHA string) error {

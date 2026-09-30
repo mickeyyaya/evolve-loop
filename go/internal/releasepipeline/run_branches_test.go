@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-// === Run — nil Now uses real time.Now ========================================
-
-// TestRun_NilNowUsesRealClock: when opts.Now is nil, Run wires time.Now
-// internally. The journal file must still be written with a non-zero StartedAt.
 func TestRun_NilNowUsesRealClock(t *testing.T) {
 	res, err := Run(Options{
 		Target:      "2.0.0",
@@ -20,7 +16,7 @@ func TestRun_NilNowUsesRealClock(t *testing.T) {
 		FromTag:     "v1.9.9",
 		MaxPollWait: time.Second,
 		Steps:       allOkSteps(),
-		Now:         nil, // must not panic
+		Now:         nil,
 	})
 	if err != nil {
 		t.Fatalf("Run with nil Now: %v", err)
@@ -30,20 +26,9 @@ func TestRun_NilNowUsesRealClock(t *testing.T) {
 	}
 }
 
-// === Run — nil Steps fields default to DefaultSteps wrappers =================
-
-// TestRun_NilStepsAreFilled: when opts.Steps has nil function fields,
-// Run fills them from DefaultSteps() before executing. We verify by providing
-// a nil Preflight and confirming no nil-dereference panic; the fallback calls
-// the real library but we short-circuit with the remaining injected steps.
-//
-// Because the real Preflight hits a live git repo, we inject only the important
-// branches (non-nil Preflight is required for a real pipeline), but we test the
-// nil-overlay path for a step that is safe: FullDryRunPreflight (step 0 is
-// skipped when RequirePreflight==false, so the nil value is never called).
 func TestRun_NilFullDryRunPreflightNotCalled(t *testing.T) {
 	steps := allOkSteps()
-	steps.FullDryRunPreflight = nil // nil, but RequirePreflight=false so never invoked
+	steps.FullDryRunPreflight = nil
 
 	res, err := Run(Options{
 		Target:      "3.0.0",
@@ -61,19 +46,11 @@ func TestRun_NilFullDryRunPreflightNotCalled(t *testing.T) {
 	}
 }
 
-// === Run — fromTag resolution via resolvePrevTag (no FromTag provided) =======
-
-// TestRun_FromTagAutoResolved_ValidRepo: when opts.FromTag is empty, Run calls
-// resolvePrevTag. If the repo has at least one tag it picks the previous tag;
-// if not, it falls through to resolveInitCommit. Either way the pipeline must
-// still complete without error (the resolved fromTag may be a SHA or a tag).
 func TestRun_FromTagAutoResolved_ValidRepo(t *testing.T) {
-	// Hermetic repo with a v0.0.1 tag — deterministic across branches/CI
-	// (the live workspace's tag set drifts as releases are cut).
 	res, err := Run(Options{
 		Target:      "99.0.0",
 		RepoRoot:    makeHermeticGitRepo(t),
-		FromTag:     "", // force auto-resolution → resolves v0.0.1
+		FromTag:     "",
 		MaxPollWait: time.Second,
 		Steps:       allOkSteps(),
 		Now:         fixedNow(t),
@@ -86,17 +63,13 @@ func TestRun_FromTagAutoResolved_ValidRepo(t *testing.T) {
 	}
 }
 
-// TestRun_FromTagAutoResolved_NonGitDir: when opts.FromTag is empty and
-// resolvePrevTag fails (non-git dir), Run falls through to resolveInitCommit,
-// which also fails, so fromTag stays empty. The pipeline still proceeds with
-// an empty fromTag (changelog range will be "..HEAD").
 func TestRun_FromTagAutoResolved_NonGitDir(t *testing.T) {
-	dir := t.TempDir() // not a git repo
+	nonGitDir := t.TempDir()
 
 	res, err := Run(Options{
 		Target:      "99.0.0",
-		RepoRoot:    dir,
-		FromTag:     "", // force auto-resolution; both git calls fail
+		RepoRoot:    nonGitDir,
+		FromTag:     "",
 		MaxPollWait: time.Second,
 		Steps:       allOkSteps(),
 		Now:         fixedNow(t),
@@ -109,10 +82,6 @@ func TestRun_FromTagAutoResolved_NonGitDir(t *testing.T) {
 	}
 }
 
-// === Run — ChangelogGen failure halts at pre-publish =========================
-
-// TestRun_ChangelogGenFails verifies that a changelog-gen failure returns
-// ErrPrePublishFailed and stops the pipeline before version-bump.
 func TestRun_ChangelogGenFails(t *testing.T) {
 	steps := allOkSteps()
 	steps.ChangelogGen = func(string, string, string, string, bool) error {
@@ -143,10 +112,6 @@ func TestRun_ChangelogGenFails(t *testing.T) {
 	}
 }
 
-// === Run — VersionBump failure halts at pre-publish ==========================
-
-// TestRun_VersionBumpFails verifies that a version-bump failure returns
-// ErrPrePublishFailed and stops the pipeline before rebuild-binary.
 func TestRun_VersionBumpFails(t *testing.T) {
 	steps := allOkSteps()
 	steps.VersionBump = func(string, string, bool) error {
@@ -177,10 +142,6 @@ func TestRun_VersionBumpFails(t *testing.T) {
 	}
 }
 
-// === Run — ReleaseSh failure halts at pre-publish ============================
-
-// TestRun_ReleaseShFails verifies that a release-sh-check failure returns
-// ErrPrePublishFailed and stops the pipeline before ship.
 func TestRun_ReleaseShFails(t *testing.T) {
 	steps := allOkSteps()
 	steps.ReleaseSh = func(string, string) error {
@@ -211,20 +172,12 @@ func TestRun_ReleaseShFails(t *testing.T) {
 	}
 }
 
-// === Run — journal init failure returns ErrPrePublishFailed ==================
-
-// TestRun_JournalInitFails_UnwritableDir: when the journal directory cannot be
-// created (opts.JournalDir points to a file, not a directory), initJournal
-// returns an error and Run wraps it as ErrPrePublishFailed.
 func TestRun_JournalInitFails_UnwritableDir(t *testing.T) {
 	dir := t.TempDir()
-	// Create a FILE at the path where MkdirAll would need to create a directory.
-	// MkdirAll will fail trying to create a directory over an existing file.
 	blockingFile := filepath.Join(dir, "blocked")
 	if err := os.WriteFile(blockingFile, []byte("x"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	// The journal dir is set to be a path under the blocking file (impossible dir).
 	impossibleDir := filepath.Join(blockingFile, "release-journal")
 
 	_, err := Run(Options{
@@ -244,10 +197,6 @@ func TestRun_JournalInitFails_UnwritableDir(t *testing.T) {
 	}
 }
 
-// === Run — dry-run with release.sh also skipped (non-DryRun branches) =======
-
-// TestRun_DryRun_JournalHasDryRunSteps: in dry-run mode, rebuild-binary and
-// release-sh-check journal entries should have status "skipped-dry-run".
 func TestRun_DryRun_JournalHasDryRunSteps(t *testing.T) {
 	res, err := Run(Options{
 		Target:      "1.2.3",
@@ -261,7 +210,6 @@ func TestRun_DryRun_JournalHasDryRunSteps(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dry-run err = %v", err)
 	}
-	// Journal must record that rebuild-binary and release-sh-check were skipped.
 	body, err := os.ReadFile(res.JournalPath)
 	if err != nil {
 		t.Fatalf("read journal: %v", err)

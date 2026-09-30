@@ -15,30 +15,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
-// ArtifactMaxBytes caps a single artifact read. Audit reports are budgeted at
-// 32 KiB; logs and interaction ledgers can run to megabytes — the page shows
-// the first 2 MiB and says so rather than streaming an unbounded file.
 const ArtifactMaxBytes = 2 << 20
 
-// ErrArtifactNotAllowed is returned for a name outside the allowlist: path
-// separators, dot-segments, hidden files, or an unknown extension.
 var ErrArtifactNotAllowed = errors.New("dashboard: artifact name not allowed")
 
-// ErrArtifactTooLarge is returned when the file exceeds ArtifactMaxBytes.
 var ErrArtifactTooLarge = errors.New("dashboard: artifact exceeds size cap")
 
-// artifactName is the allowlist: a plain file name with a known extension.
-var artifactName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*\.(md|json|txt|ndjson|log|yaml|yml)$`)
+var allowedArtifactName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*\.(md|json|txt|ndjson|log|yaml|yml)$`)
 
-// ArtifactInfo describes one file in a cycle workspace.
 type ArtifactInfo struct {
 	Name    string    `json:"name"`
 	Size    int64     `json:"size"`
 	ModTime time.Time `json:"mod_time"`
 }
 
-// ListArtifacts returns the readable files in cycle's workspace, sorted by
-// name. Sub-directories, lock sidecars and disallowed names are omitted.
 func ListArtifacts(root string, cycle int) ([]ArtifactInfo, error) {
 	entries, err := os.ReadDir(core.RunWorkspacePath(root, cycle))
 	if err != nil {
@@ -46,7 +36,7 @@ func ListArtifacts(root string, cycle int) ([]ArtifactInfo, error) {
 	}
 	out := make([]ArtifactInfo, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() || !artifactName.MatchString(e.Name()) {
+		if e.IsDir() || !allowedArtifactName.MatchString(e.Name()) {
 			continue
 		}
 		info, err := e.Info()
@@ -59,11 +49,8 @@ func ListArtifacts(root string, cycle int) ([]ArtifactInfo, error) {
 	return out, nil
 }
 
-// ReadArtifact returns the bytes of one allowlisted, regular (never symlinked)
-// file from cycle's workspace, bounded by ArtifactMaxBytes. The content is
-// LLM-authored; callers must treat it as text, never as markup.
 func ReadArtifact(root string, cycle int, name string) ([]byte, error) {
-	if !artifactName.MatchString(name) || strings.Contains(name, "..") {
+	if !allowedArtifactName.MatchString(name) || strings.Contains(name, "..") {
 		return nil, ErrArtifactNotAllowed
 	}
 	path := filepath.Join(core.RunWorkspacePath(root, cycle), name)

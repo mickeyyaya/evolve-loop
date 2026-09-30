@@ -1,16 +1,6 @@
-// Package retro implements the FAIL/WARN-only post-mortem phase as a
-// core.PhaseRunner. It runs only when the previous verdict is FAIL or
-// WARN; PASS cycles short-circuit to SKIPPED (the Memo phase handles
-// PASS-cycle observation).
-//
-// Verdict mapping:
-//
-//   - previous verdict != FAIL/WARN → SKIPPED, no bridge call
-//   - retrospective.md non-empty AND a failure lesson for THIS cycle → PASS
-//     (resolved where the persona writes them: .evolve/instincts/lessons/
-//     inst-L<cycle>*.yaml; the legacy workspace failure-lesson*.yaml shape is
-//     still accepted — see hasFailureLesson)
-//   - otherwise → FAIL
+// Package retro implements the FAIL/WARN-only retrospective phase: a
+// post-mortem that writes the retrospective report and a failure lesson.
+// See docs/architecture/packages/internal-phases-retro.md.
 package retro
 
 import (
@@ -39,14 +29,10 @@ import (
 const phaseName = string(core.PhaseRetro)
 
 type Config struct {
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	NowFn   func() time.Time
-	// Model is the LLM model passed to the bridge for the retrospective run.
-	// Empty string defaults to "auto".
-	Model string
-	// CompactPrompts strips the on-demand reference tail (below ## Reference Index)
-	// from the agent body before dispatching, mirroring BaseRunner compaction.
+	Bridge         core.Bridge
+	Prompts        *prompts.Loader
+	NowFn          func() time.Time
+	Model          string
 	CompactPrompts bool
 }
 
@@ -72,44 +58,14 @@ func New(c Config) *Phase {
 
 func (p *Phase) Name() string { return phaseName }
 
-// retroWorktree resolves the working directory this retro launch is dispatched
-// against.
-//
-// A LIVE provisioned worktree passes through verbatim — a fallback that fired
-// unconditionally would strand every normal retro in an empty scratch dir with
-// no repo. The fallback exists for one window only: under a fleet supervisor the
-// bridge drivers REFUSE a launch whose working dir does not clear the guard —
-// empty is refused as errWorktreeRequired (bridge/driver_tmux_repl.go:27) and a
-// non-existent path is refused at gobridge.IsDir (driver_tmux_repl.go:123,
-// ExitBadFlags, stderr only, no error return) — instead of falling back to the
-// process cwd. Either way a lane whose worktree was torn down (or never
-// provisioned after exhausted retries) loses its retrospective entirely — a
-// failure in the failure-handler. Retro is read-mostly and Evaluate-archetype,
-// so a disposable cwd under the workspace it already owns clears the guard.
-//
-// The condition is the guard's own predicate, not a string shape: a torn-down
-// fleet lane hands retro a NON-EMPTY but stale path (cs.ActiveWorktree), and
-// testing only for "" would pass it straight into the refusal. Both no-worktree
-// shapes are one contract (cycle-1278; the empty half alone was cycle-1270).
-//
-// The two shapes deliberately NOT used: the shared main tree (req.ProjectRoot —
-// refuted by PR #400; worktree is the write-authority predicate) and the
-// dispatching process cwd (the exact leak the guard closes). With no owned
-// workspace there is nowhere safe to mint, so this returns "" and the bridge
-// decides exactly as it does today — never a fabricated path. The guard itself is
-// untouched: the fix is supplied by the phase.
 func retroWorktree(req core.PhaseRequest) string {
-	if !fleetMode(req) || gobridge.IsDir(req.Worktree) {
+	bridgeGuardAcceptsWorktree := !fleetMode(req) || gobridge.IsDir(req.Worktree)
+	if bridgeGuardAcceptsWorktree {
 		return req.Worktree
 	}
 	return gobridge.ScratchCwd(req.Workspace, "retro-scratch-cwd")
 }
 
-// fleetMode reads the fleet flag through the SAME key + parser the bridge guard
-// uses (ipcenv.FleetKey + envchain.BoolValue, driver_tmux_repl.go:117), so the
-// phase and the guard can never disagree about which launches fail closed. The
-// request env wins; the process env is the fallback, matching the driver's own
-// env-chain lookup order.
 func fleetMode(req core.PhaseRequest) bool {
 	v := req.Env[ipcenv.FleetKey]
 	if v == "" {
@@ -152,12 +108,6 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	artifactPath := filepath.Join(req.Workspace, "retrospective-report.md")
 	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "retrospective.json")
 
-	// CLI resolution chain: EVOLVE_CLI > profile.cli > claude-tmux — matching
-	// BaseRunner (runner.go). This hand-rolled runner had regressed to the
-	// cycle-107 class (EVOLVE_CLI-or-hardcoded, profile.cli ignored), which
-	// made the 2026-08-26 deep-tier sol arrangement's flagship flip —
-	// retrospective, ~40% of deep dispatch volume — dead on arrival until
-	// review caught it against the dispatched BridgeRequest.
 	var prof profiles.Profile
 	haveProf := false
 	if loader := profiles.NewFromDir(filepath.Join(req.ProjectRoot, ".evolve", "profiles")); loader != nil {
@@ -166,15 +116,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 			haveProf = true
 		}
 	}
-	cli := req.Env["EVOLVE_CLI"]
-	if cli == "" {
-		if haveProf && prof.CLI != "" {
-			cli = prof.CLI
-		}
-	}
-	if cli == "" {
-		cli = "claude-tmux"
-	}
+	cli := resolveCLI(req.Env["EVOLVE_CLI"], prof.CLI)
 
 	model := p.model
 	if model == "auto" {
@@ -184,9 +126,6 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		}
 	}
 
-	// Skill overlays: resolve the tier-gated persona for this retro launch and
-	// thread the NAMES onto BridgeRequest.Skills, matching the phase runner — a
-	// deep/top-tier retro gets the fable operating-discipline overlay. Fail-open.
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, model)
 
 	bridgeReq := core.BridgeRequest{
@@ -207,9 +146,6 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		Env:          req.Env,
 		Skills:       overlaySkills,
 	}
-	// Read-only worktree fence (ADR-0097): retro calls the bridge itself, so it
-	// holds the same fence the shared runner does — the tree it hands to the
-	// retry envelope (tdd re-entry, salvage) is the tree it was given.
 	fence := treefence.Begin(ctx, bridgeReq.Worktree, req.WorktreeReadOnly)
 	if err := fence.TakeErr(); err != nil {
 		fmt.Fprintf(os.Stderr, "[retro] WARN worktree fence: snapshot failed (%v) — the tree this phase hands downstream is unverified\n", err)
@@ -225,14 +161,6 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	}
 
 	if bridgeErr != nil {
-		// GAP 9 (self-healing): retro is the failure-analysis phase on the
-		// audit-FAIL path. A non-nil error from Run propagates to RunCycle as a
-		// hard abort that stops the WHOLE batch (the runs 154-162 abort mode) — a
-		// failure in the failure-handler must never be fatal. Return a FAIL verdict
-		// with NIL error so the orchestrator routes through decideAfterRetro
-		// (failure-adapter: retry/block/proceed) instead of aborting. The bridge
-		// error is preserved as a diagnostic for forensics; NextPhase is advisory
-		// (decideAfterRetro picks the real successor from the verdict + history).
 		fmt.Fprintf(os.Stderr, "[retro] WARN bridge failed (%v) — emitting FAIL verdict; orchestrator routes via failure-adapter (non-fatal)\n", bridgeErr)
 		return core.PhaseResponse{
 			Phase:        phaseName,
@@ -276,6 +204,16 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 		DurationMS:   durationMS,
 		Diagnostics:  diagnostics,
 	}, nil
+}
+
+func resolveCLI(envCLI, profileCLI string) string {
+	switch {
+	case envCLI != "":
+		return envCLI
+	case profileCLI != "":
+		return profileCLI
+	}
+	return "claude-tmux"
 }
 
 func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {
@@ -330,27 +268,12 @@ func composePrompt(body string, req core.PhaseRequest, prev string) string {
 	return b.String()
 }
 
-// lessonsDirRel is where the retro persona is instructed to write lessons
-// (agents/evolve-retrospective.md: "Output path:
-// .evolve/instincts/lessons/inst-LXXX-<slug>.yaml"). Single-sourced here so the
-// gate's search location and the persona's documented output path cannot drift —
-// the drift that graded 220 of 238 retros FAIL for not producing an artifact the
-// persona is instructed never to produce.
 const lessonsDirRel = ".evolve/instincts/lessons"
 
-// lessonPrefixForCycle is the persona's own id convention: inst-L<cycle><suffix>,
-// e.g. inst-L1574a-<slug>.yaml. Matching on it keeps the check CYCLE-SCOPED —
-// 600 lessons exist in that directory (135 inst-L*, 464 an older cycle-<N>-*
-// convention), and a gate that accepted any of them would pass unconditionally,
-// converting a permanently-failing gate into a rubber stamp.
 func lessonPrefixForCycle(cycle int) string {
 	return "inst-L" + strconv.Itoa(cycle)
 }
 
-// matchesCycleLesson requires a NON-DIGIT delimiter after the cycle number. A
-// plain prefix match would let cycle 157's gate be satisfied by
-// inst-L1574a-<slug>.yaml, and cycle 1's by any lesson whose number starts with 1
-// — re-opening the rubber-stamp hole the cycle-scoping exists to close.
 func matchesCycleLesson(name, prefix string) bool {
 	if !strings.HasPrefix(name, prefix) {
 		return false
@@ -358,13 +281,10 @@ func matchesCycleLesson(name, prefix string) bool {
 	if len(name) == len(prefix) {
 		return true
 	}
-	c := name[len(prefix)]
-	return c < '0' || c > '9'
+	charAfterCycle := name[len(prefix)]
+	return charAfterCycle < '0' || charAfterCycle > '9'
 }
 
-// hasFailureLesson reports whether THIS cycle produced a failure lesson, looking
-// where the persona actually writes them and, for the pre-2026-08 corpus, in the
-// workspace as well.
 func hasFailureLesson(projectRoot, ws string, cycle int) bool {
 	if cycle > 0 && projectRoot != "" {
 		prefix := lessonPrefixForCycle(cycle)
@@ -380,7 +300,10 @@ func hasFailureLesson(projectRoot, ws string, cycle int) bool {
 			}
 		}
 	}
-	// Legacy: cycle-1571-era runs wrote failure-lesson*.yaml into the workspace.
+	return hasLegacyWorkspaceFailureLesson(ws)
+}
+
+func hasLegacyWorkspaceFailureLesson(ws string) bool {
 	entries, err := os.ReadDir(ws)
 	if err != nil {
 		return false
@@ -397,13 +320,6 @@ func hasFailureLesson(projectRoot, ws string, cycle int) bool {
 	return false
 }
 
-// init self-registers the retro phase factory with the phase registry, like
-// every other built-in phase. The subprocess dispatcher (internal/cli/phasecmd)
-// resolves phases by name and never constructs retro directly — keeping the
-// flow phase-agnostic (ADR-0035/0038). The factory builds the default
-// project-rooted bridge + prompts loader (Model "auto"), matching the prior
-// phasecmd wiring byte-for-byte (cmdutil.NewPromptsLoader was a duplicate of
-// prompts.NewForProject).
 func init() {
 	registry.Register(string(core.PhaseRetro), func(req core.PhaseRequest) core.PhaseRunner {
 		return New(Config{

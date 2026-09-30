@@ -7,12 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
 )
 
-// resolve is steps 2-7: the profile, the cli (router first, profile
-// fallback), the driver check, the model tier and the capability manifest,
-// over the complete identity admission returned. Every failure is ONE
-// BRIDGE_SUBAGENT_RESOLUTION_FAILED whose step names the port; the profile
-// step's reason carries the read error the returned text (the host's,
-// verbatim) drops.
 func (d *Dispatcher) resolve(req Request, id identity) (plan, error) {
 	p := plan{profilePath: filepath.Join(req.ProfilesDir, id.role+".json")}
 	profile, err := d.deps.Profile(p.profilePath)
@@ -30,13 +24,6 @@ func (d *Dispatcher) resolve(req Request, id identity) (plan, error) {
 	return p, nil
 }
 
-// resolveCLI is steps 3 and 5: the router's cli wins when it returned one
-// (its tier rides along); otherwise the profile's cli field with
-// source=profile — a router ERROR is the BRIDGE_SUBAGENT_LLM_RESOLVE_FALLBACK
-// (a nil error with an empty cli is the designed "profile decides" and stays
-// silent). Both paths canonicalise (antigravity → agy). The driver check
-// receives the cli; the vestigial <AdaptersDir>/<cli>.sh path is composed
-// only for the rejection's text and its signal's `path`.
 func (d *Dispatcher) resolveCLI(req Request, id identity, p *plan) error {
 	llm, llmErr := d.deps.ResolveLLM(id.role)
 	if llmErr == nil && llm.CLI != "" {
@@ -62,16 +49,13 @@ func (d *Dispatcher) resolveCLI(req Request, id identity, p *plan) error {
 	return nil
 }
 
-// legacyAdapterPath is the <AdaptersDir>/<cli>.sh spelling the driver check
-// and its error text kept from the bash adapter era — nobody opens the file.
 func legacyAdapterPath(adaptersDir, cli string) string {
 	return filepath.Join(adaptersDir, cli+".sh")
 }
 
-// resolveTier is step 6: a tier the router resolved wins; otherwise the
-// adaptive resolver evaluates profile + mastery gate + diff complexity.
 func (d *Dispatcher) resolveTier(req Request, id identity, p *plan) error {
-	if p.model != "" {
+	routerResolvedTier := p.model != ""
+	if routerResolvedTier {
 		return nil
 	}
 	model, err := d.deps.ResolveTier(TierRequest{
@@ -92,9 +76,6 @@ func (d *Dispatcher) resolveTier(req Request, id identity, p *plan) error {
 	return nil
 }
 
-// resolveCapability is step 7: the manifest under CapabilityDir (AdaptersDir
-// when unset) — its warns ride the Warns channel, its flags the env and the
-// ledger's quality_tier.
 func (d *Dispatcher) resolveCapability(req Request, id identity, p *plan) error {
 	capDir := req.CapabilityDir
 	if capDir == "" {

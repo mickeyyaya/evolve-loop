@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// The wire shape the page reads: PhasePlan and PlanStep marshal with the
-// snake_case keys app.js dereferences, every status word the page branches
-// on is a pinned literal, and the optional marks are omitted when false.
 func TestPhasePlan_PlanStep_WireShape(t *testing.T) {
 	t.Parallel()
 	for _, status := range []string{StatePass, StateWarn, StateFail, StateIncomplete, stepOngoing, stepPending, stepUnreached, stepSkipped} {

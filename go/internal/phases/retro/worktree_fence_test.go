@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// mutatingRetroBridge plays a retro agent that edits the worktree it was told
-// to inspect, then writes its report.
 type mutatingRetroBridge struct{ fakeBridge }
 
 func (b *mutatingRetroBridge) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -50,10 +48,6 @@ func fenceRepo(t *testing.T) string {
 	return dir
 }
 
-// TestRun_ReadOnlyWorktreeIsFencedAroundRetrosOwnLaunch — retro calls the
-// bridge itself (not through phases/runner), so it must hold the fence
-// itself: the tree it hands to the retry envelope is the tree it was given,
-// and the write is reported on its response.
 func TestRun_ReadOnlyWorktreeIsFencedAroundRetrosOwnLaunch(t *testing.T) {
 	dir := fenceRepo(t)
 	fb := &mutatingRetroBridge{fakeBridge{writeArtifact: "# Retrospective\n\n## Verdict\nFAIL\n"}}

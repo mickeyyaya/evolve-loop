@@ -1,30 +1,5 @@
 package modelquery
 
-// agy_test.go — agy must be enumerated by `agy models`, NOT by driving its
-// /model picker.
-//
-// The live incident this pins (observed 2026-08-28, catalog written
-// 2026-08-14 with source:"live"): agy's picker separates the model from a
-// SEPARATE effort slider, so the pane reads
-//
-//	Switch Model
-//	  Gemini 3.7 Flash
-//	  Gemini 3.1 Pro
-//	  Effort  ◂ ●━━━━◉─────○ ▸   low  medium  high
-//
-// The picker parser faithfully captured those unsuffixed names — and they are
-// NOT valid `--model` arguments. agy requires model and effort COMBINED
-// ("Gemini 3.7 Flash (Low)"), so every tier resolved to a name agy rejects:
-//
-//	⎿ model Gemini 3.1 Pro is not recognized as a known model or custom model
-//	  in settings. Using "Gemini 3.5 Flash (Medium)" instead.
-//
-// agy does not exit non-zero on that — it warns once and serves the fallback
-// for the whole session, so router/memo silently ran Gemini 3.5 Flash (Medium)
-// at every tier. `agy models` emits "<id>\t<display name>" with the effort
-// already baked in, which is exactly the string --model accepts (both halves
-// verified live), so it is the only faithful source.
-
 import (
 	"context"
 	"errors"
@@ -32,9 +7,6 @@ import (
 	"testing"
 )
 
-// realAgyModelsOutput is the verbatim shape of `agy models` on agy 1.1.22,
-// captured live. The leading progress line is not a model and must not become
-// one.
 const realAgyModelsOutput = `Fetching available models...
 gemini-3.7-flash-high	Gemini 3.7 Flash (High)
 gemini-3.7-flash-medium	Gemini 3.7 Flash (Medium)
@@ -76,9 +48,6 @@ func TestAgyLister_KeepsTheEffortSuffixThatMakesTheNameValid(t *testing.T) {
 			t.Errorf("model[%d] = %q, want %q", i, got[i], want[i])
 		}
 	}
-	// The whole point: an unsuffixed bare family name is what agy REJECTS, so
-	// it must never appear on its own. This is the assertion that would have
-	// caught the live defect.
 	for _, m := range got {
 		if !strings.Contains(m, "(") {
 			t.Errorf("model %q carries no effort/capability suffix — agy rejects such names and silently falls back", m)
@@ -99,12 +68,6 @@ func TestAgyLister_SkipsProgressNoiseAndBlankLines(t *testing.T) {
 	}
 }
 
-// A tab is not proof of a model row. Found by adversarial review: if a future
-// `agy models` grows a header, a naive "has a tab" rule contributes
-// "DISPLAY NAME" as a model — which would then be written into the catalog as
-// a tier model and rejected at launch, reproducing the exact incident class
-// this file exists to close. Not a live defect on 1.1.22; pinned so it cannot
-// become one.
 func TestAgyLister_HeaderAndBannerRowsNeverBecomeModels(t *testing.T) {
 	l := AgyLister{Run: func(context.Context, string, []string, string) (string, error) {
 		return "ID\tDISPLAY NAME\n" +
@@ -121,10 +84,6 @@ func TestAgyLister_HeaderAndBannerRowsNeverBecomeModels(t *testing.T) {
 	}
 }
 
-// A listing failure must PROPAGATE. Returning an empty list would let the
-// refresh commit a catalog with no agy models, which reads as "agy has none"
-// rather than "we could not ask" — the silent-degradation shape this whole
-// file exists to prevent.
 func TestAgyLister_PropagatesFailure(t *testing.T) {
 	l := AgyLister{Run: func(context.Context, string, []string, string) (string, error) {
 		return "boom", errors.New("exit 1")
@@ -134,10 +93,6 @@ func TestAgyLister_PropagatesFailure(t *testing.T) {
 	}
 }
 
-// WIRING PROOF. The lister is worthless if production still routes agy to the
-// picker, and that is precisely how the live defect shipped: the parser was
-// correct, the ROUTE was wrong. DefaultRouter is the single registry both
-// call sites use, so this pins the route itself rather than a copy of it.
 func TestDefaultRouter_RoutesAgyAndOllamaOffThePicker(t *testing.T) {
 	r := DefaultRouter(nil)
 	for _, cli := range []string{"agy", "ollama"} {

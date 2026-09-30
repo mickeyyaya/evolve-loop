@@ -1,19 +1,10 @@
 package ciparitygate
 
-// changeset_test.go — the touched∧derivable decision (changeset.go): the ONE
-// owner the three whole-repo gates consult.
-
 import (
 	"strings"
 	"testing"
 )
 
-// Test 15 (moved: audit/ciparity_unit_test.go:162-182's decision half,
-// audit/ciparity_touchedgo_derivability_test.go:105-135, and the pre-move pin
-// TestChangedScopeForGate_NoModuleShortCircuitsBeforeDerivation) — the three
-// outcomes over an injected change set, the module guard FIRST, and the
-// preserved quirk Q1: three whole-repo gates on one underivable request emit
-// three CHANGESET_UNDERIVABLE events, each naming its own gate.
 func TestScope_ThreeOutcomesOverAnInjectedChangeSet(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, _ := goWorktree(t)

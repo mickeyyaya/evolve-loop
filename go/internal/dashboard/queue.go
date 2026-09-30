@@ -10,16 +10,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// lifecycleDirs are the inbox sub-directories the mover promotes items into.
-// Only their counts are shown; the pending pool is the actionable list.
 var lifecycleDirs = []string{"consumed", "processing", "retry", "processed"}
 
-// inboxDir is <root>/.evolve/inbox, the pending pool inboxbatch.LoadDir reads.
 func inboxDir(root string) string { return filepath.Join(paths.EvolveDirOf(root), "inbox") }
 
-// readQueue projects the inbox through inboxbatch.LoadDir (the same loader
-// triage consumes, so the dashboard cannot disagree with it about what an item
-// is) and counts the lifecycle sub-directories.
 func readQueue(root string) (QueueSummary, []string) {
 	inbox := inboxDir(root)
 	items, warnings, err := inboxbatch.LoadDir(inbox)
@@ -48,7 +42,6 @@ func readQueue(root string) (QueueSummary, []string) {
 	return q, warnings
 }
 
-// countJSON counts *.json files directly under dir; a missing dir counts 0.
 func countJSON(dir string) int {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

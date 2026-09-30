@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// writeCycleState writes .evolve/cycle-state.json exactly as the kernel does
-// and returns the cycle's run workspace path.
 func writeCycleState(t *testing.T, root string, cs cyclestate.CycleState) string {
 	t.Helper()
 	ws := core.RunWorkspacePath(root, cs.CycleID)
@@ -75,7 +73,6 @@ func TestReadLoop_StoppedLoopFallsBackToNewestRunJSON(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	now := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
-	// No cycle-state.json (clean stop); two run workspaces, the newer one checkpointed mid-repair.
 	for _, id := range []int{1605, 1606} {
 		ws := core.RunWorkspacePath(root, id)
 		buf, _ := json.Marshal(cyclestate.CycleState{CycleID: id, Phase: "tdd", WorkspacePath: ws,

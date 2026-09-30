@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 )
 
-// countingClassifier wraps fakeClassifier and counts Classify invocations —
-// the headline stability assertion is calls == 0 on an unchanged offering.
 type countingClassifier struct {
 	inner Classifier
 	calls int
@@ -19,8 +17,6 @@ func (c *countingClassifier) Classify(ctx context.Context, cli string, ids []str
 	return c.inner.Classify(ctx, cli, ids)
 }
 
-// fullTiers is a prior tier map covering every canonical tier (the reuse
-// gate's coverage condition).
 func fullTiers(model string) map[string]string {
 	out := make(map[string]string, len(modelcatalog.CanonicalTiers))
 	for _, tier := range modelcatalog.CanonicalTiers {
@@ -29,9 +25,6 @@ func fullTiers(model string) map[string]string {
 	return out
 }
 
-// priorFor builds a prior catalog whose CLI entry matches what the current
-// pipeline would have written for candidates: live-sourced, full tier
-// coverage, and the CURRENT fingerprint of the decision inputs.
 func priorFor(cli string, candidates []string, tiers map[string]string, source string) modelcatalog.Catalog {
 	return modelcatalog.Catalog{
 		FetchedAt: fixedNow(),
@@ -48,10 +41,6 @@ func priorFor(cli string, candidates []string, tiers map[string]string, source s
 	}
 }
 
-// TestRefresh_UnchangedOfferingSkipsClassifier: an identical candidate list
-// with a live, fully-covered prior reuses the prior tier map with ZERO
-// classifier LLM calls — the stability fix for the documented flap where an
-// identical agy list reclassified Sonnet-4.6 → GPT-OSS-120B.
 func TestRefresh_UnchangedOfferingSkipsClassifier(t *testing.T) {
 	t.Parallel()
 	candidates := []string{"gpt-5.5-mini", "gpt-5.5"}
@@ -77,8 +66,6 @@ func TestRefresh_UnchangedOfferingSkipsClassifier(t *testing.T) {
 	}
 }
 
-// TestRefresh_ChangedOfferingClassifies is the anti-no-op twin: one added id
-// invalidates the fingerprint and the classifier runs exactly once.
 func TestRefresh_ChangedOfferingClassifies(t *testing.T) {
 	t.Parallel()
 	prior := priorFor("codex", []string{"gpt-5.5-mini", "gpt-5.5"}, fullTiers("gpt-5.5"), modelcatalog.SourceLive)
@@ -98,10 +85,6 @@ func TestRefresh_ChangedOfferingClassifies(t *testing.T) {
 	}
 }
 
-// TestRefresh_ReuseRequiresLiveAndFullCoverage: a hash match alone is not
-// enough. A detect-sourced prior must never be laundered into an
-// authoritative entry, and a prior missing a canonical tier (the pre-fix
-// top-less shape) must reclassify once rather than stay sticky forever.
 func TestRefresh_ReuseRequiresLiveAndFullCoverage(t *testing.T) {
 	t.Parallel()
 	candidates := []string{"gpt-5.5-mini", "gpt-5.5"}
@@ -131,13 +114,8 @@ func TestRefresh_ReuseRequiresLiveAndFullCoverage(t *testing.T) {
 	}
 }
 
-// TestRefresh_PromotesCompletesAndStamps: a fresh classification is promoted
-// within lineage (stale Pro → newest Pro, never Flash), completed to full
-// canonical-tier coverage, and stamped with the decision fingerprint so the
-// NEXT refresh can reuse it.
 func TestRefresh_PromotesCompletesAndStamps(t *testing.T) {
 	t.Parallel()
-	// fakeClassifier: fast=first, balanced=middle, deep=last (no top).
 	candidates := []string{"Gemini 3.5 Flash (Medium)", "Gemini 3.5 Pro (High)", "Gemini 3.1 Pro (High)"}
 	cls := &countingClassifier{inner: fakeClassifier{}}
 	cat, err := Refresh(context.Background(), RefreshDeps{
@@ -150,12 +128,9 @@ func TestRefresh_PromotesCompletesAndStamps(t *testing.T) {
 		t.Fatalf("Refresh: %v", err)
 	}
 	entry := cat.CLIs["agy"]
-	// deep was classified as the stale "Gemini 3.1 Pro (High)" (last id) and
-	// must be promoted to the 3.5 Pro — never the higher-versioned Flash.
 	if got := entry.TierModels["deep"]; got != "Gemini 3.5 Pro (High)" {
 		t.Errorf("deep = %q, want the newest Pro", got)
 	}
-	// top was absent from the classifier reply and fills from deep.
 	if got := entry.TierModels["top"]; got != "Gemini 3.5 Pro (High)" {
 		t.Errorf("top = %q, want deep's promoted model", got)
 	}
@@ -163,7 +138,6 @@ func TestRefresh_PromotesCompletesAndStamps(t *testing.T) {
 	if entry.CandidatesHash != wantHash {
 		t.Errorf("CandidatesHash = %q, want the current decision fingerprint", entry.CandidatesHash)
 	}
-	// A second refresh over the identical offering now reuses.
 	cls2 := &countingClassifier{inner: fakeClassifier{}}
 	_, err = Refresh(context.Background(), RefreshDeps{
 		CLIs:       []string{"agy"},

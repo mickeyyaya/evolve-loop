@@ -13,22 +13,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// fixedClock returns a deterministic Now for reproducible `ts` fields.
 func fixedClock() func() time.Time {
 	t := time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC)
 	return func() time.Time { return t }
 }
 
-// scriptRunner is a programmable sysexec.RunFunc: it matches commands by their
-// "name arg0 arg1 ..." prefix and returns the configured (stdout, exit). The
-// first matching rule wins; an unmatched command defaults to (exit 0, "").
 type scriptRunner struct {
 	rules []scriptRule
 	calls []string
 }
 
 type scriptRule struct {
-	matchPrefix string // matched against "name arg0 arg1 ..."
+	matchPrefix string
 	stdout      string
 	exit        int
 	err         error
@@ -50,8 +46,6 @@ func (s *scriptRunner) run() sysexec.RunFunc {
 	}
 }
 
-// baseOpts builds an Options whose lookPath reports `present` tools as present
-// (and everything else absent), with a deterministic clock.
 func baseOpts(root string, present ...string) Options {
 	have := map[string]bool{}
 	for _, t := range present {
@@ -75,7 +69,7 @@ func TestDetectLangs_ExtensionMapping(t *testing.T) {
 		"a.go", "b.py", "c.ts", "d.tsx", "e.js", "f.jsx", "g.mjs", "h.cjs", "i.rs",
 		"README.md", "noext", "k.txt",
 	})
-	want := []string{"go", "js", "python", "rust", "ts"} // sorted-unique
+	want := []string{"go", "js", "python", "rust", "ts"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("detectLangs = %v, want %v", got, want)
 	}
@@ -120,7 +114,6 @@ func TestReviewersSatisfied(t *testing.T) {
 
 func TestSplitReviewers_RawVerbatim(t *testing.T) {
 	t.Parallel()
-	// Empties dropped, namespace prefixes KEPT (raw spelling), order preserved.
 	got := splitReviewers("ecc:code-simplifier,,go-reviewer,")
 	want := []string{"ecc:code-simplifier", "go-reviewer"}
 	if !reflect.DeepEqual(got, want) {
@@ -144,7 +137,7 @@ func TestRun_ReviewerPreconditionFail_ExitFail(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	o := baseOpts(root, "shasum", "go")
-	o.Reviewers = "code-simplifier" // missing review capability
+	o.Reviewers = "code-simplifier"
 	sr := &scriptRunner{rules: []scriptRule{{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"}}}
 	o.Runner = sr.run()
 	res := o.Run(context.Background())
@@ -159,7 +152,6 @@ func TestRun_ReviewerPreconditionFail_ExitFail(t *testing.T) {
 func TestRun_GoLanePass_WritesAttestation(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// Real go.mod + .go file so findUp/gofmt path resolution works.
 	mustWrite(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.22\n")
 	mustWrite(t, filepath.Join(root, "x.go"), "package x\n")
 
@@ -168,8 +160,8 @@ func TestRun_GoLanePass_WritesAttestation(t *testing.T) {
 	o.Env = os.Environ()
 	sr := &scriptRunner{rules: []scriptRule{
 		{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"},
-		{matchPrefix: "git diff HEAD", stdout: "diff --git a/x.go b/x.go\n", exit: 1}, // tree-state SHA
-		{matchPrefix: "gofmt -s -l", stdout: ""},                                      // formatted
+		{matchPrefix: "git diff HEAD", stdout: "diff --git a/x.go b/x.go\n", exit: 1},
+		{matchPrefix: "gofmt -s -l", stdout: ""},
 		{matchPrefix: "go vet", exit: 0},
 		{matchPrefix: "go test", exit: 0},
 	}}
@@ -186,28 +178,21 @@ func TestRun_GoLanePass_WritesAttestation(t *testing.T) {
 	if !reflect.DeepEqual(res.ChecksPassed, wantChecks) {
 		t.Fatalf("ChecksPassed = %v, want %v", res.ChecksPassed, wantChecks)
 	}
-	// Attestation landed on disk.
 	if _, err := os.Stat(filepath.Join(root, ".commit-gate", "attestation.json")); err != nil {
 		t.Fatalf("attestation not written: %v", err)
 	}
-	// reviewers_run records the RAW spelling.
 	if !reflect.DeepEqual(res.Attestation.ReviewersRun, []string{"code-simplifier", "go-reviewer"}) {
 		t.Fatalf("ReviewersRun = %v", res.Attestation.ReviewersRun)
 	}
 }
 
-// TestRun_GeneralReviewerAlone_ExitPass is the full-pipeline successor to bash
-// commit-gate-test.sh T4: the general `code-reviewer` (no language reviewer)
-// satisfies the "one review" precondition end-to-end, so a clean Go change runs
-// to ExitPass. TestReviewersSatisfied covers the precondition decision in
-// isolation; this proves it through the whole Run.
 func TestRun_GeneralReviewerAlone_ExitPass(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.22\n")
 	mustWrite(t, filepath.Join(root, "x.go"), "package x\n")
 	o := baseOpts(root, "shasum", "go")
-	o.Reviewers = "code-simplifier,code-reviewer" // general reviewer, no go-reviewer
+	o.Reviewers = "code-simplifier,code-reviewer"
 	o.Env = os.Environ()
 	sr := &scriptRunner{rules: []scriptRule{
 		{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"},
@@ -221,17 +206,11 @@ func TestRun_GeneralReviewerAlone_ExitPass(t *testing.T) {
 	if res.ExitCode != ExitPass {
 		t.Fatalf("ExitCode = %d, want %d (%v)", res.ExitCode, ExitPass, res.Logs)
 	}
-	// Prove the Go lane actually RAN — a regression that bypassed it would still
-	// satisfy the precondition and leave ExitPass, so assert the recorded checks.
 	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt", "go:vet", "go:test"}) {
 		t.Fatalf("ChecksPassed = %v, want [go:gofmt go:vet go:test]", res.ChecksPassed)
 	}
 }
 
-// TestRun_EccPrefixedReviewer_ExitPass is the full-pipeline successor to bash
-// commit-gate-test.sh T5: ECC namespace prefixes are stripped for the precondition
-// (ecc:go-reviewer counts as go-reviewer), so a clean Go change runs to ExitPass —
-// while reviewers_run records the RAW ecc:-prefixed spelling.
 func TestRun_EccPrefixedReviewer_ExitPass(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -255,7 +234,6 @@ func TestRun_EccPrefixedReviewer_ExitPass(t *testing.T) {
 	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt", "go:vet", "go:test"}) {
 		t.Fatalf("ChecksPassed = %v, want [go:gofmt go:vet go:test]", res.ChecksPassed)
 	}
-	// Precondition strips ecc: prefixes, but reviewers_run keeps the raw spelling.
 	if !reflect.DeepEqual(res.Attestation.ReviewersRun, []string{"ecc:code-simplifier", "ecc:go-reviewer"}) {
 		t.Fatalf("ReviewersRun = %v, want raw ecc:-prefixed", res.Attestation.ReviewersRun)
 	}
@@ -270,7 +248,7 @@ func TestRun_GofmtUnformatted_ExitFail(t *testing.T) {
 	o.Reviewers = "code-simplifier,go-reviewer"
 	sr := &scriptRunner{rules: []scriptRule{
 		{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"},
-		{matchPrefix: "gofmt -s -l", stdout: "x.go\n"}, // gofmt reports it unformatted
+		{matchPrefix: "gofmt -s -l", stdout: "x.go\n"},
 	}}
 	o.Runner = sr.run()
 	res := o.Run(context.Background())
@@ -306,8 +284,6 @@ func TestRun_AcsPackagesExcluded(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.22\n")
-	// A file UNDER an acs subpackage (./acs/predicate) — the bash awk excludes
-	// /^\.\/acs\//, i.e. subpackages of acs, NOT the ./acs package itself.
 	mustWrite(t, filepath.Join(root, "acs", "predicate", "p.go"), "package predicate\n")
 	o := baseOpts(root, "shasum", "go")
 	o.Reviewers = "code-simplifier,go-reviewer"
@@ -321,15 +297,11 @@ func TestRun_AcsPackagesExcluded(t *testing.T) {
 	if res.ExitCode != ExitPass {
 		t.Fatalf("ExitCode = %d, want %d (%v)", res.ExitCode, ExitPass, res.Logs)
 	}
-	// acs/ subpackage excluded → no go vet / go test command actually ran.
 	for _, c := range sr.calls {
 		if strings.HasPrefix(c, "go vet") || strings.HasPrefix(c, "go test") {
 			t.Fatalf("acs subpackage should be excluded, but ran: %q", c)
 		}
 	}
-	// ...yet the bash runner records go:vet/go:test UNCONDITIONALLY after the
-	// (empty) module loop, so the attestation byte-format stays identical. We
-	// preserve that exactly: the checks are recorded though no command ran.
 	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt", "go:vet", "go:test"}) {
 		t.Fatalf("ChecksPassed = %v, want [go:gofmt go:vet go:test]", res.ChecksPassed)
 	}
@@ -340,7 +312,6 @@ func TestEnsureTool_ForceMissingSeam(t *testing.T) {
 	o := baseOpts(t.TempDir(), "ruff")
 	o.ForceMissing = "ruff"
 	res := &Result{}
-	// ruff is on PATH but forced-missing; install seam unset → ExitToolMissing.
 	if code := o.ensureTool("ruff", "pip install ruff", "pip install ruff", res); code != ExitToolMissing {
 		t.Fatalf("ensureTool with ForceMissing = %d, want %d", code, ExitToolMissing)
 	}
@@ -348,7 +319,7 @@ func TestEnsureTool_ForceMissingSeam(t *testing.T) {
 
 func TestEnsureTool_TestInstallOK(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir()) // ruff absent
+	o := baseOpts(t.TempDir())
 	o.TestInstall = "ok"
 	res := &Result{}
 	if code := o.ensureTool("ruff", "pip install ruff", "pip install ruff", res); code != ExitPass {
@@ -358,7 +329,7 @@ func TestEnsureTool_TestInstallOK(t *testing.T) {
 
 func TestEnsureTool_TestInstallFail(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir()) // ruff absent
+	o := baseOpts(t.TempDir())
 	o.TestInstall = "fail"
 	res := &Result{}
 	if code := o.ensureTool("ruff", "pip install ruff", "pip install ruff", res); code != ExitToolMissing {
@@ -368,7 +339,7 @@ func TestEnsureTool_TestInstallFail(t *testing.T) {
 
 func TestEnsureTool_NotAutoInstallable(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir()) // go absent, no install cmd
+	o := baseOpts(t.TempDir())
 	res := &Result{}
 	if code := o.ensureTool("go", "", "install Go", res); code != ExitToolMissing {
 		t.Fatalf("ensureTool not-installable = %d, want %d", code, ExitToolMissing)
@@ -415,7 +386,6 @@ func TestRun_EmptyArraysMarshalInline(t *testing.T) {
 
 func TestRunner_TypeAliasSatisfiesSysexec(t *testing.T) {
 	t.Parallel()
-	// Runner is sysexec.RunFunc; a value of one is assignable to the other.
 	var r Runner = sysexec.DefaultRunner
 	var _ sysexec.RunFunc = r
 	if r == nil {

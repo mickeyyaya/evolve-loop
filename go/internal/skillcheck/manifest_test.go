@@ -1,18 +1,5 @@
 package skillcheck
 
-// manifest_test.go guards the registry-membership invariant that the phase-facts,
-// command-stub, and codex projections never check: .claude-plugin/plugin.json
-// (the list Claude Code's loader actually reads) must be a bijection with the
-// skills/ dirs on disk. A well-formed skill dir that plugin.json does not list is
-// invisible to the loader — it surfaces to a user as "Unknown skill" (the failure
-// that motivated this guard). The reverse (a registry entry with no backing dir),
-// a malformed entry, a duplicate, and a dangling agents[] path are caught too.
-//
-// Strong-test discipline: TestManifestProblems_CleanRepoNoProblems is the CI
-// regression gate on the LIVE tree; every other case injects exactly one defect
-// into a minimal synthetic tree and asserts a DEFECT-SPECIFIC message (not just
-// the skill name) so each test bites only on the code path it names.
-
 import (
 	"bytes"
 	"os"
@@ -21,10 +8,6 @@ import (
 	"testing"
 )
 
-// --- fixtures ---------------------------------------------------------------
-
-// manifestTree builds an empty plugin skeleton under a temp dir and returns its
-// root. Callers layer skills/agents/manifest on, then mutate to inject one defect.
 func manifestTree(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -36,7 +19,6 @@ func manifestTree(t *testing.T) string {
 	return root
 }
 
-// writeSkillDir writes skills/<name>/SKILL.md verbatim.
 func writeSkillDir(t *testing.T, root, name, skillMD string) {
 	t.Helper()
 	dir := filepath.Join(root, "skills", name)
@@ -48,13 +30,10 @@ func writeSkillDir(t *testing.T, root, name, skillMD string) {
 	}
 }
 
-// wellFormedSkill is a valid SKILL.md whose frontmatter name matches its dir.
 func wellFormedSkill(name string) string {
 	return "---\nname: " + name + "\ndescription: The " + name + " skill.\n---\n\n# " + name + "\n\nbody\n"
 }
 
-// writeManifest writes .claude-plugin/plugin.json listing skill dirs (bare names,
-// wrapped as "./skills/<name>/") and agent paths (verbatim).
 func writeManifest(t *testing.T, root string, skills, agents []string) {
 	t.Helper()
 	var b strings.Builder
@@ -76,8 +55,6 @@ func writeManifest(t *testing.T, root string, skills, agents []string) {
 	writeRawManifest(t, root, b.String())
 }
 
-// writeRawManifest writes verbatim bytes to plugin.json (malformed-JSON /
-// malformed-entry cases the typed writeManifest cannot express).
 func writeRawManifest(t *testing.T, root, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(root, ".claude-plugin", "plugin.json"), []byte(content), 0o644); err != nil {
@@ -85,7 +62,6 @@ func writeRawManifest(t *testing.T, root, content string) {
 	}
 }
 
-// hasProblemContaining reports whether any problem string contains every substr.
 func hasProblemContaining(problems []string, substrs ...string) bool {
 	for _, p := range problems {
 		all := true
@@ -102,11 +78,6 @@ func hasProblemContaining(problems []string, substrs ...string) bool {
 	return false
 }
 
-// manifestDefectTree copies the live repo's plugin surfaces into a temp dir and
-// registers a skill the tree does not provide ("ghostskill"). Only the manifest
-// membership surface can flag it (no disk dir for the command/name/facts surfaces
-// to see), so it isolates the Run/Check wiring. Reverting the wiring drops
-// "ghostskill" from the result → red.
 func manifestDefectTree(t *testing.T) string {
 	t.Helper()
 	root := repoRoot(t)
@@ -131,11 +102,6 @@ func manifestDefectTree(t *testing.T) string {
 	return tmp
 }
 
-// --- the CI regression gate (live tree) -------------------------------------
-
-// TestManifestProblems_CleanRepoNoProblems: the live repo's plugin.json is a
-// bijection with disk. This is the regression gate — a future skill added to disk
-// but not registered (or a registry entry whose dir was deleted) turns it red.
 func TestManifestProblems_CleanRepoNoProblems(t *testing.T) {
 	problems, err := ManifestProblems(repoRoot(t))
 	if err != nil {
@@ -147,8 +113,6 @@ func TestManifestProblems_CleanRepoNoProblems(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_HealthyMinimalTree: no false positives on a hand-built
-// consistent tree (guards the gate against crying wolf).
 func TestManifestProblems_HealthyMinimalTree(t *testing.T) {
 	root := manifestTree(t)
 	writeSkillDir(t, root, "alpha", wellFormedSkill("alpha"))
@@ -166,9 +130,6 @@ func TestManifestProblems_HealthyMinimalTree(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_AbsentManifestIsSkipped: a tree with no plugin.json at all
-// is "not a plugin tree" — nothing to validate (present-but-broken is a problem;
-// absent is a skip). Keeps partial fixtures clean.
 func TestManifestProblems_AbsentManifestIsSkipped(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "skills"), 0o755); err != nil {
@@ -183,15 +144,10 @@ func TestManifestProblems_AbsentManifestIsSkipped(t *testing.T) {
 	}
 }
 
-// --- mutation cases: each injects one defect, each asserts its own message ----
-
-// TestManifestProblems_OrphanSkillDirNotInManifest: a well-formed skill dir the
-// manifest never lists is invisible to the loader ("Unknown skill" — the exact
-// fable-class regression). MUST be flagged.
 func TestManifestProblems_OrphanSkillDirNotInManifest(t *testing.T) {
 	root := manifestTree(t)
 	writeSkillDir(t, root, "alpha", wellFormedSkill("alpha"))
-	writeSkillDir(t, root, "beta", wellFormedSkill("beta")) // on disk, NOT listed
+	writeSkillDir(t, root, "beta", wellFormedSkill("beta"))
 	writeManifest(t, root, []string{"alpha"}, nil)
 
 	problems, err := ManifestProblems(root)
@@ -203,12 +159,10 @@ func TestManifestProblems_OrphanSkillDirNotInManifest(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_ListedSkillMissingDir: a registry entry whose dir/SKILL.md
-// does not exist breaks the install. MUST be flagged.
 func TestManifestProblems_ListedSkillMissingDir(t *testing.T) {
 	root := manifestTree(t)
 	writeSkillDir(t, root, "alpha", wellFormedSkill("alpha"))
-	writeManifest(t, root, []string{"alpha", "ghost"}, nil) // 'ghost' has no dir
+	writeManifest(t, root, []string{"alpha", "ghost"}, nil)
 
 	problems, err := ManifestProblems(root)
 	if err != nil {
@@ -219,8 +173,6 @@ func TestManifestProblems_ListedSkillMissingDir(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_MalformedSkillEntry: a skills[] entry that is not a
-// ./skills/<name>/ path is malformed and must be flagged as such.
 func TestManifestProblems_MalformedSkillEntry(t *testing.T) {
 	root := manifestTree(t)
 	writeRawManifest(t, root, `{"name":"evo","skills":["./agents/not-a-skill.md"],"agents":[]}`)
@@ -234,10 +186,6 @@ func TestManifestProblems_MalformedSkillEntry(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_DotDotSkillEntryRejected: a "./skills/.." entry must be
-// rejected as malformed, NOT silently resolved to projectRoot/SKILL.md. A
-// well-formed SKILL.md is planted one level above skills/ to prove the traversal
-// does not produce a false pass.
 func TestManifestProblems_DotDotSkillEntryRejected(t *testing.T) {
 	root := manifestTree(t)
 	if err := os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(wellFormedSkill("root")), 0o644); err != nil {
@@ -254,7 +202,6 @@ func TestManifestProblems_DotDotSkillEntryRejected(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_DuplicateSkillEntry: the same skill listed twice.
 func TestManifestProblems_DuplicateSkillEntry(t *testing.T) {
 	root := manifestTree(t)
 	writeSkillDir(t, root, "alpha", wellFormedSkill("alpha"))
@@ -269,7 +216,6 @@ func TestManifestProblems_DuplicateSkillEntry(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_AgentFileMissing: an agents[] entry with no backing file.
 func TestManifestProblems_AgentFileMissing(t *testing.T) {
 	root := manifestTree(t)
 	writeSkillDir(t, root, "alpha", wellFormedSkill("alpha"))
@@ -284,8 +230,6 @@ func TestManifestProblems_AgentFileMissing(t *testing.T) {
 	}
 }
 
-// TestManifestProblems_MalformedManifestJSON: a corrupt plugin.json must fail
-// closed with a JSON-specific message, not slip through to another surface.
 func TestManifestProblems_MalformedManifestJSON(t *testing.T) {
 	root := manifestTree(t)
 	writeSkillDir(t, root, "alpha", wellFormedSkill("alpha"))
@@ -300,19 +244,17 @@ func TestManifestProblems_MalformedManifestJSON(t *testing.T) {
 	}
 }
 
-// TestSkillEntryName pins the normalization contract directly, incl. the
-// path-traversal rejection ("." / ".." / separators → "" = malformed).
 func TestSkillEntryName(t *testing.T) {
 	cases := map[string]string{
 		"./skills/loop/":       "loop",
 		"./skills/loop":        "loop",
 		"skills/loop/":         "loop",
 		"./skills/plan-review": "plan-review",
-		"./skills/..":          "", // traversal — must NOT become ".."
+		"./skills/..":          "",
 		"./skills/.":           "",
-		"./skills/a/b":         "", // nested — not a single segment
+		"./skills/a/b":         "",
 		"./skills/":            "",
-		"./agents/x.md":        "", // not under skills/
+		"./agents/x.md":        "",
 	}
 	for entry, want := range cases {
 		if got := skillEntryName(entry); got != want {
@@ -321,10 +263,6 @@ func TestSkillEntryName(t *testing.T) {
 	}
 }
 
-// --- wiring proofs: both Run (CLI/CI) and Check (audit) surface the problems ---
-
-// TestCheck_SurfacesManifestProblems: the in-process audit gate includes manifest
-// bijection problems alongside phase-facts/name drift.
 func TestCheck_SurfacesManifestProblems(t *testing.T) {
 	drift, err := Check(manifestDefectTree(t))
 	if err != nil {
@@ -335,9 +273,6 @@ func TestCheck_SurfacesManifestProblems(t *testing.T) {
 	}
 }
 
-// TestRun_SurfacesManifestProblems: the `evolve skills check` CLI path (Run,
-// write=false) — the one CI's TestSkills_NoDrift exercises — must also fail
-// (exit 2) and name the broken skill, so a bijection break cannot pass locally.
 func TestRun_SurfacesManifestProblems(t *testing.T) {
 	tmp := manifestDefectTree(t)
 	var out, errBuf bytes.Buffer

@@ -1,6 +1,3 @@
-// Tests for the retro phase. Retro is a conditional phase: it runs
-// only when the previous verdict is FAIL or WARN; otherwise SKIPPED
-// without calling the bridge.
 package retro
 
 import (
@@ -161,10 +158,6 @@ func TestRun_PreviousFAIL_PASSWithLesson(t *testing.T) {
 	if resp.DurationMS != 90 {
 		t.Errorf("DurationMS=%d, want 90", resp.DurationMS)
 	}
-	// cycle-187 AC-5/AC-6: retro must poll the file the evolve-retrospective
-	// agent actually writes — "retrospective-report.md" — not the stale
-	// "retrospective.md" the runner used before. The mismatch made the bridge
-	// time out on every retro invocation (Scout Gap B).
 	if fb.gotReq.ArtifactPath != filepath.Join(ws, "retrospective-report.md") {
 		t.Errorf("ArtifactPath=%q, want retrospective-report.md (agent output path)", fb.gotReq.ArtifactPath)
 	}
@@ -232,8 +225,6 @@ x
 					DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"},
 				},
 			})
-			// ADR-0102: a missing review is a missing reasoning (FAIL); a
-			// complete review is clean (PASS, no advisories).
 			got := core.VerdictPASS
 			if err != nil {
 				got = core.VerdictFAIL
@@ -408,7 +399,6 @@ func TestRefreshExplanationHandoff_PostBuildMissingSnapshotBecomesInvalid(t *tes
 func TestRun_NoLessonWritten_FAIL(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Retrospective\n## Root Cause\nx\n## Lessons\nfollow-up\n"
-	// fakeBridge writes the report but no failure-lesson*.yaml.
 	fb := &fakeBridge{writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
@@ -432,13 +422,6 @@ func TestRun_EmptyArtifact_FAIL(t *testing.T) {
 	}
 }
 
-// GAP 9 (self-healing): a retro BRIDGE failure must NOT propagate a fatal error.
-// Retro is the failure-analysis phase on the audit-FAIL path; a RunCycle error
-// stops the whole batch (the cause of the runs 154-162 aborts). If retro's own
-// bridge dies, it returns a FAIL verdict with NIL error so the orchestrator routes
-// through decideAfterRetro (failure-adapter: retry/block/proceed) instead of
-// hard-aborting the cycle AND the batch. The bridge error is preserved as an error
-// diagnostic for forensics. (A failure in the failure-handler must never be fatal.)
 func TestRun_BridgeError_FAIL(t *testing.T) {
 	bridgeErr := errors.New("bridge boot timeout")
 	fb := &fakeBridge{err: bridgeErr}
@@ -572,8 +555,6 @@ func TestRun_AcceptsAnyFailureLessonFilename(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Retrospective\n## Root Cause\nx\n## Lessons\ny\n"
 	fb := &fakeBridge{writeArtifact: body}
-	// Pre-write a lesson file with a hash-suffix name pattern (real
-	// fixtures use failure-lesson-{shortsha}.yaml).
 	_ = os.WriteFile(filepath.Join(ws, "failure-lesson-abc123.yaml"), []byte("id: x\n"), 0o644)
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
@@ -592,9 +573,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// TestHasFailureLesson_NonexistentWorkspace_False exercises the
-// os.ReadDir error path: when the workspace doesn't exist, the helper
-// returns false (and the run path treats that as no-lesson-written).
 func TestHasFailureLesson_NonexistentWorkspace_False(t *testing.T) {
 	got := hasFailureLesson("", "/path/that/does/not/exist/at/all", 0)
 	if got {
@@ -602,25 +580,15 @@ func TestHasFailureLesson_NonexistentWorkspace_False(t *testing.T) {
 	}
 }
 
-// TestHasFailureLesson_IgnoresDirectoriesAndOtherFiles verifies the
-// helper skips directories and non-matching filenames.
 func TestHasFailureLesson_IgnoresDirectoriesAndOtherFiles(t *testing.T) {
 	ws := t.TempDir()
 	_ = os.MkdirAll(filepath.Join(ws, "failure-lesson-subdir"), 0o755)
 	_ = os.WriteFile(filepath.Join(ws, "lesson.txt"), []byte("x"), 0o644)
-	_ = os.WriteFile(filepath.Join(ws, "failure-lesson"), []byte("x"), 0o644) // no .yaml
+	_ = os.WriteFile(filepath.Join(ws, "failure-lesson"), []byte("x"), 0o644)
 	if hasFailureLesson("", ws, 0) {
 		t.Errorf("returned true with no matching .yaml; want false")
 	}
 }
-
-// --- retro-model-auto-normalization (Bug B) -------------------------------
-//
-// Retro is a hand-rolled runner: it never passes through BaseRunner, so it
-// never reaches the single dispatch resolver that expands the "auto" model
-// sentinel (llmroute.Resolve → resolvellm). These tests pin the dispatched
-// core.BridgeRequest.Model — the value that actually reaches the CLI — rather
-// than resolvellm in isolation.
 
 func writeRetroProfileDoc(t *testing.T, projectRoot, body string) {
 	t.Helper()
@@ -633,14 +601,15 @@ func writeRetroProfileDoc(t *testing.T, projectRoot, body string) {
 	}
 }
 
-// runRetroForModel drives the real Phase.Run route against a temp project root
-// holding the given retrospective profile, and returns the dispatched request.
-func runRetroForModel(t *testing.T, cfgModel, profile string) core.BridgeRequest {
+func isolateFromAmbientProfileRoots(t *testing.T) {
 	t.Helper()
-	// Isolate from any ambient profile roots so the temp project root is the
-	// only profile source resolvellm can see.
 	t.Setenv("EVOLVE_PLUGIN_ROOT", "")
 	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+}
+
+func runRetroForModel(t *testing.T, cfgModel, profile string) core.BridgeRequest {
+	t.Helper()
+	isolateFromAmbientProfileRoots(t)
 
 	projectRoot := t.TempDir()
 	writeRetroProfileDoc(t, projectRoot, profile)
@@ -664,8 +633,6 @@ func runRetroForModel(t *testing.T, cfgModel, profile string) core.BridgeRequest
 
 const retroProfileDeep = `{"name":"retrospective","role":"retrospective","cli":"codex-tmux","model_tier_default":"deep"}`
 
-// AC: Retro never sends BridgeRequest.Model == "auto" — the unset/sentinel case
-// must resolve to the profile's tier before dispatch.
 func TestRun_AutoModel_ResolvedBeforeDispatch(t *testing.T) {
 	got := runRetroForModel(t, "", retroProfileDeep)
 	if got.Model == "auto" {
@@ -676,7 +643,6 @@ func TestRun_AutoModel_ResolvedBeforeDispatch(t *testing.T) {
 	}
 }
 
-// AC: an explicitly configured tier survives unchanged (no resolution applied).
 func TestRun_ExplicitModel_PassesThroughUnchanged(t *testing.T) {
 	got := runRetroForModel(t, "balanced", retroProfileDeep)
 	if got.Model != "balanced" {
@@ -684,8 +650,6 @@ func TestRun_ExplicitModel_PassesThroughUnchanged(t *testing.T) {
 	}
 }
 
-// AC (edge): a profile with no model_tier_default must still not dispatch the
-// sentinel — it resolves to the established default tier.
 func TestRun_AutoModel_ProfileWithoutTier_ResolvesToDefaultNotAuto(t *testing.T) {
 	got := runRetroForModel(t, "", `{"name":"retrospective","role":"retrospective","cli":"codex-tmux"}`)
 	if got.Model == "auto" || got.Model == "" {
@@ -696,11 +660,8 @@ func TestRun_AutoModel_ProfileWithoutTier_ResolvesToDefaultNotAuto(t *testing.T)
 	}
 }
 
-// AC (negative/OOD): the sentinel must never survive resolution even when the
-// project root has no retrospective profile at all.
 func TestRun_AutoModel_NoProfile_NeverDispatchesSentinel(t *testing.T) {
-	t.Setenv("EVOLVE_PLUGIN_ROOT", "")
-	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	isolateFromAmbientProfileRoots(t)
 	projectRoot := t.TempDir()
 
 	fb := &fakeBridge{
@@ -713,8 +674,6 @@ func TestRun_AutoModel_NoProfile_NeverDispatchesSentinel(t *testing.T) {
 		Context: map[string]string{"previous_verdict": core.VerdictFAIL},
 	})
 	if err != nil {
-		// Failing loudly instead of dispatching the sentinel is an acceptable
-		// resolution of this AC; it must not have launched with "auto".
 		if fb.launches > 0 && fb.gotReq.Model == "auto" {
 			t.Fatalf("launched with Model=%q before failing", fb.gotReq.Model)
 		}
@@ -725,8 +684,6 @@ func TestRun_AutoModel_NoProfile_NeverDispatchesSentinel(t *testing.T) {
 	}
 }
 
-// TestValidateExplanationReview_ListValuedEvidence — the retro gate reads the
-// section with the same tolerance the audit gate does (one reportdoc parser).
 func TestValidateExplanationReview_ListValuedEvidence(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
@@ -750,10 +707,6 @@ func TestValidateExplanationReview_ListValuedEvidence(t *testing.T) {
 	}
 }
 
-// ADR-0102: the review's shape is advisory in retro too — the phase refreshes
-// the handoff itself (this fixture has no snapshot, so the finding is the
-// missing-handoff one) and every finding rides the retrospective's record as a
-// warning while the verdict is untouched.
 func TestRun_PreviousFAIL_LostHandoffAdvisoryRidesTheRecord(t *testing.T) {
 	ws := t.TempDir()
 	body := `# Retrospective
@@ -805,8 +758,6 @@ Apply rate limiter pattern.
 	}
 }
 
-// ADR-0102: retro's bookkeeping findings — an absent Correction todo, a
-// duplicated field — are advisories, never a block.
 func TestValidateExplanationReview_BookkeepingFindingsAreAdvisory(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
@@ -839,8 +790,6 @@ func TestValidateExplanationReview_BookkeepingFindingsAreAdvisory(t *testing.T) 
 	}
 }
 
-// ADR-0102: a retrospective with two review sections is a parser finding
-// (advisory) with no attributable review text — the reasoning floor fails it.
 func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t *testing.T) {
 	req := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "required", DocumentPath: "d.md", DocumentSHA256: "sha"}}
 	report := "## Explanation Documentation Review\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n- Correction todo: none\n\n## Explanation Documentation Review\n- Status: VERIFIED\n"
@@ -850,8 +799,6 @@ func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t 
 	}
 }
 
-// ADR-0102 in retro: NEEDS_CORRECTION with "none" or with an unbacked todo is
-// advisory; a host-side handoff defect still fails loudly through the gate.
 func TestValidateExplanationReview_NeedsCorrectionTodoRulesAreAdvisoryAndHostDefectsAreLoud(t *testing.T) {
 	view := &phaseio.ExplanationView{Status: "required", DocumentPath: "docs/explain/builds/cycle-42.md", DocumentSHA256: "sha", MaterialPaths: []string{"go/app.go"}}
 	req := core.PhaseRequest{Workspace: t.TempDir(), ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: view}
@@ -871,8 +818,6 @@ func TestValidateExplanationReview_NeedsCorrectionTodoRulesAreAdvisoryAndHostDef
 	}
 }
 
-// Retro parity with audit: the findings made before a host-defect error ride
-// along with it (go re-review).
 func TestValidateExplanationReview_HostDefectKeepsTheFindingsMadeBeforeIt(t *testing.T) {
 	weird := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "weird"}}
 	report := "## Explanation Documentation Review\n- Status: MAYBE\n- Build status: weird\n- Evidence: compared d.md:1 with the diff line by line\n- Correction todo: none\n"

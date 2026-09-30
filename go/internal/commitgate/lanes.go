@@ -9,19 +9,13 @@ import (
 	"strings"
 )
 
-// lookPathDefault is the production tool-presence probe.
 func lookPathDefault(tool string) (string, error) { return exec.LookPath(tool) }
 
-// fileExists reports whether path exists in the working tree. Deleted files
-// (mass refactors, moves) carry no lintable content, so the lanes skip them —
-// mirroring the bash files_ext working-tree-existence filter.
 func (o Options) fileExists(rel string) bool {
 	_, err := os.Stat(filepath.Join(o.RepoRoot, rel))
 	return err == nil
 }
 
-// existingFilesWithExt returns the changed files of extension ext that still
-// exist in the working tree.
 func (o Options) existingFilesWithExt(files []string, ext string) []string {
 	var out []string
 	for _, f := range filesWithExt(files, ext) {
@@ -32,9 +26,6 @@ func (o Options) existingFilesWithExt(files []string, ext string) []string {
 	return out
 }
 
-// findUp returns the nearest ancestor directory of the changed file rel that
-// contains marker (go.mod / Cargo.toml), or "" if none up to the filesystem
-// root. Mirrors the bash cg_find_up walk.
 func (o Options) findUp(rel, marker string) string {
 	d := filepath.Dir(filepath.Join(o.RepoRoot, rel))
 	for d != "" && d != string(filepath.Separator) {
@@ -50,10 +41,6 @@ func (o Options) findUp(rel, marker string) string {
 	return ""
 }
 
-// laneGo runs the Go lane: gofmt -s check, then per-module go vet / golangci-lint
-// (if present) / go test over the changed packages, EXCLUDING acs/ predicate
-// packages. Records go:gofmt, go:vet, [go:golangci-lint], go:test in execution
-// order. Returns an Exit* code.
 func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 	gofiles := o.existingFilesWithExt(files, "go")
 	if len(gofiles) == 0 {
@@ -63,8 +50,6 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 		return code
 	}
 
-	// gofmt -s -l: matches CI's `gofmt -d -s`. Plain gofmt would pass code that
-	// CI then rejects (recurring gofmt-not-simplify incident).
 	var unformatted []string
 	for _, f := range gofiles {
 		out, ok := o.runCmd(ctx, o.RepoRoot, "gofmt", "-s", "-l", filepath.Join(o.RepoRoot, f))
@@ -78,8 +63,6 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 	}
 	res.pass("go:gofmt")
 
-	// Map each changed .go file to (moduleDir, relPkg), dropping acs/ predicate
-	// packages (build-tagged //go:build acs state assertions, gated separately).
 	type pkgKey struct{ mod, pkg string }
 	keySet := map[pkgKey]bool{}
 	for _, f := range gofiles {
@@ -98,13 +81,13 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 		if rel == "." {
 			relPkg = "./."
 		}
-		if strings.HasPrefix(relPkg, "./acs/") {
+		isACSPredicatePackage := strings.HasPrefix(relPkg, "./acs/")
+		if isACSPredicatePackage {
 			continue
 		}
 		keySet[pkgKey{mod, relPkg}] = true
 	}
 
-	// Group packages by module dir, deterministically ordered.
 	byMod := map[string][]string{}
 	for k := range keySet {
 		byMod[k.mod] = append(byMod[k.mod], k.pkg)
@@ -135,7 +118,6 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 			return ExitFail
 		}
 	}
-	// Record in execution order (gofmt already recorded above).
 	res.pass("go:vet")
 	if glc {
 		res.pass("go:golangci-lint")
@@ -144,9 +126,6 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 	return ExitPass
 }
 
-// lanePython runs the Python lane: ruff over changed .py files, plus pytest over
-// changed test files. Records python:ruff and (if test files changed)
-// python:pytest. Returns an Exit* code.
 func (o Options) lanePython(ctx context.Context, files []string, res *Result) int {
 	pyfiles := o.existingFilesWithExt(files, "py")
 	if len(pyfiles) == 0 {
@@ -185,8 +164,6 @@ func (o Options) lanePython(ctx context.Context, files []string, res *Result) in
 	return ExitPass
 }
 
-// isPyTest reports whether a .py path is a test file (test_*.py or *_test.py),
-// mirroring the bash grep -E '(^|/)(test_.*|.*_test)\.py$'.
 func isPyTest(path string) bool {
 	base := path
 	if i := strings.LastIndex(path, "/"); i >= 0 {
@@ -199,9 +176,6 @@ func isPyTest(path string) bool {
 	return strings.HasPrefix(stem, "test_") || strings.HasSuffix(stem, "_test")
 }
 
-// laneNode runs the TS/JS lane: eslint over changed .ts/.tsx/.js/.jsx/.mjs/.cjs
-// files (via `eslint` or `npx eslint`). Records node:eslint. Returns an Exit*
-// code.
 func (o Options) laneNode(ctx context.Context, files []string, res *Result) int {
 	var nfiles []string
 	for _, f := range files {
@@ -235,9 +209,6 @@ func (o Options) laneNode(ctx context.Context, files []string, res *Result) int 
 	return ExitPass
 }
 
-// laneRust runs the Rust lane: per-crate cargo fmt --check, cargo clippy, cargo
-// test over changed .rs files. Records rust:fmt, rust:clippy, rust:test. Returns
-// an Exit* code.
 func (o Options) laneRust(ctx context.Context, files []string, res *Result) int {
 	rfiles := o.existingFilesWithExt(files, "rs")
 	if len(rfiles) == 0 {

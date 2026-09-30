@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// composedPrompt builds a prompt with the same shape the bridge composes:
-// agent heading first, body, then a Cycle Context block with the workspace
-// line that the REPL triggers on.
 func composedPrompt(heading, workspace string) string {
 	return strings.Join([]string{
 		heading,
@@ -24,8 +21,6 @@ func composedPrompt(heading, workspace string) string {
 	}, "\n")
 }
 
-// The REPL must print the boot marker, read the pasted prompt, and write the
-// phase artifact resolved from workspace+basename — the core of tmux full-cycle.
 func TestRunREPL_WritesArtifactFromWorkspaceLine(t *testing.T) {
 	ws := t.TempDir()
 	stdin := strings.NewReader(composedPrompt("# Evolve Scout", ws))
@@ -47,9 +42,6 @@ func TestRunREPL_WritesArtifactFromWorkspaceLine(t *testing.T) {
 	}
 }
 
-// Triggering on the workspace line (not a stray absolute path in the body)
-// must write to workspace/<basename> for the heading's phase — even when the
-// body mentions an upstream artifact's absolute path.
 func TestRunREPL_BuilderHeadingNotMisroutedByUpstreamMention(t *testing.T) {
 	ws := t.TempDir()
 	prompt := strings.Join([]string{
@@ -67,14 +59,11 @@ func TestRunREPL_BuilderHeadingNotMisroutedByUpstreamMention(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws, "build-report.md")); err != nil {
 		t.Fatalf("build-report.md not written to workspace: %v", err)
 	}
-	// The upstream scout path mentioned in the body must NOT have been written.
 	if _, err := os.Stat("/some/other/cycle/scout-report.md"); err == nil {
 		t.Error("REPL wrote to the upstream path mentioned in the body — should only write workspace/build-report.md")
 	}
 }
 
-// Audit verdict injection: FAIL must shape both the report verdict line and
-// the fused acs-verdict.json red_count (so the EGPS gate blocks the cycle).
 func TestRunREPL_AuditVerdictInjection(t *testing.T) {
 	cases := []struct {
 		verdict      string
@@ -116,20 +105,14 @@ func TestRunREPL_AuditVerdictInjection(t *testing.T) {
 	}
 }
 
-// EOF fallback: a prompt that never carries a "- workspace:" line (so the
-// per-line trigger never fires) but does mention an absolute artifact path
-// must still be served once when stdin closes.
 func TestRunREPL_EOFFallback_WritesFromAbsolutePath(t *testing.T) {
-	// Arrange: heading + absolute artifact path, NO workspace line.
 	ws := t.TempDir()
 	artifact := filepath.Join(ws, "scout-report.md")
-	prompt := "# Evolve Scout\n\nplease write " + artifact + "\n"
+	promptWithoutWorkspaceLine := "# Evolve Scout\n\nplease write " + artifact + "\n"
 	var stdout, stderr bytes.Buffer
 
-	// Act
-	rc := runREPL(strings.NewReader(prompt), &stdout, &stderr, "PASS")
+	rc := runREPL(strings.NewReader(promptWithoutWorkspaceLine), &stdout, &stderr, "PASS")
 
-	// Assert
 	if rc != 0 {
 		t.Fatalf("rc=%d stderr=%s", rc, stderr.String())
 	}
@@ -142,14 +125,10 @@ func TestRunREPL_EOFFallback_WritesFromAbsolutePath(t *testing.T) {
 	}
 }
 
-// emitREPLArtifacts returns false (and logs) when the phase has no artifact
-// contract — the REPL must not treat that as a successful turn.
 func TestEmitREPLArtifacts_UnknownPhase_ReturnsFalse(t *testing.T) {
-	// Arrange / Act
 	var stdout, stderr bytes.Buffer
 	ok := emitREPLArtifacts("nonesuch", "/tmp/x.md", "PASS", &stdout, &stderr)
 
-	// Assert
 	if ok {
 		t.Error("emitREPLArtifacts should return false for an unknown phase")
 	}
@@ -158,10 +137,7 @@ func TestEmitREPLArtifacts_UnknownPhase_ReturnsFalse(t *testing.T) {
 	}
 }
 
-// emitREPLArtifacts returns false when the underlying write fails (e.g. an
-// unwritable parent path); the failure is logged, never panics.
 func TestEmitREPLArtifacts_WriteFailure_ReturnsFalse(t *testing.T) {
-	// Arrange: a read-only directory so MkdirAll/WriteFile under it fails.
 	parent := t.TempDir()
 	ro := filepath.Join(parent, "ro")
 	if err := os.Mkdir(ro, 0o555); err != nil {
@@ -170,11 +146,9 @@ func TestEmitREPLArtifacts_WriteFailure_ReturnsFalse(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
 	artifact := filepath.Join(ro, "sub", "scout-report.md")
 
-	// Act
 	var stdout, stderr bytes.Buffer
 	ok := emitREPLArtifacts("scout", artifact, "PASS", &stdout, &stderr)
 
-	// Assert
 	if ok {
 		t.Error("emitREPLArtifacts should return false when the write fails")
 	}
@@ -183,11 +157,7 @@ func TestEmitREPLArtifacts_WriteFailure_ReturnsFalse(t *testing.T) {
 	}
 }
 
-// writeArtifacts must surface a write error (unwritable destination) rather
-// than silently dropping the artifact.
 func TestWriteArtifacts_UnwritableDestination_Errors(t *testing.T) {
-	// Arrange: a read-only directory; WriteFile into an existing path under it
-	// (dir already present so MkdirAll succeeds, then WriteFile fails).
 	parent := t.TempDir()
 	ro := filepath.Join(parent, "ro")
 	if err := os.Mkdir(ro, 0o555); err != nil {
@@ -195,11 +165,9 @@ func TestWriteArtifacts_UnwritableDestination_Errors(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(ro, 0o755) })
 
-	// Act: target is directly inside the read-only dir (no new subdir needed),
-	// so MkdirAll(ro) is a no-op success and WriteFile is the failing call.
-	err := writeArtifacts(map[string]string{filepath.Join(ro, "out.md"): "x"})
+	fileDirectlyInReadOnlyDir := filepath.Join(ro, "out.md")
+	err := writeArtifacts(map[string]string{fileDirectlyInReadOnlyDir: "x"})
 
-	// Assert
 	if err == nil {
 		t.Fatal("writeArtifacts should error writing into a read-only directory")
 	}
@@ -208,8 +176,6 @@ func TestWriteArtifacts_UnwritableDestination_Errors(t *testing.T) {
 	}
 }
 
-// parseArgs must infer the CLI family (for exit injection) and the
-// interactive/REPL flag from the invocation flags alone.
 func TestParseArgs_StyleAndInteractive(t *testing.T) {
 	cases := []struct {
 		name            string
@@ -239,8 +205,6 @@ func TestParseArgs_StyleAndInteractive(t *testing.T) {
 	}
 }
 
-// Per-CLI exit injection: the matching FAKE_CLI_<STYLE>_EXIT makes the
-// headless run fail with that code and write NO artifact.
 func TestRun_PerCLIExitInjection(t *testing.T) {
 	t.Setenv("FAKE_CLI_CLAUDE_EXIT", "81")
 	dir := t.TempDir()
@@ -257,16 +221,14 @@ func TestRun_PerCLIExitInjection(t *testing.T) {
 	}
 }
 
-// Exit injection is scoped to the matching style: a codex-targeted injection
-// must not affect a claude invocation.
 func TestRun_ExitInjectionScopedToStyle(t *testing.T) {
 	t.Setenv("FAKE_CLI_CODEX_EXIT", "81")
 	dir := t.TempDir()
 	artifact := filepath.Join(dir, "scout-report.md")
-	args := []string{"-p", "write to " + artifact + " please", "--model", "sonnet"} // claude style
+	claudeStyleArgs := []string{"-p", "write to " + artifact + " please", "--model", "sonnet"}
 
 	var stdout, stderr bytes.Buffer
-	if rc := run(args, bytes.NewReader(nil), &stdout, &stderr); rc != 0 {
+	if rc := run(claudeStyleArgs, bytes.NewReader(nil), &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc=%d, want 0 (codex injection must not affect claude); stderr=%s", rc, stderr.String())
 	}
 	if _, err := os.Stat(artifact); err != nil {
@@ -274,7 +236,6 @@ func TestRun_ExitInjectionScopedToStyle(t *testing.T) {
 	}
 }
 
-// auditVerdict normalises the env var; garbage and unset both mean PASS.
 func TestAuditVerdict_Normalisation(t *testing.T) {
 	cases := map[string]string{"": "PASS", "pass": "PASS", "warn": "WARN", "FAIL": "FAIL", "garbage": "PASS"}
 	for in, want := range cases {

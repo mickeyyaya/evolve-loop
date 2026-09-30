@@ -41,15 +41,13 @@ func fakePrompts(agent, body string) *prompts.Loader {
 	})
 }
 
-// --- classify evaluator (pure function) ---
-
 func TestEvaluateClassify(t *testing.T) {
 	cases := []struct {
 		name        string
 		rules       *phasespec.ClassifyRules
 		artifact    string
 		wantVerdict string
-		wantDiag    string // substring expected in a diagnostic; "" = no diags
+		wantDiag    string
 	}{
 		{"nil rules empty → FAIL", nil, "   ", core.VerdictFAIL, "empty artifact"},
 		{"nil rules content → PASS", nil, "anything", core.VerdictPASS, ""},
@@ -70,17 +68,13 @@ func TestEvaluateClassify(t *testing.T) {
 			"content", core.VerdictWARN, "",
 		},
 		{
-			// cycle-241 declared-semantics-rejection: a fail_if_signal gate
-			// without the Stage-3 signal bus can never fire — silently passing
-			// it lets an authoring mistake reach runtime undetected (retro
-			// 215-231 Practice 4). Loud authoring-time FAIL, not WARN.
 			"fail_if_signal without signal bus → FAIL (authoring-time rejection)",
 			&phasespec.ClassifyRules{FailIfSignal: map[string]string{"security.severity_max": ">=HIGH"}},
 			"content", core.VerdictFAIL, "fail_if_signal",
 		},
 		{
 			"invalid verdict_on_pass → FAIL (fail loud on typo)",
-			&phasespec.ClassifyRules{VerdictOnPass: "pass"}, // lowercase typo
+			&phasespec.ClassifyRules{VerdictOnPass: "pass"},
 			"content", core.VerdictFAIL, "invalid verdict_on_pass",
 		},
 		{
@@ -112,11 +106,6 @@ func TestEvaluateClassify(t *testing.T) {
 	}
 }
 
-// TestEvaluateClassify_FailIfSignal_RejectsWithErrorSeverity pins the
-// severity of the cycle-241 declared-semantics rejection: the diagnostic
-// naming fail_if_signal must be Severity "error" (not "warning") AND the
-// verdict must be FAIL. The table above checks verdict+message; this test
-// is the severity pin the table's shape cannot express.
 func TestEvaluateClassify_FailIfSignal_RejectsWithErrorSeverity(t *testing.T) {
 	rules := &phasespec.ClassifyRules{FailIfSignal: map[string]string{"security.severity_max": ">=HIGH"}}
 
@@ -149,8 +138,6 @@ func hasDiag(diags []core.Diagnostic, sub string) bool {
 	return false
 }
 
-// --- Hooks accessors ---
-
 func TestHooks_ArtifactFilename(t *testing.T) {
 	cases := []struct {
 		name string
@@ -182,9 +169,6 @@ func TestHooks_NameAndAgentDefaults(t *testing.T) {
 		t.Errorf("DefaultModel = %q", h.DefaultModel())
 	}
 }
-
-// --- Run-level: a pure-data spec produces the same dispatch contract as a
-// hand-written phase would (artifact path, agent, profile, prompt context). ---
 
 func TestRun_SpecDrivenPhase_PASS(t *testing.T) {
 	ws := t.TempDir()
@@ -250,8 +234,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// TestRun_NoOnPass_DefersNextPhase confirms an empty OnPass yields an empty
-// NextPhase, leaving successor selection to the orchestrator (Stage 1 contract).
 func TestRun_NoOnPass_DefersNextPhase(t *testing.T) {
 	spec := phasespec.PhaseSpec{Name: "echo", Classify: &phasespec.ClassifyRules{}}
 	fb := &fakeBridge{writeArtifact: "ok\n"}

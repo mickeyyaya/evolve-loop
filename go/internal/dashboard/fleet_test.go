@@ -17,18 +17,17 @@ func TestServer_FleetPhaseUpdateRefreshesSnapshot(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
-	seedFleetLane(t, root, 1, "build", now)
+	const phaseBefore, sameLengthPhaseAfter = "build", "audit"
+	seedFleetLane(t, root, 1, phaseBefore, now)
 	seedFleetLane(t, root, 2, "audit", now)
 	s := New(root, Options{Now: func() time.Time { return now }})
 	_, before := s.current()
 	path := filepath.Join(core.RunWorkspacePath(root, 1), core.CycleStateFile)
-	// Update the existing file without changing its directory or lease. Both
-	// phase names have the same length, so size alone cannot detect the change.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, path, strings.Replace(string(raw), `"phase":"build"`, `"phase":"audit"`, 1))
+	writeFile(t, path, strings.Replace(string(raw), `"phase":"`+phaseBefore+`"`, `"phase":"`+sameLengthPhaseAfter+`"`, 1))
 	if err := os.Chtimes(path, now, now); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +37,7 @@ func TestServer_FleetPhaseUpdateRefreshesSnapshot(t *testing.T) {
 		t.Fatal("fleet phase update did not publish a new snapshot")
 	}
 	for _, lane := range snap.Cycles {
-		if lane.ID == 1 && lane.CurrentPhase == "audit" && lane.State == StateRunning {
+		if lane.ID == 1 && lane.CurrentPhase == sameLengthPhaseAfter && lane.State == StateRunning {
 			return
 		}
 	}

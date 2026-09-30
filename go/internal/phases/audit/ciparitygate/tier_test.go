@@ -14,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
-// Test 20 (moved intent: audit/ciparity_unit_test.go:421) — every attempt runs
-// under the scrubbed allowlist env, captured ONCE at wrap time and identical on
-// both attempts: PATH and GOFLAGS survive in allowlist order, a lane-leaked
-// EVOLVE_* canary does not, and nil (inherit) is never passed.
 func TestTierAttempts_ScrubbedEnvIsCapturedOnceAndIdenticalOnBothAttempts(t *testing.T) {
 	t.Setenv("EVOLVE_LEAK_CANARY", "1")
 	t.Setenv("GOFLAGS", "-mod=mod")
@@ -48,9 +44,6 @@ func TestTierAttempts_ScrubbedEnvIsCapturedOnceAndIdenticalOnBothAttempts(t *tes
 			last = r
 		}
 	}
-	// The clean env is captured when the runner is wrapped, not per call: a
-	// change between the attempts (the first attempt mutates GOFLAGS) never
-	// reaches the retake.
 	var seen [][]string
 	mutating := func(_ context.Context, _, _ string, _, env []string, _ io.Reader, so, _ io.Writer) (int, error) {
 		seen = append(seen, env)
@@ -69,8 +62,6 @@ func TestTierAttempts_ScrubbedEnvIsCapturedOnceAndIdenticalOnBothAttempts(t *tes
 	}
 }
 
-// Test 21 — integration-tier.log is byte-identical to the goldens for the
-// red-then-green and red-then-red runs; append-only, 0o644.
 func TestTierLog_BytesMatchTheGoldenForBothOutcomes(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -105,12 +96,6 @@ func TestTierLog_BytesMatchTheGoldenForBothOutcomes(t *testing.T) {
 	}
 }
 
-// Test 22 — log failures are coded and never fatal: a regular file as the
-// Workspace fails both appends (ONE TIER_LOG_WRITE_FAILED per attempt, the
-// verdict still returned, `where` == "integration-tier.log unavailable");
-// Workspace == "" is a declared no-op (no event, no file); a log replaced by
-// a directory between the attempts fails ONLY attempt 2 and the earlier
-// pointer stands in the offenders.
 func TestTierLog_FailuresAreCodedAndTheEarlierPointerStands(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, _ := goWorktree(t)
@@ -152,7 +137,8 @@ func TestTierLog_FailuresAreCodedAndTheEarlierPointerStands(t *testing.T) {
 	calls := 0
 	g, events = observed(t, func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
 		calls++
-		if calls == 2 { // between the attempts: attempt 1 is on disk; replace the log by a directory
+		retakeStarting := calls == 2
+		if retakeStarting {
 			if err := os.Remove(logPath); err != nil {
 				t.Fatal(err)
 			}
@@ -173,12 +159,6 @@ func TestTierLog_FailuresAreCodedAndTheEarlierPointerStands(t *testing.T) {
 	}
 }
 
-// Test 23 (moved: audit/ciparity_unit_test.go:513-539 and the pre-move pin
-// TestAcquireTierLock_PrefersProjectRootOverWorktree, now over the injected
-// clock) — the lock table: a clean acquire, release re-acquires; a held lock
-// times out after TierLockWait with the 2 s poll observed; a regular file as
-// ProjectRoot fails flock's mkdir; no root at all; the lock lives under
-// ProjectRoot, never the worktree; the real flock path serializes and releases.
 func TestAcquireLock_TableOverAnInjectedClock(t *testing.T) {
 	shared, lane := t.TempDir(), t.TempDir()
 	g, events := observed(t, nil, nil)
@@ -193,7 +173,6 @@ func TestAcquireLock_TableOverAnInjectedClock(t *testing.T) {
 		t.Errorf("the lock must NOT live under the per-lane Worktree (err=%v)", err)
 	}
 
-	// Held → poll → timeout on the injected clock.
 	tick := 0
 	base := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
 	var slept []time.Duration
@@ -214,13 +193,12 @@ func TestAcquireLock_TableOverAnInjectedClock(t *testing.T) {
 	}
 	rel3()
 
-	// A regular file as the root: flock's mkdir fails → reason=error.
-	file := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+	fileAsRoot := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(fileAsRoot, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	*events = nil
-	rel4, note4 := g.acquireLock(gateTier, Request{1, file, "", ""})
+	rel4, note4 := g.acquireLock(gateTier, Request{1, fileAsRoot, "", ""})
 	rel4()
 	if !strings.HasPrefix(note4, ", lock unavailable: flock mkdir: ") {
 		t.Fatalf("unusable root: note=%q", note4)
@@ -237,7 +215,6 @@ func TestAcquireLock_TableOverAnInjectedClock(t *testing.T) {
 		t.Errorf("no root: note=%q events=%v", note5, *events)
 	}
 
-	// The real flock path: the leaf's lock and a second process-local holder exclude each other.
 	rel6, note6 := g.acquireLock(gateTier, Request{1, shared, "", ""})
 	if note6 != "" {
 		t.Fatal(note6)
@@ -248,11 +225,6 @@ func TestAcquireLock_TableOverAnInjectedClock(t *testing.T) {
 	rel6()
 }
 
-// Test 24 — decideTier is the PURE four-way table over two attempts: a retake
-// that could not start → attempt 1's offenders + pointer; red-then-green → the
-// golden flake text (both `where` variants); a deadline kill with markers →
-// the retake's offenders; without markers → the golden budget text; red-red →
-// the retake's offenders.
 func TestDecideTier_FourWayTable(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	first := attempt{out: "--- FAIL: TestFirstAttempt (0.00s)\nFAIL\tpkg\t1.0s\n", code: 1}
@@ -286,20 +258,11 @@ func TestDecideTier_FourWayTable(t *testing.T) {
 	if d.code != "" || d.cause != "retake_red" || strings.Join(d.offenders, "\n") != strings.ReplaceAll(g1["tier.redred.offenders"], "{WS}", "/ws") {
 		t.Errorf("red-red: %+v", d)
 	}
-	// deadlineHit on attempt 1 is recorded but never consulted (the original never checked attempt 1's ctx).
 	if d = decideTier(attempt{code: 1, deadlineHit: true}, red, "", time.Minute); d.cause != "retake_red" {
 		t.Errorf("attempt 1's deadline flag is inert: %+v", d)
 	}
 }
 
-// Test 25 (moved intent: audit/ciparity_unit_test.go:421/:454/:485 and the
-// pre-move pins TestIntegrationTier_RetakeExecFailure_* / _RetakeUsesAFreshBudget)
-// — end to end through fakes: green → one run, no event; red-then-green → two
-// runs, the golden flake WARN, ONE FLAKE_ABSORBED; red-then-red → the retake's
-// offenders + pointer, ONE GATE_FAILED{retake_red}; a retake start error →
-// ONE TIER_RETAKE_EXEC_FAILED then ONE GATE_FAILED{retake_exec_failed} on
-// attempt 1's offenders, the lock released; the retake carries a FRESH
-// deadline; a 1 ns budget → the deadline arms with the golden texts.
 func TestIntegrationTier_EndToEndThroughFakes(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, _ := goWorktree(t)
@@ -406,7 +369,6 @@ func TestIntegrationTier_EndToEndThroughFakes(t *testing.T) {
 		t.Errorf("GATE_FAILED: %+v", e)
 	}
 
-	// Attempt 1 cannot start → GATE_STEP_FAILED{step=tier_attempt}.
 	g, events = observed(t, fakeRunFunc(-1, "", "", errors.New("executable file not found")), fixedSet("./internal/widget/..."))
 	if off, err := g.IntegrationTier(req); off != nil || err == nil || err.Error() != g1["tier.exec_failed"] {
 		t.Fatalf("attempt 1 start failure: (%v, %v)", off, err)

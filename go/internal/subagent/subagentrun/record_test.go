@@ -13,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 40 — every integrity rung is ONE ARTIFACT_INTEGRITY_FAIL naming it,
-// with the ladder's diagnostic as the reason and the evidence carried on the
-// Outcome; a PASS emits nothing.
 func TestRecord_IntegrityRungSignals(t *testing.T) {
 	f := newFixture(t)
 	cases := []struct {
@@ -58,8 +55,6 @@ func TestRecord_IntegrityRungSignals(t *testing.T) {
 	}
 }
 
-// Test 41 — a sound artifact with a non-zero exit is FAIL and ONE
-// VERDICT_FAIL carrying the exit code; no integrity code.
 func TestRecord_VerdictFailCarriesTheExitCode(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -78,10 +73,6 @@ func TestRecord_VerdictFailCarriesTheExitCode(t *testing.T) {
 	}
 }
 
-// Test 42 — an adapter error: the ledger line exists (exit_code -1) before
-// the error is returned, the outcome is populated, exactly ONE
-// ADAPTER_EXEC_FAILED carries verdict + integrity, no VERDICT_FAIL /
-// INTEGRITY_FAIL doubles it, and the signal precedes the ledger append.
 func TestRecord_ExecErrorWritesTheLedgerThenReturnsWithOneOutcomeSignal(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -117,7 +108,6 @@ func TestRecord_ExecErrorWritesTheLedgerThenReturnsWithOneOutcomeSignal(t *testi
 	}
 }
 
-// Test 43 — the hash signal fires only when the artifact stood the ladder.
 func TestRecord_HashFailedOnlyWhenTheArtifactStood(t *testing.T) {
 	f := newFixture(t)
 	hashErr := func(string) (string, error) { return "", errors.New("hash boom") }
@@ -147,9 +137,6 @@ func TestRecord_HashFailedOnlyWhenTheArtifactStood(t *testing.T) {
 	}
 }
 
-// Test 44 — a ledger write error masks the exec error with the bare text,
-// names the op in the fields, and follows the outcome signal; no ledger path
-// ⇒ no ledger, no code.
 func TestRecord_LedgerWriteErrorMasksExecErrorAndNamesTheOp(t *testing.T) {
 	f := newFixture(t)
 	blocker := filepath.Join(f.root, "blocker")

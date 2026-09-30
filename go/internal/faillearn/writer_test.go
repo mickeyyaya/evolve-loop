@@ -35,8 +35,6 @@ func TestWriteArtifacts_WritesReportAndLesson(t *testing.T) {
 	}
 }
 
-// The floor must never clobber a richer artifact: if the LLM retro (or a
-// previous floor write) already produced the file, skip it.
 func TestWriteArtifacts_DedupesByLessonID(t *testing.T) {
 	t.Parallel()
 	runDir := t.TempDir()
@@ -104,7 +102,6 @@ func TestWriteArtifacts_NoTmpResidue(t *testing.T) {
 
 func TestWriteArtifacts_ErrorOnUnwritableTarget(t *testing.T) {
 	t.Parallel()
-	// runDir path occupied by a FILE — mkdir must fail loudly.
 	occupied := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(occupied, []byte("x"), 0o644); err != nil {
 		t.Fatalf("seed file: %v", err)
@@ -115,8 +112,6 @@ func TestWriteArtifacts_ErrorOnUnwritableTarget(t *testing.T) {
 	}
 }
 
-// Loop-scope fatals have no cycle workspace: an empty runDir writes the
-// lesson only, skipping the report instead of inventing a path.
 func TestWriteArtifacts_EmptyRunDirSkipsReport(t *testing.T) {
 	t.Parallel()
 	lessonsDir := t.TempDir()

@@ -13,14 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 )
 
-// validateExplanationReview applies retro's policy around the shared review
-// contract (explanationdocs.ValidateReviewedHandoff). Since 2026-09-13
-// (ADR-0102, operator decision) the review's shape — the section, its
-// fields, the correction-todo bookkeeping, the handoff echoes and the
-// citations — is advisory: the findings ride the retrospective's record as
-// warnings. The error, the only blocking outcome, is the reasoning floor (a
-// token Evidence; a missing or duplicated review section is no review text
-// at all) and host-side defects in the handoff itself.
 func validateExplanationReview(report string, req core.PhaseRequest) (advisories []string, err error) {
 	if req.ExplanationDocumentationVersion == 0 {
 		return nil, nil
@@ -44,7 +36,7 @@ func validateExplanationReview(report string, req core.PhaseRequest) (advisories
 	}
 	review, err := explanationdocs.ValidateReviewedHandoff(context.Background(), fields, req.BuildExplanation, req.Worktree, req.WorktreeBaseSHA)
 	if err != nil {
-		return append(advisories, review.Advisories...), err // the findings made before the host defect still ride the record
+		return append(advisories, review.Advisories...), err
 	}
 	advisories = append(advisories, review.Advisories...)
 	if review.Status == "NEEDS_CORRECTION" {
@@ -59,8 +51,6 @@ func validateExplanationReview(report string, req core.PhaseRequest) (advisories
 	return advisories, nil
 }
 
-// adviseUnbackedTodo records, as an advisory, a correction todo that
-// carryover-todos.json does not back.
 func adviseUnbackedTodo(advisories []string, workspace, todo string) []string {
 	if err := requireCorrectionTodo(workspace, todo); err != nil {
 		return append(advisories, err.Error())

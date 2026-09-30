@@ -15,9 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// llmCall is the read-only dashboard projection of the canonical attempt
-// record. Model is a verified dispatched selector for schema-v2 records and the
-// historical requested label for legacy rows.
 type llmCall struct {
 	TS        string
 	StartedAt string
@@ -30,9 +27,6 @@ type llmCall struct {
 	ExitCode  int
 }
 
-// readLoop answers "what is the loop doing right now" from cycle-state.json,
-// the current run's lease, and the operator brake file. A missing cycle-state
-// is the quiet idle case; a torn one is a warning.
 func readLoop(root string, now time.Time) (LoopStatus, []string) {
 	var ls LoopStatus
 	var warnings []string
@@ -45,8 +39,6 @@ func readLoop(root string, now time.Time) (LoopStatus, []string) {
 		warnings = append(warnings, "cycle-state.json: "+err.Error())
 	}
 	if !ok {
-		// A cleanly stopped loop removes cycle-state.json; the newest run's
-		// run.json still says where it was checkpointed, so show that.
 		cs, ok = newestRunState(root)
 		ls.Checkpointed = ok
 	}
@@ -67,7 +59,6 @@ func statusForRun(root string, now time.Time, cs cyclestate.CycleState, ls LoopS
 	lease, ok, err := runlease.Read(ws)
 	switch {
 	case err != nil:
-		// A torn lease must not read as "idle": say so.
 		warnings = append(warnings, fmt.Sprintf("cycle %d lease: %v", cs.CycleID, err))
 	case ok:
 		ls.LeaseHeartbeat = parseTime(lease.HeartbeatAt)
@@ -80,8 +71,6 @@ func statusForRun(root string, now time.Time, cs cyclestate.CycleState, ls LoopS
 	return ls, warnings
 }
 
-// Only the representative lane needs dispatch metadata here; cycle detail
-// reads are bounded separately by the selected history and live lanes.
 func enrichLoopStatus(root string, ls LoopStatus) LoopStatus {
 	if ls.CycleID > 0 {
 		if call, ok := lastCallForPhase(readLLMCalls(core.RunWorkspacePath(root, ls.CycleID)), ls.Phase); ok {
@@ -91,8 +80,6 @@ func enrichLoopStatus(root string, ls LoopStatus) LoopStatus {
 	return ls
 }
 
-// readRunStatuses gives each fleet lane its own state/lease identity. The
-// singleton remains a compatibility source only when a lane has no own state.
 func readRunStatuses(root string, now time.Time, primary LoopStatus) (map[int]LoopStatus, []string) {
 	out := map[int]LoopStatus{}
 	if primary.CycleID > 0 {
@@ -107,7 +94,6 @@ func readRunStatuses(root string, now time.Time, primary LoopStatus) (map[int]Lo
 		ws := core.RunWorkspacePath(root, id)
 		cs, ok, err := readCycleState(filepath.Join(ws, core.CycleStateFile))
 		if !ok && err == nil {
-			// run.json is a durable breadcrumb, not a replacement for live state.
 			if id == primary.CycleID {
 				continue
 			}
@@ -129,7 +115,6 @@ func readRunStatuses(root string, now time.Time, primary LoopStatus) (map[int]Lo
 	return out, warnings
 }
 
-// newestRunState reads run.json from the highest-numbered run workspace.
 func newestRunState(root string) (cyclestate.CycleState, bool) {
 	ids, _ := workspaceCycles(root)
 	if len(ids) == 0 {
@@ -146,7 +131,6 @@ func newestRunState(root string) (cyclestate.CycleState, bool) {
 	return cs, ok && cs.CycleID > 0
 }
 
-// readCycleState decodes the kernel's cycle-state file. ok=false when absent.
 func readCycleState(path string) (cs cyclestate.CycleState, ok bool, err error) {
 	buf, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -161,7 +145,6 @@ func readCycleState(path string) (cs cyclestate.CycleState, ok bool, err error) 
 	return cs, true, nil
 }
 
-// readLLMCalls projects the canonical bounded reader into dashboard fields.
 func readLLMCalls(ws string) []llmCall {
 	result, _ := llmcalls.ReadWorkspace(ws)
 	out := make([]llmCall, 0, len(result.Records))
@@ -185,9 +168,6 @@ func readLLMCalls(ws string) []llmCall {
 	return out
 }
 
-// lastCallForPhase returns the most recent dispatch recorded for phase; when
-// none matches (the phase has not finished yet) it falls back to the last
-// call overall, which is the dispatch currently on the pane.
 func lastCallForPhase(calls []llmCall, phase string) (llmCall, bool) {
 	for i := len(calls) - 1; i >= 0; i-- {
 		if calls[i].Phase == phase {
@@ -200,7 +180,6 @@ func lastCallForPhase(calls []llmCall, phase string) (llmCall, bool) {
 	return calls[len(calls)-1], true
 }
 
-// parseTime accepts RFC3339 and RFC3339Nano; anything else is the zero time.
 func parseTime(s string) time.Time {
 	if s == "" {
 		return time.Time{}

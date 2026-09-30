@@ -7,13 +7,6 @@ import (
 	"time"
 )
 
-// novelty_test.go — the near-duplicate gate on the lesson-write seam
-// (cycle-1494, `sleep-time-kb-consolidation`). Every case drives the real
-// WriteArtifacts and asserts on what actually landed on disk.
-
-// recurringEvent renders the SAME observation at a different cycle — the shape
-// that defeats writeIfAbsent's exact-path dedupe, because the lesson id embeds
-// the cycle number.
 func recurringEvent(cycle int) FailureEvent {
 	return FailureEvent{
 		Cycle:          cycle,
@@ -27,8 +20,6 @@ func recurringEvent(cycle int) FailureEvent {
 	}
 }
 
-// unrelatedEvent is a materially different failure: different phase,
-// classification, defect and summary vocabulary.
 func unrelatedEvent(cycle int) FailureEvent {
 	return FailureEvent{
 		Cycle:          cycle,
@@ -57,9 +48,6 @@ func countYAML(t *testing.T, dir string) int {
 	return n
 }
 
-// TestWriteArtifacts_NoveltyGateSuppressesRecurringObservation is the inbox
-// item's literal regression: the same observation written twice leaves ONE
-// lesson on disk, even though the two ids differ by cycle number.
 func TestWriteArtifacts_NoveltyGateSuppressesRecurringObservation(t *testing.T) {
 	lessonsDir := t.TempDir()
 
@@ -77,9 +65,6 @@ func TestWriteArtifacts_NoveltyGateSuppressesRecurringObservation(t *testing.T) 
 	}
 }
 
-// TestWriteArtifacts_NoveltyGateStillWritesRetrospective pins that suppression
-// is scoped to the LESSON: the failing cycle's own retrospective is its
-// durable failure record and must land regardless.
 func TestWriteArtifacts_NoveltyGateStillWritesRetrospective(t *testing.T) {
 	lessonsDir := t.TempDir()
 	if err := WriteArtifacts(recurringEvent(1494), t.TempDir(), lessonsDir); err != nil {
@@ -95,9 +80,6 @@ func TestWriteArtifacts_NoveltyGateStillWritesRetrospective(t *testing.T) {
 	}
 }
 
-// TestWriteArtifacts_NoveltyGateRetainsDistinctFailure is the negative test
-// that keeps the gate honest — a suppress-everything implementation passes the
-// duplicate case while destroying the corpus.
 func TestWriteArtifacts_NoveltyGateRetainsDistinctFailure(t *testing.T) {
 	lessonsDir := t.TempDir()
 	if err := WriteArtifacts(recurringEvent(1494), t.TempDir(), lessonsDir); err != nil {
@@ -111,9 +93,6 @@ func TestWriteArtifacts_NoveltyGateRetainsDistinctFailure(t *testing.T) {
 	}
 }
 
-// TestWriteArtifacts_NoveltyGateIsNonDestructiveOnCorpusRot covers the edge
-// case parseLessonFile documents: an unparseable neighbour must neither
-// suppress the incoming lesson nor be rewritten or deleted.
 func TestWriteArtifacts_NoveltyGateIsNonDestructiveOnCorpusRot(t *testing.T) {
 	lessonsDir := t.TempDir()
 	rotten := filepath.Join(lessonsDir, "rotten.yaml")
@@ -137,11 +116,6 @@ func TestWriteArtifacts_NoveltyGateIsNonDestructiveOnCorpusRot(t *testing.T) {
 	}
 }
 
-// TestWriteArtifacts_NoveltyThresholdOptionReachesTheGate names
-// WithNoveltyThreshold and proves the value REACHES the decision rather than
-// being dead config: the SAME pair of events that the default threshold keeps
-// as two lessons (TestWriteArtifacts_NoveltyGateRetainsDistinctFailure)
-// collapses to one under a deliberately loose operator threshold.
 func TestWriteArtifacts_NoveltyThresholdOptionReachesTheGate(t *testing.T) {
 	lessonsDir := t.TempDir()
 
@@ -156,9 +130,6 @@ func TestWriteArtifacts_NoveltyThresholdOptionReachesTheGate(t *testing.T) {
 	}
 }
 
-// TestWriteArtifacts_NoveltyThresholdOptionClampsMalformedValue pins the
-// resolver's range: a threshold outside (0,1] must fall back to the built-in,
-// never disarm the gate (>1) or suppress every write (<=0).
 func TestWriteArtifacts_NoveltyThresholdOptionClampsMalformedValue(t *testing.T) {
 	for _, tc := range []struct {
 		name string

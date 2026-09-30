@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestFreshest_ZeroValueIsNewestVersion: the zero FreshnessPolicy is the
-// enumerating-CLI default — newest concrete version via NewestInLineage,
-// which is composed, not modified (its versioned-beats-unversioned rule is
-// untouched).
 func TestFreshest_ZeroValueIsNewestVersion(t *testing.T) {
 	t.Parallel()
 	var p FreshnessPolicy
@@ -20,28 +16,17 @@ func TestFreshest_ZeroValueIsNewestVersion(t *testing.T) {
 	}
 }
 
-// TestFreshest_AliasPreferred: an alias-resolving CLI (claude) declares
-// PreferAlias — the bare alias is strictly fresher than any concrete id the
-// catalog could cache, because the CLI resolves it to the newest release at
-// LAUNCH. Caching a concrete "opus-4.6" would freeze the version.
 func TestFreshest_AliasPreferred(t *testing.T) {
 	t.Parallel()
 	p := FreshnessPolicy{PreferAlias: true, AliasIDs: []string{"opus", "sonnet", "haiku"}}
-	// Alias beats a concrete versioned sibling in the same lineage.
 	if got := p.Freshest([]string{"opus-4.6", "opus"}); got != "opus" {
 		t.Errorf("Freshest = %q, want the alias id", got)
 	}
-	// No alias in the bucket → falls back to newest-version, never returns "".
 	if got := p.Freshest([]string{"opus-4.6", "opus-4.10"}); got != "opus-4.10" {
 		t.Errorf("Freshest without alias member = %q, want newest concrete", got)
 	}
 }
 
-// TestPromoteLatest_WithinLineageOnly is the acceptance case from the live
-// catalog: promotion upgrades a stale Pro to the newer Pro but can never hand
-// the deep tier to a Flash — substitution happens only inside the selected
-// model's own lineage bucket. The classifier keeps 100% of the qualitative
-// tier decision; Go keeps 100% of the numeric one.
 func TestPromoteLatest_WithinLineageOnly(t *testing.T) {
 	t.Parallel()
 	sel := map[string]string{
@@ -62,14 +47,11 @@ func TestPromoteLatest_WithinLineageOnly(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("PromoteLatest = %#v, want %#v", got, want)
 	}
-	// Purity: the input selection is not mutated.
 	if sel["deep"] != "Gemini 3.1 Pro (High)" {
 		t.Error("PromoteLatest mutated its input map")
 	}
 }
 
-// TestPromoteLatest_MiniStaysMini: the -mini line promotes within itself; it
-// never jumps to the base line even though the base carries a higher version.
 func TestPromoteLatest_MiniStaysMini(t *testing.T) {
 	t.Parallel()
 	sel := map[string]string{"fast": "gpt-5.5-mini", "deep": "gpt-5.5"}
@@ -83,9 +65,6 @@ func TestPromoteLatest_MiniStaysMini(t *testing.T) {
 	}
 }
 
-// TestPromoteLatest_UnknownSelectionKept: a selected model absent from the
-// candidate list (defensive — sanitizeTierMap normally guarantees membership)
-// is kept verbatim rather than dropped or crossed into another bucket.
 func TestPromoteLatest_UnknownSelectionKept(t *testing.T) {
 	t.Parallel()
 	sel := map[string]string{"deep": "mystery-model"}
@@ -95,10 +74,6 @@ func TestPromoteLatest_UnknownSelectionKept(t *testing.T) {
 	}
 }
 
-// TestPromoteLatest_MixedDatedBucketsNeverDowngrade: stripping the date run
-// widens a lineage bucket to hold dated and undated ids of several versions.
-// A date must never outrank a version, and a tie with no date on one side
-// must keep the selection, in either candidate listing order.
 func TestPromoteLatest_MixedDatedBucketsNeverDowngrade(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

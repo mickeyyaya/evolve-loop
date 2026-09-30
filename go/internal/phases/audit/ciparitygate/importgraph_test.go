@@ -1,11 +1,5 @@
 package ciparitygate
 
-// importgraph_test.go — the package is a leaf under the audit phase (ADR-0103
-// unit 14 §2): stdlib plus the eight named internal packages, never
-// internal/core, internal/changedpkgs or the host package (the compiler is the
-// cycle guard; this is the leaf-ness declaration — signalcenter/importgraph_test.go
-// idiom).
-
 import (
 	"go/parser"
 	"go/token"

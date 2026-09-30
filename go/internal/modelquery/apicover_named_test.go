@@ -6,12 +6,6 @@ import (
 	"testing"
 )
 
-// TestModelCapturer_InterfaceContract names the ModelCapturer interface and
-// pins its single-method contract: a CaptureModelPicker implementation is
-// usable through the interface and its returned pane flows verbatim out of
-// RecipeLister via the parser. fakeCapturer (defined in recipe_test.go)
-// satisfies the interface — binding it to a ModelCapturer var proves the
-// method set matches.
 func TestModelCapturer_InterfaceContract(t *testing.T) {
 	t.Parallel()
 	var c ModelCapturer = fakeCapturer{panes: map[string]string{"claude": claudePickerPane}}
@@ -25,10 +19,6 @@ func TestModelCapturer_InterfaceContract(t *testing.T) {
 	}
 }
 
-// TestRunner_DefaultRunnerExecutes names the Runner func type and invokes the
-// production defaultRunner through a Runner-typed variable. Contract: Runner
-// shells out to (name, args), returns combined stdout+stderr and a nil error on
-// a clean exit. `true` exits 0 with no output on macOS and Linux.
 func TestRunner_DefaultRunnerExecutes(t *testing.T) {
 	t.Parallel()
 	var run Runner = defaultRunner
@@ -42,9 +32,6 @@ func TestRunner_DefaultRunnerExecutes(t *testing.T) {
 	}
 }
 
-// TestRunner_CapturesCombinedOutput pins the "combined stdout+stderr" half of
-// Runner's contract and that args are passed through: `sh -c` writing to both
-// streams must appear in the single returned string.
 func TestRunner_CapturesCombinedOutput(t *testing.T) {
 	t.Parallel()
 	var run Runner = defaultRunner

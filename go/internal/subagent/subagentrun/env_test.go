@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-// envJSON renders an adapter env the way the golden writer did: sorted keys,
-// PROMPT_FILE and the fixture paths templated.
 func envJSON(env map[string]string, pairs ...string) string {
 	keys := make([]string, 0, len(env))
 	for k := range env {
@@ -42,8 +40,6 @@ func envJSON(env map[string]string, pairs ...string) string {
 	return b.String()
 }
 
-// Test 35 — AdapterEnv.Map reproduces the two goldens (17 keys with a project
-// root, 16 without — the key absent, never empty) and never leaks AdapterPath.
 func TestEnv_MapIsGoldenAndOmitsProjectRootWhenEmpty(t *testing.T) {
 	f := newFixture(t)
 	pairs := []string{f.ws, "{WS}", f.worktree, "{WORKTREE}", f.root, "{ROOT}"}
@@ -81,9 +77,6 @@ func TestEnv_MapIsGoldenAndOmitsProjectRootWhenEmpty(t *testing.T) {
 	}
 }
 
-// Test 36 — an empty worktree keeps the Warns entry (the golden sentence,
-// carrying WORKTREE_PATH and the root) and emits ONE WORKTREE_FALLBACK; with a
-// worktree neither.
 func TestEnv_WorktreeFallbackKeepsTheWarnsEntryAndEmitsTheCode(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -115,9 +108,6 @@ func TestEnv_WorktreeFallbackKeepsTheWarnsEntryAndEmitsTheCode(t *testing.T) {
 	}
 }
 
-// Test 37 — the production stager: the name pattern, the exact bytes, mode
-// 0600, cleanup removes; a create error names op=create, a closed file
-// op=write and leaks nothing.
 func TestStage_TempfileFailuresNameTheOpAndTheDefaultStagerCleansUp(t *testing.T) {
 	path, cleanup, err := tempFileStager{create: os.CreateTemp}.Stage("prompt bytes")
 	if err != nil {
@@ -175,8 +165,6 @@ func TestStage_TempfileFailuresNameTheOpAndTheDefaultStagerCleansUp(t *testing.T
 	}
 }
 
-// Test 38 — the duration is the difference of the first two clock reads
-// (exec start, exec end); verify and the ledger ts are the third and fourth.
 func TestExecute_DurationFromTwoClockReads(t *testing.T) {
 	f := newFixture(t)
 	t0 := fixedNow

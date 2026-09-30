@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// chainFake is the bridge lanes 1676/1677 met: codex parks and exits 81 after
-// the artifact window; claude writes the retro's deliverables and exits 0.
 type chainFake struct {
 	calls []core.BridgeRequest
 }
@@ -35,12 +33,6 @@ func (f *chainFake) Launch(_ context.Context, req core.BridgeRequest) (core.Brid
 
 func (f *chainFake) Probe(context.Context) (core.BridgeProbe, error) { return core.BridgeProbe{}, nil }
 
-// TestRun_TimeoutOnThePrimaryCLIFallsBackThroughTheChain reproduces the seal
-// lanes 1676/1677 met (2026-09-14): the retro's own launch on codex exited 81
-// after 1800 s and the cycle sealed FAIL with no disposition. Through the
-// chain-walking bridge handle the composition root now hands it, the same
-// retro falls back to the profile's next CLI and PASSes — one CLI's timeout
-// costs one attempt, not the cycle.
 func TestRun_TimeoutOnThePrimaryCLIFallsBackThroughTheChain(t *testing.T) {
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")

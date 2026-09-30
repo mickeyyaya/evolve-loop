@@ -30,6 +30,17 @@ Until the workstream reaches it, existing code may still carry a one-line *why* 
 
 String literals are code. A date or incident id inside an error message or a test assertion is not a comment, and comment work never touches it.
 
+## What a deleted comment leaves behind
+
+Deleting a comment is half the job (the operator's rule, 2026-09-30: when comments are removed, the code must be lean enough to explain itself). Where a deleted comment said *what* the code does or what a value *means*, and the code does not say it, the same change makes the code say it, with the smallest behaviour-preserving edit that does:
+
+- rename an unexported identifier to the name the comment used;
+- extract a well-named function, local variable or named condition for the block or expression the comment explained;
+- replace a magic number or string with a named constant;
+- introduce a small named type where a value's meaning was only in the comment.
+
+It never changes the value of a JSON tag, a flag or env name, a string literal, an error message or a test's expected text (naming a literal keeps its value), and it adds no comment. An exported rename is made only when the name misleads and every caller changes with it. History, restatements and design reasons need nothing: the design reasons are in the package's notes.
+
 ## Where the knowledge goes
 
 | Knowledge | Home |

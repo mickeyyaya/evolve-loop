@@ -1,21 +1,5 @@
 package specrunner
 
-// verdict_from_sentinel_test.go — a judgment phase's STATED verdict must be able
-// to reach the orchestrator.
-//
-// The defect these tests pin (inbox judgment-phase-semantic-verdict-never-read,
-// weight 0.93): EvaluateClassify decided a spec-driven phase's verdict from
-// STRUCTURE ONLY. cycle-1528's premise-challenge concluded "FAIL (BLOCK). The
-// cycle must not proceed as framed" with premise.severity_max == CRITICAL, AND
-// emitted the canonical machine sentinel saying FAIL — and the cycle ran on
-// through tdd, build, adversarial-review, audit, retro. Measured across this
-// repo's whole run history: 225 of 225 judgment reports carry a well-formed
-// sentinel, 100 of them say FAIL, and every one classified PASS.
-//
-// The fixtures are REAL artifacts, not synthetic ones, because the acceptance
-// criterion is that the LIVE population parses — a hand-written fixture proves
-// only that the parser handles what its author imagined.
-
 import (
 	"encoding/json"
 	"os"
@@ -27,16 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// realPremiseChallengeFAIL is cycle-1528's verbatim report: the live objection
-// that was correct (it falsified the plan's load-bearing premise and the
-// resulting redesign shipped as ADR-0090) and changed nothing.
 func realPremiseChallengeFAIL(t *testing.T) string {
 	t.Helper()
 	return readFixture(t, "cycle-1528-premise-challenge-report.md")
 }
 
-// realAdversarialReviewPASS is cycle-1453's verbatim report — a genuine PASS,
-// so the no-false-positive direction is pinned against live bytes too.
 func realAdversarialReviewPASS(t *testing.T) string {
 	t.Helper()
 	return readFixture(t, "cycle-1453-adversarial-review-report.md")
@@ -51,7 +30,6 @@ func readFixture(t *testing.T, name string) string {
 	return string(b)
 }
 
-// premiseRules mirrors .evolve/phases/premise-challenge/phase.json.
 func premiseRules(stage string) *phasespec.ClassifyRules {
 	return &phasespec.ClassifyRules{
 		RequireSections:     []string{"Stated Premise", "Falsification Attempts", "Verdict"},
@@ -59,7 +37,6 @@ func premiseRules(stage string) *phasespec.ClassifyRules {
 	}
 }
 
-// adversarialRules mirrors .evolve/phases/adversarial-review/phase.json.
 func adversarialRules(stage string) *phasespec.ClassifyRules {
 	return &phasespec.ClassifyRules{
 		RequireSections:     []string{"Threat Model", "Findings", "Verdict"},
@@ -67,7 +44,6 @@ func adversarialRules(stage string) *phasespec.ClassifyRules {
 	}
 }
 
-// THE headline regression: the real ignored objection must now be FAIL.
 func TestEvaluateClassify_Enforce_HonorsRealCycle1528FAIL(t *testing.T) {
 	got, diags := EvaluateClassify(realPremiseChallengeFAIL(t), premiseRules(SentinelStageEnforce))
 	if got != core.VerdictFAIL {
@@ -75,8 +51,6 @@ func TestEvaluateClassify_Enforce_HonorsRealCycle1528FAIL(t *testing.T) {
 	}
 }
 
-// The SAME artifact under the rollout stage must route EXACTLY as it does today.
-// A shadow stage that changes routing is not a shadow stage.
 func TestEvaluateClassify_Shadow_RoutingUnchangedOnRealCycle1528(t *testing.T) {
 	shadowVerdict, _ := EvaluateClassify(realPremiseChallengeFAIL(t), premiseRules(SentinelStageShadow))
 	legacyVerdict, _ := EvaluateClassify(realPremiseChallengeFAIL(t), premiseRules(SentinelStageOff))
@@ -88,7 +62,6 @@ func TestEvaluateClassify_Shadow_RoutingUnchangedOnRealCycle1528(t *testing.T) {
 	}
 }
 
-// Shadow must still SAY what it would have done — a silent shadow measures nothing.
 func TestEvaluateClassify_Shadow_DisclosesTheWouldBeVerdict(t *testing.T) {
 	_, diags := EvaluateClassify(realPremiseChallengeFAIL(t), premiseRules(SentinelStageShadow))
 	var found bool
@@ -102,7 +75,6 @@ func TestEvaluateClassify_Shadow_DisclosesTheWouldBeVerdict(t *testing.T) {
 	}
 }
 
-// The no-false-positive direction, against live bytes.
 func TestEvaluateClassify_Enforce_RealPASSFixtureStaysPASS(t *testing.T) {
 	got, diags := EvaluateClassify(realAdversarialReviewPASS(t), adversarialRules(SentinelStageEnforce))
 	if got != core.VerdictPASS {
@@ -110,8 +82,6 @@ func TestEvaluateClassify_Enforce_RealPASSFixtureStaysPASS(t *testing.T) {
 	}
 }
 
-// FAIL-OPEN: an absent or unparseable sentinel keeps today's verdict, so a
-// malformed report can never hard-block a cycle.
 func TestEvaluateClassify_Enforce_FailsOpenWhenSentinelAbsent(t *testing.T) {
 	for _, tc := range []struct{ name, artifact string }{
 		{"absent", "## Stated Premise\nx\n## Falsification Attempts\ny\n## Verdict\nlooks fine to me\n"},
@@ -127,9 +97,6 @@ func TestEvaluateClassify_Enforce_FailsOpenWhenSentinelAbsent(t *testing.T) {
 	}
 }
 
-// WARN is a real stated verdict (99 of the 225 live reports say WARN) and must
-// carry through — silently upgrading it to PASS would re-create this defect for
-// the most common non-clean outcome.
 func TestEvaluateClassify_Enforce_HonorsWARN(t *testing.T) {
 	art := "## Threat Model\nx\n## Findings\ny\n## Verdict\nz\n<!-- evolve-verdict: {\"phase\":\"adversarial-review\",\"verdict\":\"WARN\",\"schema_version\":1} -->\n"
 	got, _ := EvaluateClassify(art, adversarialRules(SentinelStageEnforce))
@@ -138,9 +105,6 @@ func TestEvaluateClassify_Enforce_HonorsWARN(t *testing.T) {
 	}
 }
 
-// A typo'd stage must FAIL LOUDLY, never silently disable the gate — the same
-// cycle-241 declared-semantics rule EvaluateClassify already applies to
-// fail_if_signal and verdict_on_pass.
 func TestEvaluateClassify_UnknownStage_FailsLoudly(t *testing.T) {
 	got, diags := EvaluateClassify(realPremiseChallengeFAIL(t), premiseRules("shadwo"))
 	if got != core.VerdictFAIL {
@@ -151,12 +115,6 @@ func TestEvaluateClassify_UnknownStage_FailsLoudly(t *testing.T) {
 	}
 }
 
-// An OMITTED key and an explicit "" must mean the same thing. (This does NOT
-// prove byte-identity with the pre-fix classifier — SentinelStageOff IS the
-// zero value, so the two rule structs are the same value and the comparison
-// would hold against any implementation. Byte-identity is pinned by
-// TestHooksClassify_OptedOutPhaseIsUnchanged, which asserts an empty diag set
-// through the real call path.)
 func TestEvaluateClassify_OmittedKeyEqualsExplicitOff(t *testing.T) {
 	legacy := &phasespec.ClassifyRules{RequireSections: []string{"Stated Premise", "Falsification Attempts", "Verdict"}}
 	wantV, wantD := EvaluateClassify(realPremiseChallengeFAIL(t), legacy)
@@ -169,8 +127,6 @@ func TestEvaluateClassify_OmittedKeyEqualsExplicitOff(t *testing.T) {
 	}
 }
 
-// Structure is still evaluated FIRST: a truncated report that happens to carry a
-// PASS sentinel must not launder itself past the section requirement.
 func TestEvaluateClassify_StructuralFailurePrecedesSentinel(t *testing.T) {
 	art := "## Stated Premise\nonly this one\n<!-- evolve-verdict: {\"phase\":\"premise-challenge\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n"
 	got, diags := EvaluateClassify(art, premiseRules(SentinelStageEnforce))
@@ -182,7 +138,6 @@ func TestEvaluateClassify_StructuralFailurePrecedesSentinel(t *testing.T) {
 	}
 }
 
-// An empty artifact stays FAIL — the sentinel path must not resurrect it.
 func TestEvaluateClassify_EmptyArtifactStillFails(t *testing.T) {
 	got, _ := EvaluateClassify("", premiseRules(SentinelStageEnforce))
 	if got != core.VerdictFAIL {
@@ -190,7 +145,6 @@ func TestEvaluateClassify_EmptyArtifactStillFails(t *testing.T) {
 	}
 }
 
-// The durable measurement record: what the soak actually reads.
 func TestClassifyShadow_RecordsWouldFlipOnRealArtifact(t *testing.T) {
 	rec, ok := classifyShadow(1528, "premise-challenge", realPremiseChallengeFAIL(t), premiseRules(SentinelStageShadow))
 	if !ok {
@@ -213,8 +167,6 @@ func TestClassifyShadow_RecordsWouldFlipOnRealArtifact(t *testing.T) {
 	}
 }
 
-// Agreement must be recorded too — a record written only on disagreement
-// measures a biased sample and cannot produce a flip RATE.
 func TestClassifyShadow_RecordsAgreement(t *testing.T) {
 	rec, ok := classifyShadow(1453, "adversarial-review", realAdversarialReviewPASS(t), adversarialRules(SentinelStageShadow))
 	if !ok {
@@ -225,8 +177,6 @@ func TestClassifyShadow_RecordsAgreement(t *testing.T) {
 	}
 }
 
-// Under enforce the record is still taken — the operator needs the same column
-// after promotion, otherwise the measurement dies exactly when it starts mattering.
 func TestClassifyShadow_TakenUnderEnforceToo(t *testing.T) {
 	rec, ok := classifyShadow(1528, "premise-challenge", realPremiseChallengeFAIL(t), premiseRules(SentinelStageEnforce))
 	if !ok {
@@ -240,7 +190,6 @@ func TestClassifyShadow_TakenUnderEnforceToo(t *testing.T) {
 	}
 }
 
-// A phase that never opted in must not pay for a record it did not ask for.
 func TestClassifyShadow_OffYieldsNoRecord(t *testing.T) {
 	if _, ok := classifyShadow(1528, "premise-challenge", realPremiseChallengeFAIL(t), premiseRules(SentinelStageOff)); ok {
 		t.Fatalf("stage off must yield no record")
@@ -250,10 +199,6 @@ func TestClassifyShadow_OffYieldsNoRecord(t *testing.T) {
 	}
 }
 
-// A sentinel the parser READS but this system has no verdict for ("MAYBE") is a
-// distinct case from an unreadable one: ParseVerdictSentinel accepts any
-// non-empty verdict string. Without the canonical-verdict guard that value would
-// be routed as a verdict, and a phase could invent one.
 func TestEvaluateClassify_Enforce_NonCanonicalStatedVerdictFailsOpen(t *testing.T) {
 	art := "## Stated Premise\nx\n## Falsification Attempts\ny\n## Verdict\nz\n<!-- evolve-verdict: {\"phase\":\"premise-challenge\",\"verdict\":\"MAYBE\",\"schema_version\":1} -->\n"
 	got, diags := EvaluateClassify(art, premiseRules(SentinelStageEnforce))
@@ -271,9 +216,6 @@ func TestEvaluateClassify_Enforce_NonCanonicalStatedVerdictFailsOpen(t *testing.
 	}
 }
 
-// The record must distinguish "stated nothing readable" from "stated PASS".
-// Collapsing them would let malformed reports inflate the agreement rate an
-// operator promotes on.
 func TestClassifyShadow_UnreadableSentinelIsNotAgreement(t *testing.T) {
 	art := "## Stated Premise\nx\n## Falsification Attempts\ny\n## Verdict\nno sentinel here\n"
 	rec, ok := classifyShadow(1600, "premise-challenge", art, premiseRules(SentinelStageShadow))
@@ -291,11 +233,6 @@ func TestClassifyShadow_UnreadableSentinelIsNotAgreement(t *testing.T) {
 	}
 }
 
-// THE WIRING TEST. Everything above proves the components are correct; this
-// proves they FIRE. The defect being fixed is a correct signal nobody read, and
-// the fix's own first mutation-test survivor was "Classify stops writing the
-// record" — the identical shape one layer up. A judgment phase's spec goes in,
-// a shadow record must come out.
 func TestHooksClassify_WritesTheShadowRecordForAnOptedInPhase(t *testing.T) {
 	ws := t.TempDir()
 	h := hooks{spec: phasespec.PhaseSpec{Name: "premise-challenge", Classify: premiseRules(SentinelStageShadow)}}
@@ -321,8 +258,6 @@ func TestHooksClassify_WritesTheShadowRecordForAnOptedInPhase(t *testing.T) {
 	}
 }
 
-// The same hook, for a phase that never opted in, must be byte-identical to the
-// legacy path: same verdict, and no file.
 func TestHooksClassify_OptedOutPhaseIsUnchanged(t *testing.T) {
 	ws := t.TempDir()
 	h := hooks{spec: phasespec.PhaseSpec{Name: "scout", Classify: &phasespec.ClassifyRules{RequireSections: []string{"Verdict"}}}}
@@ -337,9 +272,6 @@ func TestHooksClassify_OptedOutPhaseIsUnchanged(t *testing.T) {
 	}
 }
 
-// shadowRecordsIn lists every shadow record in ws. Globbed rather than stat'ing
-// one expected name: a dropped ok-guard writes a zero-value record under a
-// DIFFERENT filename, which a single-name stat cannot see.
 func shadowRecordsIn(t *testing.T, ws string) []string {
 	t.Helper()
 	hits, err := filepath.Glob(filepath.Join(ws, verdictShadowRecordPrefix+"*"))
@@ -352,8 +284,6 @@ func shadowRecordsIn(t *testing.T, ws string) []string {
 	return hits
 }
 
-// A phase running without a workspace (unit paths, dry runs) must not crash or
-// invent a file at the process CWD.
 func TestHooksClassify_NoWorkspaceIsSafe(t *testing.T) {
 	h := hooks{spec: phasespec.PhaseSpec{Name: "premise-challenge", Classify: premiseRules(SentinelStageShadow)}}
 	verdict, _, _ := h.Classify(realPremiseChallengeFAIL(t), core.PhaseRequest{Cycle: 1528}, core.BridgeResponse{})
@@ -365,19 +295,11 @@ func TestHooksClassify_NoWorkspaceIsSafe(t *testing.T) {
 	}
 }
 
-// THE COLLISION REGRESSION. The workspace is core.RunWorkspacePath(root, cycle)
-// — ONE directory per cycle, shared by every phase — and both judgment phases
-// routinely run in the same cycle (47 of 55 premise-challenge cycles in the live
-// tree also ran adversarial-review, which runs LATER). A shared filename let the
-// second silently overwrite the first, destroying ~85% of premise-challenge's
-// samples, biased toward exactly the cycles that also produced a build. The
-// shadow record IS this feature's deliverable, so losing it loses everything.
 func TestHooksClassify_TwoJudgmentPhasesInOneCycleBothKeepTheirRecord(t *testing.T) {
 	ws := t.TempDir()
 	pc := hooks{spec: phasespec.PhaseSpec{Name: "premise-challenge", Classify: premiseRules(SentinelStageShadow)}}
 	ar := hooks{spec: phasespec.PhaseSpec{Name: "adversarial-review", Classify: adversarialRules(SentinelStageShadow)}}
 
-	// Live order: premise-challenge (after triage), then adversarial-review (after build).
 	pc.Classify(realPremiseChallengeFAIL(t), core.PhaseRequest{Cycle: 1528, Workspace: ws}, core.BridgeResponse{})
 	ar.Classify(realAdversarialReviewPASS(t), core.PhaseRequest{Cycle: 1528, Workspace: ws}, core.BridgeResponse{})
 
@@ -403,7 +325,6 @@ func TestHooksClassify_TwoJudgmentPhasesInOneCycleBothKeepTheirRecord(t *testing
 	}
 }
 
-// A phase name can never traverse out of the workspace or land on a sibling's file.
 func TestVerdictShadowRecordFile_IsScopedAndSafe(t *testing.T) {
 	if a, b := VerdictShadowRecordFile("premise-challenge"), VerdictShadowRecordFile("adversarial-review"); a == b {
 		t.Fatalf("two phases must not share a filename: %q", a)
@@ -416,10 +337,6 @@ func TestVerdictShadowRecordFile_IsScopedAndSafe(t *testing.T) {
 	}
 }
 
-// The record must not claim "no readable sentinel" about a report that HAS one —
-// the sentinel stage runs last, so a structural failure short-circuits before the
-// parse. Conflating "never looked" with "looked and found nothing" under-reports
-// malformedness in exactly the cycles where the phase misbehaved.
 func TestClassifyShadow_StructuralFailureSaysTheSentinelWasNeverConsulted(t *testing.T) {
 	art := "## Stated Premise\nonly this one\n<!-- evolve-verdict: {\"phase\":\"premise-challenge\",\"verdict\":\"FAIL\",\"schema_version\":1} -->\n"
 	rec, ok := classifyShadow(9999, "premise-challenge", art, premiseRules(SentinelStageShadow))
@@ -440,8 +357,6 @@ func TestClassifyShadow_StructuralFailureSaysTheSentinelWasNeverConsulted(t *tes
 	}
 }
 
-// A typo'd stage fails the phase on its CONFIG, and the record must say so
-// rather than blaming the artifact.
 func TestClassifyShadow_InvalidStageIsNamedInTheRecord(t *testing.T) {
 	rec, ok := classifyShadow(9999, "premise-challenge", realPremiseChallengeFAIL(t), premiseRules("shadwo"))
 	if !ok {
@@ -452,10 +367,6 @@ func TestClassifyShadow_InvalidStageIsNamedInTheRecord(t *testing.T) {
 	}
 }
 
-// The parser is TAIL-ANCHORED, which is what makes this fix safe against reports
-// that QUOTE the sentinel shape — contract examples, review commentary, fenced
-// blocks. This is the fix's single most load-bearing parser assumption, so pin
-// it here rather than relying on phasecontract's own tests.
 func TestEvaluateClassify_Enforce_TailSentinelWinsOverEarlierDecoys(t *testing.T) {
 	art := "## Stated Premise\nx\n## Falsification Attempts\ny\n## Verdict\nz\n" +
 		"Here is the contract example:\n```\n<!-- evolve-verdict: {\"phase\":\"premise-challenge\",\"verdict\":\"PASS\",\"schema_version\":1} -->\n```\n" +
@@ -466,9 +377,6 @@ func TestEvaluateClassify_Enforce_TailSentinelWinsOverEarlierDecoys(t *testing.T
 	}
 }
 
-// core.IsVerdict is case-SENSITIVE, so a lowercased verdict fails open rather
-// than being honored. Pin both the fail-open AND the diagnostic — an agent that
-// lowercases would otherwise lose its FAIL in silence under enforce.
 func TestEvaluateClassify_Enforce_LowercaseVerdictFailsOpenLoudly(t *testing.T) {
 	art := "## Stated Premise\nx\n## Falsification Attempts\ny\n## Verdict\nz\n<!-- evolve-verdict: {\"phase\":\"premise-challenge\",\"verdict\":\"fail\",\"schema_version\":1} -->\n"
 	got, diags := EvaluateClassify(art, premiseRules(SentinelStageEnforce))
@@ -486,8 +394,6 @@ func TestEvaluateClassify_Enforce_LowercaseVerdictFailsOpenLoudly(t *testing.T) 
 	}
 }
 
-// A judgment phase may state SKIPPED, and enforce honors it. Pinned because it
-// is a real routing outcome that nothing else documents.
 func TestEvaluateClassify_Enforce_HonorsSKIPPED(t *testing.T) {
 	art := "## Threat Model\nx\n## Findings\ny\n## Verdict\nz\n<!-- evolve-verdict: {\"phase\":\"adversarial-review\",\"verdict\":\"SKIPPED\",\"schema_version\":1} -->\n"
 	got, _ := EvaluateClassify(art, adversarialRules(SentinelStageEnforce))
@@ -496,19 +402,14 @@ func TestEvaluateClassify_Enforce_HonorsSKIPPED(t *testing.T) {
 	}
 }
 
-// A failing write must SAY SO. The record is this feature's only deliverable, so
-// a permanently failing write yields an empty soak with zero signal and nothing
-// else in the system would ever mention it. Diagnostics do not affect routing,
-// so the warning cannot perturb the decision being measured.
 func TestHooksClassify_UnwritableWorkspaceIsReportedNotSwallowed(t *testing.T) {
-	// A workspace path that is a FILE makes the join un-writable.
-	blocked := filepath.Join(t.TempDir(), "not-a-dir")
-	if err := os.WriteFile(blocked, []byte("x"), 0o644); err != nil {
+	fileAsWorkspace := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(fileAsWorkspace, []byte("x"), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
 	}
 	h := hooks{spec: phasespec.PhaseSpec{Name: "premise-challenge", Classify: premiseRules(SentinelStageShadow)}}
 
-	verdict, diags, _ := h.Classify(realPremiseChallengeFAIL(t), core.PhaseRequest{Cycle: 1528, Workspace: blocked}, core.BridgeResponse{})
+	verdict, diags, _ := h.Classify(realPremiseChallengeFAIL(t), core.PhaseRequest{Cycle: 1528, Workspace: fileAsWorkspace}, core.BridgeResponse{})
 
 	if verdict != core.VerdictPASS {
 		t.Fatalf("a failed measurement must never change the verdict it measures; got %q", verdict)

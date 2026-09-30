@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// fakeDispatcher is a test double for PromptDispatcher: it records the (cli,
-// prompt) it was invoked with and returns canned output/err, so tests can
-// prove Classify goes THROUGH the seam instead of shelling out directly.
 type fakeDispatcher struct {
 	out        string
 	err        error
@@ -27,12 +24,6 @@ func (f *fakeDispatcher) DispatchPrompt(_ context.Context, cli, prompt string) (
 	return f.out, f.err
 }
 
-// TestPromptDispatcher_InterfaceContract names the PromptDispatcher interface
-// and pins its single-method contract, mirroring ModelCapturer's contract test
-// (apicover_named_test.go): a DispatchPrompt implementation is usable through
-// the interface. The production implementation lives in cmd/evolve, routed
-// through the bridge — this seam is what keeps that fragile, live-only launch
-// out of the unit-tested classifier package (mirrors ModelCapturer/recipe.go).
 func TestPromptDispatcher_InterfaceContract(t *testing.T) {
 	t.Parallel()
 	var d PromptDispatcher = &fakeDispatcher{out: `{"fast":"a","balanced":"b","deep":"c"}`}
@@ -45,10 +36,6 @@ func TestPromptDispatcher_InterfaceContract(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierClassify_DispatchesThroughPromptDispatcher is the positive
-// C1 fix assertion (GAP 1): Classify must deliver the built classification
-// prompt through the injected PromptDispatcher — never a raw exec.Command or
-// an injected Runner — and use the dispatcher's reply to build the tier map.
 func TestCLIClassifierClassify_DispatchesThroughPromptDispatcher(t *testing.T) {
 	d := &fakeDispatcher{out: "OpenAI Codex\ncodex\n{\"fast\":\"gpt-5.4-mini\",\"balanced\":\"gpt-5.4\",\"deep\":\"gpt-5.5\"}\ntokens used\n"}
 	c := CLIClassifier{CLI: "codex", Dispatcher: d}
@@ -70,12 +57,8 @@ func TestCLIClassifierClassify_DispatchesThroughPromptDispatcher(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierClassify_NilDispatcherErrorsNeverShellsOut is the negative
-// C1 fix assertion: a CLIClassifier with no Dispatcher must error, not fall
-// back to a raw-exec default (the old `run == nil -> defaultRunner` behavior
-// is the exact bypass this cycle removes).
 func TestCLIClassifierClassify_NilDispatcherErrorsNeverShellsOut(t *testing.T) {
-	c := CLIClassifier{CLI: "codex"} // Dispatcher intentionally nil
+	c := CLIClassifier{CLI: "codex"}
 	_, err := c.Classify(context.Background(), "codex", []string{"m1"})
 	if err == nil {
 		t.Fatal("expected error when Dispatcher is nil")
@@ -85,10 +68,6 @@ func TestCLIClassifierClassify_NilDispatcherErrorsNeverShellsOut(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierClassify_DispatcherErrorPropagates covers the edge case of
-// an external dispatch failure (bridge launch error, CLI exhaustion, etc.): the
-// error must propagate through Classify, wrapped with context, not be silently
-// swallowed or retried via a fallback exec path.
 func TestCLIClassifierClassify_DispatcherErrorPropagates(t *testing.T) {
 	d := &fakeDispatcher{err: errors.New("bridge launch failed")}
 	_, err := (CLIClassifier{CLI: "codex", Dispatcher: d}).Classify(context.Background(), "codex", []string{"x"})
@@ -100,9 +79,6 @@ func TestCLIClassifierClassify_DispatcherErrorPropagates(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierClassify_BadReply pins that a dispatcher reply with no JSON
-// object still errors cleanly through the new seam (regression: this behavior
-// pre-dates the seam and must survive the refactor).
 func TestCLIClassifierClassify_BadReply(t *testing.T) {
 	d := &fakeDispatcher{out: "I cannot help with that."}
 	if _, err := (CLIClassifier{CLI: "codex", Dispatcher: d}).Classify(context.Background(), "codex", []string{"x"}); err == nil {
@@ -110,12 +86,6 @@ func TestCLIClassifierClassify_BadReply(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierClassify_SkipsPromptEcho is the regression guard for the
-// live bug ported to the new seam: codex echoes the prompt's literal JSON
-// template before the real answer; the classifier must skip the template
-// (models = "<id>", not offered) and use the real reply — proving the JSON
-// object selection logic is untouched by routing the reply through
-// PromptDispatcher instead of a raw Runner.
 func TestCLIClassifierClassify_SkipsPromptEcho(t *testing.T) {
 	echoed := `{"fast":"<id>","balanced":"<id>","deep":"<id>"}` + "\ncodex\n" +
 		`{"fast":"phi4:latest","balanced":"llama3.3:latest","deep":"gemma4:31b-cloud"}` + "\ntokens used\n"
@@ -131,11 +101,6 @@ func TestCLIClassifierClassify_SkipsPromptEcho(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierClassify_AllObjectsFailToMap covers the loop's continue
-// branch (json.Unmarshal failure on a non-object) AND the terminal "no JSON
-// object mapped a tier" error: a reply with one malformed-typed object and one
-// valid JSON object whose models are all hallucinated → no tier survives
-// sanitize. Edge/OOD diversity axis: malformed dispatcher reply.
 func TestCLIClassifierClassify_AllObjectsFailToMap(t *testing.T) {
 	t.Parallel()
 	reply := `{"fast":123}` + "\n" + `{"fast":"not-offered","deep":"also-not"}`
@@ -150,9 +115,6 @@ func TestCLIClassifierClassify_AllObjectsFailToMap(t *testing.T) {
 	}
 }
 
-// TestCLIClassifierGuards pins the pre-dispatch validation order (empty CLI /
-// no model ids), which must still fire before the dispatcher is even
-// consulted — regression floor carried over from the pre-seam behavior.
 func TestCLIClassifierGuards(t *testing.T) {
 	d := &fakeDispatcher{}
 	if _, err := (CLIClassifier{Dispatcher: d}).Classify(context.Background(), "codex", []string{"x"}); err == nil {
@@ -166,13 +128,6 @@ func TestCLIClassifierGuards(t *testing.T) {
 	}
 }
 
-// TestGuard_ClassifierHasNoDirectModelExec is the C1 self-enforcing invariant
-// (BA2 in scout-report.md): classifier.go must not reference the raw-exec seam
-// (defaultRunner), the exec-argv builder that used to route a prompt around
-// the bridge (classifierArgv), or the Runner type at all — every prompt must
-// go through PromptDispatcher. AST-based (not substring/grep) so a renamed
-// wrapper around the same call still trips the identifier check, and comments
-// mentioning these names in passing don't false-positive.
 func TestGuard_ClassifierHasNoDirectModelExec(t *testing.T) {
 	t.Parallel()
 	fset := token.NewFileSet()

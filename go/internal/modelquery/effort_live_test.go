@@ -2,27 +2,6 @@
 
 package modelquery
 
-// effort_live_test.go — the guard that would have caught the original defect.
-//
-// Every unit test in effort_test.go asserts against help text CAPTURED at a
-// point in time. That is exactly the weakness that let two live bugs sit
-// undetected for weeks: a fixture proves the parser handles what the CLI USED
-// to print, never what it prints today. The agy incident is the canonical
-// case — three tests pinned "Gemini Flash 3.7 (High)" and stayed green for two
-// weeks while agy rejected that very string at every launch.
-//
-// So this test asks the REAL binary. It runs under -tags integration and skips
-// cleanly wherever the CLI is not installed, because "not installed" and
-// "installed but no longer publishes its ladder" must never look alike.
-//
-// KNOW WHAT THIS DOES NOT COVER. CI provisions no agent CLIs, so on the
-// runners every case here SKIPS — it reports SKIP, never PASS, and a ladder
-// that changed upstream would not be caught there. These are an OPERATOR/dev
-// guard, run where the CLIs actually live; treating a green CI as evidence
-// they passed is the same "cited for more than it checks" error the rest of
-// this work is about. The honest reading of a CI run is: unit tests covered
-// the parser, nothing checked it against reality.
-
 import (
 	"context"
 	"os/exec"
@@ -33,10 +12,7 @@ import (
 
 func TestLive_HelpEffortLadders(t *testing.T) {
 	for _, tc := range []struct {
-		cli string
-		// mustHave are rungs the CLI is known to publish. A rung DISAPPEARING
-		// is as much a signal as one appearing: it means the dial we set is no
-		// longer accepted, which realizeScalar would swallow.
+		cli      string
 		mustHave []string
 	}{
 		{"claude", []string{"low", "medium", "high", "xhigh", "max"}},
@@ -65,12 +41,6 @@ func TestLive_HelpEffortLadders(t *testing.T) {
 	}
 }
 
-// codex publishes NO reasoning-effort enum in --help (verified live on
-// 0.147.0; its rungs are reachable only through the /model picker's "More
-// reasoning..." submenu). If that ever changes, help discovery becomes
-// available for codex and DefaultEffortListers should gain it — this test
-// fails to tell us so, rather than leaving codex on manifest-declared values
-// forever out of habit.
 func TestLive_CodexStillHidesItsLadderFromHelp(t *testing.T) {
 	if _, err := exec.LookPath("codex"); err != nil {
 		t.Skipf("codex not installed here: %v", err)
@@ -87,14 +57,6 @@ func TestLive_CodexStillHidesItsLadderFromHelp(t *testing.T) {
 	}
 }
 
-// End-to-end with the REAL registry and REAL CLIs, but a fake model lister so
-// no classifier/LLM call and no quota is spent: `--help` is free.
-//
-// This is the wiring proof that matters. The unit tests fake the lister, and a
-// fake can be perfect while production never calls it — which is precisely how
-// the agy defect shipped (correct parser, wrong route). Here DefaultEffortListers
-// is the real registry, HelpEffortLister shells the real binary, and the
-// assertion is made on the CATALOG that Refresh returns.
 func TestLive_DiscoveredLadderReachesTheCatalog(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err != nil {
 		t.Skipf("claude not installed here: %v", err)
@@ -104,7 +66,7 @@ func TestLive_DiscoveredLadderReachesTheCatalog(t *testing.T) {
 		Lister:        fakeLister{ids: map[string][]string{"claude": {"haiku", "sonnet", "opus"}}},
 		Classifier:    fakeClassifier{},
 		Now:           fixedNow,
-		EffortListers: DefaultEffortListers(), // the REAL registry
+		EffortListers: DefaultEffortListers(),
 	})
 	if err != nil {
 		t.Fatalf("Refresh: %v", err)

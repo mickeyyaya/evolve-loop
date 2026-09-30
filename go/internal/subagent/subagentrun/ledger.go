@@ -10,11 +10,6 @@ import (
 	"strings"
 )
 
-// ledgerEntry is the agent_subprocess record (unexported until the fan-out
-// writer folds onto this file — follow-up 16-1). RunID is the CA.5 run
-// identity: empty when it cannot be resolved from the run workspace, in which
-// case the key is OMITTED from the line (parity with core.LedgerEntry's
-// `json:"run_id,omitempty"`), never written as "".
 type ledgerEntry struct {
 	Cycle          int
 	Role           string
@@ -30,16 +25,8 @@ type ledgerEntry struct {
 	RunID          string
 }
 
-// LedgerZeroSeed is prev_hash of the first entry of a chain.
 const LedgerZeroSeed = "0000000000000000000000000000000000000000000000000000000000000000"
 
-// renderLedgerLine renders the one-line JSON record. Field order matches the
-// retired bash writer — chain hash determinism depends on it. The run_id
-// fragment is passed as an ARGUMENT (%s), never concatenated into the format
-// string: fmt does not rescan arguments for verbs, but it does rescan the
-// format, so a '%' inside a spliced value would consume the next argument and
-// shift every field after it — silently. Argument position makes that
-// structurally impossible.
 func renderLedgerLine(e ledgerEntry, ts string, entrySeq int, prevHash string) string {
 	runIDField := ""
 	if e.RunID != "" {
@@ -67,11 +54,6 @@ func renderLedgerLine(e ledgerEntry, ts string, entrySeq int, prevHash string) s
 	)
 }
 
-// appendLedger is step 14: the chained append of one agent_subprocess line to
-// ledger.jsonl and the atomic ledger.tip update (<seq>:<sha256(line)> via a
-// .tmp + rename). Every error is returned BARE — the returned text is the
-// path's contract — and op names the failing call for the signal: mkdir |
-// chain_link | open | write | close | tip_tmp | tip_rename.
 func (d *Dispatcher) appendLedger(path string, e ledgerEntry) (op string, err error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "mkdir", err
@@ -105,14 +87,10 @@ func (d *Dispatcher) appendLedger(path string, e ledgerEntry) (op string, err er
 	return "", nil
 }
 
-// openAppend is the production ledger opener.
 func openAppend(path string) (io.WriteCloser, error) {
 	return os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 }
 
-// ChainLink reads the chain link the next entry hashes against: the sha256 of
-// the last line and the line count (the zero seed and 0 for an absent or
-// empty ledger).
 func ChainLink(ledgerPath string) (prevHash string, entrySeq int, err error) {
 	prevHash = LedgerZeroSeed
 	entrySeq = 0
@@ -134,15 +112,11 @@ func ChainLink(ledgerPath string) (prevHash string, entrySeq int, err error) {
 	return prevHash, entrySeq, nil
 }
 
-// SHA256Hex is the hex sha256 of s.
 func SHA256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
-// JSONStringEscape handles the subset bash escaped (only ") expanded to
-// quote + backslash + the three control characters — kept for one-line JSONL
-// determinism.
 func JSONStringEscape(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
@@ -152,9 +126,6 @@ func JSONStringEscape(s string) string {
 	return s
 }
 
-// QualityTier maps the capability manifest's support flags to the v8.51.0
-// quality_tier label ledger entries carry. full = both supports true;
-// degraded = both false; hybrid = one of each.
 func QualityTier(budgetNative, permissionScoping bool) string {
 	if budgetNative && permissionScoping {
 		return "full"

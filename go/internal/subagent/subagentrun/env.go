@@ -8,11 +8,6 @@ import (
 	"strconv"
 )
 
-// AdapterEnv is the typed wire to the bridge exec port: everything the
-// adapter receives. Map renders the 16-key env the bash adapter contract
-// defined (17 with EVOLVE_PROJECT_ROOT). AdapterPath is the vestigial
-// <AdaptersDir>/<cli>.sh argument the host's func-shaped seam still receives;
-// it is NOT in the map.
 type AdapterEnv struct {
 	AdapterPath string
 
@@ -35,11 +30,6 @@ type AdapterEnv struct {
 	ProjectRoot         string
 }
 
-// Map reproduces the adapter env byte-for-byte: VALIDATE_ONLY is always "0"
-// on this path, and EVOLVE_PROJECT_ROOT is exported only when a project root
-// is known — never an empty export, because an unset variable falls back to
-// cwd by the subprocess contract (core/phase.go). Headless drivers inherit it
-// via driverEnv; the tmux drivers export it into the pane shell themselves.
 func (e AdapterEnv) Map() map[string]string {
 	env := map[string]string{
 		"PROFILE_PATH":                 e.ProfilePath,
@@ -65,7 +55,6 @@ func (e AdapterEnv) Map() map[string]string {
 	return env
 }
 
-// BoolEnv mirrors bash's "true"/"false" env emission for booleans.
 func BoolEnv(v bool) string {
 	if v {
 		return "true"
@@ -73,8 +62,6 @@ func BoolEnv(v bool) string {
 	return "false"
 }
 
-// adapterEnv is step 12's pure assembly of the wire from the plan, the
-// provenance, the staged prompt and the effective worktree.
 func adapterEnv(req Request, p plan, prov provenance, promptPath, worktree string) AdapterEnv {
 	tools, extra := p.profile.Overrides(p.cli)
 	return AdapterEnv{
@@ -99,30 +86,18 @@ func adapterEnv(req Request, p plan, prov provenance, promptPath, worktree strin
 	}
 }
 
-// Adapter is the leaf-owned bridge exec port: the exit code the driver
-// reported and the infrastructure error, if any (the host's default returns
-// -1 on an infrastructure error so an "exit 0 + error" never misleads the
-// verification ladder).
 type Adapter interface {
 	Exec(ctx context.Context, env AdapterEnv) (exitCode int, err error)
 }
 
-// AdapterFunc adapts a plain function to the Adapter port.
 type AdapterFunc func(ctx context.Context, env AdapterEnv) (int, error)
 
-// Exec calls f.
 func (f AdapterFunc) Exec(ctx context.Context, env AdapterEnv) (int, error) { return f(ctx, env) }
 
-// PromptStager materialises the composed prompt for the adapter and returns
-// where it is plus the cleanup that removes it after the exec.
 type PromptStager interface {
 	Stage(prompt string) (path string, cleanup func(), err error)
 }
 
-// tempFileStager is the production stager: an os.CreateTemp under the system
-// temp dir with the evolve-subagent-prompt-*.txt pattern, one WriteString,
-// one Close, removed after the exec — the same syscalls and bytes as before.
-// create is injectable so both fault branches are reachable.
 type tempFileStager struct {
 	create func(dir, pattern string) (*os.File, error)
 }
@@ -143,8 +118,6 @@ func (s tempFileStager) Stage(prompt string) (string, func(), error) {
 	return path, cleanup, nil
 }
 
-// stageFault names which staging syscall failed (create | write) so the
-// PREPARE_FAILED signal can say so; the text stays the run's own.
 type stageFault struct {
 	op  string
 	err error

@@ -1,35 +1,11 @@
 package retro
 
-// lesson_resolution_test.go — RED contract for where a failure lesson LIVES.
-//
-// retro graded itself FAIL unless hasFailureLesson found a file named
-// `failure-lesson*.yaml` in the CYCLE WORKSPACE. The retro persona is instructed
-// to write `.evolve/instincts/lessons/inst-LXXX-<slug>.yaml` — a different
-// directory AND a different filename. The phase was graded FAIL for not producing
-// an artifact its own persona is instructed never to produce.
-//
-// Measured on the runtime plane (where the loop actually writes; a git worktree's
-// copy is empty because .evolve/instincts/lessons/* is gitignored): 600 lesson
-// files, of which 135 are inst-L* and 464 are an older cycle-<N>-* convention.
-// Every recent FAILING cycle produced inst-L* and no cycle-<N>-*: 1572→1, 1574→3,
-// 1576→3, 1577→4. Exactly ONE file named failure-lesson* exists anywhere, and 220
-// of 238 retro FAILs (92%) had a substantial retrospective and no workspace lesson.
-//
-// The persona's convention is the one that is load-bearing — those files are read
-// back into future agents' instinctSummary — so the GATE moves to meet it, not the
-// other way round. The legacy workspace shape is still accepted so cycle-1571-era
-// artifacts keep passing.
-
 import (
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-// lessonsFixture builds a project root with the canonical layout:
-//
-//	<root>/.evolve/instincts/lessons/   — where the persona writes
-//	<root>/.evolve/runs/cycle-N/        — the phase workspace
 func lessonsFixture(t *testing.T, cycle int, lessonNames ...string) (root, workspace string) {
 	t.Helper()
 	root = t.TempDir()
@@ -66,11 +42,10 @@ func TestResolveFailureLesson(t *testing.T) {
 		name    string
 		cycle   int
 		lessons []string
-		legacy  bool // also drop a legacy failure-lesson*.yaml in the workspace
+		legacy  bool
 		want    bool
 	}{
 		{
-			// The shape that has been failing for months.
 			name:    "a lesson named for THIS cycle, where the persona writes it",
 			cycle:   1574,
 			lessons: []string{"inst-L1574a-continuation-deferral-must-be-reconciled.yaml"},
@@ -83,17 +58,12 @@ func TestResolveFailureLesson(t *testing.T) {
 			want:    true,
 		},
 		{
-			// CYCLE-SCOPED, not "any lesson anywhere". 600 lessons exist; a gate
-			// that accepts any of them would pass every cycle unconditionally,
-			// turning a broken gate into a rubber stamp — the opposite failure.
 			name:    "lessons exist but none name this cycle",
 			cycle:   1577,
 			lessons: []string{"inst-L1572a-other.yaml", "inst-L1574a-other.yaml"},
 			want:    false,
 		},
 		{
-			// DIGIT BOUNDARY (review L2). A plain prefix match lets cycle 157 be
-			// satisfied by cycle 1574's lesson.
 			name:    "a longer cycle number does not satisfy a shorter one's gate",
 			cycle:   157,
 			lessons: []string{"inst-L1574a-continuation-deferral.yaml"},
@@ -111,8 +81,6 @@ func TestResolveFailureLesson(t *testing.T) {
 			want:  false,
 		},
 		{
-			// cycle-1571 wrote failure-lesson-cycle1571.yaml into its workspace.
-			// That corpus must keep passing.
 			name:   "legacy workspace failure-lesson*.yaml still counts",
 			cycle:  1571,
 			legacy: true,
@@ -136,10 +104,6 @@ func TestResolveFailureLesson(t *testing.T) {
 	}
 }
 
-// The drift that caused this. The gate's search location and the persona's
-// documented output path must be the same string — checked against the persona
-// file itself, so a future edit to either side fails here rather than silently
-// re-breaking the verdict for another 238 cycles.
 func TestLessonPathIsSingleSourcedWithThePersona(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "agents", "evolve-retrospective.md"))
 	if err != nil {
