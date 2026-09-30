@@ -5,7 +5,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -270,9 +269,10 @@ func TestWorktreeEvidence_ARewrittenDeliverableStillCompletesByTheArtifactWindow
 func TestWorktreeEvidence_NoDispatchSnapshotMeansNoEvidenceEvenOnceGitRecovers(t *testing.T) {
 	launch := correctionOfABuild(t)
 	launch.worktree = t.TempDir()
+	recovered := gittest.Fixture(t)
 	res := launch.run(t, idleAgent(func() {
-		if out, err := exec.Command("git", "-C", launch.worktree, "init", "-q").CombinedOutput(); err != nil {
-			t.Errorf("git init: %v: %s", err, out)
+		if err := os.Rename(filepath.Join(recovered.Dir, ".git"), filepath.Join(launch.worktree, ".git")); err != nil {
+			t.Errorf("git recovers in the worktree: %v", err)
 		}
 		writeFile(t, filepath.Join(launch.worktree, "feature.go"), "package feature\n")
 	}))
