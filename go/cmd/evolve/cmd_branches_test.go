@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func brGit(t *testing.T, dir string, args ...string) {
@@ -127,5 +130,103 @@ func TestBranchesUnknownSubcommand_Errors(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := runBranches([]string{"bogus"}, nil, &out, &errb); code == 0 {
 		t.Errorf("unknown subcommand must exit non-zero, got 0")
+	}
+}
+
+// brKeptFixture builds a remote-less repo whose cycle-1..cycle-4 are all
+// superseded by main: cycle-1 is checked out in a linked worktree, cycle-2 is
+// named by a continuation binding, and cycle-3 and cycle-4 are free to prune.
+func brKeptFixture(t *testing.T) string {
+	t.Helper()
+	r := gittest.Fixture(t)
+	r.Git("commit", "-q", "--allow-empty", "-m", "base")
+	for _, b := range []string{"cycle-1", "cycle-2", "cycle-3", "cycle-4"} {
+		r.Git("branch", b)
+	}
+	r.Git("commit", "-q", "--allow-empty", "-m", "advance main")
+	r.Git("worktree", "add", "-q", filepath.Join(t.TempDir(), "lane"), "cycle-1")
+	if err := os.MkdirAll(filepath.Join(r.Dir, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bound := continuation.Continuation{Branch: "cycle-2", SnapshotSHA: r.Git("rev-parse", "cycle-2"), Cycle: 2}
+	if err := continuation.WriteRegistryEntry(r.Dir, "scope-bound", bound); err != nil {
+		t.Fatalf("bind cycle-2: %v", err)
+	}
+	return r.Dir
+}
+
+func brWantLines(t *testing.T, stdout string, want [][2]string) {
+	t.Helper()
+	for _, w := range want {
+		if !brLine(stdout, w[0]+" ", "superseded=true", w[1]) {
+			t.Errorf("%s must report superseded=true %s\n%s", w[0], w[1], stdout)
+		}
+	}
+}
+
+func TestBranchesPruneForce_KeepsCheckedOutAndBoundPrunesRest(t *testing.T) {
+	dir := brKeptFixture(t)
+	stdout, code := brRun(t, dir, "prune", "--dry-run=false")
+	if code != 0 {
+		t.Fatalf("prune --dry-run=false exit=%d (want 0: a kept ref never aborts the run)\n%s", code, stdout)
+	}
+	brWantLines(t, stdout, [][2]string{
+		{"cycle-1", "kept-checked-out"},
+		{"cycle-2", "kept-bound"},
+		{"cycle-3", "pruned"},
+		{"cycle-4", "pruned"},
+	})
+	if strings.Contains(stdout, "kept-open-pr") {
+		t.Errorf("the repo has no remote, so no ref can be kept behind an open PR\n%s", stdout)
+	}
+	if !brBranchExists(t, dir, "cycle-1") {
+		t.Error("deleted cycle-1, which is checked out in a worktree")
+	}
+	if !brBranchExists(t, dir, "cycle-2") {
+		t.Error("deleted cycle-2, which a continuation binding names")
+	}
+	if brBranchExists(t, dir, "cycle-3") || brBranchExists(t, dir, "cycle-4") {
+		t.Error("left a free superseded ref undeleted")
+	}
+}
+
+func TestBranchesPruneForce_DeleteFailureReportedPerRef(t *testing.T) {
+	dir := brKeptFixture(t)
+	// A held ref lock makes git refuse to delete a ref no worktree holds.
+	if err := os.WriteFile(filepath.Join(dir, ".git", "refs", "heads", "cycle-3.lock"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, _ := brRun(t, dir, "prune", "--dry-run=false")
+	brWantLines(t, stdout, [][2]string{
+		{"cycle-1", "kept-checked-out"},
+		{"cycle-3", "kept-delete-failed"},
+		{"cycle-4", "pruned"},
+	})
+	if strings.Contains(stdout, "kept-open-pr") {
+		t.Errorf("a failed delete was labeled kept-open-pr in a repo with no remote\n%s", stdout)
+	}
+	if !brBranchExists(t, dir, "cycle-3") {
+		t.Error("cycle-3 is gone although its delete was refused")
+	}
+	if brBranchExists(t, dir, "cycle-4") {
+		t.Error("the walk stopped at cycle-3's failed delete instead of pruning cycle-4")
+	}
+}
+
+func TestBranchesPruneDryRun_KeptReasonsNeverWouldPrune(t *testing.T) {
+	dir := brKeptFixture(t)
+	stdout, code := brRun(t, dir, "prune")
+	if code != 0 {
+		t.Fatalf("prune (default) exit=%d (want 0)\n%s", code, stdout)
+	}
+	brWantLines(t, stdout, [][2]string{
+		{"cycle-1", "kept-checked-out"},
+		{"cycle-2", "kept-bound"},
+		{"cycle-3", "would-prune"},
+	})
+	for _, b := range []string{"cycle-1", "cycle-2", "cycle-3", "cycle-4"} {
+		if !brBranchExists(t, dir, b) {
+			t.Errorf("dry-run deleted %s", b)
+		}
 	}
 }

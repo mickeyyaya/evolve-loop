@@ -93,6 +93,12 @@ func runBranchesPrune(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stdout, "%s superseded=false kept\n", v.Ref)
 		case v.Pruned:
 			fmt.Fprintf(stdout, "%s superseded=true pruned\n", v.Ref)
+		case v.KeptCheckedOut:
+			fmt.Fprintf(stdout, "%s superseded=true kept-checked-out\n", v.Ref)
+		case v.KeptBound:
+			fmt.Fprintf(stdout, "%s superseded=true kept-bound\n", v.Ref)
+		case v.KeptDeleteFailed:
+			fmt.Fprintf(stdout, "%s superseded=true kept-delete-failed\n", v.Ref)
 		case dryRun:
 			fmt.Fprintf(stdout, "%s superseded=true would-prune\n", v.Ref)
 		default:
