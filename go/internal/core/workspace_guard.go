@@ -21,8 +21,8 @@ func archivePollutedWorkspace(workspace string, now func() time.Time) error {
 	if err != nil {
 		return fmt.Errorf("readdir workspace: %w", err)
 	}
-	// lane-scope.json is provisioned by the fleet supervisor BEFORE the cycle
-	// runs (cycle-640 lane pin) — pre-phase by design, not pollution.
+	// lane-scope.json is provisioned by the fleet supervisor before the cycle
+	// runs — pre-phase by design, not pollution.
 	// minimal: a genuinely polluted dir is archived whole, pin included; the
 	// env-snapshot fallback re-materializes the pin for fleet lanes.
 	pollution := 0
@@ -43,9 +43,3 @@ func archivePollutedWorkspace(workspace string, now func() time.Time) error {
 		workspace, archived, pollution)
 	return nil
 }
-
-// defaultGitHEAD runs `git rev-parse HEAD` in cwd.
-// Returns empty string on error AND emits a one-line WARN to stderr so
-// operators see the degraded-mode signal. Only the throughput hook reads the
-// pre/post pair (shippedOutcome treats an empty or equal pair as no movement);
-// the cycle outcome label never does.

@@ -58,3 +58,5 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/bridge` | the native agent bridge: drives tmux and headless LLM CLIs for every phase (filled by file group) | [internal-bridge.md](internal-bridge.md) |
 | `internal/acssuite` | the deterministic, host-side EGPS predicate-suite runner: Go lane, scope lint, phantom-binding classification, evidence sealing | [internal-acssuite.md](internal-acssuite.md) |
+| `internal/phases/triage` | the cycle-scope task-selection phase: prompt composition, protected-surface routing, premise drift, carry-forward candidates | [internal-phases-triage.md](internal-phases-triage.md) |
+| `internal/flagregistry` | the declarative SSOT for every `EVOLVE_*` control flag across every reader surface | [internal-flagregistry.md](internal-flagregistry.md) |

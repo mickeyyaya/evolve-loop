@@ -1,18 +1,5 @@
 package triage
 
-// protected_surface_admission_test.go — RED contract for the second,
-// commit-time admission route (F4, docs/operations/batch-integrity-review-
-// 2026-08-04.md; inbox item triage-protected-surface-admission).
-//
-// console_routed_prompt_test.go already pins route #1: guards.IsProtectedSurface
-// screens items sourced from .evolve/inbox before they are OFFERED in the
-// prompt. That screen never runs for a top_n card the LLM writes from the
-// fleet-todo/scout route — a card whose `files={...}` segment names a
-// protected path sails through hooks.Classify today (Classify only checks
-// non-empty artifact + "## top_n" heading + >=1 list item). Cycles
-// 1257/1259/1263 burned on exactly this shape. These tests pin the second,
-// independent commit-time check: Classify itself must FAIL a committed
-// artifact whose top_n `files=` references guards.IsProtectedSurface.
 import (
 	"strings"
 	"testing"
@@ -21,11 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 )
 
-// Negative: a top_n card naming a protected file via the brace-delimited
-// `files={a;b;c}` encoding (the format inboxbatch.RenderMarkdown emits, per
-// scout-report.md's Key Findings) must FAIL Classify, and the diagnostic
-// must name both the offending task id and the offending path so the
-// operator can act without re-deriving it from the artifact.
 func TestTriageClassify_RoutesProtectedSurfaceTopNCard_BraceSyntax(t *testing.T) {
 	if !guards.IsProtectedSurface("go/acs/regression/cycle1/predicates_test.go") {
 		t.Fatal("pin moved: go/acs/regression/ no longer on ProtectedSurfaceManifest — update this test AND the routing rationale")
@@ -49,9 +31,6 @@ func TestTriageClassify_RoutesProtectedSurfaceTopNCard_BraceSyntax(t *testing.T)
 	}
 }
 
-// Same defect, the bare (unbraced) `files=a;b` encoding real cycle-1312
-// output actually used (.evolve/runs/cycle-1312/triage-report.md) — the
-// admission check must not silently no-op on the brace-less variant.
 func TestTriageClassify_RoutesProtectedSurfaceTopNCard_BareSyntax(t *testing.T) {
 	if !guards.IsProtectedSurface("go/internal/guards/role.go") {
 		t.Fatal("pin moved: go/internal/guards/role.go no longer on ProtectedSurfaceManifest — update this test AND the routing rationale")
@@ -72,9 +51,6 @@ func TestTriageClassify_RoutesProtectedSurfaceTopNCard_BareSyntax(t *testing.T) 
 	}
 }
 
-// Semantic: among several top_n cards, only the one actually naming a
-// protected path is routed — the innocent sibling stays committed and is
-// never named by a diagnostic.
 func TestTriageClassify_RoutesAmongMultipleCards_NamesOffendingIdOnly(t *testing.T) {
 	ws := t.TempDir()
 	path := writeDecision(t, ws, `{"top_n":[{"id":"innocent-task"},{"id":"binaryguard-bypass"}]}`)
@@ -96,11 +72,6 @@ func TestTriageClassify_RoutesAmongMultipleCards_NamesOffendingIdOnly(t *testing
 	}
 }
 
-// Positive/regression: a top_n card whose files= segment names only
-// ordinary, non-manifest paths must still PASS — the new admission check
-// must not regress the byte-identical PASS behavior EvaluateClassify already
-// gives a well-formed artifact (scout-report.md Acceptance Criteria: "A
-// non-protected top_n card is unaffected").
 func TestTriageClassify_AllowsNonProtectedTopNCard(t *testing.T) {
 	artifact := "## top_n\n" +
 		"- add-widget: add a widget — priority=M, files={go/internal/widget/widget.go;go/internal/widget/widget_test.go}, source=scout\n"
@@ -118,9 +89,6 @@ func TestTriageClassify_AllowsNonProtectedTopNCard(t *testing.T) {
 	}
 }
 
-// Edge: a top_n card with no files= segment at all (e.g. a purely narrative
-// line) must be unaffected by the new check — nothing to intersect means no
-// rejection basis exists.
 func TestTriageClassify_NoFilesSegmentIsUnaffected(t *testing.T) {
 	artifact := "## top_n\n" +
 		"- narrative-only: a card with no files= segment at all\n"

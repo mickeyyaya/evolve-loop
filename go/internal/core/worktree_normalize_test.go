@@ -11,15 +11,6 @@ import (
 	"testing"
 )
 
-// worktree_normalize_test.go — Option C for the cycle-156 incident
-// (docs/incidents/cycle-156-builder-commit-vs-audit-pending-diff.md).
-//
-// A builder is instructed to `git commit ... [worktree-build]` (evolve-builder.md:235),
-// but the auditor + binding inspect `git diff HEAD`, which is EMPTY after a commit.
-// normalizeWorktreeToBase soft-resets the builder's commits back to the cycle base so
-// the work becomes PENDING changes again — the state both the auditor and the binding
-// assume. These tests pin that contract.
-
 func gitInRepo(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -47,9 +38,6 @@ func newRepoWithBaseCommit(t *testing.T) (string, string) {
 	return dir, gitInRepo(t, dir, "rev-parse", "HEAD")
 }
 
-// TestNormalizeWorktreeToBase_UncommitsBuilderCommit is the RED-phase contract:
-// a builder commit on top of base must be soft-reset to base so the file shows
-// in `git diff HEAD`.
 func TestNormalizeWorktreeToBase_UncommitsBuilderCommit(t *testing.T) {
 	t.Parallel()
 	dir, base := newRepoWithBaseCommit(t)
@@ -68,16 +56,12 @@ func TestNormalizeWorktreeToBase_UncommitsBuilderCommit(t *testing.T) {
 	if head := gitInRepo(t, dir, "rev-parse", "HEAD"); head != base {
 		t.Fatalf("HEAD=%s, want base=%s (soft-reset should move HEAD to base)", head, base)
 	}
-	// The feature file must now be a PENDING change visible to `git diff HEAD`.
 	diff := gitInRepo(t, dir, "diff", "HEAD", "--name-only")
 	if !strings.Contains(diff, "feature.go") {
 		t.Fatalf("feature.go must be pending after normalize; git diff HEAD --name-only=%q", diff)
 	}
 }
 
-// TestNormalizeWorktreeToBase_NoopWhenUncommitted: when the builder left changes
-// UNCOMMITTED (HEAD already == base — the historical Claude-builder path), the
-// helper is a no-op and the pending changes survive untouched.
 func TestNormalizeWorktreeToBase_NoopWhenUncommitted(t *testing.T) {
 	t.Parallel()
 	dir, base := newRepoWithBaseCommit(t)

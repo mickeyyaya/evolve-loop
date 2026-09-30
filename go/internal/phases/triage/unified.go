@@ -19,9 +19,6 @@ type unifiedProjection struct {
 	MemberCount int    `json:"member_count"`
 }
 
-// processUnifiedCommitment validates the optional LLM-authored claim and adds
-// only its deterministic projection to the authoritative decision. Invalid
-// claims remain visible for forensics but cannot influence routing.
 func processUnifiedCommitment(req core.PhaseRequest) ([]core.Diagnostic, error) {
 	decisionPath := filepath.Join(req.Workspace, "triage-decision.json")
 	raw, err := os.ReadFile(decisionPath)

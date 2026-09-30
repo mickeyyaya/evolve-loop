@@ -12,15 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
-// TestGitWorktree_ConcurrentSiblingsNoBranchCollision reproduces the multi-stream
-// failure: several `evolve loop` runs, each in its OWN worktree of the SAME repo,
-// every one provisioning cycle 1. git worktree branch names — and, under a shared
-// EVOLVE_WORKTREE_BASE, the directory path — are GLOBAL to one object store, so a
-// bare `cycle-1` branch/dir from the first run made the second run's
-// `git worktree add -B cycle-1` fail ("'cycle-1' is already used by worktree …");
-// that run then fell back to the main tree and FAILED on the tree-diff guard.
-// After the runscope fix each cycle name embeds the per-root lane, so sibling
-// roots get distinct branches AND distinct dirs and both provision cleanly.
 func TestGitWorktree_ConcurrentSiblingsNoBranchCollision(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")

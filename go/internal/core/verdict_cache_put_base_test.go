@@ -2,16 +2,6 @@
 
 package core
 
-// verdict_cache_put_base_test.go — RED contract for the salvage-review HIGH-1
-// (salvage/verdict-cache-land): the Put-site fresh-base guard must compare the
-// audited worktree against the WORKTREE'S OWN base commit (CycleState.
-// WorktreeBaseSHA), never against projectRoot HEAD at audit time. Under fleet
-// concurrency a sibling ship advances main mid-cycle; resolving the base from
-// the advanced HEAD (a commit the lane's worktree may not even contain) either
-// diverges the operands or fails open — and an UNCHANGED worktree's shared
-// fresh-base identity gets WRITTEN into the verdict cache, the exact entry
-// class ADR-0048's guard exists to prevent on the read side.
-
 import (
 	"context"
 	"os"
@@ -71,10 +61,6 @@ func putBaseWorkspace(t *testing.T) string {
 	return ws
 }
 
-// TestAuditBindingPut_FreshBaseSuppressedWhenMainAdvances: projectRoot gains a
-// commit after the lane worktree was cut; the worktree is UNCHANGED from its
-// base. The audit-binding cache projection must NOT record the worktree's
-// (shared, fresh-base) tree identity — regardless of where main's HEAD sits.
 func TestAuditBindingPut_FreshBaseSuppressedWhenMainAdvances(t *testing.T) {
 	ctx := context.Background()
 	projectRoot := putBaseRepo(t)
@@ -103,9 +89,6 @@ func TestAuditBindingPut_FreshBaseSuppressedWhenMainAdvances(t *testing.T) {
 	}
 }
 
-// TestAuditBindingPut_ChangedWorktreeStillRecords: the twin control — a lane
-// with real changes must keep its cache projection even when main advanced, or
-// the fix trades collision-pollution for silently lost legitimate entries.
 func TestAuditBindingPut_ChangedWorktreeStillRecords(t *testing.T) {
 	ctx := context.Background()
 	projectRoot := putBaseRepo(t)
@@ -138,10 +121,6 @@ func TestAuditBindingPut_ChangedWorktreeStillRecords(t *testing.T) {
 	}
 }
 
-// TestAuditBindingPut_NoBaseIdentityFailsClosed: with no recorded base the Put
-// side cannot prove the worktree is not fresh — it must SKIP the cache write
-// (write-side fail-closed; the read side's fail-open stays, its worst case is
-// only a shadow log line).
 func TestAuditBindingPut_NoBaseIdentityFailsClosed(t *testing.T) {
 	ctx := context.Background()
 	projectRoot := putBaseRepo(t)

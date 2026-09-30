@@ -6,18 +6,7 @@ import (
 	"testing"
 )
 
-// L2.1 (concurrency-factory plan): the EVOLVE_* flag SSOT. The registry is
-// metadata-only — it documents every flag on every surface (go + bash); it
-// does NOT funnel env reads through config.Load (subprocess-reads-env is a
-// deliberate architecture property).
-
 func TestAll_NonEmptyAndWellFormed(t *testing.T) {
-	// No minimum-count floor: the registry is under intentional reduction (the
-	// flag-reduction campaign), and a count floor would block removing dead /
-	// test-only / duplicate flags. Accidental loss is caught instead by the
-	// reader-completeness guard (go/acs/regression/flagreaders), which fails if
-	// any flag READ in production Go lacks a row. Here we only require the
-	// registry be non-empty and well-formed.
 	if len(All) == 0 {
 		t.Fatal("registry is empty")
 	}
@@ -40,14 +29,8 @@ func TestAll_NonEmptyAndWellFormed(t *testing.T) {
 			t.Errorf("%s: invalid status %q", f.Name, f.Status)
 		}
 		if f.Status == StatusDeprecated && f.ReplacedBy == "" && !strings.Contains(f.Doc, "remov") {
-			// Deprecated flags should say what replaces them or when they go.
 			t.Logf("note: deprecated %s has no ReplacedBy and no removal note", f.Name)
 		}
-		// Classification-quality invariant (replaces the count floor): an active
-		// operator flag must be documented — non-empty Cluster + Doc, and never
-		// the internal "classify when touched" placeholder. This keeps the
-		// internal-classification wave honest (a promoted flag must gain a real
-		// Doc/Cluster, not just flip status).
 		if f.Status == StatusActive {
 			if f.Cluster == "" || f.Doc == "" {
 				t.Errorf("active flag %s must have a non-empty Cluster and Doc", f.Name)
@@ -67,10 +50,7 @@ func TestAll_SortedByName(t *testing.T) {
 	}
 }
 
-// TestLookup_SpotChecks pins known flags against ground truth (the
-// L2.1 acceptance: spot-check vs grep).
 func TestLookup_SpotChecks(t *testing.T) {
-	// Campaign-robust: verify Lookup round-trips for EVERY registered flag.
 	for _, want := range All {
 		got, ok := Lookup(want.Name)
 		if !ok {
@@ -89,9 +69,6 @@ func TestLookup_Miss(t *testing.T) {
 	}
 }
 
-// TestRenderIndex_StableAndComplete: the markdown index the `evolve flags
-// generate` command projects into control-flags.md covers every flag and is
-// deterministic (sorted input ⇒ byte-stable output).
 func TestRenderIndex_StableAndComplete(t *testing.T) {
 	out := RenderIndex()
 	if RenderIndex() != out {
@@ -107,12 +84,8 @@ func TestRenderIndex_StableAndComplete(t *testing.T) {
 	}
 }
 
-// TestRenderDoc_FoldsAndEscapes constructs a Flag directly to pin the
-// purpose-column contract RenderIndex depends on: ReplacedBy/RemoveIn fold into
-// the Doc, and a literal pipe is GFM-escaped so it cannot break the table. The
-// table-wide test above only exercises this through whatever real registry rows
-// happen to contain those fields; this names the Flag type and asserts the
-// contract on a row crafted to hit every branch.
+// TestRenderDoc_FoldsAndEscapes crafts a Flag hitting every renderDoc branch,
+// since the table-wide test above only exercises real registry rows.
 func TestRenderDoc_FoldsAndEscapes(t *testing.T) {
 	got := renderDoc(Flag{
 		Name:       "EVOLVE_EXAMPLE",

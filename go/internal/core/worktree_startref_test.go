@@ -31,15 +31,6 @@ func writeCommit(t *testing.T, r *gittest.Repo, name, body string) {
 	r.Git("commit", "-q", "-m", "add "+name)
 }
 
-// TestLaneStartRef_IntegrationHeadAuthority — 2026-09-09 token-waste root cause
-// #3: a fresh lane based on origin/main while the landing branch (the local
-// main, AHEAD by unpushed dossier closeouts) sat elsewhere, so Ship rebased and
-// re-dispatched Build/Audit for a diff of twelve dossier files. The lane base
-// is the INTEGRATION HEAD the landing targets: origin/main when the local main
-// is current or behind (the boundary fast-forwards it), the local main when it
-// is strictly ahead (its unpublished landings ride the next push), and a
-// loud refusal when the two have diverged — no base choice avoids a rebase
-// then, so the plane must be reconciled before any spend.
 func TestLaneStartRef_IntegrationHeadAuthority(t *testing.T) {
 	ctx := context.Background()
 	t.Run("current ⇒ origin/main", func(t *testing.T) {

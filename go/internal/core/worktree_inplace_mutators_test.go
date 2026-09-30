@@ -1,12 +1,5 @@
 package core
 
-// worktree_inplace_mutators_test.go — the invariant "a cycle never mutates the
-// operator's tree" is enforced INSIDE each worktree mutator, not at its
-// callers: a resume path, a composition seam or the next in-place root cannot
-// forget it. Each helper, handed the project root as its worktree, must leave
-// the tree byte-identical (an unformatted tracked file, an uncommitted edit,
-// the index, the commit count) and say so.
-
 import (
 	"context"
 	"os"

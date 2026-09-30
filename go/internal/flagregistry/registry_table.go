@@ -1,9 +1,5 @@
 package flagregistry
 
-// registry_table.go — the flag data. Seeded mechanically 2026-06-11 from the
-// repo-wide inventory + control-flags.md tables; hand-maintained since.
-// KEEP SORTED BY NAME (Lookup binary-searches; the test enforces order).
-
 // All is the complete EVOLVE_* flag registry, sorted by Name. It is the SSOT
 // projected into control-flags.md; Lookup binary-searches it, so it must stay
 // sorted (TestAll_SortedByName enforces this).

@@ -82,8 +82,6 @@ func writeUnifiedFixture(t *testing.T, items []unifiedFixtureItem, topN, members
 	return core.PhaseRequest{Cycle: 1720, ProjectRoot: root, Workspace: ws}
 }
 
-// Each subtest pins one branch by what it writes: the projection, the campaign
-// plan, the rejection diagnostic and the preserved top_n.
 func TestProcessUnifiedCommitment(t *testing.T) {
 	small := unifiedItems(2, "seam")
 	large := unifiedItems(inboxbatch.DefaultMaxItems+1, "seam")
