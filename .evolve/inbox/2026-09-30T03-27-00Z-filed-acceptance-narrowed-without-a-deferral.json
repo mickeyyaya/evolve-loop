@@ -1,0 +1,20 @@
+{
+  "id": "filed-acceptance-narrowed-without-a-deferral",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.6,
+  "title": "Scout or triage narrows a committed item's filed acceptance with no deferral, the build meets the narrowed eval, and the audit fails it: two consecutive cycles paid a repair round",
+  "files": [
+    "agents/evolve-scout.md",
+    "agents/evolve-triage.md",
+    "go/internal/phasecontract/contract.go"
+  ],
+  "summary": "Cycle 1772 (composed-gate-decline-coded-signal): scout rewrote 'a carry decline' as the two trip sites in composition_carryforward.go and dropped acceptance #2; the build graded itself against that eval (covering-tests.md had no row for either) and the audit failed H1 'the build met a narrowed eval, not the filed item's acceptance', costing a TDD+Build repair round. Cycle 1773 (branches-prune-aborts-on-checked-out-branch): triage narrowed the scope so acceptance #2 'A continuation-bound branch is never pruned' was undelivered 'with no deferred entry', and the audit failed H1 again (repair round 1/2). Triage's persona reasons about whole items (top_n, deferred, dropped) and has no rule for the individual acceptance criteria of an item it keeps, so a criterion can vanish between the inbox record and the eval with no record anywhere; only the audit, the most expensive phase, notices.",
+  "fix": "Make every filed acceptance criterion of a committed item accounted for before Build: either the eval grades it or triage records it as deferred with a reason (a split carryover item), and the auditor reads the deferral instead of failing an intentional narrowing. Decide whether the accounting is the auditor's judgment surfaced earlier (a triage-time adversarial check) or a structural mapping in the eval; avoid a new format gate (logic over format).",
+  "acceptance": [
+    "A committed item whose eval omits one filed acceptance criterion without a deferral is caught before Build, not at audit (red today: 1772, 1773)",
+    "An intentionally deferred criterion appears in triage's deferred list with a reason and does not fail the audit"
+  ],
+  "created_at": "2026-09-30T03:27:00Z",
+  "source": "console, 2026-09-30 audits of cycles 1772 and 1773 (wave 47, wave 48)"
+}

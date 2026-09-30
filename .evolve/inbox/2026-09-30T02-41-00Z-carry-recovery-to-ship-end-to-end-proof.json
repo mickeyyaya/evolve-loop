@@ -1,0 +1,21 @@
+{
+  "id": "carry-recovery-to-ship-end-to-end-proof",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.5,
+  "title": "No test drives the ADR-0105 carry from the real recovery through ship's later stages; the missing proof is how no carry ever shipped",
+  "files": [
+    "go/internal/core/identity_carry_forward.go",
+    "go/internal/phases/ship/audit.go",
+    "go/internal/phases/ship/worktree_integrity.go",
+    "docs/architecture/adr/0105-identity-preserving-fleet-rebase.md"
+  ],
+  "summary": "ADR-0105 named a proof test for the carry, TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit, that was never written, and without it no carry shipped: cycles 1766, 1768 and 1772 each carried and were refused at verifyAuditBinding's predicate-execution check (fixed 2026-09-30). The new TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit proves the ship-side binding with a record written by a test helper and stops at verifyAuditBinding; no test, live or at Run level, has taken a carry written by identityCarryForward through verifyStagedTree (pre-commit), verifyCommittedTree (post-push) and the ship binding (architecture review of that fix, MEDIUM-3).",
+  "fix": "Add a Run-level test: a lane audits, a peer lands, ship meets the moved main, the recovery unwinds, rebases and runs identityCarryForward (with the composed-gate runner stubbed green), and ship lands with no Build or Audit round; assert the carry record, the accepted-drift log line and the landed tree.",
+  "acceptance": [
+    "A Run-level test ships a byte-identical rebase through the real recovery with no second audit",
+    "ADR-0105 step 4 names that test and no longer lists the proof as open"
+  ],
+  "created_at": "2026-09-30T02:41:00Z",
+  "source": "console, 2026-09-30 architecture review of the verifyExecutionTree carry fix (MEDIUM-3)"
+}

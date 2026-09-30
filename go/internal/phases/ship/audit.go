@@ -113,10 +113,8 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 		}
 	}
 
-	currentExecution, err := treefence.Take(ctx, testedRoot)
-	if err != nil || currentExecution.Tree != entry.WorktreeTreeSHA {
-		return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
-			fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v); re-run Audit", entry.WorktreeTreeSHA, currentExecution.Tree, err), "audited_tree", entry.WorktreeTreeSHA, "current_tree", currentExecution.Tree)
+	if err := verifyExecutionTree(ctx, opts, res, testedRoot); err != nil {
+		return err
 	}
 
 	fi, err := os.Stat(entry.ArtifactPath)
@@ -134,6 +132,22 @@ func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) erro
 
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: audit verified — verdict PASS, SHA matches, HEAD/tree bound to audit, age %ds", age))
 	return nil
+}
+
+func verifyExecutionTree(ctx context.Context, opts *Options, res *RunResult, testedRoot string) error {
+	audited := opts.internalAuditBoundTreeSHA
+	current, err := treefence.Take(ctx, testedRoot)
+	if err == nil && current.Tree == audited {
+		return nil
+	}
+	if err == nil {
+		if ok, detail := auditBindingSatisfied(ctx, opts, testedRoot, current.Tree); ok {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: predicate execution tree drift (audit=%s current=%s) explained%s — accepted", audited, current.Tree, detail))
+			return nil
+		}
+	}
+	return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
+		fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v); re-run Audit", audited, current.Tree, err), "audited_tree", audited, "current_tree", current.Tree)
 }
 
 // findLatestAudit returns the auditor ledger entry ship binds to: the newest

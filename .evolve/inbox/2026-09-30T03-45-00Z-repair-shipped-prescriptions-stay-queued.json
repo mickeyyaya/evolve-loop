@@ -1,0 +1,20 @@
+{
+  "id": "repair-shipped-prescriptions-stay-queued",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "title": "An audit FAIL's prescriptions stay in carryoverTodos after the repair round that implemented them ships, as high-priority work that is already done",
+  "files": [
+    "go/internal/core/carryover/workspace.go",
+    "go/internal/core/defectledger/schema.go",
+    "go/internal/core/audit_fail_decision.go"
+  ],
+  "summary": "An audit FAIL writes its prescriptions to state.json carryoverTodos (priority high, first_seen_cycle N, expiresAt +30 days); the repair round that follows is dispatched to address exactly those prescriptions, and when it passes audit and ships nothing retires them. On 2026-09-30, 191 of 288 carryoverTodos were PRESCRIPTION entries, 44 of them from cycles that later shipped. Cycle 1772's four (carry each failing gate's tail as its own bounded Event.Fields entry; remove the multi-line tail dump at cmd_composition_wiring.go:116; install the outcome sink in gatesOnIntactTree; correct the explanation document's scope) were all implemented by its repair round, which passed its re-audit and shipped as b7afd3d0, yet all four stay queued at priority high for 30 days, where scout and triage can pick them as fresh work or weigh them against real backlog. A shipped cycle's WARN prescriptions (for example 1774's 'narrow TestC1774_001') are genuine follow-ups and must stay.",
+  "fix": "When a cycle ships after an audit-repair round, retire (or mark addressed-by-repair) the prescriptions that audit FAIL issued for that cycle, keyed by first_seen_cycle and the failing audit's round, while keeping prescriptions from a WARN verdict; record the retirement so the memo shows what the repair closed.",
+  "acceptance": [
+    "A cycle that ships after an audit-repair round leaves none of that FAIL's prescriptions in carryoverTodos (red today: 1772)",
+    "A shipped cycle's WARN prescriptions stay queued"
+  ],
+  "created_at": "2026-09-30T03:45:00Z",
+  "source": "console, 2026-09-30 carryoverTodos audit after wave 48's 1774 ship"
+}

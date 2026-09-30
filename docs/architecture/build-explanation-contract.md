@@ -73,6 +73,25 @@ material path still needs its own exact entry, so one broad glob can never stand
 in for the per-path explanations the contract requires (2026-09-30, after cycles
 1765 and 1768 each lost a correction round to a directory or glob citation).
 
+An entry is a Markdown list item, not a physical line. Its explanation may wrap
+onto continuation lines (unindented, or indented fewer than four spaces: the
+shared section reader hides a line indented four or more, or by a tab, as code)
+or continue in sub-bullets (a sub-bullet is its own entry, checked like any
+other, when its first span names a diff path or is shaped like one, holding a
+`/`; one that opens with a backticked identifier such as `runGateSet`
+continues the item). One item may name several paths that share its explanation
+(``- `a`, `b` — why``, also joined by `and` or `&`), but a span joins the group
+only when it covers a diff path, so a backticked identifier
+(``- `a.go`, `checkAll` — splits…``), or a path outside the diff in that
+position, stays part of the first path's explanation: the host neither cites
+nor checks it, and judging such a claim is the auditor's. The next `- ` bullet at the same or a lesser
+indent, or unindented text after a blank line, ends the item, so a short
+explanation never borrows the next block's text. Every path an item names still
+passes the diff check and the `minExplanationBytes` floor (2026-09-30, after
+cycles 1707, 1730, 1735, 1737, 1760, 1762, 1765 and 1772 each lost a correction
+round to a wrapped or grouped bullet whose explanation the line-by-line reader
+never saw).
+
 The host classifies documentation, knowledge-base files, eval definitions, ACS
 predicates, testdata, unambiguous test files and the inbox lifecycle records under
 `.evolve/inbox/` (the host claims, moves, stamps and retires them; a build's

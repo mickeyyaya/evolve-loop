@@ -8,7 +8,11 @@ import (
 )
 
 func changedAreaFailures(section string, changed, material []string) []string {
-	entries, failures := changedAreaEntries(section)
+	normalized := make([]string, 0, len(changed))
+	for _, changedPath := range changed {
+		normalized = append(normalized, normalize(changedPath))
+	}
+	entries, failures := changedAreaEntries(section, normalized)
 	for _, materialPath := range material {
 		if entries[materialPath] == "" {
 			failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas does not explain material path %s", materialPath))
@@ -19,10 +23,6 @@ func changedAreaFailures(section string, changed, material []string) []string {
 		cited = append(cited, citedPath)
 	}
 	sort.Strings(cited)
-	normalized := make([]string, 0, len(changed))
-	for _, changedPath := range changed {
-		normalized = append(normalized, normalize(changedPath))
-	}
 	for _, citedPath := range cited {
 		if !coversAnyChangedPath(citedPath, normalized) {
 			failures = append(failures, fmt.Sprintf("Explanation Documentation: cited path %s is not in the Build diff", citedPath))
@@ -95,30 +95,107 @@ func expandFirstGroup(s string) (expanded []string, ok, grouped bool) {
 	return expanded, true, true
 }
 
-func changedAreaEntries(body string) (map[string]string, []string) {
+const minExplanationBytes = 10
+
+func changedAreaEntries(body string, changed []string) (map[string]string, []string) {
 	entries := map[string]string{}
 	var failures []string
-	for _, raw := range strings.Split(body, "\n") {
-		line := strings.TrimSpace(raw)
-		if !strings.HasPrefix(line, "- `") {
-			continue
+	for _, item := range changedAreaItems(body, changed) {
+		paths, explanation := splitChangedAreaItem(item, changed)
+		for _, cited := range paths {
+			path := normalize(cited)
+			if !validRelative(path) {
+				failures = append(failures, "Explanation Documentation: Changed Areas contains an invalid repo-relative path")
+				continue
+			}
+			if len(explanation) < minExplanationBytes {
+				failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas path %s needs a what/why explanation", path))
+				continue
+			}
+			entries[path] = explanation
 		}
-		rest := strings.TrimPrefix(line, "- `")
-		end := strings.Index(rest, "`")
-		if end < 0 {
-			continue
-		}
-		path := normalize(rest[:end])
-		explanation := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(rest[end+1:]), "—-:"))
-		if !validRelative(path) {
-			failures = append(failures, "Explanation Documentation: Changed Areas contains an invalid repo-relative path")
-			continue
-		}
-		if len(explanation) < 10 {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas path %s needs a what/why explanation", path))
-			continue
-		}
-		entries[path] = explanation
 	}
 	return entries, failures
+}
+
+func changedAreaItems(body string, changed []string) []string {
+	var items []string
+	var lines []string
+	indent, blank := 0, false
+	for _, raw := range strings.Split(body, "\n") {
+		line := strings.TrimSpace(raw)
+		depth := len(raw) - len(strings.TrimLeft(raw, " \t"))
+		nested := lines != nil && depth > indent
+		switch {
+		case strings.HasPrefix(line, "- `") && (!nested || citesNestedPath(firstSpan(line), changed)):
+			items = appendItem(items, lines)
+			lines, indent, blank = []string{line}, depth, false
+		case line == "":
+			blank = true
+		case lines == nil:
+		case nested || !blank && !strings.HasPrefix(line, "- "):
+			lines = append(lines, line)
+		default:
+			items, lines = appendItem(items, lines), nil
+		}
+	}
+	return appendItem(items, lines)
+}
+
+func firstSpan(line string) string {
+	span, _, _ := leadingCodeSpan(strings.TrimPrefix(line, "- "))
+	return span
+}
+
+func citesNestedPath(span string, changed []string) bool {
+	return strings.Contains(span, "/") || namesBuildContent(span, changed)
+}
+
+func namesBuildContent(span string, changed []string) bool {
+	return coversAnyChangedPath(normalize(span), changed)
+}
+
+func appendItem(items, lines []string) []string {
+	if lines == nil {
+		return items
+	}
+	return append(items, strings.Join(lines, " "))
+}
+
+func splitChangedAreaItem(item string, changed []string) ([]string, string) {
+	first, rest, ok := leadingCodeSpan(strings.TrimPrefix(item, "- "))
+	if !ok {
+		return nil, ""
+	}
+	paths := []string{first}
+	for {
+		span, after, ok := leadingCodeSpan(afterGroupJoiner(rest))
+		if !ok || !namesBuildContent(span, changed) {
+			break
+		}
+		paths, rest = append(paths, span), after
+	}
+	return paths, explanationText(rest)
+}
+
+func leadingCodeSpan(s string) (span, rest string, ok bool) {
+	if !strings.HasPrefix(s, "`") {
+		return "", s, false
+	}
+	end := strings.Index(s[1:], "`")
+	if end < 0 {
+		return "", s, false
+	}
+	return s[1 : end+1], s[end+2:], true
+}
+
+func afterGroupJoiner(s string) string {
+	s = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(s), ","))
+	s = strings.TrimPrefix(s, "and ")
+	s = strings.TrimPrefix(s, "& ")
+	return strings.TrimSpace(s)
+}
+
+func explanationText(s string) string {
+	return strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(s), "—-:"))
 }

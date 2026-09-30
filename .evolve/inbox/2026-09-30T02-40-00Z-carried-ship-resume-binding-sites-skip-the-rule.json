@@ -1,0 +1,21 @@
+{
+  "id": "carried-ship-resume-binding-sites-skip-the-rule",
+  "kind": "bug",
+  "priority_class": "stability",
+  "weight": 0.4,
+  "title": "Three ship binding sites still compare the audited tree directly, so a carried ship interrupted after its push re-audits instead of healing",
+  "files": [
+    "go/internal/phases/ship/native.go",
+    "go/internal/phases/ship/audit.go",
+    "go/internal/phases/ship/repair.go",
+    "go/internal/phases/ship/worktree_integrity.go"
+  ],
+  "summary": "Since 2026-09-30 three binding checks apply the one rule (auditBindingSatisfied, which re-proves an ADR-0105 identity carry): the pre-commit and post-push tree checks and verifyAuditBinding's predicate-execution check (verifyExecutionTree). Three still compare the audited tree directly: the post-push idempotency gate (native.go:352, auditTree != committedTree), verifyPostPushPredicateEvidence (audit.go:270, landedTree != entry.WorktreeTreeSHA) and the resume-unpushed heal (repair.go:350, headTree != bound; its comment justifies the raw compare for inbox consumption, whose paths a fresh process cannot know, but a carry is ledger-backed and re-provable in a fresh process). All three fail closed, but a carried ship whose tree differs from the audited one by design misses both fast heals after a push and goes HeadMoved into a deep re-audit, the waste the verifyExecutionTree fix removed on the first attempt (architecture review of that fix, MEDIUM-2).",
+  "fix": "Route each site through auditBindingSatisfied (or its carry rung where consumption cannot apply), keeping each site's own operator-facing message, and prove a carried ship interrupted after its push heals without a re-audit.",
+  "acceptance": [
+    "A carried ship interrupted after its push resumes to shipped without a re-audit (red today)",
+    "No binding site in phases/ship compares the audited tree with a held tree except through auditBindingSatisfied"
+  ],
+  "created_at": "2026-09-30T02:40:00Z",
+  "source": "console, 2026-09-30 architecture review of the verifyExecutionTree carry fix (MEDIUM-2)"
+}
