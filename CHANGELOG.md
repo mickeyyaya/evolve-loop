@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — `go/acs` carries no comments: the predicate packages are stripped by the tool, and the history they carried is archived (2026-10-01)
+
+- Step 3c of the comment plan ([comment-reduction-2026-09.md](docs/plans/comment-reduction-2026-09.md), Phase 3): the acceptance predicate packages under `go/acs` held 44,439 comment lines, about half the comment lines left in the module. `commentaudit strip acs` removed 43,636 comment lines from 543 files (the strip's count and the rank's comment-line count measure differently, so the two do not subtract exactly). The 1,129 left are machine-read: the `//go:build acs` tags and the `acs-predicate:` markers.
+- `commentaudit strip` refuses to write any file whose code would change, and `commentaudit verify -base origin/main acs` confirms the landing is comment-only: `comment-only: 543 changed Go file(s) verified`.
+- The history the comments carried (cycle numbers, incidents, the reasons a predicate exists) is kept: `commentaudit history` recorded 1,283 history-bearing comment groups in 485 package pages under [docs/history/code-comments/](docs/history/code-comments/README.md), and rewrote the archive's index.
+- Checks: `go test -count=1 -tags acs ./acs/regression/...` passes (the CI suite, including `legacynames` over the new archive pages). Every `go/acs` package compiles as before, except three per-cycle packages (`cycle298`, `cycle523`, `cycle1694`) that already fail to compile on main from API drift, unchanged by this landing.
+
 ## Added — `commentaudit strip`: comments are removed by a tool, and a Clean Code review decides how the code must change to read without them (2026-09-30)
 
 - The operator's goal (2026-09-30): "remove all comments from the code and refactor the code to be clear and self-explanatory". Editor rounds had removed comments a few directories at a time, and about 88,000 comment lines remained.
