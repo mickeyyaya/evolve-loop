@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"os"
 	"path/filepath"
@@ -82,7 +86,14 @@ func TestNilSignalCenterRootsArePinned(t *testing.T) {
 		}
 		// Counted per file, so an unwired call beside a wired one still fails.
 		calls := len(callRE.FindAll(src, -1))
-		if calls == 0 || strings.Count(string(src), "WithSignalCenter(") >= calls {
+		if calls == 0 {
+			return nil
+		}
+		wired, err := countCallExprs(src, "WithSignalCenter")
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		if wired >= calls {
 			return nil
 		}
 		rel, _ := filepath.Rel(moduleRoot, path)
@@ -116,6 +127,34 @@ func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing
 	if !strings.Contains(stderr, "[orchestrator] phase.outcome WARN ORCHESTRATOR_PHASE_VERDICT_FAIL cycle=2 phase=triage attempt=1") || !strings.Contains(stderr, "warn reaches the console") {
 		t.Errorf("WARN prints the one line format on the console:\n%s", stderr)
 	}
+}
+
+// countCallExprs counts calls of name, bare or as a selector, so comment and
+// string text never count.
+func countCallExprs(src []byte, name string) (int, error) {
+	f, err := parser.ParseFile(token.NewFileSet(), "", src, 0)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	ast.Inspect(f, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		switch fn := call.Fun.(type) {
+		case *ast.Ident:
+			if fn.Name == name {
+				n++
+			}
+		case *ast.SelectorExpr:
+			if fn.Sel.Name == name {
+				n++
+			}
+		}
+		return true
+	})
+	return n, nil
 }
 
 // captureConsole returns what the root's WARN-filtered console sink rendered.

@@ -200,7 +200,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if simulate {
 		d = wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	} else {
-		d = wireOrchestratorDeps(projectRoot, evolveDir, stderr)
+		d = wireOrchestratorDepsFn(projectRoot, evolveDir, stderr)
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
@@ -214,6 +214,11 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 		BypassPolicy:          bypassPolicy,
 	})
+	if errors.Is(err, core.ErrAllFamiliesExhausted) {
+		var lr loopResult
+		lr.emitQuotaPause(loopConfig{EvolveDir: evolveDir}, result.Cycle, stdout, stderr)
+		return 5
+	}
 	if err != nil {
 		// Fleet lanes run this entrypoint as a subprocess and fleet.Result carries no
 		// cycle or workspace, so a lane's FAIL reaches the inbox lifecycle only here.
@@ -367,7 +372,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	var shipFloor []string // nil ⇒ router.DefaultShipFloor
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if policyErr != nil {
-		fmt.Fprintf(os.Stderr, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", policyErr)
+		fmt.Fprintf(console, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", policyErr)
 		pol = policy.Policy{}
 	} else {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
@@ -566,9 +571,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		reviewers = append(reviewers, triagecap.NewReviewer(cfg.TriageCapGate))
 	}
 	if cfg.TopNGate != config.StageOff {
-		// Task-binding clamp, after the contract gate: a build whose task is outside
-		// triage top_n, or a TDD that authors tests under an empty or disjoint top_n,
-		// aborts before later phases spend on it.
 		reviewers = append(reviewers, topngate.NewReviewer(cfg.TopNGate))
 	}
 	if len(reviewers) > 0 {

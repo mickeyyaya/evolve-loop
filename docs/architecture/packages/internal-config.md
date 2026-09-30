@@ -21,7 +21,7 @@
 | `EvalGate` | gate | enforce | `gates.eval_gate` | `internal/evalgate`: Gate A (scout eval files exist) and Gate B (tdd predicate quality). It fails open on ambiguity. |
 | `ContractGate` | gate | enforce | `gates.contract_gate` | The `internal/deliverable` contract gate ([ADR-0034](../adr/0034-unified-deliverable-contract.md)). A circuit breaker demotes enforce to advisory after N consecutive blocks. |
 | `TriageCapGate` | gate | enforce | `gates.triage_cap_gate` | `internal/triagecap`: committed coverage floors above ceil(1.25·K) are rejected with a cap directive. |
-| `TopNGate` | gate | enforce | `gates.topn_gate` | `internal/topngate`: a build whose task is outside triage `top_n` aborts before audit spends anything. |
+| `TopNGate` | gate | enforce | `gates.topn_gate` | `internal/topngate`: a build whose task label is outside triage `top_n` is advisory (label drift); the TDD scope gate blocks a member-set mismatch, tests under an empty `top_n`, or a missing commitment record. |
 | `SandboxMode` | auto/on/off | auto | `EVOLVE_SANDBOX` | OS sandbox wrapping of source-writing phases. |
 | `PhaseRecovery` | gate | shadow | `recovery.phase_recovery` | The ADR-0044 program: the live channel, the ask-broker, the transient-dwell fast-fail, the chain-backed `StallPolicy`, the failure-adviser promotion and the misplaced-deliverable salvage. |
 | `SpineFloor` | gate | enforce | `recovery.spine_floor` | Only whether a clean-absence handoff gap aborts the cycle. |

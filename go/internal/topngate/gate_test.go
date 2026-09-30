@@ -182,12 +182,12 @@ func TestTDDScopeGate(t *testing.T) {
 		}
 	})
 
-	t.Run("no triage report → fail-open", func(t *testing.T) {
+	t.Run("no commitment record at all → fail-loud", func(t *testing.T) {
 		ws := t.TempDir()
 		writeTDDReport(t, ws, "anything", "go/acs/cycle1073/predicates_test.go")
 		reason, block := tddScopeGate{}.check(core.ReviewInput{Phase: string(core.PhaseTDD), Workspace: ws})
-		if reason != "" || block {
-			t.Errorf("missing triage-report.md is ambiguity, not a certain violation; got reason=%q block=%v", reason, block)
+		if !block || !strings.Contains(reason, "triage-report.md") {
+			t.Errorf("an unverifiable scope must block naming the missing record; got reason=%q block=%v", reason, block)
 		}
 	})
 

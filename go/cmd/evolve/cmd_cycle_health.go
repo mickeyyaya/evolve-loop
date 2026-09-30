@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -36,6 +37,9 @@ func runCycleHealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if projectRoot == "" {
 		projectRoot = filepath.Dir(filepath.Dir(filepath.Dir(rest[1])))
 	}
+	projectRoot = paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve cycle-health: WARN: %s\n", m)
+	})
 	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle-health: %v\n", err)

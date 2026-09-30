@@ -69,17 +69,23 @@ func (tddScopeGate) appliesTo(phase string) bool { return phase == string(core.P
 // lane it blocks only files authored under an empty top_n; label drift and
 // file-scope drift are advisory.
 func (tddScopeGate) check(in core.ReviewInput) (string, bool) {
-	topN, ok := readTopNSlugs(in.Workspace)
-	if !ok {
-		return "", false
-	}
+	topN, haveReport := readTopNSlugs(in.Workspace)
 	claimed, declared, authored, ok := readTDDScope(in.Workspace)
 	if !ok {
 		return "", false
 	}
+	committed := normalizedSlugs(core.ContractTaskIDs(in.Workspace))
+	if !haveReport {
+		switch len(committed) {
+		case 0:
+			return "TDD scope is unverifiable: triage-report.md, triage-decision.json and lane-scope.json are all missing or empty", true
+		case 1:
+			topN = committed
+		}
+	}
 	// Multi-member lanes bind to the contract's ids, not the markdown top_n,
 	// whose decomposition sub-ids would block a lane that declared its contract.
-	if committed := normalizedSlugs(core.ContractTaskIDs(in.Workspace)); len(committed) > 1 {
+	if len(committed) > 1 {
 		if reason, block := reconcileMemberSets(committed, normalizedSlugs(declared)); block {
 			return reason, true
 		}

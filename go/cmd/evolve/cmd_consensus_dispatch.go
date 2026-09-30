@@ -25,7 +25,11 @@ func runConsensusDispatch(args []string, _ io.Reader, stdout, stderr io.Writer) 
 	}
 	// envOrCwd absolutizes a relative $EVOLVE_PROJECT_ROOT and falls back to cwd.
 	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
-	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve consensus-dispatch: %v\n", err)
+		return 2
+	}
 	in := consensusdispatch.Inputs{
 		Cycle:           os.Getenv("CYCLE"),
 		WorkspacePath:   os.Getenv("WORKSPACE_PATH"),
