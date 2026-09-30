@@ -50,6 +50,8 @@ type RouteInput struct {
 
 	GoalText string
 
+	LaneItems []LaneItem
+
 	CarryoverTodos []CarryoverTodo
 
 	// Catalog is the set of pre-defined phases the advisor may select instead of minting.
@@ -425,6 +427,11 @@ func mandatoryPhaseRun(in RouteInput, phase string, enable config.Enable) (bool,
 	return false, nil, false
 }
 
+const (
+	RuleSkipWhenGatesPlan   = "skip-when-gates-plan"
+	RuleInsertWhenGatesPlan = "insert-when-gates-plan"
+)
+
 // shouldRunFromPlan resolves shouldRun's Advisory-and-above branch, where the pre-clamped plan drives the
 // decision for every non-mandatory phase.
 func shouldRunFromPlan(in RouteInput, phase string, enable config.Enable, optionalUsed int) (bool, bool, *Clamp) {
@@ -433,10 +440,10 @@ func shouldRunFromPlan(in RouteInput, phase string, enable config.Enable, option
 	// A configured skip_when gates the plan. Floor phases are exempt so the
 	// gate can never bypass the floor.
 	if runs && !isFloorPhase(phase) && skipWhenFires(in.Signals, block) {
-		return false, true, &Clamp{Rule: "skip-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
+		return false, true, &Clamp{Phase: phase, Rule: RuleSkipWhenGatesPlan, Proposed: phase + "=run", Forced: phase + "=skip"}
 	}
 	if runs && insertWhenGatesPlan(in.Signals, phase, enable, block) {
-		return false, true, &Clamp{Rule: "insert-when-gates-plan", Proposed: phase + "=run", Forced: phase + "=skip"}
+		return false, true, &Clamp{Phase: phase, Rule: RuleInsertWhenGatesPlan, Proposed: phase + "=run", Forced: phase + "=skip"}
 	}
 	if runs && enable == config.EnableOff {
 		return true, true, &Clamp{Rule: "floor-overrides-enable-off", Proposed: phase + "=off", Forced: phase + "=run"}
@@ -537,12 +544,12 @@ func reasonFor(in RouteInput, phase string, optional bool) string {
 	if isMandatory(in.Cfg, phase) {
 		return "spine:" + phase
 	}
-	if enableOf(in.Cfg, phase) == config.EnableOn {
-		return "forced-on:" + phase
-	}
 	// Name plan-driven phases so forensics tell advisor-planned from trigger-inserted.
 	if in.Cfg.Stage >= config.StageAdvisory && in.Plan != nil && planRuns(in.Plan, phase) {
 		return "plan:" + phase
+	}
+	if enableOf(in.Cfg, phase) == config.EnableOn {
+		return "forced-on:" + phase
 	}
 	return "content-insert:" + phase
 }
@@ -582,6 +589,14 @@ func isFloorPhase(phase string) bool {
 	default:
 		return false
 	}
+}
+
+type LaneItem struct {
+	ID              string
+	Kind            string
+	DeliverableKind string
+	Acceptance      []string
+	Unresolved      string
 }
 
 // BenchedCLI is one CLI family the cli-health store has benched, carried as advisor context.

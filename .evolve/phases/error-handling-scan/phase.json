@@ -39,7 +39,13 @@
         "value": 50
       }
     ],
-    "skip_when": null
+    "skip_when": [
+      {
+        "field": "deliverable_kind",
+        "op": "eq",
+        "value": "document"
+      }
+    ]
   },
   "gates": {},
   "after": "build"

@@ -35,16 +35,23 @@ func writeRubricLines(b *strings.Builder, cfg config.RoutingConfig) {
 		}
 		blk := cfg.Triggers[p]
 		if len(blk.InsertWhen) > 0 {
-			clauses := make([]string, len(blk.InsertWhen))
-			for i, c := range blk.InsertWhen {
-				clauses[i] = fmt.Sprintf("%s %s %v", c.Field, opSymbol(c.Op), c.Value)
-			}
-			fmt.Fprintf(b, "- %s → insert %s\n", strings.Join(clauses, " OR "), p)
+			fmt.Fprintf(b, "- %s → insert %s\n", joinClauses(blk.InsertWhen), p)
+		}
+		if len(blk.SkipWhen) > 0 {
+			fmt.Fprintf(b, "- %s → skip %s\n", joinClauses(blk.SkipWhen), p)
 		}
 		for _, hint := range blk.RubricHint {
 			fmt.Fprintf(b, "- %s\n", hint)
 		}
 	}
+}
+
+func joinClauses(conditions []config.Condition) string {
+	clauses := make([]string, len(conditions))
+	for i, c := range conditions {
+		clauses[i] = fmt.Sprintf("%s %s %v", c.Field, opSymbol(c.Op), c.Value)
+	}
+	return strings.Join(clauses, " OR ")
 }
 
 func opSymbol(op string) string {

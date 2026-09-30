@@ -44,6 +44,11 @@
         "field": "cycle_size",
         "op": "eq",
         "value": "trivial"
+      },
+      {
+        "field": "deliverable_kind",
+        "op": "eq",
+        "value": "document"
       }
     ]
   },
