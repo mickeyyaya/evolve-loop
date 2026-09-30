@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The real-tmux integration tests (TestRealTmuxSandboxTerminalConfinement, TestRealTmux_BracketedMultilinePromptPreservesBytes) pass on a host with a load average several times its core count, or report a named skip-with-reason that the floor counts as not-run rather than a failure (red first under an artificial CPU hog)",
+    "The boot budget such a test waits on is derived from the same config the production REPL boot uses, not a wall-clock literal in the test"
+  ],
+  "consumed": {
+    "at": "2026-09-30T17:25:55Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Duplicate of realtmux-bridge-tests-flake-under-package-parallel-load (same test, same 'REPL prompt never appeared' rc=80 under host load); this is its 4th and 5th sighting, during the route-stamps floor on 2026-09-30 at a 15-minute load average of 34."
+  },
+  "created_at": "2026-10-01T00:55:00Z",
+  "files": [
+    "go/internal/bridge/terminal_policy_integration_test.go",
+    "go/internal/bridge/tmux_prompt_bytes_integration_test.go"
+  ],
+  "fix": "Find what bounds the fixture REPL's boot in these tests and make it follow the production boot budget (or a load-aware budget), so host load slows the test instead of failing it.",
+  "id": "real-tmux-tests-fail-under-host-load",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-10-01: classified twice on 2026-09-30/10-01 (the comment-strip trial and the tool branch's floor), both rc=80 'REPL prompt never appeared' while the host load average was 34; both pass in 1.5s in isolation on the branch and on unchanged main",
+  "summary": "TestRealTmuxSandboxTerminalConfinement failed twice with rc=80 (REPL prompt never appeared) during local floors run beside loop lanes and reviewers, at a 15-minute load average of 34, and passes in 1.5 s in isolation on both the branch under test and unchanged main. A floor failure that depends on host load looks like a defect in whatever change is being floored and costs a classification each time.",
+  "title": "The real-tmux integration tests fail under host load instead of waiting longer",
+  "weight": 0.45
+}

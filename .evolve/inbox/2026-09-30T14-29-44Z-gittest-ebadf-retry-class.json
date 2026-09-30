@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A test that forces the first git exec in gittest to fail with EBADF passes after one retry, and one that fails twice still fails naming the error (red first)",
+    "ship's captureWithEBADFRetry and gittest share one retry rule, with no second copy",
+    "A persistent non-EBADF error from git is never retried"
+  ],
+  "created_at": "2026-09-30T15:10:00Z",
+  "files": [
+    "go/internal/gittest/fixture.go",
+    "go/internal/phases/ship/ebadf_helpers_test.go"
+  ],
+  "fix": "Move the once-only EBADF and closed-pipe retry from ship's test helper into gittest's command runner (Repo.Git and the fixture's init), so every real-git test gets it, and have ship's tests use that one rule.",
+  "id": "gittest-ebadf-retry-class",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, CI classification of PR #753 (run 36719406746)",
+  "summary": "TestShipFromWorktree_DiffCachedQuietFails_Errors failed on ubuntu-latest with `gittest: git init -q -b main ...: fork/exec /usr/bin/git: bad file descriptor` in a PR that does not touch ship or gittest. The EBADF race in real-git test runners is already a documented class (docs/architecture/packages/internal-phases-ship.md: captureWithEBADFRetry, first seen on macOS CI), but only one ship test path retries; the shared gittest helper, used across packages, does not. This is the second sighting of the class, now on Linux.",
+  "title": "Give the shared gittest git runner the EBADF retry that one ship test path already has",
+  "weight": 0.4
+}
