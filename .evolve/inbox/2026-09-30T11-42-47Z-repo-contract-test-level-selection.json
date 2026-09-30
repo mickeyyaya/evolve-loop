@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A lane that adds a second verdict.New( call outside its package fails at the build floor, not on main (red first)",
+    "readsTheTreeOutsideThePack is empty or holds only packages with a named backstop",
+    "The pack's wall time at ship stays within its 120s build-floor deadline"
+  ],
+  "created_at": "2026-09-30T11:42:47Z",
+  "files": [
+    "go/internal/repocontract/packages_test.go",
+    "go/internal/repocontract/repocontract.go",
+    "go/internal/phases/ship/repocontract.go"
+  ],
+  "fix": "Let the pack carry test-level entries (package plus -run pattern) alongside whole packages, detect the tree-reading tests by name with the same AST rule, move the 13 records into the pack as test-level entries, and empty the table.",
+  "id": "repo-contract-test-level-selection",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, architecture review of the lane-ship size-ratchet fix",
+  "summary": "TestPackages_HoldEveryTestThatReadsTheWholeTree (go/internal/repocontract) records 13 packages outside the fixed pack: cmd/evolve, bridge, changedpkgs, core, cycleoutcome, inboxmover, inboxmover/lifecycle, phaseobserver, phases/audit, phases/runner, phases/ship, reachabilityprobe, subagent. Each holds seam or single-writer tests (e.g. TestVerdictEngine_OneConstructionSite, TestPhaseTimings_SingleWriter) that scan the whole module, so a lane touching neither the package nor an importer can break one and only main's CI finds out. Running each whole package at every ship is too slow.",
+  "title": "Run the seam and single-writer tests that read the whole tree before main, by test name, instead of recording 13 packages outside the pack",
+  "weight": 0.5
+}
