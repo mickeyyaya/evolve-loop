@@ -10,11 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// size_budget_wiring_test.go — ADR-0076 slice A consumption: the cycle's size
-// signal (triage-report.md via router.Digest — the LIVE artifact path, not the
-// extinct handoff JSON) drives the build phase's budget scale and correction
-// limit. Absent/unknown size is pinned to the exact legacy behavior.
-
 func sizeBudgetRun(t *testing.T, reportBody string, completed []string) *cycleRun {
 	t.Helper()
 	root := t.TempDir()
@@ -87,12 +82,6 @@ func (r *reportWriterRunner) Run(ctx context.Context, req PhaseRequest) (PhaseRe
 	return r.fakeRunner.Run(ctx, req)
 }
 
-// TestSizeBudget_ComposedLargeCycleExtendsCorrectionLadder is the I2 wiring
-// proof: a triage phase that DELIVERS `cycle_size_estimate: large` through the
-// real artifact path buys the build phase one extra correction round (base 2 →
-// 3) and stamps the scaled BudgetScale on every build dispatch. Contrast pin:
-// TestLadder_BudgetsExhaust_CycleAbortsAsToday holds the unsized cycle at
-// exactly 3 dispatches.
 func TestSizeBudget_ComposedLargeCycleExtendsCorrectionLadder(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -128,15 +117,12 @@ func TestSizeBudget_ComposedLargeCycleExtendsCorrectionLadder(t *testing.T) {
 
 func TestScaledCorrectionLimit_BuildPhaseOnly(t *testing.T) {
 	cr := sizeBudgetRun(t, "cycle_size_estimate: large\n", []string{"triage"})
-	// Base default is 2; large (×1.5) → 3.
 	if got := cr.correctionLimitFor(PhaseBuild, 2); got != 3 {
 		t.Errorf("build large: correctionLimitFor = %d, want 3", got)
 	}
-	// Non-build phases never scale (A2 amendment: build-only scope).
 	if got := cr.correctionLimitFor(PhaseAudit, 2); got != 2 {
 		t.Errorf("audit must not scale: got %d, want 2", got)
 	}
-	// Small cycle: identity.
 	crSmall := sizeBudgetRun(t, "cycle_size_estimate: small\n", []string{"triage"})
 	if got := crSmall.correctionLimitFor(PhaseBuild, 2); got != 2 {
 		t.Errorf("build small: got %d, want 2", got)

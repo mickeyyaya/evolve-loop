@@ -1,13 +1,5 @@
 package triage
 
-// Chronicle S3 RED contract (cycle-784, chronicle-s3-digest-wiring, task
-// inject-recent-outcomes-prompts) — triage half; see the scout twin for the
-// full contract text. Injected Context["recent_outcomes"] renders AFTER the
-// existing stable lines (carryover_summary/fleet_scope); absent or empty key
-// keeps the composed prompt byte-identical (shadow-stage regression pin).
-//
-// Builder implements; must NOT modify these tests.
-
 import (
 	"strings"
 	"testing"
@@ -15,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// RENDER: a Context-carried digest appears in the composed prompt, after the
-// existing stable lines.
 func TestTriageComposePrompt_InjectsRecentOutcomes(t *testing.T) {
 	req := core.PhaseRequest{Context: map[string]string{
 		"carryover_summary": "carryover-under-test",
@@ -35,8 +25,6 @@ func TestTriageComposePrompt_InjectsRecentOutcomes(t *testing.T) {
 	}
 }
 
-// PIN: absent key and empty key produce byte-identical output with no
-// recent_outcomes line at all — shadow/off stages keep today's prompt bytes.
 func TestComposePrompt_NoDigestContextKeyIsByteIdentical(t *testing.T) {
 	base := map[string]string{"carryover_summary": "c-1", "fleet_scope": "todo-lane-a"}
 	withEmpty := map[string]string{"carryover_summary": "c-1", "fleet_scope": "todo-lane-a", "recent_outcomes": ""}

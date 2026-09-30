@@ -1,14 +1,5 @@
 package triage
 
-// premise_drift_test.go — F40 (cycle 1691): lane 1691 picked an item filed
-// 2026-08-16 whose premise #535 had made unreachable on 2026-09-09; triage
-// committed it, the builder "fixed" a non-bug and opened a fail-open, and the
-// audit caught it a full cycle later. Six commits had touched the item's own
-// declared files after it was filed, and #535 touched its package — evidence
-// nothing put in front of triage. The host now gathers that drift (Core Rule
-// 5: deterministic evidence in code, the judgment stays triage's) so a stale
-// premise can be dropped at triage, where a drop ends the lane cleanly (F30).
-
 import (
 	"context"
 	"os"
@@ -21,9 +12,9 @@ import (
 
 const staleItemFile = "2026-08-16T19-30-00Z-warn-gap.json"
 
-// premiseRepo is a repo whose ship package moved after the item was filed on
-// 2026-08-16: one commit before filing, one on the item's own file after it,
-// one elsewhere in the same package after it (#535's shape).
+// premiseRepo lays out commits around the item's filing date: one before
+// filing, one on its own declared file after filing, and one elsewhere in
+// the same package after filing.
 func premiseRepo(t *testing.T, item string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -88,9 +79,6 @@ func TestPremiseDriftSection_PutsTheDriftSinceFilingInFrontOfTriage(t *testing.T
 	}
 }
 
-// TestPremiseDriftSection_SeesTheItemWhereTheClaimLeftIt (review M2): triage
-// claims before it selects, and a re-dispatched triage recomposes its prompt —
-// the evidence must survive the move into processing/cycle-N/.
 func TestPremiseDriftSection_SeesTheItemWhereTheClaimLeftIt(t *testing.T) {
 	dir := premiseRepo(t, staleItem)
 	claimed := filepath.Join(dir, ".evolve", "inbox", "processing", "cycle-7")
@@ -105,11 +93,6 @@ func TestPremiseDriftSection_SeesTheItemWhereTheClaimLeftIt(t *testing.T) {
 	}
 }
 
-// TestPremiseDriftSection_ACommitNamingTheIdIsTheStrongestSignal (review M4):
-// a cycle ship that consumed the item lists its consumed file in the "## Actual
-// diff" footer every ship commit carries (phases/ship/gitops.go) — found
-// wherever the change landed, even outside the declared packages. A LONGER id
-// that merely starts with this one is not a mention (re-review MINOR 2).
 func TestPremiseDriftSection_ACommitNamingTheIdIsTheStrongestSignal(t *testing.T) {
 	dir := premiseRepo(t, staleItem)
 	footer := "evolve-cycle: goal=abc\n\n---\n## Actual diff (v8.34.0+)\n\nFiles modified (1):\n- A\t.evolve/inbox/consumed/2026-08-16T19-30-00Z-warn-gap.json"
@@ -124,11 +107,6 @@ func TestPremiseDriftSection_ACommitNamingTheIdIsTheStrongestSignal(t *testing.T
 	}
 }
 
-// TestPremiseDriftSection_ShowsCommitterDatesAndSkipsTreeWidePackages (review
-// M4, go-review MINOR): the date shown is the committer date --since filters
-// on (a rebased commit's older author date would look like pre-filing
-// evidence), and a file's one-segment parent ("go/") is never expanded into
-// the whole tree's churn.
 func TestPremiseDriftSection_ShowsCommitterDatesAndSkipsTreeWidePackages(t *testing.T) {
 	item := `{"id":"warn-gap","kind":"bug","created_at":"2026-08-16T00:00:00Z","files":["go/top.go"]}`
 	dir := premiseRepo(t, item)
@@ -142,10 +120,6 @@ func TestPremiseDriftSection_ShowsCommitterDatesAndSkipsTreeWidePackages(t *test
 	}
 }
 
-// TestPremiseDriftSection_TextIsPromptSafe: agent-authorable text (commit
-// subjects, ids, declared paths) is control-stripped and length-capped, and a
-// declared path outside the repository is reported, never queried or stat-ed
-// — and it does not blank the rest of the item's evidence (go-review MAJOR).
 func TestPremiseDriftSection_TextIsPromptSafe(t *testing.T) {
 	item := `{"id":"warn-gap","kind":"bug","created_at":"2026-08-16T00:00:00Z","files":["go/internal/ship/consume.go","../../../../etc/hosts"]}`
 	dir := premiseRepo(t, item)
@@ -163,11 +137,6 @@ func TestPremiseDriftSection_TextIsPromptSafe(t *testing.T) {
 	}
 }
 
-// TestPremiseDriftSection_SilentWithoutDriftVisibleWhenUnavailable: an item
-// filed after the last change to its surface, with every declared path present,
-// renders nothing; so do no scope, an unknown id and an item with no filing
-// date. A git failure is VISIBLE (review m2) — silence would read as "no
-// drift" — and still never blocks triage.
 func TestPremiseDriftSection_SilentWithoutDriftVisibleWhenUnavailable(t *testing.T) {
 	fresh := `{"id":"warn-gap","kind":"bug","created_at":"2026-09-20T00:00:00Z","files":["go/internal/ship/consume.go"]}`
 	if s := premiseDriftSection(context.Background(), premiseRepo(t, fresh), "warn-gap"); s != "" {
@@ -198,8 +167,6 @@ func TestPremiseDriftSection_SilentWithoutDriftVisibleWhenUnavailable(t *testing
 	}
 }
 
-// TestComposePrompt_RendersPremiseDriftOnlyForAFleetLane: the section rides
-// the lane's own scope; a sequential cycle's prompt stays byte-identical.
 func TestComposePrompt_RendersPremiseDriftOnlyForAFleetLane(t *testing.T) {
 	dir := premiseRepo(t, staleItem)
 	lane := core.PhaseRequest{ProjectRoot: dir, Context: map[string]string{"fleet_scope": "warn-gap"}}

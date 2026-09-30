@@ -18,17 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// run.go is the unit-16 seam (ADR-0103): the `evolve subagent run` execution
-// path lives in internal/subagent/subagentrun; this file keeps the exported
-// RunRequest / RunOptions / RunResult bag the root and the by-name test
-// binders spell, the ONE wired construction of the dispatcher from those
-// options, the request/result projections, and the facades the fan-out
-// dispatcher, the Runner twin, the validate pipeline and the host tests keep.
-
-// RunRequest captures every input cmd_run reads from argv + environment.
-// Mirrors the bash signature subagent-run.sh <agent> <cycle> <workspace>
-// + env overrides (PROMPT_FILE_OVERRIDE, MODEL_TIER_HINT, WORKTREE_PATH,
-// ADVERSARIAL_AUDIT, LEGACY_AGENT_DISPATCH).
+// RunRequest captures every input the `evolve subagent run` execution path
+// reads from argv and the environment.
 type RunRequest struct {
 	Agent         string
 	Cycle         int
@@ -43,11 +34,10 @@ type RunRequest struct {
 	LedgerPath    string
 
 	// PromptReader supplies the user task prompt. Caller can pass an
-	// *os.File (PROMPT_FILE_OVERRIDE), os.Stdin, or a bytes.Buffer.
-	// MUST be non-nil — bash fails fast when no prompt source is configured.
+	// *os.File (PROMPT_FILE_OVERRIDE), os.Stdin, or a bytes.Buffer. Must be
+	// non-nil.
 	PromptReader io.Reader
 
-	// Env overrides bash reads at function entry.
 	ModelTierHint          string // MODEL_TIER_HINT
 	AuditorTierOverride    string // EVOLVE_AUDITOR_TIER_OVERRIDE
 	DiffComplexityDisabled bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
@@ -77,9 +67,9 @@ type RunOptions struct {
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
 	ResolveModelTier  func(req ResolveModelTierRequest, opts ResolveModelTierOptions) (string, error)
 	// AdapterExists reports whether the resolved cli has a registered bridge
-	// driver. Since ADR-0103 unit 16 it receives the CLI, not the vestigial
-	// <AdaptersDir>/<cli>.sh path (the func type is unchanged; the production
-	// default is driverExists — nothing on the run path decodes a file name).
+	// driver. It receives the CLI, not the vestigial <AdaptersDir>/<cli>.sh
+	// path (the func type is unchanged; the production default is
+	// driverExists — nothing on the run path decodes a file name).
 	AdapterExists func(cli string) bool
 	ExecAdapter   func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
 	// WriteFile is unused since the bridge port (nothing on the run path
@@ -93,9 +83,9 @@ type RunOptions struct {
 	HashFile  func(path string) (string, error)
 	Now       func() time.Time
 	Rand      func([]byte) (int, error)
-	// Signals is the root's Signal Center (ADR-0103 unit 16): the dispatcher's
-	// BRIDGE_SUBAGENT_* warnings and, through the exec seam, the bridge
-	// engine's own producers report into it. nil is the Null Object.
+	// Signals is the root's Signal Center: the dispatcher's BRIDGE_SUBAGENT_*
+	// warnings and, through the exec seam, the bridge engine's own producers
+	// report into it. nil is the Null Object.
 	Signals *signalcenter.Center
 }
 
@@ -126,18 +116,14 @@ var nonRegistryRoles = []string{
 
 // agentRoles is the canonical allow-list of agent roles (single source of
 // truth). agentRolePattern is derived from it, and tests iterate it, so a new
-// role is added in exactly one place.
-//
-// The Go list is the ONLY source: the bash dispatcher it once mirrored is
-// retired, and every consumer — the dispatcher's KnownRole port, the fan-out
-// gate and the conformance tests — derives from here.
+// role is added in exactly one place. Every consumer — the dispatcher's
+// KnownRole port, the fan-out gate and the conformance tests — derives from
+// here.
 var agentRoles = buildAgentRoles()
 
 // buildAgentRoles derives the allow-list as the UNION of (a) every
 // phasecontract-registered agent that actually produces an LLM deliverable and
-// (b) nonRegistryRoles. Before cycle-1145 this was a second hand-typed slice
-// beside the registry and had already drifted: "router" is registered (and ships
-// .evolve/profiles/router.json) yet was not dispatchable.
+// (b) nonRegistryRoles.
 //
 // NoArtifact phases are excluded: "ship" is registered but is a native
 // host-side phase with no profile, so accepting it would break the
@@ -170,27 +156,21 @@ func buildAgentRoles() []string {
 // agentRolePattern matches exactly the canonical roles in agentRoles.
 var agentRolePattern = regexp.MustCompile(`^(` + strings.Join(agentRoles, "|") + `)$`)
 
-// Run is the `evolve subagent run` execution path: argument validation,
-// worker-name parsing, profile load, cli/model resolution, the driver check,
-// model tier resolution, artifact placement, the challenge token and git
-// state, the prompt (PROMPT_FILE_OVERRIDE or stdin) assembled into the v2
-// cache-prefix envelope with the adversarial auditor framing, the adapter
-// exec with VALIDATE_ONLY=0 and the full env, artifact verification (exists,
-// fresh <5min, token-bearing) and the kind="agent_subprocess" ledger entry.
-// The path is internal/subagent/subagentrun (ADR-0103 unit 16); this facade
-// fills the production defaults, builds the ONE wired dispatcher and projects
-// the result.
+// Run is the `evolve subagent run` execution path: validation, profile load,
+// cli/model resolution, prompt assembly, adapter exec, artifact verification
+// and the kind="agent_subprocess" ledger entry. See
+// docs/architecture/packages/internal-subagent.md.
 func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error) {
 	fillRunDefaults(&opts)
 	out, err := wiredDispatcher(opts).Dispatch(ctx, requestOf(req))
 	return resultOf(out), err
 }
 
-// wiredDispatcher is the ONE construction of the unit-16 dispatcher
+// wiredDispatcher is the one construction of the dispatcher
 // (TestSubagentRun_OneConstructionSite): every host-backed port is the option
 // the caller (or fillRunDefaults) supplied, projected once onto the leaf's
-// shapes; the stdlib-backed collaborators are the caller's seams; the Center
-// is read through an accessor so a nil one stays the Null Object.
+// shapes; the Center is read through an accessor so a nil one stays the Null
+// Object.
 func wiredDispatcher(opts RunOptions) *subagentrun.Dispatcher {
 	deps := subagentrun.Deps{
 		Profile:     profileOf(opts.ReadProfile),
@@ -299,8 +279,8 @@ func adapterOf(opts RunOptions) subagentrun.Adapter {
 	})
 }
 
-// capabilityTier maps Manifest support flags to the v8.51.0 quality_tier
-// label used by ledger entries (the fan-out dispatcher's spelling).
+// capabilityTier maps Manifest support flags to the quality_tier label used
+// by ledger entries (the fan-out dispatcher's spelling).
 func capabilityTier(m capability.Manifest) string {
 	return subagentrun.QualityTier(m.BudgetNative, m.PermissionScoping)
 }

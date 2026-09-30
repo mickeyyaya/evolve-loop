@@ -82,8 +82,8 @@ func consoleRoutedReason(path string, isProtected func(string) bool) string {
 	if err != nil {
 		return ""
 	}
-	var it inboxbatch.Item
-	if json.Unmarshal(raw, &it) != nil {
+	it, ok := routingItem(raw)
+	if !ok {
 		return ""
 	}
 	routed, reason := inboxbatch.ConsoleRouted(it, isProtected)
@@ -91,4 +91,12 @@ func consoleRoutedReason(path string, isProtected func(string) bool) string {
 		return ""
 	}
 	return reason
+}
+
+func routingItem(raw []byte) (inboxbatch.Item, bool) {
+	var it inboxbatch.Item
+	if json.Unmarshal(raw, &it) != nil {
+		return inboxbatch.Item{}, false
+	}
+	return it, true
 }

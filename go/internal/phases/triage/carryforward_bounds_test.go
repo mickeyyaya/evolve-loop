@@ -1,14 +1,5 @@
 package triage
 
-// carryforward_bounds_test.go — regression cover for the bounded-context +
-// branch-cap fix (cycle 1356, closing inherited defects d803ddb6/d538a3c0/
-// d7bc70d7 from the cycle-1343 defect ledger). A cycle-1343 disposition
-// claimed CarryforwardCandidatesSection was already bounded (a deadline, a
-// branch cap, newest-first ordering, and a "(partial: N of M)" truncation
-// line); that claim was false — context.Background() was still live and
-// nothing capped the branch sweep. These tests exercise the REAL, now-fixed
-// behavior directly (no source-grep degenerate predicates).
-
 import (
 	"context"
 	"fmt"
@@ -37,10 +28,6 @@ func boundsRunGit(t *testing.T, dir string, env []string, args ...string) string
 	return string(out)
 }
 
-// TestCarryforwardCandidatesSection_NewestCommittedFirst proves branches are
-// examined/rendered newest-committed-first (not for-each-ref's default
-// refname order), the ordering the cap depends on to drop the STALEST
-// candidates rather than an arbitrary subset.
 func TestCarryforwardCandidatesSection_NewestCommittedFirst(t *testing.T) {
 	dir := t.TempDir()
 	boundsRunGit(t, dir, nil, "init", "-q", "-b", "main")
@@ -52,10 +39,9 @@ func TestCarryforwardCandidatesSection_NewestCommittedFirst(t *testing.T) {
 	boundsRunGit(t, dir, nil, "add", "base.txt")
 	boundsRunGit(t, dir, nil, "commit", "-q", "-m", "base")
 
-	// "cycle-alpha" is refname-alphabetically FIRST but committed OLDER;
-	// "cycle-zulu" is refname-alphabetically LAST but committed NEWER — an
-	// ordering bug (refname order, not committerdate order) would render
-	// alpha before zulu; the fix must render zulu first.
+	// cycle-alpha sorts first alphabetically but is committed older;
+	// cycle-zulu sorts last but is committed newer, so refname order and
+	// committerdate order disagree.
 	mkBranch := func(name, file string, ts string) {
 		boundsRunGit(t, dir, nil, "checkout", "-q", "-b", name, "main")
 		if err := os.WriteFile(filepath.Join(dir, file), []byte("x\n"), 0o644); err != nil {
@@ -80,11 +66,6 @@ func TestCarryforwardCandidatesSection_NewestCommittedFirst(t *testing.T) {
 	}
 }
 
-// TestCarryforwardCandidatesSection_CapsBranchesAndSurfacesTruncation proves
-// the sweep stops after carryforwardCandidatesMaxBranches branches and the
-// truncation is surfaced (not silent) via a "(partial: N of M)" line naming
-// both the examined count and the total — this is the exact gap the false
-// cycle-1343 disposition claimed was already closed.
 func TestCarryforwardCandidatesSection_CapsBranchesAndSurfacesTruncation(t *testing.T) {
 	dir := t.TempDir()
 	boundsRunGit(t, dir, nil, "init", "-q", "-b", "main")
@@ -116,8 +97,6 @@ func TestCarryforwardCandidatesSection_CapsBranchesAndSurfacesTruncation(t *test
 	if !strings.Contains(section, want) {
 		t.Errorf("expected truncation line containing %q, got:\n%s", want, section)
 	}
-	// Every rendered candidate line ("  - cycle-bN") must come from the
-	// capped examined set, never from beyond it.
 	lines := strings.Split(section, "\n")
 	candidateLines := 0
 	for _, l := range lines {
@@ -130,12 +109,6 @@ func TestCarryforwardCandidatesSection_CapsBranchesAndSurfacesTruncation(t *test
 	}
 }
 
-// TestComposePrompt_CarryforwardSectionUsesBoundedContext proves ComposePrompt
-// no longer hands CarryforwardCandidatesSection an unbounded
-// context.Background() — a context whose deadline has ALREADY passed handed
-// straight through to `git for-each-ref` must fail-open to "", proving the
-// call site is now deadline-aware rather than backgrounded (the exact defect
-// d803ddb6 named: no deadline, no cancellation, ever).
 func TestCarryforwardCandidatesSection_RespectsExpiredContext(t *testing.T) {
 	dir := t.TempDir()
 	boundsRunGit(t, dir, nil, "init", "-q", "-b", "main")

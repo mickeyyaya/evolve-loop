@@ -12,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
-// TestGitWorktree_CreateUsesNamedBranch validates the production provisioner
-// against real git: the worktree must be on a NAMED branch (cycle-<lane>-<N>),
-// not a detached HEAD — worktree-aware ship resolves the branch via symbolic-ref
-// and ff-merges it, so a detached worktree would break every cycle's ship. The
-// branch embeds the runscope lane so concurrent sibling worktrees don't collide.
 func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -55,13 +50,10 @@ func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 		t.Fatalf("worktree branch = %q, want %q", got, wantBranch)
 	}
 
-	// linkGuardDeps must expose the dispatcher binary at the gitignored hook
-	// path so the trust-kernel hooks resolve inside the worktree.
 	if fi, err := os.Lstat(filepath.Join(wt, "go", "bin", "evolve")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
 		t.Errorf("worktree go/bin/evolve should be a symlink (linkGuardDeps); lstat err=%v", err)
 	}
 
-	// Idempotent reuse returns the same valid worktree.
 	if wt2, err := g.Create(root, 77); err != nil || wt2 != wt {
 		t.Fatalf("reuse: got (%q, %v), want (%q, nil)", wt2, err, wt)
 	}
@@ -72,8 +64,6 @@ func TestGitWorktree_CreateUsesNamedBranch(t *testing.T) {
 	}
 }
 
-// branchExists lists local branches matching name and reports whether any
-// matched — the real-git ground truth for "did Cleanup delete the branch".
 func branchExists(t *testing.T, root, name string) bool {
 	t.Helper()
 	out, err := exec.Command("git", "-C", root, "branch", "--list", name).Output()
@@ -108,11 +98,6 @@ func initRealGitRepo(t *testing.T) string {
 	return root
 }
 
-// TestGitWorktree_Cleanup_DeletesMergedBranch (S3, workspace-hygiene plan):
-// a cycle branch that never diverged from HEAD (the common ship-succeeded
-// case — main was fast-forwarded onto it) is trivially merged, so Cleanup
-// must delete it after removing the worktree — the fix for the 106
-// never-deleted `cycle-*` branches the plan's audit found.
 func TestGitWorktree_Cleanup_DeletesMergedBranch(t *testing.T) {
 	root := initRealGitRepo(t)
 	g := gitWorktree{}
@@ -133,10 +118,6 @@ func TestGitWorktree_Cleanup_DeletesMergedBranch(t *testing.T) {
 	}
 }
 
-// TestGitWorktree_Cleanup_UnmergedBranchSurvives (S3): a branch carrying a
-// commit that was never merged to the base (a ship-fail-and-abandon case)
-// must survive Cleanup — git's own `branch -d` merge-check is the safety net
-// against silently discarding evidence of unshipped work.
 func TestGitWorktree_Cleanup_UnmergedBranchSurvives(t *testing.T) {
 	root := initRealGitRepo(t)
 	g := gitWorktree{}

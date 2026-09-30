@@ -13,24 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 )
 
-// --- cycle-967: fleet cross-lane mint false-abort ---
-// (fix spec: treediff-967-crosslane-mint-fix-spec, Variant A2)
-//
-// Both fleet lanes run `evolve cycle run` against the SHARED project root.
-// The advisor mint (phaseregistrar.Registrar) persists a minted phase's
-// config to the shared .evolve/phases/<name>/phase.json, while the per-phase
-// tree-diff guard diffs that same shared tree against a PER-LANE baseline —
-// so lane A's mint landing during lane B's phase is charged to lane B.
-// Cycle-967's PASS scout was aborted on concurrent lane-970's
-// .evolve/phases/gate-wiring-proof/phase.json mint.
-//
-// Fix: the registrar records minted names in the shared mintregistry BEFORE
-// persisting files; the guard exempts a leaked .evolve/phases/<name> path IFF
-// <name> is a registered, fresh mint. An UNREGISTERED phase-config write must
-// still abort — the deliverable-leak loophole TestIsScoutEvalMaterialization
-// pins against stays closed (TestGuardStillAbortsUnregisteredPhaseConfigLeak
-// holds both before and after the fix).
-
 // writeMintSpec persists a phase spec JSON at root/.evolve/phases/<name>/phase.json
 // exactly as the registrar's persist step would (normalized form: optional user
 // spec). body overrides the default valid spec when non-empty.
@@ -64,11 +46,6 @@ func runScoutLeakCycle(t *testing.T, root, leakPath string) error {
 	return err
 }
 
-// TestGuardExemptsConcurrentLaneMintedPhaseConfig is the cycle-967 RED proof:
-// a concurrent lane's REGISTERED mint appearing in this lane's post-scout
-// diff must not abort the cycle. The on-disk spec is present in the registrar's
-// normalized form — the guard verifies content (clamp parity), not just the
-// registry name.
 func TestGuardExemptsConcurrentLaneMintedPhaseConfig(t *testing.T) {
 	root := t.TempDir()
 	const mintLeak = ".evolve/phases/xlane-mint/phase.json"
@@ -89,9 +66,6 @@ func TestGuardExemptsConcurrentLaneMintedPhaseConfig(t *testing.T) {
 	}
 }
 
-// TestGuardStillAbortsUnregisteredPhaseConfigLeak pins the loophole shut: a
-// phase-config write whose name is NOT in the mint registry is a deliverable
-// leak and must abort, exactly as before the exemption existed.
 func TestGuardStillAbortsUnregisteredPhaseConfigLeak(t *testing.T) {
 	root := t.TempDir()
 	const leak = ".evolve/phases/evil/phase.json"
@@ -108,12 +82,6 @@ func TestGuardStillAbortsUnregisteredPhaseConfigLeak(t *testing.T) {
 	}
 }
 
-// TestGuardAbortsForgedRegistryEntryWithUnclampedSpec is the adversarial pin
-// (security review, Finding 1): a registry ENTRY alone must not exempt — the
-// on-disk phase.json must pass the same spec-side clamp the registrar
-// enforces (parses, user-floor valid, optional, name matches the dir). A
-// rogue agent forging the registry buys nothing beyond what a sanctioned
-// mint could already carry; anything unclamped still aborts loudly.
 func TestGuardAbortsForgedRegistryEntryWithUnclampedSpec(t *testing.T) {
 	const leak = ".evolve/phases/xlane-mint/phase.json"
 	cases := []struct {
@@ -143,9 +111,6 @@ func TestGuardAbortsForgedRegistryEntryWithUnclampedSpec(t *testing.T) {
 	}
 }
 
-// TestGuardAbortsCompanionPayloadUnderRegisteredMint: a legitimate mint writes
-// EXACTLY phase.json; any companion file smuggled under a registered name is
-// a leak and must abort even though the name is registered and clamp-valid.
 func TestGuardAbortsCompanionPayloadUnderRegisteredMint(t *testing.T) {
 	root := t.TempDir()
 	const payload = ".evolve/phases/xlane-mint/payload.sh"
@@ -159,11 +124,6 @@ func TestGuardAbortsCompanionPayloadUnderRegisteredMint(t *testing.T) {
 	}
 }
 
-// TestGuardQuarantinesCorruptRegistryAndStaysArmed (security review, Finding
-// 2): a corrupt registry must (a) keep the guard armed — the leak still
-// aborts — and (b) be quarantined on the spot so the degraded (exemption-off)
-// window is bounded to the one check instead of persisting fleet-wide until
-// the next mint.
 func TestGuardQuarantinesCorruptRegistryAndStaysArmed(t *testing.T) {
 	root := t.TempDir()
 	const leak = ".evolve/phases/xlane-mint/phase.json"
@@ -186,16 +146,12 @@ func TestGuardQuarantinesCorruptRegistryAndStaysArmed(t *testing.T) {
 	if len(matches) != 1 {
 		t.Errorf("expected exactly one quarantined registry file; got %v", matches)
 	}
-	// Self-healed: the next read is a clean empty registry, no error.
 	names, readErr := mintregistry.ActiveNames(regPath, time.Now())
 	if readErr != nil || len(names) != 0 {
 		t.Errorf("post-quarantine registry must read empty/no-error; got %v, %v", names, readErr)
 	}
 }
 
-// TestGuardStillAbortsExpiredMintPhaseConfigLeak: a registered mint older
-// than the TTL no longer exempts its path — the registry cannot decay into a
-// standing allowlist.
 func TestGuardStillAbortsExpiredMintPhaseConfigLeak(t *testing.T) {
 	root := t.TempDir()
 	const leak = ".evolve/phases/stale-mint/phase.json"

@@ -54,20 +54,15 @@ func setupDivergedRepo(t *testing.T, conflict bool) (worktree string) {
 	if conflict {
 		bFile, peerFile = "shared.txt", "shared.txt"
 	}
-	// This cycle's change, committed on the worktree branch.
 	writeS5b(t, filepath.Join(worktree, bFile), "this cycle's change\n")
 	gitS5b(t, worktree, "add", "-A")
 	gitS5b(t, worktree, "commit", "-q", "-m", "this cycle")
-	// A peer cycle advances main after the worktree branched.
 	writeS5b(t, filepath.Join(repo, peerFile), "a peer cycle's change\n")
 	gitS5b(t, repo, "add", "-A")
 	gitS5b(t, repo, "commit", "-q", "-m", "peer")
 	return worktree
 }
 
-// TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds pins ADR-0049 S5b-2b: the
-// advisor-partitioned (disjoint-file) case rebases cleanly so the cycle can
-// re-audit + re-ship the merged tree.
 func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
 	wt := setupDivergedRepo(t, false)
 	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", wt)
@@ -76,9 +71,6 @@ func TestRebaseCycleBranchOntoMain_CleanDisjoint_Succeeds(t *testing.T) {
 	}
 }
 
-// TestRebaseCycleBranchOntoMain_Conflict: overlapping work the partition should
-// have kept apart → rebase conflicts → (ok=false, conflict=true) so the caller
-// routes to the debugger (G13a) instead of a silent abort.
 func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 	wt := setupDivergedRepo(t, true)
 	ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", wt)
@@ -94,8 +86,6 @@ func TestRebaseCycleBranchOntoMain_Conflict(t *testing.T) {
 	}
 }
 
-// TestRebaseCycleBranchOntoMain_EmptyWorktree_False: a degraded (no-worktree)
-// run must not attempt a rebase.
 func TestRebaseCycleBranchOntoMain_EmptyWorktree_False(t *testing.T) {
 	if ok, conflicts := rebaseCycleBranchOntoMain(context.Background(), "", ""); ok || len(conflicts) > 0 {
 		t.Fatalf("empty worktree: ok=%v conflict=%v, want both false", ok, conflicts)

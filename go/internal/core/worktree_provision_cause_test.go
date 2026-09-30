@@ -1,17 +1,5 @@
 package core
 
-// worktree_provision_cause_test.go — cycle-1474 RED contract for
-// `worktree-provisioning-cause-fingerprint`.
-//
-// cyclerun.go:462-464 prints the provisioning error to stderr and deliberately
-// continues with an empty ActiveWorktree; the role-gate then denies every
-// source phase. That fail-fast is CORRECT and is not what this task touches.
-// What is missing is the CAUSE: the git error never reaches the cycle's
-// failure-reason / failure-digest surfaces, so the recorded identity is the
-// downstream phase refusal ("scout|infra-error|…") and the real, recurring
-// provisioning failure is invisible to the identical-fingerprint breaker and to
-// anyone reading the digest afterwards.
-//
 // These tests drive the REAL RunCycle path (o.newCycleRun provisions through
 // the injected WorktreeProvisioner) and read the REAL assembler
 // (AssembleFailureDigest) over the cycle's own workspace — no reimplementation
@@ -33,7 +21,7 @@ import (
 // nil ⇒ provisioning succeeds (the control axis).
 func provisionCycle(t *testing.T, createErr error) (cycle int, workspace string) {
 	t.Helper()
-	st := &fakeStorage{state: State{LastCycleNumber: 1473}} // cycle 1474
+	st := &fakeStorage{state: State{LastCycleNumber: 1473}}
 	wt := &fakeWorktree{path: t.TempDir(), createErr: createErr}
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(wt))
 
@@ -74,9 +62,6 @@ func workspaceMentions(t *testing.T, workspace, token string) bool {
 	return found
 }
 
-// TestWorktreeProvisionFailure_PersistsCause is the crux: today the git error
-// exists only on the orchestrator's stderr, so nothing durable in the cycle
-// record names why the lane had no worktree.
 func TestWorktreeProvisionFailure_PersistsCause(t *testing.T) {
 	const cause = "ZZ-PROVISION-CAUSE-A: git worktree add rc=255 (lock held)"
 	_, ws := provisionCycle(t, errors.New(cause))
@@ -86,11 +71,6 @@ func TestWorktreeProvisionFailure_PersistsCause(t *testing.T) {
 	}
 }
 
-// TestWorktreeProvisionFailure_DigestUsesProvisioningCause pins the identity
-// consequence, through the real assembler: the digest must be content-bearing
-// (never the "unexplained" class), must SEPARATE two different provisioning
-// causes, and must be DETERMINISTIC for the same cause — otherwise the
-// identical-fingerprint breaker cannot see genuine recurrence.
 func TestWorktreeProvisionFailure_DigestUsesProvisioningCause(t *testing.T) {
 	digestOf := func(cause string) FailureDigest {
 		t.Helper()
@@ -120,11 +100,6 @@ func TestWorktreeProvisionFailure_DigestUsesProvisioningCause(t *testing.T) {
 	}
 }
 
-// TestWorktreeProvisionFailure_SuccessAddsNoFailureReason is the negative axis
-// and the anti-gaming guard: a successful provision must add NO failure reason
-// at all. An implementation that unconditionally stamps a provisioning reason
-// would satisfy the two tests above while fabricating failures on every healthy
-// cycle.
 func TestWorktreeProvisionFailure_SuccessAddsNoFailureReason(t *testing.T) {
 	cycle, ws := provisionCycle(t, nil)
 
@@ -142,11 +117,6 @@ func TestWorktreeProvisionFailure_SuccessAddsNoFailureReason(t *testing.T) {
 	}
 }
 
-// TestWorktreeProvisionFailure_EmptyStderrCauseStillIdentifies is the edge
-// axis. The live incident shape is rc=255 with NOTHING on stderr, so the cause
-// text can be near-empty: the identity must still be non-empty, content-bearing
-// and stable, never degrading back to the unexplained class the whole task
-// exists to remove.
 func TestWorktreeProvisionFailure_EmptyStderrCauseStillIdentifies(t *testing.T) {
 	const terse = "rc=255"
 	cycle, ws := provisionCycle(t, errors.New(terse))

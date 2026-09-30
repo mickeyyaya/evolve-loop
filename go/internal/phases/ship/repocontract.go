@@ -1,42 +1,5 @@
 package ship
 
-// repocontract.go — the ship-time repo-contract scanner pack (2026-08-05).
-//
-// Lane ships push directly to main (per-lane landing), so a landing that
-// breaks a REPO-WIDE guard suite reds main until a console fix lands. Four
-// live incidents in one week, each an operator CI-email storm: the router
-// Digest injection (cycle-1250), the phase-catalog metadata stub (1262), the
-// tracked profile stubs (v22.13.0 release red), and the incident-postmortem
-// spec rework (1313). Per-cycle changed-scope testing structurally cannot
-// catch them — the guard suites scan repo-wide state (on-disk catalogs,
-// tracked profiles, rendering parity) that a config-only diff never selects.
-//
-// The pack runs the guard packages in the tree the ship will land — the
-// lane worktree for a cycle ship (repoContractGateRoot; until 2026-09-14 the
-// gate ran in the PROJECT ROOT, i.e. main's pre-landing tree, and could not
-// see a lane's changes at all) — BEFORE the ship binds/pushes. They are existing deterministic tests with FP≈0 by
-// construction: if one fails here, main's next run fails identically. A RED
-// pack fails the ship closed with the dedicated CodeRepoContractGate
-// (mirroring CodeManifestGate, cycle-1064) so the lane FAILs honestly in
-// place instead of redding main. Dial: policy.json gates.repo_contract_gate
-// ("enforce" default — see policy.go for the shadow-first deviation
-// rationale; "off" disables).
-//
-// cycle-1409 — exit-code classification + forensic persistence. The original
-// pack ran a bare `cmd.Run()` and wrapped ANY non-nil error as a contract RED,
-// with output teed nowhere. A build-cache contention / module-fetch flake /
-// OOM kill was therefore indistinguishable from a genuinely red guard suite,
-// and left no artifact to disprove it with: that false RED blocked three
-// audit-green ships (cycles 1402/1403/1405; the preserved worktree e0638346
-// re-ran 4/4 GREEN against the identical tree, as did baseline cba017c5).
-// Now the pack runs `go test -json`, classifies the events, and:
-//   - a genuine test/build failure stays CodeRepoContractGate, un-retried, and
-//     NAMES the failing tests in the message so ship-error.json carries them;
-//   - anything else is retried exactly once, and if still unclassifiable is
-//     returned as CodeRepoContractInfra — a distinct, re-dispatchable code;
-//   - every run, green or red, tees the scanner output to the run dir's
-//     ship-repocontract-scan.log (the green baseline is half the diagnosis).
-
 import (
 	"bufio"
 	"context"
@@ -61,13 +24,12 @@ import (
 )
 
 // repoContractPackages are the repo-wide guard suites whose breakage turned
-// main red. Kept to the incident-proven set deliberately: every addition
-// costs wall-time at every ship, every build handoff and every `evolve
-// selfcheck build`, and must carry the same FP≈0 property. The raw
-// git fixture ratchet is a source scan of the tracked test files (one git
-// ls-files, about a second) and is here because a lane adding a raw fixture
-// changes neither its package nor an importer, so no other backstop would run
-// it before main does.
+// main red. Kept to a minimal, deliberately fixed set: every addition costs
+// wall-time at every ship, every build handoff and every `evolve selfcheck
+// build`, and must carry the same FP≈0 property. The raw git fixture ratchet
+// is a source scan of the tracked test files (one git ls-files, about a
+// second) and is here because a lane adding a raw fixture changes neither its
+// package nor an importer, so no other backstop would run it before main does.
 var repoContractPackages = []string{
 	"./internal/phasespec/...",
 	"./internal/profiles/...",
@@ -77,9 +39,8 @@ var repoContractPackages = []string{
 }
 
 // scanLogName is the run-dir artifact every scanner-pack run is teed to —
-// green runs included. cycle-1403's RED was undiagnosable precisely because
-// no artifact of either the red run OR the green baseline survived. Kept
-// unexported: nothing outside this package consumes the name today.
+// green runs included, since a green baseline is what disproves a false RED.
+// Kept unexported: nothing outside this package consumes the name today.
 const scanLogName = "ship-repocontract-scan.log"
 
 // packOutcome is one classified scanner-pack run. failures is non-empty
@@ -160,22 +121,12 @@ func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Write
 	return runRepoContractPackagesWithTags(ctx, moduleDir, out, packages, nil)
 }
 
-// repoContractTestTimeout is the per-binary deadline the gate hands `go test`.
-//
-// Go's default is 10m, and that default is what red-lined cycle-1679's first
-// ship: this lane's added wiring test enrolled ./internal/core into the
-// added-test backstop for the first time, and that package measured 355.8s
-// under fleet load in the run that did pass (106.8s standalone). A package at
-// 59% of the deadline is a coin flip, and when the deadline wins the panic
-// makes `go test -json` emit a fail event for the running test AND every
-// t.Parallel() test still paused — 19 named "failures" the gate then classes a
-// real contract RED. That is a false RED on green code: the exact
-// cycle-1173/1175/1178 shape.
-//
-// 20m is ~3.4x the measured worst case, so slow-but-green survives fleet load,
-// while a genuine deadlock is still bounded rather than left to the ship's own
-// context. Raising a deadline can only turn a timeout into a real verdict; it
-// can never turn a failing test green.
+// repoContractTestTimeout is the per-binary deadline the gate hands `go test`,
+// well above Go's 10m default: a tight deadline under fleet load can make
+// `go test -json` emit a fail event for the running test and every paused
+// t.Parallel() test, which the gate would then class as a real contract RED
+// on green code. Raising the deadline can only turn a timeout into a real
+// verdict; it can never turn a failing test green.
 const repoContractTestTimeout = addedtests.PackageTimeout
 
 // repoContractTestArgs builds the gate's `go test` argv. Split out from the
@@ -188,8 +139,8 @@ func repoContractTestArgs(packages, tags []string) []string {
 	return append(args, packages...)
 }
 
-// repoContractAloneArgs is the argv that runs one package's named failing tests by themselves; a subtest is
-// reached through its top-level test.
+// packagesOf returns each failure's package once, sorted, so a package with
+// multiple named failures is run (or re-run) only once.
 func packagesOf(failures []packFailure) []string {
 	seen := map[string]bool{}
 	var pkgs []string
@@ -523,17 +474,18 @@ func runClassifiedPack(ctx context.Context, out io.Writer, workspace, name strin
 	return runClassifiedPackRetrying(ctx, out, workspace, name, true, run, nil)
 }
 
-// runClassifiedPackRetrying is runClassifiedPack with the ambiguous-exit
-// retry as a decision: a pack too large to run twice inside one ship classes
-// an ambiguous exit infra straight away (re-dispatchable) instead of paying
-// for the second run.
-// aloneRerun is the importer backstop's second look at a named red: run re-runs the red packages by themselves,
-// cleared hears the names a green re-run cleared (nil when nobody listens).
+// aloneRerun is the importer backstop's second look at a named red: run
+// re-runs the red packages by themselves, cleared hears the names a green
+// re-run cleared (nil when nobody listens).
 type aloneRerun struct {
 	run     func([]packFailure) packOutcome
 	cleared func(names []string)
 }
 
+// runClassifiedPackRetrying is runClassifiedPack with the ambiguous-exit
+// retry as a decision: a pack too large to run twice inside one ship classes
+// an ambiguous exit infra straight away (re-dispatchable) instead of paying
+// for the second run.
 func runClassifiedPackRetrying(ctx context.Context, out io.Writer, workspace, name string, retry bool, run func() packOutcome, alone *aloneRerun) error {
 	first := run()
 	switch {
@@ -618,8 +570,8 @@ func clearedAlone(out io.Writer, name string, first packOutcome, alone *aloneRer
 }
 
 // contractRed builds the genuine-violation ship error, naming the parsed
-// failing tests so ship-error.json carries them directly instead of the bare
-// "exit status 1" that made cycle-1402/1403 undiagnosable.
+// failing tests so ship-error.json carries them directly instead of a bare
+// "exit status 1".
 func contractRed(packName string, o packOutcome) error {
 	detail := packName
 	switch packName {

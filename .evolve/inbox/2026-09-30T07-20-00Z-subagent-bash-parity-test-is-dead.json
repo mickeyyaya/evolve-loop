@@ -1,0 +1,17 @@
+{
+  "id": "subagent-bash-parity-test-is-dead",
+  "kind": "hardening",
+  "priority_class": "hygiene",
+  "weight": 0.2,
+  "title": "TestValidateProfile_BashParity targets legacy/scripts/dispatch/subagent-run.sh, which no longer exists, so it can only skip",
+  "files": [
+    "go/internal/subagent/validateprofile_parity_test.go"
+  ],
+  "summary": "go/internal/subagent/validateprofile_parity_test.go:28 runs only with EVOLVE_BASH_PARITY=1 and then invokes legacy/scripts/dispatch/subagent-run.sh (line 43), which is gone from the repo; the test is permanent dead weight that reads like a live parity guard. Found by the round-9 comment editor (not fixed in a comment-only PR).",
+  "fix": "Delete the test (the bash port it compared against is retired), or retarget it at the Go path if a parity oracle still exists.",
+  "acceptance": [
+    "No test in internal/subagent references legacy/scripts/dispatch/subagent-run.sh"
+  ],
+  "created_at": "2026-09-30T07:20:00Z",
+  "source": "console, 2026-09-30 comment-reduction round 9 (subagent editor)"
+}

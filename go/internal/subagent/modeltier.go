@@ -21,9 +21,8 @@ const (
 	TierOpus   = "opus"
 )
 
-// ResolveModelTierRequest captures every input the bash resolve_model_tier
-// function reads from the environment + filesystem. Tests inject pure values;
-// production code uses NewResolveModelTierRequestFromEnv.
+// ResolveModelTierRequest captures every input model-tier resolution reads
+// from the environment and filesystem. Tests inject pure values.
 type ResolveModelTierRequest struct {
 	ProfilePath string // path to .evolve/profiles/<agent>.json
 	Cycle       int    // current cycle (reserved for future tier rules)
@@ -38,8 +37,8 @@ type ResolveModelTierRequest struct {
 	ProjectRoot string
 }
 
-// ResolveModelTierOptions injects all the filesystem + sub-process seams the
-// bash version shelled out to. Production: defaults; tests: in-memory stubs.
+// ResolveModelTierOptions injects the filesystem seams. Production uses
+// defaults; tests use in-memory stubs.
 type ResolveModelTierOptions struct {
 	// ReadProfile returns the contents of the profile JSON at path. Defaults
 	// to os.ReadFile.
@@ -50,12 +49,11 @@ type ResolveModelTierOptions struct {
 	// DiffComplexity returns "trivial" / "standard" / "complex" / "" for the
 	// given worktree. Empty string ⇒ tier unknown ⇒ fall through to profile
 	// default. Defaults to a no-op that returns "" (no diff-complexity helper
-	// in Go yet; bash callers still drive that path).
+	// exists in Go yet).
 	DiffComplexity func(worktree string) (string, error)
 }
 
-// ResolveModelTier mirrors resolve_model_tier in
-// legacy/scripts/dispatch/subagent-run.sh (lines 189–261). Precedence:
+// ResolveModelTier resolves the model tier by precedence:
 //
 //  1. MODEL_TIER_HINT wins for every agent.
 //  2. For auditor only:
@@ -67,7 +65,7 @@ type ResolveModelTierOptions struct {
 //  3. For non-auditor agents: profile.model_tier_default.
 //
 // Returns (tier, err). err is non-nil only when the profile is unreadable or
-// the JSON shape is missing model_tier_default — bash treats those as fail.
+// the JSON shape is missing model_tier_default.
 func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions) (string, error) {
 	if opts.ReadProfile == nil {
 		opts.ReadProfile = defaultReadProfile
@@ -174,8 +172,7 @@ func activeSituation(req ResolveModelTierRequest) string {
 
 // readConsecutiveSuccesses returns the streak count from
 // .evolve/state.json, defaulting to 0 on any error (missing file, bad JSON,
-// missing field). Mirrors bash's `grep -o '"consecutiveSuccesses":[0-9]*'`
-// approach — defensive, no jq dependency.
+// missing field) — a defensive regex match, no jq dependency.
 func readConsecutiveSuccesses(reader func(string) (string, error), projectRoot string) int {
 	body, err := reader(projectRoot)
 	if err != nil {

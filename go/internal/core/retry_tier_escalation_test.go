@@ -1,12 +1,5 @@
 package core
 
-// retry_tier_escalation_test.go — ADR-0076 slice D pins (adversarial-review
-// amended design): the escalation is a deterministic DISPATCH floor —
-// mode-independent, raise-only, clamped through the real envelope guardrail
-// (single-entry ClampPlanModelRouting — never a second clamp), driven by the
-// max failure_count across the cycle's scoped items (lane scope ∪ this
-// cycle's processing claims).
-
 import (
 	"os"
 	"path/filepath"

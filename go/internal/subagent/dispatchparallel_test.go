@@ -309,7 +309,7 @@ func TestDispatchParallel_NotParallelEligible(t *testing.T) {
 }
 
 func TestDispatchParallel_MissingParallelEligibleFieldRejected(t *testing.T) {
-	// Bash default is false when field absent — should reject.
+	// parallel_eligible absent is treated as false — should reject.
 	opts := dispatchHappyOpts(t, `{"role":"scout","parallel_subtasks":[]}`)
 	_, err := DispatchParallel(context.Background(),
 		DispatchParallelRequest{Agent: "scout", Cycle: 0, WorkspacePath: t.TempDir()},
@@ -396,9 +396,9 @@ func TestDispatchParallel_AntigravityRemappedForCapability(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_CachePrefixEnabledWritesPrefix covers
-// dispatchparallel.go:129-139 — the cache-prefix branch invokes the
-// WriteCache seam and passes the resulting path to fanout.
+// TestDispatchParallel_CachePrefixEnabledWritesPrefix covers the cache-prefix
+// branch: it invokes the WriteCache seam and passes the resulting path to
+// fanout.
 func TestDispatchParallel_CachePrefixEnabledWritesPrefix(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -436,7 +436,8 @@ func TestDispatchParallel_CachePrefixEnabledWritesPrefix(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_CachePrefixErrorAborts covers dispatchparallel.go:138.
+// TestDispatchParallel_CachePrefixErrorAborts covers the cache-prefix
+// write-error branch.
 func TestDispatchParallel_CachePrefixErrorAborts(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -454,11 +455,11 @@ func TestDispatchParallel_CachePrefixErrorAborts(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_SilentCLIIsAnError pins the cycle-1262 replacement for
-// the old `cli = "claude"` default. dispatch-parallel is a passthrough — it
-// never chooses the CLI its workers run — so a profile that declares none is
-// unresolvable and must fail loudly here exactly as it does in Run and
-// ValidateProfile, rather than being tiered against an invented default.
+// TestDispatchParallel_SilentCLIIsAnError: dispatch-parallel is a
+// passthrough — it never chooses the CLI its workers run — so a profile
+// that declares none is unresolvable and must fail loudly here exactly as
+// it does in Run and ValidateProfile, rather than being tiered against an
+// invented default.
 func TestDispatchParallel_SilentCLIIsAnError(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -509,7 +510,8 @@ func TestDispatchParallel_DefaultAggPathWhenProfileSilent(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_GenTokenErrorAborts covers dispatchparallel.go:155-157.
+// TestDispatchParallel_GenTokenErrorAborts covers the parent-token
+// generation error branch.
 func TestDispatchParallel_GenTokenErrorAborts(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -524,9 +526,8 @@ func TestDispatchParallel_GenTokenErrorAborts(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_EmptyGitStateNormalizedToUnknown covers
-// dispatchparallel.go:159-164 — empty git head/diff become "unknown" in the
-// parent ledger entry.
+// TestDispatchParallel_EmptyGitStateNormalizedToUnknown covers: empty git
+// head/diff become "unknown" in the parent ledger entry.
 func TestDispatchParallel_EmptyGitStateNormalizedToUnknown(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -550,10 +551,9 @@ func TestDispatchParallel_EmptyGitStateNormalizedToUnknown(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_TestExecutorBranchBuildsBashCommand covers
-// dispatchparallel.go:190-198 — when TestExecutor is set, the worker command
-// shells the test executor with EVOLVE_FANOUT_* env instead of recursing into
-// `evolve subagent run`.
+// TestDispatchParallel_TestExecutorBranchBuildsBashCommand covers: when
+// TestExecutor is set, the worker command shells the test executor with
+// EVOLVE_FANOUT_* env instead of recursing into `evolve subagent run`.
 func TestDispatchParallel_TestExecutorBranchBuildsBashCommand(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -585,8 +585,8 @@ func TestDispatchParallel_TestExecutorBranchBuildsBashCommand(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_LedgerWriteErrorPropagates covers
-// dispatchparallel.go:266-268.
+// TestDispatchParallel_LedgerWriteErrorPropagates covers the ledger-write
+// error branch.
 func TestDispatchParallel_LedgerWriteErrorPropagates(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -697,24 +697,23 @@ func TestCapabilityExtractArray(t *testing.T) {
 	}
 }
 
-// TestCapabilityExtractArray_KeyWithoutColon covers dispatchparallel.go:343 —
-// the key is present but not followed by ':'.
+// TestCapabilityExtractArray_KeyWithoutColon covers the branch where the key
+// is present but not followed by ':'.
 func TestCapabilityExtractArray_KeyWithoutColon(t *testing.T) {
 	if v, ok := capabilityExtractArray(`{"x" [1,2]}`, "x"); ok {
 		t.Errorf("key without colon should not match, got %q", v)
 	}
 }
 
-// TestCapabilityExtractArray_Unterminated covers dispatchparallel.go:362 —
-// an opening bracket that is never balanced falls through to (",false").
+// TestCapabilityExtractArray_Unterminated covers the branch where an opening
+// bracket that is never balanced falls through to ("", false).
 func TestCapabilityExtractArray_Unterminated(t *testing.T) {
 	if v, ok := capabilityExtractArray(`{"x":[1,2`, "x"); ok {
 		t.Errorf("unterminated array should not match, got %q", v)
 	}
 }
 
-// TestFirstSubmatch covers dispatchparallel.go:317-322 including the no-match
-// branch (len(m) < 2 → "").
+// TestFirstSubmatch covers the no-match branch (len(m) < 2 → "").
 func TestFirstSubmatch(t *testing.T) {
 	if got := firstSubmatch(subtaskNameRE, `{"name":"codebase"}`); got != "codebase" {
 		t.Errorf("match: got %q, want codebase", got)

@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// TestCyclePackage_IsTheOneSpelling pins the single spelling of a cycle's
-// predicate package that the suite lane, the scope lint and the Task Contract
-// inventory (core) all derive from.
 func TestCyclePackage_IsTheOneSpelling(t *testing.T) {
 	t.Parallel()
 	if got := CyclePackage(1605); got != "./acs/cycle1605" {

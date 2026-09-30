@@ -12,16 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
-// worktree.go — per-cycle git worktree provisioning for the Go orchestrator.
-//
-// Source-writing phases (tdd, build) run in an isolated per-cycle worktree so a
-// failed or buggy cycle never mutates the live working tree. The bash
-// run-cycle.sh provisioned these; the v11 Go port dropped it, which left
-// cs.ActiveWorktree empty and the role-gate's only source-write allowance
-// (phase==build && ActiveWorktree!="") permanently unsatisfiable — i.e. no
-// phase could write code. This restores provisioning behind an injected seam
-// so RunCycle stays unit-testable without real git. See ADR-0027.
-
 // WorktreeProvisioner creates and removes the per-cycle worktree. Injected via
 // WithWorktreeProvisioner; the default is gitWorktree (real `git worktree`).
 type WorktreeProvisioner interface {
@@ -33,15 +23,7 @@ type WorktreeProvisioner interface {
 	Cleanup(projectRoot, worktree string) error
 }
 
-// gitWorktree is the production provisioner: `git worktree add --detach
-// <base>/cycle-N HEAD`, base = baseOverride (policy.json worktree.base) or
-// <root>/.evolve/worktrees. Mirrors `evolve worktree create|cleanup`
-// (cmd_worktree.go).
 type gitWorktree struct {
-	// baseOverride is the operator override for the per-cycle worktree base,
-	// resolved once from policy.json (worktree.base) and injected via
-	// WithWorktreeBase. Empty ⇒ the built-in <root>/.evolve/worktrees default.
-	// Replaces the former EVOLVE_WORKTREE_BASE env read (flag-reduction, ADR-0064).
 	baseOverride string
 }
 
@@ -60,26 +42,11 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", fmt.Errorf("worktree base: %w", err)
 	}
-	// runscope is the single source for the cycle worktree's branch + directory
-	// name. The lane (a stable per-root token) namespaces both so concurrent
-	// sibling worktrees of one repo never collide on the global "cycle-<N>"
-	// branch — the multi-stream failure this closes. RunID is unset here: the
-	// worktree NAME is keyed on the stable lane (survives resume), not the
-	// per-invocation ULID.
 	rs := runscope.New(runscope.LaneFromRoot(projectRoot), "", cycle)
 	wt := rs.WorktreeDir(base)
-	// Idempotent reuse across resume/retry — but only if it is still a VALID
-	// git worktree. A pruned ref can leave a stale directory os.Stat sees but
-	// git rejects; reusing it would make every commit inside fail. Verify, and
-	// tear down a stale stub before recreating.
 	if fi, err := os.Stat(wt); err == nil && fi.IsDir() {
 		valid := gitexec.Git{Dir: wt, Exec: gitRunner}.Run(context.Background(), "rev-parse", "--git-dir") == nil
 		if valid {
-			// Clean-HEAD assertion (cycle-653 / cycle-584 gate): a reused
-			// worktree may carry a prior failed attempt's uncommitted dirt,
-			// which ship would bind into this cycle's tree. Quarantine the
-			// dirt (preserved for salvage) and reset to HEAD; fail loudly
-			// rather than hand a dirty worktree to the cycle.
 			if _, cerr := ensureCleanWorktree(context.Background(), wt, projectRoot, cycle); cerr != nil {
 				return "", fmt.Errorf("worktree reuse (cycle %d): %w", cycle, cerr)
 			}
@@ -89,32 +56,11 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 		_ = gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Run(context.Background(), "worktree", "remove", "--force", wt)
 		_ = os.RemoveAll(wt)
 	}
-	// Named branch (NOT --detach): worktree-aware ship resolves the cycle branch
-	// via `git symbolic-ref --short HEAD` and ff-merges it to main — a detached
-	// HEAD yields an empty branch and ship fails. -B creates or resets the branch
-	// to HEAD, tolerating a leftover branch from a prior attempt at this cycle. The
-	// name equals the lane-namespaced directory leaf (runscope).
 	branch := rs.CycleBranch()
-	// Base the lane on the CURRENT upstream tip, not this checkout's local HEAD
-	// (resolved only on the create path — reuse above must never re-base a live
-	// lane, which would discard in-progress work).
 	startRef, err := laneStartRef(context.Background(), projectRoot)
 	if err != nil {
 		return "", fmt.Errorf("worktree base ref (cycle %d): %w", cycle, err)
 	}
-	// Transient-contention retry (cycles 1221/1231/1232/1234/1240): N lanes of
-	// one repo provision concurrently, and `git worktree add` takes repo-level
-	// locks in the SHARED .git (the plane itself is a linked worktree), so a
-	// collision returns rc=255 with nothing on stderr beyond "Preparing
-	// worktree". One transient collision used to kill the lane's whole cycle:
-	// ActiveWorktree stayed empty, CB.2 fail-fasted every dispatch exit=10,
-	// three identical fingerprints halted the batch — twice in one day, once
-	// with zero console git activity (lane-vs-lane, not operator-vs-lane).
-	// Bounded backoff'd retry treats contention as what it is; a PERSISTENT
-	// failure still fails loudly with the same error after the last attempt —
-	// the downstream alarm chain is correct and must stay armed (the refuted
-	// PR #400 is the record of what happens when the alarm is silenced
-	// instead). verifylock is the precedent for cross-lane git serialization.
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.AddWorktreeWithRetry(
 		context.Background(), worktreeAddRetry(branch), "-B", branch, wt, startRef)
 	if err != nil || code != 0 {
@@ -128,23 +74,6 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 // package tests count sleeps instead of paying them.
 var worktreeAddRetrySleep = time.Sleep
 
-// worktreeAddRetry binds core's test seam + announcement to the shared
-// gitexec retry loop. The attempt bound lives in gitexec
-// (DefaultWorktreeAddAttempts) and nowhere else, so core, swarm and the
-// operator CLI can never drift to different bounds. Sleep is wrapped in a
-// closure rather than passed directly because worktreeAddRetrySleep is a var
-// the tests swap — the value must be read at call time, not at config time.
-// Retryable is supplied from here rather than left nil: without it the loop
-// paid the full 2s+4s ladder on PERMANENT failures, and core is the caller that
-// 33 cmd/evolve tests reach transitively over a non-repository t.TempDir()
-// (33 × 6s = 198s in a package the build floor runs with -timeout 120s). A
-// classifier that exists in gitexec but is never passed leaves that tax exactly
-// where it was.
-//
-// The announcement says "retryable", not "transient": OnRetry fires for every
-// failure the classifier did not rule out, which is not the same as a failure
-// established to be contention. Claiming transience it has not classified is
-// how a permanent rc=128 came to be logged as contention 33 times per run.
 func worktreeAddRetry(branch string) gitexec.WorktreeAddRetry {
 	return gitexec.WorktreeAddRetry{
 		Sleep:     func(d time.Duration) { worktreeAddRetrySleep(d) },
@@ -156,21 +85,6 @@ func worktreeAddRetry(branch string) gitexec.WorktreeAddRetry {
 	}
 }
 
-// laneStartRef resolves the ref a FRESH lane branch is cut from.
-//
-// Basing on the local HEAD of projectRoot is the defect this closes: in a
-// multi-lane fleet the shared checkout drifts behind the remote as sibling
-// lanes land, so every lane provisioned afterwards silently forks from a stale
-// tip — re-introducing already-fixed defects and inflating ship-time merge
-// conflicts. Contract:
-//
-//   - origin configured  → fetch it in projectRoot (the shared object store the
-//     new worktree is cut from) and cut from origin/<default-branch>.
-//   - fetch fails        → FATAL (rule 12). A best-effort fetch that continues
-//     from the stale local tip IS the defect, not the fix, so the error is
-//     returned and nothing is provisioned.
-//   - no origin at all   → "HEAD", the explicit local-only fallback for
-//     isolated checkouts and test fixtures, which must not break.
 func laneStartRef(ctx context.Context, projectRoot string) (string, error) {
 	git := gitexec.Git{Dir: projectRoot, Exec: gitRunner}
 	url, _, code, err := git.Capture(ctx, "config", "--get", "remote.origin.url")
@@ -184,16 +98,6 @@ func laneStartRef(ctx context.Context, projectRoot string) (string, error) {
 	return integrationHead(ctx, git, remote)
 }
 
-// integrationHead resolves the ref a fresh lane must base on: the INTEGRATION
-// HEAD its landing targets (2026-09-09 token-waste root cause #3 — a lane
-// based on origin/main while the local main sat AHEAD by unpushed dossier
-// closeouts forced a rebase and a second Build/Audit for twelve dossier
-// files). Off the default branch, or with the local main current or BEHIND,
-// the remote tip is the authority (the wave boundary fast-forwards a behind
-// main). A local main strictly AHEAD is the authority: its unpublished
-// landings ride the next push. Diverged histories are refused loudly — no
-// base choice avoids a rebase then, so the plane must be reconciled before
-// any lane spends a phase.
 func integrationHead(ctx context.Context, git gitexec.Git, remote string) (string, error) {
 	branch, _, bcode, berr := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if berr != nil || bcode != 0 || "origin/"+strings.TrimSpace(branch) != remote {
@@ -215,11 +119,9 @@ func integrationHead(ctx context.Context, git gitexec.Git, remote string) (strin
 	}
 }
 
-// originDefaultBranch reads the remote's published default branch from
-// refs/remotes/origin/HEAD (set by clone / `git remote set-head`). That ref is
-// absent in some checkouts, so "main" is the documented floor — if the guess is
-// wrong, `worktree add` fails loudly on the unknown ref rather than silently
-// falling back to the stale local tip.
+// originDefaultBranch falls back to "main" when refs/remotes/origin/HEAD is
+// absent; a wrong guess fails loudly on the unknown ref at worktree add rather
+// than silently basing on the stale local tip.
 func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
 	out, _, code, err := git.Capture(ctx, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
 	if err != nil || code != 0 {
@@ -232,12 +134,8 @@ func originDefaultBranch(ctx context.Context, git gitexec.Git) string {
 }
 
 // CreateFrom provisions the cycle worktree seeded from startRef instead of
-// HEAD (ADR-0076 slice C adoption: the ref is a prior attempt's salvage
-// snapshot, so the new cycle resumes committed work through the STANDARD
-// provisioning path — no dirty-state adoption, no clean-HEAD bypass). The
-// reuse/validation semantics of Create do not apply: a continuation always
-// targets a NEW cycle number, so an existing directory is a stale collision
-// and is recreated.
+// HEAD; an existing directory at this cycle number is always a stale
+// collision and is recreated, never reused.
 func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) (string, error) {
 	base := g.base(projectRoot)
 	if !filepath.IsAbs(base) {
@@ -253,9 +151,6 @@ func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) 
 		_ = os.RemoveAll(wt)
 	}
 	branch := rs.CycleBranch()
-	// Same transient-contention retry as Create: a continuation is provisioned
-	// under exactly the same concurrent multi-lane lock window, with the added
-	// insult that a collision here drops SALVAGED work on the floor.
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.AddWorktreeWithRetry(
 		context.Background(), worktreeAddRetry(branch), "-B", branch, wt, startRef)
 	if err != nil || code != 0 {
@@ -265,33 +160,12 @@ func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) 
 	return wt, nil
 }
 
-// linkGuardDeps makes the worktree self-sufficient for the trust-kernel
-// PreToolUse hooks. Those run `$CLAUDE_PROJECT_DIR/go/bin/evolve guard ...
-// --evolve-dir $CLAUDE_PROJECT_DIR/.evolve`, and Claude Code pins
-// CLAUDE_PROJECT_DIR to the cwd (the worktree) — it does NOT honor a pre-set
-// value. The binary (gitignored go/bin/evolve) and the runtime .evolve state
-// are absent in the fresh checkout, so the hooks fail and source phases stall.
-// We symlink the LIVE dispatcher binary + the guard-read state files into the
-// worktree so the hooks resolve to the real binary + current cycle-state.
-// Best-effort: failures are non-fatal (the phase will surface a denial loudly).
 func linkGuardDeps(worktree, projectRoot string, cycle int) {
-	// Binary: the running dispatcher's own executable carries the current guard
-	// logic (incl. the worktree-phase role-gate allowance), avoiding a stale
-	// in-tree go/bin/evolve.
 	if self, err := os.Executable(); err == nil {
 		if err := os.MkdirAll(filepath.Join(worktree, "go", "bin"), 0o755); err == nil {
 			symlinkForce(self, filepath.Join(worktree, "go", "bin", "evolve"))
 		}
 	}
-	// Guard-read state, file-level links (not a .evolve dir link — avoids any
-	// tree-walk recursion). cycle-state resolves to the run's OWN run.json
-	// mirror (CB.4): under concurrent runs the host-global cycle-state.json
-	// holds whichever run wrote last, so guards in this worktree must read
-	// this run's phase. The link may briefly dangle — run.json is written by
-	// the first WriteCycleState just after provisioning (see symlinkForce).
-	// state.json + ledger.jsonl stay host-global until CC.1 lands the per-run
-	// events ledger; retargeting the ledger link before a per-run ledger
-	// exists would have the chain guard verify an empty file (vacuous pass).
 	if err := os.MkdirAll(filepath.Join(worktree, ".evolve"), 0o755); err == nil {
 		symlinkForce(
 			filepath.Join(RunWorkspacePath(projectRoot, cycle), RunStateFile),
@@ -302,16 +176,9 @@ func linkGuardDeps(worktree, projectRoot string, cycle int) {
 	}
 }
 
-// symlinkForce replaces dst with a symlink to src (absolute), clearing any
-// stale checkout file/link first. src may not yet exist (a dangling link that
-// resolves once the target is written, e.g. cycle-state.json written just after
-// provisioning) — that is fine.
 func symlinkForce(src, dst string) {
 	_ = os.Remove(dst)
 	if err := os.Symlink(src, dst); err != nil {
-		// Observable, not fatal: a missing binary link makes hooks fail loudly,
-		// but a missing state link could let a guard read empty state and pass a
-		// tool it should deny — so surface it rather than swallow silently.
 		fmt.Fprintf(os.Stderr, "[worktree] WARN symlink %s → %s failed (guard hooks may not resolve): %v\n", dst, src, err)
 	}
 }
@@ -321,35 +188,18 @@ func (gitWorktree) Cleanup(projectRoot, worktree string) error {
 		return nil
 	}
 	if inPlaceWorktree(worktree, projectRoot) {
-		// NEVER dispose of the live repository. Every worktree this
-		// provisioner mints lives under the runscope base, but Cleanup is a
-		// public seam and a resumed cycle's checkpoint can name the project
-		// root as its worktree (phases/ship branches on exactly that shape).
-		// `git worktree remove` merely fails on the main tree; the
-		// os.RemoveAll below would not. Same defense, same reason, as
-		// deleteCycleBranch's "cycle-" gate: never act on a path this
-		// provisioner did not create.
 		fmt.Fprintf(os.Stderr, "[worktree] WARN refusing to remove %s: it is the project root, not a provisioned worktree\n", worktree)
 		return fmt.Errorf("worktree cleanup: %s is the project root — refusing to remove it", worktree)
 	}
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "worktree", "remove", "--force", worktree)
 	if err != nil || code != 0 {
-		// Best-effort, but surface it: a failed remove leaves an orphaned
-		// worktree that would accumulate silently.
 		fmt.Fprintf(os.Stderr, "[worktree] WARN remove %s failed (rc=%d): %v: %s\n", worktree, code, err, stderr)
 	}
-	_ = os.RemoveAll(worktree) // clear any leftover stub git left behind
+	_ = os.RemoveAll(worktree)
 	deleteCycleBranch(projectRoot, worktree)
 	return nil
 }
 
-// deleteCycleBranch deletes the cycle's own branch (the worktree's leaf name)
-// AFTER its worktree is gone, via non-force `git branch -d` — git's own
-// merged-check is the only safety net, never escalated to `-D` (S3,
-// workspace-hygiene-2026-07 plan: the 106 never-deleted `cycle-*` branches
-// this closes). Gated on the "cycle-" leaf prefix so Cleanup never attempts a
-// branch delete for a path this provisioner didn't create — every worktree
-// gitWorktree.Create mints is runscope-named "cycle-<lane>-<N>".
 func deleteCycleBranch(projectRoot, worktree string) {
 	branch := filepath.Base(worktree)
 	if !strings.HasPrefix(branch, "cycle-") {
@@ -357,41 +207,20 @@ func deleteCycleBranch(projectRoot, worktree string) {
 	}
 	_, stderr, code, err := gitexec.Git{Dir: projectRoot, Exec: gitRunner}.Capture(context.Background(), "branch", "-d", branch)
 	if err != nil || code != 0 {
-		// Best-effort: an unmerged branch is expected to refuse (rc=1,
-		// "not fully merged") — left in place, not force-deleted.
 		fmt.Fprintf(os.Stderr, "[worktree] WARN branch -d %s failed (rc=%d, likely unmerged — left in place): %v: %s\n", branch, code, err, stderr)
 	}
 }
 
-// WorktreePhase reports whether a phase writes source into the cycle worktree
-// (and therefore needs cwd=worktree + a role-gate write allowance there). Only
-// tdd (RED *_test.go) and build (production code) write source; every other
-// phase writes only its artifact into the absolute workspace path. Exported so
-// the role-gate (guards) and the orchestrator share one definition.
-//
-// PA-DDK DDK-7b: the write axis is now ALSO declared in config — tdd/build carry
-// `writes_source: true` in phase-registry.json, and o.worktreePhase reads
-// spec.WritesSource so user phases (and a renamed built-in) opt in by config.
-// This literal stays as the catalog-less floor: the role-gate (internal/guards)
-// has only the CycleState, no catalog, so it relies on this fixed set for the
-// built-in source writers — defense in depth, identical to the config value
-// (TestRegistry_DeclaresWriteAxisForSourceWriters pins the agreement).
+// WorktreePhase reports whether a phase writes source into the cycle
+// worktree: only tdd and build do; every other phase writes only its
+// artifact into the absolute workspace path.
 func WorktreePhase(p Phase) bool {
 	return p == PhaseTDD || p == PhaseBuild
 }
 
 // LeakRecoverablePhase reports whether a phase runs with an active cycle
-// worktree and therefore must be ELIGIBLE FOR LEAK RECOVERY — a DISTINCT axis
-// from WorktreePhase (role-gate write-permission). The worktree is provisioned
-// once at cycle start for every phase, so triage, audit, scout, and
-// bug-reproduction all get one even though they are not source-writers; an
-// unexpected write from any of them into the main tree must be RELOCATED into
-// the worktree, not hard-abort the cycle via the tree-diff guard. Gating
-// recovery on WorktreePhase (tdd/build only) is exactly the cycle-564 gap
-// behind 9 recorded tree-diff-leak failures (390/399/491/496/501/538/540/556)
-// spanning precisely these non-source-writing phases. This is a SEPARATE
-// predicate — widening WorktreePhase in place would be a write-permission
-// escalation masquerading as a recovery fix.
+// worktree and is therefore eligible for leak recovery, a distinct axis from
+// WorktreePhase's write permission.
 func LeakRecoverablePhase(p Phase) bool {
 	switch p {
 	case PhaseTriage, PhaseAudit, PhaseScout, PhaseTDD, PhaseBuild, Phase("bug-reproduction"):
@@ -401,14 +230,6 @@ func LeakRecoverablePhase(p Phase) bool {
 	}
 }
 
-// sameDirectory reports whether two paths denote the same directory. It is a
-// REFUSAL predicate — it keeps a destructive operation off the live
-// repository — so it errs toward "same": os.SameFile (device + inode, which
-// handles symlinks and a case-insensitive APFS volume) when both paths stat,
-// OR a lexical cleaned-absolute compare, so that a path that cannot be
-// stat'ed is still refused when it is textually the root. Neither test alone
-// is enough: the lexical compare misses /var vs /private/var, and SameFile
-// cannot see a directory that does not exist yet.
 func sameDirectory(a, b string) bool {
 	if a == "" || b == "" {
 		return false
@@ -427,17 +248,6 @@ func sameDirectory(a, b string) bool {
 	return lexical(a) == lexical(b)
 }
 
-// inPlaceWorktree reports whether worktree IS the project root — the
-// --simulate provisioner reads the root in place, and a resume checkpoint can
-// name it. Every host mutator of a worktree asks this ONE predicate INSIDE
-// itself and stands down (normalizeBuildWorktree, recoverBuildLeak,
-// worktreeContentSHA, snapshotPreservedWorktree, rebaseCycleBranchOntoMain;
-// the provisioner's Cleanup and the teardown message): the operator's tree is
-// never normalized, reverted, staged, committed, rebased or removed by a
-// cycle, whichever path — dispatch, resume, composition — reaches the
-// mutator. sameDirectory is the package's refusal predicate (errs toward
-// "same"; symlink aliases and relative spellings of the root are the root).
-// An empty projectRoot is unknown, not the root.
 func inPlaceWorktree(worktree, projectRoot string) bool {
 	return worktree != "" && projectRoot != "" && sameDirectory(worktree, projectRoot)
 }

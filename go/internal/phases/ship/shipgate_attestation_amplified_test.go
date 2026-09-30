@@ -1,14 +1,3 @@
-// shipgate_attestation_amplified_test.go — Test Amplifier (cycle 987).
-//
-// Adversarial additions on top of the TDD-contracted binding tests
-// (TestShipGate_{Stale,Fresh,Missing}Attestation{Blocked,Passes} in
-// shipgate_attestation_binding_test.go). These probe malformed/empty input,
-// the "untracked .commit-gate/ never perturbs the diff" assumption the TDD
-// contract states as fact, a time-of-check-to-time-of-use staleness gap, and
-// a large-diff scale case. Written black-box against tdd-contract.md /
-// build-report.md prose only — verifyCommitGateAttestation's body and the
-// Builder's new binding test file were deliberately not read, to avoid
-// anchoring test design on the implementation.
 package ship
 
 import (
@@ -49,13 +38,8 @@ func TestShipGate_MalformedAttestation_Blocked(t *testing.T) {
 }
 
 // TestShipGate_AttestationDirDoesNotPerturbTreeState locks in the assumption
-// the TDD contract states as fact ("the enforcer performs no git add, and
-// the untracked .commit-gate/ never perturbs the diff"): tree-state SHA
-// computed before writing the attestation must equal the SHA computed after,
-// and the attestation written against the pre-write SHA must verify fresh.
-// If this invariant ever breaks (e.g. .commit-gate/ becomes tracked, or
-// treeStateSHA starts including untracked files), this test catches it
-// immediately instead of every ship attempt silently looking stale.
+// that writing .commit-gate/attestation.json never perturbs tree-state SHA —
+// if that ever breaks, every ship attempt would silently look stale.
 func TestShipGate_AttestationDirDoesNotPerturbTreeState(t *testing.T) {
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nactual change\n")
@@ -74,9 +58,7 @@ func TestShipGate_AttestationDirDoesNotPerturbTreeState(t *testing.T) {
 }
 
 // TestShipGate_StaleAfterPostAttestationEdit_Blocked is a
-// time-of-check-to-time-of-use case distinct from the contracted
-// TestShipGate_StaleAttestationBlocked (which binds attestation to an
-// arbitrary constant SHA). Here the attestation is bound to a REAL,
+// time-of-check-to-time-of-use case: the attestation is bound to a REAL,
 // once-fresh tree state, then the tracked tree is edited again — simulating
 // a reviewer approving snapshot A while the author keeps typing into
 // snapshot B. The gate must re-derive freshness from current tree state, not
@@ -87,7 +69,6 @@ func TestShipGate_StaleAfterPostAttestationEdit_Blocked(t *testing.T) {
 	approvedSHA := treeStateSHA(t, repo)
 	writeAttestation(t, repo, approvedSHA)
 
-	// Reviewed snapshot was fresh at write time.
 	if err := verifyCommitGateAttestation(context.Background(), &Options{ProjectRoot: repo}, &RunResult{}); err != nil {
 		t.Fatalf("attestation must verify fresh immediately after writing; got %v", err)
 	}

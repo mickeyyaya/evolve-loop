@@ -6,11 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// TestCodeRepoContractGate_DualRegistered mirrors the CodeManifestGate
-// dual-registration pin: the ship-time repo-contract scanner pack's code must
-// be reachable through core (consumers import core, not shiperr), distinct
-// from git-failure codes, and constructible/recoverable through the real
-// error machinery.
 func TestCodeRepoContractGate_DualRegistered(t *testing.T) {
 	if CodeRepoContractGate != shiperr.CodeRepoContractGate {
 		t.Errorf("core.CodeRepoContractGate = %q, want the shiperr re-export %q", CodeRepoContractGate, shiperr.CodeRepoContractGate)

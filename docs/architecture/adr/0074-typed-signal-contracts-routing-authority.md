@@ -195,6 +195,10 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   them only after the lanes were cut (wave 7 ran 1 of 2 lanes). The
   plan-time gate stays the binding backstop.
 
+### Amendment (2026-09-30): the operator override is a CLI verb
+
+The `route:"lane"` override had no writer: an operator set it by editing item JSON, which the operating rule that every control goes through the published CLI forbids, and which let an override land on an item it cannot relax (the two live overrides the F35 amendment above found). `evolve inbox route-lane <id> <reason>` now writes it through `inboxmover.RouteLane`. The verb judges the rewritten item with `ConsoleRouted`, the claim floor's raw decode and the same lane-forbidden predicate as the claim floor, and refuses when the item would stay console-owned, so a declared protected file and an agent-autofiled item cannot be overridden through it either. It stamps `routed_reason` and `routed_at` and appends a `route-lane` ledger line, so an override now carries its authority and evidence the way a console route does. The decision is unchanged; this closes the gap between the rule and the operator's only means of applying it.
+
 ### Amendment (2026-09-26): the routing floor honors the builder's sandbox
 
 "What a lane can never change" had two sources. The compiled integrity manifest (`guards.IsProtectedScope`) and the build profile's `sandbox.deny_subpaths` both describe it, and the routing floor consulted only the first. An item declaring `.evolve/profiles/historian.json (new)` therefore routed to lanes whose builder the sandbox denies `.evolve/profiles`, and it failed at the build floor in cycles 1696 and 1699 ([incident](../../incidents/2026-09-26-lane-sent-work-its-sandbox-denies.md)).

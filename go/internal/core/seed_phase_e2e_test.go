@@ -22,11 +22,9 @@ func seedRepoRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
 
-// TestSeedPhase_BugReproductionReachesAdvisorCatalog is the ADR-0038 end-to-end
-// proof: a user phase living as pure config under .evolve/phases/ flows from
-// the real merged catalog into an enriched advisor card, so the advisor can
-// make an informed SELECT on bugfix cycles. (The original ADR-0038 seed was
-// named reproduce-bug; the two-tier naming rule renamed it bug-reproduction.)
+// The original seed phase was named reproduce-bug; the two-tier naming rule
+// renamed it bug-reproduction, which is why this test looks for the latter.
+// See ADR-0038.
 func TestSeedPhase_BugReproductionReachesAdvisorCatalog(t *testing.T) {
 	t.Parallel()
 	root := seedRepoRoot(t)

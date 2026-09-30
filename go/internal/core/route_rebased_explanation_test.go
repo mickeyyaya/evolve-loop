@@ -40,8 +40,6 @@ func TestRouteRebasedExplanation_APendingIdenticalChangeReturnsToAudit(t *testin
 	}
 }
 
-// Audit reads `git diff HEAD`: a committed change would show it an empty diff, so only Build, whose
-// normalisation pends the change, may follow.
 func TestRouteRebasedExplanation_ACommittedIdenticalChangeReturnsToBuild(t *testing.T) {
 	fx := rebasedCommittedLane(t)
 

@@ -12,20 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
-// TestVerdictCacheProbeEligibilityWiring is the cycle-1488 reachability proof for
-// the shared base-tree eligibility predicate.
-//
-// The fresh-base collision guard was born as an inline comparison duplicated
-// at two call sites (orchestrator.go's pre-loop shadow probe and
-// phase_bindings.go's audit-binding Put); both now route through the shared
-// predicate. This test pins the contract that the ORCHESTRATOR's decision is
-// derived from verdictcache.ProbeEligible — the single source a future
-// enforce-stage lookup must reuse — by running the real
-// RunCycle path and asserting its observed skip/match decision agrees with the
-// predicate's verdict for the same (base tree, candidate tree) pair.
-//
-// A duplicated inline comparison that drifts from the predicate fails here; so
-// does a predicate that is never reached from production (the oracle disagrees).
 func TestVerdictCacheProbeEligibilityWiring(t *testing.T) {
 	tests := []struct {
 		name  string

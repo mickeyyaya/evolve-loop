@@ -1,11 +1,5 @@
 //go:build integration
 
-// stage_explicit_paths_integration_test.go — real-git half of the cycle-1067
-// `ship-stage-explicit-paths` contract. The unit half (stage_explicit_paths_test.go)
-// pins the git ARGUMENTS via a capture runner; this pins the OBSERVABLE EFFECT
-// against a genuine repository: the ship commit contains the declared path and
-// does NOT contain an undeclared untracked stray that `git add -A` would sweep
-// in (the cross-lane leak of cycle-645).
 package ship
 
 import (
@@ -17,9 +11,6 @@ import (
 	"testing"
 )
 
-// TestShipFromWorktree_StagesDeclaredPathsOnly_ExcludesUndeclaredStray —
-// RED today: shipFromWorktree stages with `git add -A` (gitops.go:374), so the
-// stray rides into the cycle commit.
 func TestShipFromWorktree_StagesDeclaredPathsOnly_ExcludesUndeclaredStray(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
 

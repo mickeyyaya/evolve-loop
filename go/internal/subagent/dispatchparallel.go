@@ -17,8 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
 )
 
-// DispatchParallelRequest captures every input cmd_dispatch_parallel reads.
-// Mirrors bash signature `dispatch-parallel <agent> <cycle> <workspace>`.
+// DispatchParallelRequest captures every input a parallel dispatch needs.
 type DispatchParallelRequest struct {
 	Agent         string
 	Cycle         int
@@ -69,21 +68,19 @@ type DispatchParallelResult struct {
 	WorkerVerifyFailures []string
 }
 
-// DispatchParallel ports cmd_dispatch_parallel from
-// legacy/scripts/dispatch/subagent-run.sh:1449. Spawns N worker subagents in
-// parallel (bounded by EVOLVE_FANOUT_CONCURRENCY), aggregates their
-// artifacts via aggregator.Aggregate, writes a parent ledger entry of
+// DispatchParallel spawns N worker subagents in parallel (bounded by
+// EVOLVE_FANOUT_CONCURRENCY), aggregates their artifacts via
+// aggregator.Aggregate, and writes a parent ledger entry of
 // kind="agent_fanout" regardless of fanout/aggregator success.
 //
 // Returns (result, error). error is non-nil on setup failures (profile
 // missing, parallel_eligible=false, parallel_subtasks empty, etc.).
 // Aggregator/fanout non-zero exit codes are reflected in result fields
-// but NOT returned as errors — the bash equivalent always writes the
-// parent ledger entry and lets the orchestrator inspect exit codes.
+// but NOT returned as errors — the parent ledger entry is always written,
+// and the orchestrator inspects the exit codes.
 func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts DispatchParallelOptions) (DispatchParallelResult, error) {
 	fillDispatchParallelDefaults(&opts)
 
-	// Step 1: validate.
 	if !agentRolePattern.MatchString(req.Agent) {
 		return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: unknown agent: %s", req.Agent)
 	}
@@ -99,7 +96,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		return DispatchParallelResult{}, err
 	}
 
-	// Step 2: load profile + check parallel_eligible.
 	profilePath := filepath.Join(req.ProfilesDir, req.Agent+".json")
 	profileBody, err := opts.ReadProfile(profilePath)
 	if err != nil {
@@ -110,25 +106,17 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 			fmt.Errorf("dispatch-parallel: agent %s not parallel_eligible (single-writer invariant)", req.Agent)
 	}
 
-	// Step 3: extract parallel_subtasks.
 	subtasks := extractParallelSubtasks(profileBody)
 	if len(subtasks) == 0 {
 		return DispatchParallelResult{},
 			fmt.Errorf("dispatch-parallel: profile %s has no parallel_subtasks", profilePath)
 	}
 
-	// Step 4: resolve quality tier (via capability).
-	//
-	// dispatch-parallel is a PASSTHROUGH, not a chooser: nothing upstream hands it
-	// a CLI (cmd_subagent.go:460 builds the request without one) and it does not
-	// pick the CLI its workers run — each worker re-enters `subagent run`, which
-	// resolves through resolvellm from this same profile. The CLI read here is the
-	// profile's own declaration, used solely to inspect capability for the quality
-	// tier. So it must read the one authority (the profile's `cli` field, exactly
-	// what resolvellm.Resolve reads), canonicalise through the one alias table, and
-	// fail loudly when nothing resolves — as Run and ValidateProfile already do.
-	// The old `cli = "claude"` literal was a second, divergent routing authority:
-	// it silently tiered an unresolvable profile against claude's manifest.
+	// dispatch-parallel is a passthrough, not a chooser: it does not pick the
+	// CLI its workers run (each worker re-enters `subagent run`, which
+	// resolves its own CLI). The CLI read here is only the profile's own
+	// declaration, used to inspect capability for the quality tier, so it
+	// fails loudly when unresolved rather than silently defaulting.
 	cli := detectcli.Canonical(matchField(profileBody, reFieldCLI))
 	if cli == "" {
 		return DispatchParallelResult{},
@@ -141,7 +129,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	insp, _ := opts.InspectCap(capDir, cli)
 	tier := capabilityTier(insp.Manifest)
 
-	// Step 5: workers dir + optional cache-prefix.
 	workersDir := filepath.Join(req.WorkspacePath, "workers")
 	if err := os.MkdirAll(workersDir, 0o755); err != nil {
 		return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: mkdir workers: %w", err)
@@ -161,7 +148,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		}
 	}
 
-	// Step 6: aggregate path resolution.
 	aggTemplate := matchField(profileBody, reFieldOutputArtifact)
 	var aggPath string
 	if aggTemplate != "" {
@@ -185,7 +171,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		treeDiff = "unknown"
 	}
 
-	// Step 7: build commands.tsv + per-worker prompt files.
 	commandsTSV := filepath.Join(workersDir, ".fanout-commands.tsv")
 	resultsTSV := filepath.Join(workersDir, ".fanout-results.tsv")
 	var cmdsBuf strings.Builder
@@ -237,7 +222,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: write commands.tsv: %w", err)
 	}
 
-	// Step 8: run fanout dispatcher.
 	fanoutCfg := fanoutdispatch.Config{
 		CommandsFile:    commandsTSV,
 		ResultsFile:     resultsTSV,
@@ -256,7 +240,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		ParentToken:    parentToken,
 	}
 
-	// Step 9: aggregate IF fanout succeeded.
 	aggRC := 0
 	if fanoutRC == 0 {
 		for i, artifact := range workerArtifacts {
@@ -278,7 +261,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		}
 	}
 
-	// Step 10: write parent ledger entry regardless of fanout/agg outcome.
 	ledgerEntry := FanoutLedgerEntry{
 		Cycle:          req.Cycle,
 		Agent:          req.Agent,
@@ -291,8 +273,8 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		AggregatePath:  aggPath,
 		QualityTier:    tier,
 	}
-	// On fanout failure with no aggregate, mirror bash: leave AggregatePath
-	// empty if the file doesn't exist (no successful aggregate).
+	// On fanout failure with no aggregate, leave AggregatePath empty if the
+	// file doesn't exist (no successful aggregate).
 	if fanoutRC != 0 {
 		if _, err := os.Stat(aggPath); err != nil {
 			ledgerEntry.AggregatePath = ""
@@ -399,7 +381,7 @@ func capabilityExtractArray(body, name string) (string, bool) {
 }
 
 // renderSubtaskPrompt substitutes {cycle}/{agent}/{worker}/{workspace} in
-// the subtask template. Mirrors bash sed at subagent-run.sh:1568.
+// the subtask template.
 func renderSubtaskPrompt(tmpl string, cycle int, agent, worker, workspace string) string {
 	tmpl = strings.ReplaceAll(tmpl, "{cycle}", fmt.Sprintf("%d", cycle))
 	tmpl = strings.ReplaceAll(tmpl, "{agent}", agent)
@@ -408,8 +390,7 @@ func renderSubtaskPrompt(tmpl string, cycle int, agent, worker, workspace string
 	return tmpl
 }
 
-// mergePhaseFor maps agent name → aggregator merge mode. Mirrors bash
-// case statement at subagent-run.sh:1527.
+// mergePhaseFor maps agent name → aggregator merge mode.
 func mergePhaseFor(agent string) string {
 	switch agent {
 	case "scout":
@@ -459,14 +440,12 @@ func fillDispatchParallelDefaults(opts *DispatchParallelOptions) {
 	}
 }
 
-// defaultVerifyWorkerArtifact is the parent-side per-worker artifact verifier.
-// It runs the B3 Verify SSOT over the worker's artifact requiring presence,
-// readability, non-empty, and the expected per-worker token (provenance —
-// fixing H1, where an empty token made bytes.Contains(body, []byte("")) always
-// true and any non-empty file passed). Freshness is intentionally skipped
-// (MaxAge=MaxInt64): the worker's own recursive child already verified
-// freshness at write time, and the parent re-checks only after all workers
-// finish, so an early worker's artifact is legitimately older than the window.
+// defaultVerifyWorkerArtifact is the parent-side per-worker artifact
+// verifier: presence, readability, non-empty and the expected per-worker
+// token. Freshness is intentionally skipped (MaxAge=MaxInt64) — the
+// worker's own recursive child already verified freshness at write time,
+// and the parent re-checks only after all workers finish, so an early
+// worker's artifact is legitimately older than the window.
 func defaultVerifyWorkerArtifact(now func() time.Time, artifact, token string) VerifyResult {
 	in := VerifyInput{
 		Now:          now(),

@@ -1,5 +1,3 @@
-// statefile_extra_test.go — error-branch and type-coercion coverage for
-// the map-based state helpers that the round-trip happy-path tests miss.
 package ship
 
 import (

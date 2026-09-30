@@ -9,14 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// Width-scaled contention recovery (cycle-765, cycle-759 incident): with N
-// fleet lanes racing one main, P(HEAD moves during your audit→ship window)
-// grows with N, but the recovery budget was a constant maxRecoveryDepth=2 —
-// at width 3+ that guarantees a steady abort rate that looks like "loop
-// failure" while being pure landing-queue contention. Contention-class codes
-// get a budget that scales with fleet width; everything else keeps the
-// constant budget so width can never inflate retries for genuine failures.
-
 // isContentionShipCode reports whether a ship error is landing-queue
 // contention — a sibling lane moved main between this lane's audit and ship —
 // rather than a defect in this lane's own work: every AUDIT_BINDING_* code

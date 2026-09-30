@@ -1,23 +1,5 @@
 package core
 
-// retry_opts.go — the ONE registry of phase-retry recovery hooks (cycle-1166,
-// evaluate-batch-retry-parity).
-//
-// Two retry loops existed: the sequential dispatch loop (cyclerun_dispatch.go)
-// and the evaluate-batch loop (evaluate_batch.go). They agreed only by hand, so
-// each hook the sequential loop grew had to be re-remembered on the batch side —
-// and twice was not: optionalInfraSkip and postShipObserverSkip shipped
-// sequential-only, so an optional evaluate phase that exhausted infra retries
-// aborted the whole batch instead of degrading. Fixing the two misses does not
-// fix the CLASS; the next hook diverges the same way.
-//
-// retryOpts is that class fix: a Strategy value enumerating every recovery hook
-// a retry loop may run, with a nil field meaning "this path does not run that
-// hook" — divergence made explicit and inspectable instead of implicit and
-// invisible. Both paths take their hooks from a constructor here, so a new hook
-// is a new FIELD, and a field the batch constructor forgets is visible in one
-// place rather than discoverable only by diffing two loops.
-
 import (
 	"errors"
 	"fmt"
@@ -119,8 +101,8 @@ func (cr *cycleRun) backfillExhaustedArtifact(next Phase, err error, attempt, ma
 	return PhaseResponse{Phase: string(next), Verdict: VerdictWARN, ArtifactsDir: cr.cs.WorkspacePath}, true
 }
 
-// recoverShipError is the sequential loop's ship-recovery hook (Component #7):
-// ship is a pure executor, so a structured ShipError is resolved by the
+// recoverShipError is the sequential loop's ship-recovery hook: ship is a
+// pure executor, so a structured ShipError is resolved by the
 // advisor's recovery chain — which records the error, picks the recovery phase
 // (re-audit / retry-ship / debugger) and bounds the depth — not by aborting the
 // cycle. Returns true when the cycle is RECOVERING (the loop must break and let
@@ -134,7 +116,8 @@ func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, 
 		return false
 	}
 	// Preserve the worktree from the exit cleanup while a ship failure is
-	// unresolved (ADR-0039 §8 / D10) — cleared when a later ship succeeds.
+	// unresolved — cleared when a later ship succeeds.
+	// See ADR-0039.
 	cr.preserveWorktree = true
 	fleetWidth := fleetWidthFromEnv(cr.req.Env)
 	rec, recovering := cr.o.recoverFromShipError(cr.ctx, cr.req.ProjectRoot, cr.cycle, &cr.cs, se, cr.recoveryDepth, fleetWidth)
@@ -146,8 +129,9 @@ func (cr *cycleRun) recoverShipError(next Phase, err error, resp PhaseResponse, 
 	cr.ctxSnap["ship_error_class"] = string(se.Class)
 	cr.ctxSnap["ship_error_stage"] = string(se.Stage)
 	cr.ctxSnap["ship_error_debug"] = se.DebugString()
-	// ADR-0044 C1: the failed ship attempt ran and burned budget — record it
-	// before routing to recovery. A later successful ship records its own.
+	// The failed ship attempt ran and burned budget — record it before
+	// routing to recovery. A later successful ship records its own.
+	// See ADR-0044.
 	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts,
 		fmt.Sprintf("ship error %s: recovering via %s (attempt %d/%d)", se.Code, rec, cr.recoveryDepth+1, shipRecoveryBudget(se.Code, fleetWidth)), cr.cs.PhaseStartedAt))
 	cr.recoveryDepth++

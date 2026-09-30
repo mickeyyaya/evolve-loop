@@ -12,29 +12,28 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// AbnormalEvent mirrors the JSONL schema bash _append_abnormal_event writes
-// to workspace/abnormal-events.jsonl. Best-effort; missing workspace dir is
-// a no-op (matches bash `[ -d "$_ws" ] || return 0`).
+// AbnormalEvent is the workspace/abnormal-events.jsonl line schema.
+// Best-effort: a missing workspace dir is a no-op.
 type AbnormalEvent struct {
 	EventType       string
 	Severity        string
 	Details         string
 	RemediationHint string
-	// SourcePhase is fixed to "subagent-run" in bash. Exposed here so callers
-	// who run from a different phase scope can override (e.g. fanout aggregator).
+	// SourcePhase defaults to "subagent-run"; callers running from a
+	// different phase scope may override it (e.g. the fanout aggregator).
 	SourcePhase string
 }
 
 // AppendAbnormalEvent writes one event line to <workspace>/abnormal-events.jsonl.
-// Returns nil when the workspace doesn't exist (best-effort semantics matching
-// bash). Returns an error only when the directory exists but the file write
-// fails for a non-skippable reason.
+// Returns nil when the workspace doesn't exist (best-effort semantics).
+// Returns an error only when the directory exists but the file write fails
+// for a non-skippable reason.
 func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
 	}
 	if info, err := os.Stat(workspace); err != nil || !info.IsDir() {
-		return nil // bash: silently ignore when workspace dir missing
+		return nil
 	}
 	sourcePhase := ev.SourcePhase
 	if sourcePhase == "" {
@@ -52,7 +51,6 @@ func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Tim
 	path := filepath.Join(workspace, "abnormal-events.jsonl")
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		// Bash uses `|| true` so failures here are tolerated. Mirror that.
 		return nil
 	}
 	defer func() { _ = f.Close() }()
@@ -62,15 +60,14 @@ func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Tim
 	return nil
 }
 
-// FanoutLedgerEntry is the typed input to WriteFanoutLedgerEntry. Mirrors
-// the args of bash _write_fanout_ledger_entry at subagent-run.sh:1635.
+// FanoutLedgerEntry is the typed input to WriteFanoutLedgerEntry.
 type FanoutLedgerEntry struct {
 	Cycle          int
 	Agent          string
 	ChallengeToken string
 	GitHEAD        string
 	TreeStateSHA   string
-	WorkerNames    []string // space-separated in bash; we use a typed slice
+	WorkerNames    []string
 	WorkerCount    int
 	ExitCode       int
 	AggregatePath  string // may be empty when no aggregate produced
@@ -78,9 +75,8 @@ type FanoutLedgerEntry struct {
 }
 
 // WriteFanoutLedgerEntry appends a single `kind: "agent_fanout"` entry to
-// ledger.jsonl + updates ledger.tip atomically. Mirrors bash byte layout:
-// fixed JSON field order + hash chain link from the SHA256 of the prior
-// line.
+// ledger.jsonl and updates ledger.tip atomically, with a hash-chain link
+// from the SHA256 of the prior line.
 func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
@@ -102,8 +98,6 @@ func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() t
 		return fmt.Errorf("subagent/helpers: chain link: %w", err)
 	}
 
-	// Build workers JSON array preserving order. Bash uses jq -R . | jq -s .
-	// which round-trips through string then re-arrays; we just marshal once.
 	workersJSON, err := json.Marshal(e.WorkerNames)
 	if err != nil {
 		return fmt.Errorf("subagent/helpers: marshal workers: %w", err)
@@ -114,9 +108,8 @@ func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() t
 		quality = "unknown"
 	}
 
-	// Field order MUST match bash jq object construction at
-	// subagent-run.sh:1683-1690. Stable order is required because downstream
-	// verifiers + ledgerverify chain-link both hash the line.
+	// Field order is stable because downstream verifiers and the
+	// ledgerverify chain-link both hash the line.
 	line := fmt.Sprintf(
 		`{"ts":"%s","cycle":%d,"role":"%s","kind":"agent_fanout","exit_code":%d,`+
 			`"artifact_path":"%s","artifact_sha256":"%s","challenge_token":"%s",`+
@@ -163,13 +156,6 @@ func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() t
 	}
 	return nil
 }
-
-// --- internal helpers ---
-
-// The chained-append primitives are the unit-16 leaf's (ADR-0103): the fan-out
-// writer above keeps its own append skeleton beside the run path's — the
-// duplicated belief "a chained ledger append", named, folded by the fan-out
-// unit (follow-up 16-1).
 
 const ledgerZeroSeed = subagentrun.LedgerZeroSeed
 

@@ -1,24 +1,5 @@
 package ship
 
-// stage_refusal_deterministic_test.go — RED contract for cycle-1440 task
-// `deterministic-stage-refusal-router`.
-//
-// Defect (cycle-1365, live): stageExplicitPaths classifies EVERY `git add`
-// refusal as core.ShipClassTransient, so the failure floor keeps re-dispatching
-// a refusal that can never succeed in place. Cycle 1365 burned its whole retry
-// budget on the SAME .evolve/evals pathspec refused twice — its worktree base
-// predated the .gitignore carve-out, so no retry could ever win.
-//
-// Contract under test (not yet implemented — RED until Builder adds the
-// two-strikes rule): the FIRST refusal of a given pathspec stays TRANSIENT (a
-// genuinely flaky add must keep its retry), and a SECOND CONSECUTIVE refusal of
-// the SAME pathspec is reclassified core.ShipClassPrecondition — deterministic,
-// so the router stops burning attempts and routes to continuation/salvage. A
-// refusal of a DIFFERENT pathspec is a different failure and resets to transient.
-//
-// The refusal memory is per-workspace (opts.WorkspacePath), which is what makes
-// "consecutive" observable across the separate ship attempts of one cycle.
-
 import (
 	"context"
 	"io"
@@ -31,17 +12,9 @@ import (
 )
 
 // stagingRefusalRunner scripts `git status --porcelain` to report the given
-// changed paths and makes `git add` refuse with an UNRECOGNISED stderr shape.
-//
-// Cycle-1473 re-base: this file's fixture was git's rc=1 gitignore-advice
-// refusal, which the `gitstage-deterministic-classification` contract now
-// classifies non-transient on the FIRST failure from captured git_stderr (see
-// stage_classify_stderr_test.go). Keeping that fixture here would assert two
-// contradictory classes for one stderr. The two-strikes rule these tests exist
-// to pin is orthogonal to the stderr shape, so they now run on a stderr the
-// classifier cannot place — which is exactly where the strike memo is still the
-// only signal, and their original intent (a first, possibly-flaky refusal keeps
-// its retry; the same pathspec twice does not) is preserved unchanged.
+// changed paths and makes `git add` refuse with a stderr shape the
+// stderr-based classifier cannot place, isolating the two-strikes memo under
+// test from stderr classification.
 func stagingRefusalRunner(porcelain string) *scriptedRunner {
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -64,8 +37,6 @@ func stagingRefusalRunner(porcelain string) *scriptedRunner {
 	return r
 }
 
-// stageAndExpectFailure runs stageExplicitPaths against a refusing runner and
-// returns the ShipError it must produce.
 func stageAndExpectFailure(t *testing.T, workspace, porcelain string) *core.ShipError {
 	t.Helper()
 	r := stagingRefusalRunner(porcelain)
@@ -87,9 +58,6 @@ func stageAndExpectFailure(t *testing.T, workspace, porcelain string) *core.Ship
 	return se
 }
 
-// TestStageRefusal_FirstStrikeStaysTransient is the negative-side pin: the
-// two-strikes rule must not turn a first, possibly-flaky refusal into a
-// deterministic block — that would delete the retry the ladder depends on.
 func TestStageRefusal_FirstStrikeStaysTransient(t *testing.T) {
 	se := stageAndExpectFailure(t, t.TempDir(), " M .evolve/evals/foo.md\n")
 	if se.Class != core.ShipClassTransient {
@@ -97,8 +65,6 @@ func TestStageRefusal_FirstStrikeStaysTransient(t *testing.T) {
 	}
 }
 
-// TestStageRefusal_SecondSamePathspecIsDeterministic is the primary case: the
-// same pathspec refused twice in the SAME workspace is unwinnable in place.
 func TestStageRefusal_SecondSamePathspecIsDeterministic(t *testing.T) {
 	ws := t.TempDir()
 	const porcelain = " M .evolve/evals/foo.md\n"
@@ -113,10 +79,6 @@ func TestStageRefusal_SecondSamePathspecIsDeterministic(t *testing.T) {
 	}
 }
 
-// TestStageRefusal_DifferentPathspecStaysTransient is the load-bearing negative:
-// a rule that simply counts refusals (rather than matching the pathspec) would
-// pass the test above while wrongly killing the retry for an unrelated second
-// failure. Same workspace, different refused pathspec → still transient.
 func TestStageRefusal_DifferentPathspecStaysTransient(t *testing.T) {
 	ws := t.TempDir()
 
@@ -130,9 +92,6 @@ func TestStageRefusal_DifferentPathspecStaysTransient(t *testing.T) {
 	}
 }
 
-// TestStageRefusal_SeparateWorkspacesDoNotShareStrikes is the isolation edge
-// case: fleet lanes run concurrently, so one lane's first strike must never
-// deterministically block a peer lane's first strike.
 func TestStageRefusal_SeparateWorkspacesDoNotShareStrikes(t *testing.T) {
 	const porcelain = " M .evolve/evals/foo.md\n"
 
@@ -146,9 +105,6 @@ func TestStageRefusal_SeparateWorkspacesDoNotShareStrikes(t *testing.T) {
 	}
 }
 
-// TestStageRefusal_NoWorkspaceStaysTransient pins the degrade path: with no
-// workspace there is nowhere to record a strike, so the classification must fall
-// back to today's transient behavior rather than guessing deterministic.
 func TestStageRefusal_NoWorkspaceStaysTransient(t *testing.T) {
 	const porcelain = " M .evolve/evals/foo.md\n"
 	for i := 0; i < 2; i++ {

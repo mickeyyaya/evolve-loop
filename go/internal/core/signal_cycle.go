@@ -1,13 +1,5 @@
 package core
 
-// signal_cycle.go — ADR-0101 S2a producers. Each is an Adapter from a typed
-// value the pipeline already owns (CycleResult, SystemFailureSignal, ShipError,
-// the quota sentinel) to ONE Event at the chokepoint that owns the fact:
-// cycle.sealed + system.failure at completeCycle (the closeout both dispatch
-// roots share), ship.error at recordShipError, quota.paused at the
-// quota pause (pauseForQuota, both roots); the abnormal epilogue seals the
-// aborted cycle. Producers observe; every decision stays where it was.
-
 import (
 	"strconv"
 
@@ -34,11 +26,9 @@ func (o *Orchestrator) signalRunID() string {
 }
 
 // emitCycleClose ends the cycle's event stream: a system.failure first when
-// the closeout attached one (INCIDENT if it halts the loop), then the
-// cycle.sealed that names the final verdict — WARN with its own code on FAIL.
-// origin is the caller's own name (the closeout, or the abnormal epilogue for
-// a cycle that died mid-phase): origin is vocabulary, so the callee never
-// asserts its caller's identity.
+// the closeout attached one, then the cycle.sealed that names the final
+// verdict. origin is the caller's own name, so the callee never asserts its
+// caller's identity.
 func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 	o := cr.o
 	base := signalcenter.Event{
@@ -71,11 +61,10 @@ func (cr *cycleRun) emitCycleClose(result CycleResult, origin string) {
 	o.signals.Emit(e)
 }
 
-// emitShipError projects a recorded ShipError verbatim: module ship, the
-// SHIP_<code> projection, INCIDENT for the integrity class (§5.3), the
-// ship-error.json path when it was written, and the Debug keys the triage
-// whitelist names (shiperr.SignalDebugKeys — the landing step, the git exit
-// code, the branches, the repair outcome; ADR-0103 unit 07) when non-empty.
+// emitShipError projects a recorded ShipError verbatim, including the
+// ship-error.json path when it was written and the Debug keys the triage
+// whitelist names (shiperr.SignalDebugKeys) when non-empty.
+// See ADR-0103.
 func (o *Orchestrator) emitShipError(cycle int, cs CycleState, se *ShipError, artifactPath string) {
 	fields := map[string]string{"class": string(se.Class), "stage": string(se.Stage)}
 	if artifactPath != "" {
@@ -93,10 +82,8 @@ func (o *Orchestrator) emitShipError(cycle int, cs CycleState, se *ShipError, ar
 	})
 }
 
-// emitQuotaPaused names the phase a quota pause interrupted, with the one
-// error text the ledger and the phase diag also carry; a resource event,
-// resumable, never terminal evidence. Emitted from pauseForQuota — the seam
-// both dispatch roots reach.
+// emitQuotaPaused names the phase a quota pause interrupted; a resource
+// event, resumable, never terminal evidence.
 func (cr *cycleRun) emitQuotaPaused(phase Phase, cause error) {
 	cr.o.signals.Emit(signalcenter.Event{
 		Cycle: cr.cycle, RunID: cr.cs.RunID, Phase: string(phase), Module: signalcenter.ModuleOrchestrator, Origin: "cycleRun.pauseForQuota",

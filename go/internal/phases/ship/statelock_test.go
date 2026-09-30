@@ -10,14 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestWithStateLock_SerializesWithUpdateState pins ADR-0049 S2 / gap G2: ship's
-// map-based state.json read-modify-write must hold the SAME advisory lock
-// storage.UpdateState holds (<path>.lock), so the two whole-file writers cannot
-// clobber each other. Half the goroutines bump an UNMODELED key via
-// withStateLock; the other half bump a MODELED key via UpdateState — all on one
-// state.json. Without a shared lock the interleaved whole-file writes lose
-// updates on BOTH counters (RED); with the shared flock every write serializes
-// and both counters reach the full total (GREEN). Run with -race.
 func TestWithStateLock_SerializesWithUpdateState(t *testing.T) {
 	dir := t.TempDir()
 	stPath := filepath.Join(dir, "state.json")

@@ -7,23 +7,6 @@ import (
 	"strings"
 )
 
-// recursion.go — single source of truth for the bridge-recursion contract:
-// fan-out workers re-enter the SAME evolve binary via `subagent run` (never the
-// in-process Agent tool — see [B1] enforceBridgeOnly), and that recursion is
-// bounded + sandbox-coherent at every depth.
-//
-// Why a depth cap: a worker runs `evolve subagent run <agent>-worker-<subtask>`,
-// which is another full Run() — and a worker could itself fan out. Without a cap
-// a misconfigured profile could nest dispatches unboundedly. EVOLVE_DISPATCH_DEPTH
-// threads the depth across each bridge re-entry; Run() rejects past the cap.
-//
-// Why clear CLAUDECODE_TYPE: a recursive child is, by definition, NOT the
-// top-level host. If a stale CLAUDECODE_TYPE=host leaked into a child it would
-// make sandbox.DetectNested return false → ShouldWrap would attempt the inner OS
-// sandbox → on macOS sandbox_apply() EPERMs and hangs the REPL boot (the Part A
-// failure mode). Clearing it for every worker keeps DetectNested=true by
-// construction at any depth.
-
 const (
 	// SSOT IPC-protocol-allowed: parent→child recursion-depth handoff
 	// Split form keeps it out of the flagreaders guard's standalone-literal

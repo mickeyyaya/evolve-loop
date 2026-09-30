@@ -1,10 +1,3 @@
-// reviewtrailer_test.go — reviewedByTrailer (commitgate.go).
-//
-// The trailer makes "reviewed before commit, by whom" a durable property of
-// the commit SHA. It must fire ONLY for --class manual with a valid
-// attestation, and stay empty otherwise (non-manual, missing, malformed,
-// empty reviewers) — so trailer-present == reviewed.
-
 package ship
 
 import (
@@ -30,9 +23,6 @@ func TestReviewedByTrailer(t *testing.T) {
 		}
 	})
 
-	// The trust-critical case: a bypass means review was SKIPPED, so a stale
-	// on-disk attestation must NOT produce a trailer (else the commit falsely
-	// asserts it was reviewed).
 	t.Run("bypass + valid attestation → empty (not reviewed)", func(t *testing.T) {
 		opts := &Options{Class: ClassManual, ProjectRoot: repo, BypassCommitGate: true}
 		if g := reviewedByTrailer(opts); g != "" {

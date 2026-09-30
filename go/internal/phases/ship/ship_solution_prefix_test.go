@@ -8,9 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestDefaultCommitMessage_SolutionPrefix — ADR-0099 slice 2: a document cycle
-// lands under the `solution(<slug>)` prefix so the commit vocabulary names the
-// deliverable it carries; code cycles keep the legacy message byte-identical.
+// See ADR-0099.
+// TestDefaultCommitMessage_SolutionPrefix: a document cycle lands under the
+// `solution(<slug>)` prefix so the commit vocabulary names the deliverable
+// it carries; code cycles keep the legacy message byte-identical.
 func TestDefaultCommitMessage_SolutionPrefix(t *testing.T) {
 	ws := t.TempDir()
 	for name, body := range map[string]string{

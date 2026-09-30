@@ -1,13 +1,5 @@
 //go:build integration
 
-// stage_ignored_paths_integration_test.go — real-git half of the cycle-1101
-// gitignored-declared-path contract. The unit half (stage_ignored_paths_test.go)
-// pins the git ARGUMENTS via a capture runner; this pins the OBSERVABLE EFFECT
-// against a genuine repository — required by the adversarial review of the
-// first fix attempt, whose `check-ignore -z` (stdin-mode-only flag) made the
-// probe rc=128 on every ship: the capture-runner unit tests stayed green while
-// the production feature was dead on arrival. Only a real git can catch that
-// class.
 package ship
 
 import (

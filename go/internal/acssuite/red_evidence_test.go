@@ -1,14 +1,5 @@
 package acssuite
 
-// red_evidence_test.go — full-output persistence for RED predicates. Three
-// batch-18 false-reds (cycles 1173/1175/1178) were undiagnosable after the
-// fact because the 600-byte excerpt elides the MIDDLE of the inner go-test
-// stream (the same lesson class as 1107/1116/1123, which FailingTests only
-// partially fixed: names survive, assertions do not). A red's full stream now
-// lands beside the verdict; the bounded retry's outcome is recorded in
-// RetryOutcome — NOT Flaky, whose passed-on-retry-only meaning is pinned by
-// acs/cycle468 (deterministic reds carry no flaky key and no warnings).
-
 import (
 	"context"
 	"encoding/json"
@@ -94,8 +85,6 @@ func TestRun_RecordsRedOnRetryAndAppendsRetryStream(t *testing.T) {
 	if red.RetryOutcome != "red-on-retry" {
 		t.Errorf("a red that STAYED red on a completed retry must record red-on-retry, got %q", red.RetryOutcome)
 	}
-	// The cycle-468 pin: a deterministic red carries NO flaky key and adds NO
-	// warnings — RetryOutcome and the evidence file are the forensic surface.
 	if red.Flaky != "" {
 		t.Errorf("flaky must stay passed-on-retry-only (pinned), got %q", red.Flaky)
 	}

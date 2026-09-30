@@ -1,18 +1,11 @@
 package core
 
-// throughput_hook.go — R9.1 (triage capacity): the throughput-recorder seam.
-// After a cycle that actually shipped, the orchestrator hands the in-memory
-// State to the injected recorder so it can append the cycle's passed
-// coverage-floor count to the rolling window (state.json:triageThroughput).
-// The window logic itself lives in internal/triagecap (which imports core
-// for the entry type — hence the seam: core must not import triagecap).
-// Nil (default) is a no-op — byte-identical to the pre-R9 cycle.
-
 // ThroughputRecorder observes one shipped cycle: it may mutate state
 // in-place (the orchestrator writes state immediately after).
 type ThroughputRecorder func(state *State, cycle int, workspacePath string)
 
-// WithThroughputRecorder injects the R9.1 recorder. Nil keeps the seam inert.
+// WithThroughputRecorder injects the throughput recorder. Nil keeps the seam
+// inert.
 func WithThroughputRecorder(r ThroughputRecorder) Option {
 	return func(o *Orchestrator) {
 		if r != nil {
@@ -21,15 +14,11 @@ func WithThroughputRecorder(r ThroughputRecorder) Option {
 	}
 }
 
-// ThroughputRecorderWired reports whether the recorder is injected —
-// introspection for composition-root wiring tests (mirrors
-// FailureAdviserWired).
+// ThroughputRecorderWired reports whether the recorder is injected.
 func (o *Orchestrator) ThroughputRecorderWired() bool { return o.throughputRecorder != nil }
 
 // shippedOutcome reports whether the cycle's final verdict plus HEAD
-// movement constitute a real ship — the only cycles whose floor commitments
-// are honest throughput evidence. Empty HEADs (git unavailable) are never
-// shipped evidence.
+// movement constitute a real ship.
 func shippedOutcome(finalVerdict, preHEAD, postHEAD string) bool {
 	if preHEAD == "" || postHEAD == "" || preHEAD == postHEAD {
 		return false
@@ -37,18 +26,14 @@ func shippedOutcome(finalVerdict, preHEAD, postHEAD string) bool {
 	return IsShippingVerdict(finalVerdict)
 }
 
-// IsShippingVerdict reports whether a cycle's final verdict is one that CAN
-// represent shipped work. It is the ONE definition of that vocabulary: the
-// throughput hook pairs it with HEAD movement (above), and the loop's
-// non-progress breaker uses its negation to decide a cycle made no progress.
-// Two copies would let a newly added outcome label reach one consumer and not
-// the other (review MEDIUM).
+// IsShippingVerdict reports whether a cycle's final verdict is one that can
+// represent shipped work.
 func IsShippingVerdict(finalVerdict string) bool {
 	return finalVerdict == VerdictPASS || finalVerdict == CycleOutcomeShippedViaBuild
 }
 
-// hasThroughputCycle prevents replayed closeout from observing the same cycle
-// twice. Entries and carryover are already persisted in the same state write.
+// hasThroughputCycle prevents replayed closeout from observing the same
+// cycle twice.
 func hasThroughputCycle(entries []TriageThroughputEntry, cycle int) bool {
 	for _, entry := range entries {
 		if entry.Cycle == cycle {

@@ -10,20 +10,6 @@ import (
 	"testing"
 )
 
-// conformance_test.go — the subagent module conformance suite (plan B4).
-//
-// Every phase-agent role in the registry (agentRoles, run.go) must satisfy the
-// SAME dispatch invariants: it goes through the bridge (never the in-process
-// tool), its artifact is judged by the one verification SSOT (contract.go), its
-// recursion command is sandbox-coherent (CLAUDECODE_TYPE cleared, depth
-// threaded), its recursion is depth-bounded, and concurrent independent
-// dispatches stay isolated (unique token, own artifact, no cross-leak, no race).
-//
-// The suite is driven by a FAKE BRIDGE — the RunOptions ExecAdapter seam, which
-// stands in for `evolve subagent run` with no LLM cost — and is table-driven
-// over agentRoles, so adding a role to the registry auto-subjects it to every
-// invariant below.
-
 // bridgeOutcome selects what the stand-in bridge "produces" for a dispatch.
 type bridgeOutcome int
 
@@ -98,7 +84,7 @@ func conformanceReq(t *testing.T, role string) RunRequest {
 }
 
 // TestConformance_AllRoles_BridgeOnly — every role rejects the retired
-// in-process dispatch hatch (B1 invariant, uniformly across the registry).
+// in-process dispatch hatch, uniformly across the registry.
 func TestConformance_AllRoles_BridgeOnly(t *testing.T) {
 	t.Parallel()
 	for i, role := range agentRoles {
@@ -149,7 +135,7 @@ func TestConformance_AllRoles_HappyDispatchIsolated(t *testing.T) {
 	}
 }
 
-// TestConformance_AllRoles_ContractGuards — the B3 verification SSOT guards
+// TestConformance_AllRoles_ContractGuards — the verification SSOT guards
 // every role: a bridge that produces no artifact, or one without the token,
 // yields INTEGRITY_FAIL (never a false PASS).
 func TestConformance_AllRoles_ContractGuards(t *testing.T) {
@@ -178,8 +164,8 @@ func TestConformance_AllRoles_ContractGuards(t *testing.T) {
 
 // TestConformance_AllRoles_RecursionSandboxCoherent — every role's fan-out
 // worker command re-enters the bridge (`subagent run <role>-worker-<subtask>`),
-// clears the host marker (CLAUDECODE_TYPE=) so the child stays nested (no inner
-// sandbox wrap — B2/Part A), and threads the child recursion depth.
+// clears the host marker (CLAUDECODE_TYPE=) so the child stays nested (no
+// inner sandbox wrap), and threads the child recursion depth.
 func TestConformance_AllRoles_RecursionSandboxCoherent(t *testing.T) {
 	t.Parallel()
 	for _, role := range agentRoles {
@@ -200,8 +186,8 @@ func TestConformance_AllRoles_RecursionSandboxCoherent(t *testing.T) {
 	}
 }
 
-// TestConformance_AllRoles_DepthCapEnforced — every role rejects a dispatch that
-// runs deeper than the recursion cap (B2), so a fan-out loop can't recurse
+// TestConformance_AllRoles_DepthCapEnforced — every role rejects a dispatch
+// that runs deeper than the recursion cap, so a fan-out loop can't recurse
 // unboundedly regardless of which role it spawns.
 func TestConformance_AllRoles_DepthCapEnforced(t *testing.T) {
 	t.Parallel()

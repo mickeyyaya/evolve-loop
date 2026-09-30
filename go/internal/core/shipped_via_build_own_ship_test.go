@@ -5,26 +5,6 @@ import (
 	"testing"
 )
 
-// shipped_via_build_own_ship_test.go — a cycle that shipped nothing must not be
-// labelled SHIPPED_VIA_BUILD because a SIBLING lane moved main.
-//
-// Live incident (two-wave health batch, 2026-09-12): cycle 1630 ran scout and
-// triage, triage honestly committed `top_n: []` (its inbox claim had failed),
-// and the host ended the cycle `triage-empty-commitment`. Between cycle start
-// and closeout a sibling lane landed on main, so the pre/post HEAD probes
-// differed — and finalizeOutcome relabelled the SKIPPED no-work verdict as
-// SHIPPED_VIA_BUILD (loop-20260912-healthcheck.log:197). Three consumers then
-// misread the cycle: IsTriageNoWorkResult no longer held (the shortened ledger
-// floor was refused), the throughput recorder credited a cycle that committed
-// nothing, and the dossier recorded PASS. No persona instructs an inline ship
-// and lane commits carry no per-cycle trailer, so HEAD movement can never prove
-// THIS cycle shipped; the only evidence is the cycle's own ship latch
-// (CycleState.Shipped, set by latchShippedState on both dispatch roots).
-//
-// The fixture is cycle 1630's exact shape: the composed RunCycle path (not a
-// hand-built result), a real triage-decision.json with an empty commitment, and
-// a HEAD probe that answers differently at cycle start and at closeout.
-
 func TestRunCycle_EmptyTriageCommitmentSurvivesSiblingLanding(t *testing.T) {
 	t.Parallel()
 	storage := &fakeStorage{}
@@ -38,7 +18,7 @@ func TestRunCycle_EmptyTriageCommitmentSurvivesSiblingLanding(t *testing.T) {
 		WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
 		WithThroughputRecorder(func(*State, int, string) { throughputCredits++ }))
 	// A sibling lane lands on main mid-cycle: the probe at cycle start and the
-	// probe at closeout return different SHAs, exactly as cycle 1630 saw.
+	// probe at closeout return different SHAs.
 	heads := []string{"a2e60952-cycle-start", "b496a8dc-sibling-landed"}
 	o.gitHEAD = func() (string, error) {
 		head := heads[0]
@@ -66,14 +46,6 @@ func TestRunCycle_EmptyTriageCommitmentSurvivesSiblingLanding(t *testing.T) {
 	}
 }
 
-// The closeout is the one consumer of the latch: completeCycle hands the
-// persisted CycleState (with its Shipped flag) to finalizeCycle. No composed path in the default
-// pipeline yields a SKIPPED final verdict AFTER a ship PASS (the floor guard
-// declines post-ship non-floor verdicts, and an abort returns before closeout),
-// so a closeout that silently dropped the latch would leave every RunCycle test
-// green. This pins the seam directly, in the one shape that can reach it: a
-// configured ship-floor override whose post-ship floor phase SKIPPED. The
-// negative row is the cycle-1630 twin at the same seam.
 func TestCompleteCycle_ForwardsTheShipLatchToTheOutcomeLabel(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -106,12 +78,6 @@ func TestCompleteCycle_ForwardsTheShipLatchToTheOutcomeLabel(t *testing.T) {
 	}
 }
 
-// The latch has ONE home — the persisted CycleState — written by both dispatch
-// roots at the moment the ship phase PASSes and survives the deliverable
-// review. This pins the fresh root's writer site; the resume root's twin is
-// TestResumeLifecycle_ShipPassPersistsTheShipLatch (integration-tagged). Drop
-// either and that root reports a shipped cycle as SKIPPED_UNKNOWN after a
-// pause/resume.
 func TestRunCycle_ShipPassPersistsTheShipLatch(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{}

@@ -8,9 +8,9 @@ import (
 )
 
 // TestParseGoTestJSON_SkipCarriesSkipExitCode names the acssuite.SkipExitCode
-// const and pins the real branch (acssuite.go:436): a t.Skip'd predicate maps to
-// a Result whose ExitCode is the TAP/automake SKIP convention, the value the
-// audit/ship gate reads to count it neither red nor green.
+// const: a t.Skip'd predicate maps to a Result whose ExitCode is the
+// TAP/automake SKIP convention, the value the audit/ship gate reads to count
+// it neither red nor green.
 func TestParseGoTestJSON_SkipCarriesSkipExitCode(t *testing.T) {
 	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_001_Skip", "skip"))
 	results := parseGoTestJSON(strings.NewReader(raw), 9)
@@ -22,10 +22,9 @@ func TestParseGoTestJSON_SkipCarriesSkipExitCode(t *testing.T) {
 	}
 }
 
-// TestWriteVerdict_LandsAtVerdictFilename names acssuite.VerdictFilename and
-// pins the belief the const exists for: the writer and every external reader/
-// retirement path (core/audit_round_artifacts.go, cycle-1603) agree on ONE
-// spelling because WriteVerdict itself derives its destination from the const.
+// TestWriteVerdict_LandsAtVerdictFilename names acssuite.VerdictFilename: the
+// writer and every external reader/retirement path agree on one spelling
+// because WriteVerdict derives its destination from the const.
 func TestWriteVerdict_LandsAtVerdictFilename(t *testing.T) {
 	dir := t.TempDir()
 	path, err := WriteVerdict(dir, Verdict{Cycle: 1603, Verdict: "PASS"})

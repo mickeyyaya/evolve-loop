@@ -2,15 +2,6 @@ package flagregistry
 
 import "testing"
 
-// TestFlagRegistry_NoBudgetClusterDeadFlags is the cycle-356 regression guard.
-// It asserts that none of the 12 dead Budget Cluster flags (StatusDead,
-// DEPRECATED no-op since PR #96) remain in the registry after removal.
-//
-// This test is authored RED by TDD-engineer (flags still present) and turns
-// GREEN when Builder removes all 12 rows from registry_table.go.
-//
-// The 12 flags were confirmed dead by cycle-356 grep sweep — zero behavioral
-// readers; only help text, test setenv, and documentation references remain.
 func TestFlagRegistry_NoBudgetClusterDeadFlags(t *testing.T) {
 	deadBudgetFlags := []string{
 		"EVOLVE_BATCH_BUDGET_CAP",

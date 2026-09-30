@@ -1,29 +1,5 @@
 package core
 
-// ship_recovery_width_test.go — RED contract for width-scaled-binding-retry
-// (cycle 765, inbox weight 0.93, cycle-759 incident: AUDIT_BINDING_HEAD_MOVED
-// exhausted a FIXED budget of 2 recoveries and aborted a clean cycle under
-// normal width-3 landing-queue contention).
-//
-// Contract encoded here (Builder implements; DO NOT modify these tests):
-//
-//  1. The fleet supervisor advertises lane width via the SSOT IPC env key
-//     ipcenv.FleetWidthKey ("EVOLVE_FLEET_WIDTH"), read from CycleRequest.Env
-//     (never os.Getenv — fleet siblings must not leak into each other).
-//  2. shipRecoveryBudget(code ShipErrorCode, fleetWidth int) int is the pure
-//     budget classifier: contention-class codes (every AUDIT_BINDING_* code
-//     and GIT_FLEET_REBASE_NEEDED) get max(2, fleetWidth+1); every other
-//     code keeps the constant maxRecoveryDepth. Absent/garbage/non-positive
-//     width resolves to 1 (solo), i.e. the constant budget.
-//  3. Between contention re-audit attempts the orchestrator sleeps a JITTERED
-//     positive backoff through the existing backoffSleep seam (so TestMain's
-//     no-op keeps the suite fast and siblings don't re-collide in lockstep).
-//     Jitter must be drawn at millisecond granularity or finer so distinct
-//     attempts virtually never sleep identical durations.
-//
-// White-box (package core): reuses the internal fakes from orchestrator_test.go
-// and the backoffSleep seam, which the external core_test package cannot reach.
-
 import (
 	"context"
 	"testing"
@@ -68,8 +44,8 @@ func runWidthRecoveryCycle(t *testing.T, ship PhaseRunner, env map[string]string
 	return err
 }
 
-// persistentContentionShip builds a ship runner that always fails with the
-// cycle-759 contention error (a sibling landed during the audit→ship gap).
+// persistentContentionShip builds a ship runner that always fails with a
+// contention error (a sibling landed during the audit→ship gap).
 func persistentContentionShip() *widthShipStub {
 	return &widthShipStub{
 		failFirst: 99,
@@ -78,9 +54,6 @@ func persistentContentionShip() *widthShipStub {
 	}
 }
 
-// AC1 (RED): recovery attempts for contention-class ship errors scale with
-// fleet width — budget = max(2, fleetWidth+1) — so a width-N fleet is not
-// aborted by pure landing-queue contention after a constant 2 attempts.
 // Ship call count = 1 initial + budget (each recovery re-audits then re-ships).
 func TestShipRecovery_ContentionBudgetScalesWithFleetWidth(t *testing.T) {
 	cases := []struct {
@@ -114,10 +87,8 @@ func TestShipRecovery_ContentionBudgetScalesWithFleetWidth(t *testing.T) {
 	}
 }
 
-// AC2 (RED): between contention re-audit attempts the orchestrator applies a
-// jittered positive backoff through the backoffSleep seam so fleet siblings
-// don't re-collide in lockstep. NOT t.Parallel: swaps the package seam
-// (same save/restore discipline as the executeRetryBackoff unit tests).
+// NOT t.Parallel: swaps the package seam (same save/restore discipline as the
+// executeRetryBackoff unit tests).
 func TestShipRecovery_JitteredBackoffBetweenReaudits(t *testing.T) {
 	prev := backoffSleep
 	var sleeps []time.Duration
@@ -151,11 +122,6 @@ func TestShipRecovery_JitteredBackoffBetweenReaudits(t *testing.T) {
 	}
 }
 
-// AC3: non-contention transients keep the CONSTANT budget — fleet width must
-// not inflate retries for errors that aren't landing-queue contention.
-// (Behaviorally green pre-change; pinned so Builder's scaling cannot leak
-// beyond the contention class. RED today via this file's compile dependency
-// on the new contract symbols.)
 func TestShipRecovery_NonContentionTransientKeepsConstantBudget(t *testing.T) {
 	ship := &widthShipStub{
 		failFirst: 99,
@@ -172,8 +138,7 @@ func TestShipRecovery_NonContentionTransientKeepsConstantBudget(t *testing.T) {
 	}
 }
 
-// AC1b (RED): shipRecoveryBudget is the pure budget classifier. Pins
-// GIT_FLEET_REBASE_NEEDED as contention-class WITHOUT needing a live git
+// Pins GIT_FLEET_REBASE_NEEDED as contention-class WITHOUT needing a live git
 // rebase (recoverFromShipError performs a real rebase for that code, which a
 // unit cycle cannot stage), plus the solo/garbage-width floor.
 func TestShipRecovery_BudgetClassifierScalesOnlyContentionCodes(t *testing.T) {

@@ -1,19 +1,5 @@
 package core
 
-// reviewer.go — Workstream E2: per-phase deliverable review gate.
-//
-// After runner.Run returns a non-SKIPPED verdict, the orchestrator consults a
-// DeliverableReviewer BEFORE recording the phase as a success (ledger append,
-// CompletedPhases++, current=next). A nil reviewer is the default and a no-op
-// — byte-identical to the pre-E2 cycle when not opted in. Non-nil reviewers
-// (the deterministic default registered via WithReviewer, or a future LLM
-// reviewer backed by ollama-tmux at ReviewGate=enforce) may approve, reject,
-// or request a retry.
-//
-// The interface is small on purpose: presence is the contract, not shape. The
-// deterministic default reviewer + the LLM reviewer share this interface; an
-// operator can swap one for the other without touching the orchestrator.
-
 import "context"
 
 // ReviewInput is the bundle a DeliverableReviewer needs to decide on a phase.
@@ -24,10 +10,7 @@ type ReviewInput struct {
 	Cycle                           int
 	RunID                           string
 	ExplanationDocumentationVersion int
-	// WorktreeBaseSHA is the cycle's worktree base commit (CycleState
-	// .WorktreeBaseSHA) — deterministic reviewers diff against IT, not HEAD,
-	// because a committing builder (the mandated protocol) makes `git diff
-	// HEAD` empty until the post-review soft-reset re-exposes the work.
+	// WorktreeBaseSHA is the cycle's worktree base commit — reviewers diff against it, not HEAD, since a committing builder leaves `git diff HEAD` empty until the post-review soft reset.
 	WorktreeBaseSHA string
 
 	Phase          string        // phase name ("tdd", "build", ...)
@@ -51,40 +34,11 @@ type ReviewResult struct {
 	Approve bool
 	Reason  string
 	Retry   bool
-	// Demoted marks that the contract gate's own circuit breaker gave up and
-	// demoted enforce→advisory (deliverable.Reviewer's consecutive-block
-	// breaker). Without this flag a demotion is structurally identical to a
-	// compliant deliverable, so the orchestrator cannot report that a gate
-	// stopped being enforced — the batch-19/batch-21 blind spot (inbox
-	// contract-block-cli-escalation). Reason carries the last violation.
-	//
-	// Normally paired with Approve=true (the demotion IS the approval), but
-	// ChainReviewers carries it onto a rejection from a LATER gate in the chain
-	// too: the contract gate stopped enforcing whether or not topngate/triagecap
-	// went on to reject the same deliverable.
+	// Demoted marks that the contract gate's breaker demoted enforce→advisory; without it a demotion is indistinguishable from a compliant deliverable.
 	Demoted bool
-	// Blocks is the reviewer's own count of CONSECUTIVE contract blocks including
-	// this one — the breaker count that will open the circuit at its threshold.
-	// 0 means the deciding reviewer keeps no such counter (evalgate, topngate,
-	// triagecap, the build floor): those rejections are task-binding or capacity
-	// failures, not format-compliance failures, so the orchestrator must not read
-	// them as CLI evidence. The correction ladder keys its CLI escalation off
-	// THIS, never off a locally re-counted correction ordinal — the two desync
-	// whenever a prior cycle left the breaker hot or the salvage rung consumed a
-	// block without a re-dispatch.
+	// Blocks is the reviewer's own consecutive-contract-block counter; 0 means the deciding reviewer keeps none.
 	Blocks int
-	// Remediation is an OPTIONAL, gate-authored instruction describing how to
-	// SATISFY this specific violation. Empty for every gate that does not know
-	// how to fix its own rejection — and empty means the correction directive is
-	// byte-identical to what it has always been.
-	//
-	// It exists because one generic directive cannot serve two different failure
-	// classes. The default text is written for "the contracted artifact exists
-	// but is malformed" and ends with "Do not change unrelated files"; for a
-	// violation whose remedy is to CREATE a missing sidecar artifact that clause
-	// forbids the fix. Gate A (evals-materialized) is that case, and it recovered
-	// 0 of 4 times in production (cycles 1471/1476/1504/1531, each "rejected
-	// after 2 correction(s)").
+	// Remediation is an optional, gate-authored instruction for satisfying this violation; empty means the correction directive is the byte-identical default, which cannot fit every failure class (some violations are fixed only by creating a missing artifact, which the default directive's "do not change unrelated files" clause forbids).
 	Remediation string
 }
 
@@ -102,9 +56,6 @@ type DeliverableReviewer interface {
 	Review(ctx context.Context, in ReviewInput) ReviewResult
 }
 
-// mandatoryExplanationReviewer keeps the versioned Build explanation floor in
-// core, around every optional reviewer: deterministic validation runs first and
-// the host snapshot is sealed only after all optional gates approve.
 type mandatoryExplanationReviewer struct {
 	next DeliverableReviewer
 }
@@ -135,8 +86,9 @@ func (r mandatoryExplanationReviewer) Review(ctx context.Context, in ReviewInput
 }
 
 // ContractVerification is a breaker-neutral well-formedness verdict for one
-// phase deliverable (ADR-0045 I2). ArtifactPath is the CONTRACTED destination
-// — the only path the salvage rung may relocate to.
+// phase deliverable. ArtifactPath is the CONTRACTED destination — the only
+// path the salvage rung may relocate to.
+// See ADR-0045.
 type ContractVerification struct {
 	OK           bool
 	ArtifactPath string
@@ -144,15 +96,14 @@ type ContractVerification struct {
 }
 
 // ContractVerifier re-checks a phase's deliverable WITHOUT touching the
-// contract-gate circuit breaker. The I2 integrity rule (cycle-265 forensics):
-// the correction ladder's intermediate rung re-checks (salvage's
-// verify-after-move, live-fix's post-window re-verify) must never increment
-// the GLOBAL breaker in deliverable/reviewer.go — a multi-rung repair attempt
-// would otherwise count three blocks for one flaky deliverable and silently
-// demote the contract gate batch-wide. Only the ladder's FINAL outcome goes
-// through DeliverableReviewer.Review. The error follows deliverable.Verify's
-// fail-open contract: err => ambiguity (unknown phase) => the caller skips
-// the rung rather than acting blind.
+// contract-gate circuit breaker: the correction ladder's intermediate rung
+// re-checks (salvage's verify-after-move, live-fix's post-window re-verify)
+// must never increment the GLOBAL breaker in deliverable/reviewer.go — a
+// multi-rung repair attempt would otherwise count several blocks for one
+// flaky deliverable and silently demote the contract gate batch-wide. Only
+// the ladder's FINAL outcome goes through DeliverableReviewer.Review. The
+// error follows deliverable.Verify's fail-open contract: err => ambiguity
+// (unknown phase) => the caller skips the rung rather than acting blind.
 type ContractVerifier interface {
 	VerifyDeliverable(ctx context.Context, in ReviewInput) (ContractVerification, error)
 }
@@ -168,15 +119,6 @@ func ChainReviewers(reviewers ...DeliverableReviewer) DeliverableReviewer {
 type chainReviewer []DeliverableReviewer
 
 func (c chainReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
-	// Demoted must survive BOTH exits. Production mounts the contract gate in the
-	// middle of this chain (cmd_cycle.go: buildFloor → evalgate → contract →
-	// triagecap → topngate), so:
-	//   - rebuilding a bare Approve:true would swallow the gate's own "I gave up
-	//     enforcing" report on the all-approve path, and
-	//   - returning a LATER reviewer's rejection verbatim would swallow it too —
-	//     the case that actually bites triage, whose triagecap gate sits directly
-	//     after the contract gate. Either way the orchestrator goes blind and the
-	//     demotion is invisible exactly as before this fix.
 	out := ReviewResult{Approve: true}
 	for _, r := range c {
 		if r == nil {
@@ -216,7 +158,6 @@ func carryDemotion(decision, seen ReviewResult) ReviewResult {
 // wrapper still runs around it for versioned, non-degraded Build handoffs.
 type noopReviewer struct{}
 
-// Review implements DeliverableReviewer with a permissive default.
 func (noopReviewer) Review(_ context.Context, _ ReviewInput) ReviewResult {
 	return ReviewResult{Approve: true}
 }
@@ -258,7 +199,8 @@ func reviewerChainHas(r DeliverableReviewer, pred func(DeliverableReviewer) bool
 
 // contractGateSignals is the capability the composition-root wiring proof
 // asks for beside declaredDeliverablesGate: the contract gate reports its
-// decisions through the Signal Center (ADR-0101 S2b).
+// decisions through the Signal Center.
+// See ADR-0101.
 type contractGateSignals interface {
 	VerifiesDeclaredDeliverables() bool
 	SignalsWired() bool

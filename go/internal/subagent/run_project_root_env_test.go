@@ -1,17 +1,5 @@
 package subagent
 
-// run_project_root_env_test.go — the subprocess sees the plane's root.
-//
-// core/phase.go documents PhaseRequest.ProjectRoot as "what a subprocess sees
-// as EVOLVE_PROJECT_ROOT", and every phase runs with cwd = its cycle worktree
-// (CB.1). Nothing exported the variable. Any `evolve` subcommand the agent
-// runs — `inbox-mover claim` first among them — resolves its root through
-// cmdutil.EnvOrCwd, so it fell back to the worktree, whose .evolve/inbox is a
-// git-tracked SNAPSHOT of the plane's queue. Batch cycle 1631 (2026-09-12)
-// printed `[inbox-mover] claimed:` against that copy while the plane's item
-// never moved and its ledger recorded no claim; the cycle then FAILed with
-// its lane's item still queued.
-
 import (
 	"context"
 	"strings"

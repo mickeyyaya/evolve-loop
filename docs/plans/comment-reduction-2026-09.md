@@ -133,6 +133,15 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 67 | `internal/core`, file group 10 of 13 | 32 | 1,250 → 244 | — | on the round-8 comment PR |
 | 68 | `internal/phases/ship`, file group 2 of 4 | 33 | 1,249 → 656 | — | on the round-8 comment PR |
 | 69 | `internal/phases/audit`, file group 2 of 2 | 29 | 1,220 → 823 | — | on the round-8 comment PR |
+| 70 | `internal/core`, file group 11 of 13 | 32 | 1,331 → 783 | — | on the round-9 comment PR |
+| 71 | `internal/phases/ship`, file group 3 of 4 | 37 | 1,441 → 754 | — | on the round-9 comment PR |
+| 72 | `internal/subagent`, all files (1 of 1) | 30 | 1,118 → 836 | — | on the round-9 comment PR |
+| 73 | `internal/core`, file group 12 of 13 | 37 | 1,102 → 320 | — | on the round-10 comment PR |
+| 74 | `internal/phases/ship`, file group 4 of 4 | 12 | 403 → 91 | — | on the round-10 comment PR |
+| 75 | `internal/acssuite`, all files (1 of 1) | 14 | 612 → 302 | — | on the round-10 comment PR |
+| 76 | `internal/core`, file group 13 of 13 | 38 | 1,047 → 241 | — | on the round-11 comment PR |
+| 77 | `internal/flagregistry`, all files (1 of 1) | 9 | 240 → 39 | — | on the round-11 comment PR |
+| 78 | `internal/phases/triage`, all files (1 of 1) | 16 | 385 → 56 | — | on the round-11 comment PR |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

@@ -8,10 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// TestStartRunLease_WritesInitialLeaseBeforeReturn pins the WRITE-ORDERING
-// INVARIANT (CE.3): the lease exists the instant startRunLease returns — before
-// the cycle transitions to a non-terminal phase — so a gc pass that snapshots
-// liveness after the cycle has started never sees this run unleased.
 func TestStartRunLease_WritesInitialLeaseBeforeReturn(t *testing.T) {
 	dir := t.TempDir()
 	at := time.Unix(100, 0).UTC()
@@ -33,16 +29,11 @@ func TestStartRunLease_WritesInitialLeaseBeforeReturn(t *testing.T) {
 	}
 }
 
-// TestStartRunLease_EmptyWorkspace_NoOp — a worktree-less / test cycle has no
-// run dir to lease; startRunLease must be a safe no-op (no panic, no write).
 func TestStartRunLease_EmptyWorkspace_NoOp(t *testing.T) {
 	stop := startRunLease("", "run-abc", time.Now, time.Hour)
 	stop() // must not panic
 }
 
-// TestRunLeaseHeartbeat_RefreshesOnTick proves the heartbeat refreshes the
-// lease's HeartbeatAt on each tick (so a reader sees a heartbeat < TTL old
-// while the writer is alive). Deterministic via an injected tick channel.
 func TestRunLeaseHeartbeat_RefreshesOnTick(t *testing.T) {
 	dir := t.TempDir()
 	lease := runlease.Lease{RunID: "r1"}

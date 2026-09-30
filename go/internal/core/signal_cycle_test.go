@@ -1,11 +1,5 @@
 package core
 
-// signal_cycle_test.go — ADR-0101 S2a producers: cycle.sealed and
-// system.failure at completeCycle (both roots) and, for an abnormal exit,
-// from the epilogue; ship.error at recordShipError; quota.paused at
-// pauseForQuota (the seam both roots reach). Each is an Adapter from a typed
-// value the pipeline already owns to one Event — no new state, no decision.
-
 import (
 	"context"
 	"errors"

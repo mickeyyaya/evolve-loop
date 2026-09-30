@@ -40,8 +40,6 @@ func (o *Orchestrator) seedTaskRecall(ctx context.Context, base map[string]strin
 	for k, v := range base {
 		out[k] = v
 	}
-	// Always replace inherited recall, including no matches, so a scoped lane
-	// cannot accidentally reuse an unrelated task's memory on resume.
 	out[CtxKeyRecallMemory] = b.String()
 	return out
 }

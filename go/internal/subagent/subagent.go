@@ -1,27 +1,6 @@
-// Package subagent ports the orchestration loop from
-// legacy/scripts/dispatch/subagent-run.sh into Go. Its job is to:
-//
-//  1. Load the agent profile JSON (via profiles.Loader)
-//  2. Generate a 16-hex challenge token (provenance proof)
-//  3. Capture git state (HEAD + tree-diff sha256) for audit-binding
-//  4. Compose the prompt — caller supplies body, subagent prepends the
-//     challenge-token + artifact-path context block
-//  5. Call core.Bridge.Launch() (the bridge binary internally handles
-//     sandbox-exec/bwrap wrapping per profile.sandbox; the Go runner
-//     does not double-wrap)
-//  6. Verify the artifact: exists, non-empty, age < 300s, contains
-//     challenge token
-//  7. Append a kind=agent_subprocess ledger entry
-//
-// Out of scope for v11.5.0 M2 (deferred to later milestones):
-//   - parallel sibling fan-out (cmd_dispatch_parallel in bash)
-//   - phase-observer spawn/reap
-//   - cache-prefix v2 prompt rewriter
-//   - dispatch-plan log emission
-//   - fast-fail consecutive-failure counter
-//
-// These remain available via bash subagent-run.sh while the Go path
-// expands.
+// Package subagent dispatches one subagent invocation: profile load,
+// challenge-token compose, bridge launch, artifact verify and ledger
+// append. See docs/architecture/packages/internal-subagent.md.
 package subagent
 
 import (
@@ -49,29 +28,29 @@ import (
 // CHALLENGE TOKEN block so the LLM knows it must echo the token in the
 // artifact's first line.
 type Request struct {
-	Agent       string            // intent | scout | tdd-engineer | builder | auditor | …
-	Cycle       int               // current cycle number; appears in artifact path + ledger
-	ProjectRoot string            // writable project root (host repo)
-	PluginRoot  string            // immutable plugin root (profiles, prompts live here)
-	Workspace   string            // .evolve/runs/cycle-N/ — bridge writes outputs here
-	Worktree    string            // optional per-cycle worktree
-	Prompt      string            // user task body; runner prepends context block
-	Model       string            // optional model override; empty → profile default
-	CLI         string            // optional CLI override; empty → profile default
-	Env         map[string]string // propagated to bridge subprocess
+	Agent       string
+	Cycle       int
+	ProjectRoot string // writable project root (host repo)
+	PluginRoot  string // immutable plugin root (profiles, prompts live here)
+	Workspace   string // .evolve/runs/cycle-N/ — bridge writes outputs here
+	Worktree    string
+	Prompt      string
+	Model       string
+	CLI         string
+	Env         map[string]string
 }
 
 // Result captures everything Run() observed. The LedgerEntry is the
 // exact line that was appended (so callers can inspect entry_seq etc.).
 type Result struct {
-	Verdict        string          // PASS | FAIL | INTEGRITY_FAIL
-	ArtifactPath   string          // resolved absolute path
-	ArtifactSHA256 string          // sha256 of artifact bytes (empty if missing)
-	ChallengeToken string          // 16-hex token embedded in prompt + artifact
-	CostUSD        float64         // from bridge response
-	Tokens         core.TokenUsage // LLM token usage from bridge response (S5, token-telemetry)
-	DurationMS     int64           // wall-clock duration including bridge launch
-	ExitCode       int             // CLI exit code as reported by bridge
+	Verdict        string // PASS | FAIL | INTEGRITY_FAIL
+	ArtifactPath   string
+	ArtifactSHA256 string // empty if the artifact is missing
+	ChallengeToken string
+	CostUSD        float64
+	Tokens         core.TokenUsage
+	DurationMS     int64 // wall-clock duration including bridge launch
+	ExitCode       int
 	LedgerEntry    core.LedgerEntry
 	Diagnostics    []core.Diagnostic
 }
@@ -84,16 +63,15 @@ const (
 	VerdictIntegrityFail = subagentrun.VerdictIntegrityFail
 )
 
-// ArtifactMaxAge is the artifact freshness window (the leaf's).
+// ArtifactMaxAge is the artifact freshness window.
 const ArtifactMaxAge = subagentrun.ArtifactMaxAge
 
 // ChallengeTokenBytes is the size of the random source used for the
-// 16-hex token (8 bytes → 16 hex chars) — the leaf's.
+// 16-hex token (8 bytes → 16 hex chars).
 const ChallengeTokenBytes = subagentrun.ChallengeTokenBytes
 
-// Config wires in all the injectable seams. Production constructs the
-// runner with NewDefault() which fills in real implementations; tests
-// supply doubles for Bridge, Ledger, Profiles, Now, Rand, and GitState.
+// Config wires in all the injectable seams; New fills unset seams with
+// production defaults.
 type Config struct {
 	Profiles *profiles.Loader
 	Bridge   core.Bridge
@@ -157,8 +135,8 @@ func New(cfg Config) (*Runner, error) {
 }
 
 // Run drives one subagent invocation end-to-end. The returned Result
-// always carries the ledger entry, even on failure — the bash equivalent
-// always writes a ledger entry so post-mortem analysis has provenance.
+// always carries the ledger entry, even on failure, so post-mortem
+// analysis has provenance.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	if err := validateRequest(req); err != nil {
 		return Result{}, err
@@ -176,8 +154,8 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	gitHead, treeDiff, err := r.cfg.GitState(ctx, req.ProjectRoot)
 	if err != nil {
-		// Non-fatal: git state is "unknown:unknown" so the ledger entry
-		// still records what we have. Matches bash subagent-run.sh:281.
+		// Non-fatal: falls back to "unknown" so the ledger entry still
+		// records what we have.
 		gitHead, treeDiff = "unknown", "unknown"
 	}
 
@@ -263,15 +241,12 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		ChallengeToken: token,
 		GitHEAD:        gitHead,
 		TreeStateSHA:   treeDiff,
-		// Cycle-1571 H1: ship's binding lookup is run-scoped, so an entry with
-		// no run identity can never be bound. Resolved from the run workspace
-		// because this runner may execute out of the orchestrator's process.
+		// Resolved from the run workspace, not a global: ship's binding
+		// lookup is run-scoped, and this runner may execute out of the
+		// orchestrator's process.
 		RunID: core.RunIDFromWorkspace(req.Workspace),
 	}
 	if ledgerErr := r.cfg.Ledger.Append(ctx, entry); ledgerErr != nil {
-		// Surface ledger-append failure as a diagnostic but don't shadow
-		// the upstream verdict. The bash equivalent treats this as a
-		// hard fail; we follow.
 		res.Diagnostics = append(res.Diagnostics, core.Diagnostic{
 			Severity: "error",
 			Message:  fmt.Sprintf("ledger append: %v", ledgerErr),
@@ -303,17 +278,11 @@ func validateRequest(req Request) error {
 	return nil
 }
 
-// classify judges the artifact through the verification SSOT (contract.go:
-// Verify/VerifyArtifact), the one ladder shared with single-dispatch (run.go).
-// bridgeErr is the launch/exec error — a non-nil value emits a leading
-// bridge-error diagnostic but does not short-circuit the integrity checks.
 func (r *Runner) classify(bridgeErr error, artifactPath, token string, exitCode int) (string, []core.Diagnostic) {
 	res := VerifyArtifact(r.cfg.StatMTime, r.cfg.ReadFile, r.cfg.Now, artifactPath, token, exitCode, bridgeErr)
 	return res.Verdict, res.Diagnostics
 }
 
-// generateToken returns 16 lowercase hex chars (8 random bytes encoded).
-// Mirrors generate_challenge_token() at subagent-run.sh:263.
 func (r *Runner) generateToken() (string, error) {
 	buf := make([]byte, ChallengeTokenBytes)
 	n, err := r.cfg.Rand(buf)
@@ -326,25 +295,10 @@ func (r *Runner) generateToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// resolveArtifactPath expands {cycle} in the profile's output_artifact
-// template under projectRoot ("" for an empty template) — the leaf's rule,
-// the three host callers' spelling.
 func resolveArtifactPath(template string, cycle int, projectRoot string) string {
 	return subagentrun.ResolveArtifactPath(template, cycle, projectRoot)
 }
 
-// composePrompt prepends the CHALLENGE TOKEN context block to the user
-// prompt. Order matches subagent-run.sh:803-818 — token first, artifact
-// path second, then the task prompt body.
-//
-// v11.5.2 fix: section markers use `## ... ##` not `--- ... ---`.
-// claude CLI 2.1.149's flag parser rejects any prompt value whose first
-// argv-character is `-` ("unknown option" error), and the bridge
-// driver passes the composed prompt as `-p "$prompt_content"` — so a
-// leading `--` prefix tripped the parser. Switching to `## ... ##`
-// keeps the visual section-marker convention while avoiding the
-// flag-parser collision. The fix is structural: any future prompt
-// content the runner prepends must not start with `--`.
 func composePrompt(body, token, artifactPath, agent string, cycle int) string {
 	var b strings.Builder
 	b.WriteString("## INVOCATION CONTEXT ##\n")
@@ -365,10 +319,6 @@ func composePrompt(body, token, artifactPath, agent string, cycle int) string {
 	return b.String()
 }
 
-// defaultGitState shells `git rev-parse HEAD` + `git diff HEAD` and
-// returns the sha256 of the diff. Mirrors capture_git_state() at
-// subagent-run.sh:269. Errors collapse to ("unknown", "unknown", err) so
-// callers can log the failure without losing the rest of the entry.
 func defaultGitState(ctx context.Context, projectRoot string) (string, string, error) {
 	head, err := runGit(ctx, projectRoot, "rev-parse", "HEAD")
 	if err != nil {
@@ -391,9 +341,6 @@ func runGit(ctx context.Context, dir string, args ...string) (string, error) {
 	return string(out), err
 }
 
-// defaultHashFile streams the file at path through sha256 and returns
-// the hex digest (the leaf's HashFile).
 func defaultHashFile(path string) (string, error) { return subagentrun.HashFile(path) }
 
-// defaultStatMTime is the leaf's StatMTime.
 func defaultStatMTime(path string) (time.Time, error) { return subagentrun.StatMTime(path) }

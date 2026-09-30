@@ -104,9 +104,6 @@ func TestTaxonomyIsZero(t *testing.T) {
 	}
 }
 
-// TestConsequenceIsClassification documents the WS1↔WS2 contract: Taxonomy.Consequence
-// is typed as failureadapter.Classification, so misuse is a compile error rather than a
-// runtime mismatch. This test simply pins that the field accepts the canonical constants.
 func TestConsequenceIsClassification(t *testing.T) {
 	t.Parallel()
 	for _, c := range []failureadapter.Classification{

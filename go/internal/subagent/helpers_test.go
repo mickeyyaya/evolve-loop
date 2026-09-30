@@ -18,8 +18,6 @@ func fixedClock(t *testing.T, iso string) func() time.Time {
 	return func() time.Time { return parsed }
 }
 
-// --- AppendAbnormalEvent ---
-
 func TestAppendAbnormalEvent_WritesJSONLine(t *testing.T) {
 	ws := t.TempDir()
 	clock := fixedClock(t, "2026-05-23T16:30:00Z")
@@ -122,8 +120,6 @@ func TestAppendAbnormalEvent_EscapesQuotesInDetails(t *testing.T) {
 		t.Errorf("not parseable: %v\n%s", err, line)
 	}
 }
-
-// --- WriteFanoutLedgerEntry ---
 
 func TestWriteFanoutLedgerEntry_BasicLine(t *testing.T) {
 	tmp := t.TempDir()
@@ -355,8 +351,6 @@ func TestWriteFanoutLedgerEntry_TipRenameError(t *testing.T) {
 	}
 }
 
-// --- shared helpers ---
-
 func TestReadChainLink_EmptyLedger(t *testing.T) {
 	tmp := t.TempDir()
 	prev, seq, err := readChainLink(filepath.Join(tmp, "missing.jsonl"))
@@ -378,9 +372,9 @@ func TestReadChainLink_EmptyFile(t *testing.T) {
 	}
 }
 
-// TestAppendAbnormalEvent_OpenFileErrorTolerated covers helpers.go:55-58 —
-// when the events path can't be opened (here it already exists as a
-// directory), the best-effort writer swallows the error and returns nil.
+// TestAppendAbnormalEvent_OpenFileErrorTolerated covers: when the events
+// path can't be opened (here it already exists as a directory), the
+// best-effort writer swallows the error and returns nil.
 func TestAppendAbnormalEvent_OpenFileErrorTolerated(t *testing.T) {
 	ws := t.TempDir()
 	// Pre-create abnormal-events.jsonl as a DIRECTORY so OpenFile fails.
@@ -392,10 +386,10 @@ func TestAppendAbnormalEvent_OpenFileErrorTolerated(t *testing.T) {
 	}
 }
 
-// TestWriteFanoutLedgerEntry_ChainLinkError covers helpers.go:156-158 — the
-// ledger path is a directory, so readChainLink's os.ReadFile fails (a
-// directory is non-empty per os.Stat but unreadable as a file), surfacing the
-// chain-link error before the line is ever assembled.
+// TestWriteFanoutLedgerEntry_ChainLinkError covers: the ledger path is a
+// directory, so readChainLink's os.ReadFile fails (a directory is non-empty
+// per os.Stat but unreadable as a file), surfacing the chain-link error
+// before the line is ever assembled.
 func TestWriteFanoutLedgerEntry_ChainLinkError(t *testing.T) {
 	tmp := t.TempDir()
 	ledgerDir := filepath.Join(tmp, "ledger.jsonl")
@@ -411,9 +405,9 @@ func TestWriteFanoutLedgerEntry_ChainLinkError(t *testing.T) {
 	}
 }
 
-// TestReadChainLink_BlankLineFile covers helpers.go:241-243 — a file
-// containing only a newline trims to "" and yields the zero seed at seq 0
-// (the empty-first-line guard).
+// TestReadChainLink_BlankLineFile covers: a file containing only a newline
+// trims to "" and yields the zero seed at seq 0 (the empty-first-line
+// guard).
 func TestReadChainLink_BlankLineFile(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "ledger.jsonl")
@@ -429,8 +423,8 @@ func TestReadChainLink_BlankLineFile(t *testing.T) {
 	}
 }
 
-// TestReadChainLink_UnreadableFile covers helpers.go:237-239 — a non-empty
-// file that can't be read (chmod 000) surfaces the os.ReadFile error.
+// TestReadChainLink_UnreadableFile covers: a non-empty file that can't be
+// read (chmod 000) surfaces the os.ReadFile error.
 func TestReadChainLink_UnreadableFile(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root cannot mask read permission")

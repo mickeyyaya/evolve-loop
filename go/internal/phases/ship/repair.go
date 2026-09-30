@@ -1,22 +1,3 @@
-// repair.go — the self-healing ship repair ladder (ADR-0039 §8).
-//
-// Ship is a pure executor: after audit PASS its job is to find the LEGITIMATE
-// way to land the audited tree. Historically every verification failure was
-// binary — it killed the cycle even when audited-PASS work sat ready to push
-// (cycles 230, 246-248). The repair ladder gives each ShipError code at most
-// ONE typed, provably-safe repair attempt per Run, then escalates through the
-// existing orchestrator/router recovery machinery.
-//
-// Invariants (operator-approved 2026-06-07):
-//   - Bounded: a given code is repaired at most once per Run (opts.repairAttempted);
-//     the orchestrator's maxRecoveryDepth bounds the outer loop independently.
-//   - Provably safe: every repair re-verifies the original invariant afterwards
-//     (the failed stage is re-run, or the closure re-checks the tree binding).
-//   - Policy-compliant: never rebase, never force-push, never set bypass env
-//     vars, never delete content (differing colliders are quarantine-moved).
-//   - Observable: every attempt is logged, recorded on the RunResult
-//     (RepairAttempted/RepairOutcome), and stamped into the ShipError Debug
-//     map when declined — flowing into ship-error.json and the failure floor.
 package ship
 
 import (
@@ -53,11 +34,9 @@ const (
 type repairFn func(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome
 
 // repairFns maps each repairable ShipError code to its single typed repair.
-// GIT_PUSH_REJECTED is deliberately absent: the push retry runs inline at the
-// push site (the landing's Push, projected by pushWithRepair in
-// gitops_landing.go) so the post-push tree verification and ship-binding
-// sidecar still execute on the healed path.
-// Read-only after package init — never mutated at runtime.
+// GIT_PUSH_REJECTED is deliberately absent: its retry runs inline at the push
+// site (pushWithRepair in gitops_landing.go) so the post-push tree
+// verification and ship-binding sidecar still execute on the healed path.
 var repairFns = map[core.ShipErrorCode]repairFn{
 	core.CodeSelfSHATampered:       repairSelfSHAPin,
 	core.CodeGitFFMergeDiverged:    repairColliders,
@@ -124,12 +103,9 @@ func runStageWithRepair(ctx context.Context, opts *Options, res *RunResult, stag
 
 // --- mode #1: SELF_SHA_TAMPERED from a stale TOFU pin ----------------------
 
-// repairSelfSHAPin heals the cycles-246-248 stale-pin signature: the running
-// ship binary's SHA equals the SHA of the binary blob COMMITTED AT GIT HEAD —
-// a legitimate rebuild/manual-ship of audited, committed source whose pin was
-// never refreshed. Re-pin and let verifySelfSHA re-run. Any divergence from
-// the committed blob keeps the integrity BLOCK (this is the same trust
-// boundary repinPostCycle already uses: HEAD is the audited reference).
+// repairSelfSHAPin heals a stale TOFU pin when the running binary's SHA
+// still matches the blob committed at HEAD; any divergence keeps the
+// integrity block (the same trust boundary repinPostCycle uses).
 func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *core.ShipError) repairOutcome {
 	binPath := opts.ShipBinaryPath
 	if binPath == "" {
@@ -153,8 +129,9 @@ func repairSelfSHAPin(ctx context.Context, opts *Options, res *RunResult, _ *cor
 
 	statePath := filepath.Join(opts.ProjectRoot, ".evolve", "state.json")
 	pluginVer := pluginVersion(opts.PluginRoot)
-	// ADR-0049 S2 / G2: serialize the RMW under the shared state.json lock. Any
-	// error (lock/read/write) → repairNone, as before (conservative repair).
+	// See ADR-0049.
+	// Serializes the read-modify-write under the shared state.json lock;
+	// any lock/read/write error declines the repair.
 	if err := withStateLock(statePath, func() error {
 		stateMap, err := readStateMap(statePath)
 		if err != nil {
@@ -187,12 +164,11 @@ func committedBinSHA(ctx context.Context, opts *Options, relBin string) string {
 
 // --- mode #3: GIT_FF_MERGE_DIVERGED untracked colliders ---------------------
 
-// repairColliders heals the cycle-230 signature: untracked main-side files
-// blocking the worktree ff-merge. Byte-identical copies are removed (the same
-// bytes arrive via the merge); differing copies are quarantine-moved to
-// .evolve/quarantine/cycle-<N>/ with a manifest record — content is never
-// deleted. The atomic-ship stage is then re-run, which re-detects colliders
-// from scratch (the repair never bypasses the pre-flight).
+// repairColliders heals untracked main-side files blocking the worktree
+// ff-merge: byte-identical copies are removed, differing copies are
+// quarantine-moved (content is never deleted), and the atomic-ship stage is
+// re-run so it re-detects colliders from scratch rather than trusting this
+// repair's own plan.
 func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome {
 	if se.Debug["colliders"] == "" {
 		return repairNone // the real-divergence variant of GIT_FF_MERGE_DIVERGED — not repairable here
@@ -214,7 +190,7 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 		return repairNone
 	}
 
-	csMap, err := readStateMap(opts.cycleStateFile()) // ADR-0049 S3 / G3: run-scoped (cycle_id)
+	csMap, err := readStateMap(opts.cycleStateFile()) // See ADR-0049: run-scoped (cycle_id)
 	if err != nil {
 		return repairNone
 	}
@@ -224,12 +200,9 @@ func repairColliders(ctx context.Context, opts *Options, res *RunResult, se *cor
 	}
 	qDir := filepath.Join(opts.ProjectRoot, ".evolve", "quarantine", fmt.Sprintf("cycle-%d", cid))
 
-	// Plan-then-execute: verify EVERY collider is readable/comparable BEFORE
-	// mutating anything, so an unreadable file declines the repair with the
-	// main tree untouched. An execution failure after that point is loudly
-	// logged with the already-completed actions (audit trail for recovery);
-	// the stage is NOT re-run on a partial heal (repairNone → the original
-	// error stands), so no merge can land over a half-healed tree.
+	// Plan-then-execute: every collider is verified readable/comparable before
+	// any mutation, and a partial heal never re-runs the stage — the original
+	// error stands so no merge can land over a half-healed tree.
 	type colliderAction struct {
 		path      string
 		identical bool
@@ -328,12 +301,12 @@ func appendQuarantineManifest(opts *Options, qDir string, cycle int, paths []str
 
 // --- mode #2: AUDIT_BINDING_HEAD_MOVED resume-unpushed closure --------------
 
-// repairResumeUnpushed heals the cycle-246 signature: ship died after its own
-// commit/merge moved HEAD but before the push. When (a) HEAD's tree equals
-// the audit-bound tree, (b) the audited base is an ancestor of HEAD, and
+// repairResumeUnpushed heals a ship that died after its own commit/merge
+// moved HEAD but before the push. When (a) HEAD's tree equals the
+// audit-bound tree, (b) the audited base is an ancestor of HEAD, and
 // (c) origin/<branch> is strictly behind HEAD on the same history, the
 // audited work is already committed and merely unpushed — complete with a
-// push-only closure. Anything else declines (→ the re-audit route).
+// push-only closure. Anything else declines to the re-audit route.
 func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome {
 	if opts.Class != ClassCycle {
 		return repairNone
@@ -348,13 +321,10 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 	}
 	headTree = strings.TrimSpace(headTree)
 	if headTree != bound {
-		// Recorded decision (cycle-1506 review M5): a consumed-item PASS ship's
-		// HEAD tree legitimately differs from the bound tree by the sanctioned
-		// consumption delta — but this rung runs in a FRESH process after a
-		// died-between-commit-and-push crash, where internalConsumedPaths no
-		// longer exists, so the explained-by-consumption test cannot run here.
-		// Interrupted consumed-item ships therefore decline this fast heal and
-		// route to the slower re-audit path — fail-safe, deliberately.
+		// A consumed-item PASS ship's HEAD tree legitimately differs from the
+		// bound tree by the sanctioned consumption delta, but this rung runs in
+		// a fresh process where the explained-by-consumption check cannot run —
+		// decline to the slower re-audit path, deliberately fail-safe.
 		return repairNone // HEAD is not the audited work
 	}
 	auditedHead := se.Debug["audited"]
@@ -389,9 +359,9 @@ func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se
 	}
 	res.CommitSHA = head
 	if bindErr := writeShipBinding(opts, headTree, head); bindErr != nil {
-		// Without the sidecar a further re-dispatch cannot recognize the
-		// idempotent state (the once-guard blocks a second resume) — the
-		// operator must `evolve cycle reset`. The push itself succeeded.
+		// Without the sidecar a re-dispatch cannot recognize the idempotent
+		// state (the once-guard blocks a second resume); the push itself
+		// still succeeded.
 		res.Logs = append(res.Logs, "[ship] WARN: could not write ship-binding.json on resume ("+bindErr.Error()+
 			") — a re-dispatch will NOT be idempotent; run `evolve cycle reset` if this cycle is re-dispatched")
 	}

@@ -1,16 +1,5 @@
 package core
 
-// worktree_retry_consolidate_test.go — RED contract for cycle-1268 task
-// `worktree-provisioning-retry-consolidate`, adoption site #1:
-// gitWorktree.CreateFrom.
-//
-// CreateFrom is the ADR-0076 continuation-seeding path — the one that
-// provisions the worktree for a cycle RESUMING salvaged work — and it issues a
-// bare, unretried `git worktree add` (worktree.go:208). A transient lock
-// collision there costs the continuation its cycle in exactly the way PR #401
-// fixed for Create, with the added insult that the salvaged work is what is
-// being dropped on the floor.
-//
 // Fixtures (initRetryRepo, failingAddRunner) and the sleep no-op init() are
 // shared with worktree_retry_test.go — PR #401's file, which must stay green
 // and unmodified: "existing tests staying green" is part of this task's
@@ -66,8 +55,6 @@ func TestGitWorktreeCreateFrom_PersistentFailureStillFailsLoudly(t *testing.T) {
 	}
 }
 
-// A continuation that provisions cleanly must pay nothing for the retry
-// capability — one git invocation, zero backoff.
 func TestGitWorktreeCreateFrom_CleanRunCostsOneAttemptAndNoSleep(t *testing.T) {
 	root := initRetryRepo(t)
 	prevRunner, prevSleep := gitRunner, worktreeAddRetrySleep

@@ -76,8 +76,8 @@ func (s *committingShip) Run(_ context.Context, req core.PhaseRequest) (core.Pha
 	return core.PhaseResponse{Phase: string(core.PhaseShip), Verdict: core.VerdictPASS}, nil
 }
 
-// resolvingDebugger takes main's version of the conflicted file in the worktree, as 1719's debugger did, and
-// asks for a reship.
+// resolvingDebugger takes main's version of the conflicted file in the
+// worktree and asks for a reship.
 type resolvingDebugger struct {
 	calls   int
 	writes  string

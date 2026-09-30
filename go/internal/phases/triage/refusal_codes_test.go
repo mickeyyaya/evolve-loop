@@ -1,11 +1,5 @@
 package triage
 
-// refusal_codes_test.go — the three deterministic refusals Classify itself
-// raises (not the agent's verdict) carry a stable Diagnostic.Code, so the C1
-// record and the FAIL closeout can tell "the item is operator-owned" from
-// "the agent had a bad day" without regexing prose
-// (docs/incidents/2026-09-14-triage-refusal-poison-loop.md).
-
 import (
 	"os"
 	"path/filepath"
@@ -81,7 +75,6 @@ func TestTriageClassify_CommitmentInvalidRefusalCarriesItsCode(t *testing.T) {
 	}
 }
 
-// A PASS carries no refusal code — the vocabulary is for Classify's own gates.
 func TestTriageClassify_PassCarriesNoRefusalCode(t *testing.T) {
 	artifact := "## top_n\n- ok-card: a plain card — priority=M, files={go/internal/foo/foo.go}, source=scout\n"
 	verdict, diags, _ := hooks{}.Classify(artifact, core.PhaseRequest{Workspace: t.TempDir()}, core.BridgeResponse{})

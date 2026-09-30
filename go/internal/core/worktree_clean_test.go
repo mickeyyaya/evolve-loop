@@ -9,13 +9,6 @@ import (
 	"testing"
 )
 
-// Regression tests for the cycle-653 dirty-worktree-reuse incident: a reused
-// per-cycle worktree inherited a prior failed attempt's uncommitted orphan RED
-// test, ship bound the whole tree, and a would-PASS cycle failed. The
-// cycle-584 lesson's prescribed gate (clean-HEAD provisioning with quarantine,
-// never silent deletion) is ensureCleanWorktree, called on the
-// gitWorktree.Create reuse branch.
-
 func initTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -42,8 +35,8 @@ func TestEnsureCleanWorktree_QuarantinesInheritedOrphanRedTest(t *testing.T) {
 	wt := initTestRepo(t)
 	root := t.TempDir()
 
-	// Cycle-653 reproduction: the reuse candidate carries a prior attempt's
-	// uncommitted orphan RED test (untracked) AND a tracked-file modification.
+	// The reuse candidate carries a prior attempt's uncommitted orphan RED
+	// test (untracked) AND a tracked-file modification.
 	orphan := filepath.Join(wt, "go", "internal", "echo", "veto_red_test.go")
 	if err := os.MkdirAll(filepath.Dir(orphan), 0o755); err != nil {
 		t.Fatal(err)
@@ -63,7 +56,6 @@ func TestEnsureCleanWorktree_QuarantinesInheritedOrphanRedTest(t *testing.T) {
 		t.Fatalf("quarantined paths = %v, want 2 (orphan test + tracked modification)", moved)
 	}
 
-	// Dirt is PRESERVED on disk under the quarantine dir — never deleted.
 	qdir := quarantineDir(root, 653)
 	qOrphan := filepath.Join(qdir, "go", "internal", "echo", "veto_red_test.go")
 	b, err := os.ReadFile(qOrphan)
@@ -77,7 +69,6 @@ func TestEnsureCleanWorktree_QuarantinesInheritedOrphanRedTest(t *testing.T) {
 		t.Fatalf("quarantined tracked modification missing: %v", err)
 	}
 
-	// Worktree is clean at HEAD: orphan gone, tracked content restored.
 	if _, err := os.Stat(orphan); !os.IsNotExist(err) {
 		t.Fatalf("orphan RED test still present in worktree (err=%v)", err)
 	}

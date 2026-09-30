@@ -19,13 +19,6 @@ func goACSDir(t *testing.T) string {
 	return filepath.Join(filepath.Dir(self), "..", "..", "acs")
 }
 
-// TestAllACSPredicatesAreTagged is the normal-suite guard enforcing the EGPS
-// Go-native contract: every go/acs/**/predicates_test.go MUST carry the
-// `//go:build acs` constraint. EGPS predicates are state/environment assertions,
-// not unit tests — they must NOT run in the normal `go test ./...` / CI suite
-// (e.g. cycle106's "no uncommitted changes" assertion is false mid-edit). The
-// `acs` tag is what excludes them from the normal suite and includes them in the
-// host-side Go predicate lane (`go test -tags acs ./acs/...`).
 func TestAllACSPredicatesAreTagged(t *testing.T) {
 	acsDir := goACSDir(t)
 	var untagged []string
@@ -61,7 +54,7 @@ func hasACSBuildTag(src string) bool {
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "package ") {
-			return false // reached package clause without finding the tag
+			return false
 		}
 		if strings.HasPrefix(trimmed, "//go:build ") {
 			// Constraint expr must reference the acs tag (e.g. "acs", "acs && x").

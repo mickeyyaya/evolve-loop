@@ -8,13 +8,6 @@ import (
 	"testing"
 )
 
-// This file closes the apicover gap for symbols the existing tests exercise
-// through their producer functions but never NAME by their exported type/const
-// identifier. apicover flags such symbols UNCOVERED. Each test below binds the
-// real producer's output to an explicitly-typed variable (naming the type) and
-// asserts a load-bearing field, so the type identifier is both named AND its
-// producing function is executed.
-
 // TestTierHaiku_FlowsThroughModelTierResolver names the TierHaiku const and
 // asserts it through its real consumer: ResolveModelTier returns the hint
 // verbatim, and "haiku" is exactly TierHaiku. This pins the resolver's Rule-1
