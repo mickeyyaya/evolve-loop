@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Each of the three tests fails when its rule is removed, and the three comments are gone",
+    "No production file in internal/auditchain defines a function only tests call",
+    "ciparitygate names its marker literals in one place; releasepreflight has no literal copy of a ciwatch constant"
+  ],
+  "created_at": "2026-09-30T13:40:15Z",
+  "files": [
+    "go/internal/auditchain/auditchain.go",
+    "go/internal/auditchain/evidence_access.go",
+    "go/internal/skillcheck/commands.go",
+    "go/internal/phases/audit/ciparitygate/offenders.go",
+    "go/internal/releasepreflight/releasepreflight.go"
+  ],
+  "fix": "Add TestConclude_MissingLinkIsFailNeverWarn, TestRequiredEvidence_IsSortedAndDeterministic and TestRenderCommandStub_MultiLineDescriptionRoundTripsWithoutDrift, then delete the three comments; move withLink into a _test.go file; name every ciparitygate marker literal in one table; use the ciwatch constants in releasepreflight; point cycle1707's prose at the design notes instead of the deleted comment.",
+  "id": "round12-leftover-pins-and-literals",
+  "kind": "test",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, comment round 12 findings (docs/reports/comment-round-12-findings-2026-09-30.md)",
+  "summary": "Comment round 12 (PR #749) kept three comments that state a rule no test pins: auditchain's missing link is a FAIL, never a WARN; auditchain's RequiredEvidence is sorted and deterministic; skillcheck's multi-line command description round-trips without drift. auditchain's withLink (auditchain.go) is production code that only tests call. ciparitygate's offenders.go names some marker literals in a table and spells others inline, and releasepreflight repeats \"success\"/\"completed\" instead of ciwatch.ConclusionSuccess/StatusCompleted. acs/cycle1707's prose points at a doc comment in fingerprint.go that round 12 deleted.",
+  "title": "Round 12 leftovers: pin three kept whys with tests, move auditchain's test-only helpers, and unify two duplicated literal sets",
+  "weight": 0.25
+}
