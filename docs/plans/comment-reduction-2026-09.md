@@ -6,6 +6,20 @@
 
 **Owner:** console. This is a refactor of protected surfaces, so it runs outside loop lanes and lands at wave boundaries.
 
+## Phase 3: remove with a tool, refactor with review (2026-09-30)
+
+The operator's goal (2026-09-30): remove every comment and refactor the code to be clear and self-explanatory. Editor rounds removed comments by hand, a few directories at a time; about 88,000 comment lines were left. Removal is deterministic, so a tool does it; judging whether the code still reads is not, so review does that.
+
+| Step | What | How |
+|---|---|---|
+| 3a | The tool | `commentaudit strip [dir ...]` removes every comment the convention does not allow and refuses any file whose code would change (the `verify` proof). A trial on main removed 89,895 lines from 3,355 files; the stripped tree builds and vets |
+| 3b | Check the result against *Clean Code* | Eight reviewers read 64 of the riskiest stripped production files: none read fully without their comments, the mean readability was 3.45 of 5, and two thirds of the removed comments carried intent, invariants or design the code did not yet say ([report](../reports/comment-strip-clean-code-review-2026-09-30.md)) |
+| 3c | Tests and predicate packages | Stripped in bulk, one landing, recorded by `commentaudit history`; the few tests that read comments are rewritten to read code |
+| 3d | Production code, package by package | Each landing holds the removal and, in the same change, the review's refactors: intent into names, functions and constants; invariants into tests; design into `docs/architecture/packages/internal-<pkg>.md`; defects confirmed with a failing test and fixed |
+| 3e | Regrowth | As 2e: the commit gate refuses an added comment; lanes get an enforced comment floor |
+
+Phase 2's editor rounds (2a, 2b, 2d, 2f) are replaced by 3c and 3d; 2c's rule (an invariant becomes a test) is the review's `INVARIANT` class.
+
 ## Phase 2: to zero (2026-09-30)
 
 | Step | Scope | How |
@@ -47,7 +61,7 @@ Each batch covers one package, or one file group of a large package.
 3. **Prove comment-only.** `go run ./cmd/commentaudit verify -base HEAD <batch dirs>` must pass. That means an identical position-free AST, every directive and marker kept, and no file added or deleted.
 4. **Test.** Run `gofmt -l`, `go vet`, `golangci-lint run` and `go test -count=1` on the batch's packages, then `make -C go test-acs-durable`. The durable tier holds the gates that read comments across the repo: `docgo` for package docs and `envtaint` for its marker. A test that reads a comment fails here, and that comment is restored.
 5. **No review for a proven batch.** The proof in step 3 is stronger than a reader, so a batch that passes it lands without a reviewer. The commit gate accepts the same proof. A batch that also touches code gets code-simplifier and a reviewer as usual; that includes a conflict resolution that changes a code line. The editor reports code problems it finds, and they are filed as inbox items rather than fixed in the batch.
-6. **Land.** Editors share one working worktree, but batches land from a separate landing worktree. A manual ship with no workspace manifest stages every changed file (`ship.stageExplicitPaths`), so committing in the shared tree would sweep up batches still in flight.
+6. **Record the history, then land.** After the round's last batch is applied in the landing tree and before the comment-only commit, run `commentaudit history -base $(git merge-base HEAD origin/main) -label "round N (batches …)" -out docs/history/code-comments` once, the same base the re-prove below uses, and commit the archive with the removal. The editor base would be wrong here: against it, the section would also record whatever main removed since, such as an earlier round that landed in between. A second run with the same label is refused, so a change is recorded once and no history the comments carried is lost. The [archive](../history/code-comments/README.md)'s first section is the backfill of everything removed from the workstream's baseline 3ce14dd0 to main at f27afd8b, after round 12 and the zero-comment policy, so step 6 first applies to round 13. **Land.** Editors share one working worktree, but batches land from a separate landing worktree. A manual ship with no workspace manifest stages every changed file (`ship.stageExplicitPaths`), so committing in the shared tree would sweep up batches still in flight.
    - **Move each batch as a patch, never as copied files.** Take `git diff` against the editor base and apply it in the landing tree with `git apply --3way`. Copying whole files would silently revert every lane change made to them since the editor base, tests included, so the tests would stay green. New capture docs are the only files copied.
    - **Re-prove in the landing tree.** Run `commentaudit verify -base $(git merge-base HEAD origin/main)` with no directory arguments. Its verified count must equal the sum of the per-batch file counts in the progress table below. Then check that `git diff --name-only --no-renames $(git merge-base HEAD origin/main) -- ':(exclude)*.go' ':(exclude)docs/'` and `git status --porcelain --no-renames -- ':(exclude)*.go' ':(exclude)docs/'` both print nothing: every non-Go change is under `docs/`, committed or not.
    - **After a rebase or `gh pr update-branch`, re-prove before merge.** Fetch and pull the branch locally first. Build `commentaudit` from the rebased tree and re-prove with it: the cumulative proof re-checks every earlier batch under the current rules, and it catches a conflict resolution that silently reverted train code.

@@ -21,13 +21,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/commentaudit"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// minDocWords rejects bare "// Package x." stubs while accepting a genuine
-// one-line package comment. The full what/how/why template is the standard for
-// hub/complex packages; this floor just guarantees a real definition exists.
-const minDocWords = 6
+const minDocWords = commentaudit.MinPackageDocWords
 
 // TestDocGo_EveryInternalPackageDocumented asserts every internal package has a
 // substantive package doc comment, allowing only the packages explicitly listed

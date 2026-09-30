@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "RED first: on the real registry a strategy-options document lane's plan runs premise-challenge, forces-analysis, market-sizing and scope-baseline",
+    "A registry test fails when a phase named in goal_recipes[g] has an insert_when-only admission rule that cannot fire for goal_type g"
+  ],
+  "created_at": "2026-10-01T03:00:00Z",
+  "files": [
+    "docs/architecture/phase-registry.json",
+    ".evolve/phases/forces-analysis/phase.json",
+    ".evolve/phases/market-sizing/phase.json",
+    ".evolve/phases/scope-baseline/phase.json",
+    ".evolve/phases/premise-challenge/phase.json",
+    "go/internal/router/"
+  ],
+  "fix": "Make recipe and trigger one declaration: add the recipe goal types to each recipe phase's insert_when (or give those phases a rubric_hint), and pin the registry so a phase named in a goal recipe admits that goal type.",
+  "id": "document-recipes-gated-off-by-their-own-triggers",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console-cl-docplan-2026-10-01",
+  "summary": "goal_recipes.strategy-options (and business-plan, partnership-deal) name premise-challenge, forces-analysis, market-sizing and scope-baseline, but those phases' insert_when admit only other goal types (business-strategy, project-management, scout.cycle_size==large) and carry no rubric_hint, so insert-when-gates-plan skips all four on a strategy-options lane. Probed on the real registry 2026-10-01: all four clamped insert-when-gates-plan. Each skip now raises ORCHESTRATOR_PLAN_PHASE_GATED.",
+  "title": "A strategy-options lane runs none of its goal recipe's phases: their insert_when never admits that goal type",
+  "weight": 0.85
+}

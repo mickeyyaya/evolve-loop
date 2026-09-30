@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "RED first: a document lane whose advisor plan says tdd=false does not dispatch tdd, recorded with a clamp or reason naming the release",
+    "A code lane's plan-time tdd force is unchanged"
+  ],
+  "created_at": "2026-10-01T03:00:00Z",
+  "files": [
+    "go/internal/router/floor.go",
+    "go/internal/core/cyclerun_replan.go",
+    "docs/architecture/adr/0099-deliverable-kinds.md"
+  ],
+  "fix": "Either raise router_replan to advisory once a soak shows re-plans are sound, or let a floor-forced tdd entry lapse at tdd's turn when the pin is released and the advisor's original plan did not run it (record which entries the floor forced).",
+  "id": "document-lane-tdd-release-never-reaches-the-plan",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console-cl-docplan-2026-10-01",
+  "summary": "ClampPlanToFloorWith evaluates TddPinned with empty signals at cycle start, so ship-requires-tdd forces tdd into every initial plan; after scout declares deliverable_kind=document the pin is released, but the walk follows the clamped plan and router_replan is shadow. The advisor, now shown the lane's document item, cannot opt it out. item_count was the blocker to raising the re-plan and is fixed (2026-10-01).",
+  "title": "A document lane always runs tdd on the plan path: the plan-time floor forces it with empty signals and only the shadow re-plan could release it",
+  "weight": 0.7
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A change that removes a history-bearing comment group (the commentaudit check rule) with no matching labelled section added under docs/history/code-comments is refused by the commit gate, naming the file, line and the command that records it (red first)",
+    "A change whose removed history groups all appear in a section it adds passes, and a move (the group reappears whole elsewhere in the change) needs no section",
+    "The rule is commentaudit.RemovedHistoryAcrossDiff, the same one `commentaudit history` uses, with no second copy"
+  ],
+  "created_at": "2026-09-30T16:30:00Z",
+  "files": [
+    "go/internal/commitgate/comments_added.go",
+    "go/internal/commentaudit/history.go"
+  ],
+  "fix": "Beside refuseAddedComments, add a refusal that computes RemovedHistoryAcrossDiff over the staged change and requires each removed group to be present in a docs/history/code-comments page section the same change adds.",
+  "id": "history-bearing-comment-removal-needs-an-archive-entry",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, architecture review of the comment history archive (finding 3)",
+  "summary": "The operator's rule (2026-09-30) is that the history comments carried must be recorded and stored. `commentaudit history` records it into docs/history/code-comments, but only the comment-reduction rounds run it; no gate does. The tree still holds about 3,338 history-bearing comment lines under the widened rule, so a loop lane or console change that deletes such code lands with no archive entry, and git's diff is again the only record.",
+  "title": "Refuse a commit that removes history-bearing comments without recording them in the history archive",
+  "weight": 0.5
+}

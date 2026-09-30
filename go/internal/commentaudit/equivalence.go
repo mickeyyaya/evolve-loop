@@ -1,5 +1,5 @@
-// Package commentaudit proves a Go edit changed only comments, and measures
-// how much of a package is comment.
+// Package commentaudit measures, removes and records a package's comments, and
+// proves that an edit changed only comments.
 package commentaudit
 
 import (
@@ -60,29 +60,103 @@ func codeOnly(name string, v reflect.Value) bool {
 	return ast.NotNilFilter(name, v) && t != posType && t != commentGroupType && t != commentGroupsType
 }
 
-// cgoPreamble returns the comment above `import "C"`, which cgo compiles as C.
 func cgoPreamble(file *ast.File) string {
+	return cgoPreambleGroup(file).Text()
+}
+
+func cgoPreambleGroup(file *ast.File) *ast.CommentGroup {
 	for _, decl := range file.Decls {
 		gen, ok := decl.(*ast.GenDecl)
 		if !ok || gen.Tok != token.IMPORT {
 			continue
 		}
 		for _, spec := range gen.Specs {
-			if imp := spec.(*ast.ImportSpec); imp.Path.Value == `"C"` {
-				if imp.Doc != nil {
-					return imp.Doc.Text()
-				}
-				if len(gen.Specs) == 1 {
-					return gen.Doc.Text()
-				}
-				return ""
+			imp := spec.(*ast.ImportSpec)
+			switch {
+			case imp.Path.Value != `"C"`:
+			case imp.Doc != nil:
+				return imp.Doc
+			case len(gen.Specs) == 1:
+				return gen.Doc
+			default:
+				return nil
 			}
 		}
 	}
-	return ""
+	return nil
 }
 
-var directive = regexp.MustCompile(`^(//go:\S|//line |//export |//extern |//nolint(:|\s|$)|// \+build |// Code generated .* DO NOT EDIT\.$|// acs-predicate:|// minimal:|// Deprecated:|// (Unordered )?[Oo]utput:|//\s?apicover:ignore|.*IPC-protocol-allowed)`)
+type markerExtent int
+
+const (
+	markerLine markerExtent = iota
+	markerParagraph
+	markerRestOfGroup
+	markerGroup
+	markerFile
+)
+
+type commentMarker struct {
+	pattern          *regexp.Regexp
+	extent           markerExtent
+	anchorsParagraph bool
+}
+
+var commentMarkerRules = []struct {
+	pattern          string
+	extent           markerExtent
+	anchorsParagraph bool
+}{
+	{`//go:\S`, markerLine, false},
+	{`//line `, markerLine, false},
+	{`//export `, markerLine, false},
+	{`//extern `, markerLine, false},
+	{`//nolint(:|\s|$)`, markerLine, false},
+	{`// \+build `, markerLine, false},
+	{`// Code generated .* DO NOT EDIT\.$`, markerFile, false},
+	{`// acs-predicate:`, markerLine, false},
+	{`// minimal:`, markerParagraph, false},
+	{`// Deprecated:`, markerParagraph, true},
+	{`// (Unordered )?[Oo]utput:`, markerRestOfGroup, false},
+	{`//\s?apicover:ignore`, markerLine, false},
+	{`.*IPC-protocol-allowed`, markerGroup, false},
+}
+
+var (
+	directive      = anyMarker()
+	commentMarkers = compiledMarkers()
+)
+
+func anyMarker() *regexp.Regexp {
+	alternatives := make([]string, len(commentMarkerRules))
+	for i, rule := range commentMarkerRules {
+		alternatives[i] = rule.pattern
+	}
+	return regexp.MustCompile(`^(` + strings.Join(alternatives, "|") + `)`)
+}
+
+func compiledMarkers() []commentMarker {
+	markers := make([]commentMarker, len(commentMarkerRules))
+	for i, rule := range commentMarkerRules {
+		markers[i] = commentMarker{pattern: regexp.MustCompile(`^(` + rule.pattern + `)`), extent: rule.extent, anchorsParagraph: rule.anchorsParagraph}
+	}
+	return markers
+}
+
+func anchorsItsParagraph(text string) bool {
+	return slices.ContainsFunc(commentMarkers, func(m commentMarker) bool {
+		return m.anchorsParagraph && m.pattern.MatchString(text)
+	})
+}
+
+func markerExtentOf(text string) (markerExtent, bool) {
+	for _, m := range commentMarkers {
+		if m.pattern.MatchString(text) {
+			return m.extent, true
+		}
+	}
+	return markerLine, false
+}
 
 // Directives returns the comments tools or conventions act on: toolchain and
 // linter directives, generated headers, deprecation notes, example output,
@@ -141,7 +215,7 @@ func scanDirectives(src []byte) []placedDirective {
 			if text := strings.TrimSpace(lit); directive.MatchString(text) {
 				waiting = append(waiting, placedDirective{
 					text: text, line: line, trailing: line == lastCodeLine,
-					paragraph: strings.HasPrefix(text, "// Deprecated:") && opensParagraph(lines, line),
+					paragraph: anchorsItsParagraph(text) && opensParagraph(lines, line),
 				})
 			}
 		case token.SEMICOLON:
