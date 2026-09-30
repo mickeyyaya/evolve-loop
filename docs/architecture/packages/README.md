@@ -62,6 +62,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/flagregistry` | the declarative SSOT for every `EVOLVE_*` control flag across every reader surface | [internal-flagregistry.md](internal-flagregistry.md) |
 | `cmd/evolve-fake-cli` | the offline stand-in for the claude, codex and agy binaries in E2E tests | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
 | `internal/auditchain` | the audit verdict as the conclusion of a seven-link reasoning chain across the phases | [internal-auditchain.md](internal-auditchain.md) |
+| `internal/commentaudit` | measures, removes (`strip`) and records (`history`) comments, and proves an edit changed only comments | [internal-commentaudit.md](internal-commentaudit.md) |
 | `internal/commitgate` | the pre-commit quality gate `evolve commit-gate run` runs for `/commit` | [internal-commitgate.md](internal-commitgate.md) |
 | `internal/dashboard` | the read-only local web UI behind `evolve dashboard` | [internal-dashboard.md](internal-dashboard.md) |
 | `internal/faillearn` | the kernel-owned failure floor that writes the retrospective and lesson when the retro cannot run | [internal-faillearn.md](internal-faillearn.md) |

@@ -99,3 +99,29 @@ func TestAddedComments(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNarrative_CountsPullRequestsCommitsReleasesAndRounds(t *testing.T) {
+	cases := map[string]bool{
+		"// PR #503 run-scoped latestAuditEntry":        true,
+		"// dd8a8d64 / dcaf44e4 (CRIT, same defect)":    true,
+		"// sanctioned ship a33ffd6a":                   true,
+		"// v11.5.0 M1–M6: CLI surface mirrors bash":    true,
+		"// round 9 missed it":                          true,
+		"// goal_hash 805f6ced burned 4 full pipelines": true,
+		"// deadbeef is a word here":                    false,
+		"// 1234567 items":                              false,
+		"// %#v prints the struct":                      false,
+		"// masks as %#02x":                             false,
+		"// step #1 of 3":                               false,
+		"// needs v1.2 of the API":                      false,
+		"// masks with 0xdeadbeef1":                     false,
+		"// the v2 API":                                 false,
+		"// a sha256 of the diff":                       false,
+		"// 64 hex: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": false,
+	}
+	for line, want := range cases {
+		if got := isNarrative(line); got != want {
+			t.Errorf("isNarrative(%q) = %v, want %v", line, got, want)
+		}
+	}
+}

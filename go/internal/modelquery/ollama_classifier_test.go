@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -80,12 +79,8 @@ func TestOllamaListMetadataExceptionDocumented(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read ollama.go: %v", err)
 	}
-	matched, err := regexp.MatchString(`(?i)metadata|no model|not model-reaching`, string(src))
-	if err != nil {
-		t.Fatalf("regexp: %v", err)
-	}
-	if !matched {
-		t.Error("ollama.go must document its List call site as a metadata-only / non-model-reaching C1 exception")
+	if !strings.Contains(string(src), "metadataOnlyListArgs") {
+		t.Error("ollama.go must name its list arguments metadataOnlyListArgs: the name is what marks the call as the metadata-only, non-model-reaching C1 exception (TestOllamaListerReachesNoModel pins the behaviour)")
 	}
 }
 

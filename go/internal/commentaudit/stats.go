@@ -6,7 +6,9 @@ import (
 	"go/token"
 	"io/fs"
 	"path"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -22,7 +24,8 @@ func (s FileStats) add(o FileStats) FileStats {
 }
 
 var (
-	historyMarker = regexp.MustCompile(`(?i)\bcycles?[- ]\d+|\bwave[- ]\d+|\bbatch[- ]\d+|\b20\d\d-\d\d-\d\d\b`)
+	historyMarker = regexp.MustCompile(`(?i)\bcycles?[- ]\d+|\bwave[- ]\d+|\bbatch[- ]\d+|\bround[- ]\d+|\b20\d\d-\d\d-\d\d\b|#\d{2,}\b|\bv\d+\.\d+\.\d+\b`)
+	hexWord       = regexp.MustCompile(`\b[0-9a-f]{7,40}\b`)
 	caseMarker    = regexp.MustCompile(`\bF\d{2,3}\b|\b[Ii]ncident`)
 	adrMention    = regexp.MustCompile(`\bADR-\d{4}\b`)
 	adrPointer    = regexp.MustCompile(`^//\s*See ADR-\d{4}(, ADR-\d{4})*\.?$`)
@@ -33,7 +36,21 @@ const goReferenceDate = "2006-01-02"
 
 func isNarrative(line string) bool {
 	return historyMarker.MatchString(strings.ReplaceAll(line, goReferenceDate, "")) || caseMarker.MatchString(line) ||
-		(adrMention.MatchString(line) && !adrPointer.MatchString(line))
+		(adrMention.MatchString(line) && !adrPointer.MatchString(line)) || hasCommitSHA(line)
+}
+
+func hasCommitSHA(line string) bool {
+	return slices.ContainsFunc(hexWord.FindAllString(line, -1), func(w string) bool {
+		return strings.ContainsAny(w, "abcdef") && strings.ContainsAny(w, "0123456789")
+	})
+}
+
+func isSkippedDir(name string) bool {
+	return name == "testdata" || name == "vendor" || (strings.HasPrefix(name, ".") && name != ".")
+}
+
+func isOutsideProjectCode(file string) bool {
+	return slices.ContainsFunc(strings.Split(path.Dir(filepath.ToSlash(file)), "/"), isSkippedDir)
 }
 
 // Stats counts the lines of one Go source file.
@@ -175,7 +192,7 @@ func Rank(fsys fs.FS) ([]PackageStats, error) {
 			return err
 		}
 		if d.IsDir() {
-			if p != "." && (d.Name() == "testdata" || d.Name() == "vendor" || strings.HasPrefix(d.Name(), ".")) {
+			if isSkippedDir(d.Name()) {
 				return fs.SkipDir
 			}
 			return nil

@@ -160,7 +160,7 @@ func TestC50A_003_BridgeConfig_HasCodexConfigPathField(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
 	f := filepath.Join(root, "go", "internal", "bridge", "engine.go")
-	if !acsassert.FileContains(t, f, "codexConfigPath string") {
+	if !acsassert.FileMatchesRegex(t, f, `codexConfigPath\s+string`) {
 		t.Errorf("RED: engine.go does not contain 'codexConfigPath string' field on bridge.Config.\n"+
 			"Builder must add an unexported string field to bridge.Config (engine.go):\n"+
 			"  codexConfigPath string  // test seam: overrides resolved codex config path\n"+
