@@ -1,15 +1,5 @@
 package core
 
-// scope_path_disclosure_test.go — a lane's assigned ids reach its phases WITH
-// the live record's path, never as bare names.
-//
-// cycle-1548 (soak-20260823a): the scope id resolved to 17 on-disk records —
-// 1 live, 16 consumed namesakes — the prompt carried a bare string, and every
-// phase worked a record from a halt cured two weeks earlier (PR #421). The
-// orchestrator resolves paths through an INJECTED resolver (core cannot import
-// inboxmover: inboxmover -> adapters/ledger -> core), the same composition-root
-// seam WithContinuationResolver uses. Nil resolver = byte-identical Context.
-
 import (
 	"context"
 	"strings"
@@ -48,8 +38,6 @@ func runScopedCycle(t *testing.T, resolver func(projectRoot, taskID string) stri
 	return probe
 }
 
-// THE headline: a scoped lane's phases receive fleet_scope_paths mapping each
-// PENDING id to its live record.
 func TestScopePaths_ResolvedPathsReachThePhaseContext(t *testing.T) {
 	resolver := func(_, taskID string) string {
 		if taskID == "pipeline-defect-pipeline-blocker" {
@@ -72,8 +60,6 @@ func TestScopePaths_ResolvedPathsReachThePhaseContext(t *testing.T) {
 	}
 }
 
-// NO-REGRESSION: nil resolver (the default, and every non-fleet run) leaves
-// the Context byte-identical — no new key.
 func TestScopePaths_NilResolverAddsNothing(t *testing.T) {
 	p := runScopedCycle(t, nil, map[string]string{"EVOLVE_FLEET_SCOPE": "some-id"})
 	if len(p.ctxs) == 0 {
@@ -84,7 +70,6 @@ func TestScopePaths_NilResolverAddsNothing(t *testing.T) {
 	}
 }
 
-// An unscoped (sequential) cycle gets no key even WITH a resolver wired.
 func TestScopePaths_UnscopedCycleAddsNothing(t *testing.T) {
 	p := runScopedCycle(t, func(_, _ string) string { return "/never" }, nil)
 	if len(p.ctxs) == 0 {

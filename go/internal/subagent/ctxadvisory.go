@@ -16,12 +16,8 @@ type CheckCtxAdvisoryResult struct {
 
 // CheckCtxAdvisory parses the profile JSON and decides whether to emit an
 // advisory when the test-agent's current context size exceeds the profile's
-// declared threshold. Mirrors cmd_check_ctx_advisory at subagent-run.sh:605.
-//
-// Returns (result, error). Error is non-nil only when the profile file
-// cannot be read; the bash version WARNs and exit 0s when the profile is
-// missing — we return (Emit=false, err) so the CLI can decide whether to
-// surface the WARN.
+// declared threshold. Error is non-nil only when the profile file cannot be
+// read, so the CLI can decide whether to surface a WARN.
 func CheckCtxAdvisory(profilePath string, tokens int) (CheckCtxAdvisoryResult, error) {
 	body, err := os.ReadFile(profilePath)
 	if err != nil {
@@ -29,7 +25,6 @@ func CheckCtxAdvisory(profilePath string, tokens int) (CheckCtxAdvisoryResult, e
 	}
 	rawThreshold := matchField(string(body), reFieldCtxTokens)
 	if rawThreshold == "" {
-		// Profile doesn't declare the trigger; bash exit 0 without printing.
 		return CheckCtxAdvisoryResult{Emit: false}, nil
 	}
 	threshold, err := strconv.Atoi(rawThreshold)

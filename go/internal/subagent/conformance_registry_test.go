@@ -9,17 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// conformance_registry_test.go — B6: keep the agent-role allow-list SSOT
-// single-sourced and internally consistent.
-//
-// B1 collapsed the allow-list to one source (agentRoles → agentRolePattern).
-// B6 closes the remaining drift surface: the allow-list and the on-disk
-// profiles must agree (dispatch loads ProfilesDir/<role>.json, run.go:179), so
-// adding a role in exactly one place is enforced rather than assumed. (Session
-// reaping — the other B6 scale knob — is already covered by internal/swarm:
-// TestReap_KillsAllLiveAndMarksReaped, TestReapRunSessions_KillsOwnRegistryOnly,
-// et al.; not re-tested here per single-source.)
-
 // repoProfilesDir locates the repo's .evolve/profiles by walking up from the
 // working directory (absolute even under -trimpath) and, as a fallback, the
 // source file's directory. It FAILS rather than skips when neither finds the
@@ -55,8 +44,8 @@ func repoProfilesDir(t *testing.T) string {
 // TestAgentRoles_EveryRoleHasProfile enforces that the dispatch allow-list and
 // the profiles are single-sourced: every canonical role must have a
 // <role>.json profile. Adding a role to agentRoles without its profile would
-// fail at dispatch (run.go:179 loads ProfilesDir/<role>.json); this catches the
-// drift at test time instead.
+// fail at dispatch time (which loads ProfilesDir/<role>.json); this catches
+// the drift at test time instead.
 func TestAgentRoles_EveryRoleHasProfile(t *testing.T) {
 	profDir := repoProfilesDir(t)
 	for _, role := range agentRoles {
@@ -93,11 +82,11 @@ func TestAgentRoles_SSOTIntegrity(t *testing.T) {
 	}
 }
 
-// TestAgentRoles_DerivedFromPhaseContractRegistry pins the cycle-1145
-// required-roles-ssot refactor from both sides: the allow-list must COVER every
-// dispatchable registry agent (the drift that let "router" fall out of it), must
-// RETAIN the profile-backed roles the registry does not know, and must not
-// over-reach onto NoArtifact phases like "ship" (which has no profile).
+// TestAgentRoles_DerivedFromPhaseContractRegistry pins the allow-list from
+// both sides: it must COVER every dispatchable registry agent (the drift
+// that once let "router" fall out of it), must RETAIN the profile-backed
+// roles the registry does not know, and must not over-reach onto NoArtifact
+// phases like "ship" (which has no profile).
 func TestAgentRoles_DerivedFromPhaseContractRegistry(t *testing.T) {
 	allowed := make(map[string]bool, len(agentRoles))
 	for _, r := range agentRoles {

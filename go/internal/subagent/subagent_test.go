@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// --- Test doubles ----------------------------------------------------
-
 type fakeBridge struct {
 	mu       sync.Mutex
 	calls    []core.BridgeRequest
@@ -62,8 +60,6 @@ func (f *fakeLedger) Verify(_ context.Context) error { return nil }
 func (f *fakeLedger) Iter(_ context.Context) (core.LedgerIterator, error) {
 	return nil, errors.New("not impl")
 }
-
-// --- Helpers ---------------------------------------------------------
 
 // writeArtifact materializes a file at path with the given token-bearing
 // body and pins its mtime to mtime. The bridge hook uses this to simulate
@@ -127,8 +123,6 @@ func deterministicRand(b byte) func([]byte) (int, error) {
 		return len(buf), nil
 	}
 }
-
-// --- Tests -----------------------------------------------------------
 
 func TestRun_HappyPath(t *testing.T) {
 	tmp := t.TempDir()
@@ -443,11 +437,6 @@ func TestComposePrompt(t *testing.T) {
 	}
 }
 
-// TestComposePrompt_NoLeadingDashes is the v11.5.2 regression guard:
-// the prompt must NEVER start with `--`. claude CLI 2.1.149's flag
-// parser rejects any prompt value whose first argv-character is `-`,
-// and the bridge driver passes the prompt as `-p "$content"`. A
-// leading `--` would be reparsed as a flag.
 func TestComposePrompt_NoLeadingDashes(t *testing.T) {
 	tests := []struct {
 		name string

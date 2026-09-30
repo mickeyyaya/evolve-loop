@@ -1,22 +1,5 @@
 package ship
 
-// repocontract_importers.go — the importer backstop (2026-09-14).
-//
-// The fixed scanner pack catches repo-wide guard suites and the added-test
-// backstop catches red-first reproducers, but neither covers the shape that
-// redded main from 4db205a8 until #590 (cycles 1657/1659): a lane MODIFIES a
-// package, its own package tests stay green, and an UNTOUCHED test in a
-// package that imports it still asserts the old contract. Per-package scope
-// cannot see that edge; only the import graph can.
-//
-// The seed is the tree the ship will land, measured against its base — the
-// one derivation in internal/changedpkgs (working tree, never the index: a
-// lane's build output is unstaged until the ship itself stages it). The
-// closure is changedpkgs.ImporterClosureChecked — build deps and the direct
-// imports of each package's tests — projected to what `go test` can run under
-// the default build context, minus what the fixed pack already ran, through
-// the same classified pack runner as the other two layers.
-
 import (
 	"context"
 	"fmt"
@@ -35,9 +18,8 @@ const (
 	// the pack exits with no test-level failure and is classed infra.
 	importerBackstopTimeout = 20 * time.Minute
 	// importerBackstopRetryMaxTargets caps the pack size the ambiguous-exit
-	// retry (cycle-1402/1403/1405 class) is still worth: above it the second
-	// full run is more expensive than a re-dispatch, so an ambiguous exit is
-	// classed infra straight away.
+	// retry is still worth: above it the second full run is more expensive
+	// than a re-dispatch, so an ambiguous exit is classed infra straight away.
 	importerBackstopRetryMaxTargets = 25
 	// discoveryRetryPause gives the one named transient — a concurrent lane's
 	// index.lock — time to clear before the single discovery retry.

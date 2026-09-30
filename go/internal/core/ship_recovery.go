@@ -31,30 +31,30 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 		fmt.Fprintf(os.Stderr, "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, se.Code)
 		backoffSleep(pause)
 	}
-	// ADR-0049 S5b: a fleet ff-merge divergence (a peer cycle moved main) is
-	// recovered by rebasing the cycle branch onto the new main BEFORE the
-	// re-audit (the router routes this code to audit). A clean rebase replays
-	// this cycle's patches onto the peer's changes → re-audit re-binds the merged
-	// tree → re-ship fast-forwards. A conflict confined to GENERATED projections
+	// A fleet ff-merge divergence (a peer cycle moved main) is recovered by
+	// rebasing the cycle branch onto the new main BEFORE the re-audit (the
+	// router routes this code to audit). A clean rebase replays this cycle's
+	// patches onto the peer's changes → re-audit re-binds the merged tree →
+	// re-ship fast-forwards. A conflict confined to GENERATED projections
 	// (e.g. control-flags.md) is auto-resolved by regenerating them from the
 	// merged source (rebaseWithDerivedRegen) — every flag cycle rewrites that
 	// projection, so the partition cannot separate them and a debugger round-trip
 	// would be pure waste. A conflict touching any NON-derived path is genuine
 	// overlapping work the partition should have kept apart — abort loud.
 	// The code/class used for the routing decision; a fleet rebase may reclassify
-	// a clean RebaseNeeded into a CONFLICT (G13a) that routes to the debugger.
+	// a clean RebaseNeeded into a CONFLICT that routes to the debugger.
+	// See ADR-0049.
 	recoverCode, recoverClass := se.Code, se.Class
 	if se.Code == CodeGitFleetRebaseNeeded {
-		// Deterministic, zero-LLM pre-screen (cycle-968) BEFORE the blind rebase
-		// replay: ClassifyFleetRebaseCandidate reuses the cycle-962 carry-forward
-		// filter to decide whether this candidate is already landed, cleanly
-		// mergeable, or a genuine conflict. A superseded (already-landed) candidate
-		// short-circuits here with NO wasted rebase + re-audit — the explicit fix
-		// for the 948 "PASS-but-unlanded duplicate" waste class. Clean/Conflict fall
-		// through to the existing rebaseCycleBranchOntoMain path unchanged (which
-		// itself replays a clean candidate and routes a real conflict to the
-		// debugger). A pre-screen git-infra error is non-fatal here: log it and let
-		// the rebase below run and report its own infra failure loudly.
+		// Deterministic, zero-LLM pre-screen BEFORE the blind rebase replay:
+		// ClassifyFleetRebaseCandidate reuses the carry-forward filter to decide
+		// whether this candidate is already landed, cleanly mergeable, or a
+		// genuine conflict. A superseded (already-landed) candidate
+		// short-circuits here with NO wasted rebase + re-audit. Clean/Conflict
+		// fall through to the existing rebaseCycleBranchOntoMain path unchanged
+		// (which itself replays a clean candidate and routes a real conflict to
+		// the debugger). A pre-screen git-infra error is non-fatal here: log it
+		// and let the rebase below run and report its own infra failure loudly.
 		predictedConflict := false
 		if cs.ActiveWorktree != "" {
 			switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
@@ -89,18 +89,18 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 				return o.routeRebasedExplanation(ctx, projectRoot, cycle, cs)
 			}
 			// A clean replay MAY carry the audit verdict forward without a
-			// full re-audit (RUNG 0, cycle-801): if the composed diff's
-			// patch-id still matches what the audit reviewed and every
-			// composed-tree gate is green, write a composition-verdict entry
-			// and reship directly. Any rejection falls through unchanged to
-			// the pre-existing route below (router routes RebaseNeeded to
+			// full re-audit (RUNG 0): if the composed diff's patch-id still
+			// matches what the audit reviewed and every composed-tree gate
+			// is green, write a composition-verdict entry and reship
+			// directly. Any rejection falls through unchanged to the
+			// pre-existing route below (router routes RebaseNeeded to
 			// audit, re-binding the merged tree).
 			if o.compositionCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
-			// RUNG 2 (cycle-941): a RUNG 0 miss means the composed patch-id
-			// drifted (real overlapping edits). Before the RUNG 3 full
-			// re-audit, review ONLY the intersecting hunks; a compatible,
+			// RUNG 2: a RUNG 0 miss means the composed patch-id drifted
+			// (real overlapping edits). Before the RUNG 3 full re-audit,
+			// review ONLY the intersecting hunks; a compatible,
 			// patch-id-verified overlap composes directly with a
 			// composition-verdict{method:"scoped-review"} and reships.
 			// Entangled (or a dark reviewer) falls through unchanged.
@@ -222,7 +222,7 @@ type derivedArtifactSpec struct {
 
 // derivedArtifacts is the single classifier for GENERATED projections that a flag
 // cycle edits indirectly (via the registry) and that must be regenerated from the
-// merged source — NEVER hand-maintained by the LLM builder (cycle-11 H1). It feeds
+// merged source — NEVER hand-maintained by the LLM builder. It feeds
 // BOTH the post-build normalizer (normalizeDerivedProjections — deterministic regen
 // before audit, like build-gofmt) and the fleet rebase recovery
 // (rebaseWithDerivedRegen — auto-resolve a rebase conflict confined to these paths).
@@ -310,7 +310,7 @@ const maxRebaseContinueSteps = 100
 
 // rebaseCycleBranchOntoMain rebases the cycle's worktree branch onto the current
 // main so a fleet cycle whose ff-merge diverged (a peer moved main) can re-audit
-// + re-ship the merged tree (ADR-0049 S5b). Returns ok=true on a clean replay OR
+// + re-ship the merged tree. Returns ok=true on a clean replay OR
 // when every conflict was confined to derived projections that were regenerated
 // from the merged source: the re-audit re-binds the regenerated tree, so the
 // ship-time tree-SHA binding (ship/gitops.go) still holds — integrity-safe. A
@@ -319,6 +319,7 @@ const maxRebaseContinueSteps = 100
 // regenerations return (false,nil). The in-progress rebase is always aborted on
 // a non-ok return so the worktree is left clean. An empty worktree returns
 // (false,nil) — a degraded run never rebases.
+// See ADR-0049.
 func rebaseCycleBranchOntoMain(ctx context.Context, projectRoot, worktree string) (ok bool, conflicts []string) {
 	if worktree == "" {
 		return false, nil
@@ -449,10 +450,3 @@ func regenerateDerivedArtifact(ctx context.Context, worktree, relPath string) er
 	}
 	return nil
 }
-
-// decideAfterDebugger maps the debugger phase's recovery decision (surfaced on
-// PhaseResponse.Signals by the debugger runner) to the next phase, mirroring
-// decideAfterRetro. RESHIP→ship; RERUN_PHASE→the named phase (defaulting to
-// audit); BLOCK/empty/unknown→end. A malformed decision already safe-defaulted
-// to BLOCK in the debugger's Classify, so this conservatively ends on anything
-// not explicitly RESHIP/RERUN_PHASE.

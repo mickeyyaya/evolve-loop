@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-// runid_test.go — CA.5 (concurrency-factory plan, Track C-A): the
-// event-sourced run identity. RunCycle mints one ULID per run and threads
-// it into the persisted CycleState and EVERY ledger entry the run emits, so
-// concurrent runs' entries are attributable after interleaving.
-
 var crockfordRE = regexp.MustCompile(`^[0-9A-HJKMNP-TV-Z]{26}$`)
 
 func TestMintRunID_ShapeAndTimeOrdering(t *testing.T) {
@@ -23,7 +18,6 @@ func TestMintRunID_ShapeAndTimeOrdering(t *testing.T) {
 			t.Errorf("run id %q is not a 26-char Crockford ULID", id)
 		}
 	}
-	// ULID property: lexicographic order follows time order.
 	if !(a < b) {
 		t.Errorf("ULIDs not time-ordered: %q !< %q", a, b)
 	}
@@ -41,9 +35,6 @@ func TestMintRunID_Unique(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_ReusesRunRecordRunID — resume reuses the run
-// record's identity: entries appended by a resumed cycle carry the ORIGINAL
-// run id from the persisted CycleState, not a fresh mint and not "".
 func TestRunCycleFromPhase_ReusesRunRecordRunID(t *testing.T) {
 	t.Parallel()
 	const orig = "01HZZZZZZZZZZZZZZZZZZZZZZZ"
@@ -67,8 +58,6 @@ func TestRunCycleFromPhase_ReusesRunRecordRunID(t *testing.T) {
 	}
 }
 
-// TestRunCycleFromPhase_LegacyRecordMintsFresh — a pre-CA.5 run record (no
-// run_id) gets a fresh ULID rather than empty attribution.
 func TestRunCycleFromPhase_LegacyRecordMintsFresh(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{
@@ -95,9 +84,6 @@ func TestRunCycleFromPhase_LegacyRecordMintsFresh(t *testing.T) {
 	}
 }
 
-// TestRunCycle_ThreadsRunIDEverywhere — the CA.5 acceptance: after one full
-// cycle, the persisted CycleState carries the run id and every ledger entry
-// the run emitted carries the SAME run id.
 func TestRunCycle_ThreadsRunIDEverywhere(t *testing.T) {
 	t.Parallel()
 	st := &fakeStorage{state: State{LastCycleNumber: 9}}

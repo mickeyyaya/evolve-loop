@@ -33,15 +33,8 @@ type CachePrefixOptions struct {
 	ReadCycleState func(projectRoot string) (string, error)
 }
 
-// WriteCachePrefix renders a deterministic markdown cache-prefix file used by
-// sibling fan-out workers in the same batch. Same cycle+workspace+agent must
-// produce byte-identical bytes — no timestamps, no randomness — so the
-// Anthropic prompt cache reuses the prefix across workers.
-//
-// Mirrors _write_cache_prefix in legacy/scripts/dispatch/subagent-run.sh
-// (v8.23.0 Task C). Goal is extracted from orchestrator-prompt.md if present
-// (line matching `^goal:\s*`); cycle-state condensed to a single-line summary
-// of phase + active_agent + completed_phases.
+// WriteCachePrefix renders a deterministic markdown cache-prefix file shared
+// across sibling fan-out workers in the same batch.
 func WriteCachePrefix(req CachePrefixRequest, opts CachePrefixOptions) error {
 	if opts.ReadOrchestratorPrompt == nil {
 		opts.ReadOrchestratorPrompt = defaultReadOrchestratorPrompt
@@ -78,9 +71,6 @@ func WriteCachePrefix(req CachePrefixRequest, opts CachePrefixOptions) error {
 	return w.Flush()
 }
 
-// renderCachePrefix writes the markdown body. Format is byte-identical to the
-// bash _write_cache_prefix output for the same (agent, cycle, workspace,
-// goal, cs_summary) tuple.
 func renderCachePrefix(w io.Writer, req CachePrefixRequest, goalText, csSummary string) error {
 	parts := []string{
 		"<!-- cache-prefix v8.23.0 — shared across sibling fan-out workers -->\n",
@@ -109,7 +99,6 @@ func renderCachePrefix(w io.Writer, req CachePrefixRequest, goalText, csSummary 
 }
 
 // goalLineRE matches the first `goal: <text>` line in orchestrator-prompt.md.
-// Bash uses `grep -m1 -E '^goal:[[:space:]]*'` + `sed -E 's/^goal:[[:space:]]*//`.
 var goalLineRE = regexp.MustCompile(`(?m)^goal:[ \t]*(.*)$`)
 
 func extractGoalLine(body string) string {
@@ -120,9 +109,9 @@ func extractGoalLine(body string) string {
 	return strings.TrimRight(m[1], "\r\n")
 }
 
-// completedPhasesRE captures the JSON array body. Bash uses jq, but we keep
-// the package free of jq by parsing a narrow shape — same as ResolveModelTier's
-// streak extraction in modeltier.go.
+// completedPhasesRE captures the JSON array body; parsing this narrow shape
+// keeps the package free of a jq dependency, the same approach as
+// ResolveModelTier's streak extraction in modeltier.go.
 var (
 	phaseFieldRE      = regexp.MustCompile(`"phase"\s*:\s*"([^"]*)"`)
 	activeAgentRE     = regexp.MustCompile(`"active_agent"\s*:\s*"([^"]*)"`)
@@ -141,7 +130,7 @@ func summarizeCycleState(body string) string {
 	completed := ""
 	if m := completedPhasesRE.FindStringSubmatch(body); len(m) == 2 {
 		// Body is like `"a","b","c"`. Strip quotes + whitespace per element,
-		// rejoin with commas — matches bash `((.completed_phases // []) | join(","))`.
+		// rejoin with commas.
 		raw := m[1]
 		var items []string
 		for _, item := range strings.Split(raw, ",") {
@@ -165,11 +154,9 @@ func defaultReadOrchestratorPrompt(workspace string) (string, error) {
 }
 
 func defaultReadCycleState(projectRoot string) (string, error) {
-	// DispatchParallel runs this inside the fleet lane, so it MUST resolve THIS
-	// lane's per-run cycle-state (core.ResolveCycleStatePath honors the fleet
-	// override) — reading the host-global singleton would build a cache prefix
-	// from whichever peer lane wrote last, feeding the fan-out workers another
-	// lane's phase summary. Unset ⇒ host-global default (sequential unchanged).
+	// Resolves THIS lane's per-run cycle-state (core.ResolveCycleStatePath
+	// honors the fleet override); reading the host-global singleton would
+	// build a cache prefix from whichever peer lane wrote last.
 	body, err := os.ReadFile(core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve")))
 	if err != nil {
 		return "", err

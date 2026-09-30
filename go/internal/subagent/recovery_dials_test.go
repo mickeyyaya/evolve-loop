@@ -8,12 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// TestExecAdapterDeps_CarriesThePolicyRecoveryDials (F27 architecture review,
-// HIGH): the `evolve subagent run` root builds its engine Deps directly, so it
-// must carry both ADR-0044 recovery dials from the dispatched project's
-// policy.json through the one accessor every setter-less root shares — before
-// the fold it set neither, pinning the fatal-pane fast-fail to shadow here
-// whatever policy said (a dead pane idled out the full backstop on this path).
 func TestExecAdapterDeps_CarriesThePolicyRecoveryDials(t *testing.T) {
 	cases := []struct {
 		name, policy            string

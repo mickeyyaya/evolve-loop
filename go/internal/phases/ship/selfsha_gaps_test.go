@@ -1,17 +1,5 @@
 //go:build integration
 
-// selfsha_gaps_test.go — covers verifySelfSHA branches not yet exercised:
-// - sha256File failure (binary path is a directory → can't read)
-// - readStateMap failure (state.json is a directory)
-// - TOFU schema-migration path (expectedSHA==actual, expectedVer=="", pluginVer!="")
-// - TOFU legacy-SHA-only migration (expectedVer=="" and SHA mismatch)
-// - TOFU plugin-version-change repin (SHA mismatch + different version)
-// - TOFU same-version SHA tamper → IntegrityError
-// Plus: Run() input validation (missing CommitMessage, invalid class, empty ProjectRoot)
-// and verifyManualConfirm interactive-confirm "yes" path via a scriptedRunner that
-// forces the code past the non-tty guard with a faked isTerminal.
-// Note: the actual TTY scanner lines 203-213 in verify.go require a real PTY
-// and are documented in the EXCLUSION ZONE — we cover adjacent branches only.
 package ship
 
 import (
@@ -26,8 +14,6 @@ import (
 
 // --- Run: input validation -------------------------------------------------
 
-// TestRun_MissingCommitMessage_Errors: Run returns error immediately if
-// CommitMessage is empty.
 func TestRun_MissingCommitMessage_Errors(t *testing.T) {
 	_, err := Run(context.Background(), Options{
 		Class:       ClassCycle,
@@ -38,7 +24,6 @@ func TestRun_MissingCommitMessage_Errors(t *testing.T) {
 	}
 }
 
-// TestRun_InvalidClass_Errors: Run returns error for an unknown class.
 func TestRun_InvalidClass_Errors(t *testing.T) {
 	_, err := Run(context.Background(), Options{
 		Class:         Class("unknown"),
@@ -50,7 +35,6 @@ func TestRun_InvalidClass_Errors(t *testing.T) {
 	}
 }
 
-// TestRun_EmptyProjectRoot_Errors: Run returns error if ProjectRoot is "".
 func TestRun_EmptyProjectRoot_Errors(t *testing.T) {
 	_, err := Run(context.Background(), Options{
 		Class:         ClassCycle,
@@ -63,8 +47,6 @@ func TestRun_EmptyProjectRoot_Errors(t *testing.T) {
 
 // --- verifySelfSHA ---------------------------------------------------------
 
-// TestVerifySelfSHA_BinaryUnreadable_Errors: when ShipBinaryPath points to
-// a directory (can't sha256 a dir), verifySelfSHA returns a runtime error.
 func TestVerifySelfSHA_BinaryUnreadable_Errors(t *testing.T) {
 	dir := t.TempDir()
 	opts := &Options{
@@ -82,8 +64,6 @@ func TestVerifySelfSHA_BinaryUnreadable_Errors(t *testing.T) {
 	}
 }
 
-// TestVerifySelfSHA_StateMapReadError_Errors: when state.json is actually
-// a directory, readStateMap returns a non-ErrNotExist error.
 func TestVerifySelfSHA_StateMapReadError_Errors(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
@@ -107,9 +87,6 @@ func TestVerifySelfSHA_StateMapReadError_Errors(t *testing.T) {
 	}
 }
 
-// TestVerifySelfSHA_SchemaMigration_RepinsVersion: when expectedSHA matches
-// the actual binary SHA but expectedVer is "" while pluginVer is set,
-// it's a schema migration — must repin with the plugin version.
 func TestVerifySelfSHA_SchemaMigration_RepinsVersion(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
@@ -133,15 +110,12 @@ func TestVerifySelfSHA_SchemaMigration_RepinsVersion(t *testing.T) {
 	if !anyContains(res.Logs, "schema migration") {
 		t.Errorf("missing schema migration log; got %v", res.Logs)
 	}
-	// Version should now be pinned.
 	m, _ := readStateMap(filepath.Join(dir, ".evolve", "state.json"))
 	if stateString(m, "expected_ship_version") != "12.5.0" {
 		t.Errorf("expected_ship_version not pinned; got %v", m["expected_ship_version"])
 	}
 }
 
-// TestVerifySelfSHA_LegacySHAOnlyPin_Migrates: expectedSHA != actual AND
-// expectedVer == "" → "migrating legacy SHA-only pin to version-aware schema".
 func TestVerifySelfSHA_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
@@ -163,8 +137,6 @@ func TestVerifySelfSHA_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	}
 }
 
-// TestVerifySelfSHA_PluginVersionChange_Repins: SHA mismatch AND
-// pluginVer != expectedVer → "plugin version changed" repin.
 func TestVerifySelfSHA_PluginVersionChange_Repins(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
@@ -189,8 +161,6 @@ func TestVerifySelfSHA_PluginVersionChange_Repins(t *testing.T) {
 	}
 }
 
-// TestVerifySelfSHA_SameVersionSHAMismatch_IntegrityError: SHA mismatch AND
-// pluginVer == expectedVer → tamper detection → IntegrityError.
 func TestVerifySelfSHA_SameVersionSHATamper_IntegrityError(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
@@ -218,8 +188,6 @@ func TestVerifySelfSHA_SameVersionSHATamper_IntegrityError(t *testing.T) {
 
 // --- advanceLastCycleNumber: state.json read error -------------------------
 
-// TestAdvanceLastCycleNumber_StateReadError_ReturnsError: when state.json
-// is a directory, readStateMap returns an error that propagates.
 func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":5}`)
@@ -237,22 +205,19 @@ func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
 // --- postShip: cycle class with inbox-promote error silently WARNs ----------
 
 // TestPostShip_ClassCycle_InboxPromoteErrorIsWarn: an unreadable (present but
-// corrupt/dir) triage-decision.json must NOT block ship — it logs a WARN,
-// skips promote-to-processed, still drains residual claims, and proceeds to
-// the DONE log. Distinct from an ABSENT companion (which logs INFO).
+// corrupt/dir) triage-decision.json must NOT block ship — it logs a WARN and
+// still proceeds to the DONE log. Distinct from an ABSENT companion (which
+// logs INFO).
 func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
 	mustWrite(t, bin, "fake bin\n")
-	// Valid cycle-state with cycle_id.
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":11}`)
 	mustWrite(t, filepath.Join(root, ".evolve", "state.json"), `{}`)
-	// Provide triage-decision.json with an unreadable path (will cause promote error).
-	// Actually: write a corrupted triage-decision.json so ReadFile succeeds but
-	// promote finds no IDs → no promote log, which is fine.
-	// Instead, make triage-decision.json unreadable by making it a dir to force error.
+	// A directory in place of the file forces ReadFile to error, simulating an
+	// unreadable companion.
 	triagePath := filepath.Join(root, ".evolve", "runs", "cycle-11", "triage-decision.json")
-	if err := os.MkdirAll(triagePath, 0o755); err != nil { // dir, not file
+	if err := os.MkdirAll(triagePath, 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	opts := &Options{
@@ -266,12 +231,9 @@ func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("postShip must not fail on inbox-promote error; got %v", err)
 	}
-	// DONE log must still appear.
 	if !containsLog(*res, "DONE: shipped cycle at abc") {
 		t.Errorf("missing DONE log after inbox-promote warn; got %v", res.Logs)
 	}
-	// A present-but-unreadable companion keeps its WARN signal (not demoted to
-	// INFO), and neither it nor the drain blocks ship.
 	if !containsLog(*res, "WARN: triage-decision.json unreadable") {
 		t.Errorf("expected unreadable-companion WARN; got %v", res.Logs)
 	}
@@ -279,8 +241,6 @@ func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 
 // --- Run: cleanExitError path (no staged changes in manual class) ----------
 
-// TestRun_ManualClass_NoStagedChanges_ExitOK: when ClassManual + git shows
-// no staged changes, Run returns ExitOK via the cleanExitError path.
 func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 	repo := makeRepo(t) // clean tree, no staged changes
 	// No seedAudit needed — manual class skips audit.
@@ -297,18 +257,8 @@ func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 	}
 }
 
-// Note: the post-ship-error-is-non-fatal behavior is covered by
-// TestRun_PostShipError_LogsWarnAndContinues in remaining_gaps_test.go, which
-// isolates the failure to postShip (cycle-state.json broken, state.json intact)
-// so the assertion actually fires. A prior attempt here broke state.json, which
-// made verifySelfSHA fail first — the ship never reached postShip — so its
-// assertions were unreachable; it was removed during review.
-
 // --- readActiveWorktree: corrupt cycle-state.json --------------------------
 
-// TestReadActiveWorktree_CorruptState_ReturnsEmpty: a corrupt (non-JSON)
-// cycle-state.json causes readStateMap to return error → readActiveWorktree
-// returns "" (falls through to direct-ship path, never panics).
 func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), "not json{")
@@ -321,9 +271,6 @@ func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
 
 // --- captureGitOutput: runner error propagates ----------------------------
 
-// TestCaptureGitOutput_RunnerError_Propagates: when the Runner itself
-// returns a non-nil error (not just a non-zero exit code), captureGitOutput
-// must propagate it wrapped in "ship: git <args>".
 func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
 	errRunner := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
@@ -338,9 +285,6 @@ func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
 
 // --- writeShipBinding: cycle_id present, successful write -----------------
 
-// TestWriteShipBinding_ValidCycleID_WritesFile: when cycle-state.json has a
-// valid cycle_id, writeShipBinding creates the sidecar at
-// .evolve/runs/cycle-N/ship-binding.json with the correct fields.
 func TestWriteShipBinding_ValidCycleID_WritesFile(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":42}`)

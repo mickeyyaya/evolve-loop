@@ -292,9 +292,9 @@ func TestRun_TokenGenerateError(t *testing.T) {
 	}
 }
 
-// TestRun_GitStateErrorFallsBackToUnknown covers subagent.go:177-181 — when
-// the GitState seam errors, the ledger entry records "unknown:unknown" rather
-// than aborting the run.
+// TestRun_GitStateErrorFallsBackToUnknown covers: when the GitState seam
+// errors, the ledger entry records "unknown:unknown" rather than aborting
+// the run.
 func TestRun_GitStateErrorFallsBackToUnknown(t *testing.T) {
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	bridge := &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}
@@ -336,9 +336,9 @@ func TestRun_GitStateErrorFallsBackToUnknown(t *testing.T) {
 	}
 }
 
-// TestRun_DefaultsCLIAndModelWhenProfileSilent covers subagent.go:195-197 and
-// 202-204 — a profile lacking cli + model_tier_default makes Run fall back to
-// "claude-tmux" / "auto" in the bridge request.
+// TestRun_DefaultsCLIAndModelWhenProfileSilent covers: a profile lacking cli
+// + model_tier_default makes Run fall back to "claude-tmux" / "auto" in the
+// bridge request.
 func TestRun_DefaultsCLIAndModelWhenProfileSilent(t *testing.T) {
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	bridge := &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}
@@ -387,9 +387,8 @@ func TestRun_DefaultsCLIAndModelWhenProfileSilent(t *testing.T) {
 	}
 }
 
-// TestClassify_EmptyArtifactIsIntegrityFail covers subagent.go:331-337 — a
-// fresh, readable, but zero-length artifact fails integrity before the token
-// check runs.
+// TestClassify_EmptyArtifactIsIntegrityFail covers: a fresh, readable, but
+// zero-length artifact fails integrity before the token check runs.
 func TestClassify_EmptyArtifactIsIntegrityFail(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := &Runner{cfg: Config{
@@ -456,7 +455,7 @@ func TestClassify_BridgeErrorNonzero(t *testing.T) {
 	}}
 	verdict, diags := r.classify(errors.New("bridge launch failed"), "/tmp/stub", "token-xyz", 137)
 	// Artifact is healthy via stubs, but exit_code=137 + bridgeErr means
-	// the verdict is FAIL (downstream-error) not PASS — see subagent.go:345.
+	// the verdict is FAIL (downstream-error) not PASS.
 	if verdict != VerdictFAIL {
 		t.Errorf("verdict=%q want %q", verdict, VerdictFAIL)
 	}

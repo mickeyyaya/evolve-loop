@@ -23,8 +23,9 @@ type auditedChange struct {
 	base, tree, label string
 }
 
-// unwindBeforeFleetRebase is ADR-0105 rung B1: it takes ship's inbox consumption out of the change a
+// unwindBeforeFleetRebase takes ship's inbox consumption out of the change a
 // fleet rebase replays, so the rebased change is the one Audit reviewed. It reports whether it unwound.
+// See ADR-0105.
 func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot string, cycle int, cs CycleState) bool {
 	if cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
 		return false

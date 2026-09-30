@@ -1,5 +1,3 @@
-// runner.go — clock helper + the Options command-execution helpers for the
-// native ship path. CmdRunner (= sysexec.RunFunc) is defined in ship.go.
 package ship
 
 import (

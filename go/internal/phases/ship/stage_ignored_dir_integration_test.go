@@ -1,11 +1,5 @@
 //go:build integration
 
-// stage_ignored_dir_integration_test.go — real-git half of the layer-4
-// directory-form contract (2026-08-14 batch halt). The unit half pins the
-// refusal parser; this pins the OBSERVABLE EFFECT: a declared DIRECTORY whose
-// ignore rule is the `dir/` form (invisible to check-ignore, refused by add)
-// must not kill the ship — git names it, the stager drops it and retries, the
-// real change lands.
 package ship
 
 import (

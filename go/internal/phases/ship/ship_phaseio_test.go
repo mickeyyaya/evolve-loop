@@ -11,11 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
 
-// ADR-0050 §3.10 Slice 4: ship reads commit_message from the typed envelope at
-// enforce (req.Input.Active()) and the legacy Context["commit_message"] below it.
-// The empty→defaultCommitMessage(req) fallback (cycle-150 lesson) is preserved on
-// both paths. We assert the resolved message reached the commit via HEAD's subject,
-// matching the existing TestPhaseRun_DefaultCommitMessage_WhenContextMissing seam.
+// See ADR-0050.
+// Ship reads commit_message from the typed envelope at enforce
+// (req.Input.Active()) and the legacy Context["commit_message"] below it. The
+// empty→defaultCommitMessage(req) fallback is preserved on both paths. We
+// assert the resolved message reached the commit via HEAD's subject, matching
+// the existing TestPhaseRun_DefaultCommitMessage_WhenContextMissing seam.
 
 func shipOnce(t *testing.T, req core.PhaseRequest) string {
 	t.Helper()
@@ -60,8 +61,7 @@ func TestShip_CommitMessage_TypedVsMap(t *testing.T) {
 		}
 	})
 
-	// Enforce path: the typed envelope is consulted even with NO Context. RED before
-	// the fix — map read returns "" → defaultCommitMessage → subject "evolve-cycle 7".
+	// Enforce path: the typed envelope is consulted even with NO Context.
 	t.Run("typed_path_enforce", func(t *testing.T) {
 		subject := shipOnce(t, core.PhaseRequest{
 			Cycle: 7,

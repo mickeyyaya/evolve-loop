@@ -9,16 +9,10 @@ import (
 	"time"
 )
 
-// worker_token_test.go — H1 self-correction: fan-out per-worker artifact
-// verification must check PROVENANCE, not just presence. The fan-out parent
-// dictates each worker's challenge token (parentToken+"-"+subtask), threads it
-// to the worker (which writes it into its artifact), and verifies it on the
-// parent side. Before this fix the per-worker Verify ran with an empty token
-// (bytes.Contains(body, []byte("")) == true), so ANY non-empty file passed.
-
-// TestDefaultVerifyWorkerArtifact_TokenChecked pins that the per-worker verifier
-// rejects an artifact lacking the expected token and accepts one bearing it —
-// the direct fix for the H1 vacuous-token-check.
+// TestDefaultVerifyWorkerArtifact_TokenChecked pins that the per-worker
+// verifier rejects an artifact lacking the expected token and accepts one
+// bearing it: fan-out per-worker artifact verification checks provenance,
+// not just presence.
 func TestDefaultVerifyWorkerArtifact_TokenChecked(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

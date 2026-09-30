@@ -1,17 +1,5 @@
 //go:build integration
 
-// remaining_gaps_test.go — targeted coverage for the achievable gaps
-// remaining after 91.5%:
-//
-//   - atomicShip: currentBranch runner error (gitops.go:33)
-//   - shipDirect: buildDiffFooter --name-status error (gitops.go:94)
-//   - shipDirect: runCommitPrefixGate error (gitops.go:103)
-//   - advanceLastCycleNumber: state.json readStateMap error (postship.go:63)
-//   - promoteInbox: readStateMap error (postship.go:83)
-//   - verifyManualConfirm: git add -A runner error (verify.go:161)
-//   - verifyTrivial: diff --name-only runner error (verify.go:267)
-//   - verifyTrivial: ls-files runner error (verify.go:271)
-//   - native.go:213 postShip WARN log (postShip returns error, ship continues)
 package ship
 
 import (
@@ -96,7 +84,6 @@ func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
 		ProjectRoot: t.TempDir(),
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			// Fail git add -A specifically (args[0]=="add").
 			if name == "git" && len(args) > 0 && args[0] == "add" {
 				return -1, errors.New("add -A exploded")
 			}
@@ -116,7 +103,6 @@ func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
 func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 	repo := makeRepo(t)
 
-	// Write cycle-state.json with cycle_size_estimate=trivial.
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":1,"cycle_size_estimate":"trivial"}`)
 
@@ -124,9 +110,7 @@ func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 		ProjectRoot: repo,
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
 			stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-			// verifyTrivial calls: git diff --cached --name-only
-			// then git diff --name-only, then git ls-files ...
-			// Fail the second diff call: --name-only without --cached.
+			// verifyTrivial's second diff call is --name-only without --cached.
 			if name == "git" && argsContain(args, "--name-only") && !argsContain(args, "--cached") {
 				return -1, errors.New("diff name-only exploded")
 			}
@@ -168,9 +152,6 @@ func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
 }
 
 // --- native.go:213: postShip WARN log (postShip returns error) --------------
-// postShip errors log a WARN but do not fail the ship (native.go:213-216).
-// Trigger by making cycle-state.json a directory → promoteInbox errors →
-// postShip returns that error → Run logs WARN and continues to ExitOK.
 
 func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 	repo := makeRepo(t)
@@ -178,10 +159,8 @@ func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 	mustWrite(t, filepath.Join(repo, "warn.txt"), "change\n")
 	seedAudit(t, repo, "PASS")
 
-	// Replace cycle-state.json with a directory so postShip fails on
-	// advanceLastCycleNumber (readStateMap error → postShip returns error →
-	// native.go:213 logs WARN and continues).
-	// cycle-state.json doesn't exist in makeRepo, so just MkdirAll it.
+	// Making cycle-state.json a directory fails advanceLastCycleNumber's
+	// readStateMap, so postShip returns an error for Run to WARN-and-continue.
 	csPath := filepath.Join(repo, ".evolve", "cycle-state.json")
 	_ = os.Remove(csPath) // harmless if absent
 	if err := os.MkdirAll(csPath, 0o755); err != nil {
@@ -189,8 +168,6 @@ func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(csPath) })
 
-	// We also need advanceLastCycleNumber to fail first — it reads cycle-state.json
-	// which is now a dir. It will return error, postShip propagates → native logs WARN.
 	var stderrBuf strings.Builder
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -208,14 +185,12 @@ func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
 		Stdout:         io.Discard,
 		Stderr:         &stderrBuf,
 	})
-	// Ship should succeed (postShip errors are WARN-only).
 	if err != nil {
 		t.Fatalf("postShip WARN must not propagate as error, got: %v", err)
 	}
 	if res.ExitCode != ExitOK {
 		t.Fatalf("want ExitOK despite postShip error, got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	// The WARN must appear in logs.
 	found := false
 	for _, l := range res.Logs {
 		if strings.Contains(l, "post-ship hook error") {

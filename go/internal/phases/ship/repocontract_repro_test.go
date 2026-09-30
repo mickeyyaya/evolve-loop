@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// TestBugReproduction_AddedTestLiteralBuildConstraintIsNotExcluded reproduces
-// H3 from cycle 1559: a textual mention of a build constraint is not itself a
-// build constraint. The current detector excludes this real failing test,
-// allowing the ship to proceed with a red test in its staged diff.
+// TestBugReproduction_AddedTestLiteralBuildConstraintIsNotExcluded: a textual
+// mention of a build constraint is not itself a build constraint — the
+// detector must not exclude this real failing test, or the ship would
+// proceed with a red test in its staged diff.
 func TestBugReproduction_AddedTestLiteralBuildConstraintIsNotExcluded(t *testing.T) {
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")

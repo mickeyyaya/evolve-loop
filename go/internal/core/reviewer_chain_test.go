@@ -17,10 +17,6 @@ func (s stubReviewer) Review(_ context.Context, _ ReviewInput) ReviewResult {
 	return s.result
 }
 
-// ChainReviewers composes multiple DeliverableReviewers (e.g. evalgate then the
-// deliverable-contract gate). It approves only when ALL approve; the first
-// rejection short-circuits with its reason. ADR-0034.
-
 func TestChainReviewers_AllApprove(t *testing.T) {
 	t.Parallel()
 	c := ChainReviewers(

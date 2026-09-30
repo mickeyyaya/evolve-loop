@@ -1,34 +1,5 @@
 package ship
 
-// repocontract_addedtest_defects_test.go — cycle-1566 RED contract for the
-// added-test backstop's audited defects.
-//
-// The backstop (repocontract.go, addedTestPackages + the "added-test backstop"
-// runClassifiedPack call) closes the red-first-deliverable-reds-main incident
-// class: three landings pushed a genuinely failing newly-added `*_test.go`
-// with no ship-time consumer and redded main. Cycle-1559's audit reproduced
-// four defects in that backstop against the real gate; they are OPEN in the
-// tree today (.evolve/runs/cycle-1566/defect-dispositions.json). Each test
-// below drives the REAL gate (no seam swap except where the fixed pack itself
-// is the subject) against a REAL temporary git repo, so none of them can be
-// satisfied by a source-level string.
-//
-//	H1 — a build-tag-guarded added test that genuinely FAILS is compiled out of
-//	     the untagged backstop run; its package reports green and the failure
-//	     ships silently. This is pinned incident 25040cea's exact shape.
-//	H2 — a LONE tag-guarded added test package (the `//go:build acs` predicate
-//	     file every cycle mints, including this one) has no files under the
-//	     default tag set, which classifyPackEvents grades a genuine RED. That
-//	     hard-blocks the lane's own honest ship with a false CodeRepoContractGate.
-//	M1 — a `git diff --cached` error disables the whole backstop and writes
-//	     nothing anywhere: the ship proceeds believing it was scanned.
-//	M2 — the shared red message dropped the four fixed-suite names and cannot
-//	     tell an operator whether the fixed pack or an added test went red.
-//
-// The gate-level skip case is pinned here too: the runNative half already
-// exists (TestRunNative_AddedSkippedTestDoesNotBlockShip), but scout's Task 1
-// acceptance criterion is stated at the gate, and that half had no test.
-
 import (
 	"context"
 	"io"
@@ -75,11 +46,10 @@ func containsAny(haystack string, needles ...string) bool {
 	return false
 }
 
-// TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip is scout Task 1's
-// negative criterion at the gate itself: a deliberately red-first reproducer
-// that lands `t.Skip`-ped is the SAFE intermediate state and must ship. A gate
-// that graded skip as failure would make the documented land-with-skip
-// convention unusable and push lanes back to landing bare reds.
+// TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip: a deliberately
+// red-first reproducer that lands `t.Skip`-ped is the SAFE intermediate state
+// and must ship — a gate that graded skip as failure would push lanes back
+// to landing bare reds.
 func TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	repo := newLaneRepo(t)
 	const path = "go/internal/reproduction/skip_test.go"
@@ -96,12 +66,11 @@ func TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen pins H1
-// — incident 25040cea's shape. The added file carries `//go:build integration`
-// and fails; its package also holds an untagged green test, so an untagged
-// backstop run reports the package `ok` and the ship sails with a red test in
-// its diff. The backstop must run each added candidate under the build tags
-// that file actually declares, and fail closed naming the failing test.
+// TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen: an added
+// file carrying `//go:build integration` and failing must not be silently
+// graded green because its package also holds an untagged passing test — the
+// backstop must run each added candidate under the build tags that file
+// actually declares, and fail closed naming the failing test.
 func TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen(t *testing.T) {
 	repo := newLaneRepo(t)
 	pkgDir := filepath.Join(repo, "go", "internal", "reproduction")
@@ -125,14 +94,13 @@ func TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen(t *testi
 	}
 }
 
-// TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed pins H2.
-// A lone `//go:build acs` predicate package — which EVERY cycle mints into its
-// own shipping diff, this one included — has zero files under the default tag
-// set. `go test` reports that as a build/setup failure, which the fixed pack's
-// classifier grades a genuine RED, so the backstop would hard-block the very
-// ships it exists to protect. The candidate is healthy under its own tag and
-// must not red the gate; the scan log must say what was done with it rather
-// than dropping it silently.
+// TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed: a lone
+// tag-guarded predicate package (the shape every cycle's own go/acs/cycleNNNN
+// mints, this one included) has zero files under the default tag set, which
+// `go test` reports as a build/setup failure that the classifier would
+// otherwise grade a genuine RED. It must run under its own tag instead, and
+// the scan log must say what was done with it rather than dropping it
+// silently.
 func TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed(t *testing.T) {
 	repo := newLaneRepo(t)
 	const path = "go/acs/cycle9999/predicates_test.go"
@@ -150,25 +118,20 @@ func TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed(t *testi
 	}
 }
 
-// TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded pins M1. When the
-// staged-file query fails, addedTestPackages returns (nil, nil) and the gate
-// returns green having scanned nothing, with no trace in the artifact that is
-// supposed to be the record of what ran. A backstop that can disable itself
-// invisibly is worse than no backstop: the ship report claims coverage it
-// never had. Driven with a projectRoot that is a real Go module but NOT a git
-// repository, which is precisely how the underlying git query fails.
+// TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded: a backstop that
+// can disable itself invisibly is worse than no backstop — the ship report
+// would claim coverage it never had.
 func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
-	root := t.TempDir()
+	root := t.TempDir() // a real Go module but not a git repo — how the underlying git query fails
 	goDir := filepath.Join(root, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
 	writeGreenGuardSuites(t, goDir)
 
 	ws := t.TempDir()
 	err := runRepoContractGate(context.Background(), "enforce", root, ws, io.Discard)
-	// 2026-09-14: an undiscoverable diff is an infrastructure gap, not a
-	// contract violation — it is the distinct, re-dispatchable INFRA class
-	// (as a twice-ambiguous pack run already was), never a silent green: a
-	// skipped guard on a red-main gate reads as a healthy ship in the ledger.
+	// An undiscoverable diff is an infrastructure gap, not a contract
+	// violation — the distinct, re-dispatchable INFRA class, never a silent
+	// green.
 	se, ok := shiperr.AsShipError(err)
 	if !ok || se.Code != shiperr.CodeRepoContractInfra {
 		t.Fatalf("an undiscoverable diff is the INFRA class, got %v", err)
@@ -182,10 +145,10 @@ func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
 	}
 }
 
-// TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests pins M2.
-// Both packs funnel through one message, so the operator cannot tell which
-// scan went red, and the addition dropped the four fixed-suite names that told
-// them where to look. Both halves are asserted against the real error text.
+// TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests: the
+// operator must be able to tell which scan went red — the fixed-pack message
+// must keep naming every guard suite, and an added-test message must
+// identify itself as an added-test failure.
 func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testing.T) {
 	t.Run("fixed pack RED still names every guard suite", func(t *testing.T) {
 		swapRepoContractTest(t, redPack("internal/phasespec.TestCatalogParity"))
@@ -221,19 +184,9 @@ func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testi
 	})
 }
 
-// TestRepoContractTestArgs_CarriesAnExplicitTimeout pins cycle-1679's ship
-// defect: the gate handed `go test` no -timeout, so every pack ran on Go's 10m
-// default. ./internal/core — which this lane's own wiring test enrolled into
-// the added-test backstop for the first time — measured 355.8s under fleet
-// load, and when the deadline wins, the timeout panic makes `go test -json`
-// emit a fail event for the running test plus every paused t.Parallel() one.
-// classifyPackEvents then sees named test failures and classes it a real
-// contract RED: a false RED on green code, which is exactly what blocked this
-// cycle's first ship (19 named internal/core "failures", 18 of them parallel).
-//
-// The assertion is on the argv rather than on an observed timeout because the
-// defect IS the missing flag; a test that actually waited out a deadline would
-// have to burn one.
+// TestRepoContractTestArgs_CarriesAnExplicitTimeout asserts the argv rather
+// than an observed timeout, since the defect this guards is the missing flag
+// itself — a test that actually waited out a deadline would have to burn one.
 func TestRepoContractTestArgs_CarriesAnExplicitTimeout(t *testing.T) {
 	args := repoContractTestArgs([]string{"./internal/core"}, nil)
 

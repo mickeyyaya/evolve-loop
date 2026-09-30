@@ -1,24 +1,3 @@
-// stage_explicit_paths_test.go — RED contract for inbox item
-// `ship-stage-explicit-paths` (cycle-1067).
-//
-// Defect: shipDirect (gitops.go:228) and shipFromWorktree (gitops.go:374)
-// stage with `git add -A` for the non-release classes. That sweeps whatever
-// happens to be dirty in the tree — under a fleet, typically a sibling lane's
-// untracked leak (cycle-645) — into the ship commit, and it violates the
-// standing repo convention `git_add_explicit_paths`. The release class already
-// does the right thing (stageReleaseSet, gitops.go:707: `git add -- <paths>`);
-// the cycle/manual paths were simply never migrated.
-//
-// Contract pinned here:
-//  1. Neither shipDirect nor shipFromWorktree invokes `git add -A` for
-//     ClassCycle / ClassManual — staging is an explicit `git add -- <paths>`.
-//  2. The staged path list is the DECLARED manifest (build-report.md +
-//     test-report.md, the set shipmanifest.Declared computes for the
-//     manifest gate) when the workspace has readable phase reports.
-//  3. When no manifest is readable (no workspace, or no reports), staging
-//     falls back to the porcelain-status changed set — it must NOT silently
-//     skip staging (that would produce a false clean-exit / empty ship) and it
-//     must NOT fall back to `add -A`.
 package ship
 
 import (
@@ -44,9 +23,9 @@ type porcelainCapture struct {
 	ignored       []string
 	checkIgnoreRC int
 	// refuseAddPaths: pathspecs that make an `add` call refuse rc=1 with the
-	// real refusal stderr naming them — the layer-4 class where the
-	// check-ignore probe is BLIND to a path git add still refuses
-	// (directory-form rules; 2026-08-14 halt). A retry without them succeeds.
+	// real refusal stderr naming them — the class where the check-ignore probe
+	// is BLIND to a path git add still refuses (directory-form rules). A retry
+	// without them succeeds.
 	refuseAddPaths []string
 	// refuseAddAlways: when non-empty, EVERY add call refuses rc=1 naming this
 	// path in the refusal stderr — the foreign-offender/no-progress shape.
@@ -112,8 +91,6 @@ func (c *porcelainCapture) runner() CmdRunner {
 	}
 }
 
-// gitCallWith returns the first recorded git call whose args contain every
-// needle, or nil.
 // unscopedAddAll reports an `add -A` invocation WITHOUT an explicit pathspec
 // after `--` — the banned repo-wide sweep. `add -A -- <paths>` is the allowed
 // scoped form (stages adds/mods/deletions within the named paths only; plain
@@ -144,6 +121,8 @@ func (c *porcelainCapture) unscopedAddAll() []string {
 	return nil
 }
 
+// gitCallWith returns the first recorded git call whose args contain every
+// needle, or nil.
 func (c *porcelainCapture) gitCallWith(needles ...string) []string {
 	for _, call := range c.calls {
 		if call[0] != "git" {
@@ -222,9 +201,6 @@ func stageExplicitOpts(root, workspace string, class Class, runner CmdRunner) *O
 	}
 }
 
-// TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll — the crux: a cycle
-// ship stages exactly the paths the phase reports declared, via an explicit
-// `git add -- <paths>`, and leaves the undeclared sibling-lane stray alone.
 func TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll(t *testing.T) {
 	root := stageExplicitTree(t)
 	ws := writeWorkspaceReports(t,
@@ -257,10 +233,6 @@ func TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll(t *testing.T) {
 	}
 }
 
-// TestShipDirect_AReportlessWorkspaceAdoptsNoPath — H2 under the F43 contract:
-// with no readable phase reports the declared manifest is empty, so no path is
-// adopted and no `git add` runs at all; never `add -A`, and never an empty
-// `add -A --`, which stages the whole tree.
 func TestShipDirect_AReportlessWorkspaceAdoptsNoPath(t *testing.T) {
 	root := stageExplicitTree(t)
 	emptyWS := t.TempDir()
@@ -278,9 +250,6 @@ func TestShipDirect_AReportlessWorkspaceAdoptsNoPath(t *testing.T) {
 	}
 }
 
-// TestShipDirect_NoWorkspacePath_StillStagesExplicitly — edge case: an
-// operator manual ship carries no WorkspacePath at all. The manifest cannot
-// even be attempted; staging must still be explicit and non-empty.
 func TestShipDirect_NoWorkspacePath_StillStagesExplicitly(t *testing.T) {
 	root := stageExplicitTree(t)
 	cap := &porcelainCapture{porcelain: " M README.md\n"}
@@ -302,9 +271,9 @@ func TestShipDirect_NoWorkspacePath_StillStagesExplicitly(t *testing.T) {
 	}
 }
 
-// TestShipDirect_NonReleaseClasses_NeverAddAll — the anti-no-op negative: for
-// EVERY non-release class, `git add -A` must be absent from the recorded git
-// calls. A partial fix that migrates only the cycle path fails here.
+// TestShipDirect_NonReleaseClasses_NeverAddAll: for EVERY non-release class,
+// `git add -A` must be absent from the recorded git calls — a partial fix
+// that migrates only the cycle path fails here.
 func TestShipDirect_NonReleaseClasses_NeverAddAll(t *testing.T) {
 	for _, class := range []Class{ClassCycle, ClassManual, ClassTrivial} {
 		t.Run(string(class), func(t *testing.T) {
@@ -326,11 +295,9 @@ func TestShipDirect_NonReleaseClasses_NeverAddAll(t *testing.T) {
 	}
 }
 
-// TestShipDirect_CycleClass_KeepsChurnDiscard — the surviving half of the
-// former TestShipDirect_CycleClass_KeepsChurnDiscardAndAddAll discriminator
-// (release_staging_test.go): the `add -A` half is gone with this cycle's fix,
-// but the churn-discard half still guards cycle commits against unaudited
-// binary churn, so it is pinned here rather than deleted.
+// TestShipDirect_CycleClass_KeepsChurnDiscard: churn discard still guards
+// cycle commits against unaudited binary churn even with add -A gone from
+// this staging path.
 func TestShipDirect_CycleClass_KeepsChurnDiscard(t *testing.T) {
 	root := initReleaseStagingTree(t)
 	ws := writeWorkspaceReports(t, "go/evolve", "CHANGELOG.md")
