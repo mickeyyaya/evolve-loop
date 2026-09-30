@@ -108,7 +108,7 @@ func newReplWaitState(w replWaiter) *replWaitState {
 		livenessProfile: livenessProfile,
 		fatalPaneStage:  fatalPaneStage,
 		fatalDetector:   fatalDetector,
-		detector:        newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.artifactBase),
+		detector:        newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.dispatchBase),
 		// Checkpoint-only gates live on this state so the fast-poll and
 		// checkpoint paths can't share a streak.
 		checkpointExhaustion: newExhaustionGate(),

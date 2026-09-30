@@ -42,8 +42,8 @@ const contractSalvageRetryDirectiveHeading = "## Contract Salvage Retry — verb
 // last resort. remediation, when the triggering gate supplied one, is threaded
 // through composeCorrection and changes the closing clause below (see
 // salvageClosing).
-func composeContractSalvageRetry(reason, remediation string) string {
-	return composeCorrection(reason, remediation) + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
+func composeContractSalvageRetry(round int, reason, remediation string) string {
+	return composeCorrection(round, reason, remediation) + "\n\n" + contractSalvageRetryDirectiveHeading + "\n\n" +
 		"This is the second consecutive block reporting the SAME defect, and no other CLI family is " +
 		"available to escalate to — this is the last correction before the contract gate's circuit " +
 		"breaker opens and the gate stops enforcing for the rest of this run.\n\n" +

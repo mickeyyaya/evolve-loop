@@ -3,12 +3,15 @@ package bridge
 import (
 	"context"
 	"io"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 func TestCompletionContractName_IsTheStrategyKey(t *testing.T) {
-	for mode, want := range map[string]string{
+	for mode, want := range map[core.CompletionContract]core.CompletionContract{
 		"":                 completionArtifact,
 		completionArtifact: "artifact",
 		completionStdout:   "stdout",
@@ -21,13 +24,13 @@ func TestCompletionContractName_IsTheStrategyKey(t *testing.T) {
 	}
 	cfg := &Config{Artifact: "/tmp/x"}
 	lp := tmuxLaunch{promptMarker: "❯"}
-	if _, ok := newCompletionDetector(completionContractName(""), cfg, Deps{}, lp, artifactBaseline{}).(*artifactDetector); !ok {
+	if _, ok := newCompletionDetector(completionContractName(""), cfg, Deps{}, lp, dispatchBaseline{}).(*artifactDetector); !ok {
 		t.Error("the default's name selects the artifact detector")
 	}
-	if _, ok := newCompletionDetector(completionStdout, cfg, Deps{}, lp, artifactBaseline{}).(*stdoutDetector); !ok {
+	if _, ok := newCompletionDetector(completionStdout, cfg, Deps{}, lp, dispatchBaseline{}).(*stdoutDetector); !ok {
 		t.Error("completionStdout selects the stdout detector")
 	}
-	if _, ok := newCompletionDetector(completionGit, cfg, Deps{Stderr: io.Discard}.withDefaults(), lp, artifactBaseline{}).(*gitEvidenceDetector); !ok {
+	if _, ok := newCompletionDetector(completionGit, cfg, Deps{Stderr: io.Discard}.withDefaults(), lp, dispatchBaseline{}).(*gitEvidenceDetector); !ok {
 		t.Error("completionGit selects the git-evidence detector")
 	}
 }
@@ -38,9 +41,10 @@ func TestCompletionContractName_IsTheStrategyKey(t *testing.T) {
 // completionStdout instead.
 func TestCompletionContractVocabulary_SpelledOnce(t *testing.T) {
 	for needle, want := range map[string][]string{
-		`= "artifact"`:  {"internal/bridge/completion.go"},
-		`== "stdout"`:   nil,
-		`case "stdout"`: nil,
+		`= "artifact"`:          {"internal/core/ports.go"},
+		`= "worktree-evidence"`: {"internal/core/ports.go"},
+		`== "stdout"`:           nil,
+		`case "stdout"`:         nil,
 	} {
 		got := nonTestSourcesMentioning(t, needle)
 		if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -49,8 +53,15 @@ func TestCompletionContractVocabulary_SpelledOnce(t *testing.T) {
 	}
 }
 
+func TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant(t *testing.T) {
+	bareLiteral := regexp.MustCompile(`\bCompletion:\s+"`)
+	if got := nonTestSourcesWhere(t, bareLiteral.MatchString); len(got) != 0 {
+		t.Errorf("%v spell a completion contract as a bare string: name it by a core.CompletionContract constant, so the contracts are declared once", got)
+	}
+}
+
 func TestRunTmuxREPL_DoneLineNamesTheContract(t *testing.T) {
-	for mode, want := range map[string]string{"": "artifact", "bogus-typo": "bogus-typo"} {
+	for mode, want := range map[core.CompletionContract]string{"": "artifact", "bogus-typo": "bogus-typo"} {
 		cfg := fixtureConfig(t)
 		cfg.Completion = mode
 		base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "final scrollback", "cleanup scrollback"}}

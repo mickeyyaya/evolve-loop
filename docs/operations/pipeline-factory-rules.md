@@ -16,7 +16,7 @@
 
 ## 1. What is secured — the control plane
 
-The list is a compiled manifest, `guards.ProtectedSurfaceManifest` (`go/internal/guards/integrity_surface.go`, 99 path fragments, each with its rationale). A cycle is forbidden to write these; the same list feeds three independent refusals (§3). A change lands only through the operator flow: isolated branch → red-first tests → simplifier + two reviews → `commit-gate` → `evolve ship --class manual` → CI.
+The list is a compiled manifest, `guards.ProtectedSurfaceManifest` (`go/internal/guards/integrity_surface.go`, 123 path fragments, each with its rationale). A cycle is forbidden to write these; the same list feeds three independent refusals (§3). A change lands only through the operator flow: isolated branch → red-first tests → simplifier + two reviews → `commit-gate` → `evolve ship --class manual` → CI.
 
 | Surface | Why it is out of an agent's hands | Enforced by |
 |---|---|---|
@@ -29,6 +29,7 @@ The list is a compiled manifest, `guards.ProtectedSurfaceManifest` (`go/internal
 | Registry SSOT (`phase-registry.json`, flag registry, campaign contract) | the phase catalogue, the metric ratchets — the loop's definition of "progress" | manifest · ratchet gate tests |
 | Releases | `evolve release X.Y.Z`: preflight, changelog, atomic bump, 15-asset verify, auto-rollback; "publish" ≠ "push" | release preflight · operator word or 4 consecutive PASS |
 | `internal/bridge/` | the drivers and the OS-sandbox fail-closed enforcement for versioned builds | manifest |
+| `internal/core/bridge_completion.go` | the one predicate that lets a correction re-dispatch complete on worktree evidence with its deliverable carried unchanged ([ADR-0113](../architecture/adr/0113-correction-completes-on-worktree-evidence.md)) — widened, it would let a lane carry its own stale deliverable past the bridge's baseline guard | manifest |
 
 ## 2. What agents handle — in the meantime
 

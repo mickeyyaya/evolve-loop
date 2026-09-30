@@ -25,7 +25,7 @@ type replWaiter struct {
 	prefix         string
 	phaseName      string
 	resolvedPrompt string
-	artifactBase   artifactBaseline
+	dispatchBase   dispatchBaseline
 	paste          pasteOutcome // what the prompt delivery learned — recorded beside the submit verdict
 	responder      *autoResponder
 	recorder       *interaction.Recorder
