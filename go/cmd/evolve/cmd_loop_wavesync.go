@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -113,11 +115,21 @@ func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, w
 	// CHANGES would be overwritten — a normal runtime state (rebuilt-binary
 	// churn) that must be named as such, never as divergence (whose "next
 	// ship reconciles" remedy is the stowaway class).
-	if !fastForwardMain(sctx, g, warn) {
+	if !fastForwardWithInboxStamps(sctx, g, warn) {
 		return false, nil
 	}
 	fmt.Fprintf(warn, "[loop] wave-boundary sync: fast-forwarded main to origin/main (%.12s)\n", rel.Remote)
 	return true, nil
+}
+
+func fastForwardWithInboxStamps(ctx context.Context, g gitexec.Git, warn io.Writer) bool {
+	plan := prepareInboxStampsForFastForward(ctx, g, warn)
+	if !fastForwardMain(ctx, g, warn) {
+		restoreInboxStampsAfterBlockedFastForward(g.Dir, plan, warn)
+		return false
+	}
+	replayInboxStampsAfterFastForward(g.Dir, plan, warn)
+	return true
 }
 
 func fastForwardMain(ctx context.Context, g gitexec.Git, warn io.Writer) bool {
@@ -127,25 +139,69 @@ func fastForwardMain(ctx context.Context, g gitexec.Git, warn io.Writer) bool {
 	}
 	fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", code, strings.TrimSpace(stderr))
 	if blocking := blockingInboxFiles(ctx, g); len(blocking) > 0 {
-		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %d plane-side inbox file(s) block it: %s — discard the plane copy once origin holds everything it carries, then run evolve sync-main (runtime-reference: the console route at a boundary)\n", len(blocking), strings.Join(blocking, ", "))
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %d plane-side inbox file(s) block it: %s — remove the plane copy, then run evolve sync-main, which lands the loop's own stamps (runtime-reference: the console route at a boundary)\n", len(blocking), strings.Join(blocking, ", "))
 	}
 	return false
 }
 
-const inboxPathspec = ".evolve/inbox/"
+func prepareInboxStampsForFastForward(ctx context.Context, g gitexec.Git, warn io.Writer) inboxstamps.Plan {
+	partition, err := inboxstamps.Classify(ctx, g)
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: reading the tree's changes failed: %v — the loop's inbox stamps stay as they are\n", err)
+		return inboxstamps.Plan{}
+	}
+	if len(partition.Other) > 0 || len(partition.Stamps) == 0 {
+		return inboxstamps.Plan{}
+	}
+	plan, err := inboxstamps.PlanAgainst(ctx, g, partition.Stamps, "origin/main")
+	if err == nil {
+		err = plan.Prepare(ctx, g)
+	}
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — the loop's inbox stamps stay as they are\n", err)
+		warnOnFailedRestore(plan.Restore(g.Dir), warn)
+		return inboxstamps.Plan{}
+	}
+	return plan
+}
+
+func replayInboxStampsAfterFastForward(root string, plan inboxstamps.Plan, warn io.Writer) {
+	if err := plan.ApplyReplay(root); err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v\n", err)
+	}
+	warnStamps(warn, "dropped %d plane-side inbox stamp(s) on items origin retired", plan.Retired)
+	warnStamps(warn, "origin superseded %d plane-side inbox stamp(s), changing every field they set", plan.Superseded)
+	warnStamps(warn, "replayed %d plane-side inbox stamp(s) onto origin's edits, uncommitted until evolve sync-main", plan.Replay)
+}
+
+func restoreInboxStampsAfterBlockedFastForward(root string, plan inboxstamps.Plan, warn io.Writer) {
+	if warnOnFailedRestore(plan.Restore(root), warn) {
+		return
+	}
+	warnStamps(warn, "restored %d plane-side inbox stamp(s) after the blocked fast-forward", slices.Concat(plan.Retired, plan.Superseded, plan.Replay))
+}
+
+func warnOnFailedRestore(err error, warn io.Writer) bool {
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: restoring the loop's inbox stamps failed: %v\n", err)
+	}
+	return err != nil
+}
+
+func warnStamps(warn io.Writer, format string, stamps []inboxstamps.Stamp) {
+	if len(stamps) > 0 {
+		fmt.Fprintf(warn, "[loop] wave-boundary sync: "+format+": %s\n", len(stamps), strings.Join(inboxstamps.Paths(stamps), ", "))
+	}
+}
 
 func blockingInboxFiles(ctx context.Context, g gitexec.Git) []string {
-	local, _, code, err := g.Capture(ctx, "status", "--porcelain", "-z", "--untracked-files=all", "--", inboxPathspec)
+	local, _, code, err := g.Capture(ctx, "status", "--porcelain", "-z", "--untracked-files=all", "--", inboxstamps.Pathspec)
 	if err != nil || code != 0 {
 		return nil
 	}
-	remote, _, code, err := g.Capture(ctx, "diff", "-z", "--no-renames", "--name-only", "HEAD", "origin/main", "--", inboxPathspec)
-	if err != nil || code != 0 {
+	changed, err := inboxstamps.ChangedOnRemote(ctx, g, "origin/main")
+	if err != nil {
 		return nil
-	}
-	changed := map[string]bool{}
-	for _, path := range strings.Split(remote, "\x00") {
-		changed[path] = true
 	}
 	var blocking []string
 	for _, entry := range strings.Split(local, "\x00") {

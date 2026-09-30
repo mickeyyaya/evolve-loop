@@ -34,6 +34,12 @@ var lifecycleOwnedFields = []string{
 
 var lifecycleOwnedPrefixes = []string{"routed_", "retired_"}
 
+const RouteField = "route"
+
+func IsMoverWritten(key string) bool {
+	return key == RouteField || isLifecycleOwned(key)
+}
+
 func isLifecycleOwned(key string) bool {
 	hasOwnedPrefix := func(prefix string) bool { return strings.HasPrefix(key, prefix) }
 	return slices.Contains(lifecycleOwnedFields, key) || slices.ContainsFunc(lifecycleOwnedPrefixes, hasOwnedPrefix)
@@ -110,7 +116,7 @@ func checkAuthoredFields(fields map[string]json.RawMessage, item inboxbatch.Item
 			return fmt.Errorf("%w: %q is written by the lifecycle verbs, never at filing", ErrInvalidItem, key)
 		}
 	}
-	if _, authored := fields["route"]; authored && !inboxbatch.IsConsoleRoute(item.Route) {
+	if _, authored := fields[RouteField]; authored && !inboxbatch.IsConsoleRoute(item.Route) {
 		return fmt.Errorf("%w: an authored route may only send the item to the console; route %q is `evolve inbox route-lane`'s", ErrInvalidItem, item.Route)
 	}
 	return nil
