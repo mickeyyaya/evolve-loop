@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A protected path labelled discovered with keep is refused (red first)",
+    "An .apicover-enforce edit that removes another package's line needs corroboration",
+    "GamingSignals majorities ignore skipped entries; the why above signalFileHints in gaming.go (gate configuration is signal, not apparatus) is replaced by TestSurfaceOf_GateConfigurationIsSignal"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/scopedelta/scopedelta.go",
+    "go/internal/scopedelta/gaming.go"
+  ],
+  "fix": "Re-derive the boundary class in Account regardless of the producer's label; stop exempting gate-configuration files from corroboration (they are signal, not closure); compute GamingSignals floors and majorities over the counted entries only.",
+  "id": "scopedelta-label-and-closure-bypasses",
+  "kind": "bug",
+  "priority_class": "security",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "Round 12's editor found two holes. (1) Account (scopedelta.go) re-checks a declared closure or in-scope class but never boundary, and Validate refuses a keep only when the record already says boundary: an entry labelling a protected path `discovered`, disposition keep, with a declared tightens and any corroboration, passes and OK() is true. (2) goBuildMetadataRule classifies go/.apicover-enforce, go.mod and go.sum as closure in any Go-touching cycle, and Admissible exempts closure from evidence, so an enrollment edit that deletes other packages' lines ships uncorroborated. GamingSignals also divides by len(entries) including skipped closure/in-scope entries, so padding dilutes a majority.",
+  "title": "scopedelta lets a producer ship a protected path under a non-boundary label, and closure exempts gate-config edits from evidence",
+  "weight": 0.7
+}

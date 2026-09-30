@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "`evolve boundary run --dry-run --merge 12 --goal-text-file F` prints the six steps in order (red: unknown command)",
+    "With fakes for each step, a refusal at pr merge stops the run before sync-main and returns that exit code",
+    "A full fake run ends with the detached loop's pid and boot verdict"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "deps": [
+    "cli-loop-stop-wait",
+    "cli-pr-merge",
+    "cli-loop-detach"
+  ],
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/cmd/evolve/cmd_syncmain.go",
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "fix": "Add `evolve boundary run [--merge n,\u2026] --goal-text-file F [--max-cycles N]`, which runs the documented steps through their verbs in order: `loop-stop --wait`, `pr merge` for the listed PRs, `sync-main`, `gc`, `loop-stop --release`, then `loop --detach`. It prints each step's result and stops at the first failure with that step's exit code (1 refused, 2 I/O). --dry-run prints the plan. It reimplements no step. In runtime-reference.md, replace the procedure text with the verb and keep the steps as its description.",
+  "id": "cli-boundary-run",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "runtime-reference.md:172-177 gives the boundary as four steps: `evolve loop-stop` and wait; merge console PRs with gh; `evolve sync-main` then `evolve gc`; then `evolve loop-stop --release` and a launch. The operator runs them one at a time in a shell, judges at each step whether the last one succeeded, and launches the loop with nohup. A skipped or failed step (a merge while a lane still runs, a launch on an unsynced plane) is found later.",
+  "title": "The wave boundary (stop, merge, sync, gc, launch) is sequenced by hand across evolve, gh and nohup; add `evolve boundary run`",
+  "weight": 0.6
+}

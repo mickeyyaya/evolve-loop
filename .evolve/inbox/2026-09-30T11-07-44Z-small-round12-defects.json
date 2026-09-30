@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Each defect has a red-first test"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/cmd/evolve-fake-cli/main.go",
+    "go/internal/skillcheck/codex.go",
+    "go/internal/adapters/ledger/seal_test.go",
+    "go/internal/commentaudit/equivalence.go"
+  ],
+  "fix": "Order phase detection deterministically; distinguish not-exist from read errors; give the seal test a fixture ledger; scope `// Output:` to Example functions.",
+  "id": "small-round12-defects",
+  "kind": "bug",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "detectPhaseFromPrompt iterates a map, so a prompt naming two agents resolves to a random phase (go/cmd/evolve-fake-cli/main.go); codexManifestDiffs counts any read error as drift (skillcheck codex.go); TestSeal_RealLedgerCopy seals whatever real .evolve/ledger.jsonl is reachable and assumes 101 lines, so a dev worktree with a small local ledger fails it; commentaudit's directive rule treats any `// Output:` as a directive, even outside an Example test.",
+  "title": "Small defects round 12 found: fake-CLI phase detection order, skillcheck drift on read errors, a vacuous ledger test, a directive false positive",
+  "weight": 0.3
+}

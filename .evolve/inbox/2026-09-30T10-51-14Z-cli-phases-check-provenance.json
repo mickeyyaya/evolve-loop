@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "`evolve phases check-provenance --cycle N` on a fixture with a mismatched artifact prints the violation and exits 1 (red: unknown subcommand)",
+    "An unreadable ledger, or a ledger line over the scanner's limit, exits 2"
+  ],
+  "connects_to": [
+    "phasecoherence-provenance-silent"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/internal/cli/phasecmd/phases.go",
+    "go/internal/phasecoherence"
+  ],
+  "fix": "Add `evolve phases check-provenance --cycle N [--json]`, which runs CheckProvenance over each of cycle N's phase artifacts and prints the violations. Exit 0 when clean, 1 on any violation, 2 when the ledger cannot be read or scanned completely, so it never passes silently. Document it in runtime-reference.md beside check-coherence.",
+  "id": "cli-phases-check-provenance",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "phasecoherence.CheckProvenance compares a phase artifact's provenance fields with the ledger (internal/phasecoherence/provenance.go:28); only its test calls it. `evolve phases check-coherence` and `check-artifact-coherence` (phases.go:39-41) cover other checks. CheckProvenance also ignores ledger open errors and stops silently past a 64 KiB line (inbox phasecoherence-provenance-silent), so a command built on it must report those cases as failures.",
+  "title": "The ledger provenance check of a cycle's phase artifacts is unreachable; add `evolve phases check-provenance --cycle N`",
+  "weight": 0.2
+}

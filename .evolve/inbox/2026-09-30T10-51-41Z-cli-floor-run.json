@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve floor run --tier fmt` flags a file that Go 1.23's gofmt would rewrite (red: unknown command)",
+    "A red tier exits 1 naming it, and the other tiers still run and report",
+    "The tier commands match CI's (a test compares them with required.yml's steps)"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "deps": [
+    "cli-ratchet-check"
+  ],
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/commitgate",
+    "go/internal/phases/audit/ciparitygate"
+  ],
+  "fix": "Add `evolve floor run [--tier fmt,vet,integration,e2e,acs-durable,apicover,cover,ratchet]` (default: all). Each tier runs the command CI runs, with fmt under CI's pinned toolchain (from config); it reuses ciparitygate's integration, acs-durable and apicover runners and `evolve ratchet check` for the ratchet tier. It prints one verdict per tier with the tail of any failing output. Exit 1 when any tier is red, 2 when a tier cannot run. Document it in runtime-reference.md as the pre-landing floor.",
+  "id": "cli-floor-run",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve commit-gate run` covers host gofmt -s, vet, golangci and targeted tests (internal/commitgate/lanes.go:70). The rest of what CI runs is make targets (make -C go test-integration, test-e2e, test-acs-durable, cover-strict) plus gofmt under CI's Go 1.23 toolchain, all run by hand before a landing. Skipped tiers have shipped CI reds: #711 missed e2e, and a comment-reduction round missed the size ratchet and acs/regression.",
+  "title": "The local CI floor (gofmt on CI's Go, vet, integration, e2e, acs-durable, apicover, cover-strict) is make targets by hand; add `evolve floor run`",
+  "weight": 0.6
+}

@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A journal write failure after init surfaces (red first)",
+    "TestRun_ReleaseClassComputedBeforeShipCommits pins the order; the why in release_run.go is gone"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/releasepipeline/releasepipeline.go",
+    "go/internal/releasepipeline/release_run.go"
+  ],
+  "fix": "Return or report journal write errors; drop the unused parameter and the dead branch; add TestRun_ReleaseClassComputedBeforeShipCommits and delete the why.",
+  "id": "releasepipeline-journal-errors-and-classify-pin",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "appendStep and setJournalField discard writeJournal's error (releasepipeline.go), so a failed write after init leaves rollback's journal incomplete. initJournal takes an unused fromTag; resolveInitCommit's len(lines)==0 branch is dead. release_run.go keeps a one-line why above the release-class computation: classification must run before Ship commits the rebuilt go/evolve, or every release diffs as a binary-release; no test pins it.",
+  "title": "releasepipeline drops journal write errors, and the classify-before-ship ordering is pinned only by a comment",
+  "weight": 0.4
+}

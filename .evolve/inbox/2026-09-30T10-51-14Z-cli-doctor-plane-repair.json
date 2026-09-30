@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "`evolve doctor plane --repair` on a fixture hub whose directory moved restores the worktree links (red: flag provided but not defined)",
+    "Without --repair, a broken link is reported and the command exits 1"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/internal/cli/opscmd/doctor_plane.go",
+    "go/internal/plane"
+  ],
+  "fix": "Add `--repair` to `evolve doctor plane`. It lists the repository's worktrees, reports each one whose gitdir link is broken, runs `git worktree repair` over them and prints each repaired path. Without --repair, it reports broken links and exits 1 when any exist. Git I/O exits 2. Update workspace-layout.md.",
+  "id": "cli-doctor-plane-repair",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "workspace-layout.md:41 tells the operator to run `git --git-dir=.repo.git worktree repair <worktree paths>` after the hub is moved or copied. `evolve doctor plane` classifies one checkout, printing primary or linked, branch and gitdir (doctor_plane.go:16-45), but it neither detects broken worktree links nor repairs them.",
+  "title": "After the hub moves, worktree links are repaired with raw `git worktree repair`; add `evolve doctor plane --repair`",
+  "weight": 0.25
+}

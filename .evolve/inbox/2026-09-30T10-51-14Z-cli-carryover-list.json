@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "`evolve carryover list --json` on a fixture state.json prints every todo with its age and cycles_unpicked (red: unknown subcommand \"list\")",
+    "Ids it prints are accepted verbatim by `carryover apply-decisions`",
+    "An unreadable state.json exits 2"
+  ],
+  "connects_to": [
+    "carryover-queue-unbounded-by-design"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_carryover.go",
+    "go/internal/adapters/statemap"
+  ],
+  "fix": "Add `evolve carryover list [--json] [--sort age|unpicked] [--limit N]`. It prints one row per todo (id, source cycle, age, expiresAt, cycles_unpicked, priority), read through the statemap adapter that apply-decisions writes through. It is read-only and takes no flock. The ids it prints are the ones a keep/drop/cluster decisions file names. Exit 0, or exit 2 when state.json is unreadable. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-carryover-list",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "state.json:carryoverTodos is the auto-generated backlog that triage reads (764 entries when last measured; inbox carryover-queue-unbounded-by-design). `evolve carryover` has one subcommand, apply-decisions (cmd_carryover.go:45), which needs a reviewed decisions file, and the dashboard snapshot leaves carryover out. To write that file, the operator first reads the queue with jq on .evolve/state.json.",
+  "title": "carryoverTodos can be reviewed only with jq on state.json; add `evolve carryover list`",
+  "weight": 0.3
+}

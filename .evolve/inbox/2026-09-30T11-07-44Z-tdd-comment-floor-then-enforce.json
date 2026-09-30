@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A TDD predicate file with a narrative comment is corrected at TDD exit (red first)",
+    "The build floor ignores the cycle's TDD-owned predicate files, and a cycle whose only comments are TDD's passes the build floor"
+  ],
+  "connects_to": [
+    "comment-floor-enforce",
+    "comment-regrowth-build-exit-gate"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/core/comment_floor.go",
+    "go/internal/core",
+    "agents/evolve-tdd-engineer.md",
+    ".evolve/policy.json"
+  ],
+  "fix": "Run commentFloorResult at TDD exit over the files TDD wrote, so TDD corrects its own comments, and exclude those files from the build floor's scan. Flipping comment_floor.stage to enforce stays with comment-floor-enforce.",
+  "id": "tdd-comment-floor-then-enforce",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "The build handoff floor counts every comment the cycle's diff adds, including go/acs/cycle<N>/predicates_test.go, which the TDD phase writes and the builder may not edit (builder profile, persona). Enforcing it now would send the builder a correction it can never make; 10 of the last 15 cycles' predicate files hold counted comments. So comment_floor stays shadow (architecture review of the no-comment policy, 2026-09-30).",
+  "title": "Give the TDD phase its own comment floor and keep its predicate files out of the build floor's scan, so comment_floor can be enforced",
+  "weight": 0.6
+}

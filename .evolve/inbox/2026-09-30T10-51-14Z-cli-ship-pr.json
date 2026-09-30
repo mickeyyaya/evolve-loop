@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve ship --class manual --pr` with a fake gh creates the PR and prints its number (red: flag provided but not defined)",
+    "A branch that already has an open PR reports it instead of creating a second one",
+    "--pr on main exits 10"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_ship.go",
+    "go/internal/phases/ship/landing"
+  ],
+  "fix": "Add `--pr [--pr-body-file F]` to `evolve ship --class manual`. After a successful push to a non-main branch, it opens a PR against main, titled with the commit subject and using the body file (or the commit body), or reports the branch's existing PR; it prints the PR number and URL. When PR creation fails after the push, it reports the push and exits 2 without undoing the push. --pr on main exits 10. Document it in runtime-reference.md's ship classes.",
+  "id": "cli-ship-pr",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "The manual ship pushes the current branch (internal/phases/ship/landing/push.go:69) and stops. The console then runs `gh pr create` by hand with a title, body and base, and the /commit and /evo:publish flows each script their own gh calls. The PR is what the boundary merges, so every console landing has one raw step between ship and merge.",
+  "title": "`evolve ship --class manual` pushes a branch but cannot open its PR; add `--pr`",
+  "weight": 0.5
+}

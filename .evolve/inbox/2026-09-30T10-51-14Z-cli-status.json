@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "`evolve status --json` on a fixture prints loop, cycles, streak, prs and ci sections (red: unknown command)",
+    "The streak counts consecutive shipped cycles back from the newest dossier and stops at the first non-ship",
+    "With gh missing, prs and ci read 'unavailable' and the exit is 0"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/dashboard",
+    "go/internal/ciwatch"
+  ],
+  "fix": "Add `evolve status [--json] [--project-root P]`. It prints the dashboard snapshot's loop and cycle sections; the current consecutive-ship streak and the last zero-ship run, computed from the committed dossiers; open PRs with their check state; and the failing jobs of main's latest required CI run, through ciwatch's gh fetcher. When gh is unavailable those two sections read 'unavailable' and the command still succeeds. It is read-only: exit 0, or 2 when the snapshot itself cannot be read. Document it in runtime-reference.md as the status report's source.",
+  "id": "cli-status",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve dashboard --snapshot` prints the loop status, recent cycles with their verdicts, and the ship-rate trend (internal/dashboard/model.go:24-38). It has no consecutive-ship count, no open PRs and no CI state. The operator counts the ship streak (operating-policy.md \u00a74.1's goal) from the dossiers, and runs `gh pr list` and `gh run list` for the PR numbers and failing CI job names a status report needs (CLAUDE.md:13, Status Reporting).",
+  "title": "There is no single status verb, so the operator combines the dashboard snapshot, the dossiers and gh to report cycles, the ship streak, open PRs and failing CI",
+  "weight": 0.55
+}

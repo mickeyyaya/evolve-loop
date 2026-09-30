@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve land --patch F --branch B` on a fixture repo yields a worktree on B at origin/main with the patch applied and nothing committed (red: unknown command)",
+    "`--salvage <leaf>` also restores the leaf's untracked files",
+    "A conflicting patch exits 1 naming the conflicted files; an existing branch exits 1"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "deps": [
+    "cli-worktree-dev"
+  ],
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/gitexec",
+    "go/internal/gc"
+  ],
+  "fix": "Add `evolve land --branch B (--patch F | --salvage <leaf>) [--onto origin/main]`. It creates the dev worktree and branch from the base through the same code as `evolve worktree create --dev` and applies the patch with --3way. For a salvage leaf it also extracts the leaf's untracked files. It then prints the next commands (commit-gate run, ship). It never commits or pushes. A conflict leaves the markers in the worktree and exits 1 naming the files; an existing branch exits 1; a missing patch or leaf exits 2. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-land-patch",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "Console work often lands as a patch on a fresh branch from origin/main (every comment-reduction round lands this way), and a salvaged cycle lands the same way: branch from origin/main, `git apply` the patch, extract untracked.tgz, then run the commit gate and `evolve ship --class manual` (operating-policy.md:85: land recoverable work through the operator flow). No verb does the first three steps, so each landing is raw git, where a wrong base or a partial apply goes unnoticed.",
+  "title": "Landing a patch or a salvaged cycle onto current main is raw git (branch, apply, untar); add `evolve land`",
+  "weight": 0.45
+}

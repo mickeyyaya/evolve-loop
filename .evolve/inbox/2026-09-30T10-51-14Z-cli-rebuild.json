@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve rebuild --project-root P` builds P's HEAD to the path the boot refresh uses and prints both SHAs (red: unknown command)",
+    "A live run lease exits 1; a failing build exits 2 with the output tail",
+    "The boot refresh and the verb call one build function (test)"
+  ],
+  "connects_to": [
+    "untrack-goevolve-binary"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/loopchain",
+    "go/cmd/evolve/cmd_loop_boot_refresh.go"
+  ],
+  "fix": "Add `evolve rebuild [--project-root P] [--repin]`. It runs the boot refresh's build step (the same make target and output path) for P's HEAD and prints the old and new binary SHAs. --repin then re-pins the ship SHA through reset-sha's provenance-gated path. A live run lease on P exits 1. A build failure exits 2 with the tail of the output. The boot refresh and the verb call one build function. Document it in runtime-reference.md and workspace-layout.md, replacing the raw make.",
+  "id": "cli-rebuild",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "The loop rebuilds and re-execs a binary behind HEAD at boot and at chain boundaries (loopchain's binary-refresh engine; runtime-reference.md:177), but nothing exposes that build. A fresh worktree, a console tree after a merge, or a plane before a boundary check needs `make -C go build` by hand (workspace-layout.md:38), and a same-version rebuild can leave the ship SHA pin stale until `evolve reset-sha`. A bare `go build` in go/ overwrites the tracked go/evolve instead.",
+  "title": "Rebuilding an evolve binary outside the loop's boot refresh is `make -C go build` by hand; add `evolve rebuild`",
+  "weight": 0.35
+}

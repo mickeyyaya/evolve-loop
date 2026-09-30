@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve phase plan-review --cycle N` runs the spec phase through its contract and prints its PhaseResponse with the verdict (red: unknown phase \"plan-review\")",
+    "`evolve compose --phases plan-review,tdd --cycle N` accepts a spec phase in the sequence",
+    "A name in neither the registry nor .evolve/phases exits 10 listing both sets"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "deps": [
+    "cli-phase-cycle-request"
+  ],
+  "files": [
+    "go/internal/cli/phasecmd/phase.go",
+    "go/cmd/evolve/cmd_compose.go",
+    "go/internal/phaseregistrar",
+    "go/internal/phases/registry"
+  ],
+  "fix": "Resolve a name the built-in registry lacks through phaseregistrar.Registrar (PhasesDir .evolve/phases, the profiles directory, the bridge) in `evolve phase` and `evolve compose`. The phase runs with the request that `--cycle N` derives, so a spec phase runs with its contract and verdict exactly as the cycle runs it. An unknown name still exits 10 and lists both the built-in and the spec names. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-phase-spec-phases",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve phase spec-verify` exits 10 with 'unknown phase'. The registry that `phase` and `compose` read (phases/registry, filled by the blank imports at internal/cli/phasecmd/phase.go:13-22) holds audit, build, debugger, intent, retro, scout, ship, tdd and triage. The spec phases (spec-verify, architecture-design, plan-review, build-planner, doc-sync, tester, secret-leak-scan, flake-rerun-scan, memo) and the catalog phases in .evolve/phases are minted by phaseregistrar.Registrar only inside `evolve cycle run` (cmd_cycle.go:522). To run one outside a cycle, the operator hand-composes a prompt for `evolve subagent run`, which skips the spec runner's contract and verdict.",
+  "title": "`evolve phase` runs only the nine built-in phases; spec and catalog phases (plan-review, tester, doc-sync, memo) run only inside a cycle",
+  "weight": 0.4
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A launch with --goal-text T records T, and a following `evolve loop --goal-from-last --dry-run` resolves the same goal hash (red: flag provided but not defined)",
+    "--goal-file F with --goal-text exits 10; --goal-from-last with nothing recorded exits 1",
+    "The recorded file is written atomically"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_args.go",
+    "go/cmd/evolve/cmd_loop.go"
+  ],
+  "fix": "At launch, record the goal text atomically in one file the loop owns in the plane's .evolve. Add `--goal-from-last` to reuse it and `--goal-file F` to read the goal from a file. Two goal sources together exit 10; --goal-from-last with nothing recorded exits 1. The printed run config names the goal source. Writing a new goal from the last wave's outcomes stays the operator's judgment; this only removes the retyping. Document both flags in runtime-reference.md's launch step.",
+  "id": "cli-loop-goal-from-last",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve loop` takes the goal only as --goal-text, --goal-hash or a positional string (cmd_loop_args.go:39-40, 116-119), and the run does not record the goal text it ran with. At every boundary the operator retypes the goal or pastes it from a hand-kept .evolve/goal.txt that no code writes. A quoting slip or a stale file changes the goal hash without any warning.",
+  "title": "Each wave's goal text is retyped or pasted by hand; add `--goal-file` and `--goal-from-last` to `evolve loop`",
+  "weight": 0.3
+}

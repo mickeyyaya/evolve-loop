@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A fixture repo with a `fixup!` commit since the last tag fails release-preflight naming it (red: preflight passes)",
+    "--require-ci with no visible CI run fails; without it the CI check stays advisory",
+    "skills/release/SKILL.md calls the preflight instead of gh and git log"
+  ],
+  "connects_to": [
+    "release-preflight-repo-contract-suites"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/internal/releasepreflight",
+    "skills/release/SKILL.md"
+  ],
+  "fix": "Add a no-WIP step to release-preflight: subjects since the last tag that match the skill's pattern refuse with the list, exit 1. Add `--require-ci`, which turns an unavailable CI verdict into a failure. Then drop the skill's gh and git steps in favour of `evolve release-preflight <v> --require-ci`. Document both in runtime-reference.md's release lifecycle.",
+  "id": "cli-release-preflight-no-wip",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "release-preflight already hard-gates the release commit's required CI run (gateReleaseCommitCI, internal/releasepreflight/preflight_run.go:319), but it skips that gate as advisory when gh shows no run. /evo:release still runs its own `gh run list` CI step and a `git log <last tag>..HEAD` scan for WIP, fixup!, squash! and amend! subjects (skills/release/SKILL.md:31-38), because the preflight has no WIP scan and cannot fail on a CI verdict it could not see.",
+  "title": "`evolve release-preflight` lacks the no-WIP-commit check that the /evo:release skill runs with git log; add it to the preflight",
+  "weight": 0.3
+}

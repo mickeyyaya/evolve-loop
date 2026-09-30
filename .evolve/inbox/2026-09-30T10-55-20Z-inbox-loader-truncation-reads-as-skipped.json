@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A loaded-but-truncated item prints as truncated, never as skipped (red first)",
+    "An unparsable item still prints as skipped",
+    "evolve inbox batches over the checked-in inbox prints no truncation warning"
+  ],
+  "connects_to": [
+    "inboxbatch-utf8-and-resolution"
+  ],
+  "created_at": "2026-09-30T10:55:20Z",
+  "files": [
+    "go/cmd/evolve/cmd_inbox.go",
+    "go/cmd/evolve/cmd_inbox_quarantine.go",
+    "go/internal/inboxbatch/item.go"
+  ],
+  "fix": "Give LoadDir's warnings a kind (skipped: unreadable or unparsable; truncated: loaded with fields cut) and print each by its kind; shorten the 44 over-length items at a boundary so they render whole (evolve inbox add already refuses new ones).",
+  "id": "inbox-loader-truncation-reads-as-skipped",
+  "kind": "bug",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, filing the CLI-coverage requests",
+  "summary": "runInboxBatches (cmd_inbox.go:54) and inbox quarantine list (cmd_inbox_quarantine.go:42) prefix every loader warning with 'WARN skipped', but LoadFile's sanitization warning (item.go:237) is for an item that loaded and was truncated (title/files > 160 bytes, acceptance > 600), not skipped. On 2026-09-30, 44 of 241 items printed as skipped while all 241 were batched, so the operator reads a dropped queue. The truncation is silent in the prompt: those 44 lanes see titles and criteria cut mid-sentence (and mid-rune; see inboxbatch-utf8-and-resolution).",
+  "title": "inbox batches prints 'WARN skipped' for items it loaded with truncated fields; 44 items reach lanes with cut titles or criteria",
+  "weight": 0.45
+}

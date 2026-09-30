@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "`evolve dossier sweep --dry-run` lists a fixture's dirty complete pair and commits nothing (red: unknown subcommand)",
+    "Without --dry-run it commits the pair and leaves a half pair; a live run lease exits 1"
+  ],
+  "connects_to": [
+    "dossier-sweep-pairing"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "deps": [
+    "cli-dossier-publish",
+    "dossier-sweep-pairing"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_dossier.go",
+    "go/internal/dossier/sweep.go"
+  ],
+  "fix": "Add `evolve dossier sweep [--dry-run]`, calling SweepOrphans under the ship lock and live-run check that `dossier publish` uses, and printing the recommitted, skipped and failed cycles. --dry-run lists the pairs it would commit and commits nothing. Exit 0; 1 when held or when any pair failed; 2 on I/O. It lands after dossier-sweep-pairing fixes the pairing. Document it next to `dossier publish` in runtime-reference.md.",
+  "id": "cli-dossier-sweep",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "dossier.SweepOrphans recommits every complete dirty cycle-N.{json,md} pair in the tree and skips half pairs (internal/dossier/sweep.go:26-30); only its tests call it. When a closeout leaves a dossier pair dirty in the plane outside .evolve/dossiers-pending, the operator commits it with raw git. Its pairing matches by cycle number anywhere in the repo, so two same-numbered files in different directories become one pair (inbox dossier-sweep-pairing).",
+  "title": "Orphan dossier pairs left dirty in the tree are committed with raw git, while SweepOrphans exists with no caller; add `evolve dossier sweep`",
+  "weight": 0.2
+}

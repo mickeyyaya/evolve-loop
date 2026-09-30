@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A permission error on the naming manifest fails the step (red first)",
+    "TestDefaultNameGuard_MissingManifestIsCleanPass and TestDefaultCIConclusion_LookupFailuresAreUnavailableNotErrors pin the rules; the two comments are gone"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/releasepreflight/releasepreflight.go",
+    "go/internal/releasepreflight/preflight_run.go"
+  ],
+  "fix": "Distinguish not-exist from other stat errors; pin both fail-open rules with tests and delete the whys; correct the stale log text.",
+  "id": "releasepreflight-fail-open-pins",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "defaultNameGuard reads any os.Stat error on .evolve/naming.json (e.g. EACCES) as no manifest and passes. Two kept whys, above defaultNameGuard's missing-manifest branch and in defaultCIConclusion, state that a missing manifest passes and that a CI lookup failure is the unavailable verdict, never an error; no test pins either. preflight_run.go logs a stale 'advisory in v12.1.5; required in v12.2.0'.",
+  "title": "releasepreflight treats any naming-manifest stat error as absent, and two fail-open rules are pinned only by comments",
+  "weight": 0.35
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`evolve comments verify` on a comment-only fixture diff reports equivalence as `go run ./cmd/commentaudit verify` does (red: unknown command)",
+    "A relative directory argument works for verify",
+    "Both entry points call commentaudit.Main"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/commentaudit"
+  ],
+  "fix": "Add `evolve comments <rank|check|comments|verify> \u2026`, delegating to commentaudit.Main with the same git seam and resolving relative directory arguments to absolute ones before the call. The exit codes are commentaudit's. Keep cmd/commentaudit as a thin wrapper or delete it. Document it in runtime-reference.md and in the comment campaign's design note.",
+  "id": "cli-comments",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "internal/commentaudit.Main implements rank, check, comments and verify (cli.go:23-75), reachable only through `go run ./cmd/commentaudit`. The commit gate uses commentaudit.Equivalent only for its comment-only waiver (commitgate/comment_only.go:73). Every comment-reduction round runs the separate binary, which needs a Go toolchain in the tree and absolute directories for verify.",
+  "title": "The comment campaign's proof tools (rank, check, verify) run only as `go run ./cmd/commentaudit`, a separate binary; add `evolve comments`",
+  "weight": 0.4
+}

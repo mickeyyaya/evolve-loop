@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "`evolve cycle scope-delta --cycle N` on a fixture with one undeclared path lists it and exits 1 (red: unknown subcommand)",
+    "A path in a sibling lane's declared scope is classified cross-lane"
+  ],
+  "connects_to": [
+    "scopedelta-wire-or-delete"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/internal/scopedelta"
+  ],
+  "fix": "Add `evolve cycle scope-delta --cycle N [--json]`. It compares the cycle's declared files (its item and task contract) with its changed paths (the worktree diff from its base, or its shipped commit), classifies them with scopedelta.Classify using the wave's sibling scopes, and prints the Summary. It is read-only: exit 0 when everything is in scope, 1 when any path is out of scope or cross-lane, 2 on I/O. It is the operator view of the build-exit check that scopedelta-wire-or-delete proposes and shares its classifier call; it is void if that item deletes the package. Document it in runtime-reference.md.",
+  "id": "cli-cycle-scope-delta",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "internal/scopedelta classifies each changed path against a declared scope, including paths in a sibling lane's scope (Classify and Summarize, scopedelta.go:256,416), and nothing imports it. Cycle 1718 edited a doc that then conflicted with cycle 1719, and size-ratchet lanes edit an undeclared offenders.json. The operator finds such drift by diffing a cycle's worktree against its item's files by hand.",
+  "title": "No command compares a cycle's touched files with its declared scope, and scopedelta has no caller; add `evolve cycle scope-delta --cycle N`",
+  "weight": 0.2
+}
