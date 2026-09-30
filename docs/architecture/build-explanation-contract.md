@@ -76,8 +76,10 @@ in for the per-path explanations the contract requires (2026-09-30, after cycles
 An entry is a Markdown list item, not a physical line. Its explanation may wrap
 onto continuation lines (unindented, or indented fewer than four spaces: the
 shared section reader hides a line indented four or more, or by a tab, as code)
-or continue in sub-bullets (a sub-bullet that opens with a backticked path is
-its own entry). One item may name several paths that share its explanation
+or continue in sub-bullets (a sub-bullet is its own entry, checked like any
+other, when its first span names a diff path or is shaped like one, holding a
+`/`; one that opens with a backticked identifier such as `runGateSet`
+continues the item). One item may name several paths that share its explanation
 (``- `a`, `b` — why``, also joined by `and` or `&`), but a span joins the group
 only when it covers a diff path, so a backticked identifier
 (``- `a.go`, `checkAll` — splits…``), or a path outside the diff in that

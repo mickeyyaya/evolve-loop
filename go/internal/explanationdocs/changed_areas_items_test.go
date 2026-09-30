@@ -171,6 +171,80 @@ func TestChangedAreaFailures_NestedPathBulletsStayTheirOwnEntries(t *testing.T) 
 	}
 }
 
+func TestChangedAreaFailures_ANestedBulletOpeningWithAnIdentifierIsExplanation(t *testing.T) {
+	section := "" +
+		"- `go/internal/phasecoherence/coherence.go`:\n" +
+		"  - `checkAll` is split into named steps under the limit\n" +
+		"  - `runStep` is new\n"
+
+	if got := changedAreaFailures(section, coverChanged, coverMaterial); len(got) != 0 {
+		t.Errorf("failures = %v, want none: a sub-bullet that names no Build content continues its item (cycle 1772's repair round nested `runGateSet` this way)", got)
+	}
+}
+
+func TestChangedAreaFailures_ANestedDiffPathIsItsOwnEntryNotItsParentsExplanation(t *testing.T) {
+	section := "" +
+		"- `go/acs/cycle1768/predicates_test.go` — fix\n" +
+		"  - `go/internal/phasecoherence/coherence.go` — splits checkAll into named steps\n"
+
+	got := changedAreaFailures(section, coverChanged, coverMaterial)
+
+	want := []string{"Explanation Documentation: Changed Areas path go/acs/cycle1768/predicates_test.go needs a what/why explanation"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("failures = %v, want %v: a nested bullet naming a diff path starts its own entry", got, want)
+	}
+}
+
+func TestChangedAreaFailures_ANestedInventedPathUnderAPathItemIsStillReported(t *testing.T) {
+	section := "" +
+		"- `go/internal/phasecoherence/coherence.go` — splits checkAll into named steps under the limit\n" +
+		"  - `go/internal/phantom/phantom.go` — a file this diff never touched\n"
+
+	got := changedAreaFailures(section, coverChanged, coverMaterial)
+
+	want := []string{"Explanation Documentation: cited path go/internal/phantom/phantom.go is not in the Build diff"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("failures = %v, want %v: a nested bullet shaped like a path is its own entry, checked against the diff as every nested path was before", got, want)
+	}
+}
+
+func TestChangedAreaFailures_ANestedTopLevelDiffFileIsItsOwnEntry(t *testing.T) {
+	changed := []string{"go/internal/phasecoherence/coherence.go", "Makefile"}
+	section := "" +
+		"- `go/internal/phasecoherence/coherence.go` — splits checkAll into named steps under the limit\n" +
+		"  - `Makefile` — adds the target that runs the split's size check\n"
+
+	if got := changedAreaFailures(section, changed, changed); len(got) != 0 {
+		t.Errorf("failures = %v, want none: a nested span that names Build content opens its own entry even without a slash", got)
+	}
+}
+
+func TestChangedAreaFailures_ATopLevelBulletsFirstSpanIsAlwaysAnEntry(t *testing.T) {
+	section := "" +
+		"- `go/internal/phasecoherence/coherence.go` — splits checkAll into named steps under the limit\n" +
+		"- `checkAll` — now calls each named step in order\n"
+
+	got := changedAreaFailures(section, coverChanged, coverMaterial)
+
+	want := []string{"Explanation Documentation: cited path checkAll is not in the Build diff"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("failures = %v, want %v: a bullet that is not nested is an entry whatever its first span names", got, want)
+	}
+}
+
+func TestChangedAreaFailures_AnInventedPathUnderAHeadingBulletIsStillReported(t *testing.T) {
+	section := "" +
+		"- Core changes:\n" +
+		"  - `go/internal/phantom/phantom.go` — a file this diff never touched\n"
+
+	got := changedAreaFailures(section, coverChanged, nil)
+
+	want := []string{"Explanation Documentation: cited path go/internal/phantom/phantom.go is not in the Build diff"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("failures = %v, want %v: with no path item open, a bullet's first span is an entry and must name Build content", got, want)
+	}
+}
+
 func TestValidateDocument_WrappedAndGroupedChangedAreasPassTheWholeDocument(t *testing.T) {
 	base := strings.Repeat("a", 40)
 	body := "# Build Explanation — Cycle 42\n\n" +

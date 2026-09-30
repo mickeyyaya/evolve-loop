@@ -100,7 +100,7 @@ const minExplanationBytes = 10
 func changedAreaEntries(body string, changed []string) (map[string]string, []string) {
 	entries := map[string]string{}
 	var failures []string
-	for _, item := range changedAreaItems(body) {
+	for _, item := range changedAreaItems(body, changed) {
 		paths, explanation := splitChangedAreaItem(item, changed)
 		for _, cited := range paths {
 			path := normalize(cited)
@@ -118,27 +118,41 @@ func changedAreaEntries(body string, changed []string) (map[string]string, []str
 	return entries, failures
 }
 
-func changedAreaItems(body string) []string {
+func changedAreaItems(body string, changed []string) []string {
 	var items []string
 	var lines []string
 	indent, blank := 0, false
 	for _, raw := range strings.Split(body, "\n") {
 		line := strings.TrimSpace(raw)
 		depth := len(raw) - len(strings.TrimLeft(raw, " \t"))
+		nested := lines != nil && depth > indent
 		switch {
-		case strings.HasPrefix(line, "- `"):
+		case strings.HasPrefix(line, "- `") && (!nested || citesNestedPath(firstSpan(line), changed)):
 			items = appendItem(items, lines)
 			lines, indent, blank = []string{line}, depth, false
 		case line == "":
 			blank = true
 		case lines == nil:
-		case depth > indent || !blank && !strings.HasPrefix(line, "- "):
+		case nested || !blank && !strings.HasPrefix(line, "- "):
 			lines = append(lines, line)
 		default:
 			items, lines = appendItem(items, lines), nil
 		}
 	}
 	return appendItem(items, lines)
+}
+
+func firstSpan(line string) string {
+	span, _, _ := leadingCodeSpan(strings.TrimPrefix(line, "- "))
+	return span
+}
+
+func citesNestedPath(span string, changed []string) bool {
+	return strings.Contains(span, "/") || namesBuildContent(span, changed)
+}
+
+func namesBuildContent(span string, changed []string) bool {
+	return coversAnyChangedPath(normalize(span), changed)
 }
 
 func appendItem(items, lines []string) []string {
@@ -156,7 +170,7 @@ func splitChangedAreaItem(item string, changed []string) ([]string, string) {
 	paths := []string{first}
 	for {
 		span, after, ok := leadingCodeSpan(afterGroupJoiner(rest))
-		if !ok || !coversAnyChangedPath(normalize(span), changed) {
+		if !ok || !namesBuildContent(span, changed) {
 			break
 		}
 		paths, rest = append(paths, span), after
