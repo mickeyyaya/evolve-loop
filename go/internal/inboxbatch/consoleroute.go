@@ -2,8 +2,7 @@ package inboxbatch
 
 import "strings"
 
-// routeLane is the operator override: it relaxes a heuristic derivation, never a declared protected file.
-const routeLane = "lane"
+const RouteLaneValue = "lane"
 
 // consoleRoutePrefix marks operator-owned route values (console-manual, console-salvage, ...).
 const consoleRoutePrefix = "console"
@@ -30,7 +29,7 @@ func ConsoleRouted(it Item, isProtected func(string) bool) (bool, string) {
 	if !derived {
 		return false, ""
 	}
-	if route == routeLane {
+	if route == RouteLaneValue {
 		switch {
 		case surface.binding:
 			return true, surface.reason + " (route:lane cannot relax a declared protected file: triage's breaker and the ship tripwire refuse it whatever the route)"

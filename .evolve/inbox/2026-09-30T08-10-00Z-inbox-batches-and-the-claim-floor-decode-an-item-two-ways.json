@@ -1,0 +1,18 @@
+{
+  "id": "inbox-batches-and-the-claim-floor-decode-an-item-two-ways",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "weight": 0.5,
+  "title": "evolve inbox batches and triage judge an item's routing on the loader's sanitized copy while the claim floor judges the raw file, so an item can be listed Ready and then refused at claim",
+  "files": [
+    "go/internal/inboxbatch/item.go",
+    "go/internal/inboxmover/lifecycle/claim.go"
+  ],
+  "summary": "inboxbatch.LoadFile/LoadDir sanitize each item before ConsoleRouted sees it: every files[] entry is control-stripped and cut to maxFieldLen (160 bytes, item.go sanitizeItem). The claim floor (lifecycle consoleRoutedReason, now routingItem) unmarshals the raw file. An item whose single files[] entry lists several space-separated paths (surfaceTokens supports it) with a protected file past byte 160 is dispatchable to batches and the triage menu but refused by Claim: the 2026-09-14 poison-loop shape (triage picks, claim refuses, the item is re-picked). A pipeline-* kind masks it today; any other kind does not. Found by the architecture review of evolve inbox route-lane (2026-09-30), which fixed the verb to judge with the claim floor's raw decode but left the batches/triage path as it was.",
+  "fix": "Judge routing on the raw decode everywhere: have LoadDir keep the unsanitized files[] for routing (sanitize only the fields rendered into prompts), or make the sanitizer never truncate files[]. One decode, one judgment, pinned across LoadDir, the triage menu and Claim.",
+  "acceptance": [
+    "A test with a protected file past byte 160 of one files[] entry: evolve inbox batches (LoadDir + ConsoleRouted), the triage menu partition and lifecycle Claim all agree the item is console-owned"
+  ],
+  "created_at": "2026-09-30T08:10:00Z",
+  "source": "console, 2026-09-30 architecture review of evolve inbox route-lane"
+}

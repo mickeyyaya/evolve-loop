@@ -153,6 +153,10 @@ func UpdateItemJSON(path string, mutate func(m map[string]json.RawMessage)) erro
 	if err != nil {
 		return err
 	}
+	return rewriteItemJSON(path, body, mutate)
+}
+
+func rewriteItemJSON(path string, body []byte, mutate func(m map[string]json.RawMessage)) error {
 	var item map[string]json.RawMessage
 	if err := json.Unmarshal(body, &item); err != nil {
 		return err
