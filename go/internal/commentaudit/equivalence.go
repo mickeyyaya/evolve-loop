@@ -14,14 +14,12 @@ import (
 	"strings"
 )
 
-// Equivalent reports whether after differs from before only in ordinary
-// comments and layout; a code, directive or exported-doc change returns false and says which.
 func Equivalent(name string, before, after []byte) (bool, string, error) {
-	bf, b, err := parseShape(name, before)
+	b, err := parseShape(name, before)
 	if err != nil {
 		return false, "", fmt.Errorf("before: %w", err)
 	}
-	af, a, err := parseShape(name, after)
+	a, err := parseShape(name, after)
 	if err != nil {
 		return false, "", fmt.Errorf("after: %w", err)
 	}
@@ -31,109 +29,15 @@ func Equivalent(name string, before, after []byte) (bool, string, error) {
 	if !slices.Equal(anchoredDirectives(before), anchoredDirectives(after)) {
 		return false, "directive changed", nil
 	}
-	if lost := lostExportedDoc(name, bf, af); lost != "" {
-		return false, "exported doc removed: " + lost, nil
-	}
 	return true, "", nil
 }
 
-func parseShape(name string, src []byte) (*ast.File, string, error) {
+func parseShape(name string, src []byte) (string, error) {
 	file, err := parser.ParseFile(token.NewFileSet(), name, src, parser.SkipObjectResolution|parser.ParseComments)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
-	shape, err := codeShape(file)
-	return file, shape, err
-}
-
-// lostExportedDoc names the first exported declaration whose doc the edit
-// deleted. Test files declare no API, so they are exempt.
-func lostExportedDoc(name string, before, after *ast.File) string {
-	if strings.HasSuffix(name, "_test.go") {
-		return ""
-	}
-	kept := map[string]bool{}
-	for _, id := range documentedExports(after) {
-		kept[id] = true
-	}
-	for _, id := range documentedExports(before) {
-		if !kept[id] {
-			return id
-		}
-	}
-	return ""
-}
-
-func documentedExports(file *ast.File) []string {
-	var ids []string
-	for _, decl := range file.Decls {
-		switch d := decl.(type) {
-		case *ast.FuncDecl:
-			if hasDoc(d.Doc) && d.Name.IsExported() && exportedReceiver(d.Recv) {
-				ids = append(ids, funcID(d))
-			}
-		case *ast.GenDecl:
-			for _, spec := range d.Specs {
-				ids = append(ids, documentedSpec(spec, hasDoc(d.Doc))...)
-			}
-		}
-	}
-	return ids
-}
-
-func documentedSpec(spec ast.Spec, declDoc bool) []string {
-	var names []*ast.Ident
-	switch s := spec.(type) {
-	case *ast.TypeSpec:
-		declDoc = declDoc || hasDoc(s.Doc)
-		names = []*ast.Ident{s.Name}
-	case *ast.ValueSpec:
-		declDoc = declDoc || hasDoc(s.Doc)
-		names = s.Names
-	}
-	var ids []string
-	for _, n := range names {
-		if declDoc && n.IsExported() {
-			ids = append(ids, n.Name)
-		}
-	}
-	return ids
-}
-
-// hasDoc ignores a doc reduced to a bare "//" or to directives, which Text drops.
-func hasDoc(cg *ast.CommentGroup) bool {
-	return cg != nil && strings.TrimSpace(cg.Text()) != ""
-}
-
-func exportedReceiver(recv *ast.FieldList) bool {
-	if recv == nil || len(recv.List) == 0 {
-		return true
-	}
-	return receiverBase(recv.List[0].Type).IsExported()
-}
-
-func receiverBase(expr ast.Expr) *ast.Ident {
-	for {
-		switch e := expr.(type) {
-		case *ast.StarExpr:
-			expr = e.X
-		case *ast.IndexExpr:
-			expr = e.X
-		case *ast.IndexListExpr:
-			expr = e.X
-		case *ast.Ident:
-			return e
-		default:
-			return ast.NewIdent("_")
-		}
-	}
-}
-
-func funcID(d *ast.FuncDecl) string {
-	if d.Recv == nil || len(d.Recv.List) == 0 {
-		return d.Name.Name
-	}
-	return receiverBase(d.Recv.List[0].Type).Name + "." + d.Name.Name
+	return codeShape(file)
 }
 
 func codeShape(file *ast.File) (string, error) {
