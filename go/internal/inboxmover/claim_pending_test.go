@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -80,5 +81,45 @@ func TestClaimPending_AFailedMoveIsReported(t *testing.T) {
 	err := ClaimPending(Options{ProjectRoot: root, Stderr: io.Discard}, 7, []string{"a"})
 	if !errors.Is(err, ErrMvFailed) {
 		t.Fatalf("a move that failed must be returned, got %v", err)
+	}
+}
+
+func TestClaimDispatchable_RefusesAnItemWaitingOnAnUnlandedDependency(t *testing.T) {
+	root := t.TempDir()
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	place := func(dir, id, extra string) string {
+		t.Helper()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(dir, id+".json")
+		if err := os.WriteFile(p, []byte(`{"id":"`+id+`"`+extra+`}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	place(filepath.Join(inbox, "retry"), "dep", "")
+	waiting := place(inbox, "waiting", `,"deps":["dep"]`)
+	place(filepath.Join(inbox, "processed", "cycle-3"), "landed", "")
+	place(inbox, "ready", `,"deps":["landed"]`)
+	var stderr strings.Builder
+	opts := Options{ProjectRoot: root, Stderr: &stderr}
+
+	_, err := ClaimDispatchable(opts, "waiting", "7")
+	if !errors.Is(err, ErrWaitingOnDependency) {
+		t.Fatalf("ClaimDispatchable(waiting) err = %v, want ErrWaitingOnDependency", err)
+	}
+	if !strings.Contains(err.Error(), "dep") || !strings.Contains(stderr.String(), "needs dep") {
+		t.Errorf("the refusal must name the blocking dependency: err=%v stderr=%q", err, stderr.String())
+	}
+	if _, serr := os.Stat(waiting); serr != nil {
+		t.Errorf("a refused claim must leave the item at the root: %v", serr)
+	}
+
+	if _, err := ClaimDispatchable(opts, "ready", "7"); err != nil {
+		t.Fatalf("ClaimDispatchable(ready) with a landed dependency: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inbox, "processing", "cycle-7", "ready.json")); err != nil {
+		t.Errorf("a dispatchable item must be claimed: %v", err)
 	}
 }

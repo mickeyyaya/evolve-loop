@@ -53,7 +53,8 @@ func resolveClaim(opts Options, cycle int, inScope map[string]bool) *continuatio
 				cycle, it.ID, it.Continuation.Cycle)
 			continue
 		}
-		return it.Continuation
+		resolved := continuation.ExpandHostPaths(*it.Continuation)
+		return &resolved
 	}
 	return nil
 }

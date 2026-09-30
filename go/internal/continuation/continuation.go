@@ -69,5 +69,5 @@ func ReadManifest(workspace string) (Continuation, bool, error) {
 	if err := json.Unmarshal(body, &c); err != nil {
 		return Continuation{}, false, fmt.Errorf("continuation: parse manifest: %w", err)
 	}
-	return c, true, nil
+	return RedactHostPaths(c), true, nil
 }

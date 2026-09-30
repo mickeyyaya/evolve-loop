@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A failed lane's preserved item, as written to the tracked inbox file, contains no absolute home path (red today)",
+    "The next builder still reads the finding through the redacted findings_path"
+  ],
+  "consumed": {
+    "at": "2026-09-30T13:52:35Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-09-29T16:40:00Z",
+  "files": [
+    "go/internal/inboxmover",
+    "go/internal/continuation/registry.go"
+  ],
+  "fix": "Redact the stamp the mover writes into the tracked item (worktree and findings_path to the ~ form, the same RedactHostPaths), and make every reader of findings_path expand ~ before opening it. The registry, which is host runtime state, keeps absolute paths.",
+  "id": "pending-continuation-stamps-carry-host-paths",
+  "kind": "bug",
+  "priority_class": "security",
+  "route": "lane",
+  "routed_at": "2026-09-30T09:02:15Z",
+  "routed_reason": "operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop",
+  "source": "console, 2026-09-29 wave-42 boundary (landing 1761/1762 stamps)",
+  "summary": "continuation.RedactHostPaths collapses the home directory to ~ for released bindings, because consumed items are tracked and ride commits to the public remote (audit cycle-1507 M1). The pending item's own `continuation` stamp, written when a failed lane's work is preserved, is not redacted: origin/main already holds pending items whose continuation.worktree and findings_path are /Users/\u003caccount\u003e/... paths, and every wave boundary lands more (2026-09-29: the stamps from cycles 1761 and 1762).",
+  "title": "A pending item's continuation stamp carries absolute host paths (the operator's account name) into tracked inbox files",
+  "weight": 0.5
+}

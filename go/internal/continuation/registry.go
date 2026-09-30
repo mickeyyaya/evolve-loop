@@ -228,6 +228,23 @@ func RedactHostPaths(c Continuation) Continuation {
 	return c
 }
 
+func ExpandHostPaths(c Continuation) Continuation {
+	home, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(home) == "" {
+		return c
+	}
+	prefix := "~" + string(filepath.Separator)
+	expand := func(p string) string {
+		if strings.HasPrefix(p, prefix) {
+			return filepath.Join(home, strings.TrimPrefix(p, prefix))
+		}
+		return p
+	}
+	c.Worktree = expand(c.Worktree)
+	c.FindingsPath = expand(c.FindingsPath)
+	return c
+}
+
 // AppendReleased returns doc's released_continuations[] with binding c
 // appended — the ONE shape every consumption path writes (ship's in-commit
 // consume, the operator `evolve inbox consume`, and the consumed-corpus

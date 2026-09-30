@@ -90,3 +90,39 @@ func TestRedactHostPaths(t *testing.T) {
 		}
 	})
 }
+
+func TestExpandHostPaths_InvertsRedactionAndLeavesOtherPathsVerbatim(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	in := Continuation{
+		Worktree:     filepath.Join(home, "wt", "cycle-1"),
+		FindingsPath: filepath.Join(home, "runs", "audit-fail-reason.json"),
+		Branch:       "cycle-1",
+		SnapshotSHA:  "9813bc621fe4aa0d",
+		Cycle:        1,
+	}
+	if got := ExpandHostPaths(RedactHostPaths(in)); got != in {
+		t.Errorf("ExpandHostPaths(RedactHostPaths(c)) = %+v, want %+v", got, in)
+	}
+	other := Continuation{Worktree: "/srv/shared/worktree", FindingsPath: "relative/~/findings.json"}
+	if got := ExpandHostPaths(other); got != other {
+		t.Errorf("non-tilde paths were rewritten: %+v", got)
+	}
+}
+
+func TestReadManifest_RedactsHostPaths(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ws := t.TempDir()
+	c := Continuation{Worktree: filepath.Join(home, "wt"), FindingsPath: filepath.Join(home, "f.json"), SnapshotSHA: "abc", Cycle: 2}
+	if err := WriteManifest(ws, c); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := ReadManifest(ws)
+	if err != nil || !ok {
+		t.Fatalf("ReadManifest: ok=%v err=%v", ok, err)
+	}
+	if want := RedactHostPaths(c); got != want {
+		t.Errorf("ReadManifest = %+v, want the redacted %+v", got, want)
+	}
+}

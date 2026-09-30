@@ -38,21 +38,8 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "[inbox-mover] ERROR: usage: claim <task_id> <cycle>")
 			return 1
 		}
-		_, err := inboxmover.Claim(opts, rest[0], rest[1])
-		if err == nil {
-			return 0
-		}
-		if errors.Is(err, inboxmover.ErrBadArgs) || errors.Is(err, inboxmover.ErrNotFound) {
-			return 1
-		}
-		if errors.Is(err, inboxmover.ErrMvFailed) {
-			return 2
-		}
-		if errors.Is(err, inboxmover.ErrConsoleRouted) {
-			return 3
-		}
-		fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
-		return 1
+		_, err := inboxmover.ClaimDispatchable(opts, rest[0], rest[1])
+		return claimExitCode(err, stderr)
 	case "promote":
 		if len(rest) < 2 {
 			fmt.Fprintln(stderr, "[inbox-mover] ERROR: usage: promote <task_id> <new_state> [<cycle>] [--commit-sha <sha>]")
@@ -125,4 +112,21 @@ func parsePromoteArgs(args []string) (inboxmover.PromoteOpts, error) {
 		i++
 	}
 	return p, nil
+}
+
+func claimExitCode(err error, stderr io.Writer) int {
+	switch {
+	case err == nil:
+		return 0
+	case errors.Is(err, inboxmover.ErrBadArgs), errors.Is(err, inboxmover.ErrNotFound):
+		return 1
+	case errors.Is(err, inboxmover.ErrMvFailed):
+		return 2
+	case errors.Is(err, inboxmover.ErrConsoleRouted):
+		return 3
+	case errors.Is(err, inboxmover.ErrWaitingOnDependency):
+		return 4
+	}
+	fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
+	return 1
 }
