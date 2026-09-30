@@ -2,13 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
@@ -78,20 +82,36 @@ func reconcileConsumedFingerprints(evolveDir string, stderr io.Writer) {
 	}
 }
 
-// runInboxConsume implements `evolve inbox consume <item-path>`: move the item
-// into .evolve/inbox/consumed/ and ack any fingerprint it names, in one
-// invocation. The move lands FIRST — a move that succeeded with a failed ack
-// is repaired by reconcileConsumedFingerprints on the next breaker check,
-// whereas an ack whose move failed would leave the item drawable by a lane
-// while its fingerprint is already excused.
+const inboxConsumeUsage = "usage: evolve inbox consume <item-path> [--resolution <text>] [--cycle <n>|console]"
+
+type inboxConsumedStamp struct {
+	At         string `json:"at"`
+	Via        string `json:"via"`
+	Cycle      string `json:"cycle"`
+	Resolution string `json:"resolution"`
+}
+
+// runInboxConsume implements `evolve inbox consume <item-path> [--resolution
+// <text>] [--cycle <n>]`: move the item into .evolve/inbox/consumed/, stamp it
+// consumed{at, via, cycle, resolution}, and ack any fingerprint it names, in
+// one invocation. The item is decoded BEFORE the move, so a malformed item is
+// refused while still pending. The move lands FIRST — a move that succeeded
+// with a failed stamp or ack is reported non-zero and the ack is repaired by
+// reconcileConsumedFingerprints on the next breaker check, whereas an ack
+// whose move failed would leave the item drawable by a lane while its
+// fingerprint is already excused.
 func runInboxConsume(args []string, stdout, stderr io.Writer) int {
-	if len(args) < 1 || args[0] == "" {
-		fmt.Fprintln(stderr, "usage: evolve inbox consume <item-path>")
+	itemPath, stamp, ok := parseInboxConsumeArgs(args, stderr)
+	if !ok {
 		return 10
 	}
-	itemPath := args[0]
 	if _, err := os.Stat(itemPath); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %v\n", err)
+		return 1
+	}
+	doc, err := readInboxItemObject(itemPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "inbox consume: %s: %v (item left in place)\n", itemPath, err)
 		return 1
 	}
 	evolveDir := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
@@ -103,6 +123,11 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 	dest := filepath.Join(consumedDir, filepath.Base(itemPath))
 	if err := os.Rename(itemPath, dest); err != nil {
 		fmt.Fprintf(stderr, "inbox consume: %s: %v\n", itemPath, err)
+		return 1
+	}
+	stamp.At = time.Now().UTC().Format(time.RFC3339)
+	if err := writeConsumedStamp(dest, doc, stamp); err != nil {
+		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the consumed stamp write failed: %v\n", dest, err)
 		return 1
 	}
 	if releaseConsumedItemBinding(filepath.Dir(evolveDir), dest, stderr) {
@@ -119,6 +144,61 @@ func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "inbox consume: %s -> inbox/consumed/ and acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", filepath.Base(itemPath), fp)
 	return 0
+}
+
+func parseInboxConsumeArgs(args []string, stderr io.Writer) (string, inboxConsumedStamp, bool) {
+	fs := flag.NewFlagSet("inbox consume", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	resolution := fs.String("resolution", "", "how the item was resolved (recorded as consumed.resolution)")
+	cycle := fs.String("cycle", "console", "cycle that resolved the item (recorded as consumed.cycle)")
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintln(stderr, inboxConsumeUsage)
+		return "", inboxConsumedStamp{}, false
+	}
+	rest := fs.Args()
+	if len(rest) < 1 || rest[0] == "" {
+		fmt.Fprintln(stderr, inboxConsumeUsage)
+		return "", inboxConsumedStamp{}, false
+	}
+	itemPath := rest[0]
+	if err := fs.Parse(rest[1:]); err != nil || fs.NArg() > 0 {
+		fmt.Fprintln(stderr, inboxConsumeUsage)
+		return "", inboxConsumedStamp{}, false
+	}
+	c := strings.TrimSpace(*cycle)
+	if n, err := strconv.Atoi(c); c != "console" && (err != nil || n < 0) {
+		fmt.Fprintf(stderr, "inbox consume: cycle %q is not a cycle number or \"console\"\n%s\n", *cycle, inboxConsumeUsage)
+		return "", inboxConsumedStamp{}, false
+	}
+	return itemPath, inboxConsumedStamp{Via: "console-manual", Cycle: c, Resolution: strings.TrimSpace(*resolution)}, true
+}
+
+func readInboxItemObject(path string) (map[string]json.RawMessage, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("not a JSON object: %w", err)
+	}
+	if doc == nil {
+		return nil, errors.New("not a JSON object: null")
+	}
+	return doc, nil
+}
+
+func writeConsumedStamp(path string, doc map[string]json.RawMessage, stamp inboxConsumedStamp) error {
+	b, err := json.Marshal(stamp)
+	if err != nil {
+		return err
+	}
+	stamped := make(map[string]json.RawMessage, len(doc)+1)
+	for k, v := range doc {
+		stamped[k] = v
+	}
+	stamped["consumed"] = b
+	return atomicwrite.JSON(path, stamped)
 }
 
 // releaseConsumedItemBinding releases a just-consumed item's continuation
