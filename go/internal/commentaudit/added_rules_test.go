@@ -65,6 +65,17 @@ func TestAddedAcrossDiff_SkipsVendoredCode(t *testing.T) {
 	}
 }
 
+func TestAddedAcrossDiff_SkipsCodeUnderADotDirectoryAsRankDoes(t *testing.T) {
+	read := func(src string) func(string) ([]byte, error) {
+		return func(string) ([]byte, error) { return []byte(src), nil }
+	}
+	added, err := AddedAcrossDiff([]string{"go/.cache/gen/c.go"}, read("package c\n"), read("package c\n\n// a tool's cached output\nfunc F() {}\n"))
+
+	if err != nil || len(added) != 0 {
+		t.Errorf("AddedAcrossDiff = (%v, %v), want code under a dot directory skipped, as Rank and the go tool skip it", added, err)
+	}
+}
+
 func TestAddedComments_APackageDocIsSparedUpToThreeLines(t *testing.T) {
 	threeLines := "// Package p does x for the loop.\n// It also does y for the loop.\n// And z for the loop.\npackage p\n"
 	fourLines := strings.TrimSuffix(threeLines, "package p\n") + "// And w for the loop.\npackage p\n"

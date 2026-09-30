@@ -69,7 +69,3 @@ func ReadAtBase(run func(args ...string) ([]byte, error), base string) func(stri
 		return nil, fs.ErrNotExist
 	}
 }
-
-func isOutsideProjectCode(path string) bool {
-	return strings.Contains("/"+path, "/testdata/") || strings.Contains("/"+path, "/vendor/")
-}

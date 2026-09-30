@@ -2,6 +2,68 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `commentaudit strip`: comments are removed by a tool, and a Clean Code review decides how the code must change to read without them (2026-09-30)
+
+- The operator's goal (2026-09-30): "remove all comments from the code and refactor the code to be clear and self-explanatory". Editor rounds had removed comments a few directories at a time, and about 88,000 comment lines remained.
+- **`commentaudit strip [dir ...]`** removes, in place, every comment the convention does not allow. It keeps:
+  - tool directives and markers (the rule `verify` uses) and a `minimal:` or `Deprecated:` note's whole paragraph;
+  - an Example's whole `Output:` block, a cgo preamble, and a comment group carrying the `IPC-protocol-allowed` marker, which the envtaint scan reads per group;
+  - one package doc per package, from `doc.go`, else `<dir>.go`, else the first file with one, shortened to its first sentence past three lines.
+  It skips generated files and `rank`'s skip set, formats what it rewrites, writes each file atomically with its mode kept, and refuses any file whose code would change, naming it and exiting 1. A package doc it cannot bring within three lines of six words is left as written and reported for a person to write.
+- **One table of the comments a tool reads.** `equivalence.go` lists each marker with how far it reaches (its line, its paragraph, the rest of its group, its whole group, or the file); `verify`'s directive pattern is rendered from it and `strip` reads the reach, so the two cannot drift. The six-word package-doc floor is `commentaudit.MinPackageDocWords`, which `acs/regression/docgo` now imports.
+- **Two predicates stop reading comments:** `acs/cycle50`'s `TestC50A_003` and its unit twin match `codexConfigPath\s+string`, since gofmt realigns a struct once its comments go, and the Ollama classifier test checks the explanatory name `metadataOnlyListArgs`.
+- **A trial on main** removed 89,895 comment lines from 3,355 files in about six seconds; the result builds and vets. Three files were refused, and four tests that read source text failed. Those tests now read code: an anchor on `observeIdle`'s signature, an ACS pin that tolerates realignment, and `metadataOnlyListArgs` in place of the comment that said the Ollama list call reaches no model.
+- **A Clean Code review of the result** ([report](docs/reports/comment-strip-clean-code-review-2026-09-30.md)): of 64 of the riskiest stripped files, none read fully without their comments, and two thirds of the 901 removed comment groups carried intent, invariants or design the code did not yet say. So production code lands package by package with its refactors, tests and design notes, and only tests and predicate packages are stripped in bulk. The review also found defects the comments were covering for, listed in the report.
+- Tests, red first: the `TestStripComments_*`, `TestStripCommentsKeepingPackageDoc_*`, `TestStripDirs_*`, `TestPackageDocHolder_*`, `TestLeadingSentences_*` and `TestMain_Strip*` cases, and `TestEquivalent_AnchorsOnlyTheParagraphOfANoteToolsRead`. Review mutation sweeps killed every mutant, each by a named test.
+- Docs: the convention's `strip` entry; Phase 3 of the [comment plan](docs/plans/comment-reduction-2026-09.md); the review report with every reviewer's findings; a new design page, [internal-commentaudit.md](docs/architecture/packages/internal-commentaudit.md).
+
+## Added — the history deleted comments carried is recorded: `commentaudit history` and the comment history archive (2026-09-30)
+
+- The operator's rule (2026-09-30): "The history track must be recorded and stored."
+- The comment-reduction workstream moved design knowledge into package notes, but it deliberately left out history: cycle numbers, incidents, dates and F-ids. Git's diffs were its only record.
+- **`commentaudit history -base <ref> [-label L] [-out DIR] [dir ...]`** records the history a change removes: each removed comment group that carries history, whole, as it was, with its file and line and the code below it.
+  - A group that reappears whole elsewhere in the change is a move and is not recorded. Within a file it is matched first by its text and the code below it, then by its text alone; across files, by its text alone.
+  - A group that is reworded, split or merged is recorded as it was.
+  - It skips `testdata/`, `vendor/` and dot directories, by the one predicate `Rank` uses (`isSkippedDir`).
+  - The commit gate's added-comment scan (#753) had its own copy of that predicate, which skipped `testdata/` and `vendor/` but not dot directories. There is now one `isOutsideProjectCode`, so the gate also skips code under a dot directory, as `Rank` and the go tool do (`TestAddedAcrossDiff_SkipsCodeUnderADotDirectoryAsRankDoes`).
+  - An entry's anchor is the code below it, not a comment: a whole-line comment is skipped, and a line's trailing comment is cut from the anchor.
+  - A relative `-out` resolves against the repository root, so running it from `go/` still writes the one archive.
+  - Library: `commentaudit.RemovedHistoryAcrossDiff` and `RenderHistorySection`; writing the pages and the index stays inside the package.
+- **The history rule is wider.** It now also matches round numbers, PR numbers (`#503`), commit SHAs (7–40 hex characters holding both a letter and a digit) and release versions (`v11.5.0`). `check` uses the same rule, so it tightens too.
+- **The archive:** `docs/history/code-comments/` holds one page per package, with one labelled section per change.
+  - Its `README.md` index is rewritten from the pages on every run, even after a failed write, and lists only archive pages, so nothing there is edited by hand.
+  - A label already on a target page is refused before anything is written, so a change is recorded once.
+  - The backfill records everything removed between the workstream's baseline (3ce14dd0, 2026-09-26) and main at f27afd8b, after round 12 and the zero-comment policy (#753): 3,990 history comment groups on 76 package pages, under the label "comment reduction backfill, rounds 1-12 and the zero-comment policy (3ce14dd0 to f27afd8b)".
+- **What enforces it, and what does not yet:** the comment-reduction rounds run `history` once per round. No gate runs it, so another change that deletes a history-bearing comment is recorded only if its author runs it; the convention says so, and the commit-gate refusal is filed as inbox item `history-bearing-comment-removal-needs-an-archive-entry`.
+- **The protocol:** the convention names the archive as where comment history goes. The batch protocol runs `history -base $(git merge-base HEAD origin/main)` once per round, after its last batch and before its comment-only commit. `.evolve/naming.json` excludes `docs/history`, so the naming guard never rewrites the verbatim archive.
+- Tests, red first:
+  - `TestRemovedHistory_RecordsEachRemovedHistoryGroupWithWhereItSat`;
+  - `TestRemovedHistory_KeptOrMovedHistoryIsNotRecorded`;
+  - `TestRemovedHistory_AnUntouchedTrailingCommentInATouchedFileIsKept`;
+  - `TestRemovedHistory_IdenticalHistoryTextIsAttributedToTheGroupThatWentAway`;
+  - `TestRemovedHistory_AMoveWithinAFileNeverExcusesARemovalInAnother`;
+  - `TestRemovedHistory_OtherHistoryAddedElsewhereExcusesNothing`;
+  - `TestRemovedHistory_ARewordedGroupIsRecordedAsItWas`;
+  - `TestRemovedHistory_ADeletedFileRecordsItsHistory`;
+  - `TestRemovedHistory_SkipsWhatIsNotProjectCode`;
+  - `TestRemovedHistory_AnchorsATrailingCommentAtItsColumnNotTheFirstSlashes`;
+  - `TestRemovedHistory_ClipsALongAnchor` and `TestRemovedHistory_KeepsAnAnchorOfExactlyTheLimitWhole`;
+  - `TestRemovedHistory_OneMoveExcusesOneRemoval` and `TestRemovedHistory_WithinAFileOneRewrittenCopyExcusesOneRemoval`;
+  - `TestRemovedHistory_AnchorsOnTheCodeBelowSkippingOtherComments`;
+  - `TestWriteHistoryArchive_ALabelThatPrefixesAnotherIsItsOwn`;
+  - `TestWriteHistoryIndex_ListsOnlyArchivePages`;
+  - `TestRenderHistorySection_AFenceInsideTheTextNeverClosesTheEntry`;
+  - `TestMain_HistoryAppendsASectionPerPackage` (it also checks the index);
+  - `TestMain_HistoryRecordsAChangeOnce`;
+  - `TestMain_HistoryWithoutOutPrintsTheSectionAndWritesNothing`;
+  - `TestMain_HistoryWithNothingRemovedSaysSo`;
+  - `TestMain_HistoryLabelsAnUnlabelledRunByItsBase`;
+  - `TestWriteHistoryArchive_AFileAtTheRootGetsTheRootPage` (a file directly under `go/` included);
+  - `TestWriteHistoryArchive_RefusesALabelThatSpansLines`, since a label becomes a section heading;
+  - `TestWriteHistoryArchive_RewritesTheIndexAfterAFailedAppend`;
+  - `TestMain_HistoryResolvesARelativeOutAgainstTheRepoRoot`;
+  - `TestIsNarrative_CountsPullRequestsCommitsReleasesAndRounds`.
+
 ## Changed — code carries no comments: the commit gate refuses an added comment, and every loop skill and persona states the rule (2026-09-30)
 
 - The operator's rule (2026-09-30): "Add system level policy for evo loop skill and project to set the rule that it is forbidden to write comments; code should explain itself."
@@ -86,7 +148,6 @@ All notable changes to this project will be documented in this file.
   - the AST-proven comment-only commit: 228 files, 7,820 → 67 comment lines, and 17 new package design-notes pages;
   - a reviewed refactor commit of 82 files. Six agents, one per group, made the code say what about 140 deleted comments had said, for example `porcelainStatusPrefixLen`, `isAtOrUnderAny`, `isReusablePrior`, `withLink`, `configReleaseSinceLastBinaryRelease` and `ciConclusionUnavailable`.
 - About 2,500 other deleted comments needed nothing: they were history, restatements, or design reasons now in the notes.
-
 ## Added — `evolve inbox route-lane`, the operator's lane route (2026-09-30)
 
 - `evolve inbox batches` planned 0 batches from 183 pending items: 101 were console-owned by their `pipeline-*` kind, 53 by a protected surface and 28 by `route: console`. ADR-0074 lets the operator reopen a heuristic derivation with `route:"lane"`, but no command wrote it. The only way was to hand-edit item JSON, which the operator rule that every control goes through the published CLI forbids.

@@ -28,6 +28,7 @@
     "*/testdata/*",
     "go/evolve",
     "docs/operations/release-notes",
+    "docs/history",
     "*archived-*",
     "*.golden",
     ".evolve/naming.json"

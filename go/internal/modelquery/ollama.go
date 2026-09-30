@@ -15,8 +15,8 @@ func (l OllamaLister) List(ctx context.Context, _ string) ([]string, error) {
 	if run == nil {
 		run = defaultRunner
 	}
-	// `ollama list` is metadata-only and reaches no model, so it needs no PromptDispatcher.
-	out, err := run(ctx, "ollama", []string{"list"}, "")
+	metadataOnlyListArgs := []string{"list"}
+	out, err := run(ctx, "ollama", metadataOnlyListArgs, "")
 	if err != nil {
 		return nil, fmt.Errorf("ollama list: %w", err)
 	}

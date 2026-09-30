@@ -26,7 +26,7 @@ func idleReachedBracketRegionSource(t *testing.T) string {
 
 	start, end := -1, -1
 	for i, ln := range lines {
-		if start == -1 && strings.Contains(ln, "Bracket the open ask") {
+		if start == -1 && strings.Contains(ln, "func (c *replLiveChannel) observeIdle(") {
 			start = i
 		}
 		if start != -1 && strings.Contains(ln, `c.openCorrID = ""`) {

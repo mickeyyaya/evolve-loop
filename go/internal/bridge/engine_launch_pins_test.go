@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -122,8 +123,8 @@ func TestEngineSourceKeepsTheACSTokens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, token := range []string{"ClearBootStrike", "codexConfigPath string"} {
-		if !strings.Contains(string(src), token) {
+	for _, token := range []string{`ClearBootStrike`, `codexConfigPath\s+string`} {
+		if !regexp.MustCompile(token).Match(src) {
 			t.Errorf("engine.go must keep spelling %q (an ACS source pin)", token)
 		}
 	}
