@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A canary socket file in the host's tmux dir survives `go test ./cmd/evolve/` (red today)"
+  ],
+  "consumed": {
+    "at": "2026-09-30T03:37:05Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-09-29T16:00:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_control.go",
+    "go/cmd/evolve/cmd_loop_gc_test.go"
+  ],
+  "fix": "Give gcOrphanSessions an injected reaper seam (the loop config or a package var the loop tests stub), or set TMUX_TMPDIR in the loop tests' shared setup. A package-wide TMUX_TMPDIR is risky: tests that start real tmux can exceed macOS's 104-byte socket path limit under the long per-user temp dir.",
+  "id": "loop-batch-tests-reap-host-tmux-sockets",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-29, the evolve gc build (feat/gc-releases-unneeded-resources)",
+  "summary": "runLoopBatch calls gcOrphanSessions, which runs swarm.ExecReapOrphans and swarm.ExecReapOrphanSockets against the real tmux socket dir. A canary dead-pid socket file placed in /private/tmp/tmux-\u003cuid\u003e/ is removed by TestRunLoopBatch_GCHookFiresAfterFinalizeAtBatchEnd, TestRunLoopBatch_SignalExitSkipsBatchEndGCHook and TestC1735_002/003/006. Only sockets whose owning pid is dead are touched, so it is not destructive, but a unit test acts on host state; since dead sockets' files are now unlinked, the effect is visible. The evolve gc command tests were isolated with TMUX_TMPDIR in the gc PR.",
+  "title": "Loop-batch tests run the loop's real orphan-socket sweep against the host's tmux socket dir",
+  "weight": 0.45
+}
