@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -456,53 +455,7 @@ func validateDocument(body string, cycle int, baseSHA string, changed, material 
 			sections[requirement.heading] = section
 		}
 	}
-	entries, entryFailures := changedAreaEntries(sections["Changed Areas"])
-	failures = append(failures, entryFailures...)
-	changedSet := stringSet(changed)
-	for _, path := range material {
-		if entries[path] == "" {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas does not explain material path %s", path))
-		}
-	}
-	extraPaths := make([]string, 0, len(entries))
-	for path := range entries {
-		extraPaths = append(extraPaths, path)
-	}
-	sort.Strings(extraPaths)
-	for _, path := range extraPaths {
-		if !changedSet[path] {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: cited path %s is not in the Build diff", path))
-		}
-	}
-	return failures
-}
-
-func changedAreaEntries(body string) (map[string]string, []string) {
-	entries := map[string]string{}
-	var failures []string
-	for _, raw := range strings.Split(body, "\n") {
-		line := strings.TrimSpace(raw)
-		if !strings.HasPrefix(line, "- `") {
-			continue
-		}
-		rest := strings.TrimPrefix(line, "- `")
-		end := strings.Index(rest, "`")
-		if end < 0 {
-			continue
-		}
-		path := normalize(rest[:end])
-		explanation := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(rest[end+1:]), "—-:"))
-		if !validRelative(path) {
-			failures = append(failures, "Explanation Documentation: Changed Areas contains an invalid repo-relative path")
-			continue
-		}
-		if len(explanation) < 10 {
-			failures = append(failures, fmt.Sprintf("Explanation Documentation: Changed Areas path %s needs a what/why explanation", path))
-			continue
-		}
-		entries[path] = explanation
-	}
-	return entries, failures
+	return append(failures, changedAreaFailures(sections["Changed Areas"], changed, material)...)
 }
 
 func readBuildReport(workspace string) (string, error) {
