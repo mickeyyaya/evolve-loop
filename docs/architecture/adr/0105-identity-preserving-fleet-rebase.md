@@ -117,7 +117,7 @@ B1 opens two crash windows. After the carrier reset and before the rebase, a res
 
 - **Build.** A change that is not identical still invalidates the snapshot and returns to Build (step 5's non-identical test).
 - **Audit.** The rebound explanation verifies on the new base (`explanationdocs.Verify` in steps 4 and 5), and Audit always receives a pending change.
-- **Ship.** B4's `TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit` drives ship → recovery → ship with no Build or Audit round.
+- **Ship.** `TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit` (`phases/ship/execution_tree_carry_test.go`) drives the real audit binding on a carried rebase: a peer lands, the audit binds, the lane rebases byte for byte, and ship accepts the carry with no second audit. It proves the binding with a carry record written by a test helper; the end-to-end proof through the real recovery is step 4's open item. This line first named `TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit`, which was never written. Without that proof, `verifyAuditBinding`'s predicate-execution tree check (older than B4) kept comparing the held tree with the audited one directly, so every carry (cycles 1766, 1768, 1772) was refused there and re-audited; since 2026-09-30 that check applies B4's rule too.
 
 ### A constraint on B4 found on the way
 
@@ -153,6 +153,6 @@ A non-derived conflict aborts the fleet rebase (`rebaseWithDerivedRegen`) and ro
 1. **Done.** B2 with its `Verify` lineage and the tests in its component table above (`rebind_identical_rebase_test.go`). Nothing calls it until B1 wires the recovery.
 2. **Done.** B1 (the unwind) and the reordered recovery, returning Audit, not Build, when the change is identical.
 3. **Done (2026-09-27).** B3, built as the carry after the rebind rather than a repair of the commit-based RUNG 0, which a pended change can never satisfy; the F5 artifact relocation stays separate.
-4. **Done (2026-09-27).** B4, ship re-proving the carry inside its one binding rule; the end-to-end lane test named above is still to be written against the real recovery.
+4. **Done (2026-09-27).** B4, ship re-proving the carry inside its one binding rule. **Corrected (2026-09-30):** the rule did not reach `verifyAuditBinding`'s predicate-execution check, so no carry shipped until that check applied it too. `TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit` now proves the ship-side binding on a carried rebase, with the carry record written by a test helper. A test that drives the real recovery (`identityCarryForward` writing the record) through ship's later stages (the pre-commit and post-push tree checks and the ship binding) is still to be written (inbox `carry-recovery-to-ship-end-to-end-proof`).
 
 The evidence, the full test list (33 named tests), the crash windows and the mutation map are in the [design review](../../research/2026-09-26-identity-preserving-rebase-design-review.md).
