@@ -669,3 +669,5 @@
 ./internal/rawgitratchet
 # testmainexit — finds TestMain functions whose deferred cleanup os.Exit skips (a leaked temp dir per run).
 ./internal/testmainexit
+# the loop's own writes to tracked inbox items, landed or discarded at a sync (internal/inboxstamps).
+./internal/inboxstamps

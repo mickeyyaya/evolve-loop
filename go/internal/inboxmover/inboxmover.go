@@ -214,6 +214,14 @@ func updateItemJSON(path string, mutate func(m map[string]json.RawMessage)) erro
 	return lifecycle.UpdateItemJSON(path, mutate)
 }
 
+func UpdateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
+	return lifecycle.UpdateItemJSON(path, mutate)
+}
+
+func IsMoverWritten(key string) bool {
+	return lifecycle.IsMoverWritten(key)
+}
+
 // SupersededInboxIDs returns the deduped "superseded" ids of a triage decision, or nil on bad JSON.
 func SupersededInboxIDs(triageDecisionJSON []byte) []string {
 	var doc struct {

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the loop's own inbox stamps no longer block a sync: `evolve sync-main` lands them (2026-10-01)
+
+- A cycle that does not ship still writes to the inbox item it worked on: a route to the console, a failure-count bump. Those writes stayed uncommitted in the plane, so `evolve sync-main` refused the next boundary and the loop's wave sync could not fast-forward over a later change to the same item. Each such wave needed a hand-made data PR (#752) and a plain-git discard.
+- One rule, `internal/inboxstamps`, lands them ([ADR-0112](docs/architecture/adr/0112-loop-inbox-stamps-land-at-the-sync.md)):
+  - a **stamp** is a change to a tracked inbox item that touches only keys the mover writes (`route` and the lifecycle-owned fields, `inboxmover.IsMoverWritten`); an operator's hand edit, a deleted or added item, or any other tracked file is other dirt and still refuses, untouched;
+  - judged from the merge base with origin, a stamp is **kept** and committed in the plane when origin left the item's bytes alone, **dropped** by name when origin retired it, **replayed** onto origin's version when origin edited or only reformatted it (a field both changed keeps origin's value), and reported **superseded** when origin changed every field it sets, whether origin landed it by hand or set its own values;
+  - `evolve sync-main` commits the kept and replayed stamps around its merge, and the next lane ship publishes them; the loop's wave-boundary sync does the same without committing, because a commit would make the plane diverge, which halts the loop;
+  - a failure after stamps were restored puts them back, so no failure path loses the loop's write.
+- The ADR records why stamps stay in the tracked item rather than a gitignored sidecar: an item's route is one fact, already committed and reviewed there by the operator's `route-lane` and `route-console`.
+- Review (architecture and Go, first round Block) found that judging origin from HEAD instead of the merge base would drop a later stamp on a plane still ahead with an earlier stamp commit, the zero-ship case where failure bumps matter most; that treating any inbox modification as a stamp would wipe an operator's edit; and that an item added since the merge base was read as retired. A second round found that the mover's JSON escaping made a third of the inbox read as hand-edited, that a sync whose stamp was already on origin exited 1, and that judging "kept" by field values while the merge is textual could leave the plane diverged. All are fixed and pinned. A third round (Warning) found three correct behaviours no test pinned, restoring every stamp when one cannot be written, a removal origin overrode, and restoring a replay-bound stamp when the landing commit fails, and a label that called origin's overriding value "already on origin"; each now has a test that fails when its fix is reverted, the label reads "superseded", and a stamp is reported dropped or superseded only after the merge succeeds.
+- Tests, red first: `TestClassify_*`, `TestPlanAgainst_*`, `TestPlan_*`, `TestChangedOnRemote_*` on real repositories; `TestSyncMain_TheLoopsInboxStampsNeverBlockTheSync`, `TestSyncMain_AnOperatorEditToAnInboxItemStillRefuses`, `TestSyncMain_RefusesToMergeWhenTheStampsCannotLand`, `TestSyncMain_ACompletedSyncWhoseStampIsAlreadyOnOriginSucceeds`, `TestSyncMain_AConflictingMergeRestoresTheStampsItPreparedAndReportsNoneDropped`, `TestSyncMainAtWaveBoundary_DiscardsInboxStampsOriginSupersededAndFastForwards`, `TestSyncMainAtWaveBoundary_WarnsAndKeepsTheStampsWhenTheyCannotBePrepared` and `TestSyncMainAtWaveBoundary_ABlockedFastForwardRestoresThePreparedStamps` drive both callers; `TestIsMoverWritten_*` and `TestUpdateItemJSON_RewritesAnItemThroughTheFacade` pin the new facades. Mutation sweeps across the three review rounds: every mutant of a changed line that compiles is killed by a named test (the third round's five: `TestPlan_RestoreAppliesEveryStampAndNamesEachItCouldNot`, `TestPlan_AReplayRemovesAKeyTheStampRemovedUnlessOriginChangedIt`, `TestSyncMain_RefusesToMergeWhenTheStampsCannotLand`, `TestSyncMain_AConflictingMergeRestoresTheStampsItPreparedAndReportsNoneDropped`, `TestPlanAgainst_AStampWhoseEveryFieldOriginChangedIsSuperseded`).
+- Docs: ADR-0112; the runtime-reference procedure "The console route at a boundary" and the `evolve sync-main` step; a new design page, [internal-inboxstamps.md](docs/architecture/packages/internal-inboxstamps.md).
+- Consumes inbox `console-route-stamps-block-wave-sync`; its m7 part (the landing probe's result in `routed_reason`) is filed in this change as `route-reason-carries-the-landing-probe`.
+
 ## Added — `commentaudit strip`: comments are removed by a tool, and a Clean Code review decides how the code must change to read without them (2026-09-30)
 
 - The operator's goal (2026-09-30): "remove all comments from the code and refactor the code to be clear and self-explanatory". Editor rounds had removed comments a few directories at a time, and about 88,000 comment lines remained.
@@ -63,7 +77,6 @@ All notable changes to this project will be documented in this file.
   - `TestWriteHistoryArchive_RewritesTheIndexAfterAFailedAppend`;
   - `TestMain_HistoryResolvesARelativeOutAgainstTheRepoRoot`;
   - `TestIsNarrative_CountsPullRequestsCommitsReleasesAndRounds`.
-
 ## Changed — code carries no comments: the commit gate refuses an added comment, and every loop skill and persona states the rule (2026-09-30)
 
 - The operator's rule (2026-09-30): "Add system level policy for evo loop skill and project to set the rule that it is forbidden to write comments; code should explain itself."

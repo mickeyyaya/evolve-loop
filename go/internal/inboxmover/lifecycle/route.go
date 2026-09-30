@@ -42,7 +42,7 @@ func (m *Mover) RouteConsole(taskID, reason string, cycle int) (RouteResult, err
 	}
 	stamp := m.now().UTC().Format(time.RFC3339)
 	if rerr := UpdateItemJSON(loc.Path, func(item map[string]json.RawMessage) {
-		item["route"] = jsonString(RouteConsoleValue)
+		item[RouteField] = jsonString(RouteConsoleValue)
 		item["routed_reason"] = jsonString(reason)
 		item["routed_cycle"] = json.RawMessage(strconv.Itoa(cycle))
 		item["routed_at"] = jsonString(stamp)
@@ -76,7 +76,7 @@ func (m *Mover) RouteLane(taskID, reason string) (RouteResult, error) {
 	stamp := m.now().UTC().Format(time.RFC3339)
 	admit := func(body []byte) error { return m.admitToLanes(taskID, loc.Path, body) }
 	if err := updateAdmittedItemJSON(loc.Path, admit, func(it map[string]json.RawMessage) {
-		it["route"] = jsonString(inboxbatch.RouteLaneValue)
+		it[RouteField] = jsonString(inboxbatch.RouteLaneValue)
 		it["routed_reason"] = jsonString(reason)
 		it["routed_at"] = jsonString(stamp)
 		delete(it, "routed_cycle")
