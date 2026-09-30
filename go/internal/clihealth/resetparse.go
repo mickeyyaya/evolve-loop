@@ -7,25 +7,12 @@ import (
 	"time"
 )
 
-// ParseResetHint extracts a benched-until time from CLI wall text. Clock and relative hint
-// shapes are recognized (case-insensitive):
-//
-//	"try again at 6:11 AM"   → the NEXT occurrence of that local clock time
-//	"try again in 2 hours" / "in 45 minutes" / "in 1 hour 30 minutes"
-//
-// A small safety margin is added so the canary fires after the quota actually
-// resets, and the result is capped at now+24h (a hint further out than a day
-// is more likely a parse artifact than a real reset). Returns ok=false when
-// no hint parses — the caller falls back to CooldownForStrikes.
-//
-// Clock times use the printed IANA timezone when present, otherwise now's
-// location (the host-local convention used by older CLI banners).
+// ParseResetHint returns when a CLI wall says its quota resets, capped at resetHintCap, or false when no hint parses.
 func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
-	if at, ok := parseClockHint(pane, now); ok {
-		return capHint(at, now), true
-	}
-	if at, ok := parseRelativeHint(pane, now); ok {
-		return capHint(at, now), true
+	for _, hint := range resetHints {
+		if at, ok := hint.parse(pane, now); ok {
+			return capHint(at, now), true
+		}
 	}
 	return time.Time{}, false
 }
@@ -34,22 +21,29 @@ func ParseResetHint(pane string, now time.Time) (time.Time, bool) {
 // clock actually rolls over.
 const resetMargin = 2 * time.Minute
 
+const resetHintCap = 24 * time.Hour
+
 var (
+	datedHintRe    = regexp.MustCompile(`(?i)try again at\s+([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4}),?\s+(\d{1,2}):(\d{2})\s*(AM|PM)`)
 	clockHintRe    = regexp.MustCompile(`(?i)(?:try again at|resets)\s+(\d{1,2}):(\d{2})\s*(AM|PM)(?:[ \t]*\(([^)]+)\))?`)
 	relativeHintRe = regexp.MustCompile(`(?i)try again in\s+(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*min(?:ute)?s?)?`)
 )
 
-// evidenceLine returns the most representative line for a bench record: the
-// wall BANNER line that carries the reset hint (the line ParseResetHint keys
-// on), which is what actually walled the CLI — not the pane's first line. On a
-// scrolled pane firstLine catches a later frame or, as in cycle-314, the
-// agent's own edit content ("53 +\tFamily: codex,"), obscuring the real cause
-// in the bench evidence. Falls back to firstLine when no reset-hint line is
-// present (no regression for walls without a parseable hint).
+var resetHints = []struct {
+	re    *regexp.Regexp
+	parse func(string, time.Time) (time.Time, bool)
+}{
+	{datedHintRe, parseDatedHint},
+	{clockHintRe, parseClockHint},
+	{relativeHintRe, parseRelativeHint},
+}
+
 func evidenceLine(pane string) string {
 	for _, ln := range strings.Split(pane, "\n") {
-		if clockHintRe.MatchString(ln) || relativeHintRe.MatchString(ln) {
-			return ln
+		for _, hint := range resetHints {
+			if hint.re.MatchString(ln) {
+				return ln
+			}
 		}
 	}
 	return firstLine(pane)
@@ -72,16 +66,9 @@ func parseClockHint(pane string, now time.Time) (time.Time, bool) {
 		}
 		now = now.In(loc)
 	}
-	hour, _ := strconv.Atoi(m[1])
-	minute, _ := strconv.Atoi(m[2])
-	if hour < 1 || hour > 12 || minute > 59 {
+	hour, minute, ok := clockOf(m[1], m[2], m[3])
+	if !ok {
 		return time.Time{}, false
-	}
-	if strings.EqualFold(m[3], "PM") && hour != 12 {
-		hour += 12
-	}
-	if strings.EqualFold(m[3], "AM") && hour == 12 {
-		hour = 0
 	}
 	at := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, now.Location())
 	if !at.After(now) {
@@ -90,6 +77,52 @@ func parseClockHint(pane string, now time.Time) (time.Time, bool) {
 		at = at.AddDate(0, 0, 1)
 	}
 	return at.Add(resetMargin), true
+}
+
+func parseDatedHint(pane string, now time.Time) (time.Time, bool) {
+	m := datedHintRe.FindStringSubmatch(pane)
+	if m == nil {
+		return time.Time{}, false
+	}
+	month, ok := monthNamed(m[1])
+	if !ok {
+		return time.Time{}, false
+	}
+	day, _ := strconv.Atoi(m[2])
+	year, _ := strconv.Atoi(m[3])
+	hour, minute, ok := clockOf(m[4], m[5], m[6])
+	if !ok {
+		return time.Time{}, false
+	}
+	at := time.Date(year, month, day, hour, minute, 0, 0, now.Location())
+	if at.Day() != day || !at.After(now) {
+		return time.Time{}, false
+	}
+	return at.Add(resetMargin), true
+}
+
+func monthNamed(name string) (time.Month, bool) {
+	for m := time.January; m <= time.December; m++ {
+		if strings.HasPrefix(strings.ToLower(m.String()), strings.ToLower(name)) {
+			return m, true
+		}
+	}
+	return 0, false
+}
+
+func clockOf(hourText, minuteText, meridiem string) (int, int, bool) {
+	hour, _ := strconv.Atoi(hourText)
+	minute, _ := strconv.Atoi(minuteText)
+	if hour < 1 || hour > 12 || minute > 59 {
+		return 0, 0, false
+	}
+	if strings.EqualFold(meridiem, "PM") && hour != 12 {
+		hour += 12
+	}
+	if strings.EqualFold(meridiem, "AM") && hour == 12 {
+		hour = 0
+	}
+	return hour, minute, true
 }
 
 func parseRelativeHint(pane string, now time.Time) (time.Time, bool) {
@@ -113,7 +146,7 @@ func parseRelativeHint(pane string, now time.Time) (time.Time, bool) {
 }
 
 func capHint(at, now time.Time) time.Time {
-	if cap := now.Add(24 * time.Hour); at.After(cap) {
+	if cap := now.Add(resetHintCap); at.After(cap) {
 		return cap
 	}
 	return at
