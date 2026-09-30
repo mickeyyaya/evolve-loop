@@ -1,6 +1,7 @@
 package evalgate
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -16,8 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// floorBindingGate (Gate C) blocks EGPS floor predicates that bind a package
-// triage deferred or dropped this cycle. It fails open on every ambiguity.
 type floorBindingGate struct{}
 
 func (floorBindingGate) name() string                { return "floor-binding" }
@@ -41,8 +40,13 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 	deferred := triagecap.DeferredFloorPackagesDecl(string(artifact), companionPath, targets)
 	// Committed wins over deferred; a declared deferral yields only to a declared commitment.
 	// See ADR-0046.
-	_, deferredDeclared, _ := triagecap.ReadDeferredFloors(companionPath)
-	_, committedDeclared, _ := triagecap.ReadDeclaredFloors(companionPath)
+	_, deferredDeclared, deferredErr := triagecap.ReadDeferredFloors(companionPath)
+	_, committedDeclared, committedErr := triagecap.ReadDeclaredFloors(companionPath)
+	if err := cmp.Or(deferredErr, committedErr); err != nil {
+		return fmt.Sprintf(
+			"triage companion %s is unreadable or malformed (%v) — the floor-binding gate cannot tell committed floors from deferred ones; rewrite %s as valid JSON whose committed_floors/deferred_floors are string arrays",
+			companionPath, err, triagecap.TriageDecisionName()), true
+	}
 	if !deferredDeclared || committedDeclared {
 		if committed := triagecap.CommittedFloorPackages(string(artifact), companionPath, targets); len(committed) > 0 {
 			committedSet := map[string]bool{}

@@ -317,3 +317,33 @@ func TestFloorBinding_DeclaredDivergenceMessage(t *testing.T) {
 		t.Errorf("matching prose/declaration must be silent, got %q", msg)
 	}
 }
+
+func TestFloorBinding_MalformedCompanionBlocksAndNamesIt(t *testing.T) {
+	for name, body := range map[string]string{
+		"invalid json":              `{"deferred_floors": ["core"`,
+		"deferred not string list":  `{"deferred_floors": "core"}`,
+		"committed not string list": `{"committed_floors": {"core": true}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			in := buildFloorBindingFixture(t, committedBridgePredicates)
+			companion := filepath.Join(in.Workspace, triagecap.TriageDecisionName())
+			if err := os.WriteFile(companion, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			reason, block := floorBindingGate{}.check(in)
+			if !block || !strings.Contains(reason, companion) {
+				t.Fatalf("a malformed companion must block and name %s; got reason=%q block=%v", companion, reason, block)
+			}
+		})
+	}
+}
+
+func TestFloorBinding_MalformedCompanionIgnoredWithoutFloorPredicates(t *testing.T) {
+	in := buildFloorBindingFixture(t, "")
+	if err := os.WriteFile(filepath.Join(in.Workspace, triagecap.TriageDecisionName()), []byte(`{`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if reason, block := (floorBindingGate{}).check(in); reason != "" || block {
+		t.Errorf("with no floor predicate there is nothing to bind; got reason=%q block=%v", reason, block)
+	}
+}

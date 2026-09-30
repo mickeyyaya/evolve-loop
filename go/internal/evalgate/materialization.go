@@ -114,9 +114,8 @@ func readScoutReport(workspace string) (string, bool) {
 	return string(data), true
 }
 
-// evalFilePath finds slug's eval under projectRoot, then under workspace.
 func evalFilePath(projectRoot, workspace, slug string) (string, bool) {
-	for _, root := range []string{projectRoot, workspace} {
+	for _, root := range []string{workspace, projectRoot} {
 		if root == "" {
 			continue
 		}
@@ -128,9 +127,6 @@ func evalFilePath(projectRoot, workspace, slug string) (string, bool) {
 	return "", false
 }
 
-// remediation names the exact file per missing or ungraded slug and the grader
-// requirement. A missing eval is offered only its workspace path, because the
-// sandbox makes projectRoot deny-write.
 func (g materializationGate) remediation(in core.ReviewInput) string {
 	missing := g.missingSlugs(in)
 	ungraded := g.ungradedSlugs(in)
@@ -139,25 +135,24 @@ func (g materializationGate) remediation(in core.ReviewInput) string {
 	}
 	var b strings.Builder
 	if len(missing) > 0 {
-		paths := make([]string, 0, len(missing))
-		for _, s := range missing {
-			paths = append(paths, filepath.Join(in.Workspace, ".evolve", "evals", s+".md"))
-		}
 		b.WriteString("Create the missing eval file(s) — this requires writing NEW files, which is required here:\n  " +
-			strings.Join(paths, "\n  ") + "\n")
+			strings.Join(workspaceEvalPaths(in.Workspace, missing), "\n  ") + "\n")
 	}
 	if len(ungraded) > 0 {
-		paths := make([]string, 0, len(ungraded))
-		for _, s := range ungraded {
-			p, _ := evalFilePath(in.ProjectRoot, in.Workspace, s)
-			paths = append(paths, p)
-		}
-		b.WriteString("Add at least one `[code]` grader to the eval file(s) that have none:\n  " +
-			strings.Join(paths, "\n  ") + "\n")
+		b.WriteString("Write an eval carrying at least one `[code]` grader for each slug whose eval has none, at its workspace path (a workspace eval takes precedence over the project root's, which is deny-write):\n  " +
+			strings.Join(workspaceEvalPaths(in.Workspace, ungraded), "\n  ") + "\n")
 	}
 	b.WriteString("Each must contain at least one `[code]` grader and test BEHAVIOR, not existence. " +
 		"Write them at exactly those paths: an eval written only into the cycle worktree is NOT " +
 		"visible to this gate. " +
 		"Leave scout-report.md's selected slugs unchanged — the report itself is not the defect.")
 	return b.String()
+}
+
+func workspaceEvalPaths(workspace string, slugs []string) []string {
+	paths := make([]string, 0, len(slugs))
+	for _, s := range slugs {
+		paths = append(paths, filepath.Join(workspace, ".evolve", "evals", s+".md"))
+	}
+	return paths
 }

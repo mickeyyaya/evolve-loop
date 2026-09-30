@@ -115,3 +115,38 @@ func TestCmd_InboxAdd_JudgesWithTheLaneForbiddenPredicate(t *testing.T) {
 		t.Errorf("rc = %d stdout = %q, want the lane-forbidden predicate's verdict", rc, stdout.String())
 	}
 }
+
+func TestCmd_InboxAdd_WarnsOnAMonotonicBinaryTargetButStillFiles(t *testing.T) {
+	root := emptyInboxRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	item := strings.Replace(cliInboxItem, `"acceptance":["evolve inbox show <id> prints the item"]`,
+		`"class":"task-contract-design","acceptance":["reduce the backlog to at most 25 items","evolve inbox show <id> prints the item"]`, 1)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"add"}, strings.NewReader(item), &stdout, &stderr)
+
+	if rc != 0 || !strings.Contains(stdout.String(), "cli-inbox-show.json") {
+		t.Fatalf("the lint is advisory, the item must still file; rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
+	}
+	if got := strings.Count(stderr.String(), "binary absolute target"); got != 1 {
+		t.Errorf("want exactly one warning naming the absolute-count criterion, got %d in %q", got, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "reduce the backlog to at most 25 items") {
+		t.Errorf("the warning must quote the offending criterion; got %q", stderr.String())
+	}
+}
+
+func TestCmd_InboxAdd_NoMonotonicWarningForAOneShotClass(t *testing.T) {
+	root := emptyInboxRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	item := strings.Replace(cliInboxItem, `"acceptance":["evolve inbox show <id> prints the item"]`,
+		`"class":"feature","acceptance":["reduce the backlog to at most 25 items"]`, 1)
+	var stdout, stderr bytes.Buffer
+
+	if rc := runInbox([]string{"add"}, strings.NewReader(item), &stdout, &stderr); rc != 0 {
+		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
+	}
+	if strings.Contains(stderr.String(), "binary absolute target") {
+		t.Errorf("an absolute target is the right contract for one-shot work; got warning %q", stderr.String())
+	}
+}

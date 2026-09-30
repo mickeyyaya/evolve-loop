@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -29,7 +32,19 @@ func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	fmt.Fprintf(stdout, "inbox add: filed %s (%s)\n", filepath.Base(res.Path), dispatchability(res.ConsoleReason))
+	warnMonotonicBinaryTargets(raw, stderr)
 	return 0
+}
+
+func warnMonotonicBinaryTargets(raw []byte, stderr io.Writer) {
+	var item inboxbatch.Item
+	if err := json.Unmarshal(raw, &item); err != nil {
+		fmt.Fprintf(stderr, "inbox add: WARN: acceptance lint skipped: %v\n", err)
+		return
+	}
+	for _, finding := range evalgate.LintMonotonicBinaryTarget(item.Class, item.Acceptance) {
+		fmt.Fprintf(stderr, "inbox add: WARN: %s\n", finding)
+	}
 }
 
 func readInboxAddItem(args []string, stdin io.Reader, stderr io.Writer) ([]byte, int) {
