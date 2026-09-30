@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "The builder and TDD personas and the engineering-craft skill state the no-comments rule; a lane diff's added comments are reported at audit."
+  ],
+  "consumed": {
+    "at": "2026-09-30T09:02:03Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "FIXED (console inbox review 2026-09-30): agents/evolve-builder.md:108-109 says new code carries no comments; agents/evolve-tdd-engineer.md:98 forbids narrative comments; skills/engineering-craft/SKILL.md:45 has the rule. Audit reports each added comment as a LOW finding (agents/evolve-auditor.md:90). Landed in dbf7e47f8 (2026-09-28) and 5252d0d33, after this item was filed."
+  },
+  "created_at": "2026-09-27T23:30:00Z",
+  "files": [
+    "agents/evolve-builder.md",
+    "agents/evolve-tdd-engineer.md",
+    "skills/engineering-craft/SKILL.md"
+  ],
+  "id": "lane-personas-no-comments-rule",
+  "kind": "pipeline-repair",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: lanes add the comments the comment campaign removes",
+  "source": "inbox review 2026-09-27 (design doc §7.9 G1)",
+  "summary": "Every lane adds doc comments on new functions (cycles 1702, 1703, 1716) while the operator's comment campaign removes comments package by package; the personas still ask for them. Design doc §7.9 G1.",
+  "title": "Phase personas carry the no-comments rule, so lanes stop adding what the comment campaign removes",
+  "weight": 0.64
+}

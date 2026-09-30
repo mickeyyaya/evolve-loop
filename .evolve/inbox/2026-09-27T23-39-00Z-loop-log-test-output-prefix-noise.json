@@ -1,17 +1,1 @@
-{
-  "id": "loop-log-test-output-prefix-noise",
-  "created_at": "2026-09-27T23:30:00Z",
-  "title": "Lane logs carry go test output whose fixture lines look like production warnings, so log-grep diagnosis overcounts",
-  "weight": 0.8,
-  "kind": "pipeline-repair",
-  "priority_class": "debuggability",
-  "files": [
-    "go/internal/phases/ship"
-  ],
-  "summary": "Lanes pipe `go test -v` output into the loop log under lane prefixes (one log reached 64 MB); fixtures print lines such as '[orchestrator] WARN build-leak-recover ... rc=128' and all 36 'CONTRACT GATE DEMOTED' lines in the recent logs are test output. Grep-based health checks and operators misread them.",
-  "acceptance": [
-    "Gate test output reaches the lane's scan log, not the loop log; the loop log carries one summary line per gate run."
-  ],
-  "source": "inbox review 2026-09-27 (design doc §5.10)",
-  "priority_rationale": "inbox review 2026-09-27: fixture lines that look like production warnings make log-grep health checks overcount"
-}
+{"acceptance":["Gate test output reaches the lane's scan log, not the loop log; the loop log carries one summary line per gate run."],"created_at":"2026-09-27T23:30:00Z","files":["go/internal/phases/ship"],"id":"loop-log-test-output-prefix-noise","kind":"pipeline-repair","priority_class":"debuggability","priority_rationale":"inbox review 2026-09-27: fixture lines that look like production warnings make log-grep health checks overcount","route":"lane","routed_at":"2026-09-30T09:02:14Z","routed_reason":"operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop","source":"inbox review 2026-09-27 (design doc §5.10)","summary":"Lanes pipe `go test -v` output into the loop log under lane prefixes (one log reached 64 MB); fixtures print lines such as '[orchestrator] WARN build-leak-recover ... rc=128' and all 36 'CONTRACT GATE DEMOTED' lines in the recent logs are test output. Grep-based health checks and operators misread them.","title":"Lane logs carry go test output whose fixture lines look like production warnings, so log-grep diagnosis overcounts","weight":0.8}

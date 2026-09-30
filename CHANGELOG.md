@@ -16,6 +16,22 @@ All notable changes to this project will be documented in this file.
   - A mutation sweep killed 11 of 11 mutants. In the leaf: no admission check, judging the unrouted item, a nil predicate, an inverted decode guard, ignoring a claim, flattening an I/O fault to not-found, no empty-id guard, keeping `routed_cycle`, and no ledger line. In the CLI: dropping the lane predicate, and a refusal exiting 2.
 - The architecture review found the first draft judged the loader's sanitized copy while the claim floor judged the raw file, so an item with a protected file past byte 160 of a `files` entry would have been routed and then refused at claim; that is the regression case above. It also found the new root missing from `TestInboxCenterlessRootsArePinned`, and an unreadable inbox reported as a missing item (exit 1, not 2). All three are fixed. Its second pass found that an item the decode could not read was routed unjudged; it is now refused.
 - Docs: `runtime-reference.md` (operator commands), the ADR-0074 amendment, and the `cmd-evolve`, `internal-inboxmover` and `internal-inboxmover-lifecycle` package notes.
+## Changed — the comment target is zero: exported identifiers' docs are no longer kept (2026-09-30)
+
+- The operator's rule (2026-09-30): code carries **zero comments** beyond the ones something reads (toolchain directives, generated-file headers, `Deprecated:` and `Output:` lines, machine-read markers) and the package doc `docgo` enforces. Until now the convention kept one doc line on every existing exported identifier, and `commentaudit verify` refused to delete one, which left about 11,200 such lines (non-test Go outside `acs/`, measured on main b67e0bb3) out of reach of a comment-only change.
+- `commentaudit.Equivalent` (behind `commentaudit verify` and the commit gate's comment-only waiver) no longer refuses a deleted exported doc. `lostExportedDoc` and its six helpers are removed, and `parseShape` returns only the code shape. `TestEquivalent_DeletingAnyDocIsACommentEdit` replaces `TestEquivalent_AnExportedIdentifierKeepsItsDoc`; red first, it failed on exactly the six deletions the old rule refused.
+- `internal/commentaudit/stats.go` drops `isNarrative`'s comment, which called a `See ADR` pointer allowed; the convention's `check` bullet already says a bare pointer is not history.
+- `skills/refactor/reference/language-notes.md` no longer tells refactors to give extracted exports a doc comment.
+- `docs/conventions/code-comments.md`:
+  - the Keep table holds only what something reads, plus the package doc;
+  - a doc on an exported identifier, and a pointer or path comment, are now under "must not say";
+  - the one-line invariant *why* is transitional: it lasts until an inbox item pins the invariant with a test.
+- `docs/plans/comment-reduction-2026-09.md` gains Phase 2, "to zero":
+  - untouched directories;
+  - a sweep of the docs that earlier batches kept;
+  - the *whys* turned into lane-sized test items;
+  - the per-cycle predicate packages;
+  - `comment_floor` set to enforce against regrowth.
 
 ## Fixed — a dated quota wall benches its CLI family a day at a time and records the banner (wave 49, 2026-09-30)
 

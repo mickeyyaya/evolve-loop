@@ -183,32 +183,22 @@ func TestEquivalent_DirectivePlacementIsPositional(t *testing.T) {
 	}
 }
 
-func TestEquivalent_AnExportedIdentifierKeepsItsDoc(t *testing.T) {
+func TestEquivalent_DeletingAnyDocIsACommentEdit(t *testing.T) {
 	const documented = "package p\n\n// F starts the run.\n// It used to retry in cycle 42.\nfunc F() {}\n\n// T holds state.\ntype T struct{}\n\n// M resets T.\nfunc (T) M() {}\n\nconst (\n\t// A is the first.\n\tA = 1\n)\n\n// helper is internal.\nfunc helper() {}\n\ntype impl struct{}\n\n// Run implements a port.\nfunc (*impl) Run() {}\n\n// Group of settings.\nvar (\n\tG = 1\n)\n"
 	for name, after := range map[string]string{
-		"func":         strings.Replace(documented, "// F starts the run.\n// It used to retry in cycle 42.\n", "", 1),
-		"type":         strings.Replace(documented, "// T holds state.\n", "", 1),
-		"method":       strings.Replace(documented, "// M resets T.\n", "", 1),
-		"const":        strings.Replace(documented, "\t// A is the first.\n", "", 1),
-		"to a bare //": strings.Replace(documented, "// T holds state.\n", "//\n", 1),
-		"var group":    strings.Replace(documented, "// Group of settings.\n", "", 1),
-	} {
-		if ok, reason, err := Equivalent("p.go", []byte(documented), []byte(after)); err != nil || ok || !strings.Contains(reason, "exported doc") {
-			t.Errorf("%s doc deleted: ok=%v reason=%q err=%v", name, ok, reason, err)
-		}
-	}
-	for name, after := range map[string]string{
+		"func":                                   strings.Replace(documented, "// F starts the run.\n// It used to retry in cycle 42.\n", "", 1),
+		"type":                                   strings.Replace(documented, "// T holds state.\n", "", 1),
+		"method":                                 strings.Replace(documented, "// M resets T.\n", "", 1),
+		"const":                                  strings.Replace(documented, "\t// A is the first.\n", "", 1),
+		"to a bare //":                           strings.Replace(documented, "// T holds state.\n", "//\n", 1),
+		"var group":                              strings.Replace(documented, "// Group of settings.\n", "", 1),
 		"shortened":                              strings.Replace(documented, "// It used to retry in cycle 42.\n", "", 1),
 		"unexported doc deleted":                 strings.Replace(documented, "// helper is internal.\n", "", 1),
 		"a method doc on an unexported receiver": strings.Replace(documented, "// Run implements a port.\n", "", 1),
 	} {
 		if ok, reason, err := Equivalent("p.go", []byte(documented), []byte(after)); err != nil || !ok {
-			t.Errorf("%s is a comment edit: ok=%v reason=%q err=%v", name, ok, reason, err)
+			t.Errorf("%s: deleting a doc is a comment edit: ok=%v reason=%q err=%v", name, ok, reason, err)
 		}
-	}
-	testFuncDocDeleted := strings.Replace(documented, "// F starts the run.\n// It used to retry in cycle 42.\n", "", 1)
-	if ok, _, err := Equivalent("p_test.go", []byte(documented), []byte(testFuncDocDeleted)); err != nil || !ok {
-		t.Errorf("test files carry no exported API: ok=%v err=%v", ok, err)
 	}
 }
 
