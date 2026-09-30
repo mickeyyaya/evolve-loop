@@ -153,3 +153,13 @@ func TestProtectedSurfaceManifest_CoversExplanationTrustBoundary(t *testing.T) {
 		}
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheCorrectionCompletionPredicate(t *testing.T) {
+	const predicate = "go/internal/core/bridge_completion.go"
+	for _, p := range []string{predicate, "/users/x/.evolve/worktrees/cycle-9/" + predicate} {
+		if !IsProtectedSurface(p) {
+			t.Errorf("IsProtectedSurface(%q) = false: the predicate that lets a correction complete on a carried deliverable "+
+				"is control plane — a lane that widened it could carry its own stale deliverable past the bridge's baseline guard", p)
+		}
+	}
+}

@@ -31,6 +31,9 @@ func (w replWaiter) applyCheckpointDisposition(state *replWaitState, elapsed int
 	if state.lastVerdict.Action != ReviewPause {
 		return checkpointStopWaiting
 	}
+	if !state.lastEvent.Busy && w.completeOnIdle(state) {
+		return checkpointStopWaiting
+	}
 	switch state.reviewer.(type) {
 	case deterministicReviewer, *deterministicReviewer:
 	default:
@@ -42,6 +45,24 @@ func (w replWaiter) applyCheckpointDisposition(state *replWaitState, elapsed int
 	return w.deliverArtifactNudge(state, elapsed)
 }
 
+func (w replWaiter) completeOnIdle(state *replWaitState) bool {
+	completer, ok := state.detector.(idleCompleter)
+	if !ok {
+		return false
+	}
+	ready, evidence, note, err := completer.completeOnIdle(w.ctx)
+	if err != nil && state.observeDetector(err) {
+		fmt.Fprintf(w.deps.Stderr, "%s WARN: completion detector: %v\n", w.prefix, err)
+	}
+	if !ready {
+		return false
+	}
+	state.completed = true
+	fmt.Fprintf(w.deps.Stderr, "%s %s\n", w.prefix, note)
+	w.deps.Signals.Emit(worktreeEvidenceEvent(w.cfg, evidence, note))
+	return true
+}
+
 // idleNudge is the ONE decision the idle reminder's text, the operator log
 // label and the interaction trigger all come from.
 type idleNudge struct {
@@ -51,7 +72,7 @@ type idleNudge struct {
 // idleNudgeFor words the reminder by what the host sees: a stale leftover
 // deliverable gets a reminder bound to a re-check (see carryForwardRemedy),
 // never a blind "touch it"; otherwise the plain reminder.
-func idleNudgeFor(cfg *Config, base artifactBaseline) idleNudge {
+func idleNudgeFor(cfg *Config, base dispatchBaseline) idleNudge {
 	if path, found := artifactLocate(cfg); found {
 		if fi, err := os.Lstat(path); err == nil && base.matches(path, fi) {
 			return idleNudge{
@@ -83,7 +104,7 @@ func carryForwardRemedy(artifact string) string {
 // wedged submission ends the wait with its classified reason; every other
 // verification result records the nudge and begins one final interval.
 func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) checkpointDispositionResult {
-	nudge := idleNudgeFor(w.cfg, w.artifactBase)
+	nudge := idleNudgeFor(w.cfg, w.dispatchBase)
 	nudgeMsg := nudge.msg
 	_ = w.deps.Tmux.SendKeys(w.ctx, w.launch.session, nudgeMsg, true)
 	// Announce the nudge before verification so a re-send diagnostic cannot

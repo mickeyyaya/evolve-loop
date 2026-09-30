@@ -92,7 +92,7 @@ func TestPhaseAdvisor_SelectsContractForEachRouterProtocol(t *testing.T) {
 		stdout     string
 		contract   string
 		artifact   string
-		completion string
+		completion CompletionContract
 		launch     func(*PhaseAdvisor, router.RouteInput) error
 	}{
 		{

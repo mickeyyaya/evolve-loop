@@ -359,7 +359,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	review := o.performEffectsAndReview(ctx, reviewInput(resp))
 	maxCorrections := (&cycleRun{o: o, cs: cs, retryConfig: o.retryConfig}).correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
 	for correction := 1; !review.Approve && correction <= maxCorrections; correction++ {
-		req.CorrectionDirective = composeCorrection(review.Reason, review.Remediation)
+		req.CorrectionDirective = composeCorrection(correction, review.Reason, review.Remediation)
 		o.emitGateCorrection(gateCorrection{
 			origin: "Orchestrator.reviewResumedDeliverable", cycle: cycle, phase: phase, correction: correction, max: maxCorrections,
 			rung: interaction.RungRedispatch, cli: req.ModelRoutingCLI, reason: review.Reason,

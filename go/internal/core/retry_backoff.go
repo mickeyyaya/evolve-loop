@@ -9,15 +9,21 @@ import (
 
 // composeCorrection turns a deliverable-reject reason into the correction
 // directive injected into the phase re-dispatch (## Correction prompt block).
-func composeCorrection(reason, remediation string) string {
+func composeCorrection(round int, reason, remediation string) string {
 	head := "Your previous output for this phase was REJECTED by the deliverable contract check:\n\n" + reason
 	if remediation != "" {
 		return head + "\n\n" + remediation +
-			"\n\nThen finish. Change nothing else beyond what this remedy requires."
+			"\n\nThen finish. Change nothing else beyond what this remedy requires." + correctionRecord(round)
 	}
 	return head +
 		"\n\nFix the deliverable so it satisfies the contract — write it at the EXACT contracted path " +
-		"with all required sections / valid structure — then finish. Do not change unrelated files."
+		"with all required sections / valid structure — then finish. Do not change unrelated files." + correctionRecord(round)
+}
+
+func correctionRecord(round int) string {
+	return "\n\nBefore you finish, append a `## Correction " + strconv.Itoa(round) + "` section to the deliverable that names what you fixed and where — " +
+		"also when the fix is in another file — so the review that follows, and every later reader, can see what each correction changed. " +
+		"A deliverable that is not Markdown is written again in full instead."
 }
 
 var backoffSleep = time.Sleep

@@ -25,6 +25,8 @@ const (
 	// cause gets one fresh session of the same CLI.
 	CodeFreshSessionRetry signalcenter.Code = "BRIDGE_FRESH_SESSION_RETRY"
 
+	CodeCompletedOnWorktreeEvidence signalcenter.Code = "BRIDGE_COMPLETED_ON_WORKTREE_EVIDENCE"
+
 	CodePaneStagnant  signalcenter.Code = "LIVENESS_PANE_STAGNANT"
 	CodePaneHung      signalcenter.Code = "LIVENESS_PANE_HUNG"
 	CodePaneExhausted signalcenter.Code = "LIVENESS_PANE_EXHAUSTED"
@@ -42,6 +44,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeLaunchErrorPersistFailed, "the captured launch stderr could not be persisted as <workspace>/<agent>-launch-error.txt after a non-zero exit (the forensic file a validate-gauntlet death leaves); the classified error is unchanged and the BRIDGE_EXIT_* event carries no launch_error field; fields step=persist_launch_error, path, call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeResultReadFailed, "the launch exited 0 but its result (the artifact, or the stdout scrollback under the stdout completion contract) could not be read into the response; Launch still returns nil with an empty Stdout — the on-disk report is the verdict source; fields step=read_result, path, completion, call_id, cli, agent")
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeFreshSessionRetry, "a fatal-pane fast-fail ended an ephemeral-session launch on a session-recoverable cause (dead_shell, cli_self_updated: the REPL process is gone, the CLI and account are fine); the dead dispatch is on the ledger marked fresh_session_retry and ONE fresh session of the same CLI runs before the caller's chain walks on — never for a named session, a delivered run, or a deadline with no room for another wait interval (F31); fields call_id (the dead dispatch), cli, agent")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCompletedOnWorktreeEvidence, "a correction re-dispatch of a source-writing phase went idle without rewriting its deliverable, and the agent had changed the worktree since dispatch (host state under .evolve/, the workspace and the deliverable's own locations never count), so the bridge completed on the carried deliverable instead of letting the idle wait end in exit 81; core's phase verify and review gate then judge the unchanged deliverable; the reason is the completion note; fields deliverable, changed_paths, paths (at most eight, then +N more), cli")
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneStagnant, "a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant)")
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneHung, "a tmux pane is hung: no progress and no completion (LivenessCenter edge: hung)")
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneExhausted, "a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85)")

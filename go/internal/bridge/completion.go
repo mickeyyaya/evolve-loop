@@ -9,18 +9,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/evidence"
 )
 
 const (
-	completionArtifact = "artifact"
-	completionStdout   = "stdout"
-	completionGit      = "git"
+	completionArtifact         = core.CompletionArtifact
+	completionStdout           = core.CompletionStdout
+	completionGit              = core.CompletionGit
+	completionWorktreeEvidence = core.CompletionWorktreeEvidence
 )
 
 // completionContractName names the contract a mode selects; "" is the artifact contract and any other
 // mode is its own name.
-func completionContractName(mode string) string {
+func completionContractName(mode core.CompletionContract) core.CompletionContract {
 	if mode == "" {
 		return completionArtifact
 	}
@@ -61,10 +63,10 @@ func isFinalPoll(ctx context.Context) bool {
 	return final
 }
 
-// completionEvidence carries what a detector observed at completion; empty for the artifact and stdout
-// contracts, and carries the commit SHA for the git-evidence contract.
 type completionEvidence struct {
-	CommitSHA string
+	CommitSHA          string
+	CarriedDeliverable string
+	WorktreeChanges    []string
 }
 
 // completionDetector answers "is the phase done?" once per poll tick inside
@@ -79,26 +81,25 @@ type completionDetector interface {
 // newCompletionDetector builds the detector for the requested mode. Unknown /
 // empty modes fall back to the artifact contract so a typo can never silently
 // disable completion — it just keeps the legacy behavior.
-func newCompletionDetector(mode string, cfg *Config, deps Deps, lp tmuxLaunch, base artifactBaseline) completionDetector {
+func newCompletionDetector(mode core.CompletionContract, cfg *Config, deps Deps, lp tmuxLaunch, base dispatchBaseline) completionDetector {
 	switch mode {
 	case completionStdout:
 		return &stdoutDetector{cfg: cfg, deps: deps, lp: lp, threshold: stdoutIdlePolls}
 	case completionGit:
 		return newGitEvidenceDetector(cfg, deps)
+	case completionWorktreeEvidence:
+		return &worktreeEvidenceDetector{artifactDetector: &artifactDetector{cfg: cfg, baseline: base}, deps: deps}
 	default:
 		return &artifactDetector{cfg: cfg, baseline: base}
 	}
 }
 
-// artifactBaseline is the pre-dispatch snapshot of the artifact path: what was already on disk before this
-// dispatch's prompt was delivered. An observation identical to the baseline is the prior attempt's work:
-// it never begins a stability window and never completes, timeout being the honest outcome for an agent
-// that wrote nothing.
-type artifactBaseline struct {
+type dispatchBaseline struct {
 	// entries maps each candidate path that existed pre-dispatch to its (size, mtime) snapshot — the whole
 	// artifactCandidatePaths set, not just the canonical: a stray at a fallback, shadowed at capture time,
 	// must not certify later when the canonical vanishes mid-session.
-	entries map[string]baselineEntry
+	entries  map[string]baselineEntry
+	worktree worktreeSnapshot
 }
 
 type baselineEntry struct {
@@ -109,8 +110,8 @@ type baselineEntry struct {
 // captureArtifactBaseline snapshots the artifact path; must be called before prompt delivery, or an
 // instant-writing agent's fresh artifact would be mistaken for the prior attempt's and refused. Any error
 // degrades to an absent baseline (fail-open).
-func captureArtifactBaseline(cfg *Config) artifactBaseline {
-	var b artifactBaseline
+func captureArtifactBaseline(cfg *Config) dispatchBaseline {
+	var b dispatchBaseline
 	for _, path := range artifactCandidatePaths(cfg) {
 		fi, err := os.Lstat(path)
 		if err != nil || !fi.Mode().IsRegular() || fi.Size() == 0 {
@@ -126,7 +127,7 @@ func captureArtifactBaseline(cfg *Config) artifactBaseline {
 
 // matches reports whether an observation is byte-for-byte a pre-dispatch artifact (same path, size, and
 // mtime — the same key the stability window uses, so the two checks cannot drift).
-func (b artifactBaseline) matches(path string, fi os.FileInfo) bool {
+func (b dispatchBaseline) matches(path string, fi os.FileInfo) bool {
 	e, ok := b.entries[path]
 	return ok && fi.Size() == e.size && fi.ModTime().Equal(e.modTime)
 }
@@ -214,7 +215,7 @@ func shortSHA(s string) string {
 // stability window answers "is it finished?"; artifactReady then canonicalizes it.
 type artifactDetector struct {
 	cfg      *Config
-	baseline artifactBaseline
+	baseline dispatchBaseline
 
 	haveLast    bool
 	lastPath    string

@@ -47,7 +47,7 @@ func (w replWaiter) admitPrompt(state *replWaitState) int {
 	if path, found := artifactLocate(w.cfg); found {
 		// Match regularFileNonEmpty's no-symlink contract and reject an artifact
 		// that is identical to the pre-dispatch baseline.
-		if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() && !w.artifactBase.matches(path, fi) {
+		if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() && !w.dispatchBase.matches(path, fi) {
 			fmt.Fprintf(w.deps.Stderr, "%s submit-verify: pane looks parked but a post-dispatch deliverable is already on disk — submission evidently landed; continuing the normal wait\n", w.prefix)
 			return ExitOK
 		}

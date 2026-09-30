@@ -55,7 +55,7 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 		Worktree:     worktree,
 		ProjectRoot:  in.ProjectRoot,
 		ArtifactPath: artifactPath,
-		Completion:   "artifact",
+		Completion:   CompletionArtifact,
 		Agent:        "judge",
 		Cycle:        in.Cycle,
 		Env:          in.Env,

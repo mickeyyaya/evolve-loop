@@ -43,7 +43,7 @@ type Deps struct {
 	Now    func() time.Time
 	// NewChallengeToken mints the dry-run / artifact challenge token.
 	NewChallengeToken func() (string, error)
-	CaptureBaseline   func(*Config) artifactBaseline
+	CaptureBaseline   func(*Config) dispatchBaseline
 	// Env is the request-local environment overlay consulted ahead of
 	// os.Getenv (via envchain); nil is empty.
 	Env map[string]string
@@ -230,25 +230,21 @@ type Config struct {
 	// SecondaryArtifacts: extra contract deliverables (absolute paths)
 	// required alongside the primary artifact.
 	SecondaryArtifacts []string
-	// Completion selects the phase-completion contract: "" or "artifact"
-	// polls for the artifact file (default); "stdout" completes on
-	// REPL-idle for agents that print their answer (router/advisor).
-	// See ADR-0027.
-	Completion     string
-	Cycle          int
-	Worktree       string
-	RunID          string
-	ProjectRoot    string // absolute path; sandbox uses this as the read-only RepoRoot
-	Agent          string
-	PermissionMode string // "" = driver default
-	StreamOutput   bool
-	SessionName    string
-	AllowBypass    bool
-	HumanInput     bool
-	RequireFull    bool
-	RequireSandbox bool // fail closed when OS filesystem confinement is unavailable
-	DenyPaths      []string
-	DenyReadPaths  []string
+	Completion         core.CompletionContract
+	Cycle              int
+	Worktree           string
+	RunID              string
+	ProjectRoot        string // absolute path; sandbox uses this as the read-only RepoRoot
+	Agent              string
+	PermissionMode     string // "" = driver default
+	StreamOutput       bool
+	SessionName        string
+	AllowBypass        bool
+	HumanInput         bool
+	RequireFull        bool
+	RequireSandbox     bool // fail closed when OS filesystem confinement is unavailable
+	DenyPaths          []string
+	DenyReadPaths      []string
 	// SandboxWriteSubpaths is profile.sandbox.write_subpaths, carried verbatim
 	// to the wrapper (SandboxWrapRequest.WriteSubpaths), which resolves them.
 	SandboxWriteSubpaths []string
@@ -366,7 +362,7 @@ func launchArgs(req core.BridgeRequest, promptFile, stdoutLog, stderrLog string,
 		args = append(args, "--require-sandbox")
 	}
 	if req.Completion != "" {
-		args = append(args, "--completion="+req.Completion)
+		args = append(args, "--completion="+string(req.Completion))
 	}
 	// Permission mode flows as a top-level flag (→ Config.PermissionMode → the
 	// LaunchIntent), NOT after `--`, so it is realized per-CLI and never pasted
@@ -569,7 +565,7 @@ func (e *Engine) clearBootStrike(c attemptLogContext, cli string, code int) {
 // BRIDGE_RESULT_READ_FAILED, never an error: the on-disk report is the
 // verdict source and Launch still returns nil with an empty Stdout.
 func (e *Engine) readResult(c attemptLogContext, req core.BridgeRequest, stdoutLog string, resp *core.BridgeResponse) {
-	readPath, completion := req.ArtifactPath, completionContractName(req.Completion)
+	readPath, completion := req.ArtifactPath, string(completionContractName(req.Completion))
 	if req.Completion == completionStdout {
 		readPath = stdoutLog
 	}

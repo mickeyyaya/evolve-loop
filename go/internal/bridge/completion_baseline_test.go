@@ -118,7 +118,7 @@ func TestArtifactDetector_SameMTimeDifferentSizeWriteIsPostDispatch(t *testing.T
 
 // zeroBaselineCapture models a fake session, which cannot write files, as
 // already mid-session: no pre-dispatch baseline exists.
-func zeroBaselineCapture(*Config) artifactBaseline { return artifactBaseline{} }
+func zeroBaselineCapture(*Config) dispatchBaseline { return dispatchBaseline{} }
 
 func TestDepsWithDefaults_CaptureBaselineIsReal(t *testing.T) {
 	ws := t.TempDir()

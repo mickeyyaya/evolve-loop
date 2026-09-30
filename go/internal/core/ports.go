@@ -207,6 +207,15 @@ func (e *LedgerEntry) setCycle(raw json.RawMessage) error {
 	return nil
 }
 
+type CompletionContract string
+
+const (
+	CompletionArtifact         CompletionContract = "artifact"
+	CompletionStdout           CompletionContract = "stdout"
+	CompletionGit              CompletionContract = "git"
+	CompletionWorktreeEvidence CompletionContract = "worktree-evidence"
+)
+
 // BridgeRequest is the input to Bridge.Launch. Field shape mirrors the
 // flag surface of `tools/agent-bridge/bin/bridge launch`. The adapter
 // writes Prompt to a file under Workspace before invoking the bridge
@@ -236,13 +245,9 @@ type BridgeRequest struct {
 	// window stays primary-only); the artifact-timeout final poll still
 	// completes without them, and the phase gate then reports the absence
 	// loudly.
-	SecondaryArtifacts []string `json:"secondary_artifacts,omitempty"`
-	// Completion selects the phase-completion contract: "" / "artifact" =
-	// poll the artifact file (default); "stdout" = complete on REPL-idle for
-	// agents that print their answer and write no file (the router/advisor).
-	// Only the *-tmux drivers honor it; others ignore it.
-	Completion string `json:"completion,omitempty"`
-	Agent      string `json:"agent,omitempty"` // role label
+	SecondaryArtifacts []string           `json:"secondary_artifacts,omitempty"`
+	Completion         CompletionContract `json:"completion,omitempty"`
+	Agent              string             `json:"agent,omitempty"` // role label
 	// Contract selects the deliverable protocol independently from Agent. Empty
 	// defaults to Agent for backward compatibility. PhaseAdvisor uses this when
 	// one router persona produces plan, replan, and proposal artifacts.
