@@ -1,13 +1,5 @@
 package core
 
-// signal_test.go — ADR-0101 S1: the orchestrator is a registered listener of the
-// Signal Center and the ADR-0044 C1 chokepoint (recordPhaseOutcome) is its
-// first producer. Every terminal phase disposition, on both dispatch roots,
-// becomes exactly one phase.outcome (or phase.aborted) event; a green cycle
-// emits no WARN; a reasoned FAIL (cycle 1636's shape) is a WARN that names the
-// phase, its code and its own reason — rendered by the stderr sink in the ONE
-// line format, no longer hand-written at the chokepoint.
-
 import (
 	"bytes"
 	"context"
@@ -182,9 +174,6 @@ func TestRecordPhaseOutcome_WarnVerdictCarriesItsOwnErrorDiagnostics(t *testing.
 	}
 }
 
-// signalMu exists for exactly this shape: cmd_loop reads the summary from its
-// own goroutine while a drain delivers phase outcomes. Under -race a missing
-// lock in observeSignal/SignalSummary is a hard failure.
 func TestSignalSummary_IsSafeToReadWhileTheCenterDelivers(t *testing.T) {
 	t.Parallel()
 	c := signalcenter.New()

@@ -2,15 +2,6 @@ package core
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 
-// The structured ship→orchestrator error protocol now lives in the
-// zero-dependency leaf internal/shiperr (so both the ship phase that CONSTRUCTS
-// ShipErrors and core's orchestrator that MATCHES them import it one-directionally
-// — no cycle either way). This file is a back-compat shim: type aliases + const
-// re-declarations + thin func wrappers keep the ~141 existing core.ShipError /
-// core.Code* / core.NewShipError / core.AsShipError call sites unchanged. New
-// code may depend on internal/shiperr directly; the shim is removable in a later
-// cleanup pass once call sites migrate.
-
 type (
 	ShipError      = shiperr.ShipError
 	ShipErrorClass = shiperr.ShipErrorClass
@@ -18,7 +9,7 @@ type (
 	ShipErrorCode  = shiperr.ShipErrorCode
 )
 
-// Severity vocabulary.
+// ShipClassTransient and its siblings are the ship-error severity vocabulary.
 const (
 	ShipClassTransient    = shiperr.ShipClassTransient
 	ShipClassPrecondition = shiperr.ShipClassPrecondition
@@ -26,7 +17,7 @@ const (
 	ShipClassConfig       = shiperr.ShipClassConfig
 )
 
-// Ship stages.
+// StageVerifyExplanation and its siblings are the ship stages.
 const (
 	StageVerifyExplanation = shiperr.StageVerifyExplanation
 	StageVerifySelfSHA     = shiperr.StageVerifySelfSHA
@@ -36,7 +27,8 @@ const (
 	StageArgs              = shiperr.StageArgs
 )
 
-// Precise failure identities (grouped by stage).
+// CodeExplanationDocumentation and its siblings are the precise failure
+// identities, grouped by stage.
 const (
 	CodeExplanationDocumentation = shiperr.CodeExplanationDocumentation
 
@@ -88,7 +80,7 @@ const (
 	CodeUnknown = shiperr.CodeUnknown
 )
 
-// NewShipError re-exports shiperr.NewShipError (thin wrapper, immutable func).
+// NewShipError re-exports shiperr.NewShipError.
 func NewShipError(code ShipErrorCode, class ShipErrorClass, stage ShipStage, message string, debugKV ...string) *ShipError {
 	return shiperr.NewShipError(code, class, stage, message, debugKV...)
 }

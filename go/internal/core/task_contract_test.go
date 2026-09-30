@@ -51,8 +51,6 @@ func TestComposeTaskContract_SanitizedCriteriaAreNotClaimedVerbatim(t *testing.T
 	}
 }
 
-// Membership is the on-disk binding (the lane pin production writes beside
-// every fleet scope); the dispatch context only places each member's record.
 func TestTaskItemRefs_PathsThenScopeThenTriage(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithScopePathResolver(func(root, id string) string { return filepath.Join(root, id+".json") }))
 	unresolving := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
@@ -103,9 +101,6 @@ func TestTaskItemRefs_DeferredScopeIsNotMandatory(t *testing.T) {
 	}
 }
 
-// TestListACSPredicates_InventoriesTheCyclePackage runs the real `go test
-// -list` against a throwaway module: the names come from the test files, and
-// an absent package or an empty one is a loud note.
 func TestListACSPredicates_InventoriesTheCyclePackage(t *testing.T) {
 	wt := t.TempDir()
 	mod := filepath.Join(wt, "go")
@@ -135,11 +130,9 @@ func TestListACSPredicates_InventoriesTheCyclePackage(t *testing.T) {
 }
 
 // TestDispatch_TaskContractReachesTDDBuildAndAudit is the core half of the
-// wiring proof: through RunCycle with the scope-path resolver the composition
-// root wires, the tdd, build and audit requests carry the block (build and
-// audit with the predicate inventory); scout and triage do not. The phase half
-// — each ComposePrompt rendering the key under "## Task Contract" — is pinned
-// in phases/{tdd,build,audit}/task_contract_prompt_test.go.
+// wiring proof; the phase half — each ComposePrompt rendering the key under
+// "## Task Contract" — is pinned in
+// phases/{tdd,build,audit}/task_contract_prompt_test.go.
 func TestDispatch_TaskContractReachesTDDBuildAndAudit(t *testing.T) {
 	dir := t.TempDir()
 	item := writeItem(t, dir, "task-a", `{"id":"task-a","title":"Title A","acceptance":["the build prompt carries this sentence verbatim"]}`)
@@ -181,8 +174,6 @@ func TestDispatch_TaskContractReachesTDDBuildAndAudit(t *testing.T) {
 	}
 }
 
-// TestResume_TaskContractSeededOnTheResumeSurface — the crash-resume dispatch
-// builder composes the same block (resume.go is the second surface).
 func TestResume_TaskContractSeededOnTheResumeSurface(t *testing.T) {
 	item := writeItem(t, t.TempDir(), "task-r", `{"id":"task-r","title":"Resumed","acceptance":["resume carries the contract"]}`)
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictPASS})
@@ -203,8 +194,6 @@ func TestResume_TaskContractSeededOnTheResumeSurface(t *testing.T) {
 	}
 }
 
-// TestListACSPredicates_FailureBranchesAreLoud — a package that does not
-// compile and one with no Test functions are both notes, never silence.
 func TestListACSPredicates_FailureBranchesAreLoud(t *testing.T) {
 	wt := t.TempDir()
 	mod := filepath.Join(wt, "go")
@@ -232,8 +221,6 @@ func TestListACSPredicates_FailureBranchesAreLoud(t *testing.T) {
 	}
 }
 
-// Both prompt consumers must retain every pinned member, even when a resumed
-// context still carries a partial or stale path disclosure.
 func TestTaskContract_MultiSlugProjectionParity(t *testing.T) {
 	for _, pin := range []bool{false, true} {
 		t.Run(fmt.Sprint("pin=", pin), func(t *testing.T) {
@@ -336,11 +323,6 @@ func TestDispatch_TaskContractMultiSlugLiveAndResume(t *testing.T) {
 	}
 }
 
-// TestLaneScopeIDs_ExplicitEmptyPinIsNoPin: a present-but-empty pin
-// (`{"todo_ids":[]}`) is not an authoritative empty membership — treating it
-// as one would wipe the triage-derived refs and make the Task Contract
-// silently disappear (the "never a silent omission" doctrine). No producer
-// writes it today; this pins the fallback so a future producer cannot.
 func TestLaneScopeIDs_ExplicitEmptyPinIsNoPin(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, LaneScopeFile), []byte(`{"todo_ids":[]}`), 0o644); err != nil {
@@ -351,13 +333,6 @@ func TestLaneScopeIDs_ExplicitEmptyPinIsNoPin(t *testing.T) {
 	}
 }
 
-// TestContractTaskIDs — cycle-1620 salvage (architecture CRITICAL 1): the
-// TDD->Build scope gate must bind to the SAME id set the Task Contract handed
-// TDD — the lane pin when present, else the triage decision's top_n, minus the
-// decision's deferrals — never to triage-report.md's markdown ## top_n, which
-// is prose in triage's working-id namespace (decomposition sub-ids are the
-// documented norm). ContractTaskIDs is that one projection; taskItemRefs
-// derives its ids from the same readers, proven by parity below.
 func TestContractTaskIDs(t *testing.T) {
 	decision := `{"top_n":[{"id":"alpha"},{"id":"beta"},{"id":"gamma"}],"deferred":[{"id":"gamma"}]}`
 	t.Run("no pin ⇒ decision top_n minus deferred", func(t *testing.T) {
@@ -406,18 +381,12 @@ func writeWSFile(t *testing.T, ws, name, body string) {
 	}
 }
 
-// TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers pins the one
-// behavior difference between the shared committedset projection and the
-// inline code it replaced: a padded or blank id in the lane pin is trimmed and
-// dropped rather than carried verbatim. Verbatim, " beta " matched nothing
-// downstream — a phantom member that could never be satisfied.
 func TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers(t *testing.T) {
 	ws := t.TempDir()
 	writeWSFile(t, ws, LaneScopeFile, `{"todo_ids":["alpha"," beta ","","  "]}`)
 	if got := ContractTaskIDs(ws); strings.Join(got, ",") != "alpha,beta" {
 		t.Fatalf("ContractTaskIDs = %v, want the trimmed, non-blank ids", got)
 	}
-	// A padded DEFERRAL still subtracts the member it names.
 	ws2 := t.TempDir()
 	writeWSFile(t, ws2, LaneScopeFile, `{"todo_ids":["alpha","beta"]}`)
 	writeWSFile(t, ws2, "triage-decision.json", `{"deferred":[{"id":" beta "}]}`)
@@ -523,9 +492,6 @@ func TestTaskItemRefs_ContractTaskIDsParity(t *testing.T) {
 	}
 }
 
-// TestTaskItemRefs_ScopePathsResolvePathsNeverMembership: membership is the
-// committed set; ctx fleet_scope_paths only places a committed id's record
-// (its pair wins over the resolver), and the resolver places the rest.
 func TestTaskItemRefs_ScopePathsResolvePathsNeverMembership(t *testing.T) {
 	resolver := WithScopePathResolver(func(_, id string) string { return "/resolver/" + id + ".json" })
 	cases := []struct {

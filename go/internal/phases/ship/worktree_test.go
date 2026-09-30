@@ -1,12 +1,5 @@
 //go:build integration
 
-// worktree_test.go — coverage for the v8.43.0 worktree-aware ship path
-// (shipFromWorktree + writeShipBinding). The 23-case native_test.go matrix
-// ships directly from ProjectRoot and never sets cycle-state.json's
-// active_worktree, so this entire path — commit-in-worktree, ff-merge into
-// main, post-push tree-SHA binding, and the ship-binding.json sidecar —
-// was previously 0% covered. These are the most irreversible operations in
-// the package, so they earn dedicated behavioral tests.
 package ship
 
 import (
@@ -18,10 +11,6 @@ import (
 	"testing"
 )
 
-// TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding: Builder's edits
-// live uncommitted in an active_worktree on a cycle branch. Ship must
-// commit them there, ff-merge the cycle branch into main, push, and emit
-// the ship-binding.json sidecar.
 func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -46,12 +35,10 @@ func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
 	if res.CommitSHA == "" {
 		t.Error("expected non-empty CommitSHA")
 	}
-	// The worktree edit must now live on main.
 	mainFiles := runGitOut(t, repo, "log", "-1", "--name-only", "--format=")
 	if !strings.Contains(mainFiles, "feature.txt") {
 		t.Errorf("worktree edit not merged into main; HEAD files: %q", mainFiles)
 	}
-	// ship-binding.json sidecar must exist and bind the committed SHA + cycle.
 	raw, rerr := os.ReadFile(filepath.Join(repo, ".evolve", "runs", "cycle-1", "ship-binding.json"))
 	if rerr != nil {
 		t.Fatalf("ship-binding.json not written: %v", rerr)
@@ -68,12 +55,6 @@ func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
 	}
 }
 
-// TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit: ADR-0048 Slice C1.
-// The audit-bound tree-SHA binding is verified against the STAGED INDEX (via
-// `git write-tree`) BEFORE the worktree commit, so a mismatch refuses with NO
-// commit object ever created — eliminating the commit-then-rollback window.
-// The distinguishing signal from the old post-commit-rollback behavior: the
-// "committed in worktree" log MUST be absent (verification preceded mutation).
 func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -89,26 +70,19 @@ func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
 	if res.ExitCode != ExitFailure {
 		t.Fatalf("want ExitFailure (predicate tree mismatch before commit), got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
-	// C1 invariant: verification ran BEFORE the commit — no commit was created.
 	if containsLog(res, "committed in worktree") {
 		t.Errorf("commit was created before tree-SHA verification — commit-then-fail window not closed: %v", res.Logs)
 	}
-	// The cycle branch must carry no new commit (never committed, not rolled back).
 	ahead := strings.TrimSpace(runGitOut(t, repo, "rev-list", "--count", "main..cycle-9-branch"))
 	if ahead != "0" {
 		t.Errorf("cycle branch advanced; main..branch ahead=%s", ahead)
 	}
-	// main must be untouched.
 	mainFiles := runGitOut(t, repo, "log", "-1", "--name-only", "--format=")
 	if strings.Contains(mainFiles, "feature.txt") {
 		t.Errorf("main advanced despite breach; files: %q", mainFiles)
 	}
 }
 
-// TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips: ADR-0048 Slice C1
-// happy path — when the staged-index tree equals the audit-bound tree, the
-// pre-commit verification passes, the commit is then made, and the cycle branch
-// ff-merges into main. Proves verification precedes (and gates) the commit.
 func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -141,9 +115,6 @@ func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
 	}
 }
 
-// TestShipFromWorktree_CleanWorktreeNotAhead_ExitsCleanly: an
-// active_worktree with no uncommitted changes whose branch is not ahead of
-// main is a no-op clean exit (audit was for an empty diff).
 func TestShipFromWorktree_CleanWorktreeNotAhead_ExitsCleanly(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -161,11 +132,6 @@ func TestShipFromWorktree_CleanWorktreeNotAhead_ExitsCleanly(t *testing.T) {
 	}
 }
 
-// TestShipFromWorktree_AcquiresAndReleasesShipLock pins ADR-0049 S5 / gap G1:
-// the worktree-aware ship must hold the integrator lock across the shared-main
-// critical section and release it. Inject a recording seam and assert it is
-// acquired exactly once on <root>/.evolve/ship.lock and released. RED before
-// the acquire is wired into shipFromWorktree (acquired=0), GREEN after.
 func TestShipFromWorktree_AcquiresAndReleasesShipLock(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
@@ -198,9 +164,6 @@ func TestShipFromWorktree_AcquiresAndReleasesShipLock(t *testing.T) {
 	}
 }
 
-// TestShipFromWorktree_DryRun_SkipsShipLock: a dry run mutates nothing, so it
-// must NOT acquire the integrator lock (keeps dry-run pure + never creates the
-// lock file).
 func TestShipFromWorktree_DryRun_SkipsShipLock(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)

@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// Resume-root twins of shipped_via_build_own_ship_test.go (the fixture,
-// resumedLifecycleFixture, is integration-tagged).
-
 func TestResumeLifecycle_ShipPassPersistsTheShipLatch(t *testing.T) {
 	o, st, req, rp := resumedLifecycleFixture(t) // resumes at audit → ship PASSes in the resumed session
 	if _, err := o.RunCycleFromPhase(context.Background(), req, rp); err != nil {
@@ -20,10 +17,6 @@ func TestResumeLifecycle_ShipPassPersistsTheShipLatch(t *testing.T) {
 	}
 }
 
-// The resume root reads the same checkpoint: a cycle that shipped in a prior
-// session, paused, and resumed into a post-ship phase whose SKIPPED verdict
-// became final must still be labelled by ITS OWN ship — the checkpoint's
-// latch — not by the in-memory field of whichever root happens to close out.
 func TestResumeLifecycle_PostShipSkippedVerdictReadsTheCheckpointLatch(t *testing.T) {
 	cases := []struct {
 		name    string

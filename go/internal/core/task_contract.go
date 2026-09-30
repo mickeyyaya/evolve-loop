@@ -1,17 +1,5 @@
 package core
 
-// task_contract.go — the harness-owned Task Contract block (ADR-0098, research
-// proposal R4). The acceptance criteria a cycle is graded against live on the
-// inbox item; before this file they reached the builder only by way of the
-// scout's and triage's prose (two LLM hops from the source), and the ACS
-// predicates the tdd phase wrote reached the builder only if it grepped for
-// them. Both are now projected DETERMINISTICALLY into the tdd, build and audit
-// prompts under one heading: the acceptance projected from the item file the
-// lane is bound to (the same file triage and the auditor read), and — for the
-// build, which runs after tdd — the predicate names `go test -list` reports
-// for go/acs/cycle<N>. Nothing here is authored by an agent; a missing or
-// unreadable input is a loud line in the block, never a silent omission.
-
 import (
 	"context"
 	"encoding/json"
@@ -37,9 +25,7 @@ const CtxKeyTaskContract = "task_contract"
 
 // taskContractPhase reports whether p is dispatched with the Task Contract:
 // the two phases that write against the acceptance criteria (tdd, build) and
-// the one that grades against them (audit) — the grader reads the SAME words
-// the builder was handed, which is what makes the block an authority rather
-// than a claim.
+// the one that grades against them (audit).
 func taskContractPhase(p Phase) bool { return p == PhaseTDD || p == PhaseBuild || p == PhaseAudit }
 
 // taskContractPreamble is the block's ONE statement of what it is. The phases
@@ -74,16 +60,12 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 	spec, hasSpec := o.cfg.DocumentSpec()
 	block := taskContractPreamble + composeTaskContract(refs, spec)
 	if DocumentCycle(cs.WorkspacePath) {
-		// No Go predicate suite for a document deliverable: the deterministic
-		// floor is the solution contract (ADR-0099 slice 2), self-checkable
-		// with `evolve solution check`. Without a registry contract there is
-		// no floor to name — composeTaskContract already said so per item.
 		if hasSpec {
 			block += "No Go predicate inventory: this is a document cycle — the deterministic floor is the solution contract (`evolve solution check " + spec.Root + "/<id>`), and the audit grades the options against the acceptance above.\n"
 		} else {
 			block += "No Go predicate inventory: this is a document cycle, and the registry declares no document contract — the audit grades the deliverable against the acceptance above alone.\n"
 		}
-	} else if next != PhaseTDD { // build and audit run after tdd wrote the predicates
+	} else if next != PhaseTDD {
 		lister := o.acsPredicates
 		if lister == nil {
 			lister = listACSPredicates
@@ -98,13 +80,10 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 	return out
 }
 
-// taskItemRefs resolves this cycle's committed tasks (ContractTaskIDs — the
-// same projection the TDD->Build scope gate grades against) to their inbox
-// records. Membership comes from the on-disk binding only: the dispatch
-// context's fleet_scope_paths id=path pairs merely PLACE a committed member's
-// record (a pair wins over the scope-path resolver) and never add or remove a
-// member, so a stale request-context scope cannot rebind the contract. A
-// member neither source can place renders unresolved, never dropped.
+// taskItemRefs resolves this cycle's committed tasks (ContractTaskIDs) to
+// their inbox records; a pair from fleet_scope_paths wins over the
+// scope-path resolver, and a member neither source can place renders
+// unresolved, never dropped.
 func (o *Orchestrator) taskItemRefs(ctx map[string]string, projectRoot, workspace string) []taskItemRef {
 	ids := ContractTaskIDs(workspace)
 	pairs := scopePathPairs(ctx["fleet_scope_paths"])
@@ -131,26 +110,12 @@ func scopePathPairs(s string) map[string]string {
 	return pairs
 }
 
-// ContractTaskIDs is the ONE id set the Task Contract binds a cycle to — the
+// ContractTaskIDs is the one id set the Task Contract binds a cycle to — the
 // lane pin when present (LaneScopeIDs), else the triage decision's top_n
-// (BoundTaskIDs), minus the decision's deferrals — the projection every
-// consumer that reasons about "the committed members" reads: the Task
-// Contract itself (taskItemRefs, parity-tested) and the TDD->Build scope gate
-// (cycle-1620 salvage). Never triage-report.md's markdown ## top_n: that is
-// prose in triage's working-id namespace, where decomposition sub-ids are the
-// documented norm.
+// (BoundTaskIDs), minus the decision's deferrals. Never
+// triage-report.md's markdown ## top_n: that is prose in triage's working-id
+// namespace, where decomposition sub-ids are the documented norm.
 func ContractTaskIDs(workspace string) []string {
-	// Delegates to internal/committedset — the ONE projection of the committed
-	// set, shared with the cycle dossier (which cannot import core). The
-	// precedence and the deferral subtraction live there; this stays the
-	// kernel-side name every core consumer already reads.
-	//
-	// One deliberate behavior difference from the inline version this replaced:
-	// committedset trims each id and drops blank ones, where the old code took
-	// TodoIDs verbatim and compared untrimmed. Unobservable for well-formed
-	// artifacts (materializeLaneScope trims before writing), and a whitespace-
-	// padded id previously became a phantom member that matched nothing —
-	// pinned by TestContractTaskIDs_WhitespacePaddedIDsAreNotPhantomMembers.
 	ids, ok := committedset.Committed(workspace)
 	if !ok || len(ids) == 0 {
 		return nil
@@ -159,9 +124,7 @@ func ContractTaskIDs(workspace string) []string {
 }
 
 // BoundTaskIDs reads the cycle's triage decision for the committed task ids
-// (top_n) — the ONE reader the task contract, the failure digest, the solution
-// floor and ship share. Absent or malformed ⇒ nil (each consumer decides
-// whether that is loud).
+// (top_n). Absent or malformed ⇒ nil.
 func BoundTaskIDs(workspace string) []string {
 	raw, err := os.ReadFile(filepath.Join(workspace, "triage-decision.json"))
 	if err != nil {
@@ -210,9 +173,6 @@ func composeTaskContract(refs []taskItemRef, spec config.DeliverableKindSpec) st
 		if kind := strings.TrimSpace(item.DeliverableKind); kind != "" {
 			fmt.Fprintf(&b, "Deliverable kind: %s\n", kind)
 			if kind == config.DeliverableKindDocument {
-				// The contract prose is RENDERED from the registry spec (one
-				// renderer, solutioncheck.Describe) — the builder is told exactly
-				// the shape the floor judges, never a hand-typed copy.
 				if desc := solutioncheck.Describe(spec); desc != "" {
 					fmt.Fprintf(&b, "Deliverable: %s/%s/ — %s\n", spec.Root, ref.id, desc)
 				} else {
@@ -250,15 +210,10 @@ type acsPredicates struct {
 	note  string // why the list is empty or partial, verbatim for the prompt
 }
 
-// listACSPredicates runs `go test -list . -tags acs <acssuite.CyclePackage>` in
-// the worktree's Go module: the deterministic inventory of the predicates the
-// tdd phase actually wrote (test names are the seam between tdd and build — the
-// AC-Materialization table already keys on them). Bounded by acssuite.DefaultTimeout
-// — deliberately the constant, not the lane's policy override (acs.go_timeout_s
-// sizes a whole predicate RUN; this is one compile of one package, and a
-// dispatch must never wait longer than the lane would) — so a stalled compile
-// (module download, proxy) can never wedge a dispatch. A missing package, a compile failure or an empty package is
-// reported in the note, never hidden.
+// listACSPredicates runs `go test -list . -tags acs <acssuite.CyclePackage>`
+// in the worktree's Go module: the deterministic inventory of the predicates
+// the tdd phase actually wrote. A missing package, a compile failure or an
+// empty package is reported in the note, never hidden.
 func listACSPredicates(ctx context.Context, worktree string, cycle int) acsPredicates {
 	if worktree == "" {
 		return acsPredicates{note: "no worktree — ACS predicates could not be listed"}

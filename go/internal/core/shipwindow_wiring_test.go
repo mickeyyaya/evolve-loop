@@ -10,15 +10,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
-// Cycle-778 regression: the ship-window lease is acquired exactly at the
-// audit-phase binding boundary, held across it, and freed by the first
-// non-audit completion and by releaseShipWindow's idempotent re-entry.
 func TestShipWindowWiring_AuditAcquiresNonAuditReleases(t *testing.T) {
 	root := t.TempDir()
 	cr := &cycleRun{ctx: context.Background(), req: CycleRequest{ProjectRoot: root}}
 	lockPath := shipwindow.PathIn(filepath.Join(root, ".evolve"))
 
-	cr.acquireShipWindow(PhaseBuild) // non-audit phases never take the lease
+	cr.acquireShipWindow(PhaseBuild)
 	if cr.shipLease != nil {
 		t.Fatalf("acquireShipWindow(PhaseBuild) took the lease; want audit-only")
 	}
@@ -31,25 +28,21 @@ func TestShipWindowWiring_AuditAcquiresNonAuditReleases(t *testing.T) {
 		t.Fatalf("lease file missing while held: %v", err)
 	}
 
-	// A re-audit re-queues (release + acquire) and still holds afterwards.
 	cr.acquireShipWindow(PhaseAudit)
 	if cr.shipLease == nil {
 		t.Fatalf("re-audit dropped the lease; want re-acquired")
 	}
 
-	cr.releaseShipWindow() // recordAndBranch's post-ship (any non-audit) release
+	cr.releaseShipWindow()
 	if cr.shipLease != nil {
 		t.Fatalf("releaseShipWindow left shipLease non-nil")
 	}
 	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
 		t.Fatalf("lease file still present after release (stat err=%v)", err)
 	}
-	cr.releaseShipWindow() // RunCycle exit-defer path: idempotent no-op
+	cr.releaseShipWindow()
 }
 
-// Cycle-778 fail-open contract: a sibling holding the window must delay this
-// lane at most shipWindowAcquireTimeout, after which the lane proceeds
-// UNLEASED (pre-lease behavior) instead of wedging the loop.
 func TestShipWindowWiring_FailOpenWhenSiblingHolds(t *testing.T) {
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

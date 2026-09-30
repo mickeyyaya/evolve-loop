@@ -14,25 +14,6 @@ import (
 	"strings"
 )
 
-// scopelint.go — demote out-of-scope meta-predicates instead of letting them
-// false-fail cycles.
-//
-// Cycles 1115/1116/1117/1123 each FAILed on one predicate of the shape
-// "go test <core+bridge+recovery> stays green". A whole-suite sweep samples
-// everything in those packages — an auditor probe, a shared test fixture
-// root, a concurrent lane — and reports any contamination as a builder
-// regression. Whole-repo staleness is the regression suite's job; a cycle
-// predicate re-sweeping UNTOUCHED packages is duplication with a false-red
-// surface. Such predicates are demoted to SKIP (a skip counts neither red nor
-// green, so a lint false-positive can never fail a cycle) with a loud
-// EvidenceNote + verdict warning.
-//
-// Known conservative limitation: patterns assembled by string concatenation
-// or returned from helper functions are invisible to the lint. That is the
-// safe direction (a missed broad predicate merely stays un-demoted), and the
-// demotion floor below bounds what a deliberately-broad authoring style could
-// ever hide.
-
 // ScopeFinding is one out-of-scope package reference inside a cycle predicate.
 type ScopeFinding struct {
 	Test    string // predicate test function name
@@ -43,9 +24,9 @@ type ScopeFinding struct {
 // LintPredicateScope parses the cycle predicate sources in dir and returns a
 // finding per test function that references a Go package pattern outside
 // touched. An empty touched set lints nothing — with no scope authority a
-// wrong guess would demote a legitimate gate. Const indirection is resolved
-// (cycle-1117's bridgePkg shape): package-level string consts/vars count as
-// references in every function that names them.
+// wrong guess would demote a legitimate gate. Const indirection is resolved:
+// package-level string consts/vars count as references in every function
+// that names them.
 func LintPredicateScope(dir string, touched []string) ([]ScopeFinding, error) {
 	if len(touched) == 0 {
 		return nil, nil
@@ -189,11 +170,9 @@ func patternKey(p string) string {
 }
 
 // scopeLintChangedPackages derives the touched set for the lint from GIT, and
-// git only — never the builder-written handoff. Two reasons, both from
-// adversarial review: the handoff has been extinct since ~cycle-215 (reading
-// it made the lint dead code on every live cycle), and it is agent-authored,
-// so trusting it would let a builder shrink `touched` to demote sibling
-// predicates (gate-weakening). Seam var so tests can inject.
+// git only — never the builder-written handoff, which is agent-authored: a
+// builder could shrink `touched` to demote sibling predicates (gate-weakening).
+// Seam var so tests can inject.
 var scopeLintChangedPackages = func(worktreeRoot string) []string {
 	pkgs, ok := changedpkgs.FromGitChecked(worktreeRoot, "HEAD")
 	if !ok {
@@ -207,15 +186,7 @@ var scopeLintChangedPackages = func(worktreeRoot string) []string {
 // git-derived touched set is demoted to SKIP regardless of outcome —
 // authorship-based, so TDD sees it on the first run, not only under
 // contamination. Loud (EvidenceNote + verdict warning); a lint error disables
-// the lint WITH a warning (fail-open is the direction that cannot weaken the
-// gate, but it must not be silent).
-//
-// DEMOTION FLOOR (gate-weakening guard): if demotion would leave the cycle
-// with ZERO live (non-skip) own predicates, ALL demotions are cancelled and a
-// warning says so — a cycle can never ship with its whole predicate set
-// demoted, so a stray broad literal in every predicate cannot vanish a real
-// red. Corollary: a cycle whose ONLY predicate is broad keeps its red — the
-// false-red survives there, but in the safe (never gate-weakening) direction.
+// the lint with a warning instead of failing silently.
 func demoteOutOfScope(results []Result, opts Options) []string {
 	touched := scopeLintChangedPackages(opts.Root)
 	if len(touched) == 0 {
@@ -258,9 +229,8 @@ func demoteOutOfScope(results []Result, opts Options) []string {
 		pats := flagged[testRootName(name)]
 		results[i].ResultStr = "skip"
 		results[i].ExitCode = SkipExitCode
-		// APPEND to any existing note — parseGoTestJSON may have recorded the
-		// no-FAIL-line diagnosis (compile failure/timeout), and the demotion
-		// must not erase fix-1's evidence with fix-4's.
+		// Append to any existing note: parseGoTestJSON may already have
+		// recorded the no-FAIL-line diagnosis, and demotion must not erase it.
 		if results[i].EvidenceNote != "" {
 			results[i].EvidenceNote += " | "
 		}

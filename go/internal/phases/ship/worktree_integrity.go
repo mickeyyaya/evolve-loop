@@ -61,18 +61,6 @@ func (s *worktreeShip) verifyCommittedTree() (string, error) {
 		"audit_bound_tree", s.opts.internalAuditBoundTreeSHA, "committed_tree", committedTree, "phase", "post-push")
 }
 
-// auditBindingSatisfied is the ONE rule both ship paths apply to an audit
-// binding: the tree matches, or the drift is fully explained by sanctioned
-// inbox consumption. It takes only what the rule needs — no receiver — so the
-// direct path can apply the identical decision.
-//
-// It exists because the direct path shipped for a long time with NO check at
-// all while still writing audit_bound_tree_sha into ship-binding.json,
-// recording a verification that never happened. A single predicate means the
-// two paths cannot disagree about what "bound" means; each still formats its
-// own operator-facing message, because pre-commit ("refused to commit;
-// changes preserved") and post-push ("drift detected") are genuinely
-// different situations for whoever has to read them.
 func auditBindingSatisfied(ctx context.Context, opts *Options, worktree, actual string) (bool, string) {
 	if opts.internalAuditBoundTreeSHA == actual {
 		return true, ""

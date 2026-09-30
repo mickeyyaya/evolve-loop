@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// TestRun_Validation covers the required-field guards.
 func TestRun_Validation(t *testing.T) {
 	if _, err := Run(Options{Cycle: 1}); err == nil {
 		t.Error("want error for empty Root")
@@ -19,9 +18,6 @@ func TestRun_Validation(t *testing.T) {
 	}
 }
 
-// TestWriteVerdict_RoundTrip — a verdict built via record() writes atomically and
-// re-parses to the schema the audit + ship gates read (red_count/green_count/
-// verdict/predicate_suite.total).
 func TestWriteVerdict_RoundTrip(t *testing.T) {
 	v := Verdict{SchemaVersion: "1.0", Cycle: 2}
 	v.record(Result{ACID: "cycle2/TestC2_001_Ok", Predicate: "go/acs/cycle2/...:TestC2_001_Ok", ResultStr: "green"})
@@ -55,8 +51,6 @@ func TestWriteVerdict_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestWriteVerdict_MkdirError — a non-directory evolveDir surfaces an error
-// rather than silently dropping the verdict.
 func TestWriteVerdict_MkdirError(t *testing.T) {
 	root := t.TempDir()
 	blocker := filepath.Join(root, "blocker")
@@ -69,9 +63,8 @@ func TestWriteVerdict_MkdirError(t *testing.T) {
 	}
 }
 
-// TestWriteVerdict_RenameError — when the destination acs-verdict.json already
-// exists as a DIRECTORY, the final os.Rename(tmp, dst) cannot complete, so
-// WriteVerdict surfaces a "rename" error rather than reporting success.
+// The destination acs-verdict.json already exists as a directory, so the
+// final os.Rename(tmp, dst) cannot complete.
 func TestWriteVerdict_RenameError(t *testing.T) {
 	evolveDir := t.TempDir()
 	collide := filepath.Join(evolveDir, "runs", "cycle-1", "acs-verdict.json")
@@ -85,10 +78,8 @@ func TestWriteVerdict_RenameError(t *testing.T) {
 	}
 }
 
-// TestWriteVerdict_CreateTempError — the cycle dir exists but is read-only:
-// MkdirAll is a no-op (dir present), then os.CreateTemp cannot create the temp
-// file, so WriteVerdict surfaces a "create tmp" error rather than silently
-// dropping the verdict.
+// The cycle dir exists but is read-only: MkdirAll is a no-op (dir present),
+// then os.CreateTemp cannot create the temp file.
 func TestWriteVerdict_CreateTempError(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("read-only-dir permission denial does not hold for root")

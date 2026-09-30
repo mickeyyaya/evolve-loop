@@ -22,11 +22,9 @@ func mustCatalog(t *testing.T, specs ...phasespec.PhaseSpec) phasespec.Catalog {
 	return cat
 }
 
-// TestNext_AuditVerdictBranchFromSpec proves Next() resolves the audit verdict
-// branch from the descriptor's on_pass/on_fail, NOT the hardcoded case
-// PhaseAudit. The catalog INVERTS the targets vs the literal table (PASS→retro,
-// FAIL→ship) so the assertion can only pass if the spec is consulted. RED until
-// Next reads sm.specFor (the literal gives PASS→ship).
+// TestNext_AuditVerdictBranchFromSpec's catalog inverts the targets vs the
+// literal table (PASS→retro, FAIL→ship) so the assertion can only pass if the
+// spec is actually consulted, not the hardcoded PhaseAudit case.
 func TestNext_AuditVerdictBranchFromSpec(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "retrospective", OnFail: "ship"})
@@ -47,12 +45,12 @@ func TestNext_AuditVerdictBranchFromSpec(t *testing.T) {
 	}
 }
 
-// TestNext_AuditDegradesToLiteralWhenCatalogUnset is the degrade characterization:
-// a bare StateMachine (no WithCatalog) keeps the exact literal audit branch.
-// Green before AND after the Next rewrite — the safety net for catalog-less SMs.
+// TestNext_AuditDegradesToLiteralWhenCatalogUnset is the degrade
+// characterization: a bare StateMachine (no WithCatalog) keeps the exact
+// literal audit branch.
 func TestNext_AuditDegradesToLiteralWhenCatalogUnset(t *testing.T) {
 	t.Parallel()
-	sm := NewStateMachine() // no catalog
+	sm := NewStateMachine()
 	for _, c := range []struct {
 		v    string
 		want Phase
@@ -68,10 +66,9 @@ func TestNext_AuditDegradesToLiteralWhenCatalogUnset(t *testing.T) {
 	}
 }
 
-// TestWiredStateMachine_ReproducesAuditOracle proves the SHIPPED config shape
+// TestWiredStateMachine_ReproducesAuditOracle proves the shipped config shape
 // (audit on_pass:ship / on_fail:retrospective) reproduces the frozen oracle's
-// audit cells byte-identically when the catalog is wired — the live-path
-// byte-identity proof for S1.
+// audit cells byte-identically when the catalog is wired.
 func TestWiredStateMachine_ReproducesAuditOracle(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "ship", OnFail: "retrospective"})
@@ -88,10 +85,6 @@ func TestWiredStateMachine_ReproducesAuditOracle(t *testing.T) {
 	}
 }
 
-// TestNext_UnresolvableTargetErrorsLoudly guards the fail-loudly contract: a
-// descriptor whose on_pass/on_fail names a phase that does not resolve (an
-// operator typo) must surface ErrTransitionInvalid — never the silent ("",nil)
-// success that would let a ship-intended cycle skip its successor unnoticed.
 func TestNext_UnresolvableTargetErrorsLoudly(t *testing.T) {
 	t.Parallel()
 	cat := mustCatalog(t, phasespec.PhaseSpec{Name: "audit", OnPass: "no-such-phase", OnFail: "also-bogus"})

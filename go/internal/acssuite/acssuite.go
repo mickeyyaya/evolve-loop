@@ -1,20 +1,6 @@
-// Package acssuite is the deterministic, host-side EGPS predicate-suite runner.
-// It executes the Go predicate lane and writes acs-verdict.json conforming to
-// the schema the audit + ship gates read (EGPS v11 — see ADR-0042; supersedes
-// the bash run-acs-suite.sh of ADR-0025).
-//
-// The Go lane runs three scopes, each as a SEPARATE `go test -json -tags acs`
-// (so a per-package compile error is a HARD error, never a silent PASS):
-//   - ./acs/cycle<N>          this cycle's predicates (authored fresh)
-//   - ./acs/regression/<sub>  curated durable predicates, every cycle
-//   - ./acs/redteam           standing anti-gaming predicates, every cycle
-//
-// Each test maps to a Result via v.record. red_count == 0 ⇒ verdict PASS ⇒
-// ship_eligible. A test that FAILs is RED; a t.Skip is SKIP (the TAP/automake
-// convention, exit 77 in the Result) — an evidence-absent predicate (e.g. a
-// runtime-only regression predicate on a fresh clone) is counted neither red nor
-// green, so it cannot block the gate yet cannot fake a pass. CLI:
-// `evolve acs suite --cycle N`.
+// Package acssuite is the deterministic, host-side EGPS predicate-suite
+// runner: it runs the Go predicate lane and writes acs-verdict.json to the
+// schema the audit and ship gates read.
 package acssuite
 
 import (
@@ -42,7 +28,6 @@ import (
 // DefaultTimeout bounds the whole Go lane (per scope) via context cancellation.
 const DefaultTimeout = 60 * time.Second
 
-// evidenceMax caps the captured output excerpt per predicate.
 const evidenceMax = 600
 
 // maxLockWait bounds the single-flight queue wait: generous enough for a
@@ -50,12 +35,11 @@ const evidenceMax = 600
 // unserialized instead of deadlocking the fleet.
 const maxLockWait = 15 * time.Minute
 
-// SkipExitCode is the TAP/automake SKIP convention: a predicate exiting 77
-// declares its evidence absent / not-applicable on this clone. It is counted
-// neither red nor green.
+// SkipExitCode is the TAP/automake SKIP convention: exit 77 means evidence
+// absent / not-applicable, and is counted neither red nor green.
 const SkipExitCode = 77
 
-// Result is one predicate's outcome (egps-v10 schema).
+// Result is one predicate's outcome, part of the acs-verdict.json schema.
 type Result struct {
 	ACID            string `json:"ac_id"`
 	Predicate       string `json:"predicate"` // repo-relative path
@@ -65,12 +49,9 @@ type Result struct {
 	IsRegression    bool   `json:"is_regression"`
 	IsRedTeam       bool   `json:"is_red_team,omitempty"`
 	EvidenceExcerpt string `json:"evidence_excerpt,omitempty"`
-	// FailingTests names the `--- FAIL:` tests found in this predicate's
-	// output — for a meta-predicate that shells an inner `go test`, these are
-	// the INNER failures, the exact identity the excerpt cap used to destroy
-	// (cycles 1107/1116/1123: head-truncated evidence left no failing test
-	// name anywhere on disk, making their false reds permanently
-	// unconfirmable). Deduped, bounded by maxFailingTests.
+	// FailingTests names the `--- FAIL:` tests inside this predicate's output —
+	// for a meta-predicate that shells an inner `go test`, these are the INNER
+	// failures. Deduped, bounded by maxFailingTests.
 	FailingTests []string `json:"failing_tests,omitempty"`
 	// EvidenceNote records WHY no failing test could be named on a red
 	// (compile failure, timeout, signal) — a red must never be a
@@ -80,30 +61,22 @@ type Result struct {
 	// RAN — reported did-NOT-pass while absent from FailingTests, i.e. the
 	// bound name no longer resolves in its target package (renamed away, or
 	// never created). Distinct from a FAILING bound test on purpose: the cure
-	// for a phantom is repointing the binding, not fixing code, and a red that
-	// cannot say which of the two it is costs a forensic session
-	// (phantom_binding.go; the 1539-1546 absorbing streak).
+	// for a phantom is repointing the binding, not fixing code.
 	PhantomBindings []string `json:"phantom_bindings,omitempty"`
-	// Flaky marks a predicate that was RED on the first run and GREEN on the
-	// single bounded retry (cycle-468): value "passed-on-retry". Visible in
-	// the wire JSON so a flake is never silently absorbed; the first-run
-	// failure evidence is retained deliberately (the flake's signature).
-	// The meaning is PINNED by acs/cycle468 (deterministic reds carry no
-	// flaky key) — retry outcomes for reds live in RetryOutcome instead.
+	// Flaky marks a predicate red on the first run and green on the single
+	// bounded retry: value "passed-on-retry". Retry outcomes for a red that
+	// stays red live in RetryOutcome instead.
 	Flaky string `json:"flaky,omitempty"`
 
 	// RetryOutcome records what the bounded retry established about a red
 	// that STAYED red: "red-on-retry" (the retry ran and confirmed) or
 	// "retry-inconclusive" (the retry produced no result for this test —
 	// expired ctx, crash). Absent on greens, skips, and absorbed flakes.
-	// Without it a confirmed red was indistinguishable from a starved
-	// retry (batch-18 forensics gap).
 	RetryOutcome string `json:"retry_outcome,omitempty"`
 
-	// fullEvidence retains the red predicate's COMPLETE captured stream
-	// (unexported: the wire JSON stays capped at evidenceMax — the full
-	// record lands in acs-red-evidence/ beside the verdict instead; cycles
-	// 1173/1175/1178 were undiagnosable from the elided excerpt alone).
+	// fullEvidence retains the red predicate's complete captured stream: the
+	// wire JSON stays capped at evidenceMax, and the full record lands in
+	// acs-red-evidence/ beside the verdict instead.
 	fullEvidence string
 }
 
@@ -116,15 +89,11 @@ type PredicateSuite struct {
 	Total                int `json:"total"`
 }
 
-// warningsFromFlaky derives the verdict-level warnings from flaky-annotated
-// results — single source: the per-result Flaky field is authoritative and the
-// warning list is its projection (never maintained separately).
+// warningsFromFlaky projects Result.Flaky into verdict-level warnings — the
+// single source of truth; the list is never maintained separately.
 func warningsFromFlaky(results []Result) []string {
 	var w []string
 	for _, r := range results {
-		// Only absorbed flakes surface as warnings — acs/cycle468 pins that a
-		// deterministic red adds NO warnings entry; RetryOutcome + the
-		// acs-red-evidence/ file are the confirmed-red forensic surface.
 		if r.Flaky != "" {
 			w = append(w, fmt.Sprintf("flaky: %s passed-on-retry (bounded single retry absorbed a non-deterministic red; investigate under host contention)", r.ACID))
 		}
@@ -145,15 +114,13 @@ type Verdict struct {
 	SkipIDs        []string       `json:"skip_ids,omitempty"`
 	Verdict        string         `json:"verdict"` // PASS | FAIL
 	ShipEligible   bool           `json:"ship_eligible"`
-	// Warnings surfaces non-blocking anomalies (cycle-468: flaky predicates
-	// that passed on the bounded retry). Projection of Result.Flaky.
+	// Warnings surfaces non-blocking anomalies: flaky predicates that passed
+	// on the bounded retry. Projection of Result.Flaky.
 	Warnings []string `json:"warnings,omitempty"`
 	// SuiteRoot / ProjectRoot record which roots this verdict was minted
-	// under (cycle-1434: a verdict minted with the WRONG state root red'd 3
-	// predicates the correct-root run showed green, and nothing in the
-	// artifact said so). omitempty: verdicts written before these stamps
-	// stay byte-compatible, and readers treat absence as "unstamped", never
-	// as a mismatch.
+	// under. omitempty: verdicts written before these stamps stay
+	// byte-compatible, and readers treat absence as "unstamped", never as a
+	// mismatch.
 	SuiteRoot   string `json:"suite_root,omitempty"`
 	ProjectRoot string `json:"project_root,omitempty"`
 }
@@ -162,13 +129,12 @@ type Verdict struct {
 type Options struct {
 	Root  string // repo root (the Go module's parent; the lane runs from <Root>/go)
 	Cycle int    // current cycle number
-	// ProjectRoot is the MAIN project root whose `.evolve/` holds the runtime data
-	// (history under .evolve/runs/, baselines, the current build-report) that
-	// predicates read via ${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}. When set, it is
-	// exported as EVOLVE_PROJECT_ROOT to each predicate so a suite run from a
-	// worktree (Root=worktree, post issue-#9 audit-cwd=worktree) still resolves
-	// `.evolve/` to main rather than the worktree (where `.evolve/` is absent).
-	// Empty → predicates inherit the caller's env. (issue #12)
+	// ProjectRoot is the MAIN project root whose `.evolve/` holds the runtime
+	// data predicates read via ${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}. When set,
+	// it is exported as EVOLVE_PROJECT_ROOT to each predicate so a suite run
+	// from a worktree still resolves `.evolve/` to main rather than the
+	// worktree (where `.evolve/` is absent). Empty → predicates inherit the
+	// caller's env.
 	ProjectRoot string
 	// GoModuleDir is the directory holding go.mod + the acs/ predicate subtree.
 	// Empty → filepath.Join(Root, "go"). The Go lane runs
@@ -199,17 +165,10 @@ func Run(opts Options) (Verdict, error) {
 
 	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle, SuiteRoot: opts.Root, ProjectRoot: opts.ProjectRoot}
 
-	// ADR-0080 P1: the suite execution is host-wide SINGLE-FLIGHT. Fleet
-	// lanes are separate processes each shelling full package suites; run
-	// concurrently they oversubscribe the host and turn long suites into
-	// false reds (batch-16: TouchedPackagesStayGreen red on 1166/1167/1169,
-	// green in the preserved worktree — an identical-fingerprint halt over
-	// infrastructure). Blocking is bounded by the caller's lifetime only:
-	// verification MUST run, serialized, never skipped.
-	// Bounded wait (review HIGH): a wedged HOLDER must degrade this lane to
-	// unserialized (WARN below), never deadlock the fleet — the whole degrade
-	// path exists for exactly that, and an unbounded Background ctx made it
-	// unreachable.
+	// The suite execution is host-wide SINGLE-FLIGHT: verification MUST run,
+	// serialized, never skipped. A wedged holder degrades this lane to
+	// unserialized (WARN below) rather than deadlock the fleet.
+	// See ADR-0080.
 	lockCtx, lockCancel := context.WithTimeout(context.Background(), maxLockWait)
 	defer lockCancel()
 	release, lockErr := verifylock.Acquire(lockCtx, opts.Root, os.Stderr)
@@ -223,9 +182,8 @@ func Run(opts Options) (Verdict, error) {
 	if gErr != nil {
 		return Verdict{}, gErr
 	}
-	// After demoteOutOfScope: a red demoted to skip must leave no phantom
-	// red-evidence file (review M2 — the forensic surface must match the
-	// verdict).
+	// A red demoted to skip must leave no phantom red-evidence file — the
+	// forensic surface must match the verdict.
 	demoteWarnings := demoteOutOfScope(goResults, opts)
 	writeRedEvidence(opts, goResults)
 	for _, r := range goResults {
@@ -234,8 +192,6 @@ func Run(opts Options) (Verdict, error) {
 
 	v.PredicateSuite.SkippedCount = v.SkipCount
 	v.PredicateSuite.Total = len(v.Results) // skips included
-	// Invariant: a skip increments neither GreenCount nor RedCount, so
-	// PASS ⟺ red_count==0 holds.
 	if v.RedCount == 0 {
 		v.Verdict = "PASS"
 		v.ShipEligible = true
@@ -271,18 +227,12 @@ func (v *Verdict) record(r Result) {
 	v.Results = append(v.Results, r)
 }
 
-// predicateEnv builds the env exported to BOTH lanes. The dual-root pattern:
-//   - EVOLVE_PROJECT_ROOT (STATE root) → MAIN, so predicates resolve `.evolve/`
-//     runtime data to main even from a worktree (issue #12).
-//   - EVOLVE_WORKTREE_ROOT (SOURCE root) → the cycle's worktree, so predicates
-//     that validate a generated-from-source doc (e.g. `evolve flags check` /
-//     `evolve skills check`) read the WORKTREE artifact the cycle commits — not
-//     main's stale working copy. Without this, such a predicate red-fails correct
-//     work because the doc only reaches main at ship, after audit (cycle-355).
-//   - CHANGED_PACKAGES → the cycle's touched packages, so a predicate can scope
-//     `go test` (cycle-200).
-//
-// With no extras it equals os.Environ() — the prior inherit behavior.
+// predicateEnv builds the env exported to BOTH lanes: the dual-root pattern
+// (EVOLVE_PROJECT_ROOT, the state root, resolves `.evolve/` to main even from
+// a worktree; the worktree-root key, the source root, points a doc-validating
+// predicate at the cycle's committed artifact instead of main's stale copy)
+// plus CHANGED_PACKAGES so a predicate can scope `go test` to the cycle's
+// touched packages. With no extras it equals os.Environ().
 func predicateEnv(projectRoot, worktreeRoot string, changedPkgs []string) []string {
 	env := os.Environ()
 	if projectRoot != "" {
@@ -319,12 +269,10 @@ func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []stri
 	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
 	cmd.Dir = moduleDir
 	cmd.Env = env
-	// WaitDelay (review HIGH): CommandContext kills the direct `go` process,
-	// not test-binary grandchildren — and meta-predicates shell inner go-test
-	// runs. Without a delay a surviving grandchild pins CombinedOutput's pipe
-	// past ctx expiry, the lane never returns, and (single-flight) the held
-	// lock starves every other lane. Same discipline as the sandbox and fleet
-	// launchers.
+	// CommandContext kills only the direct `go` process, not test-binary
+	// grandchildren a meta-predicate's inner `go test` spawns; without a
+	// delay a surviving grandchild pins CombinedOutput's pipe past ctx
+	// expiry and the held single-flight lock starves every other lane.
 	cmd.WaitDelay = 30 * time.Second
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -365,17 +313,11 @@ func currentCycleGoPkgExists(moduleDir string, cycle int) bool {
 	return err == nil && fi.IsDir()
 }
 
-// goLanePatterns returns the existence-gated, NON-recursive package patterns the
-// Go lane runs every cycle — the three predicate scopes:
-//   - the current cycle's package (`./acs/cycle<N>`) — this cycle's predicates;
-//   - each regression sub-package (`./acs/regression/<sub>`) — the curated
-//     durable set, run every cycle;
-//   - the red-team package (`./acs/redteam`) — standing anti-gaming predicates.
-//
-// Each is a single, non-recursive pattern run as a SEPARATE `go test` so a
-// per-package compile error is caught by the (execErr && zero-events) hard-gate;
-// a recursive `./acs/regression/...` could let one sub-package's compile failure
-// hide behind another's events. Patterns whose dir is absent are skipped.
+// goLanePatterns returns the existence-gated, non-recursive package patterns
+// the Go lane runs each cycle: the current cycle's package, each regression
+// sub-package, and the red-team package. Patterns whose dir is absent are
+// skipped.
+// See ADR-0042.
 func goLanePatterns(moduleDir string, cycle int) []string {
 	var pats []string
 	if dirExists(currentCycleGoPkgDir(moduleDir, cycle)) {
@@ -442,7 +384,7 @@ func runGoTest(opts Options) ([]Result, error) {
 	changed := changedPackagesForCycle(opts.ProjectRoot, opts.Cycle)
 	// opts.Root is the cycle's worktree (resolveACSSuiteRoot → active_worktree);
 	// export it as EVOLVE_WORKTREE_ROOT so source/doc predicates validate the
-	// committed worktree artifact, not main's stale copy (cycle-355 fix).
+	// committed worktree artifact, not main's stale copy.
 	env := predicateEnv(opts.ProjectRoot, opts.Root, changed)
 
 	pol, _ := policy.Load(filepath.Join(opts.ProjectRoot, ".evolve", "policy.json"))
@@ -474,19 +416,15 @@ func runGoTest(opts Options) ([]Result, error) {
 	return all, nil
 }
 
-// retryFlakyReds is the cycle-468 bounded flake absorber: when a scope's first
-// run produced >=1 RED and NO red is the synthetic egps/ parse-error red
-// (any such red marks the whole stream untrustworthy and suppresses the
-// retry entirely — a truncated stream is not retryable evidence), the
-// scope is re-run EXACTLY ONCE. A red that passes on the retry
-// flips to green with the visible Flaky="passed-on-retry" annotation (first-run
-// evidence retained — the flake's signature); a red that stays red keeps its
-// first-run result. Greens/skips and the result set's size are untouched (the
-// retry can only flip existing reds, never add or duplicate results). Rationale:
-// parallel_evaluate=enforce runs the -race predicate suites under concurrent
-// evaluate-phase host load; contention flakes burned 4 verified-good cycles
-// (444/447/466/467). The gate is not weakened: the retry is bounded to one,
-// annotated on the wire, and surfaced as a verdict warning.
+// retryFlakyReds is the bounded flake absorber: when a scope's first run
+// produced >=1 RED and NO red is the synthetic egps/ parse-error red (any
+// such red marks the whole stream untrustworthy and suppresses the retry
+// entirely — a truncated stream is not retryable evidence), the scope is
+// re-run EXACTLY ONCE. A red that passes on the retry flips to green with the
+// visible Flaky="passed-on-retry" annotation (first-run evidence retained —
+// the flake's signature); a red that stays red keeps its first-run result.
+// Greens/skips and the result set's size are untouched (the retry can only
+// flip existing reds, never add or duplicate results).
 func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, string, []string) (string, error), moduleDir, pat string, env []string, results []Result, cycle int) []Result {
 	hasTestRed := false
 	for _, r := range results {
@@ -535,8 +473,7 @@ func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, st
 			results[i].ExitCode = 0
 			results[i].Flaky = "passed-on-retry"
 		case retryRan[results[i].ACID]:
-			// Red stayed red: record it in RetryOutcome (NOT Flaky — its
-			// passed-on-retry meaning is pinned by acs/cycle468) and keep
+			// Red stayed red: record it in RetryOutcome, not Flaky, and keep
 			// the retry's stream too.
 			results[i].RetryOutcome = "red-on-retry"
 			if re := retryEvidence[results[i].ACID]; re != "" {
@@ -777,8 +714,7 @@ func changedPackagesForCycle(projectRoot string, cycle int) []string {
 // excerptHead is the slice of evidenceMax kept from the FRONT of over-limit
 // output: a predicate's own t.Fatalf line — the author's diagnosis with its
 // file:line — prints first. The remainder comes from the TAIL, where go test
-// accumulates `--- FAIL:` detail; pure head-truncation left cycles
-// 1107/1116/1123 with reds whose failing test name survives nowhere on disk.
+// accumulates `--- FAIL:` detail.
 const excerptHead = 200
 
 // excerpt caps s at ~evidenceMax as head+"…"+tail (see excerptHead). Both cut
@@ -827,11 +763,9 @@ var (
 	writeVerdictWriteFile  = os.WriteFile
 )
 
-// VerdictFilename is the canonical acs-verdict artifact name. Exported so the
-// readers and retirement paths in other packages (core, phases, router) can
-// project from ONE spelling instead of re-typing the literal — the audit-report
-// name already has this via phasecontract.ArtifactFilename, and the verdict
-// name had drifted into 7+ copies before this const existed.
+// VerdictFilename is the canonical acs-verdict artifact name, exported so
+// readers and retirement paths in other packages (core, phases, router)
+// project from ONE spelling instead of re-typing the literal.
 const VerdictFilename = "acs-verdict.json"
 
 // WriteVerdict marshals v to <evolveDir>/runs/cycle-<N>/acs-verdict.json

@@ -1,24 +1,11 @@
 package acssuite
 
-// evidence_tail_test.go — the evidence must carry the FAILURE, not the boot
-// noise. Measured across all five red predicates of cycles 1107/1115/1116/1117
-// and again on cycle-1123: evidence_excerpt was head-truncated at evidenceMax,
-// a go-test run's first 600 chars are compiler/WARN noise, so "--- FAIL:" was
-// present in NONE of them and for 1107/1116/1123 the failing test name is
-// permanently unrecoverable — the reason those cycles' false reds could never
-// be confirmed or refuted from disk. The excerpt must be TAIL-anchored (Go
-// test output accumulates assertion detail and the FAIL line at the end), and
-// a red Result must either name the failing inner tests or say why it cannot.
-
 import (
 	"fmt"
 	"strings"
 	"testing"
 )
 
-// TestExcerpt_IsTailAnchored pins the ~10-line core fix: when output exceeds
-// evidenceMax, keep the END. A meta-predicate's t.Logf carries the inner
-// subprocess's full output — noise first, `--- FAIL:` at the tail.
 func TestExcerpt_IsTailAnchored(t *testing.T) {
 	noise := strings.Repeat("[engine] WARN: Deps.TokenResolver is nil — token telemetry disabled\n", 20)
 	failure := "--- FAIL: TestInnerThing (0.01s)\n    thing_test.go:42: the actual assertion"
@@ -36,10 +23,6 @@ func TestExcerpt_IsTailAnchored(t *testing.T) {
 	}
 }
 
-// TestParseGoTestJSON_RedCarriesInnerFailingTestNames pins the structured
-// half: a red predicate whose output embeds inner `--- FAIL:` lines (the
-// meta-predicate shape) surfaces those names in Result.FailingTests, so the
-// verdict names WHAT failed even after truncation.
 func TestParseGoTestJSON_RedCarriesInnerFailingTestNames(t *testing.T) {
 	noise := strings.Repeat("build noise line\\n", 60)
 	stream := `{"Action":"run","Package":"github.com/x/go/acs/cycle9999","Test":"TestC9999_006_suites_stay_green"}
@@ -65,10 +48,6 @@ func TestParseGoTestJSON_RedCarriesInnerFailingTestNames(t *testing.T) {
 	}
 }
 
-// TestParseGoTestJSON_RedWithoutFailLineRecordsWhy (negative / the
-// unextractable case): a red with no `--- FAIL:` anywhere (compile failure,
-// timeout, signal) must say so explicitly rather than emitting a content-free
-// exit code.
 func TestParseGoTestJSON_RedWithoutFailLineRecordsWhy(t *testing.T) {
 	stream := `{"Action":"run","Package":"github.com/x/go/acs/cycle9999","Test":"TestC9999_001_thing"}
 {"Action":"output","Package":"github.com/x/go/acs/cycle9999","Test":"TestC9999_001_thing","Output":"predicates_test.go:9:2: undefined: somesymbol\n"}
@@ -87,9 +66,6 @@ func TestParseGoTestJSON_RedWithoutFailLineRecordsWhy(t *testing.T) {
 	}
 }
 
-// TestExtractFailingTests_DedupesAndBounds keeps the extractor honest on
-// pathological output: duplicates collapse, and the list is bounded so a
-// 10k-failure sweep cannot bloat the verdict JSON.
 func TestExtractFailingTests_DedupesAndBounds(t *testing.T) {
 	var b strings.Builder
 	for i := 0; i < 50; i++ {

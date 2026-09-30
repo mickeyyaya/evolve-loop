@@ -1,11 +1,5 @@
 //go:build integration
 
-// worktree_errors_test.go — fault-injected coverage for shipFromWorktree
-// runner-error branches (gitops.go:153-237) and writeShipBinding early
-// error paths (gitops.go:268,287,291).
-//
-// Each test uses faultRunner to fail exactly one git subcommand against a
-// genuine repo so the code executes all preceding steps via real git.
 package ship
 
 import (
@@ -35,8 +29,6 @@ func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
 		Stderr:        io.Discard,
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
-	// cycle-1067: explicit-path staging (stageExplicitPaths) dropped the `-A`
-	// from the message; the worktree stage-failure branch is unchanged.
 	if err == nil || !strings.Contains(err.Error(), "git add failed") {
 		t.Fatalf("want 'git add failed' error, got %v", err)
 	}
@@ -71,19 +63,17 @@ func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 // --- gitops.go:167-169: rev-list runner error (ahead check) ----------------
 
 func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
-	// Need worktreeCleanNoCommit == true (nothing to commit) but branch ahead.
-	// Use DryRun=false with a clean worktree + branch ahead of main.
+	// Create a worktree with nothing to commit but ahead of main by one commit,
+	// so prepareChanges resolves to worktreeBranchAhead.
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	seedAudit(t, repo, "PASS")
 
-	// Create worktree on a branch that is ahead of main by one commit.
 	wt := tempRepoDir(t)
 	runGit(t, repo, "worktree", "add", "-b", "cycle-ahead", wt)
 	mustWrite(t, filepath.Join(wt, "ahead.txt"), "ahead\n")
 	runGit(t, wt, "add", "ahead.txt")
 	runGit(t, wt, "commit", "-m", "ahead commit")
-	// Nothing else staged — worktreeCleanNoCommit will be true after add -A.
 
 	opts := &Options{
 		Class:         ClassCycle,

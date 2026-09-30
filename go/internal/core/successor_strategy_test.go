@@ -1,11 +1,5 @@
 package core
 
-// successor_strategy_test.go — PA-BIG S2 (ADR-0058): the retro history-branch
-// gate is config-driven. recordAndBranch/resume enter the retro
-// failure-adapter branch when the phase's branching_strategy is "history",
-// degrading to the literal phase-identity default (retro→history) when the
-// catalog is unset or the field is absent — byte-identical to the pre-S2 flow.
-
 import (
 	"context"
 	"testing"
@@ -13,11 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// TestSuccessorStrategy pins the config read + degrade that the retro gate keys
-// on. A wired catalog returns the descriptor's branching_strategy verbatim
-// (proving the spec is consulted, not the phase name); an unset catalog OR a
-// retrospective entry that omits the field degrades to the literal default
-// (retro→history, every other phase→verdict/""), the byte-identity backstop.
 func TestSuccessorStrategy(t *testing.T) {
 	t.Parallel()
 
@@ -38,29 +27,24 @@ func TestSuccessorStrategy(t *testing.T) {
 			want: phasespec.BranchingHistory,
 		},
 		{
-			// The catalog INVERTS retro to verdict-branching; the resolver must
-			// return that (spec consulted), NOT the literal history default.
 			name: "wired-verdict-override",
 			o:    withCat(phasespec.PhaseSpec{Name: "retrospective", BranchingStrategy: phasespec.BranchingVerdict}),
 			p:    PhaseRetro,
 			want: phasespec.BranchingVerdict,
 		},
 		{
-			// Entry present but field omitted → degrade to the literal default.
 			name: "entry-without-field-degrades",
 			o:    withCat(phasespec.PhaseSpec{Name: "retrospective"}),
 			p:    PhaseRetro,
 			want: phasespec.BranchingHistory,
 		},
 		{
-			// No catalog at all → degrade to the literal default.
 			name: "catalogless-retro-degrades",
 			o:    NewOrchestrator(nil, nil, nil),
 			p:    PhaseRetro,
 			want: phasespec.BranchingHistory,
 		},
 		{
-			// A non-retro phase has no history default → verdict-driven ("").
 			name: "catalogless-nonretro-empty",
 			o:    NewOrchestrator(nil, nil, nil),
 			p:    PhaseBuild,
@@ -95,11 +79,6 @@ func retroGateHarness(t *testing.T, cat phasespec.Catalog) *cycleRun {
 	}
 }
 
-// TestRecordAndBranch_RetroGateIsStrategyKeyed proves the gate consults
-// successorStrategy, not the literal `current == PhaseRetro`. With the catalog
-// overriding retro to verdict-branching, recordAndBranch must NOT take the
-// failure-adapter history branch — RetroDecision stays empty, no successor is
-// scheduled. RED on the name-keyed gate (which fires for any retro).
 func TestRecordAndBranch_RetroGateIsStrategyKeyed(t *testing.T) {
 	t.Parallel()
 	cr := retroGateHarness(t, mustCatalog(t,
@@ -119,13 +98,9 @@ func TestRecordAndBranch_RetroGateIsStrategyKeyed(t *testing.T) {
 	}
 }
 
-// TestRecordAndBranch_RetroDegradesToHistoryWhenUnconfigured is the
-// byte-identity backstop: a catalog-less orchestrator keeps the literal retro
-// history branch (the failure-adapter runs, RetroDecision is set). Green before
-// AND after S2 — the safety net for synthetic/bare orchestrators.
 func TestRecordAndBranch_RetroDegradesToHistoryWhenUnconfigured(t *testing.T) {
 	t.Parallel()
-	cr := retroGateHarness(t, phasespec.Catalog{}) // no retrospective entry → degrade
+	cr := retroGateHarness(t, phasespec.Catalog{})
 
 	dr := dispatchResult{resp: PhaseResponse{Verdict: VerdictFAIL}, attemptCount: 1}
 	if _, err := cr.recordAndBranch(PhaseRetro, dr); err != nil {
@@ -138,11 +113,9 @@ func TestRecordAndBranch_RetroDegradesToHistoryWhenUnconfigured(t *testing.T) {
 	}
 }
 
-// resumeFromRetro builds a fake-backed orchestrator (optionally with a catalog)
-// and resumes a cycle starting at retro, exercising resume.go's history-branch
-// gate — the lockstep twin of recordAndBranch. ADR-0058 requires the retro
-// branch to be byte-identity-covered on the resume path too, not just the live
-// loop.
+// resumeFromRetro builds a fake-backed orchestrator (optionally with a
+// catalog) and resumes a cycle starting at retro, exercising resume.go's
+// history-branch gate — the lockstep twin of recordAndBranch.
 func resumeFromRetro(t *testing.T, opts ...Option) (CycleResult, error) {
 	t.Helper()
 	st := &fakeStorage{
@@ -154,13 +127,9 @@ func resumeFromRetro(t *testing.T, opts ...Option) (CycleResult, error) {
 		&ResumePoint{Phase: string(PhaseRetro), CycleID: 5})
 }
 
-// TestResume_RetroDegradesToHistoryWhenUnconfigured is the resume-path backstop:
-// a catalog-less resume from retro keeps the literal history branch (retro PASS
-// recovers to ship via the failure-adapter, RetroDecision set), completing
-// cleanly. Green before AND after S2.
 func TestResume_RetroDegradesToHistoryWhenUnconfigured(t *testing.T) {
 	t.Parallel()
-	res, err := resumeFromRetro(t) // no catalog → degrade to literal retro→history
+	res, err := resumeFromRetro(t)
 	if err != nil {
 		t.Fatalf("RunCycleFromPhase: %v", err)
 	}
@@ -169,12 +138,9 @@ func TestResume_RetroDegradesToHistoryWhenUnconfigured(t *testing.T) {
 	}
 }
 
-// TestResume_RetroGateIsStrategyKeyed proves resume.go's gate is config-driven,
-// not name-keyed: with the catalog overriding retro to verdict-branching, resume
-// must NOT take the failure-adapter history branch (RetroDecision empty). RED on
-// the literal `current == PhaseRetro` gate. The cycle may stop with a downstream
-// transition error after skipping the branch — expected; the contract under
-// test is only that the history branch did not fire.
+// TestResume_RetroGateIsStrategyKeyed tolerates a downstream transition error
+// after the history branch is skipped; the contract under test is only that
+// the branch did not fire.
 func TestResume_RetroGateIsStrategyKeyed(t *testing.T) {
 	t.Parallel()
 	res, _ := resumeFromRetro(t, WithCatalog(mustCatalog(t,

@@ -1,14 +1,3 @@
-// verify_unit_test.go — seam-injected unit tests for the ship-class
-// verification paths the integration matrix skips:
-//
-//   - checkEGPSGate     (audit.go) — the trust-kernel RED gate
-//   - verifyTrivial     (verify.go) — --class trivial audit-bypass guard
-//   - verifyManualConfirm (verify.go) — --class manual auto-confirm path
-//
-// These pin EXISTING safety-critical contracts. The most load-bearing is
-// the EGPS gate's "red_count != 0 ⇒ refuse ship" branch (the v10.0.0
-// trust-kernel invariant): a silent regression there would let a build
-// with RED predicates ship. See docs/architecture/egps-v10.md.
 package ship
 
 import (
@@ -25,7 +14,6 @@ import (
 
 // --- checkEGPSGate -------------------------------------------------------
 
-// Missing evidence cannot authorize a new ship, including a historical cycle.
 func TestCheckEGPSGate_MissingFile(t *testing.T) {
 	res := &RunResult{}
 	if _, err := checkEGPSGate(filepath.Join(t.TempDir(), "acs-verdict.json"), res); err == nil {
@@ -36,8 +24,6 @@ func TestCheckEGPSGate_MissingFile(t *testing.T) {
 	}
 }
 
-// TestCheckEGPSGate_RedCountZero is the clean-ship path: red_count==0
-// returns nil and appends a confirmation log line.
 func TestCheckEGPSGate_RedCountZero(t *testing.T) {
 	path := writeACSVerdict(t, predicateVerdictFixture(1, 12, 0, 0))
 	res := &RunResult{}
@@ -49,10 +35,6 @@ func TestCheckEGPSGate_RedCountZero(t *testing.T) {
 	}
 }
 
-// TestCheckEGPSGate_RedCountNonZero is THE trust-kernel invariant: any
-// RED predicate must produce an IntegrityError that blocks the ship and
-// names the offending predicate IDs. This is the highest-value assertion
-// in this file.
 func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
 	v := predicateVerdictFixture(1, 5, 2, 0)
 	v.RedIDs = []string{"pred-auth-leak", "pred-null-deref"}
@@ -64,13 +46,11 @@ func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
 		t.Fatal("red_count>0 MUST block the ship — got nil error (trust-kernel breach)")
 	}
 	se := wantShipErr(t, err, core.CodeEGPSRedCount, core.ShipClassPrecondition, "")
-	// The refusal must name the RED predicate IDs so the operator can act.
 	if !strings.Contains(se.Message, "pred-auth-leak") || !strings.Contains(se.Message, "pred-null-deref") {
 		t.Errorf("EGPS refusal must name RED predicate IDs; got %q", se.Message)
 	}
 }
 
-// Corrupted predicate evidence must fail independently of the narrative report.
 func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "acs-verdict.json")
@@ -83,17 +63,15 @@ func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 	}
 }
 
-// TestCheckEGPSGate_ReadError covers the non-ErrNotExist read failure
-// branch by pointing the gate at a directory (os.ReadFile of a dir errors
-// but is not os.ErrNotExist), which must surface as a wrapped error.
+// TestCheckEGPSGate_ReadError points the gate at a directory: os.ReadFile of a
+// dir errors but is not os.ErrNotExist, exercising the non-ErrNotExist branch.
 func TestCheckEGPSGate_ReadError(t *testing.T) {
-	dir := t.TempDir() // a directory, not a file
+	dir := t.TempDir()
 	res := &RunResult{}
 	_, err := checkEGPSGate(dir, res)
 	if err == nil {
 		t.Fatal("reading a directory as acs-verdict.json must error")
 	}
-	// Not an integrity error — it's a runtime read failure.
 	var ie *IntegrityError
 	if errors.As(err, &ie) {
 		t.Errorf("read failure should be a plain error, not IntegrityError; got %v", err)
@@ -102,20 +80,16 @@ func TestCheckEGPSGate_ReadError(t *testing.T) {
 
 // --- verifyTrivial -------------------------------------------------------
 
-// TestVerifyTrivial_RejectsNonTrivialEstimate: --class trivial is only
-// legal when cycle-state.json:cycle_size_estimate == "trivial".
 func TestVerifyTrivial_RejectsNonTrivialEstimate(t *testing.T) {
 	root := t.TempDir()
-	writeCycleState(t, root, "small") // not "trivial"
+	writeCycleState(t, root, "small")
 	opts := &Options{ProjectRoot: root, Runner: (&scriptedRunner{}).runner()}
 	err := verifyTrivial(context.Background(), opts, &RunResult{})
 	wantShipErr(t, err, core.CodeTrivialNotTrivial, core.ShipClassConfig, "trivial")
 }
 
-// TestVerifyTrivial_RejectsPipelineCriticalPath: even a trivial-sized
-// cycle cannot bypass audit if it touches a Tier-1 path (skills/, agents/,
-// kernel scripts, profiles, plugin manifest). Driven via the untracked
-// file list to avoid the scriptedRunner "git diff" key collision.
+// TestVerifyTrivial_RejectsPipelineCriticalPath drives the critical path via
+// the untracked file list, to avoid the scriptedRunner "git diff" key collision.
 func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
@@ -127,8 +101,6 @@ func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
 	wantShipErr(t, err, core.CodeTrivialCriticalPaths, core.ShipClassConfig, "skills/loop/SKILL.md")
 }
 
-// TestVerifyTrivial_AcceptsCleanTrivialCycle: trivial estimate + no
-// critical paths ⇒ pass with the skip-audit provenance recorded.
 func TestVerifyTrivial_AcceptsCleanTrivialCycle(t *testing.T) {
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
@@ -149,8 +121,6 @@ func TestVerifyTrivial_AcceptsCleanTrivialCycle(t *testing.T) {
 
 // --- verifyManualConfirm -------------------------------------------------
 
-// TestVerifyManualConfirm_NothingStaged: when `git diff --cached --quiet`
-// reports no staged changes (exit 0), ship exits cleanly via errEmptyDiff.
 func TestVerifyManualConfirm_NothingStaged(t *testing.T) {
 	r := &scriptedRunner{}
 	r.runner()
@@ -163,8 +133,6 @@ func TestVerifyManualConfirm_NothingStaged(t *testing.T) {
 	}
 }
 
-// TestVerifyManualConfirm_AutoConfirm: EVOLVE_SHIP_AUTO_CONFIRM=1 bypasses
-// the interactive prompt (CI mode) when there ARE staged changes.
 func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
 	r := &scriptedRunner{}
 	r.runner()
@@ -213,8 +181,7 @@ func writeCycleState(t *testing.T, root, estimate string) {
 	}
 }
 
-// scriptResult builds the anonymous-struct value scriptedRunner.scripts
-// expects, keeping the call sites in this file readable.
+// scriptResult builds the anonymous-struct value scriptedRunner.scripts expects.
 func scriptResult(t *testing.T, stdout string, exit int) struct {
 	stdout string
 	stderr string
