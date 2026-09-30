@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "`evolve pr merge 12` with a fake gh that reports every check green merges and prints the SHA (red: unknown command)",
+    "A live run lease, a pending or failed required check, or a behind branch without --update-branch exits 1 and merges nothing further",
+    "--update-branch --wait merges only after the updated head's checks go green"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/runlease",
+    "go/internal/ciwatch"
+  ],
+  "fix": "Add `evolve pr merge <n>... [--update-branch] [--wait D]`. It refuses while any run lease on the plane is live (exit 1). For each PR in order, every required check must be SUCCESS on the PR's current head; a pending or red check refuses that PR with exit 1, naming the check. With --update-branch it updates a behind branch, and with --wait it polls the new head's checks through ciwatch's gh fetcher. It then merges with the merge method from policy config and prints the merge SHA. It stops at the first refusal. Exit 2 on gh I/O, 10 usage. Update runtime-reference.md's boundary step 2.",
+  "id": "cli-pr-merge",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "runtime-reference.md:175 (boundary step 2) merges console PRs with `gh pr update-branch`, a wait for green CI on that combination, then `gh pr merge`, and only while no loop runs. Each check is manual: the operator JSON-parses `gh pr checks` for each PR, waits, and relies on memory that the loop is stopped. Merging mid-wave and merging with a red required check have both happened. No evolve verb touches PRs.",
+  "title": "Merging reviewed PRs at a boundary is gh checks, update-branch and merge by hand, with no loop-stopped check; add `evolve pr merge`",
+  "weight": 0.8
+}

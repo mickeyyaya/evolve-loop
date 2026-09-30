@@ -14,8 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/versionbump"
 )
 
-// runPreflightLib invokes the releasepreflight library directly (no shell-out
-// to legacy/scripts/release/preflight.sh).
 func runPreflightLib(repoRoot, target string, dryRun, skipTests, strictPass bool) error {
 	_, err := releasepreflight.Run(releasepreflight.Options{
 		Target:     target,
@@ -28,7 +26,6 @@ func runPreflightLib(repoRoot, target string, dryRun, skipTests, strictPass bool
 	return err
 }
 
-// runChangelogGenLib invokes the changeloggen library directly.
 func runChangelogGenLib(repoRoot, fromRef, toRef, target string, dryRun bool) error {
 	if !changeloggen.IsSemver(target) {
 		return fmt.Errorf("target version not semver: %s", target)
@@ -60,15 +57,12 @@ func runChangelogGenLib(repoRoot, fromRef, toRef, target string, dryRun bool) er
 	return err
 }
 
-// runVersionBumpLib invokes the versionbump library directly.
 func runVersionBumpLib(repoRoot, target string, dryRun bool) error {
 	paths := versionbump.DefaultPaths(repoRoot)
 	_, err := versionbump.Run(paths, target, dryRun, time.Now())
 	return err
 }
 
-// runMarketplacePollLib invokes the marketplacepoll library with the provided
-// marketplace directory.
 func runMarketplacePollLib(repoRoot, target string, maxWait time.Duration, marketplaceDir string) error {
 	_, err := marketplacepoll.Run(marketplacepoll.Options{
 		Target:         target,
@@ -81,7 +75,6 @@ func runMarketplacePollLib(repoRoot, target string, maxWait time.Duration, marke
 	return err
 }
 
-// runReleaseConsistencyLib invokes the releaseconsistency library directly.
 func runReleaseConsistencyLib(repoRoot, target string) error {
 	_, err := releaseconsistency.Run(releaseconsistency.Options{
 		ProjectRoot: repoRoot,
@@ -91,7 +84,6 @@ func runReleaseConsistencyLib(repoRoot, target string) error {
 	return err
 }
 
-// runRollbackLib invokes the rollback library directly.
 func runRollbackLib(repoRoot, journalPath, reason string) error {
 	_, err := rollback.Run(rollback.Options{
 		JournalPath: journalPath,

@@ -6,14 +6,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
-// Test 13 (moved from audit/ciparity_unit_test.go TestOffenderLines) — real
-// markers are kept, no marker falls back to the last 6 non-empty lines, the
-// cap is the last 12.
 func TestOffenderLines_MarkersFallbackAndCap(t *testing.T) {
 	if got := offenderLines("noise\nbad.go:1: import cycle not allowed\nmore\n--- FAIL: X"); len(got) != 2 {
 		t.Errorf("marker extraction: %v, want 2", got)
@@ -38,19 +36,20 @@ func TestOffenderLines_MarkersFallbackAndCap(t *testing.T) {
 	}
 }
 
-// Moved verbatim (audit/ciparity_unit_test.go:103-123) — the cycle-930/931/932
-// false-FAIL diagnostic corruption: only line-anchored failure markers survive.
 func TestOffenderLines_DropsPassingTestChatter(t *testing.T) {
-	out := strings.Join([]string{
-		"[orchestrator] WARN phase scout attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)", // chatter: mid-line "error"
-		"    --check               warn if changes introduce conflict markers or whitespace errors",                    // git usage dump chatter
-		"    highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff",                           // git usage dump chatter
-		"audit verdict=FAIL: something quoted by a passing test",                                                       // chatter: mid-line "FAIL"
-		"--- FAIL: TestRealThing (0.03s)",                                 // real: test failure header
-		"panic: runtime error: index out of range",                        // real: panic
-		"FAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/core\t55.2s", // real: package summary
-		"apicover -enforce measurement error: go.mod not found above /x",  // real: apicover infra line (go-review LOW)
-	}, "\n")
+	chatter := []string{
+		"[orchestrator] WARN phase scout attempt 1/2 hit a transient bridge error or timeout; relaunching (self-heal)",
+		"    --check               warn if changes introduce conflict markers or whitespace errors",
+		"    highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff",
+		"audit verdict=FAIL: something quoted by a passing test",
+	}
+	realFailureMarkers := []string{
+		"--- FAIL: TestRealThing (0.03s)",
+		"panic: runtime error: index out of range",
+		"FAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/core\t55.2s",
+		"apicover -enforce measurement error: go.mod not found above /x",
+	}
+	out := strings.Join(slices.Concat(chatter, realFailureMarkers), "\n")
 	got := offenderLines(out)
 	if len(got) != 4 {
 		t.Fatalf("got %d offender lines %v, want exactly the 4 real failure markers", len(got), got)
@@ -62,11 +61,6 @@ func TestOffenderLines_DropsPassingTestChatter(t *testing.T) {
 	}
 }
 
-// Test 14 (moved from audit/ciparity_unit_test.go:49-81) — the exit-code
-// mapping: exit 0 → clean, no event; exit 1 + output → offenders + ONE
-// GATE_FAILED{cause=exit}; exit 2 no output → the synthesized golden line; a
-// start error → the golden could-not-run text + ONE GATE_STEP_FAILED{step=exec};
-// no go module → (nil, nil) and the runner is never called.
 func TestRunGate_ExitCodeMappingAndNoModule(t *testing.T) {
 	g1 := golden(t, "messages.golden.txt")
 	root, _ := goWorktree(t)
@@ -122,13 +116,6 @@ func TestRunGate_ExitCodeMappingAndNoModule(t *testing.T) {
 	}
 }
 
-// Test 16 — every subprocess vector the five gates fork equals the golden
-// captured on 8e8f080f, line for line. Absorbs the three moved scope tests
-// (audit/ciparity_scope_test.go): the scoped tier runs ONLY the touched
-// package with -race -count=1 -p 4 -parallel 4 -tags integration and never
-// shells out to `go list`; a module-root change falls back to `go list ./...`
-// and tests every non-acs package; apicover's three forks carry the scoped
-// cover profile.
 func TestWholeRepoGates_ArgVectorsMatchTheGolden(t *testing.T) {
 	g2 := golden(t, "argv.golden.txt")
 	recorder := func(root string, seen *[]string, list string) func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
@@ -175,7 +162,6 @@ func TestWholeRepoGates_ArgVectorsMatchTheGolden(t *testing.T) {
 			t.Errorf("%s argv drifted:\n got %q\nwant %q", tc.gate, seen, want)
 		}
 	}
-	// apicover: the three forks, then the in-process measurement.
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

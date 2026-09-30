@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`evolve ci classify <run-id>` with a fake fetcher prints each failing test with its evidence and label (red: unknown command)",
+    "A failing test in a package the diff touches is 'real'; one also red on the base is 'pre-existing'; one green on --rerun and untouched by the diff is 'flake-evidence'",
+    "The label rules are one table with a test per row"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/ciwatch"
+  ],
+  "fix": "Add `evolve ci classify <run-id|pr|sha> [--json] [--rerun]`. It fetches the failed jobs and failing test names through ciwatch's fetcher and records deterministic evidence per failing test: whether the change's diff touches its package, whether it is red on the base commit's latest run, whether it recurred in recent main runs, and (with --rerun) whether a rerun of the failed jobs passes. A fixed rule table maps that evidence to one label per test: real, pre-existing, flake-evidence or unknown. Exit 0 when every red is labelled pre-existing or flake-evidence, 1 when any is real or unknown, 2 on gh I/O. Document it in runtime-reference.md and cite it from CLAUDE.md's CI section.",
+  "id": "cli-ci-classify",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "CLAUDE.md:47 forbids retrying an unclassified CI red. The loop only detects red: wave sync reads main's check-runs and halts on red (cmd_loop_wavesync.go:36-98) without saying which tests failed or why. ciwatch's gh fetcher can pull a failed run's log summary (internal/ciwatch/ghfetcher.go:61) but has no production caller. The operator reads the logs with gh and decides by hand whether each failing test is touched by the change, red on main too, or green on a rerun.",
+  "title": "Classifying a CI red as flake or real before a retry means reading `gh run view --log-failed`; add `evolve ci classify`",
+  "weight": 0.75
+}

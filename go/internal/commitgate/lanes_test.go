@@ -1,14 +1,5 @@
 package commitgate
 
-// lanes_test.go — RED contract for cycle-549's cli-command-layer-test-coverage
-// task (triage-report.md top_n item, fleet_scope
-// cli-command-layer-test-coverage-worktree-swarm's "commitgate (incl. non-Go
-// lane fixtures/removal)" clause). lanePython, isPyTest, laneNode, and
-// laneRust — the non-Go commit-gate lanes — had ZERO direct test coverage
-// (0.0% per `go tool cover -func`) even though laneGo (their sibling) is
-// already well covered in commitgate_test.go, whose baseOpts/scriptRunner
-// fixture harness this file reuses verbatim.
-
 import (
 	"context"
 	"path/filepath"
@@ -27,7 +18,7 @@ func TestIsPyTest(t *testing.T) {
 		{"nested/dir/baz_test.py", true},
 		{"foo.py", false},
 		{"test_foo.txt", false},
-		{"testfoo.py", false}, // no separator after "test"
+		{"testfoo.py", false},
 		{"foo.py.bak", false},
 	}
 	for _, tc := range cases {
@@ -111,7 +102,7 @@ func TestLanePython_RuffMissing_ExitToolMissing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "a.py"), "x=1\n")
-	o := baseOpts(root) // no tools present
+	o := baseOpts(root)
 	o.NoInstall = true
 	res := &Result{}
 
@@ -190,7 +181,7 @@ func TestLaneNode_EslintAbsentNpxPresent_UsesNpx(t *testing.T) {
 
 func TestLaneNode_NeitherToolPresent_ExitToolMissing(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir()) // neither eslint nor npx
+	o := baseOpts(t.TempDir())
 	res := &Result{}
 
 	if code := o.laneNode(context.Background(), []string{"a.js"}, res); code != ExitToolMissing {
@@ -252,7 +243,7 @@ func TestLaneRust_CargoMissing_ExitToolMissing(t *testing.T) {
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, "Cargo.toml"), "[package]\n")
 	mustWrite(t, filepath.Join(root, "src", "main.rs"), "fn main() {}\n")
-	o := baseOpts(root) // cargo absent
+	o := baseOpts(root)
 	o.NoInstall = true
 	res := &Result{}
 
@@ -282,11 +273,6 @@ func TestLaneRust_ClippyFails_ExitFail(t *testing.T) {
 	}
 }
 
-// TestLaneRust_NoCargoTomlAbove_NoCrateFound: a changed .rs file with no
-// Cargo.toml anywhere above it contributes no crate — the lane must not crash
-// or invoke cargo, and must still pass (mirrors laneGo's "no go.mod" being a
-// hard failure being the ONE asymmetry worth pinning: laneRust silently
-// skips an un-rooted file rather than failing the whole gate).
 func TestLaneRust_NoCargoTomlAbove_NoCrateFound(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

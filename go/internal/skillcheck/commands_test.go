@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// writeSkillFixture creates skills/<name>/SKILL.md with the given frontmatter so
-// the command projection has a single source to mirror.
 func writeSkillFixture(t *testing.T, root, name, desc, argHint string) {
 	t.Helper()
 	dir := filepath.Join(root, "skills", name)
@@ -25,15 +23,6 @@ func writeSkillFixture(t *testing.T, root, name, desc, argHint string) {
 	}
 }
 
-// TestCommandFileName pins the slash-command filename contract: a skill projects
-// to a BARE commands/<name>.md so Claude Code's native plugin-command namespacing
-// surfaces it as /evo:<name> (the plugin name supplies the /evo: prefix). A file
-// named evo-<name>.md would instead surface as /evo:evo-<name> (double-prefixed),
-// and the built-in /loop, /tdd, /refactor no longer collide because /evo:loop is
-// already namespaced. This matches .evolve/naming.json canonical.commandPrefix
-// "/evo:" and Anthropic's own plugins (ecc/aside.md → /ecc:aside). Both projection
-// surfaces (Claude Code and the agy cross-CLI publisher) derive filenames here, so
-// the convention must not drift.
 func TestCommandFileName(t *testing.T) {
 	for _, tc := range []struct {
 		skill, want string
@@ -52,10 +41,6 @@ func TestCommandFileName(t *testing.T) {
 	}
 }
 
-// TestCommandDiffs_ProjectsStubPerSkill is the RED proof: every skill must
-// project a commands/<name>.md stub carrying the skill's description and
-// argument-hint (for the `/` menu), a delegation to evo:<name>, the $ARGUMENTS
-// passthrough, and the GENERATED marker — and report drift when absent on disk.
 func TestCommandDiffs_ProjectsStubPerSkill(t *testing.T) {
 	root := t.TempDir()
 	writeSkillFixture(t, root, "foo", "Do foo work", "[target]")

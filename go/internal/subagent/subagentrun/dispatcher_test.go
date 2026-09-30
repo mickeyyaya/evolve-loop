@@ -13,13 +13,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// fixedNow is the fixture clock every run reads (four reads: exec start, exec
-// end, verify, ledger ts).
 var fixedNow = time.Date(2026, 5, 23, 17, 0, 0, 0, time.UTC)
 
 func clock() time.Time { return fixedNow }
 
-// aaRand fills the token bytes with 0xaa → "aaaaaaaaaaaaaaaa".
 func aaRand(b []byte) (int, error) {
 	for i := range b {
 		b[i] = 0xaa
@@ -31,7 +28,6 @@ const aaToken = "aaaaaaaaaaaaaaaa"
 
 var errDepth = errors.New("subagent/run: recursion depth cap exceeded — too many nested bridge dispatches (likely a fan-out loop); inspect EVOLVE_DISPATCH_DEPTH")
 
-// recorder collects every event a Center delivered, in order.
 type recorder struct{ events []signalcenter.Event }
 
 func recording() (*signalcenter.Center, *recorder) {
@@ -49,7 +45,6 @@ func (r *recorder) codes() []signalcenter.Code {
 	return out
 }
 
-// only asserts the recorder holds exactly one event of code and returns it.
 func (r *recorder) only(t *testing.T, code signalcenter.Code) signalcenter.Event {
 	t.Helper()
 	if len(r.events) != 1 || r.events[0].Code != code {
@@ -58,7 +53,6 @@ func (r *recorder) only(t *testing.T, code signalcenter.Code) signalcenter.Event
 	return r.events[0]
 }
 
-// fixture is the on-disk layout every run shares.
 type fixture struct{ root, ws, worktree string }
 
 func newFixture(t *testing.T) fixture {
@@ -77,8 +71,6 @@ func (f fixture) request() Request {
 	return Request{Agent: "scout", Cycle: 5, WorkspacePath: f.ws, ProfilesDir: "/p", AdaptersDir: "/a", ProjectRoot: f.root, WorktreePath: f.worktree, Prompt: strings.NewReader("hi\n")}
 }
 
-// writeArtifact materialises a sound artifact: the token in the first line,
-// mtime = at.
 func writeArtifact(t *testing.T, path, token string, at time.Time) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -92,7 +84,6 @@ func writeArtifact(t *testing.T, path, token string, at time.Time) {
 	}
 }
 
-// soundAdapter writes a sound artifact and exits 0.
 func soundAdapter(t *testing.T) Adapter {
 	return AdapterFunc(func(_ context.Context, e AdapterEnv) (int, error) {
 		writeArtifact(t, e.ArtifactPath, e.ChallengeToken, fixedNow)
@@ -100,10 +91,8 @@ func soundAdapter(t *testing.T) Adapter {
 	})
 }
 
-// scoutProfile is the profile every happy run reads.
 var scoutProfile = Profile{CLI: "claude", OutputArtifact: ".evolve/runs/cycle-{cycle}/scout.md", Overrides: func(string) (string, string) { return "", "" }}
 
-// happyDeps is a Deps whose every port succeeds.
 func happyDeps(t *testing.T) Deps {
 	t.Helper()
 	return Deps{
@@ -122,8 +111,6 @@ func happyDeps(t *testing.T) Deps {
 	}
 }
 
-// observed builds a dispatcher over deps with the fixture clock and entropy,
-// reporting into a recording Center.
 func observed(t *testing.T, deps Deps, opts ...Option) (*Dispatcher, *recorder) {
 	t.Helper()
 	c, r := recording()
@@ -131,7 +118,6 @@ func observed(t *testing.T, deps Deps, opts ...Option) (*Dispatcher, *recorder) 
 	return New(deps, all...), r
 }
 
-// Test 18 — construction: the production defaults and every option observed.
 func TestNew_DefaultsAndOptions(t *testing.T) {
 	d := New(happyDeps(t))
 	if d.SignalsWired() {
@@ -174,16 +160,12 @@ func TestNew_DefaultsAndOptions(t *testing.T) {
 	}
 }
 
-// stagerFunc adapts a function to the PromptStager port (test double).
 type stagerFunc func(prompt string) (string, func(), error)
 
 func (f stagerFunc) Stage(prompt string) (string, func(), error) { return f(prompt) }
 
 var _ PromptStager = stagerFunc(nil)
 
-// Test 19 — the eleven codes are registered under the bridge module with the
-// BRIDGE_SUBAGENT_ sub-prefix, documented, disjoint from the engine's six, and
-// the one producer stamps kind, severity, origin, phase and the step.
 func TestCodes_RegisteredUnderModuleBridgeWithTheSubagentPrefix(t *testing.T) {
 	engine := map[signalcenter.Code]bool{"BRIDGE_TOKEN_RESOLVER_MISSING": true, "BRIDGE_TOKEN_RESOLVER_FAILED": true, "BRIDGE_TOKEN_USAGE_WARNING": true, "BRIDGE_CONTEXT_FILL_HIGH": true, "BRIDGE_TELEMETRY_APPEND_FAILED": true, "BRIDGE_TELEMETRY_TRIPWIRE": true}
 	all := []signalcenter.Code{CodeRequestRejected, CodeResolutionFailed, CodeLLMResolveFallback, CodeWorktreeFallback, CodeGitStateUnknown, CodePrepareFailed, CodeAdapterExecFailed, CodeArtifactIntegrityFail, CodeVerdictFail, CodeArtifactHashFailed, CodeLedgerWriteFailed}
@@ -216,8 +198,6 @@ func TestCodes_RegisteredUnderModuleBridgeWithTheSubagentPrefix(t *testing.T) {
 	}
 }
 
-// The request shapes are constructed positionally so a new field breaks this
-// test at compile time and the host's ONE projection is revisited.
 func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 	r := Request{"a", 1, "ws", "p", "a", "c", "root", "wt", "l", strings.NewReader(""), "hint", "ovr", true, true, false, 2, "tok"}
 	o := Outcome{"PASS", "claude", "sonnet", "/a", "sha", "tok", 0, 1, []string{"w"}, nil, ""}
@@ -227,16 +207,10 @@ func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 	}
 }
 
-// sequencer logs the order of the ports and the stdlib collaborators one run
-// touches.
 type sequencer struct{ log []string }
 
 func (s *sequencer) mark(step string) { s.log = append(s.log, step) }
 
-// Test 49 — the step order is admit → resolve (run id, profile, cli, driver,
-// tier, capability) → prepare (artifact dir, token, git, prompt) → stage →
-// exec → verify → hash → ledger, the stager cleanup after the exec, and the
-// exec error returned last.
 func TestDispatch_StepOrderIsAdmitResolvePrepareStageExecVerifyRecord(t *testing.T) {
 	f := newFixture(t)
 	seq := &sequencer{}
@@ -290,20 +264,17 @@ type readerFunc func([]byte) (int, error)
 
 func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
 
-// Test 50 — no Center and no options: a full run through fakes with the
-// production stager and opener, the Null Object at every producer, an
-// Outcome identical to the observed run's.
 func TestDispatch_NoCenterIsTheNullObjectAndDefaultsAreTheProductionOnes(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
-	deps.GitState = func(context.Context, string) (string, string, error) { return "", "", errors.New("no git") } // a provoked WARN into nothing
+	deps.GitState = func(context.Context, string) (string, string, error) { return "", "", errors.New("no git") }
 	deps.Adapter = AdapterFunc(func(_ context.Context, e AdapterEnv) (int, error) {
 		writeArtifact(t, e.ArtifactPath, e.ChallengeToken, time.Now())
 		return 3, nil
 	})
 	bare := New(deps, WithRand(aaRand))
 	req := f.request()
-	req.WorktreePath = "" // the fallback WARN into nothing
+	req.WorktreePath = ""
 	req.LedgerPath = filepath.Join(f.root, "ledger.jsonl")
 	if bare.SignalsWired() {
 		t.Fatal("not wired")

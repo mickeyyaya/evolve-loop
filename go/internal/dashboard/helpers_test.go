@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// writeNDJSON writes one JSON object per line, the shape every *.ndjson
-// artifact in a cycle workspace uses.
 func writeNDJSON(t *testing.T, path string, lines ...string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -20,10 +18,8 @@ func writeNDJSON(t *testing.T, path string, lines ...string) {
 	}
 }
 
-// itoa keeps fixture JSON readable.
 func itoa(i int) string { return strconv.Itoa(i) }
 
-// writeFile is the plain fixture writer for markdown/json artifacts.
 func writeFile(t *testing.T, path, body string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

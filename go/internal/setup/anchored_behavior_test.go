@@ -30,7 +30,7 @@ func TestApply_FloorBreachingPinRefused(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "scout.json"), `{"cli":"claude-tmux","model_tier_default":"balanced","allowed_clis":["claude"]}`)
 	rep := mkReport([]CLIStatus{famBlocked("claude"), famReady("codex", codexTM)},
-		ph("scout", "claude-tmux", "balanced", "", "", "", []string{"all"}, ""))
+		profilePhase("scout", "claude-tmux", "balanced", "", "", "", []string{"all"}, ""))
 	out, err := Apply(rep, builtinPresets, "recommended", nil, profiles.NewFromDir(dir))
 	if err == nil || out != nil || !strings.Contains(err.Error(), "breaches floor") {
 		t.Fatalf("got out=%s err=%v", out, err)
@@ -41,7 +41,7 @@ func TestApply_EmptiedPinsBlockIsRemoved(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "scout.json"), `{"cli":"claude-tmux","model_tier_default":"balanced"}`)
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("scout", "claude-tmux", "balanced", "", "", "", nil, ""))
+		profilePhase("scout", "claude-tmux", "balanced", "", "", "", nil, ""))
 	out, err := Apply(rep, builtinPresets, "recommended", []byte(`{"version":1,"pins":{"scout":{"cli":"codex","model":"deep"}}}`), profiles.NewFromDir(dir))
 	if err != nil {
 		t.Fatal(err)
@@ -80,8 +80,8 @@ func TestRecommend_UnsetDefaultIsFirstPreset(t *testing.T) {
 
 func TestRecommend_BuilderOffDefaultFamilyIsFallback(t *testing.T) {
 	rep := mkReport([]CLIStatus{famBlocked("claude"), famReady("codex", codexTM)},
-		ph("builder", "claude-tmux", "balanced", "", "", "", []string{"all"}, "auditor"),
-		ph("auditor", "codex-tmux", "deep", "", "", "", []string{"all"}, "builder"))
+		profilePhase("builder", "claude-tmux", "balanced", "", "", "", []string{"all"}, "auditor"),
+		profilePhase("auditor", "codex-tmux", "deep", "", "", "", []string{"all"}, "builder"))
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "builder")
 	if a.CLI != "codex" || !a.CLIFallback {
 		t.Fatalf("builder = %+v", a)
@@ -90,8 +90,8 @@ func TestRecommend_BuilderOffDefaultFamilyIsFallback(t *testing.T) {
 
 func TestRecommend_AuditorSplitOffBuilderFamilyIsFallback(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM), famReady("codex", codexTM)},
-		ph("builder", "claude-tmux", "balanced", "", "", "", []string{"all"}, "auditor"),
-		ph("auditor", "claude-tmux", "deep", "", "", "", []string{"all"}, "builder"))
+		profilePhase("builder", "claude-tmux", "balanced", "", "", "", []string{"all"}, "auditor"),
+		profilePhase("auditor", "claude-tmux", "deep", "", "", "", []string{"all"}, "builder"))
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "auditor")
 	if a.CLI != "codex" || !a.CLIFallback {
 		t.Fatalf("auditor = %+v", a)
@@ -100,7 +100,7 @@ func TestRecommend_AuditorSplitOffBuilderFamilyIsFallback(t *testing.T) {
 
 func TestRecommend_UnpairedAuditorUsesItsDefault(t *testing.T) {
 	rep := mkReport([]CLIStatus{famReady("claude", claudeTM)},
-		ph("auditor", "claude-tmux", "deep", "", "", "", nil, ""))
+		profilePhase("auditor", "claude-tmux", "deep", "", "", "", nil, ""))
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "auditor")
 	if a.CLI != "claude" {
 		t.Fatalf("auditor = %+v", a)
@@ -109,7 +109,7 @@ func TestRecommend_UnpairedAuditorUsesItsDefault(t *testing.T) {
 
 func TestRecommend_DegradedRationaleIsTheWarning(t *testing.T) {
 	rep := mkReport([]CLIStatus{famBlocked("claude")},
-		ph("scout", "claude-tmux", "balanced", "", "", "", nil, ""))
+		profilePhase("scout", "claude-tmux", "balanced", "", "", "", nil, ""))
 	a := asg(t, presetByName(t, Recommend(rep, builtinPresets), "recommended"), "scout")
 	if a.Warning == "" || a.Rationale != a.Warning {
 		t.Fatalf("scout = %+v", a)

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "One declaration of the CLI fallback chain, used by both (red first: two)"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/phases/retro/retro.go",
+    "go/internal/llmroute"
+  ],
+  "fix": "Keep one resolver (llmroute's) and have retro call it.",
+  "id": "one-cli-resolver-for-phases",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "Round 12's self-explanation pass named retro's CLI resolution resolveCLI(envCLI, profileCLI); llmroute.go ~119-125 repeats the same EVOLVE_CLI then profile.cli then claude-tmux chain (architecture review of round 12).",
+  "title": "retro.resolveCLI and llmroute hold the same env, profile, claude-tmux fallback chain; one should delegate to the other",
+  "weight": 0.25
+}

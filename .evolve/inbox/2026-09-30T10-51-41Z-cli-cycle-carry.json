@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve cycle carry --cycle N` on a byte-identical rebase fixture reports eligible and names the rung (red: unknown subcommand)",
+    "A rebase that changed the audited paths reports not eligible with the differing paths, exit 1",
+    "--apply and ship's recovery call one carry function; --apply refuses under a live run lease"
+  ],
+  "connects_to": [
+    "carry-recovery-to-ship-end-to-end-proof",
+    "identity-preserving-fleet-rebase"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/internal/core/ship_recovery.go",
+    "go/internal/core/identity_carry_forward.go"
+  ],
+  "fix": "Add `evolve cycle carry --cycle N`. By default it is a read-only report of the carry decision for the cycle's current worktree: per-path identity of the rebased change, the audit binding's state, and the rung that would accept or decline, with the reason. Exit 0 when eligible, 1 when not. `--apply` runs the identityCarryForward path that ship's recovery runs and records the carry. It refuses under a live run lease (exit 1) and lands after carry-recovery-to-ship-end-to-end-proof. Document it in runtime-reference.md's ship self-healing section.",
+  "id": "cli-cycle-carry",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "The carry runs only inside ship's recovery (core/ship_recovery.go, identityCarryForward). Cycles 1766, 1768 and 1772 each carried and were refused at ship (fixed 2026-09-30), and no end-to-end test drives it (inbox carry-recovery-to-ship-end-to-end-proof). When a lane's passed audit is discarded after a rebase, the operator cannot ask whether the rebase was byte-identical or which rung declined, and cannot run the carry for that cycle. The answers come from the ship log and the recovery code.",
+  "title": "The ADR-0105 carry has no operator view; add `evolve cycle carry --cycle N` to report eligibility and, with --apply, run it",
+  "weight": 0.3
+}

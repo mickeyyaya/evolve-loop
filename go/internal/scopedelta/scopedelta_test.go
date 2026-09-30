@@ -1,25 +1,9 @@
 package scopedelta
 
-// scopedelta_test.go — the contract of scope adjudication, written before the
-// implementation.
-//
-// PROBLEM. A phase agent that produces valuable work outside its declared scope
-// has it destroyed on a technicality, and destroyed SILENTLY: ship stages by
-// declared manifest, so an unlisted path never reaches the commit and nobody
-// ever decided to lose it. The evidence is in this repo's own history — the
-// salvage layer was "built, green, and stranded in ten-plus continuation
-// worktrees" before it was recovered by hand.
-//
-// The fix is not "allow more". It is: classify out-of-scope work by what it
-// MEANS, decide on merit, and make silent disposal structurally impossible.
-// These tests pin that contract.
-
 import (
 	"strings"
 	"testing"
 )
-
-// --- The never-drop invariant -------------------------------------------
 
 func TestUnaccounted_IsTheWholePoint(t *testing.T) {
 	t.Parallel()
@@ -74,16 +58,10 @@ func TestUnaccounted_IsTheWholePoint(t *testing.T) {
 	}
 }
 
-// --- Closure is COMPUTED, never taken on the agent's word ----------------
-
-// The anti-laundering hinge. "Necessary collateral" is the label an agent would
-// reach for to smuggle anything, so the classifier must derive it from the
-// paths themselves and DOWNGRADE an unconfirmed claim rather than honour it.
 func TestClassify_ClosureIsComputed_UnconfirmedClaimsAreDowngraded(t *testing.T) {
 	t.Parallel()
 	scope := Scope{Cycle: 1450, Declared: []string{"go/internal/salvage/extract.go"}}
 
-	// Genuine closure: the test file of a package the change touches.
 	got := Classify("go/internal/salvage/extract_test.go", Declaration{Class: ClassOpportunistic}, scope, DefaultClosureRules())
 	if got.Class != ClassClosure {
 		t.Errorf("a test file for an in-scope package is closure regardless of how it was declared; got %q", got.Class)
@@ -92,7 +70,6 @@ func TestClassify_ClosureIsComputed_UnconfirmedClaimsAreDowngraded(t *testing.T)
 		t.Errorf("closure keeps by construction (rejecting it yields a broken tree); got %q", got.Disposition)
 	}
 
-	// Claimed closure that no rule confirms must NOT be honoured.
 	got = Classify("go/internal/router/pick.go", Declaration{Class: ClassClosure, Justification: "needed for my change"}, scope, DefaultClosureRules())
 	if got.Class == ClassClosure {
 		t.Error("an unconfirmed closure CLAIM was honoured — that is the laundering label for any change")
@@ -102,8 +79,6 @@ func TestClassify_ClosureIsComputed_UnconfirmedClaimsAreDowngraded(t *testing.T)
 	}
 }
 
-// Protected surfaces are policy, not merit: the producing agent's justification
-// is irrelevant, and the work is PRESERVED rather than deleted.
 func TestClassify_ProtectedSurfaceIsPolicyNotMerit(t *testing.T) {
 	t.Parallel()
 	scope := Scope{Cycle: 1450, Protected: []string{"go/internal/phases/ship/"}}
@@ -121,11 +96,6 @@ func TestClassify_ProtectedSurfaceIsPolicyNotMerit(t *testing.T) {
 	}
 }
 
-// --- Merit, not the proxy -------------------------------------------------
-
-// The rule that answers the whole request: a refusal must name a RISK. "Out of
-// scope" restates the category and decides nothing, and a reviewer allowed to
-// stop there never engages with what the change means.
 func TestEntry_Validate_RejectsScopeAsItsOwnJustification(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -155,8 +125,6 @@ func TestEntry_Validate_RejectsScopeAsItsOwnJustification(t *testing.T) {
 	}
 }
 
-// KEEP is the disposition that admits unreviewed surface, so it carries the
-// same obligation as a refusal: say why this belongs in THIS cycle.
 func TestEntry_Validate_KeepAlsoNeedsAReason(t *testing.T) {
 	t.Parallel()
 	e := Entry{Path: "p.go", Class: ClassDiscovered, Disposition: DispositionKeep}
@@ -165,8 +133,6 @@ func TestEntry_Validate_KeepAlsoNeedsAReason(t *testing.T) {
 	}
 }
 
-// A carve must carry somewhere for the work to GO, or "carve" is a polite word
-// for the silent dropping this package exists to end.
 func TestEntry_Validate_CarveMustNameItsDestination(t *testing.T) {
 	t.Parallel()
 	e := Entry{Path: "p.go", Class: ClassDiscovered, Disposition: DispositionCarve, Reason: "real adjacent defect, unreviewed here"}
@@ -179,11 +145,6 @@ func TestEntry_Validate_CarveMustNameItsDestination(t *testing.T) {
 	}
 }
 
-// --- Feedback, not just enforcement --------------------------------------
-
-// Class D is a defect in the TASK, not in the agent: if a cycle's out-of-scope
-// work is mostly "I thought this was the job", the item was ambiguous and
-// re-dispatching the same agent reproduces it.
 func TestSummarize_SurfacesScopeMisunderstandingAsATaskDefect(t *testing.T) {
 	t.Parallel()
 	entries := []Entry{

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "`evolve ratchet check size` on a fixture module with a function over its allowance exits 1 naming it (red: unknown command)",
+    "The command and the package tests share one scan function",
+    "`evolve ratchet check` passes on the current tree, as the package tests do"
+  ],
+  "connects_to": [
+    "sizeratchet-allowances-not-a-shared-registry"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/main.go",
+    "go/internal/sizeratchet",
+    "go/internal/rawgitratchet"
+  ],
+  "fix": "Add `evolve ratchet check [size|rawgit]` (default: both). It scans the module the way the package tests do, calls each Check, and prints every function over its allowance, every new offender and every raw-git site over baseline. Exit 0 when clean, 1 on any violation, 2 when the scan fails. The command and the package tests share one scan function. Put R3's tighten in the same group as `evolve ratchet tighten`, one group for both ratchets, and update the design doc's R3 row to that spelling. Document it in runtime-reference.md.",
+  "id": "cli-ratchet-check",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "sizeratchet.Check and rawgitratchet.Check (sizeratchet.go:141, rawgitratchet.go:204) are called only from their packages' tests, which scan the module. A console landing runs `go test ./internal/sizeratchet ./internal/rawgitratchet` by hand, and a comment-reduction round that skipped it turned CI red. The designed single writer of offenders.json, `evolve sizeratchet tighten` (logic-first-delivery-design.md \u00a75.13, R3), has no command group yet either.",
+  "title": "The size and raw-git ratchets run only as `go test` on their packages; add `evolve ratchet check` so a landing runs the same check CI runs",
+  "weight": 0.45
+}

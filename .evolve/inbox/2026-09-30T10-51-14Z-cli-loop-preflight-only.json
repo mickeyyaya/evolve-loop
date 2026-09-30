@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve loop --preflight-only` runs the pre-batch checks and dispatches no cycle (red: flag provided but not defined)",
+    "A failing blocking check exits 1 naming it; all passing exits 0",
+    "No run lease or cycle-state file is written"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_args.go",
+    "go/cmd/evolve/cmd_loop_preflight.go"
+  ],
+  "fix": "Add `--preflight-only` to `evolve loop`. It parses the arguments as a launch would, runs the same pre-batch gate (honouring --skip-preflight-boot), prints each check's verdict and exits without dispatching. Exit 0 when every check passes; exit 1 naming the blocking check that failed. It writes no run lease and no cycle state. Document it in runtime-reference.md's boundary step 4 as the check before launch.",
+  "id": "cli-loop-preflight-only",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "internal/looppreflight runs its checks (CLI health, versions, routing warnings, base divergence, the bridge-boot probe) only inside `evolve loop` (cmd_loop_preflight.go). `evolve loop --dry-run` prints the resolved config without running them (cmd_loop_args.go:45), and `preflight-environment` and `doctor boot|live` each cover only part of the gate. The only full readiness check is therefore a real launch, and a failing check is found with the batch already started.",
+  "title": "The loop's pre-flight readiness gate runs only at launch; add `evolve loop --preflight-only` to check readiness without starting a batch",
+  "weight": 0.4
+}

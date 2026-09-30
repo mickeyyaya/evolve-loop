@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "`evolve doctor versions --json` lists each detected CLI's installed version (red: unknown subcommand)",
+    "With --latest and a fake release source, a lagging CLI is flagged and the exit is 1; a failed lookup prints 'unavailable' and exits 0"
+  ],
+  "connects_to": [
+    "preflight-warns-when-claude-code-lags",
+    "looppreflight-version-cache"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/internal/cli/opscmd/doctor.go",
+    "go/internal/looppreflight/versioninventory.go"
+  ],
+  "fix": "Add `evolve doctor versions [--latest] [--json]`. It prints the installed version of each detected CLI from the version inventory. With --latest it adds the latest published release from a cached, network-tolerant lookup, and the gap; a failed lookup prints 'unavailable' and is not an error. The preflight WARN that preflight-warns-when-claude-code-lags asks for reuses the same lookup. Exit 0; with --latest, exit 1 when any CLI lags. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-doctor-versions",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve bridge doctor` and the loop preflight read each CLI's --version (internal/bridge/doctor.go:223; looppreflight/versioninventory.go:17-25), and nothing compares it with the latest release. Claude tiers are aliases resolved inside the installed Claude Code, so on 2026-09-30 a build pinned at 2.1.283 ran claude-sonnet-5 for two days after 2.1.284 made Sonnet 5.5 the default. The gap was found by hand (inbox preflight-warns-when-claude-code-lags).",
+  "title": "Checking whether an installed LLM CLI lags its latest release is manual; add `evolve doctor versions`",
+  "weight": 0.3
+}

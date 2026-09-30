@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "`evolve loop --dry-run` on a fixture inbox prints each lane's items as the wave engine would dispatch them (red: it prints the config only)",
+    "The plan equals what the wave engine dispatches for the same inputs (one plan source; a test runs both)",
+    "No claim, lease or cycle state is written"
+  ],
+  "connects_to": [
+    "wave-work-supply-census",
+    "goal-text-has-no-selection-authority"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop.go",
+    "go/internal/loopwave",
+    "go/internal/triagecap",
+    "go/internal/fleetbudget"
+  ],
+  "fix": "Make `evolve loop --dry-run` also print the wave plan through loopwave's plan source: the resolved width and why (quota, budget, fleet.count), each lane's items with their weights, and the pending items left out, by reason (reusing inbox batches' exclusion reasons). It dispatches nothing, claims nothing and writes no state. --json carries the same plan. Document it in runtime-reference.md's launch step.",
+  "id": "cli-loop-dry-run-wave-plan",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve loop --dry-run` prints the resolved config and exits (cmd_loop_args.go:45; cmd_loop.go:108). The wave's actual choice (the seed top-n from triagecap.SelectWaveSeedTopN, the lane partition, the width after quota and budget sizing in fleetbudget.Plan) is computed only inside a live wave. `evolve inbox batches` names the items no lane may take, but not what the planner will pick. Wave 52 (cycle 1778) launched and ended NO_WORK after triage dropped three console-owned picks, and no dry run could have shown it beforehand.",
+  "title": "Which items and lanes the next wave will dispatch is unknown until it launches; make `evolve loop --dry-run` print the wave plan",
+  "weight": 0.5
+}

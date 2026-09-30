@@ -7,9 +7,6 @@ import (
 	"testing"
 )
 
-// Test 20 — the six admission checks reject in their fixed order, each ONE
-// REQUEST_REJECTED with its reason_class, phase = the full agent name, an
-// empty run id, the run-id resolver never called and no port reached.
 func TestAdmit_RejectsInOrderWithReasonClass(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -62,7 +59,6 @@ func TestAdmit_RejectsInOrderWithReasonClass(t *testing.T) {
 	}
 }
 
-// Test 21 — moved verbatim from the host: the worker-name grammar.
 func TestParseAgentName(t *testing.T) {
 	tests := []struct {
 		in, role, worker string
@@ -83,13 +79,6 @@ func TestParseAgentName(t *testing.T) {
 	}
 }
 
-// Test 63 (review fold, architecture M3) — admission returns the identity
-// COMPLETE: the run id is stamped as the gate's last act, after the depth
-// guard, so no later step completes it by a pointer side effect and a
-// producer inserted between admit and resolve carries it. A rejected request
-// still never reads it (test 20); role → depth → run_id → profile is test
-// 49's order — kills `stamp the run id in resolve`, `read the run id before
-// the depth guard`.
 func TestAdmit_ReturnsTheIdentityCompleteAsTheGatesLastAct(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)

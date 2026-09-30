@@ -28,6 +28,7 @@ var (
 	// ErrConsoleRouted refuses the lane handoff of an operator-owned item.
 	// See ADR-0074.
 	ErrConsoleRouted = lifecycle.ErrConsoleRouted
+	ErrInvalidItem   = lifecycle.ErrInvalidItem
 )
 
 type (
@@ -260,6 +261,12 @@ type RouteResult = lifecycle.RouteResult
 
 func RouteLane(opts Options, taskID, reason string) (RouteResult, error) {
 	return opts.mover().RouteLane(taskID, reason)
+}
+
+type FileResult = lifecycle.FileResult
+
+func File(opts Options, raw []byte) (FileResult, error) {
+	return opts.mover().File(raw)
 }
 
 // RouteConsole rewrites the item in place as route:console-manual, so the claim floor refuses every later lane.

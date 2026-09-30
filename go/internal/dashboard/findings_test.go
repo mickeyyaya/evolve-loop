@@ -5,11 +5,6 @@ import (
 	"testing"
 )
 
-// The auditor writes findings as `### <ID> (<SEVERITY>[, qualifier]) — <title>`
-// under `## Issues`. Both heading shapes observed live (cycle-1605 final round
-// and cycle-1604 round 1) must parse; the verdict may be declared as
-// `## Verdict` + a bold line or inline `**Verdict: X**`.
-
 const reportBothShapes = `# Audit Report — Cycle 1605 (round 3)
 
 ## Verdict
@@ -88,8 +83,6 @@ func TestDiffRounds_ResolvedNewCarried(t *testing.T) {
 	}
 }
 
-// Reworded but same id ⇒ carried; same lead but renumbered ⇒ carried; both
-// different ⇒ new. Resolved counts the previous findings nothing matched.
 func TestDiffRounds_MatchesByIDOrLeadClause(t *testing.T) {
 	t.Parallel()
 	prev := []Finding{
@@ -108,8 +101,6 @@ func TestDiffRounds_MatchesByIDOrLeadClause(t *testing.T) {
 	}
 }
 
-// One prior finding can be carried by at most one current finding: a new
-// defect that merely reuses an old id is new, not a second carry.
 func TestDiffRounds_PriorFindingConsumedOnce(t *testing.T) {
 	t.Parallel()
 	prev := []Finding{{ID: "H1", Severity: "HIGH", Title: "same lead clause defect"}}
@@ -131,8 +122,6 @@ func TestDiffRounds_FirstRoundIsAllNew(t *testing.T) {
 	}
 }
 
-// TSV findings carry no id: matching must fall back to the lead clause only,
-// never to a severity-only key that would call any HIGH the same defect.
 func TestDiffRounds_IDLessFindingsMatchByLeadClauseOnly(t *testing.T) {
 	t.Parallel()
 	prev := []Finding{{Severity: "HIGH", Title: "defect A is untested"}}

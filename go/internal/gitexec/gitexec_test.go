@@ -10,8 +10,6 @@ import (
 )
 
 func TestGit_Capture_NonzeroExit_ReturnsCodeNotError(t *testing.T) {
-	// `git diff --quiet` exits 1 to mean "there are differences" — a non-zero
-	// exit that is NOT a failure. Capture must surface the code, not an error.
 	fake := &fixtures.FakeExec{Scripts: map[string]fixtures.ExecResponse{
 		"git diff": {ExitCode: 1},
 	}}
@@ -56,7 +54,7 @@ func TestGit_Output_TrimsStdoutAndNonzeroIsError(t *testing.T) {
 }
 
 func TestGit_Run_SuccessNilFailureErr(t *testing.T) {
-	ok := &fixtures.FakeExec{} // zero value: success
+	ok := &fixtures.FakeExec{}
 	if err := (gitexec.Git{Exec: ok.Run}).Run(context.Background(), "add", "-A"); err != nil {
 		t.Errorf("Run success = %v, want nil", err)
 	}
@@ -95,7 +93,7 @@ func TestGit_DirtyPaths_SortedWithRenameOld(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DirtyPaths err = %v", err)
 	}
-	want := []string{"a.txt", "b.go", "old.go", "z.go"} // sorted; rename dirties BOTH sides
+	want := []string{"a.txt", "b.go", "old.go", "z.go"}
 	if !reflect.DeepEqual(paths, want) {
 		t.Errorf("DirtyPaths = %v, want %v", paths, want)
 	}
@@ -105,8 +103,6 @@ func TestGit_DirtyPaths_SortedWithRenameOld(t *testing.T) {
 }
 
 func TestGit_DirtyPaths_CleanTreeReturnsEmpty(t *testing.T) {
-	// A clean worktree yields empty porcelain output; strings.Split("", "\n")
-	// gives [""], which the length guard must skip — no spurious "" path.
 	fake := &fixtures.FakeExec{Scripts: map[string]fixtures.ExecResponse{
 		"git status": {Stdout: ""},
 	}}
@@ -135,10 +131,8 @@ func TestPorcelainPath_RenameAndPlain(t *testing.T) {
 		{"R  old.go -> new.go", "new.go", "old.go"},
 		{"C  src.go -> copy.go", "copy.go", "src.go"},
 		{"?? \"weird name.go\"", "weird name.go", ""},
-		// git quotes space-containing paths; both rename sides must unquote. This
-		// is the real `git status --porcelain -uall` output (verified empirically).
 		{"R  \"old name.go\" -> \"new name.go\"", "new name.go", "old name.go"},
-		{"x", "", ""}, // too short to hold a path — must not panic
+		{"x", "", ""},
 	}
 	for _, c := range cases {
 		if got := gitexec.PorcelainPath(c.line); got != c.path {

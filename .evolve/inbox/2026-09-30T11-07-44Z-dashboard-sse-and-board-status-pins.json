@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The three tests exist, each fails when its rule is removed, and the two comments are gone",
+    "The cycle cap's behaviour is pinned by a test matching the design note"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/dashboard/server.go",
+    "go/internal/dashboard/sse.go",
+    "go/internal/dashboard/collect.go"
+  ],
+  "fix": "Add TestServer_SSEStreamOutlivesAnyWriteDeadline, TestServer_SSEFirstSnapshotIDIsNeverRepeated and TestHandleCycle_BoardLaneStatusWins, then delete the two whys; decide the cap behaviour and pin it with a test that matches the design note.",
+  "id": "dashboard-sse-and-board-status-pins",
+  "kind": "test",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "Two kept whys have no pinning test: the one in server.go saying the server's WriteTimeout stays zero (an SSE stream outlives any write deadline), and the one in sse.go saying a client subscribes before it reads current() (so the first snapshot id is never repeated). handleCycle's board lane-status overlay (the loop in (*Server).handleCycle that lets the board's lane status win over the workspace's) survives deletion in every test. selectCycles truncates workspace cycles past MaxCycles although the removed comments promised every workspace cycle is shown.",
+  "title": "dashboard: pin the SSE write-timeout and subscribe-order rules and handleCycle's board lane-status overlay; decide the cycle cap",
+  "weight": 0.35
+}

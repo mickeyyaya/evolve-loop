@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "`evolve doctor live claude-tmux --model sonnet --json` with a fake transcript reports served_model (red: flag provided but not defined)",
+    "A driver without model reporting prints 'unreported' and keeps its exit code"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/internal/cli/opscmd/doctor_live.go",
+    "go/internal/bridge/livesmoke.go"
+  ],
+  "fix": "Add `--model <tier|alias>` to `evolve doctor live <driver>`. bridge.LiveSmokeTest (internal/bridge/livesmoke.go:27) takes the model and returns the serving model id read from the reply (the CLI's stream or its transcript's message.model), and the command prints it in both the text and the JSON output. A driver that does not expose it prints 'unreported'. The exit codes are unchanged. Document it in runtime-reference.md next to the model-currency check.",
+  "id": "cli-doctor-live-served-model",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "Tier aliases (fast=haiku, balanced=sonnet, deep=opus) resolve inside the installed Claude Code. `evolve setup latest` probes the catalog's tiers, and `evolve doctor live <driver>` boots a driver and submits one prompt (doctor_live.go accepts only --json), but neither prints which model id served the reply. After the 2026-09-30 update, the operator confirmed claude-sonnet-5-5 with a separate `--model sonnet` probe and the transcript's message.model field.",
+  "title": "Which model a claude tier alias resolves to is checked with a hand-run `--model sonnet` probe; make `evolve doctor live` report the serving model",
+  "weight": 0.35
+}

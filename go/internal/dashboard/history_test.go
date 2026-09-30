@@ -7,9 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
-// writeDossier commits a minimal knowledge-base/cycles/cycle-N.json the way
-// the dossier producer does (dossier.RenderJSON), so the history reader is
-// exercised against the real schema.
 func writeDossier(t *testing.T, root string, d dossier.Dossier) {
 	t.Helper()
 	buf, err := dossier.RenderJSON(&d)
@@ -36,7 +33,6 @@ func passDossier(cycle int) dossier.Dossier {
 func TestReadHistory_ShipRateAndFingerprints(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	// 1: FAIL fp-a · 2: PASS · 3: FAIL fp-a (regressed: a PASS sits between) · 4: FAIL fp-b · 5: PASS
 	writeDossier(t, root, failDossier(1, "audit|gate-block|aaaa"))
 	writeDossier(t, root, passDossier(2))
 	writeDossier(t, root, failDossier(3, "audit|gate-block|aaaa"))
@@ -56,7 +52,6 @@ func TestReadHistory_ShipRateAndFingerprints(t *testing.T) {
 	if len(h.Fingerprints) != 2 {
 		t.Fatalf("Fingerprints = %+v, want 2 groups", h.Fingerprints)
 	}
-	// Most recent first: fp-b (last 4) then fp-a (last 3).
 	if h.Fingerprints[0].Fingerprint != "audit|verdict-fail|bbbb" || h.Fingerprints[0].Count != 1 {
 		t.Fatalf("Fingerprints[0] = %+v", h.Fingerprints[0])
 	}
@@ -103,7 +98,6 @@ func TestDossierCache_ReusesUnchangedFile(t *testing.T) {
 	if c.parses != first {
 		t.Fatalf("second read re-parsed an unchanged dossier: parses %d -> %d", first, c.parses)
 	}
-	// A rewrite (new mtime+size) is picked up.
 	writeDossier(t, root, failDossier(7, "z"))
 	h := readHistory(root, c)
 	if h.Trend.Shipped != 0 {

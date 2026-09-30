@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "`evolve bridge promote-rule` with a regex that matches no corpus line writes the rule at stage shadow (red: unknown subcommand)",
+    "A regex that matches a healthy-pane corpus line is refused with exit 1 naming the line"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_bridge.go",
+    "go/internal/interaction"
+  ],
+  "fix": "Add `evolve bridge promote-rule --regex R --response-keys K --corpus F [--note T]`. It calls PromoteRule with the rules directory add-rule uses and the corpus file's lines, and prints the promoted rule's id and path, or the corpus line that refuted it. Exit 0 promoted, 1 refused by the corpus, 10 usage. Document it next to add-rule in runtime-reference.md.",
+  "id": "cli-bridge-promote-rule",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve bridge add-rule` writes an auto-responder rule without checking it (cmd_bridge.go:114). interaction.PromoteRule refuses a regex that matches any line of a healthy-pane corpus, so a rule cannot fire on normal output, and writes the rule at stage shadow (internal/interaction/rulepromote.go:77). Only tests call it, so a rule learned from a stall is added unchecked or not at all.",
+  "title": "Promoting a learned auto-responder rule after checking it against the healthy-pane corpus is unreachable; add `evolve bridge promote-rule`",
+  "weight": 0.2
+}

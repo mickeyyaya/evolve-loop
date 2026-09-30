@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "`evolve cycle models --cycle N` on a fixture llm-calls.ndjson prints the tier, selector and serving model for each phase (red: unknown subcommand)",
+    "A launch through a fake driver that reports a model records it on the llm-calls line",
+    "Records without a serving model print 'unreported'"
+  ],
+  "connects_to": [
+    "model-failover-provenance-followups"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "deps": [
+    "cli-doctor-live-served-model"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/internal/llmcalls",
+    "go/internal/bridge/engine.go"
+  ],
+  "fix": "When a launch completes, record the serving model on its llm-calls record, read from the same reply field `doctor live --model` reads. Add `evolve cycle models --cycle N [--json]`, which prints, per phase and attempt, the requested tier, the dispatched selector and the serving model ('unreported' when the driver does not expose it). It is read-only; a cycle with no records exits 1. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-cycle-models",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve models performance` shows the dispatched selector for each attempt from llm-calls.ndjson (cmd_models_performance.go:91-107), not the model that served it. A claude alias or a within-tier model failover can serve a different model than the tier names, and the dossier records the tier (inbox model-failover-provenance-followups). To learn what ran a phase, the operator opens the CLI transcripts and reads message.model.",
+  "title": "Which model actually served each phase of a cycle is read from CLI transcripts by hand; add `evolve cycle models --cycle N`",
+  "weight": 0.3
+}

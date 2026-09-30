@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "One declaration of the item id grammar that both the filing verb and triage's parser use (red: two regexps)",
+    "An id the filing verb accepts is always one triage can name (property test)"
+  ],
+  "created_at": "2026-09-30T09:27:23Z",
+  "files": [
+    "go/internal/inboxmover/lifecycle/file.go",
+    "go/internal/triagedecision/parse.go",
+    "go/internal/inboxbatch/item.go"
+  ],
+  "fix": "Give the id grammar one home beside inboxbatch.Item (a pattern or a Valid function); triagedecision uses it, and the filing verb composes it with its stricter kebab rule. The lifecycle leaf may import inboxbatch but not triagedecision.",
+  "id": "inbox-item-id-grammar-one-home",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, architecture review of `evolve inbox add`",
+  "summary": "lifecycle.File accepts ids matching ^[a-z0-9]+(-[a-z0-9]+)*$ while triagedecision/parse.go:10 decides whether triage can name an id with ^[a-z0-9][a-z0-9-]*$. Filing is stricter today, so nothing diverges, but if triage narrows its grammar `evolve inbox add` could file an item as lane-dispatchable that triage can never pick. Found by the architecture review of `evolve inbox add`.",
+  "title": "The inbox item id grammar is spelled twice: the filing verb's kebab rule and triage's id pattern",
+  "weight": 0.3
+}

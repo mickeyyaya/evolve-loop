@@ -1,23 +1,5 @@
 package gitexec
 
-// worktree_retryable_test.go — cycle-1270 blocker (B-1/B-2/B-3).
-//
-// The retry loop slept the full 2s+4s ladder on ANY non-zero exit, including
-// conditions no amount of waiting can change. Measured cost: 33 go/cmd/evolve
-// tests reach this loop transitively over a t.TempDir() that is not a git
-// repository — a permanent rc=128 — so the package paid 33 × 6s = 198s of pure
-// backoff under a build floor that runs it with `-timeout 120s`. Deterministic,
-// not a flake.
-//
-// Three axes, each load-bearing on its own:
-//
-//	Permanent → zero backoff        the fix
-//	Transient → still rides the bound   the NEGATIVE guard: a "fix" that simply
-//	                                    stopped retrying would pass the first
-//	                                    test and re-break PR #401's absorber
-//	Nil Retryable → unchanged       the zero value stays usable, so no existing
-//	                                caller silently changes behaviour
-
 import (
 	"context"
 	"io"
@@ -28,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// permanentAddRunner fails every `worktree add` with the live shape of the
-// condition that cost cmd/evolve 198s: rc=128 and git's own fatal message.
 func permanentAddRunner(attempts *int) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		if len(args) >= 2 && args[0] == "worktree" && args[1] == "add" {
@@ -64,9 +44,6 @@ func TestAddWorktreeWithRetry_PermanentFailureSkipsBackoff(t *testing.T) {
 	if announced != 0 {
 		t.Errorf("announced %d retry line(s) for a failure that was never retried", announced)
 	}
-	// The fail-fast alarm chain stays armed: refuted PR #400 is the record of
-	// what silencing it costs. Speed must come from not WAITING, never from not
-	// reporting.
 	if code != 128 || err != nil {
 		t.Errorf("(code,err)=(%d,%v), want (128,nil) — the final exit code must survive intact", code, err)
 	}
@@ -101,7 +78,6 @@ func TestAddWorktreeWithRetry_NilRetryablePreservesRetryEverything(t *testing.T)
 	var slept []time.Duration
 	g := Git{Dir: t.TempDir(), Exec: permanentAddRunner(&attempts)}
 
-	// Nil Retryable — the zero value every pre-existing caller had.
 	_, _, code, _ := g.AddWorktreeWithRetry(context.Background(), WorktreeAddRetry{
 		Sleep: func(d time.Duration) { slept = append(slept, d) },
 	}, "-B", "lane", t.TempDir(), "HEAD")
@@ -125,10 +101,7 @@ func TestRetryableWorktreeAddFailure_ClassifiesPermanentAndUnknown(t *testing.T)
 		{"not a git repository", 128, "fatal: not a git repository (or any of the parent directories): .git", false},
 		{"branch already checked out", 128, "fatal: 'lane' is already checked out at '/x'", false},
 		{"destination exists", 128, "fatal: '/x' already exists", false},
-		// The live incident shape: rc=255 with nothing but "Preparing worktree".
 		{"lock collision", 255, "Preparing worktree (new branch 'lane')\n", true},
-		// Unrecognised stays RETRYABLE by design. A misclassified transient
-		// costs a lane its cycle; a misclassified permanent costs 6s.
 		{"unknown failure", 1, "some future git message", true},
 		{"empty stderr", 255, "", true},
 	}

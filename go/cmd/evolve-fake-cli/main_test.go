@@ -12,16 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// parseArgs must handle three real-world invocation styles:
-//  1. claude-p:  fake -p "<prompt>" --model M --allowedTools Bash,Edit
-//  2. agy:       fake -p "<prompt>" --dangerously-skip-permissions --model M
-//  3. codex:     echo "<prompt>" | fake exec --output-last-message <path>
-//
 // Output: an Invocation carrying ArtifactPath (resolved from the right
 // source per style) and Prompt (read from -p or stdin).
-// When the agent prompt does NOT contain an absolute artifact path
-// (production agents like evolve-scout.md only mention the filename),
-// fake-cli must derive workspace+basename from the Cycle Context.
 func TestParseArgs_ClaudeStyle_WorkspaceFallback(t *testing.T) {
 	prompt := strings.Join([]string{
 		"# Evolve Scout",
@@ -84,7 +76,6 @@ func TestParseArgs_CodexStyle(t *testing.T) {
 }
 
 func TestParseArgs_CodexStyle_WithMFlag(t *testing.T) {
-	// Codex driver may pass `exec -m <model> --output-last-message <path>`.
 	stdin := bytes.NewReader([]byte("audit /tmp/audit-report.md"))
 	args := []string{"exec", "-m", "gpt-4", "--output-last-message", "/tmp/audit-report.md"}
 	inv, err := parseArgs(args, stdin)
@@ -106,9 +97,6 @@ func TestParseArgs_VersionFlag(t *testing.T) {
 	}
 }
 
-// detectPhase identifies which evolve-loop phase the prompt belongs to
-// from the artifact path the bridge handed us. Filename suffix is the
-// most reliable signal — every phase has a unique artifact filename.
 func TestDetectPhase(t *testing.T) {
 	cases := []struct {
 		path string
@@ -131,9 +119,6 @@ func TestDetectPhase(t *testing.T) {
 	}
 }
 
-// artifactsFor returns the file map a phase should emit. Most phases
-// emit one file; audit uniquely emits BOTH audit-report.md AND
-// acs-verdict.json (the EGPS gate fusion).
 func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 	dir := t.TempDir()
 
@@ -141,7 +126,7 @@ func TestArtifactsFor_PerPhaseShape(t *testing.T) {
 		phase             string
 		mainPath          string
 		wantMainMarkers   []string
-		wantExtraFile     string // empty if none
+		wantExtraFile     string
 		wantExtraJSONKeys []string
 	}{
 		{
@@ -245,8 +230,6 @@ func TestArtifactsFor_UnknownPhase(t *testing.T) {
 	}
 }
 
-// run executes the end-to-end fake-cli flow: parse args, write the
-// right artifact(s), exit 0. Returns the exit code.
 func TestRun_HappyPathClaudeScout(t *testing.T) {
 	dir := t.TempDir()
 	artifact := filepath.Join(dir, "scout-report.md")
@@ -366,18 +349,12 @@ func TestParseArgs_CodexStdinError(t *testing.T) {
 	}
 }
 
-// run() must surface a parse failure (e.g. codex stdin read error) as the
-// dedicated exit code 2, not crash or write an artifact.
 func TestRun_ParseArgsError_ExitsWithCode2(t *testing.T) {
-	// Arrange: codex `exec` reads the prompt from stdin; a failing reader makes
-	// parseArgs return an error.
 	args := []string{"exec", "--output-last-message", "/tmp/x.md"}
 
-	// Act
 	var stdout, stderr bytes.Buffer
 	rc := run(args, errReader{}, &stdout, &stderr)
 
-	// Assert
 	if rc != 2 {
 		t.Errorf("rc=%d, want 2 (parse args failure)", rc)
 	}
@@ -386,11 +363,7 @@ func TestRun_ParseArgsError_ExitsWithCode2(t *testing.T) {
 	}
 }
 
-// An interactive (tmux/REPL) launch — no -p and no `exec` — must route through
-// run() into the REPL, which prints the boot marker and writes the artifact
-// resolved from the pasted prompt's workspace line.
 func TestRun_InteractiveLaunch_ServesREPL(t *testing.T) {
-	// Arrange: no -p / no exec ⇒ Interactive=true. Prompt fed on stdin.
 	ws := t.TempDir()
 	prompt := strings.Join([]string{
 		"# Evolve Scout",
@@ -401,11 +374,9 @@ func TestRun_InteractiveLaunch_ServesREPL(t *testing.T) {
 	}, "\n")
 	args := []string{"--model", "sonnet"}
 
-	// Act
 	var stdout, stderr bytes.Buffer
 	rc := run(args, strings.NewReader(prompt), &stdout, &stderr)
 
-	// Assert
 	if rc != 0 {
 		t.Fatalf("rc=%d, want 0; stderr=%s", rc, stderr.String())
 	}
@@ -417,15 +388,13 @@ func TestRun_InteractiveLaunch_ServesREPL(t *testing.T) {
 	}
 }
 
-// injectedExitCode must treat a non-numeric or negative FAKE_CLI_<STYLE>_EXIT
-// as "no injection" (return 0) rather than failing the invocation.
 func TestInjectedExitCode_GarbageAndNegativeMeanNoInjection(t *testing.T) {
 	cases := map[string]int{
-		"":        0, // unset
+		"":        0,
 		"81":      81,
 		"0":       0,
-		"notanum": 0, // Atoi error
-		"-1":      0, // negative rejected
+		"notanum": 0,
+		"-1":      0,
 	}
 	for raw, want := range cases {
 		t.Run("claude="+raw, func(t *testing.T) {
@@ -442,10 +411,6 @@ func TestInjectedExitCode_GarbageAndNegativeMeanNoInjection(t *testing.T) {
 }
 
 func TestRun_UnknownPhase(t *testing.T) {
-	// detectPhase returns "unknown" → artifactsFor errors. We need an artifact
-	// path whose basename isn't a known phase file; a "-p" prompt mentioning
-	// e.g. /tmp/intent.md would match the regex and resolve to the intent phase,
-	// so hand-craft an unknown basename via codex's --output-last-message.
 	mystery := "/tmp/mystery-output.md"
 	args := []string{"exec", "--output-last-message", mystery}
 
@@ -460,9 +425,7 @@ func TestRun_UnknownPhase(t *testing.T) {
 }
 
 func TestRun_UnwritableDir(t *testing.T) {
-	// Point artifact at an unwritable path; mkdir/write fails.
 	args := []string{"-p", "write to /this/path/cannot/be/created/by/test/scout-report.md", "--model", "x"}
-	// On most systems /proc, /sys etc are not writable. /this/path/... will fail.
 	var stdout, stderr bytes.Buffer
 	rc := run(args, bytes.NewReader(nil), &stdout, &stderr)
 	if rc == 0 {
@@ -470,12 +433,7 @@ func TestRun_UnwritableDir(t *testing.T) {
 	}
 }
 
-// Regression: an early version of absPathRE matched
-// "/scout-report.md" by backtracking inside `workspace/scout-report.md`,
-// causing the fake to write to the filesystem root.
 func TestParseArgs_RelativePathInPromptDoesNotMatchAbs(t *testing.T) {
-	// Real production prompts begin with the agent heading; we keep that
-	// shape here so the heading-based phase resolver fires.
 	prompt := "# Evolve Scout\n\nbody talks about workspace/scout-report.md as a Workspace File reference.\n\n## Cycle Context\n- workspace: /tmp/ws/cycle-7\n"
 	args := []string{"-p", prompt, "--model", "auto"}
 	inv, err := parseArgs(args, bytes.NewReader(nil))
@@ -490,10 +448,6 @@ func TestParseArgs_RelativePathInPromptDoesNotMatchAbs(t *testing.T) {
 	}
 }
 
-// Multi-artifact prompt (e.g. builder mentions scout-report.md as
-// upstream input) must NOT misroute to scout when the heading is
-// "# Evolve Builder". This is the bug that caused the matrix to fail
-// at the Build phase.
 func TestParseArgs_HeadingResolvesBuilderEvenIfPromptMentionsScout(t *testing.T) {
 	prompt := strings.Join([]string{
 		"# Evolve Builder",
@@ -516,8 +470,6 @@ func TestParseArgs_HeadingResolvesBuilderEvenIfPromptMentionsScout(t *testing.T)
 }
 
 func TestParseArgs_BooleanFlagWithEquals(t *testing.T) {
-	// Some bridge driver permutations may use --flag=value form; ensure we
-	// don't blow up consuming them.
 	args := []string{"-p", "write /tmp/scout-report.md", "--allowedTools=Bash", "--something-else"}
 	inv, err := parseArgs(args, bytes.NewReader(nil))
 	if err != nil {

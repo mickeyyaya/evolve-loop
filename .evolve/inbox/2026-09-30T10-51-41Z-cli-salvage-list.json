@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve salvage list --json` on a fixture salvage directory prints each leaf's cycle, HEAD, patch stats and landed flag (red: unknown subcommand \"list\")",
+    "An unreadable leaf exits 2 naming it; an empty or missing directory prints nothing and exits 0",
+    "gc and the list read one exported salvage-path helper"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/cmd_salvage.go",
+    "go/internal/gc"
+  ],
+  "fix": "Add `evolve salvage list [--json]`. It prints one row per salvage leaf: cycle, branch, HEAD, changed-file count and patch size, untracked-file count, age, and whether the HEAD is already in origin/main (landed). It reads the layout through one path helper exported from internal/gc, so gc and the list agree. It is read-only: exit 0, or exit 2 naming a leaf it cannot read. Document it in runtime-reference.md next to `evolve gc`.",
+  "id": "cli-salvage-list",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve gc` salvages a dirty or unmerged cycle worktree before removing it, writing .evolve/operator-salvage/<leaf>/{HEAD,uncommitted.patch,untracked.tgz} (internal/gc/salvage.go:118; runtime-reference.md:205). operating-policy.md:85 says to inventory a failed cycle's work before re-queueing it. `evolve salvage` has one subcommand, `report`, which gives the bad_verdict rate (cmd_salvage.go:21). The operator lists the directory, reads each HEAD and sizes each patch by hand.",
+  "title": "`evolve salvage` reports only the bad-verdict rate; add `salvage list` to inventory what gc salvaged",
+  "weight": 0.4
+}

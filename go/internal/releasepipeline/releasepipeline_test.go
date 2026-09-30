@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
 )
 
-// allOkSteps returns Steps where every step succeeds. The defaults that
-// would otherwise shell out to git/bash are explicitly replaced.
 func allOkSteps() Steps {
 	return Steps{
 		FullDryRunPreflight: func(string, string) error { return nil },
@@ -30,14 +28,12 @@ func allOkSteps() Steps {
 	}
 }
 
-// fixedNow returns a deterministic clock used in journal timestamps.
 func fixedNow(t *testing.T) func() time.Time {
 	t.Helper()
 	ts := time.Date(2026, 5, 24, 12, 0, 0, 0, time.UTC)
 	return func() time.Time { return ts }
 }
 
-// === Happy path: all steps succeed, journal contains all step records ======
 func TestRun_HappyPath(t *testing.T) {
 	repo := t.TempDir()
 	var buf bytes.Buffer
@@ -64,7 +60,6 @@ func TestRun_HappyPath(t *testing.T) {
 	if !equalStrings(res.StepsCompleted, expected) {
 		t.Errorf("StepsCompleted = %v, want %v", res.StepsCompleted, expected)
 	}
-	// Verify journal on disk has the expected step records.
 	body, err := os.ReadFile(res.JournalPath)
 	if err != nil {
 		t.Fatalf("read journal: %v", err)
@@ -87,7 +82,6 @@ func TestRun_HappyPath(t *testing.T) {
 	}
 }
 
-// === Invalid semver target → ErrPrePublishFailed ===========================
 func TestRun_InvalidSemver(t *testing.T) {
 	_, err := Run(Options{
 		Target:      "garbage",
@@ -100,7 +94,6 @@ func TestRun_InvalidSemver(t *testing.T) {
 	}
 }
 
-// === Step 1 preflight fails → ErrPrePublishFailed, no later steps run =====
 func TestRun_PreflightFails(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -130,7 +123,6 @@ func TestRun_PreflightFails(t *testing.T) {
 	}
 }
 
-// === Step 5 ship fails → ErrShipFailed (no rollback triggered) =============
 func TestRun_ShipFails_NoRollback(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -162,7 +154,6 @@ func TestRun_ShipFails_NoRollback(t *testing.T) {
 	}
 }
 
-// === Step 6 marketplace-poll fails → auto-rollback runs, ErrPostPublishFailed =
 func TestRun_MarketplacePollFails_AutoRollback(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -199,7 +190,6 @@ func TestRun_MarketplacePollFails_AutoRollback(t *testing.T) {
 	}
 }
 
-// === --no-rollback skips auto-rollback even on poll failure ================
 func TestRun_NoRollbackFlag(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -227,7 +217,6 @@ func TestRun_NoRollbackFlag(t *testing.T) {
 	}
 }
 
-// === --dry-run never invokes ship, never persists journal to permanent path =
 func TestRun_DryRun(t *testing.T) {
 	repo := t.TempDir()
 	shipCalls := 0
@@ -255,7 +244,6 @@ func TestRun_DryRun(t *testing.T) {
 	if res.NewCommitSHA != "" {
 		t.Errorf("NewCommitSHA = %q, want empty in dry-run", res.NewCommitSHA)
 	}
-	// Dry-run journal should be in TempDir, not under repoRoot/.evolve.
 	if !strings.Contains(res.JournalPath, os.TempDir()) {
 		t.Errorf("dry-run journal path %q should be under TempDir", res.JournalPath)
 	}
@@ -264,7 +252,6 @@ func TestRun_DryRun(t *testing.T) {
 	}
 }
 
-// === --require-preflight runs step 0; step 0 failure aborts pipeline =======
 func TestRun_RequirePreflight_Failure(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -296,7 +283,6 @@ func TestRun_RequirePreflight_Failure(t *testing.T) {
 	}
 }
 
-// === --require-preflight passes through when step 0 succeeds ===============
 func TestRun_RequirePreflight_Success(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -323,7 +309,6 @@ func TestRun_RequirePreflight_Success(t *testing.T) {
 	}
 }
 
-// === extractReleaseNotes pulls the right entry =============================
 func TestExtractReleaseNotes(t *testing.T) {
 	d := t.TempDir()
 	body := `# Changelog
@@ -355,10 +340,6 @@ func TestExtractReleaseNotes(t *testing.T) {
 	}
 }
 
-// TestExtractReleaseNotes_AppendsFingerprints: when a real changelog entry is
-// found, the release notes gain a Fingerprints section (one-binary S2) pointing
-// at the universal macOS artifact + checksums.txt for corporate approval
-// requests — while the actual changelog content is preserved.
 func TestExtractReleaseNotes_AppendsFingerprints(t *testing.T) {
 	d := t.TempDir()
 	body := "# Changelog\n\n## [2.0.0] - 2026-07-14\n\n### Added\n\n- Feature A\n"
@@ -398,7 +379,6 @@ func TestExtractReleaseNotes_NoChangelog(t *testing.T) {
 	}
 }
 
-// === IsSemver guard ========================================================
 func TestIsSemver(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -418,7 +398,6 @@ func TestIsSemver(t *testing.T) {
 	}
 }
 
-// === DefaultSteps wires all 8 step functions ===============================
 func TestDefaultSteps(t *testing.T) {
 	d := DefaultSteps()
 	if d.FullDryRunPreflight == nil || d.Preflight == nil || d.ChangelogGen == nil ||
@@ -428,7 +407,6 @@ func TestDefaultSteps(t *testing.T) {
 	}
 }
 
-// === Journal persistence: appendStep writes file each call =================
 func TestAppendStep_PersistsAcrossCalls(t *testing.T) {
 	repo := t.TempDir()
 	res, err := Run(Options{
@@ -460,7 +438,6 @@ func TestAppendStep_PersistsAcrossCalls(t *testing.T) {
 	}
 }
 
-// === setJournalField updates known fields and persists =====================
 func TestSetJournalField(t *testing.T) {
 	d := t.TempDir()
 	j := &Journal{Version: "1.2.3", Tag: "v1.2.3", Steps: []StepRecord{}}
@@ -483,11 +460,9 @@ func TestSetJournalField(t *testing.T) {
 		got.Branch != "develop" {
 		t.Errorf("journal not updated: %+v", got)
 	}
-	// Unknown field is a no-op (no crash).
 	setJournalField(j, path, "bogus_field", "ignored")
 }
 
-// === initJournal places dry-run journal in TempDir =========================
 func TestInitJournal_DryRun(t *testing.T) {
 	repo := t.TempDir()
 	j, path, err := initJournal(Options{
@@ -506,7 +481,6 @@ func TestInitJournal_DryRun(t *testing.T) {
 	}
 }
 
-// === initJournal places real journal under repo/.evolve/release-journal ===
 func TestInitJournal_RealPath(t *testing.T) {
 	repo := t.TempDir()
 	_, path, err := initJournal(Options{
@@ -525,7 +499,6 @@ func TestInitJournal_RealPath(t *testing.T) {
 	}
 }
 
-// === initJournal honors JournalDir override ================================
 func TestInitJournal_JournalDirOverride(t *testing.T) {
 	d := t.TempDir()
 	custom := filepath.Join(d, "custom-journals")
@@ -542,7 +515,6 @@ func TestInitJournal_JournalDirOverride(t *testing.T) {
 	}
 }
 
-// === Rollback error is captured but pipeline still returns ErrPostPublishFailed
 func TestRun_RollbackFailureCaptured(t *testing.T) {
 	repo := t.TempDir()
 	steps := allOkSteps()
@@ -568,7 +540,6 @@ func TestRun_RollbackFailureCaptured(t *testing.T) {
 	}
 }
 
-// === Helpers ===============================================================
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

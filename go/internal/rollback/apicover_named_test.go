@@ -6,10 +6,6 @@ import (
 	"testing"
 )
 
-// TestResult_PopulatedByRun names the Result type and pins that Run copies the
-// journal's identity (Version/Tag/CommitSHA) and each step's status into the
-// returned Result — i.e. Result is the structured outcome of a Run, not an
-// orphan struct. Asserted via field equality against a full happy-path Run.
 func TestResult_PopulatedByRun(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
 	var res Result = mustRunOK(t, jp, repo)
@@ -32,7 +28,6 @@ func TestResult_PopulatedByRun(t *testing.T) {
 	}
 }
 
-// mustRunOK runs the happy path and returns the Result, failing the test on err.
 func mustRunOK(t *testing.T, journalPath, repoRoot string) Result {
 	t.Helper()
 	res, err := Run(Options{JournalPath: journalPath, RepoRoot: repoRoot, Steps: allOkSteps()})
@@ -42,10 +37,6 @@ func mustRunOK(t *testing.T, journalPath, repoRoot string) Result {
 	return res
 }
 
-// TestJournal_JSONUnmarshalContract names the Journal type and pins its JSON
-// field tags: the on-disk publish record's snake_case keys (commit_sha) must
-// unmarshal into the Go fields ReadJournal validates. Built as a full-struct
-// want and compared after a round-trip through encoding/json.
 func TestJournal_JSONUnmarshalContract(t *testing.T) {
 	const raw = `{"version":"9.9.9","tag":"v9.9.9","commit_sha":"cafebabe","branch":"release",` +
 		`"release_url":"https://example/r","started_at":"2026-01-01T00:00:00Z"}`
@@ -68,9 +59,6 @@ func TestJournal_JSONUnmarshalContract(t *testing.T) {
 	}
 }
 
-// TestLedgerEntry_JSONMarshalKeys names the LedgerEntry type and pins that it
-// marshals to the snake_case NDJSON schema appended to release-rollbacks.jsonl
-// (the audit-trail contract downstream tooling parses), and round-trips losslessly.
 func TestLedgerEntry_JSONMarshalKeys(t *testing.T) {
 	entry := LedgerEntry{
 		Timestamp:     "2026-01-02T03:04:05Z",

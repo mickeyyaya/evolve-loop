@@ -11,15 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// verify_test.go — the host's contract_test.go moved (ADR-0103 unit 16 D5):
-// the same cases over cyclestate.Diagnostic (the type core.Diagnostic
-// aliases), with the typed rung asserted per case; the read-error case
-// provokes the read seam instead of a chmod (no root skip).
-
-// verifyNow is the comparison clock all pure Verify cases judge against.
 var verifyNow = time.Date(2026, 6, 14, 12, 0, 0, 0, time.UTC)
 
-// hasDiag reports whether any diagnostic message contains want.
 func hasDiag(diags []cyclestate.Diagnostic, want string) bool {
 	for _, d := range diags {
 		if strings.Contains(d.Message, want) {
@@ -29,18 +22,15 @@ func hasDiag(diags []cyclestate.Diagnostic, want string) bool {
 	return false
 }
 
-// Test 39 — the contract table for the pure verdict ladder: the four
-// integrity branches, the exec-status branch, the happy PASS, the precedence
-// rule (integrity beats exec status), and the typed rung.
 func TestVerify_LadderAndTypedRung(t *testing.T) {
 	t.Parallel()
-	fresh := verifyNow.Add(-1 * time.Minute) // 1 min old → fresh
+	fresh := verifyNow.Add(-1 * time.Minute)
 
 	cases := []struct {
 		name        string
 		in          VerifyInput
 		wantVerdict string
-		wantDiag    string // substring expected in diagnostics ("" = no check)
+		wantDiag    string
 		wantReason  IntegrityReason
 	}{
 		{
@@ -136,9 +126,6 @@ func TestVerify_LadderAndTypedRung(t *testing.T) {
 	}
 }
 
-// TestVerify_DiagnosticOrdering pins that a non-nil ExecErr emits its
-// bridge-launch diagnostic FIRST (before any integrity diagnostic), matching
-// the legacy Runner.classify ordering it replaces.
 func TestVerify_DiagnosticOrdering(t *testing.T) {
 	t.Parallel()
 	got := Verify(VerifyInput{
@@ -163,8 +150,6 @@ func TestVerify_DiagnosticOrdering(t *testing.T) {
 		t.Errorf("second diagnostic should be the integrity failure, got %q", got.Diagnostics[1].Message)
 	}
 }
-
-// --- VerifyArtifact: the one I/O adapter every dispatch path shares. ---
 
 func TestVerifyArtifact_StatErrIsIntegrityFail(t *testing.T) {
 	t.Parallel()
@@ -199,7 +184,6 @@ func TestVerifyArtifact_EmptyBodyIsIntegrityFail(t *testing.T) {
 	}
 }
 
-// A failing read seam (the host's chmod-0 fixture, without the root skip).
 func TestVerifyArtifact_ReadErrIntegrityFail(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
@@ -212,8 +196,6 @@ func TestVerifyArtifact_ReadErrIntegrityFail(t *testing.T) {
 	}
 }
 
-// TestVerifyArtifact_HappyPathIsPass proves the adapter gathers a real fresh
-// token-bearing artifact and judges it PASS.
 func TestVerifyArtifact_HappyPathIsPass(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()
@@ -225,7 +207,6 @@ func TestVerifyArtifact_HappyPathIsPass(t *testing.T) {
 	}
 }
 
-// Test 48 (part) — the production stat and hash over real files.
 func TestStatMTimeAndHashFile_RealFiles(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()

@@ -1,12 +1,6 @@
-// Package skillcheck is the reusable projection half of ADR-0040: it renders
-// the marker-delimited GENERATED:phase-facts region of each phase SKILL.md from
-// its SSOTs (phase registry, phasecontract headings, dispatch profiles) and
-// either writes it (generate) or reports drift (check).
-//
-// It was extracted from cmd/evolve so BOTH the `evolve skills` CLI AND the
-// autonomous cycle's audit phase can run the SAME drift check in-process —
-// without the audit (an internal package) importing package main. Run preserves
-// the exact CLI behavior; Check is the pure, print-free gate the audit calls.
+// Package skillcheck projects the phase SKILL.md facts regions, command stubs
+// and Codex manifests from their single sources, and reports their drift.
+// See docs/architecture/packages/internal-skillcheck.md.
 package skillcheck
 
 import (
@@ -37,9 +31,6 @@ const (
 	factsEnd   = "<!-- GENERATED:phase-facts END -->"
 )
 
-// phaseSkillDirs maps registry phase name → skill directory under skills/.
-// Only these built-in phase skills carry a generated phase-facts region; the
-// macro (skills/loop) and utility skills are pipeline-wide or phase-agnostic.
 var phaseSkillDirs = map[string]string{
 	"scout":         "scout",
 	"plan-review":   "plan-review",
@@ -51,15 +42,11 @@ var phaseSkillDirs = map[string]string{
 	"intent":        "intent",
 }
 
-// skillSection is one required artifact section as rendered into the doc: the
-// canonical heading plus any tolerated legacy variants.
 type skillSection struct {
 	Canonical  string
 	Alternates []string
 }
 
-// skillFacts is the template payload — every field traces to exactly one SSOT
-// (see the table in ADR-0040 §2).
 type skillFacts struct {
 	Phase            string
 	Archetype        string
@@ -77,17 +64,13 @@ type skillFacts struct {
 	Verdicts         []string
 }
 
-// factsDiff is one phase skill's projected-vs-disk comparison.
 type factsDiff struct {
-	rel     string // "skills/<dir>/SKILL.md" (display + drift identity)
-	path    string // absolute on-disk path
-	next    string // the regenerated full document
-	drifted bool   // next != the current on-disk content
+	rel     string
+	path    string
+	next    string
+	drifted bool
 }
 
-// inspect renders every phase skill's expected content and compares it to disk,
-// and collects every skill's frontmatter name!=dir mismatch. It is PURE: no
-// writes, no prints — the seam Run (CLI) and Check (audit) both build on.
 func inspect(projectRoot string) (diffs []factsDiff, nameErrs, warns []string, err error) {
 	cat, _, catWarns, err := phasespec.MergedCatalog(projectRoot)
 	if err != nil {
@@ -129,10 +112,6 @@ func inspect(projectRoot string) (diffs []factsDiff, nameErrs, warns []string, e
 	return diffs, nameErrs, warns, nil
 }
 
-// Run reproduces `evolve skills <generate|check>`: write=true rewrites each
-// stale GENERATED:phase-facts region in place; write=false reports drift and
-// returns exit 2 if any region is stale or any frontmatter name != its dir.
-// Output is byte-compatible with the pre-extraction cmd path.
 func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 	diffs, nameErrs, warns, err := inspect(projectRoot)
 	if err != nil {
@@ -148,11 +127,6 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 		drift = true
 	}
 
-	// Registry-membership surface: .claude-plugin/plugin.json (what Claude Code's
-	// loader reads) must be a bijection with the disk skills/ dirs the other
-	// projections source from. A skill dir the manifest omits passes every other
-	// check yet is invisible to the loader ("Unknown skill"). Not auto-fixable by
-	// generate, so this only fails the check gate, never the write path.
 	manifestProblems, mErr := ManifestProblems(projectRoot)
 	if mErr != nil {
 		fmt.Fprintf(stderr, "%v\n", mErr)
@@ -194,8 +168,6 @@ func projectSurfaces(projectRoot string, diffs []factsDiff, write bool, stdout, 
 		}
 	}
 
-	// Command-stub projection (ADR-0040 second surface): mirror every skill into
-	// commands/<name>.md so /evo:<name> appears in the Claude Code `/` menu.
 	cmdDiffs, cmdErr := commandDiffs(projectRoot)
 	if cmdErr != nil {
 		return false, cmdErr
@@ -205,10 +177,6 @@ func projectSurfaces(projectRoot string, diffs []factsDiff, write bool, stdout, 
 		return false, cmdErr
 	}
 
-	// Codex manifest projection (cross-CLI third surface): render
-	// .codex-plugin/plugin.json + .agents/plugins/marketplace.json from the
-	// canonical .claude-plugin/plugin.json so a Codex install mirrors the Claude
-	// one from a single source.
 	codexDiffs, codexErr := codexManifestDiffs(projectRoot)
 	if codexErr != nil {
 		return false, codexErr
@@ -257,11 +225,6 @@ func writeGenerated(path, next, rel string, stdout io.Writer) error {
 	return nil
 }
 
-// Check is the read-only drift gate for in-process callers (the cycle audit):
-// it returns the rel-paths whose SKILL.md phase-facts region is stale plus any
-// frontmatter-name!=dir messages (empty when everything is in sync). err is
-// non-nil only on an infrastructure fault (catalog/template/read failure), so
-// the caller can fail OPEN on infra while FAILing on real drift.
 func Check(projectRoot string) ([]string, error) {
 	diffs, nameErrs, _, err := inspect(projectRoot)
 	if err != nil {
@@ -291,10 +254,6 @@ func Check(projectRoot string) ([]string, error) {
 			drift = append(drift, d.rel)
 		}
 	}
-	// Registry-membership surface: .claude-plugin/plugin.json (what Claude Code's
-	// loader reads) must be a bijection with the disk skills/ dirs the other three
-	// projections source from. A skill dir the manifest omits passes every check
-	// above yet is invisible to the loader ("Unknown skill").
 	manifestProblems, mErr := ManifestProblems(projectRoot)
 	if mErr != nil {
 		return nil, mErr
@@ -302,8 +261,6 @@ func Check(projectRoot string) ([]string, error) {
 	return append(append(drift, nameErrs...), manifestProblems...), nil
 }
 
-// sortedPhaseSkillNames returns the projected phase names in stable order so
-// generate/check output is deterministic.
 func sortedPhaseSkillNames() []string {
 	names := make([]string, 0, len(phaseSkillDirs))
 	for n := range phaseSkillDirs {
@@ -313,10 +270,6 @@ func sortedPhaseSkillNames() []string {
 	return names
 }
 
-// nameMismatches enforces the ADR-0040 naming rule: every skill dir's SKILL.md
-// frontmatter `name` must equal the directory name. Returns one human message
-// per violation (empty when all match) — pure, so both Run and Check decide
-// what to do with them.
 func nameMismatches(projectRoot string) []string {
 	skillsDir := filepath.Join(projectRoot, "skills")
 	entries, err := os.ReadDir(skillsDir)
@@ -330,7 +283,7 @@ func nameMismatches(projectRoot string) []string {
 		}
 		raw, err := os.ReadFile(filepath.Join(skillsDir, e.Name(), "SKILL.md"))
 		if err != nil {
-			continue // dirs without SKILL.md are not skills
+			continue
 		}
 		fm, _, err := prompts.ParseFrontmatter(string(raw))
 		if err != nil {
@@ -345,9 +298,6 @@ func nameMismatches(projectRoot string) []string {
 	return bad
 }
 
-// collectSkillFacts gathers the template payload from the three SSOTs. Every
-// lookup is fail-soft: a missing profile or persona renders as a gap, never an
-// error — the drift detection (not this collector) decides what is fatal.
 func collectSkillFacts(projectRoot string, spec phasespec.PhaseSpec, roles map[string]string) skillFacts {
 	f := skillFacts{
 		Phase:     spec.Name,
@@ -361,7 +311,6 @@ func collectSkillFacts(projectRoot string, spec phasespec.PhaseSpec, roles map[s
 	}
 	f.PersonaPath = personaPath(projectRoot, spec, f.Role)
 
-	// Dispatch facts — .evolve/profiles/<role>.json is the SSOT.
 	loader := profiles.NewFromDir(filepath.Join(projectRoot, ".evolve", "profiles"))
 	if p, err := loader.Get(f.Role); err == nil {
 		f.CLI = p.CLI
@@ -369,8 +318,6 @@ func collectSkillFacts(projectRoot string, spec phasespec.PhaseSpec, roles map[s
 		f.FanOut = parallelSubtaskCount(p.Raw)
 	}
 
-	// Artifact + section facts — phasecontract is the SSOT for built-in
-	// headings; FromSpec derives user-phase contracts from classify rules.
 	c := phaseContract(spec)
 	f.ArtifactName = c.ArtifactName
 	f.WriteTargetLabel = "cycle workspace"
@@ -395,21 +342,14 @@ func phaseContract(spec phasespec.PhaseSpec) phasecontract.Contract {
 	c, ok := phasecontract.For(spec.Name)
 	if !ok {
 		c = phasecontract.FromSpec(spec)
-		if len(spec.Outputs.Files) == 0 {
-			// FromSpec defaults to "<phase>-report.md"; for a phase that declares
-			// no output files (e.g. ship — its deliverable is the commit itself)
-			// that default would be fiction. Suppress it.
+		declaresNoOutputFiles := len(spec.Outputs.Files) == 0
+		if declaresNoOutputFiles {
 			c.ArtifactName = ""
 		}
 	}
 	return c
 }
 
-// registryRoles reads the phase→agent/profile-name mapping from the registry's
-// raw "role" keys, once. PhaseSpec maps JSON "archetype" onto its Role field and
-// does not carry the registry's "role" (profile name), so we read it directly —
-// the registry stays the single home for the mapping. Fail-soft: an unreadable
-// registry yields an empty map (gaps, not errors).
 func registryRoles(projectRoot string) map[string]string {
 	roles := map[string]string{}
 	raw, err := os.ReadFile(config.RegistryPath(projectRoot))
@@ -431,9 +371,6 @@ func registryRoles(projectRoot string) map[string]string {
 	return roles
 }
 
-// personaPath resolves the persona markdown for a phase: explicit spec.Agent
-// first, then the evolve-<role>.md / <role>.md conventions. Returns "" when no
-// persona file exists (native phases like ship).
 func personaPath(projectRoot string, spec phasespec.PhaseSpec, role string) string {
 	var candidates []string
 	if spec.Agent != "" {
@@ -449,8 +386,6 @@ func personaPath(projectRoot string, spec phasespec.PhaseSpec, role string) stri
 	return ""
 }
 
-// parallelSubtaskCount reads the un-modeled parallel_subtasks array from the
-// profile's raw bytes (profiles.Profile keeps it in Raw by design).
 func parallelSubtaskCount(raw json.RawMessage) int {
 	if len(raw) == 0 {
 		return 0
@@ -464,8 +399,6 @@ func parallelSubtaskCount(raw json.RawMessage) int {
 	return len(p.ParallelSubtasks)
 }
 
-// alternatesOf returns a section's tolerated legacy headings (Accepted minus the
-// canonical first entry).
 func alternatesOf(s phasecontract.Section) []string {
 	var alts []string
 	for _, a := range s.Accepted {
@@ -476,20 +409,11 @@ func alternatesOf(s phasecontract.Section) []string {
 	return alts
 }
 
-// spliceGeneratedRegion replaces the marker-delimited region in doc with block,
-// preserving everything outside the markers. When no markers exist the block is
-// inserted before "## Composition" (the conventional tail section) or appended.
 func spliceGeneratedRegion(doc, block string) (string, error) {
-	return SpliceMarkedRegion(doc, block, factsBegin, factsEnd, "\n## Composition")
+	const insertBeforeCompositionSection = "\n## Composition"
+	return SpliceMarkedRegion(doc, block, factsBegin, factsEnd, insertBeforeCompositionSection)
 }
 
-// SpliceMarkedRegion replaces a marker-delimited region in doc with block,
-// preserving everything outside the markers — the marker-agnostic splice shared
-// by `evolve skills` and `evolve flags`. fallbackAnchor names the section the
-// block is inserted before when no markers exist yet ("" = append at EOF).
-// Exactly ONE marker pair is the invariant: a BEGIN without END is corruption,
-// and a second BEGIN (e.g. from a botched manual merge) errors out rather than
-// leaving an orphaned stale region behind.
 func SpliceMarkedRegion(doc, block, beginMarker, endMarker, fallbackAnchor string) (string, error) {
 	block = strings.TrimRight(block, "\n") + "\n"
 	begin := strings.Index(doc, beginMarker)
@@ -502,7 +426,6 @@ func SpliceMarkedRegion(doc, block, beginMarker, endMarker, fallbackAnchor strin
 		if strings.Contains(doc[end:], beginMarker) {
 			return "", fmt.Errorf("multiple %q regions found; keep exactly one pair", beginMarker)
 		}
-		// Swallow a single trailing newline so regeneration is idempotent.
 		if end < len(doc) && doc[end] == '\n' {
 			end++
 		}

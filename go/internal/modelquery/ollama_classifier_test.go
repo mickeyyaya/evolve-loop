@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// stubRunner returns canned output/err and records the last invocation,
-// including stdin — TestOllamaListerReachesNoModel below asserts stdin is
-// always empty for `ollama list` (the metadata-only, no-prompt guarantee).
 type stubRunner struct {
 	out       string
 	err       error
@@ -65,13 +62,6 @@ func TestOllamaListerError(t *testing.T) {
 	}
 }
 
-// TestOllamaListerReachesNoModel is GAP 2's decision-(b) predicate (scout
-// finding #3): `ollama list` is a non-interactive metadata enumeration, not a
-// model-reaching dispatch, so C1 (every LLM-CLI control that reaches a model
-// must go through the bridge) does not apply to it. This asserts the call
-// site invokes ONLY `ollama list` — no prompt argument, no stdin — which is
-// the structural difference between "enumerate what's installed" and
-// "dispatch a prompt to a model".
 func TestOllamaListerReachesNoModel(t *testing.T) {
 	s := &stubRunner{out: "NAME\nllama3.3:latest  x  y  z\n"}
 	if _, err := (OllamaLister{Run: s.run}).List(context.Background(), "ollama"); err != nil {
@@ -85,12 +75,6 @@ func TestOllamaListerReachesNoModel(t *testing.T) {
 	}
 }
 
-// TestOllamaListMetadataExceptionDocumented pins GAP 2's required call-site
-// comment (scout mailbox → Auditor: "ollama list is an ALLOWED metadata
-// exception (must be commented + tested as no-model-reached)"). A grep-gamed
-// magic string alone would be a degenerate predicate (cycle-85 lesson), so
-// this test also runs alongside TestOllamaListerReachesNoModel, which
-// exercises the actual no-prompt behavior the comment documents.
 func TestOllamaListMetadataExceptionDocumented(t *testing.T) {
 	src, err := os.ReadFile("ollama.go")
 	if err != nil {
@@ -115,7 +99,6 @@ func TestJSONObjects(t *testing.T) {
 		{"nested counts as one", `x {"a":{"b":1}} y`, []string{`{"a":{"b":1}}`}},
 		{"brace in string", `{"m":"a{b}c"}`, []string{`{"m":"a{b}c"}`}},
 		{"escaped quote in string", `{"m":"a\"{x}"}`, []string{`{"m":"a\"{x}"}`}},
-		// the live codex case: prompt-echo template first, real answer second.
 		{"prompt echo then answer", `{"fast":"<id>"}` + "\ncodex\n" + `{"fast":"phi4"}`, []string{`{"fast":"<id>"}`, `{"fast":"phi4"}`}},
 		{"lone close brace before object", `foo } {"fast":"a"}`, []string{`{"fast":"a"}`}},
 		{"none", `no json here`, nil},
@@ -136,16 +119,13 @@ func TestJSONObjects(t *testing.T) {
 	}
 }
 
-// (The CLIClassifier prompt-echo regression guard lives in classifier_test.go
-// now, exercised through the PromptDispatcher seam.)
-
 func TestSanitizeTierMap(t *testing.T) {
 	offered := []string{"m-fast", "m-bal", "m-deep"}
 	parsed := map[string]string{
 		"fast":     "m-fast",
 		"balanced": "m-bal",
-		"deep":     "hallucinated", // not offered → dropped
-		"ultra":    "m-deep",       // non-canonical tier → dropped
+		"deep":     "hallucinated",
+		"ultra":    "m-deep",
 		"weird":    "",
 	}
 	got := sanitizeTierMap(parsed, offered)
@@ -157,15 +137,6 @@ func TestSanitizeTierMap(t *testing.T) {
 	}
 }
 
-// (classifierArgv and the exec-argv-based CLIClassifier tests are retired:
-// GAP 1's fix removes classifierArgv from classifier.go entirely — the bridge's
-// headless drivers (driver_codex.go/driver_claudep.go/driver_agy.go) already
-// own the exact same per-CLI invocation shape it duplicated. See
-// TestGuard_ClassifierHasNoDirectModelExec in classifier_test.go.)
-
-// TestDefaultRunner_CapturesOutput exercises the production exec runner end to
-// end against a guaranteed-present shell builtin wrapper. Skipped only when the
-// chosen binary is genuinely absent from PATH.
 func TestDefaultRunner_CapturesOutput(t *testing.T) {
 	t.Parallel()
 	echo, err := exec.LookPath("echo")
@@ -181,8 +152,6 @@ func TestDefaultRunner_CapturesOutput(t *testing.T) {
 	}
 }
 
-// TestDefaultRunner_PipesStdin covers the stdin != "" branch via `cat`, which
-// echoes stdin to stdout. Skipped only when cat is genuinely absent.
 func TestDefaultRunner_PipesStdin(t *testing.T) {
 	t.Parallel()
 	cat, err := exec.LookPath("cat")
@@ -198,8 +167,6 @@ func TestDefaultRunner_PipesStdin(t *testing.T) {
 	}
 }
 
-// TestDefaultRunner_NonZeroExitReturnsError covers the error return path of the
-// production runner (CombinedOutput err non-nil).
 func TestDefaultRunner_NonZeroExitReturnsError(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("false"); err != nil {
@@ -210,7 +177,6 @@ func TestDefaultRunner_NonZeroExitReturnsError(t *testing.T) {
 	}
 }
 
-// TestErrNoLister_Error pins the error string of the router's no-lister sentinel.
 func TestErrNoLister_Error(t *testing.T) {
 	t.Parallel()
 	got := errNoLister("ollama").Error()
@@ -220,13 +186,6 @@ func TestErrNoLister_Error(t *testing.T) {
 	}
 }
 
-// TestOllamaLister_NilRunDefaultsToExecRunner covers the `run == nil` default
-// branch in OllamaLister.List: with no injected Runner it routes through
-// defaultRunner and shells out to the real `ollama`. The branch executes
-// regardless of whether ollama is installed — so the assertion tolerates both
-// outcomes (present → nil err + ids; absent → wrapped "ollama list" error) and
-// pins only that the nil-Run path does not panic and stays internally
-// consistent (error XOR ids).
 func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
 	t.Parallel()
 	ids, err := (OllamaLister{}).List(context.Background(), "ollama")
@@ -240,23 +199,12 @@ func TestOllamaLister_NilRunDefaultsToExecRunner(t *testing.T) {
 	}
 }
 
-// (TestCLIClassifier_AllObjectsFailToMap moved to classifier_test.go, rewired
-// through the fakeDispatcher seam. The nil-Run-defaults-to-exec-runner
-// scenario no longer applies: CLIClassifier has no exec fallback at all now —
-// see TestCLIClassifierClassify_NilDispatcherErrorsNeverShellsOut.)
-
-// TestTruncate_LongStringTruncates covers truncate's tail branch (len > n):
-// it returns the first n runes plus an ellipsis. Multi-byte runes confirm the
-// cut is rune-aware, not byte-aware.
 func TestTruncate_LongStringTruncates(t *testing.T) {
 	t.Parallel()
-	got := truncate("ααααα", 3) // 5 two-byte runes, cap 3
+	fiveTwoByteRunes := "ααααα"
+	got := truncate(fiveTwoByteRunes, 3)
 	want := "ααα" + "…"
 	if got != want {
 		t.Errorf("truncate = %q, want %q", got, want)
 	}
 }
-
-// (TestCLIClassifierGuards moved to classifier_test.go, rewired through the
-// fakeDispatcher seam, and additionally asserts the dispatcher is never
-// called when the pre-flight guards reject.)

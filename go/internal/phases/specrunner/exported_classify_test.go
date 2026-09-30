@@ -1,17 +1,5 @@
 package specrunner
 
-// RED-phase contract for cycle-249 task `phase-classify-declarative`:
-// the declarative verdict evaluator must be EXPORTED as EvaluateClassify
-// so built-in phases (triage, tdd, intent, build) can delegate their
-// hand-coded classify logic to the one shared evaluator.
-//
-// The unexported evaluator's full matrix is already covered by
-// TestEvaluateClassify in specrunner_test.go — these tests pin the
-// EXPORTED surface only (signature + the contract rows built-in phases
-// will rely on), so they complement rather than duplicate.
-//
-// Fails at baseline: EvaluateClassify is undefined (compile RED).
-
 import (
 	"strings"
 	"testing"
@@ -74,9 +62,6 @@ func TestEvaluateClassifyExported(t *testing.T) {
 			wantVerdict: core.VerdictWARN,
 		},
 		{
-			// Intent AC: "config schema validated with explicit errors (no
-			// silent fallback on malformed plugin config)" — a typo'd
-			// verdict_on_pass must FAIL loudly, never pass silently.
 			name:        "invalid_verdict_on_pass_fails_loudly",
 			artifact:    "## A\nbody\n",
 			rules:       &phasespec.ClassifyRules{RequireSections: []string{"## A"}, VerdictOnPass: "PASSS"},
@@ -104,10 +89,6 @@ func TestEvaluateClassifyExported(t *testing.T) {
 	}
 }
 
-// Pins heading-aware require_sections matching (inbox
-// classify-heading-prefix-mismatch, 2026-06-07) — semantics documented on
-// hasSection in specrunner.go. Includes strict-superset cases proving legacy
-// matches are preserved.
 func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -116,7 +97,6 @@ func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
 		wantVerdict string
 	}{
 		{
-			// The cycle-249/250 regression: bare rule vs "## " heading.
 			name:        "bare rule matches h2 heading",
 			artifact:    "## Baseline\n- ok\n",
 			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Baseline"}},
@@ -129,7 +109,6 @@ func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
 			wantVerdict: core.VerdictPASS,
 		},
 		{
-			// CommonMark permits a tab as the marker/text separator.
 			name:        "tab-separated heading matches bare rule",
 			artifact:    "##\tFindings\n- x\n",
 			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Findings"}},
@@ -142,7 +121,6 @@ func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
 			wantVerdict: core.VerdictPASS,
 		},
 		{
-			// Legacy prose-anchored behavior is preserved (strict superset).
 			name:        "bare rule matches line-anchored prose",
 			artifact:    "Verdict: PASS\n",
 			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Verdict"}},
@@ -155,8 +133,6 @@ func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
 			wantVerdict: core.VerdictFAIL,
 		},
 		{
-			// "#"-run without trailing whitespace is not a markdown heading;
-			// no stripping happens on that line.
 			name:        "hashtag-glued line is not a heading",
 			artifact:    "##Findings\n",
 			rules:       &phasespec.ClassifyRules{RequireSections: []string{"Findings"}},
@@ -179,9 +155,6 @@ func TestEvaluateClassifyExported_HeadingAwareSections(t *testing.T) {
 	}
 }
 
-// The missing-section diagnostic must NAME the missing section so a phase
-// author can debug a FAIL from the message alone (easy-to-debug scaffold
-// is an explicit cycle-249 goal).
 func TestEvaluateClassifyExported_DiagnosticNamesMissingSection(t *testing.T) {
 	_, diags := EvaluateClassify("## present\nx\n", &phasespec.ClassifyRules{
 		RequireSections: []string{"## present", "## absent-section"},

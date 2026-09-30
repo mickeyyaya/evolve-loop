@@ -1,16 +1,5 @@
-// Package specrunner turns a declarative phasespec.PhaseSpec into a runnable
-// Lego brick — a core.PhaseRunner — with ZERO per-phase Go. It is the generic
-// counterpart to the hand-written phase packages (scout, build, …): instead of
-// a bespoke Hooks impl, it derives every variation point from spec fields.
-//
-// This is what makes a user phase "pure data": drop a phase.json (the spec) +
-// agent.md (the prompt) + profile.json (permissions), and specrunner supplies
-// the artifact name, prompt composition, and verdict classification the
-// BaseRunner template needs.
-//
-// Stage 1 scope: specrunner is a constructor only — it does NOT self-register
-// into the phase registry (the composition root wires spec-derived factories in
-// Stage 2), so adding this package changes no live behavior.
+// Package specrunner turns a declarative phasespec.PhaseSpec into a runnable core.PhaseRunner with no per-phase Go.
+// See docs/architecture/packages/internal-phases-specrunner.md.
 package specrunner
 
 import (
@@ -25,29 +14,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 )
 
-// hooks is the spec-driven runner.Hooks implementation. It holds the spec by
-// value (specs are small, immutable data).
 type hooks struct {
-	spec phasespec.PhaseSpec
-	// promptBody is an optional in-band prompt. When non-empty, the
-	// BaseRunner uses it instead of reading agents/<AgentName>.md — the
-	// path that lets a minted phase ship its persona as pure data.
-	promptBody string
+	spec             phasespec.PhaseSpec
+	inlinePromptBody string
 }
 
 func (h hooks) PhaseName() string       { return h.spec.Name }
 func (h hooks) AgentPromptName() string { return h.spec.AgentName() }
 func (h hooks) DefaultModel() string    { return h.spec.ModelOrDefault() }
 
-// InlinePromptBody satisfies runner.InlinePromptProvider. ok is true only
-// when an in-band body was supplied; otherwise BaseRunner falls back to the
-// on-disk agent doc (byte-identical to the legacy path).
-func (h hooks) InlinePromptBody() (string, bool) { return h.promptBody, h.promptBody != "" }
+func (h hooks) InlinePromptBody() (string, bool) { return h.inlinePromptBody, h.inlinePromptBody != "" }
 
-// ArtifactFilename returns the basename of the first declared output file, or
-// the conventional "<name>-report.md" when none is declared. The registry may
-// store full templated paths (".evolve/runs/cycle-{cycle}/scout-report.md");
-// BaseRunner joins the basename with req.Workspace, so we strip the directory.
 func (h hooks) ArtifactFilename(_ core.PhaseRequest) string {
 	if files := h.spec.Outputs.Files; len(files) > 0 && files[0] != "" {
 		return filepath.Base(files[0])
@@ -55,11 +32,6 @@ func (h hooks) ArtifactFilename(_ core.PhaseRequest) string {
 	return h.spec.Name + "-report.md"
 }
 
-// ComposePrompt appends a "## Cycle Context" block to the agent body, mirroring
-// the hand-written phases. The keys listed in spec.prompt_context are pulled
-// from req.Context (only non-empty values are emitted). req.UpstreamSignals is
-// intentionally NOT injected here yet — declared-signal injection arrives with
-// the Stage 3 signal bus.
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
@@ -71,28 +43,18 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	return b.String()
 }
 
-// Classify evaluates the spec's declarative ClassifyRules against the artifact.
-// The next-phase hint comes from spec.OnPass (empty lets the orchestrator's
-// state machine pick the successor — Stage 1 behavior).
-//
-// The shadow record is written here rather than inside EvaluateClassify because
-// that function is pure and exhaustively unit-tested on that basis; this is the
-// I/O boundary. writeVerdictShadow is a no-op for every phase that has not
-// declared verdict_from_sentinel, so no phase pays for a measurement it did not
-// ask for and no phase name appears in Go.
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {
 	o := evaluate(artifact, h.spec.Classify)
-	rec, ok := shadowRecord(req.Cycle, h.spec.Name, sentinelStageOf(h.spec.Classify), o)
-	if err := writeVerdictShadow(req.Workspace, rec, ok); err != nil {
+	rec, optedIn := shadowRecord(req.Cycle, h.spec.Name, sentinelStageOf(h.spec.Classify), o)
+	if err := writeVerdictShadow(req.Workspace, rec, optedIn); err != nil {
 		o.diags = append(o.diags, core.Diagnostic{
 			Severity: "warn",
 			Message:  "verdict_from_sentinel: shadow record not written: " + err.Error(),
 		})
 	}
-	return o.effective, o.diags, h.spec.OnPass
+	return o.effectiveVerdict, o.diags, h.spec.OnPass
 }
 
-// sentinelStageOf reads the declared stage off possibly-absent rules.
 func sentinelStageOf(rules *phasespec.ClassifyRules) string {
 	if rules == nil {
 		return SentinelStageOff
@@ -100,62 +62,24 @@ func sentinelStageOf(rules *phasespec.ClassifyRules) string {
 	return rules.VerdictFromSentinel
 }
 
-// EvaluateClassify is the declarative verdict evaluator shared by specrunner and
-// built-in phases. Pure function (no I/O) so it is exhaustively unit-testable.
-//
-//   - empty artifact → FAIL when rules are absent or rules.FailIfEmpty is set
-//     (rules present with FailIfEmpty unset → an empty artifact is allowed to
-//     pass; the operator opted out explicitly)
-//   - every require_sections header must be present as a line-anchored markdown
-//     header, else FAIL
-//   - fail_if_signal is parsed but CANNOT be evaluated here — it needs the
-//     Stage 3 signal bus. A non-empty fail_if_signal is a HARD FAIL (the
-//     cycle-241 declared-semantics rejection: an inert gate must fail loudly,
-//     never silently pass — retro 215-231 Practice 4). The repo-catalog CI
-//     guard (phasespec.TestRepoPhaseCatalog_NoInertFailIfSignal) enforces the
-//     same invariant at authoring time so the rejection never fires mid-cycle
-//     (cycle-263: 15 mis-authored catalog phases hit this in production).
-//   - rules.VerdictOnPass overrides the pass verdict, but must be a canonical
-//     verdict (guards against silent typos in user phase JSON); else FAIL
-//   - rules.VerdictFromSentinel lets a JUDGMENT phase's own stated verdict
-//     decide (verdict_from_sentinel.go). Absent = byte-identical legacy
-//     behavior; "shadow" records the disagreement without routing on it;
-//     "enforce" makes the stated verdict authoritative. Runs LAST, so a stated
-//     verdict can never launder a structurally broken artifact, and fails open
-//     on an unreadable sentinel. An unknown stage word is a hard FAIL.
 func EvaluateClassify(artifact string, rules *phasespec.ClassifyRules) (string, []core.Diagnostic) {
 	o := evaluate(artifact, rules)
-	return o.effective, o.diags
+	return o.effectiveVerdict, o.diags
 }
 
-// classifyOutcome is one evaluation's full result. It exists so the VERDICT view
-// (EvaluateClassify) and the MEASUREMENT view (ClassifyShadow) are two readings
-// of ONE pass rather than two evaluators that can drift — the drift being
-// precisely what a shadow stage cannot survive, since a record that disagrees
-// with the routing it claims to describe measures nothing.
 type classifyOutcome struct {
-	structural string // what STRUCTURE alone concludes (the legacy verdict)
-	sentinel   string // the agent's own stated verdict; "" when absent/unusable
-	// consulted records that the sentinel stage actually ran the parse. A
-	// structural failure (or a typo'd stage word) returns before it, and
-	// without this bit "we looked and found nothing" is indistinguishable from
-	// "we never looked" — see VerdictShadowRecord.SentinelConsulted.
-	consulted bool
-	present   bool
-	effective string // what the caller actually gets, per stage
-	diags     []core.Diagnostic
+	structuralVerdict string
+	sentinelVerdict   string
+	sentinelConsulted bool
+	sentinelPresent   bool
+	effectiveVerdict  string
+	diags             []core.Diagnostic
 }
 
-// structuralOnly is the outcome for a decision reached before the sentinel stage
-// is ever consulted (empty artifact, missing sections, an inert gate). Those are
-// defects in the ARTIFACT or the CONFIG, and no stated verdict may launder them.
 func structuralOnly(verdict string, diags []core.Diagnostic) classifyOutcome {
-	return classifyOutcome{structural: verdict, effective: verdict, diags: diags}
+	return classifyOutcome{structuralVerdict: verdict, effectiveVerdict: verdict, diags: diags}
 }
 
-// evaluate runs the declarative rules once — the single pass that both the
-// verdict view and the measurement view read from. applySentinelStage runs LAST
-// and is a no-op for every phase that does not declare verdict_from_sentinel.
 func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
 	if strings.TrimSpace(artifact) == "" && (rules == nil || rules.FailIfEmpty) {
 		return structuralOnly(core.VerdictFAIL, []core.Diagnostic{{Severity: "error", Message: "phase produced an empty artifact"}})
@@ -194,17 +118,9 @@ func evaluate(artifact string, rules *phasespec.ClassifyRules) classifyOutcome {
 		}
 		verdict = rules.VerdictOnPass
 	}
-	return applySentinelStage(classifyOutcome{structural: verdict, effective: verdict}, artifact, rules.VerdictFromSentinel)
+	return applySentinelStage(classifyOutcome{structuralVerdict: verdict, effectiveVerdict: verdict}, artifact, rules.VerdictFromSentinel)
 }
 
-// hasSection reports whether section appears as a line-anchored markdown
-// header (the section text begins a line). Matching is heading-aware:
-// markdown heading markers (a "#"-run followed by whitespace) are stripped
-// from BOTH the rule and the line before the prefix compare, so
-// the rule "Baseline" matches "## Baseline" and the rule "## Findings" matches
-// a bare "Findings" line — one semantic, no dual matching modes (inbox
-// classify-heading-prefix-mismatch, 2026-06-07). Line anchoring still rejects
-// mid-line occurrences.
 func hasSection(artifact, section string) bool {
 	want := stripHeadingMarker(section)
 	for _, line := range strings.Split(artifact, "\n") {
@@ -215,45 +131,34 @@ func hasSection(artifact, section string) bool {
 	return false
 }
 
-// stripHeadingMarker trims s and removes a leading markdown heading marker —
-// a run of '#' followed by whitespace. A '#'-run glued to text ("##Findings")
-// is not a markdown heading and is left untouched.
 func stripHeadingMarker(s string) string {
 	s = strings.TrimSpace(s)
-	i := 0
-	for i < len(s) && s[i] == '#' {
-		i++
+	hashes := 0
+	for hashes < len(s) && s[hashes] == '#' {
+		hashes++
 	}
-	if i > 0 && i < len(s) && (s[i] == ' ' || s[i] == '\t') {
-		return strings.TrimSpace(s[i:])
+	isHeadingMarker := hashes > 0 && hashes < len(s) && (s[hashes] == ' ' || s[hashes] == '\t')
+	if isHeadingMarker {
+		return strings.TrimSpace(s[hashes:])
 	}
 	return s
 }
 
-// Config carries the runner dependencies, matching the hand-written phases.
 type Config struct {
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	// ContractVerifier is the deliverables gate's verifier accessor for the
-	// verdict engine (runner.Options.ContractVerifier): one verifier for gate
-	// and engine (research F22). nil = the catalog-aware default.
+	Bridge           core.Bridge
+	Prompts          *prompts.Loader
 	ContractVerifier func() runner.ContractVerifier
 	HostEffects      func() core.HostEffects
 	NowFn            func() time.Time
-	// PromptBody, when non-empty, is forwarded as the inline prompt body;
-	// empty (the default) loads agents/<AgentName>.md from disk — see the
-	// hooks.promptBody field for the full contract.
-	PromptBody string
+	PromptBody       string
 }
 
-// Phase is a spec-driven core.PhaseRunner.
 type Phase struct{ *runner.BaseRunner }
 
-// New constructs a spec-driven phase from a PhaseSpec.
 func New(spec phasespec.PhaseSpec, c Config) *Phase {
 	return &Phase{
 		BaseRunner: runner.New(runner.Options{
-			Hooks:            hooks{spec: spec, promptBody: c.PromptBody},
+			Hooks:            hooks{spec: spec, inlinePromptBody: c.PromptBody},
 			Bridge:           c.Bridge,
 			ContractVerifier: c.ContractVerifier,
 			HostEffects:      c.HostEffects,

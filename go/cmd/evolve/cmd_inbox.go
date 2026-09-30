@@ -25,11 +25,14 @@ func runInbox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "route-console" {
 		return runInboxRouteConsole(args[1:], stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "add" {
+		return runInboxAdd(args[1:], stdin, stdout, stderr)
+	}
 	if len(args) >= 1 && args[0] == "route-lane" {
 		return runInboxRouteLane(args[1:], stdout, stderr)
 	}
 	if len(args) < 1 || args[0] != "batches" {
-		fmt.Fprintln(stderr, "usage: evolve inbox <batches|quarantine|ack-fingerprint|consume|route-console|route-lane> ...")
+		fmt.Fprintln(stderr, "usage: evolve inbox <batches|add|quarantine|ack-fingerprint|consume|route-console|route-lane> ...")
 		return 10
 	}
 	return runInboxBatches(args[1:], stdout, stderr)

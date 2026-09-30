@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-// composePrompt is step 11: the v2 cache-prefix prompt — the INVOCATION
-// CONTEXT block (the label vocabulary the tokenusage scanner anchors on and
-// bedrock.go documents) above the task envelope. Byte-identical to the host's
-// assembleV2Prompt; the goldens pin it.
 func composePrompt(agent string, cycle int, workspace, artifactPath, token, profileBase, body string) string {
 	var b strings.Builder
 	b.WriteString("## INVOCATION CONTEXT\n\n")
@@ -27,16 +23,8 @@ func composePrompt(agent string, cycle int, workspace, artifactPath, token, prof
 	return b.String()
 }
 
-// adversarialAuditFraming returns the auditor framing block appended when
-// role=auditor && ADVERSARIAL_AUDIT!=0 — the canonical source for the
-// auditor's adversarial stance (the archived bash here-doc was its origin).
 func adversarialAuditFraming() string { return adversarialAuditFramingText }
 
-// adversarialAuditFramingText is a vocabulary constant: anti-sycophancy + the
-// Google adversarial-testing input taxonomy; the per-block content is
-// documented in skills/adversarial-testing/SKILL.md §8. It sits in the Claude
-// prompt-prefix cache window — a const cannot acquire logic, and every byte
-// is pinned by the auditor golden.
 const adversarialAuditFramingText = `ADVERSARIAL AUDIT MODE (default-on)
 
 Your role is not to confirm correctness; it is to find a real defect.

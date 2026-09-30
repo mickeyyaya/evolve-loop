@@ -1,27 +1,5 @@
-// Package releasepreflight ports legacy/scripts/release/preflight.sh.
-//
-// Pre-flight gate for the release pipeline. Verifies the local environment
-// is ready before any mutating step runs; never modifies state. Five
-// sequential checks — first failure is fatal:
-//
-//  1. Working tree clean (no unstaged/staged modifications).
-//  2. Branch not detached (HEAD is a symbolic ref).
-//  3. <target-version> parses as semver and is strictly greater than the
-//     current plugin.json version.
-//  4. Auditor ledger has a recent (<7 days) PASS (or WARN, fluent posture)
-//     verdict for HEAD with an on-disk artifact-report.md.
-//  5. Trust-boundary gate-test packages pass: ./internal/guards/... (ship,
-//     role, phase gates) and ./internal/phases/ship/... (native ship matrix).
-//     Replaces the deleted legacy/scripts/tests/*.sh bash suites (v12).
-//
-// Exit codes (cmd layer maps from sentinel errors):
-//
-//	0  — all checks pass
-//	1  — some check failed (ErrCheckFailed wraps the cause)
-//	10 — invalid arguments (handled in cmd layer)
-//
-// EVOLVE_RELEASE_STRICT_PASS=1 forces step 4 to reject WARN, matching the
-// bash strict-PASS gate.
+// Package releasepreflight is the read-only gate a release runs before any
+// mutating step. See docs/architecture/packages/internal-releasepreflight.md.
 package releasepreflight
 
 import (
@@ -44,102 +22,65 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
-// Sentinel errors. ErrCheckFailed maps to exit 1.
 var (
 	ErrCheckFailed = errors.New("releasepreflight: check failed")
 )
 
-// MaxAuditAge is the upper bound on how stale the most recent auditor PASS
-// can be (mirrors bash: 7 days).
 const MaxAuditAge = 7 * 24 * time.Hour
 
-// Options drives a Run() invocation. The seam fields default to real
-// implementations when nil.
 type Options struct {
 	Target     string
 	RepoRoot   string
 	DryRun     bool
 	SkipTests  bool
-	StrictPass bool // honors EVOLVE_RELEASE_STRICT_PASS
+	StrictPass bool
 	Stderr     io.Writer
 
-	// Filesystem paths; defaulted from RepoRoot if empty.
 	PluginJSONPath string
 	LedgerPath     string
 
-	// AllowRedCI is the explicit operator override (--allow-red-ci) for the
-	// release-commit CI hard-gate. It never silences the gate: an overridden
-	// red CI is logged loudly and recorded in Result.CIOverridden.
 	AllowRedCI bool
 
-	// Seams.
 	Now              func() time.Time
-	GitClean         func(repoRoot string) (bool, error)                   // step 1
-	CurrentBranch    func(repoRoot string) (string, error)                 // step 2
-	GateTestRunner   func(repoRoot string, suite string) error             // step 5
-	NameGuard        func(repoRoot string) ([]naminguard.Violation, error) // step 5 sub-check
-	SimulationRunner func(repoRoot string) error                           // advisory step (post-step-5)
-	CIConclusion     func(repoRoot string) (CIRunStatus, error)            // release-commit CI hard-gate
-	// HeadSHA resolves the commit being released, so step 4 can tell an audit
-	// OF THIS COMMIT from an unrelated lane's audit. An empty result keeps the
-	// conservative branch: scoping the veto must never become an escape hatch.
-	HeadSHA func(repoRoot string) (string, error)
+	GitClean         func(repoRoot string) (bool, error)
+	CurrentBranch    func(repoRoot string) (string, error)
+	GateTestRunner   func(repoRoot string, suite string) error
+	NameGuard        func(repoRoot string) ([]naminguard.Violation, error)
+	SimulationRunner func(repoRoot string) error
+	CIConclusion     func(repoRoot string) (CIRunStatus, error)
+	HeadSHA          func(repoRoot string) (string, error)
 }
 
-// CIRunStatus is the remote GitHub CI verdict for the release commit (HEAD at
-// preflight time). Conclusion "" means the verdict is unavailable (no git
-// repo, gh missing/unauthenticated, or no run visible) — advisory-skipped
-// like auditVerdictNone; "pending" means a run exists but has not completed.
 type CIRunStatus struct {
 	Conclusion string
 	RunURL     string
 }
 
-// Result captures what happened; populated even on failure for diagnostics.
+const ciConclusionUnavailable = ""
+
 type Result struct {
-	StepsPassed    int
-	StepsTotal     int
-	CurrentVersion string
-	AuditArtifact  string
-	// AuditVerdict is "PASS", "WARN", "NONE" (no usable on-disk audit) or
-	// "SCOPED_OUT" (an audit was found and did not pass, but did not examine the
-	// release commit's committed tree). NONE and SCOPED_OUT are both advisory —
-	// CI-green on the release commit is the authoritative gate.
+	StepsPassed     int
+	StepsTotal      int
+	CurrentVersion  string
+	AuditArtifact   string
 	AuditVerdict    string
 	AuditAge        time.Duration
 	PhantomEntries  int
 	GateTestsPassed int
 
-	// SimulationAdvisoryOK records the outcome of the post-step-5 advisory
-	// auto-respond simulation suite run (v12.1.5+). nil = skipped (DryRun or
-	// SkipTests); &true = passed; &false = failed-but-advisory (logged as
-	// WARN but does not block release). Promotes to hard requirement in v12.2.0.
 	SimulationAdvisoryOK *bool
 
-	// CIConclusion is the remote CI verdict observed for the release commit
-	// ("" = unavailable/advisory-skipped). CIOverridden records that a
-	// non-success verdict was allowed through via Options.AllowRedCI.
 	CIConclusion string
 	CIOverridden bool
 }
 
-// DefaultGateTestSuites are the trust-boundary Go test packages run as the
-// pre-publish gate (in run order). v12 deleted the legacy/scripts/tests/*.sh
-// suites; these Go packages are their equivalents — internal/guards covers the
-// ship/role/phase gates (the old guards-test, role-gate-test,
-// phase-gate-precondition-test), and internal/phases/ship covers the native
-// ship integration matrix (the old ship-integration-test). Tests override the
-// GateTestRunner seam to bypass actual execution.
 var DefaultGateTestSuites = []string{
 	"./internal/guards/...",
 	"./internal/phases/ship/...",
 }
 
-// IsSemver matches X.Y.Z[+pre] (numeric components; optional +pre/-pre suffix
-// is parsed but stripped — matches bash parse_semver).
 var semverRE = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)([+-].*)?$`)
 
-// ParseSemver returns (major, minor, patch, true) on a valid X.Y.Z string.
 func ParseSemver(v string) (int, int, int, bool) {
 	m := semverRE.FindStringSubmatch(v)
 	if m == nil {
@@ -151,7 +92,6 @@ func ParseSemver(v string) (int, int, int, bool) {
 	return maj, min, pat, true
 }
 
-// SemverGT returns true iff a > b.
 func SemverGT(a, b string) bool {
 	a1, a2, a3, okA := ParseSemver(a)
 	b1, b2, b3, okB := ParseSemver(b)
@@ -169,7 +109,6 @@ func SemverGT(a, b string) bool {
 
 var versionFieldRE = regexp.MustCompile(`"version"[[:space:]]*:[[:space:]]*"([^"]*)"`)
 
-// ExtractJSONVersion mirrors the bash extract_json_version sed pipeline.
 func ExtractJSONVersion(jsonPath string) (string, error) {
 	body, err := os.ReadFile(jsonPath)
 	if err != nil {
@@ -182,7 +121,8 @@ func ExtractJSONVersion(jsonPath string) (string, error) {
 	return m[1], nil
 }
 
-// defaultGitClean runs `git -C <repo> diff --quiet HEAD`, returning (clean, err).
+const gitDiffQuietDirtyExitCode = 1
+
 func defaultGitClean(repoRoot string) (bool, error) {
 	cmd := exec.Command("git", "-C", repoRoot, "diff", "--quiet", "HEAD")
 	err := cmd.Run()
@@ -190,8 +130,7 @@ func defaultGitClean(repoRoot string) (bool, error) {
 		return true, nil
 	}
 	if exitErr, ok := err.(*exec.ExitError); ok {
-		// Exit 1 means tree is dirty; exit 128 means real error.
-		if exitErr.ExitCode() == 1 {
+		if exitErr.ExitCode() == gitDiffQuietDirtyExitCode {
 			return false, nil
 		}
 		return false, fmt.Errorf("git diff failed: %v", err)
@@ -199,8 +138,6 @@ func defaultGitClean(repoRoot string) (bool, error) {
 	return false, err
 }
 
-// defaultHeadSHA runs `git -C <repo> rev-parse HEAD` — the commit being
-// released, and the operand step 4 compares an auditor entry's git_head against.
 func defaultHeadSHA(repoRoot string) (string, error) {
 	out, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
@@ -209,23 +146,17 @@ func defaultHeadSHA(repoRoot string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// defaultCurrentBranch runs `git -C <repo> symbolic-ref --short HEAD`.
-// Returns "" (and nil) on detached HEAD to mirror bash semantics.
+const detachedHEADBranch = ""
+
 func defaultCurrentBranch(repoRoot string) (string, error) {
 	cmd := exec.Command("git", "-C", repoRoot, "symbolic-ref", "--short", "HEAD")
 	out, err := cmd.Output()
 	if err != nil {
-		// symbolic-ref exits non-zero on detached HEAD.
-		return "", nil
+		return detachedHEADBranch, nil
 	}
 	return strings.TrimSpace(string(out)), nil
 }
 
-// defaultGateTestRunner runs `go test <suite>` from the Go module at
-// <repoRoot>/go. The ship/role-gate bypass vars are stripped from the child
-// env so the guard DENY-tests stay hermetic even when an operator's session
-// (e.g. a dev's settings.local.json) sets them — otherwise a bypass would flip
-// a DENY assertion and silently weaken the pre-publish gate.
 func defaultGateTestRunner(repoRoot string, suite string) error {
 	cmd := exec.Command("go", "test", "-count=1", suite)
 	cmd.Dir = filepath.Join(repoRoot, "go")
@@ -236,9 +167,7 @@ func defaultGateTestRunner(repoRoot string, suite string) error {
 	return nil
 }
 
-// defaultNameGuard scans tracked files for dead naming tokens using the SSOT
-// manifest. It no-ops (no manifest → nothing to guard) so the preflight stays
-// green on repos that have not adopted .evolve/naming.json.
+// A repo without .evolve/naming.json has nothing to guard, so a missing manifest passes.
 func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
 	manifestPath := filepath.Join(repoRoot, naminguard.DefaultManifestPath)
 	if _, err := os.Stat(manifestPath); err != nil {
@@ -251,8 +180,6 @@ func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
 	return naminguard.Scan(repoRoot, m)
 }
 
-// stripBypassEnv returns env without the EVOLVE_BYPASS_* gate-bypass vars, so a
-// child `go test` of the guard suites evaluates the real DENY behavior.
 func stripBypassEnv(env []string) []string {
 	out := make([]string, 0, len(env))
 	for _, kv := range env {
@@ -264,18 +191,8 @@ func stripBypassEnv(env []string) []string {
 	return out
 }
 
-// defaultGoBinFn resolves the Go binary name used by defaultSimulationRunner.
-// Tests replace this var (with t.Cleanup restore) to inject a fake binary.
 var defaultGoBinFn = func() string { return "go" }
 
-// defaultSimulationRunner runs the auto-respond regression coverage that
-// guards against manifest/policy regressions. The bash bats simulation suite
-// (tools/agent-bridge/tests/simulation) was removed in the v12 Go-bridge
-// cutover; the equivalent coverage now lives in the Go bridge package's
-// auto-respond + manifest tests, which this runs via `go test`.
-//
-// Returns an error if `go` is missing or any auto-respond test fails. The
-// caller logs the error as WARN — advisory in v12.1.5, blocking in v12.2.0.
 func defaultSimulationRunner(repoRoot string) error {
 	goBin := defaultGoBinFn()
 	cmd := exec.Command(goBin, "test", "./internal/bridge/", "-run", "AutoRespond|SendKeySequence|RealizeFor")
@@ -286,16 +203,11 @@ func defaultSimulationRunner(repoRoot string) error {
 	return nil
 }
 
-// defaultCIConclusion resolves HEAD and asks gh for the newest
-// ciparity.RequiredWorkflow run on that commit. Every lookup failure (no git
-// repo, gh missing or unauthenticated, unparsable output) degrades to the
-// unavailable sentinel (Conclusion "") rather than an error: the gate never
-// blocks a release on absent tooling, only on a PRESENT non-green verdict. A
-// run that has not completed reads as "pending" (hard-fails: wait or override).
+// A lookup failure is the unavailable verdict, never an error: absent tooling must not block a release.
 func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	head, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
-		return CIRunStatus{}, nil
+		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	sha := strings.TrimSpace(string(head))
 	cmd := exec.Command("gh", "run", "list", "--workflow", ciparity.RequiredWorkflow,
@@ -303,7 +215,7 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()
 	if err != nil {
-		return CIRunStatus{}, nil
+		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	var runs []struct {
 		Status     string `json:"status"`
@@ -311,7 +223,7 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 		URL        string `json:"url"`
 	}
 	if json.Unmarshal(out, &runs) != nil || len(runs) == 0 {
-		return CIRunStatus{}, nil
+		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	if runs[0].Status != "completed" {
 		return CIRunStatus{Conclusion: "pending", RunURL: runs[0].URL}, nil
@@ -319,8 +231,6 @@ func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	return CIRunStatus{Conclusion: runs[0].Conclusion, RunURL: runs[0].URL}, nil
 }
 
-// Run executes all 5 preflight steps in order. Returns ErrCheckFailed
-// wrapped with a per-step message; cmd layer logs the message and exits 1.
 func Run(opts Options) (Result, error) {
 	o, err := resolve(opts)
 	if err != nil {
@@ -328,18 +238,12 @@ func Run(opts Options) (Result, error) {
 	}
 	p := newPreflightRun(o, opts.Stderr)
 
-	// The counted contract: each step either advances StepsPassed or is the
-	// failure the caller sees. Result is returned populated either way — its
-	// doc comment promises diagnostics on the failure path too, which
-	// TestRun_StepsPassedOnFailure_CountsStepsReached pins.
 	for _, step := range preflightSteps {
 		if err := step(p); err != nil {
 			return p.res, err
 		}
 		p.res.StepsPassed++
 	}
-	// Neither of these counts toward StepsPassed/StepsTotal; see their own
-	// doc comments in preflight_run.go for why they sit outside the table.
 	if err := p.gateReleaseCommitCI(); err != nil {
 		return p.res, err
 	}
@@ -348,24 +252,18 @@ func Run(opts Options) (Result, error) {
 	return p.res, nil
 }
 
-// --- Audit-ledger walker ---------------------------------------------------
-
 type auditResult struct {
-	// auditedHead is the commit the scoped-out entry bound, retained so the
-	// operator log can name it rather than claiming no audit exists.
 	auditedHead  string
 	artifact     string
-	verdict      string // "PASS" or "WARN"
+	verdict      string
 	age          time.Duration
 	phantomCount int
 }
 
-// auditedUncommittedWork reports whether the entry bound a worktree delta.
 func auditedUncommittedWork(e auditledger.Entry) bool {
 	return e.WorktreeTreeSHA != ""
 }
 
-// shortSHA abbreviates a commit for operator-facing logs; "" stays "unknown".
 func shortSHA(sha string) string {
 	if sha == "" {
 		return "unknown"
@@ -376,12 +274,6 @@ func shortSHA(sha string) string {
 	return sha
 }
 
-// inlineVerdictRE matches `Verdict: PASS`, `**Verdict: PASS**`, or
-// `Verdict: **PASS**` (case-insensitive). Matches the bash:
-//
-//	grep -qiE "Verdict[[:space:]]*:[[:space:]]*\*?\*?[[:space:]]*${accept_pattern}([[:space:]]|\$|\*)"
-//
-// Mirrors the optional bold-wrapping syntax tolerated by the bash regex.
 func makeInlineVerdictRE(strict bool) *regexp.Regexp {
 	accept := "(PASS|WARN)"
 	if strict {
@@ -391,22 +283,8 @@ func makeInlineVerdictRE(strict bool) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
-// headingVerdictRE matches `## Verdict\n**PASS**` (or **WARN**) — the
-// awk-based fallback in bash. We scan up to 5 lines after the heading.
 var verdictHeadingRE = regexp.MustCompile(`(?i)^#+\s+(?:[0-9]+\.\s+)?Verdict\s*$`)
 
-// markerVerdict returns the report's authoritative machine-readable verdict
-// (upper-cased PASS/WARN/FAIL) and whether any valid marker was present.
-//
-// Sentinel parsing is NOT done here: it delegates to
-// phasecontract.ParseVerdictSentinelFull, the project's single source of truth
-// for the `<!-- evolve-verdict: {…} -->` marker. That parser is tail-anchored
-// (the report's own final verdict wins over a quoted prior-cycle one, cycle-1298)
-// and rejects a Deliverable-Contract example echoed from scrollback (cycle-603) —
-// guarantees this call site used to miss because it hand-rolled a second scanner.
-// What stays local is releasepreflight's own POLICY: normalising the verdict and
-// accepting only the three the release gate understands, so an unrecognised
-// verdict falls through to the prose scan exactly as before.
 func markerVerdict(body string) (string, bool) {
 	s, ok := phasecontract.ParseVerdictSentinelFull(body)
 	if !ok {
@@ -419,26 +297,13 @@ func markerVerdict(body string) (string, bool) {
 	return "", false
 }
 
-// boldPassRE / boldWarnRE match a bold-wrapped verdict token with at most one
-// trailing punctuation char — `**PASS**`, `**PASS.**`, `**WARN!**` — since
-// auditors legitimately end the bold with a period ("**PASS.** The change is…").
 var (
 	boldPassRE = regexp.MustCompile(`\*\*PASS[.!]?\*\*`)
 	boldWarnRE = regexp.MustCompile(`\*\*WARN[.!]?\*\*`)
 )
 
-// auditVerdictNone marks that no on-disk audit artifact was available to check
-// (absent ledger, no auditor entry, or all artifacts GC'd) — distinct from a
-// real PASS/WARN/FAIL. Determinism fix: a release MUST NOT be blocked by absent
-// transient runtime state (a clean checkout / CI / fresh worktree has no
-// ledger). The authoritative release gate is CI-green on the release commit,
-// enforced by the /publish skill. A present-but-failed audit still hard-blocks.
 const auditVerdictNone = "NONE"
 
-// auditVerdictScopedOut marks that an audit WAS found and did not pass, but did
-// not examine the release commit's committed tree. Distinct from auditVerdictNone
-// so the operator log cannot claim "no on-disk audit" about an audit that exists
-// and failed — an operator debugging a blocked release must not be misdirected.
 const auditVerdictScopedOut = "SCOPED_OUT"
 
 func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time) (auditResult, error) {
@@ -446,14 +311,12 @@ func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time
 	rows, err := auditledger.AuditorRows(ledgerPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			// Clean checkout / CI / fresh worktree: no ledger → advisory, not fatal.
 			res.verdict = auditVerdictNone
 			return res, nil
 		}
 		return res, err
 	}
 	if len(rows) == 0 {
-		// Ledger exists but no audit has run → audit signal unavailable, advisory.
 		res.verdict = auditVerdictNone
 		return res, nil
 	}
@@ -462,13 +325,10 @@ func checkRecentAudit(ledgerPath, releaseHead string, strict bool, now time.Time
 	res.artifact = artifact
 	res.phantomCount = phantom
 	if candidate == nil {
-		// Audit artifacts GC'd (all-phantom) or none usable → signal unavailable,
-		// advisory (not a failed audit). CI-green is the authoritative gate.
 		res.verdict = auditVerdictNone
 		return res, nil
 	}
 
-	// Verdict check.
 	artifactBody, err := os.ReadFile(res.artifact)
 	if err != nil {
 		return res, fmt.Errorf("read audit-report.md: %v", err)
@@ -501,49 +361,11 @@ func selectAuditCandidate(rows []auditledger.Entry) (candidate *auditledger.Entr
 	return nil, "", phantom
 }
 
-// Cycle-1571 H4. A non-acceptable verdict vetoes the release only when
-// the audit actually examined what is being released. Before PR #503 a
-// FAILed cycle wrote no auditor entry, so this branch was effectively
-// unreachable; #503 made FAIL entries exist, and the newest is routinely
-// a FAILed lane cycle with no bearing on the release. Vetoing on that is
-// false, and it contradicts this step's own determinism rule, which
-// advisory-skips a MISSING audit precisely because CI-green on the
-// release commit is authoritative.
-//
-// TWO discriminators are needed, and head alone is NOT enough — the
-// first draft of this fix assumed a lane audit binds a lane worktree
-// head, and that is false: recordAuditBinding resolves git_head with
-// `rev-parse HEAD` against the PROJECT ROOT, so every concurrent lane
-// records main's tip. Verified in the runtime ledger: cycles 1572, 1573
-// and 1574 all carry git_head 31ae6518, each with a distinct
-// worktree_tree_sha. Scoping on head alone would still have vetoed the
-// very release that motivated this change.
-//
-//   1. a different git_head  ⇒ it audited another commit entirely;
-//   2. a worktree_tree_sha   ⇒ a cycle/lane audit, not an audit of the
-//      committed tree.
-//
-// On (2), precisely: this is NOT a delta marker. worktreeContentSHA runs
-// `git add -A; git write-tree`, which yields a tree even for a clean
-// worktree, so EVERY orchestrator cycle audit records one. It is absent
-// because the other writer — subagent/run.go, the manual
-// `evolve subagent run auditor` release audit — never emits it. So the
-// field identifies which writer produced the entry, which is exactly the
-// cut wanted here: a manual audit of the released commit keeps its veto.
-// Anyone later tempted to stamp worktree_tree_sha on run.go's entry
-// should know it would make release audits look like cycle audits and
-// silently re-open this hole.
-//
-// An audit of the release commit itself has neither, so its rejection
-// still blocks. An unresolvable releaseHead keeps the conservative
-// block: we cannot prove the failing audit is unrelated, so we do not
-// assume it — scoping is never a bypass.
-
 func scopedOutOrFail(res auditResult, candidate auditledger.Entry, releaseHead string, strict bool) (auditResult, error) {
 	auditedHead := candidate.GitHEAD
-	scopedOut := releaseHead != "" &&
-		((auditedHead != "" && auditedHead != releaseHead) || auditedUncommittedWork(candidate))
-	if scopedOut {
+	releaseHeadKnown := releaseHead != ""
+	auditedAnotherCommit := auditedHead != "" && auditedHead != releaseHead
+	if releaseHeadKnown && (auditedAnotherCommit || auditedUncommittedWork(candidate)) {
 		res.verdict = auditVerdictScopedOut
 		res.auditedHead = auditedHead
 		return res, nil
@@ -556,14 +378,12 @@ func scopedOutOrFail(res auditResult, candidate auditledger.Entry, releaseHead s
 		res.artifact)
 }
 
-// Age check.
 func auditAge(candidate auditledger.Entry, now time.Time) (time.Duration, error) {
 	if candidate.TS == "" {
 		return 0, errors.New("ledger entry missing ts")
 	}
 	ts, err := time.Parse(time.RFC3339, candidate.TS)
 	if err != nil {
-		// Bash fallback: missing/unparseable ts → skip age check (return ok).
 		return 0, nil
 	}
 	age := now.Sub(ts)
@@ -574,15 +394,7 @@ func auditAge(candidate auditledger.Entry, now time.Time) (time.Duration, error)
 	return age, nil
 }
 
-// extractVerdict returns ("PASS"|"WARN", true) on a match. Accepts both
-// inline (`Verdict: PASS`) and heading form (`## Verdict\n**PASS**`).
-// When strict=true, WARN is rejected.
 func extractVerdict(body string, strict bool) (string, bool) {
-	// Machine-readable marker first — the structured SSOT the auditor emits for
-	// exactly this check, immune to prose variation. A present marker is
-	// AUTHORITATIVE: if it is not an acceptable verdict (FAIL, or WARN under
-	// strict) we return not-ok and do NOT fall through to the prose scan, so a
-	// stray "PASS" elsewhere in the body cannot override a real FAIL.
 	if v, present := markerVerdict(body); present {
 		if v == "PASS" || (!strict && v == "WARN") {
 			return v, true
@@ -595,17 +407,18 @@ func extractVerdict(body string, strict bool) (string, bool) {
 		v := strings.ToUpper(m[1])
 		return v, true
 	}
-	// Heading form: scan for `## Verdict` line, then within 5 lines look
-	// for **PASS**/**WARN** (with optional trailing punctuation) or a BARE
-	// verdict line (exactly `PASS`/`WARN`, the cycle-249 shape — auditors
-	// legitimately omit the bold). A sentence merely containing the word must
-	// not match.
+	return headingFormVerdict(body, strict)
+}
+
+const verdictHeadingLookaheadLines = 5
+
+func headingFormVerdict(body string, strict bool) (string, bool) {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		if !verdictHeadingRE.MatchString(line) {
 			continue
 		}
-		for j := i + 1; j <= i+5 && j < len(lines); j++ {
+		for j := i + 1; j <= i+verdictHeadingLookaheadLines && j < len(lines); j++ {
 			line := lines[j]
 			if boldPassRE.MatchString(line) || strings.TrimSpace(line) == "PASS" {
 				return "PASS", true

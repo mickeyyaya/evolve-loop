@@ -1,10 +1,5 @@
 package ciparitygate
 
-// vocabulary_test.go — review fold (architecture MEDIUM 2): the step / cause /
-// reason vocabularies the three doc strings enumerate are typed closed sets
-// with ONE home (vocabulary.go); the event field and the registered doc
-// (rendered into docs/architecture/signal-codes.md) are two projections of it.
-
 import (
 	"go/ast"
 	"go/parser"
@@ -17,19 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// typedConst is one `name <typ> = "<value>"` declaration in the leaf's
-// production sources.
 type typedConst struct{ typ, name, value string }
 
-// Test 40 — (a) the three sets are duplicate-free; (b) EVERY gateStep /
-// gateCause / lockReason const the leaf's production sources declare is a
-// member of its rendered set (go/ast over the package, so a tenth step added
-// beside a call site cannot leave the doc stale) and no production line
-// converts a bare literal into one of the types; (c) the registered doc of
-// each code carries its set rendered verbatim and no unit doc carries a raw
-// pipe (the renderer writes docs into markdown table cells unescaped); (d)
-// each field has ONE writer — the typed producer — so no call site can spell
-// a literal past the type.
 func TestVocabulary_TypedConstsAreTheRenderedClosedSets(t *testing.T) {
 	sets := map[string][]string{"gateStep": asStrings(gateSteps), "gateCause": asStrings(gateCauses), "lockReason": asStrings(lockReasons)}
 	for typ, values := range sets {
@@ -75,9 +59,6 @@ func TestVocabulary_TypedConstsAreTheRenderedClosedSets(t *testing.T) {
 	}
 }
 
-// scanVocabulary parses the leaf's production files and returns every const
-// declared with one of the vocabulary types plus every conversion call
-// (`gateStep("…")`) found in code.
 func scanVocabulary(t *testing.T, types map[string][]string) (decls []typedConst, conversions []string) {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -133,7 +114,6 @@ func typedConstsOf(spec *ast.ValueSpec, types map[string][]string) []typedConst 
 	return out
 }
 
-// productionOccurrences counts needle across the leaf's production sources.
 func productionOccurrences(t *testing.T, needle string) int {
 	t.Helper()
 	n := 0

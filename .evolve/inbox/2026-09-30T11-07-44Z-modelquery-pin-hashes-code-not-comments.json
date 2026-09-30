@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A comment-only edit to a decision-surface file leaves the pin unchanged; a code edit changes it (red first)",
+    "The five files carry no comments beyond the package doc"
+  ],
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/modelquery/decisionversion_pin_test.go",
+    "go/internal/modelquery/classifier.go",
+    "go/internal/modelquery/latest.go",
+    "go/internal/modelquery/complete.go",
+    "go/internal/modelquery/lineage.go",
+    "go/internal/modelquery/newestwins.go",
+    "go/internal/modelquery/ollama_classifier_test.go"
+  ],
+  "fix": "Hash a comment-stripped code shape (commentaudit's shape) so the pin tracks the algorithm only; strip the five files; delete the comment-reading test; make the nil-run test assert; fix the doc.",
+  "id": "modelquery-pin-hashes-code-not-comments",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "TestDecisionVersion_PinnedToAlgorithmSurface hashes the raw bytes of classifier.go, latest.go, complete.go, lineage.go and newestwins.go, so any comment edit forces a pin change and round 12 deferred them (stripped copies and the new pin are in the round-12 scratchpad). TestOllamaListMetadataExceptionDocumented reads a comment in ollama.go, which conflicts with the zero-comment rule; TestOllamaListerReachesNoModel already pins the behaviour. TestOllamaLister_NilRunDefaultsToExecRunner asserts nothing when ollama is installed. docs/architecture/model-discovery-and-catalog.md still lists agy under RecipeLister.",
+  "title": "modelquery's decision-surface pin hashes raw bytes, comments included, so five files cannot shed their comments",
+  "weight": 0.35
+}

@@ -156,7 +156,7 @@ func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testi
 		if err == nil {
 			t.Fatal("fixed-pack RED must fail the ship")
 		}
-		for _, suite := range []string{"phasespec", "profiles", "phasecoherence", "routingtest", "rawgitratchet"} {
+		for _, suite := range []string{"phasespec", "profiles", "phasecoherence", "routingtest", "rawgitratchet", "sizeratchet", "testmainexit", "repocontract", "policy", "guards", "acssuite", "fleet"} {
 			if !strings.Contains(err.Error(), suite) {
 				t.Errorf("fixed-pack RED must keep naming the guard suite %q so the operator knows where to look, got %q", suite, err)
 			}

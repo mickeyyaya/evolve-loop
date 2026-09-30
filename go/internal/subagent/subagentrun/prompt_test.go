@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// golden reads a pre-extraction golden with the fixture paths substituted.
 func golden(t *testing.T, name string, pairs ...string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", name))
@@ -22,9 +21,6 @@ func golden(t *testing.T, name string, pairs ...string) string {
 	return s
 }
 
-// Test 34 — composePrompt and the framing constant reproduce the five goldens
-// captured on the pre-extraction code, through the dispatcher and directly;
-// the framing carries its load-bearing blocks.
 func TestPrompt_GoldensReplayAndFramingConstant(t *testing.T) {
 	f := newFixture(t)
 	pairs := []string{"{WS}", f.ws, "{WORKTREE}", f.worktree, "{ROOT}", f.root}

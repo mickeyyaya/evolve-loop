@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`evolve routing plan --cycle N` against a fake bridge prints the parsed plan and writes nothing under runs/cycle-N (red: unknown subcommand)",
+    "The prompt it sends equals the one the cycle composes for the same inputs (one composer, a test compares them)",
+    "An unknown cycle exits 1; an advisor launch failure exits 2 with the cause"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/cmd_routing.go",
+    "go/internal/core/advisor",
+    "go/internal/core/phase_advisor.go"
+  ],
+  "fix": "Add `evolve routing plan --cycle N [--goal-text T]`. It builds the advisor's input from cycle N's recorded state (or from the goal), runs the advisor through core/advisor's launcher and profile fallback chain, and prints the plan and its rationale. It writes nothing into the cycle. It reuses the cycle's prompt composer and plan parser rather than a copy. Exit 0; exit 1 for an unknown cycle; exit 2 when the advisor launch fails. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-routing-plan",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve routing` offers explain and replay (cmd_routing.go:18-25), both over a decision a cycle already recorded, and `evolve resolve-llm` maps one role to a CLI. Nothing asks the phase advisor to plan a given cycle or goal on demand. Checking how a routing, profile or phase-config change would plan a cycle therefore takes a live cycle.",
+  "title": "`evolve routing` only explains a recorded decision; add `routing plan --cycle N` to ask the phase advisor for a plan without a cycle",
+  "weight": 0.25
+}

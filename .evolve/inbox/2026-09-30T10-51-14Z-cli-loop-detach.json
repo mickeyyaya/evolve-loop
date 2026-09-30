@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve loop --detach --log F` with a fake child that writes a run lease prints the child's pid and exits 0 (red: flag provided but not defined)",
+    "A child that exits during boot returns 1 with the log tail",
+    "The detached child keeps running after the parent exits (session-leader test)"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_args.go",
+    "go/cmd/evolve/cmd_loop.go"
+  ],
+  "fix": "Add `--detach --log F` to `evolve loop`. It re-execs the same argv without --detach in a new session, with stdout and stderr going to F, and prints the child's pid and the log path. It then waits (bounded by policy config) until the run lease appears or the child exits, and prints the boot verdict. Exit 0 when the loop is running; exit 1 when the child exited during boot, with the log's last lines; --detach without --log exits 10. Document it in runtime-reference.md's launch step.",
+  "id": "cli-loop-detach",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve loop` runs only in the foreground (cmd_loop_args.go:37-53 has no detach flag), and a synchronous launch from an agent session hangs. So every boundary launches it with nohup, a log redirect and `&`, then checks the pid and greps the log for the boot line. A launch that dies at preflight or boot is noticed only when someone next reads the log.",
+  "title": "Launching the loop detached and confirming it booted is nohup, a log redirect and a pid check by hand; add `evolve loop --detach`",
+  "weight": 0.75
+}

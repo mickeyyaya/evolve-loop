@@ -1,24 +1,3 @@
-// RED contract for cycle-1255 task `retro-fleet-worktree-empty-fallback`.
-//
-// The window: when a fleet lane's worktree is gone (post-teardown) or was never
-// provisioned (exhausted retries), retro dispatches with req.Worktree == "". The
-// bridge's fleet guard (errWorktreeRequired, driver_tmux_repl.go:27) then refuses
-// the launch and the knowledge-capture phase degrades to FAIL-not-adopted every
-// time this window is hit.
-//
-// The fix retro must make: supply its OWN disposable cwd under the workspace it
-// already owns (the applyScratchCwd precedent, scratch_cwd.go:22) so the launch
-// carries a real, isolated, writable directory. Retro is read-mostly and
-// Evaluate-archetype, so a scratch cwd is sufficient for it.
-//
-// Anti-goals these tests pin, because the naive fixes are the dangerous ones:
-//   - NEVER point retro at the shared main tree (req.ProjectRoot) — PR #400 was
-//     refuted on exactly that; worktree is the write-authority predicate.
-//   - NEVER fall through to the dispatching process's cwd — that is the very
-//     leak the fleet guard exists to close.
-//   - NEVER widen the bridge guard itself (covered by the untouched
-//     driver_tmux_repl_workdir_test.go fleet-refusal tests, which must stay green).
-//   - NEVER clobber a real worktree when one WAS provisioned.
 package retro
 
 import (
@@ -31,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// retroFailReq builds the minimal PhaseRequest that drives retro down the bridge
-// path (previous verdict FAIL — a PASS short-circuits to SKIPPED with no launch).
 func retroFailReq(projectRoot, workspace, worktree string, env map[string]string) core.PhaseRequest {
 	return core.PhaseRequest{
 		Cycle:       1255,
@@ -44,12 +21,6 @@ func retroFailReq(projectRoot, workspace, worktree string, env map[string]string
 	}
 }
 
-// TestRetro_EmptyWorktree_FallsBackToScratchUnderWorkspace — AC1 (the crux).
-// Fleet mode, empty worktree: retro must still dispatch, and the BridgeRequest it
-// hands the bridge must carry a NON-EMPTY worktree that is a real directory
-// living under the workspace retro already owns. Asserting on the captured
-// BridgeRequest (not on a source string) is what makes this behavioural: it is
-// the exact value the fleet guard reads.
 func TestRetro_EmptyWorktree_FallsBackToScratchUnderWorkspace(t *testing.T) {
 	ws := t.TempDir()
 	projectRoot := t.TempDir()
@@ -73,10 +44,6 @@ func TestRetro_EmptyWorktree_FallsBackToScratchUnderWorkspace(t *testing.T) {
 	}
 }
 
-// TestRetro_EmptyWorktree_NeverMainTreeOrProcessCwd — AC2, the NEGATIVE axis.
-// The two shapes that would satisfy AC1's "non-empty" letter while reintroducing
-// the exact defect the guard exists to prevent: pointing at the shared main tree
-// (the refuted PR #400 pattern) or at the dispatching process's cwd.
 func TestRetro_EmptyWorktree_NeverMainTreeOrProcessCwd(t *testing.T) {
 	ws := t.TempDir()
 	projectRoot := t.TempDir()
@@ -99,10 +66,6 @@ func TestRetro_EmptyWorktree_NeverMainTreeOrProcessCwd(t *testing.T) {
 	}
 }
 
-// TestRetro_RealWorktree_PassedThroughUnchanged — AC3. A lane that DID provision
-// its worktree must be dispatched against that worktree verbatim. A fallback that
-// fires unconditionally would silently strand every normal retro in a scratch dir
-// with no repo — the blind-widen regression this task's own notes name.
 func TestRetro_RealWorktree_PassedThroughUnchanged(t *testing.T) {
 	ws := t.TempDir()
 	worktree := t.TempDir()
@@ -121,11 +84,6 @@ func TestRetro_RealWorktree_PassedThroughUnchanged(t *testing.T) {
 	}
 }
 
-// TestRetro_EmptyWorktreeAndWorkspace_NoFabricatedPath — AC4, the EDGE axis.
-// With no owned workspace there is nowhere safe to mint a scratch dir. Retro must
-// degrade to today's behaviour (leave Worktree empty and let the bridge decide)
-// rather than fabricate a path — and it must not panic or return a hard error,
-// because a failure in the failure-handler must never abort the batch (GAP 9).
 func TestRetro_EmptyWorktreeAndWorkspace_NoFabricatedPath(t *testing.T) {
 	fb := &fakeBridge{}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})

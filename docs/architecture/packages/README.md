@@ -60,3 +60,20 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/acssuite` | the deterministic, host-side EGPS predicate-suite runner: Go lane, scope lint, phantom-binding classification, evidence sealing | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/phases/triage` | the cycle-scope task-selection phase: prompt composition, protected-surface routing, premise drift, carry-forward candidates | [internal-phases-triage.md](internal-phases-triage.md) |
 | `internal/flagregistry` | the declarative SSOT for every `EVOLVE_*` control flag across every reader surface | [internal-flagregistry.md](internal-flagregistry.md) |
+| `cmd/evolve-fake-cli` | the offline stand-in for the claude, codex and agy binaries in E2E tests | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
+| `internal/auditchain` | the audit verdict as the conclusion of a seven-link reasoning chain across the phases | [internal-auditchain.md](internal-auditchain.md) |
+| `internal/commitgate` | the pre-commit quality gate `evolve commit-gate run` runs for `/commit` | [internal-commitgate.md](internal-commitgate.md) |
+| `internal/dashboard` | the read-only local web UI behind `evolve dashboard` | [internal-dashboard.md](internal-dashboard.md) |
+| `internal/faillearn` | the kernel-owned failure floor that writes the retrospective and lesson when the retro cannot run | [internal-faillearn.md](internal-faillearn.md) |
+| `internal/gitexec` | the git CLI behind one small injectable type | [internal-gitexec.md](internal-gitexec.md) |
+| `internal/modelquery` | live model-catalog acquisition: each CLI's model list, classified into the canonical tiers | [internal-modelquery.md](internal-modelquery.md) |
+| `internal/phases/audit/ciparitygate` | the audit phase's five CI-parity gates | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
+| `internal/phases/retro` | the retrospective phase that runs after a FAIL or WARN verdict | [internal-phases-retro.md](internal-phases-retro.md) |
+| `internal/phases/specrunner` | turns a declarative phase spec into a runnable phase with no per-phase Go | [internal-phases-specrunner.md](internal-phases-specrunner.md) |
+| `internal/releasepipeline` | the driver behind `evolve release X.Y.Z` | [internal-releasepipeline.md](internal-releasepipeline.md) |
+| `internal/releasepreflight` | the read-only gate a release runs before any mutating step | [internal-releasepreflight.md](internal-releasepreflight.md) |
+| `internal/rollback` | reverts a failed release in three independently auditable steps | [internal-rollback.md](internal-rollback.md) |
+| `internal/scopedelta` | adjudicates a phase agent's out-of-scope changes on what they mean | [internal-scopedelta.md](internal-scopedelta.md) |
+| `internal/setup` | the deterministic core behind `evolve setup` and `/evo:setup` | [internal-setup.md](internal-setup.md) |
+| `internal/skillcheck` | renders every generated plugin surface from its single source (ADR-0040) | [internal-skillcheck.md](internal-skillcheck.md) |
+| `internal/subagent/subagentrun` | the `evolve subagent run` execution path | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |

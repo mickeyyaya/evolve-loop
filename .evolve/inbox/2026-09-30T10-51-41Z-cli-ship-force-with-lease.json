@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve ship --class manual --force-with-lease` on a diverged feature-branch fixture pushes with the lease (red: flag provided but not defined)",
+    "On main, or with --class cycle, it exits 1 and pushes nothing",
+    "A remote that moved after ship observed it fails the lease, and ship reports it"
+  ],
+  "created_at": "2026-09-30T10:51:41Z",
+  "files": [
+    "go/cmd/evolve/cmd_ship.go",
+    "go/internal/phases/ship/landing"
+  ],
+  "fix": "Add `--force-with-lease` to `evolve ship --class manual`. It pushes with --force-with-lease=<branch>:<the remote SHA ship observed>, and only when the current branch is not main and not in the protected-branch list from policy config. The cycle and release classes never accept it. A refusal exits 1 naming the rule. Document it in runtime-reference.md's ship classes.",
+  "id": "cli-ship-force-with-lease",
+  "kind": "feature",
+  "priority_class": "security",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "The ship guard denies raw `git push` (internal/guards/ship.go:22), and ship's push and repair ladder never force-push (internal/phases/ship/landing/push.go:111). When a console branch is amended or rebased after its first push (a review fix, a rebase onto main), `evolve ship --class manual` is rejected as diverged. The only way forward is `git push --force-with-lease` under a guard bypass, which also switches the guard off for anything else in that command.",
+  "title": "Re-shipping a diverged feature branch needs a raw force push under a guard bypass; add `--force-with-lease` to the manual ship",
+  "weight": 0.3
+}

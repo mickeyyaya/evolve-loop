@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// reviewWaiver returns why the change needs no reviewer, or why it still does.
-// Only a comment removal qualifies: at least one Go file proven comment-only
-// against HEAD, and nothing else but Markdown under docs/. It lists the whole
-// change itself with renames split, so neither a --files selection nor a
-// rename can hide a path from it. See docs/conventions/code-comments.md.
 func (o Options) reviewWaiver(ctx context.Context) (waived, refused string) {
 	out, _, code, err := sysexec.Capture(ctx, o.Runner, o.RepoRoot, "git", "diff", "--name-only", "--no-renames", "HEAD")
 	if err != nil || code > 1 {
@@ -54,8 +49,6 @@ func (o Options) notWaivable(ctx context.Context, path string) string {
 	return "neither Go nor Markdown under docs/"
 }
 
-// isRegularFile refuses symlinks and deletions: a symlink would let a path that
-// looks like docs or Go point at content the proof never saw.
 func (o Options) isRegularFile(path string) bool {
 	info, err := os.Lstat(filepath.Join(o.RepoRoot, path))
 	return err == nil && info.Mode().IsRegular()

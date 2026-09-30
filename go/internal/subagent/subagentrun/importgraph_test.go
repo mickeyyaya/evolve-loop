@@ -1,11 +1,5 @@
 package subagentrun
 
-// importgraph_test.go — the package is a leaf under internal/subagent
-// (ADR-0103 unit 16 §2): stdlib plus the three named internal packages, never
-// internal/subagent, internal/core, internal/bridge, capability or resolvellm
-// (the compiler is the cycle guard; this is the leaf-ness declaration —
-// signalcenter/importgraph_test.go idiom).
-
 import (
 	"go/parser"
 	"go/token"

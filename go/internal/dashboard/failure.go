@@ -12,14 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Workspace artifact names the failure panel reads. The writers are named so a
-// reader can audit the join: failure-decision.json (retro, validated by
-// core/failure_decision.go), disposition.json (retro, gated by
-// core/disposition_gate.go), audit-fail-reason.json (coherence floor,
-// core/system_failure.go), failure-digest.json (core/failure_digest.go). The
-// audit report's name and its round archives come from the phase registry
-// (phasecontract.ArtifactFilename / RoundArchiveFilename / ParseRoundArchive)
-// — the same functions the writer core/audit_round_artifacts.go uses.
 const (
 	failureDecisionFile = "failure-decision.json"
 	dispositionFile     = "disposition.json"
@@ -27,7 +19,6 @@ const (
 	failureDigestFile   = "failure-digest.json"
 )
 
-// auditReportName / buildReportName are the registry-derived report files.
 var (
 	auditReportName = phasecontract.ArtifactFilename(string(core.PhaseAudit))
 	buildReportName = phasecontract.ArtifactFilename(string(core.PhaseBuild))
@@ -62,10 +53,6 @@ type failureDigest struct {
 	PreClass    string `json:"pre_class"`
 }
 
-// readFailure assembles the "what went wrong" panel from the workspace, falling
-// back to the committed dossier's failure record when the workspace is gone.
-// Returns nil when there is nothing to report (a PASS, or no artifacts at all).
-// An unreadable or torn artifact is a warning, never silently "absent".
 func readFailure(ws string, d *dossier.Dossier) (*Failure, []string) {
 	f := &Failure{}
 	var warnings []string
@@ -117,12 +104,6 @@ func readFailure(ws string, d *dossier.Dossier) (*Failure, []string) {
 	return f, warnings
 }
 
-// readAuditRounds lists the workspace for the audit report's round archives
-// (phasecontract.ParseRoundArchive — indices are NOT contiguous: a dispatch
-// that died before writing its report archives nothing while the counter
-// still advances), sorts them by index, and appends the live final report as
-// the round after the highest archived index. Each round's delta is computed
-// against the previous one that exists. Unreadable files are warnings.
 func readAuditRounds(ws string) ([]AuditRound, []string) {
 	entries, err := os.ReadDir(ws)
 	if err != nil {
@@ -160,18 +141,15 @@ func readAuditRounds(ws string) ([]AuditRound, []string) {
 			Findings: findings, Resolved: resolved, New: fresh, Carried: carried})
 		prev = findings
 	}
-	last := 0
+	highestArchivedIndex := 0
 	for _, a := range archives {
 		add(a.index, a.name)
-		last = a.index
+		highestArchivedIndex = a.index
 	}
-	add(last+1, auditReportName)
+	add(highestArchivedIndex+1, auditReportName)
 	return rounds, warnings
 }
 
-// reportVerdict mirrors phases/audit.extractAuditVerdict's order: the
-// machine-readable sentinel is authoritative; the shared prose grammar is the
-// fallback for reports written against older templates.
 func reportVerdict(markdown string) string {
 	if v, ok := phasecontract.ParseVerdictSentinel(markdown); ok {
 		return v

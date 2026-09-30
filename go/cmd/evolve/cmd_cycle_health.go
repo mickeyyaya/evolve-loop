@@ -33,14 +33,7 @@ func runCycleHealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve cycle-health: invalid cycle %q\n", rest[0])
 		return 10
 	}
-	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
-	if projectRoot == "" {
-		projectRoot = filepath.Dir(filepath.Dir(filepath.Dir(rest[1])))
-	}
-	projectRoot = paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
-		fmt.Fprintf(stderr, "evolve cycle-health: WARN: %s\n", m)
-	})
-	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	pol, err := policy.Load(filepath.Join(cycleHealthRoot(rest[1], stderr), ".evolve", "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle-health: %v\n", err)
 		return 1
@@ -67,4 +60,14 @@ func runCycleHealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "[cycle-health] verdict: OK (%d signal(s) ran, %d warn(s))\n",
 		len(res.SignalsRun), len(res.Anomalies))
 	return 0
+}
+
+func cycleHealthRoot(workspace string, stderr io.Writer) string {
+	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
+	if projectRoot == "" {
+		projectRoot = filepath.Dir(filepath.Dir(filepath.Dir(workspace)))
+	}
+	return paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
+		fmt.Fprintf(stderr, "evolve cycle-health: WARN: %s\n", m)
+	})
 }

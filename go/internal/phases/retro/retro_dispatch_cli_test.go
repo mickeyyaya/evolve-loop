@@ -1,13 +1,5 @@
 package retro
 
-// retro_dispatch_cli_test.go — the cycle-107 class, pinned at the DISPATCH
-// level this time: retro's hand-rolled runner consulted only EVOLVE_CLI and
-// hardcoded claude-tmux, so editing retrospective.json's cli had no effect —
-// the 2026-08-26 deep-tier sol arrangement's flagship flip (retro = ~40% of
-// deep dispatch volume) was dead on arrival until review reproduced it
-// against the dispatched BridgeRequest. These pins assert the REQUEST the
-// bridge receives, never the JSON file.
-
 import (
 	"context"
 	"encoding/json"

@@ -1,13 +1,5 @@
 package dashboard
 
-// plan_test.go — the per-cycle phase plan the board renders: the registry's
-// mandatory set (config.mandatory_phases — the set the router's floor
-// enforces), every phase the cycle ran with a status
-// (pass/warn/fail/ongoing/pending/unreached/skipped), the contract-gate mark
-// from the cycle's Signal Center stream, the counts, and how the advisor's
-// proposal fared. Operator ask, 2026-09-14: "how many phases are required,
-// how many passed, which is ongoing" — on the board.
-
 import (
 	"encoding/json"
 	"path/filepath"
@@ -21,9 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// planRegistry mirrors the live registry's shape: triage is mandatory (the
-// floor never skips it) although its phases[] entry says optional; tdd is
-// conditional-mandatory; retro is neither.
 const planRegistry = `{"config":{"mandatory_phases":["scout","triage","build","audit","ship"],"spine_order":["scout","triage","tdd","build","audit","ship"],"conditional_mandatory":{"tdd":"cycle_size!=trivial"}},"phases":[{"name":"scout"},{"name":"triage","optional":true},{"name":"tdd","optional":true},{"name":"build"},{"name":"audit"},{"name":"ship"},{"name":"retro","optional":true}]}`
 
 func outcomeLine(cycle int, phase, verdict string, ms int) string {
@@ -61,12 +50,6 @@ func planFor(t *testing.T, root string, id int, loop LoopStatus) (*PhasePlan, []
 	return readPlan(set, core.RunWorkspacePath(root, id), cs, loop, newStreamReader())
 }
 
-// A LIVE lane has no phase-timing.json yet (the orchestrator flushes it at
-// closeout): what ran so far is on the Signal Center stream. scout, triage
-// and tdd passed (tdd conditional-mandatory), build is ongoing, audit and
-// ship are pending; scout's and triage's gates verified, tdd's did not; the
-// advisor proposed two insertions that have not run and a skip of scout
-// the floor overrode.
 func TestPhasePlan_LiveLaneCountsRequiredPassedOngoingAndRemaining(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -107,9 +90,6 @@ func TestPhasePlan_LiveLaneCountsRequiredPassedOngoingAndRemaining(t *testing.T)
 	}
 }
 
-// A sealed FAIL cycle reads phase-timing.json: what never ran is unreached,
-// a repeated phase shows its rounds and last verdict, an optional phase that
-// ran (retro) is drawn but not required, and nothing is ongoing.
 func TestPlanStep_SealedCycleMarksUnreachedAndRounds(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -138,9 +118,6 @@ func TestPlanStep_SealedCycleMarksUnreachedAndRounds(t *testing.T) {
 	}
 }
 
-// A WARN phase is not a passed phase; a mandatory phase the cycle went past
-// without running is skipped, not pending; a phase both executed and ongoing
-// (audit round 2 dispatched after round 1 failed) is ongoing with its rounds.
 func TestPhasePlan_WarnSkippedAndRepeatedOngoing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -160,8 +137,6 @@ func TestPhasePlan_WarnSkippedAndRepeatedOngoing(t *testing.T) {
 	}
 }
 
-// A run whose verdict is not PASS/WARN/FAIL (a torn timing entry) is
-// incomplete — drawn, never counted as passed.
 func TestPlanStep_UnknownVerdictIsIncomplete(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -172,8 +147,6 @@ func TestPlanStep_UnknownVerdictIsIncomplete(t *testing.T) {
 	}
 }
 
-// Both records present and disagreeing: a running cycle trusts the stream
-// (the live record); a sealed one trusts phase-timing.json (the durable one).
 func TestPhasePlan_PhaseHistoryPrecedenceIsStateDriven(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -189,10 +162,6 @@ func TestPhasePlan_PhaseHistoryPrecedenceIsStateDriven(t *testing.T) {
 	}
 }
 
-// Sources the reader cannot trust are said, never substituted: a torn
-// phase-replan.json yields no proposal (not the older phase-plan.json); a
-// stream that stops early is said; a malformed registry is said and the
-// compiled baseline stands in; a dossier-only cycle has no plan.
 func TestPhasePlan_TornSourcesAreSaidNotSubstituted(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -218,7 +187,6 @@ func TestPhasePlan_TornSourcesAreSaidNotSubstituted(t *testing.T) {
 	}
 }
 
-// The stream reader re-reads a stream only when it changed on disk.
 func TestStreamReader_CachesByModTimeAndSize(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -237,8 +205,6 @@ func TestStreamReader_CachesByModTimeAndSize(t *testing.T) {
 	}
 }
 
-// Collect wires the plan onto every cycle it renders, and the detail
-// endpoint (/api/cycle/{id}) carries the same plan — both seams the page reads.
 func TestCollect_CyclesCarryTheirPlan(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -273,10 +239,6 @@ func TestServer_CycleDetailCarriesThePlan(t *testing.T) {
 	}
 }
 
-// The board prints the set the floor enforces, operator overrides included:
-// the injected environment (Options.Env) narrows the mandatory list exactly
-// as it narrows the loop's floor; Server.Snapshot carries it, Collect (no
-// env) shows the registry's set alone.
 func TestServer_SnapshotReflectsTheInjectedEnvironment(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

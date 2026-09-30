@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// Test 22 — the profile error keeps the cause-less text and the signal
-// carries the cause.
 func TestResolve_ProfileErrorKeepsTextAndCarriesCause(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -29,9 +27,6 @@ func TestResolve_ProfileErrorKeepsTextAndCarriesCause(t *testing.T) {
 	}
 }
 
-// Test 23 — the router's cli and tier win (the tier resolver is NOT called);
-// a router error falls back to the profile with ONE LLM_RESOLVE_FALLBACK; a
-// nil error with an empty cli falls back silently.
 func TestResolve_LLMPrecedenceAndFallbackSignal(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -63,7 +58,6 @@ func TestResolve_LLMPrecedenceAndFallbackSignal(t *testing.T) {
 	}
 }
 
-// Test 24 — antigravity → agy on both the router and the profile path.
 func TestResolve_CanonicalisesBothPaths(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -84,8 +78,6 @@ func TestResolve_CanonicalisesBothPaths(t *testing.T) {
 	}
 }
 
-// Test 25 — an unresolved cli and a missing driver keep their texts; the
-// driver's vestigial .sh path rides the signal.
 func TestResolve_UnresolvedCLIAndDriverMissingKeepTheirTexts(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -110,8 +102,6 @@ func TestResolve_UnresolvedCLIAndDriverMissingKeepTheirTexts(t *testing.T) {
 	}
 }
 
-// Test 26 — the tier request carries exactly the seven fields; an error is
-// `resolve tier: <err>` with step=tier.
 func TestResolve_TierRequestProjectionAndError(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -137,8 +127,6 @@ func TestResolve_TierRequestProjectionAndError(t *testing.T) {
 	}
 }
 
-// Test 27 — CapabilityDir defaults to AdaptersDir; an inspect error is
-// `capability inspect: <err>` with step=capability.
 func TestResolve_CapabilityDirDefaultsAndInspectError(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -163,9 +151,6 @@ func TestResolve_CapabilityDirDefaultsAndInspectError(t *testing.T) {
 	}
 }
 
-// Test 28 — the run id is resolved ONCE after the gate (on a resolution
-// failure and on a full run, ledger or not) and stamped on every later signal
-// and on the ledger line; "" omits the key.
 func TestResolve_RunIDResolvedOnceAfterTheGateAndStampedOnEverySignal(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)
@@ -224,11 +209,6 @@ func TestResolve_RunIDResolvedOnceAfterTheGateAndStampedOnEverySignal(t *testing
 	}
 }
 
-// Test 64 (review fold, architecture M2) — the driver check receives the
-// resolved cli, never the vestigial path: the host binds the port to driver
-// presence without decoding a file name, so the compiler sees the round trip.
-// The `.sh` path stays the error text's and the signal's `path` (test 25) —
-// kills `pass the path to the port`.
 func TestResolve_DriverCheckReceivesTheCLI(t *testing.T) {
 	f := newFixture(t)
 	deps := happyDeps(t)

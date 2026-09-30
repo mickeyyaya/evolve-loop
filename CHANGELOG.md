@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a lane ship can no longer break a whole-tree test that only main ran (2026-09-30)
+
+- Cycle 1779's lane ship (`461aa782a`) grew `cmd/evolve.runCycleRun` to 91 lines (allowance 86) and `runCycleHealth` to 51 (limit 50). The ship's gates passed and main's required CI went red, so every open PR inherited the failure.
+- Cause: changed-scope testing selects a lane's packages and their importers, so a test that reads the whole tree runs only when its own package changes. The ship's fixed scanner pack held the raw-git ratchet but not the size ratchet. It was also missing the other whole-tree tests: `testmainexit`, `policy`'s env-agnostic scan, `guards`' call-site scans, `acssuite`'s tag guard and `fleet`'s module-graph partition.
+- The pack's list moves to `repocontract.Packages()`, and ship projects it. It gains `sizeratchet`, `testmainexit`, `policy`, `guards`, `acssuite`, `fleet` and `repocontract` itself. The pack runs its packages in parallel, so its wall time is set by the slowest member.
+- `TestPackages_HoldEveryTestThatReadsTheWholeTree` finds, from the AST of every tracked test outside `acs/`, each package whose tests climb out of their directory onto the module root or a top-level directory, or walk up to `go.mod`. It requires each one to be in the pack or recorded outside it with a reason.
+  - A climb's literal path parts are joined and cleaned as `filepath.Join` does, so `./..`, empty parts and a name followed by `..` resolve as they would at run time.
+  - `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod` and `TestPackProblems` pin each shape, the negative ones included (a string prefix test, a climb from another directory, a call at the module root, a fixture loop naming `go.mod`, a stale record).
+  - 13 large packages with seam tests are recorded as waiting for test-level selection (inbox `repo-contract-test-level-selection`).
+  - The detector is in the pack, so it runs before main.
+- `runCycleRun` parses its flags in `parseCycleRunFlags` into a `cycleRunFlags` value and builds its request with `cycleRunFlags.request(projectRoot, environ)`. It is now 62 lines, and its allowance tightens from 86 to 62. `runCycleHealth` resolves its root in `cycleHealthRoot` (44 lines).
+- New tests pin the flag parsing, the request's goal text, bypass and EVOLVE_ env, `--simulate` never wiring the production orchestrator, and the root resolution. Mutation sweeps killed every mutant the architecture reviews raised, on both the moved lines and the detector.
+- The docs name `repocontract.Packages()` instead of restating the list. The new `docs/architecture/packages/internal-repocontract.md` holds the pack's rationale (moved out of a code comment), the detection rule and its limits.
+
+## Added — `evolve inbox add`, the one way to file an inbox item (2026-09-30)
+
+- The inventory of core functions against the CLI (147 functions: 64 fully, 36 partly and 47 not at all executable through `evolve`) ranked this the first gap: nothing filed an inbox item, so every item was hand-written JSON with no schema, id or dependency check at write time (inbox `inbox-add-cli`).
+- `evolve inbox add [--file <item.json>]` (`go/cmd/evolve/cmd_inbox_add.go`) files one item through the new `inboxmover.File` / `lifecycle.(*Mover).File`. It writes `.evolve/inbox/<UTC filing time>-<id>.json`, stamps `created_at` when absent, appends a `file` ledger line, and prints whether a lane may take the item by the claim floor's own rule.
+- It refuses, with nothing written:
+  - a non-object;
+  - a missing or blank `id`, `title`, `kind`, `summary` or `fix`;
+  - a non-kebab or already-filed `id`, checked across the whole inbox tree, retired items included;
+  - a `weight` outside (0, 1];
+  - an empty or blank `acceptance`;
+  - a mistyped field;
+  - a `deps` entry no item backs;
+  - a lifecycle-owned field (an authored `route` is allowed only toward the console);
+  - a prompt-rendered field the loader would sanitize.
+
+  It never overwrites a file (`os.Link`) and does not HTML-escape. Exit codes: 0 filed, 1 refused, 2 I/O fault, 10 usage.
+- `inboxbatch.sanitizeItem` now names the fields it rewrote, and the new `inboxbatch.SanitizedFields` runs that one rule on a copy, so the filing verb reuses the loader's bounds instead of repeating them. `inboxbatch.FilenameStampLayout` (exported) names the file and `inboxbatch.IsConsoleRoute` is the one console-route rule; the verb prints the claim floor's own verdict on the filed file.
+- Tests, red first:
+  - `TestMover_File_*` (8 tests, including 15 refusal shapes);
+  - `TestFile_FilesAnItemTheClaimFloorCanHandToALane`;
+  - `TestSanitizedFields_NamesEveryFieldTheLoaderWouldRewrite`;
+  - `TestCmd_InboxAdd_*` (4).
+- The architecture review blocked the first draft: the filename stamp was a third literal, a filing fault's exit 2 was unpinned, an authored console route was refused, six mutants survived, the owned-field list had drifted and a design note overstated the invariant. All are fixed. Mutation sweeps: 14 of 14, then the reviewer's six survivors plus four new-rule mutants, 10 of 10, killed. The sweep also showed a self-dependency check was dead (an unfiled id cannot satisfy `deps`), so the check was removed. `internal/inboxmover/lifecycle` stays at 100% statement coverage (`cover-strict`).
+- `inbox-add-cli` is consumed in this change. Its third criterion, the retrospective's minting through the same writer, is filed as its own item through `evolve inbox add` itself.
+## Changed — a deleted comment leaves self-explaining code (comment round 12, 2026-09-30)
+
+- The operator's rule (2026-09-30): "Make sure when we removed comments, code is lean enough to explain itself without comments."
+- `docs/conventions/code-comments.md` gains *What a deleted comment leaves behind*. Where a deleted comment said what the code does or what a value means, the same change makes the code say it: an unexported rename, an extracted function or named condition, a named constant, or a small type. It is behaviour-preserving, adds no comment, and never changes the value of a tag, flag, string or error text.
+- The batch protocol gains the step *Make the code say it*, and Phase 2f applies it to rounds 1–11.
+- Round 12 lands as two commits:
+  - the AST-proven comment-only commit: 228 files, 7,820 → 67 comment lines, and 17 new package design-notes pages;
+  - a reviewed refactor commit of 82 files. Six agents, one per group, made the code say what about 140 deleted comments had said, for example `porcelainStatusPrefixLen`, `isAtOrUnderAny`, `isReusablePrior`, `withLink`, `configReleaseSinceLastBinaryRelease` and `ciConclusionUnavailable`.
+- About 2,500 other deleted comments needed nothing: they were history, restatements, or design reasons now in the notes.
+
 ## Added — `evolve inbox route-lane`, the operator's lane route (2026-09-30)
 
 - `evolve inbox batches` planned 0 batches from 183 pending items: 101 were console-owned by their `pipeline-*` kind, 53 by a protected surface and 28 by `route: console`. ADR-0074 lets the operator reopen a heuristic derivation with `route:"lane"`, but no command wrote it. The only way was to hand-edit item JSON, which the operator rule that every control goes through the published CLI forbids.

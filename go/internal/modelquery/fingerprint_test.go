@@ -5,9 +5,6 @@ import (
 	"testing"
 )
 
-// TestFingerprint_DeterministicAndPrefixed: identical inputs hash identically
-// and the rendering is namespaced ("sha256:<hex>") so a stored hash is
-// self-describing.
 func TestFingerprint_DeterministicAndPrefixed(t *testing.T) {
 	t.Parallel()
 	in := FingerprintInput{
@@ -25,9 +22,6 @@ func TestFingerprint_DeterministicAndPrefixed(t *testing.T) {
 	}
 }
 
-// TestFingerprint_CandidateOrderInsensitive: pane order is presentation, not
-// identity — a reordered candidate list is the same offering. The input slice
-// must not be mutated (sorting happens on a copy).
 func TestFingerprint_CandidateOrderInsensitive(t *testing.T) {
 	t.Parallel()
 	base := FingerprintInput{CLI: "codex", Candidates: []string{"gpt-5.5", "gpt-5.5-mini"}, Tiers: []string{"fast", "deep"}}
@@ -40,10 +34,6 @@ func TestFingerprint_CandidateOrderInsensitive(t *testing.T) {
 	}
 }
 
-// TestFingerprint_SensitiveToEveryField: any change to CLI, candidate set,
-// policy, or tier vocabulary is a different decision input and must produce a
-// different hash — otherwise a stale classification would be reused across a
-// real change.
 func TestFingerprint_SensitiveToEveryField(t *testing.T) {
 	t.Parallel()
 	base := FingerprintInput{
@@ -66,10 +56,6 @@ func TestFingerprint_SensitiveToEveryField(t *testing.T) {
 	}
 }
 
-// TestFingerprint_FramingUnambiguous: fields and list members are
-// length-prefixed, so adjacent values cannot be re-split into a colliding
-// rendering (agy ids contain spaces and parens; a bare join would be
-// ambiguous).
 func TestFingerprint_FramingUnambiguous(t *testing.T) {
 	t.Parallel()
 	a := FingerprintInput{CLI: "x", Candidates: []string{"ab", "c"}}

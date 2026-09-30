@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "`evolve inbox withdraw <id> <reason>` removes a pending unclaimed item and records a `withdraw` ledger line (red: no such subcommand)",
+    "A claimed, routed or consumed item is refused and left untouched (exit 1)",
+    "After a withdrawal, `evolve inbox add` files the same id again"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "deps": [
+    "inbox-add-cli"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_inbox.go",
+    "go/internal/inboxmover"
+  ],
+  "fix": "Add `evolve inbox withdraw <id> <reason>`: remove a pending, unclaimed root item that no cycle has claimed or routed, append a `withdraw` ledger line with the reason, and refuse a claimed, routed or retired item (exit 1). A withdrawn id may be filed again.",
+  "id": "cli-inbox-withdraw",
+  "kind": "feature",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve inbox add` files an item and appends a `file` ledger line, but the only verb that removes an item is `evolve inbox consume`, which retires its id for good. An item filed with a mistake (the wrong scope, a better-specified re-filing) is therefore deleted by hand, leaving two `file` ledger lines for one id and no record of the withdrawal. Found by the architecture re-review of `evolve inbox add` (2026-09-30).",
+  "title": "No verb withdraws a just-filed inbox item, so a mistaken filing is deleted by hand and the ledger records two filings",
+  "weight": 0.3
+}

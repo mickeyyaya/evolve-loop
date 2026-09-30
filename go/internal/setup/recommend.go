@@ -7,12 +7,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// Assignment is one phase's fully-resolved recommendation within a preset.
 type Assignment struct {
 	Role               string `json:"role"`
-	CLI                string `json:"cli"`             // base family: claude|codex|agy|gemini
-	Tier               string `json:"tier"`            // canonical fast|balanced|deep (within envelope)
-	Model              string `json:"model,omitempty"` // native model id from CLIStatus.TierModels[Tier]
+	CLI                string `json:"cli"`
+	Tier               string `json:"tier"`
+	Model              string `json:"model,omitempty"`
 	Rationale          string `json:"rationale,omitempty"`
 	DiffersFromDefault bool   `json:"differs_from_default"`
 	TierClamped        bool   `json:"tier_clamped,omitempty"`
@@ -20,7 +19,6 @@ type Assignment struct {
 	Warning            string `json:"warning,omitempty"`
 }
 
-// Preset is one named full-pipeline recommendation (assignments ordered by Roles).
 type Preset struct {
 	Name        string       `json:"name"`
 	Description string       `json:"description"`
@@ -28,8 +26,6 @@ type Preset struct {
 	Degraded    bool         `json:"degraded"`
 }
 
-// RecommendReport is the digest the /setup skill consumes to render the
-// "pick ONE preset" choice. Deterministic given a DetectReport.
 type RecommendReport struct {
 	AvailableFamilies []string `json:"available_families"`
 	CrossFamilyOK     bool     `json:"cross_family_ok"`
@@ -37,8 +33,6 @@ type RecommendReport struct {
 	Default           string   `json:"default"`
 }
 
-// canonTier maps any tier spelling (canonical, legacy alias, or native model id)
-// to the canonical fast|balanced|deep|top, or "" when unclassifiable.
 func canonTier(s string) string {
 	return tierFromRank(policy.TierRank(s))
 }
@@ -57,11 +51,6 @@ func tierFromRank(r int) string {
 	return ""
 }
 
-// Recommend computes the configured presets from a DetectReport. Pure +
-// deterministic: no clock, env, randomness, disk, or map-iteration order leaks
-// into the output. The preset definitions (names/descriptions/bias) are INJECTED
-// via cfg (loaded from the public preset config), so preset behavior is data,
-// not hardcoded here.
 func Recommend(rep DetectReport, cfg PresetConfig) RecommendReport {
 	avail := availableFamilies(rep)
 	crossOK := len(avail) >= 2
@@ -78,8 +67,6 @@ func Recommend(rep DetectReport, cfg PresetConfig) RecommendReport {
 	for _, spec := range cfg.Presets {
 		p := Preset{Name: spec.Name, Description: spec.Description}
 
-		// The builder/auditor family pair is computed ONCE per preset so the two
-		// phases stay internally consistent (adversarial split when possible).
 		bldFam, audFam := "", ""
 		if hasBuilder && hasAuditor {
 			bldFam, audFam = chooseCrossFamilyPair(builderPS, auditorPS, avail, crossOK)
@@ -136,10 +123,6 @@ func assignPhase(spec PresetSpec, ps PhaseStatus, bldFam, audFam string, avail [
 	}
 }
 
-// effectiveDefaultTier resolves a phase's baseline tier: its profile
-// model_tier_default, else the envelope default, else balanced. Used as the
-// baseline for BOTH biasTier and the differs-from-default check so they cannot
-// drift (a profile that omits model_tier_default must not look like a diff).
 func effectiveDefaultTier(defaultTier string, env Envelope) string {
 	if t := canonTier(defaultTier); t != "" {
 		return t
@@ -150,12 +133,6 @@ func effectiveDefaultTier(defaultTier string, env Envelope) string {
 	return "balanced"
 }
 
-// biasTier applies a preset's generic tier-bias STRATEGY to the profile default
-// (before envelope clamping). The strategy vocabulary is the only "preset
-// behavior" in code — a generic interpreter, not per-preset config:
-//
-//	default → profile default tier   down → one rank cheaper   up → one rank richer
-//	min     → envelope floor         max  → envelope ceiling
 func biasTier(bias, defaultTier string, env Envelope) string {
 	base := effectiveDefaultTier(defaultTier, env)
 	switch bias {
@@ -181,13 +158,11 @@ func biasTier(bias, defaultTier string, env Envelope) string {
 			return m
 		}
 		return base
-	default: // "default" (or unrecognized) → profile default
+	default:
 		return base
 	}
 }
 
-// clampTier forces want into [env.Min..env.Max] (envelope wins over bias). An
-// empty envelope passes through; an unclassifiable want falls to the default/min.
 func clampTier(want string, env Envelope) (string, bool) {
 	if env.Min == "" && env.Max == "" {
 		if want == "" {
@@ -216,9 +191,6 @@ func clampTier(want string, env Envelope) (string, bool) {
 	return want, false
 }
 
-// chooseCLI picks a base family for a non-paired phase: prefer the profile
-// default when available + allowed, else the first available allowed family,
-// else keep the default (legible) and warn that nothing allowed is available.
 func chooseCLI(role, prefBase string, allowed, avail []string) (cli string, fallback bool, warn string) {
 	if len(avail) == 0 {
 		return prefBase, false, "no CLI families authed; pipeline defaults apply"
@@ -235,17 +207,12 @@ func chooseCLI(role, prefBase string, allowed, avail []string) (cli string, fall
 	return pool[0], true, ""
 }
 
-// chooseCrossFamilyPair picks (builderFamily, auditorFamily), preferring each
-// profile's default family, and splitting them across families when ≥2 are
-// available (adversarial integrity). Returns "" for a phase with no available
-// allowed family (chooseCLI then produces the warning).
 func chooseCrossFamilyPair(b, a PhaseStatus, avail []string, crossOK bool) (string, string) {
 	bPool := poolFor(b.AllowedCLIs, avail)
 	aPool := poolFor(a.AllowedCLIs, avail)
 	bFam := pickPreferred(baseCLI(b.DefaultCLI), bPool)
 	aFam := pickPreferred(baseCLI(a.DefaultCLI), aPool)
 	if crossOK && bFam != "" && aFam != "" && bFam == aFam {
-		// Try to separate, preferring to keep the builder on its default family.
 		if alt := firstNotEqual(aPool, bFam); alt != "" {
 			aFam = alt
 		} else if alt := firstNotEqual(bPool, aFam); alt != "" {
@@ -254,8 +221,6 @@ func chooseCrossFamilyPair(b, a PhaseStatus, avail []string, crossOK bool) (stri
 	}
 	return bFam, aFam
 }
-
-// --- small deterministic helpers ---
 
 func availableFamilies(rep DetectReport) []string {
 	var out []string
@@ -268,8 +233,6 @@ func availableFamilies(rep DetectReport) []string {
 	return out
 }
 
-// allowedBaseSet returns the permitted base families and anyOK=true when the
-// allow-list is empty/nil or contains the "all" wildcard.
 func allowedBaseSet(allowed []string) (set map[string]bool, anyOK bool) {
 	if len(allowed) == 0 {
 		return nil, true
@@ -287,7 +250,7 @@ func allowedBaseSet(allowed []string) (set map[string]bool, anyOK bool) {
 func poolFor(allowed, avail []string) []string {
 	set, anyOK := allowedBaseSet(allowed)
 	var pool []string
-	for _, f := range avail { // avail is already sorted → pool is deterministic
+	for _, f := range avail {
 		if anyOK || set[f] {
 			pool = append(pool, f)
 		}

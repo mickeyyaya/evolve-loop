@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -74,8 +75,7 @@ func (it Item) DeclaredPaths() []string {
 // filedAtLayouts are the created_at shapes authors write, most specific first.
 var filedAtLayouts = []string{time.RFC3339, "2006-01-02"}
 
-// filenameStampLayout is the timestamp prefix of inbox file names; colons are not filename-safe.
-const filenameStampLayout = "2006-01-02T15-04-05Z"
+const FilenameStampLayout = "2006-01-02T15-04-05Z"
 
 // FiledAt is when the item was filed: its created_at, else its file name's timestamp prefix.
 // It is zero when neither parses; premise drift measures from it, so a date is never guessed.
@@ -86,8 +86,8 @@ func (it Item) FiledAt() time.Time {
 			return t
 		}
 	}
-	if base := filepath.Base(it.Path); len(base) >= len(filenameStampLayout) {
-		if t, err := time.Parse(filenameStampLayout, base[:len(filenameStampLayout)]); err == nil {
+	if base := filepath.Base(it.Path); len(base) >= len(FilenameStampLayout) {
+		if t, err := time.Parse(FilenameStampLayout, base[:len(FilenameStampLayout)]); err == nil {
 			return t
 		}
 	}
@@ -233,28 +233,43 @@ func LoadFile(path string) (Item, []string, error) {
 	}
 	it.Path = name
 	var warnings []string
-	if sanitizeItem(&it) {
+	if len(sanitizeItem(&it)) > 0 {
 		warnings = append(warnings, name+": sanitized control characters/overlength in rendered fields")
 	}
 	return it, warnings, nil
 }
 
-// sanitizeItem cleans the prompt-rendered fields and reports whether anything changed.
-func sanitizeItem(it *Item) bool {
-	changed := false
-	clean := func(s string) string { return cleanBounded(s, maxFieldLen, &changed) }
-	it.ID = clean(it.ID)
-	it.Title = clean(it.Title)
-	it.Campaign = clean(it.Campaign)
-	it.Route = clean(it.Route)
-	it.DeliverableKind = clean(it.DeliverableKind)
+func sanitizeItem(it *Item) []string {
+	var changed []string
+	clean := func(field, s string, max int) string {
+		mapped := StripControl(s)
+		if len(mapped) > max {
+			mapped = mapped[:max]
+		}
+		if mapped != s && !slices.Contains(changed, field) {
+			changed = append(changed, field)
+		}
+		return mapped
+	}
+	it.ID = clean("id", it.ID, maxFieldLen)
+	it.Title = clean("title", it.Title, maxFieldLen)
+	it.Campaign = clean("campaign", it.Campaign, maxFieldLen)
+	it.Route = clean("route", it.Route, maxFieldLen)
+	it.DeliverableKind = clean("deliverable_kind", it.DeliverableKind, maxFieldLen)
 	for i := range it.Files {
-		it.Files[i] = clean(it.Files[i])
+		it.Files[i] = clean("files", it.Files[i], maxFieldLen)
 	}
 	for i := range it.Acceptance {
-		it.Acceptance[i] = cleanBounded(it.Acceptance[i], maxAcceptanceLen, &changed)
+		it.Acceptance[i] = clean("acceptance", it.Acceptance[i], maxAcceptanceLen)
 	}
 	return changed
+}
+
+func SanitizedFields(it Item) []string {
+	probe := it
+	probe.Files = slices.Clone(it.Files)
+	probe.Acceptance = slices.Clone(it.Acceptance)
+	return sanitizeItem(&probe)
 }
 
 // StripControl replaces control characters (C0 and DEL) with spaces.
@@ -266,16 +281,4 @@ func StripControl(s string) string {
 		}
 		return r
 	}, s)
-}
-
-// cleanBounded strips control characters and truncates s to max bytes, flagging changed when either applied.
-func cleanBounded(s string, max int, changed *bool) string {
-	mapped := StripControl(s)
-	if len(mapped) > max {
-		mapped = mapped[:max]
-	}
-	if mapped != s {
-		*changed = true
-	}
-	return mapped
 }

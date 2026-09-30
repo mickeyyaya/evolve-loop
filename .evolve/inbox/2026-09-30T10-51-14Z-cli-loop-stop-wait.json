@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`evolve loop-stop --wait` returns 0 once a fixture lease goes stale or its owner exits (red: flag provided but not defined)",
+    "When --timeout elapses with a live lease, it exits 1 naming the run and the brake file remains",
+    "The liveness check is the one sync-main uses (shared function)"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_stop.go",
+    "go/internal/runlease"
+  ],
+  "fix": "Add `--wait [--timeout D]` to `evolve loop-stop`. After engaging the brake, it polls the plane's run leases with the liveness check sync-main uses (runlease.Read and OwnerLive, moved into one shared function) until no run is live, printing the live run and its phase whenever they change. Exit 0 when no run is live. On timeout it exits 1 naming the live run and leaves the brake engaged. --wait with --release exits 10. Update runtime-reference.md's boundary step 1 to use it.",
+  "id": "cli-loop-stop-wait",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve loop-stop` writes .evolve/loop-stop and returns; its flags are --release and --project-root (cmd_loop_stop.go:15-20). runtime-reference.md:174 then tells the operator to wait, before merging, for the '[loop] operator brake \u2026 is engaged \u2014 stopping before cycle N' line in the loop log or for the process to exit. So every boundary starts with a hand-run tail or pid poll, and merging too early breaks the no-merge-mid-wave rule.",
+  "title": "`evolve loop-stop` cannot wait for the brake to take effect, so before merging the operator tails the loop log or polls the pid",
+  "weight": 0.7
+}

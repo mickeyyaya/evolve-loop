@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "`evolve loop status` prints the loop's status and starts nothing (red: it launches a batch with goal 'status')",
+    "`evolve loop stop` exits 10 and names `evolve loop-stop`",
+    "A multi-word positional goal still launches as before"
+  ],
+  "created_at": "2026-09-30T10:51:14Z",
+  "deps": [
+    "cli-status"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_loop.go",
+    "go/cmd/evolve/cmd_loop_args.go"
+  ],
+  "fix": "Before flag parsing, dispatch `evolve loop status [--json]` to a read-only report: the loop section of `evolve status` (running, brake, cycle, phase, lease heartbeat). Refuse a positional goal that is exactly a reserved word (status, stop, help, plan, watch) with exit 10, naming the intended verb. Document it in runtime-reference.md's operator commands.",
+  "id": "cli-loop-status",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "runLoop parses every positional argument as a cycle count, a strategy or the goal (cmd_loop_args.go:156; parsePositional at :203), and resolveGoal takes a positional string as the goal text (:118-119). So `evolve loop status`, the natural way to ask whether the loop is running, starts a batch whose goal is 'status'. The read-only answer lives in `evolve dashboard --snapshot`.",
+  "title": "`evolve loop status` launches a loop because the word is parsed as goal text; make it a read-only subcommand and refuse reserved words as goals",
+  "weight": 0.6
+}
