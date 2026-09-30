@@ -11,11 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// GetenvKeysFromSrc underlies the anti-rename invariant (ADR-0064 Pillar 2, M2):
-// it collects every compile-time-constant key passed to os.Getenv / os.LookupEnv
-// in src, at ANY prefix (so a dial renamed out of the EVOLVE_ namespace is
-// visible), folding split-consts (so "HO"+"ME" -> HOME and the rename dodge
-// "FO"+"O" cannot hide), and dropping dynamic (non-constant) keys.
 func TestGetenvKeysFromSrc_AllPrefixesFoldsDynamicExcluded(t *testing.T) {
 	const src = `package p
 
@@ -38,10 +33,6 @@ func r(k string) string { return os.Getenv("DYN_" + k) }
 	}
 }
 
-// TestNoUnregisteredNonEvolveGetenvKey is the anti-rename gate (M2): every
-// constant os.Getenv / os.LookupEnv key in production must be EVOLVE_-prefixed or
-// in the pinned externalEnvAllowlist. A NEW non-EVOLVE_ key — e.g. a dial renamed
-// out of the EVOLVE_ namespace to shrink the registry — fails here.
 func TestNoUnregisteredNonEvolveGetenvKey(t *testing.T) {
 	repo := acsassert.RepoRoot(t)
 	keys, skipped, err := GetenvConstKeys(filepath.Join(repo, "go"))
@@ -65,10 +56,6 @@ func TestNoUnregisteredNonEvolveGetenvKey(t *testing.T) {
 	}
 }
 
-// TestRenameDodge_NonEvolveKeyIsFlagged proves the anti-rename check catches a
-// dial renamed out of the EVOLVE_ namespace via split-const — the go/ast scan and
-// the EVOLVE_-only read-set both miss it; the fold-aware all-prefix collector
-// surfaces it as a non-allowlisted non-EVOLVE_ key.
 func TestRenameDodge_NonEvolveKeyIsFlagged(t *testing.T) {
 	const renamed = `package p
 

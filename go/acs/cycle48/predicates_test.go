@@ -1,94 +1,5 @@
 //go:build acs
 
-// Package cycle48 materializes the cycle-48 acceptance criteria for two tasks:
-//
-//	cache-prefix-v2-dead-field-48 — remove dead field EVOLVE_CACHE_PREFIX_V2:
-//	  RunRequest.CachePrefixV2 is never read in Run(); env read at cmd_subagent.go:507
-//	  has zero runtime effect. Pure no-op removal: build-time struct literal checks
-//	  catch any missed test update before test execution.
-//	  Lower FlagCeiling 56 → 55.
-//
-//	guards-log-di-48 — DI migration for EVOLVE_GUARDS_LOG:
-//	  change appendGuardsLog(evolveDir, ...) to appendGuardsLog(logPath, ...)
-//	  and compute logPath at the call site (cmd_guard.go:122).
-//	  Lower FlagCeiling 55 → 54.
-//
-// AC map (1:1 with triage top_n for both tasks):
-//
-//	=== Task A: cache-prefix-v2-dead-field-48 ===
-//	AC1  EVOLVE_CACHE_PREFIX_V2 absent from registry        → C48A_001 (behavioral: Lookup)
-//	AC2  No prod env read for CACHE_PREFIX_V2               → C48A_002 (config-check, waiver)
-//	AC3  CachePrefixV2 field absent from run.go             → C48A_003 (config-check, waiver)
-//	AC4  FlagCeiling == 55                                  → C48A_004 (config-check, waiver)
-//	AC5  cmd_subagent_env_test.go zero CACHE_PREFIX_V2 refs → C48A_005 (config-check, waiver)
-//	AC6  go test ./internal/subagent/... PASS               → manual+checklist (Auditor)
-//	AC7  go test ./cmd/evolve/... PASS                      → manual+checklist (Auditor)
-//	AC8  go test ./internal/flagregistry/... PASS           → manual+checklist (Auditor)
-//	AC9  flagreaders ACS guard PASS                         → manual+checklist (Auditor)
-//	NEG  row count ≤ 55 after Task A flags removed          → C48A_NEG (behavioral: len)
-//
-//	=== Task B: guards-log-di-48 ===
-//	AC1  EVOLVE_GUARDS_LOG absent from registry             → C48B_001 (behavioral: Lookup)
-//	AC2  No prod os.Getenv read for GUARDS_LOG              → C48B_002 (config-check, waiver)
-//	AC3  appendGuardsLog first param is logPath string      → C48B_003 (config-check, waiver)
-//	AC4  Zero t.Setenv("EVOLVE_GUARDS_LOG") in test files   → C48B_004 (config-check, waiver)
-//	AC5  FlagCeiling == 54                                  → C48B_005 (config-check, waiver)
-//	AC6  docs_contract_test.go zero GUARDS_LOG refs         → C48B_006 (config-check, waiver)
-//	AC7  go test ./cmd/evolve/... PASS                      → manual+checklist (Auditor)
-//	AC8  go test ./internal/flagregistry/... PASS           → manual+checklist (Auditor)
-//	AC9  flagreaders ACS guard PASS                         → manual+checklist (Auditor)
-//	NEG  exact row count == 54 (final state after both)     → C48B_NEG (behavioral: len)
-//
-// Manual+checklist ACs (addressed to Auditor):
-//
-//	Task A AC6 (subagent tests pass):
-//	  (a) exit 0: cd go && go test ./internal/subagent/...
-//	  (b) no FAIL packages in output
-//
-//	Task A AC7 (cmd/evolve tests pass):
-//	  (a) exit 0: cd go && go test ./cmd/evolve/...
-//	  (b) no FAIL packages in output
-//
-//	Task A AC8 (flagregistry tests pass):
-//	  (a) exit 0: cd go && go test ./internal/flagregistry/...
-//	  (b) TestRegistry_FlagCeiling passes (FlagCeiling == 55 after Task A, == 54 after Task B)
-//
-//	Task A AC9 (flagreaders ACS guard):
-//	  (a) go test -tags acs ./acs/regression/flagreaders/...
-//	  (b) EVOLVE_CACHE_PREFIX_V2 does not appear as an orphan reader
-//
-//	Task B AC7 (cmd/evolve tests pass):
-//	  (a) exit 0: cd go && go test ./cmd/evolve/...
-//	  (b) no FAIL packages; TestAppendGuardsLog_* pass with DI path injection
-//
-//	Task B AC8 (flagregistry tests pass):
-//	  (a) exit 0: cd go && go test ./internal/flagregistry/...
-//	  (b) TestRegistry_FlagCeiling passes (FlagCeiling == 54)
-//
-//	Task B AC9 (flagreaders ACS guard):
-//	  (a) go test -tags acs ./acs/regression/flagreaders/...
-//	  (b) EVOLVE_GUARDS_LOG does not appear as an orphan reader
-//
-// Adversarial diversity (SKILL §6):
-//
-//	Negative:   C48A_001/C48B_001 — flags ABSENT from Lookup (any hit = still registered).
-//	            C48A_NEG: row count ≤ 55 (upper bound, allows Task B to apply in same build).
-//	            C48B_NEG: exact count == 54 (catches both over-removal <54 and under-removal >54).
-//	Edge/OOD:   C48B_NEG exact count rejects both directions; C48A_NEG is one-sided upper bound.
-//	Lexical:    Lookup / len / FileNotContains / FileContains / FileMatchesRegex — five distinct verbs.
-//	Semantic:   registry-absence (2 flags), env-read-clean (2 files), struct-field-absent (run.go),
-//	            DI-signature (cmd_guard.go), test-clean (2 test files), ceiling-const (2 values),
-//	            docs-contract-clean (docs_contract_test.go), exact-row-count — 10 dimensions.
-//
-// Floor binding (R9.3): predicates authored ONLY for tasks in the triage top_n.
-// Deferred tasks (EVOLVE_MODELCATALOG_AUTOREFRESH, EVOLVE_FORCE_FRESH, etc.) get zero predicates.
-//
-// 1:1 enforcement:
-//
-//	Task A: predicate=6 (C48A_001–005, C48A_NEG), manual+checklist=4 (AC6/AC7/AC8/AC9),
-//	        unverifiable-remove=0 → total AC=10 ✓
-//	Task B: predicate=7 (C48B_001–006, C48B_NEG), manual+checklist=3 (AC7/AC8/AC9),
-//	        unverifiable-remove=0 → total AC=10 ✓
 package cycle48
 
 import (
@@ -99,22 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// =============================================================================
-// Task A — cache-prefix-v2-dead-field-48
-// =============================================================================
-
-// === Registry absence (behavioral: Lookup) ===
-
-// TestC48A_001_CachePrefixV2_AbsentFromRegistry verifies that
-// EVOLVE_CACHE_PREFIX_V2 is no longer registered after the dead field removal.
-// RunRequest.CachePrefixV2 is never read in Run(); the env read at
-// cmd_subagent.go:507 has zero runtime effect.
-//
-// Covers Task A AC1. BEHAVIORAL: calls flagregistry.Lookup() — the production SSOT.
-// Adding a source comment cannot satisfy this; the registry row must be absent.
-//
-// RED: EVOLVE_CACHE_PREFIX_V2 is currently registered at registry_table.go with
-// Status=StatusActive, Cluster="Observability / Prompt Tuning".
 func TestC48A_001_CachePrefixV2_AbsentFromRegistry(t *testing.T) {
 	if f, ok := flagregistry.Lookup("EVOLVE_CACHE_PREFIX_V2"); ok {
 		t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — flag still registered.\n"+
@@ -125,19 +20,7 @@ func TestC48A_001_CachePrefixV2_AbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// === Prod-source clean (config-check waiver) ===
-
-// TestC48A_002_CachePrefixV2_AbsentFromProdSource verifies that the env read
-// envchain.Bool("EVOLVE_CACHE_PREFIX_V2", ...) has been removed from
-// cmd_subagent.go, along with the struct field assignment and help-text references.
-//
 // acs-predicate: config-check
-//
-// RED: cmd_subagent.go:507 currently has:
-//
-//	cachePrefixV2: envchain.Bool("EVOLVE_CACHE_PREFIX_V2", nil, true),
-//
-// and cmd_subagent.go:44,311 have doc/help references to EVOLVE_CACHE_PREFIX_V2.
 func TestC48A_002_CachePrefixV2_AbsentFromProdSource(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -153,17 +36,7 @@ func TestC48A_002_CachePrefixV2_AbsentFromProdSource(t *testing.T) {
 	}
 }
 
-// === Dead struct field removal (config-check waiver) ===
-
-// TestC48A_003_CachePrefixV2_FieldAbsentFromRunRequest verifies that the
-// CachePrefixV2 bool field has been removed from RunRequest in run.go.
-// The field was declared but never read inside the Run() function body.
-//
 // acs-predicate: config-check
-//
-// RED: go/internal/subagent/run.go:47 currently has:
-//
-//	CachePrefixV2          bool   // EVOLVE_CACHE_PREFIX_V2 (default true)
 func TestC48A_003_CachePrefixV2_FieldAbsentFromRunRequest(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -178,18 +51,7 @@ func TestC48A_003_CachePrefixV2_FieldAbsentFromRunRequest(t *testing.T) {
 	}
 }
 
-// === FlagCeiling after Task A (config-check waiver) ===
-
-// === Test-file clean (config-check waiver) ===
-
-// TestC48A_005_SubagentEnvTest_NoCachePrefixV2 verifies that
-// cmd_subagent_env_test.go no longer references CACHE_PREFIX_V2 or cachePrefixV2.
-// After removing the struct field, the test must not set or reference this env var.
-//
 // acs-predicate: config-check
-//
-// RED: cmd_subagent_env_test.go currently references cachePrefixV2 (struct field)
-// and EVOLVE_CACHE_PREFIX_V2 (env key) in both test functions.
 func TestC48A_005_SubagentEnvTest_NoCachePrefixV2(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -207,16 +69,6 @@ func TestC48A_005_SubagentEnvTest_NoCachePrefixV2(t *testing.T) {
 	}
 }
 
-// === Negative: upper-bound row count after Task A (behavioral) ===
-
-// TestC48A_NEG_RowCountAtMost55 verifies that after Task A the registry row count
-// has dropped from 56 to at most 55. A ≤ 55 check (rather than exact == 55) allows
-// Task B to also be applied in the same build without this predicate re-failing on
-// the further-reduced count of 54.
-//
-// BEHAVIORAL: calls len(flagregistry.All) — the production count.
-//
-// RED: registry currently has 56 rows (FlagCeiling=56); 56 > 55 fails.
 func TestC48A_NEG_RowCountAtMost55(t *testing.T) {
 	got := len(flagregistry.All)
 	if got > 55 {
@@ -228,21 +80,6 @@ func TestC48A_NEG_RowCountAtMost55(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// Task B — guards-log-di-48
-// =============================================================================
-
-// === Registry absence (behavioral: Lookup) ===
-
-// TestC48B_001_GuardsLog_AbsentFromRegistry verifies that EVOLVE_GUARDS_LOG is
-// no longer registered after the DI migration. appendGuardsLog's first param
-// changes from evolveDir to logPath; the call site at cmd_guard.go:122 computes
-// logPath := filepath.Join(evolveDir, "guards.log") directly.
-//
-// Covers Task B AC1. BEHAVIORAL: calls flagregistry.Lookup() — the production SSOT.
-//
-// RED: EVOLVE_GUARDS_LOG is currently registered at registry_table.go with
-// Status=StatusInternal.
 func TestC48B_001_GuardsLog_AbsentFromRegistry(t *testing.T) {
 	if f, ok := flagregistry.Lookup("EVOLVE_GUARDS_LOG"); ok {
 		t.Errorf("RED: flagregistry.Lookup(%q) returned (flag, true) — flag still registered.\n"+
@@ -253,17 +90,7 @@ func TestC48B_001_GuardsLog_AbsentFromRegistry(t *testing.T) {
 	}
 }
 
-// === Prod-source clean (config-check waiver) ===
-
-// TestC48B_002_GuardsLog_AbsentFromProdSource verifies that os.Getenv("EVOLVE_GUARDS_LOG")
-// has been removed from cmd_guard.go. After the DI migration, the call site
-// (line 122) computes the path with filepath.Join(evolveDir, "guards.log").
-//
 // acs-predicate: config-check
-//
-// RED: cmd_guard.go:45 currently has:
-//
-//	logPath := os.Getenv("EVOLVE_GUARDS_LOG")
 func TestC48B_002_GuardsLog_AbsentFromProdSource(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -279,17 +106,7 @@ func TestC48B_002_GuardsLog_AbsentFromProdSource(t *testing.T) {
 	}
 }
 
-// === DI signature check (config-check waiver) ===
-
-// TestC48B_003_AppendGuardsLog_HasLogPathParam verifies that appendGuardsLog now
-// accepts logPath as its first parameter (instead of evolveDir). The signature
-// must NOT have the old os.Getenv-based internal path computation.
-//
 // acs-predicate: config-check
-//
-// RED: cmd_guard.go:39 currently has:
-//
-//	func appendGuardsLog(evolveDir, guardName string, allow bool, reason string) {
 func TestC48B_003_AppendGuardsLog_HasLogPathParam(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -305,16 +122,7 @@ func TestC48B_003_AppendGuardsLog_HasLogPathParam(t *testing.T) {
 	}
 }
 
-// === Test-file clean (config-check waiver) ===
-
-// TestC48B_004_GuardTest_NoSetenvGuardsLog verifies that cmd_guard_test.go no
-// longer uses t.Setenv("EVOLVE_GUARDS_LOG", ...) to inject the log path.
-// After the DI migration, tests pass the path directly as the first argument
-// to appendGuardsLog(logPath, guardName, allow, reason).
-//
 // acs-predicate: config-check
-//
-// RED: cmd_guard_test.go:81,103 currently has t.Setenv("EVOLVE_GUARDS_LOG", ...).
 func TestC48B_004_GuardTest_NoSetenvGuardsLog(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -328,19 +136,7 @@ func TestC48B_004_GuardTest_NoSetenvGuardsLog(t *testing.T) {
 	}
 }
 
-// === FlagCeiling after Task B (config-check waiver) ===
-
-// === Docs-contract clean (config-check waiver) ===
-
-// TestC48B_006_DocsContractTest_NoGuardsLog verifies that docs_contract_test.go
-// no longer has an entry for EVOLVE_GUARDS_LOG. After the DI migration removes the
-// flag from the registry, its docs_contract entry must also be deleted.
-//
 // acs-predicate: config-check
-//
-// RED: docs_contract_test.go:69 currently has:
-//
-//	"EVOLVE_GUARDS_LOG": true, // observability shunt
 func TestC48B_006_DocsContractTest_NoGuardsLog(t *testing.T) {
 	// acs-predicate: config-check
 	root := acsassert.RepoRoot(t)
@@ -353,5 +149,3 @@ func TestC48B_006_DocsContractTest_NoGuardsLog(t *testing.T) {
 			"File: %s", f)
 	}
 }
-
-// === Exact row count — final state (behavioral: negative / edge) ===

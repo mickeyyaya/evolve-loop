@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle1732 holds the acceptance predicates for sizeratchet-shrink-gc:
-// the five oversized go/internal/gc functions shrink to sizeratchet.MaxLines,
-// lose their offenders.json entries, and keep their behavior and comments.
 package cycle1732
 
 import (
@@ -190,7 +187,6 @@ func (g worktreeGit) Show(base, path string) ([]byte, error) {
 func (g worktreeGit) Root() (string, error) { return g.root, nil }
 
 // acs-predicate: config-check — the doc comment text IS the contract under
-// test (comments have no runtime behavior); parsed with go/parser, not grepped.
 func TestC1732_008_TargetFunctionDocsMatchBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	current := funcDocs(t, currentGcSources(t))
@@ -214,8 +210,6 @@ func TestC1732_008_TargetFunctionDocsMatchBaseline(t *testing.T) {
 	}
 }
 
-// Each anchor must stay verbatim, exactly once, in the non-test gc sources:
-// the extraction moves these lines, it does not rewrite them.
 var gcMutants = []struct{ fn, name, anchor, replacement string }{
 	{"Plan", "dispatch-logs TTL deletes non-.log files", `return !isDir && strings.HasSuffix(name, ".log")`, `return !isDir`},
 	{"Plan", "tracker TTL deletes a .ephemeral regular file", `err == nil && info.IsDir() &&`, `err == nil &&`},
@@ -340,7 +334,6 @@ func writeMutantOverlay(t *testing.T, pkgDir, anchor, replacement string) string
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1732_010_NoBaselineCommentDeletedFromGc(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

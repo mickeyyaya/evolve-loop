@@ -1,41 +1,5 @@
 //go:build acs
 
-// Package cycle1439 materialises the acceptance criteria for this lane's single
-// fleet-scoped task, `salvage-worktree-relanding` (triage-report.md ## top_n).
-//
-// What this cycle is. Not new design: a LANDING. The stranded worktree
-// .evolve/worktrees/cycle-42824668-1407 (branch cycle-42824668-1407, snapshot
-// 04d3dee1, continuation records `task-a-salvage-extraction-stage` /
-// `task-b-decoy-sentinel-fixture`) holds complete, never-landed work — the
-// quote-aware + tail-anchored `ownSentinelPayload` selector, the
-// `SummarizeBadVerdictBaseline` reader, and the `evolve salvage report` CLI —
-// blocked on one isolated correctness defect: `isQuotedEcho` treats a single
-// adjacent backtick as proof of a CLOSED inline-code span, so one stray
-// unmatched backtick suppresses a report's own genuine verdict sentinel
-// (cycle-1407 adversarial finding F1).
-//
-// Predicate strategy. Every predicate exercises the system: predicates 001-005
-// call `deliverable.ClassifyBadVerdict` directly and assert on its returned
-// classification; 006-008 build and drive the REAL CLI entry point
-// (go/cmd/evolve, via the registry.go dispatch table) as a subprocess and assert
-// on its emitted JSON / exit codes; 009 runs the named unit + apicover tests in
-// internal/deliverable. No predicate here is load-bearing on a source grep —
-// the cycle-85 degenerate-predicate ban.
-//
-// Wiring proof, not unit proof. 006-008 deliberately reach the salvage reader
-// through `evolve salvage report`, never by calling SummarizeBadVerdictBaseline
-// directly: a reader whose only caller is a test is dead code, and the whole
-// point of this landing is that the sidecar written since cycle-1389 finally has
-// a production reader an operator can run.
-//
-// RED baseline (this worktree, main-based). 002/003 fail because today's
-// ClassifyBadVerdict takes the FIRST sentinel-shaped span with no quote
-// awareness at all; 006/007/008 fail because go/cmd/evolve/cmd_salvage.go and
-// go/internal/deliverable/salvage_report.go do not exist on main; 009 fails
-// because the named guard/apicover tests are worktree-only. 001/004/005 are
-// pre-existing GREEN and are pinned as regression guards: they are exactly the
-// cases a naive fix ("drop quote-awareness" / "last-match-wins only") would
-// break, so they must stay green THROUGH the landing.
 package cycle1439
 
 import (
@@ -50,45 +14,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// --- shared fixture text -----------------------------------------------------
-
-// malformedTailSentinel is a report's OWN verdict, malformed in the single most
-// common LLM way (trailing comma) — the shape ClassifyBadVerdict already claims
-// as SalvagePatternTrailingComma recoverable.
 const malformedTailSentinel = "<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"FAIL\",\"schema_version\":2,} -->\n"
 
-// cleanTailSentinel parses cleanly: a report carrying only this has nothing to
-// salvage, so Recoverable MUST be false.
 const cleanTailSentinel = "<!-- evolve-verdict: {\"phase\":\"audit\",\"verdict\":\"PASS\",\"schema_version\":2} -->\n"
 
-// quotedRecoverableDecoy is a sentinel a report merely QUOTES while discussing
-// the contract — balanced inline-code backticks on both sides. Its payload is
-// trailing-comma malformed, so a classifier without quote-awareness will report
-// it as this report's own recoverable verdict.
 const quotedRecoverableDecoy = "The contract shape is " +
 	"`<!-- evolve-verdict: {\"phase\":\"build\",\"verdict\":\"PASS\",\"schema_version\":1,} -->` " +
 	"— note the stray comma an agent often leaves behind.\n"
 
-// quotedUnrecoverableDecoy is a quoted echo whose payload is malformed in a way
-// the classifier does NOT claim as recoverable (a missing separator, not a
-// trailing comma). A classifier that keys off this span reports "not
-// recoverable" and never reaches the report's own tail sentinel.
 const quotedUnrecoverableDecoy = "Another phase emitted " +
 	"`<!-- evolve-verdict: {\"phase\":\"audit\" \"verdict\":\"FAIL\"} -->` " +
 	"which the strict parser rejected outright.\n"
 
-// --- 001-005: classifier behaviour (direct calls) ----------------------------
-
-// TestC1439_001_UnmatchedBacktickDoesNotSuppressOwnSentinel is finding F1 itself.
-//
-// One stray, never-closed backtick sits immediately before the report's own
-// malformed tail sentinel. Adjacency alone must NOT be read as a quoted echo:
-// the span is the report's genuine verdict and is plainly recoverable.
-//
-// Pre-existing GREEN on main (which has no quote-awareness at all) and RED in
-// the stranded worktree. It is pinned here because the landing introduces
-// isQuotedEcho, and the ONLY acceptable landing is one where this stays green —
-// i.e. the closure requirement, not a revert of quote-awareness.
 func TestC1439_001_UnmatchedBacktickDoesNotSuppressOwnSentinel(t *testing.T) {
 	t.Parallel()
 	const content = "## Verdict\n" +
@@ -108,13 +45,6 @@ func TestC1439_001_UnmatchedBacktickDoesNotSuppressOwnSentinel(t *testing.T) {
 	}
 }
 
-// TestC1439_002_QuotedDecoyIsNotTheReportsOwnVerdict is the quote-awareness
-// half. A malformed sentinel wrapped in BALANCED inline-code backticks is prose
-// quoting the contract; the report's own verdict, further down, parses cleanly.
-// There is therefore nothing to salvage.
-//
-// RED on main: ClassifyBadVerdict takes the FIRST sentinel-shaped span, which is
-// the decoy, and reports it recoverable.
 func TestC1439_002_QuotedDecoyIsNotTheReportsOwnVerdict(t *testing.T) {
 	t.Parallel()
 	content := "# Audit Report\n\n" + quotedRecoverableDecoy + "\n## Verdict\n" + cleanTailSentinel
@@ -131,14 +61,6 @@ func TestC1439_002_QuotedDecoyIsNotTheReportsOwnVerdict(t *testing.T) {
 	}
 }
 
-// TestC1439_003_RealTailSentinelClassifiesThroughQuotedDecoy is the other
-// direction, and the crux of the landing: the decoy above is quoted AND
-// unrecoverably malformed, while the report's own tail sentinel below it carries
-// a trailing comma. The classifier must skip the echo and classify the real one.
-//
-// RED on main: first-match-wins keys off the decoy and returns not-recoverable,
-// so a genuinely salvageable report is counted against the baseline rate the
-// extraction stage is gated on.
 func TestC1439_003_RealTailSentinelClassifiesThroughQuotedDecoy(t *testing.T) {
 	t.Parallel()
 	content := "# Audit Report\n\n" + quotedUnrecoverableDecoy + "\n## Verdict\n" + malformedTailSentinel
@@ -151,13 +73,6 @@ func TestC1439_003_RealTailSentinelClassifiesThroughQuotedDecoy(t *testing.T) {
 	}
 }
 
-// TestC1439_004_QuotedDecoyAfterRealSentinelIgnored is the adversarial guard
-// against the cheap fix. "Last match wins" alone passes 003 while failing here:
-// the real, clean sentinel comes FIRST and a malformed decoy is quoted BELOW it.
-// Only quote-awareness plus tail anchoring passes 002, 003 and 004 together.
-//
-// Pre-existing GREEN on main (first-match-wins gets this right by accident); it
-// is the negative test that keeps the landing from regressing into last-wins.
 func TestC1439_004_QuotedDecoyAfterRealSentinelIgnored(t *testing.T) {
 	t.Parallel()
 	content := "# Audit Report\n\n## Verdict\n" + cleanTailSentinel +
@@ -170,11 +85,6 @@ func TestC1439_004_QuotedDecoyAfterRealSentinelIgnored(t *testing.T) {
 	}
 }
 
-// TestC1439_005_BacktickAtContentBoundaries is the edge/OOD axis: a sentinel
-// flush against offset 0 and one flush against len(content)-1 with a trailing
-// backtick. Any adjacency check that peeks at content[start-1] / content[end]
-// without bounds-guarding panics here (index out of range), and a panic in a
-// pure classifier takes down the phase that called it.
 func TestC1439_005_BacktickAtContentBoundaries(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -203,13 +113,6 @@ func TestC1439_005_BacktickAtContentBoundaries(t *testing.T) {
 	}
 }
 
-// --- CLI harness -------------------------------------------------------------
-
-// buildEvolve compiles go/cmd/evolve — the real CLI entry point whose registry.go
-// dispatch table must carry the `salvage` subcommand — and returns the binary
-// path. One named package, never a `./...` sweep (flaky-predicate-shape rule),
-// and `go -C` rather than a bare `go` so the repo resolves from the worktree and
-// not from whatever cwd the fleet lane happens to have.
 func buildEvolve(t *testing.T) string {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -221,10 +124,6 @@ func buildEvolve(t *testing.T) string {
 	return bin
 }
 
-// writeBaselineProject materialises a project root holding the JSONL sidecar the
-// reader folds. Three bad_verdict_classified records (two recoverable), plus one
-// FOREIGN event and one blank line — both of which the reader must skip without
-// touching the denominator.
 func writeBaselineProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -245,8 +144,6 @@ func writeBaselineProject(t *testing.T) string {
 	return root
 }
 
-// firstLine keeps a failure message readable when the CLI answers with its full
-// usage dump (the shape of the RED baseline, where `salvage` is unregistered).
 func firstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return s[:i] + " …"
@@ -254,16 +151,6 @@ func firstLine(s string) string {
 	return s
 }
 
-// --- 006-008: CLI reachability (wiring proofs) -------------------------------
-
-// TestC1439_006_SalvageReportFoldsBaselineViaCLI drives the reader through its
-// PRODUCTION caller — `evolve salvage report -json`, dispatched by registry.go —
-// and asserts the folded summary. Calling SummarizeBadVerdictBaseline directly
-// would pass on dead code; the whole point of the landing is that the sidecar
-// finally has an operator-reachable reader.
-//
-// RED on main: `salvage` is not in the dispatch table, so the CLI exits non-zero
-// with an unknown-command error and emits no JSON at all.
 func TestC1439_006_SalvageReportFoldsBaselineViaCLI(t *testing.T) {
 	t.Parallel()
 	bin := buildEvolve(t)
@@ -301,8 +188,6 @@ func TestC1439_006_SalvageReportFoldsBaselineViaCLI(t *testing.T) {
 			"not manufacture a phantom shape", got.ByPattern)
 	}
 
-	// Auxiliary (not load-bearing): the landed sources must be git-TRACKED, not
-	// merely present on disk — an untracked file is silently dropped at ship.
 	repo := acsassert.RepoRoot(t)
 	for _, rel := range []string{"go/cmd/evolve/cmd_salvage.go", "go/internal/deliverable/salvage_report.go"} {
 		if _, _, c, _ := acsassert.SubprocessOutput("git", "-C", repo, "ls-files", "--error-unmatch", rel); c != 0 {
@@ -311,11 +196,6 @@ func TestC1439_006_SalvageReportFoldsBaselineViaCLI(t *testing.T) {
 	}
 }
 
-// TestC1439_007_SalvageReportFailsLoudlyOnTornRecord is the negative axis. The
-// sidecar is append-per-emit, so a killed process can leave a torn line. A
-// summarizer that skipped it would under-count the denominator and bias the very
-// rate it exists to measure (rule 12: fail loudly). The CLI must exit non-zero
-// and name the file and line.
 func TestC1439_007_SalvageReportFailsLoudlyOnTornRecord(t *testing.T) {
 	t.Parallel()
 	bin := buildEvolve(t)
@@ -324,7 +204,7 @@ func TestC1439_007_SalvageReportFailsLoudlyOnTornRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	torn := `{"event_type":"bad_verdict_classified","recoverable":true,"pattern":"trailing-comma"}` + "\n" +
-		`{"event_type":"bad_verdict_class` + "\n" // killed mid-append
+		`{"event_type":"bad_verdict_class` + "\n"
 	if err := os.WriteFile(filepath.Join(proj, ".evolve", "bad-verdict-baseline.jsonl"), []byte(torn), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -334,19 +214,11 @@ func TestC1439_007_SalvageReportFailsLoudlyOnTornRecord(t *testing.T) {
 		t.Fatalf("exit=0 on a torn record — a silently skipped line biases the measured rate.\nstdout:\n%s", stdout)
 	}
 	if !strings.Contains(stderr, "bad-verdict-baseline.jsonl") || !strings.Contains(stderr, "line 2") {
-		// Truncated: an unwired CLI answers with its whole usage dump, which
-		// would bury every other predicate's output in the RED log.
 		t.Errorf("stderr does not name the sidecar file and the offending line (want %q + %q): %q",
 			"bad-verdict-baseline.jsonl", "line 2", firstLine(stderr))
 	}
 }
 
-// TestC1439_008_SalvageIsInTheDispatchTable pins the seam itself: `salvage` must
-// be a registered subcommand reachable from the top-level CLI, not merely a
-// function that exists. An unregistered runSalvage is dead code.
-//
-// It also pins the usage contract — a bare `salvage` with no subcommand must
-// fail rather than default to something — so the surface cannot silently widen.
 func TestC1439_008_SalvageIsInTheDispatchTable(t *testing.T) {
 	t.Parallel()
 	bin := buildEvolve(t)
@@ -371,20 +243,6 @@ func TestC1439_008_SalvageIsInTheDispatchTable(t *testing.T) {
 	}
 }
 
-// --- 009: named guard + apicover coverage ------------------------------------
-
-// TestC1439_009_NamedGuardAndApicoverTestsPass runs the unit tests the landing
-// owes, by name, in ONE package with a narrowed -run (never a ./... sweep):
-//
-//   - the three isQuotedEcho guard cases the build plan enumerates, and
-//   - the apicover named test that exercises the newly exported
-//     SummarizeBadVerdictBaseline / BaselineSummary. internal/deliverable is
-//     already enrolled in go/.apicover-enforce:237, so every exported symbol the
-//     landing adds must be named in a real assertion or the repo-wide apicover
-//     gate (ADR-0069's second gate) fails the build.
-//
-// Asserting on `--- PASS: <name>` lines, and rejecting "no tests to run", is
-// what makes this a coverage proof rather than a vacuous exit-0.
 func TestC1439_009_NamedGuardAndApicoverTestsPass(t *testing.T) {
 	t.Parallel()
 	root := acsassert.RepoRoot(t)

@@ -1,9 +1,5 @@
 //go:build acs
 
-// Package cycle85 ports the cycle-85 ACS predicates (7 bash files).
-// Subjects: builder worktree isolation, cycle-state phase validation,
-// memo profile, orchestrator closure mode, promote ACS fallback,
-// subagent cost attribution, triage operator-queue priority floor.
 package cycle85
 
 import (
@@ -14,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC85_BuilderWorktreeIsolationHardError ports test_builder_worktree_isolation_hard_error.sh.
 func TestC85_BuilderWorktreeIsolationHardError(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
@@ -26,7 +21,6 @@ func TestC85_BuilderWorktreeIsolationHardError(t *testing.T) {
 	}
 }
 
-// TestC85_CycleStatePhaseValidation ports test_cycle_state_phase_validation.sh.
 func TestC85_CycleStatePhaseValidation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	gate := filepath.Join(root, "legacy", "scripts", "lifecycle", "phase-gate.sh")
@@ -38,7 +32,6 @@ func TestC85_CycleStatePhaseValidation(t *testing.T) {
 	}
 }
 
-// TestC85_MemoProfileHasMemoMdWrite ports test_memo_profile_has_memo_md_write.sh.
 func TestC85_MemoProfileHasMemoMdWrite(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "memo.json")
@@ -50,7 +43,6 @@ func TestC85_MemoProfileHasMemoMdWrite(t *testing.T) {
 	}
 }
 
-// TestC85_OrchestratorClosureModeCheck ports test_orchestrator_closure_mode_check.sh.
 func TestC85_OrchestratorClosureModeCheck(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	orch := filepath.Join(root, "agents", "evolve-orchestrator.md")
@@ -62,7 +54,6 @@ func TestC85_OrchestratorClosureModeCheck(t *testing.T) {
 	}
 }
 
-// TestC85_PromoteACSFallbackPath ports test_promote_acs_fallback_path.sh.
 func TestC85_PromoteACSFallbackPath(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -77,7 +68,6 @@ func TestC85_PromoteACSFallbackPath(t *testing.T) {
 	t.Skip("no promote script found")
 }
 
-// TestC85_SubagentCostAttribution ports test_subagent_cost_attribution.sh.
 func TestC85_SubagentCostAttribution(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	subagent := filepath.Join(root, "legacy", "scripts", "dispatch", "subagent-run.sh")
@@ -89,7 +79,6 @@ func TestC85_SubagentCostAttribution(t *testing.T) {
 	}
 }
 
-// TestC85_TriageOperatorQueuePriorityFloor ports test_triage_operator_queue_priority_floor.sh.
 func TestC85_TriageOperatorQueuePriorityFloor(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	triage := filepath.Join(root, "agents", "evolve-triage.md")

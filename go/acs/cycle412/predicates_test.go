@@ -1,35 +1,5 @@
 //go:build acs
 
-// Package cycle412 materializes the cycle-412 acceptance criteria for two prompt-optimization tasks:
-//   - prune-dead-legacy-script-refs (agents/evolve-{scout,builder,auditor,tdd-engineer,orchestrator,triage}.md)
-//   - dedupe-phase-prompt-reference-index (agents/evolve-{scout,builder,auditor}.md)
-//
-// Goal: optimize per-agent token usage by removing 18 dead legacy/scripts refs, 5 v12.0.0
-// disclaimer blocks, and collapsing 30 repeated reference-file paths (9/12/9) to ≤2 each.
-//
-// AC map (1:1 with scout-report.md top_n; R9.3 floor-binding):
-//
-//	prune-dead-legacy-script-refs:
-//	  AC1 zero legacy/scripts refs across 6 prompt files (18 currently)  → C412_001 (RED)
-//	  AC2 combined word count < 14126 (currently exactly 14126)           → C412_002 (RED)
-//	  AC3 gate anchors preserved (STOP CRITERION, challenge-token, etc)   → C412_003 (pre-existing GREEN, config-check)
-//	  AC4 no file gutted (each prompt ≥ 100 lines)                        → C412_004 (pre-existing GREEN)
-//	  AC5 v12.0.0 status disclaimers removed (5 currently)                → C412_005 (RED)
-//
-//	dedupe-phase-prompt-reference-index:
-//	  AC1 reference path repeated ≤ 2× per file (scout 9, builder 12, auditor 9 currently) → C412_006 (RED)
-//	  AC2 all 7 scout reference section names present after collapse                         → C412_007 (pre-existing GREEN, config-check)
-//	  AC3 ≥1 pointer per file (not amputated wholesale)                                      → C412_008 (pre-existing GREEN)
-//	  AC4 combined scout+builder+auditor word count < 6861 (currently exactly 6861)          → C412_009 (RED)
-//
-// Adversarial diversity (per SKILL §6):
-//
-//	Negative: legacy/scripts present → C412_001 (RED); v12.0.0 disclaimer present → C412_005 (RED);
-//	          path repeat > 2 → C412_006 (RED).
-//	Edge/OOD: file gutted (< 100 lines) → C412_004; pointer amputated entirely → C412_008.
-//	Semantic:  word-count reduction (distinct from string-absence) → C412_002, C412_009.
-//
-// Deferred (zero predicates per R9.3): 27 carryover breadcrumbs (all infra/codex-tmux boot-wedge class).
 package cycle412
 
 import (
@@ -41,41 +11,22 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// countWords returns the number of whitespace-delimited tokens (matches wc -w).
 func countWords(text string) int {
 	return len(strings.Fields(text))
 }
 
-// countSubstring returns the number of non-overlapping occurrences of substr in s.
 func countSubstring(s, substr string) int {
 	return strings.Count(s, substr)
 }
 
-// countLines returns the number of newline-terminated or final lines in text.
 func countLines(text string) int {
 	lines := strings.Split(text, "\n")
-	// Drop trailing empty string from a final newline.
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		return len(lines) - 1
 	}
 	return len(lines)
 }
 
-// ── Task 1: prune-dead-legacy-script-refs ────────────────────────────────────
-
-// TestC412_001_NoLegacyScriptRefsInAnyPrompt asserts that every occurrence of
-// "legacy/scripts" has been removed from all six phase-prompt files.
-//
-// BEHAVIORAL: reads each file and counts "legacy/scripts" occurrences; the test
-// fails while any exist. Adding or commenting text cannot satisfy it — only
-// genuine removal of all 18 references passes.
-//
-// NEGATIVE (adversarial): an unmodified tree (18 total occurrences) fails here.
-// This is the primary anti-no-op signal for prune-dead-legacy-script-refs.
-//
-// RED: currently 20 occurrences total (scout 2, builder 5, auditor 3, tdd 3,
-// orchestrator 5, triage 2). The scout cited 18 counting lines via grep -c;
-// builder:131 and tdd:83 each have 2 occurrences on a single line.
 func TestC412_001_NoLegacyScriptRefsInAnyPrompt(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	files := []string{
@@ -107,21 +58,6 @@ func TestC412_001_NoLegacyScriptRefsInAnyPrompt(t *testing.T) {
 	}
 }
 
-// TestC412_002_CombinedWordCountReduced asserts that the total word count
-// across all six phase-prompt files is strictly less than 13900.
-//
-// BEHAVIORAL: reads and counts whitespace-delimited tokens (strings.Fields semantics).
-// Removing 20 dead legacy/scripts instruction occurrences plus 5 v12.0.0 disclaimer
-// blocks reduces the word count by ~300–500 words from the Go-measured baseline of
-// 14124. The threshold 13900 sits between the baseline and the expected post-cleanup
-// floor; Builder must perform the actual dead-ref removal to pass it.
-//
-// NEGATIVE: an unmodified tree totals 14124 words (> 13900), so this fails.
-// Only genuine removal of dead instructions satisfies it.
-//
-// RED: combined Go-measured baseline = 14124 (scout 1915, builder 2683, auditor 2263,
-// tdd 2801, orchestrator 2356, triage 2106). The scout report cited 14126 via wc -w;
-// Go's strings.Fields measures 14124 for the same files.
 func TestC412_002_CombinedWordCountReduced(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	files := []struct {
@@ -143,7 +79,7 @@ func TestC412_002_CombinedWordCountReduced(t *testing.T) {
 		}
 		total += countWords(string(raw))
 	}
-	const maxWords = 13900 // baseline 14124; target ≤ 13900 after dead-ref cleanup
+	const maxWords = 13900
 	if total > maxWords {
 		t.Errorf("RED: combined word count across 6 phase prompts = %d (Go baseline 14124) — "+
 			"must be ≤ 13900 after removing dead legacy/scripts instructions and v12.0.0 disclaimers.\n"+
@@ -153,15 +89,7 @@ func TestC412_002_CombinedWordCountReduced(t *testing.T) {
 	}
 }
 
-// TestC412_003_GateAnchorsPreserved asserts that integrity-critical gate anchors
-// remain in each phase prompt after the legacy/scripts cleanup.
-//
 // acs-predicate: config-check
-//
-// ANTI-GAMING: if Builder over-deletes (removes a STOP CRITERION block or
-// challenge-token instruction while stripping legacy/scripts), this fails.
-//
-// Pre-existing GREEN: all anchors present before any edits.
 func TestC412_003_GateAnchorsPreserved(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 
@@ -207,14 +135,6 @@ func TestC412_003_GateAnchorsPreserved(t *testing.T) {
 	}
 }
 
-// TestC412_004_NoFileGutted asserts that none of the six phase-prompt files
-// was emptied or severely truncated during the legacy/scripts cleanup.
-//
-// EDGE (anti-gaming): a Builder that deletes an entire section to remove a
-// legacy/scripts reference would drive a file below 100 lines. Each file
-// is currently 219–405 lines — well above the 100-line floor.
-//
-// Pre-existing GREEN: all files are ≥219 lines currently.
 func TestC412_004_NoFileGutted(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	files := []string{
@@ -240,19 +160,6 @@ func TestC412_004_NoFileGutted(t *testing.T) {
 	}
 }
 
-// TestC412_005_NoV12StatusDisclaimers asserts that all five
-// "> **v12.0.0 status:**" disclaimer blocks have been removed from the six
-// phase-prompt files.
-//
-// BEHAVIORAL: counts "v12.0.0 status" occurrences per file. The disclaimers
-// exist solely to neutralize the dead legacy/scripts references — once those
-// references are removed (AC1), the disclaimers are pure workaround weight
-// and must be deleted too (CLAUDE rule no_workaround_root_cause_redesign).
-//
-// NEGATIVE (adversarial): the unmodified tree has 5 disclaimers (scout 1,
-// builder 1, auditor 1, tdd 1, triage 1; orchestrator 0) — all must go.
-//
-// RED: currently 5 occurrences total.
 func TestC412_005_NoV12StatusDisclaimers(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	files := []string{
@@ -281,10 +188,6 @@ func TestC412_005_NoV12StatusDisclaimers(t *testing.T) {
 	}
 }
 
-// ── Task 2: dedupe-phase-prompt-reference-index ───────────────────────────────
-
-// countLinesContaining returns the number of lines in text that contain substr.
-// Matches grep -c semantics: lines counted, not occurrences per line.
 func countLinesContaining(text, substr string) int {
 	n := 0
 	for _, line := range strings.Split(text, "\n") {
@@ -295,20 +198,6 @@ func countLinesContaining(text, substr string) int {
 	return n
 }
 
-// TestC412_006_ReferencePathLineCountAtMostTwo asserts that the reference-file
-// path appears on at most 2 lines per file in the three target prompts
-// (grep -c semantics: lines, not occurrence count).
-//
-// BEHAVIORAL: counts lines containing each path (grep -c equivalent).
-// The Reference Index currently repeats the full path on every row AND many
-// body-text inline refs: scout 9 lines, builder 12 lines, auditor 9 lines.
-// After collapse, the path should appear on ≤2 lines total (one base-pointer
-// declaration; all other mentions use just the section name).
-//
-// NEGATIVE (adversarial): unmodified files have 9/12/9 lines — all above
-// the ≤2 limit. Primary anti-no-op signal for dedupe-phase-prompt-reference-index.
-//
-// RED: scout=9, builder=12, auditor=9 lines containing the reference path currently.
 func TestC412_006_ReferencePathLineCountAtMostTwo(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	checks := []struct {
@@ -335,16 +224,7 @@ func TestC412_006_ReferencePathLineCountAtMostTwo(t *testing.T) {
 	}
 }
 
-// TestC412_007_AllScoutReferenceSectionsPresent asserts that all seven
-// section names from the scout Reference Index survive after path deduplication.
-//
 // acs-predicate: config-check
-//
-// ANTI-GAMING: if Builder collapses the table by deleting rows (removing section
-// names instead of just shortening the repeated path), this fails. The seven
-// section names must remain discoverable in the file.
-//
-// Pre-existing GREEN: all 7 sections present in current scout file.
 func TestC412_007_AllScoutReferenceSectionsPresent(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	path := filepath.Join(root, "agents", "evolve-scout.md")
@@ -367,15 +247,6 @@ func TestC412_007_AllScoutReferenceSectionsPresent(t *testing.T) {
 	}
 }
 
-// TestC412_008_ReferencePointerNotAmputated asserts that each target file
-// retains at least one pointer to its reference file after deduplication.
-//
-// EDGE (anti-amputate): a deduplication that deletes the entire Reference Index
-// section would satisfy C412_006 (≤2 repeats) but violate the "on-demand
-// reference mechanism stays" integrity constraint. At least one discoverable
-// pointer must survive.
-//
-// Pre-existing GREEN: all three files currently have 9/12/9 pointers.
 func TestC412_008_ReferencePointerNotAmputated(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	checks := []struct {
@@ -400,18 +271,6 @@ func TestC412_008_ReferencePointerNotAmputated(t *testing.T) {
 	}
 }
 
-// TestC412_009_ScoutBuilderAuditorWordCountReduced asserts that the combined
-// word count of the three Reference-Index-bearing prompts is strictly less than
-// 6861 after deduplication.
-//
-// BEHAVIORAL: reads and word-counts the three target files (scout+builder+auditor).
-// The current combined baseline is exactly 6861 — collapsing 30 redundant
-// path strings must reduce this below the baseline.
-//
-// NEGATIVE: an unmodified tree totals exactly 6861 — not strictly less, so
-// this fails. Only genuine Reference Index collapse satisfies it.
-//
-// RED: scout 1915 + builder 2683 + auditor 2263 = 6861 currently.
 func TestC412_009_ScoutBuilderAuditorWordCountReduced(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	files := []struct {
@@ -430,7 +289,7 @@ func TestC412_009_ScoutBuilderAuditorWordCountReduced(t *testing.T) {
 		}
 		total += countWords(string(raw))
 	}
-	const maxWords = 6860 // strictly < 6861
+	const maxWords = 6860
 	if total > maxWords {
 		t.Errorf("RED: combined word count for scout+builder+auditor = %d (baseline 6861) — "+
 			"must be < 6861 after collapsing Reference Index path repetition.\n"+

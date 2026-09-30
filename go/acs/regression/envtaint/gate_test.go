@@ -25,8 +25,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestEveryGoReaderHasRegistryRow fails if any fold-aware EVOLVE_ operator-dial
-// reader in production Go lacks a flagregistry row.
 func TestEveryGoReaderHasRegistryRow(t *testing.T) {
 	repo := acsassert.RepoRoot(t)
 	r, skipped, err := ReadSet(filepath.Join(repo, "go"))
@@ -36,8 +34,6 @@ func TestEveryGoReaderHasRegistryRow(t *testing.T) {
 	if len(skipped) > 0 {
 		t.Logf("envtaint: %d unparseable file(s) skipped: %v", len(skipped), skipped)
 	}
-	// Non-vacuity: the scan must actually find the live dials; an empty or tiny
-	// read-set means the walk broke and the gate would pass trivially.
 	if len(r) < 10 {
 		t.Fatalf("read-set implausibly small (%d keys) — the production scan is likely broken", len(r))
 	}
@@ -52,11 +48,6 @@ func TestEveryGoReaderHasRegistryRow(t *testing.T) {
 	}
 }
 
-// TestCycle20Dodge_OrphanedWhenRowDeleted replays the exact cycle-20 metric dodge
-// and proves the gate catches it: a split-const reader of an operator dial keeps
-// the dial working byte-identically while vanishing from the go/ast literal scan,
-// so the registry row could be deleted unnoticed. The fold-aware read-set still
-// contains the key, so deleting the row leaves a detectable orphan.
 func TestCycle20Dodge_OrphanedWhenRowDeleted(t *testing.T) {
 	const dodge = `package p
 
@@ -69,7 +60,6 @@ var _ = os.Getenv("EVOLVE_" + "WORKTREE_BASE")
 	if err != nil {
 		t.Fatalf("EvolveConstKeys: %v", err)
 	}
-	// Simulate the registry AFTER the dodge deleted the WORKTREE_BASE row.
 	rowExists := func(string) bool { return false }
 	var orphans []string
 	for _, k := range r {

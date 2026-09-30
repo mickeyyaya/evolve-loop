@@ -1,53 +1,5 @@
 //go:build acs
 
-// Package cycle468 materialises the cycle-468 acceptance criteria for the
-// single triage-committed task (operator priority override, T1 of 2):
-//
-//	egps-flake-retry-once (go/internal/acssuite retry-once for test-failure
-//	RED predicates with a visible flaky annotation + WARN;
-//	go/internal/phases/audit WARN surfacing) → C468_001..005
-//
-// 1:1 AC-materialization: 5 predicates + 0 manual+checklist + 0 removed = 5
-// ACs total (see the cycle workspace .evolve/evals/egps-flake-retry-once.md),
-// none double-counted.
-//
-// CONTROL-PLANE NOTE (why these predicates live here and pin the WIRE
-// contract, not struct fields): go/internal/acssuite/ is protected integrity
-// surface (guards.IsProtectedSurface, ADR-0064) — no autonomous phase may
-// write there, so the cycle cannot host unit tests inside the package.
-// go/acs/cycle<N>/ is the sanctioned per-cycle predicate surface, and the
-// acssuite seam API (Run / Options.GoExec / WriteVerdict) is exported, so
-// every criterion is encoded here by exercising Run in-process with a
-// scripted, invocation-counting GoExec seam and asserting on the verdict
-// STRUCT tallies plus the WRITTEN acs-verdict.json bytes — the contract the
-// audit + ship gates actually consume. Field names are left to the
-// implementation; the JSON keys ("flaky", "warnings") are the pinned API.
-//
-// RED strategy (verified in test-report.md "RED Run Output"): the package
-// COMPILES against the current acssuite API, so C468_001 and C468_002 are red
-// on their own ASSERTIONS (no retry exists: the flaky fixture yields
-// verdict=FAIL, and the seam records 1 invocation where the bound demands
-// exactly 2) — the right-reason RED. C468_003/004/005 are pre-existing-GREEN
-// regression pins by design (they pin behavior the change must NOT alter:
-// parse-error REDs stay non-retried, the no-flake wire bytes stay identical,
-// repo gates stay green).
-//
-// Adversarial diversity (skills/adversarial-testing SKILL §6):
-//
-//	Negative:   C468_002 — a deterministic red MUST stay RED (kills the
-//	            "always green on retry" gaming fake) and the seam must record
-//	            EXACTLY 2 invocations (kills unlimited-retry-until-green);
-//	            C468_001's annotation must be in the WRITTEN JSON (kills
-//	            "flip silently / strip before write").
-//	Edge / OOD: C468_003 — the synthetic egps/go-lane-parse-error RED
-//	            (oversized NDJSON line breaking the scanner) is not a test
-//	            failure and must NOT trigger a retry (1 invocation, stays
-//	            FAIL); C468_002's exact-2 bound.
-//	Semantic:   C468_001 (flake → GREEN + visible annotation + WARN) vs
-//	            C468_002 (deterministic red → unchanged FAIL) are DISTINCT
-//	            behaviors — a retry that flips everything passes 001 but
-//	            fails 002; C468_004 pins the degrade path (no flake ⇒
-//	            byte-identical wire output, omitempty invisibility).
 package cycle468
 
 import (
@@ -63,9 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// Fixture identities mirror the real cycle-466 burned-cycle evidence
-// (.evolve/runs/cycle-466/acs-verdict.json): the -race full-suite contention
-// flake this task exists to absorb.
 const (
 	fixturePkg     = "github.com/mickeyyaya/evolve-loop/go/acs/cycle466"
 	fixtureCycle   = 466
@@ -78,12 +27,10 @@ const (
 	auditPkg    = "github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 )
 
-// evTerminal builds one terminal `go test -json` event line (pass/fail/skip).
 func evTerminal(test, action string) string {
 	return `{"Action":"` + action + `","Package":"` + fixturePkg + `","Test":"` + test + `","Elapsed":0.01}`
 }
 
-// evOutput builds one output event line; body is JSON-escaped.
 func evOutput(test, body string) string {
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -94,11 +41,8 @@ func evOutput(test, body string) string {
 
 func evStream(lines ...string) string { return strings.Join(lines, "\n") + "\n" }
 
-// raceContentionOutput is the real cycle-466 red evidence shape.
 const raceContentionOutput = "    predicates_test.go:137: full-package -race regression on cmd/evolve, internal/fleet, internal/policy, internal/triagecap is red (exit=1)\n"
 
-// exitErr mimics *exec.ExitError for the GoExec seam (a non-nil error signals
-// `go test` exited nonzero).
 type exitErr struct{ code int }
 
 func (e *exitErr) Error() string { return fmt.Sprintf("exit status %d", e.code) }
@@ -108,12 +52,6 @@ type seamStep struct {
 	err error
 }
 
-// scriptedSeam plays canned (raw, err) steps for successive invocations of the
-// CURRENT-cycle scope and returns empty output for the regression/redteam
-// scopes. It counts current-cycle invocations: the retry-once bound is proved
-// by the exact count, never inferred. Past the last step it replays the last
-// step (a deterministic red stays red on any hypothetical extra retry — the
-// count assertion then catches the violation).
 type scriptedSeam struct {
 	calls int
 	steps []seamStep
@@ -131,9 +69,6 @@ func (s *scriptedSeam) exec(_ context.Context, _, pattern string, _ []string) (s
 	return s.steps[i].raw, s.steps[i].err
 }
 
-// runAndWriteVerdict runs the acssuite Go lane with the scripted seam and
-// returns the in-memory verdict plus the WRITTEN acs-verdict.json (raw bytes +
-// parsed doc) — predicates assert on the wire contract the gates consume.
 func runAndWriteVerdict(t *testing.T, seam *scriptedSeam) (acssuite.Verdict, string, map[string]any) {
 	t.Helper()
 	v, err := acssuite.Run(acssuite.Options{Root: t.TempDir(), Cycle: fixtureCycle, GoExec: seam.exec})
@@ -155,8 +90,6 @@ func runAndWriteVerdict(t *testing.T, seam *scriptedSeam) (acssuite.Verdict, str
 	return v, string(raw), doc
 }
 
-// resultByACID returns the results[] entry with the given ac_id from the
-// written verdict doc.
 func resultByACID(t *testing.T, doc map[string]any, acID string) map[string]any {
 	t.Helper()
 	results, _ := doc["results"].([]any)
@@ -170,8 +103,6 @@ func resultByACID(t *testing.T, doc map[string]any, acID string) map[string]any 
 	return nil
 }
 
-// warningStrings returns the top-level warnings[] of the written verdict doc
-// (nil when the key is absent).
 func warningStrings(doc map[string]any) []string {
 	ws, _ := doc["warnings"].([]any)
 	var out []string
@@ -183,14 +114,6 @@ func warningStrings(doc map[string]any) []string {
 	return out
 }
 
-// TestC468_001_FlakyRedFlipsGreenWithVisibleAnnotation (AC1, positive): a
-// scope red on the first GoExec invocation (cycle-466 -race contention shape)
-// and green on the second must yield verdict PASS / red_count 0 /
-// ship_eligible, with the retry visible on the wire: the flipped result
-// carries flaky="passed-on-retry" IN THE WRITTEN acs-verdict.json (not only
-// in-memory — kills strip-before-write), a top-level warning names the test,
-// the untouched green carries no annotation, and the seam records exactly 2
-// current-cycle invocations.
 func TestC468_001_FlakyRedFlipsGreenWithVisibleAnnotation(t *testing.T) {
 	seam := &scriptedSeam{steps: []seamStep{
 		{raw: evStream(
@@ -236,12 +159,6 @@ func TestC468_001_FlakyRedFlipsGreenWithVisibleAnnotation(t *testing.T) {
 	}
 }
 
-// TestC468_002_DeterministicRedStaysRedRetryBoundedToOne (AC2, negative —
-// gate not weakened): a scope red on BOTH invocations must keep verdict FAIL /
-// red_count 1 / not ship-eligible, carry NO flaky annotation and NO warnings
-// on the wire, keep the FIRST run's evidence, and the seam must record
-// exactly 2 invocations — retry is bounded to once ("always green on retry"
-// and "retry until green" both die here).
 func TestC468_002_DeterministicRedStaysRedRetryBoundedToOne(t *testing.T) {
 	firstRun := evStream(
 		evOutput(flakyTest, "first-run evidence: "+raceContentionOutput),
@@ -284,11 +201,6 @@ func TestC468_002_DeterministicRedStaysRedRetryBoundedToOne(t *testing.T) {
 	}
 }
 
-// TestC468_003_SyntheticParseErrorRedNotRetried (AC3, edge/OOD — pre-existing
-// GREEN regression pin): the synthetic egps/go-lane-parse-error RED (an
-// oversized output line breaks the NDJSON scanner) is an infra failure, not a
-// test failure — it must NOT trigger a retry (exactly 1 invocation), the
-// verdict stays FAIL, and no flaky annotation appears anywhere on the wire.
 func TestC468_003_SyntheticParseErrorRedNotRetried(t *testing.T) {
 	huge := `{"Action":"output","Package":"` + fixturePkg + `","Test":"` + flakyTest + `","Output":"` +
 		strings.Repeat("x", 2*1024*1024) + `"}`
@@ -311,12 +223,6 @@ func TestC468_003_SyntheticParseErrorRedNotRetried(t *testing.T) {
 	}
 }
 
-// TestC468_004_NoFlakeDegradePathByteIdentical (AC4, regression pin —
-// pre-existing GREEN): for an all-green suite the WRITTEN acs-verdict.json
-// must byte-compare equal to the pre-change golden serialization — the new
-// flaky/warnings fields must be omitempty-invisible when nothing flakes, so
-// every existing consumer (audit, ship gate, dossiers) sees identical bytes.
-// Golden captured from the pre-change schema at cycle 468.
 func TestC468_004_NoFlakeDegradePathByteIdentical(t *testing.T) {
 	seam := &scriptedSeam{steps: []seamStep{
 		{raw: evStream(evTerminal(steadyTest, "pass"))},
@@ -355,11 +261,6 @@ func TestC468_004_NoFlakeDegradePathByteIdentical(t *testing.T) {
 	}
 }
 
-// TestC468_005_RaceVetApicoverCleanOnTouchedPackages (AC5, CI-parity gates —
-// pre-existing GREEN baseline): full -race regression on the two packages the
-// task touches, go vet clean on both, and apicover -enforce over
-// internal/acssuite (any NEW exported symbol the implementation adds must be
-// named by a test AND executed — kills the cycle-413 WARN-ship class).
 func TestC468_005_RaceVetApicoverCleanOnTouchedPackages(t *testing.T) {
 	stdout, stderr, code, _ := acsassert.SubprocessOutput("go", "test", "-race", "-count=1", acssuitePkg+"/...", auditPkg+"/...")
 	if code != 0 {
@@ -372,8 +273,6 @@ func TestC468_005_RaceVetApicoverCleanOnTouchedPackages(t *testing.T) {
 	if vetCode != 0 {
 		t.Errorf("go vet ./internal/acssuite/... ./internal/phases/audit/... is red (exit=%d)\n%s\n%s", vetCode, vetOut, vetErr)
 	}
-	// Coverage artifacts go to a temp dir: the cycle-suffixed names of prior
-	// cycles dodged .gitignore and got committed (coverage.s3guards467.txt).
 	apicoverCmd := "T=$(mktemp -d) && cd " + goDir + " && " +
 		"go test -coverprofile=\"$T/cover.txt\" ./internal/acssuite/ >/dev/null && " +
 		"go tool cover -func=\"$T/cover.txt\" > \"$T/cover.func.txt\" && " +
@@ -384,7 +283,6 @@ func TestC468_005_RaceVetApicoverCleanOnTouchedPackages(t *testing.T) {
 	}
 }
 
-// excerptFor bounds huge outputs in failure messages.
 func excerptFor(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) <= 600 {

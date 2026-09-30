@@ -1,9 +1,5 @@
 //go:build acs
 
-// Package cycle2 holds the (re-homed) ACS predicates for the Cycle Dossier feature
-// (ADR-0055 slices D2–D4). Authored by TDD Engineer as the RED gate; Builder
-// makes them GREEN by implementing dossier.Build/Render/Write, the failure-learning
-// defects propagation, the evolve dossier CLI, and the docs patches.
 package cycle6
 
 import (
@@ -18,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ── D2: dossier-recorder-d2 ────────────────────────────────────────────────
-
-// TestC6_001_DossierBuildReturnsPopulatedDossier verifies dossier.Build
-// returns a non-nil Dossier with Cycle+Goal set from BuildOpts (D2-AC1).
 func TestC6_001_DossierBuildReturnsPopulatedDossier(t *testing.T) {
 	d, err := dossier.Build(1, dossier.BuildOpts{WorkspacePath: t.TempDir(), Goal: "reduce flags"})
 	if err != nil {
@@ -41,8 +33,6 @@ func TestC6_001_DossierBuildReturnsPopulatedDossier(t *testing.T) {
 	}
 }
 
-// TestC6_002_DossierBuildErrorOnBadCycle verifies Build returns an error for
-// cycle <= 0 (D2-AC2, negative test).
 func TestC6_002_DossierBuildErrorOnBadCycle(t *testing.T) {
 	cases := []struct{ cycle int }{{0}, {-1}}
 	for _, tc := range cases {
@@ -53,8 +43,6 @@ func TestC6_002_DossierBuildErrorOnBadCycle(t *testing.T) {
 	}
 }
 
-// TestC6_003_DossierRenderJSONRoundTrip verifies RenderJSON produces valid
-// JSON that round-trips back to the original Cycle+Goal (D2-AC3).
 func TestC6_003_DossierRenderJSONRoundTrip(t *testing.T) {
 	d := &dossier.Dossier{
 		Cycle:        3,
@@ -85,8 +73,6 @@ func TestC6_003_DossierRenderJSONRoundTrip(t *testing.T) {
 	}
 }
 
-// TestC6_004_DossierWriteCreatesTwoFiles verifies Write creates cycle-N.json
-// and cycle-N.md in the target directory (D2-AC4).
 func TestC6_004_DossierWriteCreatesTwoFiles(t *testing.T) {
 	d := &dossier.Dossier{
 		Cycle:        42,
@@ -105,10 +91,6 @@ func TestC6_004_DossierWriteCreatesTwoFiles(t *testing.T) {
 	}
 }
 
-// TestC6_005_DefectsProducedAsCarryoverTodos verifies that each entry in
-// FailedRecord.Defects becomes its own CarryoverTodo entry in State (D2-AC5).
-// Negative test: one generic todo is NOT sufficient — each defect must be
-// individually represented.
 func TestC6_005_DefectsProducedAsCarryoverTodos(t *testing.T) {
 	defects := []string{
 		"unbounded fan-out in auditor verify path",
@@ -141,10 +123,6 @@ func TestC6_005_DefectsProducedAsCarryoverTodos(t *testing.T) {
 	}
 }
 
-// ── D3: dossier-acs-d3 ────────────────────────────────────────────────────
-
-// TestC6_006_PolicyHasDossierCloseout verifies .evolve/policy.json contains
-// the "dossier-closeout" gate entry required by D3 (D3-AC5).
 // acs-predicate: config-check — inherently a policy-file presence assertion.
 func TestC6_006_PolicyHasDossierCloseout(t *testing.T) {
 	root := acsassert.RepoRoot(t)
@@ -157,9 +135,6 @@ func TestC6_006_PolicyHasDossierCloseout(t *testing.T) {
 	}
 }
 
-// TestC6_007_DossierCLISubcommandRegistered verifies the evolve binary
-// exposes a "dossier" subcommand (D3-AC4 behavioral check — invokes the
-// real binary and asserts on its help output).
 func TestC6_007_DossierCLISubcommandRegistered(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	bin := filepath.Join(root, "go", "bin", "evolve")
@@ -172,10 +147,6 @@ func TestC6_007_DossierCLISubcommandRegistered(t *testing.T) {
 	}
 }
 
-// ── D4: dossier-docs-d4 ──────────────────────────────────────────────────
-
-// TestC6_008_ADRDossierFileExistsAndHasSections verifies the ADR file exists,
-// is > 1000 bytes, and contains all four required ADR sections (D4-AC1).
 // acs-predicate: config-check — inherently a documentation presence assertion.
 func TestC6_008_ADRDossierFileExistsAndHasSections(t *testing.T) {
 	root := acsassert.RepoRoot(t)
@@ -197,8 +168,6 @@ func TestC6_008_ADRDossierFileExistsAndHasSections(t *testing.T) {
 	}
 }
 
-// TestC6_009_ScoutMdHasKBRecallStep verifies agents/evolve-scout.md contains
-// a knowledge-base/cycles recall step (D4-AC2).
 // acs-predicate: config-check — doc-content presence assertion.
 func TestC6_009_ScoutMdHasKBRecallStep(t *testing.T) {
 	root := acsassert.RepoRoot(t)
@@ -211,8 +180,6 @@ func TestC6_009_ScoutMdHasKBRecallStep(t *testing.T) {
 	}
 }
 
-// TestC6_010_RuntimeReferenceHasDossierVerify verifies runtime-reference.md
-// documents the evolve dossier verify command (D4-AC3).
 // acs-predicate: config-check — doc-content presence assertion.
 func TestC6_010_RuntimeReferenceHasDossierVerify(t *testing.T) {
 	root := acsassert.RepoRoot(t)
@@ -225,9 +192,6 @@ func TestC6_010_RuntimeReferenceHasDossierVerify(t *testing.T) {
 	}
 }
 
-// TestC6_011_ScoutMdRetainsFiveSectionHeaders verifies agents/evolve-scout.md
-// retains >= 5 '## ' section headers after the D4 patch (regression guard,
-// D4-AC4 negative test — a destructive patch that removes headers fails here).
 func TestC6_011_ScoutMdRetainsFiveSectionHeaders(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scoutPath := filepath.Join(root, "agents", "evolve-scout.md")

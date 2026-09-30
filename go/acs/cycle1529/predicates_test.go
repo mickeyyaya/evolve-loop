@@ -1,15 +1,5 @@
 //go:build acs
 
-// Package cycle1529 carries the cycle-1529 ACS predicates.
-//
-// Task: close-completion-contract-cancel-parity-stale-item — retire the stale
-// inbox item `completion-contract-cancel-parity` as not-observed/already-fixed.
-// Scout proved the defect it worried about was fixed and test-locked by the
-// `withFinalPoll` generalization (go/internal/bridge/completion.go), pinned by
-// go/internal/bridge/completion_cancel_parity_test.go. The item's own
-// acceptance criteria say "close as not-observed if none", so the cycle's work
-// is a doc-only closure — and the two non-regression predicates below exist to
-// prove the closure stayed doc-only.
 package cycle1529
 
 import (
@@ -28,18 +18,11 @@ const (
 	staleItemFile = "2026-07-16T10-30-00Z-completion-contract-cancel-parity.json"
 )
 
-// gitTracked reports whether rel (repo-relative) is tracked by git at root.
 func gitTracked(root, rel string) bool {
 	_, _, code, err := acsassert.SubprocessOutput("git", "-C", root, "ls-files", "--error-unmatch", rel)
 	return err == nil && code == 0
 }
 
-// TestC1529_001_StaleInboxItemRetiredFromLiveBacklog drives the PRODUCTION
-// consumer of the backlog (inboxbatch.LoadDir — the same loader behind
-// `evolve inbox batches` and the triage prompt) and asserts the closed item is
-// no longer drawable by any lane. Behavioral: a `closed: true` field bolted on
-// while the file stays in .evolve/inbox/ does NOT satisfy this, because
-// LoadDir would still return the item.
 func TestC1529_001_StaleInboxItemRetiredFromLiveBacklog(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	inboxDir := filepath.Join(root, ".evolve", "inbox")
@@ -59,9 +42,6 @@ func TestC1529_001_StaleInboxItemRetiredFromLiveBacklog(t *testing.T) {
 			t.Errorf("RED: %q is still in the live backlog (%d items loaded) — the closure must move the file out of .evolve/inbox/, not annotate it in place", staleItemID, len(items))
 		}
 	}
-	// Path-level corroboration: the live-backlog path must be gone from disk
-	// AND from the index (a file deleted on disk but still tracked ships as a
-	// no-op; a file untracked but present is re-drawn by the next lane).
 	live := filepath.Join(inboxDir, staleItemFile)
 	if _, err := os.Stat(live); err == nil {
 		t.Errorf("RED: %s still present on disk", live)
@@ -71,11 +51,6 @@ func TestC1529_001_StaleInboxItemRetiredFromLiveBacklog(t *testing.T) {
 	}
 }
 
-// TestC1529_002_ConsumedRecordCitesParityEvidence asserts the retired item
-// landed in the repo's existing closure convention (.evolve/inbox/consumed/,
-// the corpus reconcileConsumedFingerprints projects) carrying a closure record
-// that names WHY it was closed and WHAT proves it. An empty move with no
-// `consumed` block, or a record that cites nothing, fails here.
 func TestC1529_002_ConsumedRecordCitesParityEvidence(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rel := filepath.Join(".evolve", "inbox", "consumed", staleItemFile)
@@ -85,8 +60,6 @@ func TestC1529_002_ConsumedRecordCitesParityEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RED: consumed record unreadable at %s: %v", rel, err)
 	}
-	// Edge axis: the record must still be well-formed JSON the loader can read
-	// (a hand-edited trailing comma silently drops an item from every sweep).
 	var item struct {
 		ID       string `json:"id"`
 		Consumed struct {
@@ -109,25 +82,20 @@ func TestC1529_002_ConsumedRecordCitesParityEvidence(t *testing.T) {
 	}
 	res := item.Consumed.Resolution
 	for _, needle := range []string{
-		"completion_cancel_parity_test.go", // the evidence that closes it
-		"not-observed",                     // the item's own closure verdict
+		"completion_cancel_parity_test.go",
+		"not-observed",
 	} {
 		if !strings.Contains(res, needle) {
 			t.Errorf("RED: consumed.resolution does not cite %q — got %q", needle, res)
 		}
 	}
-	// cycle-93 lesson: disk presence without tracking ships as nothing.
 	if !gitTracked(root, rel) {
 		t.Errorf("RED: %s is untracked — it would be dropped at ship", rel)
 	}
 }
 
-// TestC1529_003_CancelParityTestsRemainGreen re-runs the four tests that are
-// the CLOSING EVIDENCE for this item. Closing an item on the strength of a
-// test suite is only sound while that suite is green, so this predicate runs
-// it. One named package, -run-narrowed (flaky-predicate-shape rules).
 func TestC1529_003_CancelParityTestsRemainGreen(t *testing.T) {
-	_ = acsassert.RepoRoot(t) // skip cleanly outside a work tree
+	_ = acsassert.RepoRoot(t)
 	const pkg = "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	const run = "TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout|TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout|TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout|TestArtifactDetector_CtxCancelledShortCircuitsDebounce"
 
@@ -135,7 +103,6 @@ func TestC1529_003_CancelParityTestsRemainGreen(t *testing.T) {
 	if err != nil || code != 0 {
 		t.Fatalf("RED: parity suite not green (code=%d err=%v)\nstdout:\n%s\nstderr:\n%s", code, err, stdout, stderr)
 	}
-	// Anti-vacuity: `-run` matching nothing also exits 0. Require all four.
 	for _, name := range []string{
 		"TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout",
 		"TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout",
@@ -148,19 +115,11 @@ func TestC1529_003_CancelParityTestsRemainGreen(t *testing.T) {
 	}
 }
 
-// Cycle 1529's shipped closure: its ship commit on main and that commit's
-// parent. Their diff is the closure this package vouches for.
 const (
 	closureBase = "19b427c4214e1ad6f84239cd1781f592b0faec22"
 	closureShip = "57e227c1e36f33562c922dcdf2546b160739e45d"
 )
 
-// TestC1529_004_ClosureStaysDocOnly is the negative/scope axis. The task is a
-// closure, explicitly NOT the hardening the stale item scoped: touching
-// go/internal/bridge this cycle means the lane re-litigated an already-fixed
-// defect without a RED test for it. It diffs cycle 1529's own base..ship range,
-// never the live `main` ref, so later bridge work on either side of main
-// cannot fail it.
 func TestC1529_004_ClosureStaysDocOnly(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	stdout, stderr, code, err := acsassert.SubprocessOutput(

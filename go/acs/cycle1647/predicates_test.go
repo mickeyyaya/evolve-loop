@@ -1,85 +1,5 @@
 //go:build acs
 
-// Package cycle1647 materializes the acceptance criteria of this fleet lane's
-// single committed task:
-//
-//   - overlay-family-name-transport-ambiguity (triage `## top_n`; the lane
-//     pin in lane-scope.json names the same id) — a routing overlay naming a
-//     bare FAMILY must not cross transport when the phase's chain holds a
-//     non-default driver of that family, on the ADVISOR projection path.
-//
-// The acceptance is the claimed inbox record's `acceptance` array, verbatim
-// (.evolve/inbox/processing/cycle-1647/2026-07-30T23-05-00Z-overlay-family-
-// name-transport-ambiguity.json). The task-contract block rendered the record
-// as unreadable because triage had already moved it from pending to
-// processing/; the array is unchanged by the move.
-//
-// # What is already built, and what this package adds
-//
-// Commit 797b8518 landed the RESOLVER half: llmroute.ApplySoftOverlay resolves
-// ov.CLI in three rungs (exact chain entry > bare-family same-family entry >
-// defaultDriverForFamily), and overlay_family_transport_test.go pins it at the
-// helper. Verified here by driving the callers, not by reading code:
-//
-//  1. THE PACKAGE DOC DOES NOT CARRY THE DECISION. `go doc ./internal/llmroute`
-//     prints the package comment from llmroute.go, which still describes the
-//     pre-overlay precedence table and says nothing about family-vs-driver
-//     selector semantics; the decision lives only on the ApplySoftOverlay
-//     function comment. AC1 asks for one sentence in the PACKAGE doc — the
-//     ambiguity was the defect, so the decision must be discoverable at the
-//     package boundary. 001 is RED.
-//  2. THE PRODUCTION ADVISOR CALLER IS UNPROVEN. runner.resolveDispatchPlan
-//     (internal/phases/runner/routing.go:71) is where the advisor projection
-//     reaches ApplySoftOverlay. No runner test drives a bare-family overlay
-//     over a headless chain, and none drives an explicit driver over a
-//     same-family headless entry: `go test -run
-//     '^TestResolveRouting_AdvisorOverlayPreservesFamilyTransport$'
-//     ./internal/phases/runner` reports "no tests to run". 004 is RED.
-//  3. THE BEHAVIOR ITSELF, THROUGH THE RUNNER, IS ALREADY CORRECT. 002 and
-//     003 drive runner.New(...).Run — the real BaseRunner over an on-disk
-//     profile and a recording bridge — so resolveDispatchPlan is reached from
-//     its production entry point, and they observe the dispatched CLI. Both
-//     are GREEN on this tree (the resolver fix is merged and the runner passes
-//     the advisor's string through un-normalized). They stay as the
-//     anti-gaming floor: a Builder who satisfies 004 with a trivially-passing
-//     named test still cannot regress the transport contract without 002/003
-//     going red, and a future caller that normalizes ModelRoutingCLI before
-//     the seam (the scout's beyond-the-ask hypothesis) trips 002 directly.
-//
-// Adversarial axes (skills/adversarial-testing §6): NEGATIVE — 002 forbids
-// claude-tmux ever being dispatched for the bare overlay (the historical
-// crossing); 003 forbids the naive family-match answer (claude-p first) for an
-// explicit claude-tmux. EDGE — 003 exercises the fallback walk (exit 80 on the
-// explicit driver) to prove the headless entry is RETAINED, not replaced.
-// SEMANTIC — family identity preserves transport (002), explicit driver
-// changes it (003), the decision is documented at the package boundary (001),
-// the projection path is covered and its caller named (004), the package
-// stays race-clean with every export exercised (005), the predicate package
-// and eval are git-tracked (006): six distinct behaviors, not one restated.
-//
-// # Audit round 1 (same cycle) — continuation hygiene, 007-008
-//
-// Round 1 passed 001-006 and FAILED the shipping tree: go/acs/cycle1638 (added
-// by this diff, named as evidence by the tracked unified-synthesis eval)
-// resolved its explanation by a cycle-1638-*.md glob the host archives on
-// every continuation, so TestC1638_010/011 were RED and nobody ran them (H1);
-// the 1647 explanation repeated the two defects they pin (M1) and cited the
-// two root inbox records at `:1` although the diff deletes them (correction
-// 3). Reconciled at the TDD seam: cycle1638's helper now resolves the record
-// the tree ships; 007 runs every inherited go/acs/cycle* package the diff
-// adds (derived from git, one named package each) so the harness lane reaches
-// them; 008 forbids a `path:line` citation into a deleted path. All three go
-// GREEN with edits to the DOCUMENT only (probed at RED).
-//
-// Flaky-shape hygiene: every `go` subprocess names ONE package (./internal/
-// phases/runner with -run narrowed; ./internal/llmroute; ./internal/router —
-// measured 1.3s / 1.9s -race / 1.3s), no `/...` sweep, no ./internal/core or
-// ./cmd/evolve (the AC5 `-race ./internal/core` half is a whole-suite shape
-// the predicate lint bans; it is delegated to CI + the Builder's pasted run,
-// see test-report.md), no wall-clock bounds, no literal PIDs, every git call
-// is -C rooted, every go call sets cmd.Dir, no load generators. 007's nested
-// runs each name ONE inherited ./acs/cycle<N> package (measured 1.0s / 1.8s /
-// 3.1s), never ./acs/... .
 package cycle1647
 
 import (
@@ -101,26 +21,16 @@ import (
 )
 
 const (
-	taskSlug = "overlay-family-name-transport-ambiguity"
-	// focusedRunnerTest is the scout's VerifiableBy name: the ONE focused
-	// runner test the Builder authors against the production advisor caller.
-	focusedRunnerTest = "TestResolveRouting_AdvisorOverlayPreservesFamilyTransport"
-	// contractEscalationTest is the pre-existing runner test for the OTHER
-	// ApplySoftOverlay projection (core's correction ladder sets
-	// ModelRoutingCLI on the re-dispatch). AC4 requires the advisor path to be
-	// covered in addition to this one, and the callers named for each.
+	taskSlug               = "overlay-family-name-transport-ambiguity"
+	focusedRunnerTest      = "TestResolveRouting_AdvisorOverlayPreservesFamilyTransport"
 	contractEscalationTest = "TestRunner_ContractEscalation_RedispatchesOnEscalatedCLIWithDirective"
 )
 
-// goDir is <repo>/go — the module root every go subprocess below runs in via
-// cmd.Dir (never process cwd: main tree, worktree and fleet lanes differ).
 func goDir(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(acsassert.RepoRoot(t), "go")
 }
 
-// runGo runs ONE go subcommand rooted at dir and returns its combined output
-// and exit code. A non-exit error (go missing from PATH) is fatal.
 func runGo(t *testing.T, dir string, args ...string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("go", args...)
@@ -137,11 +47,6 @@ func runGo(t *testing.T, dir string, args ...string) (string, int) {
 	return "", -1
 }
 
-// advisorHooks is the minimal runner.Hooks a dispatch needs: a phase name (the
-// profile file), the agent doc to load, and a PASS classification of whatever
-// the recording bridge wrote. It is deliberately NOT the runner package's
-// fakeHooks — that lives in a _test.go the predicate cannot import — so the
-// predicate reaches BaseRunner.Run exactly the way a real phase does.
 type advisorHooks struct{ phase, agent string }
 
 func (h advisorHooks) PhaseName() string                              { return h.phase }
@@ -153,10 +58,6 @@ func (h advisorHooks) Classify(string, core.PhaseRequest, core.BridgeResponse) (
 	return core.VerdictPASS, nil, ""
 }
 
-// recordingBridge records every CLI the runner dispatches, in order. A CLI in
-// `trigger` returns that exit code with an error — a fallback trigger (80 =
-// REPL boot timeout is in llmroute's default set) — so the walk advances to
-// the next chain entry, which is how 003 observes the RETAINED fallback.
 type recordingBridge struct {
 	calls   []string
 	trigger map[string]int
@@ -178,9 +79,6 @@ func (b *recordingBridge) Probe(context.Context) (core.BridgeProbe, error) {
 	return core.BridgeProbe{}, nil
 }
 
-// writeProfile materializes a per-phase profile under a throwaway project
-// root: profile.cli is the RESOLVED primary (a headless driver here, the
-// shape CI macOS runs), cli_fallback the rest of the resolved chain.
 func writeProfile(t *testing.T, agent, cli string, fallback []string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -200,17 +98,8 @@ func writeProfile(t *testing.T, agent, cli string, fallback []string) string {
 	return root
 }
 
-// dispatchThroughRunner drives the PRODUCTION advisor projection: a
-// PhaseRequest whose ModelRoutingCLI is the advisor's overlay, through
-// runner.New(...).Run → resolveDispatchPlan (routing.go) →
-// llmroute.ApplySoftOverlay → the tiered chain walk → the bridge. Returns the
-// CLIs the bridge saw, in dispatch order.
 func dispatchThroughRunner(t *testing.T, root, overlayCLI string, trigger map[string]int) []string {
 	t.Helper()
-	// The runner's primary resolution reads EVOLVE_CLI from the PROCESS env
-	// as a fallback tier (envchain.Resolve); an operator shell that exports it
-	// would override the profile and turn this predicate into a test of the
-	// shell. Pin it empty for the duration of the test.
 	t.Setenv("EVOLVE_CLI", "")
 	hooks := advisorHooks{phase: "scout", agent: "evolve-scout"}
 	bridge := &recordingBridge{trigger: trigger}
@@ -228,18 +117,7 @@ func dispatchThroughRunner(t *testing.T, root, overlayCLI string, trigger map[st
 	return bridge.calls
 }
 
-// TestC1647_001_PackageDocDecidesOverlayFamilyVsDriverSemantics — AC1: "Decide
-// and DOCUMENT whether an overlay CLI is a family selector, a driver selector,
-// or both-with-a-precedence — one sentence in llmroute's package doc".
-//
-// Runs the real `go doc` over the package and inspects ONLY the package
-// comment (the output is cut at the first exported-symbol synopsis line, so
-// the ApplySoftOverlay FUNCTION comment — which already carries the decision
-// — cannot satisfy it). The decision vocabulary is the AC's own: the sentence
-// must name both selector kinds and the overlay they apply to.
-//
 // acs-predicate: config-check — this criterion IS a documentation-presence
-// requirement; the load-bearing artifact is the package doc `go doc` emits.
 func TestC1647_001_PackageDocDecidesOverlayFamilyVsDriverSemantics(t *testing.T) {
 	out, code := runGo(t, goDir(t), "doc", "./internal/llmroute")
 	if code != 0 {
@@ -254,8 +132,6 @@ func TestC1647_001_PackageDocDecidesOverlayFamilyVsDriverSemantics(t *testing.T)
 	}
 }
 
-// packageCommentOnly returns the `go doc` output up to the first symbol
-// synopsis line (func/type/var/const), i.e. the package comment alone.
 func packageCommentOnly(goDocOut string) string {
 	var kept []string
 	for _, line := range strings.Split(goDocOut, "\n") {
@@ -269,15 +145,6 @@ func packageCommentOnly(goDocOut string) string {
 	return strings.Join(kept, "\n")
 }
 
-// TestC1647_002_RunnerAdvisorBareFamilyOverlayKeepsHeadlessTransport — AC2:
-// "chain [claude-p codex], overlay 'claude'" must not cross transport.
-//
-// The resolver half is the AC's literally-named llmroute test; the production
-// half drives BaseRunner.Run with profile.cli=claude-p, cli_fallback=[codex]
-// and the advisor's ModelRoutingCLI="claude" (a bare family name, exactly how
-// the router projection most often arrives). The dispatched CLI must be the
-// chain's own claude-p — never claude-tmux, the defaultDriverForFamily rewrite
-// that moved a headless phase onto tmux (exit=10 on a host without it).
 func TestC1647_002_RunnerAdvisorBareFamilyOverlayKeepsHeadlessTransport(t *testing.T) {
 	t.Run("resolver-named-test", func(t *testing.T) {
 		name := "TestApplySoftOverlay_BareFamilyDoesNotCrossTransportWhenTheChainHoldsANonDefaultDriver"
@@ -303,17 +170,6 @@ func TestC1647_002_RunnerAdvisorBareFamilyOverlayKeepsHeadlessTransport(t *testi
 	})
 }
 
-// TestC1647_003_RunnerAdvisorExplicitDriverOverlayWinsAndKeepsHeadlessFallback
-// — AC3: "an explicit driver-qualified overlay must still win over a
-// same-family chain entry (overlay 'claude-tmux' vs chain [claude-p]) — the
-// case that forbids naive family matching".
-//
-// Through the same production path: profile.cli=claude-p (no fallback), the
-// advisor asks for claude-tmux by name. The FIRST dispatch must be claude-tmux
-// (a naive family match would promote claude-p and satisfy an explicit
-// transport request with its opposite). The scripted claude-tmux exit 80 then
-// proves the SOFT contract: the chain's own claude-p is retained as fallback,
-// not replaced.
 func TestC1647_003_RunnerAdvisorExplicitDriverOverlayWinsAndKeepsHeadlessFallback(t *testing.T) {
 	t.Run("resolver-named-test", func(t *testing.T) {
 		name := "TestApplySoftOverlay_DriverQualifiedOverlayWinsOverSameFamilyChainEntry"
@@ -337,17 +193,6 @@ func TestC1647_003_RunnerAdvisorExplicitDriverOverlayWinsAndKeepsHeadlessFallbac
 	})
 }
 
-// TestC1647_004_FocusedRunnerRegressionCoversAdvisorProjectionAndNamesCaller
-// — AC4: "The advisor/router projection path is covered, not just the
-// contract-escalation path — name the production caller for each".
-//
-// Load-bearing: ONE narrowed `go test` over ./internal/phases/runner must
-// report `--- PASS` for BOTH the scout's focused advisor-path test (absent on
-// this tree → "no tests to run", exit 0 — which is why the PASS line, not the
-// exit code, is asserted) and the pre-existing contract-escalation test.
-// Auxiliary: the file that defines the focused test names the production
-// caller (resolveDispatchPlan in routing.go), distinguishes it from the
-// contract-escalation projection, and drives the AC's literal inputs.
 func TestC1647_004_FocusedRunnerRegressionCoversAdvisorProjectionAndNamesCaller(t *testing.T) {
 	dir := goDir(t)
 	out, code := runGo(t, dir, "test", "-count=1", "-v",
@@ -378,8 +223,6 @@ func TestC1647_004_FocusedRunnerRegressionCoversAdvisorProjectionAndNamesCaller(
 	}
 }
 
-// fileDefiningTest returns the _test.go under pkgDir that declares
-// `func <name>(`, or "" when none does.
 func fileDefiningTest(t *testing.T, pkgDir, name string) string {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join(pkgDir, "*_test.go"))
@@ -399,13 +242,6 @@ func fileDefiningTest(t *testing.T, pkgDir, name string) string {
 	return ""
 }
 
-// TestC1647_005_LlmrouteRouterRaceCleanAndApicoverEnforceClean — AC5, the
-// half a cycle predicate may run: `go test -race` over ./internal/llmroute and
-// ./internal/router (ONE package per invocation) and the repo's own
-// apicover -enforce recipe (Makefile apicover-enforce) scoped to
-// internal/llmroute, which must report zero uncovered and zero false-green
-// exports. ./internal/core is the banned whole-suite shape and is delegated
-// to CI (see the package doc).
 func TestC1647_005_LlmrouteRouterRaceCleanAndApicoverEnforceClean(t *testing.T) {
 	dir := goDir(t)
 	for _, pkg := range []string{"./internal/llmroute", "./internal/router"} {
@@ -448,10 +284,6 @@ func TestC1647_005_LlmrouteRouterRaceCleanAndApicoverEnforceClean(t *testing.T) 
 	})
 }
 
-// TestC1647_006_PredicatePackageAndEvalAreGitTracked — cycle-93 lesson: the
-// audit's predicate tree and the ship tree must agree. Disk presence alone
-// passes for a gitignored file that is dropped at ship; pair it with an
-// index check (`git ls-files --error-unmatch`), -C rooted at the worktree.
 func TestC1647_006_PredicatePackageAndEvalAreGitTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, rel := range []string{
@@ -468,22 +300,8 @@ func TestC1647_006_PredicatePackageAndEvalAreGitTracked(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 007-008: continuation hygiene — cycle-1647 audit round 1 (H1, M1 corr. 3)
-// ---------------------------------------------------------------------------
-
-// thisPackage is the acs package these predicates live in; 007 must never
-// re-run itself.
 const thisPackage = "cycle1647"
 
-// shippingExplanation resolves the ONE docs/explain/builds/cycle-*.md record
-// this tree adds and returns its repo-relative path and body. On a
-// continuation the host archives every unshipped predecessor under
-// docs/private/research/archived-*/ (explanationdocs.
-// ArchiveUnpublishedContinuationRecords), so the deliverable is the
-// index/working-tree addition on a pre-commit lane, or the record HEAD's most
-// recent record-adding commit introduced once the cycle has landed. Resolved
-// from git, never from a cycle number or a report.
 func shippingExplanation(t *testing.T) (string, string) {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -529,9 +347,6 @@ func shippingExplanation(t *testing.T) (string, string) {
 	return found[0], string(raw)
 }
 
-// explanationBase reads the `- Base SHA:` line of the record's `## Build
-// Binding`, so the diff these predicates check is the base-bound diff the
-// host bound (explanationdocs.validateDocument pins it to the binding).
 func explanationBase(t *testing.T, body string) string {
 	t.Helper()
 	in := false
@@ -554,9 +369,6 @@ func explanationBase(t *testing.T, body string) string {
 	return ""
 }
 
-// diffPaths is `git diff --name-only [--diff-filter=F] <base> -- <pathspec>`,
-// -C rooted at the worktree: the base-bound diff read from git, not from any
-// report that could agree with a wrong answer.
 func diffPaths(t *testing.T, root, base, filter, pathspec string) []string {
 	t.Helper()
 	var tail []string
@@ -577,8 +389,6 @@ func diffPaths(t *testing.T, root, base, filter, pathspec string) []string {
 	return paths
 }
 
-// failLines keeps the lines of a nested `go test -v` run that carry the
-// verdict, so a RED package reports its reasons without its whole log.
 func failLines(out string) string {
 	var keep []string
 	for _, line := range strings.Split(out, "\n") {
@@ -589,17 +399,6 @@ func failLines(out string) string {
 	return strings.Join(keep, "\n")
 }
 
-// TestC1647_007 pins cycle-1647 audit H1: a continuation ships every inherited
-// go/acs/cycle* package its base-bound diff ADDS, and the tracked eval
-// (.evolve/evals/triage-unified-solution-synthesis.md) names their tests as
-// evidence — so a RED inherited package is a RED shipping tree, whether or not
-// the harness's own lane (`./acs/cycle1647` only, acssuite.goLanePatterns)
-// happens to run it. The set is derived from the diff, never hard-coded; each
-// package is run as ONE named `go test` (no `/...` sweep). RED on this tree:
-// go/acs/cycle1638 TestC1638_010/011 fail against the shipping explanation
-// (phase-registry.json unnamed; this diff's own package attributed to
-// history — the audit's M1). The Builder's fix is the DOCUMENT, never the
-// tests.
 func TestC1647_007_InheritedPredicatePackagesAddedByThisDiffStayGreen(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	dir := goDir(t)
@@ -628,16 +427,6 @@ func TestC1647_007_InheritedPredicatePackagesAddedByThisDiffStayGreen(t *testing
 	}
 }
 
-// TestC1647_008 pins cycle-1647 audit correction (3): a `path:line` citation
-// is a promise the reader can open that file at that line on the shipped
-// tree. The explanation cites `.evolve/inbox/…-overlay-family-name-transport-
-// ambiguity.json:1` and `…-triage-unified-solution-synthesis.json:1` as its
-// source records, yet this diff DELETES both root copies (they live on under
-// .evolve/inbox/consumed/), so the citations resolve only through `git show
-// <base>:…`. Deleted paths may still be NAMED (`## Changed Areas` explains
-// the removal); they may not be cited at a line. The deleted set is derived
-// from git (`--diff-filter=D`), so any future dead line-citation fails the
-// same way; a diff that deletes nothing has nothing to assert and says so.
 func TestC1647_008_ExplanationCitesNoLineIntoAPathThisDiffDeletes(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	docPath, body := shippingExplanation(t)

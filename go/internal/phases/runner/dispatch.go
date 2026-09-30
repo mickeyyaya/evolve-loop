@@ -112,6 +112,7 @@ func (b *BaseRunner) baseRequest(req core.PhaseRequest, prep phasePreparation, r
 		ProjectRoot:         req.ProjectRoot,
 		ArtifactPath:        prep.artifactPath,
 		SecondaryArtifacts:  secondaryArtifacts(b.hooks, req),
+		Completion:          req.BridgeCompletion(),
 		Agent:               prep.phase,
 		Cycle:               req.Cycle,
 		BudgetScale:         req.BudgetScale,

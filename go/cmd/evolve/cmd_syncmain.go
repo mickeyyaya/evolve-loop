@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -52,14 +55,9 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	porcelain, err := git("status", "--porcelain", "--untracked-files=no")
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve sync-main: git status failed: %v\n%s", err, porcelain)
-		return 1
-	}
-	if strings.TrimSpace(porcelain) != "" {
-		fmt.Fprintf(stderr, "evolve sync-main: refused — tracked files have uncommitted changes; commit or stash first:\n%s", porcelain)
-		return 1
+	stamps, code := refuseDirtBeyondInboxStamps(absRoot, stderr)
+	if code != 0 {
+		return code
 	}
 
 	branch, err := git("rev-parse", "--abbrev-ref", "HEAD")
@@ -74,7 +72,9 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if code := mergeOrigin(git, branch, stderr); code != 0 {
+	landing := stampLanding{root: absRoot, stdout: stdout, stderr: stderr}
+	merge := func() int { return mergeOrigin(git, branch, stderr) }
+	if code := landing.aroundMerge("origin/"+branch, stamps, merge); code != 0 {
 		return code
 	}
 
@@ -114,4 +114,79 @@ func liveLeaseWorkspace(root string) string {
 		return ""
 	}
 	return cs.WorkspacePath
+}
+
+func refuseDirtBeyondInboxStamps(root string, stderr io.Writer) ([]inboxstamps.Stamp, int) {
+	partition, err := inboxstamps.Classify(context.Background(), gitexec.Default(root))
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve sync-main: reading the tree's changes failed: %v\n", err)
+		return nil, 1
+	}
+	if len(partition.Other) > 0 {
+		fmt.Fprintf(stderr, "evolve sync-main: refused — tracked files have uncommitted changes beyond the loop's inbox stamps; commit or stash first:\n  %s\n", strings.Join(partition.Other, "\n  "))
+		return nil, 1
+	}
+	return partition.Stamps, 0
+}
+
+type stampLanding struct {
+	root           string
+	stdout, stderr io.Writer
+}
+
+func (l stampLanding) aroundMerge(remoteRef string, stamps []inboxstamps.Stamp, merge func() int) int {
+	plan, code := l.prepare(remoteRef, stamps)
+	if code != 0 {
+		return code
+	}
+	if code := merge(); code != 0 {
+		l.restore(plan)
+		return code
+	}
+	return l.replay(plan)
+}
+
+func (l stampLanding) prepare(remoteRef string, stamps []inboxstamps.Stamp) (inboxstamps.Plan, int) {
+	ctx, g := context.Background(), gitexec.Default(l.root)
+	plan, err := inboxstamps.PlanAgainst(ctx, g, stamps, remoteRef)
+	if err == nil {
+		err = plan.Prepare(ctx, g)
+	}
+	if err == nil {
+		err = plan.CommitKept(ctx, g)
+	}
+	if err != nil {
+		fmt.Fprintf(l.stderr, "evolve sync-main: landing the loop's inbox stamps failed: %v\n", err)
+		l.restore(plan)
+		return inboxstamps.Plan{}, 1
+	}
+	reportInboxStamps(l.stdout, "committed %d inbox stamp(s) the loop wrote", plan.Kept)
+	return plan, 0
+}
+
+func (l stampLanding) replay(plan inboxstamps.Plan) int {
+	reportInboxStamps(l.stdout, "dropped %d inbox stamp(s) on items origin retired", plan.Retired)
+	reportInboxStamps(l.stdout, "origin superseded %d inbox stamp(s), changing every field they set", plan.Superseded)
+	err := plan.ApplyReplay(l.root)
+	if err == nil {
+		err = plan.CommitReplay(context.Background(), gitexec.Default(l.root))
+	}
+	if err != nil {
+		fmt.Fprintf(l.stderr, "evolve sync-main: replaying the loop's inbox stamps onto origin's edits failed: %v — every stamp named above was not applied; the rest are in the tree, uncommitted\n", err)
+		return 1
+	}
+	reportInboxStamps(l.stdout, "replayed %d inbox stamp(s) onto origin's edits", plan.Replay)
+	return 0
+}
+
+func (l stampLanding) restore(plan inboxstamps.Plan) {
+	if err := plan.Restore(l.root); err != nil {
+		fmt.Fprintf(l.stderr, "evolve sync-main: restoring the loop's inbox stamps failed: %v\n", err)
+	}
+}
+
+func reportInboxStamps(w io.Writer, format string, stamps []inboxstamps.Stamp) {
+	if len(stamps) > 0 {
+		fmt.Fprintf(w, "sync-main: "+format+": %s\n", len(stamps), strings.Join(inboxstamps.Paths(stamps), ", "))
+	}
 }

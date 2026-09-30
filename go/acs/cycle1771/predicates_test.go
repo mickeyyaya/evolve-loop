@@ -1,14 +1,5 @@
 //go:build acs
 
-// Package cycle1771 pins the behavior-preserving shrink of
-// tokenusage.ScanConfigRoot, llmcalls.Aggregate, changedpkgs.DirectImporters
-// and addedtests.BuildTags to the 50-line function-size ratchet
-// (sizeratchet-shrink-usage-scanners). All four functions exceed the limit at
-// authoring time (60/53/79/56 lines per
-// go/internal/sizeratchet/offenders.json), so TestC1771_001 is genuinely RED;
-// the rest are invariant and characterization pins that are pre-existing
-// GREEN and must stay GREEN through the extraction — see test-report.md's
-// Coverage Map.
 package cycle1771
 
 import (
@@ -24,8 +15,6 @@ import (
 )
 
 const (
-	// baseCommit is this worktree's HEAD at TDD authoring time (2026-09-30):
-	// nothing has touched any of the four target packages yet.
 	baseCommit   = "6aa43b70d6d0f68302ce12e2ab2fe54180394d79"
 	offendersRel = "go/internal/sizeratchet/offenders.json"
 
@@ -70,10 +59,6 @@ func walkModule(t *testing.T) []sizeratchet.FuncSpan {
 	return spans
 }
 
-// TestC1771_001_TargetFunctionsFitTheRatchetLimit is the primary AC 3
-// signal: all four offender functions must measure at most
-// sizeratchet.MaxLines under the ratchet's own walker, keeping their names
-// and packages.
 func TestC1771_001_TargetFunctionsFitTheRatchetLimit(t *testing.T) {
 	sizes := map[string]int{}
 	for _, s := range walkModule(t) {
@@ -97,9 +82,6 @@ func TestC1771_001_TargetFunctionsFitTheRatchetLimit(t *testing.T) {
 	}
 }
 
-// TestC1771_002_OffendersJSONLeftUnchanged guards AC 3's "offenders.json is
-// left unchanged": the shrunk functions' allowances stay as slack for the
-// boundary tighten.
 func TestC1771_002_OffendersJSONLeftUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	diff, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", baseCommit, "--", offendersRel)
@@ -120,9 +102,6 @@ func TestC1771_002_OffendersJSONLeftUnchanged(t *testing.T) {
 	}
 }
 
-// TestC1771_003_ModuleWideRatchetCheckPasses guards AC 3's "the module-wide
-// ratchet stays green": an extracted helper over the limit is an unlisted
-// violation here.
 func TestC1771_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 	offenders, err := sizeratchet.LoadOffenders(offendersPath(t))
 	if err != nil {
@@ -133,10 +112,6 @@ func TestC1771_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 	}
 }
 
-// TestC1771_004_BaselineTestDeclarationsUnchanged guards AC 1's "existing
-// tests pass unmodified": every top-level declaration of every baseline
-// _test.go file must survive byte-for-byte. Appending a new characterization
-// test (to an existing file or a new one) is allowed.
 func TestC1771_004_BaselineTestDeclarationsUnchanged(t *testing.T) {
 	git := worktreeGit{root: acsassert.RepoRoot(t)}
 	for _, dir := range packageDirs {
@@ -181,8 +156,6 @@ func assertDeclsPreserved(t *testing.T, git worktreeGit, rel string) {
 	}
 }
 
-// TestC1771_005_TargetPackageTestsPass drives AC 1's "the packages' existing
-// tests pass": one named package per invocation.
 func TestC1771_005_TargetPackageTestsPass(t *testing.T) {
 	for _, dir := range packageDirs {
 		if r := execGo(goModuleDir(t), "test", "-count=1", "./"+dir); r.err != nil || r.code != 0 {
@@ -191,9 +164,6 @@ func TestC1771_005_TargetPackageTestsPass(t *testing.T) {
 	}
 }
 
-// TestC1771_006_NoCommentLinesAdded guards AC 2: no comments added
-// (docs/conventions/code-comments.md) — names carry the intent. Vacuous until
-// the diff touches one of the four packages, then live.
 func TestC1771_006_NoCommentLinesAdded(t *testing.T) {
 	git := worktreeGit{root: acsassert.RepoRoot(t)}
 	changed, err := git.ChangedFiles(baseCommit)

@@ -86,9 +86,6 @@ func (g worktreeGit) TrackedTestFiles(base, dir string) ([]string, error) {
 	return files, nil
 }
 
-// topLevelDecls returns the source text of every non-import top-level
-// declaration, so an appended test leaves the baseline set intact while an
-// edited one drops out of it.
 func topLevelDecls(name string, src []byte) (map[string]bool, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, name, src, parser.SkipObjectResolution)

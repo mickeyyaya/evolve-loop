@@ -1,36 +1,5 @@
 //go:build acs
 
-// Package cycle1141 materialises the cycle-1141 acceptance criteria for the
-// three fleet-scoped SSOT/gate tasks pinned to this lane:
-//
-//   - artifact-name-ssot-retro-backfill      → predicates 001-003
-//   - required-roles-ssot                    → predicates 004-005
-//   - cycle-docs-floor-architecture-changes  → predicates 006-008
-//
-// Predicate strategy. Tasks 1 and 2 are SSOT *refactors*: deriving a filename
-// from phasecontract.For(phase).ArtifactName produces the SAME string the frozen
-// literal produced, so no single behavioural assertion can distinguish "derived"
-// from "re-typed". The honest materialisation is therefore a PAIR per caller:
-//
-//	(a) a behavioural assertion that EXECUTES the caller and compares its output
-//	    against the registry value computed at test time (so if the registry ever
-//	    moves, the caller must move with it), and
-//	(b) an anti-freeze assertion that the raw literal is ABSENT from the caller's
-//	    source.
-//
-// (b) alone would be the banned degenerate form — but it is inverted here: it
-// demands the magic string be REMOVED, which cannot be satisfied by pasting text
-// in, and can only be satisfied while (a) still passes by actually deriving the
-// value. The load-bearing half is always the executed one.
-//
-// Task 3 is new machinery, so its predicates are pure behaviour: a table-driven
-// exercise of the gate's decision function plus a policy round-trip proving the
-// stage is config-injected and a wiring proof that the gate is not inert.
-//
-// Root resolution: acsassert.RepoRoot(t) is the worktree (where Builder writes,
-// per worktree isolation). Source-path assertions resolve under it; behavioural
-// assertions link the packages directly, so they exercise the worktree's code by
-// construction.
 package cycle1141
 
 import (
@@ -50,14 +19,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// acsRepoRoot is the worktree root every source-path assertion resolves under.
 func acsRepoRoot(t *testing.T) string {
 	t.Helper()
 	return acsassert.RepoRoot(t)
 }
 
-// acsSubprocess runs a command with cwd = <repoRoot>/go (acsassert.SubprocessOutput
-// cannot set a working directory, and both call sites need one).
 func acsSubprocess(t *testing.T, name string, args ...string) (stdout, stderr string, code int, err error) {
 	t.Helper()
 	cmd := exec.Command(name, args...)
@@ -75,15 +41,6 @@ func acsSubprocess(t *testing.T, name string, args ...string) (stdout, stderr st
 	return out.String(), errBuf.String(), 0, nil
 }
 
-// ---------------------------------------------------------------------------
-// Task 1: artifact-name-ssot-retro-backfill
-// ---------------------------------------------------------------------------
-
-// TestC1141_001_dossier_fail_defect_derives_audit_artifact_name exercises the
-// real dossier.Build FAIL path and asserts the synthesized defect points at the
-// registry's audit artifact name, then asserts build.go no longer carries the
-// raw literal. Executed half first: Build is CALLED and its returned Defect is
-// the assertion target, so a source-only edit cannot satisfy this predicate.
 func TestC1141_001_dossier_fail_defect_derives_audit_artifact_name(t *testing.T) {
 	auditContract, ok := phasecontract.For("audit")
 	if !ok {
@@ -110,21 +67,11 @@ func TestC1141_001_dossier_fail_defect_derives_audit_artifact_name(t *testing.T)
 			d.Defects[0].Summary, want)
 	}
 
-	// Anti-freeze: the derived value must come from the registry, not a re-typed
-	// literal sitting in the caller.
 	src := filepath.Join(acsRepoRoot(t), "go", "internal", "dossier", "build.go")
 	assertNoRawLiteral(t, src, `"audit-report.md"`)
 	assertReferencesRegistry(t, src)
 }
 
-// TestC1141_002_gc_discover_markers_track_registry_artifacts exercises the real
-// gc.Discover over a synthetic .evolve tree: EVERY artifact the registry declares
-// required must, on its own, evidence a run dir. This is the live-derivation
-// guarantee — if the registry's required-artifact set ever grows, a frozen
-// runMarkers list stops discovering the new marker and this predicate fails.
-//
-// Includes the negative axis: a directory holding only an unrelated file must NOT
-// be discovered, so a "discover everything" no-op cannot pass.
 func TestC1141_002_gc_discover_markers_track_registry_artifacts(t *testing.T) {
 	required := phasecontract.RequiredArtifacts()
 	if len(required) == 0 {
@@ -142,7 +89,6 @@ func TestC1141_002_gc_discover_markers_track_registry_artifacts(t *testing.T) {
 			t.Fatalf("write marker %s: %v", name, err)
 		}
 	}
-	// Negative control: no marker file at all.
 	decoy := filepath.Join(runsDir, "run-decoy")
 	if err := os.MkdirAll(decoy, 0o755); err != nil {
 		t.Fatalf("mkdir decoy: %v", err)
@@ -175,17 +121,11 @@ func TestC1141_002_gc_discover_markers_track_registry_artifacts(t *testing.T) {
 	assertReferencesRegistry(t, src)
 }
 
-// TestC1141_003_lanescope_scout_report_name_derived covers the third
-// representative caller. core/lanescope.go exposes no exported entry point, so
-// the executed half runs the package's OWN behavioural tests for the scout-report
-// read path as a subprocess and asserts exit 0 — the refactor must preserve real
-// behaviour — paired with the anti-freeze literal-absence check.
 func TestC1141_003_lanescope_scout_report_name_derived(t *testing.T) {
 	src := filepath.Join(acsRepoRoot(t), "go", "internal", "core", "lanescope.go")
 	assertNoRawLiteral(t, src, `"scout-report.md"`)
 	assertReferencesRegistry(t, src)
 
-	// Executed half: the scout-report read/normalize path must still work.
 	stdout, stderr, code, err := acsSubprocess(t, "go", "test", "-count=1",
 		"-run", "TestNormalizeScoutGoalHash", "./internal/core/")
 	if err != nil {
@@ -197,14 +137,6 @@ func TestC1141_003_lanescope_scout_report_name_derived(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task 2: required-roles-ssot
-// ---------------------------------------------------------------------------
-
-// TestC1141_004_routing_mandatory_no_regression is the no-regression half of the
-// audit: whatever the task decides (derive or document), the LIVE routing config
-// must still name every registry-required phase plus the non-report "ship" phase,
-// and must not acquire junk phases the registry does not know.
 func TestC1141_004_routing_mandatory_no_regression(t *testing.T) {
 	cfg, _ := config.Load(filepath.Join(t.TempDir(), "absent-registry.json"), map[string]string{})
 	if len(cfg.Mandatory) == 0 {
@@ -231,12 +163,6 @@ func TestC1141_004_routing_mandatory_no_regression(t *testing.T) {
 	}
 }
 
-// TestC1141_005_mandatory_divergence_derived_or_documented is the audit-outcome
-// predicate: the Mandatory declaration site must record a DECISION. Either it
-// derives from phasecontract (an import plus a registry reference in config.go),
-// or it carries an explicit comment naming the registry and saying why the two
-// vocabularies stay separate. A silent unchanged literal — the pre-cycle state —
-// fails.
 func TestC1141_005_mandatory_divergence_derived_or_documented(t *testing.T) {
 	src := filepath.Join(acsRepoRoot(t), "go", "internal", "config", "config.go")
 	b, err := os.ReadFile(src)
@@ -252,12 +178,6 @@ func TestC1141_005_mandatory_divergence_derived_or_documented(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task 3: cycle-docs-floor-architecture-changes
-// ---------------------------------------------------------------------------
-
-// TestC1141_006_docsfloor_warns_on_undocumented_architecture_change is the crux:
-// an architecture-labeled change touching zero docs/ADR files must WARN.
 func TestC1141_006_docsfloor_warns_on_undocumented_architecture_change(t *testing.T) {
 	v := docsfloor.Evaluate(
 		docsfloor.Config{Stage: "enforce"},
@@ -275,10 +195,6 @@ func TestC1141_006_docsfloor_warns_on_undocumented_architecture_change(t *testin
 	}
 }
 
-// TestC1141_007_docsfloor_decision_table covers the remaining rows, including the
-// negative and edge axes: a documented architecture change PASSES, a
-// non-architecture change is SKIPPED entirely, an off stage never fires, and an
-// empty change set is not judged.
 func TestC1141_007_docsfloor_decision_table(t *testing.T) {
 	cases := []struct {
 		name string
@@ -331,13 +247,7 @@ func TestC1141_007_docsfloor_decision_table(t *testing.T) {
 	}
 }
 
-// TestC1141_008_docsfloor_config_injected_and_wired proves the gate is neither
-// hardcoded nor inert: the stage round-trips through a real .evolve/policy.json
-// read (config-injected, SpineFloor-style), the compiled default is enforce when
-// the block is absent, and at least one PRODUCTION file outside the gate's own
-// package calls it.
 func TestC1141_008_docsfloor_config_injected_and_wired(t *testing.T) {
-	// (a) compiled default when the policy block is absent.
 	dir := t.TempDir()
 	bare := filepath.Join(dir, "bare-policy.json")
 	if err := os.WriteFile(bare, []byte(`{}`), 0o644); err != nil {
@@ -351,7 +261,6 @@ func TestC1141_008_docsfloor_config_injected_and_wired(t *testing.T) {
 		t.Errorf("absent docs_floor block: compiled default stage = %q, want %q", got, "enforce")
 	}
 
-	// (b) policy.json override actually reaches the gate.
 	overridden := filepath.Join(dir, "override-policy.json")
 	if err := os.WriteFile(overridden, []byte(`{"docs_floor":{"stage":"off"}}`), 0o644); err != nil {
 		t.Fatalf("write override policy: %v", err)
@@ -364,24 +273,13 @@ func TestC1141_008_docsfloor_config_injected_and_wired(t *testing.T) {
 		t.Errorf("policy.json docs_floor.stage override did not reach the gate: got %q, want %q", got, "off")
 	}
 
-	// (c) wiring proof: a real caller outside internal/docsfloor invokes it.
 	if !hasProductionCaller(t, "docsfloor.Evaluate") {
 		t.Errorf("no production (non-test) file outside internal/docsfloor calls docsfloor.Evaluate — the gate is inert")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-// docPrefixes are the paths that count as a documentation touch. Kept here only
-// to document the intent of predicates 006/007; the gate owns the real list.
 var docPrefixes = []string{"docs/"}
 
-// assertNoRawLiteral fails when the caller still carries a re-typed report-name
-// literal. This is the anti-freeze half of an SSOT pair — never load-bearing on
-// its own, and inverted (absence, not presence) so it cannot be satisfied by
-// adding a magic string.
 func assertNoRawLiteral(t *testing.T, path, literal string) {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -393,9 +291,6 @@ func assertNoRawLiteral(t *testing.T, path, literal string) {
 	}
 }
 
-// assertReferencesRegistry fails when the caller does not reach the registry at
-// all: removing the literal without deriving from phasecontract (e.g. moving it
-// to a local const) would otherwise slip through.
 func assertReferencesRegistry(t *testing.T, path string) {
 	t.Helper()
 	b, err := os.ReadFile(path)
@@ -407,8 +302,6 @@ func assertReferencesRegistry(t *testing.T, path string) {
 	}
 }
 
-// hasDivergenceComment reports whether config.go carries an explicit,
-// registry-naming comment justifying a separate Mandatory vocabulary.
 func hasDivergenceComment(text string) bool {
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -426,7 +319,6 @@ func hasDivergenceComment(text string) bool {
 	return false
 }
 
-// phaseForRole maps a registry AgentName back to its phase key.
 func phaseForRole(t *testing.T, role string) string {
 	t.Helper()
 	for _, c := range phasecontract.Contracts() {
@@ -438,8 +330,6 @@ func phaseForRole(t *testing.T, role string) string {
 	return ""
 }
 
-// hasProductionCaller greps the Go tree for a non-test call site outside the
-// gate's own package — the anti-inert wiring proof.
 func hasProductionCaller(t *testing.T, call string) bool {
 	t.Helper()
 	stdout, _, _, err := acsSubprocess(t, "grep", "-rl", "--include=*.go", call,

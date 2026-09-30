@@ -1,28 +1,5 @@
 //go:build acs
 
-// Package cycle1444 materialises the cycle-1444 acceptance criteria for the two
-// fleet-scoped tasks pinned to this lane (inbox item context-fill-telemetry-and-cap):
-//
-//   - context-fill-telemetry-record  → per-launch prompt-fill telemetry, derived
-//     from the usage the existing resolver already recovers, with an explicit
-//     unmeasured sentinel instead of a divide-by-zero or a false 0%.
-//   - context-fill-warn-threshold    → a policy-configured WARN past that fill,
-//     naming the phase, emitted from the production dispatch seam and persisted
-//     into the launch record.
-//
-// Predicate strategy — every predicate exercises the system, never greps source
-// (the cycle-85 degenerate-predicate ban):
-//
-//   - 001–003 call the real tokenusage API and drive the real production
-//     resolver (DefaultResolver) over an on-disk events fixture.
-//   - 004 calls the real policy resolver across the absent/empty/override/
-//     out-of-range matrix.
-//   - 005–006 are the REACHABILITY predicates: they shell one narrowed `go test`
-//     each at the two production callers (the engine dispatch seam and the
-//     adapter composition root), because those seams are unexported and a
-//     predicate that called the helper directly would pass on dead code.
-//     Each is ONE named package narrowed with -run (never a ./... sweep), per
-//     the flaky-predicate-shape rules.
 package cycle1444
 
 import (
@@ -37,16 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// claudeWindow is the conservative effective window for the claude family
-// (200K, per the 2026-08-03 reliability finding in the inbox item).
 const claudeWindow = 200_000
 
-// goDir returns the module root inside the cycle worktree.
 func goDir(t *testing.T) string { return filepath.Join(acsassert.RepoRoot(t), "go") }
 
-// TestC1444_001_FillPctIsPercentOfEffectiveWindow — fill% is prompt-side tokens
-// over the driver family's effective window, expressed 0–100 so a percent
-// threshold compares directly. Output tokens must not count toward fill.
 func TestC1444_001_FillPctIsPercentOfEffectiveWindow(t *testing.T) {
 	if got := tokenusage.EffectiveWindow("claude-tmux"); got != claudeWindow {
 		t.Fatalf("EffectiveWindow(\"claude-tmux\") = %d, want %d", got, claudeWindow)
@@ -62,9 +33,6 @@ func TestC1444_001_FillPctIsPercentOfEffectiveWindow(t *testing.T) {
 	}
 }
 
-// TestC1444_002_UnmeasurableFillIsSentinelNeverZeroOrInf — the guard. An
-// unconfigured window must not produce Inf/NaN (which poisons every downstream
-// comparison) nor a plain 0 (which reads as a measured-empty context).
 func TestC1444_002_UnmeasurableFillIsSentinelNeverZeroOrInf(t *testing.T) {
 	for _, window := range []int{0, -1} {
 		got := tokenusage.FillPct(120_000, window)
@@ -83,10 +51,6 @@ func TestC1444_002_UnmeasurableFillIsSentinelNeverZeroOrInf(t *testing.T) {
 	}
 }
 
-// TestC1444_003_ResolverStampsFillFromRecoveredUsage — the single-sourcing
-// proof: fill% rides out of the production resolver on the usage that same
-// resolve recovered, and an uncovered launch carries the sentinel rather than a
-// false 0%.
 func TestC1444_003_ResolverStampsFillFromRecoveredUsage(t *testing.T) {
 	ws := t.TempDir()
 	events := filepath.Join(ws, "build-events.ndjson")
@@ -94,7 +58,7 @@ func TestC1444_003_ResolverStampsFillFromRecoveredUsage(t *testing.T) {
 	if err := os.WriteFile(events, []byte(envelope), 0o644); err != nil {
 		t.Fatalf("write events fixture: %v", err)
 	}
-	resolve := tokenusage.DefaultResolver(t.TempDir()) // empty config root: no transcript tier
+	resolve := tokenusage.DefaultResolver(t.TempDir())
 
 	covered, err := resolve(tokenusage.Window{Driver: "claude-tmux", EventsLogPath: events})
 	if err != nil {
@@ -119,8 +83,6 @@ func TestC1444_003_ResolverStampsFillFromRecoveredUsage(t *testing.T) {
 	}
 }
 
-// TestC1444_004_ThresholdResolutionNeverTrustsOperatorInput — absent, empty and
-// out-of-range all resolve to the built-in 60; a valid override is respected.
 func TestC1444_004_ThresholdResolutionNeverTrustsOperatorInput(t *testing.T) {
 	if got := (policy.Policy{}).ContextFillConfig().WarnThresholdPct; got != 60 {
 		t.Errorf("absent block: %d, want 60", got)
@@ -139,11 +101,6 @@ func TestC1444_004_ThresholdResolutionNeverTrustsOperatorInput(t *testing.T) {
 	}
 }
 
-// TestC1444_005_WarnReachableFromDispatchSeam — REACHABILITY. The fill WARN must
-// fire from Engine.recordTokenUsage (the single site every Launch's telemetry
-// funnels through) and be persisted into llm-calls.ndjson; the engine seam is
-// unexported, so this drives the in-package wiring test. ONE named package,
-// narrowed by -run.
 func TestC1444_005_WarnReachableFromDispatchSeam(t *testing.T) {
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
 		"go", "-C", goDir(t), "test", "-count=1", "-run", "TestContextFillWarn", "./internal/bridge")
@@ -152,9 +109,6 @@ func TestC1444_005_WarnReachableFromDispatchSeam(t *testing.T) {
 	}
 }
 
-// TestC1444_006_PolicyThresholdReachesProductionDeps — REACHABILITY, other half.
-// The operator's context_fill block must travel from policy.json through the
-// production composition root into the engine Deps, or the config is dead.
 func TestC1444_006_PolicyThresholdReachesProductionDeps(t *testing.T) {
 	stdout, stderr, code, err := acsassert.SubprocessOutput(
 		"go", "-C", goDir(t), "test", "-count=1", "-run", "TestProductionDeps.*ContextFill", "./internal/adapters/bridge")

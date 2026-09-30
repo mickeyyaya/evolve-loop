@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle91 ports the cycle-91 ACS predicates (6 bash files).
-// Subjects: regression-suite slicing, builder pre-handoff,
-// TDD-engineer 1:1 contract, triage MEDIUM rubric.
 package cycle91
 
 import (
@@ -13,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC91_001_RegressionSuiteSliceScript ports cycle-91/001.
 func TestC91_001_RegressionSuiteSliceScript(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -28,7 +24,6 @@ func TestC91_001_RegressionSuiteSliceScript(t *testing.T) {
 	t.Skip("regression-suite-slice script missing — may have been moved")
 }
 
-// TestC91_002_BuilderPreHandoffInstruction ports cycle-91/002.
 func TestC91_002_BuilderPreHandoffInstruction(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	builder := filepath.Join(root, "agents", "evolve-builder.md")
@@ -40,7 +35,6 @@ func TestC91_002_BuilderPreHandoffInstruction(t *testing.T) {
 	}
 }
 
-// TestC91_003_TddEngineerOneToOneContract ports cycle-91/003.
 func TestC91_003_TddEngineerOneToOneContract(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	tdd := filepath.Join(root, "agents", "evolve-tdd-engineer.md")
@@ -52,7 +46,6 @@ func TestC91_003_TddEngineerOneToOneContract(t *testing.T) {
 	}
 }
 
-// TestC91_004_TriageMediumMinRubric ports cycle-91/004.
 func TestC91_004_TriageMediumMinRubric(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	triage := filepath.Join(root, "agents", "evolve-triage.md")
@@ -64,14 +57,10 @@ func TestC91_004_TriageMediumMinRubric(t *testing.T) {
 	}
 }
 
-// TestC91_005_PriorRegressionPredicatesStillPass ports cycle-91/005.
-// Meta-predicate: the prior cycle's ACS regression suite still passes.
-// Soft skip — this is exercised by the bash predicate runner.
 func TestC91_005_PriorRegressionPredicatesStillPass(t *testing.T) {
 	t.Skip("meta-predicate exercised by bash regression-suite runner")
 }
 
-// TestC91_006_BuildReportSliceAttestation ports cycle-91/006.
 func TestC91_006_BuildReportSliceAttestation(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{

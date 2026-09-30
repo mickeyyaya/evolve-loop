@@ -1,59 +1,5 @@
 //go:build acs
 
-// Package cycle1694 materialises the cycle-1694 acceptance criteria for the one
-// fleet-scoped inbox id `atomicwrite-linked-state-sweep` (step 3 of
-// `statejson-latent-unresolved-writers`).
-//
-// The defect (latent, cycle-999 class). core/worktree.go linkGuardDeps symlinks
-// exactly three state files into every cycle worktree: .evolve/state.json and
-// .evolve/ledger.jsonl (to the canonical host files) and .evolve/cycle-state.json
-// (to the run's run.json mirror). The adapters/storage writers WriteState,
-// WriteCycleState and UpdateState all end in the private writeJSONAtomic, which
-// tmp+renames onto the UNRESOLVED path. A rename over a symlink replaces the LINK
-// with a regular file — the cycle-999 sever — and every later write strands in
-// the detached copy. statemap.WriteStateMap and core.SealCycle already resolve
-// the target first (cycle 1690); storage does not.
-//
-// The accepted fix: route the storage writers' write target through
-// statemap.ResolveWriteTarget, keeping storage and statemap as separate paths
-// (statemap.go:1-21) — only the write target is resolved.
-//
-// Predicate strategy — every predicate exercises the system under test (the
-// cycle-85 degenerate-predicate ban) and every fixture lives under t.TempDir()
-// (the worktree's own .evolve/state.json IS a live link to the host state file,
-// so no predicate may ever touch a repo-relative .evolve path):
-//
-//   - 001/002 drive storage.WriteState through absolute, relative and two-hop
-//     links (plus a regular-file baseline) and through a dangling link.
-//   - 003 drives storage.UpdateState's locked lossless RMW through every link
-//     shape, including dangling.
-//   - 004 drives storage.WriteCycleState through links to a canonical
-//     cycle-state.json and through the exact linkGuardDeps topology (worktree
-//     cycle-state.json -> the run's run.json, dangling until the first write).
-//   - 005 is the separation negative: through a link, the storage writers must
-//     keep their own semantics (no statemap CAS refusal, no statemapRevision
-//     bump) — rerouting storage through statemap.WriteStateMap fails it.
-//   - 006 proves the durable in-package regression tests ran, passed per link
-//     shape, and are git-tracked (a `-run` matching nothing exits 0).
-//   - 007 proves those durable tests are RED on the pre-fix code: it
-//     neutralises every statemap.ResolveWriteTarget reference in the storage
-//     package through a `go test -overlay` and requires every shape to fail.
-//   - 008 is the no-regression floor for the one touched package.
-//
-// Audit repair (round 2). Round 1's audit found the code correct but FAILed the
-// cycle on two things the predicates above never observed:
-//
-//   - 009 is AC3 / audit M1: build-report.md carried no atomicwrite-caller
-//     inventory. It measures the inventory at the base commit and requires the
-//     report to record it: the three linked files, the measured count, "none
-//     targets a linked file", and "not migrated".
-//   - 010 is AC3's "do not migrate them": while the cycle is live, no
-//     atomicwrite caller changed and no production file outside storage/statemap
-//     gained a ResolveWriteTarget reference.
-//   - 011 is the host predicate-execution gate (audit/predicate_authority.go):
-//     while the cycle is live, the full worktree tree must equal the tracked
-//     ship tree. Round 1 left this predicate file and the eval untracked, so
-//     the gate refused to run the suite and acs-verdict.json was never written.
 package cycle1694
 
 import (
@@ -77,37 +23,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// storagePkg is the one package this lane changes.
 const storagePkg = "internal/adapters/storage"
 
-// statemapImport is the resolver's home; 007 neutralises references to it.
 const statemapImport = "github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
 
-// cycleStateEnv is ipcenv.CycleStateFileKey. The fleet orchestrator sets it to
-// the LIVE lane's cycle-state (core/cyclerun.go); left set, WriteCycleState
-// would write the running cycle's state instead of the fixture.
 const cycleStateEnv = "EVOLVE_CYCLE_STATE_FILE"
 
-// durableTests are the in-package regression tests the eval file names as
-// permanent evidence (ACS predicates are cycle-scoped). Each must carry one
-// subtest per link shape in durableShapes.
 var durableTests = []string{
 	"TestWriteState_WritesThroughSymlinkedStatePath",
 	"TestUpdateState_WritesThroughSymlinkedStatePath",
 	"TestWriteCycleState_WritesThroughSymlinkedCycleStatePath",
 }
 
-// durableShapes are the subtest names AC2 requires for every migrated writer.
 var durableShapes = []string{"absolute", "relative", "dangling"}
 
-// ---------------------------------------------------------------------------
-// 001-002 — WriteState
-// ---------------------------------------------------------------------------
-
-// TestC1694_001_WriteStateWritesThroughLinkedStateJSON: a WriteState rooted at
-// an evolve dir whose state.json is a link must keep every hop a symlink and
-// land the new bytes on the canonical file. The regular-file row is the
-// baseline that must stay green.
 func TestC1694_001_WriteStateWritesThroughLinkedStateJSON(t *testing.T) {
 	for _, shape := range linkShapes() {
 		t.Run(shape.name, func(t *testing.T) {
@@ -130,9 +59,6 @@ func TestC1694_001_WriteStateWritesThroughLinkedStateJSON(t *testing.T) {
 	}
 }
 
-// TestC1694_002_WriteStateThroughDanglingLinkCreatesCanonical: linkGuardDeps
-// documents that a link "may briefly dangle". A write through a dangling link
-// must create the TARGET and leave the link in place — never replace it.
 func TestC1694_002_WriteStateThroughDanglingLinkCreatesCanonical(t *testing.T) {
 	root := t.TempDir()
 	canonical := filepath.Join(mkdir(t, filepath.Join(root, "canon", ".evolve")), "state.json")
@@ -150,14 +76,6 @@ func TestC1694_002_WriteStateThroughDanglingLinkCreatesCanonical(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 003 — UpdateState
-// ---------------------------------------------------------------------------
-
-// TestC1694_003_UpdateStateWritesThroughLinkedStateJSON drives the locked
-// lossless RMW through every link shape. It must read the canonical state
-// through the link, bump stateRevision from the CANONICAL value, keep unmodelled
-// operator keys, write the result back to canonical and keep every hop a link.
 func TestC1694_003_UpdateStateWritesThroughLinkedStateJSON(t *testing.T) {
 	shapes := append(linkShapes(), linkShape{"dangling-link", func(t *testing.T, root, canonical, name string) (string, []hop) {
 		if err := os.Remove(canonical); err != nil {
@@ -201,16 +119,6 @@ func TestC1694_003_UpdateStateWritesThroughLinkedStateJSON(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 004 — WriteCycleState
-// ---------------------------------------------------------------------------
-
-// TestC1694_004_WriteCycleStateWritesThroughLinkedCycleState covers the third
-// linked file. Rows 1-3 link the evolve dir's cycle-state.json to a canonical
-// one (absolute, relative, dangling); the checkpoint block on canonical must be
-// spliced through. Row 4 is the production topology linkGuardDeps builds: the
-// worktree's cycle-state.json is an absolute link to <workspace>/run.json that
-// dangles until the first WriteCycleState.
 func TestC1694_004_WriteCycleStateWritesThroughLinkedCycleState(t *testing.T) {
 	const seed = `{"cycle_id":1694,"phase":"tdd","workspace_path":"","checkpoint":{"resumeFrom":"tdd","marker":"keep-me"}}`
 	rows := []struct {
@@ -274,17 +182,6 @@ func TestC1694_004_WriteCycleStateWritesThroughLinkedCycleState(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 005 — storage stays off the statemap path
-// ---------------------------------------------------------------------------
-
-// TestC1694_005_StorageWritersKeepTheirOwnSemanticsThroughALink is the
-// separation negative (AC1: "Keep storage and statemap as separate paths; only
-// resolve the write target"). Through a link, WriteState is still a typed
-// replace with no CAS floor (statemap.WriteStateMap would refuse a lower
-// stateRevision with ErrStaleRevision), and UpdateState owns stateRevision and
-// leaves statemap's own statemapRevision counter untouched (UpdateStateMap
-// would bump it).
 func TestC1694_005_StorageWritersKeepTheirOwnSemanticsThroughALink(t *testing.T) {
 	const seed = `{"lastCycleNumber":1,"stateRevision":10,"statemapRevision":4,"lastUpdated":"2026-07-14T05:01:14Z"}`
 
@@ -330,14 +227,6 @@ func TestC1694_005_StorageWritersKeepTheirOwnSemanticsThroughALink(t *testing.T)
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 006-007 — durable regression tests: they run, they pass, they are RED pre-fix
-// ---------------------------------------------------------------------------
-
-// TestC1694_006_DurableRegressionTestsRanPassedAndAreTracked: each durable test
-// must run and PASS once per link shape (a -run matching nothing still exits
-// 0), and the file declaring it must be git-TRACKED (an unadded file is dropped
-// at ship).
 func TestC1694_006_DurableRegressionTestsRanPassedAndAreTracked(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -369,13 +258,6 @@ func TestC1694_006_DurableRegressionTestsRanPassedAndAreTracked(t *testing.T) {
 	}
 }
 
-// TestC1694_007_DurableTestsAreRedWithoutTheResolver is AC2's "RED on the
-// pre-fix code" made executable, and AC1's "through statemap.ResolveWriteTarget"
-// made load-bearing. It rewrites every statemap.ResolveWriteTarget reference in
-// the storage package's production files to an identity function (the pre-fix
-// behaviour), compiles that through `go test -overlay` without touching the
-// tree, and requires every durable test to FAIL on every link shape. No
-// reference at all means the writers do not go through the shared resolver.
 func TestC1694_007_DurableTestsAreRedWithoutTheResolver(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -399,14 +281,6 @@ func TestC1694_007_DurableTestsAreRedWithoutTheResolver(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 008 — no-regression floor
-// ---------------------------------------------------------------------------
-
-// TestC1694_008_StoragePackageGreenVetAndGofmtClean: the touched package's
-// suite stays green, go vet is clean (it also compiles the new storage ->
-// statemap edge, so an import cycle surfaces here), and the tree is
-// gofmt-clean.
 func TestC1694_008_StoragePackageGreenVetAndGofmtClean(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -425,26 +299,14 @@ func TestC1694_008_StoragePackageGreenVetAndGofmtClean(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 009-011 — audit repair: AC3 inventory, no migration, complete ship tree
-// ---------------------------------------------------------------------------
-
-// baseSHA is the cycle's base commit (the explanation handoff's base_sha). The
-// worktree HEAD stays on it until ship, because phases never commit.
 const baseSHA = "4a2103349a79bde1f8cbc2c96e84c975cc7f8f99"
 
-// thisCycle names the run workspace whose build-report.md AC3 grades.
 const thisCycle = 1694
 
-// linkedStateFiles are the three files core/worktree.go linkGuardDeps symlinks
-// into every cycle worktree.
 var linkedStateFiles = []string{"state.json", "ledger.jsonl", "cycle-state.json"}
 
-// atomicwriteCallPattern is the inventory's call-site shape (AC3, audit M1).
 const atomicwriteCallPattern = `atomicwrite\.(Bytes|JSON)\(`
 
-// inventoryPathspec scopes the inventory to production code: no tests, no ACS
-// predicates, not the atomicwrite package itself.
 var inventoryPathspec = []string{"--", "go/*.go", ":(exclude)*_test.go", ":(exclude)go/acs/**", ":(exclude)go/internal/atomicwrite/**"}
 
 var (
@@ -453,13 +315,6 @@ var (
 	notMigratedRe      = regexp.MustCompile(`(?i)(\b(not|no)\b[^\n]{0,60}\bmigrat|\bunmigrated\b)`)
 )
 
-// TestC1694_009_BuildReportRecordsTheAtomicwriteCallerInventory is AC3 ("the
-// atomicwrite-caller inventory is recorded in the build report") and audit M1.
-// It measures the inventory from the base commit's object store, so the count
-// is fixed forever. It checks the premise, that no call line names a linked
-// file. It then requires this run's build-report.md to carry an inventory
-// section that records the three linked files, the measured count, that none
-// targets a linked file, and that the callers were not migrated.
 func TestC1694_009_BuildReportRecordsTheAtomicwriteCallerInventory(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	calls := atomicwriteInventory(t, root, baseSHA)
@@ -496,10 +351,6 @@ func TestC1694_009_BuildReportRecordsTheAtomicwriteCallerInventory(t *testing.T)
 	}
 }
 
-// TestC1694_010_AtomicwriteCallersAreNotMigrated is AC3's negative axis: "do
-// not migrate them". While the cycle is live, the atomicwrite package and every
-// production call line are unchanged since base. No production file outside
-// storage and statemap gains a ResolveWriteTarget reference.
 func TestC1694_010_AtomicwriteCallersAreNotMigrated(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	requireLiveCycle(t, root)
@@ -534,13 +385,6 @@ func TestC1694_010_AtomicwriteCallersAreNotMigrated(t *testing.T) {
 	}
 }
 
-// TestC1694_011_PredicateInputsAreInTheShipTree encodes the gate that refused
-// round 1's audit (go/internal/phases/audit/predicate_authority.go
-// predicateTreeFor). The tree the predicates execute (every non-ignored file)
-// must equal the tracked ship tree. An untracked predicate, eval or test file is
-// an "undeclared input absent from the ship tree". The suite then never runs and
-// acs-verdict.json is never written. It calls the gate's own two treefence
-// snapshots.
 func TestC1694_011_PredicateInputsAreInTheShipTree(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	requireLiveCycle(t, root)
@@ -561,11 +405,6 @@ func TestC1694_011_PredicateInputsAreInTheShipTree(t *testing.T) {
 	}
 }
 
-// atomicwriteInventory lists the production atomicwrite.Bytes/JSON call lines
-// as "<path>:<text>". Line numbers are left out, so an edit elsewhere in a
-// caller's file does not count as a changed call. With a rev, it reads from the
-// rev's object store. With rev == "", it reads the working tree, untracked files
-// included.
 func atomicwriteInventory(t *testing.T, root, rev string) []string {
 	t.Helper()
 	args := []string{"-C", root, "grep", "--untracked", "-E", atomicwriteCallPattern}
@@ -586,8 +425,6 @@ func atomicwriteInventory(t *testing.T, root, rev string) []string {
 	return lines
 }
 
-// requireLiveCycle skips once this cycle has shipped. The worktree HEAD is the
-// base commit until ship, and later trees legitimately move past it.
 func requireLiveCycle(t *testing.T, root string) {
 	t.Helper()
 	head, errOut, code := runIn(t, root, "git", "-C", root, "rev-parse", "HEAD")
@@ -599,11 +436,6 @@ func requireLiveCycle(t *testing.T, root string) {
 	}
 }
 
-// cycleRunDir resolves this cycle's workspace on the STATE root:
-// EVOLVE_PROJECT_ROOT (the acs suite sets it), else the project root that owns
-// a lane worktree at <root>/.evolve/worktrees/<lane>, else the repo root. An
-// absent workspace (an archived run) is the documented SKIP posture, never a
-// false red.
 func cycleRunDir(t *testing.T) string {
 	t.Helper()
 	stateRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
@@ -621,9 +453,6 @@ func cycleRunDir(t *testing.T) string {
 	return dir
 }
 
-// markdownSection returns the body under the first heading matching re, up to
-// the next heading of the same or a higher level. Fenced code blocks are
-// skipped, so a `# comment` in a pasted shell block does not end the section.
 func markdownSection(doc string, re *regexp.Regexp) (string, bool) {
 	var b strings.Builder
 	level, inFence := 0, false
@@ -650,23 +479,15 @@ func markdownSection(doc string, re *regexp.Regexp) (string, bool) {
 	return b.String(), level > 0
 }
 
-// linkedFileRe matches a linked file's name as a whole token. `state.json`
-// must not match inside `cycle-state.json`.
 func linkedFileRe(name string) *regexp.Regexp {
 	return regexp.MustCompile(`(^|[^A-Za-z0-9_-])` + regexp.QuoteMeta(name))
 }
 
-// countStatedRe matches n as a standalone integer beside a call-site noun, in
-// either order ("53 call sites", "call sites: 53").
 func countStatedRe(n int) *regexp.Regexp {
 	num := `(^|[^0-9])` + strconv.Itoa(n) + `([^0-9]|$)`
 	noun := `(?i:call|site|line|caller)`
 	return regexp.MustCompile(num + `[^\n]{0,40}` + noun + `|` + noun + `[^\n]{0,40}` + num)
 }
-
-// ---------------------------------------------------------------------------
-// fixtures
-// ---------------------------------------------------------------------------
 
 type hop struct{ path, target string }
 
@@ -675,8 +496,6 @@ type linkShape struct {
 	build func(t *testing.T, root, canonical, name string) (entry string, hops []hop)
 }
 
-// linkShapes lay a worktree-view evolve dir over root/canon/.evolve/<name>. The
-// entry is always <dir>/<name>, the file name the storage writer derives.
 func linkShapes() []linkShape {
 	return []linkShape{
 		{"regular-file", func(t *testing.T, root, canonical, name string) (string, []hop) {
@@ -704,15 +523,8 @@ func durableRunPattern() string {
 	return "^(" + strings.Join(durableTests, "|") + ")$"
 }
 
-// identityResolver replaces a statemap.ResolveWriteTarget reference: same
-// signature, pre-fix behaviour (the raw path is the write target).
 const identityResolver = "(func(p string) string { return p })"
 
-// neutraliseResolver writes resolver-neutralised copies of pkgDir's production
-// files that reference statemap.ResolveWriteTarget into scratch, and returns a
-// `go -overlay` manifest mapping the originals to them plus the number of
-// references rewritten. The import is kept used with a blank var so the only
-// change is behavioural.
 func neutraliseResolver(t *testing.T, pkgDir, scratch string) (overlay string, sites int) {
 	t.Helper()
 	entries, err := os.ReadDir(pkgDir)
@@ -752,8 +564,6 @@ func neutraliseResolver(t *testing.T, pkgDir, scratch string) (overlay string, s
 	return overlay, sites
 }
 
-// neutraliseFile rewrites every <alias>.ResolveWriteTarget selector in src,
-// where alias is the file's name for the statemap import.
 func neutraliseFile(t *testing.T, path string, src []byte) ([]byte, int) {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -789,16 +599,12 @@ func neutraliseFile(t *testing.T, path string, src []byte) ([]byte, int) {
 		return src, 0
 	}
 	out := string(src)
-	for i := len(spans) - 1; i >= 0; i-- { // back to front keeps earlier offsets valid
+	for i := len(spans) - 1; i >= 0; i-- {
 		out = out[:spans[i][0]] + identityResolver + out[spans[i][1]:]
 	}
 	out += "\nvar _ = " + alias + ".ResolveWriteTarget\n"
 	return []byte(out), len(spans)
 }
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 func mkdir(t *testing.T, dir string) string {
 	t.Helper()
@@ -826,8 +632,6 @@ func symlink(t *testing.T, target, link string) string {
 	return link
 }
 
-// assertLinkIntact fails when path is no longer a symlink to want — the
-// cycle-999 sever is exactly a rename replacing the link with a regular file.
 func assertLinkIntact(t *testing.T, path, want string) {
 	t.Helper()
 	fi, err := os.Lstat(path)
@@ -862,8 +666,6 @@ func numField(m map[string]any, key string) float64 {
 	return v
 }
 
-// testFilesMatching returns the _test.go files directly in dir whose source
-// matches re.
 func testFilesMatching(t *testing.T, dir string, re *regexp.Regexp) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -887,12 +689,6 @@ func testFilesMatching(t *testing.T, dir string, re *regexp.Regexp) []string {
 	return out
 }
 
-// runIn executes one command with an explicit working directory — never the
-// process cwd, which differs between the main tree, the cycle worktree and each
-// fleet lane. EVOLVE_CYCLE_STATE_FILE is stripped from the child's environment:
-// the fleet orchestrator sets it to the live lane's cycle-state, and a storage
-// WriteCycleState test that forgot to clear it would overwrite the RUNNING
-// cycle's state.
 func runIn(t *testing.T, dir, name string, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
 	cmd := exec.CommandContext(context.Background(), name, args...)

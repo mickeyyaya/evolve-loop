@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle50 ports the cycle-50 ACS predicates (9 bash files).
 package cycle50
 
 import (
@@ -11,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestC50_001_ScoutStep45Exists ports cycle-50/001.
-// evolve-scout.md has Step 4.5 + all six cache-check exit codes.
 func TestC50_001_ScoutStep45Exists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
@@ -32,8 +29,6 @@ func TestC50_001_ScoutStep45Exists(t *testing.T) {
 	}
 }
 
-// TestC50_002_ScoutStep55Exists ports cycle-50/002.
-// Soft-passes when the Step 5.5 section has been refactored away.
 func TestC50_002_ScoutStep55Exists(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
@@ -45,7 +40,6 @@ func TestC50_002_ScoutStep55Exists(t *testing.T) {
 	}
 }
 
-// TestC50_003_ScoutStopCriterionCacheSection ports cycle-50/003.
 func TestC50_003_ScoutStopCriterionCacheSection(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")
@@ -60,8 +54,6 @@ func TestC50_003_ScoutStopCriterionCacheSection(t *testing.T) {
 	}
 }
 
-// TestC50_004_BuilderStep25ResearchPointer ports cycle-50/004.
-// Soft-passes when the research-pointer integration has been removed.
 func TestC50_004_BuilderStep25ResearchPointer(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	builder := filepath.Join(root, "agents", "evolve-builder.md")
@@ -73,7 +65,6 @@ func TestC50_004_BuilderStep25ResearchPointer(t *testing.T) {
 	}
 }
 
-// TestC50_005_TriagePassthroughAllThreeFields ports cycle-50/005.
 func TestC50_005_TriagePassthroughAllThreeFields(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	triage := filepath.Join(root, "agents", "evolve-triage.md")
@@ -87,7 +78,6 @@ func TestC50_005_TriagePassthroughAllThreeFields(t *testing.T) {
 	}
 }
 
-// TestC50_006_ReconcileInvalidateOnDrop ports cycle-50/006.
 func TestC50_006_ReconcileInvalidateOnDrop(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
@@ -101,7 +91,6 @@ func TestC50_006_ReconcileInvalidateOnDrop(t *testing.T) {
 	}
 }
 
-// TestC50_007_ReconcilePromoteOnPass ports cycle-50/007.
 func TestC50_007_ReconcilePromoteOnPass(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	rec := filepath.Join(root, "legacy", "scripts", "lifecycle", "reconcile-carryover-todos.sh")
@@ -111,16 +100,11 @@ func TestC50_007_ReconcilePromoteOnPass(t *testing.T) {
 	if !acsassert.FileContains(t, rec, "promote-research-cache.sh") {
 		return
 	}
-	// Bash regex was: promote-research-cache.sh.*$CYCLE.*$WORKSPACE
 	if !acsassert.FileMatchesRegex(t, rec, `promote-research-cache\.sh[^\n]*(\$CYCLE|"\$CYCLE")[^\n]*(\$WORKSPACE|"\$WORKSPACE")`) {
 		t.Errorf("%s: promote-research-cache.sh call missing CYCLE/WORKSPACE args", rec)
 	}
 }
 
-// TestC50_008_InjectTaskResearchPointerFlag ports cycle-50/008.
-// Bash version actually runs inject-task.sh --dry-run; Go port asserts
-// presence of the flag plumbing only. The bash predicate is authoritative
-// for runtime behavior.
 func TestC50_008_InjectTaskResearchPointerFlag(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	inj := filepath.Join(root, "legacy", "scripts", "utility", "inject-task.sh")
@@ -135,7 +119,6 @@ func TestC50_008_InjectTaskResearchPointerFlag(t *testing.T) {
 	}
 }
 
-// TestC50_009_TesterDualVarWorktreePattern ports cycle-50/009.
 func TestC50_009_TesterDualVarWorktreePattern(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	tester := filepath.Join(root, "agents", "evolve-tester.md")

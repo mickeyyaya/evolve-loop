@@ -1,23 +1,5 @@
 //go:build acs
 
-// Package pluginnamespace is the durable regression guard that locks in the
-// 2026-06-24 plugin/command namespace rename evolve-loop → evo.
-//
-// In Claude Code the slash-command namespace IS the plugin's `name` field, so
-// .claude-plugin/plugin.json and .claude-plugin/marketplace.json are the single
-// source of truth for whether commands surface as /evo:loop, /evo:tdd, … (the
-// /ecc:prune pattern). If anyone reverts the name in either manifest — or lets
-// the two disagree — the /evo:* namespace silently breaks at install time. The
-// rename itself touched 87 files, but only these two fields actually drive the
-// namespace; everything else is consistency. This gate pins the field that
-// matters and the agreement between the two manifests.
-//
-// acs-tagged like every go/acs/regression predicate; CI runs it via
-//
-//	go test -count=1 -tags acs ./acs/regression/...
-//
-// It needs no .apicover-enforce / completeness enrollment: a test-only package
-// outside ./internal/... (exactly like acs/regression/noorphan, flagreaders).
 package pluginnamespace
 
 import (
@@ -33,9 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// wantNamespace is the command namespace the rename established. Editing it here
-// is a deliberate re-namespace decision; an accidental manifest revert is not,
-// and that is exactly what these tests are here to catch.
 const wantNamespace = "evo"
 
 type pluginManifest struct {
@@ -49,7 +28,6 @@ type marketplaceManifest struct {
 	} `json:"plugins"`
 }
 
-// loadManifest reads + parses a repo-relative JSON manifest, failing loudly.
 func loadManifest(t *testing.T, rel string, dst any) {
 	t.Helper()
 	path := filepath.Join(acsassert.RepoRoot(t), filepath.FromSlash(rel))
@@ -62,8 +40,6 @@ func loadManifest(t *testing.T, rel string, dst any) {
 	}
 }
 
-// TestPluginManifest_NamespaceIsEvo — plugin.json `name` is THE command
-// namespace; reverting it to "evolve-loop" silently breaks every /evo:* command.
 func TestPluginManifest_NamespaceIsEvo(t *testing.T) {
 	var pj pluginManifest
 	loadManifest(t, ".claude-plugin/plugin.json", &pj)
@@ -72,8 +48,6 @@ func TestPluginManifest_NamespaceIsEvo(t *testing.T) {
 	}
 }
 
-// TestMarketplaceManifest_NamespaceIsEvo — the marketplace top-level name and
-// its first plugin entry both carry the namespace (the /ecc-style mirror).
 func TestMarketplaceManifest_NamespaceIsEvo(t *testing.T) {
 	var mp marketplaceManifest
 	loadManifest(t, ".claude-plugin/marketplace.json", &mp)
@@ -88,11 +62,6 @@ func TestMarketplaceManifest_NamespaceIsEvo(t *testing.T) {
 	}
 }
 
-// TestManifests_NamespaceConsistent pins the resolve invariant itself
-// (value-independent): plugin.json name MUST equal marketplace plugins[].name.
-// A disagreement is the exact failure mode that makes Claude Code install a
-// plugin whose namespace differs from the marketplace entry, so /evo:* never
-// resolves — even if each file is internally "valid".
 func TestManifests_NamespaceConsistent(t *testing.T) {
 	var pj pluginManifest
 	var mp marketplaceManifest
@@ -106,21 +75,8 @@ func TestManifests_NamespaceConsistent(t *testing.T) {
 	}
 }
 
-// The dead-install-handle guard ("<old>@<old>" plugin handle) moved to the
-// config-driven legacynames gate (acs/regression/legacynames): the handle is
-// forbidden-token entry #2 in .evolve/naming.json, so one scanner enforces it
-// instead of a hand-written test per token. This package keeps only the two
-// invariants legacynames cannot express as a forbidden substring: the manifest
-// `name` IS the namespace, and the two manifests must agree.
-
-// TestLoopSkill_DescribesEvoCommand catches a half-done rename where the
-// manifests flipped to evo but the canonical loop skill prose still advertises
-// the dead /evolve-loop command to users.
 func TestLoopSkill_DescribesEvoCommand(t *testing.T) {
 	path := filepath.Join(acsassert.RepoRoot(t), "skills", "loop", "SKILL.md")
-	// Read explicitly so a missing/unreadable file is a FATAL setup error, not
-	// conflated with the substring-absent assertion below (acsassert.FileContains
-	// reports both via the same non-fatal Errorf — undesirable in a CI gate).
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
@@ -131,11 +87,6 @@ func TestLoopSkill_DescribesEvoCommand(t *testing.T) {
 	}
 }
 
-// bareEvoSkillRefs returns every "bare" evo-command reference in skills/ docs: a
-// /<skill> slash-command token NOT namespaced as /evo:<skill>. The skill universe
-// is the skills/<name>/ directory names. Boundary chars are matched (RE2 has no
-// lookahead) so link paths (../release/), fs paths (docs/release-protocol), and
-// already-prefixed /evo:<skill> refs are NOT flagged. root is the repo root.
 func bareEvoSkillRefs(root string) ([]string, error) {
 	skillsDir := filepath.Join(root, "skills")
 	entries, err := os.ReadDir(skillsDir)
@@ -151,7 +102,6 @@ func bareEvoSkillRefs(root string) ([]string, error) {
 	if len(names) == 0 {
 		return nil, fmt.Errorf("no skills found under %s", skillsDir)
 	}
-	// Longest-first so a multi-word name matches before any shorter substring.
 	sort.Slice(names, func(i, j int) bool { return len(names[i]) > len(names[j]) })
 	re := regexp.MustCompile(`(^|[^:a-zA-Z0-9/._-])/(` + strings.Join(names, "|") + `)([^-/a-zA-Z0-9]|$)`)
 
@@ -178,9 +128,6 @@ func bareEvoSkillRefs(root string) ([]string, error) {
 	return offenders, walkErr
 }
 
-// TestSkillRefsAreEvoNamespaced enforces that every evo-skill slash-command
-// reference in skills/ docs is /evo:<skill>, never bare /<skill> — the plugin's
-// command namespace is evo, so a bare /<skill> would not resolve at install.
 func TestSkillRefsAreEvoNamespaced(t *testing.T) {
 	offenders, err := bareEvoSkillRefs(acsassert.RepoRoot(t))
 	if err != nil {
@@ -193,9 +140,6 @@ func TestSkillRefsAreEvoNamespaced(t *testing.T) {
 	}
 }
 
-// TestBareEvoSkillRefDetection is the red-proof: against a fixture with a
-// namespaced /evo:demo, a bare /demo, and a path ../demo/, only the bare ref is
-// flagged. Proves the gate catches violations and is path-safe.
 func TestBareEvoSkillRefDetection(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "skills", "demo")

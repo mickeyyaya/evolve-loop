@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle42 ports the cycle-42 ACS predicates (4 files) — all
-// file-grep / file-existence style — from acs/cycle-42/*.sh.
 package cycle42
 
 import (
@@ -22,7 +20,6 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(stdout)
 }
 
-// roadmapPath is the file every cycle-42 predicate gates on.
 func roadmapPath(t *testing.T) string {
 	t.Helper()
 	p := filepath.Join(repoRoot(t), "docs", "architecture", "token-reduction-roadmap.md")
@@ -32,8 +29,6 @@ func roadmapPath(t *testing.T) string {
 	return p
 }
 
-// TestC42_003_PNew13Done — status table row for P-NEW-13 must contain
-// 'DONE (cycle 42)' AND its field-table 'Target cycle' must not say '43+'.
 func TestC42_003_PNew13Done(t *testing.T) {
 	doc := roadmapPath(t)
 	acsassert.FileMatchesRegex(t, doc, `P-NEW-13.*DONE \(cycle 42\)`)
@@ -43,7 +38,6 @@ func TestC42_003_PNew13Done(t *testing.T) {
 		t.Fatalf("read %s: %v", doc, err)
 	}
 	if strings.Contains(string(raw), "Target cycle") && strings.Contains(string(raw), "43+") {
-		// Sniff for the specific anti-pattern: 'Target cycle' followed by 43+ near P-NEW-13.
 		for _, line := range strings.Split(string(raw), "\n") {
 			if strings.Contains(line, "Target cycle") && strings.Contains(line, "43+") {
 				t.Errorf("P-NEW-13 field table Target cycle still shows '43+' — should be DONE: %s", line)
@@ -52,15 +46,11 @@ func TestC42_003_PNew13Done(t *testing.T) {
 	}
 }
 
-// TestC42_004_PNew16Done — status table row for P-NEW-16 must contain
-// 'DONE (cycle 42)'.
 func TestC42_004_PNew16Done(t *testing.T) {
 	doc := roadmapPath(t)
 	acsassert.FileMatchesRegex(t, doc, `P-NEW-16.*DONE \(cycle 42\)`)
 }
 
-// TestC42_005_P6CitationFix — PSMAS may not be cited with arXiv:2510.26585;
-// 2604.17400 must appear somewhere.
 func TestC42_005_P6CitationFix(t *testing.T) {
 	doc := roadmapPath(t)
 	raw, err := os.ReadFile(doc)
@@ -75,7 +65,6 @@ func TestC42_005_P6CitationFix(t *testing.T) {
 	acsassert.FileContains(t, doc, "2604.17400")
 }
 
-// TestC42_006_PNew17Exists — P-NEW-17 section + status row + KB file.
 func TestC42_006_PNew17Exists(t *testing.T) {
 	root := repoRoot(t)
 	doc := filepath.Join(root, "docs", "architecture", "token-reduction-roadmap.md")

@@ -62,6 +62,11 @@ func TestExitCodes_HostAliasesAreTheLeafValues(t *testing.T) {
 // launchoutcome leaf whose source contains needle (sorted, module-relative).
 func nonTestSourcesMentioning(t *testing.T, needle string) []string {
 	t.Helper()
+	return nonTestSourcesWhere(t, func(body string) bool { return strings.Contains(body, needle) })
+}
+
+func nonTestSourcesWhere(t *testing.T, matches func(body string) bool) []string {
+	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +91,7 @@ func nonTestSourcesMentioning(t *testing.T, needle string) []string {
 		if rerr != nil {
 			return rerr
 		}
-		if strings.Contains(string(body), needle) {
+		if matches(string(body)) {
 			hits = append(hits, rel)
 		}
 		return nil

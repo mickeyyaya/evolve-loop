@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle1726 holds the acceptance predicates for the repo-wide
-// function-size ratchet (go/internal/sizeratchet): a function past 50 lines
-// fails CI unless it is a listed offender, and listed offenders may only shrink.
 package cycle1726
 
 import (
@@ -288,8 +285,6 @@ func requireNames(t *testing.T, scenario string, err error, want, notWant []stri
 	}
 }
 
-// funcSrc renders a declaration spanning exactly total lines, header and
-// closing brace included.
 func funcSrc(header string, total int) string {
 	return header + "\n" + strings.Repeat("\t// body\n", total-2) + "}\n"
 }
@@ -360,9 +355,6 @@ func diffCensus(want, got map[string]int) string {
 	return strings.Join(lines, "\n")
 }
 
-// liveOffenderCensus is an oracle independent of package sizeratchet: every
-// non-test function declaration over 50 lines under modRoot, keyed
-// "<slash dir>.<Name>" or "<slash dir>.<Receiver>.<Name>".
 func liveOffenderCensus(t *testing.T, modRoot string) map[string]int {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -441,7 +433,6 @@ func requireTracked(t *testing.T, repo, rel string) {
 	}
 }
 
-// ciTestArgs mirrors the CI recipe (make test-integration) for the one package.
 func ciTestArgs() []string {
 	return []string{"test", "-count=1", "-tags", "integration", ratchetPkg}
 }
@@ -463,8 +454,6 @@ func runGo(t *testing.T, dir string, args ...string) (string, int) {
 	return "", -1
 }
 
-// isolatedGoEnv drops EVOLVE_* so the ratchet cannot be pointed back at the
-// real tree, and pins module mode so the copy resolves only its own go.mod.
 func isolatedGoEnv() []string {
 	env := make([]string, 0, len(os.Environ())+2)
 	for _, kv := range os.Environ() {
@@ -476,10 +465,6 @@ func isolatedGoEnv() []string {
 	return append(env, "GOWORK=off", "GOFLAGS=")
 }
 
-// copyModule copies what `go test ./internal/sizeratchet` needs outside the
-// repo: every non-test source file (the ratchet's input), go.mod, go.sum,
-// vendor/, and the full directories of the ratchet package and its in-module
-// dependencies.
 func copyModule(t *testing.T, modRoot string) string {
 	t.Helper()
 	depDirs := ratchetDepDirs(t, modRoot)

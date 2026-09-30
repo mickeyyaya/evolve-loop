@@ -1,27 +1,5 @@
 //go:build acs
 
-// Package cycle1290 materialises the cycle-1290 acceptance criteria for the two
-// fleet-scoped tasks pinned to this lane (inbox item `continuation-defect-ledger`,
-// third hop of the 1285 → 1287 → 1290 continuation chain):
-//
-//   - faillearn-publish-mode-parity              → cycle-1287 audit defects[0] (F1,
-//     MEDIUM): the failure floor publishes its own artifacts at 0600 while the rest
-//     of the runtime publishes 0644, and nothing pins the mode.
-//   - faillearn-inbox-failure-preserves-diagnosis → the residual the 1287 landing
-//     note named rather than closed: a disk-level inbox failure yields ZERO
-//     artifacts, so the diagnosis dies with the queue write.
-//
-// Predicate strategy. Predicates 001/002 drive the production entry point
-// (faillearn.WriteArtifacts) directly from this package and assert on the emitted
-// artifacts' MODE and CONTENT — so they are immune to the two cheapest gaming
-// moves at once: deleting the in-package unit tests, and asserting `err == nil`
-// without ever stat-ing anything. 003/004 then require those in-package tests to
-// be tree-resident and executing (the cycle-1285 lesson: a red reproducer minted
-// and abandoned in the same cycle protects nothing), and require the pre-existing
-// transactional invariants to still pass UNMODIFIED — greening 002 by weakening
-// inbox_transactional_test.go is the fix being wrong, not the contract being met.
-// Subprocess predicates run ONE named package under an explicit -run expression
-// with per-name PASS accounting, per the flaky-predicate-shape rules.
 package cycle1290
 
 import (
@@ -35,16 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// goTestRun runs ONE named package under an explicit -run expression built from
-// the exact test names given, and requires EVERY named test to have executed and
-// PASSED.
-//
-// Per-name accounting, not exit code alone: `go test -run TestThatDoesNotExist
-// ./pkg` exits 0 with a warning, and an alternation where only some names exist
-// exits 0 with no warning at all — so an exit-code predicate greens on a tree that
-// deleted the very tests it exists to protect. `go -C <dir>` anchors the
-// invocation to the worktree under test rather than the process cwd, which differs
-// between the main tree, a worktree, and each fleet lane.
 func goTestRun(t *testing.T, root, pkg string, names ...string) {
 	t.Helper()
 	anchored := make([]string, 0, len(names))
@@ -85,13 +53,6 @@ func remediationItems() []faillearn.InboxItem {
 	}
 }
 
-// TestC1290_001_FloorArtifactsPublishAtTheAtomicwriteMode is T1's behavioural
-// criterion, exercised against the production call rather than against a source
-// grep for `Chmod`: every artifact WriteArtifacts publishes — retrospective,
-// lesson, inbox item — must land at 0644, the mode internal/atomicwrite documents
-// and enforces for every other published runtime artifact (atomicwrite.go:61-63).
-// RED today: os.CreateTemp yields 0600 and os.Link preserves it, so all three land
-// 0600 and are unreadable to the other fleet lanes and the operator that read them.
 func TestC1290_001_FloorArtifactsPublishAtTheAtomicwriteMode(t *testing.T) {
 	runDir, lessonsDir, inboxDir := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "inbox")
 
@@ -127,20 +88,9 @@ func TestC1290_001_FloorArtifactsPublishAtTheAtomicwriteMode(t *testing.T) {
 	}
 }
 
-// TestC1290_002_InboxFailurePreservesTheDiagnosisWithoutBreakingTheOrdering is
-// T2's behavioural criterion. Four properties in one predicate because any three
-// of them are satisfiable by a wrong fix: the error is still returned (no
-// swallow), retrospective-report.md is still absent (the 1255 invariant, and the
-// ordering in WriteArtifacts is NOT reversed), retrospective-unqueued.md carries
-// the diagnosis, and it names every remediation item that reached no queue.
-// RED today: the inbox failure returns before anything is written, so the run dir
-// is empty and the failure analysis is lost along with the queue write.
 func TestC1290_002_InboxFailurePreservesTheDiagnosisWithoutBreakingTheOrdering(t *testing.T) {
 	runDir, lessonsDir := t.TempDir(), t.TempDir()
 
-	// A regular file where the inbox DIRECTORY must go: MkdirAll and create both
-	// fail ENOTDIR. Deterministic, no fault-injection seam, and not defeated by a
-	// root CI runner the way a chmod-based injection would be.
 	blocked := filepath.Join(t.TempDir(), "inbox")
 	if err := os.WriteFile(blocked, []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("prepare blocked inbox path: %v", err)
@@ -172,11 +122,6 @@ func TestC1290_002_InboxFailurePreservesTheDiagnosisWithoutBreakingTheOrdering(t
 	}
 }
 
-// TestC1290_003_TheRegressionPinsAreTreeResidentAndExecuting requires this cycle's
-// reproducers to survive as tests in the package they protect. The cycle-1285
-// lesson this closes: a red reproducer minted and abandoned inside the same cycle
-// leaves the defect free to return the moment the predicate package ages out of
-// the ACS lane (cycle predicates run for one cycle; package tests run forever).
 func TestC1290_003_TheRegressionPinsAreTreeResidentAndExecuting(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goTestRun(t, root, "./internal/faillearn",
@@ -190,12 +135,6 @@ func TestC1290_003_TheRegressionPinsAreTreeResidentAndExecuting(t *testing.T) {
 		"TestWriteArtifacts_ItemLevelRejectionAlsoPreservesDiagnosis")
 }
 
-// TestC1290_004_TransactionalInvariantsSurviveUnmodified is the anti-gaming twin
-// of 002. The cheapest way to green a "write something on the failure arm"
-// criterion is to relax the invariant that says nothing may be written there, so
-// the four pre-existing transactional locks are pinned independently and must stay
-// green with their file UNMODIFIED (hypothesis H3: if the fix requires editing
-// them, the design is wrong and belongs on the failure arm instead of the order).
 func TestC1290_004_TransactionalInvariantsSurviveUnmodified(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goTestRun(t, root, "./internal/faillearn",
@@ -214,11 +153,6 @@ func TestC1290_004_TransactionalInvariantsSurviveUnmodified(t *testing.T) {
 	}
 }
 
-// TestC1290_005_ContinuationDocsRecordTheResidualClosure is the operator DOCS
-// directive for this lane: the two governed documents must carry the residual and
-// its closure, so the next hop reconciles against a written record instead of
-// re-deriving it. A content assertion is the criterion itself here (the artifact
-// under test IS the document), not a stand-in for a behavioural check.
 func TestC1290_005_ContinuationDocsRecordTheResidualClosure(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	for _, rel := range []string{
@@ -227,7 +161,7 @@ func TestC1290_005_ContinuationDocsRecordTheResidualClosure(t *testing.T) {
 	} {
 		path := filepath.Join(root, rel)
 		if !acsassert.FileExists(t, path) {
-			continue // FileExists already reported the miss
+			continue
 		}
 		if !acsassert.FileContainsAny(path, "UNQUEUED", "retrospective-unqueued.md") {
 			t.Errorf("%s does not record the unqueued-diagnosis closure — the 1287 landing named this residual rather than closing it, and an unrecorded closure is how the next hop loses it again", rel)
@@ -235,11 +169,6 @@ func TestC1290_005_ContinuationDocsRecordTheResidualClosure(t *testing.T) {
 	}
 }
 
-// TestC1290_006_TreeBuilds compiles the whole module: both tasks edit
-// go/internal/faillearn/writer.go, a package with off-lane consumers
-// (core/failure_learning.go, core/reset.go, cmd/evolve/cmd_loop_outcome.go), so a
-// signature change reaches packages this cycle never touches. `go build`, not a
-// `go test ./...` sweep — the flaky-shape rules ban the sweep as a predicate.
 func TestC1290_006_TreeBuilds(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	stdout, stderr, code, err := acsassert.SubprocessOutput(

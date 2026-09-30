@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle1736 holds the acceptance predicates for sizeratchet-shrink-skillcheck:
-// the four oversized go/internal/skillcheck functions shrink to sizeratchet.MaxLines,
-// lose their offenders.json entries, and keep their behavior and comments.
 package cycle1736
 
 import (
@@ -189,7 +186,6 @@ func (g worktreeGit) Show(base, path string) ([]byte, error) {
 func (g worktreeGit) Root() (string, error) { return g.root, nil }
 
 // acs-predicate: config-check — the doc comment text IS the contract under
-// test (comments have no runtime behavior); parsed with go/parser, not grepped.
 func TestC1736_008_TargetFunctionDocsMatchBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	current := funcDocs(t, currentPkgSources(t))
@@ -213,8 +209,6 @@ func TestC1736_008_TargetFunctionDocsMatchBaseline(t *testing.T) {
 	}
 }
 
-// Each anchor must stay verbatim, exactly once, in the non-test skillcheck sources:
-// the extraction moves these lines, it does not rewrite them.
 var skillcheckMutants = []struct{ fn, name, anchor, replacement string }{
 	{"ManifestProblems", "unreadable-manifest problem loses its source path", `"MANIFEST: cannot read .claude-plugin/plugin.json: %v"`, `"MANIFEST: cannot read plugin.json: %v"`},
 	{"ManifestProblems", "invalid-JSON problem loses its source path", `"MANIFEST: .claude-plugin/plugin.json is not valid JSON: %v"`, `"MANIFEST: plugin.json is not valid JSON: %v"`},
@@ -343,7 +337,6 @@ func writeMutantOverlay(t *testing.T, absPkgDir, anchor, replacement string) str
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1736_010_NoBaselineCommentDeletedFromSkillcheck(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle1749 pins the shrinks of cyclehealth.Check, naminguard.Fix and verifyeval.shellWords to the size ratchet.
 package cycle1749
 
 import (
@@ -216,7 +215,6 @@ func TestC1749_007_NoCommentLinesAdded(t *testing.T) {
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1749_008_ShrunkSourcesChangedWithoutLosingAComment(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

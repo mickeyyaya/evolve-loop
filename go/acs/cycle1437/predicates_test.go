@@ -1,37 +1,5 @@
 //go:build acs
 
-// Package cycle1437 materialises the cycle-1437 acceptance criteria for the one
-// fleet-scoped task pinned to this lane:
-//
-//   - salvage-baseline-measured-writeup → §6 of
-//     docs/research/deliverable-alignment-2026-08/README.md still summarises the
-//     recoverable-malformed rate as "not yet instrumented", contradicting §7,
-//     which already carries the audited measured table (cycle-1389). This cycle
-//     replaces that stale clause with the measured figures + an evidence
-//     citation, and adds a §6.3 entry per the doc's own §3.8 issue/gap/solution
-//     convention.
-//
-// Predicate strategy — the deliverable of this task IS a document, so the
-// "system under test" is the emitted artifact itself. To stay out of the
-// cycle-85 degenerate-predicate class (a grep for a magic string the
-// implementer can trivially paste), NO predicate here asserts a hardcoded
-// sentence. Every assertion is either:
-//
-//   - CROSS-REFERENTIAL — the expected values are *derived at runtime* from §7's
-//     committed measured table and then required to appear in §6, so §6 can only
-//     go green by agreeing with the audited source of record (001, 002, 003);
-//   - STRUCTURAL-BY-DERIVATION — §6.3's required subsection markers are derived
-//     from §6.1's own committed structure, not from a literal list (004);
-//   - a real FILESYSTEM check — the code path §6.3 cites must exist on disk (004);
-//   - a NEGATIVE / anti-invention assertion — history in §7 must survive the edit
-//     (001), and no count may appear in §6 that §7 does not license (005).
-//
-// Root resolution: everything is read under acsassert.RepoRoot(t) (the cycle
-// worktree, where Builder writes). Deliberately NO read of
-// .evolve/runs/cycle-1389/bad-verdict-baseline.jsonl — that main-plane read is
-// exactly what false-RED'd cycle-1434 (wrong-project-root, fixed by #449); the
-// citation is checked as a textual cross-reference to §7 instead, which is the
-// actual acceptance criterion and is worktree-local.
 package cycle1437
 
 import (
@@ -44,20 +12,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// readmeRelPath is the single target file named by scout-report targetFiles and
-// the triage decision.
 const readmeRelPath = "docs/research/deliverable-alignment-2026-08/README.md"
 
-// salvageCodeRelPath is the producing code §6.3 must point readers at (the
-// classifier that generated §7's baseline).
 const salvageCodeRelPath = "go/internal/deliverable/salvage_instrument.go"
 
-// stalePlaceholder is the clause §6 must stop asserting. Whitespace-normalised
-// before matching because the doc hard-wraps at ~80 columns, so the phrase
-// straddles a newline today.
 const stalePlaceholder = "not yet instrumented"
 
-// readReadme returns the whole target document, failing loudly when absent.
 func readReadme(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(acsassert.RepoRoot(t), readmeRelPath)
@@ -68,9 +28,6 @@ func readReadme(t *testing.T) string {
 	return string(b)
 }
 
-// section returns the body of the markdown section whose heading line begins
-// with startPrefix, up to (exclusive) the next heading whose level is <= the
-// start heading's level. ok is false when the heading is absent.
 func section(doc, startPrefix string) (body string, ok bool) {
 	lines := strings.Split(doc, "\n")
 	startLevel := len(startPrefix) - len(strings.TrimLeft(startPrefix, "#"))
@@ -99,13 +56,8 @@ func section(doc, startPrefix string) (body string, ok bool) {
 	return strings.Join(lines[start:end], "\n"), true
 }
 
-// normalize collapses all runs of whitespace to single spaces so assertions are
-// immune to the document's 80-column hard wrapping.
 func normalize(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-// section6Intro is §6's own prose — the heading through the first `###`
-// subsection. This is the paragraph carrying the stale clause (the edit site);
-// §6.1/§6.2 are landed history and are NOT in scope.
 func section6Intro(t *testing.T, doc string) string {
 	t.Helper()
 	body, ok := section(doc, "## 6. ")
@@ -127,9 +79,6 @@ func section7(t *testing.T, doc string) string {
 	return body
 }
 
-// measuredBaseline derives the audited figures from §7's committed table rather
-// than hardcoding them, so a §6 edit can only pass by agreeing with §7. Returns
-// (recoverable, total, percent) as they are literally written there.
 func measuredBaseline(t *testing.T, sec7 string) (recoverable, total, percent string) {
 	t.Helper()
 	recRe := regexp.MustCompile(`classifier-\*\*recoverable\*\*\s*\|\s*\*\*(\d+)\s*\((\d+(?:\.\d+)?%)\)`)
@@ -145,15 +94,6 @@ func measuredBaseline(t *testing.T, sec7 string) (recoverable, total, percent st
 	return m[1], mt[1], m[2]
 }
 
-// TestC1437_001_Section6DropsStalePlaceholderWhileSection7KeepsHistory is the
-// crux negative predicate. It has two halves and both must hold:
-//
-//	POSITIVE-BY-ABSENCE — §6's own prose no longer claims the rate is
-//	uninstrumented (the actual defect).
-//	ANTI-REGRESSION — §7's historical QUOTE of that old wording survives. §7
-//	opens by quoting §6's stale sentence to explain what it replaced; a
-//	document-wide find/replace (the obvious cheap "fix") would erase that
-//	provenance. This half fails such an edit and passes a scoped one.
 func TestC1437_001_Section6DropsStalePlaceholderWhileSection7KeepsHistory(t *testing.T) {
 	doc := readReadme(t)
 	intro := normalize(section6Intro(t, doc))
@@ -167,11 +107,6 @@ func TestC1437_001_Section6DropsStalePlaceholderWhileSection7KeepsHistory(t *tes
 	}
 }
 
-// TestC1437_002_Section6StatesMeasuredRateDerivedFromSection7 requires §6 to
-// state the measured rate using the EXACT figures parsed out of §7's table at
-// run time. Nothing is hardcoded: if §7 said other numbers, this predicate would
-// demand those instead — so §6 cannot be greened with an invented rate, and the
-// two sections cannot drift apart again.
 func TestC1437_002_Section6StatesMeasuredRateDerivedFromSection7(t *testing.T) {
 	doc := readReadme(t)
 	intro := normalize(section6Intro(t, doc))
@@ -191,11 +126,6 @@ func TestC1437_002_Section6StatesMeasuredRateDerivedFromSection7(t *testing.T) {
 	}
 }
 
-// TestC1437_003_Section6CitesEvidenceByPathMatchingSection7 requires the new §6
-// text to carry an evidence citation, and requires that citation to be the SAME
-// evidence path §7 cites — derived from §7, never hardcoded. A cross-reference
-// to §7 itself also satisfies the "source of record" half, but a bare number
-// with no provenance does not.
 func TestC1437_003_Section6CitesEvidenceByPathMatchingSection7(t *testing.T) {
 	doc := readReadme(t)
 	intro := normalize(section6Intro(t, doc))
@@ -212,19 +142,11 @@ func TestC1437_003_Section6CitesEvidenceByPathMatchingSection7(t *testing.T) {
 	if !citesPath && !citesSection {
 		t.Errorf("RED: §6's measured statement carries no provenance — cite the evidence path %s and/or cross-reference §7 as the source of record", evidence)
 	}
-	// The path form, when present, must be the exact one §7 uses: a stale or
-	// invented cycle number would send readers at a file that never held these
-	// counts.
 	if p := pathRe.FindString(intro); p != "" && p != evidence {
 		t.Errorf("RED: §6 cites evidence %s but §7's source of record is %s — the citations disagree", p, evidence)
 	}
 }
 
-// TestC1437_004_Section63FollowsTemplateAndCitesLiveCode checks the new
-// subsection. The required markers are DERIVED from §6.1's committed structure
-// (the doc's §3.8 issue/gap/solution convention) rather than listed literally,
-// and the code path §6.3 points at is verified to exist on disk AND be
-// git-tracked — a dangling cross-reference is the failure mode this catches.
 func TestC1437_004_Section63FollowsTemplateAndCitesLiveCode(t *testing.T) {
 	doc := readReadme(t)
 	root := acsassert.RepoRoot(t)
@@ -270,11 +192,6 @@ func TestC1437_004_Section63FollowsTemplateAndCitesLiveCode(t *testing.T) {
 	}
 }
 
-// TestC1437_005_Section6InventsNoCountsBeyondSection7 is the anti-invention
-// (OOD) axis. Every ratio (`A/B`) and percentage token appearing in §6's prose
-// or §6.3 must be licensed by §7: percentages verbatim, ratios by both of their
-// components. This is what stops the task being "satisfied" by a plausible but
-// fabricated figure — the exact risk flagged in scout's hypotheses.
 func TestC1437_005_Section6InventsNoCountsBeyondSection7(t *testing.T) {
 	doc := readReadme(t)
 	sec7 := normalize(section7(t, doc))

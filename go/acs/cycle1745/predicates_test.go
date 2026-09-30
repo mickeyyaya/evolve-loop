@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle1745 holds the acceptance predicates for shrinking the four
-// oversized functions of go/internal/cyclesimulator and go/cmd/testlatency.
 package cycle1745
 
 import (

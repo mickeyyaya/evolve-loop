@@ -36,21 +36,33 @@ func kindSignals(workspace string) router.RoutingSignals {
 
 func dispatchSignals(next Phase, workspace, projectRoot string) map[string]string {
 	sig := kindSignals(workspace)
-	kind, declared := sig.DeclaredDeliverableKind()
-	if !declared {
-		kind = config.DeliverableKindCode
-		if kindDeclaringPhase(next) && len(sig.DigestDegraded) == 0 {
-			if d, ok := domainDefaultKind(projectRoot); ok {
-				kind = d
-			}
-		}
+	declared, _ := sig.DeclaredDeliverableKind()
+	domainDefault := noDomainDefault
+	if kindDeclaringPhase(next) && len(sig.DigestDegraded) == 0 {
+		domainDefault = projectDomainDefault(projectRoot)
 	}
-	out := map[string]string{config.SignalDeliverableKind: kind}
+	out := map[string]string{config.SignalDeliverableKind: resolveDeliverableKind(declared, domainDefault)}
 	if gt := sig.Scout.GoalType; gt != "" {
 		out[config.SignalGoalType] = gt
 	}
 	return out
 }
+
+func resolveDeliverableKind(declared string, domainDefault func() (string, bool)) string {
+	if kind := router.NormalizeDeliverableKind(declared); kind != "" {
+		return kind
+	}
+	if kind, ok := domainDefault(); ok {
+		return kind
+	}
+	return config.DeliverableKindCode
+}
+
+func projectDomainDefault(projectRoot string) func() (string, bool) {
+	return func() (string, bool) { return domainDefaultKind(projectRoot) }
+}
+
+func noDomainDefault() (string, bool) { return "", false }
 
 func domainDefaultKind(projectRoot string) (string, bool) {
 	d, ok, err := config.LoadDomain(projectRoot)

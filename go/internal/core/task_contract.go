@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
 )
 
@@ -65,6 +66,7 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 		} else {
 			block += "No Go predicate inventory: this is a document cycle, and the registry declares no document contract — the audit grades the deliverable against the acceptance above alone.\n"
 		}
+		block += tddContractLine(o.cfg, kindSignals(cs.WorkspacePath))
 	} else if next != PhaseTDD {
 		lister := o.acsPredicates
 		if lister == nil {
@@ -78,6 +80,14 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 	}
 	out[CtxKeyTaskContract] = block
 	return out
+}
+
+func tddContractLine(cfg config.RoutingConfig, sig router.RoutingSignals) string {
+	source := "phase-registry.json conditional_mandatory.tdd = " + cfg.Conditional["tdd"].String()
+	if router.TddPinned(cfg, sig) {
+		return "TDD: required for this cycle (" + source + ").\n"
+	}
+	return "TDD: not required for this cycle (" + source + "): routing decides whether tdd runs, not this item's acceptance; when tdd runs on a document it writes the eval's graders RED-first, never Go predicates.\n"
 }
 
 // taskItemRefs resolves this cycle's committed tasks (ContractTaskIDs) to

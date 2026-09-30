@@ -107,7 +107,7 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 		Prompt:       a.composePrompt(in, artifact),
 		Workspace:    in.Workspace,
 		ArtifactPath: artifact,
-		Completion:   "artifact",
+		Completion:   CompletionArtifact,
 		Agent:        a.identity.AgentLabel,
 		Cycle:        in.Cycle,
 		Env:          in.Env,

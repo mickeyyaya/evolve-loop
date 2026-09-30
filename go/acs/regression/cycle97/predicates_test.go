@@ -1,8 +1,5 @@
 //go:build acs
 
-// Package cycle97 ports the cycle-97 ACS predicates (5 bash files).
-// Subjects: orchestrator profile context-mode, role-context-builder honors
-// profile + env, fail-promotion to full context, triage extraction no-dup.
 package cycle97
 
 import (
@@ -14,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// TestC97_001_OrchestratorProfileHasContextModeDigest ports cycle-97/001.
 func TestC97_001_OrchestratorProfileHasContextModeDigest(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profile := filepath.Join(root, ".evolve", "profiles", "orchestrator.json")
@@ -34,7 +30,6 @@ func TestC97_001_OrchestratorProfileHasContextModeDigest(t *testing.T) {
 	}
 }
 
-// TestC97_002_RoleContextBuilderHonorsProfileContextMode ports cycle-97/002.
 func TestC97_002_RoleContextBuilderHonorsProfileContextMode(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -51,7 +46,6 @@ func TestC97_002_RoleContextBuilderHonorsProfileContextMode(t *testing.T) {
 	t.Logf("no role-context-builder honoring context_mode")
 }
 
-// TestC97_003_RoleContextBuilderEnvVarWins ports cycle-97/003.
 func TestC97_003_RoleContextBuilderEnvVarWins(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -68,7 +62,6 @@ func TestC97_003_RoleContextBuilderEnvVarWins(t *testing.T) {
 	t.Logf("no env-var-overrides-profile path")
 }
 
-// TestC97_004_RoleContextBuilderPromotesToFullOnFail ports cycle-97/004.
 func TestC97_004_RoleContextBuilderPromotesToFullOnFail(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	candidates := []string{
@@ -84,7 +77,6 @@ func TestC97_004_RoleContextBuilderPromotesToFullOnFail(t *testing.T) {
 	t.Logf("no fail-promotion-to-full marker")
 }
 
-// TestC97_005_TriageExtractionNoDuplication ports cycle-97/005.
 func TestC97_005_TriageExtractionNoDuplication(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	triage := filepath.Join(root, "agents", "evolve-triage.md")

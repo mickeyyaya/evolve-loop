@@ -8,9 +8,6 @@ import (
 	"testing"
 )
 
-// The audit phase's sandbox denies docs/private; a repo-wide walk that treats
-// the denial as a scan failure reds the whole gate on green code (cycles
-// 1676/1679). A denied directory is skipped, not fatal.
 func TestFindOrphanScripts_SkipsASandboxDeniedDirectory(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permission bits — nothing to deny")

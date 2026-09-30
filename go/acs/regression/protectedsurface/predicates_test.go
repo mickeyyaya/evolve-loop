@@ -1,27 +1,5 @@
 //go:build acs
 
-// Package protectedsurface is the L4 durable guard (architecture review
-// 2026-07-16): every "gate-shaped" Go file in the repo must be covered by the
-// protected-surface manifest, so a NEW gate or guard file can never sit
-// silently OUTSIDE the control-plane write boundary.
-//
-// Why this guard exists: guards.IsProtectedSurface denies in-cycle writes
-// against guards.ProtectedSurfaceManifest (go/internal/guards/
-// integrity_surface.go) — the SSOT for the pipeline integrity control plane.
-// Before L4 that list was a narrow hardcoded literal, so a new gate file
-// created outside the listed fragments was writable by the very cycle it
-// judges: the trust kernel's perimeter rotted as it grew. This predicate makes
-// perimeter growth LOUD — when a gate-shaped file appears that the manifest
-// does not cover, the audit REDs until an operator extends the manifest via a
-// human-gated manual ship (the manifest itself is protected surface, so no
-// autonomous cycle can both add a gate and quietly bless it).
-//
-// "Gate-shaped" is a deliberate, mechanical class: every .go file under the
-// known control-plane directories (go/internal/guards, go/internal/commitgate,
-// go/internal/phaseintegrity, go/acs/regression), plus any file named
-// *_gate.go or *guard*.go anywhere under go/internal. Coverage is checked by
-// calling the REAL guards.IsProtectedSurface — this package holds no duplicate
-// fragment list, so it can never drift from the boundary it verifies.
 package protectedsurface
 
 import (
@@ -36,10 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// gateDirs are the repo-relative control-plane directories whose EVERY .go
-// file is gate-shaped regardless of filename. A missing dir fails the walk
-// loudly — a renamed control-plane package must never let the guard pass
-// vacuously.
 var gateDirs = []string{
 	"go/internal/guards",
 	"go/internal/commitgate",
@@ -47,14 +21,8 @@ var gateDirs = []string{
 	"go/acs/regression",
 }
 
-// nameScanRoot is the repo-relative root scanned for gate-shaped FILENAMES
-// (*_gate.go / *guard*.go) outside the gateDirs.
 const nameScanRoot = "go/internal"
 
-// TestEveryGateShapedFileIsProtectedSurface is the durable guard: every
-// gate-shaped Go file must be covered by guards.ProtectedSurfaceManifest. A
-// newly added gate/guard file outside the manifest fails HERE, at
-// ship-gate/CI time, instead of staying silently in-cycle-writable.
 func TestEveryGateShapedFileIsProtectedSurface(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	uncovered, err := uncoveredGateFiles(root)
@@ -70,21 +38,15 @@ func TestEveryGateShapedFileIsProtectedSurface(t *testing.T) {
 	}
 }
 
-// knownGateFiles anchor the anti-vacuity check: one file per detection lane
-// (dir lanes + both filename lanes), including this predicate itself. If the
-// walker stops seeing any of them it silently broke, and the guard above would
-// pass vacuously against any regression.
 var knownGateFiles = []string{
-	"go/internal/guards/integrity_surface.go",               // dir lane: the guards + the manifest SSOT
-	"go/internal/commitgate/commitgate.go",                  // dir lane: the commit gate
-	"go/internal/phaseintegrity/source.go",                  // dir lane: ADR-0065 integrity chain
-	"go/acs/regression/protectedsurface/predicates_test.go", // dir lane: this tripwire protects itself
-	"go/internal/cli/guardcmd/commit_prefix_gate.go",        // *_gate.go filename lane
-	"go/internal/core/workspace_guard.go",                   // *guard*.go filename lane
+	"go/internal/guards/integrity_surface.go",
+	"go/internal/commitgate/commitgate.go",
+	"go/internal/phaseintegrity/source.go",
+	"go/acs/regression/protectedsurface/predicates_test.go",
+	"go/internal/cli/guardcmd/commit_prefix_gate.go",
+	"go/internal/core/workspace_guard.go",
 }
 
-// TestWalkerStillSeesKnownGateFiles is the anti-vacuity check: the scanner
-// must find every known anchor file.
 func TestWalkerStillSeesKnownGateFiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	files, err := gateShapedFiles(root)
@@ -104,11 +66,6 @@ func TestWalkerStillSeesKnownGateFiles(t *testing.T) {
 	}
 }
 
-// TestClassifier_MutationProof proves the filename classifier actually bites:
-// it must flag the *_gate.go and *guard*.go classes (case-folded, like
-// IsProtectedSurface's path matching) while NOT flagging near-misses — the
-// suffix class is `_gate.go`, not every mention of "gate" (evalgate.go,
-// topngate's gate.go are dir-level protection decisions, not name-class hits).
 func TestClassifier_MutationProof(t *testing.T) {
 	cases := []struct {
 		name string
@@ -119,13 +76,13 @@ func TestClassifier_MutationProof(t *testing.T) {
 		{"workspace_guard.go", true},
 		{"binaryguard.go", true},
 		{"orchestrator_guard_test.go", true},
-		{"safeguard.go", true},        // the *guard*.go class is deliberately broad
-		{"SHIP_GATE.GO", true},        // case-insensitive FS parity (M1)
-		{"gate.go", false},            // no underscore — not the *_gate.go class
-		{"evalgate.go", false},        // "gate" mention without the suffix class
-		{"gates_test.go", false},      // plural near-miss
-		{"guard.md", false},           // not a Go file
-		{"vanguard_notes.txt", false}, // not a Go file
+		{"safeguard.go", true},
+		{"SHIP_GATE.GO", true},
+		{"gate.go", false},
+		{"evalgate.go", false},
+		{"gates_test.go", false},
+		{"guard.md", false},
+		{"vanguard_notes.txt", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -136,25 +93,15 @@ func TestClassifier_MutationProof(t *testing.T) {
 	}
 }
 
-// TestPredicate_SelfProof_SyntheticUncoveredGateFileTrips injects a fake gate
-// file into a synthetic tree and proves the REAL production path
-// (uncoveredGateFiles → guards.IsProtectedSurface) flags exactly it: covered
-// neighbors in manifest-protected dirs stay quiet, the uncovered fake trips.
-// This is the guard's own red test — it can never rot into a scanner that
-// finds nothing and passes.
 func TestPredicate_SelfProof_SyntheticUncoveredGateFileTrips(t *testing.T) {
 	root := t.TempDir()
 	files := []string{
-		// Covered: inside manifest-protected dirs (dir lanes must stay quiet).
 		"go/internal/guards/role.go",
 		"go/internal/commitgate/commitgate.go",
 		"go/internal/phaseintegrity/source.go",
 		"go/acs/regression/fake/predicates_test.go",
-		// Covered: filename lane hit inside a manifest-covered dir.
 		"go/internal/acssuite/tagguard_test.go",
-		// Ordinary source: not gate-shaped, must not even be scanned in.
 		"go/internal/core/orchestrator.go",
-		// THE INJECTION: gate-shaped by name, outside every manifest fragment.
 		"go/internal/newpkg/sneaky_gate.go",
 	}
 	for _, rel := range files {
@@ -177,9 +124,6 @@ func TestPredicate_SelfProof_SyntheticUncoveredGateFileTrips(t *testing.T) {
 	}
 }
 
-// uncoveredGateFiles returns the repo-relative gate-shaped .go files under
-// root that guards.IsProtectedSurface does NOT cover — the production seam
-// both the real-tree guard and the synthetic self-proof drive.
 func uncoveredGateFiles(root string) ([]string, error) {
 	files, err := gateShapedFiles(root)
 	if err != nil {
@@ -194,9 +138,6 @@ func uncoveredGateFiles(root string) ([]string, error) {
 	return uncovered, nil
 }
 
-// gateShapedFiles walks root and returns every gate-shaped .go file as a
-// sorted, deduped, repo-relative slash path: all .go files under gateDirs plus
-// every isGateShapedName hit under nameScanRoot.
 func gateShapedFiles(root string) ([]string, error) {
 	seen := map[string]bool{}
 	collect := func(dir string, nameFilter func(string) bool) error {
@@ -235,9 +176,6 @@ func gateShapedFiles(root string) ([]string, error) {
 	return out, nil
 }
 
-// isGateShapedName reports whether a bare filename marks a gate/guard file
-// regardless of directory: *_gate.go or *guard*.go, case-folded for parity
-// with IsProtectedSurface's case-insensitive-filesystem matching.
 func isGateShapedName(name string) bool {
 	n := strings.ToLower(name)
 	if !strings.HasSuffix(n, ".go") {

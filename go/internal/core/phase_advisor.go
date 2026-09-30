@@ -161,7 +161,7 @@ func bridgeRequestOf(r advisor.LaunchRequest) BridgeRequest {
 		ProjectRoot: r.ProjectRoot,
 		// the deliverable contract
 		ArtifactPath: r.ArtifactPath,
-		Completion:   r.Completion,
+		Completion:   CompletionContract(r.Completion),
 		Agent:        r.Agent,
 		Contract:     r.Contract,
 		// the cycle

@@ -1,13 +1,5 @@
 //go:build acs
 
-// Package cycle1712 materialises the acceptance criteria for
-// lineage-datestamp-normalization: LineageKey strips a calendar-year-shaped
-// date run so same-line dated snapshots share a lineage bucket and
-// PromoteLatest can move to the later one, while capability-bearing digits
-// (:8b, :70b, 32b) and capability words (mini, flash, pro) keep partitioning;
-// NewestInLineage orders dated snapshots by date only after the version ties;
-// the known-limitation pin is migrated into mustMatch; and the reuse-gate
-// decisionVersion ratchet moves together with its surface pin.
 package cycle1712
 
 import (
@@ -28,9 +20,6 @@ import (
 
 const modelqueryPkg = "github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
 
-// runGo runs one go subcommand scoped to a single package and returns its
-// combined output and exit code. A launch failure (code < 0) is a harness
-// fault, not a verdict, so it aborts the predicate instead of reading as RED.
 func runGo(t *testing.T, args ...string) (string, int) {
 	t.Helper()
 	stdout, stderr, code, err := acsassert.SubprocessOutput("go", args...)
@@ -40,8 +29,6 @@ func runGo(t *testing.T, args ...string) (string, int) {
 	return stdout + stderr, code
 }
 
-// modelqueryDir resolves the package directory through the go tool rather
-// than git, so the predicate also runs against an exported (non-git) tree.
 func modelqueryDir(t *testing.T) string {
 	t.Helper()
 	out, code := runGo(t, "list", "-f", "{{.Dir}}", modelqueryPkg)
@@ -51,8 +38,6 @@ func modelqueryDir(t *testing.T) string {
 	return strings.TrimSpace(out)
 }
 
-// promotionCase is one PromoteLatest scenario: the classifier's deep-tier
-// pick, the CLI-listed candidates in listing order, and the required pick.
 type promotionCase struct {
 	name       string
 	sel        string
@@ -60,8 +45,6 @@ type promotionCase struct {
 	want       string
 }
 
-// runPromotionCases drives each case through PromoteLatest, the production
-// entry point liveTiers calls after Classify.
 func runPromotionCases(t *testing.T, cases []promotionCase) {
 	t.Helper()
 	for _, tc := range cases {
@@ -72,9 +55,6 @@ func runPromotionCases(t *testing.T, cases []promotionCase) {
 	}
 }
 
-// TestC1712_001_DatedSnapshotsShareLineageAndPromote is AC1: the two dated
-// snapshots of gpt-4o share one LineageKey, and PromoteLatest therefore moves
-// a selection of the older snapshot to the newer one.
 func TestC1712_001_DatedSnapshotsShareLineageAndPromote(t *testing.T) {
 	a, b := modelquery.LineageKey("gpt-4o-2024-08-06"), modelquery.LineageKey("gpt-4o-2024-11-20")
 	if a != b {
@@ -86,10 +66,6 @@ func TestC1712_001_DatedSnapshotsShareLineageAndPromote(t *testing.T) {
 	})
 }
 
-// TestC1712_002_CapabilityClassesStayDistinct is AC2 and the anti-over-strip
-// negative: size suffixes and capability words must keep separate keys, with
-// and without a date run in the id. A fix that strips every digit run, or that
-// lets the date strip merge two lines, collapses one of these pairs.
 func TestC1712_002_CapabilityClassesStayDistinct(t *testing.T) {
 	mustDiffer := [][2]string{
 		{"llama3.1:8b", "llama3.1:70b"},
@@ -111,8 +87,6 @@ func TestC1712_002_CapabilityClassesStayDistinct(t *testing.T) {
 	})
 }
 
-// TestC1712_003_NewestInLineageOrdersDatedSnapshots is AC3: 2024-11-20 is
-// newer than 2024-08-06 regardless of listing order.
 func TestC1712_003_NewestInLineageOrdersDatedSnapshots(t *testing.T) {
 	for _, ids := range [][]string{
 		{"gpt-4o-2024-08-06", "gpt-4o-2024-11-20"},
@@ -125,11 +99,6 @@ func TestC1712_003_NewestInLineageOrdersDatedSnapshots(t *testing.T) {
 	}
 }
 
-// TestC1712_004_KnownLimitationTestMigratedToMustMatch is AC4: the pin that
-// asserted dated snapshots stay distinct is gone from the package's test
-// binary, and the collision-reviewed SeparatesCapabilityClasses table that
-// replaced it runs green. The table membership check is auxiliary; the
-// behavioral weight is the -list inventory and the executed test.
 func TestC1712_004_KnownLimitationTestMigratedToMustMatch(t *testing.T) {
 	const (
 		removed  = "TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation"
@@ -168,10 +137,6 @@ func containsLine(lines []string, want string) bool {
 	return false
 }
 
-// fingerprintV1 is Fingerprint(fingerprintBaseline) computed against the
-// pre-fix decision surface on main (decisionVersion "v1"). Only the
-// decisionVersion field differs between surfaces for this fixed input, so
-// reproducing it means the ratchet was not bumped.
 const fingerprintV1 = "sha256:1cc2285255665ad56d12d19955c0321e8059fd211cb2c8cccd00b8466abdb97d"
 
 var fingerprintBaseline = modelquery.FingerprintInput{
@@ -181,9 +146,6 @@ var fingerprintBaseline = modelquery.FingerprintInput{
 	Tiers:      []string{"fast", "balanced", "deep"},
 }
 
-// TestC1712_005_DecisionVersionBumped is AC5 (first half): LineageKey's
-// semantics changed, so a tier map cached under the pre-fix fingerprint must
-// not be reused. The fixed input must no longer reproduce the v1 fingerprint.
 func TestC1712_005_DecisionVersionBumped(t *testing.T) {
 	got := modelquery.Fingerprint(fingerprintBaseline)
 	if !strings.HasPrefix(got, "sha256:") {
@@ -194,9 +156,6 @@ func TestC1712_005_DecisionVersionBumped(t *testing.T) {
 	}
 }
 
-// TestC1712_006_DecisionSurfacePinInSync is AC5 (second half): the repo's
-// ratchet test, which hashes the decision-surface files, must pass — a diff
-// that edits lineage.go/newestwins.go without regenerating the pin fails it.
 func TestC1712_006_DecisionSurfacePinInSync(t *testing.T) {
 	out, code := runGo(t, "test", "-count=1", "-run", "^TestDecisionVersion_PinnedToAlgorithmSurface$", "-v", modelqueryPkg)
 	if code != 0 {
@@ -207,9 +166,6 @@ func TestC1712_006_DecisionSurfacePinInSync(t *testing.T) {
 	}
 }
 
-// TestC1712_007_PromoteLatestNeverDowngradesAcrossDateStamps: the widened key
-// buckets dated ids with undated or other-version siblings, so a date must
-// never outrank a version, in either listing order.
 func TestC1712_007_PromoteLatestNeverDowngradesAcrossDateStamps(t *testing.T) {
 	runPromotionCases(t, []promotionCase{
 		{"undated newer version vs dated older version", "gpt-5", []string{"gpt-5", "gpt-4-2024-04-09"}, "gpt-5"},
@@ -223,9 +179,6 @@ func TestC1712_007_PromoteLatestNeverDowngradesAcrossDateStamps(t *testing.T) {
 	})
 }
 
-// TestC1712_008_NewestInLineageComparesVersionBeforeDate: the version is read
-// with the date run removed, and the date only breaks a tie between two dated
-// ids of equal version.
 func TestC1712_008_NewestInLineageComparesVersionBeforeDate(t *testing.T) {
 	cases := []struct {
 		ids  []string
@@ -246,9 +199,6 @@ func TestC1712_008_NewestInLineageComparesVersionBeforeDate(t *testing.T) {
 	}
 }
 
-// TestC1712_009_UndatedPromotionUnchanged guards against over-correction: the
-// undated lines the enumerating CLIs report today keep promoting exactly as
-// before the date-aware comparator existed.
 func TestC1712_009_UndatedPromotionUnchanged(t *testing.T) {
 	runPromotionCases(t, []promotionCase{
 		{"undated codex line promotes within itself", "gpt-5.5", []string{"gpt-5.5", "gpt-5.6", "gpt-5.6-mini"}, "gpt-5.6"},
@@ -257,10 +207,6 @@ func TestC1712_009_UndatedPromotionUnchanged(t *testing.T) {
 	})
 }
 
-// TestC1712_010_ModelqueryVetRaceApicoverGreen is AC6: go vet, the race
-// detector and the apicover -enforce gate are all green on internal/modelquery.
-// The coverage profile lives in a temp dir so the predicate leaves the tree
-// untouched.
 func TestC1712_010_ModelqueryVetRaceApicoverGreen(t *testing.T) {
 	if out, code := runGo(t, "vet", modelqueryPkg); code != 0 {
 		t.Errorf("go vet %s exit=%d:\n%s", modelqueryPkg, code, out)
@@ -283,27 +229,19 @@ func TestC1712_010_ModelqueryVetRaceApicoverGreen(t *testing.T) {
 	}
 }
 
-// The inbox item this lane delivers, before and after the ship's consume step
-// moved it; the explanation document's Changed Areas cites both paths.
 const (
 	pendingInboxRel  = ".evolve/inbox/2026-08-05T15-30-00Z-lineage-datestamp-normalization.json"
 	consumedInboxRel = ".evolve/inbox/consumed/2026-08-05T15-30-00Z-lineage-datestamp-normalization.json"
 )
 
 var (
-	// unchangedContentClaim matches prose saying a file's bytes survived a move.
-	unchangedContentClaim = regexp.MustCompile(`(?i)\bcontents?\b[^.;]{0,20}\bunchanged\b|\bunchanged\s+contents?\b|\bsame\s+contents?\b|\bbyte[- ](for[- ]byte|identical)\b`)
-	// consumeStampDisclosure matches prose naming the `consumed` block the move added.
+	unchangedContentClaim  = regexp.MustCompile(`(?i)\bcontents?\b[^.;]{0,20}\bunchanged\b|\bunchanged\s+contents?\b|\bsame\s+contents?\b|\bbyte[- ](for[- ]byte|identical)\b`)
 	consumeStampDisclosure = regexp.MustCompile("(?i)\\bstamp|\\bprovenance\\b|consumed`?\\s+(block|field|key|object|marker)")
-	// reserializeDisclosure matches prose saying the move rewrote the record's encoding.
-	reserializeDisclosure = regexp.MustCompile(`(?i)re-?serializ|re-?marshal|re-?encod|re-?format|re-?order|\bescap|key order|sorted keys`)
-	// scanStartQualifier matches prose admitting that a scan may end where it started.
-	scanStartQualifier = regexp.MustCompile(`(?i)\beither\b|\bitself\b|never (a )?downgrad|\bor (the |its )?(start|starting|incumbent|first)\b|\bor strictly newer\b`)
-	sentenceEnd        = regexp.MustCompile(`[.!?](\s|$)`)
+	reserializeDisclosure  = regexp.MustCompile(`(?i)re-?serializ|re-?marshal|re-?encod|re-?format|re-?order|\bescap|key order|sorted keys`)
+	scanStartQualifier     = regexp.MustCompile(`(?i)\beither\b|\bitself\b|never (a )?downgrad|\bor (the |its )?(start|starting|incumbent|first)\b|\bor strictly newer\b`)
+	sentenceEnd            = regexp.MustCompile(`[.!?](\s|$)`)
 )
 
-// explanationDocument returns the repo root and this cycle's one tracked build
-// explanation document, repo-relative, with its body.
 func explanationDocument(t *testing.T) (root, rel, body string) {
 	t.Helper()
 	root = acsassert.RepoRoot(t)
@@ -325,8 +263,6 @@ func explanationDocument(t *testing.T) (root, rel, body string) {
 	return root, rel, string(raw)
 }
 
-// docSection returns one level-two section through the parser the explanation
-// contract itself uses.
 func docSection(t *testing.T, rel, body, heading string) string {
 	t.Helper()
 	section, ok, err := reportdoc.Section(body, heading)
@@ -336,8 +272,6 @@ func docSection(t *testing.T, rel, body, heading string) string {
 	return section
 }
 
-// changedAreaEntry returns the text of the Changed Areas bullet citing path,
-// or "" when no bullet cites it.
 func changedAreaEntry(changedAreas, path string) string {
 	prefix := "- `" + path + "`"
 	for _, line := range strings.Split(changedAreas, "\n") {
@@ -348,14 +282,11 @@ func changedAreaEntry(changedAreas, path string) string {
 	return ""
 }
 
-// rename is one pair from git's rename detection, keyed by its destination.
 type rename struct {
 	from       string
 	similarity int
 }
 
-// renamesSince runs git's rename detection over the diff from base to the
-// working tree.
 func renamesSince(t *testing.T, root, base string) map[string]rename {
 	t.Helper()
 	out, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", "-M", "--name-status", base)
@@ -377,12 +308,6 @@ func renamesSince(t *testing.T, root, base string) map[string]rename {
 	return renames
 }
 
-// TestC1712_011_ExplanationRenameEntryMatchesTheDiff pins the first half of
-// audit M1. Changed Areas called the consumed inbox item "content unchanged",
-// but the ship's consume step adds a `consumed` provenance stamp and
-// re-marshals the record, so git scores the rename below 100%. No entry may
-// claim unchanged content for a rename git scores below 100%, and the
-// consumed item's entry must say what the move changed.
 func TestC1712_011_ExplanationRenameEntryMatchesTheDiff(t *testing.T) {
 	root, rel, body := explanationDocument(t)
 	fields, err := reportdoc.Fields(docSection(t, rel, body, "Build Binding"), "Cycle", "Base SHA")
@@ -421,11 +346,6 @@ func TestC1712_011_ExplanationRenameEntryMatchesTheDiff(t *testing.T) {
 	}
 }
 
-// TestC1712_012_ExplanationScanGuaranteeAdmitsTheStart pins the second half
-// of audit M1. Design Decisions said a scan's winner "is strictly newer than
-// where the scan started", but NewestInLineage returns the start whenever no
-// later member is strictly newer, ties included. Every Design Decisions
-// sentence that promises "strictly newer" must also admit the start.
 func TestC1712_012_ExplanationScanGuaranteeAdmitsTheStart(t *testing.T) {
 	for _, ids := range [][]string{
 		{"gpt-4o-2024-11-20", "gpt-4o-2024-08-06"},

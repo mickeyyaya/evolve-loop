@@ -1,9 +1,5 @@
 //go:build acs
 
-// Package cycle1746 holds the acceptance predicates for design-doc-status-pass:
-// every component row of docs/architecture/logic-first-delivery-design.md §7
-// states the status its inbox record or merge commit proves, and no bullet in
-// the document is duplicated.
 package cycle1746
 
 import (
@@ -242,8 +238,6 @@ func keysOf(cs []citation) map[rowKey]bool {
 }
 
 // acs-predicate: config-check — the deliverable is the design document's text;
-// the expected status and cycle are derived from the consumed inbox records and
-// the PASS dossiers, never written into this predicate.
 func TestC1746_001_ConsumedComponentRowsReadShippedWithTheirCycle(t *testing.T) {
 	root := repoRoot(t)
 	consumed, _ := inboxCitations(t, root)
@@ -272,7 +266,6 @@ func TestC1746_001_ConsumedComponentRowsReadShippedWithTheirCycle(t *testing.T) 
 }
 
 // acs-predicate: config-check — the rows are derived from the pending inbox
-// records; a status pass that stamps every row shipped fails here.
 func TestC1746_002_PendingComponentRowsDoNotClaimShipped(t *testing.T) {
 	root := repoRoot(t)
 	_, pending := inboxCitations(t, root)
@@ -293,7 +286,6 @@ func TestC1746_002_PendingComponentRowsDoNotClaimShipped(t *testing.T) {
 }
 
 // acs-predicate: config-check — G2's status change must keep the §5.13 ceiling
-// fact the row already records.
 func TestC1746_003_G2KeepsItsCeilingNote(t *testing.T) {
 	rows := componentRows(docLines(t, repoRoot(t)))
 	r, ok := onlyRow(t, rows, rowKey{"7.9", "G2"})
@@ -306,7 +298,6 @@ func TestC1746_003_G2KeepsItsCeilingNote(t *testing.T) {
 }
 
 // acs-predicate: config-check — the PR number is read from the merge commit on
-// HEAD, the row is P3's own status cell.
 func TestC1746_004_P3RowMatchesItsMergeCommit(t *testing.T) {
 	root := repoRoot(t)
 	if _, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "merge-base", "--is-ancestor", p3MergeCommit, "HEAD"); err != nil || code != 0 {
@@ -397,7 +388,6 @@ func duplicateBullets(lines []string) []string {
 }
 
 // acs-predicate: config-check — duplication is a property of the document's
-// text; the check parses every bullet list rather than naming one bullet.
 func TestC1746_005_NoBulletIsDuplicated(t *testing.T) {
 	if dups := duplicateBullets(docLines(t, repoRoot(t))); len(dups) > 0 {
 		t.Errorf("RED: %d duplicated bullet(s) remain:\n  %s", len(dups), strings.Join(dups, "\n  "))
@@ -417,7 +407,6 @@ func countLabel(lines []string, label, mustContain string) (count int, withText 
 }
 
 // acs-predicate: config-check — removing a duplicate must leave one copy; a
-// fix that deletes both copies loses the fact and fails here.
 func TestC1746_006_DeduplicatedBulletsKeepOneCopy(t *testing.T) {
 	lines := docLines(t, repoRoot(t))
 	cases := []struct {
@@ -477,8 +466,6 @@ func missingFrom(base, now []string) []string {
 }
 
 // acs-predicate: config-check — the status pass corrects cells and removes
-// duplicates only; every heading, §7 row, component and files cell, and bullet
-// label the base document had is still there.
 func TestC1746_007_StatusPassKeepsTheRestOfTheDocument(t *testing.T) {
 	root := repoRoot(t)
 	base, now := baseDocLines(t, root), docLines(t, root)

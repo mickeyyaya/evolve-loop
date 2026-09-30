@@ -93,3 +93,29 @@ func TestDispatchSignals_DegradedDigestIsLoud(t *testing.T) {
 		t.Errorf("degraded digest must WARN naming the torn report; stderr=%q", logged)
 	}
 }
+
+func TestResolveDeliverableKind_DeclaredBeatsTheDomainDefaultWhichBeatsCode(t *testing.T) {
+	t.Parallel()
+	writing := func() (string, bool) { return config.DeliverableKindDocument, true }
+	none := func() (string, bool) { return "", false }
+	for _, tc := range []struct {
+		name, declared string
+		domainDefault  func() (string, bool)
+		want           string
+	}{
+		{"a declared kind wins", config.DeliverableKindCode, writing, config.DeliverableKindCode},
+		{"a declared kind is normalized", " Document ", none, config.DeliverableKindDocument},
+		{"an unknown word falls to the domain default", "banana", writing, config.DeliverableKindDocument},
+		{"undeclared takes the domain default", "", writing, config.DeliverableKindDocument},
+		{"undeclared with no domain default is code", "", none, config.DeliverableKindCode},
+	} {
+		if got := resolveDeliverableKind(tc.declared, tc.domainDefault); got != tc.want {
+			t.Errorf("%s: resolveDeliverableKind(%q) = %q, want %q", tc.name, tc.declared, got, tc.want)
+		}
+	}
+	consulted := false
+	resolveDeliverableKind(config.DeliverableKindDocument, func() (string, bool) { consulted = true; return "", false })
+	if consulted {
+		t.Error("a declared kind must not read the domain default")
+	}
+}

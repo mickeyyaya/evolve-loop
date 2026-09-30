@@ -1,35 +1,5 @@
 //go:build acs
 
-// Package cycle1194 materialises the cycle-1194 acceptance criteria for the
-// two fleet-scoped tasks pinned to this lane:
-//
-//   - bridgewatch-follow-macos-flake                       (predicates 001–002)
-//   - loop-must-base-lanes-on-origin-main-not-stale-local   (predicate 003)
-//
-// CONTINUATION CONTEXT. This lane inherits a salvage snapshot (df84167e, ADR-0076
-// continuation-on-fail) that already carries the fix for BOTH tasks, and a prior
-// lane (cycle-1191, go/acs/cycle1191/predicates_test.go) already authored and
-// GREENED the identical acceptance criteria against that same code:
-//
-//   - the follow suite (cmd/evolve/cmd_bridge_watch_test.go) replaced its fixed
-//     10ms sleep / 200ms deadline race with an event-driven wait bounded by a
-//     >=10s deadline in BOTH observing follow tests
-//     (TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines and
-//     TestRunBridgeWatchFollow_TailsNewLines);
-//   - looppreflight.Run wires a `base-divergence` check (basedivergence.go) that
-//     fetches origin, HALTs when local is behind, and names `evolve sync-main`.
-//
-// Every predicate below was authored and run FRESH against the LIVE artifacts in
-// THIS worktree (not copied verbatim from cycle1191's cache) and is GREEN on
-// first run — the disposition is "predicate / pre-existing GREEN", not RED. Per
-// the TDD-engineer contract's "unexpected pass" rule, that status is logged
-// explicitly in test-report.md rather than force-fitting an artificial failure.
-// Each predicate still EXERCISES the system under test (the cycle-85
-// degenerate-predicate ban): 001 runs the real follow-test suite under -race;
-// 002 parses the Go AST of the real test file and asserts on the numeric
-// deadline literal (a magic string cannot satisfy it); 003 runs the real
-// looppreflight.Run against a real git repo whose local base is genuinely
-// behind a real (file-remote) origin.
 package cycle1194
 
 import (
@@ -49,39 +19,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// ---------------------------------------------------------------------------
-// Task: bridgewatch-follow-macos-flake
-// ---------------------------------------------------------------------------
-
-// followTestFile is the file the flake lived in.
 const followTestFile = "go/cmd/evolve/cmd_bridge_watch_test.go"
 
-// observingFollowTests are the follow tests whose assertion depends on
-// OBSERVING a line appended AFTER the follow loop asynchronously seeds its
-// file offset — exactly the tests that could lose the seed race on a loaded
-// macOS runner. The other two follow tests assert an ABSENCE (no output /
-// non-fatal exit) and cannot flake on a slow runner, so they are correctly
-// out of scope.
 var observingFollowTests = []string{
 	"TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines",
 	"TestRunBridgeWatchFollow_TailsNewLines",
 }
 
-// minFollowDeadline is the inbox's floor: "the test's wait is event-driven
-// with a deadline >= 10s".
 const minFollowDeadline = 10
 
 var (
-	// secondsDeadlineRe matches a context deadline expressed in whole seconds.
 	secondsDeadlineRe = regexp.MustCompile(`WithTimeout\([^,]+,\s*(\d+)\s*\*\s*time\.Second\s*\)`)
-	// msSleepRe matches a fixed millisecond sleep — a bare wall-clock
-	// assumption. A sleep of the poll interval (time.Sleep(watchFollowInterval))
-	// is a retry cadence, not a deadline, and is deliberately NOT matched.
-	msSleepRe = regexp.MustCompile(`time\.Sleep\([^)]*time\.Millisecond`)
+	msSleepRe         = regexp.MustCompile(`time\.Sleep\([^)]*time\.Millisecond`)
 )
 
-// goFuncBody returns the source text of funcName in the Go file at path. A
-// missing function is a LOUD error, never a silently-satisfied ==0 assertion.
 func goFuncBody(path, funcName string) (string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -102,11 +53,6 @@ func goFuncBody(path, funcName string) (string, error) {
 	return "", os.ErrNotExist
 }
 
-// TestC1194_001_follow_tests_race_clean_under_repetition executes the
-// acceptance command (inbox acceptance criteria: 50/50 PASS under -race):
-// the follow suite must be green under -race and repetition. This is the
-// behavioural half of the flake criterion — a shape change that broke the
-// tests' meaning cannot pass it.
 func TestC1194_001_follow_tests_race_clean_under_repetition(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	cmd := exec.Command("go", "test", "-race", "-count=50",
@@ -118,13 +64,6 @@ func TestC1194_001_follow_tests_race_clean_under_repetition(t *testing.T) {
 	}
 }
 
-// TestC1194_002_follow_waits_are_event_driven_with_long_deadline encodes the
-// inbox acceptance criterion: "the test's wait is event-driven with a
-// deadline >= 10s, no bare sleeps shorter than the deadline."
-//
-// It parses the AST and reads the NUMERIC deadline, so it cannot be satisfied
-// by planting a magic string — the assertion is on the timing shape itself,
-// which IS this task's deliverable.
 func TestC1194_002_follow_waits_are_event_driven_with_long_deadline(t *testing.T) {
 	path := filepath.Join(acsassert.RepoRoot(t), followTestFile)
 	for _, fn := range observingFollowTests {
@@ -155,13 +94,6 @@ func TestC1194_002_follow_waits_are_event_driven_with_long_deadline(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Task: loop-must-base-lanes-on-origin-main-not-stale-local
-// ---------------------------------------------------------------------------
-
-// git runs a git command in dir, failing the test loudly on error — a
-// fixture that half-built would make the predicate assert on the wrong
-// topology.
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	full := append([]string{
@@ -176,7 +108,6 @@ func git(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// commitFile writes a file and commits it.
 func commitFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
@@ -186,10 +117,6 @@ func commitFile(t *testing.T, dir, name, content string) {
 	git(t, dir, "commit", "-m", "acs: "+name)
 }
 
-// behindBaseRepo builds a real work tree on branch main whose local base is
-// one commit BEHIND a real (file-remote) origin/main — the exact topology
-// that made every cycle-969 lane ship GIT_PUSH_REJECTED. No network is
-// involved.
 func behindBaseRepo(t *testing.T) string {
 	t.Helper()
 	base := t.TempDir()
@@ -207,16 +134,10 @@ func behindBaseRepo(t *testing.T) string {
 	git(t, work, "push", "origin", "main")
 	commitFile(t, work, "b.txt", "two")
 	git(t, work, "push", "origin", "main")
-	// Rewind the LOCAL base only: origin/main keeps b.txt ⇒ local is behind 1.
 	git(t, work, "reset", "--hard", "HEAD~1")
 	return work
 }
 
-// TestC1194_003_boot_halts_on_base_behind_origin is the WIRING proof for the
-// preflight halt: it runs the real looppreflight.Run (not the check function
-// in isolation) against the behind-base topology and requires the
-// base-divergence check to be REGISTERED, to fire at Halt, and to name the
-// reconcile command. A check that exists but is not in Run's list fails here.
 func TestC1194_003_boot_halts_on_base_behind_origin(t *testing.T) {
 	work := behindBaseRepo(t)
 	evolveDir := filepath.Join(work, ".evolve")

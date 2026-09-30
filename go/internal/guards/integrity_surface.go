@@ -105,6 +105,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/resume_execution.go", Rationale: "resume sealing, projection, and post-Build refresh call sites (resumeExecution.run); carved out of resume.go by #549"},
 	{Fragment: "/go/internal/core/resume_bootstrap.go", Rationale: "resume rebase-split recovery and explanation identity check (explanationdocs.RecoverRebaseSplit, requireResumeExplanationIdentity); carved out of resume.go by #549"},
 	{Fragment: "/go/internal/core/ports.go", Rationale: "typed Bridge request sandbox requirement"},
+	{Fragment: "/go/internal/core/bridge_completion.go", Rationale: "ADR-0113: the one predicate that lets a correction re-dispatch complete on worktree evidence with its deliverable carried unchanged — a lane that could widen it could carry its own stale deliverable past the bridge's pre-dispatch baseline guard"},
 	{Fragment: "/go/internal/core/phase.go", Rationale: "typed phase explanation handoff and contract-version fields"},
 	{Fragment: "/go/internal/cyclestate/state.go", Rationale: "durable explanation contract version and Build binding state"},
 	{Fragment: "/go/internal/phaseio/handoffs.go", Rationale: "typed cross-phase explanation handoff schema"},

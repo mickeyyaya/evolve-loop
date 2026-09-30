@@ -27,21 +27,8 @@ import (
 // "SSOT IPC-protocol-allowed" and "SSOT §IPC-protocol-allowed".
 const ipcAllowedMarker = "IPC-protocol-allowed"
 
-// flagNameRE matches a complete, well-formed flag name (anchored, so it never
-// matches a concat operand like "EVOLVE_" or a dynamic prefix like
-// "EVOLVE_PHASE_" that ends in '_'). Mirrors the flagreaders guard's literal
-// match, but applied to the type-checker's FOLDED constant value.
 var flagNameRE = regexp.MustCompile(`^EVOLVE(_[A-Z0-9]+)+$`)
 
-// EvolveConstKeys returns the sorted, de-duplicated set of EVOLVE_* operator-dial
-// keys that the source reads as compile-time constants — the read-set R for one
-// file. It folds split-consts (so the cycle-20 dodge "EVOLVE_"+"X" is visible),
-// excludes keys whose declaration carries the IPC-allowed marker, and excludes
-// dynamic (non-constant) keys.
-//
-// Type-checking is best-effort: imports are stubbed and errors are swallowed, so
-// a whole-repo walk can fold every file without resolving the build graph (an
-// unresolvable "os" does not abort the constant fold of an argument).
 func EvolveConstKeys(src string) ([]string, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "src.go", src, parser.ParseComments)
@@ -53,18 +40,12 @@ func EvolveConstKeys(src string) ([]string, error) {
 	return sortedKeys(keys), nil
 }
 
-// collectEvolveConstKeys best-effort type-checks a package's files together (so
-// same-package cross-file constant references resolve) and adds every
-// operator-dial EVOLVE_ key it folds into keys. Marker-covered and dynamic keys
-// are excluded.
 func collectEvolveConstKeys(fset *token.FileSet, pkgName string, files []*ast.File, keys map[string]bool) {
 	info := &types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
 		Uses:  make(map[*ast.Ident]types.Object),
 	}
 	conf := &types.Config{Importer: stubImporter{}, Error: func(error) {}}
-	// Best-effort: ignore the aggregate error; info.Types is still populated
-	// with every constant we can fold.
 	_, _ = conf.Check(pkgName, fset, files, info)
 
 	markerCovered := map[int]bool{}
@@ -77,12 +58,6 @@ func collectEvolveConstKeys(fset *token.FileSet, pkgName string, files []*ast.Fi
 	all := map[string]bool{}
 	excluded := map[string]bool{}
 
-	// (a) Declaration-associated marker: a const/var spec whose doc or trailing
-	// comment (or its GenDecl's doc) carries the IPC-allowed marker excludes
-	// every EVOLVE_ value it defines, BY VALUE — so the key is excluded at every
-	// read site, however far a use is from the marked declaration. This is the
-	// robust path (an AST doc-comment block of any height is associated with its
-	// spec), where raw line-proximity is not.
 	for _, f := range files {
 		ast.Inspect(f, func(n ast.Node) bool {
 			gd, ok := n.(*ast.GenDecl)
@@ -104,9 +79,6 @@ func collectEvolveConstKeys(fset *token.FileSet, pkgName string, files []*ast.Fi
 		})
 	}
 
-	// (b) One pass over every folded EVOLVE_ flag value; an inline/trailing
-	// marker (e.g. above a subprocess-env slice element, not a declaration) is
-	// caught by line proximity and also excludes by value.
 	for expr, tv := range info.Types {
 		if tv.Value == nil || tv.Value.Kind() != constant.String {
 			continue
@@ -127,13 +99,10 @@ func collectEvolveConstKeys(fset *token.FileSet, pkgName string, files []*ast.Fi
 	}
 }
 
-// commentHasMarker reports whether a comment group carries the IPC-allowed marker.
 func commentHasMarker(cg *ast.CommentGroup) bool {
 	return cg != nil && strings.Contains(cg.Text(), ipcAllowedMarker)
 }
 
-// foldedFlagName returns e's folded value when it is a well-formed EVOLVE_ flag
-// name constant.
 func foldedFlagName(info *types.Info, e ast.Expr) (string, bool) {
 	tv, ok := info.Types[e]
 	if !ok || tv.Value == nil || tv.Value.Kind() != constant.String {
@@ -155,24 +124,13 @@ func sortedKeys(set map[string]bool) []string {
 	return out
 }
 
-// readSetSkipDirs mirrors the flagreaders guard's non-production exclusions so
-// the read-set scans the same surface the orphan gate does. ipcenv is the IPC
-// protocol SSOT (its literals ARE the protocol, not operator dials); acs is the
-// gate's own tree.
 var readSetSkipDirs = map[string]bool{
 	"vendor": true, "testdata": true, ".git": true, "node_modules": true,
 	".evolve": true, "ipcenv": true, "acs": true,
 }
 
-// registryTableSuffix is the repo-relative tail of the flag catalog file, which
-// the read-set excludes (it is the SSOT being checked, not a reader).
 const registryTableSuffix = "internal/flagregistry/registry_table.go"
 
-// ReadSet walks production Go under goRoot (non-test, outside the skip dirs) and
-// returns the sorted union of operator-dial EVOLVE_ keys read across it. Files
-// are grouped by directory and type-checked per package so same-package
-// cross-file constants resolve. Unparseable files are skipped (the compiler
-// catches syntax errors elsewhere); the returned skipped list keeps that loud.
 func ReadSet(goRoot string) (keys []string, skipped []string, err error) {
 	set := map[string]bool{}
 	skipped, err = forEachProductionPackage(goRoot, func(fset *token.FileSet, pkgName string, files []*ast.File) {
@@ -184,14 +142,6 @@ func ReadSet(goRoot string) (keys []string, skipped []string, err error) {
 	return sortedKeys(set), skipped, nil
 }
 
-// forEachProductionPackage walks production Go under goRoot and invokes fn once
-// per package directory with that package's parsed non-test files, so a
-// collector can resolve same-package cross-file constants. It skips the
-// non-production subtrees (readSetSkipDirs), _test.go files, and the registry
-// CATALOG file (its {Name: "EVOLVE_..."} literals are the flag names by design —
-// scanning it would re-assert the registry against itself). Unparseable files
-// are returned in skipped, not failed (the compiler catches syntax errors
-// elsewhere, so the skip is never silent).
 func forEachProductionPackage(goRoot string, fn func(fset *token.FileSet, pkgName string, files []*ast.File)) (skipped []string, err error) {
 	fset := token.NewFileSet()
 	byDir := map[string][]*ast.File{}
@@ -236,11 +186,6 @@ func forEachProductionPackage(goRoot string, fn func(fset *token.FileSet, pkgNam
 	return skipped, nil
 }
 
-// markerCoveredLines returns the lines a marker comment annotates: every line of
-// a marker-bearing comment group PLUS the line immediately after it (the
-// annotated statement or declaration). An *ast.CommentGroup is already a
-// contiguous block, so this handles a trailing marker, a single line above, and
-// an N-line comment block above uniformly — without a fixed proximity window.
 func markerCoveredLines(fset *token.FileSet, file *ast.File) map[int]bool {
 	covered := map[int]bool{}
 	for _, cg := range file.Comments {
@@ -256,10 +201,6 @@ func markerCoveredLines(fset *token.FileSet, file *ast.File) map[int]bool {
 	return covered
 }
 
-// stubImporter resolves every import path to an empty package, so best-effort
-// type-checking proceeds (and folds constants) without the build graph. Selector
-// uses against a stub (e.g. os.Getenv) error out, but those errors are swallowed
-// and never block the argument fold.
 type stubImporter struct{}
 
 func (stubImporter) Import(path string) (*types.Package, error) {

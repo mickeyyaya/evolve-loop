@@ -4,16 +4,6 @@ package envtaint
 
 import "testing"
 
-// These tests pin the two capabilities the flag-metric harness MUST have that
-// the existing go/ast literal scanner (flagreaders) lacks, and which let
-// cycle-20 game the metric:
-//
-//  1. See through a split-const dodge: `"EVOLVE_" + "WORKTREE_BASE"` is an
-//     *ast.BinaryExpr, invisible to a strconv.Unquote literal scan. The
-//     type-checker constant-folds it; the harness must report the folded value.
-//  2. Distinguish a compile-time-constant os.Getenv argument (a real, countable
-//     operator dial) from a non-constant one (dynamic key — not a fixed dial).
-
 func TestLoad_FoldsConcatenatedStringConstant(t *testing.T) {
 	const src = `package p
 

@@ -1,64 +1,5 @@
 //go:build acs
 
-// Package cycle1156 materialises the acceptance criteria for the three tasks
-// triage COMMITTED to this fleet lane (triage-report.md `## top_n`):
-//
-//   - inboxmover-promote-mkdir-fail-loud  → 001, 002, 003
-//   - wave-lane-task-quarantine-dead      → 004, 005, 006
-//   - menu-pass-promotes-committed-ids    → 007, 008
-//
-// The fourth lane-scope id (workspace-hygiene-s5-wiring-shadow-default) was
-// DEFERRED by triage and therefore gets ZERO predicates here (R9.3 floor-binding:
-// predicates bind only to triage-committed work; a deferred-floor predicate
-// starves the committed tasks — cycle-280).
-//
-// # Why these three are one lifecycle contract
-//
-// The inbox item for wave-lane-task-quarantine-dead states it explicitly: "one
-// lifecycle seam handling PASS-promote + FAIL-bump covers both". Today there are
-// two half-lifecycles and a hole in the middle:
-//
-//   - PASS side (menu-pass-promotes-committed-ids): promotion is agent-driven, so
-//     cycle-1147 shipped three menu items in one commit and promoted NONE of them
-//     — processed/cycle-1147/ is empty and all three re-entered the backlog.
-//   - FAIL side (wave-lane-task-quarantine-dead): the failure drain is the only
-//     bumpFailureCount caller and it walks ONLY
-//     processing/cycle-N/. Wave lanes never claim their ids into processing/, so
-//     the ADR-0072 S5 retry ceiling is structurally unreachable for fleet work
-//     (batch-14: four FAILs, failure_count never incremented).
-//   - And when the underlying move fails, Promote (inboxmover.go:305-318) reports
-//     the infrastructure failure as NoOp=true / nil error — the ship.sh "already
-//     done" compat contract reused for a genuine non-delivery.
-//
-// # Contract pinned by these predicates (Builder: implement these exact signatures)
-//
-// Per Core Rule 5 (deterministic work belongs in code, not agent instructions),
-// predicates 004-008 pin ONE exported lifecycle seam in package inboxmover rather
-// than two parallel models (never_duplicate_centralize):
-//
-//	type CycleOutcome struct {
-//	    Cycle        int      // cycle number
-//	    Passed       bool     // true = PASS (promote), false = FAIL (bump/quarantine)
-//	    CommittedIDs []string // triage-decision.json `## top_n` — the worked set
-//	    CommitSHA    string   // ship SHA, PASS only ("" = no SHA prefix)
-//	    Reason       string   // ledger reason ("" = default)
-//	    Ceiling      int      // FailureThresholds.TaskRetryCeiling (FAIL only)
-//	    SystemLevel  bool     // S3 system failure: NEVER quarantines (AC4)
-//	}
-//	func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error)
-//	func ClaimLaneScope(opts Options, cycle int, ids []string) ([]string, error)
-//
-// The predicates deliberately assert on the FILESYSTEM end state (where the item
-// physically lands, and what its durable failure_count says) rather than on the
-// returned OutcomeResult — the on-disk lifecycle IS the contract, and the Builder
-// keeps freedom over the result struct's shape.
-//
-// # Predicate quality (cycle-85 ban)
-//
-// Every predicate below CALLS the production function and asserts on its return
-// value, its error, or the artifact it moved on disk; 003 runs the real `evolve`
-// binary as a subprocess and asserts on its exit code. None of them is a
-// source-grep for a magic string, so none can be satisfied by adding a comment.
 package cycle1156
 
 import (
@@ -74,12 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// --- fixture helpers --------------------------------------------------------
-
-// newInbox builds an isolated project root with an empty .evolve/inbox/ and
-// returns (projectRoot, inboxDir). Every predicate runs against its own temp
-// tree: the lifecycle is filesystem-shaped, so a shared root would let one
-// predicate's moves leak into another's assertions.
 func newInbox(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -90,9 +25,6 @@ func newInbox(t *testing.T) (string, string) {
 	return root, inbox
 }
 
-// writeItem drops an inbox item JSON carrying id (and an optional pre-existing
-// failure_count) into dir, mirroring the real .evolve/inbox/ naming convention
-// (<timestamp>-<id>.json). Returns the path written.
 func writeItem(t *testing.T, dir, id string, failureCount int) string {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -119,10 +51,6 @@ func writeItem(t *testing.T, dir, id string, failureCount int) string {
 	return path
 }
 
-// testOpts returns inboxmover Options rooted at root with the landing gate
-// stubbed to "landed". The real gate shells out to `git merge-base` and is
-// fail-open on a non-git dir; stubbing it keeps the promote predicates asserting
-// the LIFECYCLE rather than incidental git behaviour of a temp dir.
 func testOpts(root string, stderr io.Writer) inboxmover.Options {
 	return inboxmover.Options{
 		ProjectRoot: root,
@@ -131,8 +59,6 @@ func testOpts(root string, stderr io.Writer) inboxmover.Options {
 	}
 }
 
-// findItem returns the path of the file under dir whose JSON .id == id, or "".
-// Non-recursive by design: each lifecycle destination is a single flat dir.
 func findItem(t *testing.T, dir, id string) string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -158,9 +84,6 @@ func findItem(t *testing.T, dir, id string) string {
 	return ""
 }
 
-// failureCountOf reads the durable failure_count off an item JSON. Returns 0
-// when the field is absent — the same reading bumpFailureCount uses, so "absent"
-// and "0" are indistinguishable to the system and must be to the predicate too.
 func failureCountOf(t *testing.T, path string) int {
 	t.Helper()
 	body, err := os.ReadFile(path)
@@ -176,8 +99,6 @@ func failureCountOf(t *testing.T, path string) int {
 	return doc.FailureCount
 }
 
-// countItems returns how many *.json files live directly under dir (0 when the
-// dir does not exist).
 func countItems(t *testing.T, dir string) int {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -193,9 +114,6 @@ func countItems(t *testing.T, dir string) int {
 	return n
 }
 
-// lockDir makes dir read-only (0555) so a child MkdirAll under it fails with
-// EACCES, and restores 0755 at cleanup so t.TempDir() can remove the tree.
-// Skips the whole predicate when running as root, where mode bits are advisory.
 func lockDir(t *testing.T, dir string) {
 	t.Helper()
 	if os.Geteuid() == 0 {
@@ -210,17 +128,6 @@ func lockDir(t *testing.T, dir string) {
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 }
 
-// --- Task: inboxmover-promote-mkdir-fail-loud -------------------------------
-
-// AC1 (RED): "TestPromote_MkdirFailed_ReturnsError — read-only parent for
-// destDir → err != nil, res.NoOp == false (fails today)".
-//
-// Today inboxmover.go:305-318 WARNs to a default-io.Discard stderr, writes a
-// best-effort ledger line, and returns (PromoteResult{NoOp:true}, nil): a
-// stranded task is indistinguishable from a completed one to every caller. The
-// predicate also asserts the item is still findable at its source, because the
-// only safe meaning of "mkdir failed" is "nothing moved" — a loud error that
-// also lost the file would be a worse defect than the silent one.
 func TestC1156_001_promote_mkdir_failure_returns_error(t *testing.T) {
 	root, inbox := newInbox(t)
 	writeItem(t, inbox, "mkdir-fail-item", 0)
@@ -244,13 +151,6 @@ func TestC1156_001_promote_mkdir_failure_returns_error(t *testing.T) {
 	}
 }
 
-// AC2 (twin, compat): "TestPromote_SourceAlreadyMoved_NoOpSuccess — existing
-// compat behavior preserved."
-//
-// This is the anti-overcorrection predicate for 001: making mkdir loud must not
-// make the genuine "already moved" case loud. Expected to be pre-existing GREEN
-// once the package compiles; it FAILS if the Builder converts every WARN path
-// into an error.
 func TestC1156_002_promote_source_already_moved_stays_noop_success(t *testing.T) {
 	root, _ := newInbox(t)
 
@@ -265,15 +165,6 @@ func TestC1156_002_promote_source_already_moved_stays_noop_success(t *testing.T)
 	}
 }
 
-// AC3 (RED, caller check): "ship-phase promotion failure appears in cycle
-// diagnostics, not exit 0."
-//
-// Runs the REAL binary end to end: `evolve inbox-mover promote` against a
-// project root whose processed/ dir denies mkdir. cmd_inbox_mover.go:70-77
-// currently maps everything except ErrBadArgs/ErrBadState to `return 0`
-// ("ship.sh compat: all other paths exit 0"), so a non-delivery exits 0 today
-// with no operator-visible diagnostic. Behavioural by construction — a source
-// edit that does not change the process exit code cannot satisfy it.
 func TestC1156_003_promote_failure_surfaces_nonzero_exit(t *testing.T) {
 	root, inbox := newInbox(t)
 	writeItem(t, inbox, "cli-mkdir-fail-item", 0)
@@ -291,10 +182,6 @@ func TestC1156_003_promote_failure_surfaces_nonzero_exit(t *testing.T) {
 	}
 }
 
-// acsSubprocess wraps the subprocess call so a missing `go` toolchain skips
-// rather than red-failing the suite (the ACS runner may execute on a bare
-// export). Compilation errors from `go run` still surface as a non-zero code,
-// which is why 003 additionally asserts the mkdir diagnostic.
 func acsSubprocess(t *testing.T, name string, args ...string) (string, string, int, error) {
 	t.Helper()
 	stdout, stderr, code, err := acsassert.SubprocessOutput(name, args...)
@@ -304,16 +191,6 @@ func acsSubprocess(t *testing.T, name string, args ...string) (string, string, i
 	return stdout, stderr, code, err
 }
 
-// --- Task: wave-lane-task-quarantine-dead -----------------------------------
-
-// AC (RED, root cause): wave lanes never claim their scope, so the FAIL drain
-// iterates an empty processing/cycle-N/ and the S5 ceiling is unreachable.
-//
-// ClaimLaneScope is the dispatch-side half of the single lifecycle seam: it must
-// move each resolvable lane-scope id from the inbox root into
-// processing/cycle-<N>/ and tolerate ids it cannot resolve (an id already
-// claimed by another wave, or absent) without failing the whole dispatch —
-// partial claiming must never abort a lane launch.
 func TestC1156_004_lane_scope_claim_moves_menu_ids_to_processing(t *testing.T) {
 	root, inbox := newInbox(t)
 	writeItem(t, inbox, "lane-item-a", 0)
@@ -339,14 +216,6 @@ func TestC1156_004_lane_scope_claim_moves_menu_ids_to_processing(t *testing.T) {
 	}
 }
 
-// AC (RED, menu semantics): "a wave lane whose cycle FAILs leaves its committed
-// item with failure_count+1" AND "unworked menu ids (not committed by triage)
-// neither bump nor quarantine".
-//
-// The second half is the anti-overcorrection axis: claiming the whole menu at
-// dispatch and then bumping everything in processing/cycle-N/ (the legacy
-// whole-dir drain behaviour) would punish items no phase
-// ever worked, quarantining healthy backlog after N unrelated lane failures.
 func TestC1156_005_failed_cycle_bumps_only_committed_ids(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1156")
@@ -380,13 +249,10 @@ func TestC1156_005_failed_cycle_bumps_only_committed_ids(t *testing.T) {
 	}
 }
 
-// AC (RED, ceiling + AC4 edge): "at task_retry_ceiling the item moves to
-// quarantine and is not re-seeded", and a SYSTEM-level failure never quarantines
-// (ADR-0072 S3 precedence).
 func TestC1156_006_committed_id_quarantines_at_ceiling(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1156")
-	writeItem(t, procDir, "poison-item", 1) // one prior failure; ceiling 2 → this FAIL quarantines
+	writeItem(t, procDir, "poison-item", 1)
 	writeItem(t, procDir, "menu-only-item", 1)
 
 	if _, err := inboxmover.ApplyCycleOutcome(testOpts(root, io.Discard), inboxmover.CycleOutcome{
@@ -410,8 +276,6 @@ func TestC1156_006_committed_id_quarantines_at_ceiling(t *testing.T) {
 		t.Errorf("menu-only-item quarantined: an uncommitted menu id must never be quarantined by another task's failure")
 	}
 
-	// AC4 edge: the same shape with SystemLevel=true must NOT quarantine — an S3
-	// system failure is not the task's fault.
 	root2, inbox2 := newInbox(t)
 	proc2 := filepath.Join(inbox2, "processing", "cycle-1156")
 	writeItem(t, proc2, "sysfail-item", 1)
@@ -433,22 +297,11 @@ func TestC1156_006_committed_id_quarantines_at_ceiling(t *testing.T) {
 	}
 }
 
-// --- Task: menu-pass-promotes-committed-ids ---------------------------------
-
-// AC (RED): "a PASSing cycle whose triage committed N ids leaves
-// processed/cycle-<N>/ holding exactly those N items; uncommitted menu ids stay
-// in inbox root."
-//
-// Cycle-1147's shape verbatim: a menu ships several items in ONE commit, so the
-// promote must be driven by the committed-id set in code — not by an agent that
-// promoted nothing and left all three items to be re-offered by the very next
-// triage (the verified-stale-drop burn that cost cycles 1131 and 1134). The
-// "exactly N" count assertion is what rejects a promote-the-whole-menu shortcut.
 func TestC1156_007_passing_cycle_promotes_exactly_committed_ids(t *testing.T) {
 	root, inbox := newInbox(t)
 	procDir := filepath.Join(inbox, "processing", "cycle-1156")
 	writeItem(t, procDir, "shipped-a", 0)
-	writeItem(t, inbox, "shipped-b", 0) // still at root: promotion must not depend on a claim
+	writeItem(t, inbox, "shipped-b", 0)
 	writeItem(t, inbox, "menu-only-item", 0)
 
 	if _, err := inboxmover.ApplyCycleOutcome(testOpts(root, io.Discard), inboxmover.CycleOutcome{
@@ -477,13 +330,6 @@ func TestC1156_007_passing_cycle_promotes_exactly_committed_ids(t *testing.T) {
 	}
 }
 
-// AC (RED, idempotence + FAIL-side non-regression): "promote of an
-// already-processed id is a no-op WARN" and "a FAIL promotes nothing".
-//
-// Idempotence matters because the legacy agent-driven promote may still run
-// alongside the code-driven one during the transition — the two must not
-// double-move or error. The FAIL half is the negative axis: it proves the PASS
-// promotion is gated on the verdict rather than fired unconditionally.
 func TestC1156_008_pass_promote_idempotent_and_fail_promotes_nothing(t *testing.T) {
 	root, inbox := newInbox(t)
 	writeItem(t, inbox, "idem-item", 0)
@@ -506,7 +352,6 @@ func TestC1156_008_pass_promote_idempotent_and_fail_promotes_nothing(t *testing.
 		t.Errorf("processed/cycle-1156/ holds %d item(s) after two identical PASS applications; want 1 (no duplicate)", n)
 	}
 
-	// FAIL side: nothing is promoted to processed/.
 	root2, inbox2 := newInbox(t)
 	writeItem(t, filepath.Join(inbox2, "processing", "cycle-1156"), "failed-item", 0)
 	if _, err := inboxmover.ApplyCycleOutcome(testOpts(root2, io.Discard), inboxmover.CycleOutcome{

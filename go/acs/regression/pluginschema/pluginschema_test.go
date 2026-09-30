@@ -1,33 +1,5 @@
 //go:build acs
 
-// Package pluginschema is the durable regression guard for the 2026-06-29
-// Claude Code 2.1.195 plugin-manifest schema break.
-//
-// CC 2.1.195 tightened plugin validation and *claimed* the `binaries` key as a
-// native field — `binaries: record(<basename> -> {sha256, platforms})`. evo had
-// repurposed `binaries` as a documentation ARRAY and added a custom
-// `compatibility` object. The result was a hard install failure:
-//
-//	.claude-plugin/marketplace.json plugin entry — CC's marketplace-entry schema
-//	  is .strict(); the unknown `binaries`/`compatibility` keys surfaced as the
-//	  MISLEADING error "This plugin uses a source type your Claude Code version
-//	  does not support."
-//	.claude-plugin/plugin.json — `binaries: Invalid input: expected record,
-//	  received array`.
-//
-// Both fields were documentation-only (release matrix SSOT is .goreleaser.yml;
-// compatibility tiers live in docs/platform-compatibility.md) and were removed.
-// This gate pins that removal and the shape rules so the install-blocking class
-// can never silently return. It encodes the schema RULES and checks both the
-// live repo manifests AND adversarial fixtures, so a failure means a real break,
-// not a tautology.
-//
-// acs-tagged like every go/acs/regression predicate; CI runs it via
-//
-//	go test -count=1 -tags acs ./acs/regression/...
-//
-// Test-only package outside ./internal/...; no .apicover-enforce enrollment
-// (same as acs/regression/pluginnamespace, noorphan, flagreaders).
 package pluginschema
 
 import (
@@ -41,21 +13,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// allowedMarketplaceEntryKeys is the key set CC 2.1.195's .strict()
-// marketplace plugin-entry schema accepts, calibrated against the marketplaces
-// that install clean on this CC version (ecc, worktrunk). Any key outside this
-// set is rejected by CC — `binaries` and `compatibility` are exactly what broke.
-// Editing this set is a deliberate decision to track a CC schema change; an
-// accidental reintroduction of a custom field is not, and is what this catches.
 var allowedMarketplaceEntryKeys = map[string]bool{
 	"name": true, "source": true, "description": true, "version": true,
 	"author": true, "homepage": true, "repository": true, "license": true,
 	"keywords": true, "category": true, "tags": true, "strict": true,
 }
 
-// decodeObject parses raw JSON into an ordered-irrelevant key map, failing the
-// test loudly on malformed input (a manifest that does not parse is itself a
-// regression).
 func decodeObject(t *testing.T, label string, raw []byte) map[string]json.RawMessage {
 	t.Helper()
 	var obj map[string]json.RawMessage
@@ -65,7 +28,6 @@ func decodeObject(t *testing.T, label string, raw []byte) map[string]json.RawMes
 	return obj
 }
 
-// loadRepoJSON reads a repo-relative JSON manifest as raw bytes.
 func loadRepoJSON(t *testing.T, rel string) []byte {
 	t.Helper()
 	path := filepath.Join(acsassert.RepoRoot(t), filepath.FromSlash(rel))
@@ -76,11 +38,6 @@ func loadRepoJSON(t *testing.T, rel string) []byte {
 	return raw
 }
 
-// binariesPresentButNotRecord is the exact CC 2.1.195 rule that hard-failed:
-// `binaries` may be ABSENT or a JSON object (record); an array or string (evo's
-// old documentation shape) is rejected with "expected record, received array".
-// Returns (present, offending) — offending is true only when present and not a
-// JSON object.
 func binariesPresentButNotRecord(obj map[string]json.RawMessage) (present, offending bool) {
 	raw, ok := obj["binaries"]
 	if !ok {
@@ -93,8 +50,6 @@ func binariesPresentButNotRecord(obj map[string]json.RawMessage) (present, offen
 	return true, trimmed[0] != '{'
 }
 
-// unsupportedEntryKeys returns the keys of a marketplace plugin entry that fall
-// outside CC's .strict() entry schema, sorted for stable output.
 func unsupportedEntryKeys(entry map[string]json.RawMessage) []string {
 	var bad []string
 	for k := range entry {
@@ -106,10 +61,6 @@ func unsupportedEntryKeys(entry map[string]json.RawMessage) []string {
 	return bad
 }
 
-// --- Live-manifest guards: lock the fixed state of the real repo files. ---
-
-// TestClaudePlugin_BinariesIsRecordOrAbsent pins the exact field/type that
-// hard-failed install on CC 2.1.195. An array `binaries` must never return.
 func TestClaudePlugin_BinariesIsRecordOrAbsent(t *testing.T) {
 	obj := decodeObject(t, ".claude-plugin/plugin.json", loadRepoJSON(t, ".claude-plugin/plugin.json"))
 	if present, offending := binariesPresentButNotRecord(obj); present && offending {
@@ -120,11 +71,6 @@ func TestClaudePlugin_BinariesIsRecordOrAbsent(t *testing.T) {
 	}
 }
 
-// TestClaudePlugin_NoCompatibilityField locks the compatibility removal. The
-// plugin.json manifest schema is passthrough today (CC strips unknown keys), but
-// `compatibility` is dead weight and becomes a hard failure the moment CC flips
-// the manifest to .strict() (its frontmatter schemas already are). Compatibility
-// tiers are documented in docs/platform-compatibility.md.
 func TestClaudePlugin_NoCompatibilityField(t *testing.T) {
 	obj := decodeObject(t, ".claude-plugin/plugin.json", loadRepoJSON(t, ".claude-plugin/plugin.json"))
 	if _, ok := obj["compatibility"]; ok {
@@ -133,9 +79,6 @@ func TestClaudePlugin_NoCompatibilityField(t *testing.T) {
 	}
 }
 
-// TestClaudeMarketplace_EntriesUseStandardKeysOnly enforces CC's .strict()
-// marketplace plugin-entry schema. The unknown `binaries`/`compatibility` keys
-// here produced the misleading "source type ... not supported" install error.
 func TestClaudeMarketplace_EntriesUseStandardKeysOnly(t *testing.T) {
 	raw := loadRepoJSON(t, ".claude-plugin/marketplace.json")
 	var mp struct {
@@ -156,12 +99,6 @@ func TestClaudeMarketplace_EntriesUseStandardKeysOnly(t *testing.T) {
 	}
 }
 
-// TestCodexManifest_InSyncWithClaude is the D3 drift guard: the generated Codex
-// mirror (.codex-plugin/plugin.json) must carry the same name + version as the
-// canonical .claude-plugin/plugin.json, so neither `evolve release` (versionbump)
-// nor the skillcheck Codex projection can leave the Codex install surface on a
-// stale version. A mismatch means someone hand-edited a manifest or skipped
-// `evolve skills generate`.
 func TestCodexManifest_InSyncWithClaude(t *testing.T) {
 	claude := decodeObject(t, ".claude-plugin/plugin.json", loadRepoJSON(t, ".claude-plugin/plugin.json"))
 	codex := decodeObject(t, ".codex-plugin/plugin.json", loadRepoJSON(t, ".codex-plugin/plugin.json"))
@@ -173,11 +110,6 @@ func TestCodexManifest_InSyncWithClaude(t *testing.T) {
 	}
 }
 
-// --- Detection-logic guards: prove the rules CATCH the known breaks. ---
-
-// TestBinariesRule_CatchesArrayAndString verifies the shape rule rejects exactly
-// the inputs that broke install and accepts the valid ones — so the live guard
-// above is meaningful, not a tautology.
 func TestBinariesRule_CatchesArrayAndString(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -203,8 +135,6 @@ func TestBinariesRule_CatchesArrayAndString(t *testing.T) {
 	}
 }
 
-// TestEntryKeyRule_CatchesCustomFields verifies the strict-entry rule flags the
-// exact custom keys that broke and passes a standard entry.
 func TestEntryKeyRule_CatchesCustomFields(t *testing.T) {
 	cases := []struct {
 		name string

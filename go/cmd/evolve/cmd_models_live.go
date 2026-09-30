@@ -180,7 +180,7 @@ func (d bridgePromptDispatcher) DispatchPrompt(ctx context.Context, cli, prompt 
 		ProjectRoot:  d.projectRoot,
 		Agent:        "model-classifier",
 		ArtifactPath: filepath.Join(d.workspace, "model-classifier-artifact.txt"),
-		Completion:   "artifact",
+		Completion:   core.CompletionArtifact,
 	})
 	if err != nil {
 		return "", fmt.Errorf("bridgePromptDispatcher: launch %s: %w", driver, err)

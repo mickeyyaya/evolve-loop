@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle1767 pins the shrinks of phasesCreate, phasesValidate and
-// runPhaseVerify in go/internal/cli/phasecmd to the size ratchet.
 package cycle1767
 
 import (

@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle73 ports the cycle-73 ACS predicate (1 bash file).
 package cycle73
 
 import (
@@ -11,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestC73_AssertScoutStopCriterion ports cycle-73/assert-scout-stop-criterion.sh.
 func TestC73_AssertScoutStopCriterion(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	scout := filepath.Join(root, "agents", "evolve-scout.md")

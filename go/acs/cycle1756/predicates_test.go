@@ -1,9 +1,5 @@
 //go:build acs
 
-// Package cycle1756 materializes the acceptance criteria of triage top_n task
-// rebaseline-dry-run-before-seal (fleet scope: retro-failure-identity, P1):
-// FileLedger.Rebaseline must decide whether its seal would verify BEFORE it
-// writes, and a refused rebaseline must leave every ledger file byte-identical.
 package cycle1756
 
 import (
@@ -82,8 +78,6 @@ func appendRawLine(t *testing.T, dir, line string) {
 	}
 }
 
-// snapshot maps every regular file under dir to its bytes. Lock files are
-// coordination artifacts with no ledger content, so they are left out.
 func snapshot(t *testing.T, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -148,7 +142,6 @@ func TestC1756_001_StaleAnchorRebaselineRefusesAndWritesNothing(t *testing.T) {
 	if err := l.AnchorLine(ctx, 1, "", "operator anchor over entry_seq 1"); err != nil {
 		t.Fatalf("fixture AnchorLine: %v", err)
 	}
-	// The anchored line is rewritten out of band, so the sidecar names a SHA no line carries.
 	lines := readLiveLines(t, dir)
 	lines[1] = bytes.Replace(lines[1], []byte(`"kind":"phase"`), []byte(`"kind":"phase-migrated"`), 1)
 	writeLiveLines(t, dir, lines)
@@ -163,7 +156,6 @@ func TestC1756_001_StaleAnchorRebaselineRefusesAndWritesNothing(t *testing.T) {
 func TestC1756_002_UnanchoredSegmentRebaselineRefusesAndWritesNothing(t *testing.T) {
 	dir, l := chainedLedger(t, 4)
 	lines := readLiveLines(t, dir)
-	// The state a Seal leaves when it stops after truncating the live file and before appending the segment anchor.
 	var prefix bytes.Buffer
 	for _, ln := range lines[:2] {
 		prefix.Write(ln)

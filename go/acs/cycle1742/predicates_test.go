@@ -1,10 +1,5 @@
 //go:build acs
 
-// Package cycle1742 holds the acceptance predicates for
-// sizeratchet-shrink-setup-releasepipeline: six oversized functions in
-// go/internal/setup and go/internal/releasepipeline shrink to
-// sizeratchet.MaxLines with offenders.json untouched, behavior pinned by
-// characterization tests, and no comment added or lost.
 package cycle1742
 
 import (
@@ -204,7 +199,6 @@ func (g worktreeGit) Show(base, path string) ([]byte, error) {
 func (g worktreeGit) Root() (string, error) { return g.root, nil }
 
 // acs-predicate: config-check — the doc comment text IS the contract under
-// test (comments have no runtime behavior); parsed with go/parser, not grepped.
 func TestC1742_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	current := map[string]string{}
@@ -234,7 +228,6 @@ func TestC1742_009_TargetFunctionDocsMatchBaseline(t *testing.T) {
 }
 
 // acs-predicate: config-check — comment text IS the contract under test
-// (comments have no runtime behavior); graded by commentaudit, not grepped.
 func TestC1742_010_NoBaselineCommentDeleted(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	git := worktreeGit{root: root}

@@ -1,6 +1,5 @@
 //go:build acs
 
-// Package cycle102 ports the cycle-102 ACS predicates (3 bash files).
 package cycle102
 
 import (
@@ -13,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestC102_001_ProfileMaxTurnsCeilings ports cycle-102/001.
-// Verifies 4 agent profiles meet/exceed scout-recommended max_turns floors.
 func TestC102_001_ProfileMaxTurnsCeilings(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	tuples := []struct {
@@ -38,20 +35,16 @@ func TestC102_001_ProfileMaxTurnsCeilings(t *testing.T) {
 	}
 }
 
-// TestC102_002_IncidentDocTurnOverrun ports cycle-102/002.
-// Verifies cycle-99-100 turn-overrun incident doc presence + density.
 func TestC102_002_IncidentDocTurnOverrun(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	doc := filepath.Join(root, "docs", "operations", "incidents", "cycle-99-100-turn-overrun.md")
 	if !fixtures.FilePresent(doc) {
 		t.Skip("cycle-99-100-turn-overrun.md missing — skip cycle-102-002")
 	}
-	// Density: ≥30 non-blank lines
 	nonBlank := countNonBlank(t, doc)
 	if nonBlank < 30 {
 		t.Errorf("%s: %d non-blank lines (need ≥30)", doc, nonBlank)
 	}
-	// References ≥2 of {triage, intent, scout, builder}
 	refs := 0
 	for _, agent := range []string{"triage", "intent", "scout", "builder"} {
 		if acsassert.FileMatchesRegex(t, doc, `(?i)(^|[^a-zA-Z])`+agent+`([^a-zA-Z]|$)`) {
@@ -63,11 +56,8 @@ func TestC102_002_IncidentDocTurnOverrun(t *testing.T) {
 	}
 }
 
-// TestC102_003_IncidentDocShipRefused ports cycle-102/003.
-// Verifies cycle-100 ship-refused incident doc presence + density.
 func TestC102_003_IncidentDocShipRefused(t *testing.T) {
 	root := acsassert.RepoRoot(t)
-	// Accept multiple plausible filenames
 	candidates := []string{
 		filepath.Join(root, "docs", "operations", "incidents", "cycle-100-ship-refused.md"),
 		filepath.Join(root, "docs", "operations", "incidents", "abnormal-ship-refused-c100.md"),

@@ -1,36 +1,5 @@
 //go:build acs
 
-// Package cycle1057 encodes the cycle-1057 acceptance criteria for
-// `retro-artifact-budget-perphase` (retry of the cycle-1054 audit-FAIL):
-// a per-phase bridge artifact-wait budget (`BridgePolicy.PhaseArtifactTimeoutS`,
-// compiled default {"retrospective": 900, "retro": 900}) threaded
-// policy → adapters/bridge.productionEngineDeps → bridge.Deps → Engine.Launch
-// (arg vector `--artifact-timeout-s=N`) → parseLaunchArgs → Config.ArtifactTimeoutS
-// → the existing tmux artifact-wait loop, while every other phase keeps the
-// 300s builtin.
-//
-// Source incident: cycle-1048's retro was ctx-canceled at ~608s because the
-// global 300s artifact deadline is too small for the grown retro contract
-// (report + preventive_actions + disposition.json).
-//
-// Key correction over cycle-1054 (architecture-design.md Axis B): the live
-// retro launch passes Agent: "retrospective" (internal/phases/retro/retro.go),
-// NOT "retro" — a map keyed only on "retro" would be unit-green and live-dead.
-// TestC1057_008 is the behavioral drift guard binding the compiled key to the
-// label the real retro phase actually dispatches with.
-//
-// Every predicate here exercises the system under test (policy resolution, the
-// real Engine.Launch dispatch path, the real production adapter root, the real
-// retro phase). No source-grep assertions.
-//
-// PARTIALLY SUPERSEDED (inbox item deep-phase-artifact-budget-too-small): the
-// "every other phase keeps the 300s builtin" clause above was deliberately
-// NARROWED, not abandoned. build/audit/tdd/adversarial-review now carry compiled
-// 1200s budgets because ~650s (300s base × 6 extends) killed six deep-tier
-// phases in one day with no artifact at all. The invariant this suite pins —
-// an UNLISTED phase resolves 0, the "use the builtin" sentinel, so global hang
-// detection is not weakened across the board — is unchanged and is now probed
-// through phases that are still unlisted (scout/intent/triage/ship).
 package cycle1057
 
 import (
@@ -49,21 +18,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// retroAgentLabel is the compiled key the fix must carry a 900s budget for.
-// It is the label internal/phases/retro dispatches with; TestC1057_008 proves
-// that binding behaviorally rather than by trusting this constant.
 const retroAgentLabel = "retrospective"
 
-// spyCLI is the --cli name of the recording driver registered below. Unique to
-// this predicate package so it can never collide with a real driver.
 const spyCLI = "acs-spy-cycle1057"
 
-// spyDriver records the fully-resolved Config the Engine handed the driver.
-// This is the observation point that makes the wiring proof honest: the value
-// asserted on is the one that reached the driver AFTER Engine.Launch built the
-// arg vector and parseLaunchArgs rebuilt the Config from it — not a hand-built
-// Config literal, and not a Deps read (the cheapest gaming fakes, which these
-// predicates must reject; the 950-vs-954 unit-green≠live-green lesson).
 type spyDriver struct {
 	mu   sync.Mutex
 	seen []bridge.Config
@@ -78,7 +36,6 @@ func (d *spyDriver) Launch(_ context.Context, cfg *bridge.Config, _ bridge.Deps)
 	return bridge.ExitOK, nil
 }
 
-// last returns the Config from the most recent dispatch.
 func (d *spyDriver) last(t *testing.T) bridge.Config {
 	t.Helper()
 	d.mu.Lock()
@@ -93,8 +50,6 @@ var spy = &spyDriver{}
 
 func init() { bridge.Register(spy) }
 
-// launchFixture is a self-contained workspace + profile under t.TempDir():
-// predicates never write to the live repo tree.
 type launchFixture struct {
 	ws       string
 	profile  string
@@ -132,14 +87,7 @@ func (fx launchFixture) request(agent string) core.BridgeRequest {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AC1 — compiled default + positive-override merge (R2/R4/R5)
-// ---------------------------------------------------------------------------
-
 func TestC1057_001_PolicyPhaseArtifactTimeoutDefaults(t *testing.T) {
-	// A zero-value BridgePolicy is the REAL production state: the checked-in
-	// .evolve/policy.json has no "bridge" block at all, so the compiled default
-	// must resolve from the zero receiver (R4).
 	got := policy.BridgePolicy{}.PhaseArtifactTimeouts()
 	if got[retroAgentLabel] != 900 {
 		t.Errorf("compiled default %q budget = %d, want 900", retroAgentLabel, got[retroAgentLabel])
@@ -148,8 +96,6 @@ func TestC1057_001_PolicyPhaseArtifactTimeoutDefaults(t *testing.T) {
 		t.Errorf("compiled default \"retro\" alias budget = %d, want 900 — the phase/agent-label skew "+
 			"(core/routing_dispatch.go) is permanent, so both vocabularies must carry the budget", got["retro"])
 	}
-	// Still-UNLISTED phases (build/audit/tdd/adversarial-review were added to the
-	// compiled map by the deep-phase-artifact-budget fix; see the package note).
 	for _, phase := range []string{"scout", "intent", "triage", "ship"} {
 		if v := got[phase]; v != 0 {
 			t.Errorf("phase %q resolved %d, want 0 — an unlisted phase must fall through to the 300s "+
@@ -159,8 +105,6 @@ func TestC1057_001_PolicyPhaseArtifactTimeoutDefaults(t *testing.T) {
 }
 
 func TestC1057_002_PhaseArtifactTimeout_PositiveMergeFromJSON(t *testing.T) {
-	// An operator block ADDS/RAISES entries; it never erases a compiled entry,
-	// and it never touches the global artifact_timeout_s.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "policy.json")
 	body := `{"bridge": {"phase_artifact_timeout_s": {"build": 600}}}`
@@ -185,14 +129,11 @@ func TestC1057_002_PhaseArtifactTimeout_PositiveMergeFromJSON(t *testing.T) {
 			bc.ArtifactTimeoutS)
 	}
 
-	// A raise of the compiled key is honored.
 	raised := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{retroAgentLabel: 1200}}.PhaseArtifactTimeouts()
 	if raised[retroAgentLabel] != 1200 {
 		t.Errorf("operator raise of %q = %d, want 1200", retroAgentLabel, raised[retroAgentLabel])
 	}
 
-	// The resolver must return a FRESH map each call: a caller mutating the
-	// result must not poison the next resolution (shared-state defect class).
 	first := policy.BridgePolicy{}.PhaseArtifactTimeouts()
 	if first == nil {
 		t.Fatalf("PhaseArtifactTimeouts returned a nil map — it must return a fresh, populated map")
@@ -203,10 +144,6 @@ func TestC1057_002_PhaseArtifactTimeout_PositiveMergeFromJSON(t *testing.T) {
 			"alias a package-level map", retroAgentLabel, second[retroAgentLabel])
 	}
 }
-
-// ---------------------------------------------------------------------------
-// AC2 — NEGATIVE: non-positive / malformed entries are rejected (R5)
-// ---------------------------------------------------------------------------
 
 func TestC1057_003_PhaseArtifactTimeout_InvalidRejected(t *testing.T) {
 	for _, tc := range []struct {
@@ -224,15 +161,11 @@ func TestC1057_003_PhaseArtifactTimeout_InvalidRejected(t *testing.T) {
 		}
 	}
 
-	// A non-positive entry for an unlisted phase resolves 0, never negative:
-	// a negative deadline is never a valid budget.
 	got := policy.BridgePolicy{PhaseArtifactTimeoutS: map[string]int{"scout": -30}}.PhaseArtifactTimeouts()
 	if got["scout"] != 0 {
 		t.Errorf("negative scout override resolved %d, want 0", got["scout"])
 	}
 
-	// A non-integer JSON entry must not corrupt resolution: either Load errors,
-	// or the compiled default survives intact. Silently accepting garbage fails.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "policy.json")
 	bad := `{"bridge": {"phase_artifact_timeout_s": {"retrospective": "abc"}}}`
@@ -245,10 +178,6 @@ func TestC1057_003_PhaseArtifactTimeout_InvalidRejected(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// AC3 — live-path wiring proof through the real Engine.Launch (R1/R3)
-// ---------------------------------------------------------------------------
 
 func TestC1057_004_ArtifactTimeout_RetroLaunchCarries900(t *testing.T) {
 	fx := newFixture(t)
@@ -264,8 +193,6 @@ func TestC1057_004_ArtifactTimeout_RetroLaunchCarries900(t *testing.T) {
 			"budget must survive Engine.Launch → arg vector → parseLaunchArgs", retroAgentLabel, got)
 	}
 
-	// "scout" is the still-unlisted probe (build now carries a compiled 1200s
-	// deep-tier budget; see the package note).
 	if _, err := eng.Launch(context.Background(), fx.request("scout")); err != nil {
 		t.Logf("Launch returned err=%v (expected)", err)
 	}
@@ -275,10 +202,6 @@ func TestC1057_004_ArtifactTimeout_RetroLaunchCarries900(t *testing.T) {
 	}
 }
 
-// TestC1057_005 pins the PARSE side of the arg-vector transport independently
-// of the emit side: the flag must be a known flag (an unknown flag is
-// ExitBadFlags, which would kill every retro launch), in both = and space
-// forms, and a garbage value must be permissive (0), matching --cycle.
 func TestC1057_005_ArtifactTimeout_FlagParsedFromArgVector(t *testing.T) {
 	fx := newFixture(t)
 	promptFile := filepath.Join(fx.ws, "prompt.txt")
@@ -323,10 +246,6 @@ func TestC1057_005_ArtifactTimeout_FlagParsedFromArgVector(t *testing.T) {
 }
 
 func TestC1057_006_ArtifactTimeout_ProductionAdapterWiresPolicy(t *testing.T) {
-	// Production-root proof (R8): adapters/bridge.NewDefault is the composition
-	// root every phase launch goes through; its productionEngineDeps must feed
-	// the policy-resolved map. A policy.json with NO bridge block mirrors the
-	// real repo, so the compiled default has to survive the zero value.
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
@@ -345,7 +264,6 @@ func TestC1057_006_ArtifactTimeout_ProductionAdapterWiresPolicy(t *testing.T) {
 			retroAgentLabel, got)
 	}
 
-	// And an operator override reaches the same live path.
 	root2 := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root2, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
@@ -362,10 +280,6 @@ func TestC1057_006_ArtifactTimeout_ProductionAdapterWiresPolicy(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AC4 — EDGE/OOD: unknown phase, empty agent, nil map fail open (R6)
-// ---------------------------------------------------------------------------
-
 func TestC1057_007_ArtifactTimeout_UnknownPhaseFailsOpen(t *testing.T) {
 	fx := newFixture(t)
 	for _, tc := range []struct {
@@ -380,7 +294,7 @@ func TestC1057_007_ArtifactTimeout_UnknownPhaseFailsOpen(t *testing.T) {
 		{"non-positive-entry", retroAgentLabel, bridge.Deps{PhaseArtifactTimeoutS: map[string]int{retroAgentLabel: -1}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			eng := bridge.NewEngine(tc.deps) // must not panic on a nil/empty map
+			eng := bridge.NewEngine(tc.deps)
 			if _, err := eng.Launch(context.Background(), fx.request(tc.agent)); err != nil {
 				t.Logf("Launch returned err=%v (expected)", err)
 			}
@@ -391,16 +305,6 @@ func TestC1057_007_ArtifactTimeout_UnknownPhaseFailsOpen(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AC5 — DRIFT GUARD: the compiled key is the label retro actually launches with
-// ---------------------------------------------------------------------------
-
-// captureBridge records the BridgeRequest the retro phase dispatches, so the
-// agent label under test is the one the REAL phase produces — not a constant
-// copied from a report. This is the anti-recurrence proof for the cycle-1054
-// defect class (compiled key "retro" vs live label "retrospective"): a rename
-// on either side turns this predicate RED instead of silently restoring the
-// 300s timeout in production.
 type captureBridge struct {
 	req core.BridgeRequest
 	hit bool
@@ -425,7 +329,6 @@ func TestC1057_008_RetroPhaseAgentLabelCarriesTheBudget(t *testing.T) {
 		Prompts: prompts.NewForProject(root),
 	})
 
-	// previous_verdict must be FAIL/WARN or retro SKIPs without dispatching.
 	_, err := p.Run(context.Background(), core.PhaseRequest{
 		Cycle:       1057,
 		Workspace:   ws,

@@ -1,12 +1,5 @@
 //go:build acs
 
-// Package cycle1769 pins the behavior-preserving shrink of installer.Validate
-// and ciwatch.Watch to the 50-line function-size ratchet
-// (sizeratchet-shrink-installer-ciwatch). Both functions exceed the limit at
-// authoring time (58 and 64 lines per go/internal/sizeratchet/offenders.json),
-// so TestC1769_001 is genuinely RED; the rest are characterization and
-// invariant pins that are pre-existing GREEN and must stay GREEN through the
-// extraction — see test-report.md's Coverage Map.
 package cycle1769
 
 import (
@@ -30,8 +23,6 @@ import (
 )
 
 const (
-	// baseCommit is this worktree's HEAD at TDD authoring time (2026-09-30):
-	// nothing has touched go/internal/installer or go/internal/ciwatch yet.
 	baseCommit   = "fe0f8f203ba2a3fb1cfcd11b3b1ca75bd18032ec"
 	offendersRel = "go/internal/sizeratchet/offenders.json"
 
@@ -74,9 +65,6 @@ func walkModule(t *testing.T) []sizeratchet.FuncSpan {
 	return spans
 }
 
-// TestC1769_001_ValidateAndWatchFitTheRatchetLimit is the primary AC 3
-// signal: both offender functions must measure at most sizeratchet.MaxLines
-// under the ratchet's own walker, keeping their names and packages.
 func TestC1769_001_ValidateAndWatchFitTheRatchetLimit(t *testing.T) {
 	sizes := map[string]int{}
 	for _, s := range walkModule(t) {
@@ -100,9 +88,6 @@ func TestC1769_001_ValidateAndWatchFitTheRatchetLimit(t *testing.T) {
 	}
 }
 
-// TestC1769_002_OffendersJSONLeftUnchanged guards AC 3's "offenders.json is
-// left unchanged": the shrunk functions' allowances stay as slack for the
-// boundary tighten.
 func TestC1769_002_OffendersJSONLeftUnchanged(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	diff, stderr, code, err := acsassert.SubprocessOutput("git", "-C", root, "diff", baseCommit, "--", offendersRel)
@@ -123,9 +108,6 @@ func TestC1769_002_OffendersJSONLeftUnchanged(t *testing.T) {
 	}
 }
 
-// TestC1769_003_ModuleWideRatchetCheckPasses guards AC 3's "the module-wide
-// ratchet stays green": an extracted helper over the limit is an unlisted
-// violation here.
 func TestC1769_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 	offenders, err := sizeratchet.LoadOffenders(offendersPath(t))
 	if err != nil {
@@ -136,10 +118,6 @@ func TestC1769_003_ModuleWideRatchetCheckPasses(t *testing.T) {
 	}
 }
 
-// TestC1769_004_BaselineTestDeclarationsUnchanged guards AC 1's "existing
-// tests pass unmodified": every top-level declaration of every baseline
-// _test.go file must survive byte-for-byte. Appending a new characterization
-// test (to an existing file or a new one) is allowed.
 func TestC1769_004_BaselineTestDeclarationsUnchanged(t *testing.T) {
 	git := worktreeGit{root: acsassert.RepoRoot(t)}
 	for _, dir := range packageDirs {
@@ -184,8 +162,6 @@ func assertDeclsPreserved(t *testing.T, git worktreeGit, rel string) {
 	}
 }
 
-// TestC1769_005_TargetPackageTestsPass drives AC 1's "the packages' existing
-// tests pass": one named package per invocation.
 func TestC1769_005_TargetPackageTestsPass(t *testing.T) {
 	for _, dir := range packageDirs {
 		if r := execGo(goModuleDir(t), "test", "-count=1", "./"+dir); r.err != nil || r.code != 0 {
@@ -240,10 +216,6 @@ func assertNothingFiled(t *testing.T, inbox, workspace string) {
 	}
 }
 
-// TestC1769_006_WatchFetchErrorShortCircuits characterizes the error path the
-// poll-loop extraction must keep: a fetch error on the first poll returns the
-// zero record and the wrapped error at once, even when the same call reports a
-// red completed run — no sleep, no verdict, no escalation.
 func TestC1769_006_WatchFetchErrorShortCircuits(t *testing.T) {
 	sentinel := errors.New("gh api: 502 bad gateway")
 	probe := &watchProbe{}
@@ -269,10 +241,6 @@ func TestC1769_006_WatchFetchErrorShortCircuits(t *testing.T) {
 	assertNothingFiled(t, inbox, workspace)
 }
 
-// TestC1769_007_WatchTimeoutAndPollDefaults characterizes the option
-// defaulting and deadline arithmetic the extraction moves: a zero or negative
-// Timeout/Poll falls back to 900s/30s, and the loop gives up only once the
-// next poll would pass the deadline.
 func TestC1769_007_WatchTimeoutAndPollDefaults(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -317,8 +285,6 @@ func TestC1769_007_WatchTimeoutAndPollDefaults(t *testing.T) {
 	}
 }
 
-// TestC1769_008_WatchRejectsMissingRequiredOptions characterizes the input
-// guards, in order, before any fetch: SHA, then Fetch, then InboxDir.
 func TestC1769_008_WatchRejectsMissingRequiredOptions(t *testing.T) {
 	fetches := 0
 	fetch := func(context.Context, string) (ciwatch.RunStatus, error) {
@@ -351,10 +317,6 @@ func TestC1769_008_WatchRejectsMissingRequiredOptions(t *testing.T) {
 	}
 }
 
-// TestC1769_009_WatchRealClockDefaultsRecordGreenVerdict characterizes the
-// nil Now/Sleep fallbacks: with no seams the real clock stamps CheckedAt and
-// the real sleep runs between polls; a green run records the verdict
-// artifact and files nothing.
 func TestC1769_009_WatchRealClockDefaultsRecordGreenVerdict(t *testing.T) {
 	fetches := 0
 	inbox, workspace := t.TempDir(), t.TempDir()
@@ -417,11 +379,6 @@ func writeLayout(t *testing.T, root string, files map[string]string) {
 	}
 }
 
-// TestC1769_010_ValidateTranscriptIsUnchanged characterizes Validate as a
-// golden transcript: the exact OK/FAIL lines, their order (manifest,
-// marketplace, agents, loop skill files, reference docs, summary) and the
-// returned counters — the extracted skill-file and reference-doc steps must
-// print and count exactly as the inline loops did.
 func TestC1769_010_ValidateTranscriptIsUnchanged(t *testing.T) {
 	partial := map[string]string{
 		".claude-plugin/plugin.json":         `{"name":"evo","version":"6.0.0","description":"d","agents":[],"skills":[]}`,
@@ -494,9 +451,6 @@ EVOLVE_LOOP_ERRORS=2
 	}
 }
 
-// TestC1769_011_NoCommentLinesAdded guards AC 2: no comments added
-// (docs/conventions/code-comments.md) — names carry the intent. Vacuous until
-// the diff touches either package, then live.
 func TestC1769_011_NoCommentLinesAdded(t *testing.T) {
 	git := worktreeGit{root: acsassert.RepoRoot(t)}
 	changed, err := git.ChangedFiles(baseCommit)

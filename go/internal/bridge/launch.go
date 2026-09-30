@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
 // LaunchArgs is the argv-faithful launch entry point: it parses flags with BRIDGE_* env fallbacks (flags
@@ -129,7 +131,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		StderrLog:          raw.stderrLog,
 		Artifact:           raw.artifact,
 		SecondaryArtifacts: splitNonEmptyCSV(raw.secondaryArtifacts),
-		Completion:         raw.completion,
+		Completion:         core.CompletionContract(raw.completion),
 		Cycle:              cycle,
 		Worktree:           raw.worktree,
 		RunID:              raw.runID,

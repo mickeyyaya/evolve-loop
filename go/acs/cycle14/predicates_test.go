@@ -42,8 +42,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// goBashCmd runs a bash command string from the go/ directory and returns
-// combined stdout+stderr and exit code.
 func goBashCmd(t *testing.T, cmd string) (combined string, code int) {
 	t.Helper()
 	root := acsassert.RepoRoot(t)
@@ -52,8 +50,6 @@ func goBashCmd(t *testing.T, cmd string) (combined string, code int) {
 	out, errOut, c, _ := acsassert.SubprocessOutput("bash", "-c", bashCmd)
 	return strings.TrimSpace(out + "\n" + errOut), c
 }
-
-// ── ipcenv-leaf ─────────────────────────────────────────────────────────────
 
 // TestC14_001_IPCEnvLeafConstValues verifies that go/internal/ipcenv/ipcenv.go
 // defines the three exported consts with the correct string values and the
@@ -96,14 +92,6 @@ func TestC14_001_IPCEnvLeafConstValues(t *testing.T) {
 	}
 }
 
-// TestC14_002_IPCEnvLeafCompiles verifies that go/internal/ipcenv compiles
-// cleanly (go build ./internal/ipcenv/...).
-//
-// BEHAVIORAL: invokes the Go compiler. A text stub without valid Go syntax
-// or a missing package both cause a non-zero exit.
-//
-// RED: package doesn't exist → go build exits non-zero ("no such directory").
-// GREEN: Builder creates a valid Go package → go build exits 0.
 func TestC14_002_IPCEnvLeafCompiles(t *testing.T) {
 	combined, code := goBashCmd(t, "go build ./internal/ipcenv/...")
 	if code != 0 {
@@ -113,14 +101,7 @@ func TestC14_002_IPCEnvLeafCompiles(t *testing.T) {
 	}
 }
 
-// TestC14_003_IPCEnvLeafEnrolledInApicover verifies that go/.apicover-enforce
-// contains the entry ./internal/ipcenv, enrolling the new package in the
-// apicover completeness gate.
-//
 // acs-predicate: config-check — enrollment is a config file entry.
-//
-// RED: ./internal/ipcenv absent from .apicover-enforce.
-// GREEN: Builder adds the line.
 func TestC14_003_IPCEnvLeafEnrolledInApicover(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	abs := filepath.Join(root, "go", ".apicover-enforce")
@@ -132,14 +113,6 @@ func TestC14_003_IPCEnvLeafEnrolledInApicover(t *testing.T) {
 	}
 }
 
-// TestC14_004_IPCEnvLeafHasNoInternalImports verifies that internal/ipcenv
-// imports nothing from this codebase (pure const leaf — zero intra-repo imports).
-//
-// BEHAVIORAL: parses the package's import list via `go list -json` and
-// checks that no import starts with our module prefix.
-//
-// RED: package doesn't exist → go list fails (non-zero exit → Fatalf).
-// GREEN: ipcenv.go has no intra-repo imports.
 func TestC14_004_IPCEnvLeafHasNoInternalImports(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goDir := filepath.Join(root, "go")
@@ -166,16 +139,6 @@ func TestC14_004_IPCEnvLeafHasNoInternalImports(t *testing.T) {
 	}
 }
 
-// ── ipcenv-wire ─────────────────────────────────────────────────────────────
-
-// TestC14_005_NoBareLiteralFleetInProdFiles verifies that no production Go
-// file (outside ipcenv/) contains the bare string literal "EVOLVE_FLEET".
-//
-// BEHAVIORAL: greps the go/ tree excluding _test.go files and ipcenv/ (the SSOT).
-// Currently RED because multiple prod files use bare literals.
-//
-// RED: grep emits matches (literals present in bridge/core/ship/fleet/registry files).
-// GREEN: all readers route through ipcenv.FleetKey; grep emits nothing.
 func TestC14_005_NoBareLiteralFleetInProdFiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goPath := filepath.Join(root, "go")
@@ -190,12 +153,6 @@ func TestC14_005_NoBareLiteralFleetInProdFiles(t *testing.T) {
 	}
 }
 
-// TestC14_005neg_IPCEnvSSotContainsFleetLiteral is the adversarial negative:
-// verifies that the ipcenv SSOT file DOES contain the "EVOLVE_FLEET" literal,
-// confirming the exclusion in TestC14_005 is correct and the SSOT exists.
-//
-// RED: ipcenv.go doesn't exist yet → FileContains fails on read.
-// GREEN: ipcenv.go defines FleetKey = "EVOLVE_FLEET".
 func TestC14_005neg_IPCEnvSSotContainsFleetLiteral(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	abs := filepath.Join(root, "go", "internal", "ipcenv", "ipcenv.go")
@@ -206,13 +163,6 @@ func TestC14_005neg_IPCEnvSSotContainsFleetLiteral(t *testing.T) {
 	}
 }
 
-// TestC14_006_NoBareLiteralFleetScopeInProdFiles verifies that no production
-// Go file (outside ipcenv/) contains the bare string literal "EVOLVE_FLEET_SCOPE".
-//
-// BEHAVIORAL: grep over go/ excluding test files and ipcenv/.
-//
-// RED: grep finds bare literals (currently in core/cyclerun.go and fleet/fleet.go).
-// GREEN: all readers route through ipcenv.FleetScopeKey.
 func TestC14_006_NoBareLiteralFleetScopeInProdFiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goPath := filepath.Join(root, "go")
@@ -227,13 +177,6 @@ func TestC14_006_NoBareLiteralFleetScopeInProdFiles(t *testing.T) {
 	}
 }
 
-// TestC14_007_NoBareLiteralWorktreeRootInProdFiles verifies that no production
-// Go file (outside ipcenv/) contains the bare string literal "EVOLVE_WORKTREE_ROOT".
-//
-// BEHAVIORAL: grep over go/ excluding test files and ipcenv/.
-//
-// RED: grep finds bare literals (currently in cmd_subagent.go, acssuite.go, ship_recovery.go).
-// GREEN: all readers route through ipcenv.WorktreeRootKey.
 func TestC14_007_NoBareLiteralWorktreeRootInProdFiles(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	goPath := filepath.Join(root, "go")
@@ -248,15 +191,6 @@ func TestC14_007_NoBareLiteralWorktreeRootInProdFiles(t *testing.T) {
 	}
 }
 
-// TestC14_008_ThreeRegistryRowsDeleted verifies that flagregistry no longer
-// contains rows for EVOLVE_FLEET, EVOLVE_FLEET_SCOPE, or EVOLVE_WORKTREE_ROOT.
-//
-// BEHAVIORAL: calls flagregistry.Lookup() — exercises the actual registry,
-// not a text search. A StatusDeprecated row would still be found and fail.
-// (These flags must exit the registry entirely, not be demoted.)
-//
-// RED: Lookup returns true for any of the 3 flags (all three are StatusActive now).
-// GREEN: Builder deletes the 3 rows → Lookup returns false for all three.
 func TestC14_008_ThreeRegistryRowsDeleted(t *testing.T) {
 	for _, name := range []string{"EVOLVE_FLEET", "EVOLVE_FLEET_SCOPE", "EVOLVE_WORKTREE_ROOT"} {
 		if _, found := flagregistry.Lookup(name); found {
@@ -268,12 +202,6 @@ func TestC14_008_ThreeRegistryRowsDeleted(t *testing.T) {
 	}
 }
 
-// TestC14_008neg_UnrelatedFlagStillInRegistry is the adversarial negative:
-// verifies that an unrelated flag survives the deletions, confirming the
-// flag-row removal was surgical (not "truncate the whole table").
-//
-// BEHAVIORAL: Lookup for EVOLVE_SANDBOX which must remain StatusActive.
-// PRE-EXISTING GREEN: Lookup("EVOLVE_SANDBOX") already returns true.
 func TestC14_008neg_UnrelatedFlagStillInRegistry(t *testing.T) {
 	if _, found := flagregistry.Lookup("EVOLVE_SANDBOX"); !found {
 		t.Errorf("FAIL: EVOLVE_SANDBOX unexpectedly absent from flagregistry.\n" +
@@ -283,15 +211,6 @@ func TestC14_008neg_UnrelatedFlagStillInRegistry(t *testing.T) {
 	}
 }
 
-// TestC14_009_BuildIsClean verifies that the go/ module compiles cleanly
-// (go build ./...) after all ipcenv wiring changes. This is the build-level
-// proxy for "all tests pass" — the toolchain-green ship gate enforces actual
-// test passage separately.
-//
-// BEHAVIORAL: invokes the Go compiler on the entire module.
-//
-// RED: ipcenv package missing or wiring introduces compile errors.
-// GREEN: all packages compile after leaf creation + const substitution.
 func TestC14_009_BuildIsClean(t *testing.T) {
 	combined, code := goBashCmd(t, "go build ./...")
 	if code != 0 {
@@ -302,15 +221,6 @@ func TestC14_009_BuildIsClean(t *testing.T) {
 	}
 }
 
-// TestC14_010_FleetGoLocalConstsRemoved verifies that fleet/fleet.go no longer
-// defines the unexported local consts fleetEnvKey and fleetScopeEnvKey.
-//
-// BEHAVIORAL (mixed): the const ABSENCE check ensures the removal happened;
-// TestC14_009's build check ensures fleet still compiles (if consts were removed
-// without adding the ipcenv import, go build ./... would fail).
-//
-// RED: fleet.go still contains the const declarations.
-// GREEN: Builder removes them and routes through ipcenv.FleetKey/FleetScopeKey.
 func TestC14_010_FleetGoLocalConstsRemoved(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	fleetGo := filepath.Join(root, "go", "internal", "fleet", "fleet.go")

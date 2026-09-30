@@ -1,26 +1,5 @@
 //go:build acs
 
-// Package cycle1460 holds the cycle-1460 ACS predicates for the fleet-assigned
-// inbox item tokenopt-role-scoped-instruction-digests.
-//
-// Two tasks (see .evolve/runs/cycle-1460/scout-report.md and api-contract.md):
-//
-//   - digest-materialize-role-instructions: the pure cycle-1391 projector
-//     (digest.ProjectDigest) has no production caller. This task adds
-//     digest.Materialize/Result/Outcome plus the runner-side integration seam
-//     so BaseRunner.Run derives the dispatched instruction body from the
-//     role-tagged SSOT source, excludes untagged and other-role content, and
-//     fails BEFORE bridge.Launch on an unterminated marker.
-//   - digest-shadow-size-parity: digest.ShadowRecord/NewShadowRecord plus
-//     runner.FormatDigestShadowLog record full-versus-digest byte counts and a
-//     parity verdict for every dispatch, and no empty, malformed, or
-//     non-reducing projection may claim a saving or replace the live prompt.
-//     No profile default flip happens until that baseline exists.
-//
-// Every predicate below drives real production code — BaseRunner.Run, the
-// digest package's exported functions, or the real profiles loader. None is a
-// source grep (the cycle-85 degenerate-predicate failure mode); predicate 006
-// carries an explicit config-check waiver for its declarative half.
 package cycle1460
 
 import (
@@ -41,16 +20,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-// --- shared harness --------------------------------------------------------
-//
-// The harness constructs a REAL *runner.BaseRunner via the exported
-// runner.New(runner.Options{...}) constructor and calls its real Run method.
-// That is the reachability proof the house rules demand: the seam under test
-// must be reached from the production dispatch path, not called directly.
-
-// recHooks is a minimal runner.Hooks implementation that records the agent
-// body BaseRunner hands to ComposePrompt — i.e. exactly the instruction block
-// that would be dispatched.
 type recHooks struct {
 	phase        string
 	composedBody string
@@ -72,8 +41,6 @@ func (h *recHooks) Classify(artifact string, req core.PhaseRequest, bres core.Br
 	return core.VerdictPASS, nil, ""
 }
 
-// recBridge counts Launch calls so a predicate can prove a fail-closed path
-// aborted BEFORE dispatch (launches == 0) rather than merely returning FAIL.
 type recBridge struct {
 	launches int
 	artifact string
@@ -100,8 +67,6 @@ func agentFS(agentName, body string) *prompts.Loader {
 	})
 }
 
-// taggedDoc is the representative SSOT fixture: untagged prose, one block
-// tagged for role=scout, one block tagged for role=build.
 const taggedDoc = `UNTAGGED-PREAMBLE cross-cutting ship-gate detail scout never acts on.
 <!-- digest:role=scout -->
 SCOUT-ONLY-INSTRUCTIONS
@@ -112,13 +77,10 @@ BUILD-ONLY-INSTRUCTIONS
 UNTAGGED-TRAILER more cross-cutting detail.
 `
 
-// unterminatedDoc opens a role marker that never closes before EOF.
 const unterminatedDoc = `<!-- digest:role=scout -->
 SCOUT-ONLY-INSTRUCTIONS with no closing marker.
 `
 
-// runPhase drives a real BaseRunner.Run for phase with the given agent doc and
-// returns the recorded hooks, bridge, diag output, response, and error.
 func runPhase(t *testing.T, phase, doc string) (*recHooks, *recBridge, string, core.PhaseResponse, error) {
 	t.Helper()
 	hk := &recHooks{phase: phase}
@@ -136,16 +98,6 @@ func runPhase(t *testing.T, phase, doc string) (*recHooks, *recBridge, string, c
 	return hk, br, diagBuf.String(), resp, err
 }
 
-// --- digest-materialize-role-instructions ----------------------------------
-
-// TestC1460_001_DigestMaterializationInRunnerUsesRoleScopedDigest is the
-// primary wiring predicate for AC "The runner derives its injected instruction
-// block from a tagged SSOT source for the requested role". It drives the real
-// BaseRunner.Run dispatch path and asserts the body handed to ComposePrompt —
-// the block that actually reaches the CLI — is the role's projection.
-//
-// A pass-through (no-op) integration fails this: the composed body would still
-// carry the untagged preamble, so the equality assertion below breaks.
 func TestC1460_001_DigestMaterializationInRunnerUsesRoleScopedDigest(t *testing.T) {
 	hk, _, _, _, _ := runPhase(t, "scout", taggedDoc)
 
@@ -155,7 +107,6 @@ func TestC1460_001_DigestMaterializationInRunnerUsesRoleScopedDigest(t *testing.
 	if !strings.Contains(hk.composedBody, "SCOUT-ONLY-INSTRUCTIONS") {
 		t.Errorf("dispatched body lost the role=scout block; got %q", hk.composedBody)
 	}
-	// The projection is the WHOLE body — no blending of digest and full source.
 	want, err := digest.ProjectDigest([]byte(taggedDoc), "scout")
 	if err != nil {
 		t.Fatalf("fixture is malformed: %v", err)
@@ -168,10 +119,6 @@ func TestC1460_001_DigestMaterializationInRunnerUsesRoleScopedDigest(t *testing.
 	}
 }
 
-// TestC1460_002_RoleScopedDigestExcludesUntaggedAndOtherRoleContent is the
-// cross-role isolation predicate for AC "Untagged and other-role content never
-// reaches the digest". It asserts on the live dispatch body (runner path) AND
-// on digest.Materialize's classified Result, so neither layer can leak.
 func TestC1460_002_RoleScopedDigestExcludesUntaggedAndOtherRoleContent(t *testing.T) {
 	hk, _, _, _, _ := runPhase(t, "scout", taggedDoc)
 
@@ -195,27 +142,7 @@ func TestC1460_002_RoleScopedDigestExcludesUntaggedAndOtherRoleContent(t *testin
 	}
 }
 
-// TestC1460_003_DigestInjectionMalformedFailsBeforeLaunchAndNoMatchNeverYieldsFullSource
-// is the negative/edge predicate for AC "Unterminated markers fail before
-// launch; a no-match role never silently receives the full source".
-//
-// Clause A (fail-closed): a doc whose opening marker never closes must abort
-// the phase with a hard error and MUST NOT call bridge.Launch. The control leg
-// (well-formed doc → launches == 1) is what makes launches == 0 meaningful —
-// without it, any unrelated early error would false-green this predicate.
-//
-// Clause B (no silent fallback): a role with no matching block gets an EMPTY
-// digest classified OutcomeNoMatch — never the full source — while the live
-// prompt is preserved unchanged so behavior does not regress.
 func TestC1460_003_DigestInjectionMalformedFailsBeforeLaunchAndNoMatchNeverYieldsFullSource(t *testing.T) {
-	// Clause A — malformed input.
-	//
-	// NOTE (harness fact, measured): this minimal harness has no phase
-	// registry on disk, so resp.Verdict is FAIL even on a clean dispatch.
-	// Verdict is therefore NON-DISCRIMINATING here and is deliberately not
-	// asserted — the load-bearing signals are (a) a non-nil error attributed
-	// to the digest seam and (b) launches == 0, both contrasted against the
-	// control leg below, which measurably returns err == nil / launches == 1.
 	_, br, _, _, err := runPhase(t, "scout", unterminatedDoc)
 	if err == nil {
 		t.Errorf("Run returned nil error for an unterminated digest marker, want a hard failure")
@@ -227,9 +154,6 @@ func TestC1460_003_DigestInjectionMalformedFailsBeforeLaunchAndNoMatchNeverYield
 		t.Errorf("failure is not attributed to the digest seam: %v", err)
 	}
 
-	// Control leg — a well-formed doc through the same harness DOES dispatch,
-	// proving launches == 0 above is caused by the malformed marker and not by
-	// an unrelated early abort in this harness.
 	_, okBr, _, _, okErr := runPhase(t, "scout", taggedDoc)
 	if okErr != nil {
 		t.Fatalf("control leg: well-formed doc must dispatch cleanly, got %v", okErr)
@@ -238,7 +162,6 @@ func TestC1460_003_DigestInjectionMalformedFailsBeforeLaunchAndNoMatchNeverYield
 		t.Fatalf("control leg: bridge.Launch called %d times on a well-formed body, want 1 (harness cannot prove fail-before-launch otherwise)", okBr.launches)
 	}
 
-	// Clause B — no-match role.
 	res := digest.Materialize([]byte(taggedDoc), "audit")
 	if res.Outcome != digest.OutcomeNoMatch {
 		t.Errorf("Materialize(taggedDoc, audit).Outcome = %v, want OutcomeNoMatch", res.Outcome)
@@ -255,13 +178,6 @@ func TestC1460_003_DigestInjectionMalformedFailsBeforeLaunchAndNoMatchNeverYield
 	}
 }
 
-// --- digest-shadow-size-parity ---------------------------------------------
-
-// TestC1460_004_DigestShadowRecordsByteCountsAndParityVerdict covers AC
-// "Shadow data records full-versus-digest byte counts and a parity verdict".
-// Two legs: the pure derivation (NewShadowRecord over a real Materialize) and
-// the dispatch-time emission captured off the runner's injected diagnostics
-// sink — the reachability proof that telemetry is produced by the live path.
 func TestC1460_004_DigestShadowRecordsByteCountsAndParityVerdict(t *testing.T) {
 	res := digest.Materialize([]byte(taggedDoc), "scout")
 	rec := digest.NewShadowRecord([]byte(taggedDoc), res)
@@ -289,7 +205,6 @@ func TestC1460_004_DigestShadowRecordsByteCountsAndParityVerdict(t *testing.T) {
 		}
 	}
 
-	// Dispatch-time emission: the runner must log this record for a real run.
 	_, _, diagOut, _, _ := runPhase(t, "scout", taggedDoc)
 	if !strings.Contains(diagOut, "digest-shadow") {
 		t.Errorf("no digest-shadow telemetry emitted by a live dispatch; diag output was %q", diagOut)
@@ -299,11 +214,6 @@ func TestC1460_004_DigestShadowRecordsByteCountsAndParityVerdict(t *testing.T) {
 	}
 }
 
-// TestC1460_005_DigestShadowUnsafeProjectionsPreserveLivePromptAndCannotClaimSaving
-// covers AC "Empty, malformed, or parity-failing projections preserve the live
-// prompt and are explicitly non-successful". All three unsafe shapes must
-// collapse to Parity == false, and the no-match dispatch must keep the full
-// live prompt while still emitting non-successful telemetry.
 func TestC1460_005_DigestShadowUnsafeProjectionsPreserveLivePromptAndCannotClaimSaving(t *testing.T) {
 	cases := []struct {
 		name string
@@ -336,7 +246,6 @@ func TestC1460_005_DigestShadowUnsafeProjectionsPreserveLivePromptAndCannotClaim
 		}
 	}
 
-	// Explicitly non-successful classification for the malformed shape.
 	mal := digest.Materialize([]byte(unterminatedDoc), "scout")
 	if mal.Outcome != digest.OutcomeMalformed {
 		t.Errorf("Materialize(unterminatedDoc).Outcome = %v, want OutcomeMalformed", mal.Outcome)
@@ -348,7 +257,6 @@ func TestC1460_005_DigestShadowUnsafeProjectionsPreserveLivePromptAndCannotClaim
 		t.Errorf("OutcomeMalformed must carry a nil Digest, got %q", string(mal.Digest))
 	}
 
-	// Live-prompt preservation + non-successful telemetry on the empty shape.
 	hk, br, diagOut, _, err := runPhase(t, "audit", taggedDoc)
 	if err != nil {
 		t.Fatalf("a no-match projection must not fail the phase: %v", err)
@@ -367,17 +275,7 @@ func TestC1460_005_DigestShadowUnsafeProjectionsPreserveLivePromptAndCannotClaim
 	}
 }
 
-// TestC1460_006_DigestShadowNoProfileDefaultFlipBeforeBaseline covers AC "No
-// profile default flip is made until the telemetry baseline is recorded".
-//
-// The load-bearing half is behavioral: it drives the REAL profiles loader over
-// the repository's real .evolve/profiles directory and asserts every parsed
-// Profile leaves DigestFile empty. That exercises production JSON parsing, not
-// a text grep, so adding the string "digest_file" to a comment cannot pass it.
-//
 // acs-predicate: config-check — the assertion's subject is a declarative
-// configuration surface (no profile may opt into a pre-generated digest yet);
-// there is no runtime behavior to invoke beyond loading it.
 func TestC1460_006_DigestShadowNoProfileDefaultFlipBeforeBaseline(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	profileDir := filepath.Join(root, ".evolve", "profiles")

@@ -93,19 +93,19 @@ func TestTddPinned_ReleasedForDocumentCycles(t *testing.T) {
 	rule := config.CondRule{Field: "cycle_size", Op: "!=", Value: "trivial",
 		And: []config.CondRule{{Field: "deliverable_kind", Op: "!=", Value: "document"}}}
 	in := RouteInput{Cfg: config.RoutingConfig{Conditional: map[string]config.CondRule{"tdd": rule}}}
-	if !tddPinned(in) {
+	if !TddPinned(in.Cfg, in.Signals) {
 		t.Errorf("plan time (no signals): tdd must stay pinned (conservative side)")
 	}
 	in.Signals = RoutingSignals{Triage: TriageSignals{CycleSize: "medium", DeliverableKind: "document", Present: true}}
-	if tddPinned(in) {
+	if TddPinned(in.Cfg, in.Signals) {
 		t.Errorf("non-trivial DOCUMENT cycle: the config rule must release tdd")
 	}
 	in.Signals = RoutingSignals{Triage: TriageSignals{CycleSize: "medium", DeliverableKind: "code", Present: true}}
-	if !tddPinned(in) {
+	if !TddPinned(in.Cfg, in.Signals) {
 		t.Errorf("non-trivial CODE cycle: tdd stays pinned")
 	}
 	in.Signals = RoutingSignals{Triage: TriageSignals{CycleSize: "trivial", Present: true}}
-	if tddPinned(in) {
+	if TddPinned(in.Cfg, in.Signals) {
 		t.Errorf("trivial cycle: the legacy exemption is preserved by the AND rule")
 	}
 }

@@ -237,6 +237,7 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
 		}
 	}
+	o.emitRegistryGatedPhases(cycle, cs, dec)
 }
 
 func (o *Orchestrator) recordPlanRejections(ctx context.Context, cycle int, cs CycleState, rejections []router.PlanRejection) {

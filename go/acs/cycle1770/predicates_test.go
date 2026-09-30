@@ -1,7 +1,5 @@
 //go:build acs
 
-// Package cycle1770 pins the shrinks of parseArgs, artifactsFor, FakeExec.Run
-// and runCycle to the size ratchet.
 package cycle1770
 
 import (
