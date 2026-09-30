@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
@@ -230,7 +231,23 @@ func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals 
 		Present:         true,
 		GoalType:        reportHeaderValue(md, HeaderGoalType),
 		DeliverableKind: NormalizeDeliverableKind(reportHeaderValue(md, HeaderDeliverableKind)),
+		ItemCount:       selectedTaskCount(md),
 	}
+}
+
+func selectedTaskCount(md string) int {
+	tasksHeadings := phasecontract.SelectedTasks.Accepted
+	inTasks, count := false, 0
+	for _, line := range strings.Split(md, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "## "):
+			inTasks = slices.ContainsFunc(tasksHeadings, func(h string) bool { return strings.HasPrefix(trimmed, h) })
+		case inTasks && strings.HasPrefix(trimmed, "### "):
+			count++
+		}
+	}
+	return count
 }
 
 // Report header keys the kernel reads and the scout and triage personas write.

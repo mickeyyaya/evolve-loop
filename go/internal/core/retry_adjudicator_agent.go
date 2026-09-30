@@ -42,7 +42,7 @@ func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *a
 		Prompt:       a.composePrompt(cs, env, artifact),
 		Workspace:    cs.WorkspacePath,
 		ArtifactPath: artifact,
-		Completion:   "artifact",
+		Completion:   CompletionArtifact,
 		Agent:        a.identity.AgentLabel,
 		Cycle:        cs.CycleID,
 	})

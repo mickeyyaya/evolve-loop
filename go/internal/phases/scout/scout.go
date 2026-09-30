@@ -33,7 +33,7 @@ import (
 var proposedTasksRE = buildScoutBacklogRE()
 
 func buildScoutBacklogRE() *regexp.Regexp {
-	accepted := phasecontract.Scout.Sections[0].Accepted
+	accepted := phasecontract.SelectedTasks.Accepted
 	alts := make([]string, len(accepted))
 	for i, h := range accepted {
 		alts[i] = regexp.QuoteMeta(h)

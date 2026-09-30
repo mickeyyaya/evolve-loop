@@ -272,7 +272,7 @@ func commitOnOrigin(t *testing.T, origin, rel, body string) {
 	gitrun(t, c, "push", "-q", "origin", "main")
 }
 
-func TestSyncMainAtWaveBoundary_NamesTheInboxStampsThatBlockIt(t *testing.T) {
+func TestSyncMainAtWaveBoundary_DiscardsInboxStampsOriginSupersededAndFastForwards(t *testing.T) {
 	origin, runtime := syncFixture(t)
 	item := filepath.Join(".evolve", "inbox", "routed.json")
 	retired := filepath.Join(".evolve", "inbox", "retired.json")
@@ -282,7 +282,8 @@ func TestSyncMainAtWaveBoundary_NamesTheInboxStampsThatBlockIt(t *testing.T) {
 	}
 	gitrun(t, runtime, "pull", "-q", "--ff-only", "origin", "main")
 	for _, rel := range []string{item, retired, untouched} {
-		if err := os.WriteFile(filepath.Join(runtime, rel), []byte(`{"route":"console-manual"}`), 0o644); err != nil {
+		stamped := `{"id":"` + filepath.Base(rel) + `","route":"console-manual"}`
+		if err := os.WriteFile(filepath.Join(runtime, rel), []byte(stamped), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -290,16 +291,26 @@ func TestSyncMainAtWaveBoundary_NamesTheInboxStampsThatBlockIt(t *testing.T) {
 	retireOnOrigin(t, origin, retired)
 	var warn bytes.Buffer
 
-	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
-		t.Fatalf("a stamped inbox item blocks the fast-forward: %s", warn.String())
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); !synced {
+		t.Fatalf("stamps origin superseded must not block the fast-forward: %s", warn.String())
 	}
 
 	s := warn.String()
-	if !strings.Contains(s, "2 plane-side inbox file(s) block it: .evolve/inbox/retired.json, .evolve/inbox/routed.json") || !strings.Contains(s, "discard the plane copy") {
-		t.Errorf("the blocking inbox files are named with the cause-neutral remedy: %q", s)
+	for _, said := range []string{
+		"dropped 1 plane-side inbox stamp(s) on items origin retired: .evolve/inbox/retired.json",
+		"replayed 1 plane-side inbox stamp(s) onto origin's edits, uncommitted until evolve sync-main: .evolve/inbox/routed.json",
+	} {
+		if !strings.Contains(s, said) {
+			t.Errorf("warn = %q, want it to say %q", s, said)
+		}
 	}
-	if strings.Contains(s, "untouched.json") {
-		t.Errorf("a plane-side stamp origin never touched does not block, so it is never named: %q", s)
+	for rel, want := range map[string]string{item: `{"id":"routed","route":"console-manual","weight":0.5}`, untouched: `{"id":"untouched.json","route":"console-manual"}`} {
+		if got, _ := os.ReadFile(filepath.Join(runtime, rel)); string(got) != want {
+			t.Errorf("%s = %s, want %s: origin's edit with the loop's route replayed, and the untouched stamp kept", rel, got, want)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(runtime, retired)); !os.IsNotExist(err) {
+		t.Errorf("%s still in the root after the sync (%v), want origin's retirement applied", retired, err)
 	}
 }
 
@@ -356,5 +367,61 @@ func TestSyncMainAtWaveBoundary_APlaneCreatedFileIsNamedAPlaneDeletedOneIsNot(t 
 	}
 	if s := warn.String(); !strings.Contains(s, "1 plane-side inbox file(s) block it: .evolve/inbox/filed.json") {
 		t.Errorf("the plane-created file is named, the file the plane's mover moved away is not: %q", s)
+	}
+}
+
+func TestSyncMainAtWaveBoundary_WarnsAndKeepsTheStampsWhenTheyCannotBePrepared(t *testing.T) {
+	origin, runtime := syncFixture(t)
+	item := filepath.Join(".evolve", "inbox", "routed.json")
+	commitOnOrigin(t, origin, item, `{"id":"routed"}`)
+	gitrun(t, runtime, "pull", "-q", "--ff-only", "origin", "main")
+	stamped := `{"id":"routed","route":"console-manual"}`
+	if err := os.WriteFile(filepath.Join(runtime, item), []byte(stamped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commitOnOrigin(t, origin, item, `{"id":"routed","weight":0.5}`)
+	gitrun(t, runtime, "fetch", "-q", "origin")
+	if err := os.WriteFile(filepath.Join(runtime, ".git", "index.lock"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+		t.Fatalf("a locked index must not report synced: %s", warn.String())
+	}
+
+	if !strings.Contains(warn.String(), "the loop's inbox stamps stay as they are") {
+		t.Errorf("warn = %q, want the failed preparation named", warn.String())
+	}
+	if got, _ := os.ReadFile(filepath.Join(runtime, item)); string(got) != stamped {
+		t.Errorf("%s = %s, want the loop's stamp kept after a failed preparation", item, got)
+	}
+}
+
+func TestSyncMainAtWaveBoundary_ABlockedFastForwardRestoresThePreparedStamps(t *testing.T) {
+	origin, runtime := syncFixture(t)
+	item := filepath.Join(".evolve", "inbox", "routed.json")
+	commitOnOrigin(t, origin, item, `{"id":"routed"}`)
+	gitrun(t, runtime, "pull", "-q", "--ff-only", "origin", "main")
+	stamped := `{"id":"routed","route":"console-manual"}`
+	if err := os.WriteFile(filepath.Join(runtime, item), []byte(stamped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	commitOnOrigin(t, origin, item, `{"id":"routed","weight":0.5}`)
+	commitOnOrigin(t, origin, "incoming.txt", "from origin")
+	if err := os.WriteFile(filepath.Join(runtime, "incoming.txt"), []byte("a plane-side untracked file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); synced {
+		t.Fatalf("an untracked file at an incoming path must block the fast-forward: %s", warn.String())
+	}
+
+	if got, _ := os.ReadFile(filepath.Join(runtime, item)); string(got) != stamped && !strings.Contains(string(got), "console-manual") {
+		t.Errorf("%s = %s, want the prepared stamp restored after the blocked fast-forward", item, got)
+	}
+	if !strings.Contains(warn.String(), "restored 1 plane-side inbox stamp(s) after the blocked fast-forward: .evolve/inbox/routed.json") {
+		t.Errorf("warn = %q, want the restore named", warn.String())
 	}
 }

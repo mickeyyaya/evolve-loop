@@ -36,6 +36,15 @@ func (r CondRule) Clauses() []CondRule {
 	return append(out, r.And...)
 }
 
+func (r CondRule) String() string {
+	clauses := r.Clauses()
+	parts := make([]string, len(clauses))
+	for i, c := range clauses {
+		parts[i] = c.Field + c.Op + c.Value
+	}
+	return strings.Join(parts, " && ")
+}
+
 // parseCondRule parses `&&`-joined "field<op>value" clauses. A malformed clause fails the whole
 // rule, so a rule never silently shrinks.
 func parseCondRule(expr string) (CondRule, error) {

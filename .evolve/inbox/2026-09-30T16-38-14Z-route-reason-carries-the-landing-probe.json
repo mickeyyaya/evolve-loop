@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A route for a skip_shipped or close-class drop carries the landing probe's result (lifecycle WithLanded: the landed sha, or that none was found) in routed_reason (red first)",
+    "The console can confirm such routes in batches from routed_reason alone; the item is never retired automatically, since a landed sha proves a commit exists, not that it implements the item"
+  ],
+  "created_at": "2026-10-01T02:00:00Z",
+  "files": [
+    "go/internal/inboxmover/lifecycle/route.go"
+  ],
+  "fix": "When RouteConsole routes a skip_shipped or close-class drop, run the landing probe and append its result to routed_reason.",
+  "id": "route-reason-carries-the-landing-probe",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-10-01, the m7 part of console-route-stamps-block-wave-sync (F30 architecture review), left open by ADR-0112",
+  "summary": "A console route for a drop the triage classed skip_shipped or close says why in routed_reason, but not whether the landing probe found the work on main. The console then has to probe each such item by hand before retiring it. Carrying the probe's result in routed_reason lets the console confirm these routes in batches.",
+  "title": "A skip-shipped or close-class route carries the landing probe's result in routed_reason",
+  "weight": 0.45
+}

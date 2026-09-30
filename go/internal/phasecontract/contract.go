@@ -57,11 +57,13 @@ var Build = Report{
 	Producers: []string{"evolve-builder-reference"},
 }
 
+var SelectedTasks = Section{Canonical: "## Selected Tasks", Accepted: []string{"## Selected Tasks", "## Proposed Tasks"}}
+
 // Scout requires the tasks heading plus the HandoffSummary; the "at least one task" check stays in scout.go.
 var Scout = Report{
 	Phase: "scout",
 	Sections: []Section{
-		{Canonical: "## Selected Tasks", Accepted: []string{"## Selected Tasks", "## Proposed Tasks"}},
+		SelectedTasks,
 		HandoffSummary,
 	},
 	Producers: []string{"evolve-scout", "evolve-scout-reference"},

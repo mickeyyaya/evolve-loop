@@ -2,6 +2,9 @@
   "name": "fault-localization",
   "archetype": "plan",
   "agent": "evolve-fault-localization",
+  "categories": [
+    "bugfix"
+  ],
   "inputs": {
     "files": [
       ".evolve/runs/cycle-{cycle}/scout-report.md"
@@ -46,6 +49,11 @@
         "field": "cycle_size",
         "op": "eq",
         "value": "trivial"
+      },
+      {
+        "field": "deliverable_kind",
+        "op": "eq",
+        "value": "document"
       }
     ]
   },

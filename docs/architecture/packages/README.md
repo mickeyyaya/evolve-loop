@@ -45,6 +45,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/triagedecision` | the one reader of the triage report as a decision: strict for the host derivation, lenient for ship | [internal-triagedecision.md](internal-triagedecision.md) |
 | `internal/recoveryguard` | the kernel fence around a recovery dispatch: records the run, restores and reports what the agent touched outside its grant | [internal-recoveryguard.md](internal-recoveryguard.md) |
 | `internal/phasespec` | loads, validates and merges the built-in and user phase specs into one catalog | [internal-phasespec.md](internal-phasespec.md) |
+| `internal/inboxstamps` | lands or discards the loop's own writes to tracked inbox items at a sync with origin (ADR-0112) | [internal-inboxstamps.md](internal-inboxstamps.md) |
 | `internal/inboxmover` | moves inbox items through their lifecycle across concurrent lanes and enforces the routing floor | [internal-inboxmover.md](internal-inboxmover.md) |
 | `internal/inboxmover/lifecycle` | the pure inbox lifecycle moves: route, promote, release, recover and quarantine | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |
 | `internal/phases/runner` | the shared phase engine: launch, fence, verify, correction ladder and host effects before the judge | [internal-phases-runner.md](internal-phases-runner.md) |
