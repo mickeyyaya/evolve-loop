@@ -23,20 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// repoContractPackages are the repo-wide guard suites whose breakage turned
-// main red. Kept to a minimal, deliberately fixed set: every addition costs
-// wall-time at every ship, every build handoff and every `evolve selfcheck
-// build`, and must carry the same FP≈0 property. The raw git fixture ratchet
-// is a source scan of the tracked test files (one git ls-files, about a
-// second) and is here because a lane adding a raw fixture changes neither its
-// package nor an importer, so no other backstop would run it before main does.
-var repoContractPackages = []string{
-	"./internal/phasespec/...",
-	"./internal/profiles/...",
-	"./internal/phasecoherence/...",
-	"./internal/routingtest/...",
-	"./internal/rawgitratchet/...",
-}
+var repoContractPackages = repocontract.Packages()
 
 // scanLogName is the run-dir artifact every scanner-pack run is teed to —
 // green runs included, since a green baseline is what disproves a false RED.

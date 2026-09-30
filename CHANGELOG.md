@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a lane ship can no longer break a whole-tree test that only main ran (2026-09-30)
+
+- Cycle 1779's lane ship (`461aa782a`) grew `cmd/evolve.runCycleRun` to 91 lines (allowance 86) and `runCycleHealth` to 51 (limit 50). The ship's gates passed and main's required CI went red, so every open PR inherited the failure.
+- Cause: changed-scope testing selects a lane's packages and their importers, so a test that reads the whole tree runs only when its own package changes. The ship's fixed scanner pack held the raw-git ratchet but not the size ratchet. It was also missing the other whole-tree tests: `testmainexit`, `policy`'s env-agnostic scan, `guards`' call-site scans, `acssuite`'s tag guard and `fleet`'s module-graph partition.
+- The pack's list moves to `repocontract.Packages()`, and ship projects it. It gains `sizeratchet`, `testmainexit`, `policy`, `guards`, `acssuite`, `fleet` and `repocontract` itself. The pack runs its packages in parallel, so its wall time is set by the slowest member.
+- `TestPackages_HoldEveryTestThatReadsTheWholeTree` finds, from the AST of every tracked test outside `acs/`, each package whose tests climb out of their directory onto the module root or a top-level directory, or walk up to `go.mod`. It requires each one to be in the pack or recorded outside it with a reason.
+  - A climb's literal path parts are joined and cleaned as `filepath.Join` does, so `./..`, empty parts and a name followed by `..` resolve as they would at run time.
+  - `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod` and `TestPackProblems` pin each shape, the negative ones included (a string prefix test, a climb from another directory, a call at the module root, a fixture loop naming `go.mod`, a stale record).
+  - 13 large packages with seam tests are recorded as waiting for test-level selection (inbox `repo-contract-test-level-selection`).
+  - The detector is in the pack, so it runs before main.
+- `runCycleRun` parses its flags in `parseCycleRunFlags` into a `cycleRunFlags` value and builds its request with `cycleRunFlags.request(projectRoot, environ)`. It is now 62 lines, and its allowance tightens from 86 to 62. `runCycleHealth` resolves its root in `cycleHealthRoot` (44 lines).
+- New tests pin the flag parsing, the request's goal text, bypass and EVOLVE_ env, `--simulate` never wiring the production orchestrator, and the root resolution. Mutation sweeps killed every mutant the architecture reviews raised, on both the moved lines and the detector.
+- The docs name `repocontract.Packages()` instead of restating the list. The new `docs/architecture/packages/internal-repocontract.md` holds the pack's rationale (moved out of a code comment), the detection rule and its limits.
+
 ## Added — `evolve inbox add`, the one way to file an inbox item (2026-09-30)
 
 - The inventory of core functions against the CLI (147 functions: 64 fully, 36 partly and 47 not at all executable through `evolve`) ranked this the first gap: nothing filed an inbox item, so every item was hand-written JSON with no schema, id or dependency check at write time (inbox `inbox-add-cli`).
