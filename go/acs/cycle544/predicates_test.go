@@ -215,6 +215,13 @@ func TestC544_004_ObserveFiresBuildsAndWritesOneInboxTodo(t *testing.T) {
 // many consecutive such waves occur — QuotaShrunk gates the whole detector. An
 // implementation that fires on realized<desired while ignoring QuotaShrunk (a
 // no-op that "detects starvation" by counting under-utilization) FAILS here.
+//
+// This quota-shrink rule is superseded by cycle 1782 (starvation-compares-sized-width,
+// design doc §7.7 W4): a quota shrink explains only the lanes it removed, so
+// WaveObservation.Starved now compares RealizedLanes with the sized width
+// (SizedLanes); waves 19 and 20 (1 and 0 of 2 sized lanes) were wrongly counted
+// not-starved under this rule. The assertion below still passes through the
+// legacy DesiredLanes/QuotaShrunk fallback used only when SizedLanes is unset.
 func TestC544_005_QuotaShrunkWaveNeverStarves(t *testing.T) {
 	shrunk := fleet.WaveObservation{DesiredLanes: 3, RealizedLanes: 1, QuotaShrunk: true}
 	if shrunk.Starved() {

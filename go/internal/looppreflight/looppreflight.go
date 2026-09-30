@@ -95,7 +95,8 @@ type Options struct {
 	HostProbe     func() preflight.Profile
 	SandboxMode   func() string // the EVOLVE_SANDBOX value
 	DirWritable   func(dir string) bool
-	DiskFreeBytes func(path string) (uint64, error) // an error skips the low-disk warning
+	DiskFreeBytes func(path string) (uint64, error) // an error makes the disk-space check warn
+	MinFreeBytes  uint64                            // 0 → the policy preflight.min_free_gib default
 	OrphanKill    swarm.TmuxKiller                  // used by the boot orphan sweep
 
 	// NestedFallbackStage is the sandbox.nested_fallback stage; the zero value (StageOff) disables the canary.
@@ -303,6 +304,7 @@ func Run(opts Options) (Result, error) {
 		checkBaseDivergence(o),
 		checkLLMCLIStatus(o),
 		checkHostCapabilities(o),
+		checkDiskSpace(o, opts.MinFreeBytes),
 		checkCLIVersionFreeze(o),
 		checkCLIHealth(o),
 		checkCLIVersionDrift(o),

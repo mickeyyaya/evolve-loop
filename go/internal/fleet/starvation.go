@@ -13,16 +13,25 @@ const starvationWeightFloor = 0.9
 // starvationItemID is independent of the cycle, so a re-fire overwrites the single open todo.
 const starvationItemID = "fleet-work-supply-starvation"
 
-// WaveObservation is one wave's realized-vs-desired lane count.
+// WaveObservation is one wave's realized-vs-sized lane count.
 type WaveObservation struct {
-	DesiredLanes  int  // the configured fleet count, not the quota-shrunk wave count
-	RealizedLanes int  // lanes that actually dispatched work this wave
-	QuotaShrunk   bool // the quota-aware shrink reduced this wave's capacity
+	SizedLanes    int // the wave's width after the quota-aware shrink; the width Starved compares against
+	RealizedLanes int // lanes that actually dispatched work this wave
+	// minimal: DesiredLanes/QuotaShrunk only keep go/acs/cycle544's superseded observations compiling; an unset SizedLanes falls back to them.
+	DesiredLanes int
+	QuotaShrunk  bool
 }
 
-// Starved reports fewer lanes realized than desired for a reason other than a quota shrink.
+// Starved reports fewer lanes realized than the wave was sized for; a quota shrink explains only the lanes it removed.
 func (o WaveObservation) Starved() bool {
-	return o.RealizedLanes < o.DesiredLanes && !o.QuotaShrunk
+	return o.RealizedLanes < o.sizedWidth()
+}
+
+func (o WaveObservation) sizedWidth() int {
+	if o.SizedLanes > 0 || o.QuotaShrunk {
+		return o.SizedLanes
+	}
+	return o.DesiredLanes
 }
 
 // StarvationTracker counts consecutive starved waves; hold one across waves so the streak spans them.
@@ -69,16 +78,16 @@ func BuildStarvationItem(o WaveObservation, k int, weight float64, cycle int, no
 	}
 	return StarvationItem{
 		ID:     starvationItemID,
-		Title:  "Fleet lanes work-supply-starved: realized concurrency < configured",
+		Title:  "Fleet lanes work-supply-starved: realized concurrency < sized width",
 		Weight: weight,
 		Kind:   "feature",
 		Description: fmt.Sprintf(
-			"The fleet ran %d consecutive waves realizing only %d of %d configured lanes "+
-				"for a reason other than a quota/capacity shrink — work-supply starvation, "+
+			"The fleet ran %d consecutive waves realizing only %d of %d sized lanes "+
+				"(the width left after any quota/capacity shrink) — work-supply starvation, "+
 				"not a benched CLI family. Widen the triage plan / inbox backlog so every "+
 				"configured lane has file-disjoint work to dispatch, per the "+
 				"fleet-concurrency-respect architecture (observed at cycle %d).",
-			k, o.RealizedLanes, o.DesiredLanes, cycle),
+			k, o.RealizedLanes, o.sizedWidth(), cycle),
 		Files:     []string{"go/internal/triagecap"},
 		Source:    "fleet-starvation-observer",
 		CreatedAt: nowRFC3339,

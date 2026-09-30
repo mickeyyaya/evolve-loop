@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -131,6 +133,9 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 	waveBinary string,
 	starvation *fleet.StarvationTracker,
 ) batchDecision {
+	if decision, halt := b.diskSpaceHalt(iteration); halt {
+		return decision
+	}
 	if shouldRunPool(fleetConfig) {
 		if decision, done := b.dispatchPool(iteration, fleetConfig, waveBinary); done {
 			return decision
@@ -149,6 +154,20 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 	default:
 		return b.repairMinWidth(iteration, fleetConfig, waveConfig, waveBinary, starvation)
 	}
+}
+
+func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool) {
+	pol, _ := policy.Load(filepath.Join(b.cfg.EvolveDir, "policy.json"))
+	check := looppreflight.CheckDiskSpace(b.cfg.EvolveDir, pol.PreflightConfig().MinFreeBytes(), looppreflight.DiskFreeBytes)
+	if check.Level != looppreflight.LevelHalt {
+		return batchDecision{}, false
+	}
+	b.result.StopReason = "disk_space_halt"
+	emitLoopHalt(b.deps.Signals, 0, "loopBatchCoordinator.diskSpaceHalt", CodeLoopHalt,
+		fmt.Sprintf("wave %d not launched: %s; %s", iteration, check.Message, check.Detail),
+		map[string]string{"stop_reason": b.result.StopReason, "check": check.Name})
+	b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
+	return batchDecision{flow: batchReturn, exitCode: systemFailureHaltExitCode}, true
 }
 
 func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, waveBinary string) (batchDecision, bool) {
@@ -214,11 +233,7 @@ func (b *loopBatchCoordinator) repairMinWidth(iteration int, fleetConfig, waveCo
 }
 
 func (b *loopBatchCoordinator) observeWorkSupply(iteration int, fleetConfig, waveConfig policy.FleetConfig, realized int, starvation *fleet.StarvationTracker) {
-	observation := fleet.WaveObservation{
-		DesiredLanes:  fleetConfig.Count,
-		RealizedLanes: realized,
-		QuotaShrunk:   waveConfig.Count < fleetConfig.Count,
-	}
+	observation := fleet.WaveObservation{SizedLanes: waveConfig.Count, RealizedLanes: realized}
 	if !starvation.Observe(observation, fleetConfig.StarvationK) {
 		return
 	}

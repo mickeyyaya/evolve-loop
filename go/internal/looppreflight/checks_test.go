@@ -165,19 +165,18 @@ func TestRun_HostCapabilities_NoSandboxProfiles_Passes(t *testing.T) {
 	}
 }
 
-func TestRun_HostCapabilities_LowDisk_Warns(t *testing.T) {
+func TestRun_HostCapabilities_LowDisk_WarnsWhileDiskSpaceHalts(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.DiskFreeBytes = func(string) (uint64, error) { return 100 << 20, nil }
 	r, err := Run(opts)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if r.Halted() {
-		t.Fatalf("low disk must not halt; got %s", r.OverallLevel)
+	if c := findCheck(t, r, "host-capabilities"); c.Level != LevelWarn {
+		t.Fatalf("host-capabilities: want LevelWarn, got %s (%q)", c.Level, c.Detail)
 	}
-	c := findCheck(t, r, "host-capabilities")
-	if c.Level != LevelWarn {
-		t.Fatalf("want LevelWarn, got %s", c.Level)
+	if c := findCheck(t, r, "disk-space"); c.Level != LevelHalt || !r.Halted() {
+		t.Fatalf("100 MiB under the default floor: disk-space=%s halted=%v, want halt", c.Level, r.Halted())
 	}
 }
 

@@ -68,6 +68,7 @@ type Policy struct {
 	Integrity          *IntegrityPolicy          `json:"integrity,omitempty"`
 	Sandbox            *SandboxPolicy            `json:"sandbox,omitempty"`
 	Fleet              *FleetPolicy              `json:"fleet,omitempty"`
+	Preflight          *PreflightPolicy          `json:"preflight,omitempty"`
 	Chain              *ChainPolicy              `json:"chain,omitempty"`
 	GoalStall          *GoalStallPolicy          `json:"goal_stall,omitempty"`
 	ObservationMask    *ObservationMaskPolicy    `json:"observation_mask,omitempty"`

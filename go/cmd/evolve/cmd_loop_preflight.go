@@ -27,6 +27,7 @@ func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result
 		Stderr:              stderr,
 		SkipBoot:            cfg.SkipPreflightBoot,
 		NestedFallbackStage: parseGateStage(pol.SandboxConfig().NestedFallback),
+		MinFreeBytes:        pol.PreflightConfig().MinFreeBytes(),
 	})
 	if err != nil {
 		// A harness fault fails loud as a synthetic halt rather than silently
