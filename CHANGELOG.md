@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `evolve inbox add`, the one way to file an inbox item (2026-09-30)
+
+- The inventory of core functions against the CLI (147 functions: 64 fully, 36 partly and 47 not at all executable through `evolve`) ranked this the first gap: nothing filed an inbox item, so every item was hand-written JSON with no schema, id or dependency check at write time (inbox `inbox-add-cli`).
+- `evolve inbox add [--file <item.json>]` (`go/cmd/evolve/cmd_inbox_add.go`) files one item through the new `inboxmover.File` / `lifecycle.(*Mover).File`. It writes `.evolve/inbox/<UTC filing time>-<id>.json`, stamps `created_at` when absent, appends a `file` ledger line, and prints whether a lane may take the item by the claim floor's own rule.
+- It refuses, with nothing written:
+  - a non-object;
+  - a missing or blank `id`, `title`, `kind`, `summary` or `fix`;
+  - a non-kebab or already-filed `id`, checked across the whole inbox tree, retired items included;
+  - a `weight` outside (0, 1];
+  - an empty or blank `acceptance`;
+  - a mistyped field;
+  - a `deps` entry no item backs;
+  - a lifecycle-owned field (an authored `route` is allowed only toward the console);
+  - a prompt-rendered field the loader would sanitize.
+
+  It never overwrites a file (`os.Link`) and does not HTML-escape. Exit codes: 0 filed, 1 refused, 2 I/O fault, 10 usage.
+- `inboxbatch.sanitizeItem` now names the fields it rewrote, and the new `inboxbatch.SanitizedFields` runs that one rule on a copy, so the filing verb reuses the loader's bounds instead of repeating them. `inboxbatch.FilenameStampLayout` (exported) names the file and `inboxbatch.IsConsoleRoute` is the one console-route rule; the verb prints the claim floor's own verdict on the filed file.
+- Tests, red first:
+  - `TestMover_File_*` (8 tests, including 15 refusal shapes);
+  - `TestFile_FilesAnItemTheClaimFloorCanHandToALane`;
+  - `TestSanitizedFields_NamesEveryFieldTheLoaderWouldRewrite`;
+  - `TestCmd_InboxAdd_*` (4).
+- The architecture review blocked the first draft: the filename stamp was a third literal, a filing fault's exit 2 was unpinned, an authored console route was refused, six mutants survived, the owned-field list had drifted and a design note overstated the invariant. All are fixed. Mutation sweeps: 14 of 14, then the reviewer's six survivors plus four new-rule mutants, 10 of 10, killed. The sweep also showed a self-dependency check was dead (an unfiled id cannot satisfy `deps`), so the check was removed. `internal/inboxmover/lifecycle` stays at 100% statement coverage (`cover-strict`).
+- `inbox-add-cli` is consumed in this change. Its third criterion, the retrospective's minting through the same writer, is filed as its own item through `evolve inbox add` itself.
+
 ## Added — `evolve inbox route-lane`, the operator's lane route (2026-09-30)
 
 - `evolve inbox batches` planned 0 batches from 183 pending items: 101 were console-owned by their `pipeline-*` kind, 53 by a protected surface and 28 by `route: console`. ADR-0074 lets the operator reopen a heuristic derivation with `route:"lane"`, but no command wrote it. The only way was to hand-edit item JSON, which the operator rule that every control goes through the published CLI forbids.

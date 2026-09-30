@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "`evolve inbox add` writes a valid item that `evolve inbox batches` lists (red: no such subcommand)",
+    "A duplicate id, a missing required field, or a depends_on naming no item is refused with the reason",
+    "runtime-reference.md names it as the filing interface; the retrospective's minting and the console use one writer"
+  ],
+  "consumed": {
+    "at": "2026-09-30T09:12:13Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "FIXED by evolve inbox add (2026-09-30): lifecycle.(*Mover).File validates against the readers' schema, refuses a duplicate id or unknown dependency, stamps created_at and writes create-exclusive; runtime-reference.md names it the filing interface. Acceptance 3 (the retrospective's minting through the same writer) is split into retro-minting-files-through-inbox-add."
+  },
+  "created_at": "2026-09-28T19:40:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_inbox.go",
+    "go/internal/inboxmover"
+  ],
+  "fix": "Add `evolve inbox add` (flags or a JSON file on stdin) that validates the item against the one schema the readers already use (inboxmover's dispatchability and triage parsing), refuses a duplicate id or an unknown dependency, stamps created_at, and writes the file atomically. Document it in runtime-reference.md as the only way to file an item; the console and the retrospective's carryover minting call it (or its library function) instead of writing JSON.",
+  "id": "inbox-add-cli",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, 2026-09-28, interface-discipline inventory at the wave-26 boundary (gap G2)",
+  "summary": "`evolve inbox` offers batches, quarantine, ack-fingerprint and consume; `evolve inbox-mover` offers claim, promote and recover-orphans. Nothing creates an item, so the console, retrospectives and operators hand-write .evolve/inbox/\u003cts\u003e-\u003cid\u003e.json with no schema validation, id uniqueness check or dependency check at write time. Found 2026-09-28 while routing every control through the published interfaces (the operator rule: a control our interfaces cannot do is a defect to fix, never to script around).",
+  "title": "Filing an inbox item has no evolve interface: every item is hand-written JSON",
+  "weight": 0.6
+}

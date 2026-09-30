@@ -31,6 +31,8 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 		_ func(*Mover, int, string, *Policy) (RecoverResult, error)         = (*Mover).Release
 		_ func(*Mover, string, string, int) (RouteResult, error)            = (*Mover).RouteConsole
 		_ func(*Mover, string, string) (RouteResult, error)                 = (*Mover).RouteLane
+		_ func(*Mover, []byte) (FileResult, error)                          = (*Mover).File
+		_ error                                                             = ErrInvalidItem
 		_ string                                                            = RouteConsoleValue
 		_ func(*Mover, string) (int, bool)                                  = (*Mover).ReadFailureCount
 		_ func(string, string) (Location, error)                            = Locate

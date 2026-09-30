@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A replay of cycle 1637's sequence ships on the first recovery (red first on a pre-carry base)",
+    "docs/incidents/ holds a record for cycles 1637 and 1691",
+    "REGRESSION-COVERAGE-INDEX.md has a row naming the replay test"
+  ],
+  "connects_to": [
+    "carry-recovery-to-ship-end-to-end-proof"
+  ],
+  "created_at": "2026-09-30T09:12:13Z",
+  "files": [
+    "go/internal/core",
+    "docs/incidents",
+    "docs/incidents/REGRESSION-COVERAGE-INDEX.md"
+  ],
+  "fix": "Add the replay test beside the carry's recovery tests, write the incident record under docs/incidents/ for cycles 1637 and 1691, and add its row to REGRESSION-COVERAGE-INDEX.md naming the replay test.",
+  "id": "carry-chase-replay-and-incident-record",
+  "kind": "test",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30 inbox review: the unmet absorbed lines of the retired identity-preserving-fleet-rebase",
+  "summary": "identity-preserving-fleet-rebase was retired as a duplicate of carry-recovery-to-ship-end-to-end-proof (rungs B1-B4 landed; ADR-0105 hands the end-to-end proof to that item). Three acceptance lines it had absorbed from fleet-rebase-rebuild-chase were still unmet and belong to neither: a replay of cycle 1637's sequence (audit PASS then repeated peer moves) that ships on the first recovery instead of chasing to FAIL, an incident record for cycles 1637 and 1691, and a REGRESSION-COVERAGE-INDEX row.",
+  "title": "Cycle 1637's rebase-chase has no replay test, no incident record and no regression-index row",
+  "weight": 0.4
+}
