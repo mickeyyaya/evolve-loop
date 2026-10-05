@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -37,7 +37,7 @@ func retireSupersededAuditArtifacts(workspace string, round int) {
 	if workspace == "" || round < 1 {
 		return
 	}
-	for _, name := range []string{acssuite.VerdictFilename, phasecontract.ArtifactFilename(string(PhaseAudit))} {
+	for _, name := range []string{acsverdict.Filename, phasecontract.ArtifactFilename(string(PhaseAudit))} {
 		src := filepath.Join(workspace, name)
 		dst := filepath.Join(workspace, phasecontract.RoundArchiveFilename(name, round))
 		if _, err := os.Stat(dst); err == nil {

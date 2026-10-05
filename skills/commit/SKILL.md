@@ -47,7 +47,9 @@ The runner refuses to write an attestation unless `--reviewers` declares, by cap
 
 Namespace prefixes are stripped, so `ecc:go-reviewer` counts as `go-reviewer`. Pass the names you genuinely ran — fabricating the list to skip review is a CLAUDE.md Rule 9/12 violation.
 
-**A proven comment removal needs no reviewer.** The runner checks this itself. At least one changed Go file must be comment-only against `HEAD`, by the same check as `commentaudit verify`. Every other changed file must be a regular Markdown file under `docs/`. When both hold, pass `--reviewers ""`. The attestation records no reviewer, so the commit carries no `Reviewed-by:` trailer. A code or test change, a rename, a symlink, a deletion, a `testdata/` fixture or a docs-only change still needs both reviewers ([code comments](../../docs/conventions/code-comments.md)).
+**A proven comment removal needs no reviewer.** The runner checks this itself. At least one changed Go file must be comment-only against `HEAD`, by the same check as `commentaudit verify`. Every other changed file must be a regular Markdown file under `docs/`. When both hold, pass `--reviewers ""`. The attestation records no reviewer and `review_waiver: "comment-only"`, so the commit carries a `Review-waived: comment-only` trailer instead of `Reviewed-by:`. A code or test change, a rename, a symlink, a deletion, a `testdata/` fixture or a docs-only change still needs both reviewers (for docs-only, one `code-review-simplify` pass covers both) ([code comments](../../docs/conventions/code-comments.md)).
+
+**A removed history comment must be recorded.** When the change removes a comment group that carries history (a cycle, wave, batch or round number, a date, a PR number, a SHA, an incident), the runner refuses it until the change adds the group to its package's page under `docs/history/code-comments/`. Run the command the refusal names, stage the pages it writes, and re-run the gate. The archive only grows: a change that deletes or rewrites an archive page (other than the generated `README.md` index) is refused, even when it is a waived comment removal.
 
 ## When NOT to use this skill
 

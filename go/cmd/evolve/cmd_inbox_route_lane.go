@@ -10,11 +10,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-const inboxRouteLaneUsage = "usage: evolve inbox route-lane <id> <reason>"
-
 func runInboxRouteLane(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 2 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
-		fmt.Fprintln(stderr, inboxRouteLaneUsage)
+		fmt.Fprintln(stderr, inboxUsage("route-lane"))
 		return 10
 	}
 	id, reason := strings.TrimSpace(args[0]), strings.TrimSpace(args[1])

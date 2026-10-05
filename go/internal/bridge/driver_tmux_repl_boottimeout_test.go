@@ -11,10 +11,8 @@ import (
 
 func TestEngineLaunch_BootTimeout_ConfigurableViaEnv(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
-	// CapturePane always returns "", so the boot loop polls to its deadline
-	// before returning ExitREPLBootTimeout; claude-tmux also ticks the
-	// auto-responder during boot, so each iteration captures the pane twice.
-	const wantPolls = 4*2 + 1 // 4 boot-poll iterations × 2 captures (loop + tick) + 1 deferred tmuxCleanup capture
+	const bootPasses, finalScrollbackCaptures = 4, 1
+	const wantPolls = bootPasses + finalScrollbackCaptures
 	tmux := &fakeTmux{}
 	eng := newTestEngine(Deps{
 		Tmux:         tmux,
@@ -30,8 +28,8 @@ func TestEngineLaunch_BootTimeout_ConfigurableViaEnv(t *testing.T) {
 		t.Fatalf("ExitCode=%d, want ExitREPLBootTimeout (%d)", resp.ExitCode, ExitREPLBootTimeout)
 	}
 	if got := len(tmux.captureScrollback); got != wantPolls {
-		t.Fatalf("boot polled %d times, want %d (BootTimeoutS=4, interval=1) — "+
-			"the typed field must bound the loop, not the hardcoded %ds default", got, wantPolls, tmuxREPLBootTimeoutS)
+		t.Fatalf("boot polled %d times, want %d: BootTimeoutS=4 at interval 1 must bound the loop at %d passes (not the hardcoded %ds default), "+
+			"each pass capturing the pane once, plus %d final scrollback capture", got, wantPolls, bootPasses, tmuxREPLBootTimeoutS, finalScrollbackCaptures)
 	}
 }
 

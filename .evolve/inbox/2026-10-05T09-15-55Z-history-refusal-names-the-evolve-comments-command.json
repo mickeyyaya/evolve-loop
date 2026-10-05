@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The refusal names `evolve comments history …` and running exactly that command from the repo root records the history so the gate passes (the existing end-to-end test, retargeted)",
+    "No doc tells the author to use `go run ./cmd/commentaudit history`"
+  ],
+  "created_at": "2026-10-05T09:30:00Z",
+  "files": [
+    "go/internal/commitgate/history_recorded.go",
+    "docs/conventions/code-comments.md",
+    "skills/commit/SKILL.md"
+  ],
+  "fix": "Change recordHistoryCommand to the `evolve comments history` spelling (check how a relative -out resolves under `evolve comments`), update the refusal test that pins the command, and the docs that quote it (code-comments convention, skills/commit/SKILL.md, runtime-reference).",
+  "id": "history-refusal-names-the-evolve-comments-command",
+  "kind": "bug",
+  "priority_class": "hygiene",
+  "source": "console, 2026-10-05, wave-59 boundary train rebase",
+  "summary": "ADR-0115's history refusal tells the author to run `cd go && go run ./cmd/commentaudit history ...` (commitgate.recordHistoryCommand, and the docs that point to it). Cycle 1792 (2026-10-05) published the same tool as `evolve comments`, which runs the same commentaudit.Main with the same arguments from anywhere in the repo. Every control should go through the published evolve CLI, so the refusal should name `evolve comments history -base <ref> -label <change> -out docs/history/code-comments`.",
+  "title": "The commit gate's history refusal names `evolve comments history`, the published command",
+  "weight": 0.3
+}

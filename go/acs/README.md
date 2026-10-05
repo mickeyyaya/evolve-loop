@@ -29,9 +29,18 @@ selects them for the host-side predicate lane.
 
 Enforcement: `internal/acssuite.TestAllACSPredicatesAreTagged` (runs in the
 normal suite) fails CI if any `predicates_test.go` is missing `//go:build acs`. A
-predicate package that fails to compile is a HARD suite error (never a silent
-PASS); each scope runs as a separate `go test` so one broken package can't hide
-behind another's events.
+predicate package that fails to compile is a named red in the verdict
+(`egps/go-lane-scope-failed/<scope>`, with the compiler output as its evidence),
+never a silent PASS; each scope runs as a separate `go test` so one broken
+package can't hide behind another's events. Predicates run with every `EVOLVE_`
+key scrubbed from their environment except the suite's own exports
+(`EVOLVE_PROJECT_ROOT`, the worktree-root key) and the operator keys the state
+root's `.evolve/policy.json` names in `acs.predicate_env` (today only
+`EVOLVE_FLAG_CAMPAIGN`, which `regression/flagprogress` reads; a lane protocol
+key or one of the suite's exports is refused with a verdict warning). A curated
+predicate that reads any other `EVOLVE_` key fails
+`internal/acssuite.TestCuratedPredicatesReceiveEveryEvolveKeyTheyRead`; a test
+that needs a key only for itself sets it with `t.Setenv` (ADR-0114).
 
 ## The gate scope mirrors the (retired) bash lane
 

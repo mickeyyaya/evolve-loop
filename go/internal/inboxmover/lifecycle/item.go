@@ -52,6 +52,22 @@ func FindFileByTaskID(dir, taskID string) (string, error) {
 	return "", ErrNotFound
 }
 
+func (m *Mover) locatePending(verb, taskID string) (Location, error) {
+	if taskID == "" {
+		return Location{}, fmt.Errorf("%w: %s requires task_id", ErrBadArgs, verb)
+	}
+	loc, err := Locate(m.inboxDir, taskID)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return loc, fmt.Errorf("%w: %s", ErrNotFound, taskID)
+	case err != nil:
+		return loc, fmt.Errorf("%s: locate %s: %w", verb, taskID, err)
+	case loc.Cycle != 0:
+		return loc, fmt.Errorf("%w: %s (held by cycle %d)", ErrNotFound, taskID, loc.Cycle)
+	}
+	return loc, nil
+}
+
 func jsonEntries(dir string) ([]os.DirEntry, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -128,17 +144,17 @@ func BumpFailureCount(path, reason string) (int, error) {
 func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 	count := 0
 	err := UpdateItemJSON(path, func(item map[string]json.RawMessage) {
-		if raw, ok := item["failure_count"]; ok {
+		if raw, ok := item[inboxbatch.FailureCountField]; ok {
 			_ = json.Unmarshal(raw, &count) // a non-numeric counter reads as 0 (tolerant)
 		}
 		count++
-		item["failure_count"] = json.RawMessage(strconv.Itoa(count))
+		item[inboxbatch.FailureCountField] = json.RawMessage(strconv.Itoa(count))
 		if reason != "" {
 			rb, _ := json.Marshal(reason) // a string never fails to marshal
-			item["last_failure_reason"] = rb
+			item[inboxbatch.LastFailureReasonField] = rb
 		}
 		if shedAt != nil && shedAt(count) {
-			delete(item, "continuation")
+			delete(item, inboxbatch.ContinuationField)
 		}
 	})
 	if err != nil {
@@ -149,10 +165,19 @@ func bumpWith(path, reason string, shedAt func(count int) bool) (int, error) {
 
 // UpdateItemJSON atomically rewrites an item with mutate applied to its top-level fields; mutate must not retain the map.
 func UpdateItemJSON(path string, mutate func(m map[string]json.RawMessage)) error {
-	return updateAdmittedItemJSON(path, func([]byte) error { return nil }, mutate)
+	return updateAdmittedItemJSON(path, admitEvery, mutate)
 }
 
+func admitEvery([]byte) error { return nil }
+
 func updateAdmittedItemJSON(path string, admit func(body []byte) error, mutate func(m map[string]json.RawMessage)) error {
+	return rewriteItemJSON(path, admit, func(item map[string]json.RawMessage) error {
+		mutate(item)
+		return nil
+	})
+}
+
+func rewriteItemJSON(path string, admit func(body []byte) error, rewrite func(item map[string]json.RawMessage) error) error {
 	body, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -164,7 +189,12 @@ func updateAdmittedItemJSON(path string, admit func(body []byte) error, mutate f
 	if err := json.Unmarshal(body, &item); err != nil {
 		return err
 	}
-	mutate(item)
+	if item == nil {
+		return fmt.Errorf("%w: %s is not a JSON object", ErrInvalidItem, path)
+	}
+	if err := rewrite(item); err != nil {
+		return err
+	}
 	out, err := json.Marshal(item)
 	if err != nil {
 		return err

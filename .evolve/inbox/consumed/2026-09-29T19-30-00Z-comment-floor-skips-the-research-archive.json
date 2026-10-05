@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "An adopting build whose only added .go files are the archived ancestor predicates reports 0 added comment lines (red today)"
+  ],
+  "consumed": {
+    "at": "2026-09-30T18:28:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "commentaudit's added-comment rule (AddedAcrossDiff and check, which the build floor, the commit gate and the CLI share) now skips everything under docs/, which holds records, not compiled code; the removed-history rule still reads docs/. Pinned end to end by TestCommentFloorFailures_AnAdoptedAncestorsArchivedPredicatesAddNoComment, which drives explanationdocs.ArchiveSupersededPredicatePackages then the floor under enforce (ADR-0115)."
+  },
+  "created_at": "2026-09-29T19:30:00Z",
+  "files": [
+    "go/internal/core/comment_floor.go",
+    "go/internal/commentaudit/across.go",
+    "go/internal/explanationdocs/predicate_archive.go"
+  ],
+  "fix": "Export the archive root from explanationdocs as its single spelling and exclude it from the comment floor's path set (and any other added-file scanner that is not module-scoped).",
+  "id": "comment-floor-skips-the-research-archive",
+  "kind": "bug",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30 architecture review of the A2 fix (MEDIUM-3)",
+  "summary": "Since continuation adoption archives the ancestor's own go/acs/cycle\u003cM\u003e under docs/private/research/archived-\u003cdate\u003e/superseded-predicate-packages/ (design A2, 2026-09-30), those .go files are added paths in the adopting cycle's diff. commentaudit's added-comment scan filters by the .go suffix only, so every comment in the archived predicates counts as 'the build adds N comment line(s)'. Not a regression (the same lines counted at go/acs/cycle\u003cM\u003e before) and the floor is in shadow, but under comment_floor.stage=enforce it would force the builder to edit the archive, the same dead end cycle 1764 hit.",
+  "title": "The build comment floor counts archived superseded predicate files as the build's new comments",
+  "weight": 0.4
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "After `evolve inbox edit <id> --set weight=0.4` on an item filed by `evolve inbox add`, git diff shows only the weight line changed",
+    "A criterion containing `<id>` survives a rewrite byte-for-byte"
+  ],
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/internal/inboxmover/lifecycle/item.go",
+    "go/internal/inboxmover/lifecycle/file.go",
+    "docs/operations/runtime-reference.md"
+  ],
+  "fix": "Encode in rewriteItemJSON as publishNewItem does (SetEscapeHTML(false), two-space indent, trailing newline), update TestUpdateItemJSON_ErrorArmsAndCommitTmp's expected bytes, and drop runtime-reference's 'compare fields, not lines' caveats.",
+  "id": "inbox-item-writer-keeps-the-filed-format",
+  "kind": "bug",
+  "priority_class": "hygiene",
+  "source": "console lane cl-inboxverbs, 2026-10-01 (ADR-0116 consequences)",
+  "summary": "lifecycle.rewriteItemJSON (behind UpdateItemJSON, RouteLane, and now evolve inbox edit and verify) writes json.Marshal of the field map: one line, sorted keys, and <, >, & escaped as \\u003c/\\u003e/\\u0026. evolve inbox add writes two-space-indented JSON without HTML escaping (publishNewItem). A one-field curation therefore rewrites every line of a filed item and turns `<id>` in its criteria into `\\u003cid\\u003e` (verified 2026-10-01 on a copy of cli-inbox-edit), so the data PR a curation lands cannot be reviewed by diff.",
+  "title": "The inbox item writer keeps the filed format, so a curation or route stamp is a one-line diff",
+  "weight": 0.35
+}

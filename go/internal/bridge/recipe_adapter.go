@@ -57,13 +57,10 @@ type recipeSessionDriver struct {
 func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	if d.deps.Tmux.HasSession(ctx, d.session) {
 		fmt.Fprintf(d.deps.Stderr, "[recipe] attaching to existing session %s\n", d.session)
+		d.ar.endBoot()
 		return nil
 	}
-	if ws, ok := d.deps.Tmux.(workdirSessionStarter); ok {
-		if err := ws.NewSessionIn(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight, d.workingDir); err != nil {
-			return fmt.Errorf("new-session: %w", err)
-		}
-	} else if err := d.deps.Tmux.NewSession(ctx, d.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+	if err := d.deps.startSession(ctx, d.session, d.workingDir); err != nil {
 		return fmt.Errorf("new-session: %w", err)
 	}
 	if err := sessionrecord.Append(sessionrecord.PathIn(d.cfg.Workspace), sessionrecord.Record{
@@ -80,12 +77,22 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	bootDeadlineS := defaultIfZero(d.deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 	for elapsed := 0; elapsed < bootDeadlineS; elapsed++ {
 		d.deps.Sleep(time.Second)
-		if d.ar != nil {
-			d.ar.tick(ctx, d.session) // dismiss boot trust modals (codex/agy); no-op otherwise
+		pane, capErr := d.deps.Tmux.CapturePane(ctx, d.session, d.scrollback)
+		if capErr != nil {
+			continue
 		}
-		pane, _ := d.deps.Tmux.CapturePane(ctx, d.session, d.scrollback)
+		if d.ar != nil {
+			repoll, err := d.ar.bootTick(ctx, d.session, pane)
+			if err != nil {
+				return fmt.Errorf("REPL boot abandoned: %w", err)
+			}
+			if repoll {
+				continue
+			}
+		}
 		if d.marker != "" && strings.Contains(pane, d.marker) {
 			fmt.Fprintf(d.deps.Stderr, "[recipe] REPL prompt (%s) detected\n", d.marker)
+			d.ar.endBoot()
 			return nil
 		}
 	}

@@ -72,7 +72,7 @@ func TestC1076_002_CheckIsWiredIntoProductionFloorEngine(t *testing.T) {
 }
 
 func TestC1076_003_FalseClaimRejectsTheBuildDeliverable(t *testing.T) {
-	r := core.NewBuildFloorReviewer(core.DefaultBuildFloorChecks)
+	r := core.BuildHandoffFloor{{Name: "default", Run: core.DefaultBuildFloorChecks}}
 	const p = "stale/scaffold.go"
 
 	if res := r.Review(context.Background(), fixture(t, []string{p}, []string{p})); res.Approve {

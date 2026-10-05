@@ -19,3 +19,9 @@ const FleetWidthKey = "EVOLVE_FLEET_WIDTH" // SSOT IPC-protocol-allowed
 // so two concurrent lanes never share <evolveDir>/cycle-state.json. It applies only to the evolve dir
 // that holds it; see paths.CycleStateFileFor.
 const CycleStateFileKey = "EVOLVE_CYCLE_STATE_FILE" // SSOT IPC-protocol-allowed
+
+const TmuxSocketKey = "EVOLVE_TMUX_SOCKET" // SSOT IPC-protocol-allowed
+
+func ProtocolKeys() []string {
+	return []string{FleetKey, FleetScopeKey, FleetWidthKey, WorktreeRootKey, CycleStateFileKey, TmuxSocketKey}
+}

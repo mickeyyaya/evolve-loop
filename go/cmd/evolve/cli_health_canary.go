@@ -14,11 +14,14 @@ import (
 // defaultLiveProbe is the one canary probe the loop and the campaign runner
 // share, so its semantics and bound cannot drift between them.
 func defaultLiveProbe(ctx context.Context, projectRoot string, stderr io.Writer) liveProbe {
+	return liveProbeWith(ctx, projectRoot, bridge.Deps{Stderr: stderr})
+}
+
+func liveProbeWith(ctx context.Context, projectRoot string, deps bridge.Deps) liveProbe {
 	return func(driver string) (int, string, string) {
 		probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
 		defer cancel()
-		return bridge.LiveSmokeTest(probeCtx, driver,
-			&bridge.Config{ProjectRoot: projectRoot}, bridge.Deps{Stderr: stderr})
+		return bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot}, deps)
 	}
 }
 

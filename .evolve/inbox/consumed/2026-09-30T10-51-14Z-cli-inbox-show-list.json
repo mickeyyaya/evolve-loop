@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "`evolve inbox show \u003cid\u003e` prints the item and whether it is lane-ready, console-routed or waiting, with the reason (red: usage error)",
+    "`evolve inbox list --status console --json` returns exactly the items batches reports as operator-owned",
+    "An unknown id exits 1"
+  ],
+  "consumed": {
+    "at": "2026-09-30T18:28:55Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Added evolve inbox show \u003cid\u003e [--json] and evolve inbox list [--status|--kind|--route] [--json] (go/cmd/evolve/cmd_inbox_show.go, cmd_inbox_list.go), read-only through inboxbatch.LoadDir and inboxmover.PlaceOnLaneMenu, so list --status console equals batches' operator-owned set (ADR-0116)."
+  },
+  "created_at": "2026-09-30T10:51:14Z",
+  "files": [
+    "go/cmd/evolve/cmd_inbox.go",
+    "go/internal/inboxbatch"
+  ],
+  "fix": "Add `evolve inbox show \u003cid\u003e [--json]`, which prints the item, its file path, and its lane-menu status with the reason. Add `evolve inbox list [--route R] [--kind K] [--status ready|console|waiting] [--json]`. Both read through inboxbatch.LoadDir and inboxmover.PartitionLaneMenu, as batches does. They are read-only; show exits 1 for an unknown id, and LoadDir warnings go to stderr. Document both in runtime-reference.md's operator commands.",
+  "id": "cli-inbox-show-list",
+  "kind": "feature",
+  "priority_class": "debuggability",
+  "source": "console, 2026-09-30, core-function CLI inventory (operator request: a CLI request for each core function)",
+  "summary": "`evolve inbox` offers batches, quarantine, ack-fingerprint, consume, route-console and route-lane (cmd_inbox.go:15-35). batches groups only the lane-ready items and names the excluded ones. To read an item's summary, fix and acceptance, or to list items by route, kind or unmet dependency, the operator opens and filters the JSON files by hand. That is how id-less and malformed items went unnoticed.",
+  "title": "Reading one inbox item, or listing items by route or kind, means opening .evolve/inbox/*.json by hand; add `evolve inbox show` and `evolve inbox list`",
+  "weight": 0.55
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A recipe boot whose pane shows the marker over a shell process times out instead of returning nil",
+    "A recipe boot with the marker and a CLI process still boots"
+  ],
+  "created_at": "2026-10-05T06:00:00Z",
+  "files": [
+    "go/internal/bridge/recipe_adapter.go",
+    "go/internal/bridge/driver_tmux_boot.go",
+    "go/internal/bridge/tmux_pane_checks.go"
+  ],
+  "fix": "Apply the boot handshake in EnsureSession: with the marker present, keep polling while paneShellProcess reports a shell; consider one paneBootReady predicate both boot waits call.",
+  "id": "recipe-boot-needs-the-dead-shell-guard",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console lane cl-trustprompt, 2026-10-05",
+  "summary": "recipeSessionDriver.EnsureSession accepts the first capture containing the prompt marker; bootTmuxREPL also requires the pane process not to be a shell (guardDeadShell/paneShellProcess). Found 2026-10-05: on the old trust manifest, TestRecipeBoot_TrustDialogIsConfirmedOnYesBeforeReady's red run returned nil with claude exited to zsh, because the lingering dialog's ❯ matched the marker. A CLI that exits during a recipe boot with its marker on screen is treated as booted and the recipe types into the shell.",
+  "title": "The recipe adapter's boot declares a dead shell ready: EnsureSession has no dead-shell guard",
+  "weight": 0.5
+}

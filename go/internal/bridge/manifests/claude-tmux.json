@@ -136,22 +136,29 @@
       "note": "Quick feedback rating prompt from the CLI wrapper; '0' skips/cancels"
     },
     {
-      "name": "trust_prompt_no_default",
+      "name": "trust_prompt_cursor_on_no",
       "regex": "(?s)❯ No, exit.{0,80}Yes, I trust this folder.{0,120}Enter to confirm · Esc to cancel\\s*\\z",
-      "response_keys": "Down,Enter",
+      "response_keys": "Down",
       "tail_lines": 12,
       "policy": "auto_respond",
-      "once": true,
-      "note": "claude v2.1.252 folder-trust dialog (live-captured 2026-09-01): options UNNUMBERED, default flipped to '❯ No, exit' — the v2.1.193 rule's Enter would confirm No and kill the REPL (this burned all three wave-20260901b lanes). Down,Enter verified live: Down moves ❯ to 'Yes, I trust this folder', Enter boots a trusted REPL. BOTTOM-ANCHORED (footer + \\z + tail_lines 12 + distance bounds, plan_approval discipline) so tracked files quoting the dialog cannot self-match when rendered. Disjoint by construction from trust_prompt (requires ❯ No, exit; that one requires the numbered ❯ 1. Yes line). Version-tolerant: a future Yes-default build stops matching and falls through. once:true. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
+      "note": "claude 2.1.252+ folder-trust dialog, unnumbered, cursor on its default '❯ No, exit'. NAVIGATION ONLY: one Down per tick, never Enter, so a lost keystroke costs a repeat instead of the REPL. Repeats while the cursor is still seen on No (a swallowed Down, or the live dialog's Down wrapping Yes back to No, verified on 2.1.285 on 2026-10-05); the loop guard bounds it, and a boot wait that trips the guard ends at once as a boot timeout (ExitREPLBootTimeout, a bench strike) rather than sending Enter. Confirmation is trust_prompt_cursor_on_yes's job alone. BOTTOM-ANCHORED (footer + \\z + tail_lines 12 + distance bounds) so tracked files quoting the dialog cannot self-match. PERMISSIVE ON PURPOSE: any frame with a cursor on No, a torn redraw that shows a cursor on both lines included, gets a Down and never an Enter. MUST PRECEDE trust_prompt_cursor_on_yes and trust_prompt: the three are disjoint on every frame the dialog renders, but text no build renders can match two of them, and first-match order then resolves it to navigation, never confirmation. Replaces the blind Down,Enter burst (trust_prompt_no_default) that lost its Down and confirmed No at wave 59's preflight. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
+    },
+    {
+      "name": "trust_prompt_cursor_on_yes",
+      "regex": "(?sm)^[ \\t]*No, exit[ \\t]*\\n[ \\t]*❯ Yes, I trust this folder.{0,120}Enter to confirm · Esc to cancel\\s*\\z",
+      "response_keys": "Enter",
+      "tail_lines": 12,
+      "policy": "auto_respond",
+      "note": "claude 2.1.252+ folder-trust dialog, unnumbered, cursor verifiably on '❯ Yes, I trust this folder' (after trust_prompt_cursor_on_no's Down landed). The only rule that confirms this dialog, so Enter is sent only on a capture that shows the cursor on Yes; an Enter can therefore only ever confirm Yes, and repeating it on a lost Enter is safe (the loop guard bounds it). Live on 2.1.285 the dialog is gone 250 ms after the Enter and the REPL marker shows within 1 s, inside one boot tick. BOTTOM-ANCHORED like its sibling. STRICT ON PURPOSE: it requires the 'No, exit' line with no cursor directly above an unnumbered '❯ Yes' line, so a torn redraw with a cursor on both lines is left to trust_prompt_cursor_on_no's Down. It never matches a frame the numbered trust_prompt matches (that one needs '❯ 1. Yes'). Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
     },
     {
       "name": "trust_prompt",
-      "regex": "(?s)❯ 1\\.\\s+Yes, I trust this folder.{0,120}Enter to confirm.{0,40}\\s*\\z",
+      "regex": "(?sm)^[ \\t]*❯ 1\\.\\s+Yes, I trust this folder.{0,120}^[ \\t]*Enter to confirm[^\\n]{0,40}\\s*\\z",
       "response_keys": "Enter",
       "tail_lines": 12,
       "policy": "auto_respond",
       "once": true,
-      "note": "claude v2.1.193 folder-trust dialog (numbered options, Yes pre-highlighted): one Enter confirms Yes, verified live 2026-06-26. Kept for older builds; v2.1.252's unnumbered No-default dialog is trust_prompt_no_default above — the two regexes are DISJOINT BY CONSTRUCTION (this one requires the numbered ❯ 1. Yes line; that one requires ❯ No, exit), so array order is irrelevant for correctness. BOTTOM-ANCHORED on the Enter-to-confirm footer + tail_lines per the plan_approval discipline (2026-09-02: the unanchored form self-matched this repo's own tracked files when rendered by an agent — see the self-match guard test). The ❯ cursor collides with the REPL marker, so tickDuringBoot dismisses it before prompt delivery. once:true — lingering-scrollback discipline. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
+      "note": "claude v2.1.193 folder-trust dialog (numbered options, Yes pre-highlighted): one Enter confirms Yes, verified live 2026-06-26. Kept for older builds; v2.1.252+'s unnumbered No-default dialog is trust_prompt_cursor_on_no / trust_prompt_cursor_on_yes above — on every frame the dialogs render, the three regexes are disjoint (this one requires the numbered ❯ 1. Yes line; those require the unnumbered ❯ No, exit, or an uncursored No, exit line directly above an unnumbered ❯ Yes). Order still matters as the tiebreak for text no build renders: the navigation rule comes first, so ambiguity sends Down, never Enter. BOTTOM-ANCHORED on the Enter-to-confirm footer + tail_lines per the plan_approval discipline (2026-09-02: the unanchored form self-matched this repo's own tracked files when rendered by an agent — see the self-match guard test). LINE-ANCHORED (2026-10-05): the cursor line and the footer must each begin a line, because the self-match guard now slides the pane bottom over every line of the tracked files and found two test source lines that quote this dialog flattened with \\n escapes; a source line is not the dialog. The ❯ cursor collides with the REPL marker, so tickDuringBoot dismisses it before prompt delivery. once:true — lingering-scrollback discipline. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
     },
     {
       "name": "askuserquestion_multiselect",

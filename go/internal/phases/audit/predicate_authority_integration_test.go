@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -38,7 +39,7 @@ func TestNewDefault_HostPredicateExecutionBindsCompleteEvidence(t *testing.T) {
 				t.Fatal(err)
 			}
 			// An apparent green from the wrong cycle must not suppress execution.
-			if err := os.WriteFile(filepath.Join(ws, acssuite.VerdictFilename), []byte(`{"cycle":42,"red_count":0}`), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(ws, acsverdict.Filename), []byte(`{"cycle":42,"red_count":0}`), 0o644); err != nil {
 				t.Fatal(err)
 			}
 			req := core.PhaseRequest{Cycle: 7, RunID: "run-7", AuditRound: 1, ProjectRoot: root, Worktree: root, Workspace: ws}
@@ -54,7 +55,7 @@ func TestNewDefault_HostPredicateExecutionBindsCompleteEvidence(t *testing.T) {
 			if resp.Verdict != want {
 				t.Fatalf("verdict %s, want %s; diagnostics=%+v", resp.Verdict, want, resp.Diagnostics)
 			}
-			raw, err := os.ReadFile(filepath.Join(ws, acssuite.VerdictFilename))
+			raw, err := os.ReadFile(filepath.Join(ws, acsverdict.Filename))
 			if err != nil {
 				t.Fatal(err)
 			}

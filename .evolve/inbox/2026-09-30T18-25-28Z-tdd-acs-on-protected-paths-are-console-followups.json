@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A lane whose plan needs a protected path gets no ACS predicate on that path (cycle 1788 replay: 007/008 become console follow-ups)",
+    "Triage's premise check names a protected path that only a build-plan step mentions",
+    "The TDD persona states the rule, and the check is code, not only prose"
+  ],
+  "created_at": "2026-10-01T02:20:00Z",
+  "files": [
+    "agents/evolve-tdd-engineer.md",
+    "go/internal/phases/triage",
+    "go/internal/guards"
+  ],
+  "fix": "Triage's premise check covers every path in Scout's build plan, including 'wire into' steps, not only targetFiles; TDD checks each path an AC needs changed against the protected-surface rule (guards.IsProtectedScope) and records an AC on a protected path as a console follow-up instead of a lane predicate.",
+  "id": "tdd-acs-on-protected-paths-are-console-followups",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, cycle 1788 retrospective (inst-L1788a)",
+  "summary": "Cycle 1788's lane contract was unsatisfiable by construction: predicates 007 and 008 required CLI wiring in go/internal/cli/guardcmd/eval.go, a protected surface (integrity_surface.go:40). The builder wired it, was refused, restored the file, and could never turn those predicates green. Triage's premise check looked only at the target directory, not at Scout's build-plan steps ('wire into pre-flight').",
+  "title": "TDD and triage keep lane ACS predicates off protected paths; an AC that needs one becomes a console follow-up",
+  "weight": 0.7
+}

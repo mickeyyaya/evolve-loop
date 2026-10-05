@@ -78,44 +78,33 @@ func runACS(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// runACSSuite runs the Go predicate lane and exits 2 on any RED predicate and 1
-// on a hard error such as a predicate package that fails to compile.
-// See ADR-0042.
 func runACSSuite(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("evolve acs suite", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	var (
-		cycle     int
-		root      string
-		evolveDir string
-		writeJSON bool
-	)
-	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
-	fs.StringVar(&root, "root", ".", "repo root (the Go module's parent)")
-	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
-	fs.BoolVar(&writeJSON, "json", true, "write acs-verdict.json (default true)")
+	const name = "evolve acs suite"
+	f := acsFlags{}
+	fs := f.flagSet(name, stderr)
+	fs.StringVar(&f.root, "root", ".", "repo root (the Go module's parent)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	if cycle <= 0 {
-		fmt.Fprintln(stderr, "evolve acs suite: --cycle is required (must be >0)")
+	f, ok := f.resolved(name, stderr)
+	if !ok {
 		return 10
 	}
-	if root == "." {
-		if resolved := resolveACSSuiteRoot(evolveDir, cycle); resolved != "" {
-			root = resolved
+	if f.root == "." {
+		if resolved := resolveACSSuiteRoot(f.evolveDir, f.cycle); resolved != "" {
+			f.root = resolved
 		}
 	}
-	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: suiteProjectRoot(evolveDir, cycle, root), Cycle: cycle})
+	v, err := acssuite.Run(acssuite.Options{Root: f.root, ProjectRoot: suiteProjectRoot(f.evolveDir, f.cycle, f.root), Cycle: f.cycle})
 	if err != nil {
-		fmt.Fprintf(stderr, "evolve acs suite: %v\n", err)
+		fmt.Fprintf(stderr, "%s: %v\n", name, err)
 		return 1
 	}
 	printACSSuiteVerdict(stdout, v)
-	if writeJSON {
-		dst, wErr := acssuite.WriteVerdict(evolveDir, v)
+	if f.writeJSON {
+		dst, wErr := acssuite.WriteVerdict(f.evolveDir, v)
 		if wErr != nil {
-			fmt.Fprintf(stderr, "evolve acs suite: write verdict: %v\n", wErr)
+			fmt.Fprintf(stderr, "%s: write verdict: %v\n", name, wErr)
 			return 1
 		}
 		fmt.Fprintf(stderr, "[acs suite] verdict written to %s\n", dst)
@@ -124,6 +113,51 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	return 0
+}
+
+type acsFlags struct {
+	cycle     int
+	root      string
+	evolveDir string
+	writeJSON bool
+}
+
+func (f *acsFlags) flagSet(name string, stderr io.Writer) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.IntVar(&f.cycle, "cycle", 0, "cycle number (required)")
+	fs.StringVar(&f.evolveDir, "evolve-dir", ".evolve", "path to an existing .evolve/ state directory")
+	fs.BoolVar(&f.writeJSON, "json", true, "write acs-verdict.json (default true)")
+	return fs
+}
+
+func (f acsFlags) resolved(name string, stderr io.Writer) (acsFlags, bool) {
+	if f.cycle <= 0 {
+		fmt.Fprintf(stderr, "%s: --cycle is required (must be >0)\n", name)
+		return f, false
+	}
+	evolveDir, err := existingEvolveDir(f.evolveDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", name, err)
+		return f, false
+	}
+	f.evolveDir = evolveDir
+	return f, true
+}
+
+func existingEvolveDir(evolveDir string) (string, error) {
+	abs, err := filepath.Abs(evolveDir)
+	if err != nil {
+		return "", fmt.Errorf("--evolve-dir %q: %w", evolveDir, err)
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		return "", fmt.Errorf("--evolve-dir %s: %w; run from the project root or pass --evolve-dir <project>/.evolve", abs, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("--evolve-dir %s is not a directory; pass --evolve-dir <project>/.evolve", abs)
+	}
+	return abs, nil
 }
 
 func printACSSuiteVerdict(stdout io.Writer, v acssuite.Verdict) {
@@ -138,48 +172,42 @@ func printACSSuiteVerdict(stdout io.Writer, v acssuite.Verdict) {
 }
 
 func runACSRun(args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("evolve acs run", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	var (
-		cycle     int
-		evolveDir string
-		writeJSON bool
-	)
-	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
-	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
-	fs.BoolVar(&writeJSON, "json", true, "write acs-verdict.json (default true)")
+	const name = "evolve acs run"
+	f := acsFlags{}
+	fs := f.flagSet(name, stderr)
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	if cycle <= 0 {
-		fmt.Fprintln(stderr, "evolve acs run: --cycle is required (must be >0)")
+	if f.cycle > 0 && fs.NArg() != 1 {
+		fmt.Fprintf(stderr, "%s: usage: evolve acs run --cycle N <pkg>\n", name)
 		return 10
 	}
-	if fs.NArg() != 1 {
-		fmt.Fprintln(stderr, "evolve acs run: usage: evolve acs run --cycle N <pkg>")
+	f, ok := f.resolved(name, stderr)
+	if !ok {
 		return 10
 	}
-	pkg := fs.Arg(0)
-	v, err := acsrunner.Run(context.Background(), cycle, pkg)
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve acs run: %v\n", err)
-		// Fall through: the partial verdict is still emitted.
+	v, runErr := acsrunner.Run(context.Background(), f.cycle, fs.Arg(0))
+	if runErr != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", name, runErr)
 	}
 	buf, mErr := json.MarshalIndent(v, "", "  ")
 	if mErr != nil {
-		fmt.Fprintf(stderr, "evolve acs run: marshal: %v\n", mErr)
+		fmt.Fprintf(stderr, "%s: marshal: %v\n", name, mErr)
 		return 1
 	}
 	fmt.Fprintf(stdout, "%s\n", buf)
-	if writeJSON {
-		dst, wErr := acsrunner.WriteVerdict(evolveDir, v)
+	if f.writeJSON {
+		dst, wErr := acsrunner.WriteVerdict(f.evolveDir, v)
 		if wErr != nil {
-			fmt.Fprintf(stderr, "evolve acs run: write verdict: %v\n", wErr)
+			fmt.Fprintf(stderr, "%s: write verdict: %v\n", name, wErr)
 			return 1
 		}
 		fmt.Fprintf(stderr, "[acs] verdict written to %s (red=%d/%d)\n", dst, v.RedCount, v.Total)
 	}
-	if v.RedCount > 0 {
+	switch {
+	case runErr != nil:
+		return 1
+	case v.RedCount > 0:
 		return 2
 	}
 	return 0

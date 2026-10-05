@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -306,7 +307,7 @@ func checkPredicateResult(v acssuite.Verdict, res *RunResult) error {
 }
 
 func verifyPredicateReceipt(opts *Options, entry *auditEntry, report string, res *RunResult) error {
-	path := filepath.Join(filepath.Dir(entry.ArtifactPath), acssuite.VerdictFilename)
+	path := filepath.Join(filepath.Dir(entry.ArtifactPath), acsverdict.Filename)
 	raw, err := checkEGPSGate(path, res)
 	if err != nil {
 		return err

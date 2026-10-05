@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -63,6 +64,8 @@ type Options struct {
 	// open (landed) on a probe fault and returns the error, so a non-git root never blocks.
 	IsLandedFn func(sha string) (bool, error)
 
+	MainHeadFn func() (string, error)
+
 	// IsProtectedPath is the lane-routing predicate (cmd/evolve laneForbidden) behind the files-derived
 	// half of the console-routing claim floor; nil disables only that half, and route:"console-*" always refuses.
 	IsProtectedPath func(path string) bool
@@ -98,6 +101,10 @@ func (o *Options) resolveOpts() {
 		o.IsLandedFn = func(sha string) (bool, error) {
 			return shaLandedOnMain(root, sha)
 		}
+	}
+	if o.MainHeadFn == nil {
+		root := o.ProjectRoot
+		o.MainHeadFn = func() (string, error) { return originMainHead(root) }
 	}
 }
 
@@ -148,7 +155,12 @@ func (o Options) mover() *lifecycle.Mover {
 		lifecycle.WithRunWorkspace(func(cycle int) string {
 			return filepath.Join(o.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cycle))
 		}),
-		lifecycle.WithSignals(func() *signalcenter.Center { return o.Signals }))
+		lifecycle.WithSignals(func() *signalcenter.Center { return o.Signals }),
+		lifecycle.WithMainHead(o.MainHeadFn),
+		lifecycle.WithBinding(func(taskID string) (bool, error) {
+			_, bound, err := continuation.ReadRegistryEntry(o.ProjectRoot, taskID)
+			return bound, err
+		}))
 }
 
 // Claim moves taskID's item from inbox/ to processing/cycle-N/, or returns ErrNotFound.

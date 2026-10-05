@@ -46,7 +46,7 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 
 	t.Setenv("EVOLVE_PROJECT_ROOT", project)
 	var out, errb bytes.Buffer
-	code := runPhaseVerify([]string{"widget-check", "--workspace", ws}, &out, &errb)
+	code := phaseCommand{}.runPhaseVerify([]string{"widget-check", "--workspace", ws}, &out, &errb)
 	if code != 0 {
 		t.Fatalf("verify user phase: exit=%d stdout=%q stderr=%q", code, out.String(), errb.String())
 	}
@@ -56,7 +56,7 @@ func TestPhaseVerify_UserPhaseParity(t *testing.T) {
 	}
 	out.Reset()
 	errb.Reset()
-	if code := runPhaseVerify([]string{"widget-check", "--workspace", ws}, &out, &errb); code != 1 {
+	if code := (phaseCommand{}).runPhaseVerify([]string{"widget-check", "--workspace", ws}, &out, &errb); code != 1 {
 		t.Fatalf("malformed user phase should exit 1; got %d (stderr=%q)", code, errb.String())
 	}
 }

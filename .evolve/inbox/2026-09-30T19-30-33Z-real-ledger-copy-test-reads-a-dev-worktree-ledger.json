@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "In a dev worktree whose .evolve/ledger.jsonl has fewer lines than the test needs, the test skips and says why (red first on a 2-line fixture ledger)",
+    "Against a long real ledger it still seals and checks the tail"
+  ],
+  "created_at": "2026-10-01T03:45:00Z",
+  "files": [
+    "go/internal/adapters/ledger/seal_test.go"
+  ],
+  "fix": "Skip unless the found ledger is long enough for what the test asserts (more than the sealed tail it expects), naming the path and its line count in the skip message; or resolve the real ledger through the project-root rule the rest of the code uses instead of walking up directories.",
+  "id": "real-ledger-copy-test-reads-a-dev-worktree-ledger",
+  "kind": "test",
+  "priority_class": "hygiene",
+  "source": "console, 2026-10-01, cl-commenttools local floor",
+  "summary": "go/internal/adapters/ledger/seal_test.go TestSeal_RealLedgerCopy looks for .evolve/ledger.jsonl three to seven directories above the package and uses the first it finds. In a console dev worktree the first hit is the worktree's own .evolve/ledger.jsonl, which holds only the lines its `evolve inbox consume` runs wrote (2 on 2026-10-01 in dev/cl-commenttools), so the test fails with 'real-copy live tail = 2 lines, want 101' and reds `make test` and `make test-integration` for a change that never touched the ledger. With that file moved aside the test passes.",
+  "title": "TestSeal_RealLedgerCopy takes a dev worktree's short ledger for the real one and fails the local floor",
+  "weight": 0.3
+}

@@ -143,7 +143,7 @@ func TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck(t *testing.T) {
 	if len(fails) != 1 || !strings.Contains(fails[0], "internal/prompts") {
 		t.Fatalf("DefaultBuildFloorChecks did not surface the persona-budget breach — the check is UNWIRED; got %v", fails)
 	}
-	res := NewBuildFloorReviewer(DefaultBuildFloorChecks).Review(context.Background(), in)
+	res := BuildHandoffFloor{{Name: "default", Run: DefaultBuildFloorChecks}}.Review(context.Background(), in)
 	if res.Approve || !res.Retry {
 		t.Fatalf("persona-budget breach must REJECT with Retry; got Approve=%v Retry=%v", res.Approve, res.Retry)
 	}

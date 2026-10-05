@@ -11,6 +11,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/fleet` | plans and runs concurrent, file-disjoint cycle lanes | [internal-fleet.md](internal-fleet.md) |
 | `internal/guards` | the in-process trust kernel: the six guards `evolve guard` runs | [internal-guards.md](internal-guards.md) |
 | `internal/inboxbatch` | the inbox item model and the deterministic half of task selection | [internal-inboxbatch.md](internal-inboxbatch.md) |
+| `internal/ipcenv` | the lane protocol keys a parent evolve process sets for its children, their set (`ProtocolKeys`), and the `EVOLVE_` scrub every judging `go test` runs under | [internal-ipcenv.md](internal-ipcenv.md) |
 | `internal/looppreflight` | the readiness gate `evolve loop` runs before the first wave | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/phasecoherence` | drift reports between the hand-edited surfaces that define a phase | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/policy` | loads `.evolve/policy.json` into resolved configuration | [internal-policy.md](internal-policy.md) |
@@ -59,6 +60,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/bridge` | the native agent bridge: drives tmux and headless LLM CLIs for every phase (filled by file group) | [internal-bridge.md](internal-bridge.md) |
 | `internal/acssuite` | the deterministic, host-side EGPS predicate-suite runner: Go lane, scope lint, phantom-binding classification, evidence sealing | [internal-acssuite.md](internal-acssuite.md) |
+| `internal/acsrunner` | the single-package predicate runner behind `evolve acs run`: `go test -json` into an `acs-verdict.json` | [internal-acsrunner.md](internal-acsrunner.md) |
+| `internal/acsverdict` | the one spelling of the `acs-verdict.json` name and path and of the harness-red ids that both verdict writers share | [internal-acsverdict.md](internal-acsverdict.md) |
 | `internal/phases/triage` | the cycle-scope task-selection phase: prompt composition, protected-surface routing, premise drift, carry-forward candidates | [internal-phases-triage.md](internal-phases-triage.md) |
 | `internal/flagregistry` | the declarative SSOT for every `EVOLVE_*` control flag across every reader surface | [internal-flagregistry.md](internal-flagregistry.md) |
 | `cmd/evolve-fake-cli` | the offline stand-in for the claude, codex and agy binaries in E2E tests | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
