@@ -82,9 +82,8 @@ func (o *Orchestrator) loadResumeBootstrap(
 		return boot, err
 	}
 	cs.GoalHash, cs.GoalText = req.GoalHash, req.Context["goal"]
-	cycle := cs.CycleID
-	if cycle == 0 {
-		cycle = resumePoint.CycleID
+	if cs.CycleID == 0 {
+		cs.CycleID = resumePoint.CycleID
 	}
 	if cs.RunID == "" {
 		cs.RunID = MintRunID(o.now())
@@ -93,7 +92,7 @@ func (o *Orchestrator) loadResumeBootstrap(
 	boot.request = req
 	boot.state = state
 	boot.cycleState = cs
-	boot.cycle = cycle
+	boot.cycle = cs.CycleID
 	return boot, nil
 }
 

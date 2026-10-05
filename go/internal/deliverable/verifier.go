@@ -33,8 +33,7 @@ func NewVerifierWithCatalogStage(cat phasespec.Catalog, phaseIO config.Stage) co
 	return &Verifier{resolver: phasecontract.NewCatalogResolver(cat.Get), phaseIO: phaseIO}
 }
 
-// rootsFor is the one ReviewInput-to-Roots translation, shared by the gate, the rung re-check and HostEffects.
-func rootsFor(in core.ReviewInput) phasecontract.Roots {
+func RootsFor(in core.ReviewInput) phasecontract.Roots {
 	return phasecontract.Roots{
 		Workspace: in.Workspace,
 		Worktree:  in.Worktree,
@@ -47,7 +46,7 @@ func rootsFor(in core.ReviewInput) phasecontract.Roots {
 
 // VerifyDeliverable implements core.ContractVerifier without the breaker; an error keeps Verify's fail-open contract.
 func (v *Verifier) VerifyDeliverable(_ context.Context, in core.ReviewInput) (core.ContractVerification, error) {
-	res, err := VerifyWithStage(in.Phase, rootsFor(in), v.resolver, v.phaseIO)
+	res, err := VerifyWithStage(in.Phase, RootsFor(in), v.resolver, v.phaseIO)
 	if err != nil {
 		return core.ContractVerification{}, err
 	}

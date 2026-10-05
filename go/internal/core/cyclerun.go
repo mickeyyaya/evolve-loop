@@ -108,9 +108,9 @@ type cycleRun struct {
 // reviewAndGuard/recordAndBranch consume. These are PER-ITERATION values, NOT
 // cycleRun fields (each iteration re-derives them).
 type dispatchResult struct {
-	resp           PhaseResponse   // runner result; resp.Verdict → result.FinalVerdict + lastVerdict
-	attemptCount   int             // attempt-loop count; read by phaseOutcomeFrom at the record sites
-	phaseWorktree  string          // cs.ActiveWorktree snapshot; ReviewInput.Worktree + correction directives
+	resp           PhaseResponse // runner result; resp.Verdict → result.FinalVerdict + lastVerdict
+	attemptCount   int           // attempt-loop count; read by phaseOutcomeFrom at the record sites
+	phaseWorktree  string
 	treeGuard      *treediff.Guard // pre-phase guard; consumed by the post-phase tree-diff check
 	beforeDirty    []string        // pre-phase dirty snapshot
 	snapshotFailed bool            // pre-phase snapshot failed

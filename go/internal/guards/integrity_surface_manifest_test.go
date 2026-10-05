@@ -163,3 +163,14 @@ func TestProtectedSurfaceManifest_CoversTheCorrectionCompletionPredicate(t *test
 		}
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheBuildHandoffFloor(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/core/build_handoff_floor.go",
+		"/wt/go/internal/core/build_handoff_floor.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q holds the build handoff floor's mandatory half and the review-input projection; a cycle must not be able to empty the floor that grades it", path)
+		}
+	}
+}

@@ -27,7 +27,7 @@ func TestVerifyForClassification_SalvagesPersistsAndReportsOnce(t *testing.T) {
 	in := core.ReviewInput{Phase: "audit", Workspace: ws, ProjectRoot: root, Cycle: 1685, RunID: "r1685"}
 	check := gatesignal.Check{Cycle: 1685, RunID: "r1685", Phase: "audit"}
 
-	res, err := r.VerifyForClassification(check, "audit", rootsFor(in))
+	res, err := r.VerifyForClassification(check, "audit", RootsFor(in))
 	if err != nil || !res.OK {
 		t.Fatalf("the salvaged deliverable verifies OK for classification: ok=%v err=%v violations=%+v", res.OK, err, res.Violations)
 	}
@@ -65,7 +65,7 @@ func TestVerifyForClassification_OutsideEnforceReturnsTheVerifiedBytesUntouched(
 	r := newTestReviewer(config.StageShadow, filepath.Join(t.TempDir(), "breaker.json"), 3)
 	r.phaseIO = config.StageEnforce
 	in := core.ReviewInput{Phase: "audit", Workspace: ws, ProjectRoot: root}
-	res, err := r.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", rootsFor(in))
+	res, err := r.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", RootsFor(in))
 	if err != nil || res.OK || res.Content != fenced {
 		t.Fatalf("below enforce the gate does not persist a salvage, so the classifier sees the verified bytes as they are: ok=%v err=%v", res.OK, err)
 	}
@@ -89,7 +89,7 @@ func TestVerifyForClassification_BaselineIsRecordedOncePerBlock(t *testing.T) {
 	r := newTestReviewer(config.StageEnforce, filepath.Join(t.TempDir(), "breaker.json"), 3)
 	r.phaseIO = config.StageEnforce
 	in := core.ReviewInput{Phase: "audit", Workspace: ws, ProjectRoot: root}
-	if _, err := r.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", rootsFor(in)); err != nil {
+	if _, err := r.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", RootsFor(in)); err != nil {
 		t.Fatal(err)
 	}
 	r.Review(context.Background(), in)
@@ -103,7 +103,7 @@ func TestVerifyForClassification_BaselineIsRecordedOncePerBlock(t *testing.T) {
 	r2.phaseIO = config.StageEnforce
 	in2 := core.ReviewInput{Phase: "audit", Workspace: ws2, ProjectRoot: root2}
 	for i := 0; i < 3; i++ {
-		if res, _ := r2.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", rootsFor(in2)); res.OK {
+		if res, _ := r2.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", RootsFor(in2)); res.OK {
 			t.Fatal("two candidates are never salvaged")
 		}
 	}
@@ -121,7 +121,7 @@ func TestPlainVerifier_IsTheCatalogAwareVerifyWithoutSalvage(t *testing.T) {
 	fenced := "# Audit Report\n\n## Verdict\n**PASS**\n\n## Issues\nnone\n\n```json\n{\"verdict\": \"PASS\"}\n```\n"
 	ws, root := writeAuditReport(t, fenced)
 	in := core.ReviewInput{Phase: "audit", Workspace: ws, ProjectRoot: root}
-	res, err := PlainVerifier{PhaseIO: config.StageEnforce}.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", rootsFor(in))
+	res, err := PlainVerifier{PhaseIO: config.StageEnforce}.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", RootsFor(in))
 	if err != nil || res.OK || res.Content != fenced {
 		t.Fatalf("the Null-Object verifier verifies and never repairs: ok=%v err=%v", res.OK, err)
 	}
@@ -147,7 +147,7 @@ func TestNewReviewerStage_ThreadsBothDialsIntoTheEnginePath(t *testing.T) {
 			r := NewReviewerStage(tc.stage, tc.phaseIO)
 			r.logf = func(string, ...any) {}
 			in := core.ReviewInput{Phase: "audit", Workspace: ws, ProjectRoot: root}
-			res, err := r.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", rootsFor(in))
+			res, err := r.VerifyForClassification(gatesignal.Check{Phase: "audit"}, "audit", RootsFor(in))
 			if err != nil || res.OK != tc.wantOK {
 				t.Fatalf("ok=%v err=%v violations=%+v", res.OK, err, res.Violations)
 			}

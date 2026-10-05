@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -11,10 +12,12 @@ import (
 )
 
 func TestRunSelfcheck_FindingsExitOneAndPrinted(t *testing.T) {
-	orig := buildFloorChecksFn
-	defer func() { buildFloorChecksFn = orig }()
-	buildFloorChecksFn = func(ctx context.Context, in core.ReviewInput) []string {
-		return []string{"pkg/x: unit tests FAIL", "apicover naming floor: 1 package"}
+	orig := buildHandoffFloorFor
+	defer func() { buildHandoffFloorFor = orig }()
+	buildHandoffFloorFor = func(string) core.BuildHandoffFloor {
+		return core.BuildHandoffFloor{{Name: "stub", Run: func(ctx context.Context, in core.ReviewInput) []string {
+			return []string{"pkg/x: unit tests FAIL", "apicover naming floor: 1 package"}
+		}}}
 	}
 	var out, errw strings.Builder
 	rc := runSelfcheck([]string{"build", "--worktree", t.TempDir()}, nil, &out, &errw)
@@ -27,16 +30,30 @@ func TestRunSelfcheck_FindingsExitOneAndPrinted(t *testing.T) {
 }
 
 func TestRunSelfcheck_CleanExitZero(t *testing.T) {
-	orig := buildFloorChecksFn
-	defer func() { buildFloorChecksFn = orig }()
-	buildFloorChecksFn = func(context.Context, core.ReviewInput) []string { return nil }
+	r := newHandoffReplay(t, 1788, nil)
+	r.commitBuild(t, map[string]string{replayLint: replayLintBody})
+	r.writeWorkspace(t, "build-report.md", "# Build Report\n\n## Changes\n- `"+replayLint+"`\n")
+	orig := buildHandoffFloorFor
+	defer func() { buildHandoffFloorFor = orig }()
+	buildHandoffFloorFor = func(string) core.BuildHandoffFloor { return nil }
 	var out strings.Builder
-	rc := runSelfcheck([]string{"build", "--worktree", t.TempDir()}, nil, &out, &out)
-	if rc != 0 {
-		t.Fatalf("clean check must exit 0, got %d", rc)
+	rc := runSelfcheck([]string{"build", "--worktree", r.worktree}, nil, &out, &out)
+	if rc != 0 || !strings.Contains(out.String(), "GREEN") || !strings.Contains(out.String(), "safe to hand off") {
+		t.Fatalf("a bound, well-formed build with a green floor exits 0 and says GREEN (handoff evidence): rc=%d\n%s", rc, out.String())
 	}
-	if !strings.Contains(out.String(), "GREEN") {
-		t.Fatalf("clean run must say GREEN explicitly (handoff evidence):\n%s", out.String())
+}
+
+func TestRunSelfcheck_WithoutACycleBindingNeverClaimsSafe(t *testing.T) {
+	orig := buildHandoffFloorFor
+	defer func() { buildHandoffFloorFor = orig }()
+	buildHandoffFloorFor = func(string) core.BuildHandoffFloor { return nil }
+	var out, errw strings.Builder
+	rc := runSelfcheck([]string{"build", "--worktree", t.TempDir()}, nil, &out, &errw)
+	if rc == 0 || strings.Contains(out.String(), "safe to hand off") || !strings.Contains(errw.String(), "no cycle binding") {
+		t.Fatalf("an unbound worktree has no build report to hand off and must say it could not bind: rc=%d\nstdout=%s\nstderr=%s", rc, out.String(), errw.String())
+	}
+	if got := selfcheckGreen("/wt", errors.New("no state")); !strings.Contains(got, "without a cycle binding") || strings.Contains(got, "safe to hand off") {
+		t.Fatalf("a GREEN with no cycle binding must not claim it predicts the floor: %q", got)
 	}
 }
 
@@ -51,10 +68,10 @@ func TestRunSelfcheck_UsageOnBadArgs(t *testing.T) {
 }
 
 func TestSelfcheckSeam_DefaultsToBuildFloorChecks(t *testing.T) {
-	want := reflect.ValueOf(productionBuildFloorChecks).Pointer()
-	got := reflect.ValueOf(buildFloorChecksFn).Pointer()
+	want := reflect.ValueOf(probeBuildHandoffFloor).Pointer()
+	got := reflect.ValueOf(buildHandoffFloorFor).Pointer()
 	if want != got {
-		t.Fatal("seam must default to productionBuildFloorChecks — the CLI and the floor must run the SAME checks")
+		t.Fatal("seam must default to probeBuildHandoffFloor — the probes and the floor must run the SAME checks")
 	}
 }
 
