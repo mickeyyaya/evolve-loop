@@ -203,7 +203,7 @@ The seven driver kinds and what each one can do across the 4 layers:
 
 | Driver | READ window | DECIDE: auto-respond rules | DECIDE: keystroke target | INJECT: paste-buffer | VERIFY: artifact contract |
 |---|---|---|---|---|---|
-| `claude-tmux` | visible pane (`bootScrollback=0`) | 5+ rules (AskUserQuestion ms/ss, model deprecation, terminal resize, auth, rate) | yes | yes | yes |
+| `claude-tmux` | visible pane (`bootScrollback=0`) | 5+ rules (AskUserQuestion ms/ss, model deprecation, terminal resize, auth, rate, plan approval; the folder-trust dialog: numbered `trust_prompt`, and for the unnumbered No-default dialog a navigation rule (`Down`) and a confirm rule (`Enter`, only with the cursor seen on Yes), [ADR-0118](adr/0118-confirm-a-menu-only-on-the-observed-choice.md)) | yes | yes | yes |
 | `codex-tmux` | scrollback 200 (alt-screen) | trust_prompt + per_edit_approval (cycle-124 G1b) + auth + rate | yes | yes | yes |
 | `agy-tmux` | visible pane | trust_prompt + auth_recheck + rate_limit + quota_exhausted + permission_prompt | yes | yes | yes |
 | `ollama-tmux` | visible pane | minimal (no agentic tool use → no permission prompts) | yes | yes | yes (write phases REJECTED by driver — `TestOllamaTmux_RejectsWritePhase`) |

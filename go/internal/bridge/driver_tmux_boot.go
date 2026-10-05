@@ -88,10 +88,7 @@ func bootTmuxREPL(
 	observeModelDispatch(deps, lp.modelDispatch)
 	fmt.Fprintf(deps.Stderr, "%s launching: %s\n", prep.prefix, launchCmd)
 
-	interval := lp.bootIntervalS
-	if interval <= 0 {
-		interval = 1
-	}
+	interval := defaultIfZero(lp.bootIntervalS, 1)
 	bootDeadlineS := defaultIfZero(deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 	const fixedReadinessWaits = 2
 	bootWaitMS := int64(fixedReadinessWaits) * 1000
@@ -99,12 +96,17 @@ func bootTmuxREPL(
 	for elapsed := 0; elapsed < bootDeadlineS; elapsed += interval {
 		deps.Sleep(time.Duration(interval) * time.Second)
 		bootWaitMS += int64(interval) * 1000
-		pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+		pane, capErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+		if capErr != nil {
+			continue
+		}
 		if lp.tickDuringBoot {
-			// A once-only dialog can contain the normal prompt marker. Re-poll
-			// after dismissal so prompt delivery cannot land in the stale dialog.
-			ar.tick(ctx, lp.session)
-			if ar.firedOnceThisTick {
+			sentKeys, err := ar.bootTick(ctx, lp.session, pane)
+			if err != nil {
+				fmt.Fprintf(deps.Stderr, "%s FAIL: %v\n", prep.prefix, err)
+				return nil, ExitREPLBootTimeout, nil
+			}
+			if sentKeys {
 				continue
 			}
 		}
@@ -116,11 +118,8 @@ func bootTmuxREPL(
 			fmt.Fprintf(deps.Stderr, "%s boot interstitial dismissed before prompt delivery\n", prep.prefix)
 			continue
 		}
-		if lp.guardDeadShell {
-			if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
-				fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", prep.prefix, shellCmd)
-				continue
-			}
+		if lp.markerOverDeadShell(ctx, deps, prep.prefix) {
+			continue
 		}
 		promptSeen = true
 		fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", prep.prefix, lp.promptMarker)
@@ -136,4 +135,15 @@ func bootTmuxREPL(
 
 	releaseOnError = false
 	return admitRelease, ExitOK, nil
+}
+
+func (lp tmuxLaunch) markerOverDeadShell(ctx context.Context, deps Deps, prefix string) bool {
+	if !lp.guardDeadShell {
+		return false
+	}
+	shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session)
+	if isShell {
+		fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", prefix, shellCmd)
+	}
+	return isShell
 }
