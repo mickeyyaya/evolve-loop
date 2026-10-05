@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the Antigravity CLI (agy) joins every launch's last-resort fallback tail (2026-10-05)
+
+- Operator direction: "Add antigravity cli in the pipeline." Since the 2026-06-07 ban (gemini-3.5-flash judged error-prone), `workflow.universal_fallback_exclude` defaulted to `["agy"]`, so agy ran only the phases whose profiles name it as primary (router, memo, reflector, the fast scans) and never rescued a walled phase.
+- The checked-in `.evolve/policy.json` now sets `workflow.universal_fallback_exclude: []`. agy joins the last-resort tail of every phase whose `allowed_clis` allows it (scout, triage, plan-reviewer, retrospective and the analytic phases; a codex-primary one walks codex → claude → agy). It does not reach builder, tester or the Claude-family floor agents, so with codex and Claude both walled a cycle gets past scout and triage on agy and still stops at tdd or build. Why now, and agy's current models: [ADR-0104's 2026-10-05 amendment](docs/architecture/adr/0104-fallback-is-a-property-of-the-bridge-handle.md).
+- Unchanged: the Claude-family floor agents (auditor, tdd-engineer, adversarial-review, spec-verifier, spec-verify) still fall back in-family only; the compiled default stays `["agy"]` for other installs.
+- Test, red first: `TestTheCheckedInPolicyPutsAgyInTheLastResortTail` loads the checked-in policy and runs the real `universalFallbackTail` (it was `[claude-tmux codex-tmux]` before).
+- Docs: ADR-0104 amendment; runtime-reference (the family-ban row); the cmd-evolve package note; CLAUDE.md's list of keys the checked-in policy sets.
+
 ## Fixed — claude's folder-trust dialog is confirmed only once the cursor is seen on Yes, and a boot that cannot clear a dialog fails fast as a boot timeout (2026-10-05)
 
 - **What was wrong and how it showed.** claude 2.1.252+ opens a fresh folder with a trust menu whose cursor starts on "❯ No, exit". The claude-tmux rule `trust_prompt_no_default` answered it with one blind burst, `Down,Enter`. At wave 59's readiness gate the Down was dropped (it reached claude about when the dialog mounted) and the Enter was not: it confirmed "No, exit", claude exited to zsh, the dead-shell guard rejected the marker until the 60 s deadline, and the `bridge-boot` check halted the loop (`rc=80`, `stop_reason=preflight_failed`). It was 1 of the 38 fires in the loop logs of waves 30–59b. Engine gaps sat behind it: the boot wait judged readiness on a pane its own tick had just changed, re-polling only after a fire-once rule (the dialog's `❯` cursor is claude's REPL marker); the recipe boot ticked one frame and judged readiness on another; and both boot waits discarded the auto-responder's loop guard (rc 86).
