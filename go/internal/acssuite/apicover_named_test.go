@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 )
 
 // TestParseGoTestJSON_SkipCarriesSkipExitCode names the acssuite.SkipExitCode
@@ -22,19 +24,16 @@ func TestParseGoTestJSON_SkipCarriesSkipExitCode(t *testing.T) {
 	}
 }
 
-// TestWriteVerdict_LandsAtVerdictFilename names acssuite.VerdictFilename: the
-// writer and every external reader/retirement path agree on one spelling
-// because WriteVerdict derives its destination from the const.
 func TestWriteVerdict_LandsAtVerdictFilename(t *testing.T) {
 	dir := t.TempDir()
 	path, err := WriteVerdict(dir, Verdict{Cycle: 1603, Verdict: "PASS"})
 	if err != nil {
 		t.Fatalf("WriteVerdict: %v", err)
 	}
-	if filepath.Base(path) != VerdictFilename {
-		t.Errorf("verdict written to %q, want basename %q", path, VerdictFilename)
+	if filepath.Base(path) != acsverdict.Filename {
+		t.Errorf("verdict written to %q, want basename %q", path, acsverdict.Filename)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "runs", "cycle-1603", VerdictFilename)); err != nil {
-		t.Errorf("verdict not at the canonical VerdictFilename path: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, "runs", "cycle-1603", acsverdict.Filename)); err != nil {
+		t.Errorf("verdict not at the canonical acsverdict.Filename path: %v", err)
 	}
 }

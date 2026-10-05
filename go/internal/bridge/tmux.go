@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // TmuxController is the seam over the `tmux` operations the *-tmux
@@ -80,7 +82,7 @@ const TmuxSocket = "evolve-bridge"
 // TmuxSocketEnv overrides the active socket name for a run; it is an IPC
 // channel from the loop to its bridge subprocesses, not a user flag. Empty
 // or unset falls back to the shared TmuxSocket default.
-const TmuxSocketEnv = "EVOLVE_TMUX_SOCKET"
+const TmuxSocketEnv = ipcenv.TmuxSocketKey
 
 // DeriveRunSocket builds a per-run socket name from a run-scoped integer key
 // (the loop master's pid). Result: "evolve-bridge-p<pid>" — a valid tmux -L name.

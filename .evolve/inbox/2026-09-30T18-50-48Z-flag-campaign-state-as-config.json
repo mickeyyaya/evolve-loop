@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "flagprogress arms from config under the state root: with the campaign state active and no environment variable, a cycle whose working tree deletes no registry row fails; with it inactive the gate skips",
+    "no reader or mention of EVOLVE_FLAG_CAMPAIGN remains in code or config, acs.predicate_env no longer names it, and internal/acssuite.TestCuratedPredicatesReceiveEveryEvolveKeyTheyRead still passes",
+    "evolve campaign run sets and clears the campaign state itself (a test drives the command or its composition root), so the launch recipe needs no env export",
+    "ADR-0063 and ADR-0114 name the new path",
+    "acs.predicate_env and its bound are removed"
+  ],
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/acs/regression/flagprogress/progress_test.go",
+    ".evolve/policy.json",
+    "go/internal/policy/acs_paths.go",
+    "go/internal/acssuite/operator_env_test.go",
+    "go/cmd/evolve/cmd_campaign.go",
+    "docs/architecture/adr/0063-autonomous-loop-integrity-hardening.md",
+    "docs/architecture/adr/0114-the-acs-verdict-is-always-written-and-complete.md"
+  ],
+  "fix": "Represent an active flag campaign as config-as-code under the state root (a policy.json flag_campaign block, or a campaign-state file that evolve campaign run writes under .evolve/ and clears at the end), read by flagprogress from ${EVOLVE_PROJECT_ROOT}/.evolve instead of the environment; keep fail-closed quarantine when the state says active and HEAD is unreachable; then drop EVOLVE_FLAG_CAMPAIGN from acs.predicate_env and from ADR-0063, ADR-0114, the flag-campaign research doc, policy-config.md, runtime-reference.md, go/acs/README.md and the acssuite/policy notes. Once the campaign switch is config, acs.predicate_env has no key left to forward: delete the field, its bound (acssuite.forwardableKeys and the refusal warnings), its tests and its docs rather than leaving an empty forwarding mechanism.",
+  "id": "flag-campaign-state-as-config",
+  "kind": "hardening",
+  "priority_class": "stability",
+  "source": "console lane fix/acssuite-run-and-report, architecture review finding 1 (2026-10-01)",
+  "summary": "The ADR-0063 flagprogress gate (go/acs/regression/flagprogress/progress_test.go:163) arms on os.Getenv(\"EVOLVE_FLAG_CAMPAIGN\") == \"1\", an unregistered operator env flag exported by hand at campaign launch. Since ADR-0114 the ACS suite strips every EVOLVE_ key from the predicate environment, so the key reaches the gate only because the checked-in .evolve/policy.json names it in acs.predicate_env. A skip is what the gate does both outside a campaign and when the key is lost, and the key cannot be named in production Go (flagreaders/envtaint gates; flagregistry at FlagCeiling 26). Per the zero-flags rule, campaign state belongs in config under the state root.",
+  "title": "Move the flag-campaign switch from EVOLVE_FLAG_CAMPAIGN to config under the state root",
+  "weight": 0.5
+}

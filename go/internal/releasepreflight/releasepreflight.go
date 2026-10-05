@@ -17,6 +17,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
@@ -158,9 +159,7 @@ func defaultCurrentBranch(repoRoot string) (string, error) {
 }
 
 func defaultGateTestRunner(repoRoot string, suite string) error {
-	cmd := exec.Command("go", "test", "-count=1", suite)
-	cmd.Dir = filepath.Join(repoRoot, "go")
-	cmd.Env = stripBypassEnv(os.Environ())
+	cmd := goTestCommand(repoRoot, "-count=1", suite)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("go test %s: %w\n%s", suite, err, out)
 	}
@@ -180,23 +179,17 @@ func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
 	return naminguard.Scan(repoRoot, m)
 }
 
-func stripBypassEnv(env []string) []string {
-	out := make([]string, 0, len(env))
-	for _, kv := range env {
-		if strings.HasPrefix(kv, "EVOLVE_BYPASS_") {
-			continue
-		}
-		out = append(out, kv)
-	}
-	return out
+func goTestCommand(repoRoot string, args ...string) *exec.Cmd {
+	cmd := exec.Command(defaultGoBinFn(), append([]string{"test"}, args...)...)
+	cmd.Dir = filepath.Join(repoRoot, "go")
+	cmd.Env = ipcenv.Scrub(os.Environ())
+	return cmd
 }
 
 var defaultGoBinFn = func() string { return "go" }
 
 func defaultSimulationRunner(repoRoot string) error {
-	goBin := defaultGoBinFn()
-	cmd := exec.Command(goBin, "test", "./internal/bridge/", "-run", "AutoRespond|SendKeySequence|RealizeFor")
-	cmd.Dir = filepath.Join(repoRoot, "go")
+	cmd := goTestCommand(repoRoot, "./internal/bridge/", "-run", "AutoRespond|SendKeySequence|RealizeFor")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("auto-respond regression tests failed: %w (output: %s)", err, out)
 	}

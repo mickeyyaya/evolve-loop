@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
@@ -395,7 +396,7 @@ func sealTestPredicateEvidence(t *testing.T, id acssuite.EvidenceIdentity, repor
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustWrite(t, filepath.Join(filepath.Dir(reportPath), acssuite.VerdictFilename), string(raw))
+	mustWrite(t, filepath.Join(filepath.Dir(reportPath), acsverdict.Filename), string(raw))
 	if err := acssuite.SealEvidence(reportPath, raw, id); err != nil {
 		t.Fatal(err)
 	}

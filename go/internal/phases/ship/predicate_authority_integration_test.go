@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
@@ -19,7 +20,7 @@ func TestVerifyAuditBinding_PredicateEvidenceCannotChangeAfterAudit(t *testing.T
 		t.Run(mutation, func(t *testing.T) {
 			repo := makeRepo(t)
 			ws := filepath.Join(repo, ".evolve", "runs", "cycle-1")
-			path := filepath.Join(ws, acssuite.VerdictFilename)
+			path := filepath.Join(ws, acsverdict.Filename)
 			reportPath := filepath.Join(ws, "audit-report.md")
 			v, err := acssuite.Run(acssuite.Options{Root: repo, Cycle: 1, GoExec: func(_ context.Context, _, pattern string, _ []string) (string, error) {
 				if pattern != "./acs/cycle1" {

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 )
 
 func runACSSuiteCLI(t *testing.T, args ...string) (code int, stdout, stderr string) {
@@ -21,7 +22,7 @@ func runACSSuiteCLI(t *testing.T, args ...string) (code int, stdout, stderr stri
 }
 
 func suiteVerdictPath(evolveDir string, cycle string) string {
-	return filepath.Join(evolveDir, "runs", "cycle-"+cycle, acssuite.VerdictFilename)
+	return filepath.Join(evolveDir, "runs", "cycle-"+cycle, acsverdict.Filename)
 }
 
 func readSuiteVerdict(t *testing.T, path string) acssuite.Verdict {
@@ -127,13 +128,13 @@ func TestRunACSSuite_SuiteErrorIsHardFailureExit1(t *testing.T) {
 	assertNoSuiteVerdict(t, suiteVerdictPath(evolveDir, "7"))
 }
 
-func TestRunACSSuite_NoPredicateTreePassesAndWritesVerdict(t *testing.T) {
+func TestRunACSSuite_NoPredicateTreeWritesARedVerdictAndExits2(t *testing.T) {
 	root, evolveDir := t.TempDir(), t.TempDir()
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", root, "--evolve-dir", evolveDir)
-	if code != 0 {
-		t.Fatalf("exit = %d, want 0 (stderr=%q)", code, stderr)
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2: a cycle with no predicates is a red, never a pass (stderr=%q)", code, stderr)
 	}
-	if want := "[acs suite] cycle=7 verdict=PASS green=0 red=0 skip=0 total=0 (cycle=0 regression=0 red-team=0)\n"; stdout != want {
+	if want := "[acs suite] cycle=7 verdict=FAIL green=0 red=1 skip=0 total=1 (cycle=1 regression=0 red-team=0)\n  RED egps/no-predicates (exit=1)\n"; stdout != want {
 		t.Errorf("stdout = %q, want %q", stdout, want)
 	}
 	dst := suiteVerdictPath(evolveDir, "7")
@@ -141,18 +142,41 @@ func TestRunACSSuite_NoPredicateTreePassesAndWritesVerdict(t *testing.T) {
 		t.Errorf("stderr = %q, want it to contain %q", stderr, want)
 	}
 	v := readSuiteVerdict(t, dst)
-	if v.Cycle != 7 || v.Verdict != "PASS" || !v.ShipEligible || v.SuiteRoot != root {
-		t.Errorf("verdict = {cycle:%d verdict:%q ship_eligible:%v suite_root:%q}, want {7 PASS true %q}", v.Cycle, v.Verdict, v.ShipEligible, v.SuiteRoot, root)
+	if v.Cycle != 7 || v.Verdict != "FAIL" || v.ShipEligible || v.SuiteRoot != root || len(v.RedIDs) != 1 || v.RedIDs[0] != "egps/no-predicates" {
+		t.Errorf("verdict = {cycle:%d verdict:%q ship_eligible:%v suite_root:%q red_ids:%v}, want {7 FAIL false %q [egps/no-predicates]}", v.Cycle, v.Verdict, v.ShipEligible, v.SuiteRoot, v.RedIDs, root)
+	}
+}
+
+func TestRunACSSuite_AnEvolveDirThatIsNotAnExistingDirectoryIsRefused(t *testing.T) {
+	const relative = "acs-suite-relative-evolve-dir-must-not-exist"
+	t.Cleanup(func() { _ = os.RemoveAll(relative) })
+	cases := map[string]string{
+		"relative to the cwd": relative,
+		"absolute but absent": filepath.Join(t.TempDir(), "absent", ".evolve"),
+	}
+	for name, evolveDir := range cases {
+		t.Run(name, func(t *testing.T) {
+			code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", t.TempDir(), "--evolve-dir", evolveDir)
+			if code != 10 {
+				t.Fatalf("exit = %d, want 10 (stderr=%q)", code, stderr)
+			}
+			if !strings.Contains(stderr, "--evolve-dir") || stdout != "" {
+				t.Errorf("stdout=%q stderr=%q, want only a usage error naming --evolve-dir", stdout, stderr)
+			}
+			if _, err := os.Stat(evolveDir); !errors.Is(err, fs.ErrNotExist) {
+				t.Errorf("a refused run must create no evolve tree at %s (stat err=%v)", evolveDir, err)
+			}
+		})
 	}
 }
 
 func TestRunACSSuite_JSONFalseSkipsVerdictWrite(t *testing.T) {
 	root, evolveDir := t.TempDir(), t.TempDir()
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", root, "--evolve-dir", evolveDir, "--json=false")
-	if code != 0 {
-		t.Fatalf("exit = %d, want 0 (stderr=%q)", code, stderr)
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2 (stderr=%q)", code, stderr)
 	}
-	if !strings.HasPrefix(stdout, "[acs suite] cycle=7 verdict=PASS ") {
+	if !strings.HasPrefix(stdout, "[acs suite] cycle=7 verdict=FAIL ") {
 		t.Errorf("stdout = %q, want the summary line even without a verdict file", stdout)
 	}
 	if strings.Contains(stderr, "verdict written") {
@@ -162,15 +186,15 @@ func TestRunACSSuite_JSONFalseSkipsVerdictWrite(t *testing.T) {
 }
 
 func TestRunACSSuite_VerdictWriteFailureExits1AfterSummary(t *testing.T) {
-	blocker := filepath.Join(t.TempDir(), "evolve-is-a-file")
-	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+	evolveDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(evolveDir, "runs"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", t.TempDir(), "--evolve-dir", blocker)
+	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", t.TempDir(), "--evolve-dir", evolveDir)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1 when the verdict cannot be written (stderr=%q)", code, stderr)
 	}
-	if !strings.HasPrefix(stdout, "[acs suite] cycle=7 verdict=PASS ") {
+	if !strings.HasPrefix(stdout, "[acs suite] cycle=7 verdict=FAIL ") {
 		t.Errorf("stdout = %q, want the summary printed before the write is attempted", stdout)
 	}
 	if !strings.Contains(stderr, "evolve acs suite: write verdict: ") {
@@ -186,8 +210,8 @@ func TestRunACSSuite_DotRootResolvesActiveWorktreeAndPlaneRoot(t *testing.T) {
 	evolveDir := filepath.Join(plane, ".evolve")
 	writeCycleStateN(t, evolveDir, 7, `{"active_worktree":"`+worktree+`"}`)
 	code, _, stderr := runACSSuiteCLI(t, "--cycle", "7", "--evolve-dir", evolveDir)
-	if code != 0 {
-		t.Fatalf("exit = %d, want 0 (stderr=%q)", code, stderr)
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2 for the predicate-less fixture (stderr=%q)", code, stderr)
 	}
 	v := readSuiteVerdict(t, suiteVerdictPath(evolveDir, "7"))
 	if v.SuiteRoot != worktree {
@@ -203,8 +227,8 @@ func TestRunACSSuite_ExplicitRootIsNotOverriddenByActiveWorktree(t *testing.T) {
 	evolveDir := filepath.Join(plane, ".evolve")
 	writeCycleStateN(t, evolveDir, 7, `{"active_worktree":"`+worktree+`"}`)
 	code, _, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", explicit, "--evolve-dir", evolveDir)
-	if code != 0 {
-		t.Fatalf("exit = %d, want 0 (stderr=%q)", code, stderr)
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2 for the predicate-less fixture (stderr=%q)", code, stderr)
 	}
 	if v := readSuiteVerdict(t, suiteVerdictPath(evolveDir, "7")); v.SuiteRoot != explicit {
 		t.Errorf("suite_root = %q, want the explicit --root %q", v.SuiteRoot, explicit)
@@ -231,5 +255,44 @@ func TestRunACSSuite_RedPredicateExits2AndListsIt(t *testing.T) {
 	v := readSuiteVerdict(t, suiteVerdictPath(evolveDir, "7"))
 	if v.Verdict != "FAIL" || v.RedCount != 1 || v.ShipEligible {
 		t.Errorf("verdict = {verdict:%q red:%d ship_eligible:%v}, want {FAIL 1 false}", v.Verdict, v.RedCount, v.ShipEligible)
+	}
+}
+
+func TestRunACSRun_AnEvolveDirThatIsNotAnExistingDirectoryIsRefused(t *testing.T) {
+	const relative = "acs-run-relative-evolve-dir-must-not-exist"
+	t.Cleanup(func() { _ = os.RemoveAll(relative) })
+	var out, errb bytes.Buffer
+	code := runACS([]string{"run", "--cycle", "7", "--evolve-dir", relative, "./no-such-predicate-package"}, nil, &out, &errb)
+	if code != 10 {
+		t.Fatalf("exit = %d, want 10 (stderr=%q)", code, errb.String())
+	}
+	if !strings.Contains(errb.String(), "evolve acs run: --evolve-dir") {
+		t.Errorf("stderr = %q, want a usage error naming --evolve-dir", errb.String())
+	}
+	if _, err := os.Stat(relative); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a refused run must create no evolve tree under the cwd (stat err=%v)", err)
+	}
+}
+
+func TestRunACSRun_ARunThatCouldNotExecuteExits1WithAFailVerdict(t *testing.T) {
+	evolveDir := t.TempDir()
+	var out, errb bytes.Buffer
+	code := runACS([]string{"run", "--cycle", "7", "--evolve-dir", evolveDir, "./no-such-predicate-package"}, nil, &out, &errb)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1: an acs run that could not execute must never exit as a pass (stderr=%q)", code, errb.String())
+	}
+	data, err := os.ReadFile(suiteVerdictPath(evolveDir, "7"))
+	if err != nil {
+		t.Fatalf("the partial verdict is still written: %v", err)
+	}
+	var v struct {
+		Verdict      string `json:"verdict"`
+		ShipEligible bool   `json:"ship_eligible"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		t.Fatal(err)
+	}
+	if v.Verdict != "FAIL" || v.ShipEligible {
+		t.Errorf("verdict=%q ship_eligible=%v, want a FAIL that cannot ship", v.Verdict, v.ShipEligible)
 	}
 }

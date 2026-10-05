@@ -4,6 +4,11 @@ import "testing"
 
 const repoRoot = "../.."
 
+const (
+	unrelatedLeafFile    = "internal/flagregistry/registry.go"
+	unrelatedLeafPackage = "github.com/mickeyyaya/evolve-loop/go/internal/flagregistry"
+)
+
 func TestTransitivePackageSet_ResolvesTransitiveImport(t *testing.T) {
 	set, err := TransitivePackageSet([]string{"internal/fleet/partition.go"}, repoRoot)
 	if err != nil {
@@ -20,9 +25,8 @@ func TestTransitivePackageSet_NoCrossContaminationFromUnrelatedPackage(t *testin
 	if err != nil {
 		t.Fatalf("TransitivePackageSet: %v", err)
 	}
-	const unrelated = "github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
-	if set[unrelated] {
-		t.Errorf("fleet does not import acsrunner (verified via go list -deps); set must not contain %q", unrelated)
+	if set[unrelatedLeafPackage] {
+		t.Errorf("fleet does not import %s (verified via go list -deps); set must not contain it", unrelatedLeafPackage)
 	}
 }
 
@@ -59,5 +63,21 @@ func TestIsGlobalZone_OrdinarySourceFile_NotGlobalZone(t *testing.T) {
 func TestGlobalZoneFiles_NonEmpty(t *testing.T) {
 	if len(GlobalZoneFiles()) == 0 {
 		t.Errorf("GlobalZoneFiles() must list at least go.mod/go.sum")
+	}
+}
+
+func TestUnrelatedLeafFixture_SharesNoPackageWithFleet(t *testing.T) {
+	leaf, err := TransitivePackageSet([]string{unrelatedLeafFile}, repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fleet, err := TransitivePackageSet([]string{"internal/fleet/partition.go"}, repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pkg := range leaf {
+		if fleet[pkg] {
+			t.Errorf("fixture %s shares %s with fleet, so the partition tests that use it as an unrelated package cannot split it from fleet; point unrelatedLeafFile at a package with no import shared with fleet", unrelatedLeafFile, pkg)
+		}
 	}
 }
