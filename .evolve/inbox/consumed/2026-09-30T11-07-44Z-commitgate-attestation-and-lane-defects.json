@@ -3,6 +3,12 @@
     "Each defect has a red-first test",
     "The binary guard's refusals are pinned by a Run-level test (the moved guard is unpinned today)"
   ],
+  "consumed": {
+    "at": "2026-09-30T18:28:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Attestation.Marshal encodes every value with encoding/json (layout unchanged); laneNode skips files deleted from the working tree; a failing gofmt now fails the Go lane (checkGofmt); changedFiles runs under Run's ctx; the binary guard's refusal and fault are pinned through Run. Each with a red-first test in go/internal/commitgate."
+  },
   "created_at": "2026-09-30T10:52:40Z",
   "files": [
     "go/internal/commitgate/attestation.go",

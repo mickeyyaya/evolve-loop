@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A lane build that removes a history-carrying comment group without adding its text to its package's archive page is named by the floor (red first), in shadow a WARN and in enforce a correction",
+    "The rule is commentaudit.RemovedHistoryAcrossDiff + UnrecordedHistory, with no second copy"
+  ],
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/internal/core/comment_floor.go",
+    "go/internal/commentaudit/history.go",
+    "go/internal/policy"
+  ],
+  "fix": "Add a build-floor check beside comment_floor (go/internal/core/comment_floor.go) that runs commentaudit.RemovedHistoryAcrossDiff then commentaudit.UnrecordedHistory over the worktree diff against its base, staged shadow then enforce via policy.json like comment_floor; or have the build phase run `commentaudit history` automatically before handoff.",
+  "id": "loop-history-comment-removal-needs-an-archive-entry",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console lane cl-commenttools, 2026-10-01, ADR-0115 consequence",
+  "summary": "The commit gate now refuses a console change that removes a history-carrying comment group unless the change adds it to docs/history/code-comments (ADR-0115). Loop lanes ship with --class cycle and never pass through the commit gate, so a lane that deletes history-bearing code still lands it unrecorded.",
+  "title": "Loop lanes can remove history-carrying comments without recording them in the history archive",
+  "weight": 0.45
+}

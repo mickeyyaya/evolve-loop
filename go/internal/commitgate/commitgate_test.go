@@ -2,10 +2,12 @@ package commitgate
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -257,6 +259,50 @@ func TestRun_GofmtUnformatted_ExitFail(t *testing.T) {
 	}
 }
 
+func TestRun_AFailingGofmtFailsTheGoLane(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "go.mod"), "module example.com/x\n\ngo 1.22\n")
+	mustWrite(t, filepath.Join(root, "x.go"), "package x\n")
+	o := baseOpts(root, "shasum", "go")
+	o.Reviewers = "code-simplifier,go-reviewer"
+	sr := &scriptRunner{rules: []scriptRule{
+		{matchPrefix: "git diff --name-only HEAD", stdout: "x.go\n"},
+		{matchPrefix: "gofmt -s -l", stdout: "gofmt: signal: killed\n", exit: 2},
+	}}
+	o.Runner = sr.run()
+
+	res := o.Run(context.Background())
+
+	if res.ExitCode != ExitFail || slices.Contains(res.ChecksPassed, "go:gofmt") || res.Attestation != nil {
+		t.Fatalf("ExitCode = %d checks = %v, want ExitFail with no go:gofmt: a gofmt that cannot run has not checked the format (%v)", res.ExitCode, res.ChecksPassed, res.Logs)
+	}
+	if logs := strings.Join(res.Logs, "\n"); !strings.Contains(logs, "could not check x.go") || !strings.Contains(logs, "signal: killed") {
+		t.Errorf("the log names the file and gofmt's own error: %v", res.Logs)
+	}
+}
+
+type runContextKey struct{}
+
+func TestRun_ListsTheChangeUnderItsOwnContext(t *testing.T) {
+	t.Parallel()
+	ctx := context.WithValue(context.Background(), runContextKey{}, "run")
+	var listedUnder any
+	o := baseOpts(t.TempDir(), "shasum")
+	o.Runner = func(ctx context.Context, name, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+		if name == "git" && strings.Join(args, " ") == "diff --name-only HEAD" {
+			listedUnder = ctx.Value(runContextKey{})
+		}
+		return 0, nil
+	}
+
+	o.Run(ctx)
+
+	if listedUnder != "run" {
+		t.Errorf("git diff --name-only HEAD ran under %v, want Run's context so a cancelled gate stops listing", listedUnder)
+	}
+}
+
 func TestRun_GolangciLintRecordedWhenPresent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -363,8 +409,8 @@ func TestRun_AttestationStableBytes(t *testing.T) {
   "tool": "shasum"
 }
 `
-	if got := string(att.Marshal()); got != want {
-		t.Fatalf("Marshal mismatch:\n--- got ---\n%q\n--- want ---\n%q", got, want)
+	if got, err := att.Marshal(); err != nil || string(got) != want {
+		t.Fatalf("Marshal mismatch (%v):\n--- got ---\n%q\n--- want ---\n%q", err, got, want)
 	}
 }
 
@@ -379,8 +425,50 @@ func TestRun_EmptyArraysMarshalInline(t *testing.T) {
   "tool": "sha256sum"
 }
 `
-	if got := string(att.Marshal()); got != want {
-		t.Fatalf("empty-array Marshal mismatch:\n%q", got)
+	if got, err := att.Marshal(); err != nil || string(got) != want {
+		t.Fatalf("empty-array Marshal mismatch (%v):\n%q", err, got)
+	}
+}
+
+func TestAttestation_AWaiverIsWrittenOnlyWhenOneApplied(t *testing.T) {
+	t.Parallel()
+	att := &Attestation{TreeStateSHA: "z", TS: "t", ReviewWaiver: "comment-only", Tool: "shasum"}
+	want := `{
+  "tree_state_sha": "z",
+  "ts": "t",
+  "checks_passed": [],
+  "reviewers_run": [],
+  "review_waiver": "comment-only",
+  "tool": "shasum"
+}
+`
+	if got, err := att.Marshal(); err != nil || string(got) != want {
+		t.Fatalf("waived Marshal mismatch (%v):\n%s", err, got)
+	}
+}
+
+func TestAttestation_MarshalWritesValidJSONForAnyReviewerName(t *testing.T) {
+	t.Parallel()
+	att := &Attestation{
+		TreeStateSHA: "abc123",
+		TS:           "2026-06-18T12:00:00Z",
+		ChecksPassed: []string{"go:gofmt"},
+		ReviewersRun: []string{`say "hi"`, `back\slash`, "line\nbreak", "tab\there"},
+		ReviewWaiver: commentOnlyWaiver,
+		Tool:         "shasum",
+	}
+
+	raw, err := att.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got Attestation
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("Marshal wrote invalid JSON (%v):\n%s", err, raw)
+	}
+	if !reflect.DeepEqual(got, *att) {
+		t.Errorf("round trip = %+v, want %+v", got, *att)
 	}
 }
 

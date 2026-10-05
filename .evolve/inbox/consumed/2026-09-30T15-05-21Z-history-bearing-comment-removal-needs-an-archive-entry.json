@@ -4,6 +4,12 @@
     "A change whose removed history groups all appear in a section it adds passes, and a move (the group reappears whole elsewhere in the change) needs no section",
     "The rule is commentaudit.RemovedHistoryAcrossDiff, the same one `commentaudit history` uses, with no second copy"
   ],
+  "consumed": {
+    "at": "2026-09-30T18:28:42Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "The commit gate now refuses a change that removes a history-carrying comment group without adding its text to the package's page under docs/history/code-comments (refuseUnrecordedHistory in go/internal/commitgate/history_recorded.go, via commentaudit.RemovedHistoryAcrossDiff + the new commentaudit.UnrecordedHistory); it names file:line and the commentaudit history command, a move needs no record (ADR-0115)."
+  },
   "created_at": "2026-09-30T16:30:00Z",
   "files": [
     "go/internal/commitgate/comments_added.go",
