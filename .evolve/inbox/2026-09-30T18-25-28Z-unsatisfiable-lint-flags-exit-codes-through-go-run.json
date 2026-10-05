@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The lint flags cycle 1788's TestC1788_008 shape (red first)",
+    "An ExitCode()==1 or ==0 check on a go run result, and any exit code on a built binary, pass"
+  ],
+  "created_at": "2026-10-01T02:20:00Z",
+  "deps": [
+    "acs-absence-primitive-and-unsatisfiability-lint"
+  ],
+  "files": [
+    "go/internal/evalqualitycheck"
+  ],
+  "fix": "Extend evalqualitycheck's unsatisfiability lint: an ExitCode() comparison against any value other than 0 or 1 on an exec.Command(\"go\", \"run\", ...) result is unsatisfiable; the remedy is to build the binary and run it.",
+  "id": "unsatisfiable-lint-flags-exit-codes-through-go-run",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, cycle 1788 retrospective",
+  "summary": "Cycle 1788's TestC1788_008 ran `go run ./cmd/evolve ...` and asserted ExitCode()==2. `go run` exits 1 whenever its child exits non-zero, so the predicate could never pass (the retrospective reproduced it with a program that calls os.Exit(2)). The evalqualitycheck unsatisfiability lint that 1788 was building is the natural home for this rule.",
+  "title": "The unsatisfiability lint flags an exit-code assertion other than 1 on a `go run` result",
+  "weight": 0.5
+}

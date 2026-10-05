@@ -23,33 +23,6 @@ import (
 // BuildFloorCheckFn runs deterministic, LLM-free build-floor checks for a completed build and returns the failures.
 type BuildFloorCheckFn func(ctx context.Context, in ReviewInput) []string
 
-type buildFloorReviewer struct {
-	checks BuildFloorCheckFn
-}
-
-// NewBuildFloorReviewer wraps an injected check engine; a nil engine approves with a WARN, so roots can wire it unconditionally.
-func NewBuildFloorReviewer(checks BuildFloorCheckFn) DeliverableReviewer {
-	return &buildFloorReviewer{checks: checks}
-}
-
-func (r *buildFloorReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
-	if in.Phase != string(PhaseBuild) {
-		return ReviewResult{Approve: true}
-	}
-	if r.checks == nil {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN: no deterministic check engine wired — failing open (downstream gates stay armed)\n")
-		return ReviewResult{Approve: true}
-	}
-	failures := r.checks(ctx, in)
-	if len(failures) == 0 {
-		return ReviewResult{Approve: true}
-	}
-	reason := fmt.Sprintf("build handoff floor: %d deterministic check failure(s) — fix these exactly before handoff:\n  %s",
-		len(failures), strings.Join(failures, "\n  "))
-	fmt.Fprintf(os.Stderr, "[build-floor] REJECT: %s\n", reason)
-	return ReviewResult{Approve: false, Retry: true, Reason: reason}
-}
-
 // DefaultBuildFloorChecks is the production deterministic engine of the build handoff floor.
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	// Only changedPackageFloorChecks is package-driven; the rest run here because it skips a diff with no Go packages.
@@ -89,14 +62,10 @@ func protectedSurfaceFailures(paths []string, member func(string) bool, base str
 	return out
 }
 
-// NewBuildExplanationReviewer returns the mandatory Build explanation floor, composed outside the optional reviewer seam.
-func NewBuildExplanationReviewer() DeliverableReviewer {
-	return NewBuildFloorReviewer(func(ctx context.Context, in ReviewInput) []string {
-		return explanationDocumentationFailures(ctx, in)
-	})
-}
-
 func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []string {
+	if in.ExplanationDocumentationVersion == 0 {
+		return nil
+	}
 	return explanationdocs.CheckBuild(ctx, explanationdocs.CycleBinding{
 		ProjectRoot:     in.ProjectRoot,
 		Worktree:        in.Worktree,

@@ -62,7 +62,7 @@ func TestBuildExplanationReviewer_RequiresExplanationForMaterialChange(t *testin
 	if err := explanationdocs.SealBuild(binding); err != nil {
 		t.Fatal(err)
 	}
-	review := NewBuildExplanationReviewer().Review(context.Background(), ReviewInput{
+	review := MandatoryBuildHandoffFloor().Review(context.Background(), ReviewInput{
 		Phase: string(PhaseBuild), Cycle: 42, RunID: "run-42",
 		Workspace: workspace, Worktree: wt, ProjectRoot: wt, WorktreeBaseSHA: base,
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,

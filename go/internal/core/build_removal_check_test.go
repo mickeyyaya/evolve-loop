@@ -180,7 +180,7 @@ func TestDefaultBuildFloorChecks_IncludesRemovalClaimCheck(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_RemovalClaimNotActuallyRemoved(t *testing.T) {
-	r := NewBuildFloorReviewer(DefaultBuildFloorChecks)
+	r := BuildHandoffFloor{{Name: "default", Run: DefaultBuildFloorChecks}}
 
 	bad := removalFixture(t, claimBlock("stale/scaffold.go"), []string{"stale/scaffold.go"})
 	if res := r.Review(context.Background(), bad); res.Approve {

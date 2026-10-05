@@ -57,21 +57,22 @@ type DeliverableReviewer interface {
 }
 
 type mandatoryExplanationReviewer struct {
-	next DeliverableReviewer
+	next  DeliverableReviewer
+	floor BuildHandoffFloor
 }
 
 func withMandatoryExplanationReviewer(next DeliverableReviewer) DeliverableReviewer {
 	if next == nil {
 		next = noopReviewer{}
 	}
-	return mandatoryExplanationReviewer{next: next}
+	return mandatoryExplanationReviewer{next: next, floor: MandatoryBuildHandoffFloor()}
 }
 
 func (r mandatoryExplanationReviewer) Review(ctx context.Context, in ReviewInput) ReviewResult {
 	if in.Phase != string(PhaseBuild) || in.ExplanationDocumentationVersion == 0 {
 		return r.next.Review(ctx, in)
 	}
-	if floor := NewBuildExplanationReviewer().Review(ctx, in); !floor.Approve {
+	if floor := r.floor.Review(ctx, in); !floor.Approve {
 		return floor
 	}
 	optional := r.next.Review(ctx, in)

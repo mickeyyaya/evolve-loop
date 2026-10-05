@@ -23,20 +23,6 @@ func SolutionFloorChecks(spec config.DeliverableKindSpec) BuildFloorCheckFn {
 	}
 }
 
-// ChainBuildFloorChecks composes deterministic check engines in order; every
-// engine runs and every failure reaches the correction ladder.
-func ChainBuildFloorChecks(fns ...BuildFloorCheckFn) BuildFloorCheckFn {
-	return func(ctx context.Context, in ReviewInput) []string {
-		var out []string
-		for _, fn := range fns {
-			if fn != nil {
-				out = append(out, fn(ctx, in)...)
-			}
-		}
-		return out
-	}
-}
-
 // SolutionViolations judges every bound task's deliverable for a document
 // cycle: nil for a code cycle; otherwise one line per contract violation.
 func SolutionViolations(workspace, worktree, projectRoot string, spec config.DeliverableKindSpec) []string {

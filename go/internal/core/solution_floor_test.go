@@ -99,13 +99,16 @@ func TestSolutionViolations(t *testing.T) {
 	}
 }
 
-func TestChainBuildFloorChecks(t *testing.T) {
-	a := func(context.Context, ReviewInput) []string { return []string{"first"} }
-	b := func(context.Context, ReviewInput) []string { return nil }
-	c := func(context.Context, ReviewInput) []string { return []string{"third"} }
-	got := ChainBuildFloorChecks(a, b, c)(context.Background(), ReviewInput{})
+func TestBuildHandoffFloor_EveryEngineRunsAndEveryFailureReachesTheLadder(t *testing.T) {
+	floor := BuildHandoffFloor{
+		{Name: "first", Run: func(context.Context, ReviewInput) []string { return []string{"first"} }},
+		{Name: "second", Run: func(context.Context, ReviewInput) []string { return nil }},
+		{Name: "document-solution", Run: SolutionFloorChecks(documentSpec())},
+		{Name: "third", Run: func(context.Context, ReviewInput) []string { return []string{"third"} }},
+	}
+	got := floor.Failures(context.Background(), ReviewInput{})
 	if strings.Join(got, ",") != "first,third" {
-		t.Errorf("chained failures = %v, want [first third]", got)
+		t.Errorf("floor failures = %v, want [first third]", got)
 	}
 }
 

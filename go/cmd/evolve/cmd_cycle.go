@@ -556,13 +556,8 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// The build floor runs first: its rejection carries the defect list the
 	// correction ladder needs. It is the one real go-test run per changed package;
 	// the advisory post-build selfcheck skips its duplicate when this is enforced.
-	if pol.WorkflowConfig().BuildFloorEnforced {
-		checks := productionBuildFloorChecks
-		// A document cycle's solutions/<slug>/ is judged by the same floor seam.
-		if spec, ok := cfg.DocumentSpec(); ok {
-			checks = core.ChainBuildFloorChecks(productionBuildFloorChecks, core.SolutionFloorChecks(spec))
-		}
-		reviewers = append(reviewers, core.NewBuildFloorReviewer(checks))
+	if floor := composedBuildHandoffFloor(pol.WorkflowConfig(), cfg); len(floor) > 0 {
+		reviewers = append(reviewers, floor)
 	}
 	if cfg.EvalGate != config.StageOff {
 		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))

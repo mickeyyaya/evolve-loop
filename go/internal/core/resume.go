@@ -345,13 +345,9 @@ func (o *Orchestrator) reviewResumedDeliverable(
 		return fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for review and audit)", phase)
 	}
 	reviewInput := func(response PhaseResponse) ReviewInput {
-		return ReviewInput{
-			Cycle: cycle, RunID: cs.RunID,
-			ExplanationDocumentationVersion: cs.ExplanationDocumentationVersion,
-			Phase:                           string(phase), WorktreeBaseSHA: cs.WorktreeBaseSHA,
-			Response: response, Workspace: cs.WorkspacePath,
-			Worktree: cs.ActiveWorktree, ProjectRoot: projectRoot,
-		}
+		in := ReviewInputFor(cs, phase, projectRoot)
+		in.Response = response
+		return in
 	}
 	if err := recoverBeforeReview(); err != nil {
 		return resp, err

@@ -8,8 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
-
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
@@ -129,7 +127,7 @@ func runPassWithEnv(phase string, req []byte, env map[string]string, stdout, std
 			}
 		}
 	}()
-	return phasecmd.RunPhase([]string{phase}, bytes.NewReader(req), stdout, stderr)
+	return runPhase([]string{phase}, bytes.NewReader(req), stdout, stderr)
 }
 
 // joinNames is a small slice-to-comma-separated helper. Could use

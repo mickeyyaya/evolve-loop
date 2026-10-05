@@ -22,7 +22,7 @@ import (
 // runPhaseVerify is the agent's deliverable self-check; it shares the host gate's verifier.
 // Exit: 0 well-formed, 1 confirmed violation, 2 infra ambiguity (callers fail open), 10 usage error.
 // See ADR-0034.
-func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
+func (c phaseCommand) runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	phaseArg, flags := splitPhaseArg(args)
 	if phaseArg == "" {
 		fmt.Fprintf(stderr, "evolve phase verify: missing phase name\n")
@@ -50,13 +50,25 @@ func runPhaseVerify(args []string, stdout, stderr io.Writer) int {
 	if *evolveDir == "" {
 		*evolveDir = filepath.Join(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
 	}
-	roots := withCycleState(phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}, contract, stderr)
-	res, err := verifyDeliverable(phase, roots, resolver)
+	flagged := phasecontract.Roots{Workspace: *workspace, Worktree: *worktree, EvolveDir: *evolveDir}
+	var res deliverable.Result
+	var err error
+	if phase == "build" {
+		res, err = c.verifyBuild(flagged, stderr)
+	} else {
+		res, err = verifyDeliverable(phase, withCycleState(flagged, contract, stderr), resolver)
+	}
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve phase verify: %v\n", err)
 		return 2
 	}
 	return reportVerifyResult(phase, res, *asJSON, stdout, stderr)
+}
+
+func (c phaseCommand) verifyBuild(flagged phasecontract.Roots, stderr io.Writer) (deliverable.Result, error) {
+	probe := core.BuildHandoffProbe{Workspace: flagged.Workspace, EvolveDir: flagged.EvolveDir, ProjectRoot: cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), Worktree: flagged.Worktree}
+	checked, err := BuildSelfCheck{Floor: c.floor, Probe: probe}.Verify(stderr)
+	return checked.Result, err
 }
 
 func splitPhaseArg(args []string) (phaseArg string, flags []string) {
@@ -78,12 +90,12 @@ func withCycleState(roots phasecontract.Roots, contract phasecontract.Contract, 
 	if !needsSections && !needsEffects {
 		return roots
 	}
-	state, problem := persistedCycleState(roots.Workspace, roots.EvolveDir)
-	if problem != "" && needsSections {
-		fmt.Fprintf(stderr, "phase verify: WARN %s — the explanation-documentation section check is skipped; the host gate will still apply it\n", problem)
+	state, err := core.ReadRunCycleState(roots.Workspace, roots.EvolveDir)
+	if err != nil && needsSections {
+		fmt.Fprintf(stderr, "phase verify: WARN %v — the explanation-documentation section check is skipped; the host gate will still apply it\n", err)
 	}
-	if problem != "" && needsEffects {
-		fmt.Fprintf(stderr, "phase verify: WARN %s — the declared effect cannot be judged without the cycle, so verify aborts; the host gate will still apply it\n", problem)
+	if err != nil && needsEffects {
+		fmt.Fprintf(stderr, "phase verify: WARN %v — the declared effect cannot be judged without the cycle, so verify aborts; the host gate will still apply it\n", err)
 	}
 	roots.ExplanationDocumentationVersion = state.ExplanationDocumentationVersion
 	roots.Cycle = state.CycleID
@@ -165,21 +177,4 @@ func phaseVerifyResolver() phasecontract.Resolver {
 		return phasecontract.BuiltinResolver{}
 	}
 	return phasecontract.NewCatalogResolver(cat.Get)
-}
-
-// persistedCycleState prefers the workspace's per-run mirror, authoritative under fleet lanes, over the
-// global state file. A missing or unparseable file returns a problem description, never a silent zero state.
-func persistedCycleState(workspace, evolveDir string) (state core.CycleState, problem string) {
-	path := core.ResolveCycleStatePath(evolveDir)
-	if workspace != "" {
-		path = filepath.Join(workspace, core.RunStateFile)
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return core.CycleState{}, fmt.Sprintf("%s unreadable (%v)", path, err)
-	}
-	if err := json.Unmarshal(raw, &state); err != nil {
-		return core.CycleState{}, fmt.Sprintf("%s unparseable (%v)", path, err)
-	}
-	return state, ""
 }

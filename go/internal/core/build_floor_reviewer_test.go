@@ -16,7 +16,7 @@ func TestBuildFloorReviewer_RejectsRedSelfcheckThenApproves(t *testing.T) {
 		}
 		return nil
 	}
-	r := NewBuildFloorReviewer(checks)
+	r := BuildHandoffFloor{{Name: "selfcheck", Run: checks}}
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: "/wt", ProjectRoot: "/p"}
 	res := r.Review(context.Background(), in)
 	if res.Approve {
@@ -34,10 +34,10 @@ func TestBuildFloorReviewer_RejectsRedSelfcheckThenApproves(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_NonBuildPhasesUntouched(t *testing.T) {
-	r := NewBuildFloorReviewer(func(context.Context, ReviewInput) []string {
+	r := BuildHandoffFloor{{Name: "selfcheck", Run: func(context.Context, ReviewInput) []string {
 		t.Fatal("selfcheck must not run for non-build phases")
 		return nil
-	})
+	}}}
 	for _, ph := range []Phase{PhaseScout, PhaseAudit, PhaseTDD, PhaseShip} {
 		if res := r.Review(context.Background(), ReviewInput{Phase: string(ph)}); !res.Approve {
 			t.Fatalf("phase %s must be approved untouched", ph)
@@ -45,9 +45,8 @@ func TestBuildFloorReviewer_NonBuildPhasesUntouched(t *testing.T) {
 	}
 }
 
-func TestBuildFloorReviewer_ChecksErrorFailsOpen(t *testing.T) {
-	r := NewBuildFloorReviewer(nil) // nil fn = engine unavailable
-	if res := r.Review(context.Background(), ReviewInput{Phase: string(PhaseBuild)}); !res.Approve {
-		t.Fatalf("nil engine must fail open; got %+v", res)
+func TestBuildHandoffFloor_EmptyFloorApproves(t *testing.T) {
+	if res := (BuildHandoffFloor{}).Review(context.Background(), ReviewInput{Phase: string(PhaseBuild)}); !res.Approve {
+		t.Fatalf("a floor with no checks has nothing to reject; got %+v", res)
 	}
 }
