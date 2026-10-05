@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
@@ -13,11 +17,17 @@ import (
 const (
 	signalCodesBegin = "<!-- GENERATED:signal-codes BEGIN — do not edit by hand; run `evolve signals codes generate` -->"
 	signalCodesEnd   = "<!-- GENERATED:signal-codes END -->"
+	signalsTailUsage = "evolve signals tail [--cycle N] [--kind K[,K...]] [--code C[,C...]] [--follow] [--json]"
 )
 
 func runSignals(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) >= 1 && args[0] == "tail" {
+		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer stop()
+		return runSignalsTail(ctx, args[1:], tailEnv{ProjectRoot: envOrCwd("EVOLVE_PROJECT_ROOT"), Poll: time.Second}, stdout, stderr)
+	}
 	if len(args) < 2 || args[0] != "codes" {
-		fmt.Fprintln(stderr, "usage: evolve signals codes <generate|check>")
+		fmt.Fprintln(stderr, "usage: evolve signals codes <generate|check> | "+signalsTailUsage)
 		return 10
 	}
 	docPath := filepath.Join(sourceRoot(), "docs", "architecture", "signal-codes.md")
