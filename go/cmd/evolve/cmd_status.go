@@ -206,8 +206,12 @@ func statusMainCI(ctx context.Context, root string) statusRemote {
 	}}}
 }
 
+func writeStatusLoopLine(w io.Writer, l dashboard.LoopStatus) {
+	fmt.Fprintf(w, "loop:    running=%t brake=%t cycle=%d phase=%s\n", l.Running, l.BrakeEngaged, l.CycleID, l.Phase)
+}
+
 func writeStatusText(w io.Writer, r statusReport) {
-	fmt.Fprintf(w, "loop:    running=%t brake=%t cycle=%d phase=%s\n", r.Loop.Running, r.Loop.BrakeEngaged, r.Loop.CycleID, r.Loop.Phase)
+	writeStatusLoopLine(w, r.Loop)
 	fmt.Fprintf(w, "cycles:  %d rendered\n", len(r.Cycles))
 	for _, c := range r.Cycles {
 		fmt.Fprintf(w, "  cycle %d  %s\n", c.ID, c.StateName)

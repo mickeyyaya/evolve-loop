@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"time"
 )
 
 // RetryPolicy is the .evolve/policy.json "retry" block.
@@ -69,6 +70,16 @@ type SwarmConfig struct {
 type BootPolicy struct {
 	// BinaryRefresh is "auto" (default: rebuild and re-exec a stale binary) or "off".
 	BinaryRefresh string `json:"binary_refresh,omitempty"`
+	DetachWaitS   int    `json:"detach_wait_s,omitempty"`
+}
+
+const DefaultBootDetachWait = 10 * time.Minute
+
+func (p Policy) BootDetachWait() time.Duration {
+	if p.Boot == nil || p.Boot.DetachWaitS <= 0 {
+		return DefaultBootDetachWait
+	}
+	return time.Duration(p.Boot.DetachWaitS) * time.Second
 }
 
 // BootBinaryRefresh returns "off" only for an exact "off", otherwise "auto".

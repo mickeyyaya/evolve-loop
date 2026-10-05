@@ -30,6 +30,9 @@ type loopArgFlags struct {
 	skipPreflightBoot bool
 	bypassPolicy      bool
 	untilInboxEmpty   bool
+	preflightOnly     bool
+	detach            bool
+	logPath           string
 }
 
 func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
@@ -50,6 +53,9 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.BoolVar(&lf.skipPreflight, "skip-preflight", false, "bypass the whole pre-batch readiness gate (no checks, no boot)")
 	fs.BoolVar(&lf.skipPreflightBoot, "skip-preflight-boot", false, "run cheap checks but skip the real bridge-boot probe (CI/offline)")
 	fs.BoolVar(&lf.untilInboxEmpty, "until-inbox-empty", false, "chain batches: after each batch, start another until the inbox drains (bounded by policy.json chain.max_batches; .evolve/loop-stop brakes it)")
+	fs.BoolVar(&lf.preflightOnly, "preflight-only", false, "run the pre-batch readiness gate, print each check's verdict and exit without dispatching (exit 0 ready, 1 naming the blocking check)")
+	fs.BoolVar(&lf.detach, "detach", false, "launch the loop in a new session with stdout/stderr appended to --log, print its pid and wait (policy boot.detach_wait_s) for its run lease: exit 0 running, 1 exited or unconfirmed")
+	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 	return lf
 }
@@ -151,6 +157,9 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	if err := fs.Parse(args); err != nil {
 		return loopConfig{}, 10
 	}
+	if rc := validateLoopModes(lf, stderr); rc != 0 {
+		return loopConfig{}, rc
+	}
 
 	lf.projectRoot = absOrWarn(stderr, "--project-root", lf.projectRoot)
 	posCycles, posStrategy, posGoal := parsePositional(fs.Args())
@@ -161,7 +170,12 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 		return loopConfig{}, rc
 	}
 
-	resolvedGoalHash, resolvedGoalText, rc := resolveGoal(stderr, lf.goalHash, lf.goalText, posGoal, lf.resume, lf.dryRun)
+	if verb, reserved := reservedGoalVerb(posGoal); reserved {
+		fmt.Fprintf(stderr, "evolve loop: %q is a reserved word, not a goal — did you mean: %s? (to use it as goal text pass --goal-text)\n", posGoal, verb)
+		return loopConfig{}, 10
+	}
+
+	resolvedGoalHash, resolvedGoalText, rc := resolveGoal(stderr, lf.goalHash, lf.goalText, posGoal, lf.resume, lf.dryRun || lf.preflightOnly)
 	if rc != 0 {
 		return loopConfig{}, rc
 	}
@@ -171,7 +185,85 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	}
 	lf.evolveDir = absOrWarn(stderr, "--evolve-dir", lf.evolveDir)
 
-	return buildLoopConfig(lf, resolvedGoalHash, resolvedGoalText, resolvedStrategy, resolvedCycles, posCycles, perAgentCLI, perAgentModel), 0
+	cfg := buildLoopConfig(lf, resolvedGoalHash, resolvedGoalText, resolvedStrategy, resolvedCycles, posCycles, perAgentCLI, perAgentModel)
+	return withDetachLaunch(cfg, lf, args, len(args)-len(fs.Args()), stderr)
+}
+
+func withDetachLaunch(cfg loopConfig, lf *loopArgFlags, args []string, flagEnd int, stderr io.Writer) (loopConfig, int) {
+	if !lf.detach {
+		return cfg, 0
+	}
+	logPath, err := filepath.Abs(lf.logPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve loop: --log %q: %v\n", lf.logPath, err)
+		return loopConfig{}, 10
+	}
+	cfg.LogPath = logPath
+	cfg.DetachArgv = detachChildArgs(args, flagEnd)
+	return cfg, 0
+}
+
+func validateLoopModes(lf *loopArgFlags, stderr io.Writer) int {
+	var conflict string
+	switch {
+	case lf.detach && lf.preflightOnly:
+		conflict = "--detach and --preflight-only are mutually exclusive"
+	case lf.preflightOnly && lf.skipPreflight:
+		conflict = "--preflight-only and --skip-preflight are mutually exclusive (nothing would be checked)"
+	case lf.preflightOnly && lf.dryRun:
+		conflict = "--preflight-only and --dry-run are mutually exclusive"
+	case lf.detach && lf.dryRun:
+		conflict = "--detach and --dry-run are mutually exclusive"
+	case lf.detach && lf.logPath == "":
+		conflict = "--detach requires --log F"
+	case !lf.detach && lf.logPath != "":
+		conflict = "--log is only valid with --detach"
+	default:
+		return 0
+	}
+	fmt.Fprintf(stderr, "evolve loop: %s\n", conflict)
+	return 10
+}
+
+var loopReservedGoalWords = map[string]string{
+	"status": "evolve loop status",
+	"stop":   "evolve loop-stop",
+	"help":   "evolve loop -h",
+	"plan":   "evolve loop --dry-run",
+	"watch":  "evolve dashboard",
+}
+
+func reservedGoalVerb(goal string) (verb string, reserved bool) {
+	verb, reserved = loopReservedGoalWords[strings.ToLower(strings.TrimSpace(goal))]
+	return verb, reserved
+}
+
+func detachChildArgs(args []string, flagEnd int) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if i >= flagEnd {
+			out = append(out, args[i])
+			continue
+		}
+		switch name, hasValue := flagTokenName(args[i]); {
+		case name == "detach":
+		case name == "log":
+			if !hasValue {
+				i++
+			}
+		default:
+			out = append(out, args[i])
+		}
+	}
+	return out
+}
+
+func flagTokenName(token string) (name string, hasValue bool) {
+	if token == "--" || !strings.HasPrefix(token, "-") {
+		return "", false
+	}
+	name, _, hasValue = strings.Cut(strings.TrimPrefix(strings.TrimPrefix(token, "-"), "-"), "=")
+	return name, hasValue
 }
 
 func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxCycles, posCycles int, perAgentCLI, perAgentModel map[string]string) loopConfig {
@@ -193,6 +285,8 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		SkipPreflightBoot: lf.skipPreflightBoot,
 		BypassPolicy:      lf.bypassPolicy,
 		ChainMode:         lf.untilInboxEmpty,
+		PreflightOnly:     lf.preflightOnly,
+		Detach:            lf.detach,
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 	}

@@ -54,6 +54,10 @@ type loopConfig struct {
 	ChainMode         bool              `json:"chain_mode,omitempty"`
 	PerAgentCLI       map[string]string `json:"per_agent_cli,omitempty"`
 	PerAgentModel     map[string]string `json:"per_agent_model,omitempty"`
+	PreflightOnly     bool              `json:"preflight_only,omitempty"`
+	Detach            bool              `json:"detach,omitempty"`
+	LogPath           string            `json:"log_path,omitempty"`
+	DetachArgv        []string          `json:"-"`
 	ResumeWaves       int               `json:"-"`
 }
 
@@ -74,9 +78,18 @@ func signalStop(stdout, stderr io.Writer, lr *loopResult, where string) {
 // runLoop is the `evolve loop` entry point. Chaining is never entered
 // implicitly: an absent flag and an absent policy block both leave it off.
 func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if isLoopStatusInvocation(args) {
+		return runLoopStatus(args[1:], stdout, stderr)
+	}
 	cfg, rc := parseLoopArgs(args, stderr)
 	if rc != 0 {
 		return rc
+	}
+	if cfg.PreflightOnly {
+		return runLoopPreflightOnly(cfg, stdout, stderr)
+	}
+	if cfg.Detach {
+		return runLoopDetached(cfg, stdout, stderr)
 	}
 	cfg.ResumeWaves = takeReexecHandoff(cfg.EvolveDir, stderr)
 	chainCfg := loadChainConfig(cfg.EvolveDir)

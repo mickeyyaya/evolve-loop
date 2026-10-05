@@ -4,6 +4,11 @@
     "`evolve loop stop` exits 10 and names `evolve loop-stop`",
     "A multi-word positional goal still launches as before"
   ],
+  "consumed": {
+    "at": "2026-10-05T08:06:51Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-09-30T10:51:14Z",
   "deps": [
     "cli-status"

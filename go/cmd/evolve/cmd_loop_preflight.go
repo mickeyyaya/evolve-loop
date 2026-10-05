@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -73,5 +75,39 @@ func persistLoopPreflight(evolveDir string, r looppreflight.Result, stderr io.Wr
 	}
 	if err := os.Rename(tmp, target); err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: could not finalize %s: %v\n", target, err)
+	}
+}
+
+func runLoopPreflightOnly(cfg loopConfig, stdout, stderr io.Writer) int {
+	probeDir := filepath.Join(cfg.ProjectRoot, ".evolve", "worktrees")
+	_, statErr := os.Stat(probeDir)
+	res := runLoopPreflightFn(cfg, stderr)
+	if errors.Is(statErr, fs.ErrNotExist) {
+		removeEmptyProbeDir(probeDir, stderr)
+	}
+	persistLoopPreflight(cfg.EvolveDir, res, stderr)
+	fmt.Fprint(stdout, res.Summary())
+	if !res.Halted() {
+		fmt.Fprintf(stdout, "preflight-only: READY (%d/%d checks passed); no cycle dispatched\n", res.ChecksPassed, res.ChecksTotal)
+		return 0
+	}
+	for _, c := range res.Checks {
+		if c.Level == looppreflight.LevelHalt {
+			fmt.Fprintf(stderr, "evolve loop: --preflight-only: blocking check %q halted: %s\n", c.Name, c.Message)
+		}
+	}
+	return 1
+}
+
+func removeEmptyProbeDir(dir string, stderr io.Writer) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && len(entries) > 0) {
+		return
+	}
+	if err == nil {
+		err = os.Remove(dir)
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve loop: WARN: --preflight-only: could not remove the gate's probe dir %s: %v\n", dir, err)
 	}
 }
