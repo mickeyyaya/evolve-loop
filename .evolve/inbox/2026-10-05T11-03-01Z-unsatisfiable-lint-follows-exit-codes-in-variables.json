@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Both variable shapes are flagged red first",
+    "Reachable codes, and codes from a built binary, stay unflagged",
+    "The go/acs corpus test still passes"
+  ],
+  "created_at": "2026-10-05T12:00:00Z",
+  "files": [
+    "go/internal/evalqualitycheck/unsatisfiable_gorun.go"
+  ],
+  "fix": "Extend the scoped bindings with an exit-code value kind: bind a name assigned from a flagged-receiver ExitCode() call or from SubprocessOutput's third result on a go run argv, and compare those names like the call.",
+  "id": "unsatisfiable-lint-follows-exit-codes-in-variables",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, acs-absence-primitive-and-unsatisfiability-lint landing",
+  "summary": "evalqualitycheck's go-run-exit-code rule flags only a direct ExitCode() call on a bound go run result. `code := ee.ExitCode(); if code != 3` and `_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", ...); code != 3` are the same unsatisfiable class and go unflagged. The corpus has no instance today.",
+  "title": "The go-run exit-code lint follows an exit code copied into a variable or returned by SubprocessOutput",
+  "weight": 0.3
+}

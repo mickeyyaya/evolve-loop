@@ -22,6 +22,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/subagent` | dispatches one subagent invocation: profile, token, bridge launch, verify, ledger | [internal-subagent.md](internal-subagent.md) |
 | `internal/triagecap` | bounds the coverage floors triage may commit per cycle | [internal-triagecap.md](internal-triagecap.md) |
 | `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
+| `internal/cli/guardcmd` | the `evolve guard`, commit-gate and `evolve eval` commands | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |
 | `internal/topngate` | holds a build to the tasks triage selected | [internal-topngate.md](internal-topngate.md) |
 | `internal/tokenusage` | measures a phase launch's token usage and context fill | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/adapters/observer` | the stall observer's core adapter and liveness probes | [internal-adapters-observer.md](internal-adapters-observer.md) |

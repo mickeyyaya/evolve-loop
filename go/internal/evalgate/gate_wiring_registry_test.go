@@ -8,10 +8,11 @@ import (
 
 // pinnedGateWirings maps each gate in NewReviewer's slice to the test that pins it there.
 var pinnedGateWirings = map[string]string{
-	"predicate-quality":     "TestQualityGate_WiredIntoReviewer",
-	"floor-binding":         "TestFloorBindingGate_WiredIntoReviewer",
-	"evals-materialized":    "TestMaterializationGate_WiredIntoReviewer",
-	"flaky-predicate-shape": "TestFlakyShapeGate_WiredIntoReviewer",
+	"predicate-quality":             "TestQualityGate_WiredIntoReviewer",
+	"floor-binding":                 "TestFloorBindingGate_WiredIntoReviewer",
+	"evals-materialized":            "TestMaterializationGate_WiredIntoReviewer",
+	"flaky-predicate-shape":         "TestFlakyShapeGate_WiredIntoReviewer",
+	"unsatisfiable-predicate-shape": "TestUnsatisfiableShapeGate_WiredIntoReviewer",
 }
 
 func TestAllReviewerGates_HaveWiringPin(t *testing.T) {

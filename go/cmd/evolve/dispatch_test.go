@@ -349,3 +349,29 @@ func equalStrSlice(a, b []string) bool {
 	}
 	return true
 }
+
+func TestDispatch_EvalQualityCheckPrintsTheUnsatisfiableLintReceipt(t *testing.T) {
+	dir := t.TempDir()
+	evalPath := filepath.Join(dir, "eval.md")
+	predicates := filepath.Join(dir, "predicates_test.go")
+	src := "package cycle9999\n\nimport (\n\t\"testing\"\n\n\t\"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert\"\n)\n\n" +
+		"func TestC9999_Gone(t *testing.T) {\n\tif acsassert.FileContains(t, \"x.go\", \"old\") {\n\t\tt.Errorf(\"old still present\")\n\t}\n}\n"
+	for path, body := range map[string]string{evalPath: "```bash\ngo build ./go/...\n```\n", predicates: src} {
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var stdout, stderr bytes.Buffer
+	code := dispatch([]string{"eval", "quality-check", evalPath, "-predicates", predicates}, nil, &stdout, &stderr)
+	if code != 1 {
+		t.Errorf("evolve eval quality-check exit = %d, want 1 (WARN)\nstdout=%s\nstderr=%s", code, stdout.String(), stderr.String())
+	}
+	for _, want := range []string{
+		"unsatisfiable[inverted-idiom] predicates_test.go:TestC9999_Gone",
+		"[eval quality-check] unsatisfiable-lint: linted 1 file(s) under " + predicates + " — 1 advisory finding(s)",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("stdout missing %q:\n%s", want, stdout.String())
+		}
+	}
+}

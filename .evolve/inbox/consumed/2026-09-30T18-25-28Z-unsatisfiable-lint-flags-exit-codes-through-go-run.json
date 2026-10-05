@@ -3,6 +3,12 @@
     "The lint flags cycle 1788's TestC1788_008 shape (red first)",
     "An ExitCode()==1 or ==0 check on a go run result, and any exit code on a built binary, pass"
   ],
+  "consumed": {
+    "at": "2026-10-05T13:21:22Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Console landing of the unsatisfiability lint (2026-10-05): evalqualitycheck's go-run-exit-code kind flags an ExitCode() compared to a code go run cannot return, on a value bound through the scoped name table (Run/Output/CombinedOutput/Wait errors via type assertion or errors.As, and ProcessState); the 1788 TestC1788_008 body is the red-first row and the go/acs corpus sweep holds zero proof-kind findings."
+  },
   "created_at": "2026-10-01T02:20:00Z",
   "deps": [
     "acs-absence-primitive-and-unsatisfiability-lint"

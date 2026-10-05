@@ -15,7 +15,7 @@ import (
 
 func writeCyclePredicates(t *testing.T, worktree string, cycle int, src string) {
 	t.Helper()
-	dir := filepath.Join(worktree, "go", "acs", "cycle"+strconv.Itoa(cycle))
+	dir := cyclePredicateDir(worktree, cycle)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestFlakyShapeGate_FlagsFlakyShapeAdvisory(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, flakyPredicateSrc)
 
-	reason, block := flakyShapeGate{}.check(core.ReviewInput{
+	reason, block := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
 	})
 	if reason == "" {
@@ -91,7 +91,7 @@ func TestFlakyShapeGate_CleanPredicatesStateTheReceipt(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, cleanPredicateSrc)
 
-	reason, block := flakyShapeGate{}.check(core.ReviewInput{
+	reason, block := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
 	})
 	if block {
@@ -105,7 +105,7 @@ func TestFlakyShapeGate_CleanPredicatesStateTheReceipt(t *testing.T) {
 }
 
 func TestFlakyShapeGate_NoGoACsSaysSo(t *testing.T) {
-	reason, block := flakyShapeGate{}.check(core.ReviewInput{
+	reason, block := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: t.TempDir(),
 	})
 	if block {
@@ -121,7 +121,7 @@ func TestFlakyShapeGate_EveryOutcomeIsObservable(t *testing.T) {
 	writeCyclePredicates(t, flaky, 4242, flakyPredicateSrc)
 	writeCyclePredicates(t, clean, 4242, cleanPredicateSrc)
 	writeCyclePredicates(t, unparseable, 4242, "package cycle4242\nfunc {{{")
-	if err := os.MkdirAll(filepath.Join(empty, "go", "acs", "cycle4242"), 0o755); err != nil {
+	if err := os.MkdirAll(cyclePredicateDir(empty, 4242), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ name, workspace, worktree string }{
@@ -133,7 +133,7 @@ func TestFlakyShapeGate_EveryOutcomeIsObservable(t *testing.T) {
 		{"no worktree", cycleWorkspace(t, 4242), ""},
 		{"non-cycle workspace", t.TempDir(), flaky},
 	} {
-		reason, block := flakyShapeGate{}.check(core.ReviewInput{
+		reason, block := flakyShapeGate().check(core.ReviewInput{
 			Phase: "tdd", Workspace: tc.workspace, Worktree: tc.worktree,
 		})
 		if reason == "" {
@@ -152,7 +152,7 @@ func TestFlakyShapeGate_UnparseableSourceIsLoudButAdvisory(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, "package cycle4242\nfunc {{{")
 
-	reason, block := flakyShapeGate{}.check(core.ReviewInput{
+	reason, block := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
 	})
 	if reason == "" {
@@ -168,10 +168,10 @@ func TestFlakyShapeGate_UnparseableSourceIsLoudButAdvisory(t *testing.T) {
 
 func TestFlakyShapeGate_EmptyPredicateDirIsLoud(t *testing.T) {
 	wt := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(wt, "go", "acs", "cycle4242"), 0o755); err != nil {
+	if err := os.MkdirAll(cyclePredicateDir(wt, 4242), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	reason, block := flakyShapeGate{}.check(core.ReviewInput{
+	reason, block := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
 	})
 	if reason == "" {
@@ -183,7 +183,7 @@ func TestFlakyShapeGate_EmptyPredicateDirIsLoud(t *testing.T) {
 }
 
 func TestFlakyShapeGate_OnlyAtTDD(t *testing.T) {
-	g := flakyShapeGate{}
+	g := flakyShapeGate()
 	if !g.appliesTo(string(core.PhaseTDD)) {
 		t.Error("Gate D must apply at the tdd phase — the moment predicates first exist")
 	}
@@ -198,11 +198,11 @@ func TestFlakyShapeGate_NoAuthorityIsLoudNotSilent(t *testing.T) {
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, flakyPredicateSrc)
 
-	reason, block := flakyShapeGate{}.check(core.ReviewInput{Phase: "tdd", Workspace: cycleWorkspace(t, 4242)})
+	reason, block := flakyShapeGate().check(core.ReviewInput{Phase: "tdd", Workspace: cycleWorkspace(t, 4242)})
 	if !strings.Contains(reason, "NO predicate shape was inspected") || block {
 		t.Errorf("missing worktree must be loud and non-blocking; got reason=%q block=%v", reason, block)
 	}
-	reason, block = flakyShapeGate{}.check(core.ReviewInput{Phase: "tdd", Workspace: t.TempDir(), Worktree: wt})
+	reason, block = flakyShapeGate().check(core.ReviewInput{Phase: "tdd", Workspace: t.TempDir(), Worktree: wt})
 	if !strings.Contains(reason, "NO predicate shape was inspected") || block {
 		t.Errorf("non-cycle workspace must be loud and non-blocking; got reason=%q block=%v", reason, block)
 	}
@@ -211,13 +211,13 @@ func TestFlakyShapeGate_NoAuthorityIsLoudNotSilent(t *testing.T) {
 func TestFlakyShapeGate_ReasonTruncatesWithVisibleCount(t *testing.T) {
 	var b strings.Builder
 	b.WriteString("//go:build acs\n\npackage cycle4242\n\nimport (\n\t\"os/exec\"\n\t\"testing\"\n)\n")
-	for i := 0; i < flakyShapeMaxReported+3; i++ {
+	for i := 0; i < predicateLintMaxReported+3; i++ {
 		b.WriteString("\nfunc TestC4242_Sweep" + strconv.Itoa(i) + "(t *testing.T) {\n\tif err := exec.Command(\"go\", \"test\", \"./...\").Run(); err != nil {\n\t\tt.Fatal(err)\n\t}\n}\n")
 	}
 	wt := t.TempDir()
 	writeCyclePredicates(t, wt, 4242, b.String())
 
-	reason, _ := flakyShapeGate{}.check(core.ReviewInput{
+	reason, _ := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
 	})
 	if !strings.Contains(reason, "+3 more") {

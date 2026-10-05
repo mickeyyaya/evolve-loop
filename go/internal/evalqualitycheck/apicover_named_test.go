@@ -75,3 +75,26 @@ func TestCheckDiversity_BindsDiversityStructs(t *testing.T) {
 		t.Errorf("EvalDiversity.HasNegative set on %d files, want 1", negFiles)
 	}
 }
+
+func TestLintUnsatisfiablePredicates_BindsReportAndFinding(t *testing.T) {
+	dir := t.TempDir()
+	src := "package f\n\nimport (\n\t\"testing\"\n\n\t\"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert\"\n)\n\nfunc TestX(t *testing.T) {\n\tif acsassert.FileContains(t, \"f.go\", \"x\") {\n\t\tt.Errorf(\"x present\")\n\t}\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "p_test.go"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var report UnsatisfiableLintReport
+	report, err := LintUnsatisfiablePredicates(dir)
+	if err != nil {
+		t.Fatalf("LintUnsatisfiablePredicates: %v", err)
+	}
+	if report.Linted() != 1 || len(report.Findings) != 1 {
+		t.Fatalf("report = %+v, want 1 file and 1 finding", report)
+	}
+	var f UnsatisfiableFinding = report.Findings[0]
+	if f.Func != "TestX" || f.Kind != UnsatisfiableKindInvertedIdiom || f.File != "p_test.go" {
+		t.Errorf("finding = %+v", f)
+	}
+	if UnsatisfiableKindAbsenceMessage == UnsatisfiableKindInvertedIdiom {
+		t.Errorf("finding kinds must be distinct")
+	}
+}

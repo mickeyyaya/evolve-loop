@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -65,32 +64,16 @@ var procPIDPathRE = regexp.MustCompile(`^/proc/(\d+)(/|$)`)
 // LintFlakyPredicates lints a predicate .go file or cycle package dir; a dir with no .go files is an error, not a clean result.
 func LintFlakyPredicates(path string) (FlakyLintReport, error) {
 	report := FlakyLintReport{Path: path}
-	fi, err := os.Stat(path)
+	paths, err := predicateSourcePaths(path)
 	if err != nil {
-		return report, fmt.Errorf("flakylint: %w", err)
-	}
-	paths := []string{path}
-	if fi.IsDir() {
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			return report, fmt.Errorf("flakylint: %w", err)
-		}
-		paths = nil
-		for _, e := range entries { // ReadDir sorts, so file order is deterministic
-			if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
-				paths = append(paths, filepath.Join(path, e.Name()))
-			}
-		}
-		if len(paths) == 0 {
-			return report, fmt.Errorf("flakylint: no .go files under %s (nothing linted — this is not a clean result)", path)
-		}
+		return report, err
 	}
 	fset := token.NewFileSet()
 	var files []*ast.File
 	for _, p := range paths {
 		f, perr := parser.ParseFile(fset, p, nil, 0)
 		if perr != nil {
-			return report, fmt.Errorf("flakylint: %w", perr)
+			return report, perr
 		}
 		files = append(files, f)
 		report.Files = append(report.Files, filepath.Base(p))

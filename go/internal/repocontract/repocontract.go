@@ -31,6 +31,7 @@ func Packages() []string {
 		"./internal/guards/...",
 		"./internal/acssuite/...",
 		"./internal/fleet/...",
+		"./internal/evalqualitycheck/...",
 	}
 }
 
