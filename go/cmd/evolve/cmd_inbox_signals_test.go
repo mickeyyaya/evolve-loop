@@ -80,7 +80,8 @@ func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	allowed := map[string]string{
 		"cmd/evolve/cmd_inbox_mover.go":         "the triage persona's `evolve inbox-mover` root — 06-F1 verifies <run>/signals.ndjson is writable under the triage sandbox first",
-		"cmd/evolve/cmd_inbox.go":               "operator command `evolve inbox batches`: the read-only dependency partition of the lane menu (ADR-0106 W3) — never writes",
+		"cmd/evolve/cmd_inbox.go":               "operator commands `evolve inbox batches`, `list` and `show`: the read-only lane-menu placement (ADR-0106 W3, ADR-0116) — never writes",
+		"cmd/evolve/cmd_inbox_curate.go":        "operator commands `evolve inbox edit`, `withdraw` and `verify` (ADR-0116) — 06-F1",
 		"internal/phases/triage/triage.go":      "the triage menu's read-only dependency partition (ADR-0106 W3) — never writes",
 		"cmd/evolve/cmd_inbox_quarantine.go":    "operator command `evolve inbox quarantine release` — 06-F1",
 		"cmd/evolve/cmd_inbox_route_console.go": "operator command `evolve inbox route-console` — 06-F1",

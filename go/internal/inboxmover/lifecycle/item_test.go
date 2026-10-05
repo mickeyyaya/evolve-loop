@@ -178,3 +178,17 @@ func TestReadTaskIDOrUnknown_Fallbacks(t *testing.T) {
 		t.Errorf("ok: got %q", got)
 	}
 }
+
+func TestUpdateItemJSON_ANullItemIsRefusedNotAPanic(t *testing.T) {
+	path := filepath.Join(newInbox(t), "null.json")
+	writeItem(t, path, `null`)
+
+	err := UpdateItemJSON(path, func(m map[string]json.RawMessage) { m["route"] = json.RawMessage(`"x"`) })
+
+	if !errors.Is(err, ErrInvalidItem) {
+		t.Errorf("err = %v, want ErrInvalidItem", err)
+	}
+	if body, _ := os.ReadFile(path); string(body) != "null" {
+		t.Errorf("the item was rewritten: %s", body)
+	}
+}

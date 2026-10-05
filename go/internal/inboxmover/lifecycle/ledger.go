@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -31,6 +32,15 @@ func (m *Mover) ledgerLine(e ledgerEntry) {
 	if m.ledger == nil {
 		return
 	}
+	if err := m.appendRecord(e); err != nil {
+		m.linef("WARN: ledger append (inbox-lifecycle %s %s): %v", e.Action, e.TaskID, err)
+	}
+}
+
+func (m *Mover) appendRecord(e ledgerEntry) error {
+	if m.ledger == nil {
+		return errors.New("no ledger is wired to record it")
+	}
 	cycle := 0
 	if e.Cycle != nil {
 		cycle = *e.Cycle
@@ -39,7 +49,7 @@ func (m *Mover) ledgerLine(e ledgerEntry) {
 	if e.GitSHA != nil {
 		gitHead = *e.GitSHA
 	}
-	err := m.ledger.AppendLifecycle(context.Background(), ledger.LifecycleRecord{
+	return m.ledger.AppendLifecycle(context.Background(), ledger.LifecycleRecord{
 		TS:      m.now().UTC().Format(time.RFC3339),
 		Action:  e.Action,
 		TaskID:  e.TaskID,
@@ -47,9 +57,6 @@ func (m *Mover) ledgerLine(e ledgerEntry) {
 		GitHead: gitHead,
 		Message: foldLifecycleMessage(e.From, e.To, e.Reason),
 	})
-	if err != nil {
-		m.linef("WARN: ledger append (inbox-lifecycle %s %s): %v", e.Action, e.TaskID, err)
-	}
 }
 
 // intPtr parses s's leading digits (Sscanf, so "12x" is 12); empty or non-numeric is nil.

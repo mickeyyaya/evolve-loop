@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-const inboxAddUsage = "usage: evolve inbox add [--file <item.json>]   (without --file, the item JSON is read from stdin)"
-
 func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	raw, rc := readInboxAddItem(args, stdin, stderr)
 	if rc != 0 {
@@ -60,7 +58,7 @@ func readInboxAddItem(args []string, stdin io.Reader, stderr io.Writer) ([]byte,
 		defer func() { _ = f.Close() }()
 		source = f
 	default:
-		fmt.Fprintln(stderr, inboxAddUsage)
+		fmt.Fprintln(stderr, inboxUsage("add"))
 		return nil, 10
 	}
 	raw, err := io.ReadAll(source)

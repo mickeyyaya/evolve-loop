@@ -126,7 +126,7 @@ func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuat
 	if stamp != nil {
 		if serr := UpdateItemJSON(d.src, func(item map[string]json.RawMessage) {
 			cb, _ := json.Marshal(stamp)
-			item["continuation"] = cb
+			item[inboxbatch.ContinuationField] = cb
 		}); serr != nil {
 			m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
 				reason: fmt.Sprintf("release-cycle: continuation stamp failed for %s: %v (releasing unstamped)", d.base, serr),

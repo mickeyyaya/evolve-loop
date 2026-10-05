@@ -28,21 +28,14 @@ var kebabItemID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 var requiredTextFields = []string{"id", "title", "kind", "summary", "fix"}
 
-var lifecycleOwnedFields = []string{
-	"consumed", "failure_count", "last_failure_reason", "continuation", "released_continuations", "unbacked", "git_sha",
-}
-
-var lifecycleOwnedPrefixes = []string{"routed_", "retired_"}
-
-const RouteField = "route"
+const RouteField = inboxbatch.RouteField
 
 func IsMoverWritten(key string) bool {
-	return key == RouteField || isLifecycleOwned(key)
+	return inboxbatch.RoleOf(key).Owner == inboxbatch.LoopStampOwned
 }
 
 func isLifecycleOwned(key string) bool {
-	hasOwnedPrefix := func(prefix string) bool { return strings.HasPrefix(key, prefix) }
-	return slices.Contains(lifecycleOwnedFields, key) || slices.ContainsFunc(lifecycleOwnedPrefixes, hasOwnedPrefix)
+	return key != RouteField && inboxbatch.RoleOf(key).IsStamp()
 }
 
 func (m *Mover) File(raw []byte) (FileResult, error) {
@@ -86,25 +79,71 @@ func decodeNewItem(raw []byte) (map[string]json.RawMessage, inboxbatch.Item, err
 }
 
 func checkNewFields(fields map[string]json.RawMessage, item inboxbatch.Item) error {
-	isBlank := func(s string) bool { return strings.TrimSpace(s) == "" }
 	if err := checkAuthoredFields(fields, item); err != nil {
 		return err
 	}
+	return checkFieldRules(fields, item, func(string) bool { return true })
+}
+
+type fieldRule struct {
+	field string
+	check func(fields map[string]json.RawMessage, item inboxbatch.Item) error
+}
+
+var itemFieldRules = append(requiredTextRules(),
+	fieldRule{"id", checkKebabID},
+	fieldRule{"weight", checkWeight},
+	fieldRule{"acceptance", checkAcceptance},
+)
+
+func requiredTextRules() []fieldRule {
+	rules := make([]fieldRule, 0, len(requiredTextFields))
 	for _, key := range requiredTextFields {
-		var text string
-		if json.Unmarshal(fields[key], &text) != nil || isBlank(text) {
-			return fmt.Errorf("%w: %q must be a non-empty string", ErrInvalidItem, key)
-		}
+		rules = append(rules, fieldRule{key, func(fields map[string]json.RawMessage, _ inboxbatch.Item) error {
+			var text string
+			if json.Unmarshal(fields[key], &text) != nil || isBlank(text) {
+				return fmt.Errorf("%w: %q must be a non-empty string", ErrInvalidItem, key)
+			}
+			return nil
+		}})
 	}
-	switch {
-	case !kebabItemID.MatchString(item.ID):
+	return rules
+}
+
+func isBlank(s string) bool { return strings.TrimSpace(s) == "" }
+
+func checkKebabID(_ map[string]json.RawMessage, item inboxbatch.Item) error {
+	if !kebabItemID.MatchString(item.ID) {
 		return fmt.Errorf("%w: id %q must be kebab-case", ErrInvalidItem, item.ID)
-	case item.Weight <= 0 || item.Weight > 1:
+	}
+	return nil
+}
+
+func checkWeight(_ map[string]json.RawMessage, item inboxbatch.Item) error {
+	if item.Weight <= 0 || item.Weight > 1 {
 		return fmt.Errorf("%w: weight must be in (0, 1], got %v", ErrInvalidItem, item.Weight)
-	case len(item.Acceptance) == 0 || slices.ContainsFunc(item.Acceptance, isBlank):
+	}
+	return nil
+}
+
+func checkAcceptance(_ map[string]json.RawMessage, item inboxbatch.Item) error {
+	if len(item.Acceptance) == 0 || slices.ContainsFunc(item.Acceptance, isBlank) {
 		return fmt.Errorf("%w: acceptance must list at least one non-empty criterion", ErrInvalidItem)
 	}
-	if dirty := inboxbatch.SanitizedFields(item); len(dirty) > 0 {
+	return nil
+}
+
+func checkFieldRules(fields map[string]json.RawMessage, item inboxbatch.Item, judged func(field string) bool) error {
+	for _, rule := range itemFieldRules {
+		if !judged(rule.field) {
+			continue
+		}
+		if err := rule.check(fields, item); err != nil {
+			return err
+		}
+	}
+	unjudged := func(field string) bool { return !judged(field) }
+	if dirty := slices.DeleteFunc(inboxbatch.SanitizedFields(item), unjudged); len(dirty) > 0 {
 		return fmt.Errorf("%w: %s holds control characters or exceeds the loader's length bound", ErrInvalidItem, strings.Join(dirty, ", "))
 	}
 	return nil

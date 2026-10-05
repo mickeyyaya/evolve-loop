@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "No inbox item write outside internal/inboxmover (a test walks the module for writes to .evolve/inbox items)",
+    "A recurrence reweight appends an inbox-lifecycle ledger line and passes the weight rule"
+  ],
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/internal/recurrence/apply.go",
+    "go/internal/inboxbatch/fieldowner.go",
+    "go/internal/inboxmover"
+  ],
+  "fix": "Route the recurrence reweight through inboxmover (an Edit-like facade taking the weight, or a loop-owned weight stamp in the owner table), with its ledger line; decide in the ADR whether a loop reweight is a curation or a stamp.",
+  "id": "recurrence-reweight-bypasses-the-item-writer",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console lane cl-inboxverbs, 2026-10-01 (owner-table review round)",
+  "summary": "internal/recurrence/apply.go setItemWeight rewrites .evolve/inbox items' weight with atomicwrite.JSON at the wave boundary: a second item writer outside inboxmover, writing a curator-owned field (ADR-0116's owner table). Under ADR-0112's sync a plane-side reweight is not IsMoverWritten, so it is other dirt that blocks sync-main, and it bypasses edit's validation and ledger line.",
+  "title": "The recurrence engine reweights inbox items through its own writer, although the field-owner table gives weight to the curator",
+  "weight": 0.4
+}

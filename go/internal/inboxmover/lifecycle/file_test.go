@@ -247,7 +247,8 @@ func TestMover_File_ReportsWhatTheClaimFloorWouldRefuse(t *testing.T) {
 func TestMover_File_RefusesEveryLifecycleOwnedField(t *testing.T) {
 	for _, field := range []string{`"route":"lane"`, `"routed_reason":"x"`, `"routed_cycle":3`, `"retired_cycle":3`,
 		`"last_failure_reason":"x"`, `"failure_count":1`, `"consumed":{}`, `"git_sha":"abc"`, `"unbacked":true`,
-		`"continuation":{}`, `"released_continuations":[]`} {
+		`"continuation":{}`, `"released_continuations":[]`, `"premise_verified_at":"2026-09-30T00:00:00Z"`,
+		`"premise_verified_sha":"abc"`, `"premise_verified_evidence":"x"`} {
 		t.Run(field, func(t *testing.T) {
 			body := strings.Replace(validItem, `"source":"console"}`, `"source":"console",`+field+`}`, 1)
 

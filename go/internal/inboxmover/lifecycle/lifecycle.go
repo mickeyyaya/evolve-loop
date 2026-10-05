@@ -60,7 +60,8 @@ var (
 	ErrBadState = errors.New("inboxmover: invalid new_state")
 	// ErrConsoleRouted refuses a lane claim of an operator-owned item.
 	// See ADR-0074.
-	ErrConsoleRouted = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
+	ErrConsoleRouted   = errors.New("inboxmover: item is console-routed (operator-owned) — refusing lane claim")
+	ErrNotWithdrawable = errors.New("inboxmover: refusing to withdraw the item")
 )
 
 var validStates = map[string]bool{
@@ -87,6 +88,8 @@ type Mover struct {
 	retire       func(itemPath, taskID, reason string)
 	runWorkspace func(cycle int) string
 	signals      func() *signalcenter.Center
+	mainHead     func() (string, error)
+	bound        func(taskID string) (bool, error)
 }
 
 // Option configures a Mover at construction.
@@ -102,6 +105,10 @@ func New(inboxDir string, appender LedgerAppender, opts ...Option) *Mover {
 		activeCycle: func() (string, error) { return "", errors.New("lifecycle: no active-cycle reader wired") },
 		landed:      func(string) (bool, error) { return true, nil },
 		retire:      func(string, string, string) {},
+		mainHead:    func() (string, error) { return "", errors.New("lifecycle: no main-head reader wired") },
+		bound: func(string) (bool, error) {
+			return false, errors.New("lifecycle: no continuation-binding reader wired")
+		},
 	}
 	for _, opt := range opts {
 		opt(m)
@@ -168,6 +175,22 @@ func WithRunWorkspace(fn func(cycle int) string) Option {
 	return func(m *Mover) {
 		if fn != nil {
 			m.runWorkspace = fn
+		}
+	}
+}
+
+func WithMainHead(fn func() (string, error)) Option {
+	return func(m *Mover) {
+		if fn != nil {
+			m.mainHead = fn
+		}
+	}
+}
+
+func WithBinding(fn func(taskID string) (bool, error)) Option {
+	return func(m *Mover) {
+		if fn != nil {
+			m.bound = fn
 		}
 	}
 }
