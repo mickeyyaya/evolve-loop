@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (2026-09-30). The target and the tooling landed in PR #746; round 12 in #749. The commit-gate refusal and the loop-wide rule are in PR #753, and the history archive is in its own PR (both landing at the wave-54 boundary).
 - **Supersedes** the earlier target of "machine-read comments plus exported-identifier docs". Exported docs are no longer required.
+- **Followed by:** [ADR-0115](0115-commit-gate-keeps-history-and-records-waivers.md), which makes the commit gate enforce decision 7 for every console change.
 - **Related:** [the code-comments convention](../../conventions/code-comments.md) (the rule's one home); [the comment reduction plan](../../plans/comment-reduction-2026-09.md); [round 12 findings](../../reports/comment-round-12-findings-2026-09-30.md); AGENTS.md invariant 10.
 
 ## Context

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
@@ -60,6 +61,23 @@ func TestCommentFloorFailures_ANewFilesPackageDocIsNotAdded(t *testing.T) {
 
 	if failures := commentFloorFailures(context.Background(), floorInput(t, floorRoot(t, `{"comment_floor":{"stage":"enforce"}}`), repo, base)); failures != nil {
 		t.Fatalf("a new file's package doc is spared, got %v", failures)
+	}
+}
+
+func TestCommentFloorFailures_AnAdoptedAncestorsArchivedPredicatesAddNoComment(t *testing.T) {
+	repo, base := floorRepo(t)
+	writeFile(t, filepath.Join(repo.Dir, "go", "acs", "cycle42", "predicates_test.go"), "package cycle42\n\n// Cycle 42 pins the retry budget.\nfunc TestPredicate() {}\n")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "the failed ancestor's snapshot")
+	archived, err := explanationdocs.ArchiveSupersededPredicatePackages(context.Background(), repo.Dir, base, func([]string) []string { return []string{"go/acs/cycle42"} })
+	if err != nil || len(archived) != 1 {
+		t.Fatalf("archive = %v, %v; want the ancestor's package archived", archived, err)
+	}
+
+	failures := commentFloorFailures(context.Background(), floorInput(t, floorRoot(t, `{"comment_floor":{"stage":"enforce"}}`), repo, base))
+
+	if failures != nil {
+		t.Fatalf("the archived predicates under %s are records, not the build's comments: %v", archived[0], failures)
 	}
 }
 

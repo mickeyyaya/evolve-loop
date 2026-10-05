@@ -11,9 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-const commentedAtHead = "package x\n\n// F is the entry point.\n// It used to live in cycle 42's retry loop.\nfunc F() {}\n"
+const commentedAtHead = "package x\n\n// F is the entry point.\n// It returns once the lease is held.\nfunc F() {}\n"
 
 const trimmedComment = "package x\n\n// F is the entry point.\nfunc F() {}\n"
+
+const plainTrimmed = "package x\n\nfunc F() {}\n"
 
 type waiverCase struct {
 	files     string
@@ -22,6 +24,7 @@ type waiverCase struct {
 	onDisk    map[string]string
 	links     map[string]string
 	atHead    map[string]string
+	reviewers string
 	wantRun   int
 }
 
@@ -63,6 +66,7 @@ func runWaiverCase(t *testing.T, c waiverCase) *Result {
 	o := baseOpts(root, "shasum", "go")
 	o.Env = os.Environ()
 	o.Files = c.filesFlag
+	o.Reviewers = c.reviewers
 	o.Runner = (&scriptRunner{rules: rules}).run()
 	res := o.Run(context.Background())
 	if res.ExitCode != c.wantRun {
@@ -84,6 +88,30 @@ func TestRun_AProvenCommentOnlyChangeNeedsNoReviewers(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(res.Logs, "\n"), "comment-only") {
 		t.Fatalf("the log names the proof that replaced review: %v", res.Logs)
+	}
+}
+
+func TestRun_AWaivedCommitRecordsItsWaiverAndAReviewedOneDoesNot(t *testing.T) {
+	t.Parallel()
+	waived := runWaiverCase(t, waiverCase{
+		files:   "x.go\n",
+		onDisk:  map[string]string{"x.go": plainTrimmed},
+		atHead:  map[string]string{"x.go": commentedAtHead},
+		wantRun: ExitPass,
+	})
+	if waived.Attestation == nil || waived.Attestation.ReviewWaiver != "comment-only" {
+		t.Fatalf("a waived commit's attestation names the waiver, so ship can say so in git log: %+v", waived.Attestation)
+	}
+
+	reviewed := runWaiverCase(t, waiverCase{
+		files:     "x.go\n",
+		onDisk:    map[string]string{"x.go": "package x\n\nfunc F() { _ = 1 }\n"},
+		atHead:    map[string]string{"x.go": commentedAtHead},
+		reviewers: "code-simplifier,go-reviewer",
+		wantRun:   ExitPass,
+	})
+	if reviewed.Attestation == nil || reviewed.Attestation.ReviewWaiver != "" {
+		t.Fatalf("a reviewed commit records no waiver: %+v", reviewed.Attestation)
 	}
 }
 

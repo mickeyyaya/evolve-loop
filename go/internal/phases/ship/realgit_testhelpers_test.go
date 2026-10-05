@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
@@ -57,9 +58,23 @@ func containsLog(res RunResult, substr string) bool {
 // (integration tier).
 func writeAttestation(t *testing.T, repo, treeSHA string) {
 	t.Helper()
+	writeGateAttestation(t, repo, commitgate.Attestation{
+		TreeStateSHA: treeSHA,
+		TS:           "2026-05-27T00:00:00Z",
+		ChecksPassed: []string{"go:gofmt", "go:test"},
+		ReviewersRun: []string{"code-simplifier", "code-reviewer", "go-reviewer"},
+		Tool:         "shasum",
+	})
+}
+
+func writeGateAttestation(t *testing.T, repo string, att commitgate.Attestation) {
+	t.Helper()
+	body, err := att.Marshal()
+	if err != nil {
+		t.Fatalf("commit-gate attestation: %v", err)
+	}
 	mustMkdir(t, filepath.Join(repo, ".commit-gate"))
-	body := fmt.Sprintf(`{"tree_state_sha":%q,"ts":"2026-05-27T00:00:00Z","checks_passed":["go:gofmt","go:test"],"reviewers_run":["code-simplifier","code-reviewer","go-reviewer"],"tool":"shasum"}`+"\n", treeSHA)
-	mustWrite(t, filepath.Join(repo, ".commit-gate", "attestation.json"), body)
+	mustWrite(t, filepath.Join(repo, ".commit-gate", "attestation.json"), string(body))
 }
 
 // tempRepoDir returns a fresh temp directory for a git repo whose cleanup is

@@ -49,6 +49,12 @@ func isSkippedDir(name string) bool {
 	return name == "testdata" || name == "vendor" || (strings.HasPrefix(name, ".") && name != ".")
 }
 
+const documentationRoot = "docs/"
+
+func isDocumentation(file string) bool {
+	return strings.HasPrefix(filepath.ToSlash(file), documentationRoot)
+}
+
 func isOutsideProjectCode(file string) bool {
 	return slices.ContainsFunc(strings.Split(path.Dir(filepath.ToSlash(file)), "/"), isSkippedDir)
 }
