@@ -56,5 +56,8 @@
     "stage": "shadow",
     "concurrency": 3
   },
-  "version": 1
+  "version": 1,
+  "workflow": {
+    "universal_fallback_exclude": []
+  }
 }
