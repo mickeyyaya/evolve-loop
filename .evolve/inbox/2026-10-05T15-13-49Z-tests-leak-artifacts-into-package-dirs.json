@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "After go test -count=1 over core, cmd/evolve, deliverable and subagent, git status --ignored shows no new files under go/ (red first)",
+    "A guard pins it so a new leaking test fails in CI"
+  ],
+  "created_at": "2026-10-05T15:13:49Z",
+  "files": [
+    "go/internal/core/audit_fail_decision_test.go",
+    "go/cmd/evolve",
+    "go/internal/deliverable",
+    "go/internal/subagent"
+  ],
+  "fix": "Find every test that writes with an empty or relative workspace (grep for writes under os.Getwd or an empty Workspace/ProjectRoot) and give it t.TempDir(); add a guard test that runs after the package's tests (or a TestMain check) failing when the package directory gained untracked or ignored files during the run.",
+  "id": "tests-leak-artifacts-into-package-dirs",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, floor-budget landing, 2026-10-05",
+  "summary": "Every floor run leaves ignored files inside package directories: go/internal/core/audit-report.md, go/cmd/evolve/.evolve/guards.log, go/internal/deliverable/.evolve/ledger.*, go/internal/subagent/.evolve/runs. One source is audit_fail_decision_test.go:218, which writes to req.Workspace when that is empty, so the write lands in the package's working directory. The files are gitignored, so nothing fails, but they pollute worktrees, can feed later tests stale state (the real-ledger seal test already reads a stray ledger), and hide which test wrote what.",
+  "title": "Package tests write ignored artifacts into their own source directories on every run",
+  "weight": 0.35
+}
