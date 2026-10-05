@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // ShouldQuarantine reports whether a task-level failure count reached a positive ceiling.
@@ -40,8 +42,8 @@ func (m *Mover) ReleaseFromQuarantine(taskID string) (PromoteResult, error) {
 		return res, fmt.Errorf("%w: %s already at inbox root", ErrMvFailed, base)
 	}
 	if rerr := UpdateItemJSON(src, func(item map[string]json.RawMessage) {
-		item["failure_count"] = json.RawMessage("0")
-		delete(item, "last_failure_reason")
+		item[inboxbatch.FailureCountField] = json.RawMessage("0")
+		delete(item, inboxbatch.LastFailureReasonField)
 	}); rerr != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.ReleaseFromQuarantine", legacy: "WARN: ",
 			reason: fmt.Sprintf("quarantine-release: failure_count reset failed for '%s' (%v) — released with its stale count", taskID, rerr),

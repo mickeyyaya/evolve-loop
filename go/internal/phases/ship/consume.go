@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 )
@@ -269,7 +270,7 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume parse %q: %v — leaving item in place", id, err))
 		return consumedMove{}, moveFailed
 	}
-	doc["consumed"] = map[string]any{
+	doc[inboxbatch.ConsumedField] = map[string]any{
 		"at":    time.Now().UTC().Format(time.RFC3339),
 		"via":   "ship",
 		"cycle": c.cid,
@@ -284,7 +285,7 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 	m := consumedMove{id: id, src: src, raw: raw}
 	m.bound, m.boundOK = readBindingForConsume(opts, res, id)
 	if m.boundOK {
-		doc["released_continuations"] = appendReleasedForConsume(doc, m.bound, c.cid)
+		doc[inboxbatch.ReleasedContinuationsField] = appendReleasedForConsume(doc, m.bound, c.cid)
 	}
 	out, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
