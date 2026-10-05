@@ -68,8 +68,8 @@ func TestCodexTmux_LaunchCmd_ModelMapAndMarker(t *testing.T) {
 	fx := newFixture(t, "codex-tmux", "") // profile model=haiku
 	tmux := &fakeTmux{}                   // no marker → REPL boot times out, but launchCmd already sent
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass")
-	if !tmux.sentContains("codex --yolo -m gpt-5.6-luna") {
-		t.Fatalf("codex-tmux launch should map haiku→gpt-5.6-luna with --yolo prefix; sentKeys=%v", tmux.sentKeys)
+	if !tmux.sentContains("codex --yolo -c 'check_for_update_on_startup=false' -m gpt-5.6-luna") {
+		t.Fatalf("codex-tmux launch should map haiku→gpt-5.6-luna after the --yolo and update-check-off prefix; sentKeys=%v", tmux.sentKeys)
 	}
 }
 

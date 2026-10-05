@@ -1,6 +1,7 @@
 package policy_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -31,7 +32,7 @@ func TestACSTimeoutConfig_Resolution(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := tc.pol.ACSTimeoutConfig()
-			if got != tc.want {
+			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("ACSTimeoutConfig() = %+v, want %+v", got, tc.want)
 			}
 		})
@@ -54,6 +55,11 @@ func TestLoad_ACSBlock(t *testing.T) {
 			`{"acs":{"go_timeout_s":120}}`,
 			policy.ACSConfig{GoTimeoutS: 120},
 		},
+		{
+			"predicate-env-names-operator-keys",
+			`{"acs":{"predicate_env":["EVOLVE_FLAG_CAMPAIGN"]}}`,
+			policy.ACSConfig{PredicateEnv: []string{"EVOLVE_FLAG_CAMPAIGN"}},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -61,7 +67,7 @@ func TestLoad_ACSBlock(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
-			if got := pol.ACSTimeoutConfig(); got != tc.want {
+			if got := pol.ACSTimeoutConfig(); !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("after Load, ACSTimeoutConfig() = %+v, want %+v", got, tc.want)
 			}
 		})

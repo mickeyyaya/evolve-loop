@@ -22,14 +22,23 @@ import (
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 )
 
-// RunPhase implements `evolve phase <name>`: a PhaseRequest JSON on stdin, a PhaseResponse JSON on stdout.
-func RunPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+type BuildHandoffFloorFor func(projectRoot string) core.BuildHandoffFloor
+
+type phaseCommand struct {
+	floor BuildHandoffFloorFor
+}
+
+func NewRunPhase(floor BuildHandoffFloorFor) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return phaseCommand{floor: floor}.run
+}
+
+func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintf(stderr, "evolve phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10
 	}
 	if strings.ToLower(args[0]) == "verify" {
-		return runPhaseVerify(args[1:], stdout, stderr)
+		return c.runPhaseVerify(args[1:], stdout, stderr)
 	}
 	if strings.ToLower(args[0]) == "lint" {
 		return runPhaseLint(args[1:], stdout, stderr)

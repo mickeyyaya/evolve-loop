@@ -11,17 +11,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-const inboxRouteConsoleUsage = "usage: evolve inbox route-console <id> <reason> <cycle>"
-
 func runInboxRouteConsole(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 3 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
-		fmt.Fprintln(stderr, inboxRouteConsoleUsage)
+		fmt.Fprintln(stderr, inboxUsage("route-console"))
 		return 10
 	}
 	id, reason := strings.TrimSpace(args[0]), strings.TrimSpace(args[1])
 	cycle, err := strconv.Atoi(args[2])
 	if err != nil || cycle < 0 {
-		fmt.Fprintf(stderr, "inbox route-console: cycle %q is not a cycle number\n%s\n", args[2], inboxRouteConsoleUsage)
+		fmt.Fprintf(stderr, "inbox route-console: cycle %q is not a cycle number\n%s\n", args[2], inboxUsage("route-console"))
 		return 10
 	}
 	opts := inboxmover.Options{ProjectRoot: envOrCwd("EVOLVE_PROJECT_ROOT"), Stderr: stderr}

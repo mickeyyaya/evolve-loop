@@ -130,12 +130,12 @@ func TestCodexUpdateMenuDismiss(t *testing.T) {
 		// The repeated "idle ›" is the settling tick the cross-poll stability
 		// window adds before the artifact completes (see completion.go).
 		{
-			name:     "menu_present_skip_before_inject",
-			frames:   []string{cycle274CodexUpdateMenu, "ready ›", "idle ›", "idle ›", "final", "cleanup"},
+			name:     "menu_present_skip_confirmed_on_the_observed_cursor_before_inject",
+			frames:   []string{cycle274CodexUpdateMenu, codexUpdateMenuFrame(codexMenuSkip), "ready ›", "idle ›", "idle ›", "final", "cleanup"},
 			wantSkip: true,
 		},
 		{
-			name:     "menu_absent_no_spurious_skip",
+			name:     "menu_absent_no_navigation_and_no_confirm_before_inject",
 			frames:   []string{"ready ›", "idle ›", "idle ›", "final", "cleanup"},
 			wantSkip: false,
 		},
@@ -147,21 +147,21 @@ func TestCodexUpdateMenuDismiss(t *testing.T) {
 			tm := &artifactOnPasteTmux{FakeTmuxController: base, artifact: cfg.Artifact}
 			code, err := runTmuxREPL(context.Background(), cfg, fixtureDeps(tm), tmuxLaunch{
 				name: "codex-tmux", session: "codex-update", launchCmd: "codex", promptMarker: "›",
-				bootIntervalS: 1, bootMenuSkip: "2",
+				bootIntervalS: 1, tickDuringBoot: true,
 			})
 			if err != nil || code != ExitOK {
 				t.Fatalf("runTmuxREPL = (%d,%v), want ExitOK,nil", code, err)
 			}
-			skipAt, pasteAt := eventIndex(tm.Events, "send:2|true"), eventIndex(tm.Events, "paste-buffer")
+			downAt, enterAt, pasteAt := eventIndex(tm.Events, "send:Down|false"), eventIndex(tm.Events, "send:|true"), eventIndex(tm.Events, "paste-buffer")
+			if eventIndex(tm.Events, "send:2|true") >= 0 {
+				t.Fatalf("the blind hotkey-and-Enter burst was sent; events=%v", tm.Events)
+			}
 			if tc.wantSkip {
-				if skipAt < 0 {
-					t.Fatalf("Skip keypress not sent; events=%v", tm.Events)
+				if downAt < 0 || enterAt < downAt || pasteAt < enterAt {
+					t.Fatalf("want Down (cursor on Update now), then Enter (cursor on Skip), then the paste; events=%v", tm.Events)
 				}
-				if pasteAt < 0 || skipAt > pasteAt {
-					t.Fatalf("Skip must precede paste; events=%v", tm.Events)
-				}
-			} else if skipAt >= 0 {
-				t.Fatalf("unexpected Skip keypress without menu; events=%v", tm.Events)
+			} else if downAt >= 0 || enterAt < pasteAt {
+				t.Fatalf("no menu: want no Down and no Enter before the paste; events=%v", tm.Events)
 			}
 			if strings.Count(strings.Join(tm.Events, "\n"), "paste-buffer") != 1 {
 				t.Fatalf("prompt should be pasted exactly once; events=%v", tm.Events)

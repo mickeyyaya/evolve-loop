@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 )
 
 // excludeCommitGate adds .commit-gate/ to the repo's local git excludes so
@@ -122,6 +124,31 @@ func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 	}
 	if !containsLog(res, "--bypass-commit-gate") {
 		t.Errorf("missing bypass log in: %v", res.Logs)
+	}
+}
+
+func TestCommitGate_GitLogTellsAWaivedCommitFromABypassedOne(t *testing.T) {
+	repo := makeRepo(t)
+	excludeCommitGate(t, repo)
+	addRemote(t, repo)
+	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwaived change\n")
+	writeGateAttestation(t, repo, commitgate.Attestation{TreeStateSHA: treeStateSHA(t, repo), TS: "2026-10-01T00:00:00Z", ReviewWaiver: "comment-only", Tool: "shasum"})
+	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "waived change", Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"}}); res.ExitCode != ExitOK {
+		t.Fatalf("waived ship: want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	waived := runGitOut(t, repo, "log", "-1", "--format=%B")
+
+	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nbypassed change\n")
+	if res, _ := runShip(t, repo, Options{Class: ClassManual, CommitMessage: "bypassed change", BypassCommitGate: true, Env: map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"}}); res.ExitCode != ExitOK {
+		t.Fatalf("bypassed ship: want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
+	}
+	bypassed := runGitOut(t, repo, "log", "-1", "--format=%B")
+
+	if !strings.Contains(waived, "Review-waived: comment-only") || strings.Contains(waived, "Reviewed-by:") {
+		t.Errorf("the waived commit's message must carry the waiver and no reviewer:\n%s", waived)
+	}
+	if strings.Contains(bypassed, "Review-waived:") || strings.Contains(bypassed, "Reviewed-by:") {
+		t.Errorf("the bypassed commit's message must carry neither trailer:\n%s", bypassed)
 	}
 }
 

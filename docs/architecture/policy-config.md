@@ -33,7 +33,16 @@ policy).
 
   // KB recall bound + failure-lesson novelty gate. Absent / empty /
   // out-of-range ⇒ recall_k=5 (today's compiled bound), novelty_threshold=0.9.
-  "research": { "recall_k": 5, "novelty_threshold": 0.9 }
+  "research": { "recall_k": 5, "novelty_threshold": 0.9 },
+
+  // The ACS predicate lane (`evolve acs suite`, the audit). go_timeout_s is ONE
+  // budget shared by every scope (absent / 0 ⇒ 60 s). predicate_env names the
+  // operator-owned EVOLVE_ keys the suite copies from its environment into every
+  // predicate's, past the scrub that drops the rest of the namespace. A lane
+  // protocol key (ipcenv.ProtocolKeys) or a suite export (EVOLVE_PROJECT_ROOT,
+  // the worktree-root key, CHANGED_PACKAGES) is refused with a warning in the
+  // verdict; every other entry still forwards (ADR-0114).
+  "acs": { "go_timeout_s": 600, "predicate_env": ["EVOLVE_FLAG_CAMPAIGN"] }
 }
 ```
 
@@ -169,6 +178,7 @@ for emergencies.
 |---|---|---|
 | `mandatory_phases` | routing advisor | merged into the orchestrator mandatory set; `ClampPlanToFloor` keeps them in every cycle plan |
 | `pins[phase]` | dispatch resolver (`internal/llmroute`) | absolute CLI/model override, validated via `policy.ValidatePin` |
+| `acs.predicate_env` | ACS suite (`internal/acssuite`: `forwardableKeys`, then `predicateEnv`) | each named key set in the suite's environment is copied into every predicate's; every other `EVOLVE_` key is stripped. Bounded in one place: a lane protocol key or one of the suite's own exports is refused and named in the verdict's `warnings` (at projection, not at `policy.Load`, so one bad entry neither fails every policy consumer nor drops the rest of the list). Read from the state root's policy only, so a cycle worktree cannot widen it; the checked-in list may name only keys a curated predicate reads |
 
 Implementation: `go/internal/policy` (load + validate), consulted by
 `go/internal/llmroute` (pin) and `go/internal/phases/runner` (load + bypass +

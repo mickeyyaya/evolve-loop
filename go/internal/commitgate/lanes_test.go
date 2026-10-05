@@ -146,9 +146,18 @@ func TestLaneNode_NoMatchingFiles_ExitPassNoOp(t *testing.T) {
 	}
 }
 
+func nodeRoot(t *testing.T, files ...string) string {
+	t.Helper()
+	root := t.TempDir()
+	for _, f := range files {
+		mustWrite(t, filepath.Join(root, f), "export {};\n")
+	}
+	return root
+}
+
 func TestLaneNode_EslintPresent_Pass(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir(), "eslint")
+	o := baseOpts(nodeRoot(t, "a.ts", "b.jsx"), "eslint")
 	sr := &scriptRunner{rules: []scriptRule{{matchPrefix: "eslint", exit: 0}}}
 	o.Runner = sr.run()
 	res := &Result{}
@@ -166,7 +175,7 @@ func TestLaneNode_EslintPresent_Pass(t *testing.T) {
 
 func TestLaneNode_EslintAbsentNpxPresent_UsesNpx(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir(), "npx")
+	o := baseOpts(nodeRoot(t, "a.mjs"), "npx")
 	sr := &scriptRunner{rules: []scriptRule{{matchPrefix: "npx eslint", exit: 0}}}
 	o.Runner = sr.run()
 	res := &Result{}
@@ -181,7 +190,7 @@ func TestLaneNode_EslintAbsentNpxPresent_UsesNpx(t *testing.T) {
 
 func TestLaneNode_NeitherToolPresent_ExitToolMissing(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir())
+	o := baseOpts(nodeRoot(t, "a.js"))
 	res := &Result{}
 
 	if code := o.laneNode(context.Background(), []string{"a.js"}, res); code != ExitToolMissing {
@@ -191,13 +200,40 @@ func TestLaneNode_NeitherToolPresent_ExitToolMissing(t *testing.T) {
 
 func TestLaneNode_EslintFails_ExitFail(t *testing.T) {
 	t.Parallel()
-	o := baseOpts(t.TempDir(), "eslint")
+	o := baseOpts(nodeRoot(t, "a.jsx"), "eslint")
 	sr := &scriptRunner{rules: []scriptRule{{matchPrefix: "eslint", exit: 1, stdout: "1 problem\n"}}}
 	o.Runner = sr.run()
 	res := &Result{}
 
 	if code := o.laneNode(context.Background(), []string{"a.jsx"}, res); code != ExitFail {
 		t.Fatalf("code = %d, want ExitFail", code)
+	}
+}
+
+func TestLaneNode_ADeletedFileNeverReachesEslint(t *testing.T) {
+	t.Parallel()
+	o := baseOpts(nodeRoot(t, "kept.ts"), "eslint")
+	sr := &scriptRunner{rules: []scriptRule{{matchPrefix: "eslint", exit: 0}}}
+	o.Runner = sr.run()
+	res := &Result{}
+
+	if code := o.laneNode(context.Background(), []string{"gone.ts", "kept.ts", "gone.js"}, res); code != ExitPass {
+		t.Fatalf("code = %d, want ExitPass (%v)", code, res.Logs)
+	}
+	if len(sr.calls) != 1 || sr.calls[0] != "eslint kept.ts" {
+		t.Errorf("calls = %v, want eslint over the file still on disk only", sr.calls)
+	}
+}
+
+func TestLaneNode_OnlyDeletedFilesRunNoLint(t *testing.T) {
+	t.Parallel()
+	o := baseOpts(t.TempDir(), "eslint")
+	sr := &scriptRunner{}
+	o.Runner = sr.run()
+	res := &Result{}
+
+	if code := o.laneNode(context.Background(), []string{"gone.ts"}, res); code != ExitPass || len(sr.calls) != 0 || len(res.ChecksPassed) != 0 {
+		t.Errorf("code = %d calls = %v checks = %v, want a no-op: a deleted file carries nothing to lint", code, sr.calls, res.ChecksPassed)
 	}
 }
 

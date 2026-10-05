@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/binaryguard"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -150,5 +151,43 @@ func TestRefuseAddedComments_AFaultNamesItsCause(t *testing.T) {
 				t.Errorf("code = %d logs = %q, want ExitGitFatal naming %q with no formatting residue", code, logs, c.want)
 			}
 		})
+	}
+}
+
+func TestRun_ACompiledExecutableIsRefusedBeforeAnyOtherWork(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	elf := append([]byte{0x7f, 'E', 'L', 'F'}, make([]byte, binaryguard.DefaultThresholdBytes)...)
+	mustWrite(t, filepath.Join(root, "go", "bin", "evolve"), string(elf))
+	o := baseOpts(root, "shasum", "go")
+	o.Reviewers = "code-simplifier,go-reviewer"
+	sr := &scriptRunner{rules: []scriptRule{{matchPrefix: "git diff --name-only HEAD", stdout: "go/bin/evolve\n"}}}
+	o.Runner = sr.run()
+
+	res := o.Run(context.Background())
+
+	if res.ExitCode != ExitFail || res.Attestation != nil {
+		t.Fatalf("ExitCode = %d, want ExitFail and no attestation for a committed build artifact (%v)", res.ExitCode, res.Logs)
+	}
+	if logs := strings.Join(res.Logs, "\n"); !strings.Contains(logs, "REJECTED: go/bin/evolve is a") || !strings.Contains(logs, "compiled executable") {
+		t.Errorf("the refusal names the artifact: %v", res.Logs)
+	}
+	if len(sr.calls) != 1 {
+		t.Errorf("calls = %v, want only the change listing: the guard runs before the comment check and the lanes", sr.calls)
+	}
+}
+
+func TestRun_AnUnscannablePathIsAFault(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "x.go"), uncommentedAtHead)
+	o := baseOpts(root, "shasum", "go")
+	o.Reviewers = "code-simplifier,go-reviewer"
+	o.Runner = (&scriptRunner{rules: []scriptRule{{matchPrefix: "git diff --name-only HEAD", stdout: "x.go/under-a-file\n"}}}).run()
+
+	res := o.Run(context.Background())
+
+	if logs := strings.Join(res.Logs, "\n"); res.ExitCode != ExitGitFatal || !strings.Contains(logs, "binary guard:") {
+		t.Errorf("ExitCode = %d logs = %v, want ExitGitFatal naming the binary guard: a path the guard cannot stat is not a clean one", res.ExitCode, res.Logs)
 	}
 }

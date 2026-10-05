@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
+const commentOnlyWaiver = "comment-only"
+
 func (o Options) reviewWaiver(ctx context.Context) (waived, refused string) {
 	paths, err := o.changeListing(ctx)
 	if err != nil {

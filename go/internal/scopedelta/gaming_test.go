@@ -206,3 +206,20 @@ func TestAccount_RefusesContradictoryDuplicateDecisions(t *testing.T) {
 		t.Error("one path carried two contradictory decisions and the delta accounted clean")
 	}
 }
+
+func TestSurfaceOf_TheCommentProofAndTheCommitGateJudgeWhetherReviewRuns(t *testing.T) {
+	t.Parallel()
+	for _, p := range []string{"go/internal/commentaudit/equivalence.go", "go/internal/commitgate/comment_only.go"} {
+		if got := SurfaceOf(p); got != SurfaceSignal {
+			t.Errorf("SurfaceOf(%q) = %q, want signal: a wrong comment-only proof skips review, so this code judges other changes", p, got)
+		}
+		loosening := Entry{
+			Path: p, Class: ClassDiscovered, Disposition: DispositionKeep, Effect: EffectLoosens,
+			Reason:        "the directive pattern was too strict for my change, so I widened it",
+			Corroboration: Corroboration{FailsWithout: true, Command: "go test ./internal/commentaudit/"},
+		}
+		if err := Admissible(loosening); err == nil {
+			t.Errorf("a lane KEEP that loosens %s was admitted on the producer's word", p)
+		}
+	}
+}

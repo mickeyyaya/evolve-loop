@@ -48,7 +48,7 @@ type ManifestPrompt struct {
 	Name         string `json:"name"`
 	Regex        string `json:"regex"`
 	ResponseKeys string `json:"response_keys"`
-	Policy       string `json:"policy"` // auto_respond | escalate
+	Policy       string `json:"policy"`
 	Note         string `json:"note"`
 	Once         bool   `json:"once"`
 	// TailLines restricts matching to the pane's last n lines (0 = whole capture): a live modal sits at the

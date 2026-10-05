@@ -16,7 +16,7 @@ import (
 // See ADR-0072.
 func runInboxQuarantine(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "usage: evolve inbox quarantine <list|release> ...")
+		fmt.Fprintln(stderr, inboxUsage("quarantine"))
 		return 10
 	}
 	root := envOrCwd("EVOLVE_PROJECT_ROOT")
@@ -58,7 +58,7 @@ func runInboxQuarantine(args []string, _ io.Reader, stdout, stderr io.Writer) in
 
 	case "release":
 		if len(args) < 2 || args[1] == "" {
-			fmt.Fprintln(stderr, "usage: evolve inbox quarantine release <id>")
+			fmt.Fprintln(stderr, inboxUsage("quarantine"))
 			return 10
 		}
 		id := args[1]

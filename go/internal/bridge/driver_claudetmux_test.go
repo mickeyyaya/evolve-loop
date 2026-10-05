@@ -181,10 +181,7 @@ func TestClaudeTmux_HappyPath_ArtifactAppears(t *testing.T) {
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)
 	}
-	// Two marker frames: claude-tmux ticks the auto-responder during boot, so
-	// the first iteration reads the pane twice (boot loop + tick); the clean
-	// marker matches no trust rule, so it boots immediately.
-	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault, tmuxPromptMarkerDefault}}
+	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	code, stderr := runTmux(t, fx, tmux, nil, "--allow-bypass")
 	if code != ExitOK {
 		t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)
@@ -216,7 +213,7 @@ func TestClaudeTmux_TrustDialogDismissedBeforePromptDelivery(t *testing.T) {
 			if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 				t.Fatalf("seed artifact: %v", err)
 			}
-			tmux := &fakeTmux{paneSeq: []string{d.pane, d.pane, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault}}
+			tmux := &fakeTmux{paneSeq: []string{d.pane, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault, tmuxPromptMarkerDefault}}
 			code, stderr := runTmux(t, fx, tmux, nil, "--allow-bypass")
 			if code != ExitOK {
 				t.Fatalf("exit = %d, want ExitOK; stderr=%q", code, stderr)

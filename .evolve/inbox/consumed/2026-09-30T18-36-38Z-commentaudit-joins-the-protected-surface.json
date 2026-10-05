@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A lane edit to go/internal/commentaudit is refused as a protected surface, or the decision not to is recorded in ADR-0115"
+  ],
+  "consumed": {
+    "at": "2026-09-30T18:53:59Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "go/internal/commentaudit/ joined guards.ProtectedSurfaceManifest beside commitgate (go/internal/guards/integrity_surface.go), pinned by TestProtectedSurfaceManifest_CoversTheCommentProofTheCommitGateTrusts; recorded in ADR-0115, the guards package note and pipeline-factory-rules.md (123 fragments)."
+  },
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Decide whether go/internal/commentaudit/ joins ProtectedSurfaceManifest (go/internal/guards/integrity_surface.go); if so add the fragment and a test.",
+  "id": "commentaudit-joins-the-protected-surface",
+  "kind": "pipeline-repair",
+  "priority_class": "hygiene",
+  "source": "console lane cl-commenttools, 2026-10-01",
+  "summary": "go/internal/commitgate is in guards.ProtectedSurfaceManifest; go/internal/commentaudit, whose Equivalent proves the comment-only waiver and whose UnrecordedHistory/AddedAcrossDiff decide two gate refusals and the build comment floor, is only a scopedelta signal dir (ADR-0115), so a loop lane may still edit it with a corroborated tightening KEEP.",
+  "title": "commentaudit decides the commit gate's review waiver and history refusal but is not a protected surface",
+  "weight": 0.3
+}

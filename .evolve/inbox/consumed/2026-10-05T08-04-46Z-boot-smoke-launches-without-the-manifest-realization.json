@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "A codex-tmux BootSmokeTest with no caller realization launches a line that carries --yolo and -c check_for_update_on_startup=false (red first)",
+    "A claude-tmux boot smoke exports the manifest's default_env before launch; an ollama-tmux boot smoke carries --experimental-yolo",
+    "A caller-supplied realization is used unchanged (the existing tmux_identity boot smoke test stays green)",
+    "looppreflight and opscmd doctor boot tests stay green"
+  ],
+  "consumed": {
+    "at": "2026-10-05T08:38:29Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "BootSmokeTest and LiveSmokeTest share smokeLaunchConfig (go/internal/bridge/bootsmoke.go), which realizes the driver's manifest with the bypass intent when the caller supplies no Realization, so the readiness gate, evolve doctor boot, the CLI-health canary and evolve doctor live launch codex with --yolo and -c check_for_update_on_startup=false, claude and agy with --dangerously-skip-permissions and claude's default_env, and ollama's realization with --experimental-yolo (its launch guard still refuses the scratch worktree, as for any lane phase); a caller's realization is launched unchanged. Pinned by smoke_realization_test.go and the canary/doctor-live tests; ADR-0118 addendum Decision 4."
+  },
+  "created_at": "2026-10-05T08:10:00Z",
+  "files": [
+    "go/internal/bridge/bootsmoke.go",
+    "go/internal/looppreflight/boot.go",
+    "go/internal/cli/opscmd/doctor_boot.go",
+    "docs/architecture/packages/internal-bridge.md",
+    "docs/operations/runtime-reference.md"
+  ],
+  "fix": "When the caller supplies no realization, BootSmokeTest realizes the driver's manifest with the bypass intent it already assumes (cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: \"bypass\"}), as clicontrol's perFamilyConfig does), so the boot smoke carries the manifest's default_args, default_env and param defaults. Update the package notes' boot smoke bullet and the runtime-reference readiness-gate and codex update menu rows.",
+  "id": "boot-smoke-launches-without-the-manifest-realization",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console lane cl-codexupdate, 2026-10-05: runtime/.evolve/loop-20261005-wave59b.log readiness gate ('[codex-tmux] launching: sandbox-exec ... codex', no flags) vs the phase launches' 'codex --yolo -m ... -c ...'",
+  "summary": "BootSmokeTest (go/internal/bridge/bootsmoke.go) launches with the cfg.Realization its caller supplies, and neither caller supplies one: looppreflight's newDefaultBootTester and opscmd's doctorBootConfig build a Config with no Realization. The codex boot smoke therefore runs bare `codex` (wave 59b's gate: 'launching: sandbox-exec ... codex'), without --yolo and without -c check_for_update_on_startup=false, so it can still meet the update menu that phase launches no longer see; ollama-tmux's runs without --experimental-yolo, claude-tmux's without its default_env. A flag a phase launch carries (a renamed --yolo, say) is never exercised by the gate that is meant to prove the CLI boots. The bridge package notes said the boot smoke's boot 'is the one a phase launch performs'; they now say it is not and name this item.",
+  "title": "The readiness gate's boot smoke and `evolve doctor boot` launch each tmux CLI without its manifest realization, so they do not boot what a phase launches",
+  "weight": 0.6
+}

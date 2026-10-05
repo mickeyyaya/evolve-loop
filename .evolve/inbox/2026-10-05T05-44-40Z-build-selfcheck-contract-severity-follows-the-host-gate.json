@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "With contract_gate=shadow a bound self-check WARNs on a contract violation and exits 0, as the host approves",
+    "With report_size_gate=enforce an oversized Handoff Summary fails the self-check as it fails the host",
+    "The probe never writes the breaker or salvages"
+  ],
+  "created_at": "2026-10-05T00:00:00Z",
+  "files": [
+    "go/internal/deliverable/reviewer.go",
+    "go/internal/cli/phasecmd/build_selfcheck.go",
+    "go/cmd/evolve/cmd_cycle_config.go"
+  ],
+  "fix": "Extract a pure severity projection from deliverable.Reviewer (stage, report-size gate, breaker read-only) that Review uses, inject the root's resolved gate settings into BuildSelfCheck the way the floor is injected, and report each violation at that severity.",
+  "id": "build-selfcheck-contract-severity-follows-the-host-gate",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, ADR-0117 review round 2",
+  "summary": "phasecmd.BuildSelfCheck blocks on every contract violation and never runs the handoff report-size check. The host gate (deliverable.Reviewer) blocks only at contract_gate=enforce and while its breaker has not demoted it, and blocks oversized handoffs at report_size_gate=enforce. Under the default dials the outcomes match; under other dials the probe is stricter or weaker than the host (ADR-0117 decision 9).",
+  "title": "The build self-check's contract half reports at the host contract gate's live severity (contract_gate stage, breaker demotion, report_size_gate)",
+  "weight": 0.5
+}

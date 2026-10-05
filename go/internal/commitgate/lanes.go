@@ -5,9 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
+
+var nodeExts = []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 
 func lookPathDefault(tool string) (string, error) { return exec.LookPath(tool) }
 
@@ -50,18 +53,9 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 		return code
 	}
 
-	var unformatted []string
-	for _, f := range gofiles {
-		out, ok := o.runCmd(ctx, o.RepoRoot, "gofmt", "-s", "-l", filepath.Join(o.RepoRoot, f))
-		if ok && strings.TrimSpace(out) != "" {
-			unformatted = append(unformatted, f)
-		}
+	if code := o.checkGofmt(ctx, gofiles, res); code != ExitPass {
+		return code
 	}
-	if len(unformatted) > 0 {
-		res.log("go: gofmt -s needs: %s", strings.Join(unformatted, " "))
-		return ExitFail
-	}
-	res.pass("go:gofmt")
 
 	type pkgKey struct{ mod, pkg string }
 	keySet := map[pkgKey]bool{}
@@ -126,6 +120,26 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 	return ExitPass
 }
 
+func (o Options) checkGofmt(ctx context.Context, gofiles []string, res *Result) int {
+	var unformatted []string
+	for _, f := range gofiles {
+		out, ok := o.runCmd(ctx, o.RepoRoot, "gofmt", "-s", "-l", filepath.Join(o.RepoRoot, f))
+		if !ok {
+			res.log("go: gofmt -s -l could not check %s\n%s", f, out)
+			return ExitFail
+		}
+		if strings.TrimSpace(out) != "" {
+			unformatted = append(unformatted, f)
+		}
+	}
+	if len(unformatted) > 0 {
+		res.log("go: gofmt -s needs: %s", strings.Join(unformatted, " "))
+		return ExitFail
+	}
+	res.pass("go:gofmt")
+	return ExitPass
+}
+
 func (o Options) lanePython(ctx context.Context, files []string, res *Result) int {
 	pyfiles := o.existingFilesWithExt(files, "py")
 	if len(pyfiles) == 0 {
@@ -179,11 +193,8 @@ func isPyTest(path string) bool {
 func (o Options) laneNode(ctx context.Context, files []string, res *Result) int {
 	var nfiles []string
 	for _, f := range files {
-		for _, ext := range []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"} {
-			if strings.HasSuffix(f, ext) {
-				nfiles = append(nfiles, f)
-				break
-			}
+		if slices.ContainsFunc(nodeExts, func(ext string) bool { return strings.HasSuffix(f, ext) }) && o.fileExists(f) {
+			nfiles = append(nfiles, f)
 		}
 	}
 	if len(nfiles) == 0 {

@@ -24,6 +24,7 @@ The list is a compiled manifest, `guards.ProtectedSurfaceManifest` (`go/internal
 | `internal/guards/` | the guards themselves, this manifest, `role.go` | manifest (self-protecting) |
 | `skills/audit/`, `skills/adversarial-testing/`, `skills/fable/`, `skills/solution-*` | the grading rubrics and the personas the kernel preloads on its own authority — an agent that edits its own rubric grades itself | manifest |
 | `.claude/settings.json`, hook wiring | PreToolUse denies (in-process `Agent` during a live cycle, `git worktree`, bare commits) | manifest · ADR-0075 |
+| `internal/commitgate/`, `internal/commentaudit/` | the commit gate and the comment rules it trusts: the comment-only proof behind its review waiver, the added-comment, removed-history and archive-rewrite refusals ([ADR-0115](../architecture/adr/0115-commit-gate-keeps-history-and-records-waivers.md)) | manifest |
 | Ship path: bare `git commit` / `git push origin main` | every landing carries an attestation, a gate run and a ship class (`cycle` = full audit binding, `manual` = operator) | ship-gate hook (denies) · `phases/ship/commitgate.go` |
 | `.evolve/policy.json` gates & thresholds | eval / contract / repo-contract / EGPS gates default ON as compiled Go; the failure ceilings and breakers | `internal/policy` compiled defaults; operator override only |
 | Registry SSOT (`phase-registry.json`, flag registry, campaign contract) | the phase catalogue, the metric ratchets — the loop's definition of "progress" | manifest · ratchet gate tests |

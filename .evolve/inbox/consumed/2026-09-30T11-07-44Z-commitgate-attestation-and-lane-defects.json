@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Each defect has a red-first test",
+    "The binary guard's refusals are pinned by a Run-level test (the moved guard is unpinned today)"
+  ],
+  "consumed": {
+    "at": "2026-09-30T18:28:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Attestation.Marshal encodes every value with encoding/json (layout unchanged); laneNode skips files deleted from the working tree; a failing gofmt now fails the Go lane (checkGofmt); changedFiles runs under Run's ctx; the binary guard's refusal and fault are pinned through Run. Each with a red-first test in go/internal/commitgate."
+  },
+  "created_at": "2026-09-30T10:52:40Z",
+  "files": [
+    "go/internal/commitgate/attestation.go",
+    "go/internal/commitgate/lanes.go",
+    "go/internal/commitgate/commitgate.go"
+  ],
+  "fix": "Marshal with encoding/json; skip deleted files in laneNode; treat a gofmt failure as a lane failure; thread ctx.",
+  "id": "commitgate-attestation-and-lane-defects",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-30, comment round 12 editors and reviewers (PR #749)",
+  "summary": "Found by round 12's editor: the attestation's Marshal writes reviewers_run through jsonStringArray without JSON escaping, so a reviewer name with a quote writes invalid JSON (attestation.go); laneNode passes deleted .ts/.js files to eslint (lanes.go); the gofmt lane counts a failing gofmt run (parse error, missing binary) as formatted and records go:gofmt (lanes.go); changedFiles runs git diff under context.Background instead of Run's ctx (commitgate.go).",
+  "title": "commitgate writes reviewers_run unescaped, lints deleted TS files, counts a failing gofmt as formatted, and ignores Run's context",
+  "weight": 0.35
+}

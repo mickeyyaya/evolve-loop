@@ -29,7 +29,7 @@ func (r rule) acrossDiff(files []string, before, after func(string) ([]byte, err
 	var added []Added
 	removed := map[string]int{}
 	for _, f := range files {
-		if !strings.HasSuffix(f, ".go") || isOutsideProjectCode(f) {
+		if !strings.HasSuffix(f, ".go") || isOutsideProjectCode(f) || isDocumentation(f) {
 			continue
 		}
 		b, a, err := readBoth(before, after, f)

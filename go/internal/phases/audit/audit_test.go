@@ -662,9 +662,6 @@ func TestRun_ACSVerdictPresent_HostRegenerates(t *testing.T) {
 	}
 }
 
-// When the generator runs but produces no verdict file (e.g. zero
-// predicates discovered), the missing-file FAIL floor still holds — a
-// cycle with nothing to prove must NOT auto-pass.
 func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -752,10 +749,8 @@ func TestGenerateACSVerdict_SuiteRunError_Propagates(t *testing.T) {
 	}
 }
 
-// Zero predicates discovered → generateACSVerdict writes NOTHING and returns
-// nil, leaving the audit missing-file FAIL floor to fail the cycle.
-func TestGenerateACSVerdict_ZeroPredicates_WritesNothing(t *testing.T) {
-	root := t.TempDir() // no acs/ dir → empty suite
+func TestGenerateACSVerdict_ZeroPredicatesWritesARedVerdictNamingTheCause(t *testing.T) {
+	root := t.TempDir()
 	evolveDir := t.TempDir()
 	ws := filepath.Join(evolveDir, "runs", "cycle-9")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
@@ -767,8 +762,15 @@ func TestGenerateACSVerdict_ZeroPredicates_WritesNothing(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("generateACSVerdict: %v", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(ws, "acs-verdict.json")); !os.IsNotExist(statErr) {
-		t.Errorf("verdict file should be absent for a zero-predicate suite; stat err=%v", statErr)
+	reading, err := readACSVerdict(filepath.Join(ws, "acs-verdict.json"))
+	if err != nil {
+		t.Fatalf("a zero-predicate suite must still write its verdict: %v", err)
+	}
+	if reading.redCount != 1 || len(reading.harnessReds) != 1 || !strings.Contains(reading.harnessReds[0], "egps/no-predicates") {
+		t.Fatalf("red_count=%d harness reds=%v, want the one egps/no-predicates red", reading.redCount, reading.harnessReds)
+	}
+	if !strings.Contains(reading.harnessReds[0], filepath.Join(root, "go")) {
+		t.Errorf("the red must name why no predicate ran; got %q", reading.harnessReds[0])
 	}
 }
 

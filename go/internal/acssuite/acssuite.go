@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,17 +14,18 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
-// DefaultTimeout bounds the whole Go lane (per scope) via context cancellation.
 const DefaultTimeout = 60 * time.Second
 
 const evidenceMax = 600
@@ -154,52 +154,75 @@ type Options struct {
 
 // Run executes the Go predicate lane (current cycle + regression + redteam
 // scopes, each a separate `go test -json -tags acs`) and returns the Verdict.
-// A non-compiling predicate package is a HARD error, never a silent PASS.
 func Run(opts Options) (Verdict, error) {
+	opts, err := resolveOptions(opts)
+	if err != nil {
+		return Verdict{}, err
+	}
+	release := acquireSuiteLock(opts.Root)
+	defer release()
+
+	cfg, refusals := loadLaneConfig(opts.stateRoot())
+	results := runGoTest(opts, cfg)
+	// A red demoted to skip must leave no phantom red-evidence file — the
+	// forensic surface must match the verdict.
+	demoteWarnings := demoteOutOfScope(results, opts)
+	writeRedEvidence(opts, results)
+	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle, SuiteRoot: opts.Root, ProjectRoot: opts.ProjectRoot}
+	for _, r := range results {
+		v.record(r)
+	}
+	v.PredicateSuite.SkippedCount = v.SkipCount
+	v.PredicateSuite.Total = len(v.Results)
+	v.ShipEligible = v.RedCount == 0
+	v.Verdict = "FAIL"
+	if v.ShipEligible {
+		v.Verdict = "PASS"
+	}
+	v.Warnings = slices.Concat(warningsFromFlaky(v.Results), demoteWarnings, refusals)
+	return v, nil
+}
+
+func resolveOptions(opts Options) (Options, error) {
 	if opts.Root == "" {
-		return Verdict{}, fmt.Errorf("acssuite: Root required")
+		return Options{}, fmt.Errorf("acssuite: Root required")
 	}
 	if opts.Cycle <= 0 {
-		return Verdict{}, fmt.Errorf("acssuite: Cycle must be > 0")
+		return Options{}, fmt.Errorf("acssuite: Cycle must be > 0")
 	}
+	for _, p := range []*string{&opts.Root, &opts.ProjectRoot, &opts.GoModuleDir} {
+		if *p == "" {
+			continue
+		}
+		abs, err := filepath.Abs(*p)
+		if err != nil {
+			return Options{}, fmt.Errorf("acssuite: resolve %q to an absolute path: %w", *p, err)
+		}
+		*p = abs
+	}
+	return opts, nil
+}
 
-	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle, SuiteRoot: opts.Root, ProjectRoot: opts.ProjectRoot}
+func (o Options) stateRoot() string {
+	if o.ProjectRoot != "" {
+		return o.ProjectRoot
+	}
+	return o.Root
+}
 
+func acquireSuiteLock(root string) func() {
 	// The suite execution is host-wide SINGLE-FLIGHT: verification MUST run,
 	// serialized, never skipped. A wedged holder degrades this lane to
 	// unserialized (WARN below) rather than deadlock the fleet.
 	// See ADR-0080.
 	lockCtx, lockCancel := context.WithTimeout(context.Background(), maxLockWait)
 	defer lockCancel()
-	release, lockErr := verifylock.Acquire(lockCtx, opts.Root, os.Stderr)
+	release, lockErr := verifylock.Acquire(lockCtx, root, os.Stderr)
 	if lockErr != nil {
 		fmt.Fprintf(os.Stderr, "[acs] WARN: verification single-flight unavailable (%v) — running unserialized\n", lockErr)
-	} else {
-		defer release()
+		return func() {}
 	}
-
-	goResults, gErr := runGoTest(opts)
-	if gErr != nil {
-		return Verdict{}, gErr
-	}
-	// A red demoted to skip must leave no phantom red-evidence file — the
-	// forensic surface must match the verdict.
-	demoteWarnings := demoteOutOfScope(goResults, opts)
-	writeRedEvidence(opts, goResults)
-	for _, r := range goResults {
-		v.record(r)
-	}
-
-	v.PredicateSuite.SkippedCount = v.SkipCount
-	v.PredicateSuite.Total = len(v.Results) // skips included
-	if v.RedCount == 0 {
-		v.Verdict = "PASS"
-		v.ShipEligible = true
-	} else {
-		v.Verdict = "FAIL"
-	}
-	v.Warnings = append(warningsFromFlaky(v.Results), demoteWarnings...)
-	return v, nil
+	return release
 }
 
 // record appends a result and updates the green/red/skip tallies + the
@@ -227,25 +250,61 @@ func (v *Verdict) record(r Result) {
 	v.Results = append(v.Results, r)
 }
 
-// predicateEnv builds the env exported to BOTH lanes: the dual-root pattern
-// (EVOLVE_PROJECT_ROOT, the state root, resolves `.evolve/` to main even from
-// a worktree; the worktree-root key, the source root, points a doc-validating
-// predicate at the cycle's committed artifact instead of main's stale copy)
-// plus CHANGED_PACKAGES so a predicate can scope `go test` to the cycle's
-// touched packages. With no extras it equals os.Environ().
-func predicateEnv(projectRoot, worktreeRoot string, changedPkgs []string) []string {
-	env := os.Environ()
-	if projectRoot != "" {
-		env = append(env, "EVOLVE_PROJECT_ROOT="+projectRoot)
+const (
+	projectRootKey     = "EVOLVE_PROJECT_ROOT"
+	changedPackagesKey = "CHANGED_PACKAGES"
+)
+
+func suiteExportKeys() []string {
+	return []string{projectRootKey, ipcenv.WorktreeRootKey, changedPackagesKey}
+}
+
+func forwardableKeys(named []string) (forward, refusals []string) {
+	owned := slices.Concat(ipcenv.ProtocolKeys(), suiteExportKeys())
+	for _, key := range named {
+		if slices.Contains(owned, key) {
+			refusals = append(refusals, fmt.Sprintf("acs.predicate_env names %s, a lane protocol key or one of the suite's own exports; it is not forwarded", key))
+			continue
+		}
+		forward = append(forward, key)
 	}
-	if worktreeRoot != "" {
-		env = append(env, ipcenv.WorktreeRootKey+"="+worktreeRoot)
+	return forward, refusals
+}
+
+type predicateExports struct {
+	stateRoot    string
+	sourceRoot   string
+	changedPkgs  []string
+	operatorKeys []string
+}
+
+func predicateEnv(x predicateExports) []string {
+	host := os.Environ()
+	env := append(entriesNotNamed(ipcenv.Scrub(host), suiteExportKeys()), entriesNamed(host, x.operatorKeys)...)
+	if x.stateRoot != "" {
+		env = append(env, projectRootKey+"="+x.stateRoot)
 	}
-	if len(changedPkgs) > 0 {
+	if x.sourceRoot != "" {
+		env = append(env, ipcenv.WorktreeRootKey+"="+x.sourceRoot)
+	}
+	if len(x.changedPkgs) > 0 {
 		// Space-joining is safe: go package patterns never contain spaces.
-		env = append(env, "CHANGED_PACKAGES="+strings.Join(changedPkgs, " "))
+		env = append(env, changedPackagesKey+"="+strings.Join(x.changedPkgs, " "))
 	}
 	return env
+}
+
+func entriesNamed(environ, keys []string) []string {
+	return slices.DeleteFunc(slices.Clone(environ), func(entry string) bool { return !slices.Contains(keys, envKey(entry)) })
+}
+
+func entriesNotNamed(environ, keys []string) []string {
+	return slices.DeleteFunc(slices.Clone(environ), func(entry string) bool { return slices.Contains(keys, envKey(entry)) })
+}
+
+func envKey(entry string) string {
+	key, _, _ := strings.Cut(entry, "=")
+	return key
 }
 
 // hasGoACSTree reports whether moduleDir is a Go module (go.mod present) with an
@@ -341,153 +400,6 @@ func dirExists(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// runGoTest executes the Go predicate lane and maps its `go test -json` output
-// into []Result. It runs each active scope (current cycle + regression
-// sub-packages + redteam) as a SEPARATE pattern, merging results. The current
-// cycle + curated regression + red-team are run — never every historical cycle,
-// which would drag bit-rotted predicates into the gate.
-//
-// It returns (nil, nil) when the lane is a no-op (no Go module / acs subtree and
-// no GoExec seam, or no scope is present). It returns a HARD error — never an
-// empty, gate-clearing slice — when ANY scope exited nonzero having produced
-// zero test events (a compile error / infra failure): a broken predicate package
-// must not silently PASS the gate.
-func runGoTest(opts Options) ([]Result, error) {
-	moduleDir := opts.GoModuleDir
-	if moduleDir == "" {
-		moduleDir = filepath.Join(opts.Root, "go")
-	}
-
-	goExec := opts.GoExec
-	var patterns []string
-	if goExec == nil {
-		// No seam: require a real Go module + acs subtree, then existence-gate
-		// each scope against the real filesystem.
-		if !hasGoACSTree(moduleDir) {
-			return nil, nil
-		}
-		goExec = executeCompleteGoScope
-		patterns = goLanePatterns(moduleDir, opts.Cycle)
-		if len(patterns) == 0 {
-			return nil, nil
-		}
-	} else {
-		// Seam mode: the seam decides each scope's output (returns "" for
-		// inactive scopes), so the scope list is fixed and filesystem-independent.
-		patterns = []string{
-			fmt.Sprintf("./acs/cycle%d", opts.Cycle),
-			"./acs/regression/...",
-			"./acs/redteam",
-		}
-	}
-
-	changed := changedPackagesForCycle(opts.ProjectRoot, opts.Cycle)
-	// opts.Root is the cycle's worktree (resolveACSSuiteRoot → active_worktree);
-	// export it as EVOLVE_WORKTREE_ROOT so source/doc predicates validate the
-	// committed worktree artifact, not main's stale copy.
-	env := predicateEnv(opts.ProjectRoot, opts.Root, changed)
-
-	pol, _ := policy.Load(filepath.Join(opts.ProjectRoot, ".evolve", "policy.json"))
-	ctx, cancel := context.WithTimeout(context.Background(), goLaneTimeout(opts.GoTimeout, pol.ACSTimeoutConfig()))
-	defer cancel()
-
-	var all []Result
-	for _, pat := range patterns {
-		raw, execErr := goExec(ctx, moduleDir, pat, env)
-		results := parseGoTestJSON(strings.NewReader(raw), opts.Cycle)
-		if errors.Is(execErr, errIncompleteInventory) {
-			return nil, execErr
-		}
-		if opts.GoExec == nil && len(results) == 0 {
-			return nil, fmt.Errorf("acssuite: active predicate scope %q produced no execution results; required predicates did not run", pat)
-		}
-		hasRed := false
-		for _, result := range results {
-			hasRed = hasRed || result.ResultStr == "red"
-		}
-		if execErr != nil && !hasRed {
-			// Nonzero exit with zero test events ⇒ that package did not compile
-			// (or `go test` could not run). FAIL loudly, never silent-PASS.
-			return nil, fmt.Errorf("acssuite: go predicate scope %q produced no failing test evidence but exited "+
-				"nonzero (compile error / infra failure): %w\noutput:\n%s", pat, execErr, excerpt(raw))
-		}
-		all = append(all, retryFlakyReds(ctx, goExec, moduleDir, pat, env, results, opts.Cycle)...)
-	}
-	return all, nil
-}
-
-// retryFlakyReds is the bounded flake absorber: when a scope's first run
-// produced >=1 RED and NO red is the synthetic egps/ parse-error red (any
-// such red marks the whole stream untrustworthy and suppresses the retry
-// entirely — a truncated stream is not retryable evidence), the scope is
-// re-run EXACTLY ONCE. A red that passes on the retry flips to green with the
-// visible Flaky="passed-on-retry" annotation (first-run evidence retained —
-// the flake's signature); a red that stays red keeps its first-run result.
-// Greens/skips and the result set's size are untouched (the retry can only
-// flip existing reds, never add or duplicate results).
-func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, string, []string) (string, error), moduleDir, pat string, env []string, results []Result, cycle int) []Result {
-	hasTestRed := false
-	for _, r := range results {
-		if r.ResultStr != "red" {
-			continue
-		}
-		if strings.HasPrefix(r.ACID, "egps/") {
-			// Synthetic infra red: the stream itself is untrustworthy — never retry.
-			return results
-		}
-		hasTestRed = true
-	}
-	if !hasTestRed {
-		return results
-	}
-	raw, retryErr := goExec(ctx, moduleDir, pat, env) // bounded: exactly one retry
-	retry := parseGoTestJSON(strings.NewReader(raw), cycle)
-	// An incomplete retry cannot erase a confirmed first-run red, even when
-	// the process emitted a passing prefix before its failure.
-	for _, r := range retry {
-		if strings.HasPrefix(r.ACID, "egps/") {
-			retryErr = fmt.Errorf("incomplete retry evidence")
-		}
-	}
-	greenOnRetry := make(map[string]bool, len(retry))
-	retryRan := make(map[string]bool, len(retry))
-	retryEvidence := make(map[string]string, len(retry))
-	for _, r := range retry {
-		if retryErr == nil || r.ResultStr == "red" || r.ResultStr == "skip" {
-			retryRan[r.ACID] = true
-		}
-		if r.ResultStr == "green" && retryErr == nil {
-			greenOnRetry[r.ACID] = true
-		}
-		if r.fullEvidence != "" {
-			retryEvidence[r.ACID] = r.fullEvidence
-		}
-	}
-	for i := range results {
-		if results[i].ResultStr != "red" {
-			continue
-		}
-		switch {
-		case greenOnRetry[results[i].ACID]:
-			results[i].ResultStr = "green"
-			results[i].ExitCode = 0
-			results[i].Flaky = "passed-on-retry"
-		case retryRan[results[i].ACID]:
-			// Red stayed red: record it in RetryOutcome, not Flaky, and keep
-			// the retry's stream too.
-			results[i].RetryOutcome = "red-on-retry"
-			if re := retryEvidence[results[i].ACID]; re != "" {
-				results[i].fullEvidence += "\n--- RETRY RUN (still red) ---\n" + re
-			}
-		default:
-			// The retry produced NO result for this test (expired ctx, crash
-			// before it ran): inconclusive, not confirmed.
-			results[i].RetryOutcome = "retry-inconclusive"
-		}
-	}
-	return results
-}
-
 // writeRedEvidence persists each red predicate's COMPLETE captured stream
 // (first run + any retry, see retryFlakyReds) to
 // <workspace>/acs-red-evidence/<ac_id>.txt, ProjectRoot preferred over Root
@@ -497,11 +409,7 @@ func retryFlakyReds(ctx context.Context, goExec func(context.Context, string, st
 // share a path.Base) gets a numeric suffix instead of a silent overwrite.
 // Best-effort and loud: a write failure WARNs and never blocks the verdict.
 func writeRedEvidence(opts Options, results []Result) {
-	root := opts.ProjectRoot
-	if root == "" {
-		root = opts.Root
-	}
-	dir := filepath.Join(root, ".evolve", "runs", fmt.Sprintf("cycle-%d", opts.Cycle), "acs-red-evidence")
+	dir := filepath.Join(opts.stateRoot(), ".evolve", "runs", fmt.Sprintf("cycle-%d", opts.Cycle), "acs-red-evidence")
 	for _, r := range results {
 		if r.ResultStr != "red" || r.fullEvidence == "" {
 			continue
@@ -610,8 +518,8 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 		// gate-weakening path. Fail LOUD: emit a synthetic RED so the verdict
 		// blocks rather than silent-passing on a partial parse.
 		out = append(out, Result{
-			ACID:            "egps/go-lane-parse-error",
-			Predicate:       "egps/go-lane-parse-error",
+			ACID:            acsverdict.SyntheticRedPrefix + "go-lane-parse-error",
+			Predicate:       acsverdict.SyntheticRedPrefix + "go-lane-parse-error",
 			ExitCode:        1,
 			ResultStr:       "red",
 			EvidenceExcerpt: excerpt("go test -json stream parse error (results may be truncated): " + err.Error()),
@@ -621,8 +529,8 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 		a := byKey[key]
 		if a.result == "" {
 			out = append(out, Result{
-				ACID:      "egps/go-lane-incomplete/" + a.pkg + "/" + a.test,
-				Predicate: "egps/go-lane-incomplete", ExitCode: 1, ResultStr: "red",
+				ACID:      acsverdict.SyntheticRedPrefix + "go-lane-incomplete/" + a.pkg + "/" + a.test,
+				Predicate: acsverdict.SyntheticRedPrefix + "go-lane-incomplete", ExitCode: 1, ResultStr: "red",
 				EvidenceExcerpt: "predicate started without a terminal result: " + a.pkg + "/" + a.test,
 			})
 			continue
@@ -763,19 +671,15 @@ var (
 	writeVerdictWriteFile  = os.WriteFile
 )
 
-// VerdictFilename is the canonical acs-verdict artifact name, exported so
-// readers and retirement paths in other packages (core, phases, router)
-// project from ONE spelling instead of re-typing the literal.
-const VerdictFilename = "acs-verdict.json"
-
-// WriteVerdict marshals v to <evolveDir>/runs/cycle-<N>/acs-verdict.json
-// atomically (tmp + rename) and returns the path written.
 func WriteVerdict(evolveDir string, v Verdict) (string, error) {
-	dir := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", v.Cycle))
+	dst, err := acsverdict.Path(evolveDir, v.Cycle)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Dir(dst)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("acssuite: mkdir %s: %w", dir, err)
 	}
-	dst := filepath.Join(dir, VerdictFilename)
 	buf, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("acssuite: marshal: %w", err)

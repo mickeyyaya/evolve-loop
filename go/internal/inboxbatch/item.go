@@ -141,14 +141,12 @@ func isPathShaped(tok string) bool {
 
 var pathInProseRE = regexp.MustCompile(`[A-Za-z0-9_.@-]+(?:/[A-Za-z0-9_.@-]+)+/?`)
 
-// mentionSkip holds the declared surface and the machine-written fields the mention walk never reads.
-var mentionSkip = map[string]bool{
-	"files": true, "continuation": true, "route": true, "injected_by": true,
+var surfaceAndProvenanceFields = map[string]bool{
+	"files": true, "injected_by": true,
 }
 
-// skipMention also skips every "routed_" field, the prefix the console router stamps on all it writes.
 func skipMention(k string) bool {
-	return mentionSkip[k] || strings.HasPrefix(k, "routed_")
+	return surfaceAndProvenanceFields[k] || RoleOf(k).IsStamp()
 }
 
 // maxMentions bounds the walk so a runaway record cannot make routing costly.

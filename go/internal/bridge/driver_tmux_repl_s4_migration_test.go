@@ -8,22 +8,10 @@ import (
 	"testing"
 )
 
-// checkpointPaneSeq builds the fakeTmux.paneSeq needed to land checkpoint1
-// and checkpoint2 exactly, given how many CapturePane calls the driver makes
-// around them: boot consumes 2 captures (the marker-check read, then
-// claude-tmux's tickDuringBoot auto-respond tick, which captures again
-// internally but is not used for the marker decision); the post-paste
-// baseline dispatch consumes 1 more; each wait-loop iteration's auto-respond
-// tick consumes 1 capture BEFORE a checkpoint fires, and the checkpoint's own
-// capture consumes 1 more — but the interval elapses one full iteration late
-// (elapsed=0 on the first iteration never satisfies elapsed-intervalStart>=
-// interval), so checkpoint 1 lands on the SIXTH capture (index 5) and
-// checkpoint 2 on the EIGHTH (index 7). The filler positions must stay a
-// bare prompt marker — content the auto-responder's own capture never needs
-// to react to.
 func checkpointPaneSeq(cp1, cp2 string) []string {
 	const filler = tmuxPromptMarkerDefault
-	return []string{filler, filler, filler, filler, filler, cp1, filler, cp2}
+	bootPass, pastedBaseline, waitTick := filler, filler, filler
+	return []string{bootPass, pastedBaseline, waitTick, waitTick, cp1, waitTick, cp2}
 }
 
 func TestRunTmuxREPL_BusyFromCenter(t *testing.T) {

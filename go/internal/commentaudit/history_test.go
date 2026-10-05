@@ -2,8 +2,10 @@ package commentaudit
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -349,9 +351,9 @@ func TestMain_HistoryResolvesARelativeOutAgainstTheRepoRoot(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(wd) })
 	var stdout, stderr bytes.Buffer
 
-	code := Main([]string{"history", "-base", "HEAD", "-label", "round 12", "-out", historyArchiveDir}, &stdout, &stderr, git)
+	code := Main([]string{"history", "-base", "HEAD", "-label", "round 12", "-out", HistoryArchiveDir}, &stdout, &stderr, git)
 
-	if _, err := os.Stat(filepath.Join(root, historyArchiveDir, "internal-p.md")); code != 0 || err != nil {
+	if _, err := os.Stat(filepath.Join(root, HistoryArchiveDir, "internal-p.md")); code != 0 || err != nil {
 		t.Errorf("exit %d, want the page under the repo root's archive (%v):\n%s", code, err, stderr.String())
 	}
 }
@@ -400,5 +402,145 @@ func TestWriteHistoryArchive_RewritesTheIndexAfterAFailedAppend(t *testing.T) {
 	index, readErr := os.ReadFile(filepath.Join(dir, historyIndex))
 	if err == nil || len(written) != 1 || readErr != nil || !strings.Contains(string(index), "| `internal/p` | 1 |") {
 		t.Errorf("a failed append reports its error and still indexes the page it wrote (written %v, err %v):\n%s", written, err, index)
+	}
+}
+
+func TestUnrecordedHistory_WhatHistoryRecordsSatisfiesTheCheck(t *testing.T) {
+	root := writeTree(t, map[string]string{"go/internal/p/p.go": stripped})
+	base := map[string]string{"go/internal/p/p.go": withHistory}
+	var stdout, stderr bytes.Buffer
+	if code := Main([]string{"history", "-base", "HEAD", "-label", "round 13", "-out", HistoryArchiveDir}, &stdout, &stderr, fakeGit{changed: []string{"go/internal/p/p.go"}, base: base, root: root}); code != 0 {
+		t.Fatalf("history: exit %d: %s", code, stderr.String())
+	}
+	onDisk := func(p string) ([]byte, error) { return os.ReadFile(filepath.Join(root, p)) }
+	removed, err := RemovedHistoryAcrossDiff([]string{"go/internal/p/p.go"}, readFrom(base), onDisk)
+	if err != nil || len(removed) != 2 {
+		t.Fatalf("RemovedHistoryAcrossDiff = (%+v, %v), want two groups", removed, err)
+	}
+
+	unrecorded, err := UnrecordedHistory(removed, readFrom(base), onDisk)
+
+	if err != nil || len(unrecorded) != 0 {
+		t.Errorf("UnrecordedHistory = (%+v, %v), want none: the page `history` wrote records every group", unrecorded, err)
+	}
+}
+
+func TestUnrecordedHistory_ARemovalNoPageGainsIsUnrecorded(t *testing.T) {
+	removed := []HistoryEntry{
+		{File: "go/internal/p/p.go", Line: 5, Lines: []string{"// Cycle 1675 found the retry double-counted."}},
+		{File: "go/internal/p/p.go", Line: 8, Lines: []string{"// F36: kept for wave 7"}},
+	}
+
+	got, err := UnrecordedHistory(removed, readFrom(nil), readFrom(nil))
+
+	if err != nil || !slices.EqualFunc(got, removed, func(a, b HistoryEntry) bool { return a.Line == b.Line }) {
+		t.Errorf("UnrecordedHistory = (%+v, %v), want both entries in order", got, err)
+	}
+}
+
+func TestUnrecordedHistory_OnlyWhatTheChangeAddsToThePackagesPageCounts(t *testing.T) {
+	entry := HistoryEntry{File: "go/internal/p/p.go", Line: 5, Anchor: "func Run() {", Lines: []string{"// F36: kept for wave 7"}}
+	twin := HistoryEntry{File: "go/internal/p/q.go", Line: 9, Lines: entry.Lines}
+	elsewhere := HistoryEntry{File: "go/internal/q/q.go", Line: 9, Lines: entry.Lines}
+	section := RenderHistorySection("round 12", []HistoryEntry{entry})
+	pPage, qPage := HistoryArchiveDir+"/internal-p.md", HistoryArchiveDir+"/internal-q.md"
+	for name, c := range map[string]struct {
+		removed       []HistoryEntry
+		before, after map[string]string
+		unrecorded    HistoryEntry
+	}{
+		"a record an earlier change made":       {[]HistoryEntry{entry}, map[string]string{pPage: section}, map[string]string{pPage: section}, entry},
+		"a record on another package's page":    {[]HistoryEntry{entry}, nil, map[string]string{qPage: section}, entry},
+		"one record for two identical removals": {[]HistoryEntry{entry, twin}, nil, map[string]string{pPage: section}, twin},
+		"two records on one page cover no other page": {
+			[]HistoryEntry{entry, elsewhere}, nil,
+			map[string]string{pPage: RenderHistorySection("r", []HistoryEntry{entry, entry})}, elsewhere,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := UnrecordedHistory(c.removed, readFrom(c.before), readFrom(c.after))
+
+			if err != nil || len(got) != 1 || got[0].File != c.unrecorded.File {
+				t.Errorf("UnrecordedHistory = (%+v, %v), want only %s unrecorded", got, err, c.unrecorded.File)
+			}
+		})
+	}
+}
+
+func TestUnrecordedHistory_AnUnreadablePageIsAnError(t *testing.T) {
+	broken := func(string) ([]byte, error) { return nil, errors.New("git show: rc=128") }
+
+	_, err := UnrecordedHistory([]HistoryEntry{{File: "go/internal/p/p.go", Line: 5, Lines: []string{"// F36"}}}, broken, readFrom(nil))
+
+	if err == nil || !strings.Contains(err.Error(), "internal-p.md") {
+		t.Errorf("err = %v, want the unreadable page named", err)
+	}
+}
+
+func TestRemovedHistory_AGroupArchivedUnderDocsIsStoredNotRemoved(t *testing.T) {
+	archived := "docs/private/research/archived-2026-09-29/superseded-predicate-packages/cycle1764/predicates_test.go"
+
+	got, err := RemovedHistoryAcrossDiff([]string{"go/internal/p/p.go", archived},
+		readFrom(map[string]string{"go/internal/p/p.go": withHistory}),
+		readFrom(map[string]string{"go/internal/p/p.go": stripped, archived: withHistory}))
+
+	if err != nil || len(got) != 0 {
+		t.Errorf("RemovedHistoryAcrossDiff = (%+v, %v), want nothing: the groups moved whole into the archive", got, err)
+	}
+}
+
+func TestRemovedHistory_AnEmptyFileHasNoHistory(t *testing.T) {
+	got, err := RemovedHistoryAcrossDiff([]string{"go/internal/p/p.go"}, readFrom(map[string]string{"go/internal/p/p.go": ""}), readFrom(map[string]string{"go/internal/p/p.go": stripped}))
+
+	if err != nil || len(got) != 0 {
+		t.Errorf("RemovedHistoryAcrossDiff = (%+v, %v), want nothing and no parse error for an empty side", got, err)
+	}
+}
+
+func TestRewrittenHistoryPages_APageOnlyGrows(t *testing.T) {
+	page := HistoryArchiveDir + "/internal-p.md"
+	index := HistoryArchiveDir + "/" + historyIndex
+	for name, c := range map[string]struct {
+		path          string
+		before, after map[string]string
+		rewritten     bool
+	}{
+		"a section appended":         {page, map[string]string{page: "# p\n\n## round 12\n"}, map[string]string{page: "# p\n\n## round 12\n\n## round 13\n"}, false},
+		"a new page":                 {page, nil, map[string]string{page: "# p\n"}, false},
+		"an earlier section edited":  {page, map[string]string{page: "# p\n\n## round 12\n"}, map[string]string{page: "# p\n\n## round 12 (edited)\n"}, true},
+		"a page cut short":           {page, map[string]string{page: "# p\n\n## round 12\n"}, map[string]string{page: "# p\n"}, true},
+		"a page deleted":             {page, map[string]string{page: "# p\n"}, nil, true},
+		"the index rewritten":        {index, map[string]string{index: "| a |\n"}, map[string]string{index: "| b |\n"}, false},
+		"a Markdown file elsewhere":  {"docs/plans/p.md", map[string]string{"docs/plans/p.md": "a\n"}, map[string]string{"docs/plans/p.md": "b\n"}, false},
+		"a page-shaped name in code": {"go/" + page, map[string]string{"go/" + page: "a\n"}, map[string]string{"go/" + page: "b\n"}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := RewrittenHistoryPages([]string{c.path}, readFrom(c.before), readFrom(c.after))
+
+			if want := c.rewritten; err != nil || (len(got) == 1 && got[0] == c.path) != want || len(got) > 1 {
+				t.Errorf("RewrittenHistoryPages = (%v, %v), want rewritten=%v", got, err, want)
+			}
+		})
+	}
+}
+
+func TestRewrittenHistoryPages_AnUnreadablePageIsAnError(t *testing.T) {
+	broken := func(string) ([]byte, error) { return nil, errors.New("git show: rc=128") }
+
+	_, err := RewrittenHistoryPages([]string{HistoryArchiveDir + "/internal-p.md"}, broken, readFrom(nil))
+
+	if err == nil || !strings.Contains(err.Error(), "internal-p.md") {
+		t.Errorf("err = %v, want the unreadable page named", err)
+	}
+}
+
+func TestIsUnparsable_NamesASyntaxErrorAndNothingElse(t *testing.T) {
+	_, parseErr := RemovedHistoryAcrossDiff([]string{"go/internal/p/p.go"}, readFrom(nil), readFrom(map[string]string{"go/internal/p/p.go": "package p\n\nfunc {\n"}))
+
+	if !IsUnparsable(parseErr) {
+		t.Errorf("IsUnparsable(%v) = false, want true for a file that does not parse", parseErr)
+	}
+	if IsUnparsable(errors.New("git show: rc=128")) || IsUnparsable(nil) {
+		t.Error("IsUnparsable must be false for a read fault and for no error")
 	}
 }

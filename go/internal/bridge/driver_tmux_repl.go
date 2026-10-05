@@ -55,7 +55,6 @@ type tmuxLaunch struct {
 	bootScrollback  int       // capture-pane scrollback during boot (0=visible; 200 for alt-screen CLIs)
 	bootIntervalS   int       // seconds per boot poll iteration
 	tickDuringBoot  bool      // run the auto-respond engine during boot wait (codex/agy: trust prompts)
-	bootMenuSkip    string    // non-empty: keypress sent when an interstitial update menu is detected
 	exitSeq         []tmuxKey // keystrokes to close the REPL cleanly
 	bootOnly        bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
 	guardDeadShell  bool      // true for real CLI drivers; false for shell-script REPL test harnesses

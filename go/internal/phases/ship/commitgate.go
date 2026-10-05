@@ -8,22 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence"
 )
 
-// commitGateAttestation mirrors the subset of .commit-gate/attestation.json
-// this check reads. The full file also records ts/checks_passed.
-type commitGateAttestation struct {
-	TreeStateSHA string   `json:"tree_state_sha"`
-	ReviewersRun []string `json:"reviewers_run"`
-}
-
-// reviewedByTrailer returns a "Reviewed-by:" trailer block from the
-// attestation's reviewers_run, or "" when the commit was not reviewed.
-// Embedded-newline reviewers are dropped so a corrupt attestation cannot
-// inject spurious trailer lines.
-func reviewedByTrailer(opts *Options) string {
+func reviewTrailer(opts *Options) string {
 	if opts.Class != ClassManual || opts.BypassCommitGate {
 		return ""
 	}
@@ -31,21 +21,25 @@ func reviewedByTrailer(opts *Options) string {
 	if err != nil {
 		return ""
 	}
-	var att commitGateAttestation
+	var att commitgate.Attestation
 	if json.Unmarshal(raw, &att) != nil {
 		return ""
 	}
 	var b strings.Builder
 	for _, r := range att.ReviewersRun {
-		if r = strings.TrimSpace(r); r == "" || strings.ContainsAny(r, "\n\r") {
-			continue
-		}
-		fmt.Fprintf(&b, "\nReviewed-by: %s", r)
+		writeTrailer(&b, "Reviewed-by", r)
 	}
+	writeTrailer(&b, "Review-waived", att.ReviewWaiver)
 	if b.Len() == 0 {
 		return ""
 	}
 	return "\n" + b.String()
+}
+
+func writeTrailer(b *strings.Builder, key, value string) {
+	if value = strings.TrimSpace(value); value != "" && !strings.ContainsAny(value, "\n\r") {
+		fmt.Fprintf(b, "\n%s: %s", key, value)
+	}
 }
 
 // verifyCommitGateAttestation must run after verifyManualConfirm's `git add
@@ -74,7 +68,7 @@ func verifyCommitGateAttestation(ctx context.Context, opts *Options, res *RunRes
 			"ship: read commit-gate attestation: "+err.Error(), "attestation_path", attPath)
 	}
 
-	var att commitGateAttestation
+	var att commitgate.Attestation
 	if err := json.Unmarshal(raw, &att); err != nil {
 		return shipErr(core.CodeCommitGateMalformed, core.ShipClassConfig, core.StageVerifyClass,
 			fmt.Sprintf("commit-gate attestation is malformed JSON (%v) — re-run /commit", err),

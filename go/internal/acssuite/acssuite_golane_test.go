@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 )
 
 func goLine(pkg, test, action string) string {
@@ -139,27 +141,6 @@ func TestGoLane_PackageQualifiedDedup(t *testing.T) {
 	}
 }
 
-func TestGoLane_NoScopePresent_EmptyPass(t *testing.T) {
-	root := t.TempDir()
-	v, err := Run(Options{Root: root, Cycle: 1}) // no GoExec, no go/ subtree
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v.PredicateSuite.Total != 0 || v.Verdict != "PASS" || !v.ShipEligible {
-		t.Errorf("total=%d verdict=%q ship=%v, want 0/PASS/true (no scope → empty PASS)", v.PredicateSuite.Total, v.Verdict, v.ShipEligible)
-	}
-}
-
-func TestGoLane_CompileError_HardError(t *testing.T) {
-	root := t.TempDir()
-	// Build failure: go emits package-level build-output (no Test field) + nonzero exit.
-	raw := `{"Action":"build-output","Package":"` + acsPkgBase + `cycle9","Output":"./x.go:1: syntax error\n"}` + "\n"
-	_, err := Run(Options{Root: root, Cycle: 9, GoExec: seamGo(raw, &fakeExitErr{2})})
-	if err == nil {
-		t.Fatal("Run must surface a hard error when a Go predicate scope fails to compile (zero test events + nonzero exit), got nil")
-	}
-}
-
 func TestGoLane_GreenInvariantPreserved(t *testing.T) {
 	root := t.TempDir()
 	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_002_Ok", "pass"))
@@ -241,10 +222,18 @@ func TestGoLane_PerScopeCompileError(t *testing.T) {
 		"./acs/cycle256":       {raw: goStream(goLine(acsPkgBase+"cycle256", "TestC256_001_Ok", "pass"))},
 		"./acs/regression/...": {raw: `{"Action":"build-output","Package":"x/acs/regression/cycle9","Output":"./x.go:1: syntax error\n"}` + "\n", err: &fakeExitErr{2}},
 	}
-	_, err := Run(Options{Root: root, Cycle: 256, GoExec: seamGoByPattern(v)})
-	if err == nil {
-		t.Fatal("a regression-scope compile error must be a HARD error even when the current-cycle scope is clean, got nil")
+	verdict, err := Run(Options{Root: root, Cycle: 256, GoExec: seamGoByPattern(v)})
+	if err != nil {
+		t.Fatalf("Run = %v, want a verdict", err)
 	}
+	if got := resultByACID(t, verdict, "cycle256/TestC256_001_Ok"); got.ResultStr != "green" {
+		t.Errorf("the clean current-cycle scope keeps its green; got %q", got.ResultStr)
+	}
+	red := resultByACID(t, verdict, acsverdict.SyntheticRedPrefix+"go-lane-scope-failed/acs/regression/...")
+	if !strings.Contains(red.EvidenceExcerpt, "syntax error") {
+		t.Errorf("a regression-scope compile error must be a named red carrying the compiler output; got %q", red.EvidenceExcerpt)
+	}
+	assertShipGateReadsAFail(t, verdict)
 }
 
 func TestParseGoTestJSON_ScanErrorFailsLoud(t *testing.T) {
@@ -277,14 +266,12 @@ func TestGoLane_CurrentCycleScope(t *testing.T) {
 		t.Fatal("precondition: go/acs/cycle5 must exist")
 	}
 
-	v, err := Run(Options{Root: root, Cycle: 9}) // no go/acs/cycle9, no regression/redteam → no-op
+	v, err := Run(Options{Root: root, Cycle: 9})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.PredicateSuite.Total != 0 || v.Verdict != "PASS" {
-		t.Errorf("total=%d verdict=%q, want 0/PASS (no scope present → empty PASS)",
-			v.PredicateSuite.Total, v.Verdict)
-	}
+	resultByACID(t, v, acsverdict.SyntheticRedPrefix+"no-predicates")
+	assertShipGateReadsAFail(t, v)
 }
 
 func mustMkdir(t *testing.T, dir string) {

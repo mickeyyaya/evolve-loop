@@ -22,6 +22,7 @@ func bootTmuxREPL(
 	ar *autoResponder,
 ) (release func(), exitCode int, err error) {
 	if prep.namedExists {
+		ar.endBoot()
 		return func() {}, ExitOK, nil
 	}
 
@@ -37,11 +38,7 @@ func bootTmuxREPL(
 		}
 	}()
 
-	if starter, ok := deps.Tmux.(workdirSessionStarter); ok {
-		if err := starter.NewSessionIn(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight, prep.workingDir); err != nil {
-			return nil, ExitBadFlags, fmt.Errorf("%s new-session: %w", prep.prefix, err)
-		}
-	} else if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+	if err := deps.startSession(ctx, lp.session, prep.workingDir); err != nil {
 		return nil, ExitBadFlags, fmt.Errorf("%s new-session: %w", prep.prefix, err)
 	}
 
@@ -88,10 +85,7 @@ func bootTmuxREPL(
 	observeModelDispatch(deps, lp.modelDispatch)
 	fmt.Fprintf(deps.Stderr, "%s launching: %s\n", prep.prefix, launchCmd)
 
-	interval := lp.bootIntervalS
-	if interval <= 0 {
-		interval = 1
-	}
+	interval := defaultIfZero(lp.bootIntervalS, 1)
 	bootDeadlineS := defaultIfZero(deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 	const fixedReadinessWaits = 2
 	bootWaitMS := int64(fixedReadinessWaits) * 1000
@@ -99,28 +93,25 @@ func bootTmuxREPL(
 	for elapsed := 0; elapsed < bootDeadlineS; elapsed += interval {
 		deps.Sleep(time.Duration(interval) * time.Second)
 		bootWaitMS += int64(interval) * 1000
-		pane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+		pane, capErr := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+		if capErr != nil {
+			continue
+		}
 		if lp.tickDuringBoot {
-			// A once-only dialog can contain the normal prompt marker. Re-poll
-			// after dismissal so prompt delivery cannot land in the stale dialog.
-			ar.tick(ctx, lp.session)
-			if ar.firedOnceThisTick {
+			repoll, err := ar.bootTick(ctx, lp.session, pane)
+			if err != nil {
+				fmt.Fprintf(deps.Stderr, "%s FAIL: %v\n", prep.prefix, err)
+				return nil, ExitREPLBootTimeout, nil
+			}
+			if repoll {
 				continue
 			}
 		}
 		if !strings.Contains(pane, lp.promptMarker) {
 			continue
 		}
-		if lp.bootMenuSkip != "" && tmuxPaneLooksLikeUpdateMenu(pane) {
-			_ = deps.Tmux.SendKeys(ctx, lp.session, lp.bootMenuSkip, true)
-			fmt.Fprintf(deps.Stderr, "%s boot interstitial dismissed before prompt delivery\n", prep.prefix)
+		if lp.markerOverDeadShell(ctx, deps, prep.prefix) {
 			continue
-		}
-		if lp.guardDeadShell {
-			if shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session); isShell {
-				fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", prep.prefix, shellCmd)
-				continue
-			}
 		}
 		promptSeen = true
 		fmt.Fprintf(deps.Stderr, "%s REPL prompt (%s) detected\n", prep.prefix, lp.promptMarker)
@@ -130,10 +121,29 @@ func bootTmuxREPL(
 		fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", prep.prefix, bootDeadlineS)
 		return nil, ExitREPLBootTimeout, nil
 	}
+	ar.endBoot()
 	if deps.OnBoot != nil {
 		deps.OnBoot(bootWaitMS)
 	}
 
 	releaseOnError = false
 	return admitRelease, ExitOK, nil
+}
+
+func (deps Deps) startSession(ctx context.Context, session, workingDir string) error {
+	if starter, ok := deps.Tmux.(workdirSessionStarter); ok {
+		return starter.NewSessionIn(ctx, session, tmuxPaneWidth, tmuxPaneHeight, workingDir)
+	}
+	return deps.Tmux.NewSession(ctx, session, tmuxPaneWidth, tmuxPaneHeight)
+}
+
+func (lp tmuxLaunch) markerOverDeadShell(ctx context.Context, deps Deps, prefix string) bool {
+	if !lp.guardDeadShell {
+		return false
+	}
+	shellCmd, isShell := paneShellProcess(ctx, deps.Tmux, lp.session)
+	if isShell {
+		fmt.Fprintf(deps.Stderr, "%s marker visible but pane process is a shell (%s) — not ready (dead-shell guard)\n", prefix, shellCmd)
+	}
+	return isShell
 }

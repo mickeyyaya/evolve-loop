@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A codex launch's argv carries -c check_for_update_on_startup=false (red first)",
+    "A fake pane showing the update menu never receives Enter while the cursor is on Update now, and boots once Skip is confirmed (red first on the current code)",
+    "No boot path sends a confirm key without a rule that observed the chosen option; the bespoke bootMenuSkip path is gone"
+  ],
+  "consumed": {
+    "at": "2026-10-05T08:02:37Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Every realized codex-tmux launch carries -c check_for_update_on_startup=false from the manifest's default_args (go/internal/bridge/manifests/codex-tmux.json), so codex shows no update menu; if it shows anyway, update_menu_cursor_off_skip (Down) and update_menu_cursor_on_skip (Enter only on the observed Skip) answer it, and the bespoke bootMenuSkip/tmuxPaneLooksLikeUpdateMenu boot path is deleted (driver_tmux_boot.go, driver_codextmux.go). ADR-0118 addendum; pinned by codex_update_menu_verify_test.go."
+  },
+  "created_at": "2026-10-05T07:40:00Z",
+  "files": [
+    "go/internal/bridge/manifests/codex-tmux.json",
+    "go/internal/bridge/driver_codextmux.go",
+    "go/internal/bridge/driver_tmux_boot.go",
+    "go/internal/bridge/tmux_pane_checks.go"
+  ],
+  "fix": "(1) Prevent: add `-c check_for_update_on_startup=false` (a real codex config key) to the codex-tmux manifest's launch args, so no update menu appears. (2) Defence, ADR-0118's pattern: replace the bespoke bootMenuSkip path with manifest rules, cursor on Update now -\u003e Down (repeatable, bounded by the loop guard), cursor on Skip -\u003e Enter, and delete bootMenuSkip/tmuxPaneLooksLikeUpdateMenu's blind send.",
+  "id": "codex-update-menu-never-confirms-update",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, 2026-10-05, wave 59 codex dispatch failures (scout-escalation-report.json final_pane, cycle 1791)",
+  "summary": "codex 0.153.4 opens with '✨ Update available! 0.153.4 -\u003e 0.160.0' and a menu whose cursor starts on '› 1. Update now'. The boot's bespoke update-menu path (driver_codextmux.go bootMenuSkip \"2\", sent with Enter) did not move the cursor, so Enter confirmed Update now: codex ran `brew upgrade --cask codex` inside the sandbox, failed (Cellar not writable, cask pinned) and exited to the shell. Every prompt after that was typed into zsh ('nudge parked at the › input line', submit_wedged). In wave 59 (2026-10-05) all 16 codex dispatches failed this way (14 exit 81, 2 exit 80) and fell back to claude; the cli-health canary saw rc=81 and called it 'not a wall'. Same class as ADR-0118: a blind confirm on a menu whose default is destructive.",
+  "title": "codex boots never confirm the update menu's 'Update now': the startup check is off, and the menu is answered only on the observed Skip",
+  "weight": 0.9
+}

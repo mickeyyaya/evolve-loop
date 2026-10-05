@@ -1,10 +1,12 @@
 package commentaudit
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/scanner"
 	"go/token"
 	"io/fs"
 	"maps"
@@ -24,11 +26,11 @@ type HistoryEntry struct {
 
 const (
 	maxAnchorRunes    = 120
-	historyArchiveDir = "docs/history/code-comments"
+	HistoryArchiveDir = "docs/history/code-comments"
 	historyIndex      = "README.md"
 	pageTitlePrefix   = "# Comment history: `"
 	pageHeader        = pageTitlePrefix + "%s`\n\nThe history this package's comments carried, by the rule `commentaudit check` uses, recorded by `commentaudit history` from the comments each section's change removed. Each entry is the comment as it was, where it sat and the code below it. See [the code-comments convention](../../conventions/code-comments.md).\n"
-	indexHeader       = "# Comment history archive\n\nThe history the code's comments carried, by the rule `commentaudit check` uses, kept when a change removes those comments. `commentaudit history -base <ref> -label <change> -out " + historyArchiveDir + "` appends one section per change to each package's page and rewrites this index from the pages, so nothing here is edited by hand. See [the code-comments convention](../../conventions/code-comments.md).\n\n| Package | Entries | Page |\n|---|---|---|\n"
+	indexHeader       = "# Comment history archive\n\nThe history the code's comments carried, by the rule `commentaudit check` uses, kept when a change removes those comments. `commentaudit history -base <ref> -label <change> -out " + HistoryArchiveDir + "` appends one section per change to each package's page and rewrites this index from the pages, so nothing here is edited by hand. See [the code-comments convention](../../conventions/code-comments.md).\n\n| Package | Entries | Page |\n|---|---|---|\n"
 )
 
 func RemovedHistoryAcrossDiff(files []string, before, after func(string) ([]byte, error)) ([]HistoryEntry, error) {
@@ -107,7 +109,7 @@ type parsedSource struct {
 }
 
 func historyGroups(name string, src []byte) ([]HistoryEntry, error) {
-	if src == nil {
+	if len(src) == 0 {
 		return nil, nil
 	}
 	fset := token.NewFileSet()
@@ -190,7 +192,7 @@ func writeHistoryArchive(dir, label string, entries []HistoryEntry) ([]string, e
 	}
 	byPage := map[string][]HistoryEntry{}
 	for _, e := range entries {
-		page := filepath.Join(dir, strings.ReplaceAll(packageOf(e.File), "/", "-")+".md")
+		page := filepath.Join(dir, historyPageName(e.File))
 		byPage[page] = append(byPage[page], e)
 	}
 	pages := slices.Sorted(maps.Keys(byPage))
@@ -208,6 +210,10 @@ func writeHistoryArchive(dir, label string, entries []HistoryEntry) ([]string, e
 		written = append(written, page)
 	}
 	return written, writeHistoryIndex(dir)
+}
+
+func historyPageName(file string) string {
+	return strings.ReplaceAll(packageOf(file), "/", "-") + ".md"
 }
 
 func packageOf(file string) string {
@@ -298,10 +304,14 @@ func RenderHistorySection(label string, entries []HistoryEntry) string {
 		if e.Anchor != "" {
 			fmt.Fprintf(&out, " — above `%s`", strings.ReplaceAll(e.Anchor, "`", "'"))
 		}
-		fence := strings.Repeat("`", max(3, longestBacktickRun(e.Lines)+1))
-		fmt.Fprintf(&out, "\n\n%stext\n%s\n%s\n", fence, strings.Join(e.Lines, "\n"), fence)
+		fmt.Fprintf(&out, "\n\n%s", renderHistoryText(e.Lines))
 	}
 	return out.String()
+}
+
+func renderHistoryText(lines []string) string {
+	fence := strings.Repeat("`", max(3, longestBacktickRun(lines)+1))
+	return fmt.Sprintf("%stext\n%s\n%s\n", fence, strings.Join(lines, "\n"), fence)
 }
 
 func longestBacktickRun(lines []string) int {
@@ -318,4 +328,80 @@ func longestBacktickRun(lines []string) int {
 		}
 	}
 	return longest
+}
+
+func UnrecordedHistory(removed []HistoryEntry, before, after func(string) ([]byte, error)) ([]HistoryEntry, error) {
+	archive := archiveGrowth{before: before, after: after, pages: map[string][2]string{}, unclaimed: map[string]int{}}
+	var unrecorded []HistoryEntry
+	for _, e := range removed {
+		recorded, err := archive.claim(e)
+		if err != nil {
+			return nil, err
+		}
+		if !recorded {
+			unrecorded = append(unrecorded, e)
+		}
+	}
+	return unrecorded, nil
+}
+
+type archiveGrowth struct {
+	before, after func(string) ([]byte, error)
+	pages         map[string][2]string
+	unclaimed     map[string]int
+}
+
+func (g archiveGrowth) claim(e HistoryEntry) (bool, error) {
+	page := path.Join(HistoryArchiveDir, historyPageName(e.File))
+	text := renderHistoryText(e.Lines)
+	key := page + "\x00" + text
+	if _, counted := g.unclaimed[key]; !counted {
+		sides, err := g.read(page)
+		if err != nil {
+			return false, err
+		}
+		g.unclaimed[key] = strings.Count(sides[1], text) - strings.Count(sides[0], text)
+	}
+	if g.unclaimed[key] <= 0 {
+		return false, nil
+	}
+	g.unclaimed[key]--
+	return true, nil
+}
+
+func (g archiveGrowth) read(page string) ([2]string, error) {
+	if sides, ok := g.pages[page]; ok {
+		return sides, nil
+	}
+	was, now, err := readBoth(g.before, g.after, page)
+	if err != nil {
+		return [2]string{}, fmt.Errorf("history archive: %w", err)
+	}
+	g.pages[page] = [2]string{string(was), string(now)}
+	return g.pages[page], nil
+}
+
+func RewrittenHistoryPages(files []string, before, after func(string) ([]byte, error)) ([]string, error) {
+	var rewritten []string
+	for _, f := range files {
+		if !isHistoryPage(f) {
+			continue
+		}
+		was, now, err := readBoth(before, after, f)
+		if err != nil {
+			return nil, fmt.Errorf("history archive: %w", err)
+		}
+		if !bytes.HasPrefix(now, was) {
+			rewritten = append(rewritten, f)
+		}
+	}
+	return rewritten, nil
+}
+
+func isHistoryPage(file string) bool {
+	return strings.HasPrefix(file, HistoryArchiveDir+"/") && strings.HasSuffix(file, ".md") && path.Base(file) != historyIndex
+}
+
+func IsUnparsable(err error) bool {
+	return errors.As(err, new(scanner.ErrorList))
 }

@@ -21,17 +21,8 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 	// is byte-identical to pre-E2. On reject the correction loop below
 	// re-dispatches up to the configured correction limit before aborting.
 	if cr.o.reviewer != nil && dr.resp.Verdict != VerdictSKIPPED {
-		rin := ReviewInput{
-			Cycle:                           cr.cycle,
-			RunID:                           cr.cs.RunID,
-			ExplanationDocumentationVersion: cr.cs.ExplanationDocumentationVersion,
-			Phase:                           string(next),
-			WorktreeBaseSHA:                 cr.cs.WorktreeBaseSHA,
-			Response:                        dr.resp,
-			Workspace:                       cr.cs.WorkspacePath,
-			Worktree:                        dr.phaseWorktree,
-			ProjectRoot:                     cr.req.ProjectRoot,
-		}
+		rin := ReviewInputFor(cr.cs, next, cr.req.ProjectRoot)
+		rin.Response = dr.resp
 		// baseRoutingCLI is the routing CLI this phase was DISPATCHED with (the
 		// advisor overlay under model_routing=auto; empty otherwise). The
 		// contract-block escalation below temporarily overrides it for a
@@ -94,7 +85,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			act := interaction.NextCorrection(interaction.CorrectionInput{
 				Phase:      string(next),
 				Workspace:  cr.cs.WorkspacePath,
-				Worktree:   dr.phaseWorktree,
+				Worktree:   rin.Worktree,
 				Violation:  rr.Reason,
 				NamedREPL:  false, // v1: no named-session request plumbing yet
 				Busy:       false,
@@ -247,7 +238,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				// Evidence-enriched re-dispatch (I2 rung 3): kernel-verified
 				// facts only — never agent self-assessment. Shadow keeps
 				// today's directive byte-identical.
-				if digest := kernelEvidenceDigest(dr.phaseWorktree, salvagedFromInvalid); digest != "" {
+				if digest := kernelEvidenceDigest(rin.Worktree, salvagedFromInvalid); digest != "" {
 					directive += "\n\n" + digest
 				}
 				// Consume-once: the found-but-invalid note describes what

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 )
 
@@ -13,12 +14,8 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if !ok || !strings.HasSuffix(driverName, "-tmux") {
 		return ExitBadFlags, ""
 	}
-	if cfg == nil {
-		cfg = &Config{}
-	}
-	cfg.CLI = driverName
+	cfg = smokeLaunchConfig(cfg, driverName)
 	cfg.BootOnly = true
-	cfg.AllowBypass = true // boot-only runs no task; bypass-equivalent so the safety gate passes
 	if cfg.Workspace == "" {
 		// Own a scratch workspace for a minimal cfg; the deferred removal runs after the scrollback read below.
 		tmp, err := os.MkdirTemp("", "evolve-bootsmoke-*")
@@ -50,4 +47,16 @@ func ScrollbackTail(s string, n int) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+func smokeLaunchConfig(cfg *Config, driverName string) *Config {
+	if cfg == nil {
+		cfg = &Config{}
+	}
+	cfg.CLI = driverName
+	cfg.AllowBypass = true
+	if reflect.ValueOf(cfg.Realization).IsZero() {
+		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass"})
+	}
+	return cfg
 }

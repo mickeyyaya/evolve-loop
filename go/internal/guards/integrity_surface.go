@@ -34,6 +34,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 
 	// A directory entry when every file in it is control plane; file entries inside ordinary cycle territory.
 	{Fragment: "/go/internal/commitgate/", Rationale: "the pre-commit quality gate (attestation writer the manual-ship reader trusts)"},
+	{Fragment: "/go/internal/commentaudit/", Rationale: "the comment rules the commit gate trusts: the comment-only proof behind its review waiver, the added-comment and removed-history refusals, the history archive's append-only check, and the build comment floor (ADR-0115)"},
 	{Fragment: "/go/internal/phaseintegrity/", Rationale: "the per-phase integrity chain's DigestSource (ADR-0065)"},
 	{Fragment: "/go/internal/binaryguard/", Rationale: "the compiled-binary commit backstop at the commit chokepoint"},
 	{Fragment: "/go/internal/guardslog/", Rationale: "the shared guards-log writer (the guards' evidence trail)"},
@@ -145,6 +146,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.evolve/profiles/builder.json", Rationale: "Builder write boundary for explanation artifacts"},
 	{Fragment: "/.evolve/profiles/auditor.json", Rationale: "Auditor read-only boundary for Builder explanation artifacts"},
 	{Fragment: "/.evolve/build-explanation-contracts/", Rationale: "host-owned activation and Build result snapshots"},
+	{Fragment: "/go/internal/core/build_handoff_floor.go", Rationale: "build handoff floor: mandatory half, names walker, review-input projection (ADR-0117)"},
 }
 
 // IsProtectedSurface reports whether path is on the control plane. path may be absolute or

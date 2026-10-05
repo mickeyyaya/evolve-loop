@@ -29,11 +29,7 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if !ok || !strings.HasSuffix(driverName, "-tmux") {
 		return ExitBadFlags, "", ""
 	}
-	if cfg == nil {
-		cfg = &Config{}
-	}
-	cfg.CLI = driverName
-	cfg.AllowBypass = true // the probe's task is inert; bypass-equivalent so the safety gate passes
+	cfg = smokeLaunchConfig(cfg, driverName)
 	if cfg.Workspace == "" {
 		tmp, err := os.MkdirTemp("", "evolve-livesmoke-*")
 		if err != nil {

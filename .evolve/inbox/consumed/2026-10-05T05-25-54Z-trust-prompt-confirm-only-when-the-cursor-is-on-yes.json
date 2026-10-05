@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A fake pane that swallows the first Down never receives Enter while the cursor is on No, and boots once the cursor reaches Yes (red first on the current manifest)",
+    "The happy path (Down lands) boots with exactly one Down and one Enter",
+    "The rules stay bottom-anchored and disjoint from trust_prompt (numbered '❯ 1. Yes'), and the self-match guard test still passes"
+  ],
+  "consumed": {
+    "at": "2026-10-05T05:50:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "claude-tmux answers the unnumbered trust dialog by observed state: trust_prompt_cursor_on_no sends Down (repeatable, bounded by the auto-respond loop guard) and trust_prompt_cursor_on_yes sends Enter only with the cursor seen on Yes (go/internal/bridge/manifests/claude-tmux.json); both boot waits share autoResponder.bootTick, which re-polls after any send and ends the boot on the loop guard with ExitRespondLoopGuard naming the rule (autorespond.go, driver_tmux_boot.go, recipe_adapter.go), ADR-0118."
+  },
+  "created_at": "2026-10-05T05:40:00Z",
+  "files": [
+    "go/internal/bridge/manifests/claude-tmux.json",
+    "go/internal/bridge"
+  ],
+  "fix": "Split the rule into data, verify-before-confirm: a navigation rule that matches the dialog with the cursor on '❯ No, exit' and sends Down (may repeat, bounded), and a confirm rule that matches the same dialog with the cursor on '❯ Yes, I trust this folder' (unnumbered) and sends Enter. Enter is then only ever sent with the cursor proven on Yes. Check the auto-respond engine supports a repeatable, bounded rule; if it does not, add the bound in the engine (one rule), not a special case.",
+  "id": "trust-prompt-confirm-only-when-the-cursor-is-on-yes",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, 2026-10-05, wave 59 preflight halt (bridge-boot rc=80)",
+  "summary": "claude 2.1.252+ shows the folder-trust dialog with the cursor on '❯ No, exit'. The claude-tmux manifest rule trust_prompt_no_default answers it with one blind burst, Down,Enter. On 2026-10-05 (wave 59's first launch) the Down was lost, Enter confirmed No, claude exited to the shell, the preflight bridge-boot smoke timed out (rc=80) and the whole wave halted with stop_reason=preflight_failed. The rule fires on every fresh worktree, so the race costs a wave whenever it loses (about 1 in 20 boots in the 2026-09-29..10-05 logs).",
+  "title": "The claude folder-trust auto-response presses Enter only once the cursor is verifiably on Yes",
+  "weight": 0.9
+}

@@ -40,7 +40,7 @@ func (h *HostEffects) Perform(_ context.Context, in core.ReviewInput) error {
 	if !ok {
 		return nil
 	}
-	roots := rootsFor(in)
+	roots := RootsFor(in)
 	var errs []error
 	for _, name := range c.Effects {
 		perform := effects[name].perform

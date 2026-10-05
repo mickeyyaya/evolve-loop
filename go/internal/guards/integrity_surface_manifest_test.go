@@ -163,3 +163,30 @@ func TestProtectedSurfaceManifest_CoversTheCorrectionCompletionPredicate(t *test
 		}
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheCommentProofTheCommitGateTrusts(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/commentaudit/equivalence.go",
+		"go/internal/commentaudit/history.go",
+		"go/internal/commentaudit/across.go",
+		"go/internal/commitgate/comment_only.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("IsProtectedSurface(%q) = false: the comment-only proof decides the commit gate's review waiver and its history refusals, so no cycle may edit it", path)
+		}
+	}
+	if IsProtectedSurface("go/cmd/commentaudit/main.go") {
+		t.Error("the commentaudit command's thin main stays cycle territory; only the rule package is protected")
+	}
+}
+
+func TestProtectedSurfaceManifest_CoversTheBuildHandoffFloor(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/core/build_handoff_floor.go",
+		"/wt/go/internal/core/build_handoff_floor.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q holds the build handoff floor's mandatory half and the review-input projection; a cycle must not be able to empty the floor that grades it", path)
+		}
+	}
+}

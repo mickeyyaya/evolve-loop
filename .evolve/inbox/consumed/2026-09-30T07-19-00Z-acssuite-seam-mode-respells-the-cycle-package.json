@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "No fmt.Sprintf of an ./acs/cycle pattern remains in internal/acssuite outside CyclePackage"
+  ],
+  "consumed": {
+    "at": "2026-09-30T17:29:14Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "The seam branch (discoverGoLane) calls CyclePackage, and TestCyclePackage_NoOtherCodeInThePackageSpellsACyclePattern fails on any ./acs/cycle literal outside CyclePackage in the package (go/internal/acssuite/acssuite.go)."
+  },
+  "created_at": "2026-09-30T07:19:00Z",
+  "files": [
+    "go/internal/acssuite/acssuite.go"
+  ],
+  "fix": "Call CyclePackage(opts.Cycle) at acssuite.go:436.",
+  "id": "acssuite-seam-mode-respells-the-cycle-package",
+  "kind": "hardening",
+  "priority_class": "hygiene",
+  "source": "console, 2026-09-30 comment-reduction round 10 (acssuite editor)",
+  "summary": "go/internal/acssuite/acssuite.go:358 defines CyclePackage as the ONE spelling of a cycle's predicate package so the writer and its readers cannot drift, yet runGoTest's seam-mode branch (acssuite.go:436) builds the same pattern with fmt.Sprintf(\"./acs/cycle%d\", opts.Cycle). Identical output today; a change to CyclePackage would silently leave seam mode on the old spelling. Found by the round-10 comment editor (not fixed in a comment-only PR).",
+  "title": "acssuite's seam-mode branch spells ./acs/cycle%d by hand instead of calling CyclePackage, the package's one documented spelling",
+  "weight": 0.2
+}
