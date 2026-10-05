@@ -68,7 +68,7 @@ func TestDeclaredDeliverablesGateWired(t *testing.T) {
 }
 
 func TestBuildFloorReviewer_LegacyCheckpointVersionZeroIsExempt(t *testing.T) {
-	r := NewBuildFloorReviewer(nil) // no deterministic checks: only the explanation floor could reject
+	r := MandatoryBuildHandoffFloor()
 	res := r.Review(context.Background(), ReviewInput{
 		Phase: string(PhaseBuild), Cycle: 9, Workspace: t.TempDir(), Worktree: t.TempDir(), ProjectRoot: t.TempDir(),
 		ExplanationDocumentationVersion: 0,

@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A build-report.md without the ## Explanation Documentation section fails `evolve phase verify build` with the floor's message (red first, on cycle 1788's report)",
+    "A cited path that is not in the build diff, and a material path without a Changed Areas bullet, fail both probes (cycles 1763 and 1788 replays)",
+    "A test proves the probes and the floor iterate the same check list (adding a check to the floor fails the test unless the probes run it)"
+  ],
+  "consumed": {
+    "at": "2026-09-30T19:08:01Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "The build handoff floor is one named check list (core.BuildHandoffFloor: the mandatory explanation half in core, the composed half at the composition root); evolve selfcheck build and evolve phase verify build both run core.WholeBuildHandoffFloor on the cycle's own input (core.ReviewInputFor over core.ReadRunCycleState), and TestBuildHandoffProbes_IterateTheCycleFloorsCheckList proves the cycle and the probes iterate the same list (ADR-0117)."
+  },
+  "created_at": "2026-10-01T02:20:00Z",
+  "files": [
+    "go/internal/phases/build",
+    "go/internal/cli/phasecmd",
+    "go/cmd/evolve"
+  ],
+  "fix": "Make the build handoff floor's deterministic checks one exported check set, and have `evolve phase verify build` and `evolve selfcheck build` run that set with the same inputs the floor uses (the cycle binding, the explanation contract, the diff), reporting each failure in the floor's own words. No check may exist in one and not the other.",
+  "id": "pre-handoff-probes-run-the-build-floor",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, cycle 1788 retrospective (third occurrence of the probe-weaker-than-floor class)",
+  "summary": "Three cycles failed on a build handoff floor check that the builder's own pre-handoff probe had just reported green: 1763 (a correction added a material path without a Changed Areas bullet; `selfcheck build` GREEN, inst-L1763a), 1764 (`selfcheck build` GREEN while the floor was RED, inst-L1764b), and 1788 (a correction rewrote build-report.md with one Write and dropped the ## Explanation Documentation section; `evolve phase verify build` printed OK, the floor rejected it and the cycle failed after its second correction, inst-L1788b). The probes and the floor are two copies of what a valid build handoff is, and the probes' copy is weaker: a replicated belief.",
+  "title": "The builder's pre-handoff probes run the build handoff floor itself, so a green probe means a green floor",
+  "weight": 0.85
+}

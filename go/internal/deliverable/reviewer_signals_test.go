@@ -215,14 +215,14 @@ func TestVerify_ResultCarriesTheOwedFilesAndEffectsItChecked(t *testing.T) {
 	writeFile(t, ws, "build-extra.json", `{"ok":true}`)
 	in := reviewInput("build", ws, t.TempDir())
 	in.Cycle = 42
-	res, err := VerifyWithStage("build", rootsFor(in), ownedResolver{owed: []string{"build-extra.json"}, effects: []string{"inbox-claim"}}, config.StageOff)
+	res, err := VerifyWithStage("build", RootsFor(in), ownedResolver{owed: []string{"build-extra.json"}, effects: []string{"inbox-claim"}}, config.StageOff)
 	if err != nil || !res.OK {
 		t.Fatalf("precondition: verified clean: %+v %v", res, err)
 	}
 	if len(res.Owed) != 1 || res.Owed[0] != "build-extra.json" || len(res.Effects) != 1 || res.Effects[0] != "inbox-claim" {
 		t.Fatalf("the Result names the owed files and effects the verifier checked: owed=%v effects=%v", res.Owed, res.Effects)
 	}
-	plain, err := VerifyWithStage("build", rootsFor(in), ownedResolver{}, config.StageOff)
+	plain, err := VerifyWithStage("build", RootsFor(in), ownedResolver{}, config.StageOff)
 	if err != nil || len(plain.Owed) != 0 || len(plain.Effects) != 0 {
 		t.Fatalf("nothing declared, nothing claimed: %+v %v", plain, err)
 	}
@@ -242,7 +242,7 @@ func TestVerify_OwedFileDeclaredWithADirectoryIsReadAtTheWorkspaceRoot(t *testin
 	writeFile(t, ws, "build-extra.json", `{"ok":true}`)
 	in := reviewInput("build", ws, t.TempDir())
 	in.Cycle = 42
-	res, err := VerifyWithStage("build", rootsFor(in), ownedResolver{owed: []string{"reports/build-extra.json"}}, config.StageOff)
+	res, err := VerifyWithStage("build", RootsFor(in), ownedResolver{owed: []string{"reports/build-extra.json"}}, config.StageOff)
 	if err != nil || !res.OK {
 		t.Fatalf("the file is read at OwedPath(workspace, name) — the workspace root: %+v %v", res, err)
 	}

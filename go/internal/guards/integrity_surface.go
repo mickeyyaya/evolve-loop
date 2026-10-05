@@ -146,6 +146,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.evolve/profiles/builder.json", Rationale: "Builder write boundary for explanation artifacts"},
 	{Fragment: "/.evolve/profiles/auditor.json", Rationale: "Auditor read-only boundary for Builder explanation artifacts"},
 	{Fragment: "/.evolve/build-explanation-contracts/", Rationale: "host-owned activation and Build result snapshots"},
+	{Fragment: "/go/internal/core/build_handoff_floor.go", Rationale: "build handoff floor: mandatory half, names walker, review-input projection (ADR-0117)"},
 }
 
 // IsProtectedSurface reports whether path is on the control plane. path may be absolute or

@@ -141,7 +141,7 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		return core.ReviewResult{Approve: true}
 	}
 	check := gatesignal.Check{Cycle: in.Cycle, RunID: in.RunID, Phase: in.Phase}
-	roots := rootsFor(in)
+	roots := RootsFor(in)
 	res, err := VerifyWithReportSize(in.Phase, roots, r.resolver, r.phaseIO, r.reportSizeGate, r.reportSizeBudgetTokens)
 	if err != nil {
 		// The gate's own uncertainty fails open and leaves the breaker alone.

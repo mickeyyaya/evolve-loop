@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -54,6 +57,32 @@ func productionBuildFloorChecks(ctx context.Context, in core.ReviewInput) []stri
 }
 
 var repoContractPack core.RepoContractPackFn = ship.RunRepoContractPack
+
+const (
+	productionFloorCheckName = "production"
+	solutionFloorCheckName   = "document-solution"
+)
+
+func composedBuildHandoffFloor(wf policy.WorkflowConfig, cfg config.RoutingConfig) core.BuildHandoffFloor {
+	if !wf.BuildFloorEnforced {
+		return nil
+	}
+	floor := core.BuildHandoffFloor{{Name: productionFloorCheckName, Run: productionBuildFloorChecks}}
+	if spec, ok := cfg.DocumentSpec(); ok {
+		floor = append(floor, core.BuildFloorCheck{Name: solutionFloorCheckName, Run: core.SolutionFloorChecks(spec)})
+	}
+	return floor
+}
+
+func probeBuildHandoffFloor(projectRoot string) core.BuildHandoffFloor {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[policy] WARN %v (the build handoff floor uses the compiled workflow defaults, as the cycle does)\n", err)
+		pol = policy.Policy{}
+	}
+	cfg, _ := config.Load(config.RegistryPath(projectRoot), filterEvolveEnv(os.Environ()))
+	return core.WholeBuildHandoffFloor(composedBuildHandoffFloor(pol.WorkflowConfig(), cfg))
+}
 
 // parseGateStage maps a gate word onto off/shadow/enforce, silently: an unknown
 // word is off. It stays silent until its two readers' dials become PolicyStages

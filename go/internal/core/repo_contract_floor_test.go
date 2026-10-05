@@ -50,7 +50,7 @@ func TestRepoContractFloorChecks_ARawGitFixtureIsCorrectedAtBuildExitByTheRatche
 	wt := worktreeWithModule(t)
 	pack := ratchetRedPack()
 	var run RepoContractPackFn = pack.run
-	res := NewBuildFloorReviewer(RepoContractFloorChecks(run)).Review(context.Background(),
+	res := BuildHandoffFloor{{Name: "repo-contract", Run: RepoContractFloorChecks(run)}}.Review(context.Background(),
 		ReviewInput{Phase: string(PhaseBuild), Worktree: wt, ProjectRoot: t.TempDir()})
 	if res.Approve || !res.Retry {
 		t.Fatalf("a red repo-contract pack goes back to the build correction; got Approve=%v Retry=%v", res.Approve, res.Retry)
@@ -179,7 +179,7 @@ func TestRepoContractFloor_ARedPackCorrectsTheBuildAndNeverReachesTheAudit(t *te
 	audit := runners[PhaseAudit].(*fakeRunner)
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
 		WithWorktreeProvisioner(&fakeWorktree{path: worktreeWithModule(t)}),
-		WithReviewer(NewBuildFloorReviewer(RepoContractFloorChecks(ratchetRedPack().run))))
+		WithReviewer(BuildHandoffFloor{{Name: "repo-contract", Run: RepoContractFloorChecks(ratchetRedPack().run)}}))
 	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
 	if err == nil || !strings.Contains(err.Error(), "TestRatchet_NoNewRawGitFixtures") {
 		t.Fatalf("a pack that stays red fails the build naming the ratchet's test; got %v", err)
