@@ -5,6 +5,7 @@ package llmroute
 
 import (
 	"os/exec"
+	"slices"
 	"sort"
 	"time"
 
@@ -38,7 +39,22 @@ type Plan struct {
 	PrimarySource string   // "env(EVOLVE_AUDITOR_CLI)" / "env(EVOLVE_CLI)" / "profile.auditor.cli" / "policy.pin" / "default"
 	Model         string   // resolved model, "auto" already expanded when possible
 	Tiers         []string // ordered tier fallback chain, resolved tier first (see TierChain)
+
+	TierCeiling map[string][]string
 }
+
+func (p Plan) Permits(cli, tier string) bool {
+	if name := policy.TierName(policy.TierRank(tier)); name != "" {
+		tier = name
+	}
+	allowed, capped := p.TierCeiling[tier]
+	if !capped {
+		return true
+	}
+	return slices.Contains(allowed, Family(cli))
+}
+
+func DefaultDriverForFamily(cli string) string { return defaultDriverForFamily(cli) }
 
 // TriggersFallback reports whether exitCode advances the chain; any other exit is a result, not a stall.
 func (p Plan) TriggersFallback(exitCode int) bool {

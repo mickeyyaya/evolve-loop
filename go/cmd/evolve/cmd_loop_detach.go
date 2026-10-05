@@ -62,7 +62,7 @@ func startDetachedLoop(cfg loopConfig, attr *syscall.SysProcAttr) (detachedLaunc
 	if err != nil {
 		return detachedLaunch{}, fmt.Errorf("open log %s: %w", cfg.LogPath, err)
 	}
-	defer logFile.Close()
+	defer func() { _ = logFile.Close() }()
 	info, err := logFile.Stat()
 	if err != nil {
 		return detachedLaunch{}, fmt.Errorf("stat log %s: %w", cfg.LogPath, err)
@@ -140,7 +140,7 @@ func tailLogSince(path string, offset int64, n int) []string {
 	if err != nil {
 		return []string{fmt.Sprintf("(log unreadable: %v)", err)}
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
 		return []string{fmt.Sprintf("(log unreadable: %v)", err)}
 	}

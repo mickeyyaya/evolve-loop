@@ -185,6 +185,86 @@ func TestRunEval_QualityCheckPredicatesReceiptIsUnconditional(t *testing.T) {
 	}
 }
 
+const unsatisfiablePredicateSrc = "package cycle9999\n\nimport (\n\t\"os/exec\"\n\t\"testing\"\n\n\t\"example.com/acsassert\"\n)\n\n" +
+	"func TestC9999_Gone(t *testing.T) {\n" +
+	"\tif acsassert.FileContains(t, \"x.go\", \"old\") {\n\t\tt.Errorf(\"old symbol still present\")\n\t}\n}\n\n" +
+	"func TestC9999_HaltThroughGoRun(t *testing.T) {\n" +
+	"\tcmd := exec.Command(\"go\", \"run\", \"./cmd/evolve\")\n\t_ = cmd.Run()\n" +
+	"\tif cmd.ProcessState.ExitCode() != 2 {\n\t\tt.Errorf(\"want HALT\")\n\t}\n}\n"
+
+func runQualityCheck(t *testing.T, evalBody, predicates string) (string, string, int) {
+	t.Helper()
+	evalPath := filepath.Join(t.TempDir(), "eval.md")
+	if err := os.WriteFile(evalPath, []byte(evalBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	rc := RunEval([]string{"quality-check", "-predicates", predicates, evalPath}, nil, &out, &errb)
+	return out.String(), errb.String(), rc
+}
+
+func writePredicates(t *testing.T, src string) string {
+	t.Helper()
+	pred := filepath.Join(t.TempDir(), "predicates_test.go")
+	if err := os.WriteFile(pred, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return pred
+}
+
+func TestRunEval_QualityCheckPredicatesUnsatisfiableLint(t *testing.T) {
+	const cleanEval, tautologyEval = "```bash\ngo build ./go/...\n```\n", "```bash\n:\n```\n"
+	unsatisfiable := writePredicates(t, unsatisfiablePredicateSrc)
+	cases := []struct {
+		name, eval, predicates string
+		rc                     int
+		stdout                 []string
+	}{
+		{"findings raise PASS to WARN", cleanEval, unsatisfiable, 1, []string{
+			"unsatisfiable[inverted-idiom] predicates_test.go:TestC9999_Gone",
+			"unsatisfiable[go-run-exit-code] predicates_test.go:TestC9999_HaltThroughGoRun",
+			"unsatisfiable-lint: linted 1 file(s) under " + unsatisfiable + " — 2 advisory finding(s)",
+			"verdict: WARN",
+		}},
+		{"findings never lower a tautology HALT", tautologyEval, unsatisfiable, 2, []string{"unsatisfiable[inverted-idiom]", "verdict: HALT"}},
+		{"a clean package still prints the receipt", cleanEval, writePredicates(t, "package cycle9999\n"), 0, []string{"unsatisfiable-lint: linted 1 file(s)", "0 advisory finding(s)", "verdict: PASS"}},
+	}
+	for _, c := range cases {
+		out, errb, rc := runQualityCheck(t, c.eval, c.predicates)
+		if rc != c.rc {
+			t.Errorf("%s: rc = %d, want %d\nstdout=%s\nstderr=%s", c.name, rc, c.rc, out, errb)
+		}
+		for _, want := range c.stdout {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: stdout missing %q:\n%s", c.name, want, out)
+			}
+		}
+	}
+
+	out, errb, rc := runQualityCheck(t, cleanEval, "/nonexistent/predicates_test.go")
+	if rc != 0 || !strings.Contains(errb, "unsatisfiable-lint") || strings.Contains(out, "unsatisfiable-lint: linted") {
+		t.Errorf("an unreadable path must be a loud, non-blocking skip: rc=%d stdout=%q stderr=%q", rc, out, errb)
+	}
+}
+
+func TestRunEval_QualityCheckPredicateLintSkipNamesEachLintOnce(t *testing.T) {
+	_, errb, rc := runQualityCheck(t, "```bash\ngo build ./go/...\n```\n", "/nonexistent/predicates_test.go")
+	if rc != 0 {
+		t.Fatalf("rc = %d, want 0: a lint that cannot read its path must not block", rc)
+	}
+	if strings.Count(errb, "(advisory lint skipped)") != 2 {
+		t.Errorf("each of the two predicate lints must report its skip once; stderr = %q", errb)
+	}
+	for _, lint := range []string{"flaky", "unsatisfiable"} {
+		if n := strings.Count(errb, lint); n != 1 {
+			t.Errorf("the %s lint's skip names it %d times, want once; stderr = %q", lint, n, errb)
+		}
+		if !strings.Contains(errb, "evolve eval quality-check: "+lint+"-lint: ") {
+			t.Errorf("the %s lint's skip must name it as its receipt does (%s-lint); stderr = %q", lint, lint, errb)
+		}
+	}
+}
+
 // TestRunEval_QualityCheckFlakyLintNeverLowersHalt is the H3 pin — the whole
 // reason this lint is safe to leave on. Advisory-ness used to rest on a single
 // `&& overall == LevelPass` conjunct, one natural refactor away from turning a

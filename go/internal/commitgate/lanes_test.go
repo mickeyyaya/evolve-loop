@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -326,5 +327,85 @@ func TestLaneRust_NoCargoTomlAbove_NoCrateFound(t *testing.T) {
 	}
 	if len(res.ChecksPassed) != 0 {
 		t.Errorf("ChecksPassed = %v, want empty (no crate found)", res.ChecksPassed)
+	}
+}
+
+func TestLaneGo_AnArchivedGoFileOutsideEveryModuleIsFormattedButNotBuilt(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "go", "go.mod"), "module example.com/x\n\ngo 1.22\n")
+	mustWrite(t, filepath.Join(root, "go", "x.go"), "package x\n")
+	archived := filepath.Join("docs", "archived", "cycle9", "predicates_test.go")
+	mustWrite(t, filepath.Join(root, archived), "package cycle9\n")
+	o := baseOpts(root, "go")
+	sr := &scriptRunner{}
+	o.Runner = sr.run()
+	res := &Result{}
+
+	if code := o.laneGo(context.Background(), []string{"go/x.go", archived}, res); code != ExitPass {
+		t.Fatalf("code = %d, want ExitPass: an archived Go source outside every module is not part of any build (%v)", code, res.Logs)
+	}
+	gofmtArchived := false
+	for _, c := range sr.calls {
+		if strings.HasPrefix(c, "gofmt") && strings.HasSuffix(c, archived) {
+			gofmtArchived = true
+		}
+		if (strings.HasPrefix(c, "go vet") || strings.HasPrefix(c, "go test")) && strings.Contains(c, "cycle9") {
+			t.Errorf("%q builds the archived file; only module packages are vetted and tested", c)
+		}
+	}
+	if !gofmtArchived {
+		t.Errorf("the archived file was not gofmt-checked: %v", sr.calls)
+	}
+	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt", "go:vet", "go:test"}) {
+		t.Errorf("ChecksPassed = %v, want the module's gofmt, vet and test", res.ChecksPassed)
+	}
+	if !strings.Contains(strings.Join(res.Logs, "\n"), "outside every Go module") {
+		t.Errorf("logs %v do not name the archived file as outside every Go module", res.Logs)
+	}
+}
+
+func TestLaneGo_OnlyArchivedGoFilesAreFormattedAndNothingIsBuilt(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	archived := filepath.Join("docs", "archived", "cycle9", "predicates_test.go")
+	mustWrite(t, filepath.Join(root, archived), "package cycle9\n")
+	o := baseOpts(root, "go")
+	sr := &scriptRunner{}
+	o.Runner = sr.run()
+	res := &Result{}
+
+	if code := o.laneGo(context.Background(), []string{archived}, res); code != ExitPass {
+		t.Fatalf("code = %d, want ExitPass (%v)", code, res.Logs)
+	}
+	for _, c := range sr.calls {
+		if strings.HasPrefix(c, "go ") {
+			t.Errorf("%q ran with no module package staged", c)
+		}
+	}
+	if !reflect.DeepEqual(res.ChecksPassed, []string{"go:gofmt"}) {
+		t.Errorf("ChecksPassed = %v, want only go:gofmt", res.ChecksPassed)
+	}
+}
+
+func TestLaneGo_AGoModAboveTheRepoRootDoesNotClaimTheRepositorysFiles(t *testing.T) {
+	t.Parallel()
+	host := t.TempDir()
+	mustWrite(t, filepath.Join(host, "go.mod"), "module example.com/host\n\ngo 1.22\n")
+	root := filepath.Join(host, "repo")
+	archived := filepath.Join("docs", "archived", "cycle9", "predicates_test.go")
+	mustWrite(t, filepath.Join(root, archived), "package cycle9\n")
+	o := baseOpts(root, "go")
+	sr := &scriptRunner{}
+	o.Runner = sr.run()
+	res := &Result{}
+
+	if code := o.laneGo(context.Background(), []string{archived}, res); code != ExitPass {
+		t.Fatalf("code = %d, want ExitPass (%v)", code, res.Logs)
+	}
+	for _, c := range sr.calls {
+		if strings.HasPrefix(c, "go ") {
+			t.Errorf("%q ran: a go.mod above the repository root is the host's, not the repository's", c)
+		}
 	}
 }

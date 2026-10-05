@@ -10,6 +10,7 @@ package verifylock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -37,6 +38,8 @@ const waitNoteAfter = 5 * time.Second
 
 const renoteEvery = 60 * time.Second
 
+const MaxWait = 15 * time.Minute
+
 // Acquire takes the host-wide verification lock for projectRoot's repo,
 // blocking (ctx-aware) until it is free. Returns an idempotent release. A
 // root whose hub cannot be resolved degrades to a lock file beside the
@@ -50,6 +53,16 @@ func Acquire(ctx context.Context, projectRoot string, warn io.Writer) (func(), e
 		fmt.Fprintf(warn, "[verify] WARN: hub lock unresolvable for %s — degrading to a PER-WORKTREE lock (%s): concurrent lanes are NOT serialized\n", projectRoot, path)
 	}
 	return AcquireAt(ctx, path, warn)
+}
+
+func AcquireWithin(ctx context.Context, projectRoot string, wait time.Duration, warn io.Writer) (func(), error) {
+	waitCtx, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
+	release, err := Acquire(waitCtx, projectRoot, warn)
+	if err != nil && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		return nil, fmt.Errorf("verifylock: no turn at the host verification lock within the %s wait bound, so this run goes unserialized: %w", wait, err)
+	}
+	return release, err
 }
 
 // lockPathFor resolves the hub-resident lock path; hub=false marks the

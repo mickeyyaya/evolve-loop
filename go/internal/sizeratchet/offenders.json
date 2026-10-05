@@ -93,7 +93,6 @@
   "internal/cli/phasecmd.phasesCreate": 123,
   "internal/cli/phasecmd.phasesValidate": 69,
   "internal/cliadmit.Acquire": 70,
-  "internal/commitgate.Options.laneGo": 75,
   "internal/commitprefixgate.Run": 201,
   "internal/commitprefixgate.globMatchRec": 58,
   "internal/committedset.DispositionsFrom": 57,

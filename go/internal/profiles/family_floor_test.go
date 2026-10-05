@@ -5,16 +5,6 @@ import (
 	"testing"
 )
 
-// claudeFamilyFloor lists the phases that must stay off the builder's CLI
-// family, each with its reason. See ADR-0104.
-var claudeFamilyFloor = map[string]string{
-	"auditor":            "adversarial grading of build content — cross-family anti-gaming core",
-	"adversarial-review": "adversarial grading of build content — cross-family anti-gaming core",
-	"tdd-engineer":       "test author — anti-cooperative-bias family split from the builder",
-	"spec-verifier":      "audit-side verification of build output",
-	"spec-verify":        "audit-side verification of build output",
-}
-
 // family reduces a driver name to its CLI family. It mirrors policy.BaseCLI
 // because importing internal/policy here would create an import cycle.
 func family(cli string) string {
@@ -33,6 +23,7 @@ func TestClaudeFamilyFloor(t *testing.T) {
 		t.Fatalf("Get(builder): %v", err)
 	}
 	builderFam := family(builder.CLI)
+	floor := ClaudeFamilyFloor()
 
 	claudeCount := 0
 	for _, name := range names {
@@ -45,15 +36,15 @@ func TestClaudeFamilyFloor(t *testing.T) {
 			continue
 		}
 		claudeCount++
-		if _, ok := claudeFamilyFloor[name]; !ok {
-			t.Errorf("profile %s: claude family without a floor justification — claude is the quota-constrained family (2026-09-02 directive); either add it to claudeFamilyFloor WITH its load-bearing reason, or route it to codex", name)
+		if _, ok := floor[name]; !ok {
+			t.Errorf("profile %s: claude family without a floor justification — claude is the quota-constrained family (2026-09-02 directive); either add it to profiles.ClaudeFamilyFloor WITH its load-bearing reason, or route it to codex", name)
 		}
 	}
 	if claudeCount == 0 {
 		t.Fatal("matched NO claude-family profiles — the selector is broken and this guard is vacuous")
 	}
 
-	for name, why := range claudeFamilyFloor {
+	for name, why := range floor {
 		p, err := loader.Get(name)
 		if err != nil {
 			t.Errorf("floor entry %s (%s) does not resolve in the TRACKED tree: %v — a floor pinned on a missing/untracked profile is vacuous", name, why, err)

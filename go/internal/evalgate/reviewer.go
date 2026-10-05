@@ -35,7 +35,7 @@ type reviewer struct {
 func NewReviewer(stage config.Stage) core.DeliverableReviewer {
 	return &reviewer{
 		stage: stage,
-		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate{}},
+		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate(), unsatisfiableShapeGate()},
 		logf:  func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 	}
 }

@@ -27,7 +27,7 @@ func (floorBindingGate) check(in core.ReviewInput) (string, bool) {
 	if cycle <= 0 || in.Worktree == "" {
 		return "", false
 	}
-	predPath := filepath.Join(in.Worktree, "go", "acs", fmt.Sprintf("cycle%d", cycle), "predicates_test.go")
+	predPath := filepath.Join(cyclePredicateDir(in.Worktree, cycle), "predicates_test.go")
 	targets := floorPredicateTargets(predPath)
 	if len(targets) == 0 {
 		return "", false
