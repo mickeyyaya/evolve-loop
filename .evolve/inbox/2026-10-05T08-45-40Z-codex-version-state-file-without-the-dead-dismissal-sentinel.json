@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "codex-tmux Preflight on a home with no version.json creates it, and the freeze check's defaultSelfUpdateEvidence reports the codex updater state present (red first if the rename changes the call)",
+    "codex-tmux Preflight on a home whose version.json carries dismissed_version 0.160.0 and last_checked_at T leaves the file byte-identical (red first: today it rewrites both)",
+    "No code writes the 999.999.999 sentinel; grep finds it only in docs that record the history",
+    "Tests point the version path at a temp dir (codexVersionPathFn) and never touch the real home"
+  ],
+  "created_at": "2026-10-05T09:30:00Z",
+  "files": [
+    "go/internal/bridge/codex_pretrust.go",
+    "go/internal/bridge/driver_codextmux.go",
+    "go/internal/bridge/preflight_test.go",
+    "go/internal/bridge/codex_pretrust_launch_test.go",
+    "go/internal/looppreflight/freeze.go",
+    "docs/architecture/packages/internal-bridge.md"
+  ],
+  "fix": "Rename dismissCodexUpdateNag to the role it keeps (for example ensureCodexVersionState) and have it only create ~/.codex/version.json when absent, merging nothing into an existing file: no dismissed_version sentinel, no last_checked_at rewrite. Keep it at the CLIPreflight chokepoint. Update the bridge package notes (Codex launch preparation), ADR-0049's N11 row if it names the function, and the 2026-10-05 incident's Fix section. Leave an existing dismissed_version a user wrote untouched.",
+  "id": "codex-version-state-file-without-the-dead-dismissal-sentinel",
+  "kind": "pipeline-repair",
+  "priority_class": "hygiene",
+  "source": "console lane cl-codexupdate architecture review, 2026-10-05 (finding 4): the sentinel was disproven live on codex 0.153.4; docs/incidents/2026-10-05-codex-update-menu.md, Root cause step 1",
+  "summary": "codexTmuxDriver.Preflight calls dismissCodexUpdateNag (go/internal/bridge/codex_pretrust.go:128-151), which writes dismissed_version \"999.999.999\" and last_checked_at into ~/.codex/version.json. On codex 0.153.4 that sentinel no longer hides the update menu: the menu showed with that exact file on disk (latest_version 0.160.0; incident 2026-10-05-codex-update-menu). Every realized codex launch now carries -c check_for_update_on_startup=false, which is what keeps the menu away. The function still has one live role: the readiness gate's cli-version-freeze check (go/internal/looppreflight/freeze.go:26, defaultSelfUpdateEvidence) treats the presence of ~/.codex/version.json as the codex updater state, and codex no longer writes that file itself once its update check is off. The name says it dismisses an update nag and the write says so too; both are now false.",
+  "title": "The codex version-state preflight stops writing the dead 999.999.999 dismissal",
+  "weight": 0.4
+}

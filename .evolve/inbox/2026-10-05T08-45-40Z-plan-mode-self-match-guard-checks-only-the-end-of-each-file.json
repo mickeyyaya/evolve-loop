@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The plan-mode guard slides the pane bottom over every line of each file and fails today at autorespond_planmode_test.go:36 (red first)",
+    "After the fix it passes, and TestAutoRespond_PlanModeDialogs and TestAutoRespond_PlanModeAnswersEveryLiveQuestion stay green on the verbatim live frames"
+  ],
+  "created_at": "2026-10-05T09:30:00Z",
+  "files": [
+    "go/internal/bridge/autorespond_planmode_test.go",
+    "go/internal/bridge/selfmatch_guard_test.go",
+    "go/internal/bridge/manifests/codex-tmux.json",
+    "docs/architecture/packages/internal-bridge.md"
+  ],
+  "fix": "Switch the plan-mode guard to requireNoRuleFiresAtAnyPaneBottom (go/internal/bridge/selfmatch_guard_test.go) over the same files, see it fail at autorespond_planmode_test.go:36, then make the fixture unable to take the live shape (a gutter or a joined form, as the incident doc's update-menu quote does) or tighten plan_question's anchor, whichever keeps the live-frame tests green. Keep the vacuity check the guard already has.",
+  "id": "plan-mode-self-match-guard-checks-only-the-end-of-each-file",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console lane cl-codexupdate, 2026-10-05: a sliding self-match scan of every tail-anchored auto-respond rule over the tracked files while fixing the update-menu and claude trust guards",
+  "summary": "TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles (go/internal/bridge/autorespond_planmode_test.go) runs the plan rules once on each whole file. The rules are bottom-anchored, so whole-file matching only tests the end of the file. Sliding the pane bottom over every line (the requireNoRuleFiresAtAnyPaneBottom shape the update-menu and claude trust guards adopted on 2026-10-05) finds that codex's plan_question rule fires (send:Enter) on a pane whose bottom line is autorespond_planmode_test.go:36 or :37: the raw-string fixture codexPlanQuestionPane is a real-shaped picker, and a pane that stops there looks like the live dialog. An agent printing that file during a codex phase could have its pane answered with Enter.",
+  "title": "The plan-mode self-match guard checks every pane bottom, not only each file's end",
+  "weight": 0.5
+}

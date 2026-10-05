@@ -53,6 +53,11 @@ func reportDoctorLiveResult(driver string, asJSON bool, rc int, pattern, scrollb
 // cycle-283). Exit: 0 healthy, 1 walled (the escalation pattern is printed,
 // e.g. rate_limit) or failed, 10 usage (unknown or non-tmux driver).
 func runDoctorLive(args []string, stdout, stderr io.Writer) int {
+	return runDoctorLiveWith(args, stdout, bridge.Deps{Stderr: stderr})
+}
+
+func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
+	stderr := deps.Stderr
 	fs := flag.NewFlagSet("evolve doctor live", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var asJSON bool
@@ -76,8 +81,7 @@ func runDoctorLive(args []string, stdout, stderr io.Writer) int {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	rc, pattern, scrollback := bridge.LiveSmokeTest(ctx, driver,
-		&bridge.Config{Workspace: ws, ProjectRoot: cwd}, bridge.Deps{Stderr: stderr})
+	rc, pattern, scrollback := bridge.LiveSmokeTest(ctx, driver, &bridge.Config{Workspace: ws, ProjectRoot: cwd}, deps)
 
 	return reportDoctorLiveResult(driver, asJSON, rc, pattern, scrollback, stdout, stderr)
 }

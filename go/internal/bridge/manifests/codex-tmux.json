@@ -22,7 +22,9 @@
   "transient_regex": "(?i)(stream error|server_error|\\b5\\d{2}\\b\\s*(bad gateway|service unavailable|internal server error)|the server had an error)",
   "default_model": "",
   "default_args": [
-    "--yolo"
+    "--yolo",
+    "-c",
+    "check_for_update_on_startup=false"
   ],
   "params": {
     "model_tier": {
@@ -109,6 +111,22 @@
   },
   "interactive_prompts": [
     {
+      "name": "update_menu_cursor_off_skip",
+      "regex": "(?sm)^[ \\t]*› (?:1\\. Update now|3\\. Skip until next version).{0,200}^[ \\t]*Press enter to continue\\s*\\z",
+      "response_keys": "Down",
+      "tail_lines": 8,
+      "policy": "auto_respond",
+      "note": "codex's startup update menu ('Update available!'; options 1. Update now (runs brew upgrade), 2. Skip, 3. Skip until next version; footer 'Press enter to continue'), cursor on any option but Skip. The launch's default_args carry -c check_for_update_on_startup=false, so codex does not show this menu; this rule and update_menu_cursor_on_skip are the defence when it shows anyway. NAVIGATION ONLY: one Down per tick, never Enter, so a lost keystroke costs a repeat instead of a brew upgrade that exits codex to the shell. The live menu's Down wraps (1 -> 2 -> 3 -> 1, verified on 0.153.4 on 2026-10-05), so a cursor on option 3 reaches Skip in two Downs. Repeats while the cursor is seen off Skip; the loop guard bounds it, and a boot wait that trips the guard ends at once as a boot timeout (ExitREPLBootTimeout, a bench strike) rather than sending Enter. BOTTOM-ANCHORED (footer + \\z + tail_lines 8 + distance bound): an answered menu stays in the scrollback above the composer, and the old bespoke check that matched it there typed its key into the composer on every boot pass. PERMISSIVE ON PURPOSE: any frame with a cursor on Update now or on option 3, a torn redraw that shows two cursors included, gets a Down and never an Enter. MUST PRECEDE update_menu_cursor_on_skip: the two are disjoint on every frame the menu renders, and first-match order resolves text no build renders to navigation. Replaces the bespoke boot path that sent the hotkey 2 with Enter on any pane quoting the menu. Source: docs/incidents/2026-10-05-codex-update-menu.md"
+    },
+    {
+      "name": "update_menu_cursor_on_skip",
+      "regex": "(?m)^[ \\t]*1\\. Update now[^\\n]*\\n[ \\t]*› 2\\. Skip[ \\t]*\\n[ \\t]*3\\. Skip until next version[ \\t]*\\n(?:[ \\t]*\\n)*[ \\t]*Press enter to continue\\s*\\z",
+      "response_keys": "Enter",
+      "tail_lines": 8,
+      "policy": "auto_respond",
+      "note": "codex's startup update menu with the cursor verifiably on '› 2. Skip' (after update_menu_cursor_off_skip's Down landed). The only rule that confirms this menu, so Enter is sent only on a capture that shows the cursor on Skip; an Enter can therefore never confirm Update now, and repeating it on a lost Enter is safe (the loop guard bounds it). Live on 0.153.4 the composer is drawn below the menu within a second of the Enter. STRICT ON PURPOSE: it requires the cursorless '1. Update now' line directly above '› 2. Skip' and a cursorless '3. Skip until next version' directly below, so a torn redraw with two cursors is left to the navigation rule's Down. BOTTOM-ANCHORED like its sibling. Source: docs/incidents/2026-10-05-codex-update-menu.md"
+    },
+    {
       "name": "trust_prompt",
       "regex": "Do you trust the contents of this directory|Trust this directory|Working with untrusted contents|This folder has not been trusted|Yes, continue",
       "response_keys": "1,Enter",
@@ -151,6 +169,14 @@
       "tail_lines": 9,
       "policy": "auto_respond",
       "note": "Codex plan-mode clarifying-question picker (collaboration_modes is graduated-on in 0.147.0; entry is /plan or Shift+Tab, in-session). Enter submits the pre-selected '(Recommended)' option; a bare Enter is correct here because the right answer is the pre-selection, not a fixed index. BOTTOM-ANCHORED (\\z) for the same reasons as claude's plan_approval - critically including the answered-picker re-fire, which matters more on this CLI because codex-tmux captures bootScrollback=200 lines, the depth that produced the 2026-06-03 trust-dialog loop-guard abandon. The picker is multi-question, so the rule must stay multi-fire (NOT once:true) and answer each live question while never re-firing on a dismissed one. Span bound 900 (live: 464-494, sampled on a single 4-option form, so the bound carries slack for longer forms; 900 not 1200 because Go RE2 caps repeat counts at 1000 and an over-large bound makes the rule SILENTLY INERT - decideAutoRespond swallows the compile error); tail is the remainder of the footer line only (live: 47 chars, no newline). Source: docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md."
+    },
+    {
+      "name": "update_menu_unparsed",
+      "regex": "(?m)^[ \\t]*(?:✨\\W{0,3})?Update available![^›]*(?:›[^›]*)?\\z",
+      "response_keys": null,
+      "tail_lines": 24,
+      "policy": "hold",
+      "note": "FAIL CLOSED on an update menu the two shaped rules above cannot parse (a reworded footer, an extra line, options that moved). The menu's cursor glyph › is also the codex-tmux prompt marker, so without this rule a boot would declare the REPL ready on the menu's own cursor and the prompt's submit Enter would confirm Update now. HOLD sends nothing and tells a boot wait not to judge readiness on this frame; it repeats until the loop guard ends the boot as ExitREPLBootTimeout (a bench strike) with a FAIL line naming this rule, and a busy pane skips it as it skips an escalate rule. It matches the menu's header at the start of a line in the last 24 lines with at most one › after it: once Skip is confirmed codex draws its composer, with its own ›, below the answered menu, so the hold lets go; a torn redraw with two cursors is the navigation rule's. BOOT-ONLY: the responder drops every hold rule once boot readiness is declared (autoResponder.endBoot, at the tmux boot and the recipe boot, including a resumed or attached session), so an idle run-phase pane whose agent quotes the header, with the composer's › below it, is never held and never spends the loop guard. LAST IN THE MANIFEST: a menu the shaped rules parse is answered, never held, and the hold shadows no rule that can answer a frame it also matches (a cursorless menu above the trust dialog gets trust_prompt). Source: docs/incidents/2026-10-05-codex-update-menu.md"
     }
   ],
   "stub": false,
@@ -166,5 +192,5 @@
     "gpt-5.6-luna"
   ],
   "chatgpt_default_model": "gpt-5.6-sol",
-  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). model_tier_map is the codex FAMILY's single tier table: the tmux realization, the headless driver (codex.json declares no map; it resolves through this one via the shared bridge.resolveTierModel ladder), setup's presets, the advisor clamp probe and the live-catalog overlay all read it — a model-family cutover is ONE edit here (values: see CHANGELOG, the value record; 2026-09-10 cost directive: deep/top = gpt-5.6-sol at the high reasoning rung — the 2026-09-09 gpt-6-astra cutover was withdrawn for token cost, and astra is deliberately outside the safe set so a stray pin is clamped to the default). chatgpt_safe_models/chatgpt_default_model (cycle-142 mechanism): on subscription auth a realized model outside the safe set is clamped to the default, so the deep model MUST be listed here or every deep launch is silently rewritten. API-key auth bypasses the clamp entirely."
+  "note": "Interactive codex via tmux. Preserves ChatGPT-account subscription billing (vs codex exec, which may meter differently). model_tier_map is the codex FAMILY's single tier table: the tmux realization, the headless driver (codex.json declares no map; it resolves through this one via the shared bridge.resolveTierModel ladder), setup's presets, the advisor clamp probe and the live-catalog overlay all read it — a model-family cutover is ONE edit here (values: see CHANGELOG, the value record; 2026-09-10 cost directive: deep/top = gpt-5.6-sol at the high reasoning rung — the 2026-09-09 gpt-6-astra cutover was withdrawn for token cost, and astra is deliberately outside the safe set so a stray pin is clamped to the default). chatgpt_safe_models/chatgpt_default_model (cycle-142 mechanism): on subscription auth a realized model outside the safe set is clamped to the default, so the deep model MUST be listed here or every deep launch is silently rewritten. API-key auth bypasses the clamp entirely. default_args: --yolo short-circuits the per-edit-approval modal; -c check_for_update_on_startup=false (a top-level codex config key) stops codex showing its startup update menu, whose default choice runs `brew upgrade --cask codex` and exits codex to the shell when the upgrade fails (wave 59, 2026-10-05: 16 of 16 codex dispatches lost to it). Verified live on 0.153.4: the same ~/.codex/version.json shows the menu without the override and never with it. The override is per launch, so no host-global file is written; update_menu_cursor_off_skip / update_menu_cursor_on_skip answer the menu if it shows anyway. Source: docs/incidents/2026-10-05-codex-update-menu.md."
 }

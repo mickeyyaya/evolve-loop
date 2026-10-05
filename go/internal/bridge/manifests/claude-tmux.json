@@ -153,12 +153,12 @@
     },
     {
       "name": "trust_prompt",
-      "regex": "(?s)❯ 1\\.\\s+Yes, I trust this folder.{0,120}Enter to confirm.{0,40}\\s*\\z",
+      "regex": "(?sm)^[ \\t]*❯ 1\\.\\s+Yes, I trust this folder.{0,120}^[ \\t]*Enter to confirm[^\\n]{0,40}\\s*\\z",
       "response_keys": "Enter",
       "tail_lines": 12,
       "policy": "auto_respond",
       "once": true,
-      "note": "claude v2.1.193 folder-trust dialog (numbered options, Yes pre-highlighted): one Enter confirms Yes, verified live 2026-06-26. Kept for older builds; v2.1.252+'s unnumbered No-default dialog is trust_prompt_cursor_on_no / trust_prompt_cursor_on_yes above — on every frame the dialogs render, the three regexes are disjoint (this one requires the numbered ❯ 1. Yes line; those require the unnumbered ❯ No, exit, or an uncursored No, exit line directly above an unnumbered ❯ Yes). Order still matters as the tiebreak for text no build renders: the navigation rule comes first, so ambiguity sends Down, never Enter. BOTTOM-ANCHORED on the Enter-to-confirm footer + tail_lines per the plan_approval discipline (2026-09-02: the unanchored form self-matched this repo's own tracked files when rendered by an agent — see the self-match guard test). The ❯ cursor collides with the REPL marker, so tickDuringBoot dismisses it before prompt delivery. once:true — lingering-scrollback discipline. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
+      "note": "claude v2.1.193 folder-trust dialog (numbered options, Yes pre-highlighted): one Enter confirms Yes, verified live 2026-06-26. Kept for older builds; v2.1.252+'s unnumbered No-default dialog is trust_prompt_cursor_on_no / trust_prompt_cursor_on_yes above — on every frame the dialogs render, the three regexes are disjoint (this one requires the numbered ❯ 1. Yes line; those require the unnumbered ❯ No, exit, or an uncursored No, exit line directly above an unnumbered ❯ Yes). Order still matters as the tiebreak for text no build renders: the navigation rule comes first, so ambiguity sends Down, never Enter. BOTTOM-ANCHORED on the Enter-to-confirm footer + tail_lines per the plan_approval discipline (2026-09-02: the unanchored form self-matched this repo's own tracked files when rendered by an agent — see the self-match guard test). LINE-ANCHORED (2026-10-05): the cursor line and the footer must each begin a line, because the self-match guard now slides the pane bottom over every line of the tracked files and found two test source lines that quote this dialog flattened with \\n escapes; a source line is not the dialog. The ❯ cursor collides with the REPL marker, so tickDuringBoot dismisses it before prompt delivery. once:true — lingering-scrollback discipline. Source: docs/incidents/2026-09-01-claude-2252-trust-default-flip.md"
     },
     {
       "name": "askuserquestion_multiselect",

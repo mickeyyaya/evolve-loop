@@ -95,7 +95,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// passes through unclamped. This is the end-to-end launch string
 			// reaching tmux, so it is also the wiring proof that the flag
 			// survives realization, dedupe and quoting.
-			want:   "codex --yolo -m gpt-5.6-terra -c 'model_reasoning_effort=high' -c 'plan_mode_reasoning_effort=high'",
+			want:   "codex --yolo -c 'check_for_update_on_startup=false' -m gpt-5.6-terra -c 'model_reasoning_effort=high' -c 'plan_mode_reasoning_effort=high'",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}
