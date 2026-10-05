@@ -4,6 +4,11 @@
     "A live run lease, a pending or failed required check, or a behind branch without --update-branch exits 1 and merges nothing further",
     "--update-branch --wait merges only after the updated head's checks go green"
   ],
+  "consumed": {
+    "at": "2026-10-05T08:12:26Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-09-30T10:51:41Z",
   "files": [
     "go/cmd/evolve/registry.go",
@@ -11,7 +16,7 @@
     "go/internal/runlease",
     "go/internal/ciwatch"
   ],
-  "fix": "Add `evolve pr merge <n>... [--update-branch] [--wait D]`. It refuses while any run lease on the plane is live (exit 1). For each PR in order, every required check must be SUCCESS on the PR's current head; a pending or red check refuses that PR with exit 1, naming the check. With --update-branch it updates a behind branch, and with --wait it polls the new head's checks through ciwatch's gh fetcher. It then merges with the merge method from policy config and prints the merge SHA. It stops at the first refusal. Exit 2 on gh I/O, 10 usage. Update runtime-reference.md's boundary step 2.",
+  "fix": "Add `evolve pr merge \u003cn\u003e... [--update-branch] [--wait D]`. It refuses while any run lease on the plane is live (exit 1). For each PR in order, every required check must be SUCCESS on the PR's current head; a pending or red check refuses that PR with exit 1, naming the check. With --update-branch it updates a behind branch, and with --wait it polls the new head's checks through ciwatch's gh fetcher. It then merges with the merge method from policy config and prints the merge SHA. It stops at the first refusal. Exit 2 on gh I/O, 10 usage. Update runtime-reference.md's boundary step 2.",
   "id": "cli-pr-merge",
   "kind": "feature",
   "priority_class": "stability",

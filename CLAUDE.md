@@ -44,7 +44,7 @@ Maximum velocity, zero shortcuts. Worktrees are provisioned natively — agents 
 
 ## CI Failures
 
-- Classify every CI failure as flake vs. real defect before retrying. Retrying an unclassified red is not allowed.
+- Classify every CI failure as flake vs. real defect before retrying, with `evolve ci classify <run-id|pr:N|sha:H> [--json] [--rerun]` (exit 0 = retry-safe: every red is pre-existing or flake-evidence). Retrying an unclassified red is not allowed.
 - File a regression issue for any failure class seen 2+ times, and link it in the PR description.
 - Ship gates: if a gate reports RED, verify the gate's own logic before assuming the code is broken (false-RED gates have shipped before).
 

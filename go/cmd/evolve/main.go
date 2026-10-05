@@ -56,6 +56,13 @@ Commands:
   loop-stop  Stop a running loop after its current wave; --release lifts the brake,
               --wait blocks until no run lease is live
               ( loop-stop [--release | --wait [--timeout D]] [--project-root P] )
+  pr         Merge reviewed PRs at a wave boundary; refuses while a loop runs or
+              required CI is not green on the verified head
+              ( pr merge <n>... [--update-branch] [--wait D] [--project-root P] )
+  ci         Classify a red CI run's failing tests from evidence; exit 0 = retry-safe
+              ( ci classify <run-id|pr:N|sha:H> [--json] [--rerun] [--project-root P] )
+  comments   Comment-campaign proof tools (the commentaudit CLI)
+              ( comments rank|check|comments|verify|history|strip ... )
   status     Read-only report: loop, cycles, ship streak, open PRs, failing CI jobs
               ( status [--json] [--project-root P] )
   ship       Atomic commit + push (native; v11.3.0)

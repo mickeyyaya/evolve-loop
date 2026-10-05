@@ -1,16 +1,21 @@
 {
   "acceptance": [
-    "`evolve ci classify <run-id>` with a fake fetcher prints each failing test with its evidence and label (red: unknown command)",
+    "`evolve ci classify \u003crun-id\u003e` with a fake fetcher prints each failing test with its evidence and label (red: unknown command)",
     "A failing test in a package the diff touches is 'real'; one also red on the base is 'pre-existing'; one green on --rerun and untouched by the diff is 'flake-evidence'",
     "The label rules are one table with a test per row"
   ],
+  "consumed": {
+    "at": "2026-10-05T08:12:26Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-09-30T10:51:14Z",
   "files": [
     "go/cmd/evolve/registry.go",
     "go/cmd/evolve/main.go",
     "go/internal/ciwatch"
   ],
-  "fix": "Add `evolve ci classify <run-id|pr|sha> [--json] [--rerun]`. It fetches the failed jobs and failing test names through ciwatch's fetcher and records deterministic evidence per failing test: whether the change's diff touches its package, whether it is red on the base commit's latest run, whether it recurred in recent main runs, and (with --rerun) whether a rerun of the failed jobs passes. A fixed rule table maps that evidence to one label per test: real, pre-existing, flake-evidence or unknown. Exit 0 when every red is labelled pre-existing or flake-evidence, 1 when any is real or unknown, 2 on gh I/O. Document it in runtime-reference.md and cite it from CLAUDE.md's CI section.",
+  "fix": "Add `evolve ci classify \u003crun-id|pr|sha\u003e [--json] [--rerun]`. It fetches the failed jobs and failing test names through ciwatch's fetcher and records deterministic evidence per failing test: whether the change's diff touches its package, whether it is red on the base commit's latest run, whether it recurred in recent main runs, and (with --rerun) whether a rerun of the failed jobs passes. A fixed rule table maps that evidence to one label per test: real, pre-existing, flake-evidence or unknown. Exit 0 when every red is labelled pre-existing or flake-evidence, 1 when any is real or unknown, 2 on gh I/O. Document it in runtime-reference.md and cite it from CLAUDE.md's CI section.",
   "id": "cli-ci-classify",
   "kind": "feature",
   "priority_class": "stability",

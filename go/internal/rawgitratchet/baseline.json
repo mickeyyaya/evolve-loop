@@ -19,7 +19,6 @@
   "acs/cycle962/predicates_test.go": 1,
   "acs/cycle968/predicates_test.go": 1,
   "acs/cycle969/predicates_test.go": 1,
-  "cmd/commentaudit/main_test.go": 2,
   "cmd/evolve/cmd_branches_test.go": 1,
   "cmd/evolve/cmd_cycle_simulate_git_test.go": 1,
   "cmd/evolve/cmd_loop_boot_recovery_test.go": 1,

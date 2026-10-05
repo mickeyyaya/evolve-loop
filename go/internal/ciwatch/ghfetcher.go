@@ -56,7 +56,7 @@ func latestRequiredRun(ctx context.Context, repoRoot, filter, value string) (Run
 		return RunStatus{Status: "queued"}, nil
 	}
 	r := runs[0]
-	st := RunStatus{Status: r.Status, Conclusion: r.Conclusion, RunURL: r.URL}
+	st := RunStatus{Status: r.Status, Conclusion: r.Conclusion, RunURL: r.URL, RunID: r.DatabaseID}
 	if r.Status == StatusCompleted && r.Conclusion != ConclusionSuccess {
 		st.FailingTest, st.LogExcerpt, st.FailingJobs = failedLogSummary(ctx, repoRoot, r.DatabaseID)
 	}
