@@ -62,7 +62,6 @@ func DefaultClosureRules() []ClosureRule {
 	return []ClosureRule{
 		samePackageTestRule{},
 		cycleArtifactRule{},
-		goBuildMetadataRule{},
 	}
 }
 
@@ -94,28 +93,6 @@ func (cycleArtifactRule) Covers(p string, in Scope) bool {
 	c := fmt.Sprintf("%d", in.Cycle)
 	return strings.HasPrefix(p, "go/acs/cycle"+c+"/") ||
 		strings.HasPrefix(p, ".evolve/runs/cycle-"+c+"/")
-}
-
-type goBuildMetadataRule struct{}
-
-func (goBuildMetadataRule) Name() string { return "go-build-metadata" }
-
-func (goBuildMetadataRule) Covers(p string, in Scope) bool {
-	switch p {
-	case "go/go.mod", "go/go.sum", "go/.apicover-enforce":
-	default:
-		return false
-	}
-	return in.touchesGo()
-}
-
-func (s Scope) touchesGo() bool {
-	for _, d := range s.Declared {
-		if strings.HasSuffix(d, ".go") {
-			return true
-		}
-	}
-	return false
 }
 
 func (s Scope) InScope(p string) bool { return isAtOrUnderAny(p, s.Declared) }
@@ -180,6 +157,9 @@ func Classify(p string, d Declaration, in Scope, rules []ClosureRule) Entry {
 }
 
 func coveredByRule(p string, in Scope, rules []ClosureRule) string {
+	if in.isProtected(p) && !in.InScope(p) {
+		return ""
+	}
 	for _, r := range rules {
 		if r.Covers(p, in) {
 			return r.Name()
@@ -289,6 +269,10 @@ func Account(changed []string, in Scope, rules []ClosureRule, adjudicated []Entr
 			continue
 		}
 		seen[e.Path] = e.Disposition
+		if in.isProtected(e.Path) && !in.InScope(e.Path) && (e.Class != ClassBoundary || e.Disposition != DispositionRefuse) {
+			res.Invalid = append(res.Invalid, fmt.Errorf("scopedelta: %s: a protected operator-owned surface is BOUNDARY whatever the record labels it (got %s/%s) — the class is re-derived from the scope and the only legal decision is REFUSE (ADR-0074)", e.Path, e.Class, e.Disposition))
+			continue
+		}
 		if e.Class == ClassClosure && coveredByRule(e.Path, in, rules) == "" {
 			res.Invalid = append(res.Invalid, fmt.Errorf("scopedelta: %s: declared CLOSURE but no closure rule covers it — closure is computed, never claimed; if the change is genuinely necessary, name the counterfactual instead", e.Path))
 			continue

@@ -1,6 +1,8 @@
 package scopedelta
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -221,5 +223,73 @@ func TestSurfaceOf_TheCommentProofAndTheCommitGateJudgeWhetherReviewRuns(t *test
 		if err := Admissible(loosening); err == nil {
 			t.Errorf("a lane KEEP that loosens %s was admitted on the producer's word", p)
 		}
+	}
+}
+
+func TestSurfaceOf_GateConfigurationIsSignal(t *testing.T) {
+	t.Parallel()
+	for _, p := range gateConfiguration {
+		if got := SurfaceOf(p); got != SurfaceSignal {
+			t.Errorf("SurfaceOf(%q) = %q, want signal — gate configuration judges other packages: an enrollment edit can disable another package's coverage gate", p, got)
+		}
+		droppedEnrollmentLine := Entry{
+			Path: p, Class: ClassDiscovered, Disposition: DispositionKeep, Effect: EffectLoosens,
+			Reason:        "drops another package's enrollment line that was blocking my change",
+			Corroboration: Corroboration{FailsWithout: true, Command: "go test -count=1 ./internal/apicover/"},
+		}
+		if err := Admissible(droppedEnrollmentLine); err == nil {
+			t.Errorf("a KEEP that loosens %s was admitted on the producer's word", p)
+		}
+	}
+}
+
+func outOfScopeLooseningKeeps(n int) []Entry {
+	var out []Entry
+	for i := 0; i < n; i++ {
+		out = append(out, Entry{
+			Path: fmt.Sprintf("go/internal/router/pick%d_test.go", i), Class: ClassDiscovered,
+			Disposition: DispositionKeep, Effect: EffectLoosens, Reason: "the assertion was too strict for my change",
+		})
+	}
+	return out
+}
+
+func mechanicallyEstablishedPadding(n int) []Entry {
+	var out []Entry
+	for i := 0; i < n; i++ {
+		out = append(out,
+			Entry{Path: fmt.Sprintf("go/internal/salvage/extract%d.go", i), Class: ClassInScope,
+				Disposition: DispositionKeep, Reason: "declared in this cycle's scope"},
+			Entry{Path: fmt.Sprintf("go/internal/salvage/extract%d_test.go", i), Class: ClassClosure,
+				Disposition: DispositionKeep, Reason: "necessary closure (same-package-test)"})
+	}
+	return out
+}
+
+func TestGamingSignals_MajoritiesIgnoreSkippedEntries(t *testing.T) {
+	t.Parallel()
+	gamed := outOfScopeLooseningKeeps(3)
+	padded := slices.Concat(mechanicallyEstablishedPadding(2), gamed)
+	got := GamingSignals(padded)
+	joined := strings.Join(got, " | ")
+	for _, want := range []string{"signal", "loosen", "narrative"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("3 of 3 counted entries are uncorroborated loosening keeps on the apparatus, yet no %q signal fired behind %d in-scope/closure entries; got %q",
+				want, len(padded)-len(gamed), joined)
+		}
+	}
+	if strings.Contains(joined, fmt.Sprintf("of %d", len(padded))) {
+		t.Errorf("a signal counted in-scope and closure entries as out-of-scope paths: %q", joined)
+	}
+	if direct := GamingSignals(gamed); len(direct) != len(got) {
+		t.Errorf("padding changed the verdict: %d signals unpadded vs %d padded (%q)", len(direct), len(got), joined)
+	}
+}
+
+func TestGamingSignals_PaddingCannotLiftALoneEntryOverTheFloor(t *testing.T) {
+	t.Parallel()
+	lone := slices.Concat(mechanicallyEstablishedPadding(3), outOfScopeLooseningKeeps(1))
+	if s := GamingSignals(lone); len(s) != 0 {
+		t.Errorf("one counted entry behind %d in-scope/closure entries is below the floor and must raise nothing, got %v", len(lone)-1, s)
 	}
 }

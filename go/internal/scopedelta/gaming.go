@@ -58,7 +58,6 @@ var signalDirs = []string{
 }
 
 var signalFileHints = []string{"_test.go", ".jsonl", "-baseline.json", "predicates_test.go",
-	// Gate configuration is apparatus: an enrollment edit can disable another package's coverage gate.
 	".apicover-enforce", "go.mod", "go.sum"}
 
 func SurfaceOf(p string) Surface {
@@ -105,14 +104,12 @@ func Admissible(e Entry) error {
 
 func GamingSignals(entries []Entry) []string {
 	const minEntriesForMajority = 3
-	if len(entries) < minEntriesForMajority {
-		return nil
-	}
-	var signalPaths, loosening, uncorroboratedKeeps int
+	var counted, signalPaths, loosening, uncorroboratedKeeps int
 	for _, e := range entries {
 		if e.Class.isMechanicallyEstablished() {
 			continue
 		}
+		counted++
 		if SurfaceOf(e.Path) == SurfaceSignal {
 			signalPaths++
 		}
@@ -123,15 +120,18 @@ func GamingSignals(entries []Entry) []string {
 			uncorroboratedKeeps++
 		}
 	}
+	if counted < minEntriesForMajority {
+		return nil
+	}
 	var out []string
-	if isMajority(signalPaths, len(entries)) {
-		out = append(out, fmt.Sprintf("signal-heavy delta: %d of %d out-of-scope paths edit the judging apparatus rather than the code being judged", signalPaths, len(entries)))
+	if isMajority(signalPaths, counted) {
+		out = append(out, fmt.Sprintf("signal-heavy delta: %d of %d out-of-scope paths edit the judging apparatus rather than the code being judged", signalPaths, counted))
 	}
-	if isMajority(loosening, len(entries)) {
-		out = append(out, fmt.Sprintf("loosening pattern: %d of %d changes move the bar DOWN — the direction nobody takes to make their own work harder", loosening, len(entries)))
+	if isMajority(loosening, counted) {
+		out = append(out, fmt.Sprintf("loosening pattern: %d of %d changes move the bar DOWN — the direction nobody takes to make their own work harder", loosening, counted))
 	}
-	if isMajority(uncorroboratedKeeps, len(entries)) {
-		out = append(out, fmt.Sprintf("narrative-only deltas: %d of %d keeps rest on the author's account with nothing outside it", uncorroboratedKeeps, len(entries)))
+	if isMajority(uncorroboratedKeeps, counted) {
+		out = append(out, fmt.Sprintf("narrative-only deltas: %d of %d keeps rest on the author's account with nothing outside it", uncorroboratedKeeps, counted))
 	}
 	return out
 }

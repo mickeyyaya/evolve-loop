@@ -1,6 +1,7 @@
 package scopedelta
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -101,19 +102,109 @@ func TestEntry_Validate_ReasonMustSayMoreThanTheCategory(t *testing.T) {
 	}
 }
 
-func TestDefaultClosureRules_CoverBuildMetadataAChangeMechanicallyRequires(t *testing.T) {
+var gateConfiguration = []string{"go/.apicover-enforce", "go/go.mod", "go/go.sum"}
+
+func TestDefaultClosureRules_GateConfigurationIsNeverClosure(t *testing.T) {
 	t.Parallel()
-	scope := Scope{Cycle: 1450, Declared: []string{"go/internal/scopedelta/scopedelta.go"}}
-	for _, p := range []string{"go/.apicover-enforce", "go/go.sum", "go/go.mod"} {
-		got := Classify(p, Declaration{}, scope, DefaultClosureRules())
-		if got.Class != ClassClosure || got.Disposition != DispositionKeep {
-			t.Errorf("%s classified %s/%s, want closure/keep — carving it lands the change with its own gate unenforced",
-				p, got.Class, got.Disposition)
+	goCycle := Scope{Cycle: 1450, Declared: []string{"go/internal/scopedelta/scopedelta.go"}}
+	docsOnly := Scope{Cycle: 1450, Declared: []string{"docs/architecture/adr/0087-x.md"}}
+	for _, scope := range []Scope{goCycle, docsOnly} {
+		for _, p := range gateConfiguration {
+			got := Classify(p, Declaration{}, scope, DefaultClosureRules())
+			if got.Class == ClassClosure || got.Disposition == DispositionKeep {
+				t.Errorf("%s classified %s/%s with declared %v, want an adjudicated non-closure — closure is exempt from evidence, and an enrollment edit that drops another package's line disables that package's gate",
+					p, got.Class, got.Disposition, scope.Declared)
+			}
 		}
 	}
-	docsOnly := Scope{Cycle: 1450, Declared: []string{"docs/architecture/adr/0087-x.md"}}
-	if got := Classify("go/go.sum", Declaration{}, docsOnly, DefaultClosureRules()); got.Class == ClassClosure {
-		t.Error("build metadata must not be closure of a cycle that touched no Go file")
+}
+
+func TestAccount_GateConfigurationEditNeedsCorroboration(t *testing.T) {
+	t.Parallel()
+	const work = "go/internal/scopedelta/scopedelta.go"
+	scope := Scope{Cycle: 1450, Declared: []string{work}}
+	for _, p := range gateConfiguration {
+		changed := []string{work, p}
+
+		res := Account(changed, scope, DefaultClosureRules(), nil)
+		if res.OK() || !slices.Contains(res.Unaccounted, p) {
+			t.Errorf("an unadjudicated %s edit accounted clean (unaccounted=%v) — it shipped with no decision and no evidence", p, res.Unaccounted)
+		}
+
+		droppedLineAsClosure := Entry{
+			Path: p, Class: ClassClosure, Disposition: DispositionKeep, Effect: EffectLoosens,
+			Reason: "drops the enrollment line of a package this change no longer needs gated",
+		}
+		if res := Account(changed, scope, DefaultClosureRules(), []Entry{droppedLineAsClosure}); res.OK() {
+			t.Errorf("a %s edit that removes another package's line was kept as closure with no corroboration", p)
+		}
+
+		uncorroboratedEnrollment := Entry{
+			Path: p, Class: ClassDiscovered, Disposition: DispositionKeep, Effect: EffectTightens,
+			Reason: "enrolls the package whose coverage gate this change completes",
+		}
+		if res := Account(changed, scope, DefaultClosureRules(), []Entry{uncorroboratedEnrollment}); res.OK() {
+			t.Errorf("a %s keep resting on the author's word alone accounted clean", p)
+		}
+
+		corroboratedEnrollment := uncorroboratedEnrollment
+		corroboratedEnrollment.Corroboration = Corroboration{FailsWithout: true, Command: "go test -count=1 ./internal/apicover/"}
+		if res := Account(changed, scope, DefaultClosureRules(), []Entry{corroboratedEnrollment}); !res.OK() {
+			t.Errorf("a corroborated tightening of %s must account — refusing it strands every new package outside its gate: unaccounted=%v invalid=%v",
+				p, res.Unaccounted, res.Invalid)
+		}
+	}
+}
+
+func TestAccount_ProtectedPathIsBoundaryWhateverTheLabel(t *testing.T) {
+	t.Parallel()
+	const work = "go/internal/salvage/extract.go"
+	protectedSignal := "go/internal/phases/ship/gitops.go"
+	protectedSubject := "go/internal/bridge/manifest.go"
+	scope := Scope{
+		Cycle:      1450,
+		Declared:   []string{work},
+		Protected:  []string{"go/internal/phases/ship", protectedSubject},
+		LaneOthers: []string{"go/internal/phases/ship"},
+	}
+	corroborated := Corroboration{FailsWithout: true, Command: "go test -count=1 ./internal/phases/ship/ -run TestStage"}
+	labels := []Class{ClassDiscovered, ClassOpportunistic, ClassMisunderstood, ClassCrossLane, ""}
+	for _, p := range []string{protectedSignal, protectedSubject} {
+		for _, label := range labels {
+			for _, d := range []Disposition{DispositionKeep, DispositionCarve} {
+				relabelled := Entry{
+					Path: p, Class: label, Disposition: d, Effect: EffectTightens, Corroboration: corroborated,
+					Reason: "the staging bug is real and the fix is one line", PatchRef: ".evolve/carved/cycle-1450/protected.patch",
+				}
+				res := Account([]string{work, p}, scope, DefaultClosureRules(), []Entry{relabelled})
+				if res.OK() {
+					t.Errorf("protected %s labelled %q with disposition %s accounted clean — the producer's label decided a boundary it may only refuse", p, label, d)
+					continue
+				}
+				if !slices.ContainsFunc(res.Invalid, func(err error) bool { return strings.Contains(err.Error(), p) }) {
+					t.Errorf("protected %s labelled %q/%s: Invalid = %v, want an error naming the path", p, label, d, res.Invalid)
+				}
+			}
+		}
+
+		refused := Entry{Path: p, Class: ClassBoundary, Disposition: DispositionRefuse,
+			Reason: "operator-owned surface (ADR-0074); the finding is preserved for console review"}
+		if res := Account([]string{work, p}, scope, DefaultClosureRules(), []Entry{refused}); !res.OK() {
+			t.Errorf("refusing protected %s is the one legal shape: unaccounted=%v invalid=%v", p, res.Unaccounted, res.Invalid)
+		}
+	}
+
+	declaredAndProtected := Scope{Cycle: 1450, Declared: []string{protectedSubject}, Protected: []string{protectedSubject}}
+	licensed := Entry{Path: protectedSubject, Class: ClassInScope, Disposition: DispositionKeep, Reason: "the operator named this manifest edit as the task's deliverable"}
+	if res := Account([]string{protectedSubject}, declaredAndProtected, DefaultClosureRules(), []Entry{licensed}); !res.OK() {
+		t.Errorf("a protected path the cycle's own scope declares is in-scope, as Classify says: unaccounted=%v invalid=%v", res.Unaccounted, res.Invalid)
+	}
+
+	unprotected := "go/internal/router/pick.go"
+	adjacentFix := Entry{Path: unprotected, Class: ClassDiscovered, Disposition: DispositionKeep, Corroboration: corroborated,
+		Reason: "genuine nil-deref on the empty-candidate path"}
+	if res := Account([]string{work, unprotected}, scope, DefaultClosureRules(), []Entry{adjacentFix}); !res.OK() {
+		t.Errorf("a corroborated discovered keep off the protected surface must still account: unaccounted=%v invalid=%v", res.Unaccounted, res.Invalid)
 	}
 }
 
@@ -176,5 +267,25 @@ func TestAccount_ErrorsNameTheOffendingPath(t *testing.T) {
 	}
 	if !(AccountResult{}).OK() {
 		t.Error("the zero AccountResult must read as OK — a cycle with no delta has nothing to block on")
+	}
+}
+
+func TestAccount_ProtectedPathAClosureRuleWouldCoverStillNeedsARefusal(t *testing.T) {
+	t.Parallel()
+	const declared = "go/internal/phases/ship/stage.go"
+	const protectedTest = "go/internal/phases/ship/gitops_test.go"
+	scope := Scope{Cycle: 1450, Declared: []string{declared}, Protected: []string{"go/internal/phases/ship"}}
+	changed := []string{declared, protectedTest}
+
+	if got := Classify(protectedTest, Declaration{}, scope, DefaultClosureRules()); got.Class != ClassBoundary {
+		t.Fatalf("Classify(%s) = %s, want boundary — protection outranks closure", protectedTest, got.Class)
+	}
+	if res := Account(changed, scope, DefaultClosureRules(), nil); !slices.Contains(res.Unaccounted, protectedTest) {
+		t.Errorf("a protected %s omitted from the record accounted clean as closure (unaccounted=%v) — omitting the entry bypassed the boundary a labelled entry is refused for", protectedTest, res.Unaccounted)
+	}
+	refused := Entry{Path: protectedTest, Class: ClassBoundary, Disposition: DispositionRefuse,
+		Reason: "operator-owned ship gate test; the finding is preserved for console review"}
+	if res := Account(changed, scope, DefaultClosureRules(), []Entry{refused}); !res.OK() {
+		t.Errorf("refusing the protected test must account: unaccounted=%v invalid=%v", res.Unaccounted, res.Invalid)
 	}
 }
