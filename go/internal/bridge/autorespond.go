@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -79,24 +80,11 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 	pane = stripAgentDiffLines(pane)
 	suppressedOnce := "" // a fire-once prompt that matched but was already handled
 	for _, p := range prompts {
-		if p.Regex == "" {
-			continue
-		}
-		re, err := regexp.Compile(p.Regex)
-		if err != nil {
-			continue
-		}
-		// Live modals sit at the bottom of the capture, so TailLines means "on screen now".
-		subject := pane
-		if p.TailLines > 0 {
-			subject = lastLines(subject, p.TailLines)
-		}
-		if !re.MatchString(subject) {
+		if !promptMatches(p, pane) {
 			continue
 		}
 		// A busy CLI cannot be blocked on an escalate prompt, so a match is the agent quoting a banner.
-		// Only escalate is gated: menus and approvals legitimately render beside "esc to cancel".
-		if paneBusy && p.Policy == "escalate" {
+		if paneBusy && (p.Policy == "escalate" || p.Policy == "hold") {
 			continue
 		}
 		// A handled fire-once prompt lingers in scrollback: skip it without counting toward the loop
@@ -122,6 +110,8 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 				return "escalate:" + p.Name, 85
 			}
 			return "extend:" + p.ResponseKeys, 2
+		case "hold":
+			return "hold:" + p.Name, 4
 		default: // escalate
 			return "escalate:" + p.Name, 85
 		}
@@ -131,6 +121,21 @@ func decideAutoRespond(pane string, prompts []ManifestPrompt, counts map[string]
 		return "suppress_once:" + suppressedOnce, 0
 	}
 	return "noop", 0
+}
+
+func promptMatches(p ManifestPrompt, pane string) bool {
+	if p.Regex == "" {
+		return false
+	}
+	re, err := regexp.Compile(p.Regex)
+	if err != nil {
+		return false
+	}
+	subject := pane
+	if p.TailLines > 0 {
+		subject = lastLines(subject, p.TailLines)
+	}
+	return re.MatchString(subject)
 }
 
 func allDigits(s string) bool {
@@ -243,16 +248,23 @@ func (ar *autoResponder) tick(ctx context.Context, session string) (string, int)
 	return ar.tickPane(ctx, session, pane, err == nil)
 }
 
-func (ar *autoResponder) bootTick(ctx context.Context, session, capturedPane string) (sentKeys bool, err error) {
+func (ar *autoResponder) bootTick(ctx context.Context, session, capturedPane string) (repoll bool, err error) {
 	action, rc := ar.tickPane(ctx, session, capturedPane, true)
 	switch rc {
-	case 1:
+	case 1, 4:
 		return true, nil
 	case 86:
 		rule := strings.TrimPrefix(action, "loop_guard:")
 		return false, fmt.Errorf("auto-respond loop guard: rule %s matched more than %d times", rule, autoRespondLoopGuardLimit)
 	}
 	return false, nil
+}
+
+func (ar *autoResponder) endBoot() {
+	if ar == nil {
+		return
+	}
+	ar.prompts = slices.DeleteFunc(slices.Clone(ar.prompts), func(p ManifestPrompt) bool { return p.Policy == "hold" })
 }
 
 // transientDwellObservations is the 60s dwell at the wait loop's 2s cadence. Change it together
@@ -388,7 +400,7 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 					"If the agent stalls, the dialog may still be unanswered.\n", name)
 			}
 		}
-		return "", 0
+		return "", rc
 	}
 }
 

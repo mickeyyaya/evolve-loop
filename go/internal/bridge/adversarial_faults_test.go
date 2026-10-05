@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -71,8 +72,12 @@ func adversarialFaultCases() []adversarialFaultCase {
 			out[i].panes = []string{cycle274CodexUpdateMenu, "ready ›"}
 			out[i].assert = func(t *testing.T, tmux *fakeTmux, _ string) {
 				t.Helper()
-				if !tmux.sentContains("2") {
-					t.Fatalf("codex update menu should be dismissed with Skip=2; sent=%v", tmux.sentSeq)
+				beforePaste := tmux.sentSeq
+				if pasteAt := slices.Index(tmux.sentSeq, "paste-buffer"); pasteAt >= 0 {
+					beforePaste = tmux.sentSeq[:pasteAt]
+				}
+				if !slices.Contains(beforePaste, "Down|false") || enterCount(beforePaste) > 0 || slices.Contains(tmux.sentSeq, "2|true") {
+					t.Fatalf("a codex update menu seen with the cursor on Update now gets a Down and no Enter before the prompt; sent=%v", tmux.sentSeq)
 				}
 			}
 		}

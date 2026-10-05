@@ -1,7 +1,6 @@
 package bridge
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -345,16 +344,8 @@ func TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles(t *testing.T) {
 		"driver_claudetmux_test.go",    // the boot-path dialog fixtures
 		"manifests/claude-tmux.json",   // the rules and their notes
 		"../../../docs/incidents/2026-09-01-claude-2252-trust-default-flip.md",
+		"../../../docs/architecture/adr/0118-confirm-a-menu-only-on-the-observed-choice.md",
 		"trust_dialog_verify_test.go",
 	}
-	for _, f := range files {
-		body, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatalf("read %s: %v (this guard is worthless if it cannot read its own sources)", f, err)
-		}
-		a, rc := decideAutoRespond(string(body), trustRules, map[string]int{}, false)
-		if rc != 0 || a != "noop" {
-			t.Fatalf("trust rule fired on rendered tracked file %s: (%q,%d) — the bottom anchor regressed", f, a, rc)
-		}
-	}
+	requireNoRuleFiresAtAnyPaneBottom(t, trustRules, files)
 }

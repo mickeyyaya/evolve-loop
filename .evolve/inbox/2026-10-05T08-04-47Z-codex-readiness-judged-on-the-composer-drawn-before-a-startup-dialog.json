@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A fake codex pane that shows the composer at the first boot capture and mounts the update menu (cursor on Update now) right after it never receives an Enter while the cursor is on Update now (red first on the current code)",
+    "The same pane ends with the prompt delivered once to the composer after the menu is answered on the observed Skip",
+    "An unparsed dialog at the pre-submit capture (a frame no rule answers, such as a codex update menu whose footer the shaped rules do not know, which update_menu_unparsed holds at boot) gets no submit Enter: the delivery holds the prompt and the run ends as a loop-guard or boot-timeout failure instead of confirming the dialog's default (red first)",
+    "A composer with no dialog still boots and delivers with no extra key and no added boot pass"
+  ],
+  "created_at": "2026-10-05T08:10:00Z",
+  "files": [
+    "go/internal/bridge/driver_tmux_boot.go",
+    "go/internal/bridge/driver_tmux_dispatch.go",
+    "go/internal/bridge/paste_settle.go",
+    "go/internal/bridge/driver_tmux_submitverify.go",
+    "docs/architecture/packages/internal-bridge.md"
+  ],
+  "fix": "Close the race at prompt delivery rather than with a timing settle: before the submit Enter, run the auto-responder tick on the delivery's pre-submit capture and require the paste to be visible on the composer's input line (the submit-verify echo check, applied before the Enter instead of after). If a rule matches or the paste is not on the input line, send no Enter: let the rule answer the dialog, re-poll until the composer is back, and re-deliver the prompt once. Alternative if that is too invasive: a codex manifest field for boot settle (readiness only after two consecutive quiet passes showing the composer), as data.",
+  "id": "codex-readiness-judged-on-the-composer-drawn-before-a-startup-dialog",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console lane cl-codexupdate, 2026-10-05: live codex 0.153.4 probes and wave 59b launch logs (runtime/.evolve/runs/cycle-179{1,2,3}/*-launch-error.txt: 'REPL prompt (›) detected' with no dialog handling, then Update now confirmed); docs/incidents/2026-10-05-codex-update-menu.md, Residual risk",
+  "summary": "Live probe on codex 0.153.4 (2026-10-05, tmux 220x80, captures every 0.2 s): codex draws its composer ('› Ask Codex to do anything', whose › is the codex-tmux prompt marker) about 0.2 s after launch, then replaces it with a startup dialog: the update menu at about 2.4 s, the folder-trust dialog for an untrusted directory at about 3.4 s. The codex boot polls every 2 s, so its first capture can see only the composer: no rule fires, the marker is present, the pane process is codex, and bootTmuxREPL declares the REPL ready. The prompt is then pasted into the dialog and the submit Enter confirms the dialog's highlighted choice. This is how 16 of wave 59b's 19 codex launches died (Enter confirmed 'Update now'; exit 81). The update check is now off per launch and worktrees are pre-trusted, so no known dialog takes this path today, but any new codex startup dialog would.",
+  "title": "codex boot readiness is judged on the composer codex draws before a startup dialog mounts, so the prompt's submit Enter can confirm the dialog",
+  "weight": 0.7
+}

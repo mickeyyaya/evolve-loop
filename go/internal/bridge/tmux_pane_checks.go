@@ -30,12 +30,6 @@ func detectorFor(lp tmuxLaunch) panestream.LivenessProbe {
 	return panestream.DetectorFor(paneProfileFor(lp))
 }
 
-func tmuxPaneLooksLikeUpdateMenu(pane string) bool {
-	return strings.Contains(pane, "Update available!") &&
-		strings.Contains(pane, "Update now") &&
-		strings.Contains(pane, "Skip")
-}
-
 // isShellProcess reports whether a pane_current_command value names a known
 // interactive shell. Login shells report with a leading dash ("-zsh").
 func isShellProcess(cmd string) bool {

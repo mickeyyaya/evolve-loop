@@ -46,8 +46,8 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 		// drops to codex's built-in preset. This exact-argv pin is what catches
 		// the realizer dropping a repeated -c flag, so keep it exact rather
 		// than a Contains check.
-		if !reflect.DeepEqual(r.LaunchFlags, []string{"--yolo", "-m", "gpt-5.6-terra", "-c", "model_reasoning_effort=high", "-c", "plan_mode_reasoning_effort=high"}) {
-			t.Fatalf("codex-tmux = %v, want [--yolo -m gpt-5.6-terra -c model_reasoning_effort=high -c plan_mode_reasoning_effort=high] (manifest effort default, 2026-08-15 operator directive; plan-mode override 2026-08-27)", r.LaunchFlags)
+		if !reflect.DeepEqual(r.LaunchFlags, []string{"--yolo", "-c", "check_for_update_on_startup=false", "-m", "gpt-5.6-terra", "-c", "model_reasoning_effort=high", "-c", "plan_mode_reasoning_effort=high"}) {
+			t.Fatalf("codex-tmux = %v, want [--yolo -c check_for_update_on_startup=false -m gpt-5.6-terra -c model_reasoning_effort=high -c plan_mode_reasoning_effort=high] (manifest effort default, 2026-08-15 operator directive; plan-mode override 2026-08-27; update check off, 2026-10-05)", r.LaunchFlags)
 		}
 		if containsToken(r.LaunchFlags, "--dangerously-skip-permissions") {
 			t.Fatalf("codex must NOT emit claude's permission flag; trust is handled by --yolo + auto-responder; got %v", r.LaunchFlags)

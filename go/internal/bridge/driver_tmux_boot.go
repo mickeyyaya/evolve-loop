@@ -22,6 +22,7 @@ func bootTmuxREPL(
 	ar *autoResponder,
 ) (release func(), exitCode int, err error) {
 	if prep.namedExists {
+		ar.endBoot()
 		return func() {}, ExitOK, nil
 	}
 
@@ -37,11 +38,7 @@ func bootTmuxREPL(
 		}
 	}()
 
-	if starter, ok := deps.Tmux.(workdirSessionStarter); ok {
-		if err := starter.NewSessionIn(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight, prep.workingDir); err != nil {
-			return nil, ExitBadFlags, fmt.Errorf("%s new-session: %w", prep.prefix, err)
-		}
-	} else if err := deps.Tmux.NewSession(ctx, lp.session, tmuxPaneWidth, tmuxPaneHeight); err != nil {
+	if err := deps.startSession(ctx, lp.session, prep.workingDir); err != nil {
 		return nil, ExitBadFlags, fmt.Errorf("%s new-session: %w", prep.prefix, err)
 	}
 
@@ -101,21 +98,16 @@ func bootTmuxREPL(
 			continue
 		}
 		if lp.tickDuringBoot {
-			sentKeys, err := ar.bootTick(ctx, lp.session, pane)
+			repoll, err := ar.bootTick(ctx, lp.session, pane)
 			if err != nil {
 				fmt.Fprintf(deps.Stderr, "%s FAIL: %v\n", prep.prefix, err)
 				return nil, ExitREPLBootTimeout, nil
 			}
-			if sentKeys {
+			if repoll {
 				continue
 			}
 		}
 		if !strings.Contains(pane, lp.promptMarker) {
-			continue
-		}
-		if lp.bootMenuSkip != "" && tmuxPaneLooksLikeUpdateMenu(pane) {
-			_ = deps.Tmux.SendKeys(ctx, lp.session, lp.bootMenuSkip, true)
-			fmt.Fprintf(deps.Stderr, "%s boot interstitial dismissed before prompt delivery\n", prep.prefix)
 			continue
 		}
 		if lp.markerOverDeadShell(ctx, deps, prep.prefix) {
@@ -129,12 +121,20 @@ func bootTmuxREPL(
 		fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", prep.prefix, bootDeadlineS)
 		return nil, ExitREPLBootTimeout, nil
 	}
+	ar.endBoot()
 	if deps.OnBoot != nil {
 		deps.OnBoot(bootWaitMS)
 	}
 
 	releaseOnError = false
 	return admitRelease, ExitOK, nil
+}
+
+func (deps Deps) startSession(ctx context.Context, session, workingDir string) error {
+	if starter, ok := deps.Tmux.(workdirSessionStarter); ok {
+		return starter.NewSessionIn(ctx, session, tmuxPaneWidth, tmuxPaneHeight, workingDir)
+	}
+	return deps.Tmux.NewSession(ctx, session, tmuxPaneWidth, tmuxPaneHeight)
 }
 
 func (lp tmuxLaunch) markerOverDeadShell(ctx context.Context, deps Deps, prefix string) bool {
