@@ -55,7 +55,7 @@ func (o WorktreeOptions) finishedCycleTree(cwd string) bool {
 	if !ok {
 		return false
 	}
-	n, ok := leafCycleNumber(leaf)
+	n, ok := LeafCycleNumber(leaf)
 	tree := filepath.Join(o.WorktreeBase, leaf)
 	if !strings.HasPrefix(leaf, "cycle-") || !ok || o.isLive(tree) {
 		return false

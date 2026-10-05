@@ -7,6 +7,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -60,11 +61,16 @@ func runBranchesAudit(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve branches audit: %v\n", err)
 		return 1
 	}
+	isLive := liveLaneRef(projectRoot, time.Now())
 	for _, v := range verdicts {
 		landable, err := core.CarryforwardCandidateLandable(ctx, projectRoot, v.Ref, base)
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve branches audit: landable(%s): %v\n", v.Ref, err)
 			return 1
+		}
+		if isLive(v.Ref) {
+			fmt.Fprintf(stdout, "%s live superseded=false landable=%t\n", v.Ref, landable)
+			continue
 		}
 		fmt.Fprintf(stdout, "%s superseded=%t landable=%t\n", v.Ref, v.Superseded, landable)
 	}
@@ -82,13 +88,16 @@ func runBranchesPrune(args []string, stdout, stderr io.Writer) int {
 	if !dryRun {
 		hasOpenPR = remoteOpenPR(projectRoot)
 	}
-	verdicts, err := core.PruneSupersededOrphans(ctx, projectRoot, base, hasOpenPR)
+	isLive := liveLaneRef(projectRoot, time.Now())
+	verdicts, err := core.PruneSupersededOrphans(ctx, projectRoot, base, keepLive(isLive, hasOpenPR))
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve branches prune: %v\n", err)
 		return 1
 	}
 	for _, v := range verdicts {
 		switch {
+		case isLive(v.Ref) && !v.Pruned:
+			fmt.Fprintf(stdout, "%s live superseded=false kept\n", v.Ref)
 		case !v.Superseded:
 			fmt.Fprintf(stdout, "%s superseded=false kept\n", v.Ref)
 		case v.Pruned:
@@ -106,6 +115,15 @@ func runBranchesPrune(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return 0
+}
+
+func keepLive(isLive func(string) bool, hasOpenPR func(string) (bool, error)) func(string) (bool, error) {
+	return func(ref string) (bool, error) {
+		if isLive(ref) {
+			return true, nil
+		}
+		return hasOpenPR(ref)
+	}
 }
 
 // remoteOpenPR reports no open PR when there is no remote or no gh CLI, since

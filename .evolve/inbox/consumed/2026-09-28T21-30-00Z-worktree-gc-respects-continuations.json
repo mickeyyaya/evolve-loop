@@ -1,0 +1,49 @@
+{
+  "acceptance": [
+    "`evolve worktree cleanup --stale` lists the sealed, unbound cycle worktrees and, with --apply, removes exactly those (red: no such mode)",
+    "A worktree named by a continuation binding, or a lane with a fresh lease, is kept with its reason",
+    "`evolve branches audit` never reports a live lane's branch as superseded"
+  ],
+  "consumed": {
+    "at": "2026-10-05T16:49:23Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "63d60776ae1f1afcdc27240f80278e440837e2d0",
+    "branch": "cycle-cd3ae73e-1797",
+    "cycle": 1797,
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1797/audit-fail-reason.json",
+    "snapshot_sha": "1cc9d9edb9afebee18b040302c8eff993fc4d0bc",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1797"
+  },
+  "created_at": "2026-09-28T21:30:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_worktree.go",
+    "go/cmd/evolve/cmd_branches.go",
+    "go/internal/continuation"
+  ],
+  "fix": "`evolve worktree cleanup --stale` (dry-run by default, `--apply` to act) removes a cycle worktree only when its cycle is sealed (a dossier or terminal outcome exists), no run lease on it is fresh, and no continuation binding or salvage pointer names it or its branch. It then removes the branch once it is superseded. It reports every worktree it kept and why. `evolve branches prune` shares the same live-lane and binding exclusions, and the audit shows a live lane as live, not superseded.",
+  "id": "worktree-gc-respects-continuations",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "released_continuations": [
+    {
+      "base_sha": "63d60776ae1f1afcdc27240f80278e440837e2d0",
+      "branch": "cycle-cd3ae73e-1797",
+      "cycle": 1797,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1797/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-10-05T16:49:23Z",
+      "snapshot_sha": "1cc9d9edb9afebee18b040302c8eff993fc4d0bc",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1797"
+    }
+  ],
+  "route": "lane",
+  "routed_at": "2026-09-30T09:02:14Z",
+  "routed_reason": "operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop",
+  "source": "console, 2026-09-28, legacy worktree and branch cleanup",
+  "summary": "Cleanup found the following on 2026-09-28, at the operator's request to remove legacy worktrees and branches once merged. (1) `evolve worktree cleanup` without --cycle only runs `git worktree prune`, which drops bookkeeping for worktrees whose directories are already gone. (2) `--cycle N` runs `git worktree remove --force` on one worktree with no check for a live run lease, a continuation binding (`evolve continuation list` shows 90) or a salvage pointer. (3) `evolve branches audit` marks the live lanes' branches (no commits yet, so contained in main) as superseded. So removing stale cycle worktrees safely was possible only outside the interface, and the console left all 95 in place.",
+  "title": "Stale cycle worktrees and cycle-* branches have no safe CLI cleanup: 95 worktrees (7.2 GB) and 89 branches accumulate",
+  "weight": 0.6
+}

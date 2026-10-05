@@ -15,7 +15,7 @@ which was operationally correct but illegible to a human eye.
 │                      .evolve state (ledger, inbox, evals, instincts) lives here;
 │                      cycle worktrees spawn under runtime/.evolve/worktrees/
 ├─ dev/                ephemeral task worktrees — created per task, deleted on
-│                      merge (`git worktree add dev/<task> -b <branch> origin/main`)
+│                      merge (`evolve worktree create --dev <task> --branch <b>`)
 ├─ backups/            ref bundles + runs archives
 ├─ go -> console/go            compat shim for pre-migration hook references
 └─ .evolve -> console/.evolve  compat shim (safe to remove once no old sessions)
@@ -33,7 +33,16 @@ which was operationally correct but illegible to a human eye.
 ## Rules
 
 - Dev work: always a fresh worktree under `dev/`, branched from `origin/main`,
-  removed after merge (`git worktree remove`, `git branch -D`).
+  removed after merge. `evolve worktree create --dev <task> --branch <b>
+  --project-root runtime` fetches `origin/main` and adds `dev/<task>` on the new
+  branch `<b>` (no upstream); it exits 1 when `dev/<task>` or branch `<b>`
+  already exists and 2 on a git failure (the fetch included), leaving nothing
+  behind. `evolve worktree cleanup --dev <task> --project-root runtime` removes
+  the tree and deletes its branch only when the tree is clean and its head is
+  in the fetched `origin/main` or `gh` reports a merged PR for the branch whose
+  head commit is the tree's local head (git cannot see a squash merge; a merged
+  PR at any other commit proves nothing about later or reused-name work); a dirty tree or an unmerged branch exits 1 and
+  names the cause, a git failure exits 2, and both keep the tree and branch.
 - Plane sync: merge-only (`git merge origin/main`) — never rebase a plane.
 - Fresh worktree: `make -C go build` before any `evolve` command.
 - Bare-store notes: the store carries the standard refspec

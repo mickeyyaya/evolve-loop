@@ -60,13 +60,20 @@ func runWorktreeCreate(args []string, stdout, stderr io.Writer) int {
 		projectRoot string
 		base        string
 		lane        string
+		devTask     string
+		devBranch   string
 	)
-	fs.IntVar(&cycle, "cycle", 0, "cycle number (required)")
+	fs.IntVar(&cycle, "cycle", 0, "cycle number (required unless --dev)")
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
 	fs.StringVar(&lane, "lane", "", "lane override for the worktree name (default: hash of project root, or EVOLVE_LANE)")
+	fs.StringVar(&devTask, "dev", "", "create the hub dev worktree <hub>/dev/<task> on --branch at the fetched origin/main")
+	fs.StringVar(&devBranch, "branch", "", "new branch for --dev")
 	if err := fs.Parse(args); err != nil {
 		return 10
+	}
+	if devTask != "" || devBranch != "" {
+		return createDevFromFlags(absWorktreeRoot(projectRoot, stderr), devTask, devBranch, cycle, stdout, stderr)
 	}
 	if cycle <= 0 {
 		fmt.Fprintln(stderr, "evolve worktree create: --cycle is required (>0)")
@@ -123,40 +130,69 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 		base        string
 		cycle       int
 		lane        string
+		devTask     string
+		stale       bool
+		apply       bool
 	)
 	fs.StringVar(&projectRoot, "project-root", ".", "absolute path to project root")
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
 	fs.IntVar(&cycle, "cycle", 0, "cycle number to remove (0 = prune all stale)")
 	fs.StringVar(&lane, "lane", "", "lane override; must match the lane used at create (default: hash of project root, or EVOLVE_LANE)")
+	fs.StringVar(&devTask, "dev", "", "remove the hub dev worktree <hub>/dev/<task> and its branch once clean and merged")
+	fs.BoolVar(&stale, "stale", false, "list sealed cycle worktrees no continuation binding or fresh run lease holds (dry-run unless --apply)")
+	fs.BoolVar(&apply, "apply", false, "with --stale: remove the listed worktrees and their merged branches")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
+	if modes := btoi(devTask != "") + btoi(stale) + btoi(cycle > 0); modes > 1 || (apply && !stale) {
+		fmt.Fprintln(stderr, "evolve worktree cleanup: --dev, --stale and --cycle are exclusive; --apply needs --stale")
+		return 10
+	}
 	projectRoot = absWorktreeRoot(projectRoot, stderr)
+	if devTask != "" {
+		return cleanupDevFromFlags(projectRoot, devTask, stdout, stderr)
+	}
 	if base == "" {
 		base = filepath.Join(projectRoot, ".evolve", "worktrees")
 	}
-	if cycle > 0 {
-		// Same runscope projection as create, so cleanup targets the exact dir.
-		wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
-		cmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt)
-		var ebuf bytes.Buffer
-		cmd.Stderr = &ebuf
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(stderr, "evolve worktree cleanup: %v\n%s", err, ebuf.String())
-			return 1
-		}
-		// Also remove leftover dir if git left an empty stub.
-		if err := os.RemoveAll(wt); err != nil && !errIsNotExist(err) {
-			fmt.Fprintf(stderr, "evolve worktree cleanup: rm %s: %v\n", wt, err)
-		}
-		fmt.Fprintln(stdout, wt)
-		return 0
+	switch {
+	case stale:
+		return runWorktreeCleanupStale(projectRoot, base, apply, stdout, stderr)
+	case cycle > 0:
+		return removeCycleWorktree(projectRoot, base, lane, cycle, stdout, stderr)
 	}
+	return pruneWorktrees(projectRoot, stdout, stderr)
+}
+
+func removeCycleWorktree(projectRoot, base, lane string, cycle int, stdout, stderr io.Writer) int {
+	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
+	cmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt)
+	var ebuf bytes.Buffer
+	cmd.Stderr = &ebuf
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(stderr, "evolve worktree cleanup: %v\n%s", err, ebuf.String())
+		return 1
+	}
+	if err := os.RemoveAll(wt); err != nil && !errIsNotExist(err) {
+		fmt.Fprintf(stderr, "evolve worktree cleanup: rm %s: %v\n", wt, err)
+	}
+	fmt.Fprintln(stdout, wt)
+	return 0
+}
+
+func pruneWorktrees(projectRoot string, stdout, stderr io.Writer) int {
 	cmd := exec.Command("git", "-C", projectRoot, "worktree", "prune", "-v")
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
 		fmt.Fprintf(stderr, "evolve worktree cleanup: prune: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func btoi(b bool) int {
+	if b {
 		return 1
 	}
 	return 0

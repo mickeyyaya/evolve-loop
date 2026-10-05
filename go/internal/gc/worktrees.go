@@ -140,10 +140,10 @@ func parseBranchList(s string) []string {
 	return out
 }
 
-// leafCycleNumber extracts the trailing cycle number from a worktree leaf after
+// LeafCycleNumber extracts the trailing cycle number from a worktree leaf after
 // stripping a swarm suffix. cycle-aaa1111-570 -> 570;
 // cycle-legacyB-8-integration -> 8; cycle-legacyC-9-w0 -> 9.
-func leafCycleNumber(leaf string) (int, bool) {
+func LeafCycleNumber(leaf string) (int, bool) {
 	base := swarmSuffixRe.ReplaceAllString(leaf, "")
 	idx := strings.LastIndex(base, "-")
 	if idx < 0 || idx == len(base)-1 {
@@ -194,7 +194,7 @@ func activeWorktreeMatches(jsonPath, wtPath string) bool {
 }
 
 func (o WorktreeOptions) runClosedOut(runDir string) bool {
-	n, ok := leafCycleNumber(runDir)
+	n, ok := LeafCycleNumber(runDir)
 	return ok && strings.HasPrefix(runDir, "cycle-") && dossier.ClosedOut(o.ProjectRoot, n)
 }
 
@@ -215,7 +215,7 @@ func (o WorktreeOptions) isLive(path string) bool {
 			}
 		}
 	}
-	if n, ok := leafCycleNumber(filepath.Base(path)); ok {
+	if n, ok := LeafCycleNumber(filepath.Base(path)); ok {
 		runDir := filepath.Join(o.EvolveDir, "runs", fmt.Sprintf("cycle-%d", n))
 		if l, present, err := runlease.Read(runDir); err == nil && present {
 			if runlease.OwnerLive(l, o.now(), o.LeaseTTL, o.PidAlive) {
@@ -336,7 +336,7 @@ func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) Worktre
 }
 
 func (o WorktreeOptions) finishedFor(path string) (time.Duration, bool) {
-	n, ok := leafCycleNumber(filepath.Base(path))
+	n, ok := LeafCycleNumber(filepath.Base(path))
 	if !ok {
 		return 0, false
 	}
