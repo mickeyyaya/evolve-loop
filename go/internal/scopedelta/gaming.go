@@ -49,6 +49,8 @@ var signalDirs = []string{
 	"go/internal/policy/",
 	"go/internal/config/",
 	"go/internal/guards/",
+	"go/internal/commentaudit/",
+	"go/internal/commitgate/",
 	"go/internal/core/",
 	"go/internal/phases/audit/",
 	"go/internal/phases/ship/",

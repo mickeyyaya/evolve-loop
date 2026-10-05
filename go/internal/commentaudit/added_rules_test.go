@@ -1,6 +1,7 @@
 package commentaudit
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -106,5 +107,40 @@ func TestAddedComments_ALineDirectiveHidesNoLaterComment(t *testing.T) {
 
 	if got := AddedComments(before, after); !slices.Contains(got, "// real comment after") {
 		t.Errorf("AddedComments = %v, want the comment after the //line directive counted", got)
+	}
+}
+
+const archivedPredicate = "docs/private/research/archived-2026-09-29/superseded-predicate-packages/cycle1764/predicates_test.go"
+
+func TestAddedAcrossDiff_ACommentArchivedUnderDocsIsARecordNotCode(t *testing.T) {
+	after := map[string]string{archivedPredicate: "package cycle1764\n\n// Cycle 1764 pins the retry budget.\nfunc TestPredicate() {}\n"}
+
+	for name, r := range map[string]rule{"comments": commentsRule, "check": narrativeRule} {
+		got, err := r.acrossDiff([]string{archivedPredicate}, readerOf(nil), readerOf(after))
+		if err != nil || len(got) != 0 {
+			t.Errorf("%s: acrossDiff = %v, %v; want nothing added: docs/ holds records, never compiled code", name, got, err)
+		}
+	}
+}
+
+func TestAddedAcrossDiff_ACommentBroughtBackFromDocsIntoCodeIsAdded(t *testing.T) {
+	before := map[string]string{archivedPredicate: "package cycle1764\n\n// restates the helper.\nfunc h() {}\n"}
+	after := map[string]string{"go/internal/p/p.go": "package p\n\n// restates the helper.\nfunc h() {}\n"}
+
+	got, err := AddedAcrossDiff([]string{archivedPredicate, "go/internal/p/p.go"}, readerOf(before), readerOf(after))
+
+	if want := []Added{{File: "go/internal/p/p.go", Line: "// restates the helper."}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("AddedAcrossDiff = %v, %v; want %v: a record leaving docs/ for code is a comment added to code", got, err, want)
+	}
+}
+
+func TestAddedAcrossDiff_OnlyTheRootDocsDirectoryIsDocumentation(t *testing.T) {
+	const likeDocs = "go/internal/explanationdocs/x.go"
+	after := map[string]string{likeDocs: "package explanationdocs\n\n// restates the helper.\nfunc h() {}\n"}
+
+	got, err := AddedAcrossDiff([]string{likeDocs}, readerOf(nil), readerOf(after))
+
+	if want := []Added{{File: likeDocs, Line: "// restates the helper."}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("AddedAcrossDiff = %v, %v; want %v: a package whose name ends in docs is code", got, err, want)
 	}
 }

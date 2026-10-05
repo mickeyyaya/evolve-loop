@@ -261,7 +261,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 		}
 		msg = msg + footer
 	}
-	msg += reviewedByTrailer(opts)
+	msg += reviewTrailer(opts)
 
 	if err := runCommitPrefixGate(ctx, opts, msg, opts.ProjectRoot); err != nil {
 		return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,

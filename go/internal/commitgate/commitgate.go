@@ -58,7 +58,7 @@ func (o Options) Run(ctx context.Context) *Result {
 		o.lookPath = lookPathDefault
 	}
 
-	files, code := o.changedFiles(res)
+	files, code := o.changedFiles(ctx, res)
 	if code != ExitPass {
 		res.ExitCode = code
 		return res
@@ -70,13 +70,9 @@ func (o Options) Run(ctx context.Context) *Result {
 	langs := detectLangs(files)
 	res.Langs = langs
 
-	waived, refused := o.reviewWaiver(ctx)
-	switch {
-	case waived != "":
-		res.log("reviewers not required: %s", waived)
-	case !o.reviewersSatisfied(langs, res):
-		res.log("no review waiver: %s", refused)
-		res.ExitCode = ExitFail
+	waiver, code := o.reviewDecision(ctx, langs, res)
+	if code != ExitPass {
+		res.ExitCode = code
 		return res
 	}
 
@@ -98,22 +94,34 @@ func (o Options) Run(ctx context.Context) *Result {
 		}
 	}
 
-	att, code := o.writeAttestation(ctx, res)
+	att, code := o.writeAttestation(ctx, waiver, res)
 	if code != ExitPass {
 		res.ExitCode = code
 		return res
 	}
 	res.Attestation = att
-	res.log("PASS — attestation written (%s)", att.TreeStateSHA)
 	return res
 }
 
-func (o Options) changedFiles(res *Result) ([]string, int) {
+func (o Options) reviewDecision(ctx context.Context, langs []string, res *Result) (waiver string, code int) {
+	waived, refused := o.reviewWaiver(ctx)
+	switch {
+	case waived != "":
+		res.log("reviewers not required: %s", waived)
+		return commentOnlyWaiver, ExitPass
+	case !o.reviewersSatisfied(langs, res):
+		res.log("no review waiver: %s", refused)
+		return "", ExitFail
+	}
+	return "", ExitPass
+}
+
+func (o Options) changedFiles(ctx context.Context, res *Result) ([]string, int) {
 	var raw string
 	if strings.TrimSpace(o.Files) != "" {
 		raw = strings.Join(strings.Fields(o.Files), "\n")
 	} else {
-		out, _, code, err := sysexec.Capture(context.Background(), o.Runner, o.RepoRoot, "git", "diff", "--name-only", "HEAD")
+		out, _, code, err := sysexec.Capture(ctx, o.Runner, o.RepoRoot, "git", "diff", "--name-only", "HEAD")
 		if err != nil || code > 1 {
 			res.log("git diff --name-only HEAD failed")
 			return nil, ExitGitFatal
@@ -215,7 +223,7 @@ func (o Options) ensureTool(tool, install, manual string, res *Result) int {
 	}
 }
 
-func (o Options) writeAttestation(ctx context.Context, res *Result) (*Attestation, int) {
+func (o Options) writeAttestation(ctx context.Context, waiver string, res *Result) (*Attestation, int) {
 	sum, err := treestate.SHA(ctx, o.Runner, o.RepoRoot, o.Env)
 	if err != nil {
 		res.log("cannot compute tree SHA")
@@ -231,12 +239,18 @@ func (o Options) writeAttestation(ctx context.Context, res *Result) (*Attestatio
 		TS:           o.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		ChecksPassed: res.ChecksPassed,
 		ReviewersRun: splitReviewers(o.Reviewers),
+		ReviewWaiver: waiver,
 		Tool:         tool,
 	}
-	if err := atomicwrite.Bytes(o.attestPath(), att.Marshal()); err != nil {
+	body, err := att.Marshal()
+	if err == nil {
+		err = atomicwrite.Bytes(o.attestPath(), body)
+	}
+	if err != nil {
 		res.log("cannot write attestation: %v", err)
 		return nil, ExitGitFatal
 	}
+	res.log("PASS — attestation written (%s)", att.TreeStateSHA)
 	return att, ExitPass
 }
 

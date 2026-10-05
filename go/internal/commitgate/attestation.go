@@ -1,36 +1,55 @@
 package commitgate
 
-import "strings"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 type Attestation struct {
 	TreeStateSHA string   `json:"tree_state_sha"`
 	TS           string   `json:"ts"`
 	ChecksPassed []string `json:"checks_passed"`
 	ReviewersRun []string `json:"reviewers_run"`
+	ReviewWaiver string   `json:"review_waiver,omitempty"`
 	Tool         string   `json:"tool"`
 }
 
-func (a *Attestation) Marshal() []byte {
-	var b strings.Builder
-	b.WriteString("{\n")
-	b.WriteString(`  "tree_state_sha": "` + a.TreeStateSHA + "\",\n")
-	b.WriteString(`  "ts": "` + a.TS + "\",\n")
-	b.WriteString(`  "checks_passed": [` + jsonStringArray(a.ChecksPassed) + "],\n")
-	b.WriteString(`  "reviewers_run": [` + jsonStringArray(a.ReviewersRun) + "],\n")
-	b.WriteString(`  "tool": "` + a.Tool + "\"\n")
-	b.WriteString("}\n")
-	return []byte(b.String())
+type attestationField struct {
+	key   string
+	value any
 }
 
-func jsonStringArray(items []string) string {
-	if len(items) == 0 {
-		return ""
+func (a *Attestation) Marshal() ([]byte, error) {
+	lines := make([]string, 0, 6)
+	for _, f := range a.fields() {
+		value, err := json.Marshal(f.value)
+		if err != nil {
+			return nil, fmt.Errorf("attestation field %s: %w", f.key, err)
+		}
+		lines = append(lines, fmt.Sprintf("  %q: %s", f.key, value))
 	}
-	quoted := make([]string, len(items))
-	for i, it := range items {
-		quoted[i] = `"` + it + `"`
+	return []byte("{\n" + strings.Join(lines, ",\n") + "\n}\n"), nil
+}
+
+func (a *Attestation) fields() []attestationField {
+	fields := []attestationField{
+		{"tree_state_sha", a.TreeStateSHA},
+		{"ts", a.TS},
+		{"checks_passed", orEmpty(a.ChecksPassed)},
+		{"reviewers_run", orEmpty(a.ReviewersRun)},
 	}
-	return strings.Join(quoted, ",")
+	if a.ReviewWaiver != "" {
+		fields = append(fields, attestationField{"review_waiver", a.ReviewWaiver})
+	}
+	return append(fields, attestationField{"tool", a.Tool})
+}
+
+func orEmpty(items []string) []string {
+	if items == nil {
+		return []string{}
+	}
+	return items
 }
 
 func splitReviewers(csv string) []string {
