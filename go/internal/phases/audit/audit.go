@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
@@ -161,14 +162,22 @@ func extractAuditVerdict(content string, stage config.Stage) (string, bool) {
 	return "", false
 }
 
+type acsGateReading struct {
+	redCount        int
+	redIDs          []string
+	phantomBindings []string
+	harnessReds     []string
+	shipEligible    *bool
+}
+
 // readACSVerdict reads the EGPS gate fields from acs-verdict.json. shipEligible
 // is a *bool so the caller can distinguish an absent field from an explicit
 // false. redIDs name the red predicates so the failure-digest fingerprint
 // carries the defect's identity rather than a generic count.
-func readACSVerdict(path string) (redCount int, redIDs, phantomBindings []string, shipEligible *bool, err error) {
+func readACSVerdict(path string) (acsGateReading, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return 0, nil, nil, nil, fmt.Errorf("read: %w", err)
+		return acsGateReading{}, fmt.Errorf("read: %w", err)
 	}
 	var v struct {
 		RedCount     int   `json:"red_count"`
@@ -176,29 +185,34 @@ func readACSVerdict(path string) (redCount int, redIDs, phantomBindings []string
 		Results      []struct {
 			ACID            string   `json:"ac_id"`
 			Result          string   `json:"result"`
+			EvidenceExcerpt string   `json:"evidence_excerpt"`
 			PhantomBindings []string `json:"phantom_bindings"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
-		return 0, nil, nil, nil, fmt.Errorf("parse: %w", err)
+		return acsGateReading{}, fmt.Errorf("parse: %w", err)
 	}
+	g := acsGateReading{redCount: v.RedCount, shipEligible: v.ShipEligible}
 	seen := map[string]bool{}
 	for _, r := range v.Results {
 		if r.Result != "red" {
 			continue
 		}
 		if r.ACID != "" {
-			redIDs = append(redIDs, r.ACID)
+			g.redIDs = append(g.redIDs, r.ACID)
+		}
+		if strings.HasPrefix(r.ACID, acsverdict.SyntheticRedPrefix) {
+			g.harnessReds = append(g.harnessReds, r.ACID+": "+r.EvidenceExcerpt)
 		}
 		// Phantom names are surfaced, deduped, so the gate-block can carry the cure.
 		for _, pb := range r.PhantomBindings {
 			if pb != "" && !seen[pb] {
 				seen[pb] = true
-				phantomBindings = append(phantomBindings, pb)
+				g.phantomBindings = append(g.phantomBindings, pb)
 			}
 		}
 	}
-	return v.RedCount, redIDs, phantomBindings, v.ShipEligible, nil
+	return g, nil
 }
 
 // egpsRedIDCycleTokens strips the cycle-numbered chrome from an ACS ac_id,
@@ -243,6 +257,17 @@ func phantomBindingClause(phantomBindings []string) string {
 	}
 	return fmt.Sprintf("; PHANTOM binding(s) [%s]: the bound test name does not resolve in its target package (renamed or never created) — repoint the predicate's binding to the real test name or restore the name; do NOT delete the predicate",
 		strings.Join(phantomBindings, " "))
+}
+
+func harnessRedClause(harnessReds []string) string {
+	if len(harnessReds) == 0 {
+		return ""
+	}
+	clause := fmt.Sprintf("; %d red(s) are the harness's own: predicates that could not run, first %s", len(harnessReds), harnessReds[0])
+	if len(harnessReds) > 1 {
+		clause += fmt.Sprintf(" (+%d more in acs-verdict.json)", len(harnessReds)-1)
+	}
+	return clause
 }
 
 type Config struct {
@@ -502,19 +527,11 @@ func gofmtCheckDefault(req core.PhaseRequest) ([]string, error) {
 	return codequality.UnformattedGoFiles(codequality.ModuleDir(root))
 }
 
-// generateACSVerdict runs the ACS predicate suite for req.Cycle and writes
-// <workspace>/acs-verdict.json, falling back to the project root when the
-// cycle has no worktree. When the suite discovers zero predicates it writes
-// nothing, so the audit's missing-file FAIL floor holds and a cycle with no
-// predicates cannot auto-pass.
 func generateACSVerdict(req core.PhaseRequest) error {
 	root := req.Worktree
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	// Regression test-impact evidence must run before the zero-predicate early
-	// return: it is about which packages this cycle touched, not about what
-	// the suite found.
 	emitTIADecision(req, root)
 	// Predicate files are discovered under the worktree, but `.evolve/` runtime
 	// data resolves to the main project root: it lives in main, not the
@@ -523,11 +540,6 @@ func generateACSVerdict(req core.PhaseRequest) error {
 	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: req.ProjectRoot, Cycle: req.Cycle})
 	if err != nil {
 		return fmt.Errorf("acssuite run: %w", err)
-	}
-	if v.PredicateSuite.Total == 0 {
-		// Leaves the file absent so the EGPS floor fails the cycle rather than
-		// auto-passing it on an empty suite.
-		return nil
 	}
 	// evolveDir = parent of runs/, i.e. dirname(dirname(workspace)).
 	evolveDir := filepath.Dir(filepath.Dir(req.Workspace))

@@ -272,8 +272,8 @@ func TestRun_EmptyPackageNoTests(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run on empty pkg: %v", err)
 	}
-	if v.Total != 0 {
-		t.Errorf("empty package total=%d, want 0", v.Total)
+	if v.RedCount != 1 || v.RedIDs[0] != "egps/no-predicates" || v.ShipEligible {
+		t.Errorf("empty package: red_count=%d red_ids=%v ship_eligible=%v, want the egps/no-predicates harness red", v.RedCount, v.RedIDs, v.ShipEligible)
 	}
 }
 

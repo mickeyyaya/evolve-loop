@@ -1,6 +1,9 @@
 {
   "acs": {
-    "go_timeout_s": 600
+    "go_timeout_s": 600,
+    "predicate_env": [
+      "EVOLVE_FLAG_CAMPAIGN"
+    ]
   },
   "catalog": {
     "auto_refresh": false,
@@ -20,7 +23,7 @@
   "cli_health": {
     "proactive_probe": true
   },
-  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout, parallel-evaluate rollout, per-phase CLI/model pins, gc retention horizons).",
+  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout and the operator keys forwarded to predicates, parallel-evaluate rollout, per-phase CLI/model pins, gc retention horizons).",
   "disposition": {
     "stage": "enforce"
   },

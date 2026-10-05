@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A scope that runs on an expired context reports the deadline, not only 'produced no execution results' (red today)",
+    "The budget semantics (per scope or shared) are pinned by a test"
+  ],
+  "consumed": {
+    "at": "2026-09-30T17:29:14Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "The Go lane budget is pinned as one deadline shared by every scope (laneBudget, TestRun_TheGoLaneBudgetIsOneDeadlineSharedByEveryScope); a scope that finds it spent is reported 'budget ... was spent before this scope started' and never started, and a scope that failed carries its exec error plus 'expired while this scope ran: context deadline exceeded' (go/internal/acssuite/acssuite.go)."
+  },
+  "created_at": "2026-09-29T16:00:00Z",
+  "files": [
+    "go/internal/acssuite/acssuite.go",
+    "go/internal/acssuite/inventory.go"
+  ],
+  "fix": "Include execErr in the no-results error. Decide the budget explicitly: either a per-scope deadline, or a shared deadline whose exhaustion is reported as such ('the go lane's 600 s budget was spent before scope X ran'), never as a predicate package that produced nothing.",
+  "id": "acssuite-no-results-hides-exec-error",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-09-29, the evolve gc build (feat/gc-releases-unneeded-resources)",
+  "summary": "Cycle 1762's second audit failed with 'acssuite: active predicate scope \"./acs/regression/apicover\" produced no execution results'. runGoTest runs every scope under ONE context whose deadline is gc.acs go_timeout_s (600 s) for all scopes together; under the load above, the cycle's own scope (a -count=50 -race predicate) spent the budget, so the next scope's `go list` died on the expired context. The len(results)==0 branch returns without execErr, so the cause (context deadline exceeded) never reached the report.",
+  "title": "The host predicate run reports 'produced no execution results' and drops the error that explains it",
+  "weight": 0.55
+}

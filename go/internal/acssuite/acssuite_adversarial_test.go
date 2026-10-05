@@ -174,7 +174,7 @@ func TestPredicate(t *testing.T) {}
 
 func TestPredicateEnv_AllBranches(t *testing.T) {
 	t.Run("empty projectRoot and nil pkgs: neither var injected", func(t *testing.T) {
-		env := predicateEnv("", "", nil)
+		env := predicateEnv(predicateExports{})
 		for _, e := range env {
 			if strings.HasPrefix(e, "CHANGED_PACKAGES=") {
 				t.Errorf("nil pkgs must not inject CHANGED_PACKAGES; got %q", e)
@@ -191,7 +191,7 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 		}
 	})
 	t.Run("non-empty projectRoot injects EVOLVE_PROJECT_ROOT", func(t *testing.T) {
-		env := predicateEnv("/the/root", "", nil)
+		env := predicateEnv(predicateExports{stateRoot: "/the/root"})
 		var found bool
 		for _, e := range env {
 			if e == "EVOLVE_PROJECT_ROOT=/the/root" {
@@ -203,7 +203,7 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 		}
 	})
 	t.Run("non-empty worktreeRoot injects EVOLVE_WORKTREE_ROOT (dual-root)", func(t *testing.T) {
-		env := predicateEnv("/main", "/the/worktree", nil)
+		env := predicateEnv(predicateExports{stateRoot: "/main", sourceRoot: "/the/worktree"})
 		var gotProject, gotWorktree bool
 		for _, e := range env {
 			switch e {
@@ -222,7 +222,7 @@ func TestPredicateEnv_AllBranches(t *testing.T) {
 	})
 	t.Run("non-empty changedPkgs injects CHANGED_PACKAGES space-joined", func(t *testing.T) {
 		pkgs := []string{"./internal/core", "./internal/bridge"}
-		env := predicateEnv("/root", "", pkgs)
+		env := predicateEnv(predicateExports{stateRoot: "/root", changedPkgs: pkgs})
 		var found string
 		for _, e := range env {
 			if strings.HasPrefix(e, "CHANGED_PACKAGES=") {

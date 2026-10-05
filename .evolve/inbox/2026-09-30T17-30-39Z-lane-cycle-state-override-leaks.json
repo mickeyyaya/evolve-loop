@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "a pane launched for a lane without an override sees no EVOLVE_CYCLE_STATE_FILE even when the tmux server's environment has one (test through the boot sequence)",
+    "every cycle-state.json spelling outside internal/paths either goes through paths.CycleStateFileFor or through the named per-run helper, with a test pinning the rule"
+  ],
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/internal/bridge/driver_tmux_boot.go",
+    "go/internal/paths/paths.go",
+    "go/internal/inboxmover/inboxmover.go",
+    "go/internal/gc/discover.go",
+    "go/internal/gc/worktrees.go",
+    "go/internal/phases/ship/verify.go",
+    "go/internal/phases/ship/gitops.go",
+    "go/internal/phases/ship/native_explanation_gate.go",
+    "go/cmd/evolve/cmd_syncmain.go"
+  ],
+  "fix": "(b) In the tmux boot, export the pane's own cycle-state override next to EVOLVE_PROJECT_ROOT, or unset it when the launch has none. (c) Audit each spelling: route the live-state reads through paths.CycleStateFileFor, and name the per-run-dir ones through one helper so the two meanings cannot be confused.",
+  "id": "lane-cycle-state-override-leaks",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console lane fix/acssuite-run-and-report, 2026-10-01 (split from acssuite-lane-env-policy)",
+  "summary": "Rest of acssuite-lane-env-policy, items (b) and (c) of the 2026-09-26 architect review. (b) A tmux pane inherits the environment of whichever process started the tmux server, not its own lane, so an evolve command an agent runs against <plane>/.evolve can honour a sibling lane's EVOLVE_CYCLE_STATE_FILE; the bridge exports EVOLVE_PROJECT_ROOT into the pane (internal/bridge/driver_tmux_boot.go:61) but neither exports nor unsets ipcenv.CycleStateFileKey beside it. (c) Direct cycle-state.json spellings bypass paths.CycleStateFileFor in internal/inboxmover/inboxmover.go, internal/gc/discover.go, internal/gc/worktrees.go, internal/phases/ship/verify.go, internal/phases/ship/gitops.go, internal/phases/ship/native_explanation_gate.go and cmd/evolve/cmd_syncmain.go (counts verified 2026-10-01: 2, 5, 1, 3, 3, 1, 1); some are deliberate (a run dir's own runs/cycle-N/cycle-state.json), none is audited.",
+  "title": "A tmux pane can honour a sibling lane's cycle-state override, and seven sites spell cycle-state.json past the resolver",
+  "weight": 0.5
+}

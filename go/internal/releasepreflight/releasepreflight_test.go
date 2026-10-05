@@ -404,23 +404,6 @@ func TestDefaultGateTestSuites_AreGoPackages(t *testing.T) {
 	}
 }
 
-func TestStripBypassEnv(t *testing.T) {
-	in := []string{"PATH=/bin", "EVOLVE_BYPASS_SHIP_GATE=1", "HOME=/h", "EVOLVE_BYPASS_ROLE_GATE=1", "FOO=bar"}
-	got := stripBypassEnv(in)
-	if len(got) != 3 {
-		t.Fatalf("len=%d want 3: %v", len(got), got)
-	}
-	keep := map[string]bool{"PATH=/bin": true, "HOME=/h": true, "FOO=bar": true}
-	for _, kv := range got {
-		if strings.HasPrefix(kv, "EVOLVE_BYPASS_") {
-			t.Errorf("bypass var survived: %s", kv)
-		}
-		if !keep[kv] {
-			t.Errorf("unexpected entry: %s", kv)
-		}
-	}
-}
-
 func TestRun_HeadingVerdictForm(t *testing.T) {
 	r := makeRepo(t, "1.0.0")
 	auditPath := filepath.Join(r, ".evolve", "runs", "cycle-99", "audit-report.md")

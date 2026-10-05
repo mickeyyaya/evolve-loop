@@ -12,6 +12,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 // Verdict is the schema written to acs-verdict.json.
@@ -87,6 +91,33 @@ type testJSONLine struct {
 // Verdict for the given cycle number. Lines without a Test field
 // (package-level events) are ignored. Invalid JSON lines are skipped.
 func ParseTestJSON(r io.Reader, cycle int) (Verdict, error) {
+	preds, order, err := scanPredicates(r)
+	if err != nil {
+		return Verdict{}, err
+	}
+	v := Verdict{SchemaVersion: verdictSchemaVersion, Cycle: cycle}
+	for _, name := range order {
+		v.record(*preds[name])
+	}
+	if v.Total == 0 {
+		v.record(noPredicatesRed())
+	}
+	// Derived once, here, from the counters above — never by a caller, so the
+	// headline and the counts cannot disagree. Same rule as acssuite: a cycle
+	// ships only when nothing is red, and a SKIP is neither red nor green.
+	// A run ships only when nothing failed AND nothing was left unfinished. A
+	// SKIP is a declared non-result and stays neutral; an INCOMPLETE is an
+	// undeclared one and must not be read as consent.
+	v.ShipEligible = v.RedCount == 0 && v.IncompleteCount == 0
+	v.Verdict = "FAIL"
+	if v.ShipEligible {
+		v.Verdict = "PASS"
+	}
+	v.PredicateSuite.Total = v.Total
+	return v, nil
+}
+
+func scanPredicates(r io.Reader) (map[string]*Predicate, []string, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	preds := map[string]*Predicate{}
@@ -124,44 +155,44 @@ func ParseTestJSON(r io.Reader, cycle int) (Verdict, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return Verdict{}, fmt.Errorf("acsrunner scan: %w", err)
+		return nil, nil, fmt.Errorf("acsrunner scan: %w", err)
 	}
-	v := Verdict{SchemaVersion: verdictSchemaVersion, Cycle: cycle}
-	for _, name := range order {
-		p := preds[name]
-		v.Total++
-		switch p.Verdict {
-		case "PASS":
-			v.GreenCount++
-		case "FAIL":
-			v.RedCount++
-			v.RedIDs = append(v.RedIDs, p.Name)
-		case "SKIP":
-			v.SkipCount++
-		default:
-			// Empty verdict = the stream ended before this predicate reported.
-			// The default arm used to fall through to GREEN, so a killed suite
-			// aggregated to red_count=0 and then claimed ship-eligibility
-			// (review BLOCK). Nothing was learned about this predicate; the
-			// honest counter is its own.
-			v.IncompleteCount++
-			v.IncompleteIDs = append(v.IncompleteIDs, p.Name)
+	return preds, order, nil
+}
+
+func (v *Verdict) record(p Predicate) {
+	v.Total++
+	switch p.Verdict {
+	case "PASS":
+		v.GreenCount++
+	case "FAIL":
+		v.RedCount++
+		v.RedIDs = append(v.RedIDs, p.Name)
+	case "SKIP":
+		v.SkipCount++
+	default:
+		// Empty verdict = the stream ended before this predicate reported.
+		// The default arm used to fall through to GREEN, so a killed suite
+		// aggregated to red_count=0 and then claimed ship-eligibility
+		// (review BLOCK). Nothing was learned about this predicate; the
+		// honest counter is its own.
+		v.IncompleteCount++
+		v.IncompleteIDs = append(v.IncompleteIDs, p.Name)
+	}
+	v.Predicates = append(v.Predicates, p)
+}
+
+func noPredicatesRed() Predicate {
+	return Predicate{Name: acsverdict.NoPredicatesID, Verdict: "FAIL", Output: "go test reported no predicate: the package has no test, does not exist, or did not compile"}
+}
+
+func (v Verdict) hasPredicateRed() bool {
+	for _, id := range v.RedIDs {
+		if !strings.HasPrefix(id, acsverdict.SyntheticRedPrefix) {
+			return true
 		}
-		v.Predicates = append(v.Predicates, *p)
 	}
-	// Derived once, here, from the counters above — never by a caller, so the
-	// headline and the counts cannot disagree. Same rule as acssuite: a cycle
-	// ships only when nothing is red, and a SKIP is neither red nor green.
-	// A run ships only when nothing failed AND nothing was left unfinished. A
-	// SKIP is a declared non-result and stays neutral; an INCOMPLETE is an
-	// undeclared one and must not be read as consent.
-	v.ShipEligible = v.RedCount == 0 && v.IncompleteCount == 0
-	v.Verdict = "FAIL"
-	if v.ShipEligible {
-		v.Verdict = "PASS"
-	}
-	v.PredicateSuite.Total = v.Total
-	return v, nil
+	return false
 }
 
 // runCommander is a testable seam over `go test -json` invocation.
@@ -171,6 +202,7 @@ type runCommander func(ctx context.Context, args ...string) (stdout io.ReadClose
 
 var execCommand runCommander = func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd.Env = ipcenv.Scrub(os.Environ())
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -205,7 +237,7 @@ func Run(ctx context.Context, cycle int, pkg string) (Verdict, error) {
 	// `go test` exits non-zero when any test fails — that's the
 	// reportable case, not a runner failure. We propagate the parsed
 	// verdict; the exit error itself is informational.
-	if waitErr != nil && v.RedCount == 0 {
+	if waitErr != nil && !v.hasPredicateRed() {
 		return v, fmt.Errorf("acsrunner go test: %w", waitErr)
 	}
 	return v, nil
@@ -247,11 +279,14 @@ func withWriteHooks(replacement writeHooks, fn func()) {
 // WriteVerdict serializes v to <evolveDir>/runs/cycle-<N>/acs-verdict.json
 // atomically (tmp + rename).
 func WriteVerdict(evolveDir string, v Verdict) (string, error) {
-	dir := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", v.Cycle))
+	dst, err := acsverdict.Path(evolveDir, v.Cycle)
+	if err != nil {
+		return "", fmt.Errorf("verdict path: %w", err)
+	}
+	dir := filepath.Dir(dst)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir verdict dir: %w", err)
 	}
-	dst := filepath.Join(dir, "acs-verdict.json")
 	buf, err := whooks.marshal(v)
 	if err != nil {
 		return "", fmt.Errorf("marshal verdict: %w", err)

@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "an AST test fails when a production go test spawner builds its env any other way than the named projection or ciparity.CIEnv (red on a planted spawner)",
+    "every current production go test spawner passes it, pkg/acsassert included",
+    "the test's package is in repocontract.Packages() or recorded with a reason"
+  ],
+  "created_at": "2026-10-01T00:00:00Z",
+  "files": [
+    "go/internal/ipcenv/scrub.go",
+    "go/internal/acssuite/acssuite.go",
+    "go/internal/acsrunner/runner.go",
+    "go/internal/releasepreflight/releasepreflight.go",
+    "go/internal/core/task_contract.go",
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/core/phase_bindings_selfcheck.go",
+    "go/internal/phases/ship/repocontract.go",
+    "go/pkg/acsassert/go_tests.go",
+    "go/internal/repocontract/repocontract.go"
+  ],
+  "fix": "Name the rule once (for example ipcenv.GoTestEnv(extra ...string) or a goTestCommand factory the spawners share), move every production go test spawner onto it or onto ciparity.CIEnv, and add a whole-tree AST test that finds every exec.Command / exec.CommandContext / sysexec call whose program is go with a test subcommand and requires its env to come from the named projection. The test reads the whole tree, so it joins repocontract.Packages() (ADR-0110).",
+  "id": "go-test-env-projection-pinned",
+  "kind": "hardening",
+  "priority_class": "stability",
+  "source": "console lane fix/acssuite-run-and-report, 2026-10-01 (split from acssuite-lane-env-policy)",
+  "summary": "Rest of acssuite-lane-env-policy (acceptance 2). The console lane fix/acssuite-run-and-report (2026-10-01) moved acssuite's predicate env, acsrunner (evolve acs run) and both releasepreflight go-test runners onto ipcenv.Scrub, the projection core (task_contract, build_floor_reviewer, phase_bindings_selfcheck) and ship (repocontract) already use; ciparitygate and the composed-tree gate use the stricter allowlist ciparity.CIEnv. Nothing pins the rule: a new exec.Command(\"go\", \"test\", ...) or sysexec \"go\" test spawner inherits the lane's EVOLVE_FLEET / cycle-state keys again and false-REDs env-sensitive packages (guards, ship's fleet-off goldens), the 2026-09-14 and cycle-1700 class. pkg/acsassert's GoTests (sysexec.Capture with a nil env) inherits whatever its predicate got, which is now scrubbed by acssuite but not by construction.",
+  "title": "Pin one go-test environment projection across every production go test spawner with an AST test",
+  "weight": 0.6
+}
