@@ -190,3 +190,19 @@ func TestProtectedSurfaceManifest_CoversTheBuildHandoffFloor(t *testing.T) {
 		}
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheFloorsGoTestBudget(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/core/phase_bindings_selfcheck.go",
+		"/wt/go/internal/core/phase_bindings_selfcheck.go",
+		"go/internal/addedtests/budget.go",
+		"/wt/go/internal/addedtests/budget.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q sets the deadline the build floor runs a lane's packages under; a lane must not move the budget of the floor that grades it (inst-L1763b: lane 1763 raised it to survive)", path)
+		}
+	}
+	if IsProtectedSurface("go/internal/addedtests/addedtests.go") {
+		t.Error("only the budget is protected; the added-test grouping in addedtests.go stays cycle territory")
+	}
+}

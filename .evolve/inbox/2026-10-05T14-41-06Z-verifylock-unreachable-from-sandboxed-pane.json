@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "verifylock exports one lock-path helper, and both Acquire and the sandbox grant read the path from it (no second spelling of evolve-verify.lock)",
+    "On darwin, sandboxGitWritePaths grants a linked worktree's pane exactly <common>/evolve-verify.lock beside its existing git grants (red first: today the lock path is absent from the grants)",
+    "A decision, recorded in the PR, on whether the floor's per-package unit runs (realGoUnitTest) take the single-flight too, with a test for whichever is chosen",
+    "A run that cannot take the single-flight records an abnormal event naming the lock path and the error, not only a stderr WARN"
+  ],
+  "created_at": "2026-10-05T15:10:00Z",
+  "files": [
+    "go/internal/verifylock",
+    "go/internal/bridge/sandbox_paths.go",
+    "go/internal/core/phase_bindings_selfcheck.go",
+    "go/internal/core/build_floor_reviewer.go"
+  ],
+  "fix": "Export one lock-path helper from verifylock (the hub path Acquire already resolves) so the lock path has one source, and add that exact file to the darwin write grants in sandboxGitWritePaths. Decide whether realGoUnitTest's per-package runs take the single-flight as the coverage pass and the ACS suite do. Promote 'verification single-flight unavailable' from a stderr WARN to an abnormal event so a lane running unserialized is visible in the run record.",
+  "id": "verifylock-unreachable-from-sandboxed-pane",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, 2026-10-05, architecture review of fix/floor-test-budget-single-source; cycle 1797's retro todo todo-verifylock-unreachable-from-sandboxed-lane-pane",
+  "summary": "The host verification lock lives at <git common dir>/evolve-verify.lock (verifylock.Acquire). sandboxGitWritePaths (go/internal/bridge/sandbox_paths.go:64) grants a linked worktree's pane precise writes into git metadata: <common>/objects, the worktree's index, HEAD and their locks, and its branch refs. It does not grant the lock file. A floor run inside a sandboxed lane pane (the builder's pre-handoff probes, evolve selfcheck build) gets EPERM opening the lock and degrades to unserialized with only a stderr WARN, so concurrent lanes' verification is not single-flight there. Cycle 1797's retro recorded this as todo-verifylock-unreachable-from-sandboxed-lane-pane. Separately, the floor's plain per-package unit check (realGoUnitTest) never takes the lock at all; only the coverage pass and the ACS suite do.",
+  "title": "A sandboxed lane pane can take the host verification lock, and losing single-flight is a recorded event",
+  "weight": 0.6
+}
