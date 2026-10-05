@@ -451,3 +451,12 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // .evolve/profiles — cycles 1676/1679 red on EPERM here): the real tracked
 // profiles are mirrored into a temp git repo and the decoy is planted THERE.
 ```
+
+## cli-routing table L1a (2026-10-05)
+
+### `go/internal/profiles/family_floor_test.go:8` — above `var claudeFamilyFloor = map[string]string{`
+
+```text
+// claudeFamilyFloor lists the phases that must stay off the builder's CLI
+// family, each with its reason. See ADR-0104.
+```

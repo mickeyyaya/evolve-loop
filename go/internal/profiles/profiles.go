@@ -13,10 +13,11 @@ import (
 
 // Profile mirrors the .evolve/profiles/<name>.json schema.
 type Profile struct {
-	Name        string   `json:"name"`
-	Role        string   `json:"role"`
-	CLI         string   `json:"cli"`
-	AllowedCLIs []string `json:"allowed_clis,omitempty"`
+	Name            string   `json:"name"`
+	Role            string   `json:"role"`
+	CLI             string   `json:"cli"`
+	AllowedCLIs     []string `json:"allowed_clis,omitempty"`
+	CrossFamilyWith string   `json:"cross_family_with,omitempty"`
 	// CLIFallback lists registered driver names tried in order when CLI exits
 	// with a CLIFallbackOnExit code.
 	CLIFallback []string `json:"cli_fallback,omitempty"`
