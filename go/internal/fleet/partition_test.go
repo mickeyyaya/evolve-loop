@@ -213,9 +213,8 @@ func TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets(t *te
 }
 
 func TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets(t *testing.T) {
-	// fleet and acsrunner share no import edge in either direction.
 	todos := []Todo{
-		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "a", Files: []string{unrelatedLeafFile}},
 		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
 	}
 	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
@@ -237,7 +236,7 @@ func TestPartitionGraph_UnrelatedPackages_StillSpreadAcrossBuckets(t *testing.T)
 
 func TestPartitionGraph_GlobalZoneFile_ConflictsWithEveryBucket(t *testing.T) {
 	todos := []Todo{
-		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "a", Files: []string{unrelatedLeafFile}},
 		{ID: "b", Files: []string{"go.mod"}},
 	}
 	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
@@ -382,7 +381,7 @@ func TestPartitionGraph_PackageSetFailure_WrapsItsCauseAndReturnsNothing(t *test
 func TestPartitionGraph_GlobalZoneTodoInBucketZero_PullsLaterTodosIntoIt(t *testing.T) {
 	todos := []Todo{
 		{ID: "gz", Files: []string{"go.mod"}},
-		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "a", Files: []string{unrelatedLeafFile}},
 	}
 	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
 	if err != nil {
@@ -393,7 +392,7 @@ func TestPartitionGraph_GlobalZoneTodoInBucketZero_PullsLaterTodosIntoIt(t *test
 
 func TestPartitionGraph_GlobalZoneTodo_ClaimsTheBucketItJoins(t *testing.T) {
 	todos := []Todo{
-		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "a", Files: []string{unrelatedLeafFile}},
 		{ID: "gz", Files: []string{"go.sum"}},
 		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
 	}
@@ -406,9 +405,9 @@ func TestPartitionGraph_GlobalZoneTodo_ClaimsTheBucketItJoins(t *testing.T) {
 
 func TestPartitionGraph_TodoConflictingWithTwoBuckets_IsDeferred(t *testing.T) {
 	todos := []Todo{
-		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "a", Files: []string{unrelatedLeafFile}},
 		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
-		{ID: "both", Files: []string{"internal/acsrunner/runner.go", "internal/fleet/partition.go"}},
+		{ID: "both", Files: []string{unrelatedLeafFile, "internal/fleet/partition.go"}},
 		{ID: "gz", Files: []string{"go.mod"}},
 	}
 	buckets, deferred, err := PartitionGraph(todos, 2, "../..")
@@ -420,7 +419,7 @@ func TestPartitionGraph_TodoConflictingWithTwoBuckets_IsDeferred(t *testing.T) {
 
 func TestPartitionGraph_PackageOwnership_FollowsTheChosenBucket(t *testing.T) {
 	todos := []Todo{
-		{ID: "a", Files: []string{"internal/acsrunner/runner.go"}},
+		{ID: "a", Files: []string{unrelatedLeafFile}},
 		{ID: "b", Files: []string{"internal/fleet/partition.go"}},
 		{ID: "b2", Files: []string{"internal/fleet/packagegraph.go"}},
 	}

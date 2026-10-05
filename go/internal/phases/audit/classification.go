@@ -118,8 +118,8 @@ func (a *auditClassification) prepareEvidence() {
 		}
 	}
 
-	redCount, redIDs, phantomBindings, shipEligible, acsErr := readACSVerdict(verdictPath)
-	a.redCount = redCount
+	reading, acsErr := readACSVerdict(verdictPath)
+	a.redCount = reading.redCount
 	a.acsErr = acsErr
 
 	var blocked bool
@@ -129,11 +129,11 @@ func (a *auditClassification) prepareEvidence() {
 		blocked = true
 		reason = fmt.Sprintf("acs-verdict.json: %s", acsErr.Error())
 		label = "EGPS acs-verdict.json unreadable"
-	case redCount > 0:
+	case reading.redCount > 0:
 		blocked = true
-		reason = egpsRedMessage(redCount, redIDs, phantomBindings)
+		reason = egpsRedMessage(reading.redCount, reading.redIDs, reading.phantomBindings) + harnessRedClause(reading.harnessReds)
 		label = "EGPS red_count>0"
-	case shipEligible != nil && !*shipEligible:
+	case reading.shipEligible != nil && !*reading.shipEligible:
 		blocked = true
 		reason = "EGPS: acs-verdict.json ship_eligible=false — the authoritative acssuite SSOT rejects the ship even though red_count==0; a narrative PASS cannot override it"
 		label = "EGPS ship_eligible=false"

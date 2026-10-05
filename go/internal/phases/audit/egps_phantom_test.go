@@ -36,10 +36,11 @@ func writeVerdictFile(t *testing.T, body string) string {
 }
 
 func TestReadACSVerdict_SurfacesPhantomBindings(t *testing.T) {
-	redCount, redIDs, phantoms, _, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
+	reading, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
+	redCount, redIDs, phantoms := reading.redCount, reading.redIDs, reading.phantomBindings
 	if redCount != 2 || len(redIDs) != 2 {
 		t.Fatalf("red accounting must be unchanged; got count=%d ids=%v", redCount, redIDs)
 	}
@@ -83,10 +84,11 @@ func TestEGPSRedMessage_NoPhantomsIsByteIdentical(t *testing.T) {
 }
 
 func TestReadACSVerdict_AllPhantomRedsStillRed(t *testing.T) {
-	redCount, _, phantoms, shipEligible, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
+	reading, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
+	redCount, phantoms, shipEligible := reading.redCount, reading.phantomBindings, reading.shipEligible
 	if redCount == 0 {
 		t.Fatalf("phantom classification must never zero the red count")
 	}

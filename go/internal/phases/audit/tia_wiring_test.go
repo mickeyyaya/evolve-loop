@@ -4,12 +4,6 @@ package audit
 // runs the EGPS suite — and never call regressiontia directly: a seam whose
 // only caller is a test is dead code, so the shadow decision must be emitted
 // from that path or not at all.
-//
-// Root is a bare temp dir with no go.mod, so acssuite's Go lane is a fast
-// no-op (hasGoACSTree false → zero predicates → generateACSVerdict returns
-// early without writing a verdict). The TIA emission must happen BEFORE that
-// early return: the evidence is about which packages the cycle touched, not
-// about whether the suite found predicates.
 
 import (
 	"encoding/json"

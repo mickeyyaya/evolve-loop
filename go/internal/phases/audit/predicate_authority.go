@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
@@ -82,7 +83,7 @@ func sealPredicateEvidence(req core.PhaseRequest, beforeTree string) error {
 	if beforeTree != afterTree {
 		return fmt.Errorf("worktree changed during host verification; re-run Audit on the restored Build tree")
 	}
-	raw, err := os.ReadFile(filepath.Join(req.Workspace, acssuite.VerdictFilename))
+	raw, err := os.ReadFile(filepath.Join(req.Workspace, acsverdict.Filename))
 	if err != nil {
 		return err
 	}

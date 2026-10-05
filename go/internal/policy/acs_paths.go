@@ -1,9 +1,9 @@
 package policy
 
-// ACSConfig is the "acs" block for the ACS Go lane timeout.
 type ACSConfig struct {
 	// GoTimeoutS overrides the Go lane timeout in seconds; 0 means DefaultTimeout.
-	GoTimeoutS int `json:"go_timeout_s,omitempty"`
+	GoTimeoutS   int      `json:"go_timeout_s,omitempty"`
+	PredicateEnv []string `json:"predicate_env,omitempty"`
 }
 
 // ACSTimeoutConfig returns the acs block; callers must read GoTimeoutS=0 as DefaultTimeout, never a zero timeout.
