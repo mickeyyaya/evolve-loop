@@ -33,11 +33,9 @@ func (a *liveArtifactTmux) PasteBuffer(ctx context.Context, session string) erro
 
 func TestLiveSmokeTest_HealthyWritesArtifact(t *testing.T) {
 	ws := t.TempDir()
-	// Two leading "❯" frames: the auto-responder ticks during boot (tickDuringBoot), so the first boot
-	// iteration reads the pane twice (boot loop + tick) before the marker check breaks.
 	// The extra "working ❯" is the settling tick: the cross-poll stability window (completion.go) completes
 	// the artifact one tick after it first appears, so the pane is captured once more before cleanup.
-	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
+	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
 	tm := &liveArtifactTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact)}
 	rc, pattern, _ := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, liveSmokeDeps(tm))
 	if rc != ExitOK {

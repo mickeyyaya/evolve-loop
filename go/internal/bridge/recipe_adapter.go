@@ -80,10 +80,19 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	bootDeadlineS := defaultIfZero(d.deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 	for elapsed := 0; elapsed < bootDeadlineS; elapsed++ {
 		d.deps.Sleep(time.Second)
-		if d.ar != nil {
-			d.ar.tick(ctx, d.session) // dismiss boot trust modals (codex/agy); no-op otherwise
+		pane, capErr := d.deps.Tmux.CapturePane(ctx, d.session, d.scrollback)
+		if capErr != nil {
+			continue
 		}
-		pane, _ := d.deps.Tmux.CapturePane(ctx, d.session, d.scrollback)
+		if d.ar != nil {
+			sentKeys, err := d.ar.bootTick(ctx, d.session, pane)
+			if err != nil {
+				return fmt.Errorf("REPL boot abandoned: %w", err)
+			}
+			if sentKeys {
+				continue
+			}
+		}
 		if d.marker != "" && strings.Contains(pane, d.marker) {
 			fmt.Fprintf(d.deps.Stderr, "[recipe] REPL prompt (%s) detected\n", d.marker)
 			return nil

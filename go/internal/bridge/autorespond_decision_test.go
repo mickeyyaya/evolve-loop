@@ -302,20 +302,22 @@ func TestAutoRespond_ClaudeTrustDialog_v2252(t *testing.T) {
    Yes, I trust this folder
  Enter to confirm · Esc to cancel`
 	counts := map[string]int{}
-	a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
-	if a != "send:Down,Enter" || rc != 1 {
-		t.Fatalf("2.1.252 trust dialog must answer Down,Enter (select 'Yes, I trust this folder' off the No-default); got (%q,%d)", a, rc)
-	}
-	// Pin the exact sentinel, not just the suppress_once: prefix, so a rule rename fails loudly.
-	for i := 0; i < 8; i++ {
-		a, rc = decideAutoRespond(pane, m.InteractivePrompts, counts, false)
-		if rc != 0 || a != "suppress_once:trust_prompt_no_default" {
-			t.Fatalf("tick %d = (%q,%d), want (suppress_once:trust_prompt_no_default, 0) — trust_prompt_no_default is fire-once; re-firing trips the loop guard and abandons the run", i+2, a, rc)
+	for tick := 1; tick <= autoRespondLoopGuardLimit; tick++ {
+		a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false)
+		if a != "send:Down" || rc != 1 {
+			t.Fatalf("tick %d on the cursor-on-No dialog = (%q,%d), want (send:Down,1): navigation only, repeated until the cursor is seen on Yes", tick, a, rc)
 		}
+	}
+	if a, rc := decideAutoRespond(pane, m.InteractivePrompts, counts, false); a != "loop_guard:trust_prompt_cursor_on_no" || rc != 86 {
+		t.Fatalf("past the budget = (%q,%d), want (loop_guard:trust_prompt_cursor_on_no,86)", a, rc)
+	}
+	cursorOnYes := strings.Replace(strings.Replace(pane, " ❯ No, exit", "   No, exit", 1), "   Yes, I trust", " ❯ Yes, I trust", 1)
+	if a, rc := decideAutoRespond(cursorOnYes, m.InteractivePrompts, map[string]int{}, false); a != "send:Enter" || rc != 1 {
+		t.Fatalf("the cursor-on-Yes dialog = (%q,%d), want (send:Enter,1)", a, rc)
 	}
 	// Older claude builds stay launchable, so the numbered-dialog rule must still win on the old pane.
 	oldPane := "Quick safety check: Is this a project you created or one you trust?\n ❯ 1. Yes, I trust this folder\n   2. No, exit\n Enter to confirm"
-	a, rc = decideAutoRespond(oldPane, m.InteractivePrompts, map[string]int{}, false)
+	a, rc := decideAutoRespond(oldPane, m.InteractivePrompts, map[string]int{}, false)
 	if a != "send:Enter" || rc != 1 {
 		t.Fatalf("the v2.1.193 numbered dialog must keep its Enter response; got (%q,%d)", a, rc)
 	}
@@ -343,6 +345,7 @@ func TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles(t *testing.T) {
 		"driver_claudetmux_test.go",    // the boot-path dialog fixtures
 		"manifests/claude-tmux.json",   // the rules and their notes
 		"../../../docs/incidents/2026-09-01-claude-2252-trust-default-flip.md",
+		"trust_dialog_verify_test.go",
 	}
 	for _, f := range files {
 		body, err := os.ReadFile(f)
