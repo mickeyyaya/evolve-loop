@@ -78,6 +78,9 @@ type Result struct {
 var DefaultGateTestSuites = []string{
 	"./internal/guards/...",
 	"./internal/phases/ship/...",
+	"./internal/profiles/...",
+	"./internal/phasecoherence/...",
+	"./internal/phasespec/...",
 }
 
 var semverRE = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)([+-].*)?$`)

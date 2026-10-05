@@ -1,0 +1,25 @@
+{
+  "connects_to": [
+    ".evolve/release-journal/22.13.0-20260804T005753Z.json",
+    "go/internal/profiles",
+    "go/internal/phasecoherence"
+  ],
+  "consumed": {
+    "at": "2026-10-05T10:52:38Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-08-04T02:10:00Z",
+  "fix": "Add the repo-contract scanner suites (internal/profiles, internal/phasecoherence, internal/phasespec — the tests that validate TRACKED config on disk) to release-preflight's gate-suite list, or run the full suite preflight when the release diff touches .evolve/. Wiring proof: a preflight run against a tree with a deliberately-tracked invalid profile stub must FAIL before tagging.",
+  "id": "release-preflight-repo-contract-suites",
+  "kind": "pipeline-repair",
+  "notes": "The #394 demote-on-failure net worked (v22.13.0 -\u003e prerelease, v22.12.1 stayed Latest). Fix-first precedent: v22.12.0 assetless -\u003e #393/#394.",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: Release-only risk (an assetless, auto-demoted tag) with a CI hard-gate partly covering it and no assetless release since v22.20.0 (560964da). It never affects the loop's waves.",
+  "route": "lane",
+  "routed_at": "2026-09-30T09:02:14Z",
+  "routed_reason": "operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop",
+  "summary": "v22.13.0: preflight PASSed ('all 2 gate-test suites green') while tracked profile stubs violated TestSmoke_RealProfiles + TestRepoPersonaProfilePairing; the breakage surfaced only in release.yml's full suite AFTER the tag was published, costing an assetless demoted release (2nd occurrence of the class after v22.12.0's e2e timeout).",
+  "title": "Release preflight runs only 2 gate-test suites — repo-contract tests (profiles/phasecoherence/phasespec catalog scanners) are unverified until the post-tag suite fails",
+  "weight": 0.62
+}
