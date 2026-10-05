@@ -295,12 +295,18 @@ const (
 	coverStatusPlumbingError
 )
 
+var coverLockWait = verifylock.MaxWait
+
+func coverTestArgs(profile string, pkgs []string) []string {
+	return append([]string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-coverprofile", profile}, pkgs...)
+}
+
 // scopedCoverFunc returns the cover -func path, the test output, and a status that separates test failures from
 // plumbing errors. The per-run -timeout keeps one hung package from wedging the check.
 func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
 	// The coverage run is a full go-test execution, so it takes the host-wide verification single-flight.
 	// A lock failure degrades to unserialized, never to skipped verification.
-	if release, lerr := verifylock.Acquire(ctx, filepath.Dir(moduleDir), os.Stderr); lerr == nil {
+	if release, lerr := verifylock.AcquireWithin(ctx, filepath.Dir(moduleDir), coverLockWait, os.Stderr); lerr == nil {
 		defer release()
 	} else {
 		fmt.Fprintf(os.Stderr, "[build-floor] WARN: verification single-flight unavailable (%v) — running unserialized\n", lerr)
@@ -310,8 +316,7 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 		return "", err.Error(), coverStatusPlumbingError
 	}
 	profile := filepath.Join(tmpDir, "cover.out")
-	args := append([]string{"test", "-count=1", "-timeout", "300s", "-coverprofile", profile}, pkgs...)
-	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd := exec.CommandContext(ctx, "go", coverTestArgs(profile, pkgs)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	if out, err := cmd.CombinedOutput(); err != nil {

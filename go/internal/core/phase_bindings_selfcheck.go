@@ -94,6 +94,10 @@ func runBuildSelfCheck(ctx context.Context, moduleDir string, pkgs []string, run
 	return fails
 }
 
+func unitTestArgs(pkg string) []string {
+	return []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, pkg}
+}
+
 func taggedTestArgs(pkg string, tags []string) []string {
 	return []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", strings.Join(tags, ","), pkg}
 }
@@ -123,7 +127,7 @@ func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, 
 	if _, err := os.Stat(filepath.Join(moduleDir, pkg)); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Sprintf("%s: package directory removed — nothing to unit-test\n", pkg), true
 	}
-	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "-timeout", "120s", pkg)
+	cmd := exec.CommandContext(ctx, "go", unitTestArgs(pkg)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.CombinedOutput()

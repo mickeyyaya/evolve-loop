@@ -111,7 +111,7 @@ func goModulePath(goMod string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		if fields := strings.Fields(sc.Text()); len(fields) == 2 && fields[0] == "module" {

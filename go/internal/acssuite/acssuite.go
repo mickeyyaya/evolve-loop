@@ -30,10 +30,7 @@ const DefaultTimeout = 60 * time.Second
 
 const evidenceMax = 600
 
-// maxLockWait bounds the single-flight queue wait: generous enough for a
-// full sibling suite run, finite so a wedged holder degrades this lane to
-// unserialized instead of deadlocking the fleet.
-const maxLockWait = 15 * time.Minute
+var suiteLockWait = verifylock.MaxWait
 
 // SkipExitCode is the TAP/automake SKIP convention: exit 77 means evidence
 // absent / not-applicable, and is counted neither red nor green.
@@ -215,9 +212,7 @@ func acquireSuiteLock(root string) func() {
 	// serialized, never skipped. A wedged holder degrades this lane to
 	// unserialized (WARN below) rather than deadlock the fleet.
 	// See ADR-0080.
-	lockCtx, lockCancel := context.WithTimeout(context.Background(), maxLockWait)
-	defer lockCancel()
-	release, lockErr := verifylock.Acquire(lockCtx, root, os.Stderr)
+	release, lockErr := verifylock.AcquireWithin(context.Background(), root, suiteLockWait, os.Stderr)
 	if lockErr != nil {
 		fmt.Fprintf(os.Stderr, "[acs] WARN: verification single-flight unavailable (%v) — running unserialized\n", lockErr)
 		return func() {}

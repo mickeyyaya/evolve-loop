@@ -60,3 +60,29 @@ nil` and nothing about what failed.
   a bigger number and leaves every runtime lane paying the tax); exporting
   `core.worktreeAddRetrySleep` (exported mutable test state across a package boundary is a
   worse contract than not sleeping on permanent failures).
+
+## Amendment (2026-10-05) — the floor's deadline is the shared go-test budget
+
+The rejected alternative above, raising the floor's `-timeout 120s`, was right for its
+evidence: cycle 1270's 241 s was 198 s of backoff, a regression the deadline exposed. By
+cycle 1798 the same package took 105–127 s when green, with no regression behind it, and
+the floor killed it on every correction round (cycles 1787, 1791, 1792 and 1798). A deadline
+that a green package crosses on host load alone blames whichever lane touches the package,
+and the lane may not raise it (inst-L1763b).
+
+The floor's untagged self-check and its coverage pass now run under
+`addedtests.PackageTimeout`, the budget its tagged added-test check and ship's repo contract
+already used. A source scan (`TestGoTestTimeouts_AreTheSharedPackageBudget`,
+`internal/guards`) refuses any other `-timeout` value in pipeline code. The slow-package
+alarm this ADR relied on moves to a package wall-time budget check, inbox
+`cmd-evolve-unit-wall-time-and-package-budget-check`.
+
+The deadline a run holds the host verification lock under and the time a lane waits for
+that lock are separate budgets. The hold time is for correctness, so the coverage pass
+holds the lock for up to the 20 m go-test budget, as ship's repo contract does. The wait
+is for fleet fairness: a lane queued behind a hung holder waits at most
+`verifylock.MaxWait` (15 min), then runs unserialized and says so, the bound the ACS
+suite already used (the verification single-flight,
+[change log 2026-07-30 §1](../../operations/change-log-2026-07-30.md)). Record:
+[internal-core.md](../packages/internal-core.md) (build handoff floor) and the CHANGELOG
+entry of 2026-10-05.

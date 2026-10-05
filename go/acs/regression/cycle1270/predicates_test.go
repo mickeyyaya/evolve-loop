@@ -79,8 +79,10 @@ func TestC1270_003_CmdEvolveNoLongerPaysTheRetryLadder(t *testing.T) {
 		t.Errorf("the worktree retry ladder still fires under %s.\n"+
 			"The failure it retries is PERMANENT (`fatal: not a git repository` on a t.TempDir()), "+
 			"so every announcement is 2s+4s of pure sleep bought for nothing — 33 tests x 6s = 198s "+
-			"in a package the build floor runs with -timeout 120s. Classify the failure before "+
-			"sleeping (gitexec/worktree.go:59-70); do NOT raise the floor's timeout to hide it.\n"+
+			"of this package's wall time. The build floor runs every package under addedtests.PackageTimeout, "+
+			"so a slow package spends its wall-time budget instead of tripping a deadline "+
+			"(inbox cmd-evolve-unit-wall-time-and-package-budget-check). Classify the failure before "+
+			"sleeping (gitexec/worktree.go:59-70) rather than paying for it in sleep.\n"+
 			"combined go-test output:\n%s", name, out)
 	}
 }

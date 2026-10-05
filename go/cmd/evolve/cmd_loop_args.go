@@ -245,9 +245,9 @@ func detachChildArgs(args []string, flagEnd int) []string {
 			out = append(out, args[i])
 			continue
 		}
-		switch name, hasValue := flagTokenName(args[i]); {
-		case name == "detach":
-		case name == "log":
+		switch name, hasValue := flagTokenName(args[i]); name {
+		case "detach":
+		case "log":
 			if !hasValue {
 				i++
 			}

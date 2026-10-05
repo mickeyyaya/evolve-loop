@@ -10,17 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifyeval"
 )
 
-// runEval implements `evolve eval <subcommand>`. Subcommands:
-//   - quality-check [-predicates <path>] <eval.md> — Level-0 tautology
-//     detection (single file), plus an advisory authoring-time flaky-shape
-//     lint over the NEW cycle's ACS predicate sources when -predicates names
-//     a predicates_test.go file or go/acs/cycle<N> dir
-//   - diversity-check <evalsDir> — suite-level adversarial-diversity check
-//   - verify <eval.md> <workspace> — independent eval re-execution (Phase 2A port 3)
-//
-// Exit codes from quality-check / diversity-check mirror the bash contract:
-//
-//	0 PASS, 1 WARN, 2 HALT, 10 bad args, 1 internal error.
 func RunEval(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve eval: missing subcommand (quality-check|diversity-check|verify)")
@@ -42,7 +31,7 @@ func RunEval(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 func runEvalQualityCheck(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("eval quality-check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	predicates := fs.String("predicates", "", "NEW cycle's Go ACS predicate source (predicates_test.go file or go/acs/cycle<N> dir); adds the advisory flaky-shape lint (WARN-level, never HALT)")
+	predicates := fs.String("predicates", "", "NEW cycle's Go ACS predicate source (predicates_test.go file or go/acs/cycle<N> dir); adds the advisory flaky-shape and unsatisfiable-predicate lints (WARN-level, never HALT)")
 	rest, ok := parseInterspersed(fs, args)
 	if !ok {
 		return 10
@@ -67,12 +56,9 @@ func runEvalQualityCheck(args []string, stdout, stderr io.Writer) int {
 	// dropped flag this loop already exists to prevent. An empty value now reaches
 	// the lint, which reports it as the error it is.
 	if flagWasSet(fs, "predicates") {
-		// Stage=advisory. The join below is MONOTONIC (max of two severities),
-		// which is the structural pin: an advisory finding can raise PASS→WARN
-		// but can never lower a Level-0 tautology HALT to WARN, no matter how the
-		// surrounding code is later refactored. An `overall == LevelPass` guard
-		// would have been one edit away from that bug.
-		overall = maxEvalLevel(overall, flakyLintAdvisory(*predicates, stdout, stderr))
+		for _, lint := range predicateLints() {
+			overall = maxEvalLevel(overall, lint.advise(*predicates, stdout, stderr))
+		}
 	}
 	switch overall {
 	case evalqualitycheck.LevelPass:
@@ -140,38 +126,51 @@ func maxEvalLevel(a, b evalqualitycheck.Level) evalqualitycheck.Level {
 	return a
 }
 
-// flakyLintAdvisory runs the authoring-time flaky-shape lint over path (the
-// NEW cycle's predicate sources), prints one advisory line per finding annotated
-// with its Luo FSE'14 flakiness class, and returns the severity it contributes
-// (LevelWarn when anything fired, else LevelPass) for the monotonic join.
-//
-// The receipt line is UNCONDITIONAL: "linted 0 file(s)" must be visibly
-// different from "linted 12 file(s), 0 findings", because a path that taught the
-// lint nothing previously printed exactly nothing and read as a clean tree — the
-// same silent-clean class as the dropped -predicates flag this seam already hit.
-//
-// Advisory lines use a `flaky[...]` prefix, deliberately NOT the `L<n>` prefix
-// the tautology classifier uses: an Auditor reading `L1` next to a flaky-shape
-// note would be told the eval is a weak tautology, which is a different (and
-// false) claim.
-//
-// A lint error is a LOUD skip on stderr contributing LevelPass — advisory tooling
-// must never block the eval verdict, but a typo'd path must not pass silently.
-func flakyLintAdvisory(path string, stdout, stderr io.Writer) evalqualitycheck.Level {
-	report, err := evalqualitycheck.LintFlakyPredicates(path)
+type predicateLint struct {
+	name string
+	run  func(path string) (linted int, findings []string, err error)
+}
+
+func predicateLints() []predicateLint {
+	return []predicateLint{
+		{name: "flaky-lint", run: flakyLintFindings},
+		{name: "unsatisfiable-lint", run: unsatisfiableLintFindings},
+	}
+}
+
+func (l predicateLint) advise(path string, stdout, stderr io.Writer) evalqualitycheck.Level {
+	linted, findings, err := l.run(path)
 	if err != nil {
-		fmt.Fprintf(stderr, "evolve eval quality-check: flaky-lint: %v (advisory lint skipped)\n", err)
+		fmt.Fprintf(stderr, "evolve eval quality-check: %s: %v (advisory lint skipped)\n", l.name, err)
 		return evalqualitycheck.LevelPass
 	}
-	for _, f := range report.Findings {
-		fmt.Fprintf(stdout, "  flaky[%s] %s:%s — %s\n", f.Class, f.File, f.Func, f.Reason)
+	for _, f := range findings {
+		fmt.Fprintf(stdout, "  %s\n", f)
 	}
-	fmt.Fprintf(stdout, "[eval quality-check] flaky-lint: linted %d file(s) under %s — %d advisory finding(s) (stage=advisory: raises PASS→WARN, never HALT)\n",
-		report.Linted(), path, len(report.Findings))
-	if len(report.Findings) > 0 {
+	fmt.Fprintf(stdout, "[eval quality-check] %s: linted %d file(s) under %s — %d advisory finding(s) (stage=advisory: raises PASS→WARN, never HALT)\n",
+		l.name, linted, path, len(findings))
+	if len(findings) > 0 {
 		return evalqualitycheck.LevelWarn
 	}
 	return evalqualitycheck.LevelPass
+}
+
+func flakyLintFindings(path string) (int, []string, error) {
+	report, err := evalqualitycheck.LintFlakyPredicates(path)
+	findings := make([]string, 0, len(report.Findings))
+	for _, f := range report.Findings {
+		findings = append(findings, fmt.Sprintf("flaky[%s] %s:%s — %s", f.Class, f.File, f.Func, f.Reason))
+	}
+	return report.Linted(), findings, err
+}
+
+func unsatisfiableLintFindings(path string) (int, []string, error) {
+	report, err := evalqualitycheck.LintUnsatisfiablePredicates(path)
+	findings := make([]string, 0, len(report.Findings))
+	for _, f := range report.Findings {
+		findings = append(findings, fmt.Sprintf("unsatisfiable[%s] %s:%s — %s", f.Kind, f.File, f.Func, f.Reason))
+	}
+	return report.Linted(), findings, err
 }
 
 // runEvalDiversityCheck implements `evolve eval diversity-check <evalsDir> [slug]`.

@@ -61,7 +61,7 @@ func buildFloorBindingFixture(t *testing.T, predicates string) core.ReviewInput 
 	root := t.TempDir()
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-300")
 	wt := filepath.Join(root, "wt")
-	acs := filepath.Join(wt, "go", "acs", "cycle300")
+	acs := cyclePredicateDir(wt, 300)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}

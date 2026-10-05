@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "At enforce, a tdd deliverable whose predicate has an inverted-idiom or go-run-exit-code finding is rejected with the finding and remedy in the reason (red first)",
+    "An absence-message finding and every flaky-shape finding still never block",
+    "At shadow every kind is logged and approved"
+  ],
+  "created_at": "2026-10-05T12:00:00Z",
+  "files": [
+    "go/internal/evalgate/predicatelint.go",
+    "go/internal/evalgate/unsatisfiable.go",
+    "docs/architecture/packages/internal-evalgate.md",
+    "docs/architecture/acs-predicate-quality-gate.md"
+  ],
+  "fix": "Give predicateLintGate a per-finding blocking predicate (a strategy, not a flag): Gate E blocks when any finding's kind is inverted-idiom or go-run-exit-code, under the existing eval_gate stage dial (block only at enforce); absence-message and every Gate D finding stay advisory. Name the remedy in the correction directive.",
+  "id": "unsatisfiable-proof-kinds-block-at-enforce",
+  "kind": "bug",
+  "priority_class": "performance",
+  "source": "console, acs-absence-primitive-and-unsatisfiability-lint landing review",
+  "summary": "The unsatisfiable-predicate lint's inverted-idiom and go-run-exit-code kinds are proofs (red on every tree; an exit code go run cannot return), and the corpus test asserts the committed go/acs corpus holds none. Gate E still returns block=false for every kind, so a cycle's own new unsatisfiable predicate is only logged at the end of tdd and burns the build anyway.",
+  "title": "Gate E blocks the provable unsatisfiable kinds at enforce; absence-message stays advisory",
+  "weight": 0.6
+}

@@ -544,7 +544,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/triage` | 26 | [internal-phases-triage.md](internal-phases-triage.md) |
 | `internal/phasespec` | 60 | [internal-phasespec.md](internal-phasespec.md) |
 | `internal/policy` | 92 | [internal-policy.md](internal-policy.md) |
-| `internal/profiles` | 28 | [internal-profiles.md](internal-profiles.md) |
+| `internal/profiles` | 29 | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | 50 | [internal-prompts.md](internal-prompts.md) |
 | `internal/reachabilityprobe` | 18 | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/recovery` | 39 | [internal-recovery.md](internal-recovery.md) |

@@ -56,7 +56,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/explanationdocs/", Rationale: "Build explanation contract, host snapshots, and deterministic verifier"},
 	{Fragment: "/go/internal/reportdoc/", Rationale: "strict visible-Markdown parser shared by explanation review gates"},
 	{Fragment: "/go/internal/core/build_explanation_handoff.go", Rationale: "orchestrator activation and post-review sealing lifecycle"},
-	{Fragment: "/go/internal/core/build_floor_reviewer.go", Rationale: "mandatory deterministic Build explanation floor"},
+	{Fragment: "/go/internal/core/build_floor_reviewer.go", Rationale: "mandatory deterministic Build explanation floor, and the floor coverage pass's go-test argv (coverTestArgs, under addedtests.PackageTimeout) and its verification-lock wait (coverLockWait = verifylock.MaxWait)"},
 	{Fragment: "/go/internal/core/build_explanation_floor_test.go", Rationale: "composition tripwire proving optional reviewers cannot replace the explanation floor"},
 	{Fragment: "/go/internal/core/reviewer.go", Rationale: "mandatory explanation-review chain composition"},
 	{Fragment: "/go/internal/core/orchestrator.go", Rationale: "fresh-cycle explanation activation and Build-context sealing call sites"},
@@ -147,6 +147,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/.evolve/profiles/auditor.json", Rationale: "Auditor read-only boundary for Builder explanation artifacts"},
 	{Fragment: "/.evolve/build-explanation-contracts/", Rationale: "host-owned activation and Build result snapshots"},
 	{Fragment: "/go/internal/core/build_handoff_floor.go", Rationale: "build handoff floor: mandatory half, names walker, review-input projection (ADR-0117)"},
+	{Fragment: "/go/internal/core/phase_bindings_selfcheck.go", Rationale: "the build floor's go-test runners and their argvs (unit, tagged added-test): a lane must not move the deadline of the floor that grades it (inst-L1763b; cycles 1787/1791/1792/1798 timed out at a 120s literal here)"},
+	{Fragment: "/go/internal/addedtests/budget.go", Rationale: "PackageTimeout, the one go-test deadline the build floor, its coverage pass and ship's repo contract run under: moving it moves the floor's budget"},
 }
 
 // IsProtectedSurface reports whether path is on the control plane. path may be absolute or
