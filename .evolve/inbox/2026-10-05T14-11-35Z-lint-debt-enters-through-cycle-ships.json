@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A cycle ship cannot land a golangci-lint finding in a changed package, or the commit gate no longer fails a commit on findings it did not introduce, pinned by a test (red first)",
+    "The lint rule is the same on the console, cycle and CI paths, and the docs say which"
+  ],
+  "created_at": "2026-10-05T14:11:35Z",
+  "files": [
+    "go/internal/commitgate/lanes.go",
+    "go/internal/phases/ship",
+    "go/internal/core/build_handoff_floor.go",
+    ".github/workflows/go.yml"
+  ],
+  "fix": "Pick one rule for lint and apply it on every path: either CI and the ship floor run golangci-lint over changed packages (so debt cannot land), or the commit gate lints only what the commit introduces (golangci-lint --new-from-rev HEAD) so it judges the commit and not inherited debt. Record the choice in docs/architecture/packages/internal-commitgate.md and the runtime reference.",
+  "id": "lint-debt-enters-through-cycle-ships",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, unsatisfiability-lint landing, 2026-10-05",
+  "summary": "The commit gate runs golangci-lint (only when it is on PATH) over every changed package, while cycle ships (--class cycle) and CI never run it. Cycle commit 71d7334b6 landed three errcheck issues (cmd_ci.go:114, cmd_loop_detach.go:65 and :143) and one staticcheck QF1002 (cmd_loop_args.go:248) in cmd/evolve; the unsatisfiability-lint console landing (2026-10-05) touched one test line in that package and its commit gate failed on the four, which it then fixed. The gate's lint is host-dependent and stricter than CI, and the loop's own path adds the debt it trips on.",
+  "title": "Cycle ships skip golangci-lint, so lint debt lands on main and fails the next console commit that touches the package",
+  "weight": 0.55
+}

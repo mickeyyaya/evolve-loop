@@ -30,18 +30,15 @@ func (o Options) existingFilesWithExt(files []string, ext string) []string {
 }
 
 func (o Options) findUp(rel, marker string) string {
-	d := filepath.Dir(filepath.Join(o.RepoRoot, rel))
-	for d != "" && d != string(filepath.Separator) {
+	root := filepath.Clean(o.RepoRoot)
+	for d := filepath.Dir(filepath.Join(root, rel)); ; d = filepath.Dir(d) {
 		if _, err := os.Stat(filepath.Join(d, marker)); err == nil {
 			return d
 		}
-		parent := filepath.Dir(d)
-		if parent == d {
-			break
+		if d == root || d == filepath.Dir(d) {
+			return ""
 		}
-		d = parent
 	}
-	return ""
 }
 
 func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
@@ -57,34 +54,9 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 		return code
 	}
 
-	type pkgKey struct{ mod, pkg string }
-	keySet := map[pkgKey]bool{}
-	for _, f := range gofiles {
-		mod := o.findUp(f, "go.mod")
-		if mod == "" {
-			res.log("go: no go.mod above %s", f)
-			return ExitFail
-		}
-		fdir := filepath.Dir(filepath.Join(o.RepoRoot, f))
-		rel, err := filepath.Rel(mod, fdir)
-		if err != nil {
-			res.log("go: cannot relativize %s", f)
-			return ExitFail
-		}
-		relPkg := "./" + rel
-		if rel == "." {
-			relPkg = "./."
-		}
-		isACSPredicatePackage := strings.HasPrefix(relPkg, "./acs/")
-		if isACSPredicatePackage {
-			continue
-		}
-		keySet[pkgKey{mod, relPkg}] = true
-	}
-
-	byMod := map[string][]string{}
-	for k := range keySet {
-		byMod[k.mod] = append(byMod[k.mod], k.pkg)
+	byMod, inModule, code := o.goPackagesByModule(gofiles, res)
+	if code != ExitPass || !inModule {
+		return code
 	}
 	mods := make([]string, 0, len(byMod))
 	for m := range byMod {
@@ -118,6 +90,39 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 	}
 	res.pass("go:test")
 	return ExitPass
+}
+
+func (o Options) goPackagesByModule(gofiles []string, res *Result) (map[string][]string, bool, int) {
+	type pkgKey struct{ mod, pkg string }
+	keySet := map[pkgKey]bool{}
+	inModule := false
+	for _, f := range gofiles {
+		mod := o.findUp(f, "go.mod")
+		if mod == "" {
+			res.log("go: %s is outside every Go module: gofmt-checked, not built", f)
+			continue
+		}
+		inModule = true
+		fdir := filepath.Dir(filepath.Join(o.RepoRoot, f))
+		rel, err := filepath.Rel(mod, fdir)
+		if err != nil {
+			res.log("go: cannot relativize %s", f)
+			return nil, true, ExitFail
+		}
+		relPkg := "./" + rel
+		if rel == "." {
+			relPkg = "./."
+		}
+		if strings.HasPrefix(relPkg, "./acs/") {
+			continue
+		}
+		keySet[pkgKey{mod, relPkg}] = true
+	}
+	byMod := map[string][]string{}
+	for k := range keySet {
+		byMod[k.mod] = append(byMod[k.mod], k.pkg)
+	}
+	return byMod, inModule, ExitPass
 }
 
 func (o Options) checkGofmt(ctx context.Context, gofiles []string, res *Result) int {
