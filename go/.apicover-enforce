@@ -673,3 +673,7 @@
 ./internal/inboxstamps
 # acsverdict — the one spelling of the acs-verdict.json name, its path, the harness-red prefix and the no-predicates id, shared by both verdict writers (acssuite, acsrunner).
 ./internal/acsverdict
+# cliroute — the one CLI routing table (policy.json cli_routing) and the resolver every launch path calls; the legacy projection is pinned by testdata/legacy-plans.golden.jsonl.
+./internal/cliroute
+# cliroutetest — the legacy dispatch-plan scenarios and the golden record format the runner generates and cliroute replays.
+./internal/cliroute/cliroutetest

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -134,6 +135,9 @@ func Load(path string) (Policy, error) {
 	if err != nil {
 		return Policy{}, fmt.Errorf("policy: read %s: %w", path, err)
 	}
+	if err := refuseNullCLIRouting(raw); err != nil {
+		return Policy{}, fmt.Errorf("policy: parse %s: %w", path, err)
+	}
 	var p Policy
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return Policy{}, fmt.Errorf("policy: parse %s: %w", path, err)
@@ -188,14 +192,20 @@ func TierRank(s string) int {
 
 // BaseCLI strips driver suffixes ("-tmux", "-p") repeatedly: claude-tmux → claude.
 func BaseCLI(cli string) string {
-	s := strings.TrimSpace(cli)
-	for {
-		next := strings.TrimSuffix(strings.TrimSuffix(s, "-tmux"), "-p")
-		if next == s {
-			return next
-		}
-		s = next
+	return profiles.BaseCLI(cli)
+}
+
+var tierNames = []string{"fast", "balanced", "deep", "top"}
+
+func TierNames() []string {
+	return slices.Clone(tierNames)
+}
+
+func TierName(rank int) string {
+	if rank < 1 || rank > len(tierNames) {
+		return ""
 	}
+	return tierNames[rank-1]
 }
 
 func contains(xs []string, s string) bool {

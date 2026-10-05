@@ -22,3 +22,4 @@
 ./internal/loopchain 100
 ./internal/phases/audit/ciparitygate 100
 ./internal/subagent/subagentrun 100
+./internal/cliroute 100

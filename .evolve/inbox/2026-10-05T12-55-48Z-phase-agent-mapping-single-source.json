@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Every catalog phase resolves to its tracked profile through one function, pinned by a test over the real registry (red first for build, audit and tdd)",
+    "internal/cliroute and phaseinventory read that one function; no second phase to agent table remains"
+  ],
+  "created_at": "2026-10-05T12:55:48Z",
+  "files": [
+    "docs/architecture/phase-registry.json",
+    "go/internal/phasespec",
+    "go/internal/phasecontract",
+    "go/internal/cliroute",
+    "go/internal/phaseinventory"
+  ],
+  "fix": "Make one source own phase to agent: either the registry carries agent for every built-in phase and AgentName() alone answers, or the contracts own it and AgentName() reads them. Then drop the other path (cliroute's phasecontract lookup or the registry fallback) and pin the single source with a test that every catalog phase maps to a tracked profile.",
+  "id": "phase-agent-mapping-single-source",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console, CLI routing table L1a, 2026-10-05",
+  "summary": "PhaseSpec.AgentName() returns evolve-build, evolve-audit and evolve-tdd for the built-in spine because docs/architecture/phase-registry.json leaves agent empty for build, audit and tdd, while the built-in contracts in internal/phasecontract name builder, auditor and tdd-engineer. internal/cliroute (L1a of the CLI routing table, 2026-10-05) had to import phasecontract to map agents.audit to auditor, and phaseinventory displays the evolve-<name> fallback. Two sources for one fact drift.",
+  "title": "A phase's agent has two sources: the registry agent field and the built-in phase contracts",
+  "weight": 0.4
+}

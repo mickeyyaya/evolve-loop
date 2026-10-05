@@ -12,9 +12,6 @@ const exitQuotaExhausted = 85
 // universalTierFloorMin mirrors the router's universalTierFloor Min.
 const universalTierFloorMin = "balanced"
 
-// tierNameByRank inverts policy.TierRank.
-var tierNameByRank = map[int]string{1: "fast", 2: "balanced", 3: "deep", 4: "top"}
-
 // TierChain steps down from resolved one rank at a time to envelopeMin (default "balanced"); an exact model id stays alone.
 func TierChain(resolved, envelopeMin string) []string {
 	chain := []string{resolved}
@@ -27,7 +24,7 @@ func TierChain(resolved, envelopeMin string) []string {
 		floor = policy.TierRank(universalTierFloorMin)
 	}
 	for r := rank - 1; r >= floor; r-- {
-		chain = append(chain, tierNameByRank[r])
+		chain = append(chain, policy.TierName(r))
 	}
 	return chain
 }
@@ -55,9 +52,12 @@ func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err 
 	var err error
 	sawWall := false
 	for i, t := range tiers {
-		tier = t
 		allQuota := true
-		for _, cli = range plan.Candidates {
+		for _, candidate := range plan.Candidates {
+			if !plan.Permits(candidate, t) {
+				continue
+			}
+			cli, tier = candidate, t
 			var exitCode int
 			exitCode, err = launch(cli, tier)
 			attempts = append(attempts, cli+"@"+tier)
@@ -74,8 +74,13 @@ func DispatchTiered(plan Plan, launch func(cli, tier string) (exitCode int, err 
 			break
 		}
 		if onStepDown != nil {
-			onStepDown(tier, tiers[i+1])
+			onStepDown(t, tiers[i+1])
 		}
+	}
+	if len(attempts) == 0 {
+		return TieredDispatchResult{Err: ErrNoPermittedAttempt}
 	}
 	return TieredDispatchResult{CLI: cli, Tier: tier, Attempts: attempts, Err: err, Walled: sawWall}
 }
+
+var ErrNoPermittedAttempt = errors.New("llmroute: the tier ceiling permits no attempt on this chain")
