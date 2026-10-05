@@ -46,7 +46,7 @@ var commands = []subcommand{
 	{Name: "names", Summary: "Guard naming after a rename: names check (scan) | names fix (rewrite dead tokens)", Run: runNames},
 	{Name: "acs", Summary: "Run ACS predicates", Run: runACS},
 	{Name: "apicover", Summary: "Measure public-API coverage (apicover [-cover f] [-require-doc] [-enforce] <pkgdir>...)", Run: runApicover},
-	{Name: "inbox", Summary: "The backlog: inbox batches (the grouping triage consumes) | quarantine | consume | ack-fingerprint | route-console <id> <reason> <cycle>", Run: runInbox},
+	{Name: "inbox", Summary: "The backlog: batches (the grouping triage consumes) | list | show | add | edit | verify | withdraw | route-console | route-lane | consume | quarantine | ack-fingerprint (evolve inbox --help)", Run: runInbox},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: phasecmd.RunPhase},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
 	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.RunServePhase},

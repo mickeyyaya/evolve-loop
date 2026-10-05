@@ -1,9 +1,15 @@
 {
   "acceptance": [
-    "`evolve inbox withdraw <id> <reason>` removes a pending unclaimed item and records a `withdraw` ledger line (red: no such subcommand)",
+    "`evolve inbox withdraw \u003cid\u003e \u003creason\u003e` removes a pending unclaimed item and records a `withdraw` ledger line (red: no such subcommand)",
     "A claimed, routed or consumed item is refused and left untouched (exit 1)",
     "After a withdrawal, `evolve inbox add` files the same id again"
   ],
+  "consumed": {
+    "at": "2026-09-30T18:28:55Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Added evolve inbox withdraw \u003cid\u003e \u003creason\u003e: lifecycle.Mover.Withdraw (go/internal/inboxmover/lifecycle/withdraw.go) deletes a pending, unclaimed item no lifecycle verb has written and no pending item depends on, with a withdraw ledger line, so the id can be filed again (ADR-0116)."
+  },
   "created_at": "2026-09-30T10:51:14Z",
   "deps": [
     "inbox-add-cli"
@@ -12,7 +18,7 @@
     "go/cmd/evolve/cmd_inbox.go",
     "go/internal/inboxmover"
   ],
-  "fix": "Add `evolve inbox withdraw <id> <reason>`: remove a pending, unclaimed root item that no cycle has claimed or routed, append a `withdraw` ledger line with the reason, and refuse a claimed, routed or retired item (exit 1). A withdrawn id may be filed again.",
+  "fix": "Add `evolve inbox withdraw \u003cid\u003e \u003creason\u003e`: remove a pending, unclaimed root item that no cycle has claimed or routed, append a `withdraw` ledger line with the reason, and refuse a claimed, routed or retired item (exit 1). A withdrawn id may be filed again.",
   "id": "cli-inbox-withdraw",
   "kind": "feature",
   "priority_class": "hygiene",

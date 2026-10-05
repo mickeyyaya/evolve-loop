@@ -17,7 +17,7 @@ type inboxItemFingerprintFields struct {
 
 func runInboxAckFingerprint(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 || args[0] == "" {
-		fmt.Fprintln(stderr, "usage: evolve inbox ack-fingerprint <item-path>")
+		fmt.Fprintln(stderr, inboxUsage("ack-fingerprint"))
 		return 10
 	}
 	itemPath := args[0]

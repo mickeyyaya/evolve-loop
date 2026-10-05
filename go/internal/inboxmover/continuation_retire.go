@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // releasedContinuation embeds Continuation so the preserved pointer keeps the one continuation schema.
@@ -65,12 +66,12 @@ func appendReleasedContinuation(path string, c continuation.Continuation, reason
 	}
 	return updateItemJSON(path, func(m map[string]json.RawMessage) {
 		var list []json.RawMessage
-		if raw, ok := m["released_continuations"]; ok {
+		if raw, ok := m[inboxbatch.ReleasedContinuationsField]; ok {
 			_ = json.Unmarshal(raw, &list)
 		}
 		list = append(list, entry)
 		if out, merr := json.Marshal(list); merr == nil {
-			m["released_continuations"] = out
+			m[inboxbatch.ReleasedContinuationsField] = out
 		}
 	})
 }

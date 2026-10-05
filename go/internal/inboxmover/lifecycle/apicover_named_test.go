@@ -40,7 +40,21 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 		_ func(int, int, bool) bool                                         = ShouldQuarantine
 		_ func(string, string) (int, error)                                 = BumpFailureCount
 		_ func(string, func(map[string]json.RawMessage)) error              = UpdateItemJSON
+		_ func(func() (string, error)) Option                               = WithMainHead
+		_ func(*Mover, string, []FieldEdit) (string, error)                 = (*Mover).Edit
+		_ func(*Mover, string, string) (string, error)                      = (*Mover).Withdraw
+		_ func(*Mover, string, string) (string, error)                      = (*Mover).VerifyPremise
+		_ error                                                             = ErrNotWithdrawable
+		_ func(func(string) (bool, error)) Option                           = WithBinding
+		_ func(string) bool                                                 = IsMoverWritten
+		_ string                                                            = RouteField
 	)
+	if ops := []EditOp{EditSet, EditAdd, EditRemove}; ops[0] != "set" || ops[1] != "add" || ops[2] != "remove" {
+		t.Errorf("the edit ops are spelled as the CLI flags: %v", ops)
+	}
+	if edit := (FieldEdit{Op: EditSet, Field: "weight", Value: "0.4"}); edit.Field != "weight" || edit.Value != "0.4" {
+		t.Errorf("a field edit carries its field and value: %+v", edit)
+	}
 	var appender LedgerAppender = &recordingAppender{}
 	if err := appender.AppendLifecycle(context.Background(), ledger.LifecycleRecord{}); err != nil {
 		t.Fatal(err)

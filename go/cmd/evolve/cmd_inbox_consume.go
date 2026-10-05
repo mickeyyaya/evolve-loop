@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
@@ -81,8 +82,6 @@ func reconcileConsumedFingerprints(evolveDir string, stderr io.Writer) {
 		}
 	}
 }
-
-const inboxConsumeUsage = "usage: evolve inbox consume <item-path> [--resolution <text>] [--cycle <n>|console]"
 
 type inboxConsumedStamp struct {
 	At         string `json:"at"`
@@ -152,22 +151,22 @@ func parseInboxConsumeArgs(args []string, stderr io.Writer) (string, inboxConsum
 	resolution := fs.String("resolution", "", "how the item was resolved (recorded as consumed.resolution)")
 	cycle := fs.String("cycle", "console", "cycle that resolved the item (recorded as consumed.cycle)")
 	if err := fs.Parse(args); err != nil {
-		fmt.Fprintln(stderr, inboxConsumeUsage)
+		fmt.Fprintln(stderr, inboxUsage("consume"))
 		return "", inboxConsumedStamp{}, false
 	}
 	rest := fs.Args()
 	if len(rest) < 1 || rest[0] == "" {
-		fmt.Fprintln(stderr, inboxConsumeUsage)
+		fmt.Fprintln(stderr, inboxUsage("consume"))
 		return "", inboxConsumedStamp{}, false
 	}
 	itemPath := rest[0]
 	if err := fs.Parse(rest[1:]); err != nil || fs.NArg() > 0 {
-		fmt.Fprintln(stderr, inboxConsumeUsage)
+		fmt.Fprintln(stderr, inboxUsage("consume"))
 		return "", inboxConsumedStamp{}, false
 	}
 	c := strings.TrimSpace(*cycle)
 	if n, err := strconv.Atoi(c); c != "console" && (err != nil || n < 0) {
-		fmt.Fprintf(stderr, "inbox consume: cycle %q is not a cycle number or \"console\"\n%s\n", *cycle, inboxConsumeUsage)
+		fmt.Fprintf(stderr, "inbox consume: cycle %q is not a cycle number or \"console\"\n%s\n", *cycle, inboxUsage("consume"))
 		return "", inboxConsumedStamp{}, false
 	}
 	return itemPath, inboxConsumedStamp{Via: "console-manual", Cycle: c, Resolution: strings.TrimSpace(*resolution)}, true
@@ -197,7 +196,7 @@ func writeConsumedStamp(path string, doc map[string]json.RawMessage, stamp inbox
 	for k, v := range doc {
 		stamped[k] = v
 	}
-	stamped["consumed"] = b
+	stamped[inboxbatch.ConsumedField] = b
 	return atomicwrite.JSON(path, stamped)
 }
 

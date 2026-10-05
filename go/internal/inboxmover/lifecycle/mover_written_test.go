@@ -5,7 +5,7 @@ import "testing"
 func TestIsMoverWritten_CoversTheRouteAndEveryLifecycleField(t *testing.T) {
 	for key, want := range map[string]bool{
 		RouteField: true, "routed_reason": true, "routed_cycle": true, "failure_count": true, "last_failure_reason": true,
-		"consumed": true, "continuation": true, "retired_at": true,
+		"consumed": true, "continuation": true, "retired_reason": true,
 		"weight": false, "summary": false, "acceptance": false, "id": false,
 	} {
 		if got := IsMoverWritten(key); got != want {
