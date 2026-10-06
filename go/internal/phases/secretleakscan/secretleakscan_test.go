@@ -83,3 +83,36 @@ func TestVerdict(t *testing.T) {
 		t.Errorf("Verdict(one) = %q, want FAIL", got)
 	}
 }
+
+func TestScanDiff_FindingCarriesPostImageFileAndLine(t *testing.T) {
+	key := "+" + "AKIA" + "IOSFODNN7EXAMPLE"
+	cases := []struct {
+		name     string
+		diff     string
+		wantFile string
+		wantLine int
+	}{
+		{"context then added", "+++ b/c.go\n@@ -1,2 +1,3 @@\n a\n" + key + "\n b\n", "c.go", 2},
+		{"count left out", "+++ b/n.go\n@@ -0,0 +1 @@\n" + key + "\n", "n.go", 1},
+		{"removed lines do not advance", "+++ b/m.go\n@@ -10,2 +20,3 @@\n x\n-y\n" + key + "\n", "m.go", 21},
+		{"no-newline marker does not advance", "+++ b/e.go\n@@ -1 +1,2 @@\n a\n\\ No newline at end of file\n" + key + "\n", "e.go", 2},
+		{"spaced path with trailing tab", "+++ b/sp ace.txt\t\n@@ -1,3 +1,4 @@\n 1\n 2\n" + key + "\n", "sp ace.txt", 3},
+		{"quoted path", "+++ \"b/naïve.txt\"\n@@ -0,0 +1 @@\n" + key + "\n", "naïve.txt", 1},
+		{"added lines advance", "+++ b/a.go\n@@ -0,0 +4,2 @@\n+clean\n" + key + "\n", "a.go", 5},
+		{"no hunk header", "+++ b/x\n" + key + "\n", "x", 0},
+		{"no headers", key + "\n", "", 0},
+		{"garbage hunk header", "+++ b/g.go\n@@ garbage @@\n" + key + "\n", "g.go", 0},
+		{"second file restarts", "+++ b/one.go\n@@ -1 +1,2 @@\n keep\n+clean\n+++ b/two.go\n@@ -5,0 +7,1 @@\n" + key + "\n", "two.go", 7},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ScanDiff(tc.diff)
+			if len(got) != 1 || got[0].Rule != "aws-access-key-id" || got[0].Match != key[1:] {
+				t.Fatalf("want one aws-access-key-id finding, got %+v", got)
+			}
+			if got[0].File != tc.wantFile || got[0].Line != tc.wantLine {
+				t.Errorf("location = %q:%d, want %q:%d", got[0].File, got[0].Line, tc.wantFile, tc.wantLine)
+			}
+		})
+	}
+}

@@ -10,7 +10,11 @@
 // the deliverable artifact keep working unchanged.
 package secretleakscan
 
-import "regexp"
+import (
+	"regexp"
+	"strconv"
+	"strings"
+)
 
 // Finding is a single detected secret. Rule names the detector that fired and
 // Match is the offending substring (already narrowed to the credential token,
@@ -18,6 +22,8 @@ import "regexp"
 type Finding struct {
 	Rule  string
 	Match string
+	File  string
+	Line  int
 }
 
 // rule pairs a detector name with its compiled pattern. The set is intentionally
@@ -45,18 +51,66 @@ var rules = []rule{
 // content can leak a secret. The result is deterministic for identical input.
 func ScanDiff(diff string) []Finding {
 	var findings []Finding
+	var loc location
 	for _, line := range splitLines(diff) {
 		if !isAddedLine(line) {
+			loc = loc.advance(line)
 			continue
 		}
 		added := line[1:] // strip the leading '+'
 		for _, r := range rules {
 			if m := r.re.FindString(added); m != "" {
-				findings = append(findings, Finding{Rule: r.name, Match: m})
+				findings = append(findings, Finding{Rule: r.name, Match: m, File: loc.file, Line: loc.next})
 			}
 		}
+		loc = loc.step()
 	}
 	return findings
+}
+
+type location struct {
+	file string
+	next int
+}
+
+func (l location) advance(line string) location {
+	switch {
+	case hasPrefix(line, "+++"):
+		return location{file: headerPath(line)}
+	case hasPrefix(line, "@@"):
+		return location{file: l.file, next: hunkNewStart(line)}
+	case hasPrefix(line, " "):
+		return l.step()
+	}
+	return l
+}
+
+func (l location) step() location {
+	if l.next > 0 {
+		l.next++
+	}
+	return l
+}
+
+func headerPath(line string) string {
+	path, _, _ := strings.Cut(strings.TrimPrefix(line, "+++ "), "\t")
+	if len(path) >= 2 && path[0] == '"' && path[len(path)-1] == '"' {
+		path = path[1 : len(path)-1]
+	}
+	return strings.TrimPrefix(path, "b/")
+}
+
+func hunkNewStart(line string) int {
+	fields := strings.Fields(line)
+	if len(fields) < 3 || !hasPrefix(fields[2], "+") {
+		return 0
+	}
+	start, _, _ := strings.Cut(fields[2][1:], ",")
+	n, err := strconv.Atoi(start)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 // Verdict maps a finding set to the canonical phase verdict vocabulary:

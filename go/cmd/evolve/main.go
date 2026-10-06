@@ -69,6 +69,8 @@ Commands:
               ( status [--json] [--project-root P] )
   ship       Atomic commit + push (native; v11.3.0)
               ( ship [--class cycle|manual|release|trivial] [--dry-run] "<msg>" )
+  scan       Scan the staged diff or a ref range for secrets, masked; exit 0 clean, 1 finding, 2 git error
+              ( scan secrets [--staged | --diff <ref>] [--project-root P] )
   bridge     Native-Go multi-CLI agent bridge
               ( bridge launch --cli=NAME ... | bridge probe | bridge version )
 
