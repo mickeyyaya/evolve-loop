@@ -73,12 +73,12 @@ func TestAuditRepairReasonPrefix_IsSingleSourced(t *testing.T) {
 }
 
 func TestResumePath_ReachesTheAuditFailDisposition(t *testing.T) {
-	st := &fakeStorage{state: State{LastCycleNumber: 0}}
+	root := t.TempDir()
+	st := &fakeStorage{state: State{LastCycleNumber: 0}, cycleState: CycleState{CycleID: 1577, WorkspacePath: t.TempDir()}}
 	led := &fakeLedger{}
 	runners := buildRunners(map[Phase]string{PhaseAudit: VerdictFAIL, PhaseRetro: VerdictFAIL})
 	runners[PhaseAudit] = &classDeclaringAuditRunner{t: t}
 	o := NewOrchestrator(st, led, runners)
-	root := t.TempDir()
 
 	res, err := o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: root},
 		&ResumePoint{Phase: string(PhaseAudit), CycleID: 1577})

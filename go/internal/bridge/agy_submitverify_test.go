@@ -19,7 +19,7 @@ func agySubmitVerifyDeps(frames ...string) (Deps, *FakeTmuxController, *bytes.Bu
 }
 
 func agyLaunchForTest() tmuxLaunch {
-	return agyTmuxLaunch(&Config{}, Deps{}, "evolve-bridge-agy-c1-router-pid1-n1-1", false)
+	return agyTmuxLaunch("agy-tmux", &Config{}, Deps{}, "evolve-bridge-agy-c1-router-pid1-n1-1", false)
 }
 
 func bareEnters(sent []string) int {

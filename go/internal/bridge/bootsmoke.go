@@ -56,7 +56,7 @@ func smokeLaunchConfig(cfg *Config, driverName string) *Config {
 	cfg.CLI = driverName
 	cfg.AllowBypass = true
 	if reflect.ValueOf(cfg.Realization).IsZero() {
-		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass"})
+		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass", ModelTier: cfg.Model})
 	}
 	return cfg
 }

@@ -3,11 +3,12 @@ package phasespec
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repostate"
 )
 
@@ -86,34 +87,27 @@ func trackedRepoProfileNames(t *testing.T, projectRoot string) map[string]bool {
 	return set
 }
 
+func writePhaseSpec(t *testing.T, root, dir string, spec []byte) {
+	t.Helper()
+	p := filepath.Join(root, ".evolve", "phases", dir)
+	if err := os.MkdirAll(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(p, userSpecFile), spec, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestTrackedPhaseDirs_FixtureRepo(t *testing.T) {
-	root := t.TempDir()
-	git := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	git("init", "-q")
-	writePhase := func(dir string) {
-		t.Helper()
-		p := filepath.Join(root, ".evolve", "phases", dir)
-		if err := os.MkdirAll(p, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(p, userSpecFile), []byte(`{"name":"`+dir+`"}`), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	writePhase("alpha")
-	git("add", ".evolve/phases/alpha/phase.json")
-	writePhase("zz-mint") // never added: the runtime-mint shape
-	if err := os.MkdirAll(filepath.Join(root, ".evolve", "phases", "no-spec"), 0o755); err != nil {
+	repo := gittest.Fixture(t)
+	writePhaseSpec(t, repo.Dir, "alpha", []byte(`{"name":"alpha"}`))
+	repo.Git("add", ".evolve/phases/alpha/phase.json")
+	writePhaseSpec(t, repo.Dir, "zz-mint", []byte(`{"name":"zz-mint"}`))
+	if err := os.MkdirAll(filepath.Join(repo.Dir, ".evolve", "phases", "no-spec"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	set := TrackedPhaseDirs(t, root)
+	set := TrackedPhaseDirs(t, repo.Dir)
 	if set == nil {
 		t.Fatal("TrackedPhaseDirs = nil on a healthy fixture repo — filter must be active")
 	}
@@ -132,35 +126,30 @@ func TestTrackedPhaseDirs_FixtureRepo(t *testing.T) {
 	}
 }
 
-func TestTrackedPhaseDirs_RealTreeExcludesUntrackedDecoy(t *testing.T) {
-	root := repoRoot()
-	if TrackedPhaseDirs(t, root) == nil {
+func TestTrackedPhaseDirs_RealTrackedSetExcludesAnUntrackedDecoyWithoutTouchingTheRealTree(t *testing.T) {
+	real := TrackedPhaseDirs(t, repoRoot())
+	if real == nil {
 		t.Skip("no usable git context — filter disabled (bind-all fallback), nothing to prove")
 	}
-	const decoy = "zz-decoy-phasespec-funnel"
-	dir := filepath.Join(root, ".evolve", "phases", decoy)
-	if _, err := os.Stat(dir); err == nil {
-		t.Fatalf("%s already exists — refusing to clobber", dir)
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.RemoveAll(dir) })
-	if err := os.WriteFile(filepath.Join(dir, userSpecFile), []byte(`{"name":"`+decoy+`"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	set := TrackedPhaseDirs(t, root)
-	if set == nil {
-		t.Fatal("filter went dark after planting a decoy — must stay active")
-	}
-	if len(set) == 0 {
+	if len(real) == 0 {
 		t.Fatal("tracked phase set empty on the real tree")
 	}
-	if set[decoy] {
-		t.Fatalf("untracked decoy dir %q bound by TrackedPhaseDirs — the cd49274beab2 false-RED class is re-armed", decoy)
+	repo := gittest.Fixture(t)
+	for dir := range real {
+		spec, err := os.ReadFile(filepath.Join(repoRoot(), ".evolve", "phases", dir, userSpecFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writePhaseSpec(t, repo.Dir, dir, spec)
 	}
-	if names := TrackedUserPhaseNames(t, root); names != nil && names[decoy] {
-		t.Fatalf("untracked decoy name %q bound by TrackedUserPhaseNames", decoy)
+	repo.Git("add", ".evolve/phases")
+	const decoy = "zz-decoy-phasespec-funnel"
+	writePhaseSpec(t, repo.Dir, decoy, []byte(`{"name":"`+decoy+`"}`))
+
+	if set := TrackedPhaseDirs(t, repo.Dir); !maps.Equal(set, real) {
+		t.Fatalf("TrackedPhaseDirs over a copy of the real tracked set plus an untracked decoy = %v, want exactly the real set %v", set, real)
+	}
+	if names := TrackedUserPhaseNames(t, repo.Dir); names == nil || names[decoy] {
+		t.Fatalf("TrackedUserPhaseNames over the copy = %v: want an active filter without the untracked decoy %q", names, decoy)
 	}
 }

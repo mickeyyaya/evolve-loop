@@ -62,20 +62,6 @@ type DoctorReport struct {
 	} `json:"summary"`
 }
 
-func doctorBinaryFor(cli string) string {
-	switch cli {
-	case "claude-p", "claude-tmux":
-		return "claude"
-	case "codex", "codex-tmux":
-		return "codex"
-	case "agy", "agy-tmux":
-		return "agy"
-	case "ollama-tmux":
-		return "ollama"
-	}
-	return strings.TrimSuffix(cli, "-tmux")
-}
-
 func (e *Engine) doctorHome() string {
 	if h, ok := lookupEnv(e.deps, "HOME"); ok && h != "" {
 		return h
@@ -108,7 +94,7 @@ func defaultKeychainProbe(d Deps) func(service string) bool {
 // for claude).
 func (e *Engine) doctorAuth(cli string) AuthInfo {
 	home := e.doctorHome()
-	switch doctorBinaryFor(cli) {
+	switch driverBinary(cli) {
 	case "claude":
 		if fileNonEmpty(filepath.Join(home, ".claude", ".credentials.json")) {
 			return AuthInfo{Configured: true, Source: "file:credentials.json"}
@@ -194,7 +180,7 @@ func (e *Engine) doctorDeep(ctx context.Context, cli, binary string) DeepProbe {
 }
 
 func (e *Engine) doctorOne(ctx context.Context, cli string, deep bool) DoctorResult {
-	binary := doctorBinaryFor(cli)
+	binary := driverBinary(cli)
 	r := DoctorResult{CLI: cli, EnvWarnings: e.doctorEnvWarnings(cli), Auth: e.doctorAuth(cli)}
 	if path, err := e.deps.LookPath(binary); err == nil {
 		r.Binary = BinaryInfo{Present: true, Path: path, Version: doctorVersion(ctx, e.deps, binary)}

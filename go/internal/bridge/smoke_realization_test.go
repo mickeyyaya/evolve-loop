@@ -107,3 +107,39 @@ func TestBootSmokeTest_ACallerRealizationIsLaunchedUnchanged(t *testing.T) {
 		t.Fatalf("codex boot smoke merged the manifest into the caller's realization: %q", argv)
 	}
 }
+
+func TestSmokeTests_AModelOnTheConfigReachesTheLaunchArgv(t *testing.T) {
+	injectCatalogDir(t, t.TempDir())
+	cases := []struct {
+		driver, binary, model, want string
+	}{
+		{"agy-claude-tmux", "agy", "Claude Opus 5.5 (High)", "--model " + shellQuotePOSIX("Claude Opus 5.5 (High)")},
+		{"agy-claude-tmux", "agy", "deep", "--model " + shellQuotePOSIX("Claude Opus 5.5 (High)")},
+		{"claude-tmux", "claude", "opus", "--model opus"},
+	}
+	smokes := map[string]func(context.Context, string, *Config, Deps){
+		"boot": func(ctx context.Context, d string, c *Config, deps Deps) { BootSmokeTest(ctx, d, c, deps) },
+		"live": func(ctx context.Context, d string, c *Config, deps Deps) { LiveSmokeTest(ctx, d, c, deps) },
+	}
+	for name, smoke := range smokes {
+		for _, tc := range cases {
+			pane := neverReadySmokePane()
+			smoke(context.Background(), tc.driver, &Config{Workspace: t.TempDir(), Model: tc.model}, smokeDeps(pane))
+			line, _ := launchLineFor(t, pane.SentKeys, tc.binary)
+			if !strings.Contains(line, tc.want) {
+				t.Errorf("%s smoke of %s with model %q launched %q; want %s", name, tc.driver, tc.model, line, tc.want)
+			}
+		}
+	}
+}
+
+func launchLineFor(t *testing.T, sent []string, binary string) (string, int) {
+	t.Helper()
+	for i, keys := range sent {
+		if slices.ContainsFunc(launchArgv(keys), func(f string) bool { return filepath.Base(f) == binary }) {
+			return keys, i
+		}
+	}
+	t.Fatalf("no %s launch line among the keys sent: %q", binary, sent)
+	return "", -1
+}

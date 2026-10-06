@@ -110,7 +110,7 @@ func addTarEntry(tw *tar.Writer, root, name string) error {
 	if err != nil {
 		return err
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 	_, err = io.Copy(tw, src)
 	return err
 }

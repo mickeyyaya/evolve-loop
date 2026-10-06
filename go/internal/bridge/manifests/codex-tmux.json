@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "codex-tmux",
   "binary": "codex",
+  "model_family": "gpt",
   "binary_min_version": "0.13.0",
   "transport": "tmux",
   "default_tier": "hybrid",

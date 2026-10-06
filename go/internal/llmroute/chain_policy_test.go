@@ -16,7 +16,7 @@ func TestExcludeFamilies_DropsTheOperatorBannedFamilies(t *testing.T) {
 }
 
 func TestKnownDriver(t *testing.T) {
-	for _, d := range []string{"claude-p", "claude-tmux", "codex", "codex-tmux", "agy", "agy-tmux", "ollama-tmux"} {
+	for _, d := range []string{"claude-p", "claude-tmux", "codex", "codex-tmux", "agy", "agy-tmux", "agy-claude-tmux", "ollama-tmux"} {
 		if !KnownDriver(d) {
 			t.Errorf("%s is registered", d)
 		}

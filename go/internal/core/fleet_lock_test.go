@@ -7,7 +7,7 @@ import (
 
 func TestRunCycle_FleetMode_SkipsGlobalLock(t *testing.T) {
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
-	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil))
+	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil), WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}))
 	if _, err := o.RunCycle(context.Background(), CycleRequest{
 		ProjectRoot: t.TempDir(),
 		Env:         map[string]string{"EVOLVE_FLEET": "1"},

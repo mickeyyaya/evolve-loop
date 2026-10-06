@@ -105,18 +105,16 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			specs[i] = fleet.CycleSpec{GoalHash: goalHash}
 		}
 	}
-	results := runLanesThenPublish(context.Background(), sup, specs, "", stderr)
+	return reportFleetResults(runLanesThenPublish(context.Background(), sup, specs, "", stderr), stderr)
+}
 
-	failed := 0
+func reportFleetResults(results []fleet.Result, stderr io.Writer) int {
 	for _, r := range results {
-		status := "ok"
-		if r.Err != nil || r.ExitCode != 0 {
-			status, failed = "FAIL", failed+1
-		}
-		fmt.Fprintf(stderr, "[fleet] cycle %d: %s (exit=%d, err=%v)\n", r.Index, status, r.ExitCode, r.Err)
+		fmt.Fprintf(stderr, "[fleet] cycle %d: %s (exit=%d, err=%v)\n", r.Index, r.Status(), r.ExitCode, r.Err)
 	}
-	fmt.Fprintf(stderr, "[fleet] %d/%d cycles ok\n", len(specs)-failed, len(specs))
-	if failed > 0 {
+	t := laneTally(results)
+	fmt.Fprintf(stderr, "[fleet] %d/%d cycles ok%s\n", t.OK, t.Total(), t.DeferredSuffix())
+	if t.Failed > 0 {
 		return 1
 	}
 	return 0

@@ -13,17 +13,18 @@ import (
 )
 
 func TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport(t *testing.T) {
-	// The skip must precede every side effect: the body mutates the live repo tree.
-	t.Skip("reproduction PERMANENTLY disabled: it mutates the live repo tree and poisons the CI coverage profile. The gap it reproduced is CLOSED — composedGateTargets[\"apicover\"] now names the enforcing apicover-enforce recipe, pinned tree-mutation-free by TestComposedApicoverGate_TargetRecipeEnforces (recipe text) and proven live in both directions at land time. A future live-run reproduction must be rebuilt against a throwaway module COPY, never this tree (percycle-audit-apicover-newexport-parity residual)")
-	goRoot := apicoverGoRoot(t)
-	repoRoot := filepath.Dir(goRoot)
+	t.Skip("reproduction PERMANENTLY disabled. The gap it reproduced is CLOSED — composedGateTargets[\"apicover\"] now names the enforcing apicover-enforce recipe, pinned tree-mutation-free by TestComposedApicoverGate_TargetRecipeEnforces (recipe text) and proven live in both directions at land time. The body runs against a throwaway copy of the module, never this tree (percycle-audit-apicover-newexport-parity residual)")
+	repoRoot := t.TempDir()
+	goRoot := filepath.Join(repoRoot, "go")
+	if err := os.CopyFS(goRoot, os.DirFS(apicoverGoRoot(t))); err != nil {
+		t.Fatalf("copy the module: %v", err)
+	}
 
 	fixtureRel := filepath.Join("internal", "apicoverreprofixture998")
 	fixtureDir := filepath.Join(goRoot, fixtureRel)
 	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
 		t.Fatalf("create fixture package dir: %v", err)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(fixtureDir) })
 
 	fixtureSrc := `// Package apicoverreprofixture998 is a throwaway fixture for
 // bug-reproduction cycle-998 (percycle-audit-apicover-newexport-parity).

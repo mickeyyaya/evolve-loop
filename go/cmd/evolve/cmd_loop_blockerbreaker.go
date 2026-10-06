@@ -25,6 +25,7 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		fp = policy.DefaultSystemFailurePolicy()
 	}
 	digests := core.CollectBatchFailureDigests(evolveDir, batchStartCycle+1)
+	deferrals := core.CollectBatchLaneDeferrals(evolveDir, batchStartCycle+1)
 	reconcileConsumedFingerprints(evolveDir, stderr)
 	reconcileConsumedBindings(projectRoot, evolveDir, stderr)
 	acked, lerr := core.LoadResolvedFingerprints(evolveDir)
@@ -38,19 +39,29 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		UnexplainedCeiling:          fp.Thresholds.UnexplainedFailuresHaltCeiling,
 		ConsecutiveFailuresCeiling:  fp.Thresholds.ConsecutiveFailuresHaltCeiling,
 		AckedFingerprints:           acked,
+		LaneDeferredCycles:          core.LaneDeferredCycleSet(deferrals),
 	})
-	if !v.Halt {
-		return 0, false
-	}
-	latest := 0
-	for _, d := range digests {
-		if d.Cycle > latest {
-			latest = d.Cycle
+	if v.Halt {
+		latest := 0
+		for _, d := range digests {
+			latest = max(latest, d.Cycle)
 		}
+		return haltPipelineBlocker(evolveDir, projectRoot, latest, "pipeline-blocker", v, stderr, signals), true
 	}
-	workspace := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", latest))
+	if v := core.EvaluateLaneDeferrals(deferrals, fp.Thresholds.LaneDeferralHaltCeiling); v.Halt {
+		latest := 0
+		for _, d := range deferrals {
+			latest = max(latest, d.Cycle)
+		}
+		return haltPipelineBlocker(evolveDir, projectRoot, latest, "lane-provisioning", v, stderr, signals), true
+	}
+	return 0, false
+}
+
+func haltPipelineBlocker(evolveDir, projectRoot string, cycle int, category string, v core.BlockerVerdict, stderr io.Writer, signals *signalcenter.Center) int {
+	workspace := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", cycle))
 	sf := &cyclestate.SystemFailureSignal{
-		Category: "pipeline-blocker",
+		Category: category,
 		Level:    "system",
 		Evidence: v.Reason + " (rule=" + v.Rule + " fingerprint=" + v.Fingerprint + ")",
 		Halt:     true,
@@ -59,5 +70,5 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 	// action emits, so nothing is signalled twice.
 	// See ADR-0101.
 	rule := loopHaltRule{code: CodeLoopPipelineBlockerHalt, fields: map[string]string{"rule": v.Rule, "fingerprint": v.Fingerprint}}
-	return haltOnSystemFailure(evolveDir, projectRoot, latest, workspace, sf, stderr, signals, rule), true
+	return haltOnSystemFailure(evolveDir, projectRoot, cycle, workspace, sf, stderr, signals, rule)
 }

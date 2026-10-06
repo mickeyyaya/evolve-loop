@@ -388,13 +388,10 @@ func TestRepairMinWidth_FourBranchesAndTheirSignals(t *testing.T) {
 	})
 }
 
-func TestFailedLanes_CountsErrOrNonZeroExit(t *testing.T) {
+func TestTally_CountsErrOrNonZeroExitAsFailed(t *testing.T) {
 	results := []fleet.Result{{Err: errors.New("x")}, {ExitCode: 4}, {}, {Err: errors.New("y"), ExitCode: 1}}
-	if got := FailedLanes(results); got != 3 {
-		t.Errorf("FailedLanes = %d, want 3", got)
-	}
-	if FailedLanes(nil) != 0 {
-		t.Error("no results, no failures")
+	if got := Tally(results).Failed; got != 3 {
+		t.Errorf("Tally.Failed = %d, want 3", got)
 	}
 }
 

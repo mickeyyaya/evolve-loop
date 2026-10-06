@@ -22,6 +22,7 @@ type BlockerBreakerConfig struct {
 	AckedFingerprints map[string]bool
 	// ConsecutiveFailuresCeiling halts on this many back-to-back failed cycles, whatever their fingerprints.
 	ConsecutiveFailuresCeiling int
+	LaneDeferredCycles         map[int]bool
 }
 
 // ResolvedFingerprint is one record in the append-only ack ledger, .evolve/resolved-fingerprints.json.
@@ -198,23 +199,29 @@ func EvaluateBlockerBreaker(digests []FailureDigest, cfg BlockerBreakerConfig) B
 			cycles = append(cycles, c)
 		}
 		sort.Ints(cycles)
-		run := 0
-		for i, c := range cycles {
-			if i > 0 && c == cycles[i-1]+1 {
-				run++
-			} else {
-				run = 1
-			}
-			if run >= cfg.ConsecutiveFailuresCeiling {
-				d := counted[c]
-				return BlockerVerdict{
-					Halt: true, Rule: "consecutive-failures", Fingerprint: d.Fingerprint, Count: run,
-					Reason: fmt.Sprintf("%d consecutive failed cycles ending at cycle %d (ceiling %d) with mixed failure identities — a batch that cannot ship %d cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10)", run, d.Cycle, cfg.ConsecutiveFailuresCeiling, cfg.ConsecutiveFailuresCeiling),
-				}
+		if at, run, ok := consecutiveRun(cycles, cfg.ConsecutiveFailuresCeiling, cfg.LaneDeferredCycles); ok {
+			d := counted[cycles[at]]
+			return BlockerVerdict{
+				Halt: true, Rule: "consecutive-failures", Fingerprint: d.Fingerprint, Count: run,
+				Reason: fmt.Sprintf("%d consecutive failed cycles ending at cycle %d (ceiling %d) with mixed failure identities — a batch that cannot ship %d cycles in a row is pipeline-degraded regardless of fingerprint; stop, deep-dive the failures individually, fix, then resume (operator directive 2026-08-10)", run, d.Cycle, cfg.ConsecutiveFailuresCeiling, cfg.ConsecutiveFailuresCeiling),
 			}
 		}
 	}
 	return BlockerVerdict{}
+}
+
+func consecutiveRun(sortedCycles []int, ceiling int, transparent map[int]bool) (at, run int, ok bool) {
+	for i, c := range sortedCycles {
+		if i > 0 && adjacentOver(sortedCycles[i-1], c, transparent) {
+			run++
+		} else {
+			run = 1
+		}
+		if run >= ceiling {
+			return i, run, true
+		}
+	}
+	return 0, 0, false
 }
 
 // CollectBatchFailureDigests reads runs/cycle-N/failure-digest.json for N >= fromCycle, skipping missing or malformed ones.
@@ -225,15 +232,10 @@ func CollectBatchFailureDigests(evolveDir string, fromCycle int) []FailureDigest
 	}
 	var out []FailureDigest
 	for _, e := range entries {
-		name := e.Name()
-		if !e.IsDir() || !strings.HasPrefix(name, "cycle-") {
+		if _, inBatch := batchCycleNumber(e, fromCycle); !inBatch {
 			continue
 		}
-		n, cerr := strconv.Atoi(strings.TrimPrefix(name, "cycle-"))
-		if cerr != nil || n < fromCycle {
-			continue
-		}
-		raw, rerr := os.ReadFile(filepath.Join(evolveDir, "runs", name, "failure-digest.json"))
+		raw, rerr := os.ReadFile(filepath.Join(evolveDir, "runs", e.Name(), "failure-digest.json"))
 		if rerr != nil {
 			continue
 		}
@@ -244,4 +246,25 @@ func CollectBatchFailureDigests(evolveDir string, fromCycle int) []FailureDigest
 		out = append(out, d)
 	}
 	return out
+}
+
+func batchCycleNumber(e os.DirEntry, fromCycle int) (int, bool) {
+	name := e.Name()
+	if !e.IsDir() || !strings.HasPrefix(name, "cycle-") {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(name, "cycle-"))
+	if err != nil || n < fromCycle {
+		return 0, false
+	}
+	return n, true
+}
+
+func adjacentOver(prev, next int, transparent map[int]bool) bool {
+	for n := prev + 1; n < next; n++ {
+		if !transparent[n] {
+			return false
+		}
+	}
+	return true
 }

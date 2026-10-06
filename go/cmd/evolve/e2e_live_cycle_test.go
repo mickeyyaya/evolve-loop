@@ -72,7 +72,7 @@ func runLiveCycleTier1(t *testing.T, repoRoot, evolveBin string, cli liveCLI, ti
 	if isTransient(res.Out, res.Err) {
 		t.Skipf("%s live cycle: provider failure before reaching audit (quarantined):\nerr=%v\n%s", cli.Driver, res.Err, lastN(res.Out, 800))
 	}
-	captureLiveFailure(t, repoRoot, res.ProjRoot, "live-"+cli.Driver)
+	captureLiveFailure(t, res.ProjRoot, "live-"+cli.Driver)
 	t.Errorf("%s live cycle did NOT reach the core phases %v (contract break); roles=%v err=%v\n%s",
 		cli.Driver, corePhaseRoles, ledgerRoles(res.Entries), res.Err, lastN(res.Out, 1500))
 }

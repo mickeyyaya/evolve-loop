@@ -13,10 +13,13 @@
 |---|---|---|---|---|
 | Extension model | plugin marketplace | plugin marketplace (TUI) | skills + MCP (file-config) | **none** |
 | Install is a one-liner? | yes (`/plugin ...`) | no (menu-driven `/plugins`) | n/a (file-config) | n/a |
-| Model selection | `--model` + `/model` | `-m` + `/model` | `-m` + `/model` | positional arg only |
+| Model selection | `--model` + `/model` | `-m` + `/model` | `--model "<display name>"` + `/model` | positional arg only |
+| Model family (`model_family`) | claude | gpt | gemini | local |
 | Headless entrypoint | `claude -p` / `claude plugin ...` | `codex exec` | `agy -p` | `ollama run <m> "..."` |
 | Prompt marker | `❯` | `›` (alt-screen) | `? for shortcuts` | `>>> ` |
 | Reload after install | `/reload-plugins` (required) | n/a | restart / re-scan | n/a |
+
+**agy-claude-tmux** (2026-10-06) is a second target on the agy binary: the Claude models agy serves (`Claude Opus 5.5` and `Claude Sonnet 5.5`, each at Low, Medium and High, billed to the Google AI Pro subscription). Its manifest is a merge patch over agy-tmux, so every column above is agy-tmux's except the model family, which is `claude`, and the tier map: fast `Claude Sonnet 5.5 (Low)`, balanced `Claude Sonnet 5.5 (High)`, deep and top `Claude Opus 5.5 (High)`. agy offers no Haiku-class Claude. Probe it with `evolve doctor live agy-claude-tmux --model "<display name>"`. agy boots its default Gemini model for a `--model` it does not recognize, so a model-less launch of this target realizes its fast tier. The bridge keys pane reading by the manifest's binary, not the driver name, so the target reads its pane with agy's profile (the `>` input boundary) and agy's liveness detector. See [internal-bridge.md](packages/internal-bridge.md#provider-aware-targets-manifest_basego-model_familygo-agy-claude-tmux).
 
 ## Plugin / skill install flows
 
@@ -62,6 +65,7 @@ commands. Exit 0 = clean, 3 = drift, 10 = usage error.
 
 ## Known-pending validations
 
+- agy 1.2.17 ignores a `--model` it cannot validate and boots its default model (live, 2026-10-06: `--model "Claude Opus 9.9 (High)"` ran Gemini 3.8 Flash (High), and the task completed). A banner check that the booted model is the dispatched one is pending (C5 of [model-currency-2026-10.md](../plans/model-currency-2026-10.md)); see [internal-bridge.md](packages/internal-bridge.md#provider-aware-targets-manifest_basego-model_familygo-agy-claude-tmux). Until the resolved `agy-claude-tmux` manifest declares a non-empty `launch_model_verification` rule, `TestAgyClaudeRouting_WaitsForALaunchTimeModelVerificationRule` (cmd/evolve) fails if a Claude-floor profile, a policy pin or any `cli_routing` route (`clis`, `default`, `work`, `agents`, `tiers`) names `agy-claude`.
 - agy model selection: **agy 1.0.15 HAS a `--model` launch flag** (probed live
   2026-07-02: `agy --model "Gemini 3.1 Pro (High)"` boots the REPL in ~2s with
   the model in banner + footer; selectable tokens are the `agy models` display names,

@@ -37,13 +37,13 @@ func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, 
 	})
 }
 
-func TestDoctorBinaryFor(t *testing.T) {
+func TestDriverBinary_DoctorProbesEachDriversBinary(t *testing.T) {
 	for cli, want := range map[string]string{
 		"claude-p": "claude", "claude-tmux": "claude", "codex": "codex",
 		"codex-tmux": "codex", "agy": "agy", "agy-tmux": "agy", "other-tmux": "other",
 	} {
-		if got := doctorBinaryFor(cli); got != want {
-			t.Fatalf("doctorBinaryFor(%q)=%q want %q", cli, got, want)
+		if got := driverBinary(cli); got != want {
+			t.Fatalf("driverBinary(%q)=%q want %q", cli, got, want)
 		}
 	}
 }

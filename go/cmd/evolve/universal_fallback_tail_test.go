@@ -84,3 +84,19 @@ func TestTheCheckedInPolicyPutsAgyInTheLastResortTail(t *testing.T) {
 		t.Fatalf("scout chain = %v: the operator added the Antigravity CLI to the pipeline (2026-10-05), so the checked-in policy keeps agy in every launch's last-resort tail", got)
 	}
 }
+
+func TestUniversalFallbackTail_OffersEachInstalledBinaryOnceAsItsOwnDriver(t *testing.T) {
+	results := []gobridge.DoctorResult{
+		doctorResult("agy", true, "ready"),
+		doctorResult("agy-claude-tmux", true, "ready"),
+		doctorResult("agy-tmux", true, "ready"),
+		doctorResult("claude-p", true, "ready"),
+		doctorResult("claude-tmux", true, "ready"),
+	}
+
+	got := universalFallbackTail(results)
+
+	if want := []string{"agy-tmux", "claude-tmux"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("tail = %v, want %v: a provider target on a shared binary joins a chain only when a route names it", got, want)
+	}
+}

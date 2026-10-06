@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -154,7 +156,7 @@ func (r gcRun) project(projectRoot string) int {
 	failed := r.cycleProcesses(opts)
 	failed = r.worktrees(opts) || failed
 	failed = r.runDirs(evolveDir, gcPol) || failed
-	failed = r.goCache(gcPol.GoCacheTTLHours) || failed
+	failed = r.goCache(gcPol) || failed
 	failed = r.pipelineTemp(gcPol.TempTTLHours) || failed
 	if !r.dryRun && freeErr == nil {
 		r.reportDiskFree(projectRoot, before)
@@ -241,18 +243,27 @@ func (r gcRun) runDirs(evolveDir string, pol gc.Policy) bool {
 	return discoverFailed
 }
 
-func (r gcRun) goCache(ttlHours int) bool {
-	if ttlHours <= 0 {
-		fmt.Fprintf(r.stdout, "evolve gc: go build cache trim off (gc.go_cache_ttl_hours unset)\n")
+func (r gcRun) goCache(pol gc.Policy) bool {
+	dir, err := gcGoCacheDir(r.ctx)
+	if errors.Is(err, exec.ErrNotFound) {
+		fmt.Fprintf(r.stdout, "evolve gc: go build cache trim skipped: no go toolchain on PATH\n")
 		return false
 	}
-	dir, err := gcGoCacheDir(r.ctx)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: go build cache trim skipped: %v\n", err)
 		return true
 	}
-	rep := gc.TrimGoCache(dir, time.Now().Add(-time.Duration(ttlHours)*time.Hour), r.remove)
-	r.summary("%d go build cache file(s) would be trimmed (%s unused > %dh in %s)", "trimmed %d go build cache file(s) (%s unused > %dh in %s)", rep.Files, gcSize(rep.Bytes), ttlHours, dir)
+	capBytes := pol.GoCacheMaxBytes()
+	rep := gc.TrimGoCache(dir, gc.GoCacheBounds{Now: time.Now(), UnusedFor: time.Duration(pol.GoCacheTTLHours) * time.Hour, MaxBytes: capBytes}, r.remove)
+	if pol.GoCacheTTLHours > 0 {
+		r.summary("%d go build cache file(s) would be trimmed (%s unused > %dh in %s)", "trimmed %d go build cache file(s) (%s unused > %dh in %s)", rep.Files, gcSize(rep.Bytes), pol.GoCacheTTLHours, dir)
+	} else {
+		fmt.Fprintf(r.stdout, "evolve gc: go build cache age trim off (gc.go_cache_ttl_hours unset)\n")
+	}
+	r.summary("%d go build cache file(s) would be trimmed to fit the %s cap (%s, least recently used first); %s would remain", "trimmed %d go build cache file(s) to fit the %s cap (%s, least recently used first); %s remains", rep.CapFiles, gcSize(capBytes), gcSize(rep.CapBytes), gcSize(rep.RemainingBytes))
+	if rep.RemainingBytes > capBytes {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: go build cache still holds %s, over its %s cap: the cap never trims an entry whose mtime is under %s old (the go command refreshes an entry's mtime once it is an hour old, so this covers every entry looked up within about the last hour, plus a one-hour hold)\n", gcSize(rep.RemainingBytes), gcSize(capBytes), gc.GoCacheInUseWindow)
+	}
 	for _, e := range rep.Errors {
 		fmt.Fprintf(r.stderr, "evolve gc: go build cache error: %s\n", e)
 	}
@@ -285,8 +296,11 @@ func (r gcRun) reportDiskFree(path string, before uint64) {
 func gcGoCacheDir(ctx context.Context) (string, error) {
 	var out strings.Builder
 	code, err := sysexec.DefaultRunner(ctx, "go", "", []string{"env", "GOCACHE"}, nil, nil, &out, nil)
-	if err != nil || code != 0 {
-		return "", fmt.Errorf("go env GOCACHE: exit %d: %v", code, err)
+	if err != nil {
+		return "", fmt.Errorf("go env GOCACHE: %w", err)
+	}
+	if code != 0 {
+		return "", fmt.Errorf("go env GOCACHE: exit %d", code)
 	}
 	dir := strings.TrimSpace(out.String())
 	if dir == "" || dir == "off" {

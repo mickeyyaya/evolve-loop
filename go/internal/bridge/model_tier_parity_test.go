@@ -127,7 +127,7 @@ func TestAgyTierDeepLaunchCarriesModelToPane(t *testing.T) {
 		Stderr:    os.Stderr,
 	}.withDefaults()
 
-	code, err := agyTmuxDriver{}.Launch(context.Background(), cfg, deps)
+	code, err := agyTmuxDriver{target: "agy-tmux"}.Launch(context.Background(), cfg, deps)
 	if err != nil || code != ExitOK {
 		t.Fatalf("agyTmuxDriver.Launch = (%d, %v), want (ExitOK, nil)", code, err)
 	}
