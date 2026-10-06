@@ -112,3 +112,18 @@ func TestCanarySkipsActiveBenchesAndDisabledEnv(t *testing.T) {
 		t.Errorf("EVOLVE_CLI_HEALTH=0 still probed (%d)", probes)
 	}
 }
+
+func TestCanary_AnExpiredAgyClaudeBenchProbesTheAgyClaudeTarget(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	benchExpired(t, root, "agy-claude", 1)
+	var probed []string
+	var out bytes.Buffer
+	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+		probed = append(probed, driver)
+		return 0, "", ""
+	}, &out)
+	if len(probed) != 1 || probed[0] != "agy-claude-tmux" {
+		t.Fatalf("probed=%v, want one probe of agy-claude-tmux", probed)
+	}
+}

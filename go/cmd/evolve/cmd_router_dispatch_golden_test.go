@@ -20,6 +20,7 @@ var advisorBenchSets = []advisorBenchSet{
 	{name: "agy_benched", families: map[string]bool{"agy": true}},
 	{name: "agy_claude_benched", families: map[string]bool{"agy": true, "claude": true}},
 	{name: "claude_benched", families: map[string]bool{"claude": true}},
+	{name: "agy_claude_target_benched", families: map[string]bool{"agy-claude": true}},
 }
 
 var advisorDecisions = []struct {

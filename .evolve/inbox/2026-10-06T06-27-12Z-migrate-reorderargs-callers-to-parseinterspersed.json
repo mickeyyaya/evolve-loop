@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "go/internal/cli/guardcmd/eval.go, go/internal/cli/opscmd/console_lease.go, go/internal/cli/opscmd/doctor.go, go/internal/cli/opscmd/doctor_boot.go and go/cmd/evolve/args.go parse interspersed flags with cmdutil.ParseInterspersed",
+    "cmdutil.ReorderArgs, cmd/evolve's reorderArgs and guardcmd.parseInterspersed are deleted, and grep finds no caller",
+    "Each migrated command has a test in which a value flag stands after a positional and keeps its value (red first where ReorderArgs differs)",
+    "docs/architecture/packages/cmd-evolve.md names ParseInterspersed as the one interspersed-flag idiom"
+  ],
+  "created_at": "2026-10-06T06:27:11Z",
+  "files": [
+    "go/cmd/evolve/cmdutil/cmdutil.go",
+    "go/internal/cli/guardcmd/eval.go",
+    "go/internal/cli/opscmd/console_lease.go",
+    "go/internal/cli/opscmd/doctor.go",
+    "go/internal/cli/opscmd/doctor_boot.go",
+    "go/cmd/evolve/args.go",
+    "docs/architecture/packages/cmd-evolve.md"
+  ],
+  "fix": "Move each ReorderArgs caller and each hand-rolled loop to cmdutil.ParseInterspersed(fs, args), one caller per commit with its own red test where the idioms differ (a value flag after a positional; a -- terminator). Delete ReorderArgs, reorderArgs and guardcmd.parseInterspersed once nothing calls them, and update docs/architecture/packages/cmd-evolve.md.",
+  "id": "migrate-reorderargs-callers-to-parseinterspersed",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console, 2026-10-06, review fix round for the agy-claude-tmux target (branch feat/agy-claude-target)",
+  "summary": "The CLI has three ways to accept flags interspersed with positionals. cmdutil.ReorderArgs moves flag-looking tokens ahead of the positionals before flag.Parse; it is bool-flag-only by contract, because it cannot know which flags take a value and scatters a value into the positional list. cmdutil.ParseInterspersed (added for evolve doctor live <driver> --model <model>) parses with the FlagSet itself, so a value flag keeps its value wherever it stands, and a real -- terminator passes the remainder through raw. ReorderArgs callers: go/internal/cli/opscmd/doctor.go, go/internal/cli/opscmd/doctor_boot.go, go/cmd/evolve/args.go (reorderArgs and its callers). Hand-rolled copies of the ParseInterspersed loop, written because ReorderArgs scatters values: guardcmd.parseInterspersed in go/internal/cli/guardcmd/eval.go and the inline loop in go/internal/cli/opscmd/console_lease.go.",
+  "title": "Migrate the cmdutil.ReorderArgs callers to cmdutil.ParseInterspersed, so one interspersed-flag idiom remains",
+  "weight": 0.3
+}

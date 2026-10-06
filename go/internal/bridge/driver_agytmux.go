@@ -2,15 +2,12 @@ package bridge
 
 import "context"
 
-// agyTmuxDriver drives an interactive `agy` (Gemini-backed) TUI through
-// tmux — the Go port of drivers/agy-tmux.sh. It has no permission-mode
-// and selects its model via the --model launch flag (display-name tokens).
-type agyTmuxDriver struct{}
+type agyTmuxDriver struct{ target string }
 
-func (agyTmuxDriver) Name() string { return "agy-tmux" }
+func (d agyTmuxDriver) Name() string { return d.target }
 
-func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
-	if rc, handled := tmuxNonClaudePreflight("agy-tmux", cfg, deps); handled {
+func (d agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error) {
+	if rc, handled := tmuxNonClaudePreflight(d.target, cfg, deps); handled {
 		return rc, nil
 	}
 	// No credential-isolation guard: GEMINI_API_KEY/GOOGLE_API_KEY are not
@@ -18,20 +15,20 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-agy-")
 
-	return runTmuxREPL(ctx, cfg, deps, agyTmuxLaunch(cfg, deps, session, named))
+	return runTmuxREPL(ctx, cfg, deps, agyTmuxLaunch(d.target, cfg, deps, session, named))
 }
 
-func agyTmuxLaunch(cfg *Config, deps Deps, session string, named bool) tmuxLaunch {
+func agyTmuxLaunch(target string, cfg *Config, deps Deps, session string, named bool) tmuxLaunch {
 	// Launch flags come from the per-CLI Realization (ADR-0022): agy realizes
 	// permission=bypass → --dangerously-skip-permissions and model_tier →
 	// --model "<display name>"; launchCmdLine quotes the space/paren tokens.
 	// claude-keyed raw flags realize to nothing.
 	return tmuxLaunch{
-		name:            "agy-tmux",
+		name:            target,
 		session:         session,
 		named:           named,
 		launchCmd:       launchCmdLine(resolveBinary(deps, "agy"), cfg.Realization.LaunchFlags),
-		modelDispatch:   modelDispatchForTmux("agy-tmux", cfg.Realization, cfg.ExtraFlags),
+		modelDispatch:   modelDispatchForTmux(target, cfg.Realization, cfg.ExtraFlags),
 		promptMarker:    "? for shortcuts",
 		inputLineMarker: ">",
 		bootScrollback:  200, // alt-screen
@@ -43,4 +40,7 @@ func agyTmuxLaunch(cfg *Config, deps Deps, session string, named bool) tmuxLaunc
 	}
 }
 
-func init() { Register(agyTmuxDriver{}) }
+func init() {
+	Register(agyTmuxDriver{target: "agy-tmux"})
+	Register(agyTmuxDriver{target: "agy-claude-tmux"})
+}

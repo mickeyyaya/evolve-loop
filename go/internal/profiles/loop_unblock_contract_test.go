@@ -7,17 +7,19 @@ import (
 	"testing"
 )
 
-// Only the router stays on agy; the other phases moved off it.
-func TestRouterStaysOnAgyWithClaudeFallback(t *testing.T) {
+func TestRouterRunsAgyOwnedClaudeFirstThenClaudeCodeAtDeep(t *testing.T) {
 	p, err := NewFromDir(RealProfilesDir(t)).Get("router")
 	if err != nil {
 		t.Fatalf("load profile: %v", err)
 	}
-	if p.CLI != "agy-tmux" {
-		t.Fatalf("CLI=%q, want agy-tmux", p.CLI)
+	if p.CLI != "agy-claude-tmux" {
+		t.Fatalf("CLI=%q, want agy-claude-tmux: deep work runs a Claude model, agy-owned first (operator rule, 2026-10-06)", p.CLI)
 	}
 	if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
-		t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
+		t.Fatalf("CLIFallback=%v, want [claude-tmux]: Claude Code after agy's Claude", p.CLIFallback)
+	}
+	if p.ModelTierDefault != "deep" {
+		t.Fatalf("ModelTierDefault=%q, want deep: the move changes the provider, not the reasoning budget", p.ModelTierDefault)
 	}
 }
 

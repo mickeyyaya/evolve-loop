@@ -1,6 +1,9 @@
 package llmroute
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestApplySoftOverlay_BareFamilyDoesNotCrossTransportWhenTheChainHoldsANonDefaultDriver(t *testing.T) {
 	t.Parallel()
@@ -48,5 +51,25 @@ func TestApplySoftOverlay_ExactChainMatchStillWinsForBothNames(t *testing.T) {
 	out := ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
 	if out.Candidates[0] != "codex" {
 		t.Fatalf("primary = %q, want the chain's exact codex entry (PR #390 rung)", out.Candidates[0])
+	}
+}
+
+func TestApplySoftOverlay_AnOverlayPromotesTheChainEntryOfItsRoutingFamily(t *testing.T) {
+	t.Parallel()
+	chain := []string{"codex-tmux", "agy-claude-tmux", "agy-tmux", "claude-tmux"}
+	cases := []struct {
+		overlay string
+		want    []string
+	}{
+		{"agy", []string{"agy-tmux", "codex-tmux", "agy-claude-tmux", "claude-tmux"}},
+		{"agy-claude", []string{"agy-claude-tmux", "codex-tmux", "agy-tmux", "claude-tmux"}},
+		{"claude", []string{"claude-tmux", "codex-tmux", "agy-claude-tmux", "agy-tmux"}},
+		{"agy-claude-tmux", []string{"agy-claude-tmux", "codex-tmux", "agy-tmux", "claude-tmux"}},
+	}
+	for _, tc := range cases {
+		out := ApplySoftOverlay(Plan{Candidates: chain}, Overlay{CLI: tc.overlay}, nil)
+		if !slices.Equal(out.Candidates, tc.want) {
+			t.Errorf("overlay %q over %v = %v, want %v", tc.overlay, chain, out.Candidates, tc.want)
+		}
 	}
 }

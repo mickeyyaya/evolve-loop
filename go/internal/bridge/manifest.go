@@ -106,6 +106,7 @@ type Manifest struct {
 	// ModelFreshness is a fact about the CLI binary, not an operator preference; cmd/evolve's composition root
 	// maps it to modelquery.FreshnessPolicy, and modelquery never imports bridge.
 	ModelFreshness ModelFreshness `json:"model_freshness,omitempty"`
+	ModelFamily    string         `json:"model_family,omitempty"`
 	// Params is the declarative per-CLI realization table: how each LaunchIntent parameter maps to this CLI's
 	// flags, REPL input or controller hints; an absent param is a no-op.
 	// See ADR-0022.
@@ -173,12 +174,9 @@ func loadManifestRaw(cli string) (Manifest, error) {
 	if cli == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: empty cli name")
 	}
-	if data, err := os.ReadFile(filepath.Join(bridgeManifestDir(), cli+".json")); err == nil {
-		return parseManifest(cli, data)
-	}
-	data, err := manifestFS.ReadFile("manifests/" + cli + ".json")
+	data, err := resolvedManifestBytes(cli)
 	if err != nil {
-		return Manifest{}, fmt.Errorf("bridge:manifest: no manifest for cli=%s", cli)
+		return Manifest{}, err
 	}
 	return parseManifest(cli, data)
 }
@@ -303,6 +301,13 @@ func IsTmuxDriver(cli string) bool {
 		return m.IsTmux()
 	}
 	return strings.HasSuffix(cli, "-tmux")
+}
+
+func driverBinary(cli string) string {
+	if m, err := loadManifestRaw(cli); err == nil {
+		return m.Binary
+	}
+	return strings.TrimSuffix(cli, "-tmux")
 }
 
 // ManifestNames returns the sorted set of CLI names with an embedded

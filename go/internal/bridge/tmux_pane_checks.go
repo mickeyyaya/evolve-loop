@@ -7,16 +7,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 )
 
-// paneProfileFor resolves the panestream PaneProfile for a tmux driver by
-// stripping the "-tmux" suffix from the driver name (claude-tmux → claude). An
-// unknown driver (e.g. the test "itest-tmux") falls back to a profile built
-// from the launch's own prompt marker so the delta extractor still has a
-// content boundary.
 func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
-	cli := strings.TrimSuffix(lp.name, "-tmux")
-	p, ok := panestream.Profiles[cli]
+	binary := driverBinary(lp.name)
+	p, ok := panestream.Profiles[binary]
 	if !ok {
-		p = panestream.PaneProfile{Name: cli, BoundaryMarker: lp.promptMarker}
+		p = panestream.PaneProfile{Name: binary, BoundaryMarker: lp.promptMarker}
 	}
 	if m, err := LoadManifest(lp.name); err == nil {
 		p.ExhaustedRegex = manifestExhaustedPattern(m)

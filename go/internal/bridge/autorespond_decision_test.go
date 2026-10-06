@@ -6,6 +6,9 @@ import (
 )
 
 // Pane fixtures are verbatim captures from claude v2.1.150, codex v0.133.0 and agy 1.0.2.
+const agyIgnoredModelPane = "⚠ failed to construct executor: plan model not specified; you must specify a valid model\n" +
+	"⚠ Warning\n  ⎿  model Claude Opus 5.5 (High) is not recognized as a known model or custom model in settings. Ignoring the flag."
+
 func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 	cases := []struct {
 		name, cli, pane, wantAction string
@@ -71,6 +74,8 @@ func TestAutoRespond_RealManifestDecisionMatrix(t *testing.T) {
 		{"agy permission → y,Enter", "agy-tmux", "Allow write to /tmp/out.txt?", "send:y,Enter", 1},
 		{"agy quota → escalate", "agy-tmux", "You have exceeded your daily limit for the free tier", "escalate:quota_exhausted", 85},
 		{"agy rate-limit → escalate", "agy-tmux", "RESOURCE_EXHAUSTED: retry later", "escalate:rate_limit", 85},
+		{"agy ignored --model → escalate", "agy-tmux", agyIgnoredModelPane, "escalate:model_not_recognized", 85},
+		{"agy-claude ignored --model → escalate", "agy-claude-tmux", agyIgnoredModelPane, "escalate:model_not_recognized", 85},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
