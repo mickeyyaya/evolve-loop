@@ -372,7 +372,7 @@ degrading to build-from-source (v22.11.0 and v22.12.0 both hit this). The `demot
 release suite failed on tracked runtime-minted profile stubs (`TestSmoke_RealProfiles` +
 `TestRepoPersonaProfilePairing`, fixed in #406), the tag auto-demoted, and v22.12.1 stayed Latest — the net
 worked as designed. Re-promote after fixing with
-`gh api -X PATCH repos/<owner>/<repo>/releases/<id> -F prerelease=false`. **Known gap (QUEUED, not
+`evolve release-promote <tag> [--rerun]` (PATCHes `prerelease=false` only after the release workflow run is green and every asset is present; `--rerun` first runs `gh run rerun --failed`; exit 1 = refused, 2 = gh/usage error). **Known gap (QUEUED, not
 fixed):** `evolve release-preflight`'s gate suites do not run the ship-time repo-contract scanner pack, so
 a repo-contract violation can still first surface in the remote release suite (inbox item
 `release-preflight-repo-contract-suites`).

@@ -131,6 +131,11 @@ Dispatch helpers (Phase 3a + 3b ports):
   release-consistency       Verify version markers (plugin.json,
                               marketplace.json, SKILL.md, README, CHANGELOG)
                               ( release-consistency [target-version] )
+  release-promote           Re-promote a demoted release once its workflow run is
+                              green and every asset is present
+                              ( release-promote <tag> [--rerun] )
+  backups                   Verify backup bundles/patches exist elsewhere
+                              before deletion ( backups verify [--dir D] )
 
 v12.1 utilities + composition:
   skill-inventory           Build .evolve/skill-inventory.json from

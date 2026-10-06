@@ -103,6 +103,8 @@ var commands = []subcommand{
 	{Name: "release-consistency", Summary: "Verify version markers", Run: opscmd.RunReleaseConsistency},
 	{Name: "release-verify-clis", Summary: "Verify the release installs + performs for every LLM CLI", Run: runReleaseVerifyCLIs},
 	{Name: "release-verify-binaries", Summary: "Verify every prebuilt binary + checksums is published on a release tag", Run: runReleaseVerifyBinaries},
+	{Name: "release-promote", Summary: "Re-promote a demoted release after workflow+assets check (release-promote <tag> [--rerun])", Run: runReleasePromote},
+	{Name: "backups", Summary: "Verify backup bundles/patches already exist elsewhere (backups verify [--dir D])", Run: runBackups},
 
 	{Name: "skill-inventory", Summary: "Build skill inventory cache", Run: runSkillInventory},
 	{Name: "skills", Summary: "Project phase facts into skill docs from SSOT (generate|check); publish skills to other LLM CLIs (publish) — ADR-0040/0041", Run: runSkills},
