@@ -113,7 +113,7 @@ func salvagePatchStats(path string) (changed int, size int64, err error) {
 	if err != nil {
 		return 0, 0, fmt.Errorf("open %s: %w", salvagePatchFile, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	r := bufio.NewReader(f)
 	for {
 		line, err := r.ReadString('\n')
@@ -138,12 +138,12 @@ func countUntrackedArchive(path string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("open %s: %w", salvageUntrackedFile, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	gz, err := gzip.NewReader(f)
 	if err != nil {
 		return 0, fmt.Errorf("read %s: %w", salvageUntrackedFile, err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	tr := tar.NewReader(gz)
 	n := 0
 	for {

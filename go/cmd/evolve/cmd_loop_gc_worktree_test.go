@@ -38,6 +38,7 @@ func gcGit(t *testing.T, dir string, args ...string) string {
 func gcWorktreeEnv(t *testing.T, mode string) (projectRoot, evolveDir, workspace string) {
 	t.Helper()
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	t.Setenv("GOCACHE", t.TempDir())
 	projectRoot = t.TempDir()
 	workspace = t.TempDir()
 	gcGit(t, projectRoot, "init", "-b", "main")
