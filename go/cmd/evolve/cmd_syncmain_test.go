@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -441,9 +442,7 @@ func TestSyncMain_RefusesToMergeWhenTheStampsCannotLand(t *testing.T) {
 		}
 	}
 	hook := filepath.Join(repo, ".git", "hooks", "pre-commit")
-	if err := os.WriteFile(hook, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, hook, "#!/bin/sh\nexit 1\n")
 	headBefore := smHead(t, repo)
 
 	var out, errb bytes.Buffer

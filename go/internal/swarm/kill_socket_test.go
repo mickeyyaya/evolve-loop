@@ -20,7 +20,7 @@ func TestExecTmuxKill_TargetsIsolatedBridgeSocket(t *testing.T) {
 		t.Fatalf("ExecTmuxKill: %v", err)
 	}
 
-	want := []string{"-L", bridge.TmuxSocket, "kill-session", "-t", sess}
+	want := []string{"-L", bridge.TmuxSocket, "kill-session", "-t", "=" + sess + ":"}
 	if len(got) != len(want) {
 		t.Fatalf("tmux args = %v, want %v", got, want)
 	}

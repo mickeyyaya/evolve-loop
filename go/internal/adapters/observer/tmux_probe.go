@@ -68,7 +68,7 @@ func newTmuxPaneProbe(cycle int, phase, runID string, run tmuxRunner) func() boo
 		if session == "" {
 			return false
 		}
-		pane, err := run("capture-pane", "-t", session, "-p")
+		pane, err := run("capture-pane", "-t", bridge.ExactSessionTarget(session), "-p")
 		if err != nil {
 			return false
 		}

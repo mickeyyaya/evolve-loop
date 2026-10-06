@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
@@ -50,7 +51,7 @@ func TestMakeCoverageGates_RejectToolFailure(t *testing.T) {
 			// Run the real tool first so the failure leaves plausible output/profile.
 			// The gate must honor the exit status instead of accepting that output.
 			wrapper := "#!/bin/sh\nif [ \"$1\" = \"" + stage + "\" ]; then go \"$@\"; echo intentional-tool-failure >&2; exit 23; fi\n" + makeGoBuildRedirect(t) + "exec go \"$@\"\n"
-			writeMakeFixture(t, root, "probe-go", wrapper)
+			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
 			out, err := runMakeFixture(t, root, "apicover-enforce")
 			if err == nil {
 				t.Fatalf("gate accepted failing %s tool\n%s", stage, out)
@@ -268,7 +269,7 @@ func makeFixture(t *testing.T) string {
 	writeMakeFixture(t, root, "go.mod", "module gateprobe\n\ngo 1.23\n")
 	writeMakeFixture(t, root, ".cover-strict", "./internal/probe 100\n")
 	writeMakeFixture(t, root, ".apicover-enforce", "./internal/probe\n")
-	writeMakeFixture(t, root, "probe-go", "#!/bin/sh\n"+makeGoBuildRedirect(t)+"exec go \"$@\"\n")
+	fakeclitest.Install(t, filepath.Join(root, "probe-go"), "#!/bin/sh\n"+makeGoBuildRedirect(t)+"exec go \"$@\"\n")
 	return root
 }
 

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -70,9 +71,7 @@ func installCheckRunsGH(t *testing.T, response string, unavailable bool) string 
 		body += "printf '%s' \"$GH_CHECK_RUNS_RESPONSE\"\n"
 	}
 	path := filepath.Join(dir, "gh")
-	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, path, body)
 	t.Setenv("GH_CALL_MARKER", marker)
 	t.Setenv("GH_CHECK_RUNS_RESPONSE", response)
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))

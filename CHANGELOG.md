@@ -2,6 +2,71 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — bridge tests no longer go red when another floor runs: no test writes a fresh executable for code to run, each test process gets its own tmux server, no tmux target matches by prefix, and the commit gate waits for golangci-lint's lock (2026-10-06)
+
+- **What was wrong and how it showed.**
+  - `TestRealTmux_*` in `go/internal/bridge` went red whenever another process ran a floor or bridge tests at the same time: `REPL prompt never appeared after 60s`, rc 80, or an artifact timeout, rc 81, in about 8 s.
+  - `apicover-enforce` re-runs the package, so every console landing from 2026-09-30 needed a manual classification.
+  - The investigation's concurrent floors showed the same class in `TestLaunchProfilePolicyWithFixtureChild`, `TestNativeRetrospectiveLessonBoundary`, `TestNativeRoleEvalAuthoringBoundary` and `TestNativeDecisionProfileOwnedCWD` (10–20 s deadlines), and in `internal/commitgate`'s `TestGolden_GoPipelineWritesByteExactAttestation`.
+- **Root cause.** Nothing killed the sessions.
+  - **dominant:** the tests wrote a fake CLI script and ran it directly. macOS scans a freshly written executable on its first run (`XprotectService`). While another floor links and runs hundreds of new test binaries, that first run took 10–22 s, against 0.01 s for `bash <script>` and 0.01–0.05 s for a hard link to an already-scanned binary. The reds tracked other floors, not load, because isolated reruns create no new executables.
+  - **smaller:** every test process shared one default `evolve-bridge` tmux server. A dead test had started it, and its leaked sessions kept it alive for six days. Every pane ran that process's stale environment and the operator's login `zsh`, whose profile serializes on pyenv's host-wide lock.
+  - **the einject sender:** it gave up after a fixed 8 s, independent of the boot.
+  - **the commit gate:** it ran `golangci-lint run` with no runner option, so it exited `parallel golangci-lint is running` whenever another golangci-lint held the host-wide lock.
+- **Production defects found on the way.**
+  - **prefix-matched kills:** tmux resolves a `-t` name that matches no session to the one session whose name starts with it. `kill-session -t evolve-bridge-it-happy-3948` killed a live `…-39481`. The bridge's second cleanup kill, the registry reapers and named sessions (`-w1` vs `-w10`) could kill, type into or read another process's session.
+  - **commit-gate lint:** a console commit went red whenever the operator, another lane or a test linted at the same moment.
+- **What changed:**
+  - **one helper for fake CLIs:** new `internal/fakeclitest`.
+    - `Install(t, path, body)` writes the script beside `path`, never executable, and hard-links the running, already-scanned test binary at `path`.
+    - The package's `init` turns that binary into the script's interpreter (`#!` line, else `/bin/sh`) whenever a script sits beside it.
+    - The shared file is made read-only, so a stray write fails instead of overwriting the test binary.
+    - Every directly run fake in the module now goes through it:
+      - `internal/bridge`: the three real-tmux fake REPL writers and the four `BRIDGE_<CLI>_BINARY` stubs;
+      - `cmd/evolve`: tmux and gh shims, a pre-commit hook, the e2e fake ship;
+      - `internal/core`: a git shim;
+      - `internal/dossier`: a pre-commit hook;
+      - `internal/posteditvalidate`: a python stub;
+      - `internal/releasepreflight`: gh and go shims;
+      - `internal/rollback`: 15 gh, git and evolve fakes;
+      - `internal/consensusdispatch`: `writeExec`;
+      - `internal/ciparity`: the `probe-go` wrapper;
+      - `internal/tmuxtest`: a fake tmux.
+    - The fakes left alone, each with its reason, are listed in the incident record. They are never run, or run through an interpreter, or their bytes are hashed, or they live in frozen `acs/cycleN` packages, or they are binaries built with `go build`.
+  - **exact targets:** `bridge.ExactSessionTarget` (`=<name>:`) for every `-t` in `execTmux`, `swarm.ExecTmuxKill` and the observer's capture. The swarm test that killed on the shared socket is stubbed.
+  - **one tmux server per test process:**
+    - `internal/tmuxtest.Main` is the `TestMain` of `internal/bridge` and `internal/looppreflight`. It uses `evolve-bridge-t<pid>` (`bridge.DeriveTestSocket`), its own server with `-f /dev/null`, `exit-empty off` and `/bin/sh` panes, and kills only that server at exit.
+    - The orphan-socket GC reaps `evolve-bridge-[pt]<pid>` only when the owner pid is dead.
+  - **the einject sender:** it re-appends until the artifact appears or `runTmuxREPL` returns, so the run's own budgets bound it.
+  - **the commit gate:** it runs `golangci-lint run --allow-serial-runners`, which waits for the lock. Serial rather than parallel keeps runs from writing the shared analysis cache at once. golangci-lint 2.13.2 supports it.
+  - **registry doc:** the `EVOLVE_TMUX_SOCKET` registry doc names the test-process setter, and the flag index is regenerated.
+- **Tests, red first:**
+  - **under a generator of fresh executables (reproduces the scan on demand):**
+    - before the change: 3 of the 4 fixture-child tests failed (the fourth took 15 s and passed), and 5 real-tmux tests with directly run fakes failed;
+    - after: all of them pass in 0.03–3 s while a fresh script takes 14 s to start.
+  - **`internal/fakeclitest`:** `TestInstall_TheFakeIsTheRunningTestBinaryNotANewExecutable` (the deterministic stand-in for the scan), the shebang, argument, stdin and exit-code tests, and the PATH, reinstall, write-refusal, fallback and error tests.
+  - **einject sender:** a fake booting in 9 s inside a 13 s boot budget reproduced rc 81 with the old sender and passes with the new one.
+  - **commit gate:** `TestRun_GolangciLintWaitsForAnotherRunInsteadOfFailing`. Red: the argv was `golangci-lint run ./.`. A live check with another run holding the lock: plain exit 3, serial waited about 7 s and passed.
+  - **exact targets and isolation:**
+    - `TestRealTmux_AMissingSessionNeverResolvesToALongerName`, `TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget` and `TestTmuxPaneProbe_CapturesOnlyTheExactListedSession`;
+    - `TestRealTmux_ConcurrentTestProcessesNeverShareATmuxServer` (red without the `TestMain`);
+    - the socket GC tests, `TestDeriveTestSocket_…`, and the `tmuxtest` `TestMain_*` tests.
+- **Review round (architecture review: 0 critical, 4 warnings, 1 nit), each red first:**
+  - **lint wait:** the commit gate's lint now runs under `Options.LintBudget` (default 10 minutes). The serial wait could otherwise last forever behind a suspended run, since `--timeout` does not cover the lock. On the deadline the lane fails, logging `golangci-lint waited <budget> for another run's lock or its own lint, and was stopped`.
+  - **symlinked fakes:** a symlink to a fake now runs its script; `runIfFake` resolves symlinks.
+  - **rename:** `internal/fakecli` became `internal/fakeclitest`, after the other test-only helpers.
+  - **import guard:** `internal/repocontract`'s `TestTestOnlyHelpersAreNeverImportedByProductionCode` fails on any production import of `fakeclitest` or `tmuxtest`, and runs at every ship.
+  - **surviving mutant:** a window-width assertion kills the mutant that left `JiggleWindow`'s first resize non-exact.
+  - **nit:** the socket-GC tests build their names from the derivation functions.
+- **Left open:** binaries built with `go build` in tests still pay one first-run scan per build. `internal/core` takes 330–565 s per run, near `go test`'s 10 m default; that is unrelated, but worth watching.
+- **Docs:**
+  - the [incident record](docs/incidents/2026-10-06-realtmux-tests-share-a-stale-tmux-server.md), with five rows in the [regression index](docs/incidents/REGRESSION-COVERAGE-INDEX.md);
+  - new [internal-fakeclitest.md](docs/architecture/packages/internal-fakeclitest.md) and [internal-tmuxtest.md](docs/architecture/packages/internal-tmuxtest.md);
+  - [internal-bridge.md](docs/architecture/packages/internal-bridge.md), [internal-swarm.md](docs/architecture/packages/internal-swarm.md), [internal-commitgate.md](docs/architecture/packages/internal-commitgate.md), [internal-looppreflight.md](docs/architecture/packages/internal-looppreflight.md) and [internal-adapters-observer.md](docs/architecture/packages/internal-adapters-observer.md);
+  - the gc sweep in [runtime-reference.md](docs/operations/runtime-reference.md);
+  - the test commands in [tmux-prompt-delivery.md](docs/architecture/tmux-prompt-delivery.md).
+- Consumes inbox `realtmux-tests-interfere-across-concurrent-test-processes` and `realtmux-bridge-tests-flake-under-package-parallel-load`.
+
 ## Fixed — `evolve models refresh` tries every ready CLI to classify and says which CLIs fell back; agy's offline fast/balanced move to Gemini 3.8 Flash (2026-10-05)
 
 - **What was wrong and how it showed.** The operator wanted agy on its newest Flash, but the loop still ran Gemini 3.7 Flash: the live catalog's agy entry was last classified on 2026-08-14, and `evolve models refresh --source live` never picked up 3.8. `liveRefresh` ran every family's tier classification on one CLI, chosen by `pickClassifierCLI` from the `classifierCLIPreference` literal (codex > claude > agy) among the CLIs setup detect calls ready. Detect calls codex ready because a stale auth file exists, though the operator has no codex subscription. The codex classifier launch failed (`classifier codex: bridgePromptDispatcher: launch codex: bridge: launch exit=1`) and no other ready CLI was tried, so agy, claude and ollama all fell back to their detect maps, agy's being the manifest's 3.7 map. The command still printed `Refreshed model catalog (source: live /model (detect fallback))` and exited 0.

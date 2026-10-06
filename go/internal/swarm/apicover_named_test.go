@@ -96,12 +96,16 @@ func TestProcessGroupKiller_InvokedByExecSessionKiller(t *testing.T) {
 }
 
 func TestTmuxKiller_SatisfiedByExecTmuxKill(t *testing.T) {
+	calls := withTmuxRunStub(t, nil)
 	var killer TmuxKiller = ExecTmuxKill
 	if err := killer(context.Background(), ""); err == nil {
 		t.Error("TmuxKiller (ExecTmuxKill) must refuse an empty session name")
 	}
 	if err := killer(context.Background(), "evolve-bridge-test"); err != nil {
 		t.Errorf("TmuxKiller must accept a real session name best-effort, got %v", err)
+	}
+	if len(*calls) != 1 || (*calls)[0][len((*calls)[0])-1] != "=evolve-bridge-test:" {
+		t.Errorf("TmuxKiller must kill exactly the named session through the stubbed runner, got %v", *calls)
 	}
 }
 

@@ -4,14 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 func TestDefaultGhDeleteRelease_FakeGhSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	ghBin := filepath.Join(dir, "gh")
-	if err := os.WriteFile(ghBin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, ghBin, "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	got := defaultGhDeleteRelease("v0.0.0-adv-test")
 	if got != "deleted" {
@@ -23,9 +23,7 @@ func TestDefaultGhDeleteRelease_FakeGhFails_GenericError(t *testing.T) {
 	dir := t.TempDir()
 	ghBin := filepath.Join(dir, "gh")
 	script := "#!/bin/sh\necho 'internal server error' >&2\nexit 1\n"
-	if err := os.WriteFile(ghBin, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, ghBin, script)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	got := defaultGhDeleteRelease("v0.0.0-adv-test")
 	if got == "skipped" {
@@ -40,9 +38,7 @@ func TestDefaultGhDeleteRelease_FakeGhFails_NotFoundMessage(t *testing.T) {
 	dir := t.TempDir()
 	ghBin := filepath.Join(dir, "gh")
 	script := "#!/bin/sh\necho 'release not found' >&2\nexit 1\n"
-	if err := os.WriteFile(ghBin, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, ghBin, script)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	got := defaultGhDeleteRelease("v0.0.0-adv-not-found")
 	if got == "skipped" {

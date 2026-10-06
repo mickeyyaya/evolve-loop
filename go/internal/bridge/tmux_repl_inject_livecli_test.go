@@ -5,12 +5,12 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/inbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 // writeAwaitInjectFake writes a fake CLI that blocks until a live-injected
@@ -38,10 +38,8 @@ while IFS= read -r line; do
 done
 `, marker)
 	path := filepath.Join(dir, "fake-await-inject.sh")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write await-inject fake: %v", err)
-	}
-	return path // no args; behavior is baked in
+	fakeclitest.Install(t, path, script)
+	return path
 }
 
 func TestRealTmux_E2E_LiveInjection_UnblocksAgent(t *testing.T) {
@@ -60,24 +58,26 @@ func TestRealTmux_E2E_LiveInjection_UnblocksAgent(t *testing.T) {
 	// --workspace=<ws> --agent=itest "PROCEED"` would. Re-append idempotently
 	// until the artifact appears, since a send that lands before the driver's
 	// inbox cursor reaches EOF is skipped as backlog.
-	done := make(chan struct{})
+	runEnded := make(chan struct{})
+	senderStopped := make(chan struct{})
 	go func() {
-		defer close(done)
-		deadline := time.Now().Add(8 * time.Second)
-		for time.Now().Before(deadline) {
-			if fileNonEmpty(cfg.Artifact) {
-				return
-			}
+		defer close(senderStopped)
+		for !fileNonEmpty(cfg.Artifact) {
 			_ = inbox.Append(cfg.Workspace, cfg.Agent, inbox.Envelope{
 				Kind: inbox.KindCommand, Body: "PROCEED", Source: "cli",
 			}, time.Now)
-			time.Sleep(150 * time.Millisecond)
+			select {
+			case <-runEnded:
+				return
+			case <-time.After(150 * time.Millisecond):
+			}
 		}
 	}()
 
 	code, err := runTmuxREPL(context.Background(), cfg, itDeps(120*time.Millisecond),
 		itLaunch(sess, launchCmd, marker, 0, false))
-	<-done
+	close(runEnded)
+	<-senderStopped
 	if err != nil {
 		t.Fatalf("runTmuxREPL err: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
@@ -16,9 +17,7 @@ func envDumpingGo(t *testing.T) string {
 		t.Fatal(err)
 	}
 	shim := filepath.Join(t.TempDir(), "fake-go")
-	if err := os.WriteFile(shim, []byte("#!/bin/sh\necho GO_SHIM_RAN\nenv\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, shim, "#!/bin/sh\necho GO_SHIM_RAN\nenv\nexit 1\n")
 	old := defaultGoBinFn
 	t.Cleanup(func() { defaultGoBinFn = old })
 	defaultGoBinFn = func() string { return shim }

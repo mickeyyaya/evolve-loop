@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 // TestDefaultValidateJSON_ValidJSON_FallbackToEncoding — even when jq
@@ -285,9 +287,7 @@ func TestDefaultValidatePy_FallsBackToPython2Name(t *testing.T) {
 	// prove (a) the `python` branch was chosen and (b) the failure propagates.
 	stub := filepath.Join(binDir, "python")
 	script := "#!/bin/sh\necho 'STUB-PYTHON-INVOKED' 1>&2\nexit 1\n"
-	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, stub, script)
 	t.Setenv("PATH", binDir) // only `python` is reachable; no `python3`
 
 	path := filepath.Join(t.TempDir(), "mod.py")
