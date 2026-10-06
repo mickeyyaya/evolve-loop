@@ -35,6 +35,7 @@ var (
 type cliFlags struct {
 	bools  map[string]*bool
 	values map[string]*string
+	lists  map[string]*[]string
 }
 
 func (f cliFlags) parse(args []string) ([]string, error) {
@@ -45,7 +46,9 @@ func (f cliFlags) parse(args []string) ([]string, error) {
 			*b = true
 			continue
 		}
-		if v, ok := f.values[name]; ok {
+		v, isValue := f.values[name]
+		l, isList := f.lists[name]
+		if isValue || isList {
 			if !inline {
 				if i+1 >= len(args) {
 					return nil, fmt.Errorf("%s needs a value", name)
@@ -53,7 +56,11 @@ func (f cliFlags) parse(args []string) ([]string, error) {
 				i++
 				value = args[i]
 			}
-			*v = value
+			if isList {
+				*l = append(*l, value)
+			} else {
+				*v = value
+			}
 			continue
 		}
 		if strings.HasPrefix(args[i], "-") {

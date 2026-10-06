@@ -48,14 +48,10 @@ evolve release-verify-clis
 
 Require **exit 0** — every CLI row plus the `binary:core-subcommands` row reports `OK`. Anything else → **STOP**; the printed table names the failing target: a CLI whose install/projection broke, or a subcommand the binary no longer answers (the *"installed skills silently break"* regression). Fix forward before publishing. CI enforces the same matrix via the `TestReleaseVerifyCLIMatrix_RealPayload` e2e test (the Go suite, `go.yml`, which `required CI` and `release` call), so a red here predicts a red CI on the release commit.
 
-**After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch both workflows (`required.yml`, whose `CI required` job aggregates the Go, plugin, durable-ACS and landing suites, and `release.yml`), then confirm the binaries actually landed:
+**After** the pipeline reports success — the *released commit's* CI must go green AND the prebuilt binaries must publish. The `release` (goreleaser) workflow runs on the pushed tag, **separately** from the gh-free pipeline, so a goreleaser slip ships a binary-less release while `evolve release` reports success (the v21.1.0 trigger: 0 assets published, only caught by manual check). Watch both workflows (`required.yml`, whose `CI required` job aggregates the Go, plugin, durable-ACS and landing suites, and `release.yml`), then confirm the binaries actually landed. `evolve ci watch --tag` waits for both workflows on the tag's commit, prints one line per workflow with its conclusion, prints the `ci classify` verdict of every red run, and files one fix-forward inbox item on red; exit 0 = both green, 1 = either red, 2 = a run could not be observed:
 
 ```bash
-sha=$(git rev-parse origin/main)
-for wf in required.yml release.yml; do
-  rid=$(gh run list --commit "$sha" --workflow "$wf" --json databaseId -q '.[0].databaseId')
-  gh run watch "$rid" --exit-status || echo "RED: $wf on $sha"
-done
+evolve ci watch --tag "v<x.y.z>" || echo "RED or unobserved: see the per-workflow lines above"
 # A green `release` run can still upload nothing on a config slip — confirm the
 # prebuilt binaries (evolve_<os>_<arch>.tar.gz) actually landed on the release:
 gh release view --json assets -q '.assets[].name' | grep -q '\.tar\.gz$' \

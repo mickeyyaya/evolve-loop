@@ -35,9 +35,9 @@ Follow in order. **Do not edit any file between step 4 and step 5** — that wou
    - **Non-TTY agents** (LLM invocations): the command will fail with a non-TTY error that includes the exact IPC auto-confirm env var to set. Set it before re-running. The signal name comes from `envShipAutoConfirm` in `go/internal/phases/ship/verify.go`.
    - If it refuses with *"stale"* or *"missing … attestation"* → a file changed after step 4; return to step 3.
 6. **Watch CI** (skip with a clear note if `gh` is absent or the repo has no workflows):
-   - `gh run watch "$(git rev-parse HEAD)"` (or `gh pr checks --watch`).
+   - `evolve ci watch --sha "$(git rev-parse HEAD)"` on main (a red files one fix-forward inbox item), or `evolve ci watch --pr <n>` on a PR branch (files nothing). Exit 0 = green, 1 = red (the output carries the `ci classify` verdict), 2 = the run could not be observed (gh failure or the `ci_watch.timeout_s` policy timeout).
    - **green** → done; report the run URL.
-   - **red** → perform **one** auto-fix pass: `gh run view --log-failed` → fix → repeat steps 1–5 as a **new commit** (never force-push). Re-watch once. If still red, **stop and report** the failing job + logs for the user to decide.
+   - **red** → perform **one** auto-fix pass: read the printed classify table (or `gh run view --log-failed`) → fix → repeat steps 1–5 as a **new commit** (never force-push). Re-watch once. If still red, **stop and report** the failing job + logs for the user to decide.
 
 ## The `--reviewers` contract
 

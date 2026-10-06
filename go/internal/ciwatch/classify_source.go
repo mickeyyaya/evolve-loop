@@ -168,6 +168,29 @@ func (s ghClassifySource) commitSHA(ctx context.Context, ref string) (string, er
 	return doc.SHA, err
 }
 
+func ResolveCommit(ctx context.Context, repoRoot, ref string) (string, error) {
+	sha, err := ghClassifySource{root: repoRoot}.commitSHA(ctx, ref)
+	return checkedSHA("commit "+ref, sha, err)
+}
+
+func ResolvePRHead(ctx context.Context, repoRoot, pr string) (string, error) {
+	var doc struct {
+		HeadRefOid string `json:"headRefOid"`
+	}
+	err := ghClassifySource{root: repoRoot}.ghJSON(ctx, &doc, "pr", "view", pr, "--json", "headRefOid")
+	return checkedSHA("PR "+pr, doc.HeadRefOid, err)
+}
+
+func checkedSHA(what, sha string, err error) (string, error) {
+	if err != nil {
+		return "", err
+	}
+	if !isHex(sha, 40, 40) {
+		return "", fmt.Errorf("ciwatch: %s resolved to %q, not a commit SHA", what, sha)
+	}
+	return strings.ToLower(sha), nil
+}
+
 func (s ghClassifySource) firstParent(ctx context.Context, sha string) (string, error) {
 	doc, err := s.commit(ctx, sha)
 	if err != nil || len(doc.Parents) == 0 {

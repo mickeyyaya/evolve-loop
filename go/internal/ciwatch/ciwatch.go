@@ -69,10 +69,9 @@ type Options struct {
 	// SHA is the pushed commit to watch. Required.
 	SHA string
 	// Cycle is the cycle number recorded in the escalation item (0 = unknown).
-	Cycle int
-	// InboxDir is where a red conclusion files the critical fix-forward inbox
-	// item. Required.
-	InboxDir string
+	Cycle        int
+	InboxDir     string
+	NoEscalation bool
 	// WorkspaceDir, when non-empty, receives the verdict artifact
 	// (dossier.CIWatchVerdictFile) for dossier ingestion.
 	WorkspaceDir string
@@ -103,7 +102,7 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 	if opts.Fetch == nil {
 		return rec, errors.New("ciwatch: Fetch seam required")
 	}
-	if strings.TrimSpace(opts.InboxDir) == "" {
+	if !opts.NoEscalation && strings.TrimSpace(opts.InboxDir) == "" {
 		return rec, errors.New("ciwatch: InboxDir required")
 	}
 	opts = resolveWatchDefaults(opts)
@@ -124,7 +123,7 @@ func Watch(ctx context.Context, opts Options) (dossier.CIWatchRecord, error) {
 			return rec, err
 		}
 	}
-	if st.Conclusion != ConclusionSuccess {
+	if st.Conclusion != ConclusionSuccess && !opts.NoEscalation {
 		if err := fileEscalation(opts, st, opts.Now().UTC()); err != nil {
 			return rec, err
 		}

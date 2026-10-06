@@ -61,6 +61,8 @@ Commands:
               ( pr merge <n>... [--update-branch] [--wait D] [--project-root P] )
   ci         Classify a red CI run's failing tests from evidence; exit 0 = retry-safe
               ( ci classify <run-id|pr:N|sha:H> [--json] [--rerun] [--project-root P] )
+             Watch a pushed SHA, PR or tag until its CI completes; exit 0 green, 1 red, 2 unobservable
+              ( ci watch (--sha S | --pr N | --tag T) [--workflow W]... [--cycle N] )
   comments   Comment-campaign proof tools (the commentaudit CLI)
               ( comments rank|check|comments|verify|history|strip ... )
   status     Read-only report: loop, cycles, ship streak, open PRs, failing CI jobs

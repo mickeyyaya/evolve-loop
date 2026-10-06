@@ -45,23 +45,40 @@ func pruneBatchState(statePath string, stderr io.Writer) {
 	}
 }
 
+var resetClasses = []failurelog.Classification{
+	failurelog.InfrastructureSystemic,
+	failurelog.InfrastructureTransient,
+	failurelog.ShipGateConfig,
+}
+
+type resetOutcome struct {
+	pruned   failurelog.PruneResult
+	pruneErr error
+	acked    bool
+	ackErr   error
+}
+
+func resetFailures(statePath, evolveDir, fingerprint string) resetOutcome {
+	pr, pruneErr := failurelog.PruneByClassification(statePath, resetClasses)
+	out := resetOutcome{pruned: pr, pruneErr: pruneErr}
+	if fingerprint == "" {
+		return out
+	}
+	out.ackErr = core.AppendResolvedFingerprint(evolveDir, fingerprint, "operator-reset", time.Now().UTC())
+	out.acked = out.ackErr == nil
+	return out
+}
+
 func resetBatchState(cfg loopConfig, statePath string, stderr io.Writer) {
-	resetClasses := []failurelog.Classification{
-		failurelog.InfrastructureSystemic,
-		failurelog.InfrastructureTransient,
-		failurelog.ShipGateConfig,
+	out := resetFailures(statePath, cfg.EvolveDir, cfg.Fingerprint)
+	if out.pruneErr != nil {
+		fmt.Fprintf(stderr, "[loop] --reset: %v\n", out.pruneErr)
+	} else if out.pruned.Removed > 0 {
+		fmt.Fprintf(stderr, "[loop] --reset: pruned %d failedApproaches (infrastructure-{systemic,transient} + ship-gate-config) (%d→%d)\n", out.pruned.Removed, out.pruned.Before, out.pruned.After)
 	}
-	if pr, err := failurelog.PruneByClassification(statePath, resetClasses); err != nil {
-		fmt.Fprintf(stderr, "[loop] --reset: %v\n", err)
-	} else if pr.Removed > 0 {
-		fmt.Fprintf(stderr, "[loop] --reset: pruned %d failedApproaches (infrastructure-{systemic,transient} + ship-gate-config) (%d→%d)\n", pr.Removed, pr.Before, pr.After)
-	}
-	if cfg.Fingerprint == "" {
-		return
-	}
-	if err := core.AppendResolvedFingerprint(cfg.EvolveDir, cfg.Fingerprint, "operator-reset", time.Now().UTC()); err != nil {
-		fmt.Fprintf(stderr, "[loop] --reset --fingerprint: %v\n", err)
-	} else {
+	if out.ackErr != nil {
+		fmt.Fprintf(stderr, "[loop] --reset --fingerprint: %v\n", out.ackErr)
+	} else if out.acked {
 		fmt.Fprintf(stderr, "[loop] --reset --fingerprint: acknowledged %q in resolved-fingerprints.json — blocker-breaker will exclude it going forward\n", cfg.Fingerprint)
 	}
 }

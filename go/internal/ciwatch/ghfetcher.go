@@ -32,18 +32,22 @@ type ghRun struct {
 // the escalation item can name the failing test. No run visible yet reads as
 // status "queued" (the watch keeps polling until the timeout).
 func NewGHFetcher(repoRoot string) Fetcher {
+	return NewGHWorkflowFetcher(repoRoot, ciparity.RequiredWorkflow)
+}
+
+func NewGHWorkflowFetcher(repoRoot, workflow string) Fetcher {
 	return func(ctx context.Context, sha string) (RunStatus, error) {
-		return latestRequiredRun(ctx, repoRoot, "--commit", sha)
+		return latestRun(ctx, repoRoot, workflow, "--commit", sha)
 	}
 }
 
 func LatestRequiredRunOnBranch(ctx context.Context, repoRoot, branch string) (RunStatus, error) {
-	return latestRequiredRun(ctx, repoRoot, "--branch", branch)
+	return latestRun(ctx, repoRoot, ciparity.RequiredWorkflow, "--branch", branch)
 }
 
-func latestRequiredRun(ctx context.Context, repoRoot, filter, value string) (RunStatus, error) {
+func latestRun(ctx context.Context, repoRoot, workflow, filter, value string) (RunStatus, error) {
 	out, err := execCapture(ctx, repoRoot, "gh", "run", "list",
-		"--workflow", ciparity.RequiredWorkflow, filter, value, "--limit", "1",
+		"--workflow", workflow, filter, value, "--limit", "1",
 		"--json", "status,conclusion,url,databaseId")
 	if err != nil {
 		return RunStatus{}, fmt.Errorf("gh run list %s %s: %w", filter, value, err)

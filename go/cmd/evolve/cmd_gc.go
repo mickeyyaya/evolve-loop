@@ -26,9 +26,13 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	// The back-quoted `dir` is the flag package's argument placeholder (it
 	// renders as "-project-root dir"); no other back-quotes here, or the first
 	// one would be consumed as the placeholder instead.
-	projectRoot := fs.String("project-root", "", "repository root `dir` the workspace (worktree/branch) sweep is aimed at; default = current directory.\n\tNOTE the deliberate asymmetry: an explicit 'evolve gc' APPLIES the workspace sweep (an operator run is enforce),\n\twhile the in-loop hook's default mode stays 'shadow' (plan + publish only) — policy.json owns the loop's mode,\n\tthe operator owns their own invocation. Use --dry-run to preview.")
+	projectRoot := fs.String("project-root", "", "repository root `dir` the workspace (worktree/branch) sweep is aimed at; required: a non-dry run without it is refused, while --dry-run alone falls back to the current directory.\n\tNOTE the deliberate asymmetry: an explicit 'evolve gc' APPLIES the workspace sweep (an operator run is enforce),\n\twhile the in-loop hook's default mode stays 'shadow' (plan + publish only) — policy.json owns the loop's mode,\n\tthe operator owns their own invocation. Use --dry-run to preview.")
 	if err := fs.Parse(args); err != nil {
 		return 10
+	}
+	root, code, ok := resolveGCProjectRoot(*projectRoot, *dryRun, stderr)
+	if !ok {
+		return code
 	}
 	// Bound the sweep so a wedged tmux socket can't hang the command.
 	ctx, cancel := context.WithTimeout(context.Background(), orphanGCTimeout)
@@ -37,17 +41,25 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	r := newGCRun(ctx, *dryRun, stdout, stderr)
 	failed := r.sessions()
 	failed = r.sockets() || failed
-	failed = r.project(*projectRoot) != 0 || failed
+	failed = r.project(root) != 0 || failed
 	if failed {
 		return 1
 	}
 	return 0
 }
 
+type gcReapers struct {
+	sessions func(context.Context) swarm.OrphanReapReport
+	sockets  func(context.Context) swarm.OrphanSocketReport
+}
+
+var gcInjectedReapers *gcReapers
+
 type gcRun struct {
 	ctx            context.Context
 	dryRun         bool
 	stdout, stderr io.Writer
+	reapers        gcReapers
 	kill           func(pid int) error
 	remove         func(string) error
 	removeAll      func(string) error
@@ -55,8 +67,12 @@ type gcRun struct {
 
 func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun {
 	r := gcRun{ctx: ctx, dryRun: dryRun, stdout: stdout, stderr: stderr,
-		kill:   func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) },
-		remove: os.Remove, removeAll: os.RemoveAll}
+		reapers: gcReapers{sessions: swarm.ExecReapOrphans, sockets: swarm.ExecReapOrphanSockets},
+		kill:    func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) },
+		remove:  os.Remove, removeAll: os.RemoveAll}
+	if gcInjectedReapers != nil {
+		r.reapers = *gcInjectedReapers
+	}
 	if dryRun {
 		noop := func(string) error { return nil }
 		r.kill, r.remove, r.removeAll = func(int) error { return nil }, noop, noop
@@ -78,7 +94,7 @@ func (r gcRun) sessions() bool {
 		noop := func(_ context.Context, _ string) error { return nil }
 		rep = swarm.ReapOrphanSessions(r.ctx, swarm.ExecListBridgeSessions, swarm.ExecPidAlive, noop)
 	} else {
-		rep = swarm.ExecReapOrphans(r.ctx)
+		rep = r.reapers.sessions(r.ctx)
 	}
 	r.summary("%d orphan session(s) would be reaped", "reaped %d orphan session(s)", len(rep.Killed))
 	verb := "reaped"
@@ -102,7 +118,7 @@ func (r gcRun) sockets() bool {
 		noopKill := func(_ context.Context, _ string) error { return nil }
 		srep = swarm.ReapOrphanSockets(r.ctx, swarm.ExecListBridgeSockets, swarm.ExecPidAlive, noopKill)
 	} else {
-		srep = swarm.ExecReapOrphanSockets(r.ctx)
+		srep = r.reapers.sockets(r.ctx)
 	}
 	r.summary("%d dead per-run socket(s) would be reaped", "reaped %d dead per-run socket(s)", len(srep.Killed))
 	for _, s := range srep.Killed {

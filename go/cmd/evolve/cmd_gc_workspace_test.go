@@ -5,10 +5,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
 // gcUnmergedBranch is a cycle-* branch carrying a commit that is NOT reachable
@@ -77,8 +80,18 @@ func TestRunGC_ExplicitRunPreservesUnmergedBranch(t *testing.T) {
 
 func TestRunGC_MutatingRunRefusesWithoutProjectRoot(t *testing.T) {
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	reaped := 0
+	orig := gcInjectedReapers
+	t.Cleanup(func() { gcInjectedReapers = orig })
+	gcInjectedReapers = &gcReapers{
+		sessions: func(context.Context) swarm.OrphanReapReport { reaped++; return swarm.OrphanReapReport{} },
+		sockets:  func(context.Context) swarm.OrphanSocketReport { reaped++; return swarm.OrphanSocketReport{} },
+	}
 	var stdout, stderr bytes.Buffer
 	rc := runGC([]string{}, nil, &stdout, &stderr)
+	if reaped != 0 {
+		t.Errorf("a refused gc ran %d reaper(s) before refusing", reaped)
+	}
 
 	if rc != 1 {
 		t.Fatalf("expected runGC to fail (rc=1) when --project-root is omitted in a mutating run, got %d", rc)
