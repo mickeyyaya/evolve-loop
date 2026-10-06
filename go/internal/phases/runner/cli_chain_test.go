@@ -2,24 +2,6 @@ package runner
 
 import "testing"
 
-func TestSameCandidates(t *testing.T) {
-	cases := []struct {
-		a, b []string
-		want bool
-	}{
-		{[]string{"a", "b"}, []string{"a", "b"}, true},
-		{[]string{"a", "b"}, []string{"b", "a"}, false},
-		{[]string{"a"}, []string{"a", "b"}, false},
-		{nil, nil, true},
-		{nil, []string{}, true},
-	}
-	for _, c := range cases {
-		if got := sameCandidates(c.a, c.b); got != c.want {
-			t.Errorf("sameCandidates(%v, %v)=%v want %v", c.a, c.b, got, c.want)
-		}
-	}
-}
-
 func TestJoinAttempts(t *testing.T) {
 	cases := []struct {
 		in   []string

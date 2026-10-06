@@ -87,7 +87,7 @@ func TestSubagentRunRoot_PassesTheRootSignalCenterAndKeepsTheRawWarns(t *testing
 		t.Fatal("runSubagentRun / renderRunOutcome not found")
 	}
 	fn := src[start:end]
-	for _, want := range []string{"newRootSignalCenter(layout.ProjectRoot, layout.EvolveDir, stderr)", "defer signals.Flush()", "subagent.RunOptions{Signals: signals}", "range res.Warns", "return renderRunOutcome(res, agent, cycle, stderr)"} {
+	for _, want := range []string{"newRootSignalCenter(layout.ProjectRoot, layout.EvolveDir, stderr)", "defer signals.Flush()", "subagent.RunOptions{Signals: signals, ResolveLLM: roleResolver(router)}", "range res.Warns", "return renderRunOutcome(res, agent, cycle, stderr)"} {
 		if !strings.Contains(fn, want) {
 			t.Errorf("runSubagentRun lacks %q", want)
 		}

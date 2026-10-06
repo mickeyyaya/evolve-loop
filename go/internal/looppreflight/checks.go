@@ -68,8 +68,7 @@ func checkLLMCLIStatus(o resolved) CheckResult {
 	const name = "llm-cli-status"
 	seen := map[string]struct{}{}
 	var bins []string
-	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
-		// Never "": distinctDrivers yields only the non-empty names profileCLIs collected.
+	for _, d := range o.drivers() {
 		b := driverBinary(d)
 		if _, dup := seen[b]; dup {
 			continue

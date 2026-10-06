@@ -87,7 +87,7 @@ func checkCLIVersionFreeze(o resolved) CheckResult {
 	// Only *-tmux drivers: a headless launch does not run the updater.
 	seen := map[string]struct{}{}
 	var bins []string
-	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
+	for _, d := range o.drivers() {
 		if !bridge.IsTmuxDriver(d) {
 			continue
 		}

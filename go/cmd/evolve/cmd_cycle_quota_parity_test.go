@@ -46,7 +46,7 @@ func requireCycleRunUsesDepsSeam(t *testing.T) {
 	seamed := false
 	for _, decl := range f.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "runCycleRun" {
+		if !ok || (fn.Name.Name != "runCycleRun" && fn.Name.Name != "wireCycleRun") {
 			continue
 		}
 		ast.Inspect(fn.Body, func(n ast.Node) bool {

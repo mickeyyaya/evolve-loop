@@ -50,8 +50,8 @@ func attempts(calls []core.BridgeRequest) []string {
 }
 
 func fixedPlan(clis, tiers []string) bridgechain.PlanResolver {
-	return func(core.BridgeRequest) llmroute.Plan {
-		return llmroute.Plan{Candidates: clis, Triggers: llmroute.DefaultTriggers(), Tiers: tiers}
+	return func(core.BridgeRequest) (llmroute.Plan, error) {
+		return llmroute.Plan{Candidates: clis, Triggers: llmroute.DefaultTriggers(), Tiers: tiers}, nil
 	}
 }
 
@@ -89,9 +89,9 @@ func TestWalking_ArtifactTimeoutAdvancesToTheNextCLI(t *testing.T) {
 func TestWalking_ChainAttemptPassesThrough(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"codex-tmux": 81}}
 	resolved := 0
-	w := bridgechain.New(inner, func(core.BridgeRequest) llmroute.Plan {
+	w := bridgechain.New(inner, func(core.BridgeRequest) (llmroute.Plan, error) {
 		resolved++
-		return llmroute.Plan{Candidates: []string{"codex-tmux", "claude-tmux"}, Triggers: llmroute.DefaultTriggers()}
+		return llmroute.Plan{Candidates: []string{"codex-tmux", "claude-tmux"}, Triggers: llmroute.DefaultTriggers()}, nil
 	})
 	_, err := w.Launch(context.Background(), core.BridgeRequest{CLI: "codex-tmux", Model: "deep", ChainAttempt: true})
 	if err == nil || len(inner.calls) != 1 || resolved != 0 {
@@ -139,7 +139,7 @@ func TestWalking_QuotaAtEveryCLIStepsDownATierAndBenchesEachWall(t *testing.T) {
 // to say degrades to exactly the launch the caller asked for.
 func TestWalking_NoPlanLaunchesTheCallersOwnChoiceOnce(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"claude-p": 81}}
-	w := bridgechain.New(inner, func(core.BridgeRequest) llmroute.Plan { return llmroute.Plan{} })
+	w := bridgechain.New(inner, func(core.BridgeRequest) (llmroute.Plan, error) { return llmroute.Plan{}, nil })
 	_, err := w.Launch(context.Background(), core.BridgeRequest{CLI: "claude-p", Model: "sonnet"})
 	if err == nil || strings.Join(attempts(inner.calls), " ") != "claude-p@sonnet" {
 		t.Fatalf("attempts=%v err=%v", attempts(inner.calls), err)
@@ -171,16 +171,16 @@ func TestDefaultPlanResolver_ProfileChainRunsBehindTheCallersPrimary(t *testing.
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	writeProfile(t, dir, "retrospective", map[string]any{"name": "retrospective", "cli": "codex-tmux", "cli_fallback": []string{"claude-tmux"}, "model_tier_default": "deep"})
-	resolve := bridgechain.DefaultPlanResolver(dir, nil, findAll, time.Now, func(string, ...any) {})
-	plan := resolve(core.BridgeRequest{Agent: "retrospective", CLI: "codex-tmux", Model: "deep", ProjectRoot: root, Env: map[string]string{}})
+	resolve := bridgechain.DefaultPlanResolver(legacyRouter(t, dir))
+	plan := mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", CLI: "codex-tmux", Model: "deep", ProjectRoot: root, Env: map[string]string{}})
 	if strings.Join(plan.Candidates, " ") != "codex-tmux claude-tmux" || len(plan.Tiers) == 0 || plan.Tiers[0] != "deep" || !plan.TriggersFallback(81) {
 		t.Fatalf("plan = %+v", plan)
 	}
-	plan = resolve(core.BridgeRequest{Agent: "retrospective", CLI: "claude-p", Model: "deep", ProjectRoot: root, Env: map[string]string{}})
+	plan = mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", CLI: "claude-p", Model: "deep", ProjectRoot: root, Env: map[string]string{}})
 	if strings.Join(plan.Candidates, " ") != "claude-p codex-tmux claude-tmux" {
 		t.Fatalf("the caller's primary stays first: %v", plan.Candidates)
 	}
-	plan = resolve(core.BridgeRequest{Agent: "no-such-agent", CLI: "claude-p", Model: "sonnet", ProjectRoot: root, Env: map[string]string{}})
+	plan = mustPlan(t, resolve, core.BridgeRequest{Agent: "no-such-agent", CLI: "claude-p", Model: "sonnet", ProjectRoot: root, Env: map[string]string{}})
 	if len(plan.Candidates) == 0 || plan.Candidates[0] != "claude-p" {
 		t.Fatalf("no profile: the caller's choice leads: %v", plan.Candidates)
 	}

@@ -262,20 +262,9 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Env: EVOLVE_PROFILES_DIR_OVERRIDE, EVOLVE_ADAPTERS_DIR_OVERRIDE")
 		return 0
 	}
-	var dispatchPlanLog string
-	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
-		a := args[0]
-		switch {
-		case a == "--dispatch-plan-log" && len(args) > 1:
-			dispatchPlanLog = args[1]
-			args = args[2:]
-		case strings.HasPrefix(a, "--dispatch-plan-log="):
-			dispatchPlanLog = strings.TrimPrefix(a, "--dispatch-plan-log=")
-			args = args[1:]
-		default:
-			fmt.Fprintf(stderr, "evolve subagent validate-profile: unknown flag: %s\n", a)
-			return 2
-		}
+	dispatchPlanLog, args, parsed := parseValidateProfileFlags(args, stderr)
+	if !parsed {
+		return 2
 	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "evolve subagent validate-profile: expected <agent>")
@@ -284,6 +273,10 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	agent := args[0]
 
 	layout := paths.ResolveFromEnv()
+	router, routed := rootRouter(layout, "evolve subagent validate-profile", io.Discard, stderr)
+	if !routed {
+		return exitRoutingRefused
+	}
 
 	res, err := subagent.ValidateProfile(context.Background(),
 		subagent.ValidateProfileRequest{
@@ -295,7 +288,7 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 			WorktreePath:    os.Getenv("WORKTREE_PATH"),
 			DispatchPlanLog: dispatchPlanLog,
 		},
-		subagent.ValidateProfileOptions{},
+		subagent.ValidateProfileOptions{ResolveLLM: roleResolver(router)},
 	)
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
@@ -312,15 +305,38 @@ func runSubagentValidateProfile(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func printSubagentRunHelp(stdout io.Writer) int {
+	fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
+	fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
+	fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, ADVERSARIAL_AUDIT,")
+	fmt.Fprintln(stdout, "     WORKTREE_PATH")
+	fmt.Fprintln(stdout, "Config: .evolve/policy.json workflow settings")
+	fmt.Fprintln(stdout, "Note: LEGACY_AGENT_DISPATCH is retired — the bridge is the only dispatch path.")
+	return 0
+}
+
+func parseValidateProfileFlags(args []string, stderr io.Writer) (string, []string, bool) {
+	var dispatchPlanLog string
+	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		a := args[0]
+		switch {
+		case a == "--dispatch-plan-log" && len(args) > 1:
+			dispatchPlanLog = args[1]
+			args = args[2:]
+		case strings.HasPrefix(a, "--dispatch-plan-log="):
+			dispatchPlanLog = strings.TrimPrefix(a, "--dispatch-plan-log=")
+			args = args[1:]
+		default:
+			fmt.Fprintf(stderr, "evolve subagent validate-profile: unknown flag: %s\n", a)
+			return "", nil, false
+		}
+	}
+	return dispatchPlanLog, args, true
+}
+
 func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 	if cmdutil.HasHelp(args) {
-		fmt.Fprintln(stdout, "Usage: evolve subagent run <agent> <cycle> <workspace_path>")
-		fmt.Fprintln(stdout, "Prompt: read from stdin or set PROMPT_FILE_OVERRIDE")
-		fmt.Fprintln(stdout, "Env: MODEL_TIER_HINT, ADVERSARIAL_AUDIT,")
-		fmt.Fprintln(stdout, "     WORKTREE_PATH")
-		fmt.Fprintln(stdout, "Config: .evolve/policy.json workflow settings")
-		fmt.Fprintln(stdout, "Note: LEGACY_AGENT_DISPATCH is retired — the bridge is the only dispatch path.")
-		return 0
+		return printSubagentRunHelp(stdout)
 	}
 	if len(args) != 3 {
 		fmt.Fprintln(stderr, "evolve subagent run: expected <agent> <cycle> <workspace>")
@@ -356,6 +372,10 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 
 	flags := readSubagentRunFlags()
 	wc := loadWorkflowConfig(layout.EvolveDir)
+	router, routed := rootRouter(layout, "evolve subagent run", stderr, stderr)
+	if !routed {
+		return exitRoutingRefused
+	}
 
 	signals := newRootSignalCenter(layout.ProjectRoot, layout.EvolveDir, stderr)
 	defer signals.Flush()
@@ -379,7 +399,7 @@ func runSubagentRun(args []string, stdout, stderr io.Writer) int {
 		LegacyAgentDispatch:    flags.legacyAgentDispatch,
 		DispatchDepth:          subagent.ReadDispatchDepth(os.Getenv),
 		ChallengeTokenOverride: os.Getenv(subagent.FanoutWorkerTokenEnv),
-	}, subagent.RunOptions{Signals: signals})
+	}, subagent.RunOptions{Signals: signals, ResolveLLM: roleResolver(router)})
 	if err != nil {
 		fmt.Fprintf(stderr, "[subagent-run] FAIL: %v\n", err)
 		return 1

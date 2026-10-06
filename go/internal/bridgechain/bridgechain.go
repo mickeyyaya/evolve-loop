@@ -32,10 +32,10 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -44,10 +44,7 @@ import (
 // only when every CLI at the tier exits with it.
 const exitQuota = 85
 
-// PlanResolver yields the chain one launch walks: CLI candidates (primary
-// first), trigger exits, tier chain. DefaultPlanResolver builds it from the
-// same inputs the runner's resolveDispatchPlan uses.
-type PlanResolver func(req core.BridgeRequest) llmroute.Plan
+type PlanResolver func(req core.BridgeRequest) (llmroute.Plan, error)
 
 // BenchFunc records a wall after an attempt exited 85 (see BenchOnEscalation).
 type BenchFunc func(projectRoot, workspace, cli string, dispatchStart time.Time, env map[string]string)
@@ -99,7 +96,10 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	if req.ChainAttempt || w.resolve == nil {
 		return w.inner.Launch(ctx, req)
 	}
-	plan := w.resolve(req)
+	plan, err := w.resolve(req)
+	if err != nil {
+		return core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: %w", req.Agent, err)
+	}
 	if len(plan.Candidates) == 0 {
 		plan.Candidates = []string{req.CLI}
 	}
@@ -134,53 +134,19 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 	}, func(from, to string) {
 		w.logf("[bridge-chain] agent=%s tier step-down %s -> %s (every CLI at %s exited %d)\n", req.Agent, from, to, from, exitQuota)
 	})
+	if err := Unlaunched(walk, plan); err != nil {
+		return core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: %w", req.Agent, err)
+	}
 	return keeper.Surface(walk, last, lastErr)
 }
 
-// DefaultPlanResolver resolves a launch's chain the way the runner resolves a
-// phase's: the agent's profile (primary, cli_fallback, tier chain, triggers —
-// llmroute.Resolve), the caller's own CLI kept as the primary so wrapping never
-// changes which CLI runs FIRST, a capability probe, the cli-health bench, and
-// the universal fallback when the whole configured chain is absent. profilesDir
-// is <evolveDir>/profiles; discover may be nil (no universal fallback);
-// lookPath nil means exec.LookPath.
-func DefaultPlanResolver(profilesDir string, discover func() []string, lookPath func(string) (string, error), now func() time.Time, logf Logf) PlanResolver {
-	if logf == nil {
-		logf = func(string, ...any) {}
+func DefaultPlanResolver(router *cliroute.Router) PlanResolver {
+	return func(req core.BridgeRequest) (llmroute.Plan, error) {
+		d, err := router.Resolve(cliroute.Request{
+			Agent: req.Agent, ProjectRoot: req.ProjectRoot, DefaultModel: req.Model, Env: req.Env, CallerCLI: req.CLI,
+		})
+		return d.Plan, err
 	}
-	if now == nil {
-		now = time.Now
-	}
-	loader := profiles.NewFromDir(profilesDir)
-	return func(req core.BridgeRequest) llmroute.Plan {
-		var prof *profiles.Profile
-		if loader != nil && req.Agent != "" {
-			if p, err := loader.Get(req.Agent); err == nil {
-				prof = &p
-			}
-		}
-		plan := llmroute.Resolve(req.Agent, req.Agent, req.Model, req.Env, prof, nil, nil)
-		plan.Candidates = leadWith(req.CLI, plan.Candidates)
-		plan = llmroute.Probe(plan, lookPath)
-		plan = ApplyCLIHealthBench(req.ProjectRoot, req.Agent, plan, req.Env, now, logf)
-		if discover != nil {
-			plan = llmroute.ApplyUniversalFallback(plan, llmroute.AllowedDiscovered(discover(), prof), lookPath)
-		}
-		return plan
-	}
-}
-
-func leadWith(primary string, chain []string) []string {
-	if primary == "" {
-		return chain
-	}
-	out := []string{primary}
-	for _, c := range chain {
-		if c != primary {
-			out = append(out, c)
-		}
-	}
-	return out
 }
 
 // CLIHealthEnabled reports whether the cli-health bench applies (EVOLVE_CLI_HEALTH,

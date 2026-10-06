@@ -3,6 +3,8 @@ package subagent
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -241,6 +244,9 @@ func profileOf(read func(string) (string, error)) func(string) (subagentrun.Prof
 func llmOf(resolve func(string) (resolvellm.Result, error)) func(string) (subagentrun.LLM, error) {
 	return func(role string) (subagentrun.LLM, error) {
 		r, err := resolve(role)
+		if errors.Is(err, cliroute.ErrRefused) {
+			err = fmt.Errorf("%w: %w", subagentrun.ErrRouteRefused, err)
+		}
 		return subagentrun.LLM{CLI: r.CLI, ModelTier: r.ModelTier, Source: r.Source}, err
 	}
 }
