@@ -14,7 +14,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/observerengine"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -88,19 +90,19 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 
 	resolved := policy.Policy{Observer: &a.Config}.ObserverConfig()
 	cfg := Config{
-		StallS:       time.Duration(*resolved.StallS) * time.Second,
-		PollS:        time.Duration(*resolved.PollS) * time.Second,
-		Cycle:        req.Cycle,
-		Phase:        phase,
-		Agent:        phase, // the runner names the agent after the phase
-		StdoutLog:    p.Stdout,
-		WorkspaceDir: req.Workspace,
-		// Pane hash covers tmux drivers and CPU time covers headless ones; either proves life.
-		LivenessProbe: anyProbe(
-			newTmuxPaneProbe(req.Cycle, phase, req.RunID, nil),
-			newProcessCPUProbe(core.BridgePIDFile(p.Stdout), nil),
-		),
+		StallS:        time.Duration(*resolved.StallS) * time.Second,
+		PollS:         time.Duration(*resolved.PollS) * time.Second,
+		Cycle:         req.Cycle,
+		Phase:         phase,
+		Agent:         phase, // the runner names the agent after the phase
+		StdoutLog:     p.Stdout,
+		WorkspaceDir:  req.Workspace,
+		LivenessProbe: newProcessCPUProbe(core.BridgePIDFile(p.Stdout), nil),
+		PaneWatch: func() (panewatch.Snapshot, bool, error) {
+			return panewatch.ReadLive(req.Workspace, phase, runlease.PIDAlive)
+		},
 	}
+	cfg.OnEvent = phaseStallSignal(a.Signals, req, phase, cfg.StallS)
 	// This path sends no soft-stall nudges: observerengine owns that logic and is
 	// not folded in here yet. See docs/architecture/decomposition/12-phaseobserver.md.
 	obs := New(cfg, sink)

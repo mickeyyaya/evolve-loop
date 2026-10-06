@@ -364,3 +364,13 @@ func TestPaneHasSubstantiveChange(t *testing.T) {
 		})
 	}
 }
+
+func TestLastMarkerLine_MatchesOnlyAtTheStartOfALeftTrimmedLine(t *testing.T) {
+	lines := []string{"> echoed prompt", "  a > b in prose", "\t> indented box", "x"}
+	if got := LastMarkerLine(lines, ">"); got != 2 {
+		t.Errorf("LastMarkerLine = %d, want 2: a marker counts after spaces and tabs, never mid-line", got)
+	}
+	if got := LastMarkerLine([]string{"no marker", "a > b"}, ">"); got != -1 {
+		t.Errorf("LastMarkerLine = %d, want -1 when no line starts with the marker", got)
+	}
+}

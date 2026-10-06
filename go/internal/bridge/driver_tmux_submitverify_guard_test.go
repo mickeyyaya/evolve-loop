@@ -61,10 +61,9 @@ func TestVerifySubmitted_NoInputLineMarker_IsLoudNotSilent(t *testing.T) {
 	tm := &fakeTmux{paneSeq: []string{parkedPane(guardNudge)}}
 	var stderr bytes.Buffer
 	lp := tmuxLaunch{
-		name:         "agy-tmux",
+		name:         "nomarker-tmux",
 		session:      "s",
 		promptMarker: "? for shortcuts", // a FOOTER — not where input begins
-		// inputLineMarker deliberately unset: agy declares none.
 	}
 	got := verifySubmitted(context.Background(), submitVerifyDeps(tm, &stderr), lp,
 		"[agy-tmux]", "prompt", parkedPane(guardNudge), guardNudge)
@@ -179,7 +178,7 @@ func TestRunTmuxREPL_InitialSubmitVerificationCaptureFailureIsLoud(t *testing.T)
 func TestRealDriversDeclareInputLineMarker(t *testing.T) {
 	// A driver whose boot marker is NOT an input-line prompt declares the field
 	// empty; it must still NAME the field so the choice is visible in review.
-	noInputLine := map[string]bool{"driver_agytmux.go": true}
+	noInputLine := map[string]bool{}
 
 	// The guard is textual and cannot see a marker emptied at its DEFINITION.
 	// claude/codex point inputLineMarker at shared constants, so pin the shared

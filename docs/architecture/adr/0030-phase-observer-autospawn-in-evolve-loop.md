@@ -19,6 +19,16 @@
 > intentionally not built to avoid adding false-positive kill-logic to the
 > phase-killer. Config note: observer dials moved from `EVOLVE_OBSERVER_*` env
 > vars to the `.evolve/policy.json` `observer` block (`stall_s` default 600).
+>
+> **Amendment (2026-10-06, resolved by amendment: tmux liveness reads the pane-watch snapshot).** The **tmux liveness probe** named in the correction above is retired: `internal/adapters/observer/tmux_probe.go` (`newTmuxPaneProbe`, `anyProbe`) is **deleted**. It hashed the raw pane, so an animated spinner read alive forever. It found the session by a name infix that named sessions and agent-name mismatches missed. It ran only at the stall threshold. And the router, which never passes through `runner.Run`, had no observer at all.
+>
+> **What replaces it:**
+> - **Pane-watch snapshot.** The bridge publishes `<workspace>/<agent>-pane-watch.json` ([internal-panewatch](../packages/internal-panewatch.md)) from the frame it already captures every 2 s. Progress is a change of the transcript hash with spinner frames and chrome removed. The snapshot carries the writer's pid; a snapshot whose writer is dead reads as absent. The engine removes the file at the start of each attempt, and the bridge removes it when the wait ends.
+> - **Observer.** While a live snapshot exists, the observer judges the phase on it alone (`stall_no_progress`). A headless phase keeps the stdout and workspace rule (`stall_no_output`).
+> - **Signal.** Either stall is a Signal Center signal, `LIVENESS_PHASE_STALLED`. The auto-spawn path still kills nothing.
+> - **Router.** It runs under its own observer around the advisor's `Plan` and `RePlan`.
+>
+> Record: [agy liveness and phase watch (2026-10)](../../research/agy-liveness-monitoring-2026-10.md).
 
 ---
 

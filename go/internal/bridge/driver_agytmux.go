@@ -18,30 +18,29 @@ func (agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-agy-")
 
+	return runTmuxREPL(ctx, cfg, deps, agyTmuxLaunch(cfg, deps, session, named))
+}
+
+func agyTmuxLaunch(cfg *Config, deps Deps, session string, named bool) tmuxLaunch {
 	// Launch flags come from the per-CLI Realization (ADR-0022): agy realizes
 	// permission=bypass → --dangerously-skip-permissions and model_tier →
 	// --model "<display name>"; launchCmdLine quotes the space/paren tokens.
 	// claude-keyed raw flags realize to nothing.
-	return runTmuxREPL(ctx, cfg, deps, tmuxLaunch{
-		name:          "agy-tmux",
-		session:       session,
-		named:         named,
-		launchCmd:     launchCmdLine(resolveBinary(deps, "agy"), cfg.Realization.LaunchFlags),
-		modelDispatch: modelDispatchForTmux("agy-tmux", cfg.Realization, cfg.ExtraFlags),
-		promptMarker:  "? for shortcuts",
-		// NO input-line marker. agy's boot marker above is a FOOTER hint, not
-		// an input-line prompt, and captured agy panes show no reliable prompt
-		// glyph to anchor on. Declared empty on purpose: submit-verify then
-		// skips LOUDLY instead of matching against text that follows a footer.
-		// Deriving a real marker needs a verified agy pane sample (queued).
-		inputLineMarker: "",
+	return tmuxLaunch{
+		name:            "agy-tmux",
+		session:         session,
+		named:           named,
+		launchCmd:       launchCmdLine(resolveBinary(deps, "agy"), cfg.Realization.LaunchFlags),
+		modelDispatch:   modelDispatchForTmux("agy-tmux", cfg.Realization, cfg.ExtraFlags),
+		promptMarker:    "? for shortcuts",
+		inputLineMarker: ">",
 		bootScrollback:  200, // alt-screen
 		bootIntervalS:   2,
 		tickDuringBoot:  true, // agy shows a trust prompt during boot
 		exitSeq:         []tmuxKey{{keys: "C-c", enter: false, pauseS: 1}, {keys: "C-c", enter: false, pauseS: 1}},
 		bootOnly:        cfg.BootOnly,
 		guardDeadShell:  true,
-	})
+	}
 }
 
 func init() { Register(agyTmuxDriver{}) }

@@ -98,7 +98,7 @@ func WithAdvisorSignals(c *signalcenter.Center) PhaseAdvisorOption {
 func NewPhaseAdvisor(bridge Bridge, opts ...PhaseAdvisorOption) *PhaseAdvisor {
 	p := &PhaseAdvisor{
 		bridge:   bridge,
-		identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: "router"},
+		identity: AgentIdentity{CLI: "claude-tmux", Model: "opus", AgentLabel: routerAgentLabel},
 	}
 	for _, o := range opts {
 		o(p)

@@ -1,0 +1,60 @@
+agy --dangerously-skip-permissions --model 'Gemini 3.8 Flash (Low)'
+user@host work % agy --dangerously-skip-permissions --model 'Gemini 3.8 Flash (Low)'
+
+
+      ▄▀▀▄        Antigravity CLI 1.2.17
+     ▀▀▀▀▀▀       USER@example.com (Google AI Pro)
+    ▀▀▀▀▀▀▀▀      Gemini 3.8 Flash (Low)
+   ▄▀▀    ▀▀▄     /tmp/work
+  ▄▀▀      ▀▀▄
+
+
+ ┃ Gemini 3.6 & 3.7 Flash Deprecation
+ ┃ Make sure you are using Gemini 3.8 Flash! We will be turning down Gemini 3.6 Flash and Gemini 3.7 Flash shortly.
+ ┃ esc to dismiss
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+> [Pasted text #1 +122 lines]
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                                                                                                                                      Gemini 3.8 Flash · low
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

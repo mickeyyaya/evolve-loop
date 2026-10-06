@@ -35,6 +35,9 @@ Subcommands:
               <body...> )
   watch     Pretty-print the live channel feed (read-only, human debug)
             ( bridge watch --workspace=DIR --agent=NAME [--follow] )
+  sessions  List every live phase pane: cycle, phase, CLI, model, busy or idle,
+            progress and drawn age, last token line (read-only)
+            ( bridge sessions [--project-root=DIR] [--json] )
   recipe    Drive a scripted slash-command sequence (e.g. plugin-install)
             ( bridge recipe <run|list|show> ... — see 'recipe --help' )
   capabilities  Print a CLI's capability catalog ( --cli=NAME [--json] )
@@ -50,12 +53,20 @@ Exit codes: 0 ok | 2 safety-gate | 3 cost-leak | 10 bad-flags |
   86 respond-loop-guard | 99 require-full-unmet | 127 missing-binary
 `
 
+var bridgeReadOnlyViews = map[string]func([]string, io.Writer, io.Writer) int{
+	"watch":    cmdBridgeWatch,
+	"sessions": runBridgeSessions,
+}
+
 func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprint(stderr, bridgeUsage)
 		return 10
 	}
 	sub, rest := args[0], args[1:]
+	if view, ok := bridgeReadOnlyViews[sub]; ok {
+		return view(rest, stdout, stderr)
+	}
 	eng := bridge.NewEngine(bridge.Deps{})
 
 	switch sub {
@@ -156,9 +167,6 @@ func runBridge(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintf(stdout, "appended rule %q to %s\n", name, path)
 		return 0
-
-	case "watch":
-		return cmdBridgeWatch(rest, stdout, stderr)
 
 	case "send":
 		ws, agent, kind, source := "", "", "command", "cli"

@@ -173,6 +173,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LIVENESS_PANE_EXHAUSTED` | a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85) |
 | `LIVENESS_PANE_HUNG` | a tmux pane is hung: no progress and no completion (LivenessCenter edge: hung) |
 | `LIVENESS_PANE_STAGNANT` | a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant) |
+| `LIVENESS_PHASE_STALLED` | the per-phase observer saw no progress for the stall threshold, between the bridge's review checkpoints: for a tmux phase the pane-watch snapshot's transcript hash stopped changing (kind pane.liveness), for a headless phase the stdout log and workspace stopped growing (kind observer.warning); log and signal only, nothing is killed; fields source (pane | stdout), session, busy, stall_s |
 
 ### loop
 

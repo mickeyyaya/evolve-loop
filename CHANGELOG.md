@@ -2,6 +2,82 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the bridge can tell whether agy is still running a phase and what it has done, between checkpoints; `evolve bridge sessions` shows it (2026-10-06)
+
+- **What was wrong.** Through the bridge, agy's liveness was visible only at review-interval checkpoints (300 s for the router, 1200 s for build, tdd and audit), and even then it was misread.
+  - **Stale detector.** It matched only agy 1.0.4's exact `⣯ Generating...`. agy 1.2.17 draws eight spinner frames, two spaces and a changing verb. Seven of the eight frames read as new content, so every spinner tick counted as progress, and the old uplift kept a frozen spinner Converging forever.
+  - **No input-line marker.** agy declared none, so submit-verify always said `not_verified`. A parked prompt went unseen, which is how cycle 1786's router sat idle for 600 s and failed with exit 81.
+  - **Token line never parsed.** `▸ Thought for Ns, X tokens` was ignored, which gave 564 `BRIDGE_TOKEN_USAGE_WARNING` lines for agy-tmux in the runtime plane.
+  - **Observer blind to tmux phases.**
+    - It watched stdout, which a tmux driver writes only at exit, and the workspace mtime, which host writes keep fresh.
+    - At the threshold it hashed the raw pane, so any animated spinner read alive.
+    - It logged only to a file.
+    - The router had no observer at all.
+  - **Quota wall never benched agy.** agy names its wall `quota_exhausted`, which `clihealth.Benchable` did not accept.
+  - **Leftover probe sessions.** Every wave's usage probe left one live REPL per family on the loop's socket.
+- **What changed** (design record: [agy-liveness-monitoring-2026-10.md](docs/research/agy-liveness-monitoring-2026-10.md)):
+  - **A1, the agy 1.2.17 detector.**
+    - The busy marker is manifest data: `busy_line_regex` in `agy-tmux.json` is a spinner frame plus a verb, with the frame in group 1.
+    - `panestream` reads such a line as busy, and cuts the frame before every progress comparison (`cleanPaneFor`, `stableLines`, the new `ProgressHash`). A tick changes nothing, while a new verb, thought summary or transcript line still does.
+    - `AgyDetector` drops the spinner uplift and reads a new thought block as progress instead.
+    - New real-pane fixtures: `go/internal/bridge/panestream/testdata/agy-1.2.17/`.
+  - **A2, submit verification.**
+    - agy-tmux declares the `>` input-line marker (`agyTmuxLaunch`). agy 1.2.17 parks an unsubmitted paste as `> [Pasted text #N +M lines]` on that line, so the shared verifier re-sends Enter. This was chosen over `-i`, which would move prompt delivery onto the shell command line for one family.
+    - `pendingAtInputLine` now finds the input line by line (`afterLastInputLine`: the last line whose left-trimmed text starts with the marker) instead of a flat `strings.LastIndex`. Review found that a `>` inside a parked agy prompt (`x > 0`) made the parked prompt read as submitted. This applies to every CLI, with the same rule `panestream` uses for its content boundary.
+  - **A3, continuous liveness.**
+    - A new package, `internal/panewatch`, receives the frame the bridge already captures every 2 s. It publishes `<workspace>/<agent>-pane-watch.json` (progress hash and time, busy, last token line, footer model label, session identity) and removes it when the wait ends.
+    - The observer judges a tmux phase on that snapshot alone and emits `stall_no_progress`. A headless phase keeps the stdout rule, with a reason that names what was watched. The raw-pane tmux probe is removed.
+    - Every stall is a Signal Center signal, `LIVENESS_PHASE_STALLED` (`pane.liveness` or `observer.warning`). Nothing is killed.
+    - The router runs under an observer around `Plan` and `RePlan` (`internal/core/router_observer.go`).
+  - **A4, agy token telemetry.**
+    - `token_line_regex` (named groups `count` and `scale`) rides `tokenusage.Window.TokenLineRegex` into a data-driven `TokenLinePeakCollector`.
+    - agy-tmux now resolves to `scrollback_peak` (partial) instead of uncovered, so neither the warning nor the tripwire fires on an agy pane that thought at least once.
+  - **A5, operator view.** `evolve bridge sessions [--project-root=DIR] [--json]` lists every live pane with these columns: cycle, phase, CLI, footer model (`model_label_regex`), busy/idle/gone, progress age, drawn age (`#{window_activity}`) and last token line. Sessions with no snapshot are listed as `unwatched`. It writes nothing and makes one `tmux list-sessions` per socket.
+  - **A6, walls and probes.**
+    - `clihealth.Benchable` accepts `quota_exhausted` (`QuotaExhaustedPattern`), and a test walks every manifest's quota and rate escalate rules.
+    - `captureControl` kills the ephemeral session it created (`reapEphemeralSession`, also on a failed boot), and says so on stderr when the kill fails.
+- **Architecture-review fix round (FIX_THEN_MERGE: 0 critical, 6 warnings, 4 nits):**
+  - **W1, a stale snapshot never reads as live.**
+    - The snapshot records its writer's pid (`WriterPID`). The observer (`panewatch.ReadLive`) and `evolve bridge sessions` treat a snapshot whose writer is dead as absent; both use `runlease.PIDAlive`.
+    - The engine removes `<agent>-pane-watch.json` at the start of every attempt, whatever the driver (`Engine.runAttempt`).
+  - **W2, one busy producer.** The auto-responder judges busy with the launch's resolved, manifest-filled profile (`newLaunchAutoResponder` → `paneProfileFor(lp)`) instead of a static `panestream.Profiles` lookup. An agy spinner without its footer now gates an escalate rule, as it does at the checkpoint.
+  - **W5, one input-line rule.** `panestream.LastMarkerLine` (left-trim spaces and tabs, then a prefix match) serves both `stableLines` and submit-verify's `afterLastInputLine`. An "indented input line" row in `TestPendingAtInputLine` and a panestream test kill the no-trim mutant, proved with a `go test -overlay`.
+  - **W6.** ADR-0030 has an amendment recording that `tmux_probe.go` is deleted and the pane-watch snapshot replaces it.
+  - **W3 and W4** are cross-lane, landing with `dev/cl-agyclaude`'s agy split; they are recorded in the design record §3.
+  - **Nits:**
+    - NIT-1: `parseManifest` validates `busy_line_regex`, `token_line_regex` and `model_label_regex` and their required groups, so a bad override fails loudly.
+    - NIT-2: the stall event names are constants.
+    - NIT-4: `cleanPane`'s doc sits on `cleanPane` again.
+    - NIT-3 (the second progress clock) is recorded and skipped.
+- **Evidence corrected while building:**
+  - `#{session_activity}` is not the time of last output: it stays at session creation for detached, send-keys-driven sessions.
+  - `#{window_activity}` moves on every repaint, and agy repaints about every 2 s even when idle. It is shown as a heartbeat, never used as progress.
+- **Tests, red first** (reds in the lane scratchpad):
+  - **Detector and fixtures:** `TestAgyTmux1217_*`, `TestAgyTmuxManifest_BusyLineRegexNamesTheSpinnerFrame`, the `busyline`, `tokenline` and `modellabel` tests in `panestream`, and `TestAgyDetector_ANewThoughtBlockIsProgressEvenUnderAFrozenTranscript`.
+  - **Submit verification:** `TestAgyTmux_ParkedPasteChipIsResubmitted` and its siblings, including `TestAgyTmux_ParkedPromptContainingAngleBracketsIsStillResubmitted`.
+  - **Pane watch and observer:**
+    - `panewatch` tests;
+    - `TestPaneWatcher_*` and `TestRunTmuxREPL_PublishesThePaneWatchSnapshotWhileWaiting` / `…RemovesThePaneWatchSnapshotWhenTheWaitEnds`;
+    - `TestWatch_FrozenPaneStallsAsNoProgressEvenWhileTheWorkspaceChurns` and the other observer pane tests;
+    - `TestCoreAdapter_PaneStallIsALivenessSignal` / `…StdoutStallIsAnObserverWarningSignal`;
+    - `TestRouterObserver_*`.
+  - **Token telemetry:** `TestRecordTokenUsage_AgyThoughtLineMeasuresTheAttempt` and `TestDefaultResolver_AgyThoughtLineIsMeasuredNotUncovered`.
+  - **Operator view:** `TestBridgeSessions_*`, including `…WritesNothing`.
+  - **Walls and probes:** `TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily`, `TestManifests_EveryQuotaOrRateWallRuleBenchesItsFamily` and `TestCaptureControl_*`.
+  - **Fix round:**
+    - W1: `TestEngineLaunch_ClearsALeftoverPaneWatchSnapshotBeforeEachAttempt`, `TestPaneWatcher_StampsTheWriterPID`, `TestReadLive_*`, `TestCoreAdapter_ADeadWritersSnapshotFallsBackToStdout` and `TestBridgeSessions_ADeadWritersSnapshotIsNotListedAsLive`.
+    - W2: `TestAutoResponder_AgySpinnerWithoutFooterGatesEscalateLikeTheCheckpoint`.
+    - W5: `TestLastMarkerLine_*` and the indented row of `TestPendingAtInputLine`.
+    - NIT-1: `TestParseManifest_*PaneVocabulary*`.
+  - **Tests that pinned the defect, rewritten to the corrected contract:** four `TestAmp_AgyDetector_*` tests that asserted "spinner means Converging", and the `noInputLine` exception for agy in `TestRealDriversDeclareInputLineMarker`.
+- **Consumed inbox items:** `agy-declares-an-input-line-marker`, `agy-quota-exhausted-rule-benches-the-family`.
+- **Docs:**
+  - package notes: [internal-panewatch](docs/architecture/packages/internal-panewatch.md) (new), [internal-bridge-panestream](docs/architecture/packages/internal-bridge-panestream.md), [internal-bridge](docs/architecture/packages/internal-bridge.md), [internal-adapters-observer](docs/architecture/packages/internal-adapters-observer.md), [internal-tokenusage](docs/architecture/packages/internal-tokenusage.md), [internal-core](docs/architecture/packages/internal-core.md), [cmd-evolve](docs/architecture/packages/cmd-evolve.md);
+  - [runtime-reference](docs/operations/runtime-reference.md): the stall-liveness row and the new verb;
+  - [signal-codes](docs/architecture/signal-codes.md), regenerated;
+  - [ADR-0030](docs/architecture/adr/0030-phase-observer-autospawn-in-evolve-loop.md): amendment;
+  - the agy-tmux pane vocabulary in [agy-runtime](skills/loop/reference/agy-runtime.md).
+
 ## Fixed — `evolve models refresh` tries every ready CLI to classify and says which CLIs fell back; agy's offline fast/balanced move to Gemini 3.8 Flash (2026-10-05)
 
 - **What was wrong and how it showed.** The operator wanted agy on its newest Flash, but the loop still ran Gemini 3.7 Flash: the live catalog's agy entry was last classified on 2026-08-14, and `evolve models refresh --source live` never picked up 3.8. `liveRefresh` ran every family's tier classification on one CLI, chosen by `pickClassifierCLI` from the `classifierCLIPreference` literal (codex > claude > agy) among the CLIs setup detect calls ready. Detect calls codex ready because a stale auth file exists, though the operator has no codex subscription. The codex classifier launch failed (`classifier codex: bridgePromptDispatcher: launch codex: bridge: launch exit=1`) and no other ready CLI was tried, so agy, claude and ollama all fell back to their detect maps, agy's being the manifest's 3.7 map. The command still printed `Refreshed model catalog (source: live /model (detect fallback))` and exited 0.

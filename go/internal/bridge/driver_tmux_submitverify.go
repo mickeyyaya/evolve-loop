@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
@@ -43,20 +44,15 @@ func echoChunk(s string) string {
 	return string(r)
 }
 
-// pendingAtInputLine reports whether pane's input line still holds one of the
-// echoes — i.e. the keys were typed into the REPL but never submitted. It
-// reads only the text AFTER the LAST prompt marker, which is the live input
-// line; text already submitted scrolls above the marker. An empty input
-// line, an absent marker, or a non-matching echo all mean "not pending".
 func pendingAtInputLine(pane, marker string, echoes []string) bool {
 	if marker == "" {
 		return false
 	}
-	i := strings.LastIndex(pane, marker)
-	if i < 0 {
+	rest, found := afterLastInputLine(pane, marker)
+	if !found {
 		return false
 	}
-	tail := normalizeWS(pane[i+len(marker):])
+	tail := normalizeWS(rest)
 	if tail == "" {
 		return false
 	}
@@ -138,6 +134,16 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 		return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmittedAfterResend}
 	}
 	return submitVerifyOutcome{Result: interaction.ResultSubmitVerified}
+}
+
+func afterLastInputLine(pane, marker string) (string, bool) {
+	lines := strings.Split(pane, "\n")
+	i := panestream.LastMarkerLine(lines, marker)
+	if i < 0 {
+		return "", false
+	}
+	box := strings.TrimPrefix(strings.TrimLeft(lines[i], " \t"), marker)
+	return strings.Join(append([]string{box}, lines[i+1:]...), "\n"), true
 }
 
 // promptSubmitEcho is the FORWARD-direction echo for a pasted prompt: the

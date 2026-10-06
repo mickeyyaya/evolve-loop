@@ -85,9 +85,12 @@ type Manifest struct {
 	InteractivePrompts []ManifestPrompt  `json:"interactive_prompts"`
 	// TransientRegex recognizes a temporary upstream failure on the phase pane, distinct from the permanent
 	// quota wall; empty disables it.
-	TransientRegex string `json:"transient_regex,omitempty"`
-	Stub           bool   `json:"stub"`
-	Toolless       bool   `json:"toolless,omitempty"`
+	TransientRegex  string `json:"transient_regex,omitempty"`
+	BusyLineRegex   string `json:"busy_line_regex,omitempty"`
+	TokenLineRegex  string `json:"token_line_regex,omitempty"`
+	ModelLabelRegex string `json:"model_label_regex,omitempty"`
+	Stub            bool   `json:"stub"`
+	Toolless        bool   `json:"toolless,omitempty"`
 	// ModelTierMap translates the abstract fast|balanced|deep model tier to this CLI's concrete model id;
 	// each CLI's table is the single source of truth for that translation.
 	ModelTierMap map[string]string `json:"model_tier_map,omitempty"`
@@ -207,6 +210,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	}
 	// A manifest declaring the legacy `tier_aliases` key translates it to `model_tier_map` only when
 	// ModelTierMap is empty; a manifest declaring both keeps ModelTierMap as the source of truth.
+	if err := validatePaneVocabulary(cli, m); err != nil {
+		return Manifest{}, err
+	}
 	if len(m.ModelTierMap) == 0 {
 		var v1 struct {
 			TierAliases map[string]string `json:"tier_aliases"`

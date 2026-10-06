@@ -194,6 +194,7 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 	if err != nil {
 		return "", err
 	}
+	defer reapEphemeralSession(cfg, deps, drv.session)
 	if err := drv.EnsureSession(ctx); err != nil {
 		return "", fmt.Errorf("recipe: ensure session: %w", err)
 	}
@@ -215,6 +216,15 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 		}
 	}
 	return pane, nil
+}
+
+func reapEphemeralSession(cfg *Config, deps Deps, session string) {
+	if cfg.SessionName != "" {
+		return
+	}
+	if err := deps.Tmux.KillSession(context.Background(), session); err != nil {
+		fmt.Fprintf(deps.Stderr, "[recipe] WARN session %s not reaped: %v\n", session, err)
+	}
 }
 
 // CaptureHelp launches-or-attaches the CLI's REPL, sends `/help`, and returns

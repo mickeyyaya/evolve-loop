@@ -35,7 +35,8 @@ type Window struct {
 	// Scrollback is the captured pane content, not a pane id.
 	Scrollback string
 	// Driver is the launch's CLI identity, such as "claude-tmux" or "codex"; empty means claude.
-	Driver string
+	Driver         string
+	TokenLineRegex string
 	// Start and End bound, inclusively, the assistant turns that count.
 	Start time.Time
 	End   time.Time

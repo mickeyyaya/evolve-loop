@@ -818,7 +818,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		// the conservative (more-mandatory) side at plan time. The floor is the
 		// user-resolved set or the safe default; the router self-seals the
 		// non-removable evaluator regardless.
-		if raw, perr := o.planner.Plan(planIn); perr != nil {
+		if raw, perr := o.observedPlan(ctx, cs, cycle, planIn); perr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
 			// Record the structural validation of the advisor's RAW plan
