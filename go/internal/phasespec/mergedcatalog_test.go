@@ -3,6 +3,7 @@ package phasespec
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -60,3 +61,72 @@ func TestMergedCatalog_MissingRegistryErrors(t *testing.T) {
 		t.Error("MergedCatalog(no registry) = nil error, want error")
 	}
 }
+
+func writePolicy(t *testing.T, root, body string) {
+	t.Helper()
+	dir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "policy.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRootsWithWarnings(t *testing.T) {
+	cases := []struct {
+		name     string
+		policy   *string
+		wantRoot string
+		wantWarn bool
+	}{
+		{name: "missing policy.json", wantRoot: defaultRoot},
+		{name: "valid policy.json", policy: ptr(`{"paths":{"phase_roots":"custom"}}`), wantRoot: "custom"},
+		{name: "malformed policy.json", policy: ptr(`{"paths":{"phase_roots":"custom"},`), wantRoot: defaultRoot, wantWarn: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			if tc.policy != nil {
+				writePolicy(t, root, *tc.policy)
+			}
+
+			roots, warns := RootsWithWarnings(root)
+
+			if want := filepath.Join(root, tc.wantRoot); len(roots) != 1 || roots[0] != want {
+				t.Errorf("roots = %v, want [%s]", roots, want)
+			}
+			if strings.Join(Roots(root), ":") != strings.Join(roots, ":") {
+				t.Errorf("Roots = %v, want the same roots as RootsWithWarnings %v", Roots(root), roots)
+			}
+			if !tc.wantWarn {
+				if len(warns) != 0 {
+					t.Errorf("warns = %v, want none", warns)
+				}
+				return
+			}
+			if len(warns) != 1 || !strings.HasPrefix(warns[0], "PHASE_ROOTS_POLICY_UNREADABLE: ") || !strings.Contains(warns[0], filepath.Join(root, ".evolve", "policy.json")) {
+				t.Errorf("warns = %v, want one PHASE_ROOTS_POLICY_UNREADABLE warning naming the policy.json path", warns)
+			}
+		})
+	}
+}
+
+func TestMergedCatalog_MalformedPolicyWarnsAndKeepsDefaultRoot(t *testing.T) {
+	root := seedProject(t)
+	writePolicy(t, root, `{`)
+
+	cat, _, warns, err := MergedCatalog(root)
+
+	if err != nil {
+		t.Fatalf("MergedCatalog: %v, want the catalog with a warning", err)
+	}
+	if _, ok := cat.Get("widget-scan"); !ok {
+		t.Error("the default-root user phase must still resolve when policy.json is malformed")
+	}
+	if len(warns) != 1 || !strings.HasPrefix(warns[0], "PHASE_ROOTS_POLICY_UNREADABLE: ") {
+		t.Errorf("warns = %v, want exactly the PHASE_ROOTS_POLICY_UNREADABLE warning", warns)
+	}
+}
+
+func ptr(s string) *string { return &s }

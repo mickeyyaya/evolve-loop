@@ -95,8 +95,12 @@ Schema doc: [phase-descriptor.schema.json](phase-descriptor.schema.json).
 - `phasespec.DiscoverUserSpecsFromRoots(roots) (specs, sources, warnings)` — ordered
   concat; inter-root collision keeps the left-most with a shadowing warning; `sources`
   maps name → root (provenance).
-- `phaseRoots(projectRoot)` (cmd/evolve) parses `EVOLVE_PHASE_ROOTS` — colon-separated,
-  relative entries resolved against the project root, default `.evolve/phases`.
+- `phasespec.Roots(projectRoot)` reads `paths.phase_roots` from `.evolve/policy.json` —
+  colon-separated, relative entries resolved against the project root, default
+  `.evolve/phases`. `phasespec.RootsWithWarnings` also returns a
+  `PHASE_ROOTS_POLICY_UNREADABLE` warning when policy.json is malformed, so the fallback
+  to the default root is visible; `MergedCatalog` (`phases list`, preflight, skillcheck),
+  `phases validate` and `phase lint` print it. A missing policy.json is silent.
 - Wired at: composition root (`cmd_cycle.go`), `phases list/validate`, `phase lint`,
   `phases create` collision check, `phase-inventory build`.
 - `phases list` shows SOURCE + ROOT columns.

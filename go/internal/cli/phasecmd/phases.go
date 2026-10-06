@@ -88,8 +88,9 @@ func phasesValidate(project, profileDir string, args []string, stdout, stderr io
 	}
 	pnames, provenanceFailed := warnMissingProvenance(profileDir, strictProvenance, stdout)
 
-	user, _, warns := phasespec.DiscoverUserSpecsFromRoots(phasespec.Roots(project))
-	for _, w := range warns {
+	roots, warns := phasespec.RootsWithWarnings(project)
+	user, _, discWarns := phasespec.DiscoverUserSpecsFromRoots(roots)
+	for _, w := range append(warns, discWarns...) {
 		fmt.Fprintln(stderr, "WARN:", w)
 	}
 	if len(args) > 0 {

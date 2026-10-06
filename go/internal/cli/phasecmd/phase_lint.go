@@ -22,8 +22,9 @@ func runPhaseLint(args []string, stdout, stderr io.Writer) int {
 	name := strings.ToLower(strings.TrimSpace(args[0]))
 	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 
-	user, _, discWarns := phasespec.DiscoverUserSpecsFromRoots(phasespec.Roots(project))
-	for _, w := range discWarns {
+	roots, rootWarns := phasespec.RootsWithWarnings(project)
+	user, _, discWarns := phasespec.DiscoverUserSpecsFromRoots(roots)
+	for _, w := range append(rootWarns, discWarns...) {
 		fmt.Fprintln(stdout, "WARN:", w)
 	}
 
