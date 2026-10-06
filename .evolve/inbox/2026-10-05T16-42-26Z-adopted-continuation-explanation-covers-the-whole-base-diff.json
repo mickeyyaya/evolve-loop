@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "An adopted continuation's build prompt names the carried snapshot's material paths and requires the explanation to cover them (red first on the prompt builder)",
+    "A fixture continuation whose explanation describes only its increment is caught before audit, or the brief prevents it, pinned by a test"
+  ],
+  "created_at": "2026-10-05T16:42:26Z",
+  "files": [
+    "go/internal/core",
+    "agents/evolve-builder-reference.md",
+    "go/internal/explanationdocs"
+  ],
+  "fix": "When continuation-manifest.json is present, the build brief states that the explanation covers the whole base-bound diff, including every change the adopted snapshot carries, with its rationale; the host lists the snapshot's material paths and its inherited explanation (if any) as an input. Optionally the explanation floor checks that each adopted-snapshot path's section is non-trivial.",
+  "id": "adopted-continuation-explanation-covers-the-whole-base-diff",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, wave 62 audits of cycles 1799 and 1800, 2026-10-06",
+  "summary": "Wave 62's two lanes both adopted wave 61's preserved continuations (1799 from 1797, 1800 from 1798). Both builds produced code that passed every acceptance criterion, and both first audits FAILed only on the permanent explanation document. 1800's audit: the base-bound explanation describes only cycle 1800's increment over the adopted 1798 snapshot, omits the gc refuse-before-reap reordering and the whole evolve failures command group, and its Compatibility section wrongly claims CLI output is unchanged. The build prompt's explanation-documentation-contract says to cite every material path of the base-bound Build diff, but nothing tells an adopted continuation that its base-bound diff includes the carried snapshot's changes. The deterministic path-citation floor passed (the paths were cited), so each adoption costs an audit-repair round on content alone.",
+  "title": "An adopted continuation's build explains only its own increment, so its first audit fails on the explanation",
+  "weight": 0.5
+}

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -164,68 +166,57 @@ func (c bridgeModelCapturer) CaptureModelPicker(ctx context.Context, cli string)
 type bridgePromptDispatcher struct {
 	workspace   string
 	projectRoot string
+	launch      func(context.Context, core.BridgeRequest) (core.BridgeResponse, error)
 }
 
 func (d bridgePromptDispatcher) DispatchPrompt(ctx context.Context, cli, prompt string) (string, error) {
-	driver := cli
-	if cli == "claude" {
-		driver = "claude-p"
+	req := d.request(cli, prompt)
+	if err := os.Remove(req.ArtifactPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("bridgePromptDispatcher: clear %s's previous reply: %w", req.CLI, err)
 	}
-	eng := bridge.NewEngine(bridge.Deps{})
-	resp, err := eng.Launch(ctx, core.BridgeRequest{
-		CLI:          driver,
-		Profile:      filepath.Join(d.projectRoot, ".evolve", "profiles", "router.json"),
-		Prompt:       prompt,
-		Workspace:    d.workspace,
-		ProjectRoot:  d.projectRoot,
-		Agent:        "model-classifier",
-		ArtifactPath: filepath.Join(d.workspace, "model-classifier-artifact.txt"),
-		Completion:   core.CompletionArtifact,
-	})
+	resp, err := d.launcher()(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("bridgePromptDispatcher: launch %s: %w", driver, err)
+		return "", fmt.Errorf("bridgePromptDispatcher: launch %s: %w", req.CLI, err)
 	}
 	return resp.Stdout, nil
 }
 
-// classifierCLIPreference orders the CLIs we'd rather run the one-shot tier
-// classification on (codex's `exec` is the most validated headless path).
+func (d bridgePromptDispatcher) launcher() func(context.Context, core.BridgeRequest) (core.BridgeResponse, error) {
+	if d.launch != nil {
+		return d.launch
+	}
+	return bridge.NewEngine(bridge.Deps{}).Launch
+}
+
+func (d bridgePromptDispatcher) request(cli, prompt string) core.BridgeRequest {
+	driver := cli
+	if cli == "claude" {
+		driver = "claude-p"
+	}
+	artifact := filepath.Join(d.workspace, "model-classifier-artifact.txt")
+	return core.BridgeRequest{
+		CLI:          driver,
+		Profile:      filepath.Join(d.projectRoot, ".evolve", "profiles", "router.json"),
+		Prompt:       prompt + fmt.Sprintf("\n\nWrite that JSON object, and nothing else, to the file %s, then reply with the same JSON.\n", artifact),
+		Workspace:    d.workspace,
+		ProjectRoot:  d.projectRoot,
+		Agent:        "model-classifier",
+		ArtifactPath: artifact,
+		Completion:   core.CompletionArtifact,
+	}
+}
+
 var classifierCLIPreference = []string{"codex", "claude", "agy"}
 
-// liveRefresh queries each ready CLI's live /model list, classifies the ids
-// into tiers via a ready CLI (skipped wholesale when a CLI's offering
-// fingerprints identically to prior — zero LLM calls on an unchanged
-// offering), and assembles the catalog. Per-CLI live failures fall back to
-// that CLI's detect tier map (modelquery.Refresh handles this), so the
-// refresh is best-effort and never aborts.
 func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolveDir string, prior modelcatalog.Catalog, log io.Writer) (modelcatalog.Catalog, error) {
-	if projectRoot == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return modelcatalog.Catalog{}, fmt.Errorf("liveRefresh: resolve workspace: %w", err)
-		}
-		projectRoot = cwd
+	projectRoot, evolveDir, err := liveRefreshRoots(projectRoot, evolveDir)
+	if err != nil {
+		return modelcatalog.Catalog{}, err
 	}
-	if evolveDir == "" {
-		evolveDir = filepath.Join(projectRoot, ".evolve")
-	}
-	var readyCLIs []string
-	fallback := make(map[string]map[string]string)
-	for _, c := range rep.CLIs {
-		if c.Verdict != "ready" {
-			continue
-		}
-		readyCLIs = append(readyCLIs, c.CLI)
-		if len(c.TierModels) > 0 {
-			fallback[c.CLI] = c.TierModels
-		}
-	}
+	readyCLIs, fallback := readyCLIsWithDetectMaps(rep)
 	if len(readyCLIs) == 0 {
 		return modelcatalog.Catalog{}, fmt.Errorf("no ready CLIs to query (run: evolve setup detect)")
 	}
-	// Non-empty by construction: pickClassifierCLI returns "" only for an empty
-	// ready set, already excluded above.
-	classifierCLI := pickClassifierCLI(readyCLIs, "")
 
 	// The probe (tmux picker capture + one-shot classifier) works in a
 	// throwaway scratch dir, never the repo: the router profile's sandbox
@@ -245,29 +236,60 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		_ = os.RemoveAll(scratch)
 	}()
 
-	capturer := bridgeModelCapturer{workspace: scratch}
-	router := modelquery.DefaultRouter(capturer)
 	dispatcher := bridgePromptDispatcher{workspace: scratch, projectRoot: projectRoot}
-	// D7 family gate: read policy.json catalog.allowed_families so each CLI's
-	// live candidates are family-filtered before classification. Load is
-	// nil-safe — an absent/malformed policy yields a nil map (no constraint),
-	// byte-identical to today for every deployment that hasn't opted in.
-	var allowedFamilies map[string][]string
-	if pol, perr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); perr == nil {
-		allowedFamilies = pol.CatalogConfig().AllowedFamilies
-	}
 	return modelquery.Refresh(ctx, modelquery.RefreshDeps{
 		CLIs:            readyCLIs,
-		Lister:          router,
-		Classifier:      modelquery.CLIClassifier{CLI: classifierCLI, Dispatcher: dispatcher},
+		Lister:          modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch}),
+		Classifier:      tierClassifier(readyCLIs, dispatcher, log),
 		Fallback:        fallback,
-		AllowedFamilies: allowedFamilies,
+		AllowedFamilies: policyAllowedFamilies(projectRoot),
 		EffortListers:   modelquery.DefaultEffortListers(),
 		Prior:           prior,
 		Freshness:       freshnessFromManifests(readyCLIs),
 		Now:             time.Now,
 		Log:             log,
 	})
+}
+
+func liveRefreshRoots(projectRoot, evolveDir string) (string, string, error) {
+	if projectRoot == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", "", fmt.Errorf("liveRefresh: resolve workspace: %w", err)
+		}
+		projectRoot = cwd
+	}
+	if evolveDir == "" {
+		evolveDir = filepath.Join(projectRoot, ".evolve")
+	}
+	return projectRoot, evolveDir, nil
+}
+
+func readyCLIsWithDetectMaps(rep setup.DetectReport) ([]string, map[string]map[string]string) {
+	var ready []string
+	detectMaps := make(map[string]map[string]string)
+	for _, c := range rep.CLIs {
+		if c.Verdict != "ready" {
+			continue
+		}
+		ready = append(ready, c.CLI)
+		if len(c.TierModels) > 0 {
+			detectMaps[c.CLI] = c.TierModels
+		}
+	}
+	return ready, detectMaps
+}
+
+func policyAllowedFamilies(projectRoot string) map[string][]string {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return nil
+	}
+	return pol.CatalogConfig().AllowedFamilies
+}
+
+func tierClassifier(ready []string, dispatcher modelquery.PromptDispatcher, log io.Writer) modelquery.ChainClassifier {
+	return modelquery.ChainClassifier{CLIs: pickClassifierCLI(ready, ""), Dispatcher: dispatcher, Log: log}
 }
 
 // salvageProbeDiagnostics copies the diagnostic side-effects the bridge wrote
@@ -371,26 +393,21 @@ func freshnessFromManifests(clis []string) map[string]modelquery.FreshnessPolicy
 	return out
 }
 
-// pickClassifierCLI chooses which ready CLI runs the tier-classification prompt.
-// overrideCLI pins a specific CLI — but ONLY when it names a ready CLI (a
-// stale/misconfigured override must not silently classify against a blocked CLI;
-// mirrors the policy-pin validation discipline). Otherwise the first ready CLI
-// in preference order, else any ready CLI.
-func pickClassifierCLI(ready []string, overrideCLI string) string {
-	readySet := make(map[string]bool, len(ready))
+func pickClassifierCLI(ready []string, overrideCLI string) []string {
+	remaining := make(map[string]bool, len(ready))
 	for _, r := range ready {
-		readySet[r] = true
+		remaining[r] = true
 	}
-	if overrideCLI != "" && readySet[overrideCLI] {
-		return overrideCLI
-	}
-	for _, pref := range classifierCLIPreference {
-		if readySet[pref] {
-			return pref
+	order := make([]string, 0, len(ready))
+	take := func(cli string) {
+		if remaining[cli] {
+			order = append(order, cli)
+			delete(remaining, cli)
 		}
 	}
-	if len(ready) > 0 {
-		return ready[0]
+	take(overrideCLI)
+	for _, cli := range classifierCLIPreference {
+		take(cli)
 	}
-	return ""
+	return order
 }

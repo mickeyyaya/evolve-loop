@@ -94,8 +94,8 @@ func TestTierModelsFor(t *testing.T) {
 	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
 	agy := tierModelsFor("agy")
 	wantAgy := map[string]string{
-		"fast":     "Gemini 3.7 Flash (Low)",
-		"balanced": "Gemini 3.7 Flash (High)",
+		"fast":     "Gemini 3.8 Flash (Low)",
+		"balanced": "Gemini 3.8 Flash (High)",
 		"deep":     "Gemini 3.1 Pro (High)",
 	}
 	for tier, m := range wantAgy {
