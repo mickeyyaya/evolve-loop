@@ -15,8 +15,14 @@ func IsOperatorState(it Item) bool {
 		return false
 	}
 	for _, f := range it.Files {
-		if !strings.HasPrefix(f, evolveStatePrefix) {
+		tokens := declaredTokens([]string{f})
+		if len(tokens) == 0 {
 			return false
+		}
+		for _, tok := range tokens {
+			if !strings.HasPrefix(tok, evolveStatePrefix) {
+				return false
+			}
 		}
 	}
 	return true

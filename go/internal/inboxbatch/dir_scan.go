@@ -11,6 +11,7 @@ import (
 type LoadWarning struct {
 	Text       string
 	Unreadable bool
+	file       string
 }
 
 type DirScan struct {
@@ -41,7 +42,7 @@ func ScanDir(dir string) (DirScan, error) {
 			scan = scan.withFile(dir, e.Name())
 		}
 	}
-	sort.Slice(scan.Items, func(i, j int) bool { return scan.Items[i].ID < scan.Items[j].ID })
+	sort.SliceStable(scan.Items, func(i, j int) bool { return scan.Items[i].ID < scan.Items[j].ID })
 	scan.Warnings = append(scan.Warnings, duplicateIDWarnings(scan.Items)...)
 	return scan, nil
 }
@@ -49,11 +50,11 @@ func ScanDir(dir string) (DirScan, error) {
 func (s DirScan) withFile(dir, name string) DirScan {
 	it, notices, err := LoadFile(filepath.Join(dir, name))
 	if err != nil {
-		s.Warnings = append(s.Warnings, LoadWarning{Text: name + ": " + err.Error(), Unreadable: true})
+		s.Warnings = append(s.Warnings, LoadWarning{Text: name + ": " + err.Error(), Unreadable: true, file: name})
 		return s
 	}
 	for _, n := range notices {
-		s.Warnings = append(s.Warnings, LoadWarning{Text: n})
+		s.Warnings = append(s.Warnings, LoadWarning{Text: n, file: name})
 	}
 	s.Items = append(s.Items, it)
 	return s
@@ -63,7 +64,7 @@ func duplicateIDWarnings(sorted []Item) []LoadWarning {
 	var out []LoadWarning
 	for i := 1; i < len(sorted); i++ {
 		if sorted[i].ID == sorted[i-1].ID {
-			out = append(out, LoadWarning{Text: sorted[i].Path + ": duplicate id " + sorted[i].ID + " (also " + sorted[i-1].Path + ") — dep/connects references resolve ambiguously"})
+			out = append(out, LoadWarning{Text: sorted[i].Path + ": duplicate id " + sorted[i].ID + " (also " + sorted[i-1].Path + ") — dep/connects/routing references resolve to the earliest-filed record", file: sorted[i].Path})
 		}
 	}
 	return out

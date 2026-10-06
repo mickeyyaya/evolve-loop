@@ -39,10 +39,7 @@ func (c UnifiedCommitment) Validate(items []Item) error {
 		return fmt.Errorf("unified commitment: at least two members are required")
 	}
 
-	known := make(map[string]Item, len(items))
-	for _, item := range items {
-		known[item.ID] = item
-	}
+	known := indexByID(items)
 	seen := make(map[string]bool, len(c.Members))
 	campaigns := map[string]bool{}
 	kinds := map[string]bool{}
@@ -58,10 +55,11 @@ func (c UnifiedCommitment) Validate(items []Item) error {
 			return fmt.Errorf("unified commitment: member %q is duplicated", id)
 		}
 		seen[id] = true
-		item, ok := known[id]
+		at, ok := known[id]
 		if !ok {
 			return fmt.Errorf("unified commitment: member %q is not a known inbox item", id)
 		}
+		item := items[at]
 		campaigns[strings.TrimSpace(item.Campaign)] = true
 		kind := strings.TrimSpace(item.DeliverableKind)
 		if kind == "" {

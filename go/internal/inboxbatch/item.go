@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
@@ -243,7 +244,11 @@ func sanitizeItem(it *Item) []string {
 	clean := func(field, s string, max int) string {
 		mapped := StripControl(s)
 		if len(mapped) > max {
-			mapped = mapped[:max]
+			cut := max
+			for cut > 0 && !utf8.RuneStart(mapped[cut]) {
+				cut--
+			}
+			mapped = mapped[:cut]
 		}
 		if mapped != s && !slices.Contains(changed, field) {
 			changed = append(changed, field)

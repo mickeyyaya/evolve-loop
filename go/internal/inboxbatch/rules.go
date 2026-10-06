@@ -58,8 +58,8 @@ func (fileAreaRule) Edges(items []Item) []Edge {
 	byArea := map[string][]int{}
 	for i, it := range items {
 		seen := map[string]bool{}
-		for _, f := range it.Files {
-			a := fileArea(f)
+		for _, tok := range it.DeclaredPaths() {
+			a := fileArea(tok)
 			if a == "" || seen[a] {
 				continue
 			}
@@ -81,7 +81,6 @@ func (fileAreaRule) Edges(items []Item) []Edge {
 
 // fileArea returns f's directory capped at areaDepth segments, or "" when it is shallower than minAreaDepth.
 func fileArea(f string) string {
-	f = strings.TrimSpace(f)
 	dir := path.Dir(f)
 	// A trailing "/" names a directory, which path.Dir would climb out of.
 	if strings.HasSuffix(f, "/") {
@@ -120,7 +119,9 @@ func (ConnectsRule) Edges(items []Item) []Edge {
 func indexByID(items []Item) map[string]int {
 	index := make(map[string]int, len(items))
 	for i, it := range items {
-		index[it.ID] = i
+		if _, dup := index[it.ID]; !dup {
+			index[it.ID] = i
+		}
 	}
 	return index
 }

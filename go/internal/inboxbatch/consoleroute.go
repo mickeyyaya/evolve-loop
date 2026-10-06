@@ -4,6 +4,8 @@ import "strings"
 
 const RouteLaneValue = "lane"
 
+const loadWarningCode = "INBOX_LOAD_WARNING"
+
 // consoleRoutePrefix marks operator-owned route values (console-manual, console-salvage, ...).
 const consoleRoutePrefix = "console"
 
@@ -106,18 +108,23 @@ func PartitionConsole(items []Item, isProtected func(string) bool) (laneRoutable
 // RoutedResolver loads dir once and classifies by id; unknown ids and a failed load resolve dispatchable.
 // Build one per wave so inbox changes are seen; failing open keeps a broken backlog from stopping the queue.
 func RoutedResolver(dir string, isProtected func(string) bool) func(id string) (bool, string) {
-	items, _, _ := LoadDir(dir)
-	idx := make(map[string]Item, len(items))
-	for _, it := range items {
-		if _, dup := idx[it.ID]; !dup {
-			idx[it.ID] = it
-		}
-	}
+	scan, _ := ScanDir(dir)
+	idx := indexByID(scan.Items)
 	return func(id string) (bool, string) {
-		it, ok := idx[id]
+		at, ok := idx[id]
 		if !ok {
 			return false, ""
 		}
-		return ConsoleRouted(it, isProtected)
+		it := scan.Items[at]
+		routed, reason := ConsoleRouted(it, isProtected)
+		if !routed {
+			return false, reason
+		}
+		for _, w := range scan.Warnings {
+			if w.file == it.Path {
+				reason += "; " + loadWarningCode + ": " + w.Text
+			}
+		}
+		return true, reason
 	}
 }
