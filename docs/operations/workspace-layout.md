@@ -16,10 +16,13 @@ which was operationally correct but illegible to a human eye.
 │                      cycle worktrees spawn under runtime/.evolve/worktrees/
 ├─ dev/                ephemeral task worktrees — created per task, deleted on
 │                      merge (`evolve worktree create --dev <task> --branch <b>`)
-├─ backups/            ref bundles + runs archives
+├─ backups/            ref bundles + runs archives (`evolve backups verify [--dir D]`
+│                      proves every head and patch exists elsewhere before you delete)
 ├─ go -> console/go            compat shim for pre-migration hook references
 └─ .evolve -> console/.evolve  compat shim (safe to remove once no old sessions)
 ```
+
+`evolve backups verify` is read-only: each bundle head prints `IN_MAIN`, `OTHER_BRANCH` or `ONLY_IN_BACKUP`, each patch `APPLIED` (its reverse applies to the `origin/main` tree; the checkout and index are ignored) or `UNAPPLIED`. Exit 0 = safe to delete, 1 = an unsafe head or patch (named on stderr), 2 = I/O or git failure. It never deletes.
 
 ## Why two long-lived planes (unchanged from the sibling era)
 
