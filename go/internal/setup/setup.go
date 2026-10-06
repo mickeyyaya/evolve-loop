@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -118,6 +119,7 @@ type DetectOptions struct {
 	Now         func() time.Time
 	Doctor      func(ctx context.Context) bridge.DoctorReport
 	CapTier     func(base string) string
+	Router      *cliroute.Router
 }
 
 func Detect(ctx context.Context, o DetectOptions) DetectReport {
@@ -189,11 +191,12 @@ func detectPhases(o DetectOptions, env func(string) string, pol policy.Policy, p
 	profilesDir := filepath.Join(o.EvolveDir, "profiles")
 	profLoader := profiles.NewFromDir(profilesDir)
 	var phases []PhaseStatus
+	router, routeErr := detectRouter(o.Router, pol)
 	for _, role := range Roles {
 		ps := PhaseStatus{Role: role, Source: "unresolved"}
-		if res, err := resolvellm.Resolve(role, resolvellm.Options{
+		if res, ok := resolvedRole(router, routeErr, role, resolvellm.Options{
 			ProjectRoot: o.ProjectRoot, PluginRoot: o.PluginRoot, Env: env,
-		}); err == nil {
+		}); ok {
 			ps.CurrentCLI, ps.CurrentTier, ps.Source = res.CLI, res.ModelTier, res.Source
 		}
 		if pc, ok := readProfileConstraints(profilesDir, role); ok {
@@ -206,6 +209,21 @@ func detectPhases(o DetectOptions, env func(string) string, pol policy.Policy, p
 		phases = append(phases, ps)
 	}
 	return phases
+}
+
+func detectRouter(injected *cliroute.Router, pol policy.Policy) (*cliroute.Router, error) {
+	if injected != nil {
+		return injected, nil
+	}
+	return cliroute.NewSingleProfileRouter(pol, cliroute.SingleProfile{}, cliroute.Host{})
+}
+
+func resolvedRole(router *cliroute.Router, routeErr error, role string, opts resolvellm.Options) (resolvellm.Result, bool) {
+	if routeErr != nil {
+		return resolvellm.Result{}, false
+	}
+	res, err := router.ResolveRole(role, opts)
+	return res, err == nil
 }
 
 func withPolicyPin(ps PhaseStatus, pin policy.Pin, profLoader *profiles.Loader) PhaseStatus {

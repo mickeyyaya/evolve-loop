@@ -32,6 +32,7 @@ func driverChain(configRoot string, w Window) []Collector {
 	return []Collector{
 		EventsResultCollector(w.EventsLogPath),
 		ScrollbackPeakCollector(w.Scrollback),
+		TokenLinePeakCollector(w.Scrollback, w.TokenLineRegex),
 	}
 }
 

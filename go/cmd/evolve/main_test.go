@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 )
@@ -18,6 +19,9 @@ func TestMain(m *testing.M) {
 	disableWorkspaceGuardForTest = true
 	runLoopPreflightFn = func(loopConfig, io.Writer) looppreflight.Result {
 		return looppreflight.Result{}
+	}
+	cliUpdateWiringFn = func(string, io.Writer) cliUpdateWiring {
+		return cliUpdateWiring{now: time.Now}
 	}
 	tmuxTmp, err := os.MkdirTemp("/tmp", "evtmux")
 	if err != nil {

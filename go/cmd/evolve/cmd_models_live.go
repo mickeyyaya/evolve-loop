@@ -8,13 +8,16 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelquery"
@@ -206,8 +209,6 @@ func (d bridgePromptDispatcher) request(cli, prompt string) core.BridgeRequest {
 	}
 }
 
-var classifierCLIPreference = []string{"codex", "claude", "agy"}
-
 func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolveDir string, prior modelcatalog.Catalog, log io.Writer) (modelcatalog.Catalog, error) {
 	projectRoot, evolveDir, err := liveRefreshRoots(projectRoot, evolveDir)
 	if err != nil {
@@ -236,11 +237,15 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		_ = os.RemoveAll(scratch)
 	}()
 
+	preference, err := classifierPreference(projectRoot)
+	if err != nil {
+		return modelcatalog.Catalog{}, err
+	}
 	dispatcher := bridgePromptDispatcher{workspace: scratch, projectRoot: projectRoot}
 	return modelquery.Refresh(ctx, modelquery.RefreshDeps{
 		CLIs:            readyCLIs,
 		Lister:          modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch}),
-		Classifier:      tierClassifier(readyCLIs, dispatcher, log),
+		Classifier:      tierClassifier(readyCLIs, preference, dispatcher, log),
 		Fallback:        fallback,
 		AllowedFamilies: policyAllowedFamilies(projectRoot),
 		EffortListers:   modelquery.DefaultEffortListers(),
@@ -288,8 +293,30 @@ func policyAllowedFamilies(projectRoot string) map[string][]string {
 	return pol.CatalogConfig().AllowedFamilies
 }
 
-func tierClassifier(ready []string, dispatcher modelquery.PromptDispatcher, log io.Writer) modelquery.ChainClassifier {
-	return modelquery.ChainClassifier{CLIs: pickClassifierCLI(ready, ""), Dispatcher: dispatcher, Log: log}
+func tierClassifier(ready, preference []string, dispatcher modelquery.PromptDispatcher, log io.Writer) modelquery.ChainClassifier {
+	return modelquery.ChainClassifier{CLIs: pickClassifierCLI(ready, preference, ""), Dispatcher: dispatcher, Log: log}
+}
+
+func classifierPreference(projectRoot string) ([]string, error) {
+	router, _, err := loadCLIRouter(projectRoot, cliroute.Host{})
+	if err != nil {
+		return nil, fmt.Errorf("liveRefresh: the CLI routing table refuses to route the model classifier: %w", err)
+	}
+	return classifierFamilies(router)
+}
+
+func classifierFamilies(router *cliroute.Router) ([]string, error) {
+	d, err := router.Resolve(cliroute.Request{Agent: cliroute.ClassifierAgent, Launch: cliroute.LaunchClassifier})
+	if err != nil {
+		return nil, fmt.Errorf("liveRefresh: no route for the model classifier: %w", err)
+	}
+	var families []string
+	for _, cli := range d.Plan.Candidates {
+		if fam := llmroute.Family(cli); !slices.Contains(families, fam) {
+			families = append(families, fam)
+		}
+	}
+	return families, nil
 }
 
 // salvageProbeDiagnostics copies the diagnostic side-effects the bridge wrote
@@ -393,7 +420,7 @@ func freshnessFromManifests(clis []string) map[string]modelquery.FreshnessPolicy
 	return out
 }
 
-func pickClassifierCLI(ready []string, overrideCLI string) []string {
+func pickClassifierCLI(ready, preference []string, overrideCLI string) []string {
 	remaining := make(map[string]bool, len(ready))
 	for _, r := range ready {
 		remaining[r] = true
@@ -406,7 +433,7 @@ func pickClassifierCLI(ready []string, overrideCLI string) []string {
 		}
 	}
 	take(overrideCLI)
-	for _, cli := range classifierCLIPreference {
+	for _, cli := range preference {
 		take(cli)
 	}
 	return order

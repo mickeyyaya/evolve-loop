@@ -1,7 +1,9 @@
 package cliroute
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"slices"
 	"sort"
@@ -73,6 +75,10 @@ func (c *compiler) snapshotProfiles(profs ProfileSource) map[string]loadedProfil
 		return snapshot
 	}
 	names, err := profs.List()
+	if err != nil && errors.Is(err, fs.ErrNotExist) && c.pol.CLIRouting == nil {
+		c.add(SeverityWarn, "profiles", "the profiles directory does not exist, so every agent routes with no profile, as before the routing table: %v", err)
+		return snapshot
+	}
 	if err != nil {
 		c.add(SeverityError, "profiles", "listing the profiles failed: %v", err)
 		return snapshot

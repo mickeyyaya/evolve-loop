@@ -75,7 +75,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 
 	t.Run("fallback when no profile and no rc", func(t *testing.T) {
 		t.Parallel()
-		cli, model := resolveRouterDispatch(t.TempDir(), policy.RouterPolicy{}) // empty dir ⇒ no profile file
+		cli, model := mustRouterDispatch(t, t.TempDir(), policy.RouterPolicy{}) // empty dir ⇒ no profile file
 		if cli != "claude-tmux" || model != "opus" {
 			t.Errorf("fallback = (%q,%q), want (claude-tmux,opus)", cli, model)
 		}
@@ -85,7 +85,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		writeRouterProfile(t, dir, "codex-tmux", "deep")
-		cli, model := resolveRouterDispatch(dir, policy.RouterPolicy{})
+		cli, model := mustRouterDispatch(t, dir, policy.RouterPolicy{})
 		if cli != "codex-tmux" || model != "deep" {
 			t.Errorf("profile = (%q,%q), want (codex-tmux,deep)", cli, model)
 		}
@@ -95,7 +95,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		writeRouterProfile(t, dir, "codex-tmux", "deep")
-		cli, model := resolveRouterDispatch(dir, policy.RouterPolicy{CLI: "agy", Model: "balanced"})
+		cli, model := mustRouterDispatch(t, dir, policy.RouterPolicy{CLI: "agy", Model: "balanced"})
 		if cli != "agy" || model != "balanced" {
 			t.Errorf("rc = (%q,%q), want (agy,balanced) — rc must override profile", cli, model)
 		}
@@ -103,7 +103,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 
 	t.Run("rc beats fallback when no profile", func(t *testing.T) {
 		t.Parallel()
-		cli, model := resolveRouterDispatch(t.TempDir(), policy.RouterPolicy{CLI: "gemini-tmux", Model: "fast"})
+		cli, model := mustRouterDispatch(t, t.TempDir(), policy.RouterPolicy{CLI: "gemini-tmux", Model: "fast"})
 		if cli != "gemini-tmux" || model != "fast" {
 			t.Errorf("rc-only = (%q,%q), want (gemini-tmux,fast)", cli, model)
 		}
@@ -113,7 +113,7 @@ func TestResolveRouterDispatch_Precedence(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
 		writeRouterProfile(t, dir, "codex-tmux", "") // no model_tier_default
-		cli, model := resolveRouterDispatch(dir, policy.RouterPolicy{})
+		cli, model := mustRouterDispatch(t, dir, policy.RouterPolicy{})
 		if cli != "codex-tmux" || model != "opus" {
 			t.Errorf("partial = (%q,%q), want (codex-tmux,opus) — model falls back", cli, model)
 		}

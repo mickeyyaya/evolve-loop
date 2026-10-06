@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -106,9 +107,7 @@ func TestRevertAndShipWith_RevertOK_BinaryFails_LocalOnly(t *testing.T) {
 
 	binDir := t.TempDir()
 	binPath := filepath.Join(binDir, "evolve")
-	if err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, binPath, "#!/bin/sh\nexit 1\n")
 	t.Setenv("EVOLVE_GO_BIN", binPath)
 
 	fake := &fixtures.FakeExec{}
@@ -125,9 +124,7 @@ func TestRevertAndShipWith_RevertOK_BinarySucceeds_Reverted(t *testing.T) {
 
 	binDir := t.TempDir()
 	binPath := filepath.Join(binDir, "evolve")
-	if err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, binPath, "#!/bin/sh\nexit 0\n")
 	t.Setenv("EVOLVE_GO_BIN", binPath)
 
 	fake := &fixtures.FakeExec{}

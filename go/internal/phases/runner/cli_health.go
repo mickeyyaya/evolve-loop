@@ -11,11 +11,7 @@ import (
 
 func runnerLogf(format string, args ...any) { fmt.Fprintf(os.Stderr, "[runner] "+format, args...) }
 
-// applyBenchToPlan reorders the chain by the CLI-health bench unless a policy pin fixes the CLI.
-func (b *BaseRunner) applyBenchToPlan(projectRoot, phase string, plan llmroute.Plan, pinned bool, env map[string]string) llmroute.Plan {
-	if pinned {
-		return plan
-	}
+func (b *BaseRunner) bench(projectRoot, phase string, plan llmroute.Plan, env map[string]string) llmroute.Plan {
 	return bridgechain.ApplyCLIHealthBench(projectRoot, phase, plan, env, b.nowFn, runnerLogf)
 }
 

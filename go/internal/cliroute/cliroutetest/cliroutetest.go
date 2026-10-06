@@ -41,6 +41,7 @@ type Variant struct {
 	Bypass          bool
 	Overlay         llmroute.Overlay
 	CallerCLI       string
+	Router          *policy.RouterPolicy
 	Installed       []string
 	Discovered      []string
 	BenchedFamily   string
@@ -67,6 +68,7 @@ func Variants() []Variant {
 		host(Variant{Name: "caller_cli", CallerCLI: "claude-p"}),
 		host(Variant{Name: "checked_in_tail", ExcludeNoFamily: true}),
 		host(Variant{Name: "bypass", Pin: &policy.Pin{CLI: "agy", Model: "deep"}, ExcludeNoFamily: true, Bypass: true}),
+		host(Variant{Name: "router_keys", Router: &policy.RouterPolicy{CLI: "claude-tmux", Model: "balanced", PlanModel: "top"}}),
 	}
 }
 
@@ -150,6 +152,9 @@ func (v Variant) policyDoc(phases []string) map[string]any {
 	}
 	if v.ExcludeNoFamily {
 		doc["workflow"] = map[string]any{"universal_fallback_exclude": []string{}}
+	}
+	if v.Router != nil {
+		doc["router"] = v.Router
 	}
 	if len(doc) == 0 {
 		return nil
@@ -241,6 +246,7 @@ type Record struct {
 	Tiers         []string            `json:"tiers,omitempty"`
 	TierCeiling   map[string][]string `json:"tier_ceiling,omitempty"`
 	Error         string              `json:"error,omitempty"`
+	Healthy       *bool               `json:"healthy,omitempty"`
 }
 
 func PlanRecord(resolver, variant, agent, phase string, plan llmroute.Plan) Record {
@@ -257,11 +263,21 @@ func ErrorRecord(resolver, variant, agent, phase, message string) Record {
 
 func GoldenPath(t *testing.T) string {
 	t.Helper()
+	return testdataPath(t, "legacy-plans.golden.jsonl")
+}
+
+func AdvisorGoldenPath(t *testing.T) string {
+	t.Helper()
+	return testdataPath(t, "legacy-advisor.golden.jsonl")
+}
+
+func testdataPath(t *testing.T, name string) string {
+	t.Helper()
 	_, self, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
-	return filepath.Join(filepath.Dir(self), "..", "testdata", "legacy-plans.golden.jsonl")
+	return filepath.Join(filepath.Dir(self), "..", "testdata", name)
 }
 
 func Encode(records []Record) ([]byte, error) {
@@ -296,11 +312,15 @@ func ReadGolden(t *testing.T) []Record {
 
 func AssertGolden(t *testing.T, records []Record, update bool) {
 	t.Helper()
+	AssertGoldenAt(t, GoldenPath(t), records, update)
+}
+
+func AssertGoldenAt(t *testing.T, path string, records []Record, update bool) {
+	t.Helper()
 	got, err := Encode(records)
 	if err != nil {
 		t.Fatalf("encode records: %v", err)
 	}
-	path := GoldenPath(t)
 	if update {
 		if err := os.WriteFile(path, got, 0o644); err != nil {
 			t.Fatalf("write golden: %v", err)

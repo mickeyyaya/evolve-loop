@@ -6,7 +6,7 @@
 
 `internal/cliroute` is the one routing table and the one resolver for every launch path. The operator declares in `.evolve/policy.json` which CLIs exist, which CLI does each kind of work, and what happens when a chain runs out (the `cli_routing` block). `Compile` turns that block into a `Table` and reports every integrity finding at once. `Router.Resolve` turns one launch request into a dispatch `llmroute.Plan`. When the block is absent, `Resolve` reproduces today's resolution byte for byte (the legacy projection), so wiring a launch path through it changes nothing until the operator writes the block.
 
-Status (L1a, 2026-10-05): built and tested, **not yet called by any launch path**. Wiring the runner, the bridge chain, `resolvellm`, the retro, the advisor, contract escalation, the loop preflight and setup is L1b of the plan.
+Status: L1a (2026-10-05) built and tested the resolver unwired. **L1b (2026-10-06) wires every launch path through it** ([ADR-0119](../adr/0119-one-routing-table-one-resolver.md)); see [Wiring](#wiring-l1b-2026-10-06). The checked-in policy has no `cli_routing` block, so every launch still resolves through the legacy projection; the operator's table lands in L2.
 
 ## API
 
@@ -14,7 +14,7 @@ Status (L1a, 2026-10-05): built and tested, **not yet called by any launch path*
 |---|---|
 | `Compile(p, cat, profs, opts...) (Table, []Finding)` | Snapshots every listed profile, then compiles `p.CLIRouting`. With no block it returns the legacy table; its only possible findings are a missing or unlistable profile source. `WithToolCapable(fn)` adds the tool-capability check; the composition root passes `bridge.HasToolUse`. |
 | `(Table).Findings() []Finding` | The findings the table was compiled with (a copy). |
-| `New(t Table, h Host) (*Router, error)` | One router per process, built at the composition root. It refuses a table that carries any error-severity finding, naming each, so a table with a defect never routes. |
+| `New(t Table, h Host) (*Router, error)` | A router over one compiled table. It refuses a table that carries any error-severity finding, naming each, so a table with a defect never routes. Since L1b the composition roots use `Build`; `New` serves the per-launch legacy routers of components built without the root's router, and it uses `t` for both the declared and the bypass request, so a `New` router never distinguishes `Request.BypassPolicy` (its callers compile the bypass policy themselves). |
 | `(*Router).Resolve(req Request) (Decision, error)` | The plan for one launch. |
 | `Catalog` | `Get(name)` and `Names()` of the merged phase catalog; `phasespec.Catalog` satisfies it. |
 | `ProfileSource` | `Get(name)` and `List()`; `*profiles.Loader` satisfies it. |
@@ -22,6 +22,13 @@ Status (L1a, 2026-10-05): built and tested, **not yet called by any launch path*
 | `Request` | `Agent` (the profile name), `Phase` (empty for a launch with no phase), `ProjectRoot`, `DefaultModel`, `Env`, `Overlay` (the advisor's soft CLI and tier), `CallerCLI` (the CLI a non-phase caller asked for), `Expand` (the `"auto"` expander). |
 | `Decision` | `Plan`, `Rule` (`agents:<agent>`, `work:<role>`, `default`, `profile`, or one of `legacy:pin`, `legacy:env`, `legacy:caller`, `legacy:default`, `legacy:profile`), `Allowed` (the families the agent may use), `Trace` (one line per filtered or ignored input), and `Allows(cli)`. A legacy decision whose profile does not restrict `allowed_clis` has a nil `Allowed`, which allows every family. |
 | `Finding` | `Severity` (`error` or `warn`), `Key` (the policy path or check, such as `cli_routing.agents.auditor`, `cross_family_with.auditor+builder`, `agent.auditor`, `pins`) and `Message`. |
+| `Setup`, `Build(s) (*Router, []Finding, error)` | The composition root's one call (L1b). `Build` compiles two tables from one `Setup` (`Policy`, `Catalog`, `Profiles`, `Host`, `Options`): the declared table from the loaded policy and the bypass table from `policy.Policy{Workflow: loaded.Workflow}` (decision 1). It returns the declared table's findings and refuses, naming each, when either table carries an error finding. |
+| `(*Router).Recompile(cat) error` | Recompiles both tables from the stored `Setup` with a new catalog and swaps them atomically (decision 9: a profile minted mid-cycle). Recompiles are serialized, so the call made last stores last (`TestRouter_ConcurrentRecompilesKeepTheLastCallersCatalog`). A recompile with an error finding is refused and the old tables keep routing. A router built with `New` has no `Setup` and refuses. |
+| `(*Router).Policy()`, `(*Router).Findings()` | The policy the declared table was compiled from (the runner reads its skill overlays from it, so policy is loaded once per process) and that table's findings (the `show` and `check` verbs). |
+| `(*Router).ResolveRole(role, resolvellm.Options) (resolvellm.Result, error)` | Role-level resolution for the launches that take one CLI and a tier (`evolve subagent run`, `resolve-llm`, the failure advisor, `setup detect`, the runner's `auto` expansion). Legacy: `resolvellm.Resolve` exactly. Declared: `Resolve{Agent: role}`'s primary, its model and its rule as the `Source`. |
+| `Request.BypassPolicy`, `Request.Launch` | `BypassPolicy` picks the bypass table. `Launch` names a launch whose legacy semantics differ from the runner's and the bridge chain's: `LaunchAdvisor` (today's `resolveRouterDispatch`: profile `cli` or `claude-tmux`, then `router.cli`, model from the profile or `DefaultModel`, then `router.model`, the profile's fallbacks, and `claude-tmux` last as the benched-swap target; no env, no probe) and `LaunchClassifier` (agent `ClassifierAgent`, today's codex > claude > agy order). A declared table ignores `Launch`. |
+| `SingleProfile{Agent, Profile}` | A `ProfileSource` of one already-loaded profile, for a component built without the composition root's router (a test, a library caller): it compiles a per-launch legacy router from what the launch already loaded, which is the pre-L1b behaviour. |
+| `Decision.Legacy()`, `RuleLegacyPin` | Whether the decision came from the legacy projection, and the rule a legacy decision carries whenever a phase pin applied (CLI or model-only); the runner reports `model_source=pin` from it. |
 | `RuleError` | The one refusal of rule selection: `Rule`, `Kind` (`RuleLeak`, an `agents` entry outside the allowed set; `RuleEmpty`, a chain the allowed set empties), `Dropped` and `Allowed`. `Resolve` returns it wrapped (`errors.As` finds it); `Compile` turns it into a finding keyed `cli_routing.agents.<key>` for a leak and `agent.<agent>` for an empty chain. The `show` and `explain` verbs will read it too. |
 | `CeilingError` | The refusal of the tier ceiling: `Rule`, `Tiers` (the tier chain tried), `Chain` and `Ceiling`. One predicate, `Table.ceilingRefusal`, raises it for both `Resolve` (the resolved plan) and `Compile` (each selection's static plan), and `Compile` keys it `agent.<agent>.tier_ceiling`. |
 
@@ -42,6 +49,27 @@ Status (L1a, 2026-10-05): built and tested, **not yet called by any launch path*
 - **The legacy projection reproduces both of today's resolvers.** For a request with a phase it is the runner's `resolveDispatchPlan`: the phase-keyed pin (validated with `policy.ValidatePin`, the runner's own error), `llmroute.Resolve`, the advisor overlay unless pinned, then — unless a pin fixes the CLI — the probe, the bench and the universal tail (`workflow.universal_fallback`, with `universal_fallback_exclude` applied to `Host.Discover`). For a request with no phase it is `bridgechain.DefaultPlanResolver`: no pin, `CallerCLI` leading, probe, bench, tail. `leadWith` is that resolver's helper, moved here; L1b deletes the original.
 - **Imports.** `policy`, `profiles`, `phasespec`, `phasecontract`, `llmroute` and `envchain`. Never `core` or `bridge`: the bench and the tool-capability check arrive as seams, so the runner and the bridge chain can import this package.
 
+## Wiring (L1b, 2026-10-06)
+
+One Router per process, compiled once at each composition root by `cmd/evolve/cli_routing_root.go` (`buildCLIRouter`: the policy, the merged phase catalog, `routingProfilesDir(projectRoot)` = `<project>/.evolve/profiles`, the one profiles directory every root compiles and the one the runner has always read its profile from, `WithToolCapable(bridge.HasToolUse)`, and the production `Host` from `routingHost(log, now)`: `exec.LookPath`, the cli-health bench on the injected clock, and the raw doctor discovery memoized for the process). `TestProductionRouter_ReplaysTheLegacyGolden` (`cmd/evolve`) replays the whole golden through exactly this composition, with a fake doctor report that includes a banned family (agy under the compiled-default ban), a toolless driver (ollama) and a blocked one; `TestOneProfilesDirectory_ThePreflightAndTheCycleCompileTheSameTable` pins that `evolve cycle run` and the loop preflight compile the same table when `--evolve-dir` and the plugin root differ from the project. A malformed policy or any error finding exits 2 before the first dispatch (`exitRoutingRefused`).
+
+| Launch path | How it calls the resolver |
+|---|---|
+| Runner `resolveDispatchPlan` (`phases/runner/routing.go`) | `Router.Resolve{Agent, Phase, Env, Overlay, Expand, BypassPolicy}`; the router is `Options.Router`, else the package's `DefaultRouter` (set by `wireOrchestratorDeps`), else a per-launch legacy router over the request's `policy.json` and its own loaded profile. The old pin, probe, bench and tail code is gone. |
+| `bridgechain.DefaultPlanResolver(router)` | `Resolve{Agent, CallerCLI}`; a refusal fails the launch. Retro, failure advisor, judge, adjudicator and swarm launch through it. |
+| Retro (`retro.Config.Router`) | Launches `Plan.Candidates[0]`, so its skill overlays and logs name the CLI that runs first. |
+| Advisor (`resolveRouterDispatch*`, `cmd_cycle.go`) | `Resolve{Agent: "router", Launch: LaunchAdvisor}`; the benched swap takes the first unbenched candidate. `router.plan_model` / `router.propose_model` still apply per decision. |
+| Contract escalation (`core/contract_escalation.go`) | The next candidate of the decision for (agent, phase) in another family that `Decision.Allows`; the universal `claude-tmux` fallback is appended only to a legacy decision. |
+| `profileForModelRouting` (`core/cyclerun.go`) | Not a chain: it now shares `phaseProfile` (the built-in table, then `<phase>.json`) with escalation, closing the clamp gap for phases outside the table. |
+| `ResolveRole` callers | `evolve subagent run` / `validate-profile`, `resolve-llm`, `failureAdvisorOpts`, `setup detect` (`DetectOptions.Router`). |
+| Loop preflight (`looppreflight.Options.Routing`) | Drivers come from each agent's resolved chain; a `cli-routing` check halts on a table that does not compile and warns on warnings. |
+| Model classifier (`cmd_models_live.go`) | `Resolve{Agent: ClassifierAgent, Launch: LaunchClassifier}`'s families, filtered to the ready CLIs. |
+| Mid-cycle mint (`catalogPublisher`) | `Router.Recompile(catalog)` after the contract resolver re-binds. |
+
+Both walkers surface an empty walk through `bridgechain.Unlaunched` (decision 5): a walk the ceiling empties is a loud FAIL naming the rule, chain, tiers and ceiling; a walled walk keeps the quota-pause path. `TestOnlyCliRouteBuildsChains` (`internal/guards`) keeps the chain builders (`llmroute.Resolve`, `ApplyUniversalFallback`, `ChainFor`, `ExcludeFamilies`, `AllowedDiscovered` and `resolvellm.Resolve`) inside `cliroute`, `llmroute` and `resolvellm`, refuses a dot-import of either package, and admits one named exception, `internal/core/advisor/launch.go`'s `llmroute.ChainFor` (the advisor's walk, L2 question 1), which `TestChainBuilderAllowlist_EveryEntryIsStillNeeded` drops once it is gone.
+
+The read-only verbs are `evolve cli-routing show [--static] [--json]` (agents grouped by chain, with the model per tier, the rule, FLOOR, ceiling, finding and host-health notes), `check` (0 when the table compiles, warnings printed; 1 on an error finding; 2 on a usage error) and `explain <agent> [--phase P]`.
+
 ## Compile findings
 
 | Key | Severity | When |
@@ -56,19 +84,21 @@ Status (L1a, 2026-10-05): built and tested, **not yet called by any launch path*
 | `cli_routing.after_chain` | error | a value other than `other_clis` or `stop` |
 | `agent.<agent>` | error | the agent's chain is empty after the allowed-set filter, for any selection `Resolve` can make: each role of its phases, and the no-role selection when a phase-less launch has no single role |
 | `cross_family_with.<a>+<b>` | error, or warn | the two resolved primaries share a family: an error when `clis` has two or more families, a warning on a Claude-only install; a warning when only their fallbacks share a family |
-| `pins`, `workflow.universal_fallback`, `workflow.universal_fallback_exclude`, `router.cli`, `router.model` | error | set together with the block (two sources); the message points to `evolve cli-routing migrate` |
-| `profiles` | error | no profile source, or the list fails; in both modes, since an empty snapshot would silently route every agent as profile-less |
+| `pins`, `workflow.universal_fallback`, `workflow.universal_fallback_exclude`, `router.cli`, `router.model`, `router.plan_model`, `router.propose_model` | error | set together with the block (two sources); the message points to `evolve cli-routing migrate`. The per-decision models were added in the L1b fix round (2026-10-06): the advisor root lays them over the decision's model, so beside a table they would swap the tier the table and its ceiling chose |
+| `profiles` | error, or warn | no profile source, or the list fails: an error in declared mode, since an empty snapshot would silently route every agent as profile-less. With no block, a profiles directory that does not exist is a warning and an empty snapshot, which is how the runner and the bridge chain treated it before L1b (fix round, 2026-10-06); any other list failure stays an error. |
 | `profiles.<agent>` | error | a listed profile does not load (declared mode) |
 
 An unknown key inside the block, or a `null` block or agent rule, is not a finding: `policy.Load` refuses the file (strict decode, see internal-policy.md).
 
-## The legacy golden
+## The legacy goldens
 
 `go/internal/cliroute/testdata/legacy-plans.golden.jsonl` pins today's dispatch plans: every tracked profile (92 on 2026-10-05) × eleven variants (no env, `EVOLVE_CLI`, `EVOLVE_<AGENT>_CLI`, a phase pin with a CLI and model, a model-only pin, the advisor overlay, a benched family, a missing binary, a caller CLI, the checked-in `universal_fallback_exclude: []`, and `--bypass-policy` over a policy that has both pins and that workflow) × the two resolvers, 2024 records. The `bypass` variant records today's meaning of bypass: the runner ignores the pins but keeps the workflow's universal tail, so this package projects bypass as `Compile(policy.Policy{Workflow: loaded.Workflow}, …)` (L1b decision 1). `internal/cliroute/cliroutetest` holds the variants and the record format.
 
 - **Generated through today's entry points.** `TestLegacyDispatchPlans_MatchTheGolden` (in `internal/phases/runner`) calls the runner's `resolveDispatchPlan` and `bridgechain.DefaultPlanResolver`, with fake binaries on `PATH` (the runner probes through `exec.LookPath`), a fake `LookPath` and discovery for the bridge chain, a real CLI-health store with a fixed clock, and policy files written per variant.
 - **Driven through this package too.** `TestResolve_AbsentTableMatchesLegacyGolden` resolves the same matrix through `Compile` + `Resolve` and compares the bytes, so the legacy projection equals the golden.
 - **Regenerate** with `cd go && go test -count=1 ./internal/phases/runner -run TestLegacyDispatchPlans -update`. A tracked profile edit changes the golden, so the commit that edits a profile regenerates it and the diff shows which plans moved.
+- **L1b variants.** `router_keys` (a policy that sets `router.cli`, `router.model` and `router.plan_model`) adds 184 records generated from the pre-L1b code: the runner and the bridge chain ignore the advisor's keys, and the wired path keeps them ignored. The 2024 earlier records stay byte-identical (`ace6dca0…` → `80630cbd…`, 2208 records). Since L1b the generator injects a `Router` into the runner and calls `DefaultPlanResolver(router)`, so the golden is the wired launch paths' output.
+- **The advisor golden.** `testdata/legacy-advisor.golden.jsonl` (96 records: the 12 variants × 4 bench states × the plan and propose decisions) pins the advisor's `{cli, model, healthy}`. It was generated from the pre-L1b `resolveRouterDispatchHealthy` and is replayed through the wired one by `TestLegacyAdvisorDispatch_MatchesTheGolden` (`cmd/evolve`); regenerate with `go test -count=1 ./cmd/evolve -run TestLegacyAdvisorDispatch -update`.
 
 ## Invariants
 

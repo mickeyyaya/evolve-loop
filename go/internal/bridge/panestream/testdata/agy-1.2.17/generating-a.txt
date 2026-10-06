@@ -1,0 +1,60 @@
+agy --dangerously-skip-permissions --model 'Gemini 3.8 Flash (High)'
+user@host work % agy --dangerously-skip-permissions --model 'Gemini 3.8 Flash (High)'
+
+      ▄▀▀▄        Antigravity CLI 1.2.17
+     ▀▀▀▀▀▀       USER@example.com
+    ▀▀▀▀▀▀▀▀      /tmp/work
+   ▄▀▀    ▀▀▄
+  ▄▀▀      ▀▀▄
+
+────────────────────────────────────────────────────────────
+> Think carefully: how many distinct ways can 12 be written as an ordered sum of 1s and 2s? Show brief reasoning, then write the number into a file named ways.txt in the current directory, then reply DONE.
+⣟  Generating...
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+esc to cancel
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

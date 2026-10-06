@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -22,10 +24,10 @@ func writeFile(t *testing.T, path, content string) {
 
 func writeExec(t *testing.T, path, content string) {
 	t.Helper()
-	writeFile(t, path, content)
-	if err := os.Chmod(path, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	fakeclitest.Install(t, path, content)
 }
 
 func writeProfile(t *testing.T, path string, consensus map[string]any) {

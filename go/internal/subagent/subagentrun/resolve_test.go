@@ -3,6 +3,7 @@ package subagentrun
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -220,5 +221,23 @@ func TestResolve_DriverCheckReceivesTheCLI(t *testing.T) {
 	}
 	if len(got) != 1 || got[0] != "claude" {
 		t.Fatalf("the port receives the cli once: %q", got)
+	}
+}
+
+func TestResolve_ARefusedRouteFailsInsteadOfFallingBackToTheProfile(t *testing.T) {
+	f := newFixture(t)
+	deps := happyDeps(t)
+	launched := false
+	deps.Adapter = AdapterFunc(func(context.Context, AdapterEnv) (int, error) { launched = true; return 0, nil })
+	deps.ResolveLLM = func(string) (LLM, error) {
+		return LLM{}, fmt.Errorf("%w: agent scout: outside the allowed set", ErrRouteRefused)
+	}
+	d, r := observed(t, deps)
+	_, err := d.Dispatch(context.Background(), f.request())
+	if !errors.Is(err, ErrRouteRefused) || launched {
+		t.Fatalf("a refused route never launches the profile's CLI: launched=%v err=%v", launched, err)
+	}
+	if e := r.only(t, CodeResolutionFailed); e.Fields["step"] != "cli" || !strings.Contains(e.Reason, "refuses scout") {
+		t.Fatalf("the refusal is signalled: %+v", e)
 	}
 }

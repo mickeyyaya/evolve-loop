@@ -22,12 +22,13 @@ type Item struct {
 	Weight float64 `json:"weight"`
 	Kind   string  `json:"kind"`
 	// Class is the declared archetype that IsOperatorState keys on.
-	Class      string   `json:"class"`
-	Priority   string   `json:"priority"`
-	Campaign   string   `json:"campaign"`
-	Files      []string `json:"files"`
-	ConnectsTo []string `json:"connects_to"`
-	Deps       []string `json:"deps"`
+	Class         string   `json:"class"`
+	Priority      string   `json:"priority"`
+	PriorityClass string   `json:"priority_class"`
+	Campaign      string   `json:"campaign"`
+	Files         []string `json:"files"`
+	ConnectsTo    []string `json:"connects_to"`
+	Deps          []string `json:"deps"`
 	// Route "console-*" makes the item operator-owned; "lane" overrides a heuristic derivation; empty derives.
 	Route string `json:"route"`
 	// InjectedBy is autofile provenance; a non-empty value clamps the route:"lane" override.

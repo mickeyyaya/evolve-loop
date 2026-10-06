@@ -116,23 +116,19 @@ func ExecReapOrphans(ctx context.Context) OrphanReapReport {
 	return ReapOrphanSessions(ctx, ExecListBridgeSessions, ExecPidAlive, ExecTmuxKill)
 }
 
-// socketPidRE matches only per-run sockets, so the shared default socket is never killed.
-var socketPidRE = regexp.MustCompile(`^evolve-bridge-p(\d+)$`)
+var ownerPidSocketRE = regexp.MustCompile(`^evolve-bridge-[pt](\d+)$`)
 
-// OrphanSocketReport summarizes one per-run-socket sweep.
 type OrphanSocketReport struct {
 	Killed      []string
 	SkippedLive int
 	Errors      []string
 }
 
-// SocketLister returns the bridge per-run socket names on the host.
 type SocketLister func() ([]string, error)
 
 // ServerKiller kills the tmux server on one socket.
 type ServerKiller func(ctx context.Context, socket string) error
 
-// ReapOrphanSockets kills the tmux server of every per-run bridge socket whose owner PID is dead; a list error kills nothing.
 func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness, killServer ServerKiller) OrphanSocketReport {
 	var rep OrphanSocketReport
 	socks, err := list()
@@ -141,7 +137,7 @@ func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness
 		return rep
 	}
 	for _, s := range socks {
-		m := socketPidRE.FindStringSubmatch(s)
+		m := ownerPidSocketRE.FindStringSubmatch(s)
 		if m == nil {
 			continue
 		}
@@ -173,7 +169,7 @@ func tmuxSocketDir() string {
 
 // socketGlob is a test seam over the tmux socket directory.
 var socketGlob = func() ([]string, error) {
-	matches, err := filepath.Glob(filepath.Join(tmuxSocketDir(), "evolve-bridge-p*"))
+	matches, err := filepath.Glob(filepath.Join(tmuxSocketDir(), "evolve-bridge-[pt]*"))
 	if err != nil {
 		return nil, err
 	}

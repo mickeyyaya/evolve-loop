@@ -1,6 +1,7 @@
 package subagentrun
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -26,6 +27,10 @@ func (d *Dispatcher) resolve(req Request, id identity) (plan, error) {
 
 func (d *Dispatcher) resolveCLI(req Request, id identity, p *plan) error {
 	llm, llmErr := d.deps.ResolveLLM(id.role)
+	if errors.Is(llmErr, ErrRouteRefused) {
+		d.warn(id, req.Cycle, CodeResolutionFailed, "the CLI routing table refuses "+id.role+": "+llmErr.Error(), map[string]string{"step": "cli"})
+		return fmt.Errorf("subagent/run: %w", llmErr)
+	}
 	if llmErr == nil && llm.CLI != "" {
 		p.cli, p.source, p.model = llm.CLI, llm.Source, llm.ModelTier
 	} else {

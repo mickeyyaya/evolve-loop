@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -49,10 +50,12 @@ func TestRun_TimeoutOnThePrimaryCLIFallsBackThroughTheChain(t *testing.T) {
 	}
 	inner := &chainFake{}
 	var logs []string
+	router := retroRouter(t, root, policy.Policy{})
 	walked := bridgechain.New(inner,
-		bridgechain.DefaultPlanResolver(profDir, nil, func(string) (string, error) { return "/bin/true", nil }, time.Now, nil),
+		bridgechain.DefaultPlanResolver(router),
 		bridgechain.WithLog(func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) }))
 	phase := New(Config{
+		Router:  router,
 		Bridge:  walked,
 		Prompts: fakePromptsFS("# Retro body"),
 		NowFn:   fixtures.FixedClock(time.Unix(1_700_000_000, 0), 90*time.Millisecond),

@@ -49,7 +49,7 @@ func TestExecTmuxKill_NamedSessionKillArgs(t *testing.T) {
 		t.Fatalf("want exactly 1 tmux exec, got %d: %v", len(*calls), *calls)
 	}
 	got := strings.Join((*calls)[0], " ")
-	want := "-L " + bridge.TmuxSocket + " kill-session -t sess-w0"
+	want := "-L " + bridge.TmuxSocket + " kill-session -t =sess-w0:"
 	if got != want {
 		t.Fatalf("tmux args = %q, want %q", got, want)
 	}

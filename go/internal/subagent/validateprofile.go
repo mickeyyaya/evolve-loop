@@ -3,6 +3,7 @@ package subagent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +11,9 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/detectcli"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
@@ -56,7 +59,7 @@ type ValidateProfileOptions struct {
 type ValidateProfileResult struct {
 	CLI              string
 	Model            string
-	CLIResolutionSrc string // source from resolvellm.Resolve, or "profile" as a fallback
+	CLIResolutionSrc string
 	Warns            []string
 	AdapterOverrides AdapterOverrides
 	AdapterExitCode  int
@@ -69,17 +72,6 @@ type AdapterOverrides struct {
 	ExtraFlagsJSON string // raw JSON array string, "" when absent
 }
 
-// ValidateProfile runs the full validate pipeline:
-//  1. Profile load + JSON validate.
-//  2. resolvellm.Resolve → cli + model + source. "antigravity" → "agy".
-//  3. Adapter existence check.
-//  4. capability.Inspect → warns + manifest.
-//  5. adapter_overrides extraction from profile.
-//  6. Optional EVOLVE_DISPATCH_PLAN_LOG emission.
-//  7. VALIDATE_ONLY=1 adapter exec.
-//
-// Returns the full result + nil on success. Returns (result-so-far, error)
-// when any step fails — caller can inspect partial result for debugging.
 func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts ValidateProfileOptions) (ValidateProfileResult, error) {
 	if opts.ReadProfile == nil {
 		opts.ReadProfile = defaultReadProfile
@@ -119,17 +111,9 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 		return ValidateProfileResult{}, fmt.Errorf("subagent/validate: profile is not valid JSON: %s", profilePath)
 	}
 
-	llm, llmErr := opts.ResolveLLM(req.Agent)
-	var cli, source, resolvedModel string
-	if llmErr == nil && llm.CLI != "" {
-		cli = llm.CLI
-		source = llm.Source
-		resolvedModel = llm.ModelTier // resolvellm emits only a tier
-	} else {
-		// Fall through to profile.
-		cli = matchField(profileBody, reFieldCLI)
-		source = "profile"
-		resolvedModel = ""
+	cli, source, resolvedModel, err := resolvedCLI(opts.ResolveLLM, req.Agent, profileBody)
+	if err != nil {
+		return ValidateProfileResult{}, err
 	}
 	// Cross-name resolver: antigravity → agy (detectcli owns the alias table).
 	cli = detectcli.Canonical(cli)
@@ -279,10 +263,23 @@ func capabilityExtractObject(body, name string) (string, bool) {
 	return "", false
 }
 
-// defaultResolveLLM bridges to resolvellm.Resolve, which reads the
-// per-phase profile directly; there is no llm_config.json layer.
+func resolvedCLI(resolve func(string) (resolvellm.Result, error), agent, profileBody string) (string, string, string, error) {
+	llm, err := resolve(agent)
+	switch {
+	case errors.Is(err, cliroute.ErrRefused):
+		return "", "", "", fmt.Errorf("subagent/validate: %w", err)
+	case err == nil && llm.CLI != "":
+		return llm.CLI, llm.Source, llm.ModelTier, nil
+	}
+	return matchField(profileBody, reFieldCLI), "profile", "", nil
+}
+
 func defaultResolveLLM(agent string) (resolvellm.Result, error) {
-	return resolvellm.Resolve(agent, resolvellm.Options{})
+	router, err := cliroute.NewSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{}, cliroute.Host{})
+	if err != nil {
+		return resolvellm.Result{}, err
+	}
+	return router.ResolveRole(agent, resolvellm.Options{})
 }
 
 // defaultAdapterExists is the validate pipeline's path-shaped seam default:

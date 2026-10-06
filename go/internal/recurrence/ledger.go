@@ -143,6 +143,24 @@ func (l *Ledger) Patterns() []Entry {
 	return out
 }
 
+func (l *Ledger) ItemCounts() map[string]int {
+	counts := map[string]int{}
+	if l == nil {
+		return counts
+	}
+	for pattern, e := range l.Entries {
+		if e == nil || e.Generic {
+			continue
+		}
+		for _, id := range []string{pattern, e.FixItemID} {
+			if id != "" {
+				counts[id] = max(counts[id], e.Count)
+			}
+		}
+	}
+	return counts
+}
+
 // RecordClosure upserts a retro closeout for pattern in the given cycle, then
 // applies escalation when the pattern has reached the policy threshold:
 //   - a linked OPEN inbox item is bumped to policy.Target(item.Weight, count);
@@ -199,27 +217,31 @@ func containsInt(xs []int, v int) bool {
 // Load reads the ledger JSON at path under a shared file lock. A missing file
 // yields an empty ledger (first run), not an error.
 func Load(path string) (*Ledger, error) {
-	l := NewLedger()
+	var l *Ledger
 	err := flock.WithPathLock(path, func() error {
-		data, err := os.ReadFile(path)
-		if os.IsNotExist(err) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if len(data) == 0 {
-			return nil
-		}
-		if err := json.Unmarshal(data, l); err != nil {
-			return fmt.Errorf("recurrence: parse %s: %w", path, err)
-		}
-		if l.Entries == nil {
-			l.Entries = map[string]*Entry{}
-		}
-		return nil
+		var err error
+		l, err = ReadSnapshot(path)
+		return err
 	})
 	return l, err
+}
+
+func ReadSnapshot(path string) (*Ledger, error) {
+	l := NewLedger()
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) || err == nil && len(data) == 0 {
+		return l, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(data, l); err != nil {
+		return nil, fmt.Errorf("recurrence: parse %s: %w", path, err)
+	}
+	if l.Entries == nil {
+		l.Entries = map[string]*Entry{}
+	}
+	return l, nil
 }
 
 // Save writes the ledger to path atomically under an exclusive file lock so a

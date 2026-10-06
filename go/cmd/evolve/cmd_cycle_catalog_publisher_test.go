@@ -40,7 +40,7 @@ func TestWireOrchestrator_CatalogPublisherWired(t *testing.T) {
 
 func TestCatalogPublisher_RebindsResolverOnEachPublish(t *testing.T) {
 	spy := &resolverSinkSpy{}
-	pub := catalogPublisher(spy)
+	pub := catalogPublisher(spy, nil)
 	if pub == nil {
 		t.Fatal("catalogPublisher returned nil — nothing would ever reach the bridge")
 	}

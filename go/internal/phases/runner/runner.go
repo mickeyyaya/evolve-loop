@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
@@ -72,11 +74,10 @@ type InlinePromptProvider interface {
 
 // Options configures New; Hooks is required and every nil seam takes its production default.
 type Options struct {
-	Hooks   Hooks
-	Bridge  core.Bridge
-	Prompts *prompts.Loader
-	NowFn   func() time.Time
-	// ResolveLLM expands the "auto" model sentinel; nil means resolvellm.Resolve.
+	Hooks      Hooks
+	Bridge     core.Bridge
+	Prompts    *prompts.Loader
+	NowFn      func() time.Time
 	ResolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
 	// StdoutFilter writes the post-phase .clean.txt; nil means logfilter.Process.
 	StdoutFilter func(workspace, phase string) error
@@ -100,10 +101,7 @@ type Options struct {
 	// CompactPrompts strips on-demand reference sections from disk-loaded agent docs; inline bodies are never stripped.
 	CompactPrompts      bool
 	DisableStdoutFilter bool
-	// UniversalFallback appends discovered CLIs when no CLI of the configured chain is installed; inert without DiscoverCLIsFn.
-	UniversalFallback bool
-	// DiscoverCLIsFn lists the installed, authed, non-blocked drivers; a seam so this package never imports bridge.
-	DiscoverCLIsFn func() []string
+	Router              *cliroute.Router
 	// Diag receives the routing-overlay observability lines; the zero value means log.Diag().
 	Diag log.Console
 	// Signals is the engine's Signal Center accessor; nil adopts the Bridge's own Center when it exposes one.
@@ -117,21 +115,20 @@ type ContractVerifier interface {
 
 // BaseRunner is the Template Method phase runner, a core.PhaseRunner built by New.
 type BaseRunner struct {
-	hooks             Hooks
-	bridge            core.Bridge
-	prompts           *prompts.Loader
-	nowFn             func() time.Time
-	resolveLLM        func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
-	eventsProducer    func(workspace, phase, cli string, cycle int, prompt string) error
-	compactPrompts    bool
-	universalFallback bool
-	discoverCLIsFn    func() []string
-	diag              log.Console
-	contractVerifier  func() ContractVerifier
-	hostEffects       func() core.HostEffects
-	signals           func() *signalcenter.Center
-	verifyInjected    bool
-	judge             *verdict.Engine
+	hooks            Hooks
+	bridge           core.Bridge
+	prompts          *prompts.Loader
+	nowFn            func() time.Time
+	resolveLLM       func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	eventsProducer   func(workspace, phase, cli string, cycle int, prompt string) error
+	compactPrompts   bool
+	router           *cliroute.Router
+	diag             log.Console
+	contractVerifier func() ContractVerifier
+	hostEffects      func() core.HostEffects
+	signals          func() *signalcenter.Center
+	verifyInjected   bool
+	judge            *verdict.Engine
 }
 
 // New constructs a BaseRunner and panics on nil Hooks, a wiring error caught at startup.
@@ -142,10 +139,6 @@ func New(opts Options) *BaseRunner {
 	nowFn := opts.NowFn
 	if nowFn == nil {
 		nowFn = time.Now
-	}
-	resolveLLM := opts.ResolveLLM
-	if resolveLLM == nil {
-		resolveLLM = resolvellm.Resolve
 	}
 	eventsProducer := opts.EventsProducer
 	if eventsProducer == nil {
@@ -160,22 +153,16 @@ func New(opts Options) *BaseRunner {
 	if diag.Out == nil && diag.Err == nil {
 		diag = log.Diag()
 	}
-	universalFallback := opts.UniversalFallback || DefaultUniversalFallback
-	discoverCLIsFn := opts.DiscoverCLIsFn
-	if discoverCLIsFn == nil {
-		discoverCLIsFn = DefaultDiscoverCLIsFn
-	}
 	b := &BaseRunner{
-		hooks:             opts.Hooks,
-		bridge:            opts.Bridge,
-		prompts:           opts.Prompts,
-		nowFn:             nowFn,
-		resolveLLM:        resolveLLM,
-		eventsProducer:    eventsProducer,
-		compactPrompts:    opts.CompactPrompts,
-		universalFallback: universalFallback,
-		discoverCLIsFn:    discoverCLIsFn,
-		diag:              diag,
+		hooks:          opts.Hooks,
+		bridge:         opts.Bridge,
+		prompts:        opts.Prompts,
+		nowFn:          nowFn,
+		resolveLLM:     opts.ResolveLLM,
+		eventsProducer: eventsProducer,
+		compactPrompts: opts.CompactPrompts,
+		router:         opts.Router,
+		diag:           diag,
 	}
 	b.judge = wiredVerdictEngine(opts)
 	b.contractVerifier = opts.ContractVerifier
@@ -214,12 +201,24 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 		return core.PhaseResponse{}, err
 	}
 	dispatchResult := b.dispatchPhaseAttempts(ctx, req, prep, dispatchPlan)
+	if errors.Is(dispatchResult.bridgeErr, bridgechain.ErrUnlaunched) {
+		return b.unlaunchedFailure(req, prep, dispatchResult)
+	}
 	req.WorktreeVerified = dispatchResult.worktreeVerified
 
 	d := dispatchOf(req, prep, dispatchPlan, dispatchResult)
 	// Effects first: the judge's first verification must see what the host performed.
 	b.performHostEffects(ctx, d)
 	return b.judge.Judge(ctx, d, b.classifyWith(req, dispatchResult.bridgeResponse))
+}
+
+func (b *BaseRunner) unlaunchedFailure(req core.PhaseRequest, prep phasePreparation, d phaseDispatchResult) (core.PhaseResponse, error) {
+	resp := core.PhaseResponse{
+		Phase: prep.phase, Verdict: core.VerdictFAIL, ArtifactsDir: req.Workspace,
+		DurationMS:  d.durationMS,
+		Diagnostics: append(d.fenceDiagnostics, core.Diagnostic{Severity: "error", Message: d.bridgeErr.Error()}),
+	}
+	return resp, fmt.Errorf("%s: %w", prep.phase, d.bridgeErr)
 }
 
 func (b *BaseRunner) withExplanationContract(body, phase string) (string, error) {
