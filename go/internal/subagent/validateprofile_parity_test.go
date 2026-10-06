@@ -40,10 +40,16 @@ func TestValidateProfile_BashParity(t *testing.T) {
 	}
 
 	repoRoot := findRepoRoot(t)
-	bashScript := filepath.Join(repoRoot, "legacy", "scripts", "dispatch", "subagent-run.sh")
-	if _, err := os.Stat(bashScript); err != nil {
-		t.Skipf("bash subagent-run.sh not at %s: %v", bashScript, err)
+	realScripts := filepath.Join(repoRoot, "legacy", "scripts")
+	if _, err := os.Stat(filepath.Join(realScripts, "dispatch", "subagent-run.sh")); err != nil {
+		t.Skipf("bash subagent-run.sh not under %s: %v", realScripts, err)
 	}
+	pluginRoot := t.TempDir()
+	scripts := filepath.Join(pluginRoot, "legacy", "scripts")
+	if err := os.CopyFS(scripts, os.DirFS(realScripts)); err != nil {
+		t.Fatalf("mirror %s: %v", realScripts, err)
+	}
+	bashScript := filepath.Join(scripts, "dispatch", "subagent-run.sh")
 
 	// Build the Go binary on demand so the parity comparison runs against
 	// HEAD code, not a stale ./bin/evolve.
@@ -54,14 +60,6 @@ func TestValidateProfile_BashParity(t *testing.T) {
 		t.Fatalf("build evolve: %v\n%s", err, out)
 	}
 
-	// Seed an isolated fixture so bash + Go see identical files.
-	//
-	// Capability manifests are read from REAL_ADAPTERS_DIR (script-relative)
-	// in bash and from CapabilityDir (plugin install path) in Go — both
-	// ignore EVOLVE_ADAPTERS_DIR_OVERRIDE. So we must place the test
-	// manifest inside the real legacy/scripts/cli_adapters/ tree to be
-	// visible. We add + clean up a single parity-cli.capabilities.json
-	// file there for the test's lifetime.
 	fixtureRoot := t.TempDir()
 	profilesDir := filepath.Join(fixtureRoot, "profiles")
 	adaptersDir := filepath.Join(fixtureRoot, "adapters")
@@ -70,7 +68,7 @@ func TestValidateProfile_BashParity(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", d, err)
 		}
 	}
-	realAdaptersDir := filepath.Join(repoRoot, "legacy", "scripts", "cli_adapters")
+	scriptAdaptersDir := filepath.Join(scripts, "cli_adapters")
 
 	// Profile: minimal valid agent that routes to our fake-claude adapter.
 	profileBody := `{
@@ -95,16 +93,10 @@ exit 1
 	if err := os.WriteFile(filepath.Join(adaptersDir, "parity-cli.sh"), []byte(adapterBody), 0o755); err != nil {
 		t.Fatalf("write adapter: %v", err)
 	}
-	// Capability manifest: degraded budget_cap_native + full permission_scoping
-	// gives us a non-trivial WARN + plan-log shape to compare. Placed in the
-	// REAL adapters dir because both bash + Go read manifests from there
-	// (override-immune by design — protects against test-seam capability lies).
 	manifestBody := `{"adapter":"parity-cli","supports":{"budget_cap_native":false,"permission_scoping":true}}`
-	realManifest := filepath.Join(realAdaptersDir, "parity-cli.capabilities.json")
-	if err := os.WriteFile(realManifest, []byte(manifestBody), 0o644); err != nil {
-		t.Fatalf("write real manifest: %v", err)
+	if err := os.WriteFile(filepath.Join(scriptAdaptersDir, "parity-cli.capabilities.json"), []byte(manifestBody), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
 	}
-	t.Cleanup(func() { _ = os.Remove(realManifest) })
 
 	// Step 9 removed llm_config.json — both implementations resolve cli from
 	// profile.cli directly.
@@ -112,7 +104,7 @@ exit 1
 		"EVOLVE_PROFILES_DIR_OVERRIDE=" + profilesDir,
 		"EVOLVE_ADAPTERS_DIR_OVERRIDE=" + adaptersDir,
 		"EVOLVE_PROJECT_ROOT=" + fixtureRoot,
-		"EVOLVE_PLUGIN_ROOT=" + repoRoot, // bash uses this to find resolve-llm.sh sibling
+		"EVOLVE_PLUGIN_ROOT=" + pluginRoot,
 	}
 
 	bashLog := filepath.Join(fixtureRoot, "bash-plan.json")

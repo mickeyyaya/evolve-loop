@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -215,6 +216,10 @@ type classDeclaringAuditRunner struct{ t *testing.T }
 func (r *classDeclaringAuditRunner) Name() string { return string(PhaseAudit) }
 
 func (r *classDeclaringAuditRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	if req.Workspace == "" {
+		r.t.Error("the audit runner was handed no workspace; its report would land in the package directory")
+		return PhaseResponse{}, errors.New("audit runner: empty workspace")
+	}
 	writeAuditWithFailure(r.t, req.Workspace, "FAIL", "code-audit-fail", "H1 the auditor rejected this build")
 	return PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictFAIL, ArtifactsDir: req.Workspace}, nil
 }

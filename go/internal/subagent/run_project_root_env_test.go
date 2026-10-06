@@ -2,9 +2,26 @@ package subagent
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 )
+
+func runFromATempCwd(t *testing.T) {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Errorf("restore the working directory: %v", err)
+		}
+	})
+}
 
 // TestRun_ExportsProjectRootToTheSubprocess pins the documented contract at
 // the seam the adapter actually receives.
@@ -40,6 +57,7 @@ func TestRun_ExportsProjectRootToTheSubprocess(t *testing.T) {
 // TestRun_NoProjectRootMeansNoEnvKey mirrors the tmux guard for headless
 // drivers: no key rather than an empty value.
 func TestRun_NoProjectRootMeansNoEnvKey(t *testing.T) {
+	runFromATempCwd(t)
 	opts := runHappyOpts(t)
 	var captured map[string]string
 	orig := opts.ExecAdapter

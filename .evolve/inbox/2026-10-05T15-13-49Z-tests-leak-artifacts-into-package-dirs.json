@@ -1,7 +1,7 @@
 {
   "acceptance": [
-    "After go test -count=1 over core, cmd/evolve, deliverable and subagent, git status --ignored shows no new files under go/ (red first)",
-    "A guard pins it so a new leaking test fails in CI"
+    "A before-and-after filesystem walk of the tree around the test tiers shows no new file or directory (empty directories included), with no allowlist; red first against the leaks named in the summary",
+    "The walk-delta guard is written in Go and runs through the evolve CLI and make, so a new leaking test fails in CI; a git status diff is not acceptable because git does not show empty directories (the subagent leak was empty .evolve/runs/cycle-0 and cycle-1) and it needs an allowlist"
   ],
   "created_at": "2026-10-05T15:13:49Z",
   "files": [
@@ -10,7 +10,7 @@
     "go/internal/deliverable",
     "go/internal/subagent"
   ],
-  "fix": "Find every test that writes with an empty or relative workspace (grep for writes under os.Getwd or an empty Workspace/ProjectRoot) and give it t.TempDir(); add a guard test that runs after the package's tests (or a TestMain check) failing when the package directory gained untracked or ignored files during the run.",
+  "fix": "The four leaks the summary names were fixed with t.TempDir() roots in the real-tree-writes console landing (2026-10-06). Remaining: a Go component that walks the tree before and after the test tiers and fails on any new file or directory, with no allowlist, run through the evolve CLI and make; it lands as the next component and consumes this item.",
   "id": "tests-leak-artifacts-into-package-dirs",
   "kind": "bug",
   "priority_class": "stability",

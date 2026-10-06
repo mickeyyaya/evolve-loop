@@ -119,7 +119,7 @@ func effectOrchestrator(t *testing.T, root string, runners map[core.Phase]core.P
 
 func hostEffects(t *testing.T) core.Option {
 	claim := func(inboxDir string, cycle int, ids []string) error {
-		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, cycle, ids)
+		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard, Ledger: ledger.New(filepath.Dir(inboxDir))}, cycle, ids)
 	}
 	return core.WithHostEffects(NewHostEffects(effectCatalog(t), claim))
 }
