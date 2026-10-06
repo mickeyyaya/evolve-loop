@@ -52,16 +52,19 @@ func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp) []string {
 	return hits
 }
 
-func TestRoutingConfigLoader_OneConstructionSite(t *testing.T) {
+func TestRoutingConfigLoader_ConstructionSitesArePinned(t *testing.T) {
+	want := []string{
+		"cmd/evolve/cmd_cycle_config.go",
+		"internal/router/policy.go",
+	}
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bconfig\.New\(`))
-	if len(hits) != 1 || hits[0] != "cmd/evolve/cmd_cycle_config.go" {
-		t.Fatalf("config.New( belongs to cmd/evolve/cmd_cycle_config.go alone, found in %v", hits)
+	if !reflect.DeepEqual(hits, want) {
+		t.Fatalf("config.New( belongs to the composition root and PolicyForProject's caller-wired loader alone, want %v, found in %v", want, hits)
 	}
 }
 
 func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 	want := map[string]bool{
-		"internal/router/policy.go":             true, // per-phase self-skip policy (Q5)
 		"internal/cli/phasecmd/phase_verify.go": true, // the agent's self-check
 		"cmd/evolve/cmd_solution.go":            true, // hand-rendered, no Center (F7)
 		"internal/kerneltest/fixture.go":        true, // test machinery

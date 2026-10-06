@@ -9,7 +9,7 @@ import (
 
 func TestShouldSkip_ShadowMode(t *testing.T) {
 	p := New(Config{})
-	req := core.PhaseRequest{} // default: build-planner disabled (shadow mode)
+	req := core.PhaseRequest{Workspace: t.TempDir()}
 	skip, verdict, next, diags := p.ShouldSkip(req)
 	if !skip {
 		t.Error("want skip=true when EVOLVE_BUILD_PLANNER unset (shadow mode)")

@@ -107,7 +107,7 @@ the abort is learned deterministically (see audit-repair-isolation.md).
 
 ## Configuration surface
 
-`config.Loader.Load(registryPath, env)` is the **single** reader of routing env + registry (the composition root wires the `Loader` with its Signal Center, so every resolution warning is a `config.warning` under module `config`; the package-level `config.Load` facade is the Center-less loader the per-phase callers keep). The root then applies `.evolve/policy.json`'s gate/recovery/router dials through `Loader.ApplyPolicyStages`. Downstream consumers receive the resolved `RoutingConfig` by injection (`WithRouting`) and never call `os.Getenv`. Precedence: **env override > registry file > built-in default**.
+`config.Loader.Load(registryPath, env)` is the **single** reader of routing env + registry (the composition root wires the `Loader` with its Signal Center, so every resolution warning is a `config.warning` under module `config`; the per-phase callers load through `router.PolicyForProject`, which builds its own `Loader` from the caller's `config.Option`s — none today, so it stays Center-less and the root's wired loader is the one that emits each registry WARN; `TestRoutingConfigLoader_ConstructionSitesArePinned` holds the two construction sites). The root then applies `.evolve/policy.json`'s gate/recovery/router dials through `Loader.ApplyPolicyStages`. Downstream consumers receive the resolved `RoutingConfig` by injection (`WithRouting`) and never call `os.Getenv`. Precedence: **env override > registry file > built-in default**.
 
 | Env var | Default | Maps to |
 |---|---|---|

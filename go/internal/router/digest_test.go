@@ -214,3 +214,26 @@ func TestDigest_NoFailureSignalsOnPass(t *testing.T) {
 		t.Error("PASS artifact must not surface defect_count")
 	}
 }
+
+func TestDigest_AWorkspaceThatIsNotADirectoryIsAnErrorNotACleanAbsence(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "workspace-is-a-file")
+	writeFile(t, filepath.Dir(file), filepath.Base(file), "not a workspace")
+	cases := map[string]string{
+		"missing workspace":     filepath.Join(t.TempDir(), "never-created"),
+		"workspace is a file":   file,
+		"empty workspace value": "",
+	}
+	for name, ws := range cases {
+		t.Run(name, func(t *testing.T) {
+			if sig, err := Digest(ws, []string{"scout", "build"}); err == nil {
+				t.Errorf("Digest(%q) = %+v, nil; want an error, since no handoff could ever be read there", ws, sig)
+			}
+			if _, err := AssembleHandoffs(ws, []string{"scout", "build"}); err == nil {
+				t.Errorf("AssembleHandoffs(%q) returned no error; it must carry Digest's failure", ws)
+			}
+		})
+	}
+	if _, err := Digest(t.TempDir(), []string{"scout", "build"}); err != nil {
+		t.Errorf("an empty existing workspace is a clean absence, got %v", err)
+	}
+}

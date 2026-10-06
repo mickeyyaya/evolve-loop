@@ -219,13 +219,9 @@ func retroDecision(in RouteInput, proposal *Proposal) RouterDecision {
 		Evidence: map[string]interface{}{"action": string(dec.Action)},
 	}
 	d.SkipPhases = append(d.SkipPhases, dec.SkipPhases...)
-	switch dec.Action {
-	case failureadapter.ActionRetryWithFallback:
+	d.NextPhase = PhaseEnd
+	if dec.Action == failureadapter.ActionRetryWithFallback {
 		d.NextPhase = "tdd"
-	case failureadapter.ActionBlockCode, failureadapter.ActionBlockOperatorAction:
-		d.NextPhase = PhaseEnd
-	default: // PROCEED
-		d.NextPhase = PhaseEnd
 	}
 	applyFailureProposal(&d, proposal, dec.Action)
 	return d

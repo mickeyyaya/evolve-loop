@@ -55,8 +55,8 @@ func (p PhasePolicy) ShouldRunPhase(phase string) bool {
 
 // PolicyForProject loads the PhasePolicy for a phase from the registry and env; a missing registry uses defaults.
 // Loading per phase avoids threading a policy through both phase-construction paths.
-func PolicyForProject(projectRoot string, env map[string]string) PhasePolicy {
-	cfg, _ := config.Load(config.RegistryPath(projectRoot), env)
+func PolicyForProject(projectRoot string, env map[string]string, opts ...config.Option) PhasePolicy {
+	cfg, _ := config.New(opts...).Load(config.RegistryPath(projectRoot), env)
 	// Merge policy exactly as the composition root does, or a phase made mandatory only by
 	// policy would skip itself. A malformed policy is ignored here and hard-fails at dispatch.
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {

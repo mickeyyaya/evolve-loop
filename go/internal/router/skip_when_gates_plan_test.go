@@ -6,7 +6,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-func routeC1140(t *testing.T, cycleSize, triggerPhase string, block config.RoutingBlock) RouterDecision {
+func routeAfterBuildUnderAdvisorPlan(t *testing.T, cycleSize, triggerPhase string, block config.RoutingBlock) RouterDecision {
 	t.Helper()
 	return Route(RouteInput{
 		Current:   "build",
@@ -34,7 +34,7 @@ func TestShouldRun_SkipWhenGatesAdvisorPlanByCycleClass(t *testing.T) {
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},
 	}
 
-	dec := routeC1140(t, "trivial", "coverage-gate", trivialSkip)
+	dec := routeAfterBuildUnderAdvisorPlan(t, "trivial", "coverage-gate", trivialSkip)
 	if dec.NextPhase == "coverage-gate" {
 		t.Errorf("NextPhase = %q on a trivial cycle, want the optional gated", dec.NextPhase)
 	}
@@ -51,17 +51,17 @@ func TestShouldRun_SkipWhenGatesAdvisorPlanByCycleClass(t *testing.T) {
 		t.Errorf("Clamps = %v, want a skip-when-gates-plan entry (the forensic trail)", dec.Clamps)
 	}
 
-	if dec = routeC1140(t, "medium", "coverage-gate", trivialSkip); dec.NextPhase != "coverage-gate" {
+	if dec = routeAfterBuildUnderAdvisorPlan(t, "medium", "coverage-gate", trivialSkip); dec.NextPhase != "coverage-gate" {
 		t.Errorf("NextPhase = %q on a medium cycle, want \"coverage-gate\"", dec.NextPhase)
 	}
 
-	if dec = routeC1140(t, "trivial", "coverage-gate", config.RoutingBlock{}); dec.NextPhase != "coverage-gate" {
+	if dec = routeAfterBuildUnderAdvisorPlan(t, "trivial", "coverage-gate", config.RoutingBlock{}); dec.NextPhase != "coverage-gate" {
 		t.Errorf("NextPhase = %q with no skip_when, want \"coverage-gate\"", dec.NextPhase)
 	}
 }
 
 func TestShouldRun_SkipWhenNeverReachesFloorPhase(t *testing.T) {
-	dec := routeC1140(t, "trivial", "audit", config.RoutingBlock{
+	dec := routeAfterBuildUnderAdvisorPlan(t, "trivial", "audit", config.RoutingBlock{
 		SkipWhen: []config.Condition{{Field: "cycle_size", Op: "eq", Value: "trivial"}},
 	})
 	if contains(dec.SkipPhases, "audit") {

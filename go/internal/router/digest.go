@@ -2,7 +2,9 @@ package router
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +18,13 @@ import (
 // reader of on-disk handoff shapes. A role is Present only when its phase completed and an artifact
 // exists, and a missing or corrupt artifact fails open to Present:false.
 func Digest(workspace string, completed []string) (RoutingSignals, error) {
+	info, err := os.Stat(workspace)
+	if err != nil {
+		return RoutingSignals{}, fmt.Errorf("router digest: workspace: %w", err)
+	}
+	if !info.IsDir() {
+		return RoutingSignals{}, fmt.Errorf("router digest: workspace %s is not a directory", workspace)
+	}
 	var sig RoutingSignals
 	done := toSet(completed)
 
@@ -217,8 +226,8 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 		*degraded = append(*degraded, "build: handoff absent and git-derived changed-package set is underivable (no repo / git failure)")
 		return BuildSignals{}
 	}
-	// pkgs are package patterns, not files, so FilesTouched is a package count.
-	return BuildSignals{Present: true, FilesTouched: len(pkgs)}
+	changedPackageCount := len(pkgs)
+	return BuildSignals{Present: true, FilesTouched: changedPackageCount}
 }
 
 // scoutFromReportFallback derives ScoutSignals from scout-report.md when no scout handoff exists.
@@ -372,19 +381,15 @@ func hasDigitAfterPrefix(s, prefix string) bool {
 
 func extractTriage(raw []byte) TriageSignals {
 	var d struct {
-		CycleSize    string   `json:"cycle_size"`
-		CycleSizeEst string   `json:"cycle_size_estimate"`
-		PhaseSkip    []string `json:"phase_skip"`
-		Kind         string   `json:"deliverable_kind"`
+		CycleSize     string   `json:"cycle_size"`
+		ScoutEstimate string   `json:"cycle_size_estimate"`
+		PhaseSkip     []string `json:"phase_skip"`
+		Kind          string   `json:"deliverable_kind"`
 	}
 	if err := json.Unmarshal(raw, &d); err != nil {
 		return TriageSignals{}
 	}
-	size := d.CycleSize
-	if size == "" {
-		size = d.CycleSizeEst
-	}
-	return TriageSignals{CycleSize: size, PhaseSkip: d.PhaseSkip, DeliverableKind: NormalizeDeliverableKind(d.Kind), Present: true}
+	return TriageSignals{CycleSize: cmp.Or(d.CycleSize, d.ScoutEstimate), PhaseSkip: d.PhaseSkip, DeliverableKind: NormalizeDeliverableKind(d.Kind), Present: true}
 }
 
 func extractBuild(raw []byte) BuildSignals {
