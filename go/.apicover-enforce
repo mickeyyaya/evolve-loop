@@ -677,3 +677,5 @@
 ./internal/cliroute
 # cliroutetest — the legacy dispatch-plan scenarios and the golden record format the runner generates and cliroute replays.
 ./internal/cliroute/cliroutetest
+# wtcheckpoint — evolve checkpoint: refs/checkpoints snapshots of uncommitted worktree work (save, list, restore, prune, push).
+./internal/wtcheckpoint

@@ -58,6 +58,7 @@ var commands = []subcommand{
 	{Name: "continuation", Summary: "Inspect/release scope-keyed continuation bindings (continuation list | continuation release <scope-id>)", Run: runContinuation},
 	{Name: "carryover", Summary: "Apply a reviewed keep/drop/cluster decisions file to state.json:carryoverTodos via the sanctioned locked RMW path (carryover apply-decisions)", Run: runCarryover},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
+	{Name: "checkpoint", Summary: "Protect uncommitted worktree work as refs/checkpoints snapshots, never touching the branch, index or tree: checkpoint save [--worktree DIR | --all] [--label T] [--push] | list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] (each takes --json and --project-root P)", Run: runCheckpoint},
 	{Name: "gc", Summary: "Release what finished cycles left behind: tmux sessions/sockets, orphan processes, worktrees, run dirs, go build cache (gc --project-root <dir> [--dry-run])", Run: runGC},
 	{Name: "failures", Summary: "Inspect and clear state.json:failedApproaches: failures list [--class C] [--json] | failures reset [--fingerprint F] | failures prune [--dry-run] (prune also drops expired carryoverTodos; reset and a real prune require --project-root)", Run: runFailures},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
