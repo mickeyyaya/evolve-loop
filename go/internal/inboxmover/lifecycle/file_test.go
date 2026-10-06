@@ -37,7 +37,7 @@ func jsonFiles(t *testing.T, dir string) []string {
 func TestMover_File_WritesAnItemTheLoaderReadsCleanly(t *testing.T) {
 	inbox := newInbox(t)
 	rec := &recordingAppender{}
-	m := New(inbox, rec, WithNow(filingClock))
+	m := newFiler(inbox, rec)
 
 	res, err := m.File([]byte(validItem))
 
@@ -64,7 +64,7 @@ func TestMover_File_KeepsAnAuthoredCreatedAt(t *testing.T) {
 	inbox := newInbox(t)
 	body := strings.Replace(validItem, `"source":"console"}`, `"source":"console","created_at":"2026-09-29"}`, 1)
 
-	res, err := New(inbox, nil, WithNow(filingClock)).File([]byte(body))
+	res, err := newFiler(inbox, nil).File([]byte(body))
 
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestMover_File_RefusesAnInvalidItem(t *testing.T) {
 			inbox := newInbox(t)
 			rec := &recordingAppender{}
 
-			_, err := New(inbox, rec, WithNow(filingClock)).File([]byte(tc.body))
+			_, err := newFiler(inbox, rec).File([]byte(tc.body))
 
 			if !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), tc.why) {
 				t.Errorf("err = %v, want ErrInvalidItem naming %q", err, tc.why)
@@ -119,7 +119,7 @@ func TestMover_File_RefusesAnIDTheInboxAlreadyHolds(t *testing.T) {
 			inbox := newInbox(t)
 			writeItem(t, filepath.Join(inbox, where), `{"id":"cli-inbox-show"}`)
 
-			_, err := New(inbox, nil, WithNow(filingClock)).File([]byte(validItem))
+			_, err := newFiler(inbox, nil).File([]byte(validItem))
 
 			if !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "already") {
 				t.Errorf("err = %v, want ErrInvalidItem: the id is already filed", err)
@@ -134,7 +134,7 @@ func TestMover_File_ADependencyMustNameAnItem(t *testing.T) {
 	withDeps := func(deps string) []byte {
 		return []byte(strings.Replace(validItem, `"source":"console"}`, `"source":"console","deps":`+deps+`}`, 1))
 	}
-	m := New(inbox, nil, WithNow(filingClock))
+	m := newFiler(inbox, nil)
 
 	if _, err := m.File(withDeps(`["no-such-item"]`)); !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "no-such-item") {
 		t.Errorf("unknown dependency: err = %v, want ErrInvalidItem naming it", err)
@@ -155,7 +155,7 @@ func TestMover_File_AWriteFaultIsNotAnInvalidItem(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
 	rec := &recordingAppender{}
 
-	_, err := New(inbox, rec, WithNow(filingClock)).File([]byte(validItem))
+	_, err := newFiler(inbox, rec).File([]byte(validItem))
 
 	if err == nil || errors.Is(err, ErrInvalidItem) || len(rec.records) != 0 {
 		t.Errorf("err = %v ledger = %+v, want the write fault and no ledger line", err, rec.records)
@@ -169,7 +169,7 @@ func TestMover_File_AnUnreadableInboxIsAScanFault(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
 
-	_, err := New(inbox, nil, WithNow(filingClock)).File([]byte(validItem))
+	_, err := newFiler(inbox, nil).File([]byte(validItem))
 
 	if err == nil || errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "scan") {
 		t.Errorf("err = %v, want the scan fault itself", err)
@@ -182,7 +182,7 @@ func TestMover_File_NeverClobbersAFileAtTheDestination(t *testing.T) {
 	writeItem(t, occupied, `{"id":"a-different-item"}`)
 	rec := &recordingAppender{}
 
-	_, err := New(inbox, rec, WithNow(filingClock)).File([]byte(validItem))
+	_, err := newFiler(inbox, rec).File([]byte(validItem))
 
 	if err == nil || errors.Is(err, ErrInvalidItem) || len(rec.records) != 0 {
 		t.Errorf("err = %v ledger = %+v, want a publish fault and no ledger line", err, rec.records)
@@ -208,7 +208,7 @@ func TestPublishNewItem_AnUnencodableFieldIsAFault(t *testing.T) {
 func TestMover_File_AcceptsTheBoundaryWeightAndKeepsTextReadable(t *testing.T) {
 	inbox := newInbox(t)
 
-	res, err := New(inbox, nil, WithNow(filingClock)).File([]byte(strings.Replace(validItem, `"weight":0.5`, `"weight":1`, 1)))
+	res, err := newFiler(inbox, nil).File([]byte(strings.Replace(validItem, `"weight":0.5`, `"weight":1`, 1)))
 
 	if err != nil {
 		t.Fatalf("a weight of exactly 1 is in range: %v", err)
@@ -222,7 +222,7 @@ func TestMover_File_AnAuthoredConsoleRouteIsKeptAndReported(t *testing.T) {
 	inbox := newInbox(t)
 	body := strings.Replace(validItem, `"source":"console"}`, `"source":"console","route":"console-manual"}`, 1)
 
-	res, err := New(inbox, nil, WithNow(filingClock)).File([]byte(body))
+	res, err := newFiler(inbox, nil).File([]byte(body))
 
 	if err != nil || readItem(t, res.Path)["route"] != "console-manual" || !strings.Contains(res.ConsoleReason, "console-manual") {
 		t.Errorf("File = (%+v, %v), want the console route kept and reported", res, err)
@@ -234,12 +234,12 @@ func TestMover_File_ReportsWhatTheClaimFloorWouldRefuse(t *testing.T) {
 	body := strings.Replace(validItem, `"files":["go/cmd/evolve/cmd_inbox.go"]`, `"files":["go/internal/guards/phase.go"]`, 1)
 	isGuard := func(p string) bool { return p == "go/internal/guards/phase.go" }
 
-	res, err := New(inbox, nil, WithNow(filingClock), WithProtectedPath(isGuard)).File([]byte(body))
+	res, err := newFiler(inbox, nil, WithProtectedPath(isGuard)).File([]byte(body))
 
 	if err != nil || !strings.Contains(res.ConsoleReason, "protected fix surface") {
 		t.Errorf("File = (%+v, %v), want the claim floor's own refusal reported", res, err)
 	}
-	if res, err := New(newInbox(t), nil, WithNow(filingClock)).File([]byte(validItem)); err != nil || res.ConsoleReason != "" {
+	if res, err := newFiler(newInbox(t), nil).File([]byte(validItem)); err != nil || res.ConsoleReason != "" {
 		t.Errorf("a lane item: File = (%+v, %v), want no console reason", res, err)
 	}
 }
@@ -252,7 +252,7 @@ func TestMover_File_RefusesEveryLifecycleOwnedField(t *testing.T) {
 		t.Run(field, func(t *testing.T) {
 			body := strings.Replace(validItem, `"source":"console"}`, `"source":"console",`+field+`}`, 1)
 
-			_, err := New(newInbox(t), nil, WithNow(filingClock)).File([]byte(body))
+			_, err := newFiler(newInbox(t), nil).File([]byte(body))
 
 			if !errors.Is(err, ErrInvalidItem) {
 				t.Errorf("err = %v, want ErrInvalidItem", err)
@@ -264,7 +264,7 @@ func TestMover_File_RefusesEveryLifecycleOwnedField(t *testing.T) {
 func TestMover_File_LeavesOnlyTheFiledItemBehind(t *testing.T) {
 	inbox := newInbox(t)
 
-	res, err := New(inbox, nil, WithNow(filingClock)).File([]byte(validItem))
+	res, err := newFiler(inbox, nil).File([]byte(validItem))
 
 	if err != nil {
 		t.Fatal(err)

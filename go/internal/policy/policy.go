@@ -22,9 +22,10 @@ type FloorGate struct {
 // Policy is the user-controlled rule set from .evolve/policy.json; a nil block means compiled defaults.
 type Policy struct {
 	// MandatoryPhases can only add to the mandatory set; the integrity floor still applies on top.
-	MandatoryPhases []string       `json:"mandatory_phases,omitempty"`
-	Pins            map[string]Pin `json:"pins,omitempty"`
-	CLIRouting      *CLIRouting    `json:"cli_routing,omitempty"`
+	MandatoryPhases []string             `json:"mandatory_phases,omitempty"`
+	Pins            map[string]Pin       `json:"pins,omitempty"`
+	CLIRouting      *CLIRouting          `json:"cli_routing,omitempty"`
+	InboxPriority   *InboxPriorityPolicy `json:"inbox_priority,omitempty"`
 	// ShipFloor lists the phases a shipping plan must run; empty means the router's default, and FloorPhases always adds "audit".
 	ShipFloor []string `json:"ship_floor,omitempty"`
 	// Floor lists closeout gates, not phases (contrast ShipFloor).

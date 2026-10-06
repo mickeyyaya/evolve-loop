@@ -14,7 +14,7 @@ import (
 func TestMover_Withdraw_RemovesAnAsFiledItemAndTheIDMayBeFiledAgain(t *testing.T) {
 	inbox := newInbox(t)
 	rec := &recordingAppender{}
-	m := New(inbox, rec, WithNow(filingClock), WithBinding(unbound))
+	m := newFiler(inbox, rec, WithBinding(unbound))
 	filed, err := m.File([]byte(validItem))
 	if err != nil {
 		t.Fatal(err)

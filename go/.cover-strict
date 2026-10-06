@@ -23,3 +23,4 @@
 ./internal/phases/audit/ciparitygate 100
 ./internal/subagent/subagentrun 100
 ./internal/cliroute 100
+./internal/inboxrank 100

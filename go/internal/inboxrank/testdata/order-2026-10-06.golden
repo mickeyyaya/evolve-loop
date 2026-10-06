@@ -1,0 +1,241 @@
+  1 0.641741 worktreephase-test-amplification-gap
+  2 0.627644 continuation-findings-anchor-first
+  3 0.621700 treediff-guard-worktree-phase-crosslane-residual
+  4 0.618842 phase-authored-red-tests-poison-egps
+  5 0.613439 resume-does-not-refresh-a-stale-worktree-base
+  6 0.610042 ledger-append-write-discipline
+  7 0.607921 a-fail-closeout-moves-main-under-sibling-lanes
+  8 0.607425 explanation-identity-belief-remaining-copies
+  9 0.601958 acs-run-names-vacuous
+ 10 0.600949 worktree-carries-tracked-inbox-copy
+ 11 0.600054 resume-post-ship-observer-skip-parity
+ 12 0.594380 resume-heals-a-carrier-left-at-head
+ 13 0.592958 consumed-item-resurrection-guard
+ 14 0.589899 ship-refuses-deleting-committed-documentation
+ 15 0.589472 tmux-drivers-ignore-profile-tool-lists
+ 16 0.589471 fleet-lane-launches-without-a-lane-pin
+ 17 0.588458 inbox-item-identity-one-rule
+ 18 0.588458 user-phase-writer-profiles-read-only
+ 19 0.588016 auditor-persona-rules-from-one-source
+ 20 0.579016 sizeratchet-allowances-not-a-shared-registry
+ 21 0.569928 capability-filter-at-plan-resolution
+ 22 0.565516 explanation-correction-is-a-rung
+ 23 0.565516 scopedelta-wire-or-delete
+ 24 0.562826 document-recipes-gated-off-by-their-own-triggers
+ 25 0.560928 deferred-fleet-lane-releases-its-claim
+ 26 0.542589 resume-after-a-fleet-signal-stop
+ 27 0.538786 retro-events-stream-missing
+ 28 0.535446 codex-config-toml-unbounded-growth
+ 29 0.530199 lost-ship-closeout-universal-landing-witness
+ 30 0.529231 inbox-loader-failure-reporting-lies-both-ways
+ 31 0.528765 posthoc-diff-anchor-no-op-cycle
+ 32 0.525334 routing-order-authority-followups
+ 33 0.519369 goal-text-has-no-selection-authority
+ 34 0.518020 auditor-tier-cascade
+ 35 0.517809 agent-router-token-resolver-nil
+ 36 0.517745 state-growth-caps
+ 37 0.516053 within-tier-model-fallback
+ 38 0.514984 autorespond-tail-and-attribution-residuals
+ 39 0.513958 codex-model-unsupported-bench
+ 40 0.511458 wave-work-supply-census
+ 41 0.508545 no-work-hand-off-rate-alarm
+ 42 0.508225 ledger-plain-verify-fails-after-seal
+ 43 0.505525 build-floor-rejection-classifies-as-system-level
+ 44 0.504519 egps-regression-tia-selection
+ 45 0.503849 carryover-queue-unbounded-by-design
+ 46 0.503563 termination-check-uses-no-routing-predicate
+ 47 0.502458 ci-covers-real-tmux-tier-false-belief
+ 48 0.499143 same-subsystem-wave-scheduling
+ 49 0.498070 worktree-fence-one-value
+ 50 0.497867 fence-snapshot-fails-under-load
+ 51 0.496553 build-floor-routes-tdd-predicate-defects-to-tdd
+ 52 0.496015 cli-loop-zero-ship-breaker
+ 53 0.495355 tdd-acs-on-protected-paths-are-console-followups
+ 54 0.495326 document-lane-tdd-release-never-reaches-the-plan
+ 55 0.494912 triagecap-demotion-write-and-dead-seams
+ 56 0.494517 bridge-tmux-boot-unquoted-cd-and-dropped-send-errors
+ 57 0.493458 loop-log-test-output-prefix-noise
+ 58 0.493040 premise-verification-anchor
+ 59 0.492920 consumption-releases-the-continuation-binding-before-the-landing
+ 60 0.490756 codex-readiness-judged-on-the-composer-drawn-before-a-startup-dialog
+ 61 0.488732 inbox-filing-declares-surface
+ 62 0.485640 tokenopt-handoff-digests-per-edge-remainder
+ 63 0.460806 go-cache-keyed-by-worktree-path
+ 64 0.454556 audit-gate-forced-fail-earns-no-repair
+ 65 0.453050 comment-floor-enforce
+ 66 0.451806 auditor-load-repro-orphans-cpu-loops
+ 67 0.451328 filed-acceptance-narrowed-without-a-deferral
+ 68 0.451015 cli-boundary-run
+ 69 0.451015 cli-floor-run
+ 70 0.451014 tdd-comment-floor-then-enforce
+ 71 0.450455 go-test-env-projection-pinned
+ 72 0.445423 verifylock-unreachable-from-sandboxed-pane
+ 73 0.437157 composition-snapshot-reads-the-worktree-base
+ 74 0.433515 cli-dossier-publish
+ 75 0.431129 inbox-batches-and-the-claim-floor-decode-an-item-two-ways
+ 76 0.429095 continuation-carried-eval-targets-archived-predicates
+ 77 0.429069 flags-and-predicate-tests-hermetic-env
+ 78 0.428307 overlay-rule-tier-selectors-canonicalize
+ 79 0.422970 lint-debt-enters-through-cycle-ships
+ 80 0.411888 insert-when-fields-need-a-producer
+ 81 0.407698 binary-churn-discard-restores-the-rebuilt-binary
+ 82 0.406685 realtmux-bridge-tests-flake-under-package-parallel-load
+ 83 0.406360 carry-recovery-to-ship-end-to-end-proof
+ 84 0.405979 repo-contract-test-level-selection
+ 85 0.405455 flag-campaign-state-as-config
+ 86 0.405455 lane-cycle-state-override-leaks
+ 87 0.405384 fast-tier-report-claims-need-an-external-check
+ 88 0.401142 build-selfcheck-contract-severity-follows-the-host-gate
+ 89 0.400859 recipe-boot-needs-the-dead-shell-guard
+ 90 0.400693 plan-mode-self-match-guard-checks-only-the-end-of-each-file
+ 91 0.400638 realtmux-tests-interfere-across-concurrent-test-processes
+ 92 0.400487 cmd-evolve-unit-wall-time-and-package-budget-check
+ 93 0.400407 model-classifier-resolves-its-cli-through-the-routing-table
+ 94 0.400350 adopted-continuation-explanation-covers-the-whole-base-diff
+ 95 0.395884 chronicle-s7a-historian-shadow
+ 96 0.389927 docs-drift-sweep-2026-07
+ 97 0.383574 retro-minting-files-through-inbox-add
+ 98 0.383515 cli-loop-resume-target
+ 99 0.383515 cli-phase-cycle-request
+100 0.383515 cli-land-patch
+101 0.383268 acs-cycle1723-package-doc-predicate-stale-after-753
+102 0.382955 loop-history-comment-removal-needs-an-archive-entry
+103 0.374182 harness-minted-completion
+104 0.374182 instinct-summary-producer
+105 0.372745 dead-api-sweep
+106 0.369182 verifier-isolation-audit
+107 0.361607 ship-addall-staging-surface
+108 0.361419 reportdoc-indented-continuation-is-not-code
+109 0.361361 carried-ship-resume-binding-sites-skip-the-rule
+110 0.361315 repair-shipped-prescriptions-stay-queued
+111 0.361163 preflight-warns-when-claude-code-lags
+112 0.361014 releasepipeline-journal-errors-and-classify-pin
+113 0.360832 gittest-ebadf-retry-class
+114 0.360455 recurrence-reweight-bypasses-the-item-writer
+115 0.360396 remediation-directive-asks-for-a-numbered-record
+116 0.356015 cli-loop-dry-run-wave-plan
+117 0.355685 agy-declares-an-input-line-marker
+118 0.355685 agy-quota-exhausted-rule-benches-the-family
+119 0.355458 superseded-attempt-acs-retention
+120 0.353609 semantic-rederivation-dedup
+121 0.349752 acs-predicate-hardening
+122 0.349752 bridge-prompt-hardening
+123 0.349752 inbox-consume-contract
+124 0.348047 decision-document-single-declaration
+125 0.346519 artifact-log-compression
+126 0.343197 bridge-family-manifest-facade
+127 0.342019 breaker-fingerprint-similarity-tier
+128 0.341245 minor-hardening-sweep
+129 0.339410 chain-reexec-keeps-batch-budget
+130 0.338802 lane-lint-debt-class
+131 0.338515 cli-failures
+132 0.338515 cli-rebuild
+133 0.338515 cli-doctor-live-served-model
+134 0.338515 cli-cycle-reaudit
+135 0.338514 releasepreflight-fail-open-pins
+136 0.338514 rollback-fail-open-and-vacuous-tests
+137 0.337281 suite-family-flake-deflake
+138 0.336745 config-single-authority-sweep
+139 0.334828 dossier-sweep-pairing
+140 0.333512 inbox-loader-truncation-reads-as-skipped
+141 0.332920 tests-leak-artifacts-into-package-dirs
+142 0.332869 route-reason-carries-the-landing-probe
+143 0.332384 chronicle-s7b-historian-filer
+144 0.332078 phase-stub-shape-rule-at-ship-staging
+145 0.331752 worktree-scope-continuation
+146 0.329469 sandbox-wrapper-forces-network-on
+147 0.327772 kb-graph-projector
+148 0.327745 paths-subtree-accessors
+149 0.327252 ledger-binding-runid
+150 0.324379 untrack-goevolve-binary
+151 0.323837 tokenopt-session-resume-on-retry
+152 0.323768 fable-simulation-slices-f1-f5
+153 0.322080 audit-eval-existence-path-convention
+154 0.321171 protected-surface-leaf-and-floor-gaps
+155 0.321085 stale-premise-reaches-build
+156 0.320224 intent-delta-gate-seam-threading
+157 0.320196 premium-rung-placement-law-and-narrative-dedup
+158 0.319478 self-consistency-on-decision-phases
+159 0.319478 verdict-sentinel-as-tool-call
+160 0.318477 bwrap-bind-requires-existing-write-dir
+161 0.318256 claude-stop-hook-finish-gate
+162 0.316910 boot-refresh-rearms-the-wave-handoff
+163 0.316015 cli-release-promote
+164 0.315966 continuation-findings-prompt-hygiene
+165 0.315455 route-verbs-refuse-mid-wave
+166 0.314472 repo-contract-cancel-orphans-test-binary
+167 0.314042 agent-subprocess-runid-residuals
+168 0.313908 codex-effort-single-source-and-dedupe-grouping
+169 0.312882 modelprobe-sessionrecord-unreapable
+170 0.311851 inboxbatch-utf8-and-resolution
+171 0.311486 file-size-decomposition-backlog
+172 0.311085 carry-chase-replay-and-incident-record
+173 0.311015 cli-phase-spec-phases
+174 0.311015 cli-salvage-list
+175 0.310574 unsatisfiable-lint-follows-exit-codes-in-variables
+176 0.307399 router-silent-errors
+177 0.307263 observer-exec-without-context
+178 0.307218 auditchain-scout-report-literal
+179 0.307201 agy-tier-map-single-source
+180 0.307150 codex-pretrust-presence-and-escaping
+181 0.307134 phasespec-roots-silent-policy-error
+182 0.302925 policy-resolver-hygiene
+183 0.301337 tokenopt-cache-discipline-audit
+184 0.298283 phasecmd-silent-policy-fallbacks
+185 0.298192 bridge-adapter-policy-literal
+186 0.296774 cyclerun-seat-helper
+187 0.294191 routing-binding-membership-port
+188 0.293841 fleet-runpool-silent-success
+189 0.293751 llmroute-default-trigger-aliasing
+190 0.293699 evalqualitycheck-fence-and-shadowing
+191 0.293673 interaction-rollup-tmp-collision
+192 0.293602 core-floor-checks-hygiene
+193 0.293601 bridge-trust-dismissal-check-vacuous
+194 0.290237 lane-alternates-on-refusal
+195 0.289264 tokenusage-silent-reads-and-vacuous-test
+196 0.289205 cycleclassify-cycle-grep-substring
+197 0.288514 dashboard-sse-and-board-status-pins
+198 0.287485 plan-mode-soak-preconditions
+199 0.285031 inbox-filename-stamp-single-source
+200 0.284941 config-dead-dials
+201 0.284802 phasecoherence-provenance-silent
+202 0.284800 looppreflight-version-cache
+203 0.284744 swarm-worker-pgid-never-recorded
+204 0.284686 coherence-failreasons-unread
+205 0.284680 reachabilityprobe-error-path-duplicate
+206 0.284660 phaseobserver-test-hygiene
+207 0.284625 inboxmover-dead-quarantine-writer
+208 0.284182 capability-aware-prompt-scaffold
+209 0.281015 cli-ship-pr
+210 0.281015 cli-ship-manual-paths
+211 0.275756 bridge-tests-write-the-real-codex-config
+212 0.266199 bench-records-the-stated-reset
+213 0.266015 cli-carryover-list
+214 0.266015 cli-cycle-models
+215 0.266015 cli-doctor-versions
+216 0.266015 cli-cycle-carry
+217 0.255530 phase-agent-mapping-single-source
+218 0.243515 cli-routing-plan
+219 0.233629 operator-inbox-verbs-reachable-from-non-claude-phases
+220 0.230693 codex-version-state-file-without-the-dead-dismissal-sentinel
+221 0.221015 cli-bridge-promote-rule
+222 0.221015 cli-cycle-scope-delta
+223 0.221015 cli-lessons-backfill
+224 0.221015 cli-phases-check-provenance
+225 0.213514 modelquery-pin-hashes-code-not-comments
+226 0.212955 inbox-item-writer-keeps-the-filed-format
+227 0.191074 inbox-item-id-grammar-one-home
+228 0.191015 cli-loop-goal-from-last
+229 0.191015 cli-release-preflight-no-wip
+230 0.191014 retire-comment-pinning-cycle-predicates
+231 0.191014 small-round12-defects
+232 0.190294 real-ledger-copy-test-reads-a-dev-worktree-ledger
+233 0.188515 cli-scan-secrets
+234 0.185693 history-refusal-names-the-evolve-comments-command
+235 0.168515 cli-backups-verify
+236 0.168515 cli-doctor-plane-repair
+237 0.168514 one-cli-resolver-for-phases
+238 0.168396 round12-leftover-pins-and-literals
+239 0.166015 cli-ship-force-with-lease
+240 0.146164 subagent-bash-parity-test-is-dead
+241 0.146015 cli-dossier-sweep
