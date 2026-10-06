@@ -127,7 +127,7 @@ func Plan(opts Options) (Manifest, error) {
 	planTrackerTTL(opts.Runs, items, pol, now, add)
 
 	// Rule 3: operator-salvage TTL (top-level entries by mtime).
-	for _, e := range dirEntriesOlderThan(operatorSalvageDir(opts.EvolveDir), now(), pol.SalvageTTLDays, nil) {
+	for _, e := range dirEntriesOlderThan(OperatorSalvageDir(opts.EvolveDir), now(), pol.SalvageTTLDays, nil) {
 		add(e, ActionDelete, "salvage_ttl_days")
 	}
 

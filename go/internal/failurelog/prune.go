@@ -174,3 +174,33 @@ func isExpired(entry map[string]any, now time.Time) bool {
 	// Neither timestamp present — keep.
 	return false
 }
+
+type PrunePreview struct {
+	PruneResult
+	Expired []map[string]any
+}
+
+func PreviewExpired(statePath string, now time.Time) (failed PrunePreview, carryover PrunePreview, err error) {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	state, entries, err := readStateArray(statePath, "failedApproaches")
+	if err != nil {
+		return PrunePreview{}, PrunePreview{}, err
+	}
+	todos, _ := state["carryoverTodos"].([]any)
+	return previewEntries(entries, now), previewEntries(todos, now), nil
+}
+
+func previewEntries(entries []any, now time.Time) PrunePreview {
+	expired := []map[string]any{}
+	for _, e := range entries {
+		if m, ok := e.(map[string]any); ok && isExpired(m, now) {
+			expired = append(expired, m)
+		}
+	}
+	return PrunePreview{
+		PruneResult: PruneResult{Before: len(entries), After: len(entries) - len(expired), Removed: len(expired)},
+		Expired:     expired,
+	}
+}

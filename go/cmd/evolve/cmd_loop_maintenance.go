@@ -22,18 +22,33 @@ func maintainBatchState(cfg loopConfig, autoPrune bool, stderr io.Writer) {
 	}
 }
 
+type expiryOutcome struct {
+	failed       failurelog.PruneResult
+	failedErr    error
+	carryover    failurelog.PruneResult
+	carryoverErr error
+}
+
+func pruneExpiredState(statePath string, now time.Time) expiryOutcome {
+	failed, failedErr := failurelog.PruneExpired(statePath, now)
+	carryover, carryoverErr := failurelog.PruneExpiredCarryoverTodos(statePath, now)
+	return expiryOutcome{failed: failed, failedErr: failedErr, carryover: carryover, carryoverErr: carryoverErr}
+}
+
 func pruneBatchState(statePath string, stderr io.Writer) {
-	if pr, err := failurelog.PruneExpired(statePath, time.Now().UTC()); err != nil {
-		fmt.Fprintf(stderr, "[loop] auto-prune: %v\n", err)
-	} else if pr.Removed > 0 {
-		fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired failedApproaches (%d→%d)\n", pr.Removed, pr.Before, pr.After)
+	now := time.Now().UTC()
+	out := pruneExpiredState(statePath, now)
+	if out.failedErr != nil {
+		fmt.Fprintf(stderr, "[loop] auto-prune: %v\n", out.failedErr)
+	} else if out.failed.Removed > 0 {
+		fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired failedApproaches (%d→%d)\n", out.failed.Removed, out.failed.Before, out.failed.After)
 	}
-	if pr, err := failurelog.PruneExpiredCarryoverTodos(statePath, time.Now().UTC()); err != nil {
-		fmt.Fprintf(stderr, "[loop] auto-prune: carryover: %v\n", err)
-	} else if pr.Removed > 0 {
-		fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired carryoverTodos (%d→%d)\n", pr.Removed, pr.Before, pr.After)
+	if out.carryoverErr != nil {
+		fmt.Fprintf(stderr, "[loop] auto-prune: carryover: %v\n", out.carryoverErr)
+	} else if out.carryover.Removed > 0 {
+		fmt.Fprintf(stderr, "[loop] auto-prune: removed %d expired carryoverTodos (%d→%d)\n", out.carryover.Removed, out.carryover.Before, out.carryover.After)
 	}
-	if stamped, err := failurelog.BackfillLegacyCarryoverExpiry(statePath, failurelog.DefaultCarryoverBackfillTTL, time.Now().UTC()); err != nil {
+	if stamped, err := failurelog.BackfillLegacyCarryoverExpiry(statePath, failurelog.DefaultCarryoverBackfillTTL, now); err != nil {
 		fmt.Fprintf(stderr, "[loop] auto-prune: carryover backfill: %v\n", err)
 	} else if stamped > 0 {
 		fmt.Fprintf(stderr, "[loop] auto-prune: backfilled expiresAt on %d legacy carryoverTodos\n", stamped)

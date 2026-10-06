@@ -171,7 +171,7 @@ func TestRunFailures_PruneRemovesOnlyExpiredEntries(t *testing.T) {
 	}
 	corruptRoot, corruptDir := failuresProject(t, "{not json", "")
 	errb.Reset()
-	if code := runFailures([]string{"prune", "--project-root", corruptRoot}, nil, &out, &errb); code != 1 || !strings.Contains(errb.String(), "evolve failures prune:") {
+	if code := runFailures([]string{"prune", "--project-root", corruptRoot}, nil, &out, &errb); code != 2 || !strings.Contains(errb.String(), "evolve failures prune:") {
 		t.Errorf("prune of unparseable state: code=%d err=%q", code, errb.String())
 	}
 	if raw, _ := os.ReadFile(filepath.Join(corruptDir, "state.json")); string(raw) != "{not json" {
@@ -193,9 +193,9 @@ func TestRunFailures_ResetErrorPaths(t *testing.T) {
 	}{
 		{"drops only reset classes", failuresLiveState, "", "", 0, "code-build-fail,code-audit-fail", []string{"pruned 2 failedApproaches (4→2)"}, []string{"acknowledged", "--fingerprint"}, false},
 		{"acks the fingerprint", failuresLiveState, "", "fp-reset", 0, "code-build-fail,code-audit-fail", []string{"pruned 2", `acknowledged "fp-reset"`}, nil, true},
-		{"unparseable state still acks", "{not json", "", "fp-reset", 1, "", []string{"parse state", `acknowledged "fp-reset"`}, nil, true},
-		{"ack error still reports the prune", failuresLiveState, failuresCorruptResolved, "fp-reset", 1, "code-build-fail,code-audit-fail", []string{"pruned 2", "evolve failures reset: --fingerprint:", "resolved-fingerprints.json"}, []string{"acknowledged"}, false},
-		{"no fingerprint never acks", "{not json", "", "", 1, "", []string{"parse state"}, []string{"--fingerprint"}, false},
+		{"unparseable state still acks", "{not json", "", "fp-reset", 2, "", []string{"parse state", `acknowledged "fp-reset"`}, nil, true},
+		{"ack error still reports the prune", failuresLiveState, failuresCorruptResolved, "fp-reset", 2, "code-build-fail,code-audit-fail", []string{"pruned 2", "evolve failures reset: --fingerprint:", "resolved-fingerprints.json"}, []string{"acknowledged"}, false},
+		{"no fingerprint never acks", "{not json", "", "", 2, "", []string{"parse state"}, []string{"--fingerprint"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
