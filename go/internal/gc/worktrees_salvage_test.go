@@ -152,7 +152,7 @@ func TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch(t *testing
 	if got := repo.Git("rev-parse", "cycle-cd3ae73e-1677"); got != tip {
 		t.Fatalf("branch tip %q, want %q: the lane's commits must survive on the kept branch", got, tip)
 	}
-	salvage := filepath.Join(o.EvolveDir, "operator-salvage", "cycle-cd3ae73e-1677")
+	salvage := filepath.Join(OperatorSalvageDir(o.EvolveDir), "cycle-cd3ae73e-1677")
 	if head := readFile(t, filepath.Join(salvage, "HEAD")); !strings.HasPrefix(head, tip) {
 		t.Errorf("salvage HEAD %q does not record the tip %s", head, tip)
 	}
@@ -167,6 +167,23 @@ func TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch(t *testing
 	}
 	if got := untarLink(t, filepath.Join(salvage, "untracked.tgz"), "sub/link"); got != "new.txt" {
 		t.Errorf("untracked symlink archived with target %q, want the link itself (new.txt), never its dereferenced content", got)
+	}
+	leaves, err := ListSalvage(o.EvolveDir)
+	if err != nil || len(leaves) != 1 {
+		t.Fatalf("ListSalvage = %+v, %v; want the one leaf gc salvaged", leaves, err)
+	}
+	patch, err := os.Stat(filepath.Join(salvage, "uncommitted.patch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := leaves[0]
+	got.SalvagedAt = time.Time{}
+	want := SalvageLeaf{Leaf: "cycle-cd3ae73e-1677", Cycle: 1677, Branch: "cycle-cd3ae73e-1677", Head: tip, ChangedFiles: 1, PatchBytes: patch.Size(), UntrackedFiles: 2}
+	if got != want {
+		t.Errorf("ListSalvage read gc's salvage as %+v, want %+v", got, want)
+	}
+	if leaves[0].SalvagedAt.IsZero() || leaves[0].SalvagedAt.Location() != time.UTC {
+		t.Errorf("SalvagedAt = %v, want the leaf mtime in UTC", leaves[0].SalvagedAt)
 	}
 }
 

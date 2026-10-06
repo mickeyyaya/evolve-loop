@@ -36,7 +36,7 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused ma
 }
 
 func (o WorktreeOptions) salvageWorktree(path, branch string) error {
-	dir := filepath.Join(operatorSalvageDir(o.EvolveDir), filepath.Base(path))
+	dir := filepath.Join(OperatorSalvageDir(o.EvolveDir), filepath.Base(path))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create salvage dir: %w", err)
 	}
@@ -44,7 +44,7 @@ func (o WorktreeOptions) salvageWorktree(path, branch string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "HEAD"), []byte(strings.TrimSpace(head)+" "+branch+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, salvageHeadFile), []byte(strings.TrimSpace(head)+" "+branch+"\n"), 0o644); err != nil {
 		return fmt.Errorf("write salvage HEAD: %w", err)
 	}
 	patch, err := o.git(path, "diff", "HEAD", "--binary")
@@ -52,7 +52,7 @@ func (o WorktreeOptions) salvageWorktree(path, branch string) error {
 		return err
 	}
 	if patch != "" {
-		if err := os.WriteFile(filepath.Join(dir, "uncommitted.patch"), []byte(patch), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, salvagePatchFile), []byte(patch), 0o644); err != nil {
 			return fmt.Errorf("write salvage patch: %w", err)
 		}
 	}
@@ -60,7 +60,7 @@ func (o WorktreeOptions) salvageWorktree(path, branch string) error {
 	if err != nil {
 		return err
 	}
-	return archiveUntracked(path, untracked, filepath.Join(dir, "untracked.tgz"))
+	return archiveUntracked(path, untracked, filepath.Join(dir, salvageUntrackedFile))
 }
 
 func archiveUntracked(root, nulList, dest string) (err error) {
@@ -115,4 +115,10 @@ func addTarEntry(tw *tar.Writer, root, name string) error {
 	return err
 }
 
-func operatorSalvageDir(evolveDir string) string { return filepath.Join(evolveDir, "operator-salvage") }
+const (
+	salvageHeadFile      = "HEAD"
+	salvagePatchFile     = "uncommitted.patch"
+	salvageUntrackedFile = "untracked.tgz"
+)
+
+func OperatorSalvageDir(evolveDir string) string { return filepath.Join(evolveDir, "operator-salvage") }
