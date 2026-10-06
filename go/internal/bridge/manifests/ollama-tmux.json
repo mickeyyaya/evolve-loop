@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "ollama-tmux",
   "binary": "ollama",
+  "model_family": "local",
   "binary_min_version": "0.1.0",
   "transport": "tmux",
   "default_tier": "hybrid",

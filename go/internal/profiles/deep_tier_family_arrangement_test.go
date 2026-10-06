@@ -7,7 +7,7 @@ import (
 func TestDeepTierFamilyArrangement(t *testing.T) {
 	// The graders' exceptions come from claudeFamilyFloor; only the advisor is pinned here.
 	exceptions := map[string]string{
-		"router": "agy-tmux",
+		"router": "agy-claude-tmux",
 	}
 	loader, names := RealTreeProfiles(t)
 	checked := 0

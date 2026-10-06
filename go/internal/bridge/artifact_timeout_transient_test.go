@@ -112,8 +112,18 @@ func transientFamilyCases() []transientFamilyCase {
 			transient: []string{
 				"503 UNAVAILABLE: The model is overloaded. Please try again later.",
 				"500 INTERNAL",
+				"Eligibility check failed: UNAVAILABLE (code 503): The service is currently unavailable.",
 			},
 			walls: []string{"quota exceeded", "usage limit reached"},
+		},
+		{
+			cli: "agy-claude-tmux",
+			transient: []string{
+				"503 UNAVAILABLE: The model is overloaded. Please try again later.",
+				"500 INTERNAL",
+				"Eligibility check failed: UNAVAILABLE (code 503): The service is currently unavailable.",
+			},
+			walls: []string{"quota exceeded", "usage limit reached", "RESOURCE_EXHAUSTED"},
 		},
 		{
 			cli: "ollama-tmux",

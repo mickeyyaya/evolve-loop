@@ -12,6 +12,9 @@
       "agy": [
         "gemini"
       ],
+      "agy-claude": [
+        "claude"
+      ],
       "claude": [
         "claude"
       ],

@@ -42,8 +42,8 @@ func DefaultWallCorroborator(run CmdRunner, log io.Writer) WallCorroborator {
 		log = io.Discard
 	}
 	return func(ctx context.Context, cli string) bool {
-		family := strings.TrimSuffix(cli, "-tmux")
-		recipe, ok := wallProbeRecipes[family]
+		binary := driverBinary(cli)
+		recipe, ok := wallProbeRecipes[binary]
 		if !ok {
 			return true // no recipe — cannot corroborate, stay conservative
 		}
@@ -55,7 +55,7 @@ func DefaultWallCorroborator(run CmdRunner, log io.Writer) WallCorroborator {
 		}
 		rc, err := run(pctx, recipe.argv[0], "", recipe.argv[1:], nil, stdin, io.Discard, io.Discard)
 		if err != nil || rc != 0 {
-			fmt.Fprintf(log, "[bridge] wall corroborated for %s: probe rc=%d err=%v\n", family, rc, err)
+			fmt.Fprintf(log, "[bridge] wall corroborated for %s: probe rc=%d err=%v\n", binary, rc, err)
 			return true
 		}
 		return false

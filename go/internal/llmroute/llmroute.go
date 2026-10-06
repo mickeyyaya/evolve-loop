@@ -1,5 +1,5 @@
 // Package llmroute resolves a phase's dispatch plan (CLI chain, triggers, model, tiers) and walks it.
-// For an overlay CLI, a bare name is a family selector, a hyphen-qualified name is a driver selector, and an exact chain entry outranks both.
+// For an overlay CLI, a name that is not a registered driver is a family selector (matched by Family), a registered driver name is a driver selector, and an exact chain entry outranks both.
 // See docs/architecture/packages/internal-llmroute.md.
 package llmroute
 
@@ -18,15 +18,15 @@ import (
 // REPL boot timeout, artifact timeout, unknown prompt (incl. quota), timeout(1), missing binary.
 var defaultFallbackOnExit = []int{80, 81, 85, 124, 127}
 
-// cliBinaryFor mirrors bridge.doctorBinaryFor and is this package's one list of registered drivers.
 var cliBinaryFor = map[string]string{
-	"claude-p":    "claude",
-	"claude-tmux": "claude",
-	"codex":       "codex",
-	"codex-tmux":  "codex",
-	"agy":         "agy",
-	"agy-tmux":    "agy",
-	"ollama-tmux": "ollama",
+	"claude-p":        "claude",
+	"claude-tmux":     "claude",
+	"codex":           "codex",
+	"codex-tmux":      "codex",
+	"agy":             "agy",
+	"agy-tmux":        "agy",
+	"agy-claude-tmux": "agy",
+	"ollama-tmux":     "ollama",
 }
 
 // AutoModel expands the "auto" sentinel for a phase role; ok=false leaves "auto" unchanged.
@@ -202,11 +202,13 @@ func ApplyUniversalFallback(p Plan, discovered []string, lookPath func(string) (
 
 // Family maps a driver name to its CLI family ("codex-tmux" → "codex"); unknown names map to themselves.
 func Family(cli string) string {
-	if bin := cliBinaryFor[cli]; bin != "" {
-		return bin
+	if _, registered := cliBinaryFor[cli]; registered {
+		return profiles.BaseCLI(cli)
 	}
 	return cli
 }
+
+func Binary(cli string) string { return cliBinaryFor[cli] }
 
 // ApplyDriverBench demotes candidates benched by full driver name (driver → BenchedAt), never by family.
 func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
