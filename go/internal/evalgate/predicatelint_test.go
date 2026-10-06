@@ -22,21 +22,25 @@ func gateNamed(t *testing.T, name string) gate {
 
 type predicateLintGateWording struct {
 	gateName, label, subject, headline, advice, finding string
-	findingSrc                                          string
+	findingSrc, findingVerdict                          string
+	findingBlocks                                       bool
 }
 
 var predicateLintGateWordings = []predicateLintGateWording{
 	{
 		gateName: "flaky-predicate-shape", label: "flaky-shape lint", subject: "predicate shape",
 		headline: "flaky-shaped predicate(s)", finding: "predicates_test.go:TestC4242_WholeModuleSweep [concurrency] ",
-		advice:     "These shapes flake under fleet load (Luo FSE'14 async-wait/concurrency classes); rewrite before they enter the ACS corpus.",
-		findingSrc: flakyPredicateSrc,
+		advice:         "These shapes flake under fleet load (Luo FSE'14 async-wait/concurrency classes); rewrite before they enter the ACS corpus.",
+		findingSrc:     flakyPredicateSrc,
+		findingVerdict: " ADVISORY: never blocks",
 	},
 	{
 		gateName: "unsatisfiable-predicate-shape", label: "unsatisfiable-lint", subject: "predicate",
 		headline: "unsatisfiable predicate(s)", finding: "predicates_test.go:TestC4242_RetiredFileGone [inverted-idiom] ",
-		advice:     "A predicate that is red on every tree burns the build (the cycle-1488 class); rewrite it before build dispatch.",
-		findingSrc: unsatisfiablePredicateSrc,
+		advice:         "A predicate that is red on every tree burns the build (the cycle-1488 class); rewrite it before build dispatch.",
+		findingSrc:     unsatisfiablePredicateSrc,
+		findingVerdict: " BLOCKING at enforce: 1 of the 1 finding(s), listed first",
+		findingBlocks:  true,
 	},
 }
 
@@ -71,8 +75,8 @@ func TestPredicateLintGates_MessagesAreUnchanged(t *testing.T) {
 		}
 		got, block := g.check(core.ReviewInput{Phase: "tdd", Workspace: ws, Worktree: findings})
 		prefix := w.headline + " authored for cycle4242: 1 finding(s) across 1 linted file(s) — " + w.finding
-		suffix := ". " + w.advice + " ADVISORY: never blocks"
-		if block || !strings.HasPrefix(got, prefix) || !strings.HasSuffix(got, suffix) {
+		suffix := ". " + w.advice + w.findingVerdict
+		if block != w.findingBlocks || !strings.HasPrefix(got, prefix) || !strings.HasSuffix(got, suffix) {
 			t.Errorf("%s: block=%v findings reason %q, want prefix %q and suffix %q", w.gateName, block, got, prefix, suffix)
 		}
 	}
@@ -93,5 +97,22 @@ func TestPredicateLintGates_ReasonsCapFindingsWithAVisibleCount(t *testing.T) {
 		if !strings.Contains(reason, "8 finding(s)") || !strings.Contains(reason, "(+3 more)") || strings.Count(reason, "TestC4242_") != 5 {
 			t.Errorf("%s must list five findings and state how many it elided; got %q", gateName, reason)
 		}
+	}
+}
+
+func TestPredicateLintGate_ListsBlockingFindingsAheadOfTheCap(t *testing.T) {
+	findings := []predicateLintFinding{{text: "z.go:TestZ [inverted-idiom] proof", blocking: true}}
+	for i := 1; i <= 6; i++ {
+		findings = append(findings, predicateLintFinding{text: "a.go:TestA" + strconv.Itoa(i) + " [absence-message] heuristic"})
+	}
+	reason, blocking := unsatisfiableShapeGate().findingsReason(4242, predicateLintOutcome{files: []string{"a.go", "z.go"}, findings: findings})
+	if blocking != 1 {
+		t.Errorf("blocking = %d, want 1", blocking)
+	}
+	if !strings.Contains(reason, "(+2 more) — z.go:TestZ [inverted-idiom] proof; a.go:TestA1") {
+		t.Errorf("the blocking finding must lead the capped list; got %q", reason)
+	}
+	if !strings.HasSuffix(reason, " BLOCKING at enforce: 1 of the 7 finding(s), listed first") || strings.Contains(reason, "never blocks") {
+		t.Errorf("a reason with a blocking finding must say so and never call itself advisory; got %q", reason)
 	}
 }

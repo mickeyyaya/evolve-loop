@@ -19,9 +19,9 @@ func flakyShapeGate() predicateLintGate {
 
 func lintFlakyShapes(dir string) (predicateLintOutcome, error) {
 	report, err := evalqualitycheck.LintFlakyPredicates(dir)
-	findings := make([]string, 0, len(report.Findings))
+	findings := make([]predicateLintFinding, 0, len(report.Findings))
 	for _, f := range report.Findings {
-		findings = append(findings, fmt.Sprintf("%s:%s [%s] %s", f.File, f.Func, f.Class, f.Reason))
+		findings = append(findings, predicateLintFinding{text: fmt.Sprintf("%s:%s [%s] %s", f.File, f.Func, f.Class, f.Reason)})
 	}
 	return predicateLintOutcome{files: report.Files, findings: findings}, err
 }

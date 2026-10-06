@@ -17,11 +17,19 @@ func unsatisfiableShapeGate() predicateLintGate {
 	}
 }
 
+var unsatisfiableProofKinds = map[string]bool{
+	evalqualitycheck.UnsatisfiableKindInvertedIdiom: true,
+	evalqualitycheck.UnsatisfiableKindGoRunExitCode: true,
+}
+
 func lintUnsatisfiableShapes(dir string) (predicateLintOutcome, error) {
 	report, err := evalqualitycheck.LintUnsatisfiablePredicates(dir)
-	findings := make([]string, 0, len(report.Findings))
+	findings := make([]predicateLintFinding, 0, len(report.Findings))
 	for _, f := range report.Findings {
-		findings = append(findings, fmt.Sprintf("%s:%s [%s] %s", f.File, f.Func, f.Kind, f.Reason))
+		findings = append(findings, predicateLintFinding{
+			text:     fmt.Sprintf("%s:%s [%s] %s", f.File, f.Func, f.Kind, f.Reason),
+			blocking: unsatisfiableProofKinds[f.Kind],
+		})
 	}
 	return predicateLintOutcome{files: report.Files, findings: findings}, err
 }

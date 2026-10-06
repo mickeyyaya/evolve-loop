@@ -44,19 +44,62 @@ func TestC4242_RetiredFlagGone(t *testing.T) {
 }
 `
 
-func TestUnsatisfiableShapeGate_FlagsUnsatisfiablePredicateAdvisory(t *testing.T) {
-	wt := t.TempDir()
-	writeCyclePredicates(t, wt, 4242, unsatisfiablePredicateSrc)
+const absenceMessagePredicateSrc = `//go:build acs
 
-	reason, block := unsatisfiableShapeGate().check(core.ReviewInput{
-		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
-	})
-	if block {
-		t.Error("the unsatisfiable lint must never block")
+package cycle4242
+
+import (
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+)
+
+func TestC4242_DuplicateHelperRemoved(t *testing.T) {
+	if !acsassert.FileContains(t, "f.go", "helper") {
+		t.Errorf("f.go still holds the duplicated helper")
 	}
-	for _, want := range []string{"TestC4242_RetiredFileGone", "inverted-idiom", "FileExists", "1 finding(s)", "1 linted file(s)", "ADVISORY"} {
-		if !strings.Contains(reason, want) {
-			t.Errorf("reason %q missing %q", reason, want)
+}
+`
+
+const goRunExitCodePredicateSrc = `//go:build acs
+
+package cycle4242
+
+import (
+	"os/exec"
+	"testing"
+)
+
+func TestC4242_UsageErrorExitsThree(t *testing.T) {
+	cmd := exec.Command("go", "run", "./cmd/tool", "bogus")
+	_ = cmd.Run()
+	if cmd.ProcessState.ExitCode() != 3 {
+		t.Errorf("want exit 3 on a usage error")
+	}
+}
+`
+
+func TestUnsatisfiableShapeGate_BlocksOnlyTheProofKinds(t *testing.T) {
+	cases := []struct {
+		kind, src string
+		wantBlock bool
+		want      []string
+	}{
+		{"inverted-idiom", unsatisfiablePredicateSrc, true, []string{"TestC4242_RetiredFileGone", "FileExists", "BLOCKING at enforce"}},
+		{"go-run-exit-code", goRunExitCodePredicateSrc, true, []string{"TestC4242_UsageErrorExitsThree", "exit code 3", "go build", "BLOCKING at enforce"}},
+		{"absence-message", absenceMessagePredicateSrc, false, []string{"TestC4242_DuplicateHelperRemoved", "acsassert.FileNotContains", "ADVISORY: never blocks"}},
+	}
+	for _, c := range cases {
+		wt := t.TempDir()
+		writeCyclePredicates(t, wt, 4242, c.src)
+		reason, block := unsatisfiableShapeGate().check(core.ReviewInput{Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt})
+		if block != c.wantBlock {
+			t.Errorf("%s: block=%v, want %v; reason %q", c.kind, block, c.wantBlock, reason)
+		}
+		for _, want := range append([]string{"[" + c.kind + "]", "1 finding(s)", "1 linted file(s)"}, c.want...) {
+			if !strings.Contains(reason, want) {
+				t.Errorf("%s: reason %q missing %q", c.kind, reason, want)
+			}
 		}
 	}
 }
@@ -110,25 +153,38 @@ func TestUnsatisfiableShapeGate_WiredIntoReviewer(t *testing.T) {
 	t.Fatal("unsatisfiableShapeGate is not wired into NewReviewer's gate list — the lint would run only when an agent hand-runs quality-check")
 }
 
-func TestNewReviewer_UnsatisfiablePredicateSurfacesButNeverBlocksAtEnforce(t *testing.T) {
+func TestNewReviewer_ProofKindRejectsAtEnforceAndIsOnlyLoggedAtShadow(t *testing.T) {
 	ws, wt := cycleWorkspace(t, 4242), t.TempDir()
 	writeCyclePredicates(t, wt, 4242, unsatisfiablePredicateSrc)
-
-	var logged []string
-	rv := NewReviewer(config.StageEnforce).(*reviewer)
-	rv.logf = func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }
-
-	res := rv.Review(context.Background(), core.ReviewInput{Phase: "tdd", Workspace: ws, Worktree: wt, ProjectRoot: t.TempDir()})
-	if !res.Approve {
-		t.Fatalf("an unsatisfiable SHAPE must never reject a deliverable at enforce; got Reason=%q", res.Reason)
+	in := core.ReviewInput{Phase: "tdd", Workspace: ws, Worktree: wt, ProjectRoot: t.TempDir()}
+	cases := []struct {
+		stage       config.Stage
+		wantApprove bool
+		wantLog     string
+	}{
+		{config.StageEnforce, false, "stage=enforce, blocking=true"},
+		{config.StageShadow, true, "stage=shadow, blocking=false"},
 	}
-	var line string
-	for _, l := range logged {
-		if strings.Contains(l, "unsatisfiable-predicate-shape") {
-			line = l
+	for _, c := range cases {
+		var logged []string
+		rv := NewReviewer(c.stage).(*reviewer)
+		rv.logf = func(format string, args ...any) { logged = append(logged, fmt.Sprintf(format, args...)) }
+
+		res := rv.Review(context.Background(), in)
+		if res.Approve != c.wantApprove {
+			t.Errorf("%s: Approve=%v, want %v; Reason=%q", c.stage, res.Approve, c.wantApprove, res.Reason)
 		}
-	}
-	if !strings.Contains(line, "TestC4242_RetiredFileGone") || !strings.Contains(line, "blocking=false") {
-		t.Fatalf("the reviewer log must name the unsatisfiable predicate with blocking=false; got:\n%s", strings.Join(logged, "\n"))
+		if !c.wantApprove && !strings.Contains(res.Reason, "TestC4242_RetiredFileGone [inverted-idiom]") {
+			t.Errorf("%s: the rejection must name the unsatisfiable predicate and its kind; got %q", c.stage, res.Reason)
+		}
+		var line string
+		for _, l := range logged {
+			if strings.Contains(l, "unsatisfiable-predicate-shape") {
+				line = l
+			}
+		}
+		if !strings.Contains(line, "TestC4242_RetiredFileGone") || !strings.Contains(line, c.wantLog) {
+			t.Errorf("%s: the reviewer log must name the predicate with %q; got:\n%s", c.stage, c.wantLog, strings.Join(logged, "\n"))
+		}
 	}
 }
