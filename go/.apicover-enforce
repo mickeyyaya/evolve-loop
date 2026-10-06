@@ -683,3 +683,5 @@
 ./internal/cliupdate
 # inboxrank — the one computed inbox priority: score = sum of policy-weighted features (base, class, unblocks, recurrence, age, goal), ordered with the declared-surface, filing-date and id tie-breaks (ADR-0121).
 ./internal/inboxrank
+# wtcheckpoint — evolve checkpoint: refs/checkpoints snapshots of uncommitted worktree work (save, list, restore, prune, push).
+./internal/wtcheckpoint

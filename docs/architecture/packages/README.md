@@ -88,3 +88,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/setup` | the deterministic core behind `evolve setup` and `/evo:setup` | [internal-setup.md](internal-setup.md) |
 | `internal/skillcheck` | renders every generated plugin surface from its single source (ADR-0040) | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/subagent/subagentrun` | the `evolve subagent run` execution path | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
+| `internal/wtcheckpoint` | saves uncommitted worktree work as `refs/checkpoints` snapshots, and lists, restores, prunes and pushes them | [internal-wtcheckpoint.md](internal-wtcheckpoint.md) |

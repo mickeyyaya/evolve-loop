@@ -49,3 +49,15 @@ which was operationally correct but illegible to a human eye.
   (`+refs/heads/*:refs/remotes/origin/*`); if the hub directory is ever moved,
   run `git --git-dir=.repo.git worktree repair <worktree paths>` to fix the
   bidirectional links.
+
+## Checkpoints (`refs/checkpoints/`)
+
+Console lanes keep their work as uncommitted changes in `dev/` worktrees until it lands, so an agent dying, a removed worktree, a reset, a checkout or a churn-discard could lose it. `evolve checkpoint` keeps a copy in the bare store, where every worktree can see it ([ADR-0122](../architecture/adr/0122-checkpoint-uncommitted-worktree-work-as-refs.md)).
+
+- **Where it works.** In the hub only: the project root (`--project-root`, default `.`) must be a worktree root of the bare store. The hub, its `dev/` directory and `refs/remotes/origin/main` are resolved by `plane.ResolveHub`, the same rule `evolve worktree create|cleanup --dev` use.
+- **Namespace.** `refs/checkpoints/<worktree>/<UTC yyyymmddThhmmssZ>`, where `<worktree>` is the worktree directory's name (`dev/cl-gc` is `cl-gc`). Each ref names a commit whose tree is the full working tree (untracked files included, ignored files, `go/evolve` and `.evolve/ledger.*` excluded); its parent's tree is what was staged, and its grandparent is the `HEAD` the work was based on. They are ordinary refs in `.repo.git`: no branch, no reflog, not fetched or pushed by default, and they keep the base commit reachable after its branch is deleted. Only the console and `evolve checkpoint` write them.
+- **Save.** `evolve checkpoint save` in a dev worktree, or `evolve checkpoint save --all` from anywhere in the hub to cover every dev worktree (never the runtime plane or a cycle worktree). Nothing in the worktree changes. Each worktree keeps its newest `checkpoint.keep_per_worktree` (default 20).
+- **Find.** `evolve checkpoint list [--worktree <name>]`, or `git --git-dir=.repo.git for-each-ref refs/checkpoints`.
+- **Restore.** `evolve checkpoint restore <name>/<stamp> --into dev/<new-task>` creates a new worktree at the saved base with the staged, unstaged and untracked files exactly as saved; then `git switch -c <branch>` inside it to continue on a branch. Restoring into the original worktree works when it is clean (after a `reset --hard`, say); a dirty target is refused.
+- **Clean up.** `evolve checkpoint prune` applies the retention; `--landed` also drops checkpoints whose changes are already on `origin/main`. Removing a dev worktree with `evolve worktree cleanup --dev` leaves its checkpoints in place.
+- **By hand.** The same snapshot with raw git, as the console first took it: copy the worktree's index file, run `GIT_INDEX_FILE=<copy> git write-tree` for the staged tree; copy it again, run `GIT_INDEX_FILE=<copy2> git add -A -- . ':!go/evolve' ':!.evolve/ledger.*'` and `write-tree` for the full tree; `commit-tree` the staged tree on `HEAD`, the full tree on that commit, and `update-ref` the result. To restore by hand into a clean worktree at the base: `git read-tree -m -u HEAD <ref>^{tree}`, then `git read-tree <ref>^^{tree}`.

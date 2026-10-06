@@ -68,6 +68,7 @@ type Policy struct {
 	ACS                *ACSConfig                `json:"acs,omitempty"`
 	Paths              *PathsConfig              `json:"paths,omitempty"`
 	Worktree           *WorktreePolicy           `json:"worktree,omitempty"`
+	Checkpoint         *CheckpointPolicy         `json:"checkpoint,omitempty"`
 	Integrity          *IntegrityPolicy          `json:"integrity,omitempty"`
 	Sandbox            *SandboxPolicy            `json:"sandbox,omitempty"`
 	Fleet              *FleetPolicy              `json:"fleet,omitempty"`
