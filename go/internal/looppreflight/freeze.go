@@ -19,6 +19,9 @@ const pinnedListerTimeout = 5 * time.Second
 // defaultSelfUpdateEvidence is the known-updater registry, keyed by the updater-state file
 // under the default home dir. A failed home lookup is ambiguity (error), not absence.
 func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
+	if risky, evidence, declared := manifestFreezeEvidence(bin); declared {
+		return risky, evidence, nil
+	}
 	var rel string
 	var label string
 	switch bin {
@@ -146,8 +149,7 @@ func checkCLIVersionFreeze(o resolved) CheckResult {
 			pinnedDetails = append(pinnedDetails, e.detail)
 			continue
 		}
-		unpinned = append(unpinned, fmt.Sprintf("%s — run: brew pin %s   (deliberate update later: brew unpin %s && brew upgrade %s && brew pin %s — never mid-batch)",
-			e.detail, e.bin, e.bin, e.bin, e.bin))
+		unpinned = append(unpinned, e.detail+" — "+freezeRemedy(e.bin))
 	}
 	if len(unpinned) > 0 {
 		return withEvidenceWarnings(CheckResult{
@@ -179,4 +181,30 @@ func withEvidenceWarnings(res CheckResult, errs []string) CheckResult {
 		"\nevidence unverifiable (verify version-freeze manually; cycle-262: codex self-upgraded mid-phase):\n" +
 		strings.Join(errs, "\n"))
 	return res
+}
+
+var manifestAutoUpdateOff = func(bin string) (env string, set bool) {
+	m, err := bridge.LoadManifest(bin + "-tmux")
+	if err != nil || m.AutoUpdateOffEnv == "" {
+		return "", false
+	}
+	return m.AutoUpdateOffEnv, m.DefaultEnv[m.AutoUpdateOffEnv] != ""
+}
+
+func manifestFreezeEvidence(bin string) (risky bool, evidence string, declared bool) {
+	env, set := manifestAutoUpdateOff(bin)
+	switch {
+	case env == "":
+		return false, "", false
+	case set:
+		return false, "", true
+	}
+	return true, fmt.Sprintf("the %s-tmux manifest names %s as the off switch of %s's launch-time self-updater, but its default_env leaves it unset", bin, env, bin), true
+}
+
+func freezeRemedy(bin string) string {
+	if env, _ := manifestAutoUpdateOff(bin); env != "" {
+		return fmt.Sprintf("set %s in the %s-tmux manifest's default_env (a brew pin does not freeze it); evolve cli update moves its version at a boundary", env, bin)
+	}
+	return fmt.Sprintf("run: brew pin %s   (deliberate update later: brew unpin %s && brew upgrade %s && brew pin %s — never mid-batch)", bin, bin, bin, bin)
 }

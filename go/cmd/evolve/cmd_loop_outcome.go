@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclehealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -46,6 +47,7 @@ type loopResult struct {
 	// wave/fleet boundary path: nil-when-clean, populated only when this
 	// batch's stop is "loop_boundary_refresh_reexec".
 	BoundaryRefresh *chainBoundaryRefreshLogEntry `json:"boundary_refresh,omitempty"`
+	CLIUpdateHalt   []cliupdate.Result            `json:"cli_update_halt,omitempty"`
 }
 
 type cycleOutcomeEntry struct {

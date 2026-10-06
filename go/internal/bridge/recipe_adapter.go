@@ -71,6 +71,9 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)
+	for _, line := range exportLines(d.cfg.Realization.Env) {
+		_ = d.deps.Tmux.SendKeys(ctx, d.session, line, true)
+	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, d.launchCmd, true)
 	fmt.Fprintf(d.deps.Stderr, "[recipe] launching: %s\n", d.launchCmd)

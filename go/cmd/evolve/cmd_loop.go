@@ -59,6 +59,7 @@ type loopConfig struct {
 	LogPath           string            `json:"log_path,omitempty"`
 	DetachArgv        []string          `json:"-"`
 	ResumeWaves       int               `json:"-"`
+	HandedOff         bool              `json:"-"`
 }
 
 // emitSignalStop assumes the caller polled ctx.Err() before the cycle error,
@@ -91,7 +92,7 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if cfg.Detach {
 		return runLoopDetached(cfg, stdout, stderr)
 	}
-	cfg.ResumeWaves = takeReexecHandoff(cfg.EvolveDir, stderr)
+	cfg.ResumeWaves, cfg.HandedOff = takeReexecHandoff(cfg.EvolveDir, stderr)
 	chainCfg := loadChainConfig(cfg.EvolveDir)
 	cfg.ChainMode = cfg.ChainMode || chainCfg.Enabled
 

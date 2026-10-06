@@ -677,3 +677,5 @@
 ./internal/cliroute
 # cliroutetest — the legacy dispatch-plan scenarios and the golden record format the runner generates and cliroute replays.
 ./internal/cliroute/cliroutetest
+# cliupdate — the boundary CLI updater: each subscribed family's manifest updater, the smoke test of a changed version, and the cli-updates.json record cli-version-drift reads.
+./internal/cliupdate

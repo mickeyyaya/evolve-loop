@@ -93,6 +93,9 @@ func (b *loopBatchCoordinator) probeSyncAndPublish(iteration int) (batchDecision
 		b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 		return batchDecision{flow: batchReturn, exitCode: 2}, true
 	}
+	if decision, stop := b.updateCLIsAtBoundary(iteration); stop {
+		return decision, true
+	}
 	publishPendingDossiers(b.cfg.ProjectRoot, b.stderr)
 	return batchDecision{flow: batchProceed}, false
 }

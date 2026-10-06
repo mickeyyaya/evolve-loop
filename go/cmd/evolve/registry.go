@@ -116,6 +116,7 @@ var commands = []subcommand{
 	{Name: "lessons", Summary: "Lesson analytics: recurrence (deterministic recurrence ledger, patterns by count + fix status)", Run: runLessons},
 	{Name: "reachability", Summary: "Import-cycle-safety probe for structural test pins (reachability check-pin)", Run: runReachability},
 	{Name: "clihealth", Aliases: []string{"cli-health"}, Summary: "CLI quota/credential benches: list [--json] | clear <family> [--project-root DIR]", Run: runClihealth},
+	{Name: "cli", Summary: "CLI binaries: update [--dry-run] [--json] [--project-root P] runs each subscribed family's manifest updater, then smoke-tests a changed version (exit 1 on update-failed or smoke-failed)", Run: runCLICommand},
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]", Run: runRatchet},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }

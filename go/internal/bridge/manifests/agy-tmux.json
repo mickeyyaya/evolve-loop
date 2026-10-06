@@ -3,6 +3,9 @@
   "cli": "agy-tmux",
   "binary": "agy",
   "binary_min_version": "1.0.0",
+  "update_argv": ["agy", "update"],
+  "auto_update_off_env": "AGY_CLI_DISABLE_AUTO_UPDATE",
+  "default_env": {"AGY_CLI_DISABLE_AUTO_UPDATE": "1"},
   "transport": "tmux",
   "default_tier": "hybrid",
   "tier_dependencies": {

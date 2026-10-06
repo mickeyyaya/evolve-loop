@@ -80,20 +80,20 @@ type Claim struct {
 	At     time.Time
 }
 
-func TakeHandoff(attemptPath string, c Claim) (int, error) {
+func TakeHandoff(attemptPath string, c Claim) (wavesDone int, taken bool, err error) {
 	raw, err := os.ReadFile(attemptPath)
 	if err != nil {
-		return 0, nil
+		return 0, false, nil
 	}
 	var rec attempt
 	if json.Unmarshal(raw, &rec) != nil || !rec.handsOffTo(c) {
-		return 0, nil
+		return 0, false, nil
 	}
 	buf, _ := json.Marshal(attempt{RunningCommit: rec.RunningCommit, Batch: rec.Batch, Timestamp: rec.Timestamp})
 	if err := os.WriteFile(attemptPath, buf, 0o644); err != nil {
-		return 0, fmt.Errorf("consume the boundary re-exec handoff: %w", err)
+		return 0, false, fmt.Errorf("consume the boundary re-exec handoff: %w", err)
 	}
-	return rec.WavesDone, nil
+	return rec.WavesDone, true, nil
 }
 
 func (a attempt) handsOffTo(c Claim) bool {
