@@ -147,13 +147,40 @@ func ReloadFleetConfig(evolveDir string, prev policy.FleetConfig, warn io.Writer
 	return got
 }
 
-// FailedLanes counts the lanes that errored or exited non-zero.
-func FailedLanes(results []fleet.Result) int {
-	failed := 0
+type LaneTally struct {
+	OK       int
+	Deferred int
+	Failed   int
+}
+
+func Tally(results []fleet.Result) LaneTally {
+	var t LaneTally
 	for _, r := range results {
-		if r.Err != nil || r.ExitCode != 0 {
-			failed++
+		switch r.Status() {
+		case fleet.LaneOK:
+			t.OK++
+		case fleet.LaneDeferred:
+			t.Deferred++
+		default:
+			t.Failed++
 		}
 	}
-	return failed
+	return t
+}
+
+func (t LaneTally) Total() int { return t.OK + t.Deferred + t.Failed }
+
+func (t LaneTally) DeferredSuffix() string {
+	if t.Deferred == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d deferred", t.Deferred)
+}
+
+func WaveSummary(wave int, t LaneTally) (string, map[string]string) {
+	fields := map[string]string{"lanes_ok": strconv.Itoa(t.OK), "lanes": strconv.Itoa(t.Total())}
+	if t.Deferred > 0 {
+		fields["lanes_deferred"] = strconv.Itoa(t.Deferred)
+	}
+	return fmt.Sprintf("wave %d: %d/%d lanes ok%s", wave, t.OK, t.Total(), t.DeferredSuffix()), fields
 }

@@ -51,6 +51,7 @@ type FailureThresholds struct {
 	UnexplainedFailuresHaltCeiling int `json:"unexplained_failures_halt_ceiling,omitempty"`
 	// ConsecutiveFailuresHaltCeiling: this many back-to-back failing cycles, any fingerprints, halt the batch.
 	ConsecutiveFailuresHaltCeiling int `json:"consecutive_failures_halt_ceiling,omitempty"`
+	LaneDeferralHaltCeiling        int `json:"lane_deferral_halt_ceiling,omitempty"`
 	// BuildDeepEscalateAtFailures: an item with this many failures builds next at the
 	// deep tier (raise-only; the envelope still clamps).
 	BuildDeepEscalateAtFailures int `json:"build_deep_escalate_at_failures,omitempty"`
@@ -80,7 +81,7 @@ func DefaultSystemFailurePolicy() SystemFailurePolicy {
 			CategoryCodeAuditFail:   {Level: LevelTask, Action: ActionRetryWithFix, FixType: "address-audit-findings", MaxRetries: 2},
 			CategoryIntentMalformed: {Level: LevelTask, Action: ActionDeferOrQuarantine, FixType: "reintent"},
 		},
-		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, BuildDeepEscalateAtFailures: 1},
+		Thresholds:         FailureThresholds{RepeatCeiling: 2, VerifiedNotLandedCeiling: 2, TaskRetryCeiling: 2, GuardClassHaltCeiling: 2, IdenticalFingerprintHaltCeiling: 3, UnexplainedFailuresHaltCeiling: 3, ConsecutiveFailuresHaltCeiling: 3, LaneDeferralHaltCeiling: 3, BuildDeepEscalateAtFailures: 1},
 		OnTaskRetryCeiling: "quarantine",
 		OnSystemLevel:      "halt-loop-and-escalate",
 	}
@@ -100,30 +101,7 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 			}
 			out.Categories[name] = cat
 		}
-		if c.Thresholds.RepeatCeiling > 0 {
-			out.Thresholds.RepeatCeiling = c.Thresholds.RepeatCeiling
-		}
-		if c.Thresholds.VerifiedNotLandedCeiling > 0 {
-			out.Thresholds.VerifiedNotLandedCeiling = c.Thresholds.VerifiedNotLandedCeiling
-		}
-		if c.Thresholds.TaskRetryCeiling > 0 {
-			out.Thresholds.TaskRetryCeiling = c.Thresholds.TaskRetryCeiling
-		}
-		if c.Thresholds.GuardClassHaltCeiling > 0 {
-			out.Thresholds.GuardClassHaltCeiling = c.Thresholds.GuardClassHaltCeiling
-		}
-		if c.Thresholds.IdenticalFingerprintHaltCeiling > 0 {
-			out.Thresholds.IdenticalFingerprintHaltCeiling = c.Thresholds.IdenticalFingerprintHaltCeiling
-		}
-		if c.Thresholds.UnexplainedFailuresHaltCeiling > 0 {
-			out.Thresholds.UnexplainedFailuresHaltCeiling = c.Thresholds.UnexplainedFailuresHaltCeiling
-		}
-		if c.Thresholds.ConsecutiveFailuresHaltCeiling > 0 {
-			out.Thresholds.ConsecutiveFailuresHaltCeiling = c.Thresholds.ConsecutiveFailuresHaltCeiling
-		}
-		if c.Thresholds.BuildDeepEscalateAtFailures > 0 {
-			out.Thresholds.BuildDeepEscalateAtFailures = c.Thresholds.BuildDeepEscalateAtFailures
-		}
+		out.Thresholds = mergeThresholds(out.Thresholds, c.Thresholds)
 		if c.OnTaskRetryCeiling != "" {
 			out.OnTaskRetryCeiling = c.OnTaskRetryCeiling
 		}
@@ -137,6 +115,27 @@ func (p Policy) FailurePolicyConfig() (SystemFailurePolicy, error) {
 		out.Categories[key] = def.Categories[key]
 	}
 	return out, nil
+}
+
+func mergeThresholds(base, override FailureThresholds) FailureThresholds {
+	out := base
+	out.RepeatCeiling = positiveOr(override.RepeatCeiling, base.RepeatCeiling)
+	out.VerifiedNotLandedCeiling = positiveOr(override.VerifiedNotLandedCeiling, base.VerifiedNotLandedCeiling)
+	out.TaskRetryCeiling = positiveOr(override.TaskRetryCeiling, base.TaskRetryCeiling)
+	out.GuardClassHaltCeiling = positiveOr(override.GuardClassHaltCeiling, base.GuardClassHaltCeiling)
+	out.IdenticalFingerprintHaltCeiling = positiveOr(override.IdenticalFingerprintHaltCeiling, base.IdenticalFingerprintHaltCeiling)
+	out.UnexplainedFailuresHaltCeiling = positiveOr(override.UnexplainedFailuresHaltCeiling, base.UnexplainedFailuresHaltCeiling)
+	out.ConsecutiveFailuresHaltCeiling = positiveOr(override.ConsecutiveFailuresHaltCeiling, base.ConsecutiveFailuresHaltCeiling)
+	out.LaneDeferralHaltCeiling = positiveOr(override.LaneDeferralHaltCeiling, base.LaneDeferralHaltCeiling)
+	out.BuildDeepEscalateAtFailures = positiveOr(override.BuildDeepEscalateAtFailures, base.BuildDeepEscalateAtFailures)
+	return out
+}
+
+func positiveOr(v, fallback int) int {
+	if v > 0 {
+		return v
+	}
+	return fallback
 }
 
 // IsFloor reports whether the named category is a Go-enforced floor halt.

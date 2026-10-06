@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -17,6 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
+
+var syncMainFetchSleep = time.Sleep
 
 func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve sync-main", flag.ContinueOnError)
@@ -67,8 +70,8 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	branch = strings.TrimSpace(branch)
 
-	if out, err := git("fetch", "origin"); err != nil {
-		fmt.Fprintf(stderr, "evolve sync-main: git fetch origin failed: %v\n%s", err, out)
+	if err := fetchSyncBranch(absRoot, branch, stderr); err != nil {
+		fmt.Fprintf(stderr, "evolve sync-main: %v\n", err)
 		return 1
 	}
 
@@ -80,6 +83,23 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	fmt.Fprintf(stdout, "sync-main: reconciled local %s with origin/%s (merge only; nothing pushed).\n", branch, branch)
 	return 0
+}
+
+func fetchSyncBranch(root, branch string, stderr io.Writer) error {
+	if branch == "HEAD" {
+		return errors.New("refused — detached HEAD; check out the branch to sync")
+	}
+	retry := gitexec.FetchRetry{
+		Sleep: func(d time.Duration) { syncMainFetchSleep(d) },
+		OnRetry: func(attempt, attempts, code int, _ string) {
+			fmt.Fprintf(stderr, "evolve sync-main: retry %d/%d: git fetch origin %s after ref-lock contention rc=%d\n", attempt, attempts-1, branch, code)
+		},
+	}
+	_, gitErr, code, err := gitexec.Default(root).FetchOriginBranch(context.Background(), retry, branch)
+	if err != nil || code != 0 {
+		return fmt.Errorf("git fetch origin %s failed: rc=%d err=%v: %s", branch, code, err, strings.TrimSpace(gitErr))
+	}
+	return nil
 }
 
 func mergeOrigin(git func(...string) (string, error), branch string, stderr io.Writer) int {

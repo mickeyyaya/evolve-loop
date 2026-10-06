@@ -186,7 +186,11 @@ and [runtime-reference.md](runtime-reference.md) link here instead of restating 
    (default 3) back-to-back *failing* cycles of any fingerprint (`go/internal/core/blocker_breaker.go`,
    #423), and the goal-stall escalation files an item after 3 empty or 5 non-shipping cycles on one
    goal (`goal_stall`, `go/cmd/evolve/cmd_loop_goalstall.go`). An empty or mixed EMPTY/FAIL streak
-   therefore reaches the operator rule first.
+   therefore reaches the operator rule first. A fleet lane DEFERRED for want of a worktree is not a
+   failing cycle and writes no failure digest; the breaker's `lane-deferrals` rule halts after
+   `failure_policy.thresholds.lane_deferral_halt_ceiling` (default 3) of them in a row, so a
+   persistent provisioning fault is a halt, never a silent zero-ship wave after wave
+   ([cycle 1806](../incidents/2026-10-06-cycle-1806-fetch-ref-lock.md)).
 3. **Ship-streak goal: six consecutive ships.** The operator's pipeline-health target is six
    consecutive shipped cycles. It was five consecutive ships during the 2026-09-14
    [verification wave](../research/verification-wave-findings-2026-09-14.md) and moved to six by

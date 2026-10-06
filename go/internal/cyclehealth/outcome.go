@@ -85,7 +85,8 @@ func ClassifyOutcome(workspace string) (Outcome, string) {
 	// prefix (cycle-656) — checked BEFORE the generic explained-failure arm
 	// so a quota defer is never paged as a failed cycle.
 	for _, e := range timing {
-		if strings.HasPrefix(e.AbortReason, abortReasonDeferredPrefix) {
+		if strings.HasPrefix(e.AbortReason, abortReasonDeferredPrefix) ||
+			strings.HasPrefix(e.AbortReason, cyclestate.CycleTerminationLaneWorktreeDeferred) {
 			return OutcomeDeferred, e.AbortReason
 		}
 	}

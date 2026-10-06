@@ -91,11 +91,21 @@ func laneStartRef(ctx context.Context, projectRoot string) (string, error) {
 	if err != nil || code != 0 || strings.TrimSpace(url) == "" {
 		return "HEAD", nil // remoteless repo — documented fallback
 	}
-	if _, stderr, code, err := git.Capture(ctx, "fetch", "origin"); err != nil || code != 0 {
-		return "", fmt.Errorf("git fetch origin: rc=%d err=%v: %s", code, err, strings.TrimSpace(stderr))
+	branch := originDefaultBranch(ctx, git)
+	if _, stderr, code, err := git.FetchOriginBranch(ctx, laneBaseFetchRetry(branch), branch); err != nil || code != 0 {
+		return "", fmt.Errorf("git fetch origin %s: rc=%d err=%v: %s", branch, code, err, strings.TrimSpace(stderr))
 	}
-	remote := "origin/" + originDefaultBranch(ctx, git)
-	return integrationHead(ctx, git, remote)
+	return integrationHead(ctx, git, "origin/"+branch)
+}
+
+func laneBaseFetchRetry(branch string) gitexec.FetchRetry {
+	return gitexec.FetchRetry{
+		Sleep: func(d time.Duration) { worktreeAddRetrySleep(d) },
+		OnRetry: func(attempt, attempts, code int, _ string) {
+			fmt.Fprintf(os.Stderr, "[worktree] retry %d/%d: git fetch origin %s after ref-lock contention rc=%d\n",
+				attempt, attempts-1, branch, code)
+		},
+	}
 }
 
 func integrationHead(ctx context.Context, git gitexec.Git, remote string) (string, error) {

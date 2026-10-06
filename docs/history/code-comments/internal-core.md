@@ -12842,3 +12842,31 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // Rename-proof: it iterates whatever the loaded registry contains; no phase name
 // is hardcoded.
 ```
+
+## the fleet lane deferral (cycle 1806, 2026-10-06)
+
+### `go/internal/core/cyclerun.go:481` — above `if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {`
+
+```text
+// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
+// here, isolated from the live tree. cs.ActiveWorktree gates source writes
+// in the role-gate and drives worktree-aware ship. Creation remains
+// best-effort: on failure the source phases are denied by the role-gate
+// (loud, not silent). A created worktree is checked for an occupied copy of
+// this fresh cycle identity after the upstream fetch; a collision is fatal
+// before state persistence or dispatch. A rejected worktree is preserved
+// because Create may have reused it and does not return ownership metadata.
+// Safe worktrees are cleaned on cycle exit (after ship has merged the
+// worktree→main).
+// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
+// cycle base. After the build phase we soft-reset to it so a committing
+// builder's work becomes pending again (see normalizeWorktreeToBase).
+// Persisted in CycleState so the crash-resume path can run the same
+// normalize.
+// preserveWorktree: set when a ship-stage failure is recorded and cleared
+// only when a later ship attempt succeeds. While set, the exit cleanup
+// below SKIPS pruning so audited (possibly uncommitted) work survives for
+// recovery — `evolve loop --resume` or an explicit `evolve cycle reset`
+// reclaims it.
+// See ADR-0039.
+```

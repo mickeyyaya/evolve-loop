@@ -26,6 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
@@ -222,17 +223,10 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	if errors.Is(err, core.ErrAllFamiliesExhausted) {
 		var lr loopResult
 		lr.emitQuotaPause(loopConfig{EvolveDir: evolveDir}, result.Cycle, stdout, stderr)
-		return 5
+		return fleet.ExitDeferred
 	}
 	if err != nil {
-		// Fleet lanes run this entrypoint as a subprocess and fleet.Result carries no
-		// cycle or workspace, so a lane's FAIL reaches the inbox lifecycle only here.
-		var clf *core.ErrCycleLevelFailure
-		if errors.As(err, &clf) {
-			warnCycleFailureOutcome(stderr, result.Cycle, applyCycleFailureOutcome(projectRoot, evolveDir, result.Cycle, stderr, lifecycleLedger, signals))
-		}
-		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
-		return 1
+		return cycleRunErrorExit(err, result.Cycle, projectRoot, evolveDir, stderr, lifecycleLedger, signals)
 	}
 	buf, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Fprintln(stdout, string(buf))
@@ -247,6 +241,29 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
 	}
 	return cycleRunExitCode(result)
+}
+
+func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) int {
+	var deferral *core.LaneDeferral
+	if errors.As(err, &deferral) {
+		if rerr := releaseDeferredLaneClaims(projectRoot, deferral.Cycle, stderr, lifecycle, signals); rerr != nil {
+			fmt.Fprintf(stderr, "evolve cycle run: WARN: could not release cycle %d claims: %v\n", deferral.Cycle, rerr)
+		}
+		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
+		return fleet.ExitDeferred
+	}
+	var clf *core.ErrCycleLevelFailure
+	if errors.As(err, &clf) {
+		warnCycleFailureOutcome(stderr, cycle, applyCycleFailureOutcome(projectRoot, evolveDir, cycle, stderr, lifecycle, signals))
+	}
+	fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
+	return 1
+}
+
+func releaseDeferredLaneClaims(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+	opts := inboxmover.Options{ProjectRoot: projectRoot, Ledger: lifecycle, Stderr: stderr, Signals: signals}
+	_, err := inboxmover.ReleaseCycleProcessingWithReason(opts, cycle, cyclestate.CycleTerminationLaneWorktreeDeferred)
+	return err
 }
 
 // closeoutCycleOutcome is the one post-result closeout every root makes: the

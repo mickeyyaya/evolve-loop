@@ -11,12 +11,14 @@ const (
 	CodeCycleFailed   signalcenter.Code = "ORCHESTRATOR_CYCLE_FAILED"
 	CodeSystemFailure signalcenter.Code = "ORCHESTRATOR_SYSTEM_FAILURE"
 	CodeQuotaPaused   signalcenter.Code = "ORCHESTRATOR_QUOTA_PAUSED"
+	CodeLaneDeferred  signalcenter.Code = "ORCHESTRATOR_LANE_DEFERRED"
 )
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeCycleFailed, "the cycle sealed with final verdict FAIL; fields carry the termination reason and retro decision")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeSystemFailure, "an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeQuotaPaused, "every CLI family is quota-exhausted; the cycle is paused at the named phase and resumable")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeLaneDeferred, "a fleet lane could not provision its worktree (after the fetch retries and one re-provision) and ended before any phase dispatched: outcome DEFERRED, its claims released to the queue unbumped, no failure digest, failure learning or retrospective; the lane exits 5, and lane_deferral_halt_ceiling consecutive deferrals halt the batch (LOOP_PIPELINE_BLOCKER_HALT rule lane-deferrals); fields.step=worktree, cause")
 }
 
 // signalRunID is the run id the orchestrator stamps on its own events.

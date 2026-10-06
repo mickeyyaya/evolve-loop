@@ -133,9 +133,10 @@ func (e *Engine) RepairMinWidth(ctx context.Context, fleetCfg, waveCfg policy.Fl
 			fmt.Sprintf("wave %d min-width repair failed, falling back to sequential: %v", req.Wave, err), stepFields(err, "repair"))
 		return false
 	case out.Ran:
+		t := Tally(out.Results)
 		e.warn("Engine.RepairMinWidth", req.Wave, CodeMinWidthRepair,
-			fmt.Sprintf("wave %d: min-width repair dispatched %d/%d isolated lane (fleet.count=%d shrank to %d)",
-				req.Wave, len(out.Results)-FailedLanes(out.Results), len(out.Results), fleetCfg.Count, waveCfg.Count), width)
+			fmt.Sprintf("wave %d: min-width repair dispatched %d/%d isolated lane (fleet.count=%d shrank to %d)%s",
+				req.Wave, t.OK, t.Total(), fleetCfg.Count, waveCfg.Count, t.DeferredSuffix()), width)
 		return true
 	default:
 		width["cause"] = "empty_backlog"
