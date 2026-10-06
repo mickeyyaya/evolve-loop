@@ -21,7 +21,7 @@ func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 	for tier, model := range m.ModelTierMap {
 		if !agyModelName.MatchString(model) {
 			t.Errorf("agy tier %q model %q is not a name agy accepts — it needs the capability/effort parenthetical, e.g. %q. agy does NOT error on a bad name; it silently serves Gemini 3.5 Flash (Medium) for the whole session.",
-				tier, model, "Gemini 3.7 Flash (Low)")
+				tier, model, "Gemini 3.8 Flash (Low)")
 		}
 		// A transposed "Gemini Flash 3.7" passes the shape rule, so pin the word order.
 		if strings.Contains(model, "Flash") && !strings.Contains(model, "Flash (") {
@@ -30,20 +30,19 @@ func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 	}
 }
 
-// Each name was launched against agy 1.1.22 and resolved to itself.
 func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(agy-tmux): %v", err)
 	}
 	for tier, want := range map[string]string{
-		"fast":     "Gemini 3.7 Flash (Low)",
-		"balanced": "Gemini 3.7 Flash (High)",
+		"fast":     "Gemini 3.8 Flash (Low)",
+		"balanced": "Gemini 3.8 Flash (High)",
 		"deep":     "Gemini 3.1 Pro (High)",
 		"top":      "Gemini 3.1 Pro (High)",
 	} {
 		if got := m.ModelTierMap[tier]; got != want {
-			t.Errorf("agy tier %q = %q, want %q (verified accepted live on agy 1.1.22)", tier, got, want)
+			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's banner: Pro on agy 1.1.22, 3.8 Flash on agy 1.2.17, 2026-10-05)", tier, got, want)
 		}
 	}
 }

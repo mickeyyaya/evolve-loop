@@ -37,6 +37,7 @@ type CLISnapshot struct {
 	// CandidatesHash is the decision-input fingerprint passed through to
 	// CLIEntry.CandidatesHash. Optional; empty for detect-derived snapshots.
 	CandidatesHash string
+	FallbackReason string
 }
 
 // BuildFromSnapshots assembles a Catalog from per-CLI snapshots, stamping
@@ -67,7 +68,10 @@ func BuildFromSnapshots(snaps []CLISnapshot, fetchedAt time.Time) Catalog {
 		if source == "" {
 			source = SourceDetect
 		}
-		cat.CLIs[s.CLI] = CLIEntry{TierModels: tiers, Available: s.Available, Efforts: s.Efforts, Source: source, CandidatesHash: s.CandidatesHash}
+		cat.CLIs[s.CLI] = CLIEntry{
+			TierModels: tiers, Available: s.Available, Efforts: s.Efforts,
+			Source: source, CandidatesHash: s.CandidatesHash, FallbackReason: s.FallbackReason,
+		}
 	}
 	return cat
 }

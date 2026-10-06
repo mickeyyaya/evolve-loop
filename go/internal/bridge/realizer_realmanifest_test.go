@@ -30,7 +30,7 @@ func TestRealizeFor_RealManifests_NoCrossCLILeak(t *testing.T) {
 		// manifest's offline display-name default. The scalar order (model
 		// before permission) is part of the pin; settings_scope stays a
 		// no-op for agy.
-		want := []string{"--model", "Gemini 3.7 Flash (High)", "--dangerously-skip-permissions"}
+		want := []string{"--model", "Gemini 3.8 Flash (High)", "--dangerously-skip-permissions"}
 		if !reflect.DeepEqual(r.LaunchFlags, want) {
 			t.Fatalf("agy-tmux = %v, want %v", r.LaunchFlags, want)
 		}
