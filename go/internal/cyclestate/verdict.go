@@ -17,6 +17,8 @@ const CycleTerminationTriageNoWork = "triage-empty-commitment"
 
 const CycleTerminationTriageClaimFailed = "triage-empty-commitment-claimable-work"
 
+const CycleTerminationLaneWorktreeDeferred = "lane-worktree-deferred"
+
 // CycleOutcome constants are the cycle-level FinalVerdict labels, distinct from the per-phase verdicts.
 // SHIPPED_VIA_BUILD needs this cycle's own ship PASS; main HEAD movement is never evidence, since sibling lanes move it.
 const (

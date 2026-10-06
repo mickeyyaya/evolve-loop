@@ -187,8 +187,9 @@ func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.Fl
 	case err != nil:
 		fmt.Fprintf(b.stderr, "[loop] WARN: fleet: pool %d dispatch failed, falling back to sequential: %v\n", iteration, err)
 	case ran:
-		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok (rolling, target=%d)\n",
-			iteration, len(results)-failedLaneCount(results), len(results), fleetConfig.Count)
+		t := laneTally(results)
+		fmt.Fprintf(b.stderr, "[loop] pool %d: %d/%d lanes ok%s (rolling, target=%d)\n",
+			iteration, t.OK, t.Total(), t.DeferredSuffix(), fleetConfig.Count)
 		if decision := b.fleetHaltDecision("pool", iteration, results); decision.flow == batchReturn {
 			return decision, true
 		}
@@ -212,11 +213,9 @@ func (b *loopBatchCoordinator) waveRequest(iteration int, cfg policy.FleetConfig
 }
 
 func (b *loopBatchCoordinator) completeWave(iteration int, fleetConfig, waveConfig policy.FleetConfig, results []fleet.Result, pace time.Duration, starvation *fleet.StarvationTracker) batchDecision {
-	lanesOK := len(results) - failedLaneCount(results)
-	fmt.Fprintf(b.stderr, "[loop] wave %d: %d/%d lanes ok\n", iteration, lanesOK, len(results))
-	emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.completeWave", "",
-		fmt.Sprintf("wave %d: %d/%d lanes ok", iteration, lanesOK, len(results)),
-		map[string]string{"lanes_ok": strconv.Itoa(lanesOK), "lanes": strconv.Itoa(len(results))})
+	summary, fields := loopwave.WaveSummary(iteration, laneTally(results))
+	fmt.Fprintf(b.stderr, "[loop] %s\n", summary)
+	emitLoopWave(b.deps.Signals, iteration, "loopBatchCoordinator.completeWave", "", summary, fields)
 	if decision := b.fleetHaltDecision("wave", iteration, results); decision.flow == batchReturn {
 		return decision
 	}
@@ -269,8 +268,6 @@ func (b *loopBatchCoordinator) fleetHaltDecision(kind string, iteration int, res
 	return batchDecision{flow: batchReturn, exitCode: exitCode}
 }
 
-// failedLaneCount projects the leaf's ONE declaration of the failed-lane
-// belief (loopwave.FailedLanes) onto the coordinator's spelling.
-func failedLaneCount(results []fleet.Result) int {
-	return loopwave.FailedLanes(results)
+func laneTally(results []fleet.Result) loopwave.LaneTally {
+	return loopwave.Tally(results)
 }

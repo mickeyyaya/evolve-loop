@@ -32,6 +32,27 @@ type Result struct {
 	Err      error
 }
 
+const ExitDeferred = 5
+
+type LaneStatus string
+
+const (
+	LaneOK       LaneStatus = "ok"
+	LaneDeferred LaneStatus = "deferred"
+	LaneFailed   LaneStatus = "FAIL"
+)
+
+func (r Result) Status() LaneStatus {
+	switch {
+	case r.Err == nil && r.ExitCode == 0:
+		return LaneOK
+	case r.Err == nil && r.ExitCode == ExitDeferred:
+		return LaneDeferred
+	default:
+		return LaneFailed
+	}
+}
+
 // LaunchFn launches one cycle to completion and returns its process exit code.
 type LaunchFn func(ctx context.Context, spec CycleSpec) (exitCode int, err error)
 

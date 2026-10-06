@@ -67,6 +67,13 @@ func TestCycleTerminationTriageNoWork(t *testing.T) {
 	}
 }
 
+func TestCycleTerminationLaneWorktreeDeferred(t *testing.T) {
+	const want = "lane-worktree-deferred"
+	if CycleTerminationLaneWorktreeDeferred != want {
+		t.Errorf("CycleTerminationLaneWorktreeDeferred = %q, want %q: the outcome classifier reads this persisted prefix", CycleTerminationLaneWorktreeDeferred, want)
+	}
+}
+
 func TestIsVerdict_Rejects(t *testing.T) {
 	for _, s := range []string{"", "pass", " PASS", "OK"} {
 		if IsVerdict(s) {

@@ -180,7 +180,7 @@ func subtractIDs(all, remove []string) []string {
 func failedSpecs(specs []fleet.CycleSpec, results []fleet.Result) []fleet.CycleSpec {
 	var out []fleet.CycleSpec
 	for i, r := range results {
-		if i < len(specs) && (r.Err != nil || r.ExitCode != 0) {
+		if i < len(specs) && r.Status() != fleet.LaneOK {
 			out = append(out, specs[i])
 		}
 	}
