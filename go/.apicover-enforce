@@ -689,3 +689,5 @@
 ./internal/tmuxtest
 # fakeclitest — the one owner of fake command-line tools in tests: a hard link to the running test binary that runs the script through its interpreter, so no new executable is scanned on first run.
 ./internal/fakeclitest
+# landed — whether a worktree's changes since a merge-base are already in origin/main (per-path three-way proof); the one predicate evolve worktree cleanup --dev uses, and the one the checkpoint prune converges onto.
+./internal/landed

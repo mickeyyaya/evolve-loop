@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "internal/landed judges a commit's tree as well as a worktree, and its commit-tree mode has its own red-first tests, including a checkpoint full-tree commit",
+    "wtcheckpoint.hasLanded calls landed.Changes and keeps no path-by-path landed walk of its own",
+    "The decision to keep or loosen the prune's exact-equality rule is recorded in docs/architecture/packages/internal-landed.md with the test that pins it"
+  ],
+  "created_at": "2026-10-06T10:10:00Z",
+  "files": [
+    "go/internal/landed/landed.go",
+    "go/internal/wtcheckpoint/prune.go"
+  ],
+  "fix": "Two separately reviewed components. (1) Give internal/landed a commit-tree mode: judge a commit's tree against its merge-base with origin/main, red first, including a checkpoint pair (staged commit on HEAD, full tree on that). (2) Make wtcheckpoint.hasLanded call landed.Changes on the checkpoint's full-tree commit, deleting its own path walk. Whether the prune may loosen from exact equality to the merge proof is its own reviewed decision, because the prune deletes a ref: if kept strict, pass a strictness option rather than keep a second implementation.",
+  "id": "checkpoint-prune-converges-on-landed-proof",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console lane cl-gc, rebase onto train #780 (evolve checkpoint) and the GC architecture re-review, 2026-10-06",
+  "summary": "Two proofs answer whether work already landed in origin/main. internal/landed (Changes, Untracked) judges a worktree path by path through a three-way git merge-file, and evolve worktree cleanup --dev removes a dev tree on it. wtcheckpoint.hasLanded (go/internal/wtcheckpoint/prune.go) judges a checkpoint commit by exact equality of its changed paths with main, and evolve checkpoint prune --landed deletes refs/checkpoints/* on it. Both name the ref through plane.OriginMainRef, but the proof logic is duplicated and can drift. internal/landed judges worktrees only: its commit-tree mode was removed in review because nothing called it.",
+  "title": "evolve checkpoint prune --landed keeps its own equality-only landed check beside internal/landed",
+  "weight": 0.3
+}

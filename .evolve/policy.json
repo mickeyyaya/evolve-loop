@@ -44,6 +44,7 @@
   ],
   "gc": {
     "go_cache_ttl_hours": 24,
+    "mode": "enforce",
     "runs": {
       "delete_after_days": 14
     },

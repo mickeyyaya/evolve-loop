@@ -11,6 +11,8 @@
 // aliases so every existing `gc.Policy` call site is untouched.
 package gcpolicy
 
+import "time"
+
 // Policy is the `.evolve/policy.json` `gc` block. The zero value means
 // "defaults": see WithDefaults. A zero ArchiveAfterDays/DeleteAfterDays
 // disables that action entirely — retention never escalates by default.
@@ -29,6 +31,7 @@ type Policy struct {
 	// Default 7 (mirrors pruneephemeral).
 	TrackerTTLDays  int `json:"tracker_ttl_days,omitempty"`
 	GoCacheTTLHours int `json:"go_cache_ttl_hours,omitempty"`
+	GoCacheMaxGB    int `json:"go_cache_max_gb,omitempty"`
 	TempTTLHours    int `json:"temp_ttl_hours,omitempty"`
 	// Worktrees is the retention grace for the worktree+branch backlog sweep
 	// (S4); consumed by PlanWorktrees. Zero value = no KeepRecent/MinAge grace.
@@ -59,6 +62,7 @@ type WorktreesPolicy struct {
 	// window that covers the create -> lease-write race.
 	MinAgeMinutes     int `json:"min_age_minutes,omitempty"`
 	SalvageAfterHours int `json:"salvage_after_hours,omitempty"`
+	DevQuietMinutes   int `json:"dev_quiet_minutes,omitempty"`
 }
 
 // WithDefaults returns a copy of p with every zero-value retention knob
@@ -79,4 +83,31 @@ func (p Policy) WithDefaults() Policy {
 		p.TrackerTTLDays = 7
 	}
 	return p
+}
+
+const (
+	defaultGoCacheMaxGB = 20
+	bytesPerGB          = int64(1e9)
+)
+
+func (p Policy) GoCacheMaxBytes() int64 {
+	if p.GoCacheMaxGB <= 0 {
+		return defaultGoCacheMaxGB * bytesPerGB
+	}
+	return int64(p.GoCacheMaxGB) * bytesPerGB
+}
+
+const (
+	defaultDevQuietMinutes = 120
+	minDevQuietMinutes     = 30
+)
+
+func (w WorktreesPolicy) DevQuietPeriod() time.Duration {
+	switch {
+	case w.DevQuietMinutes <= 0:
+		return defaultDevQuietMinutes * time.Minute
+	case w.DevQuietMinutes < minDevQuietMinutes:
+		return minDevQuietMinutes * time.Minute
+	}
+	return time.Duration(w.DevQuietMinutes) * time.Minute
 }

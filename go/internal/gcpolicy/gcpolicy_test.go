@@ -3,6 +3,7 @@ package gcpolicy_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
@@ -76,5 +77,62 @@ func TestPolicyJSONRoundTrip(t *testing.T) {
 	}
 	if back != want {
 		t.Errorf("round trip lost data: %+v, want %+v", back, want)
+	}
+}
+
+func TestGoCacheMaxBytes_AnUnsetOrNonPositiveCapTakesTheTwentyGBDefault(t *testing.T) {
+	cases := []struct {
+		name string
+		gb   int
+		want int64
+	}{
+		{"unset", 0, 20e9},
+		{"negative", -5, 20e9},
+		{"explicit", 35, 35e9},
+		{"explicit below the default", 1, 1e9},
+	}
+	for _, c := range cases {
+		if got := (gcpolicy.Policy{GoCacheMaxGB: c.gb}).GoCacheMaxBytes(); got != c.want {
+			t.Errorf("%s: GoCacheMaxBytes() with go_cache_max_gb=%d = %d, want %d", c.name, c.gb, got, c.want)
+		}
+	}
+}
+
+func TestGoCacheMaxGB_DecodesFromItsPolicyKey(t *testing.T) {
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"go_cache_max_gb":12,"go_cache_ttl_hours":24}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.GoCacheMaxGB != 12 || p.GoCacheMaxBytes() != 12e9 {
+		t.Errorf("decoded go_cache_max_gb=%d (%d bytes), want 12 (12e9 bytes)", p.GoCacheMaxGB, p.GoCacheMaxBytes())
+	}
+}
+
+func TestDevQuietPeriod_AppliesADefaultAndAFloorSoAZeroNeverMeansNoGrace(t *testing.T) {
+	cases := []struct {
+		name    string
+		minutes int
+		want    time.Duration
+	}{
+		{"unset", 0, 2 * time.Hour},
+		{"negative", -10, 2 * time.Hour},
+		{"below the floor", 5, 30 * time.Minute},
+		{"at the floor", 30, 30 * time.Minute},
+		{"explicit", 600, 10 * time.Hour},
+	}
+	for _, c := range cases {
+		if got := (gcpolicy.WorktreesPolicy{DevQuietMinutes: c.minutes}).DevQuietPeriod(); got != c.want {
+			t.Errorf("%s: dev_quiet_minutes=%d DevQuietPeriod() = %s, want %s", c.name, c.minutes, got, c.want)
+		}
+	}
+}
+
+func TestDevQuietMinutes_DecodesBesideMinAgeMinutes(t *testing.T) {
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"worktrees":{"min_age_minutes":45,"dev_quiet_minutes":240}}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.Worktrees.DevQuietMinutes != 240 || p.Worktrees.DevQuietPeriod() != 4*time.Hour {
+		t.Errorf("decoded dev_quiet_minutes=%d (%s), want 240 (4h)", p.Worktrees.DevQuietMinutes, p.Worktrees.DevQuietPeriod())
 	}
 }
