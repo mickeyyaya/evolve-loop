@@ -2,7 +2,6 @@ package gitexec
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -34,35 +33,9 @@ func RetryableWorktreeAddFailure(code int, stderr string) bool {
 }
 
 func (g Git) AddWorktreeWithRetry(ctx context.Context, r WorktreeAddRetry, args ...string) (stdout, stderr string, exitCode int, err error) {
-	sleep := r.Sleep
-	if sleep == nil {
-		sleep = time.Sleep
-	}
 	argv := append([]string{"worktree", "add"}, args...)
-	var firstFailure string
-	for attempt := 0; attempt < DefaultWorktreeAddAttempts; attempt++ {
-		stdout, stderr, exitCode, err = g.Capture(ctx, argv...)
-		if err == nil && exitCode == 0 {
-			return stdout, stderr, exitCode, nil
-		}
-		isLastAttempt := attempt == DefaultWorktreeAddAttempts-1
-		if isLastAttempt {
-			break
-		}
-		isPermanentFailure := r.Retryable != nil && !r.Retryable(exitCode, stderr)
-		if isPermanentFailure {
-			break
-		}
-		if firstFailure == "" {
-			firstFailure = fmt.Sprintf("initial worktree add failure (rc=%d): %s", exitCode, stderr)
-		}
-		if r.OnRetry != nil {
-			r.OnRetry(attempt+1, DefaultWorktreeAddAttempts, exitCode, stderr)
-		}
-		sleep(time.Duration(attempt+1) * 2 * time.Second)
-	}
-	if firstFailure != "" {
-		stderr = firstFailure + "\nfinal worktree add failure: " + stderr
-	}
-	return stdout, stderr, exitCode, err
+	return g.captureWithRetry(ctx, retryLoop{
+		what: "worktree add", attempts: DefaultWorktreeAddAttempts,
+		sleep: r.Sleep, onRetry: r.OnRetry, retryable: r.Retryable,
+	}, argv)
 }

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestFamilyMapsDriverToBinary(t *testing.T) {
+func TestFamilyMapsDriverToRoutingFamily(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
 		"codex-tmux":  "codex",

@@ -12,6 +12,9 @@
       "agy": [
         "gemini"
       ],
+      "agy-claude": [
+        "claude"
+      ],
       "claude": [
         "claude"
       ],
@@ -44,6 +47,7 @@
   ],
   "gc": {
     "go_cache_ttl_hours": 24,
+    "mode": "enforce",
     "runs": {
       "delete_after_days": 14
     },

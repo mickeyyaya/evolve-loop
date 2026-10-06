@@ -1,10 +1,6 @@
 package llmroute
 
-import (
-	"strings"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
-)
+import "github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 
 // Overlay is a soft dispatch adjustment: unlike a policy.Pin it only reorders the chain; zero value is a no-op.
 type Overlay struct {
@@ -27,9 +23,9 @@ func ApplySoftOverlay(in Plan, ov Overlay, prof *profiles.Profile) Plan {
 				break
 			}
 		}
-		if !matched && !strings.Contains(ov.CLI, "-") {
+		if !matched && !KnownDriver(ov.CLI) {
 			for _, c := range out.Candidates {
-				if strings.HasPrefix(c, ov.CLI+"-") {
+				if Family(c) == ov.CLI {
 					primary = c
 					break
 				}

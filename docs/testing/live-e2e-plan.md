@@ -110,7 +110,11 @@ push. Four tiers, each its own env gate, escalating cost/rarity:
    `code-*`) where possible.
 4. **Failure-artifact capture**: on any non-skip failure, copy the cycle
    workspace (`*-stdout.log`, `*-stderr.log`, artifacts, ledger) to a retained
-   `testdata/live-failures/<cli>-<ts>/` and print the path + cost.
+   `$TMPDIR/evolve-live-failures/<label>-<pid>/` and print the path + cost. It
+   was `go/testdata/live-failures/` until 2026-10-06; a test may not write into
+   the repository tree it runs in (see
+   [internal-repocontract](../architecture/packages/internal-repocontract.md)),
+   so the capture moved outside it.
 5. **Timeouts**: generous, per-tier, env-tunable (`EVOLVE_E2E_TMUX_TIMEOUT_S`
    exists; add `EVOLVE_E2E_LIVE_TIMEOUT_S`). Rely on the phase-observer for
    stalls rather than only the hard wall-clock.

@@ -470,7 +470,7 @@ func TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone(t *testing.T) {
 	}
 }
 
-func TestFailedLaneCount_ProjectsToTheLeaf(t *testing.T) {
+func TestLaneTally_ProjectsToTheLeaf(t *testing.T) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "cmd_loop_window.go", nil, 0)
 	if err != nil {
@@ -478,11 +478,11 @@ func TestFailedLaneCount_ProjectsToTheLeaf(t *testing.T) {
 	}
 	for _, d := range f.Decls {
 		fn, ok := d.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "failedLaneCount" {
+		if !ok || fn.Name.Name != "laneTally" {
 			continue
 		}
 		if len(fn.Body.List) != 1 {
-			t.Fatalf("failedLaneCount has %d statements, want one return", len(fn.Body.List))
+			t.Fatalf("laneTally has %d statements, want one return", len(fn.Body.List))
 		}
 		ret, ok := fn.Body.List[0].(*ast.ReturnStmt)
 		if !ok || len(ret.Results) != 1 {
@@ -492,10 +492,10 @@ func TestFailedLaneCount_ProjectsToTheLeaf(t *testing.T) {
 		if !ok {
 			t.Fatal("not a call")
 		}
-		if sel, ok := call.Fun.(*ast.SelectorExpr); !ok || sel.Sel.Name != "FailedLanes" {
-			t.Errorf("failedLaneCount must return loopwave.FailedLanes(results)")
+		if sel, ok := call.Fun.(*ast.SelectorExpr); !ok || sel.Sel.Name != "Tally" {
+			t.Errorf("laneTally must return loopwave.Tally(results)")
 		}
 		return
 	}
-	t.Fatal("failedLaneCount not found")
+	t.Fatal("laneTally not found")
 }

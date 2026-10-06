@@ -13,32 +13,45 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
-func reportDoctorLiveResult(driver string, asJSON bool, rc int, pattern, scrollback string, stdout, stderr io.Writer) int {
+type liveProbeTarget struct {
+	driver string
+	model  string
+}
+
+func (p liveProbeTarget) String() string {
+	if p.model == "" {
+		return p.driver
+	}
+	return fmt.Sprintf("%s --model %q", p.driver, p.model)
+}
+
+func reportDoctorLiveResult(target liveProbeTarget, asJSON bool, rc int, pattern, scrollback string, stdout, stderr io.Writer) int {
 	if asJSON {
 		buf, _ := json.MarshalIndent(struct {
 			Driver   string `json:"driver"`
+			Model    string `json:"model,omitempty"`
 			ExitCode int    `json:"exit_code"`
 			Healthy  bool   `json:"healthy"`
 			Pattern  string `json:"pattern,omitempty"`
-		}{driver, rc, rc == bridge.ExitOK, pattern}, "", "  ")
+		}{target.driver, target.model, rc, rc == bridge.ExitOK, pattern}, "", "  ")
 		fmt.Fprintf(stdout, "%s\n", buf)
 	}
 
 	switch {
 	case rc == bridge.ExitOK:
-		fmt.Fprintf(stderr, "[doctor] LIVE OK: %s answered the probe\n", driver)
+		fmt.Fprintf(stderr, "[doctor] LIVE OK: %s answered the probe\n", target)
 		return 0
 	case rc == bridge.ExitBadFlags:
-		fmt.Fprintf(stderr, "[doctor] live: %q is not a known *-tmux driver\n", driver)
+		fmt.Fprintf(stderr, "[doctor] live: %q is not a known *-tmux driver\n", target.driver)
 		return 10
 	case pattern != "":
-		fmt.Fprintf(stderr, "[doctor] LIVE WALLED: %s rc=%d pattern=%s\n", driver, rc, pattern)
+		fmt.Fprintf(stderr, "[doctor] LIVE WALLED: %s rc=%d pattern=%s\n", target, rc, pattern)
 		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
 		return 1
 	default:
-		fmt.Fprintf(stderr, "[doctor] LIVE FAILED: %s rc=%d\n", driver, rc)
+		fmt.Fprintf(stderr, "[doctor] LIVE FAILED: %s rc=%d\n", target, rc)
 		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {
 			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
 		}
@@ -61,15 +74,18 @@ func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
 	fs := flag.NewFlagSet("evolve doctor live", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var asJSON bool
+	target := liveProbeTarget{}
 	fs.BoolVar(&asJSON, "json", false, "emit JSON payload")
-	if err := fs.Parse(cmdutil.ReorderArgs(args)); err != nil {
+	fs.StringVar(&target.model, "model", "", "launch this model: a tier (fast|balanced|deep|top) or a model name the CLI accepts")
+	positional, err := cmdutil.ParseInterspersed(fs, args)
+	if err != nil {
 		return 10
 	}
-	if fs.NArg() != 1 {
-		fmt.Fprintln(stderr, "evolve doctor live: usage: evolve doctor live <driver> [--json]")
+	if len(positional) != 1 {
+		fmt.Fprintln(stderr, "evolve doctor live: usage: evolve doctor live <driver> [--model <model>] [--json]")
 		return 10
 	}
-	driver := fs.Arg(0)
+	target.driver = positional[0]
 
 	ws, err := os.MkdirTemp("", "evolve-doctorlive-*")
 	if err != nil {
@@ -81,7 +97,7 @@ func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
-	rc, pattern, scrollback := bridge.LiveSmokeTest(ctx, driver, &bridge.Config{Workspace: ws, ProjectRoot: cwd}, deps)
+	rc, pattern, scrollback := bridge.LiveSmokeTest(ctx, target.driver, &bridge.Config{Workspace: ws, ProjectRoot: cwd, Model: target.model}, deps)
 
-	return reportDoctorLiveResult(driver, asJSON, rc, pattern, scrollback, stdout, stderr)
+	return reportDoctorLiveResult(target, asJSON, rc, pattern, scrollback, stdout, stderr)
 }

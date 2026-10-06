@@ -478,14 +478,6 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// build introduced, never the operator's pre-existing work.
 	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
 	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), os.Stderr)
-	// Provision the per-cycle source worktree (ADR-0027): tdd/build write code
-	// here, isolated from the live tree. cs.ActiveWorktree gates source writes
-	// in the role-gate and drives worktree-aware ship. Creation remains
-	// best-effort: on failure the source phases are denied by the role-gate
-	// (loud, not silent). A created worktree is checked for an occupied copy of
-	// this fresh cycle identity after the upstream fetch; a collision is fatal
-	// before state persistence or dispatch. A rejected worktree is preserved
-	// because Create may have reused it and does not return ownership metadata.
 	// Safe worktrees are cleaned on cycle exit (after ship has merged the
 	// worktree→main).
 	// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
@@ -499,13 +491,15 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// recovery — `evolve loop --resume` or an explicit `evolve cycle reset`
 	// reclaims it.
 	// See ADR-0039.
-	if wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle); werr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", werr)
-		if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN create workspace for provisioning failure: %v\n", err)
-		} else {
-			o.ensureFailureDigest(cycle, req.ProjectRoot, cs.WorkspacePath, "worktree", fmt.Sprintf("worktree provisioning failed: %v", werr))
+	wtPath, werr := o.worktree.Create(req.ProjectRoot, cycle)
+	if werr != nil && fleetMode(req.Env) {
+		if wtPath, werr = o.reprovisionWorktree(req.ProjectRoot, cycle, werr); werr != nil {
+			failClean()
+			return cycleInit{}, nil, o.deferLaneWithoutWorktree(cs, werr)
 		}
+	}
+	if werr != nil {
+		o.recordProvisioningFailure(cycle, req.ProjectRoot, cs.WorkspacePath, werr)
 	} else if sourceErr := verifyFreshCycleSource(wtPath, cycle); sourceErr != nil {
 		failClean()
 		return cycleInit{}, nil, fmt.Errorf("verify fresh cycle %d source in preserved worktree %s: %w", cycle, wtPath, sourceErr)

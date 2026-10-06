@@ -68,16 +68,7 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		specs[i] = fleet.CycleSpec{GoalHash: goalHash}
 	}
 	sup := &fleet.Supervisor{Launch: launchFn}
-	results := sup.Run(context.Background(), specs)
-	failed := 0
-	for _, r := range results {
-		if r.Err != nil || r.ExitCode != 0 {
-			failed++
-		}
-	}
-	if failed > 0 {
-		fmt.Fprintf(stderr, "evolve fleet soak: %d/%d launches failed\n", failed, count)
-	}
+	launchesOK := soakLaunchesOK(sup.Run(context.Background(), specs), count, stderr)
 
 	inv2S, inv2E := soakCheckReap(evolveDir)
 
@@ -90,7 +81,7 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	renderSoakTable(stdout, inv1S, inv1E, inv2S, inv2E, inv3S, inv3E, inv4S, inv4E)
 
-	if inv1S != "PASS" || inv2S != "PASS" || inv4S != "PASS" || failed > 0 {
+	if inv1S != "PASS" || inv2S != "PASS" || inv4S != "PASS" || !launchesOK {
 		return 1
 	}
 	return 0
@@ -166,4 +157,15 @@ func renderSoakTable(w io.Writer, inv1S, inv1E, inv2S, inv2E, inv3S, inv3E, inv4
 	fmt.Fprintf(w, "| 2 — sessions reaped    | %s | %s |\n", inv2E, inv2S)
 	fmt.Fprintf(w, "| 3 — no cross-run reap  | %s | %s |\n", inv3E, inv3S)
 	fmt.Fprintf(w, "| 4 — no torn config     | %s | %s |\n", inv4E, inv4S)
+}
+
+func soakLaunchesOK(results []fleet.Result, count int, stderr io.Writer) bool {
+	t := laneTally(results)
+	if t.Failed > 0 || t.Deferred > 0 {
+		fmt.Fprintf(stderr, "evolve fleet soak: %d/%d launches failed%s\n", t.Failed, count, t.DeferredSuffix())
+	}
+	if t.OK == 0 {
+		fmt.Fprintln(stderr, "evolve fleet soak: inconclusive — no launch ran to completion, so the soak proved nothing")
+	}
+	return t.Failed == 0 && t.OK > 0
 }

@@ -395,3 +395,113 @@ The review's 11 mutants were all killed; it raised four findings and a handful o
 - **Smaller fixes.** `classifierPreference` drops its unused `evolveDir`; `cli-routing show` lists agents from `routingProfilesDir`; the production golden replay goes through `loadCLIRouter` (the catalog half included; the bytes did not change); `preflightRouting` wraps both early errors with context.
 - **Docs.** ADR-0119 lists the full ban set and the two further intended legacy differences above; the preflight page's `cli-routing` row describes the no-seam table; the open L2 questions are renumbered, with a ninth on minted profiles under `--evolve-dir`.
 - **Last three leftovers (delta re-review).** The loop root and the preflight's no-seam default now share one helper, `looppreflight.CompileRouting`, so both tolerate a missing profiles directory the same way; before, the no-seam path listed the profiles a second time and halted where the root warned (red first: `TestPreflight_NoSeamAndAMissingProfilesDirectoryWarnsAndNeverHalts`). `routingCatalog` warns on stderr when the builtin registry fails to load, as `wireOrchestratorDeps` does. The plan's ban set points to ADR-0119 Decision 2, the Go-review note no longer claims a preflight fallback that W4 deleted, and ADR-0119 records the `[cliroute]` log prefix, the retro's `EVOLVE_RETROSPECTIVE_CLI` and `validate-profile`'s start-up refusal among its intended differences.
+
+## Provider-aware targets (2026-10-06)
+
+### The directive
+
+On 2026-10-06 the operator said: "agy could also use claude opus 5.5 and sonnet 5.5, prioritize using agy owned claude models first then using claude code models after".
+
+- **What agy serves.** agy 1.2.17's `agy models` lists `Claude Opus 5.5 (Low|Medium|High)` and `Claude Sonnet 5.5 (Low|Medium|High)` beside the Gemini models. Both bill the Google AI Pro subscription, not Claude Code's weekly limit.
+- **The rule.** Wherever a Claude *model* is used (the Claude-family floor agents, the deep and top tiers, Claude as a fallback), it runs through agy first. Claude Code is used only after that.
+
+### What the provider-target component landed (bridge, catalog, probe)
+
+The CLI routing table needs a name for "Claude through agy" before it can route to it. This component adds that name. Its one routing change is the router profile, made at landing (see *The router runs agy-owned Claude* below); no other profile, and no pin, tail or table, names it.
+
+| Piece | What it is | Where |
+|---|---|---|
+| Target `agy-claude-tmux` | the agy binary and driver with its own tier map: fast `Claude Sonnet 5.5 (Low)`, balanced `Claude Sonnet 5.5 (High)`, deep and top `Claude Opus 5.5 (High)`. agy offers no Haiku-class Claude. The manifest is a JSON Merge Patch over `agy-tmux` (`"base"`). | [internal-bridge.md](../architecture/packages/internal-bridge.md#provider-aware-targets-manifest_basego-model_familygo-agy-claude-tmux) |
+| Model family | every manifest's `model_family` (claude, gemini, gpt, local); `bridge.ModelFamily(driver or family)` is the one accessor | same |
+| Routing family `agy-claude` | `llmroute.Family("agy-claude-tmux")` is `agy-claude`, as `profiles.BaseCLI` already said; `llmroute.Binary` is `agy`. `DefaultDriverForFamily("agy-claude")` is the target, so a table can name `agy-claude`. | [internal-llmroute.md](../architecture/packages/internal-llmroute.md) |
+| Bench | keyed by routing family, so an agy Claude quota wall benches `agy-claude` only, and an agy Gemini wall benches `agy` only. Antigravity pools quota per model group (Gemini; Claude and GPT), each with a weekly and a 5-hour limit (live, 2026-10-06, `evolve bridge control agy usage`), so the split matches the provider. Pinned both ways by `TestBenchOnEscalation_AQuotaWallOnOneAgyTargetLeavesTheOtherFirst` | same |
+| Catalog entry `agy-claude` | one `agy models` run feeds `agy` (filtered to gemini) and `agy-claude` (filtered to claude, `catalog.allowed_families` in the checked-in policy) | [model-discovery-and-catalog.md](../architecture/model-discovery-and-catalog.md#provider-aware-entries-agy-claude-2026-10-06) |
+| `evolve doctor live <driver> --model <model>` | the operator's smoke boot of one model through the interface | [runtime-reference.md](../operations/runtime-reference.md) |
+
+**Kept out of routing on purpose.**
+
+- The legacy universal tail is keyed by binary, so the doctor's `agy-claude-tmux` row never joins a chain. 86 tracked profiles have no `allowed_clis`, or `all`, and would otherwise have gained it ahead of agy-tmux.
+- Preflight's `distinctDrivers` reads profile chains, so since the router moved it boots `agy-claude-tmux` for the router's chain.
+
+**Live evidence, 2026-10-06.**
+
+- `evolve doctor live agy-claude-tmux --model "Claude Opus 5.5 (High)"` and `--model "Claude Sonnet 5.5 (High)"` both answered LIVE OK.
+- `evolve bridge launch --cli=agy-claude-tmux --model=deep` and `--model=balanced` showed `Claude Opus 5.5 (High)` and `Claude Sonnet 5.5 (High)` in agy's banner. The agents wrote those names to their artifacts.
+- The first deep attempt hit an upstream `Eligibility check failed: UNAVAILABLE (code 503)`. While that outage lasted agy refused the model (`… is not recognized … Ignoring the flag`), and the attempt timed out. The retry passed.
+
+### L1c: route by model family (specified here; built after L1b)
+
+**Integrity by model family.**
+
+- `cliroute`'s Claude-family floor and the `cross_family_with` check (builder ≠ auditor) judge `bridge.ModelFamily` of each candidate, not its CLI family. The floor admits `agy-claude` and `claude`. A builder on `agy` (gemini) and an auditor on `agy-claude` (claude) are different families.
+- `cliroute` must not import `bridge`, so the family arrives the way tool capability does: a `Compile` option (`WithModelFamily(bridge.ModelFamily)`), wired at the composition root by L1b's successor.
+- The contract-escalation "different family" pick (`core/contract_escalation.go`) moves to model family in the same step.
+
+**The operator's table.**
+
+```json
+"cli_routing": {
+  "clis":    ["agy", "agy-claude", "claude"],
+  "default": ["agy", "agy-claude", "claude"],
+  "tiers":   { "deep": ["agy-claude", "claude"], "top": ["agy-claude", "claude"] },
+  "after_chain": "other_clis"
+}
+```
+
+- A floor agent's allowed set becomes `[agy-claude, claude]`: Claude through agy first, then Claude Code.
+- Deep and top dispatches run Claude Opus on agy first.
+- **L2:** the floor profiles' `allowed_clis` (auditor, adversarial-review, tdd-engineer, spec-verifier, spec-verify) gain `agy-claude`, and `builder.json` gains `agy` as already planned.
+
+**Prerequisites before a floor agent routes to agy-claude.** Each was found by this component, three of them live:
+
+1. **Confirm the booted model.** agy 1.2.17 boots its default model for a `--model` it does not recognize. `--model "Claude Opus 9.9 (High)"` ran `Gemini 3.8 Flash (High)` and the launch reported success. A boot-time check must refuse a launch whose banner names another model than the one dispatched. It needs a manifest banner regex, because the typed launch line also contains the model name. Without it, a stale tier map, a renamed model, or an upstream 503 can put a Gemini model in a Claude-floor seat silently. The new `model_not_recognized` escalate rule covers only a run whose pane keeps the warning, and at boot agy shows it only briefly.
+   - **Cross-link:** this prerequisite is C5 (launch-time model verification) in [model-currency-2026-10.md](model-currency-2026-10.md), which lands with PR #774.
+   - **Guard:** `TestAgyClaudeRouting_WaitsForALaunchTimeModelVerificationRule` (`go/cmd/evolve`, `agy_claude_routing_verification_test.go`) fails when any route names `agy-claude` while the resolved `agy-claude-tmux` manifest declares no `launch_model_verification` rule. The routes it reads are a `profiles.ClaudeFamilyFloor` profile's `cli`, `allowed_clis` or `cli_fallback`; any `.evolve/policy.json` pin; and the typed `policy.CLIRouting` that `policy.Load` decodes: `clis`, `default`, every `work.<role>`, every `agents.<agent>` chain (array or `{cli, model}` form) and every `tiers.<tier>`. It reads the manifest through `bridge.ManifestObject`, the loader's own merge-patch resolution, so a chained base fails as the loader fails, and a `null` that removes the base's rule or an empty `{}` counts as no rule. It passes today because nothing routes there. C5 declares its rule under that key, or renames the key in the guard in the same change. `TestAgyClaudeRouting_TheGuardSeesEachRouteL2CanAdd` (each policy shape L2 can write) and `TestAgyClaudeRouting_OnlyANonEmptyRuleOnTheResolvedTargetCounts` keep the guard from going vacuous.
+   - **When L1c types the rule:** the guard asserts the typed manifest field (a non-empty value the loader parses), not the presence of a key. The launch check reads the model agy shows in its footer through `model_label_regex`, the agy-tmux manifest key #778 added (the agy liveness refresh), rather than building a second banner parser.
+2. **A usage probe per target.** The pre-wave usage probe reads agy's `/usage` once per binary and benches `agy`. With two agy families it must classify each family's cap separately, or one family's wall benches the other.
+3. **The catalog filter from the model family.** The checked-in policy filters `agy-claude` to `claude`, and a test pins every filter to `ModelFamily`. A deployment without that policy entry would classify all agy models for `agy-claude`. The refresh should default each key's filter to its target's model family.
+4. **The live pick's effort.** The first live classification chose `Claude Sonnet 5.5 (Medium)` for balanced and `Claude Opus 5.5 (Medium)` for deep. If deep must be `(High)`, say so with `agents.<name>.model` or a catalog `tier_fallbacks` entry when the catalog moves to `enforce`.
+5. **Profiles stay byte-identical until L2.** Adding `agy-claude` to `clis` before the floor profiles allow it leaves those agents on `claude`, and `show` prints the filtering.
+6. **One bare-name → driver projection.** `bridge.bareDriverMap`, which `bridge.DriverFor` reads, has no `agy-claude` entry, so `DriverFor("agy-claude")` returns the name unchanged and the caller's `LookupDriver` miss fails loudly: `subagent/bridgeadapter.go:21` and `:82`, `consensusdispatch/consensusdispatch.go:348`, `phaseregistrar/registrar.go:128`. Nothing names the bare family today. L1c folds `bareDriverMap` into `llmroute.DefaultDriverForFamily`, so routing and dispatch share one projection (deferred from review round 2, 2026-10-06).
+
+### Integration with the boundary updater (PR #774, merged)
+
+- #774 adds `default_env: {"AGY_CLI_DISABLE_AUTO_UPDATE": "1"}` and `update_argv: ["agy", "update"]` to `agy-tmux.json`.
+- `agy-claude-tmux` inherits the env through `base`, so its launches carry the off switch with no edit. `bridge.ProcessEnv("agy")` reads `agy-tmux` and covers the agy processes that are not launches.
+- The target's `update_argv: null` removes the inherited updater. #774's updater walks `InteractiveFamilies()`, deduped by binary, so agy updates once.
+- #774's `TestUpdateArgv_EveryOtherManifestDeclaresNoUpdater` stays green with either landing order.
+- The only expected conflict is textual: both change `agy-tmux.json`, near the top for #774 and at `transient_regex`, `model_family` and `interactive_prompts` here.
+- **Landing note (review round 1, 2026-10-06).** #774 merges at the next boundary, before this component. This component lands rebased onto main with #774, and the rebase adds the assertion that the merged `agy-claude-tmux` manifest declares no `update_argv` (its updater is agy-tmux's). Until then the key is inert: this base's `Manifest` has no `update_argv` field, and the loader ignores it.
+- **Done at landing (train #780 on main, 2026-10-06).** #774's `TestUpdateArgv_EveryOtherManifestDeclaresNoUpdater` already is that assertion: it walks every manifest through `LoadManifest`, which resolves the merge patch, so it reads the merged `agy-claude-tmux`. Removing the target's `"update_argv": null` turns it red (`agy-claude-tmux declares update_argv ["agy" "update"]`), so no second test was added. The landing also resolved four conflicts with #777 (L1b) and #778 (agy liveness): `agyTmuxLaunch` takes the target name, so `agy-claude-tmux` launches with agy-tmux's `>` input-line marker and pane watcher; the auto-responder takes #778's injected profile (`cliPaneProfile`), which goes through `paneProfileFor` and so keys by binary; and the #778 manifest keys (`busy_line_regex`, `token_line_regex`, `model_label_regex`) reach the target through `base`.
+
+### The router runs agy-owned Claude (landing, 2026-10-06)
+
+- **The rule.** The operator's rule is that deep and top work runs a Claude model, agy-owned first, Claude Code after, and never Gemini 3.1 Pro. `.evolve/profiles/router.json` ran `cli: agy-tmux` at `model_tier_default: deep`, which resolves to `Gemini 3.1 Pro (High)` every cycle. `evolve bridge sessions` showed it live in cycle 1807.
+- **The change.** `router.json` runs `cli: agy-claude-tmux`, so its deep tier is `Claude Opus 5.5 (High)`. `cli_fallback` stays `["claude-tmux"]`, and the tier stays deep. Its `allowed_clis` is `["agy-claude", "claude"]` (was `["all"]`), so the resolved chain is `[agy-claude-tmux, claude-tmux]` for both the phase launch and the advisor launch: no codex, which has no subscription and can only fail, and no Gemini tail.
+- **Pinned by:**
+  - `TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel` (cmd/evolve): no deep or top profile's own chain (`cli` plus `cli_fallback`) resolves its tier to a Gemini Pro model, and no profile's full resolved chain does either. The full chain is resolved through `cliroute.Build` over the checked-in policy, with every binary installed, so it includes the universal tail. Its only exceptions are the profiles listed in `deepTierGeminiProTailAwaitingL2`, and a listed profile that stops reaching Gemini Pro fails the test, so the list only shrinks. It was red twice: first on the router's own chain (agy-tmux), then on its tail (agy-tmux after codex);
+  - `TestRouter_EveryLaunchOfTheAdvisorStaysOnClaudeModels` (cmd/evolve): both the router phase and the advisor launch resolve to exactly `[agy-claude-tmux, claude-tmux]`;
+  - `TestRouterRunsAgyOwnedClaudeFirstThenClaudeCodeAtDeep` (profiles; it was `TestRouterStaysOnAgyWithClaudeFallback`);
+  - the router exception in `TestDeepTierFamilyArrangement`.
+- **Goldens regenerated.** Only router records changed, verified record by record. The move changed 19 plan records and 88 advisor records. The `allowed_clis` stopgap changed 22 more plan records and no advisor record. The files keep 2208 and 120 records. In the first regeneration:
+  - `legacy-plans.golden.jsonl`: 19 router records change, and the file keeps 2208 records. The checked-in configuration's chain (`checked_in_tail`) is `[agy-claude-tmux, claude-tmux, codex-tmux, agy-tmux]`. In the `advisor` variant, an `agy` overlay now promotes `agy-tmux` ahead of the router's own entry, because `agy-claude-tmux` is not of the `agy` family.
+  - `legacy-advisor.golden.jsonl`: 88 router records change, and a fifth bench state, `agy_claude_target_benched`, adds 24 (120 records). An `agy-claude` wall moves the advisor to `claude-tmux`, and an `agy` or `claude` wall leaves it on `agy-claude-tmux`. The older state named `agy_claude_benched` benches the `agy` and `claude` families, not `agy-claude`.
+- **The guard does not refuse it, by design.** `TestAgyClaudeRouting_WaitsForALaunchTimeModelVerificationRule` walks the Claude-floor profiles and the policy-level routes (pins and `cli_routing`), which can reach a floor agent. The router is not a floor seat: a silent substitution there runs agy's default Gemini Flash in the advisor, which costs quality but not the builder ≠ auditor integrity the guard protects. It is also visible: #778's pane watcher records the model label agy shows. So the guard's scope is unchanged.
+- **Stopgap applied: `allowed_clis`.** The move alone left the router's chain ending with the legacy universal tail's `agy-tmux` at deep (Gemini 3.1 Pro), after codex. The router's `allowed_clis: ["agy-claude", "claude"]` removes both, following two standing operator rules: Gemini 3.1 Pro is never used for deep or top work, and codex has no subscription. One more effect: a phase pin that names `agy` for the router is now refused (`cli "agy" not in allowed_clis`), which the golden's `pin` variant records.
+- **Explicit routes still reach agy-tmux** (golden variants, unchanged by design): an operator's `EVOLVE_ROUTER_CLI=agy-tmux` (`env_agent`) and an advisor overlay that names `agy` for the router phase (`advisor`; a soft overlay prepends its family's default driver). Both are explicit choices, not the silent tail. Whether `allowed_clis` binds them is the L2 question already listed (env values under the floor guard).
+- **22 other deep profiles reach Gemini 3.1 Pro only through the universal tail**, after codex and Claude Code: `architecture-design`, `caching-strategy-design`, `compat-surface-check`, `data-integrity-check`, `data-model-design`, `debugger`, `failure-adjudicator`, `failure-advisor`, `idempotency-check`, `intent`, `merge-to-main-gate`, `migration-safety-check`, `observability-design`, `plan-reviewer`, `preliminary-study`, `premise-challenge`, `prompt-regression-eval`, `resilience-design`, `retrospective`, `rollout-plan`, `swarm-planner`, `type-safety-audit`. Each runs `codex-tmux` then `claude-tmux`, and the tail appends `agy-tmux` at deep. They are left unchanged: L2's `tiers.deep` ceiling (`["agy-claude", "claude"]`, above) closes them all at once, and the test's `deepTierGeminiProTailAwaitingL2` list is the ratchet until then. The router was the one that ran every cycle.
+
+### Review round 1 (2026-10-06)
+
+| # | Finding | Fix | Pinned by |
+|---|---|---|---|
+| 1 | CRITICAL: the bridge keyed the pane profile by the driver-name stem, so `agy-claude-tmux` got `DefaultDetector` and the `? for shortcuts` footer instead of agy's `*AgyDetector` and `>` boundary | `driverBinary(driver)` (the manifest's `binary`; the `-tmux` stem only with no manifest) keys `paneProfileFor`, the auto-responder's busy read and the wall corroborator's probe recipe. A grep of `go/internal/bridge` found no other stem derivation that picks per-binary behaviour. | `TestPaneProfileFor_AgyClaudeTmuxReadsTheAgyBinarysPaneWithTheAgyDetector`, `TestAutoResponderTick_ReadsBusyFromTheProfileOfTheBinaryATargetDrives`, `TestDefaultWallCorroborator_ProbesTheRecipeOfTheBinaryATargetDrives` |
+| 2 | HIGH: `ApplySoftOverlay` read a family by name prefix, so an `agy` overlay promoted `agy-claude-tmux` | the family rung matches `Family(entry) == ov.CLI`, and a name is a family selector when it is not a `KnownDriver` | `TestApplySoftOverlay_AnOverlayPromotesTheChainEntryOfItsRoutingFamily` |
+| 3 | HIGH: nothing verifies the model agy boots | the guard above, until C5 lands. Round 2: the first guard decoded only `cli_routing.tiers` and found no route in `default`, `work`, `agents` or `clis`, and it re-implemented base resolution (it followed chained bases and counted a `null` deletion or `{}` as a rule). It moved to `go/cmd/evolve`, walks the typed `policy.CLIRouting`, and reads the manifest through `bridge.ManifestObject` | `TestAgyClaudeRouting_WaitsForALaunchTimeModelVerificationRule`, `TestAgyClaudeRouting_TheGuardSeesEachRouteL2CanAdd`, `TestAgyClaudeRouting_OnlyANonEmptyRuleOnTheResolvedTargetCounts`, `TestManifestObject_IsTheMergedManifestTheLoaderParses` |
+| 4 | HIGH: `llmroute.cliBinaryFor` and the manifests' `binary` could drift | a parity test at the composition root, both directions, over `bridge.DriverNames()` and the new `llmroute.Drivers()` | `TestDriverBinaryParity_*` (cmd/evolve) |
+| 5 | MEDIUM: setup's `familyDriverManifest` duplicated `llmroute.DefaultDriverForFamily` | setup uses `DefaultDriverForFamily`, and `capManifest` reads the family's binary. Side effect: `setup detect` now reports ollama's real tier map, where the old switch reported the bare tier words | `TestTierModelsFor_EveryFamilyReadsItsInteractiveTargetsTierMap` |
+| 6 | MEDIUM: `ParseInterspersed` read a flag value of `--` as the terminator | it replays the parsed span and stops on a `--` only at a flag position, so `--model -- pos1 --json` keeps `--json` a flag while `a -- x --json` passes the remainder raw | `TestParseInterspersed_ValueFlagsKeepTheirValueWhereverTheyStand` |
+| 7 | MEDIUM: two interspersed-flag idioms (`ReorderArgs`, `ParseInterspersed`) and two hand-rolled copies | filed, not migrated here: inbox `migrate-reorderargs-callers-to-parseinterspersed` | — |
+| 8 | `update_argv: null` looked dead | kept; the note now says the target opts out of the agy binary's updater, which only agy-tmux owns; see the landing note above | — |
+| 9 | LOW: `TestFamilyMapsDriverToBinary` tested the routing family | renamed `TestFamilyMapsDriverToRoutingFamily` | — |
+| 10 | LOW: `manifest_base.go` discards one `json.Unmarshal` error | kept on purpose: `parseManifest` reports the malformed target | `TestManifestBase_AMalformedTargetIsStillReportedAsInvalidJSON` |

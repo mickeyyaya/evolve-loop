@@ -22,7 +22,7 @@ Routing decisions need the **models a CLI can actually serve right now**, not a 
 ### Discovery (per-CLI listers)
 
 - **ollama**: parse `ollama list` stdout table (`go/internal/modelquery/ollama.go`).
-- **agy**: parse `agy models` (`AgyLister`, `agy.go`), taking the display-name column (`Gemini 3.8 Flash (Low)`), because agy's picker shows the family and the effort as two separate controls and a pane capture yields names agy does not accept.
+- **agy**: parse `agy models` (`AgyLister`, `agy.go`), taking the display-name column (`Gemini 3.8 Flash (Low)`), because agy's picker shows the family and the effort as two separate controls and a pane capture yields names agy does not accept. One listing feeds two catalog entries, `agy` and `agy-claude`: `DefaultRouter` gives both keys one `onceLister`, so a refresh runs `agy models` once (see [Provider-aware entries](#provider-aware-entries-agy-claude-2026-10-06)).
 - **codex / claude**: `RecipeLister` (`recipe.go`) drives the `/model` picker via `ModelCapturer.CaptureModelPicker` (tmux pane capture, ADR-0031), then per-CLI parsers (`picker.go`): codex numbered rows → first token; claude rows → family (`opus|sonnet|haiku`). `DefaultRouter` (`exec.go`) is the one registry of which CLI is listed how.
 
 ### Tier classification (LLM, validated)
@@ -74,6 +74,32 @@ The live probe (tmux `/model` capture + one-shot classifier) runs in a **throwaw
 
 - **Reuse gate** (`fingerprint.go` + `query.go:liveTiers`): `Fingerprint` hashes the decision inputs (algorithm `decisionVersion`, CLI, sorted candidates, policy, tier vocabulary; length-prefixed NUL-separated framing) into `CLIEntry.CandidatesHash`. An unchanged offering reuses the prior tier map with **zero classifier LLM calls** — but only when all three conditions hold: hash matches and is non-empty, prior `Source == "live"` (a detect entry is never laundered into an authoritative one), and the prior covers every canonical tier (a pre-fix `top`-less entry reclassifies once instead of staying sticky forever). `decisionVersion` is bumped by hand on any prompt/promotion change so a fix is never silently reused away.
 
+### Provider-aware entries: `agy-claude` (2026-10-06)
+
+**Request.** The operator directive of 2026-10-06 reads "agy could also use claude opus 5.5 and sonnet 5.5, prioritize using agy owned claude models first then using claude code models after". `agy models` (agy 1.2.17) lists `Claude Opus 5.5` and `Claude Sonnet 5.5` at `(Low)`, `(Medium)` and `(High)`, beside the Gemini models and `GPT-OSS 120B (Medium)`. The bridge reaches them through the routable target `agy-claude-tmux` ([internal-bridge.md, Provider-aware targets](packages/internal-bridge.md#provider-aware-targets-manifest_basego-model_familygo-agy-claude-tmux)), whose catalog key is `agy-claude` (`policy.BaseCLI("agy-claude-tmux")`, the key `applyCatalogTierMap` overlays).
+
+**How the entry is built.** It is one more CLI of the same refresh, not a second probe:
+
+1. **Detect.** `setup.Detect` reports an `agy-claude` row from the doctor's `agy-claude-tmux` row, with the same binary, auth and verdict as agy. Its detect fallback is `agy-claude-tmux`'s tier map (`llmroute.DefaultDriverForFamily("agy-claude")`), and its capability manifest is agy's (`antigravity`), because the family's driver runs the agy binary.
+2. **List.** `Router.List("agy-claude")` reads the listing `agy` already read (`onceLister`): one `agy models` run serves both keys.
+3. **Filter.** `catalog.allowed_families` filters each key to its model family: `agy` to `gemini` and `agy-claude` to `claude`, in the checked-in `.evolve/policy.json`. `TestTheCheckedInCatalogFiltersEachTargetToItsModelFamily` (cmd/evolve) pins every target's filter to `bridge.ModelFamily` of that target, so one listing can never put a Gemini model in the Claude entry or the reverse.
+4. **Classify, promote, complete.** The unchanged pipeline runs per key. `PromoteLatest` moves a classified Claude pick to the newest version in its own lineage, so `Claude Opus 4.6 (High)` becomes `Claude Opus 5.5 (High)` when both are listed; `(High)` and `(Low)` are different lineages and are never substituted for each other.
+
+Pinned by `TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry`, which runs one fixture listing with Gemini, Claude and GPT-OSS rows. It checks that `agy models` runs once, that each classifier sees only its family, and that the result is two live entries with their tier maps. `TestDefaultRouter_AgyAndAgyClaudeShareOneLister`, `TestOnceLister_AFailedListingFailsEveryEntryThatSharesIt` and the setup tests `TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap` and `TestDetectCLIs_ReportsAgyClaudeBesideAgy` pin the rest.
+
+**The baseline and the live pick.** The manifest's offline tier map is fast `Claude Sonnet 5.5 (Low)`, balanced `Claude Sonnet 5.5 (High)`, deep and top `Claude Opus 5.5 (High)`. agy offers no Haiku-class Claude, so fast is Sonnet at its lowest effort. A live refresh classifies with an LLM, and its pick can choose another effort. The first live run (2026-10-06, a scratch copy of the plane's catalog and policy, classified by claude-p after codex failed) wrote:
+
+| Tier | Live pick |
+|---|---|
+| fast | `Claude Sonnet 5.5 (Low)` |
+| balanced | `Claude Sonnet 5.5 (Medium)` |
+| deep | `Claude Opus 5.5 (Medium)` |
+| top | `Claude Opus 5.5 (High)` |
+
+The `available` list held the six Claude rows only. The plane's catalog stays at `refresh_stage: shadow`, so dispatch reads the manifest's map until an operator refresh commits one. An operator who wants deep at `(High)` when the classifier picks otherwise can say so: a policy pin, or after L1c an `agents.<name>.model`.
+
+**Nothing dispatches it yet.** The entry is data. Routing a phase to `agy-claude` is the CLI routing table's follow-up L1c ([cli-routing-table-2026-10.md](../plans/cli-routing-table-2026-10.md#provider-aware-targets-2026-10-06)).
+
 ### Dispatch integration
 
 `LoadManifest` finishes by overlaying live catalog entries onto the embedded manifest's `ModelTierMap` (`go/internal/bridge/catalog_overlay.go`), memoized by file mtime. Policy pins (`.evolve/policy.json`) name an exact model and never trigger a catalog lookup ([policy-config.md](policy-config.md)). Fallback chain on missing/corrupt/stale catalog: unchanged manifest → static tier map; corrupt cache logs `[models] WARN unreadable catalog` and returns empty (fail-open, never blocks dispatch).
@@ -87,6 +113,7 @@ The **Realizer** (`go/internal/bridge/realizer.go`, ADR-0022) is the **single tr
 | claude | flag | `--model <model>` launch flag | manifest + realizer tests |
 | codex | flag | `-m <model>` launch flag | manifest + realizer tests |
 | agy | flag | `--model "<display name>"` launch flag (agy 1.0.15; tokens are `agy models` display names with spaces/parens, shell-quoted by `launchCmdLine`) | probed live 2026-07-02 |
+| agy-claude | flag | the same `--model "<display name>"` flag on the agy binary (`agy-claude-tmux`, a merge patch over `agy-tmux`); a model-less launch realizes `params.model_tier.default` (fast) so it never boots agy's Gemini default | `evolve doctor live agy-claude-tmux --model …`, 2026-10-06 |
 | ollama | positional | model is the positional argument of `ollama run <model>` (`driver_ollamatmux.go`), composed by the driver, not a flag | launch-cmd test pins |
 
 Rules the seam enforces, matrix-wide:
@@ -110,5 +137,6 @@ C4 has landed. `evolve cli update` ([internal-cliupdate.md](packages/internal-cl
 - TDD coverage: `modelcatalog/catalog_test.go` (staleness, DispatchModel gate), `store_test.go` (atomic write), `modelquery/picker_test.go` (per-CLI parsers tested against real captured frames).
 - Latest-selection layer: `modelquery/lineage_test.go` (capability classes never collide), `latest_test.go` (within-lineage promotion, alias preference), `fingerprint_test.go` (framing unambiguous, order-insensitive), `refresh_reuse_test.go` (zero classifier calls on unchanged offering + the three reuse refusals), `complete_test.go` (prompt generated from `CanonicalTiers`, nearest-neighbour fill), `bridge/model_freshness_test.go` (claude declares alias, everyone else zero-value), `cmd/evolve/cmd_models_stage_test.go` (off/shadow/enforce write behavior, shadow-TTL gating, diff lines).
 - Classifier chain and loud refresh (2026-10-05): `modelquery/chain_test.go` (a launch failure, a no-JSON reply and an unmapped reply each fall through to the next CLI; the exhausted chain names every failure; a cancelled context launches nothing; `TestRefresh_ChainClassifierRecoversLiveTiersWhenTheFirstCLIFails`), `modelquery/fallbackreason_test.go` (each live failure is recorded as the entry's `fallback_reason`), `modelcatalog/fallbackreason_test.go` (the reason survives the store), `cmd/evolve/cmd_models_live_test.go` (`TestPickClassifierCLI`, `TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive`, `TestBridgePromptDispatcher_NamesTheArtifactTheBridgeReadsTheReplyFrom`, `TestBridgePromptDispatcher_ALinkThatWritesNothingNeverReadsTheLastLinksReply`), `cmd/evolve/cmd_models_refresh_test.go` (no live CLI exits 1 and keeps the prior catalog, human and `--json`; a partial fallback commits and names each fallback).
+- Provider-aware entries (2026-10-06): `modelquery/agy_claude_catalog_test.go`, `setup/agy_claude_detect_test.go`, `cmd/evolve/catalog_model_family_policy_test.go`.
 - Safety properties under test: empty/detect-only catalog ⇒ dispatch byte-identical to pre-catalog; shadow stage ⇒ live catalog file byte-identical (dispatch unaffected); `evolve models refresh --source detect` is idempotent and its manifest-backed entries never map a tier to a bare tier name.
 - Shadow soak bar (before any `enforce` conversation): ≥10 cycles with `refresh_stage: "shadow"` spanning a TTL boundary; would-change diff empty or explainable every run; live catalog mtime unchanged; shadow shows `claude.deep == "opus"` and agy's `deep` on `Pro`, not `Flash`.

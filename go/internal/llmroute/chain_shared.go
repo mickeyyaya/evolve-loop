@@ -1,6 +1,8 @@
 package llmroute
 
 import (
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -55,4 +57,8 @@ func ExcludeFamilies(discovered, families []string) []string {
 func KnownDriver(name string) bool {
 	_, ok := cliBinaryFor[name]
 	return ok
+}
+
+func Drivers() []string {
+	return slices.Sorted(maps.Keys(cliBinaryFor))
 }

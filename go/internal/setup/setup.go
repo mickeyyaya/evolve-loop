@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/capability"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
@@ -34,7 +35,7 @@ func baseCLI(cli string) string {
 }
 
 func capManifest(base string) string {
-	if base == "agy" {
+	if llmroute.Binary(llmroute.DefaultDriverForFamily(base)) == "agy" {
 		return "antigravity"
 	}
 	return base
@@ -42,20 +43,8 @@ func capManifest(base string) string {
 
 var abstractTiers = []string{"fast", "balanced", "deep", "top"}
 
-func familyDriverManifest(base string) string {
-	switch base {
-	case "claude":
-		return "claude-tmux"
-	case "codex":
-		return "codex-tmux"
-	case "agy":
-		return "agy-tmux"
-	}
-	return base
-}
-
 func tierModelsFor(base string) map[string]string {
-	man, err := bridge.LoadManifest(familyDriverManifest(base))
+	man, err := bridge.LoadManifest(llmroute.DefaultDriverForFamily(base))
 	out := make(map[string]string, len(abstractTiers))
 	for _, tier := range abstractTiers {
 		model := tier

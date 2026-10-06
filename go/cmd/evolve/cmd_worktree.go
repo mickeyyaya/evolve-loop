@@ -9,8 +9,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
@@ -130,7 +132,7 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 		base        string
 		cycle       int
 		lane        string
-		devTask     string
+		dev         devCleanupRequest
 		stale       bool
 		apply       bool
 	)
@@ -138,19 +140,26 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&base, "base", "", "worktree base dir (default .evolve/worktrees)")
 	fs.IntVar(&cycle, "cycle", 0, "cycle number to remove (0 = prune all stale)")
 	fs.StringVar(&lane, "lane", "", "lane override; must match the lane used at create (default: hash of project root, or EVOLVE_LANE)")
-	fs.StringVar(&devTask, "dev", "", "remove the hub dev worktree <hub>/dev/<task> and its branch once clean and merged")
+	fs.StringVar(&dev.task, "dev", "", "remove the hub dev worktree <hub>/dev/<task> and its branch once its head is merged or every change in it is already in origin/main (a named task skips --all's quiet period)")
+	fs.BoolVar(&dev.all, "all", false, "with a bare --dev: clean up every dev/<task> a proof shows landed and unchanged for gc.worktrees.dev_quiet_minutes (default "+gcpolicy.WorktreesPolicy{}.DevQuietPeriod().String()+"), naming the reason each other one is kept")
+	fs.BoolVar(&dev.dryRun, "dry-run", false, "with --dev: print what would be removed and why each tree is kept; removes nothing and does not fetch")
 	fs.BoolVar(&stale, "stale", false, "list sealed cycle worktrees no continuation binding or fresh run lease holds (dry-run unless --apply)")
 	fs.BoolVar(&apply, "apply", false, "with --stale: remove the listed worktrees and their merged branches")
+	args, bareDev := bareDevFlag(args)
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	if modes := btoi(devTask != "") + btoi(stale) + btoi(cycle > 0); modes > 1 || (apply && !stale) {
+	if msg := dev.usage(bareDev); msg != "" {
+		fmt.Fprintln(stderr, "evolve worktree cleanup: "+msg)
+		return 10
+	}
+	if modes := btoi(dev.selected()) + btoi(stale) + btoi(cycle > 0); modes > 1 || (apply && !stale) {
 		fmt.Fprintln(stderr, "evolve worktree cleanup: --dev, --stale and --cycle are exclusive; --apply needs --stale")
 		return 10
 	}
 	projectRoot = absWorktreeRoot(projectRoot, stderr)
-	if devTask != "" {
-		return cleanupDevFromFlags(projectRoot, devTask, stdout, stderr)
+	if dev.selected() {
+		return cleanupDevFromFlags(projectRoot, dev, stdout, stderr)
 	}
 	if base == "" {
 		base = filepath.Join(projectRoot, ".evolve", "worktrees")
@@ -189,6 +198,39 @@ func pruneWorktrees(projectRoot string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func bareDevFlag(args []string) ([]string, bool) {
+	out := slices.Clone(args)
+	bare := false
+	for i, a := range out {
+		if (a == "-dev" || a == "--dev") && (i+1 == len(out) || strings.HasPrefix(out[i+1], "-")) {
+			out[i] = "--dev="
+			bare = true
+		}
+	}
+	return out, bare
+}
+
+type devCleanupRequest struct {
+	task        string
+	all, dryRun bool
+}
+
+func (r devCleanupRequest) selected() bool { return r.task != "" || r.all }
+
+func (r devCleanupRequest) usage(bareDev bool) string {
+	switch {
+	case r.all && r.task != "":
+		return "--dev <task> and --all are exclusive"
+	case r.all && !bareDev:
+		return "--all needs --dev (evolve worktree cleanup --dev --all)"
+	case bareDev && !r.all:
+		return "--dev needs a task name, or --all"
+	case r.dryRun && !r.selected():
+		return "--dry-run needs --dev"
+	}
+	return ""
 }
 
 func btoi(b bool) int {

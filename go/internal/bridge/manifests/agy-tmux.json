@@ -2,6 +2,7 @@
   "schema_version": 1,
   "cli": "agy-tmux",
   "binary": "agy",
+  "model_family": "gemini",
   "binary_min_version": "1.0.0",
   "update_argv": ["agy", "update"],
   "auto_update_off_env": "AGY_CLI_DISABLE_AUTO_UPDATE",
@@ -22,7 +23,7 @@
     ]
   },
   "prompt_marker": "? for shortcuts",
-  "transient_regex": "(?i)(\\b5\\d{2}\\b\\s*(unavailable|internal)|model is overloaded)",
+  "transient_regex": "(?i)(\\b5\\d{2}\\b\\s*(unavailable|internal)|model is overloaded|unavailable \\(code 5\\d{2}\\))",
   "default_model": "gemini-3.5-flash",
   "default_args": [],
   "params": {
@@ -92,6 +93,14 @@
       "regex": "Please log in|Authentication required|Login expired",
       "response_keys": null,
       "policy": "escalate"
+    },
+    {
+      "name": "model_not_recognized",
+      "regex": "is not recognized as a known model or custom model",
+      "response_keys": null,
+      "tail_lines": 30,
+      "policy": "escalate",
+      "note": "agy 1.2.17 ignores a --model it cannot validate (an unknown name, or any name while its model list fetch fails on an upstream 503) and runs without the dispatched model; a run must never continue on a model other than the one dispatched, so the chain moves on (exit 85). Live-captured 2026-10-06 on agy-claude-tmux, after the prompt was submitted. At boot an escalate verdict leaves readiness to the marker (ADR-0118), and agy shows this warning only briefly there, so an unknown name can still boot on agy's default model: see docs/architecture/packages/internal-bridge.md. tail_lines keeps the rule to the live screen, as codex's model_unsupported does."
     },
     {
       "name": "rate_limit",

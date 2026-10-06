@@ -30,7 +30,8 @@ func registerBuiltins() {
 	Register(agyDriver{})
 	Register(claudeTmuxDriver{})
 	Register(codexTmuxDriver{})
-	Register(agyTmuxDriver{})
+	Register(agyTmuxDriver{target: "agy-tmux"})
+	Register(agyTmuxDriver{target: "agy-claude-tmux"})
 	Register(ollamaTmuxDriver{})
 }
 
@@ -38,8 +39,8 @@ func TestDriverRegistry(t *testing.T) {
 	// Strict count over the real (init-registered) set: an accidental init() registration (e.g. a test
 	// stub forgetting deferred cleanup) gets caught immediately; a deliberate addition bumps this constant.
 	names := DriverNames()
-	if len(names) != 7 {
-		t.Fatalf("DriverNames = %v (len %d), want exactly 7 builtins", names, len(names))
+	if len(names) != 8 {
+		t.Fatalf("DriverNames = %v (len %d), want exactly 8 builtins", names, len(names))
 	}
 	for i := 1; i < len(names); i++ {
 		if names[i-1] > names[i] {
@@ -149,7 +150,7 @@ func TestLookupEnv_NilSeamFallsBackToOS(t *testing.T) {
 
 func TestManifestNames_Embedded(t *testing.T) {
 	names := ManifestNames()
-	want := map[string]bool{"claude-p": true, "claude-tmux": true, "codex": true, "codex-tmux": true, "agy": true, "agy-tmux": true}
+	want := map[string]bool{"claude-p": true, "claude-tmux": true, "codex": true, "codex-tmux": true, "agy": true, "agy-tmux": true, "agy-claude-tmux": true}
 	for _, n := range names {
 		delete(want, n)
 	}

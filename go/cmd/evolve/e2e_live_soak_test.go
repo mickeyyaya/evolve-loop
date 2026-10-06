@@ -54,7 +54,7 @@ func TestE2ELiveCrossFamilySoak(t *testing.T) {
 				if isTransient(res.Out, res.Err) {
 					t.Skipf("%s: provider failure before audit (quarantined)", name)
 				}
-				captureLiveFailure(t, repoRoot, res.ProjRoot, "soak-"+name)
+				captureLiveFailure(t, res.ProjRoot, "soak-"+name)
 				t.Errorf("%s cross-family cycle never reached audit; roles=%v err=%v\n%s",
 					name, ledgerRoles(res.Entries), res.Err, lastN(res.Out, 1200))
 				return

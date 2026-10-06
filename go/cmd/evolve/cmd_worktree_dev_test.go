@@ -66,7 +66,7 @@ func TestWorktreeDev_CreateAtOriginTipThenCleanupAfterMerge(t *testing.T) {
 	brGit(t, dev, "commit", "-q", "-m", "work")
 	olderPRHead := func(context.Context, string, string) (string, error) { return strings.Repeat("b", 40) + "\n", nil }
 	var refusedOut, refusedErr bytes.Buffer
-	if code := runWorktreeCleanupDev(runtime, "t1", olderPRHead, &refusedOut, &refusedErr); code != 1 || !strings.Contains(refusedErr.String(), "not merged") {
+	if code := runWorktreeCleanupDev(runtime, "t1", devCleanupOptions{mergedPRHeads: olderPRHead}, &refusedOut, &refusedErr); code != 1 || !strings.Contains(refusedErr.String(), "not merged") {
 		t.Errorf("cleanup of an unmerged branch exit=%d, want 1 naming not merged\n%s%s", code, refusedOut.String(), refusedErr.String())
 	}
 	brGit(t, dev, "push", "-q", "origin", "HEAD:main")

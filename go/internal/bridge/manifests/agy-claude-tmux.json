@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "cli": "agy-claude-tmux",
+  "base": "agy-tmux",
+  "model_family": "claude",
+  "default_model": "Claude Sonnet 5.5 (Low)",
+  "update_argv": null,
+  "params": {
+    "model_tier": {
+      "default": "fast"
+    }
+  },
+  "model_tier_map": {
+    "fast": "Claude Sonnet 5.5 (Low)",
+    "balanced": "Claude Sonnet 5.5 (High)",
+    "deep": "Claude Opus 5.5 (High)",
+    "top": "Claude Opus 5.5 (High)"
+  },
+  "note": "The Claude models agy serves on the Google AI Pro subscription (agy 1.2.17 `agy models` lists Claude Opus 5.5 and Claude Sonnet 5.5, each at Low, Medium and High). A merge patch over agy-tmux (`base`): the same agy binary, driver, prompts, controls and environment; its own tier map, model family and default tier. agy offers no Haiku-class Claude, so fast is Sonnet at Low effort. `params.model_tier.default` keeps a model-less launch (a probe or a canary) on a Claude model, never agy's Gemini default. `update_argv: null` opts this target out of the shared agy binary's updater, which only agy-tmux owns, so a boundary update runs agy once. See docs/architecture/packages/internal-bridge.md."
+}

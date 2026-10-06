@@ -155,12 +155,9 @@ func ledgerTotalCost(entries []ledgerEntry) float64 {
 	return sum
 }
 
-// captureLiveFailure copies a failed cycle's workspace logs/artifacts into a
-// retained dir under the repo's testdata so a flaky/real live failure is
-// triageable after the temp project is gone. Returns the retained path.
-func captureLiveFailure(t *testing.T, repoRoot, projRoot, label string) string {
+func captureLiveFailure(t *testing.T, projRoot, label string) string {
 	t.Helper()
-	dst := filepath.Join(repoRoot, "go", "testdata", "live-failures",
+	dst := filepath.Join(os.TempDir(), "evolve-live-failures",
 		fmt.Sprintf("%s-%d", strings.ReplaceAll(label, "/", "_"), os.Getpid()))
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		t.Logf("captureLiveFailure: mkdir %s: %v", dst, err)
