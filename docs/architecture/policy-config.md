@@ -42,7 +42,21 @@ policy).
   // protocol key (ipcenv.ProtocolKeys) or a suite export (EVOLVE_PROJECT_ROOT,
   // the worktree-root key, CHANGED_PACKAGES) is refused with a warning in the
   // verdict; every other entry still forwards (ADR-0114).
-  "acs": { "go_timeout_s": 600, "predicate_env": ["EVOLVE_FLAG_CAMPAIGN"] }
+  "acs": { "go_timeout_s": 600, "predicate_env": ["EVOLVE_FLAG_CAMPAIGN"] },
+
+  // The inbox priority rank (ADR-0121). Decoded STRICTLY: an unknown key or an
+  // invalid value fails the load. Absent ⇒ the compiled default shown here.
+  "inbox_priority": {
+    "class_order": ["correctness", "stability", "performance", "debuggability",
+                    "feature", "maintainability", "hygiene", "security"],
+    "factors": { "base": 0.45, "class": 0.2, "unblocks": 0.15,
+                 "recurrence": 0.1, "age": 0.05, "goal": 0.05 },
+    "age_halflife_days": 30,
+    "unblocks_cap": 3,
+    "recurrence_cap": 5,
+    "active_campaigns": [],
+    "preempt_margin": 0.05
+  }
 }
 ```
 
@@ -88,6 +102,22 @@ the same reason. Two hard rules bound the gate, both pinned by tests:
 
 A suppressed lesson is not an error, and the failing cycle's own
 `retrospective-report.md` is written either way.
+
+## Inbox priority rank (`inbox_priority`)
+
+The block configures `internal/inboxrank`, the one computed order over pending inbox items ([ADR-0121](adr/0121-inbox-priority-is-a-computed-rank.md); `evolve inbox rank` shows it). An item's score is `Σ factor × feature`, each feature in [0, 1].
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `class_order` | the `priority_class` values, most urgent first; a class at position `i` of `n` scores `(n − i) / n`, one the order lacks scores 0. `evolve inbox add` refuses an item whose class it does not name. | correctness > stability > performance > debuggability > feature > maintainability > hygiene > security (operator correction, 2026-10-06) | empty, a blank or padded entry, a duplicate |
+| `factors` | the weight of each feature: `base` (the item's weight), `class`, `unblocks`, `recurrence`, `age`, `goal`. A present block must name all six; 0 turns one off. | 0.45, 0.20, 0.15, 0.10, 0.05, 0.05 | a missing or unknown factor, a negative weight, all six 0 |
+| `age_halflife_days` | the days after filing at which the age feature reaches 0.5 | 30 | 0 or less |
+| `unblocks_cap` | the dependent count at which the unblocks feature saturates at 1 | 3 | below 1 |
+| `recurrence_cap` | the recurrence count at which the recurrence feature saturates at 1 | 5 | below 1 |
+| `active_campaigns` | the `campaign` values whose items get the goal feature | none | a blank, padded or duplicated entry |
+| `preempt_margin` | the score margin by which a new item must beat the lowest uncommitted planned slot to take it at a wave boundary (read from the plan's P4; unused in P1) | 0.05 | negative |
+
+The checked-in file names the class order and the factors explicitly, so the operator's weights live in config rather than in the compiled default. Until the plan's P2 wires the rank into dispatch, the block changes only what `evolve inbox rank` shows and which classes `evolve inbox add` accepts.
 
 ## Context-fill telemetry (`context_fill`)
 

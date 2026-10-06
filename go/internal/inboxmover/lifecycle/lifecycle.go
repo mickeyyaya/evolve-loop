@@ -90,6 +90,8 @@ type Mover struct {
 	signals      func() *signalcenter.Center
 	mainHead     func() (string, error)
 	bound        func(taskID string) (bool, error)
+
+	priorityClasses []string
 }
 
 // Option configures a Mover at construction.

@@ -117,7 +117,7 @@ phase collapses to ~5, and the external contract (`BridgeRequest` shape,
 | Phase | Pkg | Deliverable | Contract |
 |---|---|---|---|
 | **Intent** | `phases/intent` | `intent.md` (or `intent-delta.md`) | Pre-Scout: structures a vague goal into intent before any subagent budget is spent. Opt-in (`EVOLVE_REQUIRE_INTENT=1`). |
-| **Scout** | `phases/scout` | `scout-report.md` | Fans out into codebase / research / eval-design sub-scouts and merges. Selects the cycle's task by priority: new features > bug fixes > security. Reads the challenge token for its tamper-evident report. |
+| **Scout** | `phases/scout` | `scout-report.md` | Fans out into codebase / research / eval-design sub-scouts and merges. Selects the cycle's task from the computed inbox rank ([ADR-0121](../../docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md), `evolve inbox rank`). Reads the challenge token for its tamper-evident report. |
 | **Triage** | `phases/triage` | triage notes | Layer-C triage on every cycle (soft-WARN if skipped). Disable: `EVOLVE_TRIAGE_DISABLE=1`. |
 | **TDD** | `phases/tdd` | RED predicates / tests | Writes behavioral predicates **before** Build (EGPS Tester layer, `EVOLVE_TEST_PHASE_ENABLED=1`). Source-writing → runs in the worktree. |
 | **Build-planner** | `phases/buildplanner` | `build-plan.md` | Advisory (ADR-0019). Shadow / advisory / enforce rollout via `EVOLVE_BUILD_PLANNER`. |

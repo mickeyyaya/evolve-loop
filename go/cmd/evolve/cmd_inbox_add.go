@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -19,7 +20,13 @@ func runInboxAdd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 	root := envOrCwd("EVOLVE_PROJECT_ROOT")
-	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: laneForbidden(root, stderr)}
+	pol, err := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "inbox add: %v\n", err)
+		return 2
+	}
+	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: laneForbidden(root, stderr),
+		PriorityClasses: pol.InboxPriorityConfig().ClassOrder}
 	res, err := inboxmover.File(opts, raw)
 	switch {
 	case errors.Is(err, inboxmover.ErrInvalidItem):

@@ -441,6 +441,7 @@
 # cycle-662 (chronicle-s1-recurrence-index) graduates BackfillFromLessons (historical
 # backfill over lessons/*.yaml), IsGeneric + Ledger.IsGenericPattern (classification
 # de-noise), exercised by backfill_c662_test.go + generic_c662_test.go.
+# ReadSnapshot (Load's lockless decode) and Ledger.ItemCounts (the inbox rank's id linkage, ADR-0121) are named by snapshot_test.go.
 ./internal/recurrence
 
 # cycle-661 ACS predicate package (2026-07-11): recurrence-ledger-weight-escalation.
@@ -679,3 +680,5 @@
 ./internal/cliroute/cliroutetest
 # cliupdate — the boundary CLI updater: each subscribed family's manifest updater, the smoke test of a changed version, and the cli-updates.json record cli-version-drift reads.
 ./internal/cliupdate
+# inboxrank — the one computed inbox priority: score = sum of policy-weighted features (base, class, unblocks, recurrence, age, goal), ordered with the declared-surface, filing-date and id tie-breaks (ADR-0121).
+./internal/inboxrank

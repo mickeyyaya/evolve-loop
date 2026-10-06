@@ -24,3 +24,4 @@
 ./internal/subagent/subagentrun 100
 ./internal/cliroute 100
 ./internal/cliupdate 100
+./internal/inboxrank 100
