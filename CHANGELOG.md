@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## Docs — the audit ledger restructure: research record, plan and ADR-0123 (Proposed, 2026-10-06)
+
+- **Why.** The operator asked to make `.evolve/ledger.jsonl` structured and efficient to load without reading it whole. The same day, the ledger turned out to be broken at line 154453, because fleet-rebase carry diffs lived in deleted cycle worktrees, and every byte-identical carry had been refused at ship (6 of 6).
+- **Research.** `docs/research/ledger-structure-research-2026-10.md` measures the ledger:
+  - 47 MB and about 160k lines;
+  - `phase_skipped` is 52% of the bytes;
+  - no index exists, and Verify is linear and racy;
+  - evidence decays under run-dir retention.
+
+  It then surveys how Certificate Transparency and Trillian, Kafka, content addressing, event sourcing, OpenTelemetry GenAI spans, LLM context engineering and DuckDB solve the same problems, with sources, an options table and the conclusions.
+- **Plan.** `docs/plans/ledger-restructure-2026-10.md` (approved in plan mode): decisions D1–D8 and who made each; components C1–C13 in four phases, with status columns; expected results, rollout order and verification.
+- **ADR.** `docs/architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md` (Proposed) records nine decisions: history is never rewritten; integrity evidence is content-addressed; the six broken carries are restored from git, not rebaselined; skipped phases are recorded once per decision; one scanner and bounded query verbs serve every reader; segments are sealed at boundaries; routine verify is incremental and `--deep` is the audit. It amends ADR-0048, ADR-0081 and ADR-0105 (F5).
+
 ## Fixed — no test writes into the repository tree it runs in, so the repo-contract pack can no longer plant an unexplained path in a lane's worktree (cycles 1795 and 1804, 2026-10-06)
 
 - **What was wrong and how it showed.** Ship's repo-contract pack runs at the build handoff floor, during the Builder's self-check, and again at ship. In a lane, the tree it runs in is the lane's worktree. Inside the pack, `internal/phasespec`'s `TestTrackedPhaseDirs_RealTreeExcludesUntrackedDecoy` wrote `.evolve/phases/zz-decoy-phasespec-funnel/phase.json` under `repoRoot()` and removed it in `t.Cleanup`. In cycle 1804 the pack ran it while the Builder's self-check overlapped, and the explanation floor counted the untracked fixture as an unexplained material path and rejected the build. The decoy's mtime is 5 s after `build-report.md`, and the killed run never removed it. The disposition records `false-rejection`, root cause `pipeline-code`, P1. Cycle 1795 hit the identical rejection (`signals.ndjson` seq 74). The class: tests that write into the tree they were built from, whether or not they clean up.
