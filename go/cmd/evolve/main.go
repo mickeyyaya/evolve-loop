@@ -53,6 +53,8 @@ Commands:
               the branch, index or tree; restore it into a new or clean worktree
               ( checkpoint save [--worktree DIR | --all] [--label T] [--push] |
                 list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] )
+  land       Land a patch or a salvaged cycle uncommitted on a dev worktree at origin/main
+              ( land --branch B (--patch F | --salvage <leaf>) [--project-root P] )
   gc         Release what finished cycles left behind: tmux sessions/sockets,
               orphan processes, worktrees, run dirs, go build cache
               ( gc --project-root P [--dry-run] )
@@ -63,6 +65,9 @@ Commands:
   pr         Merge reviewed PRs at a wave boundary; refuses while a loop runs or
               required CI is not green on the verified head
               ( pr merge <n>... [--update-branch] [--wait D] [--project-root P] )
+  boundary   Run the wave boundary: loop-stop --wait, pr merge, sync-main, gc,
+              loop-stop --release, loop --detach; stops at the first failed step
+              ( boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--dry-run] )
   ci         Classify a red CI run's failing tests from evidence; exit 0 = retry-safe
               ( ci classify <run-id|pr:N|sha:H> [--json] [--rerun] [--project-root P] )
              Watch a pushed SHA, PR or tag until its CI completes; exit 0 green, 1 red, 2 unobservable

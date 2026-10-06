@@ -1,9 +1,14 @@
 {
   "acceptance": [
     "`evolve land --patch F --branch B` on a fixture repo yields a worktree on B at origin/main with the patch applied and nothing committed (red: unknown command)",
-    "`--salvage <leaf>` also restores the leaf's untracked files",
+    "`--salvage \u003cleaf\u003e` also restores the leaf's untracked files",
     "A conflicting patch exits 1 naming the conflicted files; an existing branch exits 1"
   ],
+  "consumed": {
+    "at": "2026-10-06T13:21:59Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-09-30T10:51:41Z",
   "deps": [
     "cli-worktree-dev"
@@ -14,7 +19,7 @@
     "go/internal/gitexec",
     "go/internal/gc"
   ],
-  "fix": "Add `evolve land --branch B (--patch F | --salvage <leaf>) [--onto origin/main]`. It creates the dev worktree and branch from the base through the same code as `evolve worktree create --dev` and applies the patch with --3way. For a salvage leaf it also extracts the leaf's untracked files. It then prints the next commands (commit-gate run, ship). It never commits or pushes. A conflict leaves the markers in the worktree and exits 1 naming the files; an existing branch exits 1; a missing patch or leaf exits 2. Document it in runtime-reference.md's operator commands.",
+  "fix": "Add `evolve land --branch B (--patch F | --salvage \u003cleaf\u003e) [--onto origin/main]`. It creates the dev worktree and branch from the base through the same code as `evolve worktree create --dev` and applies the patch with --3way. For a salvage leaf it also extracts the leaf's untracked files. It then prints the next commands (commit-gate run, ship). It never commits or pushes. A conflict leaves the markers in the worktree and exits 1 naming the files; an existing branch exits 1; a missing patch or leaf exits 2. Document it in runtime-reference.md's operator commands.",
   "id": "cli-land-patch",
   "kind": "feature",
   "priority_class": "stability",
