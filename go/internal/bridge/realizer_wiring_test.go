@@ -80,7 +80,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// substring can't match inside --model). Model "sonnet" resolves via
 			// the legacy ladder → balanced → offline default; the display-name
 			// token is shell-quoted by launchCmdLine.
-			want:   "agy --model 'Gemini 3.7 Flash (High)' --dangerously-skip-permissions",
+			want:   "agy --model 'Gemini 3.8 Flash (High)' --dangerously-skip-permissions",
 			absent: []string{" -m ", "--setting-sources", "--plugin-dir", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 		{

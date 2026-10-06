@@ -43,7 +43,8 @@ override per-phase.
 |---|---|---|---|---|
 | `claude-p` / `claude-tmux` | — | — | — | `haiku` (claude-p) |
 | `codex` / `codex-tmux` | `model_tier_map.fast` | `model_tier_map.balanced` | `model_tier_map.deep` | empty (auth-determined) — the ids are declared ONCE in `go/internal/bridge/manifests/codex-tmux.json` (the family table every codex reader resolves through; the CHANGELOG is the value history) |
-| `agy` / `agy-tmux` | `gemini-3.5-flash` | `gemini-3.5-flash` | `gemini-3.5-flash` | `gemini-3.5-flash` (deep-tier string pending live `-m` validation) |
+| `agy-tmux` | `Gemini 3.8 Flash (Low)` | `Gemini 3.8 Flash (High)` | `Gemini 3.1 Pro (High)` (top too) | `gemini-3.5-flash`, inert: the field is parsed and never read; the realized `--model` comes from `model_tier_map` in `go/internal/bridge/manifests/agy-tmux.json` (the CHANGELOG is the value history; 3.8 Flash since 2026-10-05) |
+| `agy` (headless) | `gemini-3.5-flash` | `gemini-3.5-flash` | `gemini-3.5-flash` | `gemini-3.5-flash`; documentary only: the headless driver has no model flag (`params.model_tier` channel `noop`) |
 | `ollama-tmux` | `qwen3:7b` | `qwen3:30b` | `qwen3-coder:30b` | `llama3.1:8b` |
 
 > **ollama cloud routing is by MODEL TAG**, not env: `gpt-oss:120b-cloud` hits

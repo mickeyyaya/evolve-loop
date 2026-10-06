@@ -68,6 +68,7 @@ type CLIEntry struct {
 	// unchanged. Absent never matches, so pre-existing catalogs classify once
 	// and then stabilize.
 	CandidatesHash string `json:"candidates_hash,omitempty"`
+	FallbackReason string `json:"fallback_reason,omitempty"`
 }
 
 // modelForTier resolves the entry's model for tier: the primary TierModels

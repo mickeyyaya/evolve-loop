@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
@@ -80,41 +81,63 @@ func runModelsRefresh(args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return 10
 	}
+	if o.Source != "live" && o.Source != "" && o.Source != "detect" {
+		fmt.Fprintf(stderr, "evolve models refresh: unknown --source %q (live|detect)\n", o.Source)
+		return 10
+	}
 	ctx := context.Background()
 	rep := setup.Detect(ctx, setup.DetectOptions{
 		ProjectRoot: o.Project, EvolveDir: o.EvolveDir, PluginRoot: o.Plugin, AdaptersDir: o.Adapters,
 	})
-
-	var (
-		cat    modelcatalog.Catalog
-		err    error
-		srcLbl string
-	)
-	switch o.Source {
-	case "detect":
-		cat, srcLbl = detectRefresh(rep), "setup detect"
-	case "live", "":
-		srcLbl = "live /model (detect fallback)"
-		// The live catalog is the prior: its candidates_hash lets an
-		// unchanged offering reuse the stored tier map with zero
-		// classifier calls. A read failure just means no reuse.
-		prior, _ := modelcatalog.Read(o.EvolveDir)
-		cat, err = liveRefresh(ctx, rep, o.Project, o.EvolveDir, prior, stderr)
-	default:
-		fmt.Fprintf(stderr, "evolve models refresh: unknown --source %q (live|detect)\n", o.Source)
-		return 10
+	if o.Source == "detect" {
+		return commitAndReport(o, detectRefresh(rep), "setup detect", stdout, stderr)
 	}
+	// The live catalog is the prior: its candidates_hash lets an
+	// unchanged offering reuse the stored tier map with zero
+	// classifier calls. A read failure just means no reuse.
+	prior, _ := modelcatalog.Read(o.EvolveDir)
+	cat, err := liveRefresh(ctx, rep, o.Project, o.EvolveDir, prior, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
 		return 1
 	}
+	return finishLiveRefresh(o, cat, stdout, stderr)
+}
+
+func finishLiveRefresh(o modelsOpts, cat modelcatalog.Catalog, stdout, stderr io.Writer) int {
+	live, fallback := countLiveAndFallback(cat)
+	if live > 0 {
+		return commitAndReport(o, cat, fmt.Sprintf("live /model; %d live, %d detect fallback", live, fallback), stdout, stderr)
+	}
+	fmt.Fprintf(stderr, "evolve models refresh: no ready CLI was classified live (%d detect fallback); the catalog on disk is unchanged — each CLI's fallback reason is listed\n", fallback)
+	if o.AsJSON {
+		emitCatalogJSON(cat, stdout, stderr)
+		return 1
+	}
+	fmt.Fprintf(stdout, "Model catalog NOT refreshed (source: live /model) → 0 of %d CLI(s) classified live:\n", len(cat.CLIs))
+	printCatalogHuman(stdout, cat)
+	return 1
+}
+
+func countLiveAndFallback(cat modelcatalog.Catalog) (live, fallback int) {
+	for _, e := range cat.CLIs {
+		if e.Source == modelcatalog.SourceLive {
+			live++
+		} else {
+			fallback++
+		}
+	}
+	return live, fallback
+}
+
+func commitAndReport(o modelsOpts, cat modelcatalog.Catalog, srcLbl string, stdout, stderr io.Writer) int {
 	// Commit is the one write seam: it carries operator-authored tier_fallbacks
 	// forward (the refresh rebuilds the catalog wholesale) and retains the
 	// outgoing catalog for rollback. The cycle-start auto-refresh goes through
 	// the same call — do not re-inline Read/MergeFallbacks/Write here. Its
 	// return value is what actually LANDED, chains merged in; reporting `cat`
 	// below would show the operator a catalog missing those chains.
-	cat, err = modelcatalog.Commit(o.EvolveDir, cat, stderr)
+	cat, err := modelcatalog.Commit(o.EvolveDir, cat, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve models refresh: %v\n", err)
 		return 1
@@ -188,11 +211,19 @@ func printCatalogHuman(w io.Writer, cat modelcatalog.Catalog) {
 		tm := e.TierModels
 		fmt.Fprintf(w, "  %-8s fast=%-16s balanced=%-16s deep=%s\n",
 			cli, dash(tm["fast"]), dash(tm["balanced"]), dash(tm["deep"]))
+		fmt.Fprintf(w, "  %-8s source: %s\n", "", sourceLabel(e))
 		// An operator can only notice a CLI's offering moved if this prints it.
 		if len(e.Efforts) > 0 {
 			fmt.Fprintf(w, "  %-8s efforts: %s\n", "", strings.Join(e.Efforts, ", "))
 		}
 	}
+}
+
+func sourceLabel(e modelcatalog.CLIEntry) string {
+	if e.FallbackReason != "" {
+		return "detect fallback, reason=" + evolog.DiagnosticField(e.FallbackReason)
+	}
+	return dash(e.Source)
 }
 
 func dash(s string) string {

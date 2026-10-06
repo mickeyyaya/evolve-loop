@@ -4,6 +4,7 @@ package modelquery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -47,46 +48,54 @@ func Refresh(ctx context.Context, deps RefreshDeps) (modelcatalog.Catalog, error
 
 	snaps := make([]modelcatalog.CLISnapshot, 0, len(deps.CLIs))
 	for _, cli := range deps.CLIs {
-		efforts := discoverEfforts(ctx, cli, deps, log)
-		tiers, available, hash := liveTiers(ctx, cli, deps, log)
-		if len(tiers) > 0 {
-			snaps = append(snaps, modelcatalog.CLISnapshot{
-				CLI: cli, Ready: true, TierModels: tiers,
-				Available: available, Efforts: efforts,
-				Source:         modelcatalog.SourceLive,
-				CandidatesHash: hash,
-			})
-			continue
+		if snap, ok := snapshotFor(ctx, cli, deps, log); ok {
+			snaps = append(snaps, snap)
 		}
-		fb := deps.Fallback[cli]
-		if len(fb) == 0 {
-			fmt.Fprintf(log, "[modelquery] WARN %s: no live models and no fallback; skipping\n", cli)
-			continue
-		}
-		fmt.Fprintf(log, "[modelquery] WARN %s: live query unavailable; using detect fallback\n", cli)
-		snaps = append(snaps, modelcatalog.CLISnapshot{
-			CLI: cli, Ready: true, TierModels: fb, Efforts: efforts,
-			Source: modelcatalog.SourceDetect,
-		})
 	}
 	return modelcatalog.BuildFromSnapshots(snaps, now().UTC()), nil
 }
 
-func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer) (tiers map[string]string, available []string, hash string) {
+func snapshotFor(ctx context.Context, cli string, deps RefreshDeps, log io.Writer) (modelcatalog.CLISnapshot, bool) {
+	efforts := discoverEfforts(ctx, cli, deps, log)
+	live, err := liveTiers(ctx, cli, deps)
+	if err == nil {
+		return modelcatalog.CLISnapshot{
+			CLI: cli, Ready: true, TierModels: live.tiers,
+			Available: live.available, Efforts: efforts,
+			Source:         modelcatalog.SourceLive,
+			CandidatesHash: live.hash,
+		}, true
+	}
+	fb := deps.Fallback[cli]
+	if len(fb) == 0 {
+		fmt.Fprintf(log, "[modelquery] WARN %s: %v; no detect fallback, skipping\n", cli, err)
+		return modelcatalog.CLISnapshot{}, false
+	}
+	fmt.Fprintf(log, "[modelquery] WARN %s: %v; using detect fallback\n", cli, err)
+	return modelcatalog.CLISnapshot{
+		CLI: cli, Ready: true, TierModels: fb, Efforts: efforts,
+		Source: modelcatalog.SourceDetect, FallbackReason: err.Error(),
+	}, true
+}
+
+type liveResult struct {
+	tiers     map[string]string
+	available []string
+	hash      string
+}
+
+func liveTiers(ctx context.Context, cli string, deps RefreshDeps) (liveResult, error) {
 	ids, err := deps.Lister.List(ctx, cli)
 	if err != nil {
-		fmt.Fprintf(log, "[modelquery] WARN %s: list models: %v\n", cli, err)
-		return nil, nil, ""
+		return liveResult{}, fmt.Errorf("list models: %w", err)
 	}
 	if len(ids) == 0 {
-		fmt.Fprintf(log, "[modelquery] WARN %s: CLI offered no models\n", cli)
-		return nil, nil, ""
+		return liveResult{}, errors.New("CLI offered no models")
 	}
 	if allowed := deps.AllowedFamilies[cli]; len(allowed) > 0 {
 		ids = FilterByFamily(ids, allowed...)
 		if len(ids) == 0 {
-			fmt.Fprintf(log, "[modelquery] WARN %s: no models in allowed families %v; skipping\n", cli, allowed)
-			return nil, nil, ""
+			return liveResult{}, fmt.Errorf("no models in allowed families %v", allowed)
 		}
 	}
 	fp := Fingerprint(FingerprintInput{
@@ -94,14 +103,17 @@ func liveTiers(ctx context.Context, cli string, deps RefreshDeps, log io.Writer)
 		Policy: deps.Freshness[cli], Tiers: modelcatalog.CanonicalTiers,
 	})
 	if prior, ok := deps.Prior.CLIs[cli]; ok && isReusablePrior(prior, fp) {
-		return prior.TierModels, ids, fp
+		return liveResult{tiers: prior.TierModels, available: ids, hash: fp}, nil
 	}
 	mapped, err := deps.Classifier.Classify(ctx, cli, ids)
 	if err != nil {
-		fmt.Fprintf(log, "[modelquery] WARN %s: classify models: %v\n", cli, err)
-		return nil, ids, ""
+		return liveResult{}, fmt.Errorf("classify models: %w", err)
 	}
-	return CompleteTiers(PromoteLatest(mapped, ids, deps.Freshness[cli])), ids, fp
+	tiers := CompleteTiers(PromoteLatest(mapped, ids, deps.Freshness[cli]))
+	if len(tiers) == 0 {
+		return liveResult{}, errors.New("classify models: no tier mapped to an offered model")
+	}
+	return liveResult{tiers: tiers, available: ids, hash: fp}, nil
 }
 
 func isReusablePrior(prior modelcatalog.CLIEntry, fp string) bool {
