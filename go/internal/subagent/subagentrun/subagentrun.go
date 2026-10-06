@@ -50,6 +50,8 @@ const (
 	ChallengeTokenBytes  = 8
 )
 
+var ErrRouteRefused = errors.New("subagent/run: the CLI routing table refuses the launch")
+
 var ErrInProcessDispatchBanned = errors.New(
 	"subagent/run: in-process dispatch (LEGACY_AGENT_DISPATCH) is retired — all agent dispatch must go through the bridge (`evolve subagent run`); unset LEGACY_AGENT_DISPATCH",
 )

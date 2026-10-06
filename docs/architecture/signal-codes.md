@@ -173,6 +173,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LIVENESS_PANE_EXHAUSTED` | a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85) |
 | `LIVENESS_PANE_HUNG` | a tmux pane is hung: no progress and no completion (LivenessCenter edge: hung) |
 | `LIVENESS_PANE_STAGNANT` | a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant) |
+| `LIVENESS_PHASE_STALLED` | the per-phase observer saw no progress for the stall threshold, between the bridge's review checkpoints: for a tmux phase the pane-watch snapshot's transcript hash stopped changing (kind pane.liveness), for a headless phase the stdout log and workspace stopped growing (kind observer.warning); log and signal only, nothing is killed; fields source (pane | stdout), session, busy, stall_s |
 
 ### loop
 
@@ -186,7 +187,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_CHAIN_QUOTA_DEFER` | a chained batch exited with the resumable rc=5 quota-pause code; the chain defers instead of relaunching into the wall (resume with evolve loop --resume); fields.batch, cycle, wake_at, source are the checkpoint block's (empty when no block is on disk) |
 | `LOOP_ESCALATION_BOUNDARY` | the escalation boundary staged inbox items (bumped/filed/planned) after a cycle; fields carry the counts and the stage |
 | `LOOP_FLEET_LANE_HALT` | a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed |
-| `LOOP_HALT` | the batch halted at a wave boundary (plane diverged, sync refused); the reason is the halt error |
+| `LOOP_HALT` | the batch halted at a boundary (plane diverged, sync refused, main CI red, disk below the floor, or a boundary CLI update whose smoke test failed: fields.families and fields.versions name it); the reason is the halt error |
 | `LOOP_MIN_WIDTH_REPAIR` | the fleet shrank below its committed width and one isolated lane was dispatched instead (min-width repair) |
 | `LOOP_PIPELINE_BLOCKER_HALT` | the pipeline-blocker breaker halted the batch (identical fingerprints, unexplained failures or consecutive failures over the ceiling); fields.rule and fields.fingerprint name the rule, the rest are the system-failure halt's own fields (next, escalation, inbox_item) |
 | `LOOP_SYSTEM_FAILURE_HALT` | the batch halted on an ADR-0072 system failure the cycle itself signalled (the pipeline, not the task, is the cause); fields.category names the floor, fields.next is the escalation dossier's next_action, fields.escalation and fields.inbox_item the dossier and the P0 item the halt wrote |

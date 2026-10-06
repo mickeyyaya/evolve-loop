@@ -30,7 +30,7 @@ func ExecTmuxKill(ctx context.Context, session string) error {
 	if session == "" {
 		return fmt.Errorf("refusing to kill tmux session with empty name (tmux would resolve it to the caller's own session)")
 	}
-	_ = tmuxRun(ctx, bridge.TmuxSocketArgs("kill-session", "-t", session)...)
+	_ = tmuxRun(ctx, bridge.TmuxSocketArgs("kill-session", "-t", bridge.ExactSessionTarget(session))...)
 	return nil
 }
 

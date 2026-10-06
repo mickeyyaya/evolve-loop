@@ -2,17 +2,44 @@ package commitgate
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
+	"time"
 )
 
 var nodeExts = []string{".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 
+const defaultLintBudget = 10 * time.Minute
+
 func lookPathDefault(tool string) (string, error) { return exec.LookPath(tool) }
+
+func (o Options) lintBudget() time.Duration {
+	if o.LintBudget > 0 {
+		return o.LintBudget
+	}
+	return defaultLintBudget
+}
+
+func (o Options) runGolangciLint(ctx context.Context, mod string, pkgs []string, res *Result) bool {
+	budget := o.lintBudget()
+	lintCtx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	out, ok := o.runCmd(lintCtx, mod, "golangci-lint", append([]string{"run", "--allow-serial-runners"}, pkgs...)...)
+	if errors.Is(lintCtx.Err(), context.DeadlineExceeded) {
+		res.log("golangci-lint waited %s for another run's lock or its own lint, and was stopped\n%s", budget, out)
+		return false
+	}
+	if !ok {
+		res.log("golangci-lint failed\n%s", out)
+		return false
+	}
+	return true
+}
 
 func (o Options) fileExists(rel string) bool {
 	_, err := os.Stat(filepath.Join(o.RepoRoot, rel))
@@ -73,8 +100,7 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 			return ExitFail
 		}
 		if o.have("golangci-lint") {
-			if out, ok := o.runCmd(ctx, mod, "golangci-lint", append([]string{"run"}, pkgs...)...); !ok {
-				res.log("golangci-lint failed\n%s", out)
+			if !o.runGolangciLint(ctx, mod, pkgs, res) {
 				return ExitFail
 			}
 			glc = true

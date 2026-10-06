@@ -13,6 +13,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 var itTmuxCtl = execTmux{}
@@ -62,11 +64,9 @@ while IFS= read -r line; do
 done
 `, marker)
 	path := filepath.Join(dir, "fake-repl-"+mode+".sh")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake repl: %v", err)
-	}
+	fakeclitest.Install(t, path, script)
 	// launch command carries ONLY the mode — never the marker (see above).
-	return fmt.Sprintf("%s %s", path, mode)
+	return path + " " + mode
 }
 
 // itConfig builds a fully-populated Config rooted under a fresh temp dir,

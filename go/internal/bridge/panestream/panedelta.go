@@ -3,6 +3,8 @@
 package panestream
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"strings"
 )
@@ -29,7 +31,10 @@ type PaneProfile struct {
 	// IdlePlaceholder appears only while the REPL is idle at its prompt; PaneBusy reads its absence as busy.
 	IdlePlaceholder string
 	// ExhaustedRegex is the CLI's quota-wall pattern from the bridge manifest; empty disables exhaustion detection.
-	ExhaustedRegex string
+	ExhaustedRegex  string
+	BusyLineRegex   string
+	TokenLineRegex  string
+	ModelLabelRegex string
 }
 
 // Profiles holds the tuned PaneProfile for each supported tmux LLM CLI.
@@ -54,7 +59,11 @@ var busySpinnerStatsRE = regexp.MustCompile(`\(\s*\d[\d hms]*·\s*[↑↓]\s*[\d
 // PaneBusy reports whether the CLI is generating a turn: an affordance line shows, or IdlePlaceholder is set and absent.
 func PaneBusy(rendered string, p PaneProfile) bool {
 	clean := stripANSI(rendered)
-	for _, line := range strings.Split(clean, "\n") {
+	lines := strings.Split(clean, "\n")
+	if hasBusyLine(lines, p) {
+		return true
+	}
+	for _, line := range lines {
 		if IsAffordanceLine(line) {
 			return true
 		}
@@ -72,13 +81,22 @@ func PaneHasSubstantiveChange(prev, cur string) bool {
 
 // cleanPane drops affordance lines too, so a ticking spinner-stats clock never reads as progress.
 func cleanPane(pane string) string {
+	return cleanPaneFor(pane, PaneProfile{})
+}
+
+func cleanPaneFor(pane string, p PaneProfile) string {
 	var lines []string
-	for _, line := range strings.Split(pane, "\n") {
+	for _, line := range normalizedLines(pane, p) {
 		if IsContentLine(line) {
 			lines = append(lines, line)
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func ProgressHash(rendered string, p PaneProfile) string {
+	sum := sha256.Sum256([]byte(cleanPaneFor(rendered, p)))
+	return hex.EncodeToString(sum[:])
 }
 
 // PaneDelta yields only the content lines that are new in each successive snapshot.
@@ -149,8 +167,7 @@ func lastIndexOf(s []string, want string) int {
 // stableLines returns the region above the last boundary line minus a trailing volatile run; with
 // no boundary, the last volatileFallbackRows rows are volatile.
 func stableLines(rendered string, p PaneProfile) []string {
-	clean := stripANSI(rendered)
-	lines := strings.Split(clean, "\n")
+	lines := normalizedLines(rendered, p)
 
 	// capture-pane pads the pane to full height with blank rows.
 	end := len(lines)
@@ -162,19 +179,9 @@ func stableLines(rendered string, p PaneProfile) []string {
 		return nil
 	}
 
-	isBoundary := func(ln string) bool {
-		trimmed := strings.TrimLeft(ln, " \t")
-		if p.BoundaryExact {
-			return strings.TrimSpace(trimmed) == p.BoundaryMarker
-		}
-		return strings.HasPrefix(trimmed, p.BoundaryMarker)
-	}
-
-	lastMarker := -1
-	for i, ln := range lines {
-		if isBoundary(ln) {
-			lastMarker = i
-		}
+	lastMarker := LastMarkerLine(lines, p.BoundaryMarker)
+	if p.BoundaryExact {
+		lastMarker = lastLineWhere(lines, func(trimmed string) bool { return strings.TrimSpace(trimmed) == p.BoundaryMarker })
 	}
 
 	if lastMarker < 0 {
@@ -185,6 +192,19 @@ func stableLines(rendered string, p PaneProfile) []string {
 		return trimVolatileTail(lines[:cut])
 	}
 	return trimVolatileTail(lines[:lastMarker])
+}
+
+func LastMarkerLine(lines []string, marker string) int {
+	return lastLineWhere(lines, func(trimmed string) bool { return strings.HasPrefix(trimmed, marker) })
+}
+
+func lastLineWhere(lines []string, match func(trimmed string) bool) int {
+	for i := len(lines) - 1; i >= 0; i-- {
+		if match(strings.TrimLeft(lines[i], " \t")) {
+			return i
+		}
+	}
+	return -1
 }
 
 // trimVolatileTail makes the stable region end at the last content line in both the thinking and

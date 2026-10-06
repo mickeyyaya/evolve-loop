@@ -25,7 +25,7 @@ func checkBridgeBoot(o resolved) CheckResult {
 	}
 
 	var bootable []string
-	for _, d := range distinctDrivers(o.profileLister, o.profileGetter) {
+	for _, d := range o.drivers() {
 		if bridge.IsTmuxDriver(d) {
 			bootable = append(bootable, d)
 		}

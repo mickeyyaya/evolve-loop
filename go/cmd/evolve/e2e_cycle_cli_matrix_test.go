@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 // expectedPhasesHappyPath is what the state machine drives on PASS-all.
@@ -365,9 +367,7 @@ git add -A
 git commit --allow-empty -m "$msg" >/dev/null
 echo "fake-ship: committed class=$class msg=$msg"
 `
-	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
-		t.Fatalf("write fake ship: %v", err)
-	}
+	fakeclitest.Install(t, path, body)
 	return path
 }
 

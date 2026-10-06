@@ -26,6 +26,7 @@ func TestPendingAtInputLine(t *testing.T) {
 		{"sub-floor echo below the rune floor", "❯ yes", []string{"y"}, false},
 		{"echo one rune below the floor", "❯ abcdefg and more", []string{"abcdefg"}, false},
 		{"echo exactly at the rune floor still matches", "❯ abcdefgh and more", []string{"abcdefgh"}, true},
+		{"indented input line", "  ❯ " + nudge, []string{nudge}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -118,57 +118,32 @@ func TestAmp_AgyDetector_OscillationSpinnerAnswerSpinner(t *testing.T) {
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 	answerFrame := testdataFrame(t, "agy/answer.txt")
 
-	det.Assess(answerFrame, p)  // prime
-	base.Assess(answerFrame, p) // prime (oracle)
-
-	s1, c1 := det.Assess(thinkingFrame, p)
-	bs1, _ := base.Assess(thinkingFrame, p)
-	if s1 != LivenessConverging {
-		t.Errorf("oscillation [step 1, spinner]: got %v (conf %.2f), want LivenessConverging", s1, c1)
-	}
-	if s1 == bs1 {
-		t.Errorf("oscillation [step 1]: AgyDetector and DefaultDetector both returned %v; "+
-			"AgyDetector must upgrade to Converging on spinner while DefaultDetector does not", s1)
-	}
-
-	// DefaultDetector itself reads Converging here, so the check is parity, not a fixed state.
-	s2Det, c2Det := det.Assess(answerFrame, p)
-	s2Base, c2Base := base.Assess(answerFrame, p)
-	if s2Det != s2Base {
-		t.Errorf("oscillation [step 2, answer after spinner]: AgyDetector %v != DefaultDetector %v; "+
-			"answer frame must be byte-identical to DefaultDetector (AC2)", s2Det, s2Base)
-	}
-	if c2Det != c2Base {
-		t.Errorf("oscillation [step 2]: conf %.2f != DefaultDetector %.2f; must be byte-identical", c2Det, c2Base)
-	}
-
-	s3, c3 := det.Assess(thinkingFrame, p)
-	if s3 != LivenessConverging {
-		t.Errorf("oscillation [step 3, spinner again after answer]: got %v (conf %.2f), want LivenessConverging; "+
-			"spinner signal must re-fire after an intervening answer frame", s3, c3)
-	}
-	if c3 < 0.9 {
-		t.Errorf("oscillation [step 3]: conf=%.2f, want >=0.9 (spinner must restore full uplift)", c3)
+	for i, frame := range []string{answerFrame, thinkingFrame, answerFrame, thinkingFrame} {
+		detState, detConf := det.Assess(frame, p)
+		baseState, baseConf := base.Assess(frame, p)
+		if detState != baseState || detConf != baseConf {
+			t.Errorf("step %d: AgyDetector (%v, %.2f) != DefaultDetector (%v, %.2f); a spinner frame is busy evidence, never a progress uplift",
+				i, detState, detConf, baseState, baseConf)
+		}
 	}
 }
 
-func TestAmp_AgyDetector_RepeatedSpinnerFramesAllConverging(t *testing.T) {
+func TestAmp_AgyDetector_RepeatedFrozenSpinnerFramesWalkToHung(t *testing.T) {
 	p := Profiles["agy"]
 	det := NewAgyDetector(3)
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 
-	det.Assess(thinkingFrame, p) // prime
+	det.Assess(thinkingFrame, p)
 
-	const reps = 6
-	for i := 1; i <= reps; i++ {
-		state, conf := det.Assess(thinkingFrame, p)
-		if state != LivenessConverging {
-			t.Errorf("rep %d/%d: got %v, want LivenessConverging; "+
-				"spinner must produce Converging on each subsequent call, not just the first", i, reps, state)
+	var state LivenessState
+	for i := 1; i <= 6; i++ {
+		state, _ = det.Assess(thinkingFrame, p)
+		if state == LivenessConverging {
+			t.Fatalf("rep %d: a frozen spinner frame read Converging; the spinner proves the TUI draws, not that the agent progresses", i)
 		}
-		if conf < 0.9 {
-			t.Errorf("rep %d/%d: conf=%.2f, want ≥0.9 (confidence must not degrade on repetition)", i, reps, conf)
-		}
+	}
+	if state != LivenessHung {
+		t.Errorf("after 6 identical spinner frames got %v, want Hung", state)
 	}
 }
 
@@ -241,39 +216,34 @@ func TestAmp_AgyDetector_WithNonAgyProfile(t *testing.T) {
 	}
 }
 
-func TestAmp_AgyDetector_SpinnerOverridesHighStallThreshold(t *testing.T) {
+func TestAmp_AgyDetector_FrozenSpinnerHonoursTheStallThreshold(t *testing.T) {
 	p := Profiles["agy"]
-	det := NewAgyDetector(100) // extreme threshold: DefaultDetector almost never Hung
+	det := NewAgyDetector(100)
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 
-	det.Assess(thinkingFrame, p) // prime
+	det.Assess(thinkingFrame, p)
 
-	state, conf := det.Assess(thinkingFrame, p)
-	if state != LivenessConverging {
-		t.Errorf("spinner with stallThreshold=100: got %v, want LivenessConverging; "+
-			"spinner convergence must be independent of the stall threshold — spinner layer must override", state)
-	}
-	if conf < 0.9 {
-		t.Errorf("spinner with stallThreshold=100: conf=%.2f, want ≥0.9 (no degradation from high threshold)", conf)
+	state, _ := det.Assess(thinkingFrame, p)
+	if state != LivenessBusyButStagnant {
+		t.Errorf("frozen spinner with stallThreshold=100: got %v, want BusyButStagnant until the threshold is reached", state)
 	}
 }
 
-func TestAmp_AgyDetector_GeneratingConfidenceStrictlyAboveDefault(t *testing.T) {
+func TestAmp_AgyDetector_GeneratingConfidenceEqualsDefault(t *testing.T) {
 	p := Profiles["agy"]
 	thinkingFrame := testdataFrame(t, "agy/thinking.txt")
 
 	det := NewAgyDetector(3)
 	base := NewDefaultDetector(3)
 
-	det.Assess(thinkingFrame, p)  // prime
-	base.Assess(thinkingFrame, p) // prime
+	det.Assess(thinkingFrame, p)
+	base.Assess(thinkingFrame, p)
 
 	_, detConf := det.Assess(thinkingFrame, p)
 	_, baseConf := base.Assess(thinkingFrame, p)
 
-	if detConf <= baseConf {
-		t.Errorf("NewAgyDetector generating frame: conf %.2f must be strictly > DefaultDetector %.2f; "+
-			"spinner uplift must apply via direct NewAgyDetector construction, not only via DetectorFor", detConf, baseConf)
+	if detConf != baseConf {
+		t.Errorf("generating frame: conf %.2f must equal DefaultDetector %.2f; the spinner carries no progress uplift", detConf, baseConf)
 	}
 }
 

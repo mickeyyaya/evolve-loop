@@ -73,6 +73,8 @@ type Options struct {
 	// Signals receives the mover's inbox.warning events; nil prints the legacy
 	// [inbox-mover] line instead, so nothing goes silent on a Center-less root.
 	Signals *signalcenter.Center
+
+	PriorityClasses []string
 }
 
 func (o *Options) resolveOpts() {
@@ -157,6 +159,7 @@ func (o Options) mover() *lifecycle.Mover {
 		}),
 		lifecycle.WithSignals(func() *signalcenter.Center { return o.Signals }),
 		lifecycle.WithMainHead(o.MainHeadFn),
+		lifecycle.WithPriorityClasses(o.PriorityClasses),
 		lifecycle.WithBinding(func(taskID string) (bool, error) {
 			_, bound, err := continuation.ReadRegistryEntry(o.ProjectRoot, taskID)
 			return bound, err

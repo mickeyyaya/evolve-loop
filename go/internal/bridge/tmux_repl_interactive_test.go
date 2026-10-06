@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 // writeInteractiveFake writes a per-scenario fake CLI. Everything is BAKED
@@ -72,10 +74,8 @@ fi
 while IFS= read -r _; do :; done
 `, marker, promptText, expect, timing, mode)
 	path := filepath.Join(dir, "fake-interactive.sh")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write interactive fake: %v", err)
-	}
-	return path // no args: all behavior is baked in
+	fakeclitest.Install(t, path, script)
+	return path
 }
 
 func interactiveLaunch(cli, session, launchCmd, marker string, tickDuringBoot bool) tmuxLaunch {

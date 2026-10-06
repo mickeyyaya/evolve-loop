@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute/cliroutetest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -18,7 +20,6 @@ import (
 var updateLegacyPlans = flag.Bool("update", false, "rewrite the legacy dispatch-plan golden")
 
 func TestLegacyDispatchPlans_MatchTheGolden(t *testing.T) {
-	resetUniversalFallbackDefaults(t)
 	t.Setenv("EVOLVE_CLI", "")
 	t.Setenv("EVOLVE_CLI_HEALTH", "")
 	profileDir, agents := cliroutetest.TrackedProfiles(t)
@@ -28,17 +29,31 @@ func TestLegacyDispatchPlans_MatchTheGolden(t *testing.T) {
 	var runnerRecords, chainRecords []cliroutetest.Record
 	for _, v := range cliroutetest.Variants() {
 		root := v.ProjectRoot(t, cliroutetest.PhasesOf(agents))
-		pol := v.Policy(t, root)
+		router := goldenRouter(t, v, v.Policy(t, root), profileDir)
 		t.Setenv("PATH", v.PathDir(t))
 		for _, agent := range agents {
-			runnerRecords = append(runnerRecords, runnerLegacyRecord(t, v, pol, root, profileDir, agent))
-			chainRecords = append(chainRecords, bridgechainLegacyRecord(v, pol, root, profileDir, agent))
+			runnerRecords = append(runnerRecords, runnerLegacyRecord(t, v, router, root, profileDir, agent))
+			chainRecords = append(chainRecords, bridgechainLegacyRecord(v, router, root, agent))
 		}
 	}
 	cliroutetest.AssertGolden(t, append(runnerRecords, chainRecords...), *updateLegacyPlans)
 }
 
-func runnerLegacyRecord(t *testing.T, v cliroutetest.Variant, pol policy.Policy, root, profileDir, agent string) cliroutetest.Record {
+func goldenRouter(t *testing.T, v cliroutetest.Variant, pol policy.Policy, profileDir string) *cliroute.Router {
+	t.Helper()
+	router, _, err := cliroute.Build(cliroute.Setup{
+		Policy: pol, Profiles: profiles.NewFromDir(profileDir),
+		Host: cliroute.Host{Discover: v.RawDiscover, Bench: func(root, label string, plan llmroute.Plan, env map[string]string) llmroute.Plan {
+			return bridgechain.ApplyCLIHealthBench(root, label, plan, env, cliroutetest.Now, nil)
+		}},
+	})
+	if err != nil {
+		t.Fatalf("variant %s: Build: %v", v.Name, err)
+	}
+	return router
+}
+
+func runnerLegacyRecord(t *testing.T, v cliroutetest.Variant, router *cliroute.Router, root, profileDir, agent string) cliroutetest.Record {
 	t.Helper()
 	phase := cliroutetest.PhaseOf(agent)
 	prof, err := profiles.NewFromDir(profileDir).Get(agent)
@@ -51,9 +66,8 @@ func runnerLegacyRecord(t *testing.T, v cliroutetest.Variant, pol policy.Policy,
 		ResolveLLM: func(string, resolvellm.Options) (resolvellm.Result, error) {
 			return resolvellm.Result{}, cliroutetest.ErrDeclineAuto
 		},
-		UniversalFallback: pol.WorkflowConfig().UniversalFallback,
-		DiscoverCLIsFn:    v.ProductionDiscover(pol),
-		Diag:              log.Console{Out: io.Discard, Err: io.Discard},
+		Router: router,
+		Diag:   log.Console{Out: io.Discard, Err: io.Discard},
 	})
 	prep := phasePreparation{
 		phase: phase, profileDir: profileDir, profileName: agent,
@@ -73,17 +87,13 @@ func runnerLegacyRecord(t *testing.T, v cliroutetest.Variant, pol policy.Policy,
 	return cliroutetest.PlanRecord(cliroutetest.ResolverRunner, v.Name, agent, phase, resolved.plan)
 }
 
-func bridgechainLegacyRecord(v cliroutetest.Variant, pol policy.Policy, root, profileDir, agent string) cliroutetest.Record {
-	discover := v.ProductionDiscover(pol)
-	resolve := bridgechain.DefaultPlanResolver(profileDir, func() []string {
-		if discover == nil {
-			return nil
-		}
-		return discover()
-	}, v.LookPath, cliroutetest.Now, nil)
-	plan := resolve(core.BridgeRequest{
+func bridgechainLegacyRecord(v cliroutetest.Variant, router *cliroute.Router, root, agent string) cliroutetest.Record {
+	plan, err := bridgechain.DefaultPlanResolver(router)(core.BridgeRequest{
 		Agent: agent, Model: cliroutetest.DefaultModel, CLI: v.CallerCLI,
 		Env: v.EnvFor(agent), ProjectRoot: root,
 	})
+	if err != nil {
+		return cliroutetest.ErrorRecord(cliroutetest.ResolverBridgechain, v.Name, agent, "", err.Error())
+	}
 	return cliroutetest.PlanRecord(cliroutetest.ResolverBridgechain, v.Name, agent, "", plan)
 }

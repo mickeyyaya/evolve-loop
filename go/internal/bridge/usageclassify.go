@@ -64,3 +64,11 @@ func classifyTransientPane(driver, pane string) bool {
 	}
 	return matchExhausted(m.TransientRegex, pane)
 }
+
+func manifestTokenLineRegex(cli string) string {
+	m, err := LoadManifest(cli)
+	if err != nil {
+		return ""
+	}
+	return m.TokenLineRegex
+}

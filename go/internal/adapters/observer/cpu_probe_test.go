@@ -91,30 +91,3 @@ func TestReadPID(t *testing.T) {
 		t.Error("negative pid → not ok")
 	}
 }
-
-func TestAnyProbe(t *testing.T) {
-	t.Parallel()
-	tru := func() bool { return true }
-	fls := func() bool { return false }
-
-	if anyProbe()() {
-		t.Error("no probes → false")
-	}
-	if anyProbe(nil, nil)() {
-		t.Error("all-nil → false")
-	}
-	if anyProbe(fls, fls)() {
-		t.Error("all-false → false")
-	}
-	if !anyProbe(fls, tru)() {
-		t.Error("any true → true")
-	}
-
-	calls := 0
-	counting := func() bool { calls++; return false }
-	combined := anyProbe(tru, counting) // tru first would short-circuit a lazy OR
-	combined()
-	if calls != 1 {
-		t.Errorf("counting probe consulted %d times, want 1 (no short-circuit)", calls)
-	}
-}

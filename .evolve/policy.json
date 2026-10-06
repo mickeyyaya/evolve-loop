@@ -23,7 +23,7 @@
   "cli_health": {
     "proactive_probe": true
   },
-  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout and the operator keys forwarded to predicates, parallel-evaluate rollout, per-phase CLI/model pins, gc retention horizons).",
+  "description": "Evolve loop operator policy (ADR-0055 D3 floor gates + operator config: catalog refresh, ACS lane timeout and the operator keys forwarded to predicates, parallel-evaluate rollout, per-phase CLI/model pins, gc retention horizons, the inbox priority rank's class order and factor weights).",
   "disposition": {
     "stage": "enforce"
   },
@@ -51,6 +51,31 @@
     "worktrees": {
       "salvage_after_hours": 24
     }
+  },
+  "inbox_priority": {
+    "class_order": [
+      "correctness",
+      "stability",
+      "performance",
+      "debuggability",
+      "feature",
+      "maintainability",
+      "hygiene",
+      "security"
+    ],
+    "factors": {
+      "base": 0.45,
+      "class": 0.2,
+      "unblocks": 0.15,
+      "recurrence": 0.1,
+      "age": 0.05,
+      "goal": 0.05
+    },
+    "age_halflife_days": 30,
+    "unblocks_cap": 3,
+    "recurrence_cap": 5,
+    "active_campaigns": [],
+    "preempt_margin": 0.05
   },
   "parallel_evaluate": {
     "stage": "shadow",

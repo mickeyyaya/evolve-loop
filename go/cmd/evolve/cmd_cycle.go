@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
@@ -17,9 +16,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
-	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -50,6 +49,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
@@ -210,15 +210,10 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 
-	if !f.simulate {
-		gcOrphanSessions("cycle-start", stderr)
-	}
-
-	var d orchDeps
-	if f.simulate {
-		d = wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
-	} else {
-		d = wireOrchestratorDepsFn(projectRoot, evolveDir, stderr)
+	d := wireCycleRun(f, projectRoot, evolveDir, stderr)
+	if d.RoutingErr != nil {
+		fmt.Fprintf(stderr, "evolve cycle run: %v\n", d.RoutingErr)
+		return exitRoutingRefused
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
@@ -300,6 +295,14 @@ func warnCycleFailureOutcome(stderr io.Writer, cycle int, err error) {
 	}
 }
 
+func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writer) orchDeps {
+	if f.simulate {
+		return wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
+	}
+	gcOrphanSessions("cycle-start", stderr)
+	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr)
+}
+
 // filterEvolveEnv forwards to cmdutil.FilterEvolveEnv, the one definition the
 // internal/cli groups share.
 func filterEvolveEnv(environ []string) map[string]string {
@@ -317,7 +320,9 @@ type orchDeps struct {
 	// Bridge carries Signals into every engine it builds.
 	Bridge *bridge.Adapter
 	// Runners backs the per-runner Signals wiring proof; no production reader.
-	Runners map[core.Phase]core.PhaseRunner
+	Runners    map[core.Phase]core.PhaseRunner
+	Router     *cliroute.Router
+	RoutingErr error
 }
 
 // rootLedger is one object serving the core port and the inbox mover's
@@ -377,12 +382,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	loader := wiredRoutingConfigLoader(signals)
 	cfg, _ := loader.Load(registryPath, filterEvolveEnv(os.Environ()))
 
-	// policy.json can only add mandatory phases. A malformed policy WARNs here and
-	// fails loudly at the first dispatch, where the runner reloads it for pins.
 	var shipFloor []string // nil ⇒ router.DefaultShipFloor
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if policyErr != nil {
-		fmt.Fprintf(console, "[policy] WARN %v (mandatory merge skipped; fails loudly at dispatch)\n", policyErr)
+		fmt.Fprintf(console, "[policy] WARN %v (mandatory merge skipped; the routing table refuses it before any dispatch)\n", policyErr)
 		pol = policy.Policy{}
 	} else {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
@@ -402,38 +405,19 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
 	wfCfg := pol.WorkflowConfig()
 
-	// Set the universal-fallback seams once, before the constructors, so a phase
-	// whose CLI chain is absent on this host routes to a present LLM. Discovery is
-	// a memoized bridge.Doctor probe run lazily by the first phase that needs it.
-	runner.DefaultUniversalFallback = wfCfg.UniversalFallback
-	if wfCfg.UniversalFallback {
-		var discOnce sync.Once
-		var discovered []string
-		runner.DefaultDiscoverCLIsFn = func() []string {
-			discOnce.Do(func() {
-				// Bounded: a hung `<cli> --version` would wedge this sync.Once and stall the
-				// loop. A timeout degrades to no discovery, which fails loud.
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				rep, _ := gobridge.NewEngine(gobridge.Deps{}).Doctor(ctx, "", false)
-				discovered = universalFallbackTail(rep.Results, wfCfg.UniversalFallbackExclude)
-			})
-			return discovered
-		}
+	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm)
+	cliRouter, routingErr := wireCLIRouter(projectRoot, catalog, console)
+	if routingErr != nil {
+		return orchDeps{Signals: signals, RoutingErr: routingErr}
 	}
+	runner.DefaultRouter = cliRouter
 
 	// The CLI/tier fallback chain wraps the bridge handle once, and every consumer
 	// below launches through walked. The runner and the advisor walk their own
 	// chains, so they pass straight through.
 	diagf := func(format string, args ...any) { fmt.Fprintf(os.Stderr, format, args...) }
-	discover := func() []string {
-		if runner.DefaultDiscoverCLIsFn == nil {
-			return nil
-		}
-		return runner.DefaultDiscoverCLIsFn()
-	}
 	walked := bridgechain.New(br,
-		bridgechain.DefaultPlanResolver(filepath.Join(evolveDir, "profiles"), discover, nil, time.Now, diagf),
+		bridgechain.DefaultPlanResolver(cliRouter),
 		bridgechain.WithBench(func(root, ws, cli string, start time.Time, env map[string]string) {
 			bridgechain.BenchOnEscalation(root, ws, cli, start, env, time.Now, diagf)
 		}),
@@ -460,24 +444,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
 		// The ship-bind manifest gate is operator-activatable via gates.manifest_gate.
 		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
-		core.PhaseRetro: retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseRetro: retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter}),
 		// The debugger diagnoses a novel ShipError; optional, never on the spine.
 		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 
-	// User phases merge over the built-in catalog; only valid specs are routed and
-	// get a spec runner.
-	builtinCat, builtinErr := phasespec.Load(registryPath)
-	if builtinErr != nil {
-		// Non-fatal but loud: with no registry no builtin spec runner is wired, so a
-		// selectable phase would abort at dispatch.
-		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
-	}
-	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, prm)
-	catalog, mergeWarns := builtinCat.Merge(userSpecs)
-	for _, w := range append(discWarns, mergeWarns...) {
-		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
-	}
 	// Catalog-aware so user and minted phases get their spec-derived contract.
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
 	// catalog.Get is bound to this pre-mint catalog value; the catalog publisher
@@ -502,7 +473,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// The routing advisor resolves {cli, model} like a phase: router profile, then
 	// policy. Plan decisions use the deep tier. A benched family falls back to
 	// claude; with claude benched too the advisor degrades to the static spine.
-	advCLI, advModel, advHealthy := resolveRouterDispatchHealthy(evolveDir, decisionPlan, benchedFamilies(projectRoot), routerCfg)
+	advCLI, advModel, advHealthy, advErr := resolveRouterDispatchHealthy(cliRouter, projectRoot, decisionPlan, benchedFamilies(projectRoot))
+	if advErr != nil {
+		return orchDeps{Signals: signals, RoutingErr: fmt.Errorf("the routing advisor has no route: %w", advErr)}
+	}
 	if !advHealthy {
 		fmt.Fprintf(os.Stderr, "[router] WARN router family and the claude fallback are both benched — advisor will degrade to the static spine\n")
 	}
@@ -528,12 +502,13 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.WithPlanner(advisor),
 		// Best-effort and gated on cfg.PhaseRecovery=enforce; below that it never
 		// dispatches.
-		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot)...)),
+		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot, cliRouter)...)),
 		// Feeds state.json:triageThroughput, the window the triage clamp bounds with.
 		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
 		// Re-bind the bridge's contract resolver on each mid-cycle mint, so a minted
 		// phase resolves its contract in the same cycle.
-		core.WithCatalogPublisher(catalogPublisher(br)),
+		core.WithCatalogPublisher(catalogPublisher(br, cliRouter)),
+		core.WithCLIRouter(cliRouter),
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
 			Bridge:       walked,
 			Prompts:      prm,
@@ -644,6 +619,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		Signals:      signals,
 		Bridge:       br,
 		Runners:      runners,
+		Router:       cliRouter,
 	}
 }
 
@@ -700,72 +676,61 @@ const (
 	decisionJudge                             // route-quality judge (fast)
 )
 
-// resolveRouterDispatchFor applies RouterPolicy's per-decision model override
-// to the base dispatch; the CLI is the same for every type.
-func resolveRouterDispatchFor(evolveDir string, dt routerDecisionType, rc policy.RouterPolicy) (cli, model string) {
-	cli, model = resolveRouterDispatch(evolveDir, rc)
-	switch dt {
-	case decisionPlan, decisionRePlan:
-		if rc.PlanModel != "" {
-			model = rc.PlanModel
-		}
-	case decisionPropose, decisionJudge:
-		if rc.ProposeModel != "" {
-			model = rc.ProposeModel
-		}
-	}
-	return cli, model
+const (
+	routerAgent        = "router"
+	routerDefaultModel = "opus"
+)
+
+func routerDecision(r *cliroute.Router, projectRoot string) (cliroute.Decision, error) {
+	return r.Resolve(cliroute.Request{
+		Agent: routerAgent, Launch: cliroute.LaunchAdvisor, ProjectRoot: projectRoot,
+		DefaultModel: routerDefaultModel, Env: filterEvolveEnv(os.Environ()),
+	})
 }
 
-// resolveRouterDispatchHealthy falls back to claude-tmux when the chosen family
-// is benched. With claude benched too it returns the base dispatch and
-// ok=false, and the advisor degrades to the static spine.
-func resolveRouterDispatchHealthy(evolveDir string, dt routerDecisionType, benched map[string]bool, rc policy.RouterPolicy) (cli, model string, ok bool) {
-	cli, model = resolveRouterDispatchFor(evolveDir, dt, rc)
-	if !benched[llmroute.Family(cli)] {
-		return cli, model, true
+func resolveRouterDispatch(r *cliroute.Router, projectRoot string) (cli, model string, err error) {
+	d, err := routerDecision(r, projectRoot)
+	if err != nil {
+		return "", "", err
 	}
-	if benched["claude"] {
-		// A usable dispatch even with ok=false, so a caller ignoring ok never gets "".
-		return cli, model, false
-	}
-	return "claude-tmux", model, true
+	return d.Plan.Candidates[0], d.Plan.Model, nil
 }
 
-// benchedFamilies is the set of families the clihealth store benches now.
+func resolveRouterDispatchFor(r *cliroute.Router, projectRoot string, dt routerDecisionType) (cli, model string, err error) {
+	cli, model, err = resolveRouterDispatch(r, projectRoot)
+	return cli, decisionModel(model, dt, r.Policy().RouterConfig()), err
+}
+
+func decisionModel(base string, dt routerDecisionType, rc policy.RouterPolicy) string {
+	switch {
+	case (dt == decisionPlan || dt == decisionRePlan) && rc.PlanModel != "":
+		return rc.PlanModel
+	case (dt == decisionPropose || dt == decisionJudge) && rc.ProposeModel != "":
+		return rc.ProposeModel
+	}
+	return base
+}
+
+func resolveRouterDispatchHealthy(r *cliroute.Router, projectRoot string, dt routerDecisionType, benched map[string]bool) (cli, model string, ok bool, err error) {
+	d, err := routerDecision(r, projectRoot)
+	if err != nil {
+		return "", "", false, err
+	}
+	model = decisionModel(d.Plan.Model, dt, r.Policy().RouterConfig())
+	for _, candidate := range d.Plan.Candidates {
+		if !benched[llmroute.Family(candidate)] {
+			return candidate, model, true, nil
+		}
+	}
+	return d.Plan.Candidates[0], model, false, nil
+}
+
 func benchedFamilies(projectRoot string) map[string]bool {
 	out := map[string]bool{}
 	for family := range clihealth.NewStore(projectRoot, nil).Active() {
 		out[family] = true
 	}
 	return out
-}
-
-// resolveRouterDispatch resolves the routing advisor's base {cli, model}:
-// claude-tmux/opus, then .evolve/profiles/router.json, then RouterPolicy.
-func resolveRouterDispatch(evolveDir string, rc policy.RouterPolicy) (cli, model string) {
-	cli, model = "claude-tmux", "opus"
-	if raw, err := os.ReadFile(filepath.Join(evolveDir, "profiles", "router.json")); err == nil {
-		var pj struct {
-			CLI              string `json:"cli"`
-			ModelTierDefault string `json:"model_tier_default"`
-		}
-		if json.Unmarshal(raw, &pj) == nil {
-			if pj.CLI != "" {
-				cli = pj.CLI
-			}
-			if pj.ModelTierDefault != "" {
-				model = pj.ModelTierDefault
-			}
-		}
-	}
-	if rc.CLI != "" {
-		cli = rc.CLI
-	}
-	if rc.Model != "" {
-		model = rc.Model
-	}
-	return cli, model
 }
 
 // registerBuiltinSpecRunners gives each advisor-selectable kind:llm builtin
@@ -809,16 +774,42 @@ func scopePathResolver(projectRoot, taskID string) string {
 	return st.Path
 }
 
-// failureAdvisorOpts resolves the failure advisor's CLI from its tracked
-// profile; an absent or unreadable profile keeps the compiled default.
-func failureAdvisorOpts(projectRoot string) []core.FailureAdvisorOption {
-	// Pinned: resolvellm's git fallback runs from the process cwd, which can be
-	// another tree.
-	r, err := resolvellm.Resolve("failure-advisor", resolvellm.Options{ProjectRoot: projectRoot, GitRoot: projectRoot})
-	if err != nil || r.CLI == "" {
+func failureAdvisorOpts(projectRoot string, r *cliroute.Router) []core.FailureAdvisorOption {
+	cli := failureAdvisorCLI(projectRoot, r)
+	if cli == "" {
 		return nil
 	}
-	return []core.FailureAdvisorOption{core.WithFailureAdvisorCLI(r.CLI)}
+	return []core.FailureAdvisorOption{core.WithFailureAdvisorCLI(cli)}
+}
+
+func failureAdvisorCLI(projectRoot string, r *cliroute.Router) string {
+	res, err := r.ResolveRole("failure-advisor", resolvellm.Options{ProjectRoot: projectRoot, GitRoot: projectRoot})
+	if err != nil {
+		return ""
+	}
+	return res.CLI
+}
+
+func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader) (phasespec.Catalog, phasespec.Catalog, []phasespec.PhaseSpec) {
+	builtinCat, builtinErr := phasespec.Load(registryPath)
+	if builtinErr != nil {
+		fmt.Fprintf(os.Stderr, "[phases] WARN builtin registry load failed (%v); builtin spec-runners not registered\n", builtinErr)
+	}
+	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, prm)
+	catalog, mergeWarns := builtinCat.Merge(userSpecs)
+	for _, w := range append(discWarns, mergeWarns...) {
+		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
+	}
+	return catalog, builtinCat, userSpecs
+}
+
+func wireCLIRouter(projectRoot string, cat cliroute.Catalog, console io.Writer) (*cliroute.Router, error) {
+	r, findings, err := buildCLIRouter(projectRoot, cat, routingHost(os.Stderr, time.Now))
+	reportRoutingFindings(console, findings)
+	if err != nil {
+		return nil, fmt.Errorf("the CLI routing table refuses to route: %w", err)
+	}
+	return r, nil
 }
 
 // documentSpecPtr is the registry's document contract, the one resolution the

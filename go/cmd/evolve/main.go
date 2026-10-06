@@ -49,6 +49,10 @@ Commands:
   worktree   Manage per-cycle git worktrees ( worktree create|list|cleanup )
   branches   Audit/prune superseded orphan cycle-* branches
               ( branches audit | branches prune [--dry-run=false] )
+  checkpoint Snapshot uncommitted worktree work into refs/checkpoints without touching
+              the branch, index or tree; restore it into a new or clean worktree
+              ( checkpoint save [--worktree DIR | --all] [--label T] [--push] |
+                list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] )
   gc         Release what finished cycles left behind: tmux sessions/sockets,
               orphan processes, worktrees, run dirs, go build cache
               ( gc --project-root P [--dry-run] )
@@ -156,6 +160,10 @@ v12.1 utilities + composition:
   clihealth                 CLI quota/credential benches
                               ( clihealth list [--json] [--project-root DIR]
                               | clihealth clear <family> [--project-root DIR] )
+  cli                       Update each subscribed CLI family, then
+                              smoke-test a changed version
+                              ( cli update [--dry-run] [--json]
+                              [--project-root P] )
   ratchet                   Function-size + raw-git-fixture ratchets
                               ( ratchet check [size|rawgit] [--root DIR] )
   context-fill              Context-window fill telemetry; correlates each

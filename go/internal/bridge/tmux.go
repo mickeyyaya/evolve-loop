@@ -90,6 +90,14 @@ func DeriveRunSocket(pid int) string {
 	return TmuxSocket + "-p" + strconv.Itoa(pid)
 }
 
+func DeriveTestSocket(pid int) string {
+	return TmuxSocket + "-t" + strconv.Itoa(pid)
+}
+
+func ExactSessionTarget(session string) string {
+	return "=" + session + ":"
+}
+
 func tmuxSocketName() string {
 	if s := strings.TrimSpace(os.Getenv(TmuxSocketEnv)); s != "" {
 		return s
@@ -108,7 +116,7 @@ func (execTmux) run(ctx context.Context, args ...string) (string, error) {
 }
 
 func (t execTmux) HasSession(ctx context.Context, name string) bool {
-	_, err := t.run(ctx, "has-session", "-t", name)
+	_, err := t.run(ctx, "has-session", "-t", ExactSessionTarget(name))
 	return err == nil
 }
 
@@ -127,7 +135,7 @@ func (t execTmux) NewSessionIn(ctx context.Context, name string, width, height i
 }
 
 func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
-	args := []string{"send-keys", "-t", session}
+	args := []string{"send-keys", "-t", ExactSessionTarget(session)}
 	if keys != "" {
 		args = append(args, keys)
 	}
@@ -139,9 +147,9 @@ func (t execTmux) SendKeys(ctx context.Context, session, keys string, enter bool
 }
 
 func (t execTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
-	args := []string{"capture-pane", "-p", "-t", session}
+	args := []string{"capture-pane", "-p", "-t", ExactSessionTarget(session)}
 	if scrollback > 0 {
-		args = []string{"capture-pane", "-p", "-S", fmt.Sprintf("-%d", scrollback), "-t", session}
+		args = []string{"capture-pane", "-p", "-S", fmt.Sprintf("-%d", scrollback), "-t", ExactSessionTarget(session)}
 	}
 	return t.run(ctx, args...)
 }
@@ -158,7 +166,7 @@ func (t execTmux) PasteBuffer(ctx context.Context, session string) error {
 	// the server's buffer table doesn't accumulate one entry per launch.
 	// Preserve LF bytes (-r), and bracket the paste when the receiving TUI
 	// requested it (-p), so embedded newlines are data rather than submissions.
-	_, err := t.run(ctx, "paste-buffer", "-b", session, "-t", session, "-d", "-p", "-r")
+	_, err := t.run(ctx, "paste-buffer", "-b", session, "-t", ExactSessionTarget(session), "-d", "-p", "-r")
 	return err
 }
 
@@ -172,25 +180,25 @@ type windowJiggler interface {
 // JiggleWindow nudges the window width down then back up — a net-zero
 // resize whose two SIGWINCHes force the pane's TUI to repaint.
 func (t execTmux) JiggleWindow(ctx context.Context, session string) error {
-	if _, err := t.run(ctx, "resize-window", "-t", session, "-L", "1"); err != nil {
+	if _, err := t.run(ctx, "resize-window", "-t", ExactSessionTarget(session), "-L", "1"); err != nil {
 		return err
 	}
-	_, err := t.run(ctx, "resize-window", "-t", session, "-R", "1")
+	_, err := t.run(ctx, "resize-window", "-t", ExactSessionTarget(session), "-R", "1")
 	return err
 }
 
 func (t execTmux) KillSession(ctx context.Context, session string) error {
-	_, err := t.run(ctx, "kill-session", "-t", session)
+	_, err := t.run(ctx, "kill-session", "-t", ExactSessionTarget(session))
 	return err
 }
 
 func (t execTmux) PaneCommand(ctx context.Context, session string) (string, error) {
-	out, err := t.run(ctx, "display-message", "-p", "-t", session, "#{pane_current_command}")
+	out, err := t.run(ctx, "display-message", "-p", "-t", ExactSessionTarget(session), "#{pane_current_command}")
 	return strings.TrimSpace(out), err
 }
 
 func (t execTmux) paneTTY(ctx context.Context, session string) (string, error) {
-	out, err := t.run(ctx, "display-message", "-p", "-t", session, "#{pane_tty}")
+	out, err := t.run(ctx, "display-message", "-p", "-t", ExactSessionTarget(session), "#{pane_tty}")
 	return strings.TrimSpace(out), err
 }
 

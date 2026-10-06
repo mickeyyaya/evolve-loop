@@ -25,6 +25,7 @@ func inboxVerbs() []inboxVerb {
 		{"batches", "batches [--json] [--max N]", withoutStdin(runInboxBatches)},
 		{"list", "list [--status " + strings.Join(menuStatusNames[:], "|") + "] [--kind K] [--route R] [--json]", withoutStdin(runInboxList)},
 		{"show", "show <id> [--json]", withoutStdin(runInboxShow)},
+		{"rank", "rank [--list " + strings.Join(rankListNames, "|") + "] [--top N] [--explain <id>] [--json]", withoutStdin(runInboxRank)},
 		{"add", "add [--file <item.json>]   (without --file, the item JSON is read from stdin)", runInboxAdd},
 		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)...   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
 		{"verify", "verify <id> --evidence <text>", withoutStdin(runInboxVerify)},

@@ -8,8 +8,17 @@ import (
 
 type Runner func(ctx context.Context, name string, args []string, stdin string) (string, error)
 
+var processEnv func(bin string) []string
+
+func UseProcessEnv(env func(bin string) []string) {
+	processEnv = env
+}
+
 func defaultRunner(ctx context.Context, name string, args []string, stdin string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	if processEnv != nil {
+		cmd.Env = processEnv(name)
+	}
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}

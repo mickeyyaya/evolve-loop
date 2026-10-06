@@ -22,6 +22,7 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 		_ func(func(string, string, string)) Option                         = WithRetire
 		_ func(func(int) string) Option                                     = WithRunWorkspace
 		_ func(func() *signalcenter.Center) Option                          = WithSignals
+		_ func([]string) Option                                             = WithPriorityClasses
 		_ func(*Mover) bool                                                 = (*Mover).SignalsWired
 		_ func(*Mover, string, string) (ClaimResult, error)                 = (*Mover).Claim
 		_ func(*Mover, string, string, PromoteOpts) (PromoteResult, error)  = (*Mover).Promote

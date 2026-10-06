@@ -71,6 +71,9 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, "cd "+shellSingleQuote(d.workingDir), true)
+	for _, line := range exportLines(d.cfg.Realization.Env) {
+		_ = d.deps.Tmux.SendKeys(ctx, d.session, line, true)
+	}
 	d.deps.Sleep(time.Second)
 	_ = d.deps.Tmux.SendKeys(ctx, d.session, d.launchCmd, true)
 	fmt.Fprintf(d.deps.Stderr, "[recipe] launching: %s\n", d.launchCmd)
@@ -194,6 +197,7 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 	if err != nil {
 		return "", err
 	}
+	defer reapEphemeralSession(cfg, deps, drv.session)
 	if err := drv.EnsureSession(ctx); err != nil {
 		return "", fmt.Errorf("recipe: ensure session: %w", err)
 	}
@@ -215,6 +219,15 @@ func captureControl(ctx context.Context, cfg *Config, deps Deps, cli, command st
 		}
 	}
 	return pane, nil
+}
+
+func reapEphemeralSession(cfg *Config, deps Deps, session string) {
+	if cfg.SessionName != "" {
+		return
+	}
+	if err := deps.Tmux.KillSession(context.Background(), session); err != nil {
+		fmt.Fprintf(deps.Stderr, "[recipe] WARN session %s not reaped: %v\n", session, err)
+	}
 }
 
 // CaptureHelp launches-or-attaches the CLI's REPL, sends `/help`, and returns

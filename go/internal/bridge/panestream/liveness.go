@@ -197,40 +197,28 @@ func (d *OllamaDetector) Assess(rendered string, p PaneProfile) (LivenessState, 
 	return base, baseConf
 }
 
-// agyGeneratingSpinner is the line agy renders while generating; it vanishes in the answer frame.
-const agyGeneratingSpinner = "⣯ Generating..."
-
-func containsAgyGeneratingSignal(rendered string) bool {
-	for _, line := range strings.Split(rendered, "\n") {
-		if strings.TrimSpace(line) == agyGeneratingSpinner {
-			return true
-		}
-	}
-	return false
-}
-
-// AgyDetector layers agy's "⣯ Generating..." spinner over DefaultDetector as a stronger Converging signal.
 type AgyDetector struct {
-	base   *DefaultDetector
-	primed bool
+	base      *DefaultDetector
+	lastBlock string
+	primed    bool
 }
 
-// NewAgyDetector returns an AgyDetector; stallThreshold is forwarded to its DefaultDetector.
 func NewAgyDetector(stallThreshold int) *AgyDetector {
 	return &AgyDetector{base: NewDefaultDetector(stallThreshold)}
 }
 
-// Assess returns (LivenessConverging, 0.92) while the generating spinner shows; the first call only primes.
 func (d *AgyDetector) Assess(rendered string, p PaneProfile) (LivenessState, float64) {
 	base, baseConf := d.base.Assess(rendered, p)
+	block := LastTokenLine(rendered, p.TokenLineRegex)
 	if !d.primed {
-		d.primed = true
+		d.primed, d.lastBlock = true, block
 		return base, baseConf
 	}
-	if containsAgyGeneratingSignal(rendered) {
-		return LivenessConverging, 0.92
+	if block == "" || block == d.lastBlock {
+		return base, baseConf
 	}
-	return base, baseConf
+	d.lastBlock = block
+	return LivenessConverging, 0.95
 }
 
 // DetectorFor returns a new LivenessProbe for the profile's CLI; unknown CLIs get a DefaultDetector.

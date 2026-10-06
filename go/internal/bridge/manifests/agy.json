@@ -3,6 +3,8 @@
   "cli": "agy",
   "binary": "agy",
   "binary_min_version": "1.0.0",
+  "auto_update_off_env": "AGY_CLI_DISABLE_AUTO_UPDATE",
+  "default_env": {"AGY_CLI_DISABLE_AUTO_UPDATE": "1"},
   "transport": "headless",
   "default_tier": "full",
   "tier_dependencies": {

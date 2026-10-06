@@ -59,6 +59,7 @@ type loopConfig struct {
 	LogPath           string            `json:"log_path,omitempty"`
 	DetachArgv        []string          `json:"-"`
 	ResumeWaves       int               `json:"-"`
+	HandedOff         bool              `json:"-"`
 }
 
 // emitSignalStop assumes the caller polled ctx.Err() before the cycle error,
@@ -91,7 +92,7 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if cfg.Detach {
 		return runLoopDetached(cfg, stdout, stderr)
 	}
-	cfg.ResumeWaves = takeReexecHandoff(cfg.EvolveDir, stderr)
+	cfg.ResumeWaves, cfg.HandedOff = takeReexecHandoff(cfg.EvolveDir, stderr)
 	chainCfg := loadChainConfig(cfg.EvolveDir)
 	cfg.ChainMode = cfg.ChainMode || chainCfg.Enabled
 
@@ -102,6 +103,15 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runLoopChain(cfg, chainCfg, stdin, stdout, stderr)
 	}
 	return runLoopBatch(cfg, stdin, stdout, stderr)
+}
+
+func printLoopDryRun(cfg loopConfig, stdout io.Writer) int {
+	buf, _ := json.MarshalIndent(map[string]any{
+		"dry_run": true,
+		"config":  cfg,
+	}, "", "  ")
+	fmt.Fprintln(stdout, string(buf))
+	return 0
 }
 
 // runLoopBatch runs exactly one batch of cycles.
@@ -119,12 +129,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if cfg.DryRun {
-		buf, _ := json.MarshalIndent(map[string]any{
-			"dry_run": true,
-			"config":  cfg,
-		}, "", "  ")
-		fmt.Fprintln(stdout, string(buf))
-		return 0
+		return printLoopDryRun(cfg, stdout)
 	}
 
 	runtime := startLoopBatchRuntime()
@@ -137,6 +142,10 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	gcOrphanSessions("startup", stderr)
 
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)
+	if deps.RoutingErr != nil {
+		fmt.Fprintf(stderr, "evolve loop: %v\n", deps.RoutingErr)
+		return exitRoutingRefused
+	}
 	defer deps.Signals.Flush()
 	// orch is narrowed to loopCycleRunner so a test can inject a scripted
 	// orchestrator (loopOrchOverride); the real *core.Orchestrator cannot be

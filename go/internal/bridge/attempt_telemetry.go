@@ -163,7 +163,7 @@ func (e *Engine) resolveAttemptTokens(req core.BridgeRequest, start, end time.Ti
 	result, err := e.deps.TokenResolver(tokenusage.Window{
 		Worktree: req.Worktree, ArtifactPath: req.ArtifactPath,
 		EventsLogPath: eventsLogPath, Scrollback: scrollback, Driver: req.CLI,
-		Start: start, End: end,
+		TokenLineRegex: manifestTokenLineRegex(req.CLI), Start: start, End: end,
 	})
 	if err != nil {
 		(e.attemptContext(req, callID, attempt)).warn(CodeTokenResolverFailed, "token resolver failed: "+err.Error())

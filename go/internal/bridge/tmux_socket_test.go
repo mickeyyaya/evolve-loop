@@ -58,3 +58,13 @@ func TestDeriveRunSocket(t *testing.T) {
 		t.Fatalf("derived socket must extend the base %q", TmuxSocket)
 	}
 }
+
+func TestDeriveTestSocket_IsPerProcessAndNeverTheSharedOrALoopSocket(t *testing.T) {
+	got := DeriveTestSocket(4242)
+	if got != "evolve-bridge-t4242" {
+		t.Fatalf("DeriveTestSocket(4242) = %q, want evolve-bridge-t4242", got)
+	}
+	if got == TmuxSocket || got == DeriveRunSocket(4242) || DeriveTestSocket(4243) == got {
+		t.Fatalf("a test process socket must be its own: %q", got)
+	}
+}

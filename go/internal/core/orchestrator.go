@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
@@ -294,6 +295,7 @@ type Orchestrator struct {
 	// mint changes it, so a consumer that bound a resolver over the cycle-start
 	// catalog value can re-bind. nil ⇒ no-op.
 	catalogPublisher func(phasespec.Catalog)
+	cliRouter        *cliroute.Router
 
 	// kb is the knowledge-base recall port: at plan time the orchestrator looks
 	// up prior lessons matching the most recent failure and threads them into
@@ -445,6 +447,12 @@ func WithCatalogPublisher(fn func(phasespec.Catalog)) Option {
 		}
 	}
 }
+
+func WithCLIRouter(r *cliroute.Router) Option {
+	return func(o *Orchestrator) { o.cliRouter = r }
+}
+
+func (o *Orchestrator) CLIRouterWired() bool { return o.cliRouter != nil }
 
 // CatalogPublisherWired reports whether the composition root bound a catalog
 // publisher; without it a mid-cycle mint never reaches the live contract resolver.

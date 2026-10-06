@@ -55,9 +55,7 @@ func prepareFreshBatch(
 		}
 	}
 
-	if loopPreflightHalts(cfg, stderr) {
-		lr.StopReason = "preflight_failed"
-		lr.emit(stdout)
+	if bootGateHalts(ctx, cfg, deps, lr, stdout, stderr) {
 		return 2, true
 	}
 
@@ -65,4 +63,16 @@ func prepareFreshBatch(
 	// finalized worktrees are handled by the end sweep.
 	gcHookFn(cfg, filepath.Join(gcManifestDir(cfg.EvolveDir), "pre-batch"), stderr)
 	return 0, false
+}
+
+func bootGateHalts(ctx context.Context, cfg loopConfig, deps orchDeps, lr *loopResult, stdout, stderr io.Writer) bool {
+	if bootCLIUpdateHalts(ctx, cfg, deps, lr, stdout, stderr) {
+		return true
+	}
+	if loopPreflightHalts(cfg, stderr) {
+		lr.StopReason = "preflight_failed"
+		lr.emit(stdout)
+		return true
+	}
+	return false
 }

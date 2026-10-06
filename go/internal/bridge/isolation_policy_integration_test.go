@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
@@ -133,9 +134,7 @@ if cat private-fixture/sample >/dev/null 2>&1; then exit 41; fi
 if cat alias/sample >/dev/null 2>&1; then exit 42; fi
 if (printf forbidden > evals/sample) 2>/dev/null; then exit 43; fi
 printf done > ` + shellQuotePOSIX(fx.artifact) + "\n"
-	if err := os.WriteFile(stub, []byte(script), 0700); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, stub, script)
 	if err := os.WriteFile(fx.profile, []byte(`{"name":"fixture","sandbox":{"enabled":true,"allow_network":true,"deny_subpaths":["evals"],"deny_read_subpaths":["private-fixture"]}}`), 0600); err != nil {
 		t.Fatal(err)
 	}

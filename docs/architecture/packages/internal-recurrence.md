@@ -1,0 +1,22 @@
+# internal/recurrence
+
+> Related: [ADR-0121](../adr/0121-inbox-priority-is-a-computed-rank.md) (the inbox rank's recurrence factor reads this ledger), [internal-inboxrank.md](internal-inboxrank.md), and the failure-disposition boundary escalation whose staged intents `ApplyBoundary` applies ([ADR-0107](../adr/0107-failure-disposition-boundary-escalation.md)).
+
+## Purpose
+
+`internal/recurrence` keeps the deterministic recurrence ledger, `.evolve/recurrence-ledger.json`: one `Entry` per lesson `pattern:` key with the cycles it closed out in, its `Count`, the linked fix item (`fix_item_id`) and whether the pattern is classification noise (`Generic`). `Ledger.RecordClosure` upserts a retro closeout and applies the count-to-weight escalation policy, idempotent per cycle. `ApplyBoundary` applies the intents the disposition router staged, at the loop's boundary under the inbox lock. `BackfillFromLessons`, `IsGeneric` and `WriteDigest` build the ledger from history, mark noise and render the failure digest. The ledger itself (`ledger.go`) needs only the standard library, `internal/atomicwrite` and `internal/adapters/flock`; the applier, the backfill and the digest also import `cyclestate`, `dispositionrouter`, `dossier`, `failureadapter`, `failurelog` and `retrofile`.
+
+## Design
+
+- **Two reads of one file.** `Load` takes the `<path>.lock` sidecar lock (`flock.WithPathLock`) and decodes; it is the read half of a read-modify-write that ends in `Save`, which writes under the same lock by atomic rename. `ReadSnapshot` is the same decode without the lock, for a reader that only looks: the file is replaced by rename, so a lockless read sees either the old or the new ledger, never a torn one, and it creates no sidecar file. `Load` is the lock wrapped around `ReadSnapshot`, so the two cannot decode differently. The decode rules: a missing or empty file is an empty ledger; a file without `entries`, or with `"entries": null`, gets an empty map; anything else that fails to parse is an error naming the path, with no ledger.
+- **The inbox rank's linkage lives here.** `Ledger.ItemCounts()` maps an inbox item id to its recurrence count: every non-generic entry counts under its pattern key (an autofiled recurrence item is filed under its pattern) and under its `fix_item_id`, and when several entries name one id the largest count wins. A nil ledger or a nil entry counts nothing. `evolve inbox rank` composes `inboxrank.Context.Recurrence` from `ReadSnapshot(...).ItemCounts()`, so the rank package never imports this one. Items carry no fingerprint field yet; the plan's P3 adds one and the linkage moves with it.
+
+## Invariants
+
+- **`Load` and `ReadSnapshot` decode alike, and `ReadSnapshot` writes nothing.** `TestReadSnapshot_DecodesAsLoadDoesWithoutTakingTheLock` runs each decode rule through both and compares the directory before and after the snapshot read; `TestReadSnapshot_AMalformedOrUnreadableLedgerIsAnError` pins the parse error (the same text from both) and a read error.
+- **`ItemCounts` is the one id linkage.** `TestLedger_ItemCounts_CountsThePatternAnItemCarriesOrFixes` pins the pattern and `fix_item_id` keys, the largest-count rule, and that generic and nil entries count nothing.
+- **Persistence round-trips.** `TestLedger_LoadSaveRoundTrip`.
+
+## Findings
+
+- **The Go package comment is stale on dependencies (2026-10-06).** It still calls the package a leaf of the standard library, `atomicwrite` and `flock`; `go list -f '{{.Imports}}' ./internal/recurrence` shows six more internal imports, which arrived with the boundary applier, the backfill and the digest. Code comments are being removed tree-wide (AGENTS.md invariant 10), so this page, not the comment, is the record.

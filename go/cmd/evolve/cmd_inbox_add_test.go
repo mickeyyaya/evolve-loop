@@ -150,3 +150,44 @@ func TestCmd_InboxAdd_NoMonotonicWarningForAOneShotClass(t *testing.T) {
 		t.Errorf("an absolute target is the right contract for one-shot work; got warning %q", stderr.String())
 	}
 }
+
+func writePolicy(t *testing.T, root, text string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCmd_InboxAdd_RefusesAPriorityClassThePolicyOrderLacks(t *testing.T) {
+	root := emptyInboxRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	urgent := strings.Replace(cliInboxItem, `"priority_class":"debuggability"`, `"priority_class":"urgent"`, 1)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"add"}, strings.NewReader(urgent), &stdout, &stderr)
+
+	if rc != 1 || !strings.Contains(stderr.String(), `priority_class "urgent"`) || !strings.Contains(stderr.String(), "correctness, stability, performance, debuggability, feature, maintainability, hygiene, security") {
+		t.Fatalf("rc = %d stderr = %q, want 1 naming the class and the compiled class order", rc, stderr.String())
+	}
+	writePolicy(t, root, `{"inbox_priority": {"class_order": ["urgent", "security"]}}`)
+	stderr.Reset()
+	if rc := runInbox([]string{"add"}, strings.NewReader(urgent), &stdout, &stderr); rc != 0 {
+		t.Errorf("a class the policy's own order names: rc = %d stderr = %q, want it filed", rc, stderr.String())
+	}
+}
+
+func TestCmd_InboxAdd_AMalformedPolicyIsAFaultAndFilesNothing(t *testing.T) {
+	root := emptyInboxRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	writePolicy(t, root, `{"inbox_priority": {"class_ordr": ["security"]}}`)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInbox([]string{"add"}, strings.NewReader(cliInboxItem), &stdout, &stderr)
+
+	if rc != 2 || !strings.Contains(stderr.String(), "class_ordr") {
+		t.Errorf("rc = %d stderr = %q, want 2 naming the bad key", rc, stderr.String())
+	}
+	if entries, _ := os.ReadDir(filepath.Join(root, ".evolve", "inbox")); len(entries) != 0 {
+		t.Errorf("a policy fault filed %d entries", len(entries))
+	}
+}

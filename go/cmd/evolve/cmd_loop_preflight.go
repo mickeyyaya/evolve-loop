@@ -8,21 +8,23 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 // runLoopPreflightFn is the test seam for the pre-batch readiness gate; tests
 // override it to force a halt/pass without a real environment probe.
 var runLoopPreflightFn = defaultLoopPreflight
 
-func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result {
+func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Options {
 	layout := paths.ResolveFromEnv()
 	// Absent or malformed policy resolves the fallback dial to off, the dormant
 	// default: the canary never runs nor halts unless an operator opts in.
 	pol, _ := policy.Load(filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json"))
-	res, err := looppreflight.Run(looppreflight.Options{
+	return looppreflight.Options{
 		ProjectRoot:         cfg.ProjectRoot,
 		EvolveDir:           cfg.EvolveDir,
 		ProfileDir:          layout.ProfilesDir,
@@ -30,7 +32,12 @@ func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result
 		SkipBoot:            cfg.SkipPreflightBoot,
 		NestedFallbackStage: parseGateStage(pol.SandboxConfig().NestedFallback),
 		MinFreeBytes:        pol.PreflightConfig().MinFreeBytes(),
-	})
+		Routing:             func() (looppreflight.Routing, error) { return preflightRouting(cfg.ProjectRoot) },
+	}
+}
+
+func defaultLoopPreflight(cfg loopConfig, stderr io.Writer) looppreflight.Result {
+	res, err := looppreflight.Run(loopPreflightOptions(cfg, stderr))
 	if err != nil {
 		// A harness fault fails loud as a synthetic halt rather than silently
 		// letting a misconfigured gate pass a doomed batch through.
@@ -110,4 +117,14 @@ func removeEmptyProbeDir(dir string, stderr io.Writer) {
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop: WARN: --preflight-only: could not remove the gate's probe dir %s: %v\n", dir, err)
 	}
+}
+
+func preflightRouting(projectRoot string) (looppreflight.Routing, error) {
+	return looppreflight.CompileRouting(func() (*cliroute.Router, []cliroute.Finding, error) {
+		router, findings, err := loadCLIRouter(projectRoot, cliroute.Host{})
+		if err != nil {
+			return nil, findings, fmt.Errorf("compile the CLI routing table of %s: %w", projectRoot, err)
+		}
+		return router, findings, nil
+	}, profiles.NewFromDir(routingProfilesDir(projectRoot)).List)
 }

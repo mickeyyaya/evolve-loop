@@ -58,6 +58,7 @@ var commands = []subcommand{
 	{Name: "continuation", Summary: "Inspect/release scope-keyed continuation bindings (continuation list | continuation release <scope-id>)", Run: runContinuation},
 	{Name: "carryover", Summary: "Apply a reviewed keep/drop/cluster decisions file to state.json:carryoverTodos via the sanctioned locked RMW path (carryover apply-decisions)", Run: runCarryover},
 	{Name: "swarm", Summary: "Inspect/reap swarm worker sessions (ADR-0032)", Run: runSwarm},
+	{Name: "checkpoint", Summary: "Protect uncommitted worktree work as refs/checkpoints snapshots, never touching the branch, index or tree: checkpoint save [--worktree DIR | --all] [--label T] [--push] | list [--worktree DIR] | restore <ref> --into DIR | prune [--landed] (each takes --json and --project-root P)", Run: runCheckpoint},
 	{Name: "gc", Summary: "Release what finished cycles left behind: tmux sessions/sockets, orphan processes, worktrees, run dirs, go build cache (gc --project-root <dir> [--dry-run])", Run: runGC},
 	{Name: "failures", Summary: "Inspect and clear state.json:failedApproaches: failures list [--class C] [--json] | failures reset [--fingerprint F] | failures prune [--dry-run] (prune also drops expired carryoverTodos; reset and a real prune require --project-root)", Run: runFailures},
 	{Name: "loop", Summary: "Drive the dispatcher loop", Run: runLoop},
@@ -77,6 +78,7 @@ var commands = []subcommand{
 	{Name: "detect-nested-claude", Summary: "Detect nested claude -p", Run: runDetectNested},
 	{Name: "phase-order", Summary: "List phases from registry", Run: phasecmd.RunPhaseOrder},
 	{Name: "routing", Summary: "Explain a recorded routing decision (read-only)", Run: runRouting},
+	{Name: "cli-routing", Summary: "The CLI routing table (ADR-0119): show [--static] [--json] | check | explain <agent> (read-only)", Run: runCLIRouting},
 	{Name: "estimate-quota-reset", Summary: "Predict quota reset timestamp", Run: runQuotaReset},
 	{Name: "build-invocation-context", Summary: "Emit subagent bedrock prefix", Run: runBedrock},
 	{Name: "resolve-llm", Summary: "Route phase role → cli + model", Run: runResolveLLM},
@@ -118,6 +120,7 @@ var commands = []subcommand{
 	{Name: "lessons", Summary: "Lesson analytics: recurrence (deterministic recurrence ledger, patterns by count + fix status)", Run: runLessons},
 	{Name: "reachability", Summary: "Import-cycle-safety probe for structural test pins (reachability check-pin)", Run: runReachability},
 	{Name: "clihealth", Aliases: []string{"cli-health"}, Summary: "CLI quota/credential benches: list [--json] | clear <family> [--project-root DIR]", Run: runClihealth},
+	{Name: "cli", Summary: "CLI binaries: update [--dry-run] [--json] [--project-root P] runs each subscribed family's manifest updater, then smoke-tests a changed version (exit 1 on update-failed or smoke-failed)", Run: runCLICommand},
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]", Run: runRatchet},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }

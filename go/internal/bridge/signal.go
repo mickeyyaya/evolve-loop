@@ -30,6 +30,7 @@ const (
 	CodePaneStagnant  signalcenter.Code = "LIVENESS_PANE_STAGNANT"
 	CodePaneHung      signalcenter.Code = "LIVENESS_PANE_HUNG"
 	CodePaneExhausted signalcenter.Code = "LIVENESS_PANE_EXHAUSTED"
+	CodePhaseStalled  signalcenter.Code = "LIVENESS_PHASE_STALLED"
 )
 
 func init() {
@@ -47,6 +48,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCompletedOnWorktreeEvidence, "a correction re-dispatch of a source-writing phase went idle without rewriting its deliverable, and the agent had changed the worktree since dispatch (host state under .evolve/, the workspace and the deliverable's own locations never count), so the bridge completed on the carried deliverable instead of letting the idle wait end in exit 81; core's phase verify and review gate then judge the unchanged deliverable; the reason is the completion note; fields deliverable, changed_paths, paths (at most eight, then +N more), cli")
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneStagnant, "a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant)")
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneHung, "a tmux pane is hung: no progress and no completion (LivenessCenter edge: hung)")
+	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePhaseStalled, "the per-phase observer saw no progress for the stall threshold, between the bridge's review checkpoints: for a tmux phase the pane-watch snapshot's transcript hash stopped changing (kind pane.liveness), for a headless phase the stdout log and workspace stopped growing (kind observer.warning); log and signal only, nothing is killed; fields source (pane | stdout), session, busy, stall_s")
 	signalcenter.RegisterCode(signalcenter.ModuleLiveness, CodePaneExhausted, "a tmux pane shows the CLI's quota/rate-limit exhaustion (LivenessCenter edge: exhausted; the exhaustion gate corroborates before rc 85)")
 }
 

@@ -70,4 +70,4 @@ Invoked by:
 
 - `agents/evolve-tdd-engineer.md` (persona definition)
 - `.evolve/profiles/tdd-engineer.json`
-- CLAUDE.md "Evolve Loop Task Priority" section
+- Task priority: the computed inbox rank (CLAUDE.md "/evo:loop task priority", [ADR-0121](../../docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md))

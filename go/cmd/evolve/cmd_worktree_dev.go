@@ -16,28 +16,21 @@ import (
 )
 
 const (
-	devOriginMain = "refs/remotes/origin/main"
+	devOriginMain = plane.OriginMainRef
 	devGHTimeout  = 30 * time.Second
 )
 
-type devHub struct{ root, store string }
+type devHub struct{ root, store, dev string }
 
 func resolveDevHub(projectRoot string) (devHub, error) {
-	info, err := plane.Classify(projectRoot)
+	hub, err := plane.ResolveHub(projectRoot)
 	if err != nil {
 		return devHub{}, err
 	}
-	store, err := plane.CommonGitDir(info)
-	if err != nil {
-		return devHub{}, err
-	}
-	if filepath.Base(store) == ".git" {
-		return devHub{}, fmt.Errorf("%s is not a hub worktree: dev worktrees need the bare-store layout of docs/operations/workspace-layout.md", projectRoot)
-	}
-	return devHub{root: filepath.Dir(store), store: store}, nil
+	return devHub{root: hub.Root, store: hub.Store, dev: hub.DevDir()}, nil
 }
 
-func (h devHub) taskDir(task string) string { return filepath.Join(h.root, "dev", task) }
+func (h devHub) taskDir(task string) string { return filepath.Join(h.dev, task) }
 
 func validDevTask(task string) bool {
 	return task != "" && task != "." && task != ".." && !strings.ContainsAny(task, `/\`)

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -66,16 +67,12 @@ func TestDefaultSimulationRunner(t *testing.T) {
 	t.Cleanup(func() { defaultGoBinFn = old })
 	defaultGoBinFn = func() string { return shim }
 
-	if err := os.WriteFile(shim, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, shim, "#!/bin/sh\nexit 0\n")
 	if err := defaultSimulationRunner(dir); err != nil {
 		t.Errorf("shim exit 0 should succeed, got %v", err)
 	}
 
-	if err := os.WriteFile(shim, []byte("#!/bin/sh\necho boom; exit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, shim, "#!/bin/sh\necho boom; exit 1\n")
 	if err := defaultSimulationRunner(dir); err == nil {
 		t.Error("shim exit 1 should return an error")
 	}
@@ -90,9 +87,7 @@ func TestRun_AdvisorySimulationDefaultRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	shim := filepath.Join(t.TempDir(), "fake-go")
-	if err := os.WriteFile(shim, []byte("#!/bin/sh\necho boom; exit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, shim, "#!/bin/sh\necho boom; exit 1\n")
 	old := defaultGoBinFn
 	t.Cleanup(func() { defaultGoBinFn = old })
 	defaultGoBinFn = func() string { return shim }

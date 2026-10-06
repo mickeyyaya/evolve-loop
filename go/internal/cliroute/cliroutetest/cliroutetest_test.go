@@ -197,3 +197,32 @@ func TestFirstDifference_NamesTheFirstDifferingLine(t *testing.T) {
 		t.Fatal("equal bytes do not differ")
 	}
 }
+
+func TestAssertGoldenAt_WritesAndThenMatchesTheGivenPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "advisor.jsonl")
+	healthy := false
+	records := []Record{{Resolver: "advisor", Variant: "none/claude_benched", Agent: "router", Phase: "plan", Candidates: []string{"agy-tmux"}, Model: "deep", Healthy: &healthy}}
+	AssertGoldenAt(t, path, records, true)
+	raw, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(raw), `"healthy":false`) {
+		t.Fatalf("the written record keeps an explicit false: %s %v", raw, err)
+	}
+	AssertGoldenAt(t, path, records, false)
+}
+
+func TestAdvisorGoldenPath_SitsBesideThePlanGolden(t *testing.T) {
+	if filepath.Dir(AdvisorGoldenPath(t)) != filepath.Dir(GoldenPath(t)) || filepath.Base(AdvisorGoldenPath(t)) != "legacy-advisor.golden.jsonl" {
+		t.Fatalf("advisor golden at %s", AdvisorGoldenPath(t))
+	}
+	if _, err := os.Stat(AdvisorGoldenPath(t)); err != nil {
+		t.Fatalf("the advisor golden is checked in: %v", err)
+	}
+}
+
+func TestVariants_TheRouterKeysVariantWritesTheRouterBlock(t *testing.T) {
+	v := variantNamed(t, "router_keys")
+	rc := v.Policy(t, v.ProjectRoot(t, nil)).RouterConfig()
+	if rc.CLI != "claude-tmux" || rc.Model != "balanced" || rc.PlanModel != "top" {
+		t.Fatalf("router_keys policy router block = %+v", rc)
+	}
+}

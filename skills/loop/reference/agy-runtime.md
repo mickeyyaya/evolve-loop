@@ -112,6 +112,26 @@ bash legacy/scripts/dispatch/detect-cli.sh
 bash legacy/scripts/cli_adapters/_capability-check.sh antigravity --human
 ```
 
+## Interactive agy (agy-tmux): pane vocabulary and liveness
+
+The loop's default agy path is the interactive `agy-tmux` driver, not `agy -p`. What the bridge reads from an agy pane is declared in `go/internal/bridge/manifests/agy-tmux.json`. The values below were verified against agy 1.2.17 on 2026-10-06; fixtures are in `go/internal/bridge/panestream/testdata/agy-1.2.17/`.
+
+| What | How agy 1.2.17 shows it | Where the bridge declares it |
+|---|---|---|
+| REPL ready | footer `? for shortcuts` | `prompt_marker` and the driver's `promptMarker` |
+| Turn running | footer `esc to cancel`, plus a spinner line: one of `⣾⣽⣻⢿⡿⣟⣯⣷`, two spaces, a verb (`Generating...`, `Working...`, `Loading...`, `Editing files...`, or a running thought summary) | `busy_line_regex`; group 1 is the frame, which is cut before progress is judged, so a spinner tick is not progress |
+| Input line | the box between two separators: exactly `>` when empty; `> <text>` or `> [Pasted text #N +M lines]` when a prompt is parked | the driver's `inputLineMarker` (`>`), so submit-verify detects a parked prompt and re-sends Enter |
+| Thinking tokens | `▸ Thought for 14s, 1.5k tokens` after each thinking block | `token_line_regex` (named groups `count`, `scale`): token telemetry records the peak as `scrollback_peak` instead of "uncovered" |
+| Model in use | footer, bottom right: `Gemini 3.8 Flash · low`. When agy ignores `--model`, this shows the model it fell back to | `model_label_regex` (named group `model`, read from the last line) |
+| Quota wall | `quota_exhausted` rule (`quota.*exceed`, daily, monthly or free-tier limit) | escalates (exit 85); `clihealth` benches the agy family on it |
+
+To see whether agy is still working on a phase, and what it did last, run `evolve bridge sessions`. It is read-only and lists every live pane with its busy state, progress age, drawn age and last token line. The per-phase observer reads the same snapshot and signals `LIVENESS_PHASE_STALLED` when the transcript stops changing for the stall threshold. Design record: [agy-liveness-monitoring-2026-10.md](../../../docs/research/agy-liveness-monitoring-2026-10.md).
+
+Two agy facts that matter for liveness:
+
+- **`#{window_activity}` is not progress.** agy repaints about every 2 s even when idle.
+- **A spinning `Generating...` line is not progress.** In one 1.2.17 session agy spun it for about two minutes and then printed `failed to construct executor: plan model not specified`; `agy models` listed the model it had rejected.
+
 ## See also
 
 - [reference/agy-tools.md](agy-tools.md) — tool name translation map and agy-specific flags
@@ -122,6 +142,7 @@ bash legacy/scripts/cli_adapters/_capability-check.sh antigravity --human
 
 ## Last verified
 
+- **agy-tmux pane vocabulary:** 2026-10-06, agy 1.2.17 (`agy --help` lists `-i/--prompt-interactive`, `--log-file`, `--effort`), captured on a private tmux socket.
 - **Date:** 2026-05-21 (cycle-101 infrastructure ship)
 - **agy binary:** `~/.local/bin/agy` (140MB, installed 2026-05-20), flags `--print`/`-p`, `--dangerously-skip-permissions`, `--add-dir`
 - **Re-verify cadence:** quarterly or when agy releases new flags. If agy adds `--max-budget-usd` or native JSON output, update `agy.capabilities.json:supports.budget_cap_native` and the cost_blind envelope accordingly.

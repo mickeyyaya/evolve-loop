@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/envchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
@@ -26,7 +27,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
-const phaseName = string(core.PhaseRetro)
+const (
+	phaseName  = string(core.PhaseRetro)
+	retroAgent = "retrospective"
+)
 
 type Config struct {
 	Bridge         core.Bridge
@@ -34,6 +38,7 @@ type Config struct {
 	NowFn          func() time.Time
 	Model          string
 	CompactPrompts bool
+	Router         *cliroute.Router
 }
 
 type Phase struct {
@@ -42,6 +47,7 @@ type Phase struct {
 	nowFn          func() time.Time
 	model          string
 	compactPrompts bool
+	router         *cliroute.Router
 }
 
 func New(c Config) *Phase {
@@ -53,7 +59,7 @@ func New(c Config) *Phase {
 	if model == "" {
 		model = "auto"
 	}
-	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn, model: model, compactPrompts: c.CompactPrompts}
+	return &Phase{bridge: c.Bridge, prompts: c.Prompts, nowFn: nowFn, model: model, compactPrompts: c.CompactPrompts, router: c.Router}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -108,22 +114,22 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	artifactPath := filepath.Join(req.Workspace, "retrospective-report.md")
 	profilePath := filepath.Join(req.ProjectRoot, ".evolve", "profiles", "retrospective.json")
 
-	var prof profiles.Profile
-	haveProf := false
-	if loader := profiles.NewFromDir(filepath.Join(req.ProjectRoot, ".evolve", "profiles")); loader != nil {
-		if loaded, err := loader.Get("retrospective"); err == nil {
-			prof = loaded
-			haveProf = true
-		}
-	}
-	cli := resolveCLI(req.Env["EVOLVE_CLI"], prof.CLI)
-
+	prof := retroProfile(req.ProjectRoot)
 	model := p.model
 	if model == "auto" {
 		model = "balanced"
-		if haveProf && prof.ModelTierDefault != "" {
+		if prof != nil && prof.ModelTierDefault != "" {
 			model = prof.ModelTierDefault
 		}
+	}
+	cli, routeErr := p.resolveCLI(req, prof, model)
+	if routeErr != nil {
+		fmt.Fprintf(os.Stderr, "[retro] WARN routing refused (%v) — emitting FAIL verdict (non-fatal)\n", routeErr)
+		return core.PhaseResponse{
+			Phase: phaseName, Verdict: core.VerdictFAIL, ArtifactsDir: req.Workspace, NextPhase: string(core.PhaseEnd),
+			DurationMS:  p.nowFn().Sub(start).Milliseconds(),
+			Diagnostics: []core.Diagnostic{{Severity: "error", Message: routeErr.Error()}},
+		}, nil
 	}
 
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, phaseName, cli, model)
@@ -141,7 +147,7 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 			filepath.Join(req.Workspace, "carryover-todos.json"),
 		},
 		ArtifactPath: artifactPath,
-		Agent:        "retrospective",
+		Agent:        retroAgent,
 		Cycle:        req.Cycle,
 		Env:          req.Env,
 		Skills:       overlaySkills,
@@ -206,14 +212,28 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	}, nil
 }
 
-func resolveCLI(envCLI, profileCLI string) string {
-	switch {
-	case envCLI != "":
-		return envCLI
-	case profileCLI != "":
-		return profileCLI
+func retroProfile(projectRoot string) *profiles.Profile {
+	loaded, err := profiles.NewFromDir(filepath.Join(projectRoot, ".evolve", "profiles")).Get(retroAgent)
+	if err != nil {
+		return nil
 	}
-	return "claude-tmux"
+	return &loaded
+}
+
+func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model string) (string, error) {
+	router := p.router
+	if router == nil {
+		launch, err := cliroute.NewSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{Agent: retroAgent, Profile: prof}, cliroute.Host{})
+		if err != nil {
+			return "", err
+		}
+		router = launch
+	}
+	d, err := router.Resolve(cliroute.Request{Agent: retroAgent, ProjectRoot: req.ProjectRoot, DefaultModel: model, Env: req.Env})
+	if err != nil {
+		return "", err
+	}
+	return d.Plan.Candidates[0], nil
 }
 
 func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {

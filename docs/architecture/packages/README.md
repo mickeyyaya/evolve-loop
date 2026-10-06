@@ -11,8 +11,11 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/fleet` | plans and runs concurrent, file-disjoint cycle lanes | [internal-fleet.md](internal-fleet.md) |
 | `internal/guards` | the in-process trust kernel: the six guards `evolve guard` runs | [internal-guards.md](internal-guards.md) |
 | `internal/inboxbatch` | the inbox item model and the deterministic half of task selection | [internal-inboxbatch.md](internal-inboxbatch.md) |
+| `internal/inboxrank` | the one computed inbox priority: a policy-weighted, explainable score and a total order over pending items (ADR-0121) | [internal-inboxrank.md](internal-inboxrank.md) |
+| `internal/recurrence` | the recurrence ledger over lesson patterns, its escalation policy, and the snapshot read and item counts the inbox rank uses | [internal-recurrence.md](internal-recurrence.md) |
 | `internal/ipcenv` | the lane protocol keys a parent evolve process sets for its children, their set (`ProtocolKeys`), and the `EVOLVE_` scrub every judging `go test` runs under | [internal-ipcenv.md](internal-ipcenv.md) |
 | `internal/looppreflight` | the readiness gate `evolve loop` runs before the first wave | [internal-looppreflight.md](internal-looppreflight.md) |
+| `internal/cliupdate` | updates each subscribed CLI family at a loop boundary, smoke-tests a changed version and records the change for the drift check | [internal-cliupdate.md](internal-cliupdate.md) |
 | `internal/phasecoherence` | drift reports between the hand-edited surfaces that define a phase | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/policy` | loads `.evolve/policy.json` into resolved configuration | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | loads the agent profiles in `.evolve/profiles/` | [internal-profiles.md](internal-profiles.md) |
@@ -29,6 +32,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/llmroute` | resolves the CLI and fallback chain that runs each phase | [internal-llmroute.md](internal-llmroute.md) |
 | `internal/cliroute` | the one CLI routing table (`policy.json` `cli_routing`) and the resolver every launch path calls, with the legacy projection pinned by a golden | [internal-cliroute.md](internal-cliroute.md) |
 | `internal/swarm` | provisions and dispatches parallel worker sessions within one phase | [internal-swarm.md](internal-swarm.md) |
+| `internal/tmuxtest` | gives a test binary that runs real tmux a tmux server only its own process owns | [internal-tmuxtest.md](internal-tmuxtest.md) |
+| `internal/fakeclitest` | stands in for a command-line tool in tests without writing a new executable file | [internal-fakeclitest.md](internal-fakeclitest.md) |
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
@@ -38,6 +43,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/coherence` | checks that a cycle's recorded verdicts and artifacts agree with each other | [internal-coherence.md](internal-coherence.md) |
 | `internal/reachabilityprobe` | proves a frozen test's pins stay reachable through the import graph | [internal-reachabilityprobe.md](internal-reachabilityprobe.md) |
 | `internal/interaction` | records every prompt interaction and correction outcome, and promotes auto-respond rules | [internal-interaction.md](internal-interaction.md) |
+| `internal/panewatch` | publishes each tmux phase pane's liveness snapshot for observers and operators | [internal-panewatch.md](internal-panewatch.md) |
 | `internal/phaseobserver` | watches one running phase for stalls and dead processes | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/loopwave` | plans, gates and launches each fleet wave | [internal-loopwave.md](internal-loopwave.md) |
 | `internal/dossier` | writes, commits and reads the per-cycle dossier record | [internal-dossier.md](internal-dossier.md) |
@@ -84,3 +90,4 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/setup` | the deterministic core behind `evolve setup` and `/evo:setup` | [internal-setup.md](internal-setup.md) |
 | `internal/skillcheck` | renders every generated plugin surface from its single source (ADR-0040) | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/subagent/subagentrun` | the `evolve subagent run` execution path | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
+| `internal/wtcheckpoint` | saves uncommitted worktree work as `refs/checkpoints` snapshots, and lists, restores, prunes and pushes them | [internal-wtcheckpoint.md](internal-wtcheckpoint.md) |

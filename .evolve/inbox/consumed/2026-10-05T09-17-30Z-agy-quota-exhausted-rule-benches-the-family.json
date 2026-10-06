@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "An agy pane matching quota_exhausted benches the agy family (red first)",
+    "Every escalate rule that names a quota or rate wall in any manifest is benchable (a test walks the manifests)"
+  ],
+  "consumed": {
+    "at": "2026-10-06T06:42:34Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "clihealth.Benchable accepts QuotaExhaustedPattern (quota_exhausted), the name agy-tmux and agy give their quota wall (go/internal/clihealth/clihealth.go). Pinned by TestBenchable_TheQuotaExhaustedWallIsBenchable, TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily (internal/bridgechain) and TestManifests_EveryQuotaOrRateWallRuleBenchesItsFamily (internal/bridge), which walks every manifest's escalate rules. Design: docs/research/agy-liveness-monitoring-2026-10.md, A6."
+  },
+  "created_at": "2026-10-05T09:40:00Z",
+  "files": [
+    "go/internal/bridge/manifests/agy-tmux.json",
+    "go/internal/clihealth/clihealth.go"
+  ],
+  "fix": "Make the wall benchable in one place: rename the manifest rule to the benchable pattern name, or add quota_exhausted to clihealth.Benchable, whichever keeps one vocabulary; check codex and claude manifests for the same mismatch.",
+  "id": "agy-quota-exhausted-rule-benches-the-family",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-10-05, architecture review of agy in the fallback tail",
+  "summary": "The agy-tmux manifest's quota_exhausted rule (quota.*exceed|daily limit|monthly limit|free.tier limit) escalates (exit 85) but writes the pattern name quota_exhausted, which clihealth.Benchable does not accept (it accepts rate_limit, exhausted, boot timeout and auth_recheck). So an agy daily or monthly quota wall is escalated per launch but never benched; agy is tried again at every dispatch. Found by the 2026-10-05 review of adding agy to the fallback tail.",
+  "title": "agy's quota_exhausted rule benches the agy family like a rate_limit wall",
+  "weight": 0.4
+}

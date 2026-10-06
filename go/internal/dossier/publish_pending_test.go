@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
@@ -136,9 +137,7 @@ func TestPublishPending_AFailedCommitKeepsThePairPendingAndTheCorpusClean(t *tes
 	if err := os.MkdirAll(hooks, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(hooks, "pre-commit"), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, filepath.Join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n")
 	head := r.Git("rev-parse", "HEAD")
 
 	res, err := PublishPending(r.Dir, io.Discard)

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/observerengine"
+	"github.com/mickeyyaya/evolve-loop/go/internal/panewatch"
 )
 
 // Default observer timings; policy.ObserverPolicy supplies the live values.
@@ -37,6 +38,13 @@ const (
 	activityScanMaxFiles = 500
 )
 
+const (
+	eventStallNoProgress = "stall_no_progress"
+	eventStallNoOutput   = "stall_no_output"
+	sourcePane           = "pane"
+	sourceStdout         = "stdout"
+)
+
 // Event is one observer emission, NDJSON-serialized.
 type Event struct {
 	TS       string `json:"ts"`
@@ -46,6 +54,9 @@ type Event struct {
 	Phase    string `json:"phase"`
 	Agent    string `json:"agent"`
 	Reason   string `json:"reason,omitempty"`
+	Source   string `json:"source,omitempty"`
+	Session  string `json:"session,omitempty"`
+	Busy     bool   `json:"busy,omitempty"`
 }
 
 // Config pins the observer's runtime parameters.
@@ -67,6 +78,8 @@ type Config struct {
 	// OnEvent, when set, receives every event synchronously after the sink write
 	// and outside the sink lock. It must not block.
 	OnEvent func(Event)
+
+	PaneWatch func() (panewatch.Snapshot, bool, error)
 }
 
 // Observer watches one phase's stdout log and workspace and emits events when rules fire.
@@ -99,10 +112,7 @@ func New(cfg Config, sink io.Writer) *Observer {
 // on cancellation and nil on Stop; a stall emits stall_no_output but never ends the watch.
 func (o *Observer) Watch(ctx context.Context) error {
 	o.emit("started", "info", "observer attached")
-	lastGrowth := o.nowFunc()
-	lastSize := o.statSize()
-	lastActivity := o.newestActivity()
-	stallEmitted := false
+	st := watchState{lastGrowth: o.nowFunc(), lastSize: o.statSize(), lastActivity: o.newestActivity()}
 
 	ticker := time.NewTicker(o.cfg.PollS)
 	defer ticker.Stop()
@@ -115,30 +125,96 @@ func (o *Observer) Watch(ctx context.Context) error {
 			o.emit("stopped", "info", "stop requested")
 			return nil
 		case <-ticker.C:
-			sz := o.statSize()
-			act := o.newestActivity()
-			if sz > lastSize || act.After(lastActivity) {
-				lastSize = sz
-				if act.After(lastActivity) {
-					lastActivity = act
-				}
-				lastGrowth = o.nowFunc()
-				stallEmitted = false
-				continue
-			}
-			if !stallEmitted && o.nowFunc().Sub(lastGrowth) >= o.cfg.StallS {
-				if o.cfg.LivenessProbe != nil && o.cfg.LivenessProbe() {
-					lastGrowth = o.nowFunc()
-					o.emit("stall_probe_active", "info",
-						fmt.Sprintf("no fs growth for %s but liveness probe active", o.cfg.StallS))
-					continue
-				}
-				o.emit("stall_no_output", "incident",
-					fmt.Sprintf("no stdout growth for %s", o.cfg.StallS))
-				stallEmitted = true
-			}
+			o.poll(&st)
 		}
 	}
+}
+
+type watchState struct {
+	lastGrowth   time.Time
+	lastSize     int64
+	lastActivity time.Time
+	paneProgress time.Time
+	stallEmitted bool
+	paneReadBad  bool
+}
+
+func (st *watchState) progressed(now time.Time) {
+	st.lastGrowth = now
+	st.stallEmitted = false
+}
+
+func (o *Observer) stallDue(st *watchState) bool {
+	return !st.stallEmitted && o.nowFunc().Sub(st.lastGrowth) >= o.cfg.StallS
+}
+
+func (o *Observer) poll(st *watchState) {
+	if snap, ok := o.paneSnapshot(st); ok {
+		o.pollPane(st, snap)
+		return
+	}
+	o.pollOutput(st)
+}
+
+func (o *Observer) paneSnapshot(st *watchState) (panewatch.Snapshot, bool) {
+	if o.cfg.PaneWatch == nil {
+		return panewatch.Snapshot{}, false
+	}
+	snap, ok, err := o.cfg.PaneWatch()
+	if err != nil && !st.paneReadBad {
+		st.paneReadBad = true
+		o.emit("pane_watch_unreadable", "info", err.Error()+" (falling back to stdout and workspace activity)")
+	}
+	return snap, ok && err == nil
+}
+
+func (o *Observer) pollPane(st *watchState, snap panewatch.Snapshot) {
+	if snap.ProgressAt.After(st.paneProgress) {
+		st.paneProgress = snap.ProgressAt
+		st.progressed(o.nowFunc())
+		return
+	}
+	if !o.stallDue(st) {
+		return
+	}
+	state := "idle at its prompt"
+	if snap.Busy {
+		state = "busy"
+	}
+	o.emitEvent(Event{Type: eventStallNoProgress, Severity: "incident", Source: sourcePane, Session: snap.Session, Busy: snap.Busy,
+		Reason: fmt.Sprintf("pane %s showed no new transcript for %s (%s)", snap.Session, o.cfg.StallS, state)})
+	st.stallEmitted = true
+}
+
+func (o *Observer) pollOutput(st *watchState) {
+	sz := o.statSize()
+	act := o.newestActivity()
+	if sz > st.lastSize || act.After(st.lastActivity) {
+		st.lastSize = sz
+		if act.After(st.lastActivity) {
+			st.lastActivity = act
+		}
+		st.progressed(o.nowFunc())
+		return
+	}
+	if !o.stallDue(st) {
+		return
+	}
+	if o.cfg.LivenessProbe != nil && o.cfg.LivenessProbe() {
+		st.progressed(o.nowFunc())
+		o.emit("stall_probe_active", "info",
+			fmt.Sprintf("no fs growth for %s but liveness probe active", o.cfg.StallS))
+		return
+	}
+	o.emitEvent(Event{Type: eventStallNoOutput, Severity: "incident", Source: sourceStdout, Reason: o.outputStallReason()})
+	st.stallEmitted = true
+}
+
+func (o *Observer) outputStallReason() string {
+	if o.cfg.WorkspaceDir == "" {
+		return fmt.Sprintf("no stdout growth for %s", o.cfg.StallS)
+	}
+	return fmt.Sprintf("no stdout growth and no workspace file activity for %s", o.cfg.StallS)
 }
 
 // newestActivity returns the newest file mtime under WorkspaceDir, excluding
@@ -191,15 +267,12 @@ func (o *Observer) statSize() int64 {
 }
 
 func (o *Observer) emit(eventType, severity, reason string) {
-	e := Event{
-		TS:       o.nowFunc().UTC().Format(time.RFC3339Nano),
-		Type:     eventType,
-		Severity: severity,
-		Cycle:    o.cfg.Cycle,
-		Phase:    o.cfg.Phase,
-		Agent:    o.cfg.Agent,
-		Reason:   reason,
-	}
+	o.emitEvent(Event{Type: eventType, Severity: severity, Reason: reason})
+}
+
+func (o *Observer) emitEvent(e Event) {
+	e.TS = o.nowFunc().UTC().Format(time.RFC3339Nano)
+	e.Cycle, e.Phase, e.Agent = o.cfg.Cycle, o.cfg.Phase, o.cfg.Agent
 	o.encMu.Lock()
 	if b, err := json.Marshal(e); err == nil {
 		_, _ = o.sink.Write(append(b, '\n'))

@@ -35,6 +35,8 @@ type Options struct {
 	Runner    Runner
 	Now       func() time.Time
 
+	LintBudget time.Duration
+
 	TestInstall  string
 	ForceMissing string
 	lookPath     func(string) (string, error)

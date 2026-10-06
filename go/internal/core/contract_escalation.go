@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -84,21 +86,13 @@ type contractDispatch struct {
 	salvageRetried bool
 }
 
-// contractEscalationProfile resolves the profile governing a phase, plus the
-// AGENT name whose EVOLVE_<AGENT>_CLI env key the dispatch resolver reads.
-//
-// Two lookups, in precedence order: the built-in phase→agent table, then the
-// `<phase>.json` convention every MINTED/user phase follows. The second is
-// load-bearing, not defensive: phaseAgentName covers only the built-in spine
-// phases, so a minted phase with a real .evolve/profiles/<phase>.json would
-// otherwise resolve to nil through the built-in table alone and could never
-// escalate.
 func (cr *cycleRun) contractEscalationProfile(phase Phase) (*profiles.Profile, string) {
-	loader := profiles.NewFromDir(filepath.Join(cr.req.ProjectRoot, ".evolve", "profiles"))
-	if loader == nil {
-		return nil, string(phase)
-	}
-	for _, agent := range []string{phaseAgentName[string(phase)], string(phase)} {
+	return phaseProfile(cr.req.ProjectRoot, string(phase))
+}
+
+func phaseProfile(projectRoot, phase string) (*profiles.Profile, string) {
+	loader := profiles.NewFromDir(filepath.Join(projectRoot, ".evolve", "profiles"))
+	for _, agent := range []string{phaseAgentName[phase], phase} {
 		if agent == "" {
 			continue
 		}
@@ -106,53 +100,57 @@ func (cr *cycleRun) contractEscalationProfile(phase Phase) (*profiles.Profile, s
 			return &prof, agent
 		}
 	}
-	return nil, string(phase)
+	return nil, phase
 }
 
-// contractDispatchCLI names the CLI a phase's deliverable was actually produced
-// by: the routing override when one is in force, else the primary the dispatch
-// resolver would pick. It goes through llmroute.Resolve rather than reading
-// profile.CLI because EVOLVE_<AGENT>_CLI / EVOLVE_CLI outrank the profile — a
-// WARN (or an escalation family test) computed from profile.CLI would name a CLI
-// that never ran.
 func (cr *cycleRun) contractDispatchCLI(phase Phase, override string) string {
 	if override != "" {
 		return override
 	}
-	prof, agent := cr.contractEscalationProfile(phase)
-	if plan := llmroute.Resolve(agent, string(phase), "", cr.envSnap, prof, nil, nil); len(plan.Candidates) > 0 {
-		return plan.Candidates[0]
+	d, routed := cr.routingDecision(phase)
+	if !routed {
+		return universalContractFallbackCLI
 	}
-	return universalContractFallbackCLI
+	return d.Plan.Candidates[0]
 }
 
-// contractEscalationCLI picks the CLI a contract-blocked re-dispatch escalates
-// to: the first candidate in the phase's resolved dispatch chain belonging to a
-// DIFFERENT family than the one that just failed, else the universal claude
-// fallback. dispatchedCLI is the CLI the blocks are attributable to.
-//
-// The family test is what makes this an escalation rather than a shuffle — a
-// same-family sibling driver runs the same model through the same prompt renderer
-// and would reproduce the identical format violation. A phase whose whole chain
-// is one family, and that family is the universal fallback's, therefore has no
-// target and returns ok=false: the ladder then behaves exactly as before.
 func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (string, bool) {
-	prof, agent := cr.contractEscalationProfile(phase)
-	plan := llmroute.Resolve(agent, string(phase), "", cr.envSnap, prof, nil, nil)
+	d, routed := cr.routingDecision(phase)
+	if !routed {
+		return "", false
+	}
 	failed := llmroute.Family(cr.contractDispatchCLI(phase, dispatchedCLI))
-	for _, c := range plan.Candidates {
-		if c == "" || llmroute.Family(c) == failed {
-			continue
-		}
-		if cr.escalationAllowed(phase, c, prof) {
+	candidates := slices.Clone(d.Plan.Candidates)
+	if d.Legacy() {
+		candidates = append(candidates, universalContractFallbackCLI)
+	}
+	for _, c := range candidates {
+		if c != "" && llmroute.Family(c) != failed && escalationAllowed(phase, c, d) {
 			return c, true
 		}
 	}
-	if llmroute.Family(universalContractFallbackCLI) != failed &&
-		cr.escalationAllowed(phase, universalContractFallbackCLI, prof) {
-		return universalContractFallbackCLI, true
-	}
 	return "", false
+}
+
+func (cr *cycleRun) routingDecision(phase Phase) (cliroute.Decision, bool) {
+	prof, agent := cr.contractEscalationProfile(phase)
+	router, err := cr.cliRouter(agent, prof)
+	d := cliroute.Decision{}
+	if err == nil {
+		d, err = router.Resolve(cliroute.Request{Agent: agent, Phase: string(phase), ProjectRoot: cr.req.ProjectRoot, Env: cr.envSnap})
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract escalation has no route: %v\n", phase, err)
+		return cliroute.Decision{}, false
+	}
+	return d, true
+}
+
+func (cr *cycleRun) cliRouter(agent string, prof *profiles.Profile) (*cliroute.Router, error) {
+	if cr.o != nil && cr.o.cliRouter != nil {
+		return cr.o.cliRouter, nil
+	}
+	return cliroute.NewSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{Agent: agent, Profile: prof}, cliroute.Host{})
 }
 
 // contractBlocksShareIdentity reports whether the contract block now on the
@@ -270,15 +268,9 @@ func newContractBlockIdentity(reason string) contractBlockIdentity {
 	return id
 }
 
-// escalationAllowed keeps the escalation inside the guardrails that bound the
-// sanctioned ModelRoutingCLI writer. policy.ValidatePin is the SINGLE validator
-// for a profile's allowed_clis, and the routing projection in cyclerun_dispatch
-// only ever writes values that passed it (via router.ClampPlanModelRouting) — so
-// escalating past it would make this the one path that can route a phase to a
-// CLI family its operator forbade (e.g. tester allowed_clis=["claude"]).
-func (cr *cycleRun) escalationAllowed(phase Phase, cli string, prof *profiles.Profile) bool {
-	if err := policy.ValidatePin(string(phase), policy.Pin{CLI: cli}, prof); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract-escalation candidate cli=%s refused by the profile guardrails: %v\n", phase, cli, err)
+func escalationAllowed(phase Phase, cli string, d cliroute.Decision) bool {
+	if !d.Allows(cli) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract-escalation candidate cli=%s refused: outside the allowed set %v\n", phase, cli, d.Allowed)
 		return false
 	}
 	return true

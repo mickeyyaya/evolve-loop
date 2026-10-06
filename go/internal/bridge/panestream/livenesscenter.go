@@ -84,7 +84,7 @@ func (sc *LivenessCenter) Observe(sessionKey, rendered string, profile PaneProfi
 	ss.last = state
 
 	ss.busy = PaneBusy(rendered, profile)
-	clean := cleanPane(rendered)
+	clean := cleanPaneFor(rendered, profile)
 	ss.changed = existed && clean != ss.clean
 	ss.clean = clean
 	ss.mu.Unlock()

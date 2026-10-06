@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The four ambient git variable names are defined once, in internal/gitexec, and treefence imports them or the Isolated runner",
+    "treefence writes its snapshot trees through gitexec.TreeOfIndexCopy; its existing fence tests pass unchanged, and the allFiles behaviour on a missing index is a named test either way",
+    "No second copy of the index-copy routine remains (grep for os.Chtimes on an index copy finds only gitexec)"
+  ],
+  "created_at": "2026-10-06T07:30:00Z",
+  "files": [
+    "go/internal/treefence/fence.go",
+    "go/internal/gitexec/scratchindex.go"
+  ],
+  "fix": "Move treefence's snapshot onto gitexec.TreeOfIndexCopy and its git calls onto gitexec.Isolated (or give gitexec a seed-optional variant if the allFiles tolerance is still wanted, decided and pinned by a test), delete treefence's copyIndex and ambientGitVars, and keep ambientGitVars defined only in gitexec. treefence is the read-only phase fence (ADR-0097): land it as its own reviewed refactor, not inside a feature.",
+  "id": "treefence-writes-its-snapshot-through-gitexec-tree-of-index-copy",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console lane cl-checkpoint, architecture re-review of evolve checkpoint, 2026-10-06",
+  "summary": "evolve checkpoint added gitexec.Git.TreeOfIndexCopy (copy the worktree's index from one file handle keeping its mtime, run git add on the copy through GIT_INDEX_FILE, write-tree) and gitexec.Isolated (drops inherited GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_COMMON_DIR). internal/treefence still carries its own copy of both: writeTreeMode/copyIndex (go/internal/treefence/fence.go) and its ambientGitVars list, so the two four-name lists and the two copy routines can drift apart. The copies already differ in one way that matters: treefence's allFiles mode tolerates a failed real-index seed and builds the tree from an empty index, which TreeOfIndexCopy refuses.",
+  "title": "treefence keeps a private copy of the scratch-index tree writer that gitexec now owns",
+  "weight": 0.3
+}

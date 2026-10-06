@@ -20,6 +20,7 @@ type replWaitState struct {
 	livenessCenter  *panestream.LivenessCenter
 	paneProfile     panestream.PaneProfile
 	livenessProfile panestream.PaneProfile
+	paneWatch       *paneWatcher
 	fatalPaneStage  string
 	fatalDetector   *recovery.FatalPaneDetector
 	detector        completionDetector
@@ -106,6 +107,7 @@ func newReplWaitState(w replWaiter) *replWaitState {
 		livenessCenter:  livenessCenter,
 		paneProfile:     paneProfile,
 		livenessProfile: livenessProfile,
+		paneWatch:       newPaneWatcher(w.cfg, w.launch, paneProfile, w.deps.Stderr, w.prefix),
 		fatalPaneStage:  fatalPaneStage,
 		fatalDetector:   fatalDetector,
 		detector:        newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, w.dispatchBase),
