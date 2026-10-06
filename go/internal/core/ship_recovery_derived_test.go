@@ -318,32 +318,34 @@ func TestRegenerateDerivedArtifact_UnregisteredPath_Errors(t *testing.T) {
 	}
 }
 
-// TestRegenerateDerivedArtifact_Integration exercises the real production path:
-// `go run ./cmd/evolve flags generate` from the worktree's go/ with
-// EVOLVE_WORKTREE_ROOT set. Run against the repo itself — control-flags.md is
-// committed in sync with the registry, so flagsRun's up-to-date guard makes this
-// a no-op write (the file is byte-identical before/after). Compiles cmd/evolve,
-// so it is skipped under -short.
 func TestRegenerateDerivedArtifact_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("compiles cmd/evolve via `go run`; skipped under -short")
 	}
 	root := repoRootForTest(t)
-	docPath := filepath.Join(root, cflags)
-	before, err := os.ReadFile(docPath)
+	committed, err := os.ReadFile(filepath.Join(root, cflags))
 	if err != nil {
 		t.Fatalf("read %s: %v", cflags, err)
 	}
-	if err := regenerateDerivedArtifact(context.Background(), root, cflags); err != nil {
+	worktree := t.TempDir()
+	if err := os.Symlink(filepath.Join(root, "go"), filepath.Join(worktree, "go")); err != nil {
+		t.Fatal(err)
+	}
+	docPath := filepath.Join(worktree, cflags)
+	if err := os.MkdirAll(filepath.Dir(docPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(docPath, committed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := regenerateDerivedArtifact(context.Background(), worktree, cflags); err != nil {
 		t.Fatalf("regenerate failed: %v", err)
 	}
 	after, err := os.ReadFile(docPath)
 	if err != nil {
 		t.Fatalf("re-read %s: %v", cflags, err)
 	}
-	if string(before) != string(after) {
-		// Restore so a drift here does not leave the worktree dirty.
-		_ = os.WriteFile(docPath, before, 0o644)
+	if string(committed) != string(after) {
 		t.Fatalf("%s changed after regeneration — the committed projection is out of sync with the registry", cflags)
 	}
 }

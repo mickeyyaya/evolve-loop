@@ -122,8 +122,8 @@ func unit16Artifact(t *testing.T, path, token string, at time.Time) {
 // fixed order: prompt reader, role, cycle, workspace, the legacy escape
 // hatch, the recursion depth.
 func TestRun_AdmissionOrderIsFixed(t *testing.T) {
-	_, ws, worktree := unit16Dirs(t)
-	req := RunRequest{Agent: "bogus", Cycle: -1, WorkspacePath: "/non/existent", LegacyAgentDispatch: true, DispatchDepth: 99, WorktreePath: worktree}
+	root, ws, worktree := unit16Dirs(t)
+	req := RunRequest{Agent: "bogus", Cycle: -1, WorkspacePath: "/non/existent", LegacyAgentDispatch: true, DispatchDepth: 99, WorktreePath: worktree, ProjectRoot: root}
 	fix := []struct {
 		name string
 		fix  func(*RunRequest)

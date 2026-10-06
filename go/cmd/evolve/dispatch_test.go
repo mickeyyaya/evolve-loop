@@ -168,7 +168,7 @@ func TestDispatch_GuardShip_Allow(t *testing.T) {
 	// ship.sh-shaped command — guard should allow.
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"bash scripts/lifecycle/ship.sh msg"}}`)
 	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"guard", "ship"}, in, &stdout, &stderr)
+	code := dispatch([]string{"guard", "ship", "--evolve-dir", t.TempDir()}, in, &stdout, &stderr)
 	if code != 0 {
 		t.Errorf("want 0, got %d, stderr=%s", code, stderr.String())
 	}
@@ -181,7 +181,7 @@ func TestDispatch_GuardShip_Deny(t *testing.T) {
 	t.Setenv("EVOLVE_BYPASS_SHIP_GATE", "")
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"git commit -m bypass"}}`)
 	var stdout, stderr bytes.Buffer
-	code := dispatch([]string{"guard", "ship"}, in, &stdout, &stderr)
+	code := dispatch([]string{"guard", "ship", "--evolve-dir", t.TempDir()}, in, &stdout, &stderr)
 	if code != 2 {
 		t.Errorf("want 2 (deny), got %d, stderr=%s", code, stderr.String())
 	}

@@ -106,7 +106,6 @@
   "internal/phases/swarmrunner/swarmrunner_test.go": 2,
   "internal/phases/triage/carryforward_bounds_test.go": 3,
   "internal/phases/triage/premise_drift_test.go": 1,
-  "internal/phasespec/tracked_realtree_test.go": 1,
   "internal/profiles/tracked_realtree_test.go": 1,
   "internal/recoveryguard/guard_test.go": 1,
   "internal/reportdoc/reportdoc_test.go": 5,
