@@ -132,12 +132,12 @@ func maybeRefreshChainBoundary(cfg loopConfig, batch int, stderr io.Writer) (ref
 	return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch)
 }
 
-func takeReexecHandoff(evolveDir string, stderr io.Writer) int {
-	done, err := loopchain.TakeHandoff(filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile), loopchain.Claim{PID: os.Getpid(), Commit: chainRunningCommitFn(), At: time.Now()})
+func takeReexecHandoff(evolveDir string, stderr io.Writer) (int, bool) {
+	done, handedOff, err := loopchain.TakeHandoff(filepath.Join(evolveDir, chainBoundaryRefreshAttemptFile), loopchain.Claim{PID: os.Getpid(), Commit: chainRunningCommitFn(), At: time.Now()})
 	if err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: boundary re-exec handoff not honoured (%v) — starting at wave 0 with the full budget\n", err)
 	}
-	return done
+	return done, handedOff
 }
 
 // lastChainBoundaryRefreshLogEntry reads the audit trail's LAST entry —
@@ -172,7 +172,7 @@ func wiredChain(cfg loopConfig, cc policy.ChainConfig, stdin io.Reader, stdout, 
 		Batch: func() int {
 			signals.Flush()
 			batchCfg := next
-			next.ResumeWaves = 0
+			next.ResumeWaves, next.HandedOff = 0, false
 			return runLoopBatchFn(batchCfg, stdin, stdout, stderr)
 		},
 		Refresh:     func(batch int) bool { return wiredRefresher(cfg, stderr, signals).Refresh(context.Background(), batch) },

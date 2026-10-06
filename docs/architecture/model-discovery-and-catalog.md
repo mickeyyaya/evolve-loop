@@ -93,6 +93,12 @@ Rules the seam enforces, matrix-wide:
 - **Resolution order**: policy pin (exact model, bypasses the catalog) → live catalog overlay (`source=="live"` entries only) → the manifest's `model_tier_map` offline defaults. Unknown non-tier values pass through verbatim as raw model identifiers.
 - **No silent drops**: a multi-model CLI may not declare a do-nothing channel — the parity pin (`go/internal/bridge/model_tier_parity_test.go`) rejects that shape; agy carried exactly that defect from 2026-05-31 (agy 1.0.3 had no model flag at all — incident cycle-154) until the 2026-07-02 re-probe found agy 1.0.15 grew `--model`.
 
+### Currency: the installed CLI bounds the catalog (2026-10-05)
+
+A CLI's `/model` picker lists only the models its installed version knows, so a refresh can be no more current than the CLI. Sonnet 5.5 was missed until `claude update` (2026-09-30), and on 2026-10-05 every agy dispatch still ran Gemini 3.7 Flash while `agy models` listed 3.8. The operator's answer is the [model currency plan](../plans/model-currency-2026-10.md): every dispatch runs the latest model of its line, checked and adopted at each boundary. Its components are C1 (classifier fallback and loud degradation), C2 (lineage-keyed reuse), C3 (`refresh_stage: enforce`, adopted per family), C4 (the boundary CLI update), C5 (launch verification) and C6 (classifier routing).
+
+C4 has landed. `evolve cli update` ([internal-cliupdate.md](packages/internal-cliupdate.md)) runs each subscribed family's manifest updater (`update_argv`) at loop boot and at every later wave boundary, smoke-tests a changed version with `evolve doctor live`, and halts the next wave when that smoke fails. It runs before the catalog refresh, so the refresh lists the new version's models. CLIs stay frozen within a wave, and `cli-version-drift` treats a change the updater recorded in `.evolve/cli-updates.json` as expected. agy's listers (`agy models`, `agy --help`) run with the agy manifest's `default_env` through `modelquery.UseProcessEnv(bridge.ProcessEnv)`, so a refresh never self-updates agy mid-wave.
+
 ## Deferred
 
 - Feed picker capability-descriptions to the classifier for sharper tiering (noted in PR #31).

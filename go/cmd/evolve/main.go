@@ -154,6 +154,10 @@ v12.1 utilities + composition:
   clihealth                 CLI quota/credential benches
                               ( clihealth list [--json] [--project-root DIR]
                               | clihealth clear <family> [--project-root DIR] )
+  cli                       Update each subscribed CLI family, then
+                              smoke-test a changed version
+                              ( cli update [--dry-run] [--json]
+                              [--project-root P] )
   ratchet                   Function-size + raw-git-fixture ratchets
                               ( ratchet check [size|rawgit] [--root DIR] )
   context-fill              Context-window fill telemetry; correlates each
