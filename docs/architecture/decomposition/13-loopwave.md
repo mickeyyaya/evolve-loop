@@ -155,7 +155,7 @@ type Option func(*options) // shared: WithSignals(func() *Center), WithNow(func(
 type Refresher struct { /* roots; deps; stderr io.Writer; opts */ }
 func NewRefresher(roots Roots, deps RefreshDeps, warn io.Writer, opts ...Option) *Refresher
 func (r *Refresher) Refresh(ctx context.Context, batch int) (refreshed bool) // guards → rebuildAndRepin → armAndExec; Flush immediately before ReExec; ctx checked before the rebuild, after it and before the exec (2026-09-29, §11)
-func TakeHandoff(attemptPath string, c Claim) (int, error) // Claim{PID, Commit, At}; the wave-boundary re-exec handoff (2026-09-29, §11)
+func TakeHandoff(attemptPath string, c Claim) (wavesDone int, taken bool, err error) // Claim{PID, Commit, At}; the wave-boundary re-exec handoff (2026-09-29, §11); `taken` since 2026-10-06 (a wave-0 handoff)
 func (r *Refresher) SignalsWired() bool
 func GitAhead(projectRoot, runningCommit string) (bool, error)
 func GitProvenance(runningCommit func() string) func(projectRoot string) (string, phaseintegrity.ProvenanceVerified)

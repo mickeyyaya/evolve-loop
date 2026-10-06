@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the loop installs a newer Claude Code or agy at each boundary and smoke-tests it before dispatch: `evolve cli update` (2026-10-05)
+
+- **Why.** A CLI's `/model` picker lists only the models its installed version knows, so the catalog can be no more current than the CLI: Sonnet 5.5 was missed until `claude update` (2026-09-30). The operator decided on 2026-10-05 that a newer CLI found at a wave boundary is installed **at that boundary**, smoke-tested, and only then dispatched; CLIs stay frozen within a wave ([model currency plan, C4](docs/plans/model-currency-2026-10.md)).
+- **What changed.**
+  - **The updater is manifest data.** `update_argv` in the family manifests: `claude-tmux.json` `["claude", "update"]`, `agy-tmux.json` `["agy", "update"]`. codex and ollama declare none and report `no-updater`, never a failure.
+  - **New package `internal/cliupdate`.** For each subscribed family it reads `<bin> --version` (the readiness gate's own probe, now exported as `looppreflight.CLIVersion`), runs the updater, reads the version again, and smoke-tests with the `evolve doctor live <family>-tmux` probe any version the updater may have touched. It returns one typed result per family: `unchanged`, `updated`, `update-failed`, `smoke-failed`, `no-updater` or `skipped`. "Subscribed", until the routing table's `cli_routing.clis` is wired (L2), means installed, not on a cli-health credential-wall bench, and answering `doctor live`, so an unsubscribed codex is skipped. Every version change goes to `.evolve/cli-updates.json`.
+  - **New verb `evolve cli update [--dry-run] [--json] [--project-root P]`.** It prints a table or JSON. Exit 0 is clean, 1 means some family is `update-failed` or `smoke-failed`, 2 is a usage error. `--dry-run` lists what would run and probes, updates and records nothing.
+  - **The loop runs it at two points:** at boot, after the unfinished-cycle guard and before the readiness gate (so before any catalog refresh), and at each later wave boundary, after the plane sync. A `smoke-failed` family halts the next wave: exit 2, `stop_reason=cli_update_smoke_halt`, the result's new `cli_update_halt`, and a `LOOP_HALT` incident naming the family and versions (the code's registered description now lists every boundary halt). An `update-failed` family whose smoke passed is a `[loop] WARN: cli-update:` line, and the wave proceeds on the proven CLI.
+  - **Drift.** `cli-version-drift` passes a change that only recorded boundary updates explain, and still warns on any other change (a mid-wave self-update or a manual install). A record never relaxes `cli-version-freeze`.
+- **Scope note (2026-10-06): agy self-updates, and now cannot inside the loop.**
+  - **What happened.** agy moved 1.2.14 → 1.2.16 → 1.2.17 outside any boundary, and wave 62's readiness gate halted on `bridge-boot` (`agy-tmux rc=80`, blank pane).
+  - **What agy has.** Read-only research of agy 1.2.17 found a launch-time self-updater, and `AGY_CLI_DISABLE_AUTO_UPDATE` as its off switch; it has no settings key.
+  - **Freeze at the source.** Both agy manifests declare that variable (new `auto_update_off_env`) and set it in `default_env`, so every realized agy launch runs with the updater off. The recipe boot behind the `/model` capture now exports the realized env too.
+  - **The freeze check.** `cli-version-freeze` treats a manifest that sets its declared off switch as frozen at the source, and halts on one that does not, naming the manifest fix rather than a brew pin.
+  - **What still moves.** The record now keeps the versions the boundary accepted (`baseline`, `update`, `self-update`). A version that differs from a family's last record is smoke-booted before anything else launches it and reported `self-updated` (a failed smoke halts and is never recorded). `cli-version-drift` reports it `self-updated, smoke OK`.
+  - **Tests, red first:**
+    - `TestRunLoop_AnUnrecordedAgyVersionChangeIsSmokeBootedBeforeThePreflightGate`;
+    - `TestUpdate_AnUnrecordedVersionChangeIsSmokeBootedBeforeTheUpdaterRuns` and its siblings;
+    - `TestVersionDrift_ASelfUpdateTheBoundarySmokeBootedIsReportedAsSelfUpdatedSmokeOK`;
+    - `TestAgyManifests_EveryLaunchRealizesTheSelfUpdaterOff`, `TestRecipeBoot_ExportsTheRealizedEnvBetweenTheCdAndTheLaunch` and `TestRecipeBoot_AnAgyModelCaptureLaunchesWithTheSelfUpdaterOff`;
+    - `TestRun_VersionFreeze_AnAgyManifestWithoutItsOffSwitchHaltsNamingTheManifestFix` and its siblings.
+  - `checkCLIVersionFreeze`'s size allowance shrinks from 87 to 86.
+- **Architecture review revision (FIX_THEN_MERGE, 2026-10-06):**
+  - **CRITICAL fixed, the off switch reaches every agy exec.** The catalog refresh lists agy with bare `agy models` and `agy --help` (`modelquery.AgyLister`, `HelpEffortLister`, at cycle start inside a wave), not through the recipe `/model` capture, and `agy --version` and the bridge doctor's probes were bare too.
+    - **One source.** `bridge.ProcessEnv(bin)` is now that source (the process env plus the `<bin>-tmux` manifest's `default_env`); it feeds `modelquery.UseProcessEnv` (installed by `cmd/evolve`; the C1 call sites in `cmd_models_live.go` are untouched), `looppreflight`'s version probe, and `bridge.doctorVersion`/`doctorDeep`.
+    - **Tests:**
+      - the real `AgyLister`, `HelpEffortLister` and version probe against a fake `agy` that refuses without the switch;
+      - the production `DefaultRouter`/`DefaultEffortListers` through `cmd/evolve`'s wiring.
+  - **W1.** The updater runs through `cliupdate.GroupRunner` (process group, group kill on deadline, `WaitDelay`). The old runner waited 60 s past a 1 s deadline on `sh -c "sleep 12 & sleep 60"`.
+  - **W2.** The version is read before the `doctor live` probe, and a found change's smoke is the probe, so a self-updated CLI that no longer boots halts the next wave instead of being skipped. `Seams.Subscribed` became `Eligible` + `Probe`, and a probe-failure skip is a `[loop] WARN:` line.
+  - **W3.** `evolve cli update` refuses (exit 2) while a run holds a live lease, unless `--dry-run`.
+  - **N1.** A re-exec at wave 0 no longer repeats the boot update: `loopchain.TakeHandoff` returns `taken`, and the boot update skips on `loopConfig.HandedOff`.
+  - **N2.** The updater's env drops the family's off switch (`Family.AutoUpdateOffEnv`).
+  - **N3.** An unreadable starting version is smoke-tested.
+  - **N4.** An interrupt is `skipped: interrupted`, never `smoke-failed` and never recorded, and the verb exits 130.
+  - **N5.** The drift check uses only records written after the `cli-versions.json` baseline.
+  - **N6.** The worst-case boundary stall (about 18 minutes per family) is documented.
+  - **Proof.** Each fix's test fails with that fix reverted.
+- **Tests, red first**, using fakes only, so no real updater ran:
+  - `TestUpdate_*`, `TestPlan_*`, `TestSubscribed_*`, `TestExec_*`, `TestRemember_*`, `TestExplains_*` (44 in `internal/cliupdate`, 100% coverage);
+  - `TestUpdateArgv_*` in bridge;
+  - `TestVersionDrift_AChangeTheBoundaryUpdaterRecordedIsExpectedNotDrift`, `TestVersionDrift_AChangeTheBoundaryUpdaterDidNotRecordStillWarns`, `TestVersionDrift_ExpectedAndUnrecordedChangesAreReportedApart`, `TestVersionDrift_AnUnreadableUpdateRecordLeavesEveryChangeAsDrift`, `TestRun_VersionFreeze_ABoundaryUpdateRecordDoesNotUnfreezeASelfUpdater` and `TestCLIVersion_ReadsTheFirstVersionToken` in looppreflight;
+  - `TestCLIUpdate_*` (table, JSON, exit 1 on either failure, a dry run that calls nothing, usage errors);
+  - `TestRunLoop_TheBootCLIUpdateRunsBeforeThePreflightGate`, `TestRunLoop_ASmokeFailureAtBootHaltsBeforeAnyCycleNamingTheFamilyAndVersion`, `TestPrepareIteration_ASmokeFailureAtAWaveBoundaryHaltsTheNextWave`, `TestPrepareIteration_TheFirstIterationOfAProcessLeavesTheUpdateToBoot`, `TestPrepareIteration_AnUpdateFailureWithAHealthySmokeWarnsAndTheWaveProceeds`, `TestPrepareIteration_AnInterruptDuringTheUpdateStopsTheBatchWithoutAHalt` and `TestBootCLIUpdate_AReexecHandoffLeavesTheUpdateToTheBoundaryThatRanIt` in cmd/evolve.
+- **Docs:**
+  - the C4 landing notes in the plan;
+  - [internal-cliupdate.md](docs/architecture/packages/internal-cliupdate.md) and its row in the packages index;
+  - the looppreflight, bridge and cmd-evolve package notes;
+  - runtime-reference (the operator verb and the "Boundary CLI update" row);
+  - a currency section in [model-discovery-and-catalog.md](docs/architecture/model-discovery-and-catalog.md);
+  - a `loop.halt` producer row in the Signal Center design, and the regenerated signal-codes.md.
+- `internal/cliupdate` is enrolled in `go/.apicover-enforce` and held at 100% in `go/.cover-strict`.
+- `prepareFreshBatch` hands its boot gate (the CLI update, then the readiness gate) to `bootGateHalts`, and its size-ratchet allowance shrinks from 56 to 53.
+
 ## Fixed — `evolve models refresh` tries every ready CLI to classify and says which CLIs fell back; agy's offline fast/balanced move to Gemini 3.8 Flash (2026-10-05)
 
 - **What was wrong and how it showed.** The operator wanted agy on its newest Flash, but the loop still ran Gemini 3.7 Flash: the live catalog's agy entry was last classified on 2026-08-14, and `evolve models refresh --source live` never picked up 3.8. `liveRefresh` ran every family's tier classification on one CLI, chosen by `pickClassifierCLI` from the `classifierCLIPreference` literal (codex > claude > agy) among the CLIs setup detect calls ready. Detect calls codex ready because a stale auth file exists, though the operator has no codex subscription. The codex classifier launch failed (`classifier codex: bridgePromptDispatcher: launch codex: bridge: launch exit=1`) and no other ready CLI was tried, so agy, claude and ollama all fell back to their detect maps, agy's being the manifest's 3.7 map. The command still printed `Refreshed model catalog (source: live /model (detect fallback))` and exited 0.

@@ -184,27 +184,13 @@ func checkCLIVersionDrift(o resolved) CheckResult {
 
 	cachePath := filepath.Join(o.evolveDir, "cli-versions.json")
 	prev, _ := loadVersionCache(cachePath)
-
-	var warns []string
-	for bin, curVer := range current {
-		prevVer, hadPrev := prev[bin]
-		if !hadPrev || prevVer == curVer {
-			continue
-		}
-		warns = append(warns, fmt.Sprintf("%s changed: %s → %s", bin, prevVer, curVer))
-	}
-	sort.Strings(warns)
+	changes := classifyVersionChanges(o.evolveDir, prev, current)
 
 	// Best-effort: a failed save only costs the next batch its comparison.
 	_ = saveVersionCache(cachePath, current)
 
-	if len(warns) > 0 {
-		return CheckResult{
-			Name:    name,
-			Level:   LevelWarn,
-			Message: fmt.Sprintf("%d CLI(s) changed version since last batch", len(warns)),
-			Detail:  strings.Join(warns, "\n"),
-		}
+	if res, changed := changes.result(name); changed {
+		return res
 	}
 
 	parts := make([]string, 0, len(current))

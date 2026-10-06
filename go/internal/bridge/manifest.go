@@ -75,6 +75,8 @@ type Manifest struct {
 	// use Manifest.IsTmux() rather than the CLI name string.
 	Transport        string              `json:"transport,omitempty"`
 	BinaryMinVersion string              `json:"binary_min_version"`
+	UpdateArgv       []string            `json:"update_argv,omitempty"`
+	AutoUpdateOffEnv string              `json:"auto_update_off_env,omitempty"`
 	DefaultTier      string              `json:"default_tier"`
 	TierDependencies map[string][]string `json:"tier_dependencies"`
 	PromptMarker     string              `json:"prompt_marker"`

@@ -3,21 +3,26 @@ package looppreflight
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 // versionCaptureTimeout drops a hung binary from the inventory instead of stalling batch start.
-const versionCaptureTimeout = 5 * time.Second
+var versionCaptureTimeout = 5 * time.Second
 
 // execVersion runs "<bin> --version"; tests replace it.
 var execVersion = func(bin string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCaptureTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, bin, "--version").Output()
+	cmd := exec.CommandContext(ctx, bin, "--version")
+	cmd.Env = bridge.ProcessEnv(bin)
+	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
@@ -27,16 +32,24 @@ var execVersion = func(bin string) (string, error) {
 // versionTokenRE matches the first M.N or M.N.P token, as in "codex-cli 0.139.0".
 var versionTokenRE = regexp.MustCompile(`\d+\.\d+(?:\.\d+)?`)
 
+func CLIVersion(bin string) (string, error) {
+	raw, err := execVersion(bin)
+	if err != nil {
+		return "", fmt.Errorf("%s --version: %w", bin, err)
+	}
+	token := versionTokenRE.FindString(raw)
+	if token == "" {
+		return "", fmt.Errorf("%s --version printed no version token: %q", bin, raw)
+	}
+	return token, nil
+}
+
 // captureVersionInventory omits bins whose probe fails or prints no version token.
 func captureVersionInventory(bins []string) map[string]string {
 	inv := make(map[string]string, len(bins))
 	for _, b := range bins {
-		raw, err := execVersion(b)
-		if err != nil || raw == "" {
-			continue
-		}
-		if m := versionTokenRE.FindString(raw); m != "" {
-			inv[b] = m
+		if v, err := CLIVersion(b); err == nil {
+			inv[b] = v
 		}
 	}
 	return inv

@@ -181,8 +181,8 @@ func TestLoopPreflightOnly_LeavesTheBoundaryReexecHandoffForTheLoop(t *testing.T
 	if err != nil || !bytes.Equal(after, armed) {
 		t.Fatalf("--preflight-only consumed or rewrote the boundary re-exec handoff (err=%v):\nbefore %s\nafter  %s", err, armed, after)
 	}
-	if waves := takeReexecHandoff(evolveDir, io.Discard); waves != 1 {
-		t.Errorf("the handoff must still be honourable by the real loop after --preflight-only: waves=%d want 1", waves)
+	if waves, handedOff := takeReexecHandoff(evolveDir, io.Discard); waves != 1 || !handedOff {
+		t.Errorf("the handoff must still be honourable by the real loop after --preflight-only: waves=%d handedOff=%v want 1, true", waves, handedOff)
 	}
 }
 
