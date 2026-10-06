@@ -32,6 +32,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/llmroute` | resolves the CLI and fallback chain that runs each phase | [internal-llmroute.md](internal-llmroute.md) |
 | `internal/cliroute` | the one CLI routing table (`policy.json` `cli_routing`) and the resolver every launch path calls, with the legacy projection pinned by a golden | [internal-cliroute.md](internal-cliroute.md) |
 | `internal/swarm` | provisions and dispatches parallel worker sessions within one phase | [internal-swarm.md](internal-swarm.md) |
+| `internal/tmuxtest` | gives a test binary that runs real tmux a tmux server only its own process owns | [internal-tmuxtest.md](internal-tmuxtest.md) |
+| `internal/fakeclitest` | stands in for a command-line tool in tests without writing a new executable file | [internal-fakeclitest.md](internal-fakeclitest.md) |
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |

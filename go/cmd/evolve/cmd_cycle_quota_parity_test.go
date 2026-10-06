@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -67,9 +68,7 @@ func runCycleRunWith(t *testing.T, runner core.PhaseRunner, onlyScout bool) (rc 
 	t.Helper()
 	requireCycleRunUsesDepsSeam(t)
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	root := t.TempDir()
 	initLoopContractRepo(t, root)

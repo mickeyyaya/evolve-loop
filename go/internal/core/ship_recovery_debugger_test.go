@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
@@ -251,9 +252,7 @@ func gitShimFailingTreefenceWriteTreeWhen(t *testing.T, guard, cause string) str
 		"esac\n" +
 		"exec \"" + realGit + "\" \"$@\"\n"
 	shim := filepath.Join(dir, "git")
-	if err := os.WriteFile(shim, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, shim, script)
 	return dir
 }
 

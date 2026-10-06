@@ -57,7 +57,9 @@ acknowledgment or proof that a model understood the task.
 
 ```sh
 cd go
-SHELL=/bin/sh EVOLVE_TMUX_SOCKET=evolve-delivery-tests go test -tags=integration ./internal/bridge -run 'TestRealTmux_BracketedMultilinePromptPreservesBytes|TestRealTmux_MultilineSpecialCharPrompt|TestTmuxPrompt' -count=1
+go test -tags=integration ./internal/bridge -run 'TestRealTmux_BracketedMultilinePromptPreservesBytes|TestRealTmux_MultilineSpecialCharPrompt|TestTmuxPrompt' -count=1
 # Opt-in: launches real provider CLIs and consumes model usage.
-SHELL=/bin/sh EVOLVE_TMUX_SOCKET=evolve-delivery-live EVOLVE_BRIDGE_LIVE_CLI_ROUNDTRIP=1 go test -tags=integration ./internal/bridge -run '^TestLiveCLI_FullRoundtrip$' -count=1 -v
+EVOLVE_BRIDGE_LIVE_CLI_ROUNDTRIP=1 go test -tags=integration ./internal/bridge -run '^TestLiveCLI_FullRoundtrip$' -count=1 -v
 ```
+
+These commands used to set `SHELL=/bin/sh` and a private `EVOLVE_TMUX_SOCKET` by hand. Since 2026-10-06 the bridge test binary's `TestMain` ([`tmuxtest.Main`](packages/internal-tmuxtest.md)) does both for every run: each test process gets its own `evolve-bridge-t<pid>` server with `/bin/sh` panes, and an `EVOLVE_TMUX_SOCKET` set on the command line is replaced.

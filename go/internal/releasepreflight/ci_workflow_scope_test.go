@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
@@ -36,8 +37,6 @@ func installFakeGH(t *testing.T, requiredRuns string) {
 		"*\" --workflow " + ciparity.RequiredWorkflow + " \"*) echo '" + requiredRuns + "' ;;\n" +
 		"*) echo '[{\"status\":\"completed\",\"conclusion\":\"success\",\"url\":\"https://ci/landing-pages\"}]' ;;\n" +
 		"esac\n"
-	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, filepath.Join(dir, "gh"), script)
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

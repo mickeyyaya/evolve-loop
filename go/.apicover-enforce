@@ -685,3 +685,7 @@
 ./internal/inboxrank
 # wtcheckpoint — evolve checkpoint: refs/checkpoints snapshots of uncommitted worktree work (save, list, restore, prune, push).
 ./internal/wtcheckpoint
+# tmuxtest — the one owner of a test process's tmux server: its own evolve-bridge-t<pid> socket, a /bin/sh pane shell and no user config, killed at exit.
+./internal/tmuxtest
+# fakeclitest — the one owner of fake command-line tools in tests: a hard link to the running test binary that runs the script through its interpreter, so no new executable is scanned on first run.
+./internal/fakeclitest

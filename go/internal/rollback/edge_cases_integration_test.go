@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 func TestRun_NilStepsGetDefaultsWired(t *testing.T) {
@@ -103,9 +105,7 @@ func TestRun_NilRevertAndShip_DefaultIsWired(t *testing.T) {
 func TestDefaultGhDeleteRelease_ViewSucceeds_DeleteSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	ghScript := filepath.Join(dir, "gh")
-	if err := os.WriteFile(ghScript, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, ghScript, "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 
 	got := defaultGhDeleteRelease("v9.9.9")
@@ -124,9 +124,7 @@ case "$2" in
   *)      exit 0 ;;
 esac
 `
-	if err := os.WriteFile(ghScript, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, ghScript, script)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 
 	got := defaultGhDeleteRelease("v9.9.9")
@@ -144,9 +142,7 @@ case "$2" in
   *)      exit 0 ;;
 esac
 `
-	if err := os.WriteFile(ghScript, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, ghScript, script)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 
 	got := defaultGhDeleteRelease("v9.9.9")
@@ -169,9 +165,7 @@ for arg in "$@"; do
 done
 exit 0
 `
-	if err := os.WriteFile(gitScript, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, gitScript, script)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 
 	got := defaultDeleteRemoteTag(t.TempDir(), tag)
@@ -193,9 +187,7 @@ for arg in "$@"; do
 done
 exit 0
 `
-	if err := os.WriteFile(gitScript, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, gitScript, script)
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 
 	got := defaultDeleteRemoteTag(t.TempDir(), tag)
@@ -207,9 +199,7 @@ exit 0
 func TestDefaultRevertAndShip_RevertSucceeds_NoBin_LocalOnly(t *testing.T) {
 	dir := t.TempDir()
 	gitScript := filepath.Join(dir, "git")
-	if err := os.WriteFile(gitScript, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, gitScript, "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	t.Setenv("EVOLVE_GO_BIN", "")
 
@@ -222,13 +212,9 @@ func TestDefaultRevertAndShip_RevertSucceeds_NoBin_LocalOnly(t *testing.T) {
 
 func TestDefaultRevertAndShip_RevertSucceeds_BinPresent_ShipSucceeds(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, filepath.Join(dir, "git"), "#!/bin/sh\nexit 0\n")
 	evolveBin := filepath.Join(dir, "fake-evolve")
-	if err := os.WriteFile(evolveBin, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, evolveBin, "#!/bin/sh\nexit 0\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	t.Setenv("EVOLVE_GO_BIN", evolveBin)
 
@@ -241,13 +227,9 @@ func TestDefaultRevertAndShip_RevertSucceeds_BinPresent_ShipSucceeds(t *testing.
 
 func TestDefaultRevertAndShip_RevertSucceeds_BinPresent_ShipFails(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, filepath.Join(dir, "git"), "#!/bin/sh\nexit 0\n")
 	evolveBin := filepath.Join(dir, "fake-evolve-fail")
-	if err := os.WriteFile(evolveBin, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	fakeclitest.Install(t, evolveBin, "#!/bin/sh\nexit 1\n")
 	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	t.Setenv("EVOLVE_GO_BIN", evolveBin)
 

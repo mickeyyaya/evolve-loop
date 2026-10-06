@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 // Use the checked-in role profiles through Engine.LaunchArgs, then execute the
@@ -61,9 +62,7 @@ func TestNativeRoleEvalAuthoringBoundary(t *testing.T) {
 			}
 			script += "printf done > " + shellQuotePOSIX(fx.artifact) + "\n"
 			stub := filepath.Join(root, "fixture-cli")
-			if err := os.WriteFile(stub, []byte(script), 0700); err != nil {
-				t.Fatal(err)
-			}
+			fakeclitest.Install(t, stub, script)
 			var log strings.Builder
 			deps := Deps{Env: map[string]string{"BRIDGE_TESTING": "1", "BRIDGE_CLAUDE_BINARY": stub}, Stderr: &log, LookupEnv: mapLookup(nil)}
 			deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })

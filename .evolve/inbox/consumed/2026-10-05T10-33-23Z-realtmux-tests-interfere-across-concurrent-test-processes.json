@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Two concurrent `go test -tags integration -run TestRealTmux ./internal/bridge/` processes both pass (red first)",
+    "No test or reaper kills a tmux session it did not create"
+  ],
+  "consumed": {
+    "at": "2026-10-06T05:14:18Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Root cause: no killer; stacked causes. Dominant: tests wrote a fake CLI script and ran it directly; macOS scans a freshly written executable on its first run (XprotectService), and while another floor links and runs hundreds of new test binaries that first run took 10-22 s (vs 0.01-0.05 s for a hard link to an already-scanned binary), past the real-tmux boot budget and the 10-20 s deadlines of the bridge fixture-child tests. Smaller: every test process shared the default evolve-bridge tmux server, started 2026-09-30 by a dead test and kept alive by its leaked sessions, so panes ran a stale environment and the operator's login zsh (pyenv's host-wide lock). Also: einject's sender stopped after a fixed 8 s; the commit gate's golangci-lint refused to run beside another. Fix: new internal/fakeclitest (Install hard-links the running test binary at the fake path and its init runs the script through its interpreter) for every directly executed fake in the module; internal/tmuxtest.Main gives each test process its own evolve-bridge-t<pid> server (no user config, /bin/sh panes) and the orphan-socket GC reaps dead-owner -t<pid> sockets; the einject sender lives as long as the run; the commit gate runs golangci-lint --allow-serial-runners. Production defect found: tmux prefix-matches -t names, so a kill/send/capture of an ended session reached a live one extending its name; every target is now exact (bridge.ExactSessionTarget =<name>:) and the swarm test that killed on the shared socket is stubbed. Red-first: reproduced on demand with a fresh-executable load generator (3/4 fixture-child + 5 real-tmux tests red before, all green after), TestRealTmux_AMissingSessionNeverResolvesToALongerName, TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget, TestRealTmux_ConcurrentTestProcessesNeverShareATmuxServer, TestReapOrphanSockets_ReapsADeadTestProcessSocketAndSparesALiveOne, TestRun_GolangciLintWaitsForAnotherRunInsteadOfFailing. Incident: docs/incidents/2026-10-06-realtmux-tests-share-a-stale-tmux-server.md."
+  },
+  "created_at": "2026-10-05T10:40:00Z",
+  "files": [
+    "go/internal/bridge",
+    "go/internal/tmuxgc"
+  ],
+  "fix": "Find what one test process does to another's tmux sessions (session GC, kill-server, name collisions, shared socket or tmp paths) and isolate each test process: a per-process tmux socket (-L/-S) or a per-run session-name namespace the reaper honours. Add a test that runs two bridge test processes at once.",
+  "id": "realtmux-tests-interfere-across-concurrent-test-processes",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-10-05, train59 floor reds and reruns",
+  "summary": "Evidence gathered 2026-10-01..05 for realtmux-bridge-tests-flake-under-package-parallel-load: every red of the TestRealTmux* group (REPL prompt never appeared, rc=80, failing in about 8 s instead of the 60 s boot budget) happened while another worktree's floor or a console-lane agent was running bridge tests at the same moment; every isolated rerun passed, including at a load average of 45, and the same group failed and then passed on an idle host (load 6.6) minutes apart on the same tree (train/wave59-boundary, 2026-10-05 18:25 then 18:27). Load is not the cause; concurrency between test processes is. Suspects: one process's tmux session GC or reaper killing another's evolve-bridge-it-* sessions on the shared default tmux server, or shared fixed paths.",
+  "title": "Real-tmux bridge tests fail when another process runs them at the same time, not under load",
+  "weight": 0.5
+}
