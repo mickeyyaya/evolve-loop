@@ -865,28 +865,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	}
 }
 
-// profileForModelRouting resolves a phase's profiles.Profile for the
-// model-routing guardrail check by reading .evolve/profiles/<agent>.json from the cycle's
-// ProjectRoot, where <agent> is the phase's AGENT name (phaseAgentName table —
-// the cycle-safe static mirror of each phase package's AgentPromptName(), which
-// core cannot import without an import cycle). nil is returned only when the
-// profile is genuinely absent — the documented ValidatePin "nothing to
-// validate ⇒ ok" pass-through: a phase with no agent name (e.g. native ship),
-// an unconfigured profiles dir, or a missing profile file (mint-only phases).
-// A resolved profile with no explicit model_tier_envelope is returned non-nil
-// so router.ClampPlanModelRouting's universalTierFloor still governs it.
 func (o *Orchestrator) profileForModelRouting(projectRoot, phase string) *profiles.Profile {
-	agent, ok := phaseAgentName[phase]
-	if !ok {
-		return nil // phase has no governing profile (e.g. native ship) — nil-safe
-	}
-	loader := profiles.NewFromDir(filepath.Join(projectRoot, ".evolve", "profiles"))
-	if loader == nil {
-		return nil
-	}
-	prof, err := loader.Get(agent)
-	if err != nil {
-		return nil // profile file genuinely absent — matches ValidatePin's nil contract
-	}
-	return &prof
+	prof, _ := phaseProfile(projectRoot, phase)
+	return prof
 }

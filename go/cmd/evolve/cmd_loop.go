@@ -104,6 +104,15 @@ func runLoop(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return runLoopBatch(cfg, stdin, stdout, stderr)
 }
 
+func printLoopDryRun(cfg loopConfig, stdout io.Writer) int {
+	buf, _ := json.MarshalIndent(map[string]any{
+		"dry_run": true,
+		"config":  cfg,
+	}, "", "  ")
+	fmt.Fprintln(stdout, string(buf))
+	return 0
+}
+
 // runLoopBatch runs exactly one batch of cycles.
 func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	maybePrintSetupNudge(stderr, cfg.EvolveDir)
@@ -119,12 +128,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if cfg.DryRun {
-		buf, _ := json.MarshalIndent(map[string]any{
-			"dry_run": true,
-			"config":  cfg,
-		}, "", "  ")
-		fmt.Fprintln(stdout, string(buf))
-		return 0
+		return printLoopDryRun(cfg, stdout)
 	}
 
 	runtime := startLoopBatchRuntime()
@@ -137,6 +141,10 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	gcOrphanSessions("startup", stderr)
 
 	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)
+	if deps.RoutingErr != nil {
+		fmt.Fprintf(stderr, "evolve loop: %v\n", deps.RoutingErr)
+		return exitRoutingRefused
+	}
 	defer deps.Signals.Flush()
 	// orch is narrowed to loopCycleRunner so a test can inject a scripted
 	// orchestrator (loopOrchOverride); the real *core.Orchestrator cannot be

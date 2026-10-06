@@ -41,6 +41,20 @@ func (c *compiler) checkTwoSources() {
 	if rt := c.pol.Router; rt != nil && rt.Model != "" {
 		c.add(SeverityError, "router.model", "is set together with cli_routing — %s", migrateHint)
 	}
+	c.checkRouterDecisionModels()
+}
+
+func (c *compiler) checkRouterDecisionModels() {
+	rt := c.pol.Router
+	if rt == nil {
+		return
+	}
+	if rt.PlanModel != "" {
+		c.add(SeverityError, "router.plan_model", "is set together with cli_routing, and it would swap the advisor's tier after the table decided it — %s", migrateHint)
+	}
+	if rt.ProposeModel != "" {
+		c.add(SeverityError, "router.propose_model", "is set together with cli_routing, and it would swap the advisor's tier after the table decided it — %s", migrateHint)
+	}
 }
 
 func (c *compiler) agentRoles() map[string][]phasespec.Role {

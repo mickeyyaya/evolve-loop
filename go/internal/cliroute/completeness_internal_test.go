@@ -38,7 +38,7 @@ func TestCompile_EveryRefusalResolveCanMakeIsACompileFinding(t *testing.T) {
 	}
 	for name, block := range blocks {
 		table, findings := Compile(policy.Policy{CLIRouting: &block}, cat, profiles.NewFromDir(profileDir))
-		r := &Router{table: table, host: Host{LookPath: everyBinaryInstalled}}
+		r := routerOf(table, Host{LookPath: everyBinaryInstalled})
 		for _, agent := range agents {
 			for _, phase := range []string{cliroutetest.PhaseOf(agent), ""} {
 				_, err := r.Resolve(Request{Agent: agent, Phase: phase, DefaultModel: "balanced"})
@@ -74,7 +74,7 @@ func TestCompile_ReportsTheReviewersTierCeilingProbe(t *testing.T) {
 	if !reportsAgent(findings, table, "intent") {
 		t.Fatalf("intent runs only at deep, where the agy-only chain has nothing to launch: %+v", findings)
 	}
-	r := &Router{table: table, host: Host{LookPath: everyBinaryInstalled}}
+	r := routerOf(table, Host{LookPath: everyBinaryInstalled})
 	_, resolveErr := r.Resolve(Request{Agent: "intent", Phase: "intent", DefaultModel: "balanced"})
 	var ceilingErr *CeilingError
 	if !errors.As(resolveErr, &ceilingErr) {
@@ -103,7 +103,7 @@ func TestResolve_APhaselessLaunchOfASingleRoleAgentGetsItsPhasesChain(t *testing
 	}
 	block := reviewerProbeBlock()
 	table, _ := Compile(policy.Policy{CLIRouting: &block}, cat, profiles.NewFromDir(profileDir))
-	r := &Router{table: table, host: Host{LookPath: everyBinaryInstalled}}
+	r := routerOf(table, Host{LookPath: everyBinaryInstalled})
 	for _, agent := range []string{"tester", "retrospective"} {
 		phased, errP := r.Resolve(Request{Agent: agent, Phase: cliroutetest.PhaseOf(agent), DefaultModel: "balanced"})
 		phaseless, errN := r.Resolve(Request{Agent: agent, DefaultModel: "balanced"})
@@ -122,14 +122,14 @@ func TestResolve_ADeclaredProfileThatFailsToLoadIsRefused(t *testing.T) {
 	if len(findings) == 0 {
 		t.Fatal("Compile reports the profile that does not load")
 	}
-	r := &Router{table: table, host: Host{LookPath: everyBinaryInstalled}}
+	r := routerOf(table, Host{LookPath: everyBinaryInstalled})
 	if _, err := r.Resolve(Request{Agent: "x"}); err == nil || !strings.Contains(err.Error(), "does not load") {
 		t.Fatalf("a declared table never widens an unloadable profile to every CLI: %v", err)
 	}
 }
 
 func TestApplyTierCeiling_APlanWithNoTierChainIsCheckedAtItsModel(t *testing.T) {
-	r := &Router{table: Table{tiers: map[string][]string{"deep": {"claude"}}}}
+	r := resolver{table: Table{tiers: map[string][]string{"deep": {"claude"}}}}
 	res := resolution{plan: llmroute.Plan{Candidates: []string{"agy-tmux"}, Model: "balanced"}}
 	if _, err := applyTierCeiling(r, res); err != nil {
 		t.Fatalf("an empty Tiers walks at the model, which the ceiling permits: %v", err)
@@ -138,4 +138,10 @@ func TestApplyTierCeiling_APlanWithNoTierChainIsCheckedAtItsModel(t *testing.T) 
 	if _, err := applyTierCeiling(r, res); err == nil {
 		t.Fatal("an empty Tiers walks at the model; a deep model on agy has nothing to run")
 	}
+}
+
+func routerOf(table Table, host Host) *Router {
+	r := &Router{host: host}
+	r.tables.Store(&tablePair{declared: table, bypass: table})
+	return r
 }

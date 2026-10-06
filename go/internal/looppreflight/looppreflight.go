@@ -120,6 +120,8 @@ type Options struct {
 
 	// PhaseRoutingWarnings returns the user-phase specs phasespec dropped while merging the catalog.
 	PhaseRoutingWarnings func() []string
+
+	Routing func() (Routing, error)
 }
 
 // resolved is Options with every seam and default filled in.
@@ -157,6 +159,8 @@ type resolved struct {
 	versionInventory func() map[string]string
 
 	phaseRoutingWarnings func() []string
+
+	routing *routingOnce
 }
 
 // DefaultBootBudget is the per-driver REPL boot deadline, matching `evolve doctor boot`.
@@ -198,6 +202,7 @@ func resolve(opts Options) (resolved, error) {
 		versionInventory: opts.VersionInventory,
 
 		phaseRoutingWarnings: opts.PhaseRoutingWarnings,
+		routing:              onceRouting(opts.Routing),
 	}
 	if o.stderr == nil {
 		o.stderr = io.Discard
@@ -275,12 +280,11 @@ func resolve(opts Options) (resolved, error) {
 		o.phaseRoutingWarnings = defaultPhaseRoutingWarnings(o.projectRoot)
 	}
 	if o.versionInventory == nil {
-		// Resolved after the profile seams so the closure binds the final lister and getter.
-		lister, getter := o.profileLister, o.profileGetter
+		drivers := o.drivers
 		o.versionInventory = func() map[string]string {
 			seen := map[string]struct{}{}
 			var bins []string
-			for _, d := range distinctDrivers(lister, getter) {
+			for _, d := range drivers() {
 				b := driverBinary(d)
 				if _, dup := seen[b]; !dup {
 					seen[b] = struct{}{}
@@ -311,6 +315,7 @@ func Run(opts Options) (Result, error) {
 		checkBridgeBoot(o),
 		checkSandboxNestedFallback(o),
 		checkPhaseRoutingWarnings(o),
+		checkCLIRouting(o),
 	}
 	r := finalize(checks, o.now())
 	r.CLIVersions = o.versionInventory()

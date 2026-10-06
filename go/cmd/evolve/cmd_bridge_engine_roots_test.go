@@ -26,7 +26,7 @@ var bridgeEngineRoots = map[string]struct {
 	wiring string
 }{
 	"cmd/evolve/cmd_bridge.go":           {1, "center-less: `evolve bridge launch`, bare Deps{}"},
-	"cmd/evolve/cmd_cycle.go":            {1, "center-less: the pre-cycle Doctor probe, bare Deps{}"},
+	"cmd/evolve/cli_routing_root.go":     {1, "center-less: the routing table's discovered-tail Doctor probe, bare Deps{}"},
 	"cmd/evolve/cmd_models_live.go":      {1, "center-less: the models-live probe, bare Deps{}"},
 	"internal/adapters/bridge/bridge.go": {3, "center-bearing: New()'s default factory (Env only), NewDefault's factory and Launch's onStopReview branch through productionEngineDeps (Deps.Signals = the Adapter's Center; nil when NewDefault was given nil)"},
 	"internal/setup/setup.go":            {1, "center-less: the setup Doctor default, bare Deps{}"},

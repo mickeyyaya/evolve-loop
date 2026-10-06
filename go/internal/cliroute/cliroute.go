@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -42,6 +44,15 @@ type Host struct {
 	Logf     func(format string, args ...any)
 }
 
+type Launch string
+
+const (
+	LaunchAdvisor    Launch = "advisor"
+	LaunchClassifier Launch = "classifier"
+)
+
+const ClassifierAgent = "model-classifier"
+
 type Request struct {
 	Agent        string
 	Phase        string
@@ -51,6 +62,8 @@ type Request struct {
 	Overlay      llmroute.Overlay
 	CallerCLI    string
 	Expand       llmroute.AutoModel
+	BypassPolicy bool
+	Launch       Launch
 }
 
 type Decision struct {
@@ -64,46 +77,76 @@ func (d Decision) Allows(cli string) bool {
 	return d.Allowed == nil || slices.Contains(d.Allowed, familyOf(cli))
 }
 
+func (d Decision) Legacy() bool {
+	return strings.HasPrefix(d.Rule, legacyRulePrefix)
+}
+
 type Router struct {
+	tables      atomic.Pointer[tablePair]
+	recompiling sync.Mutex
+	host        Host
+	setup       *Setup
+}
+
+type tablePair struct {
+	declared Table
+	bypass   Table
+}
+
+type resolver struct {
 	table Table
 	host  Host
 }
 
 func New(t Table, h Host) (*Router, error) {
+	if err := refusal(t.findings); err != nil {
+		return nil, err
+	}
+	r := &Router{host: h}
+	r.tables.Store(&tablePair{declared: t, bypass: t})
+	return r, nil
+}
+
+func refusal(findings []Finding) error {
 	var refused []string
-	for _, f := range t.findings {
+	for _, f := range findings {
 		if f.Severity == SeverityError {
 			refused = append(refused, f.Key+": "+f.Message)
 		}
 	}
 	if len(refused) > 0 {
-		return nil, fmt.Errorf("cliroute: the routing table has %d error finding(s): %s", len(refused), strings.Join(refused, "; "))
+		return fmt.Errorf("cliroute: the routing table has %d error finding(s): %s", len(refused), strings.Join(refused, "; "))
 	}
-	return &Router{table: t, host: h}, nil
+	return nil
 }
 
 func (r *Router) Resolve(req Request) (Decision, error) {
-	if !r.table.declared {
-		return r.resolveLegacy(req)
+	pair := r.tables.Load()
+	v := resolver{table: pair.declared, host: r.host}
+	if req.BypassPolicy {
+		v.table = pair.bypass
 	}
-	return r.resolveDeclared(req)
+	if !v.table.declared {
+		return v.resolveLegacy(req)
+	}
+	return v.resolveDeclared(req)
 }
 
-func (r *Router) logf(format string, args ...any) {
-	if r.host.Logf != nil {
-		r.host.Logf(format, args...)
+func (v resolver) logf(format string, args ...any) {
+	if v.host.Logf != nil {
+		v.host.Logf(format, args...)
 	}
 }
 
-func (r *Router) bench(req Request, plan llmroute.Plan) llmroute.Plan {
-	if r.host.Bench == nil {
+func (v resolver) bench(req Request, plan llmroute.Plan) llmroute.Plan {
+	if v.host.Bench == nil {
 		return plan
 	}
 	label := req.Phase
 	if label == "" {
 		label = req.Agent
 	}
-	return r.host.Bench(req.ProjectRoot, label, plan, req.Env)
+	return v.host.Bench(req.ProjectRoot, label, plan, req.Env)
 }
 
 func familyOf(cli string) string {

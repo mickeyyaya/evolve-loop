@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -80,11 +81,10 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		log.Diag().Infof("[runner] phase=%s dispatch chain exhausted after a quota wall: surfacing the wall over the last rung's exit %d, so the cycle defers\n", phase, bres.ExitCode)
 		bres, bridgeErr = wall.Surface(tieredRes, bres, bridgeErr)
 	}
-	// The terminal attempt's tier, below the resolved one after a step-down; empty only without candidates.
-	resolvedModel := tieredRes.Tier
-	if resolvedModel == "" {
-		resolvedModel = model
+	if unlaunched := bridgechain.Unlaunched(tieredRes, plan); unlaunched != nil {
+		bridgeErr = unlaunched
 	}
+	resolvedModel := terminalTier(tieredRes, model)
 	if len(attemptLog) > 1 {
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
 	}
@@ -100,6 +100,13 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		worktreeVerified: verified,
 		fenceDiagnostics: fenceDiags,
 	}
+}
+
+func terminalTier(walk llmroute.TieredDispatchResult, resolved string) string {
+	if walk.Tier == "" {
+		return resolved
+	}
+	return walk.Tier
 }
 
 func (b *BaseRunner) baseRequest(req core.PhaseRequest, prep phasePreparation, resolved phaseDispatchPlan) core.BridgeRequest {
@@ -125,4 +132,21 @@ func (b *BaseRunner) baseRequest(req core.PhaseRequest, prep phasePreparation, r
 		OperatorDirectives:  req.OperatorDirectives,
 		ChainAttempt:        true,
 	}
+}
+
+func joinAttempts(attempts []string) string {
+	if len(attempts) == 0 {
+		return ""
+	}
+	out := attempts[0]
+	for _, a := range attempts[1:] {
+		out += " -> " + a
+	}
+	return out
+}
+
+func FormatSkillOverlayLog(phase string, skills []string, tier string) string {
+	return "[runner] phase=" + phase +
+		" skill-overlays=[" + strings.Join(skills, ",") + "]" +
+		" (tier=" + tier + ")"
 }

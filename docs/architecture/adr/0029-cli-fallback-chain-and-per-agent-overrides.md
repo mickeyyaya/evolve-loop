@@ -165,3 +165,7 @@ After that, ANY profile can name them in `cli` or `cli_fallback` and `--cli phas
 - **Builds on ADR-0022** (LaunchIntent→Realizer) — the per-CLI realization layer this ADR's chain dispatches into.
 - **Builds on ADR-0051** (setup-onboarding) — the `allowed_clis` envelope constraint that gates which CLIs can appear in a profile's chain.
 - **Related ADR-0024** (dynamic phase routing) — orthogonal axis; PhaseAdvisor chooses WHICH phases run; ADR-0029 chooses WHICH CLI runs a chosen phase.
+
+## Amendment — 2026-10-06: one routing table, one resolver (ADR-0119)
+
+The chain this ADR describes (a profile's `cli` + `cli_fallback`, the env overrides, the triggers) is still the legacy projection, byte for byte. What changed is who computes it: every launch path now asks `internal/cliroute`'s `Router.Resolve`, compiled once per process, instead of calling `llmroute.Resolve` itself, and an operator-declared `cli_routing` block in `.evolve/policy.json` outranks the profile chain when present. See [ADR-0119](0119-one-routing-table-one-resolver.md).

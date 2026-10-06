@@ -57,7 +57,7 @@ func TestPickClassifierCLI(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := pickClassifierCLI(tt.ready, ""); !reflect.DeepEqual(got, tt.want) {
+			if got := pickClassifierCLI(tt.ready, legacyClassifierPreference(t), ""); !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("pickClassifierCLI(%v) = %v, want %v", tt.ready, got, tt.want)
 			}
 		})
@@ -65,10 +65,10 @@ func TestPickClassifierCLI(t *testing.T) {
 }
 
 func TestPickClassifierCLIEnvOverride(t *testing.T) {
-	if got := pickClassifierCLI([]string{"codex", "agy"}, "agy"); !reflect.DeepEqual(got, []string{"agy", "codex"}) {
+	if got := pickClassifierCLI([]string{"codex", "agy"}, legacyClassifierPreference(t), "agy"); !reflect.DeepEqual(got, []string{"agy", "codex"}) {
 		t.Fatalf("a ready override leads the chain, got %v", got)
 	}
-	if got := pickClassifierCLI([]string{"codex", "agy"}, "gemini"); !reflect.DeepEqual(got, []string{"codex", "agy"}) {
+	if got := pickClassifierCLI([]string{"codex", "agy"}, legacyClassifierPreference(t), "gemini"); !reflect.DeepEqual(got, []string{"codex", "agy"}) {
 		t.Fatalf("a non-ready override is ignored, got %v", got)
 	}
 }
@@ -97,7 +97,7 @@ func TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive(t *testing.T
 	cat, err := modelquery.Refresh(context.Background(), modelquery.RefreshDeps{
 		CLIs:       []string{"agy"},
 		Lister:     offeringLister{"agy": {"Gemini 3.8 Flash (Low)", "Gemini 3.8 Flash (High)", "Gemini 3.7 Flash (High)", "Gemini 3.1 Pro (High)"}},
-		Classifier: tierClassifier([]string{"agy", "claude", "codex"}, script, &log),
+		Classifier: tierClassifier([]string{"agy", "claude", "codex"}, legacyClassifierPreference(t), script, &log),
 		Fallback:   map[string]map[string]string{"agy": {"balanced": "Gemini 3.7 Flash (High)"}},
 		Now:        stageNow,
 	})
@@ -152,7 +152,7 @@ func TestBridgePromptDispatcher_ALinkThatWritesNothingNeverReadsTheLastLinksRepl
 	cat, err := modelquery.Refresh(context.Background(), modelquery.RefreshDeps{
 		CLIs:       []string{"agy"},
 		Lister:     offeringLister{"agy": {"Gemini 3.8 Flash (Low)", "Gemini 3.8 Flash (High)"}},
-		Classifier: tierClassifier([]string{"codex", "claude"}, d, io.Discard),
+		Classifier: tierClassifier([]string{"codex", "claude"}, legacyClassifierPreference(t), d, io.Discard),
 		Fallback:   map[string]map[string]string{"agy": {"balanced": "Gemini 3.8 Flash (High)"}},
 		Now:        stageNow,
 	})

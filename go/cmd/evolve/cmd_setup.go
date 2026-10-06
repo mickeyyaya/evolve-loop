@@ -80,6 +80,7 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 	project, plugin, evolveDir, adapters := setupRoots(projectRootFlag, evolveDirFlag, stderr)
 	rep := setup.Detect(context.Background(), setup.DetectOptions{
 		ProjectRoot: project, EvolveDir: evolveDir, PluginRoot: plugin, AdaptersDir: adapters,
+		Router: detectRouter(project, stderr),
 	})
 	if asJSON {
 		buf, err := json.MarshalIndent(rep, "", "  ")
