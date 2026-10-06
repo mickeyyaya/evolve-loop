@@ -50,7 +50,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	irec := w.recorder
 	channel := w.channel
 	state := newReplWaitState(w)
-	defer state.recordNudgeOutcome(irec, deps.Now)
+	defer state.finishWait(irec, deps.Now)
 
 	if code := w.admitPrompt(state); code != ExitOK {
 		return state.result, code

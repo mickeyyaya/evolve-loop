@@ -90,7 +90,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 
 	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
 	human := humanActive(deps, cfg.HumanInput)
-	ar := newAutoResponder(lp.name, cfg.Workspace, deps, human, lp.bootScrollback)
+	ar := newLaunchAutoResponder(cfg.Workspace, deps, lp, human)
 	// tick() strips pane lines that verbatim-echo this session's own
 	// delivered prompt before its exhaustion/escalation scans.
 	ar.injectedPrompt = resolvedPrompt

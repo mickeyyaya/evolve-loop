@@ -20,6 +20,9 @@ func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
 	}
 	if m, err := LoadManifest(lp.name); err == nil {
 		p.ExhaustedRegex = manifestExhaustedPattern(m)
+		p.BusyLineRegex = m.BusyLineRegex
+		p.TokenLineRegex = m.TokenLineRegex
+		p.ModelLabelRegex = m.ModelLabelRegex
 	}
 	return p
 }

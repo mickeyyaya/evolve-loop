@@ -199,6 +199,7 @@ type autoResponder struct {
 	// shadowRules match observe-only and record would_fire once per rule (shadowFired); they send nothing.
 	shadowRules []shadowObserver
 	shadowFired map[string]bool
+	paneProfile panestream.PaneProfile
 }
 
 // firedRuleName names the rule whose count just advanced, so the send log attributes the keystroke.
@@ -239,7 +240,7 @@ func newAutoResponder(cli, workspace string, deps Deps, human bool, scrollback i
 			}
 		}
 	}
-	return &autoResponder{prompts: prompts, transientRegex: transientRegex, transientPattern: transientPattern, transientGate: &exhaustionGate{threshold: transientDwellObservations}, exhaustedRegex: exhaustedRegex, exhaustGate: newExhaustionGate(), workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
+	return &autoResponder{paneProfile: cliPaneProfile(cli), prompts: prompts, transientRegex: transientRegex, transientPattern: transientPattern, transientGate: &exhaustionGate{threshold: transientDwellObservations}, exhaustedRegex: exhaustedRegex, exhaustGate: newExhaustionGate(), workspace: workspace, cli: cli, counts: map[string]int{}, deps: deps, human: human, scrollback: scrollback, suppressLogged: map[string]bool{}, shadowFired: map[string]bool{}}
 }
 
 // tick captures the pane and applies one observation, returning (action, rc) for runTmuxREPL.
@@ -298,7 +299,7 @@ func (ar *autoResponder) tickPane(ctx context.Context, session, pane string, cap
 	}
 	// pane stays raw for resolvePending, shadow rules and writeEscalation; only the decision strips it.
 	// BusyOf is nil-safe and stateless, so this read never disturbs the checkpoint's Observe baseline.
-	paneBusy := ar.deps.LivenessCenter.BusyOf(pane, panestream.Profiles[strings.TrimSuffix(ar.cli, "-tmux")])
+	paneBusy := ar.deps.LivenessCenter.BusyOf(pane, ar.paneProfile)
 	// scanPane drops prompt echoes so neither scan fires on the agent's own instructions.
 	scanPane := stripPromptEchoLines(pane, ar.injectedPrompt)
 	action, rc := decideAutoRespond(scanPane, ar.prompts, ar.counts, paneBusy)
@@ -588,4 +589,16 @@ func lastLines(s string, n int) string {
 		lines = lines[len(lines)-n:]
 	}
 	return strings.Join(lines, "\n")
+}
+
+func newLaunchAutoResponder(workspace string, deps Deps, lp tmuxLaunch, human bool) *autoResponder {
+	ar := newAutoResponder(lp.name, workspace, deps, human, lp.bootScrollback)
+	ar.paneProfile = paneProfileFor(lp)
+	return ar
+}
+
+func cliPaneProfile(cli string) panestream.PaneProfile {
+	var lp tmuxLaunch
+	lp.name = cli
+	return paneProfileFor(lp)
 }

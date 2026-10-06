@@ -86,7 +86,7 @@ func (cr *cycleRun) postScoutReplan() {
 		return
 	}
 
-	raw, err := planner.RePlan(in)
+	raw, err := cr.observedRePlan(planner, in)
 	if err != nil || raw == nil {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN post-scout re-plan failed (keeping initial plan): %v\n", err)

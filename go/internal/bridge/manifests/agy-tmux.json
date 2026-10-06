@@ -121,6 +121,9 @@
       "note": "agy end-of-session rating dialog; '4' = neutral skip"
     }
   ],
+  "busy_line_regex": "^\\s*([⣾⣽⣻⢿⡿⣟⣯⣷])\\s+\\S",
+  "token_line_regex": "(?m)^\\s*▸\\s*Thought for [^,\\n]*,\\s*(?P<count>[0-9][0-9,]*(?:\\.[0-9]+)?)(?P<scale>k?)\\s+tokens",
+  "model_label_regex": "^(?:esc to cancel|\\? for shortcuts)?\\s{2,}(?P<model>\\S[^·]*·\\s*\\S+)\\s*$",
   "stub": false,
   "model_tier_map": {
     "fast": "Gemini 3.8 Flash (Low)",

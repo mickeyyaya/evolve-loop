@@ -69,3 +69,13 @@ func ScrollbackPeakCollector(pane string) Collector {
 		}
 	}
 }
+
+func TokenLinePeakCollector(pane, pattern string) Collector {
+	return func() Result {
+		peak := panestream.TokenLinePeak(pane, pattern)
+		if peak == 0 {
+			return Result{Source: SourceNone}
+		}
+		return Result{Usage: cyclestate.TokenUsage{Output: peak}, Source: SourceScrollbackPeak}
+	}
+}

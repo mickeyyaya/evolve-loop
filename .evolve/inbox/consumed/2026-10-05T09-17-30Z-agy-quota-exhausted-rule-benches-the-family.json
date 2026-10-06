@@ -3,6 +3,12 @@
     "An agy pane matching quota_exhausted benches the agy family (red first)",
     "Every escalate rule that names a quota or rate wall in any manifest is benchable (a test walks the manifests)"
   ],
+  "consumed": {
+    "at": "2026-10-06T06:42:34Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "clihealth.Benchable accepts QuotaExhaustedPattern (quota_exhausted), the name agy-tmux and agy give their quota wall (go/internal/clihealth/clihealth.go). Pinned by TestBenchable_TheQuotaExhaustedWallIsBenchable, TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily (internal/bridgechain) and TestManifests_EveryQuotaOrRateWallRuleBenchesItsFamily (internal/bridge), which walks every manifest's escalate rules. Design: docs/research/agy-liveness-monitoring-2026-10.md, A6."
+  },
   "created_at": "2026-10-05T09:40:00Z",
   "files": [
     "go/internal/bridge/manifests/agy-tmux.json",

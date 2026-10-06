@@ -405,7 +405,7 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	}
 	model := resolvedModel(req.Model)
 	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
-	run := e.freshSessionRetry(ctx, req, model, func() launchRun { return e.runScoped(ctx, args, req.Env) })
+	run := e.freshSessionRetry(ctx, req, model, func() launchRun { return e.runAttempt(ctx, req, args) })
 	resp := core.BridgeResponse{ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS}
 	// The terminal time is frozen before optional token resolution begins, so
 	// one dispatch yields one attempt record even when token enrichment is

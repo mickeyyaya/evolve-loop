@@ -65,8 +65,10 @@ func IsBootTimeoutExitCode(exitCode int) bool { return exitCode == 80 }
 // tiny closed set (single home — runner bench-writer and loop canary both consult it): re-dispatching a
 // walled resource is guaranteed waste, while most escalations (trust prompts) are situational.
 func Benchable(pattern string) bool {
-	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == BootTimeoutPattern || pattern == CredentialPattern
+	return pattern == "rate_limit" || pattern == ExhaustedPattern || pattern == QuotaExhaustedPattern || pattern == BootTimeoutPattern || pattern == CredentialPattern
 }
+
+const QuotaExhaustedPattern = "quota_exhausted"
 
 // CredentialPattern is the classifier pattern of a login prompt ("Please log in", "Login expired"): a wall
 // only the operator clears, so the family is benched until a canary probe succeeds after the login.

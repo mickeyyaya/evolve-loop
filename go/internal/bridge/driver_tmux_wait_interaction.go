@@ -20,7 +20,7 @@ func (w replWaiter) handleTickInteractions(state *replWaitState, elapsed int, pa
 		}
 	}
 
-	w.channel.observeIdle(pane, state.livenessCenter)
+	w.observeTickPane(state, pane, captureOK)
 	action, rc := w.responder.tickPane(w.ctx, w.launch.session, pane, captureOK)
 	switch rc {
 	case 0, 1: // noop / responded
