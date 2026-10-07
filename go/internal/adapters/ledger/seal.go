@@ -184,7 +184,7 @@ func (l *FileLedger) readChain() ([]sealedSegment, [][]byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	liveRaw, err := os.ReadFile(l.ledgerPath)
+	liveRaw, err := hooks.readF(l.ledgerPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, nil, fmt.Errorf("ledger read: %w", err)
 	}
@@ -228,14 +228,20 @@ func (l *FileLedger) VerifyDeep(ctx context.Context) error {
 
 // VerifyDeepScope is VerifyDeep plus the verified scope, which must match what VerifyScope reports.
 func (l *FileLedger) VerifyDeepScope(_ context.Context) (VerifiedScope, error) {
-	segs, live, err := l.readChain()
-	if err != nil {
+	var segs []sealedSegment
+	var live [][]byte
+	var tip tipRead
+	if err := l.readSnapshot(func() (err error) {
+		segs, live, err = l.readChain()
+		tip = l.readTipFile()
+		return err
+	}); err != nil {
 		return VerifiedScope{}, err
 	}
-	return verifyChain(segs, live, l.loadAnchorSHA(), l.checkTip)
+	return l.verifyChain(segs, live, tip.check)
 }
 
-func verifyChain(segs []sealedSegment, live [][]byte, fileAnchorSHA string, checkTip func(lastSeq int, lastSha string) error) (VerifiedScope, error) {
+func (l *FileLedger) verifyChain(segs []sealedSegment, live [][]byte, checkTip func(lastSeq int, lastSha string) error) (VerifiedScope, error) {
 	for _, s := range segs {
 		// Every segment, not just the newest: a first line still live means a truncation never completed.
 		if len(s.lines) > 0 && len(live) > 0 && bytes.Equal(s.lines[0], live[0]) {
@@ -244,8 +250,8 @@ func verifyChain(segs []sealedSegment, live [][]byte, fileAnchorSHA string, chec
 	}
 	full := chainOrder(segs, live)
 
-	anchorSHA, anchorSeq := effectiveAnchorSHA(full, fileAnchorSHA)
-	lastSeq, lastSha, sawV837, err := walkChain(full, anchorSHA)
+	anchorSHA, anchorSeq := effectiveAnchorSHA(full, l.loadAnchorSHA())
+	lastSeq, lastSha, sawV837, err := walkChain(full, anchorSHA, indexCompositionEvidence(l.evidence(), full))
 	if err != nil {
 		return VerifiedScope{}, err
 	}

@@ -66,7 +66,7 @@ func (l *FileLedger) dryRunSeal(segs []sealedSegment, live [][]byte, seal core.L
 	}
 	sealTip := fmt.Sprintf("%d:%s", seal.EntrySeq, sha256Hex(line))
 	sealed := append(live[:len(live):len(live)], line)
-	_, err = verifyChain(segs, sealed, l.loadAnchorSHA(), func(lastSeq int, lastSha string) error {
+	_, err = l.verifyChain(segs, sealed, func(lastSeq int, lastSha string) error {
 		return compareTip(sealTip, lastSeq, lastSha)
 	})
 	return err

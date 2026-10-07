@@ -117,7 +117,7 @@ func TestWalking_QuotaAtEveryCLIStepsDownATierAndBenchesEachWall(t *testing.T) {
 	inner := &scripted{exits: map[string]int{"codex-tmux@deep": 85, "claude-tmux@deep": 85}}
 	var benched, logs []string
 	w := bridgechain.New(inner, fixedPlan([]string{"codex-tmux", "claude-tmux"}, []string{"deep", "balanced"}),
-		bridgechain.WithBench(func(_, _ string, cli string, _ time.Time, _ map[string]string) { benched = append(benched, cli) }),
+		bridgechain.WithBench(func(e bridgechain.Escalation) { benched = append(benched, e.CLI) }),
 		bridgechain.WithLog(func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) }),
 		bridgechain.WithClock(func() time.Time { return time.Unix(0, 0) }))
 	resp, err := w.Launch(context.Background(), core.BridgeRequest{CLI: "codex-tmux", Model: "deep", Agent: "failure-advisor"})
@@ -225,13 +225,13 @@ func TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames(t *testing.T) {
 		}
 	}
 	report(now().Add(-time.Hour)) // stale: captured before this dispatch started
-	bridgechain.BenchOnEscalation(root, ws, "codex-tmux", now().Add(-time.Minute), map[string]string{}, now, nil)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
 	if active := clihealth.NewStore(root, now).Active(); len(active) != 0 {
 		t.Fatalf("a stale report must not bench: %v", active)
 	}
 	report(now())
 	var logs []string
-	bridgechain.BenchOnEscalation(root, ws, "codex-tmux", now().Add(-time.Minute), map[string]string{}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "codex-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	active := clihealth.NewStore(root, now).Active()
 	if _, ok := active["codex"]; !ok || len(logs) != 1 || !strings.Contains(logs[0], "benched family codex") {
 		t.Fatalf("active=%v logs=%q", active, logs)
@@ -244,7 +244,7 @@ func TestBenchOnEscalation_BenchesTheFamilyAFreshReportNames(t *testing.T) {
 func TestExports_AreNamed(t *testing.T) {
 	var _ core.Bridge = (*bridgechain.Walking)(nil)
 	var resolve bridgechain.PlanResolver = fixedPlan(nil, nil)
-	var bench bridgechain.BenchFunc = func(string, string, string, time.Time, map[string]string) {}
+	var bench bridgechain.BenchFunc = func(bridgechain.Escalation) {}
 	var logf bridgechain.Logf = func(string, ...any) {}
 	var opts []bridgechain.Option = []bridgechain.Option{bridgechain.WithBench(bench), bridgechain.WithLog(logf), bridgechain.WithClock(time.Now)}
 	if w := bridgechain.New(&scripted{}, resolve, opts...); w == nil {

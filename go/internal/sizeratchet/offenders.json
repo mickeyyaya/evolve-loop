@@ -47,8 +47,6 @@
   "internal/acssuite.parseGoTestJSON": 107,
   "internal/adapters/ledger.FileLedger.VerifyDeepScope": 64,
   "internal/adapters/ledger.FileLedger.sealLocked": 54,
-  "internal/adapters/ledger.WriteCompositionVerdict": 68,
-  "internal/adapters/ledger.walkChain": 63,
   "internal/adapters/observer.CoreAdapter.Start": 67,
   "internal/adapters/sandbox.BwrapPrefix": 68,
   "internal/adapters/sandbox.GenerateSBPL": 91,

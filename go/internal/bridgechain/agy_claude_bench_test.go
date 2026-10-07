@@ -30,7 +30,7 @@ func TestBenchOnEscalation_AQuotaWallOnOneAgyTargetLeavesTheOtherFirst(t *testin
 			t.Fatal(err)
 		}
 
-		bridgechain.BenchOnEscalation(root, ws, tc.walled, now().Add(-time.Minute), map[string]string{}, now, nil)
+		bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: tc.walled, DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
 
 		active := clihealth.NewStore(root, now).Active()
 		if _, benched := active[tc.benched]; !benched || len(active) != 1 {

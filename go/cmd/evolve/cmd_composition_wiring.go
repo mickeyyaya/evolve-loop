@@ -59,7 +59,6 @@ func writeCompositionVerdict(ledgerPath string, in core.CompositionVerdictInput)
 		GateResults:    in.GateResults,
 		AuditedDiff:    in.AuditedDiff,
 		ComposedDiff:   in.ComposedDiff,
-		ArtifactDir:    in.ArtifactDir,
 	})
 }
 

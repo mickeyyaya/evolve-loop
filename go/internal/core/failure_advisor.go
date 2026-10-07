@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -72,6 +73,8 @@ func NewFailureAdvisor(bridge Bridge, opts ...FailureAdvisorOption) *FailureAdvi
 	return a
 }
 
+const UsageEvidenceFile = "usage-evidence.ndjson"
+
 // FailureAdviseInput is the evidence envelope for one unclassified terminal
 // state: which phase/CLI died, how, and the recent pane tail.
 type FailureAdviseInput struct {
@@ -132,6 +135,7 @@ func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) s
 	}
 	b.WriteString("# Incident\n")
 	fmt.Fprintf(&b, "- phase: %s\n- cli: %s\n- exit_code: %d\n- cycle: %d\n\n", in.Phase, in.CLI, in.ExitCode, in.Cycle)
+	writeUsageEvidence(&b, in.Workspace)
 	// See ADR-0045.
 	b.WriteString("# Recent pane tail\n")
 	b.WriteString(panetrust.Frame(in.PaneTail, advisorPaneMaxLines, advisorPaneMaxCols))
@@ -145,6 +149,36 @@ func (a *FailureAdvisor) composePrompt(in FailureAdviseInput, artifact string) s
 	fmt.Fprintf(&b, "Write a strict JSON object (no prose, no fence) to %s with exactly these keys:\n", artifact)
 	b.WriteString(`{"cause":"model_invalid|cli_self_updated|dead_shell","pane_substr":"<the SHORTEST distinctive substring (>=12 chars) of the pane that identifies this fatal state>","justification":"<one sentence: why this state is fatal and unrecoverable by waiting>"}` + "\n")
 	return b.String()
+}
+
+const advisorUsageEvidenceLines = 5
+
+func writeUsageEvidence(b *strings.Builder, workspace string) {
+	lines := usageEvidenceLines(workspace)
+	if len(lines) == 0 {
+		return
+	}
+	b.WriteString("# Usage evidence\nA usage query ran when the CLI failed; it verifies or rules out quota as the cause. Read it before blaming the task or the code.\n")
+	b.WriteString(panetrust.Frame(strings.Join(lines, "\n"), advisorUsageEvidenceLines, advisorPaneMaxCols))
+	b.WriteString("\n\n")
+}
+
+func usageEvidenceLines(workspace string) []string {
+	raw, err := os.ReadFile(filepath.Join(workspace, UsageEvidenceFile))
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var rec struct{ Driver, Trigger, Summary string }
+		if json.Unmarshal([]byte(line), &rec) == nil && rec.Summary != "" {
+			out = append(out, fmt.Sprintf("- %s (%s): %s", rec.Driver, rec.Trigger, rec.Summary))
+		}
+	}
+	if len(out) > advisorUsageEvidenceLines {
+		out = out[len(out)-advisorUsageEvidenceLines:]
+	}
+	return out
 }
 
 // parseFailureAdvice is the trust boundary: it applies the same checks

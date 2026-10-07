@@ -104,8 +104,7 @@ type Options struct {
 	// SandboxCanaryProbe reports true when the outer environment denied an out-of-allowlist write.
 	SandboxCanaryProbe func() bool
 
-	// BootTester boots one *-tmux driver's REPL without a prompt and returns the bridge exit code and scrollback.
-	BootTester func(ctx context.Context, driver string, sandbox bool) (rc int, scrollback string)
+	BootTester func(ctx context.Context, driver string, sandbox bool) BootOutcome
 
 	// SelfUpdateEvidence reports whether bin self-updates on launch; an error means unverifiable (Warn).
 	SelfUpdateEvidence func(bin string) (bool, string, error)
@@ -122,6 +121,8 @@ type Options struct {
 	PhaseRoutingWarnings func() []string
 
 	Routing func() (Routing, error)
+
+	UsageEvidence func(driver string) string
 }
 
 // resolved is Options with every seam and default filled in.
@@ -147,7 +148,7 @@ type resolved struct {
 	dirWritable   func(string) bool
 	diskFreeBytes func(string) (uint64, error)
 	orphanKill    swarm.TmuxKiller
-	bootTester    func(context.Context, string, bool) (int, string)
+	bootTester    func(context.Context, string, bool) BootOutcome
 
 	nestedFallbackStage config.Stage
 	sandboxCanaryProbe  func() bool
@@ -312,7 +313,7 @@ func Run(opts Options) (Result, error) {
 		checkCLIVersionFreeze(o),
 		checkCLIHealth(o),
 		checkCLIVersionDrift(o),
-		checkBridgeBoot(o),
+		checkBridgeBoot(o, opts.UsageEvidence),
 		checkSandboxNestedFallback(o),
 		checkPhaseRoutingWarnings(o),
 		checkCLIRouting(o),

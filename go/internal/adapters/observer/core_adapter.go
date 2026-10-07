@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 )
 
 // watcherExitTimeout bounds the cancel's wait for the watcher, which notices
@@ -43,6 +44,8 @@ type CoreAdapter struct {
 	// Signals yields the Signal Center for the adapter's own faults. It is read
 	// at every use; a nil Center is the Null Object.
 	Signals func() *signalcenter.Center
+
+	UsageEvidence usageevidence.Explain
 }
 
 // NewCoreAdapter returns a CoreAdapter using the given observer policy, or the compiled defaults.
@@ -102,12 +105,12 @@ func (a *CoreAdapter) Start(ctx context.Context, phase string, req core.PhaseReq
 			return panewatch.ReadLive(req.Workspace, phase, runlease.PIDAlive)
 		},
 	}
-	cfg.OnEvent = phaseStallSignal(a.Signals, req, phase, cfg.StallS)
+	watchCtx, cancel := context.WithCancel(ctx)
+	cfg.OnEvent = a.phaseStallSignal(watchCtx, phaseWatch{req: req, phase: phase, stall: cfg.StallS})
 	// This path sends no soft-stall nudges: observerengine owns that logic and is
 	// not folded in here yet. See docs/architecture/decomposition/12-phaseobserver.md.
 	obs := New(cfg, sink)
 
-	watchCtx, cancel := context.WithCancel(ctx)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {

@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
-	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
@@ -433,11 +432,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// below launches through walked. The runner and the advisor walk their own
 	// chains, so they pass straight through.
 	diagf := func(format string, args ...any) { fmt.Fprintf(os.Stderr, format, args...) }
-	walked := bridgechain.New(br,
+	explainUsage := usageEvidenceFn(projectRoot, evolveDir, console)
+	walked := bridgechain.New(withUsageEvidence(br, explainUsage, signals),
 		bridgechain.DefaultPlanResolver(cliRouter),
-		bridgechain.WithBench(func(root, ws, cli string, start time.Time, env map[string]string) {
-			bridgechain.BenchOnEscalation(root, ws, cli, start, env, time.Now, diagf)
-		}),
+		bridgechain.WithBench(func(e bridgechain.Escalation) { bridgechain.BenchOnEscalation(e, time.Now, diagf) }),
 		bridgechain.WithLog(diagf))
 
 	// Every BaseRunner's verdict engine reads the contract verifier through this
@@ -534,14 +532,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 			RegistryPath: mintregistry.Path(projectRoot), // the tree-diff guard reads it under projectRoot
 		}}),
 	}
-	// Auto-spawn the per-phase observer unless policy.json disables it.
-	observerCfg := pol.ObserverConfig()
-	if *observerCfg.Autospawn {
-		ca := observer.NewCoreAdapter(observerCfg)
-		ca.RecoveryStage = cfg.PhaseRecovery.String()
-		ca.Signals = func() *signalcenter.Center { return signals } // the adapter's own faults are observer.warning signals
-		opts = append(opts, core.WithObserver(ca))
-	}
+	opts = append(opts, phaseObserverOptions(pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage})...)
 	// Every deliverable gate chains behind one reviewer, since WithReviewer takes
 	// one. Each is gated on its own and fails open on ambiguity.
 	var reviewers []core.DeliverableReviewer

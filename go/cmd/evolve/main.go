@@ -169,7 +169,8 @@ v12.1 utilities + composition:
                               [--ship-anyway] [--dry-run] )
   clihealth                 CLI quota/credential benches
                               ( clihealth list [--json] [--project-root DIR]
-                              | clihealth clear <family> [--project-root DIR] )
+                              | clihealth clear <family> [--project-root DIR]
+                              | clihealth usage [--json] [family...] [--project-root DIR] )
   cli                       Update each subscribed CLI family, then
                               smoke-test a changed version
                               ( cli update [--dry-run] [--json]
