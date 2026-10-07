@@ -1,15 +1,22 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
+	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
 var evolveDeliverablePrefixes = []string{
-	".evolve/evals/",
+	evalsDir,
 	".evolve/phases/",
 	".evolve/commit-prefix-scope.json",
 }
@@ -29,119 +36,326 @@ func isEvolveDeliverablePath(p string) bool {
 	return false
 }
 
-// recoverBuildLeak relocates or discards a phase's main-tree leak so its
-// cycle can continue past the tree-diff guard. sourceWriter=false phases
-// (triage/audit/scout/bug-reproduction) relocate only genuine untracked
-// leaks, leaving evolve deliverables and tracked edits for the guard to judge.
-func recoverBuildLeak(ctx context.Context, projectRoot, worktree string, baseline map[string]bool, sourceWriter bool) bool {
-	if worktree == "" {
-		return true // no worktree to relocate into → degrade (caller guards this anyway)
+type writeAuthority int
+
+const (
+	readOnlyAuthority writeAuthority = iota
+	evalAuthorAuthority
+	sourceWriterAuthority
+)
+
+type phaseLeakScope struct {
+	projectRoot string
+	cycleState  CycleState
+	phase       Phase
+	baseline    map[string]bool
+	leased      map[string]bool
+}
+
+func (o *Orchestrator) recoverPhaseLeak(ctx context.Context, scope phaseLeakScope) error {
+	if !o.leakRecoverablePhase(scope.phase) || scope.cycleState.ActiveWorktree == "" {
+		return nil
 	}
-	if inPlaceWorktree(worktree, projectRoot) {
-		return true // the tree IS the worktree: nothing to relocate, nothing to check out (inPlaceWorktree)
+	if scope.baseline == nil {
+		return nil
 	}
-	// -uall lists untracked files individually, so os.Rename here never hits
-	// a directory collision.
-	out, code, err := gitCapture(ctx, projectRoot, "status", "--porcelain", "-uall")
-	if err != nil || code != 0 {
-		// Can't determine leaks → degrade to the tree-diff guard (true); false
-		// is reserved for a detected leak that couldn't be safely recovered.
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git status failed (rc=%d): %v — degrading to tree-diff guard\n", code, err)
+	ownership := laneOwnership(scope.cycleState, activeVerifiedMints(scope.projectRoot))
+	recovery := leakRecovery{
+		projectRoot: scope.projectRoot,
+		worktree:    scope.cycleState.ActiveWorktree,
+		cycle:       scope.cycleState.CycleID,
+		baseline:    scope.baseline,
+		authority:   o.writeAuthority(scope.phase),
+		ownership:   ownership,
+		exempt:      ownership.exemptions(scope.projectRoot, scope.cycleState.WorkspacePath, scope.leased),
+	}
+	if recoverBuildLeak(ctx, recovery) {
+		return nil
+	}
+	return fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for review and audit)", scope.phase)
+}
+
+func (cr *cycleRun) recoveryBaselineFor(guard *treediff.Guard, before []string) map[string]bool {
+	if guard == nil || !cr.mainTreeIsCheckout() {
+		return nil
+	}
+	set := make(map[string]bool, len(before))
+	for _, p := range before {
+		set[p] = true
+	}
+	return set
+}
+
+type checkoutDecision struct {
+	decided  bool
+	checkout bool
+}
+
+func (cr *cycleRun) mainTreeIsCheckout() bool {
+	if cr.checkout == nil {
+		cr.checkout = &checkoutDecision{}
+	}
+	if !cr.checkout.decided {
+		cr.checkout.decided, cr.checkout.checkout = true, !notAGitCheckout(cr.req.ProjectRoot)
+	}
+	return cr.checkout.checkout
+}
+
+func notAGitCheckout(projectRoot string) bool {
+	_, err := plane.Classify(projectRoot)
+	return errors.Is(err, fs.ErrNotExist)
+}
+
+const (
+	snapshotAttempts     = 3
+	snapshotRetryBackoff = 100 * time.Millisecond
+)
+
+var errPrePhaseSnapshot = fmt.Errorf("pre-phase main-tree snapshot failed after %d attempts, so the phase was not run", snapshotAttempts)
+
+func withSnapshotRetries(ctx context.Context, read func() error) error {
+	err := read()
+	for attempt := 1; err != nil && attempt < snapshotAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		backoffSleep(time.Duration(attempt) * snapshotRetryBackoff)
+		err = read()
+	}
+	return err
+}
+
+func retryingDirtyPaths(read treediff.GitDirtyFn) treediff.GitDirtyFn {
+	if read == nil {
+		return nil
+	}
+	return func(ctx context.Context, repoRoot string) ([]string, error) {
+		var paths []string
+		err := withSnapshotRetries(ctx, func() error {
+			var readErr error
+			paths, readErr = read(ctx, repoRoot)
+			return readErr
+		})
+		return paths, err
+	}
+}
+
+func readMainTreeStatus(ctx context.Context, projectRoot string) (string, error) {
+	var out string
+	err := withSnapshotRetries(ctx, func() error {
+		stdout, code, err := gitCapture(ctx, projectRoot, "status", "--porcelain", "-uall")
+		if err != nil {
+			return err
+		}
+		if code != 0 {
+			return fmt.Errorf("git status exit %d", code)
+		}
+		out = stdout
+		return nil
+	})
+	return out, err
+}
+
+func (cr *cycleRun) snapshotThenDispatch(next Phase, req PhaseRequest, hooks retryOpts) (map[string]bool, PhaseResponse, int, error) {
+	guard, before, err := cr.snapshotMainTree(next)
+	if err != nil {
+		return nil, PhaseResponse{}, 0, err
+	}
+	resp, attempts, err := cr.retryPhaseRunner(next, req, hooks)
+	return cr.recoveryBaselineFor(guard, before), resp, attempts, err
+}
+
+func (o *Orchestrator) writeAuthority(p Phase) writeAuthority {
+	switch {
+	case o.worktreePhase(p):
+		return sourceWriterAuthority
+	case p == PhaseScout:
+		return evalAuthorAuthority
+	}
+	return readOnlyAuthority
+}
+
+type leakRecovery struct {
+	projectRoot string
+	worktree    string
+	cycle       int
+	baseline    map[string]bool
+	authority   writeAuthority
+	ownership   mainTreeOwnership
+	exempt      leakExemptions
+}
+
+func (r leakRecovery) authors(p string) bool {
+	switch r.authority {
+	case sourceWriterAuthority:
+		return true
+	case evalAuthorAuthority:
+		return r.ownership.ownsEval(p)
+	}
+	return false
+}
+
+func recoverBuildLeak(ctx context.Context, r leakRecovery) bool {
+	if r.worktree == "" || inPlaceWorktree(r.worktree, r.projectRoot) {
 		return true
 	}
-	var relocated []string
+	out, err := readMainTreeStatus(ctx, r.projectRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: cannot read the main tree after %d attempts: %v — recovery fails rather than report the tree clean\n", snapshotAttempts, err)
+		return false
+	}
+	var staged []string
 	for _, line := range strings.Split(out, "\n") {
-		if len(line) < 4 {
+		p, isNew := r.newLeak(line)
+		if !isNew {
 			continue
 		}
-		p := porcelainPath(line)
-		if p == "" || baseline[p] {
-			continue
-		}
-		// Skip paths isLegitimateMainTreePath classifies as runtime state (the
-		// same classification the boundary guard uses); evolveDeliverablePrefixes
-		// are NOT skipped, since those relocate into the worktree like any other leak.
-		if isLegitimateMainTreePath(p) && !buildArtifacts[p] {
-			continue
-		}
-		xy := line[:2]
-		switch {
-		case strings.Contains(xy, "?"): // untracked file → relocate out of the main tree
-			if !sourceWriter && isEvolveDeliverablePath(p) {
-				continue
-			}
-			src := filepath.Join(projectRoot, p)
-			dst := filepath.Join(worktree, p)
-			if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: mkdir for %s: %v\n", p, err)
-				return false
-			}
-			if err := moveFile(src, dst); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate %s: %v\n", p, err)
-				return false
-			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s out of main tree\n", p)
-			// Stage only for source writers, so the auditor's `git diff HEAD`
-			// sees builder source; a non-source leak just needs to vacate main.
-			if sourceWriter {
-				relocated = append(relocated, p)
-			}
-		case buildArtifacts[p]: // rebuilt release binary leaked → always discard
-			if err := discardMainLeak(ctx, projectRoot, p); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
-				return false
-			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked rebuilt artifact %s\n", p)
-		case strings.Contains(xy, "M"): // modified tracked file (exists at HEAD)
-			if !sourceWriter {
-				// A non-source-writer phase must not edit tracked source; leave
-				// it for the tree-diff guard to abort.
-				continue
-			}
-			if worktreeCleanForPath(ctx, worktree, p) {
-				if err := relocateTrackedEdit(ctx, projectRoot, worktree, p); err != nil {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate tracked edit %s: %v\n", p, err)
-					return false
-				}
-				fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked tracked edit %s into worktree\n", p)
-				relocated = append(relocated, p)
-			} else {
-				if err := discardMainLeak(ctx, projectRoot, p); err != nil {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
-					return false
-				}
-				fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s (worktree diverged)\n", p)
-			}
-		case strings.ContainsAny(xy, "AD"): // added-not-at-HEAD / deleted tracked → discard (rare; conservative)
-			if !sourceWriter {
-				continue // leave for the tree-diff guard (non-source phase)
-			}
-			if err := discardMainLeak(ctx, projectRoot, p); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
-				return false
-			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked main-tree change %s\n", p)
-		default: // rename/copy/unknown — not safe to auto-recover
-			if !sourceWriter {
-				continue // leave for the tree-diff guard (non-source phase)
-			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: unrecoverable leak status %q for %s (falling through to abort)\n", xy, p)
+		stage, recovered := r.recoverPath(ctx, line[:2], p)
+		if !recovered {
 			return false
 		}
-	}
-	if len(relocated) > 0 {
-		// -f: a relocated path may be gitignored in the worktree, and a plain
-		// `git add` would exit 1 on an ignored path and abort the whole batch.
-		args := append([]string{"add", "-f", "--"}, relocated...)
-		if _, c, e := gitCapture(ctx, worktree, args...); e != nil || c != 0 {
-			// A failed stage leaves the files relocated but invisible to the
-			// auditor; return false so the tree-diff guard aborts instead of
-			// shipping that half-recovered state.
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git add of relocated paths failed (rc=%d): %v — aborting recovery\n", c, e)
-			return false
+		if stage {
+			staged = append(staged, p)
 		}
-		fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: %d leaked path(s) relocated into worktree; main tree restored\n", len(relocated))
 	}
+	return stageRelocated(ctx, r.worktree, staged)
+}
+
+func (r leakRecovery) newLeak(line string) (string, bool) {
+	if len(line) < 4 {
+		return "", false
+	}
+	p := porcelainPath(line)
+	if p == "" || r.baseline[p] {
+		return "", false
+	}
+	return p, !isLegitimateMainTreePath(p) || buildArtifacts[p]
+}
+
+func (r leakRecovery) recoverPath(ctx context.Context, xy, p string) (stage, recovered bool) {
+	if r.exempt.leased[p] {
+		fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: left %s in the main tree — the console lease holds it\n", p)
+		return false, true
+	}
+	if owner, foreign := r.ownership.foreignOwner(p); foreign {
+		return false, r.leaveForOwner(p, owner)
+	}
+	switch {
+	case strings.Contains(xy, "?"):
+		return r.recoverUntracked(p)
+	case buildArtifacts[p]:
+		return false, r.discard(ctx, p, "rebuilt artifact")
+	case !r.authors(p):
+		return false, true
+	case strings.Contains(xy, "M"):
+		return r.recoverTrackedEdit(ctx, p)
+	case strings.ContainsAny(xy, "AD"):
+		return false, r.discard(ctx, p, "main-tree change")
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: unrecoverable leak status %q for %s (falling through to abort)\n", xy, p)
+	return false, false
+}
+
+func (r leakRecovery) recoverUntracked(p string) (stage, recovered bool) {
+	authored := r.authors(p)
+	if !authored && isEvolveDeliverablePath(p) {
+		return false, true
+	}
+	src, dst := filepath.Join(r.projectRoot, p), filepath.Join(r.worktree, p)
+	if info, err := os.Lstat(dst); err == nil && info.Mode().IsRegular() {
+		return false, r.setAsideShadowedLeak(src, dst, p)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: mkdir for %s: %v\n", p, err)
+		return false, false
+	}
+	if err := moveFile(src, dst); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate %s: %v\n", p, err)
+		return false, false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s out of main tree\n", p)
+	return authored, true
+}
+
+func (r leakRecovery) leaveForOwner(p, owner string) bool {
+	if !r.exempt.heldElsewhere(p) {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %s belongs to %s, not this lane, and no live lane holds it — recovery refuses to claim it or leave it unjudged\n", p, owner)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: left %s in the main tree — it belongs to %s, not this lane\n", p, owner)
+	return true
+}
+
+func (r leakRecovery) setAsideShadowedLeak(src, dst, p string) bool {
+	same, err := sameBytes(src, dst)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: compare leaked %s with the worktree's copy: %v\n", p, err)
+		return false
+	}
+	if same {
+		return removeDuplicateLeak(src, p)
+	}
+	quarantined := uniqueQuarantinePath(filepath.Join(quarantineDir(r.projectRoot, r.cycle), p))
+	if err := moveFile(src, quarantined); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: quarantine leaked %s: %v\n", p, err)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: leaked %s differs from the worktree's own copy, which wins; the main-tree copy is kept at %s\n", p, quarantined)
+	return true
+}
+
+func removeDuplicateLeak(src, p string) bool {
+	if err := os.Remove(src); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: drop leaked %s: %v\n", p, err)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: dropped leaked %s — the worktree already holds the same bytes\n", p)
+	return true
+}
+
+func sameBytes(a, b string) (bool, error) {
+	left, err := os.ReadFile(a)
+	if err != nil {
+		return false, err
+	}
+	right, err := os.ReadFile(b)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(left, right), nil
+}
+
+func (r leakRecovery) recoverTrackedEdit(ctx context.Context, p string) (stage, recovered bool) {
+	if !worktreeCleanForPath(ctx, r.worktree, p) {
+		return false, r.discard(ctx, p, "main-tree change (worktree diverged)")
+	}
+	if err := relocateTrackedEdit(ctx, r.projectRoot, r.worktree, p); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate tracked edit %s: %v\n", p, err)
+		return false, false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked tracked edit %s into worktree\n", p)
+	return true, true
+}
+
+func (r leakRecovery) discard(ctx context.Context, p, kind string) bool {
+	if err := discardMainLeak(ctx, r.projectRoot, p); err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked %s %s\n", kind, p)
+	return true
+}
+
+func stageRelocated(ctx context.Context, worktree string, paths []string) bool {
+	if len(paths) == 0 {
+		return true
+	}
+	args := append([]string{"add", "-f", "--"}, paths...)
+	if _, c, e := gitCapture(ctx, worktree, args...); e != nil || c != 0 {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git add of relocated paths failed (rc=%d): %v — aborting recovery\n", c, e)
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: %d leaked path(s) relocated into worktree; main tree restored\n", len(paths))
 	return true
 }
 

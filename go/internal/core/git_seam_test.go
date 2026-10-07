@@ -47,7 +47,7 @@ func TestRecoverBuildLeak_UsesInjectedGit(t *testing.T) {
 	r := &gitRec{stdout: ""} // empty porcelain → no leaks → clean true
 	useFakeGit(t, r)
 
-	if ok := recoverBuildLeak(context.Background(), "/proj", "/proj/.evolve/worktrees/cycle-1", map[string]bool{}, true); !ok {
+	if ok := recoverBuildLeak(context.Background(), leakRecovery{projectRoot: "/proj", worktree: "/proj/.evolve/worktrees/cycle-1", baseline: map[string]bool{}, authority: sourceWriterAuthority}); !ok {
 		t.Fatalf("recoverBuildLeak = false, want true on a clean (no-leak) tree")
 	}
 	if len(r.calls) == 0 {

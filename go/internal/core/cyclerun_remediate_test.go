@@ -315,3 +315,29 @@ func TestDispatch_ReadOnlyFlagOnResumeAndEvaluateBatchSurfaces(t *testing.T) {
 		}
 	}
 }
+
+type cancelProbeRunner struct {
+	obs          *recordingObserver
+	cancelsAtRun int32
+}
+
+func (r *cancelProbeRunner) Name() string { return "probe" }
+func (r *cancelProbeRunner) Run(_ context.Context, _ PhaseRequest) (PhaseResponse, error) {
+	r.cancelsAtRun = r.obs.cancelCalls.Load()
+	return PhaseResponse{Verdict: VerdictPASS}, nil
+}
+
+func TestObservedRun_TheObserverWatchesTheWholeRun(t *testing.T) {
+	obs := &recordingObserver{}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithObserver(obs))
+	cr := &cycleRun{o: o, ctx: context.Background()}
+	runner := &cancelProbeRunner{obs: obs}
+
+	if _, err := cr.observedRun(PhaseBuild, runner, PhaseRequest{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if runner.cancelsAtRun != 0 || obs.cancelCalls.Load() != 1 || len(obs.starts) != 1 || obs.starts[0] != string(PhaseBuild) {
+		t.Fatalf("observer: starts=%v cancels during run=%d after=%d, want one %s watch spanning the run, cancelled once after it", obs.starts, runner.cancelsAtRun, obs.cancelCalls.Load(), PhaseBuild)
+	}
+}

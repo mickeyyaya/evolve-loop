@@ -6,10 +6,11 @@ Add unit tests in `go/internal/core` covering pure helper functions currently at
 
 ## Criteria
 
-### C1 — isScoutEvalMaterialization fully covered [code]
+### C1 — the main-tree ownership Specification is fully covered [code]
+`isScoutEvalMaterialization` was deleted on 2026-10-07 (the scout's eval home is its workspace; incident `docs/incidents/2026-10-06-cycle-1811-cross-lane-eval-relocation.md`). `mainTreeOwnership` replaced it.
 ```bash
 cd /Users/danleemh/ai/claude/evolve-loop/go && \
-  go test ./internal/core/ -run TestIsScoutEvalMaterialization -v -count=1 2>&1 | grep -E "PASS|FAIL"
+  go test ./internal/core/ -run TestMainTreeOwnership_ -v -count=1 2>&1 | grep -E "PASS|FAIL"
 ```
 Expected: `PASS` — test runs and passes.
 
@@ -34,12 +35,12 @@ cd /Users/danleemh/ai/claude/evolve-loop/go && \
 ```
 Expected: `PASS`.
 
-### C5 — Negative: isScoutEvalMaterialization rejects non-scout phase [code]
+### C5 — Negative: a path another owner holds is never this lane's [code]
 ```bash
 cd /Users/danleemh/ai/claude/evolve-loop/go && \
-  go test ./internal/core/ -run TestIsScoutEvalMaterialization -v -count=1 2>&1 | grep -E "non-scout|build.*false|PASS"
+  go test ./internal/core/ -run 'TestMainTreeOwnership_(ForeignOwner|HeldBySibling)' -v -count=1 2>&1 | grep -E "sibling|PASS"
 ```
-Expected: `PASS` (the test verifies false is returned for non-scout phases).
+Expected: `PASS` (the table rows for sibling evals, predicate packages, change records and mints are refused).
 
 ### C6 — Overall core package coverage ≥ 79% after changes [code]
 ```bash

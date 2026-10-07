@@ -294,28 +294,26 @@ func (o *Orchestrator) RunCycleFromPhase(ctx context.Context, req CycleRequest, 
 	stopLease := startRunLease(cs.WorkspacePath, cs.RunID, o.now, leaseRefreshInterval())
 	defer stopLease()
 
-	inputs := o.snapshotResumeInputs(ctx, &boot)
+	inputs := o.snapshotResumeInputs(&boot)
 	cs = boot.cycleState
 	envSnap := inputs.env
 	ctxSnap := inputs.context
 	result = inputs.result
 	preResumeHEAD := inputs.preResumeHEAD
-	mainDirtyBaseline := inputs.mainDirtyBaseline
 
 	execution = resumeExecution{
-		orchestrator:      o,
-		ctx:               ctx,
-		request:           req,
-		resumePoint:       resumePoint,
-		state:             state,
-		cycleState:        cs,
-		cycle:             cycle,
-		startPhase:        startPhase,
-		envSnapshot:       envSnap,
-		contextSnapshot:   ctxSnap,
-		initialResult:     result,
-		preResumeHEAD:     preResumeHEAD,
-		mainDirtyBaseline: mainDirtyBaseline,
+		orchestrator:    o,
+		ctx:             ctx,
+		request:         req,
+		resumePoint:     resumePoint,
+		state:           state,
+		cycleState:      cs,
+		cycle:           cycle,
+		startPhase:      startPhase,
+		envSnapshot:     envSnap,
+		contextSnapshot: ctxSnap,
+		initialResult:   result,
+		preResumeHEAD:   preResumeHEAD,
 	}
 	return execution.run()
 
@@ -330,26 +328,17 @@ func (o *Orchestrator) reviewResumedDeliverable(
 	runner PhaseRunner,
 	req PhaseRequest,
 	resp PhaseResponse,
-	mainDirtyBaseline map[string]bool,
+	phaseBaseline map[string]bool,
 ) (PhaseResponse, error) {
 	if o.reviewer == nil || resp.Verdict == VerdictSKIPPED {
 		return resp, nil
-	}
-	recoverBeforeReview := func() error {
-		if !o.leakRecoverablePhase(phase) || cs.ActiveWorktree == "" {
-			return nil
-		}
-		if recoverBuildLeak(ctx, projectRoot, cs.ActiveWorktree, mainDirtyBaseline, o.worktreePhase(phase)) {
-			return nil
-		}
-		return fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for review and audit)", phase)
 	}
 	reviewInput := func(response PhaseResponse) ReviewInput {
 		in := ReviewInputFor(cs, phase, projectRoot)
 		in.Response = response
 		return in
 	}
-	if err := recoverBeforeReview(); err != nil {
+	if err := o.recoverPhaseLeak(ctx, phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}); err != nil {
 		return resp, err
 	}
 	review := o.performEffectsAndReview(ctx, reviewInput(resp))
@@ -375,7 +364,7 @@ func (o *Orchestrator) reviewResumedDeliverable(
 			return corrected, fmt.Errorf("resume review gate: phase %q correction %d returned non-canonical verdict %q", phase, correction, corrected.Verdict)
 		}
 		resp = corrected
-		if err := recoverBeforeReview(); err != nil {
+		if err := o.recoverPhaseLeak(ctx, phaseLeakScope{projectRoot: projectRoot, cycleState: cs, phase: phase, baseline: phaseBaseline}); err != nil {
 			return resp, err
 		}
 		// Correction output is a fresh worktree mutation. Normalize it before

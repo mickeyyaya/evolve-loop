@@ -754,19 +754,18 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	// loop-carried state, so late mutations by sub-methods (pointer receivers
 	// throughout) are visible to the exit defers and the next iteration.
 	cr := &cycleRun{
-		o:                 o,
-		ctx:               ctx,
-		req:               req,
-		cycle:             init.cycle,
-		mainDirtyBaseline: init.mainDirtyBaseline,
-		consoleLeased:     init.consoleLeased,
-		state:             init.state,
-		cs:                init.cs,
-		result:            CycleResult{Cycle: init.cycle, FinalVerdict: VerdictPASS},
-		current:           PhaseStart,
-		lastVerdict:       VerdictPASS,
-		retryConfig:       o.retryConfig,
-		workflowConfig:    o.workflowConfig,
+		o:              o,
+		ctx:            ctx,
+		req:            req,
+		cycle:          init.cycle,
+		consoleLeased:  init.consoleLeased,
+		state:          init.state,
+		cs:             init.cs,
+		result:         CycleResult{Cycle: init.cycle, FinalVerdict: VerdictPASS},
+		current:        PhaseStart,
+		lastVerdict:    VerdictPASS,
+		retryConfig:    o.retryConfig,
+		workflowConfig: o.workflowConfig,
 	}
 	// Registered first (fires last, LIFO); reads cr.preserveWorktree /
 	// cr.cycleCompletedNormally at defer-execution time so late mutations by

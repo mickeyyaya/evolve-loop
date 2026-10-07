@@ -64,6 +64,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/cyclerun_dispatch.go", Rationale: "fresh-cycle downstream explanation projection call site"},
 	{Fragment: "/go/internal/core/cyclerun_review.go", Rationale: "post-Build explanation refresh eligibility decision and review-to-guard ordering"},
 	{Fragment: "/go/internal/core/cyclerun_postreview.go", Rationale: "fresh-cycle post-Build explanation refresh call site (applyPostReviewGuards -> explanationdocs.RefreshResult); carved out of cyclerun_review.go by #549"},
+	{Fragment: "/go/internal/core/leak_recovery.go", Rationale: "build-leak recovery and its fail-closed rules: the pre-phase snapshot retry and the abort when it still fails in a checkout, the no-checkout exemption decided once per cycle, leaveForOwner failing a keyed path no live lane or console lease holds, and quarantine-not-delete for a differing main-tree copy"},
+	{Fragment: "/go/internal/core/leak_ownership.go", Rationale: "the main-tree ownership Specification: what leak recovery may claim, which leaked paths the tree-diff guard exempts as a live sibling's (leakExemptions, heldBySibling), the mint-registry read with its quarantine, and the explanationdocs.IsCycleChangeRecord owner rule"},
 	{Fragment: "/go/internal/core/cyclerun_remediate.go", Rationale: "Build explanation correction and remediation projection"},
 	{Fragment: "/go/internal/core/continuation_stamp.go", Rationale: "continuation explanation-history ownership transition"},
 	{Fragment: "/go/internal/core/continuation_ancestor_predicates.go", Rationale: "continuation archives the ancestor's explanation records and predicate package (design A2)"},

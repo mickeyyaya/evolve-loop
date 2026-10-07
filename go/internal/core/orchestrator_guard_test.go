@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
@@ -254,43 +256,65 @@ func TestDefaultGitDirtyPaths_RenameEmitsBothSides(t *testing.T) {
 }
 
 func TestGuardIgnoresScoutEvalMaterialization(t *testing.T) {
-	evalPath := ".evolve/evals/ledger-seal-io-coverage.md"
-	dirty := &fakeGitDirty{baseline: []string{}, afterLeak: []string{evalPath}}
-	runners := minimalRunners(PhaseScout, &leakInjector{name: PhaseScout})
-	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners,
-		WithWorktreeProvisioner(&fakeWorktree{path: t.TempDir()}),
-		WithGitDirtyPaths(dirty.Fn()),
-	)
-	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g"})
-	// minimalRunners registers only scout, so reaching the next phase's
-	// "no runner" error proves the cycle advanced past scout's guard.
-	if err == nil || !strings.Contains(err.Error(), "no runner") {
-		t.Fatalf("expected the cycle to advance past scout's guard to a no-runner phase; got: %v", err)
+	root := initAuditLeakRepo(t)
+	const slug = "ledger-seal-io-coverage"
+	writeLanePin(t, RunWorkspacePath(root, 1), slug)
+	evalPath := ".evolve/evals/" + slug + ".md"
+	var copied atomic.Bool
+	runners := buildRunners(nil)
+	runners[PhaseScout] = &tddLeakRunner{name: string(PhaseScout), onRun: func() {
+		writeTreeFile(t, root, evalPath, "scout copy in the main tree\n")
+		copied.Store(true)
+	}}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners, WithWorktreeProvisioner(gitWorktree{}))
+
+	res, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+
+	if err != nil {
+		t.Fatalf("a scout's copy of its own eval in the main tree must not abort the cycle: %v", err)
 	}
-	if strings.Contains(err.Error(), "tree-diff") || strings.Contains(err.Error(), evalPath) {
-		t.Errorf("guard must NOT fire on scout eval materialization; got: %v", err)
+	if !slices.Contains(res.PhasesRun, PhaseShip) {
+		t.Fatalf("the cycle must run to ship; phases=%v", res.PhasesRun)
+	}
+	if !copied.Load() {
+		t.Fatal("the scout never wrote its main-tree copy")
+	}
+	requireAbsent(t, root, evalPath)
+}
+
+func TestGuardStillChargesAnEvalNoLiveSiblingHolds(t *testing.T) {
+	root := initAuditLeakRepo(t)
+	const strayEval = ".evolve/evals/another-item.md"
+	writeLanePin(t, RunWorkspacePath(root, 1), "router-silent-errors")
+	runners := buildRunners(nil)
+	runners[PhaseShip] = &tddLeakRunner{name: string(PhaseShip), onRun: func() {
+		writeTreeFile(t, root, strayEval, "written during a phase leak recovery never runs for\n")
+	}}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners, WithWorktreeProvisioner(gitWorktree{}))
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+
+	if err == nil || !strings.Contains(err.Error(), "tree-diff") || !strings.Contains(err.Error(), strayEval) {
+		t.Fatalf("an eval no live sibling holds must still be charged to the phase that wrote it; got: %v", err)
 	}
 }
 
-func TestIsScoutEvalMaterialization(t *testing.T) {
-	cases := []struct {
-		phase Phase
-		path  string
-		want  bool
-	}{
-		{PhaseScout, ".evolve/evals/ledger-seal-io-coverage.md", true},
-		{PhaseScout, ".evolve/evals/x.md", true},
-		{PhaseScout, ".evolve/evals/notamarkdown.sh", false}, // only <slug>.md is the contract
-		{PhaseTriage, ".evolve/evals/smuggled.md", false},    // only scout materializes evals
-		{PhaseBuild, ".evolve/evals/smuggled.md", false},
-		{PhaseScout, ".evolve/phases/x/phase.json", false}, // other deliverables not exempt
-		{PhaseScout, "go/internal/core/leak.go", false},    // source leak from scout still fires
+func TestRecoveryFailsAPhaseThatLeftAnEvalNoLiveLaneHolds(t *testing.T) {
+	root := initAuditLeakRepo(t)
+	const strayEval = ".evolve/evals/another-item.md"
+	writeLanePin(t, RunWorkspacePath(root, 1), "router-silent-errors")
+	runners := buildRunners(nil)
+	runners[PhaseTriage] = &tddLeakRunner{name: string(PhaseTriage), onRun: func() {
+		writeTreeFile(t, root, strayEval, "written by this lane's triage\n")
+	}}
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners, WithWorktreeProvisioner(gitWorktree{}))
+
+	_, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: root, GoalHash: "g"})
+
+	if err == nil || !strings.Contains(err.Error(), "worktree-leak recovery failed") {
+		t.Fatalf("recovery must fail the phase that left a keyed path no live lane holds; got: %v", err)
 	}
-	for _, tc := range cases {
-		if got := isScoutEvalMaterialization(tc.phase, tc.path); got != tc.want {
-			t.Errorf("isScoutEvalMaterialization(%q,%q)=%v, want %v", tc.phase, tc.path, got, tc.want)
-		}
-	}
+	requireTreeFile(t, root, strayEval, "written by this lane's triage\n")
 }
 
 func TestGuardRecoversCatalogWritesSourcePhaseLeak(t *testing.T) {

@@ -2,6 +2,123 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a fleet lane's leak recovery no longer claims a path another lane owns; the scout's eval has one home, its workspace; the recovery baseline is captured per phase (cycle 1811, wave 68, 2026-10-06)
+
+- **What was wrong and how it showed.** Two lanes ran on one shared main tree in wave 68: lane 1811 (`router-silent-errors`) and lane 1812 (`phasespec-roots-silent-policy-error`).
+  - At 13:28:08Z, 1812's scout wrote its eval to its workspace, as its persona says, and also copied it into the main tree with `cp … runtime/.evolve/evals/`.
+  - 1811's TDD then ended (13:39:52Z). `recoverBuildLeak` compared the main tree with a dirty baseline captured once at cycle start. It took the sibling's eval for its own leak and moved and staged it into 1811's worktree (`boundary-loop.log:178`).
+  - The audit failed 1811 on the out-of-scope eval (H1). The repair round could not delete it, because the builder's sandbox denies `.evolve/evals/*`. The cycle sealed FAIL.
+  - The same move had happened twice before. Batch 2026-08-16a shipped a sibling's eval in the wrong lane's commit, and batch 2026-08-15b moved a sibling's minted `phase.json`.
+  - The scout's copy looked sanctioned because the rule for where its eval lives had three homes. The persona said the workspace. `core.isScoutEvalMaterialization` said the main tree and exempted it from the tree-diff guard. Gate A read both.
+- **What changed:**
+  - **The ownership Specification.** `core/leak_ownership.go` adds `mainTreeOwnership`, one Specification that keys main-tree paths to their owners:
+    - `.evolve/evals/<slug>.md` to the item `<slug>`;
+    - `go/acs/cycle<N>/…` and `docs/explain/builds/cycle-<N>-<run>.md` to cycle N;
+    - a verified active mint to the mint registry.
+
+    A lane holds the ids `committedset.Committed` binds it to, the slugs it materialized in its workspace eval home, and its own cycle. Both homes are needed: across runtime cycles with a lane pin, 49 of 138 workspace eval slugs differ from the pin's ids.
+  - **What recovery claims.** `recoverBuildLeak` now takes a `leakRecovery` parameter object. It leaves a path another owner holds in the main tree, with one line that names the owner. That covers a new file and an edit to a committed one alike; a sibling re-materializing a committed eval was the 1811 theft by another route.
+    - When the worktree already holds a file at a leaked path, the worktree's copy wins. A main-tree copy with the same bytes is dropped; one that differs is moved to `.evolve/quarantine/cycle-<N>/` under a unique name (`uniqueQuarantinePath`), with a WARN naming the path. A scout's copy can no longer overwrite the eval TDD wrote, and a differing copy is never deleted. A compare that cannot read both copies fails recovery.
+    - When no live sibling, the mint registry or the console lease holds the owner, recovery fails the phase instead of leaving the path. Crash-resume has no tree-diff guard, so this is what makes it fail closed. Recovery and the guard read one exemption set (`leakExemptions`, carried to recovery in `phaseLeakScope`), so an operator's leased edit the guard waives is never a recovery failure.
+    - The function was split from about 110 lines into short functions under 50 lines each.
+    - `Orchestrator.recoverPhaseLeak`, with a `phaseLeakScope` parameter object, is the one seam the live loop and crash-resume share, and it replaces resume's private copy.
+  - **What the guard exempts.** The tree-diff guard exempts a keyed path the lane does not hold only when a live sibling run holds its owner, or the path is a registered mint. A key nobody live holds is still charged, so the guard is never weaker than before. The mint registry is one of the owner rules, so the guard has one mint exemption, not two. `activeVerifiedMints` is the one registry read, with its quarantine, shared by recovery and the guard.
+  - **The scout's eval has one home, its workspace.** `isScoutEvalMaterialization` is deleted. The scout has its own write authority (`evalAuthorAuthority`): a copy of its own eval left in the main tree is relocated by its own phase's recovery, a recovery rung rather than a block. Gate A reads the project root only for evals earlier cycles committed. `core.EvalFilePath` is the one layout, and `evalgate` uses it. `explanationdocs.IsCycleChangeRecord` is now exported for the change-record owner rule.
+  - **A per-phase baseline.** The recovery baseline is captured at every dispatch, at the remediation fix dispatch, and before every resumed dispatch, instead of once at cycle start or resume bootstrap. 1811's TDD began 2 min 52 s after the sibling's write.
+  - **One pre-dispatch snapshot, carried by the dispatch.** `cycleRun.snapshotMainTree` takes one `git status` per dispatch into `dispatchResult.beforeDirty`, and both recovery and the tree-diff guard read it.
+    - It runs at the phase dispatch, at the remediation fix dispatch and at the gate's re-run; crash-resume takes one before every resumed dispatch.
+    - Every main-tree read is retried 3 times (100 ms, then 200 ms backoff, stopping at once on a cancelled context): the pre-phase snapshot, recovery's own `git status`, and the guard's post-phase check and re-check.
+      - If the pre-phase snapshot still fails in a git checkout, the phase is not run: a fresh dispatch aborts, a remediation round is voided, a resume fails.
+      - If recovery's read still fails, recovery fails the phase instead of reporting the tree clean.
+      - If the guard's read still fails, it aborts the phase instead of warning.
+      - Whether the root is a git checkout is decided once per cycle, so a phase that deletes `.git` cannot switch the guard off. A degrade that skipped both recovery and the guard would let a leak made during the failure ship silently. `defaultGitDirtyPaths` returns git's error instead of an empty set.
+    - `cycleRun.snapshotThenRun` (snapshot, then `observedRun`) replaces the two inline snapshot and observe-and-run blocks in `maybeRemediate`. Crash-resume uses `cycleRun.snapshotThenDispatch`, through the same seam.
+    - These function-size allowances were lowered to the functions' current sizes:
+
+      | Function | Old | New |
+      |---|---|---|
+      | `cycleRun.dispatch` | 376 | 357 |
+      | `cycleRun.maybeRemediate` | 138 | 119 |
+      | `cycleRun.applyPostReviewGuards` | 114 | 93 |
+      | `Orchestrator.reviewResumedDeliverable` | 67 | 58 |
+      | `Orchestrator.RunCycleFromPhase` | 81 | 68 |
+      | `Orchestrator.newCycleRun` | 194 | 183 |
+      | `Orchestrator.RunCycle` | 221 | 220 |
+      | `resumeExecution.run` | 404 | 273 |
+
+      `recoverBuildLeak`'s allowance was dropped because it now fits the limit.
+  - **The ownership and recovery files are protected.**
+    - `go/internal/core/leak_ownership.go` holds the guard's exemption logic, which moved out of the protected `cyclerun_postreview.go`.
+    - `go/internal/core/leak_recovery.go` holds the snapshot retry and abort, the no-checkout exemption, the fail-closed owner rule and quarantine-not-delete.
+    - Both get `ProtectedSurfaceManifest` rows, pinned by `TestProtectedSurfaceManifest_CoversTheMainTreeOwnershipSpecification` and `TestProtectedSurfaceManifest_CoversTheLeakRecoveryRules`.
+- **The deadlock gets no rung.** The only route by which a foreign eval was ever observed entering a lane's tree is recovery relocation, which the Specification now closes. A continuation snapshot only carries what that route put there; 1811's was refused stamping. No audit report from cycles 15xx–18xx shows an agent authoring another item's eval. The incident record holds the proof.
+- **Tests, red first.** These failed on the pre-fix tree:
+  - `TestRecoverBeforeReview_SiblingLaneEvalWrittenMidPhaseStaysInTheMainTree`, the regression twin with two lanes on one main tree;
+  - `TestRunCycle_SiblingEvalWrittenDuringTDDIsNeitherChargedNorClaimed`;
+  - `TestRecoverBeforeReview_RegisteredMintStaysInTheMainTree`;
+  - `TestRecoverBeforeReview_ScoutsOwnMainTreeEvalCopyLeavesTheMainTree`;
+  - `TestRunCycle_PhaseBaselineExcludesASiblingWriteBeforeThePhase` and `TestRunCycleFromPhase_PhaseBaselineExcludesASiblingWriteBeforeThePhase`;
+  - the Specification tables (`TestMainTreeOwnership_*`, `TestLaneOwnership_*`);
+  - from the review round, red on the first fix:
+    - `TestRecoverBeforeReview_SiblingEditToACommittedEvalIsNotStolen`;
+    - `TestRecoverBeforeReview_OwnEvalLeakNeverOverwritesTheWorktreeCopy`;
+    - `TestDefaultGitDirtyPaths_ReportsAFailedGitStatus`;
+    - `TestRecoverPhaseLeak_SkipsAPhaseWithNoPrePhaseSnapshot`;
+    - `TestCycleRun_RecoveryBaselineNeedsASnapshotOfACheckout`.
+
+  - from the second review round, red on the first fix round:
+    - `TestRunCycle_ATransientPrePhaseSnapshotFailureIsRetriedAndTheLeakRecovered`;
+    - `TestRunCycle_APrePhaseSnapshotThatKeepsFailingStopsBeforeThePhaseRuns`;
+    - `TestRunCycleFromPhase_APrePhaseSnapshotThatKeepsFailingStopsBeforeThePhaseRuns`;
+    - `TestRecoverBeforeReview_ADifferingMainTreeCopyIsQuarantinedNotDeleted`;
+    - `TestRecoverBeforeReview_AKeyedPathNoLiveLaneHoldsFailsRecovery`;
+    - `TestRunCycleFromPhase_AnEditToAnUnownedCommittedEvalFailsTheResume`.
+
+  - from the final check, red before their fix:
+    - `TestRecoverBeforeReview_APostPhaseGitFailureFailsRecovery`;
+    - `TestRunCycle_APostPhaseGuardReadFailureAbortsThePhase`;
+    - `TestSnapshotMainTree_ADotGitRemovedMidCycleDoesNotTurnTheGuardOff`;
+    - `TestRetryingDirtyPaths_StopsWhenTheContextIsCancelled`;
+    - `TestRecoverBeforeReview_QuarantiningTheSamePathTwiceKeepsBothCopies`;
+    - `TestRecoverBeforeReview_AConsoleLeasedPathIsLeftJustAsTheGuardWaivesIt`;
+    - `TestProtectedSurfaceManifest_CoversTheLeakRecoveryRules`.
+
+  - from the narrow final check, red before their fix or killing its mutant:
+    - `TestRunCycleFromPhase_ADotGitRemovedBetweenResumedPhasesDoesNotTurnTheGuardOff`, which fails when a resume's phases stop sharing one checkout decision;
+    - `TestRetryingDirtyPaths_NoReaderStaysNoReader`.
+
+  These tests kill the review's surviving mutants:
+  - `TestMaybeRemediate_AFixSnapshotFailureVoidsTheRound`;
+  - `TestMaybeRemediate_AGateRerunSnapshotFailureVoidsTheRound`;
+  - `TestSnapshotMainTree_TwoTransientFailuresFitInsideTheRetries`;
+  - `TestSnapshotMainTree_AMalformedGitPointerIsACheckoutNotAnExemption`;
+  - `TestRecoverBeforeReview_AnExpiredSiblingLeaseDoesNotHoldItsEval`;
+  - `TestRecoverBeforeReview_AnUnheldPathAfterAHeldOneStillFailsRecovery`;
+  - `TestRecoverBeforeReview_ADifferingCopyOfTheSameLengthIsQuarantined`;
+  - `TestRecoverBeforeReview_AnUnreadableWorktreeCopyKeepsTheMainCopy`;
+  - `TestRunCycle_AGuardReCheckFailureAfterTheBinaryDiscardAbortsThePhase`;
+  - `TestRecoverBeforeReview_SiblingsStagedChangesToItsCommittedEvalAreLeft`;
+  - `TestMaybeRemediate_TheGateReRunsOwnLeakIsRecovered`;
+  - `TestRecoverBeforeReview_AFailedSnapshotNeverRecoversAgainstAnEmptyBaseline`;
+  - `TestObservedRun_TheObserverWatchesTheWholeRun`;
+  - `TestGuardChargesThisLanesOwnEvalWhileItsOwnLeaseIsLive`;
+  - the own-slug and own-cycle rows of `TestMainTreeOwnership_HeldBySiblingNeedsALiveHolder`;
+  - `TestLaneOwnership_MaterializedEvalsAloneMakeTheIdentityKnown`;
+  - the per-authority subtests of `TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean`.
+
+  These preservation tests pass before and after the fix:
+  - `TestRecoverBeforeReview_OwnLaneEvalLeakStillRelocates`;
+  - `TestRecoverBeforeReview_SourceLeakStillRelocatesBesideASibling`;
+  - `TestRecoverBeforeReview_SiblingEvalDuringScoutStaysForItsOwner`;
+  - `TestGuardStillChargesAnEvalNoLiveSiblingHolds`;
+  - `TestGuardIgnoresScoutEvalMaterialization`, rewritten onto a real git tree. Its old body asserted the deleted main-tree belief on a tree where recovery cannot run.
+- **Docs:**
+  - the [incident record](docs/incidents/2026-10-06-cycle-1811-cross-lane-eval-relocation.md) and its rows in the [regression coverage index](docs/incidents/REGRESSION-COVERAGE-INDEX.md);
+  - the [core](docs/architecture/packages/internal-core.md) package notes (recovery's parameter object, main-tree ownership, the per-phase baseline, the guard's exemptions);
+  - the [evalgate](docs/architecture/packages/internal-evalgate.md) package notes (Gate A's one home);
+  - the scout persona and its reference;
+  - `.evolve/evals/core-pure-helpers-coverage.md`, whose C1 and C5 named the deleted test.
+
 ## Fixed — a carry's evidence outlives its cycle worktree, so a second byte-identical carry ships; the plane's broken ledger is restored from git, not rebaselined (6 of 6 carries refused, ADR-0105 F5, ledger plan Phase 1, 2026-10-06)
 
 - **What was wrong and how it showed.** No byte-identical fleet-rebase carry had ever shipped: cycles 1766, 1768, 1772, 1773, 1782 and 1810 each logged `rebase is byte-identical: the audited verdict carries`, then ship refused with `AUDIT_BINDING_TREE_MISMATCH … error=<nil>` and the cycle paid a full re-audit. `identityCarryForward` wrote the carry's two diffs into the cycle worktree (`<worktree>/.evolve/composition-artifacts/`) but its record into the project ledger. Ship's carry check runs a whole-ledger `ledger.Verify`, which re-derives every composition line's patch-id from the files it names and treats a missing file as a broken chain. Once the first carry's worktree was cleaned up, the plane ledger stopped verifying (`BROKEN: line 154453 … composition-1766-audited.diff: no such file or directory`), so every later carry was declined, silently. ADR-0105 had named this hazard (F5) and said it must land with B3; it did not, and no inbox item tracked it. The 2026-09-30 carry fix below was proven with a test whose helper kept the diffs in `repo/.evolve`, so it never met the hazard.

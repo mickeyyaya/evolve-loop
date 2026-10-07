@@ -68,14 +68,13 @@ func TestCorrectionRedispatch_RecoversLeakBeforeReview(t *testing.T) {
 		WithRetryConfig(retryCfg),
 	)
 	cr := &cycleRun{
-		o:                 o,
-		ctx:               context.Background(),
-		req:               CycleRequest{ProjectRoot: repo},
-		cycle:             7,
-		mainDirtyBaseline: porcelainDirtySet(context.Background(), repo),
-		cs:                CycleState{CycleID: 7, WorkspacePath: workspace, ActiveWorktree: wt},
-		result:            CycleResult{Cycle: 7, FinalVerdict: VerdictPASS},
-		retryConfig:       retryCfg,
+		o:           o,
+		ctx:         context.Background(),
+		req:         CycleRequest{ProjectRoot: repo},
+		cycle:       7,
+		cs:          CycleState{CycleID: 7, WorkspacePath: workspace, ActiveWorktree: wt},
+		result:      CycleResult{Cycle: 7, FinalVerdict: VerdictPASS},
+		retryConfig: retryCfg,
 	}
 	dr := dispatchResult{
 		resp:          PhaseResponse{Phase: string(PhaseBuild), Verdict: VerdictPASS, ArtifactsDir: workspace},
@@ -84,6 +83,7 @@ func TestCorrectionRedispatch_RecoversLeakBeforeReview(t *testing.T) {
 		runner:        runner,
 		phaseReq:      PhaseRequest{Cycle: 7, ProjectRoot: repo, Workspace: workspace, Worktree: wt},
 	}
+	takePhaseSnapshot(t, cr, &dr, PhaseBuild)
 
 	action, err := cr.reviewAndGuard(PhaseBuild, &dr)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestRecoverBuildLeak_RelocatesIntoRealWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	if st := gitInRepo(t, repo, "status", "--porcelain", "-uall"); st != "" {
@@ -159,7 +159,7 @@ func TestRecoverBuildLeak_StagesOnlyRelocatedPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only")
@@ -181,7 +181,7 @@ func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
 	}
 	gitInRepo(t, repo, "add", "base.txt") // staged-only ("M ") — the case checkout -- would miss
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	if st := gitInRepo(t, repo, "status", "--porcelain", "-uall"); st != "" {
@@ -210,7 +210,7 @@ func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	if got, _ := os.ReadFile(filepath.Join(repo, "base.txt")); string(got) != "base\n" {
@@ -236,7 +236,7 @@ func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	if _, err := os.Stat(filepath.Join(repo, "artifact.bin")); err != nil {
@@ -249,27 +249,36 @@ func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
 
 func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testing.T) {
 	t.Parallel()
-	repo, wt := realWorktree(t)
-	if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("OLD BINARY\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	gitInRepo(t, repo, "add", "go/evolve")
-	gitInRepo(t, repo, "commit", "-q", "-m", "track go/evolve")
-	gitInRepo(t, repo, "worktree", "prune")
-	baseline := porcelainDirtySet(context.Background(), repo)
+	for name, authority := range map[string]writeAuthority{
+		"source writer": sourceWriterAuthority,
+		"eval author":   evalAuthorAuthority,
+		"read-only":     readOnlyAuthority,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			repo, wt := realWorktree(t)
+			if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("OLD BINARY\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			gitInRepo(t, repo, "add", "go/evolve")
+			gitInRepo(t, repo, "commit", "-q", "-m", "track go/evolve")
+			gitInRepo(t, repo, "worktree", "prune")
+			baseline := porcelainDirtySet(context.Background(), repo)
 
-	if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("REBUILT BINARY\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+			if err := os.WriteFile(filepath.Join(repo, "go/evolve"), []byte("REBUILT BINARY\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
-		t.Fatal("recoverBuildLeak should return true")
-	}
-	if got, _ := os.ReadFile(filepath.Join(repo, "go/evolve")); string(got) != "OLD BINARY\n" {
-		t.Fatalf("rebuilt artifact must be discarded (restored to HEAD); got %q", got)
-	}
-	if diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only"); strings.Contains(diff, "go/evolve") {
-		t.Fatalf("artifact must NOT be relocated/staged into the worktree; git diff HEAD=%q", diff)
+			if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: authority}) {
+				t.Fatal("recoverBuildLeak should return true")
+			}
+			if got, _ := os.ReadFile(filepath.Join(repo, "go/evolve")); string(got) != "OLD BINARY\n" {
+				t.Fatalf("rebuilt artifact must be discarded (restored to HEAD); got %q", got)
+			}
+			if diff := gitInRepo(t, wt, "diff", "HEAD", "--name-only"); strings.Contains(diff, "go/evolve") {
+				t.Fatalf("artifact must NOT be relocated/staged into the worktree; git diff HEAD=%q", diff)
+			}
+		})
 	}
 }
 
@@ -287,7 +296,7 @@ func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing
 	// A real nested worktree — `git status -uall` reports it as a bare dir (no recurse).
 	gitInRepo(t, repo, "worktree", "add", "--detach", "-q", filepath.Join(repo, ".evolve/worktrees/cycle-1"), "HEAD")
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak must skip .evolve/ runtime state + the nested-worktree dir and return true, not abort")
 	}
 	if _, err := os.Stat(filepath.Join(repo, ".evolve/ledger.tip")); err != nil {
@@ -312,7 +321,7 @@ func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
 		}
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak must SKIP nested .evolve/ runtime state and return true, not abort")
 	}
 	if _, err := os.Stat(filepath.Join(repo, "go/.evolve/guards.log")); err != nil {
@@ -335,7 +344,7 @@ func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
 	}
 	if _, err := os.Stat(filepath.Join(repo, "preexisting.txt")); err != nil {
@@ -362,7 +371,7 @@ func TestRecoverBuildLeak_RelocatesUntrackedEvalDeliverable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("an eval-deliverable leak must be recoverable, not abort")
 	}
 	if _, err := os.Stat(leak); !os.IsNotExist(err) {
@@ -395,7 +404,7 @@ func TestRecoverBuildLeak_RelocatesTrackedEvolveConfigEdit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !recoverBuildLeak(context.Background(), repo, wt2, baseline, true) {
+	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt2, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("a tracked .evolve config edit must be recoverable (cycle-262), not abort")
 	}
 	got, err := os.ReadFile(filepath.Join(wt2, ".evolve/commit-prefix-scope.json"))
