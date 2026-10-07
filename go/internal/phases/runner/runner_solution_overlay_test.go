@@ -19,7 +19,7 @@ func TestRunner_OverlaySignalsRideThePhaseRequest(t *testing.T) {
 	}{
 		{"scout/document", "scout", "evolve-scout", document, "solution-scout"},
 		{"build/document", "build", "evolve-builder", document, "solution-build"},
-		{"build/code", "build", "evolve-builder", map[string]string{config.SignalDeliverableKind: "code"}, ""},
+		{"build/code", "build", "evolve-builder", map[string]string{config.SignalDeliverableKind: "code"}, "engineering-craft"},
 		{"build/no signals", "build", "evolve-builder", nil, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

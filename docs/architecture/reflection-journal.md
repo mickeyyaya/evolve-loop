@@ -94,7 +94,7 @@ These three combined are calibrated, not draconian: a phase that genuinely runs 
 
 - **NOT a retrospective.** Reflections surface friction; retrospective (`evolve-retrospective`) does root-cause analysis on FAIL/WARN and produces lesson YAMLs.
 - **NOT a memo replacement.** Memo (`evolve-memo`) continues to own PASS-cycle carryoverTodos. The reflector synthesis feeds memo with structured suggestions; memo decides which become deferred work.
-- **NOT a code-quality review.** That's `EVOLVE_BUILDER_SELF_REVIEW` (Builder-only, advisory diff review). Reflection journal is process-level — same cycle, every phase, regardless of code change.
+- **NOT a code-quality review.** That's the source writers' required Self-review pass (`code-review-simplify`, recorded as `## Self-Review` in the phase report). Reflection journal is process-level — same cycle, every phase, regardless of code change.
 - **NOT a replacement for phase-tracker.** Phase-tracker captures objective numbers (timing, cost, turns); reflection captures the agent's subjective friction. The two are complementary — reflection's `phase_tracker_refs` block cites phase-tracker as evidence.
 
 ## Cross-references

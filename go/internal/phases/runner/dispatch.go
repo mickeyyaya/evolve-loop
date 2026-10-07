@@ -19,6 +19,7 @@ type phaseDispatchResult struct {
 	durationMS       int64
 	worktreeVerified bool
 	fenceDiagnostics []core.Diagnostic
+	skills           []string
 }
 
 // dispatchPhaseAttempts owns one worktree fence around the complete CLI/tier
@@ -41,7 +42,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 
 	var bres core.BridgeResponse
 	var bridgeErr error
-	var attemptLog []string
+	var attemptLog, skills []string
 	var wall bridgechain.WallKeeper
 	base := b.baseRequest(req, prep, resolved)
 	// The tier is passed as the model; the bridge maps it per CLI, so the runner resolves no model itself.
@@ -54,13 +55,10 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 				phase, i+1, candidateCLI, tier, attemptLog[i-1], bres.ExitCode)
 		}
 		// Overlays resolve per attempt because overlay rules key on the tier, which steps down across attempts.
-		overlayDispatch := policy.DispatchFromPhaseRequest(phase, candidateCLI, tier, tier)
-		// core's one per-dispatch signal projection; the runner never re-reads the workspace.
-		overlayDispatch.Signals = req.Signals
-		overlaySkills := overlayPolicy.ResolveOverlays(overlayDispatch)
-		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, overlaySkills, tier))
+		skills = overlayPolicy.ResolveOverlays(overlayDispatchFor(req, phase, candidateCLI, tier))
+		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, skills, tier))
 		attempt := base
-		attempt.CLI, attempt.Model, attempt.Skills = candidateCLI, tier, overlaySkills
+		attempt.CLI, attempt.Model, attempt.Skills = candidateCLI, tier, skills
 		bres, bridgeErr = b.bridge.Launch(ctx, attempt)
 		wall.Observe(candidateCLI+"@"+tier, bres, bridgeErr)
 		// Per attempt, so the events file cycleclassify reads describes the last CLI that ran.
@@ -99,7 +97,16 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		durationMS:       durationMS,
 		worktreeVerified: verified,
 		fenceDiagnostics: fenceDiags,
+		skills:           skills,
 	}
+}
+
+func overlayDispatchFor(req core.PhaseRequest, phase, cli, tier string) policy.OverlayDispatch {
+	d := policy.DispatchFromPhaseRequest(phase, cli, tier, tier)
+	// core's one per-dispatch signal projection; the runner never re-reads the workspace.
+	d.Signals = req.Signals
+	d.WritesSource = req.WritesSource()
+	return d
 }
 
 func terminalTier(walk llmroute.TieredDispatchResult, resolved string) string {
