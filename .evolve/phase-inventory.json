@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-08-05T07:57:42.597052+08:00",
-  "project_root": "/Users/danleemh/ai/claude/evolve-loop-runtime/.evolve/worktrees/cycle-42824668-1313",
-  "phase_count": 83,
+  "generated_at": "2026-10-07T14:51:13.49322+08:00",
+  "project_root": "/Users/danleemh/ai/claude/evolve-loop/dev/cl-codereview",
+  "phase_count": 87,
   "phases": [
     {
       "name": "accessibility-audit",
@@ -182,6 +182,7 @@
       "archetype": "evaluate",
       "kind": "llm",
       "optional": true,
+      "writes_source": true,
       "tier": "auto",
       "agent": "evolve-bug-reproduction",
       "description": "Produce a FAIL_TO_PASS reproduction that demonstrably fails on the current tree, BEFORE any patch.",
@@ -350,6 +351,27 @@
       "after": "triage"
     },
     {
+      "name": "code-review",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "evaluate",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-code-reviewer",
+      "description": "independent read-only review of the build's diff on the shared quality index: a justified Review Plan, findings with a suggested fix each (recorded in the defect ledger) and Scores for every dimension",
+      "when_to_use": "never selected: the registry pins it on every code cycle whose build touched files (conditional_mandatory, ADR-0124)",
+      "artifact": "code-review-report.md",
+      "required_sections": [
+        "## Review Plan",
+        "## Findings",
+        "## Scores",
+        "## Verdict"
+      ],
+      "emits_verdict": true,
+      "after": "build"
+    },
+    {
       "name": "compat-surface-check",
       "source": "user",
       "root": ".evolve/phases",
@@ -492,6 +514,32 @@
       "after": "triage"
     },
     {
+      "name": "defect-disposition-ledger",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-defect-disposition-ledger",
+      "description": "Authors this cycle's defect-dispositions.json in full — one entry per inherited defect id, FIXED with single-string resolvable evidence or DEFERRED with a reason — plus a coverage report reconciled against the continuation manifest or registry binding.",
+      "when_to_use": "Select whenever this lane inherits defects from an ancestor cycle (a continuation manifest or a continuation-registry lane-scope binding exists), especially after any audit that reported disposition-preflight MISSING or INCOMPLETE.",
+      "artifact": "defect-disposition-ledger-report.md"
+    },
+    {
+      "name": "defect-disposition-preflight",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-defect-disposition-preflight",
+      "description": "Authors this workspace's defect-dispositions.json in full for every inherited defect (FIXED with resolvable path:line evidence, or DEFERRED with a reason) and scrubs every uncited closure claim from all cycle reports before audit.",
+      "when_to_use": "Select whenever a lane inherits defects from an ancestor cycle, or when the previous cycle's audit FAILed on 'disposition-preflight: MISSING', 'defect(s) inherited ... unaccounted for', or 'closure claim without a citation'.",
+      "artifact": "defect-disposition-preflight-report.md"
+    },
+    {
       "name": "dependency-audit",
       "source": "user",
       "root": ".evolve/phases",
@@ -565,6 +613,9 @@
       "optional": true,
       "tier": "auto",
       "agent": "evolve-fault-localization",
+      "categories": [
+        "bugfix"
+      ],
       "artifact": "fault-localization-report.md",
       "required_sections": [
         "## Suspect Ranking",
@@ -689,10 +740,10 @@
       ],
       "artifact": "incident-postmortem-report.md",
       "required_sections": [
-        "## Incident Summary",
-        "## Root Cause Analysis",
-        "## Remediation Steps",
-        "## Prevention Plan"
+        "## Impact",
+        "## Timeline",
+        "## Root Cause",
+        "## Action Items"
       ],
       "emits_verdict": true,
       "after": "build"
@@ -978,6 +1029,19 @@
         "## Out of Scope"
       ],
       "after": "triage"
+    },
+    {
+      "name": "pre-audit-evidence-check",
+      "source": "user",
+      "root": ".evolve/phases",
+      "archetype": "plan",
+      "kind": "llm",
+      "optional": true,
+      "tier": "auto",
+      "agent": "evolve-pre-audit-evidence-check",
+      "description": "A re-authored defect-dispositions.json for every inherited defect, a closure-claim citation sweep over this cycle's reports, and a classified EGPS red_count — the audit's admissibility inputs, verified before audit runs.",
+      "when_to_use": "Select when the lane inherits defects from an ancestor cycle (continuation manifest or continuation-registry binding present), or when recent cycles FAILed audit on disposition-preflight, uncited closure claims, or EGPS red_count rather than on code quality.",
+      "artifact": "pre-audit-evidence-check-report.md"
     },
     {
       "name": "preliminary-study",
@@ -1344,7 +1408,7 @@
       "writes_source": true,
       "tier": "auto",
       "agent": "evolve-tdd",
-      "artifact": "tdd-contract.md"
+      "artifact": "test-report.md"
     },
     {
       "name": "telemetry-coverage-check",
@@ -1374,6 +1438,7 @@
       "archetype": "evaluate",
       "kind": "llm",
       "optional": true,
+      "writes_source": true,
       "tier": "auto",
       "agent": "evolve-test-amplification",
       "artifact": "test-amplification-report.md",
@@ -1475,6 +1540,7 @@
     "bugfix": [
       "bug-reproduction",
       "error-handling-scan",
+      "fault-localization",
       "flake-rerun-scan",
       "incident-postmortem"
     ],
@@ -1549,11 +1615,13 @@
       "changelog-sync",
       "cleanup-sweep",
       "close-checklist",
+      "code-review",
       "context-condense",
+      "defect-disposition-ledger",
+      "defect-disposition-preflight",
       "dependency-audit",
       "dependency-map",
       "doc-sync",
-      "fault-localization",
       "forces-analysis",
       "fuzz-probe",
       "intent",
@@ -1568,6 +1636,7 @@
       "plan-review",
       "post-ship-monitor",
       "prd-draft",
+      "pre-audit-evidence-check",
       "preliminary-study",
       "retrospective",
       "risk-register",

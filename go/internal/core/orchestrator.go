@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -60,50 +61,31 @@ func optionalSkipDetails(p Phase, err error) (kind, msg string, diags []Diagnost
 	return "optional_infra_skip", msg, []Diagnostic{{Severity: "warn", Message: msg}}
 }
 
+func (o *Orchestrator) skippableOptional(p Phase) (phasespec.PhaseSpec, bool) {
+	if isConfiguredMandatory(o.cfg, string(p)) {
+		return phasespec.PhaseSpec{}, false
+	}
+	spec, ok := o.catalog.Get(string(p))
+	if !ok || !spec.Optional || slices.Contains(o.resolvedShipFloor(), string(p)) {
+		return phasespec.PhaseSpec{}, false
+	}
+	return spec, true
+}
+
 func (o *Orchestrator) optionalInfraSkip(p Phase, err error) bool {
 	if !IsOptionalSkippableError(err) {
 		return false
 	}
-	if isConfiguredMandatory(o.cfg, string(p)) {
-		return false
-	}
-	spec, ok := o.catalog.Get(string(p))
-	if !ok || !spec.Optional {
-		return false
-	}
-	name := string(p)
-	for _, f := range o.resolvedShipFloor() {
-		if name == f {
-			return false
-		}
-	}
-	return true
+	_, ok := o.skippableOptional(p)
+	return ok
 }
 
 func (o *Orchestrator) postShipObserverSkip(p Phase, shipped bool) bool {
-	if !shipped {
+	if !shipped || p == PhaseShip {
 		return false
 	}
-	if p == PhaseShip {
-		return false
-	}
-	if isConfiguredMandatory(o.cfg, string(p)) {
-		return false
-	}
-	spec, ok := o.catalog.Get(string(p))
-	if !ok || !spec.Optional {
-		return false
-	}
-	if spec.RoleOrDefault() != phasespec.RoleControl {
-		return false
-	}
-	name := string(p)
-	for _, f := range o.resolvedShipFloor() {
-		if name == f {
-			return false
-		}
-	}
-	return true
+	spec, ok := o.skippableOptional(p)
+	return ok && spec.RoleOrDefault() == phasespec.RoleControl
 }
 
 // specFor resolves a phase's descriptor, canonicalizing the name first so the

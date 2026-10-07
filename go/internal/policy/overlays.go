@@ -68,6 +68,7 @@ func compiledDefaultOverlays() []OverlayRule {
 		{Phases: []string{"build"}, When: document, Skills: []string{"solution-build"}},
 		{Phases: []string{"audit"}, When: document, Skills: []string{"solution-audit"}},
 		{WritesSource: true, When: code, Skills: []string{"engineering-craft", SelfReviewSkill}},
+		{Phases: []string{"code-review"}, When: code, Skills: []string{"engineering-craft", SelfReviewSkill, "architecture-review", "quality-index"}},
 	}
 }
 

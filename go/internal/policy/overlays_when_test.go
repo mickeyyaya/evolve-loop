@@ -84,7 +84,7 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 
 func TestCompiledDefaultOverlaySkills(t *testing.T) {
 	got := policy.CompiledDefaultOverlaySkills()
-	want := []string{"fable", "solution-scout", "solution-build", "solution-audit", "engineering-craft", "code-review-simplify"}
+	want := []string{"fable", "solution-scout", "solution-build", "solution-audit", "engineering-craft", "code-review-simplify", "architecture-review", "quality-index"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("CompiledDefaultOverlaySkills() = %v, want %v", got, want)
 	}

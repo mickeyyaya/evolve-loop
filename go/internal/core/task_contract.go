@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
@@ -51,7 +52,7 @@ type taskItemRef struct{ id, path string }
 // persisted inputs, so the crash-resume path composes the same block.
 func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]string, next Phase, cs CycleState, projectRoot string) map[string]string {
 	base = o.seedTaskRecall(ctx, base, next, cs, projectRoot)
-	if !taskContractPhase(next) {
+	if !taskContractPhase(next) && !o.requestsContext(next, CtxKeyTaskContract) {
 		return base
 	}
 	refs := o.taskItemRefs(base, projectRoot, cs.WorkspacePath)
@@ -274,4 +275,9 @@ func renderPredicates(p acsPredicates) string {
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+func (o *Orchestrator) requestsContext(p Phase, key string) bool {
+	spec, ok := o.specFor(p)
+	return ok && slices.Contains(spec.PromptContext, key)
 }

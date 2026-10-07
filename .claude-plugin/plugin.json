@@ -34,6 +34,7 @@
   ],
   "skills": [
     "./skills/adversarial-testing/",
+    "./skills/architecture-review/",
     "./skills/audit/",
     "./skills/build/",
     "./skills/code-review-simplify/",
@@ -51,6 +52,7 @@
     "./skills/phase-create/",
     "./skills/plan-review/",
     "./skills/publish/",
+    "./skills/quality-index/",
     "./skills/refactor/",
     "./skills/release/",
     "./skills/retro/",

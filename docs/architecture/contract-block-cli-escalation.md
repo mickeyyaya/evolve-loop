@@ -28,6 +28,23 @@ A correction re-dispatch escalates to a different CLI **family** when both hold:
 `Blocks == 0` (evalgate / topngate / triagecap / the build floor) never escalates: those are
 task-binding or capacity rejections, and a different CLI is not the remedy.
 
+## The breaker-exempt class (ADR-0124)
+
+An optional evaluate phase past the ship floor, which the routing config does not list as mandatory
+(`config.mandatory_phases`), is **breaker-exempt** (`ReviewInput.BreakerExempt`). Code-review is the
+one such phase today. Its blocks are never counted, its passes never reset the breaker, and it never
+demotes, so a malformed review cannot hand the audit a `contract_gate_demoted` waiver. Its rejections
+carry `Blocks == 0`, so:
+- **no second-block CLI escalation** fires for it;
+- **no salvage re-prompt** fires for it either: that directive warns of a breaker about to open,
+  which is false for this phase. Each correction is the plain directive.
+
+When its ladder is exhausted, a **present but malformed** report degrades the phase to SKIPPED with a
+WARN (`contract_exhaustion_skip`, and `REVIEW_SKIPPED` for code-review), and an **absent** (missing or
+empty) report aborts the cycle, because a non-admitted missing deliverable never reaches Ship. The
+fresh ladder (`reviewWithCorrections`) and the resume ladder (`reviewResumedDeliverable`) take both
+decisions from the same helpers (`Orchestrator.reviewInputFor`, `degradesRejection`).
+
 ## Scoping
 
 Escalation is applied to `PhaseRequest.ModelRoutingCLI` **for that re-dispatch only**, as a soft

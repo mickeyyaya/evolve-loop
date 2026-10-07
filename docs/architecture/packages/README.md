@@ -81,6 +81,8 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/auditchain` | the audit verdict as the conclusion of a seven-link reasoning chain across the phases | [internal-auditchain.md](internal-auditchain.md) |
 | `internal/commentaudit` | measures, removes (`strip`) and records (`history`) comments, and proves an edit changed only comments | [internal-commentaudit.md](internal-commentaudit.md) |
 | `internal/commitgate` | the pre-commit quality gate `evolve commit-gate run` runs for `/commit` | [internal-commitgate.md](internal-commitgate.md) |
+| `internal/codereview` | the code-review phase's kernel half: parses the review report into defect-ledger rows, checks its grammar, and emits `REVIEW_FINDINGS` (ADR-0124) | [internal-codereview.md](internal-codereview.md) |
+| `internal/qualityindex` | the shared quality index: the ten dimensions, the thresholds, the Scores and Review Plan grammars, and `Qualifies` (ADR-0124) | [internal-qualityindex.md](internal-qualityindex.md) |
 | `internal/dashboard` | the read-only local web UI behind `evolve dashboard` | [internal-dashboard.md](internal-dashboard.md) |
 | `internal/faillearn` | the kernel-owned failure floor that writes the retrospective and lesson when the retro cannot run | [internal-faillearn.md](internal-faillearn.md) |
 | `internal/gitexec` | the git CLI behind one small injectable type | [internal-gitexec.md](internal-gitexec.md) |
