@@ -49,3 +49,12 @@ func TestChronicleConfig_PolicyOverrides(t *testing.T) {
 	}
 	assertChronicle(t, partial.ChronicleConfig(), "enforce", 1200, 10, "shadow", "off")
 }
+
+func TestChronicleConfig_NegativeOverridesResolveToDefaults(t *testing.T) {
+	for _, tc := range []struct{ tokens, cycles int }{{-1, -1}, {-1200, -100000}, {0, 0}} {
+		p := Policy{Chronicle: &ChroniclePolicy{DigestTokens: tc.tokens, DigestCycles: tc.cycles}}
+		assertChronicle(t, p.ChronicleConfig(), "shadow", 1200, 10, "shadow", "off")
+	}
+	p := Policy{Chronicle: &ChroniclePolicy{DigestTokens: 1, DigestCycles: 1}}
+	assertChronicle(t, p.ChronicleConfig(), "shadow", 1, 1, "shadow", "off")
+}

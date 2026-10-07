@@ -1,6 +1,10 @@
 package policy
 
-import "path/filepath"
+import (
+	"maps"
+	"path/filepath"
+	"slices"
+)
 
 // WorkflowPolicy is the .evolve/policy.json "workflow" block.
 type WorkflowPolicy struct {
@@ -109,7 +113,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 	c.AllowDocDelete = p.Workflow.AllowDocDelete
 	c.DiffComplexityDisable = p.Workflow.DiffComplexityDisable
 	c.AuditorTierOverride = p.Workflow.AuditorTierOverride
-	c.PhaseEnables = p.Workflow.PhaseEnables
+	c.PhaseEnables = maps.Clone(p.Workflow.PhaseEnables)
 	if p.Workflow.ConsensusAuditEnabled != nil {
 		c.ConsensusAuditEnabled = *p.Workflow.ConsensusAuditEnabled
 	}
@@ -135,7 +139,7 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		c.RemediationRounds = *p.Workflow.RemediationRounds
 	}
 	if p.Workflow.RemediablePhases != nil {
-		c.RemediablePhases = p.Workflow.RemediablePhases
+		c.RemediablePhases = slices.Clone(p.Workflow.RemediablePhases)
 	}
 	if p.Workflow.BuildFloor != nil {
 		c.BuildFloorEnforced = *p.Workflow.BuildFloor
@@ -148,15 +152,6 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		for k, v := range p.Workflow.InteractivePolicies {
 			c.InteractivePolicies[k] = v
 		}
-	}
-	if p.Workflow.RemediationRounds != nil {
-		c.RemediationRounds = *p.Workflow.RemediationRounds
-	}
-	if p.Workflow.RemediablePhases != nil {
-		c.RemediablePhases = p.Workflow.RemediablePhases
-	}
-	if p.Workflow.BuildFloor != nil {
-		c.BuildFloorEnforced = *p.Workflow.BuildFloor
 	}
 	return c
 }

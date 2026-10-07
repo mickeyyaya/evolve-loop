@@ -38,3 +38,20 @@ func TestFailureDispositionConfig_UnknownStageIsReportOnly(t *testing.T) {
 		t.Fatal("an unknown stage must be report-only")
 	}
 }
+
+func TestFailureDispositionConfig_NegativeOverridesResolveToDefaults(t *testing.T) {
+	t.Parallel()
+	for _, fd := range []FailureDispositionPolicy{
+		{Threshold: -1, Step: -0.03, Cap: -0.5},
+		{Threshold: -100000, Step: -1, Cap: -99},
+	} {
+		got := Policy{FailureDisposition: &fd}.FailureDispositionConfig()
+		if got.Threshold != 2 || got.Step != 0.03 || got.Cap != 0.99 {
+			t.Errorf("negative override %+v resolved to %+v, want threshold 2, step 0.03, cap 0.99", fd, got)
+		}
+	}
+	tiny := Policy{FailureDisposition: &FailureDispositionPolicy{Threshold: 1, Step: 0.001, Cap: 0.01}}.FailureDispositionConfig()
+	if tiny.Threshold != 1 || tiny.Step != 0.001 || tiny.Cap != 0.01 {
+		t.Errorf("a small positive override must still win: %+v", tiny)
+	}
+}

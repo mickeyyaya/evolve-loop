@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -28,10 +27,6 @@ var Roles = []string{
 	"intent", "scout", "triage", "plan-reviewer", "tdd-engineer",
 	"build-planner", "builder", "tester", "auditor", "orchestrator",
 	"retrospective", "memo",
-}
-
-func baseCLI(cli string) string {
-	return strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(cli), "-tmux"), "-p")
 }
 
 func capManifest(base string) string {
@@ -149,7 +144,7 @@ func detectCLIs(rep bridge.DoctorReport, capFn func(string) string, env func(str
 	seen := map[string]bool{}
 	var clis []CLIStatus
 	for _, r := range rep.Results {
-		family := baseCLI(r.CLI)
+		family := policy.BaseCLI(r.CLI)
 		if seen[family] {
 			continue
 		}

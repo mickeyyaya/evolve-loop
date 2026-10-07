@@ -38,10 +38,10 @@ func (p Policy) ChronicleConfig() ChronicleConfig {
 	if p.Chronicle.Digest != "" {
 		c.Digest = p.Chronicle.Digest
 	}
-	if p.Chronicle.DigestTokens != 0 {
+	if p.Chronicle.DigestTokens > 0 {
 		c.DigestTokens = p.Chronicle.DigestTokens
 	}
-	if p.Chronicle.DigestCycles != 0 {
+	if p.Chronicle.DigestCycles > 0 {
 		c.DigestCycles = p.Chronicle.DigestCycles
 	}
 	if p.Chronicle.Escalation != "" {

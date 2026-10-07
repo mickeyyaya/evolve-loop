@@ -94,7 +94,7 @@ func defaultPresetName(cfg PresetConfig) string {
 
 func assignPhase(spec PresetSpec, ps PhaseStatus, bldFam, audFam string, avail []string, cliByBase map[string]CLIStatus) Assignment {
 	tier, clamped := clampTier(biasTier(spec.TierBias, ps.DefaultTier, ps.Envelope), ps.Envelope)
-	prefBase := baseCLI(ps.DefaultCLI)
+	prefBase := policy.BaseCLI(ps.DefaultCLI)
 
 	var (
 		cli      string
@@ -210,8 +210,8 @@ func chooseCLI(role, prefBase string, allowed, avail []string) (cli string, fall
 func chooseCrossFamilyPair(b, a PhaseStatus, avail []string, crossOK bool) (string, string) {
 	bPool := poolFor(b.AllowedCLIs, avail)
 	aPool := poolFor(a.AllowedCLIs, avail)
-	bFam := pickPreferred(baseCLI(b.DefaultCLI), bPool)
-	aFam := pickPreferred(baseCLI(a.DefaultCLI), aPool)
+	bFam := pickPreferred(policy.BaseCLI(b.DefaultCLI), bPool)
+	aFam := pickPreferred(policy.BaseCLI(a.DefaultCLI), aPool)
 	if crossOK && bFam != "" && aFam != "" && bFam == aFam {
 		if alt := firstNotEqual(aPool, bFam); alt != "" {
 			aFam = alt
@@ -242,7 +242,7 @@ func allowedBaseSet(allowed []string) (set map[string]bool, anyOK bool) {
 		if a == "all" {
 			return nil, true
 		}
-		set[baseCLI(a)] = true
+		set[policy.BaseCLI(a)] = true
 	}
 	return set, false
 }
