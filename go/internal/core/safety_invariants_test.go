@@ -194,3 +194,35 @@ func containsSubstr(ss []string, sub string) bool {
 	}
 	return false
 }
+
+func TestStateMachine_EveryPathReaches(t *testing.T) {
+	cyclic := NewStateMachine().WithLegalGraph(map[Phase]map[Phase]bool{
+		"loop-a": {"loop-b": true},
+		"loop-b": {"loop-a": true},
+	})
+	diamond := NewStateMachine().WithLegalGraph(map[Phase]map[Phase]bool{
+		"fork":  {"left": true, "right": true},
+		"left":  {"joint": true},
+		"right": {"joint": true},
+		"joint": {PhaseBuild: true},
+	})
+	for _, tc := range []struct {
+		name         string
+		sm           *StateMachine
+		from, target Phase
+		want         bool
+	}{
+		{"tdd reaches build on every path, directly or via build-planner", NewStateMachine(), PhaseTDD, PhaseBuild, true},
+		{"build-planner's only successor is build", NewStateMachine(), PhaseBuildPlanner, PhaseBuild, true},
+		{"audit may branch to ship or retro", NewStateMachine(), PhaseAudit, PhaseBuild, false},
+		{"a phase with no legal successor reaches nothing", NewStateMachine(), "test-amplification", PhaseBuild, false},
+		{"a cycle that never reaches the target terminates and fails", cyclic, "loop-a", PhaseBuild, false},
+		{"branches that rejoin before the target reach it on every path", diamond, "fork", PhaseBuild, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.sm.everyPathReaches(tc.from, tc.target); got != tc.want {
+				t.Errorf("everyPathReaches(%s, %s) = %v, want %v", tc.from, tc.target, got, tc.want)
+			}
+		})
+	}
+}

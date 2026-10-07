@@ -109,7 +109,7 @@ func scanStream(path string, gates map[string]bool) (outcomes []PhaseRun, warn s
 		switch {
 		case ev.Code == gatesignal.CodeVerified:
 			gates[ev.Phase] = true
-		case ev.Kind == signalcenter.KindPhaseOutcome:
+		case ev.Kind == signalcenter.KindPhaseOutcome && ev.Fields["verdict"] != "":
 			ms, _ := strconv.ParseInt(ev.Fields["duration_ms"], 10, 64)
 			outcomes = append(outcomes, PhaseRun{Phase: ev.Phase, Verdict: ev.Fields["verdict"], DurationMS: ms, Attempt: ev.Attempt})
 		}

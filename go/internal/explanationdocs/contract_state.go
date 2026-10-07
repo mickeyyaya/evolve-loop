@@ -9,11 +9,20 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 )
+
+var ErrContent = errors.New("explanation content failed validation")
+
+type contentFailure []string
+
+func (f contentFailure) Error() string { return strings.Join(f, "; ") }
+
+func (contentFailure) Is(target error) bool { return target == ErrContent }
 
 type resultSnapshot struct {
 	SchemaVersion   int                     `json:"schema_version"`
@@ -153,11 +162,11 @@ func revalidateResult(ctx context.Context, binding CycleBinding) (*phaseio.Expla
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if failures := CheckBuild(ctx, binding); len(failures) != 0 {
+	if failures, fault := checkBuild(ctx, binding); fault != nil || len(failures) != 0 {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("revalidate builder explanation handoff before sealing: %s", strings.Join(failures, "; "))
+		return nil, revalidationFailure(failures, fault)
 	}
 	view, err := Load(binding.Workspace)
 	if err != nil {
@@ -167,6 +176,14 @@ func revalidateResult(ctx context.Context, binding CycleBinding) (*phaseio.Expla
 		return nil, fmt.Errorf("builder explanation handoff does not match the sealed host contract")
 	}
 	return view, nil
+}
+
+func revalidationFailure(failures []string, fault error) error {
+	if fault == nil {
+		return fmt.Errorf("revalidate builder explanation handoff before sealing: %w", contentFailure(failures))
+	}
+	verdicts := strings.Join(append(slices.Clip(failures), "Explanation Documentation: "), "; ")
+	return fmt.Errorf("revalidate builder explanation handoff before sealing: %s%w", verdicts, fault)
 }
 
 func sealResultViewExpected(ctx context.Context, binding CycleBinding, view *phaseio.ExplanationView, expectedMaterialSHA string) (requiresBuild bool, err error) {

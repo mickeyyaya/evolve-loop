@@ -227,3 +227,21 @@ func (sm *StateMachine) sourceNode() Phase {
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i] < candidates[j] })
 	return candidates[0]
 }
+
+func (sm *StateMachine) everyPathReaches(from, target Phase) bool {
+	return sm.onlyLeadsTo(from, target, map[Phase]bool{})
+}
+
+func (sm *StateMachine) onlyLeadsTo(p, target Phase, onPath map[Phase]bool) bool {
+	if onPath[p] || len(sm.allowed[p]) == 0 {
+		return false
+	}
+	onPath[p] = true
+	defer delete(onPath, p)
+	for to := range sm.allowed[p] {
+		if to != target && !sm.onlyLeadsTo(to, target, onPath) {
+			return false
+		}
+	}
+	return true
+}

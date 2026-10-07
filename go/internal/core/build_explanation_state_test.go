@@ -71,17 +71,15 @@ func TestBuildExplanationHandoff_LegacyIsExplicit(t *testing.T) {
 }
 
 func TestPostBuildExplanationRefreshEligibility_IsLimitedToLaterSourceWriters(t *testing.T) {
-	cr := &cycleRun{
-		o: NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil)),
-		cs: CycleState{
-			ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
-			CompletedPhases:                 []string{string(PhaseBuild)},
-		},
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	cs := CycleState{
+		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
+		CompletedPhases:                 []string{string(PhaseBuild)},
 	}
-	if !cr.postBuildExplanationRefreshEligible(PhaseTDD) {
+	if !o.explanationRefreshEligible(cs, PhaseTDD) {
 		t.Fatal("post-Build source writer was not eligible for snapshot refresh")
 	}
-	if cr.postBuildExplanationRefreshEligible(PhaseAudit) || cr.postBuildExplanationRefreshEligible(PhaseBuild) {
+	if o.explanationRefreshEligible(cs, PhaseAudit) || o.explanationRefreshEligible(cs, PhaseBuild) {
 		t.Fatal("Audit or Build must not use post-Build refresh")
 	}
 }

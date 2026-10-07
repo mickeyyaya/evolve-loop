@@ -177,7 +177,7 @@ raised to WARN — never dropped. *(review 21: `advisor` and `config` added to m
 | Kind | Meaning | Severity default | Terminal? |
 |---|---|---|---|
 | `phase.dispatched` | a phase attempt started | INFO | |
-| `phase.outcome` | the C1 terminal disposition (verdict recorded) | INFO on PASS, WARN on WARN/FAIL | ✓ on FAIL |
+| `phase.outcome` | the C1 terminal disposition (verdict recorded); also the routing disposition the orchestrator takes after a phase: an audit FAIL's repair grant or decline (`ORCHESTRATOR_AUDIT_REPAIR_*`), and a post-Build writer's stale explanation routed back to Build (`ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED`, WARN). A routing disposition carries no verdict and is not a phase run: the dashboard counts a `phase.outcome` as a run only when `fields.verdict` is set | INFO on PASS, WARN on WARN/FAIL | ✓ on FAIL |
 | `phase.aborted` | the cycle aborted after a phase (review reject, guard, persistence) | WARN | ✓ |
 | `gate.passed` | the contract gate let the phase advance: verified (`GATE_CONTRACT_VERIFIED`, fields name the artifact, its size, the owed files and effects — where it searched), salvaged, or advanced with a WARN it should not hide (would-block under a shadow stage, breaker demotion, fail-open) — S2b | INFO; WARN for would-block / demoted / fail-open | |
 | `gate.rejected` / `gate.corrected` | the contract gate refused at enforce (the reason IS the correction directive; `fields.codes`, `blocks`) / the orchestrator's ladder re-dispatched a correction (`fields.correction`, `max`, `rung`, `cli`, `escalated`) — S2b, both roots | WARN / INFO | ✓ / |
