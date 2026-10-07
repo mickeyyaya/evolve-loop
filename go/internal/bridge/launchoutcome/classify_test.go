@@ -107,11 +107,8 @@ func TestClassify_ExitOK_IsTheZeroOutcome(t *testing.T) {
 	}
 }
 
-// Test 13 — the table: 11 rows over the declared non-zero exits, each with a
-// name, a registered bridge signal code with a doc and a cause code; no
-// duplicate exit; the default row is named separately.
 func TestClassify_TableCoversEveryDeclaredExit(t *testing.T) {
-	want := []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitREPLBootTimeout, ExitArtifactTimeout, ExitUnknownPrompt, ExitRespondLoopGuard, ExitRequireFullUnmet, ExitCmdTimeout, ExitMissingBinary, ExitSignalDeath}
+	want := []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitREPLBootTimeout, ExitArtifactTimeout, ExitUnknownPrompt, ExitRespondLoopGuard, ExitModelMismatch, ExitRequireFullUnmet, ExitCmdTimeout, ExitMissingBinary, ExitSignalDeath}
 	if len(exitClasses) != len(want) {
 		t.Fatalf("exitClasses has %d rows, want %d", len(exitClasses), len(want))
 	}
@@ -154,7 +151,6 @@ func TestClassify_81_WrapsErrArtifactTimeout_NotTransient(t *testing.T) {
 	}
 }
 
-// Test 15 — the transient set is exactly {80, 85, 86, 124}; 2/3/10/99/127/42 plain.
 func TestClassify_TransientSet_IsExactly80_85_86_124(t *testing.T) {
 	for _, code := range []int{ExitREPLBootTimeout, ExitUnknownPrompt, ExitRespondLoopGuard, ExitCmdTimeout} {
 		out := Classify(code, nil, "")
@@ -162,7 +158,7 @@ func TestClassify_TransientSet_IsExactly80_85_86_124(t *testing.T) {
 			t.Errorf("exit %d is transient: %+v", code, out)
 		}
 	}
-	for _, code := range []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitRequireFullUnmet, ExitMissingBinary, 42} {
+	for _, code := range []int{ExitSafetyGate, ExitCostLeak, ExitBadFlags, ExitModelMismatch, ExitRequireFullUnmet, ExitMissingBinary, 42} {
 		out := Classify(code, nil, "")
 		if out.Transient || errors.Is(out.Err, core.ErrTransientBridgeFailure) || errors.Is(out.Err, core.ErrArtifactTimeout) {
 			t.Errorf("exit %d is plain: %+v", code, out)

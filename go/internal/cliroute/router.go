@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"slices"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -17,6 +18,7 @@ type Setup struct {
 	Profiles ProfileSource
 	Host     Host
 	Options  []CompileOption
+	Bypass   bool
 }
 
 var ErrRefused = errors.New("cliroute: route refused")
@@ -38,6 +40,9 @@ func (s Setup) compile(cat Catalog) (tablePair, []Finding, error) {
 	bypass, bypassFindings := Compile(policy.Policy{Workflow: s.Policy.Workflow}, cat, s.Profiles, s.Options...)
 	if err := refusal(append(slices.Clone(findings), bypassFindings...)); err != nil {
 		return tablePair{}, findings, err
+	}
+	if s.Bypass {
+		declared = bypass
 	}
 	return tablePair{declared: declared, bypass: bypass}, findings, nil
 }
@@ -72,7 +77,11 @@ func (r *Router) ResolveRole(role string, opts resolvellm.Options) (resolvellm.R
 	if err != nil {
 		return resolvellm.Result{}, err
 	}
-	return resolvellm.Result{CLI: d.Plan.Candidates[0], ModelTier: d.Plan.Model, Source: d.Rule}, nil
+	walk, err := d.Walk()
+	if err != nil {
+		return resolvellm.Result{}, err
+	}
+	return resolvellm.Result{CLI: walk.Candidates[0], ModelTier: d.Plan.Model, Source: d.Rule}, nil
 }
 
 func NewSingleProfileRouter(pol policy.Policy, sp SingleProfile, h Host) (*Router, error) {
@@ -97,4 +106,24 @@ func (s SingleProfile) Get(name string) (profiles.Profile, error) {
 		return profiles.Profile{}, fmt.Errorf("cliroute: profile %s: %w", name, fs.ErrNotExist)
 	}
 	return *s.Profile, nil
+}
+
+var ErrNoRootRouter = errors.New("cliroute: this launch has no compiled router")
+
+func RefuseLaunchRouter(pol policy.Policy) error {
+	if pol.CLIRouting == nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %w, but the project declares a cli_routing table; the composition root must inject the router it compiled at start", ErrRefused, ErrNoRootRouter)
+}
+
+func NewLegacyLaunchRouter(projectRoot string, sp SingleProfile) (*Router, error) {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return nil, err
+	}
+	if err := RefuseLaunchRouter(pol); err != nil {
+		return nil, err
+	}
+	return NewSingleProfileRouter(policy.Policy{}, sp, Host{})
 }

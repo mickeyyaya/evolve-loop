@@ -46,7 +46,7 @@
 |---|---|---|
 | Boundary CLI updater, a failed `doctor live` (`internal/cliupdate`) | yes | `Seams.Explain` decides the result: `quota-exhausted`, `boot-timeout` with the verdict appended, or `skipped` explained by the verdict. "Counts as unsubscribed" is no longer inferred. |
 | Preflight `bridge-boot`, a failed boot (`internal/looppreflight`) | yes | `Options.UsageEvidence` adds a `usage:` line to the halt detail. The check still halts. |
-| Bridge launch failures before the fallback (exit 80, 81, 85, 86 and any other non-zero but 127), for both chain walkers | yes | The `Wrap` decorator at `cmd/evolve` `wireOrchestratorDeps`. |
+| Bridge launch failures before the fallback (exit 80, 81, 85, 86, 87 and any other non-zero but 127), for both chain walkers | yes | The `Wrap` decorator at `cmd/evolve` `wireOrchestratorDeps`. |
 | `LIVENESS_PHASE_STALLED`, a pane stall (`internal/adapters/observer`) | yes, as evidence only | `CoreAdapter.UsageEvidence`, read by the adapter's own `phaseStallSignal` and `reportStallUsage` methods. A stdout stall has no known CLI and is left alone. |
 | `evolve doctor live <driver>`, failed (`internal/cli/opscmd`) | yes, read-only | It prints the verdict and windows on stderr, and `--json` adds `usage`. It never benches or records. |
 | The boundary updater's smoke after an update | left alone | A smoke failure halts the wave as a broken CLI. Whether verified quota exhaustion should turn that halt into a warning is a separate decision. |
@@ -54,6 +54,7 @@
 
 ## Invariants
 
+- **A launch-time model mismatch (exit 87) is quota-explainable** (2026-10-07): agy boots its Gemini default when its Claude group is exhausted, so a mismatch on `agy-claude-tmux` is queried like any other failure, and a drained Claude group benches `agy-claude` while a healthy screen benches nothing. Pinned by `TestBridge_AModelMismatchOnADrainedClaudeGroupBenchesAgyClaude` and `TestBridge_AModelMismatchWithHealthyQuotaBenchesNothing`.
 - **Every failure quota could explain is explained once, recorded and signalled; a success, a missing binary or an interrupt is not.** Pinned by `TestBridge_EveryFailureQuotaCouldExplainIsExplainedRecordedAndSignalled`, `TestBridge_ASuccessOrAMissingBinaryIsNotQuotaEvidence` and `TestBridge_ACancelledLaunchQueriesNothing`.
 - **The decorator hides nothing of the inner bridge.** Pinned by `TestBridge_ForwardsTheInnerSignalCenterAndItsWiringProof`.
 - **The code is registered and its severity follows the verdict.** Pinned by `TestReport_AnUnavailableVerdictIsAWarningAndNoWorkspaceIsOnlyASignal`.

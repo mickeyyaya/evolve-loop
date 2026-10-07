@@ -58,6 +58,7 @@ type tmuxLaunch struct {
 	exitSeq         []tmuxKey // keystrokes to close the REPL cleanly
 	bootOnly        bool      // boot smoke-test: return ExitOK once the marker appears; no prompt/artifact
 	guardDeadShell  bool      // true for real CLI drivers; false for shell-script REPL test harnesses
+	modelCheck      launchModelCheck
 }
 
 func launchCmdLine(binary string, flags []string) string {
@@ -121,20 +122,11 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	defer admitRelease()
 
-	// Boot smoke-test: the marker alone proves the CLI can launch; exit
-	// without delivering a prompt or waiting for an artifact. The deferred
-	// tmuxCleanup still captures the final scrollback.
+	if code := lp.verifyBootedModel(ctx, bootedModelRun{cfg: cfg, deps: deps, responder: ar}); code != ExitOK {
+		return code, nil
+	}
 	if lp.bootOnly {
-		if !lp.named {
-			for _, k := range lp.exitSeq {
-				_ = deps.Tmux.SendKeys(ctx, lp.session, k.keys, k.enter)
-				if k.pauseS > 0 {
-					deps.Sleep(time.Duration(k.pauseS) * time.Second)
-				}
-			}
-		}
-		fmt.Fprintf(deps.Stderr, "%s BOOT-SMOKE: REPL booted; exiting without prompt\n", pfx)
-		return ExitOK, nil
+		return lp.endBootSmoke(ctx, deps, pfx), nil
 	}
 
 	dispatchBase, paste, code, err := dispatchTmuxPrompt(ctx, cfg, deps, lp, prep, human, phaseName)
@@ -173,14 +165,26 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		// cycle-start orphan GC behind it) owns teardown here.
 		fmt.Fprintf(deps.Stderr, "%s exit sequence skipped (ctx done) — session kill handles teardown\n", pfx)
 	default:
-		for _, k := range lp.exitSeq {
-			_ = deps.Tmux.SendKeys(ctx, lp.session, k.keys, k.enter)
-			if k.pauseS > 0 {
-				deps.Sleep(time.Duration(k.pauseS) * time.Second)
-			}
-		}
+		lp.sendExitSeq(ctx, deps)
 	}
 	contract := completionContractName(cfg.Completion)
 	fmt.Fprintf(deps.Stderr, "%s DONE: %s completion verdict = SUCCESS\n", pfx, contract)
 	return 0, nil
+}
+
+func (lp tmuxLaunch) endBootSmoke(ctx context.Context, deps Deps, pfx string) int {
+	if !lp.named {
+		lp.sendExitSeq(ctx, deps)
+	}
+	fmt.Fprintf(deps.Stderr, "%s BOOT-SMOKE: REPL booted; exiting without prompt\n", pfx)
+	return ExitOK
+}
+
+func (lp tmuxLaunch) sendExitSeq(ctx context.Context, deps Deps) {
+	for _, k := range lp.exitSeq {
+		_ = deps.Tmux.SendKeys(ctx, lp.session, k.keys, k.enter)
+		if k.pauseS > 0 {
+			deps.Sleep(time.Duration(k.pauseS) * time.Second)
+		}
+	}
 }

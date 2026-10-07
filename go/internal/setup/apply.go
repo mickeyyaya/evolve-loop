@@ -2,6 +2,7 @@ package setup
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,16 +10,20 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
+var ErrRoutingTableDeclared = errors.New("this project declares a cli_routing table, which owns every route, so setup presets do not apply: inspect the routes with `evolve cli-routing show` and change one with `evolve cli-routing set agents.<role> <clis> [--model <tier>]`")
+
 func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicyJSON []byte, profLoader *profiles.Loader) ([]byte, error) {
+	if declaresRoutingTable(existingPolicyJSON) {
+		return nil, fmt.Errorf("setup apply: %w", ErrRoutingTableDeclared)
+	}
 	preset, err := findPreset(Recommend(rep, cfg), presetName)
 	if err != nil {
 		return nil, err
 	}
-	obj, pins, err := parseExistingPolicy(existingPolicyJSON)
+	pins, err := parseExistingPins(existingPolicyJSON)
 	if err != nil {
 		return nil, err
 	}
-
 	for _, a := range preset.Assignments {
 		if a.Warning != "" {
 			return nil, fmt.Errorf("setup apply: preset %q is degraded for phase %q (%s); refusing to write an unsatisfiable pin",
@@ -28,18 +33,24 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 		if perr != nil {
 			continue
 		}
-		if a.DiffersFromDefault {
-			pin := policy.Pin{CLI: a.CLI, Model: a.Tier}
-			if verr := policy.ValidatePin(a.Role, pin, &prof); verr != nil {
-				return nil, fmt.Errorf("setup apply: emitted pin for %q breaches floor: %w", a.Role, verr)
-			}
-			pins[a.Role] = pin
-		} else {
+		if !a.DiffersFromDefault {
 			delete(pins, a.Role)
+			continue
 		}
+		pin := policy.Pin{CLI: a.CLI, Model: a.Tier}
+		if verr := policy.ValidatePin(a.Role, pin, &prof); verr != nil {
+			return nil, fmt.Errorf("setup apply: emitted pin for %q breaches floor: %w", a.Role, verr)
+		}
+		pins[a.Role] = pin
 	}
+	return policy.PatchBlocks(existingPolicyJSON, map[string]any{"pins": pinsBlock(pins)})
+}
 
-	return encodePolicy(obj, pins)
+func pinsBlock(pins map[string]policy.Pin) any {
+	if len(pins) == 0 {
+		return nil
+	}
+	return pins
 }
 
 func findPreset(rr RecommendReport, presetName string) (*Preset, error) {
@@ -51,37 +62,20 @@ func findPreset(rr RecommendReport, presetName string) (*Preset, error) {
 	return nil, fmt.Errorf("setup apply: unknown preset %q (have %s)", presetName, presetNamesOf(rr))
 }
 
-func parseExistingPolicy(existingPolicyJSON []byte) (map[string]json.RawMessage, map[string]policy.Pin, error) {
+func parseExistingPins(existingPolicyJSON []byte) (map[string]policy.Pin, error) {
 	obj := map[string]json.RawMessage{}
 	if len(strings.TrimSpace(string(existingPolicyJSON))) > 0 {
 		if err := json.Unmarshal(existingPolicyJSON, &obj); err != nil {
-			return nil, nil, fmt.Errorf("setup apply: existing policy.json is malformed (%w); refusing to clobber", err)
+			return nil, fmt.Errorf("setup apply: existing policy.json is malformed (%w); refusing to clobber", err)
 		}
 	}
 	pins := map[string]policy.Pin{}
 	if raw, ok := obj["pins"]; ok {
 		if err := json.Unmarshal(raw, &pins); err != nil {
-			return nil, nil, fmt.Errorf("setup apply: existing policy.json pins block is malformed (%w); refusing to clobber", err)
+			return nil, fmt.Errorf("setup apply: existing policy.json pins block is malformed (%w); refusing to clobber", err)
 		}
 	}
-	return obj, pins, nil
-}
-
-func encodePolicy(obj map[string]json.RawMessage, pins map[string]policy.Pin) ([]byte, error) {
-	if len(pins) == 0 {
-		delete(obj, "pins")
-	} else {
-		pinsRaw, err := json.Marshal(pins)
-		if err != nil {
-			return nil, fmt.Errorf("setup apply: encoding pins: %w", err)
-		}
-		obj["pins"] = pinsRaw
-	}
-	out, err := json.MarshalIndent(obj, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("setup apply: encoding policy: %w", err)
-	}
-	return append(out, '\n'), nil
+	return pins, nil
 }
 
 func presetNamesOf(rr RecommendReport) string {
@@ -90,4 +84,17 @@ func presetNamesOf(rr RecommendReport) string {
 		names = append(names, p.Name)
 	}
 	return strings.Join(names, "|")
+}
+
+func declaresRoutingTable(policyJSON []byte) bool {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(policyJSON, &top) != nil {
+		return false
+	}
+	for key := range top {
+		if strings.EqualFold(key, "cli_routing") {
+			return true
+		}
+	}
+	return false
 }

@@ -7,10 +7,13 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -27,9 +30,17 @@ func TestSpikeAdvisorLive(t *testing.T) {
 	cfg, _ := config.Load(registry, filterEvolveEnv(os.Environ()))
 
 	br := bridge.NewDefault(root, nil)
-	cli, model := resolveRouterDispatch(filepath.Join(root, ".evolve"))
+	cliRouter, _, err := loadCLIRouter(root, routingHost(io.Discard, time.Now))
+	if err != nil {
+		t.Fatalf("routing table: %v", err)
+	}
+	rd, err := resolveRouterDispatchHealthy(cliRouter, root, decisionPlan, benchedFamilies(root))
+	if err != nil {
+		t.Fatalf("router dispatch: %v", err)
+	}
+	cli, model := rd.cli, rd.model
 	var persona string
-	if rp, perr := newPromptsLoader(root).Agent("evolve-router"); perr == nil {
+	if rp, perr := cmdutil.NewPromptsLoader(root).Agent("evolve-router"); perr == nil {
 		persona = rp.Body
 	}
 	t.Logf("SPIKE: advisor cli=%s model=%s persona=%dB", cli, model, len(persona))

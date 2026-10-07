@@ -115,7 +115,8 @@ type Manifest struct {
 	Params map[string]ParamSpec `json:"params,omitempty"`
 	// Controls is the per-CLI control mapping table: an abstract event (usage|status|clean_ctx|…) to this
 	// CLI's concrete slash command; an absent event reports not-found.
-	Controls map[string]ControlSpec `json:"controls,omitempty"`
+	Controls                map[string]ControlSpec   `json:"controls,omitempty"`
+	LaunchModelVerification *LaunchModelVerification `json:"launch_model_verification,omitempty"`
 }
 
 // ControlSpec is one abstract-event → concrete-command manifest entry: Send is pasted into the REPL, Await
@@ -217,6 +218,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	// A manifest declaring the legacy `tier_aliases` key translates it to `model_tier_map` only when
 	// ModelTierMap is empty; a manifest declaring both keeps ModelTierMap as the source of truth.
 	if err := validatePaneVocabulary(cli, m); err != nil {
+		return Manifest{}, err
+	}
+	if err := validateLaunchModelVerification(cli, m); err != nil {
 		return Manifest{}, err
 	}
 	if len(m.ModelTierMap) == 0 {

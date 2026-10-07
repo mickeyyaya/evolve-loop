@@ -19,18 +19,6 @@ var chainBuilders = map[string][]string{
 	goModulePath + "internal/resolvellm": {"Resolve"},
 }
 
-type allowedChainBuilder struct {
-	selector string
-	why      string
-}
-
-var chainBuilderAllowlist = map[string]allowedChainBuilder{
-	"internal/core/advisor/launch.go": {
-		selector: "llmroute.ChainFor",
-		why:      "L2 question 1 in docs/plans/cli-routing-table-2026-10.md: the advisor walks ChainFor(identity.CLI, profile) until it walks the routing table's chain",
-	},
-}
-
 var chainBuilderHomes = []string{"internal/cliroute/", "internal/llmroute/", "internal/resolvellm/"}
 
 func TestOnlyCliRouteBuildsChains(t *testing.T) {
@@ -113,14 +101,13 @@ func chainBuilderRefs(t *testing.T, path, rel string) []string {
 	for _, imp := range dotImports {
 		out = append(out, rel+":"+strconv.Itoa(fset.Position(imp.Pos()).Line)+" dot-import of "+imp.Path.Value)
 	}
-	allowed := chainBuilderAllowlist[filepath.ToSlash(rel)].selector
 	ast.Inspect(file, func(n ast.Node) bool {
 		sel, ok := n.(*ast.SelectorExpr)
 		if !ok {
 			return true
 		}
 		pkg, isIdent := sel.X.(*ast.Ident)
-		if !isIdent || !slices.Contains(banned[pkg.Name], sel.Sel.Name) || pkg.Name+"."+sel.Sel.Name == allowed {
+		if !isIdent || !slices.Contains(banned[pkg.Name], sel.Sel.Name) {
 			return true
 		}
 		out = append(out, rel+":"+strconv.Itoa(fset.Position(sel.Pos()).Line)+" "+pkg.Name+"."+sel.Sel.Name)
@@ -149,24 +136,6 @@ func bannedSelectors(file *ast.File) (map[string][]string, []*ast.ImportSpec) {
 		out[local] = names
 	}
 	return out, dotImports
-}
-
-func fileUses(t *testing.T, path, selector string) bool {
-	t.Helper()
-	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-	if err != nil {
-		t.Fatalf("parse %s: %v", path, err)
-	}
-	found := false
-	ast.Inspect(file, func(n ast.Node) bool {
-		if sel, ok := n.(*ast.SelectorExpr); ok {
-			if pkg, isIdent := sel.X.(*ast.Ident); isIdent && pkg.Name+"."+sel.Sel.Name == selector {
-				found = true
-			}
-		}
-		return !found
-	})
-	return found
 }
 
 func TestChainBuilderCalls_BansEveryChainPrimitiveOutsideCliroute(t *testing.T) {
@@ -202,7 +171,7 @@ var _ = Resolve
 	}
 }
 
-func TestChainBuilderCalls_TheAllowlistAdmitsOnlyItsNamedFileAndSelector(t *testing.T) {
+func TestChainBuilderCalls_TheAdvisorsFileHasNoExceptionSinceL2(t *testing.T) {
 	module := t.TempDir()
 	writeGoFile(t, module, filepath.Join("internal", "core", "advisor", "launch.go"), `package advisor
 
@@ -214,23 +183,7 @@ var (
 )
 `)
 	violations, _ := chainBuilderCalls(t, module)
-	if len(violations) != 1 || !strings.Contains(violations[0], "llmroute.ExcludeFamilies") {
-		t.Fatalf("the advisor's ChainFor is allowlisted until L2, nothing else in its file is: %v", violations)
-	}
-}
-
-func TestChainBuilderAllowlist_EveryEntryIsStillNeeded(t *testing.T) {
-	module, err := filepath.Abs("../..")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rel, allowed := range chainBuilderAllowlist {
-		refs := chainBuilderRefs(t, filepath.Join(module, rel), rel)
-		if len(refs) != 0 {
-			t.Errorf("%s: %v", rel, refs)
-		}
-		if !fileUses(t, filepath.Join(module, rel), allowed.selector) {
-			t.Errorf("%s no longer uses %s — drop the allowlist entry (%s)", rel, allowed.selector, allowed.why)
-		}
+	if len(violations) != 2 || !strings.Contains(violations[0], "llmroute.ChainFor") {
+		t.Fatalf("the advisor walks the routing table's chain since L2, so its ChainFor is a violation like any other: %v", violations)
 	}
 }

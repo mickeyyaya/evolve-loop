@@ -52,6 +52,8 @@ func TestDoctorCharacterization_LiveReport(t *testing.T) {
 			"[doctor] LIVE FAILED: claude-tmux rc=81\n[doctor] final pane:\n" + paneLines(9, 20) + "\n"},
 		{"failed empty pane", false, bridge.ExitArtifactTimeout, "", "", 1, "",
 			"[doctor] LIVE FAILED: claude-tmux rc=81\n"},
+		{"wrong model", false, bridge.ExitModelMismatch, "", pane, 1, "",
+			"[doctor] LIVE WRONG MODEL: claude-tmux rc=87 — the REPL booted a model outside the target's model family, or showed no readable model label, so the prompt was never sent\n[doctor] final pane:\n" + paneLines(15, 20) + "\n"},
 	}
 	for _, tc := range cases {
 		var out, errb bytes.Buffer
@@ -80,6 +82,8 @@ func TestDoctorCharacterization_BootReport(t *testing.T) {
 		{"failed empty pane json", false, true, bridge.ExitREPLBootTimeout, "", 1,
 			"{\n  \"driver\": \"claude-tmux\",\n  \"sandbox\": false,\n  \"exit_code\": 80,\n  \"booted\": false\n}\n",
 			"[doctor] BOOT FAILED: claude-tmux rc=80 (sandbox=false)\n"},
+		{"wrong model", false, false, bridge.ExitModelMismatch, pane, 1, "",
+			"[doctor] BOOT WRONG MODEL: claude-tmux rc=87 (sandbox=false) — the REPL booted a model outside the target's model family, or showed no readable model label\n[doctor] final pane:\n" + paneLines(15, 20) + "\n"},
 	}
 	for _, tc := range cases {
 		var out, errb bytes.Buffer

@@ -17,10 +17,6 @@ func assertRegisteredBridgeCode(t *testing.T, code signalcenter.Code) {
 	}
 }
 
-// Test 29 — Outcome.Signal is the table's signal column; the naming RULE
-// code == "BRIDGE_EXIT_" + upper(name) holds for every row; every code is
-// valid and registered under bridge; success has no code; exactly 12 codes
-// carry the BRIDGE_EXIT_ prefix.
 func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 	rows := append([]exitClass{}, exitClasses...)
 	rows = append(rows, driverErrorClass)
@@ -37,7 +33,7 @@ func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 	for code, want := range map[int]signalcenter.Code{
 		ExitSafetyGate: CodeExitSafetyGate, ExitCostLeak: CodeExitCostLeak, ExitBadFlags: CodeExitBadFlags,
 		ExitREPLBootTimeout: CodeExitREPLBootTimeout, ExitArtifactTimeout: CodeExitArtifactTimeout,
-		ExitUnknownPrompt: CodeExitUnknownPrompt, ExitRespondLoopGuard: CodeExitRespondLoopGuard,
+		ExitUnknownPrompt: CodeExitUnknownPrompt, ExitRespondLoopGuard: CodeExitRespondLoopGuard, ExitModelMismatch: CodeExitModelMismatch,
 		ExitRequireFullUnmet: CodeExitRequiredTierUnavailable, ExitCmdTimeout: CodeExitCommandTimeout,
 		ExitMissingBinary: CodeExitMissingBinary, ExitSignalDeath: CodeExitSignalDeath, 42: CodeExitDriverError,
 	} {
@@ -59,8 +55,8 @@ func TestOutcomeSignal_IsTheTableColumnAndFollowsTheNamingRule(t *testing.T) {
 			}
 		}
 	}
-	if registered != 12 {
-		t.Errorf("BRIDGE_EXIT_ codes registered = %d, want 12", registered)
+	if registered != 13 {
+		t.Errorf("BRIDGE_EXIT_ codes registered = %d, want 13", registered)
 	}
 }
 

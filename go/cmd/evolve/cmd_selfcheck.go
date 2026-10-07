@@ -15,7 +15,7 @@ import (
 var buildHandoffFloorFor phasecmd.BuildHandoffFloorFor = probeBuildHandoffFloor
 
 func runPhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return phasecmd.NewRunPhase(buildHandoffFloorFor)(args, stdin, stdout, stderr)
+	return phasecmd.NewRunPhase(buildHandoffFloorFor, rootRouterInstaller)(args, stdin, stdout, stderr)
 }
 
 func runSelfcheck(args []string, _ io.Reader, stdout, stderr io.Writer) int {

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,20 +109,20 @@ func (cr *cycleRun) contractDispatchCLI(phase Phase, override string) string {
 	if override != "" {
 		return override
 	}
-	d, routed := cr.routingDecision(phase)
+	_, walk, routed := cr.routingWalk(phase)
 	if !routed {
 		return universalContractFallbackCLI
 	}
-	return d.Plan.Candidates[0]
+	return walk.Candidates[0]
 }
 
 func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (string, bool) {
-	d, routed := cr.routingDecision(phase)
+	d, walk, routed := cr.routingWalk(phase)
 	if !routed {
 		return "", false
 	}
-	failed := llmroute.Family(cr.contractDispatchCLI(phase, dispatchedCLI))
-	candidates := slices.Clone(d.Plan.Candidates)
+	failed := llmroute.Family(cmp.Or(dispatchedCLI, walk.Candidates[0]))
+	candidates := slices.Clone(walk.Candidates)
 	if d.Legacy() {
 		candidates = append(candidates, universalContractFallbackCLI)
 	}
@@ -131,6 +132,19 @@ func (cr *cycleRun) contractEscalationCLI(phase Phase, dispatchedCLI string) (st
 		}
 	}
 	return "", false
+}
+
+func (cr *cycleRun) routingWalk(phase Phase) (cliroute.Decision, llmroute.Plan, bool) {
+	d, routed := cr.routingDecision(phase)
+	if !routed {
+		return d, llmroute.Plan{}, false
+	}
+	walk, err := d.Walk()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract escalation has no route: %v\n", phase, err)
+		return d, llmroute.Plan{}, false
+	}
+	return d, walk, true
 }
 
 func (cr *cycleRun) routingDecision(phase Phase) (cliroute.Decision, bool) {
@@ -151,7 +165,7 @@ func (cr *cycleRun) cliRouter(agent string, prof *profiles.Profile) (*cliroute.R
 	if cr.o != nil && cr.o.cliRouter != nil {
 		return cr.o.cliRouter, nil
 	}
-	return cliroute.NewSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{Agent: agent, Profile: prof}, cliroute.Host{})
+	return cliroute.NewLegacyLaunchRouter(cr.req.ProjectRoot, cliroute.SingleProfile{Agent: agent, Profile: prof})
 }
 
 // contractBlocksShareIdentity reports whether the contract block now on the

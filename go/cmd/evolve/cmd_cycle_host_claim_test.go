@@ -31,7 +31,7 @@ func wiredWithRealPhases(t *testing.T) orchDeps {
 	if err := os.WriteFile(filepath.Join(root, "docs", "architecture", "phase-registry.json"), registry, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return wireOrchestratorDeps(root, filepath.Join(root, ".evolve"), io.Discard)
+	return wireOrchestratorDeps(root, filepath.Join(root, ".evolve"), io.Discard, routingRun{})
 }
 
 func TestWireOrchestrator_HostEffectsWired(t *testing.T) {

@@ -13,7 +13,7 @@ func TestWireOrchestrator_DeclaredDeliverablesGateWired(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if !d.Orchestrator.DeclaredDeliverablesGateWired() {
 		t.Fatal("the production composition root does not wire the declared-deliverables gate (ADR-0100) — a phase that omits a declared output would proceed exactly as before")
 	}

@@ -19,7 +19,6 @@ var inScopeScanProfiles = []string{
 	"resilience-gap-scan",
 	"security-scan",
 	"smell-scan",
-	"telemetry-coverage-check",
 	"test-amplification",
 }
 
@@ -35,28 +34,30 @@ func loadShippedScanProfile(t *testing.T, name string) *profiles.Profile {
 	return &prof
 }
 
-func TestScanProfiles_CarryFastTierEnvelope(t *testing.T) {
+func TestScanProfiles_CarryABalancedOnlyEnvelope(t *testing.T) {
 	for _, name := range inScopeScanProfiles {
 		prof := loadShippedScanProfile(t, name)
 		env := prof.ModelTierEnvelope
 		if env == nil {
-			t.Errorf("%s: model_tier_envelope is nil — want {min:fast, max:balanced}", name)
+			t.Errorf("%s: model_tier_envelope is nil — want {min:balanced, max:balanced}", name)
 			continue
 		}
-		if env.Min != "fast" || env.Max != "balanced" {
-			t.Errorf("%s: model_tier_envelope = {min:%q, max:%q}, want {min:fast, max:balanced}", name, env.Min, env.Max)
+		if env.Min != "balanced" || env.Max != "balanced" {
+			t.Errorf("%s: model_tier_envelope = {min:%q, max:%q}, want {min:balanced, max:balanced}: scans run on Flash High, never Flash Low", name, env.Min, env.Max)
 		}
 	}
 }
 
-func TestScanProfiles_EnvelopeClampsDeepPin(t *testing.T) {
+func TestScanProfiles_EnvelopeClampsDeepAndFastPins(t *testing.T) {
 	for _, name := range inScopeScanProfiles {
 		prof := loadShippedScanProfile(t, name)
-		if err := policy.ValidatePin(name, policy.Pin{Model: "deep"}, prof); err == nil {
-			t.Errorf("%s: ValidatePin admitted a deep pin — the {fast,balanced} envelope must clamp it", name)
+		for _, tier := range []string{"deep", "fast"} {
+			if err := policy.ValidatePin(name, policy.Pin{Model: tier}, prof); err == nil {
+				t.Errorf("%s: ValidatePin admitted a %s pin — the balanced-only envelope must clamp it", name, tier)
+			}
 		}
-		if err := policy.ValidatePin(name, policy.Pin{Model: "fast"}, prof); err != nil {
-			t.Errorf("%s: ValidatePin rejected a fast pin (the envelope min): %v", name, err)
+		if err := policy.ValidatePin(name, policy.Pin{Model: "balanced"}, prof); err != nil {
+			t.Errorf("%s: ValidatePin rejected a balanced pin (the envelope itself): %v", name, err)
 		}
 	}
 }
@@ -64,8 +65,8 @@ func TestScanProfiles_EnvelopeClampsDeepPin(t *testing.T) {
 func TestScanProfiles_ExcludedUntouched(t *testing.T) {
 	for _, name := range excludedScanProfiles {
 		prof := loadShippedScanProfile(t, name)
-		if env := prof.ModelTierEnvelope; env != nil && env.Min == "fast" && env.Max == "balanced" {
-			t.Errorf("%s: gained a {fast,balanced} envelope but is out of scope (owned by mechanical-scans-to-native)", name)
+		if env := prof.ModelTierEnvelope; env != nil && env.Max == "balanced" {
+			t.Errorf("%s: gained a balanced-capped envelope but is out of scope (owned by mechanical-scans-to-native)", name)
 		}
 		if err := policy.ValidatePin(name, policy.Pin{Model: "deep"}, prof); err != nil {
 			t.Errorf("%s: a deep pin was rejected — this excluded profile's floor must stay untouched: %v", name, err)

@@ -262,7 +262,7 @@ func TestRunLoop_BootRefreshRunsBeforeRecovery(t *testing.T) {
 
 	prevDeps := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = prevDeps })
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		return orchDeps{Storage: &fixtures.FakeStorage{}, Ledger: newFakeLedger()}
 	}
 

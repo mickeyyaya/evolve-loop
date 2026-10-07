@@ -168,7 +168,7 @@ check and the harness's post-phase gate can never drift.
 - **CLI escalation before the breaker** (`internal/core/contract_escalation.go`; full design:
   [contract-block-cli-escalation.md](contract-block-cli-escalation.md)): a contract block
   never triggers the profile's `cli_fallback` chain (that fires only on infra exits
-  `{80,81,85,124,127}`), so a CLI that systematically mis-formats a deliverable used to burn every
+  `{80,81,85,87,124,127}`), so a CLI that systematically mis-formats a deliverable used to burn every
   correction and open the circuit — a format failure silently WEAKENING the gate (batch-19
   adversarial-review, batch-21 triage; both agy-tmux). The correction ladder now re-dispatches the
   **second** consecutive block on a different CLI **family**: the first candidate in the phase's

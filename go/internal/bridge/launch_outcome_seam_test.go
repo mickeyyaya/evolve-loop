@@ -23,6 +23,7 @@ func TestExitCodes_HostAliasesAreTheLeafValues(t *testing.T) {
 		"ExitRequireFullUnmet": {ExitRequireFullUnmet, launchoutcome.ExitRequireFullUnmet},
 		"ExitCmdTimeout":       {ExitCmdTimeout, launchoutcome.ExitCmdTimeout},
 		"ExitMissingBinary":    {ExitMissingBinary, launchoutcome.ExitMissingBinary},
+		"ExitModelMismatch":    {ExitModelMismatch, launchoutcome.ExitModelMismatch},
 	} {
 		if pair[0] != pair[1] {
 			t.Errorf("%s: host %d, leaf %d — the numeric contract is spelled twice on purpose and must agree", name, pair[0], pair[1])

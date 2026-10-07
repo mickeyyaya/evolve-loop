@@ -13,8 +13,6 @@ import (
 )
 
 func init() {
-	// registry.Register wires this test phase into the resolution path
-	// evolve serve-phase (phasecmd.RunServePhase → registry.For) uses.
 	registry.Register("echo", func(req core.PhaseRequest) core.PhaseRunner {
 		return &echoPhaseRunner{}
 	})

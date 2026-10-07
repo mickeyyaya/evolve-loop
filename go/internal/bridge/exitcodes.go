@@ -18,4 +18,5 @@ const (
 	ExitRequireFullUnmet = 99  // --require-full set and full tier unavailable
 	ExitCmdTimeout       = 124 // driver killed by a command-level timeout (gnu `timeout` convention)
 	ExitMissingBinary    = 127 // required external binary missing
+	ExitModelMismatch    = 87
 )

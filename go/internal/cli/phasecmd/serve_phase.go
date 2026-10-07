@@ -11,8 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/phaseproto"
 )
 
-// RunServePhase implements `evolve serve-phase <name>`: one phase run over phaseproto envelopes on stdio.
-func RunServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func NewRunServePhase(install RouterInstaller) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return phaseCommand{install: install}.serve
+}
+
+func (c phaseCommand) serve(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintf(stderr, "evolve serve-phase: missing phase name (%s)\n", strings.Join(registry.Names(), "|"))
 		return 10
@@ -25,6 +28,9 @@ func RunServePhase(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 	}
 
 	handler := func(ctx context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
+		if err := c.installRouter(req.ProjectRoot); err != nil {
+			return core.PhaseResponse{}, err
+		}
 		return factory(req).Run(ctx, req)
 	}
 

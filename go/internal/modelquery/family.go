@@ -1,6 +1,9 @@
 package modelquery
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 var familyTokens = []struct {
 	family string
@@ -14,13 +17,8 @@ var familyTokens = []struct {
 const unknownFamily = ""
 
 func FamilyOf(id string) string {
-	lower := strings.ToLower(id)
-	for _, fam := range familyTokens {
-		for _, tok := range fam.tokens {
-			if strings.Contains(lower, tok) {
-				return fam.family
-			}
-		}
+	if families := FamiliesIn(id); len(families) > 0 {
+		return families[0]
 	}
 	return unknownFamily
 }
@@ -41,4 +39,15 @@ func FilterByFamily(ids []string, allowed ...string) []string {
 		}
 	}
 	return out
+}
+
+func FamiliesIn(label string) []string {
+	lower := strings.ToLower(label)
+	var families []string
+	for _, fam := range familyTokens {
+		if slices.ContainsFunc(fam.tokens, func(tok string) bool { return strings.Contains(lower, tok) }) {
+			families = append(families, fam.family)
+		}
+	}
+	return families
 }

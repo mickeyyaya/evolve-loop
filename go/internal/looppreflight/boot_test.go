@@ -123,6 +123,7 @@ func TestBootRCName(t *testing.T) {
 		{"ExitREPLBootTimeout", bridge.ExitREPLBootTimeout, "ExitREPLBootTimeout"},
 		{"ExitMissingBinary", bridge.ExitMissingBinary, "ExitMissingBinary"},
 		{"ExitBadFlags", bridge.ExitBadFlags, "ExitBadFlags"},
+		{"ExitModelMismatch", bridge.ExitModelMismatch, "ExitModelMismatch — the REPL booted a model outside"},
 		{"WorkspaceSetupFailed", exitWorkspaceSetupFailed, "workspace setup failed"},
 		{"UnknownCode1", 1, "boot failure"},
 		{"UnknownCode99", 99, "boot failure"},

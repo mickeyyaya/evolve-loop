@@ -34,6 +34,7 @@ const (
 	ExitRequireFullUnmet = 99  // --require-full set and full tier unavailable
 	ExitCmdTimeout       = 124 // driver killed by a command-level timeout (gnu `timeout` convention)
 	ExitMissingBinary    = 127 // required external binary missing
+	ExitModelMismatch    = 87
 )
 
 // ExitSignalDeath is what Go's ExitError.ExitCode() reports for a signal
@@ -56,10 +57,6 @@ type exitClass struct {
 	sentinelOnCancel bool
 }
 
-// exitClasses is the table — 11 rows over the declared non-zero exits;
-// driverErrorClass is the default for any other non-zero code; ExitOK has
-// no row (success is the zero Outcome).
-//
 // 124 joins the transient set as the sibling of 81 (a driver killed by a
 // command-level timeout is infra weather); 127 deliberately stays plain — an
 // absent CLI is an environment defect that must fail loud, and its only
@@ -72,6 +69,7 @@ var exitClasses = []exitClass{
 	{code: ExitArtifactTimeout, name: "artifact_timeout", signal: CodeExitArtifactTimeout, causeCode: "artifact_timeout", sentinel: core.ErrArtifactTimeout},
 	{code: ExitUnknownPrompt, name: "unknown_prompt", signal: CodeExitUnknownPrompt, causeCode: "unknown_prompt", sentinel: core.ErrTransientBridgeFailure},
 	{code: ExitRespondLoopGuard, name: "respond_loop_guard", signal: CodeExitRespondLoopGuard, causeCode: "respond_loop_guard", sentinel: core.ErrTransientBridgeFailure},
+	{code: ExitModelMismatch, name: "model_mismatch", signal: CodeExitModelMismatch, causeCode: "model_mismatch"},
 	{code: ExitRequireFullUnmet, name: "required_tier_unavailable", signal: CodeExitRequiredTierUnavailable, causeCode: "required_tier_unavailable"},
 	{code: ExitCmdTimeout, name: "command_timeout", signal: CodeExitCommandTimeout, causeCode: "command_timeout", sentinel: core.ErrTransientBridgeFailure},
 	{code: ExitMissingBinary, name: "missing_binary", signal: CodeExitMissingBinary, causeCode: "missing_binary"},

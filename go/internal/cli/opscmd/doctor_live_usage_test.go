@@ -71,3 +71,14 @@ func TestDoctorLive_TheJSONReportCarriesTheUsageEvidenceAndAHealthyProbeAsksNoth
 		t.Errorf("a healthy probe printed usage: %q", errb.String())
 	}
 }
+
+func TestDoctorLive_AWrongModelPrintsTheUsageVerdict(t *testing.T) {
+	ev := usageprobe.Evidence{CLI: "agy", Family: "agy-claude", Verdict: usageprobe.VerdictExhausted, Detail: "claude group drained"}
+	var errb bytes.Buffer
+
+	code := reportDoctorLiveResult(liveOutcome{target: liveProbeTarget{driver: "agy-claude-tmux"}, rc: bridge.ExitModelMismatch, scrollback: "? for shortcuts      Gemini 3.8 Flash · low", usage: &ev}, io.Discard, &errb)
+
+	if code != 1 || !strings.Contains(errb.String(), "LIVE WRONG MODEL") || !strings.Contains(errb.String(), "[doctor] usage: "+ev.Summary()) {
+		t.Fatalf("exit %d, stderr:\n%s\nwant the wrong-model line and the usage verdict that says whether an exhausted Claude group explains it", code, errb.String())
+	}
+}

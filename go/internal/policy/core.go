@@ -1,7 +1,6 @@
 package policy
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -135,11 +134,8 @@ func Load(path string) (Policy, error) {
 	if err != nil {
 		return Policy{}, fmt.Errorf("policy: read %s: %w", path, err)
 	}
-	if err := refuseNullCLIRouting(raw); err != nil {
-		return Policy{}, fmt.Errorf("policy: parse %s: %w", path, err)
-	}
-	var p Policy
-	if err := json.Unmarshal(raw, &p); err != nil {
+	p, err := Parse(raw)
+	if err != nil {
 		return Policy{}, fmt.Errorf("policy: parse %s: %w", path, err)
 	}
 	return p, nil

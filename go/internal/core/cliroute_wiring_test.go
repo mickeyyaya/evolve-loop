@@ -1,6 +1,7 @@
 package core
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -125,5 +126,45 @@ func TestContractEscalation_ADeclaredStopNeverEscalatesToTheUniversalFallback(t 
 	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}}
 	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); ok {
 		t.Fatalf("after_chain stop leaves the builder agy alone; the legacy claude fallback must not override the table: %q", esc)
+	}
+}
+
+func TestContractEscalation_ADeclaredTableWithNoRootRouterIsLoudAndNeverEscalates(t *testing.T) {
+	t.Setenv("EVOLVE_CLI", "")
+	root := t.TempDir()
+	writeRawProfile(t, root, "builder", map[string]any{"name": "builder", "cli": "codex-tmux", "allowed_clis": []string{"claude", "codex", "agy"}})
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"cli_routing":{"clis":["agy","claude"],"default":["agy","claude"]}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cr := &cycleRun{o: &Orchestrator{}, req: CycleRequest{ProjectRoot: root}}
+	var esc string
+	var ok bool
+
+	stderr := captureStderr(t, func() { esc, ok = cr.contractEscalationCLI(PhaseBuild, "codex-tmux") })
+
+	if ok || !strings.Contains(stderr, "contract escalation has no route") || !strings.Contains(stderr, "no compiled router") {
+		t.Fatalf("an orchestrator with no router must not escalate on its own under a declared table: esc=%q ok=%v stderr=%q", esc, ok, stderr)
+	}
+}
+
+func TestContractEscalation_ADeepDispatchNamesAndEscalatesOnlyWhatTheCeilingPermits(t *testing.T) {
+	t.Setenv("EVOLVE_CLI", "")
+	root := t.TempDir()
+	writeRawProfile(t, root, "builder", map[string]any{"name": "builder", "cli": "agy-tmux", "model_tier_default": "deep"})
+	block := policy.CLIRouting{CLIs: []string{"agy", "agy-claude", "claude"}, Default: []string{"agy", "agy-claude", "claude"}, Tiers: map[string][]string{"deep": {"agy-claude", "claude"}}}
+	r, _, err := cliroute.Build(cliroute.Setup{
+		Policy: policy.Policy{CLIRouting: &block}, Profiles: profiles.NewFromDir(filepath.Join(root, ".evolve", "profiles")),
+		Host: cliroute.Host{LookPath: func(string) (string, error) { return "/fake", nil }},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	cr := &cycleRun{o: routedOrchestrator(r), req: CycleRequest{ProjectRoot: root}}
+
+	if got := cr.contractDispatchCLI(PhaseBuild, ""); got != "agy-claude-tmux" {
+		t.Fatalf("dispatched CLI = %q, want agy-claude-tmux: agy is not permitted at deep", got)
+	}
+	if esc, ok := cr.contractEscalationCLI(PhaseBuild, ""); !ok || esc != "claude-tmux" {
+		t.Fatalf("escalation = %q %v, want claude-tmux: never the forbidden agy", esc, ok)
 	}
 }

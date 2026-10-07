@@ -108,6 +108,13 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 	case rc == bridge.ExitBadFlags:
 		fmt.Fprintf(stderr, "[doctor] live: %q is not a known *-tmux driver\n", target.driver)
 		return 10
+	case rc == bridge.ExitModelMismatch:
+		fmt.Fprintf(stderr, "[doctor] LIVE WRONG MODEL: %s rc=%d — the REPL booted a model outside the target's model family, or showed no readable model label, so the prompt was never sent\n", target, rc)
+		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {
+			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
+		}
+		printUsage(stderr, usage)
+		return 1
 	case pattern != "":
 		fmt.Fprintf(stderr, "[doctor] LIVE WALLED: %s rc=%d pattern=%s\n", target, rc, pattern)
 		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {

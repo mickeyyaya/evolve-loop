@@ -49,7 +49,7 @@ func bootAgyClaude(t *testing.T, intent LaunchIntent) []string {
 		AllowBypass: true, BootOnly: true,
 		Realization: RealizeFor("agy-claude-tmux", intent),
 	}
-	tm := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{"? for shortcuts"}, 12)}
+	tm := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{agyFooterClaudeOpus}, 12)}
 	deps := Deps{
 		Tmux: tm, Sleep: func(time.Duration) {}, Stderr: io.Discard,
 		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"}),
@@ -294,28 +294,5 @@ func TestInteractiveFamilies_AgyClaudeTmuxSharesTheAgyBinary(t *testing.T) {
 	got := interactiveFamiliesFrom([]string{"agy-claude-tmux", "agy-tmux", "claude-tmux"}, loadManifestRaw, func(string) bool { return true })
 	if want := []string{"agy", "claude"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("installed interactive binaries = %v, want %v: the usage probe and the updater run once per binary", got, want)
-	}
-}
-
-func TestManifestObject_IsTheMergedManifestTheLoaderParses(t *testing.T) {
-	dir := t.TempDir()
-	writeManifestFile(t, dir, "fake-tmux", `{"cli":"fake-tmux","binary":"fake","rule":{"a":"1"},"dropped":{"b":"2"}}`)
-	writeManifestFile(t, dir, "fake-alt-tmux", `{"cli":"fake-alt-tmux","base":"fake-tmux","rule":{"c":"3"},"dropped":null}`)
-	writeManifestFile(t, dir, "fake-chain-tmux", `{"cli":"fake-chain-tmux","base":"fake-alt-tmux"}`)
-	writeManifestFile(t, dir, "fake-bad-tmux", `{"cli":`)
-	useBridgeManifestDir(t, dir)
-
-	object, err := ManifestObject("fake-alt-tmux")
-	if err != nil {
-		t.Fatalf("ManifestObject: %v", err)
-	}
-	want := map[string]any{"cli": "fake-alt-tmux", "binary": "fake", "rule": map[string]any{"a": "1", "c": "3"}}
-	if !reflect.DeepEqual(object, want) {
-		t.Errorf("ManifestObject(fake-alt-tmux) = %v, want %v: the target merged over its base, a null removing the base's key", object, want)
-	}
-	for name, wantErr := range map[string]string{"fake-chain-tmux": "itself names a base", "fake-bad-tmux": "invalid JSON", "absent-tmux": "no manifest"} {
-		if _, err := ManifestObject(name); err == nil || !strings.Contains(err.Error(), wantErr) {
-			t.Errorf("ManifestObject(%s) err = %v, want one naming %q, as the loader refuses it", name, err, wantErr)
-		}
 	}
 }
