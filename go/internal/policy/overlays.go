@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
@@ -40,27 +41,33 @@ type OverlayRule struct {
 	Tiers  []string `json:"tiers,omitempty"`
 	// When keys the rule on the cycle's signals; a clause on an absent signal never matches.
 	// See ADR-0099.
-	When   []config.Condition `json:"when,omitempty"`
-	Skills []string           `json:"skills,omitempty"`
+	When         []config.Condition `json:"when,omitempty"`
+	WritesSource bool               `json:"writes_source,omitempty"`
+	Skills       []string           `json:"skills,omitempty"`
 }
 
 // OverlayDispatch describes one agent launch for overlay resolution; nil Signals leaves every When rule inert.
 type OverlayDispatch struct {
-	Phase   string
-	CLI     string
-	Model   string
-	Tier    string
-	Signals map[string]string
+	Phase        string
+	CLI          string
+	Model        string
+	Tier         string
+	Signals      map[string]string
+	WritesSource bool
 }
+
+const SelfReviewSkill = "code-review-simplify"
 
 // compiledDefaultOverlays is the only built-in tier→skills mapping; a policy overlays block replaces it wholesale.
 func compiledDefaultOverlays() []OverlayRule {
 	document := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindDocument}}
+	code := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindCode}}
 	return []OverlayRule{
 		{Tiers: []string{"deep", "top"}, Skills: []string{"fable"}},
 		{Phases: []string{"scout"}, When: document, Skills: []string{"solution-scout"}},
 		{Phases: []string{"build"}, When: document, Skills: []string{"solution-build"}},
 		{Phases: []string{"audit"}, When: document, Skills: []string{"solution-audit"}},
+		{WritesSource: true, When: code, Skills: []string{"engineering-craft", SelfReviewSkill}},
 	}
 }
 
@@ -215,10 +222,11 @@ func toSet(ss []string) map[string]struct{} {
 }
 
 func (r OverlayRule) matches(d OverlayDispatch) bool {
-	return matchDim(r.Phases, d.Phase) &&
+	return (d.WritesSource || !r.WritesSource) &&
+		matchDim(r.Phases, d.Phase) &&
 		matchDim(r.CLIs, d.CLI) &&
 		matchDim(r.Models, d.Model) &&
-		matchDim(r.Tiers, d.Tier) &&
+		matchTier(r.Tiers, d.Tier) &&
 		matchWhen(r.When, d.Signals)
 }
 
@@ -245,6 +253,60 @@ func matchWhen(when []config.Condition, signals map[string]string) bool {
 		}
 	}
 	return true
+}
+
+func matchTier(selectors []string, tier string) bool {
+	if matchDim(selectors, tier) {
+		return true
+	}
+	canonical := canonicalTier(tier)
+	if canonical == "" {
+		return false
+	}
+	for _, sel := range selectors {
+		if !isGlob(sel) && canonicalTier(sel) == canonical {
+			return true
+		}
+	}
+	return false
+}
+
+func canonicalTier(token string) string {
+	return TierName(TierRank(token))
+}
+
+func isGlob(selector string) bool {
+	return strings.ContainsAny(selector, `*?[\`)
+}
+
+func namesCanonicalTier(selector string) bool {
+	if !isGlob(selector) {
+		return canonicalTier(selector) != ""
+	}
+	for _, tier := range tierNames {
+		if ok, err := path.Match(selector, tier); err == nil && ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (p Policy) NonCanonicalOverlayTierSelectors() []string {
+	if p.Overlays == nil {
+		return nil
+	}
+	var out []string
+	seen := map[string]struct{}{}
+	for _, r := range p.Overlays.Rules {
+		for _, sel := range r.Tiers {
+			if _, dup := seen[sel]; dup || namesCanonicalTier(sel) {
+				continue
+			}
+			seen[sel] = struct{}{}
+			out = append(out, sel)
+		}
+	}
+	return out
 }
 
 func matchDim(patterns []string, value string) bool {

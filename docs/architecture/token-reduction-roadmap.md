@@ -1,5 +1,7 @@
 # Token-Reduction Roadmap (Cycles 15–19+)
 
+> **Superseded in part (2026-10-07):** the flag-gated builder self-review loop described below (`EVOLVE_BUILDER_SELF_REVIEW`) is gone; the flag has had no reader since cycle 22's dead-flag sweep. Every code-cycle source writer now runs `code-review-simplify`'s required Self-review hook, preloaded by the compiled-default overlay ([skill-overlays](skill-overlays.md)). The cycle 15–20 analysis stands as history.
+
 > **Status:** v9.1.1 baseline — Cycle 15 research deliverable + opt-in audit-advisory hook. Cycles 16+17 originally shipped advisory subagents (`code-simplifier`, `evolve-code-reviewer`) but their reports were orphans — no downstream consumer. Cycle 20 refactor deleted both and replaced them with a Builder self-review skill loop (`EVOLVE_BUILDER_SELF_REVIEW=1`, default OFF) that invokes review skills mid-build via the Skill tool and converges before Auditor handoff. See "Cycle 20 Refactor" section below.
 > For context-floor history see [token-floor-history.md](token-floor-history.md).
 > For Cycle-11 cost forensics see [token-economics-2026.md](token-economics-2026.md).

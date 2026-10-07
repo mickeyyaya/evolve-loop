@@ -4,14 +4,14 @@ description: Use when reviewing code changes for quality, security, performance,
 argument-hint: "[--tier lightweight|standard|full] [--files <paths>]"
 ---
 
-> Unified code review + simplification. Single-pass, multi-dimensional scoring, adaptive depth. Integrates with evolve-loop auditor and builder phases.
+> Unified code review + simplification. Single-pass, multi-dimensional scoring, adaptive depth. Integrates with evolve-loop's source-writing phases.
 
 ## Contents
 - [Architecture](#architecture) — hybrid pipeline+agentic model
 - [Single-Pass Flow](#single-pass-flow) — read diff once, analyze both dimensions
 - [Multi-Dimensional Scoring](#multi-dimensional-scoring) — 4 dimensions with numeric scores
 - [Adaptive Depth Routing](#adaptive-depth-routing) — scale analysis with diff complexity
-- [Integration Hooks](#integration-hooks) — evolve-loop auditor and builder wiring
+- [Integration Hooks](#integration-hooks) — evolve-loop source-writer wiring
 - [Simplification Catalog](#simplification-catalog) — what to simplify and when
 - [Output Schema](#output-schema) — structured review+simplify report
 
@@ -27,7 +27,7 @@ Input: git diff (changed files)
 │  PIPELINE LAYER (fast)  │  Deterministic pattern checks
 │  ─────────────────────  │
 │  1. Complexity scan     │  Cognitive complexity, nesting depth
-│  2. Smell detection     │  22-smell catalog from detect-code-smells
+│  2. Smell detection     │  the Simplification Catalog below
 │  3. Security scan       │  OWASP patterns, secrets, injection
 │  4. Style check         │  Naming, file size, function length
 │  5. Duplication check   │  Near-duplicate code blocks
@@ -78,13 +78,17 @@ DIFF_LINES=$(git diff "$REF" --numstat | awk '{s+=$1+$2} END {print s}')
 CHANGED_FILES=$(git diff "$REF" --name-only)
 ```
 
+`git diff HEAD` omits untracked files, so a file the change creates is invisible until it is staged: run `git add -N <new paths>` (intent to add, no content staged) before loading, or the review misses every new file and, when only new files changed, falls back to the previous commit.
+
+Inside an evolve-loop phase the worktree also holds files an earlier phase of the cycle wrote and never committed, such as the TDD phase's tests or the bug-reproduction phase's reproducer. The Self-review hook loads only the files its own phase changed, measured against the `git status --porcelain` the phase saved before its first edit (see [Integration Hooks](#integration-hooks)).
+
 ### Step 2: PIPELINE (structured checks)
 
 Run deterministic checks on each changed file:
 
 | Check | Tool | Threshold | Finding Type |
 |-------|------|-----------|-------------|
-| Cognitive complexity | `legacy/scripts/verification/complexity-check.sh` | > 15 per function | `complexity` |
+| Cognitive complexity | read the function: branches, loops, boolean operators | > 15 per function | `complexity` |
 | Nesting depth | grep-based | > 4 levels | `complexity` |
 | Function length | line count | > 50 lines | `maintainability` |
 | File length | line count | > 800 lines | `maintainability` |
@@ -131,6 +135,8 @@ Four dimensions, each scored 0.0 to 1.0. Replaces binary PASS/FAIL with actionab
 | 0.6 - 0.79 | WARN | Ship with noted issues; simplification recommended |
 | < 0.6 | FAIL | Block shipping; fix required |
 
+In the evolve-loop these verdicts are the skill's own grade, never a gate: a source writer records them in its `## Self-Review` section and does not block its own handoff on them (see [Integration Hooks](#integration-hooks)).
+
 **Simplification trigger:** If `maintainability < 0.7`, auto-generate simplification suggestions (see Simplification Catalog).
 
 **Confidence:** Each dimension includes a `confidence` (0.0-1.0). If any dimension's confidence < 0.7, escalate to WARN regardless of score.
@@ -145,6 +151,8 @@ Scale analysis intensity with diff complexity. Small changes get lightweight rev
 | **Standard** | 50-200 lines, 3-10 files | Full pipeline checks | Full agentic analysis (all 5 checks) | ~20-35K |
 | **Full Review** | > 200 lines, 10+ files, or security-sensitive | Full pipeline checks | Multi-agent specialist panel: correctness + security + performance agents | ~40-80K |
 
+Inside a loop phase the Full Review tier runs the three specialist lenses in turn, in the same agent: a phase agent dispatches no subagents (in-process `Agent` is denied while a cycle is active).
+
 **Security-sensitive detection:** Files matching these patterns auto-escalate to full review:
 - `auth*`, `*login*`, `*password*`, `*token*`, `*secret*`
 - `*payment*`, `*billing*`, `*checkout*`
@@ -155,44 +163,30 @@ Scale analysis intensity with diff complexity. Small changes get lightweight rev
 
 ## Integration Hooks
 
-### Evolve-Loop Auditor Integration
+In the evolve-loop the kernel preloads this skill, as a compiled-default skill overlay ([skill-overlays](../../docs/architecture/skill-overlays.md)), into every code-cycle dispatch that may write source: tdd, build, a debugger resolving a rebase conflict, and a catalog phase whose spec keeps `writes_source` (boot strips it from a user phase whose profile is not a sandboxed writer). There it runs as the **Self-review hook** below: REQUIRED, never a gate, and strictly the writer's own pass over its own files. A configured `code-review` phase loads this skill in **review mode**, beside the shared `quality-index` skill: it reviews the cycle's diff independently, reports findings and scores, and edits nothing; the Self-review hook is not its job. The audit does not preload this skill.
 
-The auditor invokes this skill as an optional enhancement to its review pass:
+### Self-review (every source-writing phase)
 
-```
-Auditor Standard Flow:
-  1. Read build-report.md
-  2. Run code quality checks          ← ENHANCED by pipeline layer
-  3. Run security checks               ← ENHANCED by security scan
-  4. Run hallucination detection        (unchanged)
-  5. Run pipeline integrity checks      (unchanged)
-  6. Run eval verification              (unchanged)
-  7. Generate verdict                   ← ENHANCED by multi-dimensional scoring
-```
+Before your first edit, save `git status --porcelain` to your workspace (never into the worktree). After your own verification passes and before you write your report:
 
-**Auditor invocation:** When the auditor encounters code changes (not doc-only or config-only), it can invoke this skill's structured checks to supplement its review. The skill's composite score feeds into the auditor's verdict logic.
+1. Scope: review only your phase's own files, the ones that changed after your phase started. Every path already listed in the saved status is earlier-phase-owned, unless your dispatch names it as yours to write (a debugger's conflicted paths): read it for context, never edit it, and record a finding in it as `Declined: earlier-phase-owned`. Examples are the tests the TDD phase lists in its `test-report.md` handoff `testFiles`, every ACS predicate under `go/acs/` (`acs/` in the legacy shell form), and the reproducer test the bug-reproduction phase's report names. The rule holds when `testFiles` is absent or empty, and for writers that run after the build. The TDD phase's own tests are its own, and it never edits production code.
+2. Run this skill on those files, at the tier [Adaptive Depth Routing](#adaptive-depth-routing) picks for their size.
+3. Your own changed Go `*_test.go` files also get the checklist of the `golang-test-review` skill (`skills/golang-test-review/SKILL.md`). A change with none skips it.
+4. Apply the simplifications that preserve behaviour. Fix every CRITICAL or HIGH finding in your own files, or decline it visibly with its reason; decline any other finding the same way.
+5. Re-run your phase's own check (the build's tests, the TDD phase's RED run). A simplification that breaks it is reverted, not chased.
+6. Record the pass in your report:
 
-**Configuration in evolve-auditor.md:**
 ```markdown
-### Optional Skill Consultation
-- **code-review-simplify**: For code changes, invoke `skills/code-review-simplify/SKILL.md` 
-  pipeline layer. Use composite score to supplement verdict. If maintainability < 0.7, 
-  append simplification suggestions to audit-report.md.
+## Self-Review
+- Skill: code-review-simplify, tier <lightweight|standard|full> (<N> files, <M> lines)
+- Scores: composite <0.NN>, correctness <0.NN>, security <0.NN>, performance <0.NN>, maintainability <0.NN>
+- Applied: <technique at file:line, ...> | none
+- Declined: <finding: reason, ...; a finding in an earlier phase's file as Declined: earlier-phase-owned> | none
+- Go tests: golang-test-review applied to <your own test files> | no *_test.go change
+- Re-verified: <command> -> <N/N PASS, or the RED run>
 ```
 
-### Evolve-Loop Builder Integration
-
-The builder can invoke this skill post-implementation for self-review:
-
-```
-Builder Self-Review (after implementation, before reporting):
-  1. Run eval graders (existing)
-  2. Run code-review-simplify lightweight tier
-  3. If maintainability < 0.7: apply simplification suggestions before reporting
-  4. Include self-review score in build-report.md
-```
-
-**Builder invocation:** After implementing a task and before writing `build-report.md`, the builder runs this skill's lightweight tier on its own changes. Simplification suggestions with `maintainability < 0.7` are applied inline. This catches issues before the auditor sees them, reducing audit-fix cycles.
+A report without this section, or with no `- Scores:` line in it, is not rejected: the runner records the advisory signal `RUNNER_SELF_REVIEW_MISSING`.
 
 ### Standalone Invocation
 
@@ -223,6 +217,8 @@ When `maintainability < 0.7`, generate simplification suggestions from this cata
 - Max 5 simplification suggestions per review. Focus on highest-impact.
 - Each suggestion must include before/after code snippets and estimated complexity reduction.
 - Never suggest simplification that changes external behavior (pure refactoring only).
+- Never simplify away input validation, error handling, security checks or tests ([minimalism](../minimalism/SKILL.md)'s guardrails). Deleting or weakening a test is never a simplification.
+- Never suggest adding a comment. Code carries none beyond machine-read directives and markers and a package's one doc ([code-comments](../../docs/conventions/code-comments.md)): an unclear line gets a better name, an extracted function, a type or a test, and an added non-machine comment is itself a maintainability finding.
 
 ## Output Schema
 

@@ -16,6 +16,35 @@ self-review, honest failure reporting). Before this wiring, that discipline only
 applied when a human manually invoked `/evo:fable`; now the loop applies it to
 deep/top-tier phase agents automatically, **by configuration**.
 
+The second compiled-default persona is `skills/engineering-craft/SKILL.md`, the
+craft companion to fable (red-first tests, search before you write, smallest
+correct diff). The loop preloads it into **every dispatch that may write source
+into a code cycle's worktree, at any tier** (operator directive 2026-10-06: "make
+sure you loaded the skill when agent is running"). Before this rule, live waves
+68 and 69 logged `phase=build skill-overlays=[]` and `phase=tdd skill-overlays=[]`
+at the balanced, sonnet and auto tiers: the craft skill was on the advisor
+allow-list, but no rule applied it.
+
+The third is `code-review-simplify`, the one-pass review and simplification. It
+rides the same rule as engineering-craft, so every code-cycle source writer loads
+both. What it preloads is the skill's `COMPACT.md`, the Self-review hook alone;
+the full `SKILL.md` is read on demand. The hook has each writer simplify and
+review the files it changed itself (never an earlier phase's files, such as the
+TDD phase's tests, the `go/acs/` predicates or the bug-reproduction reproducer,
+which it reads but does not edit) before handoff, and record the
+scores under `## Self-Review` in its report (operator directive 2026-10-07: "I would like the
+building related phases also applying code simplifier and code review with the
+skills we built"). Before this, the builder persona's self-review loop was
+opt-in behind `EVOLVE_BUILDER_SELF_REVIEW`, a flag with no reader since cycle 22's
+dead-flag sweep, and its other hook waited for a `code-review-simplify.sh` that
+does not exist, so the pass never ran. A report without the section is never rejected:
+the runner records the advisory signal `RUNNER_SELF_REVIEW_MISSING` (below). The
+audit does not load the skill: by operator decision (2026-10-07) a new
+`code-review` phase is the one home of independent review, and the audit grades
+the build's dispositions of that phase's findings instead of reviewing the code
+itself. That phase loads the skill in review mode, beside a shared
+`quality-index` skill; the Self-review hook stays the writer's own pass.
+
 Which skill loads for which phase agent is **configuration, never code**:
 `internal/policy` resolves it from the compiled default or `.evolve/policy.json`.
 
@@ -55,14 +84,29 @@ cacheable prefix.
 
 The runner resolves overlays **per dispatch attempt** inside the tier-fallback
 closure, so the skill set tracks the tier actually dispatched (a deep→sonnet
-step-down under a quota wall recomputes overlays for the new tier). The compiled
-default keys on the abstract tier names `deep`/`top`; a phase whose dispatched
-model is a concrete name (e.g. `sonnet`) matches no compiled rule and dispatches
-byte-identically (no overlay).
+step-down under a quota wall recomputes overlays for the new tier). A `tiers`
+selector matches the dispatch's **canonical tier**, not only its spelling:
+`matchTier` first glob-matches the raw token, then compares
+`canonicalTier(selector)` with `canonicalTier(tier)`, where
+`canonicalTier = TierName(TierRank(token))` is the policy package's one
+canonicalization (`TierNames` is pinned equal to `modelcatalog.CanonicalTiers`).
+So `{tiers:[deep]}` matches `deep`, `opus` and `claude-opus-*`, and `{tiers:[fast]}`
+matches `haiku`; a selector may also be an alias (`opus` matches `deep`). A glob
+selector (`*`, `?`, `[`, `\`) matches the raw token only. A `tiers` selector names a
+tier, never a model: a concrete model id or a Claude alias canonicalizes to its
+whole tier, so `{tiers:[claude-opus-4-1]}` matches every deep dispatch (`deep`,
+`opus` and any `claude-opus-*`), not that one model. Before 2026-10-07
+selectors compared the string exactly, so the compiled deep rule missed every
+dispatch under the concrete token `opus`: 80 cycle workspaces on the plane, up
+to cycle 1813, log `phase=audit skill-overlays=[] (tier=opus)`, deep auditors
+running without fable (inbox `overlay-rule-tier-selectors-canonicalize`). A `sonnet`
+dispatch is `balanced`, which no compiled tier rule names.
 
 ## Configuration (`.evolve/policy.json` → `overlays`)
 
 > **`when` (ADR-0099 slice 3):** a rule may also key on the cycle's objective signals — `{"when": [{"field": "deliverable_kind", "op": "eq", "value": "document"}]}` — evaluated against `OverlayDispatch.Signals`, which core projects at dispatch (`PhaseRequest.Signals`, ONE kernel digest per dispatch — the runner copies, never re-reads the workspace): `deliverable_kind` (declared by triage/scout, else the project default from `.evolve/domain.json`, else `code` — always present) and `scout.goal_type` (only when the scout declared one). The keys are the kernel's routable field names (`config.SignalDeliverableKind` / `config.SignalGoalType` — the same words a `conditional_mandatory` clause uses). An absent signal never matches (fail-closed; see Caveats). The compiled default preloads `solution-scout` / `solution-build` / `solution-audit` onto a document cycle's scout / build / audit dispatches.
+
+> **`writes_source` (2026-10-07):** `{"writes_source": true}` selects only a dispatch that may write source into the cycle worktree; omitted or `false` is a wildcard, like an empty list. The value is `OverlayDispatch.WritesSource`, which the runner reads from `PhaseRequest.WritesSource()`: `!WorktreeReadOnly || len(WorktreeWritablePaths) > 0`. Both fields are set only by the orchestrator's `withWorktreeFence`, from the one write predicate (`worktreePhase`: built-in tdd and build, plus any catalog phase whose spec keeps `writes_source`; `bug-reproduction` and `test-amplification` declare it, but today boot strips it from both because their dispatch profiles are not sandboxed writers (`phasespec.ClampDiscoveredSpecs`; inbox `user-phase-writer-profiles-read-only`), so they run read-only and receive neither skill) and from the debugger's fleet-rebase carve-out (its `conflicted_paths`). So the selector and the worktree fence cannot disagree about who writes, and no phase list exists to drift. The compiled default uses it as `{writes_source: true, when: deliverable_kind==code} → [engineering-craft, code-review-simplify]`: tdd, build, a conflict-resolving debugger and any catalog phase that keeps `writes_source` get the craft persona and the self-review skill at every tier, while scout, triage, audit and a decision-only debugger get neither. A document cycle's build gets `solution-build` instead, because that persona is the document deliverable's craft and engineering-craft's red-first law has no test to write for prose.
 
 
 ```jsonc
@@ -89,7 +133,7 @@ Semantics of the `overlays` block:
 
 | `overlays` value                | Behavior                                                        |
 |---------------------------------|----------------------------------------------------------------|
-| **absent** (no block)           | the **compiled default** applies: `{tiers:[deep,top]} → [fable]` and `{phases:[scout|build|audit], when: deliverable_kind==document} → [solution-scout|-build|-audit]` |
+| **absent** (no block)           | the **compiled default** applies: `{tiers:[deep,top]} → [fable]`, `{phases:[scout|build|audit], when: deliverable_kind==document} → [solution-scout|-build|-audit]` and `{writes_source: true, when: deliverable_kind==code} → [engineering-craft, code-review-simplify]` |
 | present, `rules: []` (empty)    | explicit **opt-out** — zero overlays (not the default)         |
 | present, `rules: [...]`         | the UNION of every matching rule's skills, deduped, stable order|
 
@@ -98,6 +142,31 @@ A skill name must be a directory under `skills/` containing a `SKILL.md`
 list). A configured skill whose `SKILL.md` is missing/unreadable, or an unsafe
 name, is **WARNed loudly and skipped** — never silently dropped, never a hard
 failure of the dispatch.
+
+## The self-review signal
+
+The runner's classify wrapper (`classifyWith`, `internal/phases/runner/verdict_engine.go`)
+checks one fact per dispatch. A dispatch that may write source
+(`PhaseRequest.WritesSource()`), loaded `policy.SelfReviewSkill` on its final
+attempt, and handed off a report the phase accepted (any verdict but FAIL) must
+record the pass: `phasecontract.SelfReviewRecorded` wants a visible level-two
+`## Self-Review` (or `## Self-review`) heading, found by `reportdoc.Section`, with
+a `- Scores:` line in that section, read by `reportdoc.Fields`, that holds a
+decimal score (a digit, a dot, a digit). A heading inside a fence or an HTML
+comment, a prose mention, a level-three heading, the output template's empty
+heading and its unfilled `<0.NN>` placeholders are no record. A repeated section
+or a repeated scores line counts as a record: a writer that re-ran the hook
+appended a second block. When it does not, the runner emits one WARN `RUNNER_SELF_REVIEW_MISSING` (fields `skill`
+and `section`) and changes nothing else: the verdict, the diagnostics and the
+next phase stay the phase's own. Only logic blocks; a missing report section is
+format. The check keys on the skills the dispatch actually loaded, so an
+`overlays` block that drops the skill drops the obligation with it, and a
+read-only dispatch that loads it owes nothing. A FAIL already says the handoff is
+wrong, so the signal would add only noise there. The verdict it keys on is the
+phase's own `Classify` result, before the engine's ship guard, so a report the
+guard later downgrades to FAIL (an unverified deliverable) may still carry the
+WARN. The skills are the final attempt's: a fallback dispatch owes the section
+only when the attempt that ran loaded the skill.
 
 ## Caveats
 
@@ -108,11 +177,11 @@ failure of the dispatch.
   `OverlayDispatch.Model` to the same tier token as `.Tier` — a rule like
   `{"models": ["gpt-5.5"]}` silently never matches from a phase dispatch. Use
   `tiers`/`phases`/`clis` selectors; `models` is redundant with `tiers` here.
-  (Canonical phase profiles set `model_tier_default` to the abstract tier
-  vocabulary — `auditor`/`intent` = `deep`, `builder`/`tdd` = `balanced` — so the
-  compiled `{tiers:[deep,top]}→[fable]` rule fires for the deep-tier phases. A
-  profile that sets a *concrete* model name as its tier default would not match a
-  tier-name rule; use tier names.)
+  (A `tiers` selector, unlike `models`, canonicalizes: a profile whose tier
+  default is a concrete name such as `opus` still meets the compiled
+  `{tiers:[deep,top]}→[fable]` rule. A selector that names no canonical tier
+  matches only a token spelled the same way, and the `overlay-tier-selectors`
+  preflight check warns on it at batch start.)
 - **`--bypass-policy` still applies the compiled-default overlays.** That flag
   skips reading `.evolve/policy.json` entirely (it exists to bypass *pins*), so
   `overlayPolicy` is the zero value and `ResolveOverlays` falls to the compiled
@@ -131,13 +200,21 @@ failure of the dispatch.
   `Signals`, so no `when` rule matches there — silently; their tier/phase/cli
   rules still apply.
 
+- **`writes_source` is read only on the phase runner's dispatch.** The non-phase
+  launch seams (`subagent run`, the out-of-band retro, swarm workers) build no
+  `PhaseRequest` write axis, so `OverlayDispatch.WritesSource` is false there and
+  a `writes_source` rule never fires. Swarm writer workers are the one writing
+  seam this leaves out; `swarm.stage` is unset in the checked-in policy, so the
+  swarm decorator delegates to the phase runner and the build still gets the
+  craft persona.
+
 ## Security surface
 
 Once a skill's `SKILL.md` is injected into every deep/top phase prompt, its
 content is **integrity-load-bearing**: a tampered persona would silently rewrite
 every deep-tier agent's operating discipline. Therefore every compiled-default
 skill — `policy.CompiledDefaultOverlaySkills()`: `fable`, `solution-scout`,
-`solution-build`, `solution-audit` — is in `ProtectedSurfaceManifest`
+`solution-build`, `solution-audit`, `engineering-craft`, `code-review-simplify` — is in `ProtectedSurfaceManifest`
 (`internal/guards/integrity_surface.go`), the L4 control-plane perimeter, pinned
 by `TestProtectedSurface_CompiledDefaultOverlaySkills`, which iterates that
 export so the next compiled skill cannot skip the manifest. **Adding a new skill
@@ -162,16 +239,80 @@ depth behind the policy registry clamp).
 - **Reuse the `SystemPrompt` seam** (producer resolves, adapter injects) rather
   than a parallel path — single prompt-assembly point, correct cache-aware
   placement for free (never-duplicate).
-- **Cost**: `skills/fable/SKILL.md` is ~18 KB (~4.5K tokens) prepended to each
-  deep/top dispatch. The block is stable (cacheable). Operators who do not want
-  it set `overlays.rules: []` (opt-out) or a narrower rule.
+- **Cost**: the materializer prefers a skill's `COMPACT.md` when one exists
+  (`skilloverlay.readSkillBody`). fable's compact body is 2,289 bytes (~0.6K
+  tokens), prepended to each deep/top dispatch; its 18 KB `SKILL.md` is never
+  injected. engineering-craft has no compact form, so its 6,041-byte body (~1.5K
+  tokens) is prepended to each code-cycle source-writer dispatch; its
+  `references/` files are not inlined, and the agent reads them from the worktree
+  when its task needs them. code-review-simplify's compact body is 3,228 bytes
+  (~0.8K tokens), the Self-review hook alone, pinned by
+  `TestMaterialize_TheCodeReviewSimplifyOverlayIsItsCompactProjection`; its full
+  `SKILL.md` is read on demand. A code-cycle writer therefore carries 9,269 bytes
+  of preloaded skill bodies (~2.3K tokens) below deep, and 11,558 bytes at deep
+  and top. The blocks are stable, so they stay in the cacheable prefix. Operators
+  who do not want them set `overlays.rules: []` (opt-out) or a narrower rule.
+- **Compiled default, not a checked-in `overlays` block, for engineering-craft.**
+  A present block replaces the compiled default wholesale, so it would restate
+  the fable and solution rules (a second home for each), it would reach only
+  this repository, and `--bypass-policy` would drop it. The compiled default
+  ships to every install and survives a pin bypass, which is what an operating
+  floor needs.
+- **The write axis, not a phase list, selects the craft persona.** The orchestrator's
+  `worktreePhase` is the one home of "this phase writes source"; the overlay reads
+  its projection on the request instead of keeping a second list of phases.
+- **One rule for craft and self-review.** `code-review-simplify` reaches exactly
+  the dispatches engineering-craft reaches, so it joins that rule's skill list
+  instead of a second rule with identical selectors (one home). It sits after
+  engineering-craft (write by the craft, then review against it), inside the last
+  rule, so every older resolution keeps its order.
+- **Go test review routes through the skill's text, not an overlay.**
+  `golang-test-review` is Go-specific, and the loop serves projects in any
+  language. No project-language signal exists (`config` routes only
+  `deliverable_kind` and `scout.goal_type`), and a checked-in `overlays` block
+  would replace the compiled default and load the Go skill into every writer
+  dispatch of this repository, test change or not. The Self-review hook sends only
+  the writer's own changed `*_test.go` files to `golang-test-review`: the diff
+  itself is the most precise signal, and a non-Go project never reads the Go skill.
+  `TestCompiledDefaultOverlaySkills` pins the compiled list exactly, so the Go
+  skill cannot slip into the compiled default unnoticed.
+- **A compact form for the self-review skill (console decision, 2026-10-07).**
+  Builds increasingly run on fast-class models at the balanced tier. About 70% of
+  `SKILL.md` (the architecture diagram, the scoring math, the JSON schema and the
+  full report) is irrelevant to the hook, and a capability-limited model may
+  write the full report instead of the `## Self-Review` block. `COMPACT.md` holds
+  only the hook, and the materializer already prefers it, so no code changed.
+- **The hook is the writer's own pass over its own files.** TDD and
+  bug-reproduction never commit, and the build's soft reset touches only build
+  commits, so the builder's `git diff HEAD` also holds the TDD phase's tests, the
+  `go/acs/` predicates and an in-package reproducer test (cycles 1802, 1804 and
+  1808 wrote one under `go/internal/`, in neither `go/acs/` nor `testFiles`). One
+  general rule covers them all, an absent or empty `testFiles` and the writers
+  that run after the build: a phase saves `git status --porcelain` to its
+  workspace before its first edit, and every path already listed there is
+  earlier-phase-owned unless the dispatch names it as the phase's to write (a
+  debugger's conflicted paths). The phase reads such a file, never edits it, and
+  records a finding there as `Declined: earlier-phase-owned`. `testFiles`,
+  `go/acs/` and the reproducer stay in the text as named examples.
+- **The audit does not load the skill (dropped by operator decision, 2026-10-07).**
+  A new `code-review` phase is the one home of independent code review, and the
+  audit grades the build's dispositions of its findings; an audit-side copy of
+  the skill would be a second home. That phase's lane slims the auditor persona.
 
 ## Tests
 
 | Layer      | Test                                                              |
 |------------|-------------------------------------------------------------------|
 | Materializer | `internal/skilloverlay` — frontmatter strip, missing-report, order, path-traversal guard |
-| Resolver   | `internal/policy` `TestResolveOverlays_*` — deep/top→fable, opt-out, union |
-| Producer   | `internal/phases/runner` `TestRunner_DeepTierDispatch_ResolvesFableOverlay` — proves the runner sets `req.Skills` AND the tier string is literally `deep` |
+| Resolver   | `internal/policy` `TestResolveOverlays_*` — deep/top→fable, opt-out, union, `TestResolveOverlays_WritesSourceSelectorMatchesOnlyWriters` |
+| Resolver   | `internal/policy` `TestCompiledDefaultOverlays_EngineeringCraftOnEveryCodeSourceWriterAtAnyTier` and `TestCompiledDefaultOverlays_EngineeringCraftNeverReachesAReadOnlyOrDocumentDispatch` — both directions of the craft rule, fable kept first |
+| Write axis | `internal/core` `TestPhaseRequest_WritesSource_TheWorktreeFenceDecidesWhoWrites` — build, tdd and a conflict-resolving debugger write; scout, triage, audit and a decision-only debugger do not |
+| Resolver   | `internal/policy` `TestCompiledDefaultOverlays_CodeReviewSimplifyReachesOnlyCodeSourceWriters` — code writers get `[engineering-craft, code-review-simplify]`; the audit, scout, triage, a decision-only debugger and document cycles do not; `TestSelfReviewSkill_IsTheSkillTheCompiledWriterRuleLoadsLast` |
+| Producer   | `internal/phases/runner` `TestRunner_DeepTierDispatch_ResolvesFableOverlay` — proves the runner sets `req.Skills` AND the tier string is literally `deep`; `TestRunner_TheWriteAxisOfTheRequestSelectsEngineeringCraft` — the request's write axis reaches the resolver at a non-deep tier |
+| Self-review signal | `internal/phases/runner` `TestRunner_ASourceWriterThatLoadedTheSelfReviewSkillOwesASelfReviewSection` — a code build or tdd report without a recorded pass (no section, the template's empty heading, a prose mention) emits one WARN; a section with its `- Scores:` line in either case, a FAIL, a read-only dispatch that loads the skill, a document build and a writer whose policy drops the skill emit none; no verdict changes. `TestRunner_TheSelfReviewObligationFollowsTheFinalAttemptsSkills` — a walled primary's skills do not oblige the fallback that ran, and the fallback's do |
+| Self-review record | `internal/phasecontract` `TestSelfReviewRecorded_NeedsAVisibleLevelTwoHeadingWithAScoresLine` (15 cases: fenced, commented, prose, level-three and empty headings and the template's `<0.NN>` placeholders are no record; a re-run's repeated section or scores line is); `TestSelfReview_TheWriterPersonasAndTheSkillDeclareTheHeadingTheRunnerChecks` (the builder and tdd personas, `SKILL.md` and `COMPACT.md`); `TestSelfReview_TheHookNeverEditsEarlierPhaseOwnedFiles` (the hook, the compact hook and both personas carry the `git status --porcelain` baseline and `Declined: earlier-phase-owned`; the hook, the compact hook and the builder name `testFiles`, `go/acs/` and bug-reproduction) |
+| Compact overlay | `internal/skilloverlay` `TestMaterialize_TheCodeReviewSimplifyOverlayIsItsCompactProjection` — the preloaded block is `COMPACT.md`, under 4 KB |
 | Injector   | `internal/adapters/bridge` `TestLaunch_InjectsSkillOverlay` — proves `req.Skills` reaches the launched prompt |
-| Security   | `internal/guards` `TestProtectedSurface_FableSkillOverlay` — `/skills/fable/` is protected |
+| Security   | `internal/guards` `TestProtectedSurface_CompiledDefaultOverlaySkills` — every compiled-default skill directory is protected |
+| Tier selectors | `internal/policy` `TestResolveOverlays_TierSelectorsMatchTheCanonicalTier` (26 selector/tier pairs: canonical, alias, concrete id, glob, and a backslash-escaped selector that stays a glob), `TestResolveOverlays_CompiledDefaultReachesConcreteOpusModels`, `TestNonCanonicalOverlayTierSelectors`; `internal/core/advisor` `TestLaunch_ResolvesSkillOverlaysPerAttemptFromTheZeroPolicy` (the opus default now resolves fable) |
+| Preflight  | `internal/looppreflight` `TestRun_OverlayTierSelectors` — a non-canonical selector or an unreadable policy warns, never halts |

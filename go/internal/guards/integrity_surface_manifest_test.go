@@ -191,6 +191,28 @@ func TestProtectedSurfaceManifest_CoversTheBuildHandoffFloor(t *testing.T) {
 	}
 }
 
+func TestProtectedSurfaceManifest_CoversTheMainTreeOwnershipSpecification(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/core/leak_ownership.go",
+		"/wt/go/internal/core/leak_ownership.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q decides which leaked main-tree paths the tree-diff guard exempts as a live sibling's; a cycle must not be able to widen the exemption that judges it", path)
+		}
+	}
+}
+
+func TestProtectedSurfaceManifest_CoversTheLeakRecoveryRules(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/core/leak_recovery.go",
+		"/wt/go/internal/core/leak_recovery.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("%q holds the snapshot retry and abort, the no-checkout exemption, the fail-closed owner rule and quarantine-not-delete; a cycle must not be able to loosen the recovery that judges it", path)
+		}
+	}
+}
+
 func TestProtectedSurfaceManifest_CoversTheFloorsGoTestBudget(t *testing.T) {
 	for _, path := range []string{
 		"go/internal/core/phase_bindings_selfcheck.go",

@@ -316,6 +316,7 @@ func Run(opts Options) (Result, error) {
 		checkBridgeBoot(o, opts.UsageEvidence),
 		checkSandboxNestedFallback(o),
 		checkPhaseRoutingWarnings(o),
+		checkOverlayTierSelectors(o),
 		checkCLIRouting(o),
 	}
 	r := finalize(checks, o.now())

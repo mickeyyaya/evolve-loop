@@ -8,7 +8,7 @@ import (
 // dr is a pointer because a successful correction re-dispatch updates dr.resp
 // and dr.phaseReq's CorrectionDirective, which recordAndBranch then consumes.
 func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, error) {
-	if phaseErr := cr.prepareForReview(next); phaseErr != nil {
+	if phaseErr := cr.prepareForReview(next, dr); phaseErr != nil {
 		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 		cr.recordFailureLearning(next, phaseErr, 1)
 		return loopAbort, phaseErr
@@ -23,8 +23,8 @@ func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, 
 
 // Recovery must precede host normalization, and both must finish before the
 // initial review or any corrected re-review.
-func (cr *cycleRun) prepareForReview(next Phase) error {
-	if err := cr.recoverBeforeReview(next); err != nil {
+func (cr *cycleRun) prepareForReview(next Phase, dr *dispatchResult) error {
+	if err := cr.recoverBeforeReview(next, dr); err != nil {
 		return err
 	}
 	cr.o.normalizeBuildWorktree(cr.ctx, next, cr.cs, cr.req.ProjectRoot)
@@ -36,14 +36,14 @@ func (cr *cycleRun) postBuildExplanationRefreshEligible(completed Phase) bool {
 		cr.o.worktreePhase(completed) && containsString(cr.cs.CompletedPhases, string(PhaseBuild))
 }
 
-func (cr *cycleRun) recoverBeforeReview(next Phase) error {
-	if !cr.o.leakRecoverablePhase(next) || cr.cs.ActiveWorktree == "" {
-		return nil
-	}
-	if recoverBuildLeak(cr.ctx, cr.req.ProjectRoot, cr.cs.ActiveWorktree, cr.mainDirtyBaseline, cr.o.worktreePhase(next)) {
-		return nil
-	}
-	return fmt.Errorf("phase %s: worktree-leak recovery failed (main tree left unsafe for review and audit)", next)
+func (cr *cycleRun) recoverBeforeReview(next Phase, dr *dispatchResult) error {
+	return cr.o.recoverPhaseLeak(cr.ctx, phaseLeakScope{
+		projectRoot: cr.req.ProjectRoot,
+		cycleState:  cr.cs,
+		phase:       next,
+		baseline:    cr.recoveryBaselineFor(dr.treeGuard, dr.beforeDirty),
+		leased:      cr.consoleLeased,
+	})
 }
 
 // filterRealLeaks checks the cycle-start console lease last: it waives exact
@@ -51,12 +51,12 @@ func (cr *cycleRun) recoverBeforeReview(next Phase) error {
 // masquerade as a clean phase.
 //
 // See ADR-0080.
-func filterRealLeaks(next Phase, leaked []string, mints, leased map[string]bool, warn io.Writer) (real []string, waived int) {
+func filterRealLeaks(leaked []string, exempt leakExemptions, warn io.Writer) (real []string, waived int) {
 	for _, p := range leaked {
-		if isLegitimateMainTreePath(p) || isScoutEvalMaterialization(next, p) || isActiveMintPhasePath(mints, p) {
+		if isLegitimateMainTreePath(p) || exempt.heldElsewhere(p) {
 			continue
 		}
-		if leased[p] {
+		if exempt.leased[p] {
 			waived++
 			fmt.Fprintf(warn, "[orchestrator] WARN tree-diff: leaked path %q WAIVED by the cycle-start console lease (ADR-0080 S4) — operator-leased, not a clean phase\n", p)
 			continue

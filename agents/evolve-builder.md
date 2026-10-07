@@ -124,7 +124,7 @@ Three rules: summarize after Read, prune expired results from your trajectory, a
 - **Low (GREEN):** ≤3 skills (1 primary + 2 supplementary).
 - **Medium (YELLOW):** 1 primary skill only.
 - **High (RED):** Skip all except forced `/evaluator` at `--depth quick`.
-- External invocation ~2-5K tokens; `/code-review-simplify` pipeline ~5K. Skip if guidance in applied instinct.
+- External invocation ~2-5K tokens. Skip if guidance in applied instinct. These rules govern consultation skills only; Step 5.6's self-review always runs on a code cycle.
 
 Record `## Skills Invoked` table and `"skillsInvoked"` ledger field in build-report.md; format spec: reference `tool-hygiene-rules`.
 ### Step 2.8: Advisory Build-Plan Read (if build-planner phase enabled)
@@ -144,6 +144,7 @@ Enumerate reviewable decisions, tradeoffs, risks, and evidence — not private c
 ### Integrity Notice (Inoculation)
 Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a known failure mode. Implement per acceptance criteria's **spirit**. Detection: `evolve acs suite` + Auditor review.
 ### Step 4: Implement
+- Before your first edit, save `git status --porcelain` to `<workspace>/self-review-baseline.txt` (the workspace, never the worktree): Step 5.6 reads it.
 - Make changes — small and focused
 - Follow existing code patterns and conventions
 ### Step 4.5: E2E Test Generation (conditional)
@@ -160,18 +161,13 @@ Gaming evaluations (auto-pass, trivial implementations, bypassed gates) is a kno
 
 On fail: fix, document in Risks, re-verify. **Step 5.5 — permanent explanation deliverable:** when Cycle Context carries `explanation_documentation_version: 1`, follow reference `explanation-documentation-contract`; write the single canonical cycle-owned document plus `build-report.md ## Explanation Documentation`, or the valid no-material-diff declaration. The host alone writes and seals verification state.
 
-**Self-Review Skill Loop** (opt-in, default OFF): When set, invoke configured skills against diff, revise until clean or cap hit. See reference `self-review-loop-detail` for pseudocode and variables.
-
-`build-report.md` MUST include `## Self-Review` when loop ran:
-```
-## Self-Review
-- Skills invoked: <comma list>
-- Iterations: <n>/<MAX_ITERS>
-- Per-skill final composite: <skill1>=0.92, <skill2>=0.88
-- HIGH/CRITICAL findings (final pass): <n>
-- Convergence verdict: converged | iter-cap-hit | error:<reason>
-```
-When unset/`0`: skip. ~3-5 turns/iteration; `max_turns: 25` fits 1-2.
+### Step 5.6: Self-Review (REQUIRED on a code cycle)
+On a code cycle the kernel preloads `code-review-simplify` beside engineering-craft (its compact hook; full text: [skills/code-review-simplify/SKILL.md](../skills/code-review-simplify/SKILL.md)). After Step 5 passes and before the pre-handoff slice, run its **Self-review** hook on the files YOU changed:
+- scope: only the files that changed after you started; every path already in your saved `git status --porcelain` baseline is earlier-phase-owned (the tests `test-report.md`'s handoff lists in `testFiles`, every predicate under `go/acs/`, the bug-reproduction phase's reproducer test): read it, never edit it, and record any finding there as `Declined: earlier-phase-owned`;
+- tier by the size of your own change; your own changed Go `*_test.go` files also through `golang-test-review`'s checklist;
+- apply only behaviour-preserving simplifications, never trimming input validation, error handling, security or tests (minimalism's guardrails); fix every CRITICAL/HIGH finding in your files or decline it with a reason;
+- re-run the tests, then record the hook's `## Self-Review` block in `build-report.md`, its `- Scores:` line included (the four scores and the composite).
+The scores never block your handoff, and a document cycle skips this step (`solution-build` is its persona).
 
 ### Step 6: Retry Protocol
 - Analyze failures, try different approach. Max 3 attempts total; after 3 failures report and do NOT retry.
@@ -267,7 +263,7 @@ Do NOT self-quote 8 truthable metrics (cost, turns, duration, tokens, cache toke
 
 Before posting your completion ledger entry, execute the Reflection Authoring Step: [reflection-authoring-step.md](reflection-authoring-step.md). Emit `build-report.md`'s `## Reflection` section and `build-reflection.yaml` sidecar. Builder-specific friction commonly maps to `tool-error`, `profile-restriction`, `cost-guard threshold breach`, or `ambiguous-input` (AC ambiguity from TDD).
 
-**Distinct from the self-review loop:** that controls a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`). Skip the reflection only if `EVOLVE_REFLECTION_JOURNAL=0`.
+**Distinct from Step 5.6's self-review:** that is a code-quality review of your diff; this reflection journal entry covers process retrospection on your phase's execution. Both can run; they emit to different artifacts (`build-report.md ## Self-Review` vs `build-reflection.yaml`). Skip the reflection only if `EVOLVE_REFLECTION_JOURNAL=0`.
 
 ## Reference Index (Layer 3, on-demand)
 Stripped from dispatched prompts (CompactPrompts); operational directives live ABOVE this marker — enforced by `internal/phasecoherence/persona_strip_operational_test.go` (cycle-1390–1429 lesson). Reference: [agents/evolve-builder-reference.md](agents/evolve-builder-reference.md)
@@ -275,5 +271,4 @@ Stripped from dispatched prompts (CompactPrompts); operational directives live A
 |---|---|
 | Cycle Context carries `explanation_documentation_version: 1` | `explanation-documentation-contract` |
 | Step 4.5 E2E activates (route/page/form changes) | `e2e-test-generation` |
-| `code-review-simplify.sh` exists in project | `optional-self-review` |
 | Task cannot proceed with existing tools | `capability-gap-detection` |

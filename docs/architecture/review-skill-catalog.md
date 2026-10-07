@@ -1,5 +1,5 @@
 > **Audience**: Operators configuring `EVOLVE_BUILDER_REVIEW_SKILLS`; Builders invoking the self-review loop.
-> **Status**: Normative — reflects cycle-20 assessment of all available skills for `EVOLVE_BUILDER_SELF_REVIEW=1` integration.
+> **Status**: Superseded in part (2026-10-07). The flag-gated builder loop is gone: every code-cycle source writer runs `code-review-simplify`'s required Self-review hook, preloaded by the compiled-default overlay ([skill-overlays](skill-overlays.md)), and the `EVOLVE_BUILDER_*` variables below have had no reader since cycle 22's dead-flag sweep. The cycle-20 skill assessments stand as history.
 
 # Review Skill Catalog
 

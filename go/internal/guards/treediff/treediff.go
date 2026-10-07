@@ -33,10 +33,6 @@ func New(gitDirty GitDirtyFn) *Guard {
 	return &Guard{gitDirty: gitDirty}
 }
 
-// Snapshot captures the main-tree dirty set BEFORE a source-writing phase
-// runs. A snapshot error is non-fatal at the guard level: the orchestrator
-// callers degrade to "skip the post-phase check" rather than abort the cycle
-// — observability beats hard-failing on a transient git read.
 func (g *Guard) Snapshot(ctx context.Context, repoRoot string) ([]string, error) {
 	if g == nil || g.gitDirty == nil {
 		return nil, nil // no seam → no-op
@@ -44,11 +40,6 @@ func (g *Guard) Snapshot(ctx context.Context, repoRoot string) ([]string, error)
 	return g.gitDirty(ctx, repoRoot)
 }
 
-// CheckResult carries the verdict of a post-phase compare. Leaked is the
-// sorted list of paths that became dirty during the phase but were not dirty
-// before. SnapshotMissed=true means the before-snapshot itself failed
-// (caller couldn't establish a baseline); the orchestrator should warn but
-// not abort.
 type CheckResult struct {
 	Leaked         []string
 	SnapshotMissed bool

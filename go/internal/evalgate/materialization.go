@@ -119,7 +119,7 @@ func evalFilePath(projectRoot, workspace, slug string) (string, bool) {
 		if root == "" {
 			continue
 		}
-		p := filepath.Join(root, ".evolve", "evals", slug+".md")
+		p := core.EvalFilePath(root, slug)
 		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
 			return p, true
 		}
@@ -152,7 +152,7 @@ func (g materializationGate) remediation(in core.ReviewInput) string {
 func workspaceEvalPaths(workspace string, slugs []string) []string {
 	paths := make([]string, 0, len(slugs))
 	for _, s := range slugs {
-		paths = append(paths, filepath.Join(workspace, ".evolve", "evals", s+".md"))
+		paths = append(paths, core.EvalFilePath(workspace, s))
 	}
 	return paths
 }

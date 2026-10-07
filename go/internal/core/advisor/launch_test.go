@@ -296,8 +296,8 @@ func TestLaunch_ResolvesSkillOverlaysPerAttemptFromTheZeroPolicy(t *testing.T) {
 	if _, err := New(fl, defaultIdentity(), nil).Plan(tempInput(t)); err != nil {
 		t.Fatal(err)
 	}
-	if len(fl.gotReq.Skills) != 0 {
-		t.Errorf("the raw opus default matches no tier selector: %v", fl.gotReq.Skills)
+	if len(fl.gotReq.Skills) != 1 || fl.gotReq.Skills[0] != "fable" {
+		t.Errorf("the raw opus default is the deep tier, so the compiled deep rule resolves fable: %v", fl.gotReq.Skills)
 	}
 	root := writeRouterProfile(t, "agy-tmux", []string{"claude-tmux"}, []int{81})
 	fl = &fakeLauncher{seq: []scriptedResp{exitErr("agy-tmux", 81), okPlan()}}

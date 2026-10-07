@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A ship test: a carried lane whose carry stops re-proving between the verify-class check and the pre-commit check (the ledger no longer verifies) is refused as AUDIT_BINDING_TREE_MISMATCH with the precondition class, and router.Recover sends it to audit",
+    "A ship test: a carried lane whose staged tree has a path neither the carry nor the re-ship's consumption explains is still refused as INTEGRITY_TREE_DRIFT with the integrity class",
+    "A core test: the re-audit that follows a pre-commit refusal binds a tree without ship's staged inbox consumption (the staged, uncommitted consumption is unwound first)"
+  ],
+  "connects_to": [
+    "carry-recovery-to-ship-end-to-end-proof"
+  ],
+  "created_at": "2026-10-07T10:04:09Z",
+  "files": [
+    "go/internal/phases/ship/worktree_integrity.go",
+    "go/internal/phases/ship/carry.go",
+    "go/internal/core/ship_recovery_unwind.go",
+    "go/internal/router/recovery.go"
+  ],
+  "fix": "In verifyStagedTree, when a carry record names the bound audit and the re-ship's consumption explains every path from the carried tree, but the carry itself does not re-prove, refuse with AUDIT_BINDING_TREE_MISMATCH (precondition) instead of INTEGRITY_TREE_DRIFT, so the router returns the lane to audit. Before that audit, take ship's staged consumption out of the worktree (extend core's unwind, which today handles only a ship commit on the fleet-rebase path, to the staged shape). Keep INTEGRITY_TREE_DRIFT for any path neither rule explains, and for every post-push refusal, because a pushed commit cannot be re-audited.",
+  "id": "pre-commit-carry-refusal-returns-to-audit",
+  "kind": "pipeline-repair",
+  "priority_class": "stability",
+  "source": "console, 2026-10-07 cycle-1825 lane (fix/carry-composes-with-consumption), the brief's fallback evaluation",
+  "summary": "Cycle 1825 (wave 75) was sealed FAIL because ship's pre-commit tree check refused a carried rebase plus the re-ship's inbox consumption as INTEGRITY_TREE_DRIFT, which the router ends as integrity-block. The 2026-10-07 fix makes the carry compose with the consumption, so that shape now ships. What remains: an unprovable carry is caught as a recoverable re-audit only at the verify-class check (verifyExecutionTree, AUDIT_BINDING_TREE_MISMATCH, precondition), which runs before ship stages its consumption. If the carry stops re-proving after that check (a ledger append that breaks Verify, a moved HEAD), the pre-commit refusal is still integrity-class and terminal, although nothing unaudited is in the tree. Making it recoverable is not a local change: verifyStagedTree needs the carry's state out of auditBindingSatisfied (five callers), and the re-audit route must first unstage ship's consumption, or the audit would bind the consumed tree and the re-ship would consume again on top of it.",
+  "title": "A carried lane whose carry stops re-proving after verify-class is refused at pre-commit as integrity-block; it should return to a re-audit",
+  "weight": 0.4
+}

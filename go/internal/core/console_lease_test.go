@@ -111,14 +111,14 @@ func TestFilterRealLeaks_LeaseWaiverIsExactAndLoud(t *testing.T) {
 	var warn strings.Builder
 	leaked := []string{"go/internal/core/foo.go", "go/internal/core/bar.go"}
 	leased := map[string]bool{"go/internal/core/foo.go": true}
-	real, waived := filterRealLeaks(PhaseBuild, leaked, nil, leased, &warn)
+	real, waived := filterRealLeaks(leaked, leakExemptions{leased: leased}, &warn)
 	if len(real) != 1 || real[0] != "go/internal/core/bar.go" || waived != 1 {
 		t.Fatalf("realLeaks = %v waived = %d, want only the unleased bar.go with one waiver", real, waived)
 	}
 	if !strings.Contains(warn.String(), "ADR-0080") || !strings.Contains(warn.String(), "foo.go") {
 		t.Errorf("waiver must WARN loudly with the ADR reference: %q", warn.String())
 	}
-	if v, w := filterRealLeaks(PhaseBuild, leaked, nil, nil, &warn); len(v) != 2 || w != 0 {
+	if v, w := filterRealLeaks(leaked, leakExemptions{}, &warn); len(v) != 2 || w != 0 {
 		t.Fatalf("no lease ⇒ both source leaks real and zero waivers, got %v (%d)", v, w)
 	}
 }
