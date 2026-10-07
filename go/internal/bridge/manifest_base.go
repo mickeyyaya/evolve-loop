@@ -29,18 +29,6 @@ func resolvedManifestBytes(cli string) ([]byte, error) {
 	return resolveManifestBase(cli, data)
 }
 
-func ManifestObject(cli string) (map[string]any, error) {
-	data, err := resolvedManifestBytes(cli)
-	if err != nil {
-		return nil, err
-	}
-	var object map[string]any
-	if err := json.Unmarshal(data, &object); err != nil {
-		return nil, fmt.Errorf("bridge:manifest: invalid JSON for cli=%s: %w", cli, err)
-	}
-	return object, nil
-}
-
 func resolveManifestBase(cli string, data []byte) ([]byte, error) {
 	var target map[string]any
 	if json.Unmarshal(data, &target) != nil {

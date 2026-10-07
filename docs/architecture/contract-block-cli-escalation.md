@@ -7,7 +7,7 @@
 
 The correction ladder in `reviewAndGuard` re-dispatched the **same** profile CLI after a
 deliverable-contract block. A profile's `cli_fallback` chain fires only on infra exit codes
-`{80,81,85,124,127}` — never on a contract violation — so a CLI that systematically mis-formats a
+`{80,81,85,87,124,127}` — never on a contract violation — so a CLI that systematically mis-formats a
 deliverable burns every correction and the contract-gate breaker opens, demoting `enforce→advisory`
 for the rest of the run. Batch-19 (cycles 1171/1172) and batch-21 (cycle-1215) both ended that way:
 a FORMAT-compliance failure silently WEAKENED a gate. The correct escape hatch is CLI escalation,

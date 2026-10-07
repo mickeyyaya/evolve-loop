@@ -50,7 +50,7 @@ func TestRunServePhase_HappyPath(t *testing.T) {
 	stdin := bytes.NewReader(envelopeStdin(t, req))
 	var stdout, stderr bytes.Buffer
 
-	code := RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
+	code := NewRunServePhase(nil)([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code=%d want 0; stderr=%s", code, stderr.String())
 	}
@@ -76,7 +76,7 @@ func TestRunServePhase_HappyPath(t *testing.T) {
 
 func TestRunServePhase_MissingPhaseName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := RunServePhase(nil, bytes.NewReader(nil), &stdout, &stderr)
+	code := NewRunServePhase(nil)(nil, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d want 10", code)
 	}
@@ -87,7 +87,7 @@ func TestRunServePhase_MissingPhaseName(t *testing.T) {
 
 func TestRunServePhase_UnknownPhase(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := RunServePhase([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := NewRunServePhase(nil)([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d want 10", code)
 	}
@@ -107,7 +107,7 @@ func TestRunServePhase_RunnerErrorEmitsErrorEnvelope(t *testing.T) {
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 1}))
 	var stdout, stderr bytes.Buffer
-	code := RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
+	code := NewRunServePhase(nil)([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Errorf("code=%d want 0 (handler errors are wire-level, not exit-level); stderr=%s", code, stderr.String())
 	}
@@ -129,7 +129,7 @@ func TestRunServePhase_MalformedEnvelopeExits1(t *testing.T) {
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} })
 
 	var stdout, stderr bytes.Buffer
-	code := RunServePhase([]string{"intent"}, strings.NewReader("not-an-envelope\n"), &stdout, &stderr)
+	code := NewRunServePhase(nil)([]string{"intent"}, strings.NewReader("not-an-envelope\n"), &stdout, &stderr)
 	if code != 1 {
 		t.Errorf("code=%d want 1", code)
 	}
@@ -146,7 +146,7 @@ func TestRunServePhase_EnvelopeRoundTrip(t *testing.T) {
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 2}))
 	var stdout, stderr bytes.Buffer
-	code := RunServePhase([]string{"scout"}, stdin, &stdout, &stderr)
+	code := NewRunServePhase(nil)([]string{"scout"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("dispatch serve-phase exit=%d stderr=%s", code, stderr.String())
 	}
@@ -174,7 +174,7 @@ func TestRunServePhase_PlumbsContext(t *testing.T) {
 
 	stdin := bytes.NewReader(envelopeStdin(t, core.PhaseRequest{Cycle: 1}))
 	var stdout, stderr bytes.Buffer
-	_ = RunServePhase([]string{"intent"}, stdin, &stdout, &stderr)
+	_ = NewRunServePhase(nil)([]string{"intent"}, stdin, &stdout, &stderr)
 	if stub.ctx == nil {
 		t.Error("handler invoked with nil ctx")
 	}

@@ -158,7 +158,7 @@ func TestWireOrchestratorDeps_ConfigWarningRendersAndIsDurable(t *testing.T) {
 	if err := os.WriteFile(reg, []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	console := captureConsole(func(c io.Writer) { wireOrchestratorDeps(root, evolveDir, c) })
+	console := captureConsole(func(c io.Writer) { wireOrchestratorDeps(root, evolveDir, c, routingRun{}) })
 	for _, want := range []string{"[config] config.warning WARN CONFIG_REGISTRY_MALFORMED", "origin=Loader.Load", "step=registry", "phase registry malformed"} {
 		if !strings.Contains(console, want) {
 			t.Errorf("the root console must carry %q:\n%s", want, console)

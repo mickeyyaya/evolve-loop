@@ -48,6 +48,12 @@ func reportDoctorBootResult(driver string, sandbox, asJSON bool, rc int, scrollb
 	case bridge.ExitBadFlags:
 		fmt.Fprintf(stderr, "[doctor] boot: %q is not a known *-tmux driver\n", driver)
 		return 10
+	case bridge.ExitModelMismatch:
+		fmt.Fprintf(stderr, "[doctor] BOOT WRONG MODEL: %s rc=%d (sandbox=%v) — the REPL booted a model outside the target's model family, or showed no readable model label\n", driver, rc, sandbox)
+		if tail := bridge.ScrollbackTail(scrollback, 6); tail != "" {
+			fmt.Fprintf(stderr, "[doctor] final pane:\n%s\n", tail)
+		}
+		return 1
 	default:
 		fmt.Fprintf(stderr, "[doctor] BOOT FAILED: %s rc=%d (sandbox=%v)\n", driver, rc, sandbox)
 		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {

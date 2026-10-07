@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -83,12 +83,10 @@ func TestNew_NilLauncherFailsEveryLaunchWithNilBridge(t *testing.T) {
 	}
 }
 
-func TestLaunch_PreflightOrderIsBridgeWorkspaceDepthProfile(t *testing.T) {
+func TestLaunch_PreflightOrderIsBridgeWorkspaceDepth(t *testing.T) {
 	noWs := baseRouteInput()
 	noWs.Workspace = ""
 	depthTrue := WithDepthCheck(func(map[string]string) bool { return true })
-	loads := 0
-	counting := WithProfileLoader(func(string) (*profiles.Profile, error) { loads++; return nil, errors.New("must not load") })
 	cases := []struct {
 		name string
 		l    Launcher
@@ -97,17 +95,14 @@ func TestLaunch_PreflightOrderIsBridgeWorkspaceDepthProfile(t *testing.T) {
 	}{
 		{"nil launcher beats the empty workspace and the depth guard", nil, noWs, "phase advisor: nil bridge"},
 		{"empty workspace beats the depth guard", refusingLauncher{t}, noWs, "phase advisor: empty workspace"},
-		{"the depth guard beats the profile read and the launch", refusingLauncher{t}, baseRouteInput(), "phase advisor: recursion guard: depth check failed"},
+		{"the depth guard beats the launch", refusingLauncher{t}, baseRouteInput(), "phase advisor: recursion guard: depth check failed"},
 	}
 	for _, c := range cases {
-		a, got := observed(t, c.l, defaultIdentity(), depthTrue, counting)
+		a, got := observed(t, c.l, defaultIdentity(), depthTrue)
 		if _, err := a.Plan(c.in); err == nil || err.Error() != c.want {
 			t.Errorf("%s: %v, want %q", c.name, err, c.want)
 		}
 		assertOneEvent(t, *got, CodeLaunchFailed, map[string]string{"step": "preflight", "decision": "plan", "contract": "router"})
-	}
-	if loads != 0 {
-		t.Errorf("the profile loader ran %d time(s) on refused launches", loads)
 	}
 	fl := &fakeLauncher{stdout: planJSON()}
 	if _, err := New(fl, defaultIdentity(), nil, WithDepthCheck(func(map[string]string) bool { return false })).Plan(tempInput(t)); err != nil || fl.calls != 1 {
@@ -152,13 +147,13 @@ func TestLaunch_ThreadsWorktreeArtifactContractCompletionAgentCycleEnv(t *testin
 	}
 }
 
-func TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion(t *testing.T) {
+func TestLaunch_WalksItsRouteAndReportsExhaustion(t *testing.T) {
+	route := func(candidates ...string) Option {
+		return WithRoute(llmroute.Plan{Candidates: candidates, Triggers: []int{80, 81, 85, 124, 127}})
+	}
 	for _, code := range []int{80, 81, 85, 124, 127} {
-		root := writeRouterProfile(t, "agy-tmux", []string{"claude-tmux"}, []int{80, 81, 85, 124, 127})
 		fl := &fakeLauncher{seq: []scriptedResp{exitErr("agy-tmux", code), okPlan()}}
-		in := tempInput(t)
-		in.ProjectRoot = root
-		plan, err := New(fl, Identity{CLI: "agy-tmux", Model: "opus", AgentLabel: "router"}, plainWriter).Plan(in)
+		plan, err := New(fl, Identity{CLI: "agy-tmux", Model: "opus", AgentLabel: "router"}, plainWriter, route("agy-tmux", "claude-tmux")).Plan(tempInput(t))
 		if err != nil || plan == nil || len(plan.Entries) == 0 {
 			t.Fatalf("exit=%d: the fallback must produce a plan: %v %+v", code, err, plan)
 		}
@@ -167,11 +162,8 @@ func TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion(t *testing.T) {
 		}
 	}
 	t.Run("three-hop chain", func(t *testing.T) {
-		root := writeRouterProfile(t, "agy-tmux", []string{"codex-tmux", "claude-tmux"}, []int{81})
 		fl := &fakeLauncher{seq: []scriptedResp{exitErr("agy-tmux", 81), exitErr("codex-tmux", 81), okPlan()}}
-		in := tempInput(t)
-		in.ProjectRoot = root
-		if _, err := New(fl, Identity{CLI: "agy-tmux"}, nil).Plan(in); err != nil {
+		if _, err := New(fl, Identity{CLI: "agy-tmux"}, nil, route("agy-tmux", "codex-tmux", "claude-tmux")).Plan(tempInput(t)); err != nil {
 			t.Fatal(err)
 		}
 		if got := fl.calledCLIs(); strings.Join(got, ",") != "agy-tmux,codex-tmux,claude-tmux" {
@@ -179,11 +171,11 @@ func TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion(t *testing.T) {
 		}
 	})
 	t.Run("exhausted chain is one dispatch signal", func(t *testing.T) {
-		root := writeRouterProfile(t, "agy-tmux", []string{"claude-tmux"}, []int{81})
+		root := t.TempDir()
 		fl := &fakeLauncher{seq: []scriptedResp{exitErr("agy-tmux", 81), exitErr("claude-tmux", 81)}}
 		in := tempInput(t)
 		in.ProjectRoot = root
-		a, got := observed(t, fl, Identity{CLI: "agy-tmux", Model: "opus", AgentLabel: "router"})
+		a, got := observed(t, fl, Identity{CLI: "agy-tmux", Model: "opus", AgentLabel: "router"}, route("agy-tmux", "claude-tmux"))
 		_, err := a.Plan(in)
 		if err == nil || err.Error() != "phase advisor: bridge launch: claude-tmux: exit=81" {
 			t.Fatalf("exhaustion surfaces the terminal attempt's error: %v", err)
@@ -197,89 +189,16 @@ func TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion(t *testing.T) {
 		}
 	})
 	t.Run("a non-trigger exit never reroutes", func(t *testing.T) {
-		root := writeRouterProfile(t, "agy-tmux", []string{"claude-tmux"}, []int{81})
 		fl := &fakeLauncher{seq: []scriptedResp{exitErr("agy-tmux", 2)}}
-		in := tempInput(t)
-		in.ProjectRoot = root
-		if _, err := New(fl, Identity{CLI: "agy-tmux"}, nil).Plan(in); err == nil || fl.calls != 1 {
+		if _, err := New(fl, Identity{CLI: "agy-tmux"}, nil, route("agy-tmux", "claude-tmux")).Plan(tempInput(t)); err == nil || fl.calls != 1 {
 			t.Fatalf("a real failure surfaces after exactly one launch: %v (%d)", err, fl.calls)
 		}
 	})
-	for name, profile := range map[string]string{
-		"no cli_fallback":             `{"name":"router","cli":"claude-tmux"}`,
-		"explicit-empty cli_fallback": `{"name":"router","cli":"claude-tmux","cli_fallback":[]}`,
-	} {
-		t.Run(name, func(t *testing.T) {
-			root := t.TempDir()
-			if err := os.MkdirAll(filepath.Join(root, ".evolve", "profiles"), 0o755); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(root, ".evolve", "profiles", "router.json"), []byte(profile), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			fl := &fakeLauncher{stdout: planJSON()}
-			in := tempInput(t)
-			in.ProjectRoot = root
-			a, got := observed(t, fl, defaultIdentity())
-			if _, err := a.Plan(in); err != nil || fl.calls != 1 || len(*got) != 0 {
-				t.Fatalf("exactly one dispatch, no signal: %v (%d calls, %+v)", err, fl.calls, *got)
-			}
-		})
-	}
-}
-
-func TestLaunch_ProfileLoadFaultWarnsOnceAndAbsenceIsSilent(t *testing.T) {
-	seed := func(t *testing.T, seedFn func(path string)) (string, string) {
-		t.Helper()
-		root := t.TempDir()
-		path := filepath.Join(root, ".evolve", "profiles", "router.json")
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		seedFn(path)
-		return root, path
-	}
-	for name, seedFn := range map[string]func(path string){
-		"a directory at router.json": func(path string) {
-			if err := os.Mkdir(path, 0o755); err != nil {
-				t.Fatal(err)
-			}
-		},
-		"malformed router.json": func(path string) {
-			if err := os.WriteFile(path, []byte(`{not valid json`), 0o644); err != nil {
-				t.Fatal(err)
-			}
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			root, path := seed(t, seedFn)
-			fl := &fakeLauncher{stdout: planJSON()}
-			in := tempInput(t)
-			in.ProjectRoot = root
-			a, got := observed(t, fl, defaultIdentity())
-			if _, err := a.Plan(in); err != nil || fl.calls != 1 {
-				t.Fatalf("the dispatch still runs once on the primary: %v (%d)", err, fl.calls)
-			}
-			assertOneEvent(t, *got, CodeProfileLoadFailed, map[string]string{"step": "dispatch", "path": path, "decision": "plan"})
-		})
-	}
-	t.Run("missing router.json", func(t *testing.T) {
+	t.Run("a one-CLI route dispatches once with no signal", func(t *testing.T) {
 		fl := &fakeLauncher{stdout: planJSON()}
-		in := tempInput(t)
-		in.ProjectRoot = t.TempDir()
-		a, got := observed(t, fl, defaultIdentity())
-		if _, err := a.Plan(in); err != nil || fl.calls != 1 || len(*got) != 0 {
-			t.Fatalf("absence is the silent single dispatch: %v (%d calls, %+v)", err, fl.calls, *got)
-		}
-	})
-	t.Run("no project root and no explicit profile reads nothing", func(t *testing.T) {
-		loads := 0
-		fl := &fakeLauncher{stdout: planJSON()}
-		in := tempInput(t)
-		in.ProjectRoot = ""
-		a, got := observed(t, fl, defaultIdentity(), WithProfileLoader(func(string) (*profiles.Profile, error) { loads++; return nil, errors.New("x") }))
-		if _, err := a.Plan(in); err != nil || loads != 0 || len(*got) != 0 || fl.gotReq.Profile != "" {
-			t.Fatalf("an empty profile path short-circuits the read: %v loads=%d events=%+v profile=%q", err, loads, *got, fl.gotReq.Profile)
+		a, got := observed(t, fl, defaultIdentity(), route("claude-tmux"))
+		if _, err := a.Plan(tempInput(t)); err != nil || fl.calls != 1 || len(*got) != 0 {
+			t.Fatalf("exactly one dispatch, no signal: %v (%d calls, %+v)", err, fl.calls, *got)
 		}
 	})
 }
@@ -305,7 +224,7 @@ func TestLaunch_ResolvesSkillOverlaysPerAttemptFromTheZeroPolicy(t *testing.T) {
 	in.ProjectRoot = root
 	var seen []string
 	resolver := WithOverlayResolver(func(cli string) []string { seen = append(seen, cli); return []string{"custom-" + cli} })
-	if _, err := New(fl, Identity{CLI: "agy-tmux"}, nil, resolver).Plan(in); err != nil {
+	if _, err := New(fl, Identity{CLI: "agy-tmux"}, nil, resolver, WithRoute(llmroute.Plan{Candidates: []string{"agy-tmux", "claude-tmux"}, Triggers: []int{81}})).Plan(in); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(seen, ",") != "agy-tmux,claude-tmux" || fl.reqs[0].Skills[0] != "custom-agy-tmux" || fl.reqs[1].Skills[0] != "custom-claude-tmux" {

@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/advisor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -35,6 +36,7 @@ type PhaseAdvisor struct {
 	signals    *signalcenter.Center // set by WithAdvisorSignals at the composition root
 	brainOnce  sync.Once            // guards the ONE construction of brain (a literal may be first-used concurrently)
 	brain      *advisor.Advisor     // the unit-04 leaf, built once
+	walk       llmroute.Plan
 }
 
 // PhaseAdvisorOption customizes a PhaseAdvisor.
@@ -59,6 +61,10 @@ func WithProposerModel(model string) PhaseAdvisorOption {
 			p.identity.Model = model
 		}
 	}
+}
+
+func WithProposerWalk(walk llmroute.Plan) PhaseAdvisorOption {
+	return func(p *PhaseAdvisor) { p.walk = walk }
 }
 
 // WithDepthCheck injects the recursion-depth guard (defense-in-depth).
@@ -125,7 +131,8 @@ func (p *PhaseAdvisor) wiredAdvisor() *advisor.Advisor {
 	return advisor.New(launcherOf(p.bridge), p.identity, writeArtifactAtomically,
 		advisor.WithDepthCheck(p.checkDepth),
 		advisor.WithRecentFiles(recentlyChangedFiles),
-		advisor.WithSignals(func() *signalcenter.Center { return p.signals }))
+		advisor.WithSignals(func() *signalcenter.Center { return p.signals }),
+		advisor.WithRoute(p.walk))
 }
 
 // launcherOf adapts a Bridge to the leaf's port; nil stays nil.

@@ -1,0 +1,25 @@
+# Superseded ACS predicates: the five-code default trigger set and the frozen exit list (2026-10-07)
+
+> Archived by the CLI routing table's L2 fix round ([the plan's "L2 fix round" notes](../../../../plans/cli-routing-table-2026-10.md)), which added exit 87 (`ExitModelMismatch`, the launch-time model check) to `llmroute`'s default walk triggers. The predicates below asserted that the default is exactly `{80, 81, 85, 124, 127}` as part of their acceptance, so 87 supersedes them. They are archived here under the A2 retention rule ([logic-first-delivery-design.md](../../../../architecture/logic-first-delivery-design.md), row A2; precedent: [the 2026-10-06 archive](../../archived-2026-10-06/superseded-predicates/README.md)): never deleted, never silently edited. The rest of `go/acs/cycle1821` (004 to 007) stays live and unchanged. The same change adds a new bridge exit code, which supersedes one `go/acs/cycle1580` predicate (below).
+
+## What was archived and why
+
+| Predicate | It asserted | Why L2 supersedes it | What pins the contract now |
+|---|---|---|---|
+| `TestC1821_001_EditingOnePlansTriggersNeverChangesAnotherPlans` | `Resolve` and `ChainFor` hand out a private copy of the default triggers, and the copy is exactly `{80, 81, 85, 124, 127}` before and after an edit to an earlier plan | the default is now `{80, 81, 85, 87, 124, 127}`; the anti-aliasing half still holds, but the predicate cannot pass without its hard-coded set changing | `internal/llmroute` `TestResolveTriggers_EveryPlanOwnsItsDefaultTriggers` (now compares with `DefaultTriggers()` taken before any edit, so it no longer hard-codes the set) and `TestDefaultTriggers_IsTheConservativeSet` (the one pin of the set itself) |
+| `TestC1821_002_ProfilesWithoutTriggersStillGetAPrivateCopy` | the same for a nil profile and profiles with no, or an empty, `cli_fallback_on_exit`, and that a profile's own list wins and is never aliased | the same hard-coded set | `TestResolveTriggers_EveryPlanOwnsItsDefaultTriggers` (the same four profile shapes), `TestResolveTriggers_AProfileListWinsAndIsNeverAliased` |
+| `TestC1821_003_ProductionRouterDecisionsDoNotShareTriggers` | a legacy `cliroute.Router`'s dispatch and advisor decisions do not share a triggers array, compared with the five-code set | the same hard-coded set | `internal/cliroute` `TestRouter_EveryDecisionOwnsItsTriggers` (new: the same two launches, compared with the default taken before the edit) |
+
+Both replacement pins kill the aliasing mutant (`resolveTriggers` returning the package default instead of a copy), as the archived predicates did.
+
+## A new exit code supersedes cycle 1580's AC-2
+
+| Predicate | It asserted | Why L2 supersedes it | What pins the contract now |
+|---|---|---|---|
+| `TestC1580_002_NoNewExitCode` | `go/internal/bridge/exitcodes.go` declares exactly the eleven exit constants of 2026-09 and no other ("the transient shortcircuit must reuse ExitArtifactTimeout (81)"), and the transient dwell reuses exit 81 | the launch-time model check needs its own exit, 87 (`ExitModelMismatch`): 80 records boot strikes that bench, 85 benches as quota, 81 is the artifact timeout (the reasoning is in the plan's "L2 fix round" notes) | the numeric contract: `internal/bridge/launchoutcome` `TestExitCodes_NumericContractUnchanged` and `TestClassify_TableCoversEveryDeclaredExit`, `internal/bridge` `TestExitCodes_HostAliasesAreTheLeafValues` (each now names 87); the reuse of 81 by the transient dwell: the live `TestC1580_006_ReviewStopReusesTheCompletedBlock`, which runs the same `TestRunTmuxREPL_TransientDwell_ReusesExistingExitAndArtifacts` |
+
+## Notes
+
+- The live `go/acs/cycle1821` lost the archived predicates' helpers (`conservativeTriggerSet`, `planSource`, `defaultTriggerSources`, `overwriteAt`, `appendThroughReslice`, `requireConservativeSet`, `emptyProfileSource`, `legacyRouter`) and three now-unused imports with them; the move is pure (every removed line is in the archived file). `go test -tags acs ./acs/cycle1821/` runs all four live predicates (004 to 007). 004, 005 and 006 pass in the lane worktree. 007 is point-in-time: it compares the tree with `git merge-base main HEAD` and fails while any change since that base touches `go/internal/sizeratchet/offenders.json`. It therefore fails in this lane's worktree, which lowers four allowances, and passes on main once the lane is merged and the base moves past it.
+- The archived file keeps the predicates' original package clause, helpers and bodies, so it reads as it ran. It lives outside the Go module and never builds.
+- `go/acs/cycle1580` lost `frozenExitCodes`, `exitConstRE` and three imports with its archived predicate; the move is pure. The archived file also carries copies of the package's `bridgePkg`/`deliverablePkg` constants and its `runBridgeTests`/`runPkgTests` helpers, which stay live for `001` and `003` to `009`. The lane first amended the frozen map with 87; this archive replaces that edit, so no live predicate's acceptance was edited.

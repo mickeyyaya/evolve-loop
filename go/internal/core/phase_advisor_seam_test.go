@@ -46,7 +46,7 @@ func TestBridgeRequestOf_ProjectsEveryLaunchField(t *testing.T) {
 func TestPhaseAdvisor_OneConstructionSite(t *testing.T) {
 	for needle, onlySite := range map[string]string{
 		"advisor.New(":          "internal/core/phase_advisor.go",
-		"core.NewPhaseAdvisor(": "cmd/evolve/cmd_cycle.go",
+		"core.NewPhaseAdvisor(": "cmd/evolve/router_dispatch.go",
 	} {
 		if offenders := nonTestSourcesMentioning(t, needle, onlySite); len(offenders) > 0 {
 			t.Errorf("%q belongs to ONE non-test file (%s); these non-test files use it too: %v", needle, onlySite, offenders)

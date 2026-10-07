@@ -70,21 +70,6 @@ func TestUniversalFallbackTail_LeavesTheExclusionToTheRouter(t *testing.T) {
 	}
 }
 
-func TestTheCheckedInPolicyPutsAgyInTheLastResortTail(t *testing.T) {
-	pol, root := checkedInPolicy(t)
-	if !pol.WorkflowConfig().UniversalFallback {
-		t.Fatal("the checked-in policy turns the last-resort tail off, so agy would join no chain")
-	}
-	results := []gobridge.DoctorResult{
-		doctorResult("claude-tmux", true, "ready"),
-		doctorResult("agy-tmux", true, "ready"),
-		doctorResult("codex-tmux", true, "ready"),
-	}
-	if got := scoutChainUnder(t, pol, root, results); !slices.Contains(got, "agy-tmux") {
-		t.Fatalf("scout chain = %v: the operator added the Antigravity CLI to the pipeline (2026-10-05), so the checked-in policy keeps agy in every launch's last-resort tail", got)
-	}
-}
-
 func TestUniversalFallbackTail_OffersEachInstalledBinaryOnceAsItsOwnDriver(t *testing.T) {
 	results := []gobridge.DoctorResult{
 		doctorResult("agy", true, "ready"),

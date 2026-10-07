@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -18,7 +18,6 @@ const (
 	CodeLaunchFailed        signalcenter.Code = "ADVISOR_LAUNCH_FAILED"
 	CodeResponseUnparseable signalcenter.Code = "ADVISOR_RESPONSE_UNPARSEABLE"
 	CodeMintRejected        signalcenter.Code = "ADVISOR_MINT_REJECTED"
-	CodeProfileLoadFailed   signalcenter.Code = "ADVISOR_PROFILE_LOAD_FAILED"
 	CodeReconGitFailed      signalcenter.Code = "ADVISOR_RECON_GIT_FAILED"
 	CodeCaptureWriteFailed  signalcenter.Code = "ADVISOR_CAPTURE_WRITE_FAILED"
 )
@@ -45,7 +44,6 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeLaunchFailed, "the routing/plan dispatch produced no response — the preflight refused (nil bridge, empty workspace, the depth guard; fields.step="+stepPreflight+") or every CLI in the router profile's fallback chain failed (fields.step="+stepDispatch+", cli, chain, exit_code, profile); the error is still returned and the caller degrades to the static spine or keeps the initial plan; fields.decision, contract")
 	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeResponseUnparseable, "the launch returned but no decision decoded from its output (fields.cause = "+causeNoJSON+" / "+causeInvalidJSON+" / "+causeEmpty+"); the wrapped error is still returned and the caller degrades — on the per-transition Propose path this is the first visibility the fault ever had; fields.step="+stepParse+", stdout_bytes, artifact, decision, contract")
 	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeMintRejected, "a plan entry minted a reserved control-plane identity (router/advisor/failure-advisor and their aliases) and was dropped by the recursion guard; the rest of the plan stands, one event per drop at decision time (never on resume or replay); fields.step="+stepMint+", minted_phase, decision, contract")
-	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeProfileLoadFailed, ".evolve/profiles/router.json exists but could not be read or parsed (absence is silent); the dispatch degrades to the single primary CLI exactly as before, so a configured fallback chain is silently narrower than the operator believes; fields.step="+stepDispatch+", path, decision, contract")
 	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeReconGitFailed, "the pre-plan recon's recent-files reader (git log over the project root) failed while the recon digest was on; the digest is composed without file facts and planning proceeds; fields.step="+stepCompose+", project_root, decision, contract")
 	signalcenter.RegisterCode(signalcenter.ModuleAdvisor, CodeCaptureWriteFailed, "a redacted capture artifact (advisor-prompt-, advisor-response- or advisor-span-<kind>) could not be persisted (fields.artifact = prompt / response / span; fields.op = "+opMarshal+" / "+opWrite+" — marshal is dormant, a Span always marshals); the decision still returns and the remaining artifacts are still attempted; the ledger binds nothing for an absent capture; fields.step="+stepCapture+", path, decision, contract")
 }
@@ -93,9 +91,6 @@ type LaunchResponse struct {
 // ArtifactWriter persists one capture artifact; nil disables the capture.
 type ArtifactWriter func(path string, data []byte) error
 
-// ProfileLoader reads the router profile at path and returns any read or parse error.
-type ProfileLoader func(path string) (*profiles.Profile, error)
-
 // RecentFiles lists the files recent commits touched under projectRoot; core injects its git reader.
 type RecentFiles func(projectRoot string) ([]string, error)
 
@@ -110,11 +105,11 @@ type Advisor struct {
 	launcher      Launcher
 	identity      Identity
 	writeArtifact ArtifactWriter
-	loadProfile   ProfileLoader
 	recentFiles   RecentFiles
 	checkDepth    DepthCheck
 	overlays      OverlayResolver
 	signals       func() *signalcenter.Center
+	route         llmroute.Plan
 }
 
 // Option configures an Advisor at construction.
@@ -126,7 +121,6 @@ func New(launcher Launcher, identity Identity, capture ArtifactWriter, opts ...O
 		launcher:      launcher,
 		identity:      identity,
 		writeArtifact: capture,
-		loadProfile:   defaultProfileLoader,
 		recentFiles:   func(string) ([]string, error) { return nil, nil },
 	}
 	for _, opt := range opts {
@@ -135,13 +129,8 @@ func New(launcher Launcher, identity Identity, capture ArtifactWriter, opts ...O
 	return a
 }
 
-// WithProfileLoader replaces the router-profile reader.
-func WithProfileLoader(load ProfileLoader) Option {
-	return func(a *Advisor) {
-		if load != nil {
-			a.loadProfile = load
-		}
-	}
+func WithRoute(walk llmroute.Plan) Option {
+	return func(a *Advisor) { a.route = walk }
 }
 
 // WithRecentFiles replaces the recon's recent-files reader.

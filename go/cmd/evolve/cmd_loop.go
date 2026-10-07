@@ -141,7 +141,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) int {
 	// cannot see them. Liveness-scoped, so a live concurrent run is never touched.
 	gcOrphanSessions("startup", stderr)
 
-	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)
+	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: buildCycleEnv(cfg, os.Environ())})
 	if deps.RoutingErr != nil {
 		fmt.Fprintf(stderr, "evolve loop: %v\n", deps.RoutingErr)
 		return exitRoutingRefused

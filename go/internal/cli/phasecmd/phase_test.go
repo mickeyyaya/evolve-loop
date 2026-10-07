@@ -38,7 +38,7 @@ func TestRunPhase_DispatchesToFactory(t *testing.T) {
 	stdin := bytes.NewReader(reqJSON)
 	var stdout, stderr bytes.Buffer
 
-	code := NewRunPhase(nil)([]string{"intent"}, stdin, &stdout, &stderr)
+	code := NewRunPhase(nil, nil)([]string{"intent"}, stdin, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("code=%d, want 0 (stderr=%s)", code, stderr.String())
 	}
@@ -56,7 +56,7 @@ func TestRunPhase_DispatchesToFactory(t *testing.T) {
 
 func TestRunPhase_MissingPhaseName(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := NewRunPhase(nil)(nil, bytes.NewReader(nil), &stdout, &stderr)
+	code := NewRunPhase(nil, nil)(nil, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d, want 10", code)
 	}
@@ -67,7 +67,7 @@ func TestRunPhase_MissingPhaseName(t *testing.T) {
 
 func TestRunPhase_UnknownPhase(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := NewRunPhase(nil)([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
+	code := NewRunPhase(nil, nil)([]string{"nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {
 		t.Errorf("code=%d, want 10", code)
 	}
@@ -82,7 +82,7 @@ func TestRunPhase_MalformedJSON(t *testing.T) {
 	registry.Register("intent", func(req core.PhaseRequest) core.PhaseRunner { return &stubPhase{} })
 
 	var stdout, stderr bytes.Buffer
-	code := NewRunPhase(nil)([]string{"intent"}, strings.NewReader("not-json"), &stdout, &stderr)
+	code := NewRunPhase(nil, nil)([]string{"intent"}, strings.NewReader("not-json"), &stdout, &stderr)
 	if code != 11 {
 		t.Errorf("code=%d, want 11", code)
 	}
@@ -100,7 +100,7 @@ func TestRunPhase_RunnerErrorExits1(t *testing.T) {
 	req := core.PhaseRequest{Cycle: 1}
 	rJSON, _ := json.Marshal(req)
 	var stdout, stderr bytes.Buffer
-	code := NewRunPhase(nil)([]string{"intent"}, bytes.NewReader(rJSON), &stdout, &stderr)
+	code := NewRunPhase(nil, nil)([]string{"intent"}, bytes.NewReader(rJSON), &stdout, &stderr)
 	if code != 1 {
 		t.Errorf("code=%d, want 1", code)
 	}

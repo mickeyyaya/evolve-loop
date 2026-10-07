@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static]  (all take --project-root DIR)"
+	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static] | init --clis a,b | set <key> <a,b> [--model T] | unset <key> | migrate [--dry-run]  (all take --project-root DIR)"
 	exitRoutingUsage   = 2
 	exitRoutingFinding = 1
 )
@@ -81,6 +81,8 @@ func runCLIRouting(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runCLIRoutingCheck(args[1:], stdout, stderr)
 	case "explain":
 		return runCLIRoutingExplain(args[1:], stdout, stderr)
+	case "init", "set", "unset", "migrate":
+		return runCLIRoutingWrite(args[0], args[1:], stdout, stderr)
 	case "-h", "--help", "help":
 		fmt.Fprintln(stdout, "evolve cli-routing: "+cliRoutingUsage)
 		return 0
@@ -100,13 +102,27 @@ func parseCLIRoutingFlags(name string, args []string, stderr io.Writer) (cliRout
 	if err := fs.Parse(args); err != nil {
 		return f, nil, false
 	}
-	if f.root == "" {
-		f.root = os.Getenv("EVOLVE_PROJECT_ROOT")
+	root, err := routingProjectRoot(f.root, os.Getwd)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", name, err)
+		return f, nil, false
 	}
-	if f.root == "" {
-		f.root, _ = os.Getwd()
-	}
+	f.root = root
 	return f, fs.Args(), true
+}
+
+func routingProjectRoot(flagged string, getwd func() (string, error)) (string, error) {
+	if flagged != "" {
+		return flagged, nil
+	}
+	if env := os.Getenv("EVOLVE_PROJECT_ROOT"); env != "" {
+		return env, nil
+	}
+	wd, err := getwd()
+	if err != nil {
+		return "", fmt.Errorf("cannot read the working directory (%v): pass --project-root", err)
+	}
+	return wd, nil
 }
 
 func loadRoutingView(f cliRoutingFlags) (routingView, error) {

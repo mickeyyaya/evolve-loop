@@ -30,7 +30,7 @@ func (r *recordedFloor) floorFor(projectRoot string) core.BuildHandoffFloor {
 func floorVerify(t *testing.T, floor BuildHandoffFloorFor, args ...string) (int, string, string) {
 	t.Helper()
 	var out, errb bytes.Buffer
-	code := NewRunPhase(floor)(append([]string{"verify"}, args...), nil, &out, &errb)
+	code := NewRunPhase(floor, nil)(append([]string{"verify"}, args...), nil, &out, &errb)
 	return code, out.String(), errb.String()
 }
 

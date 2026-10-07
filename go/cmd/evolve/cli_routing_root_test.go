@@ -39,7 +39,7 @@ func wiringRoot(t *testing.T, policyJSON string) (string, string) {
 func TestWireOrchestratorDeps_AnErrorFindingRefusesBeforeAnyDispatch(t *testing.T) {
 	root, evolveDir := wiringRoot(t, `{"cli_routing":{"clis":["agy"],"default":["agy"]}}`)
 	var console bytes.Buffer
-	d := wireOrchestratorDeps(root, evolveDir, &console)
+	d := wireOrchestratorDeps(root, evolveDir, &console, routingRun{})
 	if d.RoutingErr == nil || d.Orchestrator != nil || !strings.Contains(d.RoutingErr.Error(), "cli_routing.clis") {
 		t.Fatalf("a table with an error finding is refused at the composition root: err=%v orch=%v", d.RoutingErr, d.Orchestrator)
 	}
@@ -50,7 +50,7 @@ func TestWireOrchestratorDeps_AnErrorFindingRefusesBeforeAnyDispatch(t *testing.
 
 func TestWireOrchestratorDeps_AMalformedPolicyIsRefusedBeforeAnyDispatch(t *testing.T) {
 	root, evolveDir := wiringRoot(t, `{"pins": `)
-	if d := wireOrchestratorDeps(root, evolveDir, io.Discard); d.RoutingErr == nil {
+	if d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{}); d.RoutingErr == nil {
 		t.Fatal("a malformed policy.json exits at start instead of failing each phase")
 	}
 }
@@ -59,7 +59,7 @@ func TestWireOrchestratorDeps_OneRouterReachesEveryLaunchPath(t *testing.T) {
 	orig := runner.DefaultRouter
 	t.Cleanup(func() { runner.DefaultRouter = orig })
 	root, evolveDir := wiringRoot(t, "")
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if d.RoutingErr != nil || d.Router == nil {
 		t.Fatalf("a legacy tree routes: %v", d.RoutingErr)
 	}
@@ -71,7 +71,7 @@ func TestWireOrchestratorDeps_OneRouterReachesEveryLaunchPath(t *testing.T) {
 func TestRunCycleRun_ARefusedRoutingTableExitsTwo(t *testing.T) {
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		return orchDeps{RoutingErr: errors.New("the CLI routing table refuses to route: cli_routing.clis")}
 	}
 	var stdout, stderr bytes.Buffer
@@ -84,7 +84,7 @@ func TestRunCycleRun_ARefusedRoutingTableExitsTwo(t *testing.T) {
 func TestRunLoop_ARefusedRoutingTableExitsTwo(t *testing.T) {
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		return orchDeps{RoutingErr: errors.New("the CLI routing table refuses to route: cli_routing.clis")}
 	}
 	root, evolveDir := wiringRoot(t, "")
@@ -211,7 +211,7 @@ func TestWireOrchestratorDeps_AProjectWithNoProfilesDirectoryRoutesAsBefore(t *t
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if d := wireOrchestratorDeps(root, evolveDir, io.Discard); d.RoutingErr != nil || d.Orchestrator == nil {
+	if d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{}); d.RoutingErr != nil || d.Orchestrator == nil {
 		t.Fatalf("a fresh project with no cli_routing block and no profiles directory wires as before L1b: %v", d.RoutingErr)
 	}
 }
@@ -238,7 +238,7 @@ func TestOneProfilesDirectory_ThePreflightAndTheCycleCompileTheSameTable(t *test
 	if err := os.MkdirAll(filepath.Join(otherEvolve, "profiles"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, otherEvolve, io.Discard)
+	d := wireOrchestratorDeps(root, otherEvolve, io.Discard, routingRun{})
 	if d.RoutingErr != nil {
 		t.Fatalf("the cycle compiles the project's profiles, not --evolve-dir's: %v", d.RoutingErr)
 	}

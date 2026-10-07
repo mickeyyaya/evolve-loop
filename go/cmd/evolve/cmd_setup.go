@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
@@ -110,6 +111,10 @@ func runSetupRecommend(args []string, stdout, stderr io.Writer) int {
 	rep := setup.Detect(context.Background(), setup.DetectOptions{
 		ProjectRoot: project, EvolveDir: evolveDir, PluginRoot: plugin, AdaptersDir: adapters,
 	})
+	if rep.RoutingTableDeclared {
+		fmt.Fprintf(stderr, "evolve setup recommend: %v\n", setup.ErrRoutingTableDeclared)
+		return 1
+	}
 	cfg, err := setup.LoadPresets(evolveDir)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve setup recommend: %v\n", err)
@@ -195,18 +200,8 @@ func runSetupApply(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "%s", out)
 		return 0
 	}
-	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
-		fmt.Fprintf(stderr, "evolve setup apply: mkdir: %v\n", err)
-		return 1
-	}
-	tmp := fmt.Sprintf("%s.tmp.%d", policyPath, os.Getpid())
-	if err := os.WriteFile(tmp, out, 0o644); err != nil {
-		fmt.Fprintf(stderr, "evolve setup apply: write temp: %v\n", err)
-		return 1
-	}
-	defer func() { _ = os.Remove(tmp) }()
-	if err := os.Rename(tmp, policyPath); err != nil {
-		fmt.Fprintf(stderr, "evolve setup apply: atomic rename: %v\n", err)
+	if err := atomicwrite.Bytes(policyPath, out); err != nil {
+		fmt.Fprintf(stderr, "evolve setup apply: %v\n", err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "[setup apply] wrote preset %q to %s\n", preset, policyPath)
@@ -232,6 +227,9 @@ func printDetectHuman(w io.Writer, rep setup.DetectReport) {
 	}
 	if rep.PolicyError != "" {
 		fmt.Fprintf(w, "\n⚠ policy.json malformed (pins ignored): %s\n", rep.PolicyError)
+	}
+	if rep.RoutingTableDeclared {
+		fmt.Fprintln(w, "\nThis project declares a cli_routing table, which owns every route: presets do not apply; read it with `evolve cli-routing show`.")
 	}
 	fmt.Fprintln(w, "\nPer-phase routing (current):")
 	for _, p := range rep.Phases {

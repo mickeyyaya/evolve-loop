@@ -14,9 +14,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// defaultFallbackOnExit mirrors bridge/exitcodes.go as literals so this leaf package stays bridge-free:
-// REPL boot timeout, artifact timeout, unknown prompt (incl. quota), timeout(1), missing binary.
-var defaultFallbackOnExit = []int{80, 81, 85, 124, 127}
+const ExitModelMismatch = 87
+
+var defaultFallbackOnExit = []int{80, 81, 85, ExitModelMismatch, 124, 127}
 
 var cliBinaryFor = map[string]string{
 	"claude-p":        "claude",
@@ -127,13 +127,20 @@ func defaultDriverForFamily(cli string) string {
 	return cli
 }
 
-func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile) (cli, source string) {
+func EnvPrimary(agent string, env map[string]string) (cli, source string) {
 	perAgentKey := envchain.PhaseEnvKey(agent, "CLI")
 	if v := env[perAgentKey]; v != "" {
 		return v, "env(" + perAgentKey + ")"
 	}
 	if v := envchain.Resolve("EVOLVE_CLI", env, "", ""); v != "" {
 		return v, "env(EVOLVE_CLI)"
+	}
+	return "", ""
+}
+
+func resolvePrimary(agent string, env map[string]string, prof *profiles.Profile) (cli, source string) {
+	if cli, source := EnvPrimary(agent, env); cli != "" {
+		return cli, source
 	}
 	if prof != nil && prof.CLI != "" {
 		return prof.CLI, "profile." + agent + ".cli"

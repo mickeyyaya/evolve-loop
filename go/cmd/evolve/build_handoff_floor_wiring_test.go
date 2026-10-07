@@ -22,7 +22,7 @@ func TestBuildHandoffProbes_IterateTheCycleFloorsCheckList(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
-	cycleFloor := wireOrchestratorDeps(root, evolveDir, io.Discard).Orchestrator.BuildHandoffFloorNames()
+	cycleFloor := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{}).Orchestrator.BuildHandoffFloorNames()
 	probeFloor := probeBuildHandoffFloor(root).Names()
 	if !reflect.DeepEqual(cycleFloor, probeFloor) {
 		t.Fatalf("the cycle's build handoff floor and the probes' floor must be one check list:\ncycle  %q\nprobes %q", cycleFloor, probeFloor)
