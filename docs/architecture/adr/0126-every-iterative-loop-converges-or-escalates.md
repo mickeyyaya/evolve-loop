@@ -36,9 +36,9 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
    - **`J_0`** is a full judgment.
    - **Round 1** is a normal fix (ADR-0096's raise stays here for audit repair).
    - **Round 2, rung 1, changes the feedback:**
-     - verify-only re-judgment for code-review and console judges;
      - an effort raise within the judge's family (deep high → top xhigh), for reasoning-class blockers, with headroom;
-     - a fixer raise.
+     - a fixer raise, once.
+     - Code-review and console judgments are already verify-only from `J_1` on (decision 6).
    - **Round 3, rung 2, changes the strategy:** a fresh-context fixer or a re-plan; the bar rises to HIGH; MEDIUM/LOW are deferred and filed (code-review and console only).
    - **No round 4.**
 3. **Stop on marginal gain.** A round whose repair damage is at least its repairs, or with no progress at the current bar, skips straight to the strategy change (or to rung 3).
@@ -52,7 +52,7 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
 6. **Judges.**
    - Only `J_0` carries probe and mutant quotas.
    - Later judgments verify the previous findings and the fix's own hunks.
-   - A late finding (on code unchanged since `J_0`) below HIGH is filed. A late CRITICAL or HIGH blocks only when its certificate survives a falsification check that sees only the diff.
+   - A late finding (on code unchanged since `J_0`) below HIGH is filed. A late CRITICAL or HIGH is filed only when a falsification check that sees only the diff refutes its certificate; until that check has run, it blocks.
    - Every blocking finding passes that check.
    - A dispute goes to an adjudicator, never to another round.
 7. **Kind.** A capability finding below CRITICAL never blocks; it is filed. A CRITICAL is always a defect. The audit records `kind` only.
