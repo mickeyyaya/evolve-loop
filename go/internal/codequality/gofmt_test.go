@@ -3,6 +3,7 @@ package codequality
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -75,6 +76,77 @@ func TestUnformattedGoFiles_ParseErrorIsOffenderNotInfraError(t *testing.T) {
 	}
 	if len(got) == 0 {
 		t.Fatal("want the parse error surfaced as an offender so audit FAILs; got none")
+	}
+}
+
+func TestUnformattedGoFiles_AnUnreadableFileIsAnErrorNotAnOffender(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "good.go", "package p\n")
+	locked := write(t, dir, "locked.go", "package p\n")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o644) })
+	if f, err := os.Open(locked); err == nil {
+		_ = f.Close()
+		t.Skip("mode 0 does not deny this user a read (root): no I/O error to provoke")
+	}
+
+	got, err := UnformattedGoFiles(dir)
+
+	if err == nil || got != nil {
+		t.Fatalf("got (%q, %v), want (nil, error): gofmt could not read a file, which says nothing about its formatting, so the gate must fail open instead of naming an offender", got, err)
+	}
+	if !strings.Contains(err.Error(), "permission denied") {
+		t.Errorf("error %q does not carry gofmt's own I/O diagnosis", err)
+	}
+}
+
+func TestUnformattedGoFiles_AnUnreadableFileDoesNotHideAnUnformattedSibling(t *testing.T) {
+	dir := t.TempDir()
+	dirty := write(t, dir, "dirty.go", "package p\nfunc  f() {}\n")
+	locked := write(t, dir, "locked.go", "package p\n")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o644) })
+	if f, err := os.Open(locked); err == nil {
+		_ = f.Close()
+		t.Skip("mode 0 does not deny this user a read (root): no I/O error to provoke")
+	}
+
+	got, err := UnformattedGoFiles(dir)
+
+	if err != nil || len(got) != 1 || got[0] != dirty {
+		t.Fatalf("got (%q, %v), want ([%q], nil): an I/O error on one file must not discard the offender gofmt did report", got, err, dirty)
+	}
+}
+
+func TestUnformattedGoFiles_AColumnlessParseDiagnosticIsAnOffender(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "gen.go", "package p\n//line gen.y:10\nfunc {\n")
+
+	got, err := UnformattedGoFiles(dir)
+
+	if err != nil || len(got) != 1 || !strings.HasPrefix(got[0], "gofmt parse error: ") {
+		t.Fatalf("got (%q, %v), want one parse-error offender: a //line directive drops the column, and the file still does not parse", got, err)
+	}
+}
+
+func TestUnformattedGoFiles_AGofmtThatDiesSilentlyIsAnErrorNotAnOffender(t *testing.T) {
+	bin := t.TempDir()
+	write(t, bin, "gofmt", "#!/bin/sh\nexit 2\n")
+	if err := os.Chmod(filepath.Join(bin, "gofmt"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	dir := t.TempDir()
+	write(t, dir, "good.go", "package p\n")
+
+	got, err := UnformattedGoFiles(dir)
+
+	if err == nil || got != nil {
+		t.Fatalf("got (%q, %v), want (nil, error): a gofmt that exits non-zero with nothing on stderr was killed or broken, which is the host's failure, not a parse error in the tree", got, err)
 	}
 }
 

@@ -78,8 +78,8 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 	if contradicted {
 		return nil
 	}
-	if dec.Category == policy.CategoryVerdictIncoherence && hasSubstantiveFailReasons(cs) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN floor: prose %s claim overruled — the recorded FAIL carries persisted substantive fail reasons (diagnosed downgrade, not forgery); treating as task-level FAIL\n", dec.Category)
+	if refutation := floorClaimRefutation(dec.Category, cs); refutation != "" {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN floor: prose %s claim overruled — %s; treating as task-level FAIL\n", dec.Category, refutation)
 		return nil
 	}
 	ev := dec.Evidence
@@ -92,6 +92,16 @@ func (o *Orchestrator) applyFailureDecisionFloor(cs CycleState, retroVerdict str
 		Evidence: "orchestrator-classified " + dec.Category + ": " + ev,
 		Halt:     true,
 	}
+}
+
+func floorClaimRefutation(category string, cs CycleState) string {
+	if category == policy.CategoryVerdictIncoherence && hasSubstantiveFailReasons(cs) {
+		return "the recorded FAIL carries persisted substantive fail reasons (diagnosed downgrade, not forgery)"
+	}
+	if staticGateReadingsForcedTheFail(cs.AuditFailReasons) && len(cs.ShipFailReasons) == 0 {
+		return "every persisted fail reason is a static reading of the tree by a deterministic audit gate, forced over a PASS or WARN narrative"
+	}
+	return ""
 }
 
 func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, history []FailedRecord) (next Phase, extraEnv map[string]string, reason string, sig *SystemFailureSignal) {

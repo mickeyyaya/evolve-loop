@@ -44,13 +44,20 @@ func composeRepairBrief(cs CycleState) string {
 }
 
 func auditRejectionReasons(cs CycleState, briefed []reportdoc.Finding) string {
+	declared, isDeclared := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
+	if derived, ok := gateFailureBlock(cs.AuditFailReasons); ok && !isDeclared {
+		return renderFailureBlock("the deterministic gates' failure block", derived, briefed)
+	}
 	if runnerDiagnosedAudit(cs) {
 		return renderFailReasons(string(PhaseAudit), cs.AuditFailReasons)
 	}
-	fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
-	if !ok {
+	if !isDeclared {
 		return ""
 	}
+	return renderFailureBlock("the verdict's failure block", declared, briefed)
+}
+
+func renderFailureBlock(source string, fb *phasecontract.FailureBlock, briefed []reportdoc.Finding) string {
 	var lines []string
 	for _, defect := range fb.Defects {
 		if defect = strings.TrimSpace(defect); defect != "" && !restatesAFinding(defect, briefed) {
@@ -60,7 +67,7 @@ func auditRejectionReasons(cs CycleState, briefed []reportdoc.Finding) string {
 	if len(lines) == 0 {
 		return ""
 	}
-	return "audit defects (the verdict's failure block, class " + fb.Class + "):\n" + strings.Join(lines, "\n")
+	return "audit defects (" + source + ", class " + fb.Class + "):\n" + strings.Join(lines, "\n")
 }
 
 func restatesAFinding(defect string, briefed []reportdoc.Finding) bool {
