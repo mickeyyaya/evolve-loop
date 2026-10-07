@@ -12,27 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
 )
-
-const awaitsTestLevelSelection = "a large package whose seam or single-writer tests read the tree; running the whole package at every ship is too slow, so it waits for test-level selection (inbox repo-contract-test-level-selection)"
-
-var readsTheTreeOutsideThePack = map[string]string{
-	"cmd/evolve":                    awaitsTestLevelSelection,
-	"internal/bridge":               awaitsTestLevelSelection,
-	"internal/changedpkgs":          awaitsTestLevelSelection,
-	"internal/core":                 awaitsTestLevelSelection,
-	"internal/cycleoutcome":         awaitsTestLevelSelection,
-	"internal/inboxmover":           awaitsTestLevelSelection,
-	"internal/inboxmover/lifecycle": awaitsTestLevelSelection,
-	"internal/phaseobserver":        awaitsTestLevelSelection,
-	"internal/phases/audit":         awaitsTestLevelSelection,
-	"internal/phases/runner":        awaitsTestLevelSelection,
-	"internal/phases/ship":          awaitsTestLevelSelection,
-	"internal/reachabilityprobe":    awaitsTestLevelSelection,
-	"internal/subagent":             awaitsTestLevelSelection,
-}
 
 func TestPackages_HoldEveryTestThatReadsTheWholeTree(t *testing.T) {
 	root, err := filepath.Abs("../..")
@@ -43,59 +26,200 @@ func TestPackages_HoldEveryTestThatReadsTheWholeTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readers := treeReaders(t, root, files)
+	reading := treeReadingTests(t, root, files)
+	readers := slices.Sorted(maps.Keys(reading))
 	for _, want := range []string{"internal/repocontract", "internal/sizeratchet", "internal/policy", "internal/acssuite", "internal/guards"} {
 		if !slices.Contains(readers, want) {
 			t.Fatalf("the detector must find %s; it found %v", want, readers)
 		}
 	}
-	for _, problem := range packProblems(readers, Packages(), readsTheTreeOutsideThePack) {
+	for _, problem := range packProblems(reading, Packages(), TreeReadingTests()) {
 		t.Error(problem)
 	}
 }
 
-func packProblems(readers, pack []string, outside map[string]string) []string {
+func packProblems(reading map[string][]string, pack []string, selections []TestSelection) []string {
 	inPack := map[string]bool{}
 	for _, pattern := range pack {
 		inPack[strings.TrimSuffix(strings.TrimPrefix(pattern, "./"), "/...")] = true
 	}
+	selected := map[string][]string{}
+	for _, selection := range selections {
+		dir := strings.TrimPrefix(selection.Package, "./")
+		selected[dir] = append(selected[dir], selection.Tests...)
+	}
 	var problems []string
-	for _, dir := range readers {
-		if !inPack[dir] && outside[dir] == "" {
-			problems = append(problems, fmt.Sprintf("%s has a test that reads the whole tree, so a lane that touches neither it nor an importer can still break it; put it in Packages() or record why it is outside", dir))
+	for _, dir := range slices.Sorted(maps.Keys(reading)) {
+		if inPack[dir] {
+			continue
+		}
+		if len(reading[dir]) == 0 {
+			problems = append(problems, fmt.Sprintf("%s reads the whole tree outside any test the detector can name; put it in Packages()", dir))
+		}
+		for _, test := range reading[dir] {
+			if !slices.Contains(selected[dir], test) {
+				problems = append(problems, fmt.Sprintf("%s.%s reads the whole tree, so a lane that touches neither its package nor an importer can still break it; add it to TreeReadingTests() or put the package in Packages()", dir, test))
+			}
 		}
 	}
-	for _, dir := range slices.Sorted(maps.Keys(outside)) {
-		if inPack[dir] || !slices.Contains(readers, dir) {
-			problems = append(problems, fmt.Sprintf("%s is recorded outside the pack but is in it or no longer reads the tree; remove the record", dir))
+	for _, dir := range slices.Sorted(maps.Keys(selected)) {
+		for _, test := range selected[dir] {
+			if inPack[dir] || !slices.Contains(reading[dir], test) {
+				problems = append(problems, fmt.Sprintf("%s.%s is selected by name but its package is in the pack or it no longer reads the tree; remove it from TreeReadingTests()", dir, test))
+			}
 		}
 	}
 	return problems
 }
 
-func treeReaders(t *testing.T, root string, files []string) []string {
+func treeReadingTests(t *testing.T, root string, files []string) map[string][]string {
 	t.Helper()
-	var dirs []string
+	byDir := map[string][]*ast.File{}
 	for _, rel := range files {
-		dir := path.Dir(rel)
-		if strings.HasPrefix(rel, "acs/") || slices.Contains(dirs, dir) {
+		if strings.HasPrefix(rel, "acs/") {
 			continue
 		}
 		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, filepath.FromSlash(rel)), nil, parser.SkipObjectResolution)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if climbsOutOfItsPackage(file, dir) || walksUpToGoMod(file) {
-			dirs = append(dirs, dir)
+		byDir[path.Dir(rel)] = append(byDir[path.Dir(rel)], file)
+	}
+	reading := map[string][]string{}
+	for dir, parsed := range byDir {
+		if tests, reads := readingTestsOf(parsed, dir); reads {
+			reading[dir] = tests
 		}
 	}
-	slices.Sort(dirs)
-	return dirs
+	return reading
 }
 
-func climbsOutOfItsPackage(file *ast.File, dir string) bool {
+type declUnit struct {
+	names []string
+	test  bool
+	reads bool
+	refs  map[string]bool
+}
+
+func readingTestsOf(files []*ast.File, dir string) (tests []string, reads bool) {
+	units := declUnits(files, dir)
+	reading := map[string]bool{}
+	for _, unit := range units {
+		if unit.reads {
+			reads = true
+			markAll(reading, unit.names)
+		}
+	}
+	for grew := true; grew; {
+		grew = false
+		for _, unit := range units {
+			if !allIn(reading, unit.names) && anyIn(unit.refs, reading) {
+				markAll(reading, unit.names)
+				grew = true
+			}
+		}
+	}
+	for _, unit := range units {
+		if unit.test && reading[unit.names[0]] && !slices.Contains(tests, unit.names[0]) {
+			tests = append(tests, unit.names[0])
+		}
+	}
+	slices.Sort(tests)
+	return tests, reads
+}
+
+func declUnits(files []*ast.File, dir string) []declUnit {
+	var units []declUnit
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			for _, node := range declNodes(decl) {
+				units = append(units, declUnit{
+					names: declaredNames(node),
+					test:  isGoTest(node),
+					reads: climbsOutOfItsPackage(node, dir) || walksUpToGoMod(node),
+					refs:  identifiersIn(node),
+				})
+			}
+		}
+	}
+	return units
+}
+
+func declNodes(decl ast.Decl) []ast.Node {
+	gen, ok := decl.(*ast.GenDecl)
+	if !ok {
+		return []ast.Node{decl}
+	}
+	var nodes []ast.Node
+	for _, spec := range gen.Specs {
+		if _, isImport := spec.(*ast.ImportSpec); !isImport {
+			nodes = append(nodes, spec)
+		}
+	}
+	return nodes
+}
+
+func declaredNames(node ast.Node) []string {
+	var idents []*ast.Ident
+	switch decl := node.(type) {
+	case *ast.FuncDecl:
+		idents = []*ast.Ident{decl.Name}
+	case *ast.ValueSpec:
+		idents = decl.Names
+	case *ast.TypeSpec:
+		idents = []*ast.Ident{decl.Name}
+	}
+	var names []string
+	for _, id := range idents {
+		if id.Name != "_" {
+			names = append(names, id.Name)
+		}
+	}
+	return names
+}
+
+func isGoTest(node ast.Node) bool {
+	fn, ok := node.(*ast.FuncDecl)
+	if !ok || fn.Recv != nil || fn.Name.Name == "TestMain" || fn.Type.Params.NumFields() != 1 {
+		return false
+	}
+	rest, ok := strings.CutPrefix(fn.Name.Name, "Test")
+	return ok && (rest == "" || !unicode.IsLower(rune(rest[0])))
+}
+
+func identifiersIn(node ast.Node) map[string]bool {
+	refs := map[string]bool{}
+	ast.Inspect(node, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok {
+			refs[id.Name] = true
+		}
+		return true
+	})
+	return refs
+}
+
+func markAll(set map[string]bool, names []string) {
+	for _, name := range names {
+		set[name] = true
+	}
+}
+
+func allIn(set map[string]bool, names []string) bool {
+	return !slices.ContainsFunc(names, func(name string) bool { return !set[name] })
+}
+
+func anyIn(refs, set map[string]bool) bool {
+	for name := range refs {
+		if set[name] {
+			return true
+		}
+	}
+	return false
+}
+
+func climbsOutOfItsPackage(node ast.Node, dir string) bool {
 	depth := depthBelowTheModuleRoot(dir)
-	return inspectFound(file, func(n ast.Node) bool {
+	return inspectFound(node, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return false
@@ -172,8 +296,8 @@ func stringLiteral(expr ast.Expr) *string {
 	return &text
 }
 
-func walksUpToGoMod(file *ast.File) bool {
-	return inspectFound(file, func(n ast.Node) bool {
+func walksUpToGoMod(node ast.Node) bool {
+	return inspectFound(node, func(n ast.Node) bool {
 		loop, ok := n.(*ast.ForStmt)
 		return ok && loop.Init == nil && loop.Cond == nil && loop.Post == nil && namesGoMod(loop.Body)
 	})

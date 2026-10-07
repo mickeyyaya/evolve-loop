@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/phasecmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
@@ -22,6 +23,8 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	phasesArg := fs.String("phases", "", "comma-separated phase names to run in order (e.g., scout,audit)")
 	shipAnyway := fs.Bool("ship-anyway", false, "permit 'ship' in the composition (otherwise refused early)")
 	dryRun := fs.Bool("dry-run", false, "print the planned phase sequence; do not execute")
+	cycle := fs.Int("cycle", 0, "derive the request from .evolve/runs/cycle-N/cycle-state.json instead of stdin")
+	projectRoot := fs.String("project-root", "", "project root for --cycle (default EVOLVE_PROJECT_ROOT or cwd)")
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
@@ -39,18 +42,9 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 
-	// stdin carries the same request envelope as `evolve phase`.
-	body, err := io.ReadAll(stdin)
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve compose: read stdin: %v\n", err)
-		return 1
-	}
-	var req core.PhaseRequest
-	if len(strings.TrimSpace(string(body))) > 0 {
-		if err := json.Unmarshal(body, &req); err != nil {
-			fmt.Fprintf(stderr, "evolve compose: parse stdin JSON: %v\n", err)
-			return 10
-		}
+	req, rc := composeRequest(*cycle, *projectRoot, stdin, stderr)
+	if rc != 0 {
+		return rc
 	}
 
 	// In compose mode the kernel phase guard warns instead of blocking.
@@ -89,6 +83,30 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "[compose] at least one phase did not PASS")
 	}
 	return overall
+}
+
+func composeRequest(cycle int, projectRoot string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {
+	if cycle != 0 {
+		req, err := phasecmd.RequestForCycle(projectRoot, cycle, stdin)
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve compose: %v\n", err)
+			return core.PhaseRequest{}, phasecmd.CycleRequestExitCode(err)
+		}
+		return req, 0
+	}
+	body, err := io.ReadAll(stdin)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve compose: read stdin: %v\n", err)
+		return core.PhaseRequest{}, 1
+	}
+	var req core.PhaseRequest
+	if len(strings.TrimSpace(string(body))) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			fmt.Fprintf(stderr, "evolve compose: parse stdin JSON: %v\n", err)
+			return core.PhaseRequest{}, 10
+		}
+	}
+	return req, 0
 }
 
 func splitNonEmptyPhases(csv string) []string {

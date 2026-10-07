@@ -3,6 +3,7 @@ package phasecmd
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"strings"
@@ -55,11 +56,9 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return 10
 	}
 
-	var req core.PhaseRequest
-	dec := json.NewDecoder(stdin)
-	if err := dec.Decode(&req); err != nil {
-		fmt.Fprintf(stderr, "evolve phase: parse stdin JSON: %v\n", err)
-		return 11
+	req, rc := phaseRequest(args[1:], stdin, stderr)
+	if rc != 0 {
+		return rc
 	}
 
 	if err := c.installRouter(req.ProjectRoot); err != nil {
@@ -82,6 +81,30 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	fmt.Fprintln(stdout, string(buf))
 	return 0
+}
+
+func phaseRequest(flags []string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {
+	fs := flag.NewFlagSet("phase", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	cycle := fs.Int("cycle", 0, "derive the request from .evolve/runs/cycle-N/cycle-state.json instead of stdin")
+	projectRoot := fs.String("project-root", "", "project root for --cycle (default EVOLVE_PROJECT_ROOT or cwd)")
+	if err := fs.Parse(flags); err != nil {
+		return core.PhaseRequest{}, exitCycleUsage
+	}
+	if *cycle != 0 {
+		req, err := RequestForCycle(*projectRoot, *cycle, stdin)
+		if err != nil {
+			fmt.Fprintf(stderr, "evolve phase: %v\n", err)
+			return core.PhaseRequest{}, CycleRequestExitCode(err)
+		}
+		return req, 0
+	}
+	var req core.PhaseRequest
+	if err := json.NewDecoder(stdin).Decode(&req); err != nil {
+		fmt.Fprintf(stderr, "evolve phase: parse stdin JSON: %v\n", err)
+		return core.PhaseRequest{}, 11
+	}
+	return req, 0
 }
 
 func (c phaseCommand) installRouter(projectRoot string) error {
