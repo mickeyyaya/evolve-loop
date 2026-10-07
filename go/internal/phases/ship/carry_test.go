@@ -33,7 +33,11 @@ type carriedLane struct {
 // rebasedLane is a lane whose audited change (tree0 on base0) is pended byte for byte on a peer's later base (tree1 on base1).
 func rebasedLane(t *testing.T) carriedLane {
 	t.Helper()
-	repo := makeRepo(t)
+	return rebasedLaneOn(t, makeRepo(t), 1715)
+}
+
+func rebasedLaneOn(t *testing.T, repo string, cycle int) carriedLane {
+	t.Helper()
 	rev := func(args ...string) string { return strings.TrimSpace(runGitOut(t, repo, args...)) }
 	base0 := rev("rev-parse", "HEAD")
 	mustWrite(t, filepath.Join(repo, "lane.txt"), "the lane's audited change\n")
@@ -48,7 +52,7 @@ func rebasedLane(t *testing.T) carriedLane {
 	base1 := rev("rev-parse", "HEAD")
 	runGit(t, repo, "-c", "commit.gpgsign=false", "cherry-pick", lane)
 	runGit(t, repo, "reset", "-q", "--soft", base1)
-	return carriedLane{repo: repo, base0: base0, tree0: tree0, base1: base1, tree1: rev("write-tree"), cycle: 1715}
+	return carriedLane{repo: repo, base0: base0, tree0: tree0, base1: base1, tree1: rev("write-tree"), cycle: cycle}
 }
 
 func writeCarry(t *testing.T, l carriedLane, ref, auditedTree string) {

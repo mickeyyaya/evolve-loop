@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 50 |
-| Distinct failure modes (coverage-map rows) | 76 |
-| ✅ covered (a test would fail if the bug returned) | 62 |
+| Incidents mapped | 51 |
+| Distinct failure modes (coverage-map rows) | 78 |
+| ✅ covered (a test would fail if the bug returned) | 64 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 10 |
 | ❌ none (no regression test) | 4 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -29,7 +29,8 @@ row or a status flip updates this table in the same change. An incident counts
 once however many rows it has; a record that documents several named incidents
 counts each name. Recounted on 2026-10-06 when the carry incident's four rows
 were added: by this rule the map held 48 incidents before them (the earlier
-summary said 49) and 49 with them. Untestable modes are
+summary said 49) and 49 with them. Recounted on 2026-10-07 when the cycle-1825
+carry incident's two rows were added beside cycle 1811's five: 51 incidents, 78 rows. Untestable modes are
 kept in the "Untestable-by-unit" section below rather than as ⛔ map rows.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
@@ -118,6 +119,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-10-06 — cycles 1766–1810 | ship's carry check declined silently: `carrySatisfied` returned no reason, so six refusals read `error=<nil>` | `phases/ship/carry.go`, `phases/ship/audit.go` | ✅ | `phases/ship/carry_reason_test.go::TestVerifyExecutionTree_NamesWhyACarryWasNotReProven` (3 cases) + `::TestCarrySatisfied_SignalsACarryRecordItCouldNotReProve` + `::TestCarrySatisfied_SignalsARecordThatNamesAnotherAuditedTree` + `::TestCarrySatisfied_SignalsNothingWhenNoCarryNamesTheAudit` + `cmd/evolve/cmd_ledger_evidence_test.go::TestLedgerEvidenceRestore_ExitsTwoWhenTheChainStillDoesNotVerify` |
 | 2026-10-06 — cycles 1766–1810 | Verify read `ledger.tip` after walking the file, without the ledger lock, so a peer's append in between read as a tip mismatch | `adapters/ledger/ledger.go`, `adapters/ledger/seal.go` | ✅ | `adapters/ledger/verify_snapshot_test.go::TestVerify_APeerAppendBetweenTheChainAndTipReadsIsNotABreak` (Verify and VerifyDeep; deterministic interleaving through `flock.TryLock`) + `::TestVerify_HoldsTheChainLockSharedSoReadersDoNotSerialize` + `::TestVerify_ReadsALedgerInADirectoryItCannotWrite` + `::TestVerify_FailsLoudlyWhenTheChainLockCannotBeOpened` |
 | 2026-10-06 — cycles 1766–1810 | RUNG 0/2 wrote through the worktree's linked ledger (a symlink to the plane ledger whose tip, lock and evidence store were the worktree's), a latent fork of the plane chain | `core/composition_carryforward.go` | ✅ | `core/composition_project_ledger_test.go::TestCompositionCarry_ChainsFromTheProjectLedgersTipThroughALinkedWorktree` (both rungs, through a worktree linked as `linkGuardDeps` links it) |
+| [2026-10-07 — cycle 1825: ship's carry rule refused the re-ship's own inbox consumption](2026-10-07-cycle-1825-carry-refused-the-reships-consumption.md) | after a fleet rebase the re-ship consumes its inbox items again, so ship's pre-commit check holds the carried tree plus that consumption; the carry accepted only its record's exact tree and the consumption rule measured from the audited tree, so neither explained the sum and a correct carry ended `integrity-block` (sealed FAIL) | `phases/ship/carry.go` (`carrySatisfied`, `carryExplains`, `boundCarryRecord`) | ✅ | `phases/ship/carry_consumption_compose_test.go::TestVerifyStagedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption` (red with the live `unsanctioned drift path(s): … (carry not re-proven: the carry of cycle 1825 names the tree …)`) + `::TestVerifyStagedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtraPath` (preservation, green before and after) + `::TestCarrySatisfied_DeclinesWhatTheReShipsConsumptionCannotCompose` (3 cases: an unsanctioned path, a record with another change's patch-id, an audited tree with no change); 13 overlay mutants killed |
+| 2026-10-07 — cycle 1825 | the post-push tree check (`verifyCommittedTree`) shares the binding rule, so a carried, consumed ship that got past the commit would have been refused after its push | `phases/ship/worktree_integrity.go`, `phases/ship/carry.go` | ✅ | `phases/ship/carry_consumption_compose_test.go::TestVerifyCommittedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption` (red on the old rule) + `::TestVerifyCommittedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtraPath` (preservation) |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 

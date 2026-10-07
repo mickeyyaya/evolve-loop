@@ -1,0 +1,23 @@
+{
+  "id": "carry-precommit-requires-head-at-record",
+  "title": "Ship's carry rule accepts a held tree that would revert a peer HEAD already contains",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "weight": 0.4,
+  "source": "console, 2026-10-07 architecture review of the cycle-1825 carry fix (LOW-3, probe P6); pre-existing, not introduced by the fix",
+  "created_at": "2026-10-07T11:13:04Z",
+  "summary": "The carry re-proof's ancestry edge {rec.GitHead, \"HEAD\"} (go/internal/phases/ship/carry.go) is an is-ancestor check. At pre-commit, if the worktree's HEAD has advanced to a peer commit while the index still holds the carry tree (with or without the re-ship's consumption), the held tree lacks the peer's change, yet the carry is accepted: committing would revert the peer. The review's probe P6 shows the exact carry was already accepted on the base before the composition fix. No production path is known to move the worktree HEAD without its index between the carry and pre-commit (the fleet rebase does reset --soft to GitHead, and ff-merge requires descent from main), so this is defense in depth.",
+  "fix": "At the pre-commit check, require HEAD == rec.GitHead for a carried ship, or re-derive tree-delta identity against the current HEAD instead of the record's head. One home inside the carry rule; post-push stays as it is.",
+  "acceptance": [
+    "A carried ship whose worktree HEAD moved past rec.GitHead to a peer commit, with the index at the carry tree (+ consumption), is refused at pre-commit with the moved HEAD named (red first; the review's probe P6 shape)",
+    "A carried ship whose HEAD equals rec.GitHead still ships (the cycle-1825 pin stays green)",
+    "Overlay mutants on the new condition are killed"
+  ],
+  "files": [
+    "go/internal/phases/ship/carry.go",
+    "go/internal/phases/ship/carry_consumption_compose_test.go"
+  ],
+  "connects_to": [
+    "pre-commit-carry-refusal-returns-to-audit"
+  ]
+}

@@ -20,9 +20,9 @@ func init() {
 }
 
 func carrySatisfied(ctx context.Context, opts *Options, dir, actual string) (bool, string) {
-	rec, found, reason := boundCarryRecord(opts, actual)
+	rec, found, reason := boundCarryRecord(opts)
 	if reason == "" {
-		reason = reProveCarry(ctx, opts, heldCarry{dir: dir, tree: actual, record: rec})
+		reason = carryExplains(ctx, opts, heldCarry{dir: dir, tree: actual, record: rec})
 	}
 	if reason == "" {
 		return true, fmt.Sprintf(" (the byte-identical rebase carry of cycle %d, re-proven)", rec.Cycle)
@@ -37,7 +37,7 @@ func carrySatisfied(ctx context.Context, opts *Options, dir, actual string) (boo
 	return false, reason
 }
 
-func boundCarryRecord(opts *Options, actual string) (ledger.CompositionVerdict, bool, string) {
+func boundCarryRecord(opts *Options) (ledger.CompositionVerdict, bool, string) {
 	ref := opts.internalAuditArtifactSHA
 	if ref == "" {
 		return ledger.CompositionVerdict{}, false, "the audit binding names no audit artifact"
@@ -50,8 +50,6 @@ func boundCarryRecord(opts *Options, actual string) (ledger.CompositionVerdict, 
 		return rec, false, "no identical-rebase carry names audit " + ref
 	case rec.AuditedTreeSHA != opts.internalAuditBoundTreeSHA:
 		return rec, true, fmt.Sprintf("the carry of cycle %d names the audited tree %s, not the bound %s", rec.Cycle, rec.AuditedTreeSHA, opts.internalAuditBoundTreeSHA)
-	case rec.TreeStateSHA != actual:
-		return rec, true, fmt.Sprintf("the carry of cycle %d names the tree %s, not %s", rec.Cycle, rec.TreeStateSHA, actual)
 	}
 	return rec, true, ""
 }
@@ -59,6 +57,16 @@ func boundCarryRecord(opts *Options, actual string) (ledger.CompositionVerdict, 
 type heldCarry struct {
 	dir, tree string
 	record    ledger.CompositionVerdict
+}
+
+func carryExplains(ctx context.Context, opts *Options, held heldCarry) string {
+	rec := held.record
+	if rec.TreeStateSHA != held.tree {
+		if ok, offending := treeDriftExplainedByConsumption(ctx, opts, held.dir, rec.TreeStateSHA, held.tree); !ok {
+			return fmt.Sprintf("the carry of cycle %d names the tree %s, not %s%s", rec.Cycle, rec.TreeStateSHA, held.tree, offending)
+		}
+	}
+	return reProveCarry(ctx, opts, held)
 }
 
 func reProveCarry(ctx context.Context, opts *Options, held heldCarry) string {
@@ -74,7 +82,7 @@ func reProveCarry(ctx context.Context, opts *Options, held heldCarry) string {
 			return fmt.Sprintf("%s is not an ancestor of %s", edge[0], edge[1])
 		}
 	}
-	audited, _, ok, err := treedelta.Identical(ctx, gitAt(opts), dir, rec.AuditedBase, rec.AuditedTreeSHA, rec.GitHead, held.tree)
+	audited, _, ok, err := treedelta.Identical(ctx, gitAt(opts), dir, rec.AuditedBase, rec.AuditedTreeSHA, rec.GitHead, rec.TreeStateSHA)
 	if err != nil || !ok {
 		return fmt.Sprintf("the change on %s is not byte for byte the audited change (err=%v)", rec.GitHead, err)
 	}
