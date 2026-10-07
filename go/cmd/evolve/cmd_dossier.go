@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json]")
+		fmt.Fprintln(stderr, "evolve dossier: usage: dossier verify | retro-mislabel [--project-root P] [--json] | publish [--dry-run] [--project-root P]")
 		return 10
 	}
 	switch args[0] {
@@ -22,10 +23,72 @@ func runDossier(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runDossierVerify(args[1:], stdout, stderr)
 	case "retro-mislabel":
 		return runDossierRetroMislabel(args[1:], stdout, stderr)
+	case "publish":
+		return runDossierPublish(args[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | retro-mislabel)\n", args[0])
+		fmt.Fprintf(stderr, "evolve dossier: unknown subcommand %q (want: verify | retro-mislabel | publish)\n", args[0])
 		return 10
 	}
+}
+
+func runDossierPublish(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("evolve dossier publish", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	root := fs.String("project-root", ".", "the plane whose .evolve/dossiers-pending is published")
+	dryRun := fs.Bool("dry-run", false, "list what would publish and what would hold it; change nothing")
+	if err := fs.Parse(args); err != nil {
+		return 10
+	}
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "dossier publish: unexpected arguments %q\n", fs.Args())
+		return 10
+	}
+	projectRoot := paths.AbsoluteRoot("the project root", *root, nil)
+	pairs, halfPairs, err := dossier.ListPending(projectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier publish: %v\n", err)
+		return 2
+	}
+	if len(halfPairs) > 0 {
+		fmt.Fprintf(stdout, "dossier publish: half pairs %v stay pending (a .md without its .json)\n", halfPairs)
+	}
+	if len(pairs) == 0 {
+		fmt.Fprintln(stdout, "dossier publish: nothing pending to publish")
+		return 0
+	}
+	lock := tryDossierPublishLock
+	if *dryRun {
+		lock = probeDossierPublishLock
+	}
+	release, hold, err := holdDossierPublish(projectRoot, lock)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier publish: %v\n", err)
+		return 2
+	}
+	if hold != "" {
+		fmt.Fprintf(stderr, "dossier publish: held: %s; pending cycles %v stay pending\n", hold, pairs)
+		return 1
+	}
+	defer release()
+	if *dryRun {
+		fmt.Fprintf(stdout, "dossier publish: dry run: would publish cycles %v\n", pairs)
+		return 0
+	}
+	return publishDossierPairs(projectRoot, stdout, stderr)
+}
+
+func publishDossierPairs(projectRoot string, stdout, stderr io.Writer) int {
+	res, err := dossier.PublishPending(projectRoot, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "dossier publish: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(stdout, "dossier publish: published cycles %v\n", res.Published)
+	if len(res.Failed) > 0 {
+		fmt.Fprintf(stderr, "dossier publish: %d pending pairs were refused or failed and stay pending\n", len(res.Failed))
+		return 2
+	}
+	return 0
 }
 
 type dossierRetroMislabelReport struct {

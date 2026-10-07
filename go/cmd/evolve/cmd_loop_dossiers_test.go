@@ -415,3 +415,26 @@ func TestRunFleet_PublishesTheLanesPendingCloseoutsInItsWorkingTree(t *testing.T
 		t.Fatalf("HEAD = %q, want the lanes' pending closeout published once they returned", got)
 	}
 }
+
+func TestRunDossierPublish_ADryRunReportsABusyLockAsAHoldAndPublishesNothing(t *testing.T) {
+	r := planeWithAPendingCloseout(t, "main")
+	release, err := flock.Lock(flock.ShipLockPath(r.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	head := r.Git("rev-parse", "HEAD")
+	var stdout, stderr bytes.Buffer
+
+	code := runDossier([]string{"publish", "--dry-run", "--project-root", r.Dir}, nil, &stdout, &stderr)
+
+	if code != 1 || !strings.Contains(stderr.String(), "git-mutation lock") || !strings.Contains(stderr.String(), "1705") {
+		t.Fatalf("a dry run while the lock is busy must exit 1 naming the lock and cycle 1705: code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
+	}
+	if r.Git("rev-parse", "HEAD") != head {
+		t.Fatal("a dry run moved HEAD")
+	}
+	if _, err := os.Stat(filepath.Join(dossier.PendingDir(r.Dir), "cycle-1705.json")); err != nil {
+		t.Fatalf("the pair must stay pending: %v", err)
+	}
+}

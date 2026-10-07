@@ -30,19 +30,12 @@ type PublishResult struct {
 
 func PublishPending(projectRoot string, logw io.Writer) (PublishResult, error) {
 	res := PublishResult{Failed: map[int]error{}}
-	entries, err := os.ReadDir(PendingDir(projectRoot))
-	if errors.Is(err, fs.ErrNotExist) {
-		return res, nil
-	}
+	pairs, halfPairs, err := ListPending(projectRoot)
 	if err != nil {
-		return res, fmt.Errorf("dossier: list pending closeouts: %w", err)
+		return res, err
 	}
-	cycles, hasJSON := pendingCycles(entries)
-	for _, n := range cycles {
-		if !hasJSON[n] {
-			res.Skipped = append(res.Skipped, n)
-			continue
-		}
+	res.Skipped = halfPairs
+	for _, n := range pairs {
 		if err := publishPair(projectRoot, n); err != nil {
 			res.Failed[n] = err
 			fmt.Fprintf(logw, "[dossier-publish] ERROR cycle %d: %v; the pair stays pending\n", n, err)
@@ -54,6 +47,25 @@ func PublishPending(projectRoot string, logw io.Writer) (PublishResult, error) {
 		}
 	}
 	return res, nil
+}
+
+func ListPending(projectRoot string) (pairs, halfPairs []int, err error) {
+	entries, err := os.ReadDir(PendingDir(projectRoot))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("dossier: list pending closeouts: %w", err)
+	}
+	cycles, hasJSON := pendingCycles(entries)
+	for _, n := range cycles {
+		if hasJSON[n] {
+			pairs = append(pairs, n)
+		} else {
+			halfPairs = append(halfPairs, n)
+		}
+	}
+	return pairs, halfPairs, nil
 }
 
 func pendingCycles(entries []fs.DirEntry) ([]int, map[int]bool) {

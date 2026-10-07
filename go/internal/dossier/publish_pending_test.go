@@ -302,3 +302,45 @@ func appendTo(t *testing.T, path, text string) {
 		t.Fatal(err)
 	}
 }
+
+func TestListPending_SplitsPairsFromHalfPairsAndIgnoresStrayFiles(t *testing.T) {
+	root := t.TempDir()
+	pending := PendingDir(root)
+	for _, d := range []*Dossier{pendingCloseout(), {Cycle: 3, Goal: "half", FinalVerdict: VerdictPass,
+		Phases: []PhaseRecord{{Name: "build", Verdict: VerdictPass}}}} {
+		if err := Write(d, pending, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Remove(filepath.Join(pending, "cycle-3.json")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pending, "notes.txt"), []byte("stray\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pairs, halfPairs, err := ListPending(root)
+
+	if err != nil || !reflect.DeepEqual(pairs, []int{7}) || !reflect.DeepEqual(halfPairs, []int{3}) {
+		t.Fatalf("ListPending = (%v, %v, %v), want pair 7 and half pair 3", pairs, halfPairs, err)
+	}
+}
+
+func TestListPending_AnAbsentDirIsEmptyAndAnUnlistableOneIsAnError(t *testing.T) {
+	root := t.TempDir()
+	if pairs, halfPairs, err := ListPending(root); err != nil || pairs != nil || halfPairs != nil {
+		t.Fatalf("ListPending with no pending dir = (%v, %v, %v), want nothing", pairs, halfPairs, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(PendingDir(root)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(PendingDir(root), []byte("not a dir\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := ListPending(root)
+
+	if err == nil || !strings.Contains(err.Error(), "dossiers-pending") {
+		t.Fatalf("ListPending on an unlistable pending dir = %v, want an error naming it", err)
+	}
+}

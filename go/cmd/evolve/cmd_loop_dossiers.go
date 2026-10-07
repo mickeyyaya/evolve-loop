@@ -31,23 +31,15 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 	if !hasPendingDossiers(projectRoot, warn) {
 		return
 	}
-	if _, err := plane.Classify(projectRoot); err != nil {
-		return
-	}
-	if busy := anotherRunLive(projectRoot); busy != "" {
-		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %s — they stay pending\n", busy)
-		return
-	}
-	release, err := dossierPublishLock(projectRoot)
+	release, hold, err := holdDossierPublish(projectRoot, dossierPublishLock)
 	if err != nil {
-		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: git-mutation lock: %v — they stay pending\n", err)
 		return
 	}
-	defer release()
-	if hold := publishHold(projectRoot); hold != "" {
+	if hold != "" {
 		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %s — they stay pending\n", hold)
 		return
 	}
+	defer release()
 	res, err := dossier.PublishPending(projectRoot, warn)
 	if err != nil {
 		fmt.Fprintf(warn, "[dossier] WARN: pending dossiers: %v — they stay pending\n", err)
@@ -56,6 +48,43 @@ func publishPendingDossiers(projectRoot string, warn io.Writer) {
 	if len(res.Published) > 0 || len(res.Skipped) > 0 || len(res.Failed) > 0 {
 		fmt.Fprintf(warn, "[dossier] pending dossiers: published cycles %v; half pairs %v; refused or failed %d\n", res.Published, res.Skipped, len(res.Failed))
 	}
+}
+
+func holdDossierPublish(projectRoot string, lock func(string) (func(), error)) (release func(), hold string, err error) {
+	if _, err := plane.Classify(projectRoot); err != nil {
+		return nil, "", err
+	}
+	if busy := anotherRunLive(projectRoot); busy != "" {
+		return nil, busy, nil
+	}
+	release, err = lock(projectRoot)
+	if err != nil {
+		return nil, fmt.Sprintf("git-mutation lock: %v", err), nil
+	}
+	if hold := publishHold(projectRoot); hold != "" {
+		release()
+		return nil, hold, nil
+	}
+	return release, "", nil
+}
+
+func tryDossierPublishLock(projectRoot string) (func(), error) {
+	path := flock.ShipLockPath(projectRoot)
+	release, held, err := flock.TryLock(path)
+	if err != nil {
+		return nil, err
+	}
+	if held {
+		return nil, fmt.Errorf("%s is held by another process", path)
+	}
+	return release, nil
+}
+
+func probeDossierPublishLock(projectRoot string) (func(), error) {
+	if _, err := os.Lstat(flock.ShipLockPath(projectRoot)); errors.Is(err, fs.ErrNotExist) {
+		return func() {}, nil
+	}
+	return tryDossierPublishLock(projectRoot)
 }
 
 func anotherRunLive(projectRoot string) string {
