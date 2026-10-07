@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
 )
 
 // Policy, RunsPolicy and WorktreesPolicy are the `.evolve/policy.json` gc
@@ -286,7 +287,7 @@ func protected(evolveDir, path string) bool {
 	}
 	first := strings.Split(filepath.ToSlash(rel), "/")[0]
 	switch first {
-	case "quarantine", "ledger.jsonl", "ledger.tip", "ledger-segments", "ledger.lock", "archive":
+	case "quarantine", "ledger.jsonl", "ledger.tip", "ledger-segments", ledgerartifacts.DirName, "ledger.lock", "archive":
 		return true
 	}
 	return false

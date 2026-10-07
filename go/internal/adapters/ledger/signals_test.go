@@ -142,9 +142,11 @@ func TestWithSignals_NilCenterIsTheNullObject(t *testing.T) {
 func TestFileLedger_EveryLineWriterReachesTheAppendChokepointOrIsInventoried(t *testing.T) {
 	t.Parallel()
 	exempt := map[string]string{
-		"Append":                  "the chokepoint itself — the observer runs here",
-		"Rebaseline":              "evolve ledger rebaseline: an operator repair root outside the orchestrator process; the marker chains from the physical tail",
-		"WriteCompositionVerdict": "a composition record (not a core.LedgerEntry) written by a self-constructed ledger; S4b threads the root's ledger",
+		"Append":                     "the chokepoint itself — the observer runs here",
+		"Rebaseline":                 "evolve ledger rebaseline: an operator repair root outside the orchestrator process; the marker chains from the physical tail",
+		"WriteCompositionVerdict":    "a composition record (not a core.LedgerEntry) written by a self-constructed ledger; S4b threads the root's ledger",
+		"RestoreCompositionEvidence": "evolve ledger evidence restore: an operator repair root outside the orchestrator process; its composition-evidence record is not a core.LedgerEntry",
+		"PreviewCompositionEvidence": "evolve ledger evidence restore --dry-run: its previewSink records nothing; this scan resolves calls by bare name, so it cannot tell the sinks apart",
 	}
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool { return !strings.HasSuffix(fi.Name(), "_test.go") }, 0)

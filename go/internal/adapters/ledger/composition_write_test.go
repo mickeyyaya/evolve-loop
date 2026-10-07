@@ -19,7 +19,7 @@ func passingComposedGates() map[string]string {
 	return m
 }
 
-func honestWriteInput(t *testing.T, artifactDir string) CompositionVerdictInput {
+func honestWriteInput(t *testing.T) CompositionVerdictInput {
 	t.Helper()
 	honestID, err := PatchID([]byte(compTestDiff))
 	if err != nil {
@@ -35,7 +35,6 @@ func honestWriteInput(t *testing.T, artifactDir string) CompositionVerdictInput 
 		GateResults:  passingComposedGates(),
 		AuditedDiff:  []byte(compTestDiff),
 		ComposedDiff: []byte(compTestDiff),
-		ArtifactDir:  artifactDir,
 	}
 }
 
@@ -54,7 +53,7 @@ func ledgerSize(t *testing.T, ledgerPath string) int64 {
 func TestWriteCompositionVerdict_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	ledgerPath := filepath.Join(dir, "ledger.jsonl")
-	in := honestWriteInput(t, dir)
+	in := honestWriteInput(t)
 
 	if err := WriteCompositionVerdict(ledgerPath, in); err != nil {
 		t.Fatalf("WriteCompositionVerdict(honest input): %v", err)
@@ -148,7 +147,7 @@ func TestWriteCompositionVerdict_RejectsPatchIDMismatch(t *testing.T) {
 			}
 			before := ledgerSize(t, ledgerPath)
 
-			in := honestWriteInput(t, dir)
+			in := honestWriteInput(t)
 			tc.mutate(&in)
 
 			if err := WriteCompositionVerdict(ledgerPath, in); err == nil {
@@ -175,7 +174,7 @@ func TestWriteCompositionVerdict_EmptyDiff(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			ledgerPath := filepath.Join(dir, "ledger.jsonl")
-			in := honestWriteInput(t, dir)
+			in := honestWriteInput(t)
 			tc.mutate(&in)
 
 			if err := WriteCompositionVerdict(ledgerPath, in); err == nil {
