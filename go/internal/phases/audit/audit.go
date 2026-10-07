@@ -263,7 +263,7 @@ func harnessRedClause(harnessReds []string) string {
 	if len(harnessReds) == 0 {
 		return ""
 	}
-	clause := fmt.Sprintf("; %d red(s) are the harness's own: predicates that could not run, first %s", len(harnessReds), harnessReds[0])
+	clause := fmt.Sprintf("; %d%s, first %s", len(harnessReds), core.HarnessRedClauseMarker, harnessReds[0])
 	if len(harnessReds) > 1 {
 		clause += fmt.Sprintf(" (+%d more in acs-verdict.json)", len(harnessReds)-1)
 	}

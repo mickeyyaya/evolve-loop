@@ -67,8 +67,12 @@ func (o *Orchestrator) decideAfterAuditFail(cs CycleState) (Phase, string, *Syst
 }
 
 func (o *Orchestrator) auditFailEnvelope(cs CycleState, floorCandidate string) (retryEnvelope, *phasecontract.FailureBlock) {
-	fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
-	if !ok {
+	fb, declared := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit))
+	gateDerived := false
+	if !declared {
+		fb, gateDerived = gateFailureBlock(cs.AuditFailReasons)
+	}
+	if fb == nil {
 		fb = &phasecontract.FailureBlock{}
 	}
 	env := computeRetryEnvelope(retryEnvelopeInput{
@@ -77,6 +81,9 @@ func (o *Orchestrator) auditFailEnvelope(cs CycleState, floorCandidate string) (
 		Attempts:                    cs.AuditRepairAttempts,
 		Policy:                      o.failurePolicy,
 	})
+	if gateDerived {
+		env = gateRemediationEnvelope(env)
+	}
 	if _, explanationOnly := explanationCorrectionDocument(cs, fb); explanationOnly {
 		env = explanationCorrectionEnvelope(env)
 	}
