@@ -1,0 +1,38 @@
+{
+  "acceptance": [
+    "Plain Verify passes on a sealed, untampered ledger and still fails on a tampered live line (test)",
+    "A byte-identical carry re-proves on a sealed ledger (ship test through carrySatisfied)",
+    "VerifyDeep inside Seal's truncate-then-anchor window does not report ErrSealResidue for a seal in progress (test)",
+    "docs/plans/ledger-restructure-2026-10.md lists this item as a hard prerequisite of C12 and C13"
+  ],
+  "connects_to": [
+    "ledger-plain-verify-fails-after-seal"
+  ],
+  "consumed": {
+    "at": "2026-10-07T12:46:37Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "839a819ca9f0930d6e4929cdea60df6c1b9c38e3",
+    "branch": "cycle-cd3ae73e-1825",
+    "cycle": 1825,
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1825/audit-fail-reason.json",
+    "snapshot_sha": "bf4c2b1d9276e81ca00618d66b1409b2b23f80fa",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-1825"
+  },
+  "created_at": "2026-10-07T00:00:00Z",
+  "files": [
+    "go/internal/adapters/ledger/ledger.go",
+    "go/internal/adapters/ledger/seal.go",
+    "go/internal/phases/ship/carry.go"
+  ],
+  "fix": "Make plain Verify segment-aware enough to verify a sealed ledger: start the strict walk from the newest segment's anchored tail hash. That is the ledger plan's C12 (incremental verify); land it, or this narrower fix, before C13 seals anything on the plane. Give Seal one atomic step: append the anchor before releasing the chain lock, or have VerifyDeep treat a segment whose anchor is the next append as in-flight. Pin both with tests: seal then plain Verify, seal then carrySatisfied, and VerifyDeep inside Seal's gap.",
+  "id": "seal-breaks-live-only-verify-and-carry",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-07 re-review of the carry lane (finding A4)",
+  "summary": "Found by the 2026-10-07 re-review of the carry lane (dev/cl-carryf5, finding A4), pre-existing. After a seal, the first live line chains from a line that now lives in a sealed segment, so plain Verify reads only the live file and stops with 'line 0 chained-genesis prev_hash mismatch' on every sealed ledger (the package doc's open finding). Ship's carry check, carrySatisfied, runs that live-only Verify, so the first seal of the plane ledger would make every byte-identical carry fall back to a re-audit, for good. Separately, Seal truncates under the lock and appends its segment_seal anchor only after releasing it; a VerifyDeep inside that gap reports ErrSealResidue (no anchor for the segment) although nothing is damaged. A reviewer probe in the carry lane's scratch (TestProbeRereview_VerifyInsideSealsGap) shows both.",
+  "title": "Sealing the ledger makes live-only Verify fail for good, which would disable every carry; Seal's gap also shows ErrSealResidue to a concurrent VerifyDeep",
+  "weight": 0.7
+}

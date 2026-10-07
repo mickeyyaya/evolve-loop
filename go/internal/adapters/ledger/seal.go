@@ -14,10 +14,14 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-const segmentsDirName = "ledger-segments"
+const (
+	segmentsDirName = "ledger-segments"
+	segmentMode     = 0o600
+)
 
 // SealKind is the Kind of the chained entry that binds a segment to its uncompressed SHA.
 const SealKind = "segment_seal"
@@ -26,7 +30,7 @@ const SealKind = "segment_seal"
 var ErrSealResidue = errors.New("ledger seal residue — re-run `evolve ledger seal` to complete")
 
 // Seal moves all but the newest keepTail (at least 1) lines into the next gzip segment and appends its anchor.
-func (l *FileLedger) Seal(ctx context.Context, keepTail int) error {
+func (l *FileLedger) Seal(_ context.Context, keepTail int) error {
 	if keepTail < 1 {
 		keepTail = 1
 	}
@@ -38,24 +42,30 @@ func (l *FileLedger) Seal(ctx context.Context, keepTail int) error {
 	}
 	defer sealRelease()
 
-	anchor, err := func() (*core.LedgerEntry, error) {
-		l.mu.Lock()
-		defer l.mu.Unlock()
-		release, err := flock.Lock(l.lockPath)
-		if err != nil {
-			return nil, fmt.Errorf("ledger seal: %w", err)
-		}
-		defer release()
-		return l.sealLocked(keepTail)
-	}()
-	if err != nil || anchor == nil {
+	anchor, err := l.sealAndAnchor(keepTail)
+	if anchor == nil {
 		return err
 	}
-	// The anchor goes through Append once the inner locks drop, so it chains like any entry.
-	if err := l.Append(ctx, *anchor); err != nil {
+	l.observe(*anchor, err)
+	if err != nil {
 		return fmt.Errorf("ledger seal: anchor append: %w", err)
 	}
 	return nil
+}
+
+func (l *FileLedger) sealAndAnchor(keepTail int) (*core.LedgerEntry, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	release, err := flock.Lock(l.lockPath)
+	if err != nil {
+		return nil, fmt.Errorf("ledger seal: %w", err)
+	}
+	defer release()
+	anchor, err := l.sealLocked(keepTail)
+	if err != nil || anchor == nil {
+		return nil, err
+	}
+	return anchor, l.appendChainedLocked(chainInto(anchor))
 }
 
 // sealLocked does the segment write + truncation under the caller-held
@@ -283,6 +293,24 @@ func (l *FileLedger) verifyChain(segs []sealedSegment, live [][]byte, checkTip f
 	return scope, nil
 }
 
+func (l *FileLedger) sealedPredecessor(live [][]byte) ([]byte, error) {
+	segs, err := segmentFiles(filepath.Join(filepath.Dir(l.ledgerPath), segmentsDirName))
+	if err != nil {
+		return nil, err
+	}
+	for i := len(segs) - 1; i >= 0; i-- {
+		segLines, _, err := readSegment(segs[i])
+		if err != nil {
+			return nil, err
+		}
+		stillLive := len(segLines) > 0 && len(live) > 0 && bytes.Equal(segLines[0], live[0])
+		if len(segLines) > 0 && !stillLive {
+			return segLines[len(segLines)-1], nil
+		}
+	}
+	return nil, nil
+}
+
 // segmentFiles lists seg-*.jsonl.gz sorted; the fixed-width counter makes lexical order chronological.
 func segmentFiles(segDir string) ([]string, error) {
 	entries, err := os.ReadDir(segDir)
@@ -305,36 +333,16 @@ func segmentFiles(segDir string) ([]string, error) {
 
 // writeSegment gzips raw into path atomically (tmp + rename + dir create).
 func writeSegment(path string, raw []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("ledger seal: mkdir: %w", err)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("ledger seal: tmp: %w", err)
-	}
-	tmpPath := tmp.Name()
-	fail := func(stage string, err error) error {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("ledger seal: %s: %w", stage, err)
-	}
-	zw := gzip.NewWriter(tmp)
+	var gz bytes.Buffer
+	zw := gzip.NewWriter(&gz)
 	if _, err := zw.Write(raw); err != nil {
-		return fail("gzip write", err)
+		return fmt.Errorf("ledger seal: gzip write: %w", err)
 	}
 	if err := zw.Close(); err != nil {
-		return fail("gzip close", err)
+		return fmt.Errorf("ledger seal: gzip close: %w", err)
 	}
-	if err := tmp.Sync(); err != nil {
-		return fail("sync", err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("ledger seal: close: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("ledger seal: rename: %w", err)
+	if err := atomicwrite.Durable(path, gz.Bytes(), segmentMode); err != nil {
+		return fmt.Errorf("ledger seal: %w", err)
 	}
 	return nil
 }

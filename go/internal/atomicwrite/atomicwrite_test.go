@@ -14,18 +14,18 @@ import (
 // t.Parallel() (only the seam-free happy-path/marshal tests do).
 func withSeams(t *testing.T, set func()) {
 	t.Helper()
-	origMkdir, origRename, origRemove, origCreate := mkdirAll, renameFile, removeFile, createTemp
+	origMkdir, origRename, origRemove, origCreate, origOpenDir := mkdirAll, renameFile, removeFile, createTemp, openDir
 	t.Cleanup(func() {
-		mkdirAll, renameFile, removeFile, createTemp = origMkdir, origRename, origRemove, origCreate
+		mkdirAll, renameFile, removeFile, createTemp, openDir = origMkdir, origRename, origRemove, origCreate, origOpenDir
 	})
 	set()
 }
 
 // fakeTemp is an injectable tempFile whose ops fail on demand.
 type fakeTemp struct {
-	name                         string
-	writeErr, chmodErr, closeErr error
-	closed                       bool
+	name                                  string
+	writeErr, chmodErr, syncErr, closeErr error
+	closed, synced                        bool
 }
 
 func (f *fakeTemp) Write(p []byte) (int, error) {
@@ -36,6 +36,7 @@ func (f *fakeTemp) Write(p []byte) (int, error) {
 }
 func (f *fakeTemp) Name() string            { return f.name }
 func (f *fakeTemp) Chmod(fs.FileMode) error { return f.chmodErr }
+func (f *fakeTemp) Sync() error             { f.synced = true; return f.syncErr }
 func (f *fakeTemp) Close() error            { f.closed = true; return f.closeErr }
 
 func TestBytes_HappyPath_WritesAtomicallyWith0644(t *testing.T) {

@@ -298,19 +298,33 @@ func TestPut_KeepsTheTempOfALiveWriterItCannotSignal(t *testing.T) {
 	}
 }
 
-func TestPut_TheReaperReadsTheTempNamesItsWriterCreates(t *testing.T) {
-	f, err := os.CreateTemp(t.TempDir(), tempPattern(4242))
-	if err != nil {
+func TestPut_ReapsTheDurableTempOfAWriterThatDiedAndKeepsALiveOnes(t *testing.T) {
+	evolveDir := t.TempDir()
+	body := []byte("a crashed durable write\n")
+	digest := sha256Hex(body)
+	fanOut := filepath.Join(evolveDir, DirName, "sha256", digest[:2])
+	if err := os.MkdirAll(fanOut, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Close(); err != nil {
+	durableTemp := func(pid int) string {
+		return filepath.Join(fanOut, fmt.Sprintf(".%s.%d.123.tmp", digest[2:], pid))
+	}
+	stale, inFlight := durableTemp(exitedPID(t)), durableTemp(os.Getpid())
+	for _, p := range []string{stale, inFlight} {
+		if err := os.WriteFile(p, []byte("partial"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := Open(evolveDir).Put(body); err != nil {
 		t.Fatal(err)
 	}
 
-	pid, ok := tempWriter(filepath.Base(f.Name()))
-
-	if !ok || pid != 4242 {
-		t.Fatalf("tempWriter(%q) = (%d, %v), want (4242, true): the reaper must parse the name its own writer creates", filepath.Base(f.Name()), pid, ok)
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the durable temp of a writer that died is still in the store (stat err=%v)", err)
+	}
+	if _, err := os.Stat(inFlight); err != nil {
+		t.Errorf("the durable temp of a live writer was reaped: %v", err)
 	}
 }
 

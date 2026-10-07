@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/statemap"
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -174,25 +175,14 @@ func readJSON(path string, v any) error {
 	return nil
 }
 
-// ioHooks holds injectable seams so tests can drive error branches
-// (fsync, close, rename) that are otherwise impossible to trigger with
-// a real filesystem on macOS/Linux without root.
 type ioHooks struct {
 	marshal func(v any) ([]byte, error)
-	write   func(f *os.File, b []byte) (int, error)
-	sync    func(f *os.File) error
-	closeF  func(f *os.File) error
-	rename  func(oldpath, newpath string) error
 }
 
 // hooks is the default I/O surface. Tests swap fields temporarily via
 // withHooks to inject failures.
 var hooks = ioHooks{
 	marshal: func(v any) ([]byte, error) { return json.MarshalIndent(v, "", "  ") },
-	write:   func(f *os.File, b []byte) (int, error) { return f.Write(b) },
-	sync:    func(f *os.File) error { return f.Sync() },
-	closeF:  func(f *os.File) error { return f.Close() },
-	rename:  os.Rename,
 }
 
 // withHooks temporarily replaces hooks for the duration of fn. Used by
@@ -203,18 +193,6 @@ func withHooks(replacement ioHooks, fn func()) {
 	if replacement.marshal != nil {
 		hooks.marshal = replacement.marshal
 	}
-	if replacement.write != nil {
-		hooks.write = replacement.write
-	}
-	if replacement.sync != nil {
-		hooks.sync = replacement.sync
-	}
-	if replacement.closeF != nil {
-		hooks.closeF = replacement.closeF
-	}
-	if replacement.rename != nil {
-		hooks.rename = replacement.rename
-	}
 	defer func() { hooks = prev }()
 	fn()
 }
@@ -223,39 +201,9 @@ func withHooks(replacement ioHooks, fn func()) {
 // file + rename. Crash-safe: either the old file or the new file is
 // visible, never a half-written truncation.
 func writeJSONAtomic(path string, v any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
-	}
 	buf, err := hooks.marshal(v)
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	buf = append(buf, '\n')
-
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
-	if err != nil {
-		return fmt.Errorf("tmp: %w", err)
-	}
-	tmpPath := tmp.Name()
-	cleanup := func() { _ = os.Remove(tmpPath) }
-
-	if _, err := hooks.write(tmp, buf); err != nil {
-		_ = hooks.closeF(tmp)
-		cleanup()
-		return fmt.Errorf("write tmp: %w", err)
-	}
-	if err := hooks.sync(tmp); err != nil {
-		_ = hooks.closeF(tmp)
-		cleanup()
-		return fmt.Errorf("sync tmp: %w", err)
-	}
-	if err := hooks.closeF(tmp); err != nil {
-		cleanup()
-		return fmt.Errorf("close tmp: %w", err)
-	}
-	if err := hooks.rename(tmpPath, path); err != nil {
-		cleanup()
-		return fmt.Errorf("rename: %w", err)
-	}
-	return nil
+	return atomicwrite.Durable(path, append(buf, '\n'), 0o600)
 }

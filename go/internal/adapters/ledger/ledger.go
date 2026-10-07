@@ -94,33 +94,43 @@ func New(evolveDir string, opts ...Option) *FileLedger {
 
 // Append chains e onto the tip (entry_seq, prev_hash), appends it to ledger.jsonl and replaces ledger.tip.
 func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
-	err := l.appendChained(func(seq int, prevHash string) any {
+	err := l.appendChained(chainInto(&e))
+	l.observe(e, err)
+	return err
+}
+
+func chainInto(e *core.LedgerEntry) func(seq int, prevHash string) any {
+	return func(seq int, prevHash string) any {
 		e.EntrySeq = seq
 		e.PrevHash = prevHash
-		return e
-	})
-	if l.onAppend != nil {
-		l.onAppend(e, err) // e carries the chained seq the fill stamped on success
+		return *e
 	}
-	return err
+}
+
+func (l *FileLedger) observe(e core.LedgerEntry, err error) {
+	if l.onAppend != nil {
+		l.onAppend(e, err)
+	}
 }
 
 // appendChained is the tip-read→append→tip-write critical section every chained line goes through.
 // A line written outside it breaks the next entry, which chains from the tip while walkChain reads the file.
 func (l *FileLedger) appendChained(fill func(seq int, prevHash string) any) error {
-	return l.underChainLock(func() error {
-		prevSeq, prevHash, err := l.readTip()
-		if err != nil {
-			return err
-		}
-		seq := 0
-		if prevHash == "" {
-			prevHash = ZeroSeed
-		} else {
-			seq = prevSeq + 1
-		}
-		return l.appendLineAndReplaceTip(fill(seq, prevHash), seq)
-	})
+	return l.underChainLock(func() error { return l.appendChainedLocked(fill) })
+}
+
+func (l *FileLedger) appendChainedLocked(fill func(seq int, prevHash string) any) error {
+	prevSeq, prevHash, err := l.readTip()
+	if err != nil {
+		return err
+	}
+	seq := 0
+	if prevHash == "" {
+		prevHash = ZeroSeed
+	} else {
+		seq = prevSeq + 1
+	}
+	return l.appendLineAndReplaceTip(fill(seq, prevHash), seq)
 }
 
 func (l *FileLedger) underChainLock(fn func() error) error {
@@ -242,12 +252,19 @@ func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 	if _, err := os.Stat(l.ledgerPath); errors.Is(err, os.ErrNotExist) {
 		return VerifiedScope{}, nil
 	}
-	var raw []byte
+	var live [][]byte
+	var seed []byte
 	var tip tipRead
-	err := l.readSnapshot(func() (err error) {
-		raw, err = hooks.readF(l.ledgerPath)
+	var segErr error
+	err := l.readSnapshot(func() error {
+		raw, err := hooks.readF(l.ledgerPath)
 		tip = l.readTipFile()
-		return err
+		if err != nil {
+			return err
+		}
+		live = splitLines(raw)
+		seed, segErr = l.sealedPredecessor(live)
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -255,18 +272,25 @@ func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 		}
 		return VerifiedScope{}, fmt.Errorf("ledger read: %w", err)
 	}
-	lines := splitLines(raw)
-	if len(lines) == 0 {
+	if segErr != nil {
+		return VerifiedScope{}, segErr
+	}
+	if len(live) == 0 {
 		return VerifiedScope{}, nil
 	}
+	return l.verifyLive(seed, live, tip)
+}
 
-	anchorSHA, anchorSeq := effectiveAnchorSHA(lines, l.loadAnchorSHA())
-	lastSeq, lastSha, sawV837, err := walkChain(lines, anchorSHA, indexCompositionEvidence(l.evidence(), lines))
+func (l *FileLedger) verifyLive(seed []byte, live [][]byte, tip tipRead) (VerifiedScope, error) {
+	lines := live
+	if seed != nil {
+		lines = append([][]byte{seed}, live...)
+	}
+	scope := liveScope(seed, lines, l.loadAnchorSHA())
+	lastSeq, lastSha, sawV837, err := walkChain(lines, scope.AnchorLineSHA, indexCompositionEvidence(l.evidence(), lines))
 	if err != nil {
 		return VerifiedScope{}, err
 	}
-	scope := VerifiedScope{AnchorLineSHA: anchorSHA, AnchorSeq: anchorSeq}
-	// A ledger with no chained (v8.37+) line has no tip to check.
 	if !sawV837 {
 		return scope, nil
 	}
@@ -274,6 +298,26 @@ func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 		return VerifiedScope{}, err
 	}
 	return scope, nil
+}
+
+func liveScope(seed []byte, lines [][]byte, fileAnchorSHA string) VerifiedScope {
+	anchorSHA, anchorSeq := effectiveAnchorSHA(lines, fileAnchorSHA)
+	if seed == nil || carriesLine(lines, anchorSHA) {
+		return VerifiedScope{AnchorLineSHA: anchorSHA, AnchorSeq: anchorSeq}
+	}
+	if anchorSHA, anchorSeq = effectiveAnchorSHA(lines, ""); anchorSHA != "" {
+		return VerifiedScope{AnchorLineSHA: anchorSHA, AnchorSeq: anchorSeq}
+	}
+	_, e, _ := decodeLedgerLine(seed)
+	return VerifiedScope{AnchorLineSHA: sha256Hex(seed), AnchorSeq: e.EntrySeq, FromSealedSegment: true}
+}
+
+func carriesLine(lines [][]byte, lineSHA string) bool {
+	if lineSHA == "" {
+		return false
+	}
+	_, found := epochStart(lines, lineSHA)
+	return found
 }
 
 // walkChain is the one strict chain walk behind Verify and VerifyDeep. It accepts two seams real

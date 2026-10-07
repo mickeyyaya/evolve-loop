@@ -292,54 +292,6 @@ func TestWriteJSONAtomic_MarshalError(t *testing.T) {
 	})
 }
 
-func TestWriteJSONAtomic_WriteError(t *testing.T) {
-	s, _ := newStore(t)
-	withHooks(ioHooks{
-		write: func(*os.File, []byte) (int, error) { return 0, errors.New("forced write fail") },
-	}, func() {
-		err := s.WriteState(context.Background(), core.State{})
-		if err == nil || !strings.Contains(err.Error(), "write tmp") {
-			t.Errorf("got %v, want write tmp error", err)
-		}
-	})
-}
-
-func TestWriteJSONAtomic_SyncError(t *testing.T) {
-	s, _ := newStore(t)
-	withHooks(ioHooks{
-		sync: func(*os.File) error { return errors.New("forced sync fail") },
-	}, func() {
-		err := s.WriteState(context.Background(), core.State{})
-		if err == nil || !strings.Contains(err.Error(), "sync") {
-			t.Errorf("got %v, want sync error", err)
-		}
-	})
-}
-
-func TestWriteJSONAtomic_CloseError(t *testing.T) {
-	s, _ := newStore(t)
-	withHooks(ioHooks{
-		closeF: func(*os.File) error { return errors.New("forced close fail") },
-	}, func() {
-		err := s.WriteState(context.Background(), core.State{})
-		if err == nil || !strings.Contains(err.Error(), "close") {
-			t.Errorf("got %v, want close error", err)
-		}
-	})
-}
-
-func TestWriteJSONAtomic_RenameError(t *testing.T) {
-	s, _ := newStore(t)
-	withHooks(ioHooks{
-		rename: func(_, _ string) error { return errors.New("forced rename fail") },
-	}, func() {
-		err := s.WriteState(context.Background(), core.State{})
-		if err == nil || !strings.Contains(err.Error(), "rename") {
-			t.Errorf("got %v, want rename error", err)
-		}
-	})
-}
-
 func TestAcquireLock_FailsWhenLockPathUnwritable(t *testing.T) {
 	// Point storage at a non-existent root with a path component that
 	// can't be created (e.g. a file in place of a directory).

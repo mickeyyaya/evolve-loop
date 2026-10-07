@@ -52,7 +52,8 @@ type VerifiedScope struct {
 	// AnchorLineSHA is the epoch-anchor line strict validation resumed from; "" means from genesis.
 	AnchorLineSHA string
 	// AnchorSeq is that line's own entry_seq; meaningless when AnchorLineSHA is "".
-	AnchorSeq int
+	AnchorSeq         int
+	FromSealedSegment bool
 }
 
 // effectiveAnchorSHA resolves the later of the ledger-anchor.json line and any self-valid operator seal

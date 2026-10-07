@@ -87,6 +87,10 @@ func verifiedFrom(s ledger.VerifiedScope) string {
 	if s.AnchorLineSHA == "" {
 		return "verified strictly from genesis (no epoch anchor)"
 	}
+	if s.FromSealedSegment {
+		return fmt.Sprintf("live tail verified strictly from the newest sealed segment's last line entry_seq=%d line-sha %s; --deep verifies the sealed segments",
+			s.AnchorSeq, s.AnchorLineSHA)
+	}
 	return fmt.Sprintf("verified strictly from epoch anchor entry_seq=%d line-sha %s; the preserved prefix before it is operator-adjudicated, NOT chain-validated",
 		s.AnchorSeq, s.AnchorLineSHA)
 }

@@ -12,16 +12,18 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 const DirName = "ledger-artifacts"
 
 const (
-	objectsDirName = "sha256"
-	digestLen      = sha256.Size * 2
-	fanOutLen      = 2
-	objectMode     = 0o444
-	tempPrefix     = ".put-"
+	objectsDirName   = "sha256"
+	digestLen        = sha256.Size * 2
+	fanOutLen        = 2
+	objectMode       = 0o444
+	legacyTempPrefix = ".put-"
 )
 
 var (
@@ -50,6 +52,9 @@ func (s Store) Put(body []byte) (string, error) {
 	if existing, err := os.ReadFile(path); err == nil && Digest(existing) == digest {
 		return digest, nil
 	}
+	if err := reapTempsOfGoneWriters(filepath.Dir(path)); err != nil {
+		return "", err
+	}
 	if err := writeAtomically(path, body); err != nil {
 		return "", err
 	}
@@ -76,59 +81,17 @@ func (s Store) fannedOut(digest string) string {
 }
 
 func writeAtomically(path string, body []byte) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := atomicwrite.Durable(path, body, objectMode); err != nil {
 		return fmt.Errorf("ledgerartifacts: %w", err)
-	}
-	if err := reapTempsOfGoneWriters(dir); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, tempPattern(os.Getpid()))
-	if err != nil {
-		return fmt.Errorf("ledgerartifacts: %w", err)
-	}
-	if err := placeObject(tmp, path, body); err != nil {
-		_ = os.Remove(tmp.Name())
-		return err
 	}
 	return nil
 }
 
-func placeObject(tmp *os.File, path string, body []byte) error {
-	if _, err := tmp.Write(body); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("ledgerartifacts: write %s: %w", path, err)
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return fmt.Errorf("ledgerartifacts: sync %s: %w", path, err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("ledgerartifacts: close %s: %w", path, err)
-	}
-	if err := os.Chmod(tmp.Name(), objectMode); err != nil {
-		return fmt.Errorf("ledgerartifacts: %w", err)
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return fmt.Errorf("ledgerartifacts: %w", err)
-	}
-	return syncDir(filepath.Dir(path))
-}
-
-func syncDir(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return fmt.Errorf("ledgerartifacts: %w", err)
-	}
-	if err := d.Sync(); err != nil {
-		_ = d.Close()
-		return fmt.Errorf("ledgerartifacts: sync %s: %w", dir, err)
-	}
-	return d.Close()
-}
-
 func reapTempsOfGoneWriters(dir string) error {
 	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("ledgerartifacts: %w", err)
 	}
@@ -140,14 +103,10 @@ func reapTempsOfGoneWriters(dir string) error {
 	return nil
 }
 
-func tempPattern(pid int) string {
-	return tempPrefix + strconv.Itoa(pid) + "-*"
-}
-
 func tempWriter(name string) (pid int, ok bool) {
-	rest, ok := strings.CutPrefix(name, tempPrefix)
+	rest, ok := strings.CutPrefix(name, legacyTempPrefix)
 	if !ok {
-		return 0, false
+		return atomicwrite.TempWriter(name)
 	}
 	pidText, _, ok := strings.Cut(rest, "-")
 	if !ok {
