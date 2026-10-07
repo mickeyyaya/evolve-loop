@@ -16,21 +16,28 @@ import (
 // identity and process resources are established by RunCycleFromPhase before
 // this component starts.
 type resumeExecution struct {
-	orchestrator      *Orchestrator
-	ctx               context.Context
-	request           CycleRequest
-	resumePoint       *ResumePoint
-	state             State
-	cycleState        CycleState
-	cycle             int
-	startPhase        Phase
-	envSnapshot       map[string]string
-	contextSnapshot   map[string]string
-	initialResult     CycleResult
-	preResumeHEAD     string
-	mainDirtyBaseline map[string]bool
+	orchestrator    *Orchestrator
+	ctx             context.Context
+	request         CycleRequest
+	resumePoint     *ResumePoint
+	state           State
+	cycleState      CycleState
+	cycle           int
+	startPhase      Phase
+	envSnapshot     map[string]string
+	contextSnapshot map[string]string
+	initialResult   CycleResult
+	preResumeHEAD   string
+	checkout        *checkoutDecision
 
 	closeout *cycleRun
+}
+
+func (r *resumeExecution) checkoutDecision() *checkoutDecision {
+	if r.checkout == nil {
+		r.checkout = &checkoutDecision{}
+	}
+	return r.checkout
 }
 
 func (r *resumeExecution) run() (result CycleResult, retErr error) {
@@ -46,7 +53,6 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	ctxSnap := r.contextSnapshot
 	result = r.initialResult
 	preResumeHEAD := r.preResumeHEAD
-	mainDirtyBaseline := r.mainDirtyBaseline
 
 	var phaseTimings []phaseTimingEntry
 	completed := false
@@ -148,13 +154,13 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			Signals:                         dispatchSignals(next, cs.WorkspacePath, req.ProjectRoot),
 		}
 		phaseReq = o.withWorktreeFence(phaseReq, next, cs)
-		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig}
+		dispatch := &cycleRun{o: o, ctx: ctx, req: req, cs: cs, cycle: cycle, ctxSnap: ctxSnap, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig, checkout: r.checkoutDecision()}
 		dispatch.applyDispatchPolicy(next, &phaseReq)
 		if next != PhaseBuild {
 			projectBuildExplanation(req.ProjectRoot, cs).apply(&phaseReq)
 		}
 		retryHooks := retryOpts{quotaExhausted: allFamiliesQuotaExhausted, optionalInfraSkip: o.optionalInfraSkip}
-		resp, attempts, err := dispatch.retryPhaseRunner(next, phaseReq, retryHooks)
+		phaseBaseline, resp, attempts, err := dispatch.snapshotThenDispatch(next, phaseReq, retryHooks)
 		// pauseForQuota records through dispatch, so the resume's own accumulators go in and come back.
 		pauseOnQuotaWall := func() {
 			dispatch.result, dispatch.phaseTimings = result, phaseTimings
@@ -176,7 +182,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			return result, ferr
 		}
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
-		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, mainDirtyBaseline)
+		resp, err = o.reviewResumedDeliverable(ctx, req.ProjectRoot, cycle, cs, next, runner, phaseReq, resp, phaseBaseline)
 		if errors.Is(err, ErrAllFamiliesExhausted) {
 			pauseOnQuotaWall()
 			return result, err

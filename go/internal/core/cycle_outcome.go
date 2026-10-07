@@ -8,21 +8,6 @@ func preserveOnVerdict(finalVerdict string) bool {
 	return finalVerdict == VerdictFAIL
 }
 
-// isScoutEvalMaterialization reports whether a main-tree write is scout
-// performing its documented eval-materialization contract. Scout writes the
-// SELECTED slugs' evals to projectRoot/.evolve/evals/<slug>.md in the MAIN
-// tree (internal/evalgate/materialization.go reads them there for Gate A), so
-// that write is scout's JOB, not a deliverable escape. Without this carve-out
-// a later cycle iterating the same coverage target re-materializes the same
-// slug, MODIFYING the prior cycle's committed eval, and the tree-diff guard
-// aborts the cycle. Scoped to scout + .evolve/evals/<slug>.md only: a code
-// phase leaking an eval, or scout writing a non-.md file or any other
-// deliverable (phases/, commit-prefix-scope.json) or a source file, all still
-// fire the guard.
-func isScoutEvalMaterialization(phase Phase, p string) bool {
-	return phase == PhaseScout && strings.HasPrefix(p, ".evolve/evals/") && strings.HasSuffix(p, ".md")
-}
-
 // finalizeOutcome translates a bare SKIPPED cycle verdict into a specific
 // CycleOutcome label. PASS/FAIL/WARN pass through untouched.
 //

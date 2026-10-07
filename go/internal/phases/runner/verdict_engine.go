@@ -1,12 +1,15 @@
 package runner
 
 import (
+	"slices"
+
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable/gatesignal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/logfilter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/verdict"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -67,9 +70,14 @@ func dispatchOf(req core.PhaseRequest, prep phasePreparation, plan phaseDispatch
 }
 
 // classifyWith binds the phase hook to Run's request, WorktreeVerified already stamped, and the terminal bridge response.
-func (b *BaseRunner) classifyWith(req core.PhaseRequest, bres core.BridgeResponse) verdict.Classify {
+func (b *BaseRunner) classifyWith(req core.PhaseRequest, d verdict.Dispatch, skills []string) verdict.Classify {
+	owesSelfReview := req.WritesSource() && slices.Contains(skills, policy.SelfReviewSkill)
 	return func(artifact string) (string, []core.Diagnostic, string) {
-		return b.hooks.Classify(artifact, req, bres)
+		v, diags, next := b.hooks.Classify(artifact, req, d.Bridge)
+		if owesSelfReview && v != core.VerdictFAIL && !phasecontract.SelfReviewRecorded(artifact) {
+			b.warnSelfReviewMissing(d)
+		}
+		return v, diags, next
 	}
 }
 

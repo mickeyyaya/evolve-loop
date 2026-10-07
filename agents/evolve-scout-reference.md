@@ -152,7 +152,7 @@ Scout writes only the eval graders; Builder generates the actual `.spec.ts`.
 <!-- ANCHOR:eval-format-template -->
 ## Section: eval-format-template
 
-Loaded when writing eval definitions for `.evolve/evals/<task-slug>.md`.
+Loaded when writing eval definitions for `<workspace>/.evolve/evals/<task-slug>.md`.
 
 ````markdown
 # Eval: <task-name>
@@ -238,7 +238,7 @@ Finding	Source	Target File(s)	Change Description
 - **Expected eval delta:** <dimensions improved>
 - **Acceptance Criteria:** [ ] <testable criterion>
 - **Files to modify:** <list>
-- **Eval:** written to `evals/<slug>.md`
+- **Eval:** written to `<workspace>/.evolve/evals/<slug>.md`
 - **Eval Graders** (inline): `<test command>` → expects exit 0
 - **Recommended Skills:** `<skill>` (primary) — <rationale>
 

@@ -29,6 +29,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/skills/solution-scout/", Rationale: "the document-cycle discovery persona the kernel preloads on its own authority (policy.CompiledDefaultOverlaySkills, ADR-0099 slice 3)"},
 	{Fragment: "/skills/solution-build/", Rationale: "the document-cycle build persona the kernel preloads on its own authority (policy.CompiledDefaultOverlaySkills, ADR-0099 slice 3)"},
 	{Fragment: "/skills/solution-audit/", Rationale: "the document-cycle audit grading persona the kernel preloads on its own authority — the same class as /skills/audit/ (policy.CompiledDefaultOverlaySkills, ADR-0099 slice 3)"},
+	{Fragment: "/skills/engineering-craft/", Rationale: "the craft persona the kernel preloads into every code cycle's source-writing dispatch at any tier (policy.CompiledDefaultOverlaySkills); a tampered copy would rewrite how every builder and test writer works"},
+	{Fragment: "/skills/code-review-simplify/", Rationale: "the self-review persona the kernel preloads into every code cycle's source-writing dispatch at any tier (policy.CompiledDefaultOverlaySkills); a tampered copy would rewrite how every builder and test writer reviews its own diff"},
 	{Fragment: "/.claude/settings.json", Rationale: "PreToolUse hook wiring (repo + global ~/.claude)"},
 	{Fragment: "/.evolve/policy.json", Rationale: "gate-default overrides (eval/contract/swarm gates)"},
 
@@ -64,6 +66,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/cyclerun_dispatch.go", Rationale: "fresh-cycle downstream explanation projection call site"},
 	{Fragment: "/go/internal/core/cyclerun_review.go", Rationale: "post-Build explanation refresh eligibility decision and review-to-guard ordering"},
 	{Fragment: "/go/internal/core/cyclerun_postreview.go", Rationale: "fresh-cycle post-Build explanation refresh call site (applyPostReviewGuards -> explanationdocs.RefreshResult); carved out of cyclerun_review.go by #549"},
+	{Fragment: "/go/internal/core/leak_recovery.go", Rationale: "build-leak recovery and its fail-closed rules: the pre-phase snapshot retry and the abort when it still fails in a checkout, the no-checkout exemption decided once per cycle, leaveForOwner failing a keyed path no live lane or console lease holds, and quarantine-not-delete for a differing main-tree copy"},
+	{Fragment: "/go/internal/core/leak_ownership.go", Rationale: "the main-tree ownership Specification: what leak recovery may claim, which leaked paths the tree-diff guard exempts as a live sibling's (leakExemptions, heldBySibling), the mint-registry read with its quarantine, and the explanationdocs.IsCycleChangeRecord owner rule"},
 	{Fragment: "/go/internal/core/cyclerun_remediate.go", Rationale: "Build explanation correction and remediation projection"},
 	{Fragment: "/go/internal/core/continuation_stamp.go", Rationale: "continuation explanation-history ownership transition"},
 	{Fragment: "/go/internal/core/continuation_ancestor_predicates.go", Rationale: "continuation archives the ancestor's explanation records and predicate package (design A2)"},

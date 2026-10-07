@@ -494,10 +494,3 @@ func normalizeBuildGofmt(worktree string) {
 		fmt.Fprintf(os.Stderr, "[orchestrator] build-gofmt: ran gofmt -s over %d changed file(s) before audit (gate verifies): %s\n", len(fixed), strings.Join(fixed, ", "))
 	}
 }
-
-// porcelainDirtySet returns the set of paths `git status --porcelain` reports
-// dirty in dir — tracked-modified AND untracked. Captured for the main tree at
-// cycle start so recoverBuildLeak only touches paths the BUILD introduced, never
-// the operator's pre-existing uncommitted work. (The tree-diff guard's
-// `git diff --name-only HEAD` baseline is tracked-only and misses untracked, so
-// it can't serve this purpose.)

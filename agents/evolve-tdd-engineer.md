@@ -87,6 +87,8 @@ Go-only repo: default is Go ACS predicate (`go/acs/cycle<N>/predicates_test.go`,
 
 ### Step 3: Write Failing Tests (RED)
 
+Before your first edit, save `git status --porcelain` to `<workspace>/self-review-baseline.txt` (the workspace, never the worktree): Step 4.5 reads it.
+
 **For `predicate`-dispositioned ACs (default in Go-only repo), RED test IS Go ACS predicate** — `func TestC<N>_<NNN>_<slug>(t *testing.T)` in `<worktree>/go/acs/cycle<N>/predicates_test.go` (`//go:build acs`, `package cycle<N>`, `import acsassert`). Author from [go/acs/README.md](../go/acs/README.md). No separate `acs/cycle-<N>/*.sh` — one Go test is both RED test and audit-gating predicate (`evolve acs suite`). Shell fallback only for criterion genuinely not testable in Go.
 
 **Predicates bind ONLY to triage-committed work (R9.3).** Author predicates for `## top_n` tasks only — never `## deferred`/`## dropped`. Coverage-floor predicates target only packages `## top_n` commits THIS cycle; deferred floors get **zero** predicates. Host enforces (`floor-binding` gate rejects deferred-floor predicate — cycle-280: predicates gating deferred starved committed task).
@@ -134,6 +136,10 @@ bash tests/test-<task-slug>.sh 2>&1 | tee -a workspace/test-red-output.txt
 
 **Reachability-probe obligation before freezing a package-qualified pin (cycle-644 lesson).** A structural test that pins a call site as `pkgX.Foo(` — and will be frozen `doNotModifyTests:true` at RED — commits the codebase to a specific import shape: the package containing that pin will need to import `pkgX`. Before freezing any such pin, compiler-probe the shape with `go build ./...` (or a scoped `go build <pinning-package>`) against a throwaway import of `pkgX` from the pinning package's file, to prove the import is buildable — not merely that the string parses. Skipping this probe is the exact root cause of cycle-644: TDD froze a `doNotModifyTests:true` structural test pinning `storage.UpdateStateMap(` inside a `core`-package file while `storage` already imported `core` — a compiler-proven import cycle — making the acceptance criterion permanently unsatisfiable and burning the whole cycle. When a deterministic reachability check is available (`go/internal/reachabilityprobe`), prefer it over an ad hoc probe; it flags the cycle-644 shape (and transitive N-hop variants) from the import graph without invoking the toolchain.
 
+### Step 4.5: Self-Review (REQUIRED on a code cycle)
+
+On a code cycle the kernel preloads `code-review-simplify` beside engineering-craft (its compact hook; full text: [skills/code-review-simplify/SKILL.md](../skills/code-review-simplify/SKILL.md)). Once RED is verified, run its **Self-review** hook on the tests you wrote this phase, the files that changed after you started; every path already in your saved `git status --porcelain` baseline is earlier-phase-owned (read it, never edit it, record a finding there as `Declined: earlier-phase-owned`). Review at the tier their size picks; your Go `*_test.go` files also go through `golang-test-review`'s checklist. Apply only simplifications that keep every test failing for its named reason (merge near-duplicate cases into a table, reuse an existing fixture); never weaken an assertion, drop a negative case or edit production code to answer a finding. Re-run Step 4, then record the hook's `## Self-Review` block, its `- Scores:` line included, in `test-report.md`. The scores never block your handoff.
+
 ### Step 5: Coverage Gap Analysis
 
 Enumerate uncovered criteria:
@@ -158,6 +164,9 @@ Enumerate uncovered criteria:
 \```
 <paste of test run showing all failures>
 \```
+
+## Self-Review
+<the code-review-simplify Self-review block from Step 4.5>
 
 ## Coverage Map
 | Criterion | Test | Status |

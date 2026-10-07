@@ -130,12 +130,12 @@ Algorithm: [skill-routing.md](../skills/loop/reference/skill-routing.md). Per ta
 
 Write evals testing **behavior, not existence**. Trivial evals (`grep -q`, `echo "pass"`, `exit 0`) = specification gaming. `evolve eval quality-check <eval.md>` classifies — Level 0-1 trigger warnings or halt cycle.
 
-**Adversarial diversity** (canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6). Per non-trivial feature: include ≥1 **negative case** (input rejected/command exits non-zero) and ≥1 **edge/OOD case** (empty, boundary, malformed). Module evals must not share all command verbs (diversity collapse). Per criterion, name cheapest gaming fake and test failure. Suite-level check: `evolve eval diversity-check .evolve/evals/`.
+**Adversarial diversity** (canonical: [skills/adversarial-testing/SKILL.md](../skills/adversarial-testing/SKILL.md) §6). Per non-trivial feature: include ≥1 **negative case** (input rejected/command exits non-zero) and ≥1 **edge/OOD case** (empty, boundary, malformed). Module evals must not share all command verbs (diversity collapse). Per criterion, name cheapest gaming fake and test failure. Suite-level check: `evolve eval diversity-check <workspace>/.evolve/evals/`.
 
 ### 9. Write Eval Definitions
 
 Per task: write eval under absolute `workspace` path from Cycle Context: `<workspace>/.evolve/evals/<task-slug>.md`. Workspace-local path accepted by eval materialization gate; avoids writing evals to cycle worktree where gate cannot see them. Tag commands with grader type (`[code]`, `[model]`, `[human]`). Every eval MUST have ≥1 `[code]` grader. See reference `eval-format-template`.
-**eval materialization gate (gate #6):** Inline AC in scout-report NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing. Do NOT write only to the cycle worktree.
+**eval materialization gate (gate #6):** Inline AC in scout-report NOT sufficient. Use EXACT slug (kebab-case) as filename; self-verify each `<workspace>/.evolve/evals/<slug>.md` exists before finalizing. Do NOT write only to the cycle worktree. The workspace is the eval's ONLY home: never also copy it into the project root or main tree, which fleet lanes share (cycle 1811 failed on a sibling's copy); the orchestrator relocates any copy it finds.
 
 ## Output
 
@@ -166,7 +166,7 @@ Apply hygiene rules to avoid context saturation. See reference `tool-hygiene-rul
 | 3 | `backlog-complete` | 2–4 tasks with priority, weight, scope, and acceptance criteria |
 | 4 | `build-plan-written` | `## Build Plan Summary` section lists ordered steps for Builder |
 | 5 | `research-cache-section` | `## Research Cache` present; each carryoverTodo noted HIT/MISS/STALE/INVALIDATED/NO_ENTRY/DISABLED |
-| 6 | `evals-materialized` | EVERY slug in `## Selected Tasks` has a written `.evolve/evals/<slug>.md` file with ≥1 `[code]` grader, self-verified to exist (§9). Selected task lacking eval file = incomplete scout → blocks cycle. |
+| 6 | `evals-materialized` | EVERY slug in `## Selected Tasks` has a written `<workspace>/.evolve/evals/<slug>.md` file with ≥1 `[code]` grader, self-verified to exist (§9). Selected task lacking eval file = incomplete scout → blocks cycle. |
 
 **Exit & banned-post-report:** follow [evolve-stop-criterion-reference.md](evolve-stop-criterion-reference.md) — write `scout-report.md` once (final version), then stop; no reads, searches, or tool calls after Write.
 

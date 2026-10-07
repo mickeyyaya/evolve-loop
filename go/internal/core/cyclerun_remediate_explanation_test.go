@@ -90,7 +90,7 @@ func TestRemediation_GateRerunReceivesResealedExplanationHandoff(t *testing.T) {
 	o.reviewer = remediationResealingReviewer{t: t, binding: binding}
 	cr := &cycleRun{
 		o: o, ctx: context.Background(), req: CycleRequest{ProjectRoot: root}, cycle: binding.Cycle,
-		mainDirtyBaseline: map[string]bool{}, retryConfig: o.retryConfig, workflowConfig: o.workflowConfig,
+		retryConfig: o.retryConfig, workflowConfig: o.workflowConfig,
 		cs: CycleState{
 			CycleID: binding.Cycle, RunID: binding.RunID, WorkspacePath: workspace,
 			ActiveWorktree: worktree, WorktreeBaseSHA: base,

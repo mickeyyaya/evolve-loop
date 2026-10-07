@@ -97,3 +97,18 @@ func TestNonMaterialDiff_AForeignRecordIsStillImmutable(t *testing.T) {
 		t.Fatalf("a declared explanation let a prior cycle-document rewrite through: %v", failures)
 	}
 }
+
+func TestIsCycleChangeRecord_NamesOnlyCycleBoundRecords(t *testing.T) {
+	cases := map[string]bool{
+		"docs/explain/builds/cycle-1812-01m48p8jhdj97bg0evcbbetkyr.md":  true,
+		"docs/explain/builds/cycle-0-01m48p8jhdj97bg0evcbbetkyr.md":     false,
+		"docs/explain/builds/index.md":                                  false,
+		"docs/explain/builds/cycle-1812-01m48p8jhdj97bg0evcbbetkyr.txt": false,
+		"docs/explain/cycle-1812-01m48p8jhdj97bg0evcbbetkyr.md":         false,
+	}
+	for path, want := range cases {
+		if got := IsCycleChangeRecord(path); got != want {
+			t.Errorf("IsCycleChangeRecord(%q)=%v, want %v", path, got, want)
+		}
+	}
+}
