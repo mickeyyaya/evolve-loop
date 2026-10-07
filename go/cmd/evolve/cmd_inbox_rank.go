@@ -12,8 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
 const allRankLists = "all"
@@ -115,38 +115,35 @@ func parseInboxRankArgs(args []string, stderr io.Writer) (inboxRankRequest, bool
 
 func loadRankedInbox(now time.Time, stderr io.Writer) (rankedInbox, error) {
 	root := envOrCwd("EVOLVE_PROJECT_ROOT")
-	pol, err := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
-	if err != nil {
+	evolveDir := filepath.Join(root, ".evolve")
+	if _, err := policy.Load(filepath.Join(evolveDir, "policy.json")); err != nil {
 		return rankedInbox{}, err
 	}
 	inbox, err := loadPendingInbox("rank", stderr)
 	if err != nil {
 		return rankedInbox{}, err
 	}
-	cfg := pol.InboxPriorityConfig()
-	for _, warning := range inboxrank.ClassWarnings(inbox.items, cfg) {
+	in := loadRankInputs("rank", evolveDir, now, stderr)
+	for _, warning := range inboxrank.ClassWarnings(inbox.items, in.Config) {
 		fmt.Fprintf(stderr, "inbox rank: WARN %s\n", warning)
 	}
-	counts := ledgerItemCounts(root, stderr)
-	ctx := inboxrank.Context{Now: now, Queue: inbox.items, Recurrence: func(it inboxbatch.Item) int { return counts[it.ID] }}
 	menu := inboxmover.PartitionLaneMenu(inbox.opts, inbox.items, inbox.isProtected)
 	doc := rankedInboxDoc{AsOf: now.UTC().Format(time.RFC3339)}
 	for _, list := range []struct {
 		place inboxmover.MenuPlace
 		items []inboxbatch.Item
 	}{{inboxmover.MenuReady, menu.Ready}, {inboxmover.MenuConsole, menu.Console}, {inboxmover.MenuWaiting, menu.Waiting}} {
-		doc.Lists = append(doc.Lists, rankedList{List: menuStatusNames[list.place], Items: rankedRows(inboxrank.Order(list.items, cfg, ctx))})
+		doc.Lists = append(doc.Lists, rankedList{List: menuStatusNames[list.place], Items: rankedRows(in.Order(list.items, inbox.items))})
 	}
-	return rankedInbox{doc: doc, cfg: cfg, opts: inbox.opts}, nil
+	return rankedInbox{doc: doc, cfg: in.Config, opts: inbox.opts}, nil
 }
 
-func ledgerItemCounts(root string, stderr io.Writer) map[string]int {
-	ledger, err := recurrence.ReadSnapshot(filepath.Join(root, ".evolve", "recurrence-ledger.json"))
-	if err != nil {
-		fmt.Fprintf(stderr, "inbox rank: WARN recurrence ledger unreadable (%v); the recurrence factor is 0 for every item\n", err)
-		return nil
+func loadRankInputs(verb, evolveDir string, now time.Time, stderr io.Writer) inboxrank.Inputs {
+	in, warnings := rankinputs.Load(evolveDir, now)
+	for _, w := range warnings {
+		fmt.Fprintf(stderr, "inbox %s: WARN %s\n", verb, w)
 	}
-	return ledger.ItemCounts()
+	return in
 }
 
 func rankedRows(ranked []inboxrank.Ranked) []rankedRow {

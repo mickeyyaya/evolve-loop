@@ -3,6 +3,7 @@ package dashboard
 import (
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writeInboxItem(t *testing.T, dir, name, body string) {
@@ -10,7 +11,7 @@ func writeInboxItem(t *testing.T, dir, name, body string) {
 	writeFile(t, filepath.Join(dir, name), body)
 }
 
-func TestReadQueue_PendingSortedByWeightAndLifecycleCounts(t *testing.T) {
+func TestReadQueue_PendingInRankOrderAndLifecycleCounts(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
@@ -23,7 +24,7 @@ func TestReadQueue_PendingSortedByWeightAndLifecycleCounts(t *testing.T) {
 	writeInboxItem(t, filepath.Join(inbox, "processed"), "d.json", `{"id":"d"}`)
 	writeInboxItem(t, filepath.Join(inbox, "consumed"), "notes.md", `not an item`)
 
-	q, warns := readQueue(root)
+	q, warns := readQueue(root, time.Now())
 	if len(warns) != 0 {
 		t.Fatalf("warnings: %v", warns)
 	}
@@ -45,7 +46,7 @@ func TestReadQueue_MalformedItemIsWarnedNotFatal(t *testing.T) {
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	writeInboxItem(t, inbox, "ok.json", `{"id":"ok","title":"t","weight":0.7}`)
 	writeInboxItem(t, inbox, "bad.json", `{`)
-	q, warns := readQueue(root)
+	q, warns := readQueue(root, time.Now())
 	if len(q.Pending) != 1 || len(warns) != 1 {
 		t.Fatalf("pending=%d warns=%v", len(q.Pending), warns)
 	}
@@ -53,7 +54,7 @@ func TestReadQueue_MalformedItemIsWarnedNotFatal(t *testing.T) {
 
 func TestReadQueue_MissingInboxIsEmpty(t *testing.T) {
 	t.Parallel()
-	q, warns := readQueue(t.TempDir())
+	q, warns := readQueue(t.TempDir(), time.Now())
 	if len(q.Pending) != 0 || q.Consumed != 0 || len(warns) != 0 {
 		t.Fatalf("empty: %+v %v", q, warns)
 	}

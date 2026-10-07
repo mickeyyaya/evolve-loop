@@ -32,6 +32,7 @@ func Packages() []string {
 		"./internal/acssuite/...",
 		"./internal/fleet/...",
 		"./internal/evalqualitycheck/...",
+		"./internal/inboxrank/...",
 	}
 }
 

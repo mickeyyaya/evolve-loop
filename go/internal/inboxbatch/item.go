@@ -43,10 +43,15 @@ type Item struct {
 	// CreatedAt is the filing timestamp as authored: RFC3339 or a bare date.
 	CreatedAt string `json:"created_at,omitempty"`
 	// Path is the file name inside the inbox dir, for display only.
-	Path string `json:"-"`
+	Path           string `json:"-"`
+	IDFromFileName bool   `json:"-"`
 	// mentions are the files the record's own text names, derived at decode.
 	mentions []string
 }
+
+type ItemKey struct{ ID, Path string }
+
+func (it Item) Key() ItemKey { return ItemKey{ID: it.ID, Path: it.Path} }
 
 // UnmarshalJSON decodes a record and derives the files its author-written fields name.
 // Deriving at decode gives every reader (wave seed, claim floor, LoadFile) the same surface.
@@ -229,7 +234,7 @@ func LoadFile(path string) (Item, []string, error) {
 	}
 	name := filepath.Base(path)
 	if it.ID == "" {
-		it.ID = strings.TrimSuffix(name, ".json")
+		it.ID, it.IDFromFileName = strings.TrimSuffix(name, ".json"), true
 	}
 	it.Path = name
 	var warnings []string

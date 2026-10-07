@@ -1,6 +1,9 @@
 package inboxmover
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+)
 
 type Dispatchability struct {
 	Dispatchable bool
@@ -67,6 +70,16 @@ type LaneMenu struct {
 	ConsoleReasons []string
 	Waiting        []inboxbatch.Item
 	WaitingReasons []string
+}
+
+type RankedLaneMenu struct {
+	LaneMenu
+	Ranked []inboxrank.Ranked
+}
+
+func RankLaneMenu(opts Options, queue []inboxbatch.Item, isProtected func(string) bool, rank inboxrank.Inputs) RankedLaneMenu {
+	menu := PartitionLaneMenu(opts, queue, isProtected)
+	return RankedLaneMenu{LaneMenu: menu, Ranked: rank.Order(menu.Ready, queue)}
 }
 
 func PartitionLaneMenu(opts Options, items []inboxbatch.Item, isProtected func(string) bool) LaneMenu {

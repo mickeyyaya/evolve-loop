@@ -55,7 +55,7 @@ func stage(t *testing.T, root, action, id, pattern string, count int, weight flo
 	t.Helper()
 	if _, err := dispositionrouter.StageIntent(filepath.Join(root, "escalations"), dispositionrouter.Intent{
 		Cycle: 1, Pattern: pattern, ItemID: id, Action: action,
-		Route: dispositionrouter.RouteQueue, Recurrence: count, Weight: weight,
+		Route: dispositionrouter.RouteQueue, Recurrence: count, Weight: weight, PriorityClass: "correctness",
 	}); err != nil {
 		t.Fatalf("StageIntent: %v", err)
 	}

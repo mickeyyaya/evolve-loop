@@ -45,8 +45,8 @@ const fixtureRetro = "# Cycle 640 Retrospective\n\n" +
 	"## Recommended preventive actions\n\n" +
 	"```json\n" +
 	`[
-  {"id": "builder-task-binding-topn-gate", "title": "Block out-of-lane builds at the build->audit transition", "weight_hint": 0.92, "files": ["go/internal/topngate"], "evidence": "audit-report.md#D1", "recurrence": 7},
-  {"id": "add-mutation-gate", "title": "Add a mutation-kill gate to the audit phase", "files": ["go/internal/audit"], "evidence": "audit-report.md#D2"}
+  {"id": "builder-task-binding-topn-gate", "title": "Block out-of-lane builds at the build->audit transition", "weight_hint": 0.92, "files": ["go/internal/topngate"], "evidence": "audit-report.md#D1", "recurrence": 7, "priority_class": "correctness"},
+  {"id": "add-mutation-gate", "title": "Add a mutation-kill gate to the audit phase", "files": ["go/internal/audit"], "evidence": "audit-report.md#D2", "priority_class": "correctness"}
 ]` + "\n```\n\n" +
 	"## Out of scope\n\n- unrelated\n"
 
@@ -166,7 +166,7 @@ func TestFileActions_DedupSkipsExistingOpenItem(t *testing.T) {
 	inbox := t.TempDir()
 	writeInboxItem(t, filepath.Join(inbox, "2026-07-06-builder-task-binding-topn-gate.json"), "builder-task-binding-topn-gate")
 
-	actions := []PreventiveAction{{ID: "builder-task-binding-topn-gate", Title: "dup"}}
+	actions := []PreventiveAction{{ID: "builder-task-binding-topn-gate", Title: "dup", PriorityClass: "correctness"}}
 	written, err := FileActions(inbox, 640, actions, 0.75, fixedNow)
 	if err != nil {
 		t.Fatalf("FileActions: %v", err)
@@ -187,7 +187,7 @@ func TestFileActions_DedupSkipsExistingProcessedItem(t *testing.T) {
 	inbox := t.TempDir()
 	writeInboxItem(t, filepath.Join(inbox, "processed", "cycle-646", "builder-task-binding-topn-gate.json"), "builder-task-binding-topn-gate")
 
-	actions := []PreventiveAction{{ID: "builder-task-binding-topn-gate", Title: "dup"}}
+	actions := []PreventiveAction{{ID: "builder-task-binding-topn-gate", Title: "dup", PriorityClass: "correctness"}}
 	written, err := FileActions(inbox, 640, actions, 0.75, fixedNow)
 	if err != nil {
 		t.Fatalf("FileActions: %v", err)
@@ -202,7 +202,7 @@ func TestFileActions_DedupSkipsExistingProcessedItem(t *testing.T) {
 // consecutive FAIL cycles files exactly once while the first remains open.
 func TestFileActions_DedupAcrossTwoConsecutiveFailsFilesOnce(t *testing.T) {
 	inbox := t.TempDir()
-	actions := []PreventiveAction{{ID: "recurring-fix", Title: "recurring", WeightHint: 0.9, Recurrence: 2}}
+	actions := []PreventiveAction{{ID: "recurring-fix", Title: "recurring", WeightHint: 0.9, Recurrence: 2, PriorityClass: "correctness"}}
 
 	first, err := FileActions(inbox, 640, actions, 0.75, fixedNow)
 	if err != nil {
@@ -234,7 +234,7 @@ func TestFileActions_DedupAcrossTwoConsecutiveFailsFilesOnce(t *testing.T) {
 // WeightHint is filed at the caller-supplied policy default weight.
 func TestFileActions_UsesDefaultWeightWhenNoHint(t *testing.T) {
 	inbox := t.TempDir()
-	actions := []PreventiveAction{{ID: "plain-action", Title: "no hint"}}
+	actions := []PreventiveAction{{ID: "plain-action", Title: "no hint", PriorityClass: "correctness"}}
 	if _, err := FileActions(inbox, 640, actions, 0.75, fixedNow); err != nil {
 		t.Fatalf("FileActions: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestFileActions_UsesDefaultWeightWhenNoHint(t *testing.T) {
 // action carries its higher WeightHint instead of the default.
 func TestFileActions_UsesHintForRecurrenceFlagged(t *testing.T) {
 	inbox := t.TempDir()
-	actions := []PreventiveAction{{ID: "hot-action", Title: "recurring", WeightHint: 0.95, Recurrence: 5}}
+	actions := []PreventiveAction{{ID: "hot-action", Title: "recurring", WeightHint: 0.95, Recurrence: 5, PriorityClass: "correctness"}}
 	if _, err := FileActions(inbox, 640, actions, 0.75, fixedNow); err != nil {
 		t.Fatalf("FileActions: %v", err)
 	}

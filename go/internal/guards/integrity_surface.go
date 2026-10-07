@@ -149,6 +149,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/build_handoff_floor.go", Rationale: "build handoff floor: mandatory half, names walker, review-input projection (ADR-0117)"},
 	{Fragment: "/go/internal/core/phase_bindings_selfcheck.go", Rationale: "the build floor's go-test runners and their argvs (unit, tagged added-test): a lane must not move the deadline of the floor that grades it (inst-L1763b; cycles 1787/1791/1792/1798 timed out at a 120s literal here)"},
 	{Fragment: "/go/internal/addedtests/budget.go", Rationale: "PackageTimeout, the one go-test deadline the build floor, its coverage pass and ship's repo contract run under: moving it moves the floor's budget"},
+	{Fragment: "/go/internal/inboxrank/weightsort_ban_test.go", Rationale: "the one-ranking guard: no inbox ordering outside inboxrank (ADR-0121); a lane that could edit it could reorder the queue it is graded from"},
 }
 
 // IsProtectedSurface reports whether path is on the control plane. path may be absolute or

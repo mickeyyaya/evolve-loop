@@ -3,10 +3,11 @@ package dashboard
 import (
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
@@ -14,7 +15,7 @@ var lifecycleDirs = []string{"consumed", "processing", "retry", "processed"}
 
 func inboxDir(root string) string { return filepath.Join(paths.EvolveDirOf(root), "inbox") }
 
-func readQueue(root string) (QueueSummary, []string) {
+func readQueue(root string, now time.Time) (QueueSummary, []string) {
 	inbox := inboxDir(root)
 	items, warnings, err := inboxbatch.LoadDir(inbox)
 	var q QueueSummary
@@ -24,17 +25,16 @@ func readQueue(root string) (QueueSummary, []string) {
 	for i := range warnings {
 		warnings[i] = "inbox: " + warnings[i]
 	}
-	q.Pending = make([]QueueItem, 0, len(items))
-	for _, it := range items {
-		q.Pending = append(q.Pending, QueueItem{ID: it.ID, Title: it.Title, Kind: it.Kind, Class: it.Class,
-			Route: it.Route, Priority: it.Priority, Weight: it.Weight})
+	in, rankWarnings := rankinputs.Load(paths.EvolveDirOf(root), now)
+	for _, w := range rankWarnings {
+		warnings = append(warnings, "inbox rank: "+w)
 	}
-	sort.SliceStable(q.Pending, func(i, j int) bool {
-		if q.Pending[i].Weight != q.Pending[j].Weight {
-			return q.Pending[i].Weight > q.Pending[j].Weight
-		}
-		return q.Pending[i].ID < q.Pending[j].ID
-	})
+	q.Pending = make([]QueueItem, 0, len(items))
+	for _, r := range in.Order(items, items) {
+		it := r.Item
+		q.Pending = append(q.Pending, QueueItem{ID: it.ID, Title: it.Title, Kind: it.Kind, Class: it.Class,
+			Route: it.Route, Priority: it.Priority, Weight: it.Weight, Score: r.Breakdown.Score})
+	}
 	q.Consumed = countJSON(filepath.Join(inbox, "consumed"))
 	q.Processing = countJSON(filepath.Join(inbox, "processing"))
 	q.Retry = countJSON(filepath.Join(inbox, "retry"))

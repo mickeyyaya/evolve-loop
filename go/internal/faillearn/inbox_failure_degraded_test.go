@@ -122,7 +122,7 @@ func TestWriteArtifacts_InboxFailureWithNoRunDirStillErrors(t *testing.T) {
 func TestWriteArtifacts_ItemLevelRejectionAlsoPreservesDiagnosis(t *testing.T) {
 	runDir, lessonsDir, inboxDir := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "inbox")
 
-	bad := []InboxItem{{ID: "", Title: "unaddressable remediation item", Weight: 0.9, Kind: "bug", Priority: "H", InjectedBy: "retrofile"}}
+	bad := []InboxItem{{ID: "", Title: "unaddressable remediation item", Weight: 0.9, Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "retrofile"}}
 	err := WriteArtifacts(remediationEvent(), runDir, lessonsDir, WithInbox(inboxDir, bad))
 	if err == nil {
 		t.Fatal("an item with no id must still be rejected loudly")

@@ -492,7 +492,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/regression/pluginschema` | 1 | [acs-regression-pluginschema.md](acs-regression-pluginschema.md) |
 | `acs/regression/protectedsurface` | 2 | [acs-regression-protectedsurface.md](acs-regression-protectedsurface.md) |
 | `cmd/evolve-fake-cli` | 1 | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
-| `cmd/evolve` | 432 | [cmd-evolve.md](cmd-evolve.md) |
+| `cmd/evolve` | 433 | [cmd-evolve.md](cmd-evolve.md) |
 | `internal/acssuite` | 26 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
@@ -522,7 +522,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
 | `internal/gitexec` | 15 | [internal-gitexec.md](internal-gitexec.md) |
 | `internal/guards` | 33 | [internal-guards.md](internal-guards.md) |
-| `internal/inboxbatch` | 43 | [internal-inboxbatch.md](internal-inboxbatch.md) |
+| `internal/inboxbatch` | 44 | [internal-inboxbatch.md](internal-inboxbatch.md) |
 | `internal/inboxmover/lifecycle` | 24 | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |
 | `internal/inboxmover` | 81 | [internal-inboxmover.md](internal-inboxmover.md) |
 | `internal/interaction` | 19 | [internal-interaction.md](internal-interaction.md) |

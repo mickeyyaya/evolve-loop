@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // starvationWeightFloor mirrors policy.FleetConfig's clamp, so neither a bad config nor a bad caller under-weights the todo.
@@ -61,14 +62,15 @@ func (t *StarvationTracker) Observe(o WaveObservation, k int) bool {
 
 // StarvationItem is the self-filed inbox todo; its JSON is a superset of what triagecap.ReadInboxBacklog reads.
 type StarvationItem struct {
-	ID          string   `json:"id"`
-	Title       string   `json:"title"`
-	Weight      float64  `json:"weight"`
-	Kind        string   `json:"kind"`
-	Description string   `json:"description"`
-	Files       []string `json:"files"`
-	Source      string   `json:"source"`
-	CreatedAt   string   `json:"created_at"`
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Weight        float64  `json:"weight"`
+	Kind          string   `json:"kind"`
+	PriorityClass string   `json:"priority_class"`
+	Description   string   `json:"description"`
+	Files         []string `json:"files"`
+	Source        string   `json:"source"`
+	CreatedAt     string   `json:"created_at"`
 }
 
 // BuildStarvationItem builds the inbox todo for k consecutive starved waves, clamping weight up to 0.9.
@@ -77,10 +79,11 @@ func BuildStarvationItem(o WaveObservation, k int, weight float64, cycle int, no
 		weight = starvationWeightFloor
 	}
 	return StarvationItem{
-		ID:     starvationItemID,
-		Title:  "Fleet lanes work-supply-starved: realized concurrency < sized width",
-		Weight: weight,
-		Kind:   "feature",
+		ID:            starvationItemID,
+		Title:         "Fleet lanes work-supply-starved: realized concurrency < sized width",
+		Weight:        weight,
+		Kind:          "feature",
+		PriorityClass: inboxbatch.ClassStability,
 		Description: fmt.Sprintf(
 			"The fleet ran %d consecutive waves realizing only %d of %d sized lanes "+
 				"(the width left after any quota/capacity shrink) — work-supply starvation, "+
@@ -100,7 +103,7 @@ func (it StarvationItem) Validate() error {
 		return fmt.Errorf("fleet: starvation item weight %v below floor %v", it.Weight, starvationWeightFloor)
 	}
 	for _, f := range []struct{ name, val string }{
-		{"id", it.ID}, {"title", it.Title}, {"kind", it.Kind},
+		{"id", it.ID}, {"title", it.Title}, {"kind", it.Kind}, {"priority_class", it.PriorityClass},
 		{"description", it.Description}, {"source", it.Source}, {"created_at", it.CreatedAt},
 	} {
 		if f.val == "" {

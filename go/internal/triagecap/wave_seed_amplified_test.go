@@ -75,10 +75,10 @@ func TestC541Amp_ReadInboxBacklog_SkipsEmptyIDTodos(t *testing.T) {
 	}
 }
 
-func TestC541Amp_ReadInboxBacklog_FilenameOrderTiesEqualWeight(t *testing.T) {
+func TestC541Amp_ReadInboxBacklog_EqualScoresTieBreakOnTheID(t *testing.T) {
 	evolveDir, inboxDir := c541ampInboxDir(t)
-	c541ampWriteInboxTodo(t, inboxDir, "b-second.json", c541ampInboxTodo{ID: "second", Weight: 0.5, Files: []string{"b.go"}})
-	c541ampWriteInboxTodo(t, inboxDir, "a-first.json", c541ampInboxTodo{ID: "first", Weight: 0.5, Files: []string{"a.go"}})
+	c541ampWriteInboxTodo(t, inboxDir, "a-second.json", c541ampInboxTodo{ID: "second", Weight: 0.5, Files: []string{"b.go"}})
+	c541ampWriteInboxTodo(t, inboxDir, "b-first.json", c541ampInboxTodo{ID: "first", Weight: 0.5, Files: []string{"a.go"}})
 	c541ampWriteInboxTodo(t, inboxDir, "c-third.json", c541ampInboxTodo{ID: "third", Weight: 0.5, Files: []string{"c.go"}})
 	got := ReadInboxBacklog(evolveDir, nil)
 	if len(got) != 3 {
@@ -87,7 +87,7 @@ func TestC541Amp_ReadInboxBacklog_FilenameOrderTiesEqualWeight(t *testing.T) {
 	wantOrder := []string{"first", "second", "third"}
 	for i, id := range wantOrder {
 		if got[i].ID != id {
-			t.Fatalf("equal-weight todos must tie-break by filename order, want %v got %v", wantOrder, c541ampIDs(got))
+			t.Fatalf("equal-score undated todos must tie-break on the id, not the file name, want %v got %v", wantOrder, c541ampIDs(got))
 		}
 	}
 }

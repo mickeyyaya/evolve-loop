@@ -28,22 +28,24 @@ func remediationEvent() FailureEvent {
 func remediationItems() []InboxItem {
 	return []InboxItem{
 		{
-			ID:         "retro-1279-stale-active-worktree",
-			Title:      "Reconcile cs.ActiveWorktree on fleet teardown",
-			Weight:     0.96,
-			Kind:       "bug",
-			Priority:   "H",
-			Files:      []string{"go/internal/core/fleet.go"},
-			InjectedBy: "retrofile",
+			ID:            "retro-1279-stale-active-worktree",
+			Title:         "Reconcile cs.ActiveWorktree on fleet teardown",
+			Weight:        0.96,
+			Kind:          "bug",
+			Priority:      "H",
+			PriorityClass: "correctness",
+			Files:         []string{"go/internal/core/fleet.go"},
+			InjectedBy:    "retrofile",
 		},
 		{
-			ID:         "retro-1279-symlink-test-suffix",
-			Title:      "Resolve symlinks before the _test.go suffix check",
-			Weight:     0.9,
-			Kind:       "bug",
-			Priority:   "H",
-			Files:      []string{"go/internal/phases/audit/probe_quarantine.go"},
-			InjectedBy: "retrofile",
+			ID:            "retro-1279-symlink-test-suffix",
+			Title:         "Resolve symlinks before the _test.go suffix check",
+			Weight:        0.9,
+			Kind:          "bug",
+			Priority:      "H",
+			PriorityClass: "correctness",
+			Files:         []string{"go/internal/phases/audit/probe_quarantine.go"},
+			InjectedBy:    "retrofile",
 		},
 	}
 }

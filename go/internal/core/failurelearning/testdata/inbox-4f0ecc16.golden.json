@@ -4,6 +4,7 @@
   "weight": 0.75,
   "kind": "bug",
   "priority": "H",
+  "priority_class": "correctness",
   "files": null,
   "injected_by": "faillearn-failure-floor"
 }
