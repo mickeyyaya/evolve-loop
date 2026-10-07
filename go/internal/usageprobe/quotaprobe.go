@@ -15,16 +15,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
-// ProbeQuota captures each family's /usage pane through the injected probe and
-// parses it into a quotastate.QuotaState. It runs the families concurrently and
-// is fail-open: a family is OMITTED unless it yields a PROBED state (real
-// numbers parsed). That covers both an errored probe (unsupported usage command
-// like ollama's, or a bridge/timeout failure) AND a successful-but-unparseable
-// pane (Parse → Source=unknown) — neither produces a fabricated cap, so the
-// allocator treats an absent family as no signal (floor fallback). now is
-// injected so reset-time parsing is deterministic. The returned slice order is
-// not significant; an empty families list yields an empty (non-nil) slice.
-func ProbeQuota(ctx context.Context, families []string, probe func(ctx context.Context, family string) (string, error), now time.Time) []quotastate.QuotaState {
+type QuotaReader struct {
+	Probe func(ctx context.Context, family string) (string, error)
+	Read  func(family, pane string, now time.Time) []quotastate.UsageWindow
+	Now   time.Time
+}
+
+func ProbeQuota(ctx context.Context, families []string, r QuotaReader) []quotastate.QuotaState {
 	out := make([]quotastate.QuotaState, 0, len(families))
 	var (
 		mu sync.Mutex
@@ -35,16 +32,13 @@ func ProbeQuota(ctx context.Context, families []string, probe func(ctx context.C
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			pane, err := probe(ctx, family)
+			pane, err := r.Probe(ctx, family)
 			if err != nil {
 				return // unsupported or errored probe → omit (fail-open)
 			}
-			q := quotastate.Parse(family, pane, now)
-			if q.Source != quotastate.SourceProbed {
-				return // responded, but no numbers parsed → omit (no fabricated state)
-			}
+			states := quotastate.StatesOf(r.Read(family, pane, r.Now), r.Now)
 			mu.Lock()
-			out = append(out, q)
+			out = append(out, states...)
 			mu.Unlock()
 		}()
 	}

@@ -19,7 +19,7 @@ func TestBenchOnEscalation_AgyQuotaWallBenchesTheAgyFamily(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(ws, "escalation-report.json"), b, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	bridgechain.BenchOnEscalation(root, ws, "agy-tmux", now().Add(-time.Minute), map[string]string{}, now, nil)
+	bridgechain.BenchOnEscalation(bridgechain.Escalation{ProjectRoot: root, Workspace: ws, CLI: "agy-tmux", DispatchStart: now().Add(-time.Minute), Env: map[string]string{}}, now, nil)
 	if _, ok := clihealth.NewStore(root, now).Active()["agy"]; !ok {
 		t.Fatal("agy's quota_exhausted wall left the family unbenched; every later dispatch pays a dead round-trip")
 	}

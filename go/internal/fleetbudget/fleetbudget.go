@@ -182,11 +182,6 @@ func ShadowJoin(states []quotastate.QuotaState, tp budgethistory.Throughput) (Qu
 	}, true
 }
 
-// tightestHealthy returns the tightest (min remaining) window across healthy
-// (non-exhausted, probed) families — the binding constraint. A probed state
-// parsed by quotastate.Parse carries a fraction per bucket, so found implies rem
-// is known; a directly-constructed QuotaState with no buckets is safely ignored
-// (the inner range no-ops, leaving found=false → floor fallback).
 func tightestHealthy(states []quotastate.QuotaState) binding {
 	b := binding{}
 	for _, q := range states {

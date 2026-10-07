@@ -1,5 +1,7 @@
 package policy
 
+import "time"
+
 // FanoutPolicy is the "fanout" block; prefer Policy.FanoutConfig for resolved values.
 type FanoutPolicy struct {
 	// Concurrency: below 1 means 2.
@@ -176,7 +178,29 @@ func (p Policy) QuotaResetConfig() QuotaResetConfig {
 // CLIHealthConfig configures the CLI-health subsystem; EVOLVE_CLI_HEALTH=0 still disables all of it.
 type CLIHealthConfig struct {
 	// ProactiveProbe (opt-in) benches capped CLI families before any phase boots them.
-	ProactiveProbe bool `json:"proactive_probe,omitempty"`
+	ProactiveProbe        bool `json:"proactive_probe,omitempty"`
+	UsageEvidenceTimeoutS int  `json:"usage_evidence_timeout_s,omitempty"`
+	UsageEvidenceTTLS     int  `json:"usage_evidence_ttl_s,omitempty"`
+}
+
+const (
+	defaultUsageEvidenceTimeout = 2 * time.Minute
+	defaultUsageEvidenceTTL     = 10 * time.Minute
+)
+
+func (c CLIHealthConfig) UsageEvidenceTimeout() time.Duration {
+	return secondsOr(c.UsageEvidenceTimeoutS, defaultUsageEvidenceTimeout)
+}
+
+func (c CLIHealthConfig) UsageEvidenceTTL() time.Duration {
+	return secondsOr(c.UsageEvidenceTTLS, defaultUsageEvidenceTTL)
+}
+
+func secondsOr(seconds int, fallback time.Duration) time.Duration {
+	if seconds <= 0 {
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
 }
 
 // CLIHealthConfig returns the cli_health block, or the zero value (probe off) when absent.

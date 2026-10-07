@@ -24,7 +24,7 @@ func validatePaneVocabulary(cli string, m Manifest) error {
 			return fmt.Errorf("bridge:manifest: %s for cli=%s: %w", rule.field, cli, err)
 		}
 	}
-	return nil
+	return validateUsageWindows(cli, m)
 }
 
 func (r paneVocabularyRule) check(pattern string) error {

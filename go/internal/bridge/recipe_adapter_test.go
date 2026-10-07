@@ -2,10 +2,12 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func recipeDeps(tx *fakeTmux) Deps {
@@ -57,6 +59,39 @@ func TestRecipeDriver_EnsureSession_BootTimeout(t *testing.T) {
 	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
 	if err := d.EnsureSession(context.Background()); err == nil {
 		t.Fatal("want boot-timeout error")
+	}
+}
+
+func TestRecipeDriver_EnsureSession_AnEndedContextStopsTheBootWaitInsteadOfPollingTheFullDeadline(t *testing.T) {
+	tx := &fakeTmux{paneSeq: []string{"never shows the marker"}}
+	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := d.EnsureSession(ctx)
+
+	if !errors.Is(err, context.Canceled) || len(tx.captureScrollback) != 0 {
+		t.Fatalf("err %v after %d pane captures; a caller whose context ended gets its error at once, not a %ds boot poll", err, len(tx.captureScrollback), tmuxREPLBootTimeoutS)
+	}
+}
+
+func TestRecipeDriver_EnsureSession_AContextEndingMidBootStopsTheWaitAtTheNextTick(t *testing.T) {
+	tx := &fakeTmux{paneSeq: []string{"never shows the marker"}}
+	d := newTestRecipeDriver(t, tx, "claude-tmux", "sess")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sleeps := 0
+	d.deps.Sleep = func(time.Duration) {
+		sleeps++
+		if sleeps == 5 {
+			cancel()
+		}
+	}
+
+	err := d.EnsureSession(ctx)
+
+	if !errors.Is(err, context.Canceled) || len(tx.captureScrollback) > 3 {
+		t.Fatalf("err %v after %d pane captures; the context ended during the third boot tick, so the wait stops there", err, len(tx.captureScrollback))
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 
 // checkBridgeBoot boots each *-tmux driver's REPL in turn and halts if any misses its
 // prompt marker; SkipBoot warns instead. Sandbox needs a profile request and a capable host.
-func checkBridgeBoot(o resolved) CheckResult {
+func checkBridgeBoot(o resolved, usageEvidence func(driver string) string) CheckResult {
 	const name = "bridge-boot"
 
 	if o.skipBoot {
@@ -35,15 +35,11 @@ func checkBridgeBoot(o resolved) CheckResult {
 
 	var fails []string
 	for _, driver := range bootable {
-		rc, scrollback := bootOne(o, driver, sandbox)
-		if rc == bridge.ExitOK {
+		out := bootOne(o, driver, sandbox)
+		if out.RC == bridge.ExitOK {
 			continue
 		}
-		detail := fmt.Sprintf("driver %q boot failed: rc=%d (%s)", driver, rc, bootRCName(rc))
-		if tail := bridge.ScrollbackTail(scrollback, 12); tail != "" {
-			detail += "\n  final pane:\n" + indent(tail, "    ")
-		}
-		fails = append(fails, detail)
+		fails = append(fails, bootFailureDetail(driver, out, usageEvidence))
 	}
 
 	if len(fails) > 0 {
@@ -61,19 +57,51 @@ func checkBridgeBoot(o resolved) CheckResult {
 	}
 }
 
-func bootOne(o resolved, driver string, sandbox bool) (int, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), o.bootBudget)
-	defer cancel()
-	return o.bootTester(ctx, driver, sandbox)
+type BootOutcome struct {
+	RC         int
+	Wall       string
+	Scrollback string
+}
+
+func bootOne(o resolved, driver string, sandbox bool) BootOutcome {
+	var out BootOutcome
+	bridge.BootProbe{Driver: driver, Log: o.stderr}.Retry(context.Background(), func() (int, string) {
+		ctx, cancel := context.WithTimeout(context.Background(), o.bootBudget)
+		defer cancel()
+		out = o.bootTester(ctx, driver, sandbox)
+		return out.RC, out.Wall
+	})
+	return out
+}
+
+func bootFailureDetail(driver string, out BootOutcome, usageEvidence func(driver string) string) string {
+	detail := fmt.Sprintf("driver %q boot failed: rc=%d (%s)%s", driver, out.RC, bootRCName(out.RC), attemptsNote(driver, out))
+	if out.Wall != "" {
+		detail += "; the pane escalated " + out.Wall
+	}
+	if tail := bridge.ScrollbackTail(out.Scrollback, 12); tail != "" {
+		detail += "\n  final pane:\n" + indent(tail, "    ")
+	}
+	if usageEvidence != nil {
+		detail += "\n  usage: " + usageEvidence(driver)
+	}
+	return detail
+}
+
+func attemptsNote(driver string, out BootOutcome) string {
+	if attempts := bridge.ProbeBootAttempts(driver); out.RC == bridge.ExitREPLBootTimeout && out.Wall == "" && attempts > 1 {
+		return fmt.Sprintf(" on all %d boot attempts", attempts)
+	}
+	return ""
 }
 
 // newDefaultBootTester mirrors `evolve doctor boot`: it boots in a throwaway workspace,
 // plus a throwaway worktree and the build agent on the sandbox path.
-func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Context, string, bool) (int, string) {
-	return func(ctx context.Context, driver string, sandbox bool) (int, string) {
+func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Context, string, bool) BootOutcome {
+	return func(ctx context.Context, driver string, sandbox bool) BootOutcome {
 		ws, err := os.MkdirTemp("", "evolve-looppreflight-*")
 		if err != nil {
-			return exitWorkspaceSetupFailed, "could not create boot workspace: " + err.Error()
+			return BootOutcome{RC: exitWorkspaceSetupFailed, Scrollback: "could not create boot workspace: " + err.Error()}
 		}
 		defer func() { _ = os.RemoveAll(ws) }()
 		cfg := &bridge.Config{Workspace: ws, ProjectRoot: projectRoot, AllowNetwork: true}
@@ -85,7 +113,8 @@ func newDefaultBootTester(projectRoot string, stderr io.Writer) func(context.Con
 				cfg.Agent = "build"
 			}
 		}
-		return bridge.BootSmokeTest(ctx, driver, cfg, bridge.Deps{Stderr: stderr})
+		rc, scrollback := bridge.BootSmokeTest(ctx, driver, cfg, bridge.Deps{Stderr: stderr})
+		return BootOutcome{RC: rc, Wall: bridge.EscalationPattern(ws), Scrollback: scrollback}
 	}
 }
 

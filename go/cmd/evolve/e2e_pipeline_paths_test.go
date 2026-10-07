@@ -39,10 +39,7 @@ func pipelineCycle(t *testing.T, evolveBin, fakeBin, repoRoot, goalHash string, 
 	env = append(env, isolatedHome(t)...)
 	for _, e := range extraEnv {
 		if e == strictPolicyMarker {
-			policyPath := filepath.Join(projRoot, ".evolve", "policy.json")
-			if err := os.WriteFile(policyPath, []byte(`{"workflow":{"strict_audit":true}}`), 0o644); err != nil {
-				t.Fatalf("write strict policy: %v", err)
-			}
+			writeProjectPolicy(t, projRoot, map[string]any{"workflow": map[string]any{"strict_audit": true}})
 			continue // marker is harness-only; never forward it to the subprocess
 		}
 		env = append(env, e)

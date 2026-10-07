@@ -19,101 +19,63 @@ func refNow(t *testing.T) time.Time {
 	return time.Date(2026, time.July, 3, 12, 0, 0, 0, loc)
 }
 
-// TestParse_ClaudeGolden parses the REAL captured claude /usage pane (testdata/
-// claude_usage.txt) and asserts every bucket + used% + reset. This is the whole
-// design premise: claude reports numeric per-window usage, so the budget can be
-// real. Gaming kills: hard-coding the 3 buckets fails when the golden changes;
-// returning Source=unknown fails the numeric assertions.
-func TestParse_ClaudeGolden(t *testing.T) {
+func TestReadWindows_TheJulyClaudeGoldenKeepsItsBucketsThroughStatesOf(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("testdata", "claude_usage.txt"))
 	if err != nil {
 		t.Fatalf("read golden: %v", err)
 	}
 	now := refNow(t)
-	var q QuotaState = Parse("claude", string(raw), now)
 
-	if q.Source != SourceProbed {
-		t.Fatalf("Source = %q, want %q (numeric buckets parsed)", q.Source, SourceProbed)
-	}
-	if len(q.Buckets) != 3 {
-		t.Fatalf("got %d buckets, want 3 (session, week, week:Fable); buckets=%+v", len(q.Buckets), q.Buckets)
-	}
-	if !q.Exhausted {
-		t.Errorf("Exhausted = false, want true (the Fable week bucket is at 100%%)")
-	}
+	states := StatesOf(ReadWindows(claudeWindowSpec, string(raw), now), now)
 
+	if len(states) != 1 || states[0].Family != "claude" || states[0].Source != SourceProbed || states[0].Exhausted {
+		t.Fatalf("states = %+v; want one probed claude state that its drained Fable window does not exhaust", states)
+	}
 	byName := map[string]Bucket{}
-	for _, b := range q.Buckets {
+	for _, b := range states[0].Buckets {
 		byName[b.Name] = b
 	}
-
-	// session: 27% used → 73% remaining, resets 4:10pm today (still ahead of noon).
-	sess, ok := byName["session"]
-	if !ok {
-		t.Fatalf("missing 'session' bucket; got %v", byName)
+	for name, want := range map[string]struct {
+		used  float64
+		reset time.Time
+	}{
+		"session": {0.27, time.Date(2026, time.July, 3, 16, 10, 0, 0, now.Location())},
+		"week":    {0.66, time.Date(2026, time.July, 5, 21, 0, 0, 0, now.Location())},
+	} {
+		b, ok := byName[name]
+		if !ok || !approx(b.UsedFraction, want.used) || !b.ResetAt.Equal(want.reset) {
+			t.Errorf("bucket %s = %+v (present=%v); want used %v, reset %v", name, b, ok, want.used, want.reset)
+		}
 	}
-	if !approx(sess.UsedFraction, 0.27) {
-		t.Errorf("session UsedFraction = %v, want 0.27", sess.UsedFraction)
-	}
-	if !approx(sess.RemainingFraction(), 0.73) {
-		t.Errorf("session RemainingFraction() = %v, want 0.73", sess.RemainingFraction())
-	}
-	wantSessReset := time.Date(2026, time.July, 3, 16, 10, 0, 0, now.Location())
-	if !sess.ResetAt.Equal(wantSessReset) {
-		t.Errorf("session ResetAt = %v, want %v (4:10pm today)", sess.ResetAt, wantSessReset)
-	}
-
-	// week (all models): 66% used → the tightest APPLICABLE cap for opus/sonnet.
-	wk, ok := byName["week"]
-	if !ok {
-		t.Fatalf("missing 'week' bucket; got %v", byName)
-	}
-	if !approx(wk.UsedFraction, 0.66) {
-		t.Errorf("week UsedFraction = %v, want 0.66", wk.UsedFraction)
-	}
-	wantWkReset := time.Date(2026, time.July, 5, 21, 0, 0, 0, now.Location())
-	if !wk.ResetAt.Equal(wantWkReset) {
-		t.Errorf("week ResetAt = %v, want %v (Jul 5 at 9pm)", wk.ResetAt, wantWkReset)
-	}
-
-	// week:Fable — the per-model window, at 100% (why deep moved off fable).
-	fab, ok := byName["week:Fable"]
-	if !ok {
-		t.Fatalf("missing 'week:Fable' bucket; got %v", byName)
-	}
-	if !approx(fab.UsedFraction, 1.0) {
-		t.Errorf("week:Fable UsedFraction = %v, want 1.0", fab.UsedFraction)
-	}
-
-	// TightestRemaining over the general windows (session+week) = the weekly
-	// 34%, not the roomier 73% session — the binding constraint the budget uses.
-	got, ok := q.TightestRemaining("session", "week")
-	if !ok || !approx(got, 0.34) {
+	if got, ok := states[0].TightestRemaining("session", "week"); !ok || !approx(got, 0.34) {
 		t.Errorf("TightestRemaining(session,week) = %v,%v, want 0.34,true (weekly binds)", got, ok)
+	}
+	if _, perModel := byName["week:Fable"]; perModel || len(byName) != 2 {
+		t.Errorf("buckets = %v; a family's quota state holds only its family-scoped windows", byName)
+	}
+	if got := byName["session"].RemainingFraction(); !approx(got, 0.73) {
+		t.Errorf("session RemainingFraction() = %v, want 0.73", got)
+	}
+	for _, q := range states {
+		if q.Source == SourceUnknown || q.Source != SourceProbed {
+			t.Errorf("%s state Source = %q; a state built from read windows is always probed, never %q", q.Family, q.Source, SourceUnknown)
+		}
 	}
 }
 
-// TestParse_UnknownPane: a pane with no recognizable bucket (an unsupported CLI
-// or a garbled capture) yields Source=unknown with NO fabricated buckets — the
-// budget must degrade to the min_lanes floor, never invent a cap.
-func TestParse_UnknownPane(t *testing.T) {
+func TestStatesOf_NoWindowsIsNoState(t *testing.T) {
 	for name, pane := range map[string]string{
 		"empty":     "",
 		"blank":     "\n\n   \n",
 		"unrelated": "codex v1.2\ntype /help for commands\n> ",
 	} {
-		t.Run(name, func(t *testing.T) {
-			q := Parse("codex", pane, refNow(t))
-			if q.Source != SourceUnknown {
-				t.Errorf("Source = %q, want %q", q.Source, SourceUnknown)
-			}
-			if len(q.Buckets) != 0 {
-				t.Errorf("got %d buckets, want 0 (no fabricated cap): %+v", len(q.Buckets), q.Buckets)
-			}
-			if _, ok := q.TightestRemaining(); ok {
-				t.Errorf("TightestRemaining ok=true on unknown pane, want false")
-			}
-		})
+		if got := StatesOf(ReadWindows(claudeWindowSpec, pane, refNow(t)), refNow(t)); len(got) != 0 {
+			t.Errorf("%s: states = %+v, want none (no fabricated cap)", name, got)
+		}
+	}
+	var none QuotaState
+	if _, ok := none.TightestRemaining(); ok {
+		t.Errorf("TightestRemaining on a state with no buckets: ok=true, want false")
 	}
 }
 

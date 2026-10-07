@@ -95,6 +95,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BRIDGE_TOKEN_RESOLVER_FAILED` | the token resolver returned an error for a completed attempt; usage recorded as resolver-error |
 | `BRIDGE_TOKEN_RESOLVER_MISSING` | the engine was built without a token resolver; lifecycle and outcome records continue without token counts (fail-open) |
 | `BRIDGE_TOKEN_USAGE_WARNING` | the token resolver measured the attempt with a caveat (invalid counters, partial measurement); the caveat is the reason |
+| `BRIDGE_USAGE_EVIDENCE` | a CLI failed in a way quota could explain (a REPL boot timeout, no response, an escalation, a stall, a failed doctor probe), so the failure path queried the CLI's usage in a fresh session and recorded the verdict for the failing family: exhausted (a family-scoped window is used up: the verified cause, and the family is benched until the reset), healthy (quota ruled out for the family; an exhausted per-model window is named as a note, never as the cause), unavailable (the usage query failed too, which points at auth, install or network) or unknown (no usage window could be read); the reason is the verdict summary; fields driver, cli, family, verdict, trigger (exit N or stall), exit_code, cached, and record_error when the workspace record could not be written |
 
 ### carryover
 

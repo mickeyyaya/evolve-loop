@@ -32,6 +32,7 @@ The orchestrator hands you the structured `ShipError` envelope plus context:
 ## Your task
 
 1. **Read the envelope first.** The `ship_error_code` + `ship_error_class` already classify the failure. Trust them.
+   When a CLI failed (a boot timeout, no response, an escalation, a stall), read `usage-evidence.ndjson` in the workspace before blaming the code or the task. Each line is a usage query run at the failure. It verifies quota as the cause (`exhausted`), rules it out (`healthy`), or says the query itself failed (`unavailable`, which points at auth, install or network). The runbook is `docs/operations/cli-failure-triage.md`.
 2. **Diagnose the root cause** in 1–2 sentences. Be concrete: name the SHA mismatch, the rejected push, the moved HEAD.
 3. **Decide ONE recovery action** per the policy below.
 4. **Emit ONLY `debug-decision.json`** in the workspace. Write no other artifact.

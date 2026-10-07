@@ -2,6 +2,93 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a CLI that "doesn't work" is explained by a usage query, never inferred: every failure path verifies or rules out quota and records the verdict; one manifest-declared usage reader serves every CLI (agy's per-group screen, Claude Code's `N% used`); agy's cold first boot is retried once by the probes that run first (2026-10-06)
+
+- **What was wrong and how it showed.**
+  - **Cold start.** agy's first launch after an idle period can take longer than the bridge's 60 s REPL boot wait, while the next launch boots in seconds. In wave 62 that launch was preflight's `bridge-boot`, and the loop halted. At the wave 67 boundary it was the boundary updater's `doctor live agy-tmux` (`rc=80`), logged as `agy skipped 1.3.0: doctor live did not answer, so the family counts as unsubscribed`. Preflight's agy boots 80 s later both booted.
+  - **Blind usage probes.** Two live `/usage` screens had drifted past their manifests' `exhausted_regex`:
+    - agy 1.3.0 pools quota per model group (Gemini; Claude and GPT), each with a weekly and a five-hour window, and prints the remaining share as `0.00%` on the bar line. `\b0%\s*(left|remaining)` cannot match that.
+    - Claude Code 2.1.291 prints `N% used`, and its regex expects `0% left`.
+
+    So a drained pool or a fully used claude window went unseen, and where agy's regex did match, it benched `agy` whichever group was drained.
+  - **Inference instead of evidence.** The updater read a failed probe as "unsubscribed", and a phase that timed out on a drained pool looked like any timeout. Nothing asked the CLI.
+- **What changed:**
+  - **The cold-start retry** (component 1). The manifest field `probe_boot_retries` is 1 in agy-tmux.json; agy-claude-tmux inherits it, and every other driver has 0.
+    - `bridge.BootProbe.Retry` retries a bare exit 80 (no classified wall, context alive) with a full budget per attempt, and logs `cold start: boot attempt 1 of 2 …`. On a second timeout it logs `FAIL: the REPL never drew its prompt on any of 2 boot attempts`, with the pane captured.
+    - The live probe (the updater's probe and smoke, and the canary) and preflight's `bridge-boot` use it. Both hand it the attempt's classified wall (preflight's boot tester returns `BootOutcome{RC, Wall, Scrollback}`, read through `bridge.EscalationPattern`), so a login wall at boot is never retried. Phase dispatch is unchanged.
+    - A bare boot timeout in the updater is the new status `boot-timeout`, carrying the attempt count and the final pane, never "unsubscribed".
+  - **One usage reader** (component 2). `quotastate.ReadWindows(spec, pane, now)` reads any CLI's screen into typed windows: `UsageWindow{Scope, Kind, PercentUsed, ResetsText, ResetsAt, Models, Family, Model, Exhausted}`.
+    - The layout comes from the CLI manifest's `controls.usage.windows`: section and label regexes, the value and its direction (`used` or `remaining`), the reset regex, the exhaustion threshold (default 100% used), and a scope → `{family, per_model}` map. `parseManifest` validates it.
+    - agy-tmux.json and claude-tmux.json declare it; agy-claude-tmux inherits agy's. codex declares none until its screen is captured live.
+    - The reader replaces claude's compiled-regex `quotastate.Parse`, so the cap probe and the budget probe read a screen the same way. `ProbeQuota(ctx, families, QuotaReader{Probe, Read, Now})` yields one state per target family, built from family-scoped windows only.
+    - `quotastate.WindowSpec.Validate` is the one home of the spec's rules; the manifest loader and the reader share it.
+    - `UsageWindow.ExhaustsFamily()` is the one per-model rule (`Exhausted && Model == ""`), asked by the bench, the evidence verdict, the budget's states and the `clihealth usage` table.
+    - An exhausted family-scoped window benches its own family until its reset (capped at 24 h, `clihealth.Store.BenchWallUntil`): a drained Claude group benches `agy-claude`, a drained claude session or all-models week benches `claude`.
+    - A per-model window (claude's `Current week (Fable)`) is a WARN and a recorded fact, because benches are per family. The follow-up is the [model-level benches design note](docs/plans/model-level-benches-2026-10.md), inbox `model-level-benches-from-per-model-usage-windows`.
+    - Every parsed screen is recorded in `.evolve/usage-windows.json`.
+    - The new `evolve clihealth usage [--json] [family...]` runs the query now and prints the typed windows, read-only.
+  - **Usage evidence on every failure path** (component 3). `usageprobe.EvidenceSource.Explain` queries the failing driver's binary in a fresh session, bounded by `cli_health.usage_evidence_timeout_s` (120 s) and cached per CLI for `cli_health.usage_evidence_ttl_s` (600 s), the cache shared through `usage-windows.json`. It judges the driver's routing family as one of four verdicts:
+    - `exhausted`: a family-scoped window is used up, the verified cause; it benches the family;
+    - `healthy`: quota ruled out for the family, so the original cause stands. A drained per-model window is a note in the detail, never the cause, because the failing phase may have run on another model;
+    - `unavailable`: the query failed too, which points at auth, install or network;
+    - `unknown`: no window could be read.
+
+    A read taken before the failure cannot rule it out: `Explain(ctx, driver, since)` takes the failing attempt's start, and an earlier read (the pre-wave probe's, say) that would say `healthy` is refused and the CLI is queried again. A stale failed query is still reused inside the TTL, so a down CLI is not re-booted for every failing attempt. An exhausted read is reused only until its reset comes. The decorator benches every exit 85's classified wall through `bridgechain.BenchOnEscalation(bridgechain.Escalation, now, logf)`, whatever the verdict. That is the one rule the runner's walk and the walker's walk already used. It now benches a report once, so the walks add one strike between them, and a usage bench until the screen's reset is not shortened. This closes a live hole from wave 69: agy-claude's router launches hit `⚠ Individual quota reached … Resets in 1h3m47s` and exited 85, but the router (the phase advisor) walks its own chain, and only the runner benched, so nothing benched agy-claude. The wall is classified by agy-claude-tmux's inherited `exhausted_regex` (`quota (exceeded|reached)`), so no manifest change was needed. One in-flight query per CLI per process serves every waiter, and a query for one CLI never waits on another's. It runs detached from the caller's context, so a caller that stops waiting gets `unknown` and never records its cancellation as an "auth, install or network" verdict. A regex-only wall benches the failing family, never agy's Gemini family for an agy-claude failure. `internal/usageevidence` records the verdict in the phase workspace's `usage-evidence.ndjson` and emits the new `BRIDGE_USAGE_EVIDENCE` signal. The sites:
+    - the updater: `quota-exhausted`, `boot-timeout`, or `skipped` explained by the verdict; "counts as unsubscribed" is gone;
+    - preflight's `bridge-boot` halt detail;
+    - every bridge launch attempt that exits non-zero (not 127) before the chain falls back, through a `core.Bridge` decorator that both walkers pass through;
+    - a pane stall seen by the per-phase observer, as evidence only;
+    - `evolve doctor live`, which on failure prints the verdict and windows, read-only.
+
+    The failure advisor's prompt carries the record. The debugger, failure-advisor and retrospective personas read it before blaming the code or the task.
+- **Tests, red first:**
+  - `TestUpdate_ADoctorLiveBootTimeoutIsReportedAsABootTimeoutNotAsUnsubscribed` failed with the wave 67 wording.
+  - `TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding` failed with `1 agy launches`.
+  - The cold-start fakes: `TestBootProbeRetry_AnAgyThatDrawsItsREPLLateOnItsFirstLaunchOnlyBootsOnTheRetry` and `…NeverDrawsItsREPLFailsWithThePaneCaptured`.
+  - The reader: `TestReadWindows_*` over 9 fixtures in `go/internal/quotastate/testdata/` (four agy screens; Claude Code 2.1.291's screen and its session, all-models and Fable 100%-used variants; July's claude golden). `TestUsageWindows_TheWholeFamilyRegexIsBlindToTheseDrainedScreens` pins the drift.
+  - `TestNewUsageProber_ReadsEachCLIsWindowsThroughItsManifestAndBenchesTheRightFamily` was red with `map[]` without the seam.
+  - The evidence: `TestEvidence_*` (each verdict, the TTL, the timeout, read-only), `TestBridge_*` (exits 80, 81, 85, 86 and 1 explained; 0 and 127 not), and the site tests `TestUpdate_ABootTimeoutWithHealthyUsageIsABootTimeoutNotUnsubscribedNorQuota`, `TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset`, `TestRun_BridgeBoot_AFailedBootCarriesTheUsageVerdictAndAPassAsksNothing`, `TestPhaseStallSignal_*`, `TestDoctorLive_AFailedProbePrintsTheUsageVerdictAndItsWindows` and `TestFailureAdvisor_PromptCarriesTheUsageEvidenceRecordedForTheFailure`.
+  - `evolve signals codes check` was stale before the code was generated.
+  - Review round 1 (Block / FIX_THEN_MERGE, all items fixed):
+    - `TestEvidence_AnExhaustedPerModelWindowIsNotAVerifiedFamilyCause` was red with the reviewer's probe: "verdict=exhausted … verified … Fable week".
+    - The live wall:
+      - `TestBridge_AnUnavailableUsageQueryFallsBackToTheAttemptsOwnWallAndBenchesTheFailingFamily` was red (`benches map[]`).
+      - `TestEvidence_AnObservationOlderThanTheFailureIsNotEvidenceForIt` was red: a pre-failure healthy read ruled the wall out.
+      - `TestEvidence_AFailedQueryReadBeforeTheFailureIsStillReusedSoADownCLIIsNotStormed` was red against the first cut of that rule, which re-booted a down CLI per failing attempt.
+      - `TestBenchOnEscalation_OneReportBenchesItsFamilyOnceAndKeepsALongerBench` was red: the runner overwrote a 2 h usage bench with 1 h and doubled the strikes.
+      - Pinned: `TestBridge_TheLiveAgyClaudeWallWithADrainedClaudeGroupBenchesAgyClaudeUntilTheScreensReset` and `TestAgyClaudeTmux_TheLiveIndividualQuotaWallIsClassifiedByTheManifestsExhaustedRegex` over the live pane fixture.
+      - Preservation: the new-strike twin of the once-per-report rule, since extended and renamed (below).
+    - Also red first: `TestUsageWindow_ExhaustsFamilyOnlyForAnExhaustedFamilyScopedWindow`, `TestWindowSpec_ValidateNamesTheBrokenFieldAndReadWindowsReadsNothingWithIt` (the reader had accepted an unknown kind and a family-less scope), `TestEvidence_ASlowQueryForOneCLIDoesNotBlockAnotherAndOneCLIIsQueriedOnce` (agy waited on claude), `TestEvidence_TheRegexFallbackBenchesTheFailingFamilyNotTheWholeBinary` and `TestRun_BridgeBoot_ABootTimeoutCarryingAWallIsNotRetriedAndNamesTheWall` (the wall was retried).
+  - Delta re-review (FIX_THEN_MERGE, 2026-10-07: 1 CRITICAL, 2 HIGH, 4 MEDIUM, 2 LOW; all fixed):
+    - **CRITICAL, one bench rule.** Round 1 gated the decorator's bench on an `unavailable` or `unknown` verdict, while the runner's walk and the generic walker benched ungated. A per-model wall, such as claude's Fable week, was therefore benched on the runner's walk and never on the advisor's. `TestBridge_AWallTheFamilyScreenDoesNotShowBenchesAlikeOnTheAdvisorsWalkAndOnTheRunnersWalk` was red (the advisor's walk benched nothing). Round 1's preservation test is inverted on purpose to `TestBridge_AFreshHealthyUsageScreenIsRecordedAsEvidenceAndTheClassifiedWallIsStillBenchedOnce`, because a healthy family screen is evidence, not a veto.
+    - **HIGH, a cancelled leader poisoned the cache.** `TestEvidence_ALeaderCancelledMidQueryReturnsAtOnceAndNeitherCachesNorRecordsTheCancellation` and `TestEvidence_AFollowerWithALiveContextGetsTheQuerysAnswerWhenTheLeaderIsCancelled` were red with "context canceled" cached as `unavailable` for the follower, for a later caller and for another lane through `usage-windows.json`.
+    - **HIGH, surviving mutants.** New pins cover a follower's own context (`TestEvidence_AFollowerWhoseOwnContextEndsStopsWaitingForASlowQuery`), a bench still in force before the wall (`TestBenchOnEscalation_AWallSeenAfterTheLastBenchIsANewStrikeWhetherOrNotThatBenchIsStillActive`), the attempt's start (`TestBridge_AHealthyReadTakenDuringTheAttemptIsReusedWithoutASecondQuery`), the TTL and `since` boundaries (`TestEvidence_AReadIsReusedForLessThanTheTTLAndQueriedAgainAtExactlyTheTTL`, `TestEvidence_AHealthyReadTakenTheInstantTheFailureStartedDescribesIt`) and the bench policy (`TestBenchWallUntil_TheNewestReadingsResetReplacesTheBenchEvenWhenItIsEarlier`: the newest screen's reset wins, as `NewBenchEntry`'s newest wall does).
+    - **MEDIUM.**
+      - An exhausted read whose reset passed is queried again (`TestEvidence_AnExhaustedReadIsReusedUntilItsResetAndQueriedAgainOnceTheResetComes`, red).
+      - The cost claim is corrected: a CLI that reads healthy is queried once per later failing attempt, by decision, and the reason is in the usageevidence page.
+      - The e2e fixture projects set `cli_health.usage_evidence_timeout_s: 1`. Measuring that exposed a real bound defect: the recipe adapter's boot wait polled its full 60 s deadline after the context ended, so the usage query's timeout never bounded a REPL still booting, and each e2e query took 62 s. The wait now stops when its context ends (`TestRecipeDriver_EnsureSession_AnEndedContextStopsTheBootWaitInsteadOfPollingTheFullDeadline`, red at 60 pane captures). Measured on the `cmd/evolve` e2e run: 65 `Explain` calls, 6 queries at about 2 s each, against about 49 s before.
+      - `BenchOnEscalation` and `BenchFunc` take a `bridgechain.Escalation` parameter object.
+    - **LOW.**
+      - A reused regex wall verifies only the family it was read for (`Observation.RegexWallFamily`; `TestEvidence_AReusedRegexWallVerifiesOnlyTheFamilyItWasReadFor`, red).
+      - A follower of a query in flight is not `cached` (`TestEvidence_AFollowerOfAQueryInFlightGetsAFreshAnswerNotACachedOne`, red).
+  - Second delta re-review (FIX_THEN_MERGE, no CRITICAL, 2026-10-07):
+    - **Killed two surviving mutants.** `TestRecipeDriver_EnsureSession_AContextEndingMidBootStopsTheWaitAtTheNextTick` kills a boot wait that checks its context only once, before the loop (60 pane captures). `TestEvidence_TwoFamiliesOfOneBinaryFailingTogetherShareOneUsageQuery` kills a single-flight keyed by family instead of binary (2 probes).
+    - **Closed an orphan window.** A pane stall reported after the phase's context ended no longer starts a usage query (`TestPhaseStallSignal_AStallReportedAfterThePhaseEndedStartsNoUsageQuery`, red). A query still running when the process exits leaves its `evolve-recipe-…-pid<N>` session for the liveness GC (`swarm.ExecReapOrphans`).
+    - **Filed MEDIUM-C** as inbox `escalation-bench-own-decorator` (maintainability): one dedicated escalation-bench decorator beneath every walk, replacing the three call sites.
+- **Left open:**
+  - The real agy binary was not launched; the next boundary's `cold start:` and `[usage-probe]` lines are the live check.
+  - codex's `/status` screen needs a `windows` block.
+  - Model-level benches.
+  - Whether a verified quota exhaustion should turn the updater's smoke halt into a warning.
+- **Docs:**
+  - the [CLI-failure triage runbook](docs/operations/cli-failure-triage.md);
+  - the [cold-start incident note](docs/incidents/agy-cold-start-boot-timeout-2026-10-06.md);
+  - the new [usageevidence](docs/architecture/packages/internal-usageevidence.md) and [usageprobe](docs/architecture/packages/internal-usageprobe.md) pages;
+  - the bridge, cliupdate, looppreflight, policy, adapters-observer, core and cmd-evolve pages;
+  - [runtime-reference](docs/operations/runtime-reference.md);
+  - [agy-runtime](skills/loop/reference/agy-runtime.md);
+  - [signal-codes](docs/architecture/signal-codes.md).
+
 ## Docs — the audit ledger restructure: research record, plan and ADR-0123 (Proposed, 2026-10-06)
 
 - **Why.** The operator asked to make `.evolve/ledger.jsonl` structured and efficient to load without reading it whole. The same day, the ledger turned out to be broken at line 154453, because fleet-rebase carry diffs lived in deleted cycle worktrees, and every byte-identical carry had been refused at ship (6 of 6).
