@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // preventiveHeading is the retro-report section under which the autofiler
@@ -32,12 +34,13 @@ const preventiveHeading = "## Recommended preventive actions"
 // caller's default weight — the recurrence-escalation lever. Recurrence is the
 // count the retro attached (advisory; surfaced in the filed item's evidence).
 type PreventiveAction struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	WeightHint float64  `json:"weight_hint"`
-	Files      []string `json:"files"`
-	Evidence   string   `json:"evidence"`
-	Recurrence int      `json:"recurrence"`
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	WeightHint    float64  `json:"weight_hint"`
+	Files         []string `json:"files"`
+	Evidence      string   `json:"evidence"`
+	Recurrence    int      `json:"recurrence"`
+	PriorityClass string   `json:"priority_class"`
 }
 
 // ParsePreventiveActions lifts the JSON array from the fenced ```json block
@@ -91,6 +94,9 @@ func FileActions(inboxDir string, cycle int, actions []PreventiveAction, default
 		if a.ID == "" || existing[a.ID] {
 			continue
 		}
+		if err := inboxbatch.RequirePriorityClass(a.PriorityClass); err != nil {
+			return written, fmt.Errorf("retrofile: action %s: %w", a.ID, err)
+		}
 		weight := defaultWeight
 		if a.WeightHint > 0 {
 			weight = a.WeightHint
@@ -104,6 +110,7 @@ func FileActions(inboxDir string, cycle int, actions []PreventiveAction, default
 			"files":            a.Files,
 			"evidence_pointer": a.Evidence,
 			"recurrence":       a.Recurrence,
+			"priority_class":   a.PriorityClass,
 			"injected_at":      now.UTC().Format(time.RFC3339),
 			"injected_by":      "retro-preventive-actions-autofiler",
 		}

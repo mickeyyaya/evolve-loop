@@ -64,7 +64,7 @@ func (e *Engine) probe() fleet.FreshnessProbeFn {
 
 func (e *Engine) refill() fleet.RefillFn {
 	return func(exclude map[string]bool) (fleet.CycleSpec, bool) {
-		for _, c := range triagecap.RankForDispatch(triagecap.ReadInboxBacklog(e.roots.EvolveDir, e.ports.Protected)) {
+		for _, c := range triagecap.ReadInboxBacklog(e.roots.EvolveDir, e.ports.Protected) {
 			if !exclude[c.ID] {
 				return fleet.CycleSpec{Scope: []string{c.ID}, Env: map[string]string{ipcenv.FleetScopeKey: c.ID}}, true
 			}

@@ -683,6 +683,8 @@
 ./internal/cliupdate
 # inboxrank — the one computed inbox priority: score = sum of policy-weighted features (base, class, unblocks, recurrence, age, goal), ordered with the declared-surface, filing-date and id tie-breaks (ADR-0121).
 ./internal/inboxrank
+# rankinputs — the rank's inputs for one evolve dir: its policy's inbox_priority block and its recurrence ledger's item counts, one loader for every consumer (ADR-0121, plan P2).
+./internal/inboxrank/rankinputs
 # wtcheckpoint — evolve checkpoint: refs/checkpoints snapshots of uncommitted worktree work (save, list, restore, prune, push).
 ./internal/wtcheckpoint
 # tmuxtest — the one owner of a test process's tmux server: its own evolve-bridge-t<pid> socket, a /bin/sh pane shell and no user config, killed at exit.

@@ -17,6 +17,7 @@ var allowedImports = map[string]bool{
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover": true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate":     true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn":      true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch":     true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog":     true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths":          true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract":  true,

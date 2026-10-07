@@ -56,11 +56,11 @@ func TestClassify_HubFileAreaDoesNotBlob(t *testing.T) {
 	if len(batches) != 5 {
 		t.Fatalf("batches = %d, want 5 (hub area must not bind); got %+v", len(batches), batches)
 	}
-	if got := ids(batches[0]); got != "g1,g2" {
-		t.Errorf("batch[0] = %s, want g1,g2 (weight tie → id order)", got)
+	if got := ids(batches[0]); got != "r1,r2" {
+		t.Errorf("batch[0] = %s, want r1,r2 (real shared area still binds, in the caller's order)", got)
 	}
-	if got := ids(batches[1]); got != "r1,r2" {
-		t.Errorf("batch[1] = %s, want r1,r2 (real shared area still binds)", got)
+	if got := ids(batches[1]); got != "g1,g2" {
+		t.Errorf("batch[1] = %s, want g1,g2 (real shared area still binds)", got)
 	}
 }
 
@@ -93,11 +93,7 @@ func TestClassify_ConnectsToDoesNotClusterByDefault(t *testing.T) {
 	}
 }
 
-// TestClassify_DepsDoNotAffectGroupingOrOrdering pins the post-removal contract: Deps is
-// carried on Item (kept for now — see the cycle-1724 build report) but neither binds edges
-// nor influences ordering. Items sharing only a Deps chain stay separate singletons, and a
-// campaign-bound heavier child sorts BEFORE a lighter parent it declares a dependency on.
-func TestClassify_DepsDoNotAffectGroupingOrOrdering(t *testing.T) {
+func TestClassify_DepsNeitherBindNorReorderTheInjectedOrder(t *testing.T) {
 	unbound := []Item{
 		item("child", 0.95, withDeps("parent")),
 		item("parent", 0.2),
@@ -110,16 +106,16 @@ func TestClassify_DepsDoNotAffectGroupingOrOrdering(t *testing.T) {
 		item("parent", 0.2, withCampaign("camp-x")),
 		item("child", 0.95, withCampaign("camp-x"), withDeps("parent")),
 	}
-	batches := Classify(bound, Config{MaxItems: 4})
+	batches := Classify(bound, Config{MaxItems: 4, Order: orderBy("child", "parent")})
 	if len(batches) != 1 {
 		t.Fatalf("batches = %d, want 1 (campaign still unions them)", len(batches))
 	}
 	if got := ids(batches[0]); got != "child,parent" {
-		t.Errorf("order = %s, want child,parent (weight-desc; Deps must not reorder)", got)
+		t.Errorf("order = %s, want child,parent (the injected order; Deps must not reorder)", got)
 	}
 }
 
-func TestClassify_OversizedClusterChunksByWeight(t *testing.T) {
+func TestClassify_OversizedClusterChunksInRankOrder(t *testing.T) {
 	items := []Item{
 		item("d1", 0.9, withCampaign("big")),
 		item("d2", 0.8, withCampaign("big")),
@@ -155,7 +151,7 @@ func TestClassify_ZeroMaxUsesDefault(t *testing.T) {
 }
 
 func TestRenderMarkdown_EmptyIsEmpty(t *testing.T) {
-	if got := RenderMarkdown(nil); got != "" {
+	if got := RenderMarkdown(nil, nil); got != "" {
 		t.Errorf("RenderMarkdown(nil) = %q, want empty", got)
 	}
 }
@@ -165,8 +161,8 @@ func TestRenderMarkdown_ListsBatchesWithIDsAndReasons(t *testing.T) {
 		item("a", 0.9, withCampaign("camp-x")),
 		item("b", 0.5, withCampaign("camp-x")),
 	}
-	out := RenderMarkdown(Classify(items, Config{MaxItems: 4}))
-	for _, want := range []string{"batch 1", "a", "b", "campaign", "0.90"} {
+	out := RenderMarkdown(Classify(items, Config{MaxItems: 4}), nil)
+	for _, want := range []string{"batch 1", "a", "b", "campaign"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered section missing %q:\n%s", want, out)
 		}
@@ -175,13 +171,12 @@ func TestRenderMarkdown_ListsBatchesWithIDsAndReasons(t *testing.T) {
 
 func TestRenderMarkdown_CompactsLongReasonLists(t *testing.T) {
 	b := Batch{
-		Items:  []Item{{ID: "x", Weight: 0.5}},
-		Weight: 0.5,
+		Items: []Item{{ID: "x", Weight: 0.5}},
 		Reasons: []string{
 			"campaign a", "campaign b", "dep p→q", "dep q→r", "file-area go/internal/x", "file-area go/internal/y",
 		},
 	}
-	out := RenderMarkdown([]Batch{b})
+	out := RenderMarkdown([]Batch{b}, nil)
 	if !strings.Contains(out, "+3 more") {
 		t.Errorf("6 reasons must compact to %d + a '+3 more' summary:\n%s", maxRenderedReasons, out)
 	}

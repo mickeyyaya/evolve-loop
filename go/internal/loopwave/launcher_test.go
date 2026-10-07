@@ -115,7 +115,7 @@ func TestFreshnessProbe_ResolvesTheInboxLifecycle(t *testing.T) {
 	}
 }
 
-func TestRefill_PicksHighestWeightNotExcludedWithFleetScopeEnv(t *testing.T) {
+func TestRefill_PicksTheFirstRankedNotExcludedWithFleetScopeEnv(t *testing.T) {
 	h := newHarness(t)
 	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "low.json"), map[string]any{"id": "low", "weight": 0.2, "files": []string{"l.go"}})
 	writeJSON(t, filepath.Join(h.evolveDir, "inbox", "high.json"), map[string]any{"id": "high", "weight": 0.9, "files": []string{"h.go"}})
@@ -124,7 +124,7 @@ func TestRefill_PicksHighestWeightNotExcludedWithFleetScopeEnv(t *testing.T) {
 	refill := h.e.refill()
 	spec, ok := refill(map[string]bool{})
 	if !ok || spec.Scope[0] != "high" || spec.Env[ipcenv.FleetScopeKey] != "high" || len(spec.Scope) != 1 {
-		t.Errorf("the highest-weight dispatchable item, shaped as a lane: %+v %v", spec, ok)
+		t.Errorf("the first-ranked dispatchable item, shaped as a lane: %+v %v", spec, ok)
 	}
 	if spec, ok := refill(map[string]bool{"high": true}); !ok || spec.Scope[0] != "mid" {
 		t.Errorf("exclusion honoured: %+v", spec)

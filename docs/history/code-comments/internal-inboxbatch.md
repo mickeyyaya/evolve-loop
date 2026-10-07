@@ -535,3 +535,14 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // discriminative bound and a non-tautological eval against real backlog data,
 // which is precisely what D1/D2 found missing.
 ```
+
+## inbox prioritization P2
+
+### `go/internal/inboxbatch/classify_test.go:96` — above `func TestClassify_DepsDoNotAffectGroupingOrOrdering(t *testing.T) {`
+
+```text
+// TestClassify_DepsDoNotAffectGroupingOrOrdering pins the post-removal contract: Deps is
+// carried on Item (kept for now — see the cycle-1724 build report) but neither binds edges
+// nor influences ordering. Items sharing only a Deps chain stay separate singletons, and a
+// campaign-bound heavier child sorts BEFORE a lighter parent it declares a dependency on.
+```

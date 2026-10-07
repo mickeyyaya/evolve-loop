@@ -1,42 +1,43 @@
 package triagecap
 
 import (
-	"encoding/json"
+	"fmt"
+	"io"
 	"os"
-	"path/filepath"
-	"sort"
+	"slices"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
 )
 
-// SelectWaveSeedTopN returns SelectFleetWidthTopN over the inbox backlog.
 func SelectWaveSeedTopN(evolveDir string, count int, isProtected func(string) bool) []FleetCandidate {
 	return SelectFleetWidthTopN(ReadInboxBacklog(evolveDir, isProtected), count)
 }
 
 func ReadInboxBacklog(evolveDir string, isProtected func(string) bool) []FleetCandidate {
-	lifecycle := readOnlyLifecycle(evolveDir)
-	entries, _ := filepath.Glob(filepath.Join(lifecycle.InboxDir, "*.json"))
-	sort.Strings(entries)
-	candidates := make([]FleetCandidate, 0, len(entries))
-	for _, p := range entries {
-		if doc, ok := laneMaterial(p, isProtected, lifecycle); ok {
-			candidates = append(candidates, FleetCandidate{ID: doc.ID, Weight: doc.Weight, Files: doc.Files, Declared: doc.DeclaredSurface()})
-		}
-	}
-	return candidates
+	return readRankedBacklog(evolveDir, isProtected, time.Now(), os.Stderr)
 }
 
-func laneMaterial(path string, isProtected func(string) bool, lifecycle inboxmover.Options) (inboxbatch.Item, bool) {
-	raw, err := os.ReadFile(path)
+func readRankedBacklog(evolveDir string, isProtected func(string) bool, now time.Time, loopLog io.Writer) []FleetCandidate {
+	rank, warnings := rankinputs.Load(evolveDir, now)
+	lifecycle := readOnlyLifecycle(evolveDir)
+	queue, _, err := inboxbatch.LoadDir(lifecycle.InboxDir)
 	if err != nil {
-		return inboxbatch.Item{}, false
+		fmt.Fprintf(loopLog, "[triagecap] WARN inbox backlog unreadable: %v\n", err)
+		return nil
 	}
-	var doc inboxbatch.Item
-	if json.Unmarshal(raw, &doc) != nil || doc.ID == "" {
-		return inboxbatch.Item{}, false
+	for _, w := range append(warnings, inboxrank.ClassWarnings(queue, rank.Config)...) {
+		fmt.Fprintf(loopLog, "[triagecap] WARN inbox rank: %s\n", w)
 	}
-	place, _ := inboxmover.PlaceOnLaneMenu(lifecycle, doc, isProtected)
-	return doc, place == inboxmover.MenuReady
+	ranked := slices.DeleteFunc(inboxmover.RankLaneMenu(lifecycle, queue, isProtected, rank).Ranked, func(r inboxrank.Ranked) bool {
+		return r.Item.IDFromFileName
+	})
+	candidates := make([]FleetCandidate, len(ranked))
+	for i, r := range ranked {
+		candidates[i] = FleetCandidate{ID: r.Item.ID, Weight: r.Item.Weight, Files: r.Item.Files}
+	}
+	return candidates
 }

@@ -205,7 +205,8 @@ Schema (one object per action):
     "weight_hint": 0.92,
     "files": ["go/internal/<pkg>"],
     "evidence": "audit-report.md#D1",
-    "recurrence": 7
+    "recurrence": 7,
+    "priority_class": "correctness"
   }
 ]
 ```
@@ -221,6 +222,12 @@ Field contract:
 - `evidence` *(optional)* — pointer to the artifact proving the failure.
 - `recurrence` *(optional)* — count of prior occurrences (advisory; surfaced in
   the filed item so Triage can prioritize).
+- `priority_class` *(required)* — the kind of finding, one of the policy's
+  `inbox_priority.class_order` (`correctness`, `stability`, `performance`,
+  `debuggability`, `feature`, `maintainability`, `hygiene`, `security`). The
+  inbox rank weighs it ([ADR-0121](../docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md)),
+  and the autofiler refuses an action without one (`inboxbatch.ErrNoPriorityClass`),
+  so an action with no class is never filed.
 
 ### 5. Write the lesson YAML(s)
 

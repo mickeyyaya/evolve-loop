@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // StatusCompleted is the terminal RunStatus.Status value; every other status
@@ -185,15 +186,16 @@ func writeVerdict(dir string, rec dossier.CIWatchRecord) error {
 // escalationItem is the critical fix-forward inbox item filed on a red run.
 // The shape mirrors the hand-filed .evolve/inbox items triage already reads.
 type escalationItem struct {
-	ID        string  `json:"id"`
-	CreatedAt string  `json:"created_at"`
-	Weight    float64 `json:"weight"`
-	Kind      string  `json:"kind"`
-	Priority  string  `json:"priority"`
-	Title     string  `json:"title"`
-	Summary   string  `json:"summary"`
-	Evidence  string  `json:"evidence,omitempty"`
-	Source    string  `json:"source"`
+	ID            string  `json:"id"`
+	CreatedAt     string  `json:"created_at"`
+	Weight        float64 `json:"weight"`
+	Kind          string  `json:"kind"`
+	Priority      string  `json:"priority"`
+	PriorityClass string  `json:"priority_class"`
+	Title         string  `json:"title"`
+	Summary       string  `json:"summary"`
+	Evidence      string  `json:"evidence,omitempty"`
+	Source        string  `json:"source"`
 }
 
 // fileEscalation writes the critical fix-forward inbox item for a red run,
@@ -212,12 +214,13 @@ func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 		excerpt = excerpt[:maxLogExcerpt] + "\n[... excerpt truncated by ciwatch ...]"
 	}
 	item := escalationItem{
-		ID:        "ci-red-" + short,
-		CreatedAt: now.Format(time.RFC3339),
-		Weight:    0.95,
-		Kind:      "fix",
-		Priority:  "critical",
-		Title:     fmt.Sprintf("CI %s on pushed commit %s — %s", st.Conclusion, short, failing),
+		ID:            "ci-red-" + short,
+		CreatedAt:     now.Format(time.RFC3339),
+		Weight:        0.95,
+		Kind:          "fix",
+		Priority:      "critical",
+		PriorityClass: inboxbatch.ClassCorrectness,
+		Title:         fmt.Sprintf("CI %s on pushed commit %s — %s", st.Conclusion, short, failing),
 		Summary: fmt.Sprintf(
 			"Post-push CI watch (cycle %d): the GitHub run for %s completed with conclusion=%q. Failing: %s. Fix forward before shipping on top.\n\nLog excerpt:\n%s",
 			opts.Cycle, opts.SHA, st.Conclusion, failing, excerpt),

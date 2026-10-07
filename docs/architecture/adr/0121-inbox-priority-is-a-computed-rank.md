@@ -1,6 +1,7 @@
 # ADR-0121 — Inbox priority is a computed rank
 
 - **Status:** Accepted (2026-10-06, console lane `feat/inbox-priority-rank`). P1 of the approved plan [inbox prioritization](../../plans/inbox-prioritization-2026-10.md) lands with this ADR: the rank, its policy block, the validated class and the read-only verb. It is **unwired**: no consumer reads the rank until P2. The operator reviews the new order in [the preview report](../../reports/inbox-rank-preview-2026-10-06.md).
+  - **Amended 2026-10-06 (P2 prerequisite and P2, console lane `feat/inbox-rank-p2`):** the rank is **wired**. Every inbox consumer reads `inboxrank.Order`, and every autofiler stamps a `priority_class`. See [the P2 amendment](#amendment-2026-10-06-p2-prerequisite-and-p2-wire-the-rank) below.
 - **Number.** 0119 is held by in-flight work (`one-routing-table-one-resolver`, the CLI routing lane) and 0120 is reserved for in-flight work, so this ADR takes 0121, the number the plan names.
 - **Supersedes nothing.** It replaces the hand-typed `weight` as the sole ordering key once P2 wires it; the weight stays, as one input.
 - **Related:**
@@ -57,11 +58,42 @@ On 2026-10-06 the operator asked whether the inbox reprioritizes when a new requ
 
 ## Consequences
 
-- P2 replaces `RankForDispatch`, the `Classify` cluster order and the wave seed and refill paths with `inboxrank.Order`, and a source scan bans any other weight sort. Until then the rank is only shown.
+- P2 replaces `RankForDispatch`, the `Classify` cluster order and the wave seed and refill paths with `inboxrank.Order`, and a source scan bans any other weight sort. Until then the rank is only shown. *(Landed 2026-10-06; see the P2 amendment below.)*
 - The class labels now matter. The preview shows the 2026-09-26 hygiene sweep's items falling about 20 places, several of which describe silent failures. The operator's answer (2026-10-06): they are not relabelled automatically; the P3 overlap judge and the operator re-class an item with `evolve inbox edit --set priority_class=… --reason …`.
 - `evolve inbox add` needs a valid `priority_class` on every new item.
 - The recurrence factor reads an item's pattern as either a ledger pattern equal to its id (an autofiled recurrence item) or a pattern whose `fix_item_id` names it. The recurrence package owns that linkage (`recurrence.Ledger.ItemCounts`). Items carry no fingerprint field yet.
-- **Autofiled items carry no class yet (found in the P1 review, 2026-10-06).** Eight production autofilers write pending items without a `priority_class`: the post-push CI watch (`ci-red-*`, weight 0.95), the recurrence boundary applier's retro autofile (`retrofile`, filing the intents the disposition router stages), the fleet starvation observer, the fail-learning floor, the triage-cap demotion, the goal-stall escalation, the ADR-0072 halt writer and the unexplained-outcome classifier. None files through `lifecycle.File`, so decision 6's check never sees them. Once P2 wires the rank they score a class feature of 0 and sink below mid-weight items: a fresh `ci-red` item at weight 0.95 scores 0.4275, below a fresh correctness item at weight 0.6 (0.47), and a fail-learning defect at 0.75 (0.3375) ranks below a stability item at 0.5 (0.40). P1 stays unwired and does not change the writers. The fix is a P2 prerequisite: every autofiler stamps a `priority_class` from the policy order, chosen by the writer for the kind of finding it files, as it chooses the weight today, and a contract test requires every inbox writer's item to carry a class the checked-in order names. The plan lists the proposed class per writer.
+- **Autofiled items carry no class yet (found in the P1 review, 2026-10-06).** Eight production autofilers write pending items without a `priority_class`: the post-push CI watch (`ci-red-*`, weight 0.95), the recurrence boundary applier's retro autofile (`retrofile`, filing the intents the disposition router stages), the fleet starvation observer, the fail-learning floor, the triage-cap demotion, the goal-stall escalation, the ADR-0072 halt writer and the unexplained-outcome classifier. None files through `lifecycle.File`, so decision 6's check never sees them. Once P2 wires the rank they score a class feature of 0 and sink below mid-weight items: a fresh `ci-red` item at weight 0.95 scores 0.4275, below a fresh correctness item at weight 0.6 (0.47), and a fail-learning defect at 0.75 (0.3375) ranks below a stability item at 0.5 (0.40). P1 stays unwired and does not change the writers. The fix is a P2 prerequisite: every autofiler stamps a `priority_class` from the policy order, chosen by the writer for the kind of finding it files, as it chooses the weight today, and a contract test requires every inbox writer's item to carry a class the checked-in order names. The plan lists the proposed class per writer. *(Fixed 2026-10-06 by the P2 prerequisite; see the P2 amendment below.)*
+
+## Amendment 2026-10-06: P2 prerequisite and P2 wire the rank
+
+Landed on `feat/inbox-rank-p2` from `origin/main` `2f2cefdeb`. The details, the choices and the live check are the plan's [P2 landing notes](../../plans/inbox-prioritization-2026-10.md#p2-prerequisite-and-p2-landing-notes-2026-10-06).
+
+1. **Every autofiled item carries a class** (the P2 prerequisite). Each writer stamps the class of the finding it files, beside the kind and weight it already chooses; the policy keeps owning how much a class matters.
+
+   | Writer | Item | Class |
+   |---|---|---|
+   | Post-push CI watch (`ciwatch`) | `ci-red-<sha12>` | correctness |
+   | Contract-gate demotion, filed by the recurrence boundary applier through `retrofile` | `contract-gate-demoted-<phase>` (the class rides on the staged `dispositionrouter.Intent`, built by `core.ContractGateDemotion.Intent`) | correctness |
+   | Fleet starvation observer (`fleet`) | `fleet-work-supply-starvation` | stability |
+   | Fail-learning floor (`core/failurelearning`, written by `faillearn`) | `retro-<cycle>-<slug>-<sha8>` | correctness |
+   | Triage-cap demotion (`triagecap`) | `auto-heuristic-demotion-triagecap-c<a>-c<b>` | correctness |
+   | Goal-stall escalation (`cmd/evolve`) | `goal-stall-<hash8>` / `nonprogress-<hash8>` | stability |
+   | ADR-0072 halt writer (`cmd/evolve`) | `pipeline-defect-<category>-cycle<N>` | stability |
+   | Unexplained-outcome classifier (`cmd/evolve`) | `unexplained-outcome-cycle-<N>` | debuggability |
+
+   `TestInboxWriters_EveryAutofiledItemCarriesAKnownClass` (cmd/evolve) builds each item through its writer's own path, decodes it as an `inboxbatch.Item` and requires the row's class and `CheckPriorityClass` against the checked-in `class_order`. Its scan pins the force, not a list: any production function that writes into `.evolve/inbox/` must be an enrolled autofiler or an enrolled writer that only moves or rewrites filed items, so a ninth autofiler is red.
+2. **One order feeds every consumer** (P2). The wave seed, the widen and the launch refill read `triagecap.ReadInboxBacklog`, which returns the lane-ready backlog in `inboxrank.Order` against the whole pending queue; `RankForDispatch` is deleted. `inboxbatch.Classify` takes the order through an injected `Config.Order` (it cannot import the rank), runs it once, ranks clusters by their best-ranked member and keeps members in rank order; with no order it keeps the caller's order and never ranks by weight. The triage prompt and `evolve inbox batches` inject `Sequence` of one `Inputs.Order` run and print each item's score and top factor (`Labels`). The dashboard's queue is ranked too. Every consumer loads its inputs through one loader, `internal/inboxrank/rankinputs`.
+3. **No other weight sort.** `TestNoProductionCodeOrdersByWeightOutsideTheRank` scans the module's production code and fails on any ordering by an inbox weight outside `internal/inboxrank`; weight validation against a floor stays allowed. `./internal/inboxrank/...` joined the ship-time repo-contract pack, so a lane cannot land a stray weight sort.
+4. **Superseded acceptance.** Three per-cycle ACS predicates asserted the weight order (`cycle536` 007 and 008, `cycle1724` 002); they are archived under the A2 retention rule ([superseded predicates](../../private/research/archived-2026-10-06/superseded-predicates/README.md)).
+
+5. **The architecture review's fix round (2026-10-06).**
+   - The partition-then-rank step is one helper, `inboxmover.RankLaneMenu`, that every consumer calls.
+   - The shared funnels refuse a missing class: `dispositionrouter.StageIntent`, `retrofile.FileActions` and faillearn's inbox writer. A legacy classless intent is refused at apply, never filed.
+   - The wave planner's loop log and the triage prompt name every queued item with an unknown class, the runtime backstop for the force scan's blind spots.
+   - The class names are constants beside `inboxbatch.CheckPriorityClass`.
+   - The review also judged that the rank can starve the later classes by design. That stays an open question for the operator ([the plan's P4/P5 question](../../plans/inbox-prioritization-2026-10.md#open-question-for-p4-and-p5-starvation-by-design)); the rank is unchanged.
+
+Still to come: P3 (one intake path and the overlap judge), P4 (boundary preemption), P5 (a reason on every priority change).
 
 ## Alternatives considered
 

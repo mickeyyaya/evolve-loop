@@ -65,6 +65,7 @@ func TestStageIntent_AppendsJSONLAndCreatesDir(t *testing.T) {
 	}
 	second := in
 	second.Action = dispositionrouter.ActionAutofile
+	second.PriorityClass = "correctness"
 	if _, err := dispositionrouter.StageIntent(escDir, second); err != nil {
 		t.Fatalf("StageIntent (second): %v", err)
 	}

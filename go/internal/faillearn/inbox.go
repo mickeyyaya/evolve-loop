@@ -7,16 +7,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 type InboxItem struct {
-	ID         string   `json:"id"`
-	Title      string   `json:"title"`
-	Weight     float64  `json:"weight"`
-	Kind       string   `json:"kind"`
-	Priority   string   `json:"priority"`
-	Files      []string `json:"files"`
-	InjectedBy string   `json:"injected_by"`
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	Weight        float64  `json:"weight"`
+	Kind          string   `json:"kind"`
+	Priority      string   `json:"priority"`
+	PriorityClass string   `json:"priority_class"`
+	Files         []string `json:"files"`
+	InjectedBy    string   `json:"injected_by"`
 }
 
 type Option func(*writeConfig)
@@ -37,6 +40,11 @@ func WithInbox(dir string, items []InboxItem) Option {
 func (c writeConfig) writeInboxItems() error {
 	if c.inboxDir == "" || len(c.inboxItems) == 0 {
 		return nil
+	}
+	for _, it := range c.inboxItems {
+		if err := inboxbatch.RequirePriorityClass(it.PriorityClass); err != nil {
+			return fmt.Errorf("faillearn: inbox item %s: %w", it.ID, err)
+		}
 	}
 	for _, it := range c.inboxItems {
 		path, err := c.itemPath(it)
