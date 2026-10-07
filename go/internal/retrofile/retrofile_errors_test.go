@@ -60,7 +60,7 @@ func TestFileActions_MkdirFailsWhenInboxIsFile(t *testing.T) {
 	if err := os.WriteFile(inboxPath, []byte("x"), 0o644); err != nil {
 		t.Fatalf("seed file: %v", err)
 	}
-	if _, err := FileActions(inboxPath, 640, []PreventiveAction{{ID: "x", Title: "t"}}, 0.75, time.Unix(0, 0).UTC()); err == nil {
+	if _, err := FileActions(inboxPath, 640, []PreventiveAction{{ID: "x", Title: "t", PriorityClass: "correctness"}}, 0.75, time.Unix(0, 0).UTC()); err == nil {
 		t.Fatal("expected error when inboxDir is a regular file, got nil")
 	}
 }
@@ -76,7 +76,7 @@ func TestFileActions_NonItemJSONIgnoredDuringDedup(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(inbox, "noid.json"), []byte(`{"note":"x"}`), 0o644); err != nil {
 		t.Fatalf("seed noid json: %v", err)
 	}
-	written, err := FileActions(inbox, 640, []PreventiveAction{{ID: "fresh", Title: "t"}}, 0.75, time.Unix(0, 0).UTC())
+	written, err := FileActions(inbox, 640, []PreventiveAction{{ID: "fresh", Title: "t", PriorityClass: "correctness"}}, 0.75, time.Unix(0, 0).UTC())
 	if err != nil {
 		t.Fatalf("FileActions: %v", err)
 	}

@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
 )
 
 type inboxVerb struct {
@@ -107,13 +109,15 @@ func runInboxBatches(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox batches: %v\n", err)
 		return 1
 	}
-	menu := inboxmover.PartitionLaneMenu(inbox.opts, inbox.items, inbox.isProtected)
+	rank := loadRankInputs("batches", filepath.Dir(inbox.opts.InboxDir), time.Now(), stderr)
+	menu := inboxmover.RankLaneMenu(inbox.opts, inbox.items, inbox.isProtected, rank)
+	cfg.Order = inboxrank.Sequence(menu.Ranked)
 	batches := inboxbatch.Classify(menu.Ready, cfg)
 	if asJSON {
 		return encodeInboxBatches(stdout, stderr, inboxBatchesDoc{Batches: batches, ConsoleRouted: excludedItems(menu.Console, menu.ConsoleReasons), DependencyBlocked: excludedItems(menu.Waiting, menu.WaitingReasons)})
 	}
 	fmt.Fprintf(stdout, "%d items -> %d batches\n", len(inbox.items), len(batches))
-	fmt.Fprint(stdout, inboxbatch.RenderMarkdown(batches))
+	fmt.Fprint(stdout, inboxbatch.RenderMarkdown(batches, inboxrank.Labels(menu.Ranked)))
 	listExcluded(stdout, "%d operator-owned item(s) NOT selectable by a lane (the claim floor refuses them):\n", menu.ConsoleReasons)
 	listExcluded(stdout, "%d item(s) waiting on a dependency (not selectable until it lands):\n", menu.WaitingReasons)
 	return 0

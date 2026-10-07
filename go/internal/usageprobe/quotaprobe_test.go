@@ -25,6 +25,33 @@ const claudeUsagePane = "" +
 	"   █████████████▌                                     27% used\n" +
 	"   Resets 4:10pm (Asia/Taipei)\n"
 
+func readSession(family, pane string, _ time.Time) []quotastate.UsageWindow {
+	if pane != claudeUsagePane {
+		return nil
+	}
+	return []quotastate.UsageWindow{{Scope: "session", Kind: quotastate.KindSession, PercentUsed: 27, Family: family}}
+}
+
+func TestProbeQuota_OneScreenReportsEveryFamilyItsWindowsTarget(t *testing.T) {
+	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
+	read := func(string, string, time.Time) []quotastate.UsageWindow {
+		return []quotastate.UsageWindow{
+			{Scope: "GEMINI MODELS", Kind: quotastate.KindWeek, PercentUsed: 8.3, Family: "agy"},
+			{Scope: "CLAUDE AND GPT MODELS", Kind: quotastate.KindFiveHour, PercentUsed: 100, Family: "agy-claude", Exhausted: true},
+		}
+	}
+
+	got := ProbeQuota(context.Background(), []string{"agy"}, QuotaReader{Probe: func(context.Context, string) (string, error) { return "agy /usage", nil }, Read: read, Now: now})
+
+	byFamily := map[string]quotastate.QuotaState{}
+	for _, q := range got {
+		byFamily[q.Family] = q
+	}
+	if len(got) != 2 || byFamily["agy"].Exhausted || !byFamily["agy-claude"].Exhausted {
+		t.Fatalf("states = %+v; want a healthy agy and an exhausted agy-claude from one screen", got)
+	}
+}
+
 // TestProbeQuota_ParsesHealthyOmitsFailed pins the two core contracts: a family
 // whose probe succeeds is parsed to a probed QuotaState; a family whose probe is
 // unsupported OR errors is OMITTED (fail-open, no fabricated entry). Naming
@@ -48,7 +75,7 @@ func TestProbeQuota_ParsesHealthyOmitsFailed(t *testing.T) {
 
 	// claude parses (kept); codex errors, ollama is unsupported, garble responds
 	// but yields no numbers (Source=unknown) — all three omitted.
-	got := ProbeQuota(context.Background(), []string{"claude", "codex", "ollama", "garble"}, probe, now)
+	got := ProbeQuota(context.Background(), []string{"claude", "codex", "ollama", "garble"}, QuotaReader{Probe: probe, Read: readSession, Now: now})
 
 	if len(got) != 1 {
 		t.Fatalf("ProbeQuota returned %d states, want 1 (only claude reported); got=%+v", len(got), got)
@@ -81,7 +108,7 @@ func TestProbeQuota_ConcurrentFailOpen(t *testing.T) {
 		return "", errors.New("down")
 	}
 
-	got := ProbeQuota(context.Background(), families, probe, now)
+	got := ProbeQuota(context.Background(), families, QuotaReader{Probe: probe, Read: readSession, Now: now})
 
 	if len(got) != 8 {
 		t.Fatalf("want 8 healthy states, got %d", len(got))
@@ -96,9 +123,9 @@ func TestProbeQuota_ConcurrentFailOpen(t *testing.T) {
 // TestProbeQuota_EmptyFamilies returns an empty slice (never nil-deref) for no
 // families — the shadow-safe caller passes nil when budgeting is off.
 func TestProbeQuota_EmptyFamilies(t *testing.T) {
-	if got := ProbeQuota(context.Background(), nil, func(context.Context, string) (string, error) {
+	if got := ProbeQuota(context.Background(), nil, QuotaReader{Probe: func(context.Context, string) (string, error) {
 		return "", nil
-	}, time.Now()); len(got) != 0 {
+	}, Read: readSession, Now: time.Now()}); len(got) != 0 {
 		t.Errorf("ProbeQuota(nil families) = %+v, want empty", got)
 	}
 }

@@ -51,16 +51,16 @@ func TestTopN_FleetWidthAware_FewerThanCountDisjoint_ReturnsWidestSetNoOverlap(t
 	}
 }
 
-func TestTopN_FleetWidthAware_CountOneOrAbsent_PreservesSingleTopNBehavior(t *testing.T) {
+func TestTopN_FleetWidthAware_CountOneOrAbsent_ReturnsTheFirstRankedCandidate(t *testing.T) {
 	candidates := []FleetCandidate{
-		{ID: "task-low", Weight: 0.6, Files: []string{"go/internal/a/a.go"}},
-		{ID: "task-top", Weight: 0.9, Files: []string{"go/internal/b/b.go"}},
+		{ID: "task-first-ranked", Weight: 0.6, Files: []string{"go/internal/a/a.go"}},
+		{ID: "task-heavier", Weight: 0.9, Files: []string{"go/internal/b/b.go"}},
 		{ID: "task-mid", Weight: 0.75, Files: []string{"go/internal/c/c.go"}},
 	}
 	for _, count := range []int{0, 1} {
 		got := SelectFleetWidthTopN(candidates, count)
-		if len(got) != 1 || got[0].ID != "task-top" {
-			t.Errorf("SelectFleetWidthTopN(count=%d) = %+v, want exactly the single highest-weight candidate task-top (legacy single-focus behavior)", count, got)
+		if len(got) != 1 || got[0].ID != "task-first-ranked" {
+			t.Errorf("SelectFleetWidthTopN(count=%d) = %+v, want exactly the first-ranked candidate (legacy single-focus behavior)", count, got)
 		}
 	}
 }

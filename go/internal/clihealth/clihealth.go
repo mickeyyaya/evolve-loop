@@ -208,10 +208,32 @@ func (s *Store) Load() (map[string]Entry, error) {
 // the read-prev→compose→write sequence both the runner bench-writer and the loop
 // canary need. Returns the composed entry.
 func (s *Store) BenchWall(family, pattern, paneText string) (Entry, error) {
+	return s.benchComposed(family, func(prev Entry, now time.Time) Entry {
+		return NewBenchEntry(prev, family, pattern, paneText, now)
+	})
+}
+
+type Wall struct {
+	Pattern  string
+	Evidence string
+	Reset    time.Time
+}
+
+func (s *Store) BenchWallUntil(family string, w Wall) (Entry, error) {
+	return s.benchComposed(family, func(prev Entry, now time.Time) Entry {
+		entry := NewBenchEntry(prev, family, w.Pattern, w.Evidence, now)
+		if w.Reset.After(now) {
+			entry.BenchedUntil = capHint(w.Reset.Add(resetMargin), now)
+		}
+		return entry
+	})
+}
+
+func (s *Store) benchComposed(family string, compose func(prev Entry, now time.Time) Entry) (Entry, error) {
 	var entry Entry
 	err := s.withLock(func() error {
 		benches, _ := s.Load()
-		entry = NewBenchEntry(benches[family], family, pattern, paneText, s.now())
+		entry = compose(benches[family], s.now())
 		benches[family] = entry
 		return s.write(benches)
 	})

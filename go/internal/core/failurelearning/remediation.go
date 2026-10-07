@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // remediationSlugMaxRunes bounds the id's derived tail so a long defect line
@@ -44,11 +45,12 @@ func (e *Engine) remediationItems(f Failure, defects []string, weight float64) [
 			continue // an unnameable defect yields no addressable item
 		}
 		items = append(items, faillearn.InboxItem{
-			ID:       fmt.Sprintf("retro-%d-%s-%s", f.Cycle, slug, remediationFingerprint(title)),
-			Title:    title,
-			Weight:   weight,
-			Kind:     "bug",
-			Priority: "H",
+			ID:            fmt.Sprintf("retro-%d-%s-%s", f.Cycle, slug, remediationFingerprint(title)),
+			Title:         title,
+			Weight:        weight,
+			Kind:          "bug",
+			Priority:      "H",
+			PriorityClass: inboxbatch.ClassCorrectness,
 			// Non-empty provenance is load-bearing: inboxbatch.ConsoleRouted
 			// treats an empty injected_by as operator-authored.
 			InjectedBy: "faillearn-failure-floor",

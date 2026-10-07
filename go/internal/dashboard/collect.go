@@ -52,7 +52,7 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 		}
 	}
 	snap.Loop = enrichLoopStatus(c.root, snap.Loop)
-	snap.Queue, warns = readQueue(c.root)
+	snap.Queue, warns = readQueue(c.root, now)
 	snap.Warnings = append(snap.Warnings, warns...)
 	h := readHistory(c.root, c.cache)
 	snap.Warnings = append(snap.Warnings, h.Warnings...)

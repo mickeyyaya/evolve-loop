@@ -117,7 +117,7 @@ The block configures `internal/inboxrank`, the one computed order over pending i
 | `active_campaigns` | the `campaign` values whose items get the goal feature | none | a blank, padded or duplicated entry |
 | `preempt_margin` | the score margin by which a new item must beat the lowest uncommitted planned slot to take it at a wave boundary (read from the plan's P4; unused in P1) | 0.05 | negative |
 
-The checked-in file names the class order and the factors explicitly, so the operator's weights live in config rather than in the compiled default. Until the plan's P2 wires the rank into dispatch, the block changes only what `evolve inbox rank` shows and which classes `evolve inbox add` accepts.
+The checked-in file names the class order and the factors explicitly, so the operator's weights live in config rather than in the compiled default. Since the plan's P2 (2026-10-06) the block orders the loop's work: the wave seed, the widen, the launch refill, the triage prompt's `inbox_batches` menu, `evolve inbox batches` and the dashboard's queue all read the rank it configures (loaded per evolve dir by `internal/inboxrank/rankinputs`), as well as deciding what `evolve inbox rank` shows and which classes `evolve inbox add` accepts. A malformed block makes those consumers rank with the compiled default and warn; `evolve inbox rank` and `evolve inbox add` refuse it. (Under P1, from the same morning, the block changed only the verb's output and the classes `add` accepts.)
 
 ## Context-fill telemetry (`context_fill`)
 

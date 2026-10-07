@@ -18,10 +18,14 @@ func defaultLiveProbe(ctx context.Context, projectRoot string, stderr io.Writer)
 }
 
 func liveProbeWith(ctx context.Context, projectRoot string, deps bridge.Deps) liveProbe {
-	return func(driver string) (int, string, string) {
-		probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
-		defer cancel()
-		return bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot}, deps)
+	return func(driver string) (rc int, pattern, scrollback string) {
+		bridge.BootProbe{Driver: driver, Log: deps.Stderr}.Retry(ctx, func() (int, string) {
+			probeCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
+			defer cancel()
+			rc, pattern, scrollback = bridge.LiveSmokeTest(probeCtx, driver, &bridge.Config{ProjectRoot: projectRoot}, deps)
+			return rc, pattern
+		})
+		return rc, pattern, scrollback
 	}
 }
 

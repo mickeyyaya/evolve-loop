@@ -22,7 +22,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopPipelineBlockerHalt, "the pipeline-blocker breaker halted the batch (identical fingerprints, unexplained failures or consecutive failures over the ceiling, or consecutive fleet lanes deferred for want of a worktree: rule lane-deferrals, category lane-provisioning, the git cause in the reason); fields.rule and fields.fingerprint name the rule, the rest are the system-failure halt's own fields (next, escalation, inbox_item)")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopFleetLaneHalt, "a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopHalt, "the batch halted at a boundary (plane diverged, sync refused, main CI red, disk below the floor, or a boundary CLI update whose smoke test failed: fields.families and fields.versions name it); the reason is the halt error")
-	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopEscalationBoundary, "the escalation boundary staged inbox items (bumped/filed/planned) after a cycle; fields carry the counts and the stage")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopEscalationBoundary, "the escalation boundary staged inbox items (bumped/filed/planned) or refused a staged autofile intent that names no priority_class after a cycle; fields carry the counts (refused among them, each refused id also printed as a WARN line) and the stage")
 }
 
 // loopHaltRule is what only the caller of haltOnSystemFailure knows: the

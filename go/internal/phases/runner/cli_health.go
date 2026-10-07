@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
@@ -16,6 +15,6 @@ func (b *BaseRunner) bench(projectRoot, phase string, plan llmroute.Plan, env ma
 }
 
 // maybeBenchOnEscalation benches the candidate's family when this dispatch's escalation report classifies a benchable wall.
-func (b *BaseRunner) maybeBenchOnEscalation(projectRoot, workspace, candidateCLI string, dispatchStart time.Time, env map[string]string) {
-	bridgechain.BenchOnEscalation(projectRoot, workspace, candidateCLI, dispatchStart, env, b.nowFn, runnerLogf)
+func (b *BaseRunner) maybeBenchOnEscalation(e bridgechain.Escalation) {
+	bridgechain.BenchOnEscalation(e, b.nowFn, runnerLogf)
 }

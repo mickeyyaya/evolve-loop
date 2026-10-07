@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "An exhausted claude Current week (Opus) window benches (claude, Opus) until its reset and leaves the claude family bench untouched",
+    "With that model bench, a deep-tier phase whose claude-tmux candidate resolves to Opus is demoted and agy-claude-tmux deep is tried first; a balanced-tier claude phase keeps claude-tmux first",
+    "A scope word the manifest's model_match does not map benches nothing and keeps the WARN",
+    "The canary probes an expired model bench with doctor live --model and clears it on success",
+    "The scope-word to model map lives in the manifest, never in Go"
+  ],
+  "created_at": "2026-10-06T13:00:00Z",
+  "files": [
+    "go/internal/clihealth/clihealth.go",
+    "go/internal/usageprobe/windows.go",
+    "go/internal/llmroute/llmroute.go",
+    "go/internal/bridge/manifests/claude-tmux.json",
+    "docs/plans/model-level-benches-2026-10.md"
+  ],
+  "fix": "Build model-level benches as five components, each with its own red-first tests and unwired before it is wired, per docs/plans/model-level-benches-2026-10.md. (1) clihealth: a model-scoped entry (family plus model), with Active() unchanged. (2) usageprobe: an exhausted per-model window becomes a model bench until its reset; keep the WARN. (3) llmroute: demote only the (cli, tier) candidates whose resolved model matches the benched model, through a manifest-declared scope-word to model match (model_match in controls.usage.windows), so an exhausted Opus moves claude's deep tier to agy-claude's Opus and leaves balanced on claude. (4) The canary clears a model bench with doctor live --model. (5) evolve clihealth list and preflight cli-health show model benches.",
+  "id": "model-level-benches-from-per-model-usage-windows",
+  "kind": "feature",
+  "priority_class": "stability",
+  "source": "console lane cl-agyreliab (usage-window reader, operator scope extension), 2026-10-06",
+  "summary": "The usage-window reader (controls.usage.windows, quotastate.ReadWindows) reads Claude Code 2.1.291's /usage as a session window, an all-models week and one week per separately metered model. An exhausted session or all-models week benches the claude family until its reset. An exhausted per-model week benches nothing: clihealth benches are keyed by routing family, and benching claude for one model would sideline its other models and the auditor floor. Today the probe logs a WARN and records the window in .evolve/usage-windows.json. A phase routed to that model then fails at run time, and the reactive wall classifier benches the whole family anyway.",
+  "title": "An exhausted per-model usage window (claude's Fable or Opus week) is only a WARN; benches are per family",
+  "weight": 0.5
+}

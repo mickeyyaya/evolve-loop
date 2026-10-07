@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -22,6 +23,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
@@ -161,9 +165,11 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 	if forbidden == nil {
 		forbidden = guards.IsProtectedScope
 	}
-	menu := inboxmover.PartitionLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, items, forbidden)
+	rank := rankInputs(projectRoot)
+	menu := inboxmover.RankLaneMenu(inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}, items, forbidden, rank)
 	var sect strings.Builder
-	sect.WriteString(selectableBatchesNote(menu.Ready))
+	sect.WriteString(unknownClassNote(inboxrank.ClassWarnings(items, rank.Config)))
+	sect.WriteString(selectableBatchesNote(menu.Ready, menu.Ranked))
 	sect.WriteString(consoleRoutedNote(menu.Console))
 	sect.WriteString(dependencyBlockedNote(menu.WaitingReasons))
 	fmt.Fprintf(&sect, "- protected_surfaces: a top_n card must not name a path under a control-plane surface; drop such an item with reason "+
@@ -172,14 +178,24 @@ func inboxBatchesSection(projectRoot string, forbidden func(string) bool) string
 	return sect.String()
 }
 
-func selectableBatchesNote(ready []inboxbatch.Item) string {
-	rendered := inboxbatch.RenderMarkdown(inboxbatch.Classify(ready, inboxbatch.Config{}))
+func rankInputs(projectRoot string) inboxrank.Inputs {
+	in, warnings := rankinputs.Load(paths.EvolveDirOf(projectRoot), time.Now())
+	for _, w := range warnings {
+		fmt.Fprintf(os.Stderr, "[triage] WARN inbox rank: %s\n", w)
+	}
+	return in
+}
+
+func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) string {
+	batches := inboxbatch.Classify(ready, inboxbatch.Config{Order: inboxrank.Sequence(ranked)})
+	rendered := inboxbatch.RenderMarkdown(batches, inboxrank.Labels(ranked))
 	if rendered == "" {
 		return ""
 	}
 	return "- inbox_batches: the backlog below is pre-grouped by campaign/file-area; " +
 		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
-		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches:\n" +
+		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches. " +
+		"Batches come in inbox-rank order, the computed priority `evolve inbox rank` shows, and each item's line gives its score and top factor:\n" +
 		rendered
 }
 
@@ -193,6 +209,14 @@ func consoleRoutedNote(console []inboxbatch.Item) string {
 	}
 	return fmt.Sprintf("- console_routed_excluded: %d operator-owned item(s) NOT selectable (route, pipeline-* kind, or protected fix surface; the claim floor refuses them): %s\n",
 		len(console), strings.Join(ids, ", "))
+}
+
+func unknownClassNote(warnings []string) string {
+	if len(warnings) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("- unknown_priority_class: %d queued item(s) carry no class the policy's class_order names, so the rank puts them below every class: %s\n",
+		len(warnings), strings.Join(warnings, "; "))
 }
 
 func dependencyBlockedNote(reasons []string) string {

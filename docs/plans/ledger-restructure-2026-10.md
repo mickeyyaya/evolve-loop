@@ -66,7 +66,7 @@ Status values: ☐ not started · ◐ in progress · ☑ landed (with PR).
 
 | # | Component | Where | Status |
 |---|---|---|---|
-| C1 | `internal/ledgerartifacts`: a write-once, content-addressed store at `.evolve/ledger-artifacts/sha256/<2>/<62>`. Put is idempotent, Get re-checks the sha, and gc's hard-protect list includes it. | new leaf package; `gc/gc.go` | ◐ (carry lane `dev/cl-carryf5`) |
+| C1 | `internal/ledgerartifacts`: a write-once, content-addressed store at `.evolve/ledger-artifacts/sha256/<2>/<62>`. Put is idempotent, Get re-checks the sha, and gc's hard-protect list includes it. | new leaf package; `gc/gc.go` | ◐ built and reviewed in the carry lane (`dev/cl-carryf5`); lands with C2–C5 |
 | C2 | Composition verdicts store their diffs in C1 and record `{audited,composed}_diff_sha256`. Verify resolves from the store before the path. | `adapters/ledger/composition.go` | ◐ |
 | C3 | `evolve ledger evidence restore [--dry-run]`: regenerate each legacy diff with `treedelta.Args` from the commits and trees its line names, require the recorded `patch_id`, store the diff, and append a chained record mapping the legacy line to the stored sha. Run at a boundary. | `adapters/ledger`; `cmd/evolve/cmd_ledger.go` | ◐ |
 | C4 | Fallback rungs 0 and 2 write through the project ledger, not a worktree path. A worktree path creates a local tip and lock, which is a latent chain break. | `core/composition_carryforward.go` | ◐ |
@@ -92,8 +92,8 @@ Status values: ☐ not started · ◐ in progress · ☑ landed (with PR).
 |---|---|---|---|
 | C10 | Segment-aware ledgerscan: read the live file, then the segments from newest to oldest. Every seal on the plane depends on this landing first. | `ledgerscan` | ☐ |
 | C11 | Seal manifest: the `segment_seal` line carries a per-segment summary (seq and time ranges, cycles, kind counts, raw and gz sha) plus `manifest_sha256`. `ledger-segments/manifest.jsonl` is a rebuildable projection. | `adapters/ledger/seal.go` | ☐ |
-| C12 | Incremental `Verify` (D5); `--deep` keeps the full walk and recomputes the manifest. | `adapters/ledger/ledger.go` | ☐ |
-| C13 | Boundary seal (D4) in `evolve boundary run`, after sync and gc, plus a one-time monthly backfill of history. | `cmd/evolve/cmd_boundary.go` | ☐ |
+| C12 | Incremental `Verify` (D5); `--deep` keeps the full walk and recomputes the manifest. **Hard prerequisite:** inbox `seal-breaks-live-only-verify-and-carry`. Live-only `Verify` fails for good on any sealed ledger, and ship's carry check (`carrySatisfied`) runs it, so the first seal would disable every carry; Seal's truncate-then-anchor gap also shows `ErrSealResidue` to a concurrent `VerifyDeep`. | `adapters/ledger/ledger.go` | ☐ |
+| C13 | Boundary seal (D4) in `evolve boundary run`, after sync and gc, plus a one-time monthly backfill of history. **Depends on C12 and on inbox `seal-breaks-live-only-verify-and-carry`:** no seal may run on the plane before both land. | `cmd/evolve/cmd_boundary.go` | ☐ |
 
 ## 5. Expected results
 
@@ -138,3 +138,4 @@ Status values: ☐ not started · ◐ in progress · ☑ landed (with PR).
 | Date | Component | PR | Note |
 |---|---|---|---|
 | 2026-10-06 | plan | — | Approved in plan mode. The research record and this plan were written in `dev/cl-ledgerdesign`. Phase 1 was assigned to the in-flight carry lane (`dev/cl-carryf5`), whose first fix (a durable directory for carry diffs) was re-scoped to the content-addressed store. |
+| 2026-10-07 | C1–C5, C12/C13 | — | Phase 1 is built and reviewed in the carry lane (two review rounds: FIX_THEN_MERGE, then its remaining survivors killed); C1–C5 land together. The re-review found that live-only `Verify` fails on any sealed ledger and that ship's carry check uses it (inbox `seal-breaks-live-only-verify-and-carry`), now a hard prerequisite of C12 and C13. |

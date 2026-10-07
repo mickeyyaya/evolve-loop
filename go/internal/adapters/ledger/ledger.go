@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
 )
 
 // ZeroSeed is the prev_hash of a genesis entry (64 ASCII '0's).
@@ -26,7 +27,7 @@ type FileLedger struct {
 	tipPath    string
 	lockPath   string
 	anchorPath string
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	// onAppend observes every entry through Append, the chokepoint all writers reach; nil is unobserved.
 	onAppend func(e core.LedgerEntry, err error)
 }
@@ -41,6 +42,7 @@ type ledgerHooks struct {
 	write   func(f *os.File, b []byte) (int, error)
 	closeF  func(f *os.File) error
 	writeF  func(path string, data []byte, perm os.FileMode) error
+	readF   func(path string) ([]byte, error)
 }
 
 var hooks = ledgerHooks{
@@ -49,6 +51,7 @@ var hooks = ledgerHooks{
 	write:   func(f *os.File, b []byte) (int, error) { return f.Write(b) },
 	closeF:  func(f *os.File) error { return f.Close() },
 	writeF:  os.WriteFile,
+	readF:   os.ReadFile,
 }
 
 func withHooks(replacement ledgerHooks, fn func()) {
@@ -67,6 +70,9 @@ func withHooks(replacement ledgerHooks, fn func()) {
 	}
 	if replacement.writeF != nil {
 		hooks.writeF = replacement.writeF
+	}
+	if replacement.readF != nil {
+		hooks.readF = replacement.readF
 	}
 	defer func() { hooks = prev }()
 	fn()
@@ -102,6 +108,22 @@ func (l *FileLedger) Append(_ context.Context, e core.LedgerEntry) error {
 // appendChained is the tip-read→append→tip-write critical section every chained line goes through.
 // A line written outside it breaks the next entry, which chains from the tip while walkChain reads the file.
 func (l *FileLedger) appendChained(fill func(seq int, prevHash string) any) error {
+	return l.underChainLock(func() error {
+		prevSeq, prevHash, err := l.readTip()
+		if err != nil {
+			return err
+		}
+		seq := 0
+		if prevHash == "" {
+			prevHash = ZeroSeed
+		} else {
+			seq = prevSeq + 1
+		}
+		return l.appendLineAndReplaceTip(fill(seq, prevHash), seq)
+	})
+}
+
+func (l *FileLedger) underChainLock(fn func() error) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	// mu cannot serialize two evolve processes; without the flock their tip reads and appends interleave.
@@ -110,19 +132,21 @@ func (l *FileLedger) appendChained(fill func(seq int, prevHash string) any) erro
 		return fmt.Errorf("ledger: %w", err)
 	}
 	defer release()
+	return fn()
+}
 
-	prevSeq, prevHash, err := l.readTip()
+func (l *FileLedger) readSnapshot(read func() error) error {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	release, err := flock.LockShared(l.lockPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return read()
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("ledger: %w", err)
 	}
-	seq := 0
-	if prevHash == "" {
-		prevHash = ZeroSeed
-	} else {
-		seq = prevSeq + 1
-	}
-
-	return l.appendLineAndReplaceTip(fill(seq, prevHash), seq)
+	defer release()
+	return read()
 }
 
 // appendLineAndReplaceTip is the one write half of both chain writers, so they cannot diverge.
@@ -189,28 +213,22 @@ func (l *FileLedger) AppendLifecycle(ctx context.Context, r LifecycleRecord) err
 // appendChainedFromTail is the repair-path appendChained: it chains from the physical last line, not the tip,
 // because walkChain checks physical predecessors. Its full-file read keeps it off the hot append path.
 func (l *FileLedger) appendChainedFromTail(fill func(seq int, prevHash string) any) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	release, err := flock.Lock(l.lockPath)
-	if err != nil {
-		return fmt.Errorf("ledger: %w", err)
-	}
-	defer release()
-
-	raw, err := os.ReadFile(l.ledgerPath)
-	if err != nil {
-		return fmt.Errorf("ledger read: %w", err)
-	}
-	lines := splitLines(raw)
-	if len(lines) == 0 {
-		return fmt.Errorf("ledger: appendChainedFromTail on an empty chain")
-	}
-	prevHash := sha256Hex(lines[len(lines)-1])
-	prevSeq, _, err := l.readTip()
-	if err != nil {
-		return err
-	}
-	return l.appendLineAndReplaceTip(fill(prevSeq+1, prevHash), prevSeq+1)
+	return l.underChainLock(func() error {
+		raw, err := os.ReadFile(l.ledgerPath)
+		if err != nil {
+			return fmt.Errorf("ledger read: %w", err)
+		}
+		lines := splitLines(raw)
+		if len(lines) == 0 {
+			return fmt.Errorf("ledger: appendChainedFromTail on an empty chain")
+		}
+		prevHash := sha256Hex(lines[len(lines)-1])
+		prevSeq, _, err := l.readTip()
+		if err != nil {
+			return err
+		}
+		return l.appendLineAndReplaceTip(fill(prevSeq+1, prevHash), prevSeq+1)
+	})
 }
 
 // Verify walks the live file's hash chain and tip, returning core.ErrLedgerChainBroken on any inconsistency.
@@ -221,7 +239,16 @@ func (l *FileLedger) Verify(ctx context.Context) error {
 
 // VerifyScope is Verify plus the scope that same walk validated; zero means every line from genesis.
 func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
-	raw, err := os.ReadFile(l.ledgerPath)
+	if _, err := os.Stat(l.ledgerPath); errors.Is(err, os.ErrNotExist) {
+		return VerifiedScope{}, nil
+	}
+	var raw []byte
+	var tip tipRead
+	err := l.readSnapshot(func() (err error) {
+		raw, err = hooks.readF(l.ledgerPath)
+		tip = l.readTipFile()
+		return err
+	})
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return VerifiedScope{}, nil
@@ -234,7 +261,7 @@ func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 	}
 
 	anchorSHA, anchorSeq := effectiveAnchorSHA(lines, l.loadAnchorSHA())
-	lastSeq, lastSha, sawV837, err := walkChain(lines, anchorSHA)
+	lastSeq, lastSha, sawV837, err := walkChain(lines, anchorSHA, indexCompositionEvidence(l.evidence(), lines))
 	if err != nil {
 		return VerifiedScope{}, err
 	}
@@ -243,7 +270,7 @@ func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 	if !sawV837 {
 		return scope, nil
 	}
-	if err := l.checkTip(lastSeq, lastSha); err != nil {
+	if err := tip.check(lastSeq, lastSha); err != nil {
 		return VerifiedScope{}, err
 	}
 	return scope, nil
@@ -251,77 +278,111 @@ func (l *FileLedger) VerifyScope(_ context.Context) (VerifiedScope, error) {
 
 // walkChain is the one strict chain walk behind Verify and VerifyDeep. It accepts two seams real
 // history carries: a re-genesis (seq 0, zero prev) and a fork sibling (the previous line's parent).
-func walkChain(lines [][]byte, anchorLineSHA string) (lastSeq int, lastSha string, sawV837 bool, err error) {
-	seenPrev := map[string]struct{}{}
-	prevLinePrev := "" // previous line's prev_hash (fork-sibling signature)
+func walkChain(lines [][]byte, anchorLineSHA string, evidence compositionEvidenceIndex) (lastSeq int, lastSha string, sawV837 bool, err error) {
 	// Lines before an epoch anchor are preserved but not validated, by operator sign-off.
 	// See ADR-0048.
-	inEpoch := anchorLineSHA == ""
-	for i, line := range lines {
-		if !inEpoch {
-			// lastSha is set before the match so the first post-anchor line chains from the anchor line.
-			lastSha = sha256Hex(line)
-			if lastSha == anchorLineSHA {
-				inEpoch = true
-				sawV837 = true // strict from here forward
-				if _, e, derr := decodeLedgerLine(line); derr == nil {
-					lastSeq = e.EntrySeq
-				}
-			}
-			continue
+	start, found := epochStart(lines, anchorLineSHA)
+	if !found {
+		// No line carries the anchor's SHA, so its content is absent or altered: fail rather than relax.
+		return 0, "", false, fmt.Errorf("%w: epoch anchor line not found (sha %s) — anchored content absent or altered", core.ErrLedgerChainBroken, anchorLineSHA)
+	}
+	c := chainCursor{seenPrev: map[string]struct{}{}}
+	if start > 0 {
+		// lastSha is set before the match so the first post-anchor line chains from the anchor line.
+		c.lastSha = sha256Hex(lines[start-1])
+		c.sawV837 = true // strict from here forward
+		if _, e, derr := decodeLedgerLine(lines[start-1]); derr == nil {
+			c.lastSeq = e.EntrySeq
 		}
-		hasPrev, e, err := decodeLedgerLine(line)
+	}
+	for i := start; i < len(lines); i++ {
+		hasPrev, e, err := decodeLedgerLine(lines[i])
 		if err != nil {
 			return 0, "", false, fmt.Errorf("%w: line %d unmarshal: %v", core.ErrLedgerChainBroken, i, err)
 		}
 		// A composition verdict whose diffs no longer re-derive its patch_id is tampered, like a hash break.
 		if e.Kind == CompositionVerdictKind {
-			if cerr := verifyCompositionLine(i, line); cerr != nil {
+			if cerr := verifyCompositionLine(i, lines[i], evidence); cerr != nil {
 				return 0, "", false, cerr
 			}
 		}
 		if hasPrev {
-			isReGenesis := e.PrevHash == ZeroSeed && e.EntrySeq == 0
-			// A sibling never shares a ZERO parent: a zero-prev line is
-			// either a true (re-)genesis (seq 0, handled above) or forged.
-			isForkSibling := prevLinePrev != "" && prevLinePrev != ZeroSeed && e.PrevHash == prevLinePrev
-			if sawV837 {
-				if e.PrevHash != lastSha && !isReGenesis && !isForkSibling {
-					return 0, "", false, fmt.Errorf("%w: line %d prev_hash mismatch (have %s want %s)", core.ErrLedgerChainBroken, i, e.PrevHash, lastSha)
-				}
-			} else if !isReGenesis && e.PrevHash != lastSha {
-				// The chained region starts with a seq-0 zero-seeded entry or one chained from the last
-				// unchained (pre-v8.37) line; a zero seed with a nonzero seq stays a break.
-				return 0, "", false, fmt.Errorf("%w: line %d chained-genesis prev_hash mismatch (have %s want zero seed or %s)", core.ErrLedgerChainBroken, i, e.PrevHash, lastSha)
+			if err := c.acceptChained(i, e); err != nil {
+				return 0, "", false, err
 			}
-			// Seams and siblings repeat a prev_hash by nature; any other duplicate is a non-adjacent fork.
-			// Sibling runs are unbounded: without control of ledger.tip an attacker gains nothing from one.
-			if _, dup := seenPrev[e.PrevHash]; dup && sawV837 && !isReGenesis && !isForkSibling {
-				return 0, "", false, fmt.Errorf("%w: line %d duplicate prev_hash (concurrent fan-out anomaly)", core.ErrLedgerChainBroken, i)
-			}
-			seenPrev[e.PrevHash] = struct{}{}
-			lastSeq = e.EntrySeq
-			sawV837 = true
-			prevLinePrev = e.PrevHash
 		} else {
-			prevLinePrev = ""
+			c.prevLinePrev = ""
 		}
-		lastSha = sha256Hex(line)
+		c.lastSha = sha256Hex(lines[i])
 	}
-	if !inEpoch {
-		// No line carries the anchor's SHA, so its content is absent or altered: fail rather than relax.
-		return 0, "", false, fmt.Errorf("%w: epoch anchor line not found (sha %s) — anchored content absent or altered", core.ErrLedgerChainBroken, anchorLineSHA)
-	}
-	return lastSeq, lastSha, sawV837, nil
+	return c.lastSeq, c.lastSha, c.sawV837, nil
 }
 
-// checkTip verifies ledger.tip equals "<seq>:<sha>" of the last line.
-func (l *FileLedger) checkTip(lastSeq int, lastSha string) error {
-	tip, err := os.ReadFile(l.tipPath)
-	if err != nil {
-		return fmt.Errorf("%w: tip read: %v", core.ErrLedgerChainBroken, err)
+func epochStart(lines [][]byte, anchorLineSHA string) (start int, found bool) {
+	if anchorLineSHA == "" {
+		return 0, true
 	}
-	return compareTip(string(tip), lastSeq, lastSha)
+	for i, line := range lines {
+		if sha256Hex(line) == anchorLineSHA {
+			return i + 1, true
+		}
+	}
+	return 0, false
+}
+
+type chainCursor struct {
+	lastSeq      int
+	lastSha      string
+	sawV837      bool
+	prevLinePrev string // previous line's prev_hash (fork-sibling signature)
+	seenPrev     map[string]struct{}
+}
+
+func (c *chainCursor) acceptChained(i int, e core.LedgerEntry) error {
+	isReGenesis := e.PrevHash == ZeroSeed && e.EntrySeq == 0
+	// A sibling never shares a ZERO parent: a zero-prev line is
+	// either a true (re-)genesis (seq 0, handled above) or forged.
+	isForkSibling := c.prevLinePrev != "" && c.prevLinePrev != ZeroSeed && e.PrevHash == c.prevLinePrev
+	if c.sawV837 {
+		if e.PrevHash != c.lastSha && !isReGenesis && !isForkSibling {
+			return fmt.Errorf("%w: line %d prev_hash mismatch (have %s want %s)", core.ErrLedgerChainBroken, i, e.PrevHash, c.lastSha)
+		}
+	} else if !isReGenesis && e.PrevHash != c.lastSha {
+		// The chained region starts with a seq-0 zero-seeded entry or one chained from the last
+		// unchained (pre-v8.37) line; a zero seed with a nonzero seq stays a break.
+		return fmt.Errorf("%w: line %d chained-genesis prev_hash mismatch (have %s want zero seed or %s)", core.ErrLedgerChainBroken, i, e.PrevHash, c.lastSha)
+	}
+	// Seams and siblings repeat a prev_hash by nature; any other duplicate is a non-adjacent fork.
+	// Sibling runs are unbounded: without control of ledger.tip an attacker gains nothing from one.
+	if _, dup := c.seenPrev[e.PrevHash]; dup && c.sawV837 && !isReGenesis && !isForkSibling {
+		return fmt.Errorf("%w: line %d duplicate prev_hash (concurrent fan-out anomaly)", core.ErrLedgerChainBroken, i)
+	}
+	c.seenPrev[e.PrevHash] = struct{}{}
+	c.lastSeq = e.EntrySeq
+	c.sawV837 = true
+	c.prevLinePrev = e.PrevHash
+	return nil
+}
+
+func (l *FileLedger) evidence() ledgerartifacts.Store {
+	return ledgerartifacts.Open(filepath.Dir(l.ledgerPath))
+}
+
+type tipRead struct {
+	body []byte
+	err  error
+}
+
+func (l *FileLedger) readTipFile() tipRead {
+	body, err := hooks.readF(l.tipPath)
+	return tipRead{body: body, err: err}
+}
+
+func (t tipRead) check(lastSeq int, lastSha string) error {
+	if t.err != nil {
+		return fmt.Errorf("%w: tip read: %v", core.ErrLedgerChainBroken, t.err)
+	}
+	return compareTip(string(t.body), lastSeq, lastSha)
 }
 
 func compareTip(tip string, lastSeq int, lastSha string) error {

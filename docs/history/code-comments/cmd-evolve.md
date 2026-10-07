@@ -6154,3 +6154,13 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // permanent counterpart to the per-cycle ACS predicates in
 // go/acs/cycle1029/predicates_test.go, which are pruned after the cycle.
 ```
+
+## inbox prioritization P2
+
+### `go/cmd/evolve/cmd_loop_escalation.go:89` — above `"injected_by": escalationInjectedBy,`
+
+```text
+// Autofile provenance: the classifier's route:"lane" clamp treats an
+// item with injected_by as agent-authored (ADR-0073 clamp-parity), so
+// a halt record can never be widened into lane work by annotation.
+```

@@ -41,7 +41,7 @@ func probeWaveQuota(ctx context.Context, projectRoot, evolveDir string, now time
 	}
 	factory := bridge.NewControllerFactory(projectRoot, filepath.Join(evolveDir, "budget-probe"), "budget-probe", bridge.Deps{})
 	fmt.Fprintf(stderr, "[budget] probing %v for quota before wave sizing\n", families)
-	return usageprobe.ProbeQuota(ctx, families, bridgeUsageProbe(factory), now)
+	return usageprobe.ProbeQuota(ctx, families, usageprobe.QuotaReader{Probe: bridgeUsageProbe(factory), Read: bridge.UsageWindows, Now: now})
 }
 
 // collectWaveThroughput rolls up the last window cycles' pace; the zero

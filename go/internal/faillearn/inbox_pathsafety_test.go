@@ -33,7 +33,7 @@ func TestWriteArtifacts_InboxRejectsPathEscapingID(t *testing.T) {
 			err := WriteArtifacts(
 				FailureEvent{Cycle: 1279, FailedPhase: "audit", Scope: ScopePhase, Classification: "deliverable-rejected", Verdict: "FAIL", Summary: "s"},
 				runDir, lessons,
-				WithInbox(inbox, []InboxItem{{ID: id, Title: "t", Kind: "bug", Priority: "H", InjectedBy: "faillearn-failure-floor"}}),
+				WithInbox(inbox, []InboxItem{{ID: id, Title: "t", Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"}}),
 			)
 			if err == nil {
 				t.Fatalf("id %q was accepted — an id that is not a bare filename must be rejected, like the empty-id case already is", id)
@@ -65,7 +65,7 @@ func TestWriteArtifacts_InboxAcceptsOrdinaryID(t *testing.T) {
 	if err := WriteArtifacts(
 		FailureEvent{Cycle: 1279, FailedPhase: "audit", Scope: ScopePhase, Classification: "deliverable-rejected", Verdict: "FAIL", Summary: "s"},
 		runDir, lessons,
-		WithInbox(inbox, []InboxItem{{ID: id, Title: "t", Kind: "bug", Priority: "H", InjectedBy: "faillearn-failure-floor"}}),
+		WithInbox(inbox, []InboxItem{{ID: id, Title: "t", Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor"}}),
 	); err != nil {
 		t.Fatalf("an ordinary slug id must still be written: %v", err)
 	}

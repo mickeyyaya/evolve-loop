@@ -11,7 +11,7 @@ func inboxFixture(t *testing.T) (inboxDir string, item InboxItem) {
 	t.Helper()
 	return t.TempDir(), InboxItem{
 		ID: "retro-1255-stale-worktree", Title: "stale cs.ActiveWorktree survives fleet teardown",
-		Weight: 0.9, Kind: "bug", Priority: "H", InjectedBy: "faillearn-failure-floor",
+		Weight: 0.9, Kind: "bug", Priority: "H", PriorityClass: "correctness", InjectedBy: "faillearn-failure-floor",
 	}
 }
 

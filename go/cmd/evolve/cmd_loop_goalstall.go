@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -96,15 +97,16 @@ func (t *goalStallTracker) observe(nonShipping bool, reason string, threshold in
 // goalStallItem's JSON matches the canonical inbox-item schema, plus the
 // human-facing fields a scout reads.
 type goalStallItem struct {
-	ID          string  `json:"id"`
-	Title       string  `json:"title"`
-	Weight      float64 `json:"weight"`
-	Kind        string  `json:"kind"`
-	Priority    string  `json:"priority"`
-	Campaign    string  `json:"campaign"`
-	Description string  `json:"description"`
-	Source      string  `json:"source"`
-	CreatedAt   string  `json:"created_at"`
+	ID            string  `json:"id"`
+	Title         string  `json:"title"`
+	Weight        float64 `json:"weight"`
+	Kind          string  `json:"kind"`
+	Priority      string  `json:"priority"`
+	PriorityClass string  `json:"priority_class"`
+	Campaign      string  `json:"campaign"`
+	Description   string  `json:"description"`
+	Source        string  `json:"source"`
+	CreatedAt     string  `json:"created_at"`
 }
 
 func buildGoalStallItem(kind stallKind, goalHash string, esc *goalStallEscalation, weight float64, cycle int, nowRFC3339 string) goalStallItem {
@@ -117,12 +119,13 @@ func buildGoalStallItem(kind stallKind, goalHash string, esc *goalStallEscalatio
 	}
 	short := shortGoalHash(goalHash)
 	return goalStallItem{
-		ID:       kind.idPrefix + short,
-		Title:    fmt.Sprintf("Goal %s stalled: %d consecutive %s cycles shipped nothing — re-scope, split, or unblock", short, esc.streak, kind.outcomes),
-		Weight:   weight,
-		Kind:     "bug",
-		Priority: "high",
-		Campaign: "pipeline-stability",
+		ID:            kind.idPrefix + short,
+		Title:         fmt.Sprintf("Goal %s stalled: %d consecutive %s cycles shipped nothing — re-scope, split, or unblock", short, esc.streak, kind.outcomes),
+		Weight:        weight,
+		Kind:          "bug",
+		Priority:      "high",
+		PriorityClass: inboxbatch.ClassStability,
+		Campaign:      "pipeline-stability",
 		Description: fmt.Sprintf(
 			"The goal (hash %s) produced %d CONSECUTIVE %s cycles landing nothing "+
 				"(observed through cycle %d). The scheduler stopped blind re-dispatch and filed "+
@@ -139,7 +142,7 @@ func (it goalStallItem) validate() error {
 		return fmt.Errorf("goalstall: item weight %v below floor %v", it.Weight, goalStallWeightFloor)
 	}
 	for _, f := range []struct{ name, val string }{
-		{"id", it.ID}, {"title", it.Title}, {"kind", it.Kind},
+		{"id", it.ID}, {"title", it.Title}, {"kind", it.Kind}, {"priority_class", it.PriorityClass},
 		{"description", it.Description}, {"source", it.Source}, {"created_at", it.CreatedAt},
 	} {
 		if f.val == "" {

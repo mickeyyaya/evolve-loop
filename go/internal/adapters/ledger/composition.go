@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
 )
 
 // CompositionVerdictKind is the kind of an audit carry-forward entry that ledger verify kernel-recomputes.
@@ -28,9 +29,86 @@ const IdenticalRebaseMethod = "identical-rebase"
 
 // compositionFields is the kernel-recomputable subset of a composition-verdict line.
 type compositionFields struct {
-	PatchID          string `json:"patch_id"`
-	AuditedDiffPath  string `json:"audited_diff_path"`
-	ComposedDiffPath string `json:"composed_diff_path"`
+	PatchID            string `json:"patch_id"`
+	AuditedDiffPath    string `json:"audited_diff_path"`
+	ComposedDiffPath   string `json:"composed_diff_path"`
+	AuditedDiffSHA256  string `json:"audited_diff_sha256"`
+	ComposedDiffSHA256 string `json:"composed_diff_sha256"`
+}
+
+func (r compositionRecord) fields() compositionFields {
+	return compositionFields{PatchID: r.PatchID, AuditedDiffPath: r.AuditedDiffPath, ComposedDiffPath: r.ComposedDiffPath,
+		AuditedDiffSHA256: r.AuditedDiffSHA256, ComposedDiffSHA256: r.ComposedDiffSHA256}
+}
+
+type compositionEvidencePair struct {
+	audited, composed compositionEvidence
+}
+
+func (f compositionFields) evidence() compositionEvidencePair {
+	return compositionEvidencePair{
+		audited:  compositionEvidence{label: "audited_diff_path", digest: f.AuditedDiffSHA256, path: f.AuditedDiffPath},
+		composed: compositionEvidence{label: "composed_diff_path", digest: f.ComposedDiffSHA256, path: f.ComposedDiffPath},
+	}
+}
+
+func (p compositionEvidencePair) both() []compositionEvidence {
+	return []compositionEvidence{p.audited, p.composed}
+}
+
+type compositionEvidence struct {
+	label, digest, path string
+}
+
+func (e compositionEvidence) read(store ledgerartifacts.Store) ([]byte, error) {
+	if e.digest != "" {
+		return store.Get(e.digest)
+	}
+	return os.ReadFile(e.path)
+}
+
+const compositionEvidenceKind = "composition-evidence"
+
+type compositionEvidenceRecord struct {
+	TS                 string `json:"ts"`
+	Kind               string `json:"kind"`
+	Role               string `json:"role"`
+	Cycle              int    `json:"cycle"`
+	LineSHA256         string `json:"composition_line_sha256"`
+	AuditedDiffSHA256  string `json:"audited_diff_sha256"`
+	ComposedDiffSHA256 string `json:"composed_diff_sha256"`
+	EntrySeq           int    `json:"entry_seq"`
+	PrevHash           string `json:"prev_hash"`
+}
+
+type compositionEvidenceIndex struct {
+	store  ledgerartifacts.Store
+	byLine map[string]compositionEvidenceRecord
+}
+
+func indexCompositionEvidence(store ledgerartifacts.Store, lines [][]byte) compositionEvidenceIndex {
+	idx := compositionEvidenceIndex{store: store, byLine: map[string]compositionEvidenceRecord{}}
+	marker := []byte(`"` + compositionEvidenceKind + `"`)
+	for _, line := range lines {
+		if !bytes.Contains(line, marker) {
+			continue
+		}
+		var rec compositionEvidenceRecord
+		if json.Unmarshal(line, &rec) == nil && rec.Kind == compositionEvidenceKind {
+			idx.byLine[rec.LineSHA256] = rec
+		}
+	}
+	return idx
+}
+
+func (idx compositionEvidenceIndex) resolve(f compositionFields, line []byte) compositionFields {
+	if f.AuditedDiffSHA256 != "" || f.ComposedDiffSHA256 != "" {
+		return f
+	}
+	if alias, ok := idx.byLine[sha256Hex(line)]; ok {
+		f.AuditedDiffSHA256, f.ComposedDiffSHA256 = alias.AuditedDiffSHA256, alias.ComposedDiffSHA256
+	}
+	return f
 }
 
 // PatchID returns the `git patch-id --stable` content identity of diff; it needs no repository.
@@ -61,34 +139,83 @@ type CompositionVerdictInput struct {
 	GateResults    map[string]string // must record "pass" for every required composed gate
 	AuditedDiff    []byte            // unified diff the audit reviewed
 	ComposedDiff   []byte            // unified diff of the composed (rebased) tree
-	ArtifactDir    string            // directory the two diff artifacts persist under
 }
 
 // compositionRecord is the on-disk line: the union of ship's compositionEntry and compositionFields,
 // plus the chain fields appendChained fills in.
 type compositionRecord struct {
-	TS               string            `json:"ts"`
-	Cycle            int               `json:"cycle"`
-	Kind             string            `json:"kind"`
-	Method           string            `json:"method"`
-	LaneAuditRef     string            `json:"lane_audit_ref"`
-	PatchID          string            `json:"patch_id"`
-	AuditedBase      string            `json:"audited_base"`
-	GitHead          string            `json:"git_head"`
-	TreeStateSHA     string            `json:"tree_state_sha"`
-	AuditedTreeSHA   string            `json:"audited_tree_sha,omitempty"`
-	GateResults      map[string]string `json:"gate_results"`
-	AuditedDiffPath  string            `json:"audited_diff_path"`
-	ComposedDiffPath string            `json:"composed_diff_path"`
-	EntrySeq         int               `json:"entry_seq"`
-	PrevHash         string            `json:"prev_hash"`
+	TS                 string            `json:"ts"`
+	Cycle              int               `json:"cycle"`
+	Kind               string            `json:"kind"`
+	Method             string            `json:"method"`
+	LaneAuditRef       string            `json:"lane_audit_ref"`
+	PatchID            string            `json:"patch_id"`
+	AuditedBase        string            `json:"audited_base"`
+	GitHead            string            `json:"git_head"`
+	TreeStateSHA       string            `json:"tree_state_sha"`
+	AuditedTreeSHA     string            `json:"audited_tree_sha,omitempty"`
+	GateResults        map[string]string `json:"gate_results"`
+	AuditedDiffPath    string            `json:"audited_diff_path"`
+	ComposedDiffPath   string            `json:"composed_diff_path"`
+	AuditedDiffSHA256  string            `json:"audited_diff_sha256,omitempty"`
+	ComposedDiffSHA256 string            `json:"composed_diff_sha256,omitempty"`
+	EntrySeq           int               `json:"entry_seq"`
+	PrevHash           string            `json:"prev_hash"`
 }
 
 // WriteCompositionVerdict validates in, persists both diffs and appends one chained line; validation writes nothing.
 func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) error {
+	if err := checkCompositionLedgerPath(ledgerPath); err != nil {
+		return err
+	}
+	if err := validateCompositionInput(in); err != nil {
+		return err
+	}
+
+	audited, composed, err := storeCompositionDiffs(ledgerartifacts.Open(filepath.Dir(ledgerPath)), in)
+	if err != nil {
+		return err
+	}
+
+	method := in.Method
+	if method == "" {
+		method = TrivialRebaseMethod
+	}
+	rec := compositionRecord{
+		TS:                 time.Now().UTC().Format(time.RFC3339),
+		Cycle:              in.Cycle,
+		Kind:               CompositionVerdictKind,
+		Method:             method,
+		LaneAuditRef:       in.LaneAuditRef,
+		PatchID:            in.PatchID,
+		AuditedBase:        in.AuditedBase,
+		GitHead:            in.GitHead,
+		TreeStateSHA:       in.TreeStateSHA,
+		AuditedTreeSHA:     in.AuditedTreeSHA,
+		GateResults:        in.GateResults,
+		AuditedDiffPath:    audited.path,
+		ComposedDiffPath:   composed.path,
+		AuditedDiffSHA256:  audited.digest,
+		ComposedDiffSHA256: composed.digest,
+	}
+	return New(filepath.Dir(ledgerPath)).appendChained(func(seq int, prevHash string) any {
+		rec.EntrySeq = seq
+		rec.PrevHash = prevHash
+		return rec
+	})
+}
+
+func checkCompositionLedgerPath(ledgerPath string) error {
 	if filepath.Base(ledgerPath) != "ledger.jsonl" {
 		return fmt.Errorf("composition-verdict: ledger path must be a ledger.jsonl (chained append), got %q", ledgerPath)
 	}
+	if info, err := os.Lstat(ledgerPath); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("composition-verdict: ledger path %s is a link: its tip, lock and evidence store would be its own directory's, forking the chain it points at — write through the ledger it links to", ledgerPath)
+	}
+	return nil
+}
+
+func validateCompositionInput(in CompositionVerdictInput) error {
 	diffs := []struct {
 		label string
 		diff  []byte
@@ -113,50 +240,29 @@ func WriteCompositionVerdict(ledgerPath string, in CompositionVerdictInput) erro
 			return fmt.Errorf("composition-verdict: %s recomputes patch-id %s but caller claims %s — refusing to write a line verify would flag as tampered", d.label, got, in.PatchID)
 		}
 	}
+	return nil
+}
 
-	if err := os.MkdirAll(in.ArtifactDir, 0o755); err != nil {
-		return fmt.Errorf("composition-verdict: artifact dir: %w", err)
+func storeCompositionDiffs(store ledgerartifacts.Store, in CompositionVerdictInput) (audited, composed compositionEvidence, err error) {
+	if audited, err = storeCompositionDiff(store, in.AuditedDiff); err != nil {
+		return audited, composed, err
 	}
-	auditedPath := filepath.Join(in.ArtifactDir, fmt.Sprintf("composition-%d-audited.diff", in.Cycle))
-	composedPath := filepath.Join(in.ArtifactDir, fmt.Sprintf("composition-%d-composed.diff", in.Cycle))
-	for _, a := range []struct {
-		path string
-		diff []byte
-	}{{auditedPath, in.AuditedDiff}, {composedPath, in.ComposedDiff}} {
-		if err := os.WriteFile(a.path, a.diff, 0o644); err != nil {
-			return fmt.Errorf("composition-verdict: persist artifact %s: %w", a.path, err)
-		}
-	}
+	composed, err = storeCompositionDiff(store, in.ComposedDiff)
+	return audited, composed, err
+}
 
-	method := in.Method
-	if method == "" {
-		method = TrivialRebaseMethod
+func storeCompositionDiff(store ledgerartifacts.Store, diff []byte) (compositionEvidence, error) {
+	digest, err := store.Put(diff)
+	if err != nil {
+		return compositionEvidence{}, fmt.Errorf("composition-verdict: store diff: %w", err)
 	}
-	rec := compositionRecord{
-		TS:               time.Now().UTC().Format(time.RFC3339),
-		Cycle:            in.Cycle,
-		Kind:             CompositionVerdictKind,
-		Method:           method,
-		LaneAuditRef:     in.LaneAuditRef,
-		PatchID:          in.PatchID,
-		AuditedBase:      in.AuditedBase,
-		GitHead:          in.GitHead,
-		TreeStateSHA:     in.TreeStateSHA,
-		AuditedTreeSHA:   in.AuditedTreeSHA,
-		GateResults:      in.GateResults,
-		AuditedDiffPath:  auditedPath,
-		ComposedDiffPath: composedPath,
-	}
-	return New(filepath.Dir(ledgerPath)).appendChained(func(seq int, prevHash string) any {
-		rec.EntrySeq = seq
-		rec.PrevHash = prevHash
-		return rec
-	})
+	path, err := store.Path(digest)
+	return compositionEvidence{digest: digest, path: path}, err
 }
 
 // verifyCompositionLine checks both persisted diffs recompute the recorded patch_id. Failures wrap
 // core.ErrLedgerChainBroken so `evolve ledger verify` exits 2 as for a hash break.
-func verifyCompositionLine(i int, line []byte) error {
+func verifyCompositionLine(i int, line []byte, evidence compositionEvidenceIndex) error {
 	var f compositionFields
 	if err := json.Unmarshal(line, &f); err != nil {
 		return fmt.Errorf("%w: line %d composition-verdict unmarshal: %v", core.ErrLedgerChainBroken, i, err)
@@ -164,11 +270,8 @@ func verifyCompositionLine(i int, line []byte) error {
 	if f.PatchID == "" {
 		return fmt.Errorf("%w: line %d composition-verdict has no patch_id — not kernel-recomputable", core.ErrLedgerChainBroken, i)
 	}
-	for _, p := range []struct{ label, path string }{
-		{"audited_diff_path", f.AuditedDiffPath},
-		{"composed_diff_path", f.ComposedDiffPath},
-	} {
-		diff, err := os.ReadFile(p.path)
+	for _, p := range evidence.resolve(f, line).evidence().both() {
+		diff, err := p.read(evidence.store)
 		if err != nil {
 			return fmt.Errorf("%w: line %d composition-verdict %s unreadable: %v", core.ErrLedgerChainBroken, i, p.label, err)
 		}

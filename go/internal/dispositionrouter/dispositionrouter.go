@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // Route vocabulary. Closed set: a disposition is either operator-owned
@@ -93,14 +94,15 @@ func Decide(preClass string, recurrence int, llmRoute string) Decision {
 // with no open item. Weight is the base weight the escalation formula starts
 // from; Recurrence is the count it escalates for.
 type Intent struct {
-	Cycle      int     `json:"cycle"`
-	Pattern    string  `json:"pattern"`
-	ItemID     string  `json:"item_id,omitempty"`
-	Action     string  `json:"action"` // "escalate" | "autofile"
-	Route      string  `json:"route"`
-	Recurrence int     `json:"recurrence"`
-	Weight     float64 `json:"weight"`
-	Reason     string  `json:"reason,omitempty"`
+	Cycle         int     `json:"cycle"`
+	Pattern       string  `json:"pattern"`
+	ItemID        string  `json:"item_id,omitempty"`
+	Action        string  `json:"action"`
+	Route         string  `json:"route"`
+	Recurrence    int     `json:"recurrence"`
+	Weight        float64 `json:"weight"`
+	Reason        string  `json:"reason,omitempty"`
+	PriorityClass string  `json:"priority_class,omitempty"`
 }
 
 // Action vocabulary for Intent.Action.
@@ -119,6 +121,9 @@ func PendingActionsPath(escalationsDir string) string {
 // .evolve/inbox/ — see invariant (2) in the package doc. The append is
 // serialized by the shared file lock so concurrent lanes cannot tear a line.
 func StageIntent(escalationsDir string, in Intent) (string, error) {
+	if err := requireAutofileClass(in); err != nil {
+		return "", err
+	}
 	path := PendingActionsPath(escalationsDir)
 	if err := os.MkdirAll(escalationsDir, 0o755); err != nil {
 		return "", fmt.Errorf("dispositionrouter: create escalations dir: %w", err)
@@ -142,6 +147,16 @@ func StageIntent(escalationsDir string, in Intent) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func requireAutofileClass(in Intent) error {
+	if in.Action != ActionAutofile {
+		return nil
+	}
+	if err := inboxbatch.RequirePriorityClass(in.PriorityClass); err != nil {
+		return fmt.Errorf("dispositionrouter: autofile intent %q: %w", in.ItemID, err)
+	}
+	return nil
 }
 
 // LoadIntents reads every staged intent from the pending-actions file at path.

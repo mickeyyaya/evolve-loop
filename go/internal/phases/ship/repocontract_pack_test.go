@@ -51,7 +51,7 @@ func TestContractRed_NamesEverySuiteOfTheOnePackList(t *testing.T) {
 			t.Errorf("the ship's red message names the pack's suites from the one list; %q missing from %q", suite, err.Error())
 		}
 	}
-	want := "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest, rawgitratchet, sizeratchet, testmainexit, repocontract, policy, guards, acssuite, fleet, evalqualitycheck)"
+	want := "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest, rawgitratchet, sizeratchet, testmainexit, repocontract, policy, guards, acssuite, fleet, evalqualitycheck, inboxrank)"
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf("the ship's red message stays byte-identical; want %q in %q", want, err.Error())
 	}

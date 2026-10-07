@@ -60,15 +60,19 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")); err == nil {
 		scrollback = string(b)
 	}
-	// The autoresponder persists its classification before an escalate exit; surface the pattern name so
-	// callers can act on the class (rate_limit) rather than the bare exit code.
-	if raw, err := os.ReadFile(filepath.Join(cfg.Workspace, "escalation-report.json")); err == nil {
-		var rep struct {
-			Pattern string `json:"pattern_name"`
-		}
-		if json.Unmarshal(raw, &rep) == nil {
-			pattern = rep.Pattern
-		}
+	return rc, EscalationPattern(cfg.Workspace), scrollback
+}
+
+func EscalationPattern(workspace string) string {
+	raw, err := os.ReadFile(filepath.Join(workspace, "escalation-report.json"))
+	if err != nil {
+		return ""
 	}
-	return rc, pattern, scrollback
+	var rep struct {
+		Pattern string `json:"pattern_name"`
+	}
+	if json.Unmarshal(raw, &rep) != nil {
+		return ""
+	}
+	return rep.Pattern
 }

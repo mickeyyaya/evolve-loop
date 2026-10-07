@@ -79,6 +79,9 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	fmt.Fprintf(d.deps.Stderr, "[recipe] launching: %s\n", d.launchCmd)
 	bootDeadlineS := defaultIfZero(d.deps.BootTimeoutS, tmuxREPLBootTimeoutS)
 	for elapsed := 0; elapsed < bootDeadlineS; elapsed++ {
+		if ctx.Err() != nil {
+			return fmt.Errorf("REPL boot abandoned: %w", ctx.Err())
+		}
 		d.deps.Sleep(time.Second)
 		pane, capErr := d.deps.Tmux.CapturePane(ctx, d.session, d.scrollback)
 		if capErr != nil {

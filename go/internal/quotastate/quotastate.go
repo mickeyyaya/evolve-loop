@@ -9,10 +9,6 @@
 // static min_lanes assertion. Budgeting is in each CLI's NATIVE units
 // (remaining fraction + reset), never dollars — the reason the prior
 // dollar-cost budget was removed (subscription claude reports $0).
-//
-// Fail-open by construction: an unparseable or bucketless pane yields
-// Source="unknown" with no fabricated cap, so the budget degrades to the
-// min_lanes floor rather than inventing a limit.
 package quotastate
 
 import (
@@ -78,75 +74,6 @@ func contains(xs []string, s string) bool {
 		}
 	}
 	return false
-}
-
-var (
-	// bucketHeaderRE matches a window header line: "Current session" or
-	// "Current week (all models)" / "Current week (Fable)".
-	bucketHeaderRE = regexp.MustCompile(`(?i)^current (session|week)(?:\s*\(([^)]*)\))?\s*$`)
-	// usedRE matches "27% used" anywhere on the bar line. The \b prefix rejects
-	// a 4+-digit run (e.g. "1000% used") outright rather than silently capturing
-	// its last 3 digits — a wrong value is worse than an unparsed bucket.
-	usedRE = regexp.MustCompile(`\b(\d{1,3})%\s*used`)
-	// resetLineRE matches "Resets <when>" up to an optional "(timezone)".
-	resetLineRE = regexp.MustCompile(`(?i)^\s*resets\s+(.+?)\s*(?:\([^)]*\))?\s*$`)
-)
-
-// Parse turns a captured usage pane into a QuotaState. now anchors relative
-// reset times (e.g. "4:10pm" → the next 4:10pm). It scans for bucket headers
-// and reads the following "NN% used" + "Resets ..." lines — the block shape
-// claude's /usage emits. A pane with no recognizable bucket ⇒ Source="unknown".
-func Parse(family, pane string, now time.Time) QuotaState {
-	q := QuotaState{Family: family, Source: SourceUnknown, ObservedAt: now}
-	lines := strings.Split(pane, "\n")
-	for i := 0; i < len(lines); i++ {
-		hm := bucketHeaderRE.FindStringSubmatch(strings.TrimSpace(lines[i]))
-		if hm == nil {
-			continue
-		}
-		b := Bucket{Name: normalizeName(hm[1], hm[2]), Label: strings.TrimSpace(lines[i])}
-		gotUsed := false
-		// Look at the next few lines for the used% and reset — the block is
-		// header → bar+used → resets, but tolerate a blank line between.
-		for j := i + 1; j < len(lines) && j <= i+3; j++ {
-			if !gotUsed {
-				if um := usedRE.FindStringSubmatch(lines[j]); um != nil {
-					if n, err := strconv.Atoi(um[1]); err == nil {
-						b.UsedFraction = clamp01(float64(n) / 100)
-						gotUsed = true
-						continue
-					}
-				}
-			}
-			if rm := resetLineRE.FindStringSubmatch(lines[j]); rm != nil {
-				b.ResetRaw = strings.TrimSpace(rm[1])
-				if t, ok := ParseResetWhen(b.ResetRaw, now); ok {
-					b.ResetAt = t
-				}
-				break
-			}
-		}
-		if !gotUsed {
-			continue // a header with no parseable usage is not a real bucket
-		}
-		if b.UsedFraction >= 1 {
-			q.Exhausted = true
-		}
-		q.Buckets = append(q.Buckets, b)
-	}
-	if len(q.Buckets) > 0 {
-		q.Source = SourceProbed
-	}
-	return q
-}
-
-func normalizeName(kind, qualifier string) string {
-	kind = strings.ToLower(strings.TrimSpace(kind))
-	qualifier = strings.TrimSpace(qualifier)
-	if kind == "week" && qualifier != "" && !strings.EqualFold(qualifier, "all models") {
-		return "week:" + qualifier
-	}
-	return kind
 }
 
 func clamp01(f float64) float64 {

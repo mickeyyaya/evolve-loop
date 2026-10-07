@@ -107,10 +107,7 @@ type CompositionVerdictInput struct {
 	GateResults    map[string]string
 	AuditedDiff    []byte
 	ComposedDiff   []byte
-	ArtifactDir    string
 }
-
-const compositionArtifactDirName = "composition-artifacts"
 
 // WithCompositionSnapshot injects the capture of the lane's pre-rebase audited state; nil keeps the fast path off.
 func WithCompositionSnapshot(fn func(ctx context.Context, worktree, runID string) (CompositionAuditSnapshot, error)) Option {
@@ -188,9 +185,8 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 		GateResults:  gateResults,
 		AuditedDiff:  snap.Diff,
 		ComposedDiff: []byte(composedDiff),
-		ArtifactDir:  filepath.Join(worktree, ".evolve", compositionArtifactDirName),
 	}
-	ledgerPath := filepath.Join(worktree, ".evolve", "ledger.jsonl")
+	ledgerPath := filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
 	if err := o.compositionVerdictWriter(ledgerPath, in); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
 		return false
@@ -275,9 +271,8 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		GateResults:  gateResults,
 		AuditedDiff:  snap.Diff,
 		ComposedDiff: resolution,
-		ArtifactDir:  filepath.Join(worktree, ".evolve", compositionArtifactDirName),
 	}
-	ledgerPath := filepath.Join(worktree, ".evolve", "ledger.jsonl")
+	ledgerPath := filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
 	if err := o.compositionVerdictWriter(ledgerPath, in); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
 		return false

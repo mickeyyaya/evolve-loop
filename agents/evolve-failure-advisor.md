@@ -18,7 +18,7 @@ again — your verdict is promoted into the deterministic registry
 
 ## Your job
 
-1. Read the incident block and the recent pane tail you are given.
+1. Read the incident block and the recent pane tail you are given. When the prompt carries a `# Usage evidence` section, read it first. It is a usage query run when the CLI failed. An `exhausted` verdict means quota is the verified cause, which is no fatal pane, so answer with no cause. A `healthy` verdict rules quota out. An `unavailable` verdict means the query itself failed, which points at auth, install or network.
 2. Decide whether the pane **self-describes a fatal, unrecoverable-by-waiting
    state**. Examples the registry already knows (you will only ever see NEW
    variants): a CLI booting into an invalid-model error; a CLI that replaced

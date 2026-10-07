@@ -177,8 +177,8 @@ function renderQueue() {
   const q = snap.queue;
   const box = clear($('queue'));
   box.append(h('h2', null, 'inbox', h('small', null, `${q.pending.length} pending · ${q.processing} processing · ${q.retry} retry · ${q.consumed} consumed · ${q.processed} processed`)));
-  const tbl = h('table', null, h('tr', null, h('th', null, 'w'), h('th', null, 'item'), h('th', null, 'kind'), h('th', null, 'route')));
-  for (const it of q.pending.slice(0, 25)) tbl.append(h('tr', { title: it.title }, h('td', { class: 'mono' }, it.weight.toFixed(2)), h('td', null, h('div', null, it.id), h('div', { class: 'small muted' }, (it.title || '').slice(0, 110))), h('td', { class: 'small' }, it.kind || it.class || ''), h('td', { class: 'small' }, it.route || '')));
+  const tbl = h('table', null, h('tr', null, h('th', null, 'score'), h('th', null, 'item'), h('th', null, 'kind'), h('th', null, 'route')));
+  for (const it of q.pending.slice(0, 25)) tbl.append(h('tr', { title: it.title }, h('td', { class: 'mono' }, it.score.toFixed(3)), h('td', null, h('div', null, it.id), h('div', { class: 'small muted' }, (it.title || '').slice(0, 110))), h('td', { class: 'small' }, it.kind || it.class || ''), h('td', { class: 'small' }, it.route || '')));
   if (q.pending.length > 25) tbl.append(h('tr', null, h('td', { colspan: '4', class: 'muted small' }, `… ${q.pending.length - 25} more`)));
   box.append(tbl);
 }

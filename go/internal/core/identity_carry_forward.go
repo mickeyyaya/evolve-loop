@@ -59,7 +59,7 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 	in := CompositionVerdictInput{
 		Cycle: cycle, Method: identicalRebaseMethod, LaneAuditRef: audit.ArtifactSHA256, PatchID: patchID,
 		AuditedBase: base0, GitHead: base1, TreeStateSHA: tree1, AuditedTreeSHA: tree0, GateResults: gates,
-		AuditedDiff: audited, ComposedDiff: composed, ArtifactDir: filepath.Join(worktree, ".evolve", compositionArtifactDirName),
+		AuditedDiff: audited, ComposedDiff: composed,
 	}
 	if err := o.compositionVerdictWriter(filepath.Join(projectRoot, ".evolve", "ledger.jsonl"), in); err != nil {
 		return decline("carry record: %v", err)

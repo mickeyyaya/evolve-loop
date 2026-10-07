@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The operator's choice between protecting ship-pack scanners as a class and file-by-file entries is recorded in docs/architecture/packages/internal-guards.md with its reason",
+    "If the class option is chosen, a test fails when a whole-tree scanner in a repocontract.Packages() package is not covered by guards.ProtectedSurfaceManifest"
+  ],
+  "connects_to": [
+    "docs/plans/inbox-prioritization-2026-10.md (P2 review fix round)",
+    "go/internal/inboxrank/weightsort_ban_test.go"
+  ],
+  "created_at": "2026-10-06T15:00:00Z",
+  "files": [
+    "go/internal/guards/integrity_surface.go",
+    "go/internal/repocontract/repocontract.go",
+    "docs/architecture/packages/internal-guards.md"
+  ],
+  "fix": "Operator decision first: either (a) protect ship-pack scanners as a class, for example by deriving manifest coverage from repocontract.Packages() for the scanner test files and adding a predicate that fails when a pack package's whole-tree test is not covered, or (b) keep file-by-file entries and record the rule for when a scanner earns one. Then implement the chosen option red first, with the manifest change landed through an operator-gated evolve ship --class manual.",
+  "id": "decide-protecting-ship-pack-scanners-as-a-class",
+  "kind": "decision",
+  "priority_class": "maintainability",
+  "route": "console-manual",
+  "summary": "The inbox rank P2 review protected one scanner, go/internal/inboxrank/weightsort_ban_test.go (the one-ranking guard), by a file entry in guards.ProtectedSurfaceManifest at the operator's approval. Every package in repocontract.Packages() runs at each ship and several hold whole-tree scanners of the same nature (sizeratchet, rawgitratchet, repocontract's own detectors, testmainexit, acssuite's tag guard, the inbox-writer force scan in cmd/evolve outside the pack). Today a scanner is protected only if its file name is gate-shaped (contains guard or ends _gate.go) or an operator adds a file entry, so a lane can weaken an ungated scanner it touches.",
+  "title": "Decide whether every ship-pack scanner test is a protected surface, as a class, not file by file",
+  "weight": 0.4
+}
