@@ -209,7 +209,7 @@ func (b *BaseRunner) Run(ctx context.Context, req core.PhaseRequest) (core.Phase
 	d := dispatchOf(req, prep, dispatchPlan, dispatchResult)
 	// Effects first: the judge's first verification must see what the host performed.
 	b.performHostEffects(ctx, d)
-	return b.judge.Judge(ctx, d, b.classifyWith(req, dispatchResult.bridgeResponse))
+	return b.judge.Judge(ctx, d, b.classifyWith(req, d, dispatchResult.skills))
 }
 
 func (b *BaseRunner) unlaunchedFailure(req core.PhaseRequest, prep phasePreparation, d phaseDispatchResult) (core.PhaseResponse, error) {

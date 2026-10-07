@@ -144,13 +144,6 @@ If the build cannot proceed with what's available:
 
 ---
 
-## Section: optional-self-review
-
-Loaded when `legacy/scripts/utility/code-review-simplify.sh` exists in the project.
-Optional — non-blocking. If the script is missing or failing, skip silently.
-
----
-
 ## Section: worktree-isolation
 
 Loaded for Step 0 verification. Builder runs in an isolated git worktree provisioned by `run-cycle.sh`.
@@ -212,20 +205,6 @@ assert_go_test_pass_changed          # all touched packages must pass
 # assert_go_test_pass ./internal/foo/...   # or name the package explicitly
 ```
 
-After Step 5 self-verify passes, optionally run the lightweight pipeline
-layer on the changes:
-
-```bash
-bash legacy/scripts/utility/code-review-simplify.sh HEAD 2>/dev/null || true
-```
-
-- If maintainability findings are reported, apply simplifications before
-  reporting (Extract Method, flatten nesting, remove dead code).
-- If no findings or script not found, skip silently.
-- Include self-review score summary in build-report.md under
-  `## Self-Review`.
-- Missing or failing script does NOT block the build.
-
 ---
 
 <!-- ANCHOR:build-research-protocol -->
@@ -243,32 +222,6 @@ Loaded for Step 2.5.
 - If no research needed → `Research Source: no-research-needed`
 
 **Routing:** Quick gaps → **Default WebSearch** (1-2 queries); complex architecture → **Smart Web Search**. See `online-researcher.md`.
-
----
-
-<!-- ANCHOR:self-review-loop-detail -->
-## Section: self-review-loop-detail
-
-Loaded for Step 5 convergence loop.
-
-Convergence loop (pseudocode):
-
-```
-for iter in 1..MAX_ITERS:
-    all_clean = true
-    for skill in split(reviewSkills, ','):
-        invoke Skill tool with `skill` (the skill reads `git diff HEAD` itself)
-        parse: composite_score (0.0-1.0), severity_counts (HIGH/CRITICAL)
-        if composite_score >= THRESHOLD and HIGH+CRITICAL == 0:
-            continue                         # this skill is clean
-        else:
-            apply fixes to worktree (Edit/Write/MultiEdit per findings)
-            all_clean = false
-    if all_clean: break                       # converged
-record final state: converged | iter-cap-hit | error
-```
-
-Skill contract: read diff; emit composite score 0.0-1.0 + severity (HIGH/CRITICAL); parseable output. Default: `code-review-simplify`; extend via the `reviewSkills` config.
 
 ---
 
@@ -441,6 +394,9 @@ MODIFY	path/to/file	<what changed>
 Check	Result
 <eval grader 1>	PASS / FAIL
 ```
+
+## Self-Review
+<!-- Step 5.6 on a code cycle: the code-review-simplify Self-review block (tier, scores, applied, declined, Go tests, re-verified). Omit on a document cycle. -->
 
 ## E2E Verification
 <!-- Include ONLY when task triggered Step 4.5. Omit entirely for non-UI tasks. -->

@@ -29,6 +29,8 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/skills/solution-scout/", Rationale: "the document-cycle discovery persona the kernel preloads on its own authority (policy.CompiledDefaultOverlaySkills, ADR-0099 slice 3)"},
 	{Fragment: "/skills/solution-build/", Rationale: "the document-cycle build persona the kernel preloads on its own authority (policy.CompiledDefaultOverlaySkills, ADR-0099 slice 3)"},
 	{Fragment: "/skills/solution-audit/", Rationale: "the document-cycle audit grading persona the kernel preloads on its own authority — the same class as /skills/audit/ (policy.CompiledDefaultOverlaySkills, ADR-0099 slice 3)"},
+	{Fragment: "/skills/engineering-craft/", Rationale: "the craft persona the kernel preloads into every code cycle's source-writing dispatch at any tier (policy.CompiledDefaultOverlaySkills); a tampered copy would rewrite how every builder and test writer works"},
+	{Fragment: "/skills/code-review-simplify/", Rationale: "the self-review persona the kernel preloads into every code cycle's source-writing dispatch at any tier (policy.CompiledDefaultOverlaySkills); a tampered copy would rewrite how every builder and test writer reviews its own diff"},
 	{Fragment: "/.claude/settings.json", Rationale: "PreToolUse hook wiring (repo + global ~/.claude)"},
 	{Fragment: "/.evolve/policy.json", Rationale: "gate-default overrides (eval/contract/swarm gates)"},
 
