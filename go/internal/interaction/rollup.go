@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
 const summarySchemaVersion = 1
@@ -88,10 +90,5 @@ func WriteRollup(workspace string) error {
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(workspace, "interaction-summary.json")
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return atomicwrite.Bytes(filepath.Join(workspace, "interaction-summary.json"), append(b, '\n'))
 }
