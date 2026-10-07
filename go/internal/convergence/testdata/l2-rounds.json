@@ -1,0 +1,125 @@
+{
+  "loop": "console-lane",
+  "round": 3,
+  "components": {
+    "bridge:model-check": {"separable": false}
+  },
+  "fixer": {"family": "claude-tmux", "tier": "deep", "model": "opus"},
+  "judge": {"family": "claude-tmux", "tier": "deep", "model": "opus"},
+  "rounds": [
+    {
+      "index": 0,
+      "findings": [
+        {"id": "fix-H1", "severity": "HIGH", "class": "correctness", "location": "go/internal/cli/phasecmd/run_phase.go:40", "status": "OPEN", "certificate": "phase_verbs_root_router_test.go"},
+        {"id": "fix-H2", "severity": "HIGH", "class": "architecture", "location": "go/internal/setup/apply.go:88", "status": "OPEN"},
+        {"id": "fix-H3", "severity": "HIGH", "class": "correctness", "location": "go/internal/llmroute/env.go:22", "status": "OPEN"},
+        {"id": "fix-H4", "severity": "HIGH", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/manifest.go:98", "status": "OPEN"},
+        {"id": "fix-M1", "severity": "MEDIUM", "class": "correctness", "location": "go/internal/cliroute/floor_test.go:30", "status": "OPEN"},
+        {"id": "fix-M2", "severity": "MEDIUM", "class": "correctness", "location": "go/internal/cliroute/decision.go:55", "status": "OPEN"},
+        {"id": "fix-M3", "severity": "MEDIUM", "class": "architecture", "location": "go/cmd/evolve/cmd_cycle_wiring.go:120", "status": "OPEN"},
+        {"id": "fix-M4", "severity": "MEDIUM", "class": "hygiene", "location": "go/cmd/evolve/cmd_cli_routing.go:200", "status": "OPEN"},
+        {"id": "fix-M5", "severity": "MEDIUM", "class": "hygiene", "location": "go/internal/cliroute/realtree_test.go:15", "status": "OPEN"},
+        {"id": "fix-L1", "severity": "LOW", "class": "hygiene", "location": "go/cmd/evolve/cli_routing_root.go:10", "status": "OPEN"},
+        {"id": "fix-L2", "severity": "LOW", "class": "hygiene", "location": "go/cmd/evolve/cmd_subagent.go:300", "status": "OPEN"},
+        {"id": "fix-L3", "severity": "LOW", "class": "correctness", "location": "go/cmd/evolve/cli_routing_root.go:44", "status": "OPEN"},
+        {"id": "fix-L4", "severity": "LOW", "class": "correctness", "location": "go/cmd/evolve/cmd_cli_routing_migrate.go:60", "status": "OPEN"}
+      ]
+    },
+    {
+      "index": 1,
+      "fix_hunks": [
+        {"file": "go/internal/bridge/launch_model_check.go", "from": 1, "to": 220},
+        {"file": "go/internal/setup/apply.go", "from": 120, "to": 160},
+        {"file": "go/internal/setup/apply_table.go", "from": 1, "to": 80},
+        {"file": "go/internal/bridge/boot_smoke.go", "from": 30, "to": 50},
+        {"file": "go/internal/bridge/canary.go", "from": 70, "to": 90},
+        {"file": "go/internal/cliroute/compile.go", "from": 200, "to": 220}
+      ],
+      "findings": [
+        {"id": "fix-H1", "severity": "HIGH", "status": "FIXED"},
+        {"id": "fix-H3", "severity": "HIGH", "status": "FIXED"},
+        {"id": "fix-H4", "severity": "HIGH", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "fix-M1", "severity": "MEDIUM", "status": "FIXED"},
+        {"id": "fix-M2", "severity": "MEDIUM", "status": "FIXED"},
+        {"id": "fix-M3", "severity": "MEDIUM", "status": "FIXED"},
+        {"id": "fix-M4", "severity": "MEDIUM", "status": "FIXED"},
+        {"id": "fix-M5", "severity": "MEDIUM", "status": "FIXED"},
+        {"id": "fix-L1", "severity": "LOW", "status": "FIXED"},
+        {"id": "fix-L2", "severity": "LOW", "status": "FIXED"},
+        {"id": "fix-L3", "severity": "LOW", "status": "FIXED"},
+        {"id": "fix-L4", "severity": "LOW", "status": "FIXED"},
+        {"id": "fix-H2", "severity": "HIGH", "class": "correctness", "location": "go/internal/setup/apply.go:140", "status": "OPEN"},
+        {"id": "final-HIGH-2", "severity": "HIGH", "class": "correctness", "location": "go/internal/setup/apply_table.go:30", "status": "OPEN"},
+        {"id": "final-HIGH-3", "severity": "HIGH", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:61", "status": "OPEN"},
+        {"id": "final-MEDIUM-1", "severity": "MEDIUM", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:95", "status": "OPEN"},
+        {"id": "final-MEDIUM-2", "severity": "MEDIUM", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/boot_smoke.go:40", "status": "OPEN"},
+        {"id": "final-MEDIUM-3", "severity": "MEDIUM", "class": "docs", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:130", "status": "OPEN"},
+        {"id": "final-LOW-1", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:150", "status": "OPEN"},
+        {"id": "final-LOW-2", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:170", "status": "OPEN"},
+        {"id": "final-LOW-3", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/canary.go:80", "status": "OPEN"},
+        {"id": "final-LOW-4", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/cliroute/compile.go:210", "status": "OPEN"}
+      ]
+    },
+    {
+      "index": 2,
+      "fix_hunks": [
+        {"file": "go/internal/bridge/launch_model_check.go", "from": 60, "to": 200},
+        {"file": "go/internal/panestream/footer.go", "from": 1, "to": 80},
+        {"file": "go/internal/setup/apply.go", "from": 120, "to": 170},
+        {"file": "go/internal/bridge/canary.go", "from": 70, "to": 100}
+      ],
+      "findings": [
+        {"id": "fix-H2", "severity": "HIGH", "status": "FIXED"},
+        {"id": "final-HIGH-2", "severity": "HIGH", "status": "FIXED"},
+        {"id": "final-HIGH-3", "severity": "HIGH", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-MEDIUM-1", "severity": "MEDIUM", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-MEDIUM-2", "severity": "MEDIUM", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-MEDIUM-3", "severity": "MEDIUM", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-LOW-1", "severity": "LOW", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-LOW-2", "severity": "LOW", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-LOW-3", "severity": "LOW", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "final-LOW-4", "severity": "LOW", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-H1", "severity": "HIGH", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/looppreflight/bridge_boot.go:70", "status": "OPEN"},
+        {"id": "r6-H2", "severity": "HIGH", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check_test.go:200", "status": "OPEN"},
+        {"id": "r6-M1", "severity": "MEDIUM", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/panestream/footer.go:40", "status": "OPEN"},
+        {"id": "r6-M2", "severity": "MEDIUM", "class": "correctness", "location": "go/internal/setup/apply.go:150", "status": "OPEN"},
+        {"id": "r6-M3", "severity": "MEDIUM", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:180", "status": "OPEN"},
+        {"id": "r6-L1", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:110", "status": "OPEN"},
+        {"id": "r6-L2", "severity": "LOW", "class": "docs", "location": "docs/architecture/packages/internal-setup.md:30", "status": "OPEN"},
+        {"id": "r6-L3", "severity": "LOW", "class": "correctness", "location": "go/cmd/evolve/cmd_setup.go:90", "status": "OPEN"},
+        {"id": "r6-L4", "severity": "LOW", "class": "docs", "location": "skills/setup/SKILL.md:40", "status": "OPEN"},
+        {"id": "r6-L5", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/canary.go:95", "status": "OPEN"},
+        {"id": "r6-L6", "severity": "LOW", "class": "docs", "location": "docs/private/research/archived-2026-10-07/superseded-predicates/README.md:12", "status": "OPEN"},
+        {"id": "r6-L7", "severity": "LOW", "class": "hygiene", "location": "go/internal/setup/apply.go:200", "status": "OPEN"}
+      ]
+    },
+    {
+      "index": 3,
+      "fix_hunks": [
+        {"file": "go/internal/panestream/footer.go", "from": 1, "to": 90},
+        {"file": "go/internal/looppreflight/bridge_boot.go", "from": 60, "to": 100},
+        {"file": "go/internal/bridge/launch_model_check.go", "from": 100, "to": 200}
+      ],
+      "findings": [
+        {"id": "r6-H1", "severity": "HIGH", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-H2", "severity": "HIGH", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-M1", "severity": "MEDIUM", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-M2", "severity": "MEDIUM", "status": "FIXED"},
+        {"id": "r6-M3", "severity": "MEDIUM", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-L1", "severity": "LOW", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-L2", "severity": "LOW", "status": "FIXED"},
+        {"id": "r6-L3", "severity": "LOW", "status": "FIXED"},
+        {"id": "r6-L4", "severity": "LOW", "status": "FIXED"},
+        {"id": "r6-L5", "severity": "LOW", "component": "bridge:model-check", "status": "FIXED"},
+        {"id": "r6-L6", "severity": "LOW", "status": "FIXED"},
+        {"id": "r6-L7", "severity": "LOW", "status": "FIXED"},
+        {"id": "r7-MEDIUM-1", "severity": "MEDIUM", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/panestream/footer.go:52", "status": "OPEN"},
+        {"id": "r7-LOW-1", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "status": "OPEN"},
+        {"id": "r7-LOW-2", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/looppreflight/bridge_boot.go:88", "status": "OPEN"},
+        {"id": "r7-LOW-3", "severity": "LOW", "class": "correctness", "component": "bridge:model-check", "location": "go/internal/bridge/launch_model_check.go:140", "status": "OPEN"},
+        {"id": "r7-LOW-4", "severity": "LOW", "class": "docs", "component": "bridge:model-check", "location": "docs/architecture/packages/internal-bridge-panestream.md:20", "status": "OPEN"},
+        {"id": "r7-INFO", "severity": "INFO", "class": "correctness", "location": "go/internal/setup/apply.go:60", "status": "OPEN"}
+      ]
+    }
+  ]
+}

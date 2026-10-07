@@ -1,12 +1,13 @@
 # Your First Cycle — A Hands-On Walkthrough
 
-> Run evolve-loop end-to-end on your own machine. Follow this top-to-bottom: ~15 minutes wall clock, ~$0.50–1.50 budget. By the end you'll have shipped one commit, inspected every phase's output, and read your first audit verdict.
-> Audience: people who've read [overview.md](../concepts/overview.md) and want to actually try it.
+> Run evolve-loop end-to-end on your own machine. Follow this document from top to bottom: ~15 minutes wall clock, ~$0.50–1.50 budget.
+> At the end, you will have one shipped commit, and you will know the output of every phase. You will also have read your first audit verdict.
+> Audience: people who read [overview.md](../concepts/overview.md) and want to actually try it.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Step 1 — Install the Plugin](#step-1--install-the-plugin)
+2. [Step 1 — Install the Plugin](#step-1--install)
 3. [Step 2 — Verify Your Setup](#step-2--verify-your-setup)
 4. [Step 3 — (Optional) Choose Your LLM Routing](#step-3--optional-choose-your-llm-routing)
 5. [Step 4 — Run One Cycle](#step-4--run-one-cycle)
@@ -23,17 +24,17 @@
 
 | Requirement | Minimum | Why |
 |---|---|---|
-| Claude Code CLI | v2.1.139+ | The `claude -p` non-interactive mode + Agent View; older versions work but lack `/goal` reference points |
+| Claude Code CLI | v2.1.139+ | The `claude -p` non-interactive mode + Agent View. Older versions work, but they do not have the `/goal` reference points |
 | macOS or Linux | macOS 12+ / glibc 2.31+ | `sandbox-exec` (macOS) or `bwrap` (Linux); WSL2 works |
-| bash | 3.2+ (default macOS) | Many scripts target the macOS-default bash; no bash-4-isms required |
+| bash | 3.2+ (default macOS) | Many scripts target the default bash of macOS; no bash-4-isms required |
 | git | 2.5+ | Per-cycle worktrees need `git worktree add` |
 | `jq` | 1.6+ | Every state.json + ledger operation |
-| Anthropic auth | Subscription via `~/.claude.json` OR `ANTHROPIC_API_KEY` | Subscription auth is first-class for `/evo:loop`; API key is also supported |
+| Anthropic auth | Subscription through `~/.claude.json` OR `ANTHROPIC_API_KEY` | Subscription auth is first-class for `/evo:loop`. The API key is also supported |
 | (optional) Gemini CLI | v0.42+ | Only if you want Gemini-routed phases |
 | (optional) Codex CLI | any | Only if you want Codex-routed phases (hybrid mode) |
 | Free disk | ~200 MB | Per-cycle worktrees + workspace artifacts |
 
-Verify each:
+Verify each one:
 
 ```bash
 claude --version       # Expect 2.1.139 or newer
@@ -47,9 +48,9 @@ echo $ANTHROPIC_API_KEY  # Either set, or use subscription auth via ~/.claude.js
 
 ## Step 1 — Install
 
-The fastest path — one line that detects your platform, gets the `evolve` binary
-(prebuilt, or built from source as a fallback), auto-installs missing deps, and
-installs evolve for the CLI(s) you have:
+The fastest path is one line. It detects your platform and gets the `evolve` binary
+(prebuilt, or, as a fallback, built from source). It automatically installs the deps that are not there.
+Then it installs evolve for the CLI(s) that you have:
 
 ```bash
 curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh
@@ -63,21 +64,21 @@ Or, inside Claude Code, add the plugin directly:
 ```
 
 **On Windows:** the loop runtime is Unix-based (tmux, bash), so run it under
-[WSL2](https://learn.microsoft.com/windows/wsl/install) — install WSL, open your
-WSL (e.g. Ubuntu) shell, then run the one-liner above there (inside WSL it
-installs exactly as on Linux). The `/evo:*` skills install natively in Claude
-Code on Windows via the `/plugin` commands above; only the loop runtime needs WSL.
+[WSL2](https://learn.microsoft.com/windows/wsl/install). Install WSL, open your
+WSL shell (for example, Ubuntu), then run the one-liner above there. Inside WSL, it
+installs exactly as on Linux. The `/evo:*` skills install natively in Claude
+Code on Windows, with the `/plugin` commands above. Only the loop runtime needs WSL.
 
-Or for a project-local install (recommended for trying it out):
+Or, for a project-local install (recommended when you want to try it out):
 
 ```bash
 cd /your/project
 git clone https://github.com/mickeyyaya/evolve-loop.git .evolve/plugin
 ```
 
-Then in Claude Code: `/plugin reload`.
+Then, in Claude Code: `/plugin reload`.
 
-Verify install:
+Verify the install:
 
 ```bash
 ls .evolve/plugin/.claude-plugin/plugin.json
@@ -89,7 +90,7 @@ jq '.version' .evolve/plugin/.claude-plugin/plugin.json
 
 ## Step 2 — Verify Your Setup
 
-Before running a cycle, sanity-check that the kernel hooks are wired:
+Before you run a cycle, do a sanity check that the kernel hooks are connected:
 
 ```bash
 ls .claude/settings.json   # Expect: hooks block referencing legacy/scripts/guards/*.sh
@@ -103,29 +104,30 @@ ls legacy/scripts/guards/
 # Expect: phase-gate-precondition.sh, role-gate.sh, ship-gate.sh, ...
 ```
 
-If any of those fail, see [Common First-Time Issues](#common-first-time-issues).
+If one of these checks fails, see [Common First-Time Issues](#common-first-time-issues).
 
 ---
 
 ## Step 3 — (Optional) Choose Your LLM Routing
 
-By default, evolve-loop runs each phase on the model its **profile** declares. The simplest way to change that is the one-question setup flow:
+By default, evolve-loop runs each phase on the model that its **profile** declares. The simplest way to change that is the one-question setup flow:
 
 ```
 /evo:setup
 ```
 
-It auto-detects which CLIs/subscriptions you have, explains the pipeline, then offers **three ready-made presets** — each a complete per-phase model plan the binary computes from your profiles:
+It automatically detects which CLIs/subscriptions you have, and it explains the pipeline.
+Then it offers **three ready-made presets**. Each preset is a complete per-phase model plan that the binary calculates from your profiles:
 
 | Preset | What it does |
 |---|---|
-| **Recommended** | Profile defaults, subscription-aware. Builder and Auditor run on different model families when you have two (adversarial integrity). |
-| **Economy** | One tier cheaper per phase where the envelope allows — lighter on quota/cost. |
-| **Max-quality** | Top of each phase's envelope — best quality, highest cost. |
+| **Recommended** | Profile defaults, subscription-aware. When you have two model families, Builder and Auditor run on different families (adversarial integrity). |
+| **Economy** | One tier cheaper per phase, where the envelope allows it. It uses less quota and costs less. |
+| **Max-quality** | The top of the envelope of each phase. Best quality, highest cost. |
 
-You pick **one**; the binary writes per-phase pins to `.evolve/policy.json` (only where they differ from the profile default). Skip this on your first cycle — the defaults work.
+You select **one**. The binary writes per-phase pins to `.evolve/policy.json` (only where they are different from the profile default). Skip this step on your first cycle, because the defaults work.
 
-Prefer the command line, or want to script it?
+Do you prefer the command line, or do you want to script it?
 
 ```bash
 evolve setup recommend                 # show the three presets for your machine
@@ -133,25 +135,26 @@ evolve setup apply --preset economy    # write the chosen preset's pins to .evol
 evolve setup apply --preset recommended --dry-run   # preview the merged policy, write nothing
 ```
 
-Presets themselves are public config (`go/internal/setup/presets.json`), overridable per-repo via `.evolve/setup-presets.json`. For the full mechanism see [setup-onboarding.md](../architecture/setup-onboarding.md); for more routing configs see [pluggability.md](../concepts/pluggability.md).
+The presets themselves are public config (`go/internal/setup/presets.json`). You can override them per repo through `.evolve/setup-presets.json`.
+For the full mechanism, see [setup-onboarding.md](../architecture/setup-onboarding.md). For more routing configs, see [pluggability.md](../concepts/pluggability.md).
 
 ---
 
 ## Step 4 — Run One Cycle
 
-Pick a small, contained goal for your first cycle. Avoid sweeping refactors. Good examples:
+Select a small, contained goal for your first cycle. Do not use broad refactors. Good examples:
 
 | Good first goals | Why |
 |---|---|
 | "Add a `--dry-run` flag to `legacy/scripts/foo.sh`" | Single file, clear acceptance |
 | "Document the `bar()` function in `lib/baz.py`" | Doc-only; no test infra needed |
-| "Fix the typo in README.md line 42" | Trivial; verifies the pipeline runs |
+| "Fix the typo in README.md line 42" | Trivial; verifies that the pipeline runs |
 | "Add unit tests for the `parseConfig()` function" | Small but real |
 
 | Bad first goals | Why |
 |---|---|
-| "Refactor the database layer" | Huge scope; cycle will get stuck in Triage |
-| "Make the app faster" | Vague; intent phase will reject |
+| "Refactor the database layer" | Huge scope; the cycle will get stuck in Triage |
+| "Make the app faster" | Vague; the intent phase will reject it |
 | "Update all dependencies" | Touches many files; high risk |
 | "Improve security" | No measurable acceptance |
 
@@ -162,33 +165,33 @@ bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget
   "Add a --dry-run flag to legacy/scripts/foo.sh that prints the planned operation without executing it."
 ```
 
-Or, if you're inside Claude Code:
+Or, if you are inside Claude Code:
 
 ```
 /evo:loop --cycles 1 --budget-usd 3 "Add a --dry-run flag to legacy/scripts/foo.sh..."
 ```
 
-The dispatcher launches the orchestrator subprocess. You'll see streaming output for ~10-20 minutes.
+The dispatcher starts the orchestrator subprocess. You will see streaming output for ~10-20 minutes.
 
 ---
 
 ## Step 5 — Watch It Work (Without Polling)
 
-The dispatcher logs to stdout. While it runs:
+The dispatcher logs to stdout. While it runs, watch these lines:
 
 | What to watch | Why |
 |---|---|
-| `[phase-watchdog] phase advance: 'X' → 'Y'` | Tracks pipeline progression |
-| `[claude-adapter]` or `[gemini-adapter]` lines | Which CLI is dispatching this phase |
+| `[phase-watchdog] phase advance: 'X' → 'Y'` | Tracks the progress of the pipeline |
+| `[claude-adapter]` or `[gemini-adapter]` lines | Which CLI dispatches this phase |
 | `[subagent-run] cli_resolution: ...` | The router decision |
-| Watchdog stalls | If a phase idle >180s, you'll see WARN |
+| Watchdog stalls | If a phase is idle for >180s, you will see a WARN |
 
-**Do not poll** by re-running commands in a tight loop. Each poll burns prompt tokens. Either:
-- Wait passively (the dispatcher prints natural progress)
-- Open a second terminal and `tail -f .evolve/runs/cycle-N/*.log` 
-- Open the Claude Code Agent View (UI) for visual monitoring
+**Do not poll**: do not run commands again and again in a tight loop. Each poll burns prompt tokens. Do one of these:
+- Wait passively (the dispatcher prints natural progress).
+- Open a second terminal and run `tail -f .evolve/runs/cycle-N/*.log`.
+- Open the Claude Code Agent View (UI) for visual monitoring.
 
-Cycle artifacts appear in `.evolve/runs/cycle-N/` as each phase completes:
+The cycle artifacts appear in `.evolve/runs/cycle-N/` as each phase completes:
 
 ```bash
 ls -lt .evolve/runs/cycle-N/
@@ -205,7 +208,7 @@ ls -lt .evolve/runs/cycle-N/
 
 ## Step 6 — Read the Verdict
 
-When the dispatcher exits, check three things in order:
+When the dispatcher exits, check three things in this order:
 
 ### A — Exit code
 
@@ -216,7 +219,7 @@ echo $?
 | Exit code | Meaning |
 |---|---|
 | `0` | All cycles shipped successfully |
-| `2` | INTEGRITY-BREACH — investigate before re-running |
+| `2` | INTEGRITY-BREACH — examine the cause before you run again |
 | `3` | DONE-WITH-RECOVERABLE-FAILURES — review failedApproaches |
 | `4` | BATCH-BUDGET-EXHAUSTED |
 
@@ -242,7 +245,7 @@ jq '{verdict, green_count, red_count, total_predicates}' .evolve/runs/cycle-N/ac
 }
 ```
 
-`verdict: PASS` with `red_count: 0` is what triggers ship-gate to allow the commit. Any RED predicate fails the cycle deterministically.
+`verdict: PASS` with `red_count: 0` triggers ship-gate to allow the commit. Any RED predicate fails the cycle deterministically.
 
 ### D — Git log
 
@@ -255,54 +258,55 @@ git log --oneline -3
 
 ## Step 7 — Inspect the Phase Artifacts
 
-This is where you learn what each agent actually did. Read in pipeline order:
+Here, you learn what each agent actually did. Read the artifacts in pipeline order:
 
 ### `scout-report.md`
 
 Look for:
 - `## Discovery Summary` — what scout saw in your repo
-- `## Key Findings` — facts grounded in `git status` / `git diff` (post-cycle-62 grounding check)
+- `## Key Findings` — facts grounded in `git status` / `git diff` (the post-cycle-62 grounding check)
 - `## Selected Tasks` — what scout proposed
-- `## Carryover Decisions` — any items deferred to the next cycle
+- `## Carryover Decisions` — the items deferred to the next cycle
 
 ### `triage-decision.md`
 
 Look for:
-- `## top_n` — what triage allowed this cycle to attempt
-- `## deferred` — items pushed to next cycle
+- `## top_n` — what triage let this cycle try
+- `## deferred` — items pushed to the next cycle
 - `## dropped` — items rejected entirely
 
 ### `build-report.md`
 
 Look for:
-- `## Files Changed/Staged` — the diff Builder produced
-- `## AC Claims` — Builder's claim that each acceptance criterion is met
-- `## Self-Verification` — Builder's pre-audit check
+- `## Files Changed/Staged` — the diff that Builder produced
+- `## AC Claims` — the claim of Builder that each acceptance criterion is met
+- `## Self-Verification` — the pre-audit check of Builder
 
 ### `audit-report.md`
 
 Look for:
 - `## Verdict` — PASS / WARN / FAIL
 - `## Evidence Summary` — per-AC verification with `path:line` citations
-- `## Defects Found` — any RED findings
+- `## Defects Found` — the RED findings
 - `## Observations` — non-blocking notes
 
 ### `orchestrator-report.md`
 
 Look for:
 - `## Phase Outcomes` — the per-phase table
-- `## CLI Resolution` — auto-rendered from ledger; shows which CLI/model actually ran each phase
-- `## Verdict` — the orchestrator's narrative verdict (SHIPPED / WARN / FAILED-AND-LEARNED)
+- `## CLI Resolution` — auto-rendered from the ledger. It shows which CLI/model actually ran each phase
+- `## Verdict` — the narrative verdict of the orchestrator (SHIPPED / WARN / FAILED-AND-LEARNED)
 
 ### `acs/cycle-N/*.sh`
 
-These are the **predicates** — the actual exit-code-based verdicts. Open one:
+These are the **predicates**: the actual verdicts, based on exit codes. Open one:
 
 ```bash
 cat acs/cycle-N/001-*.sh
 ```
 
-Each predicate has a metadata header, an explicit acceptance criterion, and a bash test that returns 0 (GREEN) or non-zero (RED). After successful ship, these get promoted to `acs/regression-suite/cycle-N/` and run in every future cycle's audit.
+Each predicate has a metadata header, an explicit acceptance criterion, and a bash test. The test returns 0 (GREEN) or non-zero (RED).
+After a successful ship, the pipeline promotes these predicates to `acs/regression-suite/cycle-N/`. They then run in the audit of every future cycle.
 
 ---
 
@@ -314,14 +318,14 @@ The ledger is the tamper-evident audit trail. Every phase writes one entry:
 grep -F '"cycle":N' .evolve/ledger.jsonl | jq -c '{role, kind, model, exit_code, artifact_sha256}'
 ```
 
-Each entry's `prev_hash` chains to the previous one. Verify the chain is intact:
+The `prev_hash` of each entry chains to the previous entry. Verify that the chain is intact:
 
 ```bash
 bash legacy/scripts/observability/verify-ledger-chain.sh
 # Expect: ledger chain verified, N entries
 ```
 
-This is what makes evolve-loop "tamper-evident" — modifying any past entry invalidates every subsequent `prev_hash`.
+This makes evolve-loop "tamper-evident": a change to any past entry invalidates every later `prev_hash`.
 
 ---
 
@@ -333,11 +337,11 @@ Run another cycle:
 bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3
 ```
 
-Note: no goal argument. The orchestrator picks from `state.json:carryoverTodos[]` (if cycle 1 left any) and from `state.json:instinctSummary[]` (lessons learned so far).
+Note: there is no goal argument. The orchestrator selects from `state.json:carryoverTodos[]` (if cycle 1 left any) and from `state.json:instinctSummary[]` (the lessons learned until now).
 
-This is the self-evolving property in action: cycle 2's Scout reads cycle 1's lessons. If cycle 1 audit FAIL'd, cycle 2 has a `retrospective-report.md` lesson YAML to consult.
+This is the self-evolving property in action: the Scout of cycle 2 reads the lessons of cycle 1. If the cycle 1 audit FAIL'd, cycle 2 has a `retrospective-report.md` lesson YAML to consult.
 
-For deeper understanding of cross-cycle learning, see [self-evolution.md](../concepts/self-evolution.md).
+For more about cross-cycle learning, see [self-evolution.md](../concepts/self-evolution.md).
 
 ---
 
@@ -345,29 +349,29 @@ For deeper understanding of cross-cycle learning, see [self-evolution.md](../con
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `ship-gate DENY` on a manual git command | Hook is enforcing — direct git commit forbidden | Use `bash legacy/scripts/lifecycle/ship.sh --class manual "<msg>"` |
-| `claude binary not found` | Claude Code CLI not in PATH | `which claude` to verify; install per claude.com/code |
-| `sandbox-exec: Operation not permitted` | Nested-Claude environment (running `/evo:loop` from inside Claude Code) | Auto-detected; check `.evolve/environment.json:auto_config.inner_sandbox=false` is set |
-| `INTEGRITY-FAIL: expected_ship_sha mismatch` | Out-of-date pin after a ship.sh update | Delete `.evolve/state.json:expected_ship_sha` and re-run; v8.32+ auto-rotates |
-| Cycle stuck in `calibrate` for >2 min | Orchestrator subprocess slow to start | Check `pgrep -fl claude` to confirm subprocess running; wait or kill + retry |
-| `state.json:lastCycleNumber` not advancing | Worktree-state-not-syncing (B7) | Fixed in v10.7.0+; if older, run `jq '.lastCycleNumber += 1 \| .' state.json > tmp && mv tmp state.json` |
-| Audit FAIL but you think the code is correct | EGPS predicates are stricter than prose verdicts; read `audit-report.md` for cited `path:line` evidence | Trust the predicates; adjust the code or refine the predicate definition |
-| Memo phase API 529 | Anthropic rate-limit during memo | Classified as `infrastructure` (recoverable); next run retries |
-| `role-gate DENY: phase=retrospective ...` | Stuck cycle-state from prior failed run | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
-| `BATCH-BUDGET CRITICAL: cumulative ... >= 95%` | About to exhaust cost cap | Either: increase `--budget-usd`, OR let next cycle checkpoint via v9.1.0 mechanism |
+| `ship-gate DENY` on a manual git command | The hook enforces its rule: a direct git commit is forbidden | Use `bash legacy/scripts/lifecycle/ship.sh --class manual "<msg>"` |
+| `claude binary not found` | The Claude Code CLI is not in the PATH | Run `which claude` to verify. Install it as claude.com/code tells |
+| `sandbox-exec: Operation not permitted` | Nested-Claude environment (you run `/evo:loop` from inside Claude Code) | Auto-detected. Check that `.evolve/environment.json:auto_config.inner_sandbox=false` is set |
+| `INTEGRITY-FAIL: expected_ship_sha mismatch` | Out-of-date pin after a ship.sh update | Delete `.evolve/state.json:expected_ship_sha` and run again. v8.32+ auto-rotates it |
+| Cycle stuck in `calibrate` for >2 min | The orchestrator subprocess is slow to start | Run `pgrep -fl claude` to confirm that the subprocess runs. Wait, or kill it and try again |
+| `state.json:lastCycleNumber` does not advance | Worktree-state-not-syncing (B7) | Fixed in v10.7.0+. On an older version, run `jq '.lastCycleNumber += 1 \| .' state.json > tmp && mv tmp state.json` |
+| Audit FAIL, but you think that the code is correct | EGPS predicates are stricter than prose verdicts. Read `audit-report.md` for the cited `path:line` evidence | Trust the predicates. Adjust the code, or refine the predicate definition |
+| Memo phase API 529 | Anthropic rate limit during memo | Classified as `infrastructure` (recoverable). The next run tries again |
+| `role-gate DENY: phase=retrospective ...` | A stuck cycle-state from an earlier failed run | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
+| `BATCH-BUDGET CRITICAL: cumulative ... >= 95%` | The cost cap is almost exhausted | Increase `--budget-usd`, OR let the next cycle checkpoint with the v9.1.0 mechanism |
 
 ---
 
 ## Reading the Failure Mode (If Cycle FAIL'd)
 
-If your first cycle returned audit FAIL:
+If your first cycle returned an audit FAIL:
 
-1. **It's normal.** The cycle 61 incident (preserved in `docs/incidents/cycle-61.md`) is a worked example — 7 bugs caught by the framework's own audit.
-2. **Read the lesson YAML.** `.evolve/instincts/lessons/cycle-N-*.yaml` shows what the retrospective learned. The next cycle's Scout will see these.
-3. **Re-run.** Cycle N+1 will read the lesson and (likely) succeed at the same task with a different approach.
-4. **If it FAILs the same way twice**, that's a real signal — read [error-recovery.md](../concepts/error-recovery.md) and consider whether the goal needs decomposition.
+1. **It is normal.** The cycle 61 incident (kept in `docs/incidents/cycle-61.md`) is a worked example: the audit of the framework caught 7 bugs.
+2. **Read the lesson YAML.** `.evolve/instincts/lessons/cycle-N-*.yaml` shows what the retrospective learned. The Scout of the next cycle will see these lessons.
+3. **Run again.** Cycle N+1 will read the lesson. It will (likely) succeed at the same task with a different approach.
+4. **If it FAILs the same way two times**, that is a real signal. Read [error-recovery.md](../concepts/error-recovery.md). Then decide if the goal needs decomposition.
 
-The framework's value proposition is **not "every cycle succeeds"** — it's **"failures produce durable lessons that improve future cycles."**
+The value proposition of the framework is **not "every cycle succeeds"**. It is **"failures produce durable lessons that improve future cycles."**
 
 Welcome to the loop.
 
@@ -377,5 +381,5 @@ Welcome to the loop.
 
 - [Why evolve-loop is self-evolving](../concepts/self-evolution.md) — the mechanism of cross-cycle learning
 - [How LLMs are prevented from gaming the verdict](../concepts/trust-architecture.md) — the 3-tier enforcement
-- [Per-phase mechanics deep-dive](../architecture/phase-architecture.md) — what each phase does in detail
+- [Per-phase mechanics deep-dive](../architecture/phase-architecture.md) — what each phase does, in detail
 - [Comparison with /goal and other long-running skills](../comparisons/long-running-claude-skills.md) — when to use what

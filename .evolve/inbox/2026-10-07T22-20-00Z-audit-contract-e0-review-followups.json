@@ -1,0 +1,24 @@
+{
+  "id": "audit-contract-e0-review-followups",
+  "title": "Audit evaluation contract: apply the E0 verify check's filed findings before E1",
+  "kind": "docs",
+  "priority_class": "correctness",
+  "weight": 0.4,
+  "route": "console",
+  "routed_reason": "design-doc corrections that E1-E6 (code-review landing 2) build on; the console writes landing 2",
+  "source": "console, 2026-10-07 E0 docs landing (verify-only check, round 2 under ADR-0126: MERGE, 0 blocking, 16 MEDIUM/LOW filed; 5 mechanical ones fixed at landing)",
+  "created_at": "2026-10-07T22:20:00Z",
+  "summary": "The verify-only check of the ADR-0125 docs confirmed all 38 earlier findings fixed and filed 16 non-blocking findings. Fixed at landing: V4 (ADR-0124 amended by ADR-0126), V10 (table pipe), V12 (section citation), V15 (research-index components), V16 (rollout status). Eleven remain for the design before E1 is built.",
+  "fix": "In docs/architecture/audit-evaluation-contract.md, the plan and the dossier: V1 the instrument fence re-snapshots after every tdd dispatch, including audit-repair re-entries, and the set is the handoff testFiles plus go/acs/cycle<N>/** and the eval file; V2 the degrade rule applies only before the ship floor, and the phase spec gains its skip-signal field; V3 audit finding fields add Kind and Blocking (ADR-0126) and rename the certificate placeholder to <certificate-kind>; V5 a certificate form may combine two kinds, and G-COMMENT's form is resolved by stage before check 6; V6 the expectations Dimensions line carries a depth, or the depth clause becomes a persona rule; V7 an E-D10 row records the removal of G-REVIEW and the addition of G-ACCEPT.<task>.eval; V8 dossier line 102 names the verifier set kernel, audit or both, and the E-D9 stage rule; V9 design section 10 states the interplay with ADR-0126 (criterion section feeds rung 2(a)'s distilled brief; post-re-entry review is verify-only); V11 cite the qualityindex parsers for the CRLF and bold tolerances; V13 G-ACS, G-EVAL, G-ACCEPT and G-DISPO index RL section 6.2's qualification conditions, one flip and one signal per defect; V14 a Criterion finding counts for its section 2.1 dimension, and the cap applies to the audit's Scores only. Also: review-loop-and-quality-index.md never mentions ADR-0126.",
+  "acceptance": [
+    "Each of V1-V3, V5-V9, V11, V13 and V14 is resolved in the design, plan or dossier with a file:line in the landing notes",
+    "review-loop-and-quality-index.md links ADR-0126 where its loop calls the convergence policy",
+    "Every relative link in the touched docs resolves"
+  ],
+  "files": [
+    "docs/architecture/audit-evaluation-contract.md",
+    "docs/plans/audit-evaluation-contract-2026-10.md",
+    "docs/research/audit-evaluation-contract-prior-art-2026-10.md",
+    "docs/architecture/review-loop-and-quality-index.md"
+  ]
+}

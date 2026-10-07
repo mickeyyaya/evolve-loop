@@ -1,0 +1,20 @@
+{
+  "id": "ship-stage-hygiene-check-stub-warns-every-cycle",
+  "title": "The ship-stage-hygiene-check stub warns on every cycle plan",
+  "kind": "pipeline-repair",
+  "priority_class": "hygiene",
+  "weight": 0.2,
+  "source": "console, 2026-10-07 wave 77 boundary log (38 WARN lines across 15 lanes since the stub landed in #404)",
+  "created_at": "2026-10-07T22:10:00Z",
+  "summary": "The phase .evolve/phases/ship-stage-hygiene-check/phase.json is a reserved config stub from cycle 1262 (#404) with SELECT metadata but no persona. Every cycle's plan step logs 'optional phase ship-stage-hygiene-check persona doc missing ... excluded from the selectable set this cycle', so the warning is permanent noise that hides real persona gaps.",
+  "fix": "Decide the stub's fate in one place: either give it a persona and gates (pre-ship manifest reconciliation, its reserved intent) or remove the stub and its inventory row. If reserved stubs must stay, mark them reserved in the phase config so the planner skips them silently and a real missing persona still warns.",
+  "acceptance": [
+    "A cycle plan on main logs no persona-missing warning for ship-stage-hygiene-check",
+    "A phase whose persona is genuinely missing still warns (a regression test with a fixture phase)",
+    "TestPhaseCatalog_OptionalPhasesHaveSelectMetadata stays green"
+  ],
+  "files": [
+    ".evolve/phases/ship-stage-hygiene-check/phase.json",
+    ".evolve/phase-inventory.json"
+  ]
+}

@@ -2,6 +2,118 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a FAIL that only audit gates forced gets a Build repair round, and a static gate reading cannot halt the loop on the prose of a retro (cycle 1828, wave 76, ADR-0093, ADR-0072, 2026-10-07)
+
+- **What occurred.** In cycle 1828, the auditor wrote PASS (0.88; ACS 170 green, 0 red). The in-process skills-drift gate then forced FAIL:
+  - The gate wrote ``skill projection drift: 30 artifact(s) stale … Run `evolve skills generate` ``.
+  - The conflict record said `verdict-conflict: auditor narrative=PASS but 1 deterministic gate(s) forced FAIL [skills-drift]`.
+  - The envelope declined: "audit declared no failure class; nothing to base a retry on" (`ORCHESTRATOR_AUDIT_REPAIR_DECLINED`, 12:20:05Z).
+  - The retrospective wrote the category `infra-systemic` in `failure-decision.json`. `applyFailureDecisionFloor` halted the loop (`LOOP_SYSTEM_FAILURE_HALT`, 12:23:51Z).
+- **The root cause.**
+  - `auditFailEnvelope` read the class only from the verdict sentinel of the auditor. A PASS narrative never has that sentinel.
+  - The gates that override the verdict wrote diagnostics (`CycleState.AuditFailReasons`), but no class.
+  - Only a bookkeeping conflict had a route (the regrade).
+  - The only floor overrule of a prose claim covered `verdict-incoherence`.
+- **What changed:**
+  - **One table** (`auditGateRemedies` in `go/internal/core/audit_gate_remedy.go`).
+    - It has one row for each gate: gofmt, solution-contract, skills-drift, go vet, acs-durable, the integration tier, apicover-enforce, new-package graduation and EGPS `red_count>0`.
+    - Each row gives the stable prefix of the diagnostic, a one-step remedy and `isStaticReading`. `isStaticReading` is true for gofmt, solution-contract, skills-drift and graduation: these gates read the tree and do not run it.
+    - Every derived block declares `code-audit-fail`.
+    - The table is in `core` because the floor reads it too, and `core` cannot import `phases/audit`.
+    - The skills-drift remedy names the generator of the worktree: `EVOLVE_WORKTREE_ROOT=<worktree> go run ./cmd/evolve skills generate` in `<worktree>/go`. An installed binary renders the templates of the base, so it can revert a generator change.
+  - **The derived block** (`gateFailureBlock`).
+    - It applies only when deterministic gates forced the FAIL over a PASS or WARN narrative (a verdict-conflict record exists), and only when every other audit fail reason is the diagnosis of a gate in the table.
+    - Then the failure block is `code-audit-fail`, with one defect for each diagnosis, in the form `<remedy> — <diagnosis>`.
+    - A FAIL narrative beside a gate diagnosis derives nothing.
+    - An EGPS reason with the harness-red clause (`HarnessRedClauseMarker`) is not a gate diagnosis.
+    - A block that the auditor declares still wins, in the envelope and in the brief.
+  - **The envelope.** A grant derived from a gate is narrowed to `retry@build` or `decline` (`gateRemediationEnvelope`, through `narrowRetryEnvelope`). The explanation-correction route now uses the same `narrowRetryEnvelope`. The budget of `code-audit-fail` limits the grant.
+  - **The brief** (`auditRejectionReasons`). When the report declares no block, the brief shows the gate block first, so the remedy comes first.
+  - **The floor** (`floorClaimRefutation`).
+    - The verdict-incoherence overrule becomes one rule of evidence.
+    - A prose floor claim is also refuted when only static gate readings forced the FAIL over a PASS or WARN narrative, and no ship fail reason exists (`staticGateReadingsForcedTheFail`).
+    - A gate that runs code (go vet, acs-durable, the integration tier, apicover-enforce, EGPS) keeps the halt, because a host failure can cause its offenders.
+    - A CLI wall, a host failure, a ship reason and a reason outside the table also keep the halt.
+  - **The producers.**
+    - The new-package graduation diagnostic gets a stable prefix: `apicover new-package graduation: `.
+    - The four diagnostics that state a remedy render it from the table (`core.AuditGateRemedy`).
+    - The harness-red clause renders `core.HarnessRedClauseMarker`.
+  - **gofmt host failures are not offenders.**
+    - `codequality.UnformattedGoFiles` returns an error, and the gofmt gate warns and skips, unless every stderr line is a parse diagnostic with a position.
+    - An unreadable file or a gofmt that stops with no diagnostic is no longer a `gofmt parse error:` offender. Thus gofmt can count as a static reading.
+    - **Changed at the landing (review round 2, finding F1):** when gofmt also lists unformatted files, it returns those files as offenders. An I/O error on one file no longer hides an unformatted file beside it.
+    - **Changed at the landing (finding F2):** a parse diagnostic with no column (after a `//line` directive) is an offender, not a host failure.
+  - **The integration tier does not change.** A serialized retake that cannot start still FAILs on the offenders of attempt 1, because retake trouble never launders a real red. That FAIL gets the bounded repair round. The tier runs code, so it never refutes the halt.
+  - Failure learning, the bookkeeping regrade and `ReadFailureBlock` do not change. A FAIL that can get the regrade is never gate-only, so no FAIL takes both routes.
+- **The bound.** `code-audit-fail` allows 2 retries. Identical gate FAILs get two Build rounds, and the third declines with `retry budget spent for code-audit-fail (2/2)`. With a budget of 1, one round occurs and then a decline. Tests pin both cases. When the convergence policy is live, ADR-0126 §10 (plan V10/V11) stops a cycle at one fingerprint behind two backward edges. Until then, the budget stays 2.
+- **Not fixed here: the RED of 1828 came from version skew.** The in-process gate renders `commands/*.md` with the generator in the orchestrator binary. Cycle 1828 changed that generator, so its repair round cannot succeed. The waste is bounded, and the result is a task-level FAIL, not a halt. The cure is the retro carryover `skills-drift-gate-grades-with-worktree-generator`.
+- **Tests, red first:**
+  - **In `core/audit_gate_remedy_test.go`, red on base:** `TestAuditGateFail_SkillsDriftOverPassNarrativeGrantsOneBuildRepairLedByItsRemediation` (red with the live decline text), `TestAuditGateFail_IdenticalGateFailsAreBoundedByTheEnvelopeBudget`, `TestResumePath_GateForcedAuditFailRepairsAtBuildWithinTheBudget`, `TestAuditGateFail_ProseInfraSystemicRetroDoesNotHaltAGateDiagnosedFail`, `TestDecideAfterRetroFloor_StaticGateDiagnosisRefutesProseInfraSystemic`, `TestAuditGateRemedies_EveryGateDeclaresARepairableClassAndARemediation` and `TestGateFailureBlock_DerivesTheClassOnlyWhenGatesAloneForcedTheFail`.
+  - **Review fix round 1, red on the round-0 lane:** `TestDecideAfterRetroFloor_AGateThatExecutesCodeKeepsTheHalt`, `TestAuditGateFail_AHarnessRedEGPSEarnsNoRepairAndKeepsTheHalt`, `TestAuditGateFail_AFailNarrativeBesideAGateDiagnosisDerivesNothingAndKeepsTheFloor`, `TestAuditRejectionReasons_AnAuditorDeclaredBlockKeepsTheDerivedGateBlockOut`, `TestAuditGateFail_TheDerivedRouteIsRetryAtBuild` (it kills the surviving mutant N8) and `TestAuditGateFail_AnIntegrationTierRedKeepsItsRepairAndTheProseInfraSystemicHalt` (probe P5, end to end).
+  - **Preservation:** `TestDecideAfterRetroFloor_ProseInfraSystemicWithAnyNonGateReasonStillHalts`, `TestAuditGateFail_BookkeepingConflictStillTakesTheRegrade`, `TestAuditGateFail_GateBesideBookkeepingEarnsNeitherRoute` and `TestAuditFailEnvelope_AnAuditorDeclaredClassKeepsItsFullEnvelope`.
+  - **In `phases/audit/audit_gate_remedy_binding_test.go`:**
+    - `TestAuditGateRemedies_ClassifyEveryGateProducer` walks every `hooks` check seam by reflection, and EGPS (red: 9 of 9 not classified);
+    - `TestAuditGateRemedies_HostAndBookkeepingFailuresAreNoGateDiagnosis` (now with EGPS reds that the harness could not run);
+    - `TestAuditGateRemedies_ProducersRenderTheTableRemedy`.
+  - **In `codequality/gofmt_test.go`:** `TestUnformattedGoFiles_AnUnreadableFileIsAnErrorNotAnOffender` and `TestUnformattedGoFiles_AGofmtThatDiesSilentlyIsAnErrorNotAnOffender`. At the landing, red first: `TestUnformattedGoFiles_AnUnreadableFileDoesNotHideAnUnformattedSibling` and `TestUnformattedGoFiles_AColumnlessParseDiagnosticIsAnOffender`.
+  - **Mutants:** the review mutant N8 is killed. C0, N14 and N17 stay killed. Twelve more mutants of the round hunks are killed.
+- **Review.**
+  - Round 1, a full architecture review: FIX_THEN_MERGE (3 HIGH, 3 MEDIUM, 3 LOW).
+  - Round 2, a verify-only check: MERGE. All findings were fixed. F1 and F2 were fixed at the landing. F3 and F4 (old wording in a comment and in test fixtures) are cosmetic.
+- **Docs.**
+  - [The incident](docs/incidents/2026-10-07-cycle-1828-gate-forced-fail-earned-no-repair-and-halted.md), with the halt.
+  - The ADR-0093 update and the ADR-0072 extension.
+  - The `internal-core` and `internal-phases-audit` package notes.
+  - runtime-reference (the audit-FAIL retry row).
+  - `signal-codes.md`, generated again: the `declared_class` of `ORCHESTRATOR_AUDIT_REPAIR_DECLINED` can now come from a gate.
+  - REGRESSION-COVERAGE-INDEX: three rows, all ✅. The summary now reads 54 incidents, 84 rows, 69 covered, 10 partial and 5 none.
+  - The inbox item `gate-forced-audit-fail-declares-a-repairable-class` is consumed.
+## Added — one convergence policy decides the next step of every loop that repeats (ADR-0126 V1–V3, 2026-10-07)
+
+- **The operator's request (2026-10-07).** "Prioritize a convergence rule/solution using L2 with 7 rounds as the example issue that should converge earlier by escalating to top / deep model or other approaches". Also: "It just retry for too many times". Also: "Convergence rule should also apply to evo loop cycle pipeline to avoid infinite back and forth endless loop".
+- **The design.** [convergence-policy.md](docs/architecture/convergence-policy.md) and [ADR-0126](docs/architecture/adr/0126-every-iterative-loop-converges-or-escalates.md).
+- **The new package `internal/convergence`:**
+  - `Decide(Input) Decision` is pure and deterministic. It has one row of rules for each loop: code-review, console-lane, audit-repair, explanation, cycle, inbox-item and ship-recovery.
+  - **The ladder:**
+    - Rung 1 changes the feedback. From J_1, the judge only verifies. The fixer and the judge get one raise in their own family, when headroom exists.
+    - Rung 2 changes the strategy. The fixer gets a fresh context. A loop that can defer raises its bar to HIGH, and it defers and files MEDIUM and LOW findings.
+    - Rung 3 changes the scope: split, accept with limits, or stop. A fourth round never occurs.
+  - **The triggers:** a round that gains too little (its damage is equal to or more than its repairs, or it makes no progress at the bar), oscillation, and concentration in one component.
+  - **Keep-best:** the round with the fewest strict findings at the bar lands. A tie goes to the lowest open mass, and then to the earliest round.
+  - **Headroom** comes from the tier table in the family's manifest and from the judge's actual model and effort. The policy never assumes headroom.
+- **Safety rules:**
+  - A CRITICAL finding is never deferred, exempted, filed or landed.
+  - Split and accept refuse an open CRITICAL in the judged round and in the landed round.
+  - Audit-repair, cycle, inbox-item and ship-recovery never defer.
+  - The cycle loop keeps its base bar.
+  - A late CRITICAL or HIGH finding blocks, unless its falsification check says `refuted`. When the result is absent, the finding blocks.
+- **The new verb `evolve convergence decide --input <rounds.json> [--json]`.** The console lanes use it. It accepts the `console-lane` loop only; for other loops, it exits 10 and names the caller in the process. Bad input exits 10, an unreadable policy exits 2, and a write failure exits 1. The input schema is in [runtime-reference](docs/operations/runtime-reference.md).
+- **The new config `workflow.convergence`** in `.evolve/policy.json`. It has compiled defaults and a strict key decode, and its `stage` is `shadow`. `policy.ConvergenceConfig.Validate` is the one home for the bar words and the ranges. No loop calls `Decide` yet. V5, V6 and V10–V12 connect it.
+- **The L2 example, replayed** (`go/internal/convergence/testdata/l2-rounds.json`, a reconstruction of the four round tables):
+  - The policy lands round 3 through rung 2. L2 itself used seven fix rounds.
+  - It defers r7-MEDIUM-1 and r7-LOW-1 to r7-LOW-4. It files r7-INFO. It names the redesign `bridge:model-check`.
+  - The concentration share is 0.647, against 0.636 before.
+- **The review, under the policy itself:**
+  - **Round 1, a full architecture and Go review: FIX_THEN_MERGE.**
+    - One CRITICAL: accept with limits, together with keep-best, could defer an open CRITICAL from an earlier round.
+    - Four HIGH findings: a tie landed an unfixed round; an absent certificate meant "refuted"; the HIGH bar of the cycle dropped open MEDIUM findings; and 7 mutants survived.
+    - Also 8 MEDIUM and 7 LOW findings. The lane fixed all of them, except one capability finding, which went to the inbox.
+  - **Round 2, a verify-only check: MERGE.** All 20 findings were fixed, and none blocked. At the landing, the console added the reviewer's rank test, `TestKeepBest_FewerStrictFindingsOutrankALighterResidue`. It kills a mutant that ranks mass first, which no other test killed. The other filed items went to the inbox.
+- **Tests, red first:**
+  - More than 92 tests in `convergence`, `policy` and the verb.
+  - The lane's 36 mutants and the reviewer's 23 mutants are all killed.
+  - A sweep of 20,000 inputs found no deferred CRITICAL and no landed CRITICAL.
+  - Fifty identical runs gave identical output.
+- **Inbox:**
+  - `convergence-disputed-critical-names-its-adjudicator` (L3, a capability);
+  - `convergence-v1-review-followups`: a property test in the suite for the rule "never land a CRITICAL", and one wording for the single judge raise;
+  - `routing-logs-name-the-cli-that-runs`: in wave 77, the runner logged `cli=agy-tmux` for deep builders. The tier ceiling ran them on `claude-tmux`. Also, the bench times show no date.
+- **Docs:**
+  - [the design](docs/architecture/convergence-policy.md): the pointer to the §2.1 schema, the keep-best order in §3, the falsification rule in §4 and the cycle bar in §6.1;
+  - [ADR-0126](docs/architecture/adr/0126-every-iterative-loop-converges-or-escalates.md);
+  - [the plan](docs/plans/convergence-policy-2026-10.md): V1–V3 landed;
+  - `internal-convergence.md`, `internal-policy.md`, `cmd-evolve.md`, `policy-config.md` and runtime-reference.
+
 ## Changed — the operator's CLI routing table is live: agy first on Gemini 3.8 Flash High, Claude through agy before Claude Code at deep and top (and agy-claude verifies the model it booted), and every launch path honours it (cli-routing L2, 2026-10-07)
 
 - **What the operator asked.** "Leverage more on the gemini 3.8 flash high model for non-deep and non-top agent phases" (2026-10-06, restating the 2026-10-05 table). Before this, `.evolve/policy.json` had no `cli_routing` block: 57 balanced profiles named `codex-tmux` primary, codex has no subscription, so each of those dispatches booted codex, hit the wall and fell to Claude Code; the ten fast-tier profiles ran agy at `Gemini 3.8 Flash (Low)`.

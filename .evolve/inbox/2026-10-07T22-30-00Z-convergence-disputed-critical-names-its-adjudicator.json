@@ -1,0 +1,23 @@
+{
+  "id": "convergence-disputed-critical-names-its-adjudicator",
+  "title": "A convergence decision that lands beside a DISPUTED CRITICAL names the adjudicator in its reasons",
+  "kind": "feature",
+  "priority_class": "correctness",
+  "weight": 0.4,
+  "route": "console",
+  "source": "console, 2026-10-07 convergence V1-V3 review (finding L3, filed by the console's fix-round decision, not fixed in the lane)",
+  "created_at": "2026-10-07T22:30:00Z",
+  "summary": "ADR-0126 design rule 4.5 sends a dispute to an adjudicator (the audit for code-review, the operator for a console lane) and never to another round, so convergence.Decide treats a DISPUTED finding as non-blocking. A console-lane input whose only finding is a CRITICAL with status DISPUTED therefore returns Land at rung 0 with the single reason CONVERGENCE_RUNG: nothing in the decision tells the console that a CRITICAL is waiting on the operator's ruling (the review's probe 10). The decision is correct by the rule; what is missing is the evidence line, so a console following the verb can land past a disputed CRITICAL without seeing it.",
+  "fix": "Add a reason (for example CONVERGENCE_DISPUTED loop=, count=, critical=, adjudicator=audit|operator) whenever the decided round holds DISPUTED findings, emitted in the fixed reason order after CONVERGENCE_CONCENTRATION; register it with the other convergence codes in V8. Decide whether a console-lane land beside a DISPUTED CRITICAL should instead wait for the operator's ruling (a design question for the console, ADR-0126 decision 6).",
+  "acceptance": [
+    "RED first: a console-lane input whose round holds a DISPUTED CRITICAL returns a decision whose reasons name the disputed finding and its adjudicator",
+    "A round with no DISPUTED finding gains no new reason line, and the pinned reason order (TestReasons_FollowTheRungInAFixedOrder) is extended, not reordered",
+    "The design doc (convergence-policy.md section 9) and runtime-reference list the new code"
+  ],
+  "files": [
+    "go/internal/convergence/reasons.go",
+    "go/internal/convergence/decide.go",
+    "docs/architecture/convergence-policy.md",
+    "docs/operations/runtime-reference.md"
+  ]
+}
