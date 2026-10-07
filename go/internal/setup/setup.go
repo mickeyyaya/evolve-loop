@@ -86,12 +86,13 @@ type PhaseStatus struct {
 }
 
 type DetectReport struct {
-	ScannedAt        string        `json:"scanned_at"`
-	CLIs             []CLIStatus   `json:"clis"`
-	Phases           []PhaseStatus `json:"phases"`
-	SetupCompletedAt string        `json:"setup_completed_at,omitempty"`
-	SetupVersion     int           `json:"setup_version,omitempty"`
-	PolicyError      string        `json:"policy_error,omitempty"`
+	ScannedAt            string        `json:"scanned_at"`
+	CLIs                 []CLIStatus   `json:"clis"`
+	Phases               []PhaseStatus `json:"phases"`
+	SetupCompletedAt     string        `json:"setup_completed_at,omitempty"`
+	SetupVersion         int           `json:"setup_version,omitempty"`
+	PolicyError          string        `json:"policy_error,omitempty"`
+	RoutingTableDeclared bool          `json:"routing_table_declared,omitempty"`
 }
 
 type DetectOptions struct {
@@ -129,10 +130,11 @@ func Detect(ctx context.Context, o DetectOptions) DetectReport {
 
 	clis := detectCLIs(doctorFn(ctx), capFn, env)
 
-	pol, polErr := policy.Load(filepath.Join(o.EvolveDir, "policy.json"))
+	policyPath := filepath.Join(o.EvolveDir, "policy.json")
+	pol, polErr := policy.Load(policyPath)
 	phases := detectPhases(o, env, pol, polErr)
 
-	dr := DetectReport{ScannedAt: now().UTC().Format(time.RFC3339), CLIs: clis, Phases: phases}
+	dr := DetectReport{ScannedAt: now().UTC().Format(time.RFC3339), CLIs: clis, Phases: phases, RoutingTableDeclared: policyFileDeclaresRoutingTable(policyPath)}
 	if polErr != nil {
 		dr.PolicyError = polErr.Error()
 	}
@@ -348,4 +350,9 @@ func Complete(o CompleteOptions) (string, error) {
 		return "", fmt.Errorf("setup complete: atomic rename: %w", err)
 	}
 	return stamp, nil
+}
+
+func policyFileDeclaresRoutingTable(path string) bool {
+	raw, err := os.ReadFile(path)
+	return err == nil && declaresRoutingTable(raw)
 }

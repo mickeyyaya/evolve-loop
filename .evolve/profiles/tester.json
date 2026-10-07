@@ -108,9 +108,12 @@
     "max": "deep"
   },
   "allowed_clis": [
-    "claude"
+    "agy",
+    "agy-claude",
+    "claude",
+    "codex"
   ],
-  "_note": "Restricted to claude \u2014 same safety reasoning as builder.",
+  "_note": "Mirrors the builder's ceiling, for the builder's safety reasoning.",
   "stream_output": true,
   "generated_from": "hand-authored",
   "cli_fallback": [

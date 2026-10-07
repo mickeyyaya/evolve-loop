@@ -3,6 +3,8 @@ package setup
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -199,5 +201,82 @@ func TestApply_CrossFamilyPinsLegal(t *testing.T) {
 	pins := parsePins(t, out)
 	if pins["builder"].CLI == pins["auditor"].CLI {
 		t.Errorf("builder/auditor should be cross-family, both %q", pins["builder"].CLI)
+	}
+}
+
+func TestApply_ADeclaredTableRefusesEveryPreset(t *testing.T) {
+	rep, loader := applyFixture(t)
+	rep.RoutingTableDeclared = true
+	existing := []byte(`{"cli_routing": {"clis": ["agy", "claude"], "default": ["agy", "claude"]}}`)
+
+	out, err := Apply(rep, builtinPresets, "recommended", existing, loader)
+
+	if out != nil || !errors.Is(err, ErrRoutingTableDeclared) || !strings.Contains(err.Error(), "cli-routing set agents.<role>") {
+		t.Fatalf("out=%s err=%v: a declared table owns every route, so a preset is refused with the pointer to the table's own writer", out, err)
+	}
+}
+
+func TestApply_ATablePolicyThatFailsToLoadIsStillRefused(t *testing.T) {
+	project, evolveDir := fixtureRepo(t)
+	existing := []byte(`{"cli_routing": {"clis": ["claude"], "default": ["claude"]}, "fleet": {"count": "three"}}`)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), existing, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep := Detect(context.Background(), DetectOptions{ProjectRoot: project, EvolveDir: evolveDir, Env: func(string) string { return "" }, Doctor: fakeDoctor, CapTier: func(string) string { return "full" }})
+
+	out, err := Apply(rep, builtinPresets, "recommended", existing, profiles.NewFromDir(filepath.Join(evolveDir, "profiles")))
+
+	if rep.PolicyError == "" || !rep.RoutingTableDeclared {
+		t.Errorf("policy_error %q, routing_table_declared %v: detect reads the cli_routing key from the raw file even when the policy does not load", rep.PolicyError, rep.RoutingTableDeclared)
+	}
+	if out != nil || !errors.Is(err, ErrRoutingTableDeclared) {
+		t.Fatalf("out=%s err=%v: apply never writes pins beside a cli_routing key, whatever else in the file fails to load", out, err)
+	}
+}
+
+func TestApply_TheFileItPatchesDecidesTheRefusalNotTheReport(t *testing.T) {
+	for _, key := range []string{"cli_routing", "CLI_Routing"} {
+		t.Run(key, func(t *testing.T) {
+			rep, loader := applyFixture(t)
+			rep.RoutingTableDeclared = false
+			existing := []byte(`{"` + key + `": {"clis": ["claude"], "default": ["claude"]}}`)
+			if p, err := policy.Parse(existing); err != nil || p.CLIRouting == nil {
+				t.Fatalf("policy.Parse(%s) = (%+v, %v): the policy loader reads this key as a live routing table", existing, p, err)
+			}
+
+			out, err := Apply(rep, builtinPresets, "recommended", existing, loader)
+
+			if out != nil || !errors.Is(err, ErrRoutingTableDeclared) {
+				t.Fatalf("out=%s err=%v: a %s key the policy loader reads as the routing table refuses the preset", out, err, key)
+			}
+		})
+	}
+}
+
+func TestDetect_ReportsWhetherTheRoutingTableIsDeclared(t *testing.T) {
+	for name, tc := range map[string]struct {
+		policy string
+		want   bool
+	}{
+		"a declared table":            {`{"cli_routing": {"clis": ["claude"], "default": ["claude"]}}`, true},
+		"a table key in another case": {`{"Cli_Routing": {"clis": ["claude"], "default": ["claude"]}}`, true},
+		"pins only":                   {`{"pins": {"builder": {"cli": "claude-tmux"}}}`, false},
+		"a malformed policy":          {`{"cli_routing": `, false},
+		"no policy file":              {"", false},
+	} {
+		project, evolveDir := fixtureRepo(t)
+		policyPath := filepath.Join(evolveDir, "policy.json")
+		if err := os.Remove(policyPath); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		if tc.policy != "" {
+			if err := os.WriteFile(policyPath, []byte(tc.policy), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		rep := Detect(context.Background(), DetectOptions{ProjectRoot: project, EvolveDir: evolveDir, Env: func(string) string { return "" }, Doctor: fakeDoctor, CapTier: func(string) string { return "full" }})
+		if rep.RoutingTableDeclared != tc.want {
+			t.Errorf("%s: RoutingTableDeclared = %v, want %v", name, rep.RoutingTableDeclared, tc.want)
+		}
 	}
 }

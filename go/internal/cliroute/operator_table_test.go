@@ -20,7 +20,7 @@ type operatorFixture struct {
 func newOperatorFixture(t *testing.T) operatorFixture {
 	t.Helper()
 	profileDir, agents := cliroutetest.TrackedProfiles(t)
-	profs := widenedBuilder{profiles.NewFromDir(profileDir)}
+	profs := profiles.NewFromDir(profileDir)
 	table := mustCompile(t, operatorTable(), realCatalog(t), profs)
 	return operatorFixture{router: mustRouter(t, table, cliroute.Host{LookPath: everyBinary()}), agents: agents, profs: profs}
 }
@@ -38,17 +38,11 @@ func (f operatorFixture) requests(agent string) []cliroute.Request {
 
 func TestCompile_TheOperatorTableCompilesWithOnlyAcceptedWarnings(t *testing.T) {
 	profileDir, _ := cliroutetest.TrackedProfiles(t)
-	_, findings := cliroute.Compile(operatorTable(), realCatalog(t), widenedBuilder{profiles.NewFromDir(profileDir)})
+	_, findings := cliroute.Compile(operatorTable(), realCatalog(t), profiles.NewFromDir(profileDir))
 	if errs := errorFindings(findings); len(errs) > 0 {
-		t.Fatalf("the operator's table with the widened builder must compile: %+v", errs)
+		t.Fatalf("the operator's table must compile against the tracked profiles: %+v", errs)
 	}
 	requireFinding(t, findings, "cross_family_with.auditor+builder", cliroute.SeverityWarn, "claude")
-}
-
-func TestCompile_TheOperatorTableCollapsesTheBuilderOntoTheAuditorWithoutTheL2BuilderEdit(t *testing.T) {
-	profileDir, _ := cliroutetest.TrackedProfiles(t)
-	_, findings := cliroute.Compile(operatorTable(), realCatalog(t), profiles.NewFromDir(profileDir))
-	requireFinding(t, findings, "cross_family_with.auditor+builder", cliroute.SeverityError, "claude")
 }
 
 func TestResolve_TheOperatorTableRoutesNoLaunchToCodex(t *testing.T) {
@@ -101,7 +95,7 @@ func TestResolve_DeepAndTopNeverRunOnAgy(t *testing.T) {
 	}
 }
 
-func TestResolve_BuilderBalancedOnAgyEscalatesToClaudeAtDeep(t *testing.T) {
+func TestResolve_BuilderBalancedOnAgyEscalatesToAgyOwnedClaudeAtDeep(t *testing.T) {
 	f := newOperatorFixture(t)
 	builder, err := f.profs.Get("builder")
 	if err != nil {
@@ -116,16 +110,16 @@ func TestResolve_BuilderBalancedOnAgyEscalatesToClaudeAtDeep(t *testing.T) {
 		t.Fatalf("builder.json model_tier_overrides.m_complex_5plus_files = %q; this test pins its deep escalation", escalated)
 	}
 	d = mustResolve(t, f.router, cliroute.Request{Agent: "builder", Phase: "build", DefaultModel: "balanced", Overlay: llmroute.Overlay{Tier: escalated}})
-	if first := walkWith(d.Plan, nil).Attempts[0]; first != "claude-tmux@deep" {
-		t.Fatalf("a deep builder escalation runs on claude, first attempt %s (chain %v tiers %v)", first, d.Plan.Candidates, d.Plan.Tiers)
+	if first := walkWith(d.Plan, nil).Attempts[0]; first != "agy-claude-tmux@deep" {
+		t.Fatalf("a deep builder escalation runs Claude through agy first, first attempt %s (chain %v tiers %v)", first, d.Plan.Candidates, d.Plan.Tiers)
 	}
 }
 
-func TestResolve_WalledClaudeAtDeepStepsDownNotToAgyDeep(t *testing.T) {
+func TestResolve_WalledClaudeModelsAtDeepStepDownNotToAgyDeep(t *testing.T) {
 	f := newOperatorFixture(t)
 	d := mustResolve(t, f.router, cliroute.Request{Agent: "builder", Phase: "build", DefaultModel: "balanced", Overlay: llmroute.Overlay{Tier: "deep"}})
-	res := walkWith(d.Plan, map[string]int{"claude-tmux@deep": 85})
-	if want := []string{"claude-tmux@deep", "agy-tmux@balanced"}; !reflect.DeepEqual(res.Attempts, want) {
+	res := walkWith(d.Plan, map[string]int{"agy-claude-tmux@deep": 85, "claude-tmux@deep": 85})
+	if want := []string{"agy-claude-tmux@deep", "claude-tmux@deep", "agy-tmux@balanced"}; !reflect.DeepEqual(res.Attempts, want) {
 		t.Fatalf("attempts = %v, want %v", res.Attempts, want)
 	}
 	if res.Err != nil || res.CLI != "agy-tmux" || res.Tier != "balanced" {

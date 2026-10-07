@@ -32,11 +32,13 @@ type WorkflowPolicy struct {
 	RemediationRounds        *int     `json:"remediation_rounds,omitempty"`
 	// SizeBudgetMultipliers scale per-cycle budgets by cycle_size_estimate; each positive key overrides its default.
 	// See ADR-0076.
-	SizeBudgetMultipliers map[string]float64 `json:"size_budget_multipliers,omitempty"`
-	RemediablePhases      []string           `json:"remediable_phases,omitempty"`
-	BuildFloor            *bool              `json:"build_floor,omitempty"`
-	InteractivePolicy     string             `json:"interactive_policy,omitempty"`
-	InteractivePolicies   map[string]string  `json:"interactive_policies,omitempty"`
+	SizeBudgetMultipliers map[string]float64    `json:"size_budget_multipliers,omitempty"`
+	RemediablePhases      []string              `json:"remediable_phases,omitempty"`
+	BuildFloor            *bool                 `json:"build_floor,omitempty"`
+	InteractivePolicy     string                `json:"interactive_policy,omitempty"`
+	InteractivePolicies   map[string]string     `json:"interactive_policies,omitempty"`
+	FindingsRepair        *FindingsRepairPolicy `json:"findings_repair,omitempty"`
+	QualityIndex          *QualityIndexPolicy   `json:"quality_index,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.
@@ -71,6 +73,8 @@ type WorkflowConfig struct {
 	UniversalFallbackExclude []string
 	InteractivePolicy        string
 	InteractivePolicies      map[string]string
+	CodeReviewRepair         JudgeRepairConfig
+	QualityIndex             QualityIndexConfig
 }
 
 // WorkflowConfig returns workflow configuration with built-in defaults resolved.
@@ -91,6 +95,8 @@ func (p Policy) WorkflowConfig() WorkflowConfig {
 		BuildFloorEnforced:       true,
 		SizeBudgetMultipliers:    map[string]float64{"trivial": 1.0, "small": 1.0, "medium": 1.25, "large": 1.5},
 		InteractivePolicy:        "recommended_or_first",
+		CodeReviewRepair:         resolveJudgeRepair("code-review", p.codeReviewRepairPolicy()),
+		QualityIndex:             p.qualityIndexConfig(),
 	}
 	if p.Workflow == nil {
 		return c

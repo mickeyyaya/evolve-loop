@@ -31,20 +31,20 @@ func advisorRouter(t *testing.T, evolveDir string, rc policy.RouterPolicy) *clir
 
 func mustRouterDispatch(t *testing.T, evolveDir string, rc policy.RouterPolicy) (string, string) {
 	t.Helper()
-	cli, model, err := resolveRouterDispatch(advisorRouter(t, evolveDir, rc), "")
+	rd, err := resolveRouterDispatchHealthy(advisorRouter(t, evolveDir, rc), "", decisionPlan, nil)
 	if err != nil {
-		t.Fatalf("resolveRouterDispatch: %v", err)
+		t.Fatalf("resolveRouterDispatchHealthy: %v", err)
 	}
-	return cli, model
+	return rd.cli, rd.model
 }
 
 func legacyAdvisorDispatch(t *testing.T, evolveDir, root string, pol policy.Policy, dt routerDecisionType, benched map[string]bool) (string, string, bool) {
 	t.Helper()
-	cli, model, ok, err := resolveRouterDispatchHealthy(routerOverEvolveDir(t, evolveDir, pol), root, dt, benched)
+	rd, err := resolveRouterDispatchHealthy(routerOverEvolveDir(t, evolveDir, pol), root, dt, benched)
 	if err != nil {
 		t.Fatalf("resolveRouterDispatchHealthy: %v", err)
 	}
-	return cli, model, ok
+	return rd.cli, rd.model, rd.healthy
 }
 
 func TestRouterDispatch_ComesFromTheTable(t *testing.T) {
@@ -57,16 +57,16 @@ func TestRouterDispatch_ComesFromTheTable(t *testing.T) {
 	}
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
 	r := routerOverEvolveDir(t, evolveDir, policy.Policy{CLIRouting: &block})
-	cli, model, ok, err := resolveRouterDispatchHealthy(r, "", decisionPlan, map[string]bool{})
-	if err != nil || !ok || cli != "agy-tmux" || model != "deep" {
-		t.Fatalf("the advisor routes on the table's primary at the router profile's tier: cli=%s model=%s ok=%v err=%v", cli, model, ok, err)
+	rd, err := resolveRouterDispatchHealthy(r, "", decisionPlan, map[string]bool{})
+	if err != nil || !rd.healthy || rd.cli != "agy-tmux" || rd.model != "deep" {
+		t.Fatalf("the advisor routes on the table's primary at the router profile's tier: %+v err=%v", rd, err)
 	}
-	cli, _, ok, _ = resolveRouterDispatchHealthy(r, "", decisionPlan, map[string]bool{"agy": true})
-	if !ok || cli != "claude-tmux" {
-		t.Fatalf("the benched swap walks the table's chain: cli=%s ok=%v", cli, ok)
+	rd, _ = resolveRouterDispatchHealthy(r, "", decisionPlan, map[string]bool{"agy": true})
+	if !rd.healthy || rd.cli != "claude-tmux" {
+		t.Fatalf("the benched swap walks the table's chain: %+v", rd)
 	}
-	_, _, ok, _ = resolveRouterDispatchHealthy(r, "", decisionPlan, map[string]bool{"agy": true, "claude": true})
-	if ok {
+	rd, _ = resolveRouterDispatchHealthy(r, "", decisionPlan, map[string]bool{"agy": true, "claude": true})
+	if rd.healthy {
 		t.Fatal("every candidate benched degrades the advisor")
 	}
 }
@@ -76,10 +76,7 @@ func TestRouterDispatch_ARefusedRouteIsAnError(t *testing.T) {
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
 	r := routerOverEvolveDir(t, evolveDir, policy.Policy{CLIRouting: &block})
 	t.Setenv("EVOLVE_ROUTER_CLI", "codex-tmux")
-	if _, _, _, err := resolveRouterDispatchHealthy(r, "", decisionPlan, nil); err == nil {
+	if _, err := resolveRouterDispatchHealthy(r, "", decisionPlan, nil); err == nil {
 		t.Fatal("an env primary outside the table refuses the advisor's route")
-	}
-	if _, _, err := resolveRouterDispatchFor(r, "", decisionPlan); err == nil {
-		t.Fatal("resolveRouterDispatchFor surfaces the refusal")
 	}
 }

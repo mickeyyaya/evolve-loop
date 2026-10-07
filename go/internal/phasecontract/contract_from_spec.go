@@ -24,7 +24,15 @@ func FromSpec(spec phasespec.PhaseSpec) Contract {
 		AgentOwedFiles:        spec.Outputs.AgentOwed,
 		Effects:               spec.Effects,
 		DerivedFrom:           spec.Outputs.DerivedFrom,
+		Grammars:              grammarsFromSpec(spec),
 	}
+}
+
+func grammarsFromSpec(spec phasespec.PhaseSpec) []string {
+	if spec.Classify == nil {
+		return nil
+	}
+	return spec.Classify.Grammars
 }
 
 // overlayDeclared copies the registry-only fields onto a built-in contract, which never declares them itself.

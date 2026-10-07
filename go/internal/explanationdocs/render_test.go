@@ -26,8 +26,8 @@ func TestRenderNotApplicableDeclaration_RoundTripsThroughTheValidator(t *testing
 		t.Fatal(err)
 	}
 	binding := CycleBinding{ProjectRoot: root, Worktree: root, Workspace: workspace, Cycle: 1, RunID: "run-1", ContractVersion: 1}
-	if failures := checkNotApplicable(binding, decl, nil, ""); len(failures) != 0 {
-		t.Fatalf("the validator rejects its own render: %v", failures)
+	if failures, fault := checkNotApplicable(binding, decl, nil, ""); len(failures) != 0 || fault != nil {
+		t.Fatalf("the validator rejects its own render: %v %v", failures, fault)
 	}
 	if !strings.HasSuffix(report, "\n") {
 		t.Error("the render ends its last bullet with a newline so a following section parses")

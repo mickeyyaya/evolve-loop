@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -40,17 +41,34 @@ func routingProfilesDir(projectRoot string) string {
 }
 
 func buildCLIRouter(projectRoot string, cat cliroute.Catalog, host cliroute.Host) (*cliroute.Router, []cliroute.Finding, error) {
-	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	s, err := cliRouterSetup(routerSite{root: projectRoot, catalog: cat}, host)
 	if err != nil {
 		return nil, nil, err
 	}
-	return cliroute.Build(cliroute.Setup{
+	return cliroute.Build(s)
+}
+
+type routerSite struct {
+	root    string
+	catalog cliroute.Catalog
+}
+
+func cliRouterSetup(site routerSite, host cliroute.Host) (cliroute.Setup, error) {
+	pol, err := policy.Load(filepath.Join(site.root, ".evolve", "policy.json"))
+	if err != nil {
+		return cliroute.Setup{}, err
+	}
+	return routerSetupOf(pol, site, host), nil
+}
+
+func routerSetupOf(pol policy.Policy, site routerSite, host cliroute.Host) cliroute.Setup {
+	return cliroute.Setup{
 		Policy:   pol,
-		Catalog:  cat,
-		Profiles: profiles.NewFromDir(routingProfilesDir(projectRoot)),
+		Catalog:  site.catalog,
+		Profiles: profiles.NewFromDir(routingProfilesDir(site.root)),
 		Host:     host,
 		Options:  []cliroute.CompileOption{cliroute.WithToolCapable(gobridge.HasToolUse)},
-	})
+	}
 }
 
 func loadCLIRouter(projectRoot string, host cliroute.Host) (*cliroute.Router, []cliroute.Finding, error) {
@@ -120,4 +138,18 @@ func detectRouter(projectRoot string, stderr io.Writer) *cliroute.Router {
 		return nil
 	}
 	return router
+}
+
+func installRootRouter(projectRoot string, stderr io.Writer) error {
+	router, findings, err := loadCLIRouter(projectRoot, routingHost(stderr, time.Now))
+	if err != nil {
+		reportRoutingFindings(stderr, findings)
+		return fmt.Errorf("the CLI routing table refuses to route: %w", err)
+	}
+	runner.DefaultRouter = router
+	return nil
+}
+
+func rootRouterInstaller(projectRoot string) error {
+	return installRootRouter(projectRoot, os.Stderr)
 }

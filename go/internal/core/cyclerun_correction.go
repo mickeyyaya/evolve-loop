@@ -21,8 +21,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 	// is byte-identical to pre-E2. On reject the correction loop below
 	// re-dispatches up to the configured correction limit before aborting.
 	if cr.o.reviewer != nil && dr.resp.Verdict != VerdictSKIPPED {
-		rin := ReviewInputFor(cr.cs, next, cr.req.ProjectRoot)
-		rin.Response = dr.resp
+		rin := cr.o.reviewInputFor(cr.cs, next, cr.req.ProjectRoot, dr.resp)
 		// baseRoutingCLI is the routing CLI this phase was DISPATCHED with (the
 		// advisor overlay under model_routing=auto; empty otherwise). The
 		// contract-block escalation below temporarily overrides it for a
@@ -307,20 +306,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		dr.phaseReq.CorrectionDirective = ""
 		dr.phaseReq.ModelRoutingCLI = baseRoutingCLI
 		if !rr.Approve {
-			if maxCorrections == 0 {
-				// Byte-identical to the pre-feature abort message.
-				phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected: %s", next, rr.Reason)
-				// The phase ran and produced its own verdict; the reject is
-				// recorded as the abort reason, not a rewrite.
-				// See ADR-0044.
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
-				cr.recordFailureLearning(next, phaseErr, 1)
-				return loopAbort, wrapCycleLevelError(next, phaseErr)
-			}
-			phaseErr := fmt.Errorf("review gate: phase %q deliverable rejected after %d correction(s): %s", next, maxCorrections, rr.Reason)
-			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
-			cr.recordFailureLearning(next, phaseErr, maxCorrections)
-			return loopAbort, wrapCycleLevelError(next, phaseErr)
+			return cr.rejectAfterCorrections(next, dr, rr, maxCorrections)
 		}
 	}
 

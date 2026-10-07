@@ -81,6 +81,7 @@ type Contract struct {
 	// DerivedFrom maps an agent-owed secondary to the primary the host derives it from when the agent leaves
 	// it absent. See ADR-0106.
 	DerivedFrom map[string]string
+	Grammars    []string
 }
 
 // EffectInboxClaim names the effect of claiming a cycle's committed inbox items.

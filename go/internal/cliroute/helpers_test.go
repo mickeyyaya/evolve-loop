@@ -186,22 +186,10 @@ func realCatalog(t *testing.T) phasespec.Catalog {
 	return cat
 }
 
-type widenedBuilder struct {
-	cliroute.ProfileSource
-}
-
-func (w widenedBuilder) Get(name string) (profiles.Profile, error) {
-	p, err := w.ProfileSource.Get(name)
-	if err == nil && name == "builder" && !slices.Contains(p.AllowedCLIs, "agy") {
-		p.AllowedCLIs = append(slices.Clone(p.AllowedCLIs), "agy")
-	}
-	return p, err
-}
-
 func operatorTable() policy.Policy {
 	return routingPolicy(policy.CLIRouting{
-		CLIs:    []string{"agy", "claude"},
-		Default: []string{"agy", "claude"},
-		Tiers:   map[string][]string{"deep": {"claude"}, "top": {"claude"}},
+		CLIs:    []string{"agy", "agy-claude", "claude"},
+		Default: []string{"agy", "agy-claude", "claude"},
+		Tiers:   map[string][]string{"deep": {"agy-claude", "claude"}, "top": {"agy-claude", "claude"}},
 	})
 }

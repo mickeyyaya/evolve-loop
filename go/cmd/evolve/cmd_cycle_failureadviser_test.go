@@ -14,7 +14,7 @@ func TestWireOrchestrator_FailureAdviserWired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if !d.Orchestrator.FailureAdviserWired() {
 		t.Fatal("RED (R8.1): production composition root does not wire the ADR-0044 failure-advisor tail — EVOLVE_PHASE_RECOVERY=enforce would silently skip advise→promote")
 	}

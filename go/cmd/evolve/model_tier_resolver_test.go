@@ -54,7 +54,7 @@ func TestWireOrchestrator_ModelCatalogLookupWired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if !d.Orchestrator.ModelCatalogLookupWired() {
 		t.Fatal("production composition root (wireOrchestratorDeps) does not wire core.WithModelCatalogLookup — " +
 			"router.ClampPlanModelRouting short-circuits on a nil lookup, so the catalog-resolvability gate is a " +

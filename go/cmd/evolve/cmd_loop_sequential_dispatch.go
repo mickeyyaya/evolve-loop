@@ -51,19 +51,16 @@ func (b *loopBatchCoordinator) dispatchSequentialCycle() (sequentialCycle, batch
 }
 
 func (b *loopBatchCoordinator) handleCycleError(result core.CycleResult, cycleErr error) batchDecision {
-	var cycleFailure *core.ErrCycleLevelFailure
-	if !errors.As(cycleErr, &cycleFailure) {
-		b.result.StopReason = "error"
-		fmt.Fprintf(b.stderr, "evolve loop: cycle %d: %v\n", result.Cycle, cycleErr)
-		return batchDecision{flow: batchStopIterations}
-	}
-
 	fmt.Fprintf(b.stderr, "evolve loop: cycle %d: %v\n", result.Cycle, cycleErr)
-	// A wall is resumable from its checkpoint, so its claims stay claimed and nothing is a failure yet; every
-	// producer wraps it as a cycle-level failure, which is why the check above lets it through to here.
 	if errors.Is(cycleErr, core.ErrAllFamiliesExhausted) {
 		b.result.emitQuotaPause(b.cfg, result.Cycle, b.stdout, b.stderr)
 		return batchDecision{flow: batchReturn, exitCode: 5}
+	}
+	var cycleFailure *core.ErrCycleLevelFailure
+	if !errors.As(cycleErr, &cycleFailure) {
+		b.result.StopReason = "error"
+		b.applyCycleFailureOutcome(result.Cycle)
+		return batchDecision{flow: batchStopIterations}
 	}
 	b.result.RecoverableFailures++
 	workspace := cycleWorkspace(b.cfg.ProjectRoot, result.Cycle)

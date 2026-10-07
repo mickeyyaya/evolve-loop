@@ -51,7 +51,7 @@ func TestCycleRunFlags_RequestCarriesTheGoalTheBypassAndTheEvolveEnv(t *testing.
 func TestRunCycleRun_SimulateNeverWiresTheProductionOrchestrator(t *testing.T) {
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		t.Fatal("--simulate wired the production orchestrator, which calls out to real CLIs")
 		return orchDeps{}
 	}

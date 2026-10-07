@@ -114,7 +114,7 @@ func mergeInherited(current, ancestor []Entry, claims map[string]Entry, resolve 
 			// ANCESTOR's text is the record — a shadowed id means the operator
 			// cannot trust any disposition keyed on it.
 			missing = append(missing, unaccounted{a.ID, fmt.Sprintf("id shadowed: this cycle's ledger holds different text %q for the same id", Truncate(merged[i].Text, 120))})
-			merged[i] = Entry{ID: a.ID, Text: a.Text, Status: StatusOpen}
+			merged[i] = reopened(a)
 			continue
 		}
 		if a.Status != StatusOpen {
@@ -137,7 +137,7 @@ func mergeInherited(current, ancestor []Entry, claims map[string]Entry, resolve 
 // is unaccounted. A rejected FIXED row is written back with no evidence or
 // reason — an unverifiable FIXED row IS the laundering.
 func gradeClaim(a Entry, claim Entry, has bool, resolve func(string) (bool, string)) (Entry, string) {
-	e := Entry{ID: a.ID, Text: a.Text, Status: StatusOpen}
+	e := reopened(a)
 	switch {
 	case !has:
 		return e, "no disposition"
@@ -165,4 +165,8 @@ func originCycleOf(ancestor, current Doc) int {
 		return current.OriginCycle
 	}
 	return ancestor.OriginCycle
+}
+
+func reopened(a Entry) Entry {
+	return Entry{ID: a.ID, Text: a.Text, Status: StatusOpen, Source: a.Source, Round: a.Round, Severity: a.Severity, Dimension: a.Dimension}
 }

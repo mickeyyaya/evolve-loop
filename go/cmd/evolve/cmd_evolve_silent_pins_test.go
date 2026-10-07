@@ -96,7 +96,7 @@ func TestWireOrchestratorDeps_MalformedPolicyWarnsOnTheGivenConsole(t *testing.T
 	root := t.TempDir()
 	writeMalformedPolicy(t, root)
 	console := captureConsole(func(w io.Writer) {
-		wireOrchestratorDeps(root, filepath.Join(root, ".evolve"), w)
+		wireOrchestratorDeps(root, filepath.Join(root, ".evolve"), w, routingRun{})
 	})
 	if !strings.Contains(console, "policy") {
 		t.Errorf("the composition root writes its policy WARN to the console it is given, not os.Stderr; console=%q", console)

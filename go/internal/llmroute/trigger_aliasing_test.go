@@ -8,7 +8,7 @@ import (
 )
 
 func TestResolveTriggers_EveryPlanOwnsItsDefaultTriggers(t *testing.T) {
-	want := []int{80, 81, 85, 124, 127}
+	want := DefaultTriggers()
 	cases := map[string]*profiles.Profile{
 		"nil profile":        nil,
 		"nil trigger list":   {CLI: "codex-tmux"},

@@ -7,7 +7,7 @@
 
 The correction ladder in `reviewAndGuard` re-dispatched the **same** profile CLI after a
 deliverable-contract block. A profile's `cli_fallback` chain fires only on infra exit codes
-`{80,81,85,124,127}` — never on a contract violation — so a CLI that systematically mis-formats a
+`{80,81,85,87,124,127}` — never on a contract violation — so a CLI that systematically mis-formats a
 deliverable burns every correction and the contract-gate breaker opens, demoting `enforce→advisory`
 for the rest of the run. Batch-19 (cycles 1171/1172) and batch-21 (cycle-1215) both ended that way:
 a FORMAT-compliance failure silently WEAKENED a gate. The correct escape hatch is CLI escalation,
@@ -27,6 +27,23 @@ A correction re-dispatch escalates to a different CLI **family** when both hold:
 
 `Blocks == 0` (evalgate / topngate / triagecap / the build floor) never escalates: those are
 task-binding or capacity rejections, and a different CLI is not the remedy.
+
+## The breaker-exempt class (ADR-0124)
+
+An optional evaluate phase past the ship floor, which the routing config does not list as mandatory
+(`config.mandatory_phases`), is **breaker-exempt** (`ReviewInput.BreakerExempt`). Code-review is the
+one such phase today. Its blocks are never counted, its passes never reset the breaker, and it never
+demotes, so a malformed review cannot hand the audit a `contract_gate_demoted` waiver. Its rejections
+carry `Blocks == 0`, so:
+- **no second-block CLI escalation** fires for it;
+- **no salvage re-prompt** fires for it either: that directive warns of a breaker about to open,
+  which is false for this phase. Each correction is the plain directive.
+
+When its ladder is exhausted, a **present but malformed** report degrades the phase to SKIPPED with a
+WARN (`contract_exhaustion_skip`, and `REVIEW_SKIPPED` for code-review), and an **absent** (missing or
+empty) report aborts the cycle, because a non-admitted missing deliverable never reaches Ship. The
+fresh ladder (`reviewWithCorrections`) and the resume ladder (`reviewResumedDeliverable`) take both
+decisions from the same helpers (`Orchestrator.reviewInputFor`, `degradesRejection`).
 
 ## Scoping
 

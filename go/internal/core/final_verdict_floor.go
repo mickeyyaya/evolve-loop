@@ -53,5 +53,9 @@ func (o *Orchestrator) nonFloorExhaustionDegrade(phase Phase, workspace string, 
 	if o.isAuthoritativePhase(phase) || !floorAlreadyRecorded {
 		return PhaseResponse{}, false
 	}
-	return PhaseResponse{Phase: string(phase), Verdict: VerdictSKIPPED, ArtifactsDir: workspace}, true
+	return skippedResponse(phase, workspace), true
+}
+
+func skippedResponse(phase Phase, workspace string) PhaseResponse {
+	return PhaseResponse{Phase: string(phase), Verdict: VerdictSKIPPED, ArtifactsDir: workspace}
 }

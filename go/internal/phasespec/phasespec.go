@@ -40,7 +40,8 @@ type ClassifyRules struct {
 	RequireFailureContext bool `json:"require_failure_context,omitempty"`
 	// VerdictFromSentinel lets a judgment phase's stated verdict decide: "" off, "shadow" records, "enforce" decides.
 	// See ADR-0091.
-	VerdictFromSentinel string `json:"verdict_from_sentinel,omitempty"`
+	VerdictFromSentinel string   `json:"verdict_from_sentinel,omitempty"`
+	Grammars            []string `json:"grammars,omitempty"`
 }
 
 // Gates names the inter-phase gate functions; the guard layer resolves them, not this package.

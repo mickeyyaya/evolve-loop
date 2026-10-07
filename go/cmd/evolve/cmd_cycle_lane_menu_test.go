@@ -15,7 +15,7 @@ func TestWireOrchestrator_TheNoWorkCheckAsksTheLaneMenu(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if d := wireOrchestratorDeps(root, evolveDir, io.Discard); !d.Orchestrator.LaneMenuWired() {
+	if d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{}); !d.Orchestrator.LaneMenuWired() {
 		t.Fatal("the production composition root must give the no-work check the lane menu triage offers, or a sequential cycle with only console-owned or waiting work seals a claim failure")
 	}
 }

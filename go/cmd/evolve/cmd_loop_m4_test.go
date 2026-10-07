@@ -91,7 +91,7 @@ func initLoopContractRepo(t *testing.T, projectRoot string) {
 func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func() {
 	t.Helper()
 	prev := wireOrchestratorDepsFn
-	wireOrchestratorDepsFn = func(projectRoot, evolveDir string, console io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {
 		initLoopContractRepo(t, projectRoot)
 		runners := map[core.Phase]core.PhaseRunner{
 			core.PhaseIntent:       noopRunner{name: "intent"},

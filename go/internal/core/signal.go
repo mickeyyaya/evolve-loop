@@ -19,6 +19,8 @@ const (
 	// verdict on an audit FAIL.
 	CodeAuditRepairDeclined signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_DECLINED"
 	CodeAuditRepairGranted  signalcenter.Code = "ORCHESTRATOR_AUDIT_REPAIR_GRANTED"
+
+	CodeExplanationReauthorRouted signalcenter.Code = "ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED"
 )
 
 func init() {
@@ -26,6 +28,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePhaseVerdictWarn, "a phase recorded verdict WARN; the reason carries its error-severity diagnostics, if any")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeAuditRepairDeclined, "an audit FAIL earned no repair round and the cycle goes to retro; fields.reason is the retry envelope's verdict (unrecognised class, budget spent, system-level or non-retry class, no class declared), fields.declared_class the audit's own class")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeAuditRepairGranted, "an audit FAIL earned a repair round; fields.next is the re-entry phase (tdd | build), fields.attempt the repair attempt about to be spent, fields.reason the envelope's basis")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeExplanationReauthorRouted, "a post-Build source writer left the Build explanation's content stale (a cited path no longer in the diff, Changed Areas drift) and the cycle routed back to Build for the owner to re-author it instead of aborting — fields.next is the re-entry phase; fields.charged is false when every legal successor of the writer already leads to Build (tdd), so the round costs nothing, and true when it spends one code-audit-fail attempt, with fields.attempt the attempt spent and fields.envelope the budget's reason; the reason is the validator's verdict")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePhaseAborted, "the cycle aborted after this phase's outcome (review reject, guard, persistence); the abort reason is in fields.abort_reason")
 }
 

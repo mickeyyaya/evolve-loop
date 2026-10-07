@@ -7,7 +7,7 @@ import (
 	"testing/fstest"
 )
 
-func TestClaudeFamilyFloor_NamesTheFiveGraderAgents(t *testing.T) {
+func TestClaudeFamilyFloor_NamesTheGraderAgents(t *testing.T) {
 	floor := ClaudeFamilyFloor()
 	names := make([]string, 0, len(floor))
 	for name, why := range floor {
@@ -17,7 +17,7 @@ func TestClaudeFamilyFloor_NamesTheFiveGraderAgents(t *testing.T) {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	want := []string{"adversarial-review", "auditor", "spec-verifier", "spec-verify", "tdd-engineer"}
+	want := []string{"adversarial-review", "auditor", "code-reviewer", "spec-verifier", "spec-verify", "tdd-engineer"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("ClaudeFamilyFloor() = %v, want %v", names, want)
 	}

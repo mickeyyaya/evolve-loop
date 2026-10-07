@@ -61,6 +61,9 @@ const (
 	// Declared effects: missing_effect is an unperformed effect, unbound_effect a registry name no check binds.
 	CodeMissingEffect = "missing_effect"
 	CodeUnboundEffect = "unbound_effect"
+
+	CodeBadGrammar     = "bad_grammar"
+	CodeUnboundGrammar = "unbound_grammar"
 )
 
 // Verify checks a phase's deliverable against the built-in registry: an error is ambiguity (fail open), !OK a confirmed violation (fail closed).
@@ -128,7 +131,9 @@ func verifyPrimary(phase string, c phasecontract.Contract, roots phasecontract.R
 	case phasecontract.KindJSON:
 		verifyJSON(&res, c, content)
 	default:
-		verifyMarkdown(&res, c, content, roots, phaseIO)
+		if err := verifyMarkdown(&res, c, content, roots, phaseIO); err != nil {
+			return Result{}, err
+		}
 	}
 	return res, nil
 }
@@ -162,7 +167,7 @@ func readDeliverableWithGrace(path string) (content string, exists bool, err err
 	}
 }
 
-func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots phasecontract.Roots, phaseIO config.Stage) {
+func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots phasecontract.Roots, phaseIO config.Stage) error {
 	for _, s := range c.Sections {
 		if !s.Present(content) {
 			res.add(CodeMissingSection, fmt.Sprintf("required section %q is missing", s.Canonical))
@@ -178,6 +183,9 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 	}
 	if len(c.Verdicts) > 0 && !verdictPresent(content, c.Verdicts, phaseIO) {
 		res.add(CodeBadVerdict, fmt.Sprintf("no parseable verdict; expected one of %v", c.Verdicts))
+	}
+	if err := verifyGrammars(res, c, content, roots); err != nil {
+		return err
 	}
 	// A sentinel FAIL/WARN owes the structured failure block; PhaseIO phases owe it only at enforce, prose-only verdicts never.
 	if c.RequireFailureContext || (c.RequireFailureContextPhaseIO && phaseIO >= config.StageEnforce) {
@@ -204,6 +212,7 @@ func verifyMarkdown(res *Result, c phasecontract.Contract, content string, roots
 		}
 	}
 	checkStray(res, c, roots)
+	return nil
 }
 
 // checkStray flags a deliverable written into the worktree root instead of the workspace.
@@ -287,6 +296,10 @@ func (r *Result) add(code, msg string) {
 func (r *Result) finish() { r.OK = len(r.Violations) == 0 }
 
 // onlyViolation reports whether r fails solely on code; salvage and the warn-only size gate need sole, never membership.
+func (r Result) deliverableAbsent() bool {
+	return r.hasCode(CodeMissingArtifact) || r.hasCode(CodeEmptyArtifact)
+}
+
 func (r Result) onlyViolation(code string) bool {
 	if len(r.Violations) == 0 {
 		return false

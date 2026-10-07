@@ -41,7 +41,7 @@ func TestWireOrchestratorDeps_SignalCenterWired(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if d.Signals == nil || !d.Orchestrator.SignalCenterWired() {
 		t.Fatal("the production composition root must construct a Signal Center and register the orchestrator as its listener (ADR-0101 S1)")
 	}
@@ -117,7 +117,7 @@ func TestWireOrchestratorDeps_SignalCenterConsoleSinkIsFilteredAtWarn(t *testing
 		t.Fatal(err)
 	}
 	stderr := captureConsole(func(console io.Writer) {
-		d := wireOrchestratorDeps(root, evolveDir, console)
+		d := wireOrchestratorDeps(root, evolveDir, console, routingRun{})
 		d.Signals.Emit(signalcenter.Event{Cycle: 2, Module: signalcenter.ModuleLoop, Origin: "Test.filtered", Kind: signalcenter.KindLoopWave, Severity: signalcenter.SeverityInfo, Reason: "info stays in the file"})
 		d.Signals.Emit(signalcenter.Event{Cycle: 2, Phase: "triage", Attempt: 1, Module: signalcenter.ModuleOrchestrator, Origin: "Test.filtered", Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityWarn, Code: core.CodePhaseVerdictFail, Reason: "triage verdict=FAIL: warn reaches the console"})
 	})
@@ -192,7 +192,7 @@ func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if d.Bridge == nil || !d.Bridge.SignalsWired() {
 		t.Fatal("the production bridge Adapter must be built with the Signal Center (bridge.NewDefault(projectRoot, signals))")
 	}
@@ -245,7 +245,7 @@ func TestWireOrchestratorDeps_LedgerIsObservedByTheSignalCenter(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	observed, ok := d.Ledger.(*ledger.FileLedger)
 	if !ok || !observed.SignalsWired() {
 		t.Fatalf("the root's ledger must be the file ledger observed by the Signal Center, got %T", d.Ledger)
@@ -393,7 +393,7 @@ func TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner(t *testing.T) 
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if d.Bridge == nil || d.Bridge.Signals() != d.Signals {
 		t.Fatal("the production Adapter carries the root's Center (Signals() == orchDeps.Signals)")
 	}

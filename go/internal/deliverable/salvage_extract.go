@@ -163,7 +163,9 @@ func salvageVerdictWith(res Result, resolver phasecontract.Resolver, roots phase
 	// Re-verify the repaired bytes rather than set OK, so every content check still applies; the caller's
 	// roots keep the path-dependent checks off the process CWD.
 	var check Result
-	verifyMarkdown(&check, c, repaired, roots, phaseIO)
+	if err := verifyMarkdown(&check, c, repaired, roots, phaseIO); err != nil {
+		return res, false
+	}
 	check.finish()
 	if !check.OK {
 		return res, false

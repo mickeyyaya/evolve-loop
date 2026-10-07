@@ -29,7 +29,7 @@ func stubPreflightOnlyGate(t *testing.T, res looppreflight.Result) *preflightOnl
 		probe.gateCfg = cfg
 		return res
 	}
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		probe.launched = true
 		return orchDeps{Storage: &fixtures.FakeStorage{}, Ledger: newFakeLedger()}
 	}

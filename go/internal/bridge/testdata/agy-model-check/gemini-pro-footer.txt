@@ -1,0 +1,30 @@
+  - deep: judgment-heavy phases — build, tdd, audit, architecture/design, adversarial review.
+  - balanced: review/scan/triage-class phases — the safe default for anything not covered below.
+  - fast: ONLY mechanical phases (doc-sync, changelog-sync, locale-format-check, close-checklist) — NEVER for a phase that writes source, renders a verdict, or scopes work. When in doubt, propose HIGHER.
+  - Judgment phases usually carry a min=balanced envelope above — don't fight the clamp with a low-tier proposal; propose a CLI only when deviating from the phase's profile default is justified.
+
+  ## Respond with STRICT JSON only (a bare array, no prose, no markdown fence):
+  [{"phase":"<phase>","run":true,"justification":"<one
+  sentence>","cli":"<cli>","tier":"balanced"},{"phase":"<new-phase>","run":true,"justification":"<why>","mint":{"prompt":"<persona>","tier":"balanced","cli":"claude","description":"<what it
+  produces>","when_to_use":"<when to select it>"}}]
+
+  Now write your whole-cycle plan as a strict JSON array to /repo/runtime/.evolve/runs/cycle-1688/routing-replan.json (no prose, no fence).
+
+
+  DELIVERABLE PATH: /repo/runtime/.evolve/runs/cycle-1688/routing-replan.json
+
+  <deliverable-contract phase="router-replan">
+    <artifact-path>/repo/runtime/.evolve/runs/cycle-1688/routing-replan.json</artifact-path>
+    <format>a single valid JSON array — write nothing else to this file</format>
+    <self-check>evolve phase verify router-replan --workspace <your workspace dir></self-check>
+  </deliverable-contract>
+
+▸ Thought for 11s, 1.7k tokens
+  Prioritizing Tool Selection
+
+● Edit(~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1688/routing-replan.json) (ctrl+o to expand)
+⣻  Editing files...
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+esc to cancel                                                                                                                                                                                          Gemini 3.1 Pro · high

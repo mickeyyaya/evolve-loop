@@ -154,7 +154,9 @@ func (r *Reviewer) Review(_ context.Context, in core.ReviewInput) core.ReviewRes
 		bp = filepath.Join(roots.EvolveDir, breakerFile)
 	}
 	if res.OK {
-		resetBreaker(bp)
+		if !in.BreakerExempt {
+			resetBreaker(bp)
+		}
 		r.signals.Verified(check, r.verifiedSet(res))
 		return core.ReviewResult{Approve: true}
 	}
@@ -196,6 +198,11 @@ func (r *Reviewer) violationResult(check gatesignal.Check, in core.ReviewInput, 
 		return core.ReviewResult{Approve: true}
 	}
 
+	if in.BreakerExempt {
+		r.logf("[contract-gate] %s: %s (stage=enforce, BLOCK, breaker-exempt: the circuit never counts this phase)", in.Phase, reason)
+		r.signals.Rejected(check, reason, codesOf(res), 0, r.threshold)
+		return core.ReviewResult{Approve: false, Reason: reason, DeliverableAbsent: res.deliverableAbsent()}
+	}
 	n := incrBreaker(bp)
 	if n >= r.threshold {
 		r.logf("[contract-gate] CIRCUIT OPEN: %d consecutive contract blocks — demoting enforce→advisory so the loop is not bricked. Inspect policy.gates.contract_gate / the failing phase %q. Last reason: %s", n, in.Phase, reason)
@@ -206,7 +213,7 @@ func (r *Reviewer) violationResult(check gatesignal.Check, in core.ReviewInput, 
 	r.logf("[contract-gate] %s: %s (stage=enforce, BLOCK %d/%d)", in.Phase, reason, n, r.threshold)
 	r.signals.Rejected(check, reason, codesOf(res), n, r.threshold)
 	// Blocks is this breaker's count, so the ladder escalates off the counter that opens the circuit.
-	return core.ReviewResult{Approve: false, Reason: reason, Blocks: n}
+	return core.ReviewResult{Approve: false, Reason: reason, Blocks: n, DeliverableAbsent: res.deliverableAbsent()}
 }
 
 // summarize renders the violations into one actionable rejection reason.

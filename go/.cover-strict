@@ -26,5 +26,7 @@
 ./internal/cliupdate 100
 ./internal/inboxrank 100
 ./internal/inboxrank/rankinputs 100
+./internal/codereview 100
+./internal/qualityindex 100
 # wtcheckpoint drives real git through gitexec with no fake runner; what it leaves uncovered are git-failure returns.
 ./internal/wtcheckpoint 87

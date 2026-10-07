@@ -223,7 +223,7 @@ func retroProfile(projectRoot string) *profiles.Profile {
 func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model string) (string, error) {
 	router := p.router
 	if router == nil {
-		launch, err := cliroute.NewSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{Agent: retroAgent, Profile: prof}, cliroute.Host{})
+		launch, err := cliroute.NewLegacyLaunchRouter(req.ProjectRoot, cliroute.SingleProfile{Agent: retroAgent, Profile: prof})
 		if err != nil {
 			return "", err
 		}
@@ -233,7 +233,11 @@ func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model 
 	if err != nil {
 		return "", err
 	}
-	return d.Plan.Candidates[0], nil
+	walk, err := d.Walk()
+	if err != nil {
+		return "", err
+	}
+	return walk.Candidates[0], nil
 }
 
 func refreshExplanationHandoff(ctx context.Context, req core.PhaseRequest) core.PhaseRequest {

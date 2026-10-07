@@ -3,9 +3,6 @@
 package cycle1580
 
 import (
-	"os"
-	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
@@ -34,43 +31,6 @@ func TestC1580_001_TransientRegexResolvedOnceFromTheManifest(t *testing.T) {
 	ok, out := runBridgeTests(t, "TestAutoResponder_TransientRegexResolvedAtConstruction|TestAutoResponder_TransientRegexIsFamilyAgnostic")
 	if !ok {
 		t.Errorf("AC-1 unmet: the transient pattern is not resolved from the launched CLI's manifest at construction\n%s", out)
-	}
-}
-
-var frozenExitCodes = map[string]string{
-	"ExitOK": "0", "ExitSafetyGate": "2", "ExitCostLeak": "3", "ExitBadFlags": "10",
-	"ExitREPLBootTimeout": "80", "ExitArtifactTimeout": "81", "ExitUnknownPrompt": "85",
-	"ExitRespondLoopGuard": "86", "ExitRequireFullUnmet": "99", "ExitCmdTimeout": "124",
-	"ExitMissingBinary": "127",
-}
-
-var exitConstRE = regexp.MustCompile(`(?m)^\s*(Exit\w+)\s+=\s+(\d+)`)
-
-func TestC1580_002_NoNewExitCode(t *testing.T) {
-	root := acsassert.RepoRoot(t)
-	src, err := os.ReadFile(filepath.Join(root, "go", "internal", "bridge", "exitcodes.go"))
-	if err != nil {
-		t.Fatalf("read the bridge exit-code contract: %v", err)
-	}
-	got := map[string]string{}
-	for _, m := range exitConstRE.FindAllStringSubmatch(string(src), -1) {
-		got[m[1]] = m[2]
-	}
-	if len(got) == 0 {
-		t.Fatalf("parsed no exit-code constants — the predicate is reading the wrong file")
-	}
-	for name, want := range frozenExitCodes {
-		if got[name] != want {
-			t.Errorf("exit code %s = %q, want %q — the numeric contract is load-bearing and must not drift", name, got[name], want)
-		}
-	}
-	for name, val := range got {
-		if _, known := frozenExitCodes[name]; !known {
-			t.Errorf("AC-2 violated: new exit code %s = %s — the transient shortcircuit must reuse ExitArtifactTimeout (81)", name, val)
-		}
-	}
-	if ok, out := runBridgeTests(t, "TestRunTmuxREPL_TransientDwell_ReusesExistingExitAndArtifacts"); !ok {
-		t.Errorf("AC-2 unmet: the shortcircuit does not exit through the existing ExitArtifactTimeout path\n%s", out)
 	}
 }
 

@@ -49,16 +49,6 @@ func geminiProEntries(t *testing.T, chain []string, tier string) []string {
 	return hits
 }
 
-var deepTierGeminiProTailAwaitingL2 = map[string]bool{
-	"architecture-design": true, "caching-strategy-design": true, "compat-surface-check": true,
-	"data-integrity-check": true, "data-model-design": true, "debugger": true, "failure-adjudicator": true,
-	"failure-advisor": true, "idempotency-check": true, "intent": true, "merge-to-main-gate": true,
-	"migration-safety-check": true, "observability-design": true, "plan-reviewer": true,
-	"preliminary-study": true, "premise-challenge": true, "prompt-regression-eval": true,
-	"resilience-design": true, "retrospective": true, "rollout-plan": true, "swarm-planner": true,
-	"type-safety-audit": true,
-}
-
 func resolvedChain(t *testing.T, r *cliroute.Router, req cliroute.Request) []string {
 	t.Helper()
 	d, err := r.Resolve(req)
@@ -68,12 +58,27 @@ func resolvedChain(t *testing.T, r *cliroute.Router, req cliroute.Request) []str
 	return d.Plan.Candidates
 }
 
+func permittedChain(t *testing.T, r *cliroute.Router, req cliroute.Request, tier string) []string {
+	t.Helper()
+	d, err := r.Resolve(req)
+	if err != nil {
+		t.Fatalf("Resolve(%s): %v", req.Agent, err)
+	}
+	var permitted []string
+	for _, cli := range d.Plan.Candidates {
+		if d.Plan.Permits(cli, tier) {
+			permitted = append(permitted, cli)
+		}
+	}
+	return permitted
+}
+
 func TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	profileDir, agents := cliroutetest.TrackedProfiles(t)
 	loader := profiles.NewFromDir(profileDir)
 	r := everyBinaryInstalledRouter(t)
-	checked, awaiting := 0, map[string]bool{}
+	checked := 0
 	for _, name := range agents {
 		p, err := loader.Get(name)
 		if err != nil || (p.ModelTierDefault != "deep" && p.ModelTierDefault != "top") {
@@ -83,18 +88,9 @@ func TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel(t *te
 		if hits := geminiProEntries(t, slices.Concat([]string{p.CLI}, p.CLIFallback), p.ModelTierDefault); len(hits) > 0 {
 			t.Errorf("%s's own chain runs %v at %s: deep and top work runs a Claude model, agy-owned first, and never Gemini Pro (operator rule, 2026-10-06)", name, hits, p.ModelTierDefault)
 		}
-		chain := resolvedChain(t, r, cliroute.Request{Agent: name, Phase: cliroutetest.PhaseOf(name), ProjectRoot: t.TempDir()})
-		hits := geminiProEntries(t, chain, p.ModelTierDefault)
-		switch {
-		case len(hits) > 0 && deepTierGeminiProTailAwaitingL2[name]:
-			awaiting[name] = true
-		case len(hits) > 0:
-			t.Errorf("%s resolves to %v at %s, which reaches %v through the universal tail: restrict its allowed_clis, or wait for L2's tiers.deep ceiling and list it in deepTierGeminiProTailAwaitingL2", name, chain, p.ModelTierDefault, hits)
-		}
-	}
-	for name := range deepTierGeminiProTailAwaitingL2 {
-		if !awaiting[name] {
-			t.Errorf("%s no longer reaches Gemini Pro at deep or top: remove it from deepTierGeminiProTailAwaitingL2", name)
+		chain := permittedChain(t, r, cliroute.Request{Agent: name, Phase: cliroutetest.PhaseOf(name), ProjectRoot: t.TempDir()}, p.ModelTierDefault)
+		if hits := geminiProEntries(t, chain, p.ModelTierDefault); len(hits) > 0 {
+			t.Errorf("%s resolves to %v at %s, which reaches %v: the cli_routing tiers.%s ceiling must keep Gemini Pro off deep and top work", name, chain, p.ModelTierDefault, hits, p.ModelTierDefault)
 		}
 	}
 	if checked == 0 {

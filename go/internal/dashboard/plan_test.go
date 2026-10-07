@@ -266,3 +266,19 @@ func TestServer_SnapshotReflectsTheInjectedEnvironment(t *testing.T) {
 		t.Errorf("snapshot mandatory = %v, collect mandatory = %v", withEnv, without)
 	}
 }
+
+func TestScanStream_ARoutingDispositionIsNotAPhaseRun(t *testing.T) {
+	path := filepath.Join(t.TempDir(), signalcenter.StreamFileName)
+	writeNDJSON(t, path,
+		`{"kind":"phase.outcome","phase":"tdd","attempt":1,"fields":{"verdict":"PASS","duration_ms":"1200"}}`,
+		`{"kind":"phase.outcome","phase":"tdd","code":"ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED","severity":"WARN","fields":{"charged":"false","next":"build"}}`,
+		`{"kind":"phase.outcome","phase":"audit","code":"ORCHESTRATOR_AUDIT_REPAIR_GRANTED","severity":"INFO","fields":{"next":"tdd","attempt":"1"}}`,
+	)
+
+	outcomes, _ := scanStream(path, map[string]bool{})
+
+	last, rounds, _ := runOrder(outcomes, "build", true)
+	if len(outcomes) != 1 || verdictStatus(last["tdd"].Verdict) != StatePass || rounds["tdd"] != 1 || rounds["audit"] != 0 {
+		t.Fatalf("a phase.outcome with no verdict is a routing disposition, not a run: outcomes=%+v rounds=%v", outcomes, rounds)
+	}
+}

@@ -14,7 +14,7 @@ func TestWireOrchestrator_ThroughputRecorderWired(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if !d.Orchestrator.ThroughputRecorderWired() {
 		t.Fatal("RED (R9.1): production composition root does not wire the triage-throughput recorder — the R9.2 capacity clamp would never see observed throughput")
 	}

@@ -19,6 +19,7 @@ type ReviewInput struct {
 	Worktree       string        // absolute worktree dir; "" for non-worktree (read-only) phases
 	ProjectRoot    string        // absolute project root (for git-evidence verification)
 	ChallengeToken string        // <workspace>/challenge-token.txt; empty if the phase didn't emit one
+	BreakerExempt  bool
 }
 
 // ReviewResult is the reviewer's decision.
@@ -39,7 +40,8 @@ type ReviewResult struct {
 	// Blocks is the reviewer's own consecutive-contract-block counter; 0 means the deciding reviewer keeps none.
 	Blocks int
 	// Remediation is an optional, gate-authored instruction for satisfying this violation; empty means the correction directive is the byte-identical default, which cannot fit every failure class (some violations are fixed only by creating a missing artifact, which the default directive's "do not change unrelated files" clause forbids).
-	Remediation string
+	Remediation       string
+	DeliverableAbsent bool
 }
 
 // DeliverableReviewer adjudicates a finished phase's deliverable. Implementations
