@@ -82,27 +82,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	// worktreePhase. Empty when provisioning failed — the pre-existing
 	// degraded mode.
 	phaseWorktree := cr.cs.ActiveWorktree
-	// Snapshot the main-tree dirty set BEFORE a source-writing phase runs.
-	// After it runs we re-snapshot and compare — any newly-dirty MAIN-tree
-	// path is a leak that escaped the bridge sandbox (each git worktree is a
-	// separate working dir, so its writes don't show up here). The treediff
-	// package owns the snapshot/check + SnapshotMissed semantics; the
-	// orchestrator just threads it through. Skipped entirely for
-	// non-worktree phases.
-	var (
-		treeGuard      *treediff.Guard
-		beforeDirty    []string
-		snapshotFailed bool
-	)
-	if cr.o.gitDirtyPaths != nil {
-		treeGuard = treediff.New(cr.o.gitDirtyPaths)
-		snap, err := treeGuard.Snapshot(cr.ctx, cr.req.ProjectRoot)
-		if err != nil {
-			snapshotFailed = true
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff pre-phase snapshot failed for %s: %v (sandbox guard degraded; post-phase leak check skipped)\n", next, err)
-		} else {
-			beforeDirty = snap
-		}
+	treeGuard, beforeDirty, snapErr := cr.snapshotMainTree(next)
+	if snapErr != nil {
+		return dispatchResult{}, loopAbort, fmt.Errorf("phase %s: %w", next, snapErr)
 	}
 	phaseCtx := cr.ctxSnap
 	if next == PhaseRetro {
@@ -387,13 +369,25 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 	}
 
 	return dispatchResult{
-		resp:           resp,
-		attemptCount:   attemptCount,
-		phaseWorktree:  phaseWorktree,
-		treeGuard:      treeGuard,
-		beforeDirty:    beforeDirty,
-		snapshotFailed: snapshotFailed,
-		runner:         runner,
-		phaseReq:       phaseReq,
+		resp:          resp,
+		attemptCount:  attemptCount,
+		phaseWorktree: phaseWorktree,
+		treeGuard:     treeGuard,
+		beforeDirty:   beforeDirty,
+		runner:        runner,
+		phaseReq:      phaseReq,
 	}, loopNext, nil
+}
+
+func (cr *cycleRun) snapshotMainTree(next Phase) (*treediff.Guard, []string, error) {
+	checkout := cr.mainTreeIsCheckout()
+	guard := treediff.New(retryingDirtyPaths(cr.o.gitDirtyPaths))
+	before, err := guard.Snapshot(cr.ctx, cr.req.ProjectRoot)
+	switch {
+	case err == nil:
+		return guard, before, nil
+	case !checkout:
+		return nil, nil, nil
+	}
+	return nil, nil, fmt.Errorf("%w for %s: %w", errPrePhaseSnapshot, next, err)
 }

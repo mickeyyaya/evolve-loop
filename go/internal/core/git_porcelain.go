@@ -25,12 +25,24 @@ func defaultGitHEAD() (string, error) {
 }
 
 func porcelainDirtySet(ctx context.Context, dir string) map[string]bool {
+	set, err := porcelainDirty(ctx, dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN dirty-set: %v — read as a clean tree\n", err)
+		return map[string]bool{}
+	}
+	return set
+}
+
+func porcelainDirty(ctx context.Context, dir string) (map[string]bool, error) {
 	set := map[string]bool{}
 	// -uall lists every untracked file individually (never a bare directory),
 	// so recoverBuildLeak can relocate leaks at file granularity.
 	out, code, err := gitCapture(ctx, dir, "status", "--porcelain", "-uall")
-	if err != nil || code != 0 {
-		return set
+	if err != nil {
+		return nil, fmt.Errorf("git status in %s: %w", dir, err)
+	}
+	if code != 0 {
+		return nil, fmt.Errorf("git status in %s: exit %d", dir, code)
 	}
 	for _, line := range strings.Split(out, "\n") {
 		if len(line) < 4 {
@@ -41,7 +53,7 @@ func porcelainDirtySet(ctx context.Context, dir string) map[string]bool {
 			set[old] = true
 		}
 	}
-	return set
+	return set, nil
 }
 
 // porcelainPath and porcelainOldPath delegate to the gitexec leaf, which owns
@@ -67,7 +79,10 @@ func gitCapture(ctx context.Context, dir string, args ...string) (string, int, e
 // diff would miss. Errors propagate so the guard degrades to "snapshot
 // missed" rather than misreporting leaks.
 func defaultGitDirtyPaths(ctx context.Context, repoRoot string) ([]string, error) {
-	set := porcelainDirtySet(ctx, repoRoot)
+	set, err := porcelainDirty(ctx, repoRoot)
+	if err != nil {
+		return nil, err
+	}
 	paths := make([]string, 0, len(set))
 	for p := range set {
 		paths = append(paths, p)

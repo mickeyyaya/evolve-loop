@@ -369,14 +369,14 @@ func foreignHistoryFailures(changed []string, current string) []string {
 func changedCycleRecords(changed []string) []string {
 	var records []string
 	for _, path := range uniqueSorted(changed) {
-		if isCycleChangeRecord(path) {
+		if IsCycleChangeRecord(path) {
 			records = append(records, path)
 		}
 	}
 	return records
 }
 
-func isCycleChangeRecord(path string) bool {
+func IsCycleChangeRecord(path string) bool {
 	return cycleRecordPath.MatchString(path)
 }
 

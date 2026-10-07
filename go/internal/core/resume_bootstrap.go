@@ -97,16 +97,15 @@ func (o *Orchestrator) loadResumeBootstrap(
 }
 
 type resumeInputs struct {
-	env               map[string]string
-	context           map[string]string
-	result            CycleResult
-	preResumeHEAD     string
-	mainDirtyBaseline map[string]bool
+	env           map[string]string
+	context       map[string]string
+	result        CycleResult
+	preResumeHEAD string
 }
 
 // snapshotResumeInputs copies caller-owned maps and restores derived runtime
 // inputs after the run identity and lease have been activated.
-func (o *Orchestrator) snapshotResumeInputs(ctx context.Context, boot *resumeBootstrap) resumeInputs {
+func (o *Orchestrator) snapshotResumeInputs(boot *resumeBootstrap) resumeInputs {
 	req := boot.request
 	cs := &boot.cycleState
 
@@ -133,10 +132,9 @@ func (o *Orchestrator) snapshotResumeInputs(ctx context.Context, boot *resumeBoo
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN resume cycle %d: legacy checkpoint has no pre-cycle HEAD; earlier ship throughput cannot be reconstructed from this checkpoint\n", boot.cycle)
 	}
 	return resumeInputs{
-		env:               envSnap,
-		context:           ctxSnap,
-		result:            result,
-		preResumeHEAD:     preResumeHEAD,
-		mainDirtyBaseline: porcelainDirtySet(ctx, req.ProjectRoot),
+		env:           envSnap,
+		context:       ctxSnap,
+		result:        result,
+		preResumeHEAD: preResumeHEAD,
 	}
 }

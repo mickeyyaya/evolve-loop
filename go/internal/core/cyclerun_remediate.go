@@ -64,16 +64,6 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 
 	// Tree-diff guard parity with a normal dispatch: snapshot before the fix
 	// dispatch, recover + check after; a main-tree leak voids the round.
-	var fixGuard *treediff.Guard
-	var fixBefore []string
-	fixSnapOK := false
-	if cr.o.gitDirtyPaths != nil {
-		fixGuard = treediff.New(cr.o.gitDirtyPaths)
-		if snap, serr := fixGuard.Snapshot(cr.ctx, cr.req.ProjectRoot); serr == nil {
-			fixBefore, fixSnapOK = snap, true
-		}
-	}
-
 	fixStarted := cr.o.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	breq := dr.phaseReq
 	// The gate's request is the template (same workspace/worktree/roots), but
@@ -92,11 +82,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 			"Read its report at %s and fix EXACTLY the enumerated defects in the worktree — "+
 			"typically missing tests for new code. Do not widen scope; do not touch unrelated "+
 			"files. The same gate re-runs immediately after you finish.", round, next, report)
-	obsCancel := cr.o.observer.Start(cr.ctx, string(PhaseBuild), breq)
-	bresp, berr := builder.Run(cr.ctx, breq)
-	if obsCancel != nil {
-		obsCancel()
-	}
+	fixGuard, fixBefore, bresp, berr := cr.snapshotThenRun(PhaseBuild, builder, breq)
 	// The fix dispatch burned tokens — record it whatever happens, under its
 	// own label so it never clobbers the build phase's own records.
 	fixAbort := ""
@@ -113,7 +99,6 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	fixResult := dispatchResult{
 		resp: bresp, attemptCount: 1, phaseWorktree: cr.cs.ActiveWorktree,
 		runner: builder, phaseReq: breq, treeGuard: fixGuard, beforeDirty: fixBefore,
-		snapshotFailed: !fixSnapOK,
 	}
 	if act, reviewErr := cr.reviewAndGuard(PhaseBuild, &fixResult); act == loopAbort {
 		note := fmt.Sprintf("%s: round %d voided (Build review rejected: %v)", next, round, reviewErr)
@@ -139,11 +124,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	cr.cs.PhaseStartedAt = cr.o.now().UTC().Format("2006-01-02T15:04:05Z07:00")
 	greq := dr.phaseReq
 	greq.CorrectionDirective = fmt.Sprintf("RE-VERIFY after remediation round %d: run your full check fresh against the current worktree.", round)
-	obsCancel = cr.o.observer.Start(cr.ctx, string(next), greq)
-	resp2, rerr := dr.runner.Run(cr.ctx, greq)
-	if obsCancel != nil {
-		obsCancel()
-	}
+	rerunGuard, rerunBefore, resp2, rerr := cr.snapshotThenRun(next, dr.runner, greq)
 	if rerr != nil {
 		if isQuotaWall(rerr) {
 			return loopAbort, cr.pauseForQuota(next, dr.resp, dr.attemptCount+round, rerr)
@@ -153,7 +134,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: gate re-run dispatch failed (%v) — original FAIL stands\n", rerr)
 		return loopNext, nil
 	}
-	dr.resp = resp2
+	dr.resp, dr.treeGuard, dr.beforeDirty = resp2, rerunGuard, rerunBefore
 	cr.result.Remediations = append(cr.result.Remediations,
 		fmt.Sprintf("%s: round %d -> %s", next, round, resp2.Verdict))
 	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s re-ran -> %s (round %d/%d)\n",
@@ -165,6 +146,24 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		return act, err
 	}
 	return loopNext, nil
+}
+
+func (cr *cycleRun) snapshotThenRun(phase Phase, runner PhaseRunner, req PhaseRequest) (*treediff.Guard, []string, PhaseResponse, error) {
+	guard, before, err := cr.snapshotMainTree(phase)
+	if err != nil {
+		return nil, nil, PhaseResponse{}, err
+	}
+	resp, err := cr.observedRun(phase, runner, req)
+	return guard, before, resp, err
+}
+
+func (cr *cycleRun) observedRun(phase Phase, runner PhaseRunner, req PhaseRequest) (PhaseResponse, error) {
+	cancel := cr.o.observer.Start(cr.ctx, string(phase), req)
+	resp, err := runner.Run(cr.ctx, req)
+	if cancel != nil {
+		cancel()
+	}
+	return resp, err
 }
 
 // remediableListed reports whether phase is in the configured remediable set.

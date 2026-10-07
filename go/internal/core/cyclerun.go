@@ -53,9 +53,8 @@ type cycleRun struct {
 	ctx context.Context // same ctx the inline closure/dispatch captured
 
 	// per-cycle constants (set once at construction, never reassigned)
-	req               CycleRequest
-	cycle             int
-	mainDirtyBaseline map[string]bool
+	req   CycleRequest
+	cycle int
 	// consoleLeased: an operator lease ADOPTED at cycle start (hub-resident; a
 	// mid-cycle write cannot waive the cycle that made it).
 	// See ADR-0080.
@@ -70,8 +69,9 @@ type cycleRun struct {
 	workflowConfig policy.WorkflowConfig // resolved once at orchestrator construction
 
 	// heavily-mutated shared state (mutated by sub-methods, read post-loop)
-	state        State              // &cr.state passed to recordFailureLearning + finalizeCycle
-	cs           CycleState         // the ONE authoritative CycleState the loop drives
+	state        State      // &cr.state passed to recordFailureLearning + finalizeCycle
+	cs           CycleState // the ONE authoritative CycleState the loop drives
+	checkout     *checkoutDecision
 	result       CycleResult        // accumulating result; mutated via &cr.result; returned on every abort
 	phaseTimings []phaseTimingEntry // appended via &cr.phaseTimings; read by RunCycle's exit defer (live header)
 	// timingsFlushed/timingsComposed make the phase-timing composition happen
@@ -108,14 +108,13 @@ type cycleRun struct {
 // reviewAndGuard/recordAndBranch consume. These are PER-ITERATION values, NOT
 // cycleRun fields (each iteration re-derives them).
 type dispatchResult struct {
-	resp           PhaseResponse // runner result; resp.Verdict → result.FinalVerdict + lastVerdict
-	attemptCount   int           // attempt-loop count; read by phaseOutcomeFrom at the record sites
-	phaseWorktree  string
-	treeGuard      *treediff.Guard // pre-phase guard; consumed by the post-phase tree-diff check
-	beforeDirty    []string        // pre-phase dirty snapshot
-	snapshotFailed bool            // pre-phase snapshot failed
-	runner         PhaseRunner     // resolved runner; reviewAndGuard re-dispatches it in the correction ladder
-	phaseReq       PhaseRequest    // the phase request; reviewAndGuard mutates CorrectionDirective for re-dispatch
+	resp          PhaseResponse // runner result; resp.Verdict → result.FinalVerdict + lastVerdict
+	attemptCount  int           // attempt-loop count; read by phaseOutcomeFrom at the record sites
+	phaseWorktree string
+	treeGuard     *treediff.Guard // pre-phase guard; consumed by the post-phase tree-diff check
+	beforeDirty   []string        // pre-phase dirty snapshot
+	runner        PhaseRunner     // resolved runner; reviewAndGuard re-dispatches it in the correction ladder
+	phaseReq      PhaseRequest    // the phase request; reviewAndGuard mutates CorrectionDirective for re-dispatch
 }
 
 // recordFailureLearning replaces RunCycle's inline closure: it builds the
@@ -333,16 +332,11 @@ func (o *Orchestrator) finalizeCycle(ctx context.Context, cs CycleState, cycle i
 	return preserveWorktree, nil
 }
 
-// cycleInit carries the resources RunCycle's setup produces and the rest of the
-// cycle consumes: the read state, the freshly-built CycleState, the allocated
-// cycle number, and the main-tree dirty baseline (subtracted by recoverBuildLeak
-// so it only relocates paths the build introduced).
 type cycleInit struct {
-	state             State
-	cs                CycleState
-	cycle             int
-	mainDirtyBaseline map[string]bool
-	consoleLeased     map[string]bool
+	state         State
+	cs            CycleState
+	cycle         int
+	consoleLeased map[string]bool
 }
 
 // newCycleRun performs RunCycle's resource setup (extracted behavior-preserving):
@@ -473,10 +467,6 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN workspace archive failed: %v\n", err)
 		}
 	}
-	// Full main-tree dirty baseline (tracked + untracked) captured BEFORE any
-	// phase runs. recoverBuildLeak subtracts it so it only relocates paths the
-	// build introduced, never the operator's pre-existing work.
-	mainDirtyBaseline := porcelainDirtySet(ctx, req.ProjectRoot)
 	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), os.Stderr)
 	// Safe worktrees are cleaned on cycle exit (after ship has merged the
 	// worktree→main).
@@ -544,11 +534,10 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	stack = append(stack, func(_, _ bool) { stopLease() })
 
 	return cycleInit{
-		state:             state,
-		cs:                cs,
-		cycle:             cycle,
-		mainDirtyBaseline: mainDirtyBaseline,
-		consoleLeased:     consoleLeased,
+		state:         state,
+		cs:            cs,
+		cycle:         cycle,
+		consoleLeased: consoleLeased,
 	}, run, nil
 }
 

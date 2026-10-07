@@ -67,7 +67,7 @@ func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
 			})
 		}},
 		{"recoverBuildLeak (git checkout -- / add -f)", func(t *testing.T, r inPlaceRepo) string {
-			if !recoverBuildLeak(ctx, r.root, r.root, map[string]bool{}, true) {
+			if !recoverBuildLeak(ctx, leakRecovery{projectRoot: r.root, worktree: r.root, baseline: map[string]bool{}, authority: sourceWriterAuthority}) {
 				t.Error("an in-place root has nothing to relocate — recovery reports done, never failed")
 			}
 			return "recovered"

@@ -5,10 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
-	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 )
 
 // applyPostReviewGuards runs only after the deliverable review and correction
@@ -46,15 +44,10 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 		cr.preserveWorktree = false
 	}
 
-	// The post-phase tree-diff check runs BEFORE the ledger append so a leak
-	// aborts the cycle without recording the phase as a success. Snapshot
-	// failures (pre OR post) degrade silently — the guard is
-	// belt-and-suspenders to the OS sandbox, so a transient git read error
-	// must never cause a false abort.
-	if dr.treeGuard != nil && !dr.snapshotFailed {
+	if dr.treeGuard != nil {
 		res := dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty)
 		if res.SnapshotMissed {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff post-phase snapshot failed for %s (sandbox guard degraded; not aborting)\n", next)
+			return cr.abortUncheckedPhase(next, dr)
 		} else if !res.OK() {
 			// Attempt phase-agnostic binary churn discard for build artifacts
 			var relBin string
@@ -74,30 +67,14 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 			}
 
 			res2 := dr.treeGuard.Check(cr.ctx, cr.req.ProjectRoot, dr.beforeDirty)
+			if res2.SnapshotMissed {
+				return cr.abortUncheckedPhase(next, dr)
+			}
 			if res2.OK() {
 				fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: discarded binary rebuild churn in phase %s; continuing\n", next)
 			} else {
-				// isLegitimateMainTreePath, isScoutEvalMaterialization and
-				// isActiveMintPhasePath each exempt one class of legitimate
-				// main-tree write from the leak guard — a phase's own .evolve/
-				// workspace writes, scout's contract-mandated eval writes, and a
-				// concurrent fleet lane's registered mint — so real escapes stay
-				// armed: source files, non-scout/non-eval deliverable paths, and
-				// both sides of a leak-disguising rename still abort.
 				leaked := res2.Leaked
-				mints, mintErr := mintregistry.ActiveNames(mintregistry.Path(cr.req.ProjectRoot), time.Now())
-				if mintErr != nil {
-					// ABNORMAL, not WARN: a corrupt registry is either damage or a
-					// deliberate availability attack. Quarantine bounds the
-					// outage to this one check; the guard stays armed either way.
-					fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL tree-diff: mint registry unreadable (%v); mint exemption disabled for this check\n", mintErr)
-					if _, qErr := mintregistry.QuarantineCorrupt(mintregistry.Path(cr.req.ProjectRoot)); qErr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: mint registry quarantine failed: %v\n", qErr)
-					}
-				} else {
-					mints = verifiedActiveMints(cr.req.ProjectRoot, mints)
-				}
-				realLeaks, waived := filterRealLeaks(next, leaked, mints, cr.consoleLeased, os.Stderr)
+				realLeaks, waived := filterRealLeaks(leaked, cr.leakExemptions(), os.Stderr)
 				if len(realLeaks) == 0 {
 					if waived > 0 {
 						fmt.Fprintf(os.Stderr, "[orchestrator] WARN tree-diff: phase %s continued only because %d leaked path(s) were console-leased (ADR-0080 S4) — not a clean phase\n", next, waived)
@@ -127,4 +104,11 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 	}
 
 	return loopNext, nil
+}
+
+func (cr *cycleRun) abortUncheckedPhase(next Phase, dr *dispatchResult) (loopAction, error) {
+	phaseErr := fmt.Errorf("tree-diff guard: the post-phase main-tree snapshot for %s failed after %d attempts, so the phase's writes cannot be checked", next, snapshotAttempts)
+	cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
+	cr.recordFailureLearning(next, phaseErr, 1)
+	return loopAbort, phaseErr
 }

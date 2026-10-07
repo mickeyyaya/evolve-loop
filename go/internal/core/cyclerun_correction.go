@@ -283,7 +283,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			}
 			// A correction is a fresh authoring pass. Establish the same recovered
 			// and normalized filesystem view used for the initial review.
-			if phaseErr := cr.prepareForReview(next); phaseErr != nil {
+			if phaseErr := cr.prepareForReview(next, dr); phaseErr != nil {
 				recordCorrection(interaction.ResultRejectedAgain)
 				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 				cr.recordFailureLearning(next, phaseErr, corr)
