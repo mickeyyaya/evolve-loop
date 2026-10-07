@@ -73,7 +73,7 @@ func (v resolver) legacyUnlocked(req Request, prof *profiles.Profile, plan llmro
 		return plan
 	}
 	discovered := llmroute.ExcludeFamilies(v.host.Discover(), wf.UniversalFallbackExclude)
-	tailed := llmroute.ApplyUniversalFallback(plan, llmroute.AllowedDiscovered(discovered, prof), nil)
+	tailed := llmroute.ApplyUniversalFallback(plan, llmroute.AllowedDiscovered(discovered, prof))
 	v.logReorder(req, "universal fallback appended to", plan.Candidates, tailed.Candidates)
 	return tailed
 }

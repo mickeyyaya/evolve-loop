@@ -1,27 +1,13 @@
 package llmroute
 
 import (
-	"errors"
 	"strings"
 	"testing"
 )
 
-func lookPathStub(present ...string) func(string) (string, error) {
-	set := map[string]struct{}{}
-	for _, p := range present {
-		set[p] = struct{}{}
-	}
-	return func(bin string) (string, error) {
-		if _, ok := set[bin]; ok {
-			return "/usr/local/bin/" + bin, nil
-		}
-		return "", errors.New("not found")
-	}
-}
-
 func TestApplyUniversalFallback_AllStaticMissing_AppendsDiscovered(t *testing.T) {
-	p := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}} // both binaries absent
-	got := ApplyUniversalFallback(p, []string{"agy-tmux"}, lookPathStub("agy"))
+	p := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}}
+	got := ApplyUniversalFallback(p, []string{"agy-tmux"})
 	want := []string{"claude-tmux", "codex-tmux", "agy-tmux"}
 	if len(got.Candidates) != len(want) {
 		t.Fatalf("candidates = %v, want %v", got.Candidates, want)
@@ -35,7 +21,7 @@ func TestApplyUniversalFallback_AllStaticMissing_AppendsDiscovered(t *testing.T)
 
 func TestApplyUniversalFallback_AConfiguredCLIAvailable_AppendsTheRestAsLastResort(t *testing.T) {
 	p := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}}
-	got := ApplyUniversalFallback(p, []string{"agy-tmux"}, lookPathStub("codex")) // codex present
+	got := ApplyUniversalFallback(p, []string{"agy-tmux"})
 	want := []string{"claude-tmux", "codex-tmux", "agy-tmux"}
 	if strings.Join(got.Candidates, " ") != strings.Join(want, " ") {
 		t.Fatalf("a present configured CLI keeps precedence and the discovered rest is appended; got %v", got.Candidates)
@@ -44,7 +30,7 @@ func TestApplyUniversalFallback_AConfiguredCLIAvailable_AppendsTheRestAsLastReso
 
 func TestApplyUniversalFallback_NoDiscovered_FailLoudPreserved(t *testing.T) {
 	p := Plan{Candidates: []string{"claude-tmux"}}
-	got := ApplyUniversalFallback(p, nil, lookPathStub())
+	got := ApplyUniversalFallback(p, nil)
 	if len(got.Candidates) != 1 || got.Candidates[0] != "claude-tmux" {
 		t.Fatalf("no discovered CLIs must leave the plan untouched (fail-loud); got %v", got.Candidates)
 	}
@@ -57,7 +43,7 @@ func TestApplyUniversalFallback_DedupesAndPreservesOtherFields(t *testing.T) {
 		Model:      "auto",
 		Tiers:      []string{"deep"},
 	}
-	got := ApplyUniversalFallback(p, []string{"agy-tmux", "codex-tmux"}, lookPathStub()) // all static missing
+	got := ApplyUniversalFallback(p, []string{"agy-tmux", "codex-tmux"})
 	want := []string{"claude-tmux", "agy-tmux", "codex-tmux"}
 	if len(got.Candidates) != len(want) {
 		t.Fatalf("candidates = %v, want %v (dedup agy)", got.Candidates, want)
@@ -74,7 +60,7 @@ func TestApplyUniversalFallback_DedupesAndPreservesOtherFields(t *testing.T) {
 
 func TestApplyUniversalFallback_UnknownCandidateName_ConfiguredStaysFirst(t *testing.T) {
 	p := Plan{Candidates: []string{"some-future-cli"}}
-	got := ApplyUniversalFallback(p, []string{"agy-tmux"}, lookPathStub())
+	got := ApplyUniversalFallback(p, []string{"agy-tmux"})
 	if strings.Join(got.Candidates, " ") != "some-future-cli agy-tmux" {
 		t.Fatalf("configured first, discovered appended; got %v", got.Candidates)
 	}

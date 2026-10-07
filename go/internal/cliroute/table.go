@@ -143,7 +143,7 @@ func (t Table) withAfterChain(plan llmroute.Plan, allowed []string) llmroute.Pla
 	if t.stop {
 		return plan
 	}
-	return llmroute.ApplyUniversalFallback(plan, afterChainTail(allowed), nil)
+	return llmroute.ApplyUniversalFallback(plan, afterChainTail(allowed))
 }
 
 func (t Table) ceilingRefusal(rule string, chain, tiers []string) *CeilingError {

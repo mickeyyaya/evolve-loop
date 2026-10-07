@@ -145,7 +145,7 @@ func resolveTriggers(prof *profiles.Profile) []int {
 	if prof != nil && len(prof.CLIFallbackOnExit) > 0 {
 		return append([]int(nil), prof.CLIFallbackOnExit...)
 	}
-	return defaultFallbackOnExit
+	return DefaultTriggers()
 }
 
 // Probe demotes (never drops) candidates whose binary is off PATH; nil lookPath means exec.LookPath.
@@ -178,11 +178,10 @@ func Probe(p Plan, lookPath func(string) (string, error)) Plan {
 }
 
 // ApplyUniversalFallback appends the discovered CLIs after the configured chain, deduped against it.
-func ApplyUniversalFallback(p Plan, discovered []string, lookPath func(string) (string, error)) Plan {
+func ApplyUniversalFallback(p Plan, discovered []string) Plan {
 	if len(discovered) == 0 {
 		return p
 	}
-	_ = lookPath // unused: binary presence never suppresses the tail
 	seen := make(map[string]struct{}, len(p.Candidates))
 	for _, c := range p.Candidates {
 		seen[c] = struct{}{}
@@ -212,12 +211,23 @@ func Binary(cli string) string { return cliBinaryFor[cli] }
 
 // ApplyDriverBench demotes candidates benched by full driver name (driver → BenchedAt), never by family.
 func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
-	if len(p.Candidates) <= 1 || len(benchedDrivers) == 0 {
+	return applyBenchKeyed(p, benchedDrivers, driverName)
+}
+
+// ApplyBench demotes candidates whose family is benched (family → BenchedAt); all benched runs least-recent first.
+func ApplyBench(p Plan, benched map[string]time.Time) Plan {
+	return applyBenchKeyed(p, benched, Family)
+}
+
+func driverName(cli string) string { return cli }
+
+func applyBenchKeyed(p Plan, benched map[string]time.Time, benchKey func(cli string) string) Plan {
+	if len(p.Candidates) <= 1 || len(benched) == 0 {
 		return p
 	}
 	var healthy, demoted []string
 	for _, cli := range p.Candidates {
-		if _, hit := benchedDrivers[cli]; hit {
+		if _, hit := benched[benchKey(cli)]; hit {
 			demoted = append(demoted, cli)
 		} else {
 			healthy = append(healthy, cli)
@@ -227,33 +237,7 @@ func ApplyDriverBench(p Plan, benchedDrivers map[string]time.Time) Plan {
 	if len(healthy) == 0 { // bench is advice, never a veto
 		all := append([]string(nil), p.Candidates...)
 		sort.SliceStable(all, func(i, j int) bool {
-			return benchedDrivers[all[i]].Before(benchedDrivers[all[j]])
-		})
-		out.Candidates = all
-		return out
-	}
-	out.Candidates = append(healthy, demoted...)
-	return out
-}
-
-// ApplyBench demotes candidates whose family is benched (family → BenchedAt); all benched runs least-recent first.
-func ApplyBench(p Plan, benched map[string]time.Time) Plan {
-	if len(p.Candidates) <= 1 || len(benched) == 0 {
-		return p
-	}
-	var healthy, demoted []string
-	for _, cli := range p.Candidates {
-		if _, hit := benched[Family(cli)]; hit {
-			demoted = append(demoted, cli)
-		} else {
-			healthy = append(healthy, cli)
-		}
-	}
-	out := p
-	if len(healthy) == 0 {
-		all := append([]string(nil), p.Candidates...)
-		sort.SliceStable(all, func(i, j int) bool {
-			return benched[Family(all[i])].Before(benched[Family(all[j])])
+			return benched[benchKey(all[i])].Before(benched[benchKey(all[j])])
 		})
 		out.Candidates = all
 		return out
