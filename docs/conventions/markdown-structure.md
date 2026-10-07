@@ -5,22 +5,22 @@ metadata:
   type: convention
 ---
 
-> **Canonical markdown schema** — every reference, architecture, skill, and agent doc in this project follows this schema. Tools: `legacy/scripts/utility/lint-markdown-structure.sh` (WARN linter), `legacy/scripts/utility/extract-tldr.sh` (TLDR extractor).
+> **Canonical markdown schema.** Every reference, architecture, skill and agent doc in this project follows this schema. Tools: `legacy/scripts/utility/lint-markdown-structure.sh` (WARN linter), `legacy/scripts/utility/extract-tldr.sh` (TLDR extractor).
 
 ## TLDR
 
-**Synopsis:** All markdown files must follow this schema: YAML frontmatter block, TLDR section with synopsis + key points + non-goals, TOC for files over 100 lines, tables over prose lists, and imperative voice in headings.
+**Synopsis:** All markdown files must follow this schema: a YAML frontmatter block and a TLDR section (synopsis + key points + non-goals). They also need a TOC for files over 100 lines, tables over prose lists, and imperative voice in headings.
 
 **Key points:**
-- Frontmatter is mandatory: `name`, `description`, `metadata.type` fields required
-- TLDR section required in every file; synopsis + key points + non-goals sub-structure
-- TOC required for files exceeding 100 lines
-- Tables preferred over prose lists for structured data
-- Imperative voice in H2 headings (e.g., "Run the linter" not "Running the linter")
-- One-line comments only; no multi-paragraph docstrings
-- Inter-doc links use `[[name]]` slug pattern
+- Frontmatter is mandatory. The `name`, `description` and `metadata.type` fields are required.
+- Every file requires a TLDR section, with the sub-structure synopsis + key points + non-goals.
+- A file of more than 100 lines requires a TOC.
+- Tables are preferred over prose lists for structured data.
+- Use the imperative voice in H2 headings (for example, "Run the linter", not "Running the linter").
+- Use one-line comments only. Do not use multi-paragraph docstrings.
+- Inter-doc links use the `[[name]]` slug pattern.
 
-**Non-goals:** Enforcing this schema retroactively on legacy files this cycle; gating ship on lint failures; reformatting prose body paragraphs.
+**Non-goals:** to enforce this schema retroactively on legacy files this cycle; to gate ship on lint failures; to reformat prose body paragraphs.
 
 ## Table of Contents
 
@@ -69,7 +69,7 @@ Optional fields:
 
 ## TLDR Section
 
-Place immediately after the blockquote header (if present) or after frontmatter. Required in every file.
+Put it immediately after the blockquote header (if present) or after the frontmatter. Every file requires it.
 
 ```markdown
 ## TLDR
@@ -84,7 +84,7 @@ Place immediately after the blockquote header (if present) or after frontmatter.
 **Non-goals:** <what this file does NOT cover, one line>
 ```
 
-The TLDR is the first thing readers and tools see. Keep synopsis under 25 words. Key points are 2–5 bullets. Non-goals prevents scope creep.
+The TLDR is the first thing readers and tools see. Keep the synopsis under 25 words. Key points are 2–5 bullets. The Non-goals line prevents scope creep.
 
 ---
 
@@ -99,13 +99,13 @@ Add a TOC when the file exceeds 100 lines. Format:
 2. [Another Section](#another-anchor)
 ```
 
-Anchors are lowercase, spaces replaced by hyphens, special chars dropped. Do not add a TOC for files under 100 lines — it adds noise without benefit.
+Anchors are lowercase. Hyphens replace spaces, and special chars are dropped. Do not add a TOC for files under 100 lines. It adds noise without benefit.
 
 ---
 
 ## Tables Over Prose
 
-Use tables for any structured comparison, parameter list, enum description, or mapping. Prefer:
+Use tables for any structured comparison, parameter list, enum description or mapping. Prefer this form:
 
 ```markdown
 | Key | Value | Notes |
@@ -113,9 +113,9 @@ Use tables for any structured comparison, parameter list, enum description, or m
 | ... | ...   | ...   |
 ```
 
-Over prose like "The key can be X, Y, or Z. X means this. Y means that."
+Prefer it to prose like "The key can be X, Y, or Z. X means this. Y means that."
 
-Exception: narrative explanation that requires sentences to convey causality belongs in prose paragraphs, not tables.
+Exception: a narrative explanation that needs sentences to show causality belongs in prose paragraphs, not in tables.
 
 ---
 
@@ -135,7 +135,7 @@ Body prose can use any clear voice. Headings must be imperative.
 
 ## Comment Style
 
-One-line comments only. No multi-paragraph docstrings or comment blocks.
+Use one-line comments only. Do not use multi-paragraph docstrings or comment blocks.
 
 ```markdown
 <!-- one-line note here -->
@@ -147,21 +147,21 @@ Use anchors for tool-targeted sections:
 <!-- ANCHOR:acceptance_criteria -->
 ```
 
-Do not add comments that explain WHAT the section does — the heading already does that.
+Do not add comments that explain WHAT the section does. The heading already does that.
 
 ---
 
 ## Inter-doc Links
 
-Reference related documents using the `[[name]]` slug pattern in body text:
+To refer to related documents in body text, use the `[[name]]` slug pattern:
 
 ```markdown
 See [[incremental-intent]] for the delta-mode design.
 ```
 
-The `name` field in the referenced file's frontmatter is the canonical slug. Unresolved links (pointing to a file not yet created) are allowed — they mark future work. Lint tools report them as INFO, not WARN.
+The `name` field in the frontmatter of the referenced file is the canonical slug. Unresolved links (to a file that does not exist yet) are permitted. They mark future work. Lint tools report them as INFO, not WARN.
 
-For actual hyperlinks use standard markdown: `[text](path/to/file.md)`.
+For actual hyperlinks, use standard markdown: `[text](path/to/file.md)`.
 
 ---
 
@@ -223,7 +223,7 @@ bash legacy/scripts/utility/extract-tldr.sh <path/to/file.md>
 
 Exit codes: 0 = found, 1 = not found.
 
-The linter always exits 0 (WARN-only). No gate integration this cycle.
+The linter always exits 0 (WARN-only). This cycle adds no gate integration.
 
 ---
 
@@ -231,4 +231,4 @@ The linter always exits 0 (WARN-only). No gate integration this cycle.
 
 - `legacy/scripts/utility/lint-markdown-structure.sh` — WARN-only linter
 - `legacy/scripts/utility/extract-tldr.sh` — TLDR extractor
-- [[feedback_skill_file_structure]] — operator memory entry that motivated this convention
+- [[feedback_skill_file_structure]] — the operator memory entry that motivated this convention
