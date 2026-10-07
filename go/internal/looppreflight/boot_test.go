@@ -29,8 +29,8 @@ func TestRun_BridgeBoot_Skipped_Warns(t *testing.T) {
 func TestRun_BridgeBoot_Success_Passes(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.SkipBoot = false
-	opts.BootTester = func(ctx context.Context, driver string, sandbox bool) (int, string) {
-		return bridge.ExitOK, ""
+	opts.BootTester = func(ctx context.Context, driver string, sandbox bool) BootOutcome {
+		return BootOutcome{RC: bridge.ExitOK, Scrollback: ""}
 	}
 	r, err := Run(opts)
 	if err != nil {
@@ -45,8 +45,8 @@ func TestRun_BridgeBoot_Success_Passes(t *testing.T) {
 func TestRun_BridgeBoot_Timeout_Halts(t *testing.T) {
 	opts := goodPipelineOptions(t)
 	opts.SkipBoot = false
-	opts.BootTester = func(ctx context.Context, driver string, sandbox bool) (int, string) {
-		return bridge.ExitREPLBootTimeout, "...waiting for prompt marker\nboot timed out after 60s"
+	opts.BootTester = func(ctx context.Context, driver string, sandbox bool) BootOutcome {
+		return BootOutcome{RC: bridge.ExitREPLBootTimeout, Scrollback: "...waiting for prompt marker\nboot timed out after 60s"}
 	}
 	r, err := Run(opts)
 	if err != nil {
@@ -74,9 +74,9 @@ func TestRun_BridgeBoot_OnlyTmuxDrivers(t *testing.T) {
 		return profiles.Profile{Name: name, CLI: "claude-p", CLIFallback: []string{"claude-tmux"}}, nil
 	}
 	var booted []string
-	opts.BootTester = func(ctx context.Context, driver string, sandbox bool) (int, string) {
+	opts.BootTester = func(ctx context.Context, driver string, sandbox bool) BootOutcome {
 		booted = append(booted, driver)
-		return bridge.ExitOK, ""
+		return BootOutcome{RC: bridge.ExitOK, Scrollback: ""}
 	}
 	if _, err := Run(opts); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -96,9 +96,9 @@ func TestRun_BridgeBoot_SandboxEngageDerived(t *testing.T) {
 		opts.HostProbe = func() preflight.Profile {
 			return preflight.Profile{Sandbox: preflight.Sandbox{ExpectedToWork: expectWork, SandboxExecAvailable: expectWork}}
 		}
-		opts.BootTester = func(ctx context.Context, driver string, sandbox bool) (int, string) {
+		opts.BootTester = func(ctx context.Context, driver string, sandbox bool) BootOutcome {
 			sandboxArg = sandbox
-			return bridge.ExitOK, ""
+			return BootOutcome{RC: bridge.ExitOK, Scrollback: ""}
 		}
 		if _, err := Run(opts); err != nil {
 			t.Fatalf("Run: %v", err)

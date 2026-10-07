@@ -1,0 +1,24 @@
+Current session
+██████████████████████████████████████████████████ 100% used
+Resets 12:40am (Asia/Taipei)
+Current week (all models)
+████████████████████████████████                   64% used
+Resets Oct 11 at 9pm (Asia/Taipei)
+Current week (Fable)
+                                                   0% used
+Resets Oct 11 at 9pm (Asia/Taipei)
+
+What's contributing to your limits usage?
+Approximate, based on local sessions on this machine — does not include other devices or claude.ai
+
+Subagents                                          41%
+Main conversation                                  59%
+  general-purpose                                  23%
+  code-reviewer                                    18%
+
+d to day · w to week
+
+Usage credits
+Usage credits are off · /usage-credits to turn them on
+
+Esc to cancel

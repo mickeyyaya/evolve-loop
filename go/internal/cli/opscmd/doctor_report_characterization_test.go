@@ -55,7 +55,7 @@ func TestDoctorCharacterization_LiveReport(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var out, errb bytes.Buffer
-		code := reportDoctorLiveResult(liveProbeTarget{driver: "claude-tmux"}, tc.asJSON, tc.rc, tc.pattern, tc.scrollback, &out, &errb)
+		code := reportDoctorLiveResult(liveOutcome{target: liveProbeTarget{driver: "claude-tmux"}, asJSON: tc.asJSON, rc: tc.rc, pattern: tc.pattern, scrollback: tc.scrollback}, &out, &errb)
 		checkDoctorReport(t, tc.name, code, tc.wantCode, out.String(), tc.wantStdout, errb.String(), tc.wantStderr)
 	}
 }

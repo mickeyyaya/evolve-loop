@@ -190,9 +190,9 @@ func TestCheckLevel_StringUnknown(t *testing.T) {
 
 func TestNewDefaultBootTester_InvalidDriverReturnsBadFlags(t *testing.T) {
 	tester := newDefaultBootTester(t.TempDir(), io.Discard)
-	rc, scrollback := tester(context.Background(), "not-a-real-driver", true)
-	if rc != bridge.ExitBadFlags {
-		t.Fatalf("invalid driver rc = %d, want ExitBadFlags; scrollback=%q", rc, scrollback)
+	out := tester(context.Background(), "not-a-real-driver", true)
+	if out.RC != bridge.ExitBadFlags || out.Wall != "" {
+		t.Fatalf("invalid driver = %+v, want ExitBadFlags and no wall", out)
 	}
 }
 

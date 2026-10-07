@@ -21,10 +21,10 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/clicontrol"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
 // benchReason labels a bench written by the proactive probe (vs the reactive
@@ -45,6 +45,8 @@ type Prober struct {
 	Families []string
 	Probe    func(ctx context.Context, family string) (pane string, err error)
 	Classify func(family, pane string) bool
+	Windows  func(family, pane string) []quotastate.UsageWindow
+	Record   func(cli string, windows []quotastate.UsageWindow) error
 	Store    *clihealth.Store
 	Log      io.Writer
 }
@@ -109,16 +111,7 @@ func (p *Prober) probeOne(ctx context.Context, family string) {
 	if ctx.Err() != nil {
 		return // never author a bench after the interrupt, even from a pane read just before it
 	}
-	if !p.Classify(family, pane) {
-		return // healthy (or unclassifiable) — never a false bench
-	}
-	// BenchWall does the rest: parse the pane's reset hint (else strike-scaled
-	// cooldown), accumulate strikes, keep the evidence line, all under the flock.
-	entry, berr := p.Store.BenchWall(family, benchReason, pane)
-	if berr != nil {
-		fmt.Fprintf(p.Log, "[usage-probe] WARN bench %s failed: %v\n", family, berr)
-		return
-	}
-	fmt.Fprintf(p.Log, "[usage-probe] %s capped — benched until %s (strikes=%d)\n",
-		family, entry.BenchedUntil.Format(time.RFC3339), entry.Strikes)
+	r := p.read(family, pane)
+	p.record(family, r)
+	p.act(family, r)
 }

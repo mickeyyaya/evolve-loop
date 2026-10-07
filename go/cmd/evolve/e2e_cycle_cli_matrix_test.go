@@ -256,10 +256,7 @@ func setupTempProject(t *testing.T, repoRoot string) string {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatalf("mkdir .evolve: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"),
-		[]byte(`{"catalog":{"auto_refresh":false}}`+"\n"), 0o644); err != nil {
-		t.Fatalf("write policy.json: %v", err)
-	}
+	writeProjectPolicy(t, root, nil)
 
 	profilesDir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(profilesDir, 0o755); err != nil {
@@ -315,6 +312,24 @@ func TestAuditFixture(t *testing.T) {
 	gitInit(t, root)
 
 	return root
+}
+
+func writeProjectPolicy(t *testing.T, root string, extra map[string]any) {
+	t.Helper()
+	policy := map[string]any{
+		"catalog":    map[string]any{"auto_refresh": false},
+		"cli_health": map[string]any{"usage_evidence_timeout_s": 1},
+	}
+	for key, block := range extra {
+		policy[key] = block
+	}
+	body, err := json.Marshal(policy)
+	if err != nil {
+		t.Fatalf("marshal policy.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), append(body, '\n'), 0o644); err != nil {
+		t.Fatalf("write policy.json: %v", err)
+	}
 }
 
 func gitInit(t *testing.T, root string) {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -269,6 +270,51 @@ func TestLiveCheck_ProbesTheFamilysTmuxDriverAndNamesAFailure(t *testing.T) {
 	}
 	if !reflect.DeepEqual(probed, []string{"claude-tmux", "codex-tmux"}) {
 		t.Errorf("probed %q", probed)
+	}
+}
+
+func TestLiveCheck_ABareREPLBootTimeoutIsABootTimeoutWithItsPaneAndAWallIsNot(t *testing.T) {
+	check := liveCheck(func(context.Context) liveProbe {
+		return func(driver string) (int, string, string) {
+			if driver == "agy-tmux" {
+				return bridge.ExitREPLBootTimeout, "", "Antigravity CLI\n  signing in…\n"
+			}
+			return bridge.ExitREPLBootTimeout, "auth_recheck", "Please log in"
+		}
+	})
+
+	err := check(context.Background(), "agy")
+	if !errors.Is(err, cliupdate.ErrBootTimeout) || !strings.Contains(err.Error(), "signing in") || !strings.Contains(err.Error(), "2 attempt") {
+		t.Fatalf("a bare exit 80 must wrap cliupdate.ErrBootTimeout and carry the attempts and the final pane, got %v", err)
+	}
+	if err := check(context.Background(), "codex"); errors.Is(err, cliupdate.ErrBootTimeout) {
+		t.Errorf("a login wall at boot is a classified wall, not a cold start: %v", err)
+	}
+}
+
+func TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding(t *testing.T) {
+	var log bytes.Buffer
+	pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"Antigravity CLI\n  signing in…"}, 512)}
+	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &log}
+
+	rc, _, scrollback := liveProbeWith(context.Background(), t.TempDir(), deps)("agy-tmux")
+
+	if rc != bridge.ExitREPLBootTimeout || !strings.Contains(scrollback, "signing in") {
+		t.Fatalf("rc=%d scrollback=%q; want a loud boot timeout with the pane", rc, scrollback)
+	}
+	if got := strings.Count(log.String(), "launching: "); got != 2 {
+		t.Errorf("%d agy launches; the probe retries one REPL-boot timeout:\n%s", got, log.String())
+	}
+	if !strings.Contains(log.String(), "cold start: boot attempt 1 of 2") {
+		t.Errorf("the log does not name the cold start:\n%s", log.String())
+	}
+}
+
+func TestBoundaryCLIUpdate_ABootTimeoutOrAVerifiedQuotaCauseIsAWarningLine(t *testing.T) {
+	for _, status := range []cliupdate.Status{cliupdate.StatusBootTimeout, cliupdate.StatusQuotaExhausted} {
+		if prefix := cliUpdateLogPrefix[status]; !strings.Contains(prefix, "WARN") {
+			t.Errorf("%s at the boundary prints as %q; want a WARN line", status, prefix)
+		}
 	}
 }
 

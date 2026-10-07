@@ -262,6 +262,7 @@
 ./internal/bridge
 ./internal/bridge/clicontrol
 ./internal/usageprobe
+./internal/usageevidence
 ./internal/phasecontract
 ./internal/router
 ./internal/interaction

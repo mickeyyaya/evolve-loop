@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A composition test over the real bridgechain walker and the production wiring pins strikes == 1 for one exit-85 escalation report, on the runner's walk and on the advisor's walk alike",
+    "With no usage explainer wired, the same exit-85 report still benches its family once through the dedicated decorator",
+    "An exhausted usage screen read for the failure still benches the family until the screen's reset, and the report adds no second strike",
+    "phases/runner/dispatch.go and the bridgechain walker no longer call BenchOnEscalation, and no exit-85 bench predicate tests bridgeErr"
+  ],
+  "created_at": "2026-10-07T03:00:00Z",
+  "files": [
+    "go/internal/usageevidence/usageevidence.go",
+    "go/internal/phases/runner/dispatch.go",
+    "go/internal/bridgechain/bridgechain.go"
+  ],
+  "fix": "Extract the escalation bench into one dedicated core.Bridge decorator (for example bridgechain.EscalationBench) that the composition root wraps around the raw bridge unconditionally, beneath both walkers, so every attempt of every walk passes through it whether or not a usage explainer is wired. Remove the bench from usageevidence.Bridge.Launch, delete the runner's maybeBenchOnEscalation call together with its bridgeErr != nil predicate, and delete the walker's WithBench option and BenchFunc. Keep the order in which the usage evidence runs before the bench, so an exhausted usage screen still sets the bench until its reset and the report is then skipped as already benched.",
+  "id": "escalation-bench-own-decorator",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console lane cl-agyreliab, second delta re-review MEDIUM-C, 2026-10-07",
+  "summary": "Since the agy reliability lane (2026-10-07) bridgechain.BenchOnEscalation is the one bench rule for an exit-85 escalation report, and it benches a report once. Three sites still call it. The usage-evidence decorator (internal/usageevidence Bridge.Launch) calls it on every exit 85. The phase runner's walk (phases/runner/dispatch.go) calls it only when bridgeErr != nil && exit == 85, and the generic walker (bridgechain Walking.Launch via WithBench) calls it on every exit 85. Production always wires an explainer, so the decorator always runs first. The runner and walker calls therefore only log 'already benched for this wall', and the runner's predicate differs from the other two. The bench is a concern of its own, coupled to the usage evidence only by where it sits.",
+  "title": "The exit-85 escalation bench lives inside the usage-evidence decorator; the runner and walker still bench too, under a divergent predicate",
+  "weight": 0.5
+}

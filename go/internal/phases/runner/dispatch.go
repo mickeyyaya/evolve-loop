@@ -71,7 +71,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		// Every candidate, the last included, so a wall is benched even with no fallback left. Staleness counts
 		// from the run start: the guard excludes other phases' leftovers, not this run's earlier attempts.
 		if bridgeErr != nil && bres.ExitCode == 85 {
-			b.maybeBenchOnEscalation(req.ProjectRoot, req.Workspace, candidateCLI, start, req.Env)
+			b.maybeBenchOnEscalation(bridgechain.Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: candidateCLI, DispatchStart: start, Env: req.Env})
 		}
 		return bres.ExitCode, bridgeErr
 	}, func(from, to string) {
