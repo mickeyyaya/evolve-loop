@@ -213,6 +213,36 @@ These bind the **code-review judge and console delta checks**. The audit keeps i
 | Console lane | yes, through the verb | all, with split = unstage | The console follows the decision from the start. |
 | Contract-correction ladder | **no** | — | It is a format loop, and its findings carry no severity or component. The existing mechanisms already play the rung roles: the second-block CLI escalation is rung 1, and the exhaustion degrade is rung 3 (the code-review design §7, its recovery-rung table; landing 1). |
 
+### 6.1 The cycle pipeline as a whole (no endless back-and-forth)
+
+Operator directive (2026-10-07): *"Convergence rule should also apply to evo loop cycle pipeline to avoid infinite back and forth endless loop."*
+
+**Today's bounds are per loop, and the combination is unbounded except by a crash guard.**
+- **Backward edges.** The cycle graph (`docs/architecture/phase-registry.json` `legal_successors`) has these:
+  - audit → tdd and build;
+  - retrospective → tdd and audit;
+  - ship → audit, build, tdd, and **ship → ship**;
+  - debugger → audit, build, tdd and ship;
+  - code-review → build (ADR-0124, landing 2).
+- **Existing per-loop bounds:**
+  - audit repair: 2 attempts, from the envelope;
+  - ship recovery: `maxRecoveryDepth` 2, or fleet width + 1;
+  - the fleet-rebase replay: 100 steps;
+  - correction ladders: per phase.
+- **Everything else** is caught only by `defaultMaxPhaseIterations = 32` (`core/cyclerun.go`). That is a crash guard, not a convergence rule, so a cycle may legally bounce through 32 dispatches.
+- **Across cycles,** an inbox item is retried until `TaskRetryCeiling` (2) and then quarantined. `RepeatCeiling` (2) and the identical-fingerprint halt watch the batch. The response is binary: the same approach again, then quarantine. Nothing changes between attempts.
+
+**The policy covers three more scopes, all calling the same `Decide`:**
+
+| Scope | Loop name | Round | What the ladder changes | Final exit |
+|---|---|---|---|---|
+| **Within a cycle:** every backward edge combined | `cycle` | one round per backward edge taken (any of the edges above) | rung 1 at the 2nd backward edge: the next re-entry carries the accumulated findings and raises the fixer's effort. Rung 2 at the 3rd: fresh context, HIGH bar. **Cross-loop oscillation:** the same failure fingerprint behind two different backward edges jumps to rung 3. | **`max_backward_edges`** (default 3) ends the cycle with a **Stop**: an ADR-0076 continuation, with the work preserved and the best round recorded. The cycle never crawls to the 32-iteration crash guard, which stays as a guard. |
+| **Across cycles:** one inbox item | `inbox-item` | one round per cycle attempt on the item, counted by its `failure_count` | attempt 2 (rung 1): the continuation brief carries the earlier attempt's findings and the effort is raised. Attempt 3 (rung 2, the final attempt): a strategy change, meaning a fresh plan at triage at the deep tier, a narrowed scope, or a split of the item. | after the final attempt, **rung 3**: split the item (file the hot part), or **route it to the console**, or quarantine it, as today. A third attempt is never the same approach. `TaskRetryCeiling` becomes the ladder's *N*. |
+| **Fleet ship recovery** (ship ↔ rebase ↔ re-audit) | `ship-recovery` | one round per recovery depth | it keeps its bound (`maxRecoveryDepth` or width + 1). With the carry composing (#796), a byte-identical rebase does not need a re-audit round. | a Stop, with the work preserved |
+
+- **One budget home per scope.** `max_backward_edges` is new config. The item ladder's *N* is `TaskRetryCeiling`, and ship recovery's is `maxRecoveryDepth`. The policy chooses rungs and never duplicates a budget.
+- **The fingerprint** is the existing failure fingerprint from the identical-fingerprint halt, so there is one vocabulary.
+
 ### 7. Escalation headroom
 
 Today's tier tables have **no** deep→top headroom in any family:
@@ -240,7 +270,8 @@ Today's tier tables have **no** deep→top headroom in any family:
     "raised_blocking_bar": "HIGH",
     "concentration_threshold": 0.6,
     "concentration_window": 2,
-    "concentration_min_findings": 5
+    "concentration_min_findings": 5,
+    "max_backward_edges": 3
   }
 }
 ```

@@ -20,6 +20,7 @@
 > - *"Prioritize a convergence rule/solution using L2 with 7 rounds as the example issue that should converge earlier by escalating to top / deep model or other approaches to proceed with persuing the perfection with no output."*
 > - *"The latest top model is opus 5.5 with xhigh effort, not fable 5.1"*
 > - *"I would like you to research online to learn the best policy to coverage the review feedback with limited rounds"*
+> - *"Convergence rule should also apply to evo loop cycle pipeline to avoid infinite back and forth endless loop"*
 
 > **Terms:** as in the design doc's Terms block:
 > - judgment `J_r` (with `J_0` the full first judgment), round, finding (`kind`, `component`, `late`, `blocking`);
@@ -73,6 +74,7 @@ C stays as a phase-B option for cheap tiers, after a strategy change.
 | V-D9 | Stop on marginal gain | if a round's repair damage is at least its repairs, or there is no progress at the current bar, skip straight to the strategy change (or to rung 3) | console (research F2) |
 | V-D10 | Keep-best | checkpoint every round's candidate, and land the best qualifying round | console (research F2) |
 | V-D11 | Split and accept | both require no open CRITICAL. A cycle's split is a Stop plus a continuation. Accept-with-limits rows go to the audit's adjudication. | console (doc review H1) |
+| V-D12 | The cycle pipeline | The policy also governs the whole cycle (`max_backward_edges`, default 3, across every backward edge), an inbox item across cycles (*N* = `TaskRetryCeiling`; attempt 3 changes the strategy) and ship recovery. The 32-iteration crash guard stays as a guard. | **operator, 2026-10-07** |
 | CQ1 | Claude top-tier headroom | **Top is Opus 5.5 at xhigh effort**, not Fable 5.1. V3b makes the tier table carry it. | **operator, 2026-10-07** |
 
 ## 4. Principles
@@ -116,6 +118,9 @@ Ordered by priority: the console adopts the policy first, then the pipeline loop
 | V7 | The finding grammars gain `Kind:`, `Blocking:`, `Component:` and `Late:`: code-review (RL §4.1) and the audit's Criteria findings (ADR-0125). The falsification check runs before a blocking finding blocks. | `codereview/`, `qualityindex/`, personas | ☐ |
 | V8 | Signals (10 codes, registered, `signal-codes.md` regenerated). The `evolve convergence metrics` readout: rounds-to-land, deferred-then-closed share, falsification drop rate. | `core/signal.go`, `signalcenter/`, `cmd/evolve` | ☐ |
 | V9 | The flip: `workflow.convergence.stage = enforce` after 2 shadow waves, at a boundary | operator | ☐ |
+| V10 | **Cycle-wide convergence:**<br>• every backward edge taken in a cycle is a round of loop `cycle`;<br>• `max_backward_edges` (default 3) ends the cycle with a Stop (continuation, work preserved);<br>• cross-loop oscillation (one failure fingerprint behind two backward edges) jumps to rung 3;<br>• the 32-iteration crash guard stays as a guard;<br>• replay test: a cycle bouncing audit → build → audit → retro → tdd stops at the 3rd backward edge, not at iteration 32. | `go/internal/core/` (`cyclerun.go`, `resume_execution.go`, the backward-edge sites), `policy/` | ☐ |
+| V11 | **Inbox-item convergence:**<br>• each cycle attempt on an item is a round of loop `inbox-item`, with *N* = `TaskRetryCeiling`;<br>• attempt 2 carries the findings and raises effort;<br>• attempt 3 changes the strategy (deep-tier fresh plan, a narrowed scope, or a split);<br>• after the final attempt: split, route to the console, or quarantine;<br>• replay test: an item failing twice with one fingerprint is never retried a third time the same way. | `go/internal/inboxmover/`, `core/` (the continuation brief), triage persona | ☐ |
+| V12 | **Ship recovery under the policy:** signals plus the documented bound (`maxRecoveryDepth` or width + 1); no new budget | `core/ship_recovery*.go` | ☐ |
 | VB | Phase B, optional: best-of-N for cheap tiers after a strategy change, and judge trust weights from the falsification drop rate | — | ☐ after data |
 
 ## 7. Expected results

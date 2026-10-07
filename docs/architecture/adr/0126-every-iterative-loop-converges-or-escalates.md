@@ -62,7 +62,11 @@ On 2026-10-07 the operator stopped L2 at round 7 ("It just retry for too many ti
    - Raises stay within the judge's own family.
    - A disagreement between two efforts of one model is settled by deterministic evidence, because their errors are correlated.
 9. **The audit is untouched.** CRITICAL is never deferred, and no audit FAIL becomes a PASS. The audit keeps its full verdict rules. Audit repair uses rung 1, rung 2(a) and Stop only, with no deferrals.
-10. **Rollout:** `workflow.convergence.stage`, shadow then enforce. The console follows the decision from the start.
+10. **The cycle pipeline converges too** (the operator, 2026-10-07: *"Convergence rule should also apply to evo loop cycle pipeline to avoid infinite back and forth endless loop"*).
+    - **Within a cycle:** every backward edge (audit/retro/ship/debugger/code-review → an earlier phase, and ship → ship) is a round. `max_backward_edges` (default 3) ends the cycle with a Stop, and one failure fingerprint behind two edges jumps to rung 3. The 32-iteration crash guard stays as a guard.
+    - **Across cycles:** an inbox item's attempts climb the same ladder, with *N* = `TaskRetryCeiling`. Attempt 3 changes the strategy, and after it the item is split, routed to the console, or quarantined, never retried the same way.
+    - **Ship recovery** keeps its bound, under the policy's signals.
+11. **Rollout:** `workflow.convergence.stage`, shadow then enforce. The console follows the decision from the start.
 
 ## Alternatives considered
 
