@@ -1,0 +1,20 @@
+{
+  "id": "routing-logs-name-the-cli-that-runs",
+  "title": "The runner's dispatch line names the CLI that runs, and bench times carry their date",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "weight": 0.35,
+  "source": "console, 2026-10-07 wave 77 (cycles 1829/1830): both builders logged cli=agy-tmux while the deep tier ceiling ran them on claude-tmux; the bench line read 'agy-claude until 21:42' at 22:43 for a bench ending the next day",
+  "created_at": "2026-10-07T22:55:00Z",
+  "summary": "Two routing log lines mislead the operator. (1) internal/phases/runner/routing.go:132-137 (logDecision) prints plan.Candidates[0], the table chain's first CLI, but the tier ceiling walk (cliroute Decision.Walk, which L2 made the retro, contract escalation and ResolveRole use) dispatches the first CLI permitted at the seat's tier. On wave 77 the deep builder logged cli=agy-tmux, and claude-tmux ran (pane-watch cli=claude-tmux, session names without the agy prefix). (2) internal/bridgechain/bridgechain.go:222 (benchedSummary) formats BenchedUntil as 15:04 with no date, so a 24-hour bench ending tomorrow reads as already expired.",
+  "fix": "logDecision prints the CLI Decision.Walk() selects (and the walk's skipped candidates with the reason, the tier ceiling), one home with the other Walk consumers. benchedSummary prints the date when BenchedUntil is not today (for example 2006-01-02 15:04).",
+  "acceptance": [
+    "A deep seat whose chain starts with a CLI the tier ceiling forbids logs the CLI that is dispatched, not the chain's first entry (red first, through BaseRunner's real routing path)",
+    "A bench ending on a later day prints its date in the bench reorder line",
+    "The bridge's launch session matches the runner's logged CLI in an end-to-end fake dispatch"
+  ],
+  "files": [
+    "go/internal/phases/runner/routing.go",
+    "go/internal/bridgechain/bridgechain.go"
+  ]
+}

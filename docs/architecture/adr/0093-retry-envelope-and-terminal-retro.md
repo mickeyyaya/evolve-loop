@@ -149,3 +149,32 @@ the in-memory twin of that file) when a gate diagnosed the FAIL, and otherwise t
 sentinel's failure-block defects, the auditor's own list, through one function
 (`auditRejectionReasons`). The explanation-only route no longer copies its defects into the file.
 See the logic-first design, §5.14.
+
+**Update (2026-10-07, cycle 1828).** Decision 2 keys the envelope on the audit's own declared
+class, and only the auditor's report could declare one, so a FAIL that deterministic gates forced
+over a PASS or WARN narrative declined as "audit declared no failure class", even when the gate
+named a one-command remedy. The host now derives the class from the gates' own diagnoses, but only
+when only deterministic gates forced the FAIL over a PASS or WARN narrative (a verdict-conflict
+record exists): every other `CycleState.AuditFailReasons` entry is a diagnosis from one table in
+`core` (`auditGateRemedies`: gofmt, solution-contract, skills-drift, go vet, acs-durable, the
+integration tier, both apicover gates, EGPS `red_count>0`), and one or more such diagnoses exist.
+Then the FAIL's failure block is class `code-audit-fail` with one defect per diagnosis, led by that
+gate's remediation. A FAIL narrative beside a gate diagnosis writes no conflict record, so it
+derives nothing: the auditor's own FAIL stands, and with no declared block it declines as before.
+An EGPS reason that carries the harness-red clause (predicates the harness could not run) is no
+gate diagnosis. An auditor-declared block still wins, in the envelope and in the repair brief. A
+gate-derived envelope narrows to `retry@build` or `decline`, and the `code-audit-fail` budget
+bounds it as it bounds every repair round. Declined as before: a FAIL with any reason outside the
+table (a host failure, `ship_eligible=false`, a bookkeeping reason, which the regrade owns). Only
+the static rows of the same table (gofmt, solution-contract, skills-drift, new-package
+graduation) refute a retro's prose floor claim, so such a FAIL can no longer halt the loop on an
+`infra-systemic` claim, while a gate that executes code keeps the halt (ADR-0072 gate 2; gate 1 is
+unchanged).
+
+Two audit→build edges can sit behind an identical gate fingerprint: with the shipped budget of 2,
+identical gate FAILs earn two Build rounds before the third declines. ADR-0126 §10 bounds this
+from outside: the convergence component jumps to rung 3 when one failure fingerprint is behind two
+backward edges in a cycle (plan V10 in `docs/plans/convergence-policy-2026-10.md`), and an inbox
+item failing twice with one fingerprint is never retried the same way (plan V11). The budget stays
+at 2 until that policy is live (`workflow.convergence.stage` is not yet enforced). See the
+[incident](../../incidents/2026-10-07-cycle-1828-gate-forced-fail-earned-no-repair-and-halted.md).

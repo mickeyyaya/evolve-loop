@@ -1,0 +1,24 @@
+{
+  "id": "convergence-v1-review-followups",
+  "title": "Convergence V1-V3: pin the never-land-a-CRITICAL invariant in the suite and align the once-only judge raise",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "weight": 0.45,
+  "route": "console",
+  "routed_reason": "the convergence package is console-built (ADR-0126 plan V1-V12); these are the round-2 verify check's filed items",
+  "source": "console, 2026-10-07 convergence V1-V3 landing (round-2 verify-only check: MERGE, 0 blocking; F1 adopted at landing as TestKeepBest_FewerStrictFindingsOutrankALighterResidue)",
+  "created_at": "2026-10-07T23:40:00Z",
+  "summary": "The round-2 check confirmed the landed-round CRITICAL guard (internal/convergence/decide.go landing) is unreachable today and recommended keeping it: the invariant rests on exempted never exempting a CRITICAL (pinned) and on keepBest's rank order (pinned at landing by a single example). The only thing that exercises the invariant across inputs is a 20,000-input sweep that lives outside the repo. Two smaller items: the M3 fix also limits the judge raise to the first rung-1 round, which spec section 3 row 2 and ADR-0126 decision 2 state only for the fixer (no effect at the default max_fix_rounds 3); and the guard's Stop, if it ever fired, would name the next rung's cause.",
+  "fix": "Add a fixed-seed fast-tier property test (2-5k generated inputs through convergence.Decide) asserting, for every Land, Split and AcceptWithLimits: the landed round holds no unresolved CRITICAL; no decision defers an unresolved CRITICAL of its reference round; the landed round holds no unresolved finding at the decision's bar outside the split component, Defer and File. Align spec section 3 row 2 and ADR-0126 decision 2 with the code: the feedback change (fixer and judge raise) is made once, because a second raise has no headroom once the first moved to the top pair. Give the guard's Stop its own cause.",
+  "acceptance": [
+    "The property test kills a keepBest rank-order swap (mass first) and the removal of the CRITICAL clause in exempted, each run as an overlay mutant",
+    "Spec, ADR and internal-convergence.md state one rule for the once-only raise, and a test pins it at max_fix_rounds 4",
+    "The suite stays under the fast tier's time budget"
+  ],
+  "files": [
+    "go/internal/convergence/decide.go",
+    "go/internal/convergence/findings.go",
+    "docs/architecture/convergence-policy.md",
+    "docs/architecture/adr/0126-every-iterative-loop-converges-or-escalates.md"
+  ]
+}

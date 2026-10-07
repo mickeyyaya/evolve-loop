@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A PASS narrative overridden by the skills-drift gate grants one audit-repair round at Build whose brief names `evolve skills generate` (red first: today it declines with 'audit declared no failure class')",
+    "The grant is bounded by the audit-repair envelope: a second identical gate FAIL after the repair is declined with the envelope's reason, never a storm",
+    "Each CI-parity gate's forced FAIL maps to a declared class and remediation in one table, pinned by a test"
+  ],
+  "consumed": {
+    "at": "2026-10-07T12:57:08Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Gate-forced audit FAILs derive class code-audit-fail from one gate table (core/audit_gate_remedy.go); a gate-derived envelope re-enters build only, bounded by the code-audit-fail budget (2 by default; budget 1 gives one grant then a decline); the brief leads with each gate's remediation (skills-drift: evolve skills generate); every gate seam is pinned by a reflection walk. Also: a gate-only FAIL refutes a retro's prose floor claim (no infra-systemic halt). Incident: docs/incidents/2026-10-07-cycle-1828-gate-forced-fail-earned-no-repair-and-halted.md"
+  },
+  "created_at": "2026-10-07T13:00:00Z",
+  "files": [
+    "go/internal/phases/audit/audit.go",
+    "go/internal/core/retry_envelope.go"
+  ],
+  "fix": "When deterministic CI-parity gates (skills-drift, gofmt, apicover, EGPS) force FAIL over a PASS/WARN narrative, the audit's failure block declares a repairable class (code-audit-fail) whose defects are the gate diagnostics with their remediation, so audit-repair grants a bounded Build re-entry whose brief leads with the remediation (for skills-drift: run `evolve skills generate`). One home for the gate-to-class mapping in phases/audit; the envelope budget bounds it; failure-learning stays as today.",
+  "id": "gate-forced-audit-fail-declares-a-repairable-class",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-07 wave 76 cycle 1828 (generated-skill-command-shadows-its-skill)",
+  "summary": "Cycle 1828's auditor wrote PASS (confidence 0.88, ACS 170 green / 0 red), but the in-process CI-parity gate skills-drift forced FAIL ('skill projection drift: 30 artifact(s) stale vs their SSOTs ... Run `evolve skills generate`', recorded as 'verdict-conflict: auditor narrative=PASS but 1 deterministic gate(s) forced FAIL [skills-drift]'). The gate-forced FAIL declares no failure class, so computeRetryEnvelope declines ('audit declared no failure class; nothing to base a retry on', core/retry_envelope.go:75) and the cycle goes to retro: a correct change with a deterministic, gate-named one-command remediation produces no output. Only bookkeeping-class conflicts have a regrade path (core/bookkeeping_regrade.go). This is the convergence-policy defect class (ADR-0126): a mechanical fix must get a deterministic repair rung, bounded by the audit-repair envelope (the old skills-drift storm was unbounded retries, cyclerun.go:142-148).",
+  "title": "A deterministic gate that forces an audit FAIL declares no failure class, so a one-command fix earns no repair round",
+  "weight": 0.8
+}

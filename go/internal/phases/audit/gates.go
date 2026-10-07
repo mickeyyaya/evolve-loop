@@ -13,17 +13,17 @@ import (
 func (a *auditClassification) executeRepositoryGates() {
 	a.applyRepositoryGate(a.hooks.gofmtCheck, "gofmt",
 		"gofmt gate skipped (could not run): %s",
-		"gofmt: %d file(s) are not gofmt -s clean — CI `vet + fmt` would FAIL. Run `gofmt -w -s .` in go/. Offenders: %s",
+		"gofmt: %d file(s) are not gofmt -s clean — CI `vet + fmt` would FAIL. "+remedySentence("gofmt")+" Offenders: %s",
 		", ",
 	)
 	a.applyRepositoryGate(a.hooks.solutionCheck, "solution-contract",
 		"solution-contract gate skipped (could not run): %s",
-		"solution contract: %d violation(s) in the document deliverable — fix these exactly (self-check: `evolve solution check`): %s",
+		"solution contract: %d violation(s) in the document deliverable. "+remedySentence("solution-contract")+" Violations: %s",
 		"; ",
 	)
 	a.applyRepositoryGate(a.hooks.skillsDriftCheck, "skills-drift",
 		"skills-drift gate skipped (could not run): %s",
-		"skill projection drift: %d artifact(s) stale vs their SSOTs (SKILL.md phase-facts and/or commands/ stubs) — CI TestSkills_NoDrift would FAIL. Run `evolve skills generate`. Drifted: %s",
+		"skill projection drift: %d artifact(s) stale vs their SSOTs (SKILL.md phase-facts and/or commands/ stubs) — CI TestSkills_NoDrift would FAIL. "+remedySentence("skills-drift")+" Drifted: %s",
 		", ",
 	)
 
@@ -36,7 +36,11 @@ func (a *auditClassification) executeRepositoryGates() {
 	a.applyCIGate(a.hooks.apicoverEnforceCheck, "apicover-enforce gate",
 		"apicover -enforce flagged %d line(s) in touched enforced packages — CI `api-coverage enforce` would FAIL (unnamed export). Offenders: %s")
 	a.applyCIGate(a.hooks.apicoverNewPkgGraduationCheck, "apicover new-package graduation gate",
-		"%d new go/internal/<pkg>(s) changed this cycle are absent from .apicover-enforce — the apicover -enforce gate silently skips them (new-package blind spot). Add each to go/.apicover-enforce + an apicover_named_test.go before ship. Offenders: %s")
+		"apicover new-package graduation: %d new go/internal/<pkg>(s) changed this cycle are absent from .apicover-enforce — the apicover -enforce gate silently skips them (new-package blind spot). "+remedySentence("apicover new-package graduation gate")+" Offenders: %s")
+}
+
+func remedySentence(gate string) string {
+	return "Remedy: " + core.AuditGateRemedy(gate) + "."
 }
 
 func (a *auditClassification) applyRepositoryGate(

@@ -3,7 +3,6 @@ package core
 import (
 	"path"
 	"regexp"
-	"slices"
 	"strings"
 	"unicode"
 
@@ -55,13 +54,8 @@ func namesDocument(location, document string) bool {
 }
 
 func explanationCorrectionEnvelope(env retryEnvelope) retryEnvelope {
-	if !slices.Contains(env.Legal, retryActionRetryBuild) {
-		return env
-	}
-	return retryEnvelope{
-		Legal:  []retryAction{retryActionReauthorExplanation, retryActionDecline},
-		Reason: env.Reason + "; every defect names the cycle's explanation document (" + explanationNeedsCorrection + "): Build re-authors it, TDD and the code build are skipped",
-	}
+	return narrowRetryEnvelope(env, retryActionReauthorExplanation,
+		"every defect names the cycle's explanation document ("+explanationNeedsCorrection+"): Build re-authors it, TDD and the code build are skipped")
 }
 
 func explanationReauthorScope(next Phase, cs CycleState) string {

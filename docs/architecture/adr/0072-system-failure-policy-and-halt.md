@@ -193,6 +193,54 @@ existing audit-phase-only behavior unchanged; `failure_dossier_test.go`'s
 twin; `failure_digest_test.go`'s `c1329_ship_repo_contract_gate` case covers
 the classifier fix.
 
+## Extension: a static gate reading refutes a prose floor claim (cycle 1828)
+
+Cycle 1828's audit FAIL was forced by one deterministic gate (skills-drift) over a PASS
+narrative, and its retrospective wrote `failure-decision.json` with category `infra-systemic`.
+`applyFailureDecisionFloor` halted the loop on it (`LOOP_SYSTEM_FAILURE_HALT`). The orchestrator's
+judgment (gate 2) had one evidence-based overrule, and only for `verdict-incoherence`: a recorded
+FAIL that carries persisted substantive fail reasons is a diagnosed downgrade, not a forgery.
+
+Fix: the overrule is one rule over persisted evidence, `floorClaimRefutation` in
+`core/decision_branch.go`. It keeps the `verdict-incoherence` case as it was, and adds one: any
+prose floor claim is refuted when only deterministic gates forced the FAIL over a PASS or WARN
+narrative (a verdict-conflict record exists), every gate among them reads the tree statically,
+and no `ShipFailReasons` entry is recorded. The static gates are the rows of the gate table
+(`core/audit_gate_remedy.go`, `auditGateRemedies`) marked `isStaticReading`: gofmt,
+solution-contract, skills-drift and new-package graduation. Such a FAIL is task-level with a named
+remedy, so the failure adapter disposes of it instead of the loop halting. The evidence is
+orchestrator memory, the trust boundary `AuditFailReasons` already documents; no workspace file can
+produce it.
+
+A gate that executes code cannot refute the halt, because its offenders can be the host's
+symptoms: `go vet` turns any non-zero exit into offenders (a full disk reads as an issue), the
+integration tier keeps attempt 1's offenders when its serialized retake cannot start (deliberately:
+a real red is never laundered by retake trouble), and acs-durable, apicover-enforce and EGPS
+`red_count>0` all run code. Those rows
+keep their bounded repair grant (ADR-0093) and never count here. The table also refuses an EGPS
+reason that carries the harness-red clause (`HarnessRedClauseMarker`: predicates the harness could
+not run), so it is no gate diagnosis at all. gofmt counts because an I/O error is no longer an
+offender: `codequality.UnformattedGoFiles` returns an error (the gate warns and is skipped) unless
+every line gofmt wrote to stderr is a positioned parse diagnostic. A genuine systemic failure keeps
+the halt: a CLI wall ends the dispatch before the gates run, a host failure reaches the reasons as
+a gate that could not run (a warning, not a reason), as a reason outside the table, or as an
+executed gate's offenders, which do not refute; gate 1 (the deterministic dossier candidate) runs
+first and is unchanged.
+
+Wiring proof: `TestAuditGateFail_ProseInfraSystemicRetroDoesNotHaltAGateDiagnosedFail` drives the
+cycle-1828 shape through `recordAndBranch` (audit, then retro);
+`TestDecideAfterRetroFloor_StaticGateDiagnosisRefutesProseInfraSystemic` pins the refutation for
+each static gate; `TestDecideAfterRetroFloor_AGateThatExecutesCodeKeepsTheHalt` pins the halt for
+a `go vet` diagnosis of a full disk, an integration tier whose retake could not run, acs-durable,
+apicover-enforce and an EGPS red; `TestAuditGateFail_AnIntegrationTierRedKeepsItsRepairAndTheProseInfraSystemicHalt`
+drives a tier FAIL through `recordAndBranch` to its bounded repair and then the halt;
+`TestAuditGateFail_AHarnessRedEGPSEarnsNoRepairAndKeepsTheHalt`
+and `TestAuditGateFail_AFailNarrativeBesideAGateDiagnosisDerivesNothingAndKeepsTheFloor` pin the
+harness-red and no-conflict-record cases; `TestDecideAfterRetroFloor_ProseInfraSystemicWithAnyNonGateReasonStillHalts`
+pins the halt for a CLI wall, a gate beside a non-gate or ship reason, a conflict record alone,
+`ship_eligible=false`, a host predicate failure and no reason. See the
+[incident](../../incidents/2026-10-07-cycle-1828-gate-forced-fail-earned-no-repair-and-halted.md).
+
 ## Implementation slices (one campaign)
 
 - **S1 — Policy schema + loader:** `failure_policy` struct in `internal/policy` + compiled defaults + policy.json block. TDD.

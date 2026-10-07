@@ -5,6 +5,16 @@
   - **Afternoon, approved in plan mode:** the review-loop redesign. It supersedes the morning's one-fix-round loop and grade-only audit (plan §3, Q-D1 to Q-D4, D3 to D9).
   - **Landing 1** (R0–R3 plus the stage switch R8a, held in shadow) is staged and amended by Q0–Q2 before its review.
 - **Design (the core logic):** [review-loop-and-quality-index.md](../review-loop-and-quality-index.md).
+- **Amended by:** [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (Proposed, 2026-10-07).
+  - The quality index becomes the audit's full published standard (Part 2, gate criteria), and the dimension bars cite the criteria they cover.
+  - An `audit-plan` phase writes each cycle's expectations before build.
+  - The cross-check gains the causes `criterion` and `criterion_kernel`.
+  - The Review Plan covers the dimensions the expectations mark required.
+  - Divergence excludes review rounds after an audit-repair re-entry.
+- **Amended by:** [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md) (Proposed, 2026-10-07).
+  - The landing-2 loop calls the convergence policy with `max_fix_rounds` 3, equal to `max_rounds` 4, so the budget is unchanged.
+  - A row the policy DEFERS at rung 2 (MEDIUM/LOW, with a filed follow-up) no longer counts as strict OPEN in §6.2.
+  - Accept-with-limits rows go to the audit's adjudication, as DISPUTED rows do.
 - **Amends:**
   - [ADR-0028](0028-user-defined-phases.md) and [ADR-0038](0038-structured-phase-plugin-system.md):
     - a user phase may be pinned by a `conditional_mandatory` rule. This is the first user phase the registry pins. It stays optional-only and never satisfies or displaces the build → audit → ship floor;

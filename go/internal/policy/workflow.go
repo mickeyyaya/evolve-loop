@@ -39,6 +39,7 @@ type WorkflowPolicy struct {
 	InteractivePolicies   map[string]string     `json:"interactive_policies,omitempty"`
 	FindingsRepair        *FindingsRepairPolicy `json:"findings_repair,omitempty"`
 	QualityIndex          *QualityIndexPolicy   `json:"quality_index,omitempty"`
+	Convergence           *ConvergencePolicy    `json:"convergence,omitempty"`
 }
 
 // WorkflowConfig is the resolved workflow configuration with defaults applied.

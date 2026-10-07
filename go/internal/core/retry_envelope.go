@@ -1,6 +1,7 @@
 package core
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -100,6 +101,13 @@ func computeRetryEnvelope(in retryEnvelopeInput) retryEnvelope {
 		Reason: "policy " + declared + " ⇒ " + string(cat.Action) + " (" + cat.FixType + "), attempt " +
 			strconv.Itoa(in.Attempts+1) + "/" + strconv.Itoa(cat.MaxRetries),
 	}
+}
+
+func narrowRetryEnvelope(env retryEnvelope, reentry retryAction, why string) retryEnvelope {
+	if !slices.Contains(env.Legal, retryActionRetryBuild) {
+		return env
+	}
+	return retryEnvelope{Legal: []retryAction{reentry, retryActionDecline}, Reason: env.Reason + "; " + why}
 }
 
 // adjudication is a deep-tier phase's PROPOSAL for how to dispose of an audit

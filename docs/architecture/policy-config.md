@@ -56,6 +56,23 @@ policy).
     "recurrence_cap": 5,
     "active_campaigns": [],
     "preempt_margin": 0.05
+  },
+
+  // The convergence policy (ADR-0126). The convergence sub-block decodes
+  // STRICTLY: an unknown key or an out-of-range number fails the load; an
+  // unknown stage or bar word warns and resolves to its default. Absent ⇒ the
+  // compiled default shown here. The other workflow keys stay lenient.
+  "workflow": {
+    "convergence": {
+      "stage": "shadow",
+      "max_fix_rounds": 3,
+      "base_blocking_bar": "MEDIUM",
+      "raised_blocking_bar": "HIGH",
+      "concentration_threshold": 0.6,
+      "concentration_window": 2,
+      "concentration_min_findings": 5,
+      "max_backward_edges": 3
+    }
   }
 }
 ```
@@ -118,6 +135,21 @@ The block configures `internal/inboxrank`, the one computed order over pending i
 | `preempt_margin` | the score margin by which a new item must beat the lowest uncommitted planned slot to take it at a wave boundary (read from the plan's P4; unused in P1) | 0.05 | negative |
 
 The checked-in file names the class order and the factors explicitly, so the operator's weights live in config rather than in the compiled default. Since the plan's P2 (2026-10-06) the block orders the loop's work: the wave seed, the widen, the launch refill, the triage prompt's `inbox_batches` menu, `evolve inbox batches` and the dashboard's queue all read the rank it configures (loaded per evolve dir by `internal/inboxrank/rankinputs`), as well as deciding what `evolve inbox rank` shows and which classes `evolve inbox add` accepts. A malformed block makes those consumers rank with the compiled default and warn; `evolve inbox rank` and `evolve inbox add` refuse it. (Under P1, from the same morning, the block changed only the verb's output and the classes `add` accepts.)
+
+## Convergence policy (`workflow.convergence`)
+
+The block configures `internal/convergence`, the one rule every repeat-until-accepted loop uses to choose its next rung ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md), [design](convergence-policy.md) §8; `evolve convergence decide` prints a decision). Absent means the compiled defaults below.
+
+| Key | Meaning | Default | Refused or warned |
+|---|---|---|---|
+| `stage` | `shadow`: loops compute and signal the decision; `enforce`: loops act on it. The console follows the decision from the start. | `shadow` | an unknown word warns and resolves to `shadow` |
+| `max_fix_rounds` | *N*: rung 1 for rounds 2 … *N*−1, rung 2 for the final round *N*, rung 3 after it; never a round *N*+1. A loop with its own budget (the audit-repair envelope, `TaskRetryCeiling`, `maxRecoveryDepth`) passes that instead. | 3 | below 1 fails the load |
+| `base_blocking_bar` | the severity at or above which an OPEN finding blocks until the final round | `MEDIUM` | a word other than CRITICAL, HIGH or MEDIUM warns and resolves to `MEDIUM` |
+| `raised_blocking_bar` | the bar from the final round on, for the loops that raise it (code-review, console lanes, the cycle) | `HIGH` | an unknown word warns and resolves to `HIGH`; a bar below the base warns and is held at the base |
+| `concentration_threshold` | the share of a window's findings in one component that, on two consecutive windows, escalates that component | 0.6 | at or below 0, or above 1, fails the load |
+| `concentration_window` | the judgments one concentration window spans | 2 | below 1 fails the load |
+| `concentration_min_findings` | the findings (LOW or above) a window needs before its share is defined | 5 | below 1 fails the load |
+| `max_backward_edges` | the cycle loop's *N*: the backward edges (audit → build, retro → tdd, ship → ship, …) one cycle may take before it stops with a continuation (design §6.1) | 3 | below 1 fails the load |
 
 ## Context-fill telemetry (`context_fill`)
 
