@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -55,8 +56,7 @@ func TestSupervisor_LaunchesAllWithFleetEnv(t *testing.T) {
 func TestSupervisor_BoundedConcurrency(t *testing.T) {
 	var inFlight, maxSeen int32
 	release := make(chan struct{})
-	var started sync.WaitGroup
-	started.Add(5)
+	entered := make(chan struct{}, 5)
 	s := &Supervisor{
 		Concurrency: 2,
 		Launch: func(_ context.Context, _ CycleSpec) (int, error) {
@@ -67,7 +67,7 @@ func TestSupervisor_BoundedConcurrency(t *testing.T) {
 					break
 				}
 			}
-			started.Done()
+			entered <- struct{}{}
 			<-release
 			atomic.AddInt32(&inFlight, -1)
 			return 0, nil
@@ -76,7 +76,12 @@ func TestSupervisor_BoundedConcurrency(t *testing.T) {
 	specs := make([]CycleSpec, 5)
 	done := make(chan []Result, 1)
 	go func() { done <- s.Run(context.Background(), specs) }()
-	for atomic.LoadInt32(&inFlight) < 2 {
+	for i := 0; i < 2; i++ {
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("only %d of 2 lanes launched within 5s", i)
+		}
 	}
 	close(release)
 	<-done

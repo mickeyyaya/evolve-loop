@@ -1,6 +1,13 @@
 package fleet
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"sort"
+	"testing"
+)
 
 const repoRoot = "../.."
 
@@ -63,6 +70,35 @@ func TestIsGlobalZone_OrdinarySourceFile_NotGlobalZone(t *testing.T) {
 func TestGlobalZoneFiles_NonEmpty(t *testing.T) {
 	if len(GlobalZoneFiles()) == 0 {
 		t.Errorf("GlobalZoneFiles() must list at least go.mod/go.sum")
+	}
+}
+
+func TestGlobalZoneFiles_MatchesDocumentedGlobalZone(t *testing.T) {
+	doc, err := os.ReadFile(filepath.Join(repoRoot, "..", "docs", "architecture", "packages", "internal-fleet.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clause := regexp.MustCompile(`global-zone file \(([^)]*)\)`).FindSubmatch(doc)
+	if clause == nil {
+		t.Fatal("internal-fleet.md no longer lists the global zone as \"global-zone file (...)\", so the pin has nothing to compare against")
+	}
+	var documented []string
+	for _, m := range regexp.MustCompile("`([^`]+)`").FindAllSubmatch(clause[1], -1) {
+		documented = append(documented, string(m[1]))
+	}
+	if len(documented) == 0 {
+		t.Fatalf("the documented global-zone clause %q names no file", clause[1])
+	}
+	got := GlobalZoneFiles()
+	sort.Strings(documented)
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, documented) {
+		t.Errorf("GlobalZoneFiles() = %v, documented global zone = %v", got, documented)
+	}
+	for _, f := range documented {
+		if !IsGlobalZone(f) || !IsGlobalZone("./"+f) {
+			t.Errorf("IsGlobalZone(%q) = false for a documented global-zone file", f)
+		}
 	}
 }
 

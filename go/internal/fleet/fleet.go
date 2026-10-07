@@ -104,9 +104,6 @@ func (s *Supervisor) Run(ctx context.Context, specs []CycleSpec) []Result {
 }
 
 func (s *Supervisor) launchOne(ctx context.Context, i int, spec CycleSpec, width int) Result {
-	if s.Launch == nil {
-		return Result{Index: i, ExitCode: -1, Err: errNoLaunch}
-	}
 	// Copy so the caller's map is never mutated; core.shipRecoveryBudget scales with the width.
 	env := make(map[string]string, len(spec.Env)+2)
 	for k, v := range spec.Env {

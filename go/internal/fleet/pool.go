@@ -22,10 +22,10 @@ type PoolTransition struct {
 
 // RunPool keeps up to cfg.Target file-disjoint lanes running, backfilling as each exits; Result.Index indexes backlog.
 func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) []Result {
-	results := make([]Result, len(backlog))
-	if len(backlog) == 0 || launch == nil {
-		return results
+	if launch == nil {
+		return noLaunchResults(len(backlog))
 	}
+	results := make([]Result, len(backlog))
 
 	limit := cfg.Target
 	if cfg.Concurrency > 0 && cfg.Concurrency < limit {
@@ -96,6 +96,14 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 			}
 			dispatch(cand)
 		}
+	}
+	return results
+}
+
+func noLaunchResults(n int) []Result {
+	results := make([]Result, n)
+	for i := range results {
+		results[i] = Result{Index: i, ExitCode: -1, Err: errNoLaunch}
 	}
 	return results
 }

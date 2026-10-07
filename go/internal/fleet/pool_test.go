@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -282,4 +283,33 @@ func scopeID(spec CycleSpec) string {
 		return ""
 	}
 	return spec.Scope[0]
+}
+
+func TestRunPool_NilLaunch_FailsEveryLaneWithErrNoLaunch(t *testing.T) {
+	backlog := []Todo{
+		{ID: "A", Files: []string{"a.go"}},
+		{ID: "B", Files: []string{"b.go"}},
+		{ID: "C", Files: []string{"a.go"}},
+	}
+	var transitions []PoolTransition
+	res := RunPool(context.Background(), PoolConfig{Target: 2}, backlog, nil, func(tr PoolTransition) {
+		transitions = append(transitions, tr)
+	})
+	if len(res) != len(backlog) {
+		t.Fatalf("got %d results, want %d", len(res), len(backlog))
+	}
+	for i, r := range res {
+		if r.Index != i || r.ExitCode != -1 || !errors.Is(r.Err, errNoLaunch) {
+			t.Errorf("result[%d]=%+v, want index=%d exit=-1 err=errNoLaunch, the shape Supervisor.Run returns for a nil LaunchFn", i, r, i)
+		}
+		if r.Status() != LaneFailed {
+			t.Errorf("result[%d].Status()=%q, want %q: no lane ran, so none may read as a success", i, r.Status(), LaneFailed)
+		}
+	}
+	if len(transitions) != 0 {
+		t.Errorf("a nil launcher emitted lane transitions %v, want none: no lane went live", transitions)
+	}
+	if empty := RunPool(context.Background(), PoolConfig{Target: 2}, nil, nil, nil); len(empty) != 0 {
+		t.Errorf("RunPool(empty backlog, nil launcher) = %+v, want no results", empty)
+	}
 }
