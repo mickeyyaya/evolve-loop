@@ -35,6 +35,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/tmuxtest` | gives a test binary that runs real tmux a tmux server only its own process owns | [internal-tmuxtest.md](internal-tmuxtest.md) |
 | `internal/fakeclitest` | stands in for a command-line tool in tests without writing a new executable file | [internal-fakeclitest.md](internal-fakeclitest.md) |
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
+| `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/cycleclassify` | classifies how a cycle ended: quota pause, hang, refusal or failure | [internal-cycleclassify.md](internal-cycleclassify.md) |

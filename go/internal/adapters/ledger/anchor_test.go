@@ -32,12 +32,12 @@ func bytesLines(strs []string) [][]byte {
 
 func TestWalkChain_NoAnchor_ByteIdenticalBehavior(t *testing.T) {
 	lines, _ := chainLines()
-	if _, _, _, err := walkChain(bytesLines(lines), ""); err != nil {
+	if _, _, _, err := walkChain(bytesLines(lines), "", compositionEvidenceIndex{}); err != nil {
 		t.Fatalf("valid chain must pass with no anchor: %v", err)
 	}
 	damaged := append([]string(nil), lines...)
 	damaged[1] = `{"ts":"2026-05-01T00:01:00Z","cycle":999,"role":"scout","kind":"phase","exit_code":0,"entry_seq":1,"prev_hash":"` + ZeroSeed + `"}`
-	if _, _, _, err := walkChain(bytesLines(damaged), ""); err == nil {
+	if _, _, _, err := walkChain(bytesLines(damaged), "", compositionEvidenceIndex{}); err == nil {
 		t.Fatal("mid-chain damage must break with no anchor (regression guard)")
 	}
 }
@@ -47,7 +47,7 @@ func TestWalkChain_Anchor_SkipsPreEpochDamage(t *testing.T) {
 	damaged := append([]string(nil), lines...)
 	damaged[1] = `{"ts":"2026-05-01T00:01:00Z","cycle":999,"role":"scout","kind":"phase","exit_code":0,"entry_seq":1,"prev_hash":"` + ZeroSeed + `"}`
 	// Anchor at line 2 (b): intact, the first line after the damage.
-	if _, lastSha, _, err := walkChain(bytesLines(damaged), sha[2]); err != nil {
+	if _, lastSha, _, err := walkChain(bytesLines(damaged), sha[2], compositionEvidenceIndex{}); err != nil {
 		t.Fatalf("anchored walk past pre-epoch damage must pass: %v", err)
 	} else if lastSha != sha[3] {
 		t.Errorf("lastSha=%s, want last line sha %s", lastSha, sha[3])
@@ -59,14 +59,14 @@ func TestWalkChain_Anchor_PostAnchorBreakStillCaught(t *testing.T) {
 	// Anchor at line 1 (a); damage line 2 (b) → line 3 (c)'s prev mismatches.
 	damaged := append([]string(nil), lines...)
 	damaged[2] = `{"ts":"2026-05-01T00:02:00Z","cycle":999,"role":"builder","kind":"phase","exit_code":0,"entry_seq":2,"prev_hash":"` + sha256Of(lines[1]) + `"}`
-	if _, _, _, err := walkChain(bytesLines(damaged), sha[1]); err == nil {
+	if _, _, _, err := walkChain(bytesLines(damaged), sha[1], compositionEvidenceIndex{}); err == nil {
 		t.Fatal("post-anchor damage must still break the chain")
 	}
 }
 
 func TestWalkChain_AnchorNotFound_Errors(t *testing.T) {
 	lines, _ := chainLines()
-	if _, _, _, err := walkChain(bytesLines(lines), "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"); err == nil {
+	if _, _, _, err := walkChain(bytesLines(lines), "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", compositionEvidenceIndex{}); err == nil {
 		t.Fatal("an anchor SHA matching no line must error")
 	}
 }
@@ -75,7 +75,7 @@ func TestWalkChain_AnchorLineMutated_NotFound(t *testing.T) {
 	lines, sha := chainLines()
 	mutated := append([]string(nil), lines...)
 	mutated[2] = `{"ts":"2026-05-01T00:02:00Z","cycle":777,"role":"builder","kind":"phase","exit_code":0,"entry_seq":2,"prev_hash":"` + sha256Of(lines[1]) + `"}`
-	if _, _, _, err := walkChain(bytesLines(mutated), sha[2]); err == nil {
+	if _, _, _, err := walkChain(bytesLines(mutated), sha[2], compositionEvidenceIndex{}); err == nil {
 		t.Fatal("mutating the anchor line itself must fail 'anchor not found' (SHA binding self-invalidates)")
 	}
 }

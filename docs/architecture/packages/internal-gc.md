@@ -54,7 +54,7 @@ Two callers drive it. The loop's hook (`runGCHook` in `cmd/evolve`), which runs 
   - a continuation lane whose snapshot commit is bound in `continuation-registry.json`.
 
   The control in the same test: that continuation lane's tree is salvaged and removed, while its snapshot commit stays on the kept branch and the registry is unchanged. Adoption seeds from the SHA. `TestTheCheckedInPolicyRunsTheWaveEndGCInEnforce` pins the mode itself.
-- **Protected paths are never planned.** `quarantine/`, the ledger files and `archive/` are manual-only (`protected`).
+- **Protected paths are never planned.** `quarantine/`, the ledger files (`ledger.jsonl`, `ledger.tip`, `ledger.lock`, `ledger-segments/` and, since 2026-10-06, the evidence store `ledger-artifacts/`, spelled by `ledgerartifacts.DirName`) and `archive/` are manual-only (`protected`). The evidence store is the ledger's: a composition-verdict line whose diff is gone breaks the chain, and ship then refuses every carry ([incident](../../incidents/2026-10-06-carry-refused-ledger-verify-f5.md)). Pinned by `TestApply_RefusesTheLedgerEvidenceStore`, and across every sweep, the loop's enforce hook and an operator `evolve gc`, by `cmd/evolve` `TestGC_TheEnforceHookAndTheOperatorRunKeepTheLedgerEvidenceStore`. No sweep reaches the store today (run dirs, registered worktrees, the Go cache, temp files and dev worktrees all live elsewhere); the protection keeps a future rule from changing that.
 - **A failed listing mutates nothing.** An unreadable cache or temp dir, or a failed `lsof`, is reported as an error and no entry is touched (`TestTrimGoCache_AMissingCacheIsReportedNotIgnored`, `TestReapFinishedCycleOrphans_AFailedListingSignalsNothingAndIsReported`).
 
 ## Follow-ups

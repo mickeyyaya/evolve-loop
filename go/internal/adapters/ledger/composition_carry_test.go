@@ -29,7 +29,6 @@ func TestWriteCompositionVerdict_IdenticalRebaseRecordsTheAuditedTreeAndReadsBac
 			Cycle: 1715, Method: IdenticalRebaseMethod, LaneAuditRef: ref, PatchID: patchID,
 			AuditedBase: "base0", GitHead: "base1", TreeStateSHA: composed, AuditedTreeSHA: audited,
 			GateResults: greenGates(), AuditedDiff: []byte(compTestDiff), ComposedDiff: []byte(compTestDiff),
-			ArtifactDir: filepath.Join(dir, "artifacts"),
 		}); err != nil {
 			t.Fatalf("WriteCompositionVerdict: %v", err)
 		}

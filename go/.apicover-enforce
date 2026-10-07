@@ -691,3 +691,5 @@
 ./internal/fakeclitest
 # landed — whether a worktree's changes since a merge-base are already in origin/main (per-path three-way proof); the one predicate evolve worktree cleanup --dev uses, and the one the checkpoint prune converges onto.
 ./internal/landed
+# ledgerartifacts — the ledger's write-once content-addressed evidence store (.evolve/ledger-artifacts/sha256/<2>/<62>) and the legacy-path aliases evidence restore records; gc hard-protects it.
+./internal/ledgerartifacts

@@ -2,11 +2,13 @@ package ship
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/treedelta"
 )
 
 func TestVerifyExecutionTree_AcceptsAReProvenCarry(t *testing.T) {
@@ -49,7 +51,13 @@ func TestVerifyExecutionTree_RefusesWhenTheTreeCannotBeTaken(t *testing.T) {
 	wantShipErr(t, err, core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, "predicate execution tree-state")
 }
 
-func TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit(t *testing.T) {
+type laneCarriedOntoAPeer struct {
+	lane carriedLane
+	ref  string
+}
+
+func auditedLaneRebasedOntoAPeer(t *testing.T) laneCarriedOntoAPeer {
+	t.Helper()
 	repo := makeRepo(t)
 	rev := func(dir string, args ...string) string { return strings.TrimSpace(runGitOut(t, dir, args...)) }
 	base0 := rev(repo, "rev-parse", "HEAD")
@@ -69,18 +77,63 @@ func TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit(t *testing.T)
 	runGit(t, wt, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "lane")
 	runGit(t, wt, "-c", "commit.gpgsign=false", "rebase", "-q", base1)
 	runGit(t, wt, "reset", "-q", "--soft", base1)
-	lane := carriedLane{repo: repo, base0: base0, tree0: tree0, base1: base1, tree1: rev(wt, "write-tree")}
-	writeCarry(t, lane, mustHashFile(t, filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")), tree0)
-	opts := auditOpts(t, repo)
-	opts.ActiveWorktree = wt
-	res := &RunResult{}
+	return laneCarriedOntoAPeer{
+		lane: carriedLane{repo: repo, worktree: wt, base0: base0, tree0: tree0, base1: base1, tree1: rev(wt, "write-tree"), cycle: 1715},
+		ref:  mustHashFile(t, filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")),
+	}
+}
 
-	err := verifyAuditBinding(context.Background(), opts, res)
+func (c laneCarriedOntoAPeer) ship(t *testing.T) (*RunResult, error) {
+	t.Helper()
+	opts := auditOpts(t, c.lane.repo)
+	opts.ActiveWorktree = c.lane.worktree
+	res := &RunResult{}
+	return res, verifyAuditBinding(context.Background(), opts, res)
+}
+
+func carriedAndCleanedUp(t *testing.T, repo string, cycle int) {
+	t.Helper()
+	wt := filepath.Join(repo, ".evolve", "worktrees", fmt.Sprintf("cycle-cd3ae73e-%d", cycle))
+	runGit(t, repo, "worktree", "add", "-q", "--detach", wt)
+	base := strings.TrimSpace(runGitOut(t, wt, "rev-parse", "HEAD"))
+	mustWrite(t, filepath.Join(wt, fmt.Sprintf("lane-%d.txt", cycle)), "an earlier lane's carried change\n")
+	runGit(t, wt, "add", "-A")
+	tree := strings.TrimSpace(runGitOut(t, wt, "write-tree"))
+	diff, err := treedelta.Delta(context.Background(), testGit, wt, base, tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	earlier := carriedLane{repo: repo, worktree: wt, base0: base, tree0: tree, base1: base, tree1: tree, cycle: cycle}
+	writeCarryOf(t, earlier, fmt.Sprintf("audit-of-cycle-%d", cycle), tree, tree, diff, diff)
+	runGit(t, repo, "worktree", "remove", "--force", wt)
+}
+
+func TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit(t *testing.T) {
+	c := auditedLaneRebasedOntoAPeer(t)
+	writeCarry(t, c.lane, c.ref, c.lane.tree0)
+
+	res, err := c.ship(t)
 
 	if err != nil {
 		t.Fatalf("verifyAuditBinding = %v; a peer landed before the audit bound, the lane rebased byte for byte, and its carry must ship on the verdict it earned (the live shape of cycles 1766, 1768 and 1772)", err)
 	}
 	if logs := strings.Join(res.Logs, "\n"); !strings.Contains(logs, "carry of cycle 1715, re-proven") {
 		t.Errorf("logs = %q, want the binding to name the carry it accepted", logs)
+	}
+}
+
+func TestVerifyAuditBinding_ShipsASecondCarryAfterTheFirstCarrysWorktreeIsGone(t *testing.T) {
+	c := auditedLaneRebasedOntoAPeer(t)
+	carriedAndCleanedUp(t, c.lane.repo, 1766)
+	c.lane.cycle = 1782
+	writeCarry(t, c.lane, c.ref, c.lane.tree0)
+
+	res, err := c.ship(t)
+
+	if err != nil {
+		t.Fatalf("verifyAuditBinding = %v; cycle 1766 carried and its worktree was cleaned up, so cycle 1782's byte-identical carry must still ship (the live shape of cycles 1782 and 1810)", err)
+	}
+	if logs := strings.Join(res.Logs, "\n"); !strings.Contains(logs, "carry of cycle 1782, re-proven") {
+		t.Errorf("logs = %q, want the binding to name the second carry", logs)
 	}
 }
