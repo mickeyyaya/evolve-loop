@@ -30,13 +30,13 @@ func TestRetrospectiveRoutesToCodexDeep(t *testing.T) {
 		t.Fatalf("load profile: %v", err)
 	}
 	if p.CLI != "codex-tmux" {
-		t.Fatalf("CLI=%q, want codex-tmux (2026-08-26 deep-tier sol arrangement)", p.CLI)
+		t.Fatalf("CLI=%q, want codex-tmux (2026-08-26 deep-tier arrangement)", p.CLI)
 	}
 	if len(p.CLIFallback) != 1 || p.CLIFallback[0] != "claude-tmux" {
 		t.Fatalf("CLIFallback=%v, want [claude-tmux]", p.CLIFallback)
 	}
 	if p.ModelTierEnvelope == nil || p.ModelTierEnvelope.Default != "deep" {
-		t.Fatalf("envelope default must stay deep (codex deep tier — gpt-5.6-sol per the 2026-09-10 cost directive; gpt-6-astra since 2026-09-09): %+v", p.ModelTierEnvelope)
+		t.Fatalf("envelope default must stay deep (the codex deep-tier model lives in bridge/manifests/codex-tmux.json): %+v", p.ModelTierEnvelope)
 	}
 }
 

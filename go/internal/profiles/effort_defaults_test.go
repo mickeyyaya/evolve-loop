@@ -30,8 +30,42 @@ func TestEffortDefaults_Matrix(t *testing.T) {
 // codexDeepTopRung is the effort level every codex deep/top profile must declare.
 const codexDeepTopRung = "high"
 
-// maxEffortRung is the costliest effort level, reserved for deep/top profiles.
-const maxEffortRung = "max"
+var premiumEffortRungs = map[string]bool{"max": true, "ultra": true}
+
+func violatesPremiumPlacement(p Profile) bool {
+	if !premiumEffortRungs[p.EffortLevel] {
+		return false
+	}
+	return p.ModelTierDefault != "deep" && p.ModelTierDefault != "top"
+}
+
+func TestViolatesPremiumPlacement(t *testing.T) {
+	cases := []struct {
+		cli, tier, effort string
+		want              bool
+	}{
+		{"codex-tmux", "balanced", "ultra", true},
+		{"codex-tmux", "", "ultra", true},
+		{"codex-tmux", "fast", "ultra", true},
+		{"codex-tmux", "balanced", "max", true},
+		{"codex-tmux", "fast", "max", true},
+		{"claude-tmux", "", "max", true},
+		{"codex-tmux", "deep", "ultra", false},
+		{"codex-tmux", "top", "ultra", false},
+		{"codex-tmux", "top", "max", false},
+		{"claude-tmux", "deep", "max", false},
+		{"codex-tmux", "balanced", "xhigh", false},
+		{"codex-tmux", "fast", "low", false},
+		{"codex-tmux", "balanced", "", false},
+		{"codex-tmux", "deep", "high", false},
+	}
+	for _, c := range cases {
+		p := Profile{Name: "table", CLI: c.cli, ModelTierDefault: c.tier, EffortLevel: c.effort}
+		if got := violatesPremiumPlacement(p); got != c.want {
+			t.Errorf("violatesPremiumPlacement(cli=%s tier=%q effort=%q) = %v, want %v", c.cli, c.tier, c.effort, got, c.want)
+		}
+	}
+}
 
 // The guard reads the declared tier; a dispatch-time escalation changes effort
 // only through the profile's effort_overrides.
@@ -60,37 +94,18 @@ func TestCodexDeepTierProfilesAllRunAtDirectedRung(t *testing.T) {
 	}
 }
 
-// The rule holds for every CLI family: max is the costliest level wherever it
-// exists, and a fast or balanced phase was costed at a lower one.
-func TestMaxEffortOnlyOnDeepOrTopProfiles(t *testing.T) {
+func TestPremiumEffortOnlyOnDeepOrTopProfiles(t *testing.T) {
 	loader, names := RealTreeProfiles(t)
-	checked := 0
 	for _, name := range names {
 		p, err := loader.Get(name)
 		if err != nil {
-			// Report, don't skip: Get also expands policies, so a skip would
-			// silently shrink the checked set.
 			t.Errorf("profile %s: Get failed (%v) — it cannot be checked, so it cannot be trusted", name, err)
 			continue
 		}
-		if p.EffortLevel != maxEffortRung {
-			continue
+		if violatesPremiumPlacement(p) {
+			t.Errorf("profile %s (cli %s): effort_level %q on tier %q (unset resolves to balanced) — the premium rungs max and ultra are reserved for deep/top models. They are the most expensive rungs; a fast/balanced phase was costed lower deliberately.",
+				name, p.CLI, p.EffortLevel, p.ModelTierDefault)
 		}
-		checked++
-		// An unset model_tier_default resolves to balanced at dispatch.
-		tier := p.ModelTierDefault
-		if tier == "" {
-			tier = "balanced"
-		}
-		if tier != "deep" && tier != "top" {
-			t.Errorf("profile %s (cli %s): effort_level %q on a %q-tier phase — max is reserved for deep/top models (2026-08-29 directive). It is the most expensive rung; a fast/balanced phase was costed that way deliberately.",
-				name, p.CLI, p.EffortLevel, tier)
-		}
-	}
-	if checked == 0 {
-		// Zero matches is expected; the sibling class guard catches
-		// EffortLevel decode regressions.
-		t.Logf("no tracked profile at effort %q — expected since the 2026-09-01 directive; placement law armed for future adoption", maxEffortRung)
 	}
 }
 
