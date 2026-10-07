@@ -2,6 +2,7 @@ package phasespec
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -56,3 +57,45 @@ func TestApplyUserRouting_SkipsInvalid(t *testing.T) {
 }
 
 func orderIndexHas(order []string, name string) bool { return indexOfStr(order, name) >= 0 }
+
+func TestApplyUserRouting_AnUnregisteredGrammarIsALoadErrorNotAnAgentCorrection(t *testing.T) {
+	cfg := config.RoutingConfig{
+		Order:       []string{"scout", "build", "audit", "ship"},
+		Triggers:    map[string]config.RoutingBlock{},
+		PhaseEnable: map[string]config.Enable{},
+	}
+	specs := []PhaseSpec{
+		{Name: "typo-review", Optional: true, After: "build", Classify: &ClassifyRules{Grammars: []string{"code-review-reprot"}}},
+		{Name: "real-review", Optional: true, After: "build", Classify: &ClassifyRules{Grammars: []string{GrammarCodeReviewReport}}},
+	}
+
+	warns := ApplyUserRouting(&cfg, specs, Catalog{})
+
+	if len(warns) != 1 || !strings.Contains(warns[0], "typo-review") || !strings.Contains(warns[0], `"code-review-reprot"`) {
+		t.Fatalf("warnings = %v, want one naming the phase and its unregistered grammar", warns)
+	}
+	if want := []string{"scout", "build", "real-review", "audit", "ship"}; !reflect.DeepEqual(cfg.Order, want) {
+		t.Errorf("Order = %v, want %v: the phase with an unregistered grammar is never loaded", cfg.Order, want)
+	}
+}
+
+func TestGrammars_IsACopyACallerCannotRewrite(t *testing.T) {
+	got := Grammars()
+	if !reflect.DeepEqual(got, []string{GrammarCodeReviewReport}) {
+		t.Fatalf("Grammars() = %v, want [%s]", got, GrammarCodeReviewReport)
+	}
+
+	got[0] = "rewritten"
+
+	if again := Grammars(); again[0] != GrammarCodeReviewReport || len(ValidateUserSpec(PhaseSpec{Name: "real-review", Optional: true, Classify: &ClassifyRules{Grammars: []string{GrammarCodeReviewReport}}})) != 0 {
+		t.Errorf("Grammars() after a caller's write = %v: the vocabulary must not be the caller's slice", again)
+	}
+}
+
+func TestValidateUserSpec_AGrammarNameThatDiffersInCaseIsUnregistered(t *testing.T) {
+	spec := PhaseSpec{Name: "real-review", Optional: true, Classify: &ClassifyRules{Grammars: []string{"Code-Review-Report"}}}
+
+	if v := ValidateUserSpec(spec); len(v) != 1 || !strings.Contains(v[0], `"Code-Review-Report"`) {
+		t.Errorf("violations = %v, want the case variant refused: the gate binds the exact name only", v)
+	}
+}

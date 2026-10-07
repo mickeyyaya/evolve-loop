@@ -157,6 +157,27 @@ func TestHooks_ArtifactFilename(t *testing.T) {
 	}
 }
 
+func TestHooks_ComposePrompt_AMultiLineContextValueIsItsOwnHeadedBlock(t *testing.T) {
+	h := hooks{spec: phasespec.PhaseSpec{Name: "code-review", PromptContext: []string{"goal", "task_contract", "absent", "lane"}}}
+	contract := "Bound acceptance:\n- the refusal path is pinned\n"
+	req := core.PhaseRequest{Context: map[string]string{"goal": "ship the guard", "task_contract": contract, "lane": "lane-7"}}
+
+	got := h.ComposePrompt("BODY", req)
+
+	if !strings.Contains(got, "- goal: ship the guard\n") {
+		t.Errorf("prompt lacks the one-line goal entry:\n%s", got)
+	}
+	if !strings.Contains(got, "\n\n## Task Contract\n"+contract) || strings.Contains(got, "- task_contract:") {
+		t.Errorf("prompt = %q, want the contract as its own ## Task Contract block, never after a list marker", got)
+	}
+	if strings.Contains(got, "absent") {
+		t.Errorf("an empty context value rendered: %q", got)
+	}
+	if entry, block := strings.Index(got, "- lane: lane-7\n"), strings.Index(got, "## Task Contract"); entry < 0 || entry > block {
+		t.Errorf("prompt = %q, want every one-line entry before the first headed block: a block declared earlier never splits the context list", got)
+	}
+}
+
 func TestHooks_NameAndAgentDefaults(t *testing.T) {
 	h := hooks{spec: phasespec.PhaseSpec{Name: "security-scan"}}
 	if h.PhaseName() != "security-scan" {

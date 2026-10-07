@@ -1,11 +1,5 @@
 package defectledger
 
-// importgraph_test.go — the package is a leaf under core (ADR-0103 unit 09
-// §2): stdlib plus the five named internal packages, never internal/core,
-// carryover or phasecontract (the compiler is the cycle guard; this is the
-// leaf-ness declaration — signalcenter/importgraph_test.go idiom). The leaf
-// also never writes stderr: its failure modes are codes, not prose lines.
-
 import (
 	"go/parser"
 	"go/token"
@@ -19,6 +13,7 @@ var allowedImports = map[string]bool{
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation": true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate":   true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths":        true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc":    true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter": true,
 }
 
@@ -49,7 +44,7 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 			switch {
 			case allowedImports[path]:
 			case strings.Contains(path, "/internal/"):
-				t.Errorf("%s imports %s: the ledger is a leaf — stdlib plus the five declared packages only", name, path)
+				t.Errorf("%s imports %s: the ledger is a leaf — stdlib plus the six declared packages only", name, path)
 			case strings.Contains(strings.SplitN(path, "/", 2)[0], "."):
 				t.Errorf("%s imports third-party %s: stdlib only", name, path)
 			}

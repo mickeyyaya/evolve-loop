@@ -384,7 +384,7 @@ func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
 		t.Fatalf("read shared phase completion: %v", err)
 	}
 	body := string(shared)
-	for _, call := range []string{"recordJudgmentLesson(", "recordFloorVerdictFailure("} {
+	for _, call := range []string{"recordJudgmentLesson(", "recordFloorVerdictFailure(", "recordReviewFindings("} {
 		if !strings.Contains(body, call) {
 			t.Errorf("shared phase completion does not call %s", call)
 		}

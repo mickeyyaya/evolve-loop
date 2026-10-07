@@ -154,6 +154,14 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/core/phase_bindings_selfcheck.go", Rationale: "the build floor's go-test runners and their argvs (unit, tagged added-test): a lane must not move the deadline of the floor that grades it (inst-L1763b; cycles 1787/1791/1792/1798 timed out at a 120s literal here)"},
 	{Fragment: "/go/internal/addedtests/budget.go", Rationale: "PackageTimeout, the one go-test deadline the build floor, its coverage pass and ship's repo contract run under: moving it moves the floor's budget"},
 	{Fragment: "/go/internal/inboxrank/weightsort_ban_test.go", Rationale: "the one-ranking guard: no inbox ordering outside inboxrank (ADR-0121); a lane that could edit it could reorder the queue it is graded from"},
+	{Fragment: "/skills/quality-index/", Rationale: "the one definition of \"qualified\" the code-review loop and the audit share: the dimensions, the bars, the N/A rules and the grammars (ADR-0124)"},
+	{Fragment: "/go/internal/qualityindex/", Rationale: "the quality index's code home: the vocabulary, the threshold resolver, the Scores and Review Plan parsers and Qualifies (ADR-0124)"},
+	{Fragment: "/skills/architecture-review/", Rationale: "the structural rubric the independent code review judges with (ADR-0124)"},
+	{Fragment: "/go/internal/codereview/", Rationale: "the code-review phase's kernel half: the report grammar, the finding rows and the REVIEW_FINDINGS signal (ADR-0124)"},
+	{Fragment: "/agents/evolve-code-reviewer.md", Rationale: "the independent reviewer's persona: what it reviews and how it reports (ADR-0124)"},
+	{Fragment: "/.evolve/phases/code-review/", Rationale: "the code-review phase's spec: its sections, grammar and inputs (ADR-0124)"},
+	{Fragment: "/.evolve/profiles/code-reviewer.json", Rationale: "the reviewer's read-only, Claude-floor dispatch profile (ADR-0124)"},
+	{Fragment: "/go/internal/router/code_review_pin_test.go", Rationale: "pins the registry's conditional_mandatory[code-review] rule; the registry file itself stays editable for routing work (ADR-0124)"},
 }
 
 // IsProtectedSurface reports whether path is on the control plane. path may be absolute or

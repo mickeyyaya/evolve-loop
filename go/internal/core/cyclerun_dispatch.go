@@ -327,17 +327,9 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// recordFinalVerdict then records the degrade into
 				// VerdictsNotAdopted without clobbering the floor verdict.
 				if degraded, ok := cr.o.nonFloorExhaustionDegrade(next, cr.cs.WorkspacePath, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases)); ok {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (contract_exhaustion_skip)\n", next, resp.Verdict)
+					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (%s)\n", next, resp.Verdict, ledgerKindContractExhaustionSkip)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: non-canonical verdict %q after %d attempts", next, resp.Verdict, attempt), attempt)
-					if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
-						TS:       cr.o.now().UTC().Format(time.RFC3339),
-						Cycle:    cr.cycle,
-						Role:     string(next),
-						Kind:     "contract_exhaustion_skip",
-						ExitCode: 0,
-					}); lerr != nil {
-						fmt.Fprintf(os.Stderr, "[orchestrator] WARN contract_exhaustion_skip ledger append: %v\n", lerr)
-					}
+					cr.o.noteContractExhaustionSkip(cr.ctx, cr.cs, next)
 					resp = degraded
 					break
 				}

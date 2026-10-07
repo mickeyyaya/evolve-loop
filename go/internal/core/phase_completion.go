@@ -52,6 +52,7 @@ func (r phaseCompletionRecord) persist() error {
 			r.result.FailReasons = append(r.result.FailReasons, cs.AuditFailReasons...)
 		}
 	}
+	r.orchestrator.recordReviewFindings(*cs, r.phase, r.response.Verdict)
 	r.recordOutcome("")
 	return nil
 }

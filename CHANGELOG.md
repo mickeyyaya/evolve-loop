@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the code-review phase and the shared quality index, landing 1: an independent review between build and audit, held in shadow (ADR-0124, 2026-10-07)
+
+- **Why.** The operator asked for a review phase that is independent of the build and runs before the audit. It should:
+  - cover every review lens and justify which ones a change needs;
+  - feed findings with suggested fixes back to the build until they are resolved;
+  - share one quality index with the audit, which decides whether the result qualifies.
+
+  Until now the audit was both the loop's only code reviewer and its ship gate, so a builder first heard about a defect when the gate rejected.
+- **Decisions.** Plan `docs/plans/code-review-phase-2026-10.md`, design `docs/architecture/review-loop-and-quality-index.md` and ADR-0124 (Proposed):
+  - strategy S3: one shared quality index, a lead reviewer, and data-driven specialists later;
+  - a review loop with deterministic stops (4 rounds, no progress, oscillation);
+  - a blind audit that scores the same index, cross-checked by the kernel;
+  - shadow first, then enforce.
+- **What landed (held in shadow):**
+  - **the quality index:**
+    - `skills/quality-index/` (SKILL and COMPACT): ten dimensions with their score-4 bars, N/A rules, review procedures and grammars;
+    - the `qualityindex` package: the vocabulary, the threshold resolver for `workflow.quality_index.thresholds` (compiled default 4), the Scores and Review Plan parsers, their agreement check, and `Qualifies`;
+    - both are protected surfaces, as are the phase's own files and its pin test.
+  - **the phase:**
+    - `.evolve/phases/code-review/phase.json`, an evaluate phase after build with the sections Review Plan, Findings, Scores and Verdict, and the report grammar `code-review-report`. Its `prompt_context` is `["goal", "task_contract"]`, and the spec runner renders the multi-line contract as its own `## Task Contract` block;
+    - the persona `agents/evolve-code-reviewer.md`: read-only, fresh, every dimension, the earlier deliverables, with the Task Contract in its prompt;
+    - the profile `.evolve/profiles/code-reviewer.json`: deep tier, a Claude-floor member, Read/Grep/Glob/Bash, a read-only sandbox, no git writes.
+
+    The registry pins it with `conditional_mandatory["code-review"] = "deliverable_kind==code && build.files_touched>0"`, because `insert_when` alone only gates the advisor's plan.
+  - **the report grammar in the deliverable gate:** a phase may declare `classify.grammars`. `code-review-report` checks the plan, the scores, their agreement and that every gap cites a finding, so a malformed report gets the contract-correction rung (`bad_grammar`).
+    - The grammar names are `phasespec`'s vocabulary, so a user spec naming an unregistered grammar is refused at catalog load instead of reaching an agent's correction.
+    - A `policy.json` that cannot be loaded is the gate's own fault: `policy.QualityIndexThresholdsFor` returns the error, and the gate fails open loudly (`GATE_CONTRACT_FAIL_OPEN`).
+  - **the skill:** `skills/architecture-review/SKILL.md`, the structural rubric converted from `.claude/agents/architecture-reviewer.md` for a read-only phase.
+  - **the ledger rows:**
+    - `defectledger.Entry` gains `source`, `round`, `severity` and `dimension` (all `omitempty`; a legacy ledger re-serializes byte-identical), and inherited rows keep them through the reconcile gate.
+    - The merge rule becomes the exported `defectledger.Append`, which the audit's Emit now uses, byte-identical by the G1/G2 goldens. A cut's stand-in row takes the highest cut severity.
+    - Dedupe, the cap and the stand-in are each kept per source, and a review row's id hashes `source + "\xff" + text`, which no JSON-decoded audit defect can spell. The reconcile gate's empty-ancestor check and vouch count only the rows a continuation owes, so an ancestor holding only shadow rows is the empty ancestor and the audit's verdict is byte-identical in shadow.
+    - The new `internal/codereview` parses the report and appends one row per finding. In shadow the rows are DEFERRED with the stage as the reason, so no continuation owes them and the audit is unaffected.
+    - The core records them at the shared completion boundary (`phaseCompletionRecord.persist`, which serves the fresh loop and resume) and in the parallel evaluate batch.
+  - **the signal:** module `review`, code `REVIEW_FINDINGS`, with the counts by severity, the derived verdict, the scores vector, the gaps, `would_repair` (any finding or a gap: the round-1 projection of the loop's decision), the stage, the threshold and the round, within the Signal Center's 12-field cap. It is the shadow metric.
+  - **an exhausted correction ladder degrades, never aborts:** an optional evaluate phase past the ship floor that `config.mandatory_phases` does not list, whose report is present but still malformed after the correction rung, is SKIPPED with a WARN on the fresh and the resume ladder alike (a missing or empty report keeps the abort, so a non-admitted missing deliverable never reaches Ship) (`contract_exhaustion_skip` in the ledger; `REVIEW_SKIPPED{reason: malformed}` for code-review), the same shape as the non-canonical-verdict degrade. Its contract blocks are exempt from the contract gate's persisted breaker (`ReviewInput.BreakerExempt`: no count, no reset, no demotion), so a malformed review never hands the audit a `contract_gate_demoted` waiver. A degraded review records no ledger rows.
+  - **the findings grammar:** `ValidateReport` also refuses a `###` heading under `## Findings` that is not a finding, a line that opens with a `CR<n>` id but is not a finding heading (`####`, a bullet), and a body that is neither findings nor `None.`, so a drifted finding can no longer be dropped silently. A finding's dimension is read in lower case, and a `**bold**` Scores or Review Plan key is read the way `reportdoc.Fields` reads one.
+  - **the stage switch:** `workflow.findings_repair.code-review.{stage, threshold}`, compiled default shadow at MEDIUM. `enforce` is refused with a warning until the loop (Q3) and the audit's cross-check (Q5) land.
+- **Retired.** `.evolve/evals/wire-code-review-simplify-auditor-hook.md` expected the auditor persona to name code-review-simplify. That premise is false since the self-review lane (C0), which stopped the audit preloading the skill, and since ADR-0124, which makes the code-review phase the one home of independent review.
+- **Next (landing 2):**
+  - Q3: the review loop, generalized from audit-repair;
+  - Q4: the delta re-review and DISPUTED findings;
+  - Q5: the blind audit on the index, the kernel cross-check and divergence;
+  - Q6: the capacity skip, the full signal set, the order after build, and `evolve review metrics`.
+
+  After C0: the phase's skill overlay rule.
+
 ## Fixed — ship's carry composes with the re-ship's inbox consumption, so a correct carry no longer ends integrity-block at the pre-commit check (cycle 1825, wave 75, ADR-0105 B1/B4, 2026-10-07)
 
 - **What was wrong and how it showed.** Cycle 1825 passed audit (audited tree `92e7ba18` on `b0860ce1`), met main moved by cycle 1826 (`839a819ca`) at ship, and carried its verdict across a byte-identical rebase: the carry record (plane ledger line 161629) names `fcfb917`, exactly 1826's 12 paths from the audited tree. The re-ship then consumed its inbox again, so the staged tree became `9a96ef` (`fcfb917` plus 4 consumption paths), and ship's pre-commit check refused it: `INTEGRITY_TREE_DRIFT … (unsanctioned drift path(s): <1826's files>) (carry not re-proven: the carry of cycle 1825 names the tree fcfb917…, not 9a96ef…)`. The router ends an integrity-class error as `integrity-block`, and 1825 was sealed FAIL with nothing unaudited in its tree.
