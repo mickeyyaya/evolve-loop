@@ -121,6 +121,7 @@ largest report observed across 256 recorded runs (max 22,035 bytes, p90 15,777)
 ## References
 
 - ADR-0012 (parent): [adr/0012-commit-claim-coherence.md](adr/0012-commit-claim-coherence.md)
+- The audit evaluation contract (ADR-0125, Proposed): [audit-evaluation-contract.md](audit-evaluation-contract.md). Its gate criterion `G-CONST` indexes P1–P8 without restating them, so this document stays the principles' one home.
 - Layer 1 (commit-prefix gate): [legacy/scripts/guards/commit-prefix-gate.sh](../../legacy/scripts/guards/commit-prefix-gate.sh)
 - Layer 3 (POSTHOC schema): [posthoc-schema.md](posthoc-schema.md)
 - Layer 5 (verdict-elevation, pending): TBD by cycle E

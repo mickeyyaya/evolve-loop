@@ -2,7 +2,7 @@
 
 > **Purpose.** This report records what was learned while building the evolve-loop "factory". The factory is an autonomous, multi-phase LLM software pipeline (scout → triage → tdd → build → audit → ship). A Go orchestrator runs it as fleet waves of isolated lanes. Every finding cites the source it rests on. Findings live in `docs/`, never in code comments (`AGENTS.md` §5, `docs/conventions/code-comments.md`).
 >
-> **Version:** v1, 2026-09-26. **Status:** living document; §6 says how to extend it.
+> **Version:** v1.1, 2026-10-07 (P4 and P7 gain ADR-0125 pointers; §5.1 gains rows 10–11); v1, 2026-09-26. **Status:** living document; §6 says how to extend it.
 
 ## 1. Purpose and scope
 
@@ -71,6 +71,7 @@ Each principle names the failure class that taught it, the evidence, and the mec
   - ADR-0084 I2: literal examples single-sourced against the production reader (`docs/architecture/adr/0084-gate-integrity-invariants.md`).
   - ADR-0100's `agent_owed`/`harness_produced` partition and declared effects, with owed paths rendered into the prompt.
   - The persona keep-guard, and the rule "grade the dispatched prompt, not the source file".
+- **Extended by (proposed, 2026-10-07):** [ADR-0125](../architecture/adr/0125-audit-publishes-its-evaluation-contract.md) (the audit publishes its standard and per-cycle expectations). External evidence: [the dossier](audit-evaluation-contract-prior-art-2026-10.md) F1.
 
 ### P5. Verify the gate before the code
 - **Taught by:** the pipeline manufacturing its own FAILs.
@@ -110,6 +111,7 @@ Each principle names the failure class that taught it, the evidence, and the mec
   - Typed routing: `route`, and `pipeline-*` kinds routed to the console.
   - Deterministic refusals routed to the console on the first hit.
   - A Claude-family floor, so the builder's family never judges its own work (`docs/architecture/adr/0104-fallback-is-a-property-of-the-bridge-handle.md`).
+- **Extended by (proposed, 2026-10-07):** [ADR-0125](../architecture/adr/0125-audit-publishes-its-evaluation-contract.md) E-D5. External evidence: [the dossier](audit-evaluation-contract-prior-art-2026-10.md) F2.
 
 ### P8. Recorded state must be entailed by evidence
 - **Taught by:** state that no longer matched what had happened.
@@ -302,6 +304,8 @@ Taken from the sources' "filed, not done" and open sections.
 7. **Batch 5.** ADR-0074 says "three of its four FAILs" (cycles 1028–1037). The July lessons and the operating policy say "six of seven" (1028–1043). The two sources cover different windows.
 8. **The ~90% projection** in the July lessons was not realized: ADR-0076 reports ~45% for batches 6–8.
 9. **ADR-0100.** Its verification section exercises `handoff-build.json`, which Decision 1 removed from the registry. It is probably a test-local registry, but the ADR does not say.
+10. **Publishing the evaluator's criteria** (2026-10-07). The external sources disagree: Anthropic's harness shares a sprint contract before work, while StrongDM, SpecBench and the Agentic Engineering Manifesto hold the evaluation out of the producer's sight. ADR-0125 resolves it with E-D5: criteria public, probe instances private. See the [dossier](audit-evaluation-contract-prior-art-2026-10.md), "Where the sources disagree".
+11. **Specific versus generic rubrics** (2026-10-07). Agentic Rubrics finds grounded, task-specific criteria help a verifier. ImpossibleRubrics finds task-specific rubrics invite fabricated claims. ADR-0125 makes the criteria specific about evidence, never about claims or implementation (same dossier table).
 
 ## 6. How to extend this report
 

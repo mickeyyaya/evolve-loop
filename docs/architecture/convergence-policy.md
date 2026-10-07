@@ -305,6 +305,6 @@ Today's tier tables have **no** deep→top headroom in any family:
 ### 11. What this does not do
 
 - **It never defers a CRITICAL, and never lets one land.** Split and accept both require no open CRITICAL.
-- **It never turns an audit FAIL into a PASS.** The audit's verdict rules and the kernel cross-checks (ADR-0124/0125) are unchanged. The audit records `kind`, and verify-only does not bind it. The one changed input is which *code-review rows* the cross-check counts (§6), and accept-with-limits rows still face the audit's adjudication.
+- **It never turns an audit FAIL into a PASS.** The audit's verdict rules and the kernel cross-checks ([ADR-0124](adr/0124-code-review-phase.md), [ADR-0125](adr/0125-audit-publishes-its-evaluation-contract.md)) are unchanged. The audit records `kind`, and verify-only does not bind it. The one changed input is which *code-review rows* the cross-check counts (§6), and accept-with-limits rows still face the audit's adjudication.
 - **It does not replace any loop's budget home.**
 - **It does not add a phase.**
