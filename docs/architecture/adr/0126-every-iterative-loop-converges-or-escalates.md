@@ -11,7 +11,7 @@
     - its landing-2 loop calls the policy, with `max_fix_rounds` 3 (equal to its `max_rounds` 4, so the budget is unchanged) and its own U(n) as the mass;
     - §6.2: a row DEFERRED by the policy at rung 2 (MEDIUM/LOW, with a filed follow-up) no longer counts as strict OPEN;
     - accept-with-limits rows go to the audit's adjudication, as DISPUTED rows do.
-  - ADR-0125 (the audit evaluation contract): findings carry `kind` and `blocking`. The audit records `kind` and never uses it to unblock.
+  - [ADR-0125](0125-audit-publishes-its-evaluation-contract.md) (the audit evaluation contract): findings carry `kind` and `blocking`. The audit records `kind` and never uses it to unblock.
 - **Evidence:**
   - ADR-0096 measured ship probability by audit-round count at 100% → 50% → 17% → 0%.
   - L2: seven fix rounds on the deepest Claude model, with about 18 of the last 27 findings in one heuristic that a review had added.
