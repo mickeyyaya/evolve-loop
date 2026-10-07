@@ -11,9 +11,11 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
@@ -24,6 +26,10 @@ import (
 )
 
 var repoContractPackages = repocontract.Packages()
+
+var repoContractSelections = repocontract.TreeReadingTests()
+
+const packWaitDelay = 2 * time.Second
 
 // scanLogName is the run-dir artifact every scanner-pack run is teed to —
 // green runs included, since a green baseline is what disproves a false RED.
@@ -81,7 +87,27 @@ func (o packOutcome) allNamedTests() bool {
 var repoContractTestFn = defaultRepoContractTest
 
 func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Writer) packOutcome {
-	return runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
+	whole := runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
+	return whole.merged(runGoTestJSON(ctx, moduleDir, out, repoContractSelectionArgs(repoContractSelections)))
+}
+
+func (o packOutcome) merged(next packOutcome) packOutcome {
+	return packOutcome{
+		failures:   append(append([]packFailure{}, o.failures...), next.failures...),
+		failureLog: o.failureLog + next.failureLog,
+		err:        errors.Join(o.err, next.err),
+	}
+}
+
+func repoContractSelectionArgs(selections []repocontract.TestSelection) []string {
+	var packages, tests []string
+	for _, selection := range selections {
+		packages = append(packages, selection.Package)
+		tests = append(tests, selection.Tests...)
+	}
+	slices.Sort(tests)
+	args := append(repoContractTestArgs(nil, nil), "-run", "^("+strings.Join(slices.Compact(tests), "|")+")$")
+	return append(args, packages...)
 }
 
 func RunRepoContractPack(ctx context.Context, root string) (reds []string, diagnostic string, err error) {
@@ -194,6 +220,8 @@ func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
+	cancelKillsTheProcessGroup(cmd)
+	cmd.WaitDelay = packWaitDelay
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return packOutcome{err: fmt.Errorf("go test stdout pipe: %w", err)}
@@ -414,6 +442,7 @@ func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, works
 	fmt.Fprintf(out, "[ship] repo-contract scanner pack: go test -json -count=1 -timeout %s %s (module %s, changes vs %s)\n",
 		repoContractTestTimeout,
 		strings.Join(repoContractPackages, " "), moduleDir, baseRef)
+	fmt.Fprintf(out, "[ship] repo-contract tree-reading tests by name: go %s\n", strings.Join(repoContractSelectionArgs(repoContractSelections), " "))
 	return runClassifiedPack(ctx, out, workspace, "scanner pack", func() packOutcome {
 		return repoContractTestFn(ctx, moduleDir, out)
 	})

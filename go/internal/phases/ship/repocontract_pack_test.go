@@ -3,8 +3,11 @@ package ship
 import (
 	"context"
 	"path"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 )
 
 const ratchetRed = "github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet.TestRatchet_NoNewRawGitFixtures"
@@ -54,5 +57,36 @@ func TestContractRed_NamesEverySuiteOfTheOnePackList(t *testing.T) {
 	want := "fixed scanner pack (phasespec, profiles, phasecoherence, routingtest, rawgitratchet, sizeratchet, testmainexit, repocontract, policy, guards, acssuite, fleet, evalqualitycheck, inboxrank)"
 	if !strings.Contains(err.Error(), want) {
 		t.Fatalf("the ship's red message stays byte-identical; want %q in %q", want, err.Error())
+	}
+}
+
+func TestRepoContractSelectionArgs_RunsEachSelectedTestByNameInItsPackages(t *testing.T) {
+	args := repoContractSelectionArgs([]repocontract.TestSelection{
+		{Package: "./internal/core", Tests: []string{"TestPhaseTimings_SingleWriter", "TestSeam_OneConstructionSite"}},
+		{Package: "./cmd/evolve", Tests: []string{"TestSeam_OneConstructionSite"}},
+	})
+	want := append(repoContractTestArgs(nil, nil), "-run", "^(TestPhaseTimings_SingleWriter|TestSeam_OneConstructionSite)$", "./internal/core", "./cmd/evolve")
+	if !slices.Equal(args, want) {
+		t.Fatalf("the by-name run takes the gate's budgeted argv, one anchored -run of every selected test once, then the packages;\ngot  %q\nwant %q", args, want)
+	}
+}
+
+func TestPackOutcomeMerged_KeepsEveryRunsRedsAndErrors(t *testing.T) {
+	whole := redPack("pkg.TestWhole")
+	whole.failureLog = "whole\n"
+	byName := redPack("other.TestByName")
+	byName.failureLog = "by name\n"
+	merged := whole.merged(byName)
+	if !merged.realRed() || !slices.Equal(merged.failedNames(), []string{"pkg.TestWhole", "other.TestByName"}) || merged.failureLog != "whole\nby name\n" {
+		t.Fatalf("both runs' reds and output must reach the verdict; got %v %q %v", merged.failedNames(), merged.failureLog, merged.err)
+	}
+	if cancelled := ambiguousPack().merged(packOutcome{err: context.Canceled}); cancelled.green() || cancelled.realRed() {
+		t.Fatalf("a cancel in either run stays ambiguous, never green or a named red; got %+v", cancelled)
+	}
+	if green := (packOutcome{}).merged(packOutcome{}); !green.green() {
+		t.Fatalf("two green runs are green; got %+v", green)
+	}
+	if red := (packOutcome{}).merged(redPack("pkg.TestLate")); !red.realRed() {
+		t.Fatalf("a red by-name run after a green whole pack is the pack's red; got %+v", red)
 	}
 }

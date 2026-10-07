@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -34,6 +35,98 @@ func Packages() []string {
 		"./internal/evalqualitycheck/...",
 		"./internal/inboxrank/...",
 	}
+}
+
+type TestSelection struct {
+	Package string
+	Tests   []string
+}
+
+func TreeReadingTests() []TestSelection {
+	selections := make([]TestSelection, 0, len(treeReadingSelections))
+	for _, selection := range treeReadingSelections {
+		selections = append(selections, TestSelection{Package: selection.Package, Tests: slices.Clone(selection.Tests)})
+	}
+	return selections
+}
+
+var treeReadingSelections = []TestSelection{
+	{Package: "./cmd/evolve", Tests: []string{
+		"TestApicoverSubcommand_ByteParityWithStandalone",
+		"TestBridgeEngineRootsAreEnumerated",
+		"TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset",
+		"TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout",
+		"TestCenterlessConfigLoadSitesArePinned",
+		"TestChainEngines_OneConstructionSite",
+		"TestChainResultAndLoopResult_BoundaryRefreshJSONTagPresent",
+		"TestChainResult_IsTheLeafResultWithNoReSpelledSchema",
+		"TestClihealthUsage_PrintsEachCLIsTypedWindowsAndWritesNothing",
+		"TestClihealthUsage_TheTableNamesEveryWindowAndAFailedProbeExitsOne",
+		"TestComposedApicoverGate_TargetRecipeEnforces",
+		"TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport",
+		"TestConsoleSinkThresholdHasOneHome",
+		"TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar",
+		"TestInboxCenterlessRootsArePinned",
+		"TestLoopPreflightOptions_AFailedBootIsExplainedByTheUsageEvidence",
+		"TestNewUsageProber_ReadsEachCLIsWindowsThroughItsManifestAndBenchesTheRightFamily",
+		"TestNilSignalBridgeRootsAreExplicit",
+		"TestNilSignalCenterRootsArePinned",
+		"TestObserverAdapterConstructionsAreWired",
+		"TestRegistryPathSpelling_HasOneNonTestHome",
+		"TestRoutingConfigLoader_ConstructionSitesArePinned",
+		"TestRunLoopChain_SetsBoundaryRefreshOnReExecStop",
+		"TestUnobservedLedgerRootsArePinned",
+		"TestWaveEngine_OneConstructionSite",
+		"TestWireBridgeStages_IsTheRootsOnlyStageForwarding",
+	}},
+	{Package: "./internal/bridge", Tests: []string{
+		"TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant",
+		"TestCompletionContractVocabulary_SpelledOnce",
+		"TestLaunchOutcome_OneClassificationSite",
+	}},
+	{Package: "./internal/changedpkgs", Tests: []string{
+		"TestCoveringTests_ReachableFromProduction",
+		"TestDirectImporters_ReachableFromProduction",
+	}},
+	{Package: "./internal/core", Tests: []string{
+		"TestAgentSubprocessWriters_AllStampRunID",
+		"TestAgentSubprocessWriters_SetIsClosed",
+		"TestCarryoverLifecycle_OneConstructionSite",
+		"TestFailureDiagWriter_OneConstructionSite",
+		"TestFailureLearningEngine_OneConstructionSite",
+		"TestPhaseAdvisor_OneConstructionSite",
+		"TestPhaseTimings_SingleWriter",
+	}},
+	{Package: "./internal/cycleoutcome", Tests: []string{
+		"TestLaneScopeProjection_SingleWireShapeDeclaration",
+	}},
+	{Package: "./internal/inboxmover", Tests: []string{
+		"TestOptionsMover_OneConstructionSite",
+	}},
+	{Package: "./internal/inboxmover/lifecycle", Tests: []string{
+		"TestLifecycle_OnlyHostImportsTheLeaf",
+	}},
+	{Package: "./internal/phaseobserver", Tests: []string{
+		"TestObserverEngine_OneConstructionSite",
+	}},
+	{Package: "./internal/phases/audit", Tests: []string{
+		"TestArtifactNames_HaveOneProductionSpellingEach",
+		"TestCIParityGates_OneConstructionSite",
+		"TestDefectLedgerSeam_OneConstructionSite",
+		"TestNullLedgerFacades_HaveNoProductionCaller",
+	}},
+	{Package: "./internal/phases/runner", Tests: []string{
+		"TestVerdictEngine_OneConstructionSite",
+	}},
+	{Package: "./internal/phases/ship", Tests: []string{
+		"TestLanding_OneConstructionSite",
+	}},
+	{Package: "./internal/reachabilityprobe", Tests: []string{
+		"TestBuildImportGraph_Named",
+	}},
+	{Package: "./internal/subagent", Tests: []string{
+		"TestSubagentRun_OneConstructionSite",
+	}},
 }
 
 func ModuleDir(root string) string {

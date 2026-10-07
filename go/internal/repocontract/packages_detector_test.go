@@ -1,6 +1,7 @@
 package repocontract
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"slices"
@@ -72,23 +73,72 @@ func TestWalksUpToGoMod(t *testing.T) {
 func TestPackProblems(t *testing.T) {
 	pack := []string{"./internal/in/..."}
 	cases := []struct {
-		name    string
-		readers []string
-		outside map[string]string
-		want    []string
+		name       string
+		reading    map[string][]string
+		selections []TestSelection
+		want       []string
 	}{
-		{"in the pack", []string{"internal/in"}, nil, nil},
-		{"recorded outside", []string{"internal/big"}, map[string]string{"internal/big": "slow"}, nil},
-		{"neither", []string{"internal/new"}, nil, []string{"internal/new has a test that reads the whole tree"}},
-		{"a record no longer found", nil, map[string]string{"internal/gone": "slow"}, []string{"internal/gone is recorded outside the pack"}},
-		{"recorded and in the pack", []string{"internal/in"}, map[string]string{"internal/in": "slow"}, []string{"internal/in is recorded outside the pack"}},
+		{"in the pack", map[string][]string{"internal/in": {"TestA"}}, nil, nil},
+		{"selected by name", map[string][]string{"internal/big": {"TestA", "TestB"}}, []TestSelection{{Package: "./internal/big", Tests: []string{"TestA", "TestB"}}}, nil},
+		{"neither", map[string][]string{"internal/new": {"TestA"}}, nil, []string{"internal/new.TestA reads the whole tree"}},
+		{"one test of a package left out", map[string][]string{"internal/big": {"TestA", "TestB"}}, []TestSelection{{Package: "./internal/big", Tests: []string{"TestA"}}}, []string{"internal/big.TestB reads the whole tree"}},
+		{"a read no test reaches", map[string][]string{"internal/main": nil}, nil, []string{"internal/main reads the whole tree outside any test"}},
+		{"a selection no longer reading", nil, []TestSelection{{Package: "./internal/gone", Tests: []string{"TestA"}}}, []string{"internal/gone.TestA is selected by name"}},
+		{"selected and in the pack", map[string][]string{"internal/in": {"TestA"}}, []TestSelection{{Package: "./internal/in", Tests: []string{"TestA"}}}, []string{"internal/in.TestA is selected by name"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := packProblems(tc.readers, pack, tc.outside)
+			got := packProblems(tc.reading, pack, tc.selections)
 			if len(got) != len(tc.want) || !slices.EqualFunc(got, tc.want, strings.HasPrefix) {
 				t.Errorf("packProblems = %q, want problems starting %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestReadingTestsOf_CreditsTheTestsThatReachARead(t *testing.T) {
+	const source = `package p
+
+var moduleRoot = filepath.Join("..", "..")
+
+func sourcesMentioning(name string) []string { return walk(moduleRoot, name) }
+
+func helperReachingTheRead() []string { return sourcesMentioning("New(") }
+
+func TestSeam_OneConstructionSite(t *testing.T) { _ = helperReachingTheRead() }
+
+func TestDirect(t *testing.T) { _ = filepath.Abs("../..") }
+
+func TestLocal(t *testing.T) { _ = filepath.Join("testdata", "x.json") }
+
+func TestMain(m *testing.M) { _ = moduleRoot }
+
+func Testlowercase(t *testing.T) { _ = moduleRoot }
+`
+	file, err := parser.ParseFile(token.NewFileSet(), "x_test.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests, reads := readingTestsOf([]*ast.File{file}, "internal/p")
+	if want := []string{"TestDirect", "TestSeam_OneConstructionSite"}; !reads || !slices.Equal(tests, want) {
+		t.Fatalf("readingTestsOf = (%v, %v), want (%v, true): a test reaching a read through helpers and a package-level var is credited, TestMain and a non-test are not", tests, reads, want)
+	}
+	if tests, reads := readingTestsOf([]*ast.File{file}, "."); reads || len(tests) != 0 {
+		t.Fatalf("at the module root nothing climbs out; got (%v, %v)", tests, reads)
+	}
+}
+
+func TestTreeReadingTests_SelectsOnlyPackagesOutsideThePack(t *testing.T) {
+	selections := TreeReadingTests()
+	if len(selections) == 0 {
+		t.Fatal("the pack selects no test by name")
+	}
+	for _, selection := range selections {
+		if slices.ContainsFunc(Packages(), func(pattern string) bool { return strings.TrimSuffix(pattern, "/...") == selection.Package }) {
+			t.Errorf("%s is run whole and by name", selection.Package)
+		}
+		if !strings.HasPrefix(selection.Package, "./") || len(selection.Tests) == 0 || !slices.IsSorted(selection.Tests) {
+			t.Errorf("%s must be a ./ package pattern naming its tests sorted; got %v", selection.Package, selection.Tests)
+		}
 	}
 }
