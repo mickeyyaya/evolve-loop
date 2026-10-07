@@ -249,10 +249,7 @@ func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stde
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 		return fleet.ExitDeferred
 	}
-	var clf *core.ErrCycleLevelFailure
-	if errors.As(err, &clf) {
-		warnCycleFailureOutcome(stderr, cycle, applyCycleFailureOutcome(projectRoot, evolveDir, cycle, stderr, lifecycle, signals))
-	}
+	warnCycleFailureOutcome(stderr, cycle, applyCycleFailureOutcome(projectRoot, evolveDir, cycle, stderr, lifecycle, signals))
 	fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 	return 1
 }
@@ -296,6 +293,9 @@ func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, li
 // inbox failure lifecycle on the root's ledger and Signal Center. A nil ledger
 // (the --simulate root) falls back to the mover's own unobserved file ledger.
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+	if cycle == 0 {
+		return nil
+	}
 	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
 		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
 	).WithLedger(lifecycle).WithSignals(signals))

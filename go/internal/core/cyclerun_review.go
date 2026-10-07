@@ -31,11 +31,6 @@ func (cr *cycleRun) prepareForReview(next Phase, dr *dispatchResult) error {
 	return nil
 }
 
-func (cr *cycleRun) postBuildExplanationRefreshEligible(completed Phase) bool {
-	return cr.cs.ExplanationDocumentationVersion != 0 && completed != PhaseBuild &&
-		cr.o.worktreePhase(completed) && containsString(cr.cs.CompletedPhases, string(PhaseBuild))
-}
-
 func (cr *cycleRun) recoverBeforeReview(next Phase, dr *dispatchResult) error {
 	return cr.o.recoverPhaseLeak(cr.ctx, phaseLeakScope{
 		projectRoot: cr.req.ProjectRoot,

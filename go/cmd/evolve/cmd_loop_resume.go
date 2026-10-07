@@ -58,14 +58,11 @@ func runResumeBatch(
 		return 5
 	}
 	closeout := result
-	var clf *core.ErrCycleLevelFailure
-	if errors.As(err, &clf) {
+	if err != nil {
 		closeout.FinalVerdict = core.VerdictFAIL
 	}
-	if err == nil || clf != nil {
-		if applied, cerr := closeoutCycleOutcome(closeout, cfg.ProjectRoot, cfg.EvolveDir, stderr, lifecycle, signals); cerr != nil {
-			fmt.Fprintf(stderr, "evolve loop: resume: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, cerr)
-		}
+	if applied, cerr := closeoutCycleOutcome(closeout, cfg.ProjectRoot, cfg.EvolveDir, stderr, lifecycle, signals); cerr != nil {
+		fmt.Fprintf(stderr, "evolve loop: resume: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, cerr)
 	}
 	if err != nil {
 		lr.StopReason = "error"

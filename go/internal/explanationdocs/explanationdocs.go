@@ -138,47 +138,48 @@ func RequireActivation(binding CycleBinding) error {
 // workspace handoff on success. The host marker is the sole activation
 // authority; legacy cycles without one remain exempt.
 func CheckBuild(ctx context.Context, binding CycleBinding) []string {
+	return renderFailures(checkBuild(ctx, binding))
+}
+
+func checkBuild(ctx context.Context, binding CycleBinding) ([]string, error) {
 	binding, active, err := resolveBuildActivation(binding)
-	if err != nil {
-		return explanationFailure(err)
-	}
-	if !active {
-		return nil
+	if err != nil || !active {
+		return nil, err
 	}
 	switch binding.ContractVersion {
 	case contractV1:
 		return checkBuildV1(ctx, binding)
 	default:
-		return explanationFailure(fmt.Errorf("unsupported explanation contract version %d", binding.ContractVersion))
+		return nil, fmt.Errorf("unsupported explanation contract version %d", binding.ContractVersion)
 	}
 }
 
-func checkBuildV1(ctx context.Context, binding CycleBinding) []string {
+func checkBuildV1(ctx context.Context, binding CycleBinding) ([]string, error) {
 	if binding.Worktree == "" || binding.Workspace == "" || binding.BaseSHA == "" {
-		return explanationFailure(errors.New("active contract requires worktree, workspace, and base SHA"))
+		return nil, errors.New("active contract requires worktree, workspace, and base SHA")
 	}
 	paths, err := changedSince(ctx, binding.Worktree, binding.BaseSHA)
 	if err != nil {
-		return explanationFailure(fmt.Errorf("derive base-bound diff: %w", err))
+		return nil, fmt.Errorf("derive base-bound diff: %w", err)
 	}
 	diffSHA, err := diffSHA256(ctx, binding.Worktree, binding.BaseSHA)
 	if err != nil {
-		return explanationFailure(fmt.Errorf("hash base-bound diff: %w", err))
+		return nil, fmt.Errorf("hash base-bound diff: %w", err)
 	}
 	report, err := readBuildReport(binding.Workspace)
 	if err != nil {
-		return explanationFailure(err)
+		return nil, err
 	}
 	declaration, present, err := parseDeclaration(report)
 	if err != nil {
-		return explanationFailure(err)
+		return explanationFailure(err), nil
 	}
 	if !present {
-		return explanationFailure(errors.New("build-report.md is missing the required ## Explanation Documentation section"))
+		return explanationFailure(errors.New("build-report.md is missing the required ## Explanation Documentation section")), nil
 	}
 	material := materialPaths(paths)
 	if failures := foreignHistoryFailures(paths, cycleDocumentPath(binding.Cycle, binding.RunID)); len(failures) != 0 {
-		return failures
+		return failures, nil
 	}
 	if len(material) == 0 && declaration.Status != "REQUIRED" {
 		return checkNotApplicable(binding, declaration, material, diffSHA)
@@ -317,19 +318,18 @@ func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoo
 	}
 	verificationBinding := binding
 	verificationBinding.Worktree = verificationRoot
-	failures := validateRequired(ctx, verificationBinding, paths, material, view)
-	if len(failures) != 0 {
+	if failures := renderFailures(validateRequired(ctx, verificationBinding, paths, material, view)); len(failures) != 0 {
 		return nil, true, errors.New(strings.Join(failures, "; "))
 	}
 	return view, true, nil
 }
 
-func checkNotApplicable(binding CycleBinding, declaration reportDeclaration, material []string, diffSHA string) []string {
+func checkNotApplicable(binding CycleBinding, declaration reportDeclaration, material []string, diffSHA string) ([]string, error) {
 	if declaration.Status != "NOT_APPLICABLE" || strings.TrimSpace(declaration.Reason) == "" || declaration.Document != "" {
-		return explanationFailure(errors.New("build-report.md must declare Status: NOT_APPLICABLE and a Reason, with no Document"))
+		return explanationFailure(errors.New("build-report.md must declare Status: NOT_APPLICABLE and a Reason, with no Document")), nil
 	}
 	if err := validateMetadataText("Reason", declaration.Reason, 1000); err != nil {
-		return explanationFailure(err)
+		return explanationFailure(err), nil
 	}
 	view := &phaseio.ExplanationView{
 		SchemaVersion:   currentArtifactSchema,
@@ -341,13 +341,10 @@ func checkNotApplicable(binding CycleBinding, declaration reportDeclaration, mat
 		DiffSHA256:      diffSHA,
 		MaterialPaths:   material,
 	}
-	if err := writeManifest(binding, view); err != nil {
-		return explanationFailure(err)
-	}
-	return nil
+	return nil, writeManifest(binding, view)
 }
 
-func checkRequired(ctx context.Context, binding CycleBinding, declaration reportDeclaration, changed, material []string, diffSHA string) []string {
+func checkRequired(ctx context.Context, binding CycleBinding, declaration reportDeclaration, changed, material []string, diffSHA string) ([]string, error) {
 	want := cycleDocumentPath(binding.Cycle, binding.RunID)
 	var failures []string
 	if declaration.Status != "REQUIRED" {
@@ -367,21 +364,18 @@ func checkRequired(ctx context.Context, binding CycleBinding, declaration report
 		DiffSHA256:      diffSHA,
 		MaterialPaths:   material,
 	}
-	failures = append(failures, validateRequired(ctx, binding, changed, material, view)...)
-	if len(failures) != 0 {
-		return failures
+	verdicts, fault := validateRequired(ctx, binding, changed, material, view)
+	if failures = append(failures, verdicts...); fault != nil || len(failures) != 0 {
+		return failures, fault
 	}
-	if err := writeManifest(binding, view); err != nil {
-		return explanationFailure(err)
-	}
-	return nil
+	return nil, writeManifest(binding, view)
 }
 
-func validateRequired(ctx context.Context, binding CycleBinding, changed, material []string, view *phaseio.ExplanationView) []string {
+func validateRequired(ctx context.Context, binding CycleBinding, changed, material []string, view *phaseio.ExplanationView) ([]string, error) {
 	want := cycleDocumentPath(binding.Cycle, binding.RunID)
 	var failures []string
 	if view.DocumentPath != want {
-		return []string{"Explanation Documentation: manifest Document path is not canonical for the cycle"}
+		return []string{"Explanation Documentation: manifest Document path is not canonical for the cycle"}, nil
 	}
 	if view.BaseSHA == "" {
 		failures = append(failures, "Explanation Documentation: base_sha is required for downstream verification")
@@ -395,22 +389,26 @@ func validateRequired(ctx context.Context, binding CycleBinding, changed, materi
 	if view.BaseSHA != "" {
 		exists, err := existsAtBase(ctx, binding.Worktree, view.BaseSHA, want)
 		if err != nil {
-			failures = append(failures, "Explanation Documentation: cannot verify cycle document immutability: "+err.Error())
-		} else if exists {
+			return failures, fmt.Errorf("cannot verify cycle document immutability: %w", err)
+		}
+		if exists {
 			failures = append(failures, "Explanation Documentation: cycle document existed at the cycle base; published Build explanations are immutable")
 		}
 	}
 	failures = append(failures, immutableHistoryFailures(changed, want)...)
 	body, sha, err := readRegularWithin(binding.Worktree, want)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, errArtifactTooLarge) {
+		return append(failures, "Explanation Documentation: "+err.Error()), nil
+	}
 	if err != nil {
-		return append(failures, "Explanation Documentation: "+err.Error())
+		return failures, err
 	}
 	failures = append(failures, validateDocument(body, binding.Cycle, authoredBase(view), changed, material)...)
 	if view.DocumentSHA256 != "" && view.DocumentSHA256 != sha {
 		failures = append(failures, "Explanation Documentation: document SHA256 mismatch")
 	}
 	view.DocumentSHA256 = sha
-	return failures
+	return failures, nil
 }
 
 func validateDocument(body string, cycle int, baseSHA string, changed, material []string) []string {
@@ -623,6 +621,13 @@ func supportedArtifactSchema(version int) bool {
 
 func explanationFailure(err error) []string {
 	return []string{"Explanation Documentation: " + err.Error()}
+}
+
+func renderFailures(failures []string, fault error) []string {
+	if fault == nil {
+		return failures
+	}
+	return append(failures, explanationFailure(fault)...)
 }
 
 func validateMetadataText(label, value string, max int) error {

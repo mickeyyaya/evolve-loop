@@ -162,7 +162,17 @@ change the retry verdict.
 - Host normalization runs before Build validation and sealing. A later
   write-capable phase such as test amplification may refresh only the
   whole-diff digest when material paths and Builder-owned documentation remain
-  unchanged; material drift routes back to Build.
+  unchanged; material drift routes back to Build. A refresh failure in the
+  explanation's own content also routes back to Build, for the owner to
+  re-author it: for example, the writer dropped a test path that Changed Areas
+  cites. The revalidation reports such a failure as `ErrContent`, separate from
+  binding, git and unreadable-artifact faults. When every legal successor of
+  the writer already leads to Build (tdd), the round is free: Build was coming
+  anyway and its own floor re-validates the document. Any other writer spends
+  one attempt of the `code-audit-fail` budget, and a spent budget ends the
+  cycle (a cycle-level failure) but not the batch. Every round emits
+  `ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED`; any fault aborts
+  ([incident](../incidents/2026-10-07-cycle-1822-explanation-refresh-abort.md)).
 - Fleet rebase writes the verified host base as a write-ahead authority before
   persisting the matching checkpoint. A partial checkpoint or mirror failure
   rolls forward on resume from the old-base snapshot witness and re-enters

@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A post-build writer that leaves the explanation citing a path no longer in the diff routes to Build for re-authoring instead of aborting (fresh and resume paths, red first)",
+    "A non-content refresh failure (unreadable doc, binding error) still aborts loudly (preservation test)",
+    "The re-author route is bounded by the existing explanation-correction budget and emits a registered signal",
+    "The post-review abort path releases the cycle's inbox claims like every other failure (cycle 1822 left its item stranded in processing/cycle-1822, so the next boundary's sync-main refused until recover-orphans ran) — red first"
+  ],
+  "consumed": {
+    "at": "2026-10-07T07:54:33Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "console lane fix/explanation-refresh-reauthors: explanationdocs classifies content verdicts (ErrContent) apart from binding/unreadable faults; core reauthorStaleExplanation routes a content failure back to Build on both dispatch roots under the code-audit-fail budget with ORCHESTRATOR_EXPLANATION_REAUTHOR_ROUTED; every abnormal exit walks the inbox failure closeout at cycleRunErrorExit, handleCycleError and runResumeBatch; incident docs/incidents/2026-10-07-cycle-1822-explanation-refresh-abort.md"
+  },
+  "created_at": "2026-10-07T05:51:40Z",
+  "files": [
+    "go/internal/core/cyclerun_postreview.go",
+    "go/internal/core/resume_execution.go",
+    "go/internal/explanationdocs/contract_state.go"
+  ],
+  "fix": "Classify RefreshResult's revalidation failures: a CheckBuild failure about the explanation's content (stale or missing cited paths, Changed Areas drift) routes back to Build for an owner-authored re-explanation, bounded by the existing explanation-correction budget, on both the fresh and resume paths. Only an unreadable or binding-level failure stays an abort. Emit a coded signal when the rung is taken.",
+  "id": "post-build-explanation-refresh-aborts-instead-of-reauthoring",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-07, wave 73 cycle 1822 failure investigation",
+  "summary": "applyPostReviewGuards (core/cyclerun_postreview.go:24-31) re-validates the build explanation after a post-build source writer (tdd in an audit-repair round, test-amplification). When explanationdocs.RefreshResult returns an error, e.g. CheckBuild's 'cited path go/internal/fleet/quota_test.go is not in the Build diff', the cycle ABORTS (loopAbort, infra-error). The same block already routes a material-scope change back to Build for an owner-authored explanation (requiresBuild → scheduledNext = PhaseBuild), and the retry vocabulary has retryActionReauthorExplanation. A stale citation is a format/process failure, so under logic-over-format it should take that recovery rung, not kill a cycle whose code may be correct. Seen live: cycle 1822 (wave 73, after an audit FAIL → tdd repair round) and an earlier cycle citing go/internal/phaseio/digest_test.go. The resume path (resume_execution.go:193) has the same shape.",
+  "title": "A stale citation in the build's explanation doc aborts the cycle after a post-build writer instead of routing back to build to re-author it",
+  "weight": 0.6
+}

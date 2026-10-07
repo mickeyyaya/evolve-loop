@@ -2,13 +2,18 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
+	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type buildExplanationHandoff struct {
@@ -136,6 +141,52 @@ func sealBuildExplanationContext(projectRoot string, cs CycleState) error {
 		return fmt.Errorf("active Build explanation contract requires worktree and base SHA")
 	}
 	return explanationdocs.SealBuild(explanationBinding(projectRoot, cs))
+}
+
+func (o *Orchestrator) explanationRefreshEligible(cs CycleState, writer Phase) bool {
+	return cs.ExplanationDocumentationVersion != 0 && writer != PhaseBuild &&
+		o.worktreePhase(writer) && containsString(cs.CompletedPhases, string(PhaseBuild))
+}
+
+func (o *Orchestrator) routeAfterExplanationRefresh(cs *CycleState, writer Phase, requiresBuild bool, refreshErr error) (Phase, error) {
+	switch {
+	case refreshErr == nil && requiresBuild:
+		fmt.Fprintf(os.Stderr, "[orchestrator] phase %s changed material scope after Build — routing back to Build for owner-authored explanation\n", writer)
+		return PhaseBuild, nil
+	case refreshErr == nil:
+		return "", nil
+	case !errors.Is(refreshErr, explanationdocs.ErrContent):
+		return "", refreshErr
+	}
+	fields, spent := o.chargeExplanationReauthor(cs, writer)
+	if spent != nil {
+		return "", wrapCycleLevelError(writer, fmt.Errorf("%w; %w", refreshErr, spent))
+	}
+	fields["next"] = string(PhaseBuild)
+	o.signals.Emit(signalcenter.Event{
+		Cycle: cs.CycleID, RunID: o.signalRunID(), Phase: string(writer),
+		Module: signalcenter.ModuleOrchestrator, Origin: "Orchestrator.routeAfterExplanationRefresh",
+		Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityWarn, Code: CodeExplanationReauthorRouted,
+		Reason: fmt.Sprintf("phase %s left the Build explanation stale; build re-authors it: %v", writer, refreshErr),
+		Fields: fields,
+	})
+	return PhaseBuild, nil
+}
+
+func (o *Orchestrator) chargeExplanationReauthor(cs *CycleState, writer Phase) (map[string]string, error) {
+	if o.sm.everyPathReaches(writer, PhaseBuild) {
+		return map[string]string{"charged": "false"}, nil
+	}
+	env := computeRetryEnvelope(retryEnvelopeInput{
+		DeclaredClass: string(failurelog.CodeAuditFail),
+		Attempts:      cs.AuditRepairAttempts,
+		Policy:        o.failurePolicy,
+	})
+	if !slices.Contains(env.Legal, retryActionRetryBuild) {
+		return nil, fmt.Errorf("no explanation re-author round left: %s", env.Reason)
+	}
+	cs.AuditRepairAttempts++
+	return map[string]string{"charged": "true", "attempt": strconv.Itoa(cs.AuditRepairAttempts), "envelope": env.Reason}, nil
 }
 
 func explanationBinding(projectRoot string, cs CycleState) explanationdocs.CycleBinding {

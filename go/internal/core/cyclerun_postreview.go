@@ -13,22 +13,17 @@ import (
 // ladder approves. It owns explanation refresh, Ship success latching, and the
 // final main-tree leak verdict.
 func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopAction, error) {
-	// A legitimate post-Build source writer (notably test-amplification) can
-	// change the whole-diff digest without changing the material behavior the
-	// Builder documented. Refresh that host snapshot after its deliverable is
-	// final. If material scope changed, preserve phase ownership by routing back
-	// through Build instead of letting the host rewrite the rationale.
-	if cr.postBuildExplanationRefreshEligible(next) {
+	if cr.o.explanationRefreshEligible(cr.cs, next) {
 		requiresBuild, err := explanationdocs.RefreshResult(cr.ctx, explanationBinding(cr.req.ProjectRoot, cr.cs))
-		if err != nil {
-			phaseErr := fmt.Errorf("refresh Build explanation after %s: %w", next, err)
+		reentry, abortErr := cr.o.routeAfterExplanationRefresh(&cr.cs, next, requiresBuild, err)
+		if abortErr != nil {
+			phaseErr := fmt.Errorf("refresh Build explanation after %s: %w", next, abortErr)
 			cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
 			cr.recordFailureLearning(next, phaseErr, 1)
 			return loopAbort, phaseErr
 		}
-		if requiresBuild {
-			fmt.Fprintf(os.Stderr, "[orchestrator] phase %s changed material scope after Build — routing back to Build for owner-authored explanation\n", next)
-			cr.scheduledNext = PhaseBuild
+		if reentry != "" {
+			cr.scheduledNext = reentry
 		}
 	}
 
