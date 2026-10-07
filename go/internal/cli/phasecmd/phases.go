@@ -25,29 +25,102 @@ func RunPhases(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
+	overrides, err := parsePersonaOverride(*personaOverride)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve phases: %v\n", err)
+		return 10
+	}
 	remaining := fs.Args()
 	if len(remaining) == 0 {
-		fmt.Fprintln(stderr, "usage: evolve phases <list|validate [name]|add <name>|create --spec <file|->>")
+		fmt.Fprintf(stderr, "usage: evolve phases [--profile-dir <dir>] [--persona-override <path>:<name>] <%s>\n", phasesUsage())
 		return 10
 	}
-	project := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
-	switch remaining[0] {
-	case "list":
-		return phasesList(project, stdout, stderr)
-	case "validate":
-		return phasesValidate(project, *profileDir, remaining[1:], stdout, stderr)
-	case "check-coherence":
-		return phasesCheckCoherence(project, *profileDir, *personaOverride, remaining[1:], stdout, stderr)
-	case "check-artifact-coherence":
-		return phasesCheckArtifactCoherence(project, *profileDir, *personaOverride, remaining[1:], stdout, stderr)
-	case "add":
-		return phasesAdd(project, remaining[1:], stdout, stderr)
-	case "create":
-		return phasesCreate(project, remaining[1:], stdin, stdout, stderr)
-	default:
-		fmt.Fprintf(stderr, "unknown subcommand %q (want list|validate|add|create)\n", remaining[0])
+	sub, ok := lookupPhasesSubcommand(remaining[0])
+	if !ok {
+		fmt.Fprintf(stderr, "unknown subcommand %q (want %s)\n", remaining[0], strings.Join(phasesSubcommandNames(), "|"))
 		return 10
 	}
+	return sub.run(phasesCall{
+		project:    cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"),
+		profileDir: *profileDir,
+		overrides:  overrides,
+		args:       remaining[1:],
+		stdin:      stdin,
+		stdout:     stdout,
+		stderr:     stderr,
+	})
+}
+
+type phasesCall struct {
+	project    string
+	profileDir string
+	overrides  map[string]string
+	args       []string
+	stdin      io.Reader
+	stdout     io.Writer
+	stderr     io.Writer
+}
+
+type phasesSubcommand struct {
+	name  string
+	usage string
+	run   func(phasesCall) int
+}
+
+var phasesSubcommands = []phasesSubcommand{
+	{"list", "list", func(c phasesCall) int { return phasesList(c.project, c.stdout, c.stderr) }},
+	{"validate", "validate [name] [--strict-provenance]", func(c phasesCall) int {
+		return phasesValidate(c.project, c.profileDir, c.args, c.stdout, c.stderr)
+	}},
+	{"check-coherence", "check-coherence [--strict]", func(c phasesCall) int {
+		return phasesCoherence(c, "check-coherence", phasecoherence.Check)
+	}},
+	{"check-artifact-coherence", "check-artifact-coherence [--strict]", func(c phasesCall) int {
+		return phasesCoherence(c, "check-artifact-coherence", phasecoherence.CheckArtifactNames)
+	}},
+	{"check-provenance", "check-provenance --cycle N [--json]", phasesCheckProvenance},
+	{"add", "add <name>", func(c phasesCall) int { return phasesAdd(c.project, c.args, c.stdout, c.stderr) }},
+	{"create", "create --spec <file|->", func(c phasesCall) int {
+		return phasesCreate(c.project, c.args, c.stdin, c.stdout, c.stderr)
+	}},
+}
+
+func lookupPhasesSubcommand(name string) (phasesSubcommand, bool) {
+	for _, sub := range phasesSubcommands {
+		if sub.name == name {
+			return sub, true
+		}
+	}
+	return phasesSubcommand{}, false
+}
+
+func phasesSubcommandNames() []string {
+	names := make([]string, 0, len(phasesSubcommands))
+	for _, sub := range phasesSubcommands {
+		names = append(names, sub.name)
+	}
+	return names
+}
+
+func phasesUsage() string {
+	usages := make([]string, 0, len(phasesSubcommands))
+	for _, sub := range phasesSubcommands {
+		usages = append(usages, sub.usage)
+	}
+	return strings.Join(usages, "|")
+}
+
+func parsePersonaOverride(value string) (map[string]string, error) {
+	overrides := make(map[string]string)
+	if value == "" {
+		return overrides, nil
+	}
+	path, name, ok := strings.Cut(value, ":")
+	if !ok || path == "" || name == "" {
+		return nil, fmt.Errorf("--persona-override %q: want <path>:<name>", value)
+	}
+	overrides[name] = path
+	return overrides, nil
 }
 
 func mergedCatalog(project string) (phasespec.Catalog, map[string]string, []string, error) {
@@ -162,88 +235,29 @@ func reportUserSpecVerdicts(user []phasespec.PhaseSpec, stdout io.Writer) (faile
 	return failed
 }
 
-func phasesCheckCoherence(project, profileDir, personaOverride string, args []string, stdout, stderr io.Writer) int {
+func phasesCoherence(c phasesCall, label string, check func(phasecoherence.Options) ([]phasecoherence.Violation, error)) int {
 	strict := false
-	for _, arg := range args {
+	for _, arg := range c.args {
 		if arg == "--strict" {
 			strict = true
 		}
 	}
-
+	profileDir := c.profileDir
 	if profileDir == "" {
-		profileDir = filepath.Join(project, ".evolve", "profiles")
+		profileDir = filepath.Join(c.project, ".evolve", "profiles")
 	}
-
-	overrides := make(map[string]string)
-	if personaOverride != "" {
-		parts := strings.SplitN(personaOverride, ":", 2)
-		if len(parts) == 2 {
-			path := parts[0]
-			name := parts[1]
-			overrides[name] = path
-		}
-	}
-
-	opts := phasecoherence.Options{
-		AgentsFS:   os.DirFS(project),
+	violations, err := check(phasecoherence.Options{
+		AgentsFS:   os.DirFS(c.project),
 		ProfilesFS: os.DirFS(profileDir),
-		Overrides:  overrides,
-	}
-
-	violations, err := phasecoherence.Check(opts)
+		Overrides:  c.overrides,
+	})
 	if err != nil {
-		fmt.Fprintf(stderr, "check-coherence: %v\n", err)
+		fmt.Fprintf(c.stderr, "%s: %v\n", label, err)
 		return 1
 	}
-
 	for _, v := range violations {
-		fmt.Fprintf(stdout, "%s: %s: %s\n", v.Severity, v.Persona, v.Message)
+		fmt.Fprintf(c.stdout, "%s: %s: %s\n", v.Severity, v.Persona, v.Message)
 	}
-
-	if len(violations) > 0 && strict {
-		return 2
-	}
-	return 0
-}
-
-func phasesCheckArtifactCoherence(project, profileDir, personaOverride string, args []string, stdout, stderr io.Writer) int {
-	strict := false
-	for _, arg := range args {
-		if arg == "--strict" {
-			strict = true
-		}
-	}
-
-	if profileDir == "" {
-		profileDir = filepath.Join(project, ".evolve", "profiles")
-	}
-
-	overrides := make(map[string]string)
-	if personaOverride != "" {
-		parts := strings.SplitN(personaOverride, ":", 2)
-		if len(parts) == 2 {
-			path := parts[0]
-			name := parts[1]
-			overrides[name] = path
-		}
-	}
-
-	opts := phasecoherence.Options{
-		AgentsFS:   os.DirFS(project),
-		ProfilesFS: os.DirFS(profileDir),
-		Overrides:  overrides,
-	}
-
-	violations, err := phasecoherence.CheckArtifactNames(opts)
-	if err != nil {
-		fmt.Fprintf(stderr, "check-artifact-coherence: %v\n", err)
-		return 1
-	}
-
-	for _, v := range violations {
-		fmt.Fprintf(stdout, "%s: %s: %s\n", v.Severity, v.Persona, v.Message)
-	}
-
 	if len(violations) > 0 && strict {
 		return 2
 	}

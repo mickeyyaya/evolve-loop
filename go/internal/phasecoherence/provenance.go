@@ -3,6 +3,7 @@ package phasecoherence
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -25,20 +26,23 @@ var kvRegex = regexp.MustCompile(`(\w+)=(\S+)`)
 
 // CheckProvenance reports each evolve:provenance header field that disagrees with expected,
 // and cross-checks tree_sha against the ledger that the process environment resolves.
-func CheckProvenance(artifact string, expected ProvenanceFields) []Violation {
+func CheckProvenance(artifact string, expected ProvenanceFields) ([]Violation, error) {
 	matches := provenanceRegex.FindStringSubmatch(artifact)
 	if len(matches) < 2 {
 		return []Violation{{
 			Severity: "WARN",
 			Kind:     "missing-provenance",
 			Message:  "missing evolve:provenance header",
-		}}
+		}}, nil
 	}
 
 	parsed := parseProvenanceKV(matches[1])
 	violations, hasDirectTreeSHAMismatch := checkProvenanceFields(parsed, expected)
-	violations = append(violations, checkLedgerTreeSHA(expected, parsed["tree_sha"], hasDirectTreeSHAMismatch)...)
-	return violations
+	ledgerViolations, err := checkLedgerTreeSHA(expected, parsed["tree_sha"], hasDirectTreeSHAMismatch)
+	if err != nil {
+		return nil, err
+	}
+	return append(violations, ledgerViolations...), nil
 }
 
 func parseProvenanceKV(inner string) map[string]string {
@@ -91,11 +95,14 @@ func checkProvenanceFields(parsed map[string]string, expected ProvenanceFields) 
 	return violations, hasDirectTreeSHAMismatch
 }
 
-func checkLedgerTreeSHA(expected ProvenanceFields, treeSHA string, hasDirectTreeSHAMismatch bool) []Violation {
-	layout := paths.Resolve(os.Getenv, "")
-	f, err := os.Open(layout.LedgerFile)
+func checkLedgerTreeSHA(expected ProvenanceFields, treeSHA string, hasDirectTreeSHAMismatch bool) ([]Violation, error) {
+	ledgerPath := paths.Resolve(os.Getenv, "").LedgerFile
+	f, err := os.Open(ledgerPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("open ledger %s: %w", ledgerPath, err)
 	}
 	defer func() { _ = f.Close() }()
 
@@ -117,15 +124,18 @@ func checkLedgerTreeSHA(expected ProvenanceFields, treeSHA string, hasDirectTree
 			}
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan ledger %s: %w", ledgerPath, err)
+	}
 
 	if hasDirectTreeSHAMismatch || !foundEntry || ledgerTreeSHA == "" || treeSHA == ledgerTreeSHA {
-		return nil
+		return nil, nil
 	}
 	return []Violation{{
 		Severity: "error",
 		Kind:     "provenance-mismatch",
 		Message:  fmt.Sprintf("tree_sha mismatch against ledger: got %q, ledger has %q", treeSHA, ledgerTreeSHA),
-	}}
+	}}, nil
 }
 
 func canonicalRole(role string) string {

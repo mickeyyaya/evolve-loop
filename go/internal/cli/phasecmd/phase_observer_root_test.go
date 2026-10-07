@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseobserver"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 const usageLine = "[phase-observer] usage: phase-observer [--enforce] [--scope=...] <workspace> <pgid> <cycle> <phase> <agent> [cycle-state]\n"
@@ -36,6 +38,9 @@ func TestParseObserverArgs_TableVerbatim(t *testing.T) {
 		{"unknown flag", append([]string{"--verbose"}, five...), phaseobserver.ExitInvalidArgs, true, "", "[phase-observer] unknown flag: --verbose\n", false, phaseobserver.ScopePhase, 0},
 		{"too few positionals", five[:4], phaseobserver.ExitInvalidArgs, true, "", usageLine, false, phaseobserver.ScopePhase, 4},
 		{"six positionals keep the cycle-state", append(five, "state.json"), 0, false, "", "", false, phaseobserver.ScopePhase, 6},
+		{"zero pgid", []string{"/ws", "0", "7", "build", "builder"}, phaseobserver.ExitInvalidArgs, true, "", "[phase-observer] pgid must be a positive integer, got: 0\n", false, phaseobserver.ScopePhase, 5},
+		{"negative pgid", []string{"/ws", "-4", "7", "build", "builder"}, phaseobserver.ExitInvalidArgs, true, "", "[phase-observer] pgid must be a positive integer, got: -4\n", false, phaseobserver.ScopePhase, 5},
+		{"non-numeric pgid", []string{"/ws", "bogus", "7", "build", "builder"}, phaseobserver.ExitInvalidArgs, true, "", "[phase-observer] pgid must be a positive integer, got: bogus\n", false, phaseobserver.ScopePhase, 5},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -49,10 +54,10 @@ func TestParseObserverArgs_TableVerbatim(t *testing.T) {
 			}
 		})
 	}
-	// Atoi errors are discarded by design: a bogus pgid or cycle becomes 0.
 	shutdown := make(chan struct{})
-	cfg := observerConfig(observerArgs{pos: []string{"/ws", "bogus", "x", "build", "builder", "state.json"}}, shutdown, nil)
-	if cfg.SubagentPGID != 0 || cfg.Cycle != 0 || cfg.CycleState != "state.json" || cfg.Workspace != "/ws" || cfg.Phase != "build" || cfg.Agent != "builder" {
+	a, _, _ := parseObserverArgs([]string{"/ws", "123", "x", "build", "builder", "state.json"}, &bytes.Buffer{}, &bytes.Buffer{})
+	cfg := observerConfig(a, policy.Policy{}, shutdown, nil)
+	if cfg.SubagentPGID != 123 || cfg.Cycle != 0 || cfg.CycleState != "state.json" || cfg.Workspace != "/ws" || cfg.Phase != "build" || cfg.Agent != "builder" {
 		t.Errorf("config: %+v", cfg)
 	}
 	if cfg.ProcessAlive == nil || cfg.ShutdownSig == nil || cfg.Signals == nil {
@@ -71,7 +76,7 @@ func TestRunPhaseObserver_RendersObserverCodesOnStderr(t *testing.T) {
 	var out, errb bytes.Buffer
 	done := make(chan int, 1)
 	go func() {
-		done <- RunPhaseObserver([]string{ws, "bogus-pgid", "7", "build", "builder"}, nil, &out, &errb)
+		done <- RunPhaseObserver([]string{ws, strconv.Itoa(syscall.Getpgrp()), "7", "build", "builder"}, nil, &out, &errb)
 	}()
 	events := filepath.Join(ws, "builder-observer-events.ndjson")
 	deadline := time.Now().Add(5 * time.Second)

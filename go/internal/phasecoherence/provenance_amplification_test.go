@@ -36,7 +36,7 @@ func TestCheckProvenance_BothTreeSHAAndInputsDigestMismatch(t *testing.T) {
 		Phase: "build", Cycle: 242,
 		TreeSHA: "correctsha", InputsDigest: "correctdigest0000",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	var hasTree, hasDigest bool
 	for _, v := range violations {
@@ -63,7 +63,7 @@ func TestCheckProvenance_TreeSHAMismatchOnly_NoLedger(t *testing.T) {
 		Phase: "build", Cycle: 242,
 		TreeSHA: "goodsha", InputsDigest: "digest789",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 1 {
 		t.Fatalf("expected exactly 1 violation, got %d: %+v", len(violations), violations)
@@ -88,7 +88,7 @@ func TestCheckProvenance_EmptyExpectedTreeSHA_NoViolation(t *testing.T) {
 		Phase: "build", Cycle: 242,
 		TreeSHA: "", InputsDigest: "digest789",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations for empty expected.TreeSHA, got %d: %+v", len(violations), violations)
@@ -103,7 +103,7 @@ func TestCheckProvenance_ValidHeaderAllFields(t *testing.T) {
 		Phase: "build", Cycle: 242,
 		TreeSHA: "abc123", InputsDigest: "dig456",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations, got %d: %+v", len(violations), violations)
@@ -120,7 +120,7 @@ func TestCheckProvenance_LedgerAndDirectMismatch_SingleTreeSHAViolation(t *testi
 		Phase: "build", Cycle: 242,
 		TreeSHA: "goodsha", InputsDigest: "digest789",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	treeCount := 0
 	for _, v := range violations {

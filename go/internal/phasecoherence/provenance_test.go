@@ -3,6 +3,7 @@ package phasecoherence
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestProvenanceGate_MissingHeader_ReturnsViolation(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	artifact := "# Some Report\nNo provenance here."
 	expected := ProvenanceFields{Phase: "build", Cycle: 241}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %+v", len(violations), violations)
@@ -32,7 +33,7 @@ func TestProvenanceGate_ValidHeader_NoViolation(t *testing.T) {
 		TreeSHA:      "abcdef123456",
 		InputsDigest: "digest789",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations, got %d: %+v", len(violations), violations)
@@ -48,7 +49,7 @@ func TestProvenanceGate_TamperedPhase_ReturnsViolation(t *testing.T) {
 		TreeSHA:      "abcdef123456",
 		InputsDigest: "digest789",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %+v", len(violations), violations)
@@ -70,7 +71,7 @@ func TestProvenanceGate_WrongCycle_ReturnsViolation(t *testing.T) {
 		TreeSHA:      "abcdef123456",
 		InputsDigest: "digest789",
 	}
-	violations := CheckProvenance(artifact, expected)
+	violations := mustCheckProvenance(t, artifact, expected)
 
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %+v", len(violations), violations)
@@ -105,13 +106,13 @@ func TestProvenanceGate_LedgerCrossCheck(t *testing.T) {
 		TreeSHA:      "goodsha",
 		InputsDigest: "digest789",
 	}
-	violations1 := CheckProvenance(artifact1, expected)
+	violations1 := mustCheckProvenance(t, artifact1, expected)
 	if len(violations1) != 0 {
 		t.Errorf("expected 0 violations, got %d: %+v", len(violations1), violations1)
 	}
 
 	artifact2 := "<!-- evolve:provenance phase=build cycle=241 tree_sha=badsha inputs_digest=digest789 -->\n# Report"
-	violations2 := CheckProvenance(artifact2, expected)
+	violations2 := mustCheckProvenance(t, artifact2, expected)
 	if len(violations2) != 1 {
 		t.Fatalf("expected 1 violation for bad tree_sha, got %d: %+v", len(violations2), violations2)
 	}
@@ -120,5 +121,58 @@ func TestProvenanceGate_LedgerCrossCheck(t *testing.T) {
 	}
 	if violations2[0].Kind != "provenance-mismatch" {
 		t.Errorf("expected Kind provenance-mismatch, got %q", violations2[0].Kind)
+	}
+}
+
+func mustCheckProvenance(t *testing.T, artifact string, expected ProvenanceFields) []Violation {
+	t.Helper()
+	violations, err := CheckProvenance(artifact, expected)
+	if err != nil {
+		t.Fatalf("CheckProvenance: %v", err)
+	}
+	return violations
+}
+
+func TestCheckProvenance_LedgerReadFailuresAreErrors(t *testing.T) {
+	artifact := "<!-- evolve:provenance phase=build cycle=241 tree_sha=goodsha inputs_digest=d -->\n# Report"
+	expected := ProvenanceFields{Phase: "build", Cycle: 241}
+	cases := []struct {
+		name  string
+		setup func(t *testing.T, ledgerPath string)
+	}{
+		{"directory at the ledger path", func(t *testing.T, ledgerPath string) {
+			if err := os.MkdirAll(ledgerPath, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"line past the scanner limit", func(t *testing.T, ledgerPath string) {
+			body := `{"cycle":1,"note":"` + strings.Repeat("x", 128<<10) + `"}` + "\n" +
+				`{"cycle":241,"role":"builder","tree_state_sha":"latersha"}` + "\n"
+			if err := os.WriteFile(ledgerPath, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := hermeticEnv(t)
+			if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			ledgerPath := filepath.Join(root, ".evolve", "ledger.jsonl")
+			tc.setup(t, ledgerPath)
+			violations, err := CheckProvenance(artifact, expected)
+			if err == nil || !strings.Contains(err.Error(), "ledger") {
+				t.Fatalf("CheckProvenance = %+v, %v; want an error naming the ledger", violations, err)
+			}
+		})
+	}
+}
+
+func TestCheckProvenance_AbsentLedgerIsNotAnError(t *testing.T) {
+	hermeticEnv(t)
+	artifact := "<!-- evolve:provenance phase=build cycle=241 tree_sha=goodsha inputs_digest=d -->\n# Report"
+	if got := mustCheckProvenance(t, artifact, ProvenanceFields{Phase: "build", Cycle: 241}); len(got) != 0 {
+		t.Errorf("violations = %+v, want none without a ledger", got)
 	}
 }

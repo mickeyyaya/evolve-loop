@@ -36,7 +36,7 @@ func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 		fmt.Fprintf(stderr, "[phase-watchdog] ERROR: cycle must be a positive integer, got: %s\n", pos[2])
 		return phasewatchdog.ExitInvalidArg
 	}
-	cfg := watchdogEnvConfig()
+	cfg := watchdogEnvConfig(stderr)
 	cfg.Workspace = pos[0]
 	cfg.TargetPGID = pgid
 	cfg.Cycle = cycle
@@ -45,8 +45,13 @@ func RunPhaseWatchdog(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 }
 
 // watchdogEnvConfig resolves watchdog settings from .evolve/policy.json.
-func watchdogEnvConfig() phasewatchdog.Config {
-	cfg := loadObserverPolicy()
+func watchdogEnvConfig(stderr io.Writer) phasewatchdog.Config {
+	pol, path, err := loadPolicy()
+	if err != nil {
+		fmt.Fprintf(stderr, "[phase-watchdog] WARN %s path=%s: policy load failed (using compiled watchdog defaults): %v\n",
+			CodePolicyLoadFailed, path, err)
+	}
+	cfg := pol.ObserverConfig()
 	return phasewatchdog.Config{
 		ProjectRoot: os.Getenv("EVOLVE_PROJECT_ROOT"),
 		ThresholdS:  *cfg.StallS,
