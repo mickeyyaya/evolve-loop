@@ -106,7 +106,35 @@
       "send": "/usage",
       "await": "prompt_marker",
       "exhausted_regex": "(?i)((?:reached|hit) your (usage|weekly) limit|you(?:.?ve| have) reached your .{1,40}? limit\\b.{0,40}?/usage-credits|usage limit reached|\\b0%\\s*(left|remaining)|out of (usage|credits)|upgrade to (a paid plan|continue))|(?im:^[\\t\\p{Zs}]*(?:⎿[\\t\\p{Zs}]*)?you(?:[’']ve| have) (?:hit|reached) your session limit[\\t\\p{Zs}]*[·—][\\t\\p{Zs}]*resets\\b)",
-      "drift_probe_regex": "(?i)(/usage-credits|(?:reached|hit) your|usage limit|weekly limit|rate.?limit|out of (usage|credits)|upgrade to|switch models with /model)"
+      "drift_probe_regex": "(?i)(/usage-credits|(?:reached|hit) your|usage limit|weekly limit|rate.?limit|out of (usage|credits)|upgrade to|switch models with /model)",
+      "windows": {
+        "labels": [
+          {
+            "regex": "^\\s*Current session\\s*$",
+            "kind": "session",
+            "scope": "session"
+          },
+          {
+            "regex": "^\\s*Current week \\((?P<scope>[^)]+)\\)\\s*$",
+            "kind": "week"
+          }
+        ],
+        "value_regex": "(?P<pct>\\d{1,3}(?:\\.\\d+)?)%\\s*used",
+        "value_direction": "used",
+        "reset_regex": "^\\s*Resets\\s+(?P<reset>.+?)\\s*$",
+        "scopes": {
+          "session": {
+            "family": "claude"
+          },
+          "all models": {
+            "family": "claude"
+          },
+          "*": {
+            "family": "claude",
+            "per_model": true
+          }
+        }
+      }
     },
     "status": {
       "send": "/status",

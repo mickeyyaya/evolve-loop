@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
 var bridgeManifestDirFn = func() string {
@@ -77,6 +78,7 @@ type Manifest struct {
 	BinaryMinVersion string              `json:"binary_min_version"`
 	UpdateArgv       []string            `json:"update_argv,omitempty"`
 	AutoUpdateOffEnv string              `json:"auto_update_off_env,omitempty"`
+	ProbeBootRetries int                 `json:"probe_boot_retries,omitempty"`
 	DefaultTier      string              `json:"default_tier"`
 	TierDependencies map[string][]string `json:"tier_dependencies"`
 	PromptMarker     string              `json:"prompt_marker"`
@@ -125,7 +127,8 @@ type ControlSpec struct {
 	ExhaustedRegex string `json:"exhausted_regex,omitempty"`
 	// DriftProbeRegex is a broad, deliberately-loose quota-wall heuristic used only by the drift alarm
 	// (exhaustion_drift.go); empty disables the alarm for this CLI.
-	DriftProbeRegex string `json:"drift_probe_regex,omitempty"`
+	DriftProbeRegex string                 `json:"drift_probe_regex,omitempty"`
+	Windows         *quotastate.WindowSpec `json:"windows,omitempty"`
 }
 
 // Control resolves the ControlSpec for an abstract event; ok=false when the CLI declares no mapping (or no
@@ -196,6 +199,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	}
 	if m.CLI == "" || m.Binary == "" {
 		return Manifest{}, fmt.Errorf("bridge:manifest: missing required fields (cli, binary) for %s", cli)
+	}
+	if m.ProbeBootRetries < 0 {
+		return Manifest{}, fmt.Errorf("bridge:manifest: probe_boot_retries for cli=%s is %d; it counts retries, so it cannot be negative", cli, m.ProbeBootRetries)
 	}
 	for key, value := range m.DefaultEnv {
 		if !isShellIdentifier(key) {

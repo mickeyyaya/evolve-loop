@@ -33,6 +33,7 @@ func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Option
 		NestedFallbackStage: parseGateStage(pol.SandboxConfig().NestedFallback),
 		MinFreeBytes:        pol.PreflightConfig().MinFreeBytes(),
 		Routing:             func() (looppreflight.Routing, error) { return preflightRouting(cfg.ProjectRoot) },
+		UsageEvidence:       evidenceSummary(usageEvidenceFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)),
 	}
 }
 

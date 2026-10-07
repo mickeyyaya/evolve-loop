@@ -2,6 +2,7 @@ package inboxbatch
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -15,18 +16,16 @@ type Config struct {
 	MaxItems int
 	// Rules nil means DefaultRules().
 	Rules []Rule
+	Order func([]Item) []Item
 }
 
-// Batch is one cycle's unit of work: deps-first items, binding reasons, and the max member weight.
 type Batch struct {
 	Items   []Item
 	Reasons []string
-	Weight  float64
 	// DependsOnPrev marks a later chunk of a split cluster: run the previous batch first.
 	DependsOnPrev bool
 }
 
-// Classify groups items into dep-ordered, cap-split batches ranked by weight; it is pure and deterministic.
 func Classify(items []Item, cfg Config) []Batch {
 	if len(items) == 0 {
 		return nil
@@ -39,86 +38,103 @@ func Classify(items []Item, cfg Config) []Batch {
 	if rules == nil {
 		rules = DefaultRules()
 	}
-
-	uf := newUnionFind(len(items))
-	// Campaign is a partition: an inferred edge never merges two distinct
-	// non-empty campaigns, and each root's claim keeps the guard transitive.
-	clusterCampaign := make([]string, len(items))
-	for i, it := range items {
-		clusterCampaign[i] = strings.TrimSpace(it.Campaign)
-	}
-	reasons := map[int][]string{} // root → binding signals
-	// The partition guard makes union outcomes order-dependent, so determinism rests on the sorted edges.
-	for _, e := range sortedRuleEdges(rules, items) {
-		ra, rb := uf.find(e.A), uf.find(e.B)
-		if ra != rb {
-			ca, cb := clusterCampaign[ra], clusterCampaign[rb]
-			if ca != "" && cb != "" && ca != cb {
-				continue
-			}
-			uf.union(ra, rb)
-			// An empty merged claim means one side was empty, so ca+cb is the other side's claim.
-			if merged := uf.find(ra); clusterCampaign[merged] == "" {
-				clusterCampaign[merged] = ca + cb
-			}
-		}
-		reasons[uf.find(e.A)] = append(reasons[uf.find(e.A)], e.Reason)
-	}
-
-	// A later union can move a root, so fold every reason list into its final root.
-	clusters := map[int][]int{}
-	for i := range items {
-		clusters[uf.find(i)] = append(clusters[uf.find(i)], i)
-	}
-	finalReasons := map[int][]string{}
-	for root, rs := range reasons {
-		finalReasons[uf.find(root)] = append(finalReasons[uf.find(root)], rs...)
-	}
-
-	// Rank whole clusters, not chunks, so a continuation always follows its predecessor.
-	type clusterOut struct {
-		chunks  []Batch
-		weight  float64
-		firstID string
-	}
-	var out []clusterOut
+	clusters, reasons := clusterByRules(items, rules)
+	position := rankPositions(items, cfg.Order)
+	var out []rankedCluster
 	for root, member := range clusters {
-		ordered := weightOrder(items, member)
-		rs := dedupSorted(finalReasons[root])
-		co := clusterOut{firstID: items[ordered[0]].ID}
-		for start := 0; start < len(ordered); start += maxItems {
-			end := start + maxItems
-			if end > len(ordered) {
-				end = len(ordered)
-			}
-			chunk := make([]Item, 0, end-start)
-			w := 0.0
-			for _, idx := range ordered[start:end] {
-				chunk = append(chunk, items[idx])
-				if items[idx].Weight > w {
-					w = items[idx].Weight
-				}
-			}
-			if w > co.weight {
-				co.weight = w
-			}
-			co.chunks = append(co.chunks, Batch{
-				Items:         chunk,
-				Reasons:       rs,
-				Weight:        w,
-				DependsOnPrev: start > 0,
-			})
-		}
-		out = append(out, co)
+		ordered := rankOrder(member, position)
+		out = append(out, rankedCluster{best: position[ordered[0]], chunks: chunk(itemsAt(items, ordered), dedupSorted(reasons[root]), maxItems)})
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return weightDescThenID(out[i].weight, out[i].firstID, out[j].weight, out[j].firstID)
-	})
+	sort.Slice(out, func(i, j int) bool { return out[i].best < out[j].best })
 	var batches []Batch
 	for _, co := range out {
 		batches = append(batches, co.chunks...)
 	}
 	return batches
+}
+
+func clusterByRules(items []Item, rules []Rule) (clusters map[int][]int, reasons map[int][]string) {
+	uf := newUnionFind(len(items))
+	campaignOfRoot := make([]string, len(items))
+	for i, it := range items {
+		campaignOfRoot[i] = strings.TrimSpace(it.Campaign)
+	}
+	signalsByRoot := map[int][]string{}
+	for _, e := range sortedRuleEdges(rules, items) {
+		ra, rb := uf.find(e.A), uf.find(e.B)
+		if ra != rb {
+			ca, cb := campaignOfRoot[ra], campaignOfRoot[rb]
+			if ca != "" && cb != "" && ca != cb {
+				continue
+			}
+			uf.union(ra, rb)
+			if merged := uf.find(ra); campaignOfRoot[merged] == "" {
+				campaignOfRoot[merged] = ca + cb
+			}
+		}
+		signalsByRoot[uf.find(e.A)] = append(signalsByRoot[uf.find(e.A)], e.Reason)
+	}
+	clusters = map[int][]int{}
+	for i := range items {
+		clusters[uf.find(i)] = append(clusters[uf.find(i)], i)
+	}
+	reasons = map[int][]string{}
+	for root, rs := range signalsByRoot {
+		reasons[uf.find(root)] = append(reasons[uf.find(root)], rs...)
+	}
+	return clusters, reasons
+}
+
+type rankedCluster struct {
+	chunks []Batch
+	best   int
+}
+
+func itemsAt(items []Item, indices []int) []Item {
+	picked := make([]Item, len(indices))
+	for i, idx := range indices {
+		picked[i] = items[idx]
+	}
+	return picked
+}
+
+func chunk(members []Item, reasons []string, maxItems int) []Batch {
+	var batches []Batch
+	for start := 0; start < len(members); start += maxItems {
+		end := min(start+maxItems, len(members))
+		batches = append(batches, Batch{Items: members[start:end:end], Reasons: reasons, DependsOnPrev: start > 0})
+	}
+	return batches
+}
+
+func rankPositions(items []Item, order func([]Item) []Item) []int {
+	position := make([]int, len(items))
+	if order == nil {
+		for i := range position {
+			position[i] = i
+		}
+		return position
+	}
+	ranked := order(slices.Clone(items))
+	slots := map[ItemKey][]int{}
+	for at, it := range ranked {
+		slots[it.Key()] = append(slots[it.Key()], at)
+	}
+	for i, it := range items {
+		key := it.Key()
+		if len(slots[key]) == 0 {
+			position[i] = len(ranked) + i
+			continue
+		}
+		position[i], slots[key] = slots[key][0], slots[key][1:]
+	}
+	return position
+}
+
+func rankOrder(member, position []int) []int {
+	ordered := slices.Clone(member)
+	slices.SortFunc(ordered, func(a, b int) int { return position[a] - position[b] })
+	return ordered
 }
 
 // sortedRuleEdges collects every rule's edges in one canonical (A, B, Reason) order.
@@ -139,25 +155,10 @@ func sortedRuleEdges(rules []Rule, items []Item) []Edge {
 	return edges
 }
 
-// weightOrder returns member indices sorted weight-desc-then-id (weightDescThenID);
-// this is the sole ordering Classify uses for a cluster's members.
-func weightOrder(items []Item, member []int) []int {
-	out := make([]int, len(member))
-	copy(out, member)
-	sort.Slice(out, func(x, y int) bool {
-		return weightDescThenID(items[out[x]].Weight, items[out[x]].ID, items[out[y]].Weight, items[out[y]].ID)
-	})
-	return out
-}
-
 // maxRenderedReasons caps the binding signals shown per batch line.
 const maxRenderedReasons = 3
 
-// RenderMarkdown formats one line per batch for the triage prompt and the CLI; no batches render "".
-func RenderMarkdown(batches []Batch) string {
-	if len(batches) == 0 {
-		return ""
-	}
+func RenderMarkdown(batches []Batch, label func(Item) string) string {
 	var b strings.Builder
 	for n, batch := range batches {
 		ids := make([]string, len(batch.Items))
@@ -168,8 +169,12 @@ func RenderMarkdown(batches []Batch) string {
 		if batch.DependsOnPrev {
 			cont = " (continuation — run the previous batch first)"
 		}
-		fmt.Fprintf(&b, "- batch %d (weight %.2f; %s)%s: %s\n",
-			n+1, batch.Weight, compactReasons(batch.Reasons), cont, strings.Join(ids, ", "))
+		fmt.Fprintf(&b, "- batch %d (%s)%s: %s\n", n+1, compactReasons(batch.Reasons), cont, strings.Join(ids, ", "))
+		for _, it := range batch.Items {
+			if label != nil {
+				fmt.Fprintf(&b, "  - %s: %s\n", it.ID, label(it))
+			}
+		}
 	}
 	return b.String()
 }
@@ -182,14 +187,6 @@ func compactReasons(rs []string) string {
 		return strings.Join(rs, ", ")
 	}
 	return fmt.Sprintf("%s, +%d more", strings.Join(rs[:maxRenderedReasons], ", "), len(rs)-maxRenderedReasons)
-}
-
-// weightDescThenID is the one ordering weightOrder and Classify's ranking share.
-func weightDescThenID(weightA float64, idA string, weightB float64, idB string) bool {
-	if weightA != weightB {
-		return weightA > weightB
-	}
-	return idA < idB
 }
 
 func dedupSorted(rs []string) []string {

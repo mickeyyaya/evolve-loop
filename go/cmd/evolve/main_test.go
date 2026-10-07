@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 )
 
 // TestMain disables the workspace-pollution guard, since this package's
@@ -22,6 +25,10 @@ func TestMain(m *testing.M) {
 	}
 	cliUpdateWiringFn = func(string, io.Writer) cliUpdateWiring {
 		return cliUpdateWiring{now: time.Now}
+	}
+	usageEvidenceFn = func(string, string, io.Writer) usageevidence.Explain { return nil }
+	clihealthUsagePaneFn = func(string) (func(context.Context, string) (string, error), func()) {
+		return func(context.Context, string) (string, error) { return "", errors.New("no CLI is launched in tests") }, func() {}
 	}
 	tmuxTmp, err := os.MkdirTemp("/tmp", "evtmux")
 	if err != nil {

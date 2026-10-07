@@ -3,6 +3,8 @@
 > **Status:** approved by the operator on 2026-10-06. The request: "Do we have logic to reprioritize the Todo inbox tasks when adding the new requests? If not, we need to build the logic… with ultrathink".
 >
 > **Decision record:** ADR-0121, which lands with P1.
+>
+> **Progress:** P1 landed unwired on 2026-10-06 ([notes](#p1-landing-notes-2026-10-06)); the P2 prerequisite and P2 landed the same day and wired the rank ([notes](#p2-prerequisite-and-p2-landing-notes-2026-10-06)). P3 to P5 remain.
 
 ## Context: what existed on 2026-10-06
 
@@ -84,12 +86,12 @@ The **score** is computed in Go from those facts. Its weights live in policy con
   - `age` raises an old item;
   - an `active_campaigns` member rises;
   - a hygiene item outranks an otherwise equal security item (the corrected order puts security last).
-- **P2 prerequisite:**
-  - each autofiler's item builder, driven by its test, yields an item whose `priority_class` the checked-in `class_order` names;
-  - the source scan is red on a fixture that writes an item into `.evolve/inbox/` outside the enrolled writers.
-- **P2:**
-  - every consumer returns `inboxrank.Order`;
-  - the source-scan guard is red on a stray weight sort.
+- **P2 prerequisite** (done 2026-10-06):
+  - each autofiler's item builder, driven by its test, yields an item whose `priority_class` the checked-in `class_order` names: `TestInboxWriters_EveryAutofiledItemCarriesAKnownClass` (cmd/evolve, one subtest per writer), with a per-writer test in each package (listed in the landing notes);
+  - the source scan is red on a fixture that writes an item into `.evolve/inbox/` outside the enrolled writers: `TestInboxWriteSites_FindsEveryShapeOfAnInboxWriteAndNoRead` and `TestEnrollmentProblems_NameAnUnenrolledWriterAndAStaleEnrollment`; a mutation adding a ninth production writer turned the contract test red, as did one dropping the CI watch's class.
+- **P2** (done 2026-10-06):
+  - every consumer returns `inboxrank.Order`: `TestReadInboxBacklog_IsTheRanksOrderOverTheReadyListAgainstTheWholeQueue`, `TestSeedWavePlanFromInbox_SeedsTheFirstRankedLanesNotTheHeaviest`, `TestWidenNarrowDecision_BackfillsTheFirstRankedLane`, `TestRefill_TakesTheFirstRankedItemNotTheHeaviest`, `TestClassify_ClustersRankByTheirBestRankedMember`, `TestTriageComposePrompt_BatchesFollowTheRankAndShowEachScoreAndTopFactor`, `TestInboxBatches_ListsBatchesInRankOrderWithEachScore`, `TestReadQueue_PendingFollowsTheInboxRankAndCarriesEachScore`;
+  - the source-scan guard is red on a stray weight sort: `TestWeightOrderingSites_FindEveryShapeOfAWeightSortAndNoValidation` on a fixture, and `TestNoProductionCodeOrdersByWeightOutsideTheRank` named exactly the five old orderings when run on the pre-P2 tree.
 - **P3:**
   - a machine-origin overlap is judged (fake judge) and the decision is applied with recorded reasoning;
   - a human-origin overlap exits 3 and writes a pending intake;
@@ -97,7 +99,7 @@ The **score** is computed in Go from those facts. Its weights live in policy con
   - with no overlap, no judge call is made.
 - **P4:** a fixture plan with a planned-but-unstarted slot and a higher new item gets preempted; a running lane and a continuation do not.
 - **P5:** an edit without `--reason` is refused; recurrence moves the rank without writing a weight.
-- **Live:** after P2, `evolve inbox rank --top 20` matches what the next wave's triage receives.
+- **Live:** after P2, `evolve inbox rank --top 20` matches what the next wave's triage receives. (Checked 2026-10-06, read-only, on the runtime plane: see the P2 landing notes.)
 
 ## P2 prerequisite: a class on every autofiled item
 
@@ -195,3 +197,120 @@ The P1 review raised the findings below; each was fixed in the same unwired land
 | W1: eight autofilers file items with no `priority_class` | not fixed in P1, which stays unwired: ADR-0121 records the gap in its Consequences and [the P2 prerequisite](#p2-prerequisite-a-class-on-every-autofiled-item) above proposes a class per writer and the contract test | — |
 
 The explicit `float64(value × weight)` conversion in the score is unchanged: it is the rounding point that keeps the contributions summing to the score exactly (`TestScore_ContributionsAddUpToTheScore`).
+
+## P2 prerequisite and P2 landing notes (2026-10-06)
+
+P2's prerequisite and P2 landed together on branch `feat/inbox-rank-p2` (console lane), from `origin/main` `2f2cefdeb`, the prerequisite first. The rank is now **wired**: every inbox consumer reads `inboxrank.Order`. The decision record is [ADR-0121's P2 amendment](../architecture/adr/0121-inbox-priority-is-a-computed-rank.md#amendment-2026-10-06-p2-prerequisite-and-p2-wire-the-rank).
+
+### What landed
+
+| Component | Where |
+|---|---|
+| A class on every autofiled item (the table [above](#the-proposed-class-per-writer), as proposed) | `ciwatch.go` (`escalationItem.PriorityClass`), `core/contract_escalation.go` (`ContractGateDemotion.Intent`), `dispositionrouter.Intent.PriorityClass`, `recurrence/apply.go` → `retrofile.PreventiveAction.PriorityClass`, `fleet/starvation.go`, `core/failurelearning/remediation.go` with `faillearn.InboxItem.PriorityClass`, `triagecap/demotion.go`, and in `cmd/evolve` `cmd_loop_goalstall.go`, `cmd_loop_escalation.go`, `cmd_loop_outcome.go` |
+| The contract test and the force scan | `go/cmd/evolve/inbox_writers_contract_test.go` (`TestInboxWriters_EveryAutofiledItemCarriesAKnownClass`), `inbox_writers_scan_test.go` (`inboxWriteSites`) |
+| The consumer's whole input, the injected order and the labels | `go/internal/inboxrank/inputs.go`: `Inputs`, `Inputs.Order`, `Sequence`, `Labels` (and the unexported `Breakdown.topFactor` the labels read) |
+| One loader of the rank's inputs | `go/internal/inboxrank/rankinputs` (`Load`), enrolled in `.apicover-enforce` and `.cover-strict` at 100; [internal-inboxrank-rankinputs.md](../architecture/packages/internal-inboxrank-rankinputs.md) |
+| The wave seed, widen and refill | `triagecap.ReadInboxBacklog` ranks; `RankForDispatch` and `FleetCandidate.Declared` deleted; `loopwave/launcher.go`'s refill reads the ranked backlog |
+| The batch order | `inboxbatch.Config.Order`; `Classify` split into `clusterByRules`, `rankPositions`, `rankOrder`, `chunkCluster`; `Batch.Weight` removed; `RenderMarkdown(batches, label)` |
+| The triage prompt and `evolve inbox batches` | `phases/triage/triage.go` (`inboxBatchesSection`, `selectableBatchesNote`), `cmd/evolve/cmd_inbox.go` |
+| `evolve inbox rank` | `cmd_inbox_rank.go` loads through `loadRankInputs` (`rankinputs.Load`); `ledgerItemCounts` deleted |
+| The dashboard's queue | `dashboard/queue.go` (`readQueue(root, now)`), `QueueItem.Score`, `static/app.js` shows the score |
+| The weight-sort guard | `go/internal/inboxrank/weightsort_ban_test.go`; `./internal/inboxrank/...` added to `repocontract.Packages()` |
+
+### Choices made in the landing
+
+1. **The class lives in each writer, as proposed.** The retro autofile path carries it on the staged intent: `core.ContractGateDemotion.Intent` is the pure builder the stager calls, exported so the contract test stages the real stager's intent through `recurrence.ApplyBoundary` rather than a hand-made one. `fleet`'s and the goal stall's `Validate` now require the class. `faillearn` takes the class from its caller and never defaults it.
+2. **The contract test drives each writer's own path** (the real `ciwatch.Watch` with a fake fetcher, the demotion staged and applied, `BuildStarvationItem(...).WriteTo`, `failurelearning.Engine.WriteFloor`, `triagecap.NewDemotionLedgerRecord`, and the three `cmd/evolve` writers), decodes the item with `inboxbatch.LoadDir` or `LoadFile`, and checks the row's class and `CheckPriorityClass` against the checked-in `.evolve/policy.json`.
+3. **The scan pins the force with a heuristic data-flow.** A site is a production function that calls a write primitive (`os.WriteFile`, `os.Create`, `os.OpenFile`, `os.CreateTemp`, any `atomicwrite` call, or the target of `os.Rename`/`os.Link`) on a path built from an inbox name (an identifier or field named `inbox` or `*InboxDir`), an `inbox` or `.evolve/inbox` path literal, a package constant holding one, or a same-package helper that returns or writes such a path. Taint flows through assignments, `var` declarations, struct fields, `range` and `filepath.Walk` callbacks, and through path-building calls (`filepath`, `path`, `strings`, `fmt.Sprintf`), not through arbitrary call results (an item list loaded from the inbox is not a path). Flow through another package's helper is not followed, so a writer that receives an inbox path under a neutral parameter name from another package is a known blind spot. Every site found must be an autofiler row's site or an entry of `inboxWritersThatFileNothing` with its reason (the lifecycle package, `inboxmover.RecordRootTaskFailure`, `recurrence.applyIntent`'s weight write, the ship's consumption `phases/ship.stage`, and `evolve inbox consume`), and every enrollment must still be found.
+4. **The scan lives in `cmd/evolve`**, not in a ship-pack package: three of the eight builders are package `main`, and `cmd/evolve` is already a sanctioned tree reader outside the ship pack (`repocontract`'s `readsTheTreeOutsideThePack`). The weight-sort guard, which needs no `main` builder, lives in `internal/inboxrank`, which joined the pack.
+5. **`ReadInboxBacklog` and `SelectWaveSeedMenus` keep their signatures.** The per-cycle ACS predicates 1159, 1180 and 1181 call them and still hold, so a new rank parameter would have stopped valid predicates compiling. The backlog loads the evolve dir's own inputs (`rankinputs.Load(evolveDir, time.Now())`, its policy and its ledger, beside the inbox it already reads) and prints a loader warning to the loop log; the testable core is `readRankedBacklog(evolveDir, isProtected, now, loopLog)`, which takes the clock and the log writer (`ReadInboxBacklog` passes `time.Now()` and `os.Stderr`). It reads items through `inboxbatch.LoadDir`, the reader the verb and the triage prompt use, so all three rank identical items (the backlog's own decode, which skipped the loader's sanitizer, is gone), and keeps dropping an id-less item.
+6. **`loopwave`'s import allowlist is unchanged.** The P2 plumbing note proposed adding `inboxrank` to it; because the inputs load where the backlog is read, the engine handles no rank type.
+7. **`Classify` never ranks by weight itself.** With no `Config.Order` it keeps the caller's order; the order is run once and turned into positions keyed by `(id, path)`, so scoring never goes O(N²) and same-id items keep their places. `Batch.Weight` (the maximum member weight) is removed: in a ranked menu it read as the priority.
+8. **Labels go on sub-lines.** Each batch line keeps its `- batch N (<reasons>): id, id` shape, and each member gets a `  - <id>: score 0.4475, top factor base` line beneath it, because readers parse the batch line by its last `": "` (`go/acs/cycle1724` 004, `go/acs/cycle1678`); a label inside the line would have broken them.
+9. **`evolve inbox rank` keeps exiting 2 on a malformed policy**; every other consumer ranks with the compiled default and a warning, because a consumer inside the loop must not stop on it.
+
+### Goldens and predicates
+
+| Artifact | Change | Why |
+|---|---|---|
+| `go/internal/core/failurelearning/testdata/inbox-915304b4.golden.json`, `inbox-4f0ecc16.golden.json` | gained `"priority_class": "correctness"` | the remediation items now carry their class (row 4) |
+| `go/internal/loopwave/testdata/decision_{seed,widen,prune}.golden.json` | unchanged, re-checked | their fixtures carry no class and no date, so the rank equals the old weight order on them; new tests with classed fixtures pin the rank order instead |
+| `go/acs/cycle536` 007, 008 and `go/acs/cycle1724` 002 | archived to [superseded predicates](../private/research/archived-2026-10-06/superseded-predicates/README.md) under the A2 retention rule | each asserted the weight order as its acceptance (the seed led by the heaviest item; an un-ranked `Classify` ordered weight-descending) |
+| `go/acs/cycle536`'s seven other predicates | compile and pass again | the two archived predicates had kept the package from compiling since `SelectWaveSeedTopN` gained `isProtected`, before P2 |
+| `go/acs/cycle1159`, `1180`, `1181`, `1182`, `1206`, `1633` | checked, unchanged | they assert committed-prefix preservation, consumed-id pruning, rule-set membership or batch independence; all pass as before (`1181` 003 needs a live `.evolve/state.json` and fails in a dev worktree exactly as on the base) |
+| `go/acs/cycle541` | checked, unchanged | its candidates are already given in order, so it asserts disjointness, not the weight order; it has not compiled since `fleet.PlanFromTriage` gained arguments, unrelated to P2 |
+
+The unit tests that pinned the weight order were rewritten to the rank-order contract (`triagecap`'s rank and amplified tests, `inboxbatch`'s classify tests, the dashboard's queue test), each renamed for what it now pins.
+
+### The live check (2026-10-06, read-only)
+
+On the runtime plane's inbox (232 pending items: 49 lane-ready, 180 console-owned, 3 waiting), with the branch's binary:
+
+- `evolve inbox rank --top 20` and the wave seed's backlog (`triagecap.ReadInboxBacklog` with the loop's `laneForbidden` predicate) list the same 20 items in the same order, from `cli-dossier-publish`, `overlay-rule-tier-selectors-canonicalize` and `repo-contract-test-level-selection` down to `phasecmd-silent-policy-fallbacks`.
+- `evolve inbox batches`, the triage prompt's composition, places all 49 ready items in 37 batches; members are in rank order and each cluster sits at its best member's rank.
+- 45 of the 49 ready items moved against the old weight order. The old top ten (`router-silent-errors`, `phasespec-roots-silent-policy-error`, `overlay-rule-tier-selectors-canonicalize`, `policy-resolver-hygiene`, `premium-rung-placement-law-and-narrative-dedup`, …) was mostly hygiene items; the new top ten leads with `cli-dossier-publish`, `overlay-rule-tier-selectors-canonicalize`, `repo-contract-test-level-selection`, `cli-phase-cycle-request` and `acs-cycle1723-package-doc-predicate-stale-after-753`.
+- **Recurrence moved nothing:** the plane has no `recurrence-ledger.json`, so the factor is 0 for every item (the question P1 left open for P2).
+- Every pending item on the plane carries a known class, so no `WARN` was printed.
+
+### Review and floor
+
+- **The diff review** (one combined Go reviewer) passed with no CRITICAL or HIGH finding. Its two MEDIUM findings are kept as choices: `triagecap.ReadInboxBacklog` and the triage prompt print the rank's input warnings to the process's stderr (the loop log) because their signatures carry no writer and the backlog's signature stays compatible with the ACS predicates above; and the backlog drops `inboxbatch.LoadDir`'s per-file notices (the plane prints about forty sanitize notices per read, and the loop chain already reports an invalid root item), while a read error still prints. Its two LOW findings are recorded above: the verb reads the policy twice to keep its exit 2, and the weight-sort guard is a syntactic scan, not a data-flow proof.
+- **Ratchets the landing moved.** The function-size ratchet: `writePipelineEscalation` grew by its class line, so a redundant comment went and it is back at its allowance; `inboxbatch.Classify` (allowance 93) is under the limit after the split, so its allowance was removed. The ship's pinned pack list (`TestContractRed_NamesEverySuiteOfTheOnePackList`) names `inboxrank`. The guard's file is `weightsort_ban_test.go`, because a `go/internal` file name containing `guard` is gate-shaped and must be on the protected-surface manifest (`TestEveryGateShapedFileIsProtectedSurface`); the operator then protected it with a file entry in `guards.ProtectedSurfaceManifest` (see the fix round below).
+- **The floor, on the staged tree, one target at a time** (final run, after the architecture review's fix round and the engineering-craft audit): `make test` (258 packages ok), `make test-integration` (259 ok), `make test-e2e` (6 ok), `make test-acs-durable` (42 ok), `make apicover-enforce` (258 packages, 4859 of 4859 exports covered, 0 false-green), `make cover-strict` (24 of 24 at their floors, `inboxrank`, `rankinputs`, `loopwave`, `core/failurelearning` and `inboxmover/lifecycle` at 100%); go1.23 `gofmt -l -s` clean; `go vet ./...` clean; `golangci-lint` clean on every touched package (the whole-tree run reports four findings in untouched files: `signalcenter/stream.go`, `pkg/acsassert/go_tests.go`). One earlier run lost `internal/core` to Go's 10-minute package timeout under a machine load average of 16 to 21; it passed in 426 s on the rerun.
+
+### Architecture review fix round (2026-10-06)
+
+The architecture review judged the landing FIX_THEN_MERGE (0 CRITICAL, 4 WARNING, 4 NIT) and confirmed dispatchability unchanged, a single source, and the archived predicates moved verbatim. Each fix was written red first; the reds are recorded in the lane's scratchpad (`fix-W1.txt`, `fix-W2.txt`, `fix-W3.txt`, `fix-NIT.txt`).
+
+| Finding | What changed | Pinned by |
+|---|---|---|
+| W1: a surviving mutant. `Order(menu.Ready, menu.Ready)` at the triage prompt or at `evolve inbox batches` passed every test, because no fixture had a waiting dependent | one helper, `inboxmover.RankLaneMenu` (partition, then rank the ready list against the whole queue), used by the triage prompt, `evolve inbox batches` and `triagecap.ReadInboxBacklog`; both consumers' tests gained a waiting item whose `deps` name a lighter ready item, which must lead | `TestRankLaneMenu_RanksTheReadyListAgainstTheWholeQueue`; the mutant inside the helper reds it and the triage, batches and backlog rank tests; before the helper, the same mutant at each old site redded the extended triage and batches tests |
+| W2: a missing class was refused only by the producers | the shared funnels refuse it: `dispositionrouter.StageIntent` refuses an autofile intent with no class (`inboxbatch.ErrNoPriorityClass`); `retrofile.FileActions` refuses an action with no class after its dedupe (`inboxbatch.ErrNoPriorityClass`); `recurrence.applyIntent` records a legacy classless line as `ApplyResult.Refused` and never wedges the boundary; faillearn's inbox writer refuses a batch with a classless item before any write (`inboxbatch.ErrNoPriorityClass`); the retrospective persona's `preventive_actions` schema requires `priority_class` | `TestStageIntent_RefusesAnAutofileWithNoPriorityClass`, `TestFileActions_RefusesAnActionWithNoPriorityClassButNotAnAlreadyFiledOne`, `TestApplyBoundary_AClasslessAutofileStagedBeforeClassesIsRefusedNotFiledAndDoesNotWedge`, `TestWriteInboxItems_RefusesAnItemWithNoPriorityClassAndWritesNone` |
+| W3: no runtime backstop for the force scan's blind spots | `triagecap.ReadInboxBacklog` prints `inboxrank.ClassWarnings` over the whole pending queue to the loop log at every read; the triage prompt's inbox section opens with an `- unknown_priority_class:` line; the scan's inbox names widen to `inbox(dir\|path\|root)`; the blind spots (imported path builders, non-`os` write primitives, function values) are recorded in [cmd-evolve.md](../architecture/packages/cmd-evolve.md) | `TestReadRankedBacklog_NamesEveryUnclassedQueuedItemInTheLoopLog`, `TestTriageComposePrompt_NamesQueuedItemsWithNoKnownClass`, `TestInboxWriteSites_FindsEveryShapeOfAnInboxWriteAndNoRead` (now with `inboxPath` and `inboxRoot` writers) |
+| W4: `internal-loopwave.md` still described the refill's `RankForDispatch` order | the refill takes the first non-excluded candidate of `triagecap.ReadInboxBacklog`, in rank order | — |
+| NITs | `LoadFile` records the file-name fallback as `Item.IDFromFileName` and the backlog filters on it (`recordsAnID`, which re-decoded each file, is deleted); one exported identity key, `inboxbatch.ItemKey` (`Item.Key()`), replaces the two private copies in `inboxbatch` and `inboxrank`; the class names `inboxbatch.ClassCorrectness` … `ClassSecurity` sit beside `CheckPriorityClass` and every autofiler and the contract table use them (`core/failurelearning`'s import allowlist gained `inboxbatch`); one inbox item asks the operator whether ship-pack scanners should be protected as a class (`decide-protecting-ship-pack-scanners-as-a-class`, console-owned, maintainability) | `TestLoadFile_RecordsAnIDTakenFromTheFileName`, `TestItem_KeyIsTheIDAndThePath`, `TestClassNames_AreThePolicysCompiledClassOrder` |
+
+**More superseded acceptance.** W2 makes a classless remediation item or autofile intent invalid input, so four more per-cycle predicates whose premise filed one are archived under the A2 retention rule ([superseded predicates](../private/research/archived-2026-10-06/superseded-predicates/README.md)): `cycle1062` 008 and 009 and `cycle1290` 001 and `cycle1292` 001; their behavior is pinned by classed unit tests that the live `cycle1290` 003 and `cycle1292` 003 still run by name. `cycle1290` 004 compares `inbox_transactional_test.go` with `HEAD`, whose fixture gained `priority_class`, so it is red until the change is committed. `cycle1292` 004 is red in any checkout for a data reason that predates P2 (a tracked inbox item's title is over 160 characters).
+
+**The operator kept two additions in the staged index:** a protected-surface manifest entry for `inboxrank/weightsort_ban_test.go` (`go/internal/guards/integrity_surface.go`) and its dated bullet in [internal-guards.md](../architecture/packages/internal-guards.md).
+
+**The engineering-craft audit (2026-10-06).** The operator required the repo's `engineering-craft` and `golang-test-review` skills to be loaded and the staged diff audited against them. What it changed:
+
+- **One home for a class rule.** `inboxbatch.RequirePriorityClass` and `ErrNoPriorityClass` replace three package sentinels in `dispositionrouter`, `retrofile` and `faillearn`.
+- **Parameter objects instead of long signatures.**
+  - `core.ContractGateDemotion{…}.Intent()` replaces a six-parameter builder.
+  - `inboxbatch`'s chunking is two three-parameter helpers, `chunk` and `itemsAt`.
+  - `recurrence.autofileIntent` derives its id itself.
+- **No flag argument.** The force scan's taint function takes seed names instead of a bool.
+- **No export without an outside caller.** `inboxrank`'s top factor is unexported (`Breakdown.topFactor`), so it no longer needs a guard for an impossible empty case. Its tie is pinned through `Labels`.
+- **Shared harness.** The new tests write fixtures with `fixtures.MustWrite` instead of four local copies, and the contract test's builders call `t.Helper`.
+- **Assertion-level reds.** Several first reds were compile errors, which do not count as red. Every new behavior was re-proven with a `go test -overlay` mutant of the staged code: 38 mutants, all killed by the test named for the behavior, the first one a control. They include reorder mutants (the class check before retrofile's dedupe, faillearn's check inside the write loop, the triage class line after the lists), a shift mutant (`>` to `>=` in the top factor), wrong-key mutants (an `ItemKey` without the path) and a wrong-list mutant (`RankLaneMenu` ranking the ready list against itself).
+- **Four functions keep four parameters, as natural signatures.**
+  - `inboxmover.RankLaneMenu` is `PartitionLaneMenu`'s three plus the rank.
+  - `triagecap.readRankedBacklog` is the backlog's two plus the injected clock and log.
+  - `loadRankInputs` in `cmd/evolve` is the verb label, the directory, the clock and the sink.
+
+**The delta re-review (2026-10-06): FIX_THEN_MERGE, closed here.** The re-review closed W1–W4 and the NITs. It found the original W1 mutant killed in four packages, the 11 live legacy classless intents degrading to `Skipped` with none refused, and the seven archived predicates byte-identical. It raised one HIGH and five surviving mutants:
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| H1: a refused autofile intent was invisible in the loop log (`applyEscalationBoundary` stayed quiet when only `Refused` was non-empty, and its signal had no `refused` field) | the quiet check counts `Refused`; one `[loop] WARN escalation boundary: refused <id>: no priority_class` line per id; a `refused` field on `LOOP_ESCALATION_BOUNDARY` (registry text and `signal-codes.md` regenerated) | `TestApplyEscalationBoundary_NamesEachRefusedIntentInTheLoopLogAndItsSignal`, red on the prior code; the reviewer's own probe passes; three mutants killed (quiet check, WARN line, field) |
+| M3: the triage class line could warn over the ready list only | a waiting unclassed item must be named | `TestTriageComposePrompt_NamesQueuedItemsWithNoKnownClass` kills it |
+| M7: faillearn could check `Priority` instead of `PriorityClass` | both fixture items carry `Priority: "H"` | `TestWriteInboxItems_RefusesAnItemWithNoPriorityClassAndWritesNone` kills it |
+| M6: recurrence could refuse before retrofile's dedupe | a legacy classless intent whose item is already filed is `Skipped`, not `Refused` | `TestApplyBoundary_AClasslessLegacyAutofileWhoseItemIsFiledIsSkippedNotRefused` kills it |
+| M10, M11: the triage prompt and `evolve inbox batches` could load rank inputs from the wrong directory | each writes a `policy.json` whose `class_order` puts security first and requires the heavier security item to lead | `TestTriageComposePrompt_RanksWithTheEvolveDirsPolicy`, `TestInboxBatches_RanksWithTheEvolveDirsPolicy` kill them |
+| MEDIUM (Boy Scout): `writePipelineEscalation` was 62 lines | extracted into `haltRecord` with `narrative`, `dossier` and `inboxItem`, now 14 lines; its size-ratchet allowance removed | the `TestWritePipelineEscalation_*` tests pass before and after |
+| LOW: this plan named `rankedBacklog` with fixed `Inputs` | reworded to `readRankedBacklog(evolveDir, isProtected, now, loopLog)` | — |
+
+### Open question for P4 and P5: starvation by design
+
+The architecture review judged that the rank can starve a class by design (ADR-0121). The rank was not changed. The question is the operator's:
+
+- **The arithmetic.** The class factor is 0.20 over eight classes, so one class step is 0.025. At equal weight, a correctness item leads a feature item by four steps (0.10), a hygiene item by six (0.15) and a security item by seven (0.175).
+- **Age cannot close the gap.** The age factor is capped at 0.05 (`1 − 0.5^(days/30)` × 0.05): 0.025 after 30 days, 0.0375 after 60, and only toward 0.05 after that. So age closes at most two class positions, and only in the limit; an item four or more steps behind never overtakes a fresh item of equal weight on age alone.
+- **The consequence.** While correctness and stability items keep arriving at similar weights, feature, hygiene and security items wait indefinitely. What can still move them is a weight about 0.056 higher per class step, a dependent they unblock (up to 0.15), a recurrence count (up to 0.10) or the operator's `active_campaigns` steering (0.05).
+- **The question.** Is that starvation the intended reading of the class order, or should P4 or P5 add an anti-starvation term? Options include a larger or uncapped age factor, a per-class age clock, or a share of lane slots per class. Any of these is a policy change for the operator to approve; none is made here.
+
+### What remains
+
+P3 (one intake path, the overlap judge), P4 (boundary preemption), P5 (`--reason` on every priority change, and deleting `recurrence.setItemWeight`, the one remaining weight writer outside the lifecycle). The writers `ciwatch`, `retrofile`, `dispositionrouter` and `core/failurelearning` have no package page under `docs/architecture/packages/`; their class is recorded here, in ADR-0121's amendment and in `internal-core.md`, `internal-recurrence.md`, `internal-faillearn.md`, `internal-fleet.md`, `internal-triagecap.md` and `cmd-evolve.md`.

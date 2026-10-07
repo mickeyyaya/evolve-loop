@@ -163,7 +163,7 @@ item consumed ⇒ work landed (transactional consumption); dossier phase records
   this ADR's rule that prose never GRANTS routing. (3) **The weight stays the
   priority:** `triagecap.RankForDispatch`, the one ordering the seed paths
   share, breaks EQUAL weights toward the verified-admissible candidate
-  (`FleetCandidate.Declared`, set from the same belief). Live queue: 65 → 47
+  (`FleetCandidate.Declared`, set from the same belief). *(Superseded 2026-10-06 by [ADR-0121](0121-inbox-priority-is-a-computed-rank.md)'s P2 amendment: the seed paths read the computed inbox rank, whose tie-break still puts a declared surface first; `RankForDispatch` and `FleetCandidate.Declared` are deleted.)* Live queue: 65 → 47
   lane-dispatchable. Follow-ups filed console-owned: scope-aware triage
   termination (`triage-termination-scope-aware`, cycle 1682), in-lane
   alternates on refusal (`lane-alternates-on-refusal`).

@@ -13,7 +13,7 @@ import (
 
 func runClihealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: evolve clihealth list [--json] | clear <family> [--project-root DIR]")
+		fmt.Fprintln(stderr, "usage: evolve clihealth list [--json] | clear <family> | usage [--json] [family...] [--project-root DIR]")
 		return 2
 	}
 	fs := flag.NewFlagSet("clihealth "+args[0], flag.ContinueOnError)
@@ -30,8 +30,10 @@ func runClihealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return clihealthList(store, *asJSON, stdout)
 	case args[0] == "clear" && len(positional) == 1:
 		return clihealthClear(store, positional[0], stderr)
+	case args[0] == "usage":
+		return clihealthUsage(usageView{projectRoot: *root, families: positional, asJSON: *asJSON}, stdout, stderr)
 	}
-	fmt.Fprintf(stderr, "evolve clihealth: bad invocation %q; want list [--json] | clear <family>\n", args)
+	fmt.Fprintf(stderr, "evolve clihealth: bad invocation %q; want list [--json] | clear <family> | usage [--json] [family...]\n", args)
 	return 2
 }
 

@@ -13,9 +13,11 @@ import (
 const cliUpdateSmokeHalt = "cli_update_smoke_halt"
 
 var cliUpdateLogPrefix = map[cliupdate.Status]string{
-	cliupdate.StatusUpdateFailed: "[loop] WARN: cli-update: ",
-	cliupdate.StatusSkipped:      "[loop] WARN: cli-update: ",
-	cliupdate.StatusSmokeFailed:  "[loop] HALT: cli-update: ",
+	cliupdate.StatusUpdateFailed:   "[loop] WARN: cli-update: ",
+	cliupdate.StatusSkipped:        "[loop] WARN: cli-update: ",
+	cliupdate.StatusBootTimeout:    "[loop] WARN: cli-update: ",
+	cliupdate.StatusQuotaExhausted: "[loop] WARN: cli-update: ",
+	cliupdate.StatusSmokeFailed:    "[loop] HALT: cli-update: ",
 }
 
 func boundaryCLIUpdate(ctx context.Context, cfg loopConfig, stderr io.Writer) []cliupdate.Result {

@@ -1,0 +1,31 @@
+# internal/ledgerartifacts
+
+> Decision record: [ADR-0123](../adr/0123-ledger-durable-evidence-segments-incremental-verify.md) (D2 and D6). Plan: [ledger restructure](../../plans/ledger-restructure-2026-10.md), Phase 1, component C1. The incident that made it urgent: [2026-10-06 carry refused](../../incidents/2026-10-06-carry-refused-ledger-verify-f5.md). This page keeps the package-level detail those do not.
+
+## Purpose
+
+`internal/ledgerartifacts` stores the bytes the audit ledger commits to and re-reads when it verifies, so they live as long as the ledger instead of as long as the directory that produced them. The first user is the composition verdict: the two diffs whose patch-id `ledger.Verify` re-derives. Its scope is integrity-bearing evidence only (ADR-0123 D2); prompts, responses and other run artifacts keep the normal run retention.
+
+## Design
+
+- **Layout.** `<evolveDir>/ledger-artifacts/sha256/<first 2 hex>/<remaining 62 hex>`, one file per object, named by the sha256 of its bytes. `Open(evolveDir)` roots a `Store` beside the ledger it serves, so a ledger and its evidence share one lifetime. `DirName` is the one spelling of the directory name; gc's hard-protect list uses it.
+- **API.** `Put(body) (digest, error)`, `Get(digest) (body, error)`, `Path(digest) (string, error)` and `Digest(body) string`. Nothing else: no listing, no deletion, no index. Which object a record means is the record's job (the ledger line's `*_diff_sha256` fields, or a chained `composition-evidence` record for a line written before the store existed).
+- **Write-once, durable.** `Put` returns at once when the object exists and still hashes to its name. Otherwise it writes the bytes to a temporary file in the same directory, fsyncs it, makes it read-only (0444), renames it into place and fsyncs the fan-out directory, so a reader never sees a partial object and a crash after `Put` returns keeps it (ADR-0123 D2). A corrupt object is replaced only by bytes that hash to its name, which is the one rewrite that cannot change what the name means. The temporary file is named `.put-<pid>-*`, and every `Put` first removes from its fan-out directory the temporaries whose writer process is gone (a crash between the write and the rename leaves one); a live writer's temporary is never touched. This is a durable copy of `atomicwrite.Bytes`, which never fsyncs: the third such copy in the repo, filed for consolidation as `durable-atomic-write-single-implementation`.
+- **One digest function.** `Digest` is the sha256 name of a body. The ledger uses it to check a regenerated diff against the sha its line records, so the store's naming rule has one home.
+- **Verified reads.** `Get` re-hashes the bytes and returns an error wrapping the package's corruption sentinel when they no longer match their name. A missing object wraps `fs.ErrNotExist`, so a caller can tell absence from damage.
+- **Names are validated.** `Path` and `Get` accept only a 64-character lowercase hex digest, so a name can never reach outside the store. The two error sentinels stay unexported: no caller outside the package branches on them (callers report them, and the ledger reads any failure as a chain break).
+- **A leaf.** It imports only the standard library, so `adapters/ledger`, `gc` and any later reader can depend on it without a cycle.
+
+## Invariants
+
+- **The name is the content.** An object's file name is the sha256 of its bytes, a valid object is never rewritten, a corrupt one is replaced only by the bytes its name commits to, and a read that does not re-hash to the name fails. Pinned by `TestPut_NamesTheBytesByTheirSHA256AndGetReturnsThem`, `TestPut_IsIdempotentAndNeverRewritesAValidObject`, `TestPut_ReplacesAnObjectWhoseBytesNoLongerHashToItsName` and `TestGet_RefusesBytesThatNoLongerHashToTheirName`. The tests build every expected path from an independent sha256, never from the value under test.
+- **Absence and damage are different errors.** Pinned by `TestGet_AMissingObjectIsNotExist` and `TestGet_RefusesBytesThatNoLongerHashToTheirName`.
+- **No name escapes the store.** Pinned by `TestPath_RefusesANameThatIsNotASHA256Digest`.
+- **A write that cannot complete fails loudly** and leaves no partial object, and a stored object is read-only. Pinned by `TestPut_FailsLoudlyWhenTheStoreCannotBeCreated`, `TestPut_FailsLoudlyWhenTheObjectCannotBeWritten`, `TestPut_FailsLoudlyWhenTheFanOutDirIsReadOnly` (skipped as root, which writes through read-only directories) and `TestPut_LeavesTheObjectReadOnly`. The fsyncs have no test: their effect only shows across a kernel crash.
+- **The store collects only its own debris.** A writer counts as gone only when signalling it reports ESRCH; EPERM (a live writer of another user) keeps its temp. The temp name has one home, `tempPattern(pid)`, and the reaper parses exactly what it creates. Pinned by `TestPut_ReapsTheTempFilesOfAWriterThatDied`, `TestPut_LeavesAloneEveryFileThatIsNotTheTempOfAWriterThatDied`, `TestPut_KeepsTheTempOfALiveWriterItCannotSignal`, `TestPut_TheReaperReadsTheTempNamesItsWriterCreates` and `TestPut_FailsLoudlyWhenItCannotListItsFanOutDir`. `Digest` is pinned by `TestDigest_IsTheNameAnObjectIsStoredUnder`.
+- **Nothing collects the store.** `gc`'s `protected()` refuses any path under `ledger-artifacts`, beside `ledger.jsonl`, `ledger.tip` and `ledger-segments`, so a hand-edited manifest cannot delete it either. Pinned by `gc` `TestApply_RefusesTheLedgerEvidenceStore` and, across the whole sweep (the loop's enforce hook and an operator `evolve gc`), by `cmd/evolve` `TestGC_TheEnforceHookAndTheOperatorRunKeepTheLedgerEvidenceStore`.
+
+## Findings
+
+- **Why it exists** ([incident](../../incidents/2026-10-06-carry-refused-ledger-verify-f5.md)): the identity carry wrote its proof diffs into the cycle worktree and its record into the project ledger. Worktrees are deleted when their cycle ends, so the ledger stopped verifying at line 154453 and ship refused all six carries. A plain durable directory would have worked for new lines but not let a restore prove what it stored; content addressing makes every stored diff checkable by its name.
+- **Not yet stored here:** audit reports, contracts and verdict artifacts that gates re-read. The plan's C7 adds them at append time.

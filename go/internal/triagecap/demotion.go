@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
 // The ADR's GateClass registry is not built while this clamp is the only heuristic gate.
@@ -159,6 +161,7 @@ type DemotionLedgerRecord struct {
 	ID              string       `json:"id"`
 	Action          string       `json:"action"`
 	Priority        string       `json:"priority"`
+	PriorityClass   string       `json:"priority_class"`
 	Weight          float64      `json:"weight"`
 	RelievedCycle   int          `json:"relieved_cycle"`
 	RemedyStatus    RemedyStatus `json:"remedy_status"`
@@ -174,6 +177,7 @@ func NewDemotionLedgerRecord(currentCycle, older, newer int, detail string, stat
 		Action: fmt.Sprintf("The triage capacity clamp rejected two consecutive cycles with a byte-identical reason template (%s) — a determinism artifact, so the gate itself is the suspect (ADR-0046 Layer 2; precedent: cycles 301/302 phantom floors). The gate ran SHADOW for cycle %d only and now enforces again. Investigate the clamp's counter against the rejected artifacts in .evolve/runs/, fix with a TDD pin replaying them, and verify with `evolve guard triage-floors`.",
 			detail, currentCycle),
 		Priority:        "HIGH",
+		PriorityClass:   inboxbatch.ClassCorrectness,
 		Weight:          0.7,
 		RelievedCycle:   currentCycle,
 		RemedyStatus:    NormalizeRemedyStatus(string(status)),

@@ -23,6 +23,7 @@ package recurrence
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/retrofile"
 )
 
@@ -66,6 +68,7 @@ type ApplyResult struct {
 	Bumped  []string `json:"bumped"`
 	Filed   []string `json:"filed"`
 	Skipped []string `json:"skipped"`
+	Refused []string `json:"refused,omitempty"`
 	Planned []string `json:"planned,omitempty"`
 	Shadow  bool     `json:"shadow"`
 	Cycle   int      `json:"cycle"`
@@ -127,23 +130,7 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 	id := intentID(in)
 	switch in.Action {
 	case dispositionrouter.ActionAutofile:
-		filed, err := retrofile.FileActions(opts.InboxDir, opts.Cycle, []retrofile.PreventiveAction{{
-			ID:         id,
-			Title:      fmt.Sprintf("recurring failure %s (%d occurrences)", in.Pattern, in.Recurrence),
-			WeightHint: in.Weight,
-			Evidence:   in.Reason,
-			Recurrence: in.Recurrence,
-		}}, in.Weight, opts.Now)
-		if err != nil {
-			return false, err
-		}
-		if len(filed) == 0 {
-			// retrofile deduplicated: the item is already open or already done.
-			res.Skipped = append(res.Skipped, id)
-			return true, nil
-		}
-		res.Filed = append(res.Filed, id)
-		return true, nil
+		return autofileIntent(opts, in, res)
 
 	case dispositionrouter.ActionEscalate:
 		path, weight, state := findItem(opts.InboxDir, id)
@@ -168,6 +155,31 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 		res.Skipped = append(res.Skipped, id)
 		return false, nil
 	}
+}
+
+func autofileIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResult) (bool, error) {
+	id := intentID(in)
+	filed, err := retrofile.FileActions(opts.InboxDir, opts.Cycle, []retrofile.PreventiveAction{{
+		ID:            id,
+		Title:         fmt.Sprintf("recurring failure %s (%d occurrences)", in.Pattern, in.Recurrence),
+		WeightHint:    in.Weight,
+		Evidence:      in.Reason,
+		Recurrence:    in.Recurrence,
+		PriorityClass: in.PriorityClass,
+	}}, in.Weight, opts.Now)
+	if errors.Is(err, inboxbatch.ErrNoPriorityClass) {
+		res.Refused = append(res.Refused, id)
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if alreadyOpenOrDone := len(filed) == 0; alreadyOpenOrDone {
+		res.Skipped = append(res.Skipped, id)
+		return true, nil
+	}
+	res.Filed = append(res.Filed, id)
+	return true, nil
 }
 
 // itemState distinguishes a dispatchable item from one a lane already claimed.

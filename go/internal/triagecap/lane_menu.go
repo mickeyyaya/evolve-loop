@@ -27,8 +27,7 @@ func ExpandWithClusterMates(selection, backlog []FleetCandidate, perLane int) []
 	if perLane < 2 {
 		return menus
 	}
-	sorted := RankForDispatch(backlog)
-	for _, c := range sorted {
+	for _, c := range backlog {
 		if inMenu[c.ID] {
 			continue
 		}

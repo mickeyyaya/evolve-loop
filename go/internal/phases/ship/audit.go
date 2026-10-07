@@ -141,14 +141,17 @@ func verifyExecutionTree(ctx context.Context, opts *Options, res *RunResult, tes
 	if err == nil && current.Tree == audited {
 		return nil
 	}
+	unexplained := ""
 	if err == nil {
-		if ok, detail := auditBindingSatisfied(ctx, opts, testedRoot, current.Tree); ok {
+		ok, detail := auditBindingSatisfied(ctx, opts, testedRoot, current.Tree)
+		if ok {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: predicate execution tree drift (audit=%s current=%s) explained%s — accepted", audited, current.Tree, detail))
 			return nil
 		}
+		unexplained = detail
 	}
 	return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
-		fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v); re-run Audit", audited, current.Tree, err), "audited_tree", audited, "current_tree", current.Tree)
+		fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v)%s; re-run Audit", audited, current.Tree, err, unexplained), "audited_tree", audited, "current_tree", current.Tree)
 }
 
 // findLatestAudit returns the auditor ledger entry ship binds to: the newest

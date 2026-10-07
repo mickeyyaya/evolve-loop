@@ -42,11 +42,14 @@ func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer, sign
 		fmt.Fprintf(stderr, "[loop] WARN: escalation boundary: %v\n", err)
 		return
 	}
-	if len(res.Bumped)+len(res.Filed)+len(res.Planned) == 0 {
+	if len(res.Bumped)+len(res.Filed)+len(res.Planned)+len(res.Refused) == 0 {
 		return // nothing staged — stay quiet
+	}
+	for _, id := range res.Refused {
+		fmt.Fprintf(stderr, "[loop] WARN escalation boundary: refused %s: no priority_class\n", id)
 	}
 	emitLoopEscalation(signals, cycle, "applyEscalationBoundary",
 		fmt.Sprintf("escalation boundary staged %d item(s)", len(res.Bumped)+len(res.Filed)+len(res.Planned)),
 		map[string]string{"stage": string(cfg.Stage), "bumped": strconv.Itoa(len(res.Bumped)), "filed": strconv.Itoa(len(res.Filed)),
-			"skipped": strconv.Itoa(len(res.Skipped)), "planned": strconv.Itoa(len(res.Planned))})
+			"skipped": strconv.Itoa(len(res.Skipped)), "planned": strconv.Itoa(len(res.Planned)), "refused": strconv.Itoa(len(res.Refused))})
 }

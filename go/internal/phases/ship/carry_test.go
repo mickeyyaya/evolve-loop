@@ -26,7 +26,8 @@ func testGit(ctx context.Context, dir string, args ...string) (string, int, erro
 }
 
 type carriedLane struct {
-	repo, base0, tree0, base1, tree1 string
+	repo, worktree, base0, tree0, base1, tree1 string
+	cycle                                      int
 }
 
 // rebasedLane is a lane whose audited change (tree0 on base0) is pended byte for byte on a peer's later base (tree1 on base1).
@@ -47,7 +48,7 @@ func rebasedLane(t *testing.T) carriedLane {
 	base1 := rev("rev-parse", "HEAD")
 	runGit(t, repo, "-c", "commit.gpgsign=false", "cherry-pick", lane)
 	runGit(t, repo, "reset", "-q", "--soft", base1)
-	return carriedLane{repo: repo, base0: base0, tree0: tree0, base1: base1, tree1: rev("write-tree")}
+	return carriedLane{repo: repo, base0: base0, tree0: tree0, base1: base1, tree1: rev("write-tree"), cycle: 1715}
 }
 
 func writeCarry(t *testing.T, l carriedLane, ref, auditedTree string) {
@@ -76,10 +77,27 @@ func writeCarryOf(t *testing.T, l carriedLane, ref, auditedTree, treeState strin
 		gates[g] = "pass"
 	}
 	if err := ledger.WriteCompositionVerdict(filepath.Join(l.repo, ".evolve", "ledger.jsonl"), ledger.CompositionVerdictInput{
-		Cycle: 1715, Method: ledger.IdenticalRebaseMethod, LaneAuditRef: ref, PatchID: patchID,
+		Cycle: l.cycle, Method: ledger.IdenticalRebaseMethod, LaneAuditRef: ref, PatchID: patchID,
 		AuditedBase: l.base0, GitHead: l.base1, TreeStateSHA: treeState, AuditedTreeSHA: auditedTree, GateResults: gates,
-		AuditedDiff: audited, ComposedDiff: composed, ArtifactDir: filepath.Join(l.repo, ".evolve", "composition-artifacts"),
+		AuditedDiff: audited, ComposedDiff: composed,
 	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func appendACopyOutsideTheChain(t *testing.T, l carriedLane) {
+	t.Helper()
+	ledgerPath := filepath.Join(l.repo, ".evolve", "ledger.jsonl")
+	body, err := os.ReadFile(ledgerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+	forged := strings.Replace(lines[len(lines)-1], `"cycle":1715`, `"cycle":1716`, 1)
+	if forged == lines[len(lines)-1] {
+		t.Fatal("fixture: the record's cycle is not where this test expects")
+	}
+	if err := os.WriteFile(ledgerPath, []byte(string(body)+forged+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -164,19 +182,7 @@ func TestAuditBindingSatisfied_ReProvesTheRecordsClaimsIndependently(t *testing.
 	t.Run("a line outside the ledger chain never carries", func(t *testing.T) {
 		l := rebasedLane(t)
 		writeCarry(t, l, "audit-ref", l.tree0)
-		ledgerPath := filepath.Join(l.repo, ".evolve", "ledger.jsonl")
-		body, err := os.ReadFile(ledgerPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		lines := strings.Split(strings.TrimSpace(string(body)), "\n")
-		forged := strings.Replace(lines[len(lines)-1], `"cycle":1715`, `"cycle":1716`, 1)
-		if forged == lines[len(lines)-1] {
-			t.Fatal("fixture: the record's cycle is not where this test expects")
-		}
-		if err := os.WriteFile(ledgerPath, []byte(string(body)+forged+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		appendACopyOutsideTheChain(t, l)
 		if ok, _ := auditBindingSatisfied(ctx, boundTo(t, l, l.tree0, "audit-ref"), l.repo, l.tree1); ok {
 			t.Error("a record appended outside the chain, even a copy of a true one, is not evidence")
 		}

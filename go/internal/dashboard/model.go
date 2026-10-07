@@ -52,6 +52,7 @@ type QueueItem struct {
 	Route    string  `json:"route,omitempty"`
 	Priority string  `json:"priority,omitempty"`
 	Weight   float64 `json:"weight"`
+	Score    float64 `json:"score"`
 }
 
 type CycleSummary struct {

@@ -33,7 +33,7 @@ func TestWriteCompositionVerdict_MethodScopedReview(t *testing.T) {
 
 	dir := t.TempDir()
 	ledgerPath := filepath.Join(dir, "ledger.jsonl")
-	in := honestWriteInput(t, dir)
+	in := honestWriteInput(t)
 	in.Method = ScopedReviewMethod
 
 	if err := WriteCompositionVerdict(ledgerPath, in); err != nil {
@@ -47,7 +47,7 @@ func TestWriteCompositionVerdict_MethodScopedReview(t *testing.T) {
 func TestWriteCompositionVerdict_MethodDefaultsTrivialRebase(t *testing.T) {
 	dir := t.TempDir()
 	ledgerPath := filepath.Join(dir, "ledger.jsonl")
-	in := honestWriteInput(t, dir) // Method left zero-value
+	in := honestWriteInput(t) // Method left zero-value
 
 	if err := WriteCompositionVerdict(ledgerPath, in); err != nil {
 		t.Fatalf("WriteCompositionVerdict(default method): %v", err)

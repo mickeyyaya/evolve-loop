@@ -2,35 +2,27 @@ package triagecap
 
 import (
 	"path/filepath"
-	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 )
 
-// FleetCandidate is a backlog item eligible for top_n; candidates sharing a file cannot run as concurrent lanes.
 type FleetCandidate struct {
 	ID     string
 	Weight float64
 	Files  []string
-	// Declared is inboxbatch.Item.DeclaredSurface from the backlog read; candidates built from a decision stay false.
-	Declared bool
 }
 
-// SelectFleetWidthTopN returns one representative per mutually file-disjoint lane, up to count, via fleet.Partition.
-// count<2 returns the single top-ranked candidate regardless of overlap.
-func SelectFleetWidthTopN(candidates []FleetCandidate, count int) []FleetCandidate {
-	if len(candidates) == 0 {
+func SelectFleetWidthTopN(ranked []FleetCandidate, count int) []FleetCandidate {
+	if len(ranked) == 0 {
 		return nil
 	}
-	sorted := RankForDispatch(candidates)
-
 	if count < 2 {
-		return []FleetCandidate{sorted[0]}
+		return []FleetCandidate{ranked[0]}
 	}
 
-	todos := make([]fleet.Todo, len(sorted))
-	byID := make(map[string]FleetCandidate, len(sorted))
-	for i, c := range sorted {
+	todos := make([]fleet.Todo, len(ranked))
+	byID := make(map[string]FleetCandidate, len(ranked))
+	for i, c := range ranked {
 		todos[i] = fleet.Todo{ID: c.ID, Files: c.Files}
 		byID[c.ID] = c
 	}
@@ -68,9 +60,7 @@ func WidenTopNToFleetWidth(committed, backlog []FleetCandidate, count int) []Fle
 		return out
 	}
 
-	sorted := RankForDispatch(backlog)
-
-	for _, c := range sorted {
+	for _, c := range backlog {
 		if len(out) >= count {
 			break
 		}
@@ -94,16 +84,4 @@ func overlapsClaimed(files []string, claimed map[string]bool) bool {
 		}
 	}
 	return false
-}
-
-func RankForDispatch(cands []FleetCandidate) []FleetCandidate {
-	sorted := make([]FleetCandidate, len(cands))
-	copy(sorted, cands)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		if sorted[i].Weight != sorted[j].Weight {
-			return sorted[i].Weight > sorted[j].Weight
-		}
-		return sorted[i].Declared && !sorted[j].Declared
-	})
-	return sorted
 }

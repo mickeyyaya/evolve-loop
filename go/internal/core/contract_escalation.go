@@ -10,6 +10,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -341,20 +342,31 @@ func (cr *cycleRun) noteContractGateDemotion(phase Phase, d contractDispatch, bl
 	}
 	if _, serr := dispositionrouter.StageIntent(
 		filepath.Join(cr.req.ProjectRoot, ".evolve", "escalations"),
-		dispositionrouter.Intent{
-			Action: dispositionrouter.ActionAutofile,
-			Route:  dispositionrouter.RouteConsole,
-			ItemID: "contract-gate-demoted-" + string(phase),
-			// Pattern is the recurrence identity AND the filed item's title stem
-			// (recurrence.applyIntent renders "recurring failure <pattern> (<n>
-			// occurrences)"), so it must read as a defect, not as a bare label.
-			Pattern:    fmt.Sprintf("contract gate demoted enforce->advisory on phase %s (cli=%s)", phase, cli),
-			Cycle:      cr.cycle,
-			Recurrence: blocks,
-			Weight:     pol.RetroAutofileDefaultWeight(),
-			Reason:     warn,
-		}); serr != nil {
+		ContractGateDemotion{Phase: phase, CLI: cli, Cycle: cr.cycle, Blocks: blocks, Weight: pol.RetroAutofileDefaultWeight(), Reason: warn}.Intent()); serr != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s: stage escalation intent: %v\n", ledgerKindContractGateDemoted, serr)
+	}
+}
+
+type ContractGateDemotion struct {
+	Phase  Phase
+	CLI    string
+	Cycle  int
+	Blocks int
+	Weight float64
+	Reason string
+}
+
+func (d ContractGateDemotion) Intent() dispositionrouter.Intent {
+	return dispositionrouter.Intent{
+		Action:        dispositionrouter.ActionAutofile,
+		Route:         dispositionrouter.RouteConsole,
+		ItemID:        "contract-gate-demoted-" + string(d.Phase),
+		Pattern:       fmt.Sprintf("contract gate demoted enforce->advisory on phase %s (cli=%s)", d.Phase, d.CLI),
+		Cycle:         d.Cycle,
+		Recurrence:    d.Blocks,
+		Weight:        d.Weight,
+		Reason:        d.Reason,
+		PriorityClass: inboxbatch.ClassCorrectness,
 	}
 }
 

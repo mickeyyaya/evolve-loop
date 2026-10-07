@@ -12,7 +12,7 @@ An architect's read-only review for [ADR-0105](../architecture/adr/0105-identity
   - The treefence and the predicate receipt refuse any tree but the audited one, by design (`recovery-predicate-authority.md`).
 - **F3 (base inside the patch).** `explanationdocs` requires the document's `## Build Binding` to equal `binding.BaseSHA`, and the document is part of the diff.
 - **F4 (bookkeeping in the diverged commit).** `worktree_ship.go` consumes inbox items before the worktree commit; `.evolve/inbox/**` is material, and consumed copies are re-serialized with timestamps. The rebuilt 1698 and 1701 documents had to explain inbox moves.
-- **F5 (artifacts in the worktree).** RUNG 0 writes its diff artifacts under the worktree, and `ledger verify` treats an unreadable artifact as a broken chain.
+- **F5 (artifacts in the worktree).** RUNG 0 writes its diff artifacts under the worktree, and `ledger verify` treats an unreadable artifact as a broken chain. **Resolved (2026-10-06)** by [ADR-0123](../architecture/adr/0123-ledger-durable-evidence-segments-incremental-verify.md) Phase 1, after it came true: B3 had shipped without it, and six carries were refused ([incident](../incidents/2026-10-06-carry-refused-ledger-verify-f5.md)).
 
 ## Test list
 
@@ -92,7 +92,7 @@ Add `RebindIdenticalRebase` to the explanation call-site vocabulary floor in `in
 1. The blast radius spans about six protected files across four packages; this is console work, merged only at wave boundaries.
 2. A semantic interaction outside the lane's files is accepted under the operator directive, following Gerrit's TRIVIAL_REBASE precedent, and bounded by the disjointness rule.
 3. The gate runtime on a carry is minutes of CPU, still far below an LLM round.
-4. F5 must land together with B3.
+4. F5 must land together with B3. (It did not; it was resolved on 2026-10-06, after six carries were refused.)
 5. B1 changes the Build fallback too: rebuilt documents stop explaining inbox moves.
 6. B4 stops refusing a moved plane HEAD in worktree mode. This is a separate behaviour change and needs its own review.
 7. A reviewer may be confused when the document's base differs from the handoff's; render the lineage in the handoff.

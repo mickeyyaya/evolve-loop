@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -22,6 +23,8 @@ import (
 )
 
 const cliUsage = "usage: evolve cli update [--dry-run] [--json] [--project-root P]"
+
+const liveCheckPaneLines = 6
 
 type cliUpdateWiring struct {
 	families []cliupdate.Family
@@ -142,6 +145,7 @@ func productionCLIUpdateWiring(projectRoot string, log io.Writer) cliUpdateWirin
 			Version:  looppreflight.CLIVersion,
 			Run:      cliupdate.Exec(cliupdate.GroupRunner),
 			Smoke:    live,
+			Explain:  familyEvidence(usageEvidenceFn(projectRoot, filepath.Join(projectRoot, ".evolve"), log)),
 		},
 		now: time.Now,
 	}
@@ -173,10 +177,30 @@ func credentialWall(store *clihealth.Store) func(family string) (string, bool) {
 func liveCheck(newProbe func(context.Context) liveProbe) func(ctx context.Context, family string) error {
 	return func(ctx context.Context, family string) error {
 		driver := family + "-tmux"
-		rc, pattern, _ := newProbe(ctx)(driver)
-		if rc == bridge.ExitOK {
-			return nil
-		}
-		return fmt.Errorf("doctor live %s rc=%d pattern=%q", driver, rc, pattern)
+		rc, pattern, scrollback := newProbe(ctx)(driver)
+		return liveCheckErr(driver, liveProbeResult{rc: rc, pattern: pattern, scrollback: scrollback})
 	}
+}
+
+type liveProbeResult struct {
+	rc                  int
+	pattern, scrollback string
+}
+
+func liveCheckErr(driver string, r liveProbeResult) error {
+	switch {
+	case r.rc == bridge.ExitOK:
+		return nil
+	case r.rc == bridge.ExitREPLBootTimeout && r.pattern == "":
+		return fmt.Errorf("doctor live %s: %w after %d attempt(s); final pane: %s", driver, cliupdate.ErrBootTimeout, bridge.ProbeBootAttempts(driver), paneTailLine(r.scrollback))
+	}
+	return fmt.Errorf("doctor live %s rc=%d pattern=%q", driver, r.rc, r.pattern)
+}
+
+func paneTailLine(scrollback string) string {
+	tail := bridge.ScrollbackTail(scrollback, liveCheckPaneLines)
+	if tail == "" {
+		return "(no pane was captured)"
+	}
+	return strings.Join(strings.Fields(strings.ReplaceAll(tail, "\n", " | ")), " ")
 }

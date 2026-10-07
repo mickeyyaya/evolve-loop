@@ -65,12 +65,13 @@ func auditBindingSatisfied(ctx context.Context, opts *Options, worktree, actual 
 	if opts.internalAuditBoundTreeSHA == actual {
 		return true, ""
 	}
-	if ok, note := carrySatisfied(ctx, opts, worktree, actual); ok {
-		return true, note
+	carried, carry := carrySatisfied(ctx, opts, worktree, actual)
+	if carried {
+		return true, carry
 	}
 	ok, offending := treeDriftExplainedByConsumption(ctx, opts, worktree, opts.internalAuditBoundTreeSHA, actual)
 	if ok {
 		return true, fmt.Sprintf(" (sanctioned inbox consumption, %d path(s))", len(opts.internalConsumedPaths))
 	}
-	return false, offending
+	return false, offending + " (carry not re-proven: " + carry + ")"
 }

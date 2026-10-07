@@ -4,21 +4,28 @@ package cliupdate
 
 import (
 	"context"
+	"errors"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/usageprobe"
 )
 
 type Status string
 
 const (
-	StatusUnchanged    Status = "unchanged"
-	StatusUpdated      Status = "updated"
-	StatusSelfUpdated  Status = "self-updated"
-	StatusUpdateFailed Status = "update-failed"
-	StatusSmokeFailed  Status = "smoke-failed"
-	StatusNoUpdater    Status = "no-updater"
-	StatusSkipped      Status = "skipped"
-	StatusPlanned      Status = "planned"
+	StatusUnchanged      Status = "unchanged"
+	StatusUpdated        Status = "updated"
+	StatusSelfUpdated    Status = "self-updated"
+	StatusUpdateFailed   Status = "update-failed"
+	StatusSmokeFailed    Status = "smoke-failed"
+	StatusNoUpdater      Status = "no-updater"
+	StatusSkipped        Status = "skipped"
+	StatusPlanned        Status = "planned"
+	StatusBootTimeout    Status = "boot-timeout"
+	StatusQuotaExhausted Status = "quota-exhausted"
 )
+
+var ErrBootTimeout = errors.New("the REPL never drew its prompt")
 
 const noUpdaterDetail = "the family manifest declares no update_argv"
 
@@ -34,6 +41,7 @@ type Seams struct {
 	Version  func(bin string) (string, error)
 	Run      func(ctx context.Context, f Family) error
 	Smoke    func(ctx context.Context, family string) error
+	Explain  func(ctx context.Context, family string) usageprobe.Evidence
 }
 
 type Result struct {
@@ -115,9 +123,36 @@ func checkStart(ctx context.Context, res Result, s Seams, last string) (Result, 
 		if ctx.Err() != nil {
 			return res.interrupted(ctx), false
 		}
-		return res.with(StatusSkipped, "doctor live did not answer, so the family counts as unsubscribed: "+err.Error()), false
+		return res.unprobed(err, explain(ctx, s, res.Family)), false
 	}
 	return res, true
+}
+
+func explain(ctx context.Context, s Seams, family string) *usageprobe.Evidence {
+	if s.Explain == nil {
+		return nil
+	}
+	ev := s.Explain(ctx, family)
+	return &ev
+}
+
+func (r Result) unprobed(err error, ev *usageprobe.Evidence) Result {
+	switch {
+	case ev != nil && ev.Verdict == usageprobe.VerdictExhausted:
+		return r.with(StatusQuotaExhausted, "doctor live failed, and a usage query verified the cause: "+ev.Summary()+"; doctor live: "+err.Error())
+	case errors.Is(err, ErrBootTimeout):
+		return r.with(StatusBootTimeout, "doctor live timed out booting the REPL, so this boundary neither checked nor updated the version: "+err.Error()+evidenceNote(ev))
+	case ev == nil:
+		return r.with(StatusSkipped, "doctor live did not answer and no usage query ran, so the cause is unverified: "+err.Error())
+	}
+	return r.with(StatusSkipped, "doctor live failed and was not updated; "+ev.Summary()+": "+err.Error())
+}
+
+func evidenceNote(ev *usageprobe.Evidence) string {
+	if ev == nil {
+		return ""
+	}
+	return "; " + ev.Summary()
 }
 
 func runUpdater(ctx context.Context, res Result, f Family, s Seams) Result {

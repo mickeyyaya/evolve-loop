@@ -21,6 +21,7 @@ type carryHarness struct {
 	snapErr     error
 	duringGates func()
 	signals     *signalcenter.Center
+	persist     func(string, CompositionVerdictInput) error
 }
 
 func allComposedGatesPass() map[string]ciparity.GateOutcome {
@@ -63,6 +64,9 @@ func (h *carryHarness) route(t *testing.T, rows ...LedgerEntry) (Phase, bool, Cy
 		WithCompositionVerdictWriter(func(path string, in CompositionVerdictInput) error {
 			h.writtenTo = path
 			h.written = append(h.written, in)
+			if h.persist != nil {
+				return h.persist(path, in)
+			}
 			return h.writeErr
 		}),
 	)

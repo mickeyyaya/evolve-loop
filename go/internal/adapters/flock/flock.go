@@ -43,7 +43,19 @@ func Lock(path string) (release func(), err error) {
 	if err != nil {
 		return nil, fmt.Errorf("flock open %s: %w", path, err)
 	}
-	err = flockFn(int(f.Fd()), syscall.LOCK_EX)
+	return lockFile(f, path, syscall.LOCK_EX)
+}
+
+func LockShared(path string) (release func(), err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("flock open %s: %w", path, err)
+	}
+	return lockFile(f, path, syscall.LOCK_SH)
+}
+
+func lockFile(f *os.File, path string, how int) (release func(), err error) {
+	err = flockFn(int(f.Fd()), how)
 	// KeepAlive: f must outlive the raw-fd syscall — without it the GC may
 	// finalize (close) f between Fd() and the flock completing.
 	runtime.KeepAlive(f)

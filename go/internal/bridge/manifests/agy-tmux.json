@@ -6,6 +6,7 @@
   "binary_min_version": "1.0.0",
   "update_argv": ["agy", "update"],
   "auto_update_off_env": "AGY_CLI_DISABLE_AUTO_UPDATE",
+  "probe_boot_retries": 1,
   "default_env": {"AGY_CLI_DISABLE_AUTO_UPDATE": "1"},
   "transport": "tmux",
   "default_tier": "hybrid",
@@ -55,7 +56,33 @@
       "send": "/usage",
       "await": "prompt_marker",
       "exhausted_regex": "(?i)(usage limit reached|quota (exceeded|reached)|\\b0%\\s*(left|remaining))",
-      "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))"
+      "drift_probe_regex": "(?i)(limit reached|usage limit|weekly limit|(?:reached|hit) your|\\b0%\\s*(left|remaining)|out of (usage|credits|tokens)|rate.?limit|too many requests|quota (exceeded|reached)|upgrade to (a paid plan|continue))",
+      "windows": {
+        "section_regex": "^\\s*(?P<scope>[A-Z][A-Z0-9 &/-]*MODELS)\\s*$",
+        "models_regex": "Models within this group:\\s*(?P<models>.+?)\\s*$",
+        "labels": [
+          {
+            "regex": "^\\s*Weekly Limit Remaining\\s*$",
+            "kind": "week"
+          },
+          {
+            "regex": "^\\s*Five Hour Limit Remaining\\s*$",
+            "kind": "5h"
+          }
+        ],
+        "value_regex": "(?P<pct>\\d{1,3}(?:\\.\\d+)?)%",
+        "value_direction": "remaining",
+        "reset_regex": "(?i)refreshes in\\s+(?P<reset>\\d+\\s*[hms](?:\\s*\\d+\\s*[hms])*)",
+        "exhausted_at_used_pct": 99.5,
+        "scopes": {
+          "GEMINI MODELS": {
+            "family": "agy"
+          },
+          "CLAUDE AND GPT MODELS": {
+            "family": "agy-claude"
+          }
+        }
+      }
     },
     "status": {
       "send": "/usage",
@@ -140,5 +167,5 @@
     "deep": "Gemini 3.1 Pro (High)",
     "top": "Gemini 3.1 Pro (High)"
   },
-  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. model_tier is channel=flag via --model (probed live 2026-07-02, agy 1.0.15: `agy --model \"Claude Opus 4.6 (Thinking)\"` boots the REPL in ~2s with the model in banner+footer; `agy models` lists the selectable tokens, which are display names with spaces/parens \u2014 launchCmdLine shell-quotes every realized flag token). `-m` remains UNDEFINED ('flags provided but not defined: -m'), so the cycle-154 incident claim about -m still holds; agy 1.0.3 had no model flag at all and channel was noop 2026-05-31..2026-07-02 (docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md). model_tier_map holds offline defaults only; the LIVE model catalog overlays real per-tier picks at LoadManifest (catalog_overlay.go). See docs/architecture/cli-capability-matrix.md."
+  "note": "Interactive agy via tmux. Preserves Google AI Pro subscription billing (OAuth). REPL marker is the '? for shortcuts' footer text \u2014 unique to the idle state. model_tier is channel=flag via --model (probed live 2026-07-02, agy 1.0.15: `agy --model \"Claude Opus 4.6 (Thinking)\"` boots the REPL in ~2s with the model in banner+footer; `agy models` lists the selectable tokens, which are display names with spaces/parens \u2014 launchCmdLine shell-quotes every realized flag token). `-m` remains UNDEFINED ('flags provided but not defined: -m'), so the cycle-154 incident claim about -m still holds; agy 1.0.3 had no model flag at all and channel was noop 2026-05-31..2026-07-02 (docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md). model_tier_map holds offline defaults only; the LIVE model catalog overlays real per-tier picks at LoadManifest (catalog_overlay.go). See docs/architecture/cli-capability-matrix.md. probe_boot_retries: 1 because agy's first launch after an idle period can miss the 60s REPL boot budget while the next launch boots in seconds; the probes that run first retry one bare boot timeout (docs/incidents/agy-cold-start-boot-timeout-2026-10-06.md). controls.usage.windows reads agy 1.3.0's /usage screen as one weekly and one five-hour window per model group and maps each group to its routing family; exhausted_regex is the fallback for a screen the reader finds no window on (docs/architecture/packages/internal-usageprobe.md)."
 }

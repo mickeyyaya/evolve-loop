@@ -47,7 +47,15 @@ const exitQuota = 85
 type PlanResolver func(req core.BridgeRequest) (llmroute.Plan, error)
 
 // BenchFunc records a wall after an attempt exited 85 (see BenchOnEscalation).
-type BenchFunc func(projectRoot, workspace, cli string, dispatchStart time.Time, env map[string]string)
+type BenchFunc func(Escalation)
+
+type Escalation struct {
+	ProjectRoot   string
+	Workspace     string
+	CLI           string
+	DispatchStart time.Time
+	Env           map[string]string
+}
 
 // Logf is the walk's diagnostic sink; the composition root points it at the
 // loop's stderr so a fallback is never silent.
@@ -128,7 +136,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		keeper.Observe(cli+"@"+tier, last, lastErr)
 		attempts = append(attempts, fmt.Sprintf("%s@%s=%d", cli, tier, last.ExitCode))
 		if last.ExitCode == exitQuota && w.bench != nil {
-			w.bench(req.ProjectRoot, req.Workspace, cli, start, req.Env)
+			w.bench(Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: cli, DispatchStart: start, Env: req.Env})
 		}
 		return last.ExitCode, lastErr
 	}, func(from, to string) {
@@ -232,14 +240,14 @@ type escalationReport struct {
 // dispatch's start (the workspace is shared across phases; a leftover report
 // must never bench). benched_until comes from the pane's own reset hint when
 // parseable, else the strike-scaled cooldown.
-func BenchOnEscalation(projectRoot, workspace, cli string, dispatchStart time.Time, env map[string]string, now func() time.Time, logf Logf) {
-	if !CLIHealthEnabled(env) {
+func BenchOnEscalation(e Escalation, now func() time.Time, logf Logf) {
+	if !CLIHealthEnabled(e.Env) {
 		return
 	}
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
-	raw, err := os.ReadFile(filepath.Join(workspace, "escalation-report.json"))
+	raw, err := os.ReadFile(filepath.Join(e.Workspace, "escalation-report.json"))
 	if err != nil {
 		return // no report — generic 85, nothing to classify
 	}
@@ -247,17 +255,28 @@ func BenchOnEscalation(projectRoot, workspace, cli string, dispatchStart time.Ti
 	if err := json.Unmarshal(raw, &rep); err != nil {
 		return
 	}
-	if !clihealth.Benchable(rep.Pattern) || rep.CLI != cli || rep.CapturedAt.Before(dispatchStart) {
+	if !clihealth.Benchable(rep.Pattern) || rep.CLI != e.CLI || rep.CapturedAt.Before(e.DispatchStart) {
 		return
 	}
-	family := llmroute.Family(cli)
-	entry, err := clihealth.NewStore(projectRoot, now).BenchWall(family, rep.Pattern, rep.PaneTail)
+	family := llmroute.Family(e.CLI)
+	store := clihealth.NewStore(e.ProjectRoot, now)
+	if benchedFor(store, family, rep.CapturedAt) {
+		logf("cli-health: family %s is already benched for this wall; not benched again\n", family)
+		return
+	}
+	entry, err := store.BenchWall(family, rep.Pattern, rep.PaneTail)
 	if err != nil {
 		logf("WARN cli-health bench write failed: %v\n", err)
 		return
 	}
 	logf("cli-health: benched family %s until %s (pattern=%s strikes=%d)%s\n",
 		family, entry.BenchedUntil.Format(time.RFC3339), rep.Pattern, entry.Strikes, operatorSuffix(entry))
+}
+
+func benchedFor(store *clihealth.Store, family string, wallSeen time.Time) bool {
+	benches, _ := store.Load()
+	prev, ok := benches[family]
+	return ok && !prev.BenchedAt.Before(wallSeen)
 }
 
 // Signals forwards the inner adapter's Signal Center so the verdict engine of

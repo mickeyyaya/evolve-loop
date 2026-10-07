@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
@@ -29,7 +30,7 @@ import (
 //	                                     call (OPERATOR sign-off; append-only)
 func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "evolve ledger: missing subcommand (try: verify | seal | tail | anchor | rebaseline)")
+		fmt.Fprintln(stderr, "evolve ledger: missing subcommand (try: verify | seal | tail | anchor | rebaseline | evidence)")
 		return 10
 	}
 	switch args[0] {
@@ -43,6 +44,8 @@ func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runLedgerAnchor(args[1:], stderr)
 	case "rebaseline":
 		return runLedgerRebaseline(args[1:], stderr)
+	case "evidence":
+		return runLedgerEvidence(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve ledger: unknown subcommand %q\n", args[0])
 		return 10
@@ -181,6 +184,65 @@ func runLedgerRebaseline(args []string, stderr io.Writer) int {
 	fmt.Fprintf(stderr, "[ledger] OK: rebaselined (%s/ledger.jsonl). The prior chain is PRESERVED on disk and no longer "+
 		"chain-validated — trusted by this operator action; the chain verifies strictly forward from the seal.\n", evolveDir)
 	return 0
+}
+
+func runLedgerEvidence(args []string, stdout, stderr io.Writer) int {
+	if len(args) < 1 || args[0] != "restore" {
+		fmt.Fprintln(stderr, "evolve ledger evidence: usage: evolve ledger evidence restore [--evolve-dir DIR] [--repo DIR] [--dry-run]")
+		return 10
+	}
+	fs := flag.NewFlagSet("evolve ledger evidence restore", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var evolveDir, repo string
+	var dryRun bool
+	fs.StringVar(&evolveDir, "evolve-dir", ".evolve", "path to .evolve/ state directory")
+	fs.StringVar(&repo, "repo", "", "git work tree whose objects the composition lines name (default: the evolve dir's parent)")
+	fs.BoolVar(&dryRun, "dry-run", false, "report what would be stored or rebuilt and write nothing")
+	if err := fs.Parse(args[1:]); err != nil {
+		return 10
+	}
+	if repo == "" {
+		repo = filepath.Dir(evolveDir)
+	}
+	l := ledger.New(evolveDir)
+	walk, pending := l.RestoreCompositionEvidence, ""
+	if dryRun {
+		walk, pending = l.PreviewCompositionEvidence, "would be "
+	}
+	results, err := walk(context.Background(), repo)
+	if err != nil {
+		fmt.Fprintf(stderr, "[ledger] evidence restore failed: %v\n", err)
+		return 1
+	}
+	if refused := reportEvidence(stdout, results, pending); refused > 0 {
+		fmt.Fprintf(stderr, "[ledger] evidence restore: %d composition line(s) could not be restored and were left as they were\n", refused)
+		return 1
+	}
+	if dryRun {
+		fmt.Fprintf(stderr, "[ledger] evidence restore --dry-run: %d composition line(s) checked, nothing written\n", len(results))
+		return 0
+	}
+	if err := l.Verify(context.Background()); err != nil {
+		fmt.Fprintf(stderr, "[ledger] evidence restored but the chain still does NOT verify: %v\n", err)
+		return 2
+	}
+	fmt.Fprintf(stderr, "[ledger] OK: the evidence of %d composition line(s) is in the store and the chain verifies (%s/ledger.jsonl)\n", len(results), evolveDir)
+	return 0
+}
+
+func reportEvidence(w io.Writer, results []ledger.EvidenceRestoration, pending string) (refused int) {
+	for _, r := range results {
+		outcome := string(r.Action)
+		switch r.Action {
+		case ledger.EvidenceUnrestorable:
+			refused++
+			outcome += ": " + r.Reason
+		case ledger.EvidenceStored, ledger.EvidenceRebuilt:
+			outcome = pending + outcome
+		}
+		fmt.Fprintf(w, "line %d cycle %d %s: %s\n", r.Line, r.Cycle, r.Method, outcome)
+	}
+	return refused
 }
 
 func runLedgerTail(args []string, stdout, stderr io.Writer) int {

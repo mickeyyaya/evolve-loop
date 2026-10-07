@@ -47,6 +47,8 @@ Lead with the tag. `stale-completed` is not a tag: write `already-shipped: <sha>
 
 `high` = blocks the cycle goal. `medium` = next-cycle work. `low` = nice-to-have. When carryoverTodos disagree with scout-report priorities (the same kind of work appears in both), trust scout-report — it's based on the current cycle's evidence.
 
+**Inbox items arrive ranked (ADR-0121, since 2026-10-06).** The prompt's `inbox_batches` menu lists batches in inbox-rank order: the computed score `evolve inbox rank` shows, a policy-weighted sum of the filer's `weight`, the `priority_class`, how much queued work the item unblocks, recurrence, age and active campaigns. Each item's sub-line gives its score and top contributing factor. Prefer earlier batches; the `weight` is one input of the score, not the order. Leave a higher-ranked item only with a stated reason (scope, intent, a blocker, the evidence).
+
 **Operator-queue priority floor (v10.2.0+):** If `carryoverTodos[]` contains items with `priority: "HIGH"` (operator-queued or operator-escalated), at least one `top_n` slot MUST be reserved for them, regardless of whether the scout-report corroborates their priority. Operator intent and scout evidence are separate dimensions — operator-queued HIGH items must not be demoted below scout-sourced MEDIUM items. The "trust scout-report" tie-break applies only between items of equal operator-assigned priority.
 
 ### 5. Blockers ride alone (v18.7.0+)
@@ -67,7 +69,7 @@ When including or deferring a `carryoverTodo`, preserve the fields `research_poi
 
 ## Process (single-pass)
 
-Before Step 1: run inbox pre-checks (idempotency) and ingest any pending `.evolve/inbox/` files. Emit `skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]` in `triage-decision.json`. Honor `weight` tie-breaker (default 0.5). Full algorithms: see reference tail and [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count.
+Before Step 1: run inbox pre-checks (idempotency) and ingest any pending `.evolve/inbox/` files. Emit `skip_shipped[]`, `skip_rejected[]`, `escalate_block[]`, `top_n[]`, `committed_floors[]` in `triage-decision.json`. Inbox items are ranked for you (the `inbox_batches` menu order, ADR-0121). Full algorithms: see reference tail and [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count.
 
 ### 1. Read inputs
 
@@ -296,7 +298,7 @@ Before reading the main inputs, ingest any pending files from `.evolve/inbox/`:
 7. Append to in-memory carryoverTodos working set. (File moves are the host's: the claim of your committed ids after you finish (Step 0a.4) and the post-commit promote — do NOT manually mv files here.)
 8. Write ledger entry: `role=triage, action=ingest-inbox, count=<ingested>, rejected=<rejected>`.
 
-Honor `weight` as tie-breaker within priority class (default 0.5 when null). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).
+The menu order is the inbox rank (`evolve inbox rank --explain <id>` shows any item's factors). Full algorithm: [agents/evolve-triage-reference.md](agents/evolve-triage-reference.md). Proceed to Step 1 regardless of inbox count (inbox may be empty).
 
 ## Reflection Authoring (v10.20.0+)
 

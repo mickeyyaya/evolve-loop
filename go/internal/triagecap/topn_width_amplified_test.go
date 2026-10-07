@@ -3,7 +3,6 @@ package triagecap
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"testing"
 )
 
@@ -98,10 +97,9 @@ func TestC541Amp_NilAndEmptyInputsDoNotPanic(t *testing.T) {
 	}
 }
 
-func TestC541Amp_BackfillsHighestWeightFirstAmongDisjoint(t *testing.T) {
+func TestC541Amp_BackfillsInTheBacklogsRankOrderAmongDisjoint(t *testing.T) {
 	committed := []FleetCandidate{c541ampCand("committed-1", 1.0, "core/committed.go")}
 	backlog := []FleetCandidate{
-		// intentionally NOT weight-sorted in input order
 		c541ampCand("low", 0.2, "pkg/low.go"),
 		c541ampCand("high", 0.9, "pkg/high.go"),
 		c541ampCand("mid", 0.5, "pkg/mid.go"),
@@ -114,11 +112,11 @@ func TestC541Amp_BackfillsHighestWeightFirstAmongDisjoint(t *testing.T) {
 		t.Fatalf("committed candidate must lead the result verbatim, got %+v", got[0])
 	}
 	tail := got[1:]
-	if tail[0].ID != "high" || tail[1].ID != "mid" {
-		t.Fatalf("backfill must be highest-weight-first among disjoint candidates, got tail %v", c541ampIDs(tail))
+	if tail[0].ID != "low" || tail[1].ID != "high" {
+		t.Fatalf("backfill must follow the backlog's rank order, whatever the weight, got tail %v", c541ampIDs(tail))
 	}
-	if c541ampContainsID(got, "low") {
-		t.Fatalf("low-weight candidate must not be added once count is satisfied by higher-weight disjoint picks: %v", c541ampIDs(got))
+	if c541ampContainsID(got, "mid") {
+		t.Fatalf("the third-ranked candidate must not be added once count is satisfied by earlier-ranked disjoint picks: %v", c541ampIDs(got))
 	}
 	c541ampAllDisjoint(t, got)
 }
@@ -296,14 +294,8 @@ func TestC541Amp_LargeScaleDisjointBackfill(t *testing.T) {
 	}
 	c541ampAllDisjoint(t, got)
 
-	tail := got[1:]
-	sorted := append([]FleetCandidate(nil), tail...)
-	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Weight > sorted[j].Weight })
-	if !reflect.DeepEqual(tail, sorted) {
-		t.Fatalf("backfilled tail must stay in descending-weight order, got %v", c541ampIDs(tail))
-	}
-	if sorted[0].ID != fmt.Sprintf("b-%d", n-1) {
-		t.Fatalf("highest-weight backlog candidate must be picked first, got %s", sorted[0].ID)
+	if tail := got[1:]; !reflect.DeepEqual(tail, backlog[:count-1]) {
+		t.Fatalf("backfilled tail must be the backlog's first-ranked candidates in order, got %v", c541ampIDs(tail))
 	}
 }
 

@@ -3,6 +3,7 @@ package cliupdate_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -174,11 +175,35 @@ func TestUpdate_AFamilyWhoseDoctorLiveProbeFailsIsSkippedWithoutAnUpdate(t *test
 
 	res := only(t, cliupdate.Update(context.Background(), []cliupdate.Family{codex}, h.seams(), nil))
 
-	if res.Status != cliupdate.StatusSkipped || !strings.Contains(res.Detail, "unsubscribed") || !strings.Contains(res.Detail, "rate_limit") {
-		t.Fatalf("a family whose probe fails counts as unsubscribed: %+v", res)
+	if res.Status != cliupdate.StatusSkipped || !strings.Contains(res.Detail, "unverified") || !strings.Contains(res.Detail, "rate_limit") || strings.Contains(res.Detail, "unsubscribed") {
+		t.Fatalf("with no usage query, a failed probe is skipped as unverified, never inferred as unsubscribed: %+v", res)
 	}
 	if h.called("run") || h.called("smoke") {
 		t.Errorf("an unsubscribed family is never updated or smoke-tested: %q", h.calls)
+	}
+}
+
+func TestUpdate_ADoctorLiveBootTimeoutIsReportedAsABootTimeoutNotAsUnsubscribed(t *testing.T) {
+	timeout := fmt.Errorf("doctor live agy-tmux: %w after 2 attempt(s); final pane: signing in", cliupdate.ErrBootTimeout)
+	h := &fakeHost{
+		versions: map[string][]string{"agy": {"1.3.0"}},
+		probeErr: map[string]error{"agy": timeout},
+	}
+	agy := cliupdate.Family{Name: "agy", UpdateArgv: []string{"agy", "update"}}
+
+	res := only(t, cliupdate.Update(context.Background(), []cliupdate.Family{agy}, h.seams(), nil))
+
+	if res.Status != cliupdate.StatusBootTimeout {
+		t.Fatalf("status = %q, want %q: a REPL that never drew its prompt is a boot timeout: %+v", res.Status, cliupdate.StatusBootTimeout, res)
+	}
+	if strings.Contains(res.Detail, "unsubscribed") || !strings.Contains(res.Detail, "boot") || !strings.Contains(res.Detail, "signing in") {
+		t.Errorf("the detail must name the boot timeout and carry the pane, never call the family unsubscribed: %q", res.Detail)
+	}
+	if h.called("run") || h.called("smoke") {
+		t.Errorf("an unbooted family is neither updated nor smoke-tested: %q", h.calls)
+	}
+	if !strings.HasPrefix(res.Line(), "agy boot-timeout 1.3.0: ") {
+		t.Errorf("Line() = %q", res.Line())
 	}
 }
 
