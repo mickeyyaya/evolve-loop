@@ -1,0 +1,21 @@
+{
+  "id": "agy-boot-model-check-reads-a-structured-source",
+  "title": "The agy-claude boot model check reads a structured source instead of the TUI footer",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "weight": 0.5,
+  "source": "console, 2026-10-07 L2 landing (review convergence: rounds 5-7 found ~18 of 27 findings in the footer heuristic)",
+  "created_at": "2026-10-07T12:05:00Z",
+  "summary": "L2's launch model check decides whether agy booted Claude by reading the label on agy's footer-prefix line (bridge/launch_model_verification.go, panestream.FooterModelLabel). A TUI footer can take endless shapes, so every adversarial review found a new one (rounds 5-7). Round 7 made every miss fail safe (unreadable gives 87, which fails over to Claude Code). Two limits remain: healthy footers that are split, use a bullet separator, or are NBSP-padded read as unreadable (needless failovers), and a Gemini boot verifies as Claude only if agy draws a footer-prefix line whose own label names Claude.",
+  "fix": "Read the booted model from a structured source: the existing modelquery /model capture after boot, or agy's own state or settings if they record the active model. Keep the footer read only as a fallback signal. One home for the family decision (modelquery.FamiliesIn).",
+  "acceptance": [
+    "The model check decides from a structured source on a real agy-claude boot (characterized against a captured /model response or agy state, red first)",
+    "A split, bullet-separated or NBSP-padded healthy footer no longer causes a failover",
+    "A Gemini boot is never verified as Claude, including with Claude-named toasts or output anywhere in the pane"
+  ],
+  "files": [
+    "go/internal/bridge/launch_model_verification.go",
+    "go/internal/bridge/panestream/tokenline.go",
+    "go/internal/modelquery/agy.go"
+  ]
+}

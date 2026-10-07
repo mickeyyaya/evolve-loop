@@ -2,9 +2,7 @@ package advisor
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -12,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -52,9 +49,8 @@ func (a *Advisor) profilePath(in router.RouteInput) string {
 	return profile
 }
 
-// dispatch makes identity.CLI, not the profile's cli, the primary so the composition root's bench-aware swap holds.
 func (a *Advisor) dispatch(in router.RouteInput, d decision, profile, prompt string) (LaunchResponse, error) {
-	plan := llmroute.ChainFor(a.identity.CLI, a.profileFor(in, d, profile))
+	plan := a.walk()
 	var resp LaunchResponse
 	dispatched := llmroute.Dispatch(plan, func(cli string) (int, error) {
 		var launchErr error
@@ -72,29 +68,11 @@ func (a *Advisor) dispatch(in router.RouteInput, d decision, profile, prompt str
 	return resp, nil
 }
 
-// profileFor keeps an absent profile silent; any other fault is reported because the fallback chain is then not in force.
-func (a *Advisor) profileFor(in router.RouteInput, d decision, path string) *profiles.Profile {
-	if path == "" {
-		return nil
+func (a *Advisor) walk() llmroute.Plan {
+	if len(a.route.Candidates) > 0 {
+		return a.route
 	}
-	prof, err := a.loadProfile(path)
-	if err == nil {
-		return prof
-	}
-	if !errors.Is(err, fs.ErrNotExist) {
-		a.warn(in, d, CodeProfileLoadFailed, err.Error(), map[string]string{"step": stepDispatch, "path": path})
-	}
-	return nil
-}
-
-func defaultProfileLoader(path string) (*profiles.Profile, error) {
-	dir := filepath.Dir(path)
-	name := strings.TrimSuffix(filepath.Base(path), ".json")
-	prof, err := profiles.NewFromDir(dir).Get(name)
-	if err != nil {
-		return nil, err
-	}
-	return &prof, nil
+	return llmroute.Plan{Candidates: []string{a.identity.CLI}}
 }
 
 func (a *Advisor) launchOnce(in router.RouteInput, d decision, cli, profile, prompt string) (LaunchResponse, error) {

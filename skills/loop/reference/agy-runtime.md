@@ -122,7 +122,7 @@ The loop's default agy path is the interactive `agy-tmux` driver, not `agy -p`. 
 | Turn running | footer `esc to cancel`, plus a spinner line: one of `⣾⣽⣻⢿⡿⣟⣯⣷`, two spaces, a verb (`Generating...`, `Working...`, `Loading...`, `Editing files...`, or a running thought summary) | `busy_line_regex`; group 1 is the frame, which is cut before progress is judged, so a spinner tick is not progress |
 | Input line | the box between two separators: exactly `>` when empty; `> <text>` or `> [Pasted text #N +M lines]` when a prompt is parked | the driver's `inputLineMarker` (`>`), so submit-verify detects a parked prompt and re-sends Enter |
 | Thinking tokens | `▸ Thought for 14s, 1.5k tokens` after each thinking block | `token_line_regex` (named groups `count`, `scale`): token telemetry records the peak as `scrollback_peak` instead of "uncovered" |
-| Model in use | footer, bottom right: `Gemini 3.8 Flash · low`. When agy ignores `--model`, this shows the model it fell back to | `model_label_regex` (named group `model`, read from the last line) |
+| Model in use | footer, bottom right: `Gemini 3.8 Flash · low`. When agy ignores `--model`, this shows the model it fell back to | `model_label_regex` (named groups `footer`, the `esc to cancel` or `? for shortcuts` prefix, and `model`; the pane watch reads the last line, and agy-claude's launch-time model check reads only the label on the footer-prefix line) |
 | Quota wall | `quota_exhausted` rule (`quota.*exceed`, daily, monthly or free-tier limit) | escalates (exit 85); `clihealth` benches the agy family on it |
 
 ### `/usage`: one screen, two quota groups (agy 1.3.0)

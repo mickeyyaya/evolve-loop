@@ -42,7 +42,7 @@ func TestLoop_CycleLevelFailureContinues(t *testing.T) {
 
 	prev := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prev }()
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		st := &fixtures.FakeStorage{}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{

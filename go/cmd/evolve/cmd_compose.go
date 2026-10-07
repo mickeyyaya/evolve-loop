@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -34,24 +35,8 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve compose: --phases produced empty list after trimming")
 		return 10
 	}
-	known := registry.Names()
-	knownSet := map[string]bool{}
-	for _, n := range known {
-		knownSet[n] = true
-	}
-	for _, p := range phases {
-		if !knownSet[p] {
-			fmt.Fprintf(stderr, "evolve compose: unknown phase %q (known: %s)\n",
-				p, joinNames(known))
-			return 10
-		}
-	}
-	// The ship gate still enforces; refusing here gives a clearer error.
-	for _, p := range phases {
-		if p == string(core.PhaseShip) && !*shipAnyway {
-			fmt.Fprintln(stderr, "evolve compose: refusing to compose 'ship' without --ship-anyway")
-			return 2
-		}
+	if rc := refuseComposePhases(phases, *shipAnyway, stderr); rc != 0 {
+		return rc
 	}
 
 	// stdin carries the same request envelope as `evolve phase`.
@@ -75,6 +60,10 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *dryRun {
 		fmt.Fprintln(stdout, "[compose] DRY-RUN; no phases will execute")
 		return 0
+	}
+	if err := installRootRouter(req.ProjectRoot, stderr); err != nil {
+		fmt.Fprintf(stderr, "evolve compose: %v\n", err)
+		return exitRoutingRefused
 	}
 
 	overall := 0
@@ -111,4 +100,19 @@ func splitNonEmptyPhases(csv string) []string {
 		}
 	}
 	return out
+}
+
+func refuseComposePhases(phases []string, shipAnyway bool, stderr io.Writer) int {
+	known := registry.Names()
+	for _, p := range phases {
+		if !slices.Contains(known, p) {
+			fmt.Fprintf(stderr, "evolve compose: unknown phase %q (known: %s)\n", p, joinNames(known))
+			return 10
+		}
+	}
+	if slices.Contains(phases, string(core.PhaseShip)) && !shipAnyway {
+		fmt.Fprintln(stderr, "evolve compose: refusing to compose 'ship' without --ship-anyway")
+		return 2
+	}
+	return 0
 }

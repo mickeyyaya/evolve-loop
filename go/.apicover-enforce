@@ -696,3 +696,7 @@
 ./internal/landed
 # ledgerartifacts — the ledger's write-once content-addressed evidence store (.evolve/ledger-artifacts/sha256/<2>/<62>) and the legacy-path aliases evidence restore records; gc hard-protects it.
 ./internal/ledgerartifacts
+# codereview — the code-review phase's kernel half: parses the review's findings through reportdoc and records them in the defect ledger, plus the REVIEW_FINDINGS signal (ADR-0124).
+./internal/codereview
+# qualityindex — the quality index the code-review loop and the audit share: the dimensions, the threshold resolver, the Scores and Review Plan grammars and Qualifies (ADR-0124).
+./internal/qualityindex

@@ -95,7 +95,7 @@ func (l *Ledger) loadLineage(req Request, cont continuation.Continuation) (linea
 		l.emit("Ledger.Reconcile", req, CodeLedgerUnreadable, v.Diagnostics[0].Message, map[string]string{"step": "grade", "blocked": "true", "which": "ancestor", "op": fault.op, "path": ancestorPath, "ancestor_cycle": strconv.Itoa(cont.Cycle)})
 		return lineage{}, v, false
 	}
-	if !hasLedger || len(ancestor.Entries) == 0 {
+	if !hasLedger || !hasOwedRow(ancestor) {
 		msg := fmt.Sprintf("defect ledger: this cycle continues cycle-%d, which left no reconcilable %s in %s — NO inherited defect is being enforced here. Expected for an ancestor that predates the ledger; a deleted ledger looks identical, so it is recorded rather than assumed benign.", cont.Cycle, LedgerFile, ancestorWS)
 		l.emit("Ledger.Reconcile", req, CodeAncestorEmpty, msg, map[string]string{"step": "grade", "blocked": "false", "ancestor_cycle": strconv.Itoa(cont.Cycle), "path": ancestorPath})
 		return lineage{ancestor: ancestor}, Verdict{Diagnostics: []cyclestate.Diagnostic{warningDiag(msg)}}, false
@@ -120,7 +120,7 @@ func (l *Ledger) loadLineage(req Request, cont continuation.Continuation) (linea
 // ledger must not convert the closure gate's backstop into a demotion. Reads
 // the Doc the grade already loaded — no second read.
 func vouchedCycles(cont continuation.Continuation, ancestor Doc) []int {
-	if len(ancestor.Entries) == 0 {
+	if !hasOwedRow(ancestor) {
 		return nil
 	}
 	cycles := []int{cont.Cycle}
@@ -128,4 +128,13 @@ func vouchedCycles(cont continuation.Continuation, ancestor Doc) []int {
 		cycles = append(cycles, ancestor.OriginCycle)
 	}
 	return cycles
+}
+
+func hasOwedRow(doc Doc) bool {
+	for _, e := range doc.Entries {
+		if e.Source == "" || e.Status == StatusOpen {
+			return true
+		}
+	}
+	return false
 }

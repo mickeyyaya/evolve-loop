@@ -391,6 +391,8 @@ func existsAtBase(ctx context.Context, worktree, baseSHA, path string) (bool, er
 	return strings.TrimSuffix(string(out), "\x00") == path, nil
 }
 
+var errArtifactTooLarge = fmt.Errorf("exceeds %d bytes", maxArtifactBytes)
+
 func readRegularWithin(root, rel string) (string, string, error) {
 	if !validRelative(rel) {
 		return "", "", fmt.Errorf("invalid relative path %q", rel)
@@ -408,7 +410,7 @@ func readRegularWithin(root, rel string) (string, string, error) {
 		return "", "", fmt.Errorf("%s must be a regular non-symlink file", rel)
 	}
 	if info.Size() > maxArtifactBytes {
-		return "", "", fmt.Errorf("%s exceeds %d bytes", rel, maxArtifactBytes)
+		return "", "", fmt.Errorf("%s %w", rel, errArtifactTooLarge)
 	}
 	realRoot, err := filepath.EvalSymlinks(absRoot)
 	if err != nil {
@@ -432,7 +434,7 @@ func readRegularWithin(root, rel string) (string, string, error) {
 		return "", "", fmt.Errorf("read %s: %w", rel, err)
 	}
 	if len(body) > maxArtifactBytes {
-		return "", "", fmt.Errorf("%s exceeds %d bytes", rel, maxArtifactBytes)
+		return "", "", fmt.Errorf("%s %w", rel, errArtifactTooLarge)
 	}
 	after, err := file.Stat()
 	if err != nil || !os.SameFile(opened, after) || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) {

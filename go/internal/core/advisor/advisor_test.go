@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
-	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -124,7 +123,7 @@ func TestWithSignals_ReadsTheCenterLive(t *testing.T) {
 }
 
 func TestAdvisorCodes_AreRegisteredWithDocsUnderModuleAdvisor(t *testing.T) {
-	for _, code := range []signalcenter.Code{CodeLaunchFailed, CodeResponseUnparseable, CodeMintRejected, CodeProfileLoadFailed, CodeReconGitFailed, CodeCaptureWriteFailed} {
+	for _, code := range []signalcenter.Code{CodeLaunchFailed, CodeResponseUnparseable, CodeMintRejected, CodeReconGitFailed, CodeCaptureWriteFailed} {
 		m, ok := signalcenter.IsRegistered(code)
 		if !ok || m != signalcenter.ModuleAdvisor {
 			t.Errorf("%s: registered=%v module=%s", code, ok, m)
@@ -150,7 +149,6 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 	}
 	persona := Identity{CLI: "claude-tmux", Model: "deep", Persona: "PERSONA", AgentLabel: "router"}
 	gitFault := WithRecentFiles(func(string) ([]string, error) { return nil, errors.New("git: boom") })
-	profileFault := WithProfileLoader(func(string) (*profiles.Profile, error) { return nil, errors.New("bad json") })
 	plan := func(a *Advisor) { _, _ = a.Plan(in) }
 	propose := func(a *Advisor) { _, _ = a.Propose(in) }
 	var events []signalcenter.Event
@@ -160,7 +158,7 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 		call func(*Advisor)
 	}{
 		{nil, nil, plan}, // preflight
-		{&fakeLauncher{err: errors.New("boom")}, []Option{profileFault}, plan},                                     // dispatch: the profile fault, then the chain
+		{&fakeLauncher{err: errors.New("boom")}, nil, plan},                                                        // dispatch
 		{&fakeLauncher{stdout: "no decision"}, nil, propose},                                                       // parse / no_json
 		{&fakeLauncher{stdout: `{"next_phase": }`}, nil, propose},                                                  // parse / invalid_json
 		{&fakeLauncher{stdout: "[]"}, nil, plan},                                                                   // parse / empty (+ the capture write fault)
@@ -197,7 +195,6 @@ func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 	}
 	var (
 		_ ArtifactWriter  = plainWriter
-		_ ProfileLoader   = defaultProfileLoader
 		_ RecentFiles     = goldenRecentFiles
 		_ DepthCheck      = func(map[string]string) bool { return false }
 		_ OverlayResolver = func(string) []string { return nil }
@@ -207,13 +204,9 @@ func TestRequestShapes_HaveExactlyTheDeclaredFields(t *testing.T) {
 		_ RejectedMint    = RejectedMint{}
 		_ ParsedPlan      = ParsedPlan{}
 	)
-	if prof, err := defaultProfileLoader("/nonexistent/dir/router.json"); prof != nil || err == nil {
-		t.Error("the default loader returns the read error")
-	}
 	if _, err := (&fakeLauncher{stdout: "x"}).Launch(context.Background(), req); err != nil {
 		t.Fatal(err)
 	}
-	_ = profiles.Profile{}
 	if strings.TrimSpace(string(CodeLaunchFailed)) != "ADVISOR_LAUNCH_FAILED" {
 		t.Error("code spelling")
 	}

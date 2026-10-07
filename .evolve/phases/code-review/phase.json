@@ -1,0 +1,43 @@
+{
+  "name": "code-review",
+  "archetype": "evaluate",
+  "optional": true,
+  "agent": "evolve-code-reviewer",
+  "description": "independent read-only review of the build's diff on the shared quality index: a justified Review Plan, findings with a suggested fix each (recorded in the defect ledger) and Scores for every dimension",
+  "when_to_use": "never selected: the registry pins it on every code cycle whose build touched files (conditional_mandatory, ADR-0124)",
+  "inputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/build-report.md",
+      ".evolve/runs/cycle-{cycle}/intent.md",
+      ".evolve/runs/cycle-{cycle}/scout-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-report.md",
+      ".evolve/runs/cycle-{cycle}/triage-decision.json",
+      ".evolve/runs/cycle-{cycle}/test-report.md"
+    ],
+    "signals": [
+      "build.files_touched"
+    ]
+  },
+  "outputs": {
+    "files": [
+      ".evolve/runs/cycle-{cycle}/code-review-report.md"
+    ]
+  },
+  "prompt_context": [
+    "goal",
+    "task_contract"
+  ],
+  "classify": {
+    "require_sections": [
+      "Review Plan",
+      "Findings",
+      "Scores",
+      "Verdict"
+    ],
+    "grammars": [
+      "code-review-report"
+    ]
+  },
+  "gates": {},
+  "after": "build"
+}

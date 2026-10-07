@@ -117,9 +117,7 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(p, r.resp, r.attempts, reason, cr.cs.PhaseStartedAt))
 		cr.cs.CompletedPhases = append(cr.cs.CompletedPhases, string(p))
 		if r.err == nil {
-			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle, Role: string(p), Kind: "phase", ExitCode: 0}); lerr != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN evaluate-batch ledger append %s: %v\n", p, lerr)
-			}
+			cr.recordBatchMember(p, r.resp)
 			batchVerdict = mergeVerdict(batchVerdict, r.resp.Verdict)
 		}
 		cr.current = p
@@ -137,6 +135,13 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 	cr.lastVerdict = batchVerdict
 	cr.result.FinalVerdict = batchVerdict
 	return loopNext, nil
+}
+
+func (cr *cycleRun) recordBatchMember(p Phase, resp PhaseResponse) {
+	if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle, Role: string(p), Kind: "phase", ExitCode: 0}); lerr != nil {
+		fmt.Fprintf(os.Stderr, "[orchestrator] WARN evaluate-batch ledger append %s: %v\n", p, lerr)
+	}
+	cr.o.recordReviewFindings(cr.cs, p, resp.Verdict)
 }
 
 func (cr *cycleRun) planRunOrder() []string {

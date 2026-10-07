@@ -45,6 +45,16 @@ the build's dispositions of that phase's findings instead of reviewing the code
 itself. That phase loads the skill in review mode, beside a shared
 `quality-index` skill; the Self-review hook stays the writer's own pass.
 
+The fourth and fifth are that `code-review` phase's own skills
+([ADR-0124](adr/0124-code-review-phase.md)): `skills/architecture-review/SKILL.md`,
+the structural rubric (duplicated beliefs, patterns with forces, the three-book
+audit, mutation probes), and `skills/quality-index/` (its `COMPACT.md` is the
+injected form), the ten-dimension index the review and the audit share. One
+phase-selector rule, `{phases: [code-review], when: deliverable_kind==code}`,
+preloads `engineering-craft` (the standard the review judges against),
+`code-review-simplify` (run in review mode: the persona has it apply nothing),
+`architecture-review` and `quality-index` into the reviewer, at any tier.
+
 Which skill loads for which phase agent is **configuration, never code**:
 `internal/policy` resolves it from the compiled default or `.evolve/policy.json`.
 
@@ -133,7 +143,7 @@ Semantics of the `overlays` block:
 
 | `overlays` value                | Behavior                                                        |
 |---------------------------------|----------------------------------------------------------------|
-| **absent** (no block)           | the **compiled default** applies: `{tiers:[deep,top]} → [fable]`, `{phases:[scout|build|audit], when: deliverable_kind==document} → [solution-scout|-build|-audit]` and `{writes_source: true, when: deliverable_kind==code} → [engineering-craft, code-review-simplify]` |
+| **absent** (no block)           | the **compiled default** applies: `{tiers:[deep,top]} → [fable]`, `{phases:[scout|build|audit], when: deliverable_kind==document} → [solution-scout|-build|-audit]` `{writes_source: true, when: deliverable_kind==code} → [engineering-craft, code-review-simplify]` and `{phases:[code-review], when: deliverable_kind==code} → [engineering-craft, code-review-simplify, architecture-review, quality-index]` |
 | present, `rules: []` (empty)    | explicit **opt-out** — zero overlays (not the default)         |
 | present, `rules: [...]`         | the UNION of every matching rule's skills, deduped, stable order|
 
@@ -214,7 +224,7 @@ Once a skill's `SKILL.md` is injected into every deep/top phase prompt, its
 content is **integrity-load-bearing**: a tampered persona would silently rewrite
 every deep-tier agent's operating discipline. Therefore every compiled-default
 skill — `policy.CompiledDefaultOverlaySkills()`: `fable`, `solution-scout`,
-`solution-build`, `solution-audit`, `engineering-craft`, `code-review-simplify` — is in `ProtectedSurfaceManifest`
+`solution-build`, `solution-audit`, `engineering-craft`, `code-review-simplify`, `architecture-review`, `quality-index` — is in `ProtectedSurfaceManifest`
 (`internal/guards/integrity_surface.go`), the L4 control-plane perimeter, pinned
 by `TestProtectedSurface_CompiledDefaultOverlaySkills`, which iterates that
 export so the next compiled skill cannot skip the manifest. **Adding a new skill
@@ -298,6 +308,14 @@ depth behind the policy registry clamp).
   A new `code-review` phase is the one home of independent code review, and the
   audit grades the build's dispositions of its findings; an audit-side copy of
   the skill would be a second home. That phase's lane slims the auditor persona.
+- **A phase selector for the reviewer, not the writer rule.** The reviewer is
+  read-only, so `writes_source` never selects it, and no routable signal names "an
+  independent review dispatch" except the phase. The rule is the last in the table,
+  so every older resolution keeps its order. The phase name is the one literal the
+  rule adds; `internal/codereview`'s `TestTheCompiledOverlayRuleReachesThisPhase`
+  pins it to `codereview.PhaseName`. `quality-index` ships a `COMPACT.md`, so the
+  reviewer carries the index's table and grammars, not its full procedures, and
+  reads a dimension's procedure from the worktree when its plan marks it deep.
 
 ## Tests
 
@@ -313,6 +331,7 @@ depth behind the policy registry clamp).
 | Self-review record | `internal/phasecontract` `TestSelfReviewRecorded_NeedsAVisibleLevelTwoHeadingWithAScoresLine` (15 cases: fenced, commented, prose, level-three and empty headings and the template's `<0.NN>` placeholders are no record; a re-run's repeated section or scores line is); `TestSelfReview_TheWriterPersonasAndTheSkillDeclareTheHeadingTheRunnerChecks` (the builder and tdd personas, `SKILL.md` and `COMPACT.md`); `TestSelfReview_TheHookNeverEditsEarlierPhaseOwnedFiles` (the hook, the compact hook and both personas carry the `git status --porcelain` baseline and `Declined: earlier-phase-owned`; the hook, the compact hook and the builder name `testFiles`, `go/acs/` and bug-reproduction) |
 | Compact overlay | `internal/skilloverlay` `TestMaterialize_TheCodeReviewSimplifyOverlayIsItsCompactProjection` — the preloaded block is `COMPACT.md`, under 4 KB |
 | Injector   | `internal/adapters/bridge` `TestLaunch_InjectsSkillOverlay` — proves `req.Skills` reaches the launched prompt |
+| Resolver   | `internal/policy` `TestCompiledDefaultOverlays_TheCodeReviewPhaseLoadsTheStandardTheRubricsAndTheIndex` — the reviewer gets `[engineering-craft, code-review-simplify, architecture-review, quality-index]` (fable first at deep); a document cycle, the audit, the build and other evaluators keep their own sets; `internal/codereview` `TestTheCompiledOverlayRuleReachesThisPhase` |
 | Security   | `internal/guards` `TestProtectedSurface_CompiledDefaultOverlaySkills` — every compiled-default skill directory is protected |
 | Tier selectors | `internal/policy` `TestResolveOverlays_TierSelectorsMatchTheCanonicalTier` (26 selector/tier pairs: canonical, alias, concrete id, glob, and a backslash-escaped selector that stays a glob), `TestResolveOverlays_CompiledDefaultReachesConcreteOpusModels`, `TestNonCanonicalOverlayTierSelectors`; `internal/core/advisor` `TestLaunch_ResolvesSkillOverlaysPerAttemptFromTheZeroPolicy` (the opus default now resolves fable) |
 | Preflight  | `internal/looppreflight` `TestRun_OverlayTierSelectors` — a non-canonical selector or an unreadable policy warns, never halts |

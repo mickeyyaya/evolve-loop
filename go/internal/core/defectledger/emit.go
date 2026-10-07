@@ -32,20 +32,8 @@ func (l *Ledger) Emit(req Request, r Rejection) Verdict {
 	if !existed {
 		doc.OriginCycle = req.Cycle
 	}
-	known := make(map[string]bool, len(doc.Entries))
-	for _, e := range doc.Entries {
-		known[e.Text] = true
-	}
-	added, overflow := appendOpen(&doc, known, rowTexts(r))
+	doc, added, overflow := Append(doc, openRows(rowTexts(r)), req.Cycle)
 	if overflow > 0 {
-		// One OPEN row standing for the truncated tail. It has no per-defect
-		// text, so it can never be dispositioned by a targeted claim — a
-		// continuation inheriting it must widen the cap or fix the emitter,
-		// which is the correct forcing function for an overflowing rejection.
-		if row := overflowRow(overflow, req.Cycle); !known[row.Text] {
-			doc.Entries = append(doc.Entries, row)
-			added = true
-		}
 		l.emit("Ledger.Emit", req, CodeOverflow, fmt.Sprintf("defect ledger: %d defect(s) from cycle-%d were not recorded: the ledger cap of %d entries was reached", overflow, req.Cycle, MaxEntries),
 			map[string]string{"step": "emit", "blocked": "false", "overflow": strconv.Itoa(overflow), "cap": strconv.Itoa(MaxEntries), "path": path})
 	}
@@ -79,27 +67,14 @@ func rowTexts(r Rejection) []string {
 	return texts
 }
 
-// appendOpen appends one OPEN row per text not already in the ledger (a
-// defect re-reported on a retry is one row, not two), capped at MaxEntries;
-// it reports whether anything was added and how many texts overflowed.
-func appendOpen(doc *Doc, known map[string]bool, texts []string) (added bool, overflow int) {
-	for _, text := range texts {
-		text = Truncate(text, TextMaxRunes)
-		if known[text] {
-			continue
-		}
-		if len(doc.Entries) >= MaxEntries {
-			overflow++
-			continue
-		}
-		known[text] = true
-		doc.Entries = append(doc.Entries, Entry{ID: ID(text), Text: text, Status: StatusOpen})
-		added = true
+func openRows(texts []string) []Entry {
+	rows := make([]Entry, len(texts))
+	for i, text := range texts {
+		rows[i] = Entry{Text: text, Status: StatusOpen}
 	}
-	return added, overflow
+	return rows
 }
 
-// overflowRow is the synthetic OPEN row standing for the truncated tail.
 func overflowRow(overflow, cycle int) Entry {
 	text := fmt.Sprintf("%d further defect(s) from cycle-%d were not recorded: the ledger cap of %d entries was reached", overflow, cycle, MaxEntries)
 	return Entry{ID: ID(text), Text: text, Status: StatusOpen}

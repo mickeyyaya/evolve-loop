@@ -75,6 +75,9 @@ func (b *BaseRunner) launchRouter(req core.PhaseRequest, prep phasePreparation) 
 		if loaded, err = policy.Load(filepath.Join(req.ProjectRoot, ".evolve", "policy.json")); err != nil {
 			return nil, policy.Policy{}, err
 		}
+		if err := cliroute.RefuseLaunchRouter(loaded); err != nil {
+			return nil, policy.Policy{}, err
+		}
 	}
 	router, err := cliroute.NewSingleProfileRouter(loaded, cliroute.SingleProfile{Agent: prep.profileName, Profile: prep.profile}, cliroute.Host{Bench: b.bench})
 	return router, loaded, err

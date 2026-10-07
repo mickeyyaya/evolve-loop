@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -96,6 +97,7 @@ func TestRunResumeBatch_AResumedFailWalksTheFailureLifecycle(t *testing.T) {
 	for name, runner := range map[string]resumedFailRunner{
 		"a FAIL verdict":        {result: core.CycleResult{Cycle: 7, FinalVerdict: core.VerdictFAIL}},
 		"a cycle-level failure": {result: core.CycleResult{Cycle: 7}, err: &core.ErrCycleLevelFailure{Phase: "build", Cause: errors.New("builder crashed")}},
+		"a batch-fatal abort":   {result: core.CycleResult{Cycle: 7}, err: errors.New("resume refresh Build explanation after tdd: unreadable host snapshot")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := t.TempDir()
@@ -115,5 +117,23 @@ func TestRunResumeBatch_AResumedFailWalksTheFailureLifecycle(t *testing.T) {
 				t.Errorf("the walk's lifecycle lines go through the root's ledger; stderr=%s", stderr.String())
 			}
 		})
+	}
+}
+
+func TestRunResumeBatch_AResumedQuotaWallKeepsItsClaims(t *testing.T) {
+	root := t.TempDir()
+	evolveDir, ws := seedFailedCycleInbox(t, root, "worked", 7)
+	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "worked", "7"); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	writeResumeCheckpoint(t, evolveDir, ws)
+	runner := resumedFailRunner{result: core.CycleResult{Cycle: 7}, err: &core.ErrCycleLevelFailure{Phase: "build", Cause: fmt.Errorf("phase build: %w", core.ErrAllFamiliesExhausted)}}
+	var stdout, stderr bytes.Buffer
+	lr := loopResult{}
+
+	rc := runResumeBatch(context.Background(), loopConfig{ProjectRoot: root, EvolveDir: evolveDir, Resume: true}, runner, newFakeLedger(), nil, map[string]string{}, map[string]string{}, &lr, &stdout, &stderr)
+
+	if entries, _ := os.ReadDir(filepath.Join(evolveDir, "inbox", "processing", "cycle-7")); rc != 5 || len(entries) != 1 {
+		t.Fatalf("a resumed quota wall is a resumable pause that keeps its claim: rc=%d claim files=%d stderr=%s", rc, len(entries), stderr.String())
 	}
 }

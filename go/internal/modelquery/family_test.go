@@ -2,6 +2,7 @@ package modelquery
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -75,5 +76,19 @@ func TestFilterByFamily_ComposesWithNewestWins(t *testing.T) {
 	pure := FilterByFamily(in, "gemini")
 	if got := NewestInLineage(pure); got != "Gemini 3.5 Pro" {
 		t.Errorf("NewestInLineage(FilterByFamily(%v, \"gemini\")) = %q, want %q (family-filter then newest-wins promotes the frontier Gemini)", in, got, "Gemini 3.5 Pro")
+	}
+}
+
+func TestFamiliesIn_NamesEveryFamilyALabelMentionsInTableOrder(t *testing.T) {
+	for label, want := range map[string][]string{
+		"Claude Opus 5.5 · high":                       {"claude"},
+		"Gemini 3.8 Flash · low":                       {"gemini"},
+		"Gemini 3.1 Pro (Claude Opus 5.5 unavailable)": {"claude", "gemini"},
+		"gpt-5.6-sol":                                  {"gpt"},
+		"bypass permissions on (shift+tab to cycle)":   nil,
+	} {
+		if got := FamiliesIn(label); !slices.Equal(got, want) {
+			t.Errorf("FamiliesIn(%q) = %v, want %v", label, got, want)
+		}
 	}
 }

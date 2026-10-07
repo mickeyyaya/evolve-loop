@@ -16,7 +16,7 @@ func TestWireOrchestratorDeps_ContractGateSignalsWired(t *testing.T) {
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := wireOrchestratorDeps(root, evolveDir, io.Discard)
+	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	if !d.Orchestrator.DeclaredDeliverablesGateWired() {
 		t.Fatal("precondition: the default policy mounts the declared-deliverables gate (ADR-0100)")
 	}

@@ -80,11 +80,15 @@ const evidenceSeparator = "; "
 
 // Entry is one tracked defect — the on-disk row.
 type Entry struct {
-	ID       string `json:"id"`
-	Text     string `json:"text"`
-	Status   string `json:"status"`
-	Evidence string `json:"evidence,omitempty"`
-	Reason   string `json:"reason,omitempty"`
+	ID        string `json:"id"`
+	Text      string `json:"text"`
+	Status    string `json:"status"`
+	Evidence  string `json:"evidence,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+	Source    string `json:"source,omitempty"`
+	Round     int    `json:"round,omitempty"`
+	Severity  string `json:"severity,omitempty"`
+	Dimension string `json:"dimension,omitempty"`
 }
 
 // Doc is the on-disk <workspace>/defect-ledger.json wire shape. OriginCycle

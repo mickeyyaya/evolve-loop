@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 )
 
 // nameRE keeps a phase or agent name safe as a filename, agent suffix and routing token.
@@ -93,6 +94,19 @@ func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 		v = append(v, fmt.Sprintf("classify.verdict_on_pass %q must be one of PASS/FAIL/WARN/SKIPPED", s.Classify.VerdictOnPass))
 	}
 
+	return append(v, unregisteredGrammars(s)...)
+}
+
+func unregisteredGrammars(s PhaseSpec) []string {
+	if s.Classify == nil {
+		return nil
+	}
+	var v []string
+	for _, name := range s.Classify.Grammars {
+		if !slices.Contains(grammarNames, name) {
+			v = append(v, fmt.Sprintf("classify.grammars %q is not a registered report grammar (registered: %s)", name, strings.Join(grammarNames, ", ")))
+		}
+	}
 	return v
 }
 
@@ -159,3 +173,9 @@ func ValidateOutputsPartition(s PhaseSpec) []string {
 	slices.Sort(v)
 	return v
 }
+
+const GrammarCodeReviewReport = "code-review-report"
+
+var grammarNames = []string{GrammarCodeReviewReport}
+
+func Grammars() []string { return slices.Clone(grammarNames) }

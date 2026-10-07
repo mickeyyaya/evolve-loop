@@ -192,17 +192,16 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			return result, err
 		}
 		latchShippedState(&cs, next, resp.Verdict)
-		if cs.ExplanationDocumentationVersion != 0 && next != PhaseBuild &&
-			o.worktreePhase(next) && containsString(cs.CompletedPhases, string(PhaseBuild)) {
+		if o.explanationRefreshEligible(cs, next) {
 			requiresBuild, refreshErr := explanationdocs.RefreshResult(ctx, explanationBinding(req.ProjectRoot, cs))
-			if refreshErr != nil {
-				phaseErr := fmt.Errorf("resume refresh Build explanation after %s: %w", next, refreshErr)
-				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath,
-					phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
+			reentry, abortErr := o.routeAfterExplanationRefresh(&cs, next, requiresBuild, refreshErr)
+			if abortErr != nil {
+				phaseErr := fmt.Errorf("resume refresh Build explanation after %s: %w", next, abortErr)
+				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
 				return result, phaseErr
 			}
-			if requiresBuild {
-				cursor.schedule(PhaseBuild)
+			if reentry != "" {
+				cursor.schedule(reentry)
 			}
 		}
 

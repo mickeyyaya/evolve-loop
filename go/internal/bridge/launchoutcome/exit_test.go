@@ -5,8 +5,6 @@ package launchoutcome
 
 import "testing"
 
-// Test 31 — the 11 literals and ExitSignalDeath == -1: the numbers docs,
-// skills and the dispatcher's failure classifier key on.
 func TestExitCodes_NumericContractUnchanged(t *testing.T) {
 	for name, tc := range map[string]struct{ got, want int }{
 		"ExitOK": {ExitOK, 0}, "ExitSafetyGate": {ExitSafetyGate, 2}, "ExitCostLeak": {ExitCostLeak, 3},
@@ -14,7 +12,7 @@ func TestExitCodes_NumericContractUnchanged(t *testing.T) {
 		"ExitArtifactTimeout": {ExitArtifactTimeout, 81}, "ExitUnknownPrompt": {ExitUnknownPrompt, 85},
 		"ExitRespondLoopGuard": {ExitRespondLoopGuard, 86}, "ExitRequireFullUnmet": {ExitRequireFullUnmet, 99},
 		"ExitCmdTimeout": {ExitCmdTimeout, 124}, "ExitMissingBinary": {ExitMissingBinary, 127},
-		"ExitSignalDeath": {ExitSignalDeath, -1},
+		"ExitSignalDeath": {ExitSignalDeath, -1}, "ExitModelMismatch": {ExitModelMismatch, 87},
 	} {
 		if tc.got != tc.want {
 			t.Errorf("%s = %d, want %d", name, tc.got, tc.want)
@@ -22,14 +20,11 @@ func TestExitCodes_NumericContractUnchanged(t *testing.T) {
 	}
 }
 
-// Test 27 — CauseCode projects the table's cause column: the 11 snake_case
-// names; -1 and an unknown exit stay driver_error (the ledger never changes);
-// 0 is "".
 func TestCauseCode_ProjectsTheTableColumn(t *testing.T) {
 	for code, want := range map[int]string{
 		ExitOK: "", ExitSafetyGate: "safety_gate", ExitCostLeak: "cost_leak", ExitBadFlags: "bad_flags",
 		ExitREPLBootTimeout: "repl_boot_timeout", ExitArtifactTimeout: "artifact_timeout",
-		ExitUnknownPrompt: "unknown_prompt", ExitRespondLoopGuard: "respond_loop_guard",
+		ExitUnknownPrompt: "unknown_prompt", ExitRespondLoopGuard: "respond_loop_guard", ExitModelMismatch: "model_mismatch",
 		ExitRequireFullUnmet: "required_tier_unavailable", ExitCmdTimeout: "command_timeout",
 		ExitMissingBinary: "missing_binary", ExitSignalDeath: "driver_error", 42: "driver_error",
 	} {

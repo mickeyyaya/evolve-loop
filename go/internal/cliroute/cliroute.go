@@ -152,3 +152,28 @@ func (v resolver) bench(req Request, plan llmroute.Plan) llmroute.Plan {
 func familyOf(cli string) string {
 	return llmroute.Family(llmroute.DefaultDriverForFamily(cli))
 }
+
+func (d Decision) WalkAt(tier string, benched func(cli string) bool) (llmroute.Plan, bool, error) {
+	var permitted []string
+	for _, cli := range d.Plan.Candidates {
+		if d.Plan.Permits(cli, tier) {
+			permitted = append(permitted, cli)
+		}
+	}
+	if len(permitted) == 0 {
+		return llmroute.Plan{}, false, fmt.Errorf("%w: no candidate of %v is permitted at tier %s", ErrRefused, d.Plan.Candidates, tier)
+	}
+	lead, healthy := permitted[0], false
+	for _, cli := range permitted {
+		if !benched(cli) {
+			lead, healthy = cli, true
+			break
+		}
+	}
+	return llmroute.Plan{Candidates: leadWith(lead, permitted), Triggers: d.Plan.Triggers}, healthy, nil
+}
+
+func (d Decision) Walk() (llmroute.Plan, error) {
+	walk, _, err := d.WalkAt(d.Plan.Model, func(string) bool { return false })
+	return walk, err
+}

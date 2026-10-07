@@ -1,0 +1,69 @@
+{
+  "name": "code-reviewer",
+  "role": "code-reviewer",
+  "effort_level": "xhigh",
+  "cli": "claude-tmux",
+  "cli_fallback": [
+    "claude-p"
+  ],
+  "allowed_clis": [
+    "claude"
+  ],
+  "model_tier_default": "deep",
+  "model_tier_envelope": {
+    "min": "deep",
+    "default": "deep",
+    "max": "deep"
+  },
+  "allowed_tools": [
+    "Read",
+    "Grep",
+    "Glob",
+    "Bash",
+    "Bash(evolve phase verify:*)"
+  ],
+  "disallowed_tools": [
+    "Edit",
+    "Edit(.evolve/state.json)",
+    "Edit(.evolve/ledger.jsonl)",
+    "Write(.evolve/state.json)",
+    "Write(.evolve/ledger.jsonl)",
+    "Bash(git add:*)",
+    "Bash(git commit:*)",
+    "Bash(git push:*)",
+    "Bash(git stash:*)",
+    "Bash(git checkout:*)",
+    "Bash(git reset:*)",
+    "Bash(git config:*)"
+  ],
+  "max_budget_usd": 2.0,
+  "max_turns": 30,
+  "output_artifact": "code-review-report.md",
+  "challenge_token_required": true,
+  "extra_flags_by_cli": {
+    "claude-tmux": [
+      "--strict-mcp-config",
+      "--exclude-dynamic-system-prompt-sections",
+      "--disable-slash-commands",
+      "--setting-sources",
+      "project"
+    ]
+  },
+  "parallel_eligible": false,
+  "sandbox": {
+    "enabled": true,
+    "write_subpaths": [
+      ".evolve/runs/cycle-*"
+    ],
+    "read_only_repo": true,
+    "deny_subpaths": [
+      ".git",
+      ".evolve/state.json",
+      ".evolve/ledger.jsonl",
+      ".evolve/profiles",
+      ".evolve/evals"
+    ],
+    "allow_network": false
+  },
+  "generated_from": "hand-authored"
+}

@@ -363,6 +363,9 @@ func runPreliminaryStudy(workspace, feedback string) error {
 	}
 	worktree := sourceRoot()
 	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(workspace)))
+	if err := installRootRouter(projectRoot, os.Stderr); err != nil {
+		return err
+	}
 	cfgPath := filepath.Join(worktree, ".evolve", "phases", "preliminary-study", "phase.json")
 	cfg, err := phaseconfig.Load(cfgPath)
 	if err != nil {

@@ -16,7 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
@@ -28,7 +27,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
-	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mintregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseconfig"
@@ -251,10 +249,7 @@ func cycleRunErrorExit(err error, cycle int, projectRoot, evolveDir string, stde
 		fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 		return fleet.ExitDeferred
 	}
-	var clf *core.ErrCycleLevelFailure
-	if errors.As(err, &clf) {
-		warnCycleFailureOutcome(stderr, cycle, applyCycleFailureOutcome(projectRoot, evolveDir, cycle, stderr, lifecycle, signals))
-	}
+	warnCycleFailureOutcome(stderr, cycle, applyCycleFailureOutcome(projectRoot, evolveDir, cycle, stderr, lifecycle, signals))
 	fmt.Fprintf(stderr, "evolve cycle run: %v\n", err)
 	return 1
 }
@@ -298,6 +293,9 @@ func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, li
 // inbox failure lifecycle on the root's ledger and Signal Center. A nil ledger
 // (the --simulate root) falls back to the mover's own unobserved file ledger.
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
+	if cycle == 0 {
+		return nil
+	}
 	_, err := cycleoutcome.ApplyFailure(cycleoutcome.FailureInputsFor(
 		projectRoot, evolveDir, cycleWorkspace(projectRoot, cycle), cycle, stderr,
 	).WithLedger(lifecycle).WithSignals(signals))
@@ -316,7 +314,7 @@ func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writ
 		return wireSimulateOrchestrator(projectRoot, evolveDir, stderr)
 	}
 	gcOrphanSessions("cycle-start", stderr)
-	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr)
+	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ())})
 }
 
 // filterEvolveEnv forwards to cmdutil.FilterEvolveEnv, the one definition the
@@ -365,7 +363,7 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *sign
 
 // wireOrchestratorDeps builds the production orchestrator and returns it with
 // its storage, ledger, Signal Center, bridge and runners.
-func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orchDeps {
+func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {
 	// Pin the model-catalog dir to this .evolve, which the cycle-start refresher
 	// writes; EVOLVE_PROJECT_ROOT may name another tree.
 	if evolveDir != "" {
@@ -422,7 +420,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	wfCfg := pol.WorkflowConfig()
 
 	catalog, builtinCat, userSpecs := loadPhaseCatalog(projectRoot, registryPath, prm)
-	cliRouter, routingErr := wireCLIRouter(projectRoot, catalog, console)
+	cliRouter, routingErr := wireCLIRouter(routerSite{root: projectRoot, catalog: catalog}, run, console)
 	if routingErr != nil {
 		return orchDeps{Signals: signals, RoutingErr: routingErr}
 	}
@@ -488,26 +486,10 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 	// The routing advisor resolves {cli, model} like a phase: router profile, then
 	// policy. Plan decisions use the deep tier. A benched family falls back to
 	// claude; with claude benched too the advisor degrades to the static spine.
-	advCLI, advModel, advHealthy, advErr := resolveRouterDispatchHealthy(cliRouter, projectRoot, decisionPlan, benchedFamilies(projectRoot))
+	advisor, advErr := wireRouterAdvisor(routerAdvisorWiring{router: cliRouter, root: projectRoot, bridge: walked, prompts: prm, signals: signals})
 	if advErr != nil {
-		return orchDeps{Signals: signals, RoutingErr: fmt.Errorf("the routing advisor has no route: %w", advErr)}
+		return orchDeps{Signals: signals, RoutingErr: advErr}
 	}
-	if !advHealthy {
-		fmt.Fprintf(os.Stderr, "[router] WARN router family and the claude fallback are both benched — advisor will degrade to the static spine\n")
-	}
-	var advPersona string
-	if rp, perr := prm.Agent("evolve-router"); perr == nil {
-		advPersona = rp.Body
-	} else {
-		fmt.Fprintf(os.Stderr, "[router] WARN persona evolve-router.md not loaded (%v); advisor uses legacy inline framing\n", perr)
-	}
-	advisor := core.NewPhaseAdvisor(walked,
-		core.WithProposerCLI(advCLI),
-		core.WithProposerModel(advModel),
-		core.WithPersona(advPersona),
-		core.WithDepthCheck(core.AdvisorDepthExceeded),
-		core.WithAdvisorSignals(signals),
-	)
 	strategy := router.Select(cfg, advisor)
 	// The advisor also plans the whole cycle; the orchestrator consults it only at
 	// Stage>=Advisory with DynamicLLM, so wiring it here costs nothing otherwise.
@@ -517,7 +499,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer) orch
 		core.WithPlanner(advisor),
 		// Best-effort and gated on cfg.PhaseRecovery=enforce; below that it never
 		// dispatches.
-		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot, cliRouter)...)),
+		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot, cliRouter, console)...)),
 		// Feeds state.json:triageThroughput, the window the triage clamp bounds with.
 		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
 		// Re-bind the bridge's contract resolver on each mid-cycle mint, so a minted
@@ -673,74 +655,6 @@ func cycleContext(goalHash, goalText string) map[string]string {
 	return ctx
 }
 
-// routerDecisionType selects the advisor decision a dispatch resolves for:
-// plan and re-plan want the deep tier, propose and judge the fast one.
-type routerDecisionType int
-
-const (
-	decisionPlan    routerDecisionType = iota // initial whole-cycle plan (deep)
-	decisionRePlan                            // post-scout re-plan (deep)
-	decisionPropose                           // reactive per-transition tweak (fast)
-	decisionJudge                             // route-quality judge (fast)
-)
-
-const (
-	routerAgent        = "router"
-	routerDefaultModel = "opus"
-)
-
-func routerDecision(r *cliroute.Router, projectRoot string) (cliroute.Decision, error) {
-	return r.Resolve(cliroute.Request{
-		Agent: routerAgent, Launch: cliroute.LaunchAdvisor, ProjectRoot: projectRoot,
-		DefaultModel: routerDefaultModel, Env: filterEvolveEnv(os.Environ()),
-	})
-}
-
-func resolveRouterDispatch(r *cliroute.Router, projectRoot string) (cli, model string, err error) {
-	d, err := routerDecision(r, projectRoot)
-	if err != nil {
-		return "", "", err
-	}
-	return d.Plan.Candidates[0], d.Plan.Model, nil
-}
-
-func resolveRouterDispatchFor(r *cliroute.Router, projectRoot string, dt routerDecisionType) (cli, model string, err error) {
-	cli, model, err = resolveRouterDispatch(r, projectRoot)
-	return cli, decisionModel(model, dt, r.Policy().RouterConfig()), err
-}
-
-func decisionModel(base string, dt routerDecisionType, rc policy.RouterPolicy) string {
-	switch {
-	case (dt == decisionPlan || dt == decisionRePlan) && rc.PlanModel != "":
-		return rc.PlanModel
-	case (dt == decisionPropose || dt == decisionJudge) && rc.ProposeModel != "":
-		return rc.ProposeModel
-	}
-	return base
-}
-
-func resolveRouterDispatchHealthy(r *cliroute.Router, projectRoot string, dt routerDecisionType, benched map[string]bool) (cli, model string, ok bool, err error) {
-	d, err := routerDecision(r, projectRoot)
-	if err != nil {
-		return "", "", false, err
-	}
-	model = decisionModel(d.Plan.Model, dt, r.Policy().RouterConfig())
-	for _, candidate := range d.Plan.Candidates {
-		if !benched[llmroute.Family(candidate)] {
-			return candidate, model, true, nil
-		}
-	}
-	return d.Plan.Candidates[0], model, false, nil
-}
-
-func benchedFamilies(projectRoot string) map[string]bool {
-	out := map[string]bool{}
-	for family := range clihealth.NewStore(projectRoot, nil).Active() {
-		out[family] = true
-	}
-	return out
-}
-
 // registerBuiltinSpecRunners gives each advisor-selectable kind:llm builtin
 // phase that lacks a hand-wired runner a spec runner, so selecting it never
 // aborts dispatch. Control phases are skipped; a phase with no persona WARNs.
@@ -782,17 +696,19 @@ func scopePathResolver(projectRoot, taskID string) string {
 	return st.Path
 }
 
-func failureAdvisorOpts(projectRoot string, r *cliroute.Router) []core.FailureAdvisorOption {
-	cli := failureAdvisorCLI(projectRoot, r)
+func failureAdvisorOpts(projectRoot string, r *cliroute.Router, console io.Writer) []core.FailureAdvisorOption {
+	cli := failureAdvisorCLI(projectRoot, r, console)
 	if cli == "" {
 		return nil
 	}
 	return []core.FailureAdvisorOption{core.WithFailureAdvisorCLI(cli)}
 }
 
-func failureAdvisorCLI(projectRoot string, r *cliroute.Router) string {
-	res, err := r.ResolveRole("failure-advisor", resolvellm.Options{ProjectRoot: projectRoot, GitRoot: projectRoot})
+func failureAdvisorCLI(projectRoot string, r *cliroute.Router, console io.Writer) string {
+	const agent = "failure-advisor"
+	res, err := r.ResolveRole(agent, resolvellm.Options{ProjectRoot: projectRoot, GitRoot: projectRoot})
 	if err != nil {
+		fmt.Fprintf(console, "[cycle] WARN failure advisor has no route (agent %s), so it keeps the compiled default: %v\n", agent, err)
 		return ""
 	}
 	return res.CLI
@@ -809,15 +725,6 @@ func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader) (ph
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
 	return catalog, builtinCat, userSpecs
-}
-
-func wireCLIRouter(projectRoot string, cat cliroute.Catalog, console io.Writer) (*cliroute.Router, error) {
-	r, findings, err := buildCLIRouter(projectRoot, cat, routingHost(os.Stderr, time.Now))
-	reportRoutingFindings(console, findings)
-	if err != nil {
-		return nil, fmt.Errorf("the CLI routing table refuses to route: %w", err)
-	}
-	return r, nil
 }
 
 // documentSpecPtr is the registry's document contract, the one resolution the

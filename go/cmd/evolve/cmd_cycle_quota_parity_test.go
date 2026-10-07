@@ -80,7 +80,7 @@ func runCycleRunWith(t *testing.T, runner core.PhaseRunner, onlyScout bool) (rc 
 	fake = newFakeLedger()
 	old := wireOrchestratorDepsFn
 	t.Cleanup(func() { wireOrchestratorDepsFn = old })
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		runners := map[core.Phase]core.PhaseRunner{}
 		for _, p := range []core.Phase{core.PhaseIntent, core.PhaseScout, core.PhaseTriage, core.PhaseTDD, core.PhaseBuildPlanner, core.PhaseBuild, core.PhaseAudit, core.PhaseShip, core.PhaseRetro} {
 			if onlyScout && p != core.PhaseScout {

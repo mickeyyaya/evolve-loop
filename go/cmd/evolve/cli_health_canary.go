@@ -65,6 +65,8 @@ func runCLIHealthCanary(ctx context.Context, projectRoot string, env map[string]
 			if entry.OperatorAction != "" {
 				fmt.Fprintf(stderr, "[loop] cli-health canary: %s\n", entry.OperatorAction)
 			}
+		case rc == bridge.ExitModelMismatch:
+			fmt.Fprintf(stderr, "[loop] cli-health canary: %s booted a model outside its family (exit %d) — bench kept until a probe reaches the family's own model\n", family, rc)
 		default:
 			_ = store.Clear(family)
 			fmt.Fprintf(stderr, "[loop] cli-health canary: %s probe failed rc=%d (not a wall) — bench cleared; normal dispatch machinery owns this failure class\n",

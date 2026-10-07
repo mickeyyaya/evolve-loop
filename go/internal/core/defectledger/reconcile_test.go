@@ -256,6 +256,67 @@ func TestReconcile_AncestorEmptyOrAbsent_WarnsWithoutBlockingOrVouching(t *testi
 	}
 }
 
+func TestReconcile_AnAncestorHoldingOnlyShadowRowsIsTheEmptyAncestor(t *testing.T) {
+	f := newFixture(t)
+	f.ancestorLedger(t, `{"origin_cycle":1255,"entries":[{"id":"d1","text":"[HIGH] correctness go/x.go:1 — t | scenario: s | evidence: e | fix: f","status":"DEFERRED","reason":"shadow stage","source":"code-review","round":1,"severity":"HIGH","dimension":"correctness"}]}`)
+	l, got := observed(scopeOf(), resolveNever)
+
+	v := l.Reconcile(f.req)
+
+	assertVerdict(t, "ancestor_shadow_only", v, goldenScenario(t, "ancestor_empty", f))
+	fieldsOf(t, only(t, *got, CodeAncestorEmpty), map[string]string{"step": "grade", "blocked": "false", "ancestor_cycle": "1255"})
+}
+
+func TestReconcile_AnAncestorsOpenRowIsOwedWhateverItsSource(t *testing.T) {
+	f := newFixture(t)
+	f.ancestorLedger(t, `{"origin_cycle":1255,"entries":[{"id":"d1","text":"[HIGH] correctness go/x.go:1 — t","status":"OPEN","source":"code-review","round":1,"severity":"HIGH"}]}`)
+	f.claims(t, `{"dispositions":[{"id":"d1","status":"DEFERRED","reason":"later"}]}`)
+	l, got := observed(scopeOf(), resolveNever)
+
+	v := l.Reconcile(f.req)
+
+	if v.Blocked || strings.Join(ints(v.LineageCycles), ",") != "1255" || len(*got) != 0 {
+		t.Errorf("verdict = %+v (events %v), want lineage 1255 vouched: an OPEN row is owed whatever its source, so an enforced review row is a lineage", v, codesOf(*got))
+	}
+}
+
+func TestReconcile_AnAuditDefectQuotingAShadowRowIsGradedLikeOneAlone(t *testing.T) {
+	shadowText := "[HIGH] correctness go/x.go:1 — t | scenario: s | evidence: e | fix: f"
+	auditText := "code-review: " + shadowText
+	beside, _, _ := Append(Doc{OriginCycle: 1255}, []Entry{{Text: shadowText, Status: StatusDeferred, Reason: "shadow stage", Source: "code-review", Round: 1, Severity: "HIGH"}}, 1255)
+	beside, _, _ = Append(beside, openRows([]string{auditText}), 1255)
+	alone, _, _ := Append(Doc{OriginCycle: 1255}, openRows([]string{auditText}), 1255)
+	claims := `{"dispositions":[{"id":"` + alone.Entries[0].ID + `","status":"DEFERRED","reason":"tracked in the inbox"}]}`
+	verdict := func(doc Doc) Verdict {
+		f := newFixture(t)
+		raw, err := json.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.ancestorLedger(t, string(raw))
+		f.claims(t, claims)
+		l, _ := observed(scopeOf(), resolveNever)
+		return l.Reconcile(f.req)
+	}
+
+	a, b := verdict(alone), verdict(beside)
+
+	if a.Blocked || b.Blocked || len(a.Diagnostics) != len(b.Diagnostics) {
+		t.Errorf("alone blocked=%v, beside a shadow row blocked=%v (%v): a shadow row sharing the audit row's id shadowed it and changed the audit verdict", a.Blocked, b.Blocked, b.Diagnostics)
+	}
+}
+
+func TestReconcile_ShadowRowsBesideTheAuditsLeaveTheVerdictByteIdentical(t *testing.T) {
+	f := newFixture(t)
+	shadowRow := `,{"id":"dshadow","text":"unaccounted one","status":"DEFERRED","reason":"shadow stage","source":"code-review","round":1,"severity":"CRITICAL"}]}`
+	f.ancestorLedger(t, strings.TrimSuffix(reconciledAncestor, "]}")+shadowRow)
+	f.ownLedger(t, reconciledCurrent)
+	f.claims(t, reconciledClaims)
+	l, _ := observed(scopeOf(), resolveUnder(f.root))
+
+	assertVerdict(t, "reconciled_writeback_beside_shadow", l.Reconcile(f.req), goldenScenario(t, "reconciled_writeback", f))
+}
+
 // Test 23 — this cycle's own ledger unreadable blocks: {which=own}.
 func TestReconcile_OwnLedgerUnreadable_Blocks(t *testing.T) {
 	f := newFixture(t)

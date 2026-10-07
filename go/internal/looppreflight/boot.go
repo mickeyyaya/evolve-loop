@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -13,11 +14,9 @@ import (
 // checkBridgeBoot boots each *-tmux driver's REPL in turn and halts if any misses its
 // prompt marker; SkipBoot warns instead. Sandbox needs a profile request and a capable host.
 func checkBridgeBoot(o resolved, usageEvidence func(driver string) string) CheckResult {
-	const name = "bridge-boot"
-
 	if o.skipBoot {
 		return CheckResult{
-			Name:    name,
+			Name:    bridgeBootCheck,
 			Level:   LevelWarn,
 			Message: "bridge boot skipped (EVOLVE_SKIP_PREFLIGHT_BOOT)",
 			Detail:  "cheap checks ran; the real REPL boot — the check that catches an ExitREPLBootTimeout — was not exercised",
@@ -33,28 +32,37 @@ func checkBridgeBoot(o resolved, usageEvidence func(driver string) string) Check
 
 	sandbox := sandboxWanted(o.profileLister, o.profileGetter) && o.hostProbe().Sandbox.ExpectedToWork
 
-	var fails []string
+	tally := bootTally{booted: len(bootable), sandbox: sandbox}
 	for _, driver := range bootable {
 		out := bootOne(o, driver, sandbox)
-		if out.RC == bridge.ExitOK {
-			continue
+		switch out.RC {
+		case bridge.ExitOK:
+		case bridge.ExitModelMismatch:
+			tally.mismatches = append(tally.mismatches, bootFailureDetail(driver, out, usageEvidence))
+		default:
+			tally.fails = append(tally.fails, bootFailureDetail(driver, out, usageEvidence))
 		}
-		fails = append(fails, bootFailureDetail(driver, out, usageEvidence))
 	}
+	return tally.result()
+}
 
-	if len(fails) > 0 {
-		return CheckResult{
-			Name:    name,
-			Level:   LevelHalt,
-			Message: fmt.Sprintf("%d driver(s) failed to boot", len(fails)),
-			Detail:  strings.Join(fails, "\n"),
-		}
+const bridgeBootCheck = "bridge-boot"
+
+type bootTally struct {
+	booted            int
+	sandbox           bool
+	fails, mismatches []string
+}
+
+func (b bootTally) result() CheckResult {
+	detail := strings.Join(append(slices.Clone(b.fails), b.mismatches...), "\n")
+	switch {
+	case len(b.fails) > 0:
+		return CheckResult{Name: bridgeBootCheck, Level: LevelHalt, Message: fmt.Sprintf("%d driver(s) failed to boot", len(b.fails)), Detail: detail}
+	case len(b.mismatches) > 0:
+		return CheckResult{Name: bridgeBootCheck, Level: LevelWarn, Message: fmt.Sprintf("%d driver(s) booted another model family: their seats fail over to the next CLI", len(b.mismatches)), Detail: detail}
 	}
-	return CheckResult{
-		Name:    name,
-		Level:   LevelPass,
-		Message: fmt.Sprintf("%d driver(s) booted (sandbox=%v)", len(bootable), sandbox),
-	}
+	return CheckResult{Name: bridgeBootCheck, Level: LevelPass, Message: fmt.Sprintf("%d driver(s) booted (sandbox=%v)", b.booted, b.sandbox)}
 }
 
 type BootOutcome struct {
@@ -128,6 +136,8 @@ func bootRCName(rc int) string {
 		return "ExitREPLBootTimeout — REPL never reached its prompt marker"
 	case bridge.ExitMissingBinary:
 		return "ExitMissingBinary — CLI binary not found"
+	case bridge.ExitModelMismatch:
+		return "ExitModelMismatch — the REPL booted a model outside the target's model family, or showed no readable model label"
 	case bridge.ExitBadFlags:
 		return "ExitBadFlags — unknown or non-tmux driver"
 	case exitWorkspaceSetupFailed:

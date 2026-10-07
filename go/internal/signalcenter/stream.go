@@ -34,7 +34,7 @@ func readStreamFrom(path string, from int64) ([]byte, int64, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	size, err := f.Seek(0, io.SeekEnd)
 	start := from
 	if start < 0 || start > size {

@@ -49,7 +49,7 @@ var commands = []subcommand{
 	{Name: "inbox", Summary: "The backlog: batches (the grouping triage consumes) | list | show | add | edit | verify | withdraw | route-console | route-lane | consume | quarantine | ack-fingerprint (evolve inbox --help)", Run: runInbox},
 	{Name: "phase", Summary: "Run a single phase in-process", Run: runPhase},
 	{Name: "phases", Summary: "List/validate/scaffold phase definitions (the phase catalog)", Run: phasecmd.RunPhases},
-	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.RunServePhase},
+	{Name: "serve-phase", Summary: "Envelope-framed phase subprocess", Run: phasecmd.NewRunServePhase(rootRouterInstaller)},
 	{Name: "cycle", Summary: "Run one full cycle", Run: runCycle},
 	{Name: "fleet", Summary: "Launch N concurrent cycles (ADR-0049 S6)", Run: runFleet},
 	{Name: "campaign", Summary: "Multi-cycle campaign planner (study|replan|run|status)", Run: runCampaign},

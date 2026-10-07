@@ -33,14 +33,29 @@ func (h hooks) ArtifactFilename(_ core.PhaseRequest) string {
 }
 
 func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
-	var b strings.Builder
+	var b, blocks strings.Builder
 	b.WriteString(runner.BaseCycleContext(body, req))
 	for _, key := range h.spec.PromptContext {
-		if v := req.Context[key]; v != "" {
+		switch v := req.Context[key]; {
+		case v == "":
+		case strings.Contains(v, "\n"):
+			fmt.Fprintf(&blocks, "\n\n## %s\n%s", contextHeading(key), v)
+		default:
 			fmt.Fprintf(&b, "- %s: %s\n", key, v)
 		}
 	}
+	b.WriteString(blocks.String())
 	return b.String()
+}
+
+func contextHeading(key string) string {
+	words := strings.Split(key, "_")
+	for i, w := range words {
+		if w != "" {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeResponse) (string, []core.Diagnostic, string) {

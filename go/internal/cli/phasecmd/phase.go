@@ -24,12 +24,17 @@ import (
 
 type BuildHandoffFloorFor func(projectRoot string) core.BuildHandoffFloor
 
+type RouterInstaller func(projectRoot string) error
+
+const exitRoutingRefused = 2
+
 type phaseCommand struct {
-	floor BuildHandoffFloorFor
+	floor   BuildHandoffFloorFor
+	install RouterInstaller
 }
 
-func NewRunPhase(floor BuildHandoffFloorFor) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return phaseCommand{floor: floor}.run
+func NewRunPhase(floor BuildHandoffFloorFor, install RouterInstaller) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return phaseCommand{floor: floor, install: install}.run
 }
 
 func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -57,6 +62,10 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return 11
 	}
 
+	if err := c.installRouter(req.ProjectRoot); err != nil {
+		fmt.Fprintf(stderr, "evolve phase: %s: %v\n", name, err)
+		return exitRoutingRefused
+	}
 	runner := factory(req)
 	resp, err := runner.Run(context.Background(), req)
 	if err != nil {
@@ -73,4 +82,11 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	fmt.Fprintln(stdout, string(buf))
 	return 0
+}
+
+func (c phaseCommand) installRouter(projectRoot string) error {
+	if c.install == nil {
+		return nil
+	}
+	return c.install(projectRoot)
 }

@@ -185,6 +185,18 @@ REAL repo catalog and asserts the phase reaches an enriched advisor card — thi
 caught a real bug (metadata-less optional built-ins starving metadata-rich plugin
 phases out of the enriched slots).
 
+## 4b. A pinned user phase: `code-review` (ADR-0124, 2026-10-07)
+
+A user phase stays optional-only and can never satisfy or displace the floor, but the registry may still **pin** one. `docs/architecture/phase-registry.json` `config.conditional_mandatory["code-review"] = "deliverable_kind==code && build.files_touched>0"` makes the router run the `code-review` user phase after build on every code cycle that touched files, whatever the advisor planned.
+
+Why a pin and not `routing.insert_when`: at the Advisory stage `insert_when` only *gates* the advisor's plan (`router.shouldRunFromPlan`). It removes a planned phase whose trigger does not fire, but never adds an unplanned one. A pinned phase also does not count against `max_optional_insertions`, and PSMAS cannot skip it. Pinned by `TestCodeReviewPin_*` (`internal/router/code_review_pin_test.go`), which loads the real registry and the real `.evolve/phases`.
+
+**Report grammars.** A user phase may declare `classify.grammars`, a list of named report grammars. The deliverable gate runs each registered grammar's check on the report, and a violation (`bad_grammar`) gets the contract-correction rung like a missing section. The grammar names are `phasespec`'s vocabulary (`phasespec.Grammars()`). A user spec naming any other grammar fails `ValidateUserSpec`, so the catalog load skips it with a WARN, the same as any invalid spec. A typo is therefore a load error and never reaches an agent's correction rung. The gate's `unbound_grammar` stays for a spec that bypassed validation. `TestGrammars_TheGateBindsExactlyTheGrammarsASpecMayDeclare` pins the gate's registry to that vocabulary in both directions. `code-review` declares `code-review-report` (`codereview.ValidateReport`): the Review Plan, the quality-index Scores, their agreement, and a cited finding for every gap ([design §3](review-loop-and-quality-index.md)).
+
+**The Task Contract on request.** A user phase that lists `task_contract` in `prompt_context` is seeded the Task Contract block, as tdd, build and audit are; `code-review` does, so the reviewer sees the acceptance it judges against. A spec that sets `prompt_context` replaces the evaluate default `["goal"]`, so `code-review` lists both: `["goal", "task_contract"]`. The spec runner renders a multi-line value as its own `## Task Contract` block.
+
+Open (OQ1 in the [plan §11](../plans/code-review-phase-2026-10.md)): user phases anchored `after: build` splice in reverse-alphabetical order, so `code-review` is not guaranteed to run first after build. Shadow does not need it to, because no fix round changes the diff. Enforce does, and Q6 adds an explicit order.
+
 ## 5. Operational notes
 
 - **Add a phase by talking:** invoke `/phase-create` (or just ask) → the LLM designs

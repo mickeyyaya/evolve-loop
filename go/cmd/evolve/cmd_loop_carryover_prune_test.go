@@ -37,7 +37,7 @@ func TestRunLoop_AutoPrunesExpiredCarryoverTodos(t *testing.T) {
 
 	prevDeps := wireOrchestratorDepsFn
 	defer func() { wireOrchestratorDepsFn = prevDeps }()
-	wireOrchestratorDepsFn = func(string, string, io.Writer) orchDeps {
+	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		return orchDeps{Storage: &fixtures.FakeStorage{}, Ledger: newFakeLedger()}
 	}
 	prevPf := runLoopPreflightFn

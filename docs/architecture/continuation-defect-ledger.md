@@ -363,3 +363,22 @@ gate's no-manifest anti-tamper block above is byte-identical: deletion of the
 WORKSPACE manifest under a live binding still blocks; declination by the
 ORCHESTRATOR now releases. Full rationale and rejected alternatives:
 [ADR-0085](adr/0085-continuation-registry-release.md).
+
+## Code-review rows (ADR-0124, 2026-10-07)
+
+**Issue.** The audit was the ledger's only writer, so a defect reached the record only after the gate rejected. The new `code-review` phase ([ADR-0124](adr/0124-code-review-phase.md), [design](review-loop-and-quality-index.md)) reviews the build's diff before the audit, and its findings need the same addressable home.
+
+**Gap.** A second store would give findings two homes. A text prefix (like `PRESCRIPTION: `) would make every reader that needs the severity, the source or the dimension parse prose.
+
+**Solution.**
+- **Four additive `omitempty` fields on each entry:** `source` (`code-review`; empty is the audit), `round` (the cycle's code-review dispatch count), `severity` and `dimension` (a quality-index dimension). Old ledgers parse and re-serialize byte-identical.
+- **One merge rule for both writers.** `internal/codereview` appends the review's rows through `defectledger.Append`, the function the audit's Emit now uses. Dedupe, the 64-row cap and the stand-in for a cut are each kept per source, keyed on `(source, text)`, and a non-audit row's id hashes `source + "\xff" + text`, a preimage no JSON-decoded defect text can spell. A review row therefore never dedupes, cuts or swallows an audit row, and an audit row's bytes are unchanged. The stand-in takes the cut rows' status, reason, source and round, and their highest severity.
+- **The row text is position-free:** `[SEVERITY] dimension location — title | scenario | evidence | fix`, without the report's `CR<n>` id, so a renumbered re-report is the same row.
+- **Provenance survives inheritance.** `mergeInherited` and `gradeClaim` carry `source`, `round`, `severity` and `dimension` through whatever status the grade gives, so an inherited code-review row stays visible as one to the continuation's audit.
+
+**Shadow posture.** In the shadow stage (`workflow.findings_repair.code-review.stage`, compiled default) every code-review row is written **DEFERRED** with the stage as its reason. The Reconcile gate carries a non-OPEN row verbatim and never owes it, and its empty-ancestor check and lineage vouch count only owed rows (audit rows, and OPEN rows of any source). An ancestor holding only shadow rows is therefore the empty ancestor, so a continuation's audit is unaffected. The prescription carryover reads only OPEN rows. The ledger still never shrinks.
+
+**In enforce** (the design's §5–§6, components Q3–Q5), rows are OPEN.
+- The build answers them in this cycle's `defect-dispositions.json`.
+- `applyReviewDispositions` grades those answers for same-cycle rows with `gradeClaim`'s rules: FIXED needs resolving evidence, and DEFERRED needs a reason. The reconcile gate above grades only inherited rows.
+- A strict deferral the reviewer rejects twice becomes `DISPUTED` (a status Q4 adds), and the audit rules on it. A row still DISPUTED at cycle close becomes OPEN, so a continuation inherits it as owed.

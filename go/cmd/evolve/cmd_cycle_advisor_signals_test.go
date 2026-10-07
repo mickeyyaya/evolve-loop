@@ -48,15 +48,22 @@ func TestWireSimulateOrchestrator_AdvisorWarningRenders(t *testing.T) {
 }
 
 func TestPhaseAdvisorRoot_WiresTheSignalCenter(t *testing.T) {
-	src, err := os.ReadFile("cmd_cycle.go")
+	wiring, err := os.ReadFile("router_dispatch.go")
 	if err != nil {
 		t.Fatal(err)
 	}
-	call := regexp.MustCompile(`(?s)core\.NewPhaseAdvisor\(.*?\n\t\)`).FindString(string(src))
+	call := regexp.MustCompile(`(?s)core\.NewPhaseAdvisor\(.*?\n\t\)`).FindString(string(wiring))
 	if call == "" {
-		t.Fatal("cmd_cycle.go must construct the advisor through core.NewPhaseAdvisor")
+		t.Fatal("router_dispatch.go must construct the advisor through core.NewPhaseAdvisor")
 	}
-	if !strings.Contains(call, "core.WithAdvisorSignals(signals)") {
-		t.Fatalf("the composition root must hand its Signal Center to the advisor:\n%s", call)
+	if !strings.Contains(call, "core.WithAdvisorSignals(w.signals)") {
+		t.Fatalf("wireRouterAdvisor must hand its Signal Center to the advisor:\n%s", call)
+	}
+	root, err := os.ReadFile("cmd_cycle.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`wireRouterAdvisor\(routerAdvisorWiring\{[^}]*signals: signals`).Match(root) {
+		t.Fatal("the composition root must hand its Signal Center to wireRouterAdvisor")
 	}
 }

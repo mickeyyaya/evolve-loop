@@ -242,7 +242,7 @@ deferred-debt-then-unify move ADR-0044 used for outcome recording (C1 → C3 res
 
 **Problem.** An agent stuck on an unknown prompt escalates exit 85 — which (since cycle-267)
 **already triggers the cross-family CLI fallback chain** (`llmroute` default triggers
-`{80, 81, 85, 124, 127}`). That is the right floor, but it is wasteful when the kernel *knows the
+`{80, 81, 85, 87, 124, 127}`). That is the right floor, but it is wasteful when the kernel *knows the
 answer* (the deliverable path, the goal, the cycle number): the fallback CLI re-does the whole
 phase to get past a question one injected line would have cleared.
 

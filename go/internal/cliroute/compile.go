@@ -58,6 +58,7 @@ func (c *compiler) compileDeclared(t Table) Table {
 	t.agentKeys = maps.Clone(c.agentKeys)
 	c.checkTwoSources()
 	c.checkAgents(t)
+	c.checkProfileLessLaunches(t)
 	return t
 }
 
@@ -88,6 +89,7 @@ func (c *compiler) snapshotProfiles(profs ProfileSource) map[string]loadedProfil
 	for _, name := range names {
 		p, err := profs.Get(name)
 		snapshot[name] = loadedProfile{profile: p, err: err}
+		c.checkModelMismatchTrigger(name, p)
 	}
 	return snapshot
 }

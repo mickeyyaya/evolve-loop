@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 )
 
@@ -125,5 +126,33 @@ func TestCanary_AnExpiredAgyClaudeBenchProbesTheAgyClaudeTarget(t *testing.T) {
 	}, &out)
 	if len(probed) != 1 || probed[0] != "agy-claude-tmux" {
 		t.Fatalf("probed=%v, want one probe of agy-claude-tmux", probed)
+	}
+}
+
+func TestCanaryAModelMismatchKeepsTheBench(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	benchExpired(t, root, "agy-claude", 1)
+	var out bytes.Buffer
+	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+		return bridge.ExitModelMismatch, "", "Gemini 3.8 Flash · low"
+	}, &out)
+	benches, _ := clihealth.NewStore(root, nil).Load()
+	if _, kept := benches["agy-claude"]; !kept || !strings.Contains(out.String(), "bench kept") {
+		t.Fatalf("benches %v, log %q: a probe that booted another model proves nothing about the family's own model", benches, out.String())
+	}
+}
+
+func TestCanaryAWallBesideAModelMismatchRebenchesWithAStrike(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	benchExpired(t, root, "agy-claude", 1)
+	var out bytes.Buffer
+	runCLIHealthCanary(context.Background(), root, nil, func(driver string) (int, string, string) {
+		return bridge.ExitModelMismatch, "rate_limit", "Individual quota reached. Resets in 2h15m."
+	}, &out)
+	benches, _ := clihealth.NewStore(root, nil).Load()
+	if entry, ok := benches["agy-claude"]; !ok || entry.Strikes != 2 || !strings.Contains(out.String(), "still walled") {
+		t.Fatalf("benches %v, log %q: a classified wall is the stronger evidence, so the family is re-benched with a strike before the mismatch rule keeps it", benches, out.String())
 	}
 }

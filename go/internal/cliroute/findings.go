@@ -111,6 +111,20 @@ func (c *compiler) checkAgents(t Table) {
 	c.checkCrossFamily(t, primaries)
 }
 
+func (c *compiler) checkModelMismatchTrigger(name string, prof profiles.Profile) {
+	if len(prof.CLIFallbackOnExit) == 0 || slices.Contains(prof.CLIFallbackOnExit, llmroute.ExitModelMismatch) {
+		return
+	}
+	c.add(SeverityWarn, "profiles."+name+".cli_fallback_on_exit", "omits %d, the launch-time model-mismatch exit, so a target that boots another model family ends the walk instead of handing the attempt to the next CLI", llmroute.ExitModelMismatch)
+}
+
+func (c *compiler) checkProfileLessLaunches(t Table) {
+	if _, declared := t.chains[ruleDefault]; declared {
+		return
+	}
+	c.add(SeverityWarn, "cli_routing.default", "is not set, so a launch with no profile has no chain: the %s and any agent no profile names are refused at dispatch", ClassifierAgent)
+}
+
 func (c *compiler) checkSelection(t Table, a agentView, sel roleSel) []string {
 	picked, ruleErr := t.selectRule(a.name, sel, a.prof, a.allowed)
 	if ruleErr == nil {

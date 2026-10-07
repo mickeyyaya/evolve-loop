@@ -1,6 +1,9 @@
 package bridge
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 type agyTmuxDriver struct{ target string }
 
@@ -15,7 +18,15 @@ func (d agyTmuxDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int,
 
 	session, named := resolveSession(cfg, deps, "evolve-bridge-agy-")
 
-	return runTmuxREPL(ctx, cfg, deps, agyTmuxLaunch(d.target, cfg, deps, session, named))
+	check, err := d.launchModelCheck()
+	if err != nil {
+		return ExitBadFlags, fmt.Errorf("[%s] launch model check: %w", d.target, err)
+	}
+	return runTmuxREPL(ctx, cfg, deps, agyTmuxLaunch(d.target, cfg, deps, session, named).withModelCheck(check))
+}
+
+func (d agyTmuxDriver) launchModelCheck() (launchModelCheck, error) {
+	return launchModelCheckFor(d.target)
 }
 
 func agyTmuxLaunch(target string, cfg *Config, deps Deps, session string, named bool) tmuxLaunch {
