@@ -68,6 +68,51 @@ All notable changes to this project will be documented in this file.
   - `signal-codes.md`, generated again: the `declared_class` of `ORCHESTRATOR_AUDIT_REPAIR_DECLINED` can now come from a gate.
   - REGRESSION-COVERAGE-INDEX: three rows, all ✅. The summary now reads 54 incidents, 84 rows, 69 covered, 10 partial and 5 none.
   - The inbox item `gate-forced-audit-fail-declares-a-repairable-class` is consumed.
+## Added — one convergence policy decides the next step of every loop that repeats (ADR-0126 V1–V3, 2026-10-07)
+
+- **The operator's request (2026-10-07).** "Prioritize a convergence rule/solution using L2 with 7 rounds as the example issue that should converge earlier by escalating to top / deep model or other approaches". Also: "It just retry for too many times". Also: "Convergence rule should also apply to evo loop cycle pipeline to avoid infinite back and forth endless loop".
+- **The design.** [convergence-policy.md](docs/architecture/convergence-policy.md) and [ADR-0126](docs/architecture/adr/0126-every-iterative-loop-converges-or-escalates.md).
+- **The new package `internal/convergence`:**
+  - `Decide(Input) Decision` is pure and deterministic. It has one row of rules for each loop: code-review, console-lane, audit-repair, explanation, cycle, inbox-item and ship-recovery.
+  - **The ladder:**
+    - Rung 1 changes the feedback. From J_1, the judge only verifies. The fixer and the judge get one raise in their own family, when headroom exists.
+    - Rung 2 changes the strategy. The fixer gets a fresh context. A loop that can defer raises its bar to HIGH, and it defers and files MEDIUM and LOW findings.
+    - Rung 3 changes the scope: split, accept with limits, or stop. A fourth round never occurs.
+  - **The triggers:** a round that gains too little (its damage is equal to or more than its repairs, or it makes no progress at the bar), oscillation, and concentration in one component.
+  - **Keep-best:** the round with the fewest strict findings at the bar lands. A tie goes to the lowest open mass, and then to the earliest round.
+  - **Headroom** comes from the tier table in the family's manifest and from the judge's actual model and effort. The policy never assumes headroom.
+- **Safety rules:**
+  - A CRITICAL finding is never deferred, exempted, filed or landed.
+  - Split and accept refuse an open CRITICAL in the judged round and in the landed round.
+  - Audit-repair, cycle, inbox-item and ship-recovery never defer.
+  - The cycle loop keeps its base bar.
+  - A late CRITICAL or HIGH finding blocks, unless its falsification check says `refuted`. When the result is absent, the finding blocks.
+- **The new verb `evolve convergence decide --input <rounds.json> [--json]`.** The console lanes use it. It accepts the `console-lane` loop only; for other loops, it exits 10 and names the caller in the process. Bad input exits 10, an unreadable policy exits 2, and a write failure exits 1. The input schema is in [runtime-reference](docs/operations/runtime-reference.md).
+- **The new config `workflow.convergence`** in `.evolve/policy.json`. It has compiled defaults and a strict key decode, and its `stage` is `shadow`. `policy.ConvergenceConfig.Validate` is the one home for the bar words and the ranges. No loop calls `Decide` yet. V5, V6 and V10–V12 connect it.
+- **The L2 example, replayed** (`go/internal/convergence/testdata/l2-rounds.json`, a reconstruction of the four round tables):
+  - The policy lands round 3 through rung 2. L2 itself used seven fix rounds.
+  - It defers r7-MEDIUM-1 and r7-LOW-1 to r7-LOW-4. It files r7-INFO. It names the redesign `bridge:model-check`.
+  - The concentration share is 0.647, against 0.636 before.
+- **The review, under the policy itself:**
+  - **Round 1, a full architecture and Go review: FIX_THEN_MERGE.**
+    - One CRITICAL: accept with limits, together with keep-best, could defer an open CRITICAL from an earlier round.
+    - Four HIGH findings: a tie landed an unfixed round; an absent certificate meant "refuted"; the HIGH bar of the cycle dropped open MEDIUM findings; and 7 mutants survived.
+    - Also 8 MEDIUM and 7 LOW findings. The lane fixed all of them, except one capability finding, which went to the inbox.
+  - **Round 2, a verify-only check: MERGE.** All 20 findings were fixed, and none blocked. At the landing, the console added the reviewer's rank test, `TestKeepBest_FewerStrictFindingsOutrankALighterResidue`. It kills a mutant that ranks mass first, which no other test killed. The other filed items went to the inbox.
+- **Tests, red first:**
+  - More than 92 tests in `convergence`, `policy` and the verb.
+  - The lane's 36 mutants and the reviewer's 23 mutants are all killed.
+  - A sweep of 20,000 inputs found no deferred CRITICAL and no landed CRITICAL.
+  - Fifty identical runs gave identical output.
+- **Inbox:**
+  - `convergence-disputed-critical-names-its-adjudicator` (L3, a capability);
+  - `convergence-v1-review-followups`: a property test in the suite for the rule "never land a CRITICAL", and one wording for the single judge raise;
+  - `routing-logs-name-the-cli-that-runs`: in wave 77, the runner logged `cli=agy-tmux` for deep builders. The tier ceiling ran them on `claude-tmux`. Also, the bench times show no date.
+- **Docs:**
+  - [the design](docs/architecture/convergence-policy.md): the pointer to the §2.1 schema, the keep-best order in §3, the falsification rule in §4 and the cycle bar in §6.1;
+  - [ADR-0126](docs/architecture/adr/0126-every-iterative-loop-converges-or-escalates.md);
+  - [the plan](docs/plans/convergence-policy-2026-10.md): V1–V3 landed;
+  - `internal-convergence.md`, `internal-policy.md`, `cmd-evolve.md`, `policy-config.md` and runtime-reference.
 
 ## Changed — the operator's CLI routing table is live: agy first on Gemini 3.8 Flash High, Claude through agy before Claude Code at deep and top (and agy-claude verifies the model it booted), and every launch path honours it (cli-routing L2, 2026-10-07)
 
