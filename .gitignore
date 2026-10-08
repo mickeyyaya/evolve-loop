@@ -89,6 +89,10 @@ node_modules/
 # (e.g. dossier-closeout) that must pass before a cycle can ship. Operator-
 # extensible; must be tracked so the gate applies consistently across clones.
 !.evolve/policy.json
+# ... and except the standing wave goal. `evolve wave next` puts it first in
+# each wave goal (policy key wave.standing_goal). It is tracked so that the
+# boundary sync brings each change to the plane.
+!.evolve/wave-goal.md
 # ... and except the naming-guard manifest (SSOT for the legacynames acs gate,
 # `evolve release` preflight, and `evolve names`). Lists the dead naming tokens a
 # rename leaves behind; must be tracked so the guard applies across all clones.
