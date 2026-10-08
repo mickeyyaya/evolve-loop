@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "Two cycle-N files in different directories are never swept as one pair (test)",
+    "Write(nil) returns an error without panicking (test that does not recover)",
+    "BuildOpts has no dead fields"
+  ],
+  "consumed": {
+    "at": "2026-10-08T06:48:07Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "created_at": "2026-09-26T12:40:00Z",
+  "files": [
+    "go/internal/dossier/sweep.go",
+    "go/internal/dossier/write.go",
+    "go/internal/dossier/build.go"
+  ],
+  "fix": "Pair by (directory, cycle) under the dossier directory only, and ignore tracked modifications and renames, with a test holding two same-numbered files in different directories. Nil-check Write's argument and return an error; test it without safeCallWrite. Delete LedgerPath.",
+  "id": "dossier-sweep-pairing",
+  "kind": "pipeline-repair",
+  "priority": "P2",
+  "priority_class": "hygiene",
+  "priority_rationale": "inbox review 2026-09-27: The wrong-pair commit is only reachable through a function nothing calls; the rest is a nil guard and a dead field.",
+  "route": "lane",
+  "routed_at": "2026-09-30T09:02:14Z",
+  "routed_reason": "operator inbox review 2026-09-30: classified ACTIONABLE-S (small, specified, re-verified against main 1e6912c4); routed to the lanes per the operator's direction to batch-implement the inbox through the evo loop",
+  "source": "console-comment-workstream-batch11",
+  "summary": "Found by comment-reduction batch 11 (2026-09-26) and reported without changing code. (1) SweepOrphans pairs dossier files by cycle number alone, ignoring the directory, and its regex matches cycle-N.{json,md} anywhere in the repo. Two same-numbered files in different directories become one 'pair', and the commit then fails on the missing .md. It also picks up tracked, modified pairs and rename sources, because DirtyPaths returns tracked changes as well as untracked files. (2) Write(nil, …) dereferences d.Cycle before any nil check. TestWrite_NilDossier passes only because safeCallWrite turns the panic into an error. (3) BuildOpts.LedgerPath is dead: nothing sets or reads it. internal/core/dossier_producer.go still carries cycle-1623 history in a comment; that is for a later core batch.",
+  "title": "dossier: SweepOrphans pairs files by cycle number only and can commit a wrong or half pair; Write(nil) panics",
+  "weight": 0.5
+}

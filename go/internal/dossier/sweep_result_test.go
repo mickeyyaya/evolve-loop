@@ -10,9 +10,9 @@ import (
 func TestSweepResult_FieldsReportOnePassOutcome(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
-	writePairFile(t, dir, "cycle-7.json", `{"cycle":7}`)
-	writePairFile(t, dir, "cycle-7.md", "# cycle 7\n")
-	writePairFile(t, dir, "cycle-8.json", `{"cycle":8}`) // lone half-pair
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-7.json", `{"cycle":7}`)
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-7.md", "# cycle 7\n")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-8.json", `{"cycle":8}`) // lone half-pair
 
 	// Typed explicitly so apicover sees the SweepResult identifier in the test AST.
 	var got SweepResult

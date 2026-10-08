@@ -38,15 +38,6 @@ func safeCallJSON(f func() ([]byte, error)) (out []byte, err error) {
 	return f()
 }
 
-func safeCallWrite(f func() error) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
-	}()
-	return f()
-}
-
 func TestBuild_ZeroCycleBoundary(t *testing.T) {
 	tmp := t.TempDir()
 	_, err := Build(0, BuildOpts{WorkspacePath: tmp, Goal: "g"})
@@ -375,8 +366,7 @@ func TestParseJSON_PreservesAllFields(t *testing.T) {
 }
 
 func TestWrite_NilDossier(t *testing.T) {
-	err := safeCallWrite(func() error { return Write(nil, t.TempDir(), false) })
-	if err == nil {
+	if err := Write(nil, t.TempDir(), false); err == nil {
 		t.Error("GAP: Write(nil, ...) must return error (not panic)")
 	}
 }

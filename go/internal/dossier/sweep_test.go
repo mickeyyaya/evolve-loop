@@ -51,7 +51,11 @@ func initSweepRepo(t *testing.T, dir string) {
 
 func writePairFile(t *testing.T, dir, name, content string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+	p := filepath.Join(dir, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", name, err)
+	}
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
 		t.Fatalf("write %s: %v", name, err)
 	}
 }
@@ -70,10 +74,10 @@ func sweepGitStatus(t *testing.T, dir string) string {
 func TestSweepOrphans_RecommitsUntrackedPairs(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
-	writePairFile(t, dir, "cycle-10.json", `{"cycle":10}`)
-	writePairFile(t, dir, "cycle-10.md", "# cycle 10")
-	writePairFile(t, dir, "cycle-20.json", `{"cycle":20}`)
-	writePairFile(t, dir, "cycle-20.md", "# cycle 20")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-10.json", `{"cycle":10}`)
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-10.md", "# cycle 10")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-20.json", `{"cycle":20}`)
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-20.md", "# cycle 20")
 
 	res, err := SweepOrphans(gitexec.Default(dir), io.Discard)
 	if err != nil {
@@ -99,7 +103,7 @@ func TestSweepOrphans_RecommitsUntrackedPairs(t *testing.T) {
 func TestSweepOrphans_SkipsIncompleteOrMismatchedPairs(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
-	writePairFile(t, dir, "cycle-30.json", `{"cycle":30}`) // .md deliberately missing
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-30.json", `{"cycle":30}`)
 
 	res, err := SweepOrphans(gitexec.Default(dir), io.Discard)
 	if err != nil {
@@ -125,10 +129,10 @@ func TestSweepOrphans_SkipsIncompleteOrMismatchedPairs(t *testing.T) {
 func TestSweepOrphans_LogsUnrecoverableFailureLoudly(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
-	writePairFile(t, dir, "cycle-40.json", `{"cycle":40}`) // this pair's commit is forced to fail
-	writePairFile(t, dir, "cycle-40.md", "# cycle 40")
-	writePairFile(t, dir, "cycle-50.json", `{"cycle":50}`) // this pair must still succeed
-	writePairFile(t, dir, "cycle-50.md", "# cycle 50")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-40.json", `{"cycle":40}`)
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-40.md", "# cycle 40")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-50.json", `{"cycle":50}`)
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-50.md", "# cycle 50")
 
 	g := gitexec.Git{Dir: dir, Exec: (&interceptExec{blockBase: "cycle-40"}).run}
 	var log bytes.Buffer

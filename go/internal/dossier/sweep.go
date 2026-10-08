@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -13,20 +14,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
-// orphanPair matches a cycle-<N>.json or cycle-<N>.md basename.
+const dossierDir = "knowledge-base/cycles"
+
 var orphanPair = regexp.MustCompile(`(^|/)cycle-(\d+)\.(json|md)$`)
 
-// SweepResult reports what a SweepOrphans pass did, keyed by cycle number.
 type SweepResult struct {
-	Recommitted []int         // complete pairs successfully committed (sorted)
-	Skipped     []int         // incomplete pairs (a lone .json or .md) left untouched (sorted)
-	Failed      map[int]error // pairs whose recommit failed; the batch continued past each
+	Recommitted []int
+	Skipped     []int
+	Failed      map[int]error
 }
 
-// SweepOrphans recommits every complete dirty cycle-N.{json,md} pair in g's
-// working tree (untracked or modified) and skips half pairs. A per-pair failure
-// is logged to logw and recorded in Failed; only a failure to enumerate the
-// tree returns an error.
 func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
 	res := SweepResult{Failed: map[int]error{}}
 
@@ -43,8 +40,12 @@ func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
 	}
 	sort.Ints(cycles)
 
+	ctx := context.Background()
 	for _, n := range cycles {
 		pp := pairs[n]
+		if anyTracked(ctx, g, pp.json, pp.md) {
+			continue
+		}
 		if pp.json == "" || pp.md == "" {
 			res.Skipped = append(res.Skipped, n)
 			continue
@@ -60,12 +61,31 @@ func SweepOrphans(g gitexec.Git, logw io.Writer) (SweepResult, error) {
 	return res, nil
 }
 
+func anyTracked(ctx context.Context, g gitexec.Git, files ...string) bool {
+	var nonZero []string
+	for _, f := range files {
+		if f != "" {
+			nonZero = append(nonZero, f)
+		}
+	}
+	if len(nonZero) == 0 {
+		return false
+	}
+	args := append([]string{"ls-files", "--"}, nonZero...)
+	out, err := g.Output(ctx, args...)
+	return err == nil && strings.TrimSpace(out) != ""
+}
+
 type orphanPairPaths struct{ json, md string }
 
 func groupOrphanPairs(dirty []string) map[int]*orphanPairPaths {
 	pairs := map[int]*orphanPairPaths{}
 	for _, p := range dirty {
-		m := orphanPair.FindStringSubmatch(p)
+		slash := filepath.ToSlash(p)
+		if path.Dir(slash) != dossierDir {
+			continue
+		}
+		m := orphanPair.FindStringSubmatch(slash)
 		if m == nil {
 			continue
 		}
@@ -79,9 +99,9 @@ func groupOrphanPairs(dirty []string) map[int]*orphanPairPaths {
 			pairs[n] = pp
 		}
 		if m[3] == "json" {
-			pp.json = p
+			pp.json = slash
 		} else {
-			pp.md = p
+			pp.md = slash
 		}
 	}
 	return pairs
