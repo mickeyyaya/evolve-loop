@@ -81,11 +81,14 @@ func explanationDocumentationFailures(ctx context.Context, in ReviewInput) []str
 // See ADR-0077.
 func docsFloorWarn(in ReviewInput, paths []string) {
 	var cfg docsfloor.Config
+	steStage := policy.Policy{}.DocsFloorConfig().SteStage
 	if in.ProjectRoot != "" {
 		if p, err := policy.Load(filepath.Join(in.ProjectRoot, ".evolve", "policy.json")); err == nil {
 			cfg.Stage = p.DocsFloorConfig().Stage
+			steStage = p.DocsFloorConfig().SteStage
 		}
 	}
+	steLintWarn(in.Worktree, steStage, paths)
 	// The blocking-grade classifier drops test-only diffs; the verdict still stays WARN.
 	v := docsfloor.Evaluate(cfg, docsfloor.Input{
 		ArchitectureLabeled: docsfloor.IsArchitectureClass(paths),

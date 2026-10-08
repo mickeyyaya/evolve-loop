@@ -151,6 +151,15 @@ The block configures `internal/convergence`, the one rule every repeat-until-acc
 | `concentration_min_findings` | the findings (LOW or above) a window needs before its share is defined | 5 | below 1 fails the load |
 | `max_backward_edges` | the cycle loop's *N*: the backward edges (audit → build, retro → tdd, ship → ship, …) one cycle may take before it stops with a continuation (design §6.1) | 3 | below 1 fails the load |
 
+## Documentation floors (`docs_floor`)
+
+The block sets the stages of the two documentation floors of the build handoff. Both floors only WARN. The loader decodes the block strictly. An unknown key, or a `stage` or `ste_stage` word that is not `off`, `shadow` or `enforce`, fails the load of the whole file. Thus a typo key in `docs_floor` stops every consumer of the policy, not only the two floors.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | the documentation floor for an architecture change without a document ([ADR-0077](adr/0077-docs-floor-for-architecture-changes.md)). `off` turns it off. `shadow` and `enforce` turn it on. | `enforce` |
+| `ste_stage` | the STE lint of the changed documents ([internal-stelint](packages/internal-stelint.md), `evolve docs ste-lint`). `off` prints nothing. `shadow` and `enforce` print the `[ste-lint] WARN:` line. | `shadow` |
+
 ## Context-fill telemetry (`context_fill`)
 
 Every launch's token telemetry carries a derived **fill reading**: the prompt-side

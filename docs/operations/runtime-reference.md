@@ -397,3 +397,20 @@ a repo-contract violation can still first surface in the remote release suite (i
 Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/loop/SKILL.md` (heading), `README.md`, `CHANGELOG.md`. `evolve release-consistency` is the standalone consistency verifier.
 
 Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/publishing-releases.md](../guides/publishing-releases.md).
+
+## Documentation lint: `evolve docs ste-lint`
+
+The lint checks text against the ASD-STE100 house rules ([the standard](../conventions/ste100-writing.md), [the plan](../plans/ste100-docs-rewrite-2026-10.md), [the package notes](../architecture/packages/internal-stelint.md)). It reads the house list of words from the standard under the project root.
+
+| Form | What it checks |
+|---|---|
+| `evolve docs ste-lint` | `docs/**/*.md`, `README.md`, `CLAUDE.md`, `AGENTS.md` and `CHANGELOG.md` |
+| `evolve docs ste-lint <paths...>` | the named files, and the `.md` files under the named directories |
+| `evolve docs ste-lint --changed <base-ref>` | the files in scope that changed since the base ref, with the untracked files |
+| `evolve docs ste-lint --go [paths...]` | the log and error text in `go/**/*.go`, but not `_test.go` files, `testdata` or `go/acs/**` |
+
+- **Output:** one `path:line RULE message` line for each finding, and one summary line. `--json` prints the counts, `by_rule`, the findings and the generated files that the lint did not check.
+- **The project root:** `--project-root P` sets the root. Without it, the verb uses `EVOLVE_WORKTREE_ROOT`, then `EVOLVE_PROJECT_ROOT`, then the git top level of the current directory. It never uses the current directory itself, so it works from `go/` and from any subdirectory. Outside a git tree with no root, it exits 2. A path that you name is relative to the current directory.
+- **Exit codes:** the exit code is 0 with or without findings (WARN). It is 1 with `--strict` when there are findings. It is 2 when the standard or a file cannot be read, and 10 for a bad flag.
+- **The build floor:** the build handoff floor checks the changed documents in scope. When it finds a problem, it prints one line, `[ste-lint] WARN: <n> finding(s) in <m> file(s) (first: path:line RULE)`. It never blocks the handoff.
+- **The dial:** `.evolve/policy.json` `docs_floor.ste_stage` is `off`, `shadow` or `enforce`, and the compiled default is `shadow`. `off` stops the floor's line. `shadow` and `enforce` both only WARN. The policy loader refuses an unknown word in `stage` or `ste_stage`, and an unknown `docs_floor` key.
