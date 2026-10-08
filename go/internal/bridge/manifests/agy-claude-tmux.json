@@ -36,8 +36,8 @@
   "model_tier_map": {
     "fast": "Claude Sonnet 5.5 (Low)",
     "balanced": "Claude Sonnet 5.5 (Medium)",
-    "deep": "Claude Opus 5.5 (High)",
-    "top": "Claude Opus 5.5 (High)"
+    "deep": "Claude Opus 5.5 (Medium)",
+    "top": "Claude Opus 5.5 (Medium)"
   },
   "note": "The Claude models agy serves on the Google AI Pro subscription (agy 1.2.17 `agy models` lists Claude Opus 5.5 and Claude Sonnet 5.5, each at Low, Medium and High). A merge patch over agy-tmux (`base`): the same agy binary, driver, prompts, controls and environment; its own tier map, model family and default tier. agy offers no Haiku-class Claude, so fast is Sonnet at Low effort. `params.model_tier.default` keeps a model-less launch (a probe or a canary) on a Claude model, never agy's Gemini default. `update_argv: null` opts this target out of the shared agy binary's updater, which only agy-tmux owns, so a boundary update runs agy once. `launch_model_verification` makes every launch read the booted model from the label on the footer-prefix line (the base's `model_label_regex`, whose named `footer` group is the prefix; any other label never counts) after the REPL boots and before the prompt goes out: a label outside the claude family, or none within `label_wait_s`, kills the session and exits 87, so the walk moves to Claude Code instead of running a deep or top seat on agy's Gemini default. See docs/architecture/packages/internal-bridge.md."
 }

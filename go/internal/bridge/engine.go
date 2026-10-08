@@ -67,7 +67,7 @@ type Deps struct {
 	// budget (seconds) keyed on agent label; a missing or non-positive entry
 	// falls open to the built-in default.
 	PhaseArtifactTimeoutS map[string]int
-	TierEffort            map[string]string
+	Efforts               policy.EffortTable
 	// CorroborateWall is the out-of-band truth check behind the exhaustion
 	// fast-fail; nil falls back to the pane match being the verdict.
 	CorroborateWall WallCorroborator
@@ -170,9 +170,6 @@ func defaultIfZero(val, def int) int {
 // withDefaults returns a copy of d with each zero-value seam replaced by
 // its production default.
 func (d Deps) withDefaults() Deps {
-	if d.TierEffort == nil {
-		d.TierEffort = policy.BridgePolicy{}.TierEfforts()
-	}
 	if d.CaptureBaseline == nil {
 		d.CaptureBaseline = captureArtifactBaseline
 	}

@@ -61,7 +61,6 @@
     "hard_exit_at_turn": 18,
     "checkpoint_note": "At turn 15: list remaining steps, estimate turns needed, defer anything that cannot fit in the remaining 10 turns. Never defer build-report.md write or worktree commit."
   },
-  "effort_level": "medium",
   "output_artifact": ".evolve/runs/cycle-{cycle}/build-report.md",
   "challenge_token_required": true,
   "isolation": "worktree",
@@ -121,8 +120,5 @@
     "kb_search": 20
   },
   "stream_output": true,
-  "generated_from": "hand-authored",
-  "effort_overrides": {
-    "deep": "high"
-  }
+  "generated_from": "hand-authored"
 }

@@ -26,7 +26,7 @@ func TestAgyClaudeEffortSelectsTheModelVariant(t *testing.T) {
 		{"deep", "high", "Claude Opus 5.5 (High)", ""},
 		{"top", "xhigh", "Claude Opus 5.5 (High)", "xhigh"},
 		{"top", "max", "Claude Opus 5.5 (High)", "max"},
-		{"deep", "", "Claude Opus 5.5 (High)", ""},
+		{"deep", "", "Claude Opus 5.5 (Medium)", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.tier+"/"+tc.effort, func(t *testing.T) {
@@ -99,11 +99,11 @@ func TestAgyClaudeTierMapSuffixIsTheProjectionOfTheCompiledTierEffort(t *testing
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)
 	}
-	efforts := policy.BridgePolicy{}.TierEfforts()
 	for _, tier := range policy.TierNames() {
-		want := modelVariantSuffix(m.Params["effort"].Values[efforts[tier]])
+		effort, _ := policy.EffortTable{}.Resolve(tier)
+		want := modelVariantSuffix(m.Params["effort"].Values[effort])
 		if got := m.ModelTierMap[tier]; want == "" || !strings.HasSuffix(got, want) {
-			t.Errorf("model_tier_map[%s] = %q, want the suffix %q that the compiled effort %q selects", tier, got, want, efforts[tier])
+			t.Errorf("model_tier_map[%s] = %q, want the suffix %q that the compiled effort %q selects", tier, got, want, effort)
 		}
 	}
 }

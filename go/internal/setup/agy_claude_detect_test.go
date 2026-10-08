@@ -12,8 +12,8 @@ func TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap(t *testing.T) {
 	want := map[string]string{
 		"fast":     "Claude Sonnet 5.5 (Low)",
 		"balanced": "Claude Sonnet 5.5 (Medium)",
-		"deep":     "Claude Opus 5.5 (High)",
-		"top":      "Claude Opus 5.5 (High)",
+		"deep":     "Claude Opus 5.5 (Medium)",
+		"top":      "Claude Opus 5.5 (Medium)",
 	}
 	if got := tierModelsFor("agy-claude"); !reflect.DeepEqual(got, want) {
 		t.Fatalf("tierModelsFor(agy-claude) = %v, want %v: a detect fallback that names tiers is no model at all", got, want)
@@ -43,8 +43,8 @@ func TestDetectCLIs_ReportsAgyClaudeBesideAgy(t *testing.T) {
 		t.Fatalf("detected %+v, want agy and agy-claude", clis)
 	}
 	claude := clis[1]
-	if claude.Verdict != "ready" || claude.AuthMode != "SUBSCRIPTION" || claude.CapabilityTier != "antigravity" || claude.TierModels["deep"] != "Claude Opus 5.5 (High)" {
-		t.Fatalf("agy-claude = %+v, want a ready Antigravity subscription whose deep tier is Claude Opus 5.5 (High)", claude)
+	if claude.Verdict != "ready" || claude.AuthMode != "SUBSCRIPTION" || claude.CapabilityTier != "antigravity" || claude.TierModels["deep"] != "Claude Opus 5.5 (Medium)" {
+		t.Fatalf("agy-claude = %+v, want a ready Antigravity subscription whose deep tier is Claude Opus 5.5 (Medium)", claude)
 	}
 }
 

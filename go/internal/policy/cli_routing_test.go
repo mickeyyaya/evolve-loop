@@ -39,7 +39,7 @@ func TestLoad_CLIRoutingDecodesTheOperatorTable(t *testing.T) {
 			"router": {CLI: []string{"agy"}, Model: "balanced"},
 			"memo":   {CLI: []string{"agy", "claude"}},
 		},
-		Tiers:      map[string][]string{"deep": {"claude"}, "top": {"claude"}},
+		Tiers:      map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "top": {CLIs: []string{"claude"}}},
 		AfterChain: "stop",
 	}
 	if !reflect.DeepEqual(p.CLIRouting, want) {

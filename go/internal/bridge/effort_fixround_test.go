@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func modelFlag(t *testing.T, flags []string) string {
@@ -19,17 +21,17 @@ func modelFlag(t *testing.T, flags []string) string {
 
 func TestSmokeLaunchConfig_CarriesTheTierDefaultEffort(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
-	deep := smokeLaunchConfig(&Config{Model: "deep"}, "claude-tmux", Deps{}.withDefaults().TierEffort)
-	if !containsSubsequence(deep.Realization.LaunchFlags, []string{"--effort", "high"}) {
-		t.Errorf("deep smoke flags = %v, want --effort high", deep.Realization.LaunchFlags)
+	deep := smokeLaunchConfig(&Config{Model: "deep"}, "claude-tmux", policy.EffortTable{})
+	if !containsSubsequence(deep.Realization.LaunchFlags, []string{"--effort", "medium"}) {
+		t.Errorf("deep smoke flags = %v, want --effort medium", deep.Realization.LaunchFlags)
 	}
-	untiered := smokeLaunchConfig(&Config{}, "agy-claude-tmux", Deps{}.withDefaults().TierEffort)
+	untiered := smokeLaunchConfig(&Config{}, "agy-claude-tmux", policy.EffortTable{})
 	if got := modelFlag(t, untiered.Realization.LaunchFlags); got != "Claude Sonnet 5.5 (Low)" || untiered.Realization.EffortVariant != "(Low)" {
 		t.Errorf("model-less agy-claude smoke = %q variant %q, want the fast tier at its own (Low) effort", got, untiered.Realization.EffortVariant)
 	}
-	policyTable := smokeLaunchConfig(&Config{Model: "deep"}, "claude-tmux", map[string]string{"deep": "medium"})
-	if !containsSubsequence(policyTable.Realization.LaunchFlags, []string{"--effort", "medium"}) {
-		t.Errorf("smoke with a policy table = %v, want --effort medium from the table", policyTable.Realization.LaunchFlags)
+	policyTable := smokeLaunchConfig(&Config{Model: "deep"}, "claude-tmux", effortTableOf(policy.CLIRouting{Tiers: map[string]policy.TierRule{"deep": {Effort: "high"}}}))
+	if !containsSubsequence(policyTable.Realization.LaunchFlags, []string{"--effort", "high"}) {
+		t.Errorf("smoke with a policy table = %v, want --effort high from the table", policyTable.Realization.LaunchFlags)
 	}
 }
 
@@ -50,7 +52,7 @@ func TestLaunchIntentFor_AnUntieredModelTakesTheManifestDefaultTier(t *testing.T
 		{"claude-tmux", "claude-opus-5-5", ""},
 	}
 	for _, tc := range cases {
-		got := launchIntentFor(&Config{CLI: tc.cli, Model: tc.model}, Profile{}, Deps{}.withDefaults().TierEffort).Effort
+		got := launchIntentFor(&Config{CLI: tc.cli, Model: tc.model}, Profile{}, policy.EffortTable{}).Effort
 		if got != tc.want {
 			t.Errorf("launchIntentFor(cli=%s model=%q).Effort = %q, want %q", tc.cli, tc.model, got, tc.want)
 		}
@@ -59,17 +61,17 @@ func TestLaunchIntentFor_AnUntieredModelTakesTheManifestDefaultTier(t *testing.T
 
 func TestClaudePHeadlessLaunchCarriesTheEffort(t *testing.T) {
 	cfg := &Config{CLI: "claude-p", Model: "deep"}
-	cfg.Realization = RealizeFor("claude-p", launchIntentFor(cfg, Profile{}, Deps{}.withDefaults().TierEffort))
+	cfg.Realization = RealizeFor("claude-p", launchIntentFor(cfg, Profile{}, policy.EffortTable{}))
 	args, _ := claudePArgs(cfg, "prompt")
-	if !containsSubsequence(args, []string{"--effort", "high"}) {
-		t.Fatalf("claude -p argv = %v, want --effort high", args)
+	if !containsSubsequence(args, []string{"--effort", "medium"}) {
+		t.Fatalf("claude -p argv = %v, want --effort medium", args)
 	}
 }
 
-func TestAgyClaudeExplicitProfileEffortWinsOverAPinnedVariant(t *testing.T) {
+func TestAgyClaudeExplicitAgentEffortWinsOverAPinnedVariant(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
 	cfg := &Config{CLI: "agy-claude-tmux", Model: "Claude Opus 5.5 (High)"}
-	r := RealizeFor("agy-claude-tmux", launchIntentFor(cfg, Profile{EffortLevel: "low"}, Deps{}.withDefaults().TierEffort))
+	r := RealizeFor("agy-claude-tmux", launchIntentFor(cfg, Profile{Name: "scout"}, effortTableOf(policy.CLIRouting{Agents: map[string]policy.AgentRule{"scout": {Effort: "low"}}})))
 	if got := modelFlag(t, r.LaunchFlags); got != "Claude Opus 5.5 (Low)" {
 		t.Fatalf("--model = %q, want the profile effort to replace the pinned (High)", got)
 	}
@@ -109,7 +111,7 @@ func TestBootSmokeTest_ALaunchFromRawDepsCarriesTheCompiledEffort(t *testing.T) 
 	if rc, _ := BootSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: t.TempDir(), Model: "deep"}, deps); rc != ExitOK {
 		t.Fatalf("rc = %d, want ExitOK", rc)
 	}
-	if !tmux.sentContains("--effort high") {
-		t.Errorf("the boot smoke launch line lacks --effort high; sent=%v", tmux.sentKeys)
+	if !tmux.sentContains("--effort medium") {
+		t.Errorf("the boot smoke launch line lacks --effort medium; sent=%v", tmux.sentKeys)
 	}
 }

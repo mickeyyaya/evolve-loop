@@ -1,8 +1,6 @@
 package policy
 
 import (
-	"fmt"
-	"maps"
 	"slices"
 	"time"
 )
@@ -125,8 +123,7 @@ type BridgePolicy struct {
 	// PhaseArtifactTimeoutS is keyed on the bridge agent label; see PhaseArtifactTimeouts.
 	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
 	// AnthropicBaseURL is the proxy base URL; empty means no proxy.
-	AnthropicBaseURL string            `json:"anthropic_base_url,omitempty"`
-	TierEffort       map[string]string `json:"tier_effort,omitempty"`
+	AnthropicBaseURL string `json:"anthropic_base_url,omitempty"`
 }
 
 const (
@@ -146,33 +143,8 @@ func EffortLevels() []string {
 var defaultTierEffort = map[string]string{
 	"fast":     effortLow,
 	"balanced": effortMedium,
-	"deep":     effortHigh,
-	"top":      effortXHigh,
-}
-
-func (p BridgePolicy) TierEffortWarnings() []string {
-	var out []string
-	for _, tier := range slices.Sorted(maps.Keys(p.TierEffort)) {
-		effort := p.TierEffort[tier]
-		compiled, known := defaultTierEffort[tier]
-		switch {
-		case !known:
-			out = append(out, fmt.Sprintf("bridge.tier_effort.%s: unknown tier, ignored", tier))
-		case !slices.Contains(effortLevels, effort):
-			out = append(out, fmt.Sprintf("bridge.tier_effort.%s: unknown effort %q, keeping %q", tier, effort, compiled))
-		}
-	}
-	return out
-}
-
-func (p BridgePolicy) TierEfforts() map[string]string {
-	out := maps.Clone(defaultTierEffort)
-	for tier, effort := range p.TierEffort {
-		if _, known := defaultTierEffort[tier]; known && slices.Contains(effortLevels, effort) {
-			out[tier] = effort
-		}
-	}
-	return out
+	"deep":     effortMedium,
+	"top":      effortMedium,
 }
 
 // defaultPhaseArtifactTimeoutS keys each phase by both its agent label and persona alias (the two differ

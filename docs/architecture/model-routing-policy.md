@@ -59,6 +59,16 @@ floor) — not tier-vocabulary violations. The tier vocabulary
 (`fast`/`balanced`/`deep`) remains fully driver-agnostic for all profiles;
 `allowed_clis` constrains *dispatch eligibility*, not tier resolution.
 
+## Effort for each tier
+
+The reasoning effort is a second dial beside the tier. It lives in the same central file as the CLI chains: `.evolve/policy.json` `cli_routing`.
+
+- `cli_routing.tiers.<tier>.effort` sets the effort of a tier.
+- `cli_routing.agents.<agent>.effort` sets the effort of one agent at every tier.
+- With no entry, the compiled default applies: fast `low`, balanced, deep and top `medium`.
+
+The operator directive of 2026-10-08 is: "Based on the opus 5.5, the effort should be configured starting with medium effort". A higher level comes only after a measured gain. A profile carries no effort: the fields `effort_level` and `effort_overrides` are retired. Write the effort with `evolve cli-routing set ... --effort <level>`. See [model-routing.md](../reference/model-routing.md#effort-for-each-tier).
+
 ## Routing Principles
 
 - Use deterministic Go for fixed checks, state transitions, hashing, and gates.

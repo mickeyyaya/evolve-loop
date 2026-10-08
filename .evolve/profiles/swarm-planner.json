@@ -78,6 +78,5 @@
     "Write(.evolve/runs/cycle-*/intent.md)",
     "Write(.evolve/runs/cycle-*/orchestrator-report.md)"
   ],
-  "output_artifact": ".evolve/runs/cycle-{cycle}/swarm-plan.md",
-  "effort_level": "high"
+  "output_artifact": ".evolve/runs/cycle-{cycle}/swarm-plan.md"
 }

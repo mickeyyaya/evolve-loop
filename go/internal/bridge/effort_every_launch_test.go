@@ -41,6 +41,15 @@ func shippedProfiles(t *testing.T) map[string]Profile {
 	return out
 }
 
+func trackedEfforts(t *testing.T) policy.EffortTable {
+	t.Helper()
+	pol, err := policy.Load(filepath.Join(repoRootForEffort(t), ".evolve", "policy.json"))
+	if err != nil {
+		t.Fatalf("load the tracked policy.json: %v", err)
+	}
+	return pol.Efforts()
+}
+
 func effortRealized(m Manifest, r Realization, effort string) bool {
 	spec := m.Params["effort"]
 	switch {
@@ -57,7 +66,7 @@ func effortRealized(m Manifest, r Realization, effort string) bool {
 
 func TestEveryShippedProfileAndTierLaunchesWithAnEffort(t *testing.T) {
 	injectCatalogDir(t, t.TempDir())
-	tiers := policy.BridgePolicy{}.TierEfforts()
+	efforts := trackedEfforts(t)
 	profiles := shippedProfiles(t)
 	launches := 0
 	for _, cli := range effortChannelCLIs {
@@ -70,7 +79,7 @@ func TestEveryShippedProfileAndTierLaunchesWithAnEffort(t *testing.T) {
 		}
 		for name, prof := range profiles {
 			for _, tier := range policy.TierNames() {
-				intent := launchIntentFor(&Config{CLI: cli, Model: tier}, prof, tiers)
+				intent := launchIntentFor(&Config{CLI: cli, Model: tier, Agent: name}, prof, efforts)
 				launches++
 				if !slices.Contains(policy.EffortLevels(), intent.Effort) {
 					t.Errorf("%s/%s/%s: effort %q is not a level", cli, name, tier, intent.Effort)

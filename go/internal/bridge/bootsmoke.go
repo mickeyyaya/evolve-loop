@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 // BootSmokeTest boots a *-tmux driver through its normal Launch with BootOnly set and exits without a prompt, returning the exit code and final scrollback.
@@ -15,7 +17,7 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		return ExitBadFlags, ""
 	}
 	deps = deps.withDefaults()
-	cfg = smokeLaunchConfig(cfg, driverName, deps.TierEffort)
+	cfg = smokeLaunchConfig(cfg, driverName, deps.Efforts)
 	cfg.BootOnly = true
 	if cfg.Workspace == "" {
 		// Own a scratch workspace for a minimal cfg; the deferred removal runs after the scrollback read below.
@@ -49,14 +51,14 @@ func ScrollbackTail(s string, n int) string {
 	return strings.Join(out, "\n")
 }
 
-func smokeLaunchConfig(cfg *Config, driverName string, tierEffort map[string]string) *Config {
+func smokeLaunchConfig(cfg *Config, driverName string, efforts policy.EffortTable) *Config {
 	if cfg == nil {
 		cfg = &Config{}
 	}
 	cfg.CLI = driverName
 	cfg.AllowBypass = true
 	if reflect.ValueOf(cfg.Realization).IsZero() {
-		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass", ModelTier: cfg.Model, Effort: tierDefaultEffort(driverName, cfg.Model, tierEffort)})
+		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass", ModelTier: cfg.Model, Effort: LaunchEffort(driverName, cfg.Model, efforts)})
 	}
 	return cfg
 }

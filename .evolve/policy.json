@@ -37,6 +37,17 @@
       "agy-claude",
       "claude"
     ],
+    "agents": {
+      "reflector": {
+        "effort": "low"
+      },
+      "scout": {
+        "effort": "low"
+      },
+      "triage": {
+        "effort": "low"
+      }
+    },
     "tiers": {
       "deep": [
         "agy-claude",

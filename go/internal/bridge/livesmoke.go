@@ -30,7 +30,7 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 		return ExitBadFlags, "", ""
 	}
 	deps = deps.withDefaults()
-	cfg = smokeLaunchConfig(cfg, driverName, deps.TierEffort)
+	cfg = smokeLaunchConfig(cfg, driverName, deps.Efforts)
 	if cfg.Workspace == "" {
 		tmp, err := os.MkdirTemp("", "evolve-livesmoke-*")
 		if err != nil {

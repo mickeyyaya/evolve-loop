@@ -24,16 +24,21 @@ type routingSet struct {
 	key    string
 	values []string
 	model  string
+	effort string
 }
 
 func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, error) {
 	key, values, model := set.key, set.values, set.model
 	group, name, scoped := strings.Cut(key, ".")
 	switch {
-	case len(values) == 0:
+	case len(values) == 0 && set.effort == "":
 		return block, fmt.Errorf("%s needs a value", key)
 	case model != "" && group != "agents":
 		return block, fmt.Errorf("--model applies only to agents.<agent>, not %s", key)
+	case set.effort != "" && (!scoped || (group != "tiers" && group != "agents")):
+		return block, fmt.Errorf("--effort applies only to tiers.<tier> and agents.<agent>, not %s", key)
+	case len(values) == 0 && model != "":
+		return block, fmt.Errorf("--model needs the chain of %s", key)
 	case key == "after_chain" && len(values) > 1:
 		return block, fmt.Errorf("after_chain takes one value: other_clis or stop")
 	}
@@ -45,19 +50,72 @@ func setRoutingKey(block policy.CLIRouting, set routingSet) (policy.CLIRouting, 
 	case key == "after_chain":
 		block.AfterChain = values[0]
 	case scoped && group == "tiers":
-		block.Tiers = withEntry(block.Tiers, name, values)
+		block.Tiers = withEntry(block.Tiers, name, tierRuleWith(block.Tiers[name], values, set.effort))
 	case scoped && group == "work":
 		block.Work = withEntry(block.Work, name, values)
 	case scoped && group == "agents":
-		block.Agents = withEntry(block.Agents, name, policy.AgentRule{CLI: values, Model: model})
+		block.Agents = withEntry(block.Agents, name, agentRuleWith(block.Agents[name], values, model, set.effort))
 	default:
 		return block, fmt.Errorf("unknown key %q (clis, default, after_chain, tiers.<tier>, work.<role>, agents.<agent>)", key)
 	}
 	return block, nil
 }
 
+func tierRuleWith(rule policy.TierRule, chain []string, effort string) policy.TierRule {
+	if len(chain) > 0 {
+		rule.CLIs = chain
+	}
+	if effort != "" {
+		rule.Effort = effort
+	}
+	return rule
+}
+
+func agentRuleWith(rule policy.AgentRule, chain []string, model, effort string) policy.AgentRule {
+	if len(chain) > 0 {
+		rule.CLI, rule.Model = chain, model
+	}
+	if effort != "" {
+		rule.Effort = effort
+	}
+	return rule
+}
+
+const effortSuffix = ".effort"
+
+func unsetEffort(block policy.CLIRouting, group, name string) (policy.CLIRouting, error) {
+	switch group {
+	case "tiers":
+		rule, ok := block.Tiers[name]
+		if !ok {
+			return block, fmt.Errorf("tiers.%s is not set", name)
+		}
+		rule.Effort = ""
+		block.Tiers = withEntry(block.Tiers, name, rule)
+		if len(rule.CLIs) == 0 {
+			delete(block.Tiers, name)
+		}
+	case "agents":
+		rule, ok := block.Agents[name]
+		if !ok {
+			return block, fmt.Errorf("agents.%s is not set", name)
+		}
+		rule.Effort = ""
+		block.Agents = withEntry(block.Agents, name, rule)
+		if len(rule.CLI) == 0 && rule.Model == "" {
+			delete(block.Agents, name)
+		}
+	default:
+		return block, fmt.Errorf("an effort is set only on tiers.<tier> and agents.<agent>, not %s", group)
+	}
+	return block, nil
+}
+
 func unsetRoutingKey(block policy.CLIRouting, key string) (policy.CLIRouting, error) {
 	group, name, scoped := strings.Cut(key, ".")
+	if base, isEffort := strings.CutSuffix(name, effortSuffix); scoped && isEffort {
+		return unsetEffort(block, group, base)
+	}
 	switch {
 	case key == "clis":
 		block.CLIs = nil

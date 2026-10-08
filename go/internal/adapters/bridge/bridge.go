@@ -6,7 +6,6 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -61,6 +60,7 @@ type Adapter struct {
 	fatalPaneStage string
 	// bridgeConfig holds the policy.json timing overrides; zero values mean the engine's built-in defaults.
 	bridgeConfig policy.BridgePolicy
+	efforts      policy.EffortTable
 	// contextFillWarnPct is the validated policy threshold; zero lets the engine apply its built-in default.
 	contextFillWarnPct int
 	// bootTimeoutStore records driver-scoped boot-timeout bench strikes.
@@ -84,7 +84,7 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
-		reportTierEffortWarnings(os.Stderr, a.bridgeConfig.TierEffortWarnings())
+		a.efforts = pol.Efforts()
 		// The validating resolver, never the raw field: an out-of-range value must arrive as the built-in.
 		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
@@ -108,7 +108,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		ArtifactTimeoutS:      a.bridgeConfig.ArtifactTimeoutS,
 		ArtifactMaxExtends:    a.bridgeConfig.ArtifactMaxExtends,
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
-		TierEffort:            a.bridgeConfig.TierEfforts(),
+		Efforts:               a.efforts,
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
 		ContextFillWarnPct:    a.contextFillWarnPct,
@@ -313,10 +313,4 @@ func (a *Adapter) Signals() *signalcenter.Center {
 		return nil
 	}
 	return a.signals
-}
-
-func reportTierEffortWarnings(w io.Writer, warnings []string) {
-	for _, warning := range warnings {
-		fmt.Fprintf(w, "[bridge] WARN policy %s\n", warning)
-	}
 }

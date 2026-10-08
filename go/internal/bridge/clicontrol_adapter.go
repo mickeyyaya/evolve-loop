@@ -33,7 +33,7 @@ func (c *cliController) perFamilyConfig(cli string) *Config {
 	// Copy the slices so concurrent per-family configs never share a backing array.
 	out.AllowedTools = append([]string(nil), c.cfg.AllowedTools...)
 	out.ExtraFlags = append([]string(nil), c.cfg.ExtraFlags...)
-	intent := LaunchIntent{Effort: tierDefaultEffort(cli, c.cfg.Model, c.deps.TierEffort)}
+	intent := LaunchIntent{Effort: LaunchEffort(cli, c.cfg.Model, c.deps.Efforts)}
 	if c.cfg.AllowBypass {
 		intent.Permission = "bypass"
 	}

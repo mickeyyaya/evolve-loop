@@ -46,7 +46,6 @@ type Dispatch struct {
 	DisallowedTools   []string                    `json:"disallowed_tools,omitempty"`
 	PermissionMode    string                      `json:"permission_mode,omitempty"`
 	Sandbox           *profiles.SandboxConfig     `json:"sandbox,omitempty"`
-	EffortLevel       string                      `json:"effort_level,omitempty"`
 	// SystemPrompt is the per-agent launch-time rules block ("persona"). Inline
 	// only here — a minted phase carries its persona in-band, so it needs no
 	// system_prompt_file on disk.
@@ -109,7 +108,6 @@ func (c PhaseConfig) ToProfile() profiles.Profile {
 		AllowedTools:      d.AllowedTools,
 		DisallowedTools:   d.DisallowedTools,
 		Sandbox:           d.Sandbox,
-		EffortLevel:       d.EffortLevel,
 		PermissionMode:    d.PermissionMode,
 		SystemPrompt:      d.SystemPrompt,
 	}

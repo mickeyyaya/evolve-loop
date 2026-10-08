@@ -65,7 +65,6 @@
   "max_budget_usd": 0.25,
   "max_turns": 12,
   "turn_budget_hint": 6,
-  "effort_level": "medium",
   "output_artifact": ".evolve/runs/cycle-{cycle}/workers/scout-scan-{slice}-digest.json",
   "challenge_token_required": true,
   "extra_flags_by_cli": {

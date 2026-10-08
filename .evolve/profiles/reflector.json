@@ -94,7 +94,6 @@
   "max_budget_usd": 0.2,
   "max_turns": 10,
   "turn_budget_hint": 6,
-  "effort_level": "low",
   "output_artifact": ".evolve/runs/cycle-{cycle}/learn/reflector-synthesis.md",
   "challenge_token_required": false,
   "extra_flags_by_cli": {

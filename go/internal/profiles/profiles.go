@@ -4,6 +4,7 @@ package profiles
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -34,17 +35,13 @@ type Profile struct {
 	OutputArtifact     string             `json:"output_artifact,omitempty"`
 	ResearchQuota      map[string]int     `json:"research_quota,omitempty"`
 	Sandbox            *SandboxConfig     `json:"sandbox,omitempty"`
-	EffortLevel        string             `json:"effort_level,omitempty"`
-	// EffortOverrides maps a resolved model tier to the effort level used at
-	// that tier, so a tier escalation carries its effort. See ADR-0096.
-	EffortOverrides   map[string]string `json:"effort_overrides,omitempty"`
-	AddDir            []string          `json:"add_dir,omitempty"`
-	PermissionMode    string            `json:"permission_mode,omitempty"`
-	InteractivePolicy string            `json:"interactive_policy,omitempty"`
-	StreamOutput      bool              `json:"stream_output,omitempty"`
-	StopCriterion     string            `json:"stop_criterion,omitempty"`
-	TurnBudgetHint    int               `json:"turn_budget_hint,omitempty"`
-	GeneratedFrom     string            `json:"generated_from,omitempty"`
+	AddDir             []string           `json:"add_dir,omitempty"`
+	PermissionMode     string             `json:"permission_mode,omitempty"`
+	InteractivePolicy  string             `json:"interactive_policy,omitempty"`
+	StreamOutput       bool               `json:"stream_output,omitempty"`
+	StopCriterion      string             `json:"stop_criterion,omitempty"`
+	TurnBudgetHint     int                `json:"turn_budget_hint,omitempty"`
+	GeneratedFrom      string             `json:"generated_from,omitempty"`
 	// SystemPrompt holds per-agent rules prepended to the prompt at launch; it
 	// wins over SystemPromptFile, which resolves relative to the profile dir.
 	SystemPrompt     string `json:"system_prompt,omitempty"`
@@ -103,6 +100,9 @@ func (l *Loader) Get(name string) (Profile, error) {
 	var prof Profile
 	if err := json.Unmarshal(raw, &prof); err != nil {
 		return Profile{}, fmt.Errorf("profiles: parse %s: %w", p, err)
+	}
+	if err := refuseRetiredEffort(p, raw); err != nil {
+		return Profile{}, err
 	}
 	prof.Raw = json.RawMessage(raw)
 	expanded, err := l.expandPolicies(prof.DisallowedTools)
@@ -200,4 +200,17 @@ func (l *Loader) List() ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+var ErrRetiredEffortField = errors.New("effort_level and effort_overrides are retired: effort lives in policy.json cli_routing; run evolve cli-routing migrate")
+
+func refuseRetiredEffort(file string, raw []byte) error {
+	var probe struct {
+		EffortLevel     json.RawMessage `json:"effort_level"`
+		EffortOverrides json.RawMessage `json:"effort_overrides"`
+	}
+	if json.Unmarshal(raw, &probe) != nil || (probe.EffortLevel == nil && probe.EffortOverrides == nil) {
+		return nil
+	}
+	return fmt.Errorf("profiles: %s: %w", file, ErrRetiredEffortField)
 }

@@ -190,6 +190,6 @@ func operatorTable() policy.Policy {
 	return routingPolicy(policy.CLIRouting{
 		CLIs:    []string{"agy", "agy-claude", "claude"},
 		Default: []string{"agy", "agy-claude", "claude"},
-		Tiers:   map[string][]string{"deep": {"agy-claude", "claude"}, "top": {"agy-claude", "claude"}},
+		Tiers:   map[string]policy.TierRule{"deep": {CLIs: []string{"agy-claude", "claude"}}, "top": {CLIs: []string{"agy-claude", "claude"}}},
 	})
 }
