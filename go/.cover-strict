@@ -30,6 +30,7 @@
 ./internal/qualityindex 100
 # wtcheckpoint drives real git through gitexec with no fake runner; what it leaves uncovered are git-failure returns.
 ./internal/wtcheckpoint 87
+./internal/wave 100
 ./internal/proctree 100
 ./internal/sysexec 100
 ./internal/gcpolicy 100

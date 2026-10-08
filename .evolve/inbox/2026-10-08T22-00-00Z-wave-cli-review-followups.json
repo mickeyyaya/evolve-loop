@@ -1,0 +1,26 @@
+{
+  "id": "wave-cli-review-followups",
+  "title": "evolve wave: review follow-ups (one json flag source, a tested retry, the close order, the unknown start time) and a hermetic ledger test",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "weight": 0.2,
+  "route": "console",
+  "routed_reason": "the console owns the wave verbs and the boundary",
+  "source": "console, 2026-10-08, delta review (round 2) of lane cl-wave-cli, verdict SHIP, LOW items",
+  "created_at": "2026-10-08T22:00:00Z",
+  "summary": "Five LOW items from the round-2 review of evolve wave, plus one test defect found by the lane. 1: cmd_wave_next.go:97 decides --json with slices.Contains, apart from the flag parser. 2: the record save retry (waveRecordAttempts=2) has no fail-once-then-pass test. 3: closeLastWave saves the old record as closed before the new record exists. 4: an unknown process start time passes the pid check with no warning. 5: adapters/ledger TestSeal_RealLedgerCopy copies the real ledger of the worktree, so a short local ledger file made it fail.",
+  "fix": "1: parseWaveNextArgs sets the json flag and runWaveNext reads it back. 2: add a test where the first save fails and the second passes. 3: document the order in wave-operations.md, or close the old record after the new save. 4: write one WARN when the start time is unknown. 5: make the ledger test build its own fixture ledger.",
+  "acceptance": [
+    "--json=true and a note with the literal text --json do not split the parser and the envelope decision, with a test",
+    "A mutation to one save attempt fails a test",
+    "The close order is documented or changed, with a test",
+    "An unknown start time writes one WARN line",
+    "TestSeal_RealLedgerCopy passes with no ledger file in the worktree"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_wave_next.go",
+    "go/cmd/evolve/cmd_wave.go",
+    "docs/operations/wave-operations.md",
+    "go/internal/adapters/ledger"
+  ]
+}
