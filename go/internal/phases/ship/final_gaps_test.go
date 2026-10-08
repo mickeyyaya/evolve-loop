@@ -239,14 +239,14 @@ func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
 		Class:         ClassCycle,
 		CommitMessage: "feat: commit fail",
 		ProjectRoot:   repo,
-		Runner:        faultRunner("git commit", 1, nil),
+		Runner:        faultRunner("git commit-tree", 128, nil),
 		Stdin:         strings.NewReader(""),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
-	if err == nil || !strings.Contains(err.Error(), "git commit in worktree failed") {
-		t.Fatalf("want 'git commit in worktree failed' error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "git commit-tree in worktree failed") {
+		t.Fatalf("want 'git commit-tree in worktree failed' error, got %v", err)
 	}
 }
 

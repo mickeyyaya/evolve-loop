@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
 // repairOutcome is the dispatcher's verdict on a single repair attempt.
@@ -301,72 +302,54 @@ func appendQuarantineManifest(opts *Options, qDir string, cycle int, paths []str
 
 // --- mode #2: AUDIT_BINDING_HEAD_MOVED resume-unpushed closure --------------
 
-// repairResumeUnpushed heals a ship that died after its own commit/merge
-// moved HEAD but before the push. When (a) HEAD's tree equals the
-// audit-bound tree, (b) the audited base is an ancestor of HEAD, and
-// (c) origin/<branch> is strictly behind HEAD on the same history, the
-// audited work is already committed and merely unpushed — complete with a
-// push-only closure. Anything else declines to the re-audit route.
 func repairResumeUnpushed(ctx context.Context, opts *Options, res *RunResult, se *core.ShipError) repairOutcome {
-	if opts.Class != ClassCycle {
+	in, ok := strandedLanding(ctx, opts, se)
+	if !ok {
 		return repairNone
 	}
-	bound := opts.internalAuditBoundTreeSHA
-	if bound == "" {
+	verdict := opts.landing().Admit(ctx, in)
+	if verdict.Declined != "" {
+		res.Logs = append(res.Logs, "[ship] REPAIR: resume-unpushed declined: "+verdict.Declined)
 		return repairNone
 	}
-	headTree, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")
-	if err != nil {
-		return repairNone
-	}
-	headTree = strings.TrimSpace(headTree)
-	if headTree != bound {
-		// A consumed-item PASS ship's HEAD tree legitimately differs from the
-		// bound tree by the sanctioned consumption delta, but this rung runs in
-		// a fresh process where the explained-by-consumption check cannot run —
-		// decline to the slower re-audit path, deliberately fail-safe.
-		return repairNone // HEAD is not the audited work
-	}
-	auditedHead := se.Debug["audited"]
-	if auditedHead == "" || !isAncestor(ctx, opts, auditedHead, "HEAD") {
-		return repairNone
-	}
-	branch, err := currentBranch(ctx, opts)
-	if err != nil || branch == "" {
-		return repairNone
-	}
-	// Refresh the remote ref; a fetch failure falls back to the local ref.
-	_, _ = opts.run(ctx, "git", []string{"fetch", "origin", branch}, io.Discard, io.Discard)
-	originRef, err := captureGitOutput(ctx, opts, "rev-parse", "origin/"+branch)
-	if err != nil {
-		return repairNone
-	}
-	originRef = strings.TrimSpace(originRef)
-	head, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
-	if err != nil {
-		return repairNone
-	}
-	head = strings.TrimSpace(head)
-
-	if originRef != head {
-		if !isAncestor(ctx, opts, originRef, "HEAD") {
-			return repairNone // origin diverged — never rebase, never force-push
-		}
-		exit, pushErr := opts.run(ctx, "git", []string{"push", "origin", branch}, opts.Stdout, opts.Stderr)
-		if pushErr != nil || exit != 0 {
+	if !verdict.OnOrigin {
+		if err := pushLanding(ctx, opts, res, in); err != nil {
 			return repairNone
 		}
 	}
-	res.CommitSHA = head
-	if bindErr := writeShipBinding(opts, headTree, head); bindErr != nil {
-		// Without the sidecar a re-dispatch cannot recognize the idempotent
-		// state (the once-guard blocks a second resume); the push itself
-		// still succeeded.
-		res.Logs = append(res.Logs, "[ship] WARN: could not write ship-binding.json on resume ("+bindErr.Error()+
-			") — a re-dispatch will NOT be idempotent; run `evolve cycle reset` if this cycle is re-dispatched")
+	if err := settleLanding(ctx, opts, res, in); err != nil {
+		res.Logs = append(res.Logs, "[ship] WARN: resume-unpushed landed "+in.CommitSHA+" but cannot settle it: "+err.Error())
+		return repairNone
 	}
 	res.RepairOutcome = "resume-pushed"
 	res.Logs = append(res.Logs, fmt.Sprintf(
-		"[ship] REPAIR: resume-unpushed — HEAD %s carries the audit-bound tree %s; completed with push-only closure", head, bound))
+		"[ship] REPAIR: resume-unpushed — HEAD %s carries the audit-bound tree %s; the landing's ancestry checks admitted it", in.CommitSHA, in.AuditedTree))
 	return repairCompleted
+}
+
+func strandedLanding(ctx context.Context, opts *Options, se *core.ShipError) (landing.Intent, bool) {
+	if opts.Class != ClassCycle || opts.internalAuditBoundTreeSHA == "" {
+		return landing.Intent{}, false
+	}
+	head, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD")
+	if err != nil {
+		return landing.Intent{}, false
+	}
+	headTree, err := captureGitOutput(ctx, opts, "rev-parse", "HEAD^{tree}")
+	if err != nil {
+		return landing.Intent{}, false
+	}
+	head, headTree = strings.TrimSpace(head), strings.TrimSpace(headTree)
+	auditedHead := se.Debug["audited"]
+	if ok, _ := auditBindingSatisfied(ctx, opts, "", headTree); !ok || auditedHead == "" || !isAncestor(ctx, opts, auditedHead, "HEAD") {
+		return landing.Intent{}, false
+	}
+	branch, err := currentBranch(ctx, opts)
+	cid, hasCycle, cerr := cycleIDForShip(opts)
+	if err != nil || branch == "" || cerr != nil || !hasCycle {
+		return landing.Intent{}, false
+	}
+	return landing.Intent{Cycle: cid, RunID: opts.RunID, AuditArtifactSHA256: opts.internalAuditArtifactSHA,
+		AuditedTree: opts.internalAuditBoundTreeSHA, WorktreeBaseSHA: auditedHead, CommitSHA: head, CommitTree: headTree,
+		PreMain: head, Branch: branch, Status: landing.IntentPrepared}, true
 }

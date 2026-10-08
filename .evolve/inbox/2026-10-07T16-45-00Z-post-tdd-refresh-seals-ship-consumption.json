@@ -1,0 +1,22 @@
+{
+  "id": "post-tdd-refresh-seals-ship-consumption",
+  "title": "A post-TDD refresh can seal the Build binding again over ship's own inbox consumption",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "weight": 0.55,
+  "summary": "In cycle 1830 the repair round ran TDD and Build with no change. The post-TDD refresh then sealed the Build handoff again at 8eb4ced1. That digest covers 14 paths: the 12 paths of the Build and the two paths of ship's inbox consumption. So the Build binding took in a change that ship made, not the Builder. The two-phase landing (ADR-0039 §8.1) unwinds the lane before Audit or Build sees ship's commit, so this path is now rare. It still occurs when the unwind declines, or when a lane holds a commit from an older binary.",
+  "fix": "Make the refresh refuse a material change that is only inbox consumption pairs, or measure from the audited shape. A refresh must never take ship's consumption into the Build binding.",
+  "acceptance": [
+    "A refresh over a lane that holds ship's consumption commit does not seal the consumption paths (red first)",
+    "A refresh over a real Build change still seals it (preservation)"
+  ],
+  "files": [
+    "go/internal/explanationdocs/",
+    "go/internal/core/"
+  ],
+  "routed_reason": "out of scope for the ship-landing lane (brief: secondary finding); the fix is in core and explanationdocs, protected surfaces",
+  "created_at": "2026-10-07T16:45:00Z",
+  "route": "console",
+  "routed_at": "2026-10-07T16:45:00Z",
+  "source": "console forensics of cycle 1830 (wave 77), secondary finding; filed by the ship-landing lane"
+}

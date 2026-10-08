@@ -120,22 +120,47 @@ func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
 	}
 }
 
-// --- gitops.go:227-229: ff-merge failure -----------------------------------
-
-func TestShipFromWorktree_FFMergeFails_Errors(t *testing.T) {
+func TestShipFromWorktree_ADivergedMainFailsBeforeThePush(t *testing.T) {
 	repo, wt := makeWorktreeScenario(t)
+	published := remoteHeadSHA(t, repo)
 
 	opts := &Options{
 		Class:         ClassCycle,
 		CommitMessage: "feat: ff-merge fail",
 		ProjectRoot:   repo,
-		Runner:        faultRunner("git merge", 1, nil),
+		Runner:        faultRunner("git merge-base", 1, nil),
 		Stdout:        io.Discard,
 		Stderr:        io.Discard,
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
 	if err == nil || !strings.Contains(err.Error(), "ff-merge") {
 		t.Fatalf("want ff-merge error, got %v", err)
+	}
+	if got := remoteHeadSHA(t, repo); got != published {
+		t.Errorf("origin moved to %s: a main the lane cannot fast-forward is refused before the push", got)
+	}
+}
+
+func TestShipFromWorktree_AFastForwardThatFailsAfterThePushStillLands(t *testing.T) {
+	repo, wt := makeWorktreeScenario(t)
+	res := &RunResult{}
+
+	opts := &Options{
+		Class:         ClassCycle,
+		CommitMessage: "feat: ff-merge fail after the push",
+		ProjectRoot:   repo,
+		Runner:        faultRunner("git merge", 1, nil),
+		Stdout:        io.Discard,
+		Stderr:        io.Discard,
+	}
+	err := shipFromWorktree(context.Background(), opts, res, "main", wt)
+
+	tip := strings.TrimSpace(runGitOut(t, wt, "rev-parse", "HEAD"))
+	if err != nil || remoteHeadSHA(t, repo) != tip || res.CommitSHA != tip {
+		t.Fatalf("err=%v origin=%s result=%s, want the pushed lane commit %s to stand: origin holds the landing", err, remoteHeadSHA(t, repo), res.CommitSHA, tip)
+	}
+	if !containsLog(*res, "the fast-forward of main to the pushed "+tip+" failed") {
+		t.Errorf("logs %q, want the lagging main reported", res.Logs)
 	}
 }
 
@@ -153,7 +178,7 @@ func TestShipFromWorktree_PushFails_Errors(t *testing.T) {
 		Stderr:        io.Discard,
 	}
 	err := shipFromWorktree(context.Background(), opts, &RunResult{}, "main", wt)
-	if err == nil || !strings.Contains(err.Error(), "git push failed") {
+	if err == nil || !strings.Contains(err.Error(), "to origin/main failed (rc=1)") {
 		t.Fatalf("want push-failed error, got %v", err)
 	}
 }

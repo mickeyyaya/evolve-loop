@@ -198,3 +198,23 @@ func TestRole_DeniesRelocatedExplanationCallSitesInBuildPhase(t *testing.T) {
 		}
 	}
 }
+
+func TestRole_DeniesTheLandingIntentToEveryPhase(t *testing.T) {
+	root := "/work/plane"
+	intent := filepath.Join(root, ".evolve", "landing", "cycle-1830.json")
+	if !IsProtectedSurface(intent) {
+		t.Fatalf("IsProtectedSurface(%q) = false: ship resumes a landing from this file with no gate, so no phase may write it", intent)
+	}
+	for _, phase := range []string{"build", "audit", "ship", "retro"} {
+		s, _ := setupStorageWithCS(t, core.CycleState{
+			CycleID: 1830, Phase: phase, ActiveAgent: phase, ActiveWorktree: filepath.Join(root, ".evolve", "worktrees", "cycle-1830"),
+			WorkspacePath: filepath.Join(t.TempDir(), ".evolve", "runs", "cycle-1830"),
+		})
+
+		dec := NewRole(s, false).Decide(context.Background(), core.GuardInput{ToolName: "Write", ToolInput: map[string]any{"file_path": intent}})
+
+		if dec.Allow || !dec.Alarm {
+			t.Errorf("phase %s writing the landing intent: allow=%v alarm=%v, want an alarmed denial", phase, dec.Allow, dec.Alarm)
+		}
+	}
+}

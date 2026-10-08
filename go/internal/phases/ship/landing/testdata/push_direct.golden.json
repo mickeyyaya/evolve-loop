@@ -47,7 +47,7 @@
         "code": "GIT_PUSH_REJECTED",
         "class": "transient",
         "stage": "atomic-ship",
-        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "message": "ship: git push failed (rc=1)",
         "debug": {
           "branch": "main",
           "git_err": "",
@@ -81,7 +81,7 @@
         "code": "GIT_PUSH_REJECTED",
         "class": "transient",
         "stage": "atomic-ship",
-        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "message": "ship: git push failed (rc=1)",
         "debug": {
           "branch": "main",
           "git_err": "",
@@ -116,7 +116,7 @@
         "code": "GIT_PUSH_REJECTED",
         "class": "transient",
         "stage": "atomic-ship",
-        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "message": "ship: git push failed (rc=1)",
         "debug": {
           "branch": "main",
           "git_err": "",
@@ -239,7 +239,7 @@
         "code": "GIT_PUSH_REJECTED",
         "class": "transient",
         "stage": "atomic-ship",
-        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "message": "ship: git push failed (rc=1)",
         "debug": {
           "branch": "main",
           "git_err": "",
@@ -308,7 +308,7 @@
         "code": "GIT_PUSH_REJECTED",
         "class": "transient",
         "stage": "atomic-ship",
-        "message": "ship: git push failed (rc=1): \u003cnil\u003e",
+        "message": "ship: git push failed (rc=1)",
         "debug": {
           "branch": "main",
           "git_err": "",

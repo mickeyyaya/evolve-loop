@@ -39,26 +39,23 @@ func (s *worktreeShip) verifyStagedTree() error {
 		"audit_bound_tree", s.opts.internalAuditBoundTreeSHA, "worktree_tree", stagedTree, "phase", "pre-commit")
 }
 
-// verifyCommittedTree checks the same binding after push and returns the tree
-// SHA used by ship-binding.json.
-func (s *worktreeShip) verifyCommittedTree() (string, error) {
-	committedTree, _ := captureGitOutput(s.ctx, s.opts, "rev-parse", "HEAD^{tree}")
+func verifyCommittedTree(ctx context.Context, opts *Options, landed string) (string, string, error) {
+	committedTree, _ := captureGitOutput(ctx, opts, "rev-parse", landed+"^{tree}")
 	committedTree = strings.TrimSpace(committedTree)
-	if s.opts.internalAuditBoundTreeSHA == "" || committedTree == "" {
-		return committedTree, nil
+	bound := opts.internalAuditBoundTreeSHA
+	if bound == "" || committedTree == "" {
+		return committedTree, "", nil
 	}
-	if s.opts.internalAuditBoundTreeSHA == committedTree {
-		s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship] OK: tree-SHA binding verified (audit=%s committed=%s)", s.opts.internalAuditBoundTreeSHA, committedTree))
-		return committedTree, nil
+	if bound == committedTree {
+		return committedTree, fmt.Sprintf("[ship] OK: tree-SHA binding verified (audit=%s committed=%s)", bound, committedTree), nil
 	}
-	ok, detail := auditBindingSatisfied(s.ctx, s.opts, "", committedTree)
+	ok, detail := auditBindingSatisfied(ctx, opts, "", committedTree)
 	if ok {
-		s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship] OK: post-push tree drift (audit=%s committed=%s) explained%s — accepted", s.opts.internalAuditBoundTreeSHA, committedTree, detail))
-		return committedTree, nil
+		return committedTree, fmt.Sprintf("[ship] OK: post-push tree drift (audit=%s committed=%s) explained%s — accepted", bound, committedTree, detail), nil
 	}
-	return "", shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip,
-		fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s — worktree-to-main tree drift detected%s", s.opts.internalAuditBoundTreeSHA, committedTree, detail),
-		"audit_bound_tree", s.opts.internalAuditBoundTreeSHA, "committed_tree", committedTree, "phase", "post-push")
+	return "", "", shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip,
+		fmt.Sprintf("INTEGRITY BREACH: audit-bound tree SHA %s != committed tree SHA %s — worktree-to-main tree drift detected%s", bound, committedTree, detail),
+		"audit_bound_tree", bound, "committed_tree", committedTree, "phase", "post-push")
 }
 
 func auditBindingSatisfied(ctx context.Context, opts *Options, worktree, actual string) (bool, string) {

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 )
 
@@ -63,8 +62,9 @@ func (s *worktreeShip) run() error {
 	if err != nil || changes == worktreeNoChanges {
 		return err
 	}
+	var pending string
 	if changes == worktreeStagedChanges {
-		if err := s.commit(); err != nil {
+		if pending, err = s.commit(); err != nil {
 			return err
 		}
 	}
@@ -72,7 +72,7 @@ func (s *worktreeShip) run() error {
 		s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship]   [DRY-RUN] would ff-merge + push %s into %s", s.cycleBranch, s.branch))
 		return nil
 	}
-	return s.integrate()
+	return s.land(pending)
 }
 
 func (s *worktreeShip) resolveCycleBranch() error {
@@ -141,6 +141,9 @@ func (s *worktreeShip) prepareChanges() (worktreeChangeState, error) {
 	}
 	ahead := strings.TrimSpace(aheadOutput)
 	if ahead == "0" || ahead == "" {
+		if err := s.requireLaneOnOrigin(); err != nil {
+			return worktreeNoChanges, err
+		}
 		s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship] no changes in worktree AND branch not ahead of %s; exiting cleanly", s.branch))
 		return worktreeNoChanges, nil
 	}
@@ -148,51 +151,77 @@ func (s *worktreeShip) prepareChanges() (worktreeChangeState, error) {
 	return worktreeBranchAhead, nil
 }
 
-func (s *worktreeShip) commit() error {
+func (s *worktreeShip) commit() (string, error) {
 	footer, err := buildDiffFooterAtDir(s.ctx, s.opts, s.worktree)
 	if err != nil {
-		return err
+		return "", err
 	}
 	message := s.opts.CommitMessage + footer
 	if err := runCommitPrefixGate(s.ctx, s.opts, message, s.worktree); err != nil {
-		return shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
+		return "", shipErr(core.CodeCommitPrefixGate, core.ShipClassPrecondition, core.StageAtomicShip,
 			"ship: commit-prefix-gate rejected worktree commit (Layer 1 of ADR-0012). To bypass for manual class only: --bypass-prefix-gate: "+err.Error(),
 			"gate_err", err.Error(), "worktree", s.worktree)
 	}
 	if err := s.verifyStagedTree(); err != nil {
-		return err
+		return "", err
 	}
 	if s.opts.DryRun {
 		s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship]   [DRY-RUN] would commit in worktree on %s", s.cycleBranch))
-		return nil
+		return "", nil
 	}
-	exit, err := s.opts.run(s.ctx, "git", []string{"-C", s.worktree, "-c", "commit.gpgsign=false", "commit", "-m", message},
-		s.opts.Stdout, s.opts.Stderr)
-	if err != nil || exit != 0 {
-		return shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
-			fmt.Sprintf("ship: git commit in worktree failed (rc=%d): %v", exit, err),
-			"git_rc", fmt.Sprintf("%d", exit), "git_err", errStr(err), "worktree", s.worktree)
+	commit, err := s.commitObject(message)
+	if err != nil {
+		return "", err
 	}
-	s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship]   OK: committed in worktree on %s", s.cycleBranch))
-	return nil
+	s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship]   OK: committed in worktree on %s as %s; the lane ref moves after the landing intent", s.cycleBranch, commit))
+	return commit, nil
 }
 
-func (s *worktreeShip) integrate() error {
-	if err := s.opts.landing().Integrate(s.ctx, landing.Integration{Branch: s.branch, CycleBranch: s.cycleBranch,
-		Binary: "go/evolve", Fleet: s.opts.envBool(ipcenv.FleetKey), Log: logTo(s.result)}); err != nil {
-		return err
+func (s *worktreeShip) commitObject(message string) (string, error) {
+	tree, err := captureGitOutputAtDir(s.ctx, s.opts, s.worktree, "write-tree")
+	var commit string
+	if err == nil {
+		commit, err = captureGitOutputAtDir(s.ctx, s.opts, s.worktree, "-c", "commit.gpgsign=false", "commit-tree", strings.TrimSpace(tree), "-p", "HEAD", "-m", message)
 	}
-	if err := pushWithRepair(s.ctx, s.opts, s.result, s.branch, landing.SiteWorktree); err != nil {
-		return err
+	if commit = strings.TrimSpace(commit); err != nil || commit == "" {
+		return "", shipErr(core.CodeGitCommitFailed, core.ShipClassPrecondition, core.StageAtomicShip,
+			fmt.Sprintf("ship: git commit-tree in worktree failed: %v", err), "git_err", errStr(err), "worktree", s.worktree)
 	}
-	s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", s.branch))
+	return commit, nil
+}
 
-	committedTree, err := s.verifyCommittedTree()
+func (s *worktreeShip) requireLaneOnOrigin() error {
+	out, err := captureGitOutput(s.ctx, s.opts, "rev-list", "origin/"+s.branch+".."+s.cycleBranch)
 	if err != nil {
-		return err
+		s.result.Logs = append(s.result.Logs, fmt.Sprintf("[ship] WARN: no origin/%s to compare the lane with (%v); nothing to commit", s.branch, err))
+		return nil
 	}
-	if err := writeShipBinding(s.opts, committedTree, s.result.CommitSHA); err != nil {
-		s.result.Logs = append(s.result.Logs, "[ship] WARN: could not write ship-binding.json: "+err.Error())
+	stranded := strandedLandings(s.opts, strings.Fields(out))
+	if len(stranded) == 0 {
+		return nil
 	}
-	return maybeCreateRelease(s.ctx, s.opts, s.result)
+	return shipErr(core.CodeGitLaneNotOnOrigin, core.ShipClassIntegrity, core.StageAtomicShip,
+		fmt.Sprintf("ship: nothing to commit, but the lane %s holds %d journaled lane commit(s) that origin/%s does not hold, and their landing is not complete (newest %s). A PASS with no push reports a landing that did not occur. %s",
+			s.cycleBranch, len(stranded), s.branch, stranded[0], boundarySteps(stranded[0])),
+		"cycle_branch", s.cycleBranch, "branch", s.branch, "stranded", strings.Join(stranded, ","))
+}
+
+func strandedLandings(opts *Options, commits []string) []string {
+	journal := readShipJournal(opts.ProjectRoot)
+	var stranded []string
+	for _, sha := range commits {
+		entry, journaled := journal[sha]
+		if journaled && entry.Class == string(ClassCycle) && !landingComplete(opts, entry.Cycle) {
+			stranded = append(stranded, sha)
+		}
+	}
+	return stranded
+}
+
+func landingComplete(opts *Options, cycle int) bool {
+	if cycle <= 0 {
+		return false
+	}
+	in, found, err := landing.ReadIntent(intentPath(opts, cycle))
+	return err == nil && found && in.Status == landing.IntentComplete
 }

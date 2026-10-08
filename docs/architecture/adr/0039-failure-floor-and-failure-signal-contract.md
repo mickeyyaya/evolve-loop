@@ -173,15 +173,15 @@ Rules (operator-approved 2026-06-07):
 | Code | Signature healed | Repair | Re-verify |
 |---|---|---|---|
 | `SELF_SHA_TAMPERED` | stale TOFU pin: running binary SHA == blob at `HEAD:<bin>` (legit rebuild/manual-ship of committed source; cycles 246-248) | re-pin `expected_ship_sha` | `verifySelfSHA` re-runs |
-| `AUDIT_BINDING_HEAD_MOVED` | merged-but-unpushed: `HEAD^{tree}` == audit-bound tree, audited base ∈ ancestors, origin strictly behind (cycle 246) | push-only closure + `ship-binding.json` | tree binding checked by the closure itself |
+| `AUDIT_BINDING_HEAD_MOVED` | merged-but-unpushed, left by a ship from before the two-phase landing (8.1), which moved `main` before its push (cycle 246). The rung needs three facts. HEAD's tree satisfies the audit binding (`auditBindingSatisfied`). The audited base is an ancestor of HEAD. Origin is an ancestor of HEAD. | The rung builds a landing intent from these facts. It has no witness of its own, so only the ancestry checks apply: it calls `Landing.Admit`, not `Landing.Resume`. Then it runs the shared steps of 8.1, `pushLanding` and `settleLanding`. When origin already holds the commit, the rung settles it with no push. | the ancestry checks, then the post-push tree check and `ship-binding.json` |
 | `GIT_FF_MERGE_DIVERGED` (collider variant) | untracked main-side colliders (cycle 230) | byte-identical → remove; differing → quarantine-move to `.evolve/quarantine/cycle-<N>/` + `manifest.json` (never deleted) | atomic-ship stage re-runs incl. collider pre-flight |
-| `GIT_PUSH_REJECTED` | push race | inline fetch + ONE ff-retry when origin ∈ ancestors; diverged origin reclassifies to Precondition `repair_outcome=needs-reaudit` (local commit preserved, re-audit on the new base) | post-push verification on the healed path |
+| `GIT_PUSH_REJECTED` | Ship classifies the stderr of the push: a policy refusal, a transport error or a 5xx, or another rejection (a race). | Policy: no retry. The code is `GIT_PUSH_POLICY_REFUSED`, a final precondition, and the router ends the cycle. Transport: the identical push again after the bounded backoff (`transportBackoff` in `landing/push.go`), in the step. Race: one fetch and one ff retry when origin is an ancestor of the pushed commit; a diverged origin becomes a precondition with `repair_outcome=needs-reaudit`. At the worktree site, a precondition unwinds the lane first, and a transient failure keeps the intent `prepared` for the resume (8.1). | post-push verification on the healed path |
 
 Routing fix (`router/recovery.go`): ship-LOCAL preconditions a re-audit cannot re-establish
 (`GIT_FF_MERGE_DIVERGED`, `COMMIT_PREFIX_GATE`, `GIT_DETACHED_HEAD`, `WORKTREE_RESOLVE`) now
 route to the **debugger** phase, not audit — the in-Run ladder already declined by the time the
 router sees the error, and re-auditing was the cycle-230 audit↔ship loop. `AUDIT_BINDING_*`
-residues still re-audit; integrity still blocks.
+residues still re-audit; integrity still blocks. A policy refusal of the push (`GIT_PUSH_POLICY_REFUSED`) goes to the end of the cycle with a ship fail reason. A re-audit cannot change what origin refuses.
 
 Worktree preservation (D10 fix): the orchestrator's exit cleanup skips pruning while a ship
 failure is unresolved; the worktree is reclaimed when ship eventually succeeds or via
@@ -189,6 +189,81 @@ failure is unresolved; the worktree is reclaimed when ship eventually succeeds o
 `RepairAttempted`/`RepairOutcome` on the run result, surfaces `ship.repair_attempted` /
 `ship.repair_outcome` signals (v2 sentinel plane), and declined attempts annotate the
 `ShipError` Debug map → `ship-error.json` → failure floor.
+
+### 8.1 Two-phase landing with a write-ahead intent (amended 2026-10-07)
+
+Cycle 1830 showed that the worktree landing was not a transaction across the push ([incident](../../incidents/2026-10-07-cycle-1830-a-failed-push-stranded-the-audited-commit.md)). Ship committed and fast-forwarded the shared `main`, and then a GitHub 500 failed the push. The retry ran the gates again, and they measured ship's own commit. The code home is `go/internal/phases/ship/landing` (ADR-0103 unit 07). The fix round of 2026-10-08 closed the gaps that the first review found.
+
+**The intent.** `.evolve/landing/cycle-<N>.json` (`landing.IntentPath`) holds these fields:
+
+- `cycle`, `run_id`, `audit_artifact_sha256` and `audited_tree`: the audit that the landing serves;
+- `lane_tree`: the tree of the lane before ship's inbox consumption, for the unwind;
+- `worktree_base_sha`: the base of the lane, for the unwind;
+- `commit_sha` and `commit_tree`: the lane commit;
+- `consumed_paths`: the inbox consumption pairs that the commit carries;
+- `explanation_view_sha256`: the SHA256 of the sealed Build explanation (the host snapshot);
+- `pre_main`, `branch` and `lane_branch`: the integration branch, its tip before the landing, and the lane branch;
+- `status`: `prepared`, `complete`, `unwound` or `stale`.
+
+Only ship writes the intent. The file is outside every run workspace, and `.evolve/landing/` is on the protected surface (`guards.ProtectedSurfaceManifest`). So the role guard denies a phase Edit or Write there and raises an alarm. The role guard sees only the Edit and Write tools. The OS sandbox is the second layer: no profile lets a phase write `.evolve/landing/` or the ship journal, so it stops Bash, the other write tools and a symlink. The resume also needs a journal entry and a PASS audit row, and the tree check refuses bytes that no audit saw. Ship writes the intent atomically (a temp file, then a rename). A resume never takes the branch from the intent: it uses the branch of the plane.
+
+**The life of an intent.**
+
+1. **Commit object.** Ship makes the lane commit with `git commit-tree`. This moves no ref.
+2. **Catch-up.** Under `ship.lock`, ship fast-forwards `main` to `origin/main` when two conditions are true.
+   - `main` is a strict ancestor of `origin/main`.
+   - The ship journal holds each commit in `main..origin/main`.
+3. **Check.** Ship checks that `main` is an ancestor of the commit (`Landing.CheckFastForward`).
+4. **Divergence.** On a divergence, ship moves the lane ref to the commit and stops. It writes no intent and no journal entry.
+5. **Record.** Ship journals `commit_sha` with its cycle. Then it writes the intent as `prepared`.
+6. **Ref.** Only after the record does ship move the lane ref, with `git update-ref`.
+7. **Record failure.** If the journal or the intent write fails, ship moves the ref, unwinds the lane and pushes nothing.
+8. **Push.** Ship adopts the consumed paths through `adoptIntentConsumption` and checks `commit_tree` against the audit binding.
+9. **Push target.** Then ship pushes `commit_sha:refs/heads/<branch>`.
+10. **Settle.** After the push lands, ship fast-forwards the plane `main` (`settleLanding`). A failed fast-forward is a WARN.
+11. **Complete.** Ship runs the post-push tree check, writes `ship-binding.json` and marks the intent `complete`.
+
+The divergence rule keeps the fleet rebase (ADR-0105 B1) as it was: the rebase finds the lane commit on the lane. A failed fast-forward after the push (`SHIP_LANDING_MAIN_ADVANCE_FAILED`) does not stop later landings, because the next landing does the catch-up first.
+
+**The resume.** `Landing.Resume` is the first stage of `ship.Run`. It runs before the repo-contract pack, the explanation gate and the audit binding.
+
+1. **Roll forward.** A stop can come after the record and before the ref moves. Ship then moves the lane ref forward, if three conditions are true.
+   - The lane tip is the parent of `commit_sha`.
+   - The staged tree is `commit_tree`.
+   - The journal holds `commit_sha`.
+2. **Witness.** The host reads the run and the cycle from `cycle-state.json`. It also reads the lane tip, the journal and the newest audit.
+3. **Checks.** A `prepared` intent resumes only when all of these checks pass:
+   - the ship journal holds `commit_sha`;
+   - the cycle and the run of the intent are the cycle and the run of the host;
+   - the newest audit of the run is a PASS, and its bytes match its SHA256;
+   - the newest audit names the same artifact and tree (no audit supersedes it);
+   - the lane tip is `commit_sha`, and the sealed Build explanation has the same SHA256.
+4. **Ancestry.** `Landing.Admit` checks that the commit holds `commit_tree`. Then it fetches origin and reads the ancestry.
+   - When `commit_sha` is an ancestor of origin, origin holds the commit. Ship pushes nothing and settles the landing.
+   - Otherwise origin and the plane `main` must be ancestors of `commit_sha`. Then ship resumes at the push.
+
+No gate runs again. The content-addressed commit and the binding check before the push prove the bytes. The audit binding of a resume comes from the newest audit row (`bindResumedAudit`, in `audit.go`), never from the intent.
+
+**Unwind or stale.** When an intent does not resume, ship decides from the lane, not from the intent.
+
+- The lane tip is `commit_sha`, and the cycle and the run are the host's. Then ship resets the lane to the audited shape before any gate runs. The unwind is B1 `unwindShipCommit` (`core.UnwindToAuditedShape`), to `lane_tree` on `worktree_base_sha`. Ship marks the intent `unwound`.
+- In all other cases, the lane does not hold this commit. Ship marks the intent `stale`, changes nothing on the lane, and runs the gates.
+
+A failed write of `unwound` or `stale` is a `STATE_IO` error, not a WARN. A push failure that is not transient also unwinds the lane, so Audit never measures ship's own commit. The unwind goes to `lane_tree`, not to `audited_tree`. A carried lane (ADR-0105 B3) holds the change of the audit on a later base, and only `lane_tree` matches its base. If the unwind declines, the cycle stops with `GIT_LANDING_UNWIND_DECLINED` (integrity), and `main` does not move. The message gives the operator steps.
+
+The plane `main` is never ahead of origin through ship's own action. A transient push failure goes back to ship, and the resume completes it.
+
+**A lane with nothing to ship whose commits origin does not hold.** `prepareChanges` used to report "nothing to ship" when the lane was equal to local `main` while `main` was ahead of origin. So a ship passed without a push (the landing-lost WARN of cycle 1830). But at each boundary, local `main` is ahead of origin by design: the sync-main merge, the dossier closeouts and the inbox stamps. A lane with nothing to ship must not stop for those commits.
+
+So ship refuses with `GIT_LANE_NOT_ON_ORIGIN` (integrity) only for a stranded landing. That is a commit in `origin/<branch>..<lane>` that the ship journal records as a `cycle` commit, whose landing intent is not `complete`. In all other cases, ship keeps the "nothing to ship" result. The reason:
+
+- A push needs a binding that proves the lane's commits are the work of this audit. Only a `prepared` intent proves that, and the resume takes that path before `prepareChanges` runs.
+- A stranded landing has no proof for this lane, and a push publishes commits with no proof. The integrity class stops the cycle with its work kept.
+- The message gives the operator steps: fast-forward the plane `main` to the commit, run `evolve sync-main`, then run `evolve ship --push-only`.
+
+**What is left.** Two binding sites still compare the audited tree with a held tree directly: the post-push idempotency check (`native.go`) and `verifyPostPushPredicateEvidence` (`audit.go`). A consuming or carried ship that is dispatched again after its intent is `complete` does not take the report-only path. Inbox `carried-ship-resume-binding-sites-skip-the-rule` stays open for these two sites.
+
+A stop between ship's inbox consumption and the record is a window from before this change. The next ship then sees the consumption with no intent. Inbox `ship-consumption-before-the-landing-record-has-no-resume` keeps it open.
 
 ## Consequences
 

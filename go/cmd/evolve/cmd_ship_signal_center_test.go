@@ -45,9 +45,7 @@ func TestWireSimulateOrchestrator_ShipWarningRenders(t *testing.T) {
 	}
 	l := landing.New(failingReset, func() landing.Streams { return landing.Streams{Stdout: io.Discard, Stderr: io.Discard} },
 		landing.WithRun(string(core.PhaseShip), 3, ""), landing.WithSignals(func() *signalcenter.Center { return d.Signals }))
-	if err := l.Integrate(context.Background(), landing.Integration{Branch: "main", CycleBranch: "cycle-3-branch", Binary: "go/evolve"}); err != nil {
-		t.Fatal(err)
-	}
+	l.Integrate(context.Background(), landing.Integration{Branch: "main", CycleBranch: "cycle-3-branch", Commit: "a1b2c3d4", Binary: "go/evolve"})
 	if out := console.String(); !strings.Contains(out, "[ship] ship.warning WARN SHIP_LANDING_BINARY_RESET_FAILED cycle=3 phase=ship") || !strings.Contains(out, "origin=Landing.Integrate") {
 		t.Fatalf("the console sink renders the unit's WARN under --simulate: %q", out)
 	}

@@ -77,22 +77,18 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) ([]string, i
 	return offenders, scanned
 }
 
-// A failed tracked-binary reset no longer writes the raw `[ship] WARN:` line
-// to opts.Stderr: the Center on Options.Signals sees
-// SHIP_LANDING_BINARY_RESET_FAILED under phase "ship" with the run identity,
-// and the merge still runs.
-func TestWorktreeShipIntegrate_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing.T) {
+func TestWorktreeShipLand_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing.T) {
 	opts, _, stderr := pinOptions(t, ClassCycle)
 	opts.RunID = "run-7"
 	c, got := recordingCenter()
 	opts.Signals = c
 	r := newArgvRecorder(opts)
 	r.on("checkout HEAD -- go/evolve", scriptedCall{exit: 1})
-	scriptGreenPost(r)
+	scriptGreenLanding(r, filepath.Join(opts.ProjectRoot, "wt"))
 	res := &RunResult{}
 	s := newWorktreeShip(context.Background(), opts, res, pinBranch, filepath.Join(opts.ProjectRoot, "wt"))
 	s.cycleBranch = pinCycleBranch
-	if err := s.integrate(); err != nil {
+	if err := s.land(""); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(stderr.String(), "could not reset go/evolve") {
@@ -101,8 +97,8 @@ func TestWorktreeShipIntegrate_BinaryResetFailureIsTheLandingCodeNotStderr(t *te
 	if len(*got) != 1 || (*got)[0].Code != landing.CodeBinaryResetFailed || (*got)[0].Phase != phaseName || (*got)[0].Cycle != 7 || (*got)[0].RunID != "run-7" {
 		t.Errorf("the Center sees the landing code under the ship phase with the run identity: %+v", *got)
 	}
-	if len(r.calls) < 2 || !strings.HasPrefix(r.calls[1].Argv, "merge --ff-only") {
-		t.Errorf("the merge still runs: %v", r.argvs())
+	if !strings.Contains(strings.Join(r.argvs(), "\n"), "checkout HEAD -- go/evolve [discard]\nmerge --ff-only "+pinHead+" [streams]") {
+		t.Errorf("the merge still runs after the failed reset: %v", r.argvs())
 	}
 }
 
@@ -118,7 +114,7 @@ func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 	r.on("push origin "+pinBranch, scriptedCall{exit: 1})
 	r.on("fetch origin "+pinBranch, scriptedCall{exit: 1})
 	res := &RunResult{CommitSHA: "untouched"}
-	err := pushWithRepair(context.Background(), opts, res, pinBranch, landing.SiteDirect)
+	err := pushWithRepair(context.Background(), opts, res, landing.PushRequest{Branch: pinBranch, Site: landing.SiteDirect})
 	if err == nil {
 		t.Fatal("a declined repair returns the rejection")
 	}
@@ -129,7 +125,7 @@ func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 		t.Error("the once-guard is written back to the host's ledger")
 	}
 	probes := len(r.calls)
-	if err := pushWithRepair(context.Background(), opts, res, pinBranch, landing.SiteDirect); err == nil {
+	if err := pushWithRepair(context.Background(), opts, res, landing.PushRequest{Branch: pinBranch, Site: landing.SiteDirect}); err == nil {
 		t.Fatal("the second rejection returns the rejection")
 	}
 	if len(r.calls) != probes+1 {
@@ -144,7 +140,7 @@ func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 	r2 := newArgvRecorder(fresh)
 	scriptGreenPost(r2)
 	res2 := &RunResult{}
-	if err := pushWithRepair(context.Background(), fresh, res2, pinBranch, landing.SiteDirect); err != nil {
+	if err := pushWithRepair(context.Background(), fresh, res2, landing.PushRequest{Branch: pinBranch, Site: landing.SiteDirect}); err != nil {
 		t.Fatal(err)
 	}
 	if res2.CommitSHA != pinHead || res2.RepairAttempted != "" || fresh.repairAttempted != nil {
@@ -152,10 +148,6 @@ func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 	}
 }
 
-// A recording Center threaded through Options.Signals on a scripted green
-// worktree ship (run(): resolve, lock, preflight, stage, commit, integrate)
-// records ZERO events from module ship: the landing adds nothing to the
-// stream on the happy path.
 func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t *testing.T) {
 	opts, _, _ := pinOptions(t, ClassCycle)
 	c, got := recordingCenter()
@@ -165,7 +157,7 @@ func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t 
 	mustMkdir(t, wt)
 	r.on("-C "+wt+" symbolic-ref --short HEAD", scriptedCall{stdout: pinCycleBranch + "\n"})
 	r.on("-C "+wt+" diff --cached --quiet", scriptedCall{exit: 1})
-	scriptGreenPost(r)
+	scriptGreenLanding(r, wt)
 	res := &RunResult{}
 	if err := newWorktreeShip(context.Background(), opts, res, pinBranch, wt).run(); err != nil {
 		t.Fatalf("green worktree ship: %v\n%s", err, strings.Join(res.Logs, "\n"))

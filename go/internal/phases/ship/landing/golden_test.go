@@ -64,7 +64,7 @@ func loadGolden(t *testing.T, name string) goldenFile {
 func leafWindow(argv []string) []string {
 	start := -1
 	for i, a := range argv {
-		if strings.HasPrefix(a, "checkout HEAD -- ") || strings.HasPrefix(a, "push origin ") {
+		if strings.HasPrefix(a, "push origin ") {
 			start = i
 			break
 		}
@@ -98,16 +98,6 @@ func leafLogs(logs []string) []string {
 // same responses the host recorder gave when the golden was captured.
 func scriptScenario(f *fakeGit, name string) {
 	scenario := name[strings.LastIndex(name, "/")+1:]
-	if strings.HasPrefix(name, "reset-") {
-		if strings.Contains(name, "reset-fail") {
-			f.on("checkout HEAD -- go/evolve", scripted{exit: 1})
-		}
-		if strings.Contains(name, "merge-diverged") {
-			f.on("merge --ff-only "+testCycleBr, scripted{exit: 128})
-		}
-		f.on("rev-parse HEAD", scripted{stdout: testHead + "\n"})
-		return
-	}
 	if scenario != "push-ok" {
 		f.on("push origin "+testBranch, scripted{exit: 1}, scripted{exit: 0})
 	}
@@ -182,38 +172,14 @@ func assertErrorMatchesGolden(t *testing.T, name string, err error, want *golden
 	}
 }
 
-// Test 22 (integrate rows) — every landing_integrate golden row replays
-// through Integrate + Push: the leaf window's argv and streams, the leaf's
-// log lines, the head and the error are the host's bytes.
-func TestIntegrate_ArgvAndLogSequencesMatchTheGoldens(t *testing.T) {
-	for _, row := range loadGolden(t, "landing_integrate.golden.json").Rows {
-		f := newFakeGit()
-		scriptScenario(f, row.Name)
-		l, _ := newLanding(f)
-		sink, lines := logSink()
-		req := Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve", Fleet: strings.HasSuffix(row.Name, "fleet-on"), Log: sink}
-		err := l.Integrate(context.Background(), req)
-		var out PushResult
-		if err == nil {
-			out, err = l.Push(context.Background(), PushRequest{Branch: testBranch, Site: SiteWorktree, Log: sink})
-		}
-		assertReplay(t, row, f.calls, *lines, out, err, "integrate")
-	}
-}
-
 // Test 22 (push rows) — every push_<site> golden row replays through Push.
 func TestPush_ArgvAndLogSequencesMatchTheGoldens(t *testing.T) {
-	for name, site := range map[string]PushSite{"direct": SiteDirect, "worktree": SiteWorktree, "pushonly": SitePushOnly} {
+	for name, site := range map[string]PushSite{"direct": SiteDirect, "pushonly": SitePushOnly} {
 		for _, row := range loadGolden(t, "push_"+name+".golden.json").Rows {
 			f := newFakeGit()
 			scriptScenario(f, row.Name)
 			l, _ := newLanding(f)
 			sink, lines := logSink()
-			if site == SiteWorktree { // the worktree rows start at the integrate
-				if err := l.Integrate(context.Background(), Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve", Log: sink}); err != nil {
-					t.Fatal(err)
-				}
-			}
 			out, err := l.Push(context.Background(), pushRequestFor(row.Name, site, sink))
 			assertReplay(t, row, f.calls, *lines, out, err, "push")
 		}

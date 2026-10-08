@@ -1,0 +1,22 @@
+{
+  "id": "ship-consumption-before-the-landing-record-has-no-resume",
+  "title": "A stop between ship's inbox consumption and the landing record leaves the consumption with no intent",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "weight": 0.45,
+  "summary": "Ship consumes the inbox items of a cycle in the lane worktree before it makes the lane commit. The two-phase landing (ADR-0039 §8.1) records the journal entry and the landing intent after the commit object. A kill or a crash between the consumption and the record leaves the moved inbox files staged on the lane, with no intent. The next ship then finds no intent to resume. Its gates see the consumption as Build content, and the explanation gate fails as it did in cycle 1830. The J_0 review of the ship-landing lane (probe P1c) found this window. It is older than the two-phase landing: the same window existed between the consumption and the old git commit.",
+  "fix": "Record the consumption before the move (a durable consumption record in .evolve/landing/), or make the next ship undo a consumption that no intent proves, before any gate runs.",
+  "acceptance": [
+    "A stop after the consumption and before the landing record, then a second ship, lands the audited change with no EXPLANATION_DOCUMENTATION failure (red first)",
+    "A normal landing still consumes its items in the landing commit (preservation)"
+  ],
+  "files": [
+    "go/internal/phases/ship/consume.go",
+    "go/internal/phases/ship/landing_intent.go"
+  ],
+  "routed_reason": "out of scope for the ship-landing fix round (the window is older than the change); landing_intent.go is a protected surface",
+  "created_at": "2026-10-08T08:00:00Z",
+  "route": "console",
+  "routed_at": "2026-10-08T08:00:00Z",
+  "source": "J_0 review of the ship-landing lane (probe P1c), filed by the ship-landing lane in fix round 1"
+}

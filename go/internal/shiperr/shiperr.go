@@ -159,6 +159,10 @@ const (
 	CodeWorktreeResolve    ShipErrorCode = "WORKTREE_RESOLVE"
 	CodeIntegrityTreeDrift ShipErrorCode = "INTEGRITY_TREE_DRIFT"
 
+	CodeGitLaneNotOnOrigin       ShipErrorCode = "GIT_LANE_NOT_ON_ORIGIN"
+	CodeGitLandingUnwindDeclined ShipErrorCode = "GIT_LANDING_UNWIND_DECLINED"
+	CodeGitPushPolicyRefused     ShipErrorCode = "GIT_PUSH_POLICY_REFUSED"
+
 	// generic / fallthrough
 	CodeArgs    ShipErrorCode = "ARGS"
 	CodeGitIO   ShipErrorCode = "GIT_IO"

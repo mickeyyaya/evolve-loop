@@ -74,6 +74,10 @@ const (
 	CodeWorktreeResolve        = shiperr.CodeWorktreeResolve
 	CodeIntegrityTreeDrift     = shiperr.CodeIntegrityTreeDrift
 
+	CodeGitLaneNotOnOrigin       = shiperr.CodeGitLaneNotOnOrigin
+	CodeGitLandingUnwindDeclined = shiperr.CodeGitLandingUnwindDeclined
+	CodeGitPushPolicyRefused     = shiperr.CodeGitPushPolicyRefused
+
 	CodeArgs    = shiperr.CodeArgs
 	CodeGitIO   = shiperr.CodeGitIO
 	CodeStateIO = shiperr.CodeStateIO
