@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the skills-drift gate grades a generator change with the worktree's own generator (cycles 1828 and 1840, 2026-10-09)
+
+- **What happened.** Cycles 1828 and 1840 changed the skill-command generator (`skillcheck.RenderCommandStub`) and regenerated `commands/*.md`. The worktree's own `evolve skills check` was OK, and ACS was 4/4 PASS. The audit gate reported 30 and 32 drifted stubs, a false red. Cycle 1840 halted as `infra-systemic`. Plan: [skills-drift-worktree-generator-2026-10.md](docs/plans/skills-drift-worktree-generator-2026-10.md).
+- **Root cause.** `skillsDriftCheckDefault` ran `skillcheck.Check` in the orchestrator process. That process has the base generator compiled in, not the lane's generator. The same skew also passed a lane that changed the generator but did not regenerate the stubs, which CI then failed.
+- **The fix.** If the lane changes a path under `go/internal/skillcheck/` since the cycle base, the gate runs the worktree's own `evolve skills check` (`go run ./cmd/evolve` in `<worktree>/go`). Each other lane gets the in-process check, with byte-identical output.
+- **No fail-open on a red check.** A non-zero exit without report lines is a FAIL. Only a runner error fails open, with a loud WARN. When the worktree check passes but the host generator disagrees, the gate gives a WARN that names the count.
+- **One invocation.** `core.WorktreeEvolveInvocation` builds the worktree-evolve invocation. The derived-artifact regenerator (`regenerateDerivedArtifact`) and the gate both use it.
+
 ## Fixed — `evolve inbox release --keep root|claim` resolves a claim whose root copy has other bytes, and `evolve wave watch` no longer shows a lane of the previous wave (2026-10-09)
 
 - **What happened.** At the wave-82 boundary, `evolve inbox release --stale` refused the claim of cycle 1836 on `rollback-fail-open-and-vacuous-tests` (`ErrClaimConflict`). The root copy was the claim copy plus two stamps from cycle 1838: `failure_count` and `last_failure_reason`. No verb could choose the copy to keep, so the item stayed held.

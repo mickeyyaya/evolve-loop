@@ -1,0 +1,25 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1840"
+  ],
+  "consumed": {
+    "at": "2026-10-08T21:49:19Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "fixed by the skills-drift gate fix: a lane that changes go/internal/skillcheck is graded with the worktree's own generator (deadline first, non-zero exit without a report fails, host disagreement warns)"
+  },
+  "created_at": "2026-10-08T19:04:49Z",
+  "fix": "Root-cause the pipeline failure described by the recorded evidence: orchestrator-classified infra-systemic: failure-dossier.json audit_declared.class=infrastructure-systemic; audit-report.md round 3: ACS 4/4 PASS and worktree skills check OK while host binary 017d3e817ef1 skills check reports 32 DRIFT; same gate false RED as cycle 1828 (inst-L1828a). Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-infra-systemic-cycle1840",
+  "injected_by": "loop-escalation",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-10-08T19:04:49Z. Evidence: orchestrator-classified infra-systemic: failure-dossier.json audit_declared.class=infrastructure-systemic; audit-report.md round 3: ACS 4/4 PASS and worktree skills check OK while host binary 017d3e817ef1 skills check reports 32 DRIFT; same gate false RED as cycle 1828 (inst-L1828a)",
+  "priority": "P0",
+  "priority_class": "stability",
+  "root_cause": "The system-failure signal reported: orchestrator-classified infra-systemic: failure-dossier.json audit_declared.class=infrastructure-systemic; audit-report.md round 3: ACS 4/4 PASS and worktree skills check OK while host binary 017d3e817ef1 skills check reports 32 DRIFT; same gate false RED as cycle 1828 (inst-L1828a). Preserve this evidence while identifying the pipeline cause.",
+  "summary": "ADR-0072 system-failure halt at cycle 1840 (category=infra-systemic). Evidence: orchestrator-classified infra-systemic: failure-dossier.json audit_declared.class=infrastructure-systemic; audit-report.md round 3: ACS 4/4 PASS and worktree skills check OK while host binary 017d3e817ef1 skills check reports 32 DRIFT; same gate false RED as cycle 1828 (inst-L1828a). This is a PIPELINE defect, not a task failure — diagnose the reported failure before retrying the task.",
+  "title": "PIPELINE DEFECT (infra-systemic): the loop halted — orchestrator-classified infra-systemic: failure-dossier.json audit_declared.class=infrastructure-systemic; audit-report.md round 3: ACS 4/4 PASS and worktree skills check OK while host binary 017d3e817ef1 skills check reports 32 DRIFT; same gate false RED as cycle 1828 (inst-L1828a)",
+  "weight": 0.99
+}
