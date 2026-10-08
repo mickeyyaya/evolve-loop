@@ -17,10 +17,8 @@ const (
 
 var objectIDRe = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 
-// auditedChange is what the newest audit bound: the base the lane forked at, the tree it reviewed, and a
-// label that names the cycle and run in the carrier commit's trailer.
-type auditedChange struct {
-	base, tree, label string
+type AuditedChange struct {
+	Base, Tree, Label string
 }
 
 // unwindBeforeFleetRebase takes ship's inbox consumption out of the change a
@@ -35,7 +33,7 @@ func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot 
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: read the audited tree: %v\n", cycle, err)
 		return false
 	}
-	audited := auditedChange{base: cs.WorktreeBaseSHA, tree: tree, label: fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)}
+	audited := AuditedChange{Base: cs.WorktreeBaseSHA, Tree: tree, Label: fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)}
 	declined, err := unwindShipCommit(ctx, cs.ActiveWorktree, audited, gitCapture)
 	switch {
 	case err != nil:
@@ -49,14 +47,22 @@ func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot 
 	return true
 }
 
+func UnwindToAuditedShape(ctx context.Context, worktree string, audited AuditedChange) (string, error) {
+	declined, err := unwindShipCommit(ctx, worktree, audited, gitCapture)
+	if declined != "" || err != nil {
+		return declined, err
+	}
+	return "", pendRebasedChange(ctx, worktree, gitCapture)
+}
+
 // unwindShipCommit replaces the lane's commits with one carrier commit of the audited tree on the audited
 // base. It returns why it declined, changing nothing, or "" once HEAD is the carrier.
-func unwindShipCommit(ctx context.Context, worktree string, audited auditedChange, git gitFn) (string, error) {
+func unwindShipCommit(ctx context.Context, worktree string, audited AuditedChange, git gitFn) (string, error) {
 	if declined, err := unwindDecline(ctx, worktree, audited, git); declined != "" || err != nil {
 		return declined, err
 	}
-	carrier, err := gitStdout(ctx, git, worktree, "-c", "commit.gpgsign=false", "commit-tree", audited.tree, "-p", audited.base,
-		"-m", "evolve: the audited change, unwound from its ship commit", "-m", "Evolve-Carrier: "+audited.label)
+	carrier, err := gitStdout(ctx, git, worktree, "-c", "commit.gpgsign=false", "commit-tree", audited.Tree, "-p", audited.Base,
+		"-m", "evolve: the audited change, unwound from its ship commit", "-m", "Evolve-Carrier: "+audited.Label)
 	if err != nil {
 		return "", err
 	}
@@ -64,8 +70,8 @@ func unwindShipCommit(ctx context.Context, worktree string, audited auditedChang
 	return "", err
 }
 
-func unwindDecline(ctx context.Context, worktree string, audited auditedChange, git gitFn) (string, error) {
-	if !objectIDRe.MatchString(audited.base) || !objectIDRe.MatchString(audited.tree) {
+func unwindDecline(ctx context.Context, worktree string, audited AuditedChange, git gitFn) (string, error) {
+	if !objectIDRe.MatchString(audited.Base) || !objectIDRe.MatchString(audited.Tree) {
 		return "the audited base or tree is not an object id", nil
 	}
 	status, err := gitStdout(ctx, git, worktree, "status", "--porcelain", "--untracked-files=normal")
@@ -79,17 +85,17 @@ func unwindDecline(ctx context.Context, worktree string, audited auditedChange, 
 	if err != nil {
 		return "", fmt.Errorf("resolve the fork point: %w", err)
 	}
-	if fork != audited.base {
+	if fork != audited.Base {
 		return "the lane did not fork at the audited base", nil
 	}
-	_, code, err := git(ctx, worktree, "rev-parse", "--verify", "--quiet", audited.tree+"^{tree}")
+	_, code, err := git(ctx, worktree, "rev-parse", "--verify", "--quiet", audited.Tree+"^{tree}")
 	if err != nil {
 		return "", fmt.Errorf("look up the audited tree: %w", err)
 	}
 	if code != 0 {
 		return "git does not hold the audited tree", nil
 	}
-	return consumptionDecline(ctx, worktree, audited.tree, git)
+	return consumptionDecline(ctx, worktree, audited.Tree, git)
 }
 
 // consumptionDecline holds unless HEAD differs from the audited tree by exactly ship's inbox consumption:

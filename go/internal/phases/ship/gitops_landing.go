@@ -25,13 +25,19 @@ func (o *Options) landing() *landing.Landing {
 // captured eagerly: Run defaults the streams after Options is built, and
 // the root sets Signals separately.
 func (o *Options) wiredLanding() *landing.Landing {
+	opts := []landing.Option{
+		landing.WithRun(phaseName, o.CycleID, o.RunID),
+		landing.WithSignals(func() *signalcenter.Center { return o.Signals }),
+	}
+	if o.Sleep != nil {
+		opts = append(opts, landing.WithSleep(o.Sleep))
+	}
 	return landing.New(
 		func(ctx context.Context, args []string, stdout, stderr io.Writer) (int, error) {
 			return o.run(ctx, "git", args, stdout, stderr)
 		},
 		func() landing.Streams { return landing.Streams{Stdout: o.Stdout, Stderr: o.Stderr} },
-		landing.WithRun(phaseName, o.CycleID, o.RunID),
-		landing.WithSignals(func() *signalcenter.Center { return o.Signals }))
+		opts...)
 }
 
 // logTo is the res.Logs sink the landing writes its lines through.
@@ -39,11 +45,9 @@ func logTo(res *RunResult) func(string) {
 	return func(line string) { res.Logs = append(res.Logs, line) }
 }
 
-func pushWithRepair(ctx context.Context, opts *Options, res *RunResult, branch string, site landing.PushSite) error {
-	out, err := opts.landing().Push(ctx, landing.PushRequest{
-		Branch: branch, Site: site, DryRun: opts.DryRun,
-		RepairAttempted: opts.repairAttempted[core.CodeGitPushRejected], Log: logTo(res),
-	})
+func pushWithRepair(ctx context.Context, opts *Options, res *RunResult, req landing.PushRequest) error {
+	req.DryRun, req.RepairAttempted, req.Log = opts.DryRun, opts.repairAttempted[core.CodeGitPushRejected], logTo(res)
+	out, err := opts.landing().Push(ctx, req)
 	if out.RepairAttempted {
 		ensureRepairMap(opts)
 		opts.repairAttempted[core.CodeGitPushRejected] = true

@@ -540,6 +540,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phases/retro` | 25 | [internal-phases-retro.md](internal-phases-retro.md) |
 | `internal/phases/runner/verdict` | 22 | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/phases/runner` | 78 | [internal-phases-runner.md](internal-phases-runner.md) |
+| `internal/phases/ship/landing` | 1 | [internal-phases-ship-landing.md](internal-phases-ship-landing.md) |
 | `internal/phases/ship` | 246 | [internal-phases-ship.md](internal-phases-ship.md) |
 | `internal/phases/specrunner` | 15 | [internal-phases-specrunner.md](internal-phases-specrunner.md) |
 | `internal/phases/triage` | 26 | [internal-phases-triage.md](internal-phases-triage.md) |

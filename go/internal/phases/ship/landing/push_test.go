@@ -5,13 +5,37 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const repairLine = "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry"
 
+const (
+	worktreePush  = "push origin " + testHead + ":refs/heads/" + testBranch
+	serverError   = "To github.com:o/r.git\n ! [remote rejected] main -> main (Internal Server Error)\nerror: failed to push some refs to 'github.com:o/r.git'\n"
+	policyRefusal = " ! [remote rejected] main -> main (protected branch hook declined)\n"
+	raceRejection = " ! [rejected]        main -> main (fetch first)\n"
+)
+
 func pushReq(site PushSite) PushRequest { return PushRequest{Branch: testBranch, Site: site} }
+
+func worktreeReq() PushRequest {
+	return PushRequest{Branch: testBranch, Commit: testHead, Site: SiteWorktree}
+}
+
+type sleeps []time.Duration
+
+func (s *sleeps) record(d time.Duration) { *s = append(*s, d) }
+
+func sleepingLanding(f *fakeGit) (*Landing, *[]signalcenter.Event, *sleeps) {
+	c, got := recordingCenter()
+	slept := &sleeps{}
+	l := New(f.git, f.streams, WithRun("ship", 7, "r7"), WithSignals(func() *signalcenter.Center { return c }), WithSleep(slept.record))
+	return l, got, slept
+}
 
 // rejectPush scripts the first push rejected (rc=1) and the second accepted.
 func rejectPush(f *fakeGit) *fakeGit {
@@ -40,30 +64,30 @@ func headReadFailureFixture(t *testing.T, l *Landing, f *fakeGit) {
 	f.set("rev-parse HEAD", scripted{stdout: testHead + "\n"})
 }
 
-// Test 15 — the rejection wording per site, isolated by the once-guard
-// (RepairAttempted true → zero REPAIR probes; the worktree site's own
-// wording probe `rev-parse HEAD` still runs, before the guard). Kills: sites
-// swapped, the head probe dropped, prefix drift.
 func TestPush_RejectionWordingPerSite(t *testing.T) {
 	rows := []struct {
 		site  PushSite
 		msg   string
-		probe []string
+		argv  []string
 		debug map[string]string
 	}{
-		{SiteDirect, "ship: git push failed (rc=1): <nil>", nil,
+		{SiteDirect, "ship: git push failed (rc=1)", []string{"push origin " + testBranch + " [streams]"},
 			map[string]string{"git_rc": "1", "git_err": "", "branch": testBranch, "step": "push"}},
-		{SiteWorktree, "ship: git push failed (rc=1); main is at " + testHead + ": <nil>", []string{"rev-parse HEAD [capture]"},
-			map[string]string{"git_rc": "1", "git_err": "", "branch": testBranch, "head": testHead, "step": "push"}},
-		{SitePushOnly, "ship --push-only: git push failed (rc=1): <nil>", nil,
+		{SiteWorktree, "ship: git push of " + testHead + " to origin/main failed (rc=1); ship did not move main", []string{worktreePush + " [streams]"},
+			map[string]string{"git_rc": "1", "git_err": "", "branch": testBranch, "commit": testHead, "step": "push"}},
+		{SitePushOnly, "ship --push-only: git push failed (rc=1)", []string{"push origin " + testBranch + " [streams]"},
 			map[string]string{"git_rc": "1", "git_err": "", "branch": testBranch, "step": "push"}},
 	}
 	for _, row := range rows {
 		f := newFakeGit()
 		rejectPush(f)
+		f.on(worktreePush, scripted{exit: 1})
 		f.on("rev-parse HEAD", scripted{stdout: testHead + "\n"})
 		l, got := newLanding(f)
 		req := pushReq(row.site)
+		if row.site == SiteWorktree {
+			req = worktreeReq()
+		}
 		req.RepairAttempted = true
 		out, err := l.Push(context.Background(), req)
 		se := wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient, row.msg)
@@ -75,8 +99,7 @@ func TestPush_RejectionWordingPerSite(t *testing.T) {
 				t.Errorf("site %d: Debug[%s]=%q, want %q", row.site, k, se.Debug[k], v)
 			}
 		}
-		want := append([]string{"push origin " + testBranch + " [streams]"}, row.probe...)
-		if strings.Join(f.calls, "\n") != strings.Join(want, "\n") {
+		if want := row.argv; strings.Join(f.calls, "\n") != strings.Join(want, "\n") {
 			t.Errorf("site %d: argv %q, want %q", row.site, f.calls, want)
 		}
 		if out != (PushResult{}) || len(*got) != 0 {
@@ -85,12 +108,6 @@ func TestPush_RejectionWordingPerSite(t *testing.T) {
 	}
 }
 
-// Test 16 — every probe failure declines: the SAME *ShipError comes back
-// with Debug{repair_attempted, repair_outcome=declined} stamped, the result
-// says attempted/declined, the REPAIR line is logged once, and exactly ONE
-// SHIP_LANDING_PUSH_REPAIR_DECLINED names the probe. Kills: the probe name
-// wrong, Debug not stamped, a new error returned, two warns, RepairAttempted
-// false.
 func TestPush_RepairDeclinesOnEveryProbeFailure(t *testing.T) {
 	rows := []struct {
 		name   string
@@ -121,7 +138,7 @@ func TestPush_RepairDeclinesOnEveryProbeFailure(t *testing.T) {
 			req := pushReq(SiteDirect)
 			req.Log = sink
 			out, err := l.Push(context.Background(), req)
-			se := wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient, "ship: git push failed (rc=1): <nil>")
+			se := wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient, "ship: git push failed (rc=1)")
 			if se.Debug["repair_attempted"] != "GIT_PUSH_REJECTED" || se.Debug["repair_outcome"] != "declined" || se.Debug["step"] != "push" {
 				t.Errorf("Debug %v", se.Debug)
 			}
@@ -132,7 +149,7 @@ func TestPush_RepairDeclinesOnEveryProbeFailure(t *testing.T) {
 				t.Errorf("log lines %q", *lines)
 			}
 			e := wantOneEvent(t, *got, CodePushRepairDeclined, "Landing.Push", map[string]string{"step": "push", "branch": testBranch, "probe": row.probe})
-			if e.Reason != "push rejected; inline fetch + ff-retry declined at "+row.probe {
+			if e.Reason != "the remote rejected the push; the inline repair declined at "+row.probe {
 				t.Errorf("reason %q", e.Reason)
 			}
 		})
@@ -171,10 +188,6 @@ func TestPush_RepairAlreadyPushed(t *testing.T) {
 	}
 }
 
-// Test 18 — origin an ancestor of HEAD: the retry push streams to the
-// operator streams and lands as push-retried; no argv of tests 15-19 ever
-// carries rebase / --force / -f / --force-with-lease. Kills: push streams
-// discarded, the outcome string drifted, a force flag added.
 func TestPush_RepairFastForwardRetry_NeverRebasesNeverForcePushes(t *testing.T) {
 	f := newFakeGit()
 	rejectPush(f)
@@ -183,7 +196,7 @@ func TestPush_RepairFastForwardRetry_NeverRebasesNeverForcePushes(t *testing.T) 
 	f.on("merge-base --is-ancestor "+testOriginRef+" HEAD", scripted{exit: 0})
 	l, got := newLanding(f)
 	sink, lines := logSink()
-	req := pushReq(SiteWorktree)
+	req := pushReq(SiteDirect)
 	req.Log = sink
 	out, err := l.Push(context.Background(), req)
 	if err != nil {
@@ -192,7 +205,7 @@ func TestPush_RepairFastForwardRetry_NeverRebasesNeverForcePushes(t *testing.T) 
 	if out != (PushResult{Head: testHead, RepairAttempted: true, RepairOutcome: RepairPushRetried}) || string(out.RepairOutcome) != "push-retried" {
 		t.Errorf("result %+v", out)
 	}
-	wantArgv := []string{"push origin main [streams]", "rev-parse HEAD [capture]", "fetch origin main [discard]", "rev-parse origin/main [capture]",
+	wantArgv := []string{"push origin main [streams]", "fetch origin main [discard]", "rev-parse origin/main [capture]",
 		"rev-parse HEAD [capture]", "merge-base --is-ancestor " + testOriginRef + " HEAD [discard]", "push origin main [streams]", "rev-parse HEAD [capture]"}
 	if strings.Join(f.calls, "\n") != strings.Join(wantArgv, "\n") {
 		t.Errorf("argv %q", f.calls)
@@ -341,5 +354,192 @@ func TestCapture_ExitRuleAndErrorTexts(t *testing.T) {
 	}
 	if f.calls[0] != "rev-parse HEAD [capture]" {
 		t.Errorf("a capture streams stdout to a builder and stderr to io.Discard: %q", f.calls[0])
+	}
+}
+
+func TestPush_TheWorktreeSitePushesTheCommitByRefspecAndProbesTheRaceAgainstIt(t *testing.T) {
+	f := newFakeGit()
+	f.set(worktreePush, scripted{exit: 1, stderr: raceRejection}, scripted{exit: 0})
+	f.on("rev-parse origin/"+testBranch, scripted{stdout: testOriginRef + "\n"})
+	f.on("merge-base --is-ancestor "+testOriginRef+" "+testHead, scripted{exit: 0})
+	l, got, slept := sleepingLanding(f)
+
+	out, err := l.Push(context.Background(), worktreeReq())
+
+	if err != nil || out != (PushResult{Head: testHead, RepairAttempted: true, RepairOutcome: RepairPushRetried}) {
+		t.Fatalf("Push = %+v, %v; want the commit landed by the race repair", out, err)
+	}
+	want := []string{worktreePush + " [streams]", "fetch origin main [discard]", "rev-parse origin/main [capture]",
+		"merge-base --is-ancestor " + testOriginRef + " " + testHead + " [discard]", worktreePush + " [streams]"}
+	if strings.Join(f.calls, "\n") != strings.Join(want, "\n") {
+		t.Errorf("argv\n got %q\nwant %q: the worktree site never reads HEAD, because main has not moved", f.calls, want)
+	}
+	if len(*slept) != 0 || len(*got) != 0 {
+		t.Errorf("slept %v, events %+v: a race is probed, never backed off", *slept, *got)
+	}
+}
+
+func TestPush_TheWorktreeSiteDivergenceNamesTheCommitAndNeedsAReaudit(t *testing.T) {
+	f := newFakeGit()
+	f.on(worktreePush, scripted{exit: 1, stderr: raceRejection})
+	f.on("rev-parse origin/"+testBranch, scripted{stdout: testOriginRef + "\n"})
+	f.on("merge-base --is-ancestor "+testOriginRef+" "+testHead, scripted{exit: 1})
+	l, _ := newLanding(f)
+
+	out, err := l.Push(context.Background(), worktreeReq())
+
+	se := wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassPrecondition,
+		"ship: origin rejected the push of "+testHead+" because origin/main diverged; Audit must run again on the new base (ship does not rebase or force-push)")
+	if se.Debug["head"] != testHead || se.Debug["repair_outcome"] != "needs-reaudit" || out.RepairOutcome != RepairNeedsReaudit {
+		t.Errorf("Debug %v, result %+v", se.Debug, out)
+	}
+}
+
+func TestPush_ATransportErrorBacksOffAndRetriesTheIdenticalPush(t *testing.T) {
+	f := newFakeGit()
+	f.set(worktreePush, scripted{exit: 1, stderr: serverError}, scripted{exit: 1, stderr: serverError}, scripted{exit: 0})
+	l, got, slept := sleepingLanding(f)
+	sink, lines := logSink()
+	req := worktreeReq()
+	req.Log = sink
+
+	out, err := l.Push(context.Background(), req)
+
+	if err != nil || out != (PushResult{Head: testHead, RepairAttempted: true, RepairOutcome: RepairPushRetried}) {
+		t.Fatalf("Push = %+v, %v; want the third identical push to land", out, err)
+	}
+	if want := (sleeps{2 * time.Second, 4 * time.Second}); strings.Join(durations(*slept), ",") != strings.Join(durations(want), ",") {
+		t.Errorf("slept %v, want %v", *slept, want)
+	}
+	if want := []string{worktreePush + " [streams]", worktreePush + " [streams]", worktreePush + " [streams]"}; strings.Join(f.calls, "\n") != strings.Join(want, "\n") {
+		t.Errorf("argv %q, want three identical pushes and no fetch probe", f.calls)
+	}
+	wantLogs := []string{"[ship] REPAIR: the push failed with a transport or server error; ship retries the identical push after a backoff", "[ship] REPAIR: push retry after a 4s backoff succeeded"}
+	if strings.Join(*lines, "\n") != strings.Join(wantLogs, "\n") || len(*got) != 0 {
+		t.Errorf("logs %q events %+v", *lines, *got)
+	}
+}
+
+func TestPush_ATransportOutageDeclinesAfterTheBoundedBackoff(t *testing.T) {
+	f := newFakeGit()
+	f.set(worktreePush, scripted{exit: 1, stderr: serverError})
+	l, got, slept := sleepingLanding(f)
+
+	out, err := l.Push(context.Background(), worktreeReq())
+
+	se := wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient,
+		"ship: git push of "+testHead+" to origin/main failed (rc=1): To github.com:o/r.git | ! [remote rejected] main -> main (Internal Server Error) | error: failed to push some refs to 'github.com:o/r.git'; ship did not move main")
+	if se.Debug["repair_outcome"] != "declined" || out != (PushResult{RepairAttempted: true, RepairOutcome: RepairDeclined}) {
+		t.Errorf("Debug %v result %+v", se.Debug, out)
+	}
+	if want := (sleeps{2 * time.Second, 4 * time.Second, 8 * time.Second}); strings.Join(durations(*slept), ",") != strings.Join(durations(want), ",") || len(f.calls) != 4 {
+		t.Errorf("slept %v over %d pushes, want %v over 4: the backoff is bounded inside the step", *slept, len(f.calls), want)
+	}
+	wantOneEvent(t, *got, CodePushRepairDeclined, "Landing.Push", map[string]string{"step": "push", "branch": testBranch, "probe": "transport_retry"})
+}
+
+func TestPush_ARejectionThatStopsBeingTransportEndsTheBackoff(t *testing.T) {
+	f := newFakeGit()
+	f.set(worktreePush, scripted{exit: 1, stderr: serverError}, scripted{exit: 1, stderr: raceRejection})
+	l, _, slept := sleepingLanding(f)
+
+	_, err := l.Push(context.Background(), worktreeReq())
+
+	wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient, "")
+	if len(*slept) != 1 || len(f.calls) != 2 {
+		t.Errorf("slept %v over %d pushes, want one backoff and two pushes: the backoff never applies to a race", *slept, len(f.calls))
+	}
+}
+
+func TestPush_APolicyRefusalIsFinalAtEverySite(t *testing.T) {
+	for name, req := range map[string]PushRequest{"direct": pushReq(SiteDirect), "worktree": worktreeReq(), "once-guarded": {Branch: testBranch, Site: SitePushOnly, RepairAttempted: true}} {
+		t.Run(name, func(t *testing.T) {
+			f := newFakeGit()
+			f.on("push origin "+testBranch, scripted{exit: 1, stderr: policyRefusal})
+			f.on(worktreePush, scripted{exit: 1, stderr: policyRefusal})
+			l, got, slept := sleepingLanding(f)
+
+			out, err := l.Push(context.Background(), req)
+
+			se := wantShipError(t, err, shiperr.CodeGitPushPolicyRefused, shiperr.ShipClassPrecondition,
+				"ship: origin refused the push to main by policy; ship does not retry a policy refusal: ! [remote rejected] main -> main (protected branch hook declined)")
+			if se.Debug["step"] != "push" || se.Debug["git_rc"] != "1" {
+				t.Errorf("Debug %v", se.Debug)
+			}
+			if len(f.calls) != 1 || len(*slept) != 0 || out != (PushResult{}) || len(*got) != 0 {
+				t.Errorf("calls %q slept %v result %+v events %+v: a policy refusal makes no probe, no retry and no backoff", f.calls, *slept, out, *got)
+			}
+		})
+	}
+}
+
+func TestPush_TheOperatorStderrStillReceivesThePushOutput(t *testing.T) {
+	f := newFakeGit()
+	f.on(worktreePush, scripted{exit: 1, stderr: policyRefusal})
+	l, _ := newLanding(f)
+
+	_, err := l.Push(context.Background(), worktreeReq())
+
+	if f.stderr.String() != policyRefusal || err == nil || !strings.Contains(err.Error(), "protected branch hook declined") {
+		t.Errorf("operator stderr %q, error %v: git's stderr reaches the operator and the classifier both", f.stderr.String(), err)
+	}
+}
+
+func TestPush_WithoutAnOperatorStderrTheRejectionIsStillClassified(t *testing.T) {
+	f := newFakeGit()
+	f.on(worktreePush, scripted{exit: 1, stderr: policyRefusal})
+	l := New(f.git, func() Streams { return Streams{Stdout: &f.stdout} })
+
+	_, err := l.Push(context.Background(), worktreeReq())
+
+	wantShipError(t, err, shiperr.CodeGitPushPolicyRefused, shiperr.ShipClassPrecondition, "")
+}
+
+func durations(d sleeps) []string {
+	out := make([]string, len(d))
+	for i, v := range d {
+		out[i] = v.String()
+	}
+	return out
+}
+
+func TestPush_ASpawnErrorIsNamedInTheRejectionInsteadOfItsStderr(t *testing.T) {
+	f := newFakeGit()
+	f.on("push origin "+testBranch, scripted{err: errors.New("spawn: no git"), stderr: serverError})
+	l, _ := newLanding(f)
+	req := pushReq(SiteDirect)
+	req.RepairAttempted = true
+
+	_, err := l.Push(context.Background(), req)
+
+	se := wantShipError(t, err, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient, "ship: git push failed (rc=0): spawn: no git")
+	if se.Debug["git_err"] != "spawn: no git" {
+		t.Errorf("Debug %v", se.Debug)
+	}
+}
+
+func TestPush_APolicyRefusalDuringTheBackoffIsFinalNotTransient(t *testing.T) {
+	f := newFakeGit()
+	f.set(worktreePush, scripted{exit: 1, stderr: serverError}, scripted{exit: 1, stderr: policyRefusal})
+	l, _, slept := sleepingLanding(f)
+
+	out, err := l.Push(context.Background(), worktreeReq())
+
+	wantShipError(t, err, shiperr.CodeGitPushPolicyRefused, shiperr.ShipClassPrecondition,
+		"ship: origin refused the push to main by policy; ship does not retry a policy refusal: ! [remote rejected] main -> main (protected branch hook declined)")
+	if len(*slept) != 1 || len(f.calls) != 2 || out.RepairOutcome != RepairDeclined {
+		t.Errorf("slept %v over %d pushes, result %+v: a refusal after one backoff ends the retries as a policy precondition", *slept, len(f.calls), out)
+	}
+}
+
+func TestPush_AWorktreeSiteWithNoCommitNeverPushes(t *testing.T) {
+	f := newFakeGit()
+	l, _ := newLanding(f)
+
+	_, err := l.Push(context.Background(), PushRequest{Branch: testBranch, Site: SiteWorktree})
+
+	wantShipError(t, err, shiperr.CodeArgs, shiperr.ShipClassConfig, "ship: a worktree push names no commit, so ship pushes nothing")
+	if len(f.calls) != 0 {
+		t.Errorf("calls %q: a refspec with no commit deletes the remote branch, so ship runs no git", f.calls)
 	}
 }

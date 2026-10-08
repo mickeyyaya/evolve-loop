@@ -1,0 +1,24 @@
+{
+  "id": "ship-landing-review-followups",
+  "title": "Ship landing: pin two edge cases and make the operator steps work on a boundary state",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "weight": 0.3,
+  "route": "console",
+  "routed_reason": "the ship landing is a console-built control plane change (ADR-0039 §8.1); these are the filed items of its round-2 check",
+  "source": "console, 2026-10-08, the ship-landing landing (round-2 verify-only check: MERGE; the MEDIUM regression and the doc item were fixed at the landing)",
+  "created_at": "2026-10-08T10:00:00Z",
+  "summary": "The round-2 check of the ship landing filed three items that the landing did not fix. Item 2: mutant N7 survives. If strandedLandings ignores the journal class (worktree_ship.go), no test fails. Item 3: mutant N11 almost survives. The roll forward checks the journal, but the journal is written before the intent, so the check matters only at one edge, where the lane would unwind instead of going stale. Item 4: the operator steps for a stranded landing can fail on a boundary state. When a dossier closeout or an inbox stamp is on top of the strand, step 3 (evolve ship --push-only) refuses, because those commits are not journaled and are not a sync-main merge.",
+  "fix": "Item 2: add a test with a journaled commit that is not of class cycle, for example a manual ship with a failed push. Item 3: decide if the journal check in the roll forward is necessary. If it is, add a test at its edge; if not, remove it. Item 4: let --push-only accept the plane's own bookkeeping commits (dossier closeouts and inbox stamps) above a journaled strand, or add a step that tells the operator to publish them first.",
+  "acceptance": [
+    "Mutant N7 is killed by a named test",
+    "The roll-forward journal check is pinned by a test or removed, with the reason in ADR-0039 §8.1",
+    "The operator steps for a stranded landing complete on a boundary state with a dossier closeout and an inbox stamp on top"
+  ],
+  "files": [
+    "go/internal/phases/ship/worktree_ship.go",
+    "go/internal/phases/ship/landing_intent.go",
+    "go/internal/phases/ship/pushonly.go",
+    "docs/architecture/adr/0039-failure-floor-and-failure-signal-contract.md"
+  ]
+}

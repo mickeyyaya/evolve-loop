@@ -304,7 +304,7 @@ func shipDirect(ctx context.Context, opts *Options, res *RunResult, branch strin
 
 	// A push rejection retries once via an inline fetch+ff-merge; a genuine
 	// divergence reclassifies to needs-reaudit.
-	if err := pushWithRepair(ctx, opts, res, branch, landing.SiteDirect); err != nil {
+	if err := pushWithRepair(ctx, opts, res, landing.PushRequest{Branch: branch, Site: landing.SiteDirect}); err != nil {
 		return err
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: pushed to origin/%s", branch))

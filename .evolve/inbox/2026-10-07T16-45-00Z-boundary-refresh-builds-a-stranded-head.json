@@ -1,0 +1,21 @@
+{
+  "id": "boundary-refresh-builds-a-stranded-head",
+  "title": "The boundary binary refresh can build go/bin/evolve from a stranded plane HEAD",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "weight": 0.5,
+  "summary": "The boundary binary refresh rebuilds the loop binary when its build stamp is behind HEAD with a go/ change. If the plane main holds a commit that origin does not hold (a strand such as ba61c7341 in cycle 1830), the refresh builds and runs unshipped code. The two-phase landing (ADR-0039 §8.1) stops ship from leaving such a strand, but an older binary, a dossier closeout or a manual commit can still leave one.",
+  "fix": "Build the refresh from the commit that origin holds (the merge base of HEAD and origin/main), or refuse the refresh and name the ahead commits when HEAD is ahead of origin.",
+  "acceptance": [
+    "A plane HEAD ahead of origin with a go/ change does not rebuild the loop binary from the unshipped commit (red first)"
+  ],
+  "files": [
+    "go/internal/loopchain/",
+    "go/cmd/evolve/cmd_loop_boot_refresh.go"
+  ],
+  "routed_reason": "out of scope for the ship-landing lane (brief: secondary finding); the loop chain and the boot refresh are console-owned",
+  "created_at": "2026-10-07T16:45:00Z",
+  "route": "console",
+  "routed_at": "2026-10-07T16:45:00Z",
+  "source": "console forensics of cycle 1830 (wave 77), secondary finding; filed by the ship-landing lane"
+}

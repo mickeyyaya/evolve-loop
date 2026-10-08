@@ -67,6 +67,9 @@ func TestShip_PostPush_Idempotent_CorrectReportOnly(t *testing.T) {
 	if res2.CommitSHA != shippedHEAD {
 		t.Errorf("re-dispatch CommitSHA=%q, want the existing ship commit %q", res2.CommitSHA, shippedHEAD)
 	}
+	if !containsLog(res2, "succeeding report-only") || res2.RepairOutcome == "landing-resumed" {
+		t.Errorf("outcome=%q logs=%q: a completed landing intent never resumes; the re-dispatch takes the report-only path", res2.RepairOutcome, res2.Logs)
+	}
 	if got := headSHA(t, repo); got != shippedHEAD {
 		t.Errorf("HEAD moved on re-dispatch (%s → %s) — post-push correction must not commit", shippedHEAD, got)
 	}

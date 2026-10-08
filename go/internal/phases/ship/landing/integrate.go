@@ -15,6 +15,7 @@ import (
 type Integration struct {
 	Branch      string
 	CycleBranch string
+	Commit      string
 	Binary      string
 	// Fleet selects the divergence class: true → GIT_FLEET_REBASE_NEEDED /
 	// transient (a peer lane moved main; core's rebase engine recovers),
@@ -24,24 +25,30 @@ type Integration struct {
 	Log func(string)
 }
 
-// Integrate resets the tracked binary (best-effort — a failure is
-// SHIP_LANDING_BINARY_RESET_FAILED and the merge still runs), then fast-
-// forwards the cycle branch into the integration branch on the operator
-// streams. A merge that errs or exits non-zero is the class-by-Fleet
-// ShipError with Debug{git_rc, git_err, cycle_branch, branch, step=integrate}.
-func (l *Landing) Integrate(ctx context.Context, req Integration) error {
+func (l *Landing) CheckFastForward(ctx context.Context, req Integration) error {
+	exit, err := l.git(ctx, []string{"merge-base", "--is-ancestor", req.Branch, req.Commit}, io.Discard, io.Discard)
+	if err == nil && exit == 0 {
+		return nil
+	}
+	return l.diverged(req, exit, err)
+}
+
+func (l *Landing) Integrate(ctx context.Context, req Integration) {
 	if exit, err := l.git(ctx, []string{"checkout", "HEAD", "--", req.Binary}, io.Discard, io.Discard); exit != 0 || err != nil {
 		l.warn("Landing.Integrate", CodeBinaryResetFailed,
 			fmt.Sprintf("could not reset %s to HEAD (exit=%d, err=%v); ff-merge may still fail if it is dirty", req.Binary, exit, err),
 			map[string]string{shiperr.StepKey: stepIntegrate, "path": req.Binary, shiperr.GitRCKey: fmt.Sprintf("%d", exit), "git_err": errText(err)})
 	}
 	s := l.streams()
-	exit, err := l.git(ctx, []string{"merge", "--ff-only", req.CycleBranch}, s.Stdout, s.Stderr)
+	exit, err := l.git(ctx, []string{"merge", "--ff-only", req.Commit}, s.Stdout, s.Stderr)
 	if err != nil || exit != 0 {
-		return l.diverged(req, exit, err)
+		l.warn("Landing.Integrate", CodeAdvanceFailed,
+			fmt.Sprintf("the fast-forward of %s to the pushed %s failed (exit=%d, err=%v); origin holds the commit, and the next landing fast-forwards %s to origin before its own check", req.Branch, req.Commit, exit, err, req.Branch),
+			map[string]string{shiperr.StepKey: stepIntegrate, shiperr.BranchKey: req.Branch, "commit": req.Commit, shiperr.GitRCKey: fmt.Sprintf("%d", exit), "git_err": errText(err)})
+		emitLog(req.Log, fmt.Sprintf("[ship] WARN: the fast-forward of %s to the pushed %s failed (rc=%d); the next landing fast-forwards %s to origin before its own check", req.Branch, req.Commit, exit, req.Branch))
+		return
 	}
 	emitLog(req.Log, fmt.Sprintf("[ship]   OK: ff-merged %s into %s", req.CycleBranch, req.Branch))
-	return nil
 }
 
 // diverged classifies a failed ff-merge: under a fleet it is the expected

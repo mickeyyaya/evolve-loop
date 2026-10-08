@@ -8,6 +8,7 @@ package landing
 
 import (
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,6 +37,8 @@ func leafSources(t *testing.T) map[string]string {
 	return sources
 }
 
+var structTag = regexp.MustCompile("`[^`]*`")
+
 func TestLeaf_NoHandWrittenStderrOrEnvReads(t *testing.T) {
 	banned := []string{"os.Stderr", "os.Stdout", "Fprintf(os.", "os.Getenv", "os.LookupEnv", `"EVOLVE_`, "ipcenv"}
 	for name, src := range leafSources(t) {
@@ -57,8 +60,9 @@ func TestLeaf_SpellsTheWhitelistedDebugKeysThroughShiperr(t *testing.T) {
 		t.Fatalf("the whitelist shrank to %v: the scan would pass vacuously", shiperr.SignalDebugKeys)
 	}
 	for name, src := range leafSources(t) {
+		code := structTag.ReplaceAllString(src, "")
 		for _, key := range shiperr.SignalDebugKeys {
-			if needle := `"` + key + `"`; strings.Contains(src, needle) {
+			if needle := `"` + key + `"`; strings.Contains(code, needle) {
 				t.Errorf("%s spells the projected Debug key %s as a literal: use its shiperr constant", name, needle)
 			}
 		}

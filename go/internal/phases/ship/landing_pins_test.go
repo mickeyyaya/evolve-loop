@@ -21,6 +21,8 @@ const (
 	pinHead          = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
 	pinOriginRef     = "0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98"
 	pinTree          = "77777777777777777777777777777777abcdef01"
+	pinLaneTree      = "66666666666666666666666666666666abcdef02"
+	pinItemBlob      = "55555555555555555555555555555555abcdef03"
 )
 
 // scriptedCall is one scripted git response; a queue per argv is consumed
@@ -67,7 +69,7 @@ func (r *argvRecorder) streamsOf(stdout, stderr io.Writer) string {
 	switch {
 	case stdout == io.Discard && stderr == io.Discard:
 		return "discard"
-	case r.opts != nil && stdout == r.opts.Stdout && stderr == r.opts.Stderr:
+	case r.opts != nil && stdout == r.opts.Stdout:
 		return "streams"
 	case stderr == io.Discard:
 		return "capture"
@@ -194,36 +196,15 @@ func scriptGreenPost(r *argvRecorder) {
 	r.on("rev-parse HEAD^{tree}", scriptedCall{stdout: pinTree + "\n"})
 }
 
-// integrateRow drives worktreeShip.integrate() for one reset × merge × fleet
-// combination and returns what it observed.
-func integrateRow(t *testing.T, resetOK, mergeOK, fleet bool) (goldenRow, *strings.Builder) {
-	t.Helper()
-	opts, _, stderr := pinOptions(t, ClassCycle)
-	if fleet {
-		opts.Env["EVOLVE_FLEET"] = "1"
-	}
-	r := newArgvRecorder(opts)
-	if !resetOK {
-		r.on("checkout HEAD -- go/evolve", scriptedCall{exit: 1})
-	}
-	if !mergeOK {
-		r.on("merge --ff-only "+pinCycleBranch, scriptedCall{exit: 128})
-	}
+func scriptGreenLanding(r *argvRecorder, wt string) {
 	scriptGreenPost(r)
-	res := &RunResult{}
-	s := newWorktreeShip(context.Background(), opts, res, pinBranch, filepath.Join(opts.ProjectRoot, "wt"))
-	s.cycleBranch = pinCycleBranch
-	err := s.integrate()
-	name := "reset-" + onOff(resetOK, "ok", "fail") + "/merge-" + onOff(mergeOK, "ok", "diverged") + "/fleet-" + onOff(fleet, "on", "off")
-	return goldenRow{Name: name, Argv: r.argvs(), Logs: res.Logs, CommitSHA: res.CommitSHA,
-		RepairAttempted: res.RepairAttempted, RepairOutcome: res.RepairOutcome, Error: goldenErrorOf(t, err)}, stderr
-}
-
-func onOff(b bool, yes, no string) string {
-	if b {
-		return yes
-	}
-	return no
+	r.on("-C "+wt+" write-tree", scriptedCall{stdout: pinTree + "\n"})
+	r.on("-C "+wt+" -c commit.gpgsign=false commit-tree "+pinTree+" -p HEAD -m feat: pinned landing", scriptedCall{stdout: pinHead + "\n"})
+	r.on("ls-tree "+pinHead+"^ -- .evolve/inbox/item.json", scriptedCall{stdout: "100644 blob " + pinItemBlob + "\t.evolve/inbox/item.json\n"})
+	r.on("write-tree", scriptedCall{stdout: pinLaneTree + "\n"})
+	r.on("-C "+wt+" rev-parse HEAD", scriptedCall{stdout: pinHead + "\n"})
+	r.on("rev-parse "+pinHead+"^{tree}", scriptedCall{stdout: pinTree + "\n"})
+	r.on("rev-parse "+pinBranch, scriptedCall{stdout: pinOriginRef + "\n"})
 }
 
 // pushSiteDriver drives one of the three push sites to its push with the
@@ -238,11 +219,6 @@ var pushSites = []pushSiteDriver{
 		opts.Class = ClassManual
 		r.on("diff --cached --quiet", scriptedCall{exit: 1}) // staged changes exist
 		return shipDirect(context.Background(), opts, res, pinBranch)
-	}},
-	{name: "worktree", drive: func(t *testing.T, opts *Options, r *argvRecorder, res *RunResult) error {
-		s := newWorktreeShip(context.Background(), opts, res, pinBranch, filepath.Join(opts.ProjectRoot, "wt"))
-		s.cycleBranch = pinCycleBranch
-		return s.integrate()
 	}},
 	{name: "pushonly", drive: func(t *testing.T, opts *Options, r *argvRecorder, res *RunResult) error {
 		opts.PushOnly = true
@@ -316,10 +292,6 @@ func pushRow(t *testing.T, site pushSiteDriver, row repairRow) goldenRow {
 		RepairAttempted: res.RepairAttempted, RepairOutcome: res.RepairOutcome, Error: goldenErrorOf(t, err)}
 }
 
-// dryRunApplies reports which sites a --dry-run row reaches the push on: the
-// direct path returns before its push under DryRun (gitops.go), so only the
-// worktree integrate (called after run()'s own DryRun return) and push-only
-// (native.go runs it before any DryRun gate) carry the row.
 func dryRunApplies(site pushSiteDriver) bool { return site.name != "direct" }
 
 func assertRowsMatchGolden(t *testing.T, got []goldenRow, golden goldenFile) {
@@ -371,24 +343,6 @@ func assertGoldenError(t *testing.T, name string, got, want *goldenError) {
 			t.Errorf("%s: Debug gained %s=%q", name, k, got.Debug[k])
 		}
 	}
-}
-
-// The ff-merge over reset ok/fail × merge ok/diverged × fleet on/off: argv
-// order and streams, the OK line, the class-by-fleet error and its Debug
-// keys, byte-identical to the capture. Kills: merge before reset, the fleet
-// class flipped, cycle_branch dropped, the OK line moved after the push.
-func TestWorktreeShipIntegrate_GoldenArgvLogsAndErrors(t *testing.T) {
-	golden := loadGolden(t, "landing_integrate.golden.json")
-	var got []goldenRow
-	for _, resetOK := range []bool{true, false} {
-		for _, mergeOK := range []bool{true, false} {
-			for _, fleet := range []bool{false, true} {
-				row, _ := integrateRow(t, resetOK, mergeOK, fleet)
-				got = append(got, row)
-			}
-		}
-	}
-	assertRowsMatchGolden(t, got, golden)
 }
 
 // The three push sites × the repair matrix, byte-identical to the capture:

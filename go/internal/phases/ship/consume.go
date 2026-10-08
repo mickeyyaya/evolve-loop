@@ -103,7 +103,7 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 		return
 	}
 	c := &itemConsumer{ctx: ctx, opts: opts, res: res, prefix: prefix, root: root,
-		inboxDir: filepath.Join(root, ".evolve", "inbox"), cid: stateString(mustStateMap(opts), "cycle_id")}
+		inboxDir: filepath.Join(root, filepath.FromSlash(inboxRel)), cid: stateString(mustStateMap(opts), "cycle_id")}
 	members := validatedUnifiedMembers(body)
 	unified := make(map[string]bool, len(members))
 	for _, id := range members {
@@ -125,7 +125,14 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 }
 
 // consumedRel is the tracked dir a consumed item moves into, repo-relative.
-const consumedRel = ".evolve/inbox/consumed"
+const (
+	inboxRel    = ".evolve/inbox"
+	consumedRel = inboxRel + "/consumed"
+)
+
+func consumptionPair(name string) (src, dst string) {
+	return inboxRel + "/" + name, consumedRel + "/" + name
+}
 
 // itemConsumer carries one consumeCommittedItems invocation's fixed context.
 type itemConsumer struct {
@@ -307,8 +314,7 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 		_ = os.Remove(m.dstAbs) // do not leave a half-move
 		return consumedMove{}, moveFailed
 	}
-	m.srcRel = ".evolve/inbox/" + base
-	m.dstRel = consumedRel + "/" + base
+	m.srcRel, m.dstRel = consumptionPair(base)
 	// Review HIGH (cycle-1506 fix hardening): when an audit binding is set,
 	// the drift tolerance downstream will SANCTION these paths — so the
 	// consumed bytes must be exactly what the AUDITED tree carried. A file
@@ -435,6 +441,20 @@ func treeDriftExplainedByConsumption(ctx context.Context, opts *Options, gitDir,
 		offenders = offenders[:maxNamed]
 	}
 	return false, " (unsanctioned drift path(s): " + strings.Join(offenders, ", ") + extra + ")"
+}
+
+func adoptIntentConsumption(opts *Options, paths []string) error {
+	if len(paths)%2 != 0 {
+		return fmt.Errorf("%d consumed path(s) are not whole inbox consumption pairs", len(paths))
+	}
+	for i := 0; i < len(paths); i += 2 {
+		name := filepath.Base(paths[i])
+		if src, dst := consumptionPair(name); !strings.HasSuffix(name, ".json") || paths[i] != src || paths[i+1] != dst {
+			return fmt.Errorf("%s -> %s is not an inbox consumption pair", paths[i], paths[i+1])
+		}
+	}
+	opts.internalConsumedPaths = append([]string(nil), paths...)
+	return nil
 }
 
 // workspaceACSVerdict reads the deterministic verdict the gate stamped, or ""

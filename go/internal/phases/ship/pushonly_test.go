@@ -81,7 +81,9 @@ func TestPushOnly_PushesJournaledStrand(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	appendShipJournal(root, sha, ClassManual)
+	if err := appendShipJournal(root, shipJournalEntry{SHA: sha, Class: string(ClassManual)}); err != nil {
+		t.Fatal(err)
+	}
 
 	res, err := pushOnlyRun(t, root)
 	if err != nil {
@@ -110,7 +112,9 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	appendShipJournal(root, sha, ClassManual)
+	if err := appendShipJournal(root, shipJournalEntry{SHA: sha, Class: string(ClassManual)}); err != nil {
+		t.Fatal(err)
+	}
 	run(root, "fetch", "origin", "main")
 	run(root, "merge", "--no-edit", "origin/main")
 

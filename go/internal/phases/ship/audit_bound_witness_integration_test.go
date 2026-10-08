@@ -13,13 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The cycle branch is pre-committed (worktree clean, branch ahead of main), so
-// the pre-commit tree-SHA check never runs and the post-push check is the only
-// guard between a wrong internalAuditBoundTreeSHA and a silently shipped drift.
-func TestShipFromWorktree_PostPushGuard_FiresOnRebind(t *testing.T) {
+func TestShipFromWorktree_ARebindIsRefusedBeforeThePush(t *testing.T) {
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
+	published := remoteHeadSHA(t, repo)
 	seedAudit(t, repo, "PASS")
 
 	wt := makeWorktree(t, repo, "cycle-1")
@@ -46,12 +44,10 @@ func TestShipFromWorktree_PostPushGuard_FiresOnRebind(t *testing.T) {
 	if !errors.As(err, &se) || se.Code != core.CodeIntegrityTreeDrift {
 		t.Fatalf("want CodeIntegrityTreeDrift, got %v", err)
 	}
-	if se.Stage != core.StagePostShip {
-		t.Fatalf("expected the POST-PUSH guard specifically (pre-commit check is skipped for an "+
-			"already-committed, worktree-clean, branch-ahead scenario) to fire — got stage %q: %v", se.Stage, err)
+	if !strings.Contains(err.Error(), "INTEGRITY BREACH (pre-push)") || !strings.Contains(err.Error(), "landing commit tree SHA") {
+		t.Fatalf("want the pre-push landing check, the guard for an already-committed, branch-ahead lane that no pre-commit check sees: %v", err)
 	}
-	if !strings.Contains(err.Error(), "committed tree SHA") {
-		t.Fatalf("expected the post-push message shape (\"committed tree SHA\"), not the "+
-			"pre-commit one (\"staged tree SHA\"), got: %v", err)
+	if got := remoteHeadSHA(t, repo); got != published {
+		t.Errorf("origin moved to %s: drift from the audit-bound tree is refused before any push", got)
 	}
 }

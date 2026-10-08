@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -23,6 +24,7 @@ const (
 
 type scripted struct {
 	stdout string
+	stderr string
 	exit   int
 	err    error
 }
@@ -56,7 +58,7 @@ func (f *fakeGit) classify(stdout, stderr io.Writer) string {
 	switch {
 	case stdout == io.Discard && stderr == io.Discard:
 		return "discard"
-	case stdout == io.Writer(&f.stdout) && stderr == io.Writer(&f.stderr):
+	case stdout == io.Writer(&f.stdout):
 		return "streams"
 	case stderr == io.Discard:
 		return "capture"
@@ -77,6 +79,9 @@ func (f *fakeGit) git(_ context.Context, args []string, stdout, stderr io.Writer
 	}
 	if next.stdout != "" {
 		_, _ = io.WriteString(stdout, next.stdout)
+	}
+	if next.stderr != "" {
+		_, _ = io.WriteString(stderr, next.stderr)
 	}
 	return next.exit, next.err
 }
@@ -141,16 +146,20 @@ func wantShipError(t *testing.T, err error, code shiperr.ShipErrorCode, class sh
 // WriteBinding sees ZERO events; every fault fixture emits exactly its code
 // once; no event of the terminal kind ship.error on any row.
 func TestLanding_NeverEmitsShipErrorAndHappyPathsAreSilent(t *testing.T) {
-	f := newFakeGit()
+	f := resumableGit()
 	f.on("rev-parse HEAD", scripted{stdout: testHead + "\n"})
 	l, got := newLanding(f)
-	if err := l.Integrate(context.Background(), Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve"}); err != nil {
+	l.Integrate(context.Background(), integration(false))
+	if err := l.CheckFastForward(context.Background(), integration(false)); err != nil {
 		t.Fatal(err)
 	}
-	for _, site := range []PushSite{SiteDirect, SiteWorktree, SitePushOnly} {
-		if _, err := l.Push(context.Background(), PushRequest{Branch: testBranch, Site: site}); err != nil {
+	for _, req := range []PushRequest{pushReq(SiteDirect), worktreeReq(), pushReq(SitePushOnly)} {
+		if _, err := l.Push(context.Background(), req); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if v := l.Resume(context.Background(), preparedIntent(), witnessOf(preparedIntent())); v.Declined != "" {
+		t.Fatal(v.Declined)
 	}
 	if err := l.WriteBinding(t.TempDir(), binding()); err != nil {
 		t.Fatal(err)
@@ -163,6 +172,8 @@ func TestLanding_NeverEmitsShipErrorAndHappyPathsAreSilent(t *testing.T) {
 		CodePushRepairDeclined: func() { declinedFixture(t, l, f) },
 		CodeHeadReadFailed:     func() { headReadFailureFixture(t, l, f) },
 		CodeBindingWriteFailed: func() { bindingFailureFixture(t, l) },
+		CodeAdvanceFailed:      func() { advanceFailureFixture(t, l, f) },
+		CodeOriginFetchFailed:  func() { resumeFetchFailureFixture(t, l, f) },
 	}
 	for code, fault := range faults {
 		*got = (*got)[:0]
@@ -193,24 +204,20 @@ func TestWarn_IsANullObjectWithoutACenter(t *testing.T) {
 		if l.SignalsWired() {
 			t.Errorf("%s: SignalsWired must be false", name)
 		}
-		if err := l.Integrate(context.Background(), Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve"}); err != nil {
-			t.Errorf("%s: %v", name, err)
-		}
+		l.Integrate(context.Background(), integration(false))
 	}
 	c, got := recordingCenter()
 	l := New(f.git, f.streams, WithSignals(func() *signalcenter.Center { return c }))
 	if !l.SignalsWired() {
 		t.Fatal("SignalsWired must be true with a Center")
 	}
-	if err := l.Integrate(context.Background(), Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve"}); err != nil {
-		t.Fatal(err)
-	}
+	l.Integrate(context.Background(), integration(false))
 	if len(*got) != 1 || (*got)[0].Phase != "" || (*got)[0].Cycle != 0 || (*got)[0].RunID != "" {
 		t.Errorf("without WithRun the event carries no phase/cycle/run_id: %+v", *got)
 	}
 	*got = (*got)[:0]
 	stamped := New(f.git, f.streams, WithRun("phase-x", 1641, "run-x"), WithSignals(func() *signalcenter.Center { return c }))
-	_ = stamped.Integrate(context.Background(), Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve"})
+	stamped.Integrate(context.Background(), integration(false))
 	if len(*got) != 1 || (*got)[0].Phase != "phase-x" || (*got)[0].Cycle != 1641 || (*got)[0].RunID != "run-x" {
 		t.Errorf("WithRun stamps the phase as handed in (no literal in the leaf), the cycle and the run_id: %+v", *got)
 	}
@@ -220,7 +227,7 @@ func TestWarn_IsANullObjectWithoutACenter(t *testing.T) {
 // the code grammar, and share no name with a projected ShipErrorCode; 30b:
 // every error the leaf builds is transient or precondition at atomic-ship.
 func TestCodes_RegisteredUnderModuleShipDisjointFromShipErrorCodes(t *testing.T) {
-	codes := []signalcenter.Code{CodeBinaryResetFailed, CodePushRepairDeclined, CodeHeadReadFailed, CodeBindingWriteFailed}
+	codes := []signalcenter.Code{CodeBinaryResetFailed, CodePushRepairDeclined, CodeHeadReadFailed, CodeBindingWriteFailed, CodeAdvanceFailed, CodeOriginFetchFailed}
 	docs := map[signalcenter.Code]string{}
 	for _, d := range signalcenter.RegisteredCodes()[signalcenter.ModuleShip] {
 		docs[d.Code] = d.Doc
@@ -242,29 +249,37 @@ func TestCodes_RegisteredUnderModuleShipDisjointFromShipErrorCodes(t *testing.T)
 		}
 	}
 	f := newFakeGit()
-	f.on("merge --ff-only "+testCycleBr, scripted{exit: 128})
+	f.on("merge-base --is-ancestor "+testBranch+" "+testHead, scripted{exit: 1})
 	f.on("push origin "+testBranch, scripted{exit: 1})
+	f.on(worktreePush, scripted{exit: 1})
 	f.on("rev-parse origin/"+testBranch, scripted{stdout: testOriginRef + "\n"})
 	f.on("rev-parse HEAD", scripted{stdout: testHead + "\n"})
 	f.on("merge-base --is-ancestor "+testOriginRef+" HEAD", scripted{exit: 1})
 	l, _ := newLanding(f)
 	var errs []error
 	for _, fleet := range []bool{true, false} {
-		errs = append(errs, l.Integrate(context.Background(), Integration{Branch: testBranch, CycleBranch: testCycleBr, Binary: "go/evolve", Fleet: fleet}))
+		errs = append(errs, l.CheckFastForward(context.Background(), integration(fleet)))
 	}
-	for _, site := range []PushSite{SiteDirect, SiteWorktree, SitePushOnly} {
-		_, err := l.Push(context.Background(), PushRequest{Branch: testBranch, Site: site, RepairAttempted: true})
+	for _, req := range []PushRequest{pushReq(SiteDirect), worktreeReq(), pushReq(SitePushOnly)} {
+		req.RepairAttempted = true
+		_, err := l.Push(context.Background(), req)
 		errs = append(errs, err)
 	}
-	_, err := l.Push(context.Background(), PushRequest{Branch: testBranch, Site: SiteDirect})
+	_, err := l.Push(context.Background(), pushReq(SiteDirect))
+	errs = append(errs, err)
+	f.set("push origin "+testBranch, scripted{exit: 1, stderr: policyRefusal})
+	_, err = l.Push(context.Background(), pushReq(SiteDirect))
+	errs = append(errs, err)
+	_, err = l.Push(context.Background(), PushRequest{Branch: testBranch, Site: SiteWorktree})
 	errs = append(errs, err)
 	for _, err := range errs {
 		se, ok := shiperr.AsShipError(err)
 		if !ok {
 			t.Fatalf("every landing error is a *shiperr.ShipError: %v", err)
 		}
-		if (se.Class != shiperr.ShipClassTransient && se.Class != shiperr.ShipClassPrecondition) || se.Stage != shiperr.StageAtomicShip {
-			t.Errorf("[%s/%s @%s]: the leaf builds only transient/precondition errors at atomic-ship", se.Code, se.Class, se.Stage)
+		hostBug := se.Code == shiperr.CodeArgs && se.Class == shiperr.ShipClassConfig
+		if (se.Class != shiperr.ShipClassTransient && se.Class != shiperr.ShipClassPrecondition && !hostBug) || se.Stage != shiperr.StageAtomicShip {
+			t.Errorf("[%s/%s @%s]: the leaf builds only transient or precondition errors at atomic-ship, and a config ARGS error for a host bug", se.Code, se.Class, se.Stage)
 		}
 		if se.Debug[shiperr.StepKey] == "" {
 			t.Errorf("%s: every leaf-built error stamps Debug[step]", se.Code)
@@ -281,8 +296,8 @@ func TestNew_TakesTheGitPortAndAppliesOptionsInAnyOrder(t *testing.T) {
 	c, got := recordingCenter()
 	signals := func() *signalcenter.Center { return c }
 	for name, opts := range map[string][]Option{
-		"run then signals": {WithRun("ship", 9, "r9"), WithSignals(signals)},
-		"signals then run": {WithSignals(signals), WithRun("ship", 9, "r9")},
+		"run then signals": {WithRun("ship", 9, "r9"), WithSignals(signals), WithSleep(func(time.Duration) {})},
+		"signals then run": {WithSleep(func(time.Duration) {}), WithSignals(signals), WithRun("ship", 9, "r9")},
 	} {
 		*got = (*got)[:0]
 		l := New(git, f.streams, opts...)
