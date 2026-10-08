@@ -445,11 +445,17 @@ func TestSetJournalField(t *testing.T) {
 	if err := writeJournal(j, path); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	setJournalField(j, path, "commit_sha", "abc123")
-	setJournalField(j, path, "release_url", "https://example.com/r")
-	setJournalField(j, path, "completed_at", "2026-05-24T13:00:00Z")
-	setJournalField(j, path, "tag", "v1.2.3-modified")
-	setJournalField(j, path, "branch", "develop")
+	for _, f := range [][2]string{
+		{"commit_sha", "abc123"},
+		{"release_url", "https://example.com/r"},
+		{"completed_at", "2026-05-24T13:00:00Z"},
+		{"tag", "v1.2.3-modified"},
+		{"branch", "develop"},
+	} {
+		if err := setJournalField(j, path, f[0], f[1]); err != nil {
+			t.Fatalf("setJournalField(%s): %v", f[0], err)
+		}
+	}
 	body, _ := os.ReadFile(path)
 	var got Journal
 	if err := json.Unmarshal(body, &got); err != nil {
@@ -460,7 +466,9 @@ func TestSetJournalField(t *testing.T) {
 		got.Branch != "develop" {
 		t.Errorf("journal not updated: %+v", got)
 	}
-	setJournalField(j, path, "bogus_field", "ignored")
+	if err := setJournalField(j, path, "bogus_field", "ignored"); err != nil {
+		t.Errorf("setJournalField(bogus_field): %v", err)
+	}
 }
 
 func TestInitJournal_DryRun(t *testing.T) {
@@ -469,7 +477,7 @@ func TestInitJournal_DryRun(t *testing.T) {
 		Target:   "1.2.3",
 		RepoRoot: repo,
 		DryRun:   true,
-	}, "v1.2.2", time.Now())
+	}, time.Now())
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -486,7 +494,7 @@ func TestInitJournal_RealPath(t *testing.T) {
 	_, path, err := initJournal(Options{
 		Target:   "1.2.3",
 		RepoRoot: repo,
-	}, "v1.2.2", time.Now())
+	}, time.Now())
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -506,7 +514,7 @@ func TestInitJournal_JournalDirOverride(t *testing.T) {
 		Target:     "1.2.3",
 		RepoRoot:   d,
 		JournalDir: custom,
-	}, "v1.2.2", time.Now())
+	}, time.Now())
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}

@@ -149,22 +149,21 @@ func Run(opts Options) (Result, error) {
 	if err := r.postPublish(); err != nil {
 		return r.res, err
 	}
-	r.complete()
-	return r.res, nil
+	return r.res, r.complete()
 }
 
 func failPostPublish(res *Result, journal *Journal, journalPath string, opts Options, steps Steps,
 	logf func(string, ...any), now func() time.Time, stepName, reasonPrefix string, err error) (Result, error) {
-	appendStep(journal, journalPath, stepName, "fail", err.Error(), now())
+	journalErr := appendStep(journal, journalPath, stepName, "fail", err.Error(), now())
 	res.StepsFailed = append(res.StepsFailed, stepName)
 	logf("FAIL: %s: %v", stepName, err)
-	wrapped := fmt.Errorf("%w: %s: %v", ErrPostPublishFailed, stepName, err)
 	if opts.NoRollback {
 		logf("WARN: --no-rollback set; not rolling back. Manual remediation required.")
-		return *res, wrapped
+		return *res, fmt.Errorf("%w: %s: %v", ErrPostPublishFailed, stepName, errors.Join(err, journalErr))
 	}
 	logf("auto-rolling back v%s...", opts.Target)
-	setJournalField(journal, journalPath, "completed_at", now().UTC().Format(time.RFC3339))
+	journalErr = errors.Join(journalErr, setJournalField(journal, journalPath, "completed_at", now().UTC().Format(time.RFC3339)))
+	wrapped := fmt.Errorf("%w: %s: %v", ErrPostPublishFailed, stepName, errors.Join(err, journalErr))
 	reason := fmt.Sprintf("%s: %v", reasonPrefix, err)
 	if rbErr := steps.Rollback(opts.RepoRoot, journalPath, reason); rbErr != nil {
 		logf("WARN: rollback failed: %v", rbErr)
@@ -176,7 +175,7 @@ func failPostPublish(res *Result, journal *Journal, journalPath string, opts Opt
 	return *res, wrapped
 }
 
-func initJournal(opts Options, fromTag string, startedAt time.Time) (*Journal, string, error) {
+func initJournal(opts Options, startedAt time.Time) (*Journal, string, error) {
 	branch, _ := currentBranch(opts.RepoRoot)
 	j := &Journal{
 		Version:   opts.Target,
@@ -221,17 +220,20 @@ func writeJournal(j *Journal, path string) error {
 	return os.Rename(tmp, path)
 }
 
-func appendStep(j *Journal, path, step, status, note string, ts time.Time) {
+func appendStep(j *Journal, path, step, status, note string, ts time.Time) error {
 	j.Steps = append(j.Steps, StepRecord{
 		Step:      step,
 		Status:    status,
 		Note:      note,
 		Timestamp: ts.UTC().Format(time.RFC3339),
 	})
-	_ = writeJournal(j, path)
+	if err := writeJournal(j, path); err != nil {
+		return fmt.Errorf("journal %s: step %s: %w", path, step, err)
+	}
+	return nil
 }
 
-func setJournalField(j *Journal, path, field, value string) {
+func setJournalField(j *Journal, path, field, value string) error {
 	switch field {
 	case "commit_sha":
 		j.CommitSHA = value
@@ -244,7 +246,10 @@ func setJournalField(j *Journal, path, field, value string) {
 	case "branch":
 		j.Branch = value
 	}
-	_ = writeJournal(j, path)
+	if err := writeJournal(j, path); err != nil {
+		return fmt.Errorf("journal %s: field %s: %w", path, field, err)
+	}
+	return nil
 }
 
 func resolvePrevTag(repoRoot string) (string, error) {
@@ -260,11 +265,11 @@ func resolveInitCommit(repoRoot string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 {
+	commit, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+	if commit == "" {
 		return "", errors.New("no init commit")
 	}
-	return lines[0], nil
+	return commit, nil
 }
 
 func currentBranch(repoRoot string) (string, error) {

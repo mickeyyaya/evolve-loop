@@ -41,7 +41,7 @@ func TestInitJournal_WriteJournalFails(t *testing.T) {
 		Target:     "1.2.3",
 		RepoRoot:   dir,
 		JournalDir: journalDir,
-	}, "v1.2.2", time.Now())
+	}, time.Now())
 	if err == nil {
 		t.Error("initJournal with unwritable dir: want error, got nil")
 	}

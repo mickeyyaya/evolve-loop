@@ -1,6 +1,7 @@
 package releasepipeline
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -40,7 +41,7 @@ func newReleaseRun(opts Options) (*releaseRun, error) {
 	r.logf("dry-run: %v | no-rollback: %v | skip-tests: %v",
 		opts.DryRun, opts.NoRollback, opts.SkipTests)
 
-	journal, journalPath, err := initJournal(opts, r.fromTag, r.now())
+	journal, journalPath, err := initJournal(opts, r.now())
 	if err != nil {
 		return r, fmt.Errorf("%w: journal init: %v", ErrPrePublishFailed, err)
 	}
@@ -87,17 +88,23 @@ func resolveSteps(opts Options) Steps {
 
 func (r *releaseRun) runPrePublishStep(journalName, errLabel string, run func() error) error {
 	if err := run(); err != nil {
-		appendStep(r.journal, r.journalPath, journalName, "fail", err.Error(), r.now())
+		journalErr := appendStep(r.journal, r.journalPath, journalName, "fail", err.Error(), r.now())
 		r.res.StepsFailed = append(r.res.StepsFailed, journalName)
-		return fmt.Errorf("%w: %s: %v", ErrPrePublishFailed, errLabel, err)
+		return fmt.Errorf("%w: %s: %v", ErrPrePublishFailed, errLabel, errors.Join(err, journalErr))
 	}
-	appendStep(r.journal, r.journalPath, journalName, "ok", "", r.now())
 	r.res.StepsCompleted = append(r.res.StepsCompleted, journalName)
-	return nil
+	return r.recordStep(ErrPrePublishFailed, journalName, "ok")
 }
 
-func (r *releaseRun) skipPrePublishStep(journalName string) {
-	appendStep(r.journal, r.journalPath, journalName, "skipped-dry-run", "", r.now())
+func (r *releaseRun) skipPrePublishStep(journalName string) error {
+	return r.recordStep(ErrPrePublishFailed, journalName, "skipped-dry-run")
+}
+
+func (r *releaseRun) recordStep(stageErr error, journalName, status string) error {
+	if err := appendStep(r.journal, r.journalPath, journalName, status, "", r.now()); err != nil {
+		return fmt.Errorf("%w: %s: %v", stageErr, journalName, err)
+	}
+	return nil
 }
 
 func (r *releaseRun) prePublish() error {
@@ -144,8 +151,7 @@ func (r *releaseRun) rebuildBinary() error {
 	o := r.opts
 	if o.DryRun {
 		r.logf("step: rebuild-binary (DRY-RUN — would run `go build -ldflags '-X …version=%s …'` -o go/evolve ./cmd/evolve from <RepoRoot>/go)", o.Target)
-		r.skipPrePublishStep("rebuild-binary")
-		return nil
+		return r.skipPrePublishStep("rebuild-binary")
 	}
 	r.logf("step: rebuild-binary")
 	const dryRun = false
@@ -158,8 +164,7 @@ func (r *releaseRun) releaseShCheck() error {
 	o := r.opts
 	if o.DryRun {
 		r.logf("step: release.sh-check (DRY-RUN — skipping; markers not actually bumped)")
-		r.skipPrePublishStep("release-sh-check")
-		return nil
+		return r.skipPrePublishStep("release-sh-check")
 	}
 	r.logf("step: release.sh-check")
 	return r.runPrePublishStep("release-sh-check", "release.sh consistency", func() error {
@@ -173,24 +178,29 @@ func (r *releaseRun) ship() (shipped bool, err error) {
 	if o.DryRun {
 		r.logf("step: ship.sh (DRY-RUN — would commit & push & gh release create)")
 		r.logf("  commit msg: %s", commitMsg)
-		r.skipPrePublishStep("ship")
+		if err := r.skipPrePublishStep("ship"); err != nil {
+			return false, err
+		}
 		r.logf("")
 		r.logf("DRY RUN COMPLETE — no mutations were made.")
 		return false, nil
 	}
-	// Classify before Ship commits the rebuilt go/evolve, or every release diffs as a binary-release.
 	releaseNotes := r.releaseNotes()
 	r.logf("step: ship.sh (--class release)")
 	newSHA, err := r.steps.Ship(o.RepoRoot, commitMsg, releaseNotes)
 	if err != nil {
-		appendStep(r.journal, r.journalPath, "ship", "fail", err.Error(), r.now())
+		journalErr := appendStep(r.journal, r.journalPath, "ship", "fail", err.Error(), r.now())
 		r.res.StepsFailed = append(r.res.StepsFailed, "ship")
-		return false, fmt.Errorf("%w: %v", ErrShipFailed, err)
+		return false, fmt.Errorf("%w: %v", ErrShipFailed, errors.Join(err, journalErr))
 	}
-	appendStep(r.journal, r.journalPath, "ship", "ok", "", r.now())
 	r.res.StepsCompleted = append(r.res.StepsCompleted, "ship")
 	r.res.NewCommitSHA = newSHA
-	setJournalField(r.journal, r.journalPath, "commit_sha", newSHA)
+	if err := r.recordStep(ErrPostPublishFailed, "ship", "ok"); err != nil {
+		return false, err
+	}
+	if err := setJournalField(r.journal, r.journalPath, "commit_sha", newSHA); err != nil {
+		return false, fmt.Errorf("%w: ship: %v", ErrPostPublishFailed, err)
+	}
 	return true, nil
 }
 
@@ -215,8 +225,10 @@ func (r *releaseRun) postPublish() error {
 			"marketplace-poll", "marketplace propagation failed", err)
 		return ferr
 	}
-	appendStep(r.journal, r.journalPath, "marketplace-poll", "ok", "", r.now())
 	r.res.StepsCompleted = append(r.res.StepsCompleted, "marketplace-poll")
+	if err := r.recordStep(ErrPostPublishFailed, "marketplace-poll", "ok"); err != nil {
+		return err
+	}
 
 	r.logf("step: release-verify")
 	if err := r.steps.ReleaseVerify(o.RepoRoot, o.Target, r.res.NewCommitSHA); err != nil {
@@ -224,14 +236,16 @@ func (r *releaseRun) postPublish() error {
 			"release-verify", "release self-consistency verification failed", err)
 		return ferr
 	}
-	appendStep(r.journal, r.journalPath, "release-verify", "ok", "", r.now())
 	r.res.StepsCompleted = append(r.res.StepsCompleted, "release-verify")
-	return nil
+	return r.recordStep(ErrPostPublishFailed, "release-verify", "ok")
 }
 
-func (r *releaseRun) complete() {
-	setJournalField(r.journal, r.journalPath, "completed_at", r.now().UTC().Format(time.RFC3339))
+func (r *releaseRun) complete() error {
+	if err := setJournalField(r.journal, r.journalPath, "completed_at", r.now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("%w: complete: %v", ErrPostPublishFailed, err)
+	}
 	r.logf("DONE: v%s shipped, propagated, and verified", r.opts.Target)
 	r.logf("journal: %s", r.journalPath)
 	r.logf("NOTE: GitHub CI is NOT verified by this pipeline — confirm the `required CI` workflow (its `CI required` job) is green on the release commit (e.g. `gh run watch`), or publish via /publish (which watches CI).")
+	return nil
 }
