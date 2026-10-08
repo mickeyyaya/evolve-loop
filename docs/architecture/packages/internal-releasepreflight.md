@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`internal/releasepreflight` is the read-only gate that `evolve release-preflight` (step 1 of `/evo:publish`) runs before any mutating release step. It checks the working tree, the branch, the version bump, the most recent audit, the trust-boundary gate-test suites and the release commit's remote CI, and it never modifies state. It is the Go port of `legacy/scripts/release/preflight.sh`.
+`internal/releasepreflight` is the read-only gate that `evolve release-preflight` (step 1 of `/evo:publish`) runs before any release step that changes state. It checks the working tree, the branch, the version bump, the most recent audit, the trust-boundary gate-test suites and the release commit's remote CI. It never changes state. It is the Go port of the deleted `preflight.sh` release script.
 
 ## Design
 

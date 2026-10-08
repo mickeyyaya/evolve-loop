@@ -33,11 +33,11 @@ description: Pre-Scout intent capture phase. Structures vague user goals into in
 
 ## Autonomy invariant
 
-This skill MUST NOT block on human approval. The intent persona produces intent.md; `gate_intent_to_research` verifies structure (≥1 challenged_premise, valid awn_class, SHA matches ledger); cycle proceeds. There is no `accept-intent` operator command — re-running `/evo:intent` replaces the prior file, and the kernel uses the latest ledger entry. This is the difference between an autonomy-preserving filter and a checkpoint.
+This skill MUST NOT block on human approval. The intent persona produces intent.md. The Go intent phase (`go/internal/phases/intent`) passes it when it declares `goal:` and `acceptance_checks:`, and the cycle proceeds. There is no `accept-intent` operator command — a new run of `/evo:intent` replaces the prior file, and the kernel uses the latest ledger entry. This is the difference between an autonomy-preserving filter and a checkpoint.
 
 ## Cycle-binding
 
-Like every other agent, intent.md gets a ledger entry with `(artifact_sha256, git_head, tree_state_sha, challenge_token)`. ship.sh's downstream tree-state check works against the same SHA-binding the auditor uses.
+Like every other agent, intent.md gets a ledger entry with `(artifact_sha256, git_head, tree_state_sha, challenge_token)`. The tree-state check of `evolve ship` (`go/internal/phases/ship/audit.go`) uses the same SHA binding as the auditor.
 
 <!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/intent.json -->
 ## Phase facts
@@ -73,7 +73,7 @@ Cannot be:
 
 - `agents/evolve-intent.md` (persona)
 - `.evolve/profiles/intent.json` (permission profile)
-- `legacy/scripts/lifecycle/phase-gate.sh` (`gate_calibrate_to_intent`, `gate_intent_to_research`)
-- `legacy/scripts/guards/phase-gate-precondition.sh` (scout-blocked-without-intent enforcement)
+- `go/internal/phases/intent/intent.go` (the intent verdict)
+- `go/internal/core` (the phase order)
 - `.evolve/research/intent-capture-patterns.md` (5-source research grounding)
 - `docs/architecture/intent-phase.md` (full architecture)

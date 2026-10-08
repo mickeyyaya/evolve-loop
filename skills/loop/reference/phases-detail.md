@@ -2,10 +2,10 @@
 > Activation layer (phases.md) links here for: kernel hooks, skill inventory schema, rate limit recovery, context budget gate, cycle integrity code blocks, inter-phase handoff JSON.
 
 ## Contents
-- [Kernel Hooks](#kernel-hooks) — v8.13.1 lifecycle integration code
+- [Kernel Hooks](#kernel-hooks) — cycle-state ownership and guard bypasses
 - [Skill Inventory](#skill-inventory) — routing categories, JSON schema, fallback
 - [Rate Limit Recovery](#rate-limit-recovery) — detection code + 4-step protocol
-- [Context Budget Gate](#context-budget-gate) — bash invocation block
+- [Context Budget Gate](#context-budget-gate) — removed
 - [Cycle Integrity Setup](#cycle-integrity-setup) — challenge token, canary, decay, hash chain code
 - [Inter-Phase Handoff](#inter-phase-handoff) — JSON schema
 - [Phase 4 Audit](#phase-4-audit) — subagent invocation + context JSON
@@ -14,18 +14,7 @@
 
 ## Kernel Hooks
 
-v8.13.1 lifecycle integration code blocks:
-
-```bash
-# At cycle start (run-cycle.sh handles this automatically):
-bash legacy/scripts/lifecycle/cycle-state.sh init <cycle> <workspace>
-
-# At each phase transition (orchestrator advances; runner DOES NOT auto-advance):
-bash legacy/scripts/lifecycle/cycle-state.sh advance <new_phase> <agent> [worktree]
-
-# At cycle end:
-bash legacy/scripts/lifecycle/cycle-state.sh clear
-```
+The Go orchestrator (`go/internal/core`) writes `.evolve/cycle-state.json` at cycle start, at each phase transition and at cycle end. The bash `cycle-state.sh` script is removed. For an unfinished cycle, use `evolve loop --resume` or `evolve cycle reset`.
 
 Bypasses (emergency only, logged WARN):
 - `evolve guard role --bypass`
@@ -97,7 +86,7 @@ For skill precedence, conflict resolution, phase eligibility, and budget-aware d
 }
 ```
 
-**Fallback:** If `.evolve/skill-inventory.json` missing, invoke `bash legacy/scripts/utility/setup-skill-inventory.sh` before launching Scout. If the script fails, fall back to legacy LLM-parsing and log WARN to ledger.
+**Fallback:** If `.evolve/skill-inventory.json` missing, run `evolve skill-inventory build` before launching Scout. If the command fails, fall back to legacy LLM-parsing and log WARN to ledger.
 
 ---
 
@@ -130,21 +119,7 @@ check_rate_limit(agent_result):
 
 ## Context Budget Gate
 
-Full bash invocation:
-
-```bash
-CYCLES_THIS_SESSION=${CYCLES_THIS_SESSION:-0}
-BUDGET_JSON=$(bash legacy/scripts/verification/context-budget.sh "$CYCLE_NUMBER" "$CYCLES_THIS_SESSION" "$WORKSPACE_PATH" 2>/dev/null)
-BUDGET_EXIT=$?
-BUDGET_STATUS=$(echo "$BUDGET_JSON" | grep -o '"status": *"[^"]*"' | cut -d'"' -f4)
-REMAINING_ESTIMATE=$(echo "$BUDGET_JSON" | grep -o '"remainingCyclesEstimate": *[0-9]*' | grep -o '[0-9]*$')
-```
-
-**On RED (first occurrence):** Write enriched `handoff.md` as a safety checkpoint. Then **continue immediately** — auto-compaction should free context.
-
-**On RED (second consecutive):** STOP. Output resume command: `/evo:loop <remaining> <strategy> <goal>`.
-
-Increment after each cycle: `CYCLES_THIS_SESSION=$(( CYCLES_THIS_SESSION + 1 ))`
+Removed: `context-budget.sh` is gone, and no Go command gives its GREEN, YELLOW or RED status. Do not run a budget check at cycle start. See [policies.md](policies.md#context-budget-check-removed).
 
 ---
 
@@ -232,7 +207,7 @@ JSON schema for `$WORKSPACE_PATH/handoff-<phase>.json`:
 ```bash
 cat agents/evolve-auditor.md context.json | \
     MODEL_TIER_HINT="<resolved tier>" \
-    bash legacy/scripts/dispatch/subagent-run.sh auditor "$CYCLE" "$WORKSPACE_PATH"
+    evolve subagent run auditor "$CYCLE" "$WORKSPACE_PATH"
 ```
 
 ### Context JSON
@@ -255,9 +230,9 @@ cat agents/evolve-auditor.md context.json | \
 
 ### Audit verdict routing
 
-- If `PASS-PENDING-EVAL` → proceed to eval gate (phase-gate runs `verify-eval.sh`)
+- If `PASS-PENDING-EVAL` → proceed to eval gate (`evolve eval verify <eval.md> <workspace>`)
 - If `PASS` (post-eval) → proceed to Phase 5 Ship: `git apply` worktree patch, commit, push
 - If `WARN`, `FAIL`, or `SHIP_GATE_DENIED`:
   1. `git diff HEAD > "$WORKSPACE_PATH/failed.patch"` (capture failed code state)
-  2. `bash legacy/scripts/failure/record-failure-to-state.sh "$WORKSPACE_PATH" "$VERDICT"`
+  2. The loop records the failure in `state.json:failedApproaches`; `evolve failures list` shows it
   3. `git worktree remove --force "$WORKTREE_DIR"`

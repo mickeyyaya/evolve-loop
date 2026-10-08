@@ -10,10 +10,10 @@ argument-hint: "[target] [--scope task|project|strategic] [--depth quick|standar
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Stage 1: SCOPE](#stage-1-scope)
-- [Stage 2: GRADE](#stage-2-grade)
-- [Stage 3: DETECT](#stage-3-detect)
-- [Stage 4: SCORE](#stage-4-score)
-- [Stage 5: DIRECT](#stage-5-direct)
+- [Stage 2: GRADE](#stage-2-grade-layer-1)
+- [Stage 3: DETECT](#stage-3-detect-layer-2)
+- [Stage 4: SCORE](#stage-4-score-layer-3)
+- [Stage 5: DIRECT](#stage-5-direct-layer-4)
 - [Isolation Principles](#isolation-principles)
 - [Depth Control](#depth-control)
 - [Evolve-Loop Integration](#evolve-loop-integration)
@@ -84,7 +84,7 @@ Run deterministic checks and model-based judgment. Two passes: fast pipeline + d
 
 ### Pass 1: Pipeline Checks (deterministic)
 
-Reuse `legacy/scripts/utility/code-review-simplify.sh` if available, else run equivalent checks:
+Run these checks:
 
 | Check | Threshold | Dimension Fed |
 |-------|-----------|--------------|
@@ -222,7 +222,7 @@ The evaluator is designed to be **independent from what it evaluates**:
 | **Physical isolation** | Evaluator runs as separate skill invocation, not embedded in build pipeline | AISI Inspect Toolkit |
 | **Different perspective** | Model-based assessment uses evaluation-focused prompt, not builder's prompt | CALM self-preference bias (arXiv:2410.02736) |
 | **Read-only** | Evaluator never modifies source code — only observes and scores | Anthropic eval principles |
-| **Tamper resistance** | Scoring rubric in reference files, not inline — harder to influence | verify-eval.sh pattern |
+| **Tamper resistance** | Scoring rubric in reference files, not inline — harder to influence | `evolve eval verify` pattern |
 | **Evidence requirement** | Every score must link to specific observation (file:line or metric) | EDDOps evidence-linked changes |
 
 ## Depth Control
@@ -246,10 +246,10 @@ When invoked from evolve-loop's Auditor phase:
 
   ```bash
   echo "/evo:evaluator --scope task --depth standard" | \
-      bash legacy/scripts/dispatch/subagent-run.sh evaluator "$CYCLE" "$WORKSPACE_PATH"
+      evolve subagent run evaluator "$CYCLE" "$WORKSPACE_PATH"
   ```
 
-  The runner enforces the evaluator profile (`.evolve/profiles/evaluator.json`) which is read-only at the filesystem level (no Edit/Write outside the evaluator-output artifact) and explicitly disallows WebSearch/WebFetch — the evaluator must score the artifacts on disk, not invent context from the network. Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle.
+  The runner enforces the evaluator profile (`.evolve/profiles/evaluator.json`). The profile is read-only at the filesystem level: no Edit/Write outside the evaluator-output artifact. It also disallows WebSearch/WebFetch, so the evaluator must score the artifacts on disk and not invent context from the network.
 
 - **Result:** Dimension scores merged into audit-report.md under `## Evaluator Scores`
 - **Impact:** Advisory — supplements Auditor verdict, does not override
@@ -313,4 +313,4 @@ Works without any evolve-loop infrastructure. Requires only: file system access,
 | [reference/scoring-dimensions.md](reference/scoring-dimensions.md) | Detailed 6-dimension rubric with 5-point scales |
 | [reference/anti-gaming.md](reference/anti-gaming.md) | EST protocol, saturation detection, gaming patterns |
 | [reference/eval-lifecycle.md](reference/eval-lifecycle.md) | Self-improving evaluation, drift detection, adaptive difficulty |
-| [docs/evaluator-research.md](../../docs/evaluator-research.md) | Full research archive (14 papers, benchmarks, techniques) |
+| [docs/private/research/archived-2026-05-19/evaluator-research.md](../../docs/private/research/archived-2026-05-19/evaluator-research.md) | Full research archive (14 papers, benchmarks, techniques) |

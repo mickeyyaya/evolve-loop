@@ -17,7 +17,6 @@ argument-hint: "[topic/question] [--depth QUICK|STANDARD|DEEP] [--lenses N] [--f
 - [Stage 6: DELIVER](#stage-6-deliver)
 - [Depth Control](#depth-control)
 - [Evolve-Loop Integration](#evolve-loop-integration)
-- [Output Schema](#output-schema)
 - [Reference](#reference-read-on-demand)
 
 ## Quick Start
@@ -325,10 +324,10 @@ The orchestrator can delegate to inspirer at Step 2.5 (DIVERGENCE TRIGGER):
 
 ```bash
 echo "/evo:inspirer $GOAL --depth QUICK --format evolve --lenses 3" | \
-    bash legacy/scripts/dispatch/subagent-run.sh inspirer "$CYCLE" "$WORKSPACE_PATH"
+    evolve subagent run inspirer "$CYCLE" "$WORKSPACE_PATH"
 ```
 
-The runner enforces the inspirer profile (`.evolve/profiles/inspirer.json`) which restricts writes to the inspirer-output artifact only and disallows state/ledger/profile mutation. WebSearch and WebFetch remain enabled for research-grounded ideation. Legacy fallback: `LEGACY_AGENT_DISPATCH=1` for one A/B cycle.
+The runner enforces the inspirer profile (`.evolve/profiles/inspirer.json`) which restricts writes to the inspirer-output artifact only and disallows state/ledger/profile mutation. WebSearch and WebFetch remain enabled for research-grounded ideation.
 
 **Result:** Returned concept cards merge with standard gap-analysis cards and flow to Scout with +2 priority boost (same as research-backed concepts).
 

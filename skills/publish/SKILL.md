@@ -6,7 +6,7 @@ argument-hint: "<target-version> [--dry-run] [--no-rollback] [--skip-tests] [--m
 
 # /evo:publish
 
-> Canonical release entry point. Owns the full publish lifecycle: pre-flight → bump → changelog → ship → propagate → rollback-on-failure. NOT a synonym for "git push" — see [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary.
+> Canonical release entry point. Owns the full publish lifecycle: pre-flight → bump → changelog → ship → propagate → rollback-on-failure. NOT a synonym for "git push" — see [docs/guides/publishing-releases.md](../../docs/guides/publishing-releases.md) for vocabulary.
 
 ## What this skill does
 
@@ -17,13 +17,15 @@ When the user types `/evo:publish 18.5.0` (or similar), invoke the go-native rel
 | 1 | Pre-flight gate (`evolve release-preflight`) | exit non-zero; abort, no mutations |
 | 2 | Auto-changelog | abort |
 | 3 | Version bump (6 markers) | abort |
-| 3.5 | Rebuild tracked binary `go/evolve` | abort |
-| 4 | Consistency check (`evolve release-consistency`) | abort, files in working tree |
-| 5 | Atomic ship | abort, nothing pushed |
-| 6 | Marketplace propagation poll (up to 5 min default) | auto-rollback unless `--no-rollback` |
-| 7 | Cache refresh | logged WARN; manual fix |
+| 4 | Rebuild tracked binary `go/evolve` | abort |
+| 5 | Consistency check (`evolve release-consistency`) | abort, files in working tree |
+| 6 | Atomic ship (`evolve ship --class release`) | abort, nothing pushed |
+| 7 | Marketplace propagation poll (up to 5 min default) | auto-rollback unless `--no-rollback` |
+| 8 | Release verify: the committed `go/evolve` is the disk binary and reports the target version | auto-rollback unless `--no-rollback` |
 
-> Steps 1–7 are the **`gh`-free** pipeline binary. It cannot see GitHub CI — it ends by printing a `NOTE: GitHub CI is NOT verified by this pipeline` advisory. CI gating is **this skill's** job (next section); never treat a green pipeline as a green CI.
+The order is the order in `go/internal/releasepipeline/release_run.go`. The guide [docs/guides/publishing-releases.md](../../docs/guides/publishing-releases.md) gives the details of each step.
+
+> Steps 1–8 are the **`gh`-free** pipeline binary. It cannot see GitHub CI — it ends with a `NOTE: GitHub CI is NOT verified by this pipeline` advisory. CI gating is **this skill's** job (next section); never treat a green pipeline as a green CI.
 
 ## CI gating (this skill adds what the binary cannot)
 
@@ -112,7 +114,7 @@ The pipeline emits each step's proposed output without writing or committing.
 
 ## Vocabulary refresher
 
-If unsure what "publish" means in this project: open [docs/release-protocol.md](../../docs/release-protocol.md). The short version:
+If unsure what "publish" means in this project: open [docs/guides/publishing-releases.md](../../docs/guides/publishing-releases.md). The short version:
 
 - **push** ≠ **publish**. `git push` only moves a remote ref; `publish` runs the full lifecycle.
 - **ship** is the per-commit primitive (`evolve ship --class manual|cycle`); `publish`/`release` is the version lifecycle on top of it.

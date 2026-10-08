@@ -66,6 +66,6 @@ Fan-out prompts live in `.evolve/profiles/retrospective.json:parallel_subtasks` 
 ## Reference
 
 - `.evolve/profiles/retrospective.json`
-- `legacy/scripts/dispatch/aggregator.sh` (phase=learn → lessons mode with dedup)
+- `evolve aggregator learn <output> <worker-artifact>...` (`go/internal/aggregator`: lessons mode with dedup)
 - `agents/evolve-retrospective.md`
 - `skills/loop/phase6-learn.md` (legacy detailed workflow)

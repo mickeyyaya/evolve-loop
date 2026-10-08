@@ -1,0 +1,24 @@
+{
+  "id": "skills-review-followups",
+  "title": "Skills alignment follow-ups: a dead budget field, a schema enum gap and the audit framing on the cycle path",
+  "kind": "docs",
+  "priority_class": "maintainability",
+  "weight": 0.25,
+  "route": "console",
+  "routed_reason": "the files are agent templates, adapter schema and the auditor framing path; the console owns them",
+  "source": "console, 2026-10-08, the skills alignment landing (round-2 verify-only check: MERGE; filed LOW items 1, 2 and 4)",
+  "created_at": "2026-10-08T13:00:00Z",
+  "summary": "Three LOW items from the round-2 check of the skills alignment. 1: agents/agent-templates.md:51-62 says that the orchestrator computes budgetPressure at cycle start, but no Go code produces it; skill-routing.md now marks it as removed design and links to that file. 2: adapters/_capabilities-schema.json has the adapter enum claude, gemini, codex, antigravity, but adapters/claude-tmux.capabilities.json declares claude-tmux. 3: skills/audit/SKILL.md says that the runner appends the ADVERSARIAL AUDIT MODE framing. That is true on the evolve subagent run path (subagentrun/prepare.go:36-37). The reviewer found no adversarialAuditFraming call on the cycle phase-runner path (phases/runner/dispatch.go:62 to adapters/bridge), and did not trace the cycle end to end.",
+  "fix": "1: mark agents/agent-templates.md:51-62 as removed design (persona review; the file is a template). 2: add claude-tmux to the enum, or change the manifest value, and add a test that every capabilities file validates against the schema. 3: trace the cycle path. If the cycle auditor gets no framing, decide whether it must, and make the skill text match the code.",
+  "acceptance": [
+    "agents/agent-templates.md no longer describes budgetPressure as a live input",
+    "Every adapters/*.capabilities.json validates against the schema in a test",
+    "The audit skill states where the ADVERSARIAL AUDIT MODE framing applies, with a test or a trace as proof"
+  ],
+  "files": [
+    "agents/agent-templates.md",
+    "adapters/_capabilities-schema.json",
+    "adapters/claude-tmux.capabilities.json",
+    "skills/audit/SKILL.md"
+  ]
+}
