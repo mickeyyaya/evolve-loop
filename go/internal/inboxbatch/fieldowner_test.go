@@ -25,6 +25,7 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 		"deps":                      {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.ListValue},
 		"route":                     {Owner: inboxbatch.LoopStampOwned},
 		"routed_reason":             {Owner: inboxbatch.LoopStampOwned},
+		"failure_count":             {Owner: inboxbatch.LoopStampOwned, Shape: inboxbatch.CounterValue},
 		"premise_verified_evidence": {Owner: inboxbatch.OperatorStampOwned},
 		"kind":                      {Owner: inboxbatch.AuthorOwned},
 		"created_at":                {Owner: inboxbatch.AuthorOwned},
@@ -34,6 +35,14 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 	} {
 		if got := inboxbatch.RoleOf(key); got != want {
 			t.Errorf("RoleOf(%q) = %+v, want %+v", key, got, want)
+		}
+	}
+}
+
+func TestFieldRole_IsCounterNamesOnlyTheMonotonicLoopCounters(t *testing.T) {
+	for key, want := range map[string]bool{"failure_count": true, "routed_cycle": false, "last_failure_reason": false, "weight": false, "kind": false} {
+		if got := inboxbatch.RoleOf(key).IsCounter(); got != want {
+			t.Errorf("RoleOf(%q).IsCounter() = %v, want %v", key, got, want)
 		}
 	}
 }

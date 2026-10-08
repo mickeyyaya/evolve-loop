@@ -127,3 +127,7 @@ type CycleState struct {
 	// not in a workspace file an agent could delete, so neither an agent nor a crash-resume grants it twice.
 	BookkeepingRegradeAttempted bool `json:"bookkeeping_regrade_attempted,omitempty"`
 }
+
+func (s State) HighestCycleNumber() int {
+	return max(s.LastCycleNumber, s.LastAllocatedCycleNumber)
+}

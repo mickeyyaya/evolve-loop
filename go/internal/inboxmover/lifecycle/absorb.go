@@ -57,13 +57,28 @@ func (m *Mover) absorbOne(it ClaimedItem) (Absorbed, error) {
 		return a, nil
 	}
 	a.Outcome = AbsorbParked
-	a.ParkedPath = filepath.Join(m.inboxDir, "origin-conflicts", "cycle-"+strconv.Itoa(it.Cycle), filepath.Base(it.RootPath))
+	a.ParkedPath = m.parkPath(it.Cycle, filepath.Base(it.RootPath))
 	if err := m.park(it.RootPath, a.ParkedPath); err != nil {
 		return a, fmt.Errorf("absorb %s: park origin's copy: %w", it.ID, err)
 	}
 	m.linef("WARN: absorb conflict: %s differs from the claim of cycle-%d; the claim stays, and origin's copy is parked at %s", filepath.Base(it.RootPath), it.Cycle, a.ParkedPath)
-	m.ledgerLine(m.absorbEntry("absorb-conflict", it, "origin's copy differs from the claim; the claim stays, origin's copy is parked at "+relToInbox(a.ParkedPath, m.inboxDir)))
+	m.ledgerLine(m.parkEntry(it.ID, it.Cycle, it.RootPath, a.ParkedPath, fmt.Sprintf("absorb: origin's copy differs from the claim of cycle-%d; the claim stays", it.Cycle)))
 	return a, nil
+}
+
+func (m *Mover) parkPath(cycle int, base string) string {
+	return filepath.Join(m.inboxDir, "origin-conflicts", "cycle-"+strconv.Itoa(cycle), base)
+}
+
+func (m *Mover) parkEntry(taskID string, cycle int, from, parked, reason string) ledgerEntry {
+	return ledgerEntry{
+		Action: "park",
+		TaskID: taskID,
+		From:   relToInbox(from, m.inboxDir),
+		To:     relToInbox(parked, m.inboxDir),
+		Cycle:  intPtr(strconv.Itoa(cycle)),
+		Reason: reason,
+	}
 }
 
 func (m *Mover) park(src, dest string) error {

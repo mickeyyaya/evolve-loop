@@ -220,3 +220,65 @@ func TestCmd_InboxMoverPromote_RefusesAShortCallAndABadFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestCmd_InboxReleaseKeep_ResolvesAConflictWithTheChosenCopy(t *testing.T) {
+	root := claimsRoot(t)
+	seedCurationItems(t, root, map[string]string{
+		"stale.json":                      `{"failure_count":1,"id":"stale","last_failure_reason":"cycle-failure-release"}`,
+		"processing/cycle-1826/lane.json": `{"id":"lane","title":"lane"}`,
+		"lane.json":                       `{"id":"lane","title":"origin"}`,
+	})
+	var stdout, stderr bytes.Buffer
+	if rc := runInbox([]string{"release", "stale", "wave 82 boundary", "--keep", "root"}, nil, &stdout, &stderr); rc != 0 || stdout.String() != "inbox release: stale released from cycle-1828; the root copy stays (keep: root) and the claim copy is removed\n" {
+		t.Errorf("--keep root: rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
+	}
+	if last := lifecycleLines(t, root); last[len(last)-1].Action != "release" || !strings.HasSuffix(last[len(last)-1].Message, "wave 82 boundary; keep: root") {
+		t.Errorf("ledger tail = %+v; want the release line with keep: root", last[len(last)-1])
+	}
+	stdout.Reset()
+	if rc := runInbox([]string{"release", "lane", "operator", "--keep", "claim", "--json"}, nil, &stdout, &stderr); rc != 0 || !strings.Contains(stdout.String(), `"outcome": "claim-kept"`) || !strings.Contains(stdout.String(), `"parked_path": "`) {
+		t.Errorf("--keep claim --json: rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
+	}
+	parked := filepath.Join(root, ".evolve", "inbox", "origin-conflicts", "cycle-1826", "lane.json")
+	if body, err := os.ReadFile(parked); err != nil || string(body) != `{"id":"lane","title":"origin"}` {
+		t.Errorf("origin's copy must be parked at %s: %s %v", parked, body, err)
+	}
+	stdout.Reset()
+	seedCurationItems(t, root, map[string]string{"processing/cycle-1825/text.json": `{"id":"text","title":"lane"}`, "text.json": `{"id":"text","title":"origin"}`})
+	if rc := runInbox([]string{"release", "text", "operator", "--keep", "claim"}, nil, &stdout, &stderr); rc != 0 || stdout.String() != "inbox release: text released from cycle-1825 to the inbox root (keep: claim); the root copy is parked at "+filepath.Join(root, ".evolve", "inbox", "origin-conflicts", "cycle-1825", "text.json")+"\n" {
+		t.Errorf("--keep claim text: rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	seedCurationItems(t, root, map[string]string{"processing/cycle-1826/lane.json": `{"id":"lane","title":"lane","x":1}`})
+	if rc := runInbox([]string{"release", "lane", "operator", "--keep", "claim"}, nil, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), "exists") {
+		t.Errorf("--keep claim onto a parked copy: rc = %d stderr = %q; want exit 1", rc, stderr.String())
+	}
+}
+
+func TestCmd_InboxReleaseKeep_RefusesALiveHolderANonSubsetAndBadUsage(t *testing.T) {
+	root := claimsRoot(t)
+	seedCurationItems(t, root, map[string]string{
+		"processing/cycle-1828/stale.json": `{"id":"stale","title":"lane"}`,
+		"stale.json":                       `{"id":"stale","title":"origin"}`,
+		"live.json":                        `{"id":"live","x":1}`,
+	})
+	for args, want := range map[string]int{
+		"release live operator --keep claim":        1,
+		"release stale operator --keep root":        1,
+		"release stale operator --keep both":        10,
+		"release live operator --keep both":         10,
+		"release stale operator --keep":             10,
+		"release --stale operator --keep root":      10,
+		"release stale operator --keep root --keep": 10,
+	} {
+		var stdout, stderr bytes.Buffer
+		if rc := runInbox(strings.Fields(args), nil, &stdout, &stderr); rc != want {
+			t.Errorf("%s: rc = %d, want %d (stderr=%q)", args, rc, want, stderr.String())
+		}
+	}
+	for _, path := range []string{"processing/cycle-1837/live.json", "processing/cycle-1828/stale.json"} {
+		if _, err := os.Stat(filepath.Join(root, ".evolve", "inbox", path)); err != nil {
+			t.Errorf("a refusal must keep %s: %v", path, err)
+		}
+	}
+}

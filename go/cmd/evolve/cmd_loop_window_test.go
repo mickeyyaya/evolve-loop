@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,17 @@ func TestReadBatchWindowFloor_LegacyStateFallsBackToCompletionCounter(t *testing
 	}
 	if got != 1325 {
 		t.Fatalf("window floor = %d, want 1325 — a legacy state with no allocation lease must fall back to the completion counter, never to 0 (which would re-collect all of runs/)", got)
+	}
+}
+
+func TestReadBatchWindowFloor_ReturnsTheStateReadFault(t *testing.T) {
+	fault := errors.New("state.json is locked")
+	st := &fixtures.FakeStorage{ReadStateErr: fault, State: core.State{LastCycleNumber: 1325}}
+
+	got, err := readBatchWindowFloor(context.Background(), st)
+
+	if !errors.Is(err, fault) || got != 0 {
+		t.Errorf("readBatchWindowFloor = %d, %v; want 0 and the read fault", got, err)
 	}
 }
 

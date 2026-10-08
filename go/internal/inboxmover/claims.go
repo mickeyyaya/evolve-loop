@@ -36,14 +36,26 @@ const (
 	ClaimReleased         ClaimOutcome = "released"
 	ClaimDuplicateRemoved ClaimOutcome = "duplicate-removed"
 	ClaimNotHeld          ClaimOutcome = "not-claimed"
+	ClaimRootKept         ClaimOutcome = "root-kept"
+	ClaimClaimKept        ClaimOutcome = "claim-kept"
 )
 
+type KeepCopy = lifecycle.KeepCopy
+
+const (
+	KeepRoot  = lifecycle.KeepRoot
+	KeepClaim = lifecycle.KeepClaim
+)
+
+type claimReleaser func(m *lifecycle.Mover, taskID string, loc Location, reason string) (lifecycle.ClaimReleaseResult, error)
+
 type ClaimRelease struct {
-	ID      string       `json:"id"`
-	Cycle   int          `json:"cycle"`
-	Outcome ClaimOutcome `json:"outcome"`
-	Path    string       `json:"path"`
-	Holder  Holder       `json:"holder"`
+	ID         string       `json:"id"`
+	Cycle      int          `json:"cycle"`
+	Outcome    ClaimOutcome `json:"outcome"`
+	Path       string       `json:"path"`
+	Holder     Holder       `json:"holder"`
+	ParkedPath string       `json:"parked_path,omitempty"`
 }
 
 func SurveyClaims(opts Options) (ClaimSurvey, error) {
@@ -64,6 +76,16 @@ func SurveyClaims(opts Options) (ClaimSurvey, error) {
 }
 
 func ReleaseClaim(opts Options, taskID, reason string) (ClaimRelease, error) {
+	return releaseJudged(opts, taskID, reason, (*lifecycle.Mover).ReleaseClaim)
+}
+
+func ReleaseClaimKeeping(opts Options, taskID, reason string, keep KeepCopy) (ClaimRelease, error) {
+	return releaseJudged(opts, taskID, reason, func(m *lifecycle.Mover, taskID string, loc Location, reason string) (lifecycle.ClaimReleaseResult, error) {
+		return m.ReleaseClaimKeeping(taskID, loc, keep, reason)
+	})
+}
+
+func releaseJudged(opts Options, taskID, reason string, release claimReleaser) (ClaimRelease, error) {
 	opts.resolveOpts()
 	taskID, reason = strings.TrimSpace(taskID), strings.TrimSpace(reason)
 	if taskID == "" || reason == "" {
@@ -80,7 +102,7 @@ func ReleaseClaim(opts Options, taskID, reason string) (ClaimRelease, error) {
 	if holder.Keeps() {
 		return ClaimRelease{}, fmt.Errorf("%w: %s is held by cycle %d (%s: %s)", ErrClaimHeld, taskID, loc.Cycle, holder.Verdict, holder.Reason)
 	}
-	return releaseHeld(opts, taskID, loc, holder, reason)
+	return releaseHeld(opts, taskID, loc, holder, reason, release)
 }
 
 func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
@@ -97,7 +119,7 @@ func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
 		if holder.Keeps() {
 			continue
 		}
-		rel, err := releaseHeld(opts, it.ID, it.Location, holder, reason+": "+holder.Reason)
+		rel, err := releaseHeld(opts, it.ID, it.Location, holder, reason+": "+holder.Reason, (*lifecycle.Mover).ReleaseClaim)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("release %s from cycle %d: %w", it.ID, it.Cycle, err))
 			continue
@@ -107,16 +129,24 @@ func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
 	return released, errors.Join(errs...)
 }
 
-func releaseHeld(opts Options, taskID string, loc Location, holder Holder, reason string) (ClaimRelease, error) {
-	res, err := opts.mover().ReleaseClaim(taskID, loc, reason)
+func releaseHeld(opts Options, taskID string, loc Location, holder Holder, reason string, release claimReleaser) (ClaimRelease, error) {
+	res, err := release(opts.mover(), taskID, loc, reason)
 	if err != nil {
 		return ClaimRelease{}, err
 	}
-	outcome := ClaimReleased
-	if res.Duplicate {
-		outcome = ClaimDuplicateRemoved
+	return ClaimRelease{ID: taskID, Cycle: loc.Cycle, Outcome: claimOutcome(res), Path: res.Path, Holder: holder, ParkedPath: res.ParkedPath}, nil
+}
+
+func claimOutcome(res lifecycle.ClaimReleaseResult) ClaimOutcome {
+	switch {
+	case res.Duplicate:
+		return ClaimDuplicateRemoved
+	case res.Kept == KeepRoot:
+		return ClaimRootKept
+	case res.Kept == KeepClaim:
+		return ClaimClaimKept
 	}
-	return ClaimRelease{ID: taskID, Cycle: loc.Cycle, Outcome: outcome, Path: res.Path, Holder: holder}, nil
+	return ClaimReleased
 }
 
 type Absorbed = lifecycle.Absorbed

@@ -17,14 +17,19 @@ const (
 type ValueShape string
 
 const (
-	TextValue   ValueShape = "text"
-	NumberValue ValueShape = "number"
-	ListValue   ValueShape = "list"
+	TextValue    ValueShape = "text"
+	NumberValue  ValueShape = "number"
+	ListValue    ValueShape = "list"
+	CounterValue ValueShape = "counter"
 )
 
 type FieldRole struct {
 	Owner FieldOwner
 	Shape ValueShape
+}
+
+func (r FieldRole) IsCounter() bool {
+	return r.Shape == CounterValue
 }
 
 func (r FieldRole) IsStamp() bool {
@@ -53,6 +58,7 @@ const (
 var (
 	curated       = func(shape ValueShape) FieldRole { return FieldRole{Owner: CuratorOwned, Shape: shape} }
 	loopStamp     = FieldRole{Owner: LoopStampOwned}
+	loopCounter   = FieldRole{Owner: LoopStampOwned, Shape: CounterValue}
 	operatorStamp = FieldRole{Owner: OperatorStampOwned}
 )
 
@@ -72,7 +78,7 @@ var fieldRoles = map[string]FieldRole{
 	RoutedReasonField:          loopStamp,
 	RoutedCycleField:           loopStamp,
 	RoutedAtField:              loopStamp,
-	FailureCountField:          loopStamp,
+	FailureCountField:          loopCounter,
 	LastFailureReasonField:     loopStamp,
 	ContinuationField:          loopStamp,
 	ReleasedContinuationsField: loopStamp,
