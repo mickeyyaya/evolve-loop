@@ -17,10 +17,13 @@ func TestRun_GenerateWritesCommandStubs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("commands/loop.md not generated: %v", err)
 	}
-	for _, want := range []string{"evo:loop", "$ARGUMENTS", commandGenMarker} {
+	for _, want := range []string{"${CLAUDE_PLUGIN_ROOT}/skills/loop/SKILL.md", "$ARGUMENTS", commandGenMarker} {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("commands/loop.md missing %q\n%s", want, raw)
 		}
+	}
+	if strings.Contains(string(raw), "evo:loop") {
+		t.Errorf("commands/loop.md loads evo:loop, the id it is itself registered under\n%s", raw)
 	}
 	out.Reset()
 	errBuf.Reset()

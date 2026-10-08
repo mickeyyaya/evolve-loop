@@ -1,6 +1,6 @@
 ---
 name: evaluator
-description: Use when the user invokes /evo:evaluator or asks to evaluate, assess, score, or independently audit code quality, project health, or improvement priorities with multi-dimensional scoring and anti-gaming defenses
+description: Use when the user asks to evaluate, assess, score, or independently audit code quality, project health, or improvement priorities with multi-dimensional scoring and anti-gaming defenses
 argument-hint: "[target] [--scope task|project|strategic] [--depth quick|standard|deep]"
 ---
 

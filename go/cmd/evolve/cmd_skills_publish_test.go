@@ -302,10 +302,13 @@ func TestPublishAgy_IncludesCommandStubs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("agy commands/scout.md missing — no /evo:scout in agy's menu: %v", err)
 	}
-	for _, want := range []string{"evo:scout", "$ARGUMENTS", `argument-hint: "[area]"`} {
+	for _, want := range []string{"${CLAUDE_PLUGIN_ROOT}/skills/scout/SKILL.md", "$ARGUMENTS", `argument-hint: "[area]"`} {
 		if !strings.Contains(string(cmd), want) {
 			t.Errorf("agy commands/scout.md missing %q\n%s", want, cmd)
 		}
+	}
+	if strings.Contains(string(cmd), "evo:scout") {
+		t.Errorf("agy commands/scout.md loads evo:scout, the id it is itself registered under\n%s", cmd)
 	}
 
 	manifest, _ := os.ReadFile(filepath.Join(stagingPlugin, "plugin.json"))

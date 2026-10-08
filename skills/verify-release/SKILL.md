@@ -1,6 +1,6 @@
 ---
 name: verify-release
-description: Use when the user invokes /evo:verify-release or asks to check whether a release has propagated, whether the marketplace is up to date, or whether installed plugins reflect the latest version. Wraps `evolve marketplace-poll` for standalone post-publish verification.
+description: Use when the user asks to check whether a release has propagated, whether the marketplace is up to date, or whether installed plugins reflect the latest version. Wraps `evolve marketplace-poll` for standalone post-publish verification.
 argument-hint: "<target-version> [--max-wait-s 60] [--marketplace-dir <path>]"
 ---
 

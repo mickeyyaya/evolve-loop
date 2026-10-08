@@ -1,6 +1,6 @@
 ---
 name: publish
-description: Use when the user invokes /evo:publish or asks to release a new version, ship a release, or publish a tag. Wraps the go-native self-healing release pipeline (`evolve release`) — pre-flight checks, auto-changelog, atomic ship, marketplace propagation poll, auto-rollback on failure.
+description: Use when the user asks to release a new version, ship a release, or publish a tag. Wraps the go-native self-healing release pipeline (`evolve release`) — pre-flight checks, auto-changelog, atomic ship, marketplace propagation poll, auto-rollback on failure.
 argument-hint: "<target-version> [--dry-run] [--no-rollback] [--skip-tests] [--max-poll-wait-s 300]"
 ---
 

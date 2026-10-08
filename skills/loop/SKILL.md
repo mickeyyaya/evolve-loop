@@ -1,6 +1,6 @@
 ---
 name: loop
-description: Use when the user invokes /evo:loop or asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
+description: Use when the user asks to run autonomous improvement cycles, self-evolving development, compound discovery, or multi-cycle code improvement with research, build, audit, and learning phases
 argument-hint: "(--resume | [--cycles N] [strategy] <goal>)"
 ---
 

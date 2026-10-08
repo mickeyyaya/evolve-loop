@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use when the user runs /evo:setup (or /evo:setup), asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Auto-detects available LLM CLIs/subscriptions, explains the pipeline concisely, then presents THREE ready-made config presets (Recommended/Economy/Max-quality) the Go binary computes deterministically from the public profiles — the user makes ONE choice and the binary writes per-phase pins to .evolve/policy.json. On a project that declares a `cli_routing` table (evolve-loop's own does) presets do not apply: the table owns every route, and the skill shows it with `evolve cli-routing show` instead. Runs once on first launch (the loop nudges) and is re-runnable anytime.
+description: Use when the user asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Auto-detects available LLM CLIs/subscriptions, explains the pipeline concisely, then presents THREE ready-made config presets (Recommended/Economy/Max-quality) the Go binary computes deterministically from the public profiles — the user makes ONE choice and the binary writes per-phase pins to .evolve/policy.json. On a project that declares a `cli_routing` table (evolve-loop's own does) presets do not apply: the table owns every route, and the skill shows it with `evolve cli-routing show` instead. Runs once on first launch (the loop nudges) and is re-runnable anytime.
 argument-hint: ""
 ---
 

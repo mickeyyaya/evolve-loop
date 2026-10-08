@@ -113,9 +113,9 @@ func RenderCommandStub(name, desc, argHint string) string {
 		"---\ndescription: %s\n%s---\n\n"+
 			"%s%s/SKILL.md — DO NOT EDIT. -->\n"+
 			"<!-- Edit the skill, then run `evolve skills generate`. -->\n\n"+
-			"Run the **%s** skill from the `evo` plugin (Skill tool id `evo:%s`); follow its SKILL.md instructions exactly.\n\n"+
+			"Read `${CLAUDE_PLUGIN_ROOT}/skills/%s/SKILL.md` and follow its instructions exactly.\n\n"+
 			"Arguments: $ARGUMENTS\n",
-		yamlQuote(desc), hint, commandGenMarker, name, name, name,
+		yamlQuote(desc), hint, commandGenMarker, name, name,
 	)
 }
 

@@ -1,6 +1,6 @@
 ---
 name: inspirer
-description: Use when the user invokes /evo:inspirer or asks to brainstorm creatively, think outside the box, explore unconventional approaches, break out of stagnation, or generate research-backed ideas with provocation lenses
+description: Use when the user asks to brainstorm creatively, think outside the box, explore unconventional approaches, break out of stagnation, or generate research-backed ideas with provocation lenses
 argument-hint: "[topic/question] [--depth QUICK|STANDARD|DEEP] [--lenses N] [--format full|brief|evolve]"
 ---
 
