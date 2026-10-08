@@ -196,7 +196,9 @@ func resolveRollbackSteps(opts Options, logf func(string, ...any)) Steps {
 	}
 	steps := opts.Steps
 	if steps.GhDeleteRelease == nil {
-		steps.GhDeleteRelease = defaultGhDeleteRelease
+		steps.GhDeleteRelease = func(tag string) string {
+			return defaultGhDeleteReleaseIn(opts.RepoRoot, tag)
+		}
 	}
 	if steps.DeleteRemoteTag == nil {
 		steps.DeleteRemoteTag = defaultDeleteRemoteTag
@@ -294,13 +296,30 @@ func appendLedger(path string, line []byte) (err error) {
 }
 
 func defaultGhDeleteRelease(tag string) string {
+	return defaultGhDeleteReleaseIn("", tag)
+}
+
+func defaultGhDeleteReleaseIn(repoRoot, tag string) string {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return stepSkipped
 	}
-	if err := sysexec.Command(context.Background(), "gh", "release", "view", tag).Run(); err != nil {
-		return stepNotPresent
+	ctx := context.Background()
+	out, stderr, code, err := sysexec.Capture(ctx, sysexec.DefaultRunner, repoRoot, "gh", "release", "view", tag)
+	if err != nil {
+		return stepFailed
 	}
-	if err := sysexec.Command(context.Background(), "gh", "release", "delete", tag, "--yes").Run(); err != nil {
+	if code != 0 {
+		errLower := strings.ToLower(out + " " + stderr)
+		if strings.Contains(errLower, "not found") || strings.Contains(errLower, "404") {
+			return stepNotPresent
+		}
+		return stepFailed
+	}
+	cmd := sysexec.Command(ctx, "gh", "release", "delete", tag, "--yes")
+	if repoRoot != "" {
+		cmd.Dir = repoRoot
+	}
+	if err := cmd.Run(); err != nil {
 		return stepFailed
 	}
 	return stepDeleted
@@ -312,7 +331,10 @@ func defaultDeleteRemoteTag(repoRoot, tag string) string {
 
 func deleteRemoteTagWith(g gitexec.Git, tag string) string {
 	ctx := context.Background()
-	out, _, _, _ := g.Capture(ctx, "ls-remote", "--tags", "origin", "refs/tags/"+tag)
+	out, _, exitCode, err := g.Capture(ctx, "ls-remote", "--tags", "origin", "refs/tags/"+tag)
+	if err != nil || exitCode != 0 {
+		return stepFailed
+	}
 	if !strings.Contains(out, tag) {
 		_ = g.Run(ctx, "tag", "-d", tag)
 		return stepNotPresent

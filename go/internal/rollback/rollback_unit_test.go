@@ -1,6 +1,7 @@
 package rollback
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -96,9 +97,13 @@ func TestAppendLedger_MkdirFailure_ReturnsError(t *testing.T) {
 	path := filepath.Join(blocker, "child", "ledger.jsonl")
 	err := appendLedger(path, []byte("data"))
 	if err == nil {
-		t.Error("expected mkdir error when parent is a file")
+		t.Fatal("expected mkdir error when parent is a file")
 	}
-	if !strings.Contains(err.Error(), "blocker") && !strings.Contains(err.Error(), "child") {
+	if !strings.Contains(err.Error(), blocker) {
+		t.Errorf("error %q does not name the blocking path %q", err, blocker)
+	}
+	if _, statErr := os.Stat(filepath.Join(blocker, "child")); statErr == nil {
+		t.Error("child directory was created under a regular file")
 	}
 }
 
@@ -138,12 +143,27 @@ func TestRevertAndShipWith_RevertOK_BinarySucceeds_Reverted(t *testing.T) {
 
 func TestRun_NilSteps_FallbacksAssigned(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
+	fakes := installFakeTools(t,
+		"case \"$2\" in view) pwd >> \"$FAKE_GH_PWD\"; exit 0;; *) exit 0;; esac\n",
+		"case \"$1\" in ls-remote) echo refs/tags/v1.2.3;; esac\nexit 0\n")
 	var buf strings.Builder
-	_, _ = Run(Options{
+	res, err := Run(Options{
 		JournalPath: jp,
 		RepoRoot:    repo,
 		Steps:       Steps{},
 		Stderr:      &buf,
 		Now:         func() time.Time { return time.Unix(0, 0) },
 	})
+	if res.ReleaseDelete != "deleted" || res.TagDelete != "deleted" {
+		t.Errorf("fallback steps not wired: release=%q tag=%q", res.ReleaseDelete, res.TagDelete)
+	}
+	if res.Revert == "" {
+		t.Error("RevertAndShip fallback did not run")
+	}
+	if err != nil && !errors.Is(err, ErrPartial) {
+		t.Errorf("unexpected error kind: %v", err)
+	}
+	if got := fakes.ghWorkingDirs(t); len(got) == 0 {
+		t.Error("fake gh was never invoked; the default release step is not hermetic")
+	}
 }

@@ -29,8 +29,8 @@ func TestDefaultGhDeleteRelease_FakeGhFails_GenericError(t *testing.T) {
 	if got == "skipped" {
 		t.Errorf("gh is in PATH so status must not be 'skipped'; got %q", got)
 	}
-	if got == "deleted" {
-		t.Errorf("gh exits 1 so status must not be 'deleted'; got %q", got)
+	if got != "failed" {
+		t.Errorf("unrecognised gh failure must be 'failed'; got %q", got)
 	}
 }
 
@@ -44,8 +44,8 @@ func TestDefaultGhDeleteRelease_FakeGhFails_NotFoundMessage(t *testing.T) {
 	if got == "skipped" {
 		t.Errorf("gh is in PATH; must not be 'skipped'; got %q", got)
 	}
-	if got == "deleted" {
-		t.Errorf("gh exits 1; must not be 'deleted'; got %q", got)
+	if got != "not-present" {
+		t.Errorf("gh 'release not found' must be 'not-present'; got %q", got)
 	}
 }
 
