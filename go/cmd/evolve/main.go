@@ -146,6 +146,12 @@ v12.1 utilities + composition:
   skill-inventory           Build .evolve/skill-inventory.json from
                               skills/*/SKILL.md ( skill-inventory build
                               [--ttl 1h] [--force] )
+  docs                      Documentation tools; ste-lint checks text
+                              against the ASD-STE100 house rules (WARN;
+                              exit 1 only with --strict)
+                              ( docs ste-lint [--json] [--strict] [--go]
+                              [--changed <base-ref>] [--project-root P]
+                              [paths...] )
   skills                    Project phase facts into phase skill docs
                               from their SSOTs; drift-checked in CI;
                               publish projects canonical skills to other

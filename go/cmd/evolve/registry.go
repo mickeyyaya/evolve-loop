@@ -115,6 +115,7 @@ var commands = []subcommand{
 	{Name: "signals", Summary: "Signal Center (ADR-0101): `signals codes generate|check` projects the code registry into signal-codes.md (check exits 2 on drift)", Run: runSignals},
 	{Name: "phase-inventory", Summary: "Build phase inventory cache (the advisor's phase index)", Run: phasecmd.RunPhaseInventory},
 	{Name: "eval", Summary: "Eval-quality + verify subcommands", Run: guardcmd.RunEval},
+	{Name: "docs", Summary: "Documentation tools: ste-lint checks text against the ASD-STE100 house rules (docs ste-lint [--json] [--strict] [--go] [--changed <base-ref>] [--project-root P] [paths...]); WARN only, exit 1 only with --strict", Run: runDocs},
 	{Name: "solution", Summary: "Document deliverable contract (ADR-0099): check <solutions/slug> [--project-root DIR] — the same engine as the build floor and the audit gate", Run: runSolution},
 	{Name: "cycle-health", Summary: "11-signal cycle integrity fingerprint", Run: runCycleHealth},
 	{Name: "selfcheck", Summary: "Build self-check: the deliverable contract plus the build handoff floor, bound to the worktree's cycle; the same probe as phase verify build ( selfcheck build [--worktree DIR] )", Run: runSelfcheck},

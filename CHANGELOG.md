@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `evolve docs ste-lint`: a deterministic ASD-STE100 lint for the documents and for Go log and error text, with a WARN on the build floor (STE plan S0 and S10, 2026-10-07)
+
+- **What the operator asked.** "improve the readability by strictly follow ASD-STE100 policy and rewrite all docs wording by strictly follow ASD-STE100 format" (2026-10-07). Later the same day: "all the logs, generated text, any written docs should also strictly follow ASD-STE100 format".
+- **The standard and the plan:** [ste100-writing.md](docs/conventions/ste100-writing.md) gives the house rules and the house list of words to replace. [ste100-docs-rewrite-2026-10.md](docs/plans/ste100-docs-rewrite-2026-10.md) gives the batches.
+- **The lint:** the new package `internal/stelint` reads the word list from the table in the standard, so the list has one home. It finds a sentence of more than 25 words (20 in a numbered item), a paragraph of more than 6 sentences, and the house words.
+- **What the lint reads:** a code span, a URL and a quotation count as one word each, and the lint does not check their words. Link text counts for length, but the lint does not check it for house words. A heading gets the word check only. A blockquote is prose, but the lint does not check a quoted passage. The lint does not check fenced code, frontmatter or generated text.
+- **The verb:** `evolve docs ste-lint [--json] [--strict] [--go] [--changed <base-ref>] [--project-root P] [paths...]`. The exit code is 0 with findings, 1 with `--strict`, 2 for a file that cannot be read and 10 for a bad flag.
+- **The `--go` mode:** it checks the message text of `fmt.Errorf`, `errors.New`, the `log` functions, and the methods `Infof`, `Warnf`, `Errorf`, `Printf` and `Logf`. It also checks `fmt.Fprint`, `fmt.Fprintf` and `fmt.Fprintln` to a stream named `stderr`, `Stderr`, `stdout` or `Stdout`. The scope is `go/**/*.go` without test files, `testdata` and `go/acs`.
+- **The build floor:** beside the documentation floor, the build floor checks the changed documents and prints one `[ste-lint] WARN:` line. The new key `docs_floor.ste_stage` controls it: `off`, `shadow` or `enforce`, and the compiled default is `shadow`. Every stage only WARNs. The `docs_floor` block now decodes strictly, and `stage` and `ste_stage` take only `off`, `shadow` or `enforce`.
+- **The baseline (main 3de30ec3a with this change):** 20,731 findings in 834 of 1,408 documents. The Go text has 207 findings in 118 of 1,361 files. The campaign count of the plan does not include the record directories `docs/history/**` and `docs/explain/builds/**`: it is 19,954 findings in 735 documents. The rewrite batches of the plan bring the campaign count to zero.
+
 ## Fixed — a FAIL that only audit gates forced gets a Build repair round, and a static gate reading cannot halt the loop on the prose of a retro (cycle 1828, wave 76, ADR-0093, ADR-0072, 2026-10-07)
 
 - **What occurred.** In cycle 1828, the auditor wrote PASS (0.88; ACS 170 green, 0 red). The in-process skills-drift gate then forced FAIL:
