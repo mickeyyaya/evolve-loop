@@ -287,7 +287,7 @@ func TestRun_SimulationAdvisory(t *testing.T) {
 		{name: "skip-tests skips advisory", skipTests: true, wantSimOK: nil, wantLogHas: "skipped (--skip-tests)"},
 		{name: "dry-run skips advisory", dryRun: true, wantSimOK: nil, wantLogHas: "skipped (dry-run)"},
 		{name: "happy path → true", simErr: nil, wantSimOK: ptrBool(true), wantLogHas: "auto-respond simulation suite passed"},
-		{name: "bats failure → advisory warn, no error", simErr: errors.New("bats failed"), wantSimOK: ptrBool(false), wantLogHas: "advisory in v12.1.5"},
+		{name: "bats failure → advisory warn, no error", simErr: errors.New("bats failed"), wantSimOK: ptrBool(false), wantLogHas: "WARN: auto-respond simulation suite failed (advisory): bats failed"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

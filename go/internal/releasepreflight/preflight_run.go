@@ -287,7 +287,7 @@ func (p *preflightRun) adviseSimulation() {
 	if err := p.o.simulationRunner(p.o.repoRoot); err != nil {
 		f := false
 		p.res.SimulationAdvisoryOK = &f
-		p.logf("WARN: auto-respond simulation suite failed (advisory in v12.1.5; required in v12.2.0): %v", err)
+		p.logf("WARN: auto-respond simulation suite failed (advisory): %v", err)
 		return
 	}
 	t := true

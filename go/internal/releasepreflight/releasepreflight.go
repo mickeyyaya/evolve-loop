@@ -169,11 +169,14 @@ func defaultGateTestRunner(repoRoot string, suite string) error {
 	return nil
 }
 
-// A repo without .evolve/naming.json has nothing to guard, so a missing manifest passes.
 func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
 	manifestPath := filepath.Join(repoRoot, naminguard.DefaultManifestPath)
-	if _, err := os.Stat(manifestPath); err != nil {
+	_, err := os.Stat(manifestPath)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("naming manifest: %w", err)
 	}
 	m, err := naminguard.Load(manifestPath)
 	if err != nil {
@@ -199,7 +202,6 @@ func defaultSimulationRunner(repoRoot string) error {
 	return nil
 }
 
-// A lookup failure is the unavailable verdict, never an error: absent tooling must not block a release.
 func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
 	head, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
