@@ -1,12 +1,15 @@
 package gittest
 
 import (
+	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -123,4 +126,46 @@ func commandScopeConfig(t *testing.T, env []string, key string) (string, error) 
 	cmd.Env = env
 	out, err := cmd.Output()
 	return strings.TrimSpace(string(out)), err
+}
+
+func TestIsEBADFLike_MatchesOnlyEBADFAndClosedPipeInTheChain(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want bool
+	}{
+		{&os.PathError{Op: "fork/exec", Path: "git", Err: syscall.EBADF}, true},
+		{io.ErrClosedPipe, true},
+		{nil, false},
+		{syscall.EPIPE, false},
+		{errors.New("bad file descriptor"), false},
+	} {
+		if got := IsEBADFLike(tc.err); got != tc.want {
+			t.Errorf("IsEBADFLike(%v) = %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
+
+func TestCaptureWithEBADFRetry_RetriesOnlyAnEBADFLikeErrorAndOnlyOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		errs      []error
+		wantCalls int
+		wantErr   error
+	}{
+		{"transient EBADF", []error{syscall.EBADF, nil}, 2, nil},
+		{"persistent closed pipe", []error{io.ErrClosedPipe, io.ErrClosedPipe, nil}, 2, io.ErrClosedPipe},
+		{"non-EBADF error", []error{syscall.EMFILE, nil}, 1, syscall.EMFILE},
+		{"success", []error{nil}, 1, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			out, err := CaptureWithEBADFRetry(func() ([]byte, error) {
+				calls++
+				return []byte(strconv.Itoa(calls)), tc.errs[calls-1]
+			})
+			if calls != tc.wantCalls || !errors.Is(err, tc.wantErr) || string(out) != strconv.Itoa(calls) {
+				t.Errorf("CaptureWithEBADFRetry = (%q, %v) after %d calls, want the last attempt's output, %v, after %d", out, err, calls, tc.wantErr, tc.wantCalls)
+			}
+		})
+	}
 }

@@ -11,12 +11,14 @@ package gittest
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -97,13 +99,29 @@ func ConfigEnv(extra ...[2]string) []string {
 // fails the test with the arguments, the directory and git's output.
 func (r *Repo) Git(args ...string) string {
 	r.tb.Helper()
-	cmd := exec.Command("git", append([]string{"-C", r.Dir}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
-	out, err := cmd.CombinedOutput()
+	out, err := CaptureWithEBADFRetry(func() ([]byte, error) {
+		cmd := exec.Command("git", append([]string{"-C", r.Dir}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
+		return combinedOutput(cmd)
+	})
 	if err != nil {
 		r.tb.Fatalf("gittest: git %s in %s: %v\n%s", strings.Join(args, " "), r.Dir, err, out)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+var combinedOutput = (*exec.Cmd).CombinedOutput
+
+func CaptureWithEBADFRetry(fn func() ([]byte, error)) ([]byte, error) {
+	out, err := fn()
+	if !IsEBADFLike(err) {
+		return out, err
+	}
+	return fn()
+}
+
+func IsEBADFLike(err error) bool {
+	return errors.Is(err, syscall.EBADF) || errors.Is(err, io.ErrClosedPipe)
 }
 
 // newRepo makes an empty directory under tb.TempDir() and registers its
