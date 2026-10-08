@@ -10,6 +10,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -42,7 +43,7 @@ func startOwnServer(socket string) error {
 	if err := stopServer(socket); err != nil {
 		return err
 	}
-	out, err := exec.Command("tmux", bridge.TmuxSocketArgs(
+	out, err := sysexec.Command(context.Background(), "tmux", bridge.TmuxSocketArgs(
 		"-f", os.DevNull, "start-server", ";",
 		"set-option", "-s", "exit-empty", "off", ";",
 		"set-option", "-g", "default-shell", paneShell, ";",

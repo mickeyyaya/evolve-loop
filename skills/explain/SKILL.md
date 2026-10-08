@@ -12,7 +12,7 @@ Each feature page has two movements: first **how it works today** (architecture,
 
 ## Step 1 — Gather per-lane data (this repo's sources)
 
-- **Lane ↔ cycle mapping**: the newest loop log (`.evolve/loop-resume-*.log`) prefixes every line with `[<task-id>]`; worktree strings `cycle-<lane-hash>-N` inside those lines give cycle numbers. One task may map to several cycles.
+- **Lane ↔ cycle mapping**: the loop log prefixes every line with `[<task-id>]`. The newest launch writes the file `loop.log` in `.evolve/logs/current`. Each older launch has its own dir, `.evolve/logs/<run-id>`. Logs from before 2026-10-08 are the `.evolve/loop-*.log` files. Worktree strings `cycle-<lane-hash>-N` inside those lines give cycle numbers. One task may map to several cycles.
 - **Verdicts**: `"FinalVerdict"` lines in the loop log — dedup by distinct cycle, NOT by line count (verdict JSON re-flushes on lane teardown). Wave summaries: `[loop] wave N: K/M lanes ok`.
 - **What shipped**: `git log --since=<batch start> --pretty='%h|%ad|%s'`; cycle ships carry the generic message `evolve-cycle: goal=<hash>`, so substance lives in `git show --stat <sha>` — map commits to lanes by timestamp + touched files.
 - **Why the task existed**: the inbox item JSON (`.evolve/inbox/*.json`, or its consumed copy via git history) — `summary`, `acceptance`, `connects_to`; plus cycle dossiers `knowledge-base/cycles/cycle-N.json` (`final_verdict`, `defects`, `phases`).

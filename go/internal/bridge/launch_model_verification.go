@@ -127,7 +127,7 @@ func (lp tmuxLaunch) verifyBootedModel(ctx context.Context, run bootedModelRun) 
 	observed := w.footer.observed()
 	fmt.Fprintf(run.deps.Stderr, "[%s] FAIL: launch model mismatch: the target dispatches the %s family, the footer shows %q (%s) after %ds; the session is killed and the walk moves on\n", lp.name, lp.modelCheck.family, w.footer.label, observed, lp.modelCheck.waitS)
 	if lp.named {
-		_ = run.deps.Tmux.KillSession(ctx, lp.session)
+		_ = killSessionSwept(ctx, run.deps, lp.session)
 	}
 	run.deps.Signals.Emit(lp.mismatchEvent(run.cfg, w.footer.label, observed))
 	return ExitModelMismatch

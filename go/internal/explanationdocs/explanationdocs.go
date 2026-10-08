@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -20,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -230,7 +230,7 @@ func VerifyLanded(ctx context.Context, binding CycleBinding, landedCommit string
 	if err := os.Remove(verificationRoot); err != nil {
 		return nil, true, fmt.Errorf("prepare landed verification path: %w", err)
 	}
-	addOut, err := exec.CommandContext(ctx, "git", "-C", binding.ProjectRoot, "worktree", "add", "--quiet", "--detach", verificationRoot, landedCommit).CombinedOutput()
+	addOut, err := sysexec.Command(ctx, "git", "-C", binding.ProjectRoot, "worktree", "add", "--quiet", "--detach", verificationRoot, landedCommit).CombinedOutput()
 	if err != nil {
 		_ = os.RemoveAll(verificationRoot)
 		return nil, true, fmt.Errorf("create landed verification worktree: %w: %s", err, strings.TrimSpace(string(addOut)))
@@ -238,7 +238,7 @@ func VerifyLanded(ctx context.Context, binding CycleBinding, landedCommit string
 	view, active, verifyErr := verifyResolved(ctx, binding, verificationRoot)
 	cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancelCleanup()
-	removeOut, removeErr := exec.CommandContext(cleanupCtx, "git", "-C", binding.ProjectRoot, "worktree", "remove", "--force", verificationRoot).CombinedOutput()
+	removeOut, removeErr := sysexec.Command(cleanupCtx, "git", "-C", binding.ProjectRoot, "worktree", "remove", "--force", verificationRoot).CombinedOutput()
 	if removeErr != nil {
 		return nil, true, fmt.Errorf("remove landed verification worktree: %w: %s", removeErr, strings.TrimSpace(string(removeOut)))
 	}

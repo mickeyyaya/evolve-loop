@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 func archiveDateDir() string {
@@ -39,7 +40,7 @@ func ArchiveSupersededPredicatePackages(ctx context.Context, worktree, baseSHA s
 		return nil, nil
 	}
 	args := append([]string{"-C", worktree, "add", "-A", "--"}, stagePaths...)
-	if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
+	if out, err := sysexec.Command(ctx, "git", args...).CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("stage superseded predicate archive: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return archived, nil

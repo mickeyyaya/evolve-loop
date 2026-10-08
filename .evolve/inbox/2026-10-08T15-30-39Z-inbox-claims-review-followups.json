@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "No exported inboxmover or lifecycle symbol for the orphan recovery is left without a production caller",
+    "claimHolding reads each claim dir at most once for each lane-menu partition",
+    "Every changed function keeps 100% statement coverage"
+  ],
+  "created_at": "2026-10-08T15:30:39Z",
+  "files": [
+    "go/internal/inboxmover/lifecycle/recover.go",
+    "go/internal/inboxmover/inboxmover.go",
+    "go/internal/inboxmover/dispatchstate.go",
+    "go/internal/inboxmover/holder.go",
+    "go/cmd/evolve/cmd_inbox_claims.go",
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "fix": "1: delete the dead orphan recovery and its options, rewrite the RecoverOrphans steps of the sequence goldens, and declare the golden drift in its own commit. 2 to 8: one refactor commit each, with the existing tests green and 100% coverage on every changed function.",
+  "id": "inbox-claims-review-followups",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console lane cl-inbox-claims, 2026-10-08, review fix round 1 (architecture review and go-reviewer: the simplify and performance items)",
+  "summary": "The review of the stale-claims fix left these items. 1: Mover.RecoverOrphans, recoverDir, its facade inboxmover.RecoverOrphans, lifecycle.WithActiveCycle, Options.ActiveCycleFn and readActiveCycle have no production caller, because evolve inbox-mover recover-orphans now calls ReleaseStaleClaims. The sequence goldens still run RecoverOrphans, and the package rule says a golden drift is its own commit. 2: claimHolding (dispatchstate.go) scans every claim dir once for each item; it can use lifecycle.Locate, or one ListClaims index for each lane-menu partition. 3: the evidence fields superseded_by and superseded_by_running_loop can fold into one field. 4: holderState parses cycle_id, phase and goal_hash beside core's own state parse. 5: readGoals parses the cycle number before it checks the cycle- prefix and that the entry is a dir. 6: the absorb report lines of sync-main and the wave sync share reportAbsorbed, but the error lines differ; one helper can own both. 7: runInboxRelease mixes the --stale and the per-id parse; split the parse. 8: gcRun.abs is a test seam for filepath.Abs; drop it if a temp-dir root keeps gcRun.project at 100% coverage.",
+  "title": "Inbox claims follow-ups: retire the dead orphan recovery and simplify the claim lookups",
+  "weight": 0.3
+}

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -165,7 +165,7 @@ func newPRMerger(root string, a prMergeArgs, stdout, stderr io.Writer) (prMerger
 
 func ghIn(root string) func(ctx context.Context, args ...string) ([]byte, error) {
 	return func(ctx context.Context, args ...string) ([]byte, error) {
-		cmd := exec.CommandContext(ctx, "gh", args...)
+		cmd := sysexec.Command(ctx, "gh", args...)
 		cmd.Dir = root
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
@@ -178,7 +178,7 @@ func ghIn(root string) func(ctx context.Context, args ...string) ([]byte, error)
 }
 
 func planeLiveRuns(root string, now time.Time) ([]runlease.LiveRun, error) {
-	out, err := exec.Command("git", "-C", root, "worktree", "list", "--porcelain").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", root, "worktree", "list", "--porcelain").Output()
 	if err != nil {
 		return nil, fmt.Errorf("git worktree list in %s: %w", root, err)
 	}

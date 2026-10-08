@@ -58,6 +58,10 @@ func PlaceOnLaneMenu(opts Options, it inboxbatch.Item, isProtected func(string) 
 	if routed, reason := inboxbatch.ConsoleRouted(it, isProtected); routed {
 		return MenuConsole, reason
 	}
+	opts.resolveOpts()
+	if claimDir, held := claimHolding(opts.InboxDir, it.ID); held {
+		return MenuWaiting, "held by the claim of " + claimDir
+	}
 	if d := PendingDispatchability(opts, it.Deps); !d.Dispatchable {
 		return MenuWaiting, d.Reason
 	}

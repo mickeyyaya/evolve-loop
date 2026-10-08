@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // orphanNamespaces bounds the GC: a user's own session on the same socket is foreign and never killed.
@@ -18,6 +18,8 @@ var orphanNamespaces = []string{"evolve-bridge-", "evolve-recipe-"}
 
 // pidTokenRE requires the leading dash so a substring like "rapid7" never matches.
 var pidTokenRE = regexp.MustCompile(`-pid(\d+)(?:-|$)`)
+
+var testSessionRE = regexp.MustCompile(`^evolve-bridge-it-[A-Za-z0-9._]+-(\d+)$`)
 
 // SessionLister returns every session name on the bridge tmux server.
 type SessionLister func(ctx context.Context) ([]string, error)
@@ -69,7 +71,7 @@ func ReapOrphanSessions(ctx context.Context, list SessionLister, alive PidLivene
 			rep.SkippedForeign++
 			continue
 		}
-		pid, ok := SessionPID(s)
+		pid, ok := sessionOwner(s)
 		if !ok {
 			rep.SkippedUnparseable++
 			continue
@@ -89,7 +91,7 @@ func ReapOrphanSessions(ctx context.Context, list SessionLister, alive PidLivene
 
 // tmuxListRun is a test seam, so the unit suite never shells out to tmux.
 var tmuxListRun = func(ctx context.Context, args ...string) ([]byte, error) {
-	return exec.CommandContext(ctx, "tmux", args...).Output()
+	return sysexec.Command(ctx, "tmux", args...).Output()
 }
 
 // ExecListBridgeSessions is the production SessionLister; a stopped server with no output is an empty list, not an error.
@@ -198,4 +200,16 @@ func ExecKillServer(ctx context.Context, socket string) error {
 // ExecReapOrphanSockets runs ReapOrphanSockets with the production socket lister, liveness probe and server killer.
 func ExecReapOrphanSockets(ctx context.Context) OrphanSocketReport {
 	return ReapOrphanSockets(ctx, ExecListBridgeSockets, ExecPidAlive, ExecKillServer)
+}
+
+func sessionOwner(session string) (int, bool) {
+	if pid, ok := SessionPID(session); ok {
+		return pid, true
+	}
+	m := testSessionRE.FindStringSubmatch(session)
+	if m == nil {
+		return 0, false
+	}
+	pid, err := strconv.Atoi(m[1])
+	return pid, err == nil && pid > 1
 }

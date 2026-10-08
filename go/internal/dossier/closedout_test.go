@@ -50,3 +50,28 @@ func TestClosedOutAt_ReportsWhenTheDossierLanded(t *testing.T) {
 		t.Error("a cycle without a dossier has no closeout time")
 	}
 }
+
+func TestCloseoutPath_NamesThePublishedDossierBeforeThePendingOne(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	published := filepath.Join(CyclesDir(root), "cycle-1828.json")
+	pending := filepath.Join(PendingDir(root), "cycle-1828.json")
+	onlyPending := filepath.Join(PendingDir(root), "cycle-1830.json")
+	for _, p := range []string{published, pending, onlyPending} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("{}"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, ok := CloseoutPath(root, 1828); !ok || got != published {
+		t.Errorf("CloseoutPath(1828) = %q, %v; want %q", got, ok, published)
+	}
+	if got, ok := CloseoutPath(root, 1830); !ok || got != onlyPending {
+		t.Errorf("CloseoutPath(1830) = %q, %v; want %q", got, ok, onlyPending)
+	}
+	if got, ok := CloseoutPath(root, 1836); ok || got != "" {
+		t.Errorf("CloseoutPath(1836) = %q, %v; want no closeout", got, ok)
+	}
+}

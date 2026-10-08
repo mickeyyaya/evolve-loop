@@ -97,7 +97,7 @@ func TestRetro_NoTableAndNoRootRouterKeepsTheProfilePrimary(t *testing.T) {
 func TestRetro_ADeepRetroLaunchesTheFirstCLITheCeilingPermits(t *testing.T) {
 	root := t.TempDir()
 	writeRetroProfile(t, root, "agy-tmux")
-	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Tiers: map[string][]string{"deep": {"claude"}}}
+	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}}}
 	fb := &fakeBridge{resp: core.BridgeResponse{ExitCode: 0}, writeArtifact: "# retro\n"}
 
 	_, _ = New(Config{Bridge: fb, Prompts: fakePromptsFS("body"), Router: retroRouter(t, root, policy.Policy{CLIRouting: &block})}).Run(context.Background(), core.PhaseRequest{

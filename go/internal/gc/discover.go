@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -95,7 +96,7 @@ func Discover(evolveDir string, o DiscoverOptions) ([]RunDir, error) {
 		if !ok {
 			continue
 		}
-		if !hasRunMarker(dir) && !refs[dir] {
+		if !hasRunMarker(dir) && !refs[dir] && !gcpolicy.IsPollutedArchive(e.Name()) {
 			continue // no evidence — leave it alone
 		}
 		out = append(out, RunDir{

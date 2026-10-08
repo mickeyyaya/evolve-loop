@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
 const (
@@ -362,5 +364,19 @@ func TestLoopDetach_ChildOutlivesItsExitedParentInItsOwnSession(t *testing.T) {
 	}
 	if pgid, err := syscall.Getpgid(pid); err != nil || pgid == parentGroup {
 		t.Errorf("the detached child must leave the parent's process group %d: pgid=%d err=%v", parentGroup, pgid, err)
+	}
+}
+
+func TestLoopDetach_RecordsTheChildPidBesideTheLogSoGCKeepsTheLog(t *testing.T) {
+	p := newDetachProject(t)
+	probe := stubDetachChild(t, "lease", p)
+	if rc, stdout, stderr := runDetach(t, p.args()); rc != 0 {
+		t.Fatalf("rc = %d\nstdout:\n%s\nstderr:\n%s", rc, stdout, stderr)
+	}
+
+	got, err := os.ReadFile(p.log + gcpolicy.LogWriterPIDSuffix)
+
+	if err != nil || strings.TrimSpace(string(got)) != strconv.Itoa(probe.onlyPID(t)) {
+		t.Errorf("writer pid file = %q (err %v), want the child pid %d", got, err, probe.onlyPID(t))
 	}
 }

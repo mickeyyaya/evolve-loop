@@ -119,7 +119,7 @@ func swapGoTestJSON(t *testing.T, byPackage map[string]packOutcome) *[]string {
 	t.Helper()
 	prev := goTestJSONFn
 	var ran []string
-	goTestJSONFn = func(_ context.Context, _ string, _ io.Writer, args []string) packOutcome {
+	goTestJSONFn = func(_ context.Context, _ string, _ packLog, args []string) packOutcome {
 		pkg := args[len(args)-1]
 		ran = append(ran, pkg)
 		return byPackage[pkg]
@@ -135,7 +135,7 @@ func TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed(t *testing.T) 
 		"c": redPack("c.TestC2"),
 	})
 	var out bytes.Buffer
-	got := runRepoContractPackagesAlone(context.Background(), t.TempDir(), &out, []packFailure{
+	got := runRepoContractPackagesAlone(context.Background(), t.TempDir(), packLog{notes: &out, raw: &out}, []packFailure{
 		{Package: "c", Test: "TestC1"}, {Package: "c", Test: "TestC2"}, {Package: "a", Test: "TestA"}, {Package: "b", Test: "TestB"},
 	})
 	if strings.Join(*ran, ",") != "a,b,c" {
@@ -161,7 +161,7 @@ func TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed(t *testing.T) 
 
 func TestRunRepoContractTestsAlone_EveryPackageGreenIsGreen(t *testing.T) {
 	swapGoTestJSON(t, map[string]packOutcome{"a": greenPack(), "b": greenPack()})
-	got := runRepoContractPackagesAlone(context.Background(), t.TempDir(), io.Discard, []packFailure{{Package: "a", Test: "TestA"}, {Package: "b", Test: "TestB"}})
+	got := runRepoContractPackagesAlone(context.Background(), t.TempDir(), packLog{notes: io.Discard, raw: io.Discard}, []packFailure{{Package: "a", Test: "TestA"}, {Package: "b", Test: "TestB"}})
 	if !got.green() || len(got.failures) != 0 {
 		t.Fatalf("two packages green alone are green: %+v", got)
 	}

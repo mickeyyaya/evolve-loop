@@ -16,6 +16,7 @@ import (
 // inbox seed. It prunes the decision before widening it, so the widen refills the freed slots.
 func (e *Engine) PlanFn(count int) PlanFn {
 	return func(ctx context.Context, wave int) ([]byte, []string, error) {
+		e.releaseStaleClaims(wave)
 		if lastCycle, err := e.ports.LastCycle(ctx); err == nil && lastCycle > 0 {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
@@ -81,6 +82,18 @@ func cards(menus [][]triagecap.FleetCandidate) []map[string]any {
 		}
 	}
 	return topN
+}
+
+func (e *Engine) releaseStaleClaims(wave int) {
+	opts := e.lifecycle()
+	opts.CurrentGoal = e.goal
+	released, err := inboxmover.ReleaseStaleClaims(opts, fmt.Sprintf("wave %d plan", wave))
+	for _, r := range released {
+		fmt.Fprintf(e.stderr, "[loop] wave plan: released the claim of %q held by cycle-%d (%s): %s\n", r.ID, r.Cycle, r.Outcome, r.Holder.Reason)
+	}
+	if err != nil {
+		fmt.Fprintf(e.stderr, "[loop] WARN: wave plan: a stale claim stays held: %v\n", err)
+	}
 }
 
 func (e *Engine) pruneUndispatchable(data []byte) []byte {

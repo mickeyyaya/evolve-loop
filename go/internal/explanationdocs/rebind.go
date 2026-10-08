@@ -10,6 +10,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // ErrRebindIncomplete marks an error after the rebind started writing. It may leave a split that
@@ -139,7 +140,7 @@ func lineageHolds(ctx context.Context, worktree, authored, base string, changed 
 	if ok, err := isAncestor(ctx, worktree, authored, base); err != nil || !ok {
 		return false, err
 	}
-	cmd := exec.CommandContext(ctx, "git", "-C", worktree, "diff", "--no-renames", "--name-only", "-z", authored, base, "--")
+	cmd := sysexec.Command(ctx, "git", "-C", worktree, "diff", "--no-renames", "--name-only", "-z", authored, base, "--")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -193,7 +194,7 @@ func isPlainPath(p string) bool {
 const maxPlainComponentBytes = 250
 
 func isAncestor(ctx context.Context, worktree, ancestor, descendant string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "git", "-C", worktree, "merge-base", "--is-ancestor", ancestor, descendant)
+	cmd := sysexec.Command(ctx, "git", "-C", worktree, "merge-base", "--is-ancestor", ancestor, descendant)
 	out, err := cmd.CombinedOutput()
 	var exitErr *exec.ExitError
 	switch {

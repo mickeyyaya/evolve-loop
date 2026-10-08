@@ -2,8 +2,9 @@ package modelquery
 
 import (
 	"context"
-	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type Runner func(ctx context.Context, name string, args []string, stdin string) (string, error)
@@ -15,7 +16,7 @@ func UseProcessEnv(env func(bin string) []string) {
 }
 
 func defaultRunner(ctx context.Context, name string, args []string, stdin string) (string, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := sysexec.Command(ctx, name, args...)
 	if processEnv != nil {
 		cmd.Env = processEnv(name)
 	}

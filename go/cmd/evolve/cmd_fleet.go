@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var fleetLaunchFactory = execCycleLaunch
@@ -154,7 +155,7 @@ func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalT
 		ow := &prefixLineWriter{w: stdout, prefix: prefix, mu: &logMu}
 		ew := &prefixLineWriter{w: stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
-		cmd := exec.CommandContext(ctx, binPath, cycleRunArgs(laneGoalHash(spec.GoalHash, goalHash), spec.OutputContract, goalText, simulate, projectRoot)...)
+		cmd := sysexec.Command(ctx, binPath, cycleRunArgs(laneGoalHash(spec.GoalHash, goalHash), spec.OutputContract, goalText, simulate, projectRoot)...)
 		cmd.Env = append(os.Environ(), envPairs(spec.Env)...)
 		cmd.Stdout = ow
 		cmd.Stderr = ew

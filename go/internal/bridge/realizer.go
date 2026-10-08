@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"maps"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -71,7 +72,7 @@ func Realize(m Manifest, intent LaunchIntent) Realization {
 	realizeScalar(&r, m, "model_tier", intent.ModelTier)
 	realizeScalar(&r, m, "permission", intent.Permission)
 	realizeScalar(&r, m, "settings_scope", intent.SettingsScope)
-	realizeScalar(&r, m, "effort", intent.Effort)
+	realizeEffort(&r, m, intent.Effort)
 	realizeSystemPromptFile(&r, m, intent.SystemPromptFile)
 
 	realizeSessionMode(&r, m, intent.SessionMode)
@@ -246,4 +247,44 @@ func resolveTierModel(m Manifest, value string) string {
 		}
 	}
 	return value
+}
+
+const effortChannelModelVariant = "model_variant"
+
+var modelVariantRE = regexp.MustCompile(`\([A-Za-z]+\)$`)
+
+func modelVariantSuffix(toks []string) string {
+	if len(toks) != 1 || toks[0] == "" {
+		return ""
+	}
+	return "(" + toks[0] + ")"
+}
+
+func realizeEffort(r *Realization, m Manifest, effort string) {
+	if m.Params["effort"].Channel != effortChannelModelVariant {
+		realizeScalar(r, m, "effort", effort)
+		return
+	}
+	realizeModelVariant(r, m, effort)
+}
+
+func realizeModelVariant(r *Realization, m Manifest, effort string) {
+	toks := m.Params["effort"].Values[effort]
+	suffix := modelVariantSuffix(toks)
+	i := slices.Index(r.LaunchFlags, m.Params["model_tier"].Flag)
+	if suffix == "" || i < 0 || i+1 >= len(r.LaunchFlags) {
+		return
+	}
+	loc := modelVariantRE.FindStringIndex(r.LaunchFlags[i+1])
+	if loc == nil {
+		r.EffortUnapplied = effort
+		return
+	}
+	flags := slices.Clone(r.LaunchFlags)
+	flags[i+1] = flags[i+1][:loc[0]] + suffix
+	r.LaunchFlags = flags
+	r.EffortVariant = suffix
+	if !strings.EqualFold(effort, toks[0]) {
+		r.EffortCapped = effort
+	}
 }

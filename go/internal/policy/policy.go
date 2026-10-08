@@ -78,4 +78,5 @@ type Policy struct {
 	ObservationMask    *ObservationMaskPolicy    `json:"observation_mask,omitempty"`
 	// Overlays: nil applies the compiled default; a block with empty Rules opts out of all overlays.
 	Overlays *OverlaysPolicy `json:"overlays,omitempty"`
+	Wave     *WavePolicy     `json:"wave,omitempty"`
 }

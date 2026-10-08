@@ -84,7 +84,8 @@ type Item struct {
 // Manifest is the full plan. Plan output is deterministic (sorted by path)
 // so shadow-soak diffs are stable.
 type Manifest struct {
-	Items []Item `json:"items"`
+	Items    []Item   `json:"items"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // Options drives Plan.
@@ -132,17 +133,11 @@ func Plan(opts Options) (Manifest, error) {
 		add(e, ActionDelete, "salvage_ttl_days")
 	}
 
-	// Rule 4: dispatch-log TTL (*.log files only — pruneephemeral's phase 2,
-	// generalized from batch-*.log to any .log in that directory).
-	logFilter := func(name string, isDir bool) bool {
-		return !isDir && strings.HasSuffix(name, ".log")
-	}
-	for _, e := range dirEntriesOlderThan(filepath.Join(opts.EvolveDir, "dispatch-logs"), now(), pol.LogsTTLDays, logFilter) {
-		add(e, ActionDelete, "logs_ttl_days")
-	}
+	var warnings []string
+	logPlanner{now: now(), add: add, warn: func(w string) { warnings = append(warnings, w) }}.planCatalog(opts.EvolveDir, pol.LogCatalog())
 
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
-	return Manifest{Items: items}, nil
+	return Manifest{Items: items, Warnings: warnings}, nil
 }
 
 func planRunLadder(runs []RunDir, pol Policy, now func() time.Time, add func(string, Action, string)) {

@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // CodeComposedGateDeclined marks a composed-tree gate decline at any of the three
@@ -283,7 +283,7 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 
 // compositionPatchID mirrors ledger.PatchID, which core cannot import.
 func compositionPatchID(diff []byte) (string, error) {
-	cmd := exec.Command("git", "patch-id", "--stable")
+	cmd := sysexec.Command(context.Background(), "git", "patch-id", "--stable")
 	cmd.Stdin = bytes.NewReader(diff)
 	out, err := cmd.Output()
 	if err != nil {

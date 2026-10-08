@@ -18,6 +18,7 @@ func dispatchTmuxPrompt(
 	human bool,
 	phaseName string,
 ) (dispatchBaseline, pasteOutcome, int, error) {
+	deps.sweep.recordPane(ctx, deps, lp.session)
 	capture := deps.CaptureBaseline
 	if capture == nil {
 		capture = captureArtifactBaseline

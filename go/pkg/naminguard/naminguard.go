@@ -17,6 +17,7 @@
 package naminguard
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -26,6 +27,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // DefaultManifestPath is the repo-relative SSOT location.
@@ -166,7 +169,7 @@ func (m *Manifest) excludePathspecs() []string {
 // can inject a fake without a real repository.
 var gitGrep = func(root string, args ...string) (stdout string, code int, err error) {
 	full := append([]string{"-C", root, "grep"}, args...)
-	cmd := exec.Command("git", full...)
+	cmd := sysexec.Command(context.Background(), "git", full...)
 	var out, errb strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &errb

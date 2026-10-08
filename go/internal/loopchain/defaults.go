@@ -1,9 +1,9 @@
 package loopchain
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // GitAhead reports whether HEAD carries commits beyond runningCommit — the
@@ -26,19 +27,19 @@ func GitAhead(projectRoot, runningCommit string) (ahead bool, err error) {
 	if runningCommit == "" {
 		return false, nil
 	}
-	runningOut, err := exec.Command("git", "-C", projectRoot, "rev-parse", runningCommit).Output()
+	runningOut, err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "rev-parse", runningCommit).Output()
 	if err != nil {
 		return false, fmt.Errorf("chain boundary ahead-check: resolve running commit %q: %w", runningCommit, err)
 	}
 	running := strings.TrimSpace(string(runningOut))
-	headOut, err := exec.Command("git", "-C", projectRoot, "rev-parse", "HEAD").Output()
+	headOut, err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return false, fmt.Errorf("chain boundary ahead-check: resolve HEAD: %w", err)
 	}
 	if strings.TrimSpace(string(headOut)) == running {
 		return false, nil
 	}
-	if err := exec.Command("git", "-C", projectRoot, "merge-base", "--is-ancestor", running, "HEAD").Run(); err != nil {
+	if err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "merge-base", "--is-ancestor", running, "HEAD").Run(); err != nil {
 		return false, fmt.Errorf("chain boundary ahead-check: %q is not a verifiable ancestor of HEAD: %w", runningCommit, err)
 	}
 	return true, nil
@@ -56,7 +57,7 @@ func GitProvenance(runningCommit func() string) func(projectRoot string) (string
 			if c == "" {
 				return false
 			}
-			return exec.Command("git", "-C", projectRoot, "merge-base", "--is-ancestor", c, "HEAD").Run() == nil
+			return sysexec.Command(context.Background(), "git", "-C", projectRoot, "merge-base", "--is-ancestor", c, "HEAD").Run() == nil
 		}
 	}
 }

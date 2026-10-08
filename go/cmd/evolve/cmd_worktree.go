@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -114,7 +113,7 @@ func runWorktreeList(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	projectRoot = absWorktreeRoot(projectRoot, stderr)
-	cmd := exec.Command("git", "-C", projectRoot, "worktree", "list")
+	cmd := sysexec.Command(context.Background(), "git", "-C", projectRoot, "worktree", "list")
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
@@ -175,7 +174,7 @@ func runWorktreeCleanup(args []string, stdout, stderr io.Writer) int {
 
 func removeCycleWorktree(projectRoot, base, lane string, cycle int, stdout, stderr io.Writer) int {
 	wt := runscope.New(runscope.ResolveLane(lane, projectRoot, os.Getenv), "", cycle).WorktreeDir(base)
-	cmd := exec.Command("git", "-C", projectRoot, "worktree", "remove", "--force", wt)
+	cmd := sysexec.Command(context.Background(), "git", "-C", projectRoot, "worktree", "remove", "--force", wt)
 	var ebuf bytes.Buffer
 	cmd.Stderr = &ebuf
 	if err := cmd.Run(); err != nil {
@@ -190,7 +189,7 @@ func removeCycleWorktree(projectRoot, base, lane string, cycle int, stdout, stde
 }
 
 func pruneWorktrees(projectRoot string, stdout, stderr io.Writer) int {
-	cmd := exec.Command("git", "-C", projectRoot, "worktree", "prune", "-v")
+	cmd := sysexec.Command(context.Background(), "git", "-C", projectRoot, "worktree", "prune", "-v")
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {

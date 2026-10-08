@@ -228,7 +228,7 @@ func reapEphemeralSession(cfg *Config, deps Deps, session string) {
 	if cfg.SessionName != "" {
 		return
 	}
-	if err := deps.Tmux.KillSession(context.Background(), session); err != nil {
+	if err := killSessionSwept(context.Background(), deps, session); err != nil {
 		fmt.Fprintf(deps.Stderr, "[recipe] WARN session %s not reaped: %v\n", session, err)
 	}
 }

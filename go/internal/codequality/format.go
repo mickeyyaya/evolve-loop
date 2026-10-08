@@ -1,12 +1,15 @@
 package codequality
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // ModuleDir resolves the Go module directory under root: the conventional
@@ -82,7 +85,7 @@ func FormatGoFiles(dir string) ([]string, error) {
 	if len(fixable) == 0 {
 		return nil, nil
 	}
-	if _, werr := exec.Command("gofmt", "-w", "-s", dir).Output(); werr != nil {
+	if _, werr := sysexec.Command(context.Background(), "gofmt", "-w", "-s", dir).Output(); werr != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(werr, &exitErr) {
 			return nil, fmt.Errorf("gofmt -w -s %s: %w", dir, werr)

@@ -24,7 +24,7 @@ func CaptureModelPicker(ctx context.Context, cfg *Config, deps Deps, cli string)
 	}
 	if cfg.SessionName == "" { // ephemeral session — reap the live REPL afterwards
 		// Detached context: the session is reaped even when the caller's ctx is already cancelled.
-		defer func() { _ = deps.Tmux.KillSession(context.Background(), drv.session) }()
+		defer func() { _ = killSessionSwept(context.Background(), deps, drv.session) }()
 	}
 	if serr := drv.EnsureSession(ctx); serr != nil {
 		return "", fmt.Errorf("recipe: ensure session: %w", serr)

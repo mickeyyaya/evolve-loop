@@ -10,12 +10,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Verdict is the schema written to acs-verdict.json.
@@ -201,7 +201,7 @@ func (v Verdict) hasPredicateRed() bool {
 type runCommander func(ctx context.Context, args ...string) (stdout io.ReadCloser, wait func() error, err error)
 
 var execCommand runCommander = func(ctx context.Context, args ...string) (io.ReadCloser, func() error, error) {
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd := sysexec.Command(ctx, args[0], args[1:]...)
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()

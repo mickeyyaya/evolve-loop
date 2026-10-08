@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -114,7 +115,7 @@ func ghMergedPRHeads(ctx context.Context, dir, branch string) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, devGHTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, gh, "pr", "list", "--head", branch, "--state", "merged", "--json", "headRefOid", "--jq", ".[].headRefOid")
+	cmd := sysexec.Command(ctx, gh, "pr", "list", "--head", branch, "--state", "merged", "--json", "headRefOid", "--jq", ".[].headRefOid")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	return string(out), err

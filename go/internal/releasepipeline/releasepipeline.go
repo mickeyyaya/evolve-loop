@@ -4,6 +4,7 @@
 package releasepipeline
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var (
@@ -253,7 +256,7 @@ func setJournalField(j *Journal, path, field, value string) error {
 }
 
 func resolvePrevTag(repoRoot string) (string, error) {
-	out, err := exec.Command("git", "-C", repoRoot, "describe", "--tags", "--abbrev=0").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "describe", "--tags", "--abbrev=0").Output()
 	if err != nil {
 		return "", err
 	}
@@ -261,7 +264,7 @@ func resolvePrevTag(repoRoot string) (string, error) {
 }
 
 func resolveInitCommit(repoRoot string) (string, error) {
-	out, err := exec.Command("git", "-C", repoRoot, "rev-list", "--max-parents=0", "HEAD").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "rev-list", "--max-parents=0", "HEAD").Output()
 	if err != nil {
 		return "", err
 	}
@@ -273,7 +276,7 @@ func resolveInitCommit(repoRoot string) (string, error) {
 }
 
 func currentBranch(repoRoot string) (string, error) {
-	out, err := exec.Command("git", "-C", repoRoot, "symbolic-ref", "--short", "HEAD").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "symbolic-ref", "--short", "HEAD").Output()
 	if err != nil {
 		return "unknown", nil
 	}
@@ -351,12 +354,12 @@ func defaultRebuildBinary(repoRoot, target string, dryRun bool) error {
 	}
 	const versionPkg = "github.com/mickeyyaya/evolve-loop/go/pkg/version"
 	commit := "unknown"
-	if out, err := exec.Command("git", "-C", repoRoot, "rev-parse", "--short=12", "HEAD").Output(); err == nil {
+	if out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "rev-parse", "--short=12", "HEAD").Output(); err == nil {
 		commit = strings.TrimSpace(string(out))
 	}
 	ldflags := fmt.Sprintf("-X %s.version=%s -X %s.commit=%s -X %s.builtAt=%s",
 		versionPkg, target, versionPkg, commit, versionPkg, time.Now().UTC().Format("2006-01-02T15:04:05Z"))
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", "evolve", "./cmd/evolve")
+	cmd := sysexec.Command(context.Background(), "go", "build", "-ldflags", ldflags, "-o", "evolve", "./cmd/evolve")
 	cmd.Dir = filepath.Join(repoRoot, "go")
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -380,7 +383,7 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 		return "", fmt.Errorf("evolve binary not found (set EVOLVE_GO_BIN, or place at %s/go/bin/evolve or %s/go/evolve); v12.0.0+ requires the native binary",
 			repoRoot, repoRoot)
 	}
-	cmd := exec.Command(binPath, "ship", "--class", "release", msg)
+	cmd := sysexec.Command(context.Background(), binPath, "ship", "--class", "release", msg)
 	cmd.Env = append(os.Environ(),
 		// SSOT IPC-protocol-allowed: releasepipeline → evolve-ship subprocess
 		"EVOLVE_"+"SHIP_RELEASE_NOTES="+releaseNotes,
@@ -389,7 +392,7 @@ func defaultShip(repoRoot, msg, releaseNotes string) (string, error) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("evolve ship: %v (output: %s)", err, strings.TrimSpace(string(out)))
 	}
-	headOut, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
+	headOut, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return "", err
 	}
@@ -442,7 +445,7 @@ func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
 	}
 	diskSHA := fmt.Sprintf("%x", sha256.Sum256(diskBytes))
 
-	blobBytes, err := exec.Command("git", "-C", repoRoot, "cat-file", "blob", commitSHA+":"+binRel).Output()
+	blobBytes, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "cat-file", "blob", commitSHA+":"+binRel).Output()
 	if err != nil {
 		return fmt.Errorf("release-verify: %s not committed in release %s (the v18.5.0 defect): %w", binRel, commitSHA, err)
 	}
@@ -453,7 +456,7 @@ func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
 
 	repinExpectedShipSHA(filepath.Join(repoRoot, ".evolve", "state.json"), target, blobSHA)
 
-	verOut, err := exec.Command(binAbs, "--version").CombinedOutput()
+	verOut, err := sysexec.Command(context.Background(), binAbs, "--version").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("release-verify: %s --version failed: %v (output: %s)", binRel, err, strings.TrimSpace(string(verOut)))
 	}
@@ -489,11 +492,11 @@ func repinExpectedShipSHA(statePath, target, blobSHA string) {
 }
 
 func ensureLocalTag(repoRoot, tag, commitSHA string) error {
-	tagOut, _ := exec.Command("git", "-C", repoRoot, "tag", "-l", tag).Output()
+	tagOut, _ := sysexec.Command(context.Background(), "git", "-C", repoRoot, "tag", "-l", tag).Output()
 	if strings.TrimSpace(string(tagOut)) != "" {
 		return nil
 	}
-	if out, terr := exec.Command("git", "-C", repoRoot, "tag", tag, commitSHA).CombinedOutput(); terr != nil {
+	if out, terr := sysexec.Command(context.Background(), "git", "-C", repoRoot, "tag", tag, commitSHA).CombinedOutput(); terr != nil {
 		return fmt.Errorf("release-verify: local tag %s absent and creation failed: %v (%s)", tag, terr, strings.TrimSpace(string(out)))
 	}
 	return nil

@@ -107,7 +107,7 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	// Publishes the agent PID to a per-phase file so the auto-spawn observer's CPU liveness probe can tell
 	// a silently-thinking headless agent from a hung one (tmux drivers use the pane probe instead, so only
 	// the headless driver sets this); derived from StdoutLog so it matches the observer's path.
-	env := driverEnv(deps, cfg.Realization.Env)
+	env := dispatchEnv(deps, cfg)
 	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
 		env = append(env, bridgePidfileEnv+"="+pidFile)
 	}

@@ -1,0 +1,25 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1828"
+  ],
+  "consumed": {
+    "at": "2026-10-07T23:34:32Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Fixed by #804 (train #806): a FAIL that only audit gates forced now declares code-audit-fail and gets a bounded Build repair, and a static gate reading refutes a prose infra-systemic claim. The version skew that caused the red in 1828 is open as skills-drift-gate-grades-with-worktree-generator."
+  },
+  "created_at": "2026-10-07T12:23:51Z",
+  "fix": "Root-cause the pipeline failure described by the recorded evidence: orchestrator-classified infra-systemic: audit-fail-reason.json: auditor narrative=PASS but deterministic gate [skills-drift] forced FAIL on the 30 regenerated commands/*.md; audit-chain-shadow.json chain_verdict=PASS agrees=true; acs-verdict.json green=170 red=0; go/bin/evolve (fe379ced561a, the lane base) skills check on the worktree rc=2 with 30 DRIFT, worktree-compiled skills check rc=0. Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-infra-systemic-cycle1828",
+  "injected_by": "loop-escalation",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-10-07T12:23:51Z. Evidence: orchestrator-classified infra-systemic: audit-fail-reason.json: auditor narrative=PASS but deterministic gate [skills-drift] forced FAIL on the 30 regenerated commands/*.md; audit-chain-shadow.json chain_verdict=PASS agrees=true; acs-verdict.json green=170 red=0; go/bin/evolve (fe379ced561a, the lane base) skills check on the worktree rc=2 with 30 DRIFT, worktree-compiled skills check rc=0",
+  "priority": "P0",
+  "priority_class": "stability",
+  "root_cause": "The system-failure signal reported: orchestrator-classified infra-systemic: audit-fail-reason.json: auditor narrative=PASS but deterministic gate [skills-drift] forced FAIL on the 30 regenerated commands/*.md; audit-chain-shadow.json chain_verdict=PASS agrees=true; acs-verdict.json green=170 red=0; go/bin/evolve (fe379ced561a, the lane base) skills check on the worktree rc=2 with 30 DRIFT, worktree-compiled skills check rc=0. Preserve this evidence while identifying the pipeline cause.",
+  "summary": "ADR-0072 system-failure halt at cycle 1828 (category=infra-systemic). Evidence: orchestrator-classified infra-systemic: audit-fail-reason.json: auditor narrative=PASS but deterministic gate [skills-drift] forced FAIL on the 30 regenerated commands/*.md; audit-chain-shadow.json chain_verdict=PASS agrees=true; acs-verdict.json green=170 red=0; go/bin/evolve (fe379ced561a, the lane base) skills check on the worktree rc=2 with 30 DRIFT, worktree-compiled skills check rc=0. This is a PIPELINE defect, not a task failure — diagnose the reported failure before retrying the task.",
+  "title": "PIPELINE DEFECT (infra-systemic): the loop halted — orchestrator-classified infra-systemic: audit-fail-reason.json: auditor narrative=PASS but deterministic gate [skills-drift] forced FAIL on the 30 regenerated commands/*.md; audit-chain-shadow.json chain_verdict=PASS agrees=true; acs-verdict.json green=170 red=0; go/bin/evolve (fe379ced561a, the lane base) skills check on the worktree rc=2 with 30 DRIFT, worktree-compiled skills check rc=0",
+  "weight": 0.99
+}

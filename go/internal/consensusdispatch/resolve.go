@@ -1,10 +1,13 @@
 package consensusdispatch
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // resolveNativeDispatch returns an exec.Cmd that runs `evolve <subcmd> <args...>`
@@ -26,7 +29,7 @@ func resolveNativeDispatch(dispatchDir, subcmd string, subArgs []string) (*exec.
 		return nil, fmt.Errorf("consensusdispatch: native evolve binary not found (set EVOLVE_GO_BIN or build go/bin/evolve)")
 	}
 	args := append([]string{subcmd}, subArgs...)
-	return exec.Command(binPath, args...), nil
+	return sysexec.Command(context.Background(), binPath, args...), nil
 }
 
 // resolveEvolveBin walks up from dispatchDir looking for go/bin/evolve.
