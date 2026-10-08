@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -16,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // selfCheckFailure is one changed package whose unit tests failed, with the
@@ -106,7 +106,7 @@ func taggedTestArgs(pkg string, tags []string) []string {
 // invisible to the default context, so its tests run only when asked for by
 // the tags its files declare.
 func realGoUnitTestTagged(ctx context.Context, moduleDir, pkg string, tags []string) (output string, passed bool) {
-	cmd := exec.CommandContext(ctx, "go", taggedTestArgs(pkg, tags)...)
+	cmd := sysexec.Command(ctx, "go", taggedTestArgs(pkg, tags)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.CombinedOutput()
@@ -127,7 +127,7 @@ func realGoUnitTest(ctx context.Context, moduleDir, pkg string) (output string, 
 	if _, err := os.Stat(filepath.Join(moduleDir, pkg)); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Sprintf("%s: package directory removed — nothing to unit-test\n", pkg), true
 	}
-	cmd := exec.CommandContext(ctx, "go", unitTestArgs(pkg)...)
+	cmd := sysexec.Command(ctx, "go", unitTestArgs(pkg)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.CombinedOutput()

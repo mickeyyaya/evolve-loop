@@ -4,13 +4,14 @@
 
 ## Purpose
 
-`internal/gc` decides which of the resources that finished cycles leave behind are garbage, and releases them. It owns five planners, each paired with its apply step:
+`internal/gc` decides which of the resources that finished cycles leave behind are garbage, and releases them. It owns six planners, each paired with its apply step:
 
 | Planner | Resource | Liveness or ownership proof |
 |---|---|---|
 | `Discover` + `Plan` / `Apply` (`gc.go`, `discover.go`) | run dirs under `.evolve/runs/`, `operator-salvage`, dispatch logs, `.ephemeral` trackers | a run dir needs a marker file to be considered at all; it is live if it is the current run workspace or has a fresh `.lease` |
 | `PlanWorktrees` / `ApplyWorktrees` (`worktrees.go`, `salvage.go`) | cycle worktrees under `.evolve/worktrees/` and `cycle-*` branches | the plane's `cycle-state.json`, an open run's `run.json` pointer, a fresh lease whose owner is alive |
 | `ReapFinishedCycleOrphans` (`processes.go`) | processes left running by finished cycles | orphan (ppid 1) with its cwd inside a cycle tree that `isLive` rejects and that is gone or closed out |
+| `PlanDispatchProcesses` + `StaleDispatch` / `OrphanLogTail` (`dispatch_processes.go`) | processes of a finished dispatch (MCP servers, CLI children) and orphan console log tails | Stale dispatch: the tag parses and the absolute root matches. The owner pid is dead and the process is not a shared helper. Or the cycle is closed out, the ppid is 1, and the process is in the persisted tree and is not a shared helper. Log tail: ppid 1, the program `tail`, and file arguments only under `<root>/.evolve/`. Its age is over `gc.temp_ttl_hours`, and 0 turns it off. See [internal-proctree.md](internal-proctree.md). |
 | `TrimGoCache` (`gocache.go`) | Go build cache entries | unused (mtime) past the horizon, or the least recently used beyond the size cap; the cap never takes an entry whose mtime is inside `GoCacheInUseWindow`, and every removal re-checks the entry's mtime first |
 | `ReapPipelineTemp` (`tempdir.go`) | pipeline temp artifacts in `os.TempDir()` | exact name shape plus age |
 

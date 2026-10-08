@@ -1,11 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -94,14 +95,14 @@ func defaultBootRefreshExecTarget(projectRoot string) (bool, string, error) {
 }
 
 func defaultBootRefreshHead(projectRoot string) (string, error) {
-	out, err := exec.Command("git", "-C", projectRoot, "rev-parse", "HEAD").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "rev-parse", "HEAD").Output()
 	return strings.TrimSpace(string(out)), err
 }
 
 // defaultBootRefreshSourceDelta reports whether binaryCommit..head touches
 // go/, the only tree the binary embeds.
 func defaultBootRefreshSourceDelta(projectRoot, from, to string) (bool, error) {
-	out, err := exec.Command("git", "-C", projectRoot, "diff", "--name-only", from+".."+to, "--", "go/").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "diff", "--name-only", from+".."+to, "--", "go/").Output()
 	if err != nil {
 		return false, err
 	}
@@ -111,7 +112,7 @@ func defaultBootRefreshSourceDelta(projectRoot, from, to string) (bool, error) {
 // defaultBootRefreshRebuild runs the canonical build target so the ldflags
 // stamp (version/commit/builtAt) is owned by exactly one place, the Makefile.
 func defaultBootRefreshRebuild(projectRoot string, stderr io.Writer) error {
-	cmd := exec.Command("make", "-C", "go", "build")
+	cmd := sysexec.Command(context.Background(), "make", "-C", "go", "build")
 	cmd.Dir = projectRoot
 	cmd.Stdout = stderr // build chatter is diagnostics, not loop stdout
 	cmd.Stderr = stderr

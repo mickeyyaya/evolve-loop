@@ -9,13 +9,14 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // executeCompleteGoScope discovers the compiler-selected test sources before
@@ -47,7 +48,7 @@ func executeCompleteGoScope(ctx context.Context, moduleDir, pattern string, env 
 var errIncompleteInventory = errors.New("incomplete predicate inventory")
 
 func declaredPredicateTests(ctx context.Context, moduleDir, pattern string, env []string) (map[string]bool, error) {
-	cmd := exec.CommandContext(ctx, "go", "list", "-json", "-tags", "acs", pattern)
+	cmd := sysexec.Command(ctx, "go", "list", "-json", "-tags", "acs", pattern)
 	cmd.Dir, cmd.Env, cmd.WaitDelay = moduleDir, env, 30*time.Second
 	out, err := cmd.Output()
 	if err != nil {

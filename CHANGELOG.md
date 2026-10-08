@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — each dispatch tags its processes and stops them at the end; `evolve gc` stops stale dispatch processes and orphan log tails; every pipeline command has `Cancel` and `WaitDelay` (lane H2, 2026-10-08)
+
+- **What the operator asked.** "our gc should exame the possible zombie process generated through LLM CLIs are clean them up once the tasks or requests are completed / cancelled" (2026-10-08). On that day the host had 48 orphan `tail -F` console monitors (up to 24 days old) and a test tmux session that lived 7 days. The MCP server (`node`) of a dispatched agy pane had no tag that names its dispatch.
+- **The plan:** [dispatch-process-hygiene-2026-10.md](docs/plans/dispatch-process-hygiene-2026-10.md) (decisions K8 to K11). It has the security model of the kill path: each way to kill a foreign process, and the test that blocks it.
+- **One kill path** (`internal/proctree`, [package doc](docs/architecture/packages/internal-proctree.md)).
+  - The table comes from `ps` with `LC_ALL=C`. The arguments and the environment of each pid come from `sysctl KERN_PROCARGS2` on macOS and from `/proc` on Linux. Thus an argument that looks like a tag is not a tag.
+  - A process is its pid plus its start time.
+  - The reaper sends SIGTERM and waits 2 s. Then it lists again and sends SIGKILL to each process that still has the same identity and proof. Then it lists again.
+  - It signals single pids only. It never signals a group, pid 0, pid 1, itself or its parent.
+- **K8, the dispatch tag.** Each launch mints `EVOLVE_DISPATCH_ID=<run>/<cycle>/<agent>/p<bridge-pid>n<nonce>` (`ipcenv.DispatchIDKey`, `proctree.DispatchID`). The headless drivers get it as the last entry of the environment. The tmux boot exports it before the CLI starts, or unsets it when the id is empty. `driverEnv` removes an inherited tag, so a child never carries the tag of a different dispatch.
+- **K9, the reap at dispatch end.** `tmuxCleanup` records the pane tree before `kill-session`, because macOS hides the environment of Apple binaries such as `/bin/zsh`. When the driver returns (complete, fail, timeout or cancel), the bridge stops each process with the tag or in the recorded tree. A survivor is `BRIDGE_DISPATCH_PROCESS_SURVIVED` (INCIDENT). A failed listing or signal is `BRIDGE_DISPATCH_REAP_FAILED` (WARN). A named session kept for resume gets no sweep.
+- **K10, `Cancel` and `WaitDelay`.** `sysexec.Command(ctx, name, args...)` sets `Cancel` to SIGTERM and `WaitDelay` to 5 s. Go sends SIGKILL when `WaitDelay` ends. The 136 direct `exec.Command` and `exec.CommandContext` calls in `cmd`, `internal` and `pkg` now use it. A call with no context uses `context.Background()`, so its cancel behavior does not change. `TestPipelineCode_StartsEveryProcessThroughCommand` parses each production file and fails on a new direct call.
+- **K11, the gc backstop.** `evolve gc` has a new step after the orphan process step (`internal/gc/dispatch_processes.go`, `cmd/evolve/cmd_gc_dispatch.go`):
+  - **stale dispatch:** the tag parses and `EVOLVE_PROJECT_ROOT` equals the project root. Also, the bridge pid of the tag is dead, or the cycle of the tag is closed out and the process is an orphan;
+  - **log tail:** ppid 1, the program `tail`, each file argument absolute and under `<root>/.evolve/`, and an age over `gc.temp_ttl_hours`.
+  - `--dry-run` prints `WOULD-STOP pid=<pid> rule=<rule> comm=<name> ...` and sends no signal.
+  - **Test sessions:** `swarm.ReapOrphanSessions` now reads the test pid from an integration-test session name (`evolve-bridge-it-<tag>-<testpid>`). It reaps the session when that pid is dead. The root cause of the leaked test servers was fixed on 2026-10-06. Each test binary that uses tmux owns its socket `evolve-bridge-t<pid>`, and gc reaps that socket when the pid is dead. The tests keep that socket in the default tmux directory, because gc lists sockets there. A private `TMUX_TMPDIR` can hide it.
+- **Tests, red first:** `TestReap_APidReusedByANewProcessIsNotKilled`, `TestReap_AListingFailureAfterTermSendsNoKill`, `TestTaggedWith_ATagInTheArgumentsIsNoProof`, `TestTmuxCleanup_RecordsThePaneTreeBeforeKillSessionAndTheSweepStopsOnlyOwnedProcesses`, `TestLaunchArgs_SweepsTheTagAfterTheDriverReturns`, `TestStaleDispatch_RefusesEveryProcessWithoutTheProof`, `TestOrphanLogTail_Table`, `TestGCDispatchProcesses_DryRunListsAndSignalsNothing` and `TestReapOrphans_ALeakedTestSessionWhoseTestProcessIsDeadIsReaped`. The integration test `TestExecLister_ReadsTheTagOfARealChildAndTheReaperStopsOnlyThatChild` stops only the child that it started.
+- **Changed tests, with the reason:** `TestReapOrphans_SafetySkips` used a test session as its example of a session with no pid. A test session now has an owner, so the test uses a name with no pid at all. The fake `failLaunchSendTmux` failed the second `send-keys` by count; it now fails the launch line by its text, because the boot sends one more line. `TestTmuxBoot_ACLIWithoutDefaultEnvExportsNothingExtra` now allows the dispatch tag export. The `loopchain` import graph allows `internal/sysexec`, a leaf with only standard-library imports.
+- **Review fix round 1:**
+  - The tag proves descent, not ownership. A tagged shared helper is stopped only when it is in the recorded tree of the dispatch. The shared helpers are tmux, a Claude Code daemon (`daemon run`, `bg-pty-host`, `bg-spare`), Chrome and Chromium. The class is one table in `proctree/shared.go`.
+  - The bridge records the pane tree at dispatch, on each poll and before `kill-session`, and writes it to `.evolve/dispatch-trees/<id>.json`. gc reads it after the bridge is gone. A clean sweep removes the file.
+  - gc needs a dead owner, or a closed cycle plus membership in the persisted tree. The gc root must be absolute.
+  - tmux commands start with the tag removed from the environment. The reaper never signals an ancestor of itself.
+  - Every `kill-session` site goes through `killSessionSwept`.
+  - `sysexec.DefaultRunner` returns success with a WARN line when a command exits 0 and a child keeps the output pipe open past `WaitDelay`.
+  - Final round: a recorded shared helper is stopped only while it is a live descendant of a recorded pane. gc never stops a shared helper by tree membership alone. The reaper refuses to run when its own pid is not in the table. The tree directory is mode 0700.
+  - `evolve gc` prints the program name and the arguments with `%q`.
+- **Limits:** on macOS, an Apple binary that calls `setsid` and leaves the pane tree before the record has no tag and no record. A Linux cgroup per dispatch closes this gap; it is a later item.
+
 ## Added — `evolve docs ste-lint`: a deterministic ASD-STE100 lint for the documents and for Go log and error text, with a WARN on the build floor (STE plan S0 and S10, 2026-10-07)
 
 - **What the operator asked.** "improve the readability by strictly follow ASD-STE100 policy and rewrite all docs wording by strictly follow ASD-STE100 format" (2026-10-07). Later the same day: "all the logs, generated text, any written docs should also strictly follow ASD-STE100 format".

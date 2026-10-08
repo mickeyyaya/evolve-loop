@@ -1,9 +1,11 @@
 package releasepipeline
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type ReleaseClass string
@@ -77,7 +79,7 @@ func bannerFor(class ReleaseClass, sinceVersion string) string {
 
 func gitPathsChanged(repoRoot, fromRef, toRef string, paths ...string) (bool, error) {
 	args := append([]string{"-C", repoRoot, "diff", "--name-only", fromRef + ".." + toRef, "--"}, paths...)
-	out, err := exec.Command("git", args...).Output()
+	out, err := sysexec.Command(context.Background(), "git", args...).Output()
 	if err != nil {
 		return false, fmt.Errorf("git diff %s..%s: %w", fromRef, toRef, err)
 	}
@@ -85,7 +87,7 @@ func gitPathsChanged(repoRoot, fromRef, toRef string, paths ...string) (bool, er
 }
 
 func gitOlderTags(repoRoot, prevTag string) []string {
-	out, err := exec.Command("git", "-C", repoRoot, "tag", "-l", "v*", "--sort=-version:refname").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "tag", "-l", "v*", "--sort=-version:refname").Output()
 	if err != nil {
 		return nil
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/panewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const bridgeSessionsUsage = "Usage: evolve bridge sessions [--project-root=DIR] [--json]"
@@ -38,7 +38,7 @@ type bridgeSessionRow struct {
 var bridgeSessionsTmux = func(ctx context.Context, socket string) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, bridgeSessionsTmuxTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(cctx, "tmux", "-L", socket, "list-sessions", "-F", "#{session_name}\t#{window_activity}").Output()
+	out, err := sysexec.Command(cctx, "tmux", "-L", socket, "list-sessions", "-F", "#{session_name}\t#{window_activity}").Output()
 	return string(out), err
 }
 

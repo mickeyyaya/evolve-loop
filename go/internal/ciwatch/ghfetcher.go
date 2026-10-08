@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // execCapture is the subprocess seam for NewGHFetcher; tests replace it with
 // an in-process fake so no test ever invokes the live gh CLI.
 var execCapture = func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := sysexec.Command(ctx, name, args...)
 	cmd.Dir = dir
 	return cmd.Output()
 }

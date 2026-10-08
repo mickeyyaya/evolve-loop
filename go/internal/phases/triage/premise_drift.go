@@ -3,7 +3,6 @@ package triage
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Bounded like the carry-forward sweep: git work here must never stall
@@ -132,7 +132,7 @@ func commitsSince(ctx context.Context, root string, since time.Time, extra, path
 	if len(paths) > 0 {
 		args = append(append(args, "--"), paths...)
 	}
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := sysexec.Command(ctx, "git", args...)
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {
@@ -209,13 +209,13 @@ func packageDirs(declared []string) []string {
 }
 
 func vanishedAtHEAD(ctx context.Context, root string, declared []string) (gone []string, ok bool) {
-	head := exec.CommandContext(ctx, "git", "rev-parse", "--quiet", "--verify", "HEAD^{tree}")
+	head := sysexec.Command(ctx, "git", "rev-parse", "--quiet", "--verify", "HEAD^{tree}")
 	head.Dir = root
 	if head.Run() != nil {
 		return nil, false // no HEAD tree to judge against: unavailable, never "everything vanished"
 	}
 	for _, p := range declared {
-		cmd := exec.CommandContext(ctx, "git", "cat-file", "-e", "HEAD:"+strings.TrimSuffix(p, "/"))
+		cmd := sysexec.Command(ctx, "git", "cat-file", "-e", "HEAD:"+strings.TrimSuffix(p, "/"))
 		cmd.Dir = root
 		if err := cmd.Run(); err != nil {
 			if ctx.Err() != nil {

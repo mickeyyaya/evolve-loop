@@ -24,7 +24,7 @@ import (
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve gc", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, worktrees and branches, run dirs, go build cache entries), mutating nothing")
+	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, go build cache entries), mutating nothing")
 	// The back-quoted `dir` is the flag package's argument placeholder (it
 	// renders as "-project-root dir"); no other back-quotes here, or the first
 	// one would be consumed as the placeholder instead.
@@ -154,6 +154,7 @@ func (r gcRun) project(projectRoot string) int {
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	failed := r.cycleProcesses(opts)
+	failed = r.dispatchProcesses(projectRoot, gcPol.TempTTLHours) || failed
 	failed = r.worktrees(opts) || failed
 	failed = r.runDirs(evolveDir, gcPol) || failed
 	failed = r.goCache(gcPol) || failed

@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // CtxKeyTaskContract carries the rendered Task Contract block to the tdd, build
@@ -239,7 +239,7 @@ func listACSPredicates(ctx context.Context, worktree string, cycle int) acsPredi
 	}
 	ctx, cancel := context.WithTimeout(ctx, acssuite.DefaultTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "go", "test", "-list", ".", "-tags", "acs", pkg)
+	cmd := sysexec.Command(ctx, "go", "test", "-list", ".", "-tags", "acs", pkg)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.CombinedOutput()

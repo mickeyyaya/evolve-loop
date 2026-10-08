@@ -36,6 +36,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // CmdRunner is the seam for command execution. The production implementation
@@ -263,7 +265,7 @@ func parseExpectedLine(line string, e *Expectations) {
 // propagation. The script keeps normal Bash status-handling semantics, including
 // the ability to inspect an expected failure with $?.
 func DefaultRunner(ctx context.Context, workdir, command string) (string, string, int, error) {
-	cmd := exec.CommandContext(ctx, "/bin/bash", "-o", "pipefail", "-c", command)
+	cmd := sysexec.Command(ctx, "/bin/bash", "-o", "pipefail", "-c", command)
 	if workdir != "" {
 		cmd.Dir = workdir
 	}

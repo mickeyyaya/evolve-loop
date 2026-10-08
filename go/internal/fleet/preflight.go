@@ -1,17 +1,18 @@
 package fleet
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // PreflightControlPlane refuses a wave while repoRoot has uncommitted protected-surface changes or cannot be checked.
 func PreflightControlPlane(repoRoot string) error {
 	// --untracked-files=all names a new protected file inside a new directory individually.
-	cmd := exec.Command("git", "status", "--porcelain", "--untracked-files=all")
+	cmd := sysexec.Command(context.Background(), "git", "status", "--porcelain", "--untracked-files=all")
 	cmd.Dir = repoRoot
 	out, err := cmd.CombinedOutput()
 	if err != nil {

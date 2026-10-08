@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dashboard"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -153,7 +153,7 @@ func buildStatusReport(root string, now time.Time) statusReport {
 }
 
 func statusOpenPRs(ctx context.Context, root string) statusRemote {
-	cmd := exec.CommandContext(ctx, "gh", "pr", "list", "--state", "open", "--json", "number,title,headRefName,url,statusCheckRollup")
+	cmd := sysexec.Command(ctx, "gh", "pr", "list", "--state", "open", "--json", "number,title,headRefName,url,statusCheckRollup")
 	cmd.Dir = root
 	out, err := cmd.Output()
 	if err != nil {

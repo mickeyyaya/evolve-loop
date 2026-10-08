@@ -113,7 +113,7 @@ func TestReapOrphans_SafetySkips(t *testing.T) {
 	t.Parallel()
 	foreign := "some-other-tmux-session"
 	empty := ""
-	noPID := "evolve-bridge-it-iperm-71243"
+	noPID := "evolve-bridge-something-else"
 	deadBridge := "evolve-bridge-c1-build-pid900-n1-1"
 	deadRecipe := "evolve-recipe-c0-usage-probe-pid901-n1-1"
 	list := fakeServer(foreign, empty, noPID, deadBridge, deadRecipe)
@@ -125,7 +125,7 @@ func TestReapOrphans_SafetySkips(t *testing.T) {
 		t.Fatalf("SkippedForeign=%d, want 2 (foreign + empty)", rep.SkippedForeign)
 	}
 	if rep.SkippedUnparseable != 1 {
-		t.Fatalf("SkippedUnparseable=%d, want 1 (no-pid test session)", rep.SkippedUnparseable)
+		t.Fatalf("SkippedUnparseable=%d, want 1 (a session with no pid token)", rep.SkippedUnparseable)
 	}
 	if len(*killed) != 2 {
 		t.Fatalf("killed=%v, want exactly the 2 dead evolve sessions", *killed)

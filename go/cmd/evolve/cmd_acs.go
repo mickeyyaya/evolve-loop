@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // resolveACSSuiteRoot returns the cycle's active_worktree, or "" when the cycle
@@ -49,7 +49,7 @@ func suiteProjectRoot(evolveDir string, cycle int, root string) string {
 // dir. It is wrong when the plane is itself a linked worktree, so it serves only
 // invocations with no plane evolve dir.
 func mainProjectRoot(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir").Output()
 	if err != nil {
 		return dir
 	}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var (
@@ -296,10 +297,10 @@ func defaultGhDeleteRelease(tag string) string {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return stepSkipped
 	}
-	if err := exec.Command("gh", "release", "view", tag).Run(); err != nil {
+	if err := sysexec.Command(context.Background(), "gh", "release", "view", tag).Run(); err != nil {
 		return stepNotPresent
 	}
-	if err := exec.Command("gh", "release", "delete", tag, "--yes").Run(); err != nil {
+	if err := sysexec.Command(context.Background(), "gh", "release", "delete", tag, "--yes").Run(); err != nil {
 		return stepFailed
 	}
 	return stepDeleted
@@ -336,7 +337,7 @@ func revertAndShipWith(g gitexec.Git, repoRoot, commitSHA, reason, version strin
 	if binPath == "" {
 		return stepRevertedLocalOnly
 	}
-	cmd := exec.Command(binPath, "ship", "--class", "manual", msg)
+	cmd := sysexec.Command(context.Background(), binPath, "ship", "--class", "manual", msg)
 	cmd.Env = append(os.Environ(),
 		"EVOLVE_SHIP_AUTO_CONFIRM=1",
 	)

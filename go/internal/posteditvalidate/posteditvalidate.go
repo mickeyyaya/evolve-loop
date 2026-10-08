@@ -19,6 +19,7 @@
 package posteditvalidate
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/guardslog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Options drives a Run() invocation.
@@ -200,7 +202,7 @@ func extractFilePath(payload []byte) string {
 func defaultValidateJSON(filePath string) (bool, string) {
 	// Prefer jq for byte-parity with bash; fall back to encoding/json if jq is missing.
 	if _, err := exec.LookPath("jq"); err == nil {
-		cmd := exec.Command("jq", "empty", filePath)
+		cmd := sysexec.Command(context.Background(), "jq", "empty", filePath)
 		out, err := cmd.CombinedOutput()
 		if err == nil {
 			return true, ""
@@ -222,7 +224,7 @@ func defaultValidateBash(filePath string) (bool, string) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		return true, "" // bash unavailable: don't false-positive
 	}
-	cmd := exec.Command("bash", "-n", filePath)
+	cmd := sysexec.Command(context.Background(), "bash", "-n", filePath)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		return true, ""
@@ -240,7 +242,7 @@ func defaultValidatePy(filePath string) (bool, string) {
 	if py == "" {
 		return true, "" // no python: don't false-positive
 	}
-	cmd := exec.Command(py, "-m", "py_compile", filePath)
+	cmd := sysexec.Command(context.Background(), py, "-m", "py_compile", filePath)
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		return true, ""

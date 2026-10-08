@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -33,6 +32,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // topNHeadingRE locates the selection-section heading (phasecontract.Triage,
@@ -108,7 +108,7 @@ func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string
 	if dir == "" || base == "" {
 		return ""
 	}
-	cmd := exec.CommandContext(ctx, "git", "for-each-ref",
+	cmd := sysexec.Command(ctx, "git", "for-each-ref",
 		"--sort=-committerdate", "--format=%(refname:short)", "refs/heads/cycle-*")
 	cmd.Dir = dir
 	out, err := cmd.Output()
