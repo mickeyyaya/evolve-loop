@@ -1,5 +1,7 @@
 # ADR-0096 — Repair rounds escalate tier and effort, and carry the auditor's findings
 
+> **Changed 2026-10-08:** `Profile.effort_overrides` is retired. The effort of a tier now lives in `.evolve/policy.json` `cli_routing.tiers.<tier>.effort` ([opus55-effort-config-2026-10.md](../../plans/opus55-effort-config-2026-10.md)). An escalation to a tier takes that tier's effort.
+
 - **Status:** Accepted (2026-09-03). Extends [ADR-0092](0092-audit-repair-loop.md) (the
   in-cycle repair loop) and [ADR-0093](0093-retry-envelope-and-terminal-retro.md) (the retry
   envelope); reuses the ADR-0076 slice D escalation seam and envelope clamp.

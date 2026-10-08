@@ -84,7 +84,6 @@
   "cli_fallback": [
     "claude-tmux"
   ],
-  "effort_level": "medium",
   "sandbox": {
     "enabled": true,
     "write_subpaths": [

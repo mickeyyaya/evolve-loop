@@ -704,3 +704,6 @@
 ./internal/convergence
 # stelint — the ASD-STE100 lint behind evolve docs ste-lint and the build floor's STE WARN: the house word table parsed from docs/conventions/ste100-writing.md, the sentence, paragraph and word rules for Markdown and for Go log and error text.
 ./internal/stelint
+
+# lane H2 (2026-10-08): the one kill path for dispatch processes (internal/proctree).
+./internal/proctree

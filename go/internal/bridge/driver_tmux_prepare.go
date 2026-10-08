@@ -67,12 +67,22 @@ func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch)
 
 	prep.scrollbackFile = filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")
 	prep.artifactScrollback = defaultIfZero(deps.ScrollbackLines, tmuxArtifactScrollback)
-	if omitted := cfg.Realization.ModelOmitted; omitted != "" {
-		fmt.Fprintf(deps.Stderr, "%s model='%s' is an unresolved tier token → no --model sent; this pane runs the CLI's OWN default, not the requested tier\n", prep.prefix, omitted)
-	}
-	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", prep.prefix, lp.session,
-		orDefault(effectiveModelLabel(cfg.Model, cfg.Realization.ModelOmitted), "(cli default)"), prep.workingDir)
+	reportLaunchModel(deps, cfg, prep.prefix, lp.session, prep.workingDir)
 	return prep, ExitOK, nil
+}
+
+func reportLaunchModel(deps Deps, cfg *Config, prefix, session, workingDir string) {
+	if omitted := cfg.Realization.ModelOmitted; omitted != "" {
+		fmt.Fprintf(deps.Stderr, "%s model='%s' is an unresolved tier token → no --model sent; this pane runs the CLI's OWN default, not the requested tier\n", prefix, omitted)
+	}
+	if capped := cfg.Realization.EffortCapped; capped != "" {
+		fmt.Fprintf(deps.Stderr, "%s effort=%s is capped to the %s model variant: the CLI offers no higher effort for this model\n", prefix, capped, cfg.Realization.EffortVariant)
+	}
+	if unapplied := cfg.Realization.EffortUnapplied; unapplied != "" {
+		fmt.Fprintf(deps.Stderr, "%s WARN effort=%s is not applied: the model name has no (Variant) suffix\n", prefix, unapplied)
+	}
+	fmt.Fprintf(deps.Stderr, "%s session=%s model=%s workdir=%s\n", prefix, session,
+		orDefault(effectiveModelLabel(cfg.Model, cfg.Realization.ModelOmitted), "(cli default)"), workingDir)
 }
 
 func reportNamedSession(ctx context.Context, deps Deps, lp tmuxLaunch, prefix string) bool {

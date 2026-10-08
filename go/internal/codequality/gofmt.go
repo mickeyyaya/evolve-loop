@@ -7,12 +7,15 @@
 package codequality
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // UnformattedGoFiles returns the .go files under dir that are not gofmt-clean
@@ -23,7 +26,7 @@ import (
 // result means the tree is clean. A missing gofmt binary or a gofmt failure is
 // returned as an error (never silently treated as clean).
 func UnformattedGoFiles(dir string) ([]string, error) {
-	out, err := exec.Command("gofmt", "-l", "-s", dir).Output()
+	out, err := sysexec.Command(context.Background(), "gofmt", "-l", "-s", dir).Output()
 	files := nonEmptyLines(out)
 	if err != nil {
 		var exitErr *exec.ExitError

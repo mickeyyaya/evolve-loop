@@ -57,7 +57,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 	}
 	ar.transientDwellEnabled = true
 	for elapsed := 0; ; elapsed += 2 {
-		deps.Sleep(artifactWaitInterval)
+		w.pace()
 		state.waitedS = elapsed
 		if err := ctx.Err(); err != nil {
 			// One final completion poll before abandoning: a deliverable already

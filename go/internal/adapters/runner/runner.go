@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // CmdRunner is the seam for injecting subprocess behavior in tests.
@@ -96,7 +97,7 @@ func PerPhase(phaseName string, inProc core.PhaseRunner, cmd CmdRunner) core.Pha
 // exitCode + nil err so the adapter's exit-code-based branching works.
 func execRunner(ctx context.Context, name string, args []string,
 	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := sysexec.Command(ctx, name, args...)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

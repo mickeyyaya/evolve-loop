@@ -21,11 +21,14 @@
 package repostate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // TrackedFiles returns the git-tracked paths directly under relDir (relative
@@ -49,7 +52,7 @@ func TrackedFiles(root, relDir string) ([]string, error) {
 // (relative to root, as git reports them) — the binding set for a scanner
 // that walks a whole tree rather than one flat directory.
 func TrackedTree(root, relDir string) ([]string, error) {
-	out, err := exec.Command("git", "-C", root, "ls-files", "--", relDir).Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", root, "ls-files", "--", relDir).Output()
 	if err != nil {
 		// exec.ExitError.Error() is just "exit status N"; the reason an
 		// operator needs ("not a git repository", ...) is on stderr.

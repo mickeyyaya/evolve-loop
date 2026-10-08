@@ -1,0 +1,28 @@
+{
+  "id": "dispatch-hygiene-architecture-followups",
+  "title": "Dispatch process hygiene: architecture follow-ups (one home for the tree proof, the grace time, the root key and the sweep state)",
+  "kind": "refactor",
+  "priority_class": "hygiene",
+  "weight": 0.2,
+  "route": "console",
+  "routed_reason": "the kill path of the bridge and gc (internal/proctree); the console owns it",
+  "source": "console, 2026-10-08, architecture review of lane H2 (cl-proc-hygiene), verdict Approve, MEDIUM and LOW items after fix round 3",
+  "created_at": "2026-10-08T17:30:00Z",
+  "summary": "Five items from the architecture review. M1: gc/dispatch_processes.go:48 rebuilds the recorded-tree half of OwnedByDispatch from primitives. M2: the 2 s grace time has two homes (bridge/dispatch_reap.go:27, cmd/evolve/cmd_gc_dispatch.go:16). M3: gc.ProjectRootEnvKey is one more home for EVOLVE_PROJECT_ROOT; the writer in subagentrun/env.go:53 uses a bare literal. M4: Deps.sweep holds per-dispatch mutable state in the dependency bag. L1: gc loads the persisted tree once for each check.",
+  "fix": "M1: export the tree half as one named proof (for example proctree.InRecordedTree) and use it in OwnedByDispatch and in gc. M2: one proctree.DefaultGrace for both callers. M3: one shared constant for EVOLVE_PROJECT_ROOT, used by the writer and by gc (own refactor commit). M4: carry the sweep on the per-launch state, not on Deps. L1: load each tree once per gc run.",
+  "acceptance": [
+    "gc and the bridge decide ownership only through proctree compositions, with a test that changes the tree half once and sees both callers follow",
+    "One grace constant; a grep finds no second 2 * time.Second for the reap",
+    "EVOLVE_PROJECT_ROOT has one constant home that the writer and gc both use",
+    "Deps carries no per-dispatch mutable sweep state",
+    "A gc run loads each persisted tree at most once"
+  ],
+  "files": [
+    "go/internal/proctree/shared.go",
+    "go/internal/gc/dispatch_processes.go",
+    "go/internal/bridge/dispatch_reap.go",
+    "go/internal/bridge/engine.go",
+    "go/cmd/evolve/cmd_gc_dispatch.go",
+    "go/internal/subagent/subagentrun/env.go"
+  ]
+}

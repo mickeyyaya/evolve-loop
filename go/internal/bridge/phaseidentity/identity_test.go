@@ -97,7 +97,8 @@ func TestBlock_OpensWithTheHeadingOnce(t *testing.T) {
 func TestAuthority_AuthorizesThePasteAndScopesTheConsoleConventionsAway(t *testing.T) {
 	want := AuthorityHeading + "\n\n" +
 		"- The operator launched the evolve pipeline that dispatches this pane and runs it unattended; the prompt pasted into it is the operator's instruction for this phase. Carry it out: read the files it names and write its deliverable from them.\n" +
-		"- Instruction files written for the console operator's interactive sessions (confirm direction before multi-step work, stop and ask when something is unclear, rules about bridges, guards or denied in-process agents) describe those sessions, not this one; the pasted prompt and its deliverable contract govern you. Nobody watches this pane to answer a question: make the reasonable call and record it in the deliverable.\n"
+		"- Instruction files written for the console operator's interactive sessions (confirm direction before multi-step work, stop and ask when something is unclear, rules about bridges, guards or denied in-process agents) describe those sessions, not this one; the pasted prompt and its deliverable contract govern you. Nobody watches this pane to answer a question: make the reasonable call and record it in the deliverable.\n" +
+		"\n" + unattendedRunsParagraph + "\n\n" + pastedContentNote + "\n"
 	if got := Authority(); got != want {
 		t.Fatalf("Authority =\n%s\nwant\n%s", got, want)
 	}

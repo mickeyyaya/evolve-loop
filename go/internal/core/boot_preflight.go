@@ -6,8 +6,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // classifyDirtyPaths splits dirty paths into leaked tracked source to quarantine and loop-managed paths to ignore.
@@ -43,7 +44,7 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 	// excludes the ship binary too.
 	args := append([]string{"stash", "push", "--include-untracked", "-m", label, "--"}, quarantine...)
 	args = append(args, ":(exclude)go/bin/evolve")
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := sysexec.Command(ctx, "git", args...)
 	cmd.Dir = repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("quarantine: git stash: %v: %s", err, strings.TrimSpace(string(out)))
@@ -52,7 +53,7 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 }
 
 func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
-	cmd := exec.CommandContext(ctx, "git", "status", "--porcelain")
+	cmd := sysexec.Command(ctx, "git", "status", "--porcelain")
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()
 	if err != nil {

@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Config carries the sandbox parameters extracted from a profile.
@@ -129,9 +131,9 @@ func defaultCapabilityProbe(ctx context.Context, binaryPath string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.CommandContext(ctx, binaryPath, "-p", "(version 1)(allow default)", "/usr/bin/true")
+		cmd = sysexec.Command(ctx, binaryPath, "-p", "(version 1)(allow default)", "/usr/bin/true")
 	case "linux":
-		cmd = exec.CommandContext(ctx, binaryPath, "--ro-bind", "/", "/", "/bin/true")
+		cmd = sysexec.Command(ctx, binaryPath, "--ro-bind", "/", "/", "/bin/true")
 	default:
 		// Unreachable in production: measureCapability only probes when Available,
 		// which probeFor sets solely for darwin/linux.
@@ -387,13 +389,13 @@ func (s *Sandbox) Exec(ctx context.Context, argv []string,
 	case s.probe.Available && runtime.GOOS == "darwin":
 		profile := GenerateSBPL(s.cfg)
 		args := append([]string{"-p", profile}, argv...)
-		cmd = exec.CommandContext(ctx, s.probe.BinaryPath, args...)
+		cmd = sysexec.Command(ctx, s.probe.BinaryPath, args...)
 	case s.probe.Available && runtime.GOOS == "linux":
 		args := GenerateBwrapArgv(s.cfg, argv)
-		cmd = exec.CommandContext(ctx, s.probe.BinaryPath, args...)
+		cmd = sysexec.Command(ctx, s.probe.BinaryPath, args...)
 	default:
 		fmt.Fprintf(stderr, "[sandbox] NOTE: %s; running unwrapped\n", s.probe.Reason)
-		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd = sysexec.Command(ctx, argv[0], argv[1:]...)
 	}
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout

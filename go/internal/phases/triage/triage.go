@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/phaseidentity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -33,6 +33,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // topNHeadingRE locates the selection-section heading (phasecontract.Triage,
@@ -108,7 +109,7 @@ func CarryforwardCandidatesSection(ctx context.Context, dir, base string) string
 	if dir == "" || base == "" {
 		return ""
 	}
-	cmd := exec.CommandContext(ctx, "git", "for-each-ref",
+	cmd := sysexec.Command(ctx, "git", "for-each-ref",
 		"--sort=-committerdate", "--format=%(refname:short)", "refs/heads/cycle-*")
 	cmd.Dir = dir
 	out, err := cmd.Output()
@@ -196,7 +197,7 @@ func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) s
 		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
 		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches. " +
 		"Batches come in inbox-rank order, the computed priority `evolve inbox rank` shows, and each item's line gives its score and top factor:\n" +
-		rendered
+		phaseidentity.WrapPasted(rendered)
 }
 
 func consoleRoutedNote(console []inboxbatch.Item) string {

@@ -201,3 +201,10 @@ approaches / decision / results / retro) — lives at
 | [architecture/audit-evaluation-contract.md](architecture/audit-evaluation-contract.md) | Design: the audit's published standard (dimensions plus `G-…` gate criteria with verifiers and certificates), the `audit-plan` phase that writes each cycle's expectations before build, delivery as capped digests, and the final audit held to its plan with a kernel cross-check (ADR-0125). |
 | [plans/audit-evaluation-contract-2026-10.md](plans/audit-evaluation-contract-2026-10.md) | Plan: approaches A–C, decisions E-D0 to E-D9 (E-D1–E-D4 by the operator), refinements AR1–AR9, components E0–E7 (E0 its own docs landing, E1–E6 inside the code-review plan's landing 2, E7 at its flip). |
 | [architecture/adr/0125-audit-publishes-its-evaluation-contract.md](architecture/adr/0125-audit-publishes-its-evaluation-contract.md) | Decision: the audit publishes its standard and, before build, this cycle's expectations; its verdicts are keyed to published criteria; criteria are public and probe instances private. |
+
+## 2026-10-08 — logging and process hygiene
+
+| Document | What it records |
+|---|---|
+| [research/logging-and-process-cleanup-2026-10.md](research/logging-and-process-cleanup-2026-10.md) | Research: structured logging in Go, log categories and retention, and process-tree cleanup on Linux and macOS. It also covers MCP server shutdown, harness cleanup practice and log reading for agents. Findings F1.1 to F6.8, refinements R1 to R21. |
+| [plans/logging-and-process-hygiene-2026-10.md](plans/logging-and-process-hygiene-2026-10.md) | Plan: the log catalog, a log dir for each loop launch, the ship gate output split and keep-on-fail for raw tool output (lane H1). It also covers process hygiene (H2) and the layered reader (H3, H4). Decisions K1 to K13, each with a status. |

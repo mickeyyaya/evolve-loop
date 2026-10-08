@@ -252,7 +252,7 @@ func TestResolve_APerRunTierTheCeilingEmptiesIsATypedCeilingError(t *testing.T) 
 	r := syntheticRouter(t, policy.CLIRouting{
 		CLIs: agyClaude, Default: agyClaude, AfterChain: "stop",
 		Agents: map[string]policy.AgentRule{"memo": {CLI: []string{"agy"}}},
-		Tiers:  map[string][]string{"deep": {"claude"}, "balanced": {"claude"}},
+		Tiers:  map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "balanced": {CLIs: []string{"claude"}}},
 	}, cliroute.Host{})
 	mustResolve(t, r, cliroute.Request{Agent: "memo", Phase: "memo"})
 	_, err := r.Resolve(cliroute.Request{Agent: "memo", Phase: "memo", Env: map[string]string{"EVOLVE_MEMO_MODEL": "deep"}})

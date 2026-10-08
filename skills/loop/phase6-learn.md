@@ -308,7 +308,7 @@ Promotes high-confidence, repeatedly-confirmed instincts to mandatory guidance. 
 **Self-Evaluation (LLM-as-a-Judge):**
 Model routing: tier-1 if audit retries > 1, eval failure, or calibration_error > 0.15 (richest learning signal). Otherwise inline with tier-2.
 
-Score the cycle on 4 dimensions. For each, write chain-of-thought BEFORE scoring. Binary threshold: >= 0.7 = pass.
+Score the cycle on 4 dimensions. For each, write a short justification that cites the evidence BEFORE scoring. Binary threshold: >= 0.7 = pass.
 
 | Dimension | Guiding Questions | Threshold |
 |-----------|------------------|-----------|
@@ -319,7 +319,7 @@ Score the cycle on 4 dimensions. For each, write chain-of-thought BEFORE scoring
 
 Scoring protocol:
 1. **Stepwise Evidence Gathering (MANDATORY):** Enumerate 2-3 evidence items per dimension, assign mini-score (0.0-1.0) each.
-2. Write 1-2 sentences chain-of-thought per dimension.
+2. Write a 1-2 sentence justification per dimension that cites the evidence items.
 3. Final score = mean of evidence mini-scores.
 4. If any dimension < 0.7: extract at least one instinct from that failure.
 

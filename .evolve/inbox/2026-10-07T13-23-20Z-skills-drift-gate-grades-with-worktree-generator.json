@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A lane that changes the generator AND regenerates its outputs consistently PASSes the skills-drift gate (red first: today it FAILs with N drifted artifacts)",
+    "A lane that changes the generator but does NOT regenerate the outputs still FAILs the gate",
+    "A lane that does not touch the generator is graded exactly as today (byte-identical gate output)"
+  ],
+  "created_at": "2026-10-07T14:30:00Z",
+  "files": [
+    "go/internal/phases/audit/audit.go",
+    "go/internal/skillcheck/commands.go"
+  ],
+  "fix": "When the lane diff touches go/internal/skillcheck/** (the generator), grade drift with the worktree's own generator (build or run the worktree's `evolve skills check`), not the orchestrator's compiled one. One home for the decision in phases/audit.",
+  "id": "skills-drift-gate-grades-with-worktree-generator",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "console, 2026-10-07 cycle 1828 (retro carryover todo-skills-drift-gate-…, promoted to the inbox; the gate-class lane confirmed the version skew)",
+  "summary": "Cycle 1828 changed the skill-command generator (skillcheck.RenderCommandStub) and regenerated commands/*.md consistently. The audit's in-process skills-drift gate (skillsDriftCheckDefault, go/internal/phases/audit/audit.go:502) renders the expected projections with the generator compiled into the ORCHESTRATOR's (base) binary, so it reported 30 drifted artifacts while the worktree's own build reported none: a false red that overrode an auditor PASS. The gate-class fix (a gate-forced FAIL earns a bounded Build repair and never halts) limits the damage but cannot fix it: the repair rounds re-hit the same skew.",
+  "title": "The skills-drift gate grades a generator change with the base binary's generator, a false red",
+  "weight": 0.7
+}

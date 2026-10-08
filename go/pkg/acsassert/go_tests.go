@@ -62,7 +62,7 @@ type goTestRun struct {
 
 func newGoTestRun(pkg string, names []string) (*goTestRun, error) {
 	if pkg == "" || len(names) == 0 {
-		return nil, fmt.Errorf("Go test package and expected cases must be nonempty")
+		return nil, fmt.Errorf("go test package and expected cases must be nonempty")
 	}
 	run := &goTestRun{packageName: pkg, states: make(map[string]string, len(names))}
 	for _, name := range names {
@@ -92,7 +92,7 @@ func validateGoTests(output, pkg string, names []string) error {
 		}
 	}
 	if !run.finished {
-		return fmt.Errorf("Go package did not complete successfully: %s", pkg)
+		return fmt.Errorf("go package did not complete successfully: %s", pkg)
 	}
 	for _, name := range names {
 		if run.states[name] != "pass" {
@@ -107,10 +107,10 @@ func (r *goTestRun) consume(event goTestEvent) error {
 		return nil
 	}
 	if event.Action == "fail" {
-		return fmt.Errorf("Go test failure: %s/%s", event.Package, event.Test)
+		return fmt.Errorf("go test failure: %s/%s", event.Package, event.Test)
 	}
 	if r.finished {
-		return fmt.Errorf("Go test event after package completion: %s", event.Action)
+		return fmt.Errorf("go test event after package completion: %s", event.Action)
 	}
 	if event.Test == "" {
 		return r.packageEvent(event.Action)
@@ -127,7 +127,7 @@ func (r *goTestRun) consume(event goTestEvent) error {
 		r.states[event.Test] = "run"
 	case "pass":
 		if state != "run" {
-			return fmt.Errorf("Go test passed without one active execution: %s", event.Test)
+			return fmt.Errorf("go test passed without one active execution: %s", event.Test)
 		}
 		r.states[event.Test] = "pass"
 	case "skip":
@@ -145,11 +145,11 @@ func (r *goTestRun) packageEvent(action string) error {
 		r.started = true
 	case "pass":
 		if !r.started {
-			return fmt.Errorf("Go package passed before starting: %s", r.packageName)
+			return fmt.Errorf("go package passed before starting: %s", r.packageName)
 		}
 		r.finished = true
 	case "skip":
-		return fmt.Errorf("Go package skipped: %s", r.packageName)
+		return fmt.Errorf("go package skipped: %s", r.packageName)
 	}
 	return nil
 }

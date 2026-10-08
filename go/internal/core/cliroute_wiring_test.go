@@ -151,7 +151,7 @@ func TestContractEscalation_ADeepDispatchNamesAndEscalatesOnlyWhatTheCeilingPerm
 	t.Setenv("EVOLVE_CLI", "")
 	root := t.TempDir()
 	writeRawProfile(t, root, "builder", map[string]any{"name": "builder", "cli": "agy-tmux", "model_tier_default": "deep"})
-	block := policy.CLIRouting{CLIs: []string{"agy", "agy-claude", "claude"}, Default: []string{"agy", "agy-claude", "claude"}, Tiers: map[string][]string{"deep": {"agy-claude", "claude"}}}
+	block := policy.CLIRouting{CLIs: []string{"agy", "agy-claude", "claude"}, Default: []string{"agy", "agy-claude", "claude"}, Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"agy-claude", "claude"}}}}
 	r, _, err := cliroute.Build(cliroute.Setup{
 		Policy: policy.Policy{CLIRouting: &block}, Profiles: profiles.NewFromDir(filepath.Join(root, ".evolve", "profiles")),
 		Host: cliroute.Host{LookPath: func(string) (string, error) { return "/fake", nil }},

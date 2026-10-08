@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
 )
 
@@ -103,7 +103,7 @@ type composedGateRun struct {
 
 func (r composedGateRun) gate(ctx context.Context, gate, target string) ciparity.GateOutcome {
 	tail := newTailWriter(64 * 1024)
-	cmd := exec.CommandContext(ctx, "make", "-C", "go", target)
+	cmd := sysexec.Command(ctx, "make", "-C", "go", target)
 	cmd.Dir = r.worktree
 	cmd.Env = ciparity.CIEnv(os.Environ())
 	cmd.Stdout, cmd.Stderr = tail, tail
@@ -236,7 +236,7 @@ func requireReusableAudit(entry auditledger.Entry) error {
 
 // gitDiffCapture runs `git diff <spec>` in worktree and returns its stdout.
 func gitDiffCapture(ctx context.Context, worktree, spec string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "git", "diff", spec)
+	cmd := sysexec.Command(ctx, "git", "diff", spec)
 	cmd.Dir = worktree
 	var out bytes.Buffer
 	cmd.Stdout = &out

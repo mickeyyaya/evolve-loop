@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // runBranches audits and prunes superseded local cycle-* branches.
@@ -136,7 +137,7 @@ func remoteOpenPR(dir string) func(ref string) (bool, error) {
 		if _, err := exec.LookPath("gh"); err != nil {
 			return false, nil
 		}
-		out, err := exec.Command("gh", "-C", dir, "pr", "list", "--head", ref, "--state", "open", "--json", "number", "-q", "length").Output()
+		out, err := sysexec.Command(context.Background(), "gh", "-C", dir, "pr", "list", "--head", ref, "--state", "open", "--json", "number", "-q", "length").Output()
 		if err != nil {
 			return false, fmt.Errorf("gh pr list --head %s: %w", ref, err)
 		}
@@ -146,7 +147,7 @@ func remoteOpenPR(dir string) func(ref string) (bool, error) {
 }
 
 func hasGitRemote(dir string) bool {
-	out, err := exec.Command("git", "-C", dir, "remote").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", dir, "remote").Output()
 	if err != nil {
 		return false
 	}

@@ -77,12 +77,19 @@ func tierSummary(tiers []tierRoute) string {
 		case tr.CLI == "":
 			parts = append(parts, tr.Tier+": no CLI the ceiling permits")
 		case tr.Model != "":
-			parts = append(parts, fmt.Sprintf("%s: %s %s", tr.Tier, tr.CLI, tr.Model))
+			parts = append(parts, fmt.Sprintf("%s: %s %s%s", tr.Tier, tr.CLI, tr.Model, effortLabel(tr)))
 		default:
-			parts = append(parts, tr.Tier+": "+tr.CLI)
+			parts = append(parts, tr.Tier+": "+tr.CLI+effortLabel(tr))
 		}
 	}
 	return strings.Join(parts, " · ")
+}
+
+func effortLabel(tr tierRoute) string {
+	if tr.Effort == "" {
+		return ""
+	}
+	return fmt.Sprintf(" effort %s (%s)", tr.Effort, tr.EffortSource)
 }
 
 func runCLIRoutingExplain(args []string, stdout, stderr io.Writer) int {
