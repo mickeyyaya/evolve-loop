@@ -75,6 +75,8 @@ type Options struct {
 	Signals *signalcenter.Center
 
 	PriorityClasses []string
+
+	CurrentGoal string
 }
 
 func (o *Options) resolveOpts() {

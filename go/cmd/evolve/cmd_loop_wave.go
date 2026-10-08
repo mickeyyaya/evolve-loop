@@ -30,7 +30,7 @@ func newWaveEngine(cfg loopConfig, storage core.Storage, warn io.Writer, signals
 		Protected: laneForbidden(cfg.ProjectRoot, warn),
 		Shrink:    fleet.QuotaAwareCount,
 	}
-	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals))
+	return loopwave.New(roots, ports, warn, loopwave.WithSignals(signals), loopwave.WithGoal(cfg.GoalHash))
 }
 
 // The cache is unsynchronized: a batch runs on one goroutine, so wave() is

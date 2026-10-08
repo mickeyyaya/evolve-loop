@@ -63,6 +63,7 @@ type Engine struct {
 	ports   Ports
 	stderr  io.Writer
 	signals func() *signalcenter.Center
+	goal    string
 }
 
 // Option configures an Engine at construction.
@@ -81,6 +82,10 @@ func New(roots Roots, ports Ports, warn io.Writer, opts ...Option) *Engine {
 // because the batch Center is built per batch; a nil accessor or Center emits nothing.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(e *Engine) { e.signals = c }
+}
+
+func WithGoal(hash string) Option {
+	return func(e *Engine) { e.goal = hash }
 }
 
 // SignalsWired reports whether the engine currently reaches a Center.

@@ -1,0 +1,24 @@
+{
+  "id": "inbox-claims-delta-followups",
+  "title": "Inbox claims: recurrence finds a parked origin-conflict copy, the per-run resume reason has two homes, and parked conflicts are not listed",
+  "kind": "hardening",
+  "priority_class": "correctness",
+  "weight": 0.3,
+  "route": "console",
+  "routed_reason": "the inbox lifecycle and the resume rule; the console owns them",
+  "source": "console, 2026-10-09, architecture delta check (round 2) of lane cl-inbox-claims, verdict Approve, MEDIUM and LOW items",
+  "created_at": "2026-10-09T00:30:00Z",
+  "summary": "1 (MEDIUM): recurrence/apply.go:197-221 findItem walks the whole inbox in lexical order and treats anything outside processing/ as open. origin-conflicts/ sorts before processing/, so an escalation for a claimed id finds the parked origin copy and acts on it. The same gap exists today for processed/. 2 (MEDIUM): the rule 'a per-run checkpoint needs a resumable reason' is written at inboxmover/holder.go:117 and core/resume.go:126. 3 (LOW): nothing lists or cleans .evolve/inbox/origin-conflicts/, so parked copies pile up without a word. 4 (LOW): ReleaseStaleClaims reads the goals map once per call.",
+  "fix": "1: findItem reads open items through lifecycle (the root only) and skips origin-conflicts/ and processed/, with a test. 2: give core.CheckpointResumable a per-run variant, so core owns the whole rule. 3: evolve inbox claims lists the parked origin copies and gives a count. 4: read the goals once per judged item, or accept it and record why.",
+  "acceptance": [
+    "An escalation for a claimed id never acts on a parked or processed copy, with a test",
+    "The per-run resumable-reason rule has one home in core",
+    "evolve inbox claims shows parked origin conflicts"
+  ],
+  "files": [
+    "go/internal/recurrence/apply.go",
+    "go/internal/inboxmover/holder.go",
+    "go/internal/core/resume.go",
+    "go/cmd/evolve/cmd_inbox_claims.go"
+  ]
+}

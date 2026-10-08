@@ -61,12 +61,7 @@ var ErrStaleCheckpoint = errors.New("resume: checkpoint stale")
 // typically projectRoot + "/.evolve" but is passed separately so
 // tests can place a synthetic state file anywhere.
 func LoadResumeState(_ context.Context, projectRoot, evolveDir string, opts ResumeOptions) (*ResumePoint, error) {
-	if opts.CurrentHead == nil {
-		opts.CurrentHead = defaultCurrentHead
-	}
-	if opts.PathExists == nil {
-		opts.PathExists = defaultPathExists
-	}
+	opts = opts.withDefaults()
 
 	statePath := ResolveCycleStatePath(evolveDir)
 	rp, err := loadResumeStateFrom(statePath, projectRoot, opts)
@@ -433,4 +428,20 @@ func stringsFromAny(v any) []string {
 		}
 	}
 	return out
+}
+
+func IsResumableReason(reason string) bool { return resumableReasons[reason] }
+
+func CheckpointResumable(statePath, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
+	return loadResumeStateFrom(statePath, projectRoot, opts.withDefaults())
+}
+
+func (o ResumeOptions) withDefaults() ResumeOptions {
+	if o.CurrentHead == nil {
+		o.CurrentHead = defaultCurrentHead
+	}
+	if o.PathExists == nil {
+		o.PathExists = defaultPathExists
+	}
+	return o
 }
