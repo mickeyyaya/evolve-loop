@@ -365,7 +365,7 @@ If you find a gaming pattern that the framework did not catch, please file an is
 
 ## Version
 
-**Current (v22.26)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
+**Current (v22.27)** — the full release history is in [CHANGELOG.md](CHANGELOG.md). To cut a release, use `evolve release X.Y.Z`.
 
 | Version | Date | Notes |
 |---|---|---|
@@ -407,6 +407,7 @@ If you find a gaming pattern that the framework did not catch, please file an is
 | v22.24 | Sep 15 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v22.25 | Sep 28 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 | v22.26 | Sep 30 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
+| v22.27 | Oct 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 
