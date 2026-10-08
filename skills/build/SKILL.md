@@ -23,7 +23,7 @@ description: Use after tdd has written RED tests and the contract is in team-con
 |---|---|---|
 | 1 | Read TDD contract from team-context.md | Contract loaded |
 | 2 | Implement minimum code to turn RED → GREEN | Tests pass locally |
-| 3 | Run regression suite (`legacy/scripts/utility/run-all-regression-tests.sh`) | No new regressions |
+| 3 | Run the regression suite (`evolve acs suite --cycle <N>`, from the worktree) | `red=0` (exit 0) |
 | 4 | Write `<workspace>/build-report.md` | Report present + fresh + token-bound |
 
 **Comments:** code written in this phase carries none; names, types and test names say it, and the build floor counts an added comment ([code-comments convention](../../docs/conventions/code-comments.md)).
@@ -33,9 +33,9 @@ description: Use after tdd has written RED tests and the contract is in team-con
 Builder runs in a dedicated worktree. Concurrent builders are STRUCTURALLY blocked because:
 - The trust kernel binds the cycle via SHA256 of `git diff HEAD`
 - Two concurrent writers would invalidate each other's tree-state SHA
-- `phase-gate-precondition.sh` allows only one `active_agent` per cycle
+- `.evolve/profiles/builder.json` sets `parallel_eligible: false`, so `evolve subagent dispatch-parallel builder` refuses
 
-This is **why Builder cannot fan-out** even though Scout and Auditor can.
+This is **why Builder cannot fan-out** even though Scout can.
 
 <!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/builder.json -->
 ## Phase facts

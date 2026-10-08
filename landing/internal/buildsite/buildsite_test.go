@@ -12,7 +12,7 @@ import (
 func TestBuild_RendersPagesAndCopiesAssets(t *testing.T) {
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "page.html"),
-		`{{define "mini"}}<h1>{{.Site.Hero.Headline}}</h1><img src="{{.Assets}}/hero.png">{{end}}`)
+		`{{define "mini"}}<h1>{{.Site.Hero.HeadlineLead}}{{.Site.Hero.HeadlineEmphasis}}</h1><img src="{{.Assets}}/hero.png">{{end}}`)
 	mustWrite(t, filepath.Join(dir, "gallery.html"),
 		`{{define "gallery"}}{{range .Versions}}<a href="{{.Slug}}/">{{.Title}}</a>{{end}}{{end}}`)
 

@@ -22,26 +22,26 @@
 
 | Flag | Purpose | Notes |
 |---|---|---|
-| `-p` / `--print` | Non-interactive prompt mode | Used by `agy.sh` NATIVE adapter |
+| `-p` / `--print` | Non-interactive prompt mode | Used by the headless `agy` bridge driver (`go/internal/bridge/driver_agy.go`) |
 | `--dangerously-skip-permissions` | Auto-approve all tool permissions | Required for subagent dispatch |
 | `--add-dir <path>` | Add a directory to the workspace | Repeatable; used for WORKSPACE_PATH and WORKTREE_PATH |
-| `--sandbox` | Terminal restrictions sandbox | Not used by adapter (agy handles this internally) |
+| `--sandbox` | Terminal restrictions sandbox | Not used by the bridge driver (agy handles this internally) |
 
 ## No equivalent (gaps)
 
 | Claude Code | agy CLI |
 |---|---|
-| `Agent` / `Task` (subagent dispatch with profile-scoped permissions) | **None as of 2026-05.** Skills that depend on subagent dispatch fall back to single-session execution. evolve-loop sidesteps this via the hybrid driver — see `reference/agy-runtime.md`. |
-| `--max-budget-usd` flag | **None.** agy CLI has no per-invocation cost cap. Budget tracking is deferred (cost_blind:true in this infrastructure cycle). |
-| JSON structured output | **None.** agy emits plain text only. The adapter appends a zero-cost envelope as the last STDOUT_LOG line. |
+| `Agent` / `Task` (subagent dispatch with profile-scoped permissions) | **None as of 2026-05.** Skills that depend on subagent dispatch fall back to single-session execution. evolve-loop dispatches each phase agent through the Go bridge instead — see `reference/agy-runtime.md`. |
+| `--max-budget-usd` flag | **None.** agy CLI has no per-invocation cost cap. |
+| JSON structured output | **None.** agy emits plain text only. |
 
 ## Key difference from Gemini adapter
 
-Unlike the gemini adapter, `agy.sh`'s NATIVE mode does invoke the binary directly (`agy -p`) because agy supports `--print` / `-p` non-interactive mode. No JSON translation is needed — agy emits plain text, and the adapter appends a hardcoded zero-cost envelope. The gemini adapter's JSON stats translation block does NOT port to agy.
+The bridge has a native agy driver but no gemini driver. The headless `agy` driver runs `agy -p <prompt> --dangerously-skip-permissions` directly (`go/internal/bridge/driver_agy.go`). The interactive `agy-tmux` driver runs the agy REPL in tmux. A profile `cli` of `gemini` maps to the claude-tmux driver instead.
 
 ## Implications for evolve-loop on agy
 
-When SKILL.md says "invoke the Skill tool", on agy you call the equivalent tool. When a phase doc says "spawn via subagent-run.sh", that works directly — `subagent-run.sh` resolves `cli=antigravity → agy.sh` adapter, which invokes `agy -p` as a subprocess (NATIVE) or delegates to `claude -p` (HYBRID).
+When SKILL.md says "invoke the Skill tool", on agy you call the equivalent tool. When a phase doc says to dispatch a phase agent, the Go bridge does it (`evolve loop`, or `evolve subagent run` by hand). The bridge changes `cli=antigravity` to `agy` and runs the `agy` or `agy-tmux` driver.
 
 See [reference/agy-runtime.md](agy-runtime.md) for invocation details.
 

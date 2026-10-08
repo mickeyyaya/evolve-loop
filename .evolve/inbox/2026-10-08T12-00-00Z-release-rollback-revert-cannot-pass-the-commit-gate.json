@@ -1,0 +1,22 @@
+{
+  "id": "release-rollback-revert-cannot-pass-the-commit-gate",
+  "title": "The release rollback ships its revert with no commit-gate attestation, so the revert probably stays local",
+  "kind": "bug",
+  "priority_class": "correctness",
+  "weight": 0.5,
+  "route": "console",
+  "routed_reason": "the release pipeline is console-built, and a fix needs a design decision about the rollback provenance",
+  "source": "console, 2026-10-08, the review of the v22.27.0 docs alignment (observation O2; the reviewer read the code and did not run it)",
+  "created_at": "2026-10-08T12:00:00Z",
+  "summary": "When the marketplace poll fails after the push, the release pipeline rolls back. go/internal/releasepipeline/rollback.go:339-341 ships the revert with evolve ship --class manual and EVOLVE_SHIP_AUTO_CONFIRM, but it gives no commit-gate attestation and no --bypass-commit-gate. ship/commitgate.go:58-66 (verifyCommitGateAttestation) refuses a manual ship with no attestation. Thus the revert probably stays local, and the rollback reports PARTIAL (local-only), while the bad release stays on origin.",
+  "fix": "Write a red-first test that drives the real rollback through ship with a fake remote and asserts that the revert reaches origin. Then give the rollback revert its own provenance: a release-class or rollback-class ship that the commit gate accepts with a recorded reason, or a gate attestation that the pipeline writes for its own revert. Do not use --bypass-commit-gate for routine use.",
+  "acceptance": [
+    "A test proves that the rollback revert reaches origin through the real ship path (red first)",
+    "The rollback provenance is recorded in the ledger, and the commit gate stays on for every other manual ship",
+    "docs/guides/publishing-releases.md describes the rollback as it runs"
+  ],
+  "files": [
+    "go/internal/releasepipeline/rollback.go",
+    "go/internal/phases/ship/commitgate.go"
+  ]
+}

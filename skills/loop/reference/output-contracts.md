@@ -1,6 +1,6 @@
 # Output Contracts — Phase Handoff Schemas
 
-> Reference index for the 8 phase-artifact schemas under `schemas/handoff/`. Each phase persona MUST emit an artifact that satisfies its schema; failures are detected by `validate-handoff-artifact.sh`. See [ADR 0009](../../../../docs/adr/0009-phase-handoff-schemas.md) for the rationale.
+> Reference index for the 8 phase-artifact schemas under `schemas/handoff/`. Each phase persona MUST emit an artifact that satisfies its schema. The phase runner checks each report against its contract in `go/internal/phasecontract`, and `evolve phase verify <phase>` runs the same check. See [ADR 0009](../../../docs/adr/0009-phase-handoff-schemas.md) for the rationale.
 
 ## Phase × schema matrix
 
@@ -12,7 +12,7 @@
 | 4 | TDD | `agents/evolve-tdd-engineer.md` | `tdd-report.md` | `schemas/handoff/tdd-report.schema.json` | Tests Written · AC Mapping · Red State |
 | 5 | Build | `agents/evolve-builder.md` | `build-report.md` | `schemas/handoff/build-report.schema.json` | Changes · Self-Verification · Quality Signals |
 | 6 | Audit | `agents/evolve-auditor.md` | `audit-report.md` | `schemas/handoff/audit-report.schema.json` | Artifacts Reviewed · Verdict (with PASS/WARN/FAIL value) |
-| 7 | Ship | `legacy/scripts/lifecycle/ship.sh` (no persona — script) | `ship-report.md` | `schemas/handoff/ship-report.schema.json` | Commit · Tree SHA Binding · Ledger Entry |
+| 7 | Ship | `evolve ship` (no persona — native Go, `go/internal/phases/ship`) | `ship-report.md` | `schemas/handoff/ship-report.schema.json` | Commit · Tree SHA Binding · Ledger Entry |
 | 8 | Retrospective | `agents/evolve-retrospective.md` | `retrospective-report.md` | `schemas/handoff/retrospective-report.schema.json` | What Happened · Root Cause · Lesson (with lesson YAML pointer) |
 
 ## Schema format (recap)
@@ -30,13 +30,10 @@ Schemas are bash-native / jq-readable JSON. **Not** JSON Schema v2020-12 — tha
 ## Invocation
 
 ```bash
-bash legacy/scripts/tests/validate-handoff-artifact.sh \
-    --artifact .evolve/runs/cycle-N/build-report.md \
-    --type build \
-    [--state .evolve/state.json]   # required for conditional_sections
+evolve phase verify build --workspace .evolve/runs/cycle-N [--json]
 ```
 
-Exit codes: `0` = PASS · `1` = FAIL (named violations on stdout) · `2` = ERROR (usage / missing dep).
+The phase is a built-in contract (for example `scout`, `triage`, `tdd`, `build`, `audit`, `ship`, `retro`, `intent`) or a catalog phase with a contract. Exit codes: `0` = well-formed · `1` = confirmed violation · `2` = infra ambiguity (callers fail open) · `10` = usage error.
 
 ## Authoring rules
 
@@ -47,4 +44,4 @@ Exit codes: `0` = PASS · `1` = FAIL (named violations on stdout) · `2` = ERROR
 
 ## Coverage gap (cycle 63)
 
-The cycle-63 additions (Intent, Triage, TDD, Ship, Retrospective) ship the **schema files** but `validate-handoff-artifact.sh`'s `--type` argument currently only accepts `scout|build|audit`. Extending the validator's allowlist is a separate cycle (tracked: `inbox:c64-extend-handoff-validator`). Until then, the new schemas are advisory; personas should still author against them so the eventual enforcement is a no-op.
+Removed design: the bash `validate-handoff-artifact.sh` validator is gone, and no Go code reads the `schemas/handoff/` files to check a report. The enforced contract is `go/internal/phasecontract`, and `evolve phase verify <phase>` runs the same check. Personas must still author against the schemas.

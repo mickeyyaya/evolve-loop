@@ -73,7 +73,7 @@ When built-in and external skills overlap, apply these resolutions.
 
 ## Token-Budget Depth Routing
 
-Adjust skill invocation depth based on `legacy/scripts/verification/context-budget.sh` exit status.
+> **Removed design:** no runtime gives a budget status now. The `context-budget.sh` script is removed, and no Go code produces `budgetRemaining.budgetPressure` ([agent-templates.md](../../../agents/agent-templates.md)). The text below records the former depth routing.
 
 | Budget Status | Built-in Depth | External Invocations | Max Skills/Task |
 |--------------|---------------|---------------------|:---:|

@@ -13,37 +13,32 @@ User: /evo:loop 5 polish improve dispatcher
   ↓ detects platform = gemini, reads reference/gemini-runtime.md (this file)
 
 Skill activates → STRICT MODE: execute exactly one shell command:
-  bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh 5 polish "improve dispatcher"
+  "${EVOLVE_GO_BIN:-<plugin_root>/go/bin/evolve}" loop 5 polish "improve dispatcher"
 
   ↓ (Gemini calls run_shell_command)
 
-Dispatcher loops once per cycle:
-  bash archive/legacy/scripts/dispatch/run-cycle.sh "improve dispatcher"
+evolve loop runs one cycle per iteration, in process:
+  the Go orchestrator (go/internal/core) runs the phases in order
 
   ↓
 
-run-cycle.sh spawns the orchestrator subagent via:
-  bash legacy/scripts/dispatch/subagent-run.sh orchestrator $CYCLE $WORKSPACE
+For each phase, the orchestrator dispatches the phase agent through the
+Go bridge (go/internal/bridge). The routing table and the agent profile
+(.evolve/profiles/<agent>.json) choose the CLI.
 
   ↓
 
-subagent-run.sh reads .evolve/profiles/orchestrator.json
-  → cli = "gemini"  (set by Gemini CLI users via env or profile override)
-  → dispatches through the Go bridge (`evolve subagent run`)
+The bridge has no gemini driver. A profile cli = "gemini" maps to the
+claude-tmux driver (bareDriverMap in go/internal/bridge/driver.go), so
+Claude Code runs the phase. The bridge does not probe for claude first:
+if the claude binary is not on PATH, the claude-tmux launch fails.
+The checked-in routing table has no gemini family, so the table never
+routes a phase to gemini.
 
   ↓
 
-The Go bridge's gemini driver (HYBRID SHIM):
-  1. Probes for `claude` binary on PATH (capability.QualityTier)
-  2. If found: delegates to the claude driver
-     (Claude binary becomes the actual runtime engine)
-  3. If not found: exits 99 with "install Claude CLI" message
-
-  ↓
-
-The claude driver wraps `claude -p` in sandbox-exec / bwrap, exactly as for
-the Claude Code runtime path. Builder, Auditor, Scout all run as Claude
-subprocesses with profile-scoped tool permissions.
+Builder, Auditor, Scout all run as Claude sessions with profile-scoped
+tool permissions, exactly as for the Claude Code runtime path.
 ```
 
 (The legacy bash CLI adapters under adapters/*.sh were removed in the
@@ -59,17 +54,17 @@ Gemini CLI lacks three primitives evolve-loop's runtime depends on:
 | `--max-budget-usd` cost cap | Not supported | Runaway cycles can rack up unbounded cost |
 | Subagent / Task tool with profile-scoped permissions | Not supported | Builder/Auditor cannot be sandboxed; the kernel hooks have nothing to gate |
 
-The forgery precedent ([docs/incidents/gemini-forgery.md](../../../docs/incidents/gemini-forgery.md)) shows what happens when you run evolve-loop directly on Gemini without these primitives: artifact fabrication, hallucinated git history, forged ledger entries. The kernel hooks (`role-gate`, `ship-gate`, `phase-gate-precondition`) exist *because* of that incident — but they fire on Claude Code's PreToolUse mechanism. Gemini doesn't have the same hook surface.
+The forgery precedent ([docs/incidents/gemini-forgery.md](../../../docs/incidents/gemini-forgery.md)) shows what happens when you run evolve-loop directly on Gemini without these primitives. The result was artifact fabrication, hallucinated git history and forged ledger entries. The kernel hooks (`evolve guard role`, `evolve guard ship`, `evolve guard phase`) exist *because* of that incident. But they fire on Claude Code's PreToolUse mechanism. Gemini doesn't have the same hook surface.
 
-The hybrid shim keeps the entire Claude-Code trust boundary intact: every Builder edit, every git commit, every `subagent-run.sh` invocation is gated by Claude's PreToolUse hooks. Gemini provides the conversational front-end; Claude provides the isolated execution back-end.
+The hybrid alias keeps the entire Claude-Code trust boundary intact. Claude's PreToolUse hooks gate every Builder edit, every git commit and every phase dispatch. Gemini provides the conversational front-end; Claude provides the isolated execution back-end.
 
 ## Required environment
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `gemini` binary on PATH | yes | The conversational driver |
-| `claude` binary on PATH | **yes** | The actual execution engine. Hybrid driver delegates to `claude -p` |
-| `ANTHROPIC_API_KEY` | when not in a logged-in Claude session | Auth for the underlying `claude -p` |
+| `claude` binary on PATH | **yes** | The actual execution engine. The bridge maps `gemini` to the claude-tmux driver |
+| `ANTHROPIC_API_KEY` | no — leave it unset | The claude drivers refuse to start when it is set (exit 3) |
 | `GEMINI_API_KEY` | yes | Auth for Gemini CLI itself |
 
 ## Verifying the hybrid path before running cycles
@@ -78,29 +73,29 @@ The hybrid shim keeps the entire Claude-Code trust boundary intact: every Builde
 # 1. Confirm both binaries are present
 command -v gemini && command -v claude
 
-# 2. Confirm the gemini driver delegates correctly
+# 2. Confirm the gemini binary is found
 evolve doctor probe gemini
-# Expected: HYBRID tier (claude present) — the bridge delegates to the claude driver
+# Expected: [doctor] OK: gemini found at <path>
 
 # 3. Smoke-test detection
-bash legacy/scripts/dispatch/detect-cli.sh
+evolve detect-cli
 # Expected: prints "gemini" if you're in a Gemini session
 
-# 4. Run the contract test
-bash legacy/scripts/gemini-adapter-test.sh
-# Expected: green
+# 4. Run the contract test (from go/): it pins gemini → claude-tmux
+go test -count=1 -run TestDriverFor_BareAndDriverNames ./internal/bridge/
+# Expected: ok
 ```
 
-If step 2 fails with exit 99, the message will tell you which dependency is missing.
+If step 1 or step 2 fails, install the binary that it did not find.
 
 ## What if I want true Gemini-driven phases?
 
-Currently unsupported. Tracking in [docs/platform-compatibility.md](../../../docs/platform-compatibility.md) under "Tier 2 / deferred". Two upstream conditions must hold before this becomes safe:
+Currently unsupported. [docs/architecture/platform-compatibility.md](../../../docs/architecture/platform-compatibility.md) gives the current CLI support. Two upstream conditions must hold before this becomes safe:
 
 1. Gemini CLI ships non-interactive prompt mode (so subagent dispatch is structurally possible).
 2. Read-only Gemini phases (Scout, Evaluator) are demonstrably immune to artifact-fabrication attacks against downstream phases.
 
-Until then, the hybrid driver is the only supported path.
+Until then, the gemini → claude-tmux alias is the only supported path.
 
 ## See also
 

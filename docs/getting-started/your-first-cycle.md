@@ -30,8 +30,8 @@
 | git | 2.5+ | Per-cycle worktrees need `git worktree add` |
 | `jq` | 1.6+ | Every state.json + ledger operation |
 | Anthropic auth | Subscription through `~/.claude.json` OR `ANTHROPIC_API_KEY` | Subscription auth is first-class for `/evo:loop`. The API key is also supported |
-| (optional) Gemini CLI | v0.42+ | Only if you want Gemini-routed phases |
-| (optional) Codex CLI | any | Only if you want Codex-routed phases (hybrid mode) |
+| (optional) Antigravity CLI (`agy`) | 1.0.0+ | Only if you want Gemini-routed phases, or the Claude models that agy serves (`agy-claude`) |
+| (optional) Codex CLI | 0.13.0+ | Only if you want Codex-routed phases |
 | Free disk | ~200 MB | Per-cycle worktrees + workspace artifacts |
 
 Verify each one:
@@ -90,18 +90,26 @@ jq '.version' .evolve/plugin/.claude-plugin/plugin.json
 
 ## Step 2 — Verify Your Setup
 
-Before you run a cycle, do a sanity check that the kernel hooks are connected:
+Before you run a cycle, make sure that the `evolve` binary and your CLIs work:
 
 ```bash
-ls .claude/settings.json   # Expect: hooks block referencing legacy/scripts/guards/*.sh
-bash legacy/scripts/utility/release.sh
-# Expect: PASSED: All version references are consistent.
+evolve version
+# Expect: the version, the commit and the build time of the binary
 
-bash legacy/scripts/dispatch/detect-cli.sh
-# Expect: claude (or gemini/codex if those are your default)
+evolve doctor probe tmux
+# Expect: [doctor] OK: tmux found at ...
+evolve doctor probe claude
+# Expect: [doctor] OK: claude found at ... (also probe agy or codex if you use them)
 
-ls legacy/scripts/guards/
-# Expect: phase-gate-precondition.sh, role-gate.sh, ship-gate.sh, ...
+evolve preflight-environment
+# Expect: a JSON report of the host capabilities
+
+evolve cli-routing explain builder
+# Expect: the CLI chain that runs the builder. In a project with no cli_routing table,
+# the chain comes from the profile, for example codex-tmux → claude-tmux
+
+evolve loop --preflight-only
+# Expect: the verdict of each readiness check; exit 0 means ready, exit 1 names the check that blocks
 ```
 
 If one of these checks fails, see [Common First-Time Issues](#common-first-time-issues).
@@ -136,6 +144,8 @@ evolve setup apply --preset recommended --dry-run   # preview the merged policy,
 ```
 
 The presets themselves are public config (`go/internal/setup/presets.json`). You can override them per repo through `.evolve/setup-presets.json`.
+
+If your `.evolve/policy.json` declares a `cli_routing` table, `evolve setup recommend` and `evolve setup apply` refuse and write nothing. Change the table with `evolve cli-routing set agents.<agent> <clis>`. Then use `evolve cli-routing explain <agent>` to see the chain.
 For the full mechanism, see [setup-onboarding.md](../architecture/setup-onboarding.md). For more routing configs, see [pluggability.md](../concepts/pluggability.md).
 
 ---
@@ -146,7 +156,7 @@ Select a small, contained goal for your first cycle. Do not use broad refactors.
 
 | Good first goals | Why |
 |---|---|
-| "Add a `--dry-run` flag to `legacy/scripts/foo.sh`" | Single file, clear acceptance |
+| "Add a `--dry-run` flag to `scripts/foo.sh`" | Single file, clear acceptance |
 | "Document the `bar()` function in `lib/baz.py`" | Doc-only; no test infra needed |
 | "Fix the typo in README.md line 42" | Trivial; verifies that the pipeline runs |
 | "Add unit tests for the `parseConfig()` function" | Small but real |
@@ -161,46 +171,47 @@ Select a small, contained goal for your first cycle. Do not use broad refactors.
 Run:
 
 ```bash
-bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3 \
-  "Add a --dry-run flag to legacy/scripts/foo.sh that prints the planned operation without executing it."
+evolve loop --cycles 1 \
+  --goal-text "Add a --dry-run flag to scripts/foo.sh that prints the planned operation without executing it."
 ```
 
 Or, if you are inside Claude Code:
 
 ```
-/evo:loop --cycles 1 --budget-usd 3 "Add a --dry-run flag to legacy/scripts/foo.sh..."
+/evo:loop --cycles 1 "Add a --dry-run flag to scripts/foo.sh..."
 ```
 
-The dispatcher starts the orchestrator subprocess. You will see streaming output for ~10-20 minutes.
+The loop runs the cycle and starts each phase agent through the bridge. You will see the output of the loop for ~10-20 minutes.
 
 ---
 
 ## Step 5 — Watch It Work (Without Polling)
 
-The dispatcher logs to stdout. While it runs, watch these lines:
+The loop logs its progress to stdout and stderr. To watch it from a second terminal, use these read-only tools:
 
 | What to watch | Why |
 |---|---|
-| `[phase-watchdog] phase advance: 'X' → 'Y'` | Tracks the progress of the pipeline |
-| `[claude-adapter]` or `[gemini-adapter]` lines | Which CLI dispatches this phase |
-| `[subagent-run] cli_resolution: ...` | The router decision |
-| Watchdog stalls | If a phase is idle for >180s, you will see a WARN |
+| `evolve status` | A read-only report: the loop, the cycles, the ship streak and the open PRs |
+| `evolve dashboard` | A read-only live view of the pipeline (see [pipeline-dashboard.md](../guides/pipeline-dashboard.md)) |
+| `evolve bridge sessions` | The list of the live agent panes |
+| The `LIVENESS_PHASE_STALLED` signal | The observer sends it when a phase shows no progress for 600 s. It stops nothing |
 
 **Do not poll**: do not run commands again and again in a tight loop. Each poll burns prompt tokens. Do one of these:
-- Wait passively (the dispatcher prints natural progress).
-- Open a second terminal and run `tail -f .evolve/runs/cycle-N/*.log`.
+- Wait passively (the loop prints its progress).
+- Open `evolve dashboard` in a browser.
 - Open the Claude Code Agent View (UI) for visual monitoring.
 
 The cycle artifacts appear in `.evolve/runs/cycle-N/` as each phase completes:
 
 ```bash
 ls -lt .evolve/runs/cycle-N/
-# scout-report.md      (after Scout)
-# triage-decision.md   (after Triage)
-# build-report.md      (after Build)
-# audit-report.md      (after Audit)
-# acs-verdict.json     (after Audit)
-# orchestrator-report.md  (at cycle end)
+# scout-report.md       (after Scout)
+# triage-report.md      (after Triage, with triage-decision.json)
+# test-report.md        (after TDD)
+# build-report.md       (after Build)
+# code-review-report.md (after Code-Review, on a code cycle)
+# audit-report.md       (after Audit)
+# acs-verdict.json      (after Audit)
 # carryover-todos.json (PASS) OR retrospective-report.md (FAIL/WARN)
 ```
 
@@ -208,7 +219,7 @@ ls -lt .evolve/runs/cycle-N/
 
 ## Step 6 — Read the Verdict
 
-When the dispatcher exits, check three things in this order:
+When the loop exits, check these things in this order:
 
 ### A — Exit code
 
@@ -218,10 +229,13 @@ echo $?
 
 | Exit code | Meaning |
 |---|---|
-| `0` | All cycles shipped successfully |
-| `2` | INTEGRITY-BREACH — examine the cause before you run again |
-| `3` | DONE-WITH-RECOVERABLE-FAILURES — review failedApproaches |
-| `4` | BATCH-BUDGET-EXHAUSTED |
+| `0` | The batch completed with no failure |
+| `1` | The loop stopped early: the circuit breaker opened, the loop cannot write a state file, or `--preflight-only` failed |
+| `2` | The loop stopped on an error or a fatal failure, or it refused to start (for example, because of an unfinished cycle). Read the last lines of the output before you run again |
+| `3` | The batch completed, but it absorbed a recoverable failure or a FAIL verdict. Run `evolve failures list` |
+| `5` | The quota of every CLI family is used up. The cycle has a checkpoint. Run `evolve loop --resume` after the quota resets |
+| `10` | A flag is not valid |
+| `130` | An interrupt (SIGINT or SIGTERM) stopped the loop. If a cycle was running, the loop wrote a checkpoint. Run `evolve loop --resume` |
 
 ### B — Audit verdict
 
@@ -233,7 +247,7 @@ cat .evolve/runs/cycle-N/audit-report.md | head -20
 ### C — ACS predicate verdict (the authoritative one per EGPS v10)
 
 ```bash
-jq '{verdict, green_count, red_count, total_predicates}' .evolve/runs/cycle-N/acs-verdict.json
+jq '{verdict, green_count, red_count, skip_count, ship_eligible}' .evolve/runs/cycle-N/acs-verdict.json
 ```
 
 ```json
@@ -241,11 +255,12 @@ jq '{verdict, green_count, red_count, total_predicates}' .evolve/runs/cycle-N/ac
   "verdict": "PASS",
   "green_count": 47,
   "red_count": 0,
-  "total_predicates": 47
+  "skip_count": 0,
+  "ship_eligible": true
 }
 ```
 
-`verdict: PASS` with `red_count: 0` triggers ship-gate to allow the commit. Any RED predicate fails the cycle deterministically.
+`verdict: PASS` with `red_count: 0` makes the cycle ship-eligible. Any RED predicate fails the cycle deterministically.
 
 ### D — Git log
 
@@ -268,12 +283,12 @@ Look for:
 - `## Selected Tasks` — what scout proposed
 - `## Carryover Decisions` — the items deferred to the next cycle
 
-### `triage-decision.md`
+### `triage-report.md` and `triage-decision.json`
 
-Look for:
-- `## top_n` — what triage let this cycle try
-- `## deferred` — items pushed to the next cycle
-- `## dropped` — items rejected entirely
+Look for these keys in `triage-decision.json`:
+- `top_n` — what triage let this cycle try
+- `deferred` — items pushed to the next cycle
+- `dropped` — items rejected entirely
 
 ### `build-report.md`
 
@@ -290,23 +305,25 @@ Look for:
 - `## Defects Found` — the RED findings
 - `## Observations` — non-blocking notes
 
-### `orchestrator-report.md`
+### The routing of the cycle
 
-Look for:
-- `## Phase Outcomes` — the per-phase table
-- `## CLI Resolution` — auto-rendered from the ledger. It shows which CLI/model actually ran each phase
-- `## Verdict` — the narrative verdict of the orchestrator (SHIPPED / WARN / FAILED-AND-LEARNED)
-
-### `acs/cycle-N/*.sh`
-
-These are the **predicates**: the actual verdicts, based on exit codes. Open one:
+To see the phase plan of the cycle and the integrity clamps, use the recorded routing decisions:
 
 ```bash
-cat acs/cycle-N/001-*.sh
+evolve routing explain --cycle N
 ```
 
-Each predicate has a metadata header, an explicit acceptance criterion, and a bash test. The test returns 0 (GREEN) or non-zero (RED).
-After a successful ship, the pipeline promotes these predicates to `acs/regression-suite/cycle-N/`. They then run in the audit of every future cycle.
+The CLI and the model that ran a phase are in the pane-watch file of that phase: `.evolve/runs/cycle-N/<agent>-pane-watch.json` (the fields `cli` and `model`).
+
+### The ACS predicates
+
+The **predicates** are the actual verdicts. Each predicate is a Go test in the package `acs/cycleN` of your Go module (`go/acs/cycleN/` in this repository). A test that passes is GREEN, and a test that fails is RED. Open one:
+
+```bash
+cat go/acs/cycleN/predicates_test.go
+```
+
+The ACS suite runs the package of the cycle, the regression packages in `acs/regression/` and the `acs/redteam` package. It writes the result to `acs-verdict.json`. The Go lane needs a `go.mod` and an `acs/` directory in the module root.
 
 ---
 
@@ -321,8 +338,7 @@ grep -F '"cycle":N' .evolve/ledger.jsonl | jq -c '{role, kind, model, exit_code,
 The `prev_hash` of each entry chains to the previous entry. Verify that the chain is intact:
 
 ```bash
-bash legacy/scripts/observability/verify-ledger-chain.sh
-# Expect: ledger chain verified, N entries
+evolve ledger verify
 ```
 
 This makes evolve-loop "tamper-evident": a change to any past entry invalidates every later `prev_hash`.
@@ -334,10 +350,10 @@ This makes evolve-loop "tamper-evident": a change to any past entry invalidates 
 Run another cycle:
 
 ```bash
-bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --cycles 1 --budget-usd 3
+evolve loop --cycles 1
 ```
 
-Note: there is no goal argument. The orchestrator selects from `state.json:carryoverTodos[]` (if cycle 1 left any) and from `state.json:instinctSummary[]` (the lessons learned until now).
+Note: there is no goal argument. The loop takes the next work from the inbox rank and from `state.json:carryoverTodos[]` (if cycle 1 left any). The lessons in `.evolve/instincts/lessons/` reach the phases through recall.
 
 This is the self-evolving property in action: the Scout of cycle 2 reads the lessons of cycle 1. If the cycle 1 audit FAIL'd, cycle 2 has a `retrospective-report.md` lesson YAML to consult.
 
@@ -349,16 +365,15 @@ For more about cross-cycle learning, see [self-evolution.md](../concepts/self-ev
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `ship-gate DENY` on a manual git command | The hook enforces its rule: a direct git commit is forbidden | Use `bash legacy/scripts/lifecycle/ship.sh --class manual "<msg>"` |
+| `ship-gate DENY` on a manual git command | The hook enforces its rule: a direct git commit is forbidden | Use `/commit`. It runs the commit gate, then `evolve ship --class manual` |
 | `claude binary not found` | The Claude Code CLI is not in the PATH | Run `which claude` to verify. Install it as claude.com/code tells |
 | `sandbox-exec: Operation not permitted` | Nested-Claude environment (you run `/evo:loop` from inside Claude Code) | Auto-detected. Check that `.evolve/environment.json:auto_config.inner_sandbox=false` is set |
-| `INTEGRITY-FAIL: expected_ship_sha mismatch` | Out-of-date pin after a ship.sh update | Delete `.evolve/state.json:expected_ship_sha` and run again. v8.32+ auto-rotates it |
+| `INTEGRITY-FAIL: expected_ship_sha mismatch` | Out-of-date pin after a rebuild of the `evolve` binary | Run `evolve reset-sha` |
 | Cycle stuck in `calibrate` for >2 min | The orchestrator subprocess is slow to start | Run `pgrep -fl claude` to confirm that the subprocess runs. Wait, or kill it and try again |
 | `state.json:lastCycleNumber` does not advance | Worktree-state-not-syncing (B7) | Fixed in v10.7.0+. On an older version, run `jq '.lastCycleNumber += 1 \| .' state.json > tmp && mv tmp state.json` |
 | Audit FAIL, but you think that the code is correct | EGPS predicates are stricter than prose verdicts. Read `audit-report.md` for the cited `path:line` evidence | Trust the predicates. Adjust the code, or refine the predicate definition |
 | Memo phase API 529 | Anthropic rate limit during memo | Classified as `infrastructure` (recoverable). The next run tries again |
-| `role-gate DENY: phase=retrospective ...` | A stuck cycle-state from an earlier failed run | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
-| `BATCH-BUDGET CRITICAL: cumulative ... >= 95%` | The cost cap is almost exhausted | Increase `--budget-usd`, OR let the next cycle checkpoint with the v9.1.0 mechanism |
+| `role-gate DENY: phase=retrospective ...` | A stuck cycle-state from an earlier failed run | `evolve cycle reset` |
 
 ---
 

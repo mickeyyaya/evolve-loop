@@ -35,7 +35,6 @@ type Product struct {
 	Name        string `json:"name"`
 	Version     string `json:"version"`
 	MentalModel string `json:"mentalModel"`
-	OneLiner    string `json:"oneLiner"`
 	OneBreath   string `json:"oneBreath"`
 	License     string `json:"license"`
 	Repo        string `json:"repo"`
@@ -58,14 +57,12 @@ type Verdict struct {
 }
 
 type Hero struct {
-	Headline         string   `json:"headline"`
-	HeadlineLead     string   `json:"headlineLead"`     // headline up to the emphasized part
-	HeadlineEmphasis string   `json:"headlineEmphasis"` // the part each layout renders as <em>
-	HeadlineVariants []string `json:"headlineVariants"`
-	Subhead          string   `json:"subhead"`
-	CTAPrimary       CTA      `json:"ctaPrimary"`
-	CTASecondary     CTA      `json:"ctaSecondary"`
-	Verdict          Verdict  `json:"verdictAnimation"`
+	HeadlineLead     string  `json:"headlineLead"`     // headline up to the emphasized part
+	HeadlineEmphasis string  `json:"headlineEmphasis"` // the part each layout renders as <em>
+	Subhead          string  `json:"subhead"`
+	CTAPrimary       CTA     `json:"ctaPrimary"`
+	CTASecondary     CTA     `json:"ctaSecondary"`
+	Verdict          Verdict `json:"verdictAnimation"`
 }
 
 type Stat struct {
@@ -95,6 +92,7 @@ type PipelineDemo struct {
 	Sub       string     `json:"sub"`
 	Floor     []string   `json:"floor"`
 	Providers []string   `json:"providers"`
+	RouteNote string     `json:"routeNote"`
 	Cases     []DemoCase `json:"cases"`
 }
 
@@ -173,6 +171,8 @@ type Concurrency struct {
 	Sub       string     `json:"sub"`
 	Lanes     []Lane     `json:"lanes"`
 	Scenarios []Scenario `json:"scenarios"`
+	NoteLead  string     `json:"noteLead"`
+	Note      string     `json:"note"`
 }
 
 // Lane is one concurrent loop: a goal, the LLM it runs on, its branch, and the
@@ -342,7 +342,8 @@ func (s *Site) Validate() error {
 	}{
 		{"product.name", s.Product.Name == ""},
 		{"product.version", s.Product.Version == ""},
-		{"hero.headline", s.Hero.Headline == ""},
+		{"hero.headlineLead", s.Hero.HeadlineLead == ""},
+		{"hero.headlineEmphasis", s.Hero.HeadlineEmphasis == ""},
 		{"hero.subhead", s.Hero.Subhead == ""},
 		{"hero.ctaPrimary.command", s.Hero.CTAPrimary.Command == ""},
 		{"proofBar", len(s.ProofBar) == 0},
@@ -350,11 +351,14 @@ func (s *Site) Validate() error {
 		{"pipelineDemo.heading", s.PipelineDemo.Heading == ""},
 		{"pipelineDemo.floor (>=1)", len(s.PipelineDemo.Floor) == 0},
 		{"pipelineDemo.providers (>=1)", len(s.PipelineDemo.Providers) == 0},
+		{"pipelineDemo.routeNote", s.PipelineDemo.RouteNote == ""},
 		{"pipelineDemo.cases (>=2)", len(s.PipelineDemo.Cases) < 2},
 		{"examples.heading", s.Examples.Heading == ""},
 		{"examples.items (>=5)", len(s.Examples.Items) < 5},
 		{"concurrency.heading", s.Concurrency.Heading == ""},
 		{"concurrency.lanes (>=2)", len(s.Concurrency.Lanes) < 2},
+		{"concurrency.noteLead", s.Concurrency.NoteLead == ""},
+		{"concurrency.note", s.Concurrency.Note == ""},
 		{"tryIt.heading", s.TryIt.Heading == ""},
 		{"tryIt.command", s.TryIt.Command == ""},
 		{"tryIt.terminal (>=4)", len(s.TryIt.Terminal) < 4},

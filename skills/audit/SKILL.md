@@ -1,11 +1,11 @@
 ---
 name: audit
-description: Use after build has produced build-report.md. Validates the build via four parallel sub-auditors (eval-replay, lint, regression, build-quality) and produces ALL-PASS verdict. Adversarial mode default-on per CLAUDE.md.
+description: Use after build has produced build-report.md. Validates the build with one adversarial auditor agent and produces the audit verdict. Adversarial mode default-on per CLAUDE.md.
 ---
 
 # audit
 
-> Sprint 1.2 fan-out + Sprint 3 composable skill (v8.16+). Sub-auditors run in parallel via `subagent-run.sh dispatch-parallel auditor`.
+> Sprint 3 composable skill (v8.16+). The Sprint 1.2 sub-auditor fan-out is removed. `.evolve/profiles/auditor.json` has no `parallel_subtasks`, so one auditor agent writes the report.
 
 ## When to invoke
 
@@ -15,28 +15,27 @@ description: Use after build has produced build-report.md. Validates the build v
 ## When NOT to invoke
 
 - Build status is FAIL (no point auditing broken code; orchestrator must re-build first)
-- Eval-only cycles (only run `audit-eval-replay` sub-auditor)
 
 ## Workflow
 
 | Step | Action | Exit criteria |
 |---|---|---|
 | 1 | Verify `<workspace>/build-report.md` exists, fresh, status ≠ FAIL | Build verified |
-| 2 | Dispatch 4 sub-auditors in parallel | 4 worker artifacts |
-| 3 | Aggregator applies ALL-PASS rule | `<workspace>/audit-report.md` first line is `Verdict: <X>` |
-| 4 | Phase gate `gate_audit_to_ship` enforces PASS | Gate passes only on PASS |
+| 2 | Dispatch the auditor agent through the bridge | `<workspace>/audit-report.md` written |
+| 3 | The auditor declares the verdict | `audit-report.md` has a `## Verdict` (or `Verdict:`) line |
+| 4 | `evolve ship` verifies the audit binding (`go/internal/phases/ship/audit.go`) | Ship refuses a FAIL verdict |
 
 ## Verdict semantics
 
-| Verdict | Trigger | Phase-gate behavior |
+| Verdict | Trigger | Ship behavior |
 |---|---|---|
-| `PASS` | Every sub-auditor reports PASS | Allow ship |
-| `FAIL` | Any sub-auditor reports FAIL | Block ship; orchestrator → retrospective |
-| `WARN` | Any sub-auditor reports WARN (no FAIL) | Block ship; review case-by-case |
+| `PASS` | The auditor reports PASS | Allow ship |
+| `FAIL` | The auditor reports FAIL | Block ship; orchestrator → retrospective |
+| `WARN` | The auditor reports WARN | Ship continues and logs the WARN. `workflow.strict_audit` in `.evolve/policy.json` blocks it |
 
 ## Adversarial mode (CLAUDE.md rule 8)
 
-Default ON: each sub-auditor's prompt prepends "ADVERSARIAL AUDIT MODE — require positive evidence for PASS". Disable only via `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps. Auditor model defaults to Opus while Builder defaults to Sonnet — different family breaks same-model-judge sycophancy.
+Default ON: the runner adds the "ADVERSARIAL AUDIT MODE (default-on)" framing to the end of the auditor's prompt (`go/internal/subagent/subagentrun/prepare.go`). The framing requires positive evidence for PASS. Disable it only with `ADVERSARIAL_AUDIT=0` for deliberately permissive sweeps. Auditor model defaults to Opus while Builder defaults to Sonnet — different family breaks same-model-judge sycophancy.
 
 ## Goal-integrity (metric-affecting cycles)
 
@@ -76,11 +75,8 @@ Invoked by:
 - `/evo:audit`
 - `loop` macro after `/evo:build`
 
-Fan-out prompts live in `.evolve/profiles/auditor.json:parallel_subtasks` (count projected into Phase facts above).
-
 ## Reference
 
 - `.evolve/profiles/auditor.json`
-- `legacy/scripts/dispatch/aggregator.sh` (phase=audit)
-- `legacy/scripts/lifecycle/phase-gate.sh:gate_audit_to_ship`
-- `skills/loop/phase4-audit.md` (legacy detailed workflow)
+- `go/internal/phases/audit/` (the audit phase and its gates)
+- `go/internal/phases/ship/audit.go` (the audit binding that ship verifies)

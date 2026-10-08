@@ -1,27 +1,42 @@
-# Evolve Loop — briefing for AI coding agents
+# Evolve Loop — a brief for AI agents that write code
 
-> You are likely an AI agent setting up Evolve Loop for a developer. This page
-> is the plain-text mental model plus the exact commands. Everything here is
-> also true for humans.
+> You are probably an AI agent that sets up Evolve Loop for a developer. This
+> page gives the mental model in plain text, and the exact commands. All of it
+> is also true for humans.
 
 ## What it is
 
-Evolve Loop is an autonomous, self-healing development pipeline that drives
-the AI CLI you already run (Claude Code, Codex, Gemini). Each cycle it plans
-the work (scout), writes a failing test first (tdd), implements (build), has
-an independent adversarial reviewer audit the diff (audit), and only then
-ships. The invariant: nothing ships unless a test failed first — the floor
-`ship ⇒ build ∧ audit ∧ (tdd ∨ trivial)` is compiled in, not configurable away.
+Evolve Loop is an autonomous development pipeline that repairs itself. It
+drives the AI CLIs that you already run. Antigravity (`agy`) and Claude Code
+come first. Codex and local Ollama models run when a routing table names them.
 
-## Install (one line, macOS & Linux, Windows via WSL2)
+Each cycle has these steps:
+
+1. Scout plans the work.
+2. TDD writes a test that fails first.
+3. Build makes the change, then simplifies and reviews its own diff.
+4. Code review scores the change on ten quality dimensions (in shadow).
+5. An independent adversarial auditor audits the diff.
+6. Ship merges the change only after the audit passes.
+
+The invariant is that a code change ships only after a test failed first,
+unless the change is trivial. The floor `ship ⇒ build ∧ audit ∧ (tdd ∨ trivial)`
+is compiled into the binary. A configuration cannot remove it. A document
+deliverable also waives the tdd conjunct.
+
+Current release: v22.27.0.
+
+## Install (one line, macOS and Linux, Windows through WSL2)
 
     curl -fsSL https://mickeyyaya.github.io/evolve-loop/install.sh | sh
 
-- Verifies the release checksum, installs a static Go binary to ~/.local/bin,
-  adds an idempotent PATH line to the shell rc, and projects the /evo:* skills
-  into every detected AI CLI. No account. No telemetry. Safe to re-run.
-- Pin a version:            EVO_VERSION=v22.0.1 curl … | sh
-- Don't touch shell config: EVO_NO_MODIFY_PATH=1 curl … | sh
+- The installer verifies the release checksum and installs a static Go binary
+  to ~/.local/bin. It adds one PATH line to the shell rc, and it adds the line
+  only once.
+- It installs the /evo:* skills into each AI CLI that it finds. It needs no
+  account and sends no telemetry. You can run it again safely.
+- Pin a version:            EVO_VERSION=v22.27.0 curl … | sh
+- Keep the shell config:    EVO_NO_MODIFY_PATH=1 curl … | sh
 - Read the script first:    https://github.com/mickeyyaya/evolve-loop/blob/main/install.sh
 
 ## First commands
@@ -29,17 +44,58 @@ ships. The invariant: nothing ships unless a test failed first — the floor
     evolve doctor                          # verify tmux + CLI wiring
     /evo:loop --cycles 3 "your goal"       # run inside your AI CLI
 
-## Continuous development (the operating model)
+## Routing (one table)
 
-You never stop a running loop to steer it. You drop a weighted JSON todo into
-`.evolve/inbox/` and triage picks it up by weight on the next cycle:
+One `cli_routing` table in `.evolve/policy.json` decides every dispatch.
+`evolve cli-routing init|set|unset|migrate` are the only writers of the table.
+`evolve cli-routing explain <agent>` prints the CLI chain of an agent.
+
+In the table that builds Evolve Loop itself:
+
+- agy runs first, on Gemini 3.8 Flash High.
+- Deep and top seats run Claude Opus through agy (`agy-claude`), then Claude
+  Code.
+- The integrity floor agents (auditor, adversarial review, tdd and the code
+  reviewer) run on Claude Code only.
+
+The loop updates Claude Code and agy at each wave boundary. It smoke-tests each
+update before the next dispatch.
+
+## Continuous development (how you operate it)
+
+You never stop the loop to steer it. You file a JSON item with
+`evolve inbox add`, and triage takes the top of a computed rank on the next
+cycle:
 
     {"id": "fix-auth-bug", "weight": 0.9, "title": "…", "kind": "bug",
      "fix": "…", "acceptance": ["regression test red-first", "…"]}
 
-Failures are routed, not fatal: provider quota exhaustion benches the provider
-and re-dispatches on a fallback CLI; a tampered binary blocks the ship and
-self-heals the pin; a diverged origin waits for a boundary `evolve sync-main`.
+The rank adds weight, priority class, the items that it unblocks, recurrence,
+age and goal. `evolve inbox rank --explain <id>` shows the parts of the score.
+`evolve inbox show|list|edit|verify|withdraw` curate an item.
+
+A failure is routed, not fatal:
+
+- If a provider has no quota, a usage query records the evidence. The loop
+  benches that CLI and sends the phase to the next CLI in the chain.
+- If only audit gates forced a FAIL, the build gets a bounded repair round.
+- If a binary was tampered with, the ship stops, and the pin repairs itself.
+- If the origin moved, the loop waits for `evolve sync-main` at the boundary.
+
+A convergence policy is built to make every loop that repeats converge or
+escalate (ADR-0126). It runs in shadow now: no loop calls it yet. It changes
+the feedback, then the strategy, then the scope, and it never allows a fourth
+round.
+
+`evolve checkpoint save` saves uncommitted dev-worktree work as refs.
+
+## Standards
+
+- Code explains itself: the commit gate refuses a commit that adds a comment.
+- Every code change is test-first, and mutation tests check the tests.
+- Every landing passes a review loop with a convergence rule.
+- The documentation moves to ASD-STE100 Simplified Technical English. 21 core
+  documents use it now, and its lint is in progress.
 
 ## Links
 

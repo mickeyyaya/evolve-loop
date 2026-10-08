@@ -32,16 +32,7 @@
 
 **Source:** DAAO (arXiv:2509.11079)
 
-**When:** Assign `difficultyScore` to each proposed task.
-
-| Score | Difficulty | Model Tier | Token Budget |
-|-------|-----------|------------|-------------|
-| 1-3 | Simple | tier-3 | 20-30K |
-| 4-6 | Moderate | tier-2 | 30-60K |
-| 7-9 | Complex | tier-1 | 60-100K |
-| 10 | Extreme | tier-1 + thinking | 100K+ |
-
-**Rule:** Check `state.json.taskTypeDifficulty` for per-type success rates. If `successRateByBand["7-9"] < 0.5` → split task or upgrade model tier.
+> **Status (v22.27.0).** No code and no persona reads a `difficultyScore`, a model tier for each score or `state.json.taskTypeDifficulty`. The tier of a phase comes from its profile and from the advisor (see [model-routing.md](model-routing.md)). This section only records the technique.
 
 ---
 

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`internal/cycleclassify` reads a finished or aborted cycle workspace (`.evolve/runs/cycle-<N>/`) and returns one canonical classification with the marker and file that triggered it. The loop uses the result to decide between retry and stop. It records failed approaches under that class, quota-pauses on `MarkerQuotaLikelyEmptyOutput` (`cmd_loop_sequential_verify.go`), and stops on `integrity-breach`. The package is the Go port of the legacy bash `classify_cycle_failure` (`archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh`).
+`internal/cycleclassify` reads a finished or aborted cycle workspace (`.evolve/runs/cycle-<N>/`) and returns one canonical classification with the marker and file that triggered it. The loop uses the result to decide between retry and stop. It records failed approaches under that class, quota-pauses on `MarkerQuotaLikelyEmptyOutput` (`cmd_loop_sequential_verify.go`), and stops on `integrity-breach`. The package is the Go port of the legacy bash `classify_cycle_failure` function of the deleted `evolve-loop-dispatch.sh`.
 
 ## Design
 

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -115,7 +116,7 @@ func Run(paths Paths, target string, dryRun bool, now time.Time) (Result, error)
 	} else if changed {
 		res.Modified = append(res.Modified, "README.md (Current)")
 	}
-	if changed, err := BumpReadmeHistory(paths.ReadmeMD, mm, now, dryRun); err != nil {
+	if changed, err := BumpReadmeHistory(paths.ReadmeMD, target, now, dryRun); err != nil {
 		return res, err
 	} else if changed {
 		res.Modified = append(res.Modified, "README.md (history)")
@@ -318,11 +319,8 @@ func HasHistoryRow(path, majorMinor string) (bool, error) {
 	return pattern.MatchString(string(data)), nil
 }
 
-// BumpReadmeHistory inserts a new row "| v<mm> | <today> | TBD ... |"
-// just AFTER the last contiguous v-row in the table. Bash uses awk to
-// peek the next line and insert if that line is not also a v-row; we
-// implement the same insert-after-last-vrow rule.
-func BumpReadmeHistory(path, majorMinor string, now time.Time, dryRun bool) (bool, error) {
+func BumpReadmeHistory(path, version string, now time.Time, dryRun bool) (bool, error) {
+	majorMinor := MajorMinor(version)
 	has, err := HasHistoryRow(path, majorMinor)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -340,27 +338,16 @@ func BumpReadmeHistory(path, majorMinor string, now time.Time, dryRun bool) (boo
 	if err != nil {
 		return false, err
 	}
-	// Find the last `| vX.Y |` line and insert the new row after it.
 	lines := strings.Split(string(data), "\n")
-	lastVRow := -1
-	for i, line := range lines {
-		if readmeHistoryRowRE.MatchString(line) {
-			lastVRow = i
-		}
-	}
-	if lastVRow < 0 {
-		// No history table exists — leave the file alone (bash awk does
-		// the same: it scans for v-rows; if none found, no insert).
+	firstVRow := slices.IndexFunc(lines, readmeHistoryRowRE.MatchString)
+	if firstVRow < 0 {
 		return false, nil
 	}
-	today := formatHistoryDate(now)
 	newRow := fmt.Sprintf(
-		"| v%s | %s | TBD — fill in via release-pipeline.sh + changelog-gen.sh |",
-		majorMinor, today,
+		"| v%s | %s | See the [%s] section of CHANGELOG.md. |",
+		majorMinor, formatHistoryDate(now), version,
 	)
-	updated := append([]string{}, lines[:lastVRow+1]...)
-	updated = append(updated, newRow)
-	updated = append(updated, lines[lastVRow+1:]...)
+	updated := slices.Insert(lines, firstVRow, newRow)
 	return true, atomicwrite.Bytes(path, []byte(strings.Join(updated, "\n")))
 }
 
