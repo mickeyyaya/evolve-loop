@@ -10,7 +10,7 @@ argument-hint: "(--resume | [--cycles N] [strategy] <goal>)"
 
 ## Platform overlay (v8.15.0+)
 
-Tool and command names in this file use **Claude Code conventions** (`Read`, `Bash`, `Skill`, `Agent`, etc.). If you are running this skill from a different CLI (Gemini, Codex, generic), read [reference/platform-detect.md](reference/platform-detect.md) FIRST — it tells you which translation overlay to load (`reference/<platform>-tools.md` for tool names, `reference/<platform>-runtime.md` for invocation patterns). As of v12.0.0 the runtime is the Go binary (`go/bin/evolve`); cross-CLI subagent execution is handled by `evolve subagent run` and the `evolve serve-phase <name>` phaseproto wire. See [docs/platform-compatibility.md](../../docs/platform-compatibility.md) for the support matrix.
+Tool and command names in this file use **Claude Code conventions** (for example, `Read`, `Bash`, `Skill` and `Agent`). If you run this skill from a different CLI (Gemini, Codex or a generic CLI), read [reference/platform-detect.md](reference/platform-detect.md) FIRST. It tells you which translation overlay to load: `reference/<platform>-tools.md` for tool names and `reference/<platform>-runtime.md` for invocation patterns. As of v12.0.0, the runtime is the Go binary (`go/bin/evolve`). `evolve subagent run` and the `evolve serve-phase <name>` phaseproto wire do the cross-CLI subagent execution. See [docs/architecture/platform-compatibility.md](../../docs/architecture/platform-compatibility.md) for the support matrix.
 
 > **v12.1 status:** All command examples in this skill use the native `evolve <subcommand>` CLI. The legacy bash dispatcher is archived at `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh` — not for general use.
 
@@ -87,7 +87,7 @@ The rest of this file (architecture, model routing, phase docs) is reference mat
 
 > **Trust boundary (v8.13.1, v12.1-updated)**: enforced by THREE PreToolUse kernel hooks running as native Go: `evolve guard ship` (only `evolve ship` can perform git commit/push/gh release), `evolve guard role` (Edit/Write must match the active phase's path allowlist), `evolve guard phase` (denies the in-process `Agent`/`Task` dispatch tool while a cycle is active per `.evolve/cycle-state.json`, forcing phase agents through the native bridge — NOTE: currently a wired no-op, rewire to the `Agent|Task` matcher pending per ADR-0074; phase ORDER itself is enforced by the Go state machine, `go/internal/core`). For automated cycles, prefer `evolve cycle run [--goal-text GOAL]` (or `evolve loop` for batches) — it spawns a profile-restricted orchestrator subagent that operates within these hooks. Legacy in-line orchestration remains supported but the hooks apply equally to it.
 
-> **v8.13.2 / v12.0.0**: self-healing release pipeline. For version-bump releases use `evolve release <version>` (native Go). The pipeline runs pre-flight gating, auto-generates a CHANGELOG entry from conventional commits, atomically ships via `evolve ship`, polls the marketplace for up to 5 minutes, and auto-rolls-back on any post-push failure. Use `--dry-run` to simulate without mutations. See [docs/release-protocol.md](../../docs/release-protocol.md) for vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
+> **v8.13.2 / v12.0.0**: the release pipeline heals itself. For a version-bump release, use `evolve release <version>` (native Go). The pipeline runs the pre-flight gates and writes a CHANGELOG entry from conventional commits. It ships atomically through `evolve ship`, polls the marketplace for up to 5 minutes, and rolls back automatically when a step after the push fails. Use `--dry-run` to simulate without changes. See [docs/guides/publishing-releases.md](../../docs/guides/publishing-releases.md) for the vocabulary (push ≠ tag ≠ release ≠ publish ≠ propagate).
 
 ## Code carries no comments (system policy)
 
@@ -281,16 +281,20 @@ Use `evolve loop` (multi-cycle batch) or `evolve cycle run` (single cycle) for a
 
 ## Agents
 
-| Role | File | Tier | Output |
-|------|------|------|--------|
-| Scout | `agents/evolve-scout.md` | tier-2 | `scout-report.md` |
-| Builder | `agents/evolve-builder.md` | tier-2 | `build-report.md` |
-| Auditor | `agents/evolve-auditor.md` | tier-2 | `audit-report.md` |
+| Role | File | Output |
+|------|------|--------|
+| Scout | `agents/evolve-scout.md` | `scout-report.md` |
+| Builder | `agents/evolve-builder.md` | `build-report.md` |
+| Auditor | `agents/evolve-auditor.md` | `audit-report.md` |
 
 ## Model Routing
 
-| Phase | Default | Upgrade → | Downgrade → |
-|-------|---------|-----------|-------------|
-| Scout | tier-2 | Cycle 1 / goal → tier-1 | Cycle 4+ → tier-3 |
-| Builder | tier-2 | M+5 files / retry ≥ 2 → tier-1 | S + cache → tier-3 |
-| Auditor | tier-2 | Security → tier-1 | Clean → tier-3 |
+Each profile in `.evolve/profiles/` names a default tier and an envelope on the ladder `fast`, `balanced`, `deep` and `top`. The advisor can move a phase inside its envelope (`EVOLVE_DYNAMIC_ROUTING=advisory`, the default).
+
+| Phase | Default | Envelope |
+|-------|---------|----------|
+| Scout | `balanced` | `balanced` to `deep` |
+| Builder | `balanced` | `balanced` to `deep` |
+| Auditor | `deep` | `deep` only |
+
+The `cli_routing` table in `.evolve/policy.json` decides which CLI runs each phase. `evolve cli-routing explain <agent>` prints the chain of an agent. See [model-routing.md](../../docs/reference/model-routing.md).

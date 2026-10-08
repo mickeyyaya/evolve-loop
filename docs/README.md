@@ -25,7 +25,7 @@ docs/
 ├── guides/                    ← how-to (operational tasks)
 ├── reference/                 ← per-agent technique manuals
 ├── architecture/              ← cross-role system design (reference)
-│   └── adr/                   ← runtime/engine ADRs (0001-0083, canonical corpus)
+│   └── adr/                   ← runtime/engine ADRs (0001-0126, canonical corpus)
 ├── research/                  ← merged research tree (2026-08-05): packages + notes (load on demand)
 ├── chronicle/                 ← engineering chronicle — workstream-level narratives
 ├── operations/                ← release process, ops history

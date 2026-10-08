@@ -419,7 +419,18 @@ air-gapped `install.sh --binary` recipe, `EVOLVE_GO_BIN` pinning, the
 approval-request flow, and the codesign alternative — see
 [corporate-deployment.md](corporate-deployment.md).
 
-Pipeline lifecycle: pre-flight (`evolve release-preflight`) → version bump (`evolve version-bump`) → auto-changelog (`evolve changelog-gen`, conventional commits) → consistency check (`evolve release-consistency`) → atomic ship via native `evolve ship` → marketplace propagation polling (`evolve marketplace-poll`, 5 min) → cache refresh → auto-rollback (`evolve rollback`) on post-push failure.
+Pipeline lifecycle: the one home of the release lifecycle is [publishing-releases.md](../guides/publishing-releases.md). In short, `evolve release` runs these steps:
+
+1. pre-flight (`evolve release-preflight`), with the check of the `required.yml` run of `HEAD`;
+2. the changelog (`evolve changelog-gen`, conventional commits);
+3. the version bump (`evolve version-bump`);
+4. the rebuild of `go/evolve`;
+5. the consistency check (`evolve release-consistency`);
+6. the atomic ship (`evolve ship --class release`: commit, push and `gh release create`);
+7. the marketplace poll (`evolve marketplace-poll`, 300 s);
+8. the release verify.
+
+If a step after the push fails, `evolve rollback` reverts the release.
 
 **Demote-on-failure net (#394, landed 2026-07-31; proven live at v22.13.0):** the local ship pipeline
 publishes the tag's GitHub release listing BEFORE the remote workflow's suite runs. When that suite fails,

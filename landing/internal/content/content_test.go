@@ -18,8 +18,8 @@ func TestLoad_RealContentFileIsValid(t *testing.T) {
 	if site.Product.Version == "" {
 		t.Error("Product.Version is empty")
 	}
-	if site.Hero.Headline == "" {
-		t.Error("Hero.Headline is empty")
+	if site.Hero.HeadlineLead == "" || site.Hero.HeadlineEmphasis == "" {
+		t.Error("Hero.HeadlineLead or Hero.HeadlineEmphasis is empty")
 	}
 	if site.Hero.CTAPrimary.Command == "" {
 		t.Error("Hero.CTAPrimary.Command is empty")
@@ -43,7 +43,6 @@ func TestValidate_ReportsMissingHeadline(t *testing.T) {
 	site := &Site{}
 	site.Product.Name = "X"
 	site.Product.Version = "v1"
-	// Hero.Headline intentionally left empty.
 
 	err := site.Validate()
 	if err == nil {
@@ -65,8 +64,11 @@ func TestContent_AllCopyIsCentralized(t *testing.T) {
 	if site.Hero.HeadlineLead == "" || site.Hero.HeadlineEmphasis == "" {
 		t.Fatal("hero headline must be split into HeadlineLead + HeadlineEmphasis")
 	}
-	if got := site.Hero.HeadlineLead + site.Hero.HeadlineEmphasis; got != site.Hero.Headline {
-		t.Errorf("HeadlineLead+HeadlineEmphasis = %q, want full Headline %q", got, site.Hero.Headline)
+	if site.PipelineDemo.RouteNote == "" {
+		t.Error("PipelineDemo.RouteNote missing (the pipeline routing note is hardcoded somewhere)")
+	}
+	if site.Concurrency.NoteLead == "" || site.Concurrency.Note == "" {
+		t.Error("Concurrency.NoteLead/Note missing (the concurrency note is hardcoded somewhere)")
 	}
 	if site.PillarsIntro.Kicker == "" || site.PillarsIntro.Heading == "" {
 		t.Error("PillarsIntro.Kicker/Heading missing (pillars section label is hardcoded somewhere)")
@@ -180,8 +182,8 @@ func TestLoad_ValidJSONButInvalidContentFailsLoudly(t *testing.T) {
 		t.Errorf("Load returned a non-nil *Site (%v) on validation failure, want nil", site)
 	}
 	msg := err.Error()
-	if !strings.Contains(msg, "hero.headline") {
-		t.Errorf("error %q does not name the missing field 'hero.headline'", msg)
+	if !strings.Contains(msg, "hero.headlineLead") {
+		t.Errorf("error %q does not name the missing field 'hero.headlineLead'", msg)
 	}
 	if !strings.Contains(msg, "invalid content") {
 		t.Errorf("error %q is not wrapped with the Load validate-stage prefix 'invalid content'", msg)
@@ -274,5 +276,28 @@ func TestValidate_RequiresConcurrency(t *testing.T) {
 	site.Concurrency = Concurrency{}
 	if err := site.Validate(); err == nil {
 		t.Error("Validate() accepted an empty concurrency block; want a loud failure")
+	}
+}
+
+func TestValidate_NamesEachRenderedCopyFieldWhenItIsBlank(t *testing.T) {
+	cases := []struct {
+		field string
+		blank func(*Site)
+	}{
+		{"hero.headlineLead", func(s *Site) { s.Hero.HeadlineLead = "" }},
+		{"hero.headlineEmphasis", func(s *Site) { s.Hero.HeadlineEmphasis = "" }},
+		{"pipelineDemo.routeNote", func(s *Site) { s.PipelineDemo.RouteNote = "" }},
+		{"concurrency.noteLead", func(s *Site) { s.Concurrency.NoteLead = "" }},
+		{"concurrency.note", func(s *Site) { s.Concurrency.Note = "" }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.field, func(t *testing.T) {
+			site := loadRealSite(t)
+			tc.blank(site)
+			err := site.Validate()
+			if err == nil || !strings.HasSuffix(err.Error(), ": "+tc.field) {
+				t.Errorf("Validate() = %v, want the error to name %s", err, tc.field)
+			}
+		})
 	}
 }

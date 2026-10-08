@@ -303,12 +303,14 @@ func TestHasHistoryRow(t *testing.T) {
 	}
 }
 
-func TestBumpReadmeHistory_AppendsRow(t *testing.T) {
+const newestFirstHistory = "## Version history\n\n| Version | Date | Notes |\n|---|---|---|\n| v11.6 | May 23 | second |\n| v11.5 | May 23 | first |\n\n## Next section\n"
+
+func TestBumpReadmeHistory_RowPointsAtTheChangelogSection(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "README.md")
-	writeFile(t, p, "## Version history\n\n| Version | Date | Theme |\n|---|---|---|\n| v11.5 | May 23 | first |\n| v11.6 | May 23 | second |\n\n## Next section\n")
+	writeFile(t, p, newestFirstHistory)
 	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
-	changed, err := BumpReadmeHistory(p, "11.7", now, false)
+	changed, err := BumpReadmeHistory(p, "11.7.0", now, false)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -316,16 +318,47 @@ func TestBumpReadmeHistory_AppendsRow(t *testing.T) {
 		t.Errorf("expected insert")
 	}
 	body, _ := os.ReadFile(p)
-	if !strings.Contains(string(body), "| v11.7 | May 24 | TBD") {
-		t.Errorf("new row not inserted: %s", body)
+	want := "| v11.7 | May 24 | See the [11.7.0] section of CHANGELOG.md. |\n"
+	if !strings.Contains(string(body), want) {
+		t.Errorf("new row %q not inserted: %s", want, body)
 	}
-	// Order: 11.5 then 11.6 then 11.7 then "Next section".
-	idx5 := strings.Index(string(body), "v11.5")
-	idx6 := strings.Index(string(body), "v11.6")
-	idx7 := strings.Index(string(body), "v11.7")
-	idxNext := strings.Index(string(body), "Next section")
-	if !(idx5 < idx6 && idx6 < idx7 && idx7 < idxNext) {
-		t.Errorf("row order wrong: 5=%d 6=%d 7=%d next=%d", idx5, idx6, idx7, idxNext)
+	if strings.Contains(string(body), "TBD") || strings.Contains(string(body), ".sh") {
+		t.Errorf("new row names a placeholder or a deleted script: %s", body)
+	}
+}
+
+func TestBumpReadmeHistory_InsertsTheFirstVersionRow(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "README.md")
+	writeFile(t, p, newestFirstHistory)
+	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
+	if _, err := BumpReadmeHistory(p, "11.7.0", now, false); err != nil {
+		t.Fatalf("%v", err)
+	}
+	body, _ := os.ReadFile(p)
+	lines := strings.Split(string(body), "\n")
+	sep := -1
+	for i, line := range lines {
+		if line == "|---|---|---|" {
+			sep = i
+		}
+	}
+	if sep < 0 || sep+3 >= len(lines) {
+		t.Fatalf("header separator lost: %s", body)
+	}
+	got := lines[sep+1 : sep+4]
+	want := []string{
+		"| v11.7 | May 24 | See the [11.7.0] section of CHANGELOG.md. |",
+		"| v11.6 | May 23 | second |",
+		"| v11.5 | May 23 | first |",
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("row %d under the separator = %q, want %q", i, got[i], want[i])
+		}
+	}
+	if strings.Index(string(body), "v11.5") > strings.Index(string(body), "Next section") {
+		t.Errorf("rows moved past the next section: %s", body)
 	}
 }
 
@@ -334,7 +367,7 @@ func TestBumpReadmeHistory_IdempotentWhenRowExists(t *testing.T) {
 	p := filepath.Join(tmp, "README.md")
 	writeFile(t, p, "| v11.7 | already there | done |\n")
 	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
-	changed, _ := BumpReadmeHistory(p, "11.7", now, false)
+	changed, _ := BumpReadmeHistory(p, "11.7.0", now, false)
 	if changed {
 		t.Errorf("expected idempotent skip")
 	}
@@ -345,7 +378,7 @@ func TestBumpReadmeHistory_NoTableNoOp(t *testing.T) {
 	p := filepath.Join(tmp, "README.md")
 	writeFile(t, p, "README without history table\n")
 	now := time.Date(2026, 5, 24, 0, 0, 0, 0, time.UTC)
-	changed, _ := BumpReadmeHistory(p, "11.7", now, false)
+	changed, _ := BumpReadmeHistory(p, "11.7.0", now, false)
 	if changed {
 		t.Errorf("no table → no insert")
 	}
@@ -356,7 +389,7 @@ func TestBumpReadmeHistory_DryRunDoesNotWrite(t *testing.T) {
 	p := filepath.Join(tmp, "README.md")
 	original := "| v11.6 | May 23 | s |\n"
 	writeFile(t, p, original)
-	changed, _ := BumpReadmeHistory(p, "11.7", time.Now(), true)
+	changed, _ := BumpReadmeHistory(p, "11.7.0", time.Now(), true)
 	if !changed {
 		t.Errorf("dry-run should report would-change")
 	}
@@ -419,8 +452,8 @@ func TestRun_FullBumpPipeline(t *testing.T) {
 	if !strings.Contains(string(body), "Current (v11.7)") {
 		t.Errorf("README Current not bumped")
 	}
-	if !strings.Contains(string(body), "| v11.7 |") {
-		t.Errorf("README history not appended")
+	if !strings.Contains(string(body), "\n| v11.7 | May 24 | See the [11.7.0] section of CHANGELOG.md. |\n| v11.6 |") {
+		t.Errorf("README history row not inserted above v11.6 with the full version: %s", body)
 	}
 }
 
@@ -694,7 +727,7 @@ func TestBumpReadmeCurrent_ReadErrorNonNotExist(t *testing.T) {
 // TestBumpReadmeHistory_ReadErrorNonNotExist pins a directory-path read error.
 func TestBumpReadmeHistory_ReadErrorNonNotExist(t *testing.T) {
 	dir := t.TempDir()
-	_, err := BumpReadmeHistory(dir, "11.7", time.Unix(0, 0).UTC(), false)
+	_, err := BumpReadmeHistory(dir, "11.7.0", time.Unix(0, 0).UTC(), false)
 	if err == nil || !strings.Contains(err.Error(), "read") {
 		t.Errorf("got %v, want a read error for directory path", err)
 	}

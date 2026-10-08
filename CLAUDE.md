@@ -47,7 +47,7 @@ Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mand
 5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). The in-process `Agent` is denied.
 6. The OS sandbox wraps subprocesses (`EVOLVE_SANDBOX=1`). When the sandbox is nested, the EPERM fallback turns on automatically.
 7. Run the eval-quality pre-flight on every eval (`evolve eval quality-check`).
-8. The Adversarial Auditor is on by default (an Opus auditor against a Sonnet builder). `ADVERSARIAL_AUDIT=0` turns it off.
+8. The Adversarial Auditor is on by default. The auditor runs Claude Opus on Claude Code, and the builder runs agy first. `ADVERSARIAL_AUDIT=0` turns it off.
 
 Maximum velocity, zero shortcuts. The runtime provisions worktrees natively: agents must NOT call `git worktree`. Follow the failure-adapter verdicts (PROCEED/RETRY/BLOCK) verbatim. `evolve ledger verify` checks the chain.
 
@@ -95,7 +95,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - `gc`: the retention horizons, since 2026-09-29.
   - `inbox_priority`: the class order and the factor weights of the inbox rank, since 2026-10-06 (ADR-0121). It is strict-decoded. The plan's P2 (2026-10-06) wired it: every lane consumer reads `inboxrank.Order`.
   - `gc.mode: enforce`, since 2026-10-06. Thus the batch-start and batch-end GC of the loop applies its run-dir and worktree sweeps, and does not only report them. `evolve gc` at the boundary still owns the cache, temp and process sweeps. The cache has a 20 GB compiled-default cap, `gc.go_cache_max_gb`.
-  - `cli_routing`: the CLI routing table, since 2026-10-07 (L2, [cli-routing-table-2026-10.md](docs/plans/cli-routing-table-2026-10.md)). It replaces the former `workflow.universal_fallback_exclude` and `pins` keys. `evolve cli-routing migrate` folds those keys into it.
+  - `cli_routing`: the CLI routing table, since 2026-10-07 (L2, [cli-routing-table-2026-10.md](docs/plans/cli-routing-table-2026-10.md)). It replaces the former `workflow.universal_fallback_exclude` and `pins` keys. `evolve cli-routing migrate` moves `pins`, `workflow.universal_fallback` and `router.cli/model` into it. It refuses a non-empty `workflow.universal_fallback_exclude`: drop those families from `clis`, then remove the key.
 - Since 2026-08-10: `failure_disposition.stage=enforce`. The escalation boundary is LIVE (it was shadow).
 - `fleet.count=3`. This value was restored from the August codex-quota reduction. It was verified live on 2026-08-24. Over cycles 1530-1552 there were 76 codex dispatches / 44% share and zero quota halts. The gpt-5.6 sol/terra/luna tiers were healthy at the time.
   - From 2026-09-10 until 2026-10-07, deep/top ran the deep model of the codex family manifest (gpt-5.6-sol) at high effort. On 2026-10-07 the routing table took codex out of every chain.
@@ -104,7 +104,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
 - Since 2026-10-07 the `cli_routing` table decides every dispatch:
   - Every non-deep, non-top phase runs agy first (Gemini 3.8 Flash High at balanced). No tracked profile defaults to fast, and no tracked profile lets an envelope fall to fast.
   - Deep and top seats run agy-owned Claude (`agy-claude-tmux`), then Claude Code. `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
-  - The claudeFamilyFloor seats (auditor/adversarial-review/tdd + the spec verifiers) run Claude Code only.
+  - The claudeFamilyFloor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only.
   - codex is reachable only under `--bypass-policy`.
   - `evolve cli-routing explain <agent>` prints the chain of any agent.
 - Comments: code has no comments. The code explains itself (AGENTS.md invariant 10, [docs/conventions/code-comments.md](docs/conventions/code-comments.md)). The commit gate refuses a commit that adds one. In loop lanes, the `comment_floor` of the build floor counts them (rollout stage: the convention).
@@ -134,6 +134,12 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - A stall signals `LIVENESS_PHASE_STALLED` and kills nothing.
   - `evolve bridge sessions` lists every live pane, read-only.
   - A `.evolve/policy.json` `observer` block can override the default (the checked-in file does not set it).
+- Operator verbs since v22.27.0 (details in runtime-reference):
+  - `evolve checkpoint save|list|restore|prune` keeps the uncommitted work of a dev worktree as refs (ADR-0122).
+  - `evolve cli update` installs a newer Claude Code or agy and smoke-tests it. The loop runs it at each wave boundary.
+  - `evolve convergence decide` gives the next step of a console lane's review chain (ADR-0126). The pipeline loops do not call it yet.
+  - `workflow.convergence` is a compiled default at stage shadow.
+- When only the deterministic audit gates force a FAIL over a PASS narrative, the cycle gets a bounded Build repair round (ADR-0093).
 - Run `/clear` before a new evolve-loop batch. This isolates the session cost.
 
 ## References

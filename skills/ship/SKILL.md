@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Use after audit returns Verdict PASS. Atomic git commit + tag + ledger update. Single-writer; cannot fan-out.
+description: Use after audit returns Verdict PASS. Atomic git commit + ledger update; only the `evolve release` path makes a tag. Single-writer; cannot fan-out.
 ---
 
 # ship
@@ -22,18 +22,18 @@ description: Use after audit returns Verdict PASS. Atomic git commit + tag + led
 
 | Step | Action | Exit criteria |
 |---|---|---|
-| 1 | Verify audit verdict = PASS via `gate_audit_to_ship` | Gate passes |
-| 2 | Run `legacy/scripts/utility/release.sh <version>` for consistency check | Markers consistent |
-| 3 | Run `legacy/scripts/lifecycle/ship.sh "<commit message>"` | Atomic commit + tag created |
+| 1 | Verify audit verdict = PASS (or WARN without `workflow.strict_audit`). `evolve ship` checks the audit binding itself (`go/internal/phases/ship/audit.go`) | Binding check passes |
+| 2 | Run `evolve release-consistency <version>` for consistency check | Markers consistent |
+| 3 | Run `evolve ship --class cycle "<commit message>"` | Atomic commit created. Only the `evolve release` path makes a tag |
 | 4 | Verify ledger entry added | `kind: "ship"` with cycle binding |
 
 ## Single-writer invariant
 
-Ship is ATOMIC by design — even if other phases fan out, Ship cannot. There is one git commit per cycle. Concurrent ship attempts on the same cycle are blocked by `phase-gate-precondition.sh` (only one `active_agent: orchestrator` at ship phase).
+Ship is ATOMIC by design — even if other phases fan out, Ship cannot. There is one git commit per cycle. The ship lock serializes concurrent ship attempts: `evolve ship` holds a flock on `.evolve/ship.lock` while it commits, merges and pushes (`go/internal/phases/ship/gitops.go`).
 
 ## Cycle-binding (v8.13.0+)
 
-`legacy/scripts/lifecycle/ship.sh` refuses to ship if the current tree-state SHA differs from the SHA captured at audit time (in the auditor's ledger entry). Prevents "audit cycle 50, ship cycle 51" exploits. This guarantee is preserved through Sprint 3's tri-layer refactor.
+`evolve ship` (`go/internal/phases/ship/audit.go`) refuses to ship if the current tree-state SHA differs from the SHA captured at audit time (in the auditor's ledger entry). Prevents "audit cycle 50, ship cycle 51" exploits. This guarantee is preserved through Sprint 3's tri-layer refactor.
 
 <!-- GENERATED:phase-facts BEGIN — do not edit; run `evolve skills generate`. Sources: docs/architecture/phase-registry.json · go/internal/phasecontract · .evolve/profiles/orchestrator.json -->
 ## Phase facts
@@ -54,7 +54,6 @@ Invoked by:
 
 ## Reference
 
-- `legacy/scripts/lifecycle/ship.sh` (atomic commit + tag)
-- `legacy/scripts/release-pipeline.sh` (full release lifecycle for `publish` operations)
-- `docs/release-protocol.md` (vocabulary: push / tag / release / propagate / publish / ship)
-- CLAUDE.md "Release & Publish Workflow"
+- `evolve ship` (`go/internal/phases/ship/`): atomic commit + push; only the `evolve release` path makes a tag
+- `evolve release` (`go/internal/releasepipeline/`): full release lifecycle for `publish` operations
+- [docs/guides/publishing-releases.md](../../docs/guides/publishing-releases.md) (vocabulary: push / tag / release / propagate / publish / ship)

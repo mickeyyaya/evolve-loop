@@ -39,6 +39,8 @@ A cycle is one pass through 8 phases (plus a meta-cycle every 5 cycles). Every p
 | 8 | **Ship** | If `red_count==0`, commit + push through `legacy/scripts/lifecycle/ship.sh` | git commit on `main` |
 | 9 | **Memo / Retro** | PASS → memo (carryover capture); FAIL/WARN → retrospective (lesson extraction) | `carryover-todos.json` OR `retrospective-report.md` + `lessons/<id>.yaml` |
 
+Since v22.27.0, a code cycle also runs **Code-Review** between Build and Audit. It runs in shadow, writes `code-review-report.md` and is not a gate.
+
 Then `gate_cycle_complete` archives the workspace to `.evolve/history/cycle-N/`.
 
 The 8 phases are mandatory, in order. The kernel-managed helper `legacy/scripts/lifecycle/cycle-state.sh advance <phase> <agent>` records every phase change in `cycle-state.json`. `phase-gate-precondition.sh` (PreToolUse hook) structurally blocks a skipped phase, and phases out of order.
@@ -56,12 +58,13 @@ An "agent" in evolve-loop is **one persona, one perspective, one output format**
 | **Plan-Reviewer** (opt-in fan-out) | `agents/plan-reviewer.md` | 4-lens review | `scout-report.md`, `intent.md` | `plan-review.md` (aggregate of 4 worker artifacts) |
 | **Builder** | `agents/evolve-builder.md` | Implementation | `scout-report.md`, `triage-decision.md` | code edits in worktree, `build-report.md`, `acs/cycle-N/*.sh` predicates |
 | **Tester** (opt-in, v10.3.0+) | `agents/evolve-tester.md` | Predicate authorship | `build-report.md` | `acs/cycle-N/*.sh` (split from the deliverables of Builder) |
+| **Code-Reviewer** (code cycles, shadow, v22.27.0+) | `agents/evolve-code-reviewer.md` | Independent review on the shared quality index | the build and its diff | `code-review-report.md` |
 | **Auditor** | `agents/evolve-auditor.md` | Adversarial cross-check | everything above + `git diff HEAD` | `audit-report.md`, `acs-verdict.json` |
 | **Memo** (PASS cycles only) | `agents/evolve-memo.md` | Carryover capture | scout/triage outputs | `carryover-todos.json`, `memo.md` |
 | **Retrospective** (FAIL/WARN only) | `agents/evolve-retrospective.md` | Lesson extraction | artifacts of the failed cycle | `retrospective-report.md`, `.evolve/instincts/lessons/<id>.yaml` |
 | **Orchestrator** | `agents/evolve-orchestrator.md` | Phase sequencer (not a write-heavy role) | all phase outputs | `orchestrator-report.md` |
 
-By default, the Auditor runs on a **different model family from the Builder** (Builder=Sonnet, Auditor=Opus or Haiku per profile). This is intentional: same-model judges are sycophantic. See [`docs/architecture/multi-llm-review.md`](../architecture/multi-llm-review.md).
+The routing prefers a **different model family for the Auditor and the Builder**. The Auditor runs Claude Opus on Claude Code. In this repository, the `cli_routing` table runs the Builder on agy first. `evolve cli-routing explain builder` prints the chain and the model at the tier of the builder. This is intentional: same-model judges are sycophantic. See [`docs/architecture/multi-llm-review.md`](../architecture/multi-llm-review.md).
 
 ---
 

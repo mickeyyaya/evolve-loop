@@ -17,7 +17,7 @@
 |----------|---------|
 | [genes.md](reference/genes.md) | Gene/capsule fix template format and usage |
 | [instincts.md](reference/instincts.md) | Instinct lifecycle, graduation, and memory operations |
-| [model-routing.md](reference/model-routing.md) | Tier-based model selection rules |
+| [model-routing.md](reference/model-routing.md) | The tier ladder and the `cli_routing` table |
 | [configuration.md](reference/configuration.md) | Configuration schema and domain detection |
 | [reference/scout-discovery.md](reference/scout-discovery.md) | Codebase scans and hotspot detection |
 | [accuracy-self-correction.md](private/research/archived-2026-05-19/accuracy-self-correction.md) | CoT verification and anti-conformity checks |
@@ -36,6 +36,8 @@
 | [intent-phase.md](architecture/intent-phase.md) | Intent capture phase + AwN classifier specification |
 | [sequential-write-discipline.md](architecture/sequential-write-discipline.md) | Parallelization discipline rule (`parallel_eligible`) + concurrency cap (default 2 since v8.55.0) — when a role can fan out, and how many workers run at once |
 | [build-explanation-contract.md](architecture/build-explanation-contract.md) | Builder-authored rationale deliverable, provenance binding, and Audit/Ship/Retro verification lifecycle |
+| [review-loop-and-quality-index.md](architecture/review-loop-and-quality-index.md) | The code-review phase and the shared quality index (ADR-0124, in shadow since v22.27.0) |
+| [convergence-policy.md](architecture/convergence-policy.md) | The rule that makes each loop that repeats converge or escalate (ADR-0126, in shadow since v22.27.0) |
 
 ## Release & Operations
 

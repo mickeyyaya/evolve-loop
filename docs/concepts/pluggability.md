@@ -28,7 +28,7 @@ The framework keeps three things separate: *what work occurs*, *who does it*, an
 |---|---|---|---|
 | **Persona** | The role definition of the agent (prompt, output format, perspective) | `agents/<role>.md` | Swap `evolve-scout.md` for a domain-specific scout |
 | **Skill** | The workflow steps inside a persona | `skills/<name>/SKILL.md` | Replace the `evolve-tdd` skill with a property-based-test skill |
-| **LLM** | The model + CLI that drives the persona | `.evolve/llm_config.json` | Route Scout to gemini-3.1-pro, Builder to claude-sonnet, Auditor to claude-opus |
+| **LLM** | The model + CLI that drives the persona | `.evolve/policy.json` (`cli_routing`) | Route Scout to agy, Builder to agy-owned Claude, Auditor to Claude Code |
 
 You can change one axis and not the others. When you swap the LLM that drives Scout, you do NOT need a new persona file.
 When you swap the Scout persona, you do NOT need a new skill.
@@ -91,7 +91,11 @@ The framework stays intact.
 
 ## LLM Pluggability (the CLI Router)
 
-This axis makes evolve-loop different from single-vendor agent frameworks. **Every phase declares which CLI + model runs it. Operators override this through `.evolve/llm_config.json`.**
+This axis makes evolve-loop different from single-vendor agent frameworks. **Every phase declares which CLI + model runs it. Operators override this through the `cli_routing` table in `.evolve/policy.json`.**
+
+> **Status (v22.27.0).** The router script, `.evolve/llm_config.json`, the bash adapters and the CLI Resolution renderer are removed. The sections from "The router script" to "Adding a New CLI Adapter" record that removed design. A CLI today is a bridge driver in `go/internal/bridge/` with a family manifest in `go/internal/bridge/manifests/<driver>.json`.
+>
+> Now the `cli_routing` table decides which CLI runs each phase, and `evolve cli-routing` is its only writer. `evolve cli-routing explain <agent>` prints the chain of an agent. For the tier map, the table and the commands, see [model-routing.md](../reference/model-routing.md).
 
 ### The router script
 
@@ -318,11 +322,10 @@ The v8.32-v10.7 Gemini support followed exactly this path. The router does not c
 
 | Limitation | Why | Mitigation |
 |---|---|---|
-| Gemini's native mode has workspace restrictions | The `gemini` CLI refuses writes outside the allowed workspace directories | Use `--include-directories <worktree>` (the adapter does this automatically in v10.7+) |
-| Cross-CLI cost reporting is approximate | The Gemini JSON does not include `cost_usd` (only tokens). The adapter calculates the cost with a hardcoded price table, which can drift | Update the prices in `gemini.sh` periodically. Use `gemini_translate_error: true` in the usage envelope as a drift signal |
-| Codex adapter is hybrid-only | As of v10.7, the Codex CLI has no non-interactive prompt mode | If you must run codex natively, file an issue. The path is the same as the path that gemini followed |
-| Per-phase model overrides do not compose with `EVOLVE_TASK_MODE` budget tiers | The tier resolution occurs after the CLI resolution. The budget tiers are per CLI profile | Set the budget caps with `EVOLVE_MAX_BUDGET_USD` instead |
-| Auditor's "different model family" assumption | If you set Builder=Sonnet and Auditor=Sonnet in `llm_config.json`, the adversarial-audit framing becomes weaker | Use Config C above. Or, if you deliberately run a permissive sweep, set `ADVERSARIAL_AUDIT=0` |
+| Gemini models run through agy, not through the `gemini` CLI | There is no `gemini` bridge driver | Route a Gemini phase to `agy` in the `cli_routing` table |
+| Cost reports for agy have no USD amount | `agy-tmux` measures the tokens from the pane, and it reports no USD cost | Use `evolve tokens report` for the token use of each phase |
+| The `cli_routing` table of this repository has no codex | Codex runs only under `--bypass-policy` | To route a phase to codex, add `codex` to `clis` and to a chain with `evolve cli-routing set` |
+| The auditor's "different model family" assumption | If the builder and the auditor resolve to the same family, the adversarial audit is weaker | Route the builder to another family in the `cli_routing` table. `evolve cli-routing explain builder` warns about a shared family. If you deliberately run a permissive sweep, set `ADVERSARIAL_AUDIT=0` |
 | Memo profile shell-tool restrictions (cycle 62 B4 fix) | The fix removed `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)` from the memo allowlist. If a custom memo persona needs these tools, it must use Read instead | Use the Read tool to examine files |
 
 ---

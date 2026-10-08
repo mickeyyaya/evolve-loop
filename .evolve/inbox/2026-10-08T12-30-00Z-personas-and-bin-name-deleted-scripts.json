@@ -1,0 +1,26 @@
+{
+  "id": "personas-and-bin-name-deleted-scripts",
+  "title": "Agent personas, loop phase files and bin wrappers still name deleted bash scripts",
+  "kind": "docs",
+  "priority_class": "correctness",
+  "weight": 0.55,
+  "route": "console",
+  "routed_reason": "the personas and the loop skill are protected or pinned instruction text; a change needs a persona review and tests",
+  "source": "console, 2026-10-08, the v22.27.0 docs alignment (the skills lane listed what remained outside its scope)",
+  "created_at": "2026-10-08T12:30:00Z",
+  "summary": "The v22.27.0 alignment fixed the README, the docs, the landing page, 10 skills and the loop references. These files still tell agents or users to run scripts that the Go port deleted: 19 agents/*.md personas; skills/loop/SKILL.md and skills/loop/{phases,phase3-build,phase5-ship,phase6-learn,benchmark-eval}.md; skills/adversarial-testing/SKILL.md; skills/evaluator/reference/anti-gaming.md; and bin/check-caps, bin/cost, bin/preflight, bin/status, bin/health, bin/verify-chain and bin/README.md. Also: go/internal/marketplacepoll/marketplacepoll.go:268-271 logs \"running release.sh\" and a WARN hint with a deleted path; runtime-reference.md rule 5 says that evolve guard phase is a wired no-op, but .claude/settings.json and CLAUDE.md say that it is live (ADR-0075); skills/loop/reference/phases-detail.md:238 tells agents to run git worktree remove, which the profiles deny; evolve subagent check-ctx-advisory prints a hard-coded agent name test-agent.",
+  "fix": "For each file, replace a deleted script with its current evolve verb (check each with --help), or remove the instruction when no equivalent exists, and keep the force of every rule. For the personas, run the persona tests and a persona review, because a persona change changes phase behaviour. Fix the bin wrappers to call evolve verbs, or delete them with their README rows. Fix the marketplacepoll log text and the runtime-reference rule 5 statement. Write all new text in STE.",
+  "acceptance": [
+    "A grep of agents/, skills/ and bin/ finds no deleted script named as a thing to run",
+    "Each new command in the changed files exists and was checked with --help",
+    "The persona tests, TestSkills_NoDrift and the full floor pass"
+  ],
+  "files": [
+    "agents/",
+    "skills/loop/",
+    "skills/adversarial-testing/SKILL.md",
+    "bin/",
+    "go/internal/marketplacepoll/marketplacepoll.go",
+    "docs/operations/runtime-reference.md"
+  ]
+}

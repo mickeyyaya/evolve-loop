@@ -1,8 +1,6 @@
 # Codex CLI Tool Names
 
 > Translation map for Claude Code tool names → Codex CLI (formerly OpenAI Codex CLI). Codex dispatches via the native Go bridge drivers (`codex` / `codex-tmux`); the former bash adapter was removed in the script→Go migration (2026-06). This file is the tool-name translation map.
->
-> **Note:** sections below that reference `legacy/scripts/cli_adapters/codex.sh` describe the removed bash path and are retained as historical context only.
 
 ## Direct equivalents
 
@@ -29,10 +27,6 @@
 
 ## Runtime status in evolve-loop
 
-`legacy/scripts/cli_adapters/codex.sh` is a deliberate stub that exits 99. `legacy/scripts/codex-adapter-test.sh` pins this status so it cannot be silently bypassed. Implementing real codex support requires:
+Codex runs through two native bridge drivers. The `codex` driver runs `codex exec --output-last-message <artifact>` (`go/internal/bridge/driver_codex.go`). The `codex-tmux` driver runs the codex TUI in tmux (`go/internal/bridge/driver_codextmux.go`). Codex has no `--permission-mode` flag, so the `codex` driver refuses a profile `permission_mode` and does not ignore it.
 
-1. Mapping evolve-loop profile fields (`allowed_tools[]`, `disallowed_tools[]`, `max_budget_usd`, `permission_mode`, `add_dir`, `extra_flags`) to the Codex CLI flag surface.
-2. Either providing an external budget cap (since `--max-budget-usd` doesn't exist) or accepting unbounded-cost runs.
-3. Verifying that Codex's permission/approval model can express the same per-phase access patterns Claude profiles encode.
-
-Until then, set the profile's `cli` field to `claude` (or `gemini` for the hybrid driver). See [docs/platform-compatibility.md](../../../docs/platform-compatibility.md).
+The checked-in routing table (`.evolve/policy.json` `cli_routing`) does not list codex, so a phase runs on codex only under `--bypass-policy`. See [reference/codex-runtime.md](codex-runtime.md) and [docs/architecture/platform-compatibility.md](../../../docs/architecture/platform-compatibility.md).

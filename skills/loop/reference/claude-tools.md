@@ -41,6 +41,6 @@
 
 ## Notes for evolve-loop
 
-- The skill explicitly forbids using the in-process `Agent` tool to spawn Scout/Builder/Auditor in production cycles. Subagents go through `bash legacy/scripts/dispatch/subagent-run.sh`, which invokes the per-platform adapter at `legacy/scripts/cli_adapters/<cli>.sh`. See SKILL.md's STRICT MODE section.
+- The skill explicitly forbids the use of the in-process `Agent` tool to spawn Scout/Builder/Auditor in production cycles. Phase agents go through the native Go bridge. `evolve loop` dispatches them in process, and `evolve subagent run <agent> <cycle> <workspace>` dispatches one by hand. The bridge runs the driver for the chosen CLI (`go/internal/bridge/driver_*.go`). See SKILL.md's STRICT MODE section.
 - `--allowedTools` and `--disallowedTools` flags on `claude -p` accept patterns like `Bash(git status:*)` and `Write(.evolve/runs/cycle-*/*)`. These syntaxes are documented in `.evolve/profiles/*.json`.
 - Slash commands like `/evo:loop` are registered via `.claude-plugin/plugin.json`.

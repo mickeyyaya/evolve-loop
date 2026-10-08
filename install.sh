@@ -16,7 +16,7 @@ set -eu
 
 # ---- Config (env-overridable so CI/tests can redirect) ---------------------
 REPO="mickeyyaya/evolve-loop"
-# Pin a release:  EVO_VERSION=v22.0.1 curl ... | sh    (default: latest, via the
+# Pin a release:  EVO_VERSION=vX.Y.Z curl ... | sh    (default: latest, via the
 # releases/latest/download redirect — no GitHub API call, no rate limit).
 if [ -n "${EVO_VERSION:-}" ]; then
 	RELEASE_BASE="${EVO_RELEASE_BASE:-https://github.com/${REPO}/releases/download/${EVO_VERSION}}"

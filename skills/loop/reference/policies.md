@@ -16,7 +16,7 @@ Patterns confirmed at confidence 0.9+ become mandatory behavior:
 | **Inline S-tasks** (inst-007) | S-complexity, <10 lines, clear eval → implement inline, skip Builder | ~30-50K tokens |
 | **Grep-based evals** (inst-004) | Markdown/shell projects → grep commands with match counts | — |
 | **Meta-cycle** | Every 5 cycles → split-role critique + prompt evolution | [phase7-meta.md](../phase7-meta.md) |
-| **Gene library** | Reusable fix templates in `.evolve/genes/` | [docs/genes.md](../../../docs/genes.md) |
+| **Gene library** | Reusable fix templates in `.evolve/genes/` | [docs/reference/genes.md](../../../docs/reference/genes.md) |
 
 ## Plan Reuse
 
@@ -35,6 +35,8 @@ Builder reads prior successful build-reports from `.evolve/history/` when facing
 
 ## Context Window Strategy
 
+> **Removed design:** the GREEN, YELLOW and RED context budget came from `context-budget.sh`, and the script is removed. `evolve loop` runs every cycle, and each phase runs in its own CLI session. The text about this budget below records the former in-session design.
+
 Each cycle is an **independent unit** — it has its own goal, runs its own agents (in isolated subagent context), and persists all results to files. Between cycles, Claude Code auto-compresses older conversation turns. The only accumulated context is:
 - Static overhead (system prompt, rules): ~25K — always present
 - Recent orchestrator conversation (~1-2 cycles): ~50K — not yet compacted
@@ -42,19 +44,13 @@ Each cycle is an **independent unit** — it has its own goal, runs its own agen
 
 This means effective context usage is **roughly constant** regardless of cycle count, with only slow residual growth. A 10-cycle and a 3-cycle session use similar amounts of live context.
 
-### Context Budget Check (mandatory at cycle start)
+### Context Budget Check (removed)
 
-Run `legacy/scripts/verification/context-budget.sh` at the start of every cycle. It answers: "Is there room for one more cycle?"
-
-| Status | Exit Code | Trigger | Action |
-|--------|-----------|---------|--------|
-| **GREEN** | 0 | Cycles 1-9 (default) | Continue normally — full per-cycle budget available |
-| **YELLOW** | 1 | Cycle 10+ OR headroom tight | Lean mode for this cycle. **Continue — YELLOW is NOT a stop signal.** |
-| **RED** | 2 | Cycle 30+ OR headroom < one lean cycle | Write handoff checkpoint. Only STOP on two consecutive RED cycle starts. |
+The `context-budget.sh` check is removed, and no command gives its GREEN, YELLOW or RED status. Do not run a context check at cycle start. For one phase, `evolve subagent check-ctx-advisory <profile_json> <tokens>` compares a token count with the profile's `context_clear_trigger_tokens`.
 
 ### Session Break Protocol
 
-When RED is signaled:
+When a session must break (for example, at an API rate limit):
 1. **Complete current phase** (never break mid-phase)
 2. **Write state.json** with current version (OCC protocol)
 3. **Write handoff** to `$WORKSPACE_PATH/handoff.md` AND `.evolve/workspace/handoff.md` (see template below)
@@ -106,7 +102,7 @@ Required sections (all mandatory):
 | Survives | Source | Resets | Reason |
 |----------|--------|--------|--------|
 | Cycle numbers, task decisions | state.json | CYCLES_THIS_SESSION | New session = fresh context |
-| Strategy, goal | handoff.md | Budget pressure / lean mode | Re-inferred by context-budget.sh |
+| Strategy, goal | handoff.md | Budget pressure / lean mode | Not computed now (`context-budget.sh` is removed) |
 | Remaining cycles | handoff.md only | Challenge token | Regenerated per cycle |
 | Benchmark, instincts, failed approaches | state.json | Orchestrator reasoning | Partial via "Carry Forward" |
 | Eval definitions | .evolve/evals/ (checksummed) | Auditor strictness | Decayed 50% on new invocation |
