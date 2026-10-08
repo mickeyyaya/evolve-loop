@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
 type fakeBoundaryCall struct {
@@ -69,6 +71,15 @@ func fakeBoundaryHasFlagValue(args []string, name, value string) bool {
 	return false
 }
 
+func boundaryFlagValue(args []string, name string) string {
+	for i, a := range args {
+		if a == name && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
 func TestBoundaryRun_StopsAtFirstFailedStepWithItsExitCode(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -83,6 +94,7 @@ func TestBoundaryRun_StopsAtFirstFailedStepWithItsExitCode(t *testing.T) {
 		{"sync-main refused", 3, exitRefused, []string{"loop-stop", "pr", "sync-main"}},
 		{"gc I/O failure", 4, exitIO, []string{"loop-stop", "pr", "sync-main", "gc"}},
 		{"brake release fails", 5, exitRefused, []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop"}},
+		{"log dir switch fails", 6, exitIO, []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop", boundaryLogVerb}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -111,11 +123,11 @@ func TestBoundaryRun_FullFakeRunEndsWithDetachedPidAndBootVerdict(t *testing.T) 
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 for a run whose every step succeeds\n%s%s", rc, stdout.String(), stderr.String())
 	}
-	want := []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop", "loop"}
+	want := []string{"loop-stop", "pr", "sync-main", "gc", "loop-stop", boundaryLogVerb, "loop"}
 	if got := fake.verbs(); !slices.Equal(got, want) {
-		t.Fatalf("dispatched %v, want the six steps %v in order", got, want)
+		t.Fatalf("dispatched %v, want the seven steps %v in order", got, want)
 	}
-	stop, merge, release, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[4].args, fake.calls[5].args
+	stop, merge, release, logStep, launch := fake.calls[0].args, fake.calls[1].args, fake.calls[4].args, fake.calls[5].args, fake.calls[6].args
 	if !slices.Contains(stop, "--wait") || slices.Contains(stop, "--release") {
 		t.Errorf("first loop-stop args %v: want --wait and no --release", stop)
 	}
@@ -125,8 +137,14 @@ func TestBoundaryRun_FullFakeRunEndsWithDetachedPidAndBootVerdict(t *testing.T) 
 	if !slices.Contains(release, "--release") || slices.Contains(release, "--wait") {
 		t.Errorf("second loop-stop args %v: want --release and no --wait", release)
 	}
-	if !slices.Contains(launch, "--detach") || !slices.ContainsFunc(launch, func(a string) bool { return strings.HasSuffix(a, boundaryLoopLog) }) {
-		t.Errorf("loop args %v: want --detach with a --log under the plane", launch)
+	runID := boundaryFlagValue(logStep, "--run-id")
+	if !gcpolicy.IsLogRunDir(runID) {
+		t.Fatalf("%s args %v: want a --run-id that the loop log catalog matches", boundaryLogVerb, logStep)
+	}
+	root := boundaryFlagValue(logStep, "--project-root")
+	wantLog := filepath.Join(root, ".evolve", gcpolicy.LogsDir, runID, gcpolicy.LoopLogName)
+	if !slices.Contains(launch, "--detach") || !fakeBoundaryHasFlagValue(launch, "--log", wantLog) {
+		t.Errorf("loop args %v: want --detach with --log %s, the new log dir of this launch", launch, wantLog)
 	}
 	if !strings.Contains(strings.Join(launch, "\x00"), fakeBoundaryGoal) {
 		t.Errorf("loop args %v: want the goal text read from --goal-text-file", launch)
@@ -155,7 +173,7 @@ func TestBoundaryRun_DryRunDispatchesNoStep(t *testing.T) {
 	if len(fake.calls) != 0 {
 		t.Errorf("a dry run dispatched %v; it must only print the plan", fake.verbs())
 	}
-	for _, step := range []string{"loop-stop", "sync-main", "--release", "--detach"} {
+	for _, step := range []string{"loop-stop", "sync-main", "--release", "--detach", ".evolve/logs/current"} {
 		if !strings.Contains(stdout.String(), step) {
 			t.Errorf("dry-run plan does not mention %q\n%s", step, stdout.String())
 		}

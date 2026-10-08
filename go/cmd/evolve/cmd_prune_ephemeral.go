@@ -4,8 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/pruneephemeral"
 )
 
@@ -33,7 +36,7 @@ func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	fs.BoolVar(&dryRun, "dry-run", false, "dry run — show what would be pruned without deleting")
 	fs.BoolVar(&quiet, "quiet", false, "suppress progress output")
 	fs.IntVar(&trackerTTLDays, "tracker-ttl-days", 7, "tracker retention days")
-	fs.IntVar(&logTTLDays, "dispatch-log-ttl-days", 30, "dispatch log retention days")
+	fs.IntVar(&logTTLDays, "dispatch-log-ttl-days", 30, "dispatch log retention days; when unset, the TTL of the gc log catalog (gc.logs.dispatch.ttl_days, else gc.logs_ttl_days, else 30)")
 	// intercept -h/--help before fs.Parse to write to stdout
 	for _, a := range args {
 		if a == "-h" || a == "--help" {
@@ -52,6 +55,9 @@ func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	}
 
 	projectRoot := envOrCwd("EVOLVE_PROJECT_ROOT")
+	if !flagSet(fs, "dispatch-log-ttl-days") {
+		logTTLDays = dispatchLogTTLDays(projectRoot, stderr)
+	}
 	_, err := pruneephemeral.Run(pruneephemeral.Options{
 		ProjectRoot:    projectRoot,
 		TrackerTTL:     time.Duration(trackerTTLDays) * 24 * time.Hour,
@@ -65,4 +71,27 @@ func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int
 		return 1
 	}
 	return 0
+}
+
+func flagSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
+	return set
+}
+
+func dispatchLogTTLDays(projectRoot string, stderr io.Writer) int {
+	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		fmt.Fprintf(stderr, "[prune-ephemeral] WARN: policy load failed: %v; using the default log catalog\n", err)
+	}
+	var gcPol gcpolicy.Policy
+	if pol.GC != nil {
+		gcPol = *pol.GC
+	}
+	for _, cat := range gcPol.LogCatalog() {
+		if cat.Name == gcpolicy.LogCategoryDispatch {
+			return cat.TTLDays
+		}
+	}
+	return gcPol.WithDefaults().LogsTTLDays
 }

@@ -47,6 +47,26 @@ All notable changes to this project will be documented in this file.
 - **Reasoning in the output.** Three prompt texts asked for chain-of-thought in the reply, which can cause `reasoning_extraction` refusals. They now ask for a short justification or a mapping: `agents/evolve-build-planner.md`, `agents/evolve-tdd-engineer.md:75` and `skills/loop/phase6-learn.md`.
 - **The effort sweep goes upward.** The baseline is medium everywhere. Deep moves to `high` only when a measured gain pays for its cost (the plan states the margins).
 - **Docs:** the plan, `cli-routing-table-2026-10.md`, `model-routing-policy.md`, `model-routing.md`, `runtime-reference.md`, `model-discovery-and-catalog.md`, `cli-capability-matrix.md`, `convergence-policy.md`, ADR-0096, `.evolve/profiles/AGENTS.md`, and the package docs of `bridge`, `phaseidentity`, `policy`, `profiles`, `phases/triage` and `core/advisor`.
+## Changed — logs have one catalog: a log dir for each loop launch, the raw test stream only in the scan log, keep-on-fail for raw tool output (lane H1, 2026-10-08)
+
+- **What the operator asked.** "has the log (e.g. 2.7M lines log you are referred to) been optimized with ASD-STE100 format and clean up once the job is completed?" (2026-10-08). The answer was no. `boundary-loop.log` had 2.74M lines (312 MB), because each wave appended to one file. 86 top-level `.evolve/*.log` files held 1.35 GB, and no rule deleted them.
+- **The plan:** [logging-and-process-hygiene-2026-10.md](docs/plans/logging-and-process-hygiene-2026-10.md), decisions K1, K3 to K7. The research: [logging-and-process-cleanup-2026-10.md](docs/research/logging-and-process-cleanup-2026-10.md).
+- **A log dir for each launch (K1).** `evolve boundary run` mints a run id (`20261008T142501Z`) and runs the new step `boundary-log` after the brake release.
+  - The step makes `.evolve/logs/<run-id>/` and points `.evolve/logs/current` at it. It makes `.evolve/boundary-loop.log` a symlink to `logs/current/loop.log`. The launch writes `logs/<run-id>/loop.log`.
+  - A regular `boundary-loop.log` from before moves to `logs/<run-id>-legacy/loop.log`, only when no run is live. No live file is renamed.
+  - Use `tail -F`, which follows the symlink to the new file.
+- **The raw test stream stays in the scan log (K3).** The ship repo-contract gate sends the raw `go test` stream only to `runs/cycle-N/ship-repocontract-scan.log`. Stderr, and so the loop log, gets the `[ship]` notes and `[ship] repo-contract gate: full output: <path>`. The stream was 97% of the last 400,000 loop-log lines.
+- **Keep on fail (K4).** At the seal of a PASS cycle, `ship-repocontract-scan.log` and `integration-tier.log` are deleted from the run dir. A cycle that does not pass keeps them. The scan logs held 481 MiB.
+- **The log catalog (K5, K6).** `gcpolicy.Policy.LogCatalog` gives each category its homes, its TTL and its size cap:
+  - `dispatch`: `dispatch-logs/*.log`, 512 MB;
+  - `loop`: `logs/<run-id>/`, 2048 MB, never the target of `logs/current`;
+  - `console`: `loop-*.log`, `wave*.log` and `logs/batch-*.log`, 1024 MB.
+- **The catalog rules.** The TTL is `gc.logs_ttl_days` (30). The new block `gc.logs.<category>` takes `ttl_days` and `max_total_mb`. gc deletes expired entries, then the oldest entries over the cap. The item rules are `logs.<category>.ttl_days` and `logs.<category>.max_total_mb`. The old rule name `logs_ttl_days` for `dispatch-logs/` is now `logs.dispatch.ttl_days`.
+- **Polluted archives.** gc discovery also takes a polluted run archive (`cycle-N.polluted-<stamp>`) as a dead run. 20 of them stayed on the plane.
+- **Review fix round 1.** The legacy move never overwrites. The cap counts the `current` dir, and gc warns when kept logs stay over the cap. `--detach` writes `<log>.writer-pid`, and gc keeps a log with a live writer. The run id check is an anchored regex (`gcpolicy.IsLogRunID`).
+- **Review fix round 2.** The catalog planner is a `logPlanner` struct. The ship gate passes a typed `packLog{notes, raw}`. `evolve prune-ephemeral` takes the dispatch TTL from the log catalog when `--dispatch-log-ttl-days` is not given. A rerun finishes a legacy move whose remove failed.
+- **The pane copies stay (K7).** `phasestream.Classifier.Stderr` is the only reader of `evolve_channel` breadcrumbs, and for a tmux phase its only input is the raw pane copy in `<phase>-stderr.log`. The follow-up is in the plan, section 10.6.
+- **Tests, red first:** `TestLogCatalog_*` and `TestPlan_LogCatalog*` (gcpolicy, gc), `TestDiscover_APollutedArchiveIsADeadRunWithoutAMarker`, `TestRepoContractGate_StderrGetsTheNotesAndThePathWhileTheScanLogGetsTheRawStream`, `TestCompleteCycle_APassSealDeletesTheRawToolOutputAndKeepsTheRest`, `TestPrepareBoundaryLog_*` and `TestRunBoundaryLog_ReportsTheLayoutAndRefusesABadRunID`.
 
 ## Added — `evolve docs ste-lint`: a deterministic ASD-STE100 lint for the documents and for Go log and error text, with a WARN on the build floor (STE plan S0 and S10, 2026-10-07)
 

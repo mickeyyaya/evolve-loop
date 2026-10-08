@@ -24,7 +24,7 @@ func TestRunRepoContractPackages_ScrubsTheLaneIPCEnvFromGoTest(t *testing.T) {
 
 	module := envProbeModule(t, ipcenv.FleetKey, ipcenv.CycleStateFileKey)
 	var out bytes.Buffer
-	outcome := runRepoContractPackages(context.Background(), module, &out, []string{"./..."})
+	outcome := runRepoContractPackages(context.Background(), module, packLog{notes: &out, raw: &out}, []string{"./..."})
 
 	if outcome.err != nil || len(outcome.failures) != 0 {
 		t.Fatalf("the gate leaked the lane's IPC env into go test: err=%v failed=%v\n%s", outcome.err, outcome.failedNames(), out.String())

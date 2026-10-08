@@ -31,8 +31,8 @@ func TestPlan_DispatchLogTTLSkipsNonLogFiles(t *testing.T) {
 	if _, ok := items[keep]; ok {
 		t.Errorf("a non-.log file in dispatch-logs must never be planned: %+v", m.Items)
 	}
-	if it := items[old]; it.Action != ActionDelete || it.Rule != "logs_ttl_days" {
-		t.Errorf("an expired .log file must be deleted by logs_ttl_days, got %+v", it)
+	if it := items[old]; it.Action != ActionDelete || it.Rule != "logs.dispatch.ttl_days" {
+		t.Errorf("an expired .log file must be deleted by the dispatch catalog TTL (logs.dispatch.ttl_days), got %+v", it)
 	}
 }
 

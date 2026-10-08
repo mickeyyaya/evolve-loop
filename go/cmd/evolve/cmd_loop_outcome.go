@@ -139,6 +139,9 @@ func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr
 	}
 	archive, del := gcActionCounts(manifest)
 	fmt.Fprintf(stderr, "[gc] shadow: %d items (%d archive, %d delete)\n", len(manifest.Items), archive, del)
+	for _, w := range manifest.Warnings {
+		fmt.Fprintf(stderr, "[gc] WARN: %s\n", w)
+	}
 
 	if mode != "enforce" {
 		return
