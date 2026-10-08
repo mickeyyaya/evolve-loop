@@ -96,20 +96,39 @@ func TestReadCycles_ACeilingOfZeroHasNoUpperBound(t *testing.T) {
 	}
 }
 
-func TestLastCycleNumber(t *testing.T) {
+func TestCycleFloor(t *testing.T) {
 	t.Parallel()
 	p := newPlane(t)
 	evolveDir := filepath.Join(p.root, ".evolve")
-	if n, err := wave.LastCycleNumber(evolveDir); err != nil || n != 0 {
-		t.Errorf("LastCycleNumber(no state.json) = %d, %v; want 0, nil", n, err)
+	if n, err := wave.CycleFloor(evolveDir); err != nil || n != 0 {
+		t.Errorf("CycleFloor(no state.json) = %d, %v; want 0, nil", n, err)
 	}
-	p.write(".evolve/state.json", `{"lastCycleNumber":1836,"failedApproaches":[]}`)
-	if n, err := wave.LastCycleNumber(evolveDir); err != nil || n != 1836 {
-		t.Errorf("LastCycleNumber = %d, %v; want 1836, nil", n, err)
+	p.write(".evolve/state.json", `{"lastCycleNumber":1836,"lastAllocatedCycleNumber":1830,"failedApproaches":[]}`)
+	if n, err := wave.CycleFloor(evolveDir); err != nil || n != 1836 {
+		t.Errorf("CycleFloor(lease below lastCycleNumber) = %d, %v; want 1836, nil", n, err)
 	}
 	p.write(".evolve/state.json", `{`)
-	if _, err := wave.LastCycleNumber(evolveDir); err == nil {
-		t.Error("LastCycleNumber read a malformed state.json without an error")
+	if _, err := wave.CycleFloor(evolveDir); err == nil {
+		t.Error("CycleFloor read a malformed state.json without an error")
+	}
+}
+
+func TestCycleFloor_ExcludesTheUnfinalizedLaneOfThePreviousWave(t *testing.T) {
+	t.Parallel()
+	p := newPlane(t)
+	p.write(".evolve/runs/cycle-1837/run.json", `{}`)
+	p.write(".evolve/runs/cycle-1838/run.json", `{}`)
+	p.write(".evolve/state.json", `{"lastCycleNumber":1837,"lastAllocatedCycleNumber":1838}`)
+
+	floor, err := wave.CycleFloor(filepath.Join(p.root, ".evolve"))
+	p.write(".evolve/runs/cycle-1839/run.json", `{}`)
+	got, _ := wave.ReadCycles(p.root, floor, 0)
+
+	if err != nil || floor != 1838 {
+		t.Fatalf("CycleFloor(lane 1 finalized 1837, lane 2 leased 1838) = %d, %v; want 1838, nil", floor, err)
+	}
+	if len(got) != 1 || got[0].ID != 1839 {
+		t.Errorf("the next wave lists %+v; want only cycle 1839", got)
 	}
 }
 

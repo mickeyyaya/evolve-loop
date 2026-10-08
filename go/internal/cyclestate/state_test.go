@@ -84,3 +84,24 @@ func TestStateOmitempty(t *testing.T) {
 		}
 	}
 }
+
+func TestState_HighestCycleNumberTakesTheLeaseOrTheCompletionCounter(t *testing.T) {
+	cases := []struct {
+		name            string
+		completed, mint int
+		want            int
+	}{
+		{"a lane stopped before it finalized", 1837, 1838, 1838},
+		{"a legacy state with no lease", 1836, 0, 1836},
+		{"a lease behind the completion counter", 1836, 1830, 1836},
+		{"a fresh state", 0, 0, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := State{LastCycleNumber: tc.completed, LastAllocatedCycleNumber: tc.mint}
+			if got := s.HighestCycleNumber(); got != tc.want {
+				t.Errorf("State{last %d, lease %d}.HighestCycleNumber() = %d, want %d", tc.completed, tc.mint, got, tc.want)
+			}
+		})
+	}
+}

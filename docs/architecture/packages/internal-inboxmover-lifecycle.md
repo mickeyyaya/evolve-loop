@@ -34,7 +34,7 @@
   - The host's `inboxmover.ReleaseClaim` first decides if the holder can lose its claim. The leaf only moves.
 - **`AbsorbRootCopies` gives a root copy of a claimed id back to its claim.** It reads `ListClaims` (a root copy is matched by task id, not by file name).
   - A copy with the same bytes is removed (ledger `absorb`).
-  - A copy with other bytes is parked in `origin-conflicts/cycle-N/` (ledger `absorb-conflict`, a WARN line). The claim copy is never overwritten, because it can carry a lane's newer stamps.
+  - A copy with other bytes is parked in `origin-conflicts/cycle-N/` (ledger `park`, a WARN line). The park path has one home, `Mover.parkPath`, and the ledger line one builder, `Mover.parkEntry`. `ReleaseClaimKeeping` with `KeepClaim` uses both. The claim copy is never overwritten, because it can carry a lane's newer stamps.
 - **`moveExclusive` never overwrites.** It makes a hard link and then removes the source. A destination that exists is `ErrExist`, which `ReleaseClaim` reports as `ErrClaimConflict`. If the remove fails, the link is removed again.
 
 ## Invariants

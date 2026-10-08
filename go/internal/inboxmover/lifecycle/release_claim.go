@@ -27,8 +27,10 @@ type ClaimList struct {
 }
 
 type ClaimReleaseResult struct {
-	Path      string
-	Duplicate bool
+	Path       string
+	Duplicate  bool
+	Kept       KeepCopy
+	ParkedPath string
 }
 
 func ListClaims(inboxDir string) (ClaimList, error) {

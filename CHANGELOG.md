@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — `evolve inbox release --keep root|claim` resolves a claim whose root copy has other bytes, and `evolve wave watch` no longer shows a lane of the previous wave (2026-10-09)
+
+- **What happened.** At the wave-82 boundary, `evolve inbox release --stale` refused the claim of cycle 1836 on `rollback-fail-open-and-vacuous-tests` (`ErrClaimConflict`). The root copy was the claim copy plus two stamps from cycle 1838: `failure_count` and `last_failure_reason`. No verb could choose the copy to keep, so the item stayed held.
+- **`evolve inbox release <id> <reason> --keep root|claim [--json]`** (`inboxmover.ReleaseClaimKeeping`, plan [D11](docs/plans/inbox-stale-claims-2026-10.md)).
+  - `--keep root` removes the claim copy (`root-kept`). It refuses (exit 1) when the claim copy is not a field subset of the root copy. Each key of the claim copy must be in the root copy with an equal value. A loop stamp field must be in the root copy, but its value can be different.
+  - `--keep claim` moves the claim copy to the root (`claim-kept`) and parks the root copy in `origin-conflicts/cycle-N/` (`parked_path`). It refuses before any move when another root file has the name of the claim copy. If the claim copy cannot move, the root copy moves back.
+  - A counter stamp (`failure_count`, `FieldRole.IsCounter`) must not be lower in the root copy, so `--keep root` cannot lower the quarantine count. The refusal names `--keep claim`.
+  - A parked copy now gets a `park` ledger line, for `--keep claim` and for the absorb after a sync. The absorb wrote `absorb-conflict` before.
+  - Each one appends one `release` ledger line that names the kept copy. The holder judge applies first: a `live` or `resume-pending` holder refuses (exit 1). `release --stale` still refuses a conflict.
+- **The wave floor.** At the launch of wave 82, `evolve wave watch` showed cycle 1838, a fleet lane of wave 81 that sealed FAIL in triage. The `cycle_floor` of a wave was `state.json:lastCycleNumber`. A lane that stops before it finalizes advances only the cycle lease (`lastAllocatedCycleNumber`). The floor is now the highest of the two (`cyclestate.State.HighestCycleNumber`, plan [D20](docs/plans/evolve-wave-cli-2026-10.md)). The batch window of the loop, the cycle allocator (`core.allocateCycleNumberAbove`) and the resume bootstrap read the same rule. The wave records that exist keep their recorded floor.
+
 ## Fixed — the claim of a dead cycle no longer blocks its item: `evolve inbox claims`, `evolve inbox release`, the release at the planner start, and a planner that never offers a held item (cycle 1838, 2026-10-08)
 
 - **What happened.** In wave 81, cycle 1838 sealed FAIL (`triage-empty-commitment-claimable-work`). Plan: [inbox-stale-claims-2026-10.md](docs/plans/inbox-stale-claims-2026-10.md).
@@ -20,7 +31,7 @@ All notable changes to this project will be documented in this file.
 - **The planner guard.** `ResolveDispatchState` reads `processing/` before the root, so a held id is never dispatchable. `PlaceOnLaneMenu` puts a root copy of a held id on the waiting list (`held by the claim of cycle-N`). The seed, the widen, the refill and `evolve inbox list`, `show` and `batches` read the same rule.
 - **`evolve gc`** removes the empty `processing/cycle-*` dirs of stale cycles. `--dry-run` lists them as `WOULD-REMOVE`.
 - **`sync-main` and the wave sync.** `inboxstamps.Classify` reports an unstaged deletion of a root item that a claim holds as `Claimed`, not as dirt, so `sync-main` does not refuse. After the merge or the fast-forward, the Mover verb `AbsorbRootCopies` handles each root copy of a claimed task id.
-  - A copy with the same bytes is removed. A copy with other bytes is parked in `.evolve/inbox/origin-conflicts/cycle-N/`, and the claim is never overwritten. Each item gets an `absorb` or `absorb-conflict` ledger line.
+  - A copy with the same bytes is removed. A copy with other bytes is parked in `.evolve/inbox/origin-conflicts/cycle-N/`, and the claim is never overwritten. Each item gets an `absorb` or `park` ledger line.
   - No hand restore is necessary, and `git restore` of a claimed item is never correct.
 - **Tests:** a regression test of the cycle-1838 sequence (`TestPlanFn_Cycle1838Regression_ARestoredCopyOfAPausedClaimIsNeverPlannedThenReleased`), the holder verdict table, the release outcomes, gc, `sync-main` and the wave sync on real repositories. 43 mutants were killed, after one control mutant proved the harness.
 ## Added — `evolve wave`: one public verb to run, read and watch a wave, with a goal made from facts (lane cl-wave-cli, 2026-10-08)

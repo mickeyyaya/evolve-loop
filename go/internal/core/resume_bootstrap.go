@@ -44,7 +44,7 @@ func (o *Orchestrator) loadResumeBootstrap(
 		return boot, err
 	}
 	hostCycle := cs.CycleID
-	if allocated := max(state.LastCycleNumber, state.LastAllocatedCycleNumber); allocated > 0 {
+	if allocated := state.HighestCycleNumber(); allocated > 0 {
 		hostCycle = allocated
 	} else if hostCycle == 0 {
 		hostCycle = resumePoint.CycleID

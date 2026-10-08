@@ -35,8 +35,8 @@ func TestMoverAbsorbRootCopies_DropsAnEqualCopyAndParksADifferentOne(t *testing.
 			t.Errorf("%s must leave the root: %v", p, err)
 		}
 	}
-	if len(rec.records) != 2 || rec.records[0].Action != "absorb-conflict" || rec.records[1].Action != "absorb" || !strings.Contains(rec.records[0].Message, "origin-conflicts/cycle-1836") {
-		t.Errorf("ledger = %+v; want one absorb-conflict and one absorb line", rec.records)
+	if len(rec.records) != 2 || rec.records[0].Action != "park" || rec.records[1].Action != "absorb" || !strings.Contains(rec.records[0].Message, "origin-conflicts/cycle-1836") {
+		t.Errorf("ledger = %+v; want one park and one absorb line", rec.records)
 	}
 	again, err := m.AbsorbRootCopies()
 	if err != nil || len(again) != 0 || len(rec.records) != 2 {

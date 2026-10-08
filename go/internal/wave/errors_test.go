@@ -151,14 +151,14 @@ func TestReadCycles_WarnsOnAnUnreadableLandingIntentAndSignalStream(t *testing.T
 	}
 }
 
-func TestLastCycleNumber_NamesAnUnreadableStateFile(t *testing.T) {
+func TestCycleFloor_NamesAnUnreadableStateFile(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(evolveDir, "state.json"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := wave.LastCycleNumber(evolveDir)
+	_, err := wave.CycleFloor(evolveDir)
 
-	wantErrContaining(t, "LastCycleNumber", err, "read state.json")
+	wantErrContaining(t, "CycleFloor", err, "read state.json")
 }

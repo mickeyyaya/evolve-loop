@@ -45,32 +45,55 @@ func duplicateNote(duplicate bool) string {
 	return ""
 }
 
-func runInboxRelease(args []string, stdout, stderr io.Writer) int {
+type inboxReleaseArgs struct {
+	root     string
+	operands []string
+	keep     inboxmover.KeepCopy
+	hasKeep  bool
+	stale    bool
+	asJSON   bool
+}
+
+func parseInboxRelease(args []string) (inboxReleaseArgs, bool) {
 	root, args, rootOK := takeProjectRoot(args)
+	keep, args, hasKeep, keepOK := takeFlagValue(args, "--keep")
 	flags, operands, ok := splitInboxFlags(args, "--json", "--stale")
-	ok = ok && rootOK
-	if flags["--stale"] {
-		ok = ok && len(operands) == 1
+	a := inboxReleaseArgs{root: root, operands: operands, keep: inboxmover.KeepCopy(keep), hasKeep: hasKeep, stale: flags["--stale"], asJSON: flags["--json"]}
+	ok = ok && rootOK && keepOK && (!hasKeep || a.keep.Valid())
+	if a.stale {
+		ok = ok && !hasKeep && len(operands) == 1
 	} else {
 		ok = ok && len(operands) == 2 && strings.TrimSpace(operands[0]) != ""
 	}
-	if !ok || strings.TrimSpace(operands[len(operands)-1]) == "" {
+	return a, ok && strings.TrimSpace(operands[len(operands)-1]) != ""
+}
+
+func runInboxRelease(args []string, stdout, stderr io.Writer) int {
+	a, ok := parseInboxRelease(args)
+	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("release"))
 		return 10
 	}
-	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr}
-	if flags["--stale"] {
-		return releaseStaleClaims(opts, operands[0], flags["--json"], stdout, stderr)
+	opts := inboxmover.Options{ProjectRoot: a.root, Stderr: stderr}
+	if a.stale {
+		return releaseStaleClaims(opts, a.operands[0], a.asJSON, stdout, stderr)
 	}
-	res, err := inboxmover.ReleaseClaim(opts, operands[0], operands[1])
+	res, err := releaseOneClaim(opts, a)
 	if rc := releaseExitCode(err, stderr); rc != 0 {
 		return rc
 	}
-	if flags["--json"] {
+	if a.asJSON {
 		return encodeInboxJSON("release", res, stdout, stderr)
 	}
 	printClaimRelease(stdout, res)
 	return 0
+}
+
+func releaseOneClaim(opts inboxmover.Options, a inboxReleaseArgs) (inboxmover.ClaimRelease, error) {
+	if a.hasKeep {
+		return inboxmover.ReleaseClaimKeeping(opts, a.operands[0], a.operands[1], a.keep)
+	}
+	return inboxmover.ReleaseClaim(opts, a.operands[0], a.operands[1])
 }
 
 func printClaimRelease(stdout io.Writer, res inboxmover.ClaimRelease) {
@@ -79,6 +102,10 @@ func printClaimRelease(stdout io.Writer, res inboxmover.ClaimRelease) {
 		fmt.Fprintf(stdout, "inbox release: %s is not claimed; nothing to release\n", res.ID)
 	case inboxmover.ClaimDuplicateRemoved:
 		fmt.Fprintf(stdout, "inbox release: %s released from cycle-%d; the root copy stays and the duplicate claim copy is removed\n", res.ID, res.Cycle)
+	case inboxmover.ClaimRootKept:
+		fmt.Fprintf(stdout, "inbox release: %s released from cycle-%d; the root copy stays (keep: root) and the claim copy is removed\n", res.ID, res.Cycle)
+	case inboxmover.ClaimClaimKept:
+		fmt.Fprintf(stdout, "inbox release: %s released from cycle-%d to the inbox root (keep: claim); the root copy is parked at %s\n", res.ID, res.Cycle, res.ParkedPath)
 	default:
 		fmt.Fprintf(stdout, "inbox release: %s released from cycle-%d to the inbox root\n", res.ID, res.Cycle)
 	}
@@ -110,14 +137,22 @@ func releaseExitCode(err error, stderr io.Writer) int {
 }
 
 func takeProjectRoot(args []string) (string, []string, bool) {
-	i := slices.Index(args, "--project-root")
-	if i < 0 {
+	root, rest, found, ok := takeFlagValue(args, "--project-root")
+	if !found {
 		return envOrCwd("EVOLVE_PROJECT_ROOT"), args, true
 	}
-	if i+1 >= len(args) {
-		return "", nil, false
+	return root, rest, ok
+}
+
+func takeFlagValue(args []string, name string) (string, []string, bool, bool) {
+	i := slices.Index(args, name)
+	if i < 0 {
+		return "", args, false, true
 	}
-	return args[i+1], slices.Concat(args[:i], args[i+2:]), true
+	if i+1 >= len(args) {
+		return "", nil, true, false
+	}
+	return args[i+1], slices.Concat(args[:i], args[i+2:]), true, true
 }
 
 func splitInboxFlags(args []string, known ...string) (map[string]bool, []string, bool) {
