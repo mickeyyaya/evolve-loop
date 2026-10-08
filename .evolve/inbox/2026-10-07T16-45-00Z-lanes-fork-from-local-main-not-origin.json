@@ -1,0 +1,22 @@
+{
+  "id": "lanes-fork-from-local-main-not-origin",
+  "title": "Lanes fork from local main, and the carry trusts \"on local main\", not \"on origin\"",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "weight": 0.6,
+  "summary": "laneStartRef (core/worktree.go, integrationHead) bases a new lane on the local main when main is ahead of origin. The fleet rebase targets local main, and the carry treats each commit on local main as a landed peer. In cycle 1830, peer lane 1829 rebased onto the stranded commit ba61c7341, and its push published that commit. A ship pushes the whole ancestry of its commit with no provenance check. The two-phase landing (ADR-0039 §8.1) stops ship from leaving main ahead of origin. A strand from an older binary, a dossier closeout and a manual commit can still put main ahead.",
+  "fix": "A check for \"landed\" must ask origin. Base a lane on origin/main, or refuse a base whose commits origin does not hold and the journal does not prove. Make the carry and the fleet rebase treat only commits on origin as landed.",
+  "acceptance": [
+    "A lane does not fork from a local main whose ahead commits are not journaled (red first)",
+    "The carry does not count an unpushed commit on local main as a landed peer (red first)"
+  ],
+  "files": [
+    "go/internal/core/worktree.go",
+    "go/internal/core/ship_recovery.go"
+  ],
+  "routed_reason": "out of scope for the ship-landing lane (brief: secondary finding); core is a protected surface",
+  "created_at": "2026-10-07T16:45:00Z",
+  "route": "console",
+  "routed_at": "2026-10-07T16:45:00Z",
+  "source": "console forensics of cycle 1830 (wave 77), secondary finding; filed by the ship-landing lane"
+}

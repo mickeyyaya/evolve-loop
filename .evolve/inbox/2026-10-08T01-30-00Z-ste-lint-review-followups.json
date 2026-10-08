@@ -1,0 +1,25 @@
+{
+  "id": "ste-lint-review-followups",
+  "title": "STE lint: pin three edge cases and close a fence at the end of a blockquote",
+  "kind": "hardening",
+  "priority_class": "maintainability",
+  "weight": 0.25,
+  "route": "console",
+  "routed_reason": "the stelint package is console-built (plan ste100-docs-rewrite-2026-10, S0); these are the filed items of its round-2 check",
+  "source": "console, 2026-10-08, the S0 landing (round-2 verify-only check: MERGE, 0 blocking items, 1 MEDIUM and 6 LOW filed; F1, F5 and F6 were fixed at the landing)",
+  "created_at": "2026-10-08T01:30:00Z",
+  "summary": "The round-2 check of the STE lint filed four items that the landing did not fix. F2: three mutants survive, but the behaviour is correct: the blockquote state is not reset, a quotation ends with ? or !, and the first > line is empty. F3: a fence that a blockquote opens and does not close makes the lint skip the rest of the file, and an HTML comment that closes inside a quoted line never closes. F4: a --- line directly after a list item makes the item a setext heading, so the item gets no length rule. F7: the strict decode accepts stage \"0\" as off, but the docs name only off, shadow and enforce.",
+  "fix": "F2: add the three test cases to the existing tables in go/internal/stelint. F3: clear the fence state and the comment state when a blockquote ends, as CommonMark does, and add tests. F4: apply the setext rule only to a prose paragraph. F7: name \"0\" in docs/architecture/policy-config.md, or refuse it in the decode.",
+  "acceptance": [
+    "The three F2 mutants are killed by named test cases",
+    "A blockquote that opens a fence and does not close it does not hide the text after the blockquote",
+    "A 30-word list item followed by a --- line gives one STE-SENTENCE finding",
+    "The docs and the decode agree on the stage words"
+  ],
+  "files": [
+    "go/internal/stelint/blocks.go",
+    "go/internal/stelint/text.go",
+    "go/internal/stelint/check_test.go",
+    "docs/architecture/policy-config.md"
+  ]
+}

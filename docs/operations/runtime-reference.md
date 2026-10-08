@@ -115,7 +115,7 @@ Defaults reflect production posture on current main (release line v22.14.0). Det
 | Antigravity adapter — require-full | `EVOLVE_AGY_REQUIRE_FULL` | `0` | When `1`, `agy.sh` exits 99 if neither `agy` nor `claude` binary is found (same opt-in as `EVOLVE_GEMINI_REQUIRE_FULL`). Default: graceful degradation. |
 | Antigravity adapter — binary override | `EVOLVE_AGY_BINARY` | unset | Testing seam: override the `agy` binary path. Honoured only when `EVOLVE_TESTING=1`. Used by ACS predicates to force NATIVE/DEGRADED mode in tests. |
 | Go binary path override | `EVOLVE_GO_BIN` | unset | Path to the Go binary. When unset, the entrypoint resolves `<project_root>/go/bin/evolve`. Set to the cross-compiled artifact path (e.g. `<HOME>/.local/bin/evolve-darwin-arm64`) for system-wide install. The Go binary is the sole runtime: `evolve cycle run`, `evolve loop`, `evolve doctor`, `evolve guard`, `evolve ledger`, `evolve acs`, `evolve ship`. (The bash dispatcher and `EVOLVE_USE_LEGACY_BASH` rollback hatch were removed in the Go-only consolidation; there is no bash fallback.) |
-| Native Go ship | `evolve ship` (native, no flag) | always native | The ship phase runs the native Go implementation (`go/internal/phases/ship/`): self-SHA TOFU, audit-binding, EGPS gate, atomic commit+ff-merge+push, gh release. CLI surface: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. (The `EVOLVE_NATIVE_SHIP=0` shell-out to a bash `ship.sh` was removed in the Go-only consolidation; ship is native-only.) Parity history: the test matrix in `go/internal/phases/ship/native_test.go` pins commit-message footers, exit codes, and ledger semantics. |
+| Native Go ship | `evolve ship` (native, no flag) | always native | The ship phase runs the native Go implementation (`go/internal/phases/ship/`): self-SHA TOFU, audit-binding, EGPS gate, atomic commit and gh release. The landing has two phases: the intent, the push, then the ff-merge (ADR-0039 §8.1). CLI surface: `evolve ship [--class cycle\|manual\|release\|trivial] [--dry-run] "<msg>"`. (The `EVOLVE_NATIVE_SHIP=0` shell-out to a bash `ship.sh` was removed in the Go-only consolidation; ship is native-only.) Parity history: the test matrix in `go/internal/phases/ship/native_test.go` pins commit-message footers, exit codes, and ledger semantics. |
 | Interactive policy (global) | `EVOLVE_INTERACTIVE_POLICY` | `recommended_or_first` (default-on, v12.1+) | Bridge prepends a deterministic policy block to every phase prompt so subagents self-resolve `AskUserQuestion`/y/N prompts without hanging the autonomous loop. Values: `recommended_or_first` (pick option labeled "(Recommended)" or first), `escalate` (no block, fail loudly on ambiguity — legacy posture), `auto_yes` (binary y/N → yes; multi-option falls back to recommended-or-first). Unknown values silently default to `recommended_or_first` to protect autonomy from typos. Block is < 200 tokens and deterministic to preserve Claude prompt-prefix cache. Implemented in `go/internal/adapters/bridge/bridge.go:injectPolicyPrefix`. |
 | Interactive policy (per-agent) | `EVOLVE_<AGENT>_INTERACTIVE_POLICY` | unset | Per-agent override of the global policy. `<AGENT>` is the agent name uppercased with hyphens → underscores: `scout` → `EVOLVE_SCOUT_INTERACTIVE_POLICY`, `tdd-engineer` → `EVOLVE_TDD_ENGINEER_INTERACTIVE_POLICY`. Precedence: `req.Env` per-agent > process env per-agent > `req.Env` global > process env global > default. Use to pin one phase (e.g., `EVOLVE_AUDITOR_INTERACTIVE_POLICY=escalate`) while every other phase stays on autonomy. |
 | Phase max attempts | `EVOLVE_PHASE_MAX_ATTEMPTS` | `2` | Bounds per-phase retries on a recoverable bridge timeout or transient failure in the autonomous loop. Valid range: [1,5]. Non-numeric or out-of-range values fall back to default 2 (except values > 5 which are clamped to 5). Non-transient errors are not retried. |
@@ -304,13 +304,55 @@ failure — no new bypass env vars, no rebase, no force-push, no content deletio
 
 - **Stale TOFU pin** (`SELF_SHA_TAMPERED`): re-pins when the running binary matches the blob at
   `HEAD:<bin>` (verified rebuild of committed source); any divergence still BLOCKs.
-- **Merged-but-unpushed** (`AUDIT_BINDING_HEAD_MOVED`): when HEAD already carries the
-  audit-bound tree and origin is strictly behind, ship completes with a push-only closure.
-- **Untracked colliders** (`GIT_FF_MERGE_DIVERGED`): byte-identical main-side copies are
-  removed; differing copies are quarantine-moved to `.evolve/quarantine/cycle-<N>/` (with
-  `manifest.json`) — inspect/restore from there; content is never deleted.
-- **Push race** (`GIT_PUSH_REJECTED`): one fetch + ff-retry; a diverged origin reclassifies to
-  `needs-reaudit` (local commit preserved — the recovery chain re-audits on the new base).
+- **A failed push resumes (two-phase landing, ADR-0039 §8.1, 2026-10-07, fix round 2026-10-08).**
+  A worktree ship makes the lane commit with `git commit-tree`, journals it and writes
+  `.evolve/landing/cycle-<N>.json`. Only then does it move the lane ref. It pushes the lane commit
+  by refspec first, and it fast-forwards the plane `main` only after the push lands. So a failed push
+  never moves `main`
+  ([incident](../incidents/2026-10-07-cycle-1830-a-failed-push-stranded-the-audited-commit.md)).
+  - No phase can write the intent: `.evolve/landing/` is on the protected surface of the guards.
+  - Under `ship.lock`, a landing first fast-forwards `main` to `origin/main` when `main` is behind
+    by journaled commits only. So a failed fast-forward after a push does not stop later landings.
+  - The next `evolve ship`, or the router's transient retry, resumes at the push as its first stage.
+    No gate runs again. Log: `[ship] LANDING: ship resumes the prepared landing`, and
+    `repair_outcome=landing-resumed`.
+  - The resume needs these facts from the host, not from the intent:
+    - the ship journal holds the commit;
+    - the cycle and the run of `cycle-state.json` are the intent's;
+    - the newest audit of the run is a PASS, and it is the intent's audit;
+    - the lane tip is the intent's commit, and the sealed Build explanation is unchanged;
+    - origin is an ancestor of the commit.
+  - When origin already holds the commit, ship settles the landing with no push. The push branch
+    always comes from the plane.
+  - When the intent does not resume and the lane holds its commit, ship unwinds the lane to its tree
+    before ship's consumption (B1 `unwindShipCommit`). Ship marks the intent `unwound`. In other cases
+    ship marks the intent `stale` and runs the gates. If the unwind declines, the cycle stops with
+    `GIT_LANDING_UNWIND_DECLINED`. The journal keeps the commit, and `main` does not move.
+- **Merged-but-unpushed** (`AUDIT_BINDING_HEAD_MOVED`): a strand from a ship before the two-phase
+  landing. When HEAD satisfies the audit binding and origin is an ancestor, the rung completes it.
+  It has no witness, so only the ancestry checks (`Landing.Admit`) apply, then the shared push and
+  settle steps.
+- **Push failures** (`GIT_PUSH_REJECTED`): ship classifies the stderr of the push.
+  - A policy refusal (a protected branch, a declined hook, a denied permission, a token scope, HTTP
+    403) is final: no retry, code `GIT_PUSH_POLICY_REFUSED`, class `precondition`. The router ends
+    the cycle and does not re-audit.
+  - A transport error, a 5xx or a 429 (for example `(Internal Server Error)`) gets the identical push
+    again after the bounded backoff, in the step. The code is the one home of the backoff values:
+    `transportBackoff` in `go/internal/phases/ship/landing/push.go`. A spent backoff is `declined`
+    at `transport_retry` and stays transient, so the retry resumes the intent.
+  - Any other rejection is a race: one fetch and one ff retry when origin is an ancestor of the
+    pushed commit. A diverged origin becomes `needs-reaudit`, and a worktree ship unwinds the lane
+    first.
+
+  The message ends with git's own words, never `<nil>`.
+- **No push, no PASS** (`GIT_LANE_NOT_ON_ORIGIN`): a lane with nothing to commit can hold a stranded
+  landing. That is a journaled `cycle` commit that origin does not hold and whose landing intent is
+  not `complete`. Ship refuses it (integrity). Boundary commits on local `main` (the sync-main merge,
+  the dossier closeouts, the inbox stamps) keep the "nothing to ship" result. The message gives the
+  steps for the boundary:
+  1. In the plane, run `git merge --ff-only <commit>`.
+  2. Run `evolve sync-main`.
+  3. Run `evolve ship --push-only`.
 
 Operator-visible: `[ship] REPAIR:` log lines; `ship.repair_attempted` / `ship.repair_outcome`
 signals; declined attempts annotate `ship-error.json`. On an unresolved ship failure the cycle
@@ -397,3 +439,20 @@ a repo-contract violation can still first surface in the remote release suite (i
 Auto-bumped version markers: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `skills/loop/SKILL.md` (heading), `README.md`, `CHANGELOG.md`. `evolve release-consistency` is the standalone consistency verifier.
 
 Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/publishing-releases.md](../guides/publishing-releases.md).
+
+## Documentation lint: `evolve docs ste-lint`
+
+The lint checks text against the ASD-STE100 house rules ([the standard](../conventions/ste100-writing.md), [the plan](../plans/ste100-docs-rewrite-2026-10.md), [the package notes](../architecture/packages/internal-stelint.md)). It reads the house list of words from the standard under the project root.
+
+| Form | What it checks |
+|---|---|
+| `evolve docs ste-lint` | `docs/**/*.md`, `README.md`, `CLAUDE.md`, `AGENTS.md` and `CHANGELOG.md` |
+| `evolve docs ste-lint <paths...>` | the named files, and the `.md` files under the named directories |
+| `evolve docs ste-lint --changed <base-ref>` | the files in scope that changed since the base ref, with the untracked files |
+| `evolve docs ste-lint --go [paths...]` | the log and error text in `go/**/*.go`, but not `_test.go` files, `testdata` or `go/acs/**` |
+
+- **Output:** one `path:line RULE message` line for each finding, and one summary line. `--json` prints the counts, `by_rule`, the findings and the generated files that the lint did not check.
+- **The project root:** `--project-root P` sets the root. Without it, the verb uses `EVOLVE_WORKTREE_ROOT`, then `EVOLVE_PROJECT_ROOT`, then the git top level of the current directory. It never uses the current directory itself, so it works from `go/` and from any subdirectory. Outside a git tree with no root, it exits 2. A path that you name is relative to the current directory.
+- **Exit codes:** the exit code is 0 with or without findings (WARN). It is 1 with `--strict` when there are findings. It is 2 when the standard or a file cannot be read, and 10 for a bad flag.
+- **The build floor:** the build handoff floor checks the changed documents in scope. When it finds a problem, it prints one line, `[ste-lint] WARN: <n> finding(s) in <m> file(s) (first: path:line RULE)`. It never blocks the handoff.
+- **The dial:** `.evolve/policy.json` `docs_floor.ste_stage` is `off`, `shadow` or `enforce`, and the compiled default is `shadow`. `off` stops the floor's line. `shadow` and `enforce` both only WARN. The policy loader refuses an unknown word in `stage` or `ste_stage`, and an unknown `docs_floor` key.

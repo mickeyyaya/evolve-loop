@@ -1,6 +1,10 @@
 package policy
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/config"
+import (
+	"fmt"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+)
 
 // ReportBudgetPolicy is the "report_budget" block, dialed separately from the report-size gate's stage.
 type ReportBudgetPolicy struct {
@@ -134,17 +138,35 @@ func (p Policy) BridgeRecoveryStages() (recovery, fatalPane string) {
 // See ADR-0077.
 type DocsFloorPolicy struct {
 	// Stage is "off", "shadow" or "enforce" (default); even "enforce" only WARNs.
-	Stage string `json:"stage,omitempty"`
+	Stage    string `json:"stage,omitempty"`
+	SteStage string `json:"ste_stage,omitempty"`
 }
 
-// DocsFloorConfig returns the docs_floor block, defaulting Stage to "enforce".
+func (d *DocsFloorPolicy) UnmarshalJSON(raw []byte) error {
+	type block DocsFloorPolicy
+	var decoded block
+	if err := decodeStrict(raw, &decoded); err != nil {
+		return fmt.Errorf("docs_floor: %w", err)
+	}
+	for _, dial := range [][2]string{{"stage", decoded.Stage}, {"ste_stage", decoded.SteStage}} {
+		if _, ok := config.GateStage(dial[1]); dial[1] != "" && !ok {
+			return fmt.Errorf("docs_floor: %s %q is not off, shadow or enforce", dial[0], dial[1])
+		}
+	}
+	*d = DocsFloorPolicy(decoded)
+	return nil
+}
+
 func (p Policy) DocsFloorConfig() DocsFloorPolicy {
-	c := DocsFloorPolicy{Stage: "enforce"}
+	c := DocsFloorPolicy{Stage: "enforce", SteStage: "shadow"}
 	if p.DocsFloor == nil {
 		return c
 	}
 	if p.DocsFloor.Stage != "" {
 		c.Stage = p.DocsFloor.Stage
+	}
+	if p.DocsFloor.SteStage != "" {
+		c.SteStage = p.DocsFloor.SteStage
 	}
 	return c
 }

@@ -27,6 +27,7 @@ type CmdRunner = sysexec.RunFunc
 type Config struct {
 	Runner CmdRunner
 	NowFn  func() time.Time
+	Sleep  func(time.Duration)
 	// See ADR-0050.
 	// PhaseIO threads the EVOLVE_PHASE_IO stage into the audit-binding verdict
 	// parse. Zero value (StageOff) = byte-identical (prose parse); set by the
@@ -56,6 +57,7 @@ type Config struct {
 type Phase struct {
 	runner           CmdRunner
 	nowFn            func() time.Time
+	sleep            func(time.Duration)
 	phaseIO          config.Stage
 	manifestGate     string
 	repoContractGate string
@@ -67,7 +69,7 @@ func New(c Config) *Phase {
 	if nowFn == nil {
 		nowFn = time.Now
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals}
+	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, signals: c.Signals}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -167,80 +169,65 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		PhaseIO:                         p.phaseIO, // See ADR-0050: sentinel-first verdict parse at enforce
 		ManifestGate:                    p.manifestGate,
 		Runner:                          p.runner,
+		Sleep:                           p.sleep,
 		Signals:                         p.signals, // See ADR-0103: the landing's ship.warning events reach the root's Center
 	}
 }
 
-// runNative dispatches to the native Go ship implementation. Translates
-// PhaseRequest → Options, then RunResult → PhaseResponse.
 func (p *Phase) runNative(ctx context.Context, req core.PhaseRequest, msg string, start time.Time) (core.PhaseResponse, error) {
-	// Repo-contract scanner pack BEFORE bind/push: a repo-wide guard suite
-	// RED in this lane must fail the ship here, not on main (repocontract.go).
-	// req.Workspace is the run dir: the gate tees the scanner output there
-	// (ship-repocontract-scan.log) on green AND red runs. Threading it here is
-	// the load-bearing half — a log seam reachable only from a test is dead code.
 	opts := p.shipOptions(req, msg)
-	gateRoot, baseRef, rerr := repoContractGateRoot(&opts)
-	if rerr != nil {
-		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", rerr)
-	}
-	if gerr := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); gerr != nil {
-		return core.PhaseResponse{}, fmt.Errorf("ship repo-contract gate: %w", gerr)
-	}
-	res, err := Run(ctx, opts)
-	durationMS := p.nowFn().Sub(start).Milliseconds()
-
-	if err != nil {
-		// Boundary preservation: wrap with %w so core.AsShipError still
-		// recovers the structured *core.ShipError from the orchestrator side,
-		// and surface its Code/Class/Debug as PhaseResponse.Signals so the
-		// debugger-routing layer can act on them without re-parsing strings.
-		signals := map[string]any{}
-		if se, ok := core.AsShipError(err); ok {
-			signals["ship.error_code"] = string(se.Code)
-			signals["ship.error_class"] = string(se.Class)
-			signals["ship.error_stage"] = string(se.Stage)
-			signals["ship.debug"] = se.DebugString()
+	res, resumed, err := resumeFirst(ctx, &opts)
+	if !resumed && err == nil {
+		if gerr := p.runRepoContractGate(ctx, req, &opts); gerr != nil {
+			return core.PhaseResponse{}, gerr
 		}
-		addRepairSignals(signals, res)
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			DurationMS:   durationMS,
-			Signals:      signals,
-			Diagnostics: []core.Diagnostic{
-				{Severity: "error", Message: err.Error()},
-			},
-		}, fmt.Errorf("ship: native: %w", err)
+		res, err = runStages(ctx, &opts, res)
 	}
-	if res.ExitCode != ExitOK {
-		return core.PhaseResponse{
-			Phase:        phaseName,
-			Verdict:      core.VerdictFAIL,
-			ArtifactsDir: req.Workspace,
-			DurationMS:   durationMS,
-			Diagnostics: []core.Diagnostic{
-				{Severity: "error", Message: strings.Join(res.Logs, "\n")},
-			},
-		}, fmt.Errorf("ship: native exit=%d", res.ExitCode)
+	resp, rerr := respond(req, res, err)
+	resp.DurationMS = p.nowFn().Sub(start).Milliseconds()
+	return resp, rerr
+}
+
+func (p *Phase) runRepoContractGate(ctx context.Context, req core.PhaseRequest, opts *Options) error {
+	gateRoot, baseRef, err := repoContractGateRoot(opts)
+	if err != nil {
+		return fmt.Errorf("ship repo-contract gate: %w", err)
 	}
-	// Signals stays nil on a repair-free success — byte-identical to the
-	// pre-ladder response shape.
-	var signals map[string]any
+	if err := runRepoContractGateAt(ctx, p.repoContractGate, gateRoot, baseRef, req.Workspace, os.Stderr, backstopFlakeSignal(p.signals, req.Cycle)); err != nil {
+		return fmt.Errorf("ship repo-contract gate: %w", err)
+	}
+	return nil
+}
+
+func respond(req core.PhaseRequest, res RunResult, err error) (core.PhaseResponse, error) {
+	resp := core.PhaseResponse{Phase: phaseName, Verdict: core.VerdictFAIL, ArtifactsDir: req.Workspace}
+	switch {
+	case err != nil:
+		resp.Signals = failureSignals(err, res)
+		resp.Diagnostics = []core.Diagnostic{{Severity: "error", Message: err.Error()}}
+		return resp, fmt.Errorf("ship: native: %w", err)
+	case res.ExitCode != ExitOK:
+		resp.Diagnostics = []core.Diagnostic{{Severity: "error", Message: strings.Join(res.Logs, "\n")}}
+		return resp, fmt.Errorf("ship: native exit=%d", res.ExitCode)
+	}
+	resp.Verdict, resp.NextPhase, resp.CommitSHA = core.VerdictPASS, string(core.PhaseRetro), res.CommitSHA
 	if res.RepairAttempted != "" {
-		signals = map[string]any{}
-		addRepairSignals(signals, res)
+		resp.Signals = map[string]any{}
+		addRepairSignals(resp.Signals, res)
 	}
-	return core.PhaseResponse{
-		Phase:        phaseName,
-		Verdict:      core.VerdictPASS,
-		ArtifactsDir: req.Workspace,
-		NextPhase:    string(core.PhaseRetro),
-		CommitSHA:    res.CommitSHA,
-		DurationMS:   durationMS,
-		Signals:      signals,
-	}, nil
+	return resp, nil
+}
+
+func failureSignals(err error, res RunResult) map[string]any {
+	signals := map[string]any{}
+	if se, ok := core.AsShipError(err); ok {
+		signals["ship.error_code"] = string(se.Code)
+		signals["ship.error_class"] = string(se.Class)
+		signals["ship.error_stage"] = string(se.Stage)
+		signals["ship.debug"] = se.DebugString()
+	}
+	addRepairSignals(signals, res)
+	return signals
 }
 
 // See ADR-0039.

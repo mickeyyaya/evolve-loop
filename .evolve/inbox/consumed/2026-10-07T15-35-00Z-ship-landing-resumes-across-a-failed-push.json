@@ -1,0 +1,48 @@
+{
+  "acceptance": [
+    "TestRun_ARetryAfterAFailedPushResumesAtThePushWithoutReverifying: real repo + bare remote, inbox-item lane, active explanation contract, a runner that fails every push with GitHub's 'remote rejected ... (Internal Server Error)' text in Run 1. Run 2, with fresh Options and pushes succeeding, PASSes with repair_outcome landing-resumed, remote main == the lane commit and ship-binding.json written. Red first, today with the live EXPLANATION_DOCUMENTATION 'diff SHA256 does not match the base-bound Build content'",
+    "TestRun_AFailedPushLeavesSharedMainAtItsPreLandingTip: after a failed push, rev-parse main == the pre-landing tip (red first: main advanced, the cycle-1830 reflog shape)",
+    "TestRun_AFailedPushJournalsItsCommitSoPushOnlyCompletesIt: evolve ship --push-only lands the strand (red first: 'REFUSED — lack ship provenance')",
+    "TestRun_AServerErrorTwiceIsRetriedWithBackoffInTheStep: the live 2x500 shape lands in the same Run with an injected sleep (red first: declined at push_retry)",
+    "TestRecoverFromShipError_ATransientPushFailureResumesTheShipWithoutAReaudit (core, real ship runner, real router.Recover): the second ship PASSes at recovery depth 1 and the audit runner is not re-dispatched (red first: audit re-dispatched)",
+    "Preservation twins stay green: a resume declines when a newer audit superseded the intent, when the lane tip moved off it, or when origin diverged (which unwinds to the audited shape before re-audit); a policy rejection is never retried; TestRepair_Resume_PostMergePrePush_PushOnlyCloses, TestNativeRun_PostPushExplanationRetryUsesLandedTreeAfterWorktreeCleanup and the cycle-1825 compose tests",
+    "Overlay mutants are killed: ff before push, no intent write, journal after push, resume without the audit-supersede check, consumed paths read from memory, unclassified retry",
+    "ADR-0039 §8 rows for AUDIT_BINDING_HEAD_MOVED and GIT_PUSH_REJECTED, build-explanation-contract 'Provenance checks' (pre-push resume), runtime-reference 'Ship self-healing', packages/internal-phases-ship.md and decomposition/07-shipgitops.md updated in the landing commit"
+  ],
+  "connects_to": [
+    "carried-ship-resume-binding-sites-skip-the-rule",
+    "lost-ship-closeout-universal-landing-witness",
+    "pre-commit-carry-refusal-returns-to-audit",
+    "carry-recovery-to-ship-end-to-end-proof",
+    "resume-heals-a-carrier-left-at-head"
+  ],
+  "consumed": {
+    "at": "2026-10-07T16:43:52Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Fixed by the two-phase landing with a write-ahead intent (ADR-0039 §8.1) on branch fix/ship-landing-resumes-across-a-failed-push. Each acceptance test is green, and 14 overlay mutants are dead. Two binding sites (native.go post-push idempotency, audit.go post-push predicate evidence) stay open under carried-ship-resume-binding-sites-skip-the-rule."
+  },
+  "created_at": "2026-10-07T15:35:00Z",
+  "files": [
+    "go/internal/phases/ship/landing/push.go",
+    "go/internal/phases/ship/landing/integrate.go",
+    "go/internal/phases/ship/landing/binding.go",
+    "go/internal/phases/ship/worktree_ship.go",
+    "go/internal/phases/ship/ship.go",
+    "go/internal/phases/ship/repair.go",
+    "go/internal/phases/ship/consume.go",
+    "go/internal/phases/ship/pushonly.go",
+    "go/internal/core/ship_recovery.go",
+    "docs/architecture/adr/0039-failure-floor-and-failure-signal-contract.md",
+    "docs/architecture/build-explanation-contract.md",
+    "docs/operations/runtime-reference.md"
+  ],
+  "fix": "A two-phase landing with a write-ahead landing intent, in one home: go/internal/phases/ship/landing (ADR-0103 unit 07, which already owns the ff-merge, the push and the ship-binding witness); design home ADR-0039 §8. (1) Prepare: after verifyStagedTree and the lane commit, before any shared-ref mutation, atomically write \u003crun workspace\u003e/landing-intent.json {cycle, run_id, audit_artifact_sha256, audited_tree, worktree_base_sha, commit_sha, commit_tree, consumed_paths, explanation_view_sha256, pre_main, branch} and journal commit_sha. (2) Commit: require main to be an ancestor of commit_sha; push commit_sha:refs/heads/\u003cbranch\u003e FIRST; only then ff the plane main under ship.lock; verifyCommittedTree with the consumption excuse read from the intent; writeShipBinding; complete the intent. (3) landing.Resume is the first stage of ship.Run (runNative skips the repo-contract pack when it applies): an incomplete intent for this cycle+run whose commit and tree resolve, whose audit row is still the newest for the run, whose lane tip is commit_sha, and whose origin is an ancestor of commit_sha resumes at step 2 and re-runs no gate. repairResumeUnpushed is retired into it. (4) On a non-resumable exit back to Audit or Build, unwind the lane to the audited shape (B1 unwindShipCommit/pendRebasedChange) so Audit and the explanation never measure ship's own commit. (5) Secondary: classify push stderr (transport/5xx → bounded jittered retry of the identical push; race → fetch+ff probe; policy → precondition, no retry) and fix the '…: \u003cnil\u003e' message. Rejected alternatives: (b) binding the explanation base to the recorded pre-commit base is already true (base check explanationdocs.go:272 passed). Ordering-only (c) leaves the consumption in the lane commit, so the digest still mismatches. Excluding .evolve/inbox from the digest turns the retry into a vacuous no-push PASS (worktree_ship.go:143-146).",
+  "id": "ship-landing-resumes-across-a-failed-push",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "console forensics, 2026-10-07, wave 77 cycle 1830 (lane cli-phase-cycle-request): GitHub returned 500 on both pushes at 15:08:31Z and 15:08:34Z",
+  "summary": "Cycle 1830 passed audit (15:05:22Z, tree ad697a29 on base 63eb3af76). Ship committed the audited tree plus its inbox consumption as ba61c7341, fast-forwarded the shared local main to it (worktree_ship.go:181 Integrate before :185 pushWithRepair), then the push and the repair's one identical retry both got GitHub 500. Nothing completed or undid the local effects: ship-binding.json and the ship-journal entry are written only after a successful push, and the consumed paths that excuse the consumption drift live only in memory. recover:transient-retry-ship re-ran Ship.Run from the top. The explanation gate (ship.go:227 → explanationdocs.go:292-297) hashed the lane worktree against the UNCHANGED recorded base 63eb3af76 and now included ship's own consumption pair: sealed 7bfb80dc…, measured 8eb4ced1…. A replica of foldPathStates reproduces both; dropping the two inbox paths gives exactly 7bfb80dc. That routed to precondition-reaudit, and the re-audit FAILed deterministically on the same gate (15:17:28Z). Had the gate passed, verifyAuditBinding would still have raised AUDIT_BINDING_HEAD_MOVED (ship's own ff moved the plane HEAD), and repairResumeUnpushed declines every consuming cycle (repair.go:318-329, HEAD^{tree} != bound). Meanwhile ba61c7341 sits unpushed and unjournaled on local main; laneStartRef forks new lanes from it (worktree.go:122-124); peer 1829 fleet-rebased onto it and its push will publish it regardless of 1830's verdict. The existing resume test passes only because its fixture consumes nothing and activates no explanation contract.",
+  "title": "A failed push leaves ship's commit and main fast-forward neither completed nor undone, so a transient 5xx becomes a deterministic re-audit FAIL and strands audited work on the shared main",
+  "weight": 0.9
+}

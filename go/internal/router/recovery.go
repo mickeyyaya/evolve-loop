@@ -77,6 +77,15 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
+		name: "push-policy-end",
+		match: func(b Blocker) (string, bool) {
+			if b.Code == "GIT_PUSH_POLICY_REFUSED" {
+				return PhaseEnd, true
+			}
+			return "", false
+		},
+	},
+	{
 		name: "precondition-reaudit",
 		match: func(b Blocker) (string, bool) {
 			if b.Class == "precondition" ||

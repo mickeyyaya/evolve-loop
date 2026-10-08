@@ -2,11 +2,13 @@ package ship
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -128,6 +130,8 @@ type Options struct {
 	// NowFn is a clock seam for tests.
 	NowFn func() Now
 
+	Sleep func(time.Duration)
+
 	// CmdRunner is the git/gh/external-binary execution seam. Tests
 	// inject a fake; production wiring uses execRunner.
 	Runner CmdRunner
@@ -187,113 +191,131 @@ type RunResult struct {
 // Run executes the ship lifecycle end-to-end; missing Options fields are
 // resolved from env/defaults.
 func Run(ctx context.Context, opts Options) (RunResult, error) {
-	res := RunResult{ClassUsed: opts.Class}
+	res, resumed, err := resumeFirst(ctx, &opts)
+	if resumed || err != nil {
+		return res, err
+	}
+	return runStages(ctx, &opts, res)
+}
 
-	// Push-only commits nothing, so it carries no message.
-	if opts.CommitMessage == "" && !opts.PushOnly {
-		return res, shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
+func resumeFirst(ctx context.Context, opts *Options) (RunResult, bool, error) {
+	res := RunResult{ClassUsed: opts.Class}
+	if err := opts.validate(); err != nil {
+		return res, false, err
+	}
+	opts.applyDefaults()
+	resumed, err := resumeLanding(ctx, opts, &res)
+	if err != nil {
+		out, ferr := finalize(ctx, opts, &res, err, "landing-resume")
+		return out, true, ferr
+	}
+	if !resumed {
+		return res, false, nil
+	}
+	if err := postShip(ctx, opts, &res); err != nil {
+		res.Logs = append(res.Logs, "[ship] WARN: post-ship hook error: "+err.Error())
+	}
+	out, ferr := finalize(ctx, opts, &res, nil, landingResumed)
+	return out, true, ferr
+}
+
+func (o *Options) validate() error {
+	if o.CommitMessage == "" && !o.PushOnly {
+		return shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
 			"ship: commit message required")
 	}
-	if !opts.Class.IsValid() && !opts.PushOnly { // push-only mints no commit; class is ignored
-		return res, shipErr(core.CodeInvalidClass, core.ShipClassConfig, core.StageArgs,
-			"ship: invalid --class "+string(opts.Class)+" (must be: cycle|manual|release|trivial)",
-			"class", string(opts.Class))
+	if !o.Class.IsValid() && !o.PushOnly {
+		return shipErr(core.CodeInvalidClass, core.ShipClassConfig, core.StageArgs,
+			"ship: invalid --class "+string(o.Class)+" (must be: cycle|manual|release|trivial)",
+			"class", string(o.Class))
 	}
-	if opts.ProjectRoot == "" {
-		return res, shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
+	if o.ProjectRoot == "" {
+		return shipErr(core.CodeArgs, core.ShipClassConfig, core.StageArgs,
 			"ship: ProjectRoot required")
 	}
+	return nil
+}
 
-	if opts.Stdin == nil {
-		opts.Stdin = os.Stdin
+func (o *Options) applyDefaults() {
+	if o.Stdin == nil {
+		o.Stdin = os.Stdin
 	}
-	if opts.Stdout == nil {
-		opts.Stdout = os.Stdout
+	if o.Stdout == nil {
+		o.Stdout = os.Stdout
 	}
-	if opts.Stderr == nil {
-		opts.Stderr = os.Stderr
+	if o.Stderr == nil {
+		o.Stderr = os.Stderr
 	}
-	if opts.PluginRoot == "" {
-		// When unset, fall back to ProjectRoot — the typical case when
-		// running inside the evolve-loop source repo itself.
-		opts.PluginRoot = opts.ProjectRoot
+	if o.PluginRoot == "" {
+		o.PluginRoot = o.ProjectRoot
 	}
-	if opts.Runner == nil {
-		opts.Runner = sysexec.DefaultRunner
+	if o.Runner == nil {
+		o.Runner = sysexec.DefaultRunner
 	}
-	if opts.NowFn == nil {
-		opts.NowFn = defaultNow
+	if o.NowFn == nil {
+		o.NowFn = defaultNow
 	}
-	if err := verifyNativeExplanation(ctx, &opts); err != nil {
-		return finalize(ctx, &opts, &res, shipErr(
+}
+
+func runStages(ctx context.Context, opts *Options, res RunResult) (RunResult, error) {
+	if err := verifyNativeExplanation(ctx, opts); err != nil {
+		return finalize(ctx, opts, &res, shipErr(
 			core.CodeExplanationDocumentation,
 			core.ShipClassPrecondition,
 			core.StageVerifyExplanation,
 			"ship explanation documentation gate: "+err.Error(),
 		), "verify-explanation-documentation")
 	}
-
-	// Self-SHA TOFU verification; the repair ladder may heal a stale pin and
-	// retry once.
-	if _, err := runStageWithRepair(ctx, &opts, &res, func() error {
-		return verifySelfSHA(ctx, &opts, &res)
+	if _, err := runStageWithRepair(ctx, opts, &res, func() error {
+		return verifySelfSHA(ctx, opts, &res)
 	}); err != nil {
-		return finalize(ctx, &opts, &res, err, "verify-self-sha")
+		return finalize(ctx, opts, &res, err, "verify-self-sha")
 	}
-
-	// Push-only recovery runs after self-SHA integrity but before class
-	// machinery: there is no new work to verify, only an attested strand to
-	// complete (pushonly.go).
 	if opts.PushOnly {
-		return finalize(ctx, &opts, &res, runPushOnly(ctx, &opts, &res), "push-only")
+		return finalize(ctx, opts, &res, runPushOnly(ctx, opts, &res), "push-only")
 	}
-
 	if opts.Class == ClassCycle {
-		commitSHA, idempotent, err := checkPostPushIdempotency(ctx, &opts)
+		commitSHA, idempotent, err := checkPostPushIdempotency(ctx, opts)
 		if err == nil && idempotent {
-			if err := verifyPostPushPredicateEvidence(ctx, &opts, &res, commitSHA); err != nil {
-				return finalize(ctx, &opts, &res, err, "verify-post-push-predicate-evidence")
-			}
-			res.CommitSHA = commitSHA
-			res.Logs = append(res.Logs, fmt.Sprintf("[ship] post-push correction detected (HEAD is already the ship commit %s); succeeding report-only", res.CommitSHA))
-			return finalize(ctx, &opts, &res, nil, "post-push-idempotency")
+			return reportPostPush(ctx, opts, &res, commitSHA)
 		}
 	}
+	return shipVerified(ctx, opts, &res)
+}
 
-	// Class-aware pre-flight; a HEAD-already-bound AUDIT_BINDING_HEAD_MOVED may
-	// complete the ship via a push-only resume, skipping the mutate stage below.
-	resumed, err := runStageWithRepair(ctx, &opts, &res, func() error {
-		return verifyClass(ctx, &opts, &res)
+func reportPostPush(ctx context.Context, opts *Options, res *RunResult, commitSHA string) (RunResult, error) {
+	if err := verifyPostPushPredicateEvidence(ctx, opts, res, commitSHA); err != nil {
+		return finalize(ctx, opts, res, err, "verify-post-push-predicate-evidence")
+	}
+	res.CommitSHA = commitSHA
+	res.Logs = append(res.Logs, fmt.Sprintf("[ship] post-push correction detected (HEAD is already the ship commit %s); succeeding report-only", res.CommitSHA))
+	return finalize(ctx, opts, res, nil, "post-push-idempotency")
+}
+
+func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult, error) {
+	resumed, err := runStageWithRepair(ctx, opts, res, func() error {
+		return verifyClass(ctx, opts, res)
 	})
 	if err != nil {
 		if _, isClean := err.(*cleanExitError); isClean {
 			res.ExitCode = ExitOK
-			writeDryRunJournal(ctx, &opts, &res, "no-staged-changes")
-			return res, nil
+			writeDryRunJournal(ctx, opts, res, "no-staged-changes")
+			return *res, nil
 		}
-		return finalize(ctx, &opts, &res, err, "verify-class")
+		return finalize(ctx, opts, res, err, "verify-class")
 	}
 	res.Logs = append(res.Logs, "[ship] provenance: "+res.Provenance)
-
-	// Atomic ship (commit + push + optional gh release); a collider repair
-	// re-runs this stage exactly once.
 	if !resumed {
-		if _, err := runStageWithRepair(ctx, &opts, &res, func() error {
-			return atomicShip(ctx, &opts, &res)
+		if _, err := runStageWithRepair(ctx, opts, res, func() error {
+			return atomicShip(ctx, opts, res)
 		}); err != nil {
-			return finalize(ctx, &opts, &res, err, "atomic-ship")
+			return finalize(ctx, opts, res, err, "atomic-ship")
 		}
 	}
-
-	if err := postShip(ctx, &opts, &res); err != nil {
-		// Post-ship errors are non-fatal: the commit is already on remote.
+	if err := postShip(ctx, opts, res); err != nil {
 		res.Logs = append(res.Logs, "[ship] WARN: post-ship hook error: "+err.Error())
 	}
-
-	// Success path also goes through finalize (with nil err) so it is the SINGLE
-	// exit-code + dry-run-journal site for every outcome — no separate journal
-	// write that could double up, and the err==nil branch is live, not dead.
-	return finalize(ctx, &opts, &res, nil, "normal")
+	return finalize(ctx, opts, res, nil, "normal")
 }
 
 // finalize classifies an error into the right ExitCode and writes the
@@ -302,9 +324,7 @@ func Run(ctx context.Context, opts Options) (RunResult, error) {
 func finalize(ctx context.Context, opts *Options, res *RunResult, err error, exitReason string) (RunResult, error) {
 	// Every MINTED commit is journaled, on success or after a rejected push
 	// (pushonly.go); push-only itself mints nothing so it is exempt.
-	if res.CommitSHA != "" && !opts.DryRun && !opts.PushOnly {
-		appendShipJournal(opts.ProjectRoot, res.CommitSHA, opts.Class)
-	}
+	journalMinted(opts, res)
 	if err == nil {
 		res.ExitCode = ExitOK
 		writeDryRunJournal(ctx, opts, res, exitReason)
@@ -369,6 +389,28 @@ func checkPostPushIdempotency(ctx context.Context, opts *Options) (string, bool,
 		return "", false, nil
 	}
 	return head, true, nil
+}
+
+func journalMinted(opts *Options, res *RunResult) {
+	if res.CommitSHA == "" || opts.DryRun || opts.PushOnly || journalHasSHA(opts.ProjectRoot, res.CommitSHA) {
+		return
+	}
+	cid, _, cerr := cycleIDForShip(opts)
+	err := errors.Join(cerr, appendShipJournal(opts.ProjectRoot, shipJournalEntry{SHA: res.CommitSHA, Class: string(opts.Class), Cycle: cid}))
+	if err != nil {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: the ship journal entry of %s is not complete: %v", res.CommitSHA, err))
+	}
+}
+
+func runIDForShip(opts *Options) (string, error) {
+	if opts.RunID != "" {
+		return opts.RunID, nil
+	}
+	state, err := readStateMap(opts.cycleStateFile())
+	if err != nil {
+		return "", err
+	}
+	return stateString(state, "run_id"), nil
 }
 
 func cycleIDForShip(opts *Options) (int, bool, error) {

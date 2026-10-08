@@ -3,6 +3,7 @@ package ship
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -152,6 +153,25 @@ func verifyExecutionTree(ctx context.Context, opts *Options, res *RunResult, tes
 	}
 	return shipErr(core.CodeAuditBindingTreeMismatch, core.ShipClassPrecondition, core.StageVerifyClass,
 		fmt.Sprintf("predicate execution tree-state mismatch or unavailable after Audit (audited=%s current=%s error=%v)%s; re-run Audit", audited, current.Tree, err, unexplained), "audited_tree", audited, "current_tree", current.Tree)
+}
+
+func latestRunAudit(opts *Options, runID string) (*auditEntry, error) {
+	return findLatestAudit(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), runID)
+}
+
+func auditPassed(opts *Options, entry *auditEntry) bool {
+	body, err := readAuditArtifact(entry)
+	if err != nil {
+		return false
+	}
+	sum := sha256.Sum256(body)
+	pass, _, fail := parseVerdicts(string(body), opts.PhaseIO)
+	return hex.EncodeToString(sum[:]) == entry.ArtifactSHA256 && pass && !fail
+}
+
+func bindResumedAudit(opts *Options, entry *auditEntry) {
+	opts.internalAuditBoundTreeSHA = entry.WorktreeTreeSHA
+	opts.internalAuditArtifactSHA = entry.ArtifactSHA256
 }
 
 // findLatestAudit returns the auditor ledger entry ship binds to: the newest

@@ -152,7 +152,8 @@ when `ship-binding.json` exactly matches the typed cycle, current HEAD commit,
 current HEAD tree, and non-empty audit-bound tree; Ship then re-verifies the
 explanation against an isolated detached worktree of the immutable landed
 commit, so unrelated mutable or untracked state in the main checkout cannot
-change the retry verdict.
+change the retry verdict. A resumed landing never verifies again; its intent carries
+`explanation_view_sha256`, the digest of the sealed snapshot ([ADR-0039 §8.1](adr/0039-failure-floor-and-failure-signal-contract.md)).
 
 ## Recovery behavior
 

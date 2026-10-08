@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 )
 
-// PushSite selects the rejection wording of the three push sites — the ONE
-// enumerable table of their asymmetries (the worktree site names main's head
-// in its message; push-only carries its own prefix).
 type PushSite uint8
 
 // The three push sites.
 const (
-	SiteDirect   PushSite = iota // gitops.go's direct path: "ship: git push failed (rc=%d): %v"
-	SiteWorktree                 // the worktree integrate: `rev-parse HEAD` first, then "…; main is at %s: %v" + Debug head
-	SitePushOnly                 // `evolve ship --push-only`: "ship --push-only: git push failed (rc=%d): %v"
+	SiteDirect PushSite = iota
+	SiteWorktree
+	SitePushOnly
 )
 
 // PushRequest is the push step's input: the branch, the site's wording, and
@@ -27,6 +25,7 @@ const (
 // it is shared with the repair ladder and survives the stage re-run.
 type PushRequest struct {
 	Branch string
+	Commit string
 	Site   PushSite
 	// DryRun skips the repair (repairs mutate); the push itself still runs —
 	// push-only under --dry-run pushes today, preserved verbatim.
@@ -61,44 +60,131 @@ const (
 	RepairNeedsReaudit  RepairOutcome = "needs-reaudit"
 )
 
-// Push pushes the branch on the operator streams. A rejection becomes the
-// site's transient GIT_PUSH_REJECTED (step=push) and gets ONE inline fetch +
-// fast-forward retry; once the push landed (first try, retried, or already
-// on origin) the head is read for the result — an unreadable HEAD is
-// SHIP_LANDING_HEAD_READ_FAILED and the ship proceeds with an empty Head.
+var transportBackoff = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
+
+type pushAttempt struct {
+	exit   int
+	err    error
+	stderr string
+}
+
+func (a pushAttempt) failed() bool { return a.err != nil || a.exit != 0 }
+
+func (a pushAttempt) detail() string {
+	switch {
+	case a.err != nil:
+		return ": " + a.err.Error()
+	case strings.TrimSpace(a.stderr) != "":
+		return ": " + stderrDetail(a.stderr)
+	}
+	return ""
+}
+
 func (l *Landing) Push(ctx context.Context, req PushRequest) (PushResult, error) {
 	var out PushResult
-	s := l.streams()
-	exit, err := l.git(ctx, []string{"push", "origin", req.Branch}, s.Stdout, s.Stderr)
-	if err != nil || exit != 0 {
-		if rerr := l.repairPush(ctx, req, l.rejection(ctx, req.Site, req.Branch, exit, err), &out); rerr != nil {
+	if req.Site == SiteWorktree && req.Commit == "" {
+		return out, fail(stepPush, shiperr.CodeArgs, shiperr.ShipClassConfig, "ship: a worktree push names no commit, so ship pushes nothing",
+			shiperr.BranchKey, req.Branch)
+	}
+	if attempt := l.send(ctx, req); attempt.failed() {
+		if rerr := l.answerRejection(ctx, req, attempt, &out); rerr != nil {
 			return out, rerr
 		}
 	}
-	out.Head = l.readHead(ctx)
+	out.Head = l.landedHead(ctx, req)
 	return out, nil
 }
 
-// rejection builds the site's GIT_PUSH_REJECTED — the three-case wording
-// switch. The worktree site probes `rev-parse HEAD` first (its error
-// ignored, as before) so the message can name where main is.
-func (l *Landing) rejection(ctx context.Context, site PushSite, branch string, exit int, err error) *shiperr.ShipError {
-	rc, gitErr := fmt.Sprintf("%d", exit), errText(err)
-	switch site {
+func (l *Landing) send(ctx context.Context, req PushRequest) pushAttempt {
+	s := l.streams()
+	var captured strings.Builder
+	stderr := io.Writer(&captured)
+	if s.Stderr != nil {
+		stderr = io.MultiWriter(s.Stderr, &captured)
+	}
+	exit, err := l.git(ctx, pushArgs(req), s.Stdout, stderr)
+	return pushAttempt{exit: exit, err: err, stderr: captured.String()}
+}
+
+func pushArgs(req PushRequest) []string {
+	if req.Site == SiteWorktree {
+		return []string{"push", "origin", req.Commit + ":refs/heads/" + req.Branch}
+	}
+	return []string{"push", "origin", req.Branch}
+}
+
+func tipRef(req PushRequest) string {
+	if req.Site == SiteWorktree {
+		return req.Commit
+	}
+	return "HEAD"
+}
+
+func (l *Landing) landedHead(ctx context.Context, req PushRequest) string {
+	if req.Site == SiteWorktree {
+		return req.Commit
+	}
+	return l.readHead(ctx)
+}
+
+func (l *Landing) rejection(req PushRequest, a pushAttempt) *shiperr.ShipError {
+	rc, gitErr := fmt.Sprintf("%d", a.exit), errText(a.err)
+	switch req.Site {
 	case SiteWorktree:
-		head, _ := l.Capture(ctx, "rev-parse", "HEAD")
-		head = strings.TrimSpace(head)
 		return fail(stepPush, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient,
-			fmt.Sprintf("ship: git push failed (rc=%d); main is at %s: %v", exit, head, err),
-			shiperr.GitRCKey, rc, "git_err", gitErr, shiperr.BranchKey, branch, "head", head)
+			fmt.Sprintf("ship: git push of %s to origin/%s failed (rc=%d)%s; ship did not move %s", req.Commit, req.Branch, a.exit, a.detail(), req.Branch),
+			shiperr.GitRCKey, rc, "git_err", gitErr, shiperr.BranchKey, req.Branch, "commit", req.Commit)
 	case SitePushOnly:
 		return fail(stepPush, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient,
-			fmt.Sprintf("ship --push-only: git push failed (rc=%d): %v", exit, err),
-			shiperr.GitRCKey, rc, "git_err", gitErr, shiperr.BranchKey, branch)
+			fmt.Sprintf("ship --push-only: git push failed (rc=%d)%s", a.exit, a.detail()),
+			shiperr.GitRCKey, rc, "git_err", gitErr, shiperr.BranchKey, req.Branch)
 	}
 	return fail(stepPush, shiperr.CodeGitPushRejected, shiperr.ShipClassTransient,
-		fmt.Sprintf("ship: git push failed (rc=%d): %v", exit, err),
-		shiperr.GitRCKey, rc, "git_err", gitErr, shiperr.BranchKey, branch)
+		fmt.Sprintf("ship: git push failed (rc=%d)%s", a.exit, a.detail()),
+		shiperr.GitRCKey, rc, "git_err", gitErr, shiperr.BranchKey, req.Branch)
+}
+
+func (l *Landing) refused(req PushRequest, a pushAttempt) *shiperr.ShipError {
+	return fail(stepPush, shiperr.CodeGitPushPolicyRefused, shiperr.ShipClassPrecondition,
+		fmt.Sprintf("ship: origin refused the push to %s by policy; ship does not retry a policy refusal%s", req.Branch, a.detail()),
+		shiperr.GitRCKey, fmt.Sprintf("%d", a.exit), "git_err", errText(a.err), shiperr.BranchKey, req.Branch)
+}
+
+func (l *Landing) answerRejection(ctx context.Context, req PushRequest, a pushAttempt, out *PushResult) error {
+	kind := classifyPush(a.stderr)
+	if kind == pushPolicy {
+		return l.refused(req, a)
+	}
+	rejected := l.rejection(req, a)
+	if req.DryRun || req.RepairAttempted {
+		return rejected
+	}
+	out.RepairAttempted = true
+	if kind == pushTransport {
+		return l.retryTransport(ctx, req, rejected, out)
+	}
+	return l.repairPush(ctx, req, rejected, out)
+}
+
+func (l *Landing) retryTransport(ctx context.Context, req PushRequest, rejected *shiperr.ShipError, out *PushResult) error {
+	emitLog(req.Log, "[ship] REPAIR: the push failed with a transport or server error; ship retries the identical push after a backoff")
+	for _, wait := range transportBackoff {
+		l.sleep(wait)
+		a := l.send(ctx, req)
+		if !a.failed() {
+			out.RepairOutcome = RepairPushRetried
+			emitLog(req.Log, fmt.Sprintf("[ship] REPAIR: push retry after a %s backoff succeeded", wait))
+			return nil
+		}
+		switch classifyPush(a.stderr) {
+		case pushPolicy:
+			out.RepairOutcome = RepairDeclined
+			return l.refused(req, a)
+		case pushRace:
+			return l.declined(req, rejected, out, "transport_retry")
+		}
+	}
+	return l.declined(req, rejected, out, "transport_retry")
 }
 
 // repairPush is the inline push-race repair (ADR-0039 §8 mode #4), run at
@@ -111,12 +197,8 @@ func (l *Landing) rejection(ctx context.Context, site PushSite, branch string, e
 // Never rebases, never force-pushes. The host's guards come in on the
 // request; out reports what ran.
 func (l *Landing) repairPush(ctx context.Context, req PushRequest, rejected *shiperr.ShipError, out *PushResult) error {
-	if req.DryRun || req.RepairAttempted {
-		return rejected
-	}
-	out.RepairAttempted = true
 	emitLog(req.Log, "[ship] REPAIR: push rejected — fetching origin and probing for a fast-forward retry")
-	originRef, head, probe := l.probeOrigin(ctx, req.Branch)
+	originRef, head, probe := l.probeOrigin(ctx, req)
 	if probe != "" {
 		return l.declined(req, rejected, out, probe)
 	}
@@ -125,38 +207,40 @@ func (l *Landing) repairPush(ctx context.Context, req PushRequest, rejected *shi
 		emitLog(req.Log, "[ship] REPAIR: origin already at HEAD — push race resolved itself")
 		return nil
 	}
-	if l.IsAncestor(ctx, originRef, "HEAD") {
-		s := l.streams()
-		exit, pushErr := l.git(ctx, []string{"push", "origin", req.Branch}, s.Stdout, s.Stderr)
-		if pushErr == nil && exit == 0 {
-			out.RepairOutcome = RepairPushRetried
-			emitLog(req.Log, "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)")
-			return nil
+	if l.IsAncestor(ctx, originRef, tipRef(req)) {
+		if l.send(ctx, req).failed() {
+			return l.declined(req, rejected, out, "push_retry")
 		}
-		return l.declined(req, rejected, out, "push_retry")
+		out.RepairOutcome = RepairPushRetried
+		emitLog(req.Log, "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)")
+		return nil
 	}
-	// Origin diverged: a push would need a rebase/merge, which mutates the
-	// audited tree. Reclassify so the recovery chain re-audits on the new
-	// base — the local commit is preserved for a cheap re-land.
 	out.RepairOutcome = RepairNeedsReaudit
-	return fail(stepPush, shiperr.CodeGitPushRejected, shiperr.ShipClassPrecondition,
-		fmt.Sprintf("ship: push rejected and origin/%s diverged — audited tree must be re-audited on the new base (no auto-rebase; local commit preserved). Reconcile at a batch boundary with `evolve sync-main`, then complete the stranded push with `evolve ship --push-only`.", req.Branch),
+	return divergedOrigin(req, originRef, head)
+}
+
+func divergedOrigin(req PushRequest, originRef, head string) *shiperr.ShipError {
+	msg := fmt.Sprintf("ship: push rejected and origin/%s diverged — audited tree must be re-audited on the new base (no auto-rebase; local commit preserved). Reconcile at a batch boundary with `evolve sync-main`, then complete the stranded push with `evolve ship --push-only`.", req.Branch)
+	if req.Site == SiteWorktree {
+		msg = fmt.Sprintf("ship: origin rejected the push of %s because origin/%s diverged; Audit must run again on the new base (ship does not rebase or force-push)", req.Commit, req.Branch)
+	}
+	return fail(stepPush, shiperr.CodeGitPushRejected, shiperr.ShipClassPrecondition, msg,
 		shiperr.BranchKey, req.Branch, "origin_ref", originRef, "head", head,
 		"repair_attempted", string(shiperr.CodeGitPushRejected), shiperr.RepairOutcomeKey, string(RepairNeedsReaudit))
 }
 
-// probeOrigin is the repair's fetch and its two ref reads; probe names the
-// first call that failed ("" when all three succeeded).
-func (l *Landing) probeOrigin(ctx context.Context, branch string) (originRef, head, probe string) {
-	if exit, err := l.git(ctx, []string{"fetch", "origin", branch}, io.Discard, io.Discard); err != nil || exit != 0 {
+func (l *Landing) probeOrigin(ctx context.Context, req PushRequest) (originRef, head, probe string) {
+	if exit, err := l.git(ctx, []string{"fetch", "origin", req.Branch}, io.Discard, io.Discard); err != nil || exit != 0 {
 		return "", "", "fetch"
 	}
-	originRef, err := l.Capture(ctx, "rev-parse", "origin/"+branch)
+	originRef, err := l.Capture(ctx, "rev-parse", "origin/"+req.Branch)
 	if err != nil {
 		return "", "", "origin_ref"
 	}
-	head, err = l.Capture(ctx, "rev-parse", "HEAD")
-	if err != nil {
+	if req.Site == SiteWorktree {
+		return strings.TrimSpace(originRef), req.Commit, ""
+	}
+	if head, err = l.Capture(ctx, "rev-parse", "HEAD"); err != nil {
 		return "", "", "head"
 	}
 	return strings.TrimSpace(originRef), strings.TrimSpace(head), ""
@@ -169,7 +253,7 @@ func (l *Landing) declined(req PushRequest, rejected *shiperr.ShipError, out *Pu
 	out.RepairOutcome = RepairDeclined
 	rejected.Debug["repair_attempted"] = string(shiperr.CodeGitPushRejected)
 	rejected.Debug[shiperr.RepairOutcomeKey] = string(RepairDeclined)
-	l.warn("Landing.Push", CodePushRepairDeclined, "push rejected; inline fetch + ff-retry declined at "+probe,
+	l.warn("Landing.Push", CodePushRepairDeclined, "the remote rejected the push; the inline repair declined at "+probe,
 		map[string]string{shiperr.StepKey: stepPush, shiperr.BranchKey: req.Branch, "probe": probe})
 	return rejected
 }

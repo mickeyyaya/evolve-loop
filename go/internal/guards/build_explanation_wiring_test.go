@@ -14,7 +14,8 @@ var explanationLifecycleCallPins = []struct {
 	function string
 	callee   string
 }{
-	{"../phases/ship/native.go", "Run", "verifyNativeExplanation"},
+	{"../phases/ship/native.go", "Run", "runStages"},
+	{"../phases/ship/native.go", "runStages", "verifyNativeExplanation"},
 	{"../phases/audit/classification.go", "newAuditClassification", "validateExplanationReview"},
 	{"../phases/retro/retro.go", "Run", "validateExplanationReview"},
 	{"../core/cyclerun_postreview.go", "applyPostReviewGuards", "explanationdocs.RefreshResult"},

@@ -19,7 +19,7 @@ import (
 // already landed.
 func (l *Landing) WriteBinding(dir string, b dossier.ShipBinding) error {
 	path := filepath.Join(dir, dossier.ShipBindingFile)
-	if err := writeBinding(dir, path, b); err != nil {
+	if err := writeJSON(path, "ship-binding.*.tmp", b); err != nil {
 		l.warn("Landing.WriteBinding", CodeBindingWriteFailed, "ship-binding.json write failed: "+err.Error(),
 			map[string]string{shiperr.StepKey: stepBinding, "path": path, "err": err.Error()})
 		return err
@@ -27,14 +27,15 @@ func (l *Landing) WriteBinding(dir string, b dossier.ShipBinding) error {
 	return nil
 }
 
-func writeBinding(dir, path string, b dossier.ShipBinding) error {
+func writeJSON(path, pattern string, v any) error {
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	buf, err := json.MarshalIndent(b, "", "  ")
+	buf, err := json.MarshalIndent(v, "", "  ")
 	var tmp *os.File
-	if err == nil { // MarshalIndent cannot fail for dossier.ShipBinding (plain fields only — TestWriteBinding_ShipBindingCannotFailToMarshal guards the shape); its check folds into CreateTemp's chain so every line stays reachable
-		tmp, err = os.CreateTemp(dir, "ship-binding.*.tmp")
+	if err == nil {
+		tmp, err = os.CreateTemp(dir, pattern)
 	}
 	if err != nil {
 		return err

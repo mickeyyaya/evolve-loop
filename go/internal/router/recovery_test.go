@@ -31,6 +31,7 @@ func TestRecover_Branches(t *testing.T) {
 		{"ship-local worktree resolve", &Blocker{Code: "WORKTREE_RESOLVE", Class: "precondition", Stage: "ship"}, "debugger", "recover:ship-local-debugger"},
 		{"control-plane violation → rebuild", &Blocker{Code: "CONTROL_PLANE_VIOLATION", Class: "precondition", Stage: "verify_class"}, "build", "recover:control-plane-rebuild"},
 		{"push rejected needs-reaudit", &Blocker{Code: "GIT_PUSH_REJECTED", Class: "precondition", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
+		{"push policy refusal ends the cycle", &Blocker{Code: "GIT_PUSH_POLICY_REFUSED", Class: "precondition", Stage: "atomic-ship"}, PhaseEnd, "recover:push-policy-end"},
 
 		{"binding prefix no class", &Blocker{Code: "AUDIT_BINDING_FUTURE_CODE", Class: "", Stage: "ship"}, "audit", "recover:precondition-reaudit"},
 

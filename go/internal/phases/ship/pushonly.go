@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,43 +24,47 @@ type shipJournalEntry struct {
 	SHA   string `json:"sha"`
 	Class string `json:"class"`
 	TS    string `json:"ts"`
+	Cycle int    `json:"cycle,omitempty"`
 }
 
-// Best-effort: a journal write failure must never fail a ship that already
-// pushed. O_APPEND keeps concurrent lanes' single writes line-atomic.
-func appendShipJournal(projectRoot string, sha string, class Class) {
-	if projectRoot == "" || sha == "" {
-		return
-	}
-	line, err := json.Marshal(shipJournalEntry{SHA: sha, Class: string(class), TS: time.Now().UTC().Format(time.RFC3339)})
+func appendShipJournal(projectRoot string, e shipJournalEntry) error {
+	e.TS = time.Now().UTC().Format(time.RFC3339)
+	line, err := json.Marshal(e)
 	if err != nil {
-		return
+		return err
 	}
-	f, err := os.OpenFile(shipJournalPath(projectRoot), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	path := shipJournalPath(projectRoot)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		return
+		return err
 	}
-	defer func() { _ = f.Close() }()
-	_, _ = f.Write(append(line, '\n'))
+	_, werr := f.Write(append(line, '\n'))
+	return errors.Join(werr, f.Close())
 }
 
-func journalHasSHA(projectRoot, sha string) bool {
+func readShipJournal(projectRoot string) map[string]shipJournalEntry {
+	entries := map[string]shipJournalEntry{}
 	f, err := os.Open(shipJournalPath(projectRoot))
 	if err != nil {
-		return false
+		return entries
 	}
 	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		var e shipJournalEntry
-		if json.Unmarshal(sc.Bytes(), &e) != nil {
-			continue
-		}
-		if e.SHA == sha {
-			return true
+		if json.Unmarshal(sc.Bytes(), &e) == nil && e.SHA != "" {
+			entries[e.SHA] = e
 		}
 	}
-	return false
+	return entries
+}
+
+func journalHasSHA(projectRoot, sha string) bool {
+	_, found := readShipJournal(projectRoot)[sha]
+	return found
 }
 
 // runPushOnly never commits, stages, or releases — push is its only mutation.
@@ -95,7 +100,7 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 			len(unprovenanced), shipJournalName, strings.Join(unprovenanced, ", "))
 	}
 	// Same push + reject-repair policy as an ordinary ship (gitops_landing.go).
-	if err := pushWithRepair(ctx, opts, res, branch, landing.SitePushOnly); err != nil {
+	if err := pushWithRepair(ctx, opts, res, landing.PushRequest{Branch: branch, Site: landing.SitePushOnly}); err != nil {
 		return err
 	}
 	res.Logs = append(res.Logs, fmt.Sprintf("[ship] PUSH-ONLY: pushed %d attested commit(s) to origin/%s", len(ahead), branch))

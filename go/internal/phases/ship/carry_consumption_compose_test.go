@@ -88,15 +88,14 @@ func TestVerifyCommittedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption(t
 	reShipConsumes(t, l, opts)
 	land(t, l)
 	committed := strings.TrimSpace(runGitOut(t, l.repo, "rev-parse", "HEAD^{tree}"))
-	res := &RunResult{}
 
-	tree, err := newWorktreeShip(context.Background(), opts, res, "main", l.repo).verifyCommittedTree()
+	tree, verified, err := verifyCommittedTree(context.Background(), opts, "HEAD")
 
 	if err != nil || tree != committed {
 		t.Fatalf("verifyCommittedTree = (%q, %v), want (%q, nil); %s, after the push as before the commit", tree, err, committed, cycle1825Shape)
 	}
-	if logs := strings.Join(res.Logs, "\n"); !strings.Contains(logs, "post-push tree drift") || !strings.Contains(logs, "carry of cycle 1825, re-proven") {
-		t.Errorf("logs = %q, want the accepted post-push drift to name the carry that explains it", logs)
+	if !strings.Contains(verified, "post-push tree drift") || !strings.Contains(verified, "carry of cycle 1825, re-proven") {
+		t.Errorf("verified = %q, want the accepted post-push drift to name the carry that explains it", verified)
 	}
 }
 
@@ -106,7 +105,7 @@ func TestVerifyCommittedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtr
 	smuggle(t, l)
 	land(t, l)
 
-	tree, err := newWorktreeShip(context.Background(), opts, &RunResult{}, "main", l.repo).verifyCommittedTree()
+	tree, _, err := verifyCommittedTree(context.Background(), opts, "HEAD")
 
 	se := wantShipErr(t, err, core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, "INTEGRITY BREACH: audit-bound tree")
 	if tree != "" || !strings.Contains(se.Message, "smuggled.txt") {

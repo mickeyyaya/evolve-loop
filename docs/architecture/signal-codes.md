@@ -291,6 +291,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_GIT_FLEET_REBASE_CONFLICT` | atomic-ship: the fleet rebase hit a genuine merge conflict; routed to the debugger (integrity, ADR-0049 G13a) |
 | `SHIP_GIT_FLEET_REBASE_NEEDED` | atomic-ship: a peer lane moved main; rebase and re-verify the merged tree (transient, ADR-0049 S5b) |
 | `SHIP_GIT_IO` | git I/O failure outside a named stage |
+| `SHIP_GIT_LANDING_UNWIND_DECLINED` | atomic-ship: a landing that cannot complete also cannot unwind the lane to the audited shape, so the cycle stops; the journal holds the commit, and main does not move (integrity) |
+| `SHIP_GIT_LANE_NOT_ON_ORIGIN` | atomic-ship: nothing to commit, but the lane holds commits that origin does not hold, and no landing intent proves them; ship refuses a PASS with no push (integrity) |
+| `SHIP_GIT_PUSH_POLICY_REFUSED` | atomic-ship: origin refused the push by policy (a protected branch, a hook, a rule, a token scope or an access refusal); ship does not retry it, unwinds the lane to the audited shape, and the router ends the cycle with no re-audit (precondition) |
 | `SHIP_GIT_PUSH_REJECTED` | atomic-ship: the remote rejected the push |
 | `SHIP_GIT_STAGE_FAILED` | atomic-ship: staging failed (transient) |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
@@ -298,7 +301,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_LANDING_BINARY_RESET_FAILED` | git checkout HEAD -- <binary> before the ff-merge exited non-zero or failed to spawn; the merge still runs and may fail if the tracked binary is dirty; fields.step=integrate, path, git_rc, git_err |
 | `SHIP_LANDING_BINDING_WRITE_FAILED` | ship-binding.json could not be created, written or renamed into the run workspace; the push already landed, the caller keeps shipping and keeps its WARN log line; fields.step=binding, path, err |
 | `SHIP_LANDING_HEAD_READ_FAILED` | git rev-parse HEAD after the push landed errored or returned empty; the result's CommitSHA (the dossier's delivery identity) stays empty and the ship proceeds; fields.step=push, ref, err |
-| `SHIP_LANDING_PUSH_REPAIR_DECLINED` | the inline fetch + fast-forward retry after a rejected push declined at the named probe (fetch, origin_ref, head or push_retry); the original transient GIT_PUSH_REJECTED is returned with repair_attempted/repair_outcome=declined stamped; fields.step=push, branch, probe |
+| `SHIP_LANDING_MAIN_ADVANCE_FAILED` | after the push landed, the fast-forward of the plane main to the pushed commit failed; origin holds the commit, and the ship continues; the next landing fast-forwards main to origin under the ship lock when the ship journal holds each commit between them; fields.step=integrate, branch, commit, git_rc, git_err |
+| `SHIP_LANDING_PUSH_REPAIR_DECLINED` | the inline repair after a rejected push declined at the named probe (fetch, origin_ref, head, push_retry, or transport_retry after the bounded backoff); the original transient GIT_PUSH_REJECTED returns with repair_attempted/repair_outcome=declined; fields.step=push, branch, probe |
+| `SHIP_LANDING_RESUME_FETCH_FAILED` | the git fetch of origin before a landing resume failed; the resume decides on the last known origin ref, and its push reports an outage; fields.step=resume, branch, git_rc, git_err |
 | `SHIP_MANIFEST_GATE` | atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard) |
 | `SHIP_MANUAL_DECLINED` | verify-class: the operator declined the manual ship |
 | `SHIP_MANUAL_NOT_TTY` | verify-class: a manual ship needs an interactive confirmation (or the auto-confirm environment) |

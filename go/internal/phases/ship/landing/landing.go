@@ -1,42 +1,31 @@
-// Package landing is unit 07 of the component breakdown (ADR-0103): the ship
-// phase's fleet landing. One stateless Landing owns the ff-merge of the cycle
-// branch into main (with the tracked-binary reset before it), the push with
-// its ONE inline push-race repair and the post-push head read, the two git
-// probes the host shares with it (IsAncestor, Capture), and the ship-binding
-// witness the delivery record and the lost-landing floor read. The staging
-// onion, the run-scope resolution, the post-push tree verification and the
-// fleet REBASE engine stay with the host and core. The Landing holds a Git
-// port, the operator streams through an accessor, the phase name and run
-// identity the host stamps, and the Signal Center accessor; it never reads
-// the environment, never takes the integrator lock, never touches the host's
-// Options or RunResult, never writes stderr, spells no phase name, and
-// reports its four degraded outcomes as ship.warning under module ship.
-// Design: docs/architecture/decomposition/07-shipgitops.md.
+// Package landing is the two-phase landing of ship; see docs/architecture/decomposition/07-shipgitops.md.
 package landing
 
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The unit's codes — the four WARN conditions of the landing (one replaced a
-// hand-written stderr line; three were Debug-only, blank-identifier or
-// log-line outcomes the live root dropped) — registered with their reasons.
 const (
 	CodeBinaryResetFailed  signalcenter.Code = "SHIP_LANDING_BINARY_RESET_FAILED"
 	CodePushRepairDeclined signalcenter.Code = "SHIP_LANDING_PUSH_REPAIR_DECLINED"
 	CodeHeadReadFailed     signalcenter.Code = "SHIP_LANDING_HEAD_READ_FAILED"
 	CodeBindingWriteFailed signalcenter.Code = "SHIP_LANDING_BINDING_WRITE_FAILED"
+	CodeAdvanceFailed      signalcenter.Code = "SHIP_LANDING_MAIN_ADVANCE_FAILED"
+	CodeOriginFetchFailed  signalcenter.Code = "SHIP_LANDING_RESUME_FETCH_FAILED"
 )
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeBinaryResetFailed, "git checkout HEAD -- <binary> before the ff-merge exited non-zero or failed to spawn; the merge still runs and may fail if the tracked binary is dirty; fields.step=integrate, path, git_rc, git_err")
-	signalcenter.RegisterCode(signalcenter.ModuleShip, CodePushRepairDeclined, "the inline fetch + fast-forward retry after a rejected push declined at the named probe (fetch, origin_ref, head or push_retry); the original transient GIT_PUSH_REJECTED is returned with repair_attempted/repair_outcome=declined stamped; fields.step=push, branch, probe")
+	signalcenter.RegisterCode(signalcenter.ModuleShip, CodePushRepairDeclined, "the inline repair after a rejected push declined at the named probe (fetch, origin_ref, head, push_retry, or transport_retry after the bounded backoff); the original transient GIT_PUSH_REJECTED returns with repair_attempted/repair_outcome=declined; fields.step=push, branch, probe")
 	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeHeadReadFailed, "git rev-parse HEAD after the push landed errored or returned empty; the result's CommitSHA (the dossier's delivery identity) stays empty and the ship proceeds; fields.step=push, ref, err")
 	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeBindingWriteFailed, "ship-binding.json could not be created, written or renamed into the run workspace; the push already landed, the caller keeps shipping and keeps its WARN log line; fields.step=binding, path, err")
+	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeAdvanceFailed, "after the push landed, the fast-forward of the plane main to the pushed commit failed; origin holds the commit, and the ship continues; the next landing fast-forwards main to origin under the ship lock when the ship journal holds each commit between them; fields.step=integrate, branch, commit, git_rc, git_err")
+	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeOriginFetchFailed, "the git fetch of origin before a landing resume failed; the resume decides on the last known origin ref, and its push reports an outage; fields.step=resume, branch, git_rc, git_err")
 }
 
 // The step vocabulary the landing stamps into shiperr.StepKey on every error
@@ -45,6 +34,7 @@ const (
 	stepIntegrate = "integrate"
 	stepPush      = "push"
 	stepBinding   = "binding"
+	stepResume    = "resume"
 )
 
 // Git runs `git <args>` at the project root with the host's runner, cwd and
@@ -68,6 +58,7 @@ type Landing struct {
 	cycle   int
 	runID   string
 	signals func() *signalcenter.Center
+	sleep   func(time.Duration)
 }
 
 // Option configures a Landing at construction (functional options).
@@ -78,7 +69,7 @@ type Option func(*Landing)
 // after construction and direct-helper tests set them late). A nil git or
 // streams is a programming error and panics at first use — no guard.
 func New(git Git, streams func() Streams, opts ...Option) *Landing {
-	l := &Landing{git: git, streams: streams}
+	l := &Landing{git: git, streams: streams, sleep: time.Sleep}
 	for _, opt := range opts {
 		opt(l)
 	}
@@ -91,6 +82,10 @@ func New(git Git, streams func() Streams, opts ...Option) *Landing {
 // is the Null Object; SignalsWired proves the production roots wired one.
 func WithSignals(c func() *signalcenter.Center) Option {
 	return func(l *Landing) { l.signals = c }
+}
+
+func WithSleep(sleep func(time.Duration)) Option {
+	return func(l *Landing) { l.sleep = sleep }
 }
 
 // WithRun stamps where every event the landing emits comes from: the phase
