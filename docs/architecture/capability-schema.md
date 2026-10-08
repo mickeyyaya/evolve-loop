@@ -8,23 +8,23 @@ Pre-v8.51, each adapter's behavior was hardcoded — Gemini hard-failed if Claud
 
 - The pipeline reads what an adapter can structurally guarantee, instead of inferring from per-adapter shell logic.
 - Adding a new CLI requires writing a manifest + adapter — the pipeline doesn't change.
-- Operators see the resolved capability tier explicitly via `./bin/check-caps`, instead of debugging exit codes.
+- Operators see the resolved capability tier explicitly, instead of debugging exit codes. Removed design: `./bin/check-caps` calls the deleted `_capability-check.sh` and fails; `evolve bridge probe` prints a tier for each bridge driver.
 - Graceful degradation is a first-class concept: missing capabilities lower quality, never block the pipeline.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `legacy/scripts/cli_adapters/_capabilities-schema.json` | JSON Schema (Draft 2020-12) defining the manifest structure |
-| `legacy/scripts/cli_adapters/_capability-check.sh` | Resolver: reads a manifest + runs probes, emits resolved tier per dimension |
-| `legacy/scripts/cli_adapters/<cli>.capabilities.json` | One manifest per adapter (claude / gemini / codex; add a row for any new CLI) |
-| `bin/check-caps` | Operator entry point — wraps `_capability-check.sh` |
+| `adapters/_capabilities-schema.json` | JSON Schema (Draft 2020-12) defining the manifest structure |
+| `go/internal/capability` | Resolver: `QualityTier` reads a manifest, runs the probes and returns the lowest tier; `Inspect` reads the `supports` block |
+| `adapters/<cli>.capabilities.json` | One manifest per adapter (claude / claude-tmux / gemini / codex / antigravity / agy; add a row for any new CLI) |
+| `bin/check-caps` | Removed design: it wraps the deleted `_capability-check.sh` and fails |
 
 ## Schema overview
 
 ```jsonc
 {
-  "adapter": "claude" | "gemini" | "codex",     // matches the .sh file name
+  "adapter": "claude" | "gemini" | "codex" | "antigravity", // usually the file name; agy.capabilities.json declares "antigravity"
   "version": 1,                                  // manifest schema version
   "capabilities": {
     "subprocess_isolation":  <capability_value>, // see below
@@ -86,15 +86,16 @@ Probes are runtime checks declared in the manifest's `probes` array. The resolve
 
 | Probe name | What it checks | Implementation |
 |---|---|---|
-| `claude_on_path` | Whether `claude` binary is invocable. Honors `EVOLVE_GEMINI_CLAUDE_PATH` / `EVOLVE_CODEX_CLAUDE_PATH` test seams when `EVOLVE_TESTING=1`. | `_capability-check.sh:probe_claude_on_path` |
-| `sandbox_exec_available` | Darwin + `sandbox-exec` present. | `_capability-check.sh:probe_sandbox_exec_available` |
-| `bwrap_available` | Linux + `bwrap` present. | `_capability-check.sh:probe_bwrap_available` |
+| `claude_on_path` | The `claude` binary is on PATH. Tests inject a `capability.Probe` function. | `capability.DefaultProbe` |
+| `agy_on_path` | The `agy` binary is on PATH. | `capability.DefaultProbe` |
+| `sandbox_exec_available` | Darwin + `sandbox-exec` present. | `capability.DefaultProbe` |
+| `bwrap_available` | Linux + `bwrap` present. | `capability.DefaultProbe` |
 
-Adding a new probe: extend `_capability-check.sh:run_probe()` with a new case branch and document it here.
+Adding a new probe: extend `DefaultProbe` in `go/internal/capability/qualitytier.go` with a new case and document it here. An unknown probe name reports false.
 
 ## Resolved output
 
-`./bin/check-caps <adapter> --json` emits:
+Removed design: `./bin/check-caps <adapter> --json` emitted this JSON, and no command prints it now:
 
 ```jsonc
 {
@@ -114,35 +115,34 @@ Adding a new probe: extend `_capability-check.sh:run_probe()` with a new case br
 }
 ```
 
-`subagent-run.sh` consumes this at adapter dispatch (resolves `quality_tier`, logs the per-capability warnings, passes `quality_tier` to the ledger writer as a 9th argument). Each `agent_subprocess` ledger entry post-v8.51 carries `quality_tier` as an annotation.
+`subagent-run.sh` consumed this JSON, and the script is removed. Now `evolve subagent run` writes a `quality_tier` into each `agent_subprocess` ledger entry. It takes the tier from the manifest's `supports` block (`subagentrun.QualityTier`), not from this output. `evolve consensus-dispatch` uses `capability.QualityTier` to filter voters by tier.
 
 ## Authoring a new adapter
 
-To add a 4th CLI (e.g., `copilot`):
+To add a new CLI (for example, `copilot`):
 
-1. Write `legacy/scripts/cli_adapters/copilot.sh` mirroring `gemini.sh`'s pattern (HYBRID delegation when claude binary present, DEGRADED same-session otherwise).
-2. Write `legacy/scripts/cli_adapters/copilot.capabilities.json` declaring its capabilities. Validate against the schema:
+1. Write a Go bridge driver (`go/internal/bridge/driver_copilot.go`) and its bridge manifest (`go/internal/bridge/manifests/copilot.json`).
+2. Write `adapters/copilot.capabilities.json` declaring its capabilities. Validate against the schema:
    ```bash
-   jq empty legacy/scripts/cli_adapters/copilot.capabilities.json
+   jq empty adapters/copilot.capabilities.json
    ```
 3. Add `copilot` to the adapter enum in `_capabilities-schema.json:properties.adapter.enum`.
-4. Add tests at `legacy/scripts/tests/copilot-adapter-test.sh` mirroring `codex-adapter-test.sh`.
-5. Register the test in `legacy/scripts/utility/run-all-regression-tests.sh:SUITES`.
-6. Document at `skills/loop/reference/copilot-runtime.md` and `copilot-tools.md`.
-7. Run `./bin/preflight` to validate end-to-end.
+4. Add Go tests for the driver in `go/internal/bridge/`. `go test ./...` runs them.
+5. Document at `skills/loop/reference/copilot-runtime.md` and `copilot-tools.md`.
+6. Run `evolve bridge probe` to confirm that the bridge lists the new driver.
 
-The pipeline does NOT need to change. The capability framework absorbs the new adapter at dispatch time.
+Removed design: the bash adapter steps (`copilot.sh` and the bash test suite) are gone, and a new CLI now needs a Go driver. `./bin/preflight` still exists, but it calls the deleted `full-dry-run.sh` and fails.
 
 ## Validation
 
 The schema is enforced at two layers:
 
-- **Static**: `jq empty <manifest>` confirms valid JSON. The `cli-capability-test.sh` regression suite walks all manifests and asserts they parse + cover all 5 required capabilities.
-- **Runtime**: `_capability-check.sh` rejects unknown capability names and probe names with non-zero exit; `bin/check-caps` surfaces the failure to operators.
+- **Static**: `jq empty <manifest>` confirms valid JSON. `TestQualityTier_GoldenParityWithBashManifests` (`go/internal/capability`) reads the in-tree manifests and checks their resolved tiers.
+- **Runtime**: Removed design: the Go resolver does not reject unknown names, so an unknown probe reports false and an unknown mode ranks as `none`.
 
 ## Backward compatibility
 
-The `quality_tier` field added to ledger entries in v8.51.0 is **backward-compatible**: pre-v8.51 readers tolerate missing fields via `// empty` jq filters. Existing analysis tools (`bin/cost`, `verify-ledger-chain.sh`, etc.) work unchanged. Operators upgrading from v8.50.x see no behavior change unless they explicitly query the new field.
+The `quality_tier` field added to ledger entries in v8.51.0 is **backward-compatible**: pre-v8.51 readers tolerate missing fields through `// empty` jq filters. Existing analysis tools (for example, `evolve ledger verify`) work unchanged. Operators upgrading from v8.50.x see no behavior change unless they explicitly query the new field.
 
 ## See also
 

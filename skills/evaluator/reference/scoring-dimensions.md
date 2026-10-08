@@ -122,9 +122,9 @@ Which tools/scripts feed into each dimension:
 
 | Dimension | Automated Signals | Script/Tool |
 |-----------|------------------|-------------|
-| correctness | Test pass rate, complexity score | `npm test`, `legacy/scripts/verification/complexity-check.sh` |
-| security | Secret scan, injection patterns | `legacy/scripts/utility/code-review-simplify.sh` (check 4) |
-| maintainability | File/function length, nesting, duplicates | `legacy/scripts/utility/code-review-simplify.sh` (checks 1-3, 5-6) |
+| correctness | Test pass rate, complexity score | `npm test` (no command scores complexity) |
+| security | Secret scan, injection patterns | `evolve scan secrets` (secrets only) |
+| maintainability | File/function length, nesting, duplicates | `evolve ratchet check size` (Go function size only) |
 | architecture | Import graph depth, file count per module | `grep -r import`, directory structure analysis |
 | completeness | TODO/FIXME count, doc file existence, test count | `grep -r TODO`, `test -f README.md` |
 | evolution | Hardcoded value count, config file usage, interface vs concrete | `grep -rn 'http://\|https://\|localhost'`, pattern analysis |
