@@ -18,7 +18,7 @@ type cliController struct {
 
 // NewController builds the production clicontrol.Controller; each Do derives its family's config from the template cfg, so flags never bleed across CLIs.
 func NewController(cfg *Config, deps Deps) clicontrol.Controller {
-	c := &cliController{cfg: cfg, deps: deps, resolve: LoadManifest}
+	c := &cliController{cfg: cfg, deps: deps.withDefaults(), resolve: LoadManifest}
 	c.capture = func(ctx context.Context, cli, command, _ string) (string, error) {
 		// The await is always the prompt marker today, which captureControl polls for.
 		return captureControl(ctx, c.perFamilyConfig(cli), c.deps, cli, command, helpCaptureSettleTicks)
@@ -33,7 +33,7 @@ func (c *cliController) perFamilyConfig(cli string) *Config {
 	// Copy the slices so concurrent per-family configs never share a backing array.
 	out.AllowedTools = append([]string(nil), c.cfg.AllowedTools...)
 	out.ExtraFlags = append([]string(nil), c.cfg.ExtraFlags...)
-	intent := LaunchIntent{}
+	intent := LaunchIntent{Effort: tierDefaultEffort(cli, c.cfg.Model, c.deps.TierEffort)}
 	if c.cfg.AllowBypass {
 		intent.Permission = "bypass"
 	}

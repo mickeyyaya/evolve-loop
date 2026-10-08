@@ -30,12 +30,18 @@ func execAdapterDeps(env map[string]string) gobridge.Deps {
 		home = os.Getenv("HOME")
 	}
 	configRoot := filepath.Join(home, ".claude")
-	recoveryStage, fatalPaneStage := projectPolicy(env).BridgeRecoveryStages()
+	pol := projectPolicy(env)
+	bridgeCfg := pol.BridgeConfig()
+	for _, warning := range bridgeCfg.TierEffortWarnings() {
+		fmt.Fprintf(os.Stderr, "[bridge] WARN policy %s\n", warning)
+	}
+	recoveryStage, fatalPaneStage := pol.BridgeRecoveryStages()
 	return gobridge.Deps{
 		Env:            env,
 		TokenResolver:  tokenusage.DefaultResolver(configRoot),
 		RecoveryStage:  recoveryStage,
 		FatalPaneStage: fatalPaneStage,
+		TierEffort:     bridgeCfg.TierEfforts(),
 	}
 }
 

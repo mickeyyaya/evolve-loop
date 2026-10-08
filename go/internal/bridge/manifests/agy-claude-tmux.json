@@ -8,6 +8,26 @@
   "params": {
     "model_tier": {
       "default": "fast"
+    },
+    "effort": {
+      "channel": "model_variant",
+      "values": {
+        "low": [
+          "Low"
+        ],
+        "medium": [
+          "Medium"
+        ],
+        "high": [
+          "High"
+        ],
+        "xhigh": [
+          "High"
+        ],
+        "max": [
+          "High"
+        ]
+      }
     }
   },
   "launch_model_verification": {
@@ -15,7 +35,7 @@
   },
   "model_tier_map": {
     "fast": "Claude Sonnet 5.5 (Low)",
-    "balanced": "Claude Sonnet 5.5 (High)",
+    "balanced": "Claude Sonnet 5.5 (Medium)",
     "deep": "Claude Opus 5.5 (High)",
     "top": "Claude Opus 5.5 (High)"
   },

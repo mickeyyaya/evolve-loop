@@ -52,15 +52,18 @@ func TestWriteRoutingContext_ALaneSectionLongerThanTheLaneCapIsCapped(t *testing
 		ID: "oversized-item", Kind: "strategy", DeliverableKind: "document",
 		Acceptance: []string{strings.Repeat("a", maxLaneScopeRunes)},
 	}}})
-	start, end := strings.Index(got, "## Lane scope"), strings.Index(got, "\n\n## Objective signals")
-	if start < 0 || end < start {
-		t.Fatalf("routing context lacks a lane section followed by the objective signals:\n%s", got)
+	m := lanePastedRE.FindStringSubmatch(got)
+	if m == nil {
+		t.Fatalf("routing context lacks a closed pasted lane block:\n%s", got)
 	}
 	const marker = " …[truncated]"
-	section := got[start:end]
+	section := m[2]
 	if !strings.HasSuffix(section, marker) || utf8.RuneCountInString(section) != maxLaneScopeRunes+utf8.RuneCountInString(marker) {
-		t.Errorf("the lane section must be capped at %d runes plus the truncation marker; got %d runes ending %q",
+		t.Errorf("the lane text must be capped at %d runes plus the truncation marker; got %d runes ending %q",
 			maxLaneScopeRunes, utf8.RuneCountInString(section), section[len(section)-min(len(section), 40):])
+	}
+	if !strings.Contains(got, "</pasted_content id=\""+m[1]+"\">\n\n## Objective signals") {
+		t.Errorf("the cap must keep the closing tag before the next section:\n%s", got[len(got)-min(len(got), 400):])
 	}
 }
 

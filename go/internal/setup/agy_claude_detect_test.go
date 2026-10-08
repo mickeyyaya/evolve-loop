@@ -11,7 +11,7 @@ func TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap(t *testing.T) {
 	t.Setenv("EVOLVE_MODEL_CATALOG_DIR", t.TempDir())
 	want := map[string]string{
 		"fast":     "Claude Sonnet 5.5 (Low)",
-		"balanced": "Claude Sonnet 5.5 (High)",
+		"balanced": "Claude Sonnet 5.5 (Medium)",
 		"deep":     "Claude Opus 5.5 (High)",
 		"top":      "Claude Opus 5.5 (High)",
 	}

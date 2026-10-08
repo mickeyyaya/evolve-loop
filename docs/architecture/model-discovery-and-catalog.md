@@ -87,7 +87,7 @@ The live probe (tmux `/model` capture + one-shot classifier) runs in a **throwaw
 
 Pinned by `TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry`, which runs one fixture listing with Gemini, Claude and GPT-OSS rows. It checks that `agy models` runs once, that each classifier sees only its family, and that the result is two live entries with their tier maps. `TestDefaultRouter_AgyAndAgyClaudeShareOneLister`, `TestOnceLister_AFailedListingFailsEveryEntryThatSharesIt` and the setup tests `TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap` and `TestDetectCLIs_ReportsAgyClaudeBesideAgy` pin the rest.
 
-**The baseline and the live pick.** The manifest's offline tier map is fast `Claude Sonnet 5.5 (Low)`, balanced `Claude Sonnet 5.5 (High)`, deep and top `Claude Opus 5.5 (High)`. agy offers no Haiku-class Claude, so fast is Sonnet at its lowest effort. A live refresh classifies with an LLM, and its pick can choose another effort. The first live run (2026-10-06, a scratch copy of the plane's catalog and policy, classified by claude-p after codex failed) wrote:
+**The baseline and the live pick.** The manifest's offline tier map is fast `Claude Sonnet 5.5 (Low)`, balanced `Claude Sonnet 5.5 (Medium)` (it was `(High)` until 2026-10-08), deep and top `Claude Opus 5.5 (High)`. agy offers no Haiku-class Claude, so fast is Sonnet at its lowest effort. A live refresh classifies with an LLM, and its pick can choose another effort. The first live run (2026-10-06, a scratch copy of the plane's catalog and policy, classified by claude-p after codex failed) wrote:
 
 | Tier | Live pick |
 |---|---|
@@ -96,7 +96,11 @@ Pinned by `TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry`, which ru
 | deep | `Claude Opus 5.5 (Medium)` |
 | top | `Claude Opus 5.5 (High)` |
 
-The `available` list held the six Claude rows only. The plane's catalog stays at `refresh_stage: shadow`, so dispatch reads the manifest's map until an operator refresh commits one. An operator who wants deep at `(High)` when the classifier picks otherwise can say so: a policy pin, or after L1c an `agents.<name>.model`.
+The `available` list held the six Claude rows only. The plane's catalog stays at `refresh_stage: shadow`, so dispatch reads the manifest's map until an operator refresh commits one.
+
+**The effort selects the variant at launch (2026-10-08).** The table above is a record of one classification, not the dispatched model. At launch, the resolved effort replaces the variant suffix of the name that the tier resolves to, from the manifest or from the live catalog. The effort comes from the profile, or else from `bridge.tier_effort` (compiled: fast `low`, balanced `medium`, deep `high`, top `xhigh`).
+
+The map from effort to variant: low `(Low)`, medium `(Medium)`, high, xhigh and max `(High)`. Thus a deep launch with no profile effort runs `Claude Opus 5.5 (High)`. A model id pin (not a tier word) keeps its own suffix. See [internal-bridge.md](packages/internal-bridge.md).
 
 **Nothing dispatches it yet.** The entry is data. Routing a phase to `agy-claude` is the CLI routing table's follow-up L1c ([cli-routing-table-2026-10.md](../plans/cli-routing-table-2026-10.md#provider-aware-targets-2026-10-06)).
 

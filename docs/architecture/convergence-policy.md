@@ -258,13 +258,13 @@ Today's tier tables have **no** deep→top headroom in any family:
 
 | Family | deep | top | deep→top headroom |
 |---|---|---|---|
-| claude-tmux | opus (effort from profile) | opus | **none in the manifest** |
-| agy-claude | Claude Opus 5.5 (High) | Claude Opus 5.5 (High) | none |
+| claude-tmux | opus (effort from profile, else `bridge.tier_effort` deep `high`) | opus (else top `xhigh`) | by effort only |
+| agy-claude | Claude Opus 5.5 (High) | Claude Opus 5.5 (High), `xhigh` capped | none |
 | agy (Gemini) | Gemini 3.1 Pro (High) | Gemini 3.1 Pro (High) | none |
 | codex | gpt-5.6-sol | gpt-5.6-sol | none |
 
 - **The operator's directive** (2026-10-07): top is **Opus 5.5 at xhigh effort**. The claude CLI accepts `--effort` low, medium, high, xhigh and max (model catalog `efforts`).
-- **Component V3b** gives Claude's top tier the xhigh effort through the one tier table. After that, deep (high) → top (xhigh) is real headroom, by **effort** within the same model.
+- **Component V3b** gives Claude's top tier the xhigh effort through the one tier table. Since 2026-10-08, `bridge.tier_effort` gives deep `high` and top `xhigh` to each launch with no profile effort. Thus deep (high) → top (xhigh) is real headroom, by **effort** within the same model, on `claude-tmux`. On `agy-claude-tmux` both resolve to `(High)`.
 - **Raises stay within the judge's own family.** "One tier above" is never computed across families.
 - **The raise is compared with what actually ran.** When the input names the fixer's or judge's own model and effort, a target equal to that pair is no headroom, even if the tier table's entry for the current tier differs.
 - **What the headroom is good for (CR7).** Effort helps only **reasoning-class** failures. It does not help format, docs or hygiene findings, or a capability gap (research F7). Until V3b lands, rung 1(b) and §3.2 are **dormant** and signal `CONVERGENCE_NO_HEADROOM`. They never fake a raise.

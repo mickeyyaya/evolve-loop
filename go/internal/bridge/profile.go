@@ -36,6 +36,29 @@ func (p Profile) effortForTier(tier string) string {
 	return p.EffortLevel
 }
 
+func (p Profile) effortWithTierDefault(cli, tier string, tierEffort map[string]string) string {
+	if e := p.effortForTier(tier); e != "" {
+		return e
+	}
+	return tierDefaultEffort(cli, tier, tierEffort)
+}
+
+const untieredLaunchTier = "balanced"
+
+func tierDefaultEffort(cli, model string, tierEffort map[string]string) string {
+	if model == "" || model == "auto" {
+		model = manifestDefaultTier(cli)
+	}
+	return tierEffort[legacyTierAlias(model)]
+}
+
+func manifestDefaultTier(cli string) string {
+	if m, err := LoadManifest(cli); err == nil && m.Params["model_tier"].Default != "" {
+		return m.Params["model_tier"].Default
+	}
+	return untieredLaunchTier
+}
+
 // ProfileSandbox shares the canonical profile schema so launch cannot silently
 // drop filesystem restrictions parsed by the profile loader.
 type ProfileSandbox = profiles.SandboxConfig

@@ -72,7 +72,7 @@ Read `workspace/scout-report.md`. Extract:
 - Files to create or modify
 - Inline eval graders (these become test stubs)
 
-**Chain-of-thought:** Per criterion: "Test for [criterion] = [how to verify programmatically]"
+**Mapping:** Per criterion: "Test for [criterion] = [how to verify programmatically]"
 
 ### Step 2: Discover Test Infrastructure
 

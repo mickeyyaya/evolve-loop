@@ -29,7 +29,8 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if !ok || !strings.HasSuffix(driverName, "-tmux") {
 		return ExitBadFlags, "", ""
 	}
-	cfg = smokeLaunchConfig(cfg, driverName)
+	deps = deps.withDefaults()
+	cfg = smokeLaunchConfig(cfg, driverName, deps.TierEffort)
 	if cfg.Workspace == "" {
 		tmp, err := os.MkdirTemp("", "evolve-livesmoke-*")
 		if err != nil {
@@ -53,7 +54,6 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if cfg.ArtifactTimeoutS == 0 {
 		cfg.ArtifactTimeoutS = liveSmokeArtifactTimeoutS
 	}
-	deps = deps.withDefaults()
 	// Dead-shell guard is armed by the real driver constructor (guardDeadShell), so smoke boots get the
 	// same rejection a phase launch gets.
 	rc, _ = d.Launch(ctx, cfg, deps)

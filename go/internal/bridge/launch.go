@@ -149,7 +149,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		AnthropicBaseURL:   raw.anthropicBaseURL,
 		ArtifactTimeoutS:   artifactTimeoutS,
 	}
-	cfg.Realization = RealizeFor(raw.cli, launchIntentFor(&cfg, prof))
+	cfg.Realization = RealizeFor(raw.cli, launchIntentFor(&cfg, prof, e.deps.TierEffort))
 	if prof.Sandbox != nil {
 		cfg.AllowNetwork = prof.Sandbox.AllowNetwork
 		if prof.Sandbox.Enabled {
@@ -263,12 +263,12 @@ func (r rawLaunch) missingRequired() []string {
 
 const paneAuthorityFile = "pane-authority.md"
 
-func launchIntentFor(cfg *Config, prof Profile) LaunchIntent {
+func launchIntentFor(cfg *Config, prof Profile, tierEffort map[string]string) LaunchIntent {
 	intent := LaunchIntent{
 		ModelTier:   cfg.Model,
 		Permission:  permissionIntent(cfg.PermissionMode),
 		SessionMode: "ephemeral",
-		Effort:      prof.effortForTier(cfg.Model),
+		Effort:      prof.effortWithTierDefault(cfg.CLI, cfg.Model, tierEffort),
 		RawByCLI:    prof.ExtraFlagsByCLI,
 	}
 	if cfg.SessionName != "" {

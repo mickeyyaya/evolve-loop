@@ -15,6 +15,7 @@ func TestEffortDefaults_Matrix(t *testing.T) {
 		"retrospective":      codexDeepTopRung,
 		"premise-challenge":  codexDeepTopRung,
 		"intent":             codexDeepTopRung,
+		"router":             "medium",
 	}
 	for profile, effort := range want {
 		p, err := loader.Get(profile)

@@ -14,7 +14,8 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if !ok || !strings.HasSuffix(driverName, "-tmux") {
 		return ExitBadFlags, ""
 	}
-	cfg = smokeLaunchConfig(cfg, driverName)
+	deps = deps.withDefaults()
+	cfg = smokeLaunchConfig(cfg, driverName, deps.TierEffort)
 	cfg.BootOnly = true
 	if cfg.Workspace == "" {
 		// Own a scratch workspace for a minimal cfg; the deferred removal runs after the scrollback read below.
@@ -27,7 +28,6 @@ func BootSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	}
 	// Boot in a scratch dir under the workspace, never the live checkout: an empty Worktree falls back to os.Getwd().
 	applyScratchCwd(cfg)
-	deps = deps.withDefaults()
 	// The real driver constructor arms the dead-shell guard, so a smoke boot is rejected like a phase launch.
 	rc, _ = d.Launch(ctx, cfg, deps)
 	// runTmuxREPL's deferred cleanup writes the final scrollback on both the booted and timed-out paths.
@@ -49,14 +49,14 @@ func ScrollbackTail(s string, n int) string {
 	return strings.Join(out, "\n")
 }
 
-func smokeLaunchConfig(cfg *Config, driverName string) *Config {
+func smokeLaunchConfig(cfg *Config, driverName string, tierEffort map[string]string) *Config {
 	if cfg == nil {
 		cfg = &Config{}
 	}
 	cfg.CLI = driverName
 	cfg.AllowBypass = true
 	if reflect.ValueOf(cfg.Realization).IsZero() {
-		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass", ModelTier: cfg.Model})
+		cfg.Realization = RealizeFor(driverName, LaunchIntent{Permission: "bypass", ModelTier: cfg.Model, Effort: tierDefaultEffort(driverName, cfg.Model, tierEffort)})
 	}
 	return cfg
 }
