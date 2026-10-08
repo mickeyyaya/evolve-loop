@@ -24,6 +24,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Exit codes:
@@ -239,7 +241,7 @@ func (cfg Config) runWorker(parent context.Context, name, command, resultsDir st
 	ctx, cancel := context.WithTimeout(parent, time.Duration(cfg.TimeoutSecs)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", command)
+	cmd := sysexec.Command(ctx, "/bin/sh", "-c", command)
 	cmd.Env = cfg.workerEnv() // per-worker env snapshot (ADR-0049 S1 / G8)
 	outF, _ := os.Create(filepath.Join(resultsDir, name+".out"))
 	errF, _ := os.Create(filepath.Join(resultsDir, name+".err"))
@@ -276,7 +278,7 @@ func (cfg Config) setWorkerStatus(name, status string, rc int) {
 	if status != "running" {
 		args = append(args, fmt.Sprintf("%d", rc))
 	}
-	cmd := exec.Command("bash", args...)
+	cmd := sysexec.Command(context.Background(), "bash", args...)
 	cmd.Env = os.Environ()
 	_ = cmd.Run()
 }

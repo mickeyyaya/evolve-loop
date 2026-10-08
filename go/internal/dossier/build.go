@@ -61,11 +61,8 @@ func normalizeVerdict(v string) string {
 // BuildOpts configures a Build call.
 type BuildOpts struct {
 	WorkspacePath string
-	// LedgerPath is reserved for a future ledger walk; no caller sets it and
-	// Build does not read it.
-	LedgerPath string
-	Goal       string
-	RunID      string
+	Goal          string
+	RunID         string
 	// FinalVerdict is the cycle's real outcome. Empty means PASS; FAIL makes
 	// Build synthesize a defect and carryover that point at the audit artifacts.
 	FinalVerdict       string

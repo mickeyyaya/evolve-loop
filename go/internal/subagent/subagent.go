@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Request is the typed input to Runner.Run. Caller is responsible for
@@ -324,7 +324,7 @@ func defaultGitState(ctx context.Context, projectRoot string) (string, string, e
 	if err != nil {
 		return "unknown", "unknown", err
 	}
-	cmd := exec.CommandContext(ctx, "git", "diff", "HEAD")
+	cmd := sysexec.Command(ctx, "git", "diff", "HEAD")
 	cmd.Dir = projectRoot
 	out, err := cmd.Output()
 	if err != nil {
@@ -335,7 +335,7 @@ func defaultGitState(ctx context.Context, projectRoot string) (string, string, e
 }
 
 func runGit(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := sysexec.Command(ctx, "git", args...)
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	return string(out), err

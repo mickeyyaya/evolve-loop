@@ -16,6 +16,9 @@ import (
 // it also commits exactly that pair, so the next phase's tree-diff guard never
 // sees it untracked; pass false when dir is not a git working tree.
 func Write(d *Dossier, dir string, commit bool) error {
+	if d == nil {
+		return fmt.Errorf("dossier: Write: dossier must not be nil")
+	}
 	if dir == "" {
 		return fmt.Errorf("dossier: Write: dir must not be blank")
 	}

@@ -162,7 +162,6 @@ func TestPhaseRecord_Named(t *testing.T) {
 func TestBuildOpts_Named(t *testing.T) {
 	opts := BuildOpts{
 		WorkspacePath: "/tmp/ws",
-		LedgerPath:    "/tmp/ledger.jsonl",
 		Goal:          "test goal",
 		RunID:         "01ABCDEF",
 	}

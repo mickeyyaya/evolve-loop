@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const detachLogTailLines = 20
@@ -34,7 +36,7 @@ func defaultLoopDetachCommand(argv []string) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	return exec.Command(self, append([]string{"loop"}, argv...)...), nil
+	return sysexec.Command(context.Background(), self, append([]string{"loop"}, argv...)...), nil
 }
 
 func runLoopDetached(cfg loopConfig, stdout, stderr io.Writer) int {

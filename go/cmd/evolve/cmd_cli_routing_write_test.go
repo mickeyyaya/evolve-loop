@@ -103,7 +103,7 @@ func TestCLIRoutingSet_EditsOneEntryOfEachShape(t *testing.T) {
 	got := *mustReadBlock(t, root)
 	want := policy.CLIRouting{
 		CLIs: []string{"agy", "agy-claude", "claude"}, Default: []string{"agy", "agy-claude", "claude"},
-		Tiers: map[string][]string{"deep": {"agy-claude", "claude"}}, Work: map[string][]string{"build": {"agy", "claude"}},
+		Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"agy-claude", "claude"}}}, Work: map[string][]string{"build": {"agy", "claude"}},
 		Agents:     map[string]policy.AgentRule{"router": {CLI: []string{"agy-claude", "claude"}, Model: "deep"}},
 		AfterChain: "stop",
 	}

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os/exec"
 	"slices"
 	"sort"
 	"strings"
@@ -36,7 +35,7 @@ type mainCheckRuns struct {
 // An unavailable API is returned as an error for the caller's loud fail-open
 // path; only a completed failing conclusion is positive evidence of RED.
 func mainCIRedForSHA(ctx context.Context, projectRoot, sha string) (bool, []string, error) {
-	cmd := exec.CommandContext(ctx, "gh", "api", "--method", "GET",
+	cmd := sysexec.Command(ctx, "gh", "api", "--method", "GET",
 		"repos/{owner}/{repo}/commits/"+sha+"/check-runs", "-f", "filter=latest", "-f", "per_page=100")
 	cmd.Dir = projectRoot
 	out, err := cmd.CombinedOutput()

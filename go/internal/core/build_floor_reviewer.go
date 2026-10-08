@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
@@ -215,7 +215,7 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 		return pkgs
 	}
 	args := append([]string{"list", "-e", "-f", "{{.Dir}}\t{{len .GoFiles}}\t{{len .TestGoFiles}}\t{{len .XTestGoFiles}}"}, pkgs...)
-	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd := sysexec.Command(ctx, "go", args...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.Output()
@@ -319,14 +319,14 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 		return "", err.Error(), coverStatusPlumbingError
 	}
 	profile := filepath.Join(tmpDir, "cover.out")
-	cmd := exec.CommandContext(ctx, "go", coverTestArgs(profile, pkgs)...)
+	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, pkgs)...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return tmpDir + "/", string(out), coverStatusTestsFailed
 	}
 	funcOut := filepath.Join(tmpDir, "cover.func.txt")
-	cmd2 := exec.CommandContext(ctx, "go", "tool", "cover", "-func="+profile)
+	cmd2 := sysexec.Command(ctx, "go", "tool", "cover", "-func="+profile)
 	cmd2.Dir = moduleDir
 	cmd2.Env = ipcenv.Scrub(os.Environ())
 	fo, err := cmd2.Output()

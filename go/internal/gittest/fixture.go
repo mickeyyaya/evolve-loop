@@ -9,6 +9,7 @@
 package gittest
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // teardownAttempts bounds the removal retry; with a doubling backoff from
@@ -100,7 +103,7 @@ func ConfigEnv(extra ...[2]string) []string {
 func (r *Repo) Git(args ...string) string {
 	r.tb.Helper()
 	out, err := CaptureWithEBADFRetry(func() ([]byte, error) {
-		cmd := exec.Command("git", append([]string{"-C", r.Dir}, args...)...)
+		cmd := sysexec.Command(context.Background(), "git", append([]string{"-C", r.Dir}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
 		return combinedOutput(cmd)
 	})
@@ -171,7 +174,7 @@ func holders(dir string) string {
 		return "holding process: diagnostic unavailable (lsof not on PATH)"
 	}
 	// lsof exits 1 even when it prints holders: judge its output, not its status.
-	out, err := exec.Command(lsof, "+D", dir).Output()
+	out, err := sysexec.Command(context.Background(), lsof, "+D", dir).Output()
 	var exitErr *exec.ExitError
 	if err != nil && !errors.As(err, &exitErr) {
 		return fmt.Sprintf("holding process: diagnostic unavailable (lsof: %v)", err)

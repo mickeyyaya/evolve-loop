@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 //go:embed templates/modelfile.tmpl
@@ -30,7 +32,7 @@ const publishPluginName = "evo"
 var (
 	publishLookPath = exec.LookPath
 	publishRunCmd   = func(stdout, stderr io.Writer, dir, name string, args ...string) error {
-		cmd := exec.Command(name, args...)
+		cmd := sysexec.Command(context.Background(), name, args...)
 		cmd.Dir = dir
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr

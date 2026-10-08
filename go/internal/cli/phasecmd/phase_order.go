@@ -1,15 +1,16 @@
 package phasecmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseorder"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // RunPhaseOrder prints the registry's phase order, or the hardcoded order when the registry is off or missing.
@@ -31,7 +32,7 @@ func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "[phase-order] WARN: %s\n", m)
 		})
 	} else {
-		out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+		out, err := sysexec.Command(context.Background(), "git", "rev-parse", "--show-toplevel").Output()
 		if err == nil {
 			projectRoot = strings.TrimSpace(string(out))
 		} else {

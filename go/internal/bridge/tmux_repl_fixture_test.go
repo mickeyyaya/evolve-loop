@@ -53,6 +53,7 @@ func fixtureConfig(t *testing.T) *Config {
 		StderrLog:        filepath.Join(ws, "stderr.log"),
 		Agent:            "build",
 		ArtifactTimeoutS: 1,
+		Realization:      Realization{SystemPromptFile: filepath.Join(ws, paneAuthorityFile)},
 	}
 }
 

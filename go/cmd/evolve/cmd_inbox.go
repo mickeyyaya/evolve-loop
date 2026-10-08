@@ -84,15 +84,23 @@ type pendingInbox struct {
 func loadPendingInbox(verb string, stderr io.Writer) (pendingInbox, error) {
 	root := envOrCwd("EVOLVE_PROJECT_ROOT")
 	inboxDir := filepath.Join(root, ".evolve", "inbox")
-	items, warns, err := inboxbatch.LoadDir(inboxDir)
+	scan, err := inboxbatch.ScanDir(inboxDir)
 	if err != nil {
 		return pendingInbox{}, err
 	}
-	for _, w := range warns {
-		fmt.Fprintf(stderr, "inbox %s: WARN skipped %s\n", verb, w)
-	}
+	printLoadWarnings(stderr, "inbox "+verb, scan.Warnings)
 	opts := inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard}
-	return pendingInbox{items: items, opts: opts, isProtected: laneForbidden(root, stderr)}, nil
+	return pendingInbox{items: scan.Items, opts: opts, isProtected: laneForbidden(root, stderr)}, nil
+}
+
+func printLoadWarnings(stderr io.Writer, prefix string, warns []inboxbatch.LoadWarning) {
+	for _, w := range warns {
+		if w.Unreadable {
+			fmt.Fprintf(stderr, "%s: WARN skipped %s\n", prefix, w.Text)
+		} else {
+			fmt.Fprintf(stderr, "%s: WARN %s\n", prefix, w.Text)
+		}
+	}
 }
 
 func (p pendingInbox) place(it inboxbatch.Item) (inboxmover.MenuPlace, string) {

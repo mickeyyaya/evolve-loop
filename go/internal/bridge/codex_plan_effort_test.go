@@ -53,11 +53,7 @@ func TestCodexPlanEffortMatchesGeneralEffortForEveryTier(t *testing.T) {
 				tier, general, plan)
 		}
 	}
-	// An unset phase gets the manifest default, so it must be a real tier or the override is emitted empty.
-	if spec.Default == "" {
-		t.Error("effort param has no default; an unset phase would emit no effort flags at all")
-	}
-	if _, ok := spec.Values[spec.Default]; !ok {
-		t.Errorf("effort default %q is not one of the declared values %v", spec.Default, spec.Values)
+	if spec.Default != "" {
+		t.Errorf("effort default = %q, want none: policy.EffortTable.Resolve owns the effort of every launch (2026-10-08, medium first)", spec.Default)
 	}
 }

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "`go test -count=2 ./internal/bridge/` passes (red first: fails today on the second iteration)",
+    "`go test -shuffle=on -count=1 ./internal/bridge/` passes across 5 seeds",
+    "No bridge test registers a driver in init(); every registry reset restores the previous set through t.Cleanup"
+  ],
+  "created_at": "2026-10-07T00:00:00Z",
+  "files": [
+    "go/internal/bridge/artifact_timeout_diag_test.go",
+    "go/internal/bridge/driver.go"
+  ],
+  "fix": "A test that needs a controlled driver set restores the previous registry with t.Cleanup (ResetDriversForTesting returns a restore func, or a snapshot-and-restore helper). The chatty driver registers inside its test with t.Cleanup unregistering it, not in init(). One home for snapshot-and-restore.",
+  "id": "bridge-test-driver-lost-after-registry-reset",
+  "kind": "bug",
+  "priority_class": "stability",
+  "source": "console, 2026-10-07 (seen during the C0 floor runs; pre-existing on main)",
+  "summary": "`chattyTimeoutDriver` (go/internal/bridge/artifact_timeout_diag_test.go) registers itself in `init()`. Several bridge tests call `ResetDriversForTesting()` (codex_pretrust_launch_test.go, coverage_batch7_test.go, coverage_test.go, driver_tmux_repl_runscope_test.go), which clears the whole registry and never restores it. Under `-count=2` `init()` does not re-run, so `TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter` launches an unregistered CLI and fails; the test is order-dependent, which CI's `-count=1` hides.",
+  "title": "A bridge test driver registered in init() is lost after ResetDriversForTesting (-count=2 fails)",
+  "weight": 0.4
+}

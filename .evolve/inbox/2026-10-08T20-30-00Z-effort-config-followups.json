@@ -1,0 +1,30 @@
+{
+  "id": "effort-config-followups",
+  "title": "Effort configuration follow-ups: one home for the retired fields, the error texts, migrate edge cases and the effort-blind readers",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "weight": 0.25,
+  "route": "console",
+  "routed_reason": "the code is the routing table, the profile loaders and the cli-routing writer; the console owns them",
+  "source": "console, 2026-10-08, the final review round of PR #815 (go-reviewer SHIP, architecture Approve; LOW follow-ups)",
+  "created_at": "2026-10-08T20:30:00Z",
+  "summary": "Seven LOW items from the review of the effort configuration (PR #815). 1: the set of retired profile fields is written in three places (go/internal/profiles/profiles.go refuseRetiredEffort, go/internal/bridge/profile.go profileWire, go/cmd/evolve/cli_routing_effort_migrate.go retiredEffortKeys). 2: the agent-rule error text in go/internal/policy/cli_routing.go (agentRuleError) does not name effort. 3: the partial-failure path of evolve cli-routing migrate (the table is written, a profile rewrite fails) has no test. 4: the docs do not state that migrate drops a profile effort equal to the inherited value and does not pin it. 5: migrate skips a profile file with invalid JSON with no message. 6: the agy-claude suffix in the tier map is display-only drift for readers that do not know the effort (go/internal/setup/setup.go tierModelsFor, go/cmd/evolve/model_tier_resolver.go). 7: evolve cli-routing show and explain print an effort for agy-tmux (Gemini), which has no effort channel. Also: the headless codex driver (go/internal/bridge/driver_codex.go) still adds model_reasoning_effort=high to a launch with no effort, and its comment names the removed manifest default.",
+  "fix": "1: export one profiles.RetiredEffortKeys and one refusal function, and use them in the three places. 2: name effort in agentRuleError. 3: add a test with a profile rewrite that fails after the policy write, and assert the message and that a second run completes. 4: state the drop rule in runtime-reference and the cli-routing plan. 5: print one WARN line for each skipped file. 6: give the effort-blind readers the variant of the resolved effort, or mark the value as the default variant. 7: print no effort, or mark it as not applied, for a driver with no effort channel. Codex headless: remove the hidden high, or route it through the resolver.",
+  "acceptance": [
+    "The retired field names appear in one Go place",
+    "agentRuleError names cli, model and effort",
+    "A test covers the migrate partial-failure path",
+    "migrate prints a WARN for a profile file it cannot parse",
+    "show and explain print no applied effort for agy-tmux",
+    "The headless codex driver sends no effort that the resolver did not choose"
+  ],
+  "files": [
+    "go/internal/profiles/profiles.go",
+    "go/internal/bridge/profile.go",
+    "go/cmd/evolve/cli_routing_effort_migrate.go",
+    "go/internal/policy/cli_routing.go",
+    "go/internal/setup/setup.go",
+    "go/cmd/evolve/cmd_cli_routing_print.go",
+    "go/internal/bridge/driver_codex.go"
+  ]
+}

@@ -102,9 +102,10 @@ func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile s
 		_ = os.WriteFile(scrollbackFile, []byte(raw), 0o644)
 	}
 	if named {
+		deps.sweep.preserve()
 		fmt.Fprintf(deps.Stderr, "%s session PRESERVED for resume: %s\n", pfx, session)
 		return
 	}
-	_ = deps.Tmux.KillSession(ctx, session)
+	_ = killSessionSwept(ctx, deps, session)
 	fmt.Fprintf(deps.Stderr, "%s session killed: %s\n", pfx, session)
 }

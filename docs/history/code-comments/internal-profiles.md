@@ -460,3 +460,12 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // claudeFamilyFloor lists the phases that must stay off the builder's CLI
 // family, each with its reason. See ADR-0104.
 ```
+
+## PR 815 effort lives in policy cli_routing
+
+### `go/internal/profiles/profiles.go:38` — above `EffortOverrides   map[string]string 'json:"effort_overrides,omitempty"'`
+
+```text
+// EffortOverrides maps a resolved model tier to the effort level used at
+// that tier, so a tier escalation carries its effort. See ADR-0096.
+```

@@ -33,14 +33,13 @@ func runInboxQuarantine(args []string, _ io.Reader, stdout, stderr io.Writer) in
 				return 10
 			}
 		}
-		items, warns, err := inboxbatch.LoadDir(qDir)
+		scan, err := inboxbatch.ScanDir(qDir)
 		if err != nil {
 			fmt.Fprintf(stderr, "inbox quarantine list: %v\n", err)
 			return 1
 		}
-		for _, w := range warns {
-			fmt.Fprintf(stderr, "inbox quarantine list: WARN skipped %s\n", w)
-		}
+		printLoadWarnings(stderr, "inbox quarantine list", scan.Warnings)
+		items := scan.Items
 		if asJSON {
 			enc := json.NewEncoder(stdout)
 			enc.SetIndent("", " ")

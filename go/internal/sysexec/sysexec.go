@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -32,13 +33,17 @@ type RunFunc func(ctx context.Context, name, dir string, args, env []string,
 // err is reserved for unrecoverable failures and pairs with exitCode -1.
 func DefaultRunner(ctx context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := Command(ctx, name, args...)
 	cmd.Dir = dir // "" => inherit caller cwd
 	cmd.Env = env // nil => inherit os.Environ()
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
+		if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+			fmt.Fprintf(os.Stderr, "sysexec: WARN %s: a child process kept the output open for %s after the exit; the output can be incomplete\n", name, WaitDelay)
+			return 0, nil
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return exitErr.ExitCode(), nil

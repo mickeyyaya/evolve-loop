@@ -39,6 +39,11 @@ func agyTmuxOverrideWithEnv(t *testing.T, env map[string]string) string {
 
 func bootAgyClaude(t *testing.T, intent LaunchIntent) []string {
 	t.Helper()
+	return bootAgyClaudeLogged(t, intent, io.Discard)
+}
+
+func bootAgyClaudeLogged(t *testing.T, intent LaunchIntent, stderr io.Writer) []string {
+	t.Helper()
 	d, ok := LookupDriver("agy-claude-tmux")
 	if !ok {
 		t.Fatal("agy-claude-tmux is not a registered driver")
@@ -51,7 +56,7 @@ func bootAgyClaude(t *testing.T, intent LaunchIntent) []string {
 	}
 	tm := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{agyFooterClaudeOpus}, 12)}
 	deps := Deps{
-		Tmux: tm, Sleep: func(time.Duration) {}, Stderr: io.Discard,
+		Tmux: tm, Sleep: func(time.Duration) {}, Stderr: stderr,
 		LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"}),
 	}.withDefaults()
 	if code, err := d.Launch(context.Background(), cfg, deps); err != nil || code != ExitOK {
@@ -104,9 +109,9 @@ func TestAgyClaudeTmux_TierMapRunsSonnetForFastAndBalancedAndOpusForDeepAndTop(t
 	}
 	want := map[string]string{
 		"fast":     "Claude Sonnet 5.5 (Low)",
-		"balanced": "Claude Sonnet 5.5 (High)",
-		"deep":     "Claude Opus 5.5 (High)",
-		"top":      "Claude Opus 5.5 (High)",
+		"balanced": "Claude Sonnet 5.5 (Medium)",
+		"deep":     "Claude Opus 5.5 (Medium)",
+		"top":      "Claude Opus 5.5 (Medium)",
 	}
 	if !reflect.DeepEqual(m.ModelTierMap, want) {
 		t.Fatalf("agy-claude-tmux model_tier_map = %v, want %v", m.ModelTierMap, want)
@@ -120,7 +125,7 @@ func TestAgyClaudeTmux_DeepLaunchIsAgyWithClaudeOpusAndTheAgyEnvironment(t *test
 	sent := bootAgyClaude(t, LaunchIntent{ModelTier: "deep", Permission: "bypass"})
 
 	line, launchAt := launchLineFor(t, sent, "agy")
-	if want := "--model " + shellQuotePOSIX("Claude Opus 5.5 (High)"); !strings.Contains(line, want) {
+	if want := "--model " + shellQuotePOSIX("Claude Opus 5.5 (Medium)"); !strings.Contains(line, want) {
 		t.Errorf("deep launch line %q does not carry %s", line, want)
 	}
 	if !strings.Contains(line, "--dangerously-skip-permissions") {

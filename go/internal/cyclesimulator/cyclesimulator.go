@@ -17,13 +17,13 @@
 package cyclesimulator
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -31,6 +31,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Exit codes (matches cycle-simulator.sh):
@@ -134,14 +135,14 @@ func (in *Inputs) installDefaultSeams() {
 	// default advance: shell out to cycle-state.sh
 	if in.AdvanceFn == nil {
 		in.AdvanceFn = func(phase, agent string) error {
-			cmd := exec.Command("bash", pluginScript("lifecycle/cycle-state.sh"), "advance", phase, agent)
+			cmd := sysexec.Command(context.Background(), "bash", pluginScript("lifecycle/cycle-state.sh"), "advance", phase, agent)
 			cmd.Env = os.Environ()
 			return cmd.Run()
 		}
 	}
 	if in.ShipDryRunFn == nil {
 		in.ShipDryRunFn = func(msg string) (int, error) {
-			cmd := exec.Command("bash", pluginScript("lifecycle/ship.sh"), "--dry-run", msg)
+			cmd := sysexec.Command(context.Background(), "bash", pluginScript("lifecycle/ship.sh"), "--dry-run", msg)
 			cmd.Env = os.Environ()
 			err := cmd.Run()
 			if cmd.ProcessState != nil {
@@ -152,7 +153,7 @@ func (in *Inputs) installDefaultSeams() {
 	}
 	if in.VerifyFn == nil {
 		in.VerifyFn = func() error {
-			cmd := exec.Command("bash", pluginScript("observability/verify-ledger-chain.sh"))
+			cmd := sysexec.Command(context.Background(), "bash", pluginScript("observability/verify-ledger-chain.sh"))
 			cmd.Env = os.Environ()
 			return cmd.Run()
 		}
@@ -450,7 +451,7 @@ func sha256Hex(s string) string {
 }
 
 func runGit(dir string, args ...string) string {
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd := sysexec.Command(context.Background(), "git", append([]string{"-C", dir}, args...)...)
 	out, err := cmd.Output()
 	if err != nil {
 		return ""

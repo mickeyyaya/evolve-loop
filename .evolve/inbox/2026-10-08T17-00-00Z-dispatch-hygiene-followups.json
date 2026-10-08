@@ -1,0 +1,24 @@
+{
+  "id": "dispatch-hygiene-followups",
+  "title": "Dispatch process hygiene follow-ups: a wider shared class, gc retention for tree files, and helpers with no tree",
+  "kind": "hardening",
+  "priority_class": "security",
+  "weight": 0.3,
+  "route": "console",
+  "routed_reason": "the kill path of the bridge and gc (internal/proctree); the console owns it",
+  "source": "console, 2026-10-08, lane H2 (cl-proc-hygiene) final fix round of the security review",
+  "created_at": "2026-10-08T17:00:00Z",
+  "summary": "Three follow-ups from the security review of lane H2. M-c: the shared class in proctree/shared.go has tmux, the Claude Code helpers and Chrome or Chromium; it does not have Firefox or WebKit from Playwright, Electron helpers, ssh-agent or gpg-agent. L-a: no rule removes a file in .evolve/dispatch-trees/ that a crashed bridge left behind. 3: a crashed bridge can leave a tagged shared helper with no persisted tree; gc spares it by design, so the operator must stop it by hand.",
+  "fix": "M-c: add the missing helpers to the one table, or change the tag-only kill to an allow list of program names. L-a: a gc rule removes a tree file when the owner pid of its dispatch is dead and no member is alive. 3: document the manual check in runtime-reference, or let gc report such helpers with no kill.",
+  "acceptance": [
+    "A tagged Firefox, WebKit, Electron helper, ssh-agent or gpg-agent outside the live pane tree is never selected, or the tag-only kill uses an allow list, with a table test",
+    "evolve gc --dry-run lists each stale tree file, and a real run removes it, with a test",
+    "The operator path for a tagged shared helper with no tree is documented"
+  ],
+  "files": [
+    "go/internal/proctree/shared.go",
+    "go/internal/proctree/tree.go",
+    "go/internal/gc/dispatch_processes.go",
+    "docs/plans/dispatch-process-hygiene-2026-10.md"
+  ]
+}

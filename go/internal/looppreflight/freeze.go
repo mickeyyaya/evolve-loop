@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // pinnedListerTimeout sends a hung brew to the Warn-on-ambiguity path instead of stalling batch start.
@@ -66,7 +66,7 @@ func defaultSelfUpdateEvidence(bin string) (bool, string, error) {
 func defaultPinnedLister() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), pinnedListerTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "brew", "list", "--pinned").Output()
+	out, err := sysexec.Command(ctx, "brew", "list", "--pinned").Output()
 	if err != nil {
 		return nil, fmt.Errorf("brew list --pinned: %w", err)
 	}

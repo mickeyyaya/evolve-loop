@@ -9,12 +9,14 @@ import (
 	"os/exec"
 	"syscall"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const groupWaitDelay = 2 * time.Second
 
 func GroupRunner(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := sysexec.Command(ctx, name, args...)
 	cmd.Dir, cmd.Env, cmd.Stdin, cmd.Stdout, cmd.Stderr = dir, env, stdin, stdout, stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }

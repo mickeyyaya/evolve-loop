@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
@@ -74,7 +75,7 @@ func resolveRepoRoot(explicit string) (string, error) {
 	if explicit != "" {
 		return explicit, nil
 	}
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	out, err := sysexec.Command(context.Background(), "git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return "", fmt.Errorf("resolve repo root (not in a git work tree?): %w", err)
 	}

@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -106,12 +104,12 @@ func TestSweepOrphans_SweepsAscendingAndIgnoresUnparsableCycles(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
 	for _, n := range []int{3, 1, 2} {
-		writePairFile(t, dir, fmt.Sprintf("cycle-%d.json", n), "{}")
-		writePairFile(t, dir, fmt.Sprintf("cycle-%d.md", n), "# md")
+		writePairFile(t, dir, fmt.Sprintf("knowledge-base/cycles/cycle-%d.json", n), "{}")
+		writePairFile(t, dir, fmt.Sprintf("knowledge-base/cycles/cycle-%d.md", n), "# md")
 	}
-	writePairFile(t, dir, "cycle-6.md", "# md")
-	writePairFile(t, dir, "cycle-4.json", "{}")
-	writePairFile(t, dir, "cycle-99999999999999999999.json", "{}")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-6.md", "# md")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-4.json", "{}")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-99999999999999999999.json", "{}")
 
 	res, err := SweepOrphans(gitexec.Default(dir), io.Discard)
 
@@ -129,11 +127,8 @@ func TestSweepOrphans_SweepsAscendingAndIgnoresUnparsableCycles(t *testing.T) {
 func TestSweepOrphans_LogsFailedPairByDirectory(t *testing.T) {
 	dir := t.TempDir()
 	initSweepRepo(t, dir)
-	if err := os.MkdirAll(filepath.Join(dir, "cycles"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writePairFile(t, dir, "cycles/cycle-40.json", "{}")
-	writePairFile(t, dir, "cycles/cycle-40.md", "# md")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-40.json", "{}")
+	writePairFile(t, dir, "knowledge-base/cycles/cycle-40.md", "# md")
 	var log bytes.Buffer
 
 	res, err := SweepOrphans(gitexec.Git{Dir: dir, Exec: (&interceptExec{blockBase: "cycle-40"}).run}, &log)
@@ -141,7 +136,7 @@ func TestSweepOrphans_LogsFailedPairByDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SweepOrphans: %v", err)
 	}
-	want := fmt.Sprintf("[dossier-sweep] ERROR cycle 40 (cycles): recommit failed: %v\n", res.Failed[40])
+	want := fmt.Sprintf("[dossier-sweep] ERROR cycle 40 (knowledge-base/cycles): recommit failed: %v\n", res.Failed[40])
 	if log.String() != want {
 		t.Errorf("log = %q, want %q", log.String(), want)
 	}

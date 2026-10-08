@@ -1,10 +1,12 @@
 package observer
 
 import (
+	"context"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // psRunner returns `ps` CPU-time output for pid; tests inject it.
@@ -12,7 +14,7 @@ type psRunner func(pid int) (string, error)
 
 func realPSRunner(pid int) (string, error) {
 	// `ps -o time=` prints cumulative CPU time with no header, on macOS and Linux alike.
-	out, err := exec.Command("ps", "-o", "time=", "-p", strconv.Itoa(pid)).Output()
+	out, err := sysexec.Command(context.Background(), "ps", "-o", "time=", "-p", strconv.Itoa(pid)).Output()
 	return string(out), err
 }
 

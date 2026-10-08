@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -18,22 +19,28 @@ type Profile struct {
 	StreamOutput   bool
 	SessionName    string
 	Sandbox        *ProfileSandbox
-	// EffortLevel is the abstract reasoning-effort dial (low | medium | high) carried from the profile JSON and realized per-CLI via LaunchIntent.Effort.
-	EffortLevel string
 	// ExtraFlagsByCLI is the per-CLI raw-flag escape hatch, realized only for
 	// the matching CLI so a profile switched to another CLI carries none of
 	// the original CLI's argv.
 	// See ADR-0022.
 	ExtraFlagsByCLI map[string][]string
-	// EffortOverrides maps a resolved model tier to the effort rung to launch with; an absent tier key falls back to EffortLevel.
-	EffortOverrides map[string]string
 }
 
-func (p Profile) effortForTier(tier string) string {
-	if e, ok := p.EffortOverrides[tier]; ok && e != "" {
-		return e
+const untieredLaunchTier = "balanced"
+
+func LaunchEffort(cli, model string, efforts policy.EffortTable, agents ...string) string {
+	if model == "" || model == "auto" {
+		model = manifestDefaultTier(cli)
 	}
-	return p.EffortLevel
+	effort, _ := efforts.Resolve(legacyTierAlias(model), agents...)
+	return effort
+}
+
+func manifestDefaultTier(cli string) string {
+	if m, err := LoadManifest(cli); err == nil && m.Params["model_tier"].Default != "" {
+		return m.Params["model_tier"].Default
+	}
+	return untieredLaunchTier
 }
 
 // ProfileSandbox shares the canonical profile schema so launch cannot silently
@@ -67,8 +74,8 @@ type profileWire struct {
 	StreamOutput    *bool               `json:"stream_output"`
 	SessionName     string              `json:"session_name"`
 	Sandbox         *ProfileSandbox     `json:"sandbox"`
-	EffortLevel     string              `json:"effort_level"`
-	EffortOverrides map[string]string   `json:"effort_overrides"`
+	EffortLevel     json.RawMessage     `json:"effort_level"`
+	EffortOverrides json.RawMessage     `json:"effort_overrides"`
 	ExtraFlagsByCLI map[string][]string `json:"extra_flags_by_cli"`
 }
 
@@ -89,6 +96,9 @@ func LoadProfile(path string) (Profile, error) {
 		return Profile{}, fmt.Errorf("bridge:profile: invalid JSON: %s", path)
 	}
 
+	if w.EffortLevel != nil || w.EffortOverrides != nil {
+		return Profile{}, fmt.Errorf("bridge:profile: %s: %w", path, profiles.ErrRetiredEffortField)
+	}
 	if w.Name == "" {
 		return Profile{}, fmt.Errorf("bridge:profile: missing required field: name (in %s)", path)
 	}
@@ -113,8 +123,6 @@ func LoadProfile(path string) (Profile, error) {
 		PermissionMode:  w.PermissionMode,
 		SessionName:     w.SessionName,
 		Sandbox:         w.Sandbox,
-		EffortLevel:     w.EffortLevel,
-		EffortOverrides: w.EffortOverrides,
 		ExtraFlagsByCLI: w.ExtraFlagsByCLI,
 	}
 	if w.StreamOutput != nil {

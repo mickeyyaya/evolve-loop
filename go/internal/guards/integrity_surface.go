@@ -49,6 +49,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard.go", Rationale: "staging-time backstop against compiled-binary commits (tracked-binary-in-acs-dir class fix)"},
 	{Fragment: "/go/internal/phases/ship/binary_staging_guard_test.go", Rationale: "the staging backstop's own regression pin"},
 	{Fragment: "/go/internal/bridge/driver_tmux_submitverify_guard_test.go", Rationale: "submit-verify's own keep-guard: pins that every real tmux driver declares an input-line marker (a family that omits it goes inert) and that a failed verification stays loud — a cycle editing this could re-open the cycles 1505/1510/1517 unsubmitted-prompt stall unobserved"},
+	{Fragment: "/go/internal/sysexec/command_guard_test.go", Rationale: "the K10 process guard: it fails on any production exec.Command or exec.CommandContext call outside sysexec.Command, so every process the pipeline starts has a Cancel and a WaitDelay; a cycle that quietly widened it could start processes that outlive their cancel"},
 	// A cycle that could edit the disposition gate could route its own failure classification.
 	{Fragment: "/go/internal/core/disposition_gate.go", Rationale: "ADR-0074 disposition-contract gate (retro's verdict-on-the-verdict verifier + digest cross-check)"},
 	{Fragment: "/go/internal/core/disposition_gate_test.go", Rationale: "the disposition gate's own regression pins"},

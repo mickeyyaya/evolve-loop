@@ -706,3 +706,6 @@
 ./internal/stelint
 # wave — evolve wave: the wave records and notes under .evolve/waves/, the facts reader over cycle state, signals, landing intents and dossiers, the goal composer and the watch event diff.
 ./internal/wave
+
+# lane H2 (2026-10-08): the one kill path for dispatch processes (internal/proctree).
+./internal/proctree

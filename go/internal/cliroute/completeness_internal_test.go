@@ -32,9 +32,9 @@ func TestCompile_EveryRefusalResolveCanMakeIsACompileFinding(t *testing.T) {
 	}
 	blocks := map[string]policy.CLIRouting{
 		"reviewer probe":  reviewerProbeBlock(),
-		"operator":        {CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Tiers: map[string][]string{"deep": {"claude"}, "top": {"claude"}}},
+		"operator":        {CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "top": {CLIs: []string{"claude"}}}},
 		"evaluate on agy": {CLIs: []string{"agy", "claude", "codex"}, Default: []string{"codex", "claude"}, Work: map[string][]string{"evaluate": {"agy"}}},
-		"agy-only, stop":  {CLIs: []string{"agy", "claude"}, Default: []string{"agy"}, Tiers: map[string][]string{"deep": {"claude"}, "top": {"claude"}}, AfterChain: "stop"},
+		"agy-only, stop":  {CLIs: []string{"agy", "claude"}, Default: []string{"agy"}, Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "top": {CLIs: []string{"claude"}}}, AfterChain: "stop"},
 	}
 	for name, block := range blocks {
 		table, findings := Compile(policy.Policy{CLIRouting: &block}, cat, profiles.NewFromDir(profileDir))
@@ -69,7 +69,7 @@ func TestCompile_ReportsTheReviewersTierCeilingProbe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy"}, Tiers: map[string][]string{"deep": {"claude"}, "top": {"claude"}}, AfterChain: "stop"}
+	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy"}, Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "top": {CLIs: []string{"claude"}}}, AfterChain: "stop"}
 	table, findings := Compile(policy.Policy{CLIRouting: &block}, cat, profiles.NewFromDir(profileDir))
 	if !reportsAgent(findings, table, "intent") {
 		t.Fatalf("intent runs only at deep, where the agy-only chain has nothing to launch: %+v", findings)

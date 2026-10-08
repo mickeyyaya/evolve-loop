@@ -3,10 +3,10 @@ package swarm
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"sort"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // SessionKiller tears down one worker session.
@@ -22,7 +22,7 @@ type TmuxKiller func(ctx context.Context, session string) error
 
 // tmuxRun is a test seam, so the unit suite never touches a real tmux server.
 var tmuxRun = func(ctx context.Context, args ...string) error {
-	return exec.CommandContext(ctx, "tmux", args...).Run()
+	return sysexec.Command(ctx, "tmux", args...).Run()
 }
 
 // ExecTmuxKill is the production TmuxKiller on the bridge socket: it refuses an empty name, and a missing session counts as success.

@@ -68,8 +68,8 @@ func cliRoutingRoutesToAgyClaude(table policy.CLIRouting) []string {
 	for agent, rule := range table.Agents {
 		routes = append(routes, agyClaudeEntries("cli_routing agents "+agent, rule.CLI)...)
 	}
-	for tier, chain := range table.Tiers {
-		routes = append(routes, agyClaudeEntries("cli_routing tiers "+tier, chain)...)
+	for tier, rule := range table.Tiers {
+		routes = append(routes, agyClaudeEntries("cli_routing tiers "+tier, rule.CLIs)...)
 	}
 	return routes
 }
