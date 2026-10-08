@@ -196,10 +196,7 @@ func readBatchWindowFloor(ctx context.Context, st core.Storage) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if state.LastAllocatedCycleNumber > state.LastCycleNumber {
-		return state.LastAllocatedCycleNumber, nil
-	}
-	return state.LastCycleNumber, nil
+	return state.HighestCycleNumber(), nil
 }
 
 // unfinishedCycle reports whether cycle-state describes a cycle that started

@@ -19,7 +19,7 @@ func AllocateCycleNumber(ctx context.Context, su StateUpdater) (int, error) {
 func allocateCycleNumberAbove(ctx context.Context, su StateUpdater, floor int) (int, error) {
 	var allocationErr error
 	st, err := su.UpdateState(ctx, func(s *State) {
-		base := max(s.LastCycleNumber, s.LastAllocatedCycleNumber, floor)
+		base := max(s.HighestCycleNumber(), floor)
 		next, err := nextCycleNumber(base)
 		if err != nil {
 			allocationErr = err

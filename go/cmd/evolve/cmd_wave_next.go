@@ -161,7 +161,7 @@ func prepareWave(env waveEnv, a waveNextArgs, stderr io.Writer) (wavePlan, error
 		}
 	}
 	if err == nil {
-		plan.floor, err = wave.LastCycleNumber(plane.evolveDir)
+		plan.floor, err = wave.CycleFloor(plane.evolveDir)
 	}
 	if err == nil {
 		err = composeWaveGoal(env, &plan, cfg, standing, records)

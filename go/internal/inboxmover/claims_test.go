@@ -419,7 +419,7 @@ func TestAbsorbRootCopies_ParksADifferentRootCopyAndKeepsTheClaim(t *testing.T) 
 	if body, _ := os.ReadFile(claim); string(body) != `{"id":"held","weight":0.5}` {
 		t.Errorf("the claim copy changed: %s", body)
 	}
-	if len(rec.records) != 1 || rec.records[0].Action != "absorb-conflict" || AbsorbDropped != "dropped" {
-		t.Errorf("ledger = %+v; want one absorb-conflict line", rec.records)
+	if len(rec.records) != 1 || rec.records[0].Action != "park" || AbsorbDropped != "dropped" {
+		t.Errorf("ledger = %+v; want one park line", rec.records)
 	}
 }

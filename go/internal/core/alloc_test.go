@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
@@ -381,4 +382,30 @@ func writeNestedGoModule(t *testing.T, root string) string {
 		t.Fatal(err)
 	}
 	return moduleDir
+}
+
+type failingUpdater struct{ err error }
+
+func (f failingUpdater) UpdateState(context.Context, func(*State)) (State, error) {
+	return State{}, f.err
+}
+
+func TestAllocateCycleNumber_ReturnsTheStateUpdateFault(t *testing.T) {
+	fault := errors.New("state.json lock timed out")
+
+	n, err := AllocateCycleNumber(context.Background(), failingUpdater{err: fault})
+
+	if !errors.Is(err, fault) || n != 0 || !strings.Contains(err.Error(), "allocate cycle number") {
+		t.Errorf("AllocateCycleNumber = %d, %v; want 0 and the wrapped update fault", n, err)
+	}
+}
+
+func TestAllocateCycleNumber_StartsAboveTheLeaseOfAnUnfinalizedLane(t *testing.T) {
+	m := &memUpdater{st: State{LastCycleNumber: 1837, LastAllocatedCycleNumber: 1838}}
+
+	n, err := AllocateCycleNumber(context.Background(), m)
+
+	if err != nil || n != 1839 {
+		t.Errorf("AllocateCycleNumber(last 1837, lease 1838) = %d, %v; want 1839", n, err)
+	}
 }

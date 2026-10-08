@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -32,6 +33,15 @@ const RouteField = inboxbatch.RouteField
 
 func IsMoverWritten(key string) bool {
 	return inboxbatch.RoleOf(key).Owner == inboxbatch.LoopStampOwned
+}
+
+func rootStampCovers(key string, claim, root any) bool {
+	if inboxbatch.RoleOf(key).IsCounter() {
+		claimCount, claimOK := claim.(float64)
+		rootCount, rootOK := root.(float64)
+		return claimOK && rootOK && rootCount >= claimCount
+	}
+	return IsMoverWritten(key) || reflect.DeepEqual(claim, root)
 }
 
 func isLifecycleOwned(key string) bool {
