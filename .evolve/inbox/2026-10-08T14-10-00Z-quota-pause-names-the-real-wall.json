@@ -1,0 +1,22 @@
+{
+  "id": "quota-pause-names-the-real-wall",
+  "title": "A pause for an auth wall on the only allowed CLI says that all CLI families are exhausted",
+  "kind": "pipeline-repair",
+  "priority_class": "debuggability",
+  "weight": 0.35,
+  "route": "console",
+  "routed_reason": "the pause path is loop control code; the console owns it",
+  "source": "console, 2026-10-08, wave 80 (cycles 1835 and 1836 paused at tdd)",
+  "created_at": "2026-10-08T14:10:00Z",
+  "summary": "Wave 80 paused with QUOTA-PAUSE and the text \"all CLI families exhausted mid-cycle\". The usage query showed that agy Gemini was healthy (27% of the week, 19% of 5 h) and that Claude Code had 6% session and 54% week use. The real cause was an auth bench on claude (reason auth_recheck). The cycles were at tdd, a Claude-family floor seat that may run only on Claude Code, so no allowed CLI was available. The pause was correct, but the message named the wrong cause. The operator logged in again, the console ran evolve doctor live claude-tmux (LIVE OK) and evolve clihealth clear claude, and the wave resumed with evolve loop --resume.",
+  "fix": "When the walk finds no available CLI, name each allowed CLI and its state: the bench reason (auth_recheck, usage_probe, rate_limit) and the time when the bench ends. Say \"no allowed CLI is available for <agent>\", not \"all CLI families exhausted\", when a healthy CLI exists outside the allowed set. For an auth bench, print the fix: log in, then run evolve clihealth clear <family>.",
+  "acceptance": [
+    "A test with a floor seat whose only allowed CLI has an auth bench prints the agent, the CLI, the bench reason and the fix (red first)",
+    "The message never says all CLI families are exhausted when a usage query shows a healthy family",
+    "The pause class and the exit code stay the same"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_loop_control.go",
+    "go/internal/bridgechain/bridgechain.go"
+  ]
+}
