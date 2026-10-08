@@ -283,7 +283,7 @@
         <p class="pld-vlabel">Per-phase LLM routing</p>
         <div class="pld-modelbar"></div>
         <div class="pld-modellegend"></div>
-        <p class="pld-routenote">The advisor gives each phase to an LLM and model per policy — balancing ownership across Claude Code, Codex, and Gemini, and keeping the builder and auditor on different families so the review stays honest.</p>
+        <p class="pld-routenote">{{.Site.PipelineDemo.RouteNote}}</p>
         <div class="pld-counts">
           <span class="pld-chip c-pick"><b class="pld-n-pick">0</b> common</span>
           <span class="pld-chip c-mint"><b class="pld-n-mint">0</b> minted</span>
@@ -344,6 +344,7 @@
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
   function provKey(cli) {
     var m = String(cli || '').toLowerCase();
+    if (m === 'host') { return 'host'; }
     if (m.indexOf('codex') >= 0 || m.indexOf('gpt') >= 0) { return 'codex'; }
     if (m.indexOf('gemini') >= 0) { return 'gemini'; }
     return 'claude';
@@ -528,7 +529,7 @@
       if (p.use) {
         order++;
         n.querySelector('.pl-badge').textContent = order;
-        if (p.cli) { provCounts[p.cli] = (provCounts[p.cli] || 0) + 1; }
+        if (p.cli && provKey(p.cli) !== 'host') { provCounts[p.cli] = (provCounts[p.cli] || 0) + 1; }
         cliEl.textContent = p.cli || 'run';
         cliEl.className = 'pl-cli p-' + provKey(p.cli);
         modelEl.textContent = shortModel(p.cli, p.model);
@@ -771,7 +772,7 @@
     <div class="cl-card"><h3>{{.Title}}</h3><p>{{.Note}}</p></div>
     {{end}}
   </div>
-  <p class="cl-note"><span class="cl-key">All you need is an LLM CLI subscription.</span> Each lane runs on a CLI you're already signed into — Claude, Codex, or Gemini.</p>
+  <p class="cl-note"><span class="cl-key">{{.Site.Concurrency.NoteLead}}</span> {{.Site.Concurrency.Note}}</p>
   <script type="application/json" class="cl-data">{{json .Site.Concurrency}}</script>
 </section>
 {{end}}
@@ -982,7 +983,7 @@
       <p class="ixl-note">{{.Site.InboxLab.Note}}</p>
     </div>
     <div class="ixl-panel">
-      <p class="ixl-ph">the queue — triage picks by weight, every cycle</p>
+      <p class="ixl-ph">the queue — triage takes the top of the rank, every cycle</p>
       <ul class="ixl-q">
         {{range .Site.InboxLab.Seed}}<li data-id="{{.ID}}" data-w="{{.Weight}}"><span class="ixl-w">{{.Weight}}</span><span class="ixl-id">{{.ID}}</span><span class="ixl-kind">{{.Kind}}</span><span class="ixl-age"></span></li>{{end}}
       </ul>
@@ -1441,7 +1442,7 @@
   .tri-h{font-family:var(--t-disp);font-weight:inherit;font-size:clamp(1.8rem,4vw,2.9rem);line-height:1.1;margin:14px 0 0;color:var(--t-ink)}
   .tri-sub{color:var(--t-mut);margin:14px 0 0;font-size:clamp(1rem,1.4vw,1.15rem);max-width:68ch}
   .tri-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin-top:30px;align-items:start}
-  @media (max-width:840px){.tri-grid{grid-template-columns:1fr}}
+  @media (max-width:840px){.tri-grid{grid-template-columns:minmax(0,1fr)}}
   .tri-install{border:1px solid var(--t-line);border-radius:16px;background:var(--t-surf);padding:18px}
   .tri-vh{font-family:var(--t-mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--t-mut);margin:0 0 10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .tri-vh b{color:var(--t-acc)}
