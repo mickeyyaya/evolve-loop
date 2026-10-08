@@ -1,0 +1,102 @@
+package audit
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit/ciparitygate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
+)
+
+const skillsGeneratorPrefix = "go/internal/skillcheck/"
+
+var worktreeSkillsCheckLimit = ciparitygate.DefaultTimeouts().GoVet
+
+type gateWarning string
+
+func (w gateWarning) Error() string { return string(w) }
+
+func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
+	root := req.Worktree
+	if root == "" {
+		root = req.ProjectRoot
+	}
+	if root == "" {
+		return nil, nil
+	}
+	if changesSkillsGenerator(core.ChangedWorktreePathsSinceBase(context.Background(), root, req.WorktreeBaseSHA)) {
+		return worktreeSkillsDrift(root)
+	}
+	return skillcheck.Check(root)
+}
+
+func changesSkillsGenerator(paths []string) bool {
+	for _, p := range paths {
+		if strings.HasPrefix(p, skillsGeneratorPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func worktreeSkillsDrift(root string) ([]string, error) {
+	inv := core.WorktreeEvolveInvocation(root, "skills", "check")
+	ctx, cancel := context.WithTimeout(context.Background(), worktreeSkillsCheckLimit)
+	defer cancel()
+	var report strings.Builder
+	code, err := runCmd(ctx, "go", inv.Dir, inv.Args, inv.Env, nil, nil, &report)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return nil, laneNotGraded(ctx.Err())
+	}
+	if err != nil {
+		return nil, laneNotGraded(err)
+	}
+	if code != 0 {
+		return worktreeFailureOffenders(code, report.String()), nil
+	}
+	host, hostErr := skillcheck.Check(root)
+	return nil, generatorDisagreement(host, hostErr)
+}
+
+func laneNotGraded(cause error) error {
+	return fmt.Errorf("the lane changed the skills generator, but its own `evolve skills check` did not run: the lane is NOT graded and only CI TestSkills_NoDrift checks it: %w", cause)
+}
+
+func worktreeFailureOffenders(code int, report string) []string {
+	if offenders := skillsCheckOffenders(report); len(offenders) > 0 {
+		return offenders
+	}
+	out := strings.TrimSpace(report)
+	if out == "" {
+		out = "(no output)"
+	}
+	return []string{fmt.Sprintf("the worktree generator skills check exited %d without a drift report: %s", code, out)}
+}
+
+func generatorDisagreement(host []string, hostErr error) error {
+	switch {
+	case hostErr != nil:
+		return gateWarning("the lane's generator graded the lane clean, but the host generator could not compare (" + hostErr.Error() + "); the lane grades itself, review the skillcheck diff")
+	case len(host) > 0:
+		return gateWarning(fmt.Sprintf("the lane's generator and the host generator disagree on %d artifact(s); the lane grades itself, review the skillcheck diff: %s", len(host), strings.Join(host, ", ")))
+	}
+	return nil
+}
+
+func skillsCheckOffenders(report string) []string {
+	var offenders []string
+	for _, line := range strings.Split(report, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "DRIFT: "):
+			artifact := strings.Fields(strings.TrimPrefix(line, "DRIFT: "))[0]
+			offenders = append(offenders, strings.TrimSuffix(artifact, ":"))
+		case strings.HasPrefix(line, "MANIFEST: "):
+			offenders = append(offenders, line)
+		}
+	}
+	return offenders
+}

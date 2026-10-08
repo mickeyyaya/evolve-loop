@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "The host owns the drift comparison: the worktree supplies only the rendered bytes (for example `evolve skills render --json`), and the host compares them with the tree; a lane that rewords or breaks the report cannot change the verdict (red first)",
+    "After the first criterion, a lane that changes the rendering in go/internal/phasecontract and regenerates the SKILL.md regions with its own generator PASSes the skills-drift gate (red first)",
+    "A lane that changes no package in the generator closure is graded exactly as today, with byte-identical gate output",
+    "One registry maps each generated projection to its generator source; derivedArtifacts.ssotPrefix and skillsGeneratorPrefix read it",
+    "A worktree check that cannot run emits a Signal Center event through a stepFailed-style seam"
+  ],
+  "created_at": "2026-10-08T19:33:18Z",
+  "files": [
+    "go/internal/phases/audit/skillsdrift.go",
+    "go/internal/core/ship_recovery.go",
+    "go/internal/skillcheck/skillcheck.go",
+    "go/internal/core/comment_floor.go"
+  ],
+  "fix": "(a) Add a render verb that prints the rendered projections as JSON, and move the comparison to the host. (b) Then replace the prefix trigger with the in-module `go list -deps` closure of ./internal/skillcheck in the worktree, through runCmd; compare the host build stamp with the worktree base for the stale-binary gap. (c) Put the projection-to-generator-source rule in one registry. (d) Emit a Signal Center event when the worktree check cannot run. (e) Carry the cycle context to the gate when the PhaseRequest seam gets one. (f) Make core.ChangedWorktreePathsSinceBase the one home of the empty-base rule, and let comment_floor.go use it with its --no-renames flag.",
+  "id": "skills-drift-gate-generator-dependency-closure",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "console lane cl-skills-drift, 2026-10-09: the limits of the fix for skills-drift-gate-grades-with-worktree-generator and the residuals of review round 1",
+  "summary": "The audit skills-drift gate runs the worktree's own `evolve skills check` when the lane changes a path under go/internal/skillcheck/ since the cycle base (skillsDriftCheckDefault, go/internal/phases/audit/skillsdrift.go). Residuals: (a) the lane's binary owns the comparator, the report format and the exit code, not only the renderer, so the lane grades itself; a host-side WARN shows a disagreement but does not stop it. (b) The generator also reads phasespec, phasecontract, profiles, prompts and config; a lane that changes those packages still gets the old host generator, the same false red as cycles 1828 and 1840. An orchestrator binary older than the worktree base has the same skew. Widen the trigger only after (a). (c) The rule 'a projection maps to a generator source prefix' has two homes: derivedArtifacts.ssotPrefix (core/ship_recovery.go) and skillsGeneratorPrefix (skillsdrift.go). (d) A worktree check that cannot run emits no Signal Center event. (e) The worktree run's context is not tied to the cycle, because PhaseRequest carries no context. (f) The rule 'an empty base means a diff from HEAD' has a second home: floorBase in core/comment_floor.go (with --no-renames) beside core.ChangedWorktreePathsSinceBase.",
+  "title": "The skills-drift gate lets the lane's binary grade its own generator, and sees a generator change only under go/internal/skillcheck/",
+  "weight": 0.5
+}

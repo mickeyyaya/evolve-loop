@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
-	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -441,10 +439,10 @@ func regenerateDerivedArtifact(ctx context.Context, worktree, relPath string) er
 	if !ok {
 		return fmt.Errorf("no regenerator registered for %q", relPath)
 	}
-	goArgs := append([]string{"run", "./cmd/evolve"}, spec.regenArgs...)
-	cmd := sysexec.Command(ctx, "go", goArgs...)
-	cmd.Dir = filepath.Join(worktree, "go")
-	cmd.Env = append(os.Environ(), ipcenv.WorktreeRootKey+"="+worktree)
+	inv := WorktreeEvolveInvocation(worktree, spec.regenArgs...)
+	cmd := sysexec.Command(ctx, "go", inv.Args...)
+	cmd.Dir = inv.Dir
+	cmd.Env = inv.Env
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("regenerate %s via `evolve %s`: %w: %s", relPath, strings.Join(spec.regenArgs, " "), err, strings.TrimSpace(string(out)))
 	}
