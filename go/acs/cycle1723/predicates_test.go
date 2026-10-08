@@ -244,16 +244,31 @@ func TestC1723_003_CommentsExemptsOnlyANewFilesPackageDoc(t *testing.T) {
 		t.Errorf("a new package's doc is exempt:\n%s", stdout)
 	}
 
-	existing := baseRepo(t, map[string]string{"p/a.go": "package p\n\nfunc a() {}\n", "q/q.go": "// Package q holds the old doc text.\npackage q\n"})
+	existing := baseRepo(t, map[string]string{
+		"p/a.go": "package p\n\nfunc a() {}\n",
+		"q/q.go": "// Package q holds the old doc text.\npackage q\n",
+		"r/r.go": "// Package r holds the old doc text.\npackage r\n",
+		"s/s.go": "// Package s holds the old doc text.\n// It spans five lines at base:\n// alpha,\n// beta,\n// gamma.\npackage s\n",
+	})
 	writeFiles(t, existing, map[string]string{
 		"p/a.go": "// Package p now documents itself here.\npackage p\n\nfunc a() {}\n",
 		"q/q.go": "// Package q holds the new doc text.\npackage q\n",
+		"r/r.go": "// Package r holds the new doc text.\n// It grows past three lines:\n// one,\n// two.\npackage r\n",
+		"s/s.go": "// Package s holds the new doc text.\n// It keeps its five lines:\n// uno,\n// dos,\n// tres.\npackage s\n",
 	})
 	stdout, stderr, code = run(t, existing, bin, "comments", "-base", "HEAD")
-	requireListed(t, "a package doc added or rewritten in a file that existed at base", stdout, stderr, code, []string{
+	requireListed(t, "a doc added where none was, and a rewrite past both three lines and its old length", stdout, stderr, code, []string{
 		"p/a.go: // Package p now documents itself here.",
-		"q/q.go: // Package q holds the new doc text.",
+		"r/r.go: // Package r holds the new doc text.",
+		"r/r.go: // It grows past three lines:",
+		"r/r.go: // one,",
+		"r/r.go: // two.",
 	})
+	for _, spared := range []string{"q/q.go", "s/s.go"} {
+		if strings.Contains(stdout, spared+": ") {
+			t.Errorf("a rewrite of an existing package doc within three lines or its old length is spared, but %s is listed:\n%s", spared, stdout)
+		}
+	}
 }
 
 const movedBase = "package p\n\n// callers hold the lock.\nfunc a() {}\n\nfunc b() {\n\t// the zero value is ready to use.\n\t_ = 0\n}\n"
