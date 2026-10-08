@@ -14,7 +14,7 @@
 
 ## What evolve-loop is
 
-evolve-loop is a development pipeline that evolves itself. It orchestrates specialized phase agents (Intent, Scout, Triage, TDD, Builder, Auditor, and retro/memo). The agents go through a fixed spine in each cycle (Intent → Scout → Triage → [TDD] → Build → Audit → Ship → Learn). Tier-1 kernel hooks enforce these properties:
+evolve-loop is a development pipeline that evolves itself. It orchestrates specialized phase agents (Intent, Scout, Triage, TDD, Builder, Auditor, and retro/memo). The agents go through a fixed spine in each cycle (Intent → Scout → Triage → [TDD] → Build → Audit → Ship → Learn). Since v22.27.0, a code cycle also runs the code-review phase between Build and Audit. It runs in shadow and is not a gate ([ADR-0124](docs/architecture/adr/0124-code-review-phase.md)). Tier-1 kernel hooks enforce these properties:
 
 - the phase order;
 - role-scoped write paths;
@@ -31,7 +31,7 @@ These rules apply on every CLI that you run under. They are STRUCTURAL: kernel h
 ### 1. Pipeline ordering is non-negotiable
 Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`) denies in-process subagent dispatch while a cycle is active. Per ADR-0075, this hook was rewired onto the `Agent|Task` matcher.
 
-The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag. Each use is logged loudly and is a CRITICAL violation.
+The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag. With it, the guard allows the call and writes no special log line. Each use is a CRITICAL violation.
 
 ### 2. Subagents start through the native bridge, never through in-process tool calls
 The native runner spawns every phase agent. The runner is `evolve subagent run <agent> <cycle> <workspace>`, or the in-process `go/internal/bridge` launcher that `evolve loop` / `evolve cycle run` drive. The kernel hook enforces this rule. During a cycle, the hook **denies** the in-process `Agent` (Claude Code) / `activate_skill` (Gemini) / equivalent (Codex). Reason: in-process subagents bypass the profile-scoped permissions and the tamper-evident ledger.
@@ -102,6 +102,8 @@ These are behavioral rules that every agent must follow, on every CLI. The kerne
 
 ## Per-CLI runtime details
 
+The `cli_routing` table in `.evolve/policy.json` decides which CLI runs each phase. `evolve cli-routing explain <agent>` prints the chain of an agent ([ADR-0119](docs/architecture/adr/0119-one-routing-table-one-resolver.md)).
+
 This file covers the universal contract. The CLI-specific runtime details are in companion files:
 
 - **Claude Code**: see [CLAUDE.md](CLAUDE.md). Tier-1 production. The skills at `skills/<name>/SKILL.md` are the only invocation/slash-command surface (per ADR-0040). They carry `argument-hint`. The plugin manifest at `.claude-plugin/plugin.json` declares only `agents` and `skills` (no `commands[]` array). Kernel hooks fire as PreToolUse hooks, as `.claude/settings.json` specifies.
@@ -118,6 +120,8 @@ This file covers the universal contract. The CLI-specific runtime details are in
   A Gemini *model* is also reachable natively through the Antigravity (agy) driver (`go/internal/bridge/driver_agy*.go`; the code documents it as "Gemini-backed"). But `gemini` and `agy`/`antigravity` are separate CLI identities. Only `antigravity → agy` has a name resolution (see the Antigravity bullet below).
 
 - **Antigravity CLI (agy)**: agy discovers skills automatically at `.agents/skills/<name>/SKILL.md`. The native agy bridge driver (`go/internal/bridge/driver_agy*.go`) drives it. It uses NATIVE mode (`agy -p`) when the agy binary is on PATH, HYBRID when claude is on PATH, and DEGRADED in other cases. The cross-name resolver maps `antigravity → agy`. cost_blind:true in NATIVE mode (deferred billing tap).
+
+  The `agy-claude-tmux` driver routes to the Claude models that the agy binary serves (routing family `agy-claude`). Before the prompt, it verifies that agy booted a Claude model. If not, it exits 87.
 
   See [reference/agy-runtime.md](skills/loop/reference/agy-runtime.md). Capability tier: `evolve bridge probe`.
 

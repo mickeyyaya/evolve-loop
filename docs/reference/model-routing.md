@@ -1,86 +1,47 @@
 # Model Routing — Tier Definitions, Provider Mappings & Dynamic Routing
 
-The evolve-loop uses a **3-tier model abstraction** so it works across any LLM provider. The orchestrator selects the model tier for each agent invocation based on phase complexity, optimizing cost without sacrificing quality.
+This page describes the routing of v22.27.0. The bash-era tier abstraction (`tier-1`, `tier-2`, `tier-3` and `.evolve/models.json`) is removed, and no code reads `.evolve/models.json`. The full reference is the "CLI routing table" row of [runtime-reference.md](../operations/runtime-reference.md).
 
 ## Tier Definitions
 
-| Tier | Capability | Use When | Cost Ratio |
-|------|-----------|----------|------------|
-| **tier-1** | Deep reasoning, complex architecture, multi-step analysis | Strategic decisions with multiplicative downstream impact | ~3-5x of tier-2 |
-| **tier-2** | Balanced coding, implementation, review, general analysis | Standard development work — most agent invocations | 1x (baseline) |
-| **tier-3** | Fast classification, simple edits, routine checks, summaries | Data-driven or mechanical tasks where reasoning depth adds little | ~0.1-0.3x of tier-2 |
+Each profile in `.evolve/profiles/` names a default tier and an envelope (`model_tier_default`, `model_tier_envelope`). The tier ladder has four steps: `fast`, `balanced`, `deep` and `top`. The manifest of each CLI family maps a tier to a model (`model_tier_map` in `go/internal/bridge/manifests/<driver>.json`).
 
-## Provider Model Mapping
+## Models for each tier
 
-Default mappings (override via `.evolve/models.json`):
+| Tier | `claude-tmux` | `agy-tmux` | `agy-claude-tmux` | `codex-tmux` |
+|---|---|---|---|---|
+| `fast` | haiku | Gemini 3.8 Flash (Low) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
+| `balanced` | sonnet | Gemini 3.8 Flash (High) | Claude Sonnet 5.5 (High) | gpt-5.6-terra |
+| `deep` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (High) | gpt-5.6-sol |
+| `top` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (High) | gpt-5.6-sol |
 
-| Tier | Anthropic (Claude) | Google (Gemini) | OpenAI | Mistral | DeepSeek | Open-Weight |
-|------|-------------------|-----------------|--------|---------|----------|------------|
-| **tier-1** | claude-opus-4-6 | gemini-3.1-pro | gpt-5.4 / o3-pro | mistral-large-3 | deepseek-reasoner (R1) | llama-4-behemoth |
-| **tier-2** | claude-sonnet-4-6 | gemini-3-flash | gpt-5.3-instant | mistral-small-4 | deepseek-chat (V3) | qwen-3.5-397b-a17b |
-| **tier-3** | claude-haiku-4-5 | gemini-3.1-flash-lite | gpt-5.4-nano | ministral-3-14b | deepseek-chat (cached) | qwen-3.5-9b |
+In Claude Code 2.1.293, the `haiku` alias of the `fast` tier resolves to Haiku 5.5 (checked on 2026-10-08). agy has no Haiku model, so the `fast` tier of `agy-claude-tmux` is Claude Sonnet 5.5 (Low).
 
-**Provider auto-detection:**
-- Claude Code → Anthropic mappings
-- Gemini CLI → Google mappings
-- Other environments → read `.evolve/models.json` (required)
+`evolve models refresh` refreshes the live model catalog. The resolution order is: a policy pin, then the live catalog, then the manifest baseline.
 
-**Extended thinking:** tier-1 models should have extended thinking / chain-of-thought enabled when available. tier-3 models should have it disabled for speed. tier-2 follows the host CLI default.
+## The CLI routing table
 
-## Configuration Override: `.evolve/models.json`
+Since v22.27.0, one table in `.evolve/policy.json` (`cli_routing`) decides which CLI runs each dispatch ([ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md)). The table of this repository has these rules:
 
-```json
-{
-  "provider": "anthropic",
-  "thinkingMode": {
-    "tier-1": "extended",
-    "tier-2": "default",
-    "tier-3": "disabled"
-  },
-  "tiers": {
-    "tier-1": "claude-opus-4-6",
-    "tier-2": "claude-sonnet-4-6",
-    "tier-3": "claude-haiku-4-5"
-  },
-  "overrides": {
-    "scout": "tier-2",
-    "builder": "tier-2",
-    "auditor": "tier-2",
-    "operator": "tier-3",
-    "calibrate": "tier-3",
-    "self-eval": "tier-2",
-    "meta-cycle": "tier-1"
-  }
-}
-```
+- A phase below the deep tier runs agy first, at the `balanced` tier (see the table above). Then it runs agy-owned Claude (`agy-claude`), then Claude Code. `evolve cli-routing explain <agent>` prints the chain and the model at the tier of the agent.
+- A phase at the deep or the top tier runs agy-owned Claude first, then Claude Code.
+- The Claude-family floor agents (the auditor, the adversarial review, the tdd engineer, the code reviewer and the spec verifiers) run Claude Code only.
+- Codex runs only under `--bypass-policy`.
 
-When `models.json` exists, it takes precedence over auto-detection. See [configuration.md](../reference/configuration.md) for full schema and [models-quickstart.md](models-quickstart.md) for practical examples.
+A project without a table uses the chain of each profile (`cli`, then `cli_fallback`). Then the loop probes each CLI, skips a benched CLI and falls back to an installed CLI.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `evolve cli-routing init --clis a,b,c` | Writes `clis` and `default`, and moves the legacy keys into the table |
+| `evolve cli-routing set <key> <a,b>` | Sets one key: `clis`, `default`, `after_chain`, `tiers.<tier>`, `work.<role>` or `agents.<agent>` |
+| `evolve cli-routing unset <key>` | Removes one key |
+| `evolve cli-routing migrate [--dry-run]` | Moves `pins`, `workflow.universal_fallback` and `router.cli/model` into the table. It refuses a non-empty `workflow.universal_fallback_exclude` |
+| `evolve cli-routing show`, `check`, `explain <agent>` | Prints the table, checks it, or prints the chain of one agent |
+
+These verbs are the only writers of the table. Each write compiles the merged file first. A write is refused inside a phase and while a cycle holds a live lease. `evolve setup recommend` and `evolve setup apply` refuse when the policy file has a `cli_routing` key.
 
 ## Dynamic Model Routing
 
-| Phase | Default Tier | Upgrade Condition | Downgrade Condition |
-|-------|-------------|-------------------|---------------------|
-| Scout (DISCOVER) | tier-2 | Cycle 1 or goal-directed (cycle ≤ 2) → tier-1 | Cycle 4+ with mature bandit data (3+ arms, pulls ≥ 3) → tier-3 |
-| Builder (BUILD) | tier-2 | M + 5+ files → tier-1; audit retry (attempt ≥ 2) → tier-1 | S + plan cache hit → tier-3 |
-| Auditor (AUDIT) | tier-2 | Security-sensitive changes → tier-1 | Clean build report, no risks flagged → tier-3 |
-| Calibrate (Phase 0) | tier-3 | First calibration of session → tier-2 | Subsequent calibrations → tier-3 |
-| Operator (LEARN) | tier-3 | Last cycle / fitness regression / meta-cycle → tier-2 | Standard post-cycle → tier-3 |
-| Self-Evaluation | tier-2 (inline) | Audit retries / eval failures / miscalibration → tier-1 | All clean → tier-2 (inline) |
-| Meta-cycle review | tier-1 | Always uses deep reasoning | — |
-
-## Routing Rules
-
-- The orchestrator decides the tier at launch time based on context (task complexity, strategy, cycle number)
-- Override with `model` parameter in agent context if needed
-- Track model usage in ledger entries for cost analysis
-- The `repair` strategy always uses tier-2+ for Builder (accuracy matters more than cost)
-- The `innovate` strategy can use tier-3 for Auditor on style checks (relaxed strictness)
-- The `ultrathink` strategy ALWAYS forces `tier-1` with extended thinking for all agents (Scout, Builder, Auditor) to maximize reasoning depth on complex architectural goals
-- tier-1 routing targets **decision points with multiplicative downstream impact**: cycle 1 Scout sets the session trajectory, audit retries need deeper reasoning about design failures, and problem-cycle self-evaluation extracts the richest learning signal
-- Net cost increase is ~6.5% per 5-cycle session, offset by fewer wasted retries and better task selection
-
-## Quality Guardrails
-
-- Downgrade to tier-3 only when `consecutiveClean >= 3` AND task is S/XS complexity
-- First-attempt eval failure >33% blocks tier-3 routing for that task type
-- Benchmark score drop >3 points suspends all tier-3 routing until recovery
+The advisor chooses the tier of each phase inside the envelope of its profile. This is the default (`EVOLVE_DYNAMIC_ROUTING=advisory`). `EVOLVE_DYNAMIC_ROUTING=off` keeps the static profile tiers. The advisor uses the chain of the table, from the first CLI that is not benched.
