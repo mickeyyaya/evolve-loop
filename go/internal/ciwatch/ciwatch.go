@@ -234,7 +234,7 @@ func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 	if err := os.MkdirAll(opts.InboxDir, 0o755); err != nil {
 		return fmt.Errorf("ciwatch: inbox dir: %w", err)
 	}
-	name := fmt.Sprintf("%s-ci-red-%s.json", now.Format("2006-01-02T15-04-05Z"), short)
+	name := fmt.Sprintf("%s-ci-red-%s.json", now.Format(inboxbatch.FilenameStampLayout), short)
 	path := filepath.Join(opts.InboxDir, name)
 	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
 	if err := os.WriteFile(tmp, body, 0o644); err != nil {
