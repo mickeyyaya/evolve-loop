@@ -33,7 +33,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
 )
 
 // auditReportMaxBytes bounds audit-report.md the way defect_ledger.go bounds
@@ -55,7 +54,6 @@ type hooks struct {
 	solutionCheck func(req core.PhaseRequest) ([]string, error)
 	// skillsDriftCheck reports the worktree's SKILL.md files whose generated
 	// phase-facts region has drifted from its SSOTs. nil = no skills gate.
-	// NewDefault wires skillsDriftCheckDefault (in-process skillcheck.Check).
 	skillsDriftCheck func(req core.PhaseRequest) ([]string, error)
 	// goVetCheck / acsDurableCheck / apicoverEnforceCheck are the CI-parity
 	// gates: each runs the whole-repo CI command against the cycle worktree and
@@ -494,20 +492,6 @@ func verifyExplanationDocumentation(req core.PhaseRequest) error {
 		return fmt.Errorf("typed Build explanation handoff does not match the verified host snapshot")
 	}
 	return nil
-}
-
-// skillsDriftCheckDefault is the production SKILL.md-drift gate: it runs
-// skillcheck.Check in-process, never a subprocess, against the cycle
-// worktree, falling back to ProjectRoot; an empty root is a no-op.
-func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
-	root := req.Worktree
-	if root == "" {
-		root = req.ProjectRoot
-	}
-	if root == "" {
-		return nil, nil
-	}
-	return skillcheck.Check(root)
 }
 
 // gofmtCheckDefault is the production gofmt CI-parity gate: it lists the .go

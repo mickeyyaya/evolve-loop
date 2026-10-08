@@ -1,6 +1,7 @@
 package audit
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -51,7 +52,10 @@ func (a *auditClassification) applyRepositoryGate(
 		return
 	}
 	offenders, err := check(a.req)
+	var notice gateWarning
 	switch {
+	case errors.As(err, &notice):
+		a.warn(label + ": " + notice.Error())
 	case err != nil:
 		a.warn(fmt.Sprintf(skippedTemplate, err.Error()))
 	case len(offenders) > 0:

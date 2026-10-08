@@ -105,10 +105,14 @@ func changedFloorPaths(ctx context.Context, in ReviewInput) []string {
 	if in.Worktree == "" {
 		return nil
 	}
-	if in.WorktreeBaseSHA != "" {
-		return changedWorktreePathsSince(ctx, in.Worktree, in.WorktreeBaseSHA)
+	return ChangedWorktreePathsSinceBase(ctx, in.Worktree, in.WorktreeBaseSHA)
+}
+
+func ChangedWorktreePathsSinceBase(ctx context.Context, worktree, baseSHA string) []string {
+	if baseSHA != "" {
+		return changedWorktreePathsSince(ctx, worktree, baseSHA)
 	}
-	return changedWorktreePaths(ctx, in.Worktree)
+	return changedWorktreePaths(ctx, worktree)
 }
 
 // changedPackageFloorChecks runs the post-build selfcheck machinery as a rejecting floor, one line per failing

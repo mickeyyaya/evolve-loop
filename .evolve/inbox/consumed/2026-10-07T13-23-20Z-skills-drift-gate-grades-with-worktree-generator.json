@@ -4,6 +4,12 @@
     "A lane that changes the generator but does NOT regenerate the outputs still FAILs the gate",
     "A lane that does not touch the generator is graded exactly as today (byte-identical gate output)"
   ],
+  "consumed": {
+    "at": "2026-10-08T19:33:18Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "console lane cl-skills-drift (fix/skills-drift-worktree-generator): skillsDriftCheckDefault runs the worktree's own evolve skills check (core.WorktreeEvolveInvocation) when the lane changes go/internal/skillcheck/, else skillcheck.Check in-process with byte-identical output; acceptance tests TestSkillsDriftGate_* and the cycle-1840 replay; follow-up skills-drift-gate-generator-dependency-closure"
+  },
   "created_at": "2026-10-07T14:30:00Z",
   "files": [
     "go/internal/phases/audit/audit.go",
