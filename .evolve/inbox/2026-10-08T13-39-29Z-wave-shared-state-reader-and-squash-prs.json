@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "One reader decodes state.json lastCycleNumber; redteamcheck and wave call it, and a test pins the absent-file and malformed-file results.",
+    "The wave facts list a squash-merged PR: a test with a first-parent subject 'feat: x (#123)' lists #123.",
+    "go test -count=1 ./internal/wave/ ./internal/redteamcheck/ ./cmd/evolve/ pass."
+  ],
+  "connects_to": [
+    "docs/plans/evolve-wave-cli-2026-10.md section 11 (limits)"
+  ],
+  "created_at": "2026-10-08T13:39:29Z",
+  "files": [
+    "go/internal/wave/facts.go",
+    "go/internal/redteamcheck/redteamcheck.go",
+    "go/cmd/evolve/cmd_wave.go"
+  ],
+  "fix": "(1) Give one package a read-only reader for state.json lastCycleNumber (next to cyclestate.State), and make redteamcheck and wave use it. (2) Read the merged PRs of a boundary from a source that also covers a squash merge: the PR number in the commit subject '(#N)' on first-parent commits, or the pr merge verb's own record.",
+  "id": "wave-shared-state-reader-and-squash-prs",
+  "kind": "maintainability",
+  "priority": "low",
+  "priority_class": "maintainability",
+  "root_cause": "The wave lane (cl-wave-cli, 2026-10-08) added a small decoder to stay out of the state.json read-modify-write path, and read merges from git subjects because no PR-number record exists for a squash merge.",
+  "summary": "Two ad-hoc decoders read state.json lastCycleNumber beside the typed cyclestate.State: internal/redteamcheck/redteamcheck.go and internal/wave/facts.go (LastCycleNumber). Also, evolve wave next lists the PRs merged at a boundary from 'Merge pull request #N' subjects of git log --first-parent --merges, so a squash merge or a rebase merge is not counted in the wave facts.",
+  "title": "evolve wave: read state.json lastCycleNumber through one shared reader, and count squash-merged PRs in the wave facts",
+  "weight": 0.35
+}

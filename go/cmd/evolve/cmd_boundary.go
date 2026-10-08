@@ -145,23 +145,33 @@ func boundaryPRs(merge string) ([]string, error) {
 }
 
 func boundarySteps(a boundaryArgs, root string) []boundaryStep {
+	return append(boundaryHaltSteps(a, root), boundaryLaunchSteps(a, root)...)
+}
+
+func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 	at := []string{"--project-root", root}
 	steps := []boundaryStep{{verb: "loop-stop", args: append([]string{"--wait"}, at...)}}
 	if len(a.prs) > 0 {
 		steps = append(steps, boundaryStep{verb: "pr", args: append(append([]string{"merge"}, a.prs...), at...)})
 	}
-	loopLog := filepath.Join(root, ".evolve", gcpolicy.LogsDir, a.runID, gcpolicy.LoopLogName)
-	launch := []string{"--detach", "--log", loopLog, "--goal-text", a.goalText}
+	return append(steps, boundaryStep{verb: "sync-main", args: at}, boundaryStep{verb: "gc", args: at})
+}
+
+func boundaryLoopLogPath(root, runID string) string {
+	return filepath.Join(root, ".evolve", gcpolicy.LogsDir, runID, gcpolicy.LoopLogName)
+}
+
+func boundaryLaunchSteps(a boundaryArgs, root string) []boundaryStep {
+	at := []string{"--project-root", root}
+	launch := []string{"--detach", "--log", boundaryLoopLogPath(root, a.runID), "--goal-text", a.goalText}
 	if a.maxCycles != "" {
 		launch = append(launch, "--max-cycles", a.maxCycles)
 	}
-	return append(steps,
-		boundaryStep{verb: "sync-main", args: at},
-		boundaryStep{verb: "gc", args: at},
-		boundaryStep{verb: "loop-stop", args: append([]string{"--release"}, at...)},
-		boundaryStep{verb: boundaryLogVerb, args: append([]string{"--run-id", a.runID}, at...), desc: boundaryLogStepDesc(a.runID)},
-		boundaryStep{verb: "loop", args: append(launch, at...)},
-	)
+	return []boundaryStep{
+		{verb: "loop-stop", args: append([]string{"--release"}, at...)},
+		{verb: boundaryLogVerb, args: append([]string{"--run-id", a.runID}, at...), desc: boundaryLogStepDesc(a.runID)},
+		{verb: "loop", args: append(launch, at...)},
+	}
 }
 
 func runBoundarySteps(dispatch boundaryDispatch, steps []boundaryStep, stdout, stderr io.Writer) int {

@@ -137,9 +137,11 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
 - Operator verbs since v22.27.0 (details in runtime-reference):
   - `evolve checkpoint save|list|restore|prune` keeps the uncommitted work of a dev worktree as refs (ADR-0122).
   - `evolve cli update` installs a newer Claude Code or agy and smoke-tests it. The loop runs it at each wave boundary.
+  - `evolve wave next|status|watch|note` (2026-10-08) runs and watches waves. `wave next` runs the boundary, composes the goal from facts and records the wave. Its `--json` prints one envelope on every exit ([wave-operations.md](docs/operations/wave-operations.md)). `boundary run` stays the low-level primitive.
   - `evolve convergence decide` gives the next step of a console lane's review chain (ADR-0126). The pipeline loops do not call it yet.
   - `workflow.convergence` is a compiled default at stage shadow.
 - When only the deterministic audit gates force a FAIL over a PASS narrative, the cycle gets a bounded Build repair round (ADR-0093).
+- Waves: the console starts each wave with `<plane>/go/bin/evolve wave next` and follows it with `evolve wave watch`. These read cycle state and signals, never the text log. Do not write goal scripts. The standing goal is the tracked `.evolve/wave-goal.md`; queue facts with `evolve wave note add`.
 - Run `/clear` before a new evolve-loop batch. This isolates the session cost.
 
 ## References

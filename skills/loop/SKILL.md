@@ -190,6 +190,17 @@ Parse `$ARGUMENTS`:
 | `ultrathink` | Complex refactors | tier-1 forced | Strict + confidence |
 | `autoresearch` | Hypothesis testing | Fixed metrics, embraces failure | Divergent, unpenalized |
 
+## Waves at a boundary: `evolve wave` (2026-10-08)
+
+Use `evolve wave` to run and watch the next wave. Do not write a goal script, and do not edit the last goal by hand.
+
+- `evolve wave note add "<text>"`: queue a fact for the next goal. `wave next` puts the notes in the goal and then removes them.
+- `<plane>/go/bin/evolve wave next [--merge n,...] [--max-cycles N] [--dry-run] [--json]`: run the boundary and launch the wave. Use the plane binary, so that the build, the pin and the loop are one binary. With `--json`, every exit prints one envelope: `refused`, `failed_step` and `error` say what went wrong. The goal has the standing goal (`.evolve/wave-goal.md`) and the facts of the last wave from cycle state. It also has the notes and the last wave summaries (policy key `wave.history_k`). Run `--dry-run` first to see the goal and the steps.
+- `evolve wave status --json`: read the current wave, the loop pid and each cycle's phase, verdict and ship state. It is read-only.
+- `evolve wave watch`: get one line for each phase change, seal, ship and quota pause, until the loop exits. It reads state files, not the text log.
+
+For one cycle in the foreground, use `evolve cycle run --goal-text "<goal>"`. To resume a paused cycle, use `evolve loop --resume`.
+
 ## Quota Handling & Auto-Resume (v10.6.0+)
 
 When the dispatcher exits with `DISPATCH_RC=5` it emits a structured marker
