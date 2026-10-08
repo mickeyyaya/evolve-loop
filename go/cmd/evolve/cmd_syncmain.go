@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -196,7 +197,7 @@ func (l stampLanding) replay(plan inboxstamps.Plan) int {
 		return 1
 	}
 	reportInboxStamps(l.stdout, "replayed %d inbox stamp(s) onto origin's edits", plan.Replay)
-	return 0
+	return absorbRootCopiesAfterMerge(l.root, l.stdout, l.stderr)
 }
 
 func (l stampLanding) restore(plan inboxstamps.Plan) {
@@ -208,5 +209,25 @@ func (l stampLanding) restore(plan inboxstamps.Plan) {
 func reportInboxStamps(w io.Writer, format string, stamps []inboxstamps.Stamp) {
 	if len(stamps) > 0 {
 		fmt.Fprintf(w, "sync-main: "+format+": %s\n", len(stamps), strings.Join(inboxstamps.Paths(stamps), ", "))
+	}
+}
+
+func absorbRootCopiesAfterMerge(root string, stdout, stderr io.Writer) int {
+	absorbed, err := inboxmover.AbsorbRootCopies(inboxmover.Options{ProjectRoot: root})
+	reportAbsorbed(stdout, "sync-main", absorbed)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve sync-main: the merge wrote a claimed inbox item back to the root, and the claim cannot absorb it: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func reportAbsorbed(w io.Writer, prefix string, absorbed []inboxmover.Absorbed) {
+	for _, a := range absorbed {
+		if a.Outcome == inboxmover.AbsorbParked {
+			fmt.Fprintf(w, "%s: %s differs from the claim of cycle-%d: the claim stays, and origin's copy is parked at %s\n", prefix, a.ID, a.Cycle, a.ParkedPath)
+			continue
+		}
+		fmt.Fprintf(w, "%s: removed the root copy of %s, which equals the claim of cycle-%d\n", prefix, a.ID, a.Cycle)
 	}
 }

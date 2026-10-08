@@ -35,8 +35,9 @@ type Stamp struct {
 }
 
 type Partition struct {
-	Stamps []Stamp
-	Other  []string
+	Stamps  []Stamp
+	Claimed []Claimed
+	Other   []string
 }
 
 type Plan struct {
@@ -57,6 +58,7 @@ func Classify(ctx context.Context, g Git) (Partition, error) {
 		return Partition{}, err
 	}
 	tree := worktree{root: strings.TrimSpace(root)}
+	tree.claims = claimsByName(tree.root)
 	var partition Partition
 	for _, entry := range strings.Split(out, "\x00") {
 		if len(entry) <= statusCodeSize {
@@ -67,9 +69,13 @@ func Classify(ctx context.Context, g Git) (Partition, error) {
 		if err != nil {
 			return Partition{}, err
 		}
-		if ok {
+		claimed, held := tree.claimOf(entry[:2], path)
+		switch {
+		case ok:
 			partition.Stamps = append(partition.Stamps, stamp)
-		} else {
+		case held:
+			partition.Claimed = append(partition.Claimed, claimed)
+		default:
 			partition.Other = append(partition.Other, path)
 		}
 	}
@@ -77,7 +83,8 @@ func Classify(ctx context.Context, g Git) (Partition, error) {
 }
 
 type worktree struct {
-	root string
+	root   string
+	claims map[string]string
 }
 
 func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path string) (Stamp, bool, error) {

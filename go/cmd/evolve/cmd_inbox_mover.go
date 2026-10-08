@@ -59,22 +59,10 @@ func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if errors.Is(err, inboxmover.ErrBadArgs) || errors.Is(err, inboxmover.ErrBadState) {
 			return 1
 		}
-		// A non-delivery (destination mkdir failed) is NOT the ship.sh
-		// "already moved" case: the task is stranded and the cycle must see
-		// it. Exit 2 matches claim's mv-failed code.
-		if errors.Is(err, inboxmover.ErrMvFailed) {
-			fmt.Fprintf(stderr, "[inbox-mover] ERROR: promote did not deliver '%s': %v\n", taskID, err)
-			return 2
-		}
-		// ship.sh compat: all other paths exit 0.
-		return 0
+		fmt.Fprintf(stderr, "[inbox-mover] ERROR: promote did not deliver '%s': %v\n", taskID, err)
+		return 2
 	case "recover-orphans":
-		_, err := inboxmover.RecoverOrphans(opts)
-		if err != nil {
-			fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
-			return 1
-		}
-		return 0
+		return recoverOrphans(opts, stderr)
 	default:
 		printInboxMoverUsage(stderr)
 		return 1
@@ -129,4 +117,17 @@ func claimExitCode(err error, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
 	return 1
+}
+
+func recoverOrphans(opts inboxmover.Options, stderr io.Writer) int {
+	released, err := inboxmover.ReleaseStaleClaims(opts, "recover-orphans")
+	for _, r := range released {
+		fmt.Fprintf(stderr, "[inbox-mover] recover-orphans: released %s from cycle-%d (%s): %s\n", r.ID, r.Cycle, r.Outcome, r.Holder.Reason)
+	}
+	fmt.Fprintf(stderr, "[inbox-mover] recover-orphans: %d stale claim(s) released\n", len(released))
+	if err != nil {
+		fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
+		return 1
+	}
+	return 0
 }

@@ -24,7 +24,7 @@ import (
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve gc", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries), mutating nothing")
+	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries, empty claim dirs of stale cycles), mutating nothing")
 	// The back-quoted `dir` is the flag package's argument placeholder (it
 	// renders as "-project-root dir"); no other back-quotes here, or the first
 	// one would be consumed as the placeholder instead.
@@ -65,13 +65,14 @@ type gcRun struct {
 	kill           func(pid int) error
 	remove         func(string) error
 	removeAll      func(string) error
+	abs            func(string) (string, error)
 }
 
 func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun {
 	r := gcRun{ctx: ctx, dryRun: dryRun, stdout: stdout, stderr: stderr,
 		reapers: gcReapers{sessions: swarm.ExecReapOrphans, sockets: swarm.ExecReapOrphanSockets},
 		kill:    func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) },
-		remove:  os.Remove, removeAll: os.RemoveAll}
+		remove:  os.Remove, removeAll: os.RemoveAll, abs: filepath.Abs}
 	if gcInjectedReapers != nil {
 		r.reapers = *gcInjectedReapers
 	}
@@ -137,7 +138,7 @@ func (r gcRun) project(projectRoot string) int {
 	if !ok {
 		return code
 	}
-	projectRoot, err := filepath.Abs(projectRoot)
+	projectRoot, err := r.abs(projectRoot)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: resolve --project-root: %v\n", err)
 		return 1
@@ -159,6 +160,7 @@ func (r gcRun) project(projectRoot string) int {
 	failed = r.runDirs(evolveDir, gcPol) || failed
 	failed = r.goCache(gcPol) || failed
 	failed = r.pipelineTemp(gcPol.TempTTLHours) || failed
+	failed = r.claimDirs(projectRoot) || failed
 	if !r.dryRun && freeErr == nil {
 		r.reportDiskFree(projectRoot, before)
 	}

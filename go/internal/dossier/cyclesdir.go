@@ -20,11 +20,22 @@ func ClosedOut(projectRoot string, cycle int) bool {
 }
 
 func ClosedOutAt(projectRoot string, cycle int) (time.Time, bool) {
+	at, _, ok := closeout(projectRoot, cycle)
+	return at, ok
+}
+
+func CloseoutPath(projectRoot string, cycle int) (string, bool) {
+	_, path, ok := closeout(projectRoot, cycle)
+	return path, ok
+}
+
+func closeout(projectRoot string, cycle int) (time.Time, string, bool) {
 	name := fmt.Sprintf("cycle-%d.json", cycle)
 	for _, dir := range []string{CyclesDir(projectRoot), PendingDir(projectRoot)} {
-		if info, err := os.Stat(filepath.Join(dir, name)); err == nil {
-			return info.ModTime(), true
+		path := filepath.Join(dir, name)
+		if info, err := os.Stat(path); err == nil {
+			return info.ModTime(), path, true
 		}
 	}
-	return time.Time{}, false
+	return time.Time{}, "", false
 }

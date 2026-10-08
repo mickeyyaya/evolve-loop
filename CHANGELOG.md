@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the claim of a dead cycle no longer blocks its item: `evolve inbox claims`, `evolve inbox release`, the release at the planner start, and a planner that never offers a held item (cycle 1838, 2026-10-08)
+
+- **What happened.** In wave 81, cycle 1838 sealed FAIL (`triage-empty-commitment-claimable-work`). Plan: [inbox-stale-claims-2026-10.md](docs/plans/inbox-stale-claims-2026-10.md).
+  - The planner gave lane 1838 `rollback-fail-open-and-vacuous-tests`, which cycle 1836 held in `processing/cycle-1836/`. Cycle 1836 paused on a quota wall in wave 80 and never resumed.
+  - At the boundary, `sync-main` refused the claimed tracked file as dirt. The runbook fix `git restore` put a second copy in the inbox root.
+  - The runtime also had 266 empty `processing/cycle-*` dirs. Cycle 1828 had held another item for 2 days.
+- **The holder verdict.** `inboxmover.ClassifyHolder` gives one of three verdicts. The evidence names the lease, the phase, the checkpoint, the closeout and the superseding cycle.
+  - `live`: the run lease has a live owner.
+  - `resume-pending`: `core.CheckpointResumable`, the loader that `evolve loop --resume` uses, accepts the checkpoint. A moved git HEAD, no `resumeFromPhase` or a missing worktree refuse it. The running loop (the planner passes its goal) and every higher cycle have the same goal hash.
+  - `stale`: a dossier closeout, the phase `end`, no resumable checkpoint, or a newer goal. So the first planning after a boundary releases a pause of the previous wave's goal.
+- **`evolve inbox claims [--json] [--project-root P]`** lists each claim with its holder verdict and the evidence. It marks an id that the root also holds, and it lists the empty claim dirs with their paths.
+- **`evolve inbox release <id> <reason> [--json]`** moves a claim back to the root and appends a `release` lifecycle line to the ledger. It refuses a `live` or `resume-pending` holder (exit 1). An id that no claim holds is a no-op success. A root copy with the same bytes is kept, and the claim copy is removed. A root copy with other bytes refuses (exit 1).
+- **`evolve inbox release --stale <reason> [--json] [--project-root P]`** releases every stale claim through the same function the planner calls. It prints one line for each release and a count. It exits 1 when a claim stays held. It judges each claim again just before the move.
+- **`evolve inbox-mover recover-orphans`** now calls the same release. Before, it released every claim except one "active cycle", so in a fleet wave it took live and resume-pending claims.
+- **The planner start.** `loopwave.Engine.PlanFn` releases the stale claims before it plans, with one `[loop] wave plan: released the claim of …` line for each release.
+- **The planner guard.** `ResolveDispatchState` reads `processing/` before the root, so a held id is never dispatchable. `PlaceOnLaneMenu` puts a root copy of a held id on the waiting list (`held by the claim of cycle-N`). The seed, the widen, the refill and `evolve inbox list`, `show` and `batches` read the same rule.
+- **`evolve gc`** removes the empty `processing/cycle-*` dirs of stale cycles. `--dry-run` lists them as `WOULD-REMOVE`.
+- **`sync-main` and the wave sync.** `inboxstamps.Classify` reports an unstaged deletion of a root item that a claim holds as `Claimed`, not as dirt, so `sync-main` does not refuse. After the merge or the fast-forward, the Mover verb `AbsorbRootCopies` handles each root copy of a claimed task id.
+  - A copy with the same bytes is removed. A copy with other bytes is parked in `.evolve/inbox/origin-conflicts/cycle-N/`, and the claim is never overwritten. Each item gets an `absorb` or `absorb-conflict` ledger line.
+  - No hand restore is necessary, and `git restore` of a claimed item is never correct.
+- **Tests:** a regression test of the cycle-1838 sequence (`TestPlanFn_Cycle1838Regression_ARestoredCopyOfAPausedClaimIsNeverPlannedThenReleased`), the holder verdict table, the release outcomes, gc, `sync-main` and the wave sync on real repositories. 43 mutants were killed, after one control mutant proved the harness.
 ## Added — `evolve wave`: one public verb to run, read and watch a wave, with a goal made from facts (lane cl-wave-cli, 2026-10-08)
 
 - **What the operator asked.** "Instead of writing python script to trigger the next wave, build the public cli or API command allow LLM to trigger the next wave / cycle through this new cli / api" and "I don't want to see any python code like mk_wave81_goal.py , build the cli / api to cover this usage" (2026-10-08).

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -128,7 +129,16 @@ func fastForwardWithInboxStamps(ctx context.Context, g gitexec.Git, warn io.Writ
 		return false
 	}
 	replayInboxStampsAfterFastForward(g.Dir, plan, warn)
+	absorbRootCopiesAfterFastForward(g.Dir, warn)
 	return true
+}
+
+func absorbRootCopiesAfterFastForward(root string, warn io.Writer) {
+	absorbed, err := inboxmover.AbsorbRootCopies(inboxmover.Options{ProjectRoot: root})
+	reportAbsorbed(warn, "[loop] wave-boundary sync", absorbed)
+	if err != nil {
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — the planner keeps the root copy off the lane menu while the claim holds it\n", err)
+	}
 }
 
 func fastForwardMain(ctx context.Context, g gitexec.Git, warn io.Writer) bool {

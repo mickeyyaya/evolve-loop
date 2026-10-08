@@ -32,6 +32,8 @@ func inboxVerbs() []inboxVerb {
 		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)...   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
 		{"verify", "verify <id> --evidence <text>", withoutStdin(runInboxVerify)},
 		{"withdraw", "withdraw <id> <reason>", withoutStdin(runInboxWithdraw)},
+		{"claims", "claims [--json] [--project-root P]", withoutStdin(runInboxClaims)},
+		{"release", "release <id> <reason> [--json] | release --stale <reason> [--json] [--project-root P]", withoutStdin(runInboxRelease)},
 		{"route-console", "route-console <id> <reason> <cycle>", withoutStdin(runInboxRouteConsole)},
 		{"route-lane", "route-lane <id> <reason>", withoutStdin(runInboxRouteLane)},
 		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console]", withoutStdin(runInboxConsume)},

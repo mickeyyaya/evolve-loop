@@ -36,13 +36,11 @@ type DispatchState struct {
 // ResolveDispatchState classifies taskID by the lifecycle dir holding it; unreadable evidence counts as none.
 func ResolveDispatchState(opts Options, taskID string) DispatchState {
 	opts.resolveOpts()
+	if claimDir, held := claimHolding(opts.InboxDir, taskID); held {
+		return DispatchState{State: StateProcessing, Detail: claimDir}
+	}
 	if path, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
 		return DispatchState{State: StatePending, Deps: readTaskDeps(path), Path: path}
-	}
-	for _, dir := range inboxbatch.ProcessingCycleDirs(opts.InboxDir) {
-		if _, err := FindFileByTaskID(dir, taskID); err == nil {
-			return DispatchState{State: StateProcessing, Detail: filepath.Base(dir)}
-		}
 	}
 	for _, state := range retirementStates {
 		stateDir := filepath.Join(opts.InboxDir, state)
@@ -72,4 +70,13 @@ func readTaskDeps(path string) []string {
 		return nil
 	}
 	return doc.Deps
+}
+
+func claimHolding(inboxDir, taskID string) (string, bool) {
+	for _, dir := range inboxbatch.ProcessingCycleDirs(inboxDir) {
+		if _, err := FindFileByTaskID(dir, taskID); err == nil {
+			return filepath.Base(dir), true
+		}
+	}
+	return "", false
 }
