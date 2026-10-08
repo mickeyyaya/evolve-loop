@@ -13,17 +13,23 @@ const (
 	procArgsMibLen = 3
 )
 
+type sysctlCall func(mib *[procArgsMibLen]int32, out *byte, size *uintptr) error
+
 func readProcArgs(pid int) ([]string, map[string]string, error) {
+	return readProcArgsVia(sysctl, pid)
+}
+
+func readProcArgsVia(call sysctlCall, pid int) ([]string, map[string]string, error) {
 	mib := [procArgsMibLen]int32{ctlKern, kernProcArgs2, int32(pid)}
 	size := uintptr(0)
-	if err := sysctl(&mib, nil, &size); err != nil {
+	if err := call(&mib, nil, &size); err != nil {
 		return nil, nil, err
 	}
 	if size == 0 {
 		return nil, nil, errProcArgsTruncated
 	}
 	buf := make([]byte, size)
-	if err := sysctl(&mib, &buf[0], &size); err != nil {
+	if err := call(&mib, &buf[0], &size); err != nil {
 		return nil, nil, err
 	}
 	return parseProcArgs2(buf[:size])

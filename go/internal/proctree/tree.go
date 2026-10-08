@@ -31,6 +31,10 @@ func TreeFile(dir, id string) string {
 }
 
 func SaveTree(dir, id string, ids []Identity) error {
+	return saveTree(os.CreateTemp, dir, id, ids)
+}
+
+func saveTree(create tempCreator, dir, id string, ids []Identity) error {
 	members := make([]treeEntry, 0, len(ids))
 	for _, i := range ids {
 		members = append(members, treeEntry{Pid: i.Pid, Started: i.Started.UTC()})
@@ -42,17 +46,27 @@ func SaveTree(dir, id string, ids []Identity) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("make dispatch tree dir: %w", err)
 	}
-	tmp, err := os.CreateTemp(dir, ".tree-*")
+	name, err := writeTemp(create, dir, data)
 	if err != nil {
-		return fmt.Errorf("write dispatch tree: %w", err)
+		return err
+	}
+	return os.Rename(name, TreeFile(dir, id))
+}
+
+type tempCreator func(dir, pattern string) (*os.File, error)
+
+func writeTemp(create tempCreator, dir string, data []byte) (string, error) {
+	tmp, err := create(dir, ".tree-*")
+	if err != nil {
+		return "", fmt.Errorf("write dispatch tree: %w", err)
 	}
 	_, werr := tmp.Write(data)
 	cerr := tmp.Close()
 	if werr != nil || cerr != nil {
 		_ = os.Remove(tmp.Name())
-		return fmt.Errorf("write dispatch tree: %w", errors.Join(werr, cerr))
+		return "", fmt.Errorf("write dispatch tree: %w", errors.Join(werr, cerr))
 	}
-	return os.Rename(tmp.Name(), TreeFile(dir, id))
+	return tmp.Name(), nil
 }
 
 func LoadTree(dir, id string) ([]Identity, error) {

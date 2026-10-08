@@ -22,7 +22,11 @@ func bypassIf(allowBypass bool) string {
 }
 
 func commandEfforts(stderr io.Writer) policy.EffortTable {
-	root, err := routingProjectRoot("", os.Getwd)
+	return commandEffortsFrom(os.Getwd, stderr)
+}
+
+func commandEffortsFrom(getwd func() (string, error), stderr io.Writer) policy.EffortTable {
+	root, err := routingProjectRoot("", getwd)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve bridge: WARN %v; the effort is the compiled default\n", err)
 		return policy.EffortTable{}

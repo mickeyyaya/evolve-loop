@@ -8,7 +8,11 @@ import (
 )
 
 func readProcArgs(pid int) ([]string, map[string]string, error) {
-	dir := "/proc/" + strconv.Itoa(pid)
+	return readProcArgsAt("/proc", pid)
+}
+
+func readProcArgsAt(root string, pid int) ([]string, map[string]string, error) {
+	dir := root + "/" + strconv.Itoa(pid)
 	cmdline, err := os.ReadFile(dir + "/cmdline")
 	if err != nil {
 		return nil, nil, err
