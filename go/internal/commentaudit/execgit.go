@@ -2,9 +2,11 @@ package commentaudit
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type ExecGit struct{}
@@ -32,7 +34,7 @@ func (ExecGit) Root() (string, error) {
 
 func runGit(args ...string) ([]byte, error) {
 	var stderr bytes.Buffer
-	cmd := exec.Command("git", args...)
+	cmd := sysexec.Command(context.Background(), "git", args...)
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {

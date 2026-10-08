@@ -206,7 +206,7 @@ func (e *Engine) LaunchArgs(ctx context.Context, args []string, env map[string]s
 		}
 	}
 
-	rc, err := driver.Launch(ctx, &cfg, d)
+	rc, err := launchSwept(ctx, driver, &cfg, d)
 	if err != nil {
 		fmt.Fprintf(stderr, "[bridge] %v\n", err)
 		if rc == 0 {

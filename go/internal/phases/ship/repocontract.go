@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -23,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var repoContractPackages = repocontract.Packages()
@@ -217,7 +217,7 @@ func failuresOf(pkg string, failures []packFailure) []packFailure {
 
 func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []string) packOutcome {
 	out = &lockedWriter{w: out} // the child's stderr and the event tee share it
-	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd := sysexec.Command(ctx, "go", args...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
 	cancelKillsTheProcessGroup(cmd)

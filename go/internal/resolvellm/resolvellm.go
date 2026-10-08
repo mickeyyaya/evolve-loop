@@ -11,13 +11,15 @@
 package resolvellm
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Result is the resolved dispatch info for a role: the CLI + the abstract model
@@ -120,7 +122,7 @@ func findProfile(role string, opts Options, getEnv func(string) string) (string,
 }
 
 func gitRoot() string {
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	out, err := sysexec.Command(context.Background(), "git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return ""
 	}

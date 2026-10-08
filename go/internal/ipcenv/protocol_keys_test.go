@@ -73,3 +73,9 @@ func TestTmuxSocketKey_IsTheBridgeSocketChannel(t *testing.T) {
 		t.Errorf("TmuxSocketKey = %q, want EVOLVE_TMUX_SOCKET, the socket name the loop exports to its bridge subprocesses", ipcenv.TmuxSocketKey)
 	}
 }
+
+func TestDispatchIDKey_IsTheDispatchTag(t *testing.T) {
+	if ipcenv.DispatchIDKey != "EVOLVE_DISPATCH_ID" {
+		t.Errorf("DispatchIDKey = %q, want EVOLVE_DISPATCH_ID, the tag the bridge sets on each process of a dispatch", ipcenv.DispatchIDKey)
+	}
+}

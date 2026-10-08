@@ -10,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Stable error codes used across the wire. Subprocess agents written in
@@ -50,7 +51,7 @@ func (r *SubprocessRunner) Name() string { return r.name }
 
 // buildCmd materialises an *exec.Cmd. Broken out for testability.
 func (r *SubprocessRunner) buildCmd(ctx context.Context) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, r.bin, r.args...)
+	cmd := sysexec.Command(ctx, r.bin, r.args...)
 	cmd.Env = append(os.Environ(), r.env...)
 	return cmd
 }

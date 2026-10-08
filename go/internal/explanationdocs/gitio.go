@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const (
@@ -32,11 +32,11 @@ func changedSince(ctx context.Context, worktree, baseSHA string) ([]string, erro
 	if err := validateBaseCommit(ctx, worktree, baseSHA); err != nil {
 		return nil, err
 	}
-	diff, err := exec.CommandContext(ctx, "git", "-C", worktree, "diff", "--no-renames", "--name-only", "-z", baseSHA, "--").CombinedOutput()
+	diff, err := sysexec.Command(ctx, "git", "-C", worktree, "diff", "--no-renames", "--name-only", "-z", baseSHA, "--").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git diff %s --name-only: %w: %s", baseSHA, err, strings.TrimSpace(string(diff)))
 	}
-	untracked, err := exec.CommandContext(ctx, "git", "-C", worktree, "ls-files", "--others", "--exclude-standard", "-z").CombinedOutput()
+	untracked, err := sysexec.Command(ctx, "git", "-C", worktree, "ls-files", "--others", "--exclude-standard", "-z").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("git ls-files --others: %w: %s", err, strings.TrimSpace(string(untracked)))
 	}
@@ -170,7 +170,7 @@ func currentDiffState(ctx context.Context, worktree, rel string, remaining int64
 		sha, size, err := untrackedContentSHA256(path, info, remaining)
 		return "120000", sha, size, err
 	case info.IsDir():
-		out, err := exec.CommandContext(ctx, "git", "-C", path, "rev-parse", "--verify", "HEAD").CombinedOutput()
+		out, err := sysexec.Command(ctx, "git", "-C", path, "rev-parse", "--verify", "HEAD").CombinedOutput()
 		if err != nil {
 			return "", "", 0, fmt.Errorf("changed directory is not a readable gitlink: %w: %s", err, strings.TrimSpace(string(out)))
 		}
@@ -243,7 +243,7 @@ func validateBaseCommit(ctx context.Context, worktree, baseSHA string) error {
 	if !fullCommitSHA.MatchString(baseSHA) {
 		return fmt.Errorf("base revision must be a full commit SHA")
 	}
-	out, err := exec.CommandContext(ctx, "git", "-C", worktree, "cat-file", "-e", baseSHA+"^{commit}").CombinedOutput()
+	out, err := sysexec.Command(ctx, "git", "-C", worktree, "cat-file", "-e", baseSHA+"^{commit}").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("base SHA is not a commit: %w: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -254,7 +254,7 @@ func requireLandedCommit(ctx context.Context, projectRoot, landedCommit string) 
 	if !fullCommitSHA.MatchString(landedCommit) {
 		return fmt.Errorf("landed commit must be a full commit SHA")
 	}
-	out, err := exec.CommandContext(ctx, "git", "-C", projectRoot, "rev-parse", "--verify", "HEAD").CombinedOutput()
+	out, err := sysexec.Command(ctx, "git", "-C", projectRoot, "rev-parse", "--verify", "HEAD").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("resolve landed HEAD: %w: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -317,7 +317,7 @@ func ArchiveUnpublishedContinuationRecords(ctx context.Context, worktree, baseSH
 		return nil, nil
 	}
 	args := append([]string{"-C", worktree, "add", "-A", "--"}, stagePaths...)
-	out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput()
+	out, err := sysexec.Command(ctx, "git", args...).CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("stage unpublished explanation archive: %w: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -384,7 +384,7 @@ func existsAtBase(ctx context.Context, worktree, baseSHA, path string) (bool, er
 	if !validRelative(path) {
 		return false, fmt.Errorf("invalid base path %q", path)
 	}
-	out, err := exec.CommandContext(ctx, "git", "-C", worktree, "ls-tree", "-z", "--name-only", baseSHA, "--", path).CombinedOutput()
+	out, err := sysexec.Command(ctx, "git", "-C", worktree, "ls-tree", "-z", "--name-only", baseSHA, "--", path).CombinedOutput()
 	if err != nil {
 		return false, fmt.Errorf("inspect %s at base: %w: %s", path, err, strings.TrimSpace(string(out)))
 	}

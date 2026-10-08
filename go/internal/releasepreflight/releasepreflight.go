@@ -3,6 +3,7 @@
 package releasepreflight
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/naminguard"
 )
 
@@ -128,7 +130,7 @@ func ExtractJSONVersion(jsonPath string) (string, error) {
 const gitDiffQuietDirtyExitCode = 1
 
 func defaultGitClean(repoRoot string) (bool, error) {
-	cmd := exec.Command("git", "-C", repoRoot, "diff", "--quiet", "HEAD")
+	cmd := sysexec.Command(context.Background(), "git", "-C", repoRoot, "diff", "--quiet", "HEAD")
 	err := cmd.Run()
 	if err == nil {
 		return true, nil
@@ -143,7 +145,7 @@ func defaultGitClean(repoRoot string) (bool, error) {
 }
 
 func defaultHeadSHA(repoRoot string) (string, error) {
-	out, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +155,7 @@ func defaultHeadSHA(repoRoot string) (string, error) {
 const detachedHEADBranch = ""
 
 func defaultCurrentBranch(repoRoot string) (string, error) {
-	cmd := exec.Command("git", "-C", repoRoot, "symbolic-ref", "--short", "HEAD")
+	cmd := sysexec.Command(context.Background(), "git", "-C", repoRoot, "symbolic-ref", "--short", "HEAD")
 	out, err := cmd.Output()
 	if err != nil {
 		return detachedHEADBranch, nil
@@ -186,7 +188,7 @@ func defaultNameGuard(repoRoot string) ([]naminguard.Violation, error) {
 }
 
 func goTestCommand(repoRoot string, args ...string) *exec.Cmd {
-	cmd := exec.Command(defaultGoBinFn(), append([]string{"test"}, args...)...)
+	cmd := sysexec.Command(context.Background(), defaultGoBinFn(), append([]string{"test"}, args...)...)
 	cmd.Dir = filepath.Join(repoRoot, "go")
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	return cmd
@@ -203,12 +205,12 @@ func defaultSimulationRunner(repoRoot string) error {
 }
 
 func defaultCIConclusion(repoRoot string) (CIRunStatus, error) {
-	head, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
+	head, err := sysexec.Command(context.Background(), "git", "-C", repoRoot, "rev-parse", "HEAD").Output()
 	if err != nil {
 		return CIRunStatus{Conclusion: ciConclusionUnavailable}, nil
 	}
 	sha := strings.TrimSpace(string(head))
-	cmd := exec.Command("gh", "run", "list", "--workflow", ciparity.RequiredWorkflow,
+	cmd := sysexec.Command(context.Background(), "gh", "run", "list", "--workflow", ciparity.RequiredWorkflow,
 		"--commit", sha, "--limit", "1", "--json", "status,conclusion,url")
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()

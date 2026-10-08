@@ -9,6 +9,7 @@
 package acsassert
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // deepEqualOrPanic is a thin wrapper that's testable and can be
@@ -194,7 +197,7 @@ func SubprocessOutput(name string, args ...string) (stdout, stderr string, code 
 	if _, lookErr := exec.LookPath(name); lookErr != nil {
 		return "", "", -1, fmt.Errorf("%w: %s: %v", ErrSubprocessNotFound, name, lookErr)
 	}
-	cmd := exec.Command(name, args...)
+	cmd := sysexec.Command(context.Background(), name, args...)
 	var sout, serr strings.Builder
 	cmd.Stdout = &sout
 	cmd.Stderr = &serr

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -64,7 +63,7 @@ const tmuxCmdTimeout = 30 * time.Second
 func runCmdBounded(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
 	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := exec.CommandContext(cctx, name, args...)
+	cmd := boundedCommand(cctx, name, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -310,4 +309,24 @@ var ansiRE = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]|\x1b\\][^\x07]*\x07")
 // the stdout-log is plain text.
 func stripANSI(s string) string {
 	return ansiRE.ReplaceAllString(s, "")
+}
+
+func (t execTmux) PanePIDs(ctx context.Context, session string) ([]int, error) {
+	out, err := t.run(ctx, "list-panes", "-s", "-t", ExactSessionTarget(session), "-F", "#{pane_pid}")
+	if err != nil {
+		return nil, fmt.Errorf("tmux list-panes: %w", err)
+	}
+	return parsePanePIDs(out)
+}
+
+func parsePanePIDs(out string) ([]int, error) {
+	var pids []int
+	for _, line := range strings.Fields(out) {
+		pid, err := strconv.Atoi(line)
+		if err != nil {
+			return nil, fmt.Errorf("pane pid %q: %w", line, err)
+		}
+		pids = append(pids, pid)
+	}
+	return pids, nil
 }

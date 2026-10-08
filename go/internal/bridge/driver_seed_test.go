@@ -76,12 +76,10 @@ func TestRunTmuxREPL_SeedSkippedOnNamedResume(t *testing.T) {
 
 type failLaunchSendTmux struct {
 	*fakeTmux
-	sends int
 }
 
 func (f *failLaunchSendTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
-	f.sends++
-	if f.sends == 2 { // cd succeeds; the CLI launch line fails
+	if strings.HasPrefix(keys, "claude --model") {
 		return errors.New("tmux transport unavailable")
 	}
 	return f.fakeTmux.SendKeys(ctx, session, keys, enter)

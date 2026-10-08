@@ -10,12 +10,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfsha"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -93,7 +93,7 @@ func defaultGitTree(worktree string) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), gitTreeTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "-C", worktree, "write-tree").Output()
+	out, err := sysexec.Command(ctx, "git", "-C", worktree, "write-tree").Output()
 	if err != nil {
 		return "", fmt.Errorf("phaseintegrity: git write-tree in %s: %w", worktree, err)
 	}

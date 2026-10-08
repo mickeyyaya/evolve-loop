@@ -21,7 +21,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
 )
 
@@ -131,6 +133,9 @@ type Deps struct {
 	// dispatch/latency/outcome, and a resolver error fails open (WARNed,
 	// never fails the Launch).
 	TokenResolver func(tokenusage.Window) (tokenusage.Result, error)
+	ListProcesses proctree.Lister
+	SignalProcess proctree.Signaler
+	sweep         *dispatchSweep
 }
 
 // SandboxWrapper is the bridge's view of the sandbox decision: a named
@@ -211,6 +216,7 @@ func (d Deps) withDefaults() Deps {
 	if d.KeychainProbe == nil {
 		d.KeychainProbe = defaultKeychainProbe(d)
 	}
+	d = d.withProcessDefaults()
 	return d
 }
 
@@ -273,6 +279,7 @@ type Config struct {
 	// codexConfigPath overrides ~/.codex/config.toml for
 	// pretrustCodexProjects; tests set it to avoid touching the real file.
 	codexConfigPath string
+	DispatchID      string
 }
 
 // Engine is the core.Bridge implementation: Launch runs a fixed pipeline
@@ -665,7 +672,7 @@ func defaultChallengeToken() (string, error) {
 // failures.
 func execRunner(ctx context.Context, name, dir string, args, env []string,
 	stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := sysexec.Command(ctx, name, args...)
 	// Empty dir → leave cmd.Dir unset → inherit caller cwd (unchanged).
 	cmd.Dir = dir
 	cmd.Env = env

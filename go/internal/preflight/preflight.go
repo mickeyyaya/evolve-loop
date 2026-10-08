@@ -10,6 +10,7 @@
 package preflight
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -25,6 +26,7 @@ import (
 	// inner-sandbox wrap policy, shared with the bridge launch path. Aliased
 	// because a local variable in Probe() is named `sandbox`.
 	sbx "github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Profile is the JSON shape emitted to stdout / .evolve/environment.json.
@@ -336,7 +338,7 @@ func cacheDirPath(osType string, getEnv func(string) string, hash string) string
 }
 
 func unameR() string {
-	out, err := exec.Command("uname", "-r").Output()
+	out, err := sysexec.Command(context.Background(), "uname", "-r").Output()
 	if err != nil {
 		return "unknown"
 	}
