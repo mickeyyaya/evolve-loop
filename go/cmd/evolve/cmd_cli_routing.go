@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static] | init --clis a,b | set <key> <a,b> [--model T] | unset <key> | migrate [--dry-run]  (all take --project-root DIR)"
+	cliRoutingUsage    = "usage: evolve cli-routing show [--static] [--json] | check | explain <agent> [--phase P] [--static] | init --clis a,b | set <key> [<a,b>] [--model T] [--effort L] | unset <key>[.effort] | migrate [--dry-run]  (all take --project-root DIR)"
 	exitRoutingUsage   = 2
 	exitRoutingFinding = 1
 )
@@ -35,10 +35,12 @@ type cliRoutingFlags struct {
 }
 
 type tierRoute struct {
-	Tier     string   `json:"tier"`
-	CLI      string   `json:"cli,omitempty"`
-	Model    string   `json:"model,omitempty"`
-	Filtered []string `json:"filtered,omitempty"`
+	Tier         string   `json:"tier"`
+	CLI          string   `json:"cli,omitempty"`
+	Model        string   `json:"model,omitempty"`
+	Effort       string   `json:"effort,omitempty"`
+	EffortSource string   `json:"effort_source,omitempty"`
+	Filtered     []string `json:"filtered,omitempty"`
 }
 
 type agentRoute struct {
@@ -219,6 +221,9 @@ func (v routingView) route(agent, phase string) agentRoute {
 	}
 	route.Rule, route.Chain, route.Allowed = d.Rule, d.Plan.Candidates, d.Allowed
 	route.Tiers = tierRoutes(d.Plan)
+	for i := range route.Tiers {
+		route.Tiers[i].Effort, route.Tiers[i].EffortSource = v.router.Effort(agent, route.Tiers[i].Tier)
+	}
 	route.Notes = append(route.Notes, d.Trace...)
 	route.Notes = append(route.Notes, v.agentNotes(agent, route)...)
 	return route

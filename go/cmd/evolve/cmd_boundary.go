@@ -9,6 +9,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
 const (
@@ -22,9 +25,13 @@ type boundaryDispatch func(verb string, args []string, stdout, stderr io.Writer)
 type boundaryStep struct {
 	verb string
 	args []string
+	desc string
 }
 
 func (s boundaryStep) String() string {
+	if s.desc != "" {
+		return s.desc
+	}
 	words := []string{"evolve", s.verb}
 	for _, a := range s.args {
 		if a == "" || strings.ContainsAny(a, " \t\n'\"\\") {
@@ -39,6 +46,7 @@ type boundaryArgs struct {
 	prs                 []string
 	goalText, maxCycles string
 	projectRoot         string
+	runID               string
 	dryRun              bool
 }
 
@@ -49,6 +57,7 @@ func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) int {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
 		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "gc": runGC, "loop": runLoop,
+		boundaryLogVerb: runBoundaryLog,
 	}
 	run, ok := handlers[verb]
 	if !ok {
@@ -73,6 +82,7 @@ func runBoundaryWith(dispatch boundaryDispatch, args []string, stdout, stderr io
 		fmt.Fprintf(stderr, "%s%v\n", boundaryPrefix, err)
 		return exitIO
 	}
+	a.runID = gcpolicy.LogRunID(time.Now())
 	steps := boundarySteps(a, root)
 	if a.dryRun {
 		fmt.Fprintln(stdout, "boundary: dry run; would run, in order:")
@@ -136,19 +146,21 @@ func boundaryPRs(merge string) ([]string, error) {
 
 func boundarySteps(a boundaryArgs, root string) []boundaryStep {
 	at := []string{"--project-root", root}
-	steps := []boundaryStep{{"loop-stop", append([]string{"--wait"}, at...)}}
+	steps := []boundaryStep{{verb: "loop-stop", args: append([]string{"--wait"}, at...)}}
 	if len(a.prs) > 0 {
-		steps = append(steps, boundaryStep{"pr", append(append([]string{"merge"}, a.prs...), at...)})
+		steps = append(steps, boundaryStep{verb: "pr", args: append(append([]string{"merge"}, a.prs...), at...)})
 	}
-	launch := []string{"--detach", "--log", filepath.Join(root, ".evolve", boundaryLoopLog), "--goal-text", a.goalText}
+	loopLog := filepath.Join(root, ".evolve", gcpolicy.LogsDir, a.runID, gcpolicy.LoopLogName)
+	launch := []string{"--detach", "--log", loopLog, "--goal-text", a.goalText}
 	if a.maxCycles != "" {
 		launch = append(launch, "--max-cycles", a.maxCycles)
 	}
 	return append(steps,
-		boundaryStep{"sync-main", at},
-		boundaryStep{"gc", at},
-		boundaryStep{"loop-stop", append([]string{"--release"}, at...)},
-		boundaryStep{"loop", append(launch, at...)},
+		boundaryStep{verb: "sync-main", args: at},
+		boundaryStep{verb: "gc", args: at},
+		boundaryStep{verb: "loop-stop", args: append([]string{"--release"}, at...)},
+		boundaryStep{verb: boundaryLogVerb, args: append([]string{"--run-id", a.runID}, at...), desc: boundaryLogStepDesc(a.runID)},
+		boundaryStep{verb: "loop", args: append(launch, at...)},
 	)
 }
 

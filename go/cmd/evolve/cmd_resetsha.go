@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfsha"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -43,7 +44,7 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		if c == "" {
 			return false
 		}
-		return exec.Command("git", "-C", absRoot, "merge-base", "--is-ancestor", c, "HEAD").Run() == nil
+		return sysexec.Command(context.Background(), "git", "-C", absRoot, "merge-base", "--is-ancestor", c, "HEAD").Run() == nil
 	}
 
 	statePath := filepath.Join(absRoot, ".evolve", "state.json")

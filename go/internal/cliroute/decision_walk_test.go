@@ -28,7 +28,7 @@ func deepCappedRouterFor(t *testing.T, profile, agent string) (*cliroute.Router,
 	if err := os.WriteFile(filepath.Join(dir, agent+".json"), []byte(profile), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Tiers: map[string][]string{"deep": {"claude"}}}
+	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}}}
 	r, _, err := cliroute.Build(cliroute.Setup{Policy: routingPolicy(block), Profiles: profiles.NewFromDir(dir), Host: cliroute.Host{LookPath: installed("agy", "claude")}})
 	if err != nil {
 		t.Fatalf("Build: %v", err)

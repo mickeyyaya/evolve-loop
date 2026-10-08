@@ -30,7 +30,7 @@ func resolveBinary(deps Deps, defaultName string) string {
 // (manifest default_env, sorted), then the request-local Deps.Env overrides (later entries win,
 // matching the adapter's env-merge).
 func driverEnv(deps Deps, cliEnv map[string]string) []string {
-	env := os.Environ()
+	env := slices.DeleteFunc(os.Environ(), isDispatchTag)
 	for _, k := range slices.Sorted(maps.Keys(cliEnv)) {
 		env = append(env, k+"="+cliEnv[k])
 	}

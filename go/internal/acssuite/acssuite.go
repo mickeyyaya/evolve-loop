@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -23,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
@@ -320,7 +320,7 @@ func hasGoACSTree(moduleDir string) bool {
 // CombinedOutput merges build errors (stderr, non-JSON) into the stream;
 // parseGoTestJSON tolerates the non-JSON lines.
 func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []string) (string, error) {
-	cmd := exec.CommandContext(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
+	cmd := sysexec.Command(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
 	cmd.Dir = moduleDir
 	cmd.Env = env
 	// CommandContext kills only the direct `go` process, not test-binary

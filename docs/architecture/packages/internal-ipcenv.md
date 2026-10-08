@@ -2,13 +2,15 @@
 
 ## Purpose
 
-`internal/ipcenv` is the one home of the lane protocol keys: the `EVOLVE_` environment keys a parent evolve process sets for its children (`FleetKey`, `FleetScopeKey`, `FleetWidthKey`, `WorktreeRootKey`, `CycleStateFileKey`, `TmuxSocketKey`). They are not operator dials, so they have no `flagregistry` row, and the `flagreaders` and `envtaint` regression gates skip this directory. It also owns `Scrub`, the environment every `go test` a cycle spawns to judge the repository runs under.
+`internal/ipcenv` is the one home of the lane protocol keys: the `EVOLVE_` environment keys a parent evolve process sets for its children (`FleetKey`, `FleetScopeKey`, `FleetWidthKey`, `WorktreeRootKey`, `CycleStateFileKey`, `TmuxSocketKey`, `DispatchIDKey`). They are not operator dials, so they have no `flagregistry` row, and the `flagreaders` and `envtaint` regression gates skip this directory. It also owns `Scrub`, the environment every `go test` a cycle spawns to judge the repository runs under.
 
 ## Design
 
 - **`ProtocolKeys` is the set.** It returns a fresh slice of every key constant the package declares. Consumers that must never pass a lane key on refuse this set: the ACS suite refuses any of them in `acs.predicate_env` ([ADR-0114](../adr/0114-the-acs-verdict-is-always-written-and-complete.md) decision 5). `TestProtocolKeys_AreEveryKeyThePackageDeclaresAndEachIsScrubbed` parses the package's own constants, so a key added here joins the set the day it is added.
 - **`Scrub` drops the whole `EVOLVE_` namespace**, not the listed keys, so a key nobody listed (a new one, or one owned elsewhere) cannot leak either. Only the key is inspected; a value that mentions the namespace survives.
 - **`TmuxSocketKey`** (`EVOLVE_TMUX_SOCKET`) is the per-run bridge tmux socket the loop exports to its bridge subprocesses. `bridge.TmuxSocketEnv` is defined as this constant, so the key has one spelling. It keeps its `flagregistry` row (status internal, "IPC channel, not an operator dial") for now; the row predates the constant moving here.
+
+- **`DispatchIDKey`** (`EVOLVE_DISPATCH_ID`) is the tag of one dispatch. The bridge sets it in the environment of the CLI it starts, and each descendant inherits it. The bridge at dispatch end and `evolve gc` read it from the environment of other processes to prove ownership ([internal-proctree.md](internal-proctree.md)). No Go code reads it from its own environment.
 
 ## Invariants
 

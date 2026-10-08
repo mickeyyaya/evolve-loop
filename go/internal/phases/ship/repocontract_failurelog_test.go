@@ -57,7 +57,7 @@ func TestChatty(t *testing.T) { t.Log("passing chatter") }
 
 func TestRatchet(t *testing.T) { t.Error("x/characterization_test.go builds a raw git repo") }
 `)
-	o := runRepoContractPackages(context.Background(), dir, io.Discard, []string{"./..."})
+	o := runRepoContractPackages(context.Background(), dir, packLog{notes: io.Discard, raw: io.Discard}, []string{"./..."})
 	if !o.realRed() || !strings.Contains(o.failureLog, "characterization_test.go builds a raw git repo") {
 		t.Fatalf("a real run keeps the failing test's own message; red=%v log=%q", o.realRed(), o.failureLog)
 	}

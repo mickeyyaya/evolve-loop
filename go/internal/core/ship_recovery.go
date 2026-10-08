@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot string, cycle int, cs *CycleState, se *ShipError, depth, fleetWidth int) (Phase, bool) {
@@ -442,7 +442,7 @@ func regenerateDerivedArtifact(ctx context.Context, worktree, relPath string) er
 		return fmt.Errorf("no regenerator registered for %q", relPath)
 	}
 	goArgs := append([]string{"run", "./cmd/evolve"}, spec.regenArgs...)
-	cmd := exec.CommandContext(ctx, "go", goArgs...)
+	cmd := sysexec.Command(ctx, "go", goArgs...)
 	cmd.Dir = filepath.Join(worktree, "go")
 	cmd.Env = append(os.Environ(), ipcenv.WorktreeRootKey+"="+worktree)
 	if out, err := cmd.CombinedOutput(); err != nil {

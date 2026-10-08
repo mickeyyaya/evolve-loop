@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/installer"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // cliVerify is one row of the release verification matrix: a target (an LLM CLI,
@@ -164,7 +165,7 @@ func assertGeminiPayloadPresentDep(srcDir string) error {
 func binaryAnswersSubcommandDep(binPath, sub string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, binPath, sub, "--help")
+	cmd := sysexec.Command(ctx, binPath, sub, "--help")
 	var stderr bytes.Buffer
 	cmd.Stdout = io.Discard
 	cmd.Stderr = &stderr

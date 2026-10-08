@@ -238,47 +238,74 @@ func LoadFile(path string) (Item, []string, error) {
 	}
 	it.Path = name
 	var warnings []string
-	if len(sanitizeItem(&it)) > 0 {
-		warnings = append(warnings, name+": sanitized control characters/overlength in rendered fields")
+	if r := sanitizeItem(&it); len(r.changed) > 0 {
+		warnings = append(warnings, name+": "+r.notice())
 	}
 	return it, warnings, nil
 }
 
-func sanitizeItem(it *Item) []string {
-	var changed []string
-	clean := func(field, s string, max int) string {
-		mapped := StripControl(s)
-		if len(mapped) > max {
-			cut := max
-			for cut > 0 && !utf8.RuneStart(mapped[cut]) {
-				cut--
-			}
-			mapped = mapped[:cut]
-		}
-		if mapped != s && !slices.Contains(changed, field) {
-			changed = append(changed, field)
-		}
-		return mapped
+type fieldRewrites struct {
+	changed, stripped, truncated []string
+}
+
+func (r *fieldRewrites) clean(field, s string, max int) string {
+	mapped := StripControl(s)
+	if mapped != s {
+		r.stripped = appendOnce(r.stripped, field)
 	}
-	it.ID = clean("id", it.ID, maxFieldLen)
-	it.Title = clean("title", it.Title, maxFieldLen)
-	it.Campaign = clean("campaign", it.Campaign, maxFieldLen)
-	it.Route = clean("route", it.Route, maxFieldLen)
-	it.DeliverableKind = clean("deliverable_kind", it.DeliverableKind, maxFieldLen)
+	if len(mapped) > max {
+		cut := max
+		for cut > 0 && !utf8.RuneStart(mapped[cut]) {
+			cut--
+		}
+		mapped = mapped[:cut]
+		r.truncated = appendOnce(r.truncated, field)
+	}
+	if mapped != s {
+		r.changed = appendOnce(r.changed, field)
+	}
+	return mapped
+}
+
+func (r fieldRewrites) notice() string {
+	var parts []string
+	if len(r.stripped) > 0 {
+		parts = append(parts, "sanitized control characters in "+strings.Join(r.stripped, ", "))
+	}
+	if len(r.truncated) > 0 {
+		parts = append(parts, "truncated overlength "+strings.Join(r.truncated, ", ")+" to bound (item loaded)")
+	}
+	return strings.Join(parts, "; ")
+}
+
+func appendOnce(fields []string, field string) []string {
+	if slices.Contains(fields, field) {
+		return fields
+	}
+	return append(fields, field)
+}
+
+func sanitizeItem(it *Item) fieldRewrites {
+	var r fieldRewrites
+	it.ID = r.clean("id", it.ID, maxFieldLen)
+	it.Title = r.clean("title", it.Title, maxFieldLen)
+	it.Campaign = r.clean("campaign", it.Campaign, maxFieldLen)
+	it.Route = r.clean("route", it.Route, maxFieldLen)
+	it.DeliverableKind = r.clean("deliverable_kind", it.DeliverableKind, maxFieldLen)
 	for i := range it.Files {
-		it.Files[i] = clean("files", it.Files[i], maxFieldLen)
+		it.Files[i] = r.clean("files", it.Files[i], maxFieldLen)
 	}
 	for i := range it.Acceptance {
-		it.Acceptance[i] = clean("acceptance", it.Acceptance[i], maxAcceptanceLen)
+		it.Acceptance[i] = r.clean("acceptance", it.Acceptance[i], maxAcceptanceLen)
 	}
-	return changed
+	return r
 }
 
 func SanitizedFields(it Item) []string {
 	probe := it
 	probe.Files = slices.Clone(it.Files)
 	probe.Acceptance = slices.Clone(it.Acceptance)
-	return sanitizeItem(&probe)
+	return sanitizeItem(&probe).changed
 }
 
 // StripControl replaces control characters (C0 and DEL) with spaces.

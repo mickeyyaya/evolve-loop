@@ -1,7 +1,6 @@
 {
   "name": "adversarial-review",
   "role": "adversarial-review",
-  "effort_level": "xhigh",
   "cli": "claude-tmux",
   "allowed_clis": [
     "claude"

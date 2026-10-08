@@ -26,13 +26,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Snapshot is the content state of a worktree at Take time.
@@ -354,7 +354,7 @@ func gitEnv(extra []string) []string {
 }
 
 func git(ctx context.Context, dir string, env []string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := sysexec.Command(ctx, "git", args...)
 	cmd.Dir = dir
 	cmd.Env = gitEnv(env)
 	var stdout, stderr bytes.Buffer

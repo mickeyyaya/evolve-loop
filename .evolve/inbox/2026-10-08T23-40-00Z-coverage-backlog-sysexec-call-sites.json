@@ -1,0 +1,25 @@
+{
+  "id": "coverage-backlog-sysexec-call-sites",
+  "title": "Coverage backlog: 66 older functions whose only train change was the sysexec.Command call site, plus 12 justified exceptions",
+  "kind": "hardening",
+  "priority_class": "hygiene",
+  "weight": 0.2,
+  "route": "console",
+  "routed_reason": "the operator's 100% coverage rule (2026-10-08); a large, separate task with many real-binary default seams",
+  "source": "console, 2026-10-08, lane cl-train-cover on the wave-81 train (#817)",
+  "created_at": "2026-10-08T23:40:00Z",
+  "summary": "The operator rule is 100% test coverage for new CLI and API code. The wave-81 train is at 100% for its new code and new packages (proctree, sysexec, gcpolicy at 100 in .cover-strict). 78 changed functions stay under 100. 66 of them changed only one call site, from exec.Command to sysexec.Command; their uncovered statements are older than the train (gh, git push, go build and ps default seams: releasepipeline defaultShip, cmd/evolve ghIn, statusOpenPRs, ghMergedPRHeads, execCycleLaunch, gitDiffCapture, defaultChainRebuild, defaultBootRefreshRebuild, remoteOpenPR, runSyncMain, runResetSHA, the worktree commands, explanationdocs gitio, adapters and core realPSRunner, realGoUnitTestTagged, defaultCapabilityProbe, phasecmd RunPhaseOrder, gittest and tmuxtest helpers). 12 more have a recorded reason: 4 unreachable defensive branches (moveProfileEfforts, dispatchLogTTLDays, runGoTestJSON StdoutPipe, randomStamp crypto/rand) and 8 paths that need os.Getwd to fail, a non-darwin/linux build, a live tmux and LLM, or a completion-detector fault. The full table is funcs-final.txt in the scratchpad of lane cl-train-cover.",
+  "fix": "Raise the 66 functions to 100% through injectable seams for the real-binary defaults (a RunFunc or a fake binary on PATH), one package at a time, with tests that assert behavior. For the os.Getwd paths, add one shared cwd seam. Record each truly unreachable branch in the package doc, or remove the branch only if the type system already proves it impossible.",
+  "acceptance": [
+    "Each of the 66 functions shows 100.0% in go tool cover -func with the integration tag",
+    "No production check is weakened to gain coverage",
+    "Each remaining exception has a recorded reason"
+  ],
+  "files": [
+    "go/cmd/evolve",
+    "go/internal/releasepipeline",
+    "go/internal/explanationdocs",
+    "go/internal/core",
+    "go/internal/cli/phasecmd"
+  ]
+}

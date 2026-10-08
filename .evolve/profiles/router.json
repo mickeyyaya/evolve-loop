@@ -57,7 +57,6 @@
   "max_budget_usd": 0.5,
   "max_turns": 12,
   "turn_budget_hint": 8,
-  "effort_level": "xhigh",
   "output_artifact": ".evolve/runs/cycle-{cycle}/routing-proposal.json",
   "challenge_token_required": false,
   "extra_flags_by_cli": {

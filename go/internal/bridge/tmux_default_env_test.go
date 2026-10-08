@@ -3,6 +3,8 @@ package bridge
 import (
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
 const promptSuggestionExport = "export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false"
@@ -49,7 +51,7 @@ func TestTmuxBoot_ACLIWithoutDefaultEnvExportsNothingExtra(t *testing.T) {
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass", "--worktree="+t.TempDir())
 	for _, k := range tmux.sentKeys {
-		if strings.HasPrefix(k, "export ") && !strings.HasPrefix(k, "export EVOLVE_PROJECT_ROOT=") {
+		if strings.HasPrefix(k, "export ") && !strings.HasPrefix(k, "export EVOLVE_PROJECT_ROOT=") && !strings.HasPrefix(k, "export "+ipcenv.DispatchIDKey+"=") {
 			t.Fatalf("codex-tmux declares no default_env, yet the pane received %q", k)
 		}
 	}

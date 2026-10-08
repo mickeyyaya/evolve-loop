@@ -11,11 +11,39 @@ Each profile in `.evolve/profiles/` names a default tier and an envelope (`model
 | Tier | `claude-tmux` | `agy-tmux` | `agy-claude-tmux` | `codex-tmux` |
 |---|---|---|---|---|
 | `fast` | haiku | Gemini 3.8 Flash (Low) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
-| `balanced` | sonnet | Gemini 3.8 Flash (High) | Claude Sonnet 5.5 (High) | gpt-5.6-terra |
-| `deep` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (High) | gpt-5.6-sol |
-| `top` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (High) | gpt-5.6-sol |
+| `balanced` | sonnet | Gemini 3.8 Flash (High) | Claude Sonnet 5.5 (Medium) | gpt-5.6-terra |
+| `deep` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
+| `top` | opus | Gemini 3.1 Pro (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
 
 In Claude Code 2.1.293, the `haiku` alias of the `fast` tier resolves to Haiku 5.5 (checked on 2026-10-08). agy has no Haiku model, so the `fast` tier of `agy-claude-tmux` is Claude Sonnet 5.5 (Low).
+
+## Effort for each tier
+
+Every launch on a CLI with an effort channel carries an effort (2026-10-08). The effort lives in `.evolve/policy.json` `cli_routing`, beside the chain. The order of precedence is:
+
+1. `cli_routing.agents.<agent>.effort`;
+2. `cli_routing.tiers.<tier>.effort`;
+3. the compiled default.
+
+The operator directive of 2026-10-08 is: "Based on the opus 5.5, the effort should be configured starting with medium effort". Thus every tier starts at `medium`, except fast.
+
+| Tier | Compiled default | `claude-tmux` | `agy-claude-tmux` |
+|---|---|---|---|
+| `fast` | `low` | `--effort low` | `(Low)` |
+| `balanced` | `medium` | `--effort medium` | `(Medium)` |
+| `deep` | `medium` | `--effort medium` | `(Medium)` |
+| `top` | `medium` | `--effort medium` | `(Medium)` |
+
+The checked-in table sets `low` for `scout`, `triage` and `reflector` (`agents.<agent>.effort`).
+
+To change an effort, use the routing writer at a wave boundary:
+
+- `evolve cli-routing set tiers.deep --effort high` (the chain stays);
+- `evolve cli-routing set agents.auditor --effort high`;
+- `evolve cli-routing unset tiers.deep.effort`;
+- `evolve cli-routing explain <agent>` prints each tier with its effort and the source of the effort.
+
+On `agy-claude-tmux`, the effort selects the variant suffix of the model name, because agy offers each Claude model at `(Low)`, `(Medium)` and `(High)` only. When `xhigh` or `max` is capped to `(High)`, the launch writes one `effort=<level> is capped` line. A launch with a model id, not a tier word, gets no tier default, but an agent effort still applies. `agy-tmux` (Gemini) and `ollama-tmux` have no effort channel.
 
 `evolve models refresh` refreshes the live model catalog. The resolution order is: a policy pin, then the live catalog, then the manifest baseline.
 

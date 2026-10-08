@@ -20,6 +20,7 @@ var allowedImports = map[string]bool{
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy":         true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease":       true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter":   true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec":        true,
 }
 
 func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
@@ -42,7 +43,7 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 			switch {
 			case allowedImports[path]:
 			case strings.Contains(path, "/internal/") || strings.Contains(path, "/pkg/"):
-				t.Errorf("%s imports %s: the chain engine is a core-free leaf — stdlib plus the six declared packages only", name, path)
+				t.Errorf("%s imports %s: the chain engine is a core-free leaf — stdlib plus the declared packages only", name, path)
 			case strings.Contains(strings.SplitN(path, "/", 2)[0], "."):
 				t.Errorf("%s imports third-party %s: stdlib only", name, path)
 			}

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var syncMainFetchSleep = time.Sleep
@@ -46,7 +46,7 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	})
 
 	git := func(gitArgs ...string) (string, error) {
-		cmd := exec.Command("git", append([]string{"-C", absRoot}, gitArgs...)...)
+		cmd := sysexec.Command(context.Background(), "git", append([]string{"-C", absRoot}, gitArgs...)...)
 		out, err := cmd.CombinedOutput()
 		return string(out), err
 	}

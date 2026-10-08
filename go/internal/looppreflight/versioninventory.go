@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // versionCaptureTimeout drops a hung binary from the inventory instead of stalling batch start.
@@ -20,7 +20,7 @@ var versionCaptureTimeout = 5 * time.Second
 var execVersion = func(bin string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCaptureTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, "--version")
+	cmd := sysexec.Command(ctx, bin, "--version")
 	cmd.Env = bridge.ProcessEnv(bin)
 	out, err := cmd.Output()
 	if err != nil {

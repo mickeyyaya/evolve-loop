@@ -2,10 +2,10 @@ package ledger
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // CompositionVerdictKind is the kind of an audit carry-forward entry that ledger verify kernel-recomputes.
@@ -113,7 +114,7 @@ func (idx compositionEvidenceIndex) resolve(f compositionFields, line []byte) co
 
 // PatchID returns the `git patch-id --stable` content identity of diff; it needs no repository.
 func PatchID(diff []byte) (string, error) {
-	cmd := exec.Command("git", "patch-id", "--stable")
+	cmd := sysexec.Command(context.Background(), "git", "patch-id", "--stable")
 	cmd.Stdin = bytes.NewReader(diff)
 	out, err := cmd.Output()
 	if err != nil {

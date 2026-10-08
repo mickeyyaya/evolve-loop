@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A fake agy whose first launch draws its REPL after the base budget but within the cold-start allowance boots on the first probe of a run (or on the one retry), and the log names the cold start.",
+    "A fake agy that never draws its REPL still fails the probe loudly, with the pane captured, after the bounded attempt(s).",
+    "The boundary updater reports a REPL-boot timeout as a boot timeout, not as the family counting as unsubscribed.",
+    "The budget or retry count comes from config or manifest data, not a Go literal."
+  ],
+  "connects_to": [],
+  "created_at": "2026-10-06T11:05:00Z",
+  "files": [
+    "go/internal/cliupdate",
+    "go/internal/looppreflight",
+    "go/internal/bridge/manifests/agy-tmux.json"
+  ],
+  "fix": "Make the first agy boot of a run tolerant of cold start without hiding a real failure. Options to weigh, choosing the smallest that is config-driven: (a) the doctor-live probe used by the boundary updater and the preflight bridge-boot each retry a REPL-boot timeout once, logging both attempts, before concluding; (b) a per-family cold-start boot budget in the family manifest (agy-tmux), applied only to a run's first launch of that binary. Whichever is chosen, a second timeout must still fail loudly with the pane capture, and the boundary updater must name a boot timeout as such, not 'unsubscribed'.",
+  "id": "agy-cold-start-boot-exceeds-the-60s-repl-budget",
+  "kind": "bugfix",
+  "notes": "Filed from the console at the wave 67 boundary. Evidence: runtime/.evolve/loop-20261006-wave67.log, which shows the [agy-tmux] FAIL at 60s on the livesmoke probe followed by successful agy-claude-tmux and agy-tmux preflight boots.",
+  "priority": null,
+  "priority_class": "stability",
+  "priority_rationale": "A recurring false halt or false skip at wave start (twice so far). It costs a whole wave when it hits preflight.",
+  "root_cause": "The REPL boot wait is one fixed budget for every launch. It does not tell a cold first launch from a warm one, and the probes that run first (the boundary updater's doctor live, the preflight bridge-boot) have no retry. So a slow cold start becomes a false 'unsubscribed' skip or a preflight halt.",
+  "summary": "Seen twice. In wave 62, preflight halted when agy's first boot never drew its REPL, and a live doctor boot passed a minute later. At the wave 67 boundary (2026-10-06), the boundary CLI updater's doctor-live probe of agy-tmux (the first agy launch since wave 66 ended) failed with rc=80 'REPL prompt never appeared after 60s', and the updater skipped agy as unsubscribed. Preflight's agy-claude-tmux boot 80 s later and its agy-tmux boot (same default model) both booted. So the first agy launch of a wave pays a cold-start cost (likely auth refresh or the model list fetch) that can exceed the fixed 60 s boot wait, while warm launches boot in a few seconds.",
+  "title": "agy's first launch after an idle period can take longer than the 60 s REPL boot budget, so the first probe of a wave fails while the next launch boots",
+  "weight": 0.6
+}

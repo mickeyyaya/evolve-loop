@@ -43,16 +43,14 @@ func runBridgeControl(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve bridge control: --workspace is required (the REPL scratch dir)")
 		return 10
 	}
-	intent := bridge.LaunchIntent{}
-	if allowBypass {
-		intent.Permission = "bypass"
-	}
 	cli := family + "-tmux"
+	efforts := commandEfforts(stderr)
+	intent := bridgeCommandIntent(cli, bypassIf(allowBypass), efforts)
 	cfg := &bridge.Config{
 		CLI: cli, Workspace: ws, Agent: "control",
 		AllowBypass: allowBypass, Realization: bridge.RealizeFor(cli, intent),
 	}
-	ctrl := bridge.NewController(cfg, bridge.Deps{})
+	ctrl := bridge.NewController(cfg, bridge.Deps{Efforts: efforts})
 	return emitControl(ctrl.Do, family, event, stdout, stderr)
 }
 

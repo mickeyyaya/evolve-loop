@@ -136,6 +136,9 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/subagent", Tests: []string{
 		"TestSubagentRun_OneConstructionSite",
 	}},
+	{Package: "./internal/sysexec", Tests: []string{
+		"TestPipelineCode_StartsEveryProcessThroughCommand",
+	}},
 }
 
 func ModuleDir(root string) string {

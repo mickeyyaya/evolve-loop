@@ -19,16 +19,17 @@
 package marketplacepoll
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/semvercheck"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Sentinel errors. The cmd layer maps these to bash exit codes.
@@ -113,8 +114,8 @@ func DefaultPull(dir string) error {
 	// Both errors are intentionally swallowed: the bash script does the
 	// same. Convergence is detected by the version check, not by git
 	// exit codes.
-	_ = exec.Command("git", "-C", dir, "fetch", "origin", "main", "--quiet").Run()
-	_ = exec.Command("git", "-C", dir, "reset", "--hard", "origin/main", "--quiet").Run()
+	_ = sysexec.Command(context.Background(), "git", "-C", dir, "fetch", "origin", "main", "--quiet").Run()
+	_ = sysexec.Command(context.Background(), "git", "-C", dir, "reset", "--hard", "origin/main", "--quiet").Run()
 	return nil
 }
 

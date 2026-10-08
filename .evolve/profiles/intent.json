@@ -116,6 +116,5 @@
   "generated_from": "hand-authored",
   "cli_fallback": [
     "claude-tmux"
-  ],
-  "effort_level": "high"
+  ]
 }

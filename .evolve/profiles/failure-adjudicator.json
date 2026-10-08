@@ -73,6 +73,5 @@
   "generated_from": "hand-authored (ADR-0093 retry envelope + terminal retro)",
   "cli_fallback": [
     "claude-tmux"
-  ],
-  "effort_level": "high"
+  ]
 }

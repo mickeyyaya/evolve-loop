@@ -114,7 +114,7 @@ func TestSmokeTests_AModelOnTheConfigReachesTheLaunchArgv(t *testing.T) {
 		driver, binary, model, want string
 	}{
 		{"agy-claude-tmux", "agy", "Claude Opus 5.5 (High)", "--model " + shellQuotePOSIX("Claude Opus 5.5 (High)")},
-		{"agy-claude-tmux", "agy", "deep", "--model " + shellQuotePOSIX("Claude Opus 5.5 (High)")},
+		{"agy-claude-tmux", "agy", "deep", "--model " + shellQuotePOSIX("Claude Opus 5.5 (Medium)")},
 		{"claude-tmux", "claude", "opus", "--model opus"},
 	}
 	smokes := map[string]func(context.Context, string, *Config, Deps){

@@ -3,33 +3,22 @@ package bridge
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestEffortForTier_OverrideThenDefault(t *testing.T) {
-	p := Profile{EffortLevel: "medium", EffortOverrides: map[string]string{"deep": "high", "top": ""}}
-	cases := map[string]string{"deep": "high", "balanced": "medium", "top": "medium", "": "medium"}
-	for tier, want := range cases {
-		if got := p.effortForTier(tier); got != want {
-			t.Errorf("effortForTier(%q) = %q, want %q", tier, got, want)
+func TestLoadProfile_RefusesTheRetiredEffortFields(t *testing.T) {
+	for _, body := range []string{
+		`{"name":"builder","effort_level":"medium"}`,
+		`{"name":"builder","effort_overrides":{"deep":"high"}}`,
+	} {
+		path := filepath.Join(t.TempDir(), "builder.json")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
 		}
-	}
-	if got := (Profile{EffortLevel: "low"}).effortForTier("deep"); got != "low" {
-		t.Errorf("no overrides map: got %q, want the profile default", got)
-	}
-}
-
-func TestLoadProfile_ReadsEffortOverrides(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "builder.json")
-	body := `{"name":"builder","permission_mode":"default","effort_level":"medium","effort_overrides":{"deep":"high"}}`
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	p, err := LoadProfile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.EffortLevel != "medium" || p.EffortOverrides["deep"] != "high" || p.effortForTier("deep") != "high" {
-		t.Fatalf("loaded profile = %+v", p)
+		_, err := LoadProfile(path)
+		if err == nil || !strings.Contains(err.Error(), "evolve cli-routing migrate") {
+			t.Errorf("LoadProfile(%s) err = %v, want a refusal that names evolve cli-routing migrate", body, err)
+		}
 	}
 }

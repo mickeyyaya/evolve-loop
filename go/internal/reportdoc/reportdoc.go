@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const maxCitationBytes = 16 << 20
@@ -337,7 +338,7 @@ func readCurrentReference(ctx context.Context, root, reference string) ([]byte, 
 		}
 		return []byte(target), true, nil
 	case info.IsDir():
-		out, err := exec.CommandContext(ctx, "git", "-C", path, "rev-parse", "--verify", "HEAD").Output()
+		out, err := sysexec.Command(ctx, "git", "-C", path, "rev-parse", "--verify", "HEAD").Output()
 		if err != nil {
 			return nil, false, fmt.Errorf("citation directory is not a readable gitlink: %w", err)
 		}
@@ -371,7 +372,7 @@ func readCurrentReference(ctx context.Context, root, reference string) ([]byte, 
 }
 
 func readBaseReference(ctx context.Context, root, baseSHA, reference string) ([]byte, bool, error) {
-	tree, err := exec.CommandContext(ctx, "git", "-C", root, "ls-tree", "-z", baseSHA, "--", reference).Output()
+	tree, err := sysexec.Command(ctx, "git", "-C", root, "ls-tree", "-z", baseSHA, "--", reference).Output()
 	if err != nil {
 		return nil, false, fmt.Errorf("inspect deleted base path: %w", err)
 	}
@@ -387,7 +388,7 @@ func readBaseReference(ctx context.Context, root, baseSHA, reference string) ([]
 	if objectType != "blob" {
 		return nil, false, fmt.Errorf("deleted base path has unsupported git type %s", objectType)
 	}
-	sizeBody, err := exec.CommandContext(ctx, "git", "-C", root, "cat-file", "-s", object).Output()
+	sizeBody, err := sysexec.Command(ctx, "git", "-C", root, "cat-file", "-s", object).Output()
 	if err != nil {
 		return nil, false, fmt.Errorf("size deleted base blob: %w", err)
 	}
@@ -395,7 +396,7 @@ func readBaseReference(ctx context.Context, root, baseSHA, reference string) ([]
 	if err != nil || size < 0 || size > maxCitationBytes {
 		return nil, false, fmt.Errorf("deleted base blob exceeds 16 MiB or has invalid size")
 	}
-	body, err := exec.CommandContext(ctx, "git", "-C", root, "cat-file", "blob", object).Output()
+	body, err := sysexec.Command(ctx, "git", "-C", root, "cat-file", "blob", object).Output()
 	if err != nil {
 		return nil, false, fmt.Errorf("read deleted base blob: %w", err)
 	}

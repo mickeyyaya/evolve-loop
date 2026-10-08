@@ -69,13 +69,29 @@ What that table does in practice:
 | `clis` | The CLIs this operator has. A family not listed is never dispatched or preflighted by any path. |
 | `default` | The chain for anything no other rule covers. |
 | `work.<role>` | Optional. The chain for every phase of one Role: `plan`, `build`, `evaluate` or `control`. The Role comes from `phasespec.Role`, through the spec's `role` field or `RoleOrDefault()` (`internal/phasespec/phasespec.go:145`). The operator never lists profile names, and a new phase classifies itself. |
-| `agents.<name>` | Per-agent override: an array, or `{cli, model}` when it also sets a tier. A phase name (`audit`) normalizes to its agent (`auditor`) through `PhaseSpec.AgentName()`, so the key bug can't recur. |
-| `tiers.<tier>` | Optional ceiling, keyed by `fast`, `balanced`, `deep` or `top`. A dispatch running at that tier may use only the listed CLIs, whichever rule chose its chain. |
+| `agents.<name>` | Per-agent override: an array, or `{cli, model, effort}` when it also sets a tier or an effort. Since 2026-10-08 `effort` is the reasoning effort of the agent at every tier; an object with only `effort` inherits the chain. A phase name (`audit`) normalizes to its agent (`auditor`) through `PhaseSpec.AgentName()`, so the key bug can't recur. |
+| `tiers.<tier>` | Optional ceiling, keyed by `fast`, `balanced`, `deep` or `top`. A dispatch running at that tier may use only the listed CLIs, whichever rule chose its chain. Since 2026-10-08 an entry is an array (the ceiling) or `{"clis": [...], "effort": "<level>"}`. An object with only `effort` sets the effort of that tier and sets no ceiling. |
 | `after_chain` | What happens after the chain runs out:<br>`other_clis` (the default) tries the remaining `clis` in their listed order;<br>`stop` ends the walk.<br>This replaces `workflow.universal_fallback(_exclude)`. |
 
 - **Names:** chain entries are family names (`claude`, `agy`, `codex`, `ollama`), mapped through `llmroute.defaultDriverForFamily` (`llmroute.go:107`). A driver name such as `claude-p` is also accepted.
 - **Rule precedence:** `agents` > `work` > `default` > (with no `default`) the profile's own `cli` + `cli_fallback`, filtered by `clis`.
 - **The floor needs no config.** The floor agents (auditor, adversarial-review, tdd-engineer, spec-verifier, spec-verify) are clamped to Claude automatically, so `"default": ["agy","claude"]` already leaves them on Claude.
+
+### Effort in the table (2026-10-08)
+
+The operator said: "For tier plus effort configuration, it should be placed at the centralized configurable file set as the policy, we should already have this design and we only need to extend this scope to include the effort setting." Thus the table holds the effort beside the chain:
+
+```json
+"cli_routing": {
+  "tiers":  { "deep": ["agy-claude", "claude"], "fast": { "effort": "low" } },
+  "agents": { "scout": { "effort": "low" }, "auditor": { "cli": ["claude"], "model": "deep", "effort": "high" } }
+}
+```
+
+- **Precedence:** `agents.<agent>.effort`, then `tiers.<tier>.effort`, then the compiled default (fast `low`, balanced, deep and top `medium`). One function resolves it: `policy.EffortTable.Resolve`.
+- **Refusals:** the compiler refuses an unknown tier, an unknown agent and an unknown level, before the write. `policy.Load` also refuses an unknown level. An effort must be on the agent name, not on a phase alias.
+- **The profile fields are retired:** the loaders refuse `effort_level` and `effort_overrides`, and `migrate` moves them.
+- **Plan:** [opus55-effort-config-2026-10.md](opus55-effort-config-2026-10.md).
 
 ### Semantics
 
@@ -151,8 +167,9 @@ A source-scan guard, `TestOnlyCliRouteBuildsChains`, bans every chain builder ou
 | `explain <agent>` | Explains how one agent's chain was resolved. |
 | `init --clis agy,claude` | Writes a block that compiles: `clis` plus `default` in that order. |
 | `set default agy,claude`<br>`set work.plan claude,agy`<br>`set tiers.deep claude`<br>`set agents.router agy --model fast`<br>`set clis agy,claude`<br>`set after_chain stop` | Edits one entry. |
-| `unset <key>` | Removes one entry. |
-| `migrate [--dry-run]` | Moves `pins`, `universal_fallback*` and `router.cli/model` into the block. |
+| `set tiers.deep --effort high`<br>`set agents.auditor --effort high` | Sets an effort (2026-10-08). The chain is optional when only the effort changes. |
+| `unset <key>`<br>`unset <key>.effort` | Removes one entry, or only its effort. |
+| `migrate [--dry-run]` | Moves `pins`, `universal_fallback*` and `router.cli/model` into the block. Since 2026-10-08 it also moves the profile fields `effort_level` and `effort_overrides` into `agents.<agent>.effort` and removes them from the profile file. |
 
 - **Writes:** every write validates the merged file first, then uses the setup lossless atomic writer, moved to `policy.PatchBlock`.
 - **Refusals:** a write is refused inside a phase (dispatch depth > 0) or while a cycle lease is held.

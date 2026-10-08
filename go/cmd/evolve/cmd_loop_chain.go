@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -17,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
@@ -81,7 +81,7 @@ func defaultChainBoundaryFleetLaneActive(cfg loopConfig) (active bool, err error
 // defaultChainRebuild runs `make -C go build` (runtime-reference.md) from
 // projectRoot so the on-disk binary catches up to HEAD.
 func defaultChainRebuild(projectRoot string) error {
-	cmd := exec.Command("make", "-C", "go", "build")
+	cmd := sysexec.Command(context.Background(), "make", "-C", "go", "build")
 	cmd.Dir = projectRoot
 	out, err := cmd.CombinedOutput()
 	if err != nil {
