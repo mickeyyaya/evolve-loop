@@ -7,10 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -54,6 +56,9 @@ func runLoopDetached(cfg loopConfig, stdout, stderr io.Writer) int {
 		return 1
 	}
 	fmt.Fprintf(stdout, "loop: detached pid %d, log %s\n", launch.pid, cfg.LogPath)
+	if err := recordLogWriter(cfg.LogPath, launch.pid); err != nil {
+		fmt.Fprintf(stderr, "evolve loop: WARN: --detach: %v; gc can delete this log while the loop writes it\n", err)
+	}
 	return awaitDetachedBoot(cfg, launch, detachBootWait(cfg.EvolveDir, stderr), stdout, stderr)
 }
 
@@ -80,6 +85,14 @@ func startDetachedLoop(cfg loopConfig, attr *syscall.SysProcAttr) (detachedLaunc
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	return detachedLaunch{pid: cmd.Process.Pid, offset: info.Size(), done: done}, nil
+}
+
+func recordLogWriter(logPath string, pid int) error {
+	path := logPath + gcpolicy.LogWriterPIDSuffix
+	if err := os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), 0o644); err != nil {
+		return fmt.Errorf("record the log writer pid in %s: %w", path, err)
+	}
+	return nil
 }
 
 func detachBootWait(evolveDir string, stderr io.Writer) time.Duration {

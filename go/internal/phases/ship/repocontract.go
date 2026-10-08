@@ -86,7 +86,7 @@ func (o packOutcome) allNamedTests() bool {
 // `go test -json` in the lane worktree's module dir.
 var repoContractTestFn = defaultRepoContractTest
 
-func defaultRepoContractTest(ctx context.Context, moduleDir string, out io.Writer) packOutcome {
+func defaultRepoContractTest(ctx context.Context, moduleDir string, out packLog) packOutcome {
 	whole := runRepoContractPackages(ctx, moduleDir, out, repoContractPackages)
 	return whole.merged(runGoTestJSON(ctx, moduleDir, out, repoContractSelectionArgs(repoContractSelections)))
 }
@@ -112,7 +112,7 @@ func repoContractSelectionArgs(selections []repocontract.TestSelection) []string
 
 func RunRepoContractPack(ctx context.Context, root string) (reds []string, diagnostic string, err error) {
 	var out strings.Builder
-	o := repoContractTestFn(ctx, repocontract.ModuleDir(root), &out)
+	o := repoContractTestFn(ctx, repocontract.ModuleDir(root), packLog{notes: &out, raw: &out})
 	switch {
 	case o.realRed():
 		return o.failedNames(), o.failureLog, o.err
@@ -130,7 +130,7 @@ func repoContractSuiteNames() []string {
 	return names
 }
 
-func runRepoContractPackages(ctx context.Context, moduleDir string, out io.Writer, packages []string) packOutcome {
+func runRepoContractPackages(ctx context.Context, moduleDir string, out packLog, packages []string) packOutcome {
 	return runRepoContractPackagesWithTags(ctx, moduleDir, out, packages, nil)
 }
 
@@ -167,7 +167,7 @@ func packagesOf(failures []packFailure) []string {
 	return pkgs
 }
 
-func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out io.Writer, packages, tags []string) packOutcome {
+func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out packLog, packages, tags []string) packOutcome {
 	return runGoTestJSON(ctx, moduleDir, out, repoContractTestArgs(packages, tags))
 }
 
@@ -178,7 +178,7 @@ var goTestJSONFn = runGoTestJSON
 // state stays in play and only the pack's concurrent load is removed. A package green by itself contributes
 // nothing; one still red contributes the tests still red; one whose re-run named nothing keeps its first-run reds,
 // since nothing was proven about them. The result is green only when every package is.
-func runRepoContractPackagesAlone(ctx context.Context, moduleDir string, out io.Writer, failures []packFailure) packOutcome {
+func runRepoContractPackagesAlone(ctx context.Context, moduleDir string, out packLog, failures []packFailure) packOutcome {
 	var merged packOutcome
 	var errs []string
 	for _, pkg := range packagesOf(failures) {
@@ -215,8 +215,8 @@ func failuresOf(pkg string, failures []packFailure) []packFailure {
 	return out
 }
 
-func runGoTestJSON(ctx context.Context, moduleDir string, out io.Writer, args []string) packOutcome {
-	out = &lockedWriter{w: out} // the child's stderr and the event tee share it
+func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []string) packOutcome {
+	out := &lockedWriter{w: log.raw}
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
 	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
@@ -409,12 +409,13 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 		return nil
 	}
 	moduleDir := repocontract.ModuleDir(root)
-	out := stderr
+	out := packLog{notes: stderr, raw: stderr}
 	if scan := openScanLog(workspace, stderr); scan != nil {
 		// Close error deliberately dropped: the scan log is best-effort
 		// forensics; a close failure must never turn a green pack red.
 		defer func() { _ = scan.Close() }()
-		out = io.MultiWriter(stderr, scan)
+		defer fmt.Fprintf(stderr, "[ship] repo-contract gate: full output: %s\n", scan.Name())
+		out = packLog{notes: io.MultiWriter(stderr, scan), raw: scan}
 	}
 	if err := runFixedPack(ctx, out, gate, root, baseRef, workspace); err != nil {
 		return err
@@ -427,7 +428,7 @@ func runRepoContractGateAt(ctx context.Context, gate, root, baseRef, workspace s
 	return runImporterBackstop(ctx, out, root, moduleDir, workspace, files, untagged, cleared)
 }
 
-func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, workspace string) error {
+func runFixedPack(ctx context.Context, out packLog, gate, root, baseRef, workspace string) error {
 	runs, note := repocontract.PackRuns(gate, root)
 	moduleDir := repocontract.ModuleDir(root)
 	if !runs {
@@ -453,7 +454,7 @@ func runFixedPack(ctx context.Context, out io.Writer, gate, root, baseRef, works
 // build tags its files declare. Returns the seed and the untagged groups'
 // patterns so the importer backstop (the third layer) neither re-derives the
 // seed nor re-runs those packages in the same build context.
-func runAddedTestBackstop(ctx context.Context, out io.Writer, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
+func runAddedTestBackstop(ctx context.Context, out packLog, root, baseRef, moduleDir, workspace string) (files []changedpkgs.ChangedFile, untagged []string, err error) {
 	files, err = changedFilesTwice(out, root, baseRef)
 	if err != nil {
 		return nil, nil, err

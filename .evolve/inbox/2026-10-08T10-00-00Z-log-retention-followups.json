@@ -1,0 +1,31 @@
+{
+  "id": "log-retention-followups",
+  "title": "Log retention follow-ups after lane H1: writer constants, layout helpers, run-id to lease link, and small gc gaps",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "weight": 0.3,
+  "route": "console",
+  "routed_reason": "the items touch the log catalog, the gc planner and the writers that H3 and H4 change next; the console owns that plan",
+  "source": "console, 2026-10-08, lane H1 review (architecture review FIX_THEN_MERGE items 3, 4, 6, 7, 8 and 9; Go review LOW items)",
+  "created_at": "2026-10-08T10:00:00Z",
+  "summary": "Follow-ups from the H1 review, plan docs/plans/logging-and-process-hygiene-2026-10.md. Arch 3: the writers spell the L3 file names (ship scanLogName, ciparitygate tierLog.target) beside gcpolicy.ToolOutputFiles; only drift tests join them. Arch 4: the loop log path and the legacy run dir are joined by hand in cmd_boundary.go and cmd_boundary_log.go. Arch 6: the log run id (logs/<run-id>) and the run lease RunID are not linked, and H3 and H4 need that link to select a log by run. Arch 7: LogRunDirGlob and the IsLogRunID regex are two spellings of one layout. Arch 8: the comment at gcpolicy.go:28 still says that LogsTTLDays prunes only dispatch-logs. Arch 9: the catalog types can move to a logcatalog package when H3 adds the writer factory. Go LOWs: the current target check compares paths, not os.SameFile; a .writer-pid file inside a deleted run dir goes with the dir, but one beside a console log stays when the log is deleted by hand; the pid write is not atomic (temp file and rename); loops that started before H1 write no .writer-pid file, so only the current link and the TTL keep their logs.",
+  "fix": "Arch 3: export the writer-name constants from gcpolicy and make ship and ciparitygate use them. Arch 4: add gcpolicy.LoopLogPath(evolveDir, runID) and gcpolicy.LegacyLogRunDir(runID) and use them. Arch 6: record the log run id in the run lease or in run.json, or record the lease RunID in the log dir. Arch 7: derive the glob and the regex from the run-id layout in one place. Arch 8: give the comment to the comment workstream. Arch 9: decide the package split at H3. Go LOWs: compare the current target with os.SameFile; let gc delete an orphan .writer-pid file whose log is gone; write the pid with a temp file and a rename; document the migration gap until all pre-H1 loops are gone.",
+  "acceptance": [
+    "Each L3 writer takes its file name from gcpolicy, and no drift test is needed",
+    "The loop log path and the legacy run dir have one helper each in gcpolicy",
+    "A reader can map a log run dir to its run lease RunID",
+    "One source gives the run-id glob and the run-id regex",
+    "gc deletes an orphan .writer-pid file in the console home, with a test",
+    "The writer pid file is written atomically"
+  ],
+  "files": [
+    "go/internal/gcpolicy/logs.go",
+    "go/internal/gcpolicy/gcpolicy.go",
+    "go/internal/gc/logcatalog.go",
+    "go/cmd/evolve/cmd_boundary.go",
+    "go/cmd/evolve/cmd_boundary_log.go",
+    "go/cmd/evolve/cmd_loop_detach.go",
+    "go/internal/phases/ship/repocontract.go",
+    "go/internal/phases/audit/ciparitygate/tierlog.go"
+  ]
+}

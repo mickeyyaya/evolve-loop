@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
 func archivePollutedWorkspace(workspace string, now func() time.Time) error {
@@ -34,8 +36,7 @@ func archivePollutedWorkspace(workspace string, now func() time.Time) error {
 	if pollution == 0 {
 		return nil
 	}
-	stamp := now().UTC().Format("20060102T150405.000000000")
-	archived := workspace + ".polluted-" + stamp
+	archived := workspace + gcpolicy.PollutedArchiveName(now())
 	if err := os.Rename(workspace, archived); err != nil {
 		return fmt.Errorf("rename to %s: %w", archived, err)
 	}
