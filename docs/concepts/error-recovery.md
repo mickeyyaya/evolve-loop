@@ -73,7 +73,7 @@ Cost: a single jq-update to state.json. Lifetime: 30 days by default. The operat
 | 3+ in last 30d | RETRY (try same task with adjusted approach) |
 | 3+ AND `systemic: true` | BLOCK (refuse this task class until operator intervenes) |
 
-`legacy/scripts/failure/failure-adapter.sh decide` computes the decision. The orchestrator reads its output and follows it verbatim.
+The native failure adapter (`go/internal/failureadapter`) computes the decision. The orchestrator follows it verbatim.
 
 ---
 
@@ -82,14 +82,13 @@ Cost: a single jq-update to state.json. Lifetime: 30 days by default. The operat
 When audit FAIL/WARN fires, the retrospective subagent runs inline (v8.45.0+). It reads the artifacts of the cycle and produces:
 
 - `retrospective-report.md`: a prose narrative + a `## Lessons` YAML block
-- `handoff-retrospective.json`: the machine handoff with `lessonIds[]` + `lessonFiles[]`
 - `.evolve/instincts/lessons/<id>.yaml`: one file for each lesson
 
-Then `merge-lesson-into-state.sh` reads `handoff-retrospective.json`. It verifies that each YAML file exists on disk (integrity check), and appends to `state.json:instinctSummary[]`.
+The research lookup (`go/internal/research`) reads the lesson files in `.evolve/instincts/lessons/`, and later phases get the relevant lessons. No code reads `handoff-retrospective.json` or `state.json:instinctSummary[]` now.
 
 Cost: ~$0.30-0.50 per FAIL/WARN cycle (Sonnet). The output is permanent. See [self-evolution.md](self-evolution.md) for the mechanism that learns across cycles.
 
-**Operator opt-out:** `EVOLVE_DISABLE_AUTO_RETROSPECTIVE=1` reverts to the record-only behavior of pre-v8.45. It is useful for cost-control deployments where the lesson extraction is not worth the cost.
+**Operator opt-out:** the old opt-out `EVOLVE_DISABLE_AUTO_RETROSPECTIVE` is removed. No code reads it.
 
 ---
 
@@ -116,25 +115,18 @@ A cycle can be *about* to fail mid-flight (cost spike, quota signature). Or it c
 }
 ```
 
-The EXIT trap of `run-cycle.sh` reads this block. If the block is present, the trap SKIPs the worktree removal, the branch deletion and the cycle-state clear. The next operator invocation of `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` continues at the paused phase.
+When a cycle ends abnormally, the Go orchestrator keeps its worktree (`go/internal/core/cycle_worktree_teardown.go`). It prints `preserving worktree` with the two recovery commands. `evolve loop --resume` continues at the paused phase, and `evolve cycle reset` reclaims the worktree.
 
-### Three triggers (v9.1.0+):
+### Triggers
 
-| Trigger | Cycle | Mechanism |
-|---|---|---|
-| **Reactive** | 3 | `subagent-run.sh` classifies non-zero exit + empty stderr + ≥80% cost as quota-likely → writes checkpoint |
-| **Pre-emptive** | 2 | The dispatcher tracks `BATCH_TOTAL_COST`. At ≥95% (`EVOLVE_CHECKPOINT_AT_PCT`), it exports `EVOLVE_CHECKPOINT_REQUEST=1` for the orchestrator of the next cycle. |
-| **Operator-requested** | manual | `bash legacy/scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
+| Trigger | Mechanism |
+|---|---|
+| **Quota wall** | When a phase ends on a quota wall in every CLI family, the orchestrator writes a checkpoint with the reason `quota-likely` |
+| **Operator-requested** | Send SIGINT or SIGTERM (Ctrl-C) to the loop. It writes a checkpoint with the reason `operator-requested` |
 
-### Env vars (v9.1.0+):
+`evolve loop --resume` also accepts the reasons `batch-cap-near` and `stall-inactivity` (`go/internal/core/resume.go`), but no code writes them now.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `EVOLVE_CHECKPOINT_AT_PCT` | `95` | Pre-emptive trigger % (cost-based) |
-| `EVOLVE_CHECKPOINT_WARN_AT_PCT` | `80` | Advisory WARN % |
-| `EVOLVE_CHECKPOINT_DISABLE` | `0` | Set `1` to disable all checkpoint thresholds |
-| `EVOLVE_QUOTA_DANGER_PCT` | `80` | Reactive classification cost threshold |
-| `EVOLVE_RESUME_ALLOW_HEAD_MOVED` | `0` | Set `1` to bypass the HEAD-drift guard on resume |
+The old checkpoint variables of v9.1.0 (`EVOLVE_CHECKPOINT_AT_PCT`, `EVOLVE_CHECKPOINT_WARN_AT_PCT`, `EVOLVE_CHECKPOINT_DISABLE`, `EVOLVE_QUOTA_DANGER_PCT` and `EVOLVE_RESUME_ALLOW_HEAD_MOVED`) are removed. No code reads them.
 
 See [`../architecture/checkpoint-resume.md`](../architecture/checkpoint-resume.md) for the full protocol.
 
@@ -142,20 +134,23 @@ See [`../architecture/checkpoint-resume.md`](../architecture/checkpoint-resume.m
 
 ## Layer 4: Worktree Preservation (Last-Ditch)
 
-Sometimes the cycle exits with rc≠0, but no checkpoint fires (for example, a deterministic Build error and not a quota signature). The worktree can then still survive. It survives if the dispatcher classified the failure as `recoverable`.
+Sometimes the cycle exits with rc≠0, but no checkpoint fires (for example, a deterministic Build error and not a quota signature). The worktree can then still survive: the orchestrator keeps the worktree of each cycle that ended abnormally.
 
-Classifier categories (from `archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh:classify_cycle_failure`):
+The loop classifies each failed cycle with `go/internal/cycleclassify`. The categories are:
 
-| Classification | What it means | Worktree preserved? |
-|---|---|---|
-| `infrastructure` | 429, 529, EPERM, sandbox errors, transient network | YES (the next cycle inherits + retries) |
-| `audit-fail` / `audit-warn` | The cycle ran end-to-end; the verdict is not PASS | NO (worktree removed; lessons extracted at Layer 2) |
-| `ship-gate-config` | Audit PASSed but ship-gate blocked (config drift) | YES (the operator can clear the gate condition + run ship.sh manually) |
-| `build-fail` | Builder failed without a coherent report | NO |
-| `exit-transport-hang` | (Opt-in through `EVOLVE_HANG_CLASSIFIER=1`) Two-factor: SHIPPED verdict + commit on main + rc=1, reclassified from `integrity-breach` | YES if the commit exists |
-| `integrity-breach` | run-cycle rc≠0 + orchestrator-report unclassifiable | NO (the operator must investigate; treat as a breach) |
+| Classification | What it means |
+|---|---|
+| `infrastructure` | 429, 529, EPERM, sandbox errors, transient network |
+| `audit-fail` | The cycle ran end-to-end, and the verdict is FAIL or WARN |
+| `ship-gate-config` | Audit PASSed but ship-gate blocked (config drift). The operator can clear the gate condition and run `evolve ship` manually |
+| `build-fail` | Builder failed without a coherent report |
+| `exit-transport-hang` | (Opt-in through the policy; off by default) Two-factor: SHIPPED verdict + commit on main + rc=1, reclassified from `integrity-breach` |
+| `phase-refusal` | The last recorded phase outcome is a FAIL with a diagnostic code: a refusal that the task caused |
+| `integrity-breach` | run-cycle rc≠0 + orchestrator-report unclassifiable. The operator must investigate; treat it as a breach |
 
-Operators who want stricter preservation can set `EVOLVE_PRESERVE_WORKTREE_ON_FAIL=1`. It overrides the decision that the classification makes.
+The class does not decide if the worktree stays. The worktree stays on a FAIL verdict and on every abnormal end. A PASS or a WARN removes it. L3 gc or `evolve cycle reset` reclaims a kept worktree.
+
+The old override `EVOLVE_PRESERVE_WORKTREE_ON_FAIL` is removed. No code reads it.
 
 ---
 
@@ -182,21 +177,22 @@ Operators who want stricter preservation can set `EVOLVE_PRESERVE_WORKTREE_ON_FA
    rables) Layer 2:   (worktree   record +       NO recovery
            record +   + state      lessons +     attempted —
            lessons    preserved   worktree       operator
-                      via         removed         must
-                      EXIT trap                   investigate
-                      skipping
-                      cleanup)
+                      by the      kept            must
+                      teardown                    investigate
+                      rule)
 ```
 
-The exit code of the dispatcher maps to operator intent:
+The exit code of `evolve loop` maps to operator intent:
 
 | rc | Meaning | Operator action |
 |---|---|---|
-| 0 | All cycles completed and shipped | None: `git log` shows the commits |
-| 1 | Reserved (unused) | — |
-| 2 | INTEGRITY-BREACH | Investigate before you run again |
-| 3 | DONE-WITH-RECOVERABLE-FAILURES | Review `state.json:failedApproaches[]`; the next run will adapt |
-| 4 | BATCH-BUDGET-EXHAUSTED | Increase `--budget-usd` or run another batch |
+| 0 | The batch completed with no failure | None: `git log` shows the commits |
+| 1 | The loop stopped early: the circuit breaker opened, the loop cannot write a state file, or `--preflight-only` failed | Read the last lines of the output |
+| 2 | The loop stopped on an error or a fatal failure, or it refused to start | Read the last lines of the output, and investigate before you run again |
+| 3 | The batch completed, but it absorbed a recoverable failure or a FAIL verdict | Run `evolve failures list`; the next run will adapt |
+| 5 | The quota of every CLI family is used up, and the cycle has a checkpoint | Run `evolve loop --resume` after the quota resets |
+| 10 | A flag is not valid | Correct the command |
+| 130 | An interrupt stopped the loop | If a cycle was running, the loop wrote a checkpoint. Run `evolve loop --resume` |
 
 ---
 
@@ -206,16 +202,17 @@ When something goes wrong, use these canonical commands:
 
 | Situation | Command |
 |---|---|
-| Resume a checkpointed cycle | `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --resume` |
-| Manually checkpoint a hung cycle | `bash legacy/scripts/lifecycle/cycle-state.sh checkpoint operator-requested` |
-| Clear a stuck cycle-state | `bash legacy/scripts/lifecycle/cycle-state.sh clear` |
-| Inspect what failed | `tail -50 .evolve/runs/cycle-N/orchestrator-stdout.log` |
-| Verify that the ledger is not tampered | `bash legacy/scripts/observability/verify-ledger-chain.sh` |
-| Reset everything (nuclear) | `bash archive/legacy/scripts/dispatch/evolve-loop-dispatch.sh --reset` |
-| Re-render CLI Resolution post-hoc | `bash legacy/scripts/observability/render-cli-resolution.sh <cycle>` |
-| Promote unshipped predicates to regression-suite | `bash legacy/scripts/utility/promote-acs-to-regression.sh <cycle>` |
+| Resume a checkpointed cycle | `evolve loop --resume` |
+| Manually checkpoint a hung cycle | Send SIGINT or SIGTERM (Ctrl-C) to the loop. It checkpoints the cycle. Then run `evolve loop --resume` |
+| Keep the uncommitted work of a worktree as refs (v22.27.0+) | `evolve checkpoint save`, then `list`, `restore <ref> --into DIR` or `prune` |
+| Clear a stuck cycle-state | `evolve cycle reset` |
+| Inspect what failed | `evolve failures list`, then the reports in `.evolve/runs/cycle-N/` |
+| Verify that the ledger is not tampered | `evolve ledger verify` |
+| Clear the infrastructure failures before a loop | `evolve loop --reset` |
+| Start fresh past an unfinished cycle (last resort; the history is not sealed) | `evolve loop --force-fresh` |
+| Explain the routing decisions of a cycle | `evolve routing explain --cycle N` |
 
-The `--reset` does NOT touch Tier 1 hooks: they stay in force. It clears only the Tier 3 workflow state.
+`evolve loop --reset` does NOT touch the kernel guards: they stay in force. It removes only the infrastructure and ship-gate-config entries from `state.json:failedApproaches`.
 
 ---
 
@@ -254,6 +251,8 @@ T+35:00  Cycle 11 completes; ships normally
 
 Net work loss: ~5 minutes (the partial audit phase). The ~$2-4 of Builder work survives.
 
+This timeline is from v9.1.0, before the Go port, so it names bash scripts that are now removed. Today the Go orchestrator does the same work. It writes a `quota-likely` checkpoint and keeps the worktree. Then `evolve loop --resume` continues at the paused phase.
+
 This is the canonical test of Layer 3. The expected result: subscription users (the dominant case for `/evo:loop`) NEVER lose >1 phase of work to quota.
 
 ---
@@ -264,8 +263,8 @@ This is the canonical test of Layer 3. The expected result: subscription users (
 |---|---|
 | "Recovery means the cycle will succeed eventually" | No. Layer 3 preserves *state*, not *outcome*. The same Builder code can still produce the same audit FAIL on resume. Layer 2 lessons can improve the next *new* cycle, not the resumed one. |
 | "Checkpoint-resume avoids all costs" | No. The partial cost up to the checkpoint is sunk. The resume cost is the cost of the phases that remain. |
-| "Worktree preservation lets me cherry-pick by hand" | Possible but discouraged. Cycle integrity (audit-binding through the tree SHA) requires ship.sh as the only ship path. A manual cherry-pick bypasses Tier 1 enforcement. |
-| "Recovery means I never need to reset" | No. `--reset` is the right answer for kernel-confused states (for example, when cycle-state.json got into an invalid state). The reset clears only Tier 3 state; Tier 1 + Tier 2 stay in force. |
+| "Worktree preservation lets me cherry-pick by hand" | Possible but discouraged. Cycle integrity (audit-binding through the tree SHA) requires `evolve ship` as the only ship path. A manual cherry-pick bypasses Tier 1 enforcement. |
+| "Recovery means I never need to reset" | No. `evolve cycle reset` is the right answer for kernel-confused states (for example, when cycle-state.json got into an invalid state). The reset clears only Tier 3 state; Tier 1 + Tier 2 stay in force. |
 | "Layer 3 protects against bad code" | No. The checkpoint preserves the edits of Builder, regardless of correctness. On resume, the auditor computes a fresh verdict against the code that is now preserved. |
 
 ---

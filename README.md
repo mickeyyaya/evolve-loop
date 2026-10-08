@@ -29,18 +29,19 @@ The full external surface is small, so this section lists all of it. The loop fi
 **What you control:**
 
 - **One command**: `/evo:loop "add dark mode"`. Optionally, add a strategy (`harden · repair · innovate · balanced`), a hard cycle bound (`--cycles N`), or `--resume`. `--resume` continues from a validated durable phase boundary.
-- **The backlog**: put JSON todos into `.evolve/inbox/`. `weight` sets the priority. `route` sets the ownership. `"console-manual"` marks an item as operator-owned, so autonomous lanes structurally cannot draw it. `"lane"` overrides a false positive. Routing is enforced plumbing, not a suggestion in a prompt.
-- **Policy, not code**: `.evolve/policy.json` holds the fleet width (`fleet.count`), the gate stages, the budgets and the model-tier pins. Zero feature flags.
-- **Per-phase model routing**: use `--cli` / `--model` for each agent when you want to pin who does what.
+- **The backlog**: file a JSON todo into `.evolve/inbox/` with `evolve inbox add`, and change or show it with `evolve inbox edit`, `withdraw`, `verify`, `show` and `list`. A computed rank sets the order: `evolve inbox rank --explain <id>` shows how `priority_class`, `weight` and four other factors give the score. `route` sets the ownership. `"console-manual"` marks an item as operator-owned, so autonomous lanes structurally cannot draw it. `"lane"` overrides a false positive. Routing is enforced plumbing, not a suggestion in a prompt.
+- **Policy, not code**: `.evolve/policy.json` holds the fleet width (`fleet.count`), the gate stages, the budgets and the CLI routing table (`cli_routing`). Zero feature flags.
+- **Per-phase model routing**: `evolve cli-routing init --clis <a,b,c>` starts the routing table. Then `evolve cli-routing set agents.<agent> <clis>` pins who does what, and `evolve cli-routing explain <agent>` shows the chain of an agent. `--cli` / `--model` change one run, inside the allowed set of the table.
+- **Work in progress**: `evolve checkpoint save`, `list`, `restore` and `prune` keep the uncommitted work of a worktree as git refs.
 - **Releases**: `evolve release X.Y.Z` (or `/evo:publish`) does the preflight gates, the changelog, an atomic version bump, a CI-verified publish and an auto-rollback.
 - **Observability on demand**: `evolve doctor` (environment probes), `evolve inbox batches` (how the backlog will group), `evolve dossier` (per-cycle verdict records), `evolve cycle-health` (11-signal integrity fingerprint).
 
 **What the loop completes and finds out for you:**
 
 - It finds and scopes the work (scout → triage). It puts related backlog items into one cycle. It automatically re-weights pain that recurs.
-- It routes each phase to the correct model and CLI. It detects quota exhaustion from the real provider surface. It fails over across model families during a run.
+- It routes each phase to the correct model and CLI. It detects quota exhaustion from the real provider surface. It fails over across model families during a run. At each wave boundary, it installs a newer Claude Code or agy and smoke-tests it (`evolve cli update`).
 - It writes tests that fail before it writes code. It self-verifies the build at handoff (a red build never gets to review). Then an audit agent reviews the result adversarially.
-- It ships only through deterministic gates. When a correct implementation has one minor gate defect, the loop repairs the defect in the phase and does not discard the work.
+- It ships only through deterministic gates. When a correct implementation has one minor gate defect, the loop repairs the defect in the phase and does not discard the work. When only the deterministic audit gates force a FAIL, the cycle gets a bounded Build repair round.
 - It classifies every failure (honest rejection / pipeline fault / operator-owned). It keeps the worktrees for supported continuation and operator salvage. It quarantines poison tasks that cannot pass. It files the follow-up work into its own backlog.
 - It checkpoints phase boundaries and validates the identity on resume. It keeps recoverable work after interruptions. It gets the relevant durable lessons for later phases.
 
@@ -99,7 +100,7 @@ Start with only a goal. Use a flag only when you want more control. Each step be
 /evo:setup                          # pick a preset once
 /evo:loop "harden the auth flow"
 ```
-> *Behind the scenes:* setup writes **per-phase model routing** to `.evolve/policy.json`. For example, Build on Codex/GPT-5.5 and Audit on Claude/Opus, with different model families when they are available. Family diversity is a routing preference. It does not guarantee independent judgment.
+> *Behind the scenes:* setup writes **per-phase model pins** to `.evolve/policy.json`. It prefers different model families for Build and Audit when they are available. If the policy declares a `cli_routing` table, setup refuses to write. Change the table with `evolve cli-routing set` instead. Family diversity is a routing preference. It does not guarantee independent judgment.
 
 **5 · Resume** a run that was interrupted:
 
@@ -112,13 +113,13 @@ A hands-on walkthrough of your first cycle: [docs/getting-started/your-first-cyc
 
 ### Setup & configuration (optional)
 
-You can run the loop with **zero configuration**. By default, it uses all-Claude models and sensible behavior. When you want control, it is one command:
+You can run the loop with **zero configuration**. By default, each phase runs the CLI chain of its profile. The loop skips a CLI that you do not have, and it falls back to an installed CLI. When you want control, it is one command:
 
 ```bash
 /evo:setup
 ```
 
-It detects which LLM CLIs you have and explains the pipeline. Then it offers **three presets**: **Recommended**, **Economy** (cheaper/faster models), and **Max-quality** (strongest models). You make **one choice**, and it writes the per-phase model routing for you. You can run it again at any time, because it is idempotent.
+It detects which LLM CLIs you have and explains the pipeline. Then it offers **three presets**: **Recommended**, **Economy** (cheaper/faster models), and **Max-quality** (strongest models). You make **one choice**, and it writes the per-phase model routing for you. You can run it again at any time, because it is idempotent. A project that declares a `cli_routing` table uses `evolve cli-routing` instead, because setup does not write beside a table.
 
 **All you need is an LLM CLI subscription.** Evolve drives the CLIs that you are already signed in to. Your Claude, Codex, or Gemini subscription is enough to run the loop.
 
@@ -126,7 +127,8 @@ Everything else has sane defaults. The only knobs are in `.evolve/policy.json`, 
 
 | Setting | Default | What it does |
 |---|---|---|
-| per-phase model pins | all-Claude | which LLM + model runs each phase (written by `/evo:setup`) |
+| per-phase model pins | none (the profile chains) | which LLM + model runs each phase (written by `/evo:setup`; refused beside a `cli_routing` table) |
+| `cli_routing` | not set | one routing table for every dispatch: the allowed CLIs, the default chain and the chains for each tier, role and agent. `evolve cli-routing` is its only writer |
 | `workflow.cycle_budget` | `enforce` | `enforce` = the advisor decides the cycle count; `off` = without `--cycles`, the loop runs a single cycle |
 | `workflow.max_cycles_cap` | `25` | safety ceiling for the number of cycles that the advisor can run |
 
@@ -182,7 +184,7 @@ It is **not** a code-writing agent that chases benchmarks. It is the governance 
 Every cycle runs the same spine of phases:
 
 ```
-INTENT → SCOUT → TRIAGE → [PLAN-REVIEW] → [TDD] → BUILD → AUDIT → SHIP → LEARN
+INTENT → SCOUT → TRIAGE → [PLAN-REVIEW] → [TDD] → BUILD → [CODE-REVIEW] → AUDIT → SHIP → LEARN
 ```
 
 - **Intent** turns a vague goal into a structured spec (goals, non-goals, constraints, acceptance criteria). It must challenge at least one premise.
@@ -191,6 +193,7 @@ INTENT → SCOUT → TRIAGE → [PLAN-REVIEW] → [TDD] → BUILD → AUDIT → 
 - **Plan-Review** *(optional)* sends the plan out to four lenses (product, engineering, design, security) before any code exists.
 - **TDD** *(optional, on by default)* writes tests that fail and that encode the acceptance criteria. A *separate* agent writes them, not the agent that will implement the change.
 - **Build** implements the change in an isolated git worktree.
+- **Code-Review** *(code cycles, in shadow)* reviews the build independently on the ten dimensions of the shared quality index (`/evo:quality-index`, `/evo:architecture-review`). It is not a gate.
 - **Audit** adversarially reviews the work and runs the deterministic check suite.
 - **Ship** commits only if the verdict is green.
 - **Learn** captures a carryover note on success, or a structured failure lesson on failure.
@@ -369,6 +372,19 @@ If you find a gaming pattern that the framework did not catch, please file an is
 
 | Version | Date | Notes |
 |---|---|---|
+| v22.27 | Oct 8 | The `cli_routing` table runs agy first. This release adds the code-review phase, the convergence policy (both shadow), the computed inbox rank, `evolve checkpoint` and `evolve cli update`. |
+| v22.26 | Sep 30 | `evolve gc` removes what finished cycles leave. The build handoff floor runs the repo-contract pack. This release also adds `evolve loop-stop`, `evolve inbox route-console` and the `NO_WORK` result. |
+| v22.25 | Sep 28 | A byte-identical rebase carries its audited verdict to ship (ADR-0105). Protected control-plane items go to the console. This release adds the code-comment convention and `commentaudit`. |
+| v22.24 | Sep 15 | Every fallback chain ends with every available CLI (ADR-0104). The Signal Center collects all signals (ADR-0101). Phase boundaries verify declared outputs (ADR-0100). |
+| v22.23 | Sep 11 | Document cycles get a deliverable contract (ADR-0099). This release adds the Task Contract block and `evolve dashboard`. Repair rounds increase the tier and the effort (ADR-0096). |
+| v22.22 | Sep 1 | This release adds the build-explanation deliverables. A zero `ContractVersion` cannot turn off the audit gate. The core, cmd and ship tests rejoin the lane gate. |
+| v22.21 | Aug 31 | An audit FAIL gets up to two repair rounds in its cycle (ADR-0092). One policy table decides every retry (ADR-0093). The audit binding fails closed. |
+| v22.20 | Aug 25 | Submit-verify results go to a durable ledger. The SELECT menu drops from 65 cards to 22. A judgment phase's FAIL no longer halts the loop. |
+| v22.19 | Aug 18 | The tree-drift checks accept the inbox consumption of a PASS ship. The closure-claim gate has fewer false positives. This release adds a fresh-base collision guard. |
+| v22.18 | Aug 15 | The PASS ship commit consumes its own inbox items. The retrospective moves to Claude at the deep tier. `/evo:setup` offers a live latest-model probe. |
+| v22.17 | Aug 13 | Audit verdicts show each step from evidence to verdict (ADR-0087, ADR-0088). A salvage layer repairs recoverable verdicts. The loop checks the outputs of each phase. |
+| v22.16 | Aug 12 | Three FAILs in a row halt the batch. `--push-only` recovers an attested commit that did not land. Deliverable contracts can name more than one artifact. |
+| v22.15 | Aug 6 | Latest-model selection keeps to one lineage and writes in shadow first. New evals are tracked again. A documentation audit refreshes the README and the site. |
 | v22.14 | Aug 5 | Ship-time **repo-contract scanner pack** (default enforce: lane ships can no longer red `main`). Boot-time **binary staleness self-heal** (`boot.binary_refresh=auto`). Engineering chronicle (17 narratives) + doc-root consolidation into `docs/` |
 | v22.13 | Aug 4 | Composed-gate apicover check now enforces (six-recurrence warnship class); bounded retry on worktree provisioning; a failed publish demotes its own assetless tag listing; channel-e2e deflake |
 | v22.12 | Jul 30 | Deep-tier artifact budgets (six missing_artifact deaths in one day) + contract-gate CLI escalation; verified-bytes single read. The e2e budget moved into the make recipe (the assetless-tag class), and a failed publish now demotes its own listing |
@@ -395,19 +411,6 @@ If you find a gaming pattern that the framework did not catch, please file an is
 | v21.1 | Jun 24 | Prebuilt binaries for 13 Unix targets + install.sh OS/arch detection |
 | v21.0 | Jun 24 | `/evo:` plugin namespace rename; removed the strict-audit gate dial |
 | v20.4 | Jun 24 | Public OSS-mirror release automation |
-| v22.15 | Aug 6 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.16 | Aug 12 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.17 | Aug 13 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.18 | Aug 15 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.19 | Aug 18 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.20 | Aug 25 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.21 | Aug 31 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.22 | Sep 1 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.23 | Sep 11 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.24 | Sep 15 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.25 | Sep 28 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.26 | Sep 30 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
-| v22.27 | Oct 8 | TBD — fill in via release-pipeline.sh + changelog-gen.sh |
 
 ---
 

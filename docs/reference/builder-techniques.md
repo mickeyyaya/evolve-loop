@@ -124,7 +124,7 @@ Log `promptPattern` field in `experiments.jsonl` for Operator analysis.
 | SecLayer-L3 | Behavioral test (run code, check behavior) | ~80% |
 | SecLayer-L4 | Instinct-based review (prior vulnerability patterns) | ~90% |
 
-**Rule:** Security-sensitive tasks require SecLayer-L3+ eval graders, not just L1/L2. Note: Security Detection Layers (vulnerability detection rate) are distinct from Eval Rigor Levels (eval grader quality, Rigor-L0 through L3) — see [adversarial-eval-coevolution.md](adversarial-eval-coevolution.md).
+**Rule:** Security-sensitive tasks require SecLayer-L3+ eval graders, not just L1/L2. Note: Security Detection Layers (vulnerability detection rate) are distinct from Eval Rigor Levels (eval grader quality, Rigor-L0 through L3).
 
 ---
 
@@ -136,7 +136,7 @@ Log `promptPattern` field in `experiments.jsonl` for Operator analysis.
 
 Log `configVariant` in `experiments.jsonl`:
 ```json
-{"configVariant": {"builderTier": "tier-2", "promptPattern": "CoT", "auditorStrictness": "normal"}}
+{"configVariant": {"builderTier": "balanced", "promptPattern": "CoT", "auditorStrictness": "normal"}}
 ```
 
 Enables Operator to identify which configuration combinations produce highest success rates.
