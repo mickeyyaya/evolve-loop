@@ -30,6 +30,9 @@ type Realization struct {
 	// that fell back to the CLI's own default isn't reported as the requested tier.
 	ModelOmitted     string
 	SystemPromptFile string
+	EffortCapped     string
+	EffortVariant    string
+	EffortUnapplied  string
 	// modelDispatchEffect retains selector, ambiguity and argv-terminator provenance from the final
 	// deduplicated LaunchFlags; drivers apply it to their own base selector at the invocation boundary.
 	modelDispatchEffect modelDispatch

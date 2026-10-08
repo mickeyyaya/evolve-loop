@@ -205,3 +205,8 @@ func cloneCeiling(in map[string][]string) map[string][]string {
 	}
 	return out
 }
+
+func (r *Router) Effort(agent, tier string) (effort, source string) {
+	t := r.tables.Load().declared
+	return t.pol.Efforts().Resolve(tier, agent, t.agentKeys[agent])
+}

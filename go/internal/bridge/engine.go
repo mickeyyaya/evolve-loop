@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -68,6 +69,7 @@ type Deps struct {
 	// budget (seconds) keyed on agent label; a missing or non-positive entry
 	// falls open to the built-in default.
 	PhaseArtifactTimeoutS map[string]int
+	Efforts               policy.EffortTable
 	// CorroborateWall is the out-of-band truth check behind the exhaustion
 	// fast-fail; nil falls back to the pane match being the verdict.
 	CorroborateWall WallCorroborator

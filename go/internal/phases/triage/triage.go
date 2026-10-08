@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/phaseidentity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -196,7 +197,7 @@ func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) s
 		"prefer selecting a whole batch as top_n (its items share a worktree, build, and audit — " +
 		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches. " +
 		"Batches come in inbox-rank order, the computed priority `evolve inbox rank` shows, and each item's line gives its score and top factor:\n" +
-		rendered
+		phaseidentity.WrapPasted(rendered)
 }
 
 func consoleRoutedNote(console []inboxbatch.Item) string {

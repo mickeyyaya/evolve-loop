@@ -73,8 +73,7 @@
           "-c",
           "plan_mode_reasoning_effort=ultra"
         ]
-      },
-      "default": "high"
+      }
     },
     "permission": {
       "channel": "controller"

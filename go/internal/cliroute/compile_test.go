@@ -87,7 +87,7 @@ func TestCompile_UnknownAgentRoleTierFamilyAndModelAreFindings(t *testing.T) {
 		Default: []string{"claude", "openrouter"},
 		Work:    map[string][]string{"review": {"claude"}},
 		Agents:  map[string]policy.AgentRule{"nobody": {CLI: []string{"claude"}}, "scout": {CLI: []string{"claude"}, Model: "giant"}},
-		Tiers:   map[string][]string{"huge": {"claude"}},
+		Tiers:   map[string]policy.TierRule{"huge": {CLIs: []string{"claude"}}},
 	})
 	requireFinding(t, findings, "cli_routing.clis", cliroute.SeverityError, "gemini")
 	requireFinding(t, findings, "cli_routing.default", cliroute.SeverityError, "openrouter")
@@ -106,7 +106,7 @@ func TestCompile_ADriverThatIsNotToolCapableIsAFinding(t *testing.T) {
 func TestCompile_ATierEntryOutsideClisIsAFinding(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
-		Tiers: map[string][]string{"deep": {"claude", "codex"}, "top": {}},
+		Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude", "codex"}}, "top": {CLIs: []string{}}},
 	})
 	requireFinding(t, findings, "cli_routing.tiers.deep", cliroute.SeverityError, "codex")
 	requireFinding(t, findings, "cli_routing.tiers.top", cliroute.SeverityError, "empty")
@@ -147,7 +147,7 @@ func TestCompile_ReportsEveryFinding(t *testing.T) {
 		Default:    []string{"agy"},
 		Work:       map[string][]string{"review": {"agy"}},
 		Agents:     map[string]policy.AgentRule{"auditor": {CLI: []string{"agy"}}, "ghost": {CLI: []string{"agy"}}},
-		Tiers:      map[string][]string{"deep": {"agy"}, "colossal": {"agy"}},
+		Tiers:      map[string]policy.TierRule{"deep": {CLIs: []string{"agy"}}, "colossal": {CLIs: []string{"agy"}}},
 		AfterChain: "sometimes",
 	})
 	p.Pins = map[string]policy.Pin{"scout": {Model: "fast"}}
@@ -165,7 +165,7 @@ func TestCompile_ReportsEveryFinding(t *testing.T) {
 func TestCompile_TierCeilingExcludingClaudeAtAFloorTierIsAFinding(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
-		Tiers: map[string][]string{"deep": {"agy"}},
+		Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"agy"}}},
 	})
 	requireFinding(t, findings, "cli_routing.tiers.deep", cliroute.SeverityError, "auditor", "claude")
 }
@@ -174,7 +174,7 @@ func TestCompile_AnAgentModelTierChecksTheFloorCeiling(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
 		Agents: map[string]policy.AgentRule{"tdd-engineer": {CLI: []string{"claude"}, Model: "top"}},
-		Tiers:  map[string][]string{"top": {"agy"}},
+		Tiers:  map[string]policy.TierRule{"top": {CLIs: []string{"agy"}}},
 	})
 	requireFinding(t, findings, "cli_routing.tiers.top", cliroute.SeverityError, "tdd-engineer")
 }
@@ -211,7 +211,7 @@ func TestCompile_AnUnreadableProfileListIsAFindingInBothModes(t *testing.T) {
 func TestCompile_AFloorAgentsOverrideTierChecksTheCeiling(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
-		Tiers: map[string][]string{"top": {"agy"}},
+		Tiers: map[string]policy.TierRule{"top": {CLIs: []string{"agy"}}},
 	})
 	requireFinding(t, findings, "cli_routing.tiers.top", cliroute.SeverityError, "spec-verify")
 }
@@ -247,7 +247,7 @@ func TestCompile_WithoutACatalogABuiltinPhaseKeyStillNormalizes(t *testing.T) {
 func TestCompile_AnUnknownFamilyInATierCeilingIsAFinding(t *testing.T) {
 	block := policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
-		Tiers: map[string][]string{"deep": {"claude", "gemini"}},
+		Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"claude", "gemini"}}},
 	}
 	_, findings := cliroute.Compile(routingPolicy(block), syntheticCatalog(), syntheticProfiles(t))
 	requireFinding(t, findings, "cli_routing.tiers.deep", cliroute.SeverityError, "gemini")
@@ -275,7 +275,7 @@ func TestCompile_ATierCeilingRefusalOnAnOverrideTierIsAFinding(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, AfterChain: "stop",
 		Agents: map[string]policy.AgentRule{"scanner": {CLI: []string{"agy"}}},
-		Tiers:  map[string][]string{"deep": {"claude"}, "balanced": {"claude"}},
+		Tiers:  map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "balanced": {CLIs: []string{"claude"}}},
 	})
 	requireFinding(t, findings, "agent.scanner.tier_ceiling", cliroute.SeverityError, "agents:scanner", "[deep balanced]", "[agy-tmux]")
 	if _, ok := findingFor(findings, "agent.scanner.tier_ceiling", cliroute.SeverityError, "[fast]"); ok {
@@ -287,7 +287,7 @@ func TestCompile_TheAfterChainTailCanSatisfyTheCeiling(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"},
 		Agents: map[string]policy.AgentRule{"scanner": {CLI: []string{"agy"}}},
-		Tiers:  map[string][]string{"deep": {"claude"}, "balanced": {"claude"}},
+		Tiers:  map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "balanced": {CLIs: []string{"claude"}}},
 	})
 	if _, ok := findingFor(findings, "agent.scanner.tier_ceiling", cliroute.SeverityError); ok {
 		t.Fatalf("other_clis appends claude, which the ceiling permits at deep: %+v", findings)
@@ -298,7 +298,7 @@ func TestCompile_AnAgentModelFixesTheTiersTheCeilingChecks(t *testing.T) {
 	findings := compileSynthetic(t, policy.CLIRouting{
 		CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}, AfterChain: "stop",
 		Agents: map[string]policy.AgentRule{"scanner": {CLI: []string{"agy"}, Model: "fast"}},
-		Tiers:  map[string][]string{"deep": {"claude"}, "balanced": {"claude"}},
+		Tiers:  map[string]policy.TierRule{"deep": {CLIs: []string{"claude"}}, "balanced": {CLIs: []string{"claude"}}},
 	})
 	if _, ok := findingFor(findings, "agent.scanner.tier_ceiling", cliroute.SeverityError); ok {
 		t.Fatalf("agents.scanner.model fixes the tier at fast, so the deep override never runs: %+v", findings)

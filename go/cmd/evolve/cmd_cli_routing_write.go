@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent"
 )
@@ -25,16 +26,18 @@ type routingWriteFlags struct {
 	root   string
 	clis   string
 	model  string
+	effort string
 	dryRun bool
 }
 
 type routingEdit func(existing []byte, pol policy.Policy) (map[string]any, error)
 
 type routingWrite struct {
-	verb   string
-	flags  routingWriteFlags
-	stdout io.Writer
-	stderr io.Writer
+	verb     string
+	flags    routingWriteFlags
+	rewrites map[string][]byte
+	stdout   io.Writer
+	stderr   io.Writer
 }
 
 func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) int {
@@ -42,7 +45,8 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 	if !ok {
 		return exitRoutingUsage
 	}
-	edit, err := routingEditFor(verb, f, rest)
+	rewrites := map[string][]byte{}
+	edit, err := routingEditFor(verb, f, rest, rewrites)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v (%s)\n", verb, err, cliRoutingUsage)
 		return exitRoutingUsage
@@ -51,7 +55,7 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", verb, err)
 		return exitRoutingFinding
 	}
-	return writeRoutingEdit(routingWrite{verb: "cli-routing " + verb, flags: f, stdout: stdout, stderr: stderr}, edit)
+	return writeRoutingEdit(routingWrite{verb: "cli-routing " + verb, flags: f, rewrites: rewrites, stdout: stdout, stderr: stderr}, edit)
 }
 
 func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routingWriteFlags, []string, bool) {
@@ -61,6 +65,7 @@ func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routi
 	fs.StringVar(&f.root, "project-root", "", "project root (default: EVOLVE_PROJECT_ROOT or the cwd)")
 	fs.StringVar(&f.clis, "clis", "", "init: the CLIs this operator has, in walk order")
 	fs.StringVar(&f.model, "model", "", "set agents.<agent>: the tier the agent dispatches at")
+	fs.StringVar(&f.effort, "effort", "", "set tiers.<tier> or agents.<agent>: the reasoning effort (low, medium, high, xhigh, max)")
 	fs.BoolVar(&f.dryRun, "dry-run", false, "print the result and write nothing")
 	rest, err := cmdutil.ParseInterspersed(fs, args)
 	if err != nil {
@@ -75,16 +80,19 @@ func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routi
 	return f, rest, true
 }
 
-func routingEditFor(verb string, f routingWriteFlags, rest []string) (routingEdit, error) {
+func routingEditFor(verb string, f routingWriteFlags, rest []string, rewrites map[string][]byte) (routingEdit, error) {
+	dir := routingProfilesDir(f.root)
 	switch {
 	case verb == "init" && len(rest) == 0 && f.clis != "":
-		return initRoutingEdit(splitRoutingList(f.clis)), nil
+		return initRoutingEdit(splitRoutingList(f.clis), dir, rewrites), nil
 	case verb == "set" && len(rest) == 2:
-		return setRoutingEdit(routingSet{key: rest[0], values: splitRoutingList(rest[1]), model: f.model}), nil
+		return setRoutingEdit(routingSet{key: rest[0], values: splitRoutingList(rest[1]), model: f.model, effort: f.effort}), nil
+	case verb == "set" && len(rest) == 1 && f.effort != "":
+		return setRoutingEdit(routingSet{key: rest[0], model: f.model, effort: f.effort}), nil
 	case verb == "unset" && len(rest) == 1:
 		return unsetRoutingEdit(rest[0]), nil
 	case verb == "migrate" && len(rest) == 0:
-		return migrateRoutingEdit, nil
+		return migrateRoutingEdit(dir, rewrites), nil
 	}
 	return nil, errors.New("wrong arguments")
 }
@@ -118,20 +126,27 @@ func writeRoutingEdit(w routingWrite, edit routingEdit) int {
 	path := filepath.Join(w.flags.root, ".evolve", "policy.json")
 	candidate, err := routingCandidate(path, edit)
 	if err == nil {
-		err = validateRoutingCandidate(w.flags.root, candidate, w.stderr)
+		err = validateRoutingCandidate(w.flags.root, candidate, w.rewrites, w.stderr)
 	}
 	if err != nil {
 		fmt.Fprintf(w.stderr, "evolve %s: %v\n", w.verb, err)
 		return exitRoutingFinding
 	}
+	dir := routingProfilesDir(w.flags.root)
 	if w.flags.dryRun {
 		fmt.Fprintf(w.stdout, "%s --dry-run: %s would become\n%s", w.verb, path, candidate)
+		reportProfileRewrites(w.stdout, dir, w.rewrites, true)
 		return 0
 	}
 	if err := atomicwrite.Bytes(path, candidate); err != nil {
 		fmt.Fprintf(w.stderr, "evolve %s: %v\n", w.verb, err)
 		return exitRoutingFinding
 	}
+	if err := writeProfileRewrites(dir, w.rewrites); err != nil {
+		fmt.Fprintf(w.stderr, "evolve %s: the table is written, but a profile rewrite failed (run the verb again): %v\n", w.verb, err)
+		return exitRoutingFinding
+	}
+	reportProfileRewrites(w.stdout, dir, w.rewrites, false)
 	fmt.Fprintf(w.stdout, "%s: wrote %s\n%s\n", w.verb, path, routingShipHint)
 	return 0
 }
@@ -159,12 +174,15 @@ func orEmptyObject(raw []byte) []byte {
 	return raw
 }
 
-func validateRoutingCandidate(root string, candidate []byte, stderr io.Writer) error {
+func validateRoutingCandidate(root string, candidate []byte, rewrites map[string][]byte, stderr io.Writer) error {
 	pol, err := policy.Parse(candidate)
 	if err != nil {
 		return fmt.Errorf("the result would not parse: %w", err)
 	}
 	s := routerSetupOf(pol, routerSite{root: root, catalog: routingCatalog(root)}, cliroute.Host{LookPath: everyBinaryPresent})
+	if len(rewrites) > 0 {
+		s.Profiles = profiles.NewFromFS(profileOverlay{base: os.DirFS(routingProfilesDir(root)), files: rewrites})
+	}
 	_, findings, err := cliroute.Build(s)
 	reportRoutingFindings(stderr, findings)
 	if err != nil {
@@ -173,20 +191,30 @@ func validateRoutingCandidate(root string, candidate []byte, stderr io.Writer) e
 	return nil
 }
 
-func initRoutingEdit(clis []string) routingEdit {
+func initRoutingEdit(clis []string, dir string, rewrites map[string][]byte) routingEdit {
 	return func(existing []byte, pol policy.Policy) (map[string]any, error) {
 		if pol.CLIRouting != nil {
 			return nil, errors.New("a cli_routing block exists: edit it with evolve cli-routing set")
 		}
-		return migrateLegacyKeys(existing, pol, policy.CLIRouting{CLIs: clis, Default: clis})
+		block, err := moveProfileEfforts(dir, policy.CLIRouting{CLIs: clis, Default: clis}, rewrites)
+		if err != nil {
+			return nil, err
+		}
+		return migrateLegacyKeys(existing, pol, block)
 	}
 }
 
-func migrateRoutingEdit(existing []byte, pol policy.Policy) (map[string]any, error) {
-	if pol.CLIRouting == nil {
-		return nil, errors.New("there is no cli_routing block to migrate into: run evolve cli-routing init --clis first")
+func migrateRoutingEdit(dir string, rewrites map[string][]byte) routingEdit {
+	return func(existing []byte, pol policy.Policy) (map[string]any, error) {
+		if pol.CLIRouting == nil {
+			return nil, errors.New("there is no cli_routing block to migrate into: run evolve cli-routing init --clis first")
+		}
+		block, err := moveProfileEfforts(dir, cloneRouting(*pol.CLIRouting), rewrites)
+		if err != nil {
+			return nil, err
+		}
+		return migrateLegacyKeys(existing, pol, block)
 	}
-	return migrateLegacyKeys(existing, pol, *pol.CLIRouting)
 }
 
 func setRoutingEdit(set routingSet) routingEdit {

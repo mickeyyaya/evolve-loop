@@ -1,6 +1,9 @@
 package policy
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // FanoutPolicy is the "fanout" block; prefer Policy.FanoutConfig for resolved values.
 type FanoutPolicy struct {
@@ -121,6 +124,27 @@ type BridgePolicy struct {
 	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
 	// AnthropicBaseURL is the proxy base URL; empty means no proxy.
 	AnthropicBaseURL string `json:"anthropic_base_url,omitempty"`
+}
+
+const (
+	effortLow    = "low"
+	effortMedium = "medium"
+	effortHigh   = "high"
+	effortXHigh  = "xhigh"
+	effortMax    = "max"
+)
+
+var effortLevels = []string{effortLow, effortMedium, effortHigh, effortXHigh, effortMax}
+
+func EffortLevels() []string {
+	return slices.Clone(effortLevels)
+}
+
+var defaultTierEffort = map[string]string{
+	"fast":     effortLow,
+	"balanced": effortMedium,
+	"deep":     effortMedium,
+	"top":      effortMedium,
 }
 
 // defaultPhaseArtifactTimeoutS keys each phase by both its agent label and persona alias (the two differ

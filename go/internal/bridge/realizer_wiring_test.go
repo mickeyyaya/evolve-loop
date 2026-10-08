@@ -69,7 +69,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			cli:    "claude-tmux",
 			binary: "claude",
 			marker: "❯",
-			want:   "claude --model sonnet --dangerously-skip-permissions --append-system-prompt-file {identity} --exclude-dynamic-system-prompt-sections --disable-slash-commands --setting-sources project --plugin-dir .evolve/plugin",
+			want:   "claude --model sonnet --dangerously-skip-permissions --effort medium --append-system-prompt-file {identity} --exclude-dynamic-system-prompt-sections --disable-slash-commands --setting-sources project --plugin-dir .evolve/plugin",
 			absent: []string{"--no-session-persistence"},
 		},
 		{
@@ -95,7 +95,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 			// passes through unclamped. This is the end-to-end launch string
 			// reaching tmux, so it is also the wiring proof that the flag
 			// survives realization, dedupe and quoting.
-			want:   "codex --yolo -c 'check_for_update_on_startup=false' -m gpt-5.6-terra -c 'model_reasoning_effort=high' -c 'plan_mode_reasoning_effort=high'",
+			want:   "codex --yolo -c 'check_for_update_on_startup=false' -m gpt-5.6-terra -c 'model_reasoning_effort=medium' -c 'plan_mode_reasoning_effort=medium'",
 			absent: []string{"--setting-sources", "--plugin-dir", "--dangerously-skip-permissions", "--exclude-dynamic-system-prompt-sections", "--no-session-persistence"},
 		},
 	}

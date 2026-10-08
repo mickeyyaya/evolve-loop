@@ -175,8 +175,14 @@ func (c *compiler) compileAgents() (map[string][]string, map[string]string) {
 		}
 		c.agentKeys[agent] = key
 		rule := c.block.Agents[key]
-		if chain, ok := c.compileChain(path, rule.CLI); ok {
-			chains[agentsPrefix+agent] = chain
+		c.checkEffort(path, rule.Effort)
+		if rule.Effort != "" && agent != key {
+			c.add(SeverityError, path+".effort", "an effort is keyed by the agent name: set it on agents.%s, not on the alias %s", agent, key)
+		}
+		if len(rule.CLI) > 0 || rule.Effort == "" {
+			if chain, ok := c.compileChain(path, rule.CLI); ok {
+				chains[agentsPrefix+agent] = chain
+			}
 		}
 		if rule.Model == "" {
 			continue
@@ -220,12 +226,26 @@ func (c *compiler) compileTiers(clis []string) map[string][]string {
 			c.add(SeverityError, key, "unknown tier %q (tiers: %s)", tier, strings.Join(policy.TierNames(), ", "))
 			continue
 		}
-		if len(c.block.Tiers[tier]) == 0 {
+		rule := c.block.Tiers[tier]
+		c.checkEffort(key, rule.Effort)
+		switch {
+		case len(rule.CLIs) > 0:
+			out[tier] = c.ceilingFamilies(key, rule.CLIs, clis)
+		case rule.Effort == "":
 			c.add(SeverityError, key, "an empty ceiling leaves no CLI at %s", tier)
+			out[tier] = []string{}
 		}
-		out[tier] = c.ceilingFamilies(key, c.block.Tiers[tier], clis)
 	}
 	return out
+}
+
+func (c *compiler) checkEffort(key, effort string) {
+	if effort == "" {
+		return
+	}
+	if err := policy.ValidateEffort(effort); err != nil {
+		c.add(SeverityError, key+".effort", "%v", err)
+	}
 }
 
 func (c *compiler) ceilingFamilies(key string, entries, clis []string) []string {

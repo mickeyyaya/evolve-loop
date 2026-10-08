@@ -1,7 +1,6 @@
 {
   "name": "code-reviewer",
   "role": "code-reviewer",
-  "effort_level": "xhigh",
   "cli": "claude-tmux",
   "cli_fallback": [
     "claude-p"

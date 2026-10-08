@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -415,10 +416,7 @@ func runBridgeRecipeRun(args []string, stdout, stderr io.Writer) int {
 		agent = "recipe"
 	}
 
-	intent := bridge.LaunchIntent{Permission: permMode}
-	if allowBypass && permMode == "" {
-		intent.Permission = "bypass"
-	}
+	intent := bridgeCommandIntent(cli, cmp.Or(permMode, bypassIf(allowBypass)), commandEfforts(stderr))
 	cfg := &bridge.Config{
 		CLI:         cli,
 		Workspace:   ws,
@@ -542,10 +540,7 @@ func runBridgeIntrospect(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "evolve bridge introspect: --workspace is required for live capture (or pass --pane-file)")
 			return 10
 		}
-		intent := bridge.LaunchIntent{}
-		if allowBypass {
-			intent.Permission = "bypass"
-		}
+		intent := bridgeCommandIntent(cli, bypassIf(allowBypass), commandEfforts(stderr))
 		cfg := &bridge.Config{
 			CLI: cli, Workspace: ws, Agent: "introspect", SessionName: session,
 			AllowBypass: allowBypass, Realization: bridge.RealizeFor(cli, intent),

@@ -1,7 +1,6 @@
 {
   "name": "tdd-engineer",
   "role": "tdd-engineer",
-  "effort_level": "medium",
   "cli": "claude-tmux",
   "model_tier_default": "balanced",
   "_model_tier_overrides_note": "cycle-974: removed inert 's_complex_with_cache'=deep (zero production consumers). deep overrides are within [balanced,deep].",
@@ -127,8 +126,5 @@
   "generated_from": "hand-authored",
   "cli_fallback": [
     "claude-p"
-  ],
-  "effort_overrides": {
-    "deep": "xhigh"
-  }
+  ]
 }

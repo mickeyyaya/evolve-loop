@@ -12,5 +12,11 @@
   "prompt_marker": null,
   "default_model": "haiku",
   "default_args": [],
+  "params": {
+    "effort": {
+      "channel": "flag",
+      "flag": "--effort"
+    }
+  },
   "interactive_prompts": []
 }
