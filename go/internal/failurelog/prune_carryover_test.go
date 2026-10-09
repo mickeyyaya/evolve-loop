@@ -1,21 +1,5 @@
 package failurelog
 
-// prune_carryover_test.go — RED tests (cycle 507, task
-// prune-stale-carryover-todos) for the PRUNE half of the carryoverTodos TTL
-// contract. Mirrors the existing PruneExpired (failedApproaches) behavior,
-// applied to the structurally-parallel state.json:carryoverTodos array which
-// today has no removal path at all (65 entries / 26,601 bytes, cycles 366→506).
-//
-// Semantics mirror PruneExpired exactly (single-sourced intent):
-//   - entry.expiresAt in the past           → removed
-//   - entry with NO expiresAt (legacy)      → KEPT (age unknown; never delete)
-//   - missing / carryoverTodos-less state   → {0,0,0}, nil (safe no-op)
-//
-// References PruneExpiredCarryoverTodos, which the Builder implements beside
-// PruneExpired in this package (and wires into cmd_loop.go's AutoPrune block).
-// RED now (undefined symbol → failurelog test package fails to compile). Do NOT
-// modify this file — implement the production seam.
-
 import (
 	"os"
 	"path/filepath"
@@ -42,8 +26,6 @@ func brReadState(t *testing.T, path string) string {
 	return string(b)
 }
 
-// AC (positive): an entry whose expiresAt is in the past is removed; a
-// still-fresh entry survives.
 func TestPruneExpiredCarryoverTodos_RemovesExpiredKeepsFresh(t *testing.T) {
 	now := time.Date(2026, 7, 5, 0, 0, 0, 0, time.UTC)
 	past := now.Add(-24 * time.Hour).Format(time.RFC3339)
@@ -68,10 +50,6 @@ func TestPruneExpiredCarryoverTodos_RemovesExpiredKeepsFresh(t *testing.T) {
 	}
 }
 
-// AC (negative): a legacy entry with NO expiresAt must be KEPT — its age is
-// unknowable, so auto-deleting it would destroy data. This is the anti-no-op
-// counterpart to the positive case: a prune that just truncates the array would
-// fail here.
 func TestPruneExpiredCarryoverTodos_KeepsUntimestampedLegacy(t *testing.T) {
 	now := time.Date(2026, 7, 5, 0, 0, 0, 0, time.UTC)
 	statePath := brWriteState(t, t.TempDir(),
@@ -89,8 +67,6 @@ func TestPruneExpiredCarryoverTodos_KeepsUntimestampedLegacy(t *testing.T) {
 	}
 }
 
-// AC (edge): a missing state.json (and a state with no carryoverTodos) is a safe
-// no-op — {0,0,0}, nil — never an error that would abort loop start.
 func TestPruneExpiredCarryoverTodos_MissingOrEmptyIsSafeNoOp(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "does-not-exist.json")
 	if pr, err := PruneExpiredCarryoverTodos(missing, time.Now().UTC()); err != nil || pr != (PruneResult{}) {

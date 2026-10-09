@@ -320,3 +320,23 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // undefined today, so this package fails to compile — the intended RED
 // signal. DO NOT modify this file; implement production code only.
 ```
+
+## phase 3d r1 (subagent, failurelog, acssuite)
+
+### `go/internal/subagent/modeltier.go:160` — above `func activeSituation(req ResolveModelTierRequest) string {`
+
+```text
+// activeSituation maps real request signals to a model_tier_overrides key.
+// This resolver produces cycle_1_or_low_goal (the first cycle). The
+// audit_retry_2plus key is produced elsewhere — core.repairRoundTier applies
+// it at the tdd/build re-dispatch seam of an in-cycle repair round (ADR-0096),
+// on the production tier path this resolver is not on. Other keys (cold_start,
+// …) remain inert until a producer is plumbed.
+```
+
+### `go/internal/subagent/subagent.go:58` — above `const (`
+
+```text
+// Verdict constants returned by Run — the unit-16 leaf's vocabulary,
+// projected by name (ADR-0103).
+```

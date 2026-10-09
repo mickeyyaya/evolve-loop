@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
-// happyOpts builds a Options blob that lets every step succeed against the
-// provided profile body. Tests override one or two seams at a time.
 func happyOpts(profileBody string, cli string) ValidateProfileOptions {
 	return ValidateProfileOptions{
 		ReadProfile: func(string) (string, error) { return profileBody, nil },
@@ -62,19 +60,12 @@ func TestValidateProfile_HappyPath(t *testing.T) {
 	}
 }
 
-// TestValidateProfile_NilOptionsWireDefaults covers the six `if opts.X == nil`
-// default-wiring branches. Passing a zero ValidateProfileOptions forces
-// every default to be installed; the call then fails at the real
-// defaultReadProfile (missing file) — the point is that the default seams
-// are exercised, not that the validation succeeds.
 func TestValidateProfile_NilOptionsWireDefaults(t *testing.T) {
 	_, err := ValidateProfile(context.Background(), ValidateProfileRequest{
 		Agent:       "scout",
 		ProfilesDir: filepath.Join(t.TempDir(), "profiles"),
 		AdaptersDir: filepath.Join(t.TempDir(), "adapters"),
 	}, ValidateProfileOptions{})
-	// defaultReadProfile on a nonexistent profile path errors with
-	// "profile not found".
 	if err == nil || !strings.Contains(err.Error(), "profile not found") {
 		t.Errorf("expected profile-not-found through defaults, got %v", err)
 	}
@@ -177,7 +168,7 @@ func TestValidateProfile_AntigravityRemappedToAgy(t *testing.T) {
 }
 
 func TestValidateProfile_UnresolvedCLI(t *testing.T) {
-	body := `{"model_tier_default":"sonnet"}` // no cli field
+	body := `{"model_tier_default":"sonnet"}`
 	opts := happyOpts(body, "")
 	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{}, errors.New("nope")
@@ -248,7 +239,7 @@ func TestValidateProfile_DispatchPlanLogWritten(t *testing.T) {
 			InspectCapability: opts.InspectCapability,
 			AdapterExists:     opts.AdapterExists,
 			ExecAdapter:       opts.ExecAdapter,
-			WriteFile:         os.WriteFile, // real write
+			WriteFile:         os.WriteFile,
 		})
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
@@ -336,7 +327,6 @@ func TestValidateProfile_AdapterOverridesAbsent(t *testing.T) {
 }
 
 func TestValidateProfile_AdapterOverridesOnlyForResolvedCLI(t *testing.T) {
-	// Profile has overrides for "claude" but resolved cli is "agy" — must not match.
 	body := `{"cli":"agy","adapter_overrides":{"claude":{"tools":["X"]}}}`
 	opts := happyOpts(body, "agy")
 	res, err := ValidateProfile(context.Background(),
@@ -455,29 +445,19 @@ func TestCapabilityExtractObject_NotPresent(t *testing.T) {
 	}
 }
 
-// TestCapabilityExtractObject_KeyWithoutColon covers the branch where the
-// key is found but the next non-space rune is not ':' — the parser must
-// reject rather than mis-read the following token as a value.
 func TestCapabilityExtractObject_KeyWithoutColon(t *testing.T) {
 	if v, ok := capabilityExtractObject(`{"x" 5}`, "x"); ok {
 		t.Errorf("key without colon should not match, got %q", v)
 	}
 }
 
-// TestCapabilityExtractObject_UnterminatedObject covers the fall-through
-// return when an opening brace is found but never balanced.
 func TestCapabilityExtractObject_UnterminatedObject(t *testing.T) {
 	if v, ok := capabilityExtractObject(`{"x":{"inner":1`, "x"); ok {
 		t.Errorf("unterminated object should not match, got %q", v)
 	}
 }
 
-// TestDefaultResolveLLM_BridgesToResolver exercises the defaultResolveLLM
-// seam directly (0% before); the point is to execute the bridge line itself.
 func TestDefaultResolveLLM_BridgesToResolver(t *testing.T) {
-	// The call must not panic and must return through the resolver. We assert
-	// only that the bridge returns the resolver's own result/error pair —
-	// either a populated CLI or a non-nil error, never both empty+nil.
 	res, err := defaultResolveLLM("scout")
 	if err == nil && res.CLI == "" {
 		t.Errorf("bridge returned empty result with nil error: %+v", res)
@@ -490,24 +470,18 @@ func TestCapBoolEnv(t *testing.T) {
 	}
 }
 
-// TestDefaultAdapterExists_DriverPresence pins the post-bridge-cutover meaning
-// of the existence pre-flight: it is now "does the resolved CLI map onto a
-// REGISTERED bridge driver?" (bridge.DriverFor + LookupDriver), not "is the
-// <cli>.sh file executable?". The path's base name carries the cli; a bare
-// name ("claude") projects onto its tmux driver, a driver name passes through,
-// and an unknown name has no driver.
 func TestDefaultAdapterExists_DriverPresence(t *testing.T) {
 	tmp := t.TempDir()
 	cases := []struct {
 		path string
 		want bool
 	}{
-		{filepath.Join(tmp, "claude.sh"), true},      // bare → claude-tmux (registered)
-		{filepath.Join(tmp, "gemini.sh"), true},      // bare → claude-tmux (registered)
-		{filepath.Join(tmp, "claude-tmux.sh"), true}, // already a driver
-		{filepath.Join(tmp, "codex.sh"), true},       // registered driver
-		{filepath.Join(tmp, "agy.sh"), true},         // bare → agy-tmux (registered)
-		{filepath.Join(tmp, "nope.sh"), false},       // no driver
+		{filepath.Join(tmp, "claude.sh"), true},
+		{filepath.Join(tmp, "gemini.sh"), true},
+		{filepath.Join(tmp, "claude-tmux.sh"), true},
+		{filepath.Join(tmp, "codex.sh"), true},
+		{filepath.Join(tmp, "agy.sh"), true},
+		{filepath.Join(tmp, "nope.sh"), false},
 	}
 	for _, tc := range cases {
 		if got := defaultAdapterExists(tc.path); got != tc.want {
@@ -516,13 +490,6 @@ func TestDefaultAdapterExists_DriverPresence(t *testing.T) {
 	}
 }
 
-// TestDefaultExecAdapter_DispatchesViaBridge proves the DEFAULT exec path no
-// longer shells `bash <cli>.sh` but instead dispatches through the in-process
-// Go bridge, and that the bare→driver mapping is applied. It drives the
-// VALIDATE_ONLY=1 path (the bridge prints its resolved config and returns
-// ExitOK without invoking any LLM) so the test is hermetic. The env carries a
-// BARE cli ("claude"); a non-zero exit would mean the bridge either rejected
-// the request or never reached its validate-only short-circuit.
 func TestDefaultExecAdapter_DispatchesViaBridge(t *testing.T) {
 	dir := t.TempDir()
 	prof := filepath.Join(dir, "auditor.json")
@@ -534,10 +501,10 @@ func TestDefaultExecAdapter_DispatchesViaBridge(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := map[string]string{
-		"RESOLVED_CLI":   "claude", // BARE — must project onto claude-tmux
+		"RESOLVED_CLI":   "claude",
 		"PROFILE_PATH":   prof,
 		"RESOLVED_MODEL": "sonnet",
-		"PROMPT_FILE":    "", // validate path: empty prompt (placeholder is injected)
+		"PROMPT_FILE":    "",
 		"WORKSPACE_PATH": ws,
 		"ARTIFACT_PATH":  filepath.Join(dir, "art.md"),
 		"STDOUT_LOG":     "/dev/null",
@@ -554,9 +521,6 @@ func TestDefaultExecAdapter_DispatchesViaBridge(t *testing.T) {
 	}
 }
 
-// TestDefaultExecAdapter_UnknownCLIFails proves an unresolvable CLI (no bridge
-// driver) surfaces a non-zero exit + error from the bridge rather than silently
-// succeeding — the dispatch path fails loudly when no driver can serve the cli.
 func TestDefaultExecAdapter_UnknownCLIFails(t *testing.T) {
 	dir := t.TempDir()
 	prof := filepath.Join(dir, "auditor.json")
@@ -568,7 +532,7 @@ func TestDefaultExecAdapter_UnknownCLIFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := map[string]string{
-		"RESOLVED_CLI":   "no-such-cli", // no registered driver
+		"RESOLVED_CLI":   "no-such-cli",
 		"PROFILE_PATH":   prof,
 		"RESOLVED_MODEL": "sonnet",
 		"PROMPT_FILE":    "",
@@ -577,7 +541,7 @@ func TestDefaultExecAdapter_UnknownCLIFails(t *testing.T) {
 		"STDOUT_LOG":     "/dev/null",
 		"STDERR_LOG":     "/dev/null",
 		"CYCLE":          "0",
-		"VALIDATE_ONLY":  "0", // real-launch path so the no-driver miss surfaces
+		"VALIDATE_ONLY":  "0",
 	}
 	rc, err := defaultExecAdapter(context.Background(), "/ignored/no-such-cli.sh", env)
 	if err == nil {
@@ -588,7 +552,6 @@ func TestDefaultExecAdapter_UnknownCLIFails(t *testing.T) {
 	}
 }
 
-// TestAtoiOrZero pins the permissive cycle parser used to map CYCLE → Cycle.
 func TestAtoiOrZero(t *testing.T) {
 	cases := map[string]int{"": 0, "0": 0, "42": 42, "007": 7, "x": 0, "1.5": 0, "-3": 0}
 	for in, want := range cases {

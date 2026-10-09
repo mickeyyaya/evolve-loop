@@ -32,52 +32,27 @@ const evidenceMax = 600
 
 var suiteLockWait = verifylock.MaxWait
 
-// SkipExitCode is the TAP/automake SKIP convention: exit 77 means evidence
-// absent / not-applicable, and is counted neither red nor green.
 const SkipExitCode = 77
 
-// Result is one predicate's outcome, part of the acs-verdict.json schema.
 type Result struct {
-	ACID            string `json:"ac_id"`
-	Predicate       string `json:"predicate"` // repo-relative path
-	ExitCode        int    `json:"exit_code"`
-	ResultStr       string `json:"result"` // "green" | "red" | "skip"
-	DurationMS      int64  `json:"duration_ms"`
-	IsRegression    bool   `json:"is_regression"`
-	IsRedTeam       bool   `json:"is_red_team,omitempty"`
-	EvidenceExcerpt string `json:"evidence_excerpt,omitempty"`
-	// FailingTests names the `--- FAIL:` tests inside this predicate's output —
-	// for a meta-predicate that shells an inner `go test`, these are the INNER
-	// failures. Deduped, bounded by maxFailingTests.
-	FailingTests []string `json:"failing_tests,omitempty"`
-	// EvidenceNote records WHY no failing test could be named on a red
-	// (compile failure, timeout, signal) — a red must never be a
-	// content-free exit code.
-	EvidenceNote string `json:"evidence_note,omitempty"`
-	// PhantomBindings names bound tests this red predicate demanded that NEVER
-	// RAN — reported did-NOT-pass while absent from FailingTests, i.e. the
-	// bound name no longer resolves in its target package (renamed away, or
-	// never created). Distinct from a FAILING bound test on purpose: the cure
-	// for a phantom is repointing the binding, not fixing code.
+	ACID            string   `json:"ac_id"`
+	Predicate       string   `json:"predicate"`
+	ExitCode        int      `json:"exit_code"`
+	ResultStr       string   `json:"result"`
+	DurationMS      int64    `json:"duration_ms"`
+	IsRegression    bool     `json:"is_regression"`
+	IsRedTeam       bool     `json:"is_red_team,omitempty"`
+	EvidenceExcerpt string   `json:"evidence_excerpt,omitempty"`
+	FailingTests    []string `json:"failing_tests,omitempty"`
+	EvidenceNote    string   `json:"evidence_note,omitempty"`
 	PhantomBindings []string `json:"phantom_bindings,omitempty"`
-	// Flaky marks a predicate red on the first run and green on the single
-	// bounded retry: value "passed-on-retry". Retry outcomes for a red that
-	// stays red live in RetryOutcome instead.
-	Flaky string `json:"flaky,omitempty"`
+	Flaky           string   `json:"flaky,omitempty"`
 
-	// RetryOutcome records what the bounded retry established about a red
-	// that STAYED red: "red-on-retry" (the retry ran and confirmed) or
-	// "retry-inconclusive" (the retry produced no result for this test —
-	// expired ctx, crash). Absent on greens, skips, and absorbed flakes.
 	RetryOutcome string `json:"retry_outcome,omitempty"`
 
-	// fullEvidence retains the red predicate's complete captured stream: the
-	// wire JSON stays capped at evidenceMax, and the full record lands in
-	// acs-red-evidence/ beside the verdict instead.
 	fullEvidence string
 }
 
-// PredicateSuite is the count breakdown.
 type PredicateSuite struct {
 	ThisCycleCount       int `json:"this_cycle_count"`
 	RegressionSuiteCount int `json:"regression_suite_count"`
@@ -86,8 +61,6 @@ type PredicateSuite struct {
 	Total                int `json:"total"`
 }
 
-// warningsFromFlaky projects Result.Flaky into verdict-level warnings — the
-// single source of truth; the list is never maintained separately.
 func warningsFromFlaky(results []Result) []string {
 	var w []string
 	for _, r := range results {
@@ -98,7 +71,6 @@ func warningsFromFlaky(results []Result) []string {
 	return w
 }
 
-// Verdict is the acs-verdict.json schema read by audit + ship gates.
 type Verdict struct {
 	SchemaVersion  string         `json:"schema_version"`
 	Cycle          int            `json:"cycle"`
@@ -109,48 +81,22 @@ type Verdict struct {
 	SkipCount      int            `json:"skip_count"`
 	RedIDs         []string       `json:"red_ids"`
 	SkipIDs        []string       `json:"skip_ids,omitempty"`
-	Verdict        string         `json:"verdict"` // PASS | FAIL
+	Verdict        string         `json:"verdict"`
 	ShipEligible   bool           `json:"ship_eligible"`
-	// Warnings surfaces non-blocking anomalies: flaky predicates that passed
-	// on the bounded retry. Projection of Result.Flaky.
-	Warnings []string `json:"warnings,omitempty"`
-	// SuiteRoot / ProjectRoot record which roots this verdict was minted
-	// under. omitempty: verdicts written before these stamps stay
-	// byte-compatible, and readers treat absence as "unstamped", never as a
-	// mismatch.
-	SuiteRoot   string `json:"suite_root,omitempty"`
-	ProjectRoot string `json:"project_root,omitempty"`
+	Warnings       []string       `json:"warnings,omitempty"`
+	SuiteRoot      string         `json:"suite_root,omitempty"`
+	ProjectRoot    string         `json:"project_root,omitempty"`
 }
 
-// Options configures Run. Root and Cycle are required.
 type Options struct {
-	Root  string // repo root (the Go module's parent; the lane runs from <Root>/go)
-	Cycle int    // current cycle number
-	// ProjectRoot is the MAIN project root whose `.evolve/` holds the runtime
-	// data predicates read via ${EVOLVE_PROJECT_ROOT:-$REPO_ROOT}. When set,
-	// it is exported as EVOLVE_PROJECT_ROOT to each predicate so a suite run
-	// from a worktree still resolves `.evolve/` to main rather than the
-	// worktree (where `.evolve/` is absent). Empty → predicates inherit the
-	// caller's env.
+	Root        string
+	Cycle       int
 	ProjectRoot string
-	// GoModuleDir is the directory holding go.mod + the acs/ predicate subtree.
-	// Empty → filepath.Join(Root, "go"). The Go lane runs
-	// `go test -json -tags acs -count=1 <scope>` from here.
 	GoModuleDir string
-	// GoTimeout bounds the WHOLE Go lane via context cancellation (not
-	// per-predicate; Go compiles per package). 0 → EVOLVE_ACS_GO_TIMEOUT_S
-	// (seconds) when set, else DefaultTimeout.
-	GoTimeout time.Duration
-	// GoExec runs ONE Go predicate-lane package pattern and returns the raw
-	// `go test -json` output plus the process exit error (nil on exit 0, an
-	// *exec.ExitError on nonzero). It is called once per active scope
-	// (current-cycle, each regression sub-package, redteam). Injected by tests;
-	// nil → defaultGoExec.
-	GoExec func(ctx context.Context, moduleDir, pkgPattern string, env []string) (rawJSON string, err error)
+	GoTimeout   time.Duration
+	GoExec      func(ctx context.Context, moduleDir, pkgPattern string, env []string) (rawJSON string, err error)
 }
 
-// Run executes the Go predicate lane (current cycle + regression + redteam
-// scopes, each a separate `go test -json -tags acs`) and returns the Verdict.
 func Run(opts Options) (Verdict, error) {
 	opts, err := resolveOptions(opts)
 	if err != nil {
@@ -161,8 +107,6 @@ func Run(opts Options) (Verdict, error) {
 
 	cfg, refusals := loadLaneConfig(opts.stateRoot())
 	results := runGoTest(opts, cfg)
-	// A red demoted to skip must leave no phantom red-evidence file — the
-	// forensic surface must match the verdict.
 	demoteWarnings := demoteOutOfScope(results, opts)
 	writeRedEvidence(opts, results)
 	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle, SuiteRoot: opts.Root, ProjectRoot: opts.ProjectRoot}
@@ -208,10 +152,6 @@ func (o Options) stateRoot() string {
 }
 
 func acquireSuiteLock(root string) func() {
-	// The suite execution is host-wide SINGLE-FLIGHT: verification MUST run,
-	// serialized, never skipped. A wedged holder degrades this lane to
-	// unserialized (WARN below) rather than deadlock the fleet.
-	// See ADR-0080.
 	release, lockErr := verifylock.AcquireWithin(context.Background(), root, suiteLockWait, os.Stderr)
 	if lockErr != nil {
 		fmt.Fprintf(os.Stderr, "[acs] WARN: verification single-flight unavailable (%v) — running unserialized\n", lockErr)
@@ -220,9 +160,6 @@ func acquireSuiteLock(root string) func() {
 	return release
 }
 
-// record appends a result and updates the green/red/skip tallies + the
-// PredicateSuite bucketing — the single place RedCount is incremented, so the
-// gate invariant (red_count==0 ⟺ PASS) has one source of truth.
 func (v *Verdict) record(r Result) {
 	switch r.ResultStr {
 	case "green":
@@ -283,7 +220,6 @@ func predicateEnv(x predicateExports) []string {
 		env = append(env, ipcenv.WorktreeRootKey+"="+x.sourceRoot)
 	}
 	if len(x.changedPkgs) > 0 {
-		// Space-joining is safe: go package patterns never contain spaces.
 		env = append(env, changedPackagesKey+"="+strings.Join(x.changedPkgs, " "))
 	}
 	return env
@@ -302,9 +238,6 @@ func envKey(entry string) string {
 	return key
 }
 
-// hasGoACSTree reports whether moduleDir is a Go module (go.mod present) with an
-// acs/ predicate subtree. When false, the Go lane is a no-op (backward-compat
-// for callers without a Go predicate tree).
 func hasGoACSTree(moduleDir string) bool {
 	if fi, err := os.Stat(filepath.Join(moduleDir, "go.mod")); err != nil || fi.IsDir() {
 		return false
@@ -315,28 +248,15 @@ func hasGoACSTree(moduleDir string) bool {
 	return true
 }
 
-// defaultGoExec runs the real `go test -json -tags acs -count=1 <pkgPattern>`
-// from moduleDir and returns the combined output + the process exit error.
-// CombinedOutput merges build errors (stderr, non-JSON) into the stream;
-// parseGoTestJSON tolerates the non-JSON lines.
 func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []string) (string, error) {
 	cmd := sysexec.Command(ctx, "go", "test", "-json", "-tags", "acs", "-count=1", pkgPattern)
 	cmd.Dir = moduleDir
 	cmd.Env = env
-	// CommandContext kills only the direct `go` process, not test-binary
-	// grandchildren a meta-predicate's inner `go test` spawns; without a
-	// delay a surviving grandchild pins CombinedOutput's pipe past ctx
-	// expiry and the held single-flight lock starves every other lane.
 	cmd.WaitDelay = 30 * time.Second
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
-// goLaneTimeout returns the whole-lane timeout: optsTimeout when > 0, else
-// cfg.GoTimeoutS (seconds) when > 0, else DefaultTimeout. The Go lane
-// is bounded as a whole (via context cancellation in runGoTest) because Go
-// compiles per package; the current-cycle scope runs a single package, so one
-// DefaultTimeout is the right ceiling.
 func goLaneTimeout(optsTimeout time.Duration, cfg policy.ACSConfig) time.Duration {
 	if optsTimeout > 0 {
 		return optsTimeout
@@ -347,31 +267,17 @@ func goLaneTimeout(optsTimeout time.Duration, cfg policy.ACSConfig) time.Duratio
 	return DefaultTimeout
 }
 
-// currentCycleGoPkgDir is the Go predicate package dir for the current cycle:
-// <moduleDir>/acs/cycle<N>.
 func currentCycleGoPkgDir(moduleDir string, cycle int) string {
 	return filepath.Join(moduleDir, filepath.FromSlash(CyclePackage(cycle)))
 }
 
-// CyclePackage is the ONE spelling of a cycle's ACS predicate package as a Go
-// package pattern relative to the module (`./acs/cycle<N>`). The suite lane,
-// the scope lint and the Task Contract's predicate inventory (core) all derive
-// from it, so the convention cannot drift between the writer and its readers.
 func CyclePackage(cycle int) string { return fmt.Sprintf("./acs/cycle%d", cycle) }
 
-// currentCycleGoPkgExists reports whether the current cycle has a Go predicate
-// package on disk. When absent, the Go lane is a no-op (not an error) — the
-// cycle simply has no Go ACs yet.
 func currentCycleGoPkgExists(moduleDir string, cycle int) bool {
 	fi, err := os.Stat(currentCycleGoPkgDir(moduleDir, cycle))
 	return err == nil && fi.IsDir()
 }
 
-// goLanePatterns returns the existence-gated, non-recursive package patterns
-// the Go lane runs each cycle: the current cycle's package, each regression
-// sub-package, and the red-team package. Patterns whose dir is absent are
-// skipped.
-// See ADR-0042.
 func goLanePatterns(moduleDir string, cycle int) []string {
 	var pats []string
 	if dirExists(currentCycleGoPkgDir(moduleDir, cycle)) {
@@ -395,14 +301,6 @@ func dirExists(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// writeRedEvidence persists each red predicate's COMPLETE captured stream
-// (first run + any retry, see retryFlakyReds) to
-// <workspace>/acs-red-evidence/<ac_id>.txt, ProjectRoot preferred over Root
-// (the same convention the verdict's own location uses). Each file opens
-// with a `# cycle=… ac_id=… run=…` header so repeated Runs in one cycle
-// stay attributable; a name collision (duplicate ACIDs across scope dirs
-// share a path.Base) gets a numeric suffix instead of a silent overwrite.
-// Best-effort and loud: a write failure WARNs and never blocks the verdict.
 func writeRedEvidence(opts Options, results []Result) {
 	dir := filepath.Join(opts.stateRoot(), ".evolve", "runs", fmt.Sprintf("cycle-%d", opts.Cycle), "acs-red-evidence")
 	for _, r := range results {
@@ -446,7 +344,6 @@ func writeRedEvidence(opts Options, results []Result) {
 	}
 }
 
-// goEvent is the subset of the `go test -json` event schema we consume.
 type goEvent struct {
 	Action  string  `json:"Action"`
 	Package string  `json:"Package"`
@@ -455,19 +352,12 @@ type goEvent struct {
 	Elapsed float64 `json:"Elapsed"`
 }
 
-// parseGoTestJSON walks `go test -json` NDJSON and maps each test into a Result,
-// keyed by Package+"/"+Test so the same test name in two packages stays two
-// results (acsrunner keys by bare Test and would collide them — reuse boundary).
-// PASS→green/0, FAIL→red/1, SKIP→skip/77. Evidence is captured for red/skip only
-// (green carries none — existing invariant). Classification is by package suffix:
-// cycle<N> with N==cycle → this-cycle; any other cycle → regression; a redteam
-// package → IsRedTeam.
 func parseGoTestJSON(r io.Reader, cycle int) []Result {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	type acc struct {
 		pkg, test string
-		result    string // green|red|skip
+		result    string
 		dur       int64
 		output    strings.Builder
 	}
@@ -480,10 +370,10 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 		}
 		var ev goEvent
 		if err := json.Unmarshal(raw, &ev); err != nil {
-			continue // tolerate non-JSON build-output lines
+			continue
 		}
 		if ev.Test == "" {
-			continue // package-level event
+			continue
 		}
 		key := ev.Package + "/" + ev.Test
 		a, ok := byKey[key]
@@ -508,10 +398,6 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 	}
 	var out []Result
 	if err := scanner.Err(); err != nil {
-		// A scan error (e.g. a single output line exceeding the buffer) would
-		// silently truncate the stream and could drop a later FAIL — a
-		// gate-weakening path. Fail LOUD: emit a synthetic RED so the verdict
-		// blocks rather than silent-passing on a partial parse.
 		out = append(out, Result{
 			ACID:            acsverdict.SyntheticRedPrefix + "go-lane-parse-error",
 			Predicate:       acsverdict.SyntheticRedPrefix + "go-lane-parse-error",
@@ -551,10 +437,6 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 			full := a.output.String()
 			r.fullEvidence = full
 			r.EvidenceExcerpt = excerpt(full)
-			// Extract inner failing-test identity from the FULL output,
-			// before the excerpt cap can destroy it. The predicate's own
-			// name is excluded — it is already the ACID; the inner names
-			// are the diagnosis.
 			for _, name := range extractFailingTests(full) {
 				if name != a.test {
 					r.FailingTests = append(r.FailingTests, name)
@@ -570,9 +452,6 @@ func parseGoTestJSON(r io.Reader, cycle int) []Result {
 	return out
 }
 
-// classifyGoPkg maps a predicate package dir to (isRegression, isRedTeam):
-// a redteam dir → red-team; cycle<N> with N==cycle → this-cycle (false,false);
-// any other dir (other cycle, or non-numeric like cycledefense1) → regression.
 func classifyGoPkg(dir string, cycle int) (isRegression, isRedTeam bool) {
 	if strings.Contains(dir, "redteam") || strings.Contains(dir, "red-team") {
 		return false, true
@@ -583,8 +462,6 @@ func classifyGoPkg(dir string, cycle int) (isRegression, isRedTeam bool) {
 	return true, false
 }
 
-// cycleNumFromDir parses the integer N from a "cycle<N>" package dir. Returns
-// (0,false) for non-numeric suffixes (e.g. "cycledefense1").
 func cycleNumFromDir(dir string) (int, bool) {
 	if !strings.HasPrefix(dir, "cycle") {
 		return 0, false
@@ -596,11 +473,6 @@ func cycleNumFromDir(dir string) (int, bool) {
 	return n, true
 }
 
-// changedPackagesForCycle returns the go test patterns for the files the
-// builder touched this cycle, read from handoff-build.json under the cycle
-// workspace (<projectRoot>/.evolve/runs/cycle-<N>/). Best-effort: nil when
-// projectRoot is empty or no handoff is found, so predicates fall back to their
-// own scope.
 func changedPackagesForCycle(projectRoot string, cycle int) []string {
 	if projectRoot == "" {
 		return nil
@@ -614,15 +486,11 @@ func changedPackagesForCycle(projectRoot string, cycle int) []string {
 	return nil
 }
 
-// excerptHead is the slice of evidenceMax kept from the FRONT of over-limit
 // output: a predicate's own t.Fatalf line — the author's diagnosis with its
 // file:line — prints first. The remainder comes from the TAIL, where go test
 // accumulates `--- FAIL:` detail.
 const excerptHead = 200
 
-// excerpt caps s at ~evidenceMax as head+"…"+tail (see excerptHead). Both cut
-// points are re-anchored to valid UTF-8 so a mid-rune slice cannot leak
-// mojibake into the verdict JSON.
 func excerpt(s string) string {
 	s = strings.TrimSpace(s)
 	if len(s) <= evidenceMax {
@@ -633,16 +501,10 @@ func excerpt(s string) string {
 	return head + "…" + tail
 }
 
-// maxFailingTests bounds Result.FailingTests so a mass failure cannot bloat
-// the verdict JSON; the excerpt tail still shows the overflow.
 const maxFailingTests = 8
 
-// failLineRE matches a go-test failure marker at any nesting depth — including
-// inner-subprocess output a meta-predicate t.Logf'd as free-form text.
 var failLineRE = regexp.MustCompile(`--- FAIL: (\S+)`)
 
-// extractFailingTests returns the deduped, order-preserving, bounded list of
-// test names behind every `--- FAIL:` in s.
 func extractFailingTests(s string) []string {
 	var out []string
 	seen := map[string]bool{}
@@ -679,8 +541,6 @@ func WriteVerdict(evolveDir string, v Verdict) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("acssuite: marshal: %w", err)
 	}
-	// Random tmp suffix (not PID) so concurrent same-process writers to the
-	// same cycle dir cannot collide — matches acsrunner.WriteVerdict.
 	tmpf, err := writeVerdictCreateTemp(dir, "acs-verdict.*.tmp")
 	if err != nil {
 		return "", fmt.Errorf("acssuite: create tmp: %w", err)

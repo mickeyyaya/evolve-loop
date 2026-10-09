@@ -29,6 +29,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/recovery` | the decisions of the Phase Recovery Pipeline | [internal-recovery.md](internal-recovery.md) |
 | `internal/router` | the deterministic phase-routing kernel | [internal-router.md](internal-router.md) |
 | `internal/subagent` | dispatches one subagent invocation: profile, token, bridge launch, verify, ledger | [internal-subagent.md](internal-subagent.md) |
+| `internal/failurelog` | the failure floor: the failed-cycle taxonomy, the failed-approach record in `state.json`, its expiry and the carryover-todo lifecycle | [internal-failurelog.md](internal-failurelog.md) |
 | `internal/triagecap` | bounds the coverage floors triage may commit per cycle | [internal-triagecap.md](internal-triagecap.md) |
 | `internal/cli/phasecmd` | the `evolve phase` and `evolve phases` commands | [internal-cli-phasecmd.md](internal-cli-phasecmd.md) |
 | `internal/cli/guardcmd` | the `evolve guard`, commit-gate and `evolve eval` commands | [internal-cli-guardcmd.md](internal-cli-guardcmd.md) |

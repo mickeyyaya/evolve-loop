@@ -19,9 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// executeCompleteGoScope discovers the compiler-selected test sources before
-// execution. TestMain cannot hide a declared predicate by filtering m.Run or
-// exiting early, and GOOS/build-tag exclusions remain the Go tool's decision.
 func executeCompleteGoScope(ctx context.Context, moduleDir, pattern string, env []string) (string, error) {
 	expected, err := declaredPredicateTests(ctx, moduleDir, pattern, env)
 	if err != nil {

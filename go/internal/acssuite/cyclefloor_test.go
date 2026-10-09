@@ -25,8 +25,6 @@ func TestHighestCyclePackageNumber(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Any occupied canonical name is a collision, even when corruption left a
-	// file where the cycle package directory should be.
 	if err := os.WriteFile(filepath.Join(acsDir, "cycle57"), []byte("occupied\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
