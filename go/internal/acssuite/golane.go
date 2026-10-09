@@ -160,14 +160,15 @@ func (l goLane) retryFlakyReds(pattern string, results []Result) []Result {
 	if hasHarnessResult(retry) {
 		retryErr = fmt.Errorf("incomplete retry evidence")
 	}
+	retryComplete := retryErr == nil
 	greenOnRetry := make(map[string]bool, len(retry))
 	retryRan := make(map[string]bool, len(retry))
 	retryEvidence := make(map[string]string, len(retry))
 	for _, r := range retry {
-		if retryErr == nil || r.ResultStr == "red" || r.ResultStr == "skip" {
+		if retryComplete || r.ResultStr == "red" || r.ResultStr == "skip" {
 			retryRan[r.ACID] = true
 		}
-		if r.ResultStr == "green" && retryErr == nil {
+		if r.ResultStr == "green" && retryComplete {
 			greenOnRetry[r.ACID] = true
 		}
 		if r.fullEvidence != "" {

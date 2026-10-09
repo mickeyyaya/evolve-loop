@@ -120,43 +120,45 @@ func extractSummaryForCycle(workspace string) string {
 	return ""
 }
 
+const (
+	summaryMaxLines = 8
+	summaryMaxBytes = 400
+)
+
+func isSummarySectionHeader(line string) bool {
+	return strings.HasPrefix(line, "## Failure") ||
+		strings.HasPrefix(line, "## Verdict") ||
+		strings.HasPrefix(line, "## Phase Outcomes")
+}
+
 func extractSummary(reportPath string) string {
 	data, err := os.ReadFile(reportPath)
 	if err != nil {
 		return ""
 	}
 	lines := strings.Split(string(data), "\n")
-	const maxLines = 8
-	const maxBytes = 400
 
 	var out []string
 	capturing := false
-	captured := 0
 	for _, line := range lines {
 		if capturing {
-			if len(out) > 0 && strings.HasPrefix(line, "## ") && captured > 0 {
+			if len(out) > 0 && strings.HasPrefix(line, "## ") {
 				break
 			}
 			out = append(out, line)
-			captured++
-			if captured >= maxLines {
+			if len(out) >= summaryMaxLines {
 				break
 			}
 			continue
 		}
-		if strings.HasPrefix(line, "## Failure") ||
-			strings.HasPrefix(line, "## Verdict") ||
-			strings.HasPrefix(line, "## Phase Outcomes") {
-			capturing = true
-		}
+		capturing = isSummarySectionHeader(line)
 	}
 	if len(out) == 0 {
 		return ""
 	}
-	joined := strings.Join(out, " ")
-	joined = strings.Join(strings.Fields(joined), " ")
-	if len(joined) > maxBytes {
-		joined = joined[:maxBytes]
+	joined := strings.Join(strings.Fields(strings.Join(out, " ")), " ")
+	if len(joined) > summaryMaxBytes {
+		joined = joined[:summaryMaxBytes]
 	}
 	return joined
 }
