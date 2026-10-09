@@ -6,6 +6,7 @@
 > [signal-center-inventory-2026-09-13.md](../research/signal-center-inventory-2026-09-13.md).
 > Severity contract: [observer-severity.md](observer-severity.md) (schema 1.0, adopted unchanged).
 > Envelope compatibility: [phase-observer.md](phase-observer.md) § Unified envelope.
+> External subscribers (2026-10-09): a `Publisher` listener at each root appends every event to channel logs. Other programs subscribe with `evolve events` ([event-channels.md](event-channels.md), [ADR-0127](adr/0127-push-only-event-channels.md)).
 
 ## Table of contents
 
@@ -371,6 +372,8 @@ returned no path for cycle 0, which was harmless while no regular producer was c
 loop's wave summary would have made the durable sink report a drop after every wave (caught by the
 stub root building the production topology, §15.4).
 
+**E12 retires this file** ([ADR-0127](adr/0127-push-only-event-channels.md)). The project-level `<evolveDir>/signals.ndjson` retires into the `signals` channel. The root topology then wraps the per-cycle sink in a cycle filter, so cycle 0 events never reach it. The lossless `loop` and `errors` channels keep those events ([event-channels.md](event-channels.md) §2).
+
 **Non-optional and loud** *(review 3)*: `wireOrchestratorDeps` always constructs a Center, and so does the
 `--simulate` root (both build `newRootSignalCenter`, ONE topology — unit 01's architecture review
 found the Center-less simulate root had silenced the recorder's warnings); the only nil-Center
@@ -621,6 +624,8 @@ line became the WARN's reason. `fields.next` on a halt IS the dossier's `next_ac
 (`writePipelineEscalation` returns what it wrote; the prose is stated once); the fleet-lane halt
 points at the lane's own INCIDENT. Under `--simulate` the root builds the same topology since unit 01
 (ADR-0103), so a system-failure halt renders on the console there exactly as in a real cycle.
+
+E12 of [ADR-0127](adr/0127-push-only-event-channels.md) retires the project-level `<evolveDir>/signals.ndjson` (see §7).
 
 **The ledger, after the architecture review (HIGH-1).** The first cut was a Decorator embedding
 `*FileLedger` and overriding `Append`. Go embedding is delegation without virtual dispatch: the

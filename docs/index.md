@@ -38,6 +38,7 @@
 | [build-explanation-contract.md](architecture/build-explanation-contract.md) | Builder-authored rationale deliverable, provenance binding, and Audit/Ship/Retro verification lifecycle |
 | [review-loop-and-quality-index.md](architecture/review-loop-and-quality-index.md) | The code-review phase and the shared quality index (ADR-0124, in shadow since v22.27.0) |
 | [convergence-policy.md](architecture/convergence-policy.md) | The rule that makes each loop that repeats converge or escalate (ADR-0126, in shadow since v22.27.0) |
+| [event-channels.md](architecture/event-channels.md) | The push-only publish/subscribe protocol: channel logs, cursors, the kernel wake and `evolve events` subscriptions (ADR-0127, proposed) |
 
 ## Release & Operations
 
@@ -53,6 +54,7 @@
 |----------|---------|
 | [evaluator-research.md](private/research/archived-2026-05-19/evaluator-research.md) | Evaluator agent design rationale |
 | [token-optimization-guide.md](private/research/archived-2026-05-19/token-optimization-guide.md) | Per-cycle token + cost optimization |
+| [event-notification-protocol-2026-10.md](research/event-notification-protocol-2026-10.md) | Research for ADR-0127: kernel file notification, the cost of local IPC, and topic and channel prior art |
 | [research-index.md](research-index.md) | Full research-paper index |
 | [research/](research-index.md) | Merged research tree (2026-08-05): research packages + single-file notes from the former `kb/` and `knowledge-base/research/` roots |
 | [chronicle/README.md](chronicle/README.md) | Engineering chronicle — workstream-level narratives (problem / approaches / decision / results / retro) |
