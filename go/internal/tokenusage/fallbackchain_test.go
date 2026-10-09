@@ -3,6 +3,7 @@ package tokenusage
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -13,21 +14,9 @@ func eventsLogFixture(t *testing.T, in, out, cacheR, cacheC int) string {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "scout-events.ndjson")
 	writeFile(t, log,
-		`{"kind":"result","data":{"cost_usd":0.5,"tokens":{"in":`+itoa(in)+`,"out":`+itoa(out)+
-			`,"cache_r":`+itoa(cacheR)+`,"cache_c":`+itoa(cacheC)+`}}}`+"\n")
+		`{"kind":"result","data":{"cost_usd":0.5,"tokens":{"in":`+strconv.Itoa(in)+`,"out":`+strconv.Itoa(out)+
+			`,"cache_r":`+strconv.Itoa(cacheR)+`,"cache_c":`+strconv.Itoa(cacheC)+`}}}`+"\n")
 	return log
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	digits := ""
-	for n > 0 {
-		digits = string(rune('0'+n%10)) + digits
-		n /= 10
-	}
-	return digits
 }
 
 // transcriptFixture writes a cwd-attributed, in-window transcript reporting Input=200 Output=40.

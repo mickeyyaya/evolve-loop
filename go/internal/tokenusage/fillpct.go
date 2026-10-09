@@ -63,10 +63,7 @@ func FillPct(promptTokens, window int) float64 {
 
 // FillWarn returns a phase-named warning for a reading strictly above thresholdPct, and "" otherwise or for any negative reading.
 func FillWarn(phase string, pct float64, thresholdPct int) string {
-	if pct == FillPctUnmeasured || pct < 0 {
-		return ""
-	}
-	if pct <= float64(thresholdPct) {
+	if pct < 0 || pct <= float64(thresholdPct) {
 		return ""
 	}
 	return fmt.Sprintf("context fill %.1f%% for phase %s exceeds the %d%% warn threshold — this launch is close to compaction", pct, phase, thresholdPct)

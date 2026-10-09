@@ -1,6 +1,7 @@
 package tokenusage
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,14 +31,14 @@ func TestAttributes_MarkerAnchored(t *testing.T) {
 			firstUserText: "## INVOCATION CONTEXT ##\nAgent: builder\nCycle: 1457\nArtifact path: " + artifact + "\n",
 			wantSource:    SourceTranscript,
 			wantUsage:     attributed,
-			why:           "the marker form subagent.go:358 stamps is the genuine launch shape",
+			why:           "the marker form the subagent assembler stamps is the genuine launch shape",
 		},
 		{
 			name:          "run.go assembleV2Prompt list form attributes",
 			firstUserText: "## INVOCATION CONTEXT\n\n- Agent: builder\n- Artifact path: " + artifact + "\n",
 			wantSource:    SourceTranscript,
 			wantUsage:     attributed,
-			why:           "run.go:442's leading list bullet is prose decoration OUTSIDE the key",
+			why:           "the run assembler's leading list bullet is prose decoration OUTSIDE the key",
 		},
 		{
 			name:          "bridge contract footer form attributes",
@@ -51,7 +52,7 @@ func TestAttributes_MarkerAnchored(t *testing.T) {
 			firstUserText: "<deliverable-contract phase=\"build\">  <artifact-path>" + artifact + "</artifact-path>\n",
 			wantSource:    SourceTranscript,
 			wantUsage:     attributed,
-			why:           "render.go:117 stamps the path inside the contract tail element",
+			why:           "the renderer stamps the path inside the contract tail element",
 		},
 		{
 			name: "the footer's own instruction line does not attribute by itself",
@@ -90,7 +91,7 @@ func TestAttributes_MarkerAnchored(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			sessionDir := filepath.Join(root, "projects", "-repo-worktrees-cycle-1457")
-			body := `{"type":"user","cwd":"` + foreign + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":[{"type":"text","text":` + jsonQuote(tc.firstUserText) + `}]}}
+			body := `{"type":"user","cwd":"` + foreign + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":[{"type":"text","text":` + mustMarshal(t, tc.firstUserText) + `}]}}
 {"type":"assistant","cwd":"` + foreign + `","timestamp":"2026-07-07T10:00:02Z","message":{"id":"m1","usage":{"input_tokens":40,"output_tokens":4,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
 `
 			writeTranscript(t, sessionDir, "sess.jsonl", body)
@@ -136,20 +137,11 @@ func TestArtifactAnchors_MatchRenderedContract(t *testing.T) {
 	}
 }
 
-func jsonQuote(s string) string {
-	var b []byte
-	b = append(b, '"')
-	for _, r := range s {
-		switch r {
-		case '"':
-			b = append(b, '\\', '"')
-		case '\\':
-			b = append(b, '\\', '\\')
-		case '\n':
-			b = append(b, '\\', 'n')
-		default:
-			b = append(b, string(r)...)
-		}
+func mustMarshal(t *testing.T, s string) string {
+	t.Helper()
+	b, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return string(append(b, '"'))
+	return string(b)
 }

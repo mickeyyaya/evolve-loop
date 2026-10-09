@@ -3,6 +3,7 @@ package tokenusage
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,5 +138,25 @@ func TestTranscriptScan_MissingDirYieldsSourceNone(t *testing.T) {
 	}
 	if res.Source != SourceNone {
 		t.Errorf("Source = %q, want %q", res.Source, SourceNone)
+	}
+}
+
+func TestTranscriptScan_OverlongLine(t *testing.T) {
+	worktree := "/repo/worktrees/cycle-1847"
+	root := t.TempDir()
+	sessionDir := filepath.Join(root, "projects", "-repo-worktrees-cycle-1847")
+	overlong := `{"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:07Z","message":{"id":"big","content":"` + strings.Repeat("x", 9*1024*1024) + `"}}`
+	body := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":"start"}}
+{"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:05Z","message":{"id":"m1","usage":{"input_tokens":100,"output_tokens":20}}}
+` + overlong + `
+{"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:09Z","message":{"id":"m2","usage":{"input_tokens":50,"output_tokens":10}}}
+`
+	writeTranscript(t, sessionDir, "sess1.jsonl", body)
+	w := Window{Worktree: worktree, Start: mustParse(t, launchWindowStart), End: mustParse(t, launchWindowEnd)}
+
+	res, err := ScanConfigRoot(root, w)
+
+	if err == nil && res.Warn == "" {
+		t.Fatalf("an over-long transcript line was truncated silently: Usage=%+v Warn=%q err=%v", res.Usage, res.Warn, err)
 	}
 }

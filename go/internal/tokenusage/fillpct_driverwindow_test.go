@@ -3,6 +3,7 @@ package tokenusage
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -116,7 +117,7 @@ func writeDriverWindowEventsFixture(t *testing.T, in, cacheRead int) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "build-events.ndjson")
 	envelope := `{"kind":"result","data":{"cost_usd":0.4,"tokens":{"in":` +
-		itoa(in) + `,"out":210,"cache_r":` + itoa(cacheRead) + `,"cache_c":0}}}` + "\n"
+		strconv.Itoa(in) + `,"out":210,"cache_r":` + strconv.Itoa(cacheRead) + `,"cache_c":0}}}` + "\n"
 	if err := os.WriteFile(path, []byte(envelope), 0o644); err != nil {
 		t.Fatalf("write events fixture: %v", err)
 	}

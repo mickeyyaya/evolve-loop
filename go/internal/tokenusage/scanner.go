@@ -86,12 +86,16 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	// Streamed deltas repeat a message id and are cumulative, so only the last one per id counts.
 	perMsg := map[string]cyclestate.TokenUsage{}
 	matched := false
+	warn := ""
 
 	err := filepath.WalkDir(projects, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil || d.IsDir() || !strings.HasSuffix(path, ".jsonl") {
 			return nil
 		}
-		lines := readLines(path)
+		lines, readErr := readLines(path)
+		if readErr != nil && warn == "" {
+			warn = "transcript " + path + " was read only in part, so its usage may be under-counted: " + readErr.Error()
+		}
 		if !attributes(lines, w) {
 			return nil
 		}
@@ -121,7 +125,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 			peakUsage = u
 		}
 	}
-	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage}, nil
+	return Result{Usage: total, Source: SourceTranscript, PeakPromptTokens: peak, PeakUsage: peakUsage, Warn: warn}, nil
 }
 
 func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []transcriptLine, w Window) {
@@ -142,11 +146,11 @@ func recordAssistantUsage(perMsg map[string]cyclestate.TokenUsage, lines []trans
 	}
 }
 
-// readLines skips unparseable lines and returns nil for a file it cannot open.
-func readLines(path string) []transcriptLine {
+// readLines skips unparseable lines; it returns nil for a file it cannot open and the scanner's error when a line overruns the buffer.
+func readLines(path string) ([]transcriptLine, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	defer func() { _ = f.Close() }()
 
@@ -160,7 +164,7 @@ func readLines(path string) []transcriptLine {
 		}
 		out = append(out, ln)
 	}
-	return out
+	return out, sc.Err()
 }
 
 // artifactMarker is the label both subagent prompt assemblers stamp before the deliverable path.

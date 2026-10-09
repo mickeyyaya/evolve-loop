@@ -12,7 +12,7 @@ func TestResultAndSourceNamed(t *testing.T) {
 		t.Fatal("SourceTranscript and SourceNone must be distinct")
 	}
 	r := Result{Source: SourceNone}
-	if r.Source != SourceNone || r.Usage != (r.Usage) {
+	if r.Source != SourceNone || r.Usage != (cyclestate.TokenUsage{}) {
 		t.Fatalf("zero Result must carry SourceNone, got %q", r.Source)
 	}
 	if string(SourceNone) != "none" || string(SourceTranscript) != "transcript" {
