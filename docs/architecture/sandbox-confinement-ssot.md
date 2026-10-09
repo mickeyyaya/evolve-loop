@@ -119,9 +119,8 @@ measuring it.**
    seam (nil ⇒ legacy) lets a measured-incapable result subtractively demote
    `Sandbox.ExpectedToWork`; `innerProbe` carries the measurement so `InnerSandbox`
    stays consistent. JSON shape (schema_version 3) unchanged.
-4. **Honest WARN (P2).** The preflight WARN now states the truth — "source-writing
-   phases run **UNCONFINED at the inner layer** — the outer Claude Code session +
-   Tier-1 hooks are the only confinement" — replacing "degrades gracefully".
+4. **Fail-closed halt for required sandboxes (P2).** A missing required Build
+   sandbox halts preflight by default unless opted out with `EVOLVE_SANDBOX=off`.
 5. **Verified-fallback canary (P2).** Config dial `sandbox.nested_fallback`
    (`off` default / `shadow` / `enforce`, via `parseGateStage`) gates a preflight
    write-canary that VERIFIES the outer environment blocks an out-of-allowlist
@@ -133,7 +132,7 @@ measuring it.**
 ### Pattern
 
 Measure the real confinement posture (capability probe, write-canary), surface it
-truthfully (honest WARN), gate on it (Stage dial). All defaults are behavior-
+truthfully (fail-closed halt for required sandboxes), gate on it (Stage dial). All defaults are behavior-
 neutral: the capability path is subtractive, the dial defaults off. Seams are
 injected (DI) and the dial is config-as-SSOT (`policy.SandboxConfig()`, no Go
 literal) — consistent with the `RecoveryConfig`/`parseGateStage` pattern.

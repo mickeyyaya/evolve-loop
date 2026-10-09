@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
@@ -253,6 +254,12 @@ func resolve(opts Options) (resolved, error) {
 			})
 		}
 	}
+	fillProbeDefaults(&o)
+	memoizeVersionInventory(&o)
+	return o, nil
+}
+
+func fillProbeDefaults(o *resolved) {
 	if o.dirWritable == nil {
 		o.dirWritable = defaultDirWritable
 	}
@@ -280,6 +287,9 @@ func resolve(opts Options) (resolved, error) {
 	if o.phaseRoutingWarnings == nil {
 		o.phaseRoutingWarnings = defaultPhaseRoutingWarnings(o.projectRoot)
 	}
+}
+
+func memoizeVersionInventory(o *resolved) {
 	if o.versionInventory == nil {
 		drivers := o.drivers
 		o.versionInventory = func() map[string]string {
@@ -295,7 +305,20 @@ func resolve(opts Options) (resolved, error) {
 			return captureVersionInventory(bins)
 		}
 	}
-	return o, nil
+	rawInventory := o.versionInventory
+	var (
+		invOnce sync.Once
+		memoInv map[string]string
+	)
+	o.versionInventory = func() map[string]string {
+		if _, err := o.routed(); err != nil {
+			return nil
+		}
+		invOnce.Do(func() {
+			memoInv = rawInventory()
+		})
+		return memoInv
+	}
 }
 
 // Run executes every check; a failed check halts in the Result, and err reports only harness faults.

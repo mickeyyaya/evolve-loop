@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/doctor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
@@ -19,6 +20,12 @@ func fixedNow() time.Time { return time.Unix(0, 0).UTC() }
 // goodPipelineOptions returns Options on which no check halts (bridge-boot warns: SkipBoot is set).
 func goodPipelineOptions(t *testing.T) Options {
 	t.Helper()
+	var versionInv func() map[string]string
+	if t != nil && strings.Contains(t.Name(), "DefaultInventory") {
+		versionInv = nil
+	} else {
+		versionInv = func() map[string]string { return map[string]string{"claude": "2.1.0"} }
+	}
 	return Options{
 		ProjectRoot:   t.TempDir(),
 		EvolveDir:     t.TempDir(),
@@ -41,8 +48,12 @@ func goodPipelineOptions(t *testing.T) Options {
 		DirWritable:   func(string) bool { return true },
 		DiskFreeBytes: func(string) (uint64, error) { return 50 << 30, nil },
 		// Freeze seams stubbed so tests never read the real home dir or run brew.
-		SelfUpdateEvidence: func(string) (bool, string, error) { return false, "", nil },
-		PinnedLister:       func() ([]string, error) { return nil, nil },
+		SelfUpdateEvidence:   func(string) (bool, string, error) { return false, "", nil },
+		PinnedLister:         func() ([]string, error) { return nil, nil },
+		CLIHealthActive:      func() []clihealth.Entry { return nil },
+		PhaseRoutingWarnings: func() []string { return nil },
+		OrphanKill:           func(context.Context, string) error { return nil },
+		VersionInventory:     versionInv,
 	}
 }
 

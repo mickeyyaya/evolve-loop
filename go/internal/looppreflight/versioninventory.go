@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -71,15 +72,6 @@ func loadVersionCache(path string) (map[string]string, error) {
 	return m, nil
 }
 
-// saveVersionCache writes through a temp file and rename, so a reader never sees a torn file.
 func saveVersionCache(path string, versions map[string]string) error {
-	data, err := json.Marshal(versions)
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return atomicwrite.JSON(path, versions)
 }

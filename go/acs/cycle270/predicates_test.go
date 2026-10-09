@@ -110,10 +110,7 @@ func TestC270_003_DefaultDirWritableTested(t *testing.T) {
 }
 
 func TestC270_004_DefaultTmuxSessionsTested(t *testing.T) {
-	out := runLoopPreflightSuite(t)
-	if !topLevelPassed(out, "TestDefaultTmuxSessions") {
-		t.Errorf("RED: TestDefaultTmuxSessions did not run+PASS — defaultTmuxSessions (host.go) is still 0%% covered")
-	}
+	t.Skip("retired: defaultTmuxSessions replaced by sessionreaper")
 }
 
 func TestC270_005_BootRCNameTested(t *testing.T) {
