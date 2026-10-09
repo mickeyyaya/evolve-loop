@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `internal/events/publisher`: the Signal Center listener of the event channels (E6, ADR-0127, unwired, 2026-10-09)
+
+- **What it is.** `Publisher.Listen` is one Center listener. It appends each event to each channel whose route matches it, as `{source, dispatch, signal}` ([event-channels.md](docs/architecture/event-channels.md) §1, §3, §6). It never emits and never calls `Flush`.
+- **The routes.** `New` parses each route once with `filter.Parse` against `filter.RegisteredCatalog()`. A route that does not parse is a constructor error.
+- **`lossless` channels.** The append is in the Center drain, in one locked write with the lock deadline. A lock deadline, `ErrLockPending` and a write error are counted losses. `ErrRotate` is not a loss.
+- **`best_effort` channels.** A bounded queue (`QueueEvents`, `QueueBytes`, `EnqueueDeadline`) and one writer goroutine for each channel. A put wakes the writer through a channel send. A full queue is a counted loss.
+- **Gap records.** The next good append of a channel writes one gap record for each loss reason and contiguous `seq` run. It holds the `pid`, the first and last `seq` and the count. The severity is `INCIDENT` on a `lossless` channel and `WARN` on a `best_effort` channel.
+- **The stamp.** `Config.Role` must be in the closed `Roles()` set. `Config.Dispatch` (E10 fills it from `EVOLVE_DISPATCH_ID`) is cut to 256 bytes. A channel can set its own `SegmentBytes`.
+- **`Close(deadline)`** drains the queues, writes the pending gap records and returns the count of the losses that no gap record names.
+- Nothing calls the package yet. Components E7 and E10 configure and wire it. It is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`. Package notes: [internal-events-publisher.md](docs/architecture/packages/internal-events-publisher.md).
+
 ## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
 
 - **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.
