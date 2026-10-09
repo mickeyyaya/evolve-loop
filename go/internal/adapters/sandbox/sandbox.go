@@ -213,15 +213,7 @@ func GenerateSBPL(cfg Config) string {
 		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
 		fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", p)
 	}
-	// Interactive clients reopen their controlling terminal and set raw mode
-	// on the inherited descriptor. Grant only this pane's device and its logical
-	// alias, before configured file-read/file-write denials.
-	if cfg.TerminalPath != "" {
-		fmt.Fprintf(&b, "(allow file-write-data (literal \"/dev/tty\") (literal %q))\n", cfg.TerminalPath)
-		// Only terminal attributes and window size are needed. In particular,
-		// arbitrary control/input-injection ioctls are not part of this grant.
-		fmt.Fprintf(&b, "(allow file-ioctl (require-all (require-any (literal \"/dev/tty\") (literal %q)) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))\n", cfg.TerminalPath)
-	}
+	writeTerminalRules(&b, cfg.TerminalPath)
 	// HOME writes for known Claude config dirs.
 	if cfg.HomeDir != "" {
 		for _, p := range homeStateWriteDirs(cfg.HomeDir) {
@@ -266,6 +258,20 @@ func GenerateSBPL(cfg Config) string {
 	}
 	writeClosingRules(&b, cfg)
 	return b.String()
+}
+
+const ownPseudoTerminalRules = `(allow pseudo-tty)
+(allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
+(allow file-write-data file-ioctl (require-all (regex #"^/dev/ttys[0-9]+$") (extension "com.apple.sandbox.pty")))
+`
+
+func writeTerminalRules(b *strings.Builder, pane string) {
+	b.WriteString(ownPseudoTerminalRules)
+	if pane == "" {
+		return
+	}
+	fmt.Fprintf(b, "(allow file-write-data (literal \"/dev/tty\") (literal %q))\n", pane)
+	fmt.Fprintf(b, "(allow file-ioctl (require-all (require-any (literal \"/dev/tty\") (literal %q)) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))\n", pane)
 }
 
 func writeClosingRules(b *strings.Builder, cfg Config) {

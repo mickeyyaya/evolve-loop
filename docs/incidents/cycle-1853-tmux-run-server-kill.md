@@ -53,6 +53,43 @@ Design notes: [internal-bridge.md](../architecture/packages/internal-bridge.md) 
 - `TestGenerateSBPL_RunSocketIsDeniedToTheAgentAndOpenToTheHost` runs each attack under the real `sandbox-exec` profile: connect, rename, hard link, symlink, unlink and directory rename. Each one fails, and after each one the host still reaches the server. The agent can still write in the socket directory and drive a private server of its own.
 - `TestGenerateSBPL_TheAgentSignalsOnlyItsOwnProcesses` shows that the agent cannot signal the tmux server and can still stop its own `sleep` child.
 
+## Why the retry ran the probe again
+
+The second kill (10:02:17) was a replay of the first. Each step of this chain was verified from the transcripts of the two build attempts:
+
+1. The task was the swarm pgid fix, so the builder ran `go test ./internal/swarm`.
+2. `TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget` failed in the pane: `kill_exact_test.go:37: new-session evolve-bridge-r1-c5-build-pid421: exit status 1`.
+3. The cause was the sandbox profile, not the code.
+   - `GenerateSBPL` did not allow a pseudo-terminal, and tmux makes a window with `forkpty()`.
+   - The server failed with `create window failed: fork failed: Operation not permitted`.
+   - Thus each real-tmux test was red in each sandboxed pane. Nothing told the agent so.
+4. The agent saw that its diff did not touch the test or `kill.go`. It concluded that the failure was environmental. It then probed the isolation of the test by hand (see "What happened").
+5. The pane had `$TMUX`, so the probe reached the run server and killed it.
+6. The runner then dispatched the build again with a byte-identical prompt. The worktree kept the diff of the first try. Thus the same test failed in the same way, and the agent ran the same probe. The second prompt had no facts about the first try: how it ended, when, and its last commands. Lane R2 (`attempt postmortem`) adds these facts to the next prompt.
+
+### The trigger fix (lane R1)
+
+The agent profile now lets the agent open its own pseudo-terminals and no other terminal. `writeTerminalRules` (`go/internal/adapters/sandbox/sandbox.go`) writes three rules into each agent profile:
+
+- `(allow pseudo-tty)`;
+- `(allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))`;
+- `(allow file-write-data file-ioctl (require-all (regex #"^/dev/ttys[0-9]+$") (extension "com.apple.sandbox.pty")))`.
+
+The kernel gives the sandbox extension `com.apple.sandbox.pty` only for the slave of a pseudo-terminal that the sandboxed process opened. Apple's `application.sb` uses the same rule. The grant does not include another pane's terminal, because the agent did not open it. A write to the host pane's tty from the agent's own window fails with `Operation not permitted`.
+
+A grant of `/dev/ptmx` alone is not enough. The server then opens the master but cannot open the slave `/dev/ttysN`. The first bisect showed a pass only because the new slave was `/dev/ttys003`, which was the pane terminal of the cycle-1853 profile. A live test with a profile that has only the `/dev/ptmx` rule fails with `fork failed`.
+
+The rules are in each agent profile, not only in source-writing phases. Read-only phases also run tests, and a red real-tmux test in a read-only phase can cause the same probe.
+
+After #836 a private server of the agent is safe. The run socket and the `default` socket stay denied. Signals reach only the same sandbox. With the fix, the real-tmux tests are green in a sandboxed pane, so the trigger of the probe is gone.
+
+Proofs:
+
+- `TestGenerateSBPL_GrantsOnlyThePseudoTerminalsTheAgentOpens` (unit): the three rules occur once, and the only pattern rule is the slave rule that the extension scopes.
+- `TestGenerateSBPL_TheAgentWindowGetsItsOwnTerminalAndNoOtherPane` (integration, real `sandbox-exec`): the agent starts a private server, and its window runs on its own pty. A write to the host pane's tty fails.
+- `TestGenerateSBPL_TheCycle1853ProbeGetsItsOwnServerAndLeavesTheRunServerAlive` (integration): the exact probe, with `TMUX` unset as the boot does, gets its own server, and the run server keeps its session.
+- Live: `go test ./internal/swarm` in `sandbox-exec` with the generated profile fails before the fix at `kill_exact_test.go:37` and passes after it.
+
 ## Residual risks
 
 - **Phases without the OS sandbox.** `sandboxPrefixForLaunch` wraps a tmux launch only when it has a worktree or `RequireSandbox` is set. These tmux launches have neither, so they get the detach and the rule, but no profile:

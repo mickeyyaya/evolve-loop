@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a sandboxed agent can run the real-tmux tests of the repository (cycle 1853 trigger, lane R1, 2026-10-09)
+
+- **What happened.** The agent profile did not allow a pseudo-terminal. tmux makes a window with `forkpty()`, so in each sandboxed pane a new tmux server failed with `fork failed: Operation not permitted`. Each real-tmux test was red in each pane. In cycle 1853 that red test caused the builder to probe tmux by hand, and the probe killed the run server two times ([incident](docs/incidents/cycle-1853-tmux-run-server-kill.md), "Why the retry ran the probe again").
+- **The fix.** `writeTerminalRules` (`go/internal/adapters/sandbox/sandbox.go`) writes three rules: `(allow pseudo-tty)`, a grant on `/dev/ptmx`, and a write and ioctl grant on `/dev/ttys[0-9]+`. The sandbox extension `com.apple.sandbox.pty` scopes the last grant. The kernel gives that extension only for a slave that the sandboxed process opened. Thus the agent cannot write to another pane's terminal. The rules are in each agent profile, because read-only phases also run tests.
+- **Not enough alone.** A grant of `/dev/ptmx` alone does not work: the server cannot open the slave.
+- **Proofs.** A unit test pins the three rules and the only pattern rule. Two integration tests run under the real `sandbox-exec`. In the first, the agent window runs on its own pty and cannot write to the host pane. In the second, the exact cycle-1853 probe gets its own server, and the run server keeps its session. The run and `default` socket denials of #836 stay as they were.
 ## Added — `internal/events/publisher`: the Signal Center listener of the event channels (E6, ADR-0127, unwired, 2026-10-09)
 
 - **What it is.** `Publisher.Listen` is one Center listener. It appends each event to each channel whose route matches it, as `{source, dispatch, signal}` ([event-channels.md](docs/architecture/event-channels.md) §1, §3, §6). It never emits and never calls `Flush`.

@@ -40,7 +40,7 @@ func TestGenerateSBPL_LiteralWriteDenialsFollowTheScratchGrant(t *testing.T) {
 			t.Fatalf("%s must follow the /private/tmp write grant (grant=%d at=%d):\n%s", want, grant, at, sbpl)
 		}
 	}
-	if n := strings.Count(sbpl, "(literal"); n != 2 {
+	if n := strings.Count(sbpl, "(deny file-write* (literal"); n != 2 {
 		t.Fatalf("an empty literal must emit no rule; got %d literal rules:\n%s", n, sbpl)
 	}
 }
