@@ -10,6 +10,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/events/filter` | the one filter grammar of the event channels: the terms, the matcher, the channel selectors and the vocabulary (ADR-0127, E4) | [internal-events-filter.md](internal-events-filter.md) |
 | `internal/evalgate` | the verified checks that replace prose contracts between phases | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/events/wake` | blocks a channel reader until the kernel posts a change, a process exit or an output hangup (kqueue, inotify); no poll (ADR-0127, E3) | [internal-events-wake.md](internal-events-wake.md) |
+| `internal/events/reader` | follows event channels: arm, catch up and wait; the cursor rules, the duplicate window and the last will of a loop (ADR-0127, E5) | [internal-events-reader.md](internal-events-reader.md) |
 | `internal/fleet` | plans and runs concurrent, file-disjoint cycle lanes | [internal-fleet.md](internal-fleet.md) |
 | `internal/guards` | the in-process trust kernel: the six guards `evolve guard` runs | [internal-guards.md](internal-guards.md) |
 | `internal/inboxbatch` | the inbox item model and the deterministic half of task selection | [internal-inboxbatch.md](internal-inboxbatch.md) |

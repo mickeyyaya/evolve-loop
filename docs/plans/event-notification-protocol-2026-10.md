@@ -386,4 +386,5 @@ None. The operator decided Q1 to Q10 on 2026-10-09 (§4, O10 to O19).
 | E1 | ☑ `signalcenter.ReadLines`, with its red tests and mutants. Merged in #825 (with E2). |
 | E2 | ☑ `internal/events/channel` and `flock.LockWithin` built, unwired, at 100% coverage. Merged in #825. Spec findings: [internal-events-channel.md](../architecture/packages/internal-events-channel.md) §Findings |
 | E3 | ◐ `internal/events/wake`: the kqueue and inotify backends, the syscall ports, the refusals and the no-poll guard (moved to `go/test/structure`). Coverage is 100% on darwin and Linux. The PR is open. It is unwired. |
+| E5 | ◐ `internal/events/reader` and `proctree.StartOf`. The reader arms, catches up and waits over channels. It has the cursor gaps, the duplicate window, the `--since` starts and the last will, with the two notes of the design review. Coverage is 100% on darwin and Linux, and each mutant is killed. It is unwired. Spec findings: [internal-events-reader.md](../architecture/packages/internal-events-reader.md) §Findings |
 | E1 to E14, except the rows above | ☐ not started |

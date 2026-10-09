@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `internal/events/reader` and `proctree.StartOf`: the channel reader and the last will, unwired (E5, ADR-0127, 2026-10-09)
+
+- **What it is.** A `Reader` follows one or more event channels with no poll. Each `Next` arms the waiter, catches up every channel and waits for the kernel. It returns the records as `Item` values with the channel, the record and the cursor after it. Spec: [event-channels.md](docs/architecture/event-channels.md) §4 and §7. Notes: [internal-events-reader.md](docs/architecture/packages/internal-events-reader.md).
+- **The cursor rules.** The reader passes the `retention`, `reset` and `malformed` gaps of the channel read through. A missing channel directory is made again and armed again. A rotation arms the new tail segment, and no line is lost.
+- **The start.** `ParseSince` reads `new`, `all`, `last`, an RFC 3339 time (a linear scan) and `CHANNEL:CURSOR[,CHANNEL:CURSOR]`. A malformed value is `filter.ErrUsage`.
+- **Several channels.** The reader merges the channels by `signal.ts` and keeps the order of each channel, so the result is not a total order. A window of 4,096 keys (the source and the event id) removes the copy of an event that is in two channels. A wildcard selection also watches the channel root and adds a new channel from cursor 0.
+- **The last will.** The reader always follows the `loop` channel. At the first arm, it scans the retained channel for each `loop.started` with no later `loop.exit`. It compares `fields.proc_start` with the live process, and it arms the exit watch before the second read.
+  - A loop that dies after the reader saw it live gives a synthetic `loop.lost` (`INCIDENT`, code `LOOP_LOST`). Its exit is `crash`, or `unknown` after an `INCIDENT` gap from that pid.
+  - A loop that was gone before the reader looked gives no alarm. The one exception is a history record (`historical=true`), once, when the start cursor is at or before its record.
+  - The two design-review notes apply. One retention gap comes only when the start is below the oldest base. The live set has one entry for each pid and `proc_start`.
+- **`proctree.StartOf(pid)`** reads the start time of a process. On macOS, it reads `p_starttime` of `kinfo_proc` (`KERN_PROC_PID`) through the `sysctl` helper, which now takes a MIB of any length. On Linux, it reads the boot id and the start ticks of `/proc/<pid>/stat`. A gone pid is `ESRCH`.
+- **The ends.** A deadline returns `ErrDeadline`, and an output hangup returns `ErrHangup` (terminal). The reader makes no timer.
+- **Not wired.** Nothing in production calls the reader yet. E8, E9 and E10 use it. The package is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`, and `internal/proctree` stays at 100.
+- **The merge rule.** The reader merges each batch with one head for each channel, not through `signalcenter.MergeByTS`. A sort of all events can put a later cursor of one channel before an earlier one. The spec (§4) now states this rule. The notes give three open questions.
+- **The `Next` contract.** `Next` returns items or an error, never both. A failed read moves no cursor, so no item and no `loop.lost` is lost.
 ## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
 
 - **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.

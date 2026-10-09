@@ -716,3 +716,5 @@
 ./internal/events/channel
 # E3 (ADR-0127): the kernel wake of the event channels (internal/events/wake).
 ./internal/events/wake
+# E5 (ADR-0127): the channel reader and the last will of the event channels (internal/events/reader).
+./internal/events/reader
