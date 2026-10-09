@@ -1,0 +1,317 @@
+{
+  "schema_version": 2,
+  "cycle": 1841,
+  "run_id": "01M4ESM2C4ZEA9T5CAQA98WH84",
+  "goal": "Wave 83.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 82 facts (run 20261008T173042Z): 1 of 3 cycles shipped.\n- Cycle 1838: final verdict FAIL. Last phase: triage. It did not ship.\n- Cycle 1839: final verdict PASS. It shipped.\n- Cycle 1840: final verdict FAIL. Last phase: retro. It did not ship.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 83:\n- The wave-82 boundary landed #820 (inbox release --keep root|claim; the cycle floor counts fleet lanes) and #821 (the skills-drift gate grades a skillcheck generator change with the worktree's own generator; it fixes the false red that halted cycles 1828 and 1840). The item generated-skill-command-shadows-its-skill can pass now.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "route-verbs-refuse-mid-wave"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 711267,
+      "started_at": "2026-10-08T22:20:47Z",
+      "ended_at": "2026-10-08T22:32:39Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 381189,
+      "started_at": "2026-10-08T22:33:21Z",
+      "ended_at": "2026-10-08T22:39:43Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 405084,
+      "started_at": "2026-10-08T22:39:43Z",
+      "ended_at": "2026-10-08T22:46:29Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "bug-reproduction",
+      "verdict": "PASS",
+      "duration_ms": 409133,
+      "started_at": "2026-10-08T22:46:29Z",
+      "ended_at": "2026-10-08T22:53:19Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 92992,
+      "started_at": "2026-10-08T22:53:19Z",
+      "ended_at": "2026-10-08T22:54:52Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 8659,
+        "cache_read": 550008,
+        "cache_write": 62025
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 386099,
+      "started_at": "2026-10-08T22:54:52Z",
+      "ended_at": "2026-10-08T23:03:39Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 228240,
+      "started_at": "2026-10-08T23:04:12Z",
+      "ended_at": "2026-10-08T23:13:05Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 18,
+        "output": 8777,
+        "cache_read": 699428,
+        "cache_write": 61276
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 130994,
+      "started_at": "2026-10-08T23:13:40Z",
+      "ended_at": "2026-10-08T23:27:24Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 858387,
+      "started_at": "2026-10-08T23:27:24Z",
+      "ended_at": "2026-10-08T23:45:09Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 26,
+        "output": 9021,
+        "cache_read": 1011269,
+        "cache_write": 55619
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 48619,
+      "started_at": "2026-10-08T23:45:48Z",
+      "ended_at": "2026-10-08T23:53:08Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 8,
+        "output": 1881,
+        "cache_read": 263434,
+        "cache_write": 42199
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 101590,
+      "started_at": "2026-10-08T23:53:41Z",
+      "ended_at": "2026-10-08T23:58:40Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 22,
+        "output": 7371,
+        "cache_read": 877212,
+        "cache_write": 59725
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 300015,
+      "started_at": "2026-10-08T23:59:17Z",
+      "ended_at": "2026-10-09T00:06:19Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 26,
+        "output": 9400,
+        "cache_read": 1058361,
+        "cache_write": 59624
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 218021,
+      "started_at": "2026-10-09T00:06:50Z",
+      "ended_at": "2026-10-09T00:13:46Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 22,
+        "output": 7791,
+        "cache_read": 847755,
+        "cache_write": 57277
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 138995,
+      "started_at": "2026-10-09T00:14:25Z",
+      "ended_at": "2026-10-09T00:16:45Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 26,
+        "output": 12282,
+        "cache_read": 1053652,
+        "cache_write": 65522
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|verdict-fail|16803a80e480",
+    "pre_class": "verdict-fail",
+    "reasons": [
+      "skill projection drift: 32 artifact(s) stale vs their SSOTs (SKILL.md phase-facts and/or commands/ stubs) — CI TestSkills_NoDrift would FAIL. Remedy: regenerate with the worktree's own generator: `E",
+      "verdict-conflict: auditor narrative=PASS but 1 deterministic gate(s) forced FAIL [skills-drift] — the gate outranks the narrative (ship policy unchanged); both readings are recorded so the disagreem"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1841",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 4410625,
+    "phase_count": 14,
+    "retried_count": 0,
+    "longest_phase": "audit",
+    "longest_ms": 858387,
+    "by_archetype_ms": {
+      "build": 734733,
+      "control": 269989,
+      "evaluate": 1815371,
+      "plan": 1590532
+    },
+    "total_tokens": {
+      "input": 162,
+      "output": 65182,
+      "cache_read": 6361119,
+      "cache_write": 463267
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 34,
+        "output": 11281,
+        "cache_read": 1321795,
+        "cache_write": 101823
+      },
+      "control": {
+        "input": 26,
+        "output": 12282,
+        "cache_read": 1053652,
+        "cache_write": 65522
+      },
+      "evaluate": {
+        "input": 88,
+        "output": 32960,
+        "cache_read": 3435664,
+        "cache_write": 233897
+      },
+      "plan": {
+        "input": 14,
+        "output": 8659,
+        "cache_read": 550008,
+        "cache_write": 62025
+      }
+    },
+    "wasted_tokens": {
+      "input": 70,
+      "output": 24183,
+      "cache_read": 2736236,
+      "cache_write": 172621
+    },
+    "cache_hit_ratio": 0.9999745334312381,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "tdd",
+      "audit",
+      "audit",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  }
+}
