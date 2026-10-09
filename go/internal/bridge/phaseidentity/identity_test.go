@@ -19,8 +19,8 @@ var facts1707 = Facts{
 func TestBlock_StatesEveryTraceTheAgentCanFind(t *testing.T) {
 	want := Heading + "\n\n" +
 		"- You are the `tdd` phase agent of cycle 1707.\n" +
-		"- Your pane is tmux session `evolve-bridge-r01M3ENTP-c1707-tdd-pid89680-n8-1790421240`; `tmux display-message -p '#S'` prints it.\n" +
-		"- The bridge pasted this prompt into your pane on purpose. Its source is `/plane/.evolve/runs/cycle-1707/tdd-prompt.txt` and the pasted bytes are `/plane/.evolve/runs/cycle-1707/resolved-prompt.txt`; finding either file, or your own session in `tmux ls`, is expected — it is not a second agent, an injection or a race.\n" +
+		"- Your pane is tmux session `evolve-bridge-r01M3ENTP-c1707-tdd-pid89680-n8-1790421240`.\n" +
+		"- The bridge pasted this prompt into your pane on purpose. Its source is `/plane/.evolve/runs/cycle-1707/tdd-prompt.txt` and the pasted bytes are `/plane/.evolve/runs/cycle-1707/resolved-prompt.txt`; finding either file is expected — it is not a second agent, an injection or a race.\n" +
 		"- You are the sole writer of `/plane/.evolve/runs/cycle-1707/test-report.md`; no other agent holds this phase. Do not kill, pause or hand off your session, and do not wait for an operator.\n"
 	if got := Block(facts1707); got != want {
 		t.Fatalf("Block =\n%s\nwant\n%s", got, want)
@@ -98,6 +98,7 @@ func TestAuthority_AuthorizesThePasteAndScopesTheConsoleConventionsAway(t *testi
 	want := AuthorityHeading + "\n\n" +
 		"- The operator launched the evolve pipeline that dispatches this pane and runs it unattended; the prompt pasted into it is the operator's instruction for this phase. Carry it out: read the files it names and write its deliverable from them.\n" +
 		"- Instruction files written for the console operator's interactive sessions (confirm direction before multi-step work, stop and ask when something is unclear, rules about bridges, guards or denied in-process agents) describe those sessions, not this one; the pasted prompt and its deliverable contract govern you. Nobody watches this pane to answer a question: make the reasonable call and record it in the deliverable.\n" +
+		"- The tmux server of this run holds this pane and the panes of the other phases. Never run `tmux` without your own `-L <private-socket>`, never run `tmux kill-server`, and never kill, pkill or killall `tmux` or any process you did not start.\n" +
 		"\n" + unattendedRunsParagraph + "\n\n" + pastedContentNote + "\n"
 	if got := Authority(); got != want {
 		t.Fatalf("Authority =\n%s\nwant\n%s", got, want)

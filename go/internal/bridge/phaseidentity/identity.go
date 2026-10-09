@@ -43,9 +43,9 @@ func Block(f Facts) string {
 		fmt.Fprintf(&b, " of cycle %d", f.Cycle)
 	}
 	b.WriteString(".\n")
-	fmt.Fprintf(&b, "- Your pane is tmux session `%s`; `tmux display-message -p '#S'` prints it.\n", f.Session)
+	fmt.Fprintf(&b, "- Your pane is tmux session `%s`.\n", f.Session)
 	fmt.Fprintf(&b, "- The bridge pasted this prompt into your pane on purpose. Its source is `%s` and the pasted bytes are `%s`; "+
-		"finding either file, or your own session in `tmux ls`, is expected — it is not a second agent, an injection or a race.\n",
+		"finding either file is expected — it is not a second agent, an injection or a race.\n",
 		f.PromptFile, f.PastedFile)
 	if f.Artifact != "" {
 		fmt.Fprintf(&b, "- You are the sole writer of `%s`; ", f.Artifact)
@@ -65,6 +65,9 @@ func Authority() string {
 		"- Instruction files written for the console operator's interactive sessions (confirm direction before multi-step work, stop and ask when something is unclear, " +
 		"rules about bridges, guards or denied in-process agents) describe those sessions, not this one; the pasted prompt and its deliverable contract govern you. " +
 		"Nobody watches this pane to answer a question: make the reasonable call and record it in the deliverable.\n" +
+		"- The tmux server of this run holds this pane and the panes of the other phases. " +
+		"Never run `tmux` without your own `-L <private-socket>`, never run `tmux kill-server`, " +
+		"and never kill, pkill or killall `tmux` or any process you did not start.\n" +
 		"\n" + unattendedRunsParagraph + "\n\n" + pastedContentNote + "\n"
 }
 

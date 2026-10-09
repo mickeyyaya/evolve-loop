@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -102,6 +103,26 @@ func tmuxSocketName() string {
 		return s
 	}
 	return TmuxSocket
+}
+
+func TmuxSocketDir() string {
+	base := os.Getenv("TMUX_TMPDIR")
+	if base == "" {
+		base = "/tmp"
+	}
+	return filepath.Join(base, fmt.Sprintf("tmux-%d", os.Getuid()))
+}
+
+func tmuxSocketGuard() (string, []string, error) {
+	dir := TmuxSocketDir()
+	if !filepath.IsAbs(dir) {
+		return "", nil, fmt.Errorf("tmux socket directory %q is not absolute; set TMUX_TMPDIR to an absolute path", dir)
+	}
+	real, err := canonicalSandboxPath(dir)
+	if err != nil {
+		return "", nil, err
+	}
+	return real, []string{filepath.Join(real, tmuxSocketName()), filepath.Join(real, "default")}, nil
 }
 
 // TmuxSocketArgs prepends tmux's global -L socket selector, which must

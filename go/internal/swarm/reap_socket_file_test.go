@@ -2,15 +2,19 @@ package swarm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
 func TestExecKillServer_RemovesTheDeadServersSocketFile(t *testing.T) {
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
-	dir := tmuxSocketDir()
+	dir := bridge.TmuxSocketDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +38,7 @@ func TestExecKillServer_RemovesTheDeadServersSocketFile(t *testing.T) {
 
 func TestReapOrphanSockets_ReapsTheSameDeadSocketOnlyOnce(t *testing.T) {
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
-	dir := tmuxSocketDir()
+	dir := bridge.TmuxSocketDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -50,5 +54,29 @@ func TestReapOrphanSockets_ReapsTheSameDeadSocketOnlyOnce(t *testing.T) {
 
 	if len(first.Killed) != 2 || len(second.Killed) != 0 {
 		t.Errorf("first reaped %v, second %v; the 79 sockets gc 'reaped' on 2026-09-29 were all still listed", first.Killed, second.Killed)
+	}
+}
+
+func TestExecKillServer_ReportsASocketPathItCannotRemove(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	socket := "evolve-bridge-p999993"
+	if err := os.MkdirAll(filepath.Join(bridge.TmuxSocketDir(), socket, "held"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	err := ExecKillServer(context.Background(), socket)
+
+	if err == nil || !strings.Contains(err.Error(), "remove dead socket "+socket) {
+		t.Fatalf("ExecKillServer = %v, want the remove failure for %s", err, socket)
+	}
+}
+
+func TestExecListBridgeSockets_ReportsAnUnreadableSocketDirectory(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", "/tmp/[")
+
+	names, err := ExecListBridgeSockets()
+
+	if !errors.Is(err, filepath.ErrBadPattern) || names != nil {
+		t.Fatalf("ExecListBridgeSockets = (%v, %v), want (nil, %v)", names, err, filepath.ErrBadPattern)
 	}
 }

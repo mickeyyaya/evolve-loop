@@ -43,6 +43,15 @@ All notable changes to this project will be documented in this file.
 - **Not wired.** Nothing in production calls the reader yet. E8, E9 and E10 use it. The package is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`, and `internal/proctree` stays at 100.
 - **The merge rule.** The reader merges each batch with one head for each channel, not through `signalcenter.MergeByTS`. A sort of all events can put a later cursor of one channel before an earlier one. The spec (§4) now states this rule. The notes give three open questions.
 - **The `Next` contract.** `Next` returns items or an error, never both. A failed read moves no cursor, so no item and no `loop.lost` is lost.
+## Fixed — a phase agent can no longer kill the run's tmux server (cycle 1853 incident, 2026-10-09)
+
+- **What happened.** The builder agent of cycle 1853 ran `TMUX_TMPDIR=$d tmux kill-server` in its pane, twice. The pane shell had `TMUX` set to the run socket, and tmux uses `$TMUX` before `TMUX_TMPDIR`. The command killed the run server and each pane on it. Incident: [cycle-1853-tmux-run-server-kill.md](docs/incidents/cycle-1853-tmux-run-server-kill.md).
+- **The boot.** The tmux boot sends `unset TMUX TMUX_PANE` before the CLI launch. A tmux client of the agent goes to its own server. If the send of this line fails, the boot stops with exit 10 and the CLI does not start.
+- **The sandbox.** `sandbox.Config.DenySockets` and `sandbox.Config.DenyLiterals` are new. For each phase agent, the profile denies a connection to the run socket and to the user's `default` socket. It also denies `file-write*` on both sockets and on the socket directory. Thus a rename, a hard link or an unlink of the socket fails, and a rename of the directory fails.
+- **The resolved paths.** The bridge sets the resolved socket paths. If `TMUX_TMPDIR` is relative, or the directory cannot be resolved, it does not wrap.
+- **Signals.** The profile now allows signals only inside the sandbox of the agent: `(allow signal (target same-sandbox))`, not `(allow signal)`. The agent can stop its own children. It cannot signal the tmux server, the bridge or another pane.
+- **The agent rules.** The identity block no longer names `tmux display-message` or `tmux ls`. The authority block forbids `tmux` without a private `-L` socket, `tmux kill-server`, and a kill of `tmux` or of a process the agent did not start.
+- **One home.** `bridge.TmuxSocketDir()` replaces the private `tmuxSocketDir` of `internal/swarm`. The per-OS branch of the sandbox wrapper is now `osSandboxPrefix`.
 ## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
 
 - **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.

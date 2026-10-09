@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sessionrecord"
 )
 
+const paneTmuxDetachLine = "unset TMUX TMUX_PANE"
+
 // bootTmuxREPL creates and boots a new session. Existing named sessions need no
 // boot work. The returned release keeps provider admission for the full launch.
 func bootTmuxREPL(
@@ -50,15 +52,9 @@ func bootTmuxREPL(
 	}
 
 	deps.Sleep(time.Second)
-	_ = deps.Tmux.SendKeys(ctx, lp.session, "cd "+prep.workingDir, true)
-	// The pane is a shell the bridge did not start; it inherits the tmux server's environment, not this
-	// process's, so ProjectRoot must be exported explicitly or `evolve` subcommands resolve it from the
-	// worktree cwd instead.
-	if cfg.ProjectRoot != "" {
-		_ = deps.Tmux.SendKeys(ctx, lp.session, "export EVOLVE_PROJECT_ROOT="+shellQuotePOSIX(cfg.ProjectRoot), true)
-	}
-	for _, line := range append([]string{dispatchTagLine(cfg.DispatchID)}, exportLines(cfg.Realization.Env)...) {
-		_ = deps.Tmux.SendKeys(ctx, lp.session, line, true)
+	if err := primePaneShell(ctx, deps, cfg, lp.session, prep.workingDir); err != nil {
+		fmt.Fprintf(deps.Stderr, "%s FAIL: %v\n", prep.prefix, err)
+		return nil, ExitBadFlags, fmt.Errorf("%s %w", prep.prefix, err)
 	}
 	deps.Sleep(time.Second)
 	launchCmd := lp.launchCmd
@@ -128,6 +124,20 @@ func bootTmuxREPL(
 
 	releaseOnError = false
 	return admitRelease, ExitOK, nil
+}
+
+func primePaneShell(ctx context.Context, deps Deps, cfg *Config, session, workingDir string) error {
+	_ = deps.Tmux.SendKeys(ctx, session, "cd "+workingDir, true)
+	if cfg.ProjectRoot != "" {
+		_ = deps.Tmux.SendKeys(ctx, session, "export EVOLVE_PROJECT_ROOT="+shellQuotePOSIX(cfg.ProjectRoot), true)
+	}
+	if err := deps.Tmux.SendKeys(ctx, session, paneTmuxDetachLine, true); err != nil {
+		return fmt.Errorf("detach the pane shell from the run tmux server: %w", err)
+	}
+	for _, line := range append([]string{dispatchTagLine(cfg.DispatchID)}, exportLines(cfg.Realization.Env)...) {
+		_ = deps.Tmux.SendKeys(ctx, session, line, true)
+	}
+	return nil
 }
 
 func (deps Deps) startSession(ctx context.Context, session, workingDir string) error {

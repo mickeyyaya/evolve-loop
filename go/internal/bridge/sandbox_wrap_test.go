@@ -452,8 +452,10 @@ func TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir(t *testing.T) {
 // lost) rather than running UNCONFINED (returning false).
 func TestDefaultSandboxWrap_Darwin_ProfileDirMkdirFails_FallsBackToWorkspace(t *testing.T) {
 	ws := t.TempDir()
+	var stderr strings.Builder
 	deps := Deps{
 		Env:          map[string]string{},
+		Stderr:       &stderr,
 		MkScratchDir: func(string, string) (string, error) { return "", errors.New("boom") },
 	}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
@@ -463,5 +465,8 @@ func TestDefaultSandboxWrap_Darwin_ProfileDirMkdirFails_FallsBackToWorkspace(t *
 	}
 	if got, want := sbplPathOf(t, prefix), filepath.Join(ws, "sandbox-build.sb"); got != want {
 		t.Fatalf("fallback profile path = %q, want %q", got, want)
+	}
+	if !strings.Contains(stderr.String(), "isolation lost") {
+		t.Fatalf("the fallback must warn that profile isolation is lost; stderr=%q", stderr.String())
 	}
 }
