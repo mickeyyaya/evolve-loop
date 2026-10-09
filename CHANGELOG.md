@@ -11,6 +11,14 @@ All notable changes to this project will be documented in this file.
 - **Channel selectors.** `ResolveChannels` applies the NATS wildcards of §2: `*` is one token and `>` is the rest. A selector that matches no channel is refused. `ValidChannelName` checks a channel name with the same token rule.
 - **The catalog.** `RegisteredCatalog` reads the kinds, modules and codes from the Signal Center registries. No second vocabulary exists.
 - **Not wired.** Nothing in production calls the package yet; E10 wires it. The package is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`. Design notes: [internal-events-filter.md](docs/architecture/packages/internal-events-filter.md).
+## Added — the channel log and the lock with a deadline for event channels (E1 and E2 of ADR-0127, unwired, 2026-10-09)
+
+- **`signalcenter.ReadLines(path, from)`** reads the complete lines of a file from a byte offset. It does not return a torn tail, and `Next` is the offset after the last complete line. `signalcenter.ReadStream` now uses it and gives the same results as before.
+- **`flock.LockWithin(path, wait, onSettled)`** takes the exclusive lock, or returns `flock.ErrLockDeadline` when the wait ends first. It calls `onSettled` once, when its goroutine is done. A goroutine calls the blocking `flock`, and one compare-and-swap on a three-value state decides the owner. Thus exactly one side owns the lock, also when the deadline and the lock come at the same instant. An abandoned call releases the lock when it gets it.
+- **`internal/events/channel`** keeps one channel as segments `seg-<base>.ndjson` under `ch/<name>/`. `Append` refuses an invalid record before the lock. Under the channel lock, it writes the torn-tail repair and the batch in one write and rotates past the size cap.
+- **The append rules.** A rotation error is `ErrRotate`, not a loss. While a lock call of the process waits, a new append fails at once with `ErrLockPending`.
+- **The read side.** `Read(from)` and the bounded `ReadN(from, maxBytes)` apply the cursor rules of the spec with `retention`, `reset` and `malformed` gaps. `Last` and `End` give the starts of `--since last` and `--since new`. `Segments` and `SegmentOf` serve gc and the reader.
+- Nothing calls the new code yet. Component E10 wires it. Package notes: [internal-events-channel.md](docs/architecture/packages/internal-events-channel.md). Spec: [event-channels.md](docs/architecture/event-channels.md).
 
 ## Fixed — the skills-drift gate always grades with the worktree's own generator, and the cycle-1840 replay test is green on main again (cycle 1841, 2026-10-09)
 

@@ -127,13 +127,15 @@ Two record types exist on disk, one JSON object on each line:
 
 ```json
 {"source":"loop","dispatch":"events/0/sub-alerts/p4242n1t0","signal":{"schema_version":"signal/1.0","seq":41,"pid":9055,"ts":"2026-10-09T17:46:02.114Z","cycle":1841,"module":"orchestrator","origin":"cycleRun.completeCycle","kind":"cycle.sealed","severity":"INFO","reason":"final verdict PASS","fields":{"final_verdict":"PASS"}}}
-{"source":"loop","gap":{"reason":"queue_full","severity":"WARN","pid":9055,"first_seq":57,"last_seq":73,"dropped":17}}
+{"source":"loop","gap":{"reason":"queue_full","severity":"WARN","pid":9055,"first_seq":57,"last_seq":73,"dropped":17,"from":0,"to":0}}
 ```
 
 - **`signal`** holds the full `signal/1.0` event without a change (`go/internal/signalcenter/event.go:222`).
 - **`source`** is the role of the root that published the record (§1).
 - **`dispatch`** is the `EVOLVE_DISPATCH_ID` of the process that published the record, if it has one. A record from a process with no tag has no `dispatch` key.
 - **`gap`** names events that this channel does not hold: the reason, a severity, the `pid` of the process, the `seq` range and the count. The reasons are `queue_full`, `write_error` and `lock_deadline` (§5, §6). A loss on a `lossless` channel has the severity `INCIDENT`, and a loss on a `best_effort` channel has `WARN`.
+- **`from` and `to`** are always in a gap, also when they are 0. A synthetic gap sets them to the two cursors of the move. A stored gap has 0 in both.
+- **Valid record.** A record has exactly one of `signal` and `gap`. A stored record never has the source `watch`. The writer refuses any other record, and the reader reads it as `malformed`.
 - **Size.** `Normalize` keeps a signal line at 4,096 bytes or less (`MaxLineBytes`, `event.go:33`). `source` comes from a closed set, and the Publisher cuts `dispatch` to 256 bytes. A record line is thus 4,608 bytes or less.
 
 The wire form is what `evolve events watch --json` prints and what a command reads on stdin. The reader adds four keys from the record and from the place where it read the line:
@@ -160,7 +162,7 @@ The wire form is what `evolve events watch --json` prints and what a command rea
 |---|---|
 | `new` (default) | the end of each channel when the reader arms |
 | `all` | the first retained record |
-| `last` | the last complete record of each channel, then live. It is the last line of the tail segment, or of the segment before it when the tail is empty. |
+| `last` | the last complete record of each channel, then live. It is the last line of the tail segment, or of the segment before it when the tail has no complete line. |
 | `ch:offset[,ch:offset]` | the given cursors |
 | an RFC 3339 time | the first record whose `signal.ts` is at or after the time, by a linear scan from the oldest retained segment |
 
@@ -168,17 +170,19 @@ The wire form is what `evolve events watch --json` prints and what a command rea
 - **The reset rule.** When the reader opens a channel or wakes, it compares its cursor with the channel:
   - A cursor past the end of a segment that has a later segment moves to the base of that later segment. An OS crash can drop the tail of a segment after its rotation.
   - A cursor past the end of the tail segment moves to the true end. The tail lost bytes, or someone wiped the directory.
+  - A reader at the end of a segment whose end is below the base of the later segment moves to that base. The bytes between them are lost.
   - Each move gives one synthetic gap record with `reason: reset`, `from` and `to`.
+  - A segment that gc removes after the reader listed the segments gives a `retention` gap to the base of the next segment.
   - If the channel directory is gone, the reader makes it again and arms again. The new log starts at cursor 0.
 
 ### 5. The append protocol
 
-Each append takes the channel lock `ch/<channel>.lock` with `flock.LockWithin(path, deadline)`. The lock file sits beside the channel directory, so its creation never wakes a watcher. With the lock held:
+Each append takes the channel lock `ch/<channel>.lock` with `flock.LockWithin(path, deadline, onSettled)`. The lock file sits beside the channel directory, so its creation never wakes a watcher. With the lock held:
 
 1. Open the tail segment, which is the segment with the highest base, with `O_WRONLY|O_APPEND|O_CREATE`. `fstat` it.
-2. If the last byte is not `\n`, write one `\n`. This repairs a line that a crashed writer tore.
-3. Write the batch of lines in one `write` call.
-4. If the segment is larger than `segment_mb`, make the next segment `seg-<base+size>`.
+2. If the last byte is not `\n`, put one `\n` before the batch. This repairs a line that a crashed writer tore.
+3. Write the repair and the batch of lines in one `write` call.
+4. If the segment is larger than `segment_mb`, make the next segment `seg-<base+size>`. If this step fails, the batch is on disk and is not a loss. The append returns `ErrRotate` with the cursor, and the next append tries the rotation again.
 5. Release the lock.
 
 **The lock with a deadline** (`internal/adapters/flock`, new in E2):
@@ -190,7 +194,8 @@ Each append takes the channel lock `ch/<channel>.lock` with `flock.LockWithin(pa
   - If the caller loses, the state is `handed`, and the caller takes the lock. The caller owns the lock only in the state `handed`.
   - Only one of the two swaps can win. Thus exactly one side owns the descriptor, also when the deadline and the grant come at the same instant.
   - If `flock` fails, the goroutine hands the error over in the same way.
-- At most one lock call waits for each channel and process. While it waits, a new append to that channel is a counted loss.
+- **The settle signal.** `LockWithin` calls `onSettled` once, when its goroutine is done. That is before it returns a lock, after an abandoned call released the lock, or before it returns an open error.
+- At most one lock call waits for each channel and process. While it waits, a new append to that channel fails at once with `ErrLockPending`, which wraps `ErrLockDeadline`. It starts no goroutine and opens no descriptor. It is a counted loss with the reason `lock_deadline`. The flag clears at the settle signal.
 - The deadline is `events.lock_deadline_ms` (default 250). A lossless append thus never holds the drain longer than that.
 
 **Errors:**

@@ -24,6 +24,7 @@ import (
 var (
 	heldMu    sync.Mutex
 	heldPaths = map[string]bool{}
+	absFn     = filepath.Abs
 )
 
 // TryLock attempts the exclusive lock on path WITHOUT blocking. It returns
@@ -33,7 +34,7 @@ var (
 // when the holder dies (even on SIGKILL), so a dead owner's lock is immediately
 // re-acquirable. On success, call the returned release exactly once — defer it.
 func TryLock(path string) (release func(), held bool, err error) {
-	abs, aerr := filepath.Abs(path)
+	abs, aerr := absFn(path)
 	if aerr != nil {
 		abs = path
 	}
