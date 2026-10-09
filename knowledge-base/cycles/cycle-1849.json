@@ -1,0 +1,182 @@
+{
+  "schema_version": 2,
+  "cycle": 1849,
+  "run_id": "01M4FQXWSVQYB674B6YKJ1V85S",
+  "goal": "Wave 87.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 86 facts (run 20261009T055036Z): 2 of 2 cycles shipped.\n- Cycle 1847: final verdict PASS. It shipped.\n- Cycle 1848: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 83 (run 20261008T221630Z): 1 of 2 cycles shipped.\n- Wave 84 (run 20261009T021848Z): 2 of 2 cycles shipped.\n- Wave 85 (run 20261009T035608Z): 2 of 2 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "f309fa93c7476225ee91f42a491802796ccb9f22",
+  "tree_sha": "c9a000531763d053a96ae799c3871cd552778e9a",
+  "tasks": [
+    "dashboard-sse-and-board-status-pins"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 47699,
+      "started_at": "2026-10-09T07:10:23Z",
+      "ended_at": "2026-10-09T07:11:12Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2027,
+        "cache_read": 369216,
+        "cache_write": 32119
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 55035,
+      "started_at": "2026-10-09T07:11:53Z",
+      "ended_at": "2026-10-09T07:12:49Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 1894,
+        "cache_read": 564808,
+        "cache_write": 40802
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 182486,
+      "started_at": "2026-10-09T07:12:49Z",
+      "ended_at": "2026-10-09T07:15:52Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 26,
+        "output": 15367,
+        "cache_read": 1150559,
+        "cache_write": 76483
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 241808,
+      "started_at": "2026-10-09T07:15:52Z",
+      "ended_at": "2026-10-09T07:20:17Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 36,
+        "output": 13119,
+        "cache_read": 1718624,
+        "cache_write": 81068
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 96034,
+      "started_at": "2026-10-09T07:20:51Z",
+      "ended_at": "2026-10-09T07:26:21Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 18,
+        "output": 6149,
+        "cache_read": 711645,
+        "cache_write": 58410
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 135000,
+      "started_at": "2026-10-09T07:26:58Z",
+      "ended_at": "2026-10-09T07:43:32Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 202685,
+      "started_at": "2026-10-09T07:43:32Z",
+      "ended_at": "2026-10-09T07:46:56Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 960747,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 241808,
+    "by_archetype_ms": {
+      "build": 241808,
+      "control": 337685,
+      "evaluate": 96034,
+      "plan": 285220
+    },
+    "total_tokens": {
+      "input": 108,
+      "output": 38556,
+      "cache_read": 4514852,
+      "cache_write": 288882
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 36,
+        "output": 13119,
+        "cache_read": 1718624,
+        "cache_write": 81068
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 18,
+        "output": 6149,
+        "cache_read": 711645,
+        "cache_write": 58410
+      },
+      "plan": {
+        "input": 54,
+        "output": 19288,
+        "cache_read": 2084583,
+        "cache_write": 149404
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999760795222992,
+    "hot_phase_count": 5,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  }
+}
