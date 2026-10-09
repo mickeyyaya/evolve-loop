@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "go test -count=1 -tags integration -coverprofile of ./internal/core reports 100.0% of statements",
+    "./internal/core 100 is listed in go/.cover-strict"
+  ],
+  "created_at": "2026-10-09T08:30:00Z",
+  "files": [
+    "go/internal/core",
+    "go/.cover-strict"
+  ],
+  "fix": "Close the coverage gaps of internal/core in batches by function group, with behavior tests for each uncovered branch (no tests that only walk lines). Then register ./internal/core at 100 in go/.cover-strict.",
+  "id": "core-package-coverage-to-100",
+  "kind": "test-gap",
+  "priority_class": "maintainability",
+  "source": "console lane cl-lq-q1 (plan component Q1 of ADR-0128), 2026-10-09",
+  "summary": "The operator rule of 2026-10-09 asks that every package a change touches ends at 100.0% coverage. Lane Q1 changed internal/core (ship_recovery.go, phase_bindings.go). Each new or changed function of the lane is at 100.0%, but the package is at 92.5% (231 functions below 100) with -tags integration. The gaps are older than the lane and are too many to close inside one component lane.",
+  "title": "internal/core is at 92.5% statement coverage; the operator rule asks 100.0% for each touched package",
+  "weight": 0.4
+}

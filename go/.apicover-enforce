@@ -722,3 +722,5 @@
 ./internal/overlap
 # E5 (ADR-0127): the channel reader and the last will of the event channels (internal/events/reader).
 ./internal/events/reader
+# derived — the one catalog of the generated outputs, their markers, regions and inputs, the conflict class and the regeneration (ADR-0128, plan Q1).
+./internal/derived

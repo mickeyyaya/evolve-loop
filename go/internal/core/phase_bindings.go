@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verdictcache"
@@ -412,26 +413,12 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	ensureCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath)
 }
 
-// normalizeDerivedProjections regenerates each GENERATED projection whose
-// source-of-truth this cycle changed (e.g. control-flags.md after a registry
-// edit), in the build worktree, BEFORE the audit/docs gate inspects it. Like
-// build-gofmt, regenerating a derived projection is deterministic work that must
-// NOT depend on the LLM builder remembering: a flag cycle edits registry_table.go
-// but the builder routinely leaves the control-flags.md projection stale,
-// which the docs/flags gate then correctly FAILs. This closes that
-// class at the source — the gate stays the backstop. Best-effort; never aborts.
-//
-// Timing/integrity: this runs in the BUILD iteration of recordAndBranch (after
-// emitPhaseBindings(PhaseBuild), which does NOT compute a tree SHA) and stages the
-// regenerated file. The AUDIT iteration's emitPhaseBindings(PhaseAudit) then runs
-// worktreeContentSHA (git add -u + write-tree), binding the already-staged
-// regenerated projection — so committed_tree == audit_bound_tree holds (no
-// CodeIntegrityTreeDrift).
 func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree string) {
 	if worktree == "" {
 		return
 	}
-	regenStaleProjections(ctx, worktree, changedWorktreePaths(ctx, worktree), regenerateDerivedArtifact, stageWorktreePath)
+	stale := derived.Stale(changedWorktreePaths(ctx, worktree), goInputsFor(ctx, worktree))
+	regenStaleProjections(ctx, worktree, stale, refreshDerivedEntry, stageDerivedEntry)
 }
 
 // changedWorktreePaths returns the repo-relative paths this cycle changed in the

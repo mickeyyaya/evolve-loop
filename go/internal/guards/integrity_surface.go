@@ -108,6 +108,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/triagedecision/", Rationale: "ADR-0106 H1: the one reader of the triage report the host derives the decision from before any judge — a lane that could edit it could commit itself to less than its pin"},
 	{Fragment: "/go/internal/recoveryguard/", Rationale: "ADR-0106 F2: the kernel fence around a recovery dispatch — the only backstop against an agent that may rewrite deliverables"},
 	{Fragment: "/go/internal/core/ship_recovery.go", Rationale: "rebase recovery must invalidate stale explanation and route through Build"},
+	{Fragment: "/go/internal/derived/", Rationale: "ADR-0128 Q1: the derived-output catalog decides which rebase conflicts the protected recovery regenerates instead of sending to the debugger — a lane that could edit it could auto-resolve its own genuine conflict"},
 	{Fragment: "/go/internal/core/resume.go", Rationale: "resume entry point (RunCycleFromPhase) and resumed-deliverable explanation review parity (reviewResumedDeliverable)"},
 	{Fragment: "/go/internal/core/resume_execution.go", Rationale: "resume sealing, projection, and post-Build refresh call sites (resumeExecution.run); carved out of resume.go by #549"},
 	{Fragment: "/go/internal/core/resume_bootstrap.go", Rationale: "resume rebase-split recovery and explanation identity check (explanationdocs.RecoverRebaseSplit, requireResumeExplanationIdentity); carved out of resume.go by #549"},

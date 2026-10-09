@@ -62,6 +62,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/lanerouting` | the one routing predicate: protected surface or a path the build profile's sandbox denies | [internal-lanerouting.md](internal-lanerouting.md) |
 | `internal/phasecontract` | the single registry of each phase's deliverable contract: artifact, sections, verdicts and owed files | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/treedelta` | the byte-exact change between a base and a tree, the proof a carry across a rebase rests on | [internal-treedelta.md](internal-treedelta.md) |
+| `internal/derived` | the one catalog of the generated outputs: their markers and regions, their inputs, the conflict class and the regeneration with the generator of the worktree | [internal-derived.md](internal-derived.md) |
 | `internal/triagedecision` | the one reader of the triage report as a decision: strict for the host derivation, lenient for ship | [internal-triagedecision.md](internal-triagedecision.md) |
 | `internal/recoveryguard` | the kernel fence around a recovery dispatch: records the run, restores and reports what the agent touched outside its grant | [internal-recoveryguard.md](internal-recoveryguard.md) |
 | `internal/phasespec` | loads, validates and merges the built-in and user phase specs into one catalog | [internal-phasespec.md](internal-phasespec.md) |

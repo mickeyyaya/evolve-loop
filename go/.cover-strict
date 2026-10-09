@@ -42,3 +42,4 @@
 ./test/structure 100
 ./internal/events/publisher 100
 ./internal/overlap 100
+./internal/derived 100
