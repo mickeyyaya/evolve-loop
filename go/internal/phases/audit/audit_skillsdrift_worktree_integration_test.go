@@ -27,29 +27,33 @@ const (
 	checkerFile   = "skillcheck.go"
 	laneMarkerOld = `"Arguments: $ARGUMENTS\n",`
 	laneMarkerNew = `"Arguments: $ARGUMENTS\n\nLane marker: the generator changed.\n",`
-	selfIDClause  = " (Skill tool id `evo:%s`)"
-	selfIDArgsOld = "commandGenMarker, name, name, name,"
-	selfIDArgsNew = "commandGenMarker, name, name,"
 	driftWordOld  = `"DRIFT: %s is stale or missing`
 	driftWordNew  = `"STALE: %s is stale or missing`
 )
 
+var (
+	skillsSourceFiles = []string{filepath.Join("docs", "architecture", "phase-registry.json")}
+	skillsSourceDirs  = []string{
+		"skills", "commands", "agents", ".claude-plugin", ".codex-plugin",
+		filepath.Join(".agents", "plugins"), filepath.Join(".evolve", "profiles"), filepath.Join(".evolve", "phases"),
+	}
+	generatorSourceFiles = []string{filepath.Join("go", "go.mod"), filepath.Join("go", "go.sum")}
+	generatorSourceDirs  = []string{filepath.Join("go", "vendor"), filepath.Join("go", "cmd"), filepath.Join("go", "internal"), filepath.Join("go", "pkg")}
+)
+
 func generatorLaneRepo(t *testing.T) *gittest.Repo {
+	t.Helper()
+	return committedSkillsRepo(t, append(append([]string(nil), skillsSourceFiles...), generatorSourceFiles...), append(append([]string(nil), skillsSourceDirs...), generatorSourceDirs...))
+}
+
+func committedSkillsRepo(t *testing.T, files, dirs []string) *gittest.Repo {
 	t.Helper()
 	repoRoot := skillsDriftRepoRoot(t)
 	repo := gittest.Fixture(t)
-	for _, rel := range []string{
-		filepath.Join("docs", "architecture", "phase-registry.json"),
-		filepath.Join("go", "go.mod"),
-		filepath.Join("go", "go.sum"),
-	} {
+	for _, rel := range files {
 		skillsDriftCopyFile(t, filepath.Join(repoRoot, rel), filepath.Join(repo.Dir, rel))
 	}
-	for _, dir := range []string{
-		"skills", "commands", "agents", ".claude-plugin", ".codex-plugin",
-		filepath.Join(".agents", "plugins"), filepath.Join(".evolve", "profiles"), filepath.Join(".evolve", "phases"),
-		filepath.Join("go", "vendor"), filepath.Join("go", "cmd"), filepath.Join("go", "internal"), filepath.Join("go", "pkg"),
-	} {
+	for _, dir := range dirs {
 		skillsDriftCopyTree(t, filepath.Join(repoRoot, dir), filepath.Join(repo.Dir, dir))
 	}
 	if drift, err := skillcheck.Check(repo.Dir); err != nil || len(drift) != 0 {
@@ -67,7 +71,12 @@ func generatorLaneWorktree(t *testing.T) string {
 
 func editGenerator(t *testing.T, root, file string, pairs ...string) {
 	t.Helper()
-	path := filepath.Join(root, "go", "internal", "skillcheck", file)
+	editSource(t, root, filepath.Join("go", "internal", "skillcheck", file), pairs...)
+}
+
+func editSource(t *testing.T, root, rel string, pairs ...string) {
+	t.Helper()
+	path := filepath.Join(root, rel)
 	src := fixtures.MustRead(t, path)
 	for i := 0; i < len(pairs); i += 2 {
 		if strings.Count(src, pairs[i]) != 1 {
@@ -138,28 +147,19 @@ func TestSkillsDriftGate_GeneratorChangeWithRegeneratedStubsPasses(t *testing.T)
 	requireDisagreement(t, err, len(host))
 }
 
-func TestSkillsDriftGate_CommittedGeneratorChangeTriggersFromTheCycleBase(t *testing.T) {
+func TestSkillsDriftGate_CommittedGeneratorChangeIsGradedByTheWorktreeWithOrWithoutABase(t *testing.T) {
 	repo := generatorLaneRepo(t)
 	base := repo.Git("rev-parse", "HEAD")
 	editGenerator(t, repo.Dir, rendererFile, laneMarkerOld, laneMarkerNew)
 	regenerateWithWorktreeGenerator(t, repo.Dir)
 	repo.Git("add", "-A")
 	repo.Git("commit", "-qm", "lane")
-	stubs := generatedStubs(t, repo.Dir)
-	cases := []struct {
-		name          string
-		base          string
-		wantOffenders []string
-	}{
-		{"with the cycle base the committed change is seen", base, nil},
-		{"without a base only HEAD is diffed and the change is missed", "", stubs},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, _ := skillsDriftCheckDefault(core.PhaseRequest{Worktree: repo.Dir, ProjectRoot: t.TempDir(), WorktreeBaseSHA: tc.base})
+	for name, cycleBase := range map[string]string{"with the cycle base": base, "without a base": ""} {
+		t.Run(name, func(t *testing.T) {
+			got, _ := skillsDriftCheckDefault(core.PhaseRequest{Worktree: repo.Dir, ProjectRoot: t.TempDir(), WorktreeBaseSHA: cycleBase})
 
-			if !reflect.DeepEqual(sortedCopy(got), sortedCopy(tc.wantOffenders)) {
-				t.Errorf("offenders = %v, want %v", got, tc.wantOffenders)
+			if len(got) != 0 {
+				t.Errorf("a committed generator change with consistent regeneration must pass: got %d offender(s): %v", len(got), got)
 			}
 		})
 	}
@@ -208,7 +208,7 @@ func TestSkillsDriftGate_ReworkedReportProtocolStillFails(t *testing.T) {
 	}
 }
 
-func TestSkillsDriftGate_LaneWithoutGeneratorChangeIsGradedInProcess(t *testing.T) {
+func TestSkillsDriftGate_TreeWithoutTheGeneratorSourceIsGradedInProcess(t *testing.T) {
 	cases := []struct {
 		name string
 		edit func(t *testing.T, root string)
@@ -223,7 +223,7 @@ func TestSkillsDriftGate_LaneWithoutGeneratorChangeIsGradedInProcess(t *testing.
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			root := generatorLaneWorktree(t)
+			root := committedSkillsRepo(t, skillsSourceFiles, skillsSourceDirs).Dir
 			tc.edit(t, root)
 			fake := &fixtures.FakeExec{}
 			withFakeRunner(t, fake.Run)
@@ -236,7 +236,7 @@ func TestSkillsDriftGate_LaneWithoutGeneratorChangeIsGradedInProcess(t *testing.
 				t.Errorf("gate output must be byte-identical to the in-process check:\ngot  %q\nwant %q", gotDiags, wantDiags)
 			}
 			if len(fake.Calls) != 0 {
-				t.Errorf("a lane that does not touch the generator must not run a subprocess, got %v", fake.CallKeys())
+				t.Errorf("a tree without the generator source must not run a subprocess, got %v", fake.CallKeys())
 			}
 		})
 	}
@@ -265,10 +265,10 @@ func skillsGateDiagnostics(t *testing.T, check func(core.PhaseRequest) ([]string
 
 func TestSkillsDriftGate_Cycle1840ReplayPasses(t *testing.T) {
 	root := generatorLaneWorktree(t)
-	editGenerator(t, root, rendererFile, selfIDClause, "", selfIDArgsOld, selfIDArgsNew)
+	editGenerator(t, root, rendererFile, laneMarkerOld, laneMarkerNew)
 	regenerateWithWorktreeGenerator(t, root)
-	if strings.Contains(fixtures.MustRead(t, filepath.Join(root, "commands", "scout.md")), "evo:scout") {
-		t.Fatal("precondition: the replayed generator must drop the self-reference from commands/scout.md")
+	if !strings.Contains(fixtures.MustRead(t, filepath.Join(root, "commands", "scout.md")), "Lane marker: the generator changed.") {
+		t.Fatal("precondition: the replayed generator must rewrite commands/scout.md")
 	}
 	stubs := generatedStubs(t, root)
 	if host, _ := skillcheck.Check(root); !reflect.DeepEqual(sortedCopy(host), stubs) {
@@ -277,7 +277,7 @@ func TestSkillsDriftGate_Cycle1840ReplayPasses(t *testing.T) {
 
 	diags := skillsGateDiagnostics(t, skillsDriftCheckDefault, core.PhaseRequest{Cycle: 1840, Worktree: root, ProjectRoot: t.TempDir()})
 
-	want := "PASS|warning|skills-drift: the lane's generator and the host generator disagree on " + strconv.Itoa(len(stubs)) + " artifact(s)"
+	want := "PASS|warning|skills-drift: the worktree generator and the host generator disagree on " + strconv.Itoa(len(stubs)) + " artifact(s)"
 	if len(diags) != 1 || !strings.HasPrefix(diags[0], want) {
 		t.Fatalf("the cycle-1840 lane must keep its PASS with one disagreement warning:\ngot  %q\nwant prefix %q", diags, want)
 	}

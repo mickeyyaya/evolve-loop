@@ -1,0 +1,25 @@
+{
+  "connects_to": [
+    "docs/plans/skills-drift-host-stamp-2026-10.md",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/instincts/lessons/inst-L1841a-a-gate-compiled-into-the-host-must-not-grade-a-base-newer-than-its-build-stamp.yaml",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-1841"
+  ],
+  "consumed": {
+    "at": "2026-10-09T00:36:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "console lane cl-skills-drift-peer (fix/skills-drift-host-stamp), option A after review: skillsDriftCheckDefault always runs the worktree's own evolve skills check when the tree carries go/internal/skillcheck/ (carriesSkillsGenerator), else the in-process check with byte-identical output; this covers a base newer than the host, an imported-package change and a dirty-tree host build; the stamp-diff design (option B) was rejected; acceptance tests TestSkillsDriftGate_Cycle1841ReplayBaseNewerThanTheHostPasses, _BaseGeneratorChangeWithoutRegenerationFails, _ImportedPackageChangeIsGradedByTheWorktreeGenerator, _TreeWithoutTheGeneratorSourceIsGradedInProcess; the second half of the preventive action (classify infra-systemic over a gate-forced FAIL) is the follow-up failure-dossier-reads-no-builder-declared-system-class"
+  },
+  "created_at": "2026-10-09T00:17:26Z",
+  "fix": "In skillsDriftCheckDefault, also use the worktree generator when go/internal/skillcheck/ differs between the host binary's build stamp (version.Commit) and the worktree HEAD, not only between WorktreeBaseSHA and HEAD. Pin it with a table test: (host stamp == base, lane does not touch skillcheck) -> in-process check; (host stamp older than a base that changed skillcheck) -> worktree check; (unknown stamp 'dev'/empty) -> worktree check.",
+  "id": "lesson-inst-L1841a-skills-drift-host-stamp",
+  "injected_by": "console-operator-session",
+  "kind": "pipeline-repair",
+  "notes": "No pipeline-defect-* item was filed for cycle 1841 (see the follow-up failure-dossier-reads-no-builder-declared-system-class). This record files the retro lesson inst-L1841a as the tracked item and consumes it in the same lane, as #821 did for pipeline-defect-infra-systemic-cycle1840.",
+  "priority": "P0",
+  "priority_class": "stability",
+  "root_cause": "skillsDriftCheckDefault (go/internal/phases/audit/skillsdrift.go:30 at 9b47ca6ae) selected the worktree generator only when the lane diff since WorktreeBaseSHA touched go/internal/skillcheck/. After the rebase onto 9b47ca6ae the base carried the generator change, so the in-process generator of the host binary (8f46ad383) graded 32 up-to-date stubs as drift.",
+  "summary": "Cycle 1841 (route-verbs-refuse-mid-wave): three audits wrote PASS and the skills-drift gate forced FAIL with 32 stale commands/*.md, because the host binary was built at 8f46ad383 and the rebased base 9b47ca6ae changed the generator.",
+  "title": "The skills-drift gate graded a base newer than the host build stamp with the host generator (cycle 1841, lesson inst-L1841a)",
+  "weight": 0.99
+}

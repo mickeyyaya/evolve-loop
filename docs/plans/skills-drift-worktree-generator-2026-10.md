@@ -66,8 +66,8 @@ Unit tests (no tag) pin the decision (`changesSkillsGenerator`), the report pars
 
 ## 6. Limits
 
-- The prefix covers only the `skillcheck` package. The generator also reads code in `phasespec`, `phasecontract`, `profiles`, `prompts` and `config`. A lane that changes how those packages render a SKILL.md region still meets the skew. A follow-up item records this gap. A dependency-closure check (`go list -deps`) closes it.
-- An orchestrator binary that is older than the worktree base has the same skew for every lane. The loop rebuilds the binary at wave boundaries, so this gap is small. A follow-up item records it.
+- The prefix covers only the `skillcheck` package. The generator also reads code in `phasespec`, `phasecontract`, `profiles`, `prompts` and `config`. A lane that changes how those packages render a SKILL.md region still meets the skew. A follow-up item records this gap. A dependency-closure check (`go list -deps`) closes it. Superseded: since [skills-drift-host-stamp-2026-10.md](skills-drift-host-stamp-2026-10.md) the gate always runs the worktree generator on a tree that carries its source, so no trigger is left to widen.
+- An orchestrator binary that is older than the worktree base has the same skew for every lane. The loop rebuilds the binary at wave boundaries, so this gap is small. A follow-up item records it. Cycle 1841 hit this gap; [skills-drift-host-stamp-2026-10.md](skills-drift-host-stamp-2026-10.md) closes it.
 - Other in-process gates that grade with host code: the explanation verifier (`explanationdocs.Verify`) and the solution contract (`core.SolutionViolations`). These gates are policy gates. Host authority is intentional for them: a lane must not grade itself with a gate that it changed (lesson `cycle-1340-in-binary-gate-fix-cannot-grade-the-cycle-that-authors-it`). The generator is different: its output is a projection, and CI grades it with the tree's own code.
 - A compile error in the worktree's `cmd/evolve` is now a FAIL with the compiler output as the offender.
 - Residuals from review round 1. The follow-up item `skills-drift-gate-generator-dependency-closure` records each one:

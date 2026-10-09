@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the skills-drift gate always grades with the worktree's own generator, and the cycle-1840 replay test is green on main again (cycle 1841, 2026-10-09)
+
+- **What happened.** Cycle 1841 audited PASS. A peer cycle then shipped `9b47ca6ae`, which changed the skill-command generator and regenerated the 32 `commands/*.md`. The lane rebased onto it. The host binary was built at `8f46ad383`, older than the new base. Three re-audits wrote PASS, and the skills-drift gate forced FAIL each time with 32 stale stubs. The repair budget ran out and the cycle sealed FAIL. Plan: [skills-drift-host-stamp-2026-10.md](docs/plans/skills-drift-host-stamp-2026-10.md).
+- **Root cause.** The gate selected the worktree generator only when the lane's own diff since the base touched `go/internal/skillcheck/`. The base, not the lane, carried the generator change, so the host generator graded the lane. The same path trigger also missed a change in a package that the generator imports (`prompts`, `phasespec`, `phasecontract`, `profiles`, `config`).
+- **The fix.** When the tree carries the generator source (`go/internal/skillcheck/`), the gate always runs the worktree's own `evolve skills check`, as CI does. The lane trigger is gone. A tree without the generator source is graded in-process as before. The cost is one `go run` per audit, about 0.3 s with a warm build cache. A host that disagrees still gives a WARN, and the texts now name the worktree generator, not "the lane's generator".
+- **Main was red.** `TestSkillsDriftGate_Cycle1840ReplayPasses` edited the generator at a text that `9b47ca6ae` removed. It failed in the required CI of main and in the composed-tree apicover gate of cycle 1841 (`ORCHESTRATOR_COMPOSED_GATE_DECLINED`). The test now uses a stable anchor.
+
 ## Fixed — the skills-drift gate grades a generator change with the worktree's own generator (cycles 1828 and 1840, 2026-10-09)
 
 - **What happened.** Cycles 1828 and 1840 changed the skill-command generator (`skillcheck.RenderCommandStub`) and regenerated `commands/*.md`. The worktree's own `evolve skills check` was OK, and ACS was 4/4 PASS. The audit gate reported 30 and 32 drifted stubs, a false red. Cycle 1840 halted as `infra-systemic`. Plan: [skills-drift-worktree-generator-2026-10.md](docs/plans/skills-drift-worktree-generator-2026-10.md).

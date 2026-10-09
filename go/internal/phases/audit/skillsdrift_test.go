@@ -15,29 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-func TestChangesSkillsGenerator(t *testing.T) {
-	cases := []struct {
-		name  string
-		paths []string
-		want  bool
-	}{
-		{"no change", nil, false},
-		{"docs and other packages", []string{"docs/a.md", "go/internal/core/x.go", "commands/scout.md"}, false},
-		{"the renderer", []string{"docs/a.md", "go/internal/skillcheck/commands.go"}, true},
-		{"an embedded template", []string{"go/internal/skillcheck/templates/skill.md.tmpl"}, true},
-		{"a test of the generator", []string{"go/internal/skillcheck/commands_test.go"}, true},
-		{"a sibling package with the same stem", []string{"go/internal/skillcheckx/a.go"}, false},
-		{"the generator name outside go/internal", []string{"docs/go/internal/skillcheck/notes.md"}, false},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := changesSkillsGenerator(tc.paths); got != tc.want {
-				t.Errorf("changesSkillsGenerator(%q) = %v, want %v", tc.paths, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestSkillsCheckOffenders(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -102,7 +79,7 @@ func TestWorktreeSkillsDrift_Outcomes(t *testing.T) {
 			[]string{"the worktree generator skills check exited 1 without a drift report: panic: boom"}, ""},
 		{"a non-zero exit with no output fails", fixtures.ExecResponse{ExitCode: 2},
 			[]string{"the worktree generator skills check exited 2 without a drift report: (no output)"}, ""},
-		{"a runner failure cannot grade and says so", fixtures.ExecResponse{Err: errors.New("go: not found")}, nil, "is NOT graded and only CI TestSkills_NoDrift checks it: go: not found"},
+		{"a runner failure cannot grade and says so", fixtures.ExecResponse{Err: errors.New("go: not found")}, nil, "the worktree generator `evolve skills check` did not run: the lane is NOT graded and only CI TestSkills_NoDrift checks it: go: not found"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -168,9 +145,9 @@ func TestGeneratorDisagreement(t *testing.T) {
 	}{
 		{"the host agrees", nil, nil, ""},
 		{"the host sees drift", []string{"commands/a.md", "commands/b.md"}, nil,
-			"the lane's generator and the host generator disagree on 2 artifact(s); the lane grades itself, review the skillcheck diff: commands/a.md, commands/b.md"},
+			"the worktree generator and the host generator disagree on 2 artifact(s); the worktree generator grades the lane: commands/a.md, commands/b.md"},
 		{"the host cannot compare", nil, errors.New("load phase catalog: no registry"),
-			"the lane's generator graded the lane clean, but the host generator could not compare (load phase catalog: no registry); the lane grades itself, review the skillcheck diff"},
+			"the worktree generator graded the lane clean, but the host generator could not compare (load phase catalog: no registry); the worktree generator grades the lane"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -207,5 +184,28 @@ func TestRun_SkillsDriftWarningKeepsThePASSAndNamesTheGate(t *testing.T) {
 	want := core.Diagnostic{Severity: "warning", Message: "skills-drift: the generators disagree"}
 	if !reflect.DeepEqual(resp.Diagnostics, []core.Diagnostic{want}) {
 		t.Errorf("Diagnostics = %+v, want only %+v", resp.Diagnostics, want)
+	}
+}
+
+func TestCarriesSkillsGenerator(t *testing.T) {
+	cases := []struct {
+		name string
+		file string
+		want bool
+	}{
+		{"the generator package", filepath.Join("go", "internal", "skillcheck", "commands.go"), true},
+		{"a sibling package only", filepath.Join("go", "internal", "skillcheckx", "a.go"), false},
+		{"a file in place of the package", filepath.Join("go", "internal", "skillcheck"), false},
+		{"the generator name outside go/internal", filepath.Join("docs", "go", "internal", "skillcheck", "notes.md"), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			fixtures.MustWrite(t, filepath.Join(root, tc.file), "package skillcheck\n")
+
+			if got := carriesSkillsGenerator(root); got != tc.want {
+				t.Errorf("carriesSkillsGenerator over a tree with %s = %v, want %v", tc.file, got, tc.want)
+			}
+		})
 	}
 }
