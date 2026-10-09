@@ -96,7 +96,6 @@ func TestClampPlanModelRouting_SuffixedCLIHonoredViaBaseName(t *testing.T) {
 	prof := &profiles.Profile{CLI: "claude-tmux", AllowedCLIs: []string{"claude"},
 		ModelTierEnvelope: &profiles.ModelTierEnvelope{Min: "fast", Max: "deep"}}
 	catalog := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
-		// The catalog is keyed on the base family, never a driver-qualified name.
 		"claude": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"deep": "opus"}},
 	}}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "scout", Run: true, CLI: "claude-tmux", Tier: "deep"}}}

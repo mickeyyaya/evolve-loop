@@ -1,13 +1,3 @@
-// Coverage tests for subagent package — drives the 79.1% baseline to ≥95%
-// by exercising error/edge paths not covered by subagent_test.go.
-//
-// Targets identified from `go test -cover -coverprofile`:
-//   - defaultGitState + runGit (0%) — real git fixture
-//   - generateToken short-read branch
-//   - defaultHashFile io.Copy error branch
-//   - New() nil-seam permutations
-//   - Run() ledger-append-error injection
-//   - classify combinatorial edges
 package subagent
 
 import (
@@ -25,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// TestDefaultGitState_RealRepo exercises defaultGitState + runGit against a
-// real ephemeral git repo. Both functions sat at 0% coverage before.
 func TestDefaultGitState_RealRepo(t *testing.T) {
 	dir := t.TempDir()
 	for _, args := range [][]string{
@@ -53,8 +41,6 @@ func TestDefaultGitState_RealRepo(t *testing.T) {
 	}
 }
 
-// TestDefaultGitState_NotARepo covers the error path when projectRoot is
-// not a git work tree.
 func TestDefaultGitState_NotARepo(t *testing.T) {
 	dir := t.TempDir()
 	head, treeSHA, err := defaultGitState(context.Background(), dir)
@@ -66,16 +52,10 @@ func TestDefaultGitState_NotARepo(t *testing.T) {
 	}
 }
 
-// TestDefaultGitState_HeadOKDiffFails — covered indirectly by NotARepo,
-// but explicitly tests the second-call error path. Hard to provoke
-// cleanly; relies on `git diff` failing after `git rev-parse HEAD`
-// succeeds, which is rare. Skip if we can't synthesize the state.
 func TestDefaultGitState_HeadOKDiffFails(t *testing.T) {
 	t.Skip("hard to synthesize cleanly — covered by NotARepo case")
 }
 
-// TestRunGit_Error directly drives the runGit error branch via a missing
-// argument.
 func TestRunGit_Error(t *testing.T) {
 	out, err := runGit(context.Background(), t.TempDir(), "bogus-subcommand-that-does-not-exist")
 	if err == nil {
@@ -83,12 +63,9 @@ func TestRunGit_Error(t *testing.T) {
 	}
 }
 
-// TestGenerateToken_ShortRead injects a rand source that returns fewer
-// bytes than requested.
 func TestGenerateToken_ShortRead(t *testing.T) {
 	r := &Runner{cfg: Config{
 		Rand: func(buf []byte) (int, error) {
-			// Return fewer bytes than requested, no error.
 			return ChallengeTokenBytes - 1, nil
 		},
 	}}
@@ -97,7 +74,6 @@ func TestGenerateToken_ShortRead(t *testing.T) {
 	}
 }
 
-// TestGenerateToken_RandError covers the rand-returns-error path.
 func TestGenerateToken_RandError(t *testing.T) {
 	r := &Runner{cfg: Config{
 		Rand: func(buf []byte) (int, error) {
@@ -109,32 +85,26 @@ func TestGenerateToken_RandError(t *testing.T) {
 	}
 }
 
-// TestDefaultHashFile_MissingFile covers the os.Open error branch.
 func TestDefaultHashFile_MissingFile(t *testing.T) {
 	if _, err := defaultHashFile("/nonexistent/path/should/not/exist"); err == nil {
 		t.Errorf("expected error for missing file")
 	}
 }
 
-// TestDefaultHashFile_Directory — io.Copy on a directory file descriptor.
 func TestDefaultHashFile_Directory(t *testing.T) {
 	dir := t.TempDir()
-	// os.Open on a directory succeeds; reading from it on Linux/macOS fails.
 	_, err := defaultHashFile(dir)
 	if err == nil {
-		// Some platforms may allow reading directory entries — accept.
 		t.Log("defaultHashFile(directory) succeeded on this platform — acceptable")
 	}
 }
 
-// TestDefaultStatMTime_Missing exercises the os.Stat error path.
 func TestDefaultStatMTime_Missing(t *testing.T) {
 	if _, err := defaultStatMTime("/nonexistent/should/not/exist"); err == nil {
 		t.Errorf("expected stat error")
 	}
 }
 
-// TestNew_NilBridge covers the explicit nil-bridge error.
 func TestNew_NilBridge(t *testing.T) {
 	loader := profiles.NewFromFS(fstest.MapFS{})
 	_, err := New(Config{Profiles: loader, Ledger: &fakeLedger{}})
@@ -143,7 +113,6 @@ func TestNew_NilBridge(t *testing.T) {
 	}
 }
 
-// TestNew_NilLedger covers the explicit nil-ledger error.
 func TestNew_NilLedger(t *testing.T) {
 	loader := profiles.NewFromFS(fstest.MapFS{})
 	_, err := New(Config{Profiles: loader, Bridge: &fakeBridge{}})
@@ -152,8 +121,6 @@ func TestNew_NilLedger(t *testing.T) {
 	}
 }
 
-// TestNew_DefaultsPopulated verifies the production defaults wire up
-// (covers each `if cfg.X == nil` branch).
 func TestNew_DefaultsPopulated(t *testing.T) {
 	loader := profiles.NewFromFS(fstest.MapFS{})
 	r, err := New(Config{
@@ -184,7 +151,6 @@ func TestNew_DefaultsPopulated(t *testing.T) {
 	}
 }
 
-// TestRun_LedgerAppendError exercises the ledger-failure branch in Run().
 type erroringLedger struct{}
 
 func (erroringLedger) Append(_ context.Context, _ core.LedgerEntry) error {
@@ -199,13 +165,10 @@ func TestRun_LedgerAppendError(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := newRunner(t, &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}, erroringLedger{}, now)
 	dir := t.TempDir()
-	// Pre-write artifact so verify_artifact passes.
 	artifact := filepath.Join(dir, ".evolve", "runs", "cycle-7", "build-report.md")
 	if err := os.MkdirAll(filepath.Dir(artifact), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	// Need the challenge token in the file — but token is generated at runtime.
-	// Use the deterministic Rand seed (0xAB) — token is hex of [0xAB]*8 = "abababababababab".
 	if err := os.WriteFile(artifact, []byte("<!-- challenge-token: abababababababab -->\nbody\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -219,7 +182,6 @@ func TestRun_LedgerAppendError(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected ledger-append error")
 	}
-	// Diagnostic with ledger-append failure should be appended
 	foundLedgerDiag := false
 	for _, d := range res.Diagnostics {
 		if strings.Contains(d.Message, "ledger append") {
@@ -231,20 +193,14 @@ func TestRun_LedgerAppendError(t *testing.T) {
 	}
 }
 
-// TestRun_MkdirArtifactDirError — Run() returns when MkdirAll fails for
-// the artifact's parent directory. Provoke by pointing ProjectRoot at
-// a path under an existing regular file.
 func TestRun_MkdirArtifactDirError(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := newRunner(t, &fakeBridge{}, &fakeLedger{}, now)
-	// Create a file at the location where MkdirAll would need to create a dir.
 	tmp := t.TempDir()
 	collision := filepath.Join(tmp, "blocker")
 	if err := os.WriteFile(collision, []byte("x"), 0o644); err != nil {
 		t.Fatalf("write blocker: %v", err)
 	}
-	// Use the blocker FILE as a fake project root — when Run tries to MkdirAll
-	// a subdir of it, OS rejects with "not a directory".
 	_, err := r.Run(context.Background(), Request{
 		Agent:       "builder",
 		ProjectRoot: collision,
@@ -257,7 +213,6 @@ func TestRun_MkdirArtifactDirError(t *testing.T) {
 	}
 }
 
-// TestRun_TokenGenerateError covers the generateToken-fails branch in Run.
 func TestRun_TokenGenerateError(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	bridge := &fakeBridge{}
@@ -292,9 +247,6 @@ func TestRun_TokenGenerateError(t *testing.T) {
 	}
 }
 
-// TestRun_GitStateErrorFallsBackToUnknown covers: when the GitState seam
-// errors, the ledger entry records "unknown:unknown" rather than aborting
-// the run.
 func TestRun_GitStateErrorFallsBackToUnknown(t *testing.T) {
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	bridge := &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}
@@ -336,15 +288,11 @@ func TestRun_GitStateErrorFallsBackToUnknown(t *testing.T) {
 	}
 }
 
-// TestRun_DefaultsCLIAndModelWhenProfileSilent covers: a profile lacking cli
-// + model_tier_default makes Run fall back to "claude-tmux" / "auto" in the
-// bridge request.
 func TestRun_DefaultsCLIAndModelWhenProfileSilent(t *testing.T) {
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	bridge := &fakeBridge{response: core.BridgeResponse{ExitCode: 0}}
 	ledger := &fakeLedger{}
 	loader := profiles.NewFromFS(fstest.MapFS{
-		// No "cli", no "model_tier_default".
 		"builder.json": &fstest.MapFile{Data: []byte(`{
 			"name":"builder","role":"builder",
 			"output_artifact":".evolve/runs/cycle-{cycle}/build-report.md"
@@ -387,8 +335,6 @@ func TestRun_DefaultsCLIAndModelWhenProfileSilent(t *testing.T) {
 	}
 }
 
-// TestClassify_EmptyArtifactIsIntegrityFail covers: a fresh, readable, but
-// zero-length artifact fails integrity before the token check runs.
 func TestClassify_EmptyArtifactIsIntegrityFail(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := &Runner{cfg: Config{
@@ -411,9 +357,6 @@ func TestClassify_EmptyArtifactIsIntegrityFail(t *testing.T) {
 	}
 }
 
-// TestClassify_StaleAndTokenMissing exercises the combined edge:
-// artifact exists but is stale AND missing the token. Stale-check fires
-// first (returns IntegrityFail before token check).
 func TestClassify_StaleAndTokenMissing(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := &Runner{cfg: Config{
@@ -430,7 +373,6 @@ func TestClassify_StaleAndTokenMissing(t *testing.T) {
 	}
 }
 
-// TestClassify_ReadError covers the ReadFile failure branch.
 func TestClassify_ReadError(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := &Runner{cfg: Config{
@@ -444,8 +386,6 @@ func TestClassify_ReadError(t *testing.T) {
 	}
 }
 
-// TestClassify_BridgeErrorNonzero covers the bridge-error path with
-// non-zero exit + healthy artifact.
 func TestClassify_BridgeErrorNonzero(t *testing.T) {
 	now := time.Date(2026, 5, 23, 0, 0, 0, 0, time.UTC)
 	r := &Runner{cfg: Config{
@@ -454,8 +394,6 @@ func TestClassify_BridgeErrorNonzero(t *testing.T) {
 		ReadFile:  func(_ string) ([]byte, error) { return []byte("body with token-xyz\n"), nil },
 	}}
 	verdict, diags := r.classify(errors.New("bridge launch failed"), "/tmp/stub", "token-xyz", 137)
-	// Artifact is healthy via stubs, but exit_code=137 + bridgeErr means
-	// the verdict is FAIL (downstream-error) not PASS.
 	if verdict != VerdictFAIL {
 		t.Errorf("verdict=%q want %q", verdict, VerdictFAIL)
 	}
@@ -464,24 +402,19 @@ func TestClassify_BridgeErrorNonzero(t *testing.T) {
 	}
 }
 
-// TestComposePrompt_AlreadyTrailingNewline covers the branch that skips
-// adding a trailing newline when one is already present.
 func TestComposePrompt_AlreadyTrailingNewline(t *testing.T) {
 	out := composePrompt("body\n", "tok", "/a", "scout", 1)
-	// Should NOT double-newline before END marker
 	if strings.Contains(out, "body\n\n## END") {
 		t.Errorf("double newline before END marker:\n%s", out)
 	}
 }
 
-// TestResolveArtifactPath_Empty covers the empty-template branch.
 func TestResolveArtifactPath_Empty(t *testing.T) {
 	if got := resolveArtifactPath("", 1, "/root"); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
 
-// TestResolveArtifactPath_AbsoluteTemplate covers the IsAbs branch.
 func TestResolveArtifactPath_AbsoluteTemplate(t *testing.T) {
 	got := resolveArtifactPath("/abs/cycle-{cycle}/r.md", 5, "/root")
 	if got != "/abs/cycle-5/r.md" {

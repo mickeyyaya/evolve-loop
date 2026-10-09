@@ -264,6 +264,8 @@ After a clean or derived composition, the owner materializes `C` in its own work
 
 ### 6. The overlap proof
 
+The proof package, `internal/overlap`, is protected surface ([ADR-0064](adr/0064-pipeline-integrity-boundary.md)). Its tier decides if an audit runs again, because a T1 candidate keeps its audit verdict.
+
 The proof is a pure function of these inputs:
 
 | Input | Source |
@@ -274,6 +276,8 @@ The proof is a pure function of these inputs:
 | the package map at `C` | `go list -json ./...` in the worktree that holds `C`: for each package, its directory and its file lists (next list) |
 | the import graph at `C` | the union of `go list -f '{{.ImportPath}}\|{{join .Deps ","}}' ./...` over the four tag sets of the `Makefile`: none, `integration`, `acs`, and `e2e evolve_test_phases` |
 | the catalogs | §7: derived outputs, bookkeeping, the global zone, and test data edges |
+
+With `--no-renames`, a rename is two paths in `L` or `P`: the old path and the new path. A caller that gives `L` or `P` from another source must list both paths of each rename.
 
 The file lists of the package map are these fields of `go list`:
 
@@ -303,7 +307,7 @@ The read roots are the prose paths that production code reads as data. The proof
 
 **The closure.**
 
-- `pkgs(X)` is the set of packages of the zone-4 paths of `X`. A deleted file counts by its directory.
+- `pkgs(X)` is the set of packages of the zone-4 paths of `X`. A deleted Go file counts by its directory. Each other deleted path under `go/` is unknown.
 - `closure(S)` is the union, for each package `s` in `S`, of `s` and the module-internal `Deps` of `s` in the import graph at `C`.
 - A package that does not exist at `C` adds only itself.
 - The closure uses production imports only. Test imports decide the test selection (§9), not the tier.
@@ -322,6 +326,11 @@ The read roots are the prose paths that production code reads as data. The proof
 | `unknown` | the unknown paths of zones 4 and 6, and each input that failed (for example `go list`) |
 
 The evidence digest is the SHA-256 of the canonical JSON of the evidence, with the blob ids of each evidence path on both sides. A T3 review binds this digest (§10). A new composition with the same digest keeps its review.
+
+- The blob ids bind the paths of `shared_paths`, `build_zone`, `gate_zone`, `data_edges` and `unknown`.
+- A derived output is not bound. Each composition regenerates it and checks it against `C` (§7.1).
+- A lane path outside the evidence is not bound. The audit binds `T0`, and `T0` does not change in the queue.
+- The blob ids also bind each zone-4 path of `P` that a package of an edge owns, in both directions. The edges name packages, not files. Without these blobs, a new peer change in an edge package keeps the digest, and a stale review can carry.
 
 ### 7. The catalogs
 
@@ -397,6 +406,7 @@ The rules, in three steps:
 | 1 | `conflict` | T4 | the composition has a genuine conflict (§5) |
 | 1 | `base_not_ancestor` | T4 | `base0` is not an ancestor of the tip |
 | 1 | `audited_tree_missing` | T4 | git does not hold `T0` or `base0` |
+| 2 | `empty_peer` | T1 | `P` has no path; the proof ends here |
 | 2 | `bookkeeping_peer` | T1 | each path of `P` is bookkeeping; the proof ends here |
 | 3 | `compile` | T4 | a `go vet` run of §9 fails on `C` and passes on the tip; it runs before the rest of step 3 |
 | 3 | `shared_path` | T3 | `shared_paths` is not empty |
@@ -407,7 +417,7 @@ The rules, in three steps:
 | 3 | `disjoint` | T1 | no rule of step 3 fired |
 
 - A step-1 rule ejects at once.
-- Step 2 comes before step 3, because a bookkeeping-only peer delta holds nothing that can interact with the lane.
+- Step 2 comes before step 3, because a bookkeeping-only peer delta holds nothing that can interact with the lane. An empty peer delta has its own rule, `empty_peer`, so that the record tells it apart from a bookkeeping-only peer delta.
 - In step 3, the tier is the strictest tier that a rule assigns.
 - **Unknown overlap is never T1.** Each unowned path and each input failure adds to `unknown`, so it raises the tier to T3 (research R9).
 - Package edges count in both directions, an operator decision of 2026-10-09.
@@ -418,7 +428,7 @@ The action for each tier:
 
 | Tier | Action |
 |---|---|
-| T1, by `bookkeeping_peer` | the `test` gate over `A_data(L)`, with `compile` for the `acs` tag set when `P` holds a path under `go/acs/` (§9), then the landing |
+| T1, by `empty_peer` or `bookkeeping_peer` | the `test` gate over `A_data(L)`, with `compile` for the `acs` tag set when `P` holds a path under `go/acs/` (§9), then the landing |
 | T1, by `disjoint` | the gates (§9), then the landing |
 | T2 | the regeneration (§7.1), the gates, then the landing |
 | T3, no `shared_paths`, `review: interaction` | the review (§10), the gates, then the landing |
@@ -450,6 +460,7 @@ CI on `main` picks its suites by path (`.github/workflows/required.yml`). A push
 - `A_data(X)` is each package with a data edge to a path of `X` (§7.4).
 - `A(X)` is `A_code(X) ∪ A_data(X)`.
 - `S` is `(A(L) ∩ A(P)) ∪ A_data(L)`.
+- The proof (§6) gives only `pkgs(L)` and `pkgs(P)`. The selection (component Q5) derives the rest from the package map at `C`. It derives the test importers and `A_data`. A test importer imports a package of `P` only in its test files.
 
 The two parts of `S` have two reasons:
 

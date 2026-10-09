@@ -67,7 +67,6 @@ func TestClampPlanToFloor_ForcesOnlyMissing(t *testing.T) {
 	if !planRuns(out, "audit") {
 		t.Errorf("audit must be forced on; plan=%+v", out.Entries)
 	}
-	// build-requires-audit fires before the ship floor, so it claims the single clamp.
 	if len(clamps) != 1 || clamps[0].Rule != "build-requires-audit" {
 		t.Errorf("expected exactly build-requires-audit, got %+v", clamps)
 	}
@@ -193,7 +192,6 @@ func TestClampPlanToFloor_NoTDDRuleDefaultsPinned(t *testing.T) {
 	}
 }
 
-// The fixture floor must omit the evaluator so policy takes its append branch; otherwise this false-greens.
 func TestEvaluatorFloorPhase_SingleSource(t *testing.T) {
 	t.Parallel()
 	floor, _ := policy.Policy{ShipFloor: []string{"build"}}.FloorPhases()

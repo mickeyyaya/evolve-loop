@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// Test 10 — two Emits of the same rejection append one row each, OPEN, the
-// existing rows kept: the G1 bytes (captured on 8e8f080f) both times.
 func TestEmit_AppendsOpenRowsDedupedByText(t *testing.T) {
 	ws := t.TempDir()
 	l, got := observed(scopeOf(), resolveNever)
@@ -34,8 +32,6 @@ func TestEmit_AppendsOpenRowsDedupedByText(t *testing.T) {
 	}
 }
 
-// Test 11 — prescriptions carry the prefix; OriginCycle is stamped on the
-// first write only.
 func TestEmit_PrescriptionPrefixAndOriginCycleOnlyOnFirstWrite(t *testing.T) {
 	ws := t.TempDir()
 	l, _ := observed(scopeOf(), resolveNever)
@@ -51,9 +47,6 @@ func TestEmit_PrescriptionPrefixAndOriginCycleOnlyOnFirstWrite(t *testing.T) {
 	}
 }
 
-// Test 12 — 65 defects → 64 rows + the synthetic overflow row (G2 bytes); a
-// retry adds nothing; every Emit whose overflow > 0 reports ONE
-// AUDIT_LEDGER_OVERFLOW.
 func TestEmit_OverflowRowIsRecordedOnceAndSignalled(t *testing.T) {
 	ws := t.TempDir()
 	l, got := observed(scopeOf(), resolveNever)
@@ -80,8 +73,6 @@ func TestEmit_OverflowRowIsRecordedOnceAndSignalled(t *testing.T) {
 	}
 }
 
-// Test 13 — nothing to add ⇒ nil and no file: an empty workspace, an empty
-// rejection, an all-duplicate rejection.
 func TestEmit_NothingToAdd_WritesNoFile(t *testing.T) {
 	l, got := observed(scopeOf(), resolveNever)
 	mustEmit(t, l, Request{Cycle: 1, Workspace: ""}, Rejection{Defects: []string{"x"}})
@@ -104,11 +95,6 @@ func TestEmit_NothingToAdd_WritesNoFile(t *testing.T) {
 	}
 }
 
-// Test 14 — a read fault (a directory named defect-ledger.json) returns the
-// graded wire as a Verdict — ONE warning, the host's text verbatim, never
-// blocking — AND AUDIT_LEDGER_EMIT_FAILED op=read whose Reason IS that
-// message (one author for the diagnostic and the signal); a write fault (the
-// workspace read-only after a fixture ledger) is the same with op=write.
 func TestEmit_ReadOrWriteFault_AuthorsTheWarningAndSignals(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(ws, LedgerFile), 0o755); err != nil {

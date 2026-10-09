@@ -10,10 +10,6 @@ import (
 	"testing"
 )
 
-// Test 7 — Read: absent → (zero, false, nil); a directory at the path → the
-// `read defect-ledger.json:` fault; garbage → `parse defect-ledger.json:`;
-// Write renders the G1 bytes; a round-trip is lossless; OpenEntries is the
-// exact compare (a padded " OPEN" is excluded).
 func TestRead_AbsentUnreadableMalformed_AndWrite_GoldenBytes(t *testing.T) {
 	dir := t.TempDir()
 	if doc, ok, err := Read(dir); ok || err != nil || doc.OriginCycle != 0 || doc.Entries != nil {
@@ -62,7 +58,6 @@ func TestRead_AbsentUnreadableMalformed_AndWrite_GoldenBytes(t *testing.T) {
 	}
 }
 
-// Test 8 — the id is "d" + hex(sha256[:16]): 33 runes, distinct texts distinct.
 func TestID_IsPrefixedSHA256Sixteen(t *testing.T) {
 	id := ID("some defect text")
 	if len(id) != 33 || id[0] != 'd' || ID("a") == ID("b") {
@@ -73,10 +68,6 @@ func TestID_IsPrefixedSHA256Sixteen(t *testing.T) {
 	}
 }
 
-// Test 9 — the FOURTH rune-cap rule: no TrimSpace, cut at max, the suffix
-// `…[truncated]` with no leading space; the three carryover rules (CapRunes
-// `…`, TruncateRunes ` …[truncated]` after TrimSpace, Summary ` ...[truncated]`)
-// all differ from it on the same input.
 func TestTruncate_FourthRuleVerbatim(t *testing.T) {
 	if got := Truncate("  ab", 10); got != "  ab" {
 		t.Fatalf("under the cap is returned verbatim, untrimmed: %q", got)
@@ -98,8 +89,6 @@ func TestTruncate_FourthRuleVerbatim(t *testing.T) {
 	}
 }
 
-// Test 30 — the written-back origin cycle is the ancestor's, or the current
-// ledger's when the ancestor carries none.
 func TestOriginCycleOf_FallsBackToCurrentWhenAncestorIsZero(t *testing.T) {
 	if got := originCycleOf(Doc{OriginCycle: 1250}, Doc{OriginCycle: 1270}); got != 1250 {
 		t.Fatalf("ancestor wins: %d", got)

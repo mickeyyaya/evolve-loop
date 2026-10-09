@@ -9,11 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// repoProfilesDir locates the repo's .evolve/profiles by walking up from the
-// working directory (absolute even under -trimpath) and, as a fallback, the
-// source file's directory. It FAILS rather than skips when neither finds the
-// dir: a drift-guard that can silently skip is no guard at all, so an
-// unlocatable profiles dir must surface as a failure, not a hidden pass.
 func repoProfilesDir(t *testing.T) string {
 	t.Helper()
 	var roots []string
@@ -41,11 +36,6 @@ func repoProfilesDir(t *testing.T) string {
 	return ""
 }
 
-// TestAgentRoles_EveryRoleHasProfile enforces that the dispatch allow-list and
-// the profiles are single-sourced: every canonical role must have a
-// <role>.json profile. Adding a role to agentRoles without its profile would
-// fail at dispatch time (which loads ProfilesDir/<role>.json); this catches
-// the drift at test time instead.
 func TestAgentRoles_EveryRoleHasProfile(t *testing.T) {
 	profDir := repoProfilesDir(t)
 	for _, role := range agentRoles {
@@ -56,10 +46,6 @@ func TestAgentRoles_EveryRoleHasProfile(t *testing.T) {
 	}
 }
 
-// TestAgentRoles_SSOTIntegrity pins that the allow-list has no duplicates and
-// that the derived agentRolePattern matches exactly the canonical roles while
-// rejecting non-members, case variants, and worker-name-shaped strings (which
-// take the separate parseAgentName path, not the bare allow-list).
 func TestAgentRoles_SSOTIntegrity(t *testing.T) {
 	t.Parallel()
 	if len(agentRoles) == 0 {
@@ -82,11 +68,6 @@ func TestAgentRoles_SSOTIntegrity(t *testing.T) {
 	}
 }
 
-// TestAgentRoles_DerivedFromPhaseContractRegistry pins the allow-list from
-// both sides: it must COVER every dispatchable registry agent (the drift
-// that once let "router" fall out of it), must RETAIN the profile-backed
-// roles the registry does not know, and must not over-reach onto NoArtifact
-// phases like "ship" (which has no profile).
 func TestAgentRoles_DerivedFromPhaseContractRegistry(t *testing.T) {
 	allowed := make(map[string]bool, len(agentRoles))
 	for _, r := range agentRoles {
@@ -116,8 +97,6 @@ func TestAgentRoles_DerivedFromPhaseContractRegistry(t *testing.T) {
 		}
 	}
 
-	// Sorted output keeps agentRolePattern (and every test that iterates the
-	// list) stable across Contracts()' unordered map iteration.
 	for i := 1; i < len(agentRoles); i++ {
 		if agentRoles[i-1] > agentRoles[i] {
 			t.Fatalf("agentRoles is not sorted at index %d (%q > %q) — derivation order is nondeterministic", i, agentRoles[i-1], agentRoles[i])

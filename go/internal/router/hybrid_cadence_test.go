@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
-// countingProposer records each Current it sees; its proposal agrees with Current, so it never clamps.
 type countingProposer struct{ seen []string }
 
 func (c *countingProposer) Propose(in router.RouteInput) (*router.Proposal, error) {
@@ -17,7 +16,6 @@ func (c *countingProposer) Propose(in router.RouteInput) (*router.Proposal, erro
 
 func TestHybridCadence_ProposeGatedByPlanAndBranch(t *testing.T) {
 	t.Parallel()
-	// Only the plan's non-nil-ness gates shouldPropose.
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{
 		{Phase: "scout", Run: true}, {Phase: "tdd", Run: true}, {Phase: "build", Run: true},
 		{Phase: "audit", Run: true}, {Phase: "ship", Run: true},

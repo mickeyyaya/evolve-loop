@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Each CI-parity gate, when it reports offenders, must FAIL audit even when the
-// EGPS suite is green and the report declares PASS — a cycle that would break
-// main CI (import cycle / acs-durable / unnamed export) must never ship.
 func TestRun_CIParityGate_Offenders_FAILsAudit(t *testing.T) {
 	offenders := func(core.PhaseRequest) ([]string, error) { return []string{"boom"}, nil }
 	cases := []struct {
@@ -27,7 +24,7 @@ func TestRun_CIParityGate_Offenders_FAILsAudit(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ws := t.TempDir()
-			writeACSVerdict(t, ws, 0) // EGPS green → only the CI-parity gate can FAIL.
+			writeACSVerdict(t, ws, 0)
 			cfg := tc.cfg
 			cfg.Bridge = &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}
 			cfg.Prompts = fakePromptsFS("body")
@@ -46,9 +43,6 @@ func TestRun_CIParityGate_Offenders_FAILsAudit(t *testing.T) {
 	}
 }
 
-// A gate that cannot RUN (infra error: missing toolchain) fails OPEN — the PASS
-// verdict is preserved with a loud warning, never bricking the cycle on the
-// gate's own inability to run.
 func TestRun_CIParityGate_Error_FailsOpenWithWarning(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -66,10 +60,6 @@ func TestRun_CIParityGate_Error_FailsOpenWithWarning(t *testing.T) {
 	}
 }
 
-// NewDefault must wire the real CI-parity gates: a worktree whose go/ module
-// has a real `go vet` defect (Printf verb/arg mismatch), EGPS green
-// pre-staged, so the only possible FAIL is the real go-vet gate NewDefault
-// wires.
 func TestNewDefault_WiresCIParityGates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real go vet subprocess under -short; full `go test` + CI still run it")
@@ -82,7 +72,6 @@ func TestNewDefault_WiresCIParityGates(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(goDir, "go.mod"), []byte("module ciparitytest\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A Printf verb/arg mismatch: builds fine, but `go vet ./...` FAILs.
 	if err := os.WriteFile(filepath.Join(goDir, "bad.go"),
 		[]byte("package p\n\nimport \"fmt\"\n\nfunc F() { fmt.Printf(\"%d\", \"not-an-int\") }\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -93,10 +82,7 @@ func TestNewDefault_WiresCIParityGates(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeACSVerdict(t, ws, 0) // EGPS green → only the go-vet gate can FAIL.
-	// A build handoff naming a changed Go package makes changedScopeForGate report run=true, so
-	// the real repo-wide go-vet gate actually runs (it no-ops without one — the
-	// guard that keeps the gate off synthetic/incomplete test worktrees).
+	writeACSVerdict(t, ws, 0)
 	buildRun := filepath.Join(root, ".evolve", "runs", "cycle-7")
 	if err := os.MkdirAll(buildRun, 0o755); err != nil {
 		t.Fatal(err)

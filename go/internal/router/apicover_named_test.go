@@ -150,7 +150,6 @@ func TestRouteInput_AdvisorContextTypes(t *testing.T) {
 		t.Errorf("BenchedCLI round-trip = %+v, want family=codex reason=rate_limit until=%v", bc, until)
 	}
 
-	// A ship plan makes the clamp rewrite the entries around the mint.
 	plan := &PhasePlan{Entries: []PhasePlanEntry{
 		pe("scout", true),
 		{Phase: "security-scan", Run: true, Mint: mint},
@@ -178,7 +177,6 @@ func TestPhasePolicy_ProducerAndEnabled(t *testing.T) {
 	cfg := testCfg()
 	cfg.PhaseEnable["plan-review"] = config.EnableOff
 	p := NewPhasePolicy(cfg)
-	// The explicit binding names PhasePolicy in the test AST, apicover's coverage signal.
 	var _ PhasePolicy = p
 	if !p.Enabled("build", RoutingSignals{}) {
 		t.Errorf("PhasePolicy.Enabled(build) = false, want true (mandatory)")

@@ -1,11 +1,5 @@
 package audit
 
-// A gate may not assert a CI outcome it cannot know. A gate that blocks real
-// work citing an impossible CI failure teaches operators to bypass gates. The
-// caveat is derived from the same predicate requireTmux uses — does this host
-// have tmux — so it stays true if the guarded test set ever changes, rather
-// than encoding today's file names.
-
 import (
 	"context"
 	"errors"
@@ -28,15 +22,12 @@ func TestCIParityCaveat_HostWithTmuxDisclosesTheDivergence(t *testing.T) {
 	}
 }
 
-// Parity holds when the host matches CI — no caveat, so a genuine offender is
-// not diluted by a warning that does not apply.
 func TestCIParityCaveat_HostWithoutTmuxSaysNothing(t *testing.T) {
 	if got := ciParityCaveat(func(string) (string, error) { return "", errors.New("not found") }); got != "" {
 		t.Fatalf("a host matching CI has no divergence to disclose; got %q", got)
 	}
 }
 
-// THE headline regression: the message must never assert that CI would fail.
 func TestIntegrationTierMessage_DoesNotAssertACIOutcome(t *testing.T) {
 	msg := integrationTierFailTemplate
 	if strings.Contains(msg, "CI's integration-tier test step would FAIL") {
@@ -47,7 +38,6 @@ func TestIntegrationTierMessage_DoesNotAssertACIOutcome(t *testing.T) {
 	}
 }
 
-// The template must still carry its evidence: how many, and which.
 func TestIntegrationTierMessage_KeepsCountAndOffenders(t *testing.T) {
 	msg := integrationTierFailTemplate
 	if strings.Count(msg, "%d") != 1 || strings.Count(msg, "%s") != 2 {
@@ -55,9 +45,6 @@ func TestIntegrationTierMessage_KeepsCountAndOffenders(t *testing.T) {
 	}
 }
 
-// A '%' in the caveat must not become a format verb — the spliced result is
-// itself Sprintf'd with (count, offenders), so an unescaped '%' would corrupt
-// the very finding an operator has to act on.
 func TestIntegrationTierTemplate_CaveatPercentIsEscaped(t *testing.T) {
 	out := fmtSprintfLike(integrationTierTemplateWithCaveat(" 100% of lanes contended."), 3, "a; b")
 	if strings.Contains(out, "MISSING") || strings.Contains(out, "%!") {
@@ -71,9 +58,6 @@ func TestIntegrationTierTemplate_CaveatPercentIsEscaped(t *testing.T) {
 	}
 }
 
-// THE WIRING TEST: the template the gate actually uses must carry the caveat on
-// a tmux-bearing host. A correct caveat that never reaches the finding is the
-// defect this whole change exists to remove, one layer up.
 func TestIntegrationTierTemplate_ProductionSpliceCarriesTheCaveat(t *testing.T) {
 	withTmux := integrationTierTemplateWithCaveat(ciParityCaveat(func(string) (string, error) { return "/usr/bin/tmux", nil }))
 	if !strings.Contains(withTmux, "parity gap") {
@@ -92,13 +76,9 @@ func fmtSprintfLike(tmpl string, n int, offenders string) string {
 	return fmt.Sprintf(tmpl, n, offenders)
 }
 
-// The real wiring test, through phase.Run, the path production uses: the
-// composition tests above prove the caveat helper is correct, this proves the
-// gate emits it. The assertion is on the diagnostic the orchestrator actually
-// receives, not on a string built in the test.
 func TestRun_IntegrationTierGate_DiagnosticDoesNotAssertACIOutcome(t *testing.T) {
 	ws := t.TempDir()
-	writeACSVerdict(t, ws, 0) // EGPS green → only the integration-tier gate can FAIL.
+	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
 		Bridge:  &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"},
 		Prompts: fakePromptsFS("body"),
@@ -121,18 +101,15 @@ func TestRun_IntegrationTierGate_DiagnosticDoesNotAssertACIOutcome(t *testing.T)
 	if msg == "" {
 		t.Fatalf("expected an integration-tier diagnostic; got %+v", resp.Diagnostics)
 	}
-	// The gate must not assert an outcome it cannot know.
 	if strings.Contains(msg, "CI's integration-tier test step would FAIL") {
 		t.Fatalf("the emitted diagnostic still asserts a CI outcome it cannot know: %q", msg)
 	}
 	if !strings.Contains(msg, "locally") {
 		t.Fatalf("the emitted diagnostic must say where the offenders were observed: %q", msg)
 	}
-	// The offenders and count must survive the template change.
 	if !strings.Contains(msg, "1 offender(s)") || !strings.Contains(msg, "exit = 80") {
 		t.Fatalf("the emitted diagnostic lost its evidence: %q", msg)
 	}
-	// No format-verb corruption reached the operator.
 	if strings.Contains(msg, "%!") || strings.Contains(msg, "MISSING") {
 		t.Fatalf("format corruption in the emitted diagnostic: %q", msg)
 	}

@@ -11,20 +11,6 @@ import (
 	"testing"
 )
 
-// TestValidateProfile_BashParity invokes the bash subagent-run.sh with
-// --validate-profile against a fixture agent AND the Go ValidateProfile
-// against the same agent, then diffs the resulting EVOLVE_DISPATCH_PLAN_LOG
-// JSON files byte-for-byte. Gated by EVOLVE_BASH_PARITY=1 because it
-// requires bash + jq + an installed claude.sh adapter; CI without those
-// dependencies skips it.
-//
-// To run locally:
-//
-//	EVOLVE_BASH_PARITY=1 go test -run BashParity ./internal/subagent/
-//
-// The test seeds a fixture profile + LLM config that pin every variable
-// to a known value, so the only thing that can differ between bash + Go
-// is the actual rendering logic.
 func TestValidateProfile_BashParity(t *testing.T) {
 	if os.Getenv("EVOLVE_BASH_PARITY") != "1" {
 		t.Skip("EVOLVE_BASH_PARITY!=1; skipping bash-vs-Go parity check")
@@ -51,8 +37,6 @@ func TestValidateProfile_BashParity(t *testing.T) {
 	}
 	bashScript := filepath.Join(scripts, "dispatch", "subagent-run.sh")
 
-	// Build the Go binary on demand so the parity comparison runs against
-	// HEAD code, not a stale ./bin/evolve.
 	goBin := filepath.Join(t.TempDir(), "evolve")
 	build := exec.Command("go", "build", "-o", goBin, "./cmd/evolve")
 	build.Dir = filepath.Join(repoRoot, "go")
@@ -70,7 +54,6 @@ func TestValidateProfile_BashParity(t *testing.T) {
 	}
 	scriptAdaptersDir := filepath.Join(scripts, "cli_adapters")
 
-	// Profile: minimal valid agent that routes to our fake-claude adapter.
 	profileBody := `{
   "name": "parity",
   "role": "scout",
@@ -82,7 +65,6 @@ func TestValidateProfile_BashParity(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(profilesDir, "parity.json"), []byte(profileBody), 0o644); err != nil {
 		t.Fatalf("write profile: %v", err)
 	}
-	// Adapter: trivial stub that exits 0 immediately on VALIDATE_ONLY.
 	adapterBody := `#!/usr/bin/env bash
 if [ "${VALIDATE_ONLY:-0}" = "1" ]; then
   echo "[parity-adapter] VALIDATE_ONLY=1 — ok" >&2
@@ -98,8 +80,6 @@ exit 1
 		t.Fatalf("write manifest: %v", err)
 	}
 
-	// Step 9 removed llm_config.json — both implementations resolve cli from
-	// profile.cli directly.
 	commonEnv := []string{
 		"EVOLVE_PROFILES_DIR_OVERRIDE=" + profilesDir,
 		"EVOLVE_ADAPTERS_DIR_OVERRIDE=" + adaptersDir,
@@ -134,7 +114,6 @@ exit 1
 		t.Fatalf("dispatch plan JSON differs:\nbash:\n%s\n\ngo:\n%s", bashJSON, goJSON)
 	}
 
-	// Also assert at least one WARN line appears in both stderr captures.
 	if !strings.Contains(string(bashOut), "missing=budget_cap_native") {
 		t.Errorf("bash stderr missing WARN line:\n%s", bashOut)
 	}
@@ -173,7 +152,6 @@ func mapsEqual(a, b map[string]interface{}) bool {
 }
 
 func valuesEqual(a, b interface{}) bool {
-	// Slices need element-wise comparison; primitives use ==.
 	switch av := a.(type) {
 	case []interface{}:
 		bv, ok := b.([]interface{})
@@ -199,7 +177,6 @@ func valuesEqual(a, b interface{}) bool {
 
 func findRepoRoot(t *testing.T) string {
 	t.Helper()
-	// Walk up from the package dir until we find a sibling legacy/ dir.
 	dir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)

@@ -8,12 +8,6 @@ import (
 	"testing"
 )
 
-// A separate check holds agents/evolve-auditor.md and
-// docs/architecture/continuation-defect-ledger.md to each other; this holds
-// the GO constant echoed inline on rejection (dispositionSchemaExample) to
-// the same document. Without it the two docs could stay in lockstep while
-// the message an agent actually reads at the moment of failure drifted away
-// from both.
 func TestDispositionSchemaExampleMatchesDocumentedExample(t *testing.T) {
 	root := docExampleRepoRoot(t)
 	docRaw := extractDispositionExample(t, root, "docs/architecture/continuation-defect-ledger.md")
@@ -30,9 +24,6 @@ func TestDispositionSchemaExampleMatchesDocumentedExample(t *testing.T) {
 	}
 }
 
-// TestDispositionSchemaExampleIsAcceptedByProductionReader — the inline hint is
-// itself a legal file. An example that the gate would reject teaches the next
-// dispatch to fail again.
 func TestDispositionSchemaExampleIsAcceptedByProductionReader(t *testing.T) {
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, dispositionFile), []byte(dispositionSchemaExample), 0o644); err != nil {

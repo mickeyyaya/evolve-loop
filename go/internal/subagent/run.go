@@ -21,8 +21,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// RunRequest captures every input the `evolve subagent run` execution path
-// reads from argv and the environment.
 type RunRequest struct {
 	Agent         string
 	Cycle         int
@@ -36,48 +34,26 @@ type RunRequest struct {
 	WorktreePath  string
 	LedgerPath    string
 
-	// PromptReader supplies the user task prompt. Caller can pass an
-	// *os.File (PROMPT_FILE_OVERRIDE), os.Stdin, or a bytes.Buffer. Must be
-	// non-nil.
 	PromptReader io.Reader
 
-	ModelTierHint          string // MODEL_TIER_HINT
-	AuditorTierOverride    string // EVOLVE_AUDITOR_TIER_OVERRIDE
-	DiffComplexityDisabled bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
-	AdversarialAudit       bool   // ADVERSARIAL_AUDIT (default true)
-	LegacyAgentDispatch    bool   // LEGACY_AGENT_DISPATCH=1 — retired; now a hard error (see ErrInProcessDispatchBanned)
-	DispatchDepth          int    // EVOLVE_DISPATCH_DEPTH — recursion depth; capped at maxDispatchDepth
-	// ChallengeTokenOverride (EVOLVE_FANOUT_WORKER_TOKEN) pins the challenge
-	// token instead of minting a fresh one. A fan-out worker is dispatched with
-	// the parent-dictated token (parentToken+"-"+subtask) so its artifact bears
-	// a token the parent can verify — the provenance boundary for per-worker
-	// artifact verification. Empty ⇒ mint via Rand (the normal path).
+	ModelTierHint          string
+	AuditorTierOverride    string
+	DiffComplexityDisabled bool
+	AdversarialAudit       bool
+	LegacyAgentDispatch    bool
+	DispatchDepth          int
 	ChallengeTokenOverride string
 }
 
-// ErrInProcessDispatchBanned is returned when a caller requests the retired
-// in-process dispatch path (LEGACY_AGENT_DISPATCH=1). The agent-bridge
-// (`evolve subagent run`) is the ONE and ONLY supported dispatch path; the
-// invariant and its sentinel live in the leaf (the same pointer, so errors.Is
-// holds).
 var ErrInProcessDispatchBanned = subagentrun.ErrInProcessDispatchBanned
 
-// RunOptions injects the I/O + sub-process seams. Production wires
-// defaults; tests substitute doubles.
 type RunOptions struct {
 	ReadProfile       func(path string) (string, error)
 	ResolveLLM        func(agent string) (resolvellm.Result, error)
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
 	ResolveModelTier  func(req ResolveModelTierRequest, opts ResolveModelTierOptions) (string, error)
-	// AdapterExists reports whether the resolved cli has a registered bridge
-	// driver. It receives the CLI, not the vestigial <AdaptersDir>/<cli>.sh
-	// path (the func type is unchanged; the production default is
-	// driverExists — nothing on the run path decodes a file name).
-	AdapterExists func(cli string) bool
-	ExecAdapter   func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
-	// WriteFile is unused since the bridge port (nothing on the run path
-	// writes through it); kept for the by-name binders that set it.
-	//
+	AdapterExists     func(cli string) bool
+	ExecAdapter       func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
 	// Deprecated: dead seam, retired with the next binder edit (unit 16 follow-up 16-4).
 	WriteFile func(path string, data []byte, mode os.FileMode) error
 	GitState  func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
@@ -86,14 +62,9 @@ type RunOptions struct {
 	HashFile  func(path string) (string, error)
 	Now       func() time.Time
 	Rand      func([]byte) (int, error)
-	// Signals is the root's Signal Center: the dispatcher's BRIDGE_SUBAGENT_*
-	// warnings and, through the exec seam, the bridge engine's own producers
-	// report into it. nil is the Null Object.
-	Signals *signalcenter.Center
+	Signals   *signalcenter.Center
 }
 
-// RunResult carries everything cmd_run printed + the side effects.
-// Verdict is one of VerdictPASS / VerdictFAIL / VerdictIntegrityFail.
 type RunResult struct {
 	Verdict        string
 	CLI            string
@@ -104,35 +75,15 @@ type RunResult struct {
 	ExitCode       int
 	DurationMS     int64
 	Warns          []string
-	Stderr         string // collected adapter stderr for caller logging
+	Stderr         string
 }
 
-// nonRegistryRoles are dispatchable agent roles that ship a
-// .evolve/profiles/<role>.json but have NO phasecontract entry: they are not
-// spine phases with a report contract, so the registry cannot know them. This
-// is the ONLY hand-maintained half of the allow-list, and it is deliberately
-// the small half — adding a spine phase to phasecontract now makes it
-// dispatchable automatically.
 var nonRegistryRoles = []string{
 	"inspirer", "evaluator", "plan-reviewer", "memo", "tester",
 }
 
-// agentRoles is the canonical allow-list of agent roles (single source of
-// truth). agentRolePattern is derived from it, and tests iterate it, so a new
-// role is added in exactly one place. Every consumer — the dispatcher's
-// KnownRole port, the fan-out gate and the conformance tests — derives from
-// here.
 var agentRoles = buildAgentRoles()
 
-// buildAgentRoles derives the allow-list as the UNION of (a) every
-// phasecontract-registered agent that actually produces an LLM deliverable and
-// (b) nonRegistryRoles.
-//
-// NoArtifact phases are excluded: "ship" is registered but is a native
-// host-side phase with no profile, so accepting it would break the
-// role↔profile conformance invariant (TestAgentRoles_EveryRoleHasProfile).
-// Output is sorted so the derived regex — and every test that iterates the
-// list — is deterministic despite Contracts()' unordered map iteration.
 func buildAgentRoles() []string {
 	seen := make(map[string]bool)
 	out := make([]string, 0, len(nonRegistryRoles)+len(phasecontract.Contracts()))
@@ -156,24 +107,14 @@ func buildAgentRoles() []string {
 	return out
 }
 
-// agentRolePattern matches exactly the canonical roles in agentRoles.
 var agentRolePattern = regexp.MustCompile(`^(` + strings.Join(agentRoles, "|") + `)$`)
 
-// Run is the `evolve subagent run` execution path: validation, profile load,
-// cli/model resolution, prompt assembly, adapter exec, artifact verification
-// and the kind="agent_subprocess" ledger entry. See
-// docs/architecture/packages/internal-subagent.md.
 func Run(ctx context.Context, req RunRequest, opts RunOptions) (RunResult, error) {
 	fillRunDefaults(&opts)
 	out, err := wiredDispatcher(opts).Dispatch(ctx, requestOf(req))
 	return resultOf(out), err
 }
 
-// wiredDispatcher is the one construction of the dispatcher
-// (TestSubagentRun_OneConstructionSite): every host-backed port is the option
-// the caller (or fillRunDefaults) supplied, projected once onto the leaf's
-// shapes; the Center is read through an accessor so a nil one stays the Null
-// Object.
 func wiredDispatcher(opts RunOptions) *subagentrun.Dispatcher {
 	deps := subagentrun.Deps{
 		Profile:     profileOf(opts.ReadProfile),
@@ -196,8 +137,6 @@ func wiredDispatcher(opts RunOptions) *subagentrun.Dispatcher {
 	)
 }
 
-// requestOf is the ONE projection of the root's request onto the leaf's —
-// field for field; PluginRoot is never read by the path and does not ride in.
 func requestOf(req RunRequest) subagentrun.Request {
 	return subagentrun.Request{
 		Agent: req.Agent, Cycle: req.Cycle, WorkspacePath: req.WorkspacePath,
@@ -211,9 +150,6 @@ func requestOf(req RunRequest) subagentrun.Request {
 	}
 }
 
-// resultOf is the ONE projection of the leaf's outcome onto the root's
-// result; Stderr is never set (as before) and the verification evidence the
-// outcome carries is the signal's, not the result's.
 func resultOf(out subagentrun.Outcome) RunResult {
 	return RunResult{
 		Verdict: out.Verdict, CLI: out.CLI, Model: out.Model,
@@ -222,8 +158,6 @@ func resultOf(out subagentrun.Outcome) RunResult {
 	}
 }
 
-// profileOf projects the raw-JSON profile grammar (matchField over the body,
-// the adapter overrides for the cli resolved later) onto the leaf's Profile.
 func profileOf(read func(string) (string, error)) func(string) (subagentrun.Profile, error) {
 	return func(path string) (subagentrun.Profile, error) {
 		body, err := read(path)
@@ -272,10 +206,6 @@ func tierOf(resolve func(ResolveModelTierRequest, ResolveModelTierOptions) (stri
 	}
 }
 
-// adapterOf is the bridge exec port: the gobridge-backed adapter carrying the
-// root's Center when no ExecAdapter seam was supplied (production), else the
-// supplied func over the vestigial adapter path and the rendered env (the
-// by-name binders' shape).
 func adapterOf(opts RunOptions) subagentrun.Adapter {
 	if opts.ExecAdapter == nil {
 		return bridgeAdapter{signals: opts.Signals}
@@ -285,14 +215,10 @@ func adapterOf(opts RunOptions) subagentrun.Adapter {
 	})
 }
 
-// capabilityTier maps Manifest support flags to the quality_tier label used
-// by ledger entries (the fan-out dispatcher's spelling).
 func capabilityTier(m capability.Manifest) string {
 	return subagentrun.QualityTier(m.BudgetNative, m.PermissionScoping)
 }
 
-// generateRunToken mints the 16-hex challenge token; a nil rng is
-// crypto/rand (the fan-out dispatcher's spelling).
 func generateRunToken(rng func([]byte) (int, error)) (string, error) {
 	if rng == nil {
 		rng = rand.Read
@@ -300,8 +226,6 @@ func generateRunToken(rng func([]byte) (int, error)) (string, error) {
 	return subagentrun.MintToken(rng)
 }
 
-// fillRunDefaults wires the production seams for every nil option; ExecAdapter
-// stays nil so adapterOf builds the Center-carrying bridge adapter.
 func fillRunDefaults(opts *RunOptions) {
 	if opts.ReadProfile == nil {
 		opts.ReadProfile = defaultReadProfile

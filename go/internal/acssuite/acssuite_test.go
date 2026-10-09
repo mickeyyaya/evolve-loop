@@ -57,14 +57,11 @@ func TestWriteVerdict_MkdirError(t *testing.T) {
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// evolveDir under a regular file → MkdirAll fails.
 	if _, err := WriteVerdict(filepath.Join(blocker, "evolve"), Verdict{Cycle: 1}); err == nil {
 		t.Error("want error when evolveDir cannot be created")
 	}
 }
 
-// The destination acs-verdict.json already exists as a directory, so the
-// final os.Rename(tmp, dst) cannot complete.
 func TestWriteVerdict_RenameError(t *testing.T) {
 	evolveDir := t.TempDir()
 	collide := filepath.Join(evolveDir, "runs", "cycle-1", "acs-verdict.json")
@@ -78,8 +75,6 @@ func TestWriteVerdict_RenameError(t *testing.T) {
 	}
 }
 
-// The cycle dir exists but is read-only: MkdirAll is a no-op (dir present),
-// then os.CreateTemp cannot create the temp file.
 func TestWriteVerdict_CreateTempError(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("read-only-dir permission denial does not hold for root")

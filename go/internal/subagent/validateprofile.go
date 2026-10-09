@@ -18,44 +18,25 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// ValidateProfileRequest captures every input the validate pipeline reads
-// from argv and the environment.
-//
-// CapabilityDir is intentionally separate from AdaptersDir: it should be
-// the real, override-immune plugin install path for capability manifest
-// lookups, so test seams can't lie about installed capabilities. Callers
-// SHOULD set it to the real plugin install path — the CLI does this
-// automatically. When empty, it defaults to AdaptersDir so unit tests have
-// one less knob to set.
 type ValidateProfileRequest struct {
 	Agent           string
-	ProfilesDir     string // immutable plugin profiles dir (.evolve/profiles)
-	AdaptersDir     string // adapter script dir (honors override)
-	CapabilityDir   string // manifest dir (real install; ignores override)
-	ProjectRoot     string // writable project root (host repo)
-	WorktreePath    string // optional WORKTREE_PATH override
-	DispatchPlanLog string // EVOLVE_DISPATCH_PLAN_LOG path; empty disables emission
+	ProfilesDir     string
+	AdaptersDir     string
+	CapabilityDir   string
+	ProjectRoot     string
+	WorktreePath    string
+	DispatchPlanLog string
 }
 
-// ValidateProfileOptions injects the I/O + sub-process seams. Production
-// wires defaults; tests supply doubles for ReadProfile, ResolveLLM,
-// InspectCapability, ExecAdapter.
 type ValidateProfileOptions struct {
 	ReadProfile       func(path string) (string, error)
 	ResolveLLM        func(agent string) (resolvellm.Result, error)
 	InspectCapability func(adaptersDir, cli string) (capability.Inspection, error)
-	// ExecAdapter runs the adapter with VALIDATE_ONLY=1. Returns the CLI's
-	// exit code + any execution error. Tests supply a fake.
-	ExecAdapter func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
-	// AdapterExists tests whether the resolved cli has a registered bridge
-	// driver. Defaults to defaultAdapterExists.
-	AdapterExists func(path string) bool
-	// WriteFile writes the dispatch plan log. Defaults to os.WriteFile.
-	WriteFile func(path string, data []byte, mode os.FileMode) error
+	ExecAdapter       func(ctx context.Context, adapterPath string, env map[string]string) (exitCode int, err error)
+	AdapterExists     func(path string) bool
+	WriteFile         func(path string, data []byte, mode os.FileMode) error
 }
 
-// ValidateProfileResult carries every field cmd_validate_profile printed to
-// stderr or returned via exit code. Callers can choose to log or assert.
 type ValidateProfileResult struct {
 	CLI              string
 	Model            string
@@ -65,11 +46,9 @@ type ValidateProfileResult struct {
 	AdapterExitCode  int
 }
 
-// AdapterOverrides mirrors profile.adapter_overrides.<cli> — the tool +
-// extra-flag arrays the adapter receives via env vars.
 type AdapterOverrides struct {
-	ToolsJSON      string // raw JSON array string, "" when absent
-	ExtraFlagsJSON string // raw JSON array string, "" when absent
+	ToolsJSON      string
+	ExtraFlagsJSON string
 }
 
 func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts ValidateProfileOptions) (ValidateProfileResult, error) {
@@ -115,7 +94,6 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	if err != nil {
 		return ValidateProfileResult{}, err
 	}
-	// Cross-name resolver: antigravity → agy (detectcli owns the alias table).
 	cli = detectcli.Canonical(cli)
 	if cli == "" {
 		return ValidateProfileResult{}, fmt.Errorf("subagent/validate: cli unresolved for agent %s", req.Agent)
@@ -165,7 +143,6 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 		}
 	}
 
-	// Every VALIDATE_ONLY=1 invocation expects this exact env surface.
 	artifactTemplate := matchField(profileBody, reFieldOutputArtifact)
 	artifactPath := resolveArtifactPath(artifactTemplate, 0, req.ProjectRoot)
 	worktreePath := req.WorktreePath
@@ -175,7 +152,7 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	env := map[string]string{
 		"PROFILE_PATH":                 profilePath,
 		"RESOLVED_MODEL":               model,
-		"PROMPT_FILE":                  "", // validate-only never reads the prompt
+		"PROMPT_FILE":                  "",
 		"CYCLE":                        "0",
 		"WORKSPACE_PATH":               filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-0"),
 		"WORKTREE_PATH":                worktreePath,
@@ -201,12 +178,8 @@ func ValidateProfile(ctx context.Context, req ValidateProfileRequest, opts Valid
 	return res, nil
 }
 
-// capBoolEnv renders a bool as the "true"/"false" env-var strings adapters
-// expect.
 func capBoolEnv(v bool) string { return subagentrun.BoolEnv(v) }
 
-// adapterOverridesRE captures `"adapter_overrides":{ ... }` and inside that
-// the entry for the resolved cli.
 var (
 	toolsArrayRE      = regexp.MustCompile(`"tools"\s*:\s*(\[[^\]]*\])`)
 	extraFlagsArrayRE = regexp.MustCompile(`"extra_flags"\s*:\s*(\[[^\]]*\])`)
@@ -231,9 +204,6 @@ func extractAdapterOverrides(profileBody, cli string) AdapterOverrides {
 	return out
 }
 
-// capabilityExtractObject mirrors capability.extractObject without exposing
-// it (different package). Inline a small copy here to avoid widening
-// capability's API surface.
 func capabilityExtractObject(body, name string) (string, bool) {
 	needle := fmt.Sprintf("\"%s\"", name)
 	idx := strings.Index(body, needle)
@@ -282,11 +252,6 @@ func defaultResolveLLM(agent string) (resolvellm.Result, error) {
 	return router.ResolveRole(agent, resolvellm.Options{})
 }
 
-// defaultAdapterExists is the validate pipeline's path-shaped seam default:
-// ValidateProfile still composes the legacy <AdaptersDir>/<cli>.sh path, and
-// this default recovers <cli> from its base name before asking
-// driverExists — the one place a file name is still decoded. Kept
-// injectable so tests can still stub it.
 func defaultAdapterExists(path string) bool {
 	return driverExists(strings.TrimSuffix(filepath.Base(path), ".sh"))
 }

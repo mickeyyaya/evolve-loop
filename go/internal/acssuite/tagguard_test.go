@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// goACSDir resolves <repo>/go/acs from this test file's location
-// (<repo>/go/internal/acssuite/tagguard_test.go → ../../acs).
 func goACSDir(t *testing.T) string {
 	t.Helper()
 	_, self, _, ok := runtime.Caller(0)
@@ -48,8 +46,6 @@ func TestAllACSPredicatesAreTagged(t *testing.T) {
 	}
 }
 
-// hasACSBuildTag reports whether src declares the `//go:build acs` constraint in
-// its leading build-constraint block (before the package clause).
 func hasACSBuildTag(src string) bool {
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -57,7 +53,6 @@ func hasACSBuildTag(src string) bool {
 			return false
 		}
 		if strings.HasPrefix(trimmed, "//go:build ") {
-			// Constraint expr must reference the acs tag (e.g. "acs", "acs && x").
 			expr := strings.TrimPrefix(trimmed, "//go:build ")
 			for _, tok := range strings.FieldsFunc(expr, func(r rune) bool {
 				return r == ' ' || r == '&' || r == '|' || r == '(' || r == ')' || r == '!'

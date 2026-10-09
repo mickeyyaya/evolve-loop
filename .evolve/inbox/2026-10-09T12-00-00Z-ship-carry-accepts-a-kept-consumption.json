@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A continuation lane of the 1843 shape (its consumed item carries released_continuations, a disjoint peer landed) recovers from GIT_FLEET_REBASE_NEEDED to Ship with no Build and no Audit when the composed gates are green (red first: today the route is Audit)",
+    "Ship's carry check re-proves such a carry: the drift from the record's tree to the held tree is exactly the consumption pairs that the lane's pending change already holds, and the released continuation is in the landed commit",
+    "A carry record for a lane without a kept consumption, or with any other drift, is accepted or refused byte for byte as today"
+  ],
+  "created_at": "2026-10-09T12:00:00Z",
+  "files": [
+    "go/internal/core/identity_carry_forward.go",
+    "go/internal/phases/ship/carry.go",
+    "go/internal/phases/ship/consume.go"
+  ],
+  "fix": "Let identityCarryForward compare the audited change with the pended change less ship's consumption pairs (the rule of explanationdocs.withoutShipConsumption), record the tree without the pairs, and let ship's carryExplains accept the drift from that tree to the held tree when it is exactly those pairs and the re-ship consumed nothing (the items are already in consumed/). Ship must re-prove the pairs against the audited tree, not trust the record.",
+  "id": "ship-carry-accepts-a-kept-consumption",
+  "kind": "pipeline-repair",
+  "priority_class": "performance",
+  "source": "console lane cl-lq-q12 (ADR-0128 Q12), 2026-10-09: the open question of the interim fix",
+  "summary": "Q12 makes a continuation lane reach the identity proof: after a clean rebase the recovery pends ship's replayed commit, and the rebind does not count ship's inbox consumption. The lane then goes to Audit, not Ship. The B3 carry compares the trees byte for byte (treedelta.Identical), and the pended tree holds the consumption pair that the audited tree does not. Ship's B4 check (carryExplains, reProveCarry) also re-proves the bytes, and treeDriftExplainedByConsumption needs the re-ship's own consumed paths, which are empty because the item is already consumed. A carry record written by core would be refused at ship (INTEGRITY_TREE_DRIFT, as in cycle 1825). So the interim fix stops at Audit, and each continuation lane still pays one Audit (about 5 min) after a clean rebase. Research F2.3 assumed the lane ships with no LLM phase. The landing queue (Q14) removes the class; this item is only worth it if enforce is weeks away.",
+  "title": "A continuation lane with a byte-identical rebase still re-audits: ship's carry check does not accept a consumption already in the change",
+  "weight": 0.5
+}

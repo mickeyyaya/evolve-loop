@@ -35,7 +35,6 @@ func TestRetroDecision_AdvisorChoosesEndOverRetry(t *testing.T) {
 }
 
 func TestRetroDecision_AdvisorChoosesRetryOverEnd(t *testing.T) {
-	// Empty history makes the adapter PROCEED to end.
 	d := Route(base("retro"), &Proposal{RecoveryAction: "retry"})
 	if d.NextPhase != "tdd" {
 		t.Errorf("retro(proceed)+advisor-retry → %q, want tdd", d.NextPhase)
@@ -45,7 +44,7 @@ func TestRetroDecision_AdvisorChoosesRetryOverEnd(t *testing.T) {
 func TestRetroDecision_UnknownRecoveryActionClamped(t *testing.T) {
 	in := base("retro")
 	in.Strict = true
-	in.History = retryableHistory() // kernel default: retry→tdd
+	in.History = retryableHistory()
 
 	d := Route(in, &Proposal{RecoveryAction: "halt-and-catch-fire"})
 	if d.NextPhase != "tdd" {

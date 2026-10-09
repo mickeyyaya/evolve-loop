@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// The check is AST-based, so comments and strings that mention os.Getenv do not trip it.
 func TestRouter_NoEnvReads(t *testing.T) {
 	srcs, err := filepath.Glob("*.go")
 	if err != nil {

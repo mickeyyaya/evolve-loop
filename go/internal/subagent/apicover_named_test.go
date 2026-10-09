@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-// TestTierHaiku_FlowsThroughModelTierResolver names the TierHaiku const and
-// asserts it through its real consumer: ResolveModelTier returns the hint
-// verbatim, and "haiku" is exactly TierHaiku. This pins the resolver's Rule-1
-// contract (MODEL_TIER_HINT wins for every agent) using the named const rather
-// than a bare string literal.
 func TestTierHaiku_FlowsThroughModelTierResolver(t *testing.T) {
 	tier, err := ResolveModelTier(
 		ResolveModelTierRequest{
@@ -30,16 +25,11 @@ func TestTierHaiku_FlowsThroughModelTierResolver(t *testing.T) {
 	if tier != TierHaiku {
 		t.Errorf("hint TierHaiku should win, got %q want %q", tier, TierHaiku)
 	}
-	// TierHaiku is the canonical "haiku" label adapters accept as -m.
 	if TierHaiku != "haiku" {
 		t.Errorf("TierHaiku=%q, want haiku", TierHaiku)
 	}
 }
 
-// TestCheckCtxAdvisoryResult_BoundFromProducer names CheckCtxAdvisoryResult and
-// binds it from its sole producer CheckCtxAdvisory, asserting the Emit/Threshold
-// contract: a profile threshold below the current token count emits an advisory
-// carrying both numbers.
 func TestCheckCtxAdvisoryResult_BoundFromProducer(t *testing.T) {
 	p := writeProfile(t, `{"role":"tester","context_clear_trigger_tokens":120000}`)
 	var r CheckCtxAdvisoryResult
@@ -58,8 +48,6 @@ func TestCheckCtxAdvisoryResult_BoundFromProducer(t *testing.T) {
 	}
 }
 
-// TestCheckTokenResult_BoundFromProducer names CheckTokenResult and binds it
-// from CheckToken, asserting the OK/Reason verdict on a token-bearing artifact.
 func TestCheckTokenResult_BoundFromProducer(t *testing.T) {
 	tmp := t.TempDir()
 	artifact := filepath.Join(tmp, "artifact.md")
@@ -75,7 +63,6 @@ func TestCheckTokenResult_BoundFromProducer(t *testing.T) {
 		t.Errorf("CheckTokenResult.Reason=%q, want OK message", r.Reason)
 	}
 
-	// And the failing arm: an absent token flips OK and explains why.
 	var miss CheckTokenResult = CheckToken(artifact, "not-the-token")
 	if miss.OK {
 		t.Errorf("CheckTokenResult.OK=true for absent token, want false")
@@ -85,9 +72,6 @@ func TestCheckTokenResult_BoundFromProducer(t *testing.T) {
 	}
 }
 
-// TestDispatchParallelResult_BoundFromProducer names DispatchParallelResult and
-// binds it from DispatchParallel, asserting WorkerCount/QualityTier/exit codes
-// on the happy fan-out path (reusing the package's dispatchHappyOpts fixture).
 func TestDispatchParallelResult_BoundFromProducer(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -119,9 +103,6 @@ func TestDispatchParallelResult_BoundFromProducer(t *testing.T) {
 	}
 }
 
-// TestRunResult_BoundFromProducer names RunResult and binds it from Run,
-// asserting the Verdict/CLI/Model fields on the happy single-agent path
-// (reusing the package's runHappyOpts fixture).
 func TestRunResult_BoundFromProducer(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "workspace")
@@ -154,9 +135,6 @@ func TestRunResult_BoundFromProducer(t *testing.T) {
 	}
 }
 
-// TestValidateProfileResult_BoundFromProducer names ValidateProfileResult and
-// binds it from ValidateProfile, asserting the resolved CLI/Model/source fields
-// on the happy validate path (reusing the package's happyOpts fixture).
 func TestValidateProfileResult_BoundFromProducer(t *testing.T) {
 	body := `{"role":"scout","cli":"claude","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/scout-report.md"}`
 	var r ValidateProfileResult
@@ -183,11 +161,6 @@ func TestValidateProfileResult_BoundFromProducer(t *testing.T) {
 	}
 }
 
-// TestFanoutWorkerTokenEnv_NamesTheIPCContract names the FanoutWorkerTokenEnv
-// const and pins the split-const IPC key: the parent threads the per-worker
-// challenge token through this exact env var (assembled as "EVOLVE_"+"…" so the
-// flag-registry scanner does not classify it), so the resolved value must equal
-// the protocol name workers read in run.go.
 func TestFanoutWorkerTokenEnv_NamesTheIPCContract(t *testing.T) {
 	if FanoutWorkerTokenEnv != "EVOLVE_FANOUT_WORKER_TOKEN" {
 		t.Errorf("FanoutWorkerTokenEnv=%q, want EVOLVE_FANOUT_WORKER_TOKEN", FanoutWorkerTokenEnv)

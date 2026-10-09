@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
 )
 
-// extractFanoutToken pulls the per-worker token the parent threaded into a
-// worker command (EVOLVE_FANOUT_WORKER_TOKEN=...; shell-quoted or bare).
 func extractFanoutToken(cmd string) string {
 	const key = "EVOLVE_FANOUT_WORKER_TOKEN="
 	i := strings.Index(cmd, key)
@@ -37,9 +35,6 @@ func extractFanoutToken(cmd string) string {
 	return rest
 }
 
-// writeFakeWorkerArtifact mirrors a real worker: it writes an artifact bearing
-// the parent-dictated token from its command line, so the parent-side
-// provenance verification passes.
 func writeFakeWorkerArtifact(commandsFile, line string) {
 	parts := strings.SplitN(line, "\t", 2)
 	if len(parts) != 2 {
@@ -56,7 +51,6 @@ func dispatchHappyOpts(t *testing.T, profileBody string) DispatchParallelOptions
 	return DispatchParallelOptions{
 		ReadProfile: func(string) (string, error) { return profileBody, nil },
 		RunFanout: func(cfg fanoutdispatch.Config, _ io.Writer) int {
-			// Materialize each worker artifact (token-bearing) so aggregator finds them.
 			data, _ := os.ReadFile(cfg.CommandsFile)
 			for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
 				writeFakeWorkerArtifact(cfg.CommandsFile, line)
@@ -103,7 +97,7 @@ func TestDispatchParallel_HappyPath(t *testing.T) {
 		AdaptersDir:        "/a",
 		ProjectRoot:        tmp,
 		LedgerPath:         filepath.Join(tmp, "ledger.jsonl"),
-		CachePrefixEnabled: false, // skip to simplify assertions
+		CachePrefixEnabled: false,
 	}, dispatchHappyOpts(t, sampleScoutProfile))
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
@@ -117,11 +111,9 @@ func TestDispatchParallel_HappyPath(t *testing.T) {
 	if res.QualityTier != "full" {
 		t.Errorf("tier=%s, want full", res.QualityTier)
 	}
-	// Aggregate written.
 	if _, err := os.Stat(res.AggregatePath); err != nil {
 		t.Errorf("aggregate not written: %v", err)
 	}
-	// Ledger has one agent_fanout entry.
 	body, _ := os.ReadFile(filepath.Join(tmp, "ledger.jsonl"))
 	if !strings.Contains(string(body), `"kind":"agent_fanout"`) {
 		t.Errorf("ledger missing kind: %s", body)
@@ -169,7 +161,7 @@ func TestDispatchParallel_WorkerArtifactMissingSkipsAggregation(t *testing.T) {
 		lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
 		for i, line := range lines {
 			if i == len(lines)-1 {
-				continue // deliberately leave the last worker's artifact missing
+				continue
 			}
 			writeFakeWorkerArtifact(cfg.CommandsFile, line)
 		}
@@ -204,9 +196,6 @@ func TestDispatchParallel_WorkerArtifactMissingSkipsAggregation(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_ThreadsRecursionDepth proves the worker commands written
-// for the LLM (non-test-executor) path recurse via `subagent run` AND carry an
-// incremented EVOLVE_DISPATCH_DEPTH — so the cap in Run() bounds nesting.
 func TestDispatchParallel_ThreadsRecursionDepth(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -228,7 +217,7 @@ func TestDispatchParallel_ThreadsRecursionDepth(t *testing.T) {
 		ProjectRoot:        tmp,
 		LedgerPath:         filepath.Join(tmp, "ledger.jsonl"),
 		CachePrefixEnabled: false,
-		DispatchDepth:      1, // workers must run at depth 2
+		DispatchDepth:      1,
 	}, opts)
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
@@ -241,9 +230,6 @@ func TestDispatchParallel_ThreadsRecursionDepth(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_RecursionDepthCap proves a fan-out is refused fast at the
-// boundary: at parentDepth==cap the workers would run at cap+1, so DispatchParallel
-// rejects before spawning doomed workers (the child-fence, not just self-depth).
 func TestDispatchParallel_RecursionDepthCap(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -253,7 +239,7 @@ func TestDispatchParallel_RecursionDepthCap(t *testing.T) {
 		Cycle:         5,
 		WorkspacePath: ws,
 		ProjectRoot:   tmp,
-		DispatchDepth: maxDispatchDepth, // workers would be cap+1 → refuse fast
+		DispatchDepth: maxDispatchDepth,
 	}, dispatchHappyOpts(t, sampleScoutProfile))
 	if !errors.Is(err, ErrRecursionDepthExceeded) {
 		t.Fatalf("expected ErrRecursionDepthExceeded at parentDepth==cap, got %v", err)
@@ -309,7 +295,6 @@ func TestDispatchParallel_NotParallelEligible(t *testing.T) {
 }
 
 func TestDispatchParallel_MissingParallelEligibleFieldRejected(t *testing.T) {
-	// parallel_eligible absent is treated as false — should reject.
 	opts := dispatchHappyOpts(t, `{"role":"scout","parallel_subtasks":[]}`)
 	_, err := DispatchParallel(context.Background(),
 		DispatchParallelRequest{Agent: "scout", Cycle: 0, WorkspacePath: t.TempDir()},
@@ -396,9 +381,6 @@ func TestDispatchParallel_AntigravityRemappedForCapability(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_CachePrefixEnabledWritesPrefix covers the cache-prefix
-// branch: it invokes the WriteCache seam and passes the resulting path to
-// fanout.
 func TestDispatchParallel_CachePrefixEnabledWritesPrefix(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -436,8 +418,6 @@ func TestDispatchParallel_CachePrefixEnabledWritesPrefix(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_CachePrefixErrorAborts covers the cache-prefix
-// write-error branch.
 func TestDispatchParallel_CachePrefixErrorAborts(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -455,16 +435,10 @@ func TestDispatchParallel_CachePrefixErrorAborts(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_SilentCLIIsAnError: dispatch-parallel is a
-// passthrough — it never chooses the CLI its workers run — so a profile
-// that declares none is unresolvable and must fail loudly here exactly as
-// it does in Run and ValidateProfile, rather than being tiered against an
-// invented default.
 func TestDispatchParallel_SilentCLIIsAnError(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
 	_ = os.MkdirAll(ws, 0o755)
-	// Profile omits "cli".
 	profile := `{"role":"scout","parallel_eligible":true,"parallel_subtasks":[{"name":"codebase","prompt_template":"scan {cycle}"}]}`
 	opts := dispatchHappyOpts(t, profile)
 	opts.InspectCap = func(_, cli string) (capability.Inspection, error) {
@@ -479,15 +453,10 @@ func TestDispatchParallel_SilentCLIIsAnError(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_DefaultAggPathWhenProfileSilent covers the aggregate-path
-// default (<workspace>/<agent>-report.md) taken when the profile declares no
-// output_artifact. The profile declares a cli, since an absent one now aborts
-// before this branch is reached (see TestDispatchParallel_SilentCLIIsAnError).
 func TestDispatchParallel_DefaultAggPathWhenProfileSilent(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
 	_ = os.MkdirAll(ws, 0o755)
-	// Profile omits "output_artifact".
 	profile := `{"role":"scout","cli":"antigravity","parallel_eligible":true,"parallel_subtasks":[{"name":"codebase","prompt_template":"scan {cycle}"}]}`
 	opts := dispatchHappyOpts(t, profile)
 	var inspectedCLI string
@@ -510,8 +479,6 @@ func TestDispatchParallel_DefaultAggPathWhenProfileSilent(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_GenTokenErrorAborts covers the parent-token
-// generation error branch.
 func TestDispatchParallel_GenTokenErrorAborts(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -526,8 +493,6 @@ func TestDispatchParallel_GenTokenErrorAborts(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_EmptyGitStateNormalizedToUnknown covers: empty git
-// head/diff become "unknown" in the parent ledger entry.
 func TestDispatchParallel_EmptyGitStateNormalizedToUnknown(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -551,9 +516,6 @@ func TestDispatchParallel_EmptyGitStateNormalizedToUnknown(t *testing.T) {
 	}
 }
 
-// TestDispatchParallel_TestExecutorBranchBuildsBashCommand covers: when
-// TestExecutor is set, the worker command shells the test executor with
-// EVOLVE_FANOUT_* env instead of recursing into `evolve subagent run`.
 func TestDispatchParallel_TestExecutorBranchBuildsBashCommand(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -579,14 +541,11 @@ func TestDispatchParallel_TestExecutorBranchBuildsBashCommand(t *testing.T) {
 	if !strings.Contains(commandsContents, "bash /path/to/exec.sh") {
 		t.Errorf("test-executor command not shelled: %s", commandsContents)
 	}
-	// The non-test-executor path (evolve subagent run) must NOT be present.
 	if strings.Contains(commandsContents, "subagent run scout-codebase") {
 		t.Errorf("should use test executor, not recursion: %s", commandsContents)
 	}
 }
 
-// TestDispatchParallel_LedgerWriteErrorPropagates covers the ledger-write
-// error branch.
 func TestDispatchParallel_LedgerWriteErrorPropagates(t *testing.T) {
 	tmp := t.TempDir()
 	ws := filepath.Join(tmp, "ws")
@@ -646,7 +605,7 @@ func TestMatchParallelEligibleField(t *testing.T) {
 		{`{"parallel_eligible":false}`, "false"},
 		{`{"other":1}`, ""},
 		{`{"parallel_eligible":  true }`, "true"},
-		{`{"parallel_eligible":"true"}`, ""}, // string not bool
+		{`{"parallel_eligible":"true"}`, ""},
 	}
 	for _, tc := range tests {
 		if got := matchField(tc.body, reFieldParallelEligible); got != tc.want {
@@ -697,23 +656,18 @@ func TestCapabilityExtractArray(t *testing.T) {
 	}
 }
 
-// TestCapabilityExtractArray_KeyWithoutColon covers the branch where the key
-// is present but not followed by ':'.
 func TestCapabilityExtractArray_KeyWithoutColon(t *testing.T) {
 	if v, ok := capabilityExtractArray(`{"x" [1,2]}`, "x"); ok {
 		t.Errorf("key without colon should not match, got %q", v)
 	}
 }
 
-// TestCapabilityExtractArray_Unterminated covers the branch where an opening
-// bracket that is never balanced falls through to ("", false).
 func TestCapabilityExtractArray_Unterminated(t *testing.T) {
 	if v, ok := capabilityExtractArray(`{"x":[1,2`, "x"); ok {
 		t.Errorf("unterminated array should not match, got %q", v)
 	}
 }
 
-// TestFirstSubmatch covers the no-match branch (len(m) < 2 → "").
 func TestFirstSubmatch(t *testing.T) {
 	if got := firstSubmatch(subtaskNameRE, `{"name":"codebase"}`); got != "codebase" {
 		t.Errorf("match: got %q, want codebase", got)
@@ -723,9 +677,6 @@ func TestFirstSubmatch(t *testing.T) {
 	}
 }
 
-// TestExtractParallelSubtasks_SubtaskWithoutTemplate exercises firstSubmatch's
-// empty-return path through the public parser: a subtask object with a name
-// but no prompt_template yields an empty Template (not dropped).
 func TestExtractParallelSubtasks_SubtaskWithoutTemplate(t *testing.T) {
 	got := extractParallelSubtasks(`{"parallel_subtasks":[{"name":"codebase"}]}`)
 	if len(got) != 1 {
@@ -744,11 +695,9 @@ func TestFillDispatchParallelDefaults(t *testing.T) {
 		opts.GitState == nil || opts.GenToken == nil || opts.Now == nil {
 		t.Errorf("not all defaults wired: %+v", opts)
 	}
-	// Verify Now is sane.
 	if opts.Now().IsZero() {
 		t.Errorf("Now returned zero time")
 	}
-	// Verify GenToken produces 16 hex chars.
 	tok, err := opts.GenToken()
 	if err != nil {
 		t.Errorf("GenToken: %v", err)
@@ -756,5 +705,5 @@ func TestFillDispatchParallelDefaults(t *testing.T) {
 	if len(tok) != ChallengeTokenBytes*2 {
 		t.Errorf("token len=%d", len(tok))
 	}
-	_ = time.Now() // import preserved
+	_ = time.Now()
 }

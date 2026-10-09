@@ -493,7 +493,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/regression/protectedsurface` | 2 | [acs-regression-protectedsurface.md](acs-regression-protectedsurface.md) |
 | `cmd/evolve-fake-cli` | 1 | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
 | `cmd/evolve` | 433 | [cmd-evolve.md](cmd-evolve.md) |
-| `internal/acssuite` | 26 | [internal-acssuite.md](internal-acssuite.md) |
+| `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/adapters/observer` | 30 | [internal-adapters-observer.md](internal-adapters-observer.md) |
@@ -508,8 +508,8 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/committedset` | 1 | [internal-committedset.md](internal-committedset.md) |
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
-| `internal/core/defectledger` | 1 | [internal-core-defectledger.md](internal-core-defectledger.md) |
-| `internal/core` | 908 | [internal-core.md](internal-core.md) |
+| `internal/core/defectledger` | 19 | [internal-core-defectledger.md](internal-core-defectledger.md) |
+| `internal/core` | 909 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cycleoutcome` | 1 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |
@@ -519,8 +519,10 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/evalgate` | 31 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
 | `internal/faillearn` | 19 | [internal-faillearn.md](internal-faillearn.md) |
+| `internal/failurelog` | 9 | [internal-failurelog.md](internal-failurelog.md) |
 | `internal/flagregistry` | 7 | [internal-flagregistry.md](internal-flagregistry.md) |
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
+| `internal/gc` | 10 | [internal-gc.md](internal-gc.md) |
 | `internal/gitexec` | 15 | [internal-gitexec.md](internal-gitexec.md) |
 | `internal/guards` | 33 | [internal-guards.md](internal-guards.md) |
 | `internal/inboxbatch` | 44 | [internal-inboxbatch.md](internal-inboxbatch.md) |
@@ -536,7 +538,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/phaseobserver` | 15 | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/phases/audit/ciparitygate` | 18 | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
-| `internal/phases/audit` | 159 | [internal-phases-audit.md](internal-phases-audit.md) |
+| `internal/phases/audit` | 170 | [internal-phases-audit.md](internal-phases-audit.md) |
 | `internal/phases/retro` | 25 | [internal-phases-retro.md](internal-phases-retro.md) |
 | `internal/phases/runner/verdict` | 22 | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/phases/runner` | 78 | [internal-phases-runner.md](internal-phases-runner.md) |
@@ -558,7 +560,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/skillcheck` | 5 | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/subagent/subagentrun` | 6 | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
-| `internal/subagent` | 24 | [internal-subagent.md](internal-subagent.md) |
+| `internal/subagent` | 26 | [internal-subagent.md](internal-subagent.md) |
 | `internal/swarm` | 18 | [internal-swarm.md](internal-swarm.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |

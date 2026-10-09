@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// The BEGIN marker is matched by prefix so the note inside it can change without breaking the lock.
 const (
 	recipeBeginMarker = "<!-- GENERATED:goal-recipes BEGIN"
 	recipeEndMarker   = "<!-- GENERATED:goal-recipes END -->"

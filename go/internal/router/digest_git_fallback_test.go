@@ -31,7 +31,6 @@ func writeRouterFile(t *testing.T, root, rel, content string) {
 	}
 }
 
-// runWorkspacePath mirrors core.RunWorkspacePath, which this leaf package cannot import.
 func runWorkspacePath(root string, cycle int) string {
 	return filepath.Join(root, ".evolve", "runs", "cycle-"+strconv.Itoa(cycle))
 }
@@ -64,7 +63,6 @@ func TestDigest_Build_FallsBackToGitWhenHandoffAbsent(t *testing.T) {
 
 func TestDigest_Build_GitFailureDegradesLoudly(t *testing.T) {
 	root := t.TempDir()
-	// No git init: every git call the fallback makes fails.
 	ws := runWorkspacePath(root, 589)
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatalf("mkdir workspace: %v", err)

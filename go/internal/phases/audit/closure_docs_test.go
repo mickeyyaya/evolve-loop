@@ -7,25 +7,11 @@ import (
 	"testing"
 )
 
-// The documents that narrate the closure-citation gate (closure_claim.go) must
-// themselves satisfy it — a doc that announces the rule while breaking it is
-// exactly the pattern the gate exists to catch. This is a self-check, not
-// prose review: it runs the production `closureClaimOffenders` over the real
-// committed files.
-
-// closureGovernedDocs are the documents this cycle's landing must leave in a
-// state the shipped gate accepts. Scoped deliberately to the two files named in
-// triage's top_n — a repo-wide sweep would make an unrelated future doc edit
-// fail this cycle's contract.
 var closureGovernedDocs = []string{
 	"docs/operations/batch-integrity-review-2026-08-04.md",
 	"docs/architecture/continuation-defect-ledger.md",
 }
 
-// closureDocsRepoRoot walks up from the test's working directory (the package
-// dir under `go test`) until it finds the checkout root, identified by the
-// docs/architecture directory. Walking beats a hard-coded "../../../.." because
-// the audit package's depth is not this test's business.
 func closureDocsRepoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -44,9 +30,6 @@ func closureDocsRepoRoot(t *testing.T) string {
 	}
 }
 
-// TestC1287_DocsPassClosureCitationGate: every closure claim in the two
-// governed documents must name the per-defect disposition record on its own
-// line.
 func TestC1287_DocsPassClosureCitationGate(t *testing.T) {
 	root := closureDocsRepoRoot(t)
 	for _, rel := range closureGovernedDocs {
@@ -66,16 +49,11 @@ func TestC1287_DocsPassClosureCitationGate(t *testing.T) {
 	}
 }
 
-// TestC1287_ClosureGateRejectsUncitedClaim is the anti-neutering guard for the
-// test above. The cheapest way to green a docs gate is to weaken the gate, so
-// the rejection behaviour is pinned independently: an uncited claim must still
-// be flagged, a cited one must not, and ordinary prose about a closed file
-// handle must stay invisible.
 func TestC1287_ClosureGateRejectsUncitedClaim(t *testing.T) {
 	cases := []struct {
 		name string
 		line string
-		want bool // want flagged
+		want bool
 	}{
 		{"bare verified-closed", "The 1255 CRITICAL is verified closed.", true},
 		{"closed with cycle reference", "D1 from cycle-1272 is closed.", true},

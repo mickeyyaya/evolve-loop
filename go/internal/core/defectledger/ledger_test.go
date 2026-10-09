@@ -7,11 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// Test 36 — the collaborators are REQUIRED: New(nil, resolver) panics at the
-// first arm, New(reader, nil) at the first FIXED claim; WithSignals(nil) and a
-// nil-returning accessor are the Null Object (every path runs, nothing is
-// reported); a recording Center is reached live and stamps Module audit, Kind
-// audit.warning, Phase audit, the cycle and the exported method as origin.
 func TestNew_RequiredDepsPanicAndSignalsNullObject(t *testing.T) {
 	f := newFixture(t)
 	f.removeManifest(t)
@@ -71,9 +66,6 @@ func mustPanic(t *testing.T, name string, fn func()) {
 	fn()
 }
 
-// Test 37 — all thirteen codes are registered under module audit with a
-// doc, carry the family prefix, and have a fixed severity: INFO for the
-// prompt degrade, WARN for the twelve faults.
 func TestCodes_RegisteredUnderModuleAudit_WithFixedSeverity(t *testing.T) {
 	all := []signalcenter.Code{CodeEmitFailed, CodeOverflow, CodeManifestUnreadable, CodeManifestMissing, CodeLineageDisagrees,
 		CodeLedgerUnreadable, CodeAncestorEmpty, CodeWritebackFailed, CodeDefectsUnaccounted, CodeDispositionsMissing,
@@ -105,8 +97,6 @@ func TestCodes_RegisteredUnderModuleAudit_WithFixedSeverity(t *testing.T) {
 	}
 }
 
-// The vocabulary's spellings — the ONE home audit, carryover and the seeder
-// project — and the producer's id-list bound.
 func TestVocabulary_IsTheProducersSpelling(t *testing.T) {
 	if LedgerFile != "defect-ledger.json" || DispositionsFile != "defect-dispositions.json" || StatusOpen != "OPEN" || StatusFixed != "FIXED" || StatusDeferred != "DEFERRED" ||
 		PrescriptionPrefix != "PRESCRIPTION: " || MaxEntries != 64 || TextMaxRunes != 2000 ||

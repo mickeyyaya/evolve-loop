@@ -16,7 +16,6 @@ func writeFile(t *testing.T, dir, name, body string) {
 	}
 }
 
-// buildHandoff mirrors a real handoff-build.json shape.
 const buildHandoff = `{
   "schema_version": 1, "cycle": 55, "phase": "build", "verdict": "PASS",
   "acs_result": {"green": 30, "red": 2, "total": 32, "this_cycle": 4, "regression": 26},
@@ -39,7 +38,7 @@ const scoutHandoff = `{
 func TestDigest_AllRolesExtracted(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "handoff-build.json", buildHandoff)
-	writeFile(t, ws, "handoff-auditor.json", auditHandoff) // auditor variant
+	writeFile(t, ws, "handoff-auditor.json", auditHandoff)
 	writeFile(t, ws, "handoff-scout.json", scoutHandoff)
 	writeFile(t, ws, "handoff-triage.json", `{"cycle_size_estimate":"medium","phase_skip":["retrospective"]}`)
 
@@ -57,7 +56,7 @@ func TestDigest_AllRolesExtracted(t *testing.T) {
 	if sig.Build.SeverityMax != SevCritical {
 		t.Errorf("build SeverityMax = %v, want CRITICAL", sig.Build.SeverityMax)
 	}
-	if sig.Build.FilesTouched != 3 { // a.go,b.go,c.go (a.go deduped)
+	if sig.Build.FilesTouched != 3 {
 		t.Errorf("build FilesTouched = %d, want 3 (deduped union)", sig.Build.FilesTouched)
 	}
 	if !sig.Audit.Present || sig.Audit.Confidence != 0.88 {
@@ -82,7 +81,7 @@ func TestDigest_AllRolesExtracted(t *testing.T) {
 
 func TestDigest_BuilderNamingTolerance(t *testing.T) {
 	ws := t.TempDir()
-	writeFile(t, ws, "handoff-builder.json", buildHandoff) // builder variant only
+	writeFile(t, ws, "handoff-builder.json", buildHandoff)
 	sig, _ := Digest(ws, []string{"build"})
 	if !sig.Build.Present {
 		t.Errorf("expected handoff-builder.json to be resolved")
@@ -170,7 +169,6 @@ func TestDigest_FailOpenOnTruncatedJSON(t *testing.T) {
 	}
 }
 
-// tdd's contract artifact is test-report.md, resolved through the phasecontract registry.
 func TestDigest_LiftsFailureSentinelSignals(t *testing.T) {
 	ws := t.TempDir()
 	writeFile(t, ws, "audit-report.md", "## Verdict\nFAIL\n"+

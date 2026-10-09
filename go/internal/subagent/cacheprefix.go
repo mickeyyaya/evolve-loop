@@ -12,9 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// CachePrefixRequest is the typed input to WriteCachePrefix. Workspace is the
-// per-cycle .evolve/runs/cycle-N/ dir; OutPath is where the prefix file lands.
-// ProjectRoot is the writable repo root (used to locate cycle-state.json).
 type CachePrefixRequest struct {
 	Cycle       int
 	Agent       string
@@ -23,18 +20,11 @@ type CachePrefixRequest struct {
 	ProjectRoot string
 }
 
-// CachePrefixOptions injects filesystem seams. Production uses defaults.
 type CachePrefixOptions struct {
-	// ReadOrchestratorPrompt returns the contents of <workspace>/orchestrator-prompt.md
-	// or ("", os.ErrNotExist) when absent. Defaults to os.ReadFile.
 	ReadOrchestratorPrompt func(workspace string) (string, error)
-	// ReadCycleState returns the contents of <projectRoot>/.evolve/cycle-state.json
-	// or ("", os.ErrNotExist) when absent. Defaults to os.ReadFile.
-	ReadCycleState func(projectRoot string) (string, error)
+	ReadCycleState         func(projectRoot string) (string, error)
 }
 
-// WriteCachePrefix renders a deterministic markdown cache-prefix file shared
-// across sibling fan-out workers in the same batch.
 func WriteCachePrefix(req CachePrefixRequest, opts CachePrefixOptions) error {
 	if opts.ReadOrchestratorPrompt == nil {
 		opts.ReadOrchestratorPrompt = defaultReadOrchestratorPrompt
@@ -98,7 +88,6 @@ func renderCachePrefix(w io.Writer, req CachePrefixRequest, goalText, csSummary 
 	return nil
 }
 
-// goalLineRE matches the first `goal: <text>` line in orchestrator-prompt.md.
 var goalLineRE = regexp.MustCompile(`(?m)^goal:[ \t]*(.*)$`)
 
 func extractGoalLine(body string) string {
@@ -109,9 +98,6 @@ func extractGoalLine(body string) string {
 	return strings.TrimRight(m[1], "\r\n")
 }
 
-// completedPhasesRE captures the JSON array body; parsing this narrow shape
-// keeps the package free of a jq dependency, the same approach as
-// ResolveModelTier's streak extraction in modeltier.go.
 var (
 	phaseFieldRE      = regexp.MustCompile(`"phase"\s*:\s*"([^"]*)"`)
 	activeAgentRE     = regexp.MustCompile(`"active_agent"\s*:\s*"([^"]*)"`)
@@ -129,8 +115,6 @@ func summarizeCycleState(body string) string {
 	}
 	completed := ""
 	if m := completedPhasesRE.FindStringSubmatch(body); len(m) == 2 {
-		// Body is like `"a","b","c"`. Strip quotes + whitespace per element,
-		// rejoin with commas.
 		raw := m[1]
 		var items []string
 		for _, item := range strings.Split(raw, ",") {
@@ -154,9 +138,6 @@ func defaultReadOrchestratorPrompt(workspace string) (string, error) {
 }
 
 func defaultReadCycleState(projectRoot string) (string, error) {
-	// Resolves THIS lane's per-run cycle-state (core.ResolveCycleStatePath
-	// honors the fleet override); reading the host-global singleton would
-	// build a cache prefix from whichever peer lane wrote last.
 	body, err := os.ReadFile(core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve")))
 	if err != nil {
 		return "", err

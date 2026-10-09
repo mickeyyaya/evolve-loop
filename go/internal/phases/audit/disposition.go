@@ -7,8 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// reconcileContinuation verifies inherited defect dispositions and checks that
-// prose closure claims cite the records that make those claims auditable.
 func (a *auditClassification) reconcileContinuation() {
 	ledgerDiagnostics, ledgerBlocked, lineageCycles := reconcileContinuationDefectsVia(a.hooks.defectLedger(), a.req)
 	a.diagnostics = append(a.diagnostics, ledgerDiagnostics...)
@@ -51,9 +49,6 @@ func (a *auditClassification) reconcileContinuation() {
 	}
 }
 
-// finalize applies policy and bookkeeping after every evidence gate has run.
-// Predicate sealing deliberately remains after ledger emission; existing audit
-// artifacts and chain-shadow records depend on that ordering.
 func (a *auditClassification) finalize() {
 	if a.verdictFound && core.IsVerdict(a.narrative) && a.narrative != core.VerdictFAIL && len(a.overrodeBy) > 0 {
 		a.diagnostics = append(a.diagnostics, core.Diagnostic{
@@ -77,8 +72,6 @@ func (a *auditClassification) finalize() {
 	}
 
 	if a.verdict == core.VerdictFAIL || a.verdict == core.VerdictWARN {
-		// The ledger authors its own wire (an emit fault is ONE warning; the
-		// verdict stands); the seam appends it verbatim, as reconcile's.
 		a.diagnostics = append(a.diagnostics, emitDefectLedgerVia(a.hooks.defectLedger(), a.artifact, a.req)...)
 	}
 	if a.sealPredicate != nil && a.predicateErr == nil {

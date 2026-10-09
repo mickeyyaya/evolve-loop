@@ -115,8 +115,6 @@ func TestRunGoTest_DemotesOutOfScopeMetaPredicateToSkip(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cycleDir, "predicates_test.go"), []byte(outOfScopeSrc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Touched set injected via the git seam: production derives it from git,
-	// never the agent-written handoff.
 	injectTouched(t, []string{"./internal/bridge/..."})
 
 	raw := goStream(
@@ -154,8 +152,6 @@ func TestRunGoTest_DemotesOutOfScopeMetaPredicateToSkip(t *testing.T) {
 	}
 }
 
-// injectTouched swaps the git-derived touched-set seam for the test's literal
-// set, restoring it on cleanup (repo idiom: seam var + t.Cleanup).
 func injectTouched(t *testing.T, touched []string) {
 	t.Helper()
 	orig := scopeLintChangedPackages
@@ -170,7 +166,6 @@ func TestRunGoTest_DemotionFloorCancelsWhenAllOwnPredicatesWouldSkip(t *testing.
 	if err := os.MkdirAll(cycleDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// ONE predicate, out of scope, genuinely red.
 	src := `package cycle9999
 
 import "testing"
