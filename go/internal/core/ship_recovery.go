@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -21,38 +22,13 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)
 		return "", false
 	}
-	// Contention-class errors (a sibling lane moved main) back off with jitter
-	// before re-auditing so lockstep siblings don't re-collide on every attempt.
-	// Non-contention errors recover immediately — a pause fixes nothing there.
 	if isContentionShipCode(se.Code) {
 		pause := contentionBackoff(depth)
 		fmt.Fprintf(os.Stderr, "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, se.Code)
 		backoffSleep(pause)
 	}
-	// A fleet ff-merge divergence (a peer cycle moved main) is recovered by
-	// rebasing the cycle branch onto the new main BEFORE the re-audit (the
-	// router routes this code to audit). A clean rebase replays this cycle's
-	// patches onto the peer's changes → re-audit re-binds the merged tree →
-	// re-ship fast-forwards. A conflict confined to GENERATED projections
-	// (e.g. control-flags.md) is auto-resolved by regenerating them from the
-	// merged source (rebaseWithDerivedRegen) — every flag cycle rewrites that
-	// projection, so the partition cannot separate them and a debugger round-trip
-	// would be pure waste. A conflict touching any NON-derived path is genuine
-	// overlapping work the partition should have kept apart — abort loud.
-	// The code/class used for the routing decision; a fleet rebase may reclassify
-	// a clean RebaseNeeded into a CONFLICT that routes to the debugger.
-	// See ADR-0049.
 	recoverCode, recoverClass := se.Code, se.Class
 	if se.Code == CodeGitFleetRebaseNeeded {
-		// Deterministic, zero-LLM pre-screen BEFORE the blind rebase replay:
-		// ClassifyFleetRebaseCandidate reuses the carry-forward filter to decide
-		// whether this candidate is already landed, cleanly mergeable, or a
-		// genuine conflict. A superseded (already-landed) candidate
-		// short-circuits here with NO wasted rebase + re-audit. Clean/Conflict
-		// fall through to the existing rebaseCycleBranchOntoMain path unchanged
-		// (which itself replays a clean candidate and routes a real conflict to
-		// the debugger). A pre-screen git-infra error is non-fatal here: log it
-		// and let the rebase below run and report its own infra failure loudly.
 		predictedConflict := false
 		if cs.ActiveWorktree != "" {
 			switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
@@ -63,19 +39,12 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 				return "", false
 			case verdict == FleetRebaseConflict:
 				predictedConflict = true
-				// A genuine conflict the rebase would also detect. Fall through to
-				// rebaseCycleBranchOntoMain, which performs the real replay and
-				// reclassifies to the debugger route below — keeping a single
-				// conflict-handling path rather than duplicating it here.
 			case verdict == FleetRebaseClean:
-				// Clean & not landed — the replay is worthwhile; fall through.
 			}
 		}
-		unwound := cs.ExplanationDocumentationVersion > 0 && !predictedConflict && o.unwindBeforeFleetRebase(ctx, projectRoot, cycle, *cs)
+		unwind := o.unwindUnlessPredictedConflict(ctx, projectRoot, cycle, *cs, predictedConflict)
 		ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
-		// Pend whatever the replay did: an aborted replay leaves the carrier, and pending it restores the
-		// audited shape the debugger and a re-ship expect.
-		if unwound {
+		if unwind == unwindDone || (ok && unwind == unwindKeepsConsumption) {
 			if err := pendRebasedChange(ctx, cs.ActiveWorktree, gitCapture); err != nil {
 				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d pend the audited change failed: %v\n", cycle, err)
 				return "", false
@@ -86,28 +55,13 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			if cs.ExplanationDocumentationVersion > 0 {
 				return o.routeRebasedExplanation(ctx, projectRoot, cycle, cs)
 			}
-			// A clean replay MAY carry the audit verdict forward without a
-			// full re-audit (RUNG 0): if the composed diff's patch-id still
-			// matches what the audit reviewed and every composed-tree gate
-			// is green, write a composition-verdict entry and reship
-			// directly. Any rejection falls through unchanged to the
-			// pre-existing route below (router routes RebaseNeeded to
-			// audit, re-binding the merged tree).
 			if o.compositionCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
-			// RUNG 2: a RUNG 0 miss means the composed patch-id drifted
-			// (real overlapping edits). Before the RUNG 3 full re-audit,
-			// review ONLY the intersecting hunks; a compatible,
-			// patch-id-verified overlap composes directly with a
-			// composition-verdict{method:"scoped-review"} and reships.
-			// Entangled (or a dark reviewer) falls through unchanged.
 			if o.scopedMergeCarryForward(ctx, cycle, *cs, projectRoot) {
 				return PhaseShip, true
 			}
 		case conflict:
-			// Genuine overlapping work — a re-audit cannot resolve it. Reclassify to
-			// the integrity-class conflict code so recovery routes to the debugger.
 			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
 			recoverCode, recoverClass = CodeGitFleetRebaseConflict, ShipClassIntegrity
 		default:
@@ -115,10 +69,6 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 			return "", false
 		}
 	}
-	// Recovery is deterministic Chain-of-Responsibility (no LLM); both routing
-	// strategies just delegate to the pure router.Recover, so call it directly.
-	// This keeps recovery available even when no routing Strategy was wired
-	// (e.g. Stage:Off) — error handling must not depend on routing being on.
 	dec := router.Recover(router.RouteInput{
 		Blocker: &router.Blocker{
 			Code:  string(recoverCode),
@@ -139,10 +89,6 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 	return cand, true
 }
 
-// routeRebasedExplanation moves the explanation's base binding to the rebased base. When the host proves
-// the explained change byte-identical there, the approved Build stands and the audited verdict carries to
-// ship when the carry proves it, else only Audit re-runs (ADR-0105); otherwise the snapshot is invalidated
-// and Build re-authors the explanation.
 func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot string, cycle int, cs *CycleState) (Phase, bool) {
 	newBase, err := forkPoint(ctx, gitCapture, cs.ActiveWorktree)
 	if err != nil {
@@ -154,7 +100,7 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 	rebasedState.WorktreeBaseSHA = newBase
 	persist := func() error { return o.storage.WriteCycleState(ctx, rebasedState) }
 	binding := explanationBinding(projectRoot, *cs)
-	rebound, err := rebindPendingChange(ctx, binding, newBase, persist)
+	rebound, skipped, err := rebindPendingChange(ctx, binding, newBase, persist)
 	switch {
 	case errors.Is(err, explanationdocs.ErrRebindIncomplete):
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d %v; aborting, resume recovers the split\n", cycle, err)
@@ -168,6 +114,8 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 		}
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical on %s: explanation rebound, re-auditing without a Build (ADR-0105)\n", cycle, newBase)
 		return PhaseAudit, true
+	case skipped != "":
+		o.reportIdentityProofSkipped(cycle, *cs, skipped)
 	default:
 		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebased change is not proven identical and pending on %s; Build re-authors the explanation\n", cycle, newBase)
 	}
@@ -179,14 +127,38 @@ func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot 
 	return PhaseBuild, true
 }
 
-// rebindPendingChange attempts the identity-preserving rebind only for a change pending on newBase. Audit
-// reads `git diff HEAD`, so a committed change must go through Build, whose normalisation pends it.
-func rebindPendingChange(ctx context.Context, binding explanationdocs.CycleBinding, newBase string, persist func() error) (bool, error) {
+func rebindPendingChange(ctx context.Context, binding explanationdocs.CycleBinding, newBase string, persist func() error) (rebound bool, skipped string, err error) {
 	head, err := gitStdout(ctx, gitCapture, binding.Worktree, "rev-parse", "HEAD")
-	if err != nil || head != newBase {
-		return false, err
+	if err != nil {
+		return false, "", err
 	}
-	return explanationdocs.RebindIdenticalRebase(ctx, binding, newBase, persist)
+	if head != newBase {
+		return false, fmt.Sprintf("the rebased change is committed on %s, not pending on %s, and Audit reads git diff HEAD", head, newBase), nil
+	}
+	rebound, err = explanationdocs.RebindIdenticalRebase(ctx, binding, newBase, persist)
+	return rebound, "", err
+}
+
+const CodeIdentityProofSkipped signalcenter.Code = "ORCHESTRATOR_IDENTITY_PROOF_SKIPPED"
+
+func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeIdentityProofSkipped, "the fleet-rebase recovery did not run the identity proof, so Build re-authors the explanation; fields.reason says why the proof could not run (for example, the rebased change is committed, not pending on the new base)")
+}
+
+func (o *Orchestrator) unwindUnlessPredictedConflict(ctx context.Context, projectRoot string, cycle int, cs CycleState, predictedConflict bool) unwindOutcome {
+	if cs.ExplanationDocumentationVersion <= 0 || predictedConflict {
+		return unwindNone
+	}
+	return o.unwindBeforeFleetRebase(ctx, projectRoot, cycle, cs)
+}
+
+func (o *Orchestrator) reportIdentityProofSkipped(cycle int, cs CycleState, reason string) {
+	fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d identity proof skipped (%s): %s; Build re-authors the explanation\n", cycle, CodeIdentityProofSkipped, reason)
+	o.signals.Emit(signalcenter.Event{
+		Cycle: cycle, RunID: cs.RunID, Phase: string(PhaseShip), Module: signalcenter.ModuleOrchestrator,
+		Origin: "Orchestrator.routeRebasedExplanation", Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn,
+		Code: CodeIdentityProofSkipped, Reason: "identity proof skipped: " + reason, Fields: map[string]string{"reason": reason},
+	})
 }
 
 // gitFn runs a git subcommand in dir and returns (stdout, exitCode, err); it

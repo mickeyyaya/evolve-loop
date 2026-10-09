@@ -167,6 +167,7 @@ The research compares five approaches with forces, steelmen and scores ([researc
 | D47 | In a paused queue, each owner parks. Its record becomes `parked` with its ticket and evidence, and the owner releases its lock. Its ship ends with `LANDING_QUEUE_PAUSED`, which a floor makes a system failure, so the loop halts. After `resume`, the cycle resume re-attaches each candidate (spec §3). | No process waits through a pause, so nothing polls (ADR-0127). A wait on a lock that `resume` releases needs a holder that lives through the halt. The death of that holder wakes each waiter into a pause that still holds. A halted loop keeps no lanes alive (ADR-0072). |
 | D48 | Only a candidate whose tip is the `main` tip pauses the queue on a red. A red tip that holds a candidate that has not landed keeps the candidate waiting. A `compile` red runs on the tip too (spec §9). | A red on a prefix that has not landed is not a red `main`, so it is no system failure. A compile red that the `main` tip shares must not make an innocent candidate T4. |
 | D49 | A bookkeeping-only peer delta that holds predicates under `go/acs/` also runs `compile` for the `acs` tag set (spec §8, §9). | The predicates are Go code that only that tag compiles, and a lane change can break them (research F3.9: cycle 1832). Out of bookkeeping, they add a package edge each time the lane changes a package that they import. |
+| D53 | The interim fix (Q12) routes a continuation lane to Audit, not to Ship, when its rebase is byte-identical. The inbox item [`ship-carry-accepts-a-kept-consumption`](../../.evolve/inbox/2026-10-09T12-00-00Z-ship-carry-accepts-a-kept-consumption.json) holds the Ship route; Q14 removes the class. That item also owns the check that a re-ship is idempotent when `consumed/<name>` is already present. | The lane keeps ship's consumption in its change. Ship's carry check (B4) re-proves the bytes and does not accept that consumption, so a carry record gives a false `INTEGRITY_TREE_DRIFT` (research F2.3). |
 
 ## 7. Components
 
@@ -389,4 +390,5 @@ None. On 2026-10-09 the operator decided OQ1, OQ3, OQ4 and OQ6 (§4, O10 to O13)
 | # | Status |
 |---|---|
 | Q0 | ◐ the dossier, ADR-0128, the spec and this plan are written in `dev/cl-landing-queue`, with the operator decisions of 2026-10-09 and review fix round 1; not staged |
-| Q1 to Q19 | ☐ not started |
+| Q1 to Q11, Q13 to Q19 | ☐ not started |
+| Q12 | ◐ built in `dev/cl-lq-q12`, with the five named tests and the 1843 replay; not staged. The route is Audit, not Ship (D53). |

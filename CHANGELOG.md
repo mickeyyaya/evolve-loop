@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — a continuation lane reaches the identity proof, and a proof that did not run is reported as skipped (ADR-0128 Q12, 2026-10-09)
+
+- **What happened.** Cycles 1801, 1818 and 1843 each paid a Build and an Audit after a clean fleet rebase (102.8 min in total). Each lane continued a failed cycle, so the inbox item that ship consumed carried `released_continuations`. The B1 unwind declines for such an item, the rebase replayed ship's commit, and the identity proof never ran. The log then said "not proven identical".
+- **The fix.** When the unwind declines only to keep a released continuation, the recovery pends ship's replayed commit on the fork point after a clean rebase. The explanation rebind does not count ship's inbox consumption in the identity. That is a removed `.evolve/inbox/<name>` with a present `.evolve/inbox/consumed/<name>` that adds only ship's stamps to the item; an edit of the item still declines. Thus a byte-identical lane rebinds and goes to Audit with no Build. The consumption and its released continuation stay in the change that Audit binds, and any other inbox change still declines.
+- **The report.** When the proof cannot run because the change is committed, the recovery writes `identity proof skipped` and emits the new WARN `ORCHESTRATOR_IDENTITY_PROOF_SKIPPED` with `fields.reason`. "not proven identical" now means only that the proof ran and declined.
+- **Limit.** The identity carry (B3) still declines such a lane. Ship's carry check (B4) re-proves the bytes, and it does not accept a consumption that is already in the change. Thus the lane goes to Audit, not to Ship. Protected surface: `core` recovery and `explanationdocs`. The decision is plan D53.
+- **Cleanup.** The changed recovery functions carry no comments; their notes are in [internal-core.md](docs/architecture/packages/internal-core.md). New tests cover each branch of `recoverFromShipError`, including the abort on an illegal edge from ship.
+
 ## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
 
 - **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.

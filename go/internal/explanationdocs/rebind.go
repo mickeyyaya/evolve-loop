@@ -2,13 +2,16 @@ package explanationdocs
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -78,12 +81,12 @@ func proveIdenticalRebase(ctx context.Context, binding CycleBinding, newBaseSHA 
 	return &next, true, nil
 }
 
-// sameChange holds when the pending change on the new base has the exact paths, modes and bytes the
-// approved Build sealed, the same material digest, and the Build report still declares the same handoff.
-// The rebase itself needs no separate clean-replay check: a path the replay regenerated or resolved is
-// one the peer delta also touched, which lineageHolds declines, and any other byte change fails the digest.
 func sameChange(ctx context.Context, binding CycleBinding, prior *resultSnapshot, changed []string, states []pathState, newBaseSHA string) (bool, error) {
-	if foldPathStates(diffDomain(prior.View.BaseSHA), states) != prior.View.DiffSHA256 {
+	ships, err := shipConsumption(ctx, binding.Worktree, newBaseSHA, states)
+	if err != nil {
+		return false, err
+	}
+	if foldPathStates(diffDomain(prior.View.BaseSHA), withoutShipConsumption(states, ships)) != prior.View.DiffSHA256 {
 		return false, nil
 	}
 	material := materialPaths(changed)
@@ -104,7 +107,6 @@ func sameChange(ctx context.Context, binding CycleBinding, prior *resultSnapshot
 	if prior.View.Status != statusRequired {
 		return true, nil
 	}
-	// Defence in depth: disjointness and the digest decline a document present at the new base first.
 	exists, err := existsAtBase(ctx, binding.Worktree, newBaseSHA, prior.View.DocumentPath)
 	return err == nil && !exists, err
 }
@@ -205,4 +207,69 @@ func isAncestor(ctx context.Context, worktree, ancestor, descendant string) (boo
 	default:
 		return false, fmt.Errorf("git merge-base --is-ancestor %s %s: %w: %s", ancestor, descendant, err, strings.TrimSpace(string(out)))
 	}
+}
+
+const (
+	inboxRoot     = ".evolve/inbox/"
+	consumedInbox = ".evolve/inbox/consumed/"
+)
+
+func consumptionPairs(states []pathState) []string {
+	removed, consumed := map[string]bool{}, map[string]bool{}
+	for _, s := range states {
+		switch name := path.Base(s.rel); {
+		case s.mode == "absent" && s.rel == inboxRoot+name:
+			removed[name] = true
+		case s.mode != "absent" && s.rel == consumedInbox+name:
+			consumed[name] = true
+		}
+	}
+	var pairs []string
+	for name := range removed {
+		if consumed[name] {
+			pairs = append(pairs, name)
+		}
+	}
+	return pairs
+}
+
+func shipConsumption(ctx context.Context, worktree, baseSHA string, states []pathState) (map[string]bool, error) {
+	ships := map[string]bool{}
+	for _, name := range consumptionPairs(states) {
+		before, err := sysexec.Command(ctx, "git", "-C", worktree, "show", baseSHA+":"+inboxRoot+name).Output()
+		if err != nil {
+			return nil, fmt.Errorf("read inbox item %s at %s: %w", name, baseSHA, err)
+		}
+		after, _, err := readRegularWithin(worktree, consumedInbox+name)
+		if err != nil {
+			return nil, fmt.Errorf("read consumed item %s: %w", name, err)
+		}
+		ships[name] = keepsTheItem(before, []byte(after))
+	}
+	return ships, nil
+}
+
+func keepsTheItem(before, after []byte) bool {
+	var item, consumed map[string]any
+	if json.Unmarshal(before, &item) != nil || json.Unmarshal(after, &consumed) != nil {
+		return false
+	}
+	for _, stamp := range []string{inboxbatch.ConsumedField, inboxbatch.ReleasedContinuationsField} {
+		delete(item, stamp)
+		delete(consumed, stamp)
+	}
+	return reflect.DeepEqual(item, consumed)
+}
+
+func withoutShipConsumption(states []pathState, ships map[string]bool) []pathState {
+	lane := make([]pathState, 0, len(states))
+	for _, s := range states {
+		name := path.Base(s.rel)
+		onePairHalf := s.rel == inboxRoot+name || s.rel == consumedInbox+name
+		if onePairHalf && ships[name] {
+			continue
+		}
+		lane = append(lane, s)
+	}
+	return lane
 }
