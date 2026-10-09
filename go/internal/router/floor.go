@@ -31,8 +31,7 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 	}
 
 	if planRuns(out, "build") {
-		forcePhase(out, &clamps, EvaluatorFloorPhase, "build-requires-"+EvaluatorFloorPhase)
-		forcePhase(out, &clamps, "ship", "build-requires-ship")
+		forceBuiltWorkShipped(out, &clamps)
 	}
 
 	if !planRuns(out, "ship") {
@@ -49,6 +48,11 @@ func ClampPlanToFloorWith(in RouteInput, plan *PhasePlan, floor []string, intent
 		forcePhase(out, &clamps, phase, "ship-requires-"+phase)
 	}
 	return out, clamps
+}
+
+func forceBuiltWorkShipped(out *PhasePlan, clamps *[]Clamp) {
+	forcePhase(out, clamps, EvaluatorFloorPhase, "build-requires-"+EvaluatorFloorPhase)
+	forcePhase(out, clamps, "ship", "build-requires-ship")
 }
 
 func withEvaluatorFloor(floor []string) []string {
