@@ -200,8 +200,9 @@ The owner lock thus exists before any client can read the record. A client never
 **The resume.** `evolve landing queue resume` checks the cause again, and then it clears the flag:
 
 - For a red tip, the failing tests must pass on the `main` tip, in a scratch worktree.
-- For a stranded head, it fetches `origin`. If `origin` holds the commit of the intent, the record becomes `landed`. If not, the landing did not happen, and the record becomes `parked`.
-- Ship moves `main` only after its push lands (ADR-0039 §8.1). So `main` holds the commit only when `origin` holds it.
+- For a stranded head, it fetches `origin`. If `origin` holds the commit of the intent, the resume fast-forwards local `main` to `origin` before it clears the flag, and the record becomes `landed`. Without this step, each other candidate fails its fast-forward check against an old local `main` and composes again.
+- If `origin` does not hold the commit, the landing did not happen. The resume does not move local `main`, and the record becomes `parked`.
+- Ship moves `main` only after its push lands (ADR-0039 §8.1). So `main` holds the commit only when `origin` holds it, and local `main` is an ancestor of `origin`. If local `main` is not an ancestor of `origin`, the resume refuses and the flag stays set.
 
 After the resume, the cycle resume (`evolve loop --resume`) re-attaches each parked candidate:
 
