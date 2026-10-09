@@ -139,7 +139,7 @@ func TestPendRebasedChange_AfterAnAbortedRebaseRestoresTheAuditedShape(t *testin
 	if declined, err := unwindShipCommit(ctx, fx.worktree, fx.audited(), gitCapture); err != nil || declined != "" {
 		t.Fatalf("unwindShipCommit = (%q, %v)", declined, err)
 	}
-	if ok, conflicts := rebaseWithDerivedRegen(ctx, fx.worktree, gitCapture, regenerateDerivedArtifact, isDerivedArtifact); ok || len(conflicts) == 0 {
+	if ok, conflicts := rebaseWithDerivedRegen(ctx, fx.worktree, gitCapture, regenerateDerivedArtifact, derivedEntryOf); ok || len(conflicts) == 0 {
 		t.Fatalf("rebase = (ok %v, conflict %v), want the peer's edit to the same line to conflict", ok, conflicts)
 	}
 

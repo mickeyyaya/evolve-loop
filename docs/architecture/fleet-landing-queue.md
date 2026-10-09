@@ -360,6 +360,11 @@ When an entry fires:
 - The generator is always the one in `C`, through `go run ./cmd/evolve` with `WorktreeEvolveInvocation`. It is never the host binary (research F2.6, R5).
 - A failed step ejects the candidate with `regen_failed`.
 - `agents/evolve-router.md` holds a generated region with no generator (`GENERATED:goal-recipes`). It is not an entry, so a conflict there is genuine.
+- A whole-file output with a marker, such as `commands/*.md`, has a derived conflict only when both sides of the file carry the marker. Our side is the text outside the conflict blocks plus the first part of each block. Their side is the text outside the blocks plus the last part of each block. The base part of a three-way block belongs to neither side. Any other conflict on such a file is genuine, for example on a command that a person wrote.
+- The two JSON manifests carry no marker, because JSON has no comment. A conflict on them is derived. The leftover-marker check after the regeneration guards them, and a git error in that check is a refusal.
+- A `skills/*/SKILL.md` without the `GENERATED:phase-facts` region has no generated region. A conflict there is genuine.
+- A region output with no closed conflict block, for example a conflict where one side deleted the file, is genuine.
+- `internal/derived` is on the protected surface, because it decides what the protected recovery auto-resolves.
 
 #### 7.2 Bookkeeping paths
 

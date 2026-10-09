@@ -52,6 +52,16 @@ All notable changes to this project will be documented in this file.
 - **Signals.** The profile now allows signals only inside the sandbox of the agent: `(allow signal (target same-sandbox))`, not `(allow signal)`. The agent can stop its own children. It cannot signal the tmux server, the bridge or another pane.
 - **The agent rules.** The identity block no longer names `tmux display-message` or `tmux ls`. The authority block forbids `tmux` without a private `-L` socket, `tmux kill-server`, and a kill of `tmux` or of a process the agent did not start.
 - **One home.** `bridge.TmuxSocketDir()` replaces the private `tmuxSocketDir` of `internal/swarm`. The per-OS branch of the sandbox wrapper is now `osSandboxPrefix`.
+## Changed — one catalog of the generated outputs, and the fleet rebase regenerates the skill projections (Q1 of ADR-0128, 2026-10-09)
+
+- **What it is.** The new package `internal/derived` is the one catalog of the generated outputs (spec [fleet-landing-queue.md](docs/architecture/fleet-landing-queue.md) §7.1). It has three entries: `flag-index`, `signal-codes` and `skill-projections`. The last one holds `commands/*.md`, the two Codex manifests and the `GENERATED:phase-facts` region of `skills/*/SKILL.md`. The `GENERATED:goal-recipes` region of `agents/evolve-router.md` has no generator, so it is no entry.
+- **The rebase.** `rebaseWithDerivedRegen` replaces its one-entry map with the catalog. A conflict on a region output is derived when each block lies inside the generated region. A conflict on a command stub is derived when both sides carry the generated marker. The rebase regenerates each fired entry once, with the generator of the worktree (`WorktreeEvolveInvocation`). Then it checks the entry, refuses a leftover conflict marker and stages the outputs of the entry.
+- **A hand edit is genuine.** A conflict outside the region, for example a hand edit of `control-flags.md`, now goes to the debugger. Before, the rebase regenerated over it.
+- **The cycle-1841 class.** A rebase whose only conflicts are in the generated command stubs is now regenerated and does not go to the debugger. Pinned by `TestRebaseWithDerivedRegen_ACommandStubConflictRegenerates`.
+- **The normalizer.** After the build, `normalizeDerivedProjections` checks each entry whose inputs the cycle changed, and regenerates it only when the check fails. The inputs of `signal-codes` are the packages that call `RegisterCode(`. The inputs of `skill-projections` include the closure of `go/internal/skillcheck`. A cycle that changes the skills, the agents or a package in that closure now pays one `go run` of `evolve skills check`.
+- **Protected surface.** `go/internal/derived/` joins the protected manifest (`guards/integrity_surface.go`), because it decides what the protected recovery auto-resolves.
+- The package is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`. Design notes: [internal-derived.md](docs/architecture/packages/internal-derived.md).
+
 ## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
 
 - **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.

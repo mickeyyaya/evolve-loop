@@ -228,3 +228,18 @@ func TestProtectedSurfaceManifest_CoversTheFloorsGoTestBudget(t *testing.T) {
 		t.Error("only the budget is protected; the added-test grouping in addedtests.go stays cycle territory")
 	}
 }
+
+func TestProtectedSurfaceManifest_CoversTheDerivedOutputCatalog(t *testing.T) {
+	for _, path := range []string{
+		"go/internal/derived/derived.go",
+		"go/internal/derived/conflict.go",
+		"/wt/go/internal/derived/regen.go",
+	} {
+		if !IsProtectedSurface(path) {
+			t.Errorf("IsProtectedSurface(%q) = false: the derived catalog decides which rebase conflicts the protected recovery regenerates, so a cycle must not be able to widen it", path)
+		}
+	}
+	if IsProtectedSurface("go/internal/derivedx/a.go") {
+		t.Error("a sibling package that only shares the prefix is not the catalog")
+	}
+}
