@@ -39,7 +39,7 @@ func TestEvalCondition_NumericOps(t *testing.T) {
 		{"build.files_touched", "gte", 7, true},
 		{"build.diff_loc", "gte", 500, true},
 		{"build.diff_loc", "lt", 500, false},
-		{"build.severity_max", "gte", "HIGH", true}, // severity coercion
+		{"build.severity_max", "gte", "HIGH", true},
 		{"build.severity_max", "gte", "CRITICAL", false},
 	}
 	for _, c := range cases {
@@ -57,12 +57,12 @@ func TestEvalCondition_StringOps(t *testing.T) {
 		val       interface{}
 		want      bool
 	}{
-		{"cycle_size", "eq", "medium", true}, // triage precedence
+		{"cycle_size", "eq", "medium", true},
 		{"cycle_size", "ne", "trivial", true},
 		{"scout.cycle_size", "eq", "large", true},
 		{"build.verdict", "eq", "PASS", true},
 		{"audit.verdict", "ne", "PASS", true},
-		{"unknown.field", "eq", "x", false}, // unknown → false (fail-safe)
+		{"unknown.field", "eq", "x", false},
 		{"build.acs_red", "bogusop", 1, false},
 	}
 	for _, c := range cases {
@@ -75,7 +75,7 @@ func TestEvalCondition_StringOps(t *testing.T) {
 
 func TestEvalCondition_GenericSignals(t *testing.T) {
 	sig := RoutingSignals{Generic: map[string]any{
-		"security.cves":         float64(2), // JSON number
+		"security.cves":         float64(2),
 		"security.severity_max": "HIGH",
 		"deploy.ready":          true,
 	}}
@@ -89,8 +89,8 @@ func TestEvalCondition_GenericSignals(t *testing.T) {
 		{"security.severity_max", "eq", "HIGH", true},
 		{"security.severity_max", "ne", "LOW", true},
 		{"deploy.ready", "eq", "true", true},
-		{"deploy.ready", "ne", "false", true},  // bool renders "true"/"false"
-		{"security.missing", "eq", "x", false}, // absent generic → fail-safe false
+		{"deploy.ready", "ne", "false", true},
+		{"security.missing", "eq", "x", false},
 	}
 	for _, c := range cases {
 		got := evalCondition(sig, config.Condition{Field: c.field, Op: c.op, Value: c.val})
@@ -101,7 +101,6 @@ func TestEvalCondition_GenericSignals(t *testing.T) {
 }
 
 func TestEvalCondition_AbsentFieldIsAlwaysFalse(t *testing.T) {
-	// The bus exists but lacks the queried fields; unknown.field covers the default branch.
 	sig := RoutingSignals{Generic: map[string]any{"scout.other": "present"}}
 	cases := []struct {
 		field, op string
@@ -109,7 +108,7 @@ func TestEvalCondition_AbsentFieldIsAlwaysFalse(t *testing.T) {
 	}{
 		{"scout.goal_type", "ne", "growth"},
 		{"scout.goal_type", "!=", "growth"},
-		{"scout.goal_type", "eq", ""}, // "" == "" fail-open variant
+		{"scout.goal_type", "eq", ""},
 		{"scout.goal_type", "ne", ""},
 		{"scout.goal_type", "eq", "growth"},
 		{"scout.goal_type", "gt", 0},
@@ -147,7 +146,7 @@ func TestEvalCondition_PresentEmptyString(t *testing.T) {
 }
 
 func TestEvalCondition_TypedFieldAbsentKeepsLegacySemantics(t *testing.T) {
-	var sig RoutingSignals // no handoffs digested at all
+	var sig RoutingSignals
 	if !evalCondition(sig, config.Condition{Field: "cycle_size", Op: "ne", Value: "trivial"}) {
 		t.Errorf("cycle_size ne trivial with zero signals = false; the tdd conditional-mandatory pin must stay true (conservative side) pre-handoff")
 	}

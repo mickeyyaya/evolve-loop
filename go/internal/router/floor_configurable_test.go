@@ -38,7 +38,7 @@ func TestClampPlanToFloorWith_AuditOnlyStillForcesAudit(t *testing.T) {
 func TestClampPlanToFloorWith_SelfSealsAudit(t *testing.T) {
 	in := nonTrivialIn()
 	p := &PhasePlan{Entries: []PhasePlanEntry{pe("scout", true), pe("ship", true)}}
-	out, _ := ClampPlanToFloorWith(in, p, []string{"build"}, false) // audit deliberately absent
+	out, _ := ClampPlanToFloorWith(in, p, []string{"build"}, false)
 	if !planRuns(out, "audit") {
 		t.Fatal("ClampPlanToFloorWith must self-seal audit even when the floor omits it")
 	}

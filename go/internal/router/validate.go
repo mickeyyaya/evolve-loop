@@ -1,15 +1,11 @@
 package router
 
-// PlanRejection is one problem found in a plan, or one clamp, as recorded in advisor-rejections.json.
-// Phase is empty for a whole-plan problem.
 type PlanRejection struct {
 	Phase  string
-	Reason string // a stable token, e.g. empty-plan | unknown-phase | duplicate-phase | ship-skips-audit
+	Reason string
 	Detail string
 }
 
-// ValidatePlan reports structural problems in a plan without changing it; ClampPlanToFloorWith
-// stays the sole disposer. A phase minted in this plan counts as known.
 func ValidatePlan(in RouteInput, plan *PhasePlan) []PlanRejection {
 	if plan == nil || len(plan.Entries) == 0 {
 		return []PlanRejection{{Reason: "empty-plan", Detail: "plan has no entries"}}
@@ -41,7 +37,6 @@ func ValidatePlan(in RouteInput, plan *PhasePlan) []PlanRejection {
 	return rej
 }
 
-// PlanMismatch reports whether a trigger now fires for a phase the plan does not run, the signal to re-plan.
 func PlanMismatch(in RouteInput, plan *PhasePlan) bool {
 	if plan == nil {
 		return false
@@ -54,8 +49,6 @@ func PlanMismatch(in RouteInput, plan *PhasePlan) bool {
 	return false
 }
 
-// knownPhaseSet is every phase a plan may reference. It is deliberately generous, because the
-// unknown-phase drop must never delete a legitimate phase.
 func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	known := make(map[string]struct{}, len(canonicalOrder)+len(in.Cfg.Order)+len(plan.MintPhases))
 	add := func(names ...string) {
@@ -67,7 +60,6 @@ func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	}
 	add(canonicalOrder...)
 	add(in.Cfg.Order...)
-	// A phase the plan prompt offered is known by construction, even though Cfg.Order carries it too.
 	for _, c := range in.Catalog {
 		add(c.Name)
 	}
@@ -81,7 +73,6 @@ func knownPhaseSet(in RouteInput, plan *PhasePlan) map[string]struct{} {
 	for _, m := range plan.MintPhases {
 		add(m.Name)
 	}
-	// Phases minted inline on their own entry, the second minting channel.
 	for _, e := range plan.Entries {
 		if e.Mint != nil {
 			add(e.Phase)

@@ -2,8 +2,6 @@ package router
 
 import "github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 
-// AssembleHandoffs digests workspace and projects the result into phaseio.Handoffs. It lives here
-// so phaseio stays a leaf and Digest stays the only on-disk reader.
 func AssembleHandoffs(workspace string, completed []string) (phaseio.Handoffs, error) {
 	sig, err := Digest(workspace, completed)
 	if err != nil {
@@ -12,8 +10,6 @@ func AssembleHandoffs(workspace string, completed []string) (phaseio.Handoffs, e
 	return HandoffsFromSignals(sig), nil
 }
 
-// HandoffsFromSignals projects an existing digest into phaseio views without re-reading disk;
-// severities become their canonical words.
 func HandoffsFromSignals(sig RoutingSignals) phaseio.Handoffs {
 	init := phaseio.HandoffsInit{Generic: sig.Generic, Degraded: sig.DigestDegraded}
 	if sig.Scout.Present {

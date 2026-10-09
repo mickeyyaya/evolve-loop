@@ -32,7 +32,6 @@ func TestPrePlanReconDigest_Deterministic(t *testing.T) {
 	if a.BacklogSize != 3 || a.CarryoverCount != 2 {
 		t.Errorf("backlog/carryover passthrough wrong: %+v", a)
 	}
-	// x.go appears twice → it is the top hotspot; deduped to one entry.
 	if len(a.RecentHotspots) == 0 || a.RecentHotspots[0] != "go/internal/core/x.go" {
 		t.Errorf("hotspot frequency ranking wrong: %v", a.RecentHotspots)
 	}

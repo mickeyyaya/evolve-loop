@@ -149,7 +149,6 @@ func TestRoute_AuditFailToRetrospective(t *testing.T) {
 }
 
 func TestRoute_Retro_DelegatesToFailureAdapter(t *testing.T) {
-	// Two unexpired code-audit-fail entries give BLOCK-CODE, which failureadapter returns only under Strict.
 	in := base("retro")
 	in.Strict = true
 	in.History = []failureadapter.Entry{
@@ -169,7 +168,7 @@ func TestRoute_Retro_DelegatesToFailureAdapter(t *testing.T) {
 
 func TestRoute_Retro_RetryToTDD(t *testing.T) {
 	in := base("retro")
-	in.Strict = true // RETRY is strict-gated in failureadapter
+	in.Strict = true
 	in.History = []failureadapter.Entry{
 		{Cycle: 1, Classification: failureadapter.InfraTransient, ExpiresAt: "2099-01-01T00:00:00Z"},
 	}
@@ -202,7 +201,7 @@ func TestRoute_Clamp_MandatoryNeverSkipped(t *testing.T) {
 
 func TestRoute_Clamp_MaxInsertionsCap(t *testing.T) {
 	in := base("build")
-	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // 1 optional insert already
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"}
 	in.Cfg.MaxInsertions = 1
 	in.Signals.Build = BuildSignals{ACSRed: 5, Present: true}
 	d := Route(in, nil)
@@ -247,7 +246,6 @@ func advisoryCfg() config.RoutingConfig {
 	return c
 }
 
-// spinePlan is the floor-clamped shape the orchestrator always threads, plus extra entries.
 func spinePlan(extra ...PhasePlanEntry) *PhasePlan {
 	entries := []PhasePlanEntry{
 		pe("scout", true), pe("tdd", true), pe("build", true),
@@ -260,8 +258,8 @@ func TestRoute_AdvisoryTriggerCapEnforced(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
 	in.Cfg.MaxInsertions = 1
-	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // 1 optional already spent
-	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true}       // tester trigger would fire too
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"}
+	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true}
 	in.Plan = spinePlan(pe("tester", true))
 
 	d := Route(in, nil)
@@ -278,7 +276,7 @@ func TestRoute_AdvisoryTriggerCapEnforced(t *testing.T) {
 
 func TestRoute_AdvisoryTriggerWithinCap(t *testing.T) {
 	in := base("build")
-	in.Cfg = advisoryCfg() // MaxInsertions: 4
+	in.Cfg = advisoryCfg()
 	in.Completed = []string{"scout", "tdd", "build", "plan-review"}
 	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true}
 	in.Plan = spinePlan(pe("tester", true))
@@ -297,7 +295,7 @@ func TestRoute_AdvisoryPlanPhaseExemptsFromCap(t *testing.T) {
 	in.Cfg = advisoryCfg()
 	in.Cfg.MaxInsertions = 1
 	in.Cfg.PhaseEnable["tester"] = config.EnableOn
-	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // cap spent
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"}
 	in.Plan = spinePlan(pe("tester", true))
 
 	d := Route(in, nil)
@@ -309,10 +307,10 @@ func TestRoute_AdvisoryPlanPhaseExemptsFromCap(t *testing.T) {
 func TestRoute_AdvisoryFloorPhaseNotCapped(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
-	in.Cfg.Mandatory = []string{"scout", "build", "ship"} // audit NOT mandatory here
+	in.Cfg.Mandatory = []string{"scout", "build", "ship"}
 	in.Cfg.MaxInsertions = 1
-	in.Completed = []string{"scout", "tdd", "build", "plan-review"} // cap spent
-	in.Plan = spinePlan()                                           // audit Run:true via the spine plan (floor-forced shape)
+	in.Completed = []string{"scout", "tdd", "build", "plan-review"}
+	in.Plan = spinePlan()
 
 	d := Route(in, nil)
 	if d.NextPhase != "audit" {
@@ -324,8 +322,8 @@ func TestRoute_AdvisoryPlanRunFalse(t *testing.T) {
 	in := base("build")
 	in.Cfg = advisoryCfg()
 	in.Completed = []string{"scout", "tdd", "build"}
-	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true} // tester trigger fires
-	in.Plan = spinePlan(pe("tester", false))                  // advisor explicitly vetoed tester
+	in.Signals.Build = BuildSignals{ACSRed: 2, Present: true}
+	in.Plan = spinePlan(pe("tester", false))
 
 	d := Route(in, nil)
 	if d.NextPhase != "audit" {
@@ -347,7 +345,6 @@ func TestRoute_AdvisoryPlanVetoUserPhaseAbsentSignal(t *testing.T) {
 		InsertWhen: []config.Condition{{Field: "scout.goal_type", Op: "ne", Value: "growth"}},
 	}
 	in.Completed = []string{"scout", "tdd", "build"}
-	// No generic signals: scout.goal_type is never emitted.
 	in.Plan = spinePlan(pe("growth-loop", false))
 
 	d := Route(in, nil)

@@ -7,7 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-// evalCondition reports whether one trigger clause holds against the signals; an absent field never holds.
 func evalCondition(sig RoutingSignals, c config.Condition) bool {
 	num, isNum, str, isPresent := resolveField(sig, c.Field)
 	if !isPresent {
@@ -45,7 +44,6 @@ func evalCondition(sig RoutingSignals, c config.Condition) bool {
 	}
 }
 
-// evalCondRule evaluates a conditional-mandatory rule: its head clause AND every clause in r.And.
 func evalCondRule(sig RoutingSignals, r config.CondRule) bool {
 	for _, c := range r.Clauses() {
 		if !evalCondition(sig, config.Condition{Field: c.Field, Op: c.Op, Value: c.Value}) {
@@ -55,8 +53,6 @@ func evalCondRule(sig RoutingSignals, r config.CondRule) bool {
 	return true
 }
 
-// resolveField returns (number, isNumber, string, isPresent) for a field path. A typed field is
-// present even at its zero value, so `cycle_size != trivial` holds before any handoff.
 func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool) {
 	switch field {
 	case "cycle_size", "triage.cycle_size":
@@ -106,8 +102,6 @@ func resolveField(sig RoutingSignals, field string) (float64, bool, string, bool
 	}
 }
 
-// resolveTypedOrGeneric returns the declared typed value, else the generic signal. An undeclared
-// value stays absent, so an `ne` trigger never fires on a cycle that declared nothing.
 func resolveTypedOrGeneric(sig RoutingSignals, field, typed string) (float64, bool, string, bool) {
 	if typed != "" {
 		return 0, false, typed, true
@@ -115,7 +109,6 @@ func resolveTypedOrGeneric(sig RoutingSignals, field, typed string) (float64, bo
 	return resolveGeneric(sig, field)
 }
 
-// resolveGeneric resolves field from the generic plane; bools render as "true"/"false" so eq and ne work.
 func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string, bool) {
 	v, ok := sig.GenericValue(field)
 	if !ok {
@@ -125,7 +118,7 @@ func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string, bo
 	case float64:
 		return t, true, "", true
 	case int:
-		return float64(t), true, "", true // set in process; encoding/json always yields float64
+		return float64(t), true, "", true
 	case string:
 		return 0, false, t, true
 	case bool:
@@ -138,7 +131,6 @@ func resolveGeneric(sig RoutingSignals, field string) (float64, bool, string, bo
 	}
 }
 
-// coerceNum converts a condition value to float64; a severity field accepts a word such as "HIGH".
 func coerceNum(field string, v interface{}) (float64, bool) {
 	switch t := v.(type) {
 	case float64:
