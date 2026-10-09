@@ -50,9 +50,8 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return runPhaseLint(args[1:], stdout, stderr)
 	}
 	name := strings.ToLower(args[0])
-	factory, ok := registry.For(name)
-	if !ok {
-		fmt.Fprintf(stderr, "evolve phase: unknown phase %q (known: %s)\n", name, strings.Join(registry.Names(), ", "))
+	if !IsKnownPhase(name, "") {
+		fmt.Fprintln(stderr, FormatUnknownPhaseError("evolve phase", name, ""))
 		return 10
 	}
 
@@ -65,7 +64,10 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 		fmt.Fprintf(stderr, "evolve phase: %s: %v\n", name, err)
 		return exitRoutingRefused
 	}
-	runner := factory(req)
+	runner, rc := resolvePhaseRunner(name, req, stderr)
+	if rc != 0 {
+		return rc
+	}
 	resp, err := runner.Run(context.Background(), req)
 	if err != nil {
 		// Emit the partial response anyway so the parent can read its diagnostics.
@@ -81,6 +83,19 @@ func (c phaseCommand) run(args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	fmt.Fprintln(stdout, string(buf))
 	return 0
+}
+
+func resolvePhaseRunner(name string, req core.PhaseRequest, stderr io.Writer) (core.PhaseRunner, int) {
+	runner, found, err := ResolveRunner(name, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve phase: %s: %v\n", name, err)
+		return nil, 1
+	}
+	if !found {
+		fmt.Fprintln(stderr, FormatUnknownPhaseError("evolve phase", name, req.ProjectRoot))
+		return nil, 10
+	}
+	return runner, 0
 }
 
 func phaseRequest(flags []string, stdin io.Reader, stderr io.Writer) (core.PhaseRequest, int) {

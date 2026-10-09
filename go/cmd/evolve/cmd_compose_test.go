@@ -221,3 +221,14 @@ func TestSplitNonEmptyPhases_DirectUnit(t *testing.T) {
 		}
 	}
 }
+
+func TestCompose_ShipMixedCaseStillRefused(t *testing.T) {
+	defer registry.SnapshotForTest()()
+	stub := &composeStub{}
+	registerCompose(t, stub, "ship")
+	var stdout, stderr bytes.Buffer
+	code := runCompose([]string{"--phases", "Ship"}, bytes.NewReader(nil), &stdout, &stderr)
+	if code != 2 {
+		t.Errorf("code=%d, want 2; stderr=%q", code, stderr.String())
+	}
+}

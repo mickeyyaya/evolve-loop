@@ -38,7 +38,7 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve compose: --phases produced empty list after trimming")
 		return 10
 	}
-	if rc := refuseComposePhases(phases, *shipAnyway, stderr); rc != 0 {
+	if rc := refuseComposePhases(phases, *projectRoot, *shipAnyway, stderr); rc != 0 {
 		return rc
 	}
 
@@ -62,8 +62,12 @@ func runCompose(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	overall := 0
 	for i, p := range phases {
-		factory, _ := registry.For(p)
-		runner := factory(req)
+		runner, found, resolveErr := phasecmd.ResolveRunner(p, req)
+		if resolveErr != nil || !found {
+			fmt.Fprintf(stderr, "[compose] %s ERROR: %s\n", p, composeResolveFailure(p, req.ProjectRoot, resolveErr))
+			overall = 1
+			continue
+		}
 		fmt.Fprintf(stdout, "[compose] %d/%d running %s\n", i+1, len(phases), p)
 		resp, runErr := runner.Run(context.Background(), req)
 		out, _ := json.MarshalIndent(resp, "  ", "  ")
@@ -113,18 +117,24 @@ func splitNonEmptyPhases(csv string) []string {
 	parts := strings.Split(csv, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
-		if s := strings.TrimSpace(p); s != "" {
+		if s := strings.ToLower(strings.TrimSpace(p)); s != "" {
 			out = append(out, s)
 		}
 	}
 	return out
 }
 
-func refuseComposePhases(phases []string, shipAnyway bool, stderr io.Writer) int {
-	known := registry.Names()
+func composeResolveFailure(phase, projectRoot string, err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return phasecmd.FormatUnknownPhaseError("evolve compose", phase, projectRoot)
+}
+
+func refuseComposePhases(phases []string, projectRoot string, shipAnyway bool, stderr io.Writer) int {
 	for _, p := range phases {
-		if !slices.Contains(known, p) {
-			fmt.Fprintf(stderr, "evolve compose: unknown phase %q (known: %s)\n", p, joinNames(known))
+		if !phasecmd.IsKnownPhase(p, projectRoot) {
+			fmt.Fprintln(stderr, phasecmd.FormatUnknownPhaseError("evolve compose", p, projectRoot))
 			return 10
 		}
 	}
