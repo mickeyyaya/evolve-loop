@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `internal/overlap`: the overlap proof of the landing queue (Q3, ADR-0128, unwired, 2026-10-09)
+
+- **What it is.** `overlap.Prove` is a pure function. It takes the lane change, the peer delta, the composition facts, the module map and the catalogs. It gives the tier (T1 to T4), the rules that fired, the evidence and its digest. The digest binds the blobs of the evidence paths and of the peer paths in each package of an edge ([fleet-landing-queue.md](docs/architecture/fleet-landing-queue.md) §6 and §8).
+- **The rules.** A step-1 rule gives T4 at once. An empty peer delta gives T1 by `empty_peer`, and a peer delta of bookkeeping paths only gives T1 by `bookkeeping_peer`. In step 3, the strictest rule wins. Package edges count in both directions, and an unknown path or a failed input is never T1.
+- **The zones.** A path under `go/` belongs to the package whose file lists name it, or whose `testdata/` tree holds it. A deleted Go file counts by its directory. An unowned path under `go/`, a read root, a path that is not plain, and each path outside the known zones are unknown.
+- **The adapter.** `overlap.LoadModule` runs `go list -json` for the four tag sets and merges the file lists and the module-internal dependencies of each package.
+- **A changed export.** `explanationdocs.IsPlainPath` is now exported, so the proof uses the same plain-path rule as the rebase rebind.
+- **Not wired.** Nothing in production calls the package yet; Q13 and Q14 wire it. The package is protected surface, because its tier decides if an audit runs again (plan D50). It is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`. Design notes: [internal-overlap.md](docs/architecture/packages/internal-overlap.md).
+
 ## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
 
 - **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.

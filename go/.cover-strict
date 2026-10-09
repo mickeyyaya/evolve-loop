@@ -39,3 +39,4 @@
 ./internal/events/filter 100
 ./internal/events/wake 100
 ./test/structure 100
+./internal/overlap 100

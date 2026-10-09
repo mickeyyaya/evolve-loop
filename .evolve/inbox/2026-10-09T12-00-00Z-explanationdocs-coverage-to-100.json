@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "go test -count=1 -tags integration -coverprofile of ./internal/explanationdocs reports 100.0% of statements, and go/.cover-strict lists ./internal/explanationdocs 100",
+    "Each new test drives a real failure (git or filesystem) through the public entry point of the function, and a mutant of each covered branch fails a test"
+  ],
+  "created_at": "2026-10-09T12:00:00Z",
+  "files": [
+    "go/internal/explanationdocs/gitio.go",
+    "go/internal/explanationdocs/rebind.go",
+    "go/internal/explanationdocs/predicate_archive.go",
+    "go/.cover-strict"
+  ],
+  "fix": "Close the coverage gaps of explanationdocs with tests that cause the git and filesystem failures of gitio.go, rebind.go and predicate_archive.go, then register the package at 100 in go/.cover-strict.",
+  "id": "explanationdocs-coverage-to-100",
+  "kind": "test",
+  "priority_class": "maintainability",
+  "source": "console lane cl-lq-q3 (landing queue Q3), 2026-10-09: the lane exported explanationdocs.IsPlainPath and found the package at 80.6%",
+  "summary": "Lane LQ-3 exported explanationdocs.IsPlainPath for the overlap proof (plan Q3). The changed function is at 100%, but the package is at 80.6% (224 of 1153 statements not covered) before the change. The gaps are in about 20 functions, mostly the error returns of git and filesystem calls in gitio.go (currentDiffState 55.3%, requireLandedCommit 62.5%, ArchiveUnpublishedContinuationRecords 69.0%, ensureRealSubdirectories 66.7%, existsAtBase 66.7%, safeManifestPath 72.4%), rebind.go (RebindIdenticalRebase 84.6%, proveIdenticalRebase 78.3%, sameChange 76.5%, lineageHolds 81.8%, isAncestor 85.7%) and predicate_archive.go. The package is on the protected surface (guards/integrity_surface.go:59).",
+  "title": "Bring internal/explanationdocs to 100% coverage and register it in .cover-strict",
+  "weight": 0.4
+}

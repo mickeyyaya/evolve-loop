@@ -716,3 +716,5 @@
 ./internal/events/channel
 # E3 (ADR-0127): the kernel wake of the event channels (internal/events/wake).
 ./internal/events/wake
+# lane LQ-3 (2026-10-09): the overlap proof of the landing queue (internal/overlap, ADR-0128, plan Q3).
+./internal/overlap
