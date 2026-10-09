@@ -254,7 +254,8 @@ var gitLogFn = func(cycleNum string) bool {
 
 // gitLogMatchesCycle reports whether a commit on main mentions "cycle N"; any git error is false.
 func gitLogMatchesCycle(ctx context.Context, g gitexec.Git, cycleNum string) bool {
-	out, err := g.Output(ctx, "log", "--grep=cycle "+cycleNum, "--format=%H", "main")
+	pattern := "cycle " + regexp.QuoteMeta(cycleNum) + "([^0-9]|$)"
+	out, err := g.Output(ctx, "log", "--extended-regexp", "--grep="+pattern, "--format=%H", "main")
 	if err != nil {
 		return false
 	}

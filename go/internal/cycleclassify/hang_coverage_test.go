@@ -8,7 +8,7 @@ import (
 )
 
 func TestClassify_HangClassifier_NoShippedFallthrough(t *testing.T) {
-	t.Setenv("EVOLVE_HANG_CLASSIFIER", "1")
+	setHangClassifierForTest(t, true)
 	prev := gitLogFn
 	defer func() { gitLogFn = prev }()
 	gitLogFn = func(string) bool { return true }
@@ -69,5 +69,8 @@ func TestGitLogFn_ProductionPath(t *testing.T) {
 	}
 	if gitLogFn("999") {
 		t.Fatalf("gitLogFn(999) should not match")
+	}
+	if gitLogFn("4") {
+		t.Fatalf("gitLogFn(4) should not match a cycle 42 commit")
 	}
 }

@@ -22,7 +22,7 @@ func TestGitLogMatchesCycle_Match_ReturnsTrue(t *testing.T) {
 	if keys := fake.CallKeys(); !reflect.DeepEqual(keys, []string{"git log"}) {
 		t.Fatalf("calls = %v, want [git log]", keys)
 	}
-	wantArgs := []string{"log", "--grep=cycle 5", "--format=%H", "main"}
+	wantArgs := []string{"log", "--extended-regexp", "--grep=cycle 5([^0-9]|$)", "--format=%H", "main"}
 	if got := fake.Calls[0].Args; !reflect.DeepEqual(got, wantArgs) {
 		t.Errorf("args = %v, want %v", got, wantArgs)
 	}

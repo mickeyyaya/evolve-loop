@@ -3,6 +3,7 @@ package cycleclassify
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -90,21 +91,13 @@ func TestClassify_EmptyStdoutButEventsTruncated_StaysBreach(t *testing.T) {
 	}
 	// The line must exceed the 1024-byte initial scanner buffer as well as the shrunk cap.
 	if err := os.WriteFile(filepath.Join(ws, "build-events.ndjson"),
-		[]byte(`{"kind":"tool_use","data":{"text":"`+stringRepeat("x", 2000)+`"}}`+"\n"), 0o644); err != nil {
+		[]byte(`{"kind":"tool_use","data":{"text":"`+strings.Repeat("x", 2000)+`"}}`+"\n"), 0o644); err != nil {
 		t.Fatalf("write events: %v", err)
 	}
 	r := Classify(ws)
 	if r.Class != ClassIntegrityBreach {
 		t.Errorf("class=%q, want integrity-breach (truncated scan must NOT trigger false quota-pause)", r.Class)
 	}
-}
-
-func stringRepeat(s string, n int) string {
-	out := make([]byte, 0, len(s)*n)
-	for i := 0; i < n; i++ {
-		out = append(out, s...)
-	}
-	return string(out)
 }
 
 func TestClassify_EmptyOutputNeverBeatsClassifiableMarker(t *testing.T) {

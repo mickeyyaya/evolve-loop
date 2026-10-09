@@ -3,6 +3,7 @@ package cycleclassify
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -23,29 +24,7 @@ func infraEventLine(marker, excerpt string) string {
 func llmCallLine(phase string, exitCode int) string {
 	return "{\"ts\":\"2026-07-10T10:00:00Z\",\"agent\":\"adversarial-review\",\"phase\":\"" + phase +
 		"\",\"cli\":\"claude-tmux\",\"model\":\"deep\",\"attempt\":1,\"source\":\"result\"," +
-		"\"duration_ms\":1000,\"exit_code\":" + itoa(exitCode) + "}\n"
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
+		"\"duration_ms\":1000,\"exit_code\":" + strconv.Itoa(exitCode) + "}\n"
 }
 
 func writeFixture(t *testing.T, files map[string]string) string {
