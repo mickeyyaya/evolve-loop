@@ -11,12 +11,8 @@ import (
 var commandRunners = map[string]bool{"Run": true, "Output": true, "CombinedOutput": true, "Wait": true}
 
 func goRunExitCodeVerdict(n ast.Node, scopes scopeStack) (verdict, bool) {
-	recv, code, ok := exitCodeComparedTo(n)
-	if !ok {
-		return verdict{}, false
-	}
-	result, isGoRun := goRunResultOf(scopes, recv)
-	if !isGoRun || result.reachableExitCode(code) {
+	result, code, ok := goRunExitCodeComparedTo(n, scopes)
+	if !ok || result.reachableExitCode(code) {
 		return verdict{}, false
 	}
 	return verdict{UnsatisfiableKindGoRunExitCode, fmt.Sprintf("go run reports any non-zero exit of the program it runs as 1, so the program's exit code %d never reaches ExitCode(); build the program with go build and run the built binary", code)}, true
@@ -38,17 +34,41 @@ func goRunResultOf(scopes scopeStack, recv ast.Expr) (binding, bool) {
 	return b, b.kind == kindGoRunCommand
 }
 
-func goRunCommand(expr ast.Expr) (binding, bool) {
-	call, ok := expr.(*ast.CallExpr)
-	if !ok {
+func goRunExitCodeOf(scopes scopeStack, expr ast.Expr) (binding, bool) {
+	if b := scopes.valueOf(expr); b.kind == kindGoRunExitCode {
+		return b, true
+	}
+	recv, isExitCode := exitCodeReceiver(expr)
+	if !isExitCode {
 		return binding{}, false
 	}
+	result, isGoRun := goRunResultOf(scopes, recv)
+	return binding{kind: kindGoRunExitCode, goFlagsGiven: result.goFlagsGiven}, isGoRun
+}
+
+func goRunCommand(expr ast.Expr) (binding, bool) {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || isPkgCall(call, "acsassert", "SubprocessOutput") {
+		return binding{}, false
+	}
+	return goRunBinding(call, kindGoRunCommand)
+}
+
+func goRunSubprocessExitCode(expr ast.Expr) (binding, bool) {
+	call, ok := expr.(*ast.CallExpr)
+	if !ok || !isPkgCall(call, "acsassert", "SubprocessOutput") {
+		return binding{}, false
+	}
+	return goRunBinding(call, kindGoRunExitCode)
+}
+
+func goRunBinding(call *ast.CallExpr, kind nameKind) (binding, bool) {
 	argv, _, isExec := execArgv(call, nil)
 	if !isExec || len(argv) < 2 || argv[0] != "go" || argv[1] != "run" {
 		return binding{}, false
 	}
 	goFlagsGiven := len(argv) > 2 && (argv[2] == "" || strings.HasPrefix(argv[2], "-"))
-	return binding{kind: kindGoRunCommand, goFlagsGiven: goFlagsGiven}, true
+	return binding{kind: kind, goFlagsGiven: goFlagsGiven}, true
 }
 
 func ranGoRunCommand(s scopeStack, expr ast.Expr) (binding, bool) {
@@ -103,19 +123,19 @@ func isExitErrorPointer(expr ast.Expr) bool {
 	return ok && pkg.Name == "exec"
 }
 
-func exitCodeComparedTo(n ast.Node) (ast.Expr, int64, bool) {
+func goRunExitCodeComparedTo(n ast.Node, scopes scopeStack) (binding, int64, bool) {
 	bin, ok := n.(*ast.BinaryExpr)
 	if !ok || (bin.Op != token.EQL && bin.Op != token.NEQ) {
-		return nil, 0, false
+		return binding{}, 0, false
 	}
 	for _, pair := range [][2]ast.Expr{{bin.X, bin.Y}, {bin.Y, bin.X}} {
-		recv, isExitCode := exitCodeReceiver(pair[0])
+		result, isGoRun := goRunExitCodeOf(scopes, pair[0])
 		code, isLiteral := intLiteral(pair[1])
-		if isExitCode && isLiteral {
-			return recv, code, true
+		if isGoRun && isLiteral {
+			return result, code, true
 		}
 	}
-	return nil, 0, false
+	return binding{}, 0, false
 }
 
 func exitCodeReceiver(expr ast.Expr) (ast.Expr, bool) {

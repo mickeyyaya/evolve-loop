@@ -334,3 +334,53 @@ func TestLintUnsatisfiablePredicates_GoRunExitCodeRuleSparesReachableCodesAndBui
 		}
 	}
 }
+
+func TestLintUnsatisfiablePredicates_GoRunExitCodeRuleFollowsExitCodeVariables(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"ExitError code copied into a variable compared to 3", "func TestX(t *testing.T) {\n\terr := exec.Command(\"go\", \"run\", \".\").Run()\n\tvar ee *exec.ExitError\n\tif !errors.As(err, &ee) {\n\t\tt.Fatal(err)\n\t}\n\tcode := ee.ExitCode()\n\tif code != 3 {\n\t\tt.Fatalf(\"want 3, got %d\", code)\n\t}\n}\n", true},
+		{"ProcessState code copied into a variable compared to 2", "func TestX(t *testing.T) {\n\tcmd := exec.Command(\"go\", \"run\", \".\")\n\t_ = cmd.Run()\n\tcode := cmd.ProcessState.ExitCode()\n\tif code != 2 {\n\t\tt.Fatal(\"want 2\")\n\t}\n}\n", true},
+		{"var declaration of the ExitError code", "func TestX(t *testing.T) {\n\terr := exec.Command(\"go\", \"run\", \".\").Run()\n\tif ee, ok := err.(*exec.ExitError); ok {\n\t\tvar code = ee.ExitCode()\n\t\tif code == 3 {\n\t\t\treturn\n\t\t}\n\t}\n\tt.Fatal(err)\n}\n", true},
+		{"copied code with the literal on the left", "func TestX(t *testing.T) {\n\tcmd := exec.Command(\"go\", \"run\", \".\")\n\t_ = cmd.Run()\n\tcode := cmd.ProcessState.ExitCode()\n\tif 3 != code {\n\t\tt.Fatal(\"want 3\")\n\t}\n}\n", true},
+		{"SubprocessOutput go run code compared to 3", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \"./cmd/evolve\", \"eval\")\n\tif code != 3 {\n\t\tt.Fatalf(\"want 3, got %d\", code)\n\t}\n}\n", true},
+		{"SubprocessOutput go run code compared to 2 without go flags", "func TestX(t *testing.T) {\n\tstdout, stderr, code, err := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif code != 2 {\n\t\tt.Fatal(stdout, stderr, err)\n\t}\n}\n", true},
+		{"SubprocessOutput go run with go flags compared to 3", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \"-race\", \".\")\n\tif code == 3 {\n\t\treturn\n\t}\n\tt.Fatal(\"want 3\")\n}\n", true},
+		{"SubprocessOutput go run code assigned with =", "func TestX(t *testing.T) {\n\tvar code int\n\t_, _, code, _ = acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif code != 3 {\n\t\tt.Fatal(\"want 3\")\n\t}\n}\n", true},
+		{"copied code compared to 1", "func TestX(t *testing.T) {\n\tcmd := exec.Command(\"go\", \"run\", \".\")\n\t_ = cmd.Run()\n\tcode := cmd.ProcessState.ExitCode()\n\tif code != 1 {\n\t\tt.Fatal(\"want 1\")\n\t}\n}\n", false},
+		{"copied code compared to 0", "func TestX(t *testing.T) {\n\terr := exec.Command(\"go\", \"run\", \".\").Run()\n\tvar ee *exec.ExitError\n\tif errors.As(err, &ee) {\n\t\tcode := ee.ExitCode()\n\t\tif code == 0 {\n\t\t\tt.Fatal(ee)\n\t\t}\n\t}\n}\n", false},
+		{"SubprocessOutput go run code compared to 1", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif code != 1 {\n\t\tt.Fatal(\"want 1\")\n\t}\n}\n", false},
+		{"SubprocessOutput go run code compared to 0", "func TestX(t *testing.T) {\n\t_, _, code, err := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif code != 0 || err != nil {\n\t\tt.Fatal(err)\n\t}\n}\n", false},
+		{"SubprocessOutput go run with go flags compared to 2", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \"-race\", \".\")\n\tif code != 2 {\n\t\tt.Fatal(\"want 2\")\n\t}\n}\n", false},
+		{"copied code with go flags compared to 2", "func TestX(t *testing.T) {\n\tcmd := exec.Command(\"go\", \"run\", \"-race\", \"./prog\")\n\t_ = cmd.Run()\n\tcode := cmd.ProcessState.ExitCode()\n\tif code != 2 {\n\t\tt.Fatal(\"want 2\")\n\t}\n}\n", false},
+		{"SubprocessOutput built binary code compared to 2", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(t.TempDir()+\"/evolve\", \"eval\")\n\tif code != 2 {\n\t\tt.Fatal(\"want 2\")\n\t}\n}\n", false},
+		{"built binary code copied into a variable compared to 2", "func TestX(t *testing.T) {\n\tcmd := exec.Command(t.TempDir()+\"/evolve\", \"eval\")\n\t_ = cmd.Run()\n\tcode := cmd.ProcessState.ExitCode()\n\tif code != 2 {\n\t\tt.Fatal(\"want 2\")\n\t}\n}\n", false},
+		{"built binary ExitError code copied into a variable compared to 3", "func TestX(t *testing.T) {\n\terr := exec.Command(\"./built\").Run()\n\tvar ee *exec.ExitError\n\tif errors.As(err, &ee) {\n\t\tcode := ee.ExitCode()\n\t\tif code != 3 {\n\t\t\tt.Fatal(ee)\n\t\t}\n\t}\n}\n", false},
+		{"SubprocessOutput go vet code is outside the go run rule", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"vet\", \"./prog\")\n\tif code != 2 {\n\t\tt.Fatal(\"want 2\")\n\t}\n}\n", false},
+		{"go run code rebound before the check", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tcode = other()\n\tif code != 3 {\n\t\tt.Fatal(\"want 3\")\n\t}\n}\n", false},
+		{"inner declaration shadows the go run code", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif cond {\n\t\tcode := other()\n\t\tif code != 3 {\n\t\t\tt.Fatal(\"want 3\")\n\t\t}\n\t}\n\t_ = code\n}\n", false},
+		{"closure reading the outer go run code sees an unknown value", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tcheck := func() {\n\t\tif code != 3 {\n\t\t\tt.Fatal(\"want 3\")\n\t\t}\n\t}\n\tcheck()\n}\n", false},
+		{"go run code variable never compared to a literal", "func TestX(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif code != want {\n\t\tt.Fatal(\"mismatch\")\n\t}\n}\n", false},
+		{"go run stdout is not an exit code", "func TestX(t *testing.T) {\n\tcode, _, _, _ := acsassert.SubprocessOutput(\"go\", \"run\", \".\")\n\tif code != \"3\" {\n\t\tt.Fatal(\"want 3\")\n\t}\n}\n", false},
+	}
+	for _, c := range cases {
+		findings := unsatisfiableFindings(t, goRunHeader+c.body)
+		flagged := len(findings) == 1 && findings[0].Kind == UnsatisfiableKindGoRunExitCode
+		if flagged != c.want || (!c.want && len(findings) != 0) {
+			t.Errorf("%s: want flagged=%v, got %+v", c.name, c.want, findings)
+		}
+	}
+}
+
+func TestLintUnsatisfiablePredicates_GoRunExitCodeVariableReasonNamesTheCodeAndRemedy(t *testing.T) {
+	body := "func TestC9_001_CopiedCode(t *testing.T) {\n\t_, _, code, _ := acsassert.SubprocessOutput(\"go\", \"run\", \"./cmd/evolve\")\n\tif code != 3 {\n\t\tt.Fatal(\"want 3\")\n\t}\n}\n"
+	findings := unsatisfiableFindings(t, goRunHeader+body)
+	if len(findings) != 1 || findings[0].Func != "TestC9_001_CopiedCode" {
+		t.Fatalf("want one finding on TestC9_001_CopiedCode, got %+v", findings)
+	}
+	if r := findings[0].Reason; !strings.Contains(r, "exit code 3") || !strings.Contains(r, "go build") {
+		t.Errorf("the reason must name the impossible code and the built-binary remedy: %q", r)
+	}
+}

@@ -14,6 +14,7 @@ const (
 	kindGoRunCommand
 	kindGoRunError
 	kindGoRunExitError
+	kindGoRunExitCode
 )
 
 type binding struct {
@@ -220,6 +221,10 @@ func deriveBindings(s scopeStack, results int, rhs []ast.Expr) []binding {
 	expr := ast.Unparen(rhs[0])
 	if cmd, ok := goRunCommand(expr); ok {
 		derived[0] = cmd
+	} else if code, ok := goRunSubprocessExitCode(expr); ok && results == 4 {
+		derived[2] = code
+	} else if code, ok := goRunExitCodeOf(s, expr); ok {
+		derived[0] = code
 	} else if cmd, ok := ranGoRunCommand(s, expr); ok {
 		derived[results-1] = binding{kind: kindGoRunError, goFlagsGiven: cmd.goFlagsGiven}
 	} else if err, ok := assertedExitError(s, expr); ok {

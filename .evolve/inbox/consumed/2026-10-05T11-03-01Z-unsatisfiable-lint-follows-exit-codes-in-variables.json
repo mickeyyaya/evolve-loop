@@ -4,6 +4,11 @@
     "Reachable codes, and codes from a built binary, stay unflagged",
     "The go/acs corpus test still passes"
   ],
+  "consumed": {
+    "at": "2026-10-09T04:50:14Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-10-05T12:00:00Z",
   "files": [
     "go/internal/evalqualitycheck/unsatisfiable_gorun.go"
