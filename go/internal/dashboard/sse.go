@@ -84,7 +84,6 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
-	// Subscribe before current(): a publish in between is never lost, and seq <= last drops its echo.
 	ch, unsubscribe := s.subscribe()
 	defer unsubscribe()
 	_, last := s.current()

@@ -357,3 +357,92 @@ func TestServer_ServeCancelClosesOpenSSEStream(t *testing.T) {
 		t.Fatal("SSE stream still open after Serve returned")
 	}
 }
+
+func TestServer_SSEStreamOutlivesAnyWriteDeadline(t *testing.T) {
+	t.Parallel()
+	s := New(t.TempDir(), Options{PollInterval: 10 * time.Millisecond, KeepAlive: 20 * time.Millisecond})
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go func() { _ = s.Serve(ctx, ln) }()
+	reqCtx, reqCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer reqCancel()
+	req, _ := http.NewRequestWithContext(reqCtx, "GET", "http://"+ln.Addr().String()+"/events", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	r := bufio.NewReader(resp.Body)
+	start := time.Now()
+	readSSEEvent(t, r, start.Add(3*time.Second))
+	const streamLife = 400 * time.Millisecond
+	pingsLate := 0
+	for time.Since(start) < streamLife || pingsLate == 0 {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			t.Fatalf("SSE stream closed after %v: %v", time.Since(start), err)
+		}
+		if strings.HasPrefix(line, ": ping") && time.Since(start) >= streamLife {
+			pingsLate++
+		}
+	}
+}
+
+func TestServer_SSEFirstSnapshotIDIsNeverRepeated(t *testing.T) {
+	t.Parallel()
+	s := New(t.TempDir(), Options{KeepAlive: 30 * time.Millisecond})
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "GET", ts.URL+"/events", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	r := bufio.NewReader(resp.Body)
+	first := readSSEEvent(t, r, time.Now().Add(3*time.Second))
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			t.Fatalf("sse read: %v", err)
+		}
+		switch {
+		case strings.HasPrefix(line, ": ping"):
+			return
+		case strings.HasPrefix(line, "id: "):
+			t.Fatalf("snapshot id %s sent again after the first id %s", strings.TrimSpace(strings.TrimPrefix(line, "id: ")), first)
+		}
+	}
+}
+
+func TestHandleCycle_BoardLaneStatusWins(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	seedFleetLane(t, root, 1, "build", now)
+	seedFleetLane(t, root, 2, "audit", now)
+	s := New(root, Options{Now: func() time.Time { return now }})
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+	snap, _ := s.current()
+	if snap.Loop.CycleID != 2 {
+		t.Fatalf("precondition: the loop card is lane %d, want lane 2 so lane 1 differs from the fresh read", snap.Loop.CycleID)
+	}
+	if fresh := assignState(CycleSummary{ID: 1}, snap.Loop); fresh.State == StateRunning {
+		t.Fatalf("precondition: the fresh read already says running for lane 1: %+v", fresh)
+	}
+	resp, body := get(t, ts.URL+"/api/cycle/1")
+	var d cycleDetail
+	if resp.StatusCode != 200 || json.Unmarshal([]byte(body), &d) != nil {
+		t.Fatalf("cycle detail: %d %s", resp.StatusCode, body)
+	}
+	if d.Cycle.State != StateRunning || d.Cycle.CurrentPhase != "build" || d.Cycle.StateName != "running · build" {
+		t.Fatalf("detail = %s %q %q, want the board's running · build", d.Cycle.State, d.Cycle.StateName, d.Cycle.CurrentPhase)
+	}
+}

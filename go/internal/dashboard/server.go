@@ -162,7 +162,6 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	s.allowHost(ln.Addr().String())
-	// WriteTimeout stays zero: a server-wide write deadline would kill the SSE stream.
 	srv := &http.Server{
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,

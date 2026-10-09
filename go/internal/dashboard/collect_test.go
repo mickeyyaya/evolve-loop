@@ -122,3 +122,25 @@ func TestCollect_EmptyRootIsQuiet(t *testing.T) {
 		t.Fatalf("empty root: %+v", snap)
 	}
 }
+
+func TestCollect_CapKeepsOnlyNewestWorkspacesAndRunningLanes(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	now := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
+	for i := 2; i <= 5; i++ {
+		if err := os.MkdirAll(core.RunWorkspacePath(root, i), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seedFleetLane(t, root, 1, "build", now)
+	c := newCollector(root)
+	c.maxCycles = 2
+	snap, _ := c.collect(now)
+	var got []int
+	for _, cs := range snap.Cycles {
+		got = append(got, cs.ID)
+	}
+	if len(got) != 3 || got[0] != 5 || got[1] != 4 || got[2] != 1 {
+		t.Fatalf("cycles = %v, want the 2 newest workspaces [5 4] plus running lane 1", got)
+	}
+}
