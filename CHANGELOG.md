@@ -19,6 +19,16 @@ All notable changes to this project will be documented in this file.
 - **The append rules.** A rotation error is `ErrRotate`, not a loss. While a lock call of the process waits, a new append fails at once with `ErrLockPending`.
 - **The read side.** `Read(from)` and the bounded `ReadN(from, maxBytes)` apply the cursor rules of the spec with `retention`, `reset` and `malformed` gaps. `Last` and `End` give the starts of `--since last` and `--since new`. `Segments` and `SegmentOf` serve gc and the reader.
 - Nothing calls the new code yet. Component E10 wires it. Package notes: [internal-events-channel.md](docs/architecture/packages/internal-events-channel.md). Spec: [event-channels.md](docs/architecture/event-channels.md).
+## Added — `internal/events/wake`: the kernel wake of the event channels, unwired (E3, ADR-0127, 2026-10-09)
+
+- **What it is.** A `Waiter` blocks a channel reader until the kernel posts a change, a process exit or an output hangup. It has `Arm(Targets)`, `Wait(ctx, deadline)` and `Close`. Nothing in production calls it yet, and the reader (E5) will use it. Spec: [event-channels.md](docs/architecture/event-channels.md) §7. Notes: [internal-events-wake.md](docs/architecture/packages/internal-events-wake.md).
+- **darwin.** kqueue gives `EVFILT_VNODE` with `EV_CLEAR` on each directory (`NOTE_WRITE`) and file (`NOTE_WRITE`, `NOTE_EXTEND`, `NOTE_DELETE`, `NOTE_RENAME`, `NOTE_ATTRIB`). It also gives `EVFILT_USER` for the cancel, `EVFILT_PROC` with `NOTE_EXIT`, and `EVFILT_WRITE` with `EV_EOF` on the output.
+- **Linux.** Each `Arm` makes one inotify instance in an epoll set. The set also holds a self-pipe for the cancel, a `pidfd` for each pid and the output with `EPOLLHUP|EPOLLERR`. A wake drains the queues, 16 reads at most.
+- **Refusals.** `statfs` accepts `apfs` and `hfs` on darwin, and `ext4`, `xfs`, `btrfs`, `tmpfs` and `overlay` on Linux. Each other filesystem, each other system and each refused kernel watch give `ErrRefused`. No poll fallback exists.
+- **`EINTR`** retries with the time left. A pid that is gone at the arm is an exit on the next `Wait`.
+- **The no-poll guard.** `TestNoPollTimerInTheEventChannelSources` (`go/test/structure/nopoll_guard_test.go`) refuses `time.Sleep`, `time.Tick`, `time.NewTicker`, `time.After` and `time.NewTimer` in the directories of its list (`internal/events` today). The source walker moved from the `sysexec` guard test to `go/test/structure` (`SourceFiles`, `SelectorUses`), and both guards use it.
+- **The wake contract.** `Dirs` wake on changes to the set of entries, and `Files` wake on changes to the content. A content change is an append, a truncation, a delete, a rename away or a replacement. A spurious wake is allowed, and `Hangup` is terminal.
+- **Gates.** The package is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`. `go/test/structure` is now at 100 in `go/.cover-strict` too.
 
 ## Fixed — the skills-drift gate always grades with the worktree's own generator, and the cycle-1840 replay test is green on main again (cycle 1841, 2026-10-09)
 

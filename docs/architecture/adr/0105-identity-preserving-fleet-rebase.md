@@ -1,6 +1,7 @@
 # ADR-0105: Identity-preserving fleet rebase — verdicts follow the change, gates follow the tree
 
 - **Status:** Proposed, 2026-09-26. The operator's direction: "If the audit pass, we should trust the result and mitigate the ship issue and make sure the ship issue can be resolved. The pass audit changes should not be blocked because process issue."
+- **Amended by:** [ADR-0128](0128-landing-queue-tiered-reverification.md) (Proposed, 2026-10-09). A queue lane composes its audited tree, so B1 and the recovery-path rebind and carry retire for queue lanes. B4 accepts two new record methods. Until the queue enforces, the ladder runs the proof for continuation lanes, and it reports a proof that did not run.
 - **Amends:**
   - [ADR-0049](0049-concurrent-multi-cycle-execution.md) S5 ("rebase and re-audit");
   - [recovery-predicate-authority](../recovery-predicate-authority.md), whose principle holds: carried predicate evidence still needs a fresh receipt on the composed tree;

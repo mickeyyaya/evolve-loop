@@ -139,6 +139,9 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/sysexec", Tests: []string{
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
 	}},
+	{Package: "./test/structure", Tests: []string{
+		"TestNoPollTimerInTheEventChannelSources",
+	}},
 }
 
 func ModuleDir(root string) string {
