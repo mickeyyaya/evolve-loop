@@ -16,10 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
-// builtInHours mirrors quotareset's internal fallback (5.4167h ≈ 5h25min). It is
-// recomputed here from the same literal so the assertion is exact, not magic.
-const builtInHours = 5.4167
-
 // refNow is a deterministic clock: 2026-06-20 14:00:00 UTC. Hint times before
 // 14:00 roll to tomorrow; times after stay today.
 func refNow() time.Time { return time.Date(2026, 6, 20, 14, 0, 0, 0, time.UTC) }
@@ -51,13 +47,11 @@ func TestCompute_Source1_ResetAt(t *testing.T) {
 	}{
 		{"valid-rfc3339", valid, "operator-override", valid, time.Date(2026, 6, 21, 9, 0, 0, 0, time.UTC)},
 		{"unparseable-nonempty", "not-a-time", "operator-override", "not-a-time", refNow()},
-		{"empty-falls-through", "", "default", "", time.Time{}},
-		{"whitespace-only-trimmed-falls-through", "   \t ", "default", "", time.Time{}},
+		{"empty-falls-through", "", "unknown", "", time.Time{}},
+		{"whitespace-only-trimmed-falls-through", "   \t ", "unknown", "", time.Time{}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Arrange: no workspace (skip source 2), DefaultHours 0 (built-in) so a
-			// fall-through deterministically lands on Source 3 = "default".
 			r, err := quotareset.Compute("", quotareset.Options{ResetAt: tc.resetAt, Now: fixedClock()})
 			// Act/Assert
 			if err != nil {
@@ -120,11 +114,11 @@ func TestCompute_Source2_HintParsing(t *testing.T) {
 		{"noon-12:00pm", "back at 12:00pm", "parsed", 21, 12, 0},
 		{"midnight-12:00am", "back at 12:00am", "parsed", 21, 0, 0},
 		{"midnight-00:00am", "back at 00:00am", "parsed", 21, 0, 0},
-		{"unparseable-garbage", "garbage no time here", "default", 0, 0, 0},
-		{"out-of-range-99:99am", "resets 99:99am", "default", 0, 0, 0},
-		{"missing-ampm", "resets 8:30", "default", 0, 0, 0},
-		{"empty-hint-file", "", "default", 0, 0, 0},
-		{"truncated-past-32-drops-time", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx8:30pm", "default", 0, 0, 0},
+		{"unparseable-garbage", "garbage no time here", "unknown", 0, 0, 0},
+		{"out-of-range-99:99am", "resets 99:99am", "unknown", 0, 0, 0},
+		{"missing-ampm", "resets 8:30", "unknown", 0, 0, 0},
+		{"empty-hint-file", "", "unknown", 0, 0, 0},
+		{"truncated-past-32-drops-time", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx8:30pm", "unknown", 0, 0, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -143,31 +137,29 @@ func TestCompute_Source2_HintParsing(t *testing.T) {
 }
 
 func TestCompute_Source2_SkippedWhenNoWorkspace(t *testing.T) {
-	// workspace="" means source 2 is never consulted — result must come from source 3.
 	r, _ := quotareset.Compute("", quotareset.Options{Now: fixedClock()})
-	if r.Source != "default" {
-		t.Errorf("Source = %q, want default (source 2 skipped when workspace empty)", r.Source)
+	if r.Source != "unknown" {
+		t.Errorf("Source = %q, want unknown (source 2 skipped when workspace empty)", r.Source)
 	}
 }
 
-// --- Source 3: DefaultHours / HoursFn ----------------------------------------
-
 func TestCompute_Source3_DefaultHours(t *testing.T) {
 	cases := []struct {
-		name      string
-		hours     float64
-		wantHours float64 // expected effective hours added to now
+		name       string
+		hours      float64
+		wantHours  float64
+		wantSource string
 	}{
-		{"zero-uses-builtin", 0, builtInHours},
-		{"positive-used", 3, 3},
-		{"negative-ignored-uses-builtin", -5, builtInHours},
+		{"zero-is-unknown-now", 0, 0, "unknown"},
+		{"positive-used", 3, 3, "default"},
+		{"negative-is-unknown-now", -5, 0, "unknown"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r, _ := quotareset.Compute("", quotareset.Options{DefaultHours: tc.hours, Now: fixedClock()})
 			want := refNow().Add(time.Duration(tc.wantHours * float64(time.Hour)))
-			if r.Source != "default" {
-				t.Fatalf("Source = %q, want default", r.Source)
+			if r.Source != tc.wantSource {
+				t.Fatalf("Source = %q, want %q", r.Source, tc.wantSource)
 			}
 			if !r.WakeAt.Equal(want) {
 				t.Errorf("WakeAt = %v, want %v (hours=%v)", r.WakeAt, want, tc.wantHours)
@@ -176,51 +168,7 @@ func TestCompute_Source3_DefaultHours(t *testing.T) {
 	}
 }
 
-func TestCompute_Source3_HoursFnOverridesDefaultHours(t *testing.T) {
-	cases := []struct {
-		name      string
-		hoursFn   func() float64
-		defHours  float64
-		wantHours float64
-	}{
-		{"hoursfn-beats-defaulthours", func() float64 { return 2 }, 10, 2},
-		{"hoursfn-zero-wakes-now", func() float64 { return 0 }, 10, 0},
-		{"hoursfn-negative-wakes-in-past", func() float64 { return -1 }, 10, -1},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			r, _ := quotareset.Compute("", quotareset.Options{HoursFn: tc.hoursFn, DefaultHours: tc.defHours, Now: fixedClock()})
-			want := refNow().Add(time.Duration(tc.wantHours * float64(time.Hour)))
-			if !r.WakeAt.Equal(want) {
-				t.Errorf("WakeAt = %v, want %v", r.WakeAt, want)
-			}
-			if tc.wantHours < 0 && !r.WakeAt.Before(refNow()) {
-				t.Errorf("negative HoursFn must wake in the past, got %v (now %v)", r.WakeAt, refNow())
-			}
-		})
-	}
-}
-
 // --- Result projection -------------------------------------------------------
-
-// TestCompute_OptionsEnvSeamNotCalled locks the env-agnostic invariant from the
-// consumer side: the legacy Options.Env DI seam is dead, and Compute must never
-// invoke it. A future edit that silently wired env back in through this seam
-// would flip `called` and fail loudly. (Options.Env is a func parameter, not the
-// system environment — control stays entirely on the public API.)
-func TestCompute_OptionsEnvSeamNotCalled(t *testing.T) {
-	called := false
-	r, _ := quotareset.Compute("", quotareset.Options{
-		Now: fixedClock(),
-		Env: func(string) string { called = true; return "leaked" },
-	})
-	if called {
-		t.Error("Compute invoked the dead Options.Env seam — env-agnostic invariant violated")
-	}
-	if r.Source != "default" {
-		t.Errorf("Source = %q, want default", r.Source)
-	}
-}
 
 func TestResult_Format(t *testing.T) {
 	r := quotareset.Result{ISO: "2026-06-21T09:00:00Z", Source: "operator-override"}

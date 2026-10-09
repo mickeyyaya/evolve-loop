@@ -22,9 +22,6 @@ type phaseDispatchResult struct {
 	skills           []string
 }
 
-// dispatchPhaseAttempts owns one worktree fence around the complete CLI/tier
-// fallback chain. It restores the fence before returning any result to
-// reconciliation or classification.
 func (b *BaseRunner) dispatchPhaseAttempts(
 	ctx context.Context,
 	req core.PhaseRequest,
@@ -42,32 +39,27 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 
 	var bres core.BridgeResponse
 	var bridgeErr error
-	var attemptLog, skills []string
+	var attemptLog, skills, walked []string
 	var wall bridgechain.WallKeeper
 	base := b.baseRequest(req, prep, resolved)
-	// The tier is passed as the model; the bridge maps it per CLI, so the runner resolves no model itself.
 	tieredRes := llmroute.DispatchTiered(plan, func(candidateCLI, tier string) (int, error) {
 		i := len(attemptLog)
 		if i > 0 {
-			// attemptLog, not Candidates: under tiering i outgrows Candidates, so indexing it panics on a step-down.
 			log.Diag().Infof(
 				"[runner] phase=%s fallback %d: trying cli=%s tier=%s (previous=%s exit=%d)\n",
 				phase, i+1, candidateCLI, tier, attemptLog[i-1], bres.ExitCode)
 		}
-		// Overlays resolve per attempt because overlay rules key on the tier, which steps down across attempts.
 		skills = overlayPolicy.ResolveOverlays(overlayDispatchFor(req, phase, candidateCLI, tier))
 		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, skills, tier))
 		attempt := base
 		attempt.CLI, attempt.Model, attempt.Skills = candidateCLI, tier, skills
 		bres, bridgeErr = b.bridge.Launch(ctx, attempt)
 		wall.Observe(candidateCLI+"@"+tier, bres, bridgeErr)
-		// Per attempt, so the events file cycleclassify reads describes the last CLI that ran.
 		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s@%s=%d", candidateCLI, tier, bres.ExitCode))
-		// Every candidate, the last included, so a wall is benched even with no fallback left. Staleness counts
-		// from the run start: the guard excludes other phases' leftovers, not this run's earlier attempts.
+		walked = append(walked, candidateCLI)
 		if bridgeErr != nil && bres.ExitCode == 85 {
 			b.maybeBenchOnEscalation(bridgechain.Escalation{ProjectRoot: req.ProjectRoot, Workspace: req.Workspace, CLI: candidateCLI, DispatchStart: start, Env: req.Env})
 		}
@@ -76,12 +68,13 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		log.Diag().Infof("[runner] phase=%s tier step-down: %s → %s (CLI chain exhausted at quota)\n", phase, from, to)
 	})
 	if wall.Surfaces(tieredRes, bres) {
-		log.Diag().Infof("[runner] phase=%s dispatch chain exhausted after a quota wall: surfacing the wall over the last rung's exit %d, so the cycle defers\n", phase, bres.ExitCode)
 		bres, bridgeErr = wall.Surface(tieredRes, bres, bridgeErr)
+		log.Diag().Infof("[runner] phase=%s dispatch chain exhausted after a quota wall: surfacing exit %d: %v\n", phase, bres.ExitCode, bridgeErr)
 	}
 	if unlaunched := bridgechain.Unlaunched(tieredRes, plan); unlaunched != nil {
 		bridgeErr = unlaunched
 	}
+	bridgeErr = withWalk(bridgeErr, walked)
 	resolvedModel := terminalTier(tieredRes, model)
 	if len(attemptLog) > 1 {
 		log.Diag().Infof("[runner] phase=%s dispatch chain: %s\n", phase, joinAttempts(attemptLog))
@@ -156,4 +149,11 @@ func FormatSkillOverlayLog(phase string, skills []string, tier string) string {
 	return "[runner] phase=" + phase +
 		" skill-overlays=[" + strings.Join(skills, ",") + "]" +
 		" (tier=" + tier + ")"
+}
+
+func withWalk(err error, walked []string) error {
+	if err == nil || len(walked) == 0 {
+		return err
+	}
+	return core.WalkError{CLIs: walked, Err: err}
 }

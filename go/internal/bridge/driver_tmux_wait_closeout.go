@@ -2,16 +2,12 @@ package bridge
 
 import "fmt"
 
-// closeout owns the ordered terminal effects for a completion wait. It does no
-// polling or pane capture; the coordinator has already selected its terminal
-// state before calling it.
 func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 	if state.completed {
 		return state.result, ExitOK
 	}
 
-	fmt.Fprintf(w.deps.Stderr, "%s FAIL: completion never signalled (artifact %s; stop-review paused after %d interval(s) of %ds)\n",
-		w.prefix, w.cfg.Artifact, state.attempt+1, state.intervalS)
+	fmt.Fprintf(w.deps.Stderr, "%s FAIL: completion never signalled (artifact %s; %s)\n", w.prefix, w.cfg.Artifact, waitEndOf(state))
 	fmt.Fprintf(w.deps.Stderr, "%s diagnostic: files present under workspace %s:\n", w.prefix, w.cfg.Workspace)
 	for _, line := range listWorkspaceFiles(w.cfg.Workspace) {
 		fmt.Fprintf(w.deps.Stderr, "%s   %s\n", w.prefix, line)
@@ -30,4 +26,11 @@ func (w replWaiter) closeout(state *replWaitState) (replWaitResult, int) {
 		w.deps.Sleep(transientRedispatchDelay)
 	}
 	return state.result, ExitArtifactTimeout
+}
+
+func waitEndOf(state *replWaitState) string {
+	if state.paneLost {
+		return "the pane was lost"
+	}
+	return fmt.Sprintf("stop-review paused after %d interval(s) of %ds", state.attempt+1, state.intervalS)
 }

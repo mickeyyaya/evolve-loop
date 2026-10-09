@@ -50,7 +50,6 @@ func TestCompute_ParsedHint_FutureToday(t *testing.T) {
 	}
 	// 14:00 → 20:30 same day
 	r, err := Compute(dir, Options{
-		Env: func(_ string) string { return "" },
 		Now: func() time.Time { return refNow },
 	})
 	if err != nil {
@@ -75,7 +74,6 @@ func TestCompute_ParsedHint_RollsToTomorrow(t *testing.T) {
 	}
 	// 14:00 → next 05:20 is tomorrow
 	r, err := Compute(dir, Options{
-		Env: func(_ string) string { return "" },
 		Now: func() time.Time { return refNow },
 	})
 	if err != nil {
@@ -128,8 +126,8 @@ func TestCompute_HintMalformed_FallsThrough(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	r, err := Compute(dir, Options{
-		Now:     func() time.Time { return refNow },
-		HoursFn: func() float64 { return 5.0 },
+		Now:          func() time.Time { return refNow },
+		DefaultHours: 5.0,
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
@@ -141,9 +139,8 @@ func TestCompute_HintMalformed_FallsThrough(t *testing.T) {
 
 func TestCompute_DefaultFallback(t *testing.T) {
 	r, err := Compute("", Options{
-		Env:     func(_ string) string { return "" },
-		Now:     func() time.Time { return refNow },
-		HoursFn: func() float64 { return 5.4167 },
+		Now:          func() time.Time { return refNow },
+		DefaultHours: 5.4167,
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
@@ -218,8 +215,7 @@ func TestCompute_DefaultClockUsedWhenNowNil(t *testing.T) {
 	// avoid coupling to the wall clock.
 	before := time.Now()
 	r, err := Compute("", Options{
-		Env:     func(string) string { return "" },
-		HoursFn: func() float64 { return 1.0 },
+		DefaultHours: 1.0,
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
@@ -264,8 +260,8 @@ func TestCompute_EmptyHintFile(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 	r, err := Compute(dir, Options{
-		Now:     func() time.Time { return refNow },
-		HoursFn: func() float64 { return 5.0 },
+		Now:          func() time.Time { return refNow },
+		DefaultHours: 5.0,
 	})
 	if err != nil {
 		t.Fatalf("Compute: %v", err)

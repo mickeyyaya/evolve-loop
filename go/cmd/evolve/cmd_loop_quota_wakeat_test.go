@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
@@ -30,7 +31,10 @@ func TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource(t *testing.T) {
 	}
 
 	now := time.Date(2026, 7, 30, 9, 0, 0, 0, time.Local)
-	cs := core.CycleState{CycleID: 656, Phase: "build", WorkspacePath: workspace}
+	if _, err := clihealth.NewStore(projectRoot, func() time.Time { return now }).BenchWallUntil("claude", clihealth.Wall{Pattern: "exhausted", Reset: now.Add(3 * time.Hour)}); err != nil {
+		t.Fatalf("bench a walled family: %v", err)
+	}
+	cs := core.CycleState{CycleID: 656, Phase: "build", WorkspacePath: workspace, QuotaWalkCLIs: []string{"claude-tmux"}}
 	if err := core.QuotaBoundaryCheckpointer(cs, projectRoot, now); err != nil {
 		t.Fatalf("quota-boundary checkpointer: %v", err)
 	}
@@ -42,8 +46,8 @@ func TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource(t *testing.T) {
 	if qp.WakeAt == "" {
 		t.Error("wake-at is EMPTY — `QUOTA-PAUSE: … wake-at=` gives the resume scheduler nothing to parse (the defect)")
 	}
-	if qp.Source == "" || qp.Source == "unknown" {
-		t.Errorf("source = %q, want the estimator's named source", qp.Source)
+	if qp.Source != "bench" {
+		t.Errorf("source = %q, want bench: the walled family's reset is the estimator's named source", qp.Source)
 	}
 	if qp.Cycle != 656 {
 		t.Errorf("cycle = %d, want 656", qp.Cycle)

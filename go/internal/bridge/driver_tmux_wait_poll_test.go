@@ -418,3 +418,50 @@ func TestRunTmuxREPL_CancelledCompletionPrecedesTickEffects(t *testing.T) {
 			tmux.sentSeq, wallProbes, reviewer.events)
 	}
 }
+
+func TestRunTmuxREPL_ACancelDuringADetectorFaultReportsTheFaultBeforeAbandoningTheWait(t *testing.T) {
+	fx := newFixture(t, "claude-tmux", "")
+	blocked := filepath.Join(fx.ws, "blocked")
+	fx.artifact = filepath.Join(blocked, "artifact.md")
+	fallback := filepath.Join(fx.ws, "workspace", filepath.Base(fx.artifact))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	breakTheCanonicalParentAndCancel := func(d time.Duration) {
+		if d != artifactWaitInterval || ctx.Err() != nil {
+			return
+		}
+		mustReplaceDirWithFile(t, blocked)
+		if err := os.MkdirAll(filepath.Dir(fallback), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(fallback, []byte("deliverable at fallback"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		cancel()
+	}
+	eng := newTestEngine(Deps{
+		Tmux:             &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
+		Sleep:            breakTheCanonicalParentAndCancel,
+		ArtifactTimeoutS: 1200,
+		CaptureBaseline:  zeroBaselineCapture,
+	})
+	var stdout, stderr bytes.Buffer
+
+	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--agent=build"), nil, &stdout, &stderr)
+
+	out := stderr.String()
+	warn, abandon := strings.Index(out, "WARN: completion detector:"), strings.Index(out, "abandoning completion wait")
+	if code != ExitArtifactTimeout || warn < 0 || abandon < warn {
+		t.Fatalf("exit=%d, want %d with the detector fault reported before the abandon line; stderr:\n%s", code, ExitArtifactTimeout, out)
+	}
+}
+
+func mustReplaceDirWithFile(t *testing.T, path string) {
+	t.Helper()
+	if err := os.RemoveAll(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("not a directory"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}

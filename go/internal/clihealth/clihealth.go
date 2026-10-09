@@ -70,6 +70,16 @@ func Benchable(pattern string) bool {
 
 const QuotaExhaustedPattern = "quota_exhausted"
 
+const UsageProbePattern = "usage_probe"
+
+func QuotaPattern(pattern string) bool {
+	switch pattern {
+	case "rate_limit", ExhaustedPattern, QuotaExhaustedPattern, UsageProbePattern:
+		return true
+	}
+	return false
+}
+
 // CredentialPattern is the classifier pattern of a login prompt ("Please log in", "Login expired"): a wall
 // only the operator clears, so the family is benched until a canary probe succeeds after the login.
 const CredentialPattern = "auth_recheck"
