@@ -7,6 +7,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/bridge/panestream` | reads tmux pane snapshots of an interactive LLM REPL | [internal-bridge-panestream.md](internal-bridge-panestream.md) |
 | `internal/bridge/phaseidentity` | the identity statement a tmux driver appends to the pasted prompt | [internal-bridge-phaseidentity.md](internal-bridge-phaseidentity.md) |
 | `internal/config` | resolves the routing configuration once, at the composition root | [internal-config.md](internal-config.md) |
+| `internal/events/filter` | the one filter grammar of the event channels: the terms, the matcher, the channel selectors and the vocabulary (ADR-0127, E4) | [internal-events-filter.md](internal-events-filter.md) |
 | `internal/evalgate` | the verified checks that replace prose contracts between phases | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/fleet` | plans and runs concurrent, file-disjoint cycle lanes | [internal-fleet.md](internal-fleet.md) |
 | `internal/guards` | the in-process trust kernel: the six guards `evolve guard` runs | [internal-guards.md](internal-guards.md) |

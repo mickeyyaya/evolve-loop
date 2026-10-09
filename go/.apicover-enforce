@@ -709,3 +709,6 @@
 
 # lane H2 (2026-10-08): the one kill path for dispatch processes (internal/proctree).
 ./internal/proctree
+
+# lane E4 (2026-10-09): the one filter grammar of the event channels (internal/events/filter).
+./internal/events/filter
