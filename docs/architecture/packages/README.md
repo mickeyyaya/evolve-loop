@@ -28,6 +28,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/policy` | loads `.evolve/policy.json` into resolved configuration | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | loads the agent profiles in `.evolve/profiles/` | [internal-profiles.md](internal-profiles.md) |
 | `internal/prompts` | loads agent personas and skill docs | [internal-prompts.md](internal-prompts.md) |
+| `internal/quotareset` | computes the wake-up time of a quota pause from the best evidence it has: override, hint, bench, configured hours or unknown | [internal-quotareset.md](internal-quotareset.md) |
 | `internal/recovery` | the decisions of the Phase Recovery Pipeline | [internal-recovery.md](internal-recovery.md) |
 | `internal/router` | the deterministic phase-routing kernel | [internal-router.md](internal-router.md) |
 | `internal/subagent` | dispatches one subagent invocation: profile, token, bridge launch, verify, ledger | [internal-subagent.md](internal-subagent.md) |

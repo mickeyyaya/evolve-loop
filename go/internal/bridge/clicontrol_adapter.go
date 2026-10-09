@@ -26,11 +26,9 @@ func NewController(cfg *Config, deps Deps) clicontrol.Controller {
 	return c
 }
 
-// perFamilyConfig clones the template for one CLI and realizes its launch flags, carrying the bypass posture.
 func (c *cliController) perFamilyConfig(cli string) *Config {
 	out := *c.cfg
 	out.CLI = cli
-	// Copy the slices so concurrent per-family configs never share a backing array.
 	out.AllowedTools = append([]string(nil), c.cfg.AllowedTools...)
 	out.ExtraFlags = append([]string(nil), c.cfg.ExtraFlags...)
 	intent := LaunchIntent{Effort: LaunchEffort(cli, c.cfg.Model, c.deps.Efforts)}
@@ -38,6 +36,7 @@ func (c *cliController) perFamilyConfig(cli string) *Config {
 		intent.Permission = "bypass"
 	}
 	out.Realization = RealizeFor(cli, intent)
+	applyScratchCwd(&out)
 	return &out
 }
 

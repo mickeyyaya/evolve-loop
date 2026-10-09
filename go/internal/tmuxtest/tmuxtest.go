@@ -27,20 +27,20 @@ func Main(m interface{ Run() int }) int {
 	if _, err := exec.LookPath("tmux"); err != nil {
 		return m.Run()
 	}
-	if err := startOwnServer(socket); err != nil {
+	if err := StartServer(socket); err != nil {
 		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
 		return 1
 	}
 	code := m.Run()
-	if err := stopServer(socket); err != nil {
+	if err := StopServer(socket); err != nil {
 		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
 		return max(code, 1)
 	}
 	return code
 }
 
-func startOwnServer(socket string) error {
-	if err := stopServer(socket); err != nil {
+func StartServer(socket string) error {
+	if err := StopServer(socket); err != nil {
 		return err
 	}
 	out, err := sysexec.Command(context.Background(), "tmux", bridge.TmuxSocketArgs(
@@ -55,7 +55,7 @@ func startOwnServer(socket string) error {
 	return nil
 }
 
-func stopServer(socket string) error {
+func StopServer(socket string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), serverStopTimeout)
 	defer cancel()
 	return swarm.ExecKillServer(ctx, socket)

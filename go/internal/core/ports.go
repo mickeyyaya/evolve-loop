@@ -323,7 +323,8 @@ type BridgeResponse struct {
 	// new-session to the REPL prompt marker appearing — pure dispatch overhead
 	// paid before the prompt is delivered. 0 when no cold boot happened (a
 	// resumed/warm named session, or a headless driver).
-	BootMS int64 `json:"boot_ms,omitempty"`
+	BootMS         int64 `json:"boot_ms,omitempty"`
+	UsageExhausted bool  `json:"usage_exhausted,omitempty"`
 }
 
 // BridgeProbe is what bridge reports about its environment + CLIs.
