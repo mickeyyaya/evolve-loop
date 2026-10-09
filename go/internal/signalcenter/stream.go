@@ -16,15 +16,41 @@ type StreamChunk struct {
 	Skipped int
 }
 
+type LineChunk struct {
+	Lines [][]byte
+	Start int64
+	Next  int64
+}
+
+func ReadLines(path string, from int64) (LineChunk, error) {
+	chunk, err := splitLines(path, from)
+	if err != nil {
+		return LineChunk{Start: from, Next: from}, fmt.Errorf("signalcenter: read lines %s: %w", path, err)
+	}
+	return chunk, nil
+}
+
 func ReadStream(path string, from int64) (StreamChunk, error) {
-	data, start, err := readStreamFrom(path, from)
+	lines, err := splitLines(path, from)
 	if err != nil {
 		return StreamChunk{Next: from}, fmt.Errorf("signalcenter: read stream %s: %w", path, err)
 	}
-	end := bytes.LastIndexByte(data, '\n') + 1
-	chunk := StreamChunk{Next: start + int64(end)}
-	for _, line := range bytes.Split(data[:end], []byte{'\n'}) {
+	chunk := StreamChunk{Next: lines.Next}
+	for _, line := range lines.Lines {
 		chunk.add(line)
+	}
+	return chunk, nil
+}
+
+func splitLines(path string, from int64) (LineChunk, error) {
+	data, start, err := readStreamFrom(path, from)
+	if err != nil {
+		return LineChunk{}, err
+	}
+	end := bytes.LastIndexByte(data, '\n') + 1
+	chunk := LineChunk{Start: start, Next: start + int64(end)}
+	if end > 0 {
+		chunk.Lines = bytes.Split(data[:end-1], []byte{'\n'})
 	}
 	return chunk, nil
 }
