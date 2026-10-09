@@ -1,6 +1,7 @@
 package phasecoherence
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,8 +17,8 @@ func TestProvenanceGate_MissingHeader_ReturnsViolation(t *testing.T) {
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %+v", len(violations), violations)
 	}
-	if violations[0].Severity != "WARN" {
-		t.Errorf("expected Severity WARN, got %q", violations[0].Severity)
+	if violations[0].Severity != SeverityWarn {
+		t.Errorf("expected Severity %s, got %q", SeverityWarn, violations[0].Severity)
 	}
 	if violations[0].Kind != "missing-provenance" {
 		t.Errorf("expected Kind missing-provenance, got %q", violations[0].Kind)
@@ -54,8 +55,8 @@ func TestProvenanceGate_TamperedPhase_ReturnsViolation(t *testing.T) {
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %+v", len(violations), violations)
 	}
-	if violations[0].Severity != "error" {
-		t.Errorf("expected Severity error, got %q", violations[0].Severity)
+	if violations[0].Severity != SeverityError {
+		t.Errorf("expected Severity %s, got %q", SeverityError, violations[0].Severity)
 	}
 	if violations[0].Kind != "provenance-mismatch" {
 		t.Errorf("expected Kind provenance-mismatch, got %q", violations[0].Kind)
@@ -76,8 +77,8 @@ func TestProvenanceGate_WrongCycle_ReturnsViolation(t *testing.T) {
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d: %+v", len(violations), violations)
 	}
-	if violations[0].Severity != "error" {
-		t.Errorf("expected Severity error, got %q", violations[0].Severity)
+	if violations[0].Severity != SeverityError {
+		t.Errorf("expected Severity %s, got %q", SeverityError, violations[0].Severity)
 	}
 	if violations[0].Kind != "provenance-mismatch" {
 		t.Errorf("expected Kind provenance-mismatch, got %q", violations[0].Kind)
@@ -116,8 +117,8 @@ func TestProvenanceGate_LedgerCrossCheck(t *testing.T) {
 	if len(violations2) != 1 {
 		t.Fatalf("expected 1 violation for bad tree_sha, got %d: %+v", len(violations2), violations2)
 	}
-	if violations2[0].Severity != "error" {
-		t.Errorf("expected Severity error, got %q", violations2[0].Severity)
+	if violations2[0].Severity != SeverityError {
+		t.Errorf("expected Severity %s, got %q", SeverityError, violations2[0].Severity)
 	}
 	if violations2[0].Kind != "provenance-mismatch" {
 		t.Errorf("expected Kind provenance-mismatch, got %q", violations2[0].Kind)
@@ -145,8 +146,8 @@ func TestCheckProvenance_LedgerReadFailuresAreErrors(t *testing.T) {
 				t.Fatal(err)
 			}
 		}},
-		{"line past the scanner limit", func(t *testing.T, ledgerPath string) {
-			body := `{"cycle":1,"note":"` + strings.Repeat("x", 128<<10) + `"}` + "\n" +
+		{"line past the ledger line limit", func(t *testing.T, ledgerPath string) {
+			body := `{"cycle":1,"note":"` + strings.Repeat("x", maxLedgerLineBytes) + `"}` + "\n" +
 				`{"cycle":241,"role":"builder","tree_state_sha":"latersha"}` + "\n"
 			if err := os.WriteFile(ledgerPath, []byte(body), 0o644); err != nil {
 				t.Fatal(err)
@@ -174,5 +175,57 @@ func TestCheckProvenance_AbsentLedgerIsNotAnError(t *testing.T) {
 	artifact := "<!-- evolve:provenance phase=build cycle=241 tree_sha=goodsha inputs_digest=d -->\n# Report"
 	if got := mustCheckProvenance(t, artifact, ProvenanceFields{Phase: "build", Cycle: 241}); len(got) != 0 {
 		t.Errorf("violations = %+v, want none without a ledger", got)
+	}
+}
+
+func TestCheckProvenance_LedgerScanReportsMalformedAndOversizeLines(t *testing.T) {
+	artifact := "<!-- evolve:provenance phase=build cycle=241 tree_sha=goodsha inputs_digest=d -->\n# Report"
+	oversize := `{"cycle":1,"note":"` + strings.Repeat("x", 128<<10) + `"}`
+	entry := `{"cycle":241,"role":"Build","tree_state_sha":"latersha"}`
+	cases := []struct {
+		name          string
+		lines         []string
+		wantMalformed int
+		wantMismatch  bool
+	}{
+		{"oversize line then entry", []string{oversize, entry}, 0, true},
+		{"blank lines are not malformed", []string{"", "  ", entry}, 0, true},
+		{"two malformed lines yield one count", []string{"{bad", "nope", entry}, 2, true},
+		{"malformed only", []string{"{bad"}, 1, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := hermeticEnv(t)
+			ledgerPath := filepath.Join(root, ".evolve", "ledger.jsonl")
+			if err := os.MkdirAll(filepath.Dir(ledgerPath), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(ledgerPath, []byte(strings.Join(tc.lines, "\n")+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			violations := mustCheckProvenance(t, artifact, ProvenanceFields{Phase: "build", Cycle: 241})
+			var malformed []Violation
+			mismatch := false
+			for _, v := range violations {
+				switch v.Kind {
+				case "malformed-ledger":
+					malformed = append(malformed, v)
+				case "provenance-mismatch":
+					mismatch = true
+				}
+			}
+			if tc.wantMalformed == 0 && len(malformed) != 0 {
+				t.Errorf("malformed violations = %+v, want none", malformed)
+			}
+			if tc.wantMalformed > 0 {
+				if len(malformed) != 1 || malformed[0].Severity != SeverityWarn ||
+					!strings.Contains(malformed[0].Message, fmt.Sprintf("%d malformed line", tc.wantMalformed)) {
+					t.Errorf("malformed violations = %+v, want one %s naming %d line(s)", malformed, SeverityWarn, tc.wantMalformed)
+				}
+			}
+			if mismatch != tc.wantMismatch {
+				t.Errorf("ledger mismatch = %v, want %v: %+v", mismatch, tc.wantMismatch, violations)
+			}
+		})
 	}
 }

@@ -57,7 +57,7 @@ func phasesCheckProvenance(c phasesCall) int {
 		return provenanceExitUnreadable
 	}
 	for _, v := range report.Violations {
-		if v.Severity == "error" {
+		if v.Severity == phasecoherence.SeverityError {
 			return provenanceExitViolation
 		}
 	}

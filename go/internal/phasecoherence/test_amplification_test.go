@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-func TestAmplification_CanonicalRoleCaseVariantsUseDefaultLowercase(t *testing.T) {
+func TestAmplification_CanonicalRoleCaseVariantsMapToTheAlias(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
 		want string
 	}{
-		{name: "capital scout is not exact scout arm", in: "Scout", want: "scout"},
-		{name: "upper build is not exact build arm", in: "BUILD", want: "build"},
-		{name: "capital auditor is not exact auditor arm", in: "Auditor", want: "auditor"},
-		{name: "upper memo is not exact memo arm", in: "MEMO", want: "memo"},
+		{name: "capital scout folds to scout", in: "Scout", want: "scout"},
+		{name: "upper build folds to the builder alias", in: "BUILD", want: "builder"},
+		{name: "capital auditor folds to auditor", in: "Auditor", want: "auditor"},
+		{name: "upper memo folds to memo", in: "MEMO", want: "memo"},
 	}
 
 	for _, tt := range tests {

@@ -15,9 +15,14 @@ import (
 type Violation struct {
 	Persona  string // base name without the evolve- prefix, e.g. "builder"; empty for provenance findings
 	Kind     string // "unpaired" | "disallowed" | "undeclared" | "mismatch" | "missing-provenance" | "provenance-mismatch"
-	Severity string // "WARN" for persona drift and a missing header; "error" for a provenance mismatch
+	Severity string
 	Message  string // persona drift uses the eval vocabulary: contradiction|mismatch|disallowed|undeclared
 }
+
+const (
+	SeverityWarn  = "WARN"
+	SeverityError = "ERROR"
+)
 
 // Options names the persona and profile roots a check reads.
 type Options struct {
@@ -29,54 +34,73 @@ type Options struct {
 // Check reports each evolve-<name>.md persona that lacks a profile or whose tools disagree
 // with the profile's allowed_tools; it errors only on configuration or I/O failure.
 func Check(opts Options) ([]Violation, error) {
+	var violations []Violation
+	err := walkPersonas(opts, personaVisitor{
+		unpaired: func(name string) {
+			violations = append(violations, unpairedViolations(opts, name)...)
+		},
+		paired: func(name string, profile profiles.Profile) error {
+			vs, err := checkPersonaTools(opts, name, profile)
+			violations = append(violations, vs...)
+			return err
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return violations, nil
+}
+
+type personaVisitor struct {
+	unpaired func(name string)
+	paired   func(name string, profile profiles.Profile) error
+}
+
+func walkPersonas(opts Options, visit personaVisitor) error {
 	if opts.AgentsFS == nil {
-		return nil, errors.New("missing AgentsFS")
+		return errors.New("missing AgentsFS")
 	}
 	if opts.ProfilesFS == nil {
-		return nil, errors.New("missing ProfilesFS")
+		return errors.New("missing ProfilesFS")
 	}
 
 	entries, err := fs.ReadDir(opts.AgentsFS, "agents")
 	if err != nil {
-		return nil, fmt.Errorf("read agents: %w", err)
+		return fmt.Errorf("read agents: %w", err)
 	}
 
 	loader := profiles.NewFromFS(opts.ProfilesFS)
-	var violations []Violation
-
 	for _, entry := range entries {
-		vs, err := checkPersonaEntry(opts, loader, entry)
-		if err != nil {
-			return nil, err
+		name, ok := personaName(entry)
+		if !ok {
+			continue
 		}
-		violations = append(violations, vs...)
+		profile, err := loader.Get(name)
+		if errors.Is(err, fs.ErrNotExist) {
+			if visit.unpaired != nil {
+				visit.unpaired(name)
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := visit.paired(name, profile); err != nil {
+			return err
+		}
 	}
-
-	return violations, nil
+	return nil
 }
 
-func checkPersonaEntry(opts Options, loader *profiles.Loader, entry fs.DirEntry) ([]Violation, error) {
-	if entry.IsDir() {
-		return nil, nil
-	}
+func personaName(entry fs.DirEntry) (string, bool) {
 	n := entry.Name()
-	if !strings.HasSuffix(n, ".md") || !strings.HasPrefix(n, "evolve-") {
-		return nil, nil
+	if entry.IsDir() || !strings.HasSuffix(n, ".md") || !strings.HasPrefix(n, "evolve-") {
+		return "", false
 	}
-	name := strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-")
+	return strings.TrimPrefix(strings.TrimSuffix(n, ".md"), "evolve-"), true
+}
 
-	profile, err := loader.Get(name)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return unpairedViolations(opts, name), nil
-		}
-		return nil, err
-	}
-
-	if len(profile.AllowedTools) == 0 {
-		return nil, nil
-	}
-
+func personaFrontmatter(opts Options, name string) (map[string]any, error) {
 	persona, err := personaContents(opts, name)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) && opts.Overrides[name] == "" {
@@ -84,25 +108,22 @@ func checkPersonaEntry(opts Options, loader *profiles.Loader, entry fs.DirEntry)
 		}
 		return nil, err
 	}
-
 	fm, _, err := prompts.ParseFrontmatter(persona)
-	if err != nil {
+	return fm, err
+}
+
+func checkPersonaTools(opts Options, name string, profile profiles.Profile) ([]Violation, error) {
+	if len(profile.AllowedTools) == 0 {
+		return nil, nil
+	}
+	fm, err := personaFrontmatter(opts, name)
+	if err != nil || fm == nil {
 		return nil, err
 	}
-	if fm == nil {
-		return nil, nil
-	}
-
-	toolsVal, ok := fm["tools"]
+	toolsSlice, ok := fm["tools"].([]string)
 	if !ok {
 		return nil, nil
 	}
-
-	toolsSlice, ok := toolsVal.([]string)
-	if !ok {
-		return nil, nil
-	}
-
 	return checkToolsCoherence(name, toolsSlice, profile.AllowedTools), nil
 }
 
@@ -113,7 +134,7 @@ func unpairedViolations(opts Options, name string) []Violation {
 	return []Violation{{
 		Persona:  name,
 		Kind:     "unpaired",
-		Severity: "WARN",
+		Severity: SeverityWarn,
 		Message:  "mismatch: persona agents/evolve-" + name + ".md has no profile .evolve/profiles/" + name + ".json — undispatchable (dies exit=10 at launch if routed)",
 	}}
 }
@@ -169,7 +190,7 @@ func checkToolsCoherence(name string, personaTools, allowedTools []string) []Vio
 			vs = append(vs, Violation{
 				Persona:  name,
 				Kind:     "disallowed",
-				Severity: "WARN",
+				Severity: SeverityWarn,
 				Message:  fmt.Sprintf("contradiction: tool %q is disallowed by profile", pt),
 			})
 		}
@@ -183,7 +204,7 @@ func checkToolsCoherence(name string, personaTools, allowedTools []string) []Vio
 			vs = append(vs, Violation{
 				Persona:  name,
 				Kind:     "undeclared",
-				Severity: "WARN",
+				Severity: SeverityWarn,
 				Message:  fmt.Sprintf("mismatch: allowed tool %q is undeclared in persona", at),
 			})
 		}

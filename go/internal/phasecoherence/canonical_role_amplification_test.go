@@ -2,12 +2,12 @@ package phasecoherence
 
 import "testing"
 
-func TestCanonicalRoleNormalizesKnownAliasesAndUnknowns(t *testing.T) {
+func TestCanonicalRoleFoldsCaseBeforeAliasLookup(t *testing.T) {
 	tests := map[string]string{
-		"Build":       "build",
-		"BUILD":       "build",
-		"Audit":       "audit",
-		"AUDIT":       "audit",
+		"Build":       "builder",
+		"BUILD":       "builder",
+		"Audit":       "auditor",
+		"AUDIT":       "auditor",
 		"Scout":       "scout",
 		"SHIP":        "ship",
 		"CustomPhase": "customphase",

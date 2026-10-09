@@ -69,8 +69,8 @@ func TestCheckProvenance_TreeSHAMismatchOnly_NoLedger(t *testing.T) {
 		t.Fatalf("expected exactly 1 violation, got %d: %+v", len(violations), violations)
 	}
 	v := violations[0]
-	if v.Severity != "error" {
-		t.Errorf("expected Severity error, got %q", v.Severity)
+	if v.Severity != SeverityError {
+		t.Errorf("expected Severity %s, got %q", SeverityError, v.Severity)
 	}
 	if v.Kind != "provenance-mismatch" {
 		t.Errorf("expected Kind provenance-mismatch, got %q", v.Kind)
