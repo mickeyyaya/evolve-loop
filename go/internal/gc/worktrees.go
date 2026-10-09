@@ -285,7 +285,7 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 }
 
 func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) WorktreeItem {
-	if age, ok := o.finishedFor(path); ok && o.Policy.SalvageAfterHours > 0 && age >= time.Duration(o.Policy.SalvageAfterHours)*time.Hour {
+	if age, ok := o.finishedFor(path); ok && o.pastSalvageAge(age) {
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove,
 			Reason: fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour))}
 	}
@@ -293,6 +293,10 @@ func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) Worktre
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
 	}
 	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"}
+}
+
+func (o WorktreeOptions) pastSalvageAge(age time.Duration) bool {
+	return o.Policy.SalvageAfterHours > 0 && age >= time.Duration(o.Policy.SalvageAfterHours)*time.Hour
 }
 
 func (o WorktreeOptions) finishedFor(path string) (time.Duration, bool) {

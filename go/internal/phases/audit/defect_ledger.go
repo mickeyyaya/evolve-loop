@@ -156,43 +156,25 @@ func splitEvidence(evidence string) []string {
 }
 
 func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) {
-	path := strings.TrimSpace(citation)
-	if path == "" {
+	trimmed := strings.TrimSpace(citation)
+	if trimmed == "" {
 		return false, "no evidence"
 	}
-	if strings.HasSuffix(path, ")") {
-		if i := strings.LastIndex(path, " ("); i > 0 {
-			path = strings.TrimSpace(path[:i])
-		}
-	}
-	for i := 0; i < 2; i++ {
-		idx := strings.LastIndex(path, ":")
-		if idx <= 0 || !isLineLocator(path[idx+1:]) {
-			break
-		}
-		path = path[:idx]
-	}
-
+	path := stripCitationLocator(trimmed)
 	if filepath.IsAbs(path) {
 		return false, fmt.Sprintf("evidence %q is an absolute path — closure evidence must name a repo-relative file so a reader can follow it", citation)
 	}
 	clean := filepath.Clean(path)
-	if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+	if escapesRoot(clean) {
 		return false, fmt.Sprintf("evidence %q escapes the project root", citation)
 	}
-	base := filepath.Base(clean)
-	for _, own := range []string{defectLedgerFile, defectDispositionFile, continuation.ManifestName} {
-		if strings.EqualFold(base, own) {
-			return false, fmt.Sprintf("evidence %q cites the defect-ledger mechanism's own bookkeeping — a closure claim may not vouch for itself", citation)
-		}
+	if isOwnBookkeeping(clean) {
+		return false, fmt.Sprintf("evidence %q cites the defect-ledger mechanism's own bookkeeping — a closure claim may not vouch for itself", citation)
 	}
 	if req.ProjectRoot == "" {
 		return false, fmt.Sprintf("evidence %q cannot be resolved: no project root on the phase request", citation)
 	}
-	roots := []string{req.ProjectRoot}
-	if req.Worktree != "" && req.Worktree != req.ProjectRoot {
-		roots = append(roots, req.Worktree)
-	}
+	roots := citationRoots(req)
 	var lastMode os.FileMode
 	sawIrregular := false
 	for _, root := range roots {
@@ -213,6 +195,44 @@ func oneEvidenceResolves(citation string, req core.PhaseRequest) (bool, string) 
 		return false, fmt.Sprintf("evidence %q resolves to no file under the project root", citation)
 	}
 	return false, fmt.Sprintf("evidence %q resolves to no file under the project root or this lane's worktree", citation)
+}
+
+func stripCitationLocator(path string) string {
+	if strings.HasSuffix(path, ")") {
+		if i := strings.LastIndex(path, " ("); i > 0 {
+			path = strings.TrimSpace(path[:i])
+		}
+	}
+	for range 2 {
+		idx := strings.LastIndex(path, ":")
+		if idx <= 0 || !isLineLocator(path[idx+1:]) {
+			break
+		}
+		path = path[:idx]
+	}
+	return path
+}
+
+func escapesRoot(clean string) bool {
+	return clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator))
+}
+
+func isOwnBookkeeping(clean string) bool {
+	base := filepath.Base(clean)
+	for _, own := range []string{defectLedgerFile, defectDispositionFile, continuation.ManifestName} {
+		if strings.EqualFold(base, own) {
+			return true
+		}
+	}
+	return false
+}
+
+func citationRoots(req core.PhaseRequest) []string {
+	roots := []string{req.ProjectRoot}
+	if req.Worktree != "" && req.Worktree != req.ProjectRoot {
+		roots = append(roots, req.Worktree)
+	}
+	return roots
 }
 
 func isLineLocator(s string) bool {
