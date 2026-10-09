@@ -47,8 +47,8 @@ func TestDigest_ScoutFromReportFallback_ExtractsGoalTypeAndDeliverableKind(t *te
 
 func TestDigest_TriageFromReportFallback_DeliverableKindIsAuthoritative(t *testing.T) {
 	ws := t.TempDir()
-	writeFile(t, ws, "scout-report.md", scoutReportDocument)   // scout says document …
-	writeFile(t, ws, "triage-report.md", triageReport("code")) // … triage refines to code (mixed top_n)
+	writeFile(t, ws, "scout-report.md", scoutReportDocument)
+	writeFile(t, ws, "triage-report.md", triageReport("code"))
 	sig, err := Digest(ws, []string{"scout", "triage"})
 	if err != nil {
 		t.Fatalf("Digest: %v", err)
@@ -68,7 +68,7 @@ func TestDigest_TriageFromReportFallback_DeliverableKindIsAuthoritative(t *testi
 }
 
 func TestRoutingSignals_DeliverableKind_DefaultsToCodeConservatively(t *testing.T) {
-	var sig RoutingSignals // nothing digested yet (plan time)
+	var sig RoutingSignals
 	if got := sig.DeliverableKind(); got != "code" {
 		t.Fatalf("DeliverableKind() pre-handoff = %q, want code", got)
 	}

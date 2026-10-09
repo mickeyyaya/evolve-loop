@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// The reference file is stripped from dispatched prompts, so the dispatched scout persona must name each header too.
 func TestPersonaTemplates_CarryTheHeaderLines(t *testing.T) {
 	agents := filepath.Join("..", "..", "..", "agents")
 	read := func(name string) string {

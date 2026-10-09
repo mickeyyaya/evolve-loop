@@ -10,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// promptFixture is the cycle-1431 continuation of cycle-1425 the G5 golden
-// was captured on: one OPEN row with embedded newlines, one FIXED row, one
-// 250-rune OPEN row.
 func promptFixture(t *testing.T) (root, ws, ancestorWS string) {
 	t.Helper()
 	root = t.TempDir()
@@ -36,12 +33,6 @@ func promptFixture(t *testing.T) (root, ws, ancestorWS string) {
 	return root, ws, ancestorWS
 }
 
-// Test 35 — the prompt block is the G5 bytes; the registry fallback renders
-// it when the manifest is ABSENT (zero events); "" on no workspace/root, no
-// OPEN rows, a non-continuation, an absent ancestor ledger (zero events); a
-// corrupt manifest and a garbage ancestor ledger degrade to "" with ONE INFO
-// AUDIT_LEDGER_PROMPT_DEGRADED each (reason=manifest with the fallback taken,
-// reason=ledger with the op).
 func TestPromptBlock_GoldenDegrades_AndInfoOnlyOnReadFaults(t *testing.T) {
 	root, ws, ancestorWS := promptFixture(t)
 	req := Request{Cycle: 1431, Workspace: ws, ProjectRoot: root}
@@ -66,7 +57,6 @@ func TestPromptBlock_GoldenDegrades_AndInfoOnlyOnReadFaults(t *testing.T) {
 		t.Fatalf("a non-continuation renders nothing, silently: %q %v", block, codesOf(*got))
 	}
 
-	// The registry fallback when the manifest is absent: the same block, no event.
 	binding := `{"lane-scope-id":{"cycle":1425,"branch":"cycle-1425","snapshot_sha":"deadbeef","base_sha":"cafebabe"}}`
 	if err := os.WriteFile(continuation.RegistryPath(root), []byte(binding), 0o644); err != nil {
 		t.Fatal(err)
@@ -79,7 +69,6 @@ func TestPromptBlock_GoldenDegrades_AndInfoOnlyOnReadFaults(t *testing.T) {
 		t.Fatalf("registry fallback: %q %v", block, codesOf(*boundGot))
 	}
 
-	// A corrupt manifest: "" with ONE INFO naming the fallback taken.
 	if err := os.WriteFile(filepath.Join(ws, "continuation-manifest.json"), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +85,6 @@ func TestPromptBlock_GoldenDegrades_AndInfoOnlyOnReadFaults(t *testing.T) {
 	}
 	fieldsOf(t, only(t, *boundGot, CodePromptDegraded), map[string]string{"reason": "manifest", "fallback": "registry"})
 
-	// A garbage ancestor ledger: "" with INFO reason=ledger; an absent one: "" and silence.
 	if err := continuation.WriteManifest(ws, continuation.Continuation{Cycle: 1425, SnapshotSHA: "deadbeef"}); err != nil {
 		t.Fatal(err)
 	}

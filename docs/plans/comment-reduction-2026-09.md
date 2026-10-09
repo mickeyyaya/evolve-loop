@@ -178,6 +178,7 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 83 | `internal/releasepreflight`, `internal/subagent/subagentrun`, `internal/commitgate`, all files | 38 | 1,345 → 9 | — | on the round-12 comment PR |
 | 84 | `internal/dashboard`, `internal/scopedelta`, `internal/gitexec`, all files | 39 | 1,265 → 10 | — | on the round-12 comment PR |
 | 85 | `go/acs`, all files (step 3c: `commentaudit strip acs`, then `commentaudit history`: 1,283 history-bearing groups archived in 485 pages under `docs/history/code-comments/`) | 543 | 44,439 → 1,129 (the rest machine-read: build tags, `acs-predicate:` markers) | — | on the go/acs strip PR |
+| 86 | `internal/core/defectledger`, `internal/router`, all files. The strip is staged and proven comment-only. The refactor (`reconcile.go`, `floor.go`) stays unstaged. 18 history groups are archived in `docs/history/code-comments/internal-core-defectledger.md`. Inbox item: `router-active-worktree-fleet-pin`. | 50 | 713 → 5 | 18 groups archived | staged, not committed |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

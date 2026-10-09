@@ -71,6 +71,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/shipmanifest` | the one selection of which paths Ship commits: declared report manifest, porcelain parsing, the staging pathspec | [internal-shipmanifest.md](internal-shipmanifest.md) |
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
+| `internal/core/defectledger` | the audit phase's anti-laundering defect ledger and the continuation disposition gate (unit 09, ADR-0103) | [internal-core-defectledger.md](internal-core-defectledger.md) |
 | `internal/phases/runner/verdict` | the judge: classifies a phase attempt from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/core` | the cycle orchestrator: phase sequencing, gates, recovery and ship (filled by file group) | [internal-core.md](internal-core.md) |
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |

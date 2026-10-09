@@ -1,9 +1,5 @@
 package defectledger
 
-// helpers_test.go — the leaf's test fixtures: a Ledger over stub collaborators
-// reporting into a recording Center, the continuation lineage the goldens were
-// captured on (8e8f080f, zz_golden_capture_test.go), and the golden readers.
-
 import (
 	"encoding/json"
 	"os"
@@ -18,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// recording returns a Center accessor and the events it delivered, in order.
 func recording() (func() *signalcenter.Center, *[]signalcenter.Event) {
 	c := signalcenter.New()
 	got := &[]signalcenter.Event{}
@@ -26,16 +21,12 @@ func recording() (func() *signalcenter.Center, *[]signalcenter.Event) {
 	return func() *signalcenter.Center { return c }, got
 }
 
-// scopeOf is a lane-scope reader stub returning the given ids for any workspace.
 func scopeOf(ids ...string) LaneScopeReader {
 	return func(string) []string { return ids }
 }
 
 var locatorRE = regexp.MustCompile(`:[0-9]+(-[0-9]+)?$`)
 
-// resolveUnder is the citation policy stub: every ";"-joined fragment must
-// name a file (minus up to two line locators) under root; the miss reason is
-// the production resolver's project-root wording so the goldens replay.
 func resolveUnder(root string) Resolver {
 	return func(evidence string, _ Request) (bool, string) {
 		for _, frag := range strings.Split(evidence, ";") {
@@ -53,13 +44,11 @@ func resolveUnder(root string) Resolver {
 
 func resolveNever(_ string, _ Request) (bool, string) { return false, "stub: never" }
 
-// observed builds a ledger over the stubs, reporting into a recording Center.
 func observed(scope LaneScopeReader, resolve Resolver) (*Ledger, *[]signalcenter.Event) {
 	acc, got := recording()
 	return New(scope, resolve, WithSignals(acc)), got
 }
 
-// mustEmit runs a clean Emit: a zero Verdict — no diagnostic, nothing blocked.
 func mustEmit(t *testing.T, l *Ledger, req Request, r Rejection) {
 	t.Helper()
 	if v := l.Emit(req, r); len(v.Diagnostics) != 0 || v.Blocked {
@@ -75,7 +64,6 @@ func codesOf(events []signalcenter.Event) []signalcenter.Code {
 	return out
 }
 
-// only returns the one event carrying code and fails when there are zero or several.
 func only(t *testing.T, events []signalcenter.Event, code signalcenter.Code) signalcenter.Event {
 	t.Helper()
 	var hits []signalcenter.Event
@@ -90,8 +78,6 @@ func only(t *testing.T, events []signalcenter.Event, code signalcenter.Code) sig
 	return hits[0]
 }
 
-// fixture is <root>/.evolve/runs/cycle-1270 continuing cycle-1255 — the
-// lineage the goldens were captured on.
 type fixture struct {
 	root, ws, ancestorWS string
 	req                  Request
@@ -140,7 +126,6 @@ func (f fixture) removeManifest(t *testing.T) {
 	}
 }
 
-// bindRegistry writes the root-owned registry binding the lane "lane-scope-id" to cycle.
 func (f fixture) bindRegistry(t *testing.T, cycle int) {
 	t.Helper()
 	binding := map[string]any{"cycle": cycle, "branch": "cycle-" + strconv.Itoa(cycle), "snapshot_sha": "deadbeef", "base_sha": "cafebabe"}
@@ -166,7 +151,6 @@ const (
 	reconciledClaims  = `{"dispositions":[{"id":"d1","status":"FIXED","evidence":["go/x.go:12","go/y.go"]},{"id":"d2","status":"DEFERRED","reason":"out of scope"},{"id":"d4","status":"FIXED","evidence":"go/x.go"}]}`
 )
 
-// scenario is one row of diagnostics.golden.json (captured on 8e8f080f).
 type scenario struct {
 	Diagnostics []cyclestate.Diagnostic `json:"diagnostics"`
 	Blocked     bool                    `json:"blocked"`
@@ -184,7 +168,6 @@ func goldenBytes(t *testing.T, name string) []byte {
 
 var tmpNameRE = regexp.MustCompile(`\.defect-ledger\.json\.[0-9]+\.tmp`)
 
-// goldenScenario returns the named G4 row with the fixture's paths substituted.
 func goldenScenario(t *testing.T, name string, f fixture) scenario {
 	t.Helper()
 	var all map[string]scenario
@@ -201,7 +184,6 @@ func goldenScenario(t *testing.T, name string, f fixture) scenario {
 	return s
 }
 
-// assertVerdict compares a Verdict with a golden row, normalizing the random temp name.
 func assertVerdict(t *testing.T, name string, got Verdict, want scenario) {
 	t.Helper()
 	if got.Blocked != want.Blocked || len(got.Diagnostics) != len(want.Diagnostics) || strings.Join(ints(got.LineageCycles), ",") != strings.Join(ints(want.Lineage), ",") {

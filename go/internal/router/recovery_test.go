@@ -104,7 +104,7 @@ func TestRecover_StrategyDelegationParity(t *testing.T) {
 		{Blocker: &Blocker{Code: "GIT_PUSH_REJECTED", Class: "transient", Stage: "ship"}},
 		{Blocker: &Blocker{Code: "SELF_SHA_TAMPERED", Class: "integrity", Stage: "ship"}},
 		{Blocker: &Blocker{Code: "SOME_NOVEL_CODE", Class: "", Stage: "ship"}},
-		{}, // nil blocker
+		{},
 	}
 
 	var static StaticPreset
