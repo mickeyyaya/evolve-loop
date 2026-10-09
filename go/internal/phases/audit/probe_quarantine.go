@@ -15,32 +15,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// auditProbesDir is the workspace subdirectory that preserves quarantined
-// probes — the durable record of what the auditor tried.
 const auditProbesDir = "audit-probes"
 
-// auditPromptArtifact is the dispatch anchor (the bridge writes it under the
-// phasecontract prompt-naming rule).
 var auditPromptArtifact = phasecontract.PromptArtifactFilename("audit")
 
-// quarantineGitTimeout bounds the status probe — a wedged git must degrade,
-// not hang the audit phase (same bound class as ciparity's subprocess calls).
 const quarantineGitTimeout = 30 * time.Second
 
-// anchorFileName persists the FIRST audit dispatch time across retries:
-// bridge.Engine.Launch rewrites audit-prompt.txt on EVERY dispatch, so
-// anchoring on the latest prompt mtime would classify a dead first attempt's
-// leftover probe as pre-dispatch builder work.
 const anchorFileName = ".dispatch-anchor"
 
-// quarantineProbesForRequest is the Classify call site. No worktree → nothing
-// to scan, logged loudly (the suite then runs against the main tree, so a
-// silent skip here would hide the one case where exposure is HIGHEST). No
-// dispatch anchor → skip loudly (no cutoff exists to discriminate with).
 func quarantineProbesForRequest(req core.PhaseRequest) error {
-	// The content fence already removed this dispatch's additions and restored
-	// Builder bytes. Their mtimes may now be newer than any audit anchor;
-	// re-attributing them by time would delete authenticated deliverables.
 	if req.WorktreeVerified {
 		return nil
 	}
@@ -57,11 +40,6 @@ func quarantineProbesForRequest(req core.PhaseRequest) error {
 	return qerr
 }
 
-// firstDispatchAnchor returns the FIRST audit dispatch time for this cycle,
-// persisting it under audit-probes/ on first sight. Later attempts read the
-// persisted stamp instead of the rewritten prompt's fresh mtime. Best-effort:
-// if the stamp cannot be written, the current prompt mtime is used (one
-// attempt's protection rather than none).
 func firstDispatchAnchor(workspace string, promptMtime time.Time) time.Time {
 	stamp := filepath.Join(workspace, auditProbesDir, anchorFileName)
 	if fi, err := os.Stat(stamp); err == nil {
@@ -77,16 +55,10 @@ func firstDispatchAnchor(workspace string, promptMtime time.Time) time.Time {
 	return promptMtime
 }
 
-// quarantineAuditProbes preserves-then-removes audit-authored probe tests from
-// worktree, returning the repo-relative paths it moved. Failure split: a
-// git-status failure degrades OPEN with a loud log — a .git/index.lock race
-// must not hard-fail the cycle this exists to protect; but once a probe IS
-// detected, any preserve/remove error fails loudly — silently leaving it
-// poisons the gate, silently dropping it destroys auditor evidence.
 func quarantineAuditProbes(worktree, workspace string, dispatchedAt time.Time, log io.Writer) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), quarantineGitTimeout)
 	defer cancel()
-	run := runCmd // capture once at entry (package convention, ciparity.go)
+	run := runCmd
 	out, err := sysexec.Output(ctx, run, worktree, "git", "status", "--porcelain", "-uall")
 	if err != nil {
 		fmt.Fprintf(log, "[audit] probe quarantine degraded OPEN: git status failed (%v) — tree not scanned for audit-authored probes\n", err)
@@ -102,7 +74,7 @@ func quarantineAuditProbes(worktree, workspace string, dispatchedAt time.Time, l
 		abs := filepath.Join(worktree, rel)
 		fi, statErr := os.Stat(abs)
 		if statErr != nil || fi.ModTime().Before(dispatchedAt) {
-			continue // pre-dispatch = builder deliverable; leave it alone
+			continue
 		}
 		if err := preserveThenRemove(abs, filepath.Join(workspace, auditProbesDir, rel)); err != nil {
 			return moved, fmt.Errorf("probe quarantine: %s: %w", rel, err)
@@ -114,9 +86,6 @@ func quarantineAuditProbes(worktree, workspace string, dispatchedAt time.Time, l
 	return moved, nil
 }
 
-// preserveThenRemove copies src to dst, removing src only after the copy is on
-// disk — losing auditor evidence is as bad as leaving the probe to poison the
-// gate.
 func preserveThenRemove(src, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
@@ -131,13 +100,6 @@ func preserveThenRemove(src, dst string) error {
 	return os.Remove(src)
 }
 
-// newTestFilePath parses one `git status --porcelain -uall` line, returning
-// the path when it is a NEW *_test.go outside go/acs/: untracked (`??`) or
-// added-not-yet-committed (`A`-status — a preserved continuation worktree's
-// pre-loop `git add -A` stages a prior attempt's leftovers). Path extraction
-// goes through gitexec.PorcelainPath, the documented SSOT: a hand-rolled parse
-// dropped git-quoted paths, silently missing exactly the files this exists to
-// catch.
 func newTestFilePath(line string) (string, bool) {
 	if len(line) < 4 {
 		return "", false
@@ -151,7 +113,7 @@ func newTestFilePath(line string) (string, bool) {
 		return "", false
 	}
 	if strings.HasPrefix(p, "go/acs/") {
-		return "", false // the gate's own predicate tree — never quarantined
+		return "", false
 	}
 	return p, true
 }

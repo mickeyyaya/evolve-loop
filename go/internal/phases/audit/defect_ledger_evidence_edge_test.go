@@ -55,8 +55,6 @@ func TestClassify_DispositionEvidenceWhitespaceOnlyStillBlocks(t *testing.T) {
 }
 
 func TestClassify_DispositionEvidenceSemicolonJoinedBothResolvePasses(t *testing.T) {
-	// The "; " join token doubles as a split token: one string carrying two
-	// REAL citations must behave exactly like the two-element array form.
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite1 := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	cite2 := evidenceFile(t, req.ProjectRoot, "go/internal/core/cyclerun.go")
@@ -74,8 +72,6 @@ func TestClassify_DispositionEvidenceSemicolonJoinedBothResolvePasses(t *testing
 }
 
 func TestClassify_DispositionEvidenceSemicolonJoinedOneMissingBlocks(t *testing.T) {
-	// AND-semantics survive the split: one resolvable + one phantom half
-	// must block — the split can only ever make acceptance stricter.
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{

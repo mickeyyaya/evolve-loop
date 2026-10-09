@@ -2,17 +2,6 @@
 
 package gc
 
-// worktrees_realgit_test.go — real-git end-to-end RED test (cycle 570,
-// workspace-hygiene-s4-worktree-gc-planner), mirroring the integration-tagged
-// convention core/worktree_realgit_integration_test.go already uses for the
-// sibling S1/S3 slices: exercise PlanWorktrees + ApplyWorktrees against a
-// REAL git repo + real `git worktree add`, not the scripted fake, so the
-// evidence-pipeline's actual git plumbing (porcelain parsing, merge-base
-// membership, status) is proven end-to-end at least once.
-//
-// RED now: PlanWorktrees/ApplyWorktrees do not exist yet (compile failure).
-// Do NOT modify this file. Run with: go test -tags integration ./internal/gc/...
-
 import (
 	"os"
 	"os/exec"
@@ -37,12 +26,6 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-// TestPlanAndApplyWorktrees_RealGit_MergedWorktreeIsSweptEndToEnd is the
-// single required real-git integration pass: a merged, clean, dead worktree
-// is collected AND its branch deleted; a real `git worktree list` afterward
-// confirms it, matching the AC-3/AC-HISTORY spirit of the sibling
-// acs-cycle536 task (forward-only, evidence-verified via real git state, not
-// a mock).
 func TestPlanAndApplyWorktrees_RealGit_MergedWorktreeIsSweptEndToEnd(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -63,11 +46,6 @@ func TestPlanAndApplyWorktrees_RealGit_MergedWorktreeIsSweptEndToEnd(t *testing.
 	branch := "cycle-realgit1-800"
 	wt := filepath.Join(base, branch)
 	runGit(t, root, "worktree", "add", "-B", branch, wt, "HEAD")
-	// Merge it back into the default branch (whatever HEAD already points
-	// at) so the branch qualifies as "merged" — the worktree's own HEAD is
-	// already an ancestor since it was branched from HEAD with no new
-	// commits, mirroring a real cycle that shipped with no further local
-	// drift.
 
 	opts := WorktreeOptions{
 		ProjectRoot:  root,

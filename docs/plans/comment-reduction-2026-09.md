@@ -180,6 +180,7 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 85 | `go/acs`, all files (step 3c: `commentaudit strip acs`, then `commentaudit history`: 1,283 history-bearing groups archived in 485 pages under `docs/history/code-comments/`) | 543 | 44,439 → 1,129 (the rest machine-read: build tags, `acs-predicate:` markers) | — | on the go/acs strip PR |
 | 3d r1 | `internal/subagent` (with `subagentrun`), `internal/failurelog`, `internal/acssuite`, all files | 68 | 1,673 removed; 13 + 4 + 7 comment lines left | — | on the r1 comment branch |
 | 3d r2 | `internal/core/defectledger`, `internal/router`, all files. The strip is staged and proven comment-only. The refactor (`reconcile.go`, `floor.go`) stays unstaged. 18 history groups are archived in `docs/history/code-comments/internal-core-defectledger.md`. Inbox item: `router-active-worktree-fleet-pin`. | 50 | 713 → 5 | 18 groups archived | staged, not committed |
+| 3d r3 | `internal/gc`, `internal/phases/audit` (top-level files; `ciparitygate` keeps its own page), phase 3d lane r3 | 85 | 2,369 → 6 (`gc` 408 → 3, `audit` 1,961 → 3; the package docs stay) | 22 → 0 | on the round-13 comment PR; the refactor (`oneEvidenceResolves`, `keptOrSalvaged`, a removal-order test) lands as its own unstaged change |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

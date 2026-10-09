@@ -1,13 +1,5 @@
 package audit
 
-// When a continuation cycle's defect-ledger reconcile has run and verified
-// every inherited defect against its own per-id disposition, that machine
-// record is strictly stronger evidence than the line citation the closure
-// gate demands, so a prose closure-miss demotes to a warning diagnostic
-// instead of a verdict-forcing FAIL. Every other path is unchanged: a blocked
-// reconcile still forces, and a non-continuation cycle (no lineage, no
-// dispositions) still forces.
-
 import (
 	"os"
 	"path/filepath"
@@ -17,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// A WARN summary asserting closure, no citation on that line.
 const demotionClosureReport = "# Audit Report\n\n## Findings\n\n" +
 	"the cycle-1490 defect is verified closed\n\n## Verdict\n**WARN**\n"
 
@@ -43,8 +34,6 @@ func TestClassify_ClosureMissDemotedWhenLineageFullyAccounted(t *testing.T) {
 }
 
 func TestClassify_ClosureMissOutsideLineageStillForces(t *testing.T) {
-	// The leak guard: an ACCOUNTED lineage must not vouch for a claim about an
-	// UNRELATED cycle — no record here covers cycle-900.
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -63,9 +52,6 @@ func TestClassify_ClosureMissOutsideLineageStillForces(t *testing.T) {
 }
 
 func TestClassify_RefLessStrongClaimStillForcesOnAccountedLineage(t *testing.T) {
-	// A ref-less "verified closed" — the canonical laundering sentence — names
-	// no cycle the machine record could vouch for; it must keep the full gate
-	// even when this lane's own lineage is accounted.
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -84,9 +70,6 @@ func TestClassify_RefLessStrongClaimStillForcesOnAccountedLineage(t *testing.T) 
 }
 
 func TestClassify_MissingAncestorLedgerDoesNotVouchLineage(t *testing.T) {
-	// An unblocked reconcile whose ancestor ledger is absent verified nothing —
-	// the closure gate is the backstop that makes a deleted ancestor ledger
-	// non-silent, and it must keep forcing.
 	ws, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -106,8 +89,6 @@ func TestClassify_MissingAncestorLedgerDoesNotVouchLineage(t *testing.T) {
 }
 
 func TestClassify_ClosureMissStillForcesWhenReconcileBlocked(t *testing.T) {
-	// Same report, dispositions ABSENT: the reconcile blocks, nothing verified
-	// the closure claims — the gate must keep forcing FAIL.
 	_, req := continuationFixture(t, 1490, 1502, []string{
 		"retirement region uncovered",
 	})
@@ -118,8 +99,6 @@ func TestClassify_ClosureMissStillForcesWhenReconcileBlocked(t *testing.T) {
 }
 
 func TestClassify_ClosureMissStillForcesOnNonContinuation(t *testing.T) {
-	// No lineage at all: an ordinary cycle asserting a prior cycle's defect
-	// closed with no record anywhere.
 	verdict, _ := classifyWith(t, demotionClosureReport, func(ws string) {
 		yes := true
 		writeACSVerdictShip(t, ws, 0, &yes)

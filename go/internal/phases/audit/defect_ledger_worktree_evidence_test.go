@@ -9,30 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// A continuation LANE's own fix lives in its own still-open worktree and
-// reaches the project root only when the lane merges — which is precisely
-// what evidenceResolves' single project-root Lstat blocks. The fix: when the
-// project-root Lstat misses AND req.Worktree != "", retry under req.Worktree
-// — the SHIPPED-TREE root already threaded to every phase. Every existing
-// rejection stays: absolute paths, escapes, non-regular files, and the
-// self-citation guard must reject worktree-resident citations exactly as
-// they reject project-root ones, or the fallback reopens the self-vouching
-// hole the basename denylist closes.
-//
-// Every assertion below reaches its subject through the REAL production seam,
-// hooks{}.Classify — the audit phase's verdict path. evidenceResolves is
-// unexported and calling it directly would pass on dead code.
-//
-// Adversarial diversity: positive (worktree-only evidence closes a defect),
-// negative (absent from BOTH roots still blocks; self-citation still rejected
-// under the new root), edge (empty Worktree unchanged; escape/absolute still
-// rejected with a worktree set), semantic (four distinct gate behaviors, not
-// one restated).
-
-// worktreeContinuationFixture extends continuationFixture with a populated
-// req.Worktree — the lane's own SHIPPED-TREE root, distinct from ProjectRoot:
-// a fix committed in the lane's worktree but not yet merged to the project
-// root.
 func worktreeContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDefects []string) (string, string, core.PhaseRequest) {
 	t.Helper()
 	ws, req := continuationFixture(t, ancestorCycle, thisCycle, openDefects)
@@ -41,13 +17,8 @@ func worktreeContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, ope
 	return ws, wt, req
 }
 
-// TestClassify_WorktreeResidentEvidenceClosesADefect — POSITIVE. The lane
-// cites a real file that exists in the lane's worktree and NOT under the
-// project root, because the merge that would put it there is what this gate
-// is blocking. Without the fallback: rejected, cycle cannot PASS, forever.
 func TestClassify_WorktreeResidentEvidenceClosesADefect(t *testing.T) {
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
-	// Materialize the citation in the WORKTREE only — never under ProjectRoot.
 	cite := evidenceFile(t, wt, "go/cmd/evolve/cmd_loop_chain_boundaryrefresh_shortsha_test.go")
 	if _, err := os.Stat(filepath.Join(req.ProjectRoot, "go/cmd/evolve/cmd_loop_chain_boundaryrefresh_shortsha_test.go")); err == nil {
 		t.Fatalf("fixture is wrong: the citation must NOT exist under the project root — that is the whole deadlock")
@@ -75,10 +46,6 @@ func TestClassify_WorktreeResidentEvidenceClosesADefect(t *testing.T) {
 	}
 }
 
-// TestClassify_EvidenceAbsentFromBothRootsStillBlocks — NEGATIVE, the
-// anti-no-op. The fallback widens WHERE a real file may live; it must never
-// weaken the requirement that one exist. Deleting the Lstat entirely would
-// pass the positive test above and fail this one.
 func TestClassify_EvidenceAbsentFromBothRootsStillBlocks(t *testing.T) {
 	ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -101,14 +68,8 @@ func TestClassify_EvidenceAbsentFromBothRootsStillBlocks(t *testing.T) {
 	}
 }
 
-// TestClassify_WorktreeSelfCitationStillRejected — NEGATIVE, the hole the
-// fallback could reopen. The gate's own bookkeeping is rejected by basename
-// (rule 4, EqualFold). A lane may not evade that by planting
-// defect-ledger.json in its worktree instead of the project root. The graded
-// agent WRITES its own worktree, so this is the cheapest bypass of the fix.
 func TestClassify_WorktreeSelfCitationStillRejected(t *testing.T) {
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
-	// A real, regular, worktree-resident file — it fails ONLY on rule 4.
 	cite := evidenceFile(t, wt, "go/internal/phases/audit/"+ledgerFile)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -126,11 +87,6 @@ func TestClassify_WorktreeSelfCitationStillRejected(t *testing.T) {
 	}
 }
 
-// TestClassify_WorktreeEvidenceCannotEscapeRoot — EDGE / security. The
-// absolute-path and ".." rejections run BEFORE either Lstat and must stay
-// there: a worktree root must not become a new pivot for reaching outside the
-// tree. The escape target is materialized so the test fails for the right
-// reason (rejected by rule, not by absence).
 func TestClassify_WorktreeEvidenceCannotEscapeRoot(t *testing.T) {
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	evidenceFile(t, filepath.Dir(wt), "outside-the-worktree.go")
@@ -150,15 +106,6 @@ func TestClassify_WorktreeEvidenceCannotEscapeRoot(t *testing.T) {
 	}
 }
 
-// TestClassify_LineRangeCitationResolves — a citation like
-// "go/cmd/evolve/cmd_loop_chain.go:570-588" names a real file, present under
-// BOTH roots, yet a suffix stripper that only takes ":<digits>" leaves a
-// ":<line>-<line>" RANGE glued to the path so no Lstat can ever succeed. The
-// worktree fallback alone does not fix this — the citation misses under both
-// roots for a reason the fallback cannot address.
-//
-// Ranges are the house citation style (build/audit reports cite them
-// everywhere), so this is the common case, not an exotic one.
 func TestClassify_LineRangeCitationResolves(t *testing.T) {
 	for _, suffix := range []string{":570-588", ":570", ":570:12"} {
 		t.Run(suffix, func(t *testing.T) {
@@ -179,13 +126,8 @@ func TestClassify_LineRangeCitationResolves(t *testing.T) {
 	}
 }
 
-// TestClassify_NonLocatorSuffixIsPartOfThePath — the anti-over-strip guard for
-// the test above. Only a numeric locator may be shaved off; a colon followed by
-// anything else is part of the filename and must NOT be discarded to make a
-// different, existing file satisfy the claim.
 func TestClassify_NonLocatorSuffixIsPartOfThePath(t *testing.T) {
 	ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"brake resolved twice"})
-	// The would-be over-strip target EXISTS; only the cited name does not.
 	evidenceFile(t, req.ProjectRoot, "go/cmd/evolve/cmd_loop_chain.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -203,12 +145,6 @@ func TestClassify_NonLocatorSuffixIsPartOfThePath(t *testing.T) {
 	}
 }
 
-// TestClassify_ProjectRootEvidencePathUnchanged — REGRESSION. Two shapes that
-// must behave exactly as they do today: (a) evidence under the project root
-// still closes a defect when a worktree is also set (the fallback must be a
-// FALLBACK, not a replacement), and (b) with req.Worktree empty — the
-// provisioning-failed case — a missing citation still blocks rather than
-// panicking or degrading open on the empty root.
 func TestClassify_ProjectRootEvidencePathUnchanged(t *testing.T) {
 	t.Run("project-root evidence still closes with a worktree set", func(t *testing.T) {
 		ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})

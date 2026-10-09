@@ -8,21 +8,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// offenders is a check seam that reports a gate hit.
 func offenders(names ...string) func(core.PhaseRequest) ([]string, error) {
 	return func(core.PhaseRequest) ([]string, error) { return names, nil }
 }
 
-// cannotRun is a check seam that fails OPEN (the gate could not execute).
 func cannotRun(msg string) func(core.PhaseRequest) ([]string, error) {
 	return func(core.PhaseRequest) ([]string, error) { return nil, errors.New(msg) }
 }
 
-// classifyGates runs the real Classify over a temp workspace holding a GREEN
-// EGPS verdict (red_count=0, ship_eligible=true), so the EGPS branches — the
-// only ones already implemented — cannot fire. Any conflict record observed
-// here therefore comes from the non-EGPS gate under test, never from the
-// salvaged code path.
 func classifyGates(t *testing.T, h hooks, artifact string) (string, []core.Diagnostic) {
 	t.Helper()
 	ws := t.TempDir()
@@ -32,13 +25,10 @@ func classifyGates(t *testing.T, h hooks, artifact string) (string, []core.Diagn
 	return verdict, diags
 }
 
-// nonEGPSGates enumerates every gate in Classify that forces FAIL and is NOT
-// one of the three EGPS branches already covered by the salvage. Each entry
-// wires exactly one seam so the resulting conflict record is attributable.
 var nonEGPSGates = []struct {
 	name  string
 	wire  func(*hooks)
-	inMsg string // a substring the gate's own error diagnostic carries
+	inMsg string
 }{
 	{"gofmt", func(h *hooks) { h.gofmtCheck = offenders("acs/cycle1127/predicates_test.go") }, "gofmt"},
 	{"skills-drift", func(h *hooks) { h.skillsDriftCheck = offenders("skills/evolve-auditor/SKILL.md") }, "drift"},
@@ -49,9 +39,6 @@ var nonEGPSGates = []struct {
 	{"apicover-newpkg", func(h *hooks) { h.apicoverNewPkgGraduationCheck = offenders("internal/baz") }, "apicover"},
 }
 
-// TestVerdictConflict_EveryNonEGPSGateRecordsTheConflict — the crux of this
-// cycle. For each non-EGPS gate: a narrative PASS that the gate overrides to
-// FAIL must leave exactly one error-severity conflict record naming "PASS".
 func TestVerdictConflict_EveryNonEGPSGateRecordsTheConflict(t *testing.T) {
 	for _, g := range nonEGPSGates {
 		t.Run(g.name, func(t *testing.T) {
@@ -72,8 +59,6 @@ func TestVerdictConflict_EveryNonEGPSGateRecordsTheConflict(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_NonEGPSGate_NarrativeWARN — the narrative verdict is
-// carried verbatim on the non-EGPS gates too, not hardcoded to "PASS".
 func TestVerdictConflict_NonEGPSGate_NarrativeWARN(t *testing.T) {
 	h := hooks{gofmtCheck: offenders("main.go")}
 	_, passDiags := classifyGates(t, h, narrativeReport("PASS"))
@@ -85,11 +70,6 @@ func TestVerdictConflict_NonEGPSGate_NarrativeWARN(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_MultipleGatesStillOneRecord — AC-2 / anti-duplication.
-// A cycle that is simultaneously EGPS-red, gofmt-dirty, skills-drifted and
-// vet-broken is ONE conflict (the auditor said PASS, the machine said no), not
-// four. Four records would quadruple the dossier's SubstantiveError text and
-// give the identical-fingerprint breaker four spellings of one event.
 func TestVerdictConflict_MultipleGatesStillOneRecord(t *testing.T) {
 	h := hooks{
 		gofmtCheck:       offenders("main.go"),
@@ -107,10 +87,6 @@ func TestVerdictConflict_MultipleGatesStillOneRecord(t *testing.T) {
 	}
 }
 
-// --- Negative / anti-no-op axis --------------------------------------------
-
-// TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeFAIL — the coherent case
-// on every non-EGPS gate: auditor and gate agree, nothing to record.
 func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeFAIL(t *testing.T) {
 	for _, g := range nonEGPSGates {
 		t.Run(g.name, func(t *testing.T) {
@@ -124,9 +100,6 @@ func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeFAIL(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeUnparseable — no
-// narrative was parsed, so there is no claim to disagree with. Fabricating one
-// here would fire on every malformed report in the fleet.
 func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeUnparseable(t *testing.T) {
 	h := hooks{gofmtCheck: offenders("main.go")}
 	_, diags := classifyGates(t, h, "# Audit Report\n\nprose with no verdict declaration\n")
@@ -135,11 +108,6 @@ func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeUnparseable(t *testing.
 	}
 }
 
-// TestVerdictConflict_GateCouldNotRun_NoConflict — AC-3, the fail-OPEN axis.
-// Every non-EGPS gate fails open: an infra error emits a warning and leaves the
-// verdict alone. No override happened, so no conflict exists — and the PASS
-// must survive. An implementation that keys the record off "a gate diagnostic
-// exists" instead of "the verdict was overridden" fails here.
 func TestVerdictConflict_GateCouldNotRun_NoConflict(t *testing.T) {
 	h := hooks{
 		gofmtCheck:                    cannotRun("gofmt: executable file not found"),
@@ -159,7 +127,6 @@ func TestVerdictConflict_GateCouldNotRun_NoConflict(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_AllGatesGreen_NoConflict — the ordinary shipping cycle.
 func TestVerdictConflict_AllGatesGreen_NoConflict(t *testing.T) {
 	clean := func(core.PhaseRequest) ([]string, error) { return nil, nil }
 	h := hooks{
@@ -180,13 +147,6 @@ func TestVerdictConflict_AllGatesGreen_NoConflict(t *testing.T) {
 	}
 }
 
-// --- AC-4: the returned verdict is unchanged --------------------------------
-
-// TestVerdictConflict_VerdictUnchangedAcrossGateMatrix — the additive-only
-// proof. For every (narrative x gate-state) combination the returned verdict is
-// exactly what the gate semantics dictate today. A "fix" that suppresses a gate
-// FAIL so the conflict stops appearing — the tempting wrong turn on a
-// diagnosability task — fails here.
 func TestVerdictConflict_VerdictUnchangedAcrossGateMatrix(t *testing.T) {
 	clean := func(core.PhaseRequest) ([]string, error) { return nil, nil }
 	cases := []struct {

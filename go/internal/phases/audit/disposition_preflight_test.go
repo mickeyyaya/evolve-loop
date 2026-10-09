@@ -8,28 +8,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// dispositionPreflightMissing and dispositionPreflightIncomplete are the two
-// distinct, NAMED diagnostic markers this contract pins. They must not
-// collide with the existing "(no disposition)" per-id text, and must be
-// distinguishable from one another (entirely-absent vs partially-covered
-// are different operator actions: author the file vs finish it).
 const (
 	dispositionPreflightMissing    = "disposition-preflight: MISSING"
 	dispositionPreflightIncomplete = "disposition-preflight: INCOMPLETE"
 )
 
-// TestClassify_DispositionPreflightMissingFileIsNamed — NEGATIVE. A
-// continuation inherits two OPEN defects from its ancestor and the
-// continuation's workspace has NO defect-dispositions.json at all. The
-// verdict must not PASS (already true today via the per-id switch), but the
-// diagnostics must ALSO carry a structural marker naming the file itself as
-// missing — not only two independent "(no disposition)" per-id lines.
 func TestClassify_DispositionPreflightMissingFileIsNamed(t *testing.T) {
 	_, req := continuationFixture(t, 1330, 1342, []string{
 		"boundary refresh does not repin the short sha",
 		"symlinked test-suffix bypasses probe quarantine",
 	})
-	// Deliberately do NOT write defect-dispositions.json.
 
 	verdict, diags, _ := hooks{}.Classify(narrativeReport("PASS"), req, core.BridgeResponse{})
 
@@ -45,11 +33,6 @@ func TestClassify_DispositionPreflightMissingFileIsNamed(t *testing.T) {
 	}
 }
 
-// TestClassify_DispositionPreflightIncompleteFileIsNamed — NEGATIVE. The
-// disposition file EXISTS but covers only one of the two inherited ids. The
-// pre-flight must name the gap as INCOMPLETE (not MISSING — the operator
-// action differs: finish the file, not author it from scratch) and name
-// which id(s) are uncovered.
 func TestClassify_DispositionPreflightIncompleteFileIsNamed(t *testing.T) {
 	ws, req := continuationFixture(t, 1330, 1342, []string{
 		"boundary refresh does not repin the short sha",
@@ -59,7 +42,6 @@ func TestClassify_DispositionPreflightIncompleteFileIsNamed(t *testing.T) {
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
 			map[string]any{"id": "d1", "status": "FIXED", "evidence": cite, "reason": "landed"},
-			// d2 deliberately absent — the file exists but is short.
 		},
 	})
 
@@ -80,11 +62,6 @@ func TestClassify_DispositionPreflightIncompleteFileIsNamed(t *testing.T) {
 	}
 }
 
-// TestClassify_DispositionPreflightCompleteFileNoFalsePositive — EDGE, the
-// anti-no-op half of Task 3. A pre-flight that fires on every continuation
-// regardless of completeness proves nothing. Both inherited ids are FIXED
-// with resolvable evidence: the cycle must PASS and neither new marker may
-// appear.
 func TestClassify_DispositionPreflightCompleteFileNoFalsePositive(t *testing.T) {
 	ws, req := continuationFixture(t, 1330, 1342, []string{
 		"boundary refresh does not repin the short sha",
@@ -110,11 +87,6 @@ func TestClassify_DispositionPreflightCompleteFileNoFalsePositive(t *testing.T) 
 	}
 }
 
-// TestClassify_DispositionPreflightNoAncestorNoOp — EDGE, the anti-no-op
-// half for ORDINARY cycles. A cycle with no continuation manifest and no
-// ancestor ledger (the overwhelming majority of cycles) must never see
-// either new marker, regardless of whether it happens to have a
-// defect-dispositions.json lying around.
 func TestClassify_DispositionPreflightNoAncestorNoOp(t *testing.T) {
 	ws := t.TempDir()
 	yes := true

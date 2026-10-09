@@ -32,11 +32,6 @@ func streamOf(events []signalcenter.Event) string {
 	return strings.Join(parts, " ")
 }
 
-// TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback — the free facade
-// runs on a Null-Object ledger built with the REAL core.LaneScopeIDs: a
-// manifest-deleted continuation fixture (registry + lane-scope pin) still
-// blocks with the registry finding. A source scan pins that the one wired
-// construction spells the real collaborators.
 func TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback(t *testing.T) {
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.Remove(filepath.Join(ws, "continuation-manifest.json")); err != nil {
@@ -55,10 +50,6 @@ func TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback(t *testing.T) {
 	}
 }
 
-// TestAuditConfig_SignalsReachTheLedger — Config.Signals reaches the ledger
-// through newHooks (the ONE hooks literal New builds); a wired Classify on
-// the manifest-deleted fixture records AUDIT_LEDGER_MANIFEST_MISSING and
-// keeps the verdict and diagnostics byte-identical to the null path.
 func TestAuditConfig_SignalsReachTheLedger(t *testing.T) {
 	acc, got := recordingAccessor()
 	if !newHooks(Config{Signals: acc}).ledger.SignalsWired() {
@@ -86,9 +77,6 @@ func TestAuditConfig_SignalsReachTheLedger(t *testing.T) {
 	}
 }
 
-// TestDefectLedgerSeam_OneConstructionSite pins the ONE construction site
-// (the seam file); the production sites use the wired ledger, and the
-// Null-Object facades have no production caller.
 func TestDefectLedgerSeam_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/phases/audit/defect_ledger.go"
 	if offenders := auditNonTestSourcesMentioning(t, "defectledger.New(", onlySite); len(offenders) > 0 {
@@ -122,10 +110,6 @@ func TestNullLedgerFacades_HaveNoProductionCaller(t *testing.T) {
 	}
 }
 
-// auditNonTestSourcesMentioning lists the module's non-test Go files outside
-// the defectledger leaf and the one allowed site whose source contains needle
-// (the core carryover_lifecycle_test.go idiom, re-declared here: module root
-// ../../.. and the leaf's own doc comments excluded).
 func auditNonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -163,11 +147,6 @@ func auditNonTestSourcesMentioning(t *testing.T, needle, allowed string) []strin
 	return offenders
 }
 
-// TestClassify_LedgerStreamSequenceOnABlockedContinuation pins the exact
-// ordered {module, kind, code} stream a Classify leaves: a blocked
-// continuation with an absent dispositions file and two OPEN inherited rows;
-// a non-continuation FAIL; an overflowing rejection; an emit read fault (the
-// disposition.go warn text once, no second code).
 func TestClassify_LedgerStreamSequenceOnABlockedContinuation(t *testing.T) {
 	acc, got := recordingAccessor()
 	wired := hooks{ledger: wiredDefectLedger(acc)}
@@ -225,14 +204,6 @@ func diagnosticContaining(diags []core.Diagnostic, needle string) core.Diagnosti
 	return core.Diagnostic{}
 }
 
-// TestArtifactNames_HaveOneProductionSpellingEach pins that the three
-// artifact names the gate reads have ONE production spelling each — the
-// dispositions file in the leaf's schema.go, the manifest in
-// continuation.go — and every other non-test file in the module names them
-// through the owner (defectDispositionFile, continuation.ManifestName). A
-// rename that leaves the SecondaryArtifacts hold, the self-cite denylist or
-// the prompt-degrade path field behind fails here, not in a cycle. String
-// LITERALS only: prose in comments and doc strings is not a spelling.
 func TestArtifactNames_HaveOneProductionSpellingEach(t *testing.T) {
 	owners := map[string]string{
 		defectledger.LedgerFile:       "internal/core/defectledger/schema.go",
@@ -246,8 +217,6 @@ func TestArtifactNames_HaveOneProductionSpellingEach(t *testing.T) {
 	}
 }
 
-// nonTestStringLiteralsEqualTo lists the module's non-test Go files (path
-// relative to the module root, sorted) holding a string literal equal to name.
 func nonTestStringLiteralsEqualTo(t *testing.T, name string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))

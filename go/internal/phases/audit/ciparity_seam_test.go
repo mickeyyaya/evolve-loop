@@ -19,9 +19,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Test 33 — ciparitygate.New( is spelled in exactly ONE non-test file (the
-// seam), and the five Center-less facades have NO production caller (one
-// would drop the unit's events silently).
 func TestCIParityGates_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/phases/audit/ciparity.go"
 	if offenders := nonTestSourcesMentioning(t, "ciparitygate.New(", onlySite); len(offenders) > 0 {
@@ -33,16 +30,11 @@ func TestCIParityGates_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// leaf and the one allowed site whose source contains needle
-// (core/carryover_lifecycle_test.go idiom).
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	return nonTestSourcesWhere(t, allowed, func(body string) bool { return strings.Contains(body, needle) })
 }
 
-// nonTestSourcesMatching is nonTestSourcesMentioning over a regexp, applied to
-// the CODE lines only (comments elsewhere may name a facade as history).
 func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp, allowed string) []string {
 	t.Helper()
 	return nonTestSourcesWhere(t, allowed, func(body string) bool {
@@ -92,7 +84,6 @@ func nonTestSourcesWhere(t *testing.T, allowed string, hit func(body string) boo
 	return offenders
 }
 
-// recordingCenter returns a Center whose events are appended to the slice.
 func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 	c := signalcenter.New()
 	got := &[]signalcenter.Event{}
@@ -100,9 +91,6 @@ func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 	return c, got
 }
 
-// tierRedThenGreenRunner is a runner where the integration tier is red then
-// green and every other CI command exits 0 — so a whole audit Run through the
-// production constructor reaches the flake-absorbed arm.
 func tierRedThenGreenRunner() sysexec.RunFunc {
 	tierRuns := 0
 	return func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
@@ -117,11 +105,6 @@ func tierRedThenGreenRunner() sysexec.RunFunc {
 	}
 }
 
-// Test 34 — WithSignals on the production constructor reaches the gates: a
-// whole audit Run over a red-then-green tier records the flake diagnostic
-// (text unchanged) AND the Center holds AUDIT_CIPARITY_TIER_FLAKE_ABSORBED
-// stamped with the request's cycle and the audit phase; NewDefault (the
-// registry path) and New(Config{}) are the declared Null Object.
 func TestNewDefaultWithStageCompactSpec_WithSignalsReachesTheGates_NewDefaultIsNullObject(t *testing.T) {
 	req := productionRunFixture(t, 7)
 	withFakeRunner(t, tierRedThenGreenRunner())
@@ -158,14 +141,8 @@ func TestNewDefaultWithStageCompactSpec_WithSignalsReachesTheGates_NewDefaultIsN
 	}
 }
 
-// passReport is the auditor's artifact for a whole Run through the production
-// constructor.
 const passReport = "# Audit Report\n\n## Verdict\n**PASS**\n"
 
-// productionRunFixture builds what a whole audit Run through the production
-// constructor needs: a go-module worktree with a build handoff touching one
-// Go package (so the scope decision says run) and a workspace holding a clean
-// ACS verdict; the request names them all.
 func productionRunFixture(t *testing.T, cycle int) core.PhaseRequest {
 	t.Helper()
 	root, _ := goWorktree(t)
@@ -184,11 +161,6 @@ func productionRunFixture(t *testing.T, cycle int) core.PhaseRequest {
 	return core.PhaseRequest{Cycle: cycle, ProjectRoot: root, Worktree: root, Workspace: ws, WorktreeVerified: true}
 }
 
-// Test 38 — an Option over the full Config is honoured in full: a hook an
-// Option sets through the production constructor is the hook the phase runs
-// (never post-clobbered by the CI-parity wiring, which fills only the hooks
-// no Option set), while the hooks it left nil are still the wired gates (go
-// vet runs through the runner).
 func TestNewDefaultWithStageCompactSpec_AnOptionSettingAHookIsHonoured(t *testing.T) {
 	req := productionRunFixture(t, 8)
 	vetRuns, tierRuns := 0, 0
@@ -217,9 +189,6 @@ func TestNewDefaultWithStageCompactSpec_AnOptionSettingAHookIsHonoured(t *testin
 	}
 }
 
-// Test 35 — the facades read the package-var seams PER CALL: a seam that has
-// already run a gate (so a lazily cached construction would be frozen) still
-// observes a runner and a budget swapped afterwards.
 func TestCIParityFacades_ReadThePackageVarSeamsPerCall(t *testing.T) {
 	req := tierFixture(t)
 	ci := ciParity{}
@@ -254,7 +223,6 @@ func TestCIParityFacades_ReadThePackageVarSeamsPerCall(t *testing.T) {
 	}
 }
 
-// Test 36 — the locator's handoff shape and its two file names.
 func TestChangedPackagesForAudit_HandoffShape(t *testing.T) {
 	if pkgs, derivable := changedPackagesForAudit("", 1); pkgs != nil || derivable {
 		t.Errorf("no root: (%v, %v)", pkgs, derivable)
@@ -275,8 +243,6 @@ func TestChangedPackagesForAudit_HandoffShape(t *testing.T) {
 	}
 }
 
-// Test 37 — through the facades, a mixed env-exclusive scope and a deferred
-// graduation write zero bytes to os.Stderr, compared against the golden.
 func TestCIParity_WritesNothingToStderr(t *testing.T) {
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
@@ -317,9 +283,6 @@ func TestCIParity_WritesNothingToStderr(t *testing.T) {
 	}
 }
 
-// Test 41 — the host's applyCIGate keys off len(offenders), not nilness: the
-// graduation gate's empty-but-non-nil list for an all-deferred cycle is
-// PASS at the consumer — no override, no diagnostic — while one offender FAILs.
 func TestApplyCIGate_EmptyNonNilOffendersIsPass(t *testing.T) {
 	for name, tc := range map[string]struct {
 		offenders []string

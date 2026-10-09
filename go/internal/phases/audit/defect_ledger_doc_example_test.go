@@ -11,20 +11,8 @@ import (
 	"testing"
 )
 
-// These predicates are NOT source greps for a magic string. They EXTRACT the
-// documented example and run it through the production reader,
-// readDispositions — the same function the gate calls — so a doc example
-// that the gate would reject fails here. The cross-document case then
-// compares the two examples as parsed JSON, not as text, so reformatting one
-// is fine and drifting one is not.
-
-// dispositionExampleFence matches a fenced ```json block whose body mentions
-// "dispositions". Documents may carry other JSON fences; only this one is the
-// disposition example.
 var dispositionExampleFence = regexp.MustCompile("(?s)```json\\s*\\n(.*?)```")
 
-// docExampleRepoRoot resolves the repo root from this test file's location
-// (4 levels up from go/internal/phases/audit/), mirroring skillsDriftRepoRoot.
 func docExampleRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -34,9 +22,6 @@ func docExampleRepoRoot(t *testing.T) string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..")
 }
 
-// extractDispositionExample returns the first fenced JSON block in rel that
-// mentions "dispositions". Absence is a FAILURE, not a skip: the example is
-// this cycle's deliverable.
 func extractDispositionExample(t *testing.T, root, rel string) string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
@@ -52,10 +37,6 @@ func extractDispositionExample(t *testing.T, root, rel string) string {
 	return ""
 }
 
-// TestAuditorPromptDispositionExampleIsAcceptedByProductionReader — AC8. The
-// example in the auditor's own prompt must be a document the gate can read: it
-// goes through readDispositions, the production reader, exactly as a real
-// workspace file would.
 func TestAuditorPromptDispositionExampleIsAcceptedByProductionReader(t *testing.T) {
 	root := docExampleRepoRoot(t)
 	example := extractDispositionExample(t, root, "agents/evolve-auditor.md")
@@ -101,10 +82,6 @@ func TestAuditorPromptDispositionExampleIsAcceptedByProductionReader(t *testing.
 	}
 }
 
-// TestAuditorPromptAndArchDocDispositionExamplesAgree — AC9, the doc-sync half
-// (`always_full_documentation` house rule: prompt and architecture doc land
-// together for exactly this reason). Compared as PARSED JSON, so reflowing or
-// re-indenting one document is free and drifting its content is not.
 func TestAuditorPromptAndArchDocDispositionExamplesAgree(t *testing.T) {
 	root := docExampleRepoRoot(t)
 	promptRaw := extractDispositionExample(t, root, "agents/evolve-auditor.md")
