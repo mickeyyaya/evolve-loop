@@ -15,6 +15,9 @@ func runInboxRouteLane(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("route-lane"))
 		return 10
 	}
+	if refusedMidWave("route-lane", stderr) {
+		return 1
+	}
 	id, reason := strings.TrimSpace(args[0]), strings.TrimSpace(args[1])
 	root := envOrCwd("EVOLVE_PROJECT_ROOT")
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: laneForbidden(root, stderr)}

@@ -22,6 +22,9 @@ func runInboxRouteConsole(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox route-console: cycle %q is not a cycle number\n%s\n", args[2], inboxUsage("route-console"))
 		return 10
 	}
+	if refusedMidWave("route-console", stderr) {
+		return 1
+	}
 	opts := inboxmover.Options{ProjectRoot: envOrCwd("EVOLVE_PROJECT_ROOT"), Stderr: stderr}
 	loc, err := inboxmover.Locate(filepath.Join(opts.ProjectRoot, ".evolve", "inbox"), id)
 	if err != nil {
