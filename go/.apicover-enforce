@@ -714,3 +714,5 @@
 ./internal/events/filter
 # channel — one event channel as an append-only log: segments named by their base cursor, the locked append with torn-tail repair and rotation, Read with the cursor rules and Last (ADR-0127, plan E2).
 ./internal/events/channel
+# E3 (ADR-0127): the kernel wake of the event channels (internal/events/wake).
+./internal/events/wake

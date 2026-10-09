@@ -268,7 +268,7 @@ Each component is small and lands unwired first. Each new package is at 100 in `
 | E2 | `internal/events/channel`: segment names, the locked append with tail repair, rotation, `Read(from)` and the last record. Sub-component: `flock.LockWithin`, the lock with a deadline. | `adapters/flock`, E1 |
 | E3 | `internal/events/wake`: `Waiter{Arm, Wait(ctx, deadline)}` over a syscall port, in `wake_darwin.go`, `wake_linux.go` and `wake_other.go` (refuses) | the `proctree/procargs_*` build-tag pattern |
 | E4 | `internal/events/filter`: the grammar, the matcher and the catalog from the registries | `event.go`, `registry.go` |
-| E5 | `internal/events/reader`: arm, catch up and wait over channels; rotation; gap and reset records; the duplicate window; the last will | E2 to E4, `MergeByTS` |
+| E5 | `internal/events/reader`: arm, catch up and wait over channels; rotation; gap and reset records; the duplicate window; the last will. Also `proctree.StartOf(pid)`, the process start time: `procstart_darwin.go` (`KERN_PROC_PID` `kinfo_proc` with a general `sysctl` helper) and `procstart_linux.go` (the start ticks of `/proc/<pid>/stat` and the boot id) | E2 to E4, `MergeByTS`, `proctree` |
 | E6 | `internal/events/publisher`: routes; the lossless path; the best-effort queue; gap records; the dispatch stamp; `Close(deadline)` | E2, E4, the `reportDrops` pattern |
 | E7 | `policy_events.go` (`EventsConfig()`), the gcpolicy channel categories and `Protect` | `policy_ciwatch.go`, `gcpolicy/logs.go` |
 | E8 | `internal/events/subs`: the config and cursor stores, the exec runner, pull acks, dead letters and the protected surface entry. Note (a): E8 adds the additive `Filter.Names(key, value) bool` for the `module=events` skip (D24), so the grammar keeps one home. Note (b): a stored filter whose kind a later build removed gives `ErrRefused` at load. E8 decides between two rules: refuse to start the runner with exit 1 and a message that names the kind (recommended), or dead-letter each record. | `atomicwrite`, `WithPathLock`, `sysexec.Command`, `proctree` |
@@ -312,7 +312,7 @@ The red tests, named by their acceptance criteria:
 | E9 | `TestEventsCLI_ExitCodesMatchTheTable`, `TestEventsWatch_UntilPrintsTheMatchAndExitsZero`, `TestEventsWatch_AGapNeverEndsAnUntilWatch`, `TestEventsWatch_EachSinceModeStartsWhereTheSpecSays`, `TestEventsWatch_AnEmptySelectorIsRefused`, `TestEventsWatch_AnUnreadableChannelExitsTwo`, `TestEventsWatch_EPIPEExitsThree`, `TestEventsWatch_AStdoutHangupExitsThree`, `TestEventsWatch_SIGINTExitsZero`, `TestEventsWatch_SubResumesFromTheStoredCursor`, `TestEventsSubscribe_AddWritesTheConfigOnly` |
 | E10 | `TestRootSignalCenter_EveryRootSubscribesThePublisher`, `TestRootSignalCenter_EveryRootDefersItsCloser`, `TestRootSignalCenter_CycleZeroEventsNeverReachTheCycleSink` |
 | E11 | `TestDispatchPhase_EmitsPhaseDispatched`, `TestLanding_EmitsShipLandedAtIntentComplete`, `TestWaveNext_EmitsWaveStarted`, `TestLoop_EmitsLoopStartedWithItsProcStart`, `TestLoop_EmitsLoopExitAtExit`, `TestInboxLifecycle_EmitsClaimedAndReleased`, `TestCIWatch_EmitsCICompletedAndARedRunWarns`, `TestRegistry_NewKindsAndCodesAreRegistered` |
-| E12 | `TestSignalsTail_FollowIsAViewOverTheSignalsChannel`, `TestWaveWatch_PrintsTheSameLinesFromChannels`, `TestWaveWatch_ALostLoopExitsFour`, `TestWaveWatch_AStaleOrHistoricalLossNeverExitsFour`, `TestBridgeWatch_FollowWakesOnTheFeedWithoutATicker`, `TestPhaseWatchdog_WakesOnWritesAndKeepsOneDeadline`, `TestCycleRecord_EqualsTheSignalsChannelForTheCycle`, `TestNoSleepTickOrTickerInEventsOrMigratedWatchFiles` |
+| E12 | `TestSignalsTail_FollowIsAViewOverTheSignalsChannel`, `TestWaveWatch_PrintsTheSameLinesFromChannels`, `TestWaveWatch_ALostLoopExitsFour`, `TestWaveWatch_AStaleOrHistoricalLossNeverExitsFour`, `TestBridgeWatch_FollowWakesOnTheFeedWithoutATicker`, `TestPhaseWatchdog_WakesOnWritesAndKeepsOneDeadline`, `TestCycleRecord_EqualsTheSignalsChannelForTheCycle`, `TestNoPollTimerInTheEventChannelSources` (E12 adds its files to the directory list) |
 | E13 | `TestGroup_EachMessageHasItsOwnAck`, `TestGroup_LocalTriesDoNotCountAsDeliveries`, `TestGroup_ClaimsTheEntryOfADeadRunnerOnItsExit`, `TestGroup_ClaimsWhenTheRunnerLockIsFree`, `TestGroup_ClaimsAStuckEntryAtTheAckWaitDeadline`, `TestGroup_DeadLettersPastMaxDeliver` |
 | E14 | `TestLoopStopWait_EndsOnLoopExitWithoutAPoll`, `TestLoopDetach_ConfirmsTheBootOnLoopStarted`, `TestDashboard_RefreshesOnAWake`, `TestBridgeChannelProducer_WakesOnTheOutputLog`, `TestBridgeSupervisor_WakesOnTheFeed`, `TestPhaseObserver_WakesOnWritesAndKeepsOneDeadline` |
 
@@ -321,7 +321,7 @@ How "no poll" is proved with no sleep:
 - **A fake `Waiter`** records the calls. The order must be `Arm`, one read, `Wait`. The read count stays at 1 until the test releases a wake, and then it is exactly 2.
 - **A fake clock** must never create a timer when a watch has no deadline (`TestReader_WithNoDeadlineCreatesNoTimer`).
 - **A real-kernel test** on darwin and on Linux CI: after one write, a second `Wait` with a short deadline returns at the deadline. This proves `EV_CLEAR` and no spin.
-- **The AST guard** of the spec (§15) is the test `TestNoSleepTickOrTickerInEventsOrMigratedWatchFiles`. It reuses the walker of `go/internal/sysexec/command_guard_test.go`.
+- **The AST guard** of the spec (§15) is the test `TestNoPollTimerInTheEventChannelSources` in `go/test/structure/nopoll_guard_test.go`. E3 added it. It uses the shared walker (`structure.SourceFiles`, `structure.SelectorUses`) that the `sysexec` process guard also uses.
 
 The proofs that drive real processes:
 
@@ -357,7 +357,7 @@ The proofs that drive real processes:
 |---|---|---|
 | Observer | the Center and the `Publisher` listener | Producers stay unchanged; the Publisher observes only. |
 | Specification | the filter terms and the channel routes | One grammar composes every selection. |
-| Ports and adapters | the syscall port (`kqueue`, `kevent`, `inotify`, `epoll`, `statfs`, process start time), the process lister and signaler, the clock | Every kernel and process boundary has a fake, so E3 reaches 100%. |
+| Ports and adapters | the syscall port (`kqueue`, `kevent`, `inotify`, `epoll`, `pidfd_open`, `statfs`), the process start time (`proctree.StartOf`), the process lister and signaler, the clock | Every kernel and process boundary has a fake, so E3 reaches 100%. |
 | Strategy | `Deliverer`: the command runner and the stdout writer | Two real implementations in v1; the webhook is the third. |
 | Transactional outbox | the channel log | The log is the record, and the event id is the idempotency key. |
 | Catch-up subscription | the reader: arm, catch up, wait | History, then live, with no gap at the seam. |
@@ -383,6 +383,7 @@ None. The operator decided Q1 to Q10 on 2026-10-09 (§4, O10 to O19).
 |---|---|
 | E0 | ☑ the research dossier, this plan, the spec and ADR-0127. Merged in #823. |
 | E4 | ☑ `internal/events/filter`: the grammar, the matcher, the selectors and the catalog, at 100% coverage. Merged in #824. It is unwired. |
-| E1 | ◐ `signalcenter.ReadLines`, with its red tests and mutants; PR open (with E2). |
-| E2 | ◐ `internal/events/channel` and `flock.LockWithin` built, unwired, at 100% coverage; PR open. Spec findings: [internal-events-channel.md](../architecture/packages/internal-events-channel.md) §Findings |
+| E1 | ☑ `signalcenter.ReadLines`, with its red tests and mutants. Merged in #825 (with E2). |
+| E2 | ☑ `internal/events/channel` and `flock.LockWithin` built, unwired, at 100% coverage. Merged in #825. Spec findings: [internal-events-channel.md](../architecture/packages/internal-events-channel.md) §Findings |
+| E3 | ◐ `internal/events/wake`: the kqueue and inotify backends, the syscall ports, the refusals and the no-poll guard (moved to `go/test/structure`). Coverage is 100% on darwin and Linux. The PR is open. It is unwired. |
 | E1 to E14, except the rows above | ☐ not started |
