@@ -22,6 +22,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/cliupdate` | updates each subscribed CLI family at a loop boundary, smoke-tests a changed version and records the change for the drift check | [internal-cliupdate.md](internal-cliupdate.md) |
 | `internal/usageprobe` | reads each CLI's usage screen into typed windows through its manifest, benches every family already at a cap before a wave's first phase, and records the windows | [internal-usageprobe.md](internal-usageprobe.md) |
 | `internal/usageevidence` | queries a failing CLI's usage on every failure path, records the verdict in the workspace and as a signal, and decorates the bridge with it | [internal-usageevidence.md](internal-usageevidence.md) |
+| `internal/overlap` | the overlap proof of the landing queue: the zones, the closure, the evidence and the tier, with the `go list` adapter (ADR-0128, Q3) | [internal-overlap.md](internal-overlap.md) |
 | `internal/phasecoherence` | drift reports between the hand-edited surfaces that define a phase | [internal-phasecoherence.md](internal-phasecoherence.md) |
 | `internal/policy` | loads `.evolve/policy.json` into resolved configuration | [internal-policy.md](internal-policy.md) |
 | `internal/profiles` | loads the agent profiles in `.evolve/profiles/` | [internal-profiles.md](internal-profiles.md) |

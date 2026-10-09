@@ -157,25 +157,21 @@ func lineageHolds(ctx context.Context, worktree, authored, base string, changed 
 func peerTouchesLane(peer, lane []string) bool {
 	folded := make(map[string]bool, len(lane))
 	for _, p := range lane {
-		if !isPlainPath(p) {
+		if !IsPlainPath(p) {
 			return true
 		}
 		folded[strings.ToLower(p)] = true
 	}
 	for _, p := range peer {
 		lower := strings.ToLower(p)
-		if name := path.Base(lower); !isPlainPath(p) || name == ".gitattributes" || name == ".gitignore" || folded[lower] {
+		if name := path.Base(lower); !IsPlainPath(p) || name == ".gitattributes" || name == ".gitignore" || folded[lower] {
 			return true
 		}
 	}
 	return false
 }
 
-// isPlainPath holds for an ASCII path with no ':', '\' or '~' whose components never end in a dot or a
-// space (which also rejects "." and ".." components) and stay under a filesystem's name limit: one that
-// every supported filesystem resolves to itself alone. Windows device names are out of scope here: they
-// redirect I/O rather than alias another path, so they fail the digest instead.
-func isPlainPath(p string) bool {
+func IsPlainPath(p string) bool {
 	for i := 0; i < len(p); i++ {
 		if c := p[i]; c >= 0x80 || c == ':' || c == '\\' || c == '~' {
 			return false

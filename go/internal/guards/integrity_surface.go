@@ -136,6 +136,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/phases/ship/gitops_landing.go", Rationale: "the unit-07 seam: the landing's one wired construction, the push projection and the writeShipBinding / isAncestor / captureGitOutput facades the ship paths keep (ADR-0103)"},
 	{Fragment: "/go/internal/phases/ship/landing_intent.go", Rationale: "the two-phase landing: the write-ahead intent, the resume that skips the gates, and the unwind before Audit (ADR-0039 §8.1)"},
 	{Fragment: "/.evolve/landing/", Rationale: "the host-owned landing intents: a prepared intent lets ship resume a landing with no gate, so no phase may write one (ADR-0039 §8.1)"},
+	{Fragment: "/go/internal/overlap/", Rationale: "the overlap proof of the landing queue: its tier decides whether a composed candidate keeps its audit verdict with no re-audit (T1), so a cycle that could edit it could skip its own re-audit (ADR-0128 §6, §8)"},
 	{Fragment: "/go/internal/phases/audit/explanation_review_gate.go", Rationale: "Auditor qualitative explanation-review gate"},
 	{Fragment: "/go/internal/phases/audit/solution_gate.go", Rationale: "ADR-0099 slice 2: the document deliverable audit gate default — a lane must not soften the contract its own solution is graded against"},
 	{Fragment: "/go/internal/solutioncheck/", Rationale: "ADR-0099 slice 2: the ONE engine that judges a document deliverable — the gate above delegates to it, so it is the surface a lane would actually soften"},
