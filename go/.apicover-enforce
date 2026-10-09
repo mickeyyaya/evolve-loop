@@ -724,3 +724,5 @@
 ./internal/events/reader
 # derived — the one catalog of the generated outputs, their markers, regions and inputs, the conflict class and the regeneration (ADR-0128, plan Q1).
 ./internal/derived
+# R2 (ADR-0130): the attempt postmortem, a retry carries the evidence of the attempt that it replaces (internal/attemptpostmortem).
+./internal/attemptpostmortem
