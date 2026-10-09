@@ -166,7 +166,9 @@ The wire form is what `evolve events watch --json` prints and what a command rea
 | `ch:offset[,ch:offset]` | the given cursors |
 | an RFC 3339 time | the first record whose `signal.ts` is at or after the time, by a linear scan from the oldest retained segment |
 
-- **Order.** Order is total within a channel. No order exists across channels (Kafka partitions). A reader of several channels merges them by `signal.ts` through `signalcenter.MergeByTS` and labels the result "not a total order".
+- **Order.** Order is total within a channel. No order exists across channels (Kafka partitions). A reader of several channels merges each batch by `signal.ts`, with one head for each channel, and labels the result "not a total order".
+  - The merge never changes the order of one channel. Two processes append to one channel, so its times are not in order. A sort of all events (`signalcenter.MergeByTS`) can thus put a later cursor before an earlier one, and the reader does not use it.
+  - The merge applies inside one batch. Two batches are not in time order across channels.
 - **The reset rule.** When the reader opens a channel or wakes, it compares its cursor with the channel:
   - A cursor past the end of a segment that has a later segment moves to the base of that later segment. An OS crash can drop the tail of a segment after its rotation.
   - A cursor past the end of the tail segment moves to the true end. The tail lost bytes, or someone wiped the directory.
