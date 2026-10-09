@@ -113,7 +113,6 @@ func TestAppendAbnormalEvent_EscapesQuotesInDetails(t *testing.T) {
 	if !strings.Contains(string(body), `"details":"value with \"embedded\" quotes"`) {
 		t.Errorf("quotes not escaped: %s", body)
 	}
-	// Result must still be valid JSON.
 	line := strings.TrimSpace(string(body))
 	var parsed map[string]interface{}
 	if err := json.Unmarshal([]byte(line), &parsed); err != nil {
@@ -176,7 +175,6 @@ func TestWriteFanoutLedgerEntry_BasicLine(t *testing.T) {
 		t.Errorf("workers array malformed: %v", workers)
 	}
 
-	// Tip file written.
 	tip, err := os.ReadFile(filepath.Join(tmp, "ledger.tip"))
 	if err != nil {
 		t.Fatalf("read tip: %v", err)
@@ -207,7 +205,6 @@ func TestWriteFanoutLedgerEntry_ChainAdvances(t *testing.T) {
 	if len(lines) != 3 {
 		t.Fatalf("expected 3 lines, got %d", len(lines))
 	}
-	// Each entry's prev_hash must be the sha256 of the previous line.
 	for i := 1; i < 3; i++ {
 		var entry map[string]interface{}
 		if err := json.Unmarshal([]byte(lines[i]), &entry); err != nil {
@@ -230,7 +227,7 @@ func TestWriteFanoutLedgerEntry_NoAggregateEmptyArtifactSHA(t *testing.T) {
 	err := WriteFanoutLedgerEntry(ledger, FanoutLedgerEntry{
 		Cycle: 1, Agent: "scout", ChallengeToken: "x",
 		WorkerNames: []string{}, WorkerCount: 0,
-		AggregatePath: "", // no aggregate
+		AggregatePath: "",
 	}, nil)
 	if err != nil {
 		t.Fatalf("unexpected: %v", err)
@@ -372,12 +369,8 @@ func TestReadChainLink_EmptyFile(t *testing.T) {
 	}
 }
 
-// TestAppendAbnormalEvent_OpenFileErrorTolerated covers: when the events
-// path can't be opened (here it already exists as a directory), the
-// best-effort writer swallows the error and returns nil.
 func TestAppendAbnormalEvent_OpenFileErrorTolerated(t *testing.T) {
 	ws := t.TempDir()
-	// Pre-create abnormal-events.jsonl as a DIRECTORY so OpenFile fails.
 	if err := os.Mkdir(filepath.Join(ws, "abnormal-events.jsonl"), 0o755); err != nil {
 		t.Fatalf("seed dir: %v", err)
 	}
@@ -386,10 +379,6 @@ func TestAppendAbnormalEvent_OpenFileErrorTolerated(t *testing.T) {
 	}
 }
 
-// TestWriteFanoutLedgerEntry_ChainLinkError covers: the ledger path is a
-// directory, so readChainLink's os.ReadFile fails (a directory is non-empty
-// per os.Stat but unreadable as a file), surfacing the chain-link error
-// before the line is ever assembled.
 func TestWriteFanoutLedgerEntry_ChainLinkError(t *testing.T) {
 	tmp := t.TempDir()
 	ledgerDir := filepath.Join(tmp, "ledger.jsonl")
@@ -405,9 +394,6 @@ func TestWriteFanoutLedgerEntry_ChainLinkError(t *testing.T) {
 	}
 }
 
-// TestReadChainLink_BlankLineFile covers: a file containing only a newline
-// trims to "" and yields the zero seed at seq 0 (the empty-first-line
-// guard).
 func TestReadChainLink_BlankLineFile(t *testing.T) {
 	tmp := t.TempDir()
 	p := filepath.Join(tmp, "ledger.jsonl")
@@ -423,8 +409,6 @@ func TestReadChainLink_BlankLineFile(t *testing.T) {
 	}
 }
 
-// TestReadChainLink_UnreadableFile covers: a non-empty file that can't be
-// read (chmod 000) surfaces the os.ReadFile error.
 func TestReadChainLink_UnreadableFile(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("running as root cannot mask read permission")
@@ -477,7 +461,6 @@ func TestJSONStringEscape(t *testing.T) {
 }
 
 func TestSHA256Hex(t *testing.T) {
-	// Known vector: sha256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 	if sha256Hex("") != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
 		t.Errorf("sha256Hex empty mismatch")
 	}

@@ -9,10 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
 )
 
-// TestParseGoTestJSON_SkipCarriesSkipExitCode names the acssuite.SkipExitCode
-// const: a t.Skip'd predicate maps to a Result whose ExitCode is the
-// TAP/automake SKIP convention, the value the audit/ship gate reads to count
-// it neither red nor green.
 func TestParseGoTestJSON_SkipCarriesSkipExitCode(t *testing.T) {
 	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_001_Skip", "skip"))
 	results := parseGoTestJSON(strings.NewReader(raw), 9)

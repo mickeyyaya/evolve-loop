@@ -178,6 +178,7 @@ Go files is each batch's count of changed Go files. The landing proof's verified
 | 83 | `internal/releasepreflight`, `internal/subagent/subagentrun`, `internal/commitgate`, all files | 38 | 1,345 → 9 | — | on the round-12 comment PR |
 | 84 | `internal/dashboard`, `internal/scopedelta`, `internal/gitexec`, all files | 39 | 1,265 → 10 | — | on the round-12 comment PR |
 | 85 | `go/acs`, all files (step 3c: `commentaudit strip acs`, then `commentaudit history`: 1,283 history-bearing groups archived in 485 pages under `docs/history/code-comments/`) | 543 | 44,439 → 1,129 (the rest machine-read: build tags, `acs-predicate:` markers) | — | on the go/acs strip PR |
+| 3d r1 | `internal/subagent` (with `subagentrun`), `internal/failurelog`, `internal/acssuite`, all files | 68 | 1,673 removed; 13 + 4 + 7 comment lines left | — | on the r1 comment branch |
 
 The three largest packages are split into file groups of about 40 files, taken in name order. Each group is one batch, and the package's design page fills in group by group. Narrative is not measured per group.
 

@@ -22,14 +22,10 @@ func TestCycleNumFromDir_BoundaryAndInvalid(t *testing.T) {
 		{"cycle1", 1, true},
 		{"cycle0", 0, true},
 		{"cycle99999", 99999, true},
-		// Edge: "cycle" with nothing after it — empty Atoi → error.
 		{"cycle", 0, false},
-		// Non-numeric suffix.
 		{"cycleabc", 0, false},
 		{"cycledefense1", 0, false},
-		// Negative cycles: Atoi parses "-1" as -1 (valid but odd).
 		{"cycle-1", -1, true},
-		// Wrong prefix.
 		{"notcycle1", 0, false},
 		{"CYCLE1", 0, false},
 		{"", 0, false},

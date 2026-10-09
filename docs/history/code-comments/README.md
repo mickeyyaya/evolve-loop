@@ -493,7 +493,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `acs/regression/protectedsurface` | 2 | [acs-regression-protectedsurface.md](acs-regression-protectedsurface.md) |
 | `cmd/evolve-fake-cli` | 1 | [cmd-evolve-fake-cli.md](cmd-evolve-fake-cli.md) |
 | `cmd/evolve` | 433 | [cmd-evolve.md](cmd-evolve.md) |
-| `internal/acssuite` | 26 | [internal-acssuite.md](internal-acssuite.md) |
+| `internal/acssuite` | 27 | [internal-acssuite.md](internal-acssuite.md) |
 | `internal/adapters/bridge` | 32 | [internal-adapters-bridge.md](internal-adapters-bridge.md) |
 | `internal/adapters/ledger` | 27 | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/adapters/observer` | 30 | [internal-adapters-observer.md](internal-adapters-observer.md) |
@@ -519,6 +519,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/evalgate` | 31 | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/evalqualitycheck` | 15 | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
 | `internal/faillearn` | 19 | [internal-faillearn.md](internal-faillearn.md) |
+| `internal/failurelog` | 9 | [internal-failurelog.md](internal-failurelog.md) |
 | `internal/flagregistry` | 7 | [internal-flagregistry.md](internal-flagregistry.md) |
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
 | `internal/gitexec` | 15 | [internal-gitexec.md](internal-gitexec.md) |
@@ -558,7 +559,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/setup` | 3 | [internal-setup.md](internal-setup.md) |
 | `internal/skillcheck` | 5 | [internal-skillcheck.md](internal-skillcheck.md) |
 | `internal/subagent/subagentrun` | 6 | [internal-subagent-subagentrun.md](internal-subagent-subagentrun.md) |
-| `internal/subagent` | 24 | [internal-subagent.md](internal-subagent.md) |
+| `internal/subagent` | 26 | [internal-subagent.md](internal-subagent.md) |
 | `internal/swarm` | 18 | [internal-swarm.md](internal-swarm.md) |
 | `internal/tokenusage` | 24 | [internal-tokenusage.md](internal-tokenusage.md) |
 | `internal/topngate` | 28 | [internal-topngate.md](internal-topngate.md) |

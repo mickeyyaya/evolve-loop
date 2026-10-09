@@ -23,16 +23,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// Request is the typed input to Runner.Run. Caller is responsible for
-// supplying the persona task body (Prompt); the runner prepends a
-// CHALLENGE TOKEN block so the LLM knows it must echo the token in the
-// artifact's first line.
 type Request struct {
 	Agent       string
 	Cycle       int
-	ProjectRoot string // writable project root (host repo)
-	PluginRoot  string // immutable plugin root (profiles, prompts live here)
-	Workspace   string // .evolve/runs/cycle-N/ — bridge writes outputs here
+	ProjectRoot string
+	PluginRoot  string
+	Workspace   string
 	Worktree    string
 	Prompt      string
 	Model       string
@@ -40,69 +36,45 @@ type Request struct {
 	Env         map[string]string
 }
 
-// Result captures everything Run() observed. The LedgerEntry is the
-// exact line that was appended (so callers can inspect entry_seq etc.).
 type Result struct {
-	Verdict        string // PASS | FAIL | INTEGRITY_FAIL
+	Verdict        string
 	ArtifactPath   string
-	ArtifactSHA256 string // empty if the artifact is missing
+	ArtifactSHA256 string
 	ChallengeToken string
 	CostUSD        float64
 	Tokens         core.TokenUsage
-	DurationMS     int64 // wall-clock duration including bridge launch
+	DurationMS     int64
 	ExitCode       int
 	LedgerEntry    core.LedgerEntry
 	Diagnostics    []core.Diagnostic
 }
 
-// Verdict constants returned by Run — the unit-16 leaf's vocabulary,
-// projected by name (ADR-0103).
 const (
 	VerdictPASS          = subagentrun.VerdictPASS
 	VerdictFAIL          = subagentrun.VerdictFAIL
 	VerdictIntegrityFail = subagentrun.VerdictIntegrityFail
 )
 
-// ArtifactMaxAge is the artifact freshness window.
 const ArtifactMaxAge = subagentrun.ArtifactMaxAge
 
-// ChallengeTokenBytes is the size of the random source used for the
-// 16-hex token (8 bytes → 16 hex chars).
 const ChallengeTokenBytes = subagentrun.ChallengeTokenBytes
 
-// Config wires in all the injectable seams; New fills unset seams with
-// production defaults.
 type Config struct {
-	Profiles *profiles.Loader
-	Bridge   core.Bridge
-	Ledger   core.Ledger
-	// Now returns the current wall clock. Defaults to time.Now.
-	Now func() time.Time
-	// Rand returns ChallengeTokenBytes random bytes. Defaults to
-	// crypto/rand.Read.
-	Rand func([]byte) (int, error)
-	// GitState returns ("<head>", "<tree-diff-sha256>", err) for the
-	// given project root. Defaults to running `git rev-parse HEAD` +
-	// `git diff HEAD | sha256sum`.
-	GitState func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
-	// HashFile returns the sha256 hex of the file at path. Defaults to
-	// reading and hashing via sha256.New().
-	HashFile func(path string) (string, error)
-	// StatMTime returns the modification time of path. Defaults to
-	// os.Stat.
+	Profiles  *profiles.Loader
+	Bridge    core.Bridge
+	Ledger    core.Ledger
+	Now       func() time.Time
+	Rand      func([]byte) (int, error)
+	GitState  func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
+	HashFile  func(path string) (string, error)
 	StatMTime func(path string) (time.Time, error)
-	// ReadFile returns the bytes at path. Defaults to os.ReadFile.
-	ReadFile func(path string) ([]byte, error)
+	ReadFile  func(path string) ([]byte, error)
 }
 
-// Runner is the subagent dispatcher. Constructed via New() with a fully
-// populated Config.
 type Runner struct {
 	cfg Config
 }
 
-// New constructs a Runner. Required fields: Profiles, Bridge, Ledger.
-// Other seams default to production implementations.
 func New(cfg Config) (*Runner, error) {
 	if cfg.Profiles == nil {
 		return nil, errors.New("subagent: Profiles required")
@@ -134,9 +106,6 @@ func New(cfg Config) (*Runner, error) {
 	return &Runner{cfg: cfg}, nil
 }
 
-// Run drives one subagent invocation end-to-end. The returned Result
-// always carries the ledger entry, even on failure, so post-mortem
-// analysis has provenance.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	if err := validateRequest(req); err != nil {
 		return Result{}, err
@@ -154,8 +123,6 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	gitHead, treeDiff, err := r.cfg.GitState(ctx, req.ProjectRoot)
 	if err != nil {
-		// Non-fatal: falls back to "unknown" so the ledger entry still
-		// records what we have.
 		gitHead, treeDiff = "unknown", "unknown"
 	}
 
@@ -189,10 +156,6 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	fullPrompt := composePrompt(req.Prompt, token, artifactPath, req.Agent, req.Cycle)
 
-	// Skill overlays: resolve the tier-gated persona set for this launch and
-	// thread the NAMES onto BridgeRequest.Skills, exactly as the phase runner
-	// does — so a native-bridge subagent dispatch (deep/top tier) gets the fable
-	// operating-discipline overlay too. Fail-open on a missing/malformed policy.
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, req.Agent, cli, model)
 
 	start := r.cfg.Now()
@@ -241,10 +204,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		ChallengeToken: token,
 		GitHEAD:        gitHead,
 		TreeStateSHA:   treeDiff,
-		// Resolved from the run workspace, not a global: ship's binding
-		// lookup is run-scoped, and this runner may execute out of the
-		// orchestrator's process.
-		RunID: core.RunIDFromWorkspace(req.Workspace),
+		RunID:          core.RunIDFromWorkspace(req.Workspace),
 	}
 	if ledgerErr := r.cfg.Ledger.Append(ctx, entry); ledgerErr != nil {
 		res.Diagnostics = append(res.Diagnostics, core.Diagnostic{

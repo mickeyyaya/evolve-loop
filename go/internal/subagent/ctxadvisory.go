@@ -6,18 +6,12 @@ import (
 	"strconv"
 )
 
-// CheckCtxAdvisoryResult carries the outcome of the context-tokens advisory
-// check. Emit is true iff an advisory line should be printed.
 type CheckCtxAdvisoryResult struct {
 	Emit      bool
-	Threshold int    // resolved value from profile.context_clear_trigger_tokens, 0 if absent
-	Message   string // advisory line; empty unless Emit is true
+	Threshold int
+	Message   string
 }
 
-// CheckCtxAdvisory parses the profile JSON and decides whether to emit an
-// advisory when the test-agent's current context size exceeds the profile's
-// declared threshold. Error is non-nil only when the profile file cannot be
-// read, so the CLI can decide whether to surface a WARN.
 func CheckCtxAdvisory(profilePath string, tokens int) (CheckCtxAdvisoryResult, error) {
 	body, err := os.ReadFile(profilePath)
 	if err != nil {

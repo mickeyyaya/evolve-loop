@@ -43,8 +43,6 @@ func TestCheckToken(t *testing.T) {
 }
 
 func TestCheckToken_UnreadablePathOnPermissionError(t *testing.T) {
-	// On *nix we can mask read permission to drive the non-IsNotExist branch.
-	// Skip on platforms where this doesn't work (e.g., root).
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, cannot mask read permission")
 	}
@@ -61,7 +59,6 @@ func TestCheckToken_UnreadablePathOnPermissionError(t *testing.T) {
 	if res.OK {
 		t.Fatalf("expected failure on permission-denied")
 	}
-	// Either "unreadable" (read error) or "missing" depending on platform.
 	if !strings.Contains(res.Reason, "unreadable") && !strings.Contains(res.Reason, "missing") {
 		t.Errorf("unexpected reason: %q", res.Reason)
 	}

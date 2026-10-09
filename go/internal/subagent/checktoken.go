@@ -6,16 +6,11 @@ import (
 	"os"
 )
 
-// CheckTokenResult is either OK or INTEGRITY_FAIL. Reason carries a
-// human-readable message; callers can format it however they like.
 type CheckTokenResult struct {
 	OK     bool
 	Reason string
 }
 
-// CheckToken validates that the artifact at path exists and contains the
-// challenge token. Returns a struct so the CLI shim can map to exit codes
-// without re-deciding.
 func CheckToken(artifactPath, token string) CheckTokenResult {
 	body, err := os.ReadFile(artifactPath)
 	if err != nil {

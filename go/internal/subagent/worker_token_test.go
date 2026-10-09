@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-// TestDefaultVerifyWorkerArtifact_TokenChecked pins that the per-worker
-// verifier rejects an artifact lacking the expected token and accepts one
-// bearing it: fan-out per-worker artifact verification checks provenance,
-// not just presence.
 func TestDefaultVerifyWorkerArtifact_TokenChecked(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -33,15 +29,11 @@ func TestDefaultVerifyWorkerArtifact_TokenChecked(t *testing.T) {
 		t.Errorf("token-bearing fresh artifact must pass; got %s", got.Verdict)
 	}
 
-	// Missing artifact → not PASS (presence still enforced).
 	if got := defaultVerifyWorkerArtifact(time.Now, filepath.Join(dir, "nope.md"), "tok-worker-1"); got.Verdict == VerdictPASS {
 		t.Errorf("missing artifact must NOT pass; got %s", got.Verdict)
 	}
 }
 
-// TestBuildWorkerRecursionCommand_ThreadsWorkerToken pins that the worker
-// recursion command threads EVOLVE_FANOUT_WORKER_TOKEN so the worker writes the
-// parent-known token (the provenance the parent later verifies).
 func TestBuildWorkerRecursionCommand_ThreadsWorkerToken(t *testing.T) {
 	t.Parallel()
 	cmd := buildWorkerRecursionCommand("/bin/evolve", "auditor", "sub1", 7, 1, "/ws", "/p.md", "ptok-worker-sub1")
@@ -51,15 +43,11 @@ func TestBuildWorkerRecursionCommand_ThreadsWorkerToken(t *testing.T) {
 	if !strings.Contains(cmd, "ptok-worker-sub1") {
 		t.Errorf("worker command must carry the per-worker token value: %s", cmd)
 	}
-	// The existing recursion contract is unchanged.
 	if !strings.Contains(cmd, "CLAUDECODE_TYPE= ") || !strings.Contains(cmd, "subagent run auditor-worker-sub1 ") {
 		t.Errorf("worker command must preserve B2 recursion contract: %s", cmd)
 	}
 }
 
-// TestRun_ChallengeTokenOverride pins that a fan-out worker uses the
-// parent-dictated token (so its artifact bears the token the parent verifies)
-// instead of minting a fresh one.
 func TestRun_ChallengeTokenOverride(t *testing.T) {
 	t.Parallel()
 	tmp := t.TempDir()

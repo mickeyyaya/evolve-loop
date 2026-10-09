@@ -14,19 +14,12 @@ import (
 	"strings"
 )
 
-// ScopeFinding is one out-of-scope package reference inside a cycle predicate.
 type ScopeFinding struct {
-	Test    string // predicate test function name
-	File    string // basename of the source file
-	Pattern string // the offending package pattern, as written
+	Test    string
+	File    string
+	Pattern string
 }
 
-// LintPredicateScope parses the cycle predicate sources in dir and returns a
-// finding per test function that references a Go package pattern outside
-// touched. An empty touched set lints nothing — with no scope authority a
-// wrong guess would demote a legitimate gate. Const indirection is resolved:
-// package-level string consts/vars count as references in every function
-// that names them.
 func LintPredicateScope(dir string, touched []string) ([]ScopeFinding, error) {
 	if len(touched) == 0 {
 		return nil, nil
@@ -50,9 +43,6 @@ func LintPredicateScope(dir string, touched []string) ([]ScopeFinding, error) {
 	return findings, nil
 }
 
-// parseGoDir parses every .go file in dir (house idiom: os.ReadDir +
-// parser.ParseFile — parser.ParseDir/ast.Package are deprecated since 1.22).
-// Deterministic file order, unlike ParseDir's map iteration.
 func parseGoDir(dir string) ([]*ast.File, []string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -75,7 +65,6 @@ func parseGoDir(dir string) ([]*ast.File, []string, error) {
 	return files, names, nil
 }
 
-// fileScopeFindings lints one parsed file's test functions.
 func fileScopeFindings(file *ast.File, name string, consts map[string]string, inScope map[string]bool) []ScopeFinding {
 	var findings []ScopeFinding
 	for _, decl := range file.Decls {
@@ -94,7 +83,6 @@ func fileScopeFindings(file *ast.File, name string, consts map[string]string, in
 	return findings
 }
 
-// packageStringConsts collects package-level string const/var values by name.
 func packageStringConsts(files []*ast.File) map[string]string {
 	out := map[string]string{}
 	for _, file := range files {
@@ -123,8 +111,6 @@ func packageStringConsts(files []*ast.File) map[string]string {
 	return out
 }
 
-// functionPackagePatterns returns every package-pattern-shaped string a test
-// function references — inline literals plus package-level const/var names.
 func functionPackagePatterns(fn *ast.FuncDecl, consts map[string]string) []string {
 	var out []string
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
@@ -145,23 +131,12 @@ func functionPackagePatterns(fn *ast.FuncDecl, consts map[string]string) []strin
 	return out
 }
 
-// isPackagePattern reports whether s is shaped like a `go test` package
-// argument. Delegates to gopkgpattern — the SAME rule the authoring-time
-// flaky-shape lint applies (internal/evalqualitycheck), so a shape one lint
-// stops recognizing cannot silently stop being demoted by the other.
 func isPackagePattern(s string) bool {
 	return gopkgpattern.IsPackagePattern(s)
 }
 
-// wholeModuleKey is patternKey's marker for "./..." — every package at once,
-// in scope only if the touched set itself says "everything" (it never does).
 const wholeModuleKey = "(whole-module)"
 
-// patternKey normalizes a pattern to a module-relative directory key so
-// "./internal/bridge/...", "./internal/bridge" and the full import path all
-// compare equal ("internal/bridge"). Unrecognized shapes yield "". The bare
-// whole-module sweep gets this package's never-in-scope marker instead of
-// gopkgpattern's "" (which would make it fail open into "unrecognized").
 func patternKey(p string) string {
 	if strings.TrimSpace(p) == gopkgpattern.WholeModule {
 		return wholeModuleKey
@@ -169,24 +144,14 @@ func patternKey(p string) string {
 	return gopkgpattern.Key(p)
 }
 
-// scopeLintChangedPackages derives the touched set for the lint from GIT, and
-// git only — never the builder-written handoff, which is agent-authored: a
-// builder could shrink `touched` to demote sibling predicates (gate-weakening).
-// Seam var so tests can inject.
 var scopeLintChangedPackages = func(worktreeRoot string) []string {
 	pkgs, ok := changedpkgs.FromGitChecked(worktreeRoot, "HEAD")
 	if !ok {
-		return nil // git underivable → no scope authority → lint stands down
+		return nil
 	}
 	return pkgs
 }
 
-// demoteOutOfScope applies the scope lint to the CURRENT cycle's results: a
-// predicate whose source references package patterns outside the cycle's
-// git-derived touched set is demoted to SKIP regardless of outcome —
-// authorship-based, so TDD sees it on the first run, not only under
-// contamination. Loud (EvidenceNote + verdict warning); a lint error disables
-// the lint with a warning instead of failing silently.
 func demoteOutOfScope(results []Result, opts Options) []string {
 	touched := scopeLintChangedPackages(opts.Root)
 	if len(touched) == 0 {
@@ -229,8 +194,6 @@ func demoteOutOfScope(results []Result, opts Options) []string {
 		pats := flagged[testRootName(name)]
 		results[i].ResultStr = "skip"
 		results[i].ExitCode = SkipExitCode
-		// Append to any existing note: parseGoTestJSON may already have
-		// recorded the no-FAIL-line diagnosis, and demotion must not erase it.
 		if results[i].EvidenceNote != "" {
 			results[i].EvidenceNote += " | "
 		}
@@ -243,10 +206,6 @@ func demoteOutOfScope(results []Result, opts Options) []string {
 	return warnings
 }
 
-// testRootName maps a go-test result name to its declaring function: a
-// subtest "TestFoo/case_3" demotes with its parent (the lint sees functions,
-// go test emits one Result per subtest — cycles with table-driven predicates
-// would otherwise keep red subtests after the parent demoted).
 func testRootName(name string) string {
 	if i := strings.IndexByte(name, '/'); i >= 0 {
 		return name[:i]
@@ -254,7 +213,6 @@ func testRootName(name string) string {
 	return name
 }
 
-// moduleRoot resolves the Go module dir (shared default with runGoTest).
 func moduleRoot(opts Options) string {
 	if opts.GoModuleDir != "" {
 		return opts.GoModuleDir

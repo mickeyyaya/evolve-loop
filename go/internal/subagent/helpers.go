@@ -12,22 +12,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// AbnormalEvent is the workspace/abnormal-events.jsonl line schema.
-// Best-effort: a missing workspace dir is a no-op.
 type AbnormalEvent struct {
 	EventType       string
 	Severity        string
 	Details         string
 	RemediationHint string
-	// SourcePhase defaults to "subagent-run"; callers running from a
-	// different phase scope may override it (e.g. the fanout aggregator).
-	SourcePhase string
+	SourcePhase     string
 }
 
-// AppendAbnormalEvent writes one event line to <workspace>/abnormal-events.jsonl.
-// Returns nil when the workspace doesn't exist (best-effort semantics).
-// Returns an error only when the directory exists but the file write fails
-// for a non-skippable reason.
 func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
@@ -60,7 +52,6 @@ func AppendAbnormalEvent(workspace string, ev AbnormalEvent, now func() time.Tim
 	return nil
 }
 
-// FanoutLedgerEntry is the typed input to WriteFanoutLedgerEntry.
 type FanoutLedgerEntry struct {
 	Cycle          int
 	Agent          string
@@ -70,13 +61,10 @@ type FanoutLedgerEntry struct {
 	WorkerNames    []string
 	WorkerCount    int
 	ExitCode       int
-	AggregatePath  string // may be empty when no aggregate produced
-	QualityTier    string // default "unknown"
+	AggregatePath  string
+	QualityTier    string
 }
 
-// WriteFanoutLedgerEntry appends a single `kind: "agent_fanout"` entry to
-// ledger.jsonl and updates ledger.tip atomically, with a hash-chain link
-// from the SHA256 of the prior line.
 func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
@@ -108,8 +96,6 @@ func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() t
 		quality = "unknown"
 	}
 
-	// Field order is stable because downstream verifiers and the
-	// ledgerverify chain-link both hash the line.
 	line := fmt.Sprintf(
 		`{"ts":"%s","cycle":%d,"role":"%s","kind":"agent_fanout","exit_code":%d,`+
 			`"artifact_path":"%s","artifact_sha256":"%s","challenge_token":"%s",`+
@@ -143,7 +129,6 @@ func WriteFanoutLedgerEntry(ledgerPath string, e FanoutLedgerEntry, now func() t
 		return fmt.Errorf("subagent/helpers: close ledger: %w", err)
 	}
 
-	// Update tip atomically: <seq>:<sha256-of-new-line>\n
 	tipPath := filepath.Join(filepath.Dir(ledgerPath), "ledger.tip")
 	tip := fmt.Sprintf("%d:%s\n", entrySeq, sha256Hex(line))
 	tmp := tipPath + ".tmp"

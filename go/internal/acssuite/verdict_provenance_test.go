@@ -35,9 +35,6 @@ func TestRun_StampsSuiteAndProjectRoot(t *testing.T) {
 		t.Errorf("written verdict roots = %v / %v, want %q / %q", got["suite_root"], got["project_root"], root, "/plane")
 	}
 
-	// Unstamped shape (empty ProjectRoot — the caller's-env inherit mode):
-	// the keys must be ABSENT, not empty strings, so pre-stamp readers and
-	// mismatch checks both see "unstamped".
 	v2, err := Run(Options{Root: root, Cycle: 9, GoExec: seamGo(raw, nil)})
 	if err != nil {
 		t.Fatal(err)

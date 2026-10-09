@@ -1,17 +1,5 @@
 //go:build integration
 
-// apicover_named_test.go — public-API coverage (ADR-0050 Phase 5). Names and
-// exercises exported symbols apicover flagged uncovered in this package:
-//   - const LegacyEffectiveTTL (prune.go) — asserted via PruneExpired's legacy
-//     recordedAt fallback (an entry recordedAt+LegacyEffectiveTTL in the past
-//     is pruned; one inside the window is kept).
-//   - const MaxEntries (record.go) — asserted via Record's FIFO trim cap.
-//   - type PruneResult (prune.go) — asserted by full-struct equality on the
-//     value PruneExpired returns.
-//   - type Recorded (record.go) — asserted by full-struct equality on the
-//     value Record returns.
-//
-// Each test asserts a real contract (Rule 9), not a no-op reference.
 package failurelog
 
 import (
@@ -22,9 +10,6 @@ import (
 	"time"
 )
 
-// writeStateFile seeds state.json with the given top-level map and returns its
-// path. Local to this tagged file so it does not collide with the untagged
-// helpers (writeState/seedStateWithEntries) which live in non-integration tests.
 func writeStateFile(t *testing.T, state map[string]any) string {
 	t.Helper()
 	raw, err := json.Marshal(state)
@@ -38,19 +23,12 @@ func writeStateFile(t *testing.T, state map[string]any) string {
 	return path
 }
 
-// TestLegacyEffectiveTTL_PrunesAtBoundary pins LegacyEffectiveTTL's role: a
-// legacy entry (recordedAt, no expiresAt) is expired exactly when
-// recordedAt + LegacyEffectiveTTL is in the past. We seed two entries that
-// straddle that boundary relative to `now` and assert only the older one is
-// removed — proving the constant is the TTL the pruner actually applies.
 func TestLegacyEffectiveTTL_PrunesAtBoundary(t *testing.T) {
 	if LegacyEffectiveTTL != 24*time.Hour {
 		t.Fatalf("LegacyEffectiveTTL = %v, want 24h", LegacyEffectiveTTL)
 	}
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
-	// Entry A: recordedAt is LegacyEffectiveTTL+1m before now → expired.
 	recA := now.Add(-LegacyEffectiveTTL - time.Minute).Format(time.RFC3339)
-	// Entry B: recordedAt is LegacyEffectiveTTL-1m before now → still inside TTL.
 	recB := now.Add(-LegacyEffectiveTTL + time.Minute).Format(time.RFC3339)
 	path := writeStateFile(t, map[string]any{
 		"failedApproaches": []map[string]any{
@@ -67,9 +45,6 @@ func TestLegacyEffectiveTTL_PrunesAtBoundary(t *testing.T) {
 	}
 }
 
-// TestMaxEntries_CapsFIFO pins MaxEntries as the FIFO cap Record enforces:
-// seeding MaxEntries existing entries then appending one more must leave
-// exactly MaxEntries (the oldest dropped).
 func TestMaxEntries_CapsFIFO(t *testing.T) {
 	if MaxEntries != 50 {
 		t.Fatalf("MaxEntries = %d, want 50", MaxEntries)
@@ -103,14 +78,12 @@ func TestMaxEntries_CapsFIFO(t *testing.T) {
 	}
 }
 
-// TestPruneResult_FullStructEquality asserts the PruneResult value PruneExpired
-// returns equals the expected summary field-for-field (Before/After/Removed).
 func TestPruneResult_FullStructEquality(t *testing.T) {
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	path := writeStateFile(t, map[string]any{
 		"failedApproaches": []map[string]any{
-			{"cycle": float64(1), "expiresAt": "2026-05-22T11:59:59Z"}, // expired
-			{"cycle": float64(2), "expiresAt": "2026-06-01T00:00:00Z"}, // kept
+			{"cycle": float64(1), "expiresAt": "2026-05-22T11:59:59Z"},
+			{"cycle": float64(2), "expiresAt": "2026-06-01T00:00:00Z"},
 		},
 	})
 	got, err := PruneExpired(path, now)
@@ -123,9 +96,6 @@ func TestPruneResult_FullStructEquality(t *testing.T) {
 	}
 }
 
-// TestRecorded_FullStructEquality asserts the Recorded value Record returns
-// equals the expected entry field-for-field — the deterministic Now lets us pin
-// RecordedAt and ExpiresAt (1 day later for infrastructure-transient).
 func TestRecorded_FullStructEquality(t *testing.T) {
 	path := writeStateFile(t, map[string]any{"lastCycleNumber": float64(4)})
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)

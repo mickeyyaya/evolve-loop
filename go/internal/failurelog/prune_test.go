@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-// seedStateWithEntries writes state.json with the given failedApproaches.
 func seedStateWithEntries(t *testing.T, entries []map[string]any) string {
 	t.Helper()
 	state := map[string]any{
@@ -24,9 +23,9 @@ func TestPruneExpired_RemovesPastExpiresAt(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	path := seedStateWithEntries(t, []map[string]any{
-		{"cycle": float64(1), "expiresAt": "2026-05-22T11:59:59Z"}, // expired
-		{"cycle": float64(2), "expiresAt": "2026-05-23T13:00:00Z"}, // still good
-		{"cycle": float64(3), "expiresAt": "2026-05-23T11:59:59Z"}, // expired (1s before now)
+		{"cycle": float64(1), "expiresAt": "2026-05-22T11:59:59Z"},
+		{"cycle": float64(2), "expiresAt": "2026-05-23T13:00:00Z"},
+		{"cycle": float64(3), "expiresAt": "2026-05-23T11:59:59Z"},
 	})
 	res, err := PruneExpired(path, now)
 	if err != nil {
@@ -49,10 +48,7 @@ func TestPruneExpired_LegacyRecordedAtFallback(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	path := seedStateWithEntries(t, []map[string]any{
-		// Legacy entry with only recordedAt — 2 days old, default TTL
-		// 1 day → expired.
 		{"cycle": float64(1), "recordedAt": "2026-05-21T12:00:00Z"},
-		// Legacy entry within TTL window → kept.
 		{"cycle": float64(2), "recordedAt": "2026-05-23T11:30:00Z"},
 	})
 	res, err := PruneExpired(path, now)
@@ -67,7 +63,6 @@ func TestPruneExpired_LegacyRecordedAtFallback(t *testing.T) {
 func TestPruneExpired_KeepsEntriesWithoutTimestamps(t *testing.T) {
 	t.Parallel()
 	path := seedStateWithEntries(t, []map[string]any{
-		// True legacy: no timestamps at all → keep.
 		{"cycle": float64(1), "classification": "infrastructure-transient"},
 	})
 	res, err := PruneExpired(path, time.Now())
@@ -83,7 +78,6 @@ func TestPruneExpired_MalformedExpiresAtKept(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()
 	path := seedStateWithEntries(t, []map[string]any{
-		// Malformed timestamp — we keep rather than risk losing data.
 		{"cycle": float64(1), "expiresAt": "not-a-timestamp"},
 	})
 	res, err := PruneExpired(path, now)
@@ -97,12 +91,10 @@ func TestPruneExpired_MalformedExpiresAtKept(t *testing.T) {
 
 func TestPruneExpired_NonObjectEntryKept(t *testing.T) {
 	t.Parallel()
-	// Bizarre case: failedApproaches contains a non-object element.
-	// The pruner must not panic and must keep it (don't lose data).
 	raw, _ := json.Marshal(map[string]any{
 		"failedApproaches": []any{
 			"just-a-string-somehow",
-			map[string]any{"cycle": float64(2), "expiresAt": "2020-01-01T00:00:00Z"}, // expired
+			map[string]any{"cycle": float64(2), "expiresAt": "2020-01-01T00:00:00Z"},
 		},
 	})
 	path := mustWrite(t, filepath.Join(t.TempDir(), "state.json"), string(raw))
@@ -155,11 +147,10 @@ func TestPruneExpired_NoRemovalSkipsWrite(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	path := seedStateWithEntries(t, []map[string]any{
-		{"cycle": float64(1), "expiresAt": "2026-06-01T00:00:00Z"}, // still good
+		{"cycle": float64(1), "expiresAt": "2026-06-01T00:00:00Z"},
 	})
-	// Capture mtime before + after to prove no write happened.
 	before, _ := os.Stat(path)
-	time.Sleep(15 * time.Millisecond) // ensure mtime would differ on a write
+	time.Sleep(15 * time.Millisecond)
 	if _, err := PruneExpired(path, now); err != nil {
 		t.Fatalf("PruneExpired: %v", err)
 	}
@@ -185,7 +176,6 @@ func TestPruneExpired_MalformedRecordedAtKept(t *testing.T) {
 }
 
 func TestPruneExpired_AtomicWriteError(t *testing.T) {
-	// NOT t.Parallel — mutates package-level atomicWriteJSON.
 	prev := atomicWriteJSON
 	defer func() { atomicWriteJSON = prev }()
 	atomicWriteJSON = func(string, map[string]any) error {
@@ -193,7 +183,7 @@ func TestPruneExpired_AtomicWriteError(t *testing.T) {
 	}
 	now := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	path := seedStateWithEntries(t, []map[string]any{
-		{"cycle": float64(1), "expiresAt": "2026-05-22T11:59:59Z"}, // expired
+		{"cycle": float64(1), "expiresAt": "2026-05-22T11:59:59Z"},
 	})
 	if _, err := PruneExpired(path, now); err == nil {
 		t.Fatalf("expected write error")

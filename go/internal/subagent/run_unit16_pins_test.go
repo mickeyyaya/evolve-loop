@@ -16,8 +16,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
-// unit16Goldens is where the pre-extraction goldens live, paths templated as
-// {WS} / {ROOT} / {WORKTREE}.
 const unit16Goldens = "subagentrun/testdata"
 
 func unit16Golden(t *testing.T, name string, pairs ...string) string {
@@ -33,8 +31,6 @@ func unit16Golden(t *testing.T, name string, pairs ...string) string {
 	return s
 }
 
-// unit16Dirs is the fixture layout every pin shares: a workspace and a
-// worktree under one root.
 func unit16Dirs(t *testing.T) (root, ws, worktree string) {
 	t.Helper()
 	root = t.TempDir()
@@ -47,8 +43,6 @@ func unit16Dirs(t *testing.T) (root, ws, worktree string) {
 	return root, ws, worktree
 }
 
-// unit16Capturing wraps the fixture's adapter so the delivered prompt and the
-// adapter env are observable.
 func unit16Capturing(opts *RunOptions, prompt *string, env *map[string]string) {
 	orig := opts.ExecAdapter
 	opts.ExecAdapter = func(ctx context.Context, adapter string, e map[string]string) (int, error) {
@@ -63,8 +57,6 @@ func unit16Capturing(opts *RunOptions, prompt *string, env *map[string]string) {
 	}
 }
 
-// unit16EnvJSON renders the adapter env the way the golden writer did: sorted
-// keys, PROMPT_FILE and the fixture paths templated.
 func unit16EnvJSON(env map[string]string, pairs ...string) string {
 	keys := make([]string, 0, len(env))
 	for k := range env {
@@ -93,7 +85,6 @@ func unit16EnvJSON(env map[string]string, pairs ...string) string {
 	return b.String()
 }
 
-// unit16Auditor is runHappyOpts over an auditor profile.
 func unit16Auditor(t *testing.T) RunOptions {
 	t.Helper()
 	o := runHappyOpts(t)
@@ -103,8 +94,6 @@ func unit16Auditor(t *testing.T) RunOptions {
 	return o
 }
 
-// unit16Artifact writes a sound artifact for the adapter stub: the token in
-// the first line, mtime = the fixture clock.
 func unit16Artifact(t *testing.T, path, token string, at time.Time) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -118,9 +107,6 @@ func unit16Artifact(t *testing.T, path, token string, at time.Time) {
 	}
 }
 
-// TestRun_AdmissionOrderIsFixed pins that the six admission checks fire in a
-// fixed order: prompt reader, role, cycle, workspace, the legacy escape
-// hatch, the recursion depth.
 func TestRun_AdmissionOrderIsFixed(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	req := RunRequest{Agent: "bogus", Cycle: -1, WorkspacePath: "/non/existent", LegacyAgentDispatch: true, DispatchDepth: 99, WorktreePath: worktree, ProjectRoot: root}
@@ -156,8 +142,6 @@ func TestRun_AdmissionOrderIsFixed(t *testing.T) {
 	}
 }
 
-// TestRun_OneTokenReachesPromptEnvVerifyAndLedger pins that ONE token
-// reaches the prompt, the adapter env, the result and the ledger line.
 func TestRun_OneTokenReachesPromptEnvVerifyAndLedger(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	ledger := filepath.Join(root, "ledger.jsonl")
@@ -179,9 +163,6 @@ func TestRun_OneTokenReachesPromptEnvVerifyAndLedger(t *testing.T) {
 	}
 }
 
-// TestRun_PromptTempfileLivesOnlyDuringExec pins that the prompt temp file
-// exists (0600, the pattern, the full prompt) while the adapter runs and is
-// gone afterwards.
 func TestRun_PromptTempfileLivesOnlyDuringExec(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	opts := runHappyOpts(t)
@@ -214,9 +195,6 @@ func TestRun_PromptTempfileLivesOnlyDuringExec(t *testing.T) {
 	}
 }
 
-// TestRun_ComposedPromptIsByteIdenticalToTheGolden pins that the composed
-// prompt is byte-identical to the five goldens captured on the
-// pre-extraction code.
 func TestRun_ComposedPromptIsByteIdenticalToTheGolden(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	cases := []struct {
@@ -242,9 +220,6 @@ func TestRun_ComposedPromptIsByteIdenticalToTheGolden(t *testing.T) {
 	}
 }
 
-// TestRun_AdapterEnvIsByteIdenticalToTheGolden pins that the adapter env is
-// byte-identical to the two goldens: 17 keys with a project root, 16
-// without (EVOLVE_PROJECT_ROOT absent, never empty).
 func TestRun_AdapterEnvIsByteIdenticalToTheGolden(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	pairs := []string{ws, "{WS}", worktree, "{WORKTREE}", root, "{ROOT}"}
@@ -267,8 +242,6 @@ func TestRun_AdapterEnvIsByteIdenticalToTheGolden(t *testing.T) {
 	}
 }
 
-// TestRun_AuditorWorkerGetsTheFraming pins that the framing keys on the
-// parsed ROLE, so an auditor worker gets it and a scout worker does not.
 func TestRun_AuditorWorkerGetsTheFraming(t *testing.T) {
 	_, ws, worktree := unit16Dirs(t)
 	for agent, want := range map[string]bool{"auditor-worker-deep": true, "scout-worker-codebase": false} {
@@ -284,9 +257,6 @@ func TestRun_AuditorWorkerGetsTheFraming(t *testing.T) {
 	}
 }
 
-// TestRun_DurationBracketsOnlyTheAdapterCall pins that the four clock reads
-// are start, end, verify, ledger ts: the duration brackets only the adapter
-// call and duration_s truncates.
 func TestRun_DurationBracketsOnlyTheAdapterCall(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	ledger := filepath.Join(root, "ledger.jsonl")
@@ -302,7 +272,7 @@ func TestRun_DurationBracketsOnlyTheAdapterCall(t *testing.T) {
 		return ticks[call-1]
 	}
 	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
-		unit16Artifact(t, env["ARTIFACT_PATH"], env["CHALLENGE_TOKEN"], t0.Add(time.Hour)) // fresh at the verify read
+		unit16Artifact(t, env["ARTIFACT_PATH"], env["CHALLENGE_TOKEN"], t0.Add(time.Hour))
 		return 0, nil
 	}
 	res, err := Run(context.Background(), RunRequest{Agent: "scout", Cycle: 5, WorkspacePath: ws, ProjectRoot: root, WorktreePath: worktree, LedgerPath: ledger, PromptReader: strings.NewReader("hi\n")}, opts)
@@ -318,9 +288,6 @@ func TestRun_DurationBracketsOnlyTheAdapterCall(t *testing.T) {
 	}
 }
 
-// TestRun_WarnsOrderCapabilityThenFallbackTextPinned pins that the Warns
-// channel is the capability warns, then the fallback sentence (golden),
-// only when the worktree fell back.
 func TestRun_WarnsOrderCapabilityThenFallbackTextPinned(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	opts := runHappyOpts(t)
@@ -344,8 +311,6 @@ func TestRun_WarnsOrderCapabilityThenFallbackTextPinned(t *testing.T) {
 	}
 }
 
-// TestRun_LedgerWriteErrorMasksTheExecError pins that a ledger write error
-// masks the exec error; the result is populated.
 func TestRun_LedgerWriteErrorMasksTheExecError(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	blocker := filepath.Join(root, "blocker")
@@ -367,8 +332,6 @@ func TestRun_LedgerWriteErrorMasksTheExecError(t *testing.T) {
 	}
 }
 
-// TestRun_ProfileReadErrorTextDropsItsCause characterises: the profile read
-// error drops its cause.
 func TestRun_ProfileReadErrorTextDropsItsCause(t *testing.T) {
 	_, ws, worktree := unit16Dirs(t)
 	opts := runHappyOpts(t)
@@ -379,8 +342,6 @@ func TestRun_ProfileReadErrorTextDropsItsCause(t *testing.T) {
 	}
 }
 
-// TestRun_GitStateErrorStampsUnknown pins that an erroring or empty git
-// state stamps "unknown" into the line.
 func TestRun_GitStateErrorStampsUnknown(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	for name, c := range map[string]struct {
@@ -403,8 +364,6 @@ func TestRun_GitStateErrorStampsUnknown(t *testing.T) {
 	}
 }
 
-// TestRun_HashErrorLeavesSHAEmptyInTheLedger pins that a hash error leaves
-// artifact_sha256 empty and the run green.
 func TestRun_HashErrorLeavesSHAEmptyInTheLedger(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	ledger := filepath.Join(root, "ledger.jsonl")
@@ -420,9 +379,6 @@ func TestRun_HashErrorLeavesSHAEmptyInTheLedger(t *testing.T) {
 	}
 }
 
-// TestRun_EmptyArtifactTemplateProceedsToIntegrityFail characterises: an
-// empty output_artifact template proceeds to INTEGRITY_FAIL with an empty
-// artifact path in the ledger line.
 func TestRun_EmptyArtifactTemplateProceedsToIntegrityFail(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	ledger := filepath.Join(root, "ledger.jsonl")
@@ -440,8 +396,6 @@ func TestRun_EmptyArtifactTemplateProceedsToIntegrityFail(t *testing.T) {
 	}
 }
 
-// TestRun_VerdictWiringPerRung pins the verdict wiring per rung through the
-// adapter stub.
 func TestRun_VerdictWiringPerRung(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	clock := fixedClock(t, "2026-05-23T17:00:00Z")
@@ -483,12 +437,6 @@ func TestRun_VerdictWiringPerRung(t *testing.T) {
 	_ = root
 }
 
-// The ledger goldens test relocated to the leaf as
-// subagentrun.TestLedger_LineGoldenChainAndRunID with the writer it pins.
-
-// TestRun_LLMResolverErrorFallsBackWithoutWarns characterises: an LLM
-// resolver error falls back to the profile's cli with source=profile and no
-// Warns entry.
 func TestRun_LLMResolverErrorFallsBackWithoutWarns(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	opts := runHappyOpts(t)

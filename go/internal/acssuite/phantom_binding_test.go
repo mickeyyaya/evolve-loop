@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// Verbatim real evidence: both bound names renamed, nothing matched, go test
-// printed "no tests to run".
 const cycle1546PhantomOutput = `=== RUN   TestC1544_006_ReusedSnapshotNeverBecomesTheWorktreeBase
     predicates_test.go:73: binding test TestWorktreeReuseBase_SnapshotHeadResolvesToFirstNonSnapshotAncestor did NOT pass in internal/core (missing, failing, or hidden behind a build tag). exit=0
 combined go-test output:
@@ -36,8 +34,6 @@ func TestPhantomBindings_FailingBoundTestIsNotAPhantom(t *testing.T) {
 	}
 }
 
-// The PARTIAL shape: two names bound, one ran and passed, the renamed one
-// silently never ran ("no tests to run" absent because a sibling matched).
 func TestPhantomBindings_PartialPhantomIsCaught(t *testing.T) {
 	out := `    predicates_test.go:73: binding test TestGone_Renamed did NOT pass in internal/core (missing, failing, or hidden behind a build tag). exit=0
 --- PASS: TestStillHere_Works (0.01s)
@@ -105,10 +101,6 @@ func TestParseGoTestJSON_GreenCarriesNoPhantoms(t *testing.T) {
 	}
 }
 
-// Classification must be computed from the FULL output and FULL failing set,
-// not the truncated excerpt: a bound name that also appears as `--- FAIL:` in
-// the stream is a failing test, and the binding vocabulary buried beyond the
-// excerpt cap must still classify.
 func TestParseGoTestJSON_RecordUsesFullOutputAndFailingSet(t *testing.T) {
 	ev := func(test, action, out string) string {
 		e := map[string]string{"Action": action, "Package": "p", "Test": test}
@@ -118,8 +110,6 @@ func TestParseGoTestJSON_RecordUsesFullOutputAndFailingSet(t *testing.T) {
 		b, _ := json.Marshal(e)
 		return string(b)
 	}
-	// Filler large enough that the mid-stream binding line falls outside the
-	// head+tail excerpt window.
 	filler := strings.Repeat("x", 4000) + "\n"
 	stream := strings.Join([]string{
 		ev("TestPred", "run", ""),

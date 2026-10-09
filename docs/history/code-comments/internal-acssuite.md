@@ -350,3 +350,11 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // stamps suite_root/project_root; readers treat ABSENCE as "unstamped"
 // (pre-stamp verdicts stay honored), never as a mismatch.
 ```
+
+## phase 3d r1 (subagent, failurelog, acssuite)
+
+### `go/internal/acssuite/acssuite_golane_test.go:258` — above `mustMkdir(t, filepath.Join(goDir, "acs", "cycle5"))`
+
+```text
+// A Go module with an acs/ tree and a cycle5 package — but the run is cycle 9.
+```

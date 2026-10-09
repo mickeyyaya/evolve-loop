@@ -13,8 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
-// EvidenceIdentity comes from the host dispatch, never the predicate artifact.
-// TreeSHA is the full Git tree tested by this audit round.
 type EvidenceIdentity struct {
 	Cycle   int    `json:"cycle"`
 	RunID   string `json:"run_id"`
@@ -33,9 +31,6 @@ const evidencePrefix = "<!-- evolve-acs-evidence: "
 
 var evidencePattern = regexp.MustCompile(`<!-- evolve-acs-evidence: ([^\r\n]*?) -->`)
 
-// ReadVerdict validates the complete execution result rather than interpreting
-// missing fields as successful zero values. Historical records remain readable
-// elsewhere; an incomplete historical record cannot authorize a new ship.
 func ReadVerdict(raw []byte) (Verdict, error) {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
@@ -108,9 +103,6 @@ func validEvidenceIdentity(id EvidenceIdentity) error {
 	return nil
 }
 
-// InvalidateEvidence retires every candidate receipt before host verification.
-// Even malformed agent input loses the reserved marker. Failure must prevent
-// the orchestrator from recording a ship-eligible audit result.
 func InvalidateEvidence(reportPath string) error {
 	body, err := os.ReadFile(reportPath)
 	if err != nil {
@@ -123,9 +115,6 @@ func InvalidateEvidence(reportPath string) error {
 	return atomicwrite.Bytes(reportPath, []byte(retired))
 }
 
-// SealEvidence replaces any auditor-authored receipt after host execution.
-// The orchestrator subsequently hashes this exact audit report into its ledger,
-// binding the verdict without creating another independently mutable authority.
 func SealEvidence(reportPath string, raw []byte, id EvidenceIdentity) error {
 	if err := validEvidenceIdentity(id); err != nil {
 		return err
@@ -154,9 +143,6 @@ func SealEvidence(reportPath string, raw []byte, id EvidenceIdentity) error {
 	return atomicwrite.Bytes(reportPath, body)
 }
 
-// VerifyEvidence consumes a report whose SHA has already been verified against
-// the host ledger. Matching a receipt supplied by an agent without that outer
-// binding is never proof of execution.
 func VerifyEvidence(report string, raw []byte, id EvidenceIdentity) (Verdict, error) {
 	if err := validEvidenceIdentity(id); err != nil {
 		return Verdict{}, err
