@@ -221,7 +221,16 @@ A publisher never waits on a subscriber: no subscriber takes a channel lock. A s
 
 ### 7. The wake: arm, catch up, wait
 
-The `Waiter` (`internal/events/wake`) has two calls: `Arm()` and `Wait(ctx, deadline)`. A syscall port holds `kqueue`, `kevent`, `inotify`, `epoll`, `statfs` and the start time of a process, so a test drives every branch.
+The `Waiter` (`internal/events/wake`) has two calls: `Arm(targets)` and `Wait(ctx, deadline)`. The targets are the directories, the files and the pids. Each `Arm` sets the whole watch set. A syscall port holds `kqueue`, `kevent`, `inotify`, `epoll`, `pidfd_open` and `statfs`, so a test drives every branch. The start time of a process is not in this port (see the process identity below).
+
+**The wake contract** (the same on darwin and on Linux):
+- A directory in `Dirs` wakes when its set of entries changes: an entry is made, deleted or renamed.
+- A file in `Files` wakes when its content changes: an append, a truncation, a delete, a rename away, or a replacement by rename.
+- A spurious wake is allowed. A wake only means "something can be new".
+- A rename can replace a watched file, and the old watch then holds the old file. Thus, after a `Changed` wake on such a file, the caller runs `Arm` again.
+- After each `Arm`, also one that only adds a pid, the caller catches up.
+- A pid that is gone at the arm (`ESRCH`) is an exit. The next `Wait` returns it at once.
+- `Hangup` is terminal. On darwin, `EV_EOF` can come only once, so the caller ends the watch (exit 3) at the first `Hangup`.
 
 1. **Arm** the kernel watch.
 2. **Catch up:** read every complete line after the cursor, to the end of the tail segment.
@@ -232,7 +241,7 @@ The order closes the window where an append lands between the read and the wait 
 
 **darwin (kqueue):**
 - `EVFILT_VNODE` with `NOTE_WRITE` on the channel directory: a new segment.
-- `EVFILT_VNODE` with `NOTE_WRITE`, `NOTE_EXTEND` and `NOTE_DELETE` on the tail segment: an append.
+- `EVFILT_VNODE` with `NOTE_WRITE`, `NOTE_EXTEND`, `NOTE_DELETE`, `NOTE_RENAME` and `NOTE_ATTRIB` on the tail segment: an append, a delete, a rename or a truncation. A truncation gives only `NOTE_ATTRIB`.
 - `EV_CLEAR` on both. Without it, the event returns on every call and the waiter spins (research F1.8).
 - `EVFILT_USER` with `NOTE_TRIGGER` for a cancel from the same process.
 - `EVFILT_PROC` with `NOTE_EXIT` for the last will.
@@ -240,7 +249,7 @@ The order closes the window where an append lands between the read and the wait 
 - `kevent` with no timeout, or with the time left to the deadline.
 
 **Linux (inotify):**
-- One watch on the channel directory: `IN_MODIFY`, `IN_CREATE`, `IN_MOVED_TO`, `IN_DELETE_SELF` and `IN_MOVE_SELF`.
+- One watch on the channel directory: `IN_MODIFY`, `IN_CREATE`, `IN_DELETE`, `IN_MOVED_FROM`, `IN_MOVED_TO`, `IN_DELETE_SELF` and `IN_MOVE_SELF`. A file in `Files` is watched through its directory.
 - An `epoll` set holds the inotify descriptor, a self-pipe for a cancel and a `pidfd` for the last will.
 - The same set holds stdout with `EPOLLHUP|EPOLLERR` for the output hangup.
 - `IN_Q_OVERFLOW` counts as a wake.
@@ -256,9 +265,9 @@ The order closes the window where an append lands between the read and the wait 
 
 **The last will.** A loop that exits without its `loop.exit` event is a lost loop. The reader reports it with a synthetic `loop.lost` record. The reader always follows the `loop` channel for this, even if `loop` is not selected. It prints a `loop` record only if a selected channel holds it.
 
-**The process identity.** `loop.started` carries `fields.proc_start`, the start time of the loop process. The syscall port reads it at emit:
-- On darwin it reads `p_starttime` from `kinfo_proc` (`KERN_PROC_PID`), with the same raw `sysctl` call that `proctree` uses for `KERN_PROCARGS2` (`go/internal/proctree/procargs_darwin.go`).
-- On Linux it reads the start ticks from `/proc/<pid>/stat`, with the boot id.
+**The process identity.** `loop.started` carries `fields.proc_start`, the start time of the loop process. `proctree.StartOf(pid)` reads it at emit. It is in `proctree`, not in the wake port. E5 and E11 add it:
+- On darwin, `procstart_darwin.go` reads `p_starttime` from `kinfo_proc` (`KERN_PROC_PID`). It uses a general form of the raw `sysctl` call that `proctree` uses for `KERN_PROCARGS2` (`go/internal/proctree/procargs_darwin.go`).
+- On Linux, `procstart_linux.go` reads the start ticks from `/proc/<pid>/stat`, with the boot id.
 - The reader reads the live pid with the same port and compares the two values for equality. Equal means "the same process". Anything else means "gone".
 
 At arm time, for any `--since`:
@@ -475,7 +484,7 @@ The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a sig
   - the E13 `ack_wait_s` deadline;
   - the watchdog deadline for "nothing happened".
 - **Forbidden: a poll.** A poll is a loop that sleeps and then reads a file, a status or an API again.
-- **The guard.** An AST guard test bans `time.Sleep`, `time.Tick` and `time.NewTicker` in `internal/events/...`, in `flock.LockWithin` and in the migrated watch files.
+- **The guard.** The AST guard test `TestNoPollTimerInTheEventChannelSources` (`go/test/structure/nopoll_guard_test.go`) bans `time.Sleep`, `time.Tick`, `time.NewTicker`, `time.After` and `time.NewTimer`. Its list of directories is data: `internal/events` today. E2 adds `flock.LockWithin`, and E12 and E14 add the migrated watch files.
 - **The runtime.** An idle Go process wakes about once a minute for runtime work (research F1.6). That wake never reads our state.
 
 ### 16. Safety
@@ -505,7 +514,10 @@ The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a sig
 - **No order across channels.** A merged view is ordered by time and labelled as such.
 - **A best-effort channel can lose events.** A gap record names each loss.
 - **Network filesystems and other operating systems are refused.**
-- **Linux inotify limits.** Each process that watches uses one inotify instance. The kernel defaults are 128 instances for each user, 16,384 queued events, and 8,192 to 1,048,576 watches from the RAM size (research F2.10).
+- **No exit watch without `pidfd`.** The Linux exit watch needs `pidfd_open` (Linux 5.3 or later). An older kernel gives `ENOSYS`, and the waiter refuses with `ErrRefused` (exit 1). No fallback exists.
+- **darwin and Linux differ in what wakes.** On darwin, a file watch follows the file that the waiter opened. A rename away or a replacement wakes it once, and then the caller arms again. On Linux, the watch is on the directory, so a write to any file in it wakes the reader. Both give spurious wakes, and the caller reads again and finds nothing new.
+- **Two inotify instances for each `Arm`.** Each `Arm` makes a new inotify instance before it closes the old one. Thus a Linux reader holds two instances for a short time.
+- **Linux inotify limits.** Each process that watches uses one inotify instance, and two during an `Arm`. The kernel defaults are 128 instances for each user, 16,384 queued events, and 8,192 to 1,048,576 watches from the RAM size (research F2.10).
 - **The runtime wake.** An idle watcher still wakes about once a minute for Go runtime work.
 - **Descriptors.** A darwin reader holds one descriptor for each watched directory and tail segment, plus the kqueue.
 - **A deleted lock file splits the lock.** If someone deletes `ch/<channel>.lock` while a call waits, the waiter holds the old inode. A new writer then locks a new file. The current `flock` adapter has the same exposure.

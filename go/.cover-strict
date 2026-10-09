@@ -37,3 +37,5 @@
 ./internal/sysexec 100
 ./internal/gcpolicy 100
 ./internal/events/filter 100
+./internal/events/wake 100
+./test/structure 100

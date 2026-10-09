@@ -4,11 +4,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/test/structure"
 )
 
 var pipelineSourceDirs = []string{"cmd", "internal", "pkg"}
@@ -18,27 +19,14 @@ const sysexecDir = "internal/sysexec"
 func TestPipelineCode_StartsEveryProcessThroughCommand(t *testing.T) {
 	t.Parallel()
 	root := filepath.Join("..", "..")
+	files, err := structure.SourceFiles(root, pipelineSourceDirs...)
+	if err != nil {
+		t.Fatalf("walk %v: %v", pipelineSourceDirs, err)
+	}
 	var offenders []string
-	for _, dir := range pipelineSourceDirs {
-		err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if d.IsDir() && (d.Name() == "testdata" || d.Name() == "vendor") {
-				return filepath.SkipDir
-			}
-			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-				return nil
-			}
-			rel, _ := filepath.Rel(root, path)
-			if filepath.Dir(rel) == sysexecDir {
-				return nil
-			}
-			offenders = append(offenders, directExecCalls(t, path, rel)...)
-			return nil
-		})
-		if err != nil {
-			t.Fatalf("walk %s: %v", dir, err)
+	for _, rel := range files {
+		if filepath.Dir(rel) != sysexecDir {
+			offenders = append(offenders, directExecCalls(t, filepath.Join(root, rel), rel)...)
 		}
 	}
 	if len(offenders) > 0 {

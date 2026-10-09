@@ -151,3 +151,12 @@ func TestNesting_ControlFlowDepth(t *testing.T) {
 		})
 	}
 }
+
+func TestChildBody_ANodeWithoutABodyIsItsOwnBody(t *testing.T) {
+	t.Parallel()
+	block := &ast.BlockStmt{}
+
+	if got := childBody(block); got != block {
+		t.Errorf("childBody(block) = %v, want the block itself", got)
+	}
+}
