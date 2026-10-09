@@ -716,3 +716,5 @@
 ./internal/events/channel
 # E3 (ADR-0127): the kernel wake of the event channels (internal/events/wake).
 ./internal/events/wake
+# publisher — the Signal Center listener that appends each event to the channels whose route matches it: the lossless path, the best-effort queue, the gap records and the dispatch stamp (ADR-0127, plan E6).
+./internal/events/publisher

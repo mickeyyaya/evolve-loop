@@ -91,6 +91,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/faillearn` | the kernel-owned failure floor that writes the retrospective and lesson when the retro cannot run | [internal-faillearn.md](internal-faillearn.md) |
 | `internal/gitexec` | the git CLI behind one small injectable type | [internal-gitexec.md](internal-gitexec.md) |
 | `internal/events/channel` | one event channel as an append-only log of segments: the locked append with torn-tail repair and rotation, and the read with the cursor rules (ADR-0127) | [internal-events-channel.md](internal-events-channel.md) |
+| `internal/events/publisher` | the Signal Center listener of the event channels: routes, the lossless path, the best-effort queue and gap records (ADR-0127, E6) | [internal-events-publisher.md](internal-events-publisher.md) |
 | `internal/landed` | whether a worktree's changes since a merge-base are already in `origin/main`, judged per path by a three-way merge | [internal-landed.md](internal-landed.md) |
 | `internal/modelquery` | live model-catalog acquisition: each CLI's model list, classified into the canonical tiers | [internal-modelquery.md](internal-modelquery.md) |
 | `internal/phases/audit/ciparitygate` | the audit phase's five CI-parity gates | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
