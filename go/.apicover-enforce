@@ -712,3 +712,5 @@
 
 # lane E4 (2026-10-09): the one filter grammar of the event channels (internal/events/filter).
 ./internal/events/filter
+# channel — one event channel as an append-only log: segments named by their base cursor, the locked append with torn-tail repair and rotation, Read with the cursor rules and Last (ADR-0127, plan E2).
+./internal/events/channel

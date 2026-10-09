@@ -381,6 +381,8 @@ None. The operator decided Q1 to Q10 on 2026-10-09 (§4, O10 to O19).
 
 | # | Status |
 |---|---|
-| E0 | ◐ the research dossier, this plan, the spec and ADR-0127 are written in `dev/cl-events`, with fix rounds 1 and 2; not staged |
-| E4 | ◐ `internal/events/filter` is written in `dev/cl-events-filter` (branch `feat/events-filter`). It has the grammar, the matcher, the selectors and the catalog, at 100% coverage. It is unwired and not committed. |
+| E0 | ☑ the research dossier, this plan, the spec and ADR-0127. Merged in #823. |
+| E4 | ☑ `internal/events/filter`: the grammar, the matcher, the selectors and the catalog, at 100% coverage. Merged in #824. It is unwired. |
+| E1 | ◐ `signalcenter.ReadLines`, with its red tests and mutants; PR open (with E2). |
+| E2 | ◐ `internal/events/channel` and `flock.LockWithin` built, unwired, at 100% coverage; PR open. Spec findings: [internal-events-channel.md](../architecture/packages/internal-events-channel.md) §Findings |
 | E1 to E14, except the rows above | ☐ not started |

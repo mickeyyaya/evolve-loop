@@ -36,6 +36,14 @@ func ShipLockPath(projectRoot string) string {
 // release unlocks and closes; call it exactly once (idempotence is the
 // caller's concern — defer it).
 func Lock(path string) (release func(), err error) {
+	f, err := openLockFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return lockFile(f, path, syscall.LOCK_EX)
+}
+
+func openLockFile(path string) (*os.File, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("flock mkdir: %w", err)
 	}
@@ -43,7 +51,7 @@ func Lock(path string) (release func(), err error) {
 	if err != nil {
 		return nil, fmt.Errorf("flock open %s: %w", path, err)
 	}
-	return lockFile(f, path, syscall.LOCK_EX)
+	return f, nil
 }
 
 func LockShared(path string) (release func(), err error) {
