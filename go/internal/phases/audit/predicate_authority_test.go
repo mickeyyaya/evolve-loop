@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// A candidate supplied by the auditor must never suppress host execution.
 func TestRun_PrestagedGreenCannotSuppressHostRed(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)

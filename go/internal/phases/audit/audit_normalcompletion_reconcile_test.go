@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeACSVerdictShip writes acs-verdict.json with an explicit red_count and an
-// OPTIONAL ship_eligible field. ship==nil omits the field entirely (the legacy
-// shape writeACSVerdict produces) so a test can pin back-compat: audit must not
-// require a field older verdicts never carried.
 func writeACSVerdictShip(t *testing.T, ws string, redCount int, ship *bool) {
 	t.Helper()
 	v := map[string]any{
@@ -31,22 +27,14 @@ func writeACSVerdictShip(t *testing.T, ws string, redCount int, ship *bool) {
 	}
 }
 
-// normalPassBridge returns a fakeBridge that COMPLETES normally (no timeout, no
-// error) and writes a narrative-PASS audit report — the opposite of the
-// auditTimeoutErr() bridges the reconcile-on-timeout tests use. It exercises the
-// happy Classify path where the auditor's own report is authoritative.
 func normalPassBridge() *fakeBridge {
 	return &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}
 }
 
-// TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled:
-// when the auditor completes normally, writes a narrative PASS, but
-// acs-verdict.json — the acssuite SSOT — says ship_eligible:false, the phase
-// must reject (FAIL/WARN), never accept the narrative uncontested.
 func TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled(t *testing.T) {
 	ws := t.TempDir()
 	no := false
-	writeACSVerdictShip(t, ws, 0, &no) // red_count==0 but SSOT says do-not-ship
+	writeACSVerdictShip(t, ws, 0, &no)
 	phase := New(Config{Bridge: normalPassBridge(), Prompts: fakePromptsFS("body")})
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/p", Workspace: ws})
@@ -58,13 +46,9 @@ func TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled
 	}
 }
 
-// TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail materializes
-// the headline case on the normal-completion path (the reconcile tests
-// elsewhere only cover the exit-81 timeout path): a narrative PASS with red
-// predicates must FAIL.
 func TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail(t *testing.T) {
 	ws := t.TempDir()
-	writeACSVerdict(t, ws, 2) // two red predicates, no ship_eligible field
+	writeACSVerdict(t, ws, 2)
 	phase := New(Config{Bridge: normalPassBridge(), Prompts: fakePromptsFS("body")})
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/p", Workspace: ws})
@@ -76,10 +60,6 @@ func TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail(t *testing.T
 	}
 }
 
-// TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass is the
-// negative test: genuine agreement must pass through untouched, ruling out
-// the cheapest fix of always downgrading to FAIL regardless of the ACS
-// verdict.
 func TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass(t *testing.T) {
 	ws := t.TempDir()
 	yes := true
@@ -95,13 +75,9 @@ func TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass(t *testing.T
 	}
 }
 
-// TestRun_NormalCompletion_PassReport_ShipEligibleAbsent_StaysPass pins
-// back-compat: a verdict that omits ship_eligible (every verdict written
-// before the field existed) with red_count:0 must still PASS — the
-// ship_eligible read is not wired as a mandatory field.
 func TestRun_NormalCompletion_PassReport_ShipEligibleAbsent_StaysPass(t *testing.T) {
 	ws := t.TempDir()
-	writeACSVerdictShip(t, ws, 0, nil) // field absent — legacy shape
+	writeACSVerdictShip(t, ws, 0, nil)
 	phase := New(Config{Bridge: normalPassBridge(), Prompts: fakePromptsFS("body")})
 
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 1, ProjectRoot: "/p", Workspace: ws})

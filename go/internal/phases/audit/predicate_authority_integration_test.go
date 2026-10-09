@@ -38,7 +38,6 @@ func TestNewDefault_HostPredicateExecutionBindsCompleteEvidence(t *testing.T) {
 			if err := os.MkdirAll(ws, 0o755); err != nil {
 				t.Fatal(err)
 			}
-			// An apparent green from the wrong cycle must not suppress execution.
 			if err := os.WriteFile(filepath.Join(ws, acsverdict.Filename), []byte(`{"cycle":42,"red_count":0}`), 0o644); err != nil {
 				t.Fatal(err)
 			}

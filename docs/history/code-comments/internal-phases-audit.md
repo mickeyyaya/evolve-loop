@@ -2379,3 +2379,85 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // The foreign artifact is EVIDENCE — preserved, not clobbered (the
 // incident class was "the misdiagnosis was invisible from the file").
 ```
+
+## phase 3d r3 (gc, audit)
+
+### `go/internal/phases/audit/audit.go:52` — above `solutionCheck func(req core.PhaseRequest) ([]string, error)`
+
+```text
+// solutionCheck reports document-cycle solution-contract violations
+// (ADR-0099 slice 2); nil = no gate.
+```
+
+### `go/internal/phases/audit/audit_integration_test.go:60` — above `evolveDir := t.TempDir()`
+
+```text
+// Workspace must be <evolveDir>/runs/cycle-7 so generateACSVerdict's
+// evolveDir = dirname(dirname(workspace)) lands the verdict exactly where
+// Classify reads it (<workspace>/acs-verdict.json).
+```
+
+### `go/internal/phases/audit/audit_integration_test.go:139` — above `base := t.TempDir()`
+
+```text
+// evolveDir = dirname(dirname(workspace)). Make that path a regular file so
+// acssuite.WriteVerdict's MkdirAll(<evolveDir>/runs/cycle-3) fails.
+```
+
+### `go/internal/phases/audit/audit_test.go:216` — above `got, diags, _ := h.Classify("## Verdict\n**PASS**\n", *view, core.BridgeResponse{})`
+
+```text
+// ADR-0102: a missing review section is a missing reasoning — absence is
+// never laxer than a token Evidence (go review).
+```
+
+### `go/internal/phases/audit/audit_test.go:987` — above `func TestValidateExplanationReview_DuplicateFieldIsAdvisory(t *testing.T) {`
+
+```text
+// ADR-0102: an unparsable review section (a duplicated single-valued field)
+// is a shape finding — advisory, never a block.
+```
+
+### `go/internal/phases/audit/audit_test.go:1006` — above `func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t *testing.T) {`
+
+```text
+// ADR-0102: a report with two review sections is a parser finding (advisory)
+// with no attributable review text — so the reasoning floor still fails it.
+```
+
+### `go/internal/phases/audit/audit_test.go:1017` — above `func TestValidateExplanationReview_MissingDeliveryReviewedAsFailIsCleanAndHostDefectsAreLoud(t *testing.T) {`
+
+```text
+// The two remaining blocking paths through the audit gate: a missing delivery
+// honestly reviewed as FAIL is clean (the narrative FAIL carries), and a
+// host-side handoff defect fails loudly through the gate (ADR-0102).
+```
+
+### `go/internal/phases/audit/closure_claim.go:11` — above `var closureCycleRef = regexp.MustCompile('cycle[- ]?(\d+)')`
+
+```text
+// closureCycleRef matches a cycle reference in prose ("cycle-1272", "cycle
+// 1255"), with the number captured, so the weak rung's reference check and
+// closureLineCycleRefs share one pattern and cannot drift apart.
+```
+
+### `go/internal/phases/audit/closure_claim_demotion_test.go:46` — above `ws, req := continuationFixture(t, 1490, 1502, []string{`
+
+```text
+// The leak guard: an ACCOUNTED lineage must not vouch for a claim about an
+// UNRELATED cycle — no record here covers cycle-900.
+```
+
+### `go/internal/phases/audit/defect_ledger_hardening_test.go:135` — above `if err := os.Remove(filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-1255", ledgerFile)); err != nil {`
+
+```text
+// The `rm`: the manifest still names cycle-1255 as the ancestor, but its
+// ledger is gone.
+```
+
+### `go/internal/phases/audit/task_contract_prompt_test.go:10` — above `func TestComposePrompt_RendersTaskContractVerbatim(t *testing.T) {`
+
+```text
+// TestComposePrompt_RendersTaskContractVerbatim — the grader reads the same
+// harness-owned block the builder was handed (ADR-0098); absent key ⇒ no heading.
+```

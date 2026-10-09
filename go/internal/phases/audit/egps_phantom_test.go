@@ -10,7 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// The verdict shape as acssuite actually writes phantom-bound reds.
 const phantomVerdictJSON = `{
   "schema_version": "v11",
   "cycle": 1546,
@@ -124,8 +123,6 @@ func TestRun_PhantomBindingRedEmitsTheCureInTheGateDiagnostic(t *testing.T) {
 	if resp.Verdict != core.VerdictFAIL {
 		t.Fatalf("phantom reds are still reds — verdict must be FAIL; got %q", resp.Verdict)
 	}
-	// The gate DETAIL diagnostic (the egpsRedMessage line) — not the
-	// verdict-conflict summary that also mentions EGPS and points here.
 	var msg string
 	for _, d := range resp.Diagnostics {
 		if strings.Contains(d.Message, "red_count=2") {

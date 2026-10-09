@@ -1,28 +1,4 @@
-// Package gc is the declarative retention engine for the .evolve data tree
-// (L3.1, concurrency campaign). It generalizes the fixed-rule pruneephemeral
-// port into policy-driven rules loaded from .evolve/policy.json:gc.
-//
-// Split of responsibilities:
-//   - Plan evaluates the rules against an injected run-dir list plus the
-//     salvage/dispatch-log/tracker surfaces and returns a Manifest of
-//     would-archive/would-delete actions. Plan never mutates the tree — it IS
-//     the dry-run (the L3.4 shadow stage logs exactly this manifest).
-//   - Apply executes a Manifest (archive = move under <evolve>/archive/runs/,
-//     delete = RemoveAll).
-//   - Run-dir DISCOVERY is deliberately not in this file: the production
-//     discovery (layout-agnostic, lease-aware) is L3.2; until then callers
-//     and tests inject []RunDir.
-//
-// Hard rules, NOT configurable by policy:
-//   - quarantine/** is manual-only: the engine refuses to emit an action for
-//     any path under <evolve>/quarantine even if discovery hands one in.
-//   - ledger.jsonl / ledger.tip / ledger-segments/** are never touched
-//     (append-only tamper-evident history; sealing is L3.3's job).
-//   - a LIVE run dir is never touched, no matter its age.
-//
-// The package also sweeps cycle worktrees, finished cycles' orphan processes,
-// the Go build cache and pipeline temp artifacts; the design notes and the
-// invariants of every sweep are in docs/architecture/packages/internal-gc.md.
+// Package gc is the declarative retention engine for the .evolve data tree.
 package gc
 
 import (
@@ -39,67 +15,43 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
 )
 
-// Policy, RunsPolicy and WorktreesPolicy are the `.evolve/policy.json` gc
-// block, re-exported from the zero-dependency internal/gcpolicy leaf. The
-// types moved out (cycle-1141) so internal/policy — the config SSOT — can hold
-// the block without depending on this engine; these aliases keep every
-// existing gc.Policy / gc.RunsPolicy call site working unchanged.
 type (
 	Policy          = gcpolicy.Policy
 	RunsPolicy      = gcpolicy.RunsPolicy
 	WorktreesPolicy = gcpolicy.WorktreesPolicy
 )
 
-// RunDir is one discovered run directory. Discovery is injected: L3.2's
-// layout-agnostic, lease-aware discovery is the production source; tests
-// build synthetic lists.
 type RunDir struct {
 	Path    string
 	ModTime time.Time
-	// Live marks a run that must never be touched: non-terminal run state or
-	// a fresh .lease heartbeat (L3.2 decides; the engine only honors it).
-	Live bool
+	Live    bool
 }
 
-// Action is what Apply will do to a path.
 type Action string
 
 const (
-	// ActionArchive moves a path under <evolve>/archive/runs/ rather than
-	// removing it — the retention ladder's intermediate, recoverable step.
 	ActionArchive Action = "archive"
-	// ActionDelete removes a path recursively (os.RemoveAll). Delete wins
-	// over archive when a run matches both age thresholds.
-	ActionDelete Action = "delete"
+	ActionDelete  Action = "delete"
 )
 
-// Item is one planned action. Rule names which policy rule fired — the
-// shadow manifest (L3.4) logs it so an operator can trace every entry.
 type Item struct {
 	Path   string `json:"path"`
 	Action Action `json:"action"`
 	Rule   string `json:"rule"`
 }
 
-// Manifest is the full plan. Plan output is deterministic (sorted by path)
-// so shadow-soak diffs are stable.
 type Manifest struct {
 	Items    []Item   `json:"items"`
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// Options drives Plan.
 type Options struct {
-	// EvolveDir is the .evolve root (absolute). Required.
 	EvolveDir string
 	Policy    Policy
-	// Runs is the injected run-dir discovery result.
-	Runs []RunDir
-	Now  func() time.Time
+	Runs      []RunDir
+	Now       func() time.Time
 }
 
-// Plan evaluates retention rules and returns the action manifest. It never
-// mutates the tree.
 func Plan(opts Options) (Manifest, error) {
 	if opts.EvolveDir == "" || !filepath.IsAbs(opts.EvolveDir) {
 		return Manifest{}, fmt.Errorf("gc: EvolveDir must be absolute, got %q", opts.EvolveDir)
@@ -112,23 +64,15 @@ func Plan(opts Options) (Manifest, error) {
 	var items []Item
 	add := func(path string, action Action, rule string) {
 		if protected(opts.EvolveDir, path) {
-			return // hard rule: quarantine manual-only, ledger append-only
+			return
 		}
 		items = append(items, Item{Path: path, Action: action, Rule: rule})
 	}
 
-	// Rule 1: run-dir retention ladder. Newest KeepFull are kept in full;
-	// beyond that, dead runs age into archive then delete. Live always kept.
 	planRunLadder(opts.Runs, pol, now, add)
 
-	// Rule 2: tracker .ephemeral subtrees inside KEPT runs (pruneephemeral's
-	// phase 1, generalized). Runs already planned away take their .ephemeral
-	// with them, so only un-planned runs are scanned. LIVE runs are skipped
-	// entirely — the hard rule covers their subtrees too (deleting a running
-	// session's tracker state would corrupt it).
 	planTrackerTTL(opts.Runs, items, pol, now, add)
 
-	// Rule 3: operator-salvage TTL (top-level entries by mtime).
 	for _, e := range dirEntriesOlderThan(OperatorSalvageDir(opts.EvolveDir), now(), pol.SalvageTTLDays, nil) {
 		add(e, ActionDelete, "salvage_ttl_days")
 	}
@@ -172,9 +116,6 @@ func planTrackerTTL(runs []RunDir, items []Item, pol Policy, now func() time.Tim
 	}
 }
 
-// dirEntriesOlderThan lists direct children of dir whose mtime is older than
-// ttlDays. A missing dir yields nothing. filter (optional) limits which
-// entries qualify.
 func dirEntriesOlderThan(dir string, now time.Time, ttlDays int, filter func(name string, isDir bool) bool) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -197,21 +138,8 @@ func dirEntriesOlderThan(dir string, now time.Time, ttlDays int, filter func(nam
 	return out
 }
 
-// Apply executes a manifest: archive items are moved under
-// <evolve>/archive/runs/<basename>, delete items are removed recursively.
-// Protected paths are refused (defense in depth — Plan never emits them,
-// but a hand-edited manifest must not bypass the hard rules). Each item
-// failure is reported but does not stop the rest; the joined error (if
-// any) lists every failure.
-//
-// Replay note for the shadow stage (L3.4): deletes are idempotent
-// (RemoveAll on a missing path is a no-op) but archives are NOT — re-applying
-// a manifest whose archive items already moved fails loudly on the missing
-// source. Always Plan fresh, never re-Apply a stored manifest.
 func Apply(evolveDir string, m Manifest) error {
 	if evolveDir == "" || !filepath.IsAbs(evolveDir) {
-		// Same guard as Plan: a relative root would make protected() refuse
-		// everything silently and resolve the archive dst against the CWD.
 		return fmt.Errorf("gc: evolveDir must be absolute, got %q", evolveDir)
 	}
 	var errs []error
@@ -220,12 +148,6 @@ func Apply(evolveDir string, m Manifest) error {
 			errs = append(errs, fmt.Errorf("gc: refusing protected path %s (quarantine/ledger are manual-only)", it.Path))
 			continue
 		}
-		// TOCTOU re-check (L3.2): liveness can change between Plan and Apply —
-		// a fleet scheduler may lease a run, or a new cycle may claim the dir
-		// as its workspace, in that window. Re-verify at act time on the item
-		// and its parent (subtree items like .ephemeral live under the run
-		// dir) and refuse a now-live target loudly. Any verification error
-		// counts as live (fail closed).
 		if live, why := nowLive(evolveDir, it.Path); live {
 			errs = append(errs, fmt.Errorf("gc: refusing %s — became live after Plan (%s); re-Plan and re-Apply", it.Path, why))
 			continue
@@ -253,31 +175,21 @@ func archiveItem(evolveDir, path string) error {
 	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
 		return fmt.Errorf("gc: archive mkdir for %s: %w", path, err)
 	}
-	// Never overwrite an existing archive entry — disambiguate with a
-	// numeric suffix (deterministic, no clock dependency).
 	for n := 1; ; n++ {
 		if _, err := os.Lstat(dst); err != nil {
 			break
 		}
 		dst = filepath.Join(archiveDir, base+"."+strconv.Itoa(n))
 	}
-	// Rename requires src and dst on the same filesystem; both live
-	// under .evolve so this holds unless an operator mounts
-	// .evolve/archive separately — then this surfaces as EXDEV.
 	if err := os.Rename(path, dst); err != nil {
 		return fmt.Errorf("gc: archive %s → %s: %w", path, dst, err)
 	}
 	return nil
 }
 
-// protected reports whether path may never be acted on: quarantine is
-// manual-only, ledger history is append-only, and already-archived entries
-// are terminal (re-collecting archive/ would double-archive or destroy the
-// only remaining copy).
 func protected(evolveDir, path string) bool {
 	rel, err := filepath.Rel(evolveDir, path)
 	if err != nil || strings.HasPrefix(rel, "..") {
-		// Outside the evolve dir entirely: refuse — gc only manages .evolve.
 		return true
 	}
 	first := strings.Split(filepath.ToSlash(rel), "/")[0]
@@ -288,10 +200,6 @@ func protected(evolveDir, path string) bool {
 	return false
 }
 
-// nowLive re-checks liveness at Apply time (wall clock, default lease TTL):
-// a fresh .lease on the path or its parent, or either being the in-flight
-// run's workspace, refuses the action. currentWorkspace errors count as
-// live — fail closed.
 func nowLive(evolveDir, path string) (bool, string) {
 	now := time.Now()
 	for _, d := range []string{path, filepath.Dir(path)} {
@@ -309,12 +217,10 @@ func nowLive(evolveDir, path string) (bool, string) {
 	return false, ""
 }
 
-// ageDays is a helper shared by the TTL rules.
 func ageDays(now time.Time, mod time.Time) float64 {
 	return now.Sub(mod).Hours() / 24
 }
 
-// sortRunsNewestFirst orders runs by ModTime descending (stable for tests).
 func sortRunsNewestFirst(runs []RunDir) []RunDir {
 	out := make([]RunDir, len(runs))
 	copy(out, runs)

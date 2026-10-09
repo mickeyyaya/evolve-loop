@@ -1,7 +1,5 @@
 package audit
 
-// Candidate root claims never replace host execution; preserve them for forensics.
-
 import (
 	"context"
 	"encoding/json"
@@ -29,7 +27,6 @@ func writeACSVerdictWithRoot(t *testing.T, ws string, redCount int, projectRoot 
 
 func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
 	ws := t.TempDir()
-	// A red verdict stamped under the WRONG root.
 	writeACSVerdictWithRoot(t, ws, 3, "/console-not-plane")
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -39,7 +36,6 @@ func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
 		Prompts: fakePromptsFS("body"),
 		GenerateVerdict: func(req core.PhaseRequest) error {
 			genCalls++
-			// The regenerated (correct-root) verdict is green.
 			writeACSVerdictWithRoot(t, req.Workspace, 0, req.ProjectRoot)
 			return nil
 		},
@@ -53,8 +49,6 @@ func TestRun_ACSVerdictForeignRoot_Regenerated(t *testing.T) {
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS (correct-root regeneration is green) — the wrong-root artifact won", resp.Verdict)
 	}
-	// The foreign artifact is EVIDENCE — preserved, not clobbered, so a
-	// misdiagnosis is never invisible from the file.
 	candidates, err := filepath.Glob(filepath.Join(ws, "acs-verdict.candidate.*.json"))
 	if err != nil || len(candidates) != 1 {
 		t.Fatalf("candidate not preserved: %v %v", candidates, err)

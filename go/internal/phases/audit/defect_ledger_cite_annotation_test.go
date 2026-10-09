@@ -8,7 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// TestClassify_AnnotatedRangeCiteCloses — POSITIVE, the live fixture shape.
 func TestClassify_AnnotatedRangeCiteCloses(t *testing.T) {
 	ws, wt, req := worktreeContinuationFixture(t, 1350, 1356, []string{"carryforward candidates timestamp is stale"})
 	evidenceFile(t, wt, "go/internal/phases/triage/triage.go")
@@ -27,9 +26,6 @@ func TestClassify_AnnotatedRangeCiteCloses(t *testing.T) {
 	}
 }
 
-// TestClassify_AnnotationCannotLaunderARejection — NEGATIVE table: the
-// tolerance strips decoration, never weakens a rejection. Each row is a cite
-// that must STILL block after stripping (or because stripping does not apply).
 func TestClassify_AnnotationCannotLaunderARejection(t *testing.T) {
 	cases := []struct {
 		name, evidence string
@@ -43,7 +39,6 @@ func TestClassify_AnnotationCannotLaunderARejection(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ws, wt, req := worktreeContinuationFixture(t, 1350, 1356, []string{"carryforward candidates timestamp is stale"})
-			// A real repo file exists so only the CITE is at fault.
 			evidenceFile(t, wt, "go/internal/phases/triage/triage.go")
 			writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 				"dispositions": []any{

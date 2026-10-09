@@ -521,6 +521,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/faillearn` | 19 | [internal-faillearn.md](internal-faillearn.md) |
 | `internal/flagregistry` | 7 | [internal-flagregistry.md](internal-flagregistry.md) |
 | `internal/fleet` | 30 | [internal-fleet.md](internal-fleet.md) |
+| `internal/gc` | 10 | [internal-gc.md](internal-gc.md) |
 | `internal/gitexec` | 15 | [internal-gitexec.md](internal-gitexec.md) |
 | `internal/guards` | 33 | [internal-guards.md](internal-guards.md) |
 | `internal/inboxbatch` | 44 | [internal-inboxbatch.md](internal-inboxbatch.md) |
@@ -536,7 +537,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/phasecontract` | 62 | [internal-phasecontract.md](internal-phasecontract.md) |
 | `internal/phaseobserver` | 15 | [internal-phaseobserver.md](internal-phaseobserver.md) |
 | `internal/phases/audit/ciparitygate` | 18 | [internal-phases-audit-ciparitygate.md](internal-phases-audit-ciparitygate.md) |
-| `internal/phases/audit` | 159 | [internal-phases-audit.md](internal-phases-audit.md) |
+| `internal/phases/audit` | 170 | [internal-phases-audit.md](internal-phases-audit.md) |
 | `internal/phases/retro` | 25 | [internal-phases-retro.md](internal-phases-retro.md) |
 | `internal/phases/runner/verdict` | 22 | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/phases/runner` | 78 | [internal-phases-runner.md](internal-phases-runner.md) |
