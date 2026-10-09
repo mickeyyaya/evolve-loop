@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -27,19 +29,15 @@ func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
 	if root == "" {
 		return nil, nil
 	}
-	if changesSkillsGenerator(core.ChangedWorktreePathsSinceBase(context.Background(), root, req.WorktreeBaseSHA)) {
+	if carriesSkillsGenerator(root) {
 		return worktreeSkillsDrift(root)
 	}
 	return skillcheck.Check(root)
 }
 
-func changesSkillsGenerator(paths []string) bool {
-	for _, p := range paths {
-		if strings.HasPrefix(p, skillsGeneratorPrefix) {
-			return true
-		}
-	}
-	return false
+func carriesSkillsGenerator(root string) bool {
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(skillsGeneratorPrefix)))
+	return err == nil && info.IsDir()
 }
 
 func worktreeSkillsDrift(root string) ([]string, error) {
@@ -62,7 +60,7 @@ func worktreeSkillsDrift(root string) ([]string, error) {
 }
 
 func laneNotGraded(cause error) error {
-	return fmt.Errorf("the lane changed the skills generator, but its own `evolve skills check` did not run: the lane is NOT graded and only CI TestSkills_NoDrift checks it: %w", cause)
+	return fmt.Errorf("the worktree generator `evolve skills check` did not run: the lane is NOT graded and only CI TestSkills_NoDrift checks it: %w", cause)
 }
 
 func worktreeFailureOffenders(code int, report string) []string {
@@ -79,9 +77,9 @@ func worktreeFailureOffenders(code int, report string) []string {
 func generatorDisagreement(host []string, hostErr error) error {
 	switch {
 	case hostErr != nil:
-		return gateWarning("the lane's generator graded the lane clean, but the host generator could not compare (" + hostErr.Error() + "); the lane grades itself, review the skillcheck diff")
+		return gateWarning("the worktree generator graded the lane clean, but the host generator could not compare (" + hostErr.Error() + "); the worktree generator grades the lane")
 	case len(host) > 0:
-		return gateWarning(fmt.Sprintf("the lane's generator and the host generator disagree on %d artifact(s); the lane grades itself, review the skillcheck diff: %s", len(host), strings.Join(host, ", ")))
+		return gateWarning(fmt.Sprintf("the worktree generator and the host generator disagree on %d artifact(s); the worktree generator grades the lane: %s", len(host), strings.Join(host, ", ")))
 	}
 	return nil
 }

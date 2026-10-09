@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A cycle whose audit FAIL was forced only by deterministic gates over a PASS narrative, and whose repair-round Build hands off WARN with a failure block of a system class (infrastructure-systemic), gets a failure dossier with that class as a floor candidate; the ADR-0072 halt files a pipeline-defect item (red first: the cycle-1841 artifacts give audit_declared={} and no item)",
+    "The same shape stops spending code-audit-fail repair rounds after the first round that hands off the system class with an unchanged diff (red first: cycle 1841 spent 2/2)",
+    "A builder WARN without a system class, or a FAIL narrative from the auditor, keeps today's dossier and repair decision byte for byte"
+  ],
+  "created_at": "2026-10-09T00:36:41Z",
+  "files": [
+    "go/internal/core/failure_dossier.go",
+    "go/internal/core/audit_gate_remedy.go",
+    "go/internal/core/audit_fail_decision.go"
+  ],
+  "fix": "Make the dossier read a declared system class from the last Build handoff when the audit FAIL is gate-derived (a verdict-conflict record exists) and the audit report declares no block. Route that class through the same floor rule as an audit-declared class, and let decideAfterAuditFail decline a further code-audit-fail round when the builder declared the system class and the diff did not change.",
+  "id": "failure-dossier-reads-no-builder-declared-system-class",
+  "kind": "pipeline-repair",
+  "priority_class": "correctness",
+  "source": "console lane cl-skills-drift-peer, 2026-10-09: why cycle 1841 filed no pipeline-defect item",
+  "summary": "Cycle 1840 got pipeline-defect-infra-systemic-cycle1840 because its auditor wrote FAIL with a failure block class=infrastructure-systemic. Cycle 1841 met the same false red, but its auditor wrote PASS each round (evolve-verdict schema 1, no block) and only the skills-drift gate forced FAIL. buildFailureDossier (go/internal/core/failure_dossier.go:74) reads only the audit phase's failure block, so audit_declared={} and no floor candidate. The builder declared WARN class=infrastructure-systemic in build-report.md after repair round 2, but the dossier does not read the build block, and decideAfterAuditFail spent the code-audit-fail budget (2/2). The coherence check sees a gate-forced FAIL with substantive reasons as coherent. Residuals of cl-skills-drift-peer, also here: (a) the skills-drift WARN is a diagnostic, not a Signal Center event (see skills-drift-gate-generator-dependency-closure residual d); (b) every audit of a tree with the generator source now pays one go run of the worktree evolve (about 0.3 s warm); a failed run is a skip WARN and only CI TestSkills_NoDrift grades the lane; (c) core.ChangedWorktreePathsSinceBase has no caller outside core after the gate stopped using it, so it can be unexported.",
+  "title": "A gate-forced audit FAIL with a builder-declared infrastructure-systemic block files no pipeline-defect item and spends the repair budget",
+  "weight": 0.7
+}
