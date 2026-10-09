@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — `internal/events/filter`: the one filter grammar of the event channels (E4, ADR-0127, 2026-10-09)
+
+- **What it is.** The parser and the matcher for the channel routes, `--filter`, `--until` and the subscriptions ([event-channels.md](docs/architecture/event-channels.md) §8). Terms are ANDed and values are ORed.
+- **The keys.** `kind` and `code` take a `*` glob. `severity` orders `INFO`, `WARN` and `INCIDENT`, and `cycle`, `attempt`, `pid` and `seq` compare as numbers. An absent key matches only `!=`. `fields.NAME` reads one signal field.
+- **The checks.** An unknown key or a malformed term is `ErrUsage` (exit 10). An unknown kind or module, or a `kind` glob that matches no registered kind, is `ErrRefused` (exit 1). An unknown code only gives a `Warning{Key, Value}`, because the code registry is open.
+- **Gaps.** A gap record passes every filter, and it never satisfies `--until` (D29).
+- **Channel selectors.** `ResolveChannels` applies the NATS wildcards of §2: `*` is one token and `>` is the rest. A selector that matches no channel is refused. `ValidChannelName` checks a channel name with the same token rule.
+- **The catalog.** `RegisteredCatalog` reads the kinds, modules and codes from the Signal Center registries. No second vocabulary exists.
+- **Not wired.** Nothing in production calls the package yet; E10 wires it. The package is at 100 in `go/.cover-strict` and in `go/.apicover-enforce`. Design notes: [internal-events-filter.md](docs/architecture/packages/internal-events-filter.md).
+
 ## Fixed — the skills-drift gate always grades with the worktree's own generator, and the cycle-1840 replay test is green on main again (cycle 1841, 2026-10-09)
 
 - **What happened.** Cycle 1841 audited PASS. A peer cycle then shipped `9b47ca6ae`, which changed the skill-command generator and regenerated the 32 `commands/*.md`. The lane rebased onto it. The host binary was built at `8f46ad383`, older than the new base. Three re-audits wrote PASS, and the skills-drift gate forced FAIL each time with 32 stale stubs. The repair budget ran out and the cycle sealed FAIL. Plan: [skills-drift-host-stamp-2026-10.md](docs/plans/skills-drift-host-stamp-2026-10.md).

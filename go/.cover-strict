@@ -34,3 +34,4 @@
 ./internal/proctree 100
 ./internal/sysexec 100
 ./internal/gcpolicy 100
+./internal/events/filter 100
