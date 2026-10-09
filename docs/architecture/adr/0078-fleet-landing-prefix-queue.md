@@ -1,6 +1,7 @@
 # ADR-0078 — `fleet.landing`: the single-writer prefix-queue landing composer
 
 - **Status:** Accepted (cycle-1144) — backfill of an already-landed surface
+- **Amended by:** [ADR-0128](0128-landing-queue-tiered-reverification.md) (Proposed, 2026-10-09). No production code calls the composer today. ADR-0128 makes the queue durable, with a driver, the tiers T1 to T4 and a stage dial. After the enforce soak, `prefix-queue` becomes the default.
 - **Relates to:** ADR-0057 (merge-to-main gate), ADR-0072 (system-failure floor),
   ADR-0077 (documentation floor for architecture-labeled changes), the
   `fleet.scheduling` dial (`wave` / `pool`)
