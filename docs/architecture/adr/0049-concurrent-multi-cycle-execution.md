@@ -1,6 +1,7 @@
 # ADR-0049: Concurrent Multi-Cycle Execution — Bottom-Up Isolation (agent → phase → cycle)
 
 - **Status:** Accepted — PR-1/PR-2/PR-3 implemented on branch `concurrency-hardening` (PR #93); each slice a no-op for the live sequential loop until S6's floor-removal dial (shipped default-OFF) is flipped. See **Implementation status** below for the per-gap dispositions (the adversarial re-derivation found ~half of the PR-3 prescriptions wrong or unnecessary when checked against code).
+- **Amended by:** [ADR-0128](0128-landing-queue-tiered-reverification.md) (Proposed, 2026-10-09). For fleet lanes, the tiers of a landing queue replace the rebase-and-re-audit of S5. The queue holds no lock across LLM work, which honors the concern of S5b.
 - **Date:** 2026-06-14
 - **Driver:** an operator request to run multiple `evolve` cycles concurrently — "each cycle not interfering with the others, with the advisor partitioning the backlog across independent cycles" — with the steer: *"make each phase and agent independent and executed in concurrency first; this is fundamental for cycle concurrency."*
 - **Evidence:** [concurrency-isolation-research-2026-06-14.md](../concurrency-isolation-research-2026-06-14.md) — a 28-agent codebase isolation audit (gaps G1–G14) + a web research sweep of prior art that **settles the three design decisions below**. Read it for full gap detail, citations, principles, and open risks.
