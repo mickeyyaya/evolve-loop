@@ -150,16 +150,28 @@ func resolveWatchDefaults(opts Options) Options {
 
 func pollUntilComplete(ctx context.Context, opts Options) (RunStatus, error) {
 	deadline := opts.Now().Add(opts.Timeout)
+	lastStatus := "queued"
 	for {
-		st, err := opts.Fetch(ctx, opts.SHA)
+		remaining := deadline.Sub(opts.Now())
+		if remaining <= 0 {
+			return RunStatus{}, fmt.Errorf("%w: sha=%s last status=%q", ErrWatchTimeout, opts.SHA, lastStatus)
+		}
+		fetchCtx, cancel := context.WithTimeout(ctx, remaining)
+		st, err := opts.Fetch(fetchCtx, opts.SHA)
+		timedOut := errors.Is(fetchCtx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded)
+		cancel()
 		if err != nil {
+			if timedOut {
+				return RunStatus{}, fmt.Errorf("%w: sha=%s last status=%q", ErrWatchTimeout, opts.SHA, lastStatus)
+			}
 			return RunStatus{}, fmt.Errorf("ciwatch: fetch run status for %s: %w", opts.SHA, err)
 		}
+		lastStatus = st.Status
 		if st.Status == StatusCompleted {
 			return st, nil
 		}
 		if opts.Now().Add(opts.Poll).After(deadline) {
-			return RunStatus{}, fmt.Errorf("%w: sha=%s last status=%q", ErrWatchTimeout, opts.SHA, st.Status)
+			return RunStatus{}, fmt.Errorf("%w: sha=%s last status=%q", ErrWatchTimeout, opts.SHA, lastStatus)
 		}
 		opts.Sleep(opts.Poll)
 	}

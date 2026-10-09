@@ -68,3 +68,23 @@ func TestRunCI_RoutesWatchAndPrintsItsUsage(t *testing.T) {
 		t.Errorf("unknown ci subcommand exit = %d, usage %q does not list ci watch", code, stderr.String())
 	}
 }
+
+func TestRunCIWatch_InvalidTargetExitsUsage(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := runCIWatch([]string{"--sha", "not-hex"}, &stdout, &stderr); code != exitUsage {
+		t.Fatalf("code = %d, want %d", code, exitUsage)
+	}
+	if !strings.Contains(stderr.String(), ciWatchPrefix) {
+		t.Errorf("stderr %q lacks prefix %q", stderr.String(), ciWatchPrefix)
+	}
+}
+
+func TestRunCIWatch_NonexistentRootExitsIO(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := runCIWatch([]string{"--sha", "1234567", "--project-root", "/nonexistent-path-never-exists"}, &stdout, &stderr); code != exitIO {
+		t.Fatalf("code = %d, want %d", code, exitIO)
+	}
+	if !strings.Contains(stderr.String(), ciWatchPrefix) {
+		t.Errorf("stderr %q lacks prefix %q", stderr.String(), ciWatchPrefix)
+	}
+}

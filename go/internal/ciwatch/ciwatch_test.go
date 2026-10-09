@@ -276,3 +276,47 @@ func TestLatestRequiredRunOnBranch_NamesTheFailingJobsOfTheBranchRun(t *testing.
 		t.Errorf("gh failure must propagate naming the branch filter, got %v", err)
 	}
 }
+
+func TestWatch_TimesOutWhenFetchHangs(t *testing.T) {
+	fetch := func(ctx context.Context, _ string) (RunStatus, error) {
+		<-ctx.Done()
+		return RunStatus{}, ctx.Err()
+	}
+	opts, inbox, _ := watchOpts(t, fetch)
+	opts.Timeout = 50 * time.Millisecond
+	opts.Poll = 10 * time.Millisecond
+
+	_, err := Watch(context.Background(), opts)
+	if !errors.Is(err, ErrWatchTimeout) {
+		t.Fatalf("err = %v, want ErrWatchTimeout", err)
+	}
+	if !strings.Contains(err.Error(), `last status="queued"`) {
+		t.Errorf("err = %v, want last status queued", err)
+	}
+	if names := inboxFiles(t, inbox); len(names) != 0 {
+		t.Errorf("inbox files = %v, want none on timeout", names)
+	}
+}
+
+func TestWatch_TimesOutWhenFetchHangsAfterInProgress(t *testing.T) {
+	calls := 0
+	fetch := func(ctx context.Context, _ string) (RunStatus, error) {
+		calls++
+		if calls == 1 {
+			return RunStatus{Status: "in_progress"}, nil
+		}
+		<-ctx.Done()
+		return RunStatus{}, ctx.Err()
+	}
+	opts, _, _ := watchOpts(t, fetch)
+	opts.Timeout = 60 * time.Millisecond
+	opts.Poll = 10 * time.Millisecond
+
+	_, err := Watch(context.Background(), opts)
+	if !errors.Is(err, ErrWatchTimeout) {
+		t.Fatalf("err = %v, want ErrWatchTimeout", err)
+	}
+	if !strings.Contains(err.Error(), `last status="in_progress"`) {
+		t.Errorf("err = %v, want last status in_progress", err)
+	}
+}
