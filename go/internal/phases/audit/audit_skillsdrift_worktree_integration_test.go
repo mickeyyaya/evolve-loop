@@ -291,7 +291,7 @@ func TestSkillsDriftGate_ARealRunnerTimeoutCannotGradeAndSaysSo(t *testing.T) {
 		return sysexec.DefaultRunner(ctx, "sleep", "", []string{"30"}, env, stdin, stdout, stderr)
 	})
 
-	got, err := worktreeSkillsDrift(t.TempDir())
+	got, err := worktreeSkillsDrift(context.Background(), t.TempDir())
 
 	if got != nil || err == nil || !strings.Contains(err.Error(), "is NOT graded") || !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("a real runner killed by the deadline = (%q, %v), want a loud could-not-run error that wraps the deadline", got, err)

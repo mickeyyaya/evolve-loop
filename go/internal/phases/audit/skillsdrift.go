@@ -2,7 +2,6 @@ package audit
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +29,7 @@ func skillsDriftCheckDefault(req core.PhaseRequest) ([]string, error) {
 		return nil, nil
 	}
 	if carriesSkillsGenerator(root) {
-		return worktreeSkillsDrift(root)
+		return worktreeSkillsDrift(context.Background(), root)
 	}
 	return skillcheck.Check(root)
 }
@@ -40,14 +39,17 @@ func carriesSkillsGenerator(root string) bool {
 	return err == nil && info.IsDir()
 }
 
-func worktreeSkillsDrift(root string) ([]string, error) {
+func worktreeSkillsDrift(parent context.Context, root string) ([]string, error) {
 	inv := core.WorktreeEvolveInvocation(root, "skills", "check")
-	ctx, cancel := context.WithTimeout(context.Background(), worktreeSkillsCheckLimit)
+	ctx, cancel := context.WithTimeout(parent, worktreeSkillsCheckLimit)
 	defer cancel()
 	var report strings.Builder
 	code, err := runCmd(ctx, "go", inv.Dir, inv.Args, inv.Env, nil, nil, &report)
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, laneNotGraded(ctx.Err())
+	if offenders := skillsCheckOffenders(report.String()); code != 0 && len(offenders) > 0 {
+		return offenders, nil
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, laneNotGraded(ctxErr)
 	}
 	if err != nil {
 		return nil, laneNotGraded(err)
