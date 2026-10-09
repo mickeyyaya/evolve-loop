@@ -271,7 +271,7 @@ Each component is small and lands unwired first. Each new package is at 100 in `
 | E5 | `internal/events/reader`: arm, catch up and wait over channels; rotation; gap and reset records; the duplicate window; the last will | E2 to E4, `MergeByTS` |
 | E6 | `internal/events/publisher`: routes; the lossless path; the best-effort queue; gap records; the dispatch stamp; `Close(deadline)` | E2, E4, the `reportDrops` pattern |
 | E7 | `policy_events.go` (`EventsConfig()`), the gcpolicy channel categories and `Protect` | `policy_ciwatch.go`, `gcpolicy/logs.go` |
-| E8 | `internal/events/subs`: the config and cursor stores, the exec runner, pull acks, dead letters and the protected surface entry | `atomicwrite`, `WithPathLock`, `sysexec.Command`, `proctree` |
+| E8 | `internal/events/subs`: the config and cursor stores, the exec runner, pull acks, dead letters and the protected surface entry. Note (a): E8 adds the additive `Filter.Names(key, value) bool` for the `module=events` skip (D24), so the grammar keeps one home. Note (b): a stored filter whose kind a later build removed gives `ErrRefused` at load. E8 decides between two rules: refuse to start the runner with exit 1 and a message that names the kind (recommended), or dead-letter each record. | `atomicwrite`, `WithPathLock`, `sysexec.Command`, `proctree` |
 | E9 | The CLI: `events channels`, `kinds`, `watch` and `subscribe` | the dispatch style of `cmd_wave.go` |
 | E10 | Wiring: `newRootSignalCenter(role)` returns a closer at every root; a root-list guard test | `cmd_cycle.go:352` |
 | E11 | Producers: `phase.dispatched`, `ship.landed`, `wave.*`, `loop.started`, `loop.exit`, `inbox.claimed`, `inbox.released`, `ci.completed`, and their codes | `signal_cycle.go`, `inboxmover/lifecycle` |
@@ -382,4 +382,5 @@ None. The operator decided Q1 to Q10 on 2026-10-09 (§4, O10 to O19).
 | # | Status |
 |---|---|
 | E0 | ◐ the research dossier, this plan, the spec and ADR-0127 are written in `dev/cl-events`, with fix rounds 1 and 2; not staged |
-| E1 to E14 | ☐ not started |
+| E4 | ◐ `internal/events/filter` is written in `dev/cl-events-filter` (branch `feat/events-filter`). It has the grammar, the matcher, the selectors and the catalog, at 100% coverage. It is unwired and not committed. |
+| E1 to E14, except the rows above | ☐ not started |

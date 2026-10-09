@@ -300,10 +300,16 @@ VALUE = a literal, or a glob with "*" for the keys "kind" and "code"
 
 - **Example:** `kind=cycle.sealed,loop.exit severity>=WARN cycle=1841 code=SKILLS_DRIFT_* module=ship`.
 - **Order keys.** `severity` orders `INFO`, `WARN` and `INCIDENT`. `cycle`, `attempt`, `pid` and `seq` are numbers.
+  - An order operator (`>=`, `>`, `<=`, `<`) applies only to an order key. On another key, it is a usage error (exit 10).
+  - An order operator takes exactly one value. With more than one value, it is a usage error (exit 10).
 - **Absent keys.** A key that a record does not have is absent. A `cycle` or an `attempt` of 0 is absent, as in the JSON form. An absent key never matches `=` or an order operator, and it always matches `!=`.
+  - An empty `kind`, `module`, `severity` or other text value is absent.
+  - A record severity that is not `INFO`, `WARN` or `INCIDENT` is absent.
+  - `pid` and `seq` are always present, also when they are 0.
 - **The catalog.** The vocabulary comes from the Signal Center registries (`go/internal/signalcenter/event.go:68-172`, `registry.go`). `evolve events kinds` prints it. It is the one home: no second vocabulary exists.
 - **Checks.**
   - An unknown key is a usage error (exit 10).
+  - A `severity` value that is not `INFO`, `WARN` or `INCIDENT` is a usage error (exit 10).
   - An unknown kind or module, or a `kind` glob that matches no registered kind, is refused (exit 1).
   - An unknown code only warns. The code registry is open: a newer build can add a code that a stored filter names.
 - **Gap records pass every filter.** A gap is never silent.
