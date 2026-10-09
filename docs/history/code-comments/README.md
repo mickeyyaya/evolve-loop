@@ -509,7 +509,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/config` | 56 | [internal-config.md](internal-config.md) |
 | `internal/core/advisor` | 35 | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | 1 | [internal-core-defectledger.md](internal-core-defectledger.md) |
-| `internal/core` | 908 | [internal-core.md](internal-core.md) |
+| `internal/core` | 909 | [internal-core.md](internal-core.md) |
 | `internal/cycleclassify` | 16 | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/cycleoutcome` | 1 | [internal-cycleoutcome.md](internal-cycleoutcome.md) |
 | `internal/cyclestate` | 24 | [internal-cyclestate.md](internal-cyclestate.md) |

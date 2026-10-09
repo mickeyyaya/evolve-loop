@@ -170,6 +170,7 @@ The research compares five approaches with forces, steelmen and scores ([researc
 | D50 | `internal/overlap` is protected surface, with a row in `guards.ProtectedSurfaceManifest` (spec §6). | The tier decides if an audit runs again: a T1 candidate keeps its audit verdict with no re-audit (ADR-0064). The proof also calls `explanationdocs.IsPlainPath`, and each caller of `explanationdocs` must be protected. |
 | D51 | A deleted Go file counts by its directory. Each other deleted path under `go/` is unknown (spec §6). | A deleted Go file names its package. A deleted data file under `go/` can be a test input of any package, so it is never T1 (O5). |
 | D52 | The evidence digest also binds the blobs of each zone-4 path of `P` in a package of an edge, in both directions (spec §6). | A T3 review is kept when the digest is the same. Without these blobs, a new peer change in an edge package keeps a stale review. |
+| D53 | The interim fix (Q12) routes a continuation lane to Audit, not to Ship, when its rebase is byte-identical. The inbox item [`ship-carry-accepts-a-kept-consumption`](../../.evolve/inbox/2026-10-09T12-00-00Z-ship-carry-accepts-a-kept-consumption.json) holds the Ship route; Q14 removes the class. That item also owns the check that a re-ship is idempotent when `consumed/<name>` is already present. | The lane keeps ship's consumption in its change. Ship's carry check (B4) re-proves the bytes and does not accept that consumption, so a carry record gives a false `INTEGRITY_TREE_DRIFT` (research F2.3). |
 
 ## 7. Components
 
@@ -392,5 +393,6 @@ None. On 2026-10-09 the operator decided OQ1, OQ3, OQ4 and OQ6 (§4, O10 to O13)
 | # | Status |
 |---|---|
 | Q0 | ◐ the dossier, ADR-0128, the spec and this plan are written in `dev/cl-landing-queue`, with the operator decisions of 2026-10-09 and review fix round 1; not staged |
-| Q1, Q2 and Q4 to Q19 | ☐ not started |
-| Q3 | ◐ `internal/overlap` is written unwired in `dev/cl-lq-q3`: `Prove`, the zones, the closure, the evidence digest and the `go list` adapter. The red tests of §7 are green, and the package is at 100. It is not committed. |
+| Q1, Q2, Q4 to Q11, Q13 to Q19 | ☐ not started |
+| Q3 | ☑ `internal/overlap`: `Prove`, the zones, the closure, the evidence digest and the `go list` adapter, at 100% coverage. Merged in the wave 89 train (#829). It is unwired. |
+| Q12 | ☑ the continuation lane reaches the identity proof; the route is Audit, not Ship (D53). Merged in the wave 89 train (#832). |
