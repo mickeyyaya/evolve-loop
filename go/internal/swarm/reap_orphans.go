@@ -160,18 +160,9 @@ func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness
 	return rep
 }
 
-// tmuxSocketDir mirrors where tmux keeps -L socket files.
-func tmuxSocketDir() string {
-	base := os.Getenv("TMUX_TMPDIR")
-	if base == "" {
-		base = "/tmp"
-	}
-	return filepath.Join(base, fmt.Sprintf("tmux-%d", os.Getuid()))
-}
-
 // socketGlob is a test seam over the tmux socket directory.
 var socketGlob = func() ([]string, error) {
-	matches, err := filepath.Glob(filepath.Join(tmuxSocketDir(), "evolve-bridge-[pt]*"))
+	matches, err := filepath.Glob(filepath.Join(bridge.TmuxSocketDir(), "evolve-bridge-[pt]*"))
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +182,7 @@ func ExecKillServer(ctx context.Context, socket string) error {
 		return fmt.Errorf("refusing kill-server with an empty socket name")
 	}
 	_ = tmuxRun(ctx, "-L", socket, "kill-server")
-	if err := os.Remove(filepath.Join(tmuxSocketDir(), socket)); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(filepath.Join(bridge.TmuxSocketDir(), socket)); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove dead socket %s: %w", socket, err)
 	}
 	return nil

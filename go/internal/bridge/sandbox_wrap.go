@@ -120,58 +120,53 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			paths[i] = real
 		}
 		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
-
-		switch probe.OS {
-		case "darwin":
-			// Materialize the SBPL to a per-phase file so the prefix argv stays
-			// short + shell-quote-safe under tmux SendKeys. sandbox-exec(1)
-			// distinguishes -p (inline SBPL string) from -f (file path) —
-			// passing a path with -p makes sandbox-exec parse the path AS the
-			// profile, which would silently leave the phase unconfined. Always
-			// -f here; the in-memory adapter at adapters/sandbox.Sandbox.Exec
-			// stays on -p because it holds the SBPL string, not a file.
-			sbpl := sandbox.GenerateSBPL(cfg)
-			// The SBPL is written to a per-invocation temp dir (mktemp -d, 0o700),
-			// not a shared <workspace>/sandbox-<phase>.sb, so two same-phase
-			// dispatches sharing a workspace cannot race on the same profile file.
-			// A dir-creation failure degrades to the shared workspace profile
-			// (confinement preserved, isolation lost) rather than running
-			// unconfined.
-			// See ADR-0049.
-			sbplDir := req.Workspace
-			if req.Workspace != "" {
-				mk := deps.MkScratchDir
-				if mk == nil {
-					mk = os.MkdirTemp
-				}
-				if d, err := mk(req.Workspace, "sbprofile-"); err == nil {
-					sbplDir = d
-				} else if deps.Stderr != nil {
-					fmt.Fprintf(deps.Stderr, "[bridge] WARN: per-invocation sandbox profile dir failed (%v); using shared workspace profile (isolation lost)\n", err)
-				}
+		socketDir, sockets, err := tmuxSocketGuard()
+		if err != nil {
+			if deps.Stderr != nil {
+				fmt.Fprintf(deps.Stderr, "[bridge] sandbox tmux socket guard unavailable: %v\n", err)
 			}
-			sbplPath := filepath.Join(sbplDir, "sandbox-"+req.Phase+".sb")
-			if err := os.WriteFile(sbplPath, []byte(sbpl), 0o644); err != nil {
-				// Can't write the profile → can't wrap. Caller degrades.
-				return nil, false
-			}
-			return []string{"sandbox-exec", "-f", sbplPath}, true
-		case "linux":
-			for _, path := range append(append([]string{}, req.DenyPaths...), req.DenyReadPaths...) {
-				info, err := os.Stat(path)
-				if err != nil || (!info.IsDir() && slices.Contains(req.DenyReadPaths, path)) {
-					if deps.Stderr != nil {
-						fmt.Fprintf(deps.Stderr, "[bridge] sandbox policy unavailable: Linux denial target %q must exist; read denials require directories (stat: %v)\n", path, err)
-					}
-					return nil, false
-				}
-			}
-			// bwrap takes the inner argv inline. We don't have it here, so we
-			// return just the prefix portion via the dedicated helper.
-			return append([]string{"bwrap"}, sandbox.BwrapPrefix(cfg)...), true
-		default:
 			return nil, false
 		}
+		cfg.DenySockets, cfg.DenyLiterals = sockets, append([]string{socketDir}, sockets...)
+
+		return osSandboxPrefix(probe.OS, deps, req, cfg)
+	}
+}
+
+func osSandboxPrefix(goos string, deps Deps, req SandboxWrapRequest, cfg sandbox.Config) ([]string, bool) {
+	switch goos {
+	case "darwin":
+		sbpl := sandbox.GenerateSBPL(cfg)
+		sbplDir := req.Workspace
+		if req.Workspace != "" {
+			mk := deps.MkScratchDir
+			if mk == nil {
+				mk = os.MkdirTemp
+			}
+			if d, err := mk(req.Workspace, "sbprofile-"); err == nil {
+				sbplDir = d
+			} else if deps.Stderr != nil {
+				fmt.Fprintf(deps.Stderr, "[bridge] WARN: per-invocation sandbox profile dir failed (%v); using shared workspace profile (isolation lost)\n", err)
+			}
+		}
+		sbplPath := filepath.Join(sbplDir, "sandbox-"+req.Phase+".sb")
+		if err := os.WriteFile(sbplPath, []byte(sbpl), 0o644); err != nil {
+			return nil, false
+		}
+		return []string{"sandbox-exec", "-f", sbplPath}, true
+	case "linux":
+		for _, path := range append(append([]string{}, req.DenyPaths...), req.DenyReadPaths...) {
+			info, err := os.Stat(path)
+			if err != nil || (!info.IsDir() && slices.Contains(req.DenyReadPaths, path)) {
+				if deps.Stderr != nil {
+					fmt.Fprintf(deps.Stderr, "[bridge] sandbox policy unavailable: Linux denial target %q must exist; read denials require directories (stat: %v)\n", path, err)
+				}
+				return nil, false
+			}
+		}
+		return append([]string{"bwrap"}, sandbox.BwrapPrefix(cfg)...), true
+	default:
+		return nil, false
 	}
 }
 

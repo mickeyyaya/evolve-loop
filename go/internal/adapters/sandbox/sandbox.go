@@ -34,6 +34,8 @@ type Config struct {
 	WritePaths    []string // explicit write allows
 	DenyPaths     []string // explicit write denies (claude.sh:540 deny loop)
 	DenyReadPaths []string // explicit read denies; separate from immutable readable inputs
+	DenySockets   []string
+	DenyLiterals  []string
 }
 
 // homeStateWriteDirs are CLI-owned HOME state dirs that tmux REPLs may update
@@ -186,7 +188,7 @@ func GenerateSBPL(cfg Config) string {
 	b.WriteString(`(import "system.sb")` + "\n")
 	b.WriteString("(allow process-exec)\n")
 	b.WriteString("(allow process-fork)\n")
-	b.WriteString("(allow signal)\n")
+	b.WriteString("(allow signal (target same-sandbox))\n")
 	b.WriteString("(allow sysctl-read)\n")
 	b.WriteString("(allow mach-lookup)\n")
 	b.WriteString("(allow ipc-posix-shm)\n")
@@ -262,12 +264,26 @@ func GenerateSBPL(cfg Config) string {
 			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
 		}
 	}
+	writeClosingRules(&b, cfg)
+	return b.String()
+}
+
+func writeClosingRules(b *strings.Builder, cfg Config) {
+	for _, lit := range cfg.DenyLiterals {
+		if lit != "" {
+			fmt.Fprintf(b, "(deny file-write* (literal %q))\n", lit)
+		}
+	}
 	if cfg.AllowNetwork {
 		b.WriteString("(allow network*)\n")
 	} else {
 		b.WriteString("(deny network*)\n")
 	}
-	return b.String()
+	for _, sp := range cfg.DenySockets {
+		if sp != "" {
+			fmt.Fprintf(b, "(deny network-outbound (remote unix-socket (path-literal %q)))\n", sp)
+		}
+	}
 }
 
 // GenerateBwrapArgv emits the bubblewrap argv for the given Config and
