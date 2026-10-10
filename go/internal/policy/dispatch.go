@@ -186,8 +186,7 @@ func (p Policy) BridgeConfig() BridgePolicy {
 // QuotaResetConfig configures the quotareset wake-time estimator.
 type QuotaResetConfig struct {
 	// ResetAt is an ISO 8601 wake-time override; empty means none.
-	ResetAt string `json:"reset_at,omitempty"`
-	// DefaultHours is the fallback wake duration; 0 means the built-in 5.4167 (about 5h25m).
+	ResetAt      string  `json:"reset_at,omitempty"`
 	DefaultHours float64 `json:"default_hours,omitempty"`
 }
 

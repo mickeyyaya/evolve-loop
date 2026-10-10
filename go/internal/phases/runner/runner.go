@@ -26,6 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 // Hooks holds the per-phase variation points BaseRunner delegates to.
@@ -74,38 +75,26 @@ type InlinePromptProvider interface {
 
 // Options configures New; Hooks is required and every nil seam takes its production default.
 type Options struct {
-	Hooks      Hooks
-	Bridge     core.Bridge
-	Prompts    *prompts.Loader
-	NowFn      func() time.Time
-	ResolveLLM func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
-	// StdoutFilter writes the post-phase .clean.txt; nil means logfilter.Process.
-	StdoutFilter func(workspace, phase string) error
-	// EventsProducer writes <phase>-events.ndjson and has no off switch, because cost and classification read it.
-	// prompt feeds the classifier's echo veto, so prompt text an agent quotes never reads as an infra failure.
-	EventsProducer func(workspace, phase, cli string, cycle int, prompt string) error
-	// Optional degrades an artifact timeout to a WARN that lets the cycle advance; false hard-fails.
-	Optional bool
-	// VerifyFn replaces the deliverable probe in tests and outranks ContractVerifier.
-	VerifyFn func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
-	// ContractVerifier supplies the deliverables gate's own verifier, so the engine classifies the bytes the gate
-	// approves. It is an accessor because the gate is built after the runners; nil falls back to the catalog-aware verify.
-	ContractVerifier func() ContractVerifier
-	// HostEffects performs the phase's declared host effects before the verdict
-	// engine judges it; an accessor for the same reason as ContractVerifier.
-	HostEffects func() core.HostEffects
-	// SleepFn is the delay between the engine's settle retries; nil means settleSleep.
-	SleepFn func(time.Duration)
-	// PhaseIO is the EVOLVE_PHASE_IO stage the default probe honors, as the host gate does.
-	PhaseIO config.Stage
-	// CompactPrompts strips on-demand reference sections from disk-loaded agent docs; inline bodies are never stripped.
+	Hooks               Hooks
+	Bridge              core.Bridge
+	Prompts             *prompts.Loader
+	NowFn               func() time.Time
+	ResolveLLM          func(phase string, opts resolvellm.Options) (resolvellm.Result, error)
+	StdoutFilter        func(workspace, phase string) error
+	EventsProducer      func(workspace, phase, cli string, cycle int, prompt string) error
+	Optional            bool
+	VerifyFn            func(phase string, roots phasecontract.Roots) (deliverable.Result, error)
+	ContractVerifier    func() ContractVerifier
+	HostEffects         func() core.HostEffects
+	SleepFn             func(time.Duration)
+	PhaseIO             config.Stage
 	CompactPrompts      bool
 	DisableStdoutFilter bool
 	Router              *cliroute.Router
-	// Diag receives the routing-overlay observability lines; the zero value means log.Diag().
-	Diag log.Console
-	// Signals is the engine's Signal Center accessor; nil adopts the Bridge's own Center when it exposes one.
-	Signals func() *signalcenter.Center
+	Diag                log.Console
+	Signals             func() *signalcenter.Center
+	GitExec             sysexec.RunFunc
+	AttemptClock        func() time.Time
 }
 
 // ContractVerifier is the deliverables gate's verification, salvage included, offered to the verdict engine.
@@ -129,9 +118,10 @@ type BaseRunner struct {
 	signals          func() *signalcenter.Center
 	verifyInjected   bool
 	judge            *verdict.Engine
+	gitExec          sysexec.RunFunc
+	attemptClock     func() time.Time
 }
 
-// New constructs a BaseRunner and panics on nil Hooks, a wiring error caught at startup.
 func New(opts Options) *BaseRunner {
 	if opts.Hooks == nil {
 		panic("phases/runner: Hooks required")
@@ -169,6 +159,13 @@ func New(opts Options) *BaseRunner {
 	b.hostEffects = opts.HostEffects
 	b.signals = resolveSignals(opts)
 	b.verifyInjected = opts.VerifyFn != nil
+	b.gitExec, b.attemptClock = opts.GitExec, opts.AttemptClock
+	if b.gitExec == nil {
+		b.gitExec = sysexec.DefaultRunner
+	}
+	if b.attemptClock == nil {
+		b.attemptClock = time.Now
+	}
 	return b
 }
 

@@ -37,7 +37,7 @@ func TestClampPlanToFloor_IntentExplicitSkipOverridden(t *testing.T) {
 }
 
 func TestClampPlanToFloor_IntentNotForcedWhenNotRequired(t *testing.T) {
-	in := nonTrivialIn() // IntentRequired zero-value false
+	in := nonTrivialIn()
 	out, clamps := ClampPlanToFloor(in, fullShipPlan())
 	if planRuns(out, "intent") {
 		t.Errorf("intent forced without IntentRequired; plan=%+v", out.Entries)

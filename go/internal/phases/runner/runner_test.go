@@ -19,10 +19,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
-// TestMain unsets EVOLVE_CLI so an operator shell value cannot leak into the profile and default CLI tiers.
 func TestMain(m *testing.M) {
 	os.Unsetenv("EVOLVE_CLI")
-	os.Exit(m.Run())
+	home, err := os.MkdirTemp("", "runner-home-")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("HOME", home)
+	code := m.Run()
+	os.RemoveAll(home)
+	os.Exit(code)
 }
 
 type fakeHooks struct {

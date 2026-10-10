@@ -51,6 +51,9 @@
 - **Recovery order carries meaning.** The fleet rebase conflict is the one integrity-class code that recovers, so it sits above the integrity block. Integrity sits above every code-keyed handler, so an integrity-classed error blocks even when its code is ship-local. The control-plane and ship-local handlers sit above precondition re-audit because those codes must never loop back to audit. The fleet rebase handler sits above transient retry because that transient code needs a fresh audit of the rebased tree.
 - **The model clamp is absolute.** A persuasive `Justification` never widens the envelope. A nil profile skips the guardrail checks (the catalog check still applies), and an empty `AllowedCLIs` is a preference, not a restriction (B2). The catalog is keyed by base family, so the lookup uses `policy.BaseCLI(e.CLI)`, but an honored entry keeps its original CLI string (I1).
 - **Hybrid cadence gate.** With a plan, `shouldPropose` consults the proposer only at build, audit and retrospective, where new objective signals appear. Without a plan every transition proposes, so Shadow forensics are unchanged. Extend `isBranchTransition` when a phase starts producing new post-phase signals.
+- **The fleet worktree is the caller's.** Under fleet mode (`EVOLVE_FLEET=1`) the caller must set `RouteInput.ActiveWorktree`, because the tmux driver refuses an empty worktree. The router only carries the field to the advisor; it does not read it. Pinned by no router test yet: inbox item `router-active-worktree-fleet-pin`.
+- **Unavailable phases never hide a required one.** `UnavailablePhases` lists only catalog-optional phases. Mandatory and floor phases are never listed, so their absence fails loudly rather than being dropped.
+- **Recovery is the one ladder for every strategy.** `StaticPreset`, `LLMProposal` and the `Recover` of each delegate to the same chain, so an LLM proposal cannot change a ship failure's route.
 
 ## Findings
 

@@ -1,14 +1,5 @@
 package gc
 
-// worktrees_fuzz_test.go — property-based RED test (cycle 570,
-// workspace-hygiene-s4-worktree-gc-planner) mirroring
-// TestPlanNeverTouchesLiveDirs_Property (discover_fuzz_test.go): random
-// synthetic worktree populations -> PlanWorktrees -> the three invariants
-// that must hold no matter what the random draw produces.
-//
-// RED now: PlanWorktrees/WorktreeOptions do not exist yet (compile failure).
-// Do NOT modify this file.
-
 import (
 	"fmt"
 	"path/filepath"
@@ -19,12 +10,6 @@ import (
 	"pgregory.net/rapid"
 )
 
-// TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property draws a random
-// population of cycle-prefixed worktrees (random merged/dirty/live/age
-// combinations) and asserts PlanWorktrees NEVER emits a removal or
-// branch-delete action for a live, dirty, or unmerged candidate — the same
-// three invariants the named unit tests pin individually, checked here
-// against many more combinations than a human would hand-write.
 func TestPlanWorktreesNeverTouchesLiveDirtyUnmerged_Property(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
 		e := newWorktreesTestEnv(t)

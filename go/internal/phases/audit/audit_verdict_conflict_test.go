@@ -12,15 +12,10 @@ import (
 
 const conflictMarker = "verdict-conflict"
 
-// narrativeReport renders an audit-report.md declaring the given verdict in the
-// canonical "## Verdict\n**X**" shape extractAuditVerdict recognises.
 func narrativeReport(verdict string) string {
 	return "# Audit Report\n\n## Findings\n\nnone\n\n## Verdict\n**" + verdict + "**\n"
 }
 
-// classifyWith runs the real Classify path over a temp workspace prepared by
-// prep (which may write acs-verdict.json, or deliberately not) and returns the
-// resulting verdict plus diagnostics.
 func classifyWith(t *testing.T, artifact string, prep func(ws string)) (string, []core.Diagnostic) {
 	t.Helper()
 	ws := t.TempDir()
@@ -31,7 +26,6 @@ func classifyWith(t *testing.T, artifact string, prep func(ws string)) (string, 
 	return verdict, diags
 }
 
-// conflictDiags returns every diagnostic carrying the verdict-conflict marker.
 func conflictDiags(diags []core.Diagnostic) []core.Diagnostic {
 	var out []core.Diagnostic
 	for _, d := range diags {
@@ -42,9 +36,6 @@ func conflictDiags(diags []core.Diagnostic) []core.Diagnostic {
 	return out
 }
 
-// requireConflict asserts exactly one conflict diagnostic exists, that it is
-// error-severity (the AuditFailReasons wiring), and that it names the narrative
-// verdict. Returns its message for branch-distinctness checks.
 func requireConflict(t *testing.T, diags []core.Diagnostic, narrative string) string {
 	t.Helper()
 	got := conflictDiags(diags)
@@ -63,8 +54,6 @@ func requireConflict(t *testing.T, diags []core.Diagnostic, narrative string) st
 	return got[0].Message
 }
 
-// TestVerdictConflict_RedCountBranch — the crux. Narrative PASS + red_count>0:
-// the gate correctly forces FAIL, and the disagreement is now on the record.
 func TestVerdictConflict_RedCountBranch(t *testing.T) {
 	verdict, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycle1117/TestC1117_002_ProbeTreeIsolation")
@@ -78,8 +67,6 @@ func TestVerdictConflict_RedCountBranch(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_ShipEligibleBranch — branch 2 (red_count==0 but the
-// authoritative acssuite SSOT says do-not-ship), narrative WARN.
 func TestVerdictConflict_ShipEligibleBranch(t *testing.T) {
 	no := false
 	verdict, diags := classifyWith(t, narrativeReport("WARN"), func(ws string) {
@@ -91,9 +78,6 @@ func TestVerdictConflict_ShipEligibleBranch(t *testing.T) {
 	requireConflict(t, diags, "WARN")
 }
 
-// TestVerdictConflict_ACSErrorBranch — branch 3: acs-verdict.json missing or
-// unparseable. A narrative PASS over an unreadable gate file is exactly the
-// shape an operator must be able to see.
 func TestVerdictConflict_ACSErrorBranch(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
 		verdict, diags := classifyWith(t, narrativeReport("PASS"), nil)
@@ -115,9 +99,6 @@ func TestVerdictConflict_ACSErrorBranch(t *testing.T) {
 	})
 }
 
-// TestVerdictConflict_BranchesAreDistinguishable: a constant conflict message
-// would blind the identical-fingerprint breaker's identity premise, so
-// distinct gate reasons must yield distinct conflict messages.
 func TestVerdictConflict_BranchesAreDistinguishable(t *testing.T) {
 	_, redDiags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
@@ -139,9 +120,6 @@ func TestVerdictConflict_BranchesAreDistinguishable(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_NarrativeVerdictIsCarriedVerbatim — a PASS conflict and a
-// WARN conflict on the SAME gate reason must be distinguishable; otherwise the
-// record loses the very fact it exists to preserve.
 func TestVerdictConflict_NarrativeVerdictIsCarriedVerbatim(t *testing.T) {
 	reds := func(ws string) { writeACSVerdictReds(t, ws, "cycleX/TestRed_A") }
 	_, passDiags := classifyWith(t, narrativeReport("PASS"), reds)
@@ -153,14 +131,6 @@ func TestVerdictConflict_NarrativeVerdictIsCarriedVerbatim(t *testing.T) {
 	}
 }
 
-// --- Negative / anti-noise axis -------------------------------------------
-//
-// These are the anti-no-op predicates: an implementation that unconditionally
-// appends a conflict diagnostic at every override would pass every positive
-// test above and fail all of these.
-
-// TestVerdictConflict_NoNoiseWhenNarrativeAlreadyFAIL — the coherent case. The
-// auditor and the gate AGREE; there is no conflict to record.
 func TestVerdictConflict_NoNoiseWhenNarrativeAlreadyFAIL(t *testing.T) {
 	_, diags := classifyWith(t, narrativeReport("FAIL"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
@@ -170,9 +140,6 @@ func TestVerdictConflict_NoNoiseWhenNarrativeAlreadyFAIL(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_NoNoiseWhenNarrativeUnparseable — no narrative verdict was
-// found, so there is nothing to disagree WITH. The existing unparseable-verdict
-// diagnostic already covers that case; a conflict record would be fabricated.
 func TestVerdictConflict_NoNoiseWhenNarrativeUnparseable(t *testing.T) {
 	_, diags := classifyWith(t, "# Audit Report\n\nprose with no verdict declaration\n", func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
@@ -183,9 +150,6 @@ func TestVerdictConflict_NoNoiseWhenNarrativeUnparseable(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_NoNoiseWhenGateGreen — narrative PASS over a green gate is
-// the ordinary shipping cycle: no override happened, so no conflict exists and
-// the PASS must survive.
 func TestVerdictConflict_NoNoiseWhenGateGreen(t *testing.T) {
 	yes := true
 	verdict, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
@@ -199,10 +163,6 @@ func TestVerdictConflict_NoNoiseWhenGateGreen(t *testing.T) {
 	}
 }
 
-// TestVerdictConflict_SingleRecordPerClassify — belt-and-braces against a
-// double-append when more than one gate condition could be read as conflicting.
-// A verdict that is BOTH red and ship_eligible=false takes the red branch only:
-// exactly one record, never two.
 func TestVerdictConflict_SingleRecordPerClassify(t *testing.T) {
 	_, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		no := false

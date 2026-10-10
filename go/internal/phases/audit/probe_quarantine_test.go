@@ -11,9 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// probeRepo builds a worktree-shaped git repo: a committed builder test, an
-// UNTRACKED builder test older than the cutoff, and an untracked auditor
-// probe newer than the cutoff.
 func probeRepo(t *testing.T) (worktree, workspace string, cutoff time.Time) {
 	t.Helper()
 	worktree = t.TempDir()
@@ -26,7 +23,6 @@ func probeRepo(t *testing.T) (worktree, workspace string, cutoff time.Time) {
 		t.Fatal(err)
 	}
 	old := time.Now().Add(-1 * time.Hour)
-	// Builder's untracked deliverable test — predates the audit dispatch.
 	builderTest := filepath.Join(pkg, "feature_c9999_test.go")
 	if err := os.WriteFile(builderTest, []byte("package bridge\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -35,8 +31,7 @@ func probeRepo(t *testing.T) (worktree, workspace string, cutoff time.Time) {
 		t.Fatal(err)
 	}
 
-	cutoff = time.Now().Add(-1 * time.Minute) // audit-prompt.txt mtime
-	// Auditor probe — created after dispatch.
+	cutoff = time.Now().Add(-1 * time.Minute)
 	probe := filepath.Join(pkg, "zz_audit_probe_test.go")
 	if err := os.WriteFile(probe, []byte("package bridge\nimport \"testing\"\nfunc TestZZAuditProbe_X(t *testing.T){t.Fatal(\"engineered\")}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -67,9 +62,6 @@ func TestQuarantineAuditProbes_PreservesAndExcludesAuditAuthoredTests(t *testing
 	}
 }
 
-// TestQuarantineAuditProbes_LeavesBuilderWorkAlone (negative): untracked
-// builder tests that predate the audit dispatch are the cycle's DELIVERABLE —
-// quarantining them would hide the diff from its own predicates.
 func TestQuarantineAuditProbes_LeavesBuilderWorkAlone(t *testing.T) {
 	worktree, workspace, cutoff := probeRepo(t)
 	if _, err := quarantineAuditProbes(worktree, workspace, cutoff, &bytes.Buffer{}); err != nil {
@@ -92,10 +84,6 @@ func TestQuarantineAuditProbes_NoProbesIsANoOp(t *testing.T) {
 	}
 }
 
-// TestQuarantineAuditProbes_CommittedFilesNeverTouched (adversarial): a file
-// in HEAD — genuinely tracked — must never be quarantined even when modified
-// post-dispatch: a tracked modification is visible in the diff and an auditor
-// edit of one is a different violation with a different guard.
 func TestQuarantineAuditProbes_CommittedFilesNeverTouched(t *testing.T) {
 	worktree, workspace, cutoff := probeRepo(t)
 	tracked := filepath.Join(worktree, "go", "internal", "bridge", "tracked_test.go")
@@ -105,7 +93,7 @@ func TestQuarantineAuditProbes_CommittedFilesNeverTouched(t *testing.T) {
 	gitInAudit(t, worktree, "add", "go/internal/bridge/tracked_test.go")
 	gitInAudit(t, worktree, "commit", "-q", "-m", "builder ships the test")
 	if err := os.WriteFile(tracked, []byte("package bridge\n// modified\n"), 0o644); err != nil {
-		t.Fatal(err) // post-dispatch modification of a COMMITTED file
+		t.Fatal(err)
 	}
 	if _, err := quarantineAuditProbes(worktree, workspace, cutoff, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
@@ -115,10 +103,6 @@ func TestQuarantineAuditProbes_CommittedFilesNeverTouched(t *testing.T) {
 	}
 }
 
-// TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined: a preserved
-// continuation worktree's pre-loop `git add -A` stages a prior
-// attempt's probe, so it arrives as `A `-status, not `??`. Staged-NEW is
-// still new — it must quarantine like an untracked probe.
 func TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined(t *testing.T) {
 	worktree, workspace, cutoff := probeRepo(t)
 	gitInAudit(t, worktree, "add", "go/internal/bridge/zz_audit_probe_test.go")
@@ -131,11 +115,6 @@ func TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined(t *testing.T) {
 	}
 }
 
-// TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged is the WIRING proof
-// at the phase level: the quarantine fires in Classify BEFORE the
-// verdict-exists gate, so an auditor that pre-writes acs-verdict.json (which
-// skips genVerdict entirely — the persona instructs exactly that) cannot skip
-// the quarantine with it.
 func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
 	worktree, workspace, _ := probeRepo(t)
 	workspace = filepath.Join(workspace, "runs", "cycle-9999")
@@ -150,7 +129,6 @@ func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
 	if err := os.Chtimes(promptPath, past, past); err != nil {
 		t.Fatal(err)
 	}
-	// A pre-staged candidate must not suppress host execution or probe quarantine.
 	if err := os.WriteFile(filepath.Join(workspace, "acs-verdict.json"),
 		[]byte(`{"schema_version":"1.0","cycle":9999,"results":[],"green_count":1,"red_count":0,"verdict":"PASS","ship_eligible":true}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -175,12 +153,6 @@ func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
 	}
 }
 
-// TestQuarantineProbesForRequest_AnchorSurvivesRedispatch: bridge.Engine.Launch
-// rewrites audit-prompt.txt on EVERY dispatch, so a re-dispatched audit gets a
-// NEWER anchor than a dead first attempt's leftover probe — mtime-vs-latest-
-// prompt would classify the probe as builder work and leave it to poison the
-// gate. The anchor must be the FIRST dispatch of the cycle, persisted across
-// attempts.
 func TestQuarantineProbesForRequest_AnchorSurvivesRedispatch(t *testing.T) {
 	worktree, workspace, _ := probeRepo(t)
 	workspace = filepath.Join(workspace, "runs", "cycle-9999")
@@ -189,9 +161,6 @@ func TestQuarantineProbesForRequest_AnchorSurvivesRedispatch(t *testing.T) {
 	}
 	promptPath := filepath.Join(workspace, auditPromptArtifact)
 
-	// Attempt 1 dispatched two hours ago; its quarantine ran (establishing the
-	// anchor) BEFORE the auditor wrote anything, then the phase died. Remove
-	// probeRepo's pre-made probe first so attempt 1 genuinely sees a clean tree.
 	probe := filepath.Join(worktree, "go", "internal", "bridge", "zz_audit_probe_test.go")
 	if err := os.Remove(probe); err != nil {
 		t.Fatal(err)
@@ -208,7 +177,6 @@ func TestQuarantineProbesForRequest_AnchorSurvivesRedispatch(t *testing.T) {
 		t.Fatalf("attempt-1 quarantine: %v", err)
 	}
 
-	// Attempt 1's auditor writes the probe (between the two dispatches), then dies.
 	if err := os.WriteFile(probe, []byte("package bridge\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +185,6 @@ func TestQuarantineProbesForRequest_AnchorSurvivesRedispatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Attempt 2: the prompt artifact is REWRITTEN with a fresh mtime.
 	if err := os.WriteFile(promptPath, []byte("attempt-2"), 0o644); err != nil {
 		t.Fatal(err)
 	}

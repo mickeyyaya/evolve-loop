@@ -36,7 +36,6 @@ func TestDigest_PayloadWrapped_EquivalentToFlat(t *testing.T) {
 	if !reflect.DeepEqual(flatSig, wrappedSig) {
 		t.Fatalf("payload-wrapped digest != flat digest:\n flat   =%+v\n wrapped=%+v", flatSig, wrappedSig)
 	}
-	// Guards against a vacuous pass where both digests are empty.
 	if !wrappedSig.Build.Present || wrappedSig.Build.SeverityMax != SevCritical {
 		t.Fatalf("wrapped build not extracted (unwrap missing?): %+v", wrappedSig.Build)
 	}

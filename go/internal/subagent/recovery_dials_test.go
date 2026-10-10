@@ -37,9 +37,6 @@ func TestExecAdapterDeps_CarriesThePolicyRecoveryDials(t *testing.T) {
 	}
 }
 
-// TestExecAdapterDeps_NoProjectRootResolvesCompiledDefaults: a dispatch with
-// no EVOLVE_PROJECT_ROOT (the env omits it when empty) fails open to the
-// compiled defaults instead of leaving the dials unset.
 func TestExecAdapterDeps_NoProjectRootResolvesCompiledDefaults(t *testing.T) {
 	d := execAdapterDeps(map[string]string{"HOME": t.TempDir()})
 	if d.RecoveryStage != config.StageShadow.String() || d.FatalPaneStage != config.StageEnforce.String() {

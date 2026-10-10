@@ -11,7 +11,7 @@ import (
 
 func longRedStream(t *testing.T, needle string) string {
 	t.Helper()
-	filler := strings.Repeat("x", 1000) // structurally past evidenceMax, not by arithmetic luck
+	filler := strings.Repeat("x", 1000)
 	out := `{"Action":"output","Package":"` + acsPkgBase + `cycle9","Test":"TestC9_002_Bar","Output":"` + filler + needle + filler + `\n"}`
 	return goStream(
 		goLine(acsPkgBase+"cycle9", "TestC9_001_Ok", "pass"),
@@ -54,7 +54,6 @@ func TestRun_PersistsFullRedEvidenceBeyondExcerptCap(t *testing.T) {
 	if !strings.HasPrefix(string(raw), "# cycle=9 ac_id=cycle9/TestC9_002_Bar") || !strings.Contains(string(raw), "--- FIRST RUN ---") {
 		t.Errorf("evidence must open with the attribution header + first-run label:\n%.200s", raw)
 	}
-	// Greens never write evidence files.
 	entries, _ := os.ReadDir(filepath.Dir(evPath))
 	if len(entries) != 1 {
 		t.Errorf("exactly the red predicate writes evidence, got %d files", len(entries))
@@ -114,7 +113,7 @@ func TestRun_StarvedRetryIsInconclusiveNotConfirmed(t *testing.T) {
 		if calls == 1 {
 			return longRedStream(t, "FIRST_RUN_TOKEN"), &fakeExitErr{1}
 		}
-		return "", nil // retry produced NOTHING (expired ctx / crash)
+		return "", nil
 	}
 	v, err := Run(Options{Root: root, Cycle: 9, GoExec: seam})
 	if err != nil {
@@ -140,8 +139,6 @@ func TestResultWireShape_FullEvidenceNeverSerializes(t *testing.T) {
 }
 
 func TestWriteRedEvidence_EmptyStreamWritesNothing(t *testing.T) {
-	// The synthetic egps/go-lane-parse-error red has no captured stream; it
-	// must not mint an empty evidence file.
 	root := t.TempDir()
 	writeRedEvidence(Options{Root: root, Cycle: 9}, []Result{{ACID: "egps/go-lane-parse-error", ResultStr: "red"}})
 	if _, err := os.Stat(filepath.Join(root, ".evolve", "runs", "cycle-9", "acs-red-evidence")); !os.IsNotExist(err) {

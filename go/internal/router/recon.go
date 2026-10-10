@@ -7,35 +7,27 @@ import (
 	"strings"
 )
 
-// ReconDigest holds the measured repo facts fed into the initial plan prompt. The gatherer
-// fails open: a git or fs error omits a fact rather than failing planning.
 type ReconDigest struct {
-	LangsTouched    []string // languages of recently changed files, sorted
+	LangsTouched    []string
 	HasTests        bool
-	BacklogSize     int // 0 before scout has run
+	BacklogSize     int
 	CarryoverCount  int
-	GoalKeywordHits []string // routing-salient goal keywords, sorted
-	RecentHotspots  []string // most-changed files, by frequency, capped
+	GoalKeywordHits []string
+	RecentHotspots  []string
 }
 
-// IsZero reports whether the digest carries no facts; a zero digest renders nothing.
 func (d ReconDigest) IsZero() bool {
 	return len(d.LangsTouched) == 0 && !d.HasTests && d.BacklogSize == 0 &&
 		d.CarryoverCount == 0 && len(d.GoalKeywordHits) == 0 && len(d.RecentHotspots) == 0
 }
 
-// maxReconHotspots caps the hotspot list so a churny repo cannot crowd the
-// rubric out of the context window.
 const maxReconHotspots = 8
 
-// reconGoalKeywords must stay sorted and unique: reconGoalKeywordHits relies on it to return a
-// sorted result, which keeps the prompt prefix cache-stable.
 var reconGoalKeywords = [...]string{
 	"api", "bug", "concurrency", "doc", "fix", "migration",
 	"performance", "refactor", "regression", "security", "test",
 }
 
-// BuildReconDigest assembles a deterministic digest; nil changedFiles omits the file-derived facts.
 func BuildReconDigest(changedFiles []string, goalText string, backlogSize, carryoverCount int) ReconDigest {
 	d := ReconDigest{BacklogSize: backlogSize, CarryoverCount: carryoverCount}
 	d.GoalKeywordHits = reconGoalKeywordHits(goalText)
@@ -43,8 +35,6 @@ func BuildReconDigest(changedFiles []string, goalText string, backlogSize, carry
 	return d
 }
 
-// RenderReconDigest writes the present facts under a fixed heading, and nothing for a zero digest,
-// so the prompt is byte-identical when recon is off.
 func RenderReconDigest(b *strings.Builder, d ReconDigest) {
 	if d.IsZero() {
 		return
@@ -70,8 +60,6 @@ func RenderReconDigest(b *strings.Builder, d ReconDigest) {
 	}
 }
 
-// reconGoalKeywordHits returns the keywords that prefix some word of goalText, case-insensitively.
-// A word prefix, not a substring, so "prefix" is not "fix" and "latest" is not "test", yet "docs" is "doc".
 func reconGoalKeywordHits(goalText string) []string {
 	words := strings.FieldsFunc(strings.ToLower(goalText), func(r rune) bool {
 		return r < 'a' || r > 'z'
@@ -91,8 +79,6 @@ func reconGoalKeywordHits(goalText string) []string {
 	return hits
 }
 
-// reconFromFiles derives languages, test presence and hotspots; each commit touch is one entry,
-// so a path's frequency is its churn.
 func reconFromFiles(files []string) (langs []string, hasTests bool, hotspots []string) {
 	if len(files) == 0 {
 		return nil, false, nil
@@ -115,7 +101,6 @@ func reconFromFiles(files []string) (langs []string, hasTests bool, hotspots []s
 	return sortedKeys(langSet), hasTests, topByFreq(freq, maxReconHotspots)
 }
 
-// langForPath maps a path's extension to a coarse language label, or "".
 func langForPath(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".go":
@@ -155,7 +140,6 @@ func sortedKeys(set map[string]struct{}) []string {
 	return out
 }
 
-// topByFreq returns up to n paths by descending frequency, ties broken by path.
 func topByFreq(freq map[string]int, n int) []string {
 	if len(freq) == 0 {
 		return nil

@@ -1,14 +1,5 @@
 package audit
 
-// This test pins core's disposition-skeleton preseed against this package's
-// gate: the writer and reader of a machine-graded artifact must bind against
-// each other. core cannot import audit, so its seeder re-reads the ledger
-// wire shape; this test feeds one real document through both sides and
-// proves the OPEN id set matches and an untouched skeleton still blocks
-// every seeded id by name — a seed the auditor ignores can never launder a
-// defect.
-// See ADR-0084.
-
 import (
 	"os"
 	"path/filepath"
@@ -42,7 +33,6 @@ func TestDispositionSeed_BindsGateSemantics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Adoption-side seed (the production entry point core wires at adoption).
 	core.SeedDispositionSkeleton(ws, root, 1425)
 
 	req := core.PhaseRequest{ProjectRoot: root, Workspace: ws}

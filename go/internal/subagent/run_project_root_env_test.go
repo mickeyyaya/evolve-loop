@@ -23,15 +23,11 @@ func runFromATempCwd(t *testing.T) {
 	})
 }
 
-// TestRun_ExportsProjectRootToTheSubprocess pins the documented contract at
-// the seam the adapter actually receives.
 func TestRun_ExportsProjectRootToTheSubprocess(t *testing.T) {
 	workspace := t.TempDir()
-	projectRoot := t.TempDir() // deliberately NOT the workspace's parent
-	worktree := t.TempDir()    // and not the worktree the agent runs in
+	projectRoot := t.TempDir()
+	worktree := t.TempDir()
 	opts := runHappyOpts(t)
-	// Capture the env, then let the fixture's own adapter materialize the
-	// artifact exactly as every other happy-path test does.
 	var captured map[string]string
 	orig := opts.ExecAdapter
 	opts.ExecAdapter = func(ctx context.Context, adapter string, env map[string]string) (int, error) {
@@ -54,8 +50,6 @@ func TestRun_ExportsProjectRootToTheSubprocess(t *testing.T) {
 	}
 }
 
-// TestRun_NoProjectRootMeansNoEnvKey mirrors the tmux guard for headless
-// drivers: no key rather than an empty value.
 func TestRun_NoProjectRootMeansNoEnvKey(t *testing.T) {
 	runFromATempCwd(t)
 	opts := runHappyOpts(t)

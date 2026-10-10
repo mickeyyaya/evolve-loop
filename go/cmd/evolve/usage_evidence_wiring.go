@@ -9,6 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/observer"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
+	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -63,4 +64,48 @@ func phaseObserverOptions(cfg policy.ObserverPolicy, recoveryStage string, deps 
 	ca.Signals = func() *signalcenter.Center { return deps.signals }
 	ca.UsageEvidence = deps.usage
 	return []core.Option{core.WithObserver(ca)}
+}
+
+func usageResetFrom(explain usageevidence.Explain) func(families []string, now time.Time) (time.Time, bool) {
+	if explain == nil {
+		return nil
+	}
+	return func(families []string, now time.Time) (time.Time, bool) {
+		var first time.Time
+		for _, family := range families {
+			back, ok := familyBackAt(explain(context.Background(), family+"-tmux", now))
+			if ok && (first.IsZero() || back.Before(first)) {
+				first = back
+			}
+		}
+		return first, !first.IsZero()
+	}
+}
+
+func familyBackAt(ev usageprobe.Evidence) (time.Time, bool) {
+	if ev.Verdict != usageprobe.VerdictExhausted {
+		return time.Time{}, false
+	}
+	var last time.Time
+	for _, w := range ev.Windows {
+		if w.Exhausted && w.ResetsAt != nil && w.ResetsAt.After(last) {
+			last = *w.ResetsAt
+		}
+	}
+	return last, !last.IsZero()
+}
+
+func init() {
+	checkpoint.UsageReset = productionUsageReset
+}
+
+func productionUsageReset(projectRoot string, families []string, now time.Time) (time.Time, bool) {
+	if usageEvidenceFn == nil {
+		return time.Time{}, false
+	}
+	query := usageResetFrom(usageEvidenceFn(projectRoot, filepath.Join(projectRoot, ".evolve"), io.Discard))
+	if query == nil {
+		return time.Time{}, false
+	}
+	return query(families, now)
 }

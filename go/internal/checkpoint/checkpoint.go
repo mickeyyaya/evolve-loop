@@ -18,10 +18,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
@@ -61,6 +64,7 @@ type Checkpoint struct {
 	QuotaResetSource      string   `json:"quotaResetSource"`
 	AutoResumeAttempts    int      `json:"autoResumeAttempts"`
 	AutoResumeMaxAttempts int      `json:"autoResumeMaxAttempts"`
+	OperatorAction        string   `json:"operatorAction,omitempty"`
 	// PhaseIntegrity is the per-phase agent-block digest chain (ADR-0065).
 	// Additive + omitempty: absent on pre-field checkpoints, so old state
 	// round-trips byte-clean and plain Compose stays integrity-free.
@@ -207,7 +211,7 @@ func init() {
 		return flock.WithPathLock(cycleStatePath, func() error {
 			existing := readExistingIntegrity(cycleStatePath)
 			cp := ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing)
-			return applyWithHooks(defaultHooks(), cycleStatePath, withQuotaReset(cp, cs.WorkspacePath, projectRoot, now))
+			return applyWithHooks(defaultHooks(), cycleStatePath, withQuotaReset(cp, cs, projectRoot, now))
 		})
 	}
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
@@ -250,43 +254,70 @@ func init() {
 	}
 }
 
-// withQuotaReset stamps the wake-at pair (QuotaResetAt + QuotaResetSource) onto a
-// quota-likely checkpoint. It exists because the seam used to leave both EMPTY, so
-// cmd_loop printed `QUOTA-PAUSE: … wake-at= source=unknown` and the auto-resume
-// delay arithmetic skills/loop/SKILL.md prescribes (max(60, min(3600, wake_at -
-// now + 60))) had no timestamp to run on — auto-resume was structurally dead at
-// every quota wall.
-//
-// quotareset.Compute is the SSOT for the source-priority chain — operator
-// override (policy.json quota_reset.reset_at) > the CLI adapter's scraped
-// "resets HH:MMam" hint at <workspace>/quota-reset-hint.txt > now + default
-// hours — so this only injects `now` (determinism) and the policy-sourced knobs,
-// never a second estimator. Fail-open by construction: the fallback arm always
-// yields a timestamp, so the field is never blank on the paths that matter.
-//
-// Scoped to the quota reason on purpose: a phase-complete breadcrumb has no reset
-// instant, and stamping one there would advertise a fictional wake time.
-func withQuotaReset(cp Checkpoint, workspace, projectRoot string, now time.Time) Checkpoint {
+var computeQuotaReset = quotareset.Compute
+
+var UsageReset func(projectRoot string, families []string, now time.Time) (time.Time, bool)
+
+func withQuotaReset(cp Checkpoint, cs core.CycleState, projectRoot string, now time.Time) Checkpoint {
 	qr := policy.Policy{}.QuotaResetConfig()
 	if pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
 		qr = pol.QuotaResetConfig()
 	}
-	res, err := quotareset.Compute(workspace, quotareset.Options{
+	families := walkedFamilies(cs.QuotaWalkCLIs)
+	res, err := computeQuotaReset(cs.WorkspacePath, quotareset.Options{
 		Now:          func() time.Time { return now },
 		ResetAt:      qr.ResetAt,
 		DefaultHours: qr.DefaultHours,
+		BenchedUntil: earliestQuotaReset(projectRoot, now, families),
+		UsageReset:   usageResetOf(projectRoot, families, now),
 	})
-	if err != nil {
-		// UNREACHABLE TODAY (review LOW): quotareset.Compute returns nil on every arm.
-		// Kept as contract-driven handling for a future error arm, not as live code. Still record the source so
-		// the QUOTA-PAUSE line explains itself instead of reprinting the
-		// indistinguishable `source=unknown` this fix exists to remove.
+	switch {
+	case err != nil:
 		cp.QuotaResetSource = "unavailable"
-		return cp
+	case res.Source == unknownResetSource:
+		cp.QuotaResetSource = res.Source
+		cp.AutoResumeMaxAttempts = 0
+		cp.OperatorAction = unknownResetAction
+	default:
+		cp.QuotaResetAt = res.ISO
+		cp.QuotaResetSource = res.Source
 	}
-	cp.QuotaResetAt = res.ISO
-	cp.QuotaResetSource = res.Source
 	return cp
+}
+
+const (
+	unknownResetSource = "unknown"
+	unknownResetAction = "no quota reset time is known: check the usage of the walled CLIs, then run `evolve loop --resume` by hand"
+)
+
+func walkedFamilies(clis []string) []string {
+	families := make([]string, 0, len(clis))
+	for _, cli := range clis {
+		if family := llmroute.Family(cli); !slices.Contains(families, family) {
+			families = append(families, family)
+		}
+	}
+	return families
+}
+
+func earliestQuotaReset(projectRoot string, now time.Time, families []string) time.Time {
+	var earliest time.Time
+	for _, entry := range clihealth.NewStore(projectRoot, func() time.Time { return now }).Active() {
+		if !clihealth.QuotaPattern(entry.Reason) || !slices.Contains(families, entry.Family) {
+			continue
+		}
+		if earliest.IsZero() || entry.BenchedUntil.Before(earliest) {
+			earliest = entry.BenchedUntil
+		}
+	}
+	return earliest
+}
+
+func usageResetOf(projectRoot string, families []string, now time.Time) func() (time.Time, bool) {
+	if UsageReset == nil || len(families) == 0 {
+		return nil
+	}
+	return func() (time.Time, bool) { return UsageReset(projectRoot, families, now) }
 }
 
 // hasEscalationCheckpoint reports whether path already holds a checkpoint

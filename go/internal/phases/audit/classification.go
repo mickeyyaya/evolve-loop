@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
-// auditClassification owns the mutable state for one audit classification.
-// Keeping the state concrete makes the ordered audit lifecycle visible without
-// passing a growing list of verdict, diagnostic, and predicate values between
-// otherwise independent stages.
 type auditClassification struct {
 	hooks    hooks
 	artifact string
@@ -50,10 +46,6 @@ func newAuditClassification(h hooks, artifact string, req core.PhaseRequest) *au
 			len(artifact), auditReportMaxBytes,
 		))
 	}
-	// The review's shape is advisory: it rides the record as warnings, and
-	// only a missing reasoning or a missing delivery still forces the
-	// verdict.
-	// See ADR-0102.
 	advisories, reviewErr := validateExplanationReview(artifact, req)
 	for _, advisory := range advisories {
 		classification.warn(explanationdocs.AdvisoryPrefix + advisory)
@@ -78,9 +70,6 @@ func (a *auditClassification) warn(message string) {
 	a.diagnostics = append(a.diagnostics, core.Diagnostic{Severity: "warning", Message: message})
 }
 
-// prepareEvidence invalidates agent-authored predicate evidence, regenerates
-// it on the host, and applies the authoritative EGPS result. The returned seal
-// stays pending until finalize so it covers the final defect-ledger state.
 func (a *auditClassification) prepareEvidence() {
 	verdictPath := filepath.Join(a.req.Workspace, "acs-verdict.json")
 	if err := quarantineProbesForRequest(a.req); err != nil {

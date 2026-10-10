@@ -8,36 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Contract shape. Every case reaches its subject through the REAL production
-// seam, hooks{}.Classify — the audit verdict path — never readDispositions
-// directly: a decoder that parses an array while the gate still blocks would be
-// a fix nobody can use.
-//
-// Adversarial diversity (skills/adversarial-testing §6):
-//   - regression  — the string shape that works today must keep working.
-//   - new/positive — array of resolvable cites now PASSes (AC2, the crux).
-//   - negative    — array of UNRESOLVABLE cites must still block, and must not
-//     be reported as "unparseable": tolerance may not become a bypass.
-//   - edge        — an empty array on a FIXED claim is "no evidence", still a
-//     block.
-//   - negative    — a shape that is neither string nor array (an object) must
-//     still be rejected outright; no silent degrade to "".
-
-// evidenceUnparseableMarker is the substring readDispositions uses for the
-// blocking parse-failure diagnostic. Several cases below assert its ABSENCE:
-// after the fix, an array-shaped file is a file the gate read, whatever it
-// then decides about the claim.
 const evidenceUnparseableMarker = "is unparseable"
 
-// oneDefect is the inherited-defect text used by every case here. One defect
-// keeps each assertion about the EVIDENCE SHAPE rather than about coverage
-// arithmetic, which disposition_preflight_test.go already pins.
 var oneDefect = []string{"boundary refresh does not repin the short sha"}
 
-// TestClassify_DispositionEvidenceStringShapeAccepted — REGRESSION. The shape
-// that works today: `evidence` is a plain string citing a real file. This is
-// expected to be GREEN before the fix and must STAY green after it; a tolerant
-// decoder that breaks the ordinary case has traded one outage for another.
 func TestClassify_DispositionEvidenceStringShapeAccepted(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
@@ -54,11 +28,6 @@ func TestClassify_DispositionEvidenceStringShapeAccepted(t *testing.T) {
 	}
 }
 
-// TestClassify_DispositionEvidenceArrayShapeAccepted — AC2, THE CRUX.
-// `evidence` is a JSON array of two citations, both resolving to real files.
-// The gate must read the file (no "unparseable") and honour the closure
-// (PASS). RED today: encoding/json refuses the document before any
-// resolution logic runs.
 func TestClassify_DispositionEvidenceArrayShapeAccepted(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite1 := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
@@ -80,12 +49,6 @@ func TestClassify_DispositionEvidenceArrayShapeAccepted(t *testing.T) {
 	}
 }
 
-// TestClassify_DispositionEvidenceArrayShapeUnresolvableStillBlocks —
-// NEGATIVE, the anti-gaming half. Tolerance must widen the accepted SHAPE, not
-// the accepted CLAIM. An array whose citations name no real file is an
-// unevidenced closure and must still block — and must do so on resolution, not
-// on parsing, so the operator is told the citations are wrong rather than that
-// their file is garbage.
 func TestClassify_DispositionEvidenceArrayShapeUnresolvableStillBlocks(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -106,11 +69,6 @@ func TestClassify_DispositionEvidenceArrayShapeUnresolvableStillBlocks(t *testin
 	}
 }
 
-// TestClassify_DispositionEvidenceEmptyArrayOnFixedStillBlocks — EDGE. `[]` is
-// a well-formed array carrying no citation at all. It must be treated as the
-// existing empty-evidence case (block), never as "an array was supplied, good
-// enough" — the boundary where a permissive decoder most easily becomes a
-// bypass.
 func TestClassify_DispositionEvidenceEmptyArrayOnFixedStillBlocks(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -130,10 +88,6 @@ func TestClassify_DispositionEvidenceEmptyArrayOnFixedStillBlocks(t *testing.T) 
 	}
 }
 
-// TestClassify_DispositionEvidenceObjectShapeStillBlocks — NEGATIVE. Neither
-// string nor array-of-strings: an object. This must keep hitting the
-// unparseable path and BLOCK. Silently degrading an unrecognised shape to ""
-// would hand the gate its cheapest bypass.
 func TestClassify_DispositionEvidenceObjectShapeStillBlocks(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{

@@ -1,14 +1,5 @@
 package gc
 
-// L3.1 rule-eval tests on synthetic trees. The engine's contract:
-//   - newest KeepFull runs are kept in full, however old;
-//   - beyond KeepFull, dead runs age into archive then delete (0 disables);
-//   - LIVE runs are never targeted, no matter their age;
-//   - quarantine + ledger paths are never targeted even if discovery
-//     hands them in (manual-only / append-only hard rules);
-//   - salvage and dispatch-log TTLs delete stale entries only;
-//   - .ephemeral subtrees of KEPT runs age out on the tracker TTL.
-
 import (
 	"os"
 	"path/filepath"
@@ -25,7 +16,6 @@ func nowT0() time.Time { return t0 }
 
 func daysAgo(n int) time.Time { return t0.Add(-time.Duration(n) * 24 * time.Hour) }
 
-// mkRun creates a synthetic run dir with the given mtime.
 func mkRun(t *testing.T, evolveDir, name string, mod time.Time) RunDir {
 	t.Helper()
 	p := filepath.Join(evolveDir, "runs", name)
@@ -49,7 +39,6 @@ func planItems(t *testing.T, m Manifest) map[string]Item {
 
 func TestPlan_KeepFullProtectsNewestRegardlessOfAge(t *testing.T) {
 	dir := t.TempDir()
-	// Three ancient runs, keep_full=2, delete_after=30: only the OLDEST may go.
 	r1 := mkRun(t, dir, "cycle-1", daysAgo(400))
 	r2 := mkRun(t, dir, "cycle-2", daysAgo(300))
 	r3 := mkRun(t, dir, "cycle-3", daysAgo(200))
@@ -108,17 +97,15 @@ func TestPlan_NilNowUsesWallClock(t *testing.T) {
 
 func TestPlan_ArchiveThenDeleteLadder(t *testing.T) {
 	dir := t.TempDir()
-	old := mkRun(t, dir, "cycle-10", daysAgo(90))    // beyond delete_after=60
-	middle := mkRun(t, dir, "cycle-11", daysAgo(30)) // beyond archive_after=14
-	fresh := mkRun(t, dir, "cycle-12", daysAgo(2))   // beyond keep_full but young
+	old := mkRun(t, dir, "cycle-10", daysAgo(90))
+	middle := mkRun(t, dir, "cycle-11", daysAgo(30))
+	fresh := mkRun(t, dir, "cycle-12", daysAgo(2))
 	m, err := Plan(Options{
 		EvolveDir: dir,
 		Policy:    Policy{Runs: RunsPolicy{KeepFull: 0, ArchiveAfterDays: 14, DeleteAfterDays: 60}},
 		Runs:      []RunDir{old, middle, fresh},
 		Now:       nowT0,
 	})
-	// KeepFull: 0 means "use the default 10" (zero value = defaults) — that
-	// would keep everything. Use 1 explicitly to exercise the ladder.
 	if err != nil {
 		t.Fatalf("Plan: %v", err)
 	}
@@ -152,7 +139,7 @@ func TestPlan_ZeroThresholdsDisableActions(t *testing.T) {
 	ancient := mkRun(t, dir, "cycle-20", daysAgo(1000))
 	m, err := Plan(Options{
 		EvolveDir: dir,
-		Policy:    Policy{Runs: RunsPolicy{KeepFull: 1}}, // no archive_after, no delete_after
+		Policy:    Policy{Runs: RunsPolicy{KeepFull: 1}},
 		Runs:      []RunDir{mkRun(t, dir, "cycle-21", daysAgo(1)), ancient},
 		Now:       nowT0,
 	})
@@ -194,8 +181,6 @@ func TestPlan_QuarantineAndLedgerNeverTargeted(t *testing.T) {
 	if err := os.MkdirAll(q, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Even if a (buggy or adversarial) discovery hands quarantine or ledger
-	// paths in as run dirs, the engine refuses.
 	m, err := Plan(Options{
 		EvolveDir: dir,
 		Policy:    Policy{Runs: RunsPolicy{KeepFull: 1, DeleteAfterDays: 1}},
@@ -203,7 +188,7 @@ func TestPlan_QuarantineAndLedgerNeverTargeted(t *testing.T) {
 			{Path: q, ModTime: daysAgo(900)},
 			{Path: filepath.Join(dir, "ledger.jsonl"), ModTime: daysAgo(900)},
 			{Path: filepath.Join(dir, "ledger-segments", "seg-0001.jsonl.gz"), ModTime: daysAgo(900)},
-			{Path: filepath.Join(dir, "runs", "cycle-40"), ModTime: daysAgo(1)}, // the keep_full slot
+			{Path: filepath.Join(dir, "runs", "cycle-40"), ModTime: daysAgo(1)},
 		},
 		Now: nowT0,
 	})
@@ -504,9 +489,6 @@ func TestProtected_OutsideEvolveDirIsRefused(t *testing.T) {
 	}
 }
 
-// H1 pin: the live-run hard rule covers the run's SUBTREES too — a live
-// run's stale .ephemeral must not be planned away (deleting a running
-// session's tracker state would corrupt it).
 func TestPlan_LiveRunEphemeralNeverTargeted(t *testing.T) {
 	dir := t.TempDir()
 	live := mkRun(t, dir, "cycle-70", daysAgo(1))
@@ -532,9 +514,6 @@ func TestPlan_LiveRunEphemeralNeverTargeted(t *testing.T) {
 	}
 }
 
-// KeepFull semantic pin: the count is over the newest N run dirs by mtime,
-// live or dead — a live run inside the window consumes a slot (live runs
-// are protected independently, so the window is purely positional).
 func TestPlan_KeepFullCountsLiveRunsPositionally(t *testing.T) {
 	dir := t.TempDir()
 	liveNewest := mkRun(t, dir, "cycle-80", daysAgo(1))
@@ -559,10 +538,6 @@ func TestPlan_KeepFullCountsLiveRunsPositionally(t *testing.T) {
 	}
 }
 
-// TestGCPolicyModeDefaultsOff verifies that the zero value of gc.Policy.Mode is
-// "" — the "operator set nothing" signal. Since workspace-hygiene S5, runGCHook
-// resolves that absent mode to "shadow" (non-mutating), not "off"; only an
-// explicit "off" disables the hook. The zero value itself is unchanged.
 func TestGCPolicyModeDefaultsOff(t *testing.T) {
 	pol := Policy{}
 	if pol.Mode != "" {
@@ -570,8 +545,6 @@ func TestGCPolicyModeDefaultsOff(t *testing.T) {
 	}
 }
 
-// TestGCPolicyModeRecognized verifies that gc.Policy.Mode correctly stores the
-// valid mode values off, shadow, and enforce.
 func TestGCPolicyModeRecognized(t *testing.T) {
 	for _, mode := range []string{"off", "shadow", "enforce"} {
 		pol := Policy{Mode: mode}

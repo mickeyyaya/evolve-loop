@@ -26,9 +26,11 @@ func Chain(collectors ...Collector) Result {
 	return Result{Source: SourceNone}
 }
 
-// TranscriptCollector is the highest-fidelity tier; a scan error or no match reports SourceNone.
 func TranscriptCollector(root string, w Window) Collector {
 	return func() Result {
+		if root == "" {
+			return Result{Source: SourceNone}
+		}
 		r, err := ScanConfigRoot(root, w)
 		if err != nil || r.Source == SourceNone {
 			return Result{Source: SourceNone}

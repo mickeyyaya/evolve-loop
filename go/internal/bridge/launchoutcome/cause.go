@@ -11,15 +11,11 @@ import (
 // ("artifact_timeout"); bridge projects it as its artifactTimeoutMarker.
 const ArtifactTimeoutMarker = "artifact-timeout: "
 
-// TimeoutCause is the artifact-timeout sub-cause vocabulary: what the tmux
-// wait diagnostic emits after `cause=` and the only tokens the ledger
-// projection admits (bridge keeps a type alias + seven const aliases, so the
-// emitter and the parser read one closed set).
 type TimeoutCause string
 
-// The seven-token vocabulary (driver_tmux_wait_diagnostic.go's selection order).
 const (
 	TimeoutContextCancelled  TimeoutCause = "context_cancelled"
+	TimeoutPaneLost          TimeoutCause = "pane_lost"
 	TimeoutDetectorError     TimeoutCause = "completion_detector_error"
 	TimeoutSubmitWedged      TimeoutCause = "submit_wedged"
 	TimeoutTransientUpstream TimeoutCause = "transient_upstream"
@@ -28,11 +24,9 @@ const (
 	TimeoutIncomplete        TimeoutCause = "incomplete"
 )
 
-// Known reports membership in the seven-token vocabulary — free-form `cause=`
-// prose never becomes a typed cause.
 func (c TimeoutCause) Known() bool {
 	switch c {
-	case TimeoutContextCancelled, TimeoutDetectorError, TimeoutSubmitWedged,
+	case TimeoutContextCancelled, TimeoutPaneLost, TimeoutDetectorError, TimeoutSubmitWedged,
 		TimeoutTransientUpstream, TimeoutReviewStop, TimeoutReviewPause,
 		TimeoutIncomplete:
 		return true

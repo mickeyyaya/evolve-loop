@@ -54,7 +54,13 @@
 - **Kept in sync with a peer.** The `FailureDispositionConfig` defaults (threshold 2, step 0.03, cap 0.99) must equal `recurrence.DefaultEscalationPolicy`; `policy_disposition_test.go` pins that.
 - **`RetryPolicyFor` ok=false means no retry**, never a default allow.
 - **Resolvers hand out copies.** `WorkflowConfig` clones every slice and map it returns (`PhaseEnables`, `RemediablePhases`, `UniversalFallbackExclude`, `InteractivePolicies`, `SizeBudgetMultipliers`), so a caller that edits the result never changes the loaded policy or the next resolve (`TestWorkflowConfig_MutatingResultDoesNotChangeNextResolve`, cycle 1815). It assigns each remediation knob once; an explicit `0`, `[]` or `false` still wins.
-- **Only the `cli_routing`, `checkpoint`, `inbox_priority` and `workflow.convergence` blocks decode strictly.** Every other block, and every other key of `workflow`, keeps `json.Unmarshal`'s leniency, so an unmodeled key elsewhere is ignored as before; `TestLoad_KeysOutsideTheCLIRoutingBlockStayLenient` pins the boundary, and `TestLoad_CLIRoutingRejectsAnUnknownKey`, `TestCheckpointPolicy_UnmarshalJSONRefusesAnUnknownKey`, `TestLoad_InboxPriorityRefusesAnUnknownKey` and `TestConvergencePolicy_AnUnknownKeyIsRefused` the strict side.
+- **`attempt_postmortem` is a strict block** (`policy_attempt_postmortem.go`, [ADR-0130](../adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md)). `AttemptPostmortemPolicy.UnmarshalJSON` decodes it with `decodeStrict` and validates the resolved `attemptpostmortem.Config`: an unknown key or a value below 1 fails `Load` naming `attempt_postmortem`. `AttemptPostmortemConfig()` gives `attemptpostmortem.DefaultConfig()` for an absent block, else the defaults with each set key over them; `suspect_window_s` is in seconds. Pinned by `TestAttemptPostmortemConfig_EachKeyOverridesItsCap` and `TestAttemptPostmortemPolicy_RefusesAnUnknownKeyAndANonPositiveCap`.
+- **Only the `cli_routing`, `checkpoint`, `inbox_priority`, `attempt_postmortem` and `workflow.convergence` blocks are strict.** Each other block, and each other key of `workflow`, keeps the leniency of `json.Unmarshal`. Thus an unknown key in them is ignored. `TestLoad_KeysOutsideTheCLIRoutingBlockStayLenient` pins the boundary. These tests pin the strict side:
+  - `TestLoad_CLIRoutingRejectsAnUnknownKey`;
+  - `TestCheckpointPolicy_UnmarshalJSONRefusesAnUnknownKey`;
+  - `TestLoad_InboxPriorityRefusesAnUnknownKey`;
+  - `TestAttemptPostmortemPolicy_RefusesAnUnknownKeyAndANonPositiveCap`;
+  - `TestConvergencePolicy_AnUnknownKeyIsRefused`.
 - **Wire shapes are contracts.** `AdvisorSkillRejection` is written to `advisor-rejections.json`, so its JSON tags are pinned. The `bridge.phase_artifact_timeout_s` key and the compiled budgets must appear in runtime-reference.md, which `artifact_budget_docs_pin_test.go` checks by reflecting on the struct tag.
 
 ## Findings

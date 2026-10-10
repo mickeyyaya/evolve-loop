@@ -1,10 +1,5 @@
 package audit
 
-// These tests drive generateACSVerdict — the real audit-phase function that
-// runs the EGPS suite — and never call regressiontia directly: a seam whose
-// only caller is a test is dead code, so the shadow decision must be emitted
-// from that path or not at all.
-
 import (
 	"encoding/json"
 	"os"
@@ -15,9 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 )
 
-// tiaFixture builds a project root carrying a .evolve/policy.json at the given
-// regression_tia stage (empty stage ⇒ NO regression_tia block, the checked-in
-// production shape) plus the cycle workspace, and returns (root, workspace).
 func tiaFixture(t *testing.T, stage string, cycle int) (string, string) {
 	t.Helper()
 	root := t.TempDir()
@@ -48,9 +40,6 @@ func itoa(n int) string {
 	return string(b)
 }
 
-// TestGenerateACSVerdict_ShadowStageEmitsTIADecision is the CRUX wiring proof:
-// with regression_tia.stage=shadow, the real audit path emits the decision
-// artifact into the cycle workspace.
 func TestGenerateACSVerdict_ShadowStageEmitsTIADecision(t *testing.T) {
 	root, ws := tiaFixture(t, "shadow", 4242)
 
@@ -77,11 +66,6 @@ func TestGenerateACSVerdict_ShadowStageEmitsTIADecision(t *testing.T) {
 	}
 }
 
-// TestGenerateACSVerdict_OffStageEmitsNothing is the byte-identical-baseline
-// proof and the NEGATIVE axis. The checked-in policy.json has no regression_tia
-// block, so this is the LIVE configuration: the audit phase must behave exactly
-// as it did before this cycle — no artifact, no computation, no new failure
-// mode on the path that grades every cycle.
 func TestGenerateACSVerdict_OffStageEmitsNothing(t *testing.T) {
 	for _, stage := range []string{"", "off"} {
 		root, ws := tiaFixture(t, stage, 4243)
@@ -98,10 +82,6 @@ func TestGenerateACSVerdict_OffStageEmitsNothing(t *testing.T) {
 	}
 }
 
-// TestGenerateACSVerdict_ShadowEmissionNeverFailsTheAudit pins the blast-radius
-// bound. Shadow-stage TIA is OBSERVABILITY on the path that grades every cycle:
-// a broken/unwritable evidence sink must degrade quietly, never turn a healthy
-// audit into an error. Here the workspace does not exist, so Emit cannot write.
 func TestGenerateACSVerdict_ShadowEmissionNeverFailsTheAudit(t *testing.T) {
 	root, ws := tiaFixture(t, "shadow", 4244)
 	missing := filepath.Join(ws, "does", "not", "exist")

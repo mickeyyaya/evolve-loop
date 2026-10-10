@@ -17,8 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/subagent/subagentrun"
 )
 
-// TestSubagentRun_OneConstructionSite pins that the dispatcher is
-// constructed in exactly ONE non-test file.
 func TestSubagentRun_OneConstructionSite(t *testing.T) {
 	const onlySite = "internal/subagent/run.go"
 	if offenders := nonTestSourcesMentioning(t, "subagentrun.New(", onlySite); len(offenders) > 0 {
@@ -26,9 +24,6 @@ func TestSubagentRun_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// subagentrun leaf and the one allowed site whose source contains needle
-// (core/carryover_lifecycle_test.go idiom).
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -66,10 +61,6 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	return offenders
 }
 
-// TestRun_FacadeProjectsEverySeamByName pins that one Run drives each of the
-// twelve live seams exactly once (WriteFile is dead); the request
-// projection carries every field, PluginRoot excluded; the result
-// projection carries the nine fields with Stderr "".
 func TestRun_FacadeProjectsEverySeamByName(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	calls := map[string]int{}
@@ -143,8 +134,6 @@ func TestRun_FacadeProjectsEverySeamByName(t *testing.T) {
 	}
 }
 
-// TestRun_OverRunHappyOptsIsFieldForFieldTheSameAsBefore pins Run over
-// runHappyOpts field-for-field against the golden RunResult.
 func TestRun_OverRunHappyOptsIsFieldForFieldTheSameAsBefore(t *testing.T) {
 	root, ws, _ := unit16Dirs(t)
 	res, err := Run(context.Background(), RunRequest{Agent: "scout", Cycle: 5, WorkspacePath: ws, ProfilesDir: "/p", AdaptersDir: "/a", ProjectRoot: root, PluginRoot: root, PromptReader: strings.NewReader("Do the thing.\n"), AdversarialAudit: true}, runHappyOpts(t))
@@ -161,11 +150,6 @@ func TestRun_OverRunHappyOptsIsFieldForFieldTheSameAsBefore(t *testing.T) {
 	}
 }
 
-// TestExecAdapterDepsWith_CarriesTheCenter pins that the exec seam carries
-// the Center: execAdapterDepsWith sets it on execAdapterDeps, nil is the
-// plain Deps, adapterOf picks the bridge adapter for a nil ExecAdapter and
-// the func seam otherwise, and execAdapter builds its engine from
-// execAdapterDepsWith.
 func TestExecAdapterDepsWith_CarriesTheCenter(t *testing.T) {
 	c := signalcenter.New()
 	env := map[string]string{"HOME": t.TempDir()}
@@ -203,8 +187,6 @@ func TestExecAdapterDepsWith_CarriesTheCenter(t *testing.T) {
 	}
 }
 
-// TestHostFacades_ProjectTheLeaf pins that every host facade projects the
-// leaf on one input (keeps ./internal/subagent's apicover row green).
 func TestHostFacades_ProjectTheLeaf(t *testing.T) {
 	if VerdictPASS != subagentrun.VerdictPASS || VerdictFAIL != subagentrun.VerdictFAIL || VerdictIntegrityFail != subagentrun.VerdictIntegrityFail ||
 		ArtifactMaxAge != subagentrun.ArtifactMaxAge || ChallengeTokenBytes != subagentrun.ChallengeTokenBytes || ErrInProcessDispatchBanned != subagentrun.ErrInProcessDispatchBanned || ledgerZeroSeed != subagentrun.LedgerZeroSeed {
@@ -261,8 +243,6 @@ func TestHostFacades_ProjectTheLeaf(t *testing.T) {
 	}
 }
 
-// TestRun_SignalsFieldReachesTheLeafAndNilIsSafe pins that RunOptions.Signals
-// reaches the leaf; a nil one is safe.
 func TestRun_SignalsFieldReachesTheLeafAndNilIsSafe(t *testing.T) {
 	_, ws, worktree := unit16Dirs(t)
 	c := signalcenter.New()
@@ -284,11 +264,6 @@ func TestRun_SignalsFieldReachesTheLeafAndNilIsSafe(t *testing.T) {
 	}
 }
 
-// TestRun_AdapterExistsSeamReceivesTheCLIAndDefaultsToDriverPresence pins
-// that RunOptions.AdapterExists receives the cli (its func type is
-// unchanged, so every by-name binder compiles and, ignoring its argument,
-// behaves as before) and its production default is driver presence BY CLI:
-// a path is not a cli, nothing decodes a file name on the run path.
 func TestRun_AdapterExistsSeamReceivesTheCLIAndDefaultsToDriverPresence(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
 	opts := runHappyOpts(t)
@@ -309,13 +284,6 @@ func TestRun_AdapterExistsSeamReceivesTheCLIAndDefaultsToDriverPresence(t *testi
 	}
 }
 
-// TestValidateProfile_EnvIsTheLeafsWireMinusTheRunOnlyKeys pins that the
-// adapter-env contract has ONE typed home, subagentrun.AdapterEnv.Map();
-// ValidateProfile's literal map is its named twin, so this pin keeps the two
-// key sets from drifting: the validate-only env is exactly Map()'s keys
-// minus the run-only CHALLENGE_TOKEN (and never EVOLVE_PROJECT_ROOT),
-// VALIDATE_ONLY the one axis ("1" vs "0"). A key added to either side goes
-// red here.
 func TestValidateProfile_EnvIsTheLeafsWireMinusTheRunOnlyKeys(t *testing.T) {
 	opts := happyOpts(`{"cli":"claude","model_tier_default":"sonnet","output_artifact":"x.md"}`, "claude")
 	var got map[string]string

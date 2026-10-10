@@ -9,10 +9,6 @@ import (
 	"strings"
 )
 
-// HighestCyclePackageNumber returns the largest occupied canonical cycle
-// package name under <moduleDir>/acs. Missing ACS trees have no floor. An
-// entry need not be a directory to reserve its number: any existing cycleN
-// path would collide with a fresh package of the same name.
 func HighestCyclePackageNumber(moduleDir string) (int, error) {
 	if moduleDir == "" {
 		return 0, nil
@@ -36,9 +32,6 @@ func HighestCyclePackageNumber(moduleDir string) (int, error) {
 	return highest, nil
 }
 
-// CyclePackageOccupied reports whether any filesystem entry already reserves
-// the canonical package path for cycle. It uses Lstat so even a dangling
-// symlink blocks reuse of that identity.
 func CyclePackageOccupied(moduleDir string, cycle int) (bool, error) {
 	if moduleDir == "" {
 		return false, nil

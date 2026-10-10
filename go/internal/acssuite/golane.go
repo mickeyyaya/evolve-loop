@@ -151,34 +151,24 @@ func (b laneBudget) expiryNote() string {
 	return fmt.Sprintf("; the Go lane's shared %s budget (acs.go_timeout_s) expired while this scope ran: %v", b.timeout, b.ctx.Err())
 }
 
-// retryFlakyReds is the bounded flake absorber: when a scope's first run
-// produced >=1 RED and NO red is the synthetic egps/ parse-error red (any
-// such red marks the whole stream untrustworthy and suppresses the retry
-// entirely — a truncated stream is not retryable evidence), the scope is
-// re-run EXACTLY ONCE. A red that passes on the retry flips to green with the
-// visible Flaky="passed-on-retry" annotation (first-run evidence retained —
-// the flake's signature); a red that stays red keeps its first-run result.
-// Greens/skips and the result set's size are untouched (the retry can only
-// flip existing reds, never add or duplicate results).
 func (l goLane) retryFlakyReds(pattern string, results []Result) []Result {
 	if !isRetryable(results) {
 		return results
 	}
-	raw, retryErr := l.exec(l.budget.ctx, l.moduleDir, pattern, l.env) // bounded: exactly one retry
+	raw, retryErr := l.exec(l.budget.ctx, l.moduleDir, pattern, l.env)
 	retry := parseGoTestJSON(strings.NewReader(raw), l.cycle)
-	// An incomplete retry cannot erase a confirmed first-run red, even when
-	// the process emitted a passing prefix before its failure.
 	if hasHarnessResult(retry) {
 		retryErr = fmt.Errorf("incomplete retry evidence")
 	}
+	retryComplete := retryErr == nil
 	greenOnRetry := make(map[string]bool, len(retry))
 	retryRan := make(map[string]bool, len(retry))
 	retryEvidence := make(map[string]string, len(retry))
 	for _, r := range retry {
-		if retryErr == nil || r.ResultStr == "red" || r.ResultStr == "skip" {
+		if retryComplete || r.ResultStr == "red" || r.ResultStr == "skip" {
 			retryRan[r.ACID] = true
 		}
-		if r.ResultStr == "green" && retryErr == nil {
+		if r.ResultStr == "green" && retryComplete {
 			greenOnRetry[r.ACID] = true
 		}
 		if r.fullEvidence != "" {
@@ -195,15 +185,11 @@ func (l goLane) retryFlakyReds(pattern string, results []Result) []Result {
 			results[i].ExitCode = 0
 			results[i].Flaky = "passed-on-retry"
 		case retryRan[results[i].ACID]:
-			// Red stayed red: record it in RetryOutcome, not Flaky, and keep
-			// the retry's stream too.
 			results[i].RetryOutcome = "red-on-retry"
 			if re := retryEvidence[results[i].ACID]; re != "" {
 				results[i].fullEvidence += "\n--- RETRY RUN (still red) ---\n" + re
 			}
 		default:
-			// The retry produced NO result for this test (expired ctx, crash
-			// before it ran): inconclusive, not confirmed.
 			results[i].RetryOutcome = "retry-inconclusive"
 		}
 	}
@@ -217,7 +203,6 @@ func isRetryable(results []Result) bool {
 			continue
 		}
 		if strings.HasPrefix(r.ACID, acsverdict.SyntheticRedPrefix) {
-			// Synthetic infra red: the stream itself is untrustworthy — never retry.
 			return false
 		}
 		hasTestRed = true

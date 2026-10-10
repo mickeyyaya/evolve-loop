@@ -10,6 +10,7 @@
 - the identity of a process (`Identity`: the pid plus the start time);
 - the ownership proofs (`Proof`, `TaggedWith`, `Recorded`, `AnyOf`, `Descendants`, `Select`);
 - the dispatch id (`DispatchID`, `ParseDispatchID`), the value of `EVOLVE_DISPATCH_ID`;
+- the start time of one process (`StartOf`), which the last will of the event reader compares (ADR-0127, E5);
 - the shared class (`SharedHelper`) and the dispatch ownership proof (`OwnedByDispatch`);
 - the persisted tree of a dispatch (`TreeDir`, `TreeFile`, `SaveTree`, `LoadTree`, `RemoveTree`);
 - the reaper (`Reaper.Reap`, `Report`).
@@ -20,6 +21,9 @@ The bridge uses it at the end of each dispatch (`internal/bridge/dispatch_reap.g
 
 - **The table.** `ps -A -o pid=,ppid=,pgid=,uid=,lstart=,comm=` runs with `LC_ALL=C`, so `lstart` has one format. The table keeps only the rows of the current uid.
 - **Arguments and environment come from the kernel, apart.** On macOS, `sysctl KERN_PROCARGS2` gives the argument count, the arguments and then the environment. On Linux, `/proc/<pid>/cmdline` and `/proc/<pid>/environ` give them. `ps -E` is not used: it prints the arguments and the environment on one line, so an argument such as `grep EVOLVE_DISPATCH_ID=x` can look like a tag. The table keeps only the `EVOLVE_` keys of each environment.
+- **`StartOf(pid)` reads the start time of one process from the kernel.** A caller compares two values for equality only: equal means the same process. A gone pid gives `ESRCH`, and other systems refuse.
+  - On macOS, `sysctl KERN_PROC_PID` gives the `kinfo_proc` of the pid. The value is `p_starttime` as `<seconds>.<microseconds>`. The call uses the general `sysctl` helper of `KERN_PROCARGS2`, which now takes a MIB of any length.
+  - On Linux, the value is `<boot id>:<start ticks>`. The boot id is `/proc/sys/kernel/random/boot_id`. The ticks are field 22 of `/proc/<pid>/stat`, read after the last `)`, because the command name can hold spaces and parentheses.
 - **macOS hides the environment of Apple binaries** (`/bin/zsh`, `/bin/sleep`, `/usr/bin/tail`). Their arguments stay visible. A process with a hidden or unreadable environment has an empty `Env`, so no tag proof can match it.
 - **Each proof is a predicate** (the Specification pattern). `TaggedWith(id)` reads only the environment map, and an empty id matches nothing. `Recorded(ids)` matches the pid and the start time together. `Descendants` refuses pid 0, pid 1 and negative pids as a root, because the tree of init holds every orphan on the host.
 - **The reaper is one sequence** (a template method). It lists the table and selects the proof. It sends SIGTERM to each match and waits the grace time. It lists again and sends SIGKILL to each process that still has the same identity and still matches the proof. It lists again, and each process that is still there is a survivor.
@@ -42,6 +46,7 @@ The bridge uses it at the end of each dispatch (`internal/bridge/dispatch_reap.g
 - No ancestor of the reaper gets a signal (`TestReap_NeverSignalsAnAncestorOfTheReaper`).
 - A tree file stays in its directory (`TestTreeFile_StaysInsideItsDirectory`).
 - No SIGKILL after a failed listing (`TestReap_AListingFailureAfterTermSendsNoKill`).
+- The start time of a pid is stable, a gone pid is `ESRCH`, and the fields come from the right offsets (`TestStartOf_ThisProcessReadsOneStableRecentValue`, `TestStartOf_AnUnusedPidIsESRCH`, `TestStartOfVia_ReadsPStarttimeOfTheAskedPid`, `TestStartOfAt_IsTheBootIDAndTheStartTicks`).
 - The tag format round-trips (`TestDispatchID_RoundTripsThroughItsString`, `TestParseDispatchID_RefusesEveryMalformedTag`).
 - The real lister reads the tag of a real child, and the reaper stops only that child (`TestExecLister_ReadsTheTagOfARealChildAndTheReaperStopsOnlyThatChild`, integration tier).
 

@@ -1,55 +1,5 @@
 package gc
 
-// worktrees_test.go — RED test (cycle 570, triage-committed task
-// workspace-hygiene-s4-worktree-gc-planner; docs/plans/workspace-hygiene-2026-07.md
-// Slice S4). 65 worktrees + 106 never-deleted cycle-* branches have
-// accumulated (S3 stops NEW debt at cycle-exit; this slice drains the
-// EXISTING backlog as a gc-sibling Plan/Apply planner, same shape as gc.go's
-// Plan/Apply for run dirs).
-//
-// Evidence pipeline this file's fixtures assume (evidence-based, never
-// name-parsed, per the plan):
-//   - `git worktree list --porcelain` (run in ProjectRoot) is the source of
-//     truth for registered worktrees + their branch (parsed from the
-//     "branch refs/heads/<name>" line, NOT the directory leaf).
-//   - only entries whose path sits under WorktreeBase AND whose directory
-//     leaf has the "cycle-" prefix are candidates (mirrors the existing
-//     gitWorktree.Cleanup / deleteCycleBranch gate in core/worktree.go).
-//   - merged = the branch appears in `git branch --merged HEAD` (run in
-//     ProjectRoot).
-//   - dirty = `git status --porcelain` (run IN the worktree dir) is
-//     non-empty.
-//   - dead = NOT live. Live is proven by ANY of: (a) a fresh runlease.OwnerLive
-//     .lease at <EvolveDir>/runs/cycle-<N>/.lease, where N is the trailing
-//     numeric segment of the leaf after stripping a swarm suffix
-//     ("-integration" or "-w<digits>") — so an integration/worker worktree
-//     correlates to its parent cycle's lease; (b) EvolveDir/cycle-state.json's
-//     active_worktree equals this path; (c) any EvolveDir/runs/*/run.json's
-//     active_worktree equals this path (fleet per-run mirrors). An
-//     unparseable leaf (no trailing numeric segment) skips lease evidence and
-//     is only ever collectable once its own directory mtime is >7 days old.
-//   - KeepRecent / MinAgeMinutes are grace periods on top of the above,
-//     mirroring gc.go's RunsPolicy.KeepFull ladder: the MinAgeMinutes-youngest
-//     candidates are never touched (covers the create->lease-write race
-//     window) and, among the survivors, the KeepRecent newest (by mtime) are
-//     always kept even if fully merged+clean+dead.
-//   - a branch with the "cycle-" prefix that has NO corresponding
-//     `git worktree list` entry at all (its worktree dir was already removed
-//     some other way — the literal 65-worktree/106-branch skew) is swept by
-//     the SAME merged check, emitting delete-branch (no remove-worktree,
-//     nothing to remove) or flag-unmerged, with no liveness check needed —
-//     nothing can be "checked out live" without a worktree entry.
-//
-// Contract (do NOT modify this file — implement production code instead):
-//   WorktreesPolicy{KeepRecent, MinAgeMinutes}   — new gc.Policy.Worktrees field
-//   WorktreeAction / WorktreeItem / WorktreeManifest
-//   WorktreeOptions{ProjectRoot, WorktreeBase, EvolveDir, Policy, Now, Exec,
-//                   PidAlive, LeaseTTL}
-//   PlanWorktrees(WorktreeOptions) (WorktreeManifest, error)
-//   ApplyWorktrees(WorktreeOptions, WorktreeManifest) error
-//
-// RED now: none of the above exist in this package (compile failure).
-
 import (
 	"context"
 	"fmt"
@@ -64,28 +14,21 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// --- fake git plumbing -------------------------------------------------
-
-// worktreeFixture is one synthetic `git worktree list --porcelain` entry.
 type worktreeFixture struct {
 	path     string
-	branch   string // "" => detached (never a cycle candidate)
+	branch   string
 	detached bool
 }
 
-// scriptedGit is a hand-rolled sysexec.RunFunc double keyed on (subcommand,
-// dir) — fixtures.FakeExec only keys on subcommand, which can't express
-// "git status --porcelain answers differently per worktree dir" that these
-// tests need. Safe for the single-goroutine use these tests make of it.
 type scriptedGit struct {
 	mu sync.Mutex
 
-	porcelain       string          // `git worktree list --porcelain` stdout
-	mergedBranches  map[string]bool // `git branch --merged HEAD` membership
-	backlogBranches []string        // `git branch --list cycle-*` stdout entries (orphans with no worktree)
-	dirtyDirs       map[string]bool // worktree dir -> `git status --porcelain` is non-empty
+	porcelain       string
+	mergedBranches  map[string]bool
+	backlogBranches []string
+	dirtyDirs       map[string]bool
 
-	calls []string // "<dir>|<name> <args...>" in call order, for argv assertions
+	calls []string
 }
 
 func newScriptedGit() *scriptedGit {
@@ -104,14 +47,8 @@ func (g *scriptedGit) run(_ context.Context, name, dir string, args, _ []string,
 		if len(args) >= 2 && args[1] == "list" {
 			io.WriteString(stdout, g.porcelain)
 		}
-		// "worktree remove <path>" / "worktree prune" — no output needed.
 	case "branch":
 		if len(args) >= 2 && args[1] == "--merged" {
-			// Faithful `git branch --merged HEAD`: list ONLY merged branches,
-			// honoring the per-branch bool addWorktree stored (symmetric with
-			// the status handler's `if g.dirtyDirs[dir]` guard below). Without
-			// this guard the fake listed every branch, making merged/unmerged
-			// indistinguishable.
 			for b, merged := range g.mergedBranches {
 				if merged {
 					io.WriteString(stdout, "  "+b+"\n")
@@ -123,7 +60,6 @@ func (g *scriptedGit) run(_ context.Context, name, dir string, args, _ []string,
 				io.WriteString(stdout, "  "+b+"\n")
 			}
 		}
-		// "-d <branch>" — no output needed.
 	case "status":
 		if g.dirtyDirs[dir] {
 			io.WriteString(stdout, " M some-file.go\n")
@@ -159,10 +95,6 @@ func buildPorcelain(entries []worktreeFixture) string {
 	return b.String()
 }
 
-// --- shared fixture builder ---------------------------------------------
-
-// worktreesTestEnv bundles the on-disk layout (WorktreeBase + EvolveDir) most
-// tests need, plus the scripted git double.
 type worktreesTestEnv struct {
 	t            *testing.T
 	projectRoot  string
@@ -192,9 +124,6 @@ func newWorktreesTestEnv(t *testing.T) *worktreesTestEnv {
 	return e
 }
 
-// addWorktree creates <base>/leaf on disk with the given mtime and registers
-// it with the given branch in the scripted `worktree list --porcelain`
-// output (accumulating across calls in the SAME test).
 func (e *worktreesTestEnv) addWorktree(leaf, branch string, age time.Duration, dirty, merged bool) string {
 	e.t.Helper()
 	path := filepath.Join(e.worktreeBase, leaf)
@@ -213,9 +142,6 @@ func (e *worktreesTestEnv) addWorktree(leaf, branch string, age time.Duration, d
 	return path
 }
 
-// parsePorcelainForTest re-derives the fixture list already encoded in a
-// porcelain blob so addWorktree can accumulate entries without a separate
-// slice threaded through every test.
 func parsePorcelainForTest(porcelain string) []worktreeFixture {
 	var out []worktreeFixture
 	var cur worktreeFixture
@@ -233,7 +159,6 @@ func parsePorcelainForTest(porcelain string) []worktreeFixture {
 	return out
 }
 
-// writeLease writes a runlease at <evolveDir>/runs/cycle-<n>/.lease.
 func (e *worktreesTestEnv) writeLease(n int, l runlease.Lease, heartbeatAge time.Duration) {
 	e.t.Helper()
 	dir := filepath.Join(e.evolveDir, "runs", fmt.Sprintf("cycle-%d", n))
@@ -267,11 +192,9 @@ func itemsWithAction(items []WorktreeItem, action WorktreeAction) []WorktreeItem
 	return out
 }
 
-// --- AC: merged + clean + dead -> collected ------------------------------
-
 func TestPlanWorktrees_MergedCleanDeadIsCollected(t *testing.T) {
 	e := newWorktreesTestEnv(t)
-	wt := e.addWorktree("cycle-aaa1111-570", "cycle-aaa1111-570", 20*time.Hour, false /*dirty*/, true /*merged*/)
+	wt := e.addWorktree("cycle-aaa1111-570", "cycle-aaa1111-570", 20*time.Hour, false, true)
 
 	m, err := PlanWorktrees(e.opts())
 	if err != nil {
@@ -291,11 +214,9 @@ func TestPlanWorktrees_MergedCleanDeadIsCollected(t *testing.T) {
 	}
 }
 
-// --- AC-veto: dirty is flagged, never removed ----------------------------
-
 func TestPlanWorktrees_DirtyIsFlaggedNeverRemoved(t *testing.T) {
 	e := newWorktreesTestEnv(t)
-	wt := e.addWorktree("cycle-bbb2222-571", "cycle-bbb2222-571", 20*time.Hour, true /*dirty*/, true /*merged*/)
+	wt := e.addWorktree("cycle-bbb2222-571", "cycle-bbb2222-571", 20*time.Hour, true, true)
 
 	m, err := PlanWorktrees(e.opts())
 	if err != nil {
@@ -314,11 +235,9 @@ func TestPlanWorktrees_DirtyIsFlaggedNeverRemoved(t *testing.T) {
 	}
 }
 
-// --- AC-veto: unmerged branch is kept -------------------------------------
-
 func TestPlanWorktrees_UnmergedBranchKept(t *testing.T) {
 	e := newWorktreesTestEnv(t)
-	wt := e.addWorktree("cycle-ccc3333-572", "cycle-ccc3333-572", 20*time.Hour, false /*dirty*/, false /*merged*/)
+	wt := e.addWorktree("cycle-ccc3333-572", "cycle-ccc3333-572", 20*time.Hour, false, false)
 
 	m, err := PlanWorktrees(e.opts())
 	if err != nil {
@@ -337,13 +256,9 @@ func TestPlanWorktrees_UnmergedBranchKept(t *testing.T) {
 	}
 }
 
-// --- AC-veto: a live lease excludes the worktree entirely -----------------
-
 func TestPlanWorktrees_LiveLeaseExcluded(t *testing.T) {
 	e := newWorktreesTestEnv(t)
 	e.addWorktree("cycle-ddd4444-573", "cycle-ddd4444-573", 20*time.Hour, false, true)
-	// Fresh heartbeat, no OwnerPID set -> OwnerLive falls back to
-	// freshness-only (a genuinely live in-flight cycle).
 	e.writeLease(573, runlease.Lease{RunID: "run-573"}, 1*time.Minute)
 
 	m, err := PlanWorktrees(e.opts())
@@ -355,14 +270,9 @@ func TestPlanWorktrees_LiveLeaseExcluded(t *testing.T) {
 	}
 }
 
-// --- AC: a dead pid behind a still-fresh heartbeat is collected -----------
-
 func TestPlanWorktrees_DeadPidFreshLeaseCollected(t *testing.T) {
 	e := newWorktreesTestEnv(t)
 	wt := e.addWorktree("cycle-eee5555-574", "cycle-eee5555-574", 20*time.Hour, false, true)
-	// Fresh heartbeat but a NAMED owner pid that the injected liveness probe
-	// reports as dead (the crashed-owner 2-6min post-crash window OwnerLive
-	// exists to close — mirrors runlease.OwnerLive's own doc comment).
 	e.writeLease(574, runlease.Lease{RunID: "run-574", OwnerPID: 4242}, 1*time.Minute)
 	opts := e.opts()
 	opts.PidAlive = func(pid int) bool { return pid != 4242 }
@@ -376,17 +286,12 @@ func TestPlanWorktrees_DeadPidFreshLeaseCollected(t *testing.T) {
 	}
 }
 
-// --- AC: KeepRecent + MinAgeMinutes grace periods --------------------------
-
 func TestPlanWorktrees_KeepRecentAndMinAge(t *testing.T) {
 	e := newWorktreesTestEnv(t)
-	// Otherwise-fully-eligible (merged, clean, dead) worktrees at four ages,
-	// oldest first for readability.
 	oldest := e.addWorktree("cycle-fff0001-601", "cycle-fff0001-601", 30*24*time.Hour, false, true)
 	older := e.addWorktree("cycle-fff0002-602", "cycle-fff0002-602", 20*24*time.Hour, false, true)
 	recent1 := e.addWorktree("cycle-fff0003-603", "cycle-fff0003-603", 10*24*time.Hour, false, true)
 	recent2 := e.addWorktree("cycle-fff0004-604", "cycle-fff0004-604", 5*24*time.Hour, false, true)
-	// Younger than MinAgeMinutes -- must be kept regardless of KeepRecent.
 	tooYoung := e.addWorktree("cycle-fff0005-605", "cycle-fff0005-605", 5*time.Minute, false, true)
 
 	opts := e.opts()
@@ -410,13 +315,8 @@ func TestPlanWorktrees_KeepRecentAndMinAge(t *testing.T) {
 	}
 }
 
-// --- AC: branch backlog sweep (no worktree entry at all) -------------------
-
 func TestPlanWorktrees_BranchBacklogSweep_NotCheckedOutMergedOnly(t *testing.T) {
 	e := newWorktreesTestEnv(t)
-	// No `git worktree list` entries registered at all -- these branches'
-	// worktree dirs are already gone (the literal 65-worktree/106-branch skew:
-	// legacy plain cycle-N, lane-swarm -integration, and -w<id> variants).
 	e.git.porcelain = ""
 	e.git.backlogBranches = []string{"cycle-legacyA-7", "cycle-legacyB-8-integration", "cycle-legacyC-9-w0"}
 	e.git.mergedBranches["cycle-legacyA-7"] = true
@@ -450,8 +350,6 @@ func TestPlanWorktrees_BranchBacklogSweep_NotCheckedOutMergedOnly(t *testing.T) 
 	}
 }
 
-// --- ApplyWorktrees: TOCTOU re-check ---------------------------------------
-
 func TestApplyWorktrees_TOCTOURecheckRefusesNewlyLiveOrDirty(t *testing.T) {
 	e := newWorktreesTestEnv(t)
 	wt := e.addWorktree("cycle-aaa9999-700", "cycle-aaa9999-700", 20*time.Hour, false, true)
@@ -465,8 +363,6 @@ func TestApplyWorktrees_TOCTOURecheckRefusesNewlyLiveOrDirty(t *testing.T) {
 		t.Fatalf("setup: expected the worktree to be planned for removal: %+v", m.Items)
 	}
 
-	// Simulate the race: the worktree became dirty in the window between
-	// Plan and Apply (an operator started poking at it).
 	e.git.mu.Lock()
 	e.git.dirtyDirs[wt] = true
 	e.git.mu.Unlock()
@@ -481,8 +377,6 @@ func TestApplyWorktrees_TOCTOURecheckRefusesNewlyLiveOrDirty(t *testing.T) {
 		t.Errorf("a newly-dirty target's branch must NEVER be deleted: calls=%v", e.git.calls)
 	}
 }
-
-// --- ApplyWorktrees: exact argv (non-force remove, -d never -D, one trailing prune) ---
 
 func TestApplyWorktrees_NonForceRemoveAndPrune(t *testing.T) {
 	e := newWorktreesTestEnv(t)

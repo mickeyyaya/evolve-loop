@@ -7,12 +7,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// universalTierFloor is the envelope for a profile that declares none. Max is "top", the highest
-// policy.TierRank, so only an explicitly declared lower Max ever clamps a tier down.
 var universalTierFloor = &profiles.ModelTierEnvelope{Min: "balanced", Max: "top"}
 
-// envelopeClamp records a floor or ceiling clamp. reason is echoed into Forced because
-// RejectionsFromClamps' consumers grep for "floor" and "ceiling".
 func envelopeClamp(e *PhasePlanEntry, forcedTier, reason string) Clamp {
 	return Clamp{
 		Phase:    e.Phase,
@@ -22,10 +18,6 @@ func envelopeClamp(e *PhasePlanEntry, forcedTier, reason string) Clamp {
 	}
 }
 
-// ClampPlanModelRouting re-validates each entry's proposed {CLI, Tier} against its profile envelope,
-// policy.ValidatePin and catalogLookup (modelcatalog.Catalog.Lookup, injected; nil skips the catalog
-// check). A tier outside the envelope is clamped to its bound; any other violation empties the pair to
-// the profile default. It returns a new plan and the clamps applied.
 func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profiles.Profile, catalogLookup func(cli, tier string) (string, bool)) (*PhasePlan, []Clamp) {
 	if plan == nil {
 		return nil, nil
@@ -58,8 +50,6 @@ func ClampPlanModelRouting(plan *PhasePlan, profileFor func(phase string) *profi
 	return out, clamps
 }
 
-// clampToTierEnvelope clamps e.Tier to prof's envelope bound when it falls outside it. TierRank is 0 for
-// an unknown tier, so only real ranks clamp.
 func clampToTierEnvelope(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool) {
 	if prof == nil || e.Tier == "" {
 		return Clamp{}, false
@@ -82,7 +72,6 @@ func clampToTierEnvelope(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool
 	return Clamp{}, false
 }
 
-// clampToProfilePin empties e's CLI/Tier to the profile default when the pin fails policy.ValidatePin.
 func clampToProfilePin(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool) {
 	pin := policy.Pin{CLI: e.CLI, Model: e.Tier}
 	if err := policy.ValidatePin(e.Phase, pin, prof); err == nil {
@@ -98,8 +87,6 @@ func clampToProfilePin(e *PhasePlanEntry, prof *profiles.Profile) (Clamp, bool) 
 	return c, true
 }
 
-// clampToCatalog empties e's CLI/Tier to the profile default when catalogLookup (nil skips this check)
-// has no entry for the pair.
 func clampToCatalog(e *PhasePlanEntry, catalogLookup func(cli, tier string) (string, bool)) (Clamp, bool) {
 	if catalogLookup == nil || e.CLI == "" || e.Tier == "" {
 		return Clamp{}, false
@@ -117,7 +104,6 @@ func clampToCatalog(e *PhasePlanEntry, catalogLookup func(cli, tier string) (str
 	return c, true
 }
 
-// RejectionsFromClamps converts clamps into advisor-rejections.json records; no clamps yields nil.
 func RejectionsFromClamps(clamps []Clamp) []PlanRejection {
 	if len(clamps) == 0 {
 		return nil

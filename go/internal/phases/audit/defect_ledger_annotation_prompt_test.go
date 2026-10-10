@@ -30,22 +30,14 @@ func TestEvidenceResolves_AnnotationTolerance(t *testing.T) {
 		evidence string
 		want     bool
 	}{
-		// A real cite plus a prose annotation.
 		{"cite-plus-prose", "docs/x.md:3; verified live: `go test ./...` -> PASS", true},
 		{"prose-first-then-cite", "confirmed by rerun; docs/x.md", true},
-		// Annotations alone are not evidence.
 		{"prose-only", "verified live, all suites green", false},
 		{"bare-word", "PASS", false},
-		// A cite-SHAPED fragment must resolve — typos never demote to prose.
 		{"cite-plus-typo-cite", "docs/x.md; docs/missing.md", false},
 		{"typo-cite-plus-prose", "docs/missin.md; verified by rerun", false},
-		// A slash-less but dot-bearing cite is still graded (pins the '.' half
-		// of citeShaped — a slash-only degenerate would pass everything else).
 		{"dot-only-cite", "root.md; verified by rerun", true},
-		// Pre-existing behaviors preserved.
 		{"parenthetical-annotation", "docs/x.md:2 (helper now cycle-scoped)", true},
-		// A prose suffix separated by a dash is not a citation format. Accepting
-		// the prefix alone would let an unvalidated closure claim pass the gate.
 		{"dash-suffixed-prose-is-not-truncated", "docs/x.md — claimed fixed", false},
 		{"empty", "", false},
 		{"separators-only", " ; ", false},
@@ -91,8 +83,6 @@ func TestComposePrompt_InjectsInheritedOpenDefects(t *testing.T) {
 	if !strings.Contains(prompt, "salvage parser drops fenced JSON candidates") {
 		t.Error("prompt lacks the OPEN defect's text — an id without its claim is not actionable")
 	}
-	// Agent-authored ledger Text is rendered single-line: an embedded newline
-	// heading must never appear as mechanism-authored prompt structure.
 	if strings.Contains(prompt, "\n## Additional duty") {
 		t.Error("ancestor defect text injected a heading into the audit prompt — newlines must be flattened (diff-review MEDIUM)")
 	}
@@ -103,14 +93,10 @@ func TestComposePrompt_InjectsInheritedOpenDefects(t *testing.T) {
 		t.Error("non-OPEN ancestor entries must not be listed — only OPEN ids are owed dispositions")
 	}
 
-	// Non-continuation workspace: byte-identical legacy prompt (no block).
 	freshWS := filepath.Join(root, ".evolve", "runs", "cycle-1432")
 	if err := os.MkdirAll(freshWS, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// NB: assert on the block HEADING, not a bare word — t.TempDir() embeds
-	// this test's name (…InjectsInherited…) into the paths BaseCycleContext
-	// prints, so a loose Contains("Inherited") matches the temp path itself.
 	fresh := (hooks{}).ComposePrompt("# Auditor persona\n", core.PhaseRequest{ProjectRoot: root, Workspace: freshWS})
 	if strings.Contains(fresh, defectDispositionFile) || strings.Contains(fresh, "## Inherited defect dispositions") {
 		t.Errorf("non-continuation prompt gained a disposition block:\n%s", fresh)

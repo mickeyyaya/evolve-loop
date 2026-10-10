@@ -1,19 +1,5 @@
 package audit
 
-// changedPackagesForAudit's second return value, derivable, distinguishes a
-// genuinely clean git tree (nothing changed) from an underivable changed-set
-// (git error, no repo, a fleet index-lock race). apicoverEnforceChangedDefault
-// and apicoverNewPackageGraduationDefault each FAIL loud (a single actionable
-// offender, err stays nil) when the module dir exists, an .apicover-enforce
-// list is present, and the changed-set is underivable, instead of falling
-// through the empty-intersection/empty-ungraduated no-op path. A genuinely
-// clean, git-derivable tree still stays (nil, nil).
-//
-// Each gate below is tested as a positive/negative pair:
-// *_UnderivableChangedSet_FailsLoud (must FAIL) vs *_CleanGitTree_StaysNoOp
-// (must not FAIL) — the strongest guard against a naive "always FAIL" or
-// "never FAIL" implementation.
-
 import (
 	"os"
 	"os/exec"
@@ -23,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// runGitIn runs `git <args>` in dir with an isolated, host-independent
-// config — mirrors internal/dossier/rollback_test.go / the sibling helper in
-// internal/changedpkgs/changedpkgs_derivability_test.go.
 func runGitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", args...)
@@ -36,10 +19,6 @@ func runGitIn(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// enforceFixtureNonGit builds a go module worktree (go.mod + .apicover-enforce
-// + a real tracked-looking go source file) that is deliberately NOT a git
-// repo and has NO build handoff — every git invocation FromGitChecked makes
-// will fail, so the changed-package set is underivable by construction.
 func enforceFixtureNonGit(t *testing.T) (root string) {
 	t.Helper()
 	root, goDir := goWorktree(t)
@@ -55,9 +34,6 @@ func enforceFixtureNonGit(t *testing.T) (root string) {
 	return root
 }
 
-// enforceFixtureCleanGit builds the same module + enforce list, but as a real,
-// clean, committed git repo with no build handoff — changedPackagesForAudit
-// must fall back to a DERIVABLE (git succeeds) empty set.
 func enforceFixtureCleanGit(t *testing.T) (root string) {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
@@ -78,10 +54,6 @@ func enforceFixtureCleanGit(t *testing.T) (root string) {
 	return root
 }
 
-// TestApicoverEnforceChangedDefault_UnderivableChangedSet_FailsLoud: an
-// underivable changed-set on a cycle with a real .apicover-enforce list must
-// FAIL loud (non-empty offenders, err==nil) instead of a silent (nil, nil)
-// no-op.
 func TestApicoverEnforceChangedDefault_UnderivableChangedSet_FailsLoud(t *testing.T) {
 	root := enforceFixtureNonGit(t)
 	off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
@@ -93,11 +65,6 @@ func TestApicoverEnforceChangedDefault_UnderivableChangedSet_FailsLoud(t *testin
 	}
 }
 
-// TestApicoverEnforceChangedDefault_CleanGitTree_StaysNoOp: the paired
-// anti-false-positive regression — a genuinely clean, git-derivable tree must
-// remain (nil, nil). Without this test, a naive "always fail when no handoff"
-// implementation would pass the negative test above but FAIL every real
-// clean cycle.
 func TestApicoverEnforceChangedDefault_CleanGitTree_StaysNoOp(t *testing.T) {
 	root := enforceFixtureCleanGit(t)
 	off, err := apicoverEnforceChangedDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
@@ -106,9 +73,6 @@ func TestApicoverEnforceChangedDefault_CleanGitTree_StaysNoOp(t *testing.T) {
 	}
 }
 
-// TestApicoverNewPackageGraduationDefault_UnderivableChangedSet_FailsLoud:
-// the graduation gate shares changedPackagesForAudit's resolution and must
-// get the same fail-loud treatment.
 func TestApicoverNewPackageGraduationDefault_UnderivableChangedSet_FailsLoud(t *testing.T) {
 	root := enforceFixtureNonGit(t)
 	off, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})
@@ -120,8 +84,6 @@ func TestApicoverNewPackageGraduationDefault_UnderivableChangedSet_FailsLoud(t *
 	}
 }
 
-// TestApicoverNewPackageGraduationDefault_CleanGitTree_StaysNoOp: paired
-// anti-false-positive for the graduation gate.
 func TestApicoverNewPackageGraduationDefault_CleanGitTree_StaysNoOp(t *testing.T) {
 	root := enforceFixtureCleanGit(t)
 	off, err := apicoverNewPackageGraduationDefault(core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1})

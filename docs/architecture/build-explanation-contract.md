@@ -189,9 +189,24 @@ change the retry verdict. A resumed landing never verifies again; its intent car
     as touching, because some filesystem resolves it to a differently spelled
     file: a non-ASCII path, one containing `:`, `\` or `~`, or one with a
     component ending in a dot or a space;
-  - the lane's paths, modes and bytes match the sealed digest, read once;
+  - the lane's paths, modes and bytes match the sealed digest, read once.
+    Ship's inbox consumption is not part of this comparison: a pair of a
+    removed `.evolve/inbox/<name>` and a present
+    `.evolve/inbox/consumed/<name>`. The consumed copy adds only ship's
+    stamps (`consumed`, `released_continuations`) to the item of the new
+    base. A lane edit of the item, or any other inbox change, stays in the
+    comparison. A continuation lane keeps the pair, as only ship's commit
+    holds its released continuation
+    ([ADR-0128](adr/0128-landing-queue-tiered-reverification.md), plan
+    component Q12). The
+    rebound digest includes the pair, so Audit verifies the pending tree;
   - the material digest and the Build report declaration are unchanged;
   - the document is absent at the new base.
+    Disjointness and the digest decline that case first, so this check is
+    defence in depth. The rebase needs no separate check of a clean replay.
+    A path that the replay regenerated or resolved is also in the peer delta,
+    and the disjointness check declines it. Any other byte change fails the
+    digest.
 
   The host rewrites only the derived binding fields: `base_sha`, `diff_sha256`,
   and `authored_base_sha`, which is set once. The Builder's document and report

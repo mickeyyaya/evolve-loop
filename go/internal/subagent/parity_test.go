@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// TestWriteCachePrefix_ByteParityWithBash diffs Go output against the fixed
-// golden file testdata/cache-prefix.golden. A drifted golden means
-// renderCachePrefix's layout changed — regenerate it deliberately when that
-// is intended; an unintended drift would break Anthropic prompt-cache reuse
-// across sibling fan-out workers.
 func TestWriteCachePrefix_ByteParityWithBash(t *testing.T) {
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "cache.md")
@@ -40,7 +35,6 @@ func TestWriteCachePrefix_ByteParityWithBash(t *testing.T) {
 		t.Fatalf("read golden: %v", err)
 	}
 	if !bytes.Equal(got, want) {
-		// Find first divergence to make the diff legible.
 		minLen := len(got)
 		if len(want) < minLen {
 			minLen = len(want)

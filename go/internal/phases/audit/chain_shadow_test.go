@@ -1,10 +1,5 @@
 package audit
 
-// The audit phase consumes the reasoning chain in shadow: the chain is
-// parsed, concluded and recorded beside the cycle, and the phase's verdict
-// stays byte-identical to what it would have been without any of it.
-// See ADR-0088.
-
 import (
 	"context"
 	"encoding/json"
@@ -31,13 +26,9 @@ func fullCoherentChain() auditchain.Chain {
 	return c
 }
 
-// The shadow contract, stated as a test: recording must never move the verdict.
 func TestChainShadow_NeverChangesTheVerdict(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
-	// A chain that CONCLUDES FAIL beside a narrative PASS: the most dangerous
-	// shape for a shadow stage to get wrong, because enforcing here would flip
-	// a shipping cycle on evidence nobody has soaked yet.
 	broken := fullCoherentChain()
 	broken[5] = auditchain.Link{ID: auditchain.LinkDelivery, Status: auditchain.StatusIncoherent,
 		Finding: "implements a cache; the intent asked for a retry budget", Citation: "intent.md:4"}
@@ -52,7 +43,6 @@ func TestChainShadow_NeverChangesTheVerdict(t *testing.T) {
 	}
 }
 
-// And the recording itself: a wave is only useful if the comparison is durable.
 func TestChainShadow_RecordsTheConclusionBesideTheCycle(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -91,10 +81,6 @@ func TestChainShadow_RecordsTheConclusionBesideTheCycle(t *testing.T) {
 	}
 }
 
-// A report with no chain block is the commonest state during rollout (the
-// persona change has not reached every driver yet). It must be recorded as
-// ABSENT, never inferred as coherent, and never treated as a defect while the
-// stage is shadow.
 func TestChainShadow_AbsentChainIsRecordedNotInvented(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)

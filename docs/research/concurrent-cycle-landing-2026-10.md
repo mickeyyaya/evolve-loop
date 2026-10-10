@@ -58,9 +58,11 @@ The default branch then prints "not proven identical" and routes to Build (`ship
 
 *Implication:* the log line is false. The proof did not fail; it did not run. The defect is a precondition on the shape of the change (committed or pending), not on its content.
 
-**F2.3** The checks of the proof pass on these inputs (synthesis). Cycle 1844 changed 10 paths and cycle 1843 changed 10 paths, and no path is in both. Neither side changed `.gitattributes` or `.gitignore`. Those are the checks of `lineageHolds` (`go/internal/explanationdocs/rebind.go:136-151`), and a clean replay keeps the bytes of each lane path. With the proof held, the B3 carry runs the full composed gates (11.3 min on average, F3.4). If they pass, the lane ships with no LLM phase.
+**F2.3** The checks of the proof pass on these inputs (synthesis). Cycle 1844 changed 10 paths and cycle 1843 changed 10 paths, and no path is in both. Neither side changed `.gitattributes` or `.gitignore`. Those are the checks of `lineageHolds` (`go/internal/explanationdocs/rebind.go:136-151`), and a clean replay keeps the bytes of each lane path. With the proof held, the lane needs no Build.
 
-*Implication:* cycle 1843 paid a Build of 16.8 min and an Audit of 5.0 min that the evidence did not need. Its recovery took 30.6 min from the ship error to the landed ship.
+**Corrected (2026-10-09):** the lane does not ship with no LLM phase. It keeps ship's consumption in its change, and the B3 carry and ship's B4 check compare the bytes. Thus the interim fix routes the lane to Audit (plan D53).
+
+*Implication:* cycle 1843 paid a Build of 16.8 min that the evidence did not need. Only the queue removes its Audit of 5.0 min. Its recovery took 30.6 min from the ship error to the landed ship.
 
 **F2.4** The same class cost cycles 1801 and 1818. Their logs show the same decline, for items that released a continuation (`2026-09-26T20-41-00Z-gc-reaps-before-its-refusal.json` and `2026-09-26T10-10-00Z-policy-resolver-hygiene.json`). Since 2026-10-06, these three cycles are all of the Build-route recoveries: 24.6 + 47.6 + 30.6 = 102.8 min and 7 LLM phases.
 

@@ -20,11 +20,9 @@ func hasDiagContaining(diags []core.Diagnostic, substr string) bool {
 	return false
 }
 
-// A cycle whose worktree has a gofmt-dirty Go file must FAIL audit, even when
-// the EGPS suite is green and the report declares PASS.
 func TestRun_GofmtDirty_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
-	writeACSVerdict(t, ws, 0) // EGPS green, so only the gofmt gate can FAIL it.
+	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	phase := New(Config{
 		Bridge:  &fakeBridge{writeArtifact: body},
@@ -45,7 +43,6 @@ func TestRun_GofmtDirty_FAILsAudit(t *testing.T) {
 	}
 }
 
-// A clean worktree (no gofmt-dirty files) keeps the PASS verdict.
 func TestRun_GofmtClean_PASSPreserved(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -61,9 +58,6 @@ func TestRun_GofmtClean_PASSPreserved(t *testing.T) {
 	}
 }
 
-// A gofmt infra error (e.g. binary missing) fails OPEN: warn, do not brick the
-// cycle on the gate's own inability to run — but never silently pass it off as
-// clean (a loud diagnostic is required).
 func TestRun_GofmtError_FailsOpenWithWarning(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -82,9 +76,6 @@ func TestRun_GofmtError_FailsOpenWithWarning(t *testing.T) {
 	}
 }
 
-// NewDefault must wire the real gofmt check: a worktree with a gofmt-dirty
-// go/ file, EGPS green pre-staged, so the only possible FAIL cause is the
-// real gofmt gate NewDefault wires.
 func TestNewDefault_WiresGofmtCheck(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real gofmt subprocess under -short; full `go test` + CI still run it")
@@ -103,7 +94,7 @@ func TestNewDefault_WiresGofmtCheck(t *testing.T) {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeACSVerdict(t, ws, 0) // EGPS green pre-staged → only gofmt can FAIL.
+	writeACSVerdict(t, ws, 0)
 
 	fb := &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}
 	phase := NewDefault(fb, fakePromptsFS("body"))

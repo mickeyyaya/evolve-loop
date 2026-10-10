@@ -1,11 +1,5 @@
 package audit
 
-// core.BookkeepingRegradeEligible classifies CycleState.AuditFailReasons by
-// prefix. The reasons are minted in defect_ledger.go, closure_claim.go and
-// audit.go's verdict-conflict record. This test feeds real minted diagnostics
-// through the core matchers, so a prefix drift on either side reds it instead
-// of silently disarming the regrade.
-
 import (
 	"testing"
 
@@ -15,7 +9,6 @@ import (
 func TestBookkeepingClassifier_BindsRealProducers(t *testing.T) {
 	t.Parallel()
 
-	// Producer 1: disposition preflight, MISSING branch (no file in workspace).
 	req := core.PhaseRequest{Workspace: t.TempDir()}
 	ancestor := []defectEntry{{ID: "d0f3a7c1e59b246d8a0c4e6f13579bde2", Status: defectStatusOpen}}
 	diags := dispositionPreflight(req, 1421, ancestor, map[string]defectEntry{})
@@ -26,7 +19,6 @@ func TestBookkeepingClassifier_BindsRealProducers(t *testing.T) {
 		t.Errorf("preflight MISSING message not classified bookkeeping-meta: %q", diags[0].Message)
 	}
 
-	// Producer 2: closure-claim citation gate.
 	cdiags := closureClaimDiagnostics("Resolved: the cycle-1424 defect is closed.\n")
 	if len(cdiags) == 0 {
 		t.Fatal("closureClaimDiagnostics minted nothing for an uncited closure claim")
@@ -37,8 +29,6 @@ func TestBookkeepingClassifier_BindsRealProducers(t *testing.T) {
 		}
 	}
 
-	// Producer 3: the verdict-conflict record, PASS and WARN narratives in,
-	// FAIL narrative impossible by the producer guard but pinned rejected.
 	for _, narrative := range []string{core.VerdictPASS, core.VerdictWARN} {
 		msg := verdictConflictMessage(narrative, []string{"defect-ledger"})
 		if !core.BookkeepingConflictAuditReason(msg) {
@@ -52,7 +42,6 @@ func TestBookkeepingClassifier_BindsRealProducers(t *testing.T) {
 		t.Error("a narrative=FAIL conflict record must not be regrade-conflict class")
 	}
 
-	// End-to-end eligibility over the real minted set.
 	reasons := []string{verdictConflictMessage(core.VerdictPASS, []string{"defect-ledger"}), diags[0].Message, cdiags[0].Message}
 	if !core.BookkeepingRegradeEligible(reasons) {
 		t.Errorf("real minted reason set not regrade-eligible: %v", reasons)

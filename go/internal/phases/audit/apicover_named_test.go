@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// TestNewDefaultWithStage_NamedPhase names the concrete audit.Phase type and
-// exercises NewDefaultWithStage, the composition-root seam that threads the
-// EVOLVE_PHASE_IO stage into verdict extraction.
-// See ADR-0050.
 func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 	br := &fakeBridge{}
 	prm := fakePromptsFS("# Auditor body")
@@ -43,11 +39,6 @@ func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 	}
 }
 
-// TestNewDefaultWithStageCompact_NamedPhase names NewDefaultWithStageCompact
-// and pins the constructor's reason to exist: compact=true threads
-// prompts.StripOnDemandSections into the dispatch path so the on-demand
-// reference tail never reaches the model, while compact=false leaves the body
-// intact.
 func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 	var compactPhase *Phase = NewDefaultWithStageCompact(&fakeBridge{}, fakePromptsFS("# Auditor body"), config.StageEnforce, true)
 	if compactPhase == nil {
@@ -58,9 +49,6 @@ func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 		t.Fatalf("Name() = %q, want %q", got, core.PhaseAudit)
 	}
 
-	// Driven end-to-end through the fake bridge, which captures the request the
-	// adapter would materialize, using the production "## Reference Index
-	// (Layer 3, on-demand)" heading form.
 	const body = "# Auditor body\n\n## Reference Index (Layer 3, on-demand)\n\n- tail-only reference content\n"
 	dispatchedPrompt := func(compact bool) string {
 		fb := &fakeBridge{writeArtifact: "## Verdict\n**PASS**\n"}
@@ -90,9 +78,6 @@ func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 	}
 }
 
-// TestWithSignals_NamedOptionReachesTheGates names the unit-14 exports
-// (Option, WithSignals, SignalsWired, Config.Signals): an Option applied to
-// the production constructor is what makes the CI-parity gates report.
 func TestWithSignals_NamedOptionReachesTheGates(t *testing.T) {
 	var opt Option = WithSignals(func() *signalcenter.Center { return signalcenter.New() })
 	var cfg Config
@@ -127,11 +112,6 @@ func TestWithHostEffects_NamedOptionReachesTheEngine(t *testing.T) {
 	}
 }
 
-// TestWithContractVerifier_NamedOptionReachesTheEngine names the
-// ContractVerifier export: the Option stores the gate's verifier accessor on
-// the Config, and a Phase built from it reports the wiring the same way
-// Signals does — the engine classifies through the gate's own verify+salvage,
-// not a second verifier.
 func TestWithContractVerifier_NamedOptionReachesTheEngine(t *testing.T) {
 	verifier := deliverable.PlainVerifier{PhaseIO: config.StageOff}
 	var opt Option = WithContractVerifier(func() runner.ContractVerifier { return verifier })

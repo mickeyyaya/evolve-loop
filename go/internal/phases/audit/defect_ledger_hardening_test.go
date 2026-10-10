@@ -10,13 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Every assertion reaches its subject through the REAL production seam
-// (`hooks.Classify`), never by calling an unexported helper directly: a
-// predicate that passes on a helper passes on dead code.
-
-// evidenceFile materializes rel under root and returns the "path:line" form an
-// auditor writes into a closure claim: evidence must cite a REAL artifact, so
-// fixtures that expect a closure to be honored must produce one.
 func evidenceFile(t *testing.T, root, rel string) string {
 	t.Helper()
 	abs := filepath.Join(root, filepath.FromSlash(rel))
@@ -29,8 +22,6 @@ func evidenceFile(t *testing.T, root, rel string) string {
 	return rel + ":12"
 }
 
-// ledgerByText indexes a written-back ledger by defect text — the identity that
-// must survive a retry, independent of whatever id scheme the builder picks.
 func ledgerByText(doc ledgerDoc) map[string]string {
 	out := make(map[string]string, len(doc.Entries))
 	for _, e := range doc.Entries {
@@ -39,14 +30,6 @@ func ledgerByText(doc ledgerDoc) map[string]string {
 	return out
 }
 
-// -- the ledger must never shrink -------------------------------------------
-
-// TestClassify_ContinuationRetryDoesNotEraseOwnEntries — on a second Classify
-// call (an ordinary audit retry — no adversary required), reconcile must not
-// rebuild the ledger from ancestor.Entries alone and truncate-write it: that
-// would erase the entries emit appended on the previous call. Entries
-// transition; they are never deleted. A ledger that shrinks is a ledger that
-// launders.
 func TestClassify_ContinuationRetryDoesNotEraseOwnEntries(t *testing.T) {
 	inherited := []string{"stale cs.ActiveWorktree survives fleet teardown"}
 	ws, req := continuationFixture(t, 1255, 1270, inherited)
@@ -58,8 +41,6 @@ func TestClassify_ContinuationRetryDoesNotEraseOwnEntries(t *testing.T) {
 
 	own := "reconcile truncate-writes the ledger from ancestor entries only"
 
-	// Attempt 1 rejects and records this cycle's OWN defect beside the
-	// inherited one.
 	hooks{}.Classify(failingReportWithDefects(own), req, core.BridgeResponse{})
 	first := ledgerByText(readLedger(t, ws))
 	if _, ok := first[own]; !ok {
@@ -69,10 +50,6 @@ func TestClassify_ContinuationRetryDoesNotEraseOwnEntries(t *testing.T) {
 		t.Fatalf("fixture precondition: the inherited defect was not carried into the workspace ledger; ledger held %v", first)
 	}
 
-	// Attempt 2 is the ordinary retry that now grades clean: reconcile runs
-	// and emit does not (nothing to emit on a PASS), so a truncate-write bug
-	// would be unmasked here — this cycle's own recorded defect erased with
-	// no adversary at all.
 	hooks{}.Classify(narrativeReport("PASS"), req, core.BridgeResponse{})
 	second := ledgerByText(readLedger(t, ws))
 
@@ -88,11 +65,6 @@ func TestClassify_ContinuationRetryDoesNotEraseOwnEntries(t *testing.T) {
 	}
 }
 
-// TestClassify_LedgerIDsAreContentDerived — a positionally-minted id (e.g.
-// "d"+len(entries)+1) is unsafe: once any shrink or reordering happens, the
-// same id string is re-minted for different defect text, and a disposition
-// keyed on that id closes something other than what it claims. The id must
-// be a function of the defect text alone.
 func TestClassify_LedgerIDsAreContentDerived(t *testing.T) {
 	root := t.TempDir()
 	textA := "symlinked test-suffix bypasses probe quarantine"
@@ -105,8 +77,6 @@ func TestClassify_LedgerIDsAreContentDerived(t *testing.T) {
 		core.PhaseRequest{Cycle: 1279, Workspace: wsA, ProjectRoot: root}, core.BridgeResponse{})
 	idsA := ledgerByText(readLedger(t, wsA))
 
-	// Same defects, opposite order, different cycle: a content-derived id is
-	// unchanged; a positional one swaps.
 	wsB := t.TempDir()
 	writeACSVerdictShip(t, wsB, 0, &yes)
 	hooks{}.Classify(failingReportWithDefects(textB, textA),
@@ -123,17 +93,8 @@ func TestClassify_LedgerIDsAreContentDerived(t *testing.T) {
 	}
 }
 
-// -- a missing ancestor ledger must be visible -------------------------------
-
-// TestClassify_ContinuationWithNoAncestorLedgerIsDiagnosed — the ancestor
-// ledger lives at <ProjectRoot>/.evolve/runs/cycle-N/, outside the workspace,
-// and the role guard matches Edit|Write only — one Bash `rm` can disarm the
-// entire gate. A silent (nil, false) return there would let the cycle PASS
-// with no record that reconciliation was ever skipped.
 func TestClassify_ContinuationWithNoAncestorLedgerIsDiagnosed(t *testing.T) {
 	_, req := continuationFixture(t, 1255, 1270, laundered)
-	// The `rm`: the manifest still names cycle-1255 as the ancestor, but its
-	// ledger is gone.
 	if err := os.Remove(filepath.Join(req.ProjectRoot, ".evolve", "runs", "cycle-1255", ledgerFile)); err != nil {
 		t.Fatalf("remove ancestor ledger: %v", err)
 	}
@@ -146,9 +107,6 @@ func TestClassify_ContinuationWithNoAncestorLedgerIsDiagnosed(t *testing.T) {
 	}
 }
 
-// TestClassify_NonContinuationEmitsNoLedgerDiagnostic — the NEGATIVE half:
-// the diagnostic above must be reachable only from the continuation path;
-// warning on every ordinary cycle would train operators to ignore it.
 func TestClassify_NonContinuationEmitsNoLedgerDiagnostic(t *testing.T) {
 	ws := t.TempDir()
 	yes := true
@@ -165,12 +123,6 @@ func TestClassify_NonContinuationEmitsNoLedgerDiagnostic(t *testing.T) {
 	}
 }
 
-// -- evidence must be a resolvable citation ----------------------------------
-
-// TestClassify_UnresolvableEvidenceDoesNotCloseADefect — validating a closure
-// claim's evidence for non-emptiness after trim only would let
-// `evidence:"x"` transition an inherited CRITICAL to FIXED with no
-// diagnostic. Evidence must name a file that actually exists.
 func TestClassify_UnresolvableEvidenceDoesNotCloseADefect(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered[:1])
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -195,14 +147,6 @@ func TestClassify_UnresolvableEvidenceDoesNotCloseADefect(t *testing.T) {
 	}
 }
 
-// TestClassify_ResolvableEvidenceClosesADefect — the POSITIVE half. Evidence
-// that names a real file (in "path:line" form, and as a phase artifact) must
-// still close the defect: a rule that rejected every claim would block every
-// continuation forever. A phase artifact is perfectly citable by its path
-// FROM the root, which is also what makes the citation followable by a
-// reader who has only the repo; the bare workspace-relative form is not,
-// because the workspace is this cycle's own agent-authored ephemera and
-// citing it is self-vouching.
 func TestClassify_ResolvableEvidenceClosesADefect(t *testing.T) {
 	_, req := continuationFixture(t, 1255, 1270, laundered[:2])
 	ws := req.Workspace
@@ -219,14 +163,8 @@ func TestClassify_ResolvableEvidenceClosesADefect(t *testing.T) {
 	}
 }
 
-// -- every disposition arm is exercised --------------------------------------
-
-// TestClassify_DispositionArms exercises all five disposition switch arms —
-// the headline rule this package enforces. One table case per arm, each
-// asserting the verdict AND that the gap is named by id.
 func TestClassify_DispositionArms(t *testing.T) {
-	// Closure evidence resolves under the PROJECT ROOT only.
-	realEvidence := "go/internal/core/fleet.go" // materialized per-case under the root
+	realEvidence := "go/internal/core/fleet.go"
 
 	cases := []struct {
 		name       string
@@ -304,10 +242,6 @@ func TestClassify_DispositionArms(t *testing.T) {
 	}
 }
 
-// TestClassify_CarriesForwardAlreadyDispositionedAncestorEntry — the
-// multi-hop invariant: an ancestor entry already FIXED/DEFERRED upstream
-// needs no fresh claim, and must survive into this cycle's ledger verbatim —
-// evidence and reason included, or the chain loses the proof of closure.
 func TestClassify_CarriesForwardAlreadyDispositionedAncestorEntry(t *testing.T) {
 	root := t.TempDir()
 	ancestorWS := filepath.Join(root, ".evolve", "runs", "cycle-1255")
@@ -355,13 +289,6 @@ func TestClassify_CarriesForwardAlreadyDispositionedAncestorEntry(t *testing.T) 
 	}
 }
 
-// -- emit covers WARN, not FAIL alone ----------------------------------------
-
-// TestClassify_WarnWithStructuredDefectsEmitsLedger — emit gated on
-// verdict == VerdictFAIL alone would leave a WARN-shipped cycle carrying
-// structured defects minting no ledger, so no later continuation could
-// inherit them — a laundering channel left open by the mechanism that exists
-// to close laundering.
 func TestClassify_WarnWithStructuredDefectsEmitsLedger(t *testing.T) {
 	ws := t.TempDir()
 	yes := true
@@ -389,10 +316,6 @@ func TestClassify_WarnWithStructuredDefectsEmitsLedger(t *testing.T) {
 	}
 }
 
-// TestClassify_WarnWithoutStructuredDefectsMintsNothing — the NEGATIVE guard:
-// widening emit to WARN must not make every warned cycle mint a ledger. An
-// empty or defect-less ledger makes every later cycle look like a
-// continuation, the cheapest way to render the reconcile gate vacuous.
 func TestClassify_WarnWithoutStructuredDefectsMintsNothing(t *testing.T) {
 	ws := t.TempDir()
 	yes := true

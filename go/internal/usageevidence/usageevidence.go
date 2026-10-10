@@ -117,6 +117,7 @@ func (b *Bridge) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	if b.explain != nil && ctx.Err() == nil && QuotaCouldExplain(res.ExitCode) {
 		rec := Record{Cycle: req.Cycle, RunID: req.RunID, Phase: req.Agent, Workspace: req.Workspace,
 			Origin: "Bridge.Launch", Driver: req.CLI, Trigger: "exit " + itoa(res.ExitCode), ExitCode: res.ExitCode, Evidence: b.explain(ctx, req.CLI, start)}
+		res.UsageExhausted = rec.Evidence.Verdict == usageprobe.VerdictExhausted
 		if rerr := Report(b.center(), rec); rerr != nil {
 			warnf("%s: %v\n", req.CLI, rerr)
 		}

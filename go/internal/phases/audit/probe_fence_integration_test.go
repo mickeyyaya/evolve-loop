@@ -73,8 +73,6 @@ func TestAudit_ContentFencePreservesBuilderTestsBeforeHostExecution(t *testing.T
 				t.Fatal(err)
 			}
 			if mutate {
-				// Even a pre-first-Audit Builder file must survive restoration,
-				// which writes its authenticated bytes with a fresh mtime.
 				if err := os.Chtimes(path, first.Add(-time.Hour), first.Add(-time.Hour)); err != nil {
 					t.Fatal(err)
 				}

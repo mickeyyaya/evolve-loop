@@ -40,13 +40,17 @@ func TestController_Do_ResolvesAndCaptures(t *testing.T) {
 }
 
 func TestController_perFamilyConfig(t *testing.T) {
-	c := &cliController{cfg: &Config{Workspace: "/tmp/ws", AllowBypass: true}}
+	ws := t.TempDir()
+	c := &cliController{cfg: &Config{Workspace: ws, AllowBypass: true}}
 	got := c.perFamilyConfig("claude-tmux")
 	if got.CLI != "claude-tmux" {
 		t.Errorf("CLI=%q, want claude-tmux", got.CLI)
 	}
-	if got.Workspace != "/tmp/ws" {
-		t.Errorf("Workspace=%q, want the template's /tmp/ws", got.Workspace)
+	if got.Workspace != ws {
+		t.Errorf("Workspace=%q, want the template's %s", got.Workspace, ws)
+	}
+	if c.cfg.Worktree != "" {
+		t.Errorf("template Worktree=%q, want it untouched: the scratch cwd belongs to the per-family clone", c.cfg.Worktree)
 	}
 	if len(got.Realization.LaunchFlags) == 0 {
 		t.Error("expected a non-empty per-family realization for claude bypass")

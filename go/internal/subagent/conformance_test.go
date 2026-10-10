@@ -10,23 +10,18 @@ import (
 	"testing"
 )
 
-// bridgeOutcome selects what the stand-in bridge "produces" for a dispatch.
 type bridgeOutcome int
 
 const (
-	bridgeWritesValid   bridgeOutcome = iota // fresh token-bearing artifact → PASS
-	bridgeWritesNothing                      // exits 0 but no artifact      → INTEGRITY_FAIL
-	bridgeWritesNoToken                      // fresh artifact, token absent  → INTEGRITY_FAIL
+	bridgeWritesValid bridgeOutcome = iota
+	bridgeWritesNothing
+	bridgeWritesNoToken
 )
 
-// conformanceOpts builds a fake-bridge RunOptions for one role. It reuses the
-// canonical runHappyOpts seams and overrides only (a) the profile so each role
-// writes a role-named artifact, (b) Rand so each role mints a distinct token,
-// and (c) the ExecAdapter to model the chosen bridge outcome.
 func conformanceOpts(t *testing.T, role string, tokenSeed byte, b bridgeOutcome) RunOptions {
 	t.Helper()
 	opts := runHappyOpts(t)
-	clock := opts.Now // the fixed clock runHappyOpts pinned
+	clock := opts.Now
 	opts.ReadProfile = func(string) (string, error) {
 		return fmt.Sprintf(
 			`{"role":%q,"cli":"claude","model_tier_default":"sonnet","output_artifact":".evolve/runs/cycle-{cycle}/%s.md"}`,
@@ -41,7 +36,7 @@ func conformanceOpts(t *testing.T, role string, tokenSeed byte, b bridgeOutcome)
 	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
 		path := env["ARTIFACT_PATH"]
 		if b == bridgeWritesNothing || path == "" {
-			return 0, nil // "succeeded" but produced no artifact
+			return 0, nil
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return 1, err
@@ -60,9 +55,6 @@ func conformanceOpts(t *testing.T, role string, tokenSeed byte, b bridgeOutcome)
 	return opts
 }
 
-// conformanceReq builds a standard valid RunRequest for a role, with an
-// isolated project root + workspace (the workspace dir is created so Run's
-// existence check passes).
 func conformanceReq(t *testing.T, role string) RunRequest {
 	t.Helper()
 	root := t.TempDir()
@@ -83,8 +75,6 @@ func conformanceReq(t *testing.T, role string) RunRequest {
 	}
 }
 
-// TestConformance_AllRoles_BridgeOnly — every role rejects the retired
-// in-process dispatch hatch, uniformly across the registry.
 func TestConformance_AllRoles_BridgeOnly(t *testing.T) {
 	t.Parallel()
 	for i, role := range agentRoles {
@@ -101,9 +91,6 @@ func TestConformance_AllRoles_BridgeOnly(t *testing.T) {
 	}
 }
 
-// TestConformance_AllRoles_HappyDispatchIsolated — every role dispatches
-// through the fake bridge to a PASS verdict, with a non-empty token bound into
-// its own artifact under its own project root.
 func TestConformance_AllRoles_HappyDispatchIsolated(t *testing.T) {
 	t.Parallel()
 	for i, role := range agentRoles {
@@ -135,9 +122,6 @@ func TestConformance_AllRoles_HappyDispatchIsolated(t *testing.T) {
 	}
 }
 
-// TestConformance_AllRoles_ContractGuards — the verification SSOT guards
-// every role: a bridge that produces no artifact, or one without the token,
-// yields INTEGRITY_FAIL (never a false PASS).
 func TestConformance_AllRoles_ContractGuards(t *testing.T) {
 	t.Parallel()
 	for i, role := range agentRoles {
@@ -162,10 +146,6 @@ func TestConformance_AllRoles_ContractGuards(t *testing.T) {
 	}
 }
 
-// TestConformance_AllRoles_RecursionSandboxCoherent — every role's fan-out
-// worker command re-enters the bridge (`subagent run <role>-worker-<subtask>`),
-// clears the host marker (CLAUDECODE_TYPE=) so the child stays nested (no
-// inner sandbox wrap), and threads the child recursion depth.
 func TestConformance_AllRoles_RecursionSandboxCoherent(t *testing.T) {
 	t.Parallel()
 	for _, role := range agentRoles {
@@ -186,9 +166,6 @@ func TestConformance_AllRoles_RecursionSandboxCoherent(t *testing.T) {
 	}
 }
 
-// TestConformance_AllRoles_DepthCapEnforced — every role rejects a dispatch
-// that runs deeper than the recursion cap, so a fan-out loop can't recurse
-// unboundedly regardless of which role it spawns.
 func TestConformance_AllRoles_DepthCapEnforced(t *testing.T) {
 	t.Parallel()
 	for i, role := range agentRoles {
@@ -205,9 +182,6 @@ func TestConformance_AllRoles_DepthCapEnforced(t *testing.T) {
 	}
 }
 
-// TestConformance_NoCrossAgentTokenLeakage — dispatching every role mints a
-// distinct token, and each role's artifact bears only its own token, never
-// another role's. Proves dispatches don't share token/artifact state.
 func TestConformance_NoCrossAgentTokenLeakage(t *testing.T) {
 	t.Parallel()
 	type out struct {
@@ -228,7 +202,6 @@ func TestConformance_NoCrossAgentTokenLeakage(t *testing.T) {
 		results[role] = out{token: res.ChallengeToken, body: string(body)}
 	}
 
-	// Tokens are pairwise distinct.
 	seen := map[string]string{}
 	for role, o := range results {
 		if prev, dup := seen[o.token]; dup {
@@ -237,7 +210,6 @@ func TestConformance_NoCrossAgentTokenLeakage(t *testing.T) {
 		seen[o.token] = role
 	}
 
-	// No role's artifact contains a different role's token.
 	for role, o := range results {
 		for other, oo := range results {
 			if other == role {
@@ -250,9 +222,6 @@ func TestConformance_NoCrossAgentTokenLeakage(t *testing.T) {
 	}
 }
 
-// TestConformance_ConcurrentDispatch_NoRace — every role dispatched concurrently
-// with isolated project roots/workspaces all reach PASS with no data race (run
-// under -race). Pins that independent dispatches share no mutable state.
 func TestConformance_ConcurrentDispatch_NoRace(t *testing.T) {
 	t.Parallel()
 	var wg sync.WaitGroup

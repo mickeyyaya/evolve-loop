@@ -13,38 +13,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 )
 
-// MaxEntries caps state.json:failedApproaches at this many entries.
-// Newest-wins FIFO trim when appending: keep the last MaxEntries.
-// Ports the bash `if length > 50 then .[length-50:]` slice.
 const MaxEntries = 50
 
-// ErrStateMissing is returned by Record when state.json doesn't exist.
-// Cmd_loop treats this as a soft WARN (matches bash dispatcher line
-// 647) — pre-flight should have created the file, but if it didn't,
-// recording is a no-op rather than a hard halt.
 var ErrStateMissing = errors.New("failurelog: state.json missing")
 
-// RecordRequest is the input to Record.
 type RecordRequest struct {
-	// Cycle is the cycle number that failed.
-	Cycle int
-	// Classification is the raw verdict from cycleclassify.Classify
-	// OR a legacy string. NormalizeLegacy is applied before write.
+	Cycle          int
 	Classification string
-	// ReportPath is the absolute path to the cycle's
-	// orchestrator-report.md. Optional — empty leaves Summary blank.
-	ReportPath string
-	// Summary, when non-empty, is used verbatim instead of deriving it
-	// from ReportPath. Lets callers without a report (loop fatals,
-	// operator resets) carry context like "stop_reason=<reason>".
-	Summary string
-	// Now is the timestamp the failure happened at. Defaults to
-	// time.Now().UTC() when zero.
-	Now time.Time
+	ReportPath     string
+	Summary        string
+	Now            time.Time
 }
 
-// Recorded captures what got written. Useful for cmd_loop's stderr
-// log line and for tests.
 type Recorded struct {
 	Cycle          int            `json:"cycle"`
 	Classification Classification `json:"classification"`
@@ -53,18 +33,6 @@ type Recorded struct {
 	ExpiresAt      string         `json:"expiresAt"`
 }
 
-// Record appends a failed-cycle entry to state.json:failedApproaches[],
-// FIFO-trims to MaxEntries, advances state.json:lastCycleNumber, and
-// writes both updates atomically via tmp+mv.
-//
-// Returns the entry that was persisted. Returns an error if state.json
-// is missing, unreadable, or unwritable — the bash equivalent treats
-// unwritable state.json as a FATAL halt because every retry would hit
-// the same workspace and overwrite diagnostic evidence.
-//
-// statePath is typically <projectRoot>/.evolve/state.json. runsDir is
-// where cycle-<N>/orchestrator-report.md lives (used for summary
-// extraction when req.ReportPath is empty).
 func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 	now := req.Now
 	if now.IsZero() {
@@ -86,18 +54,12 @@ func Record(statePath, runsDir string, req RecordRequest) (Recorded, error) {
 	}
 	appendFailedApproach(state, entry, req.Cycle)
 
-	// Atomic write via tmp+mv.
 	if err := atomicWriteJSON(statePath, state); err != nil {
 		return Recorded{}, fmt.Errorf("failurelog: write state: %w", err)
 	}
 	return entry, nil
 }
 
-// loadRecordState reads and decodes state.json as map[string]any so unknown
-// top-level keys survive the round-trip (state.json carries many fields not
-// modeled in core.State). Missing statePath mirrors the bash behavior (log
-// WARN, return without recording — the dispatcher's preflight is responsible
-// for creating it).
 func loadRecordState(statePath string) (map[string]any, error) {
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -113,12 +75,6 @@ func loadRecordState(statePath string) (map[string]any, error) {
 	return state, nil
 }
 
-// resolveRecordSummary picks, in order: explicit override, extraction from
-// the explicit or runsDir-derived report path, then the fallback reports a
-// cycle workspace actually has. orchestrator-report.md has no production
-// writer — 0 of 241 live workspaces carry one — so the first extraction
-// alone silently returns "" on every recorded failure; the fallback is the
-// second source that fixes that.
 func resolveRecordSummary(req RecordRequest, runsDir string) string {
 	if req.Summary != "" {
 		return req.Summary
@@ -137,10 +93,6 @@ func resolveRecordSummary(req RecordRequest, runsDir string) string {
 	return summary
 }
 
-// appendFailedApproach appends entry to state's failedApproaches, FIFO-trims
-// to MaxEntries, and advances lastCycleNumber. Monotonic: loop-fatal records
-// may carry an unknown cycle (0) — regressing the counter would reuse cycle
-// numbers and corrupt workspace history.
 func appendFailedApproach(state map[string]any, entry Recorded, cycle int) {
 	existing, _ := state["failedApproaches"].([]any)
 	existing = append(existing, mustMarshalToAny(entry))
@@ -156,9 +108,6 @@ func appendFailedApproach(state map[string]any, entry Recorded, cycle int) {
 
 var summaryFallbacks = []string{"orchestrator-report.md", "audit-report.md", "build-report.md"}
 
-// extractSummaryForCycle returns the first non-empty summary among the reports
-// present in a cycle workspace. Invents nothing: an empty workspace stays
-// empty, because a fabricated summary is worse than an absent one.
 func extractSummaryForCycle(workspace string) string {
 	if workspace == "" {
 		return ""
@@ -171,65 +120,52 @@ func extractSummaryForCycle(workspace string) string {
 	return ""
 }
 
-// extractSummary pulls the first ~8 lines of the Failure / Verdict /
-// Phase Outcomes section from orchestrator-report.md, joined into one
-// line, capped at 400 chars. Ports the bash awk extractor.
-// summaryFallbacks are the verdict-bearing reports a cycle workspace really
-// has, in the order an operator would read them: the graded verdict first, then
-// what the builder claimed.
+const (
+	summaryMaxLines = 8
+	summaryMaxBytes = 400
+)
+
+func isSummarySectionHeader(line string) bool {
+	return strings.HasPrefix(line, "## Failure") ||
+		strings.HasPrefix(line, "## Verdict") ||
+		strings.HasPrefix(line, "## Phase Outcomes")
+}
+
 func extractSummary(reportPath string) string {
 	data, err := os.ReadFile(reportPath)
 	if err != nil {
 		return ""
 	}
 	lines := strings.Split(string(data), "\n")
-	const maxLines = 8
-	const maxBytes = 400
 
 	var out []string
 	capturing := false
-	captured := 0
 	for _, line := range lines {
 		if capturing {
-			if len(out) > 0 && strings.HasPrefix(line, "## ") && captured > 0 {
-				// New section start — stop capturing.
+			if len(out) > 0 && strings.HasPrefix(line, "## ") {
 				break
 			}
 			out = append(out, line)
-			captured++
-			if captured >= maxLines {
+			if len(out) >= summaryMaxLines {
 				break
 			}
 			continue
 		}
-		// Look for the section markers.
-		if strings.HasPrefix(line, "## Failure") ||
-			strings.HasPrefix(line, "## Verdict") ||
-			strings.HasPrefix(line, "## Phase Outcomes") {
-			capturing = true
-		}
+		capturing = isSummarySectionHeader(line)
 	}
 	if len(out) == 0 {
 		return ""
 	}
-	joined := strings.Join(out, " ")
-	joined = strings.Join(strings.Fields(joined), " ") // squeeze whitespace
-	if len(joined) > maxBytes {
-		joined = joined[:maxBytes]
+	joined := strings.Join(strings.Fields(strings.Join(out, " ")), " ")
+	if len(joined) > summaryMaxBytes {
+		joined = joined[:summaryMaxBytes]
 	}
 	return joined
 }
 
-// mustMarshalToAny round-trips entry through json.Marshal so the slot
-// in state["failedApproaches"] is a plain map[string]any. Without
-// this, the json.Encoder in atomicWriteJSON would serialize the typed
-// Recorded struct alongside untyped legacy entries — fine, but a
-// uniform shape simplifies test assertions.
 func mustMarshalToAny(v any) map[string]any {
 	b, err := json.Marshal(v)
 	if err != nil {
-		// json.Marshal of Recorded cannot fail in practice; defensive
-		// branch falls through to empty map.
 		return map[string]any{}
 	}
 	var m map[string]any
@@ -237,15 +173,6 @@ func mustMarshalToAny(v any) map[string]any {
 	return m
 }
 
-// atomicWriteJSON serializes state and writes it atomically (mv-of-tmp,
-// POSIX rename is atomic on the same filesystem; no partial file on
-// failure). Delegates to the shared internal/atomicwrite implementation.
-// The rename lands on statemap.ResolveWriteTarget(path): renaming over a
-// worktree's state.json link would replace the link with a regular file and
-// strand every later write in a detached copy (cycle-999).
-//
-// Exposed via this seam so tests can drive the write-error branch
-// without contriving filesystem permissions.
 var atomicWriteJSON = func(path string, state map[string]any) error {
 	return atomicwrite.JSON(statemap.ResolveWriteTarget(path), state)
 }

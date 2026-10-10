@@ -8,10 +8,9 @@ import (
 )
 
 func TestClampPlanModelRouting_NilEnvelopeFloorClampsUp(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux"} // NO ModelTierEnvelope declared
+	prof := &profiles.Profile{CLI: "claude-tmux"}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "fast"}}}
 
-	// A nil catalogLookup isolates the envelope floor from the catalog check.
 	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), nil)
 
 	if len(clamps) != 1 {
@@ -29,7 +28,7 @@ func TestClampPlanModelRouting_NilEnvelopeFloorClampsUp(t *testing.T) {
 }
 
 func TestClampPlanModelRouting_NilEnvelopeFloorAppliesAcrossPhases(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux"} // nil envelope for all phases
+	prof := &profiles.Profile{CLI: "claude-tmux"}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{
 		{Phase: "scout", Run: true, CLI: "claude", Tier: "fast"},
 		{Phase: "audit", Run: true, CLI: "claude", Tier: "fast"},
@@ -63,7 +62,7 @@ func TestClampPlanModelRouting_ExplicitEnvelopeNotOverriddenByDefault(t *testing
 }
 
 func TestClampPlanModelRouting_NilEnvelopeWithinCeilingPassesThrough(t *testing.T) {
-	prof := &profiles.Profile{CLI: "claude-tmux"} // nil envelope
+	prof := &profiles.Profile{CLI: "claude-tmux"}
 	plan := &PhasePlan{Entries: []PhasePlanEntry{{Phase: "build", Run: true, CLI: "claude", Tier: "deep"}}}
 
 	out, clamps := ClampPlanModelRouting(plan, profileFunc(prof), nil)

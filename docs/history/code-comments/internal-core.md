@@ -12870,3 +12870,14 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // reclaims it.
 // See ADR-0039.
 ```
+
+## ADR-0128 Q12: the continuation-lane identity proof
+
+### `go/internal/core/ship_recovery.go:142` — above `func (o *Orchestrator) routeRebasedExplanation(ctx context.Context, projectRoot string, cycle int, cs *CycleState) (Phas…`
+
+```text
+// routeRebasedExplanation moves the explanation's base binding to the rebased base. When the host proves
+// the explained change byte-identical there, the approved Build stands and the audited verdict carries to
+// ship when the carry proves it, else only Audit re-runs (ADR-0105); otherwise the snapshot is invalidated
+// and Build re-authors the explanation.
+```

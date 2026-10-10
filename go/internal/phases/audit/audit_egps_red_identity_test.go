@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// writeACSVerdictReds writes acs-verdict.json whose results carry the given
-// red ac_ids (mirroring acssuite's real shape: red_count + results[]).
 func writeACSVerdictReds(t *testing.T, ws string, redIDs ...string) {
 	t.Helper()
 	results := make([]map[string]any, 0, len(redIDs)+1)
@@ -30,8 +28,6 @@ func writeACSVerdictReds(t *testing.T, ws string, redIDs ...string) {
 	}
 }
 
-// egpsRedDiagnostic runs the Classify path against a workspace whose verdict
-// carries the given reds and returns the EGPS red_count diagnostic message.
 func egpsRedDiagnostic(t *testing.T, redIDs ...string) string {
 	t.Helper()
 	ws := t.TempDir()
@@ -49,9 +45,6 @@ func egpsRedDiagnostic(t *testing.T, redIDs ...string) string {
 	return ""
 }
 
-// TestEGPSRedDiagnostic_CarriesPredicateIdentity — the crux: the message names
-// the red predicate's SEMANTIC identity, so the failure fingerprint differs
-// per distinct defect.
 func TestEGPSRedDiagnostic_CarriesPredicateIdentity(t *testing.T) {
 	m1 := egpsRedDiagnostic(t, "cycle1115/TestC1115_003_BridgeAndRecoveryStayGreen")
 	if !strings.Contains(m1, "BridgeAndRecoveryStayGreen") {
@@ -63,11 +56,6 @@ func TestEGPSRedDiagnostic_CarriesPredicateIdentity(t *testing.T) {
 	}
 }
 
-// TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded — the flip side: the same
-// SEMANTIC defect red again on a retry cycle carries a NEW cycle-numbered
-// ac_id; the messages must still be byte-identical, or the breaker goes blind
-// to real cross-cycle recurrences (verdictFailDistinguisher's "never cycle
-// numbers" rule).
 func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
 	m1 := egpsRedDiagnostic(t, "cycle1115/TestC1115_003_BridgeAndRecoveryStayGreen")
 	m2 := egpsRedDiagnostic(t, "cycle1116/TestC1116_004_BridgeAndRecoveryStayGreen")
@@ -78,7 +66,6 @@ func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
 		t.Errorf("cycle number leaked into the diagnostic: %s", m1)
 	}
 
-	// The two-part convention (no index group): TestC<cycle>_<Name>.
 	a1 := egpsRedDiagnostic(t, "cycle841/TestC841_Amplify_CLIOutput_Memo_ResolvesToClaudeTmux")
 	a2 := egpsRedDiagnostic(t, "cycle999/TestC999_Amplify_CLIOutput_Memo_ResolvesToClaudeTmux")
 	if a1 != a2 {
@@ -90,21 +77,16 @@ func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
 	if !strings.Contains(a1, "Amplify_CLIOutput_Memo_ResolvesToClaudeTmux") {
 		t.Errorf("two-part id lost its semantic name: %s", a1)
 	}
-	// NEG-prefixed sibling shape keeps its semantic tail.
 	n1 := egpsRedDiagnostic(t, "cycle416/TestC416_NEG_MarkerlessBody_CompactionIsNoOp")
 	if !strings.Contains(n1, "NEG_MarkerlessBody_CompactionIsNoOp") || strings.Contains(n1, "416") {
 		t.Errorf("NEG-shape id mishandled: %s", n1)
 	}
-	// A name that merely STARTS with 'C'+letters is not cycle chrome and must
-	// survive whole (C\d+ requires digits).
 	c1 := egpsRedDiagnostic(t, "cycle12/TestCarryforward_003_Foo")
 	if !strings.Contains(c1, "Carryforward_003_Foo") {
 		t.Errorf("legitimate C-name mangled: %s", c1)
 	}
 }
 
-// TestEGPSRedDiagnostic_CapsIDList — a mass-red verdict must not explode the
-// one-line diagnostic: at most 5 ids are named, the rest summarized.
 func TestEGPSRedDiagnostic_CapsIDList(t *testing.T) {
 	ids := make([]string, 8)
 	for i := range ids {
@@ -131,9 +113,6 @@ func TestEGPSRedDiagnostic_CapsIDList(t *testing.T) {
 	}
 }
 
-// TestEGPSRedDiagnostic_LegacyVerdictWithoutResults — a verdict carrying only
-// red_count (no results array — the shape writeACSVerdictShip pins for other
-// tests) must still gate with the bare-count message, never crash or skip.
 func TestEGPSRedDiagnostic_LegacyVerdictWithoutResults(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdictShip(t, ws, 2, nil)

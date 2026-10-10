@@ -1,12 +1,5 @@
 package gc
 
-// L3.2 acceptance: "live-dir never touched in fuzz test". Property-based:
-// random synthetic trees of run dirs (random ages, markers, lease states,
-// one optionally-current workspace) → Discover → Plan with an aggressive
-// policy. INVARIANTS: no live dir (or anything under one) is ever planned;
-// no quarantine/ledger/archive path is ever planned; markerless dirs are
-// never planned (they are invisible to discovery).
-
 import (
 	"os"
 	"path/filepath"
@@ -53,19 +46,18 @@ func TestPlanNeverTouchesLiveDirs_Property(t *testing.T) {
 				rt.Fatal(err)
 			}
 			switch rapid.IntRange(0, 3).Draw(rt, "lease-"+name) {
-			case 1: // fresh lease → live
+			case 1:
 				if err := runlease.Write(p, runlease.Lease{RunID: name}, t0.Add(-time.Minute)); err != nil {
 					rt.Fatal(err)
 				}
 				if hasMarker {
 					liveDirs[p] = true
 				}
-			case 2: // stale lease → dead
+			case 2:
 				if err := runlease.Write(p, runlease.Lease{RunID: name}, t0.Add(-2*time.Hour)); err != nil {
 					rt.Fatal(err)
 				}
 			}
-			// Chtimes again — lease writes touched the dir mtime.
 			if err := os.Chtimes(p, mod, mod); err != nil {
 				rt.Fatal(err)
 			}
@@ -80,7 +72,6 @@ func TestPlanNeverTouchesLiveDirs_Property(t *testing.T) {
 				rt.Fatal(err)
 			}
 		}
-		// Distractors that must never be planned.
 		for _, d := range []string{
 			filepath.Join(dir, "quarantine", "cycle-1"),
 			filepath.Join(dir, "archive", "runs", "old"),

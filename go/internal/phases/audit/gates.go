@@ -8,9 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// executeRepositoryGates runs local formatting and contract gates before the
-// commands that mirror repository CI. Each gate keeps its historical fail-open
-// behavior for infrastructure errors and fail-closed behavior for offenders.
 func (a *auditClassification) executeRepositoryGates() {
 	a.applyRepositoryGate(a.hooks.gofmtCheck, "gofmt",
 		"gofmt gate skipped (could not run): %s",

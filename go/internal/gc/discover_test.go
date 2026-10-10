@@ -1,10 +1,5 @@
 package gc
 
-// L3.2 discovery contract: run dirs by EVIDENCE (marker file or ledger
-// reference), never name-parsing; loose files and markerless dirs are
-// invisible to the engine; liveness from the global run state or a fresh
-// .lease (the runlease contract CE.3 writes).
-
 import (
 	"os"
 	"path/filepath"
@@ -28,16 +23,12 @@ func TestDiscover_EvidenceNotNames(t *testing.T) {
 	dir := t.TempDir()
 	runs := filepath.Join(dir, "runs")
 
-	// Marker-evidenced runs, deliberately WITHOUT cycle-N names.
 	writeFile(t, filepath.Join(runs, "oddly-named-run", "run.json"), `{"cycle_id":7}`)
 	writeFile(t, filepath.Join(runs, "legacy-run", "scout-report.md"), "r")
-	// A cycle-named dir with NO evidence must be invisible.
 	if err := os.MkdirAll(filepath.Join(runs, "cycle-999"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Loose files at runs/ root (the real tree has many) are not runs.
 	writeFile(t, filepath.Join(runs, "phase-d-validation.log"), "log")
-	// Ledger-referenced dir without a marker qualifies via refs.
 	reffed := filepath.Join(runs, "manual-release-v10.16.0")
 	if err := os.MkdirAll(reffed, 0o755); err != nil {
 		t.Fatal(err)
@@ -81,10 +72,8 @@ func TestDiscover_LivenessFromRunStateAndLease(t *testing.T) {
 	dead := filepath.Join(runs, "cycle-4")
 	writeFile(t, filepath.Join(dead, "run.json"), `{"cycle_id":4}`)
 
-	// Global run state names cycle-7's workspace (non-terminal).
 	writeFile(t, filepath.Join(dir, "cycle-state.json"),
 		`{"cycle_id":7,"phase":"build","workspace_path":"`+current+`"}`)
-	// cycle-6 has a fresh lease; cycle-5 a stale one.
 	if err := runlease.Write(leased, runlease.Lease{RunID: "r6"}, t0.Add(-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
@@ -166,10 +155,6 @@ func TestDiscover_TerminalRunStateIsIdle(t *testing.T) {
 	}
 }
 
-// HIGH-fix pins (L3.2 review): symlinked run dirs must be DISCOVERED (an
-// invisible run bypasses every protection), a malformed in-flight
-// cycle-state fails closed, and Apply re-checks liveness at act time.
-
 func TestDiscover_SymlinkedRunDirIsVisible(t *testing.T) {
 	dir := t.TempDir()
 	real := filepath.Join(dir, "relocated", "cycle-9")
@@ -207,7 +192,6 @@ func TestApply_RefusesRunLeasedAfterPlan(t *testing.T) {
 	if err := os.MkdirAll(eph, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// The lease lands AFTER Plan would have run — wall-clock fresh.
 	if err := runlease.Write(run, runlease.Lease{RunID: "r3"}, time.Now()); err != nil {
 		t.Fatal(err)
 	}

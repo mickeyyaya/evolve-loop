@@ -13,11 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// runDefaultAuditOverNewPkg runs the PRODUCTION-constructed audit phase over a
-// fixture whose build handoff introduces go/internal/brandnew, with the given
-// .apicover-enforce contents. Subprocess CI gates (vet/acs-durable/apicover)
-// are stubbed to exit 0 so the graduation gate — which is in-process — is the
-// only failing gate; the declared predicate fixture is executed by the host.
 func runDefaultAuditOverNewPkg(t *testing.T, enforce string) core.PhaseResponse {
 	t.Helper()
 	root, goDir := goWorktree(t)
@@ -28,8 +23,6 @@ func runDefaultAuditOverNewPkg(t *testing.T, enforce string) core.PhaseResponse 
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	// Materialize the production file the handoff claims — the gate now skips
-	// test-only/absent package dirs.
 	if err := os.MkdirAll(filepath.Join(goDir, "internal", "brandnew"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -70,13 +63,8 @@ func runDefaultAuditOverNewPkg(t *testing.T, enforce string) core.PhaseResponse 
 	return resp
 }
 
-// TestNewDefaultWithStageCompact_GraduationGateRegistered: through the
-// production constructor, an ungraduated new go/internal package must FAIL the
-// audit with a graduation diagnostic (registration + firing), and the SAME
-// package enrolled in .apicover-enforce must PASS (the gate is scoped, not a
-// blanket FAIL — the anti-no-op arm).
 func TestNewDefaultWithStageCompact_GraduationGateRegistered(t *testing.T) {
-	resp := runDefaultAuditOverNewPkg(t, "./internal/p\n") // brandnew NOT enrolled
+	resp := runDefaultAuditOverNewPkg(t, "./internal/p\n")
 	if resp.Verdict != core.VerdictFAIL {
 		t.Fatalf("Verdict = %q, want FAIL — the new-package graduation gate is not registered/firing via NewDefaultWithStageCompact", resp.Verdict)
 	}
@@ -84,7 +72,7 @@ func TestNewDefaultWithStageCompact_GraduationGateRegistered(t *testing.T) {
 		t.Errorf("want a diagnostic naming the .apicover-enforce graduation obligation; got %+v", resp.Diagnostics)
 	}
 
-	resp = runDefaultAuditOverNewPkg(t, "./internal/p\n./internal/brandnew\n") // enrolled
+	resp = runDefaultAuditOverNewPkg(t, "./internal/p\n./internal/brandnew\n")
 	if resp.Verdict != core.VerdictPASS {
 		t.Fatalf("Verdict = %q, want PASS — an enrolled new package must not trip the graduation gate; diags = %+v", resp.Verdict, resp.Diagnostics)
 	}

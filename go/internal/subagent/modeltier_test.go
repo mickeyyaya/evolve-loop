@@ -9,12 +9,10 @@ import (
 	"testing"
 )
 
-// stubReadProfile returns the same body for any path.
 func stubReadProfile(body string) func(string) (string, error) {
 	return func(string) (string, error) { return body, nil }
 }
 
-// stubReadState returns the same body for any projectRoot.
 func stubReadState(body string, err error) func(string) (string, error) {
 	return func(string) (string, error) { return body, err }
 }
@@ -100,7 +98,6 @@ func TestResolveModelTier_AuditorOverrideWinsInsideAuditor(t *testing.T) {
 }
 
 func TestResolveModelTier_AuditorOverrideOnlyAppliesToAuditor(t *testing.T) {
-	// EVOLVE_AUDITOR_TIER_OVERRIDE has no effect on non-auditor agents.
 	tier, err := ResolveModelTier(
 		ResolveModelTierRequest{
 			ProfilePath:         "/p",
@@ -154,7 +151,6 @@ func TestResolveModelTier_AuditorMasteryGateOpusOnLowStreak(t *testing.T) {
 }
 
 func TestResolveModelTier_AuditorStreakOneFallsToDiffComplexity(t *testing.T) {
-	// streak >= 1 with diff-complexity NOT disabled and trivial → sonnet.
 	tier, err := ResolveModelTier(
 		ResolveModelTierRequest{
 			ProfilePath:  "/p",
@@ -276,7 +272,6 @@ func TestResolveModelTier_DefaultsExerciseRealFilesystem(t *testing.T) {
 		t.Fatalf("write state: %v", err)
 	}
 
-	// With streak >= 1, no diff-complexity helper, falls through to profile default sonnet.
 	tier, err := ResolveModelTier(
 		ResolveModelTierRequest{
 			ProfilePath: profilePath,

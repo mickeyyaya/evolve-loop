@@ -8,21 +8,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// A rejected defect-dispositions.json must be self-sufficient: the raw
-// encoding/json error alone names the failure without naming the remedy, so
-// the diagnostic must also carry the literal schema the file was supposed to
-// match. Both cases below drive hooks{}.Classify, the production verdict
-// seam.
-
-// dispositionSchemaTokens are the field names the inline schema must carry. The
-// contract is on the field vocabulary, not on one exact punctuation of it: any
-// rendering that names all five is self-sufficient for a re-authoring agent.
 var dispositionSchemaTokens = []string{"dispositions", "id", "status", "evidence", "reason"}
 
-// TestClassify_DispositionUnparseableErrorNamesSchema — AC6. A wrong-typed
-// `evidence` (a number — neither the string nor the array-of-strings Task 1
-// admits) is rejected. The blocking diagnostic must name the expected schema
-// inline, alongside the existing unparseable marker and the underlying error.
 func TestClassify_DispositionUnparseableErrorNamesSchema(t *testing.T) {
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -50,13 +37,8 @@ func TestClassify_DispositionUnparseableErrorNamesSchema(t *testing.T) {
 	}
 }
 
-// TestClassify_DispositionMissingDiagnosticNotRelabelledUnparseable —
-// NEGATIVE, the no-false-positive half. An ABSENT file is a different finding
-// with a different remedy and already has its own named marker. Task 3 must not
-// smear the parse-failure text across it.
 func TestClassify_DispositionMissingDiagnosticNotRelabelledUnparseable(t *testing.T) {
 	_, req := continuationFixture(t, 1398, 1403, oneDefect)
-	// Deliberately write no defect-dispositions.json.
 
 	verdict, diags, _ := hooks{}.Classify(narrativeReport("PASS"), req, core.BridgeResponse{})
 	text := diagsText(diags)

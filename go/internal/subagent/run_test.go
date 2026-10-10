@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 )
 
-// runHappyOpts returns a RunOptions blob where every seam is configured
-// for a successful path. Tests override one or two seams at a time.
 func runHappyOpts(t *testing.T) RunOptions {
 	t.Helper()
 	clock := fixedClock(t, "2026-05-23T17:00:00Z")
@@ -34,7 +32,6 @@ func runHappyOpts(t *testing.T) RunOptions {
 		},
 		AdapterExists: func(string) bool { return true },
 		ExecAdapter: func(_ context.Context, _ string, env map[string]string) (int, error) {
-			// Materialize a valid artifact so verify passes.
 			path := env["ARTIFACT_PATH"]
 			if path == "" {
 				return 1, nil
@@ -59,7 +56,6 @@ func runHappyOpts(t *testing.T) RunOptions {
 		HashFile:  defaultHashFile,
 		Now:       clock,
 		Rand: func(b []byte) (int, error) {
-			// Deterministic token — fill with 0xaa.
 			for i := range b {
 				b[i] = 0xaa
 			}
@@ -163,7 +159,6 @@ func TestRun_ProfileNotFound(t *testing.T) {
 func TestRun_WorkerNameRoute(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
-	// Capture artifact path inside ExecAdapter so we can assert worker route.
 	var capturedArtifact string
 	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
 		capturedArtifact = env["ARTIFACT_PATH"]
@@ -216,10 +211,6 @@ func TestRun_AntigravityRemappedToAgy(t *testing.T) {
 	}
 }
 
-// TestRun_InProcessDispatchBanned pins the bridge-only invariant: requesting
-// the retired in-process dispatch path (LEGACY_AGENT_DISPATCH=1) is a hard
-// error, never a soft RunResult that signals the orchestrator to fall back
-// in-process.
 func TestRun_InProcessDispatchBanned(t *testing.T) {
 	tmp := t.TempDir()
 	res, err := Run(context.Background(), RunRequest{
@@ -238,9 +229,6 @@ func TestRun_InProcessDispatchBanned(t *testing.T) {
 	}
 }
 
-// TestRun_BridgeOnlyInvariant_AllRoles proves the in-process escape hatch is
-// unreachable for EVERY registered agent role. It iterates the agentRoles
-// registry SSOT, so a role added there is genuinely auto-covered here.
 func TestRun_BridgeOnlyInvariant_AllRoles(t *testing.T) {
 	if len(agentRoles) == 0 {
 		t.Fatal("agentRoles registry is empty")
@@ -380,7 +368,6 @@ func TestRun_MissingArtifactIsIntegrityFail(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
 	opts.ExecAdapter = func(_ context.Context, _ string, _ map[string]string) (int, error) {
-		// Write no artifact.
 		return 0, nil
 	}
 	res, _ := Run(context.Background(), RunRequest{
@@ -448,16 +435,12 @@ func TestRun_LedgerEntryWritten(t *testing.T) {
 	}
 }
 
-// TestRun_CLIFromProfileWhenResolverFails covers: when the LLM resolver
-// errors, cli falls back to the profile's "cli" field and source becomes
-// "profile".
 func TestRun_CLIFromProfileWhenResolverFails(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
 	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
 		return resolvellm.Result{}, errors.New("no llm_config")
 	}
-	// Profile still declares cli=claude; model falls to ResolveModelTier.
 	res, err := Run(context.Background(), RunRequest{
 		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
 		PromptReader: strings.NewReader("hi"),
@@ -470,8 +453,6 @@ func TestRun_CLIFromProfileWhenResolverFails(t *testing.T) {
 	}
 }
 
-// TestRun_CLIUnresolvedFails covers: resolver fails AND the profile has no
-// cli field, so cli is unresolvable.
 func TestRun_CLIUnresolvedFails(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
@@ -490,14 +471,10 @@ func TestRun_CLIUnresolvedFails(t *testing.T) {
 	}
 }
 
-// TestRun_ResolveModelTierInvokedWhenResolverHasNoModel covers: when the
-// resolver returns a CLI but no model/tier, Run delegates to the adaptive
-// ResolveModelTier seam.
 func TestRun_ResolveModelTierInvokedWhenResolverHasNoModel(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
 	opts.ResolveLLM = func(string) (resolvellm.Result, error) {
-		// CLI present, no Model/ModelTier → forces the tier-resolver branch.
 		return resolvellm.Result{CLI: "claude", Source: "profile"}, nil
 	}
 	called := false
@@ -520,8 +497,6 @@ func TestRun_ResolveModelTierInvokedWhenResolverHasNoModel(t *testing.T) {
 	}
 }
 
-// TestRun_ResolveModelTierErrorPropagates covers the ResolveModelTier error
-// branch.
 func TestRun_ResolveModelTierErrorPropagates(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
@@ -540,8 +515,6 @@ func TestRun_ResolveModelTierErrorPropagates(t *testing.T) {
 	}
 }
 
-// TestRun_CapabilityInspectErrorFails covers the InspectCapability error
-// branch.
 func TestRun_CapabilityInspectErrorFails(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
@@ -557,14 +530,12 @@ func TestRun_CapabilityInspectErrorFails(t *testing.T) {
 	}
 }
 
-// TestRun_GitStateEmptyFallsBackToUnknown covers: empty git head/diff
-// strings are normalized to "unknown" in the ledger entry.
 func TestRun_GitStateEmptyFallsBackToUnknown(t *testing.T) {
 	tmp := t.TempDir()
 	ledger := filepath.Join(tmp, "ledger.jsonl")
 	opts := runHappyOpts(t)
 	opts.GitState = func(context.Context, string) (string, string, error) {
-		return "", "", nil // empty, not an error
+		return "", "", nil
 	}
 	_, err := Run(context.Background(), RunRequest{
 		Agent: "scout", Cycle: 0, WorkspacePath: tmp, ProjectRoot: tmp,
@@ -582,12 +553,10 @@ func TestRun_GitStateEmptyFallsBackToUnknown(t *testing.T) {
 	}
 }
 
-// erroringReader fails on Read to drive the prompt-read error branch.
 type erroringReader struct{}
 
 func (erroringReader) Read([]byte) (int, error) { return 0, errors.New("pipe broken") }
 
-// TestRun_PromptReadErrorFails covers the prompt-read error branch.
 func TestRun_PromptReadErrorFails(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
@@ -600,8 +569,6 @@ func TestRun_PromptReadErrorFails(t *testing.T) {
 	}
 }
 
-// TestRun_LedgerWriteErrorPropagates covers: a ledger path whose parent is a
-// regular file makes the ledger writer's MkdirAll fail.
 func TestRun_LedgerWriteErrorPropagates(t *testing.T) {
 	tmp := t.TempDir()
 	blocker := filepath.Join(tmp, "blocker")
@@ -619,8 +586,6 @@ func TestRun_LedgerWriteErrorPropagates(t *testing.T) {
 	}
 }
 
-// TestRun_TokenGenerateErrorAborts covers: a failing Rand source makes
-// generateRunToken error before the adapter is invoked.
 func TestRun_TokenGenerateErrorAborts(t *testing.T) {
 	tmp := t.TempDir()
 	opts := runHappyOpts(t)
@@ -634,16 +599,11 @@ func TestRun_TokenGenerateErrorAborts(t *testing.T) {
 	}
 }
 
-// TestRun_AdapterExecErrorReturnsAfterLedger covers: when the adapter exec
-// itself errors, the ledger entry is still written (if a path is set) and
-// the error is returned with the result populated.
 func TestRun_AdapterExecErrorReturnsAfterLedger(t *testing.T) {
 	tmp := t.TempDir()
 	ledger := filepath.Join(tmp, "ledger.jsonl")
 	opts := runHappyOpts(t)
 	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
-		// Still write a valid artifact so verdict classification runs, but
-		// return a hard error to exercise the execErr return branch.
 		path := env["ARTIFACT_PATH"]
 		_ = os.MkdirAll(filepath.Dir(path), 0o755)
 		_ = os.WriteFile(path, []byte("<!-- challenge-token: "+env["CHALLENGE_TOKEN"]+" -->\nbody\n"), 0o644)
@@ -661,7 +621,6 @@ func TestRun_AdapterExecErrorReturnsAfterLedger(t *testing.T) {
 	if res.ExitCode != 126 {
 		t.Errorf("ExitCode=%d, want 126 (result populated despite error)", res.ExitCode)
 	}
-	// Ledger entry written before the error return.
 	if _, statErr := os.Stat(ledger); statErr != nil {
 		t.Errorf("ledger not written before exec-error return: %v", statErr)
 	}

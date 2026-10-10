@@ -12,7 +12,6 @@ import (
 )
 
 func goLine(pkg, test, action string) string {
-	// Elapsed only matters on terminal actions; a fixed value is fine for tests.
 	switch action {
 	case "pass", "fail", "skip":
 		return `{"Action":"` + action + `","Package":"` + pkg + `","Test":"` + test + `","Elapsed":0.01}`
@@ -27,10 +26,6 @@ func goStream(lines ...string) string { return strings.Join(lines, "\n") + "\n" 
 
 const acsPkgBase = "github.com/mickeyyaya/evolve-loop/go/acs/"
 
-// seamGo returns a GoExec seam that yields the canned NDJSON + err for the
-// CURRENT-cycle scope (`./acs/cycle<N>`) and empty output for the regression /
-// redteam scopes — so single-scope tests behave as before the lane gained
-// regression + redteam scopes.
 func seamGo(raw string, err error) func(context.Context, string, string, []string) (string, error) {
 	return func(_ context.Context, _ string, pattern string, _ []string) (string, error) {
 		if strings.HasPrefix(pattern, "./acs/cycle") {
@@ -40,8 +35,6 @@ func seamGo(raw string, err error) func(context.Context, string, string, []strin
 	}
 }
 
-// seamGoByPattern returns a GoExec seam that yields canned (raw, err) keyed by
-// the exact package pattern, empty for any other scope.
 func seamGoByPattern(byPat map[string]goSeamOut) func(context.Context, string, string, []string) (string, error) {
 	return func(_ context.Context, _ string, pattern string, _ []string) (string, error) {
 		if v, ok := byPat[pattern]; ok {
@@ -237,7 +230,6 @@ func TestGoLane_PerScopeCompileError(t *testing.T) {
 }
 
 func TestParseGoTestJSON_ScanErrorFailsLoud(t *testing.T) {
-	// One JSON line whose Output exceeds the 1MB max-token buffer → scan error.
 	huge := `{"Action":"output","Package":"` + acsPkgBase + `cycle9","Test":"TestC9_001","Output":"` +
 		strings.Repeat("x", 2*1024*1024) + `"}`
 	results := parseGoTestJSON(strings.NewReader(huge+"\n"), 9)
@@ -255,7 +247,6 @@ func TestParseGoTestJSON_ScanErrorFailsLoud(t *testing.T) {
 func TestGoLane_CurrentCycleScope(t *testing.T) {
 	root := t.TempDir()
 	goDir := filepath.Join(root, "go")
-	// A Go module with an acs/ tree and a cycle5 package — but the run is cycle 9.
 	mustMkdir(t, filepath.Join(goDir, "acs", "cycle5"))
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module x\n\ngo 1.21\n")
 
@@ -288,9 +279,6 @@ func mustWrite(t *testing.T, path, body string) {
 	}
 }
 
-// fakeExitErr mimics a *exec.ExitError carrying a nonzero code for the GoExec
-// seam (the production lane returns the real *exec.ExitError; tests only need a
-// non-nil error to signal "go test exited nonzero").
 type fakeExitErr struct{ code int }
 
 func (e *fakeExitErr) Error() string { return "exit status " + strconv.Itoa(e.code) }

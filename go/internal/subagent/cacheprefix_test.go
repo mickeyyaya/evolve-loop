@@ -81,7 +81,6 @@ func TestSummarizeCycleState(t *testing.T) {
 }
 
 func TestWriteCachePrefix_ByteDeterministicAcrossInvocations(t *testing.T) {
-	// Same inputs → byte-identical output (the whole point of cache-prefix).
 	tmp := t.TempDir()
 	out1 := filepath.Join(tmp, "p1.md")
 	out2 := filepath.Join(tmp, "p2.md")
@@ -127,7 +126,6 @@ func TestWriteCachePrefix_ByteDeterministicAcrossInvocations(t *testing.T) {
 	}
 
 	body := string(b1)
-	// Spot-check key invariants the cache relies on.
 	if !strings.Contains(body, "<!-- cache-prefix v8.23.0") {
 		t.Errorf("missing header sentinel")
 	}
@@ -149,9 +147,6 @@ func TestWriteCachePrefix_ByteDeterministicAcrossInvocations(t *testing.T) {
 }
 
 func TestWriteCachePrefix_DefaultsWhenSeamsAreNil(t *testing.T) {
-	// nil seams → uses defaultReadOrchestratorPrompt + defaultReadCycleState.
-	// Both files are absent, so we expect the (no goal extracted) +
-	// (cycle-state unavailable) fallback markers.
 	tmp := t.TempDir()
 	workspace := filepath.Join(tmp, "ws")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -181,8 +176,6 @@ func TestWriteCachePrefix_DefaultsWhenSeamsAreNil(t *testing.T) {
 }
 
 func TestWriteCachePrefix_DefaultsReadRealFiles(t *testing.T) {
-	// Exercises defaultReadOrchestratorPrompt + defaultReadCycleState on the
-	// real filesystem.
 	tmp := t.TempDir()
 	workspace := filepath.Join(tmp, "ws")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -255,13 +248,12 @@ func TestWriteCachePrefix_SeamErrorsFallThroughGracefully(t *testing.T) {
 }
 
 func TestWriteCachePrefix_MkdirError(t *testing.T) {
-	// Force os.MkdirAll to fail by pointing OutPath into an unwritable parent.
 	tmp := t.TempDir()
 	bad := filepath.Join(tmp, "blocker")
 	if err := os.WriteFile(bad, []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("seed blocker file: %v", err)
 	}
-	out := filepath.Join(bad, "sub", "cache.md") // bad is a file, so MkdirAll fails
+	out := filepath.Join(bad, "sub", "cache.md")
 	err := WriteCachePrefix(CachePrefixRequest{
 		Cycle: 0, Agent: "x", Workspace: tmp, ProjectRoot: tmp, OutPath: out,
 	}, CachePrefixOptions{
@@ -276,8 +268,6 @@ func TestWriteCachePrefix_MkdirError(t *testing.T) {
 	}
 }
 
-// failingWriter returns an error after writeCount successful writes, used to
-// drive the io.WriteString error branch in renderCachePrefix.
 type failingWriter struct {
 	failAfter int
 	writes    int
@@ -291,8 +281,6 @@ func (w *failingWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// TestRenderCachePrefix_WriteError covers the io.WriteString failure branch
-// by injecting a writer that fails on the first part.
 func TestRenderCachePrefix_WriteError(t *testing.T) {
 	err := renderCachePrefix(&failingWriter{failAfter: 0}, CachePrefixRequest{
 		Cycle: 1, Agent: "scout", Workspace: "/ws",
@@ -305,9 +293,6 @@ func TestRenderCachePrefix_WriteError(t *testing.T) {
 	}
 }
 
-// TestRenderCachePrefix_WriteErrorMidStream covers the failure occurring on a
-// later part rather than the first, confirming the error short-circuits the
-// loop wherever it fires.
 func TestRenderCachePrefix_WriteErrorMidStream(t *testing.T) {
 	err := renderCachePrefix(&failingWriter{failAfter: 3}, CachePrefixRequest{
 		Cycle: 2, Agent: "auditor", Workspace: "/ws",
@@ -317,13 +302,8 @@ func TestRenderCachePrefix_WriteErrorMidStream(t *testing.T) {
 	}
 }
 
-// TestWriteCachePrefix_CreateError covers the os.Create failure branch:
-// OutPath points at an existing directory, so Create fails even though
-// MkdirAll of its parent succeeds.
 func TestWriteCachePrefix_CreateError(t *testing.T) {
 	tmp := t.TempDir()
-	// OutPath is the tmp dir itself; filepath.Dir(tmp) exists so MkdirAll
-	// succeeds, but os.Create on a directory path fails.
 	err := WriteCachePrefix(CachePrefixRequest{
 		Cycle: 0, Agent: "x", Workspace: tmp, ProjectRoot: tmp, OutPath: tmp,
 	}, CachePrefixOptions{

@@ -10,14 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-// PromptBlock renders the continuation-disposition duty into the audit
-// dispatch prompt: the ancestor's OPEN ids + texts and the artifact they are
-// owed in — composed from the SAME records the gate grades against (workspace
-// manifest, registry binding fallback, ancestor ledger). It is the half of
-// "continuations must be TOLD their inherited defects" the auditor owns. The
-// prompt is context, never enforcement: on a read fault it degrades to "" and
-// says so with one INFO (AUDIT_LEDGER_PROMPT_DEGRADED) — the gate blocks the
-// same fault loudly at Classify; absence and a non-continuation are silent.
 func (l *Ledger) PromptBlock(req Request) string {
 	if req.Workspace == "" || req.ProjectRoot == "" {
 		return ""
@@ -26,7 +18,7 @@ func (l *Ledger) PromptBlock(req Request) string {
 	if err != nil || !isCont {
 		reg, has := l.laneRegistryBinding(req)
 		if has {
-			cont, isCont = reg, true // manifest-less registry binding is still owed dispositions
+			cont, isCont = reg, true
 		}
 		if err != nil {
 			fallback := "none"
@@ -59,10 +51,6 @@ func (l *Ledger) PromptBlock(req Request) string {
 		cont.Cycle, DispositionsFile, rows)
 }
 
-// promptRows renders one "- id: text" line per OPEN row. The ledger text is
-// AGENT-authored (a prior cycle's verdict sentinel), so it is rendered
-// single-line and capped: an embedded "\n## …" can never masquerade as
-// mechanism-authored prompt structure beside the MANDATORY heading.
 func promptRows(open []Entry) string {
 	var ids strings.Builder
 	for _, e := range open {

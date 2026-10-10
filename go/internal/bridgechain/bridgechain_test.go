@@ -21,8 +21,9 @@ import (
 // scripted answers 0. A non-zero exit comes with an error, as the real bridge's
 // does — DispatchTiered advances only on err != nil AND a trigger exit.
 type scripted struct {
-	exits map[string]int
-	calls []core.BridgeRequest
+	exits     map[string]int
+	exhausted map[string]bool
+	calls     []core.BridgeRequest
 }
 
 func (s *scripted) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -32,7 +33,7 @@ func (s *scripted) Launch(_ context.Context, req core.BridgeRequest) (core.Bridg
 		code = s.exits[req.CLI]
 	}
 	if code != 0 {
-		return core.BridgeResponse{ExitCode: code}, fmt.Errorf("bridge: exit %d", code)
+		return core.BridgeResponse{ExitCode: code, UsageExhausted: s.exhausted[req.CLI]}, fmt.Errorf("bridge: exit %d", code)
 	}
 	return core.BridgeResponse{ExitCode: 0}, nil
 }

@@ -10,18 +10,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// passingReport is the narrative-PASS artifact shape used by every case here.
 func passingReport() string {
 	return "# Audit Report\n\n## Verdict\n**PASS**\n\n" +
 		`<!-- evolve-verdict: {"phase":"audit","verdict":"PASS","schema_version":1} -->` + "\n"
 }
 
-// TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition — the graded
-// phase agent may write inside `.evolve/runs/cycle-N/`, so reading
-// disposition state out of THIS cycle's own ledger would let one file write
-// close inherited CRITICALs with no disposition artifact at all, and, since
-// the merge keys on ID alone, substitute the planted row's TEXT for the
-// inherited defect's under the real id.
 func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	planted := []any{}
@@ -38,7 +31,6 @@ func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
 		t.Errorf("a pre-planted workspace ledger closed %d inherited defects with no %s — the graded agent authored the gate's own trusted input.\ndiagnostics:\n%s",
 			len(laundered), dispositionFile, diagsText(diags))
 	}
-	// The tamper-evident record must still carry the ANCESTOR's text.
 	doc := readLedger(t, ws)
 	for _, want := range laundered {
 		found := false
@@ -56,25 +48,17 @@ func TestAdversarial_PrePlantedWorkspaceLedgerCannotDisposition(t *testing.T) {
 	}
 }
 
-// TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect — evidenceResolves
-// must do more than os.Stat the citation under either root: existence alone
-// would let `/etc/hosts` or the attacker's own disposition file close a
-// CRITICAL. Existence is necessary, not sufficient.
 func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 	cases := []struct {
 		name     string
 		evidence string
-		plant    bool // create the cited path as a REAL regular file under the project root, so rule 4 alone rejects it
+		plant    bool
 	}{
 		{"absolute path outside the repo", "/etc/hosts", false},
 		{"the claim's own disposition file", dispositionFile + ":1", false},
 		{"the continuation manifest", "continuation-manifest.json", false},
 		{"the ledger the gate itself writes", ledgerFile, false},
 		{"traversal out of the roots", "../../../../../../etc/hosts", false},
-		// The three bookkeeping names PLANTED in the tree: the bare-name rows
-		// above never reach rule 4 — the workspace is outside the root, so
-		// rule 3 already rejects them — and a denylist row could vanish
-		// unnoticed. A real file at each name is rejected ONLY by rule 4.
 		{"a planted continuation manifest in the tree", "docs/" + continuation.ManifestName, true},
 		{"a planted disposition file in the tree", "docs/" + dispositionFile + ":3", true},
 		{"a planted ledger in the tree", "docs/" + ledgerFile, true},
@@ -101,11 +85,6 @@ func TestAdversarial_UnrelatedExistingFileDoesNotCloseADefect(t *testing.T) {
 	}
 }
 
-// TestAdversarial_ShadowedIDIsLoudAndBlocking — a 4-byte defectID is ~2^32
-// from a chosen second preimage, and a merge index that resolves a
-// duplicated id to the LAST row would shadow the inherited entry. The id is
-// 16 bytes, the FIRST row wins the index, and a text mismatch on an
-// inherited id blocks instead of silently rewriting the record.
 func TestAdversarial_ShadowedIDIsLoudAndBlocking(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, ledgerFile), map[string]any{
@@ -132,12 +111,9 @@ func TestAdversarial_ShadowedIDIsLoudAndBlocking(t *testing.T) {
 	}
 }
 
-// TestDefectID_IsWideEnoughToResistASecondPreimage — 4 bytes is
-// brute-forceable over agent-chosen defect text, so the id must be wide
-// enough that two different defects cannot share one.
 func TestDefectID_IsWideEnoughToResistASecondPreimage(t *testing.T) {
 	id := defectID("some defect text")
-	if len(id) != 33 { // "d" + 16 bytes hex
+	if len(id) != 33 {
 		t.Errorf("defectID() = %q (%d chars); want a 16-byte hex id — a 32-bit id is aimable", id, len(id))
 	}
 	if defectID("a") == defectID("b") {
@@ -145,9 +121,6 @@ func TestDefectID_IsWideEnoughToResistASecondPreimage(t *testing.T) {
 	}
 }
 
-// TestEmitDefectLedger_CapsUnboundedDefects — the verdict sentinel is
-// agent-authored, so neither the defect count nor the per-line length can be
-// trusted to stay bounded. The cap must RECORD the overflow, never erase it.
 func TestEmitDefectLedger_CapsUnboundedDefects(t *testing.T) {
 	ws := t.TempDir()
 	defects := make([]string, defectLedgerMaxEntries+20)

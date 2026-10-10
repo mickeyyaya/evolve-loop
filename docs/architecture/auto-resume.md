@@ -60,6 +60,8 @@ Source priority:
 2. Parsed hint at `<workspace>/quota-reset-hint.txt` (HH:MM am/pm format)
 3. Fallback `now + EVOLVE_QUOTA_RESET_HOURS` (default `5.4167` ≈ 5h25min)
 
+> **The Go path since 2026-10-09** ([internal-quotareset](packages/internal-quotareset.md)). The order is: override, hint, the earliest active bench (`source=bench`), the configured `quota_reset.default_hours`, and `source=unknown` at the current time. The built-in 5.4167 h fallback is removed ([cycle 1853](../incidents/cycle-1853-secondary-defects.md)).
+
 The hint-file path is rarely populated in practice because the nested
 `claude -p` subprocess typically dies with empty stderr (the outer Claude
 Code consumes the rate-limit response at the auth layer). The fallback

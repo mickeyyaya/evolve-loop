@@ -13,59 +13,30 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
-// ModelTier names recognized by the resolver. Adapters accept these as -m
-// values; the resolver itself does not validate against the LLM provider.
 const (
 	TierHaiku  = "haiku"
 	TierSonnet = "sonnet"
 	TierOpus   = "opus"
 )
 
-// ResolveModelTierRequest captures every input model-tier resolution reads
-// from the environment and filesystem. Tests inject pure values.
 type ResolveModelTierRequest struct {
-	ProfilePath string // path to .evolve/profiles/<agent>.json
-	Cycle       int    // current cycle (reserved for future tier rules)
+	ProfilePath string
+	Cycle       int
 
-	// Env overrides — empty string means "unset".
-	ModelTierHint          string // MODEL_TIER_HINT — wins over everything
-	AuditorTierOverride    string // EVOLVE_AUDITOR_TIER_OVERRIDE — wins inside auditor branch
-	DiffComplexityDisabled bool   // EVOLVE_DIFF_COMPLEXITY_DISABLE=1
-	WorktreePath           string // WORKTREE_PATH — passed to DiffComplexity callable
+	ModelTierHint          string
+	AuditorTierOverride    string
+	DiffComplexityDisabled bool
+	WorktreePath           string
 
-	// ProjectRoot is where .evolve/state.json lives (mastery streak source).
 	ProjectRoot string
 }
 
-// ResolveModelTierOptions injects the filesystem seams. Production uses
-// defaults; tests use in-memory stubs.
 type ResolveModelTierOptions struct {
-	// ReadProfile returns the contents of the profile JSON at path. Defaults
-	// to os.ReadFile.
-	ReadProfile func(path string) (string, error)
-	// ReadState returns the contents of <projectRoot>/.evolve/state.json,
-	// or ("", os.ErrNotExist) when absent. Defaults to os.ReadFile.
-	ReadState func(projectRoot string) (string, error)
-	// DiffComplexity returns "trivial" / "standard" / "complex" / "" for the
-	// given worktree. Empty string ⇒ tier unknown ⇒ fall through to profile
-	// default. Defaults to a no-op that returns "" (no diff-complexity helper
-	// exists in Go yet).
+	ReadProfile    func(path string) (string, error)
+	ReadState      func(projectRoot string) (string, error)
 	DiffComplexity func(worktree string) (string, error)
 }
 
-// ResolveModelTier resolves the model tier by precedence:
-//
-//  1. MODEL_TIER_HINT wins for every agent.
-//  2. For auditor only:
-//     a. EVOLVE_AUDITOR_TIER_OVERRIDE wins inside auditor.
-//     b. consecutiveSuccesses < 1 (from .evolve/state.json) ⇒ opus.
-//     c. EVOLVE_DIFF_COMPLEXITY_DISABLE != "1" AND DiffComplexity returns
-//     "trivial" ⇒ sonnet.
-//     d. Otherwise fall through to profile.model_tier_default.
-//  3. For non-auditor agents: profile.model_tier_default.
-//
-// Returns (tier, err). err is non-nil only when the profile is unreadable or
-// the JSON shape is missing model_tier_default.
 func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions) (string, error) {
 	if opts.ReadProfile == nil {
 		opts.ReadProfile = defaultReadProfile
@@ -77,7 +48,6 @@ func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions)
 		opts.DiffComplexity = func(string) (string, error) { return "", nil }
 	}
 
-	// Rule 1: MODEL_TIER_HINT wins.
 	if req.ModelTierHint != "" {
 		return req.ModelTierHint, nil
 	}
@@ -93,27 +63,21 @@ func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions)
 	}
 
 	if role == "auditor" {
-		// Rule 2a.
 		if req.AuditorTierOverride != "" {
 			return req.AuditorTierOverride, nil
 		}
-		// Rule 2b: mastery gate.
 		streak := readConsecutiveSuccesses(opts.ReadState, req.ProjectRoot)
 		if streak < 1 {
 			return TierOpus, nil
 		}
-		// Rule 2c: diff complexity (only when not disabled).
 		if !req.DiffComplexityDisabled {
 			tier, _ := opts.DiffComplexity(req.WorktreePath)
 			if tier == "trivial" {
 				return TierSonnet, nil
 			}
-			// "standard", "complex", or unknown — fall through.
 		}
-		// Rule 2d: fall through to profile default.
 	}
 
-	// Rule 3 (and auditor 2d): profile.model_tier_default.
 	defaultTier := matchField(profileBody, reFieldTierDefault)
 	if defaultTier == "" {
 		return "", fmt.Errorf("subagent/modeltier: profile %s missing model_tier_default", req.ProfilePath)
@@ -121,16 +85,10 @@ func ResolveModelTier(req ResolveModelTierRequest, opts ResolveModelTierOptions)
 	return applyModelTierOverride(defaultTier, profileBody, req), nil
 }
 
-// applyModelTierOverride consumes profile.model_tier_overrides: when the
-// request's active situation matches an override key, the override tier is
-// clamped to the profile's envelope max (reusing policy.TierRank — never a new
-// rank table) and applied as a FLOOR over the base tier (max(base, clamped) by
-// rank). Vocabulary stays abstract. An empty/nil override map, an inactive
-// situation, an absent key, or an unparseable body all leave base unchanged.
 func applyModelTierOverride(base, profileBody string, req ResolveModelTierRequest) string {
 	var p profiles.Profile
 	if err := json.Unmarshal([]byte(profileBody), &p); err != nil {
-		return base // unmodeled/invalid body ⇒ base tier stands (defensive)
+		return base
 	}
 	if len(p.ModelTierOverrides) == 0 {
 		return base
@@ -143,26 +101,18 @@ func applyModelTierOverride(base, profileBody string, req ResolveModelTierReques
 	if override == "" {
 		return base
 	}
-	// Clamp to the envelope max (skip when max is unset or unclassifiable).
 	if p.ModelTierEnvelope != nil && p.ModelTierEnvelope.Max != "" {
 		if maxRank := policy.TierRank(p.ModelTierEnvelope.Max); maxRank > 0 &&
 			policy.TierRank(override) > maxRank {
 			override = p.ModelTierEnvelope.Max
 		}
 	}
-	// Floor: apply only when the override outranks the base tier.
 	if policy.TierRank(override) > policy.TierRank(base) {
 		return override
 	}
 	return base
 }
 
-// activeSituation maps real request signals to a model_tier_overrides key.
-// This resolver produces cycle_1_or_low_goal (the first cycle). The
-// audit_retry_2plus key is produced elsewhere — core.repairRoundTier applies
-// it at the tdd/build re-dispatch seam of an in-cycle repair round (ADR-0096),
-// on the production tier path this resolver is not on. Other keys (cold_start,
-// …) remain inert until a producer is plumbed.
 func activeSituation(req ResolveModelTierRequest) string {
 	if req.Cycle <= 1 {
 		return "cycle_1_or_low_goal"
@@ -170,9 +120,6 @@ func activeSituation(req ResolveModelTierRequest) string {
 	return ""
 }
 
-// readConsecutiveSuccesses returns the streak count from
-// .evolve/state.json, defaulting to 0 on any error (missing file, bad JSON,
-// missing field) — a defensive regex match, no jq dependency.
 func readConsecutiveSuccesses(reader func(string) (string, error), projectRoot string) int {
 	body, err := reader(projectRoot)
 	if err != nil {
@@ -200,7 +147,6 @@ var (
 	reFieldCtxTokens        = regexp.MustCompile(`"context_clear_trigger_tokens"\s*:\s*([0-9]+)`)
 )
 
-// matchField returns the first capture from a precompiled JSON-field regexp.
 func matchField(body string, re *regexp.Regexp) string {
 	m := re.FindStringSubmatch(body)
 	if len(m) < 2 {

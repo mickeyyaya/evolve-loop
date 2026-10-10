@@ -20,7 +20,7 @@ type fakeBridge struct {
 	calls    []core.BridgeRequest
 	response core.BridgeResponse
 	err      error
-	onLaunch func(core.BridgeRequest) error // optional pre-launch hook
+	onLaunch func(core.BridgeRequest) error
 }
 
 func (f *fakeBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -61,11 +61,6 @@ func (f *fakeLedger) Iter(_ context.Context) (core.LedgerIterator, error) {
 	return nil, errors.New("not impl")
 }
 
-// writeArtifact materializes a file at path with the given token-bearing
-// body and pins its mtime to mtime. The bridge hook uses this to simulate
-// a working subagent under a fake clock — without the chtimes() call the
-// file's real-wall mtime is compared against the fake Now() and may
-// register as "stale" or "from the future".
 func writeArtifact(t *testing.T, path, body string, mtime time.Time) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -79,8 +74,6 @@ func writeArtifact(t *testing.T, path, body string, mtime time.Time) {
 	}
 }
 
-// newRunner wires a Runner with the given doubles + a profile loader
-// backed by an in-memory FS containing a "builder" profile.
 func newRunner(t *testing.T, bridge core.Bridge, ledger core.Ledger, now time.Time) *Runner {
 	t.Helper()
 	fsys := fstest.MapFS{
@@ -131,10 +124,9 @@ func TestRun_HappyPath(t *testing.T) {
 	ledger := &fakeLedger{}
 
 	r := newRunner(t, bridge, ledger, now)
-	expectedToken := strings.Repeat("ab", ChallengeTokenBytes) // 16-hex from deterministicRand(0xAB)
+	expectedToken := strings.Repeat("ab", ChallengeTokenBytes)
 	expectedArtifact := filepath.Join(tmp, ".evolve/runs/cycle-3/build-report.md")
 
-	// Simulate the agent writing the artifact with the token embedded.
 	bridge.onLaunch = func(req core.BridgeRequest) error {
 		writeArtifact(t, req.ArtifactPath, "<!-- challenge-token: "+expectedToken+" -->\nbuild ok\n", now)
 		return nil
@@ -204,7 +196,6 @@ func TestRun_ArtifactMissing(t *testing.T) {
 	ledger := &fakeLedger{}
 	r := newRunner(t, bridge, ledger, now)
 
-	// Bridge "succeeds" but writes no artifact.
 	res, err := r.Run(context.Background(), Request{
 		Agent:       "builder",
 		Cycle:       1,
@@ -235,7 +226,6 @@ func TestRun_ArtifactStale(t *testing.T) {
 
 	expectedToken := strings.Repeat("ab", ChallengeTokenBytes)
 	bridge.onLaunch = func(req core.BridgeRequest) error {
-		// Backdate by 10 minutes — past ArtifactMaxAge (5 minutes).
 		writeArtifact(t, req.ArtifactPath, "<!-- challenge-token: "+expectedToken+" -->\nstale\n", now.Add(-10*time.Minute))
 		return nil
 	}
@@ -266,7 +256,6 @@ func TestRun_TokenMissing(t *testing.T) {
 	r := newRunner(t, bridge, ledger, now)
 
 	bridge.onLaunch = func(req core.BridgeRequest) error {
-		// Write an artifact WITHOUT the challenge token; fresh mtime.
 		writeArtifact(t, req.ArtifactPath, "build report without provenance proof\n", now)
 		return nil
 	}
@@ -310,10 +299,8 @@ func TestRun_BridgeError(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 	if res.Verdict != VerdictIntegrityFail {
-		// Bridge failed AND no artifact written → integrity fail dominates.
 		t.Errorf("verdict = %q, want INTEGRITY_FAIL", res.Verdict)
 	}
-	// Ledger entry must still be appended so we have a trail.
 	if len(ledger.entries) != 1 {
 		t.Errorf("ledger entries = %d, want 1", len(ledger.entries))
 	}
@@ -443,7 +430,7 @@ func TestComposePrompt_NoLeadingDashes(t *testing.T) {
 		body string
 	}{
 		{"plain body", "the task"},
-		{"body starting with dash", "--some-body"}, // body content is fine; only prefix matters
+		{"body starting with dash", "--some-body"},
 		{"empty body", ""},
 		{"multiline body", "line1\nline2"},
 	}

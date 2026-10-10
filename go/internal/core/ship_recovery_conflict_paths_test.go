@@ -24,7 +24,7 @@ func TestRebaseWithDerivedRegen_NamesEveryNonDerivedConflictAndNoDerivedOne(t *t
 	}
 	regen, _ := recordingRegen("")
 
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 
 	want := []string{"go/.apicover-enforce", "docs/architecture/adr/0105-identity-preserving-fleet-rebase.md"}
 	if ok || !reflect.DeepEqual(conflicts, want) {

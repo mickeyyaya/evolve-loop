@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fanoutdispatch"
 )
 
-// DispatchParallelRequest captures every input a parallel dispatch needs.
 type DispatchParallelRequest struct {
 	Agent         string
 	Cycle         int
@@ -29,34 +28,27 @@ type DispatchParallelRequest struct {
 	PluginRoot    string
 	LedgerPath    string
 
-	// Env tunables (passed through to fanoutdispatch).
-	Concurrency        int    // EVOLVE_FANOUT_CONCURRENCY (default 2)
-	CachePrefixEnabled bool   // EVOLVE_FANOUT_CACHE_PREFIX (default true)
-	TrackWorkers       bool   // EVOLVE_FANOUT_TRACK_WORKERS (default true)
-	TestExecutor       string // EVOLVE_FANOUT_TEST_EXECUTOR — bypass LLM
+	Concurrency        int
+	CachePrefixEnabled bool
+	TrackWorkers       bool
+	TestExecutor       string
 	WorktreePath       string
-	DispatchDepth      int // EVOLVE_DISPATCH_DEPTH — own recursion depth; workers run at DispatchDepth+1
+	DispatchDepth      int
 }
 
-// DispatchParallelOptions injects seams. Production wires defaults.
 type DispatchParallelOptions struct {
-	ReadProfile    func(path string) (string, error)
-	RunFanout      func(cfg fanoutdispatch.Config, stderr io.Writer) int
-	RunAggregator  func(in aggregator.Inputs, stderr io.Writer) int
-	InspectCap     func(adaptersDir, cli string) (capability.Inspection, error)
-	WriteFanoutLed func(ledgerPath string, e FanoutLedgerEntry, now func() time.Time) error
-	WriteCache     func(req CachePrefixRequest, opts CachePrefixOptions) error
-	GitState       func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
-	GenToken       func() (string, error)
-	// VerifyWorkerArtifact verifies one worker's artifact against its expected
-	// per-worker token (parentToken+"-"+subtask). The token is required: a nil
-	// seam defaults to defaultVerifyWorkerArtifact, which checks presence +
-	// readability + non-empty + that the artifact bears the token (provenance).
+	ReadProfile          func(path string) (string, error)
+	RunFanout            func(cfg fanoutdispatch.Config, stderr io.Writer) int
+	RunAggregator        func(in aggregator.Inputs, stderr io.Writer) int
+	InspectCap           func(adaptersDir, cli string) (capability.Inspection, error)
+	WriteFanoutLed       func(ledgerPath string, e FanoutLedgerEntry, now func() time.Time) error
+	WriteCache           func(req CachePrefixRequest, opts CachePrefixOptions) error
+	GitState             func(ctx context.Context, projectRoot string) (head, treeDiff string, err error)
+	GenToken             func() (string, error)
 	VerifyWorkerArtifact func(artifact, token string) VerifyResult
 	Now                  func() time.Time
 }
 
-// DispatchParallelResult records the outcome of one dispatch.
 type DispatchParallelResult struct {
 	AggregatePath        string
 	WorkerCount          int
@@ -68,16 +60,6 @@ type DispatchParallelResult struct {
 	WorkerVerifyFailures []string
 }
 
-// DispatchParallel spawns N worker subagents in parallel (bounded by
-// EVOLVE_FANOUT_CONCURRENCY), aggregates their artifacts via
-// aggregator.Aggregate, and writes a parent ledger entry of
-// kind="agent_fanout" regardless of fanout/aggregator success.
-//
-// Returns (result, error). error is non-nil on setup failures (profile
-// missing, parallel_eligible=false, parallel_subtasks empty, etc.).
-// Aggregator/fanout non-zero exit codes are reflected in result fields
-// but NOT returned as errors — the parent ledger entry is always written,
-// and the orchestrator inspects the exit codes.
 func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts DispatchParallelOptions) (DispatchParallelResult, error) {
 	fillDispatchParallelDefaults(&opts)
 
@@ -90,8 +72,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	if info, err := os.Stat(req.WorkspacePath); err != nil || !info.IsDir() {
 		return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: workspace dir missing: %s", req.WorkspacePath)
 	}
-	// Recursion bound: refuse to fan out when the workers (DispatchDepth+1) would
-	// exceed the cap. Fail fast rather than spawning doomed workers.
 	if err := enforceChildDispatchDepth(req.DispatchDepth); err != nil {
 		return DispatchParallelResult{}, err
 	}
@@ -112,11 +92,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 			fmt.Errorf("dispatch-parallel: profile %s has no parallel_subtasks", profilePath)
 	}
 
-	// dispatch-parallel is a passthrough, not a chooser: it does not pick the
-	// CLI its workers run (each worker re-enters `subagent run`, which
-	// resolves its own CLI). The CLI read here is only the profile's own
-	// declaration, used to inspect capability for the quality tier, so it
-	// fails loudly when unresolved rather than silently defaulting.
 	cli := detectcli.Canonical(matchField(profileBody, reFieldCLI))
 	if cli == "" {
 		return DispatchParallelResult{},
@@ -178,7 +153,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	var workerArtifacts []string
 	var workerTokens []string
 
-	// Find own binary path so worker recursion targets the same Go binary.
 	evolveBin, err := os.Executable()
 	if err != nil || evolveBin == "" {
 		evolveBin = "evolve"
@@ -194,8 +168,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 			return DispatchParallelResult{}, fmt.Errorf("dispatch-parallel: write prompt %s: %w", st.Name, err)
 		}
 
-		// Per-worker token (provenance): the parent dictates it, threads it to
-		// the worker, and verifies it on the artifact. Both dispatch paths use it.
 		workerToken := parentToken + "-" + st.Name
 
 		var cmd string
@@ -273,8 +245,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 		AggregatePath:  aggPath,
 		QualityTier:    tier,
 	}
-	// On fanout failure with no aggregate, leave AggregatePath empty if the
-	// file doesn't exist (no successful aggregate).
 	if fanoutRC != 0 {
 		if _, err := os.Stat(aggPath); err != nil {
 			ledgerEntry.AggregatePath = ""
@@ -288,7 +258,6 @@ func DispatchParallel(ctx context.Context, req DispatchParallelRequest, opts Dis
 	return result, nil
 }
 
-// subtask captures a single parallel_subtasks[] entry.
 type subtask struct {
 	Name     string
 	Template string
@@ -297,16 +266,12 @@ type subtask struct {
 var subtaskNameRE = regexp.MustCompile(`"name"\s*:\s*"([^"]*)"`)
 var subtaskTemplateRE = regexp.MustCompile(`"prompt_template"\s*:\s*"((?:[^"\\]|\\.)*)"`)
 
-// extractParallelSubtasks parses profile.parallel_subtasks[] without
-// depending on jq. Tolerates ordering of name/prompt_template within each
-// object — first match in each object wins.
 func extractParallelSubtasks(profileBody string) []subtask {
 	body, ok := capabilityExtractArray(profileBody, "parallel_subtasks")
 	if !ok {
 		return nil
 	}
 	var out []subtask
-	// Walk top-level `{ ... }` objects within the array.
 	depth := 0
 	start := -1
 	for i, r := range body {
@@ -348,9 +313,6 @@ func unescapeJSONString(s string) string {
 	return s
 }
 
-// capabilityExtractArray returns the inner contents of `"<name>": [...]`
-// (without brackets) or ("", false). Same depth-walk as
-// capabilityExtractObject but for `[]`.
 func capabilityExtractArray(body, name string) (string, bool) {
 	needle := fmt.Sprintf("\"%s\"", name)
 	idx := strings.Index(body, needle)
@@ -380,8 +342,6 @@ func capabilityExtractArray(body, name string) (string, bool) {
 	return "", false
 }
 
-// renderSubtaskPrompt substitutes {cycle}/{agent}/{worker}/{workspace} in
-// the subtask template.
 func renderSubtaskPrompt(tmpl string, cycle int, agent, worker, workspace string) string {
 	tmpl = strings.ReplaceAll(tmpl, "{cycle}", fmt.Sprintf("%d", cycle))
 	tmpl = strings.ReplaceAll(tmpl, "{agent}", agent)
@@ -390,7 +350,6 @@ func renderSubtaskPrompt(tmpl string, cycle int, agent, worker, workspace string
 	return tmpl
 }
 
-// mergePhaseFor maps agent name → aggregator merge mode.
 func mergePhaseFor(agent string) string {
 	switch agent {
 	case "scout":
@@ -440,12 +399,6 @@ func fillDispatchParallelDefaults(opts *DispatchParallelOptions) {
 	}
 }
 
-// defaultVerifyWorkerArtifact is the parent-side per-worker artifact
-// verifier: presence, readability, non-empty and the expected per-worker
-// token. Freshness is intentionally skipped (MaxAge=MaxInt64) — the
-// worker's own recursive child already verified freshness at write time,
-// and the parent re-checks only after all workers finish, so an early
-// worker's artifact is legitimately older than the window.
 func defaultVerifyWorkerArtifact(now func() time.Time, artifact, token string) VerifyResult {
 	in := VerifyInput{
 		Now:          now(),

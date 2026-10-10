@@ -14,9 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// Digest folds the artifacts of each completed phase in workspace into RoutingSignals; it is the only
-// reader of on-disk handoff shapes. A role is Present only when its phase completed and an artifact
-// exists, and a missing or corrupt artifact fails open to Present:false.
 func Digest(workspace string, completed []string) (RoutingSignals, error) {
 	info, err := os.Stat(workspace)
 	if err != nil {
@@ -92,7 +89,6 @@ func digestAuditPhase(workspace string, sig *RoutingSignals) {
 	}
 }
 
-// triageDecisionDigest is what routing reads from triage-decision.json.
 type triageDecisionDigest struct {
 	committedCount     int
 	unifiedSize        string
@@ -143,8 +139,6 @@ func digestTriageDecision(workspace string, degraded *[]string) (triageDecisionD
 	return result, true
 }
 
-// unwrapPayload returns the `payload` of a schema-2 handoff envelope, or raw unchanged for a flat handoff.
-// The payload is the authority: the envelope's promoted top-level fields must be a copy of it.
 func unwrapPayload(raw []byte) []byte {
 	var env struct {
 		Payload json.RawMessage `json:"payload"`
@@ -155,8 +149,6 @@ func unwrapPayload(raw []byte) []byte {
 	return raw
 }
 
-// foldFailureSentinel surfaces a phase's report failure block as <phase>.failure_class and
-// <phase>.defect_count; crash-class failures are the supervisor's to synthesize, not the router's.
 func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
 	fb, ok := phasecontract.ReadFailureBlock(workspace, phase)
 	if !ok {
@@ -165,13 +157,10 @@ func (s *RoutingSignals) foldFailureSentinel(workspace, phase string) {
 	if s.Generic == nil {
 		s.Generic = make(map[string]any, 2)
 	}
-	// float64 matches the generic plane's JSON-number convention.
 	s.Generic[phase+".failure_class"] = fb.Class
 	s.Generic[phase+".defect_count"] = float64(len(fb.Defects))
 }
 
-// foldGeneric merges a handoff's top-level "signals" into s.Generic, prefixing bare keys with the
-// phase; a dotted key is kept as-is so a phase can emit a cross-namespace signal. Last write wins.
 func (s *RoutingSignals) foldGeneric(phase string, raw []byte) {
 	var doc struct {
 		Signals map[string]any `json:"signals"`
@@ -198,8 +187,6 @@ func toSet(xs []string) map[string]bool {
 	return m
 }
 
-// readFirstTracked reads the first candidate that exists. A failure other than absence is appended
-// to degraded, because the spine gate must tell a read miss from a genuine gap.
 func readFirstTracked(dir string, degraded *[]string, candidates ...string) ([]byte, bool) {
 	for _, name := range candidates {
 		raw, err := os.ReadFile(filepath.Join(dir, name))
@@ -213,8 +200,6 @@ func readFirstTracked(dir string, degraded *[]string, candidates ...string) ([]b
 	return nil, false
 }
 
-// buildFromGitFallback derives BuildSignals from the git change set when no build handoff exists;
-// an underivable tree degrades loudly.
 func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 	root, ok := projectRootFromWorkspace(workspace)
 	if !ok {
@@ -230,7 +215,6 @@ func buildFromGitFallback(workspace string, degraded *[]string) BuildSignals {
 	return BuildSignals{Present: true, FilesTouched: changedPackageCount}
 }
 
-// scoutFromReportFallback derives ScoutSignals from scout-report.md when no scout handoff exists.
 func scoutFromReportFallback(workspace string, degraded *[]string) ScoutSignals {
 	md, present := readReportFallback(filepath.Join(workspace, phasecontract.ArtifactName("scout")), "scout", degraded)
 	if !present {
@@ -259,22 +243,19 @@ func selectedTaskCount(md string) int {
 	return count
 }
 
-// Report header keys the kernel reads and the scout and triage personas write.
 const (
 	HeaderGoalType        = "goal_type:"
 	HeaderDeliverableKind = "deliverable_kind:"
 	HeaderCycleSize       = "cycle_size_estimate:"
 )
 
-// readReportFallback returns a non-empty report's body. An empty or absent report is not present
-// and not degraded; any other read failure degrades loudly.
 func readReportFallback(path, role string, degraded *[]string) (string, bool) {
 	raw, err := os.ReadFile(path)
 	switch {
 	case err == nil && len(raw) > 0:
 		return string(raw), true
 	case err == nil:
-		return "", false // an empty report did not deliver
+		return "", false
 	case os.IsNotExist(err):
 		return "", false
 	default:
@@ -283,8 +264,6 @@ func readReportFallback(path, role string, degraded *[]string) (string, bool) {
 	}
 }
 
-// triageFromReportFallback derives TriageSignals from triage-report.md when no triage handoff exists.
-// The size is not validated here: the budget multiplier treats an unknown size as 1.0.
 func triageFromReportFallback(workspace string, degraded *[]string) TriageSignals {
 	md, present := readReportFallback(filepath.Join(workspace, "triage-report.md"), "triage", degraded)
 	if !present {
@@ -297,7 +276,6 @@ func triageFromReportFallback(workspace string, degraded *[]string) TriageSignal
 	}
 }
 
-// reportHeaderValue returns the trimmed value of the first line starting with prefix, or "".
 func reportHeaderValue(md, prefix string) string {
 	for _, line := range strings.Split(md, "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), prefix); ok {
@@ -307,8 +285,6 @@ func reportHeaderValue(md, prefix string) string {
 	return ""
 }
 
-// auditFromACSVerdictFallback derives AuditSignals from acs-verdict.json when no audit handoff exists.
-// A FAIL verdict flows through, so the spine's audit anchor refuses ship.
 func auditFromACSVerdictFallback(workspace string, degraded *[]string) AuditSignals {
 	raw, err := os.ReadFile(filepath.Join(workspace, "acs-verdict.json"))
 	if err != nil {
@@ -323,14 +299,12 @@ func auditFromACSVerdictFallback(workspace string, degraded *[]string) AuditSign
 		return a
 	}
 	if a.Verdict == "" {
-		// A verdict-less artifact is an unsatisfiable anchor; report it as degraded, not as a clean gap.
 		*degraded = append(*degraded, "audit: acs-verdict.json has no verdict field (schema drift?) — degraded, not clean")
 		return AuditSignals{}
 	}
 	return a
 }
 
-// projectRootFromWorkspace inverts core.RunWorkspacePath's <root>/.evolve/runs/cycle-<N> layout.
 func projectRootFromWorkspace(workspace string) (string, bool) {
 	dir := filepath.Clean(workspace)
 	if !strings.HasPrefix(filepath.Base(dir), "cycle-") {
@@ -362,7 +336,6 @@ func extractScout(raw []byte) ScoutSignals {
 	_ = json.Unmarshal(top["backlog_size"], &s.BacklogSize)
 	_ = json.Unmarshal(top["run_dir.artifact_bytes"], &s.ArtifactBytes)
 	for k := range top {
-		// itemN_* blocks measure scope breadth.
 		if strings.HasPrefix(k, "item") && hasDigitAfterPrefix(k, "item") {
 			s.ItemCount++
 		}
@@ -370,7 +343,6 @@ func extractScout(raw []byte) ScoutSignals {
 	return s
 }
 
-// hasDigitAfterPrefix reports whether the byte after prefix is a digit: "item3_foo" yes, "items" no.
 func hasDigitAfterPrefix(s, prefix string) bool {
 	if len(s) <= len(prefix) {
 		return false

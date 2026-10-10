@@ -146,3 +146,39 @@ func TestReport_AnUnavailableVerdictIsAWarningAndNoWorkspaceIsOnlyASignal(t *tes
 		t.Errorf("%s is not registered under the bridge module", CodeUsageEvidence)
 	}
 }
+
+func TestBridge_OnlyAnExhaustedUsageVerdictMarksTheAttemptAsProvenExhausted(t *testing.T) {
+	for _, tc := range []struct {
+		verdict usageprobe.Verdict
+		want    bool
+	}{
+		{usageprobe.VerdictExhausted, true},
+		{usageprobe.VerdictHealthy, false},
+		{usageprobe.VerdictUnknown, false},
+		{usageprobe.VerdictUnavailable, false},
+	} {
+		t.Run(string(tc.verdict), func(t *testing.T) {
+			b := Wrap(exiting(81), verdictFor(tc.verdict), nil)
+
+			res, _ := b.Launch(context.Background(), core.BridgeRequest{CLI: "claude-tmux", Agent: "build", Workspace: t.TempDir()})
+
+			if res.UsageExhausted != tc.want {
+				t.Errorf("a stall with a %s usage verdict: UsageExhausted=%v, want %v: only positive evidence proves a quota wall", tc.verdict, res.UsageExhausted, tc.want)
+			}
+		})
+	}
+}
+
+func TestBridge_ARecordThatCannotBeWrittenStillMarksTheVerdictAndReturnsTheAttempt(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "no-such-dir")
+	b := Wrap(exiting(81), verdictFor(usageprobe.VerdictExhausted), nil)
+
+	res, _ := b.Launch(context.Background(), core.BridgeRequest{CLI: "claude-tmux", Agent: "build", Workspace: missing})
+
+	if res.ExitCode != 81 || !res.UsageExhausted {
+		t.Errorf("res=%+v, want exit 81 marked exhausted: a failed record write never drops the evidence", res)
+	}
+	if _, err := os.Stat(missing); !os.IsNotExist(err) {
+		t.Errorf("the decorator created %s: it must only report the failed write", missing)
+	}
+}

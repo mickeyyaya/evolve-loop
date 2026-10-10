@@ -12,11 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
 )
 
-const prescriptionTagPrefix = carryover.PrescriptionPrefix // the unit's vocabulary, the consumer pin
+const prescriptionTagPrefix = carryover.PrescriptionPrefix
 
-// warnReportWithPrescription renders an audit-report.md whose evolve-verdict
-// sentinel is WARN, carrying the given prescription strings and zero defects
-// (a foreseen risk, not a defect).
 func warnReportWithPrescription(prescriptions ...string) string {
 	p, _ := json.Marshal(prescriptions)
 	return "# Audit Report\n\n## Verdict\n**WARN**\n\n" +
@@ -24,14 +21,6 @@ func warnReportWithPrescription(prescriptions ...string) string {
 		`"failure":{"class":"risk-foreseen","defects":[],"prescription":` + string(p) + `}} -->` + "\n"
 }
 
-// -- Criterion 2: a WARN prescription mints an addressable, blocking entry --
-
-// TestDefectLedger_WarnPrescription — positive: a WARN whose sentinel carries
-// one prescription and zero defects must still emit defect-ledger.json with
-// one OPEN, tagged entry. Negative: an EMPTY prescription array (and empty
-// defects) mints nothing — the fix must not make every narrative WARN mint a
-// vacuous entry (matches the existing "no structured content -> no ledger"
-// rule emitDefectLedger already enforces for defects).
 func TestDefectLedger_WarnPrescription(t *testing.T) {
 	t.Run("nonempty_prescription_mints_open_entry", func(t *testing.T) {
 		ws := t.TempDir()
@@ -84,13 +73,6 @@ func TestDefectLedger_WarnPrescription(t *testing.T) {
 	})
 }
 
-// -- Criterion 3: an inherited prescription blocks continuation PASS --------
-
-// prescriptionAncestorFixture builds a project root holding an ancestor cycle
-// whose ledger holds ONE OPEN, prescription-tagged entry, plus a current
-// workspace stamped as that cycle's continuation. Mirrors continuationFixture
-// (defect_ledger_test.go) — the reconcile mechanism must be exactly the one
-// FAIL-sourced defects already use, not a parallel path.
 func prescriptionAncestorFixture(t *testing.T, ancestorCycle, thisCycle int, prescriptionText string) (string, core.PhaseRequest) {
 	t.Helper()
 	root := t.TempDir()
@@ -119,14 +101,6 @@ func prescriptionAncestorFixture(t *testing.T, ancestorCycle, thisCycle int, pre
 	return ws, core.PhaseRequest{Cycle: thisCycle, Workspace: ws, ProjectRoot: root}
 }
 
-// TestReconcile_WarnPrescriptionBlocks — the crux of Criterion 3. An inherited
-// OPEN prescription entry with no matching disposition row must block PASS via
-// the SAME "unaccounted" diagnostic path FAIL-sourced defects already use.
-// Edge case: the same entry disposed FIXED with evidence that resolves to a
-// real, repo-relative, non-self file unblocks PASS — mirroring
-// evidenceResolves' existing gaming-resistance (an unverifiable "evidence:"x""
-// closure must still fail, per the file's existing rules) rather than a looser
-// check invented just for prescriptions.
 func TestReconcile_WarnPrescriptionBlocks(t *testing.T) {
 	const prescriptionText = "run `git add -f X` or dropIgnoredPaths will silently drop it"
 
@@ -158,11 +132,6 @@ func TestReconcile_WarnPrescriptionBlocks(t *testing.T) {
 	})
 
 	t.Run("unverifiable_evidence_still_blocks", func(t *testing.T) {
-		// Cheapest gaming fake: evidence:"x" resolves to no file under the
-		// project root. evidenceResolves must reject this exactly as it does
-		// for FAIL-sourced defects (defect_ledger.go) — a looser check
-		// invented just for prescriptions would reopen the unverifiable-
-		// closure hole the ledger exists to close.
 		ws, req := prescriptionAncestorFixture(t, 1258, 1327, prescriptionText)
 		writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 			"dispositions": []any{
@@ -181,14 +150,6 @@ func TestReconcile_WarnPrescriptionBlocks(t *testing.T) {
 	})
 }
 
-// -- Criterion 4: a prescription-less WARN is unchanged --------------------
-
-// TestAudit_WarnWithoutPrescription_NoRegression — an ordinary WARN with no
-// `prescription` field (the pre-fix shape, still the overwhelming majority of
-// real audits) must behave identically to today: no ledger entry from this
-// source, PASS/WARN grading unchanged. Guards the fix against widening the
-// ledger trigger into every narrative WARN — the same failure mode
-// emitDefectLedger's own doc comment already warns against.
 func TestAudit_WarnWithoutPrescription_NoRegression(t *testing.T) {
 	ws := t.TempDir()
 	yes := true

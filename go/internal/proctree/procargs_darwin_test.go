@@ -18,7 +18,7 @@ type fakeSysctl struct {
 	pids             []int32
 }
 
-func (f *fakeSysctl) call(mib *[procArgsMibLen]int32, out *byte, size *uintptr) error {
+func (f *fakeSysctl) call(mib []int32, out *byte, size *uintptr) error {
 	f.pids = append(f.pids, mib[2])
 	if out == nil {
 		*size = uintptr(len(f.raw))

@@ -31,7 +31,7 @@ func TestReapOrphanSockets_ReapsADeadTestProcessSocketAndSparesALiveOne(t *testi
 
 func TestExecListBridgeSockets_ListsTestProcessSockets(t *testing.T) {
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
-	dir := tmuxSocketDir()
+	dir := bridge.TmuxSocketDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}

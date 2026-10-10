@@ -20,26 +20,16 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// WorktreeAction is the disposition PlanWorktrees assigns each candidate.
 type WorktreeAction string
 
 const (
-	// WorktreeActionRemove removes the (merged, clean, dead) worktree dir via a
-	// non-force `git worktree remove`.
-	WorktreeActionRemove WorktreeAction = "remove"
-	// WorktreeActionDeleteBranch deletes the merged branch via `git branch -d`
-	// (never -D).
-	WorktreeActionDeleteBranch WorktreeAction = "delete-branch"
-	// WorktreeActionFlagDirty flags a dirty worktree for manual review; it is
-	// never removed (preserves ship-fail evidence).
-	WorktreeActionFlagDirty WorktreeAction = "flag-dirty"
-	// WorktreeActionFlagUnmerged flags an unmerged branch; it is never deleted.
+	WorktreeActionRemove        WorktreeAction = "remove"
+	WorktreeActionDeleteBranch  WorktreeAction = "delete-branch"
+	WorktreeActionFlagDirty     WorktreeAction = "flag-dirty"
 	WorktreeActionFlagUnmerged  WorktreeAction = "flag-unmerged"
 	WorktreeActionSalvageRemove WorktreeAction = "salvage-remove"
 )
 
-// WorktreeItem is one planned action. Path is empty for a branch-only backlog
-// entry (no worktree dir to touch).
 type WorktreeItem struct {
 	Path   string         `json:"path,omitempty"`
 	Branch string         `json:"branch,omitempty"`
@@ -47,15 +37,10 @@ type WorktreeItem struct {
 	Reason string         `json:"reason,omitempty"`
 }
 
-// WorktreeManifest is the full plan, sorted deterministically so shadow-soak
-// diffs are stable.
 type WorktreeManifest struct {
 	Items []WorktreeItem `json:"items"`
 }
 
-// WorktreeOptions drives PlanWorktrees/ApplyWorktrees. Exec is the injected git
-// runner (production: sysexec.DefaultRunner); PidAlive/Now/LeaseTTL are the
-// liveness seams shared with runlease.
 type WorktreeOptions struct {
 	ProjectRoot  string
 	WorktreeBase string
@@ -76,9 +61,6 @@ func (o WorktreeOptions) now() time.Time {
 	return time.Now()
 }
 
-// git runs a git subcommand in dir and returns captured stdout. A non-zero exit
-// or a runner error is surfaced (git's own dirty/merged safety checks live in
-// those exit codes).
 func (o WorktreeOptions) git(dir string, args ...string) (string, error) {
 	var out strings.Builder
 	code, err := o.Exec(context.Background(), "git", dir, args, nil, nil, &out, nil)
@@ -93,7 +75,7 @@ func (o WorktreeOptions) git(dir string, args ...string) (string, error) {
 
 type worktreeEntry struct {
 	path   string
-	branch string // "" => detached (never a candidate)
+	branch string
 }
 
 func parseWorktreePorcelain(s string) []worktreeEntry {
@@ -122,8 +104,6 @@ func parseWorktreePorcelain(s string) []worktreeEntry {
 	return out
 }
 
-// parseBranchList normalizes `git branch` output: strips the "* " current and
-// "+ " worktree-checkout markers and skips "(HEAD detached...)" pseudo-entries.
 func parseBranchList(s string) []string {
 	var out []string
 	sc := bufio.NewScanner(strings.NewReader(s))
@@ -140,9 +120,6 @@ func parseBranchList(s string) []string {
 	return out
 }
 
-// LeafCycleNumber extracts the trailing cycle number from a worktree leaf after
-// stripping a swarm suffix. cycle-aaa1111-570 -> 570;
-// cycle-legacyB-8-integration -> 8; cycle-legacyC-9-w0 -> 9.
 func LeafCycleNumber(leaf string) (int, bool) {
 	base := swarmSuffixRe.ReplaceAllString(leaf, "")
 	idx := strings.LastIndex(base, "-")
@@ -156,10 +133,6 @@ func LeafCycleNumber(leaf string) (int, bool) {
 	return n, true
 }
 
-// resolvePath resolves symlinks so a comparison survives macOS's
-// /var -> /private/var divergence (real `git worktree list` reports the
-// resolved path; the caller passes the unresolved base). Falls back to a
-// lexical clean when the path does not exist on disk.
 func resolvePath(p string) string {
 	if r, err := filepath.EvalSymlinks(p); err == nil {
 		return r
@@ -167,8 +140,6 @@ func resolvePath(p string) string {
 	return filepath.Clean(p)
 }
 
-// underBase reports whether path is a direct child of base (the worktree leaf
-// layout gitWorktree.Create always produces), comparing resolved parents.
 func underBase(base, path string) bool {
 	return resolvePath(filepath.Dir(filepath.Clean(path))) == resolvePath(base)
 }
@@ -177,8 +148,6 @@ func samePath(a, b string) bool {
 	return filepath.Clean(a) == filepath.Clean(b)
 }
 
-// activeWorktreeMatches reports whether the JSON file at jsonPath carries an
-// "active_worktree" equal to wtPath (fleet cycle-state / per-run mirrors).
 func activeWorktreeMatches(jsonPath, wtPath string) bool {
 	raw, err := os.ReadFile(jsonPath)
 	if err != nil {
@@ -198,8 +167,6 @@ func (o WorktreeOptions) runClosedOut(runDir string) bool {
 	return ok && strings.HasPrefix(runDir, "cycle-") && dossier.ClosedOut(o.ProjectRoot, n)
 }
 
-// isLive proves a worktree is genuinely in-flight via any of the three
-// evidence sources; used both by Plan and by Apply's TOCTOU re-check.
 func (o WorktreeOptions) isLive(path string) bool {
 	if activeWorktreeMatches(filepath.Join(o.EvolveDir, "cycle-state.json"), path) {
 		return true
@@ -234,8 +201,6 @@ func (o WorktreeOptions) isDirty(path string) (bool, error) {
 	return strings.TrimSpace(out) != "", nil
 }
 
-// PlanWorktrees evaluates the worktree+branch backlog and returns the action
-// manifest. It never mutates the tree — it IS the dry-run.
 func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 	if o.Exec == nil {
 		return WorktreeManifest{}, errors.New("gc: PlanWorktrees requires Exec")
@@ -253,10 +218,8 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 		return WorktreeManifest{}, err
 	}
 
-	// KeepRecent: retain the newest N eligible candidates by mtime.
 	items = append(items, removalItems(pool, o.Policy.KeepRecent)...)
 
-	// Branch backlog: cycle-* branches with no worktree entry at all.
 	orphans, err := o.orphanBranchItems(merged, seenBranch)
 	if err != nil {
 		return WorktreeManifest{}, err
@@ -300,14 +263,11 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 		if !strings.HasPrefix(leaf, "cycle-") {
 			continue
 		}
-		// Emit the caller-relative path (WorktreeBase/leaf), not git's
-		// symlink-resolved porcelain path, so callers match items against the
-		// paths they know. git resolves it again for status/remove.
 		path := filepath.Join(o.WorktreeBase, leaf)
 		seenBranch[e.branch] = true
 
 		if o.isLive(path) {
-			continue // a live lease excludes the worktree entirely
+			continue
 		}
 		dirty, err := o.isDirty(path)
 		if err != nil {
@@ -325,7 +285,7 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 }
 
 func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) WorktreeItem {
-	if age, ok := o.finishedFor(path); ok && o.Policy.SalvageAfterHours > 0 && age >= time.Duration(o.Policy.SalvageAfterHours)*time.Hour {
+	if age, ok := o.finishedFor(path); ok && o.pastSalvageAge(age) {
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove,
 			Reason: fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour))}
 	}
@@ -333,6 +293,10 @@ func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool) Worktre
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
 	}
 	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"}
+}
+
+func (o WorktreeOptions) pastSalvageAge(age time.Duration) bool {
+	return o.Policy.SalvageAfterHours > 0 && age >= time.Duration(o.Policy.SalvageAfterHours)*time.Hour
 }
 
 func (o WorktreeOptions) finishedFor(path string) (time.Duration, bool) {
@@ -353,7 +317,7 @@ func eligibleAfterGrace(path, branch string, now time.Time, minAge time.Duration
 		return eligible{}, false
 	}
 	if minAge > 0 && now.Sub(info.ModTime()) < minAge {
-		return eligible{}, false // MinAgeMinutes grace
+		return eligible{}, false
 	}
 	return eligible{path: path, branch: branch, mtime: info.ModTime()}, true
 }
@@ -404,39 +368,23 @@ func sortWorktreeItems(items []WorktreeItem) {
 	})
 }
 
-// ApplyWorktrees executes a manifest under .evolve/ship.lock. Every
-// worktree-backed target is re-checked (TOCTOU) immediately before mutation: a
-// target that became live since Plan is refused and reported, and so is a
-// plain-remove target that became dirty. A plain remove is a non-force
-// `git worktree remove`; a salvage-remove writes the salvage, re-checks
-// liveness, and only then removes with --force; branch deletion is
-// `git branch -d` (never -D); a single trailing `git worktree prune` reconciles
-// the whole batch.
 func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	if o.Exec == nil {
 		return errors.New("gc: ApplyWorktrees requires Exec")
 	}
-	// Whole-apply critical section on the SHARED integrator lock (flock.ShipLockPath,
-	// the SAME file internal/phases/ship acquireShipLock and the cycle-dossier commit
-	// take) so a gc worktree apply never races a lane's ship/dossier index mutation.
 	release, err := flock.Lock(flock.ShipLockPath(o.ProjectRoot))
 	if err != nil {
 		return fmt.Errorf("gc: acquire ship.lock: %w", err)
 	}
 	defer release()
 
-	// Pass 1: TOCTOU re-check every worktree-backed target before any mutation.
 	refused, errs := o.refuseChangedTargets(m.Items)
 
-	// Pass 2a: remove worktrees FIRST. git refuses `branch -d` on a branch
-	// still checked out in a linked worktree, so the dir must go before its
-	// branch.
 	didRemove, removeErrs := o.removeWorktrees(m.Items, refused)
 	errs = append(errs, removeErrs...)
 	didSalvage, salvageErrs := o.salvageRemoveWorktrees(m.Items, refused)
 	errs = append(errs, salvageErrs...)
 	didRemove = didRemove || didSalvage
-	// Pass 2b: delete branches (their worktrees, if any, are now gone).
 	errs = append(errs, o.deleteBranches(m.Items, refused)...)
 	if didRemove {
 		if _, err := o.git(o.ProjectRoot, "worktree", "prune"); err != nil {

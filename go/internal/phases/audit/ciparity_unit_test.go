@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// fakeRunFunc returns a sysexec.RunFunc that emits fixed stdout/stderr and a
-// fixed (code, err) — lets the CI-parity gate logic be exercised without forking.
 func fakeRunFunc(code int, stdout, stderr string, runErr error) sysexec.RunFunc {
 	return func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, so, se io.Writer) (int, error) {
 		_, _ = io.WriteString(so, stdout)
@@ -42,15 +40,10 @@ func goWorktree(t *testing.T) (root, goDir string) {
 	return root, goDir
 }
 
-// apicover enforced-package sources: the exported-symbol content decides whether
-// the IN-PROCESS apicover.Run reports an offender (an exported func no test names
-// → uncovered) or is clean (no exports at all).
 const (
 	apicoverOffenderPkg = "package p\n\n// Exported is public but no test names it → uncovered.\nfunc Exported() {}\n"
 	apicoverCleanPkg    = "package p\n\nfunc helper() {}\n"
-	// apicoverBrokenPkg has a syntax error, so apicover.Run's Enumerate returns a
-	// measurement error (code 2) — the gate must FAIL, not silently WARN.
-	apicoverBrokenPkg = "package p\n\nfunc (\n"
+	apicoverBrokenPkg   = "package p\n\nfunc (\n"
 )
 
 func writeApicoverFixture(t *testing.T, pkgSrc string) (root, goDir string) {
@@ -77,11 +70,6 @@ func writeApicoverFixture(t *testing.T, pkgSrc string) (root, goDir string) {
 	return root, goDir
 }
 
-// apicoverPipelineRunner fakes only the toolchain subprocesses the gate still
-// forks (go test -coverprofile, go tool cover -func, go list). apicover itself
-// now runs IN-PROCESS (apicover.Run), so there is no apicover subprocess to fake
-// and no `go build -o bin/apicover` — it records every invocation into seen (when
-// non-nil) so a test can assert neither a build nor an apicover fork happens.
 func apicoverPipelineRunner(goDir string, seen *[]string) sysexec.RunFunc {
 	return func(_ context.Context, name string, _ string, args, _ []string, _ io.Reader, so, se io.Writer) (int, error) {
 		if seen != nil {
@@ -91,7 +79,7 @@ func apicoverPipelineRunner(goDir string, seen *[]string) sysexec.RunFunc {
 			_, _ = io.WriteString(so, filepath.Join(goDir, "internal", "p")+"\n")
 			return 0, nil
 		}
-		return 0, nil // go test (coverprofile) + go tool cover -func succeed (no-op)
+		return 0, nil
 	}
 }
 
@@ -99,15 +87,12 @@ func TestApicoverEnforceChanged_NoOps(t *testing.T) {
 	if off, err := apicoverEnforceChangedDefault(core.PhaseRequest{Worktree: t.TempDir(), Cycle: 1}); off != nil || err != nil {
 		t.Errorf("no module: (%v,%v)", off, err)
 	}
-	root, _ := goWorktree(t) // go/ but no .apicover-enforce / no handoff
+	root, _ := goWorktree(t)
 	if off, err := apicoverEnforceChangedDefault(core.PhaseRequest{Worktree: root, Cycle: 1}); off != nil || err != nil {
 		t.Errorf("no enforce list: (%v,%v)", off, err)
 	}
 }
 
-// TestApicoverEnforceChanged_Pipeline drives the gate end-to-end with apicover
-// running IN-PROCESS: a clean enforced package (no exports) passes; one with an
-// exported symbol no test names yields offenders.
 func TestApicoverEnforceChanged_Pipeline(t *testing.T) {
 	rootClean, goClean := writeApicoverFixture(t, apicoverCleanPkg)
 	withFakeRunner(t, apicoverPipelineRunner(goClean, nil))
@@ -122,10 +107,6 @@ func TestApicoverEnforceChanged_Pipeline(t *testing.T) {
 	}
 }
 
-// TestCiparity_ApicoverRunsInProcess_NoBinaryCreated pins one-binary S1: a cycle
-// touching an enforced package runs the API-coverage gate to completion WITHOUT
-// forking a `go build -o bin/apicover` and WITHOUT leaving a bin/apicover artifact
-// on the worktree — apicover.Run is folded into the evolve binary.
 func TestCiparity_ApicoverRunsInProcess_NoBinaryCreated(t *testing.T) {
 	root, goDir := writeApicoverFixture(t, apicoverOffenderPkg)
 	var seen []string
@@ -138,11 +119,9 @@ func TestCiparity_ApicoverRunsInProcess_NoBinaryCreated(t *testing.T) {
 	if len(off) == 0 {
 		t.Fatal("expected offenders for an uncovered export — proves apicover actually ran in-process")
 	}
-	// No apicover binary was built or left behind.
 	if _, statErr := os.Stat(filepath.Join(goDir, "bin", "apicover")); !os.IsNotExist(statErr) {
 		t.Errorf("bin/apicover must NOT exist after an in-process gate; stat err=%v", statErr)
 	}
-	// No forked command builds apicover.
 	for _, c := range seen {
 		if strings.Contains(c, "build") && strings.Contains(c, "apicover") {
 			t.Errorf("gate forked an apicover build (%q); it must run in-process", c)
@@ -150,15 +129,6 @@ func TestCiparity_ApicoverRunsInProcess_NoBinaryCreated(t *testing.T) {
 	}
 }
 
-// TestCiparity_NoExecutableFileCreatedByGate: running the API-coverage gate
-// over an enforced package must not create any executable file anywhere in
-// the worktree, not just the historic bin/apicover. It walks the whole tree
-// before and after and asserts the executable-file set is unchanged.
-//
-// The subprocess seam (runCmd) is faked here, so this proves the in-process
-// work — apicover.Run plus any direct os.WriteFile/os.Chmod the gate itself
-// does — drops no executable; a real forked `go build` is out of scope and is
-// the acs/regression/norebuild source-scan's job instead.
 func TestCiparity_NoExecutableFileCreatedByGate(t *testing.T) {
 	root, goDir := writeApicoverFixture(t, apicoverOffenderPkg)
 	withFakeRunner(t, apicoverPipelineRunner(goDir, nil))
@@ -177,8 +147,6 @@ func TestCiparity_NoExecutableFileCreatedByGate(t *testing.T) {
 	}
 }
 
-// executableFiles returns the set of regular files under root whose owner-exec
-// bit is set (a first-party built binary would be one).
 func executableFiles(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
@@ -189,7 +157,7 @@ func executableFiles(t *testing.T, root string) map[string]bool {
 		if info.IsDir() || !info.Mode().IsRegular() {
 			return nil
 		}
-		if info.Mode().Perm()&0o111 != 0 { // any exec bit (owner/group/other)
+		if info.Mode().Perm()&0o111 != 0 {
 			out[path] = true
 		}
 		return nil
@@ -200,11 +168,6 @@ func executableFiles(t *testing.T, root string) map[string]bool {
 	return out
 }
 
-// TestApicoverEnforceChanged_MeasurementError_Fails: when apicover.Run itself
-// errors (a touched package won't parse → code 2), the gate must FAIL
-// (offenders, nil), not silently downgrade to a WARN (nil, err). In-process
-// there is no exec-start failure mode, so any measurement error is a real
-// gate failure.
 func TestApicoverEnforceChanged_MeasurementError_Fails(t *testing.T) {
 	root, goDir := writeApicoverFixture(t, apicoverBrokenPkg)
 	withFakeRunner(t, apicoverPipelineRunner(goDir, nil))
@@ -217,15 +180,6 @@ func TestApicoverEnforceChanged_MeasurementError_Fails(t *testing.T) {
 	}
 }
 
-// --- integration-tier flake-absorb ------------------------------------------
-//
-// The tier always runs with a scrubbed allowlist environment, matching CI's
-// clean environment. On a red first attempt it retakes once under a
-// cross-lane exclusive lock: a green retake is absorbed as a flake (WARN), a
-// red retake is genuine (FAIL).
-
-// seqRunFunc scripts one (code, stdout) per successive call and records the
-// env each call received.
 func seqRunFunc(t *testing.T, script []struct {
 	Code int
 	Out  string
@@ -246,10 +200,6 @@ func seqRunFunc(t *testing.T, script []struct {
 	return fn, &calls, &envs
 }
 
-// killedAtDeadline makes a scripted runner faithful to a process the ctx
-// deadline killed: it returns only once ctx is done, since a real SIGKILL
-// follows the deadline rather than preceding it, so the 1 ns budgets below
-// reach the deadline arms deterministically.
 func killedAtDeadline(fn sysexec.RunFunc) sysexec.RunFunc {
 	return func(ctx context.Context, name, dir string, args, env []string, in io.Reader, so, se io.Writer) (int, error) {
 		<-ctx.Done()
@@ -257,9 +207,6 @@ func killedAtDeadline(fn sysexec.RunFunc) sysexec.RunFunc {
 	}
 }
 
-// tierFixture builds a root with a go module, a build handoff naming a
-// NON-env-exclusive package, and a workspace dir — everything
-// integrationTierCheckDefault needs to reach the run seam.
 func tierFixture(t *testing.T) core.PhaseRequest {
 	t.Helper()
 	root, _ := goWorktree(t)
@@ -274,11 +221,6 @@ func tierFixture(t *testing.T) core.PhaseRequest {
 	return core.PhaseRequest{Cycle: 3, ProjectRoot: root, Worktree: root, Workspace: t.TempDir()}
 }
 
-// TestIntegrationTier_GreenFirstAttempt_SingleRunCleanEnv — the fast path is
-// unchanged (exactly one run) AND that one run already gets the scrubbed env:
-// PATH survives, a lane-leaked EVOLVE_* canary does not (CI parity — CI's env
-// is clean, so inheriting the lane's environment was a parity bug even when
-// nothing flaked).
 func TestIntegrationTier_GreenFirstAttempt_SingleRunCleanEnv(t *testing.T) {
 	t.Setenv("EVOLVE_LEAK_CANARY", "1")
 	req := tierFixture(t)
@@ -308,10 +250,6 @@ func TestIntegrationTier_GreenFirstAttempt_SingleRunCleanEnv(t *testing.T) {
 	}
 }
 
-// TestIntegrationTier_RedThenGreen_FlakeAbsorbedToWarn — a red first attempt
-// retakes once (serialized) and a GREEN retake is absorbed as a contention
-// flake: (nil, error) so applyCIGate surfaces a WARN, never a false FAIL. Both
-// attempts persist to integration-tier.log for the retro.
 func TestIntegrationTier_RedThenGreen_FlakeAbsorbedToWarn(t *testing.T) {
 	req := tierFixture(t)
 	fn, calls, _ := seqRunFunc(t, []struct {
@@ -340,9 +278,6 @@ func TestIntegrationTier_RedThenGreen_FlakeAbsorbedToWarn(t *testing.T) {
 	}
 }
 
-// TestIntegrationTier_RedThenRed_GenuineOffendersFromRetake — a red retake is a
-// genuine failure: FAIL with the RETAKE's offender lines (the serialized,
-// clean-env attempt is the truthful one) plus the log pointer.
 func TestIntegrationTier_RedThenRed_GenuineOffendersFromRetake(t *testing.T) {
 	req := tierFixture(t)
 	fn, calls, _ := seqRunFunc(t, []struct {

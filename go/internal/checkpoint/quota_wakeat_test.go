@@ -1,33 +1,17 @@
 package checkpoint
 
-// quota_wakeat_test.go — RED contract for the inbox defect
-// `quota-pause-wakeat-unpopulated`.
-//
-// The all-families-exhausted checkpointer (core.QuotaBoundaryCheckpointer, the
-// cycle-656 seam) wrote ReasonQuotaLikely with QuotaResetAt/QuotaResetSource left
-// EMPTY. cmd_loop then printed `QUOTA-PAUSE: … wake-at= source=unknown`, and
-// skills/loop/SKILL.md instructs the operator model to parse wake-at=ISO8601 and
-// compute its ScheduleWakeup delay from it — arithmetic that could never run on
-// the Go path. Auto-resume was structurally dead for every quota wall.
-//
-// FIX CONTRACT: the checkpointer populates both fields at write time from
-// quotareset.Compute — the package that already owns the source-priority chain
-// (operator override > workspace hint file > now + default hours) — so the
-// wake-at is NEVER empty and the source always says where it came from.
-//
-// ADVERSARIAL DIVERSITY: one test per source arm (override / parsed hint /
-// estimate fallback) plus a negative that the sibling phase-complete
-// checkpointer does NOT grow a fabricated wake-at — only the quota wall has a
-// reset instant, and stamping one on every phase boundary would invent data.
-
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/quotareset"
 )
 
 // quotaCheckpointFixture seeds a project root with a cycle-state.json and a
@@ -68,36 +52,6 @@ func readQuotaWakeAt(t *testing.T, root string) (at, source string) {
 		t.Fatalf("checkpoint reason = %q, want %q", state.Checkpoint.Reason, ReasonQuotaLikely)
 	}
 	return state.Checkpoint.QuotaResetAt, state.Checkpoint.QuotaResetSource
-}
-
-// TestQuotaBoundaryCheckpointer_PopulatesWakeAtFromEstimate is the core RED: with
-// no operator override and no hint file, the checkpoint must still carry a
-// non-empty wake-at and say it is an estimate. Empty was the defect.
-func TestQuotaBoundaryCheckpointer_PopulatesWakeAtFromEstimate(t *testing.T) {
-	if core.QuotaBoundaryCheckpointer == nil {
-		t.Fatal("core.QuotaBoundaryCheckpointer not registered (init() wiring missing)")
-	}
-	root, cs := quotaCheckpointFixture(t)
-	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.Local)
-	if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
-		t.Fatalf("checkpointer: %v", err)
-	}
-	at, source := readQuotaWakeAt(t, root)
-	if at == "" {
-		t.Fatal("quotaResetAt is EMPTY — the auto-resume delay computation has nothing to parse (the defect)")
-	}
-	if source == "" || source == "unknown" {
-		t.Errorf("quotaResetSource = %q, want an explicit source (fail-open estimate, never blank)", source)
-	}
-	// The fallback must land in the FUTURE relative to the injected now, else a
-	// consumer's max(60, wake-now) clamp degrades to a busy 60s poll.
-	wake, err := time.Parse("2006-01-02T15:04:05-0700", at)
-	if err != nil {
-		t.Fatalf("quotaResetAt %q is not the ISO 8601 shape SKILL.md parses: %v", at, err)
-	}
-	if !wake.After(now) {
-		t.Errorf("wake-at %s is not after now %s — an already-passed wake time cannot schedule a resume", at, now)
-	}
 }
 
 // TestQuotaBoundaryCheckpointer_UsesWorkspaceHint — when the CLI adapter scraped
@@ -181,5 +135,160 @@ func TestPhaseBoundaryCheckpointer_DoesNotFabricateWakeAt(t *testing.T) {
 	if state.Checkpoint.QuotaResetAt != "" || state.Checkpoint.QuotaResetSource != "" {
 		t.Errorf("phase-complete checkpoint fabricated a wake-at: at=%q source=%q",
 			state.Checkpoint.QuotaResetAt, state.Checkpoint.QuotaResetSource)
+	}
+}
+
+func TestQuotaBoundaryCheckpointer_TheEarliestActiveBenchSetsTheWakeAt(t *testing.T) {
+	root, cs := quotaCheckpointFixture(t)
+	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)
+	store := clihealth.NewStore(root, func() time.Time { return now })
+	for family, reset := range map[string]time.Time{"agy-claude": now.Add(89 * time.Hour), "codex": now.Add(3 * time.Hour)} {
+		if _, err := store.BenchWallUntil(family, clihealth.Wall{Pattern: "exhausted", Reset: reset}); err != nil {
+			t.Fatalf("bench %s: %v", family, err)
+		}
+	}
+	want := store.Active()["codex"].BenchedUntil
+	cs.QuotaWalkCLIs = []string{"agy-claude-tmux", "codex-tmux"}
+
+	if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
+		t.Fatalf("checkpointer: %v", err)
+	}
+
+	at, source := readQuotaWakeAt(t, root)
+	wake, err := time.Parse("2006-01-02T15:04:05-0700", at)
+	if err != nil {
+		t.Fatalf("quotaResetAt %q unparseable: %v", at, err)
+	}
+	if source != "bench" || !wake.Equal(want.Truncate(time.Second)) {
+		t.Errorf("wake-at=%s source=%q, want %s from the bench: the first family back sets the resume, not a default", at, source, want)
+	}
+}
+
+func TestWithQuotaReset_AnEstimatorErrorRecordsUnavailableAndNoWakeAt(t *testing.T) {
+	saved := computeQuotaReset
+	t.Cleanup(func() { computeQuotaReset = saved })
+	computeQuotaReset = func(string, quotareset.Options) (quotareset.Result, error) {
+		return quotareset.Result{}, errors.New("estimator down")
+	}
+
+	cp := withQuotaReset(Checkpoint{}, core.CycleState{WorkspacePath: t.TempDir()}, t.TempDir(), time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local))
+
+	if cp.QuotaResetSource != "unavailable" || cp.QuotaResetAt != "" {
+		t.Errorf("source=%q at=%q, want unavailable with no wake-at: a failed estimate never invents a time", cp.QuotaResetSource, cp.QuotaResetAt)
+	}
+}
+
+type pauseRecord struct {
+	QuotaResetAt          string `json:"quotaResetAt"`
+	QuotaResetSource      string `json:"quotaResetSource"`
+	AutoResumeMaxAttempts int    `json:"autoResumeMaxAttempts"`
+	OperatorAction        string `json:"operatorAction"`
+}
+
+func readPause(t *testing.T, root string) pauseRecord {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(root, ".evolve", "cycle-state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state struct {
+		Checkpoint pauseRecord `json:"checkpoint"`
+	}
+	if err := json.Unmarshal(b, &state); err != nil {
+		t.Fatal(err)
+	}
+	return state.Checkpoint
+}
+
+func withUsageReset(t *testing.T, fn func(projectRoot string, families []string, now time.Time) (time.Time, bool)) {
+	t.Helper()
+	saved := UsageReset
+	t.Cleanup(func() { UsageReset = saved })
+	UsageReset = fn
+}
+
+func TestQuotaBoundaryCheckpointer_AnUnknownResetIsNotAutoResumableAndNamesTheOperatorAction(t *testing.T) {
+	withUsageReset(t, nil)
+	root, cs := quotaCheckpointFixture(t)
+	cs.QuotaWalkCLIs = []string{"claude-tmux"}
+
+	if err := core.QuotaBoundaryCheckpointer(cs, root, time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)); err != nil {
+		t.Fatalf("checkpointer: %v", err)
+	}
+
+	got := readPause(t, root)
+	if got.QuotaResetSource != "unknown" || got.QuotaResetAt != "" || got.AutoResumeMaxAttempts != 0 || got.OperatorAction == "" {
+		t.Errorf("pause=%+v, want source unknown, no wake-at, no auto-resume and an operator action: an unknown reset is never a scheduled wake", got)
+	}
+}
+
+func TestQuotaBoundaryCheckpointer_ABenchThatIsNoQuotaResetOfTheWalkIsNoEvidence(t *testing.T) {
+	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)
+	for _, tc := range []struct {
+		name  string
+		bench func(root string) error
+	}{
+		{"a credential bench", func(root string) error {
+			_, err := clihealth.NewStore(root, func() time.Time { return now }).BenchWall("claude", clihealth.CredentialPattern, "Please log in")
+			return err
+		}},
+		{"a boot-timeout strike", func(root string) error {
+			s := clihealth.NewStore(root, func() time.Time { return now })
+			if _, err := s.RecordBootStrike("claude"); err != nil {
+				return err
+			}
+			_, err := s.RecordBootStrike("claude")
+			return err
+		}},
+		{"a quota bench of a family outside the walk", func(root string) error {
+			_, err := clihealth.NewStore(root, func() time.Time { return now }).BenchWallUntil("codex", clihealth.Wall{Pattern: "rate_limit", Reset: now.Add(time.Hour)})
+			return err
+		}},
+		{"a quota bench that already lapsed", func(root string) error {
+			past := clihealth.NewStore(root, func() time.Time { return now.Add(-10 * time.Hour) })
+			_, err := past.BenchWallUntil("claude", clihealth.Wall{Pattern: "rate_limit", Reset: now.Add(-9 * time.Hour)})
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withUsageReset(t, nil)
+			root, cs := quotaCheckpointFixture(t)
+			cs.QuotaWalkCLIs = []string{"claude-tmux"}
+			if err := tc.bench(root); err != nil {
+				t.Fatalf("seed bench: %v", err)
+			}
+
+			if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
+				t.Fatalf("checkpointer: %v", err)
+			}
+
+			if got := readPause(t, root); got.QuotaResetSource != "unknown" {
+				t.Errorf("source=%q at=%q, want unknown: %s is not the reset of a walled family", got.QuotaResetSource, got.QuotaResetAt, tc.name)
+			}
+		})
+	}
+}
+
+func TestQuotaBoundaryCheckpointer_TheUsageQuerySuppliesTheResetOfTheWalkedFamilies(t *testing.T) {
+	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.Local)
+	reset := now.Add(89 * time.Hour)
+	var asked []string
+	withUsageReset(t, func(_ string, families []string, _ time.Time) (time.Time, bool) {
+		asked = families
+		return reset, true
+	})
+	root, cs := quotaCheckpointFixture(t)
+	cs.QuotaWalkCLIs = []string{"claude-tmux", "agy-claude-tmux"}
+
+	if err := core.QuotaBoundaryCheckpointer(cs, root, now); err != nil {
+		t.Fatalf("checkpointer: %v", err)
+	}
+
+	got := readPause(t, root)
+	if got.QuotaResetSource != "usage" || got.AutoResumeMaxAttempts != DefaultAutoResumeAttempts || got.OperatorAction != "" {
+		t.Errorf("pause=%+v, want an auto-resumable usage reset", got)
+	}
+	if strings.Join(asked, ",") != "claude,agy-claude" {
+		t.Errorf("usage query asked for %v, want the walked families claude,agy-claude", asked)
 	}
 }

@@ -1,10 +1,5 @@
-// Package quotareset ports legacy/scripts/dispatch/estimate-quota-reset.sh.
-//
-// Computes wake-up time after a Claude Code quota hit. Source priority:
-//  1. opts.ResetAt — operator-supplied ISO 8601 override (set via policy.json quota_reset.reset_at)
-//  2. Hint file at $WORKSPACE/quota-reset-hint.txt — Anthropic's
-//     "resets HH:MMam" message captured by claude.sh stderr filter
-//  3. Fallback: now + opts.DefaultHours (default 5.4167 ≈ 5h25min; set via policy.json quota_reset.default_hours)
+// Package quotareset computes the wake-up time of a quota pause from the best evidence it has.
+// See docs/architecture/packages/internal-quotareset.md.
 package quotareset
 
 import (
@@ -19,70 +14,77 @@ import (
 
 var hintTimeRE = regexp.MustCompile(`(?i)(\d{1,2}):(\d{2})(am|pm)`)
 
-// Result captures the computed wake-up time + the source that produced it.
 type Result struct {
 	WakeAt time.Time
-	ISO    string // RFC3339-format ISO 8601 in local TZ
-	Source string // "operator-override", "parsed", or "default"
+	ISO    string
+	Source string
 }
 
 // Options exposes seams for testing.
 type Options struct {
-	Env          func(name string) string // reserved DI seam; no longer used for QUOTA flags
-	Now          func() time.Time         // defaults to time.Now
-	HoursFn      func() float64           // overrides DefaultHours when non-nil (backward compat)
-	ResetAt      string                   // ISO 8601 operator override (replaces EVOLVE_QUOTA_RESET_AT)
-	DefaultHours float64                  // fallback wake duration (replaces EVOLVE_QUOTA_RESET_HOURS); 0 = built-in 5.4167
+	Now          func() time.Time
+	ResetAt      string
+	DefaultHours float64
+	BenchedUntil time.Time
+	UsageReset   func() (time.Time, bool)
 }
 
-// Compute runs the source-priority chain and returns a Result.
-// workspace may be empty (skips source 2). Returns error only when
-// all three sources fail (extremely rare — would mean malformed
-// env override AND missing/malformed hint file AND a bad hours value).
 func Compute(workspace string, opts Options) (Result, error) {
 	now := opts.Now
 	if now == nil {
 		now = time.Now
 	}
-
-	// Source 1: operator override via typed field (formerly EVOLVE_QUOTA_RESET_AT)
 	if override := strings.TrimSpace(opts.ResetAt); override != "" {
-		// Parse to populate WakeAt — accept the operator's string verbatim
-		// as the canonical ISO if it parses; otherwise use it raw.
-		t, err := time.Parse(time.RFC3339, override)
-		if err != nil {
-			// keep override string but synthesize WakeAt = now
-			return Result{WakeAt: now(), ISO: override, Source: "operator-override"}, nil
-		}
-		return Result{WakeAt: t, ISO: override, Source: "operator-override"}, nil
+		return overrideResult(override, now()), nil
 	}
+	if t, ok := hintReset(workspace, now()); ok {
+		return resultAt(t, "parsed"), nil
+	}
+	if opts.BenchedUntil.After(now()) {
+		return resultAt(opts.BenchedUntil, "bench"), nil
+	}
+	if t, ok := usageReset(opts.UsageReset, now()); ok {
+		return resultAt(t, "usage"), nil
+	}
+	if opts.DefaultHours > 0 {
+		return resultAt(now().Add(time.Duration(opts.DefaultHours*float64(time.Hour))), "default"), nil
+	}
+	return resultAt(now(), "unknown"), nil
+}
 
-	// Source 2: hint file
-	if workspace != "" {
-		hintPath := filepath.Join(workspace, "quota-reset-hint.txt")
-		if info, err := os.Stat(hintPath); err == nil && info.Size() > 0 {
-			raw, err := os.ReadFile(hintPath)
-			if err == nil {
-				hint := strings.TrimSpace(string(raw))
-				if len(hint) > 32 {
-					hint = hint[:32]
-				}
-				if t, ok := parseHint(hint, now()); ok {
-					return Result{WakeAt: t, ISO: isoFormat(t), Source: "parsed"}, nil
-				}
-			}
-		}
+func usageReset(query func() (time.Time, bool), now time.Time) (time.Time, bool) {
+	if query == nil {
+		return time.Time{}, false
 	}
+	t, ok := query()
+	return t, ok && t.After(now)
+}
 
-	// Source 3: fallback hours (formerly EVOLVE_QUOTA_RESET_HOURS)
-	hours := 5.4167
-	if opts.HoursFn != nil {
-		hours = opts.HoursFn()
-	} else if opts.DefaultHours > 0 {
-		hours = opts.DefaultHours
+func overrideResult(override string, now time.Time) Result {
+	t, err := time.Parse(time.RFC3339, override)
+	if err != nil {
+		return Result{WakeAt: now, ISO: override, Source: "operator-override"}
 	}
-	wake := now().Add(time.Duration(hours * float64(time.Hour)))
-	return Result{WakeAt: wake, ISO: isoFormat(wake), Source: "default"}, nil
+	return Result{WakeAt: t, ISO: override, Source: "operator-override"}
+}
+
+func hintReset(workspace string, now time.Time) (time.Time, bool) {
+	if workspace == "" {
+		return time.Time{}, false
+	}
+	raw, err := os.ReadFile(filepath.Join(workspace, "quota-reset-hint.txt"))
+	if err != nil {
+		return time.Time{}, false
+	}
+	hint := strings.TrimSpace(string(raw))
+	if len(hint) > 32 {
+		hint = hint[:32]
+	}
+	return parseHint(hint, now)
+}
+
+func resultAt(t time.Time, source string) Result {
+	return Result{WakeAt: t, ISO: isoFormat(t), Source: source}
 }
 
 // parseHint extracts a "HH:MM(am|pm)" time and returns the next

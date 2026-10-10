@@ -60,8 +60,6 @@ func (w replWaiter) wait() (replWaitResult, int) {
 		w.pace()
 		state.waitedS = elapsed
 		if err := ctx.Err(); err != nil {
-			// One final completion poll before abandoning: a deliverable already
-			// on disk means the cancel is benign teardown, not a timeout.
 			finalCtx, finalCancel := withFinalPoll(ctx)
 			ready, _, note, detectorErr := state.detector.poll(finalCtx)
 			finalCancel()
@@ -77,19 +75,13 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			if logDetectorError {
 				fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, detectorErr)
 			}
-			// Load-bearing once a Stage-1 LLM reviewer can extend at length:
-			// stop waiting promptly rather than running out the extend budget.
 			fmt.Fprintf(deps.Stderr, "%s context cancelled (%v) — abandoning completion wait\n", pfx, err)
 			state.cancellationErr = err
 			break
 		}
-		// Live channel: stream newly-stabilized rendered content to pane.live;
-		// gated so off adds no capture.
 		var waitPane string
 		channelCaptureOK := true
 		if channel.on {
-			// This is the canonical pane observation for channel-enabled waits;
-			// taking another in auto-response can skip alternating dwell frames.
 			var captureErr error
 			waitPane, captureErr = deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			channelCaptureOK = captureErr == nil
@@ -108,19 +100,16 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			break
 		}
 		if logDetectorError {
-			// The detector surfaced a fault (e.g. an artifact present at a
-			// non-canonical path that could not be relocated — read-only
-			// workspace). Surface it once, immediately, instead of spinning the
-			// full wait window with no signal.
 			fmt.Fprintf(deps.Stderr, "%s WARN: completion detector: %v\n", pfx, derr)
 		}
 		waitCaptureOK := true
 		if !channel.on {
-			// Preserve the legacy ordering: completed artifact waits break above
-			// without consuming a pane frame solely for auto-response.
 			var werr error
 			waitPane, werr = deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			waitCaptureOK = werr == nil
+		}
+		if w.paneLost(state, channelCaptureOK && waitCaptureOK) {
+			break
 		}
 		step := w.handleTickInteractions(state, elapsed, waitPane, channelCaptureOK && waitCaptureOK)
 		if step.done {
@@ -129,7 +118,6 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			}
 			break
 		}
-		// Review checkpoint: a full interval elapsed without the artifact.
 		if elapsed-state.intervalStartS >= state.intervalS {
 			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)

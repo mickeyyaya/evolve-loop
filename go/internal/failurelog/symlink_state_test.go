@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-// TestStateWriters_PreserveSymlinkedStatePath is the cycle-1690 pin: every
-// failurelog state writer tmp+renames through atomicWriteJSON, and a rename
-// over a worktree's state.json link REPLACES the link with a regular file
-// (the cycle-999 sever). Each writer must keep the link and land its write on
-// the canonical file.
 func TestStateWriters_PreserveSymlinkedStatePath(t *testing.T) {
 	now := time.Date(2026, 9, 26, 8, 0, 0, 0, time.UTC)
 	const seed = `{
@@ -28,7 +23,7 @@ func TestStateWriters_PreserveSymlinkedStatePath(t *testing.T) {
 	writers := []struct {
 		name string
 		run  func(p string) error
-		want string // substring the canonical file must carry after the write
+		want string
 	}{
 		{"Record", func(p string) error {
 			_, err := Record(p, "", RecordRequest{Cycle: 42, Classification: string(OperatorReset), Summary: "symlink pin", Now: now})

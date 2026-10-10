@@ -10,7 +10,7 @@ import (
 
 func TestValidatePlan_RejectsMalformedAndRegressive(t *testing.T) {
 	t.Parallel()
-	in := RouteInput{} // canonicalOrder is the known-set fallback when Cfg is empty
+	in := RouteInput{}
 
 	if rej := ValidatePlan(in, &PhasePlan{}); len(rej) != 1 || rej[0].Reason != "empty-plan" {
 		t.Errorf("empty plan: got %+v, want one empty-plan rejection", rej)

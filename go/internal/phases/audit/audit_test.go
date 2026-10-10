@@ -72,12 +72,6 @@ func auditContractExample(t *testing.T, body, name string) string {
 	return rest[:close]
 }
 
-// TestExtractHonorsPhaseContract pins audit's verdict extractor to the canonical
-// heading declared in phasecontract.Audit — the single source the producer-side
-// contract test (phasecontract/contract_test.go) also reads. Audit is the only
-// phase whose classifier keeps its own regex (it extracts a verdict TOKEN, not
-// section presence); this test ties it to the shared contract so the two cannot
-// drift apart.
 func TestExtractHonorsPhaseContract(t *testing.T) {
 	canonical := phasecontract.Audit.Sections[0].Canonical
 	got, found := extractAuditVerdict(canonical+": PASS\n", config.StageOff)
@@ -86,17 +80,12 @@ func TestExtractHonorsPhaseContract(t *testing.T) {
 	}
 }
 
-// TestExtractPrefersSentinel pins the Layer-5 strangler: when an evolve-verdict
-// sentinel is present, it wins over the prose; when absent, the legacy regex
-// fallback still works (backward compatible).
 func TestExtractPrefersSentinel(t *testing.T) {
-	// Sentinel says FAIL even though prose says PASS — sentinel must win.
 	body := "## Verdict\n**PASS**\n" + phasecontract.RenderVerdictSentinel("audit", "FAIL") + "\n"
 	got, found := extractAuditVerdict(body, config.StageOff)
 	if !found || got != core.VerdictFAIL {
 		t.Fatalf("sentinel-first: got (%q,%v), want (FAIL,true)", got, found)
 	}
-	// No sentinel → legacy regex still parses prose.
 	got, found = extractAuditVerdict("## Verdict\n**WARN**\n", config.StageOff)
 	if !found || got != core.VerdictWARN {
 		t.Fatalf("regex fallback: got (%q,%v), want (WARN,true)", got, found)
@@ -132,8 +121,6 @@ func fakePromptsFS(body string) *prompts.Loader {
 	})
 }
 
-// writeACSVerdict writes a verdict.json to ws/acs-verdict.json with the
-// given red_count.
 func writeACSVerdict(t *testing.T, ws string, redCount int) {
 	t.Helper()
 	v := map[string]any{
@@ -213,8 +200,6 @@ func TestClassify_MissingExplanationReviewStillBlocksAndACompleteOnePasses(t *te
 		},
 	}
 	h := hooks{}
-	// ADR-0102: a missing review section is a missing reasoning — absence is
-	// never laxer than a token Evidence (go review).
 	got, diags, _ := h.Classify("## Verdict\n**PASS**\n", *view, core.BridgeResponse{})
 	if got != core.VerdictFAIL || !hasError(diags) {
 		t.Fatalf("missing qualitative explanation review verdict=%s diags=%v, want FAIL: no review text is no reasoning", got, diags)
@@ -334,12 +319,8 @@ func TestValidateExplanationReview_InvalidPostBuildStateRequiresFail(t *testing.
 	}
 }
 
-// writeACSVerdictSkip writes a verdict with both red_count and skip_count set,
-// mirroring the post-SKIP-convention schema (a fresh clone produces skips).
 func writeACSVerdictSkip(t *testing.T, ws string, redCount, skipCount int) {
 	t.Helper()
-	// Verdict is derived from red_count (PASS ⟺ red_count==0) so the fixture
-	// stays internally consistent with the gate it feeds.
 	verdict := "PASS"
 	if redCount > 0 {
 		verdict = "FAIL"
@@ -363,8 +344,6 @@ func writeACSVerdictSkip(t *testing.T, ws string, redCount, skipCount int) {
 	}
 }
 
-// EGPS gate keys solely off red_count: skip_count>0 with red_count==0 must PASS
-// (the fresh-clone case where runtime-only predicates SKIP).
 func TestRun_SkipCountWithRedZero_PASS(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdictSkip(t, ws, 0, 4)
@@ -379,7 +358,6 @@ func TestRun_SkipCountWithRedZero_PASS(t *testing.T) {
 	}
 }
 
-// A genuine red alongside skips must still FAIL — SKIP cannot mask a RED.
 func TestRun_RedCountWithSkipsPresent_FAIL(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdictSkip(t, ws, 2, 3)
@@ -481,8 +459,6 @@ func TestRun_AuditWARN_WARN(t *testing.T) {
 func TestRun_StrictAuditMode_WARNBecomesFAIL(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
-	// Strict mode is sourced from .evolve/policy.json (workflow.strict_audit).
-	// See ADR-0064.
 	proj := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(proj, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -517,7 +493,6 @@ func TestRun_NoVerdictHeading_FAIL(t *testing.T) {
 }
 
 func TestRun_MissingACSVerdict_FAIL(t *testing.T) {
-	// No acs-verdict.json on disk = cycle cannot prove EGPS gate → FAIL.
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{writeArtifact: body}
@@ -603,11 +578,6 @@ func TestName(t *testing.T) {
 	}
 }
 
-// When acs-verdict.json is absent, the audit phase generates it (via the
-// injected GenerateVerdict seam → acssuite in prod) before reading red_count,
-// so a clean autonomous cycle reaches PASS→ship instead of being forced to
-// FAIL on the missing file. The generator stand-in here writes a
-// red_count==0 verdict, mimicking a green suite.
 func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -618,7 +588,7 @@ func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
 		Prompts: fakePromptsFS("body"),
 		GenerateVerdict: func(req core.PhaseRequest) error {
 			genCalls++
-			writeACSVerdict(t, req.Workspace, 0) // green suite
+			writeACSVerdict(t, req.Workspace, 0)
 			return nil
 		},
 	})
@@ -639,7 +609,6 @@ func TestRun_MissingACSVerdict_GeneratedThenPASS(t *testing.T) {
 	}
 }
 
-// A pre-staged candidate is retained for forensics and replaced by execution.
 func TestRun_ACSVerdictPresent_HostRegenerates(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -669,7 +638,7 @@ func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
 	phase := New(Config{
 		Bridge:          fb,
 		Prompts:         fakePromptsFS("body"),
-		GenerateVerdict: func(core.PhaseRequest) error { return nil }, // writes no file
+		GenerateVerdict: func(core.PhaseRequest) error { return nil },
 	})
 	resp, _ := phase.Run(context.Background(), core.PhaseRequest{
 		Cycle: 1, ProjectRoot: "/p", Workspace: ws,
@@ -678,11 +647,6 @@ func TestRun_GeneratorWritesNothing_FAILFloorHolds(t *testing.T) {
 		t.Errorf("Verdict=%q, want FAIL (no verdict produced → floor holds)", resp.Verdict)
 	}
 }
-
-// TestNewDefault_WiresVerdictGenerator is in audit_integration_test.go
-// (//go:build integration) — it spawns a real `go test` subprocess.
-
-// --- v12.1 Capability 1: phaseflags wiring tests ---
 
 func writeAuditProfile(t *testing.T, contents string) string {
 	t.Helper()
@@ -697,10 +661,6 @@ func writeAuditProfile(t *testing.T, contents string) string {
 	return root
 }
 
-// When the wired GenerateVerdict seam returns an error (and the file stays
-// absent), Classify must surface a WARNING diagnostic naming the failure and
-// fall through to the missing-file FAIL floor — the generation error never
-// silently passes the gate.
 func TestRun_GeneratorReturnsError_ErrorDiagAndFAIL(t *testing.T) {
 	ws := t.TempDir()
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
@@ -730,13 +690,6 @@ func TestRun_GeneratorReturnsError_ErrorDiagAndFAIL(t *testing.T) {
 	}
 }
 
-// --- generateACSVerdict (the production GenerateVerdict default) ---
-// writeGoPredFixture, TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot,
-// and TestGenerateACSVerdict_WriteVerdictError_Propagates are in
-// audit_integration_test.go (//go:build integration) — they spawn real subprocesses.
-
-// A Cycle <= 0 makes acssuite.Run reject the request; generateACSVerdict must
-// wrap and return that error rather than swallowing it.
 func TestGenerateACSVerdict_SuiteRunError_Propagates(t *testing.T) {
 	err := generateACSVerdict(core.PhaseRequest{
 		Cycle: 0, ProjectRoot: t.TempDir(), Worktree: t.TempDir(), Workspace: t.TempDir(),
@@ -774,11 +727,6 @@ func TestGenerateACSVerdict_ZeroPredicatesWritesARedVerdictNamingTheCause(t *tes
 	}
 }
 
-// TestGenerateACSVerdict_WriteVerdictError_Propagates is in
-// audit_integration_test.go (//go:build integration) — it spawns a real subprocess.
-
-// The registry init() must publish an "audit" factory that builds a runnable
-// PhaseRunner with the production defaults wired (exercises the init closure).
 func TestRegistry_AuditFactory_BuildsRunner(t *testing.T) {
 	factory, ok := registry.For(string(core.PhaseAudit))
 	if !ok {
@@ -829,8 +777,6 @@ func TestExtractAuditVerdict_Formats(t *testing.T) {
 	}
 }
 
-// A PASS written inline as "**Verdict: PASS**" with red_count==0 must grade
-// PASS and route to ship, not be mis-graded FAIL.
 func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -850,8 +796,6 @@ func TestRun_InlineVerdictFormat_PASS(t *testing.T) {
 	}
 }
 
-// A non-empty report with red_count==0 but NO parseable verdict must FAIL
-// LOUDLY (an explicit error diagnostic), not sink the cycle silently.
 func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -877,10 +821,6 @@ func TestRun_NonEmptyNoVerdict_RedZero_LoudDiag(t *testing.T) {
 	}
 }
 
-// TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt — format
-// tolerance (several Evidence lines, a line range, citations under another
-// field name, backticked values) while the substance rule (every reference
-// cited at a line) is unchanged.
 func TestValidateExplanationReview_ReadsTheSectionAsAuditorsWriteIt(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
@@ -946,12 +886,6 @@ func containsAdvisory(advisories []string, substr string) bool {
 	return strings.Contains(strings.Join(advisories, "\n"), substr)
 }
 
-// The auditor's narrative is PASS and its review reasons about the document,
-// but its Evidence cites the material paths without a literal path:line. The
-// reasoning is the gate, the citation form is advisory — the verdict stands
-// and the advisory rides the record so the shape can still be improved
-// without burning the cycle.
-// See ADR-0102.
 func TestClassify_PathOnlyCitationsKeepThePassVerdictAndRecordTheAdvisory(t *testing.T) {
 	workspace := t.TempDir()
 	writeACSVerdict(t, workspace, 0)
@@ -984,8 +918,6 @@ func TestClassify_PathOnlyCitationsKeepThePassVerdictAndRecordTheAdvisory(t *tes
 	}
 }
 
-// ADR-0102: an unparsable review section (a duplicated single-valued field)
-// is a shape finding — advisory, never a block.
 func TestValidateExplanationReview_DuplicateFieldIsAdvisory(t *testing.T) {
 	req := core.PhaseRequest{
 		ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion,
@@ -1003,8 +935,6 @@ func TestValidateExplanationReview_DuplicateFieldIsAdvisory(t *testing.T) {
 	}
 }
 
-// ADR-0102: a report with two review sections is a parser finding (advisory)
-// with no attributable review text — so the reasoning floor still fails it.
 func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t *testing.T) {
 	req := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationAvailable, BuildExplanation: &phaseio.ExplanationView{Status: "required", DocumentPath: "d.md", DocumentSHA256: "sha"}}
 	report := "## Explanation Documentation\n- Status: VERIFIED\n- Evidence: compared d.md:1 with the diff line by line\n\n## Explanation Documentation\n- Status: VERIFIED\n"
@@ -1014,9 +944,6 @@ func TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor(t 
 	}
 }
 
-// The two remaining blocking paths through the audit gate: a missing delivery
-// honestly reviewed as FAIL is clean (the narrative FAIL carries), and a
-// host-side handoff defect fails loudly through the gate (ADR-0102).
 func TestValidateExplanationReview_MissingDeliveryReviewedAsFailIsCleanAndHostDefectsAreLoud(t *testing.T) {
 	invalid := core.PhaseRequest{ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion, BuildExplanationState: core.BuildExplanationInvalid}
 	honest := "## Explanation Documentation\n- Status: FAIL\n- Evidence: the Build handoff snapshot is missing from the workspace\n"

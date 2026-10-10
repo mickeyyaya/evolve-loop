@@ -16,7 +16,6 @@ func TestRecover_ManifestGate_RoutesToDebugger(t *testing.T) {
 	}
 }
 
-// MANIFEST_GATE is never integrity-classed in production; this pins the chain order regardless.
 func TestRecover_ManifestGate_IntegrityClassStillWinsChainOrder(t *testing.T) {
 	in := RouteInput{Blocker: &Blocker{Code: "MANIFEST_GATE", Class: "integrity", Stage: "ship"}}
 	got := Recover(in)

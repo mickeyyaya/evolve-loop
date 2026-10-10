@@ -94,7 +94,6 @@ func TestPSMAS_CannotUnpinTDDOnNonTrivial(t *testing.T) {
 func TestPSMAS_TriageVocabularyNormalized(t *testing.T) {
 	in := psmasBase("scout", "trivial", []string{"tdd-engineer", "retrospective"})
 	in.Completed = []string{"scout"}
-	// EnableOn makes legacy routing run tdd even on a trivial cycle, so only the PSMAS skip can drop it.
 	in.Cfg.PhaseEnable["tdd"] = config.EnableOn
 
 	d := Route(in, nil)

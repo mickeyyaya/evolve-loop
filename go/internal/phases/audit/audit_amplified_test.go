@@ -9,7 +9,7 @@ import (
 )
 
 func TestSkillsDriftCheckDefault_WithWorktree_NotNoOp(t *testing.T) {
-	tmp := t.TempDir() // no catalog → skillcheck.Check returns error, not an early nil
+	tmp := t.TempDir()
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{Worktree: tmp, ProjectRoot: ""})
 	if err == nil {
 		t.Error("want error from skillcheck.Check on empty Worktree dir; got nil (indicates unexpected no-op or incorrect guard)")

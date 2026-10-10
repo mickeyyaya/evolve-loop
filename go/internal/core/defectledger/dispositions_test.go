@@ -7,11 +7,6 @@ import (
 	"testing"
 )
 
-// Test 24 — ReadDispositions: the string and array evidence shapes are read,
-// `[]` joins to "" (no evidence, not a pass); object, number and bool shapes
-// block with the schema example inlined and the evidence error verbatim; a
-// missing file is the warning + an empty map + not blocked + NO event; a
-// directory blocks with op=read; the seeded {id,status,text,reason} row parses.
 func TestReadDispositions_ShapesMissingUnparseable_AndSeededTextKeyTolerated(t *testing.T) {
 	f := newFixture(t)
 	l, got := observed(scopeOf(), resolveNever)
@@ -67,8 +62,6 @@ func TestReadDispositions_ShapesMissingUnparseable_AndSeededTextKeyTolerated(t *
 	fieldsOf(t, (*got)[4], map[string]string{"op": "read", "step": "read", "blocked": "true"})
 }
 
-// Test 25 — Preflight: MISSING and INCOMPLETE with their counts; nil when
-// no OPEN row or every one is covered; the two codes with open/covered/uncovered.
 func TestPreflight_MissingAndIncompleteMarkers_SilentWhenCoveredOrNothingOwed(t *testing.T) {
 	f := newFixture(t)
 	l, got := observed(scopeOf(), resolveNever)

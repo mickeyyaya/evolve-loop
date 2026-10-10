@@ -716,3 +716,13 @@
 ./internal/events/channel
 # E3 (ADR-0127): the kernel wake of the event channels (internal/events/wake).
 ./internal/events/wake
+# publisher — the Signal Center listener that appends each event to the channels whose route matches it: the lossless path, the best-effort queue, the gap records and the dispatch stamp (ADR-0127, plan E6).
+./internal/events/publisher
+# lane LQ-3 (2026-10-09): the overlap proof of the landing queue (internal/overlap, ADR-0128, plan Q3).
+./internal/overlap
+# E5 (ADR-0127): the channel reader and the last will of the event channels (internal/events/reader).
+./internal/events/reader
+# derived — the one catalog of the generated outputs, their markers, regions and inputs, the conflict class and the regeneration (ADR-0128, plan Q1).
+./internal/derived
+# R2 (ADR-0130): the attempt postmortem, a retry carries the evidence of the attempt that it replaces (internal/attemptpostmortem).
+./internal/attemptpostmortem

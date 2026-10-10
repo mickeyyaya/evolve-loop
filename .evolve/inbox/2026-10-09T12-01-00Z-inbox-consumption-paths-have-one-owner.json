@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "One package owns the inbox root and consumed/ paths and the consumption-pair rule; core (consumptionDecline), explanationdocs (withoutShipConsumption) and ship (consumptionPair, adoptIntentConsumption) read it",
+    "The existing tests of the three sites pass unchanged"
+  ],
+  "created_at": "2026-10-09T12:01:00Z",
+  "files": [
+    "go/internal/core/ship_recovery_unwind.go",
+    "go/internal/explanationdocs/rebind.go",
+    "go/internal/phases/ship/consume.go"
+  ],
+  "fix": "Move the inbox path constants and the pair rule to a leaf package that core, explanationdocs and ship can import, and delete the three local copies.",
+  "id": "inbox-consumption-paths-have-one-owner",
+  "kind": "refactor",
+  "priority_class": "maintainability",
+  "source": "console lane cl-lq-q12 (ADR-0128 Q12), 2026-10-09",
+  "summary": "The inbox root and consumed/ paths are spelled in three packages: core/ship_recovery_unwind.go (inboxRoot, consumedInbox), explanationdocs/rebind.go (the same two constants, added by Q12, because core imports explanationdocs) and phases/ship/consume.go (inboxRel, consumedRel without the trailing slash). Each site applies its own form of the consumption-pair rule. A change of the inbox layout must find all three.",
+  "title": "The inbox consumption paths and the pair rule are spelled in three packages",
+  "weight": 0.3
+}

@@ -166,7 +166,9 @@ The wire form is what `evolve events watch --json` prints and what a command rea
 | `ch:offset[,ch:offset]` | the given cursors |
 | an RFC 3339 time | the first record whose `signal.ts` is at or after the time, by a linear scan from the oldest retained segment |
 
-- **Order.** Order is total within a channel. No order exists across channels (Kafka partitions). A reader of several channels merges them by `signal.ts` through `signalcenter.MergeByTS` and labels the result "not a total order".
+- **Order.** Order is total within a channel. No order exists across channels (Kafka partitions). A reader of several channels merges each batch by `signal.ts`, with one head for each channel, and labels the result "not a total order".
+  - The merge never changes the order of one channel. Two processes append to one channel, so its times are not in order. A sort of all events (`signalcenter.MergeByTS`) can thus put a later cursor before an earlier one, and the reader does not use it.
+  - The merge applies inside one batch. Two batches are not in time order across channels.
 - **The reset rule.** When the reader opens a channel or wakes, it compares its cursor with the channel:
   - A cursor past the end of a segment that has a later segment moves to the base of that later segment. An OS crash can drop the tail of a segment after its rotation.
   - A cursor past the end of the tail segment moves to the true end. The tail lost bytes, or someone wiped the directory.
@@ -196,7 +198,9 @@ Each append takes the channel lock `ch/<channel>.lock` with `flock.LockWithin(pa
   - If `flock` fails, the goroutine hands the error over in the same way.
 - **The settle signal.** `LockWithin` calls `onSettled` once, when its goroutine is done. That is before it returns a lock, after an abandoned call released the lock, or before it returns an open error.
 - At most one lock call waits for each channel and process. While it waits, a new append to that channel fails at once with `ErrLockPending`, which wraps `ErrLockDeadline`. It starts no goroutine and opens no descriptor. It is a counted loss with the reason `lock_deadline`. The flag clears at the settle signal.
-- The deadline is `events.lock_deadline_ms` (default 250). A lossless append thus never holds the drain longer than that.
+- The deadline is `events.lock_deadline_ms` (default 250). E10 keeps it at 250 or less.
+- **The drain bound.** One event that matches k lossless channels waits up to k × the lock deadline. The worst case is the six default lossless channels: 6 × 250 ms = 1.5 s.
+- The lock deadline bounds only the wait for the lock. A disk that hangs inside the write, after the lock is taken, is not bounded. That is an accepted limit (see Limits).
 
 **Errors:**
 - A write error (for example `ENOSPC` or `EIO`) or a lock deadline is a counted loss. The next good append writes one gap record with the reason `write_error` or `lock_deadline`.
@@ -520,6 +524,8 @@ The module `events` (new) owns `EVENTS_DEAD_LETTERED`. A gap record is not a sig
 - **Linux inotify limits.** Each process that watches uses one inotify instance, and two during an `Arm`. The kernel defaults are 128 instances for each user, 16,384 queued events, and 8,192 to 1,048,576 watches from the RAM size (research F2.10).
 - **The runtime wake.** An idle watcher still wakes about once a minute for Go runtime work.
 - **Descriptors.** A darwin reader holds one descriptor for each watched directory and tail segment, plus the kqueue.
+- **A hung disk holds the drain.** The lock deadline bounds the wait for the channel lock, not a `write` that the kernel holds. The console accepted it as a known limit; the operator can override it.
+- **One waiting lock call for each log, not for each process.** The rule of §5 is kept by one `channel.Log`. Two Publishers in one process have two logs for a channel, and thus can have two waiting lock calls. This is accepted. A later process-wide registry of waiting calls can close it.
 - **A deleted lock file splits the lock.** If someone deletes `ch/<channel>.lock` while a call waits, the waiter holds the old inode. A new writer then locks a new file. The current `flock` adapter has the same exposure.
 - **A time start is a scan.** `--since` with a time reads from the oldest retained segment. The cost grows with the retention.
 - **The duplicate window is in memory.** After a restart, a copy of an event in a second channel can run again.

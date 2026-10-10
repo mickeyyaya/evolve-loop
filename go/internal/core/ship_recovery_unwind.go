@@ -21,30 +21,46 @@ type AuditedChange struct {
 	Base, Tree, Label string
 }
 
-// unwindBeforeFleetRebase takes ship's inbox consumption out of the change a
-// fleet rebase replays, so the rebased change is the one Audit reviewed. It reports whether it unwound.
-// See ADR-0105.
-func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot string, cycle int, cs CycleState) bool {
+type unwindOutcome int
+
+const (
+	unwindNone unwindOutcome = iota
+	unwindDone
+	unwindKeepsConsumption
+)
+
+type unwindVerdict struct {
+	declined         string
+	keepsConsumption bool
+}
+
+func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot string, cycle int, cs CycleState) unwindOutcome {
 	if cs.ActiveWorktree == "" || inPlaceWorktree(cs.ActiveWorktree, projectRoot) {
-		return false
+		return unwindNone
 	}
 	tree, err := o.latestAuditedTree(ctx, cs.RunID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: read the audited tree: %v\n", cycle, err)
-		return false
+		return unwindNone
 	}
 	audited := AuditedChange{Base: cs.WorktreeBaseSHA, Tree: tree, Label: fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)}
-	declined, err := unwindShipCommit(ctx, cs.ActiveWorktree, audited, gitCapture)
+	verdict, err := unwindDecline(ctx, cs.ActiveWorktree, audited, gitCapture)
+	if err == nil && verdict.declined == "" {
+		err = carryAuditedTree(ctx, cs.ActiveWorktree, audited, gitCapture)
+	}
 	switch {
 	case err != nil:
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: %v\n", cycle, err)
-		return false
-	case declined != "":
-		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ship unwind declined: %s\n", cycle, declined)
-		return false
+		return unwindNone
+	case verdict.keepsConsumption:
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ship unwind declined: %s; the rebase replays ship's commit and pends it, so the identity proof runs\n", cycle, verdict.declined)
+		return unwindKeepsConsumption
+	case verdict.declined != "":
+		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ship unwind declined: %s\n", cycle, verdict.declined)
+		return unwindNone
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d unwound its ship commit to the audited tree %s on %s before the fleet rebase\n", cycle, tree, cs.WorktreeBaseSHA)
-	return true
+	return unwindDone
 }
 
 func UnwindToAuditedShape(ctx context.Context, worktree string, audited AuditedChange) (string, error) {
@@ -55,56 +71,57 @@ func UnwindToAuditedShape(ctx context.Context, worktree string, audited AuditedC
 	return "", pendRebasedChange(ctx, worktree, gitCapture)
 }
 
-// unwindShipCommit replaces the lane's commits with one carrier commit of the audited tree on the audited
-// base. It returns why it declined, changing nothing, or "" once HEAD is the carrier.
 func unwindShipCommit(ctx context.Context, worktree string, audited AuditedChange, git gitFn) (string, error) {
-	if declined, err := unwindDecline(ctx, worktree, audited, git); declined != "" || err != nil {
-		return declined, err
+	if verdict, err := unwindDecline(ctx, worktree, audited, git); verdict.declined != "" || err != nil {
+		return verdict.declined, err
 	}
+	return "", carryAuditedTree(ctx, worktree, audited, git)
+}
+
+func carryAuditedTree(ctx context.Context, worktree string, audited AuditedChange, git gitFn) error {
 	carrier, err := gitStdout(ctx, git, worktree, "-c", "commit.gpgsign=false", "commit-tree", audited.Tree, "-p", audited.Base,
 		"-m", "evolve: the audited change, unwound from its ship commit", "-m", "Evolve-Carrier: "+audited.Label)
 	if err != nil {
-		return "", err
+		return err
 	}
 	_, err = gitStdout(ctx, git, worktree, "reset", "--keep", carrier)
-	return "", err
+	return err
 }
 
-func unwindDecline(ctx context.Context, worktree string, audited AuditedChange, git gitFn) (string, error) {
+func unwindDecline(ctx context.Context, worktree string, audited AuditedChange, git gitFn) (unwindVerdict, error) {
+	declined := func(reason string) (unwindVerdict, error) { return unwindVerdict{declined: reason}, nil }
 	if !objectIDRe.MatchString(audited.Base) || !objectIDRe.MatchString(audited.Tree) {
-		return "the audited base or tree is not an object id", nil
+		return declined("the audited base or tree is not an object id")
 	}
 	status, err := gitStdout(ctx, git, worktree, "status", "--porcelain", "--untracked-files=normal")
 	if err != nil {
-		return "", fmt.Errorf("read the worktree status: %w", err)
+		return unwindVerdict{}, fmt.Errorf("read the worktree status: %w", err)
 	}
 	if status != "" {
-		return "the worktree holds changes or untracked files ship did not commit", nil
+		return declined("the worktree holds changes or untracked files ship did not commit")
 	}
 	fork, err := forkPoint(ctx, git, worktree)
 	if err != nil {
-		return "", fmt.Errorf("resolve the fork point: %w", err)
+		return unwindVerdict{}, fmt.Errorf("resolve the fork point: %w", err)
 	}
 	if fork != audited.Base {
-		return "the lane did not fork at the audited base", nil
+		return declined("the lane did not fork at the audited base")
 	}
 	_, code, err := git(ctx, worktree, "rev-parse", "--verify", "--quiet", audited.Tree+"^{tree}")
 	if err != nil {
-		return "", fmt.Errorf("look up the audited tree: %w", err)
+		return unwindVerdict{}, fmt.Errorf("look up the audited tree: %w", err)
 	}
 	if code != 0 {
-		return "git does not hold the audited tree", nil
+		return declined("git does not hold the audited tree")
 	}
 	return consumptionDecline(ctx, worktree, audited.Tree, git)
 }
 
-// consumptionDecline holds unless HEAD differs from the audited tree by exactly ship's inbox consumption:
-// each item removed from the inbox root and written to consumed/ under the same name. A consumed item that
-// released a continuation declines too, because its pointer lives only in ship's commit.
-func consumptionDecline(ctx context.Context, worktree, tree string, git gitFn) (string, error) {
+func consumptionDecline(ctx context.Context, worktree, tree string, git gitFn) (unwindVerdict, error) {
+	declined := func(reason string) (unwindVerdict, error) { return unwindVerdict{declined: reason}, nil }
 	out, err := gitStdout(ctx, git, worktree, "diff-tree", "-r", "-z", "--name-status", "--no-renames", tree, "HEAD")
 	if err != nil {
-		return "", fmt.Errorf("diff the audited tree against HEAD: %w", err)
+		return unwindVerdict{}, fmt.Errorf("diff the audited tree against HEAD: %w", err)
 	}
 	fields := strings.Split(strings.TrimSuffix(out, "\x00"), "\x00")
 	removed, consumed := map[string]bool{}, map[string]string{}
@@ -116,25 +133,25 @@ func consumptionDecline(ctx context.Context, worktree, tree string, git gitFn) (
 		case (status == "A" || status == "M") && p == consumedInbox+name:
 			consumed[name] = p
 		default:
-			return fmt.Sprintf("ship's commit changes %s beyond its inbox consumption", p), nil
+			return declined(fmt.Sprintf("ship's commit changes %s beyond its inbox consumption", p))
 		}
 	}
 	if len(removed) != len(consumed) {
-		return "the inbox delta is not whole consumption pairs", nil
+		return declined("the inbox delta is not whole consumption pairs")
 	}
 	for name, p := range consumed {
 		if !removed[name] {
-			return "the inbox delta is not whole consumption pairs", nil
+			return declined("the inbox delta is not whole consumption pairs")
 		}
 		released, err := releasedAContinuation(ctx, worktree, p, git)
 		if err != nil {
-			return "", err
+			return unwindVerdict{}, err
 		}
 		if released {
-			return fmt.Sprintf("consumed item %s released a continuation that only ship's commit records", name), nil
+			return unwindVerdict{declined: fmt.Sprintf("consumed item %s released a continuation that only ship's commit records", name), keepsConsumption: true}, nil
 		}
 	}
-	return "", nil
+	return unwindVerdict{}, nil
 }
 
 func releasedAContinuation(ctx context.Context, worktree, consumedPath string, git gitFn) (bool, error) {

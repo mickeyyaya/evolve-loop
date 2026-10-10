@@ -1,13 +1,5 @@
 package audit
 
-// ciparity_unit_test.go already proves CheckIntegrationTier itself returns
-// (nil, flake-error) on red-then-green and (offenders, nil) on red-then-red.
-// That is necessary but not sufficient: nothing else in the suite wires the
-// PRODUCTION integrationTierCheckDefault through the real hooks.Classify
-// orchestration and asserts on the AUDIT VERDICT the gate produces. These
-// tests close that gap: the same subprocess-level fixtures as
-// ciparity_unit_test.go, but driven through the real Classify orchestration.
-
 import (
 	"context"
 	"errors"
@@ -19,13 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// classifyThroughProductionIntegrationTierGate runs the real hooks.Classify
-// with the production integrationTierCheckDefault wired exactly as
-// NewDefaultWithStageCompact wires it — every other gate left nil so only the
-// integration-tier gate's could-not-run/offenders branch can move the
-// verdict. The EGPS verdict is written GREEN (writeACSVerdictShip) so none of
-// the three EGPS override branches — already covered by
-// audit_verdict_conflict_test.go — can fire and confound the result.
 func classifyThroughProductionIntegrationTierGate(t *testing.T, req core.PhaseRequest) (string, []core.Diagnostic) {
 	t.Helper()
 	yes := true
@@ -35,10 +20,6 @@ func classifyThroughProductionIntegrationTierGate(t *testing.T, req core.PhaseRe
 	return verdict, diags
 }
 
-// TestAuditOrchestration_IntegrationTier_RedThenGreen_ContentionAbsorbedToWarn —
-// a red first attempt that goes GREEN on the serialized clean-env retake must
-// surface as a visible warning, not fail the AUDIT ORCHESTRATION verdict (not
-// merely CheckIntegrationTier's own return value in isolation).
 func TestAuditOrchestration_IntegrationTier_RedThenGreen_ContentionAbsorbedToWarn(t *testing.T) {
 	req := tierFixture(t)
 	fn, calls, _ := seqRunFunc(t, []struct {
@@ -63,9 +44,6 @@ func TestAuditOrchestration_IntegrationTier_RedThenGreen_ContentionAbsorbedToWar
 	}
 }
 
-// TestAuditOrchestration_IntegrationTier_RedThenRed_GenuineFailReachesTheAuditVerdict —
-// a red retake is a genuine defect and must reach FAIL through the real
-// orchestration, naming the retake's own (truthful) offenders.
 func TestAuditOrchestration_IntegrationTier_RedThenRed_GenuineFailReachesTheAuditVerdict(t *testing.T) {
 	req := tierFixture(t)
 	fn, calls, _ := seqRunFunc(t, []struct {
@@ -87,12 +65,6 @@ func TestAuditOrchestration_IntegrationTier_RedThenRed_GenuineFailReachesTheAudi
 	}
 }
 
-// TestAuditOrchestration_IntegrationTier_RetakeInfraFailure_FallsBackNotLaundered —
-// when the RETAKE itself cannot run (not merely red), the gate must fall back
-// to attempt 1's offenders and still FAIL — infra trouble on the retake must
-// never launder a real first-attempt red into a pass. Regresses the "retake
-// exec error" fallback path (ciparity.go: `cerr2 != nil`) through the same
-// production Classify seam as the two cases above.
 func TestAuditOrchestration_IntegrationTier_RetakeInfraFailure_FallsBackNotLaundered(t *testing.T) {
 	req := tierFixture(t)
 	calls := 0
@@ -119,11 +91,6 @@ func TestAuditOrchestration_IntegrationTier_RetakeInfraFailure_FallsBackNotLaund
 	}
 }
 
-// TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn —
-// a retake killed by its budget with NO recognizable verdict in the truncated
-// output is not a judgment: it must degrade to the fail-open WARN, never a
-// red-twice FAIL. integrationTierTimeout is a var so the deadline path is
-// testable, the same rationale as apicoverTimeout.
 func TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWarn(t *testing.T) {
 	req := tierFixture(t)
 	oldBudget := integrationTierTimeout
@@ -148,11 +115,6 @@ func TestAuditOrchestration_IntegrationTier_DeadlineKill_MarkerFreeDegradesToWar
 	}
 }
 
-// TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFail —
-// go test flushes each completed package's verdict before the SIGKILL, so a
-// deadline-killed retake can carry REAL offenders; evidence outranks the
-// budget and those offenders must reach the FAIL verdict, not be laundered
-// into the WARN path.
 func TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFail(t *testing.T) {
 	req := tierFixture(t)
 	oldBudget := integrationTierTimeout
@@ -177,8 +139,6 @@ func TestAuditOrchestration_IntegrationTier_DeadlineKill_FlushedOffendersStillFa
 	}
 }
 
-// doneProbeCtx closes asked the first time its Done channel is requested, so a
-// test can order cancellation after a runner has started waiting — no timers.
 type doneProbeCtx struct {
 	context.Context
 	asked chan struct{}
@@ -190,20 +150,11 @@ func (c *doneProbeCtx) Done() <-chan struct{} {
 	return c.Context.Done()
 }
 
-// markerFreeKillScript is a red first attempt followed by a retake killed with
-// no recognizable verdict in its truncated output.
 var markerFreeKillScript = []struct {
 	Code int
 	Out  string
 }{{1, "--- FAIL: TestSlowRed (0.00s)\nFAIL\tpkg\t1.0s\n"}, {-1, "partial toolchain chatter, no verdict lines\nsignal: killed\n"}}
 
-// TestDecideTier_DeadlineHitRequiresSynchronizedCtx locks in what makes the
-// DeadlineKill tests deterministic: runAttempt records deadlineHit from
-// ctx.Err() when the runner returns, so a scripted kill must return only after
-// its ctx is done. The first subtest detects a helper that stops waiting
-// without depending on losing the 1 ns timer race; the others prove the
-// synchronized runner, and only it, reaches the budget WARN through the
-// production integration-tier seam.
 func TestDecideTier_DeadlineHitRequiresSynchronizedCtx(t *testing.T) {
 	t.Run("killedAtDeadline returns only after ctx is done", func(t *testing.T) {
 		parent, cancel := context.WithCancel(context.Background())

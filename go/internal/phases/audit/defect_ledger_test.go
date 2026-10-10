@@ -11,35 +11,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// Two mechanisms are pinned, both through the REAL production seam
-// (`hooks.Classify` — the audit phase's verdict path). A helper called
-// directly would pass on dead code; every assertion below reaches its subject
-// from Classify.
-//
-//  1. EMIT: a rejecting audit persists `<workspace>/defect-ledger.json`, one
-//     addressable entry per structured defect, status OPEN.
-//  2. DIFF: a continuation cycle's audit loads the ancestor's ledger and may
-//     NOT emit PASS while any entry is unaccounted for; the disposition is
-//     visible in the audit's own written-back ledger, never merely inferable.
-//
-// Wire schema pinned by this contract:
-//
-//	defect-ledger.json      {"origin_cycle":N,"entries":[{"id","text","status","evidence","reason"}]}
-//	defect-dispositions.json {"dispositions":[{"id","status","evidence","reason"}]}
-//
-// status ∈ {OPEN, FIXED, DEFERRED}. Entries are never deleted — status
-// transitions only (that is the anti-laundering property: a renamed or
-// narrowed defect cannot make its ledger row disappear).
-
 const (
 	ledgerFile      = "defect-ledger.json"
 	dispositionFile = "defect-dispositions.json"
 )
 
-// ledgerDoc mirrors the on-disk defect-ledger.json schema. Declared in the test
-// (not imported from the implementation) so the contract pins the WIRE shape a
-// later cycle's audit must be able to read back, not an internal Go type the
-// builder could rename freely.
 type ledgerDoc struct {
 	OriginCycle int `json:"origin_cycle"`
 	Entries     []struct {
@@ -51,11 +27,6 @@ type ledgerDoc struct {
 	} `json:"entries"`
 }
 
-// failingReportWithDefects renders an audit report whose evolve-verdict
-// sentinel carries a structured failure block — the exact artifact shape
-// extractAuditVerdict already parses via phasecontract.ParseVerdictSentinel,
-// so the ledger writer sources its defects from real production input rather
-// than a test-only side channel.
 func failingReportWithDefects(defects ...string) string {
 	q, _ := json.Marshal(defects)
 	return "# Audit Report\n\n## Verdict\n**FAIL**\n\n" +
@@ -63,8 +34,6 @@ func failingReportWithDefects(defects ...string) string {
 		`"failure":{"class":"deliverable-rejected","defects":` + string(q) + `}} -->` + "\n"
 }
 
-// readLedger loads and validates a written ledger, failing the test with the
-// directory listing when it is absent — an unwritten ledger is the defect.
 func readLedger(t *testing.T, dir string) ledgerDoc {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join(dir, ledgerFile))
@@ -97,8 +66,6 @@ func writeJSON(t *testing.T, path string, v any) {
 	}
 }
 
-// diagsText flattens diagnostics so a criterion can assert the gap is NAMED,
-// not merely that some diagnostic exists.
 func diagsText(diags []core.Diagnostic) string {
 	var b strings.Builder
 	for _, d := range diags {
@@ -110,12 +77,6 @@ func diagsText(diags []core.Diagnostic) string {
 	return b.String()
 }
 
-// -- Task 1: EMIT --------------------------------------------------------
-
-// TestClassify_RejectingAuditEmitsDefectLedger — the addressable record that
-// does not exist today. Three structured defects in the rejecting verdict must
-// become three OPEN, id-bearing ledger entries a LATER cycle can reconcile
-// against. Reached through the real Classify path.
 func TestClassify_RejectingAuditEmitsDefectLedger(t *testing.T) {
 	ws := t.TempDir()
 	yes := true
@@ -160,10 +121,6 @@ func TestClassify_RejectingAuditEmitsDefectLedger(t *testing.T) {
 	}
 }
 
-// TestClassify_PassingAuditWritesNoLedger — NEGATIVE criterion. A clean cycle
-// has no defects to track; minting an empty ledger would make every subsequent
-// cycle look like a continuation and is the cheapest way to game the diff gate
-// below into vacuity.
 func TestClassify_PassingAuditWritesNoLedger(t *testing.T) {
 	ws := t.TempDir()
 	yes := true
@@ -183,11 +140,6 @@ func TestClassify_PassingAuditWritesNoLedger(t *testing.T) {
 	}
 }
 
-// -- Task 2: DIFF --------------------------------------------------------
-
-// continuationFixture builds a project root holding an ancestor cycle whose
-// audit left `openDefects` OPEN, plus a current workspace stamped as that
-// cycle's continuation. Returns the current workspace and the request.
 func continuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDefects []string) (string, core.PhaseRequest) {
 	t.Helper()
 	root := t.TempDir()
@@ -210,9 +162,6 @@ func continuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDefects
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)
-	// The continuation manifest is the existing lineage marker
-	// (internal/continuation.WriteManifest / ReadManifest) — reuse it rather
-	// than inventing a parallel linkage field.
 	writeJSON(t, filepath.Join(ws, "continuation-manifest.json"), map[string]any{
 		"cycle":         ancestorCycle,
 		"branch":        "cycle-" + strconv.Itoa(ancestorCycle),
@@ -229,18 +178,12 @@ var laundered = []string{
 	"ScratchCwd follows a symlink outside the worktree",
 }
 
-// TestClassify_ContinuationCannotPassWithUnaccountedDefect — the crux: the
-// continuation genuinely fixes two of the three inherited defects, narrates
-// PASS, and the EGPS gate is green. Without this gate that ships and the
-// third defect is laundered. It must NOT be able to PASS, and the gap must
-// be named BY ID.
 func TestClassify_ContinuationCannotPassWithUnaccountedDefect(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
 			map[string]any{"id": "d1", "status": "FIXED", "evidence": "go/internal/core/fleet.go:120"},
 			map[string]any{"id": "d2", "status": "DEFERRED", "reason": "out of lane scope; queued as retro-symlink-suffix"},
-			// d3 deliberately absent — the laundering shape.
 		},
 	})
 
@@ -255,15 +198,8 @@ func TestClassify_ContinuationCannotPassWithUnaccountedDefect(t *testing.T) {
 	}
 }
 
-// TestClassify_ContinuationLedgerRetainsEveryEntry — the disposition must be
-// VISIBLE in the audit's own artifact (F1: "not just inferred from a diff a
-// human must run"), and status transitions must never delete rows. A ledger
-// that shrinks is a ledger that launders.
 func TestClassify_ContinuationLedgerRetainsEveryEntry(t *testing.T) {
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
-	// A closure claim's evidence must RESOLVE to a real file, so the fixture
-	// materializes the artifacts it cites (evidenceFile lives in
-	// defect_ledger_hardening_test.go).
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
 			map[string]any{"id": "d1", "status": "FIXED", "evidence": evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")},
@@ -297,11 +233,6 @@ func TestClassify_ContinuationLedgerRetainsEveryEntry(t *testing.T) {
 	}
 }
 
-// TestClassify_ContinuationWithNoDispositionArtifactCannotPass — EDGE /
-// anti-no-op. The cheapest way to defeat the gate is to emit no disposition
-// artifact at all and hope the diff step degrades open (the probe_quarantine
-// pattern degrades open on a MISSING WORKTREE, which is correct there — here a
-// missing disposition is the defect itself, not an environment gap).
 func TestClassify_ContinuationWithNoDispositionArtifactCannotPass(t *testing.T) {
 	_, req := continuationFixture(t, 1255, 1270, laundered)
 
@@ -311,10 +242,6 @@ func TestClassify_ContinuationWithNoDispositionArtifactCannotPass(t *testing.T) 
 	}
 }
 
-// TestClassify_NonContinuationPassPathUnchanged — REGRESSION criterion. The
-// overwhelming majority of cycles are not continuations; the new step must
-// degrade to a no-op for them (no manifest, no ancestor ledger) and must never
-// perturb an ordinary green cycle's PASS.
 func TestClassify_NonContinuationPassPathUnchanged(t *testing.T) {
 	ws := t.TempDir()
 	yes := true

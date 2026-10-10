@@ -11,20 +11,17 @@ func TestNormalizeLegacy(t *testing.T) {
 		in   string
 		want Classification
 	}{
-		// Canonical pass-through.
 		{"infrastructure-transient", InfrastructureTransient},
 		{"code-audit-warn", CodeAuditWarn},
 		{"ship-gate-config", ShipGateConfig},
 		{"operator-reset", OperatorReset},
 		{"loop-fatal", LoopFatal},
 
-		// Legacy dispatcher classifications.
 		{"infrastructure", InfrastructureTransient},
 		{"audit-fail", CodeAuditFail},
 		{"build-fail", CodeBuildFail},
 		{"ship-gate-rejection", ShipGateConfig},
 
-		// Legacy orchestrator verdicts.
 		{"FAIL", CodeAuditFail},
 		{"WARN", CodeAuditWarn},
 		{"SHIP_GATE_DENIED", ShipGateConfig},
@@ -34,11 +31,9 @@ func TestNormalizeLegacy(t *testing.T) {
 		{"BLOCKED-SYSTEMIC", InfrastructureSystemic},
 		{"SCOPE-REJECTED", IntentRejected},
 
-		// Alternate casings.
 		{"EXIT_TRANSPORT_HANG", ExitTransportHang},
 		{"exit_transport_hang", ExitTransportHang},
 
-		// Unknown / null.
 		{"", UnknownClassification},
 		{"null", UnknownClassification},
 		{"completely-made-up", UnknownClassification},
@@ -60,20 +55,20 @@ func TestAgeOutSeconds(t *testing.T) {
 		c    Classification
 		want int64
 	}{
-		{InfrastructureTransient, 86400}, // 1d
-		{InfrastructureSystemic, 604800}, // 7d
+		{InfrastructureTransient, 86400},
+		{InfrastructureSystemic, 604800},
 		{IntentMalformed, 86400},
-		{IntentRejected, 999999999}, // never
-		{CodeBuildFail, 2592000},    // 30d
+		{IntentRejected, 999999999},
+		{CodeBuildFail, 2592000},
 		{CodeAuditFail, 2592000},
-		{CodeAuditWarn, 86400},  // v8.35
-		{ShipGateConfig, 86400}, // v8.27
+		{CodeAuditWarn, 86400},
+		{ShipGateConfig, 86400},
 		{HumanAbort, 3600},
 		{ExitTransportHang, 3600},
 		{IntegrityBreach, 604800},
-		{OperatorReset, 3600},                  // 1h — operator action, like human-abort
-		{LoopFatal, 604800},                    // 7d — batch-stopper, retain across the week
-		{Classification("nonexistent"), 86400}, // default 1d
+		{OperatorReset, 3600},
+		{LoopFatal, 604800},
+		{Classification("nonexistent"), 86400},
 	}
 	for _, tc := range tests {
 		tc := tc
@@ -164,13 +159,11 @@ func TestComputeExpiresAt(t *testing.T) {
 	if got != want {
 		t.Fatalf("expiresAt=%q want %q (1d after base)", got, want)
 	}
-	// 30d for code-audit-fail
 	got = ComputeExpiresAt(CodeAuditFail, base)
 	want = "2026-06-22T12:00:00Z"
 	if got != want {
 		t.Fatalf("expiresAt=%q want %q (30d after base)", got, want)
 	}
-	// Zero time → time.Now().UTC() — assert the result is in the future.
 	got = ComputeExpiresAt(InfrastructureTransient, time.Time{})
 	parsed, err := time.Parse(time.RFC3339, got)
 	if err != nil {
@@ -199,7 +192,6 @@ func TestKnownClassifications(t *testing.T) {
 			t.Fatalf("KnownClassifications missing %q", want)
 		}
 	}
-	// Spot-check that UnknownClassification is NOT in the list.
 	for _, c := range got {
 		if c == UnknownClassification {
 			t.Fatalf("UnknownClassification should not be in KnownClassifications")

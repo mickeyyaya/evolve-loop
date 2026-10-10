@@ -5,8 +5,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // scriptedGit is a fake gitFn. respond is keyed off the call's args; every call
@@ -59,7 +63,7 @@ func TestRebaseWithDerivedRegen_CleanRebase(t *testing.T) {
 		return "", 0, nil
 	}}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("want (true,false), got (%v,%v)", ok, conflicts)
 	}
@@ -77,7 +81,9 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 			return "", 1, nil // conflict
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			return cflags + "\x00", 0, nil
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			return "", 0, nil // continue completes the rebase
@@ -86,14 +92,14 @@ func TestRebaseWithDerivedRegen_AllDerivedConflict_Resolves(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("want (true,false), got (%v,%v)", ok, conflicts)
 	}
-	if len(*got) != 1 || (*got)[0] != cflags {
-		t.Fatalf("regen paths = %v, want [%s]", *got, cflags)
+	if len(*got) != 1 || (*got)[0] != "flag-index" {
+		t.Fatalf("regen entries = %v, want [flag-index]", *got)
 	}
-	if !g.ran("add", "--", cflags) {
+	if !g.ran("add", "-A", "--", cflags) {
 		t.Fatal("must `git add` the regenerated derived artifact")
 	}
 	if !g.ran("rebase", "--continue") {
@@ -120,7 +126,7 @@ func TestRebaseWithDerivedRegen_NonDerivedConflict_AbortsToDebugger(t *testing.T
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if ok || len(conflicts) == 0 {
 		t.Fatalf("want (false,true) for a real SSOT conflict, got (%v,%v)", ok, conflicts)
 	}
@@ -149,7 +155,7 @@ func TestRebaseWithDerivedRegen_MixedConflict_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if ok || len(conflicts) == 0 {
 		t.Fatalf("want (false,true) when ANY conflict is non-derived, got (%v,%v)", ok, conflicts)
 	}
@@ -168,7 +174,9 @@ func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			return cflags + "\x00", 0, nil
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			continues++
@@ -181,7 +189,7 @@ func TestRebaseWithDerivedRegen_MultiCommitDerivedConflicts_Resolves(t *testing.
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("want (true,false) across multiple derived-conflict commits, got (%v,%v)", ok, conflicts)
 	}
@@ -205,8 +213,8 @@ func TestRebaseWithDerivedRegen_RegenFails_Aborts(t *testing.T) {
 		t.Fatalf("unexpected git call %q", j)
 		return "", 0, nil
 	}
-	regen, _ := recordingRegen(cflags) // regen fails for control-flags.md
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	regen, _ := recordingRegen("flag-index")
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if ok || len(conflicts) > 0 {
 		t.Fatalf("want (false,false) on regen failure (infra, not overlap), got (%v,%v)", ok, conflicts)
 	}
@@ -231,7 +239,7 @@ func TestRebaseWithDerivedRegen_InfraFailureNoUnmerged_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if ok || len(conflicts) > 0 {
 		t.Fatalf("want (false,false) for an infra failure with no conflicts, got (%v,%v)", ok, conflicts)
 	}
@@ -256,7 +264,9 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 				return cflags + "\x00", 0, nil
 			}
 			return "", 0, nil
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			return "nothing to commit", 1, nil // commit became empty after resolution
@@ -267,7 +277,7 @@ func TestRebaseWithDerivedRegen_EmptyCommitAfterResolve_Skips(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, _ := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("want (true,false) when an emptied commit is skipped, got (%v,%v)", ok, conflicts)
 	}
@@ -285,7 +295,9 @@ func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			return cflags + "\x00", 0, nil // perpetual derived conflict
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			return "", 1, nil // never converges
@@ -296,7 +308,7 @@ func TestRebaseWithDerivedRegen_ContinueNeverConverges_AbortsAtBound(t *testing.
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if ok || len(conflicts) > 0 {
 		t.Fatalf("want (false,false) at the replay-step bound, got (%v,%v)", ok, conflicts)
 	}
@@ -327,7 +339,8 @@ func TestRegenerateDerivedArtifact_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read %s: %v", cflags, err)
 	}
-	worktree := t.TempDir()
+	repo := gittest.Fixture(t)
+	worktree := repo.Dir
 	if err := os.Symlink(filepath.Join(root, "go"), filepath.Join(worktree, "go")); err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +351,9 @@ func TestRegenerateDerivedArtifact_Integration(t *testing.T) {
 	if err := os.WriteFile(docPath, committed, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := regenerateDerivedArtifact(context.Background(), worktree, cflags); err != nil {
+	repo.Git("add", "--", cflags)
+	repo.Git("commit", "-qm", "base")
+	if err := regenerateDerivedArtifact(context.Background(), worktree, "flag-index"); err != nil {
 		t.Fatalf("regenerate failed: %v", err)
 	}
 	after, err := os.ReadFile(docPath)
@@ -359,7 +374,9 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 			return "", 1, nil
 		case strings.HasPrefix(j, "diff --name-only --diff-filter=U"):
 			return cflags + "\x00", 0, nil
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 1, nil // staging the regenerated file fails
 		case strings.Contains(j, "rebase --abort"):
 			return "", 0, nil
@@ -368,7 +385,7 @@ func TestRebaseWithDerivedRegen_GitAddFails_Aborts(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if ok || len(conflicts) > 0 {
 		t.Fatalf("want (false,false) when `git add` fails, got (%v,%v)", ok, conflicts)
 	}
@@ -410,10 +427,10 @@ func TestRebaseCycleBranchOntoMain_RealGit_NonDerivedConflict(t *testing.T) {
 // the fakes cannot give.
 func TestRebaseWithDerivedRegen_RealGit_DerivedConflict(t *testing.T) {
 	dir := initConflictRepo(t, cflags)
-	regen := func(_ context.Context, wt, p string) error {
-		return os.WriteFile(filepath.Join(wt, p), []byte("regenerated\nshared\n"), 0o644)
+	regen := func(_ context.Context, wt, _ string) error {
+		return os.WriteFile(filepath.Join(wt, cflags), []byte("regenerated\nshared\n"), 0o644)
 	}
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), dir, gitCapture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), dir, gitCapture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("real-git derived conflict should auto-resolve: got (%v,%v)", ok, conflicts)
 	}
@@ -482,7 +499,9 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 				return cflags + "\x00", 0, nil
 			}
 			return "", 0, nil // emptied after resolution
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			return "nothing to commit", 1, nil
@@ -497,7 +516,7 @@ func TestRebaseWithDerivedRegen_SkipRetriesThenCompletes(t *testing.T) {
 		return "", 0, nil
 	}
 	regen, _ := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("want (true,false) after a retried skip, got (%v,%v)", ok, conflicts)
 	}
@@ -524,7 +543,9 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 			default: // the skip landed on a NEW commit that also conflicts on the doc
 				return cflags + "\x00", 0, nil
 			}
-		case strings.HasPrefix(j, "add -- "):
+		case strings.HasPrefix(j, "ls-files "):
+			return cflags + "\x00", 0, nil
+		case strings.HasPrefix(j, "add -A -- "):
 			return "", 0, nil
 		case strings.Contains(j, "rebase --continue"):
 			contN++
@@ -540,7 +561,7 @@ func TestRebaseWithDerivedRegen_SkipThenNewDerivedConflict_Resolves(t *testing.T
 		return "", 0, nil
 	}
 	regen, got := recordingRegen("")
-	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, isDerivedArtifact)
+	ok, conflicts := rebaseWithDerivedRegen(context.Background(), "/wt", g.capture, regen, derivedEntryOf)
 	if !ok || len(conflicts) > 0 {
 		t.Fatalf("want (true,false) for skip-fail then a new derived resolve, got (%v,%v)", ok, conflicts)
 	}
@@ -561,106 +582,61 @@ func TestRegenerateDerivedArtifact_RunFails_Errors(t *testing.T) {
 		t.Fatal(err)
 	}
 	// worktree/go has no module → `go run ./cmd/evolve` fails → error surfaced.
-	if err := regenerateDerivedArtifact(context.Background(), wt, cflags); err == nil {
+	if err := regenerateDerivedArtifact(context.Background(), wt, "flag-index"); err == nil {
 		t.Fatal("want an error when `go run` fails in a worktree with no module")
 	}
 }
 
-func TestIsDerivedArtifact(t *testing.T) {
-	if !isDerivedArtifact(cflags) {
-		t.Fatalf("%s must be classified as a derived artifact", cflags)
-	}
-	for _, p := range []string{
-		"go/internal/flagregistry/registry_table.go",
-		"go/internal/core/orchestrator.go",
-		"README.md",
-		"",
-	} {
-		if isDerivedArtifact(p) {
-			t.Fatalf("%q must NOT be a derived artifact", p)
+func TestDerivedEntryOf(t *testing.T) {
+	for path, want := range map[string]string{cflags: "flag-index", "commands/build.md": "skill-projections"} {
+		if got, ok := derivedEntryOf(path); !ok || got != want {
+			t.Errorf("derivedEntryOf(%q) = (%q, %v), want (%q, true)", path, got, ok, want)
 		}
 	}
-}
-
-// TestDerivedArtifacts_MapIntegrity locks the single classifier: every registered
-// derived artifact must exist on disk and carry a GENERATED marker pair (so the
-// path is really a projection, not a hand-written file), its regen command must be
-// non-empty, and its ssotPrefix must be a real on-disk source path.
-func TestDerivedArtifacts_MapIntegrity(t *testing.T) {
-	root := repoRootForTest(t)
-	if len(derivedArtifacts) == 0 {
-		t.Fatal("derivedArtifacts must register at least control-flags.md")
-	}
-	for rel, spec := range derivedArtifacts {
-		if len(spec.regenArgs) == 0 {
-			t.Fatalf("%s has an empty regen command", rel)
+	for _, p := range []string{"go/internal/flagregistry/registry_table.go", "README.md", ""} {
+		if got, ok := derivedEntryOf(p); ok {
+			t.Errorf("derivedEntryOf(%q) = %q, want no entry", p, got)
 		}
-		b, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil {
-			t.Fatalf("registered derived artifact %s not readable: %v", rel, err)
-		}
-		if !strings.Contains(string(b), "<!-- GENERATED:") {
-			t.Fatalf("%s has no GENERATED marker — not a projection; do not register it", rel)
-		}
-		if spec.ssotPrefix == "" {
-			t.Fatalf("%s has an empty ssotPrefix", rel)
-		}
-		if _, err := os.Stat(filepath.Join(root, spec.ssotPrefix)); err != nil {
-			t.Fatalf("%s ssotPrefix %q does not exist on disk: %v", rel, spec.ssotPrefix, err)
-		}
-	}
-}
-
-func TestDerivedProjectionsForChanges(t *testing.T) {
-	// A change under the registry SSOT prefix marks control-flags.md stale.
-	got := derivedProjectionsForChanges([]string{
-		"go/internal/flagregistry/registry_table.go",
-		"go/internal/core/foo.go",
-	})
-	if len(got) != 1 || got[0] != cflags {
-		t.Fatalf("registry change must flag %s stale, got %v", cflags, got)
-	}
-	// No SSOT change → no projection to regenerate (so non-flag cycles pay no cost).
-	if g := derivedProjectionsForChanges([]string{"go/internal/core/foo.go", "README.md"}); len(g) != 0 {
-		t.Fatalf("non-SSOT changes must trigger no regen, got %v", g)
-	}
-	if g := derivedProjectionsForChanges(nil); len(g) != 0 {
-		t.Fatalf("no changes → no regen, got %v", g)
 	}
 }
 
 func TestRegenStaleProjections_RegeneratesAndStages(t *testing.T) {
 	var regened, staged []string
-	regen := func(_ context.Context, _, rel string) error { regened = append(regened, rel); return nil }
-	stage := func(_ context.Context, _, rel string) error { staged = append(staged, rel); return nil }
-	done := regenStaleProjections(context.Background(), "/wt",
-		[]string{"go/internal/flagregistry/registry_table.go", "go/internal/core/foo.go"}, regen, stage)
-	if len(done) != 1 || done[0] != cflags {
-		t.Fatalf("done = %v, want [%s]", done, cflags)
-	}
-	if len(regened) != 1 || regened[0] != cflags {
-		t.Fatalf("regened = %v", regened)
-	}
-	if len(staged) != 1 || staged[0] != cflags {
-		t.Fatalf("staged = %v", staged)
+	regen := func(_ context.Context, _, entry string) error { regened = append(regened, entry); return nil }
+	stage := func(_ context.Context, _, entry string) error { staged = append(staged, entry); return nil }
+	stale := derived.Stale([]string{"go/internal/flagregistry/registry_table.go", "go/internal/core/foo.go"}, nil)
+
+	done := regenStaleProjections(context.Background(), "/wt", stale, regen, stage)
+
+	for name, got := range map[string][]string{"done": done, "regenerated": regened, "staged": staged} {
+		if !reflect.DeepEqual(got, []string{"flag-index"}) {
+			t.Errorf("%s = %v, want [flag-index]", name, got)
+		}
 	}
 }
 
-func TestRegenStaleProjections_NoSSOTChange_NoOp(t *testing.T) {
+func TestRegenStaleProjections_NoStaleEntry_NoOp(t *testing.T) {
 	called := false
 	regen := func(_ context.Context, _, _ string) error { called = true; return nil }
-	done := regenStaleProjections(context.Background(), "/wt",
-		[]string{"go/internal/core/foo.go", "README.md"}, regen, func(context.Context, string, string) error { return nil })
+	done := regenStaleProjections(context.Background(), "/wt", nil, regen, func(context.Context, string, string) error { return nil })
 	if len(done) != 0 || called {
-		t.Fatalf("no SSOT change must be a no-op (done=%v called=%v)", done, called)
+		t.Fatalf("no stale entry must be a no-op (done=%v called=%v)", done, called)
 	}
+}
+
+func flagIndexOnly(t *testing.T) []derived.Entry {
+	t.Helper()
+	e, ok := derived.Lookup("flag-index")
+	if !ok {
+		t.Fatal("the catalog has no flag-index entry")
+	}
+	return []derived.Entry{e}
 }
 
 func TestRegenStaleProjections_RegenFails_SkipsWithoutStaging(t *testing.T) {
 	staged := false
 	regen := func(_ context.Context, _, _ string) error { return errors.New("regen boom") }
-	done := regenStaleProjections(context.Background(), "/wt",
-		[]string{"go/internal/flagregistry/registry_table.go"}, regen, func(context.Context, string, string) error { staged = true; return nil })
+	done := regenStaleProjections(context.Background(), "/wt", flagIndexOnly(t), regen, func(context.Context, string, string) error { staged = true; return nil })
 	if len(done) != 0 {
 		t.Fatalf("regen failure → not done, got %v", done)
 	}
@@ -671,8 +647,7 @@ func TestRegenStaleProjections_RegenFails_SkipsWithoutStaging(t *testing.T) {
 
 func TestRegenStaleProjections_StageFails_Skips(t *testing.T) {
 	regen := func(_ context.Context, _, _ string) error { return nil }
-	done := regenStaleProjections(context.Background(), "/wt",
-		[]string{"go/internal/flagregistry/registry_table.go"}, regen, func(context.Context, string, string) error { return errors.New("add boom") })
+	done := regenStaleProjections(context.Background(), "/wt", flagIndexOnly(t), regen, func(context.Context, string, string) error { return errors.New("add boom") })
 	if len(done) != 0 {
 		t.Fatalf("stage failure → not done, got %v", done)
 	}
@@ -696,25 +671,41 @@ func initTempRepo(t *testing.T) (string, func(...string)) {
 	return dir, git
 }
 
-func TestStageWorktreePath_RealGit(t *testing.T) {
-	dir, _ := initTempRepo(t)
-	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x\n"), 0o644); err != nil {
-		t.Fatal(err)
+func TestStageDerivedEntry_StagesOnlyTheOutputsOfTheEntry(t *testing.T) {
+	dir, git := initTempRepo(t)
+	writeFile(t, filepath.Join(dir, "base.txt"), "base\n")
+	git("add", "-A")
+	git("commit", "-m", "base")
+	writeFile(t, filepath.Join(dir, cflags), "regenerated\n")
+	writeFile(t, filepath.Join(dir, "commands", "build.md"), "stub\n")
+
+	if err := stageDerivedEntry(context.Background(), dir, "flag-index"); err != nil {
+		t.Fatalf("stageDerivedEntry: %v", err)
 	}
-	if err := stageWorktreePath(context.Background(), dir, "f.txt"); err != nil {
-		t.Fatalf("stageWorktreePath: %v", err)
-	}
+
 	out, _, _ := gitCapture(context.Background(), dir, "diff", "--cached", "--name-only")
-	if strings.TrimSpace(out) != "f.txt" {
-		t.Fatalf("f.txt should be staged, got %q", out)
+	if strings.TrimSpace(out) != cflags {
+		t.Fatalf("staged = %q, want only %s", out, cflags)
 	}
 }
 
-func TestStageWorktreePath_NonRepo_Errors(t *testing.T) {
-	// A non-git dir makes `git add` exit non-zero → stageWorktreePath returns the
-	// command-failure error (the code!=0 branch).
-	if err := stageWorktreePath(context.Background(), t.TempDir(), "nope.txt"); err == nil {
-		t.Fatal("staging in a non-repo must return an error")
+func TestStageDerivedEntry_Refusals(t *testing.T) {
+	cases := map[string]struct{ dir, entry string }{
+		"a directory outside git":     {t.TempDir(), "flag-index"},
+		"an entry not in the catalog": {t.TempDir(), "no-such-entry"},
+	}
+	for name, c := range cases {
+		if err := stageDerivedEntry(context.Background(), c.dir, c.entry); err == nil {
+			t.Errorf("%s: stageDerivedEntry = nil, want an error", name)
+		}
+	}
+}
+
+func TestStageEntryWith_ASpawnFailureIsAnError(t *testing.T) {
+	spawnFails := func(context.Context, string, ...string) (string, int, error) { return "", -1, errors.New("no git") }
+
+	if err := stageEntryWith(context.Background(), spawnFails, "/wt", "flag-index"); err == nil || !strings.Contains(err.Error(), "no git") {
+		t.Fatalf("stageEntryWith = %v, want the spawn error", err)
 	}
 }
 

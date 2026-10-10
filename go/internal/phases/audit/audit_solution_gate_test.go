@@ -10,10 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// A document cycle whose solutions/<slug>/ fails the deterministic contract
-// (internal/solutioncheck) must FAIL audit even when the narrative says PASS
-// and EGPS is green — the same single-exit gate shape as gofmt.
-// See ADR-0099.
 func TestRun_SolutionContractViolation_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -37,8 +33,6 @@ func TestRun_SolutionContractViolation_FAILsAudit(t *testing.T) {
 	}
 }
 
-// A clean deliverable (or a code cycle: no failures) keeps PASS; an infra
-// error fails OPEN with a warning.
 func TestRun_SolutionContractClean_PASSPreserved(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -53,9 +47,6 @@ func TestRun_SolutionContractClean_PASSPreserved(t *testing.T) {
 	}
 }
 
-// TestNew_SolutionSpecWiresTheGate: the composition root hands the registry
-// spec in; a document cycle bound to no task then FAILs through the production
-// gate (no config loading inside the phase).
 func TestNew_SolutionSpecWiresTheGate(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -82,8 +73,6 @@ func TestNew_SolutionSpecWiresTheGate(t *testing.T) {
 	}
 }
 
-// TestNewDefaultWithStageCompactSpec_WiresTheGate: the composition root's
-// constructor threads the registry spec into the production gate.
 func TestNewDefaultWithStageCompactSpec_WiresTheGate(t *testing.T) {
 	spec := config.DeliverableKindSpec{Root: "solutions", MinOptions: 2}
 	if phase := NewDefaultWithStageCompactSpec(&fakeBridge{writeArtifact: "x"}, fakePromptsFS("body"), config.StageOff, false, &spec); phase == nil || phase.BaseRunner == nil {

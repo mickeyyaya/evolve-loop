@@ -14,7 +14,7 @@ func TestPruneByClassification_RemovesMatches(t *testing.T) {
 		{"cycle": float64(1), "classification": "infrastructure-systemic"},
 		{"cycle": float64(2), "classification": "infrastructure-transient"},
 		{"cycle": float64(3), "classification": "ship-gate-config"},
-		{"cycle": float64(4), "classification": "code-audit-fail"}, // not in target — keep
+		{"cycle": float64(4), "classification": "code-audit-fail"},
 	})
 	res, err := PruneByClassification(path, []Classification{
 		InfrastructureSystemic, InfrastructureTransient, ShipGateConfig,
@@ -62,14 +62,13 @@ func TestPruneByClassification_NoMatches(t *testing.T) {
 
 func TestPruneByClassification_KeepsLegacyAndNonObject(t *testing.T) {
 	t.Parallel()
-	// Mix: classification-less entry (legacy) + non-object + matching
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 	state := map[string]any{
 		"failedApproaches": []any{
-			map[string]any{"cycle": float64(1)}, // no classification — keep
-			"just-a-string",                     // non-object — keep
-			map[string]any{"cycle": float64(2), "classification": "infrastructure-systemic"}, // match — drop
+			map[string]any{"cycle": float64(1)},
+			"just-a-string",
+			map[string]any{"cycle": float64(2), "classification": "infrastructure-systemic"},
 		},
 	}
 	b, _ := json.Marshal(state)
@@ -122,8 +121,6 @@ func TestPruneByClassification_EmptyEntries(t *testing.T) {
 	}
 }
 
-// TestPruneByClassification_ReadStateError covers the `read state` error
-// branch (non-NotExist read failure, e.g., permission denied).
 func TestPruneByClassification_ReadStateError(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -140,7 +137,6 @@ func TestPruneByClassification_ReadStateError(t *testing.T) {
 }
 
 func TestPruneByClassification_AtomicWriteError(t *testing.T) {
-	// NOT t.Parallel — mutates package-level atomicWriteJSON.
 	prev := atomicWriteJSON
 	defer func() { atomicWriteJSON = prev }()
 	atomicWriteJSON = func(string, map[string]any) error {

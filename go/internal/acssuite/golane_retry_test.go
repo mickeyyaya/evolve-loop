@@ -81,3 +81,23 @@ func TestRun_TheRetryRunsInTheSameEnvironmentAsTheFirstRun(t *testing.T) {
 		t.Errorf("retry env has %d keys and state root %q, want the first run's %d keys and %q", len(retry), retry["EVOLVE_PROJECT_ROOT"], len(first), root)
 	}
 }
+
+func TestRun_AFlakeThatPassesOnACompleteRetryFlipsToGreenKeepingItsSignature(t *testing.T) {
+	first := goStream(goLine(acsPkgBase+"cycle9", "TestC9_001_Flake", "fail"))
+	retry := goStream(goLine(acsPkgBase+"cycle9", "TestC9_001_Flake", "pass"))
+	exec, calls := cycleScopeRuns([]string{first, retry}, []error{errors.New("exit status 1"), nil})
+	v, err := Run(Options{Root: t.TempDir(), Cycle: 9, GoExec: exec})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 2 {
+		t.Fatalf("the scope ran %d times, want the one bounded retry", *calls)
+	}
+	flake := resultByACID(t, v, "cycle9/TestC9_001_Flake")
+	if flake.ResultStr != "green" || flake.Flaky != "passed-on-retry" || flake.RetryOutcome != "" {
+		t.Errorf("flake after a passing retry = {result:%q flaky:%q retry:%q}, want green annotated passed-on-retry", flake.ResultStr, flake.Flaky, flake.RetryOutcome)
+	}
+	if v.RedCount != 0 {
+		t.Errorf("RedCount = %d after a flake absorbed on retry, want 0", v.RedCount)
+	}
+}

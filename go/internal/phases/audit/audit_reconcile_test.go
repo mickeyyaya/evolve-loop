@@ -8,15 +8,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// auditTimeoutErr mimics what bridge.Engine.Launch returns on exit 81.
 func auditTimeoutErr() error {
 	return fmt.Errorf("bridge: launch exit=%d: %w", 81, core.ErrArtifactTimeout)
 }
 
-// TestRun_Timeout_PassReport_RedCountZero_ReconcilesToPass — end-to-end proof of
-// reconcile-on-timeout through the REAL audit hooks + deliverable.Verify: the
-// bridge times out (exit 81) but the auditor's PASS report is on disk and the
-// EGPS suite is green (red_count==0), so the cycle ships instead of false-FAILing.
 func TestRun_Timeout_PassReport_RedCountZero_ReconcilesToPass(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -36,14 +31,9 @@ func TestRun_Timeout_PassReport_RedCountZero_ReconcilesToPass(t *testing.T) {
 	}
 }
 
-// TestRun_Timeout_PassReport_RedCountPositive_StaysFail is the CRITICAL
-// anti-Goodhart test: a PASS-declaring report on a timeout must STILL FAIL when
-// the EGPS predicate suite is red (red_count>0). This proves reconciliation
-// routes through Classify (the real EGPS gate), not a bare sentinel read — a
-// green-looking report with red predicates can never ship.
 func TestRun_Timeout_PassReport_RedCountPositive_StaysFail(t *testing.T) {
 	ws := t.TempDir()
-	writeACSVerdict(t, ws, 2) // two red predicates
+	writeACSVerdict(t, ws, 2)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	fb := &fakeBridge{err: auditTimeoutErr(), writeArtifact: body}
 	phase := New(Config{Bridge: fb, Prompts: fakePromptsFS("body")})

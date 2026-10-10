@@ -12,11 +12,9 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// A cycle whose worktree drifted a SKILL.md (e.g. edited .evolve/profiles/*.json
-// without regenerating the phase-facts region) must FAIL audit.
 func TestRun_SkillsDrift_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
-	writeACSVerdict(t, ws, 0) // EGPS green, so only the skills gate can FAIL it.
+	writeACSVerdict(t, ws, 0)
 	body := "# Audit Report\n\n## Verdict\n**PASS**\n"
 	phase := New(Config{
 		Bridge:  &fakeBridge{writeArtifact: body},
@@ -37,10 +35,6 @@ func TestRun_SkillsDrift_FAILsAudit(t *testing.T) {
 	}
 }
 
-// A drifted commands/<name>.md stub (the /-menu projection surface added with
-// the skill→command projection) must FAIL audit just like a drifted SKILL.md.
-// The gate is drift-source-agnostic, so this guards against anyone later
-// narrowing it to only "SKILL.md" and letting command drift ship CI-red.
 func TestRun_CommandStubDrift_FAILsAudit(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -77,8 +71,6 @@ func TestRun_SkillsDriftClean_PASSPreserved(t *testing.T) {
 	}
 }
 
-// Infra error (e.g. the worktree has no phase-registry to load) fails OPEN: warn,
-// never brick the cycle on the gate's own inability to run.
 func TestRun_SkillsDriftError_FailsOpenWithWarning(t *testing.T) {
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
@@ -96,8 +88,6 @@ func TestRun_SkillsDriftError_FailsOpenWithWarning(t *testing.T) {
 	}
 }
 
-// skillsDriftRepoRoot locates the repo root from this file's path (4 levels up
-// from go/internal/phases/audit/) and skips when skills/ is absent.
 func skillsDriftRepoRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -143,16 +133,12 @@ func skillsDriftCopyTree(t *testing.T, src, dst string) {
 	}
 }
 
-// TestNewDefault_WiresSkillsDriftCheck pins that NewDefault wires the real
-// skills-drift gate: a worktree with a drifted SKILL.md, combined with a
-// green EGPS suite, must cause Verdict=FAIL. This mirrors TestNewDefault_WiresGofmtCheck.
 func TestNewDefault_WiresSkillsDriftCheck(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skips real skills tree copy under -short; full `go test` + CI still run it")
 	}
 	repoRoot := skillsDriftRepoRoot(t)
 
-	// Build a temp dir with a drifted SKILL.md.
 	root := t.TempDir()
 	skillsDriftCopyFile(t,
 		filepath.Join(repoRoot, "docs", "architecture", "phase-registry.json"),
@@ -174,7 +160,7 @@ func TestNewDefault_WiresSkillsDriftCheck(t *testing.T) {
 	}
 
 	ws := t.TempDir()
-	writeACSVerdict(t, ws, 0) // EGPS green — only skills gate can FAIL.
+	writeACSVerdict(t, ws, 0)
 
 	fb := &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}
 	phase := NewDefault(fb, fakePromptsFS("body"))
@@ -200,7 +186,7 @@ func TestSkillsDriftCheckDefault_EmptyRoot_NoOp(t *testing.T) {
 }
 
 func TestSkillsDriftCheckDefault_FallsBackToProjectRoot(t *testing.T) {
-	tmp := t.TempDir() // no catalog → skillcheck.Check returns error, not an early nil
+	tmp := t.TempDir()
 	got, err := skillsDriftCheckDefault(core.PhaseRequest{Worktree: "", ProjectRoot: tmp})
 	if err == nil {
 		t.Error("want error from skillcheck.Check on empty ProjectRoot dir; got nil (may indicate early no-op instead of fallback)")

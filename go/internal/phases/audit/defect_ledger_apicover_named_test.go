@@ -7,10 +7,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// The tail constructor accepts functional options: WithSignals reaches
-// Config.Signals; zero options is today's phase. The two exports Option and
-// WithSignals are named here for the apicover gate.
-// See ADR-0103.
 func TestNewDefaultWithStageCompactSpec_AcceptsOptions(t *testing.T) {
 	var applied Config
 	capture := Option(func(c *Config) { applied = *c })

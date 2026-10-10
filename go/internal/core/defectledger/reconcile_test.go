@@ -11,10 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// G4 replay — every diagnostic scenario captured on 8e8f080f
-// (diagnostics.golden.json) rebuilt on the same fixture and graded through the
-// leaf: the messages, severities, order, block decision and lineage are
-// byte-identical.
 func TestReconcile_DiagnosticsAreByteIdenticalToTheGoldens(t *testing.T) {
 	cases := map[string]func(t *testing.T, f fixture) LaneScopeReader{
 		"corrupt_manifest": func(t *testing.T, f fixture) LaneScopeReader {
@@ -124,7 +120,6 @@ func fieldsOf(t *testing.T, e signalcenter.Event, want map[string]string) {
 	}
 }
 
-// Test 15 — no manifest and a nil lane-scope pin ⇒ the zero Verdict, no event.
 func TestReconcile_NotAContinuation_IsANoOp(t *testing.T) {
 	f := newFixture(t)
 	f.removeManifest(t)
@@ -137,8 +132,6 @@ func TestReconcile_NotAContinuation_IsANoOp(t *testing.T) {
 	}
 }
 
-// Test 16 — a corrupt manifest blocks with the golden text and reports
-// AUDIT_LEDGER_MANIFEST_UNREADABLE {step=arm, blocked=true, workspace}.
 func TestReconcile_CorruptManifest_BlocksVerbatim(t *testing.T) {
 	f := newFixture(t)
 	f.write(t, ".evolve/runs/cycle-1270/continuation-manifest.json", "{")
@@ -153,9 +146,6 @@ func TestReconcile_CorruptManifest_BlocksVerbatim(t *testing.T) {
 	}
 }
 
-// Test 17 — the registry binds the lane, the manifest is gone: the missing-
-// manifest finding is PREPENDED to the graded diagnostics; blocked;
-// AUDIT_LEDGER_MANIFEST_MISSING {registry_path, ancestor_cycle}.
 func TestReconcile_RegistryBindsManifestMissing_PrependsThenGrades(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, ancestorOneOpen)
@@ -186,8 +176,6 @@ func codeStrings(in any) []string {
 	return out
 }
 
-// Test 18 — manifest and registry naming different ancestors block;
-// AUDIT_LEDGER_LINEAGE_DISAGREES {manifest_cycle, registry_cycle}.
 func TestReconcile_ManifestAndRegistryDisagree_Blocks(t *testing.T) {
 	f := newFixture(t)
 	f.bindRegistry(t, 1200)
@@ -196,7 +184,6 @@ func TestReconcile_ManifestAndRegistryDisagree_Blocks(t *testing.T) {
 	fieldsOf(t, only(t, *got, CodeLineageDisagrees), map[string]string{"step": "arm", "blocked": "true", "manifest_cycle": "1255", "registry_cycle": "1200"})
 }
 
-// Test 19 — a nil lane-scope pin never arms from the registry, however it binds.
 func TestReconcile_NilLaneScope_NeverArmsFromTheRegistry(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, ancestorOneOpen)
@@ -208,7 +195,6 @@ func TestReconcile_NilLaneScope_NeverArmsFromTheRegistry(t *testing.T) {
 	}
 }
 
-// Test 20 — a garbage registry is a miss (fail-closed is unavailable): not armed, no signal.
 func TestReconcile_RegistryReadErrorIsAMiss(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, ancestorOneOpen)
@@ -220,8 +206,6 @@ func TestReconcile_RegistryReadErrorIsAMiss(t *testing.T) {
 	}
 }
 
-// Test 21 — an unreadable ancestor ledger blocks: AUDIT_LEDGER_UNREADABLE
-// {which=ancestor, op=parse|read, path, ancestor_cycle}.
 func TestReconcile_AncestorLedgerUnreadable_Blocks(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, "garbage")
@@ -238,8 +222,6 @@ func TestReconcile_AncestorLedgerUnreadable_Blocks(t *testing.T) {
 	fieldsOf(t, only(t, *got, CodeLedgerUnreadable), map[string]string{"which": "ancestor", "op": "read"})
 }
 
-// Test 22 — an absent or empty ancestor ledger warns without blocking or
-// vouching: AUDIT_LEDGER_ANCESTOR_EMPTY {blocked=false, ancestor_cycle, path}.
 func TestReconcile_AncestorEmptyOrAbsent_WarnsWithoutBlockingOrVouching(t *testing.T) {
 	for name, body := range map[string]string{"ancestor_absent": "", "ancestor_empty": `{"origin_cycle":1255,"entries":[]}`} {
 		f := newFixture(t)
@@ -317,7 +299,6 @@ func TestReconcile_ShadowRowsBesideTheAuditsLeaveTheVerdictByteIdentical(t *test
 	assertVerdict(t, "reconciled_writeback_beside_shadow", l.Reconcile(f.req), goldenScenario(t, "reconciled_writeback", f))
 }
 
-// Test 23 — this cycle's own ledger unreadable blocks: {which=own}.
 func TestReconcile_OwnLedgerUnreadable_Blocks(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, ancestorOneOpen)
@@ -327,9 +308,6 @@ func TestReconcile_OwnLedgerUnreadable_Blocks(t *testing.T) {
 	fieldsOf(t, only(t, *got, CodeLedgerUnreadable), map[string]string{"step": "grade", "blocked": "true", "which": "own", "op": "parse", "path": filepath.Join(f.ws, LedgerFile)})
 }
 
-// Test 26 — an absent dispositions file with defects owed yields TWO
-// diagnostics (the warning, then MISSING) and ONE signal per code; with
-// nothing owed the warning stands alone and nothing is signalled.
 func TestReconcile_AbsentDispositionsFile_TwoDiagnosticsOneSignal(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, ancestorOneOpen)
@@ -352,9 +330,6 @@ func TestReconcile_AbsentDispositionsFile_TwoDiagnosticsOneSignal(t *testing.T) 
 	}
 }
 
-// Test 27 — the merge: the first current row wins the index on a duplicated
-// id; an inherited id whose current text differs is shadowed (the 120-rune
-// cut of the planted text) and reset to the ancestor's text, OPEN.
 func TestMergeInherited_FirstRowWinsAndShadowResetsToAncestorText(t *testing.T) {
 	current := []Entry{{ID: "d1", Text: "A", Status: StatusOpen}, {ID: "d1", Text: "B", Status: StatusOpen}}
 	ancestor := []Entry{{ID: "d1", Text: "A", Status: StatusOpen}}
@@ -374,8 +349,6 @@ func TestMergeInherited_FirstRowWinsAndShadowResetsToAncestorText(t *testing.T) 
 	}
 }
 
-// Test 28 — the status table over a stub resolver: the four reason strings
-// verbatim; a rejected FIXED row carries no evidence or reason.
 func TestGradeClaim_StatusTable(t *testing.T) {
 	a := Entry{ID: "d1", Text: "t", Status: StatusOpen}
 	open := Entry{ID: "d1", Text: "t", Status: StatusOpen}
@@ -405,8 +378,6 @@ func TestGradeClaim_StatusTable(t *testing.T) {
 	}
 }
 
-// Test 29 — an ancestor row dispositioned upstream is carried verbatim and
-// never graded: the counting resolver sees zero calls.
 func TestMergeInherited_UpstreamDispositionedRowCarriedVerbatim(t *testing.T) {
 	calls := 0
 	counting := func(string) (bool, string) { calls++; return true, "" }
@@ -422,10 +393,6 @@ func TestMergeInherited_UpstreamDispositionedRowCarriedVerbatim(t *testing.T) {
 	}
 }
 
-// Test 31 — the merged ledger is written back BEFORE grading: the G3 bytes
-// land even though the grade blocks; AUDIT_LEDGER_DEFECTS_UNACCOUNTED carries
-// the count and a bounded id list; a 64-id unaccounted set renders under the
-// line cap with nothing truncated.
 func TestReconcile_WritesBackBeforeGrading_GoldenBytes(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, reconciledAncestor)
@@ -467,7 +434,6 @@ func TestReconcile_WritesBackBeforeGrading_GoldenBytes(t *testing.T) {
 	}
 }
 
-// Test 32 — a write-back failure blocks and reports AUDIT_LEDGER_WRITEBACK_FAILED {path}.
 func TestReconcile_WritebackFailure_BlocksAndSignals(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, ancestorOneOpen)
@@ -485,8 +451,6 @@ func TestReconcile_WritebackFailure_BlocksAndSignals(t *testing.T) {
 	fieldsOf(t, only(t, *got, CodeWritebackFailed), map[string]string{"step": "grade", "blocked": "true", "path": filepath.Join(f.ws, LedgerFile)})
 }
 
-// Test 33 — the vouched lineage: [ancestor] when origin_cycle equals it or
-// is 0; [ancestor, origin] when it differs; nil when blocked.
 func TestReconcile_LineageCycles(t *testing.T) {
 	for origin, want := range map[string]string{`"origin_cycle":1255,`: "1255", ``: "1255", `"origin_cycle":1250,`: "1255,1250"} {
 		f := newFixture(t)
@@ -503,8 +467,6 @@ func TestReconcile_LineageCycles(t *testing.T) {
 	}
 }
 
-// Test 34 — vouching reads the ancestor Doc the grade already loaded: a
-// resolver that deletes the ancestor ledger mid-grade still sees the vouch.
 func TestReconcile_VouchesFromTheGradesOwnAncestorDoc_NoSecondRead(t *testing.T) {
 	f := newFixture(t)
 	f.ancestorLedger(t, `{"origin_cycle":1250,"entries":[{"id":"d1","text":"a","status":"OPEN"}]}`)

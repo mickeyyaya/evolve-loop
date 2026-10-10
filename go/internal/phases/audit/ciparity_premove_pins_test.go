@@ -1,8 +1,5 @@
 package audit
 
-// The order and byte-identity invariants the CI-parity gates must keep, run
-// through the kept facades onto internal/phases/audit/ciparitygate.
-
 import (
 	"context"
 	"errors"
@@ -18,7 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// premoveGolden reads one `key<TAB>quoted` golden file.
 func premoveGolden(t *testing.T, name string) map[string]string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("ciparitygate", "testdata", name))
@@ -40,11 +36,8 @@ func premoveGolden(t *testing.T, name string) map[string]string {
 	return out
 }
 
-// Pin 2 (M2): the enforce list is read BEFORE the derivable check, so a
-// non-git root with go.mod and NO .apicover-enforce is a silent no-op for both
-// apicover gates — not the underivable hard-FAIL.
 func TestApicoverGates_MissingEnforceListWinsOverUnderivable(t *testing.T) {
-	root, _ := goWorktree(t) // go.mod, no .apicover-enforce, not a git repo, no handoff
+	root, _ := goWorktree(t)
 	req := core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1}
 	if off, err := apicoverEnforceChangedDefault(req); off != nil || err != nil {
 		t.Errorf("apicover-enforce without an enforce list = (%v, %v), want (nil, nil)", off, err)
@@ -54,10 +47,6 @@ func TestApicoverGates_MissingEnforceListWinsOverUnderivable(t *testing.T) {
 	}
 }
 
-// Pin 3 (M3, M4, a dropped release): when the serialized retake cannot even
-// start, integration-tier.log holds attempt 1 ONLY, the offenders are attempt
-// 1's plus the log pointer, and the cross-lane lock is released by the time
-// the gate returns.
 func TestIntegrationTier_RetakeExecFailure_LogHoldsAttemptOneOnlyAndReleasesFirst(t *testing.T) {
 	req := tierFixture(t)
 	calls := 0
@@ -91,15 +80,13 @@ func TestIntegrationTier_RetakeExecFailure_LogHoldsAttemptOneOnlyAndReleasesFirs
 	rel()
 }
 
-// Pin 5 (M6): the retake runs under a FRESH budget — its ctx deadline is later
-// than attempt 1's, never the leftovers of the same ctx.
 func TestIntegrationTier_RetakeUsesAFreshBudget(t *testing.T) {
 	req := tierFixture(t)
 	var deadlines []time.Time
 	withFakeRunner(t, func(ctx context.Context, _, _ string, _, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
 		d, _ := ctx.Deadline()
 		deadlines = append(deadlines, d)
-		time.Sleep(2 * time.Millisecond) // a coarse clock must still separate the two
+		time.Sleep(2 * time.Millisecond)
 		if len(deadlines) == 1 {
 			_, _ = io.WriteString(so, "--- FAIL: TestFlaky (0.00s)\n")
 			return 1, nil
@@ -114,8 +101,6 @@ func TestIntegrationTier_RetakeUsesAFreshBudget(t *testing.T) {
 	}
 }
 
-// Pin 6 (M7, M8): integration-tier.log is byte-identical to the golden for
-// the red-then-green run.
 func TestIntegrationTierLog_MatchesTheGoldenBytes(t *testing.T) {
 	req := tierFixture(t)
 	fn, _, _ := seqRunFunc(t, []struct {
@@ -139,9 +124,6 @@ func TestIntegrationTierLog_MatchesTheGoldenBytes(t *testing.T) {
 	}
 }
 
-// Pin 7 (M9, M10): the severity asymmetry, byte-exact — the whole-repo gates
-// WARN with the one underivable text; the two apicover gates hard-FAIL with
-// their own D1/D2 sentence.
 func TestChangedSetUnderivable_SeverityAsymmetryBytes(t *testing.T) {
 	g := premoveGolden(t, "messages.golden.txt")
 	root := enforceFixtureNonGit(t)

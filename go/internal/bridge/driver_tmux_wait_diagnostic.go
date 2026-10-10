@@ -16,6 +16,7 @@ type artifactTimeoutCause = launchoutcome.TimeoutCause
 
 const (
 	artifactTimeoutContextCancelled  = launchoutcome.TimeoutContextCancelled
+	artifactTimeoutPaneLost          = launchoutcome.TimeoutPaneLost
 	artifactTimeoutDetectorError     = launchoutcome.TimeoutDetectorError
 	artifactTimeoutSubmitWedged      = launchoutcome.TimeoutSubmitWedged
 	artifactTimeoutTransientUpstream = launchoutcome.TimeoutTransientUpstream
@@ -26,6 +27,7 @@ const (
 
 type artifactTimeoutEvidence struct {
 	cancellationErr         error
+	paneLost                bool
 	terminalDetectorErrored bool
 	submitWedged            bool
 	transient               bool
@@ -36,6 +38,8 @@ func selectArtifactTimeoutCause(e artifactTimeoutEvidence) artifactTimeoutCause 
 	switch {
 	case e.cancellationErr != nil:
 		return artifactTimeoutContextCancelled
+	case e.paneLost:
+		return artifactTimeoutPaneLost
 	case e.terminalDetectorErrored:
 		return artifactTimeoutDetectorError
 	case e.submitWedged:
@@ -73,6 +77,7 @@ type artifactTimeoutDiagnostic struct {
 func newArtifactTimeoutDiagnostic(w replWaiter, state *replWaitState, transient bool) artifactTimeoutDiagnostic {
 	evidence := artifactTimeoutEvidence{
 		cancellationErr:         state.cancellationErr,
+		paneLost:                state.paneLost,
 		terminalDetectorErrored: state.terminalDetectorErrored,
 		submitWedged:            state.submitWedged,
 		transient:               transient,

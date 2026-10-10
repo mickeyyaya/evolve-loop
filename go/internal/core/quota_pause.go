@@ -1,18 +1,16 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
 )
 
-// pauseForQuota records a resumable resource pause. Both dispatch entrypoints
-// preserve the same checkpoint and classification rather than creating a FAIL.
 func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int, cause error) error {
 	phaseErr := fmt.Errorf("phase %s: %w: the dispatch ended on a quota wall across %d attempts (%v); checkpoint written — resume with `evolve loop --resume` after quota reset", next, ErrAllFamiliesExhausted, attempt, cause)
-	// The pause is the quota.paused signal (WARN); the sink renders it — this
-	// seam is the one both dispatch roots reach.
 	cr.emitQuotaPaused(next, phaseErr)
+	cr.cs.QuotaWalkCLIs = walkedCLIs(cause)
 	if QuotaBoundaryCheckpointer != nil {
 		if cperr := QuotaBoundaryCheckpointer(cr.cs, cr.req.ProjectRoot, cr.o.now()); cperr != nil {
 			fmt.Fprintf(os.Stderr, "[orchestrator] WARN quota-boundary checkpoint write failed: %v (defer still recorded; resume may re-run completed phases)\n", cperr)
@@ -32,4 +30,12 @@ func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int, c
 	cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, phaseErr, attempt)
 	cr.recordFailureLearning(next, phaseErr, attempt)
 	return wrapCycleLevelError(next, phaseErr)
+}
+
+func walkedCLIs(cause error) []string {
+	var walk WalkError
+	if !errors.As(cause, &walk) {
+		return nil
+	}
+	return walk.CLIs
 }

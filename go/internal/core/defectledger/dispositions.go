@@ -11,14 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
-// ReadDispositions loads the continuation's disposition claims keyed by
-// defect id. A MISSING file is not an error and not a pass: it yields an empty
-// map and a warning, so every inherited OPEN entry falls through to
-// "unaccounted" and is named by id (the pre-flight names the absent artifact
-// and carries the signal — one absent file, one signal). An unreadable or
-// unparseable file blocks immediately with AUDIT_LEDGER_DISPOSITIONS_UNREADABLE
-// — degrading open there would hand the gate its cheapest bypass (write
-// garbage, ship). The diagnostic carries the expected schema; the signal does not.
 func (l *Ledger) ReadDispositions(req Request, ancestorCycle int) (map[string]Entry, []cyclestate.Diagnostic, bool) {
 	path := filepath.Join(req.Workspace, DispositionsFile)
 	raw, err := os.ReadFile(path)
@@ -45,17 +37,11 @@ func (l *Ledger) ReadDispositions(req Request, ancestorCycle int) (map[string]En
 	return claims, nil, false
 }
 
-// Preflight grades the disposition ARTIFACT's completeness against the
-// ancestor's OPEN set, before the per-id reconcile runs (cycle-1342 F4): the
-// per-id switch blocks correctly but never failed loudly BY NAME on the file
-// itself. Silent — necessarily, as the anti-no-op half — whenever the ancestor
-// carries no OPEN entries or every one of them is covered; a pre-flight that
-// fires on every continuation proves nothing.
 func (l *Ledger) Preflight(req Request, ancestorCycle int, ancestor []Entry, claims map[string]Entry) []cyclestate.Diagnostic {
 	var open, uncovered []string
 	for _, a := range ancestor {
 		if a.Status != StatusOpen {
-			continue // already dispositioned upstream — nothing is owed for it here
+			continue
 		}
 		open = append(open, a.ID)
 		if _, has := claims[a.ID]; !has {

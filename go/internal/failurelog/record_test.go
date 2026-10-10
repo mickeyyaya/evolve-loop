@@ -11,14 +11,11 @@ import (
 	"time"
 )
 
-// writeState seeds state.json under an isolated workspace root with the given
-// top-level shape and returns its path. Used by Record + Prune tests.
 func writeState(t *testing.T, content string) string {
 	t.Helper()
 	return mustWrite(t, filepath.Join(t.TempDir(), "state.json"), content)
 }
 
-// readState parses state.json from disk for assertions.
 func readState(t *testing.T, path string) map[string]any {
 	t.Helper()
 	var m map[string]any
@@ -59,8 +56,6 @@ func TestRecord_AppendsToEmpty(t *testing.T) {
 
 func TestRecord_FIFOTrim(t *testing.T) {
 	t.Parallel()
-	// Seed state.json with 50 existing entries — appending one more
-	// must drop the oldest.
 	var entries []any
 	for i := 0; i < 50; i++ {
 		entries = append(entries, map[string]any{
@@ -90,7 +85,6 @@ func TestRecord_FIFOTrim(t *testing.T) {
 	if len(finalEntries) != 50 {
 		t.Fatalf("entries=%d want 50 (FIFO cap)", len(finalEntries))
 	}
-	// The first (oldest, cycle=0) must be dropped; new entry (cycle=51) appended.
 	first := finalEntries[0].(map[string]any)
 	last := finalEntries[len(finalEntries)-1].(map[string]any)
 	if first["cycle"].(float64) != 1 {
@@ -155,7 +149,6 @@ Three retries all failed.
 }
 
 func TestRecord_AtomicWriteFailure(t *testing.T) {
-	// NOT t.Parallel — mutates package-level atomicWriteJSON.
 	prev := atomicWriteJSON
 	defer func() { atomicWriteJSON = prev }()
 	atomicWriteJSON = func(string, map[string]any) error {
@@ -213,7 +206,6 @@ Should not appear.
 
 func TestExtractSummary_HighlyVerboseTruncatedTo400(t *testing.T) {
 	t.Parallel()
-	// Build a long single-line summary that exceeds 400 chars.
 	long := ""
 	for i := 0; i < 100; i++ {
 		long += fmt.Sprintf("word%d ", i)
@@ -264,10 +256,6 @@ func TestRecord_EmptySummaryStillDerivedFromReport(t *testing.T) {
 	}
 }
 
-// The failure floor records loop fatals whose cycle may be unknown (0,
-// e.g. resume-load failure). lastCycleNumber must be monotonic — a
-// Record call can advance it, never regress it (cycle-number reuse
-// corrupts workspace history).
 func TestRecord_DoesNotRegressLastCycleNumber(t *testing.T) {
 	t.Parallel()
 	path := writeState(t, `{"lastCycleNumber": 7}`)

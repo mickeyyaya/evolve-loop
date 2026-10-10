@@ -16,9 +16,6 @@ func TestExecAdapterDeps_WiresNonNilTokenResolver(t *testing.T) {
 	}
 }
 
-// TestExecAdapterDeps_ResolverAppliesRealFixture proves the wired resolver
-// genuinely scans HOME/.claude via tokenusage.DefaultResolver, not a
-// disconnected stub.
 func TestExecAdapterDeps_ResolverAppliesRealFixture(t *testing.T) {
 	home := t.TempDir()
 	worktree := "/repo/worktrees/cycle-623-subagent"
@@ -51,11 +48,6 @@ func TestExecAdapterDeps_ResolverAppliesRealFixture(t *testing.T) {
 	}
 }
 
-// TestExecAdapterDeps_MissingHome_StillReturnsNonNilResolver: an env map
-// with no "HOME" key must not panic and must not leave TokenResolver nil —
-// it degrades to os.Getenv("HOME"), and even a totally unresolvable HOME
-// still yields a resolver func (Chain/ScanConfigRoot fail open to
-// SourceNone, never a nil func).
 func TestExecAdapterDeps_MissingHome_StillReturnsNonNilResolver(t *testing.T) {
 	d := execAdapterDeps(map[string]string{})
 	if d.TokenResolver == nil {

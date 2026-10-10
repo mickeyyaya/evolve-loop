@@ -26,6 +26,8 @@ Why each server option:
 - **`-f /dev/null`** keeps the operator's `.tmux.conf` out of the tests.
 - **`exit-empty off`** keeps the server alive between tests. Otherwise the next test's client would start a new server, with the user config and the login shell.
 
+`StartServer(socket)` and `StopServer(socket)` are the steps 2 and 4 alone (exported 2026-10-09). A test that must kill a server uses them on a private socket of its own, never on the shared socket of the binary. For example, `TestRealTmux_AKilledServerEndsTheWatchingDispatchAsPaneLostWithinOneLivenessInterval` uses `evolve-bridge-t<pid>-panelost`. It starts that server, kills it during a dispatch and stops it in cleanup ([cycle 1853](../../incidents/cycle-1853-secondary-defects.md)). `StartServer("")` refuses before it starts anything, because an empty name selects the default server. Pinned by `TestStartServer_RefusesAnEmptySocketBeforeItStartsAnything`.
+
 A test binary whose tmux server cannot start fails with exit 1 and runs nothing; it never falls back to the shared server. A test binary on a host without tmux still gets its own socket name, and the real-tmux tests skip as before.
 
 ## Invariants

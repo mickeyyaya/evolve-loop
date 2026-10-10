@@ -98,3 +98,19 @@ func TestMain_AServerThatCannotStartRunsNothingAndFails(t *testing.T) {
 		t.Fatalf("Main = %d, ran = %v; a test binary whose tmux server cannot start must fail without running", code, ran)
 	}
 }
+
+func TestStartServer_RefusesAnEmptySocketBeforeItStartsAnything(t *testing.T) {
+	err := StartServer("")
+
+	if err == nil || !strings.Contains(err.Error(), "empty socket name") {
+		t.Fatalf("StartServer(\"\") err=%v, want the empty-socket refusal: an empty name would select the default server", err)
+	}
+}
+
+func TestStopServer_RefusesAnEmptySocketSoItNeverKillsTheDefaultServer(t *testing.T) {
+	err := StopServer("")
+
+	if err == nil || !strings.Contains(err.Error(), "empty socket name") {
+		t.Fatalf("StopServer(\"\") err=%v, want the empty-socket refusal", err)
+	}
+}

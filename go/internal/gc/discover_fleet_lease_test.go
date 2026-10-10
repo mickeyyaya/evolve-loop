@@ -8,27 +8,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-// discover_fleet_lease_test.go — regression pin for the fleet cycle-state
-// isolation fix (2026-07-03). Under fleet each lane writes cycle state to its
-// OWN per-run file (ipcenv.CycleStateFileKey), so the host-global
-// .evolve/cycle-state.json is absent/stale and currentWorkspace() returns "".
-// The GC must NOT reap a live lane's run dir on that basis: the per-run .lease
-// (ADR-0049 G16) is the independent liveness signal in
-// `Live: dir == currentWS || leaseFresh(dir)`. This test proves that with an
-// EMPTY currentWorkspace, a fresh-lease lane stays Live and a stale-lease lane
-// does not — the exact protection that keeps concurrent fleet lanes from being
-// deleted mid-cycle.
 func TestDiscover_EmptyCurrentWorkspace_FreshLeaseStaysLive(t *testing.T) {
 	dir := t.TempDir()
-	// No cycle-state.json at the host root ⇒ currentWorkspace() == "" (the fleet
-	// case, where lanes wrote per-run files instead of the host singleton).
 	t0 := time.Unix(1_700_000_000, 0)
 
-	liveLane := mkRun(t, dir, "cycle-201", t0.Add(-time.Hour)) // old mtime, but heartbeating
+	liveLane := mkRun(t, dir, "cycle-201", t0.Add(-time.Hour))
 	deadLane := mkRun(t, dir, "cycle-202", t0.Add(-time.Hour))
-	// Every real fleet lane writes run.json (the CB.4 mirror) — the run marker
-	// hasRunMarker() requires. Without it Discover skips the dir as noise, so
-	// the fixture must carry it to exercise the liveness classification at all.
 	writeFile(t, filepath.Join(liveLane.Path, "run.json"), `{"cycle_id":201}`)
 	writeFile(t, filepath.Join(deadLane.Path, "run.json"), `{"cycle_id":202}`)
 

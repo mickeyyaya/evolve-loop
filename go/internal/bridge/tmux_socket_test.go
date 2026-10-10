@@ -1,6 +1,9 @@
 package bridge
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -67,4 +70,20 @@ func TestDeriveTestSocket_IsPerProcessAndNeverTheSharedOrALoopSocket(t *testing.
 	if got == TmuxSocket || got == DeriveRunSocket(4242) || DeriveTestSocket(4243) == got {
 		t.Fatalf("a test process socket must be its own: %q", got)
 	}
+}
+
+func TestTmuxSocketDir_FollowsTmuxTmpdirLikeTmuxDoes(t *testing.T) {
+	uid := fmt.Sprintf("tmux-%d", os.Getuid())
+	t.Run("default", func(t *testing.T) {
+		t.Setenv("TMUX_TMPDIR", "")
+		if got, want := TmuxSocketDir(), filepath.Join("/tmp", uid); got != want {
+			t.Fatalf("TmuxSocketDir() = %q, want %q", got, want)
+		}
+	})
+	t.Run("TMUX_TMPDIR", func(t *testing.T) {
+		t.Setenv("TMUX_TMPDIR", "/srv/tmux")
+		if got, want := TmuxSocketDir(), filepath.Join("/srv/tmux", uid); got != want {
+			t.Fatalf("TmuxSocketDir() = %q, want %q", got, want)
+		}
+	})
 }

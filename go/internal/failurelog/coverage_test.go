@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// TestRecord_StateUnreadable covers the os.ReadFile error branch that
-// is NOT os.ErrNotExist (permission denied / IO error). chmod 000.
 func TestRecord_StateUnreadable(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -32,8 +30,6 @@ func TestRecord_StateUnreadable(t *testing.T) {
 	}
 }
 
-// TestExtractSummary_CapsAtMaxLines covers the `captured >= maxLines`
-// break — feed 12 captured lines, assert only 8 land in the summary.
 func TestExtractSummary_CapsAtMaxLines(t *testing.T) {
 	t.Parallel()
 	body := "## Failure Root Cause\n"
@@ -42,7 +38,6 @@ func TestExtractSummary_CapsAtMaxLines(t *testing.T) {
 	}
 	path := mustWrite(t, filepath.Join(t.TempDir(), "report.md"), body)
 	s := extractSummary(path)
-	// 8 lines kept; lines 0-7 included, lines 8-11 dropped.
 	if !strings.Contains(s, "line7") {
 		t.Fatalf("summary should include line7: %q", s)
 	}
@@ -51,14 +46,8 @@ func TestExtractSummary_CapsAtMaxLines(t *testing.T) {
 	}
 }
 
-// TestMustMarshalToAny_Defensive — the only way json.Marshal of
-// Recorded fails is if a field is unmarshalable. Recorded uses plain
-// strings + ints, so this is true-defensive: the fallback path
-// returns {}. Cover it explicitly.
 func TestMustMarshalToAny_Defensive(t *testing.T) {
 	t.Parallel()
-	// Pass an unmarshalable value (channel). mustMarshalToAny is
-	// internal; we exercise it directly.
 	got := mustMarshalToAny(make(chan int))
 	if got == nil {
 		t.Fatalf("must not return nil")
@@ -68,16 +57,6 @@ func TestMustMarshalToAny_Defensive(t *testing.T) {
 	}
 }
 
-// NOTE: the former TestAtomicWriteJSONReal_{MarshalError,WriteTmpError,
-// RenameError} tests exercised the package-local atomicWriteJSONReal
-// helper's internals. That helper was removed in favor of the shared
-// internal/atomicwrite package, whose own tests cover those OS-fault
-// branches at 100%. The write path is still verified through the public
-// API via the atomicWriteJSON seam-override tests in record_test.go,
-// prune_test.go, and prune_by_class_test.go.
-
-// TestPruneExpired_StateUnreadable covers the os.ReadFile non-NotExist
-// error branch in PruneExpired (permission denied).
 func TestPruneExpired_StateUnreadable(t *testing.T) {
 	t.Parallel()
 	if os.Geteuid() == 0 {
@@ -95,12 +74,8 @@ func TestPruneExpired_StateUnreadable(t *testing.T) {
 	}
 }
 
-// TestPruneExpired_ZeroNow ensures time.Time{} input defaults to
-// time.Now().UTC().
 func TestPruneExpired_ZeroNow(t *testing.T) {
 	t.Parallel()
-	// Entry expired 1d ago → must be pruned even when caller passes
-	// time.Time{}.
 	yesterday := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339)
 	path := seedStateWithEntries(t, []map[string]any{
 		{"cycle": float64(1), "expiresAt": yesterday},
