@@ -28,14 +28,14 @@ func Collect(in Input, cfg Config) (Record, error) {
 		Schema:        SchemaVersion,
 		Attempt:       in.Attempt,
 		CommandSource: SourceTranscript,
-		PaneTail:      capTail(pane, cfg.MaxPaneTailRunes),
-		WorktreeDelta: capHead(in.WorktreeDelta, cfg.MaxDeltaRunes),
+		PaneTail:      capTail(stripControls(pane), cfg.MaxPaneTailRunes),
+		WorktreeDelta: capHead(stripControls(in.WorktreeDelta), cfg.MaxDeltaRunes),
 	}
-	trace, err := in.Transcript()
+	trace, err := readTrace(in.Transcript)
 	if err != nil {
 		rec.CommandSource, rec.SourceError = SourcePaneTail, err.Error()
 	}
-	rec.LastActivityAt = trace.LastActivityAt
+	rec.LastActivityAt, rec.SkippedTranscriptLines = trace.LastActivityAt, trace.SkippedLines
 	rec.Suspect = findSuspect(trace.Commands, sessionEnd(trace, in.Attempt), cfg.SuspectWindow)
 	rec.Commands = lastCommands(trace.Commands, cfg)
 	if rec.Suspect != nil {
@@ -43,6 +43,13 @@ func Collect(in Input, cfg Config) (Record, error) {
 	}
 	rec.EvidencePaths = evidencePaths(trace.Path, panePath)
 	return rec, rec.Validate()
+}
+
+func readTrace(t Transcript) (Trace, error) {
+	if t == nil {
+		return Trace{}, ErrNoTranscript
+	}
+	return t()
 }
 
 func readPane(path string) (string, string, error) {
@@ -64,11 +71,9 @@ func sessionEnd(trace Trace, a Attempt) time.Time {
 }
 
 func lastCommands(all []Command, cfg Config) []Command {
-	if len(all) > cfg.MaxCommands {
-		all = all[len(all)-cfg.MaxCommands:]
-	}
-	out := make([]Command, len(all))
-	for i, c := range all {
+	kept := lastN(all, cfg.MaxCommands)
+	out := make([]Command, len(kept))
+	for i, c := range kept {
 		c.Text = capHead(c.Text, cfg.MaxCommandRunes)
 		out[i] = c
 	}

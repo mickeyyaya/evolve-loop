@@ -254,6 +254,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `RUNNER_ATTEMPT_POSTMORTEM_FAILED` | the runner could not read the stored attempt postmortems of a phase before a launch (fields.step=read), or could not collect and write the postmortem of an attempt that ended abnormally (fields.step=collect); the dispatch goes on without the Previous attempts section; the reason is the error (ADR-0130) |
 | `RUNNER_DELIVERABLE_UNVERIFIED` | a CONTRACTED deliverable was still not well-formed after the settle window on the clean-exit path AND the final verdict is FAIL — the ship guard downgraded a clean-ship verdict (fields.downgraded=true) or Classify itself returned FAIL on the malformed or absent bytes; fault-only, a legitimate WARN/SKIPPED pass-through emits nothing; fields.codes, verdict_before, verdict, settle_attempts, deliverable |
 | `RUNNER_HOST_EFFECT_FAILED` | the runner could not perform a declared host effect before judging the phase; the engine and the gate still judge the effect; the reason is the performer's error |
 | `RUNNER_OPTIONAL_PHASE_DEGRADED` | an optional phase hit a bridge infra teardown with no trustworthy deliverable and degraded to WARN; the cycle continues — a stream and console ADDITION (the arm was a response diagnostic only); fields.teardown, exit, cause, verr, stale_leftover, settle_attempts, deliverable |

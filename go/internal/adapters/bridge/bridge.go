@@ -98,8 +98,6 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	return a
 }
 
-// productionEngineDeps is the one Deps builder for both production paths (NewDefault's factory and
-// Launch's onStopReview branch), so they cannot drift apart.
 func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 	return gobridge.Deps{
 		Env:                   env,
@@ -110,24 +108,13 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
 		Efforts:               a.efforts,
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
-		TokenResolver:         tokenusage.DefaultResolver(configRoot(env)),
+		TokenResolver:         tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(env)),
 		ContextFillWarnPct:    a.contextFillWarnPct,
 		RecoveryStage:         a.recoveryStage,
 		FatalPaneStage:        a.fatalPaneStage,
 		Signals:               a.signals,
-		// A pane wall match escalates rc 85 only after a live probe confirms it; wired only at this
-		// production root so engine tests keep the nil seam.
-		CorroborateWall: gobridge.DefaultWallCorroborator(nil, os.Stderr),
+		CorroborateWall:       gobridge.DefaultWallCorroborator(nil, os.Stderr),
 	}
-}
-
-// configRoot is $HOME/.claude, reading HOME from the request env before the process env.
-func configRoot(env map[string]string) string {
-	home := env["HOME"]
-	if home == "" {
-		home = os.Getenv("HOME")
-	}
-	return filepath.Join(home, ".claude")
 }
 
 // BootTimeoutStoreWired reports whether a boot-timeout strike store is wired (true for NewDefault, false for New).

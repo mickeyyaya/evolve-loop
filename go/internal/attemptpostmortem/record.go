@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"time"
 
@@ -65,14 +66,15 @@ type Attempt struct {
 type Record struct {
 	Schema string `json:"schema"`
 	Attempt
-	LastActivityAt time.Time `json:"last_activity_at"`
-	CommandSource  Source    `json:"command_source"`
-	SourceError    string    `json:"source_error,omitempty"`
-	Commands       []Command `json:"commands"`
-	Suspect        *Suspect  `json:"suspect,omitempty"`
-	PaneTail       string    `json:"pane_tail"`
-	WorktreeDelta  string    `json:"worktree_delta"`
-	EvidencePaths  []string  `json:"evidence_paths"`
+	LastActivityAt         time.Time `json:"last_activity_at"`
+	CommandSource          Source    `json:"command_source"`
+	SourceError            string    `json:"source_error,omitempty"`
+	Commands               []Command `json:"commands"`
+	Suspect                *Suspect  `json:"suspect,omitempty"`
+	PaneTail               string    `json:"pane_tail"`
+	WorktreeDelta          string    `json:"worktree_delta"`
+	EvidencePaths          []string  `json:"evidence_paths"`
+	SkippedTranscriptLines int       `json:"skipped_transcript_lines,omitempty"`
 }
 
 func (a Attempt) Abnormal() bool { return a.CauseCode != "" || a.ExitCode != 0 }
@@ -83,7 +85,7 @@ func (r Record) Validate() error {
 		ok    bool
 	}{
 		{"schema", r.Schema == SchemaVersion},
-		{"phase", r.Phase != ""},
+		{"phase", ValidPhase(r.Phase)},
 		{"cycle", r.Cycle > 0},
 		{"attempt", r.Number > 0},
 		{"ended_at", !r.EndedAt.Before(r.StartedAt)},
@@ -98,12 +100,26 @@ func (r Record) Validate() error {
 	return nil
 }
 
+var bareName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
+
+func ValidPhase(phase string) bool { return bareName.MatchString(phase) }
+
 func knownReason(r SuspectReason) bool {
 	return r == ReasonNoResult || r == ReasonSignalExit || r == ReasonEndWindow
 }
 
 func Path(workspace, phase string, number int) string {
 	return filepath.Join(workspace, fmt.Sprintf("%s-attempt-%d-postmortem.json", phase, number))
+}
+
+func NextNumber(workspace, phase string) int {
+	n := 1
+	for {
+		if _, err := os.Stat(Path(workspace, phase, n)); err != nil {
+			return n
+		}
+		n++
+	}
 }
 
 func Write(workspace string, r Record) error {
@@ -117,6 +133,9 @@ func Write(workspace string, r Record) error {
 }
 
 func ReadAll(workspace, phase string) ([]Record, error) {
+	if !ValidPhase(phase) {
+		return nil, fmt.Errorf("attemptpostmortem: phase %q is not a bare name", phase)
+	}
 	paths, err := filepath.Glob(filepath.Join(workspace, phase+"-attempt-*-postmortem.json"))
 	if err != nil {
 		return nil, fmt.Errorf("attemptpostmortem: list the records of %q: %w", phase, err)

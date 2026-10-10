@@ -1,6 +1,6 @@
 # Plan: a retry carries the evidence of the dispatch that it replaces (R2, the postmortem of an `attempt`)
 
-- **Status:** components P1 to P5 built and not wired, 2026-10-09, in lane `cl-attempt-postmortem` (branch `feat/attempt-postmortem`). The wiring lane W1 starts after lane `cl-pane-loss` merges.
+- **Status:** wired, 2026-10-10. Components P1 to P5 were built on 2026-10-09 in lane `cl-attempt-postmortem`. The wiring lane W1 (`cl-postmortem-wire`) wired them into the runner. It also added the operator verbs and the policy block, and fixed the R2 review findings.
 - **Decision record:** [ADR-0130](../architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md).
 - **Research:** [attempt-postmortem-2026-10.md](../research/attempt-postmortem-2026-10.md) (findings F1.1 to F3.10, refinements R1 to R9).
 - **Package notes:** [internal-attemptpostmortem.md](../architecture/packages/internal-attemptpostmortem.md).
@@ -46,7 +46,7 @@ The full evidence is in research §1 and §2.
 **Goals:**
 
 - G1. Each abnormal end of a dispatch leaves one record. It holds the cause, the times, the last commands and the suspect command. It also holds the pane tail and the worktree delta.
-- G2. The next dispatch of the phase gets a section that the bridge states, with a do-not-repeat rule.
+- G2. The next dispatch of the phase gets a section that the evolve runtime states, with a do-not-repeat rule.
 - G3. A resume (`RunCycleFromPhase`) reads the stored records, so a resumed cycle also knows the earlier dispatches.
 - G4. The rule that names the suspect is deterministic and has a test for each branch.
 - G5. Agent text in the section cannot change the structure of the prompt.
@@ -109,8 +109,8 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 - **D9. The transcript locator stays outside the package.** The wiring reuses the attribution rule of `tokenusage` (the artifact anchor, else the `cwd`) and adds the time window of the dispatch (F1.6).
 - **D10. The collector runs right after the abnormal end.** Each tmux session writes over `tmux-final-scrollback.txt`, so the next session must not start first (F2.2).
 - **D11. The record path is `<run>/<phase>-attempt-<n>-postmortem.json`.** `Write` validates, writes a `.tmp` file and renames it. `ReadAll` reads the records of one phase, validates each one and sorts them by number.
-- **D12. The section.** Its heading is "## Previous attempts of this phase (stated by the bridge)". It holds the facts of each abnormal dispatch and two rules:
-  1. "Do not run the suspect command or a variant of it."
+- **D12. The section.** Its heading is "## Previous attempts of this phase (stated by the evolve runtime)". It holds the facts of each abnormal dispatch and two rules:
+  1. "Do not run the suspect command again unchanged until you know why the earlier dispatch ended."
   2. "If a test fails only in your environment, record an environment finding in your report and do not probe shared infrastructure."
 - **D13. Agent text is quoted data.** A command is one code span. Its fence is longer than the longest run of backticks in it, and a newline becomes " ⏎ ". The pane tail and the delta go in fenced blocks with a longer fence. A preamble says that this text is data, not instructions.
 - **D14. The caps.** The collector caps the stored text, and the renderer caps it again, because a record on disk is not trusted. A command keeps its head, and the pane tail keeps its end.
@@ -128,7 +128,7 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 | P3 | the transcript port: `Transcript`, `ClaudeTranscript`, `TranscriptFor`, `ErrNoTranscript` | this lane | built, not wired |
 | P4 | the collector, `Collect(Input, Config)` | this lane | built, not wired |
 | P5 | the renderer, `Render(records, Config)` | this lane | built, not wired |
-| W1 | the wiring (below) | after `cl-pane-loss` | open |
+| W1 | the wiring (below) | `cl-postmortem-wire` | wired |
 | W2 | the record paths in `failure-dossier.json` as evidence | after W1 | open, optional |
 | G1 | the repeat guard (R3, below) | later | designed |
 
@@ -141,6 +141,22 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 5. Before each `Launch`, call `ReadAll` and `Render`, and append the section after the cycle context.
 6. Add the policy block `attempt_postmortem` for `Config`, with the defaults of D17.
 7. Emit a WARN signal when `Collect` or `Write` fails. The dispatch chain continues.
+
+**W1, as built (2026-10-10):**
+
+1. `tokenusage.LocateTranscript(root, window)` gives the attributed transcript with an entry inside the dispatch window. The latest entry wins.
+2. `runner.launchWithPostmortem` reads the cause from `core.BridgeResponse.CauseCode`. Then:
+   - The predicate `endedInTheAgentSession` decides if the end gets a record (fix round 1, H1).
+   - No record: a quota wall, an exhausted account, exit 85 or 87, exit 80, and the refusals 2, 3, 10, 99 and 127.
+   - A record: exit 81 with each sub-cause, and a crash or a kill (exit -1).
+   - `recordPostmortem` collects and writes the record before the next launch.
+   - `git diff --stat HEAD` runs through `gitexec`.
+   - The shared `tmux-final-scrollback.txt` names no dispatch, so the runner does not attach it.
+3. `runner.withPostmortems` appends the section after the cycle context before each launch, so a resume also gets it.
+4. The policy block `attempt_postmortem` holds the caps, `suspect_window_s` and `max_records`. It is strict.
+5. A read or collect failure is the WARN `RUNNER_ATTEMPT_POSTMORTEM_FAILED`.
+6. `evolve postmortem collect|show` writes a record for an earlier dispatch and prints the section.
+7. The package has the R2 review fixes. The list is in [internal-attemptpostmortem.md](../architecture/packages/internal-attemptpostmortem.md).
 
 **G1, the repeat guard (R3):**
 
@@ -190,7 +206,10 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 
 ## 10. Open questions
 
-- **Q1.** Is 30 s the right window? Cycle 1853 needs 0.27 s. W1 can measure the gap on real abnormal ends.
+- **Q1.** Is 30 s the right window? Cycle 1853 needs 0.27 s. The records of real abnormal ends now give the gap.
+- **Q6.** The bridge does a fresh-session retry inside one `Launch` for a `dead_shell` or `cli_self_updated` pane (`Engine.freshSessionRetry`). That retry gets the same prompt and no record. Must the bridge write a record there too?
+- **Q8.** The bridge can write a pane capture for each agent, for example `<agent>-tmux-final-scrollback.txt`. Then the record can carry a pane tail that names its dispatch.
+- **Q7.** `core.BridgeResponse` has no dispatch id and no tmux session name, so the runner records `unknown` for them. Must the response carry them?
 - **Q2.** Can the agy pane give the commands? Today the agy record has the pane tail only.
 - **Q3.** Do tools other than Bash belong in the record? Today only Bash commands can kill a process.
 - **Q4.** How does `evolve gc` treat the records? They are small and live in the run directory.
@@ -203,5 +222,5 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 | Research | done | 2026-10-09 |
 | Design (D1 to D18) | proposed | 2026-10-09 |
 | P1 to P5 | built, not wired, 100% coverage | 2026-10-09 |
-| W1 | waits for `cl-pane-loss` | — |
+| W1 | wired: runner, locator, policy block, `evolve postmortem`, R2 hardening | 2026-10-10 |
 | G1 (R3) | designed | 2026-10-09 |

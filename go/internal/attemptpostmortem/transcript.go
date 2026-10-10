@@ -2,9 +2,11 @@ package attemptpostmortem
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
@@ -18,24 +20,31 @@ type Trace struct {
 	Path           string
 	Commands       []Command
 	LastActivityAt time.Time
+	SkippedLines   int
 }
 
 type Transcript func() (Trace, error)
 
 func TranscriptFor(cli, path string) Transcript {
-	if path != "" && (cli == "claude" || strings.HasPrefix(cli, "claude-")) {
+	if path != "" && WritesTranscript(cli) {
 		return ClaudeTranscript(path)
 	}
 	return func() (Trace, error) { return Trace{}, fmt.Errorf("%w (cli %s)", ErrNoTranscript, cli) }
 }
 
+func WritesTranscript(cli string) bool {
+	return cli == "claude" || strings.HasPrefix(cli, "claude-")
+}
+
 func ClaudeTranscript(path string) Transcript {
 	return func() (Trace, error) {
-		entries, err := readEntries(path)
+		entries, skipped, err := readEntries(path)
 		if err != nil {
 			return Trace{}, err
 		}
-		return traceOf(path, entries), nil
+		trace := traceOf(path, entries)
+		trace.SkippedLines = skipped
+		return trace, nil
 	}
 }
 
@@ -59,25 +68,49 @@ type contentBlock struct {
 	Content   json.RawMessage          `json:"content"`
 }
 
-func readEntries(path string) ([]transcriptEntry, error) {
+func readEntries(path string) ([]transcriptEntry, int, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, 64*1024)
 	var entries []transcriptEntry
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), maxTranscriptLineBytes)
-	for sc.Scan() {
+	skipped := 0
+	for {
+		line, tooLong, err := readLine(r)
 		var e transcriptEntry
-		if json.Unmarshal(sc.Bytes(), &e) == nil {
+		switch {
+		case tooLong:
+			skipped++
+		case json.Unmarshal(line, &e) == nil:
 			entries = append(entries, e)
 		}
+		if errors.Is(err, io.EOF) {
+			return entries, skipped, nil
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("read transcript %s: %w", path, err)
+		}
 	}
-	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("read transcript %s: %w", path, err)
+}
+
+func readLine(r *bufio.Reader) ([]byte, bool, error) {
+	var line []byte
+	tooLong := false
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if !tooLong {
+			line = append(line, chunk...)
+			tooLong = len(bytes.TrimSuffix(line, []byte("\n"))) > maxTranscriptLineBytes
+		}
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			if tooLong {
+				line = nil
+			}
+			return line, tooLong, err
+		}
 	}
-	return entries, nil
 }
 
 func traceOf(path string, entries []transcriptEntry) Trace {
