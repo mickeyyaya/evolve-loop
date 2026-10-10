@@ -207,7 +207,8 @@ When the dispatcher exits with `DISPATCH_RC=5` it emits a structured marker
 line:
 
 ```
-QUOTA-PAUSE: cycle=N wake-at=ISO8601 source=X attempts=K/M
+QUOTA-PAUSE: cycle=N wake-at=ISO8601 source=X attempts=K/M resume-in=Ss
+QUOTA-PAUSE: cycle=N wake-at= source=unknown attempts=K/0 auto-resume=off: <operator action>
 ```
 
 This is the Claude Code subscription quota wall: the cycle ran far enough
@@ -215,13 +216,17 @@ to hit the quota ceiling, then a phase failed with empty stderr (the
 quota-likely signature). `subagent-run.sh` wrote a checkpoint and
 `cycle-state.json` carries the wake-at timestamp.
 
-**Auto-resume is always on.** When you (the model) see `DISPATCH_RC=5` /
-`QUOTA-PAUSE:` in dispatcher output, do this:
+**Auto-resume runs only when the marker has `resume-in=`.** A marker with
+`auto-resume=off` has no known reset time or no resume budget left: do not
+schedule a wake-up. Report the operator action that the marker gives, and stop.
+When you (the model) see `DISPATCH_RC=5` / `QUOTA-PAUSE:` with `resume-in=`,
+do this:
 
 1. **Parse** the `wake-at=ISO8601` value from the marker line.
-2. **Compute delay**: `delaySeconds = max(60, min(3600, wake_at_epoch - now_epoch + 60))`.
-   - Floor at 60s so a near-zero remaining window doesn't busy-loop.
-   - Cap at 3600s because `ScheduleWakeup` clamps to [60, 3600]; if the
+2. **Use the delay** in `resume-in=Ss`. The loop computes it as
+   `max(60, min(3600, wake_at_epoch - now_epoch + 60))` (`quotaPause.resumeDelay`).
+   - The 60 s floor stops a near-zero remaining window from a busy loop.
+   - The 3600 s cap matches the clamp of `ScheduleWakeup` to [60, 3600]; if the
      window is longer, call ScheduleWakeup again on the next wake.
 3. **Call `ScheduleWakeup`** with that delay and `prompt="/evo:loop --resume"`.
    Provide a `reason` like `"waiting for quota reset at <wake-at>"`.

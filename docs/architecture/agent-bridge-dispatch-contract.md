@@ -164,7 +164,7 @@ is a real conformance gap. All 14 roles pass.
 | I8 | Every registry role satisfies I1/I3–I6 uniformly | `conformance_test.go` (fake-bridge, table over `agentRoles`) |
 | I9 | Fan-out honors its concurrency cap + isolates workers | `fanoutdispatch` race tests (observed bound, high-N partial-failure) |
 | I10 | Allow-list ↔ profiles stay single-sourced; reaping releases sessions | `conformance_registry_test.go` (role↔profile drift-guard); `internal/swarm` reap tests |
-| I11 | Under a fleet supervisor the launch cwd is an OWNED directory; the phase supplies it, the guard never widens | `errWorktreeRequired` (`driver_tmux_repl.go`, `recipe_adapter.go`); `bridge.ScratchCwd` + `retro.retroWorktree`; `retro_worktree_fallback_test.go`, ACS `TestC1255_001/002` |
+| I11 | Under a fleet supervisor the launch cwd is an OWNED directory; the phase supplies it, the guard never widens | `errWorktreeRequired` (`driver_tmux_repl.go`, `recipe_adapter.go`); `bridge.ScratchCwd` + `retro.retroWorktree` + `cliController.perFamilyConfig` (the usage query, 2026-10-09); `retro_worktree_fallback_test.go`, ACS `TestC1255_001/002` |
 
 ### I11 — Fleet worktree fail-closed: the PHASE supplies the cwd
 

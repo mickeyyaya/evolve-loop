@@ -35,6 +35,8 @@ type replWaitState struct {
 	nudgeAt                 time.Time
 	detectorErrorLogged     bool
 	terminalDetectorErrored bool
+	paneLost                bool
+	paneLossTicks           int
 	lastDetectorErr         error
 	cancellationErr         error
 	attempt                 int

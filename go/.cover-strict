@@ -43,3 +43,4 @@
 ./internal/events/publisher 100
 ./internal/overlap 100
 ./internal/derived 100
+./internal/attemptpostmortem 100

@@ -326,7 +326,7 @@ func TestRun_AnExhaustedWalkThatMetAWallSurfacesTheWall(t *testing.T) {
 	sb := &scriptedBridge{
 		responses: map[string]scriptedResp{
 			"codex-tmux":  {resp: core.BridgeResponse{ExitCode: 85}, err: errors.New("bridge: launch exit=85: quota wall")},
-			"claude-tmux": {resp: core.BridgeResponse{ExitCode: 81}, err: errors.New("bridge: launch exit=81: artifact timeout")},
+			"claude-tmux": {resp: core.BridgeResponse{ExitCode: 81, UsageExhausted: true}, err: errors.New("bridge: launch exit=81: artifact timeout")},
 		},
 	}
 	root := writeFallbackProfile(t, "evolve-auditor", "codex-tmux", []string{"claude-tmux"})
@@ -335,7 +335,7 @@ func TestRun_AnExhaustedWalkThatMetAWallSurfacesTheWall(t *testing.T) {
 	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
 
 	if err == nil || !strings.Contains(err.Error(), "exit=85") || !strings.Contains(err.Error(), "claude-tmux") || len(sb.calls) != 2 {
-		t.Fatalf("a walk that met a wall and ended on a stall must surface the wall, naming every rung, so the cycle defers; err=%v calls=%v", err, sb.calls)
+		t.Fatalf("a walk that met a wall and ended on a stall proven exhausted must surface the wall, naming every rung, so the cycle defers; err=%v calls=%v", err, sb.calls)
 	}
 }
 
@@ -354,5 +354,68 @@ func TestRun_AWallThenARealFailureSurfacesTheFailure(t *testing.T) {
 
 	if err == nil || !strings.Contains(err.Error(), "exit=3") || strings.Contains(err.Error(), "exit=85") {
 		t.Fatalf("a real failure after a wall stays the verdict, never a deferral: err=%v", err)
+	}
+}
+
+func TestRun_TheCycle1853WalkIsAQuotaPauseOnlyWithExhaustionEvidenceForThePaneLoss(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		exhausted bool
+		wantExit  string
+	}{
+		{name: "pane loss with healthy or unknown usage is no pause", exhausted: false, wantExit: "exit=81"},
+		{name: "pane loss with exhausted usage still pauses", exhausted: true, wantExit: "exit=85"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "deep", prompt: "x"}
+			sb := &scriptedBridge{
+				responses: map[string]scriptedResp{
+					"claude-tmux":     {resp: core.BridgeResponse{ExitCode: 81, UsageExhausted: tc.exhausted}, err: errors.New("bridge: launch exit=81: artifact-timeout: cause=pane_lost")},
+					"agy-claude-tmux": {resp: core.BridgeResponse{ExitCode: 85}, err: errors.New("bridge: launch exit=85: escalation report written (pattern=exhausted reason=escalate)")},
+				},
+			}
+			root := writeFallbackProfile(t, "evolve-builder", "claude-tmux", []string{"agy-claude-tmux"})
+			r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-builder", "x")})
+
+			_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+
+			if err == nil {
+				t.Fatal("err=nil, want the exhausted walk's failure")
+			}
+			if got := bridgeExitOf(err); got != tc.wantExit {
+				t.Errorf("first exit in err=%q, want %q (err=%v): core.isQuotaWall reads the first exit, so it must be the pane loss unless the loss is proven exhausted", got, tc.wantExit, err)
+			}
+		})
+	}
+}
+
+func bridgeExitOf(err error) string {
+	s := err.Error()
+	i := strings.Index(s, "exit=")
+	if i < 0 {
+		return ""
+	}
+	return s[i : i+len("exit=")+2]
+}
+
+func TestRun_AFailedWalkNamesEveryCLIItLaunchedForTheQuotaCheckpoint(t *testing.T) {
+	hooks := &fakeHooks{phase: "build", agent: "evolve-builder", model: "deep", prompt: "x"}
+	sb := &scriptedBridge{
+		responses: map[string]scriptedResp{
+			"agy-claude-tmux": {resp: core.BridgeResponse{ExitCode: 87}, err: errors.New("bridge: launch exit=87")},
+			"claude-tmux":     {resp: core.BridgeResponse{ExitCode: 85}, err: errors.New("bridge: launch exit=85: escalation report written (pattern=exhausted reason=escalate)")},
+		},
+	}
+	root := writeFallbackProfile(t, "evolve-builder", "agy-claude-tmux", []string{"claude-tmux"})
+	r := New(Options{Hooks: hooks, Bridge: sb, Prompts: fakePromptsFS("evolve-builder", "x")})
+
+	_, err := r.Run(context.Background(), core.PhaseRequest{ProjectRoot: root, Workspace: t.TempDir()})
+
+	var walk core.WalkError
+	if !errors.As(err, &walk) || strings.Join(walk.CLIs, ",") != "agy-claude-tmux,claude-tmux" {
+		t.Fatalf("err=%v walk=%v, want a WalkError naming agy-claude-tmux,claude-tmux", err, walk.CLIs)
+	}
+	if bridgeExitOf(err) != "exit=85" {
+		t.Errorf("first exit in err=%q, want exit=85: a non-start before the wall leaves the wall as the verdict", bridgeExitOf(err))
 	}
 }

@@ -226,3 +226,11 @@ approaches / decision / results / retro) — lives at
 | [architecture/fleet-landing-queue.md](architecture/fleet-landing-queue.md) | Design, the spec of record: the durable landing queue, the composition with `merge-tree`, the overlap proof and the tiers T1 to T4. It also covers the scoped gates, the interaction review, ejection, budgets, signals, config keys, failure modes and limits. |
 | [plans/concurrent-cycle-landing-2026-10.md](plans/concurrent-cycle-landing-2026-10.md) | Plan: operator decisions O1 to O13, console decisions CD1 to CD4, decisions D1 to D53, and components Q0 to Q19 with red tests. It also holds the migration from the current ladder, the rollout from shadow to enforce with its metrics, and the risks. |
 | [architecture/adr/0128-landing-queue-tiered-reverification.md](architecture/adr/0128-landing-queue-tiered-reverification.md) | Decision: fleet lanes land through one queue, and their overlap with the peers picks the re-verification. It amends ADR-0078, ADR-0105 and ADR-0049. |
+
+## 2026-10-09 — a retry carries the evidence of the dispatch that it replaces (ADR-0130)
+
+| Document | What it records |
+|---|---|
+| [research/attempt-postmortem-2026-10.md](research/attempt-postmortem-2026-10.md) | Research: the cycle 1853 chain, the records that the repository writes today, and how agent harnesses carry failure context into a retry. It covers Reflexion, SWE-agent, OpenHands, Claude Code, Aider, LangGraph and same-input retry. Findings F1.1 to F3.10, refinements R1 to R9. |
+| [plans/attempt-postmortem-2026-10.md](plans/attempt-postmortem-2026-10.md) | Plan: four candidate designs with scores, decisions D1 to D18, components P1 to P5, the wiring lane W1 and the repeat guard G1 (R3). |
+| [architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md](architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md) | Decision: each abnormal end of a phase dispatch leaves a postmortem record, and the next dispatch or a resume gets a bridge-stated section with a do-not-repeat rule. |

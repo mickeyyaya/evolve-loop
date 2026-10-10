@@ -27,10 +27,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/quotastate"
 )
 
-// benchReason labels a bench written by the proactive probe (vs the reactive
-// wall classifier's "rate_limit"). Readers (applyBenchToPlan, the canary) are
-// reason-agnostic; this is for forensics only.
-const benchReason = "usage_probe"
+const benchReason = clihealth.UsageProbePattern
 
 // Prober runs the proactive usage probe across Families. All fields are
 // injected so the core carries no I/O of its own:

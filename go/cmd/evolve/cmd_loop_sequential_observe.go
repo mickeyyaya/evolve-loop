@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclecost"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 )
 
-// observeSequentialCycle applies the terminal breakers before the ledger
-// verification path can mask them.
 func (b *loopBatchCoordinator) observeSequentialCycle(cycle sequentialCycle, state *sequentialBatchState) batchDecision {
 	if failure := cycle.result.SystemFailure; failure != nil && failure.Halt {
 		exitCode := haltOnSystemFailure(b.cfg.EvolveDir, b.cfg.ProjectRoot, cycle.cycle, cycle.workspace, failure, b.stderr, b.deps.Signals, systemFailureRule)
@@ -27,14 +26,9 @@ func (b *loopBatchCoordinator) observeSequentialCycle(cycle sequentialCycle, sta
 		b.result.TotalCost += cost.Total.CostUSD
 		fmt.Fprintf(b.stderr, "[loop] cycle %d cost: $%.4f (batch total: $%.4f)\n", cycle.cycle, cost.Total.CostUSD, b.result.TotalCost)
 	}
-	// The batch report reads the Signal Center through the loop's own
-	// orchestrator seam, so a scripted runner reports exactly like the real
-	// one; it reports, never gates.
-	// See ADR-0101.
 	fmt.Fprint(b.stderr, formatSignalReport(cycle.cycle, b.orch.SignalSummary()))
 	if pause, ok := detectQuotaPause(b.cfg.EvolveDir); ok {
-		fmt.Fprintf(b.stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d\n",
-			pause.Cycle, pause.WakeAt, pause.Source, pause.Attempts, pause.MaxAttempts)
+		fmt.Fprintln(b.stderr, quotaPauseLine(pause, time.Now()))
 		fmt.Fprintln(b.stderr, "[loop]   to auto-resume in-session: SKILL.md / /loop wrapper calls ScheduleWakeup until wake-at then /evo:loop --resume")
 		fmt.Fprintln(b.stderr, "[loop]   to resume manually: evolve loop --resume")
 		b.result.StopReason = "quota-pause"

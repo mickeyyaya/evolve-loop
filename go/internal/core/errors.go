@@ -35,9 +35,6 @@ var (
 	// agent persona doc not existing on disk.
 	ErrAgentDocMissing = errors.New("core: agent persona doc missing")
 
-	// ErrAllFamiliesExhausted marks a dispatch whose fallback chain ran out
-	// after meeting a quota wall (exit=85): no family completed it, so the
-	// cycle defers instead of failing.
 	ErrAllFamiliesExhausted = errors.New("core: the dispatch chain ended at a quota wall (exit=85)")
 
 	// ErrPhaseInvalid means the supplied Phase value isn't a member of

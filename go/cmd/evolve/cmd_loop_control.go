@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -366,14 +367,46 @@ func updateBreaker(prev, streak, ranCycle, threshold int) (newPrev, newStreak in
 	return prev, streak, streak >= threshold
 }
 
-// quotaPause is the parsed cycle-state.json checkpoint block when the
-// dispatcher detects a Claude Code subscription quota wall.
 type quotaPause struct {
-	Cycle       int
-	WakeAt      string
-	Source      string
-	Attempts    int
-	MaxAttempts int
+	Cycle          int
+	WakeAt         string
+	Source         string
+	Attempts       int
+	MaxAttempts    int
+	OperatorAction string
+}
+
+const (
+	minResumeDelay = time.Minute
+	maxResumeDelay = time.Hour
+)
+
+func (qp quotaPause) resumeDelay(now time.Time) (time.Duration, bool) {
+	if qp.MaxAttempts <= qp.Attempts {
+		return 0, false
+	}
+	wake, ok := parseWakeAt(qp.WakeAt)
+	if !ok {
+		return 0, false
+	}
+	return min(maxResumeDelay, max(minResumeDelay, wake.Sub(now)+minResumeDelay)), true
+}
+
+func parseWakeAt(s string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05-0700"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func quotaPauseLine(qp quotaPause, now time.Time) string {
+	head := fmt.Sprintf("QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d", qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
+	if delay, ok := qp.resumeDelay(now); ok {
+		return fmt.Sprintf("%s resume-in=%ds", head, int(delay.Seconds()))
+	}
+	return head + " auto-resume=off: " + cmp.Or(qp.OperatorAction, "the auto-resume budget is spent or the wake time is unreadable; run `evolve loop --resume` by hand")
 }
 
 // detectQuotaPause reads <evolveDir>/cycle-state.json and returns a
@@ -428,6 +461,9 @@ func quotaPauseFromCheckpoint(blob, cp map[string]any) quotaPause {
 	if v, ok := cp["autoResumeMaxAttempts"].(float64); ok {
 		qp.MaxAttempts = int(v)
 	}
+	if v, ok := cp["operatorAction"].(string); ok {
+		qp.OperatorAction = v
+	}
 	return qp
 }
 
@@ -450,12 +486,9 @@ func dirExists(path string) bool {
 	return info.IsDir()
 }
 
-// emitQuotaPause keeps fresh and resumed batches on the same resumable CLI
-// contract, including the reset-time hint and durable checkpoint location.
 func (lr *loopResult) emitQuotaPause(cfg loopConfig, cycle int, stdout, stderr io.Writer) {
 	if qp, ok := detectQuotaPause(cfg.EvolveDir); ok {
-		fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d wake-at=%s source=%s attempts=%d/%d (all CLI families exhausted mid-cycle)\n",
-			qp.Cycle, qp.WakeAt, qp.Source, qp.Attempts, qp.MaxAttempts)
+		fmt.Fprintf(stderr, "%s (all CLI families exhausted mid-cycle)\n", quotaPauseLine(qp, time.Now()))
 	} else {
 		fmt.Fprintf(stderr, "QUOTA-PAUSE: cycle=%d (all CLI families exhausted mid-cycle; checkpoint block missing — resume re-runs from last boundary)\n", cycle)
 	}

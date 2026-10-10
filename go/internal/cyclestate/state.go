@@ -125,7 +125,8 @@ type CycleState struct {
 	FailedAt []FailedRecord `json:"failed_at,omitempty"`
 	// BookkeepingRegradeAttempted bounds the bookkeeping-regrade re-audit to once per cycle; it lives here,
 	// not in a workspace file an agent could delete, so neither an agent nor a crash-resume grants it twice.
-	BookkeepingRegradeAttempted bool `json:"bookkeeping_regrade_attempted,omitempty"`
+	BookkeepingRegradeAttempted bool     `json:"bookkeeping_regrade_attempted,omitempty"`
+	QuotaWalkCLIs               []string `json:"quota_walk_clis,omitempty"`
 }
 
 func (s State) HighestCycleNumber() int {
