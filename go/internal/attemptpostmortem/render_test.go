@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const doNotRepeat = "Do not run the suspect command or a variant of it."
+const doNotRepeat = "Do not run the suspect command again unchanged until you know why the earlier dispatch ended."
 const noProbe = "If a test fails only in your environment, record an environment finding in your report and do not probe shared infrastructure."
 
 func TestRender_TheSectionForBuildAttempt2StatesTheProbeTheCauseAndTheRule(t *testing.T) {

@@ -21,11 +21,7 @@ func driverExists(cli string) bool {
 }
 
 func execAdapterDeps(env map[string]string) gobridge.Deps {
-	home := env["HOME"]
-	if home == "" {
-		home = os.Getenv("HOME")
-	}
-	configRoot := filepath.Join(home, ".claude")
+	configRoot := tokenusage.ClaudeConfigRoot(env)
 	pol := projectPolicy(env)
 	recoveryStage, fatalPaneStage := pol.BridgeRecoveryStages()
 	return gobridge.Deps{

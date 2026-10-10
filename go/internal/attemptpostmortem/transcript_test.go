@@ -93,10 +93,9 @@ func TestClaudeTranscript_AMissingFileIsAnError(t *testing.T) {
 	}
 }
 
-func TestClaudeTranscript_ALineOverTheScannerLimitIsAnError(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "big.jsonl", strings.Repeat("x", 9*1024*1024))
-	if _, err := ClaudeTranscript(path)(); err == nil {
-		t.Fatal("err = nil, want the scanner error for a line over the limit")
+func TestClaudeTranscript_AnUnreadableFileIsAnError(t *testing.T) {
+	if _, err := ClaudeTranscript(t.TempDir())(); err == nil || !strings.Contains(err.Error(), "read transcript") {
+		t.Fatalf("err = %v, want the read error for a directory", err)
 	}
 }
 

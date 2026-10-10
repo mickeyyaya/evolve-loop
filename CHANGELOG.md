@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the dispatch postmortem is wired: a retry or a resume gets the evidence of the dispatch it replaces (W1, ADR-0130, 2026-10-10)
+
+- **The runner.** After each launch, `internal/phases/runner` reads the cause code from the new field `core.BridgeResponse.CauseCode`. The bridge engine sets it from its one classification. When the end is abnormal and in the agent session, it collects and writes `<run>/<phase>-attempt-<n>-postmortem.json` before the next launch. Before each launch, it adds the section "## Previous attempts of this phase (stated by the bridge)" after the cycle context, so the cached prefix does not change. A resume gets the section from the stored records.
+- **The inputs.** For a Claude CLI, the transcript comes from the new `tokenusage.LocateTranscript`: the attributed file with an entry inside the dispatch window. The delta comes from `git diff --stat HEAD` through `gitexec`. The runner does not attach the shared `tmux-final-scrollback.txt`, because it does not name its dispatch.
+- **No record for an end outside the agent session.** A quota wall, an exhausted account, exit 85 or 87, a boot timeout and a launch refusal get no record and no section. One predicate decides it: `endedInTheAgentSession`.
+- **The section.** The heading is "## Previous attempts of this phase (stated by the evolve runtime)". Rule 1 is now "Do not run the suspect command again unchanged until you know why the earlier dispatch ended." A code span also loses its C0 control characters.
+- **One home for the Claude config root.** `tokenusage.ClaudeConfigRoot` replaces three copies. With no `HOME`, it gives "", and no reader uses a relative `.claude`. `LocateTranscript` skips a symlinked transcript.
+- **A failure does not stop the retry.** A read or collect failure is the WARN `RUNNER_ATTEMPT_POSTMORTEM_FAILED` with `fields.step`.
+- **The policy block `attempt_postmortem`.** It is strict: `max_commands`, `max_command_runes`, `max_pane_tail_runes`, `max_delta_runes`, `suspect_window_s` and `max_records`. The defaults are `attemptpostmortem.DefaultConfig()`.
+- **The verbs.** `evolve postmortem collect` writes a record for a dispatch that ended before the wiring (the cycle 1853 backfill). `evolve postmortem show` prints the section.
+- **The R2 review hardening of `internal/attemptpostmortem`.** These are the changes:
+  - a phase must be a bare name, and a nil transcript falls back to the pane tail;
+  - the renderer caps the count of records and commands and the length of the identity fields;
+  - a transcript line over 8 MiB is skipped and counted;
+  - a negative time before the end is 0 s;
+  - C0 control characters are removed from the pane tail and the delta.
+- Package notes: [internal-attemptpostmortem](docs/architecture/packages/internal-attemptpostmortem.md), [internal-phases-runner](docs/architecture/packages/internal-phases-runner.md), [internal-tokenusage](docs/architecture/packages/internal-tokenusage.md), [internal-policy](docs/architecture/packages/internal-policy.md), [cmd-evolve](docs/architecture/packages/cmd-evolve.md). Operator text: [runtime-reference.md](docs/operations/runtime-reference.md).
+
 ## Fixed — a sandboxed agent can run the real-tmux tests of the repository (cycle 1853 trigger, lane R1, 2026-10-09)
 
 - **What happened.** The agent profile did not allow a pseudo-terminal. tmux makes a window with `forkpty()`, so in each sandboxed pane a new tmux server failed with `fork failed: Operation not permitted`. Each real-tmux test was red in each pane. In cycle 1853 that red test caused the builder to probe tmux by hand, and the probe killed the run server two times ([incident](docs/incidents/cycle-1853-tmux-run-server-kill.md), "Why the retry ran the probe again").

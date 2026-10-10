@@ -432,6 +432,7 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	// signal code — is the classifier's ONE table. ctx.Err() is sampled after
 	// the persist: only the signal-death row reads it.
 	out := launchoutcome.Classify(run.code, ctx.Err(), run.stderr)
+	resp.CauseCode = out.CauseCode
 	e.recordBootStrike(c, req.CLI, run.code)
 	c.launchWarn("Engine.Launch", "classify", out.Signal, out.Err.Error(), launchFields(out, launchError))
 	return resp, out.Err

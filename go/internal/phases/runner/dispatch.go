@@ -42,20 +42,17 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	var attemptLog, skills, walked []string
 	var wall bridgechain.WallKeeper
 	base := b.baseRequest(req, prep, resolved)
+	postmortems := postmortemScope{req: req, phase: phase, artifactPath: prep.artifactPath, cfg: overlayPolicy.AttemptPostmortemConfig()}
 	tieredRes := llmroute.DispatchTiered(plan, func(candidateCLI, tier string) (int, error) {
-		i := len(attemptLog)
-		if i > 0 {
-			log.Diag().Infof(
-				"[runner] phase=%s fallback %d: trying cli=%s tier=%s (previous=%s exit=%d)\n",
-				phase, i+1, candidateCLI, tier, attemptLog[i-1], bres.ExitCode)
-		}
+		logFallbackStep(phase, attemptLog, candidateCLI, tier, bres.ExitCode)
 		skills = overlayPolicy.ResolveOverlays(overlayDispatchFor(req, phase, candidateCLI, tier))
 		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, skills, tier))
 		attempt := base
 		attempt.CLI, attempt.Model, attempt.Skills = candidateCLI, tier, skills
-		bres, bridgeErr = b.bridge.Launch(ctx, attempt)
+		attempt.Prompt = b.withPostmortems(postmortems, prompt)
+		bres, bridgeErr = b.launchWithPostmortem(ctx, postmortems, attempt)
 		wall.Observe(candidateCLI+"@"+tier, bres, bridgeErr)
-		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, prompt); err != nil {
+		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, attempt.Prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)
 		}
 		attemptLog = append(attemptLog, fmt.Sprintf("%s@%s=%d", candidateCLI, tier, bres.ExitCode))
@@ -94,9 +91,17 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 	}
 }
 
+func logFallbackStep(phase string, attemptLog []string, cli, tier string, previousExit int) {
+	i := len(attemptLog)
+	if i == 0 {
+		return
+	}
+	log.Diag().Infof("[runner] phase=%s fallback %d: trying cli=%s tier=%s (previous=%s exit=%d)\n",
+		phase, i+1, cli, tier, attemptLog[i-1], previousExit)
+}
+
 func overlayDispatchFor(req core.PhaseRequest, phase, cli, tier string) policy.OverlayDispatch {
 	d := policy.DispatchFromPhaseRequest(phase, cli, tier, tier)
-	// core's one per-dispatch signal projection; the runner never re-reads the workspace.
 	d.Signals = req.Signals
 	d.WritesSource = req.WritesSource()
 	return d

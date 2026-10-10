@@ -128,7 +128,7 @@ func TestWrite_RefusesAnInvalidRecordAndReportsEachWriteFailure(t *testing.T) {
 }
 
 func TestReadAll_ReportsABadPatternAnUnreadableFileBadJSONAndAnInvalidRecord(t *testing.T) {
-	if _, err := ReadAll(t.TempDir(), "["); err == nil {
+	if _, err := ReadAll(filepath.Join(t.TempDir(), "["), "build"); err == nil {
 		t.Error("a bad glob pattern: err = nil")
 	}
 	cases := map[string]func(t *testing.T, dir string){
