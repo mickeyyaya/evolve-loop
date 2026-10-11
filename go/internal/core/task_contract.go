@@ -39,6 +39,8 @@ const taskContractPreamble = "Harness-owned block (ADR-0098). The acceptance bel
 // the inventory cannot be listed — the tail, where the verdict lines are.
 const predicateNoteTailMax = 400
 
+var predicateModuleDir = codequality.ModuleDir
+
 // predicateLister is the injectable seam for the `go test -list` inventory
 // (production: listACSPredicates; tests substitute a fake).
 type predicateLister func(ctx context.Context, worktree string, cycle int) acsPredicates
@@ -229,7 +231,7 @@ func listACSPredicates(ctx context.Context, worktree string, cycle int) acsPredi
 	if worktree == "" {
 		return acsPredicates{note: "no worktree — ACS predicates could not be listed"}
 	}
-	moduleDir := codequality.ModuleDir(worktree)
+	moduleDir := predicateModuleDir(worktree)
 	if moduleDir == "" {
 		return acsPredicates{note: "no Go module under the worktree — ACS predicates could not be listed"}
 	}

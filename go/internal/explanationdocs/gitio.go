@@ -25,6 +25,13 @@ const (
 
 var errDiffDigestLimit = errors.New("base-bound diff exceeds the 64 MiB digest limit")
 
+var (
+	absPath      = filepath.Abs
+	evalSymlinks = filepath.EvalSymlinks
+	lstat        = os.Lstat
+	removePath   = os.Remove
+)
+
 func changedSince(ctx context.Context, worktree, baseSHA string) ([]string, error) {
 	if worktree == "" || baseSHA == "" {
 		return nil, fmt.Errorf("worktree and base SHA are required")
@@ -132,18 +139,18 @@ func currentDiffState(ctx context.Context, worktree, rel string, remaining int64
 	if remaining < 0 {
 		return "", "", 0, errDiffDigestLimit
 	}
-	root, err := filepath.Abs(worktree)
+	root, err := absPath(worktree)
 	if err != nil {
 		return "", "", 0, err
 	}
-	realRoot, err := filepath.EvalSymlinks(root)
+	realRoot, err := evalSymlinks(root)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("resolve worktree: %w", err)
 	}
 	path := filepath.Join(root, filepath.FromSlash(rel))
-	info, err := os.Lstat(path)
+	info, err := lstat(path)
 	if os.IsNotExist(err) {
-		if _, repeatErr := os.Lstat(path); !os.IsNotExist(repeatErr) {
+		if _, repeatErr := lstat(path); !os.IsNotExist(repeatErr) {
 			return "", "", 0, fmt.Errorf("deleted path changed while hashing")
 		}
 		return "absent", "-", 0, nil
@@ -151,7 +158,7 @@ func currentDiffState(ctx context.Context, worktree, rel string, remaining int64
 	if err != nil {
 		return "", "", 0, err
 	}
-	realParent, err := filepath.EvalSymlinks(filepath.Dir(path))
+	realParent, err := evalSymlinks(filepath.Dir(path))
 	if err != nil {
 		return "", "", 0, fmt.Errorf("resolve changed-path parent: %w", err)
 	}
@@ -287,7 +294,7 @@ func ArchiveUnpublishedContinuationRecords(ctx context.Context, worktree, baseSH
 			continue
 		}
 		path := filepath.Join(worktree, filepath.FromSlash(rel))
-		info, err := os.Lstat(path)
+		info, err := lstat(path)
 		if os.IsNotExist(err) {
 			continue
 		}
@@ -302,7 +309,7 @@ func ArchiveUnpublishedContinuationRecords(ctx context.Context, worktree, baseSH
 		}
 		archiveRel := filepath.ToSlash(filepath.Join(archiveDir, filepath.Base(rel)))
 		archivePath := filepath.Join(archiveAbs, filepath.Base(rel))
-		if _, err := os.Lstat(archivePath); err == nil {
+		if _, err := lstat(archivePath); err == nil {
 			return nil, fmt.Errorf("archive destination %s already exists", archiveRel)
 		} else if !os.IsNotExist(err) {
 			return nil, fmt.Errorf("inspect archive destination %s: %w", archiveRel, err)

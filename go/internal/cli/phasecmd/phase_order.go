@@ -13,6 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
+var absoluteRoot = paths.AbsoluteRoot
+
 // RunPhaseOrder prints the registry's phase order, or the hardcoded order when the registry is off or missing.
 func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	for _, a := range args {
@@ -28,7 +30,7 @@ func RunPhaseOrder(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	projectRoot := os.Getenv("EVOLVE_PROJECT_ROOT")
 	if projectRoot != "" {
 		// Only the env root can be relative; the git and cwd fallbacks are absolute.
-		projectRoot = paths.AbsoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
+		projectRoot = absoluteRoot("EVOLVE_PROJECT_ROOT", projectRoot, func(m string) {
 			fmt.Fprintf(stderr, "[phase-order] WARN: %s\n", m)
 		})
 	} else {

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -53,7 +55,27 @@ func TestDefaultGitState_NotARepo(t *testing.T) {
 }
 
 func TestDefaultGitState_HeadOKDiffFails(t *testing.T) {
-	t.Skip("hard to synthesize cleanly — covered by NotARepo case")
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not on PATH")
+	}
+	repo := gittest.Fixture(t)
+	repo.Git("commit", "-q", "--allow-empty", "-m", "head")
+	dir := repo.Dir
+	bin := t.TempDir()
+	script := "#!/bin/sh\n[ \"$1\" = diff ] && exit 3\nexec '" + realGit + "' \"$@\"\n"
+	fakeclitest.Install(t, filepath.Join(bin, "git"), script)
+	t.Setenv("PATH", bin)
+
+	head, treeSHA, err := defaultGitState(context.Background(), dir)
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 3 {
+		t.Fatalf("err = %v, want the git diff exit 3", err)
+	}
+	if len(head) != 40 || strings.ContainsAny(head, "\n ") || treeSHA != "unknown" {
+		t.Fatalf("head %q tree %q, want the trimmed HEAD and an unknown tree", head, treeSHA)
+	}
 }
 
 func TestRunGit_Error(t *testing.T) {

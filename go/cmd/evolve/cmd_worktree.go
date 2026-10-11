@@ -22,6 +22,8 @@ import (
 // through, mirroring core's gitRunner and swarm's newGit precedents.
 var worktreeGitRunner sysexec.RunFunc = sysexec.DefaultRunner
 
+var worktreeRemoveAll = os.RemoveAll
+
 // worktreeAddRetry shares gitexec's single retry contract; Retryable is the
 // same classifier core and swarm pass, so a non-repository fails immediately
 // instead of waiting out a retry ladder that cannot help.
@@ -181,7 +183,7 @@ func removeCycleWorktree(projectRoot, base, lane string, cycle int, stdout, stde
 		fmt.Fprintf(stderr, "evolve worktree cleanup: %v\n%s", err, ebuf.String())
 		return 1
 	}
-	if err := os.RemoveAll(wt); err != nil && !errIsNotExist(err) {
+	if err := worktreeRemoveAll(wt); err != nil && !errIsNotExist(err) {
 		fmt.Fprintf(stderr, "evolve worktree cleanup: rm %s: %v\n", wt, err)
 	}
 	fmt.Fprintln(stdout, wt)

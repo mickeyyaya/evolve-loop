@@ -15,6 +15,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
 
+var (
+	resetSHARunningFn = selfsha.Running
+	resetSHACommitFn  = version.Commit
+	resetSHARepinFn   = phaseintegrity.RepinShipSHA
+	resetSHAGetwd     = os.Getwd
+)
+
 // See ADR-0065.
 func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve reset-sha", flag.ContinueOnError)
@@ -33,12 +40,12 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	runningSHA, err := selfsha.Running()
+	runningSHA, err := resetSHARunningFn()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve reset-sha: hash running binary: %v\n", err)
 		return 1
 	}
-	commit := version.Commit()
+	commit := resetSHACommitFn()
 
 	prov := func(c string) bool {
 		if c == "" {
@@ -48,7 +55,7 @@ func runResetSHA(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	statePath := filepath.Join(absRoot, ".evolve", "state.json")
-	res, err := phaseintegrity.RepinShipSHA(statePath, runningSHA, commit, "", prov, operator)
+	res, err := resetSHARepinFn(statePath, runningSHA, commit, "", prov, operator)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve reset-sha: %v\n", err)
 		return 1
@@ -65,7 +72,7 @@ func resetSHAProjectRoot(projectRoot string, stderr io.Writer) (string, error) {
 		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
 	}
 	if projectRoot == "" {
-		cwd, err := os.Getwd()
+		cwd, err := resetSHAGetwd()
 		if err != nil {
 			return "", fmt.Errorf("cwd: %w", err)
 		}

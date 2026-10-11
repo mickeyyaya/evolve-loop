@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -181,7 +180,7 @@ func pidList(procs []proctree.Process) string {
 
 func randomStamp() string {
 	b := make([]byte, 6)
-	if _, err := rand.Read(b); err != nil {
+	if _, err := randRead(b); err != nil {
 		return strconv.FormatInt(time.Now().UnixNano(), 36)
 	}
 	return hex.EncodeToString(b)
