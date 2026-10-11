@@ -57,7 +57,7 @@ type Violation struct {
 // Error lets a Violation serve directly as a failure reason.
 func (v *Violation) Error() string {
 	return fmt.Sprintf("pinning %s.%s( inside package %q would create an import cycle: %s -> %s",
-		v.Site.ReferencedPackage, v.Site.Symbol, v.Site.PinningPackage, pathString(v.Cycle), v.Site.PinningPackage)
+		v.Site.ReferencedPackage, v.Site.Symbol, v.Site.PinningPackage, pathString(v.Cycle), v.Site.ReferencedPackage)
 }
 
 func pathString(chain []string) string {

@@ -63,9 +63,9 @@ func jsonBlocks(body string) []string {
 // A pin is one line holding a .go path literal and an ident.Symbol( literal. Scanning
 // string literals, not raw line text, keeps the assertion call itself from matching.
 var (
-	quotedLiteral  = regexp.MustCompile(`"([^"\\]*)"`)
-	goSourceLiteal = regexp.MustCompile(`^[\w./-]+\.go$`)
-	pinnedCallSite = regexp.MustCompile(`^([A-Za-z_]\w*)\.([A-Za-z_]\w*)\(`)
+	quotedLiteral   = regexp.MustCompile(`"([^"\\]*)"`)
+	goSourceLiteral = regexp.MustCompile(`^[\w./-]+\.go$`)
+	pinnedCallSite  = regexp.MustCompile(`^([A-Za-z_]\w*)\.([A-Za-z_]\w*)\(`)
 )
 
 // pinnedRef is one extracted pin plus what resolving it needs: its module root and import aliases.
@@ -79,10 +79,7 @@ type pinnedRef struct {
 
 // ExtractFrozenPins returns each pin with the pinned file's package and the referenced identifier as written.
 func ExtractFrozenPins(worktreeRoot string, frozenTestFiles []string) ([]CallSite, error) {
-	refs, err := extractPins(worktreeRoot, frozenTestFiles)
-	if err != nil {
-		return nil, err
-	}
+	refs := extractPins(worktreeRoot, frozenTestFiles)
 	sites := make([]CallSite, 0, len(refs))
 	for _, ref := range refs {
 		sites = append(sites, ref.site)
@@ -90,7 +87,7 @@ func ExtractFrozenPins(worktreeRoot string, frozenTestFiles []string) ([]CallSit
 	return sites, nil
 }
 
-func extractPins(worktreeRoot string, frozenTestFiles []string) ([]pinnedRef, error) {
+func extractPins(worktreeRoot string, frozenTestFiles []string) []pinnedRef {
 	var refs []pinnedRef
 	for _, rel := range frozenTestFiles {
 		body, err := os.ReadFile(filepath.Join(worktreeRoot, filepath.FromSlash(rel)))
@@ -118,7 +115,7 @@ func extractPins(worktreeRoot string, frozenTestFiles []string) ([]pinnedRef, er
 			})
 		}
 	}
-	return refs, nil
+	return refs
 }
 
 // importAliases maps each aliased import's name to its path; base-name matching covers unaliased imports.
@@ -149,7 +146,7 @@ func pinOnLine(line string) (source, referenced, symbol string, ok bool) {
 	for _, m := range quotedLiteral.FindAllStringSubmatch(line, -1) {
 		literal := m[1]
 		switch {
-		case source == "" && goSourceLiteal.MatchString(literal):
+		case source == "" && goSourceLiteral.MatchString(literal):
 			source = literal
 		case referenced == "":
 			if call := pinnedCallSite.FindStringSubmatch(literal); call != nil {
@@ -198,10 +195,7 @@ func modulePath(gomod string) string {
 
 // CheckFrozenPins returns a Violation for each frozen pin its module's real import graph proves would close a cycle.
 func CheckFrozenPins(worktreeRoot string, frozenTestFiles []string) ([]Violation, error) {
-	refs, err := extractPins(worktreeRoot, frozenTestFiles)
-	if err != nil {
-		return nil, err
-	}
+	refs := extractPins(worktreeRoot, frozenTestFiles)
 
 	var out []Violation
 	// A nil graph marks an underivable module, so it costs one `go list`, not one per pin.
@@ -209,6 +203,7 @@ func CheckFrozenPins(worktreeRoot string, frozenTestFiles []string) ([]Violation
 	for _, ref := range refs {
 		graph, seen := graphs[ref.moduleRoot]
 		if !seen {
+			var err error
 			graph, err = BuildImportGraph(ref.moduleRoot, "./...")
 			if err != nil {
 				graph = nil

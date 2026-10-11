@@ -223,3 +223,21 @@ func TestExtractFrozenPins_AliasIdentifierPreserved(t *testing.T) {
 		" resolution-free by contract; the alias identifier is resolved later,"+
 		" in CheckFrozenPins", pins, want)
 }
+
+func TestFrozenPins_UnreadableFileFailsOpen(t *testing.T) {
+	wt := aliasFixtureWorktree(t)
+	missing := "go/internal/core/missing_test.go"
+
+	pins, err := ExtractFrozenPins(wt, []string{missing, aliasCyclicFrozenTest})
+	if err != nil {
+		t.Fatalf("ExtractFrozenPins with an unreadable file: err = %v, want nil", err)
+	}
+	if len(pins) != 1 || pins[0].Symbol != "UpdateStateMap" {
+		t.Errorf("ExtractFrozenPins = %+v, want only the readable file's pin", pins)
+	}
+
+	violations, err := CheckFrozenPins(wt, []string{missing})
+	if err != nil || len(violations) != 0 {
+		t.Errorf("CheckFrozenPins(unreadable only) = %+v, %v; want none, nil", violations, err)
+	}
+}

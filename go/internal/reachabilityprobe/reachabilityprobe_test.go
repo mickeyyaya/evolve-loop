@@ -111,3 +111,34 @@ func TestCheckCallSite(t *testing.T) {
 		})
 	}
 }
+
+func TestViolationErrorClosesCycleAtReferencedPackage(t *testing.T) {
+	cases := []struct {
+		name string
+		v    Violation
+		want string
+	}{
+		{
+			name: "two-hop",
+			v:    Violation{Site: CallSite{PinningPackage: "core", ReferencedPackage: "storage", Symbol: "UpdateStateMap"}, Cycle: []string{"storage", "core"}},
+			want: `pinning storage.UpdateStateMap( inside package "core" would create an import cycle: storage -> core -> storage`,
+		},
+		{
+			name: "three-hop",
+			v:    Violation{Site: CallSite{PinningPackage: "c", ReferencedPackage: "a", Symbol: "Do"}, Cycle: []string{"a", "b", "c"}},
+			want: `pinning a.Do( inside package "c" would create an import cycle: a -> b -> c -> a`,
+		},
+		{
+			name: "self-reference",
+			v:    Violation{Site: CallSite{PinningPackage: "core", ReferencedPackage: "core", Symbol: "Foo"}, Cycle: []string{"core"}},
+			want: `pinning core.Foo( inside package "core" would create an import cycle: core -> core`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.v.Error(); got != tc.want {
+				t.Errorf("Violation.Error() =\n  %q\nwant\n  %q", got, tc.want)
+			}
+		})
+	}
+}
