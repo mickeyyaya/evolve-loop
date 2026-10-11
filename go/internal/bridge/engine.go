@@ -111,6 +111,7 @@ type Deps struct {
 	// and wait interval — the one channel the fresh-session retry reads.
 	// Package-private like onModelDispatch.
 	onFatalPane func(fatalPaneObservation)
+	onBootLoss  func(launchoutcome.BootLossCause)
 	// KeychainProbe reports whether a macOS login-Keychain generic-password
 	// item exists for the given service; doctorAuth needs it because
 	// claude's OAuth token lives in the Keychain (service "Claude
@@ -416,23 +417,15 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
 	run := e.freshSessionRetry(ctx, req, model, func() launchRun { return e.runAttempt(ctx, req, args) })
 	resp := core.BridgeResponse{ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS}
-	// The terminal time is frozen before optional token resolution begins, so
-	// one dispatch yields one attempt record even when token enrichment is
-	// unavailable or errors; a Launch that ran a fresh session holds two: the
-	// dead one (fresh_session_retry) and this one.
-	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp)
+	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, markBootLoss(run))
 	e.clearBootStrike(c, req.CLI, run.code)
 	if run.code == ExitOK {
 		e.readResult(c, req, in.stdoutLog, &resp)
 		return resp, nil
 	}
 	launchError := e.persistLaunchError(c, req.Workspace, in.agent, run.stderr)
-	// What the exit MEANS — the error chain (wire shape: "bridge: launch
-	// exit=<code>[: <cause>]" + the port sentinel), the ledger cause and the
-	// signal code — is the classifier's ONE table. ctx.Err() is sampled after
-	// the persist: only the signal-death row reads it.
 	out := launchoutcome.Classify(run.code, ctx.Err(), run.stderr)
-	resp.CauseCode = out.CauseCode
+	resp.CauseCode = launchoutcome.WithBootLoss(out.CauseCode, run.code, run.bootLoss)
 	e.recordBootStrike(c, req.CLI, run.code)
 	c.launchWarn("Engine.Launch", "classify", out.Signal, out.Err.Error(), launchFields(out, launchError))
 	return resp, out.Err
@@ -477,6 +470,7 @@ type launchRun struct {
 	bootMS     int64
 	dispatched modelDispatch
 	fatal      fatalPaneObservation
+	bootLoss   launchoutcome.BootLossCause
 }
 
 // freshSessionRetry runs the launch and, when it ended on a session-
@@ -490,7 +484,7 @@ func (e *Engine) freshSessionRetry(ctx context.Context, req core.BridgeRequest, 
 		return first
 	}
 	dead := core.BridgeResponse{ExitCode: first.code, Stderr: first.stderr, BootMS: first.bootMS}
-	c := e.recordModelAttempt(req, model, first.code, first.start, first.end, first.dispatched, first.stderr, &dead, markFreshSessionRetry)
+	c := e.recordModelAttempt(req, model, first.code, first.start, first.end, first.dispatched, first.stderr, &dead, markFreshSessionRetry, markBootLoss(first))
 	e.clearBootStrike(c, req.CLI, first.code)
 	c.launchWarn("Engine.freshSessionRetry", "", CodeFreshSessionRetry,
 		fmt.Sprintf("%s pane died (%s): the REPL process is gone, not the CLI — one fresh %s session before the chain moves on", req.Agent, first.fatal.cause, req.CLI), nil)
@@ -544,6 +538,13 @@ func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]st
 		run.fatal = observation
 		if previousFatalObserver != nil {
 			previousFatalObserver(observation)
+		}
+	}
+	previousBootLossObserver := callDeps.onBootLoss
+	callDeps.onBootLoss = func(cause launchoutcome.BootLossCause) {
+		run.bootLoss = cause
+		if previousBootLossObserver != nil {
+			previousBootLossObserver(cause)
 		}
 	}
 	callEngine := &Engine{deps: callDeps}

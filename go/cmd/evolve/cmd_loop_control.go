@@ -12,6 +12,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
@@ -390,6 +391,17 @@ func (qp quotaPause) resumeDelay(now time.Time) (time.Duration, bool) {
 		return 0, false
 	}
 	return min(maxResumeDelay, max(minResumeDelay, wake.Sub(now)+minResumeDelay)), true
+}
+
+func quotaPauseOf(cycle int, cp checkpoint.Checkpoint) quotaPause {
+	return quotaPause{
+		Cycle:          cycle,
+		WakeAt:         cp.QuotaResetAt,
+		Source:         cmp.Or(cp.QuotaResetSource, "unknown"),
+		Attempts:       cp.AutoResumeAttempts,
+		MaxAttempts:    cp.AutoResumeMaxAttempts,
+		OperatorAction: cp.OperatorAction,
+	}
 }
 
 func parseWakeAt(s string) (time.Time, bool) {

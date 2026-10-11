@@ -27,3 +27,41 @@ The history this package's comments carried, by the rule `commentaudit check` us
 // checkpointer does NOT grow a fabricated wake-at — only the quota wall has a
 // reset instant, and stamping one on every phase boundary would invent data.
 ```
+
+## quota-resume-cap-and-boot-wall
+
+### `go/internal/checkpoint/checkpoint.go:203` — above `core.QuotaBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {`
+
+```text
+// Cycle-656: the mid-cycle all-families-exhausted detector needs to write
+// a quota-likely checkpoint from inside core's dispatch seam. quota-likely
+// IS an escalation reason, so unlike the phase-complete hook below it
+// writes unconditionally (still carrying the recorded integrity chain and
+// holding the same sidecar lock). detectQuotaPause / `evolve loop --resume`
+// consume it — including the wake-at withQuotaReset stamps on.
+```
+
+### `go/internal/checkpoint/checkpoint.go:224` — above `return flock.WithPathLock(cycleStatePath, func() error {`
+
+```text
+// ADR-0049 N17: check-and-act under ONE lock. The escalation guard read
+// used to be UNLOCKED and the phase-complete write took the cycle-state
+// lock SEPARATELY — a TOCTOU. Under fleet mode concurrent cycles share the
+// host-global cycle-state.json, so a peer could write an escalation
+// checkpoint in the window between our read and our write, which this
+// lowest-priority phase-complete write then clobbered (lost escalation).
+// Folding the read + write into a single flock.WithPathLock critical
+// section closes the window: both serialized orders converge on the
+// escalation. applyWithHooks (the lock-free inner of ApplyToStateFile) is
+// called DIRECTLY — flock is non-reentrant, so re-calling ApplyToStateFile
+// here would self-deadlock on the same sidecar lock.
+```
+
+### `go/internal/checkpoint/checkpoint.go:247` — above `existing := readExistingIntegrity(cycleStatePath)`
+
+```text
+// ADR-0065: CARRY the recorded per-phase integrity chain through the
+// phase-complete write (ComposeWithIntegrity), else this Compose would
+// drop it (omitempty nil clobbers the on-disk phaseIntegrity). Read +
+// write under the one lock — no TOCTOU with a peer's append.
+```

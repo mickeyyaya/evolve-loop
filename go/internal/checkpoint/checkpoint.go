@@ -192,62 +192,33 @@ func init() {
 	core.ResumeBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
 		path := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
 		return flock.WithPathLock(path, func() error {
-			// On resume, the current owner has consumed the old pause. On a fresh
-			// cycle, graceful cancellation preserves the phase still in flight. Both
-			// need the same replaceable active-phase checkpoint; fresh leases exclude
-			// it from fleet discovery while the owner remains alive.
+			attempts, err := carriedAttempts(path)
+			if err != nil {
+				return err
+			}
 			cp := ComposeWithIntegrity(cs, ReasonOperatorRequest, 0, "", now, readExistingIntegrity(path))
+			cp.AutoResumeAttempts = attempts
 			return applyWithHooks(defaultHooks(), path, cp)
 		})
 	}
-	// Cycle-656: the mid-cycle all-families-exhausted detector needs to write
-	// a quota-likely checkpoint from inside core's dispatch seam. quota-likely
-	// IS an escalation reason, so unlike the phase-complete hook below it
-	// writes unconditionally (still carrying the recorded integrity chain and
-	// holding the same sidecar lock). detectQuotaPause / `evolve loop --resume`
-	// consume it — including the wake-at withQuotaReset stamps on.
 	core.QuotaBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
 		cycleStatePath := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
 		return flock.WithPathLock(cycleStatePath, func() error {
 			existing := readExistingIntegrity(cycleStatePath)
-			cp := ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing)
-			return applyWithHooks(defaultHooks(), cycleStatePath, withQuotaReset(cp, cs, projectRoot, now))
+			cp := withQuotaReset(ComposeWithIntegrity(cs, ReasonQuotaLikely, 0, "", now, existing), cs, projectRoot, now)
+			return applyQuotaPause(cycleStatePath, cp)
 		})
 	}
 	core.PhaseBoundaryCheckpointer = func(cs core.CycleState, projectRoot string, now time.Time) error {
-		// Under fleet each lane's resume/checkpoint block must land in the SAME
-		// per-run cycle-state file the orchestrator's WriteCycleState uses, else
-		// this lane's resume block would be written to (and read from) the wrong
-		// file. The SSOT resolver honors the fleet per-run override; unset ⇒ the
-		// host-global default (sequential loop unchanged).
 		cycleStatePath := core.ResolveCycleStatePath(filepath.Join(projectRoot, ".evolve"))
-		// ADR-0049 N17: check-and-act under ONE lock. The escalation guard read
-		// used to be UNLOCKED and the phase-complete write took the cycle-state
-		// lock SEPARATELY — a TOCTOU. Under fleet mode concurrent cycles share the
-		// host-global cycle-state.json, so a peer could write an escalation
-		// checkpoint in the window between our read and our write, which this
-		// lowest-priority phase-complete write then clobbered (lost escalation).
-		// Folding the read + write into a single flock.WithPathLock critical
-		// section closes the window: both serialized orders converge on the
-		// escalation. applyWithHooks (the lock-free inner of ApplyToStateFile) is
-		// called DIRECTLY — flock is non-reentrant, so re-calling ApplyToStateFile
-		// here would self-deadlock on the same sidecar lock.
 		return flock.WithPathLock(cycleStatePath, func() error {
 			yield, err := hasEscalationCheckpoint(cycleStatePath)
 			if err != nil {
 				return err
 			}
 			if yield {
-				// phase-complete is the lowest-priority reason: never clobber an
-				// escalation checkpoint (quota-likely, batch-cap-near,
-				// operator-requested, stall-inactivity) — those must survive until
-				// their consumer (e.g. detectQuotaPause after RunCycle) reads them.
 				return nil
 			}
-			// ADR-0065: CARRY the recorded per-phase integrity chain through the
-			// phase-complete write (ComposeWithIntegrity), else this Compose would
-			// drop it (omitempty nil clobbers the on-disk phaseIntegrity). Read +
-			// write under the one lock — no TOCTOU with a peer's append.
 			existing := readExistingIntegrity(cycleStatePath)
 			return applyWithHooks(defaultHooks(), cycleStatePath, ComposeWithIntegrity(cs, ReasonPhaseComplete, 0, "", now, existing))
 		})

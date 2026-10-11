@@ -40,6 +40,7 @@ type loopConfig struct {
 	// the ceiling to the safety cap instead of defaulting to 1.
 	MaxCyclesExplicit bool `json:"max_cycles_explicit,omitempty"`
 	Resume            bool `json:"resume,omitempty"`
+	AutoResume        bool `json:"auto_resume,omitempty"`
 	Reset             bool `json:"reset,omitempty"`
 	// Fingerprint is the --fingerprint value for --reset: it acknowledges one
 	// failure fingerprint so the blocker-breaker excludes it going forward.

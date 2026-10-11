@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -31,9 +33,10 @@ func runResumeBatch(
 	}
 	fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f state=%s\n",
 		rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause, rp.StatePath)
+	if !admitResume(cfg, rp, lr, stdout, stderr) {
+		return 2
+	}
 
-	// A fleet checkpoint keeps reading and writing the per-run state file that
-	// discovery selected, including across a second pause in this invocation.
 	restoreState := core.ActivateResumeStatePath(rp, cfg.EvolveDir)
 	defer restoreState()
 
@@ -80,4 +83,23 @@ func runResumeBatch(
 	finalizeCompletedCycle(cfg, stderr)
 	lr.emit(stdout)
 	return 0
+}
+
+var recordResume = checkpoint.RecordResume
+
+func admitResume(cfg loopConfig, rp *core.ResumePoint, lr *loopResult, stdout, stderr io.Writer) bool {
+	cp, admitted, err := recordResume(rp.StatePath, cfg.AutoResume)
+	switch {
+	case err != nil:
+		fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
+		lr.StopReason = "error"
+		lr.emitFatal(stdout, stderr, cfg, rp.CycleID)
+		return false
+	case !admitted:
+		fmt.Fprintln(stderr, quotaPauseLine(quotaPauseOf(rp.CycleID, cp), time.Now()))
+		lr.StopReason = "auto-resume-refused"
+		lr.emit(stdout)
+		return false
+	}
+	return true
 }
