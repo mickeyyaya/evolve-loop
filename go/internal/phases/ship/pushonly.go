@@ -27,9 +27,11 @@ type shipJournalEntry struct {
 	Cycle int    `json:"cycle,omitempty"`
 }
 
+var marshalJSON = json.Marshal
+
 func appendShipJournal(projectRoot string, e shipJournalEntry) error {
 	e.TS = time.Now().UTC().Format(time.RFC3339)
-	line, err := json.Marshal(e)
+	line, err := marshalJSON(e)
 	if err != nil {
 		return err
 	}

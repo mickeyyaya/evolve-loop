@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -387,7 +386,7 @@ func explanationViewSHA(projectRoot string, cycle int, runID string) (string, er
 	if err != nil {
 		return "", err
 	}
-	body, err := json.Marshal(view)
+	body, err := marshalJSON(view)
 	if err != nil {
 		return "", err
 	}

@@ -255,6 +255,11 @@ func (c *itemConsumer) record(m consumedMove) {
 	}
 }
 
+var (
+	readInboxItem    = os.ReadFile
+	marshalInboxItem = json.MarshalIndent
+)
+
 // stage moves id's root item into consumed/ with its consumption annotation
 // and stages both paths. Every failure is per-item, LOUD, and rolled back.
 func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
@@ -267,7 +272,7 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 		}
 		return consumedMove{}, moveAbsent // already consumed or never tracked — a no-op
 	}
-	raw, err := os.ReadFile(src)
+	raw, err := readInboxItem(src)
 	if err != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume read %q: %v", id, err))
 		return consumedMove{}, moveFailed
@@ -294,7 +299,7 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 	if m.boundOK {
 		doc[inboxbatch.ReleasedContinuationsField] = appendReleasedForConsume(doc, m.bound, c.cid)
 	}
-	out, err := json.MarshalIndent(doc, "", "  ")
+	out, err := marshalInboxItem(doc, "", "  ")
 	if err != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: consume marshal %q: %v", id, err))
 		return consumedMove{}, moveFailed
