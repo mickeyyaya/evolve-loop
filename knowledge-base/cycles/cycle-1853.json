@@ -1,0 +1,234 @@
+{
+  "schema_version": 2,
+  "cycle": 1853,
+  "run_id": "01M4FY77W5XZNZGJ1NSMN06N3J",
+  "goal": "Wave 89.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 88 facts (run 20261009T075015Z): 2 of 2 cycles shipped.\n- Cycle 1851: final verdict PASS. It shipped.\n- Cycle 1852: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 85 (run 20261009T035608Z): 2 of 2 cycles shipped.\n- Wave 86 (run 20261009T055036Z): 2 of 2 cycles shipped.\n- Wave 87 (run 20261009T070638Z): 2 of 2 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "swarm-worker-pgid-never-recorded"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 578708,
+      "started_at": "2026-10-09T09:00:26Z",
+      "ended_at": "2026-10-09T09:10:06Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 291527,
+      "started_at": "2026-10-09T09:10:49Z",
+      "ended_at": "2026-10-09T09:15:42Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 215142,
+      "started_at": "2026-10-09T09:15:42Z",
+      "ended_at": "2026-10-09T09:19:19Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 36,
+        "output": 18631,
+        "cache_read": 1776676,
+        "cache_write": 85185
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "FAIL",
+      "duration_ms": 2478278,
+      "started_at": "2026-10-09T09:19:19Z",
+      "ended_at": "2026-10-09T10:42:13Z",
+      "archetype": "build",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 526440,
+      "started_at": "2026-10-11T13:37:23Z",
+      "ended_at": "2026-10-11T13:47:42Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 183773,
+      "started_at": "2026-10-11T13:47:42Z",
+      "ended_at": "2026-10-11T13:53:45Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 11000,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 227633,
+      "started_at": "2026-10-11T13:53:45Z",
+      "ended_at": "2026-10-11T13:57:34Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build-planner",
+      "verdict": "WARN",
+      "started_at": "2026-10-11T13:57:34Z",
+      "ended_at": "2026-10-11T13:57:35Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 283027,
+      "started_at": "2026-10-11T13:57:35Z",
+      "ended_at": "2026-10-11T14:48:29Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "build|infra-error|9fe4b830f861",
+    "pre_class": "infra-error",
+    "reasons": [
+      "cycle aborted in phase build (abnormal-exit epilogue) cause=…cates_test.go:359:42: unknown field PGID in struct literal of type core.BridgeResponse FAIL github.com/mickeyyaya/evolve-loop/go/acs/cycl"
+    ]
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 1853",
+      "priority": "high"
+    }
+  ],
+  "skipped_phases": [
+    {
+      "phase": "closeout",
+      "reason": "abnormal exit in phase build"
+    }
+  ],
+  "phases_run_verdict_not_adopted": [
+    {
+      "phase": "build-planner",
+      "verdict": "SKIPPED"
+    }
+  ],
+  "timing": {
+    "total_ms": 4784528,
+    "phase_count": 9,
+    "retried_count": 1,
+    "longest_phase": "build",
+    "longest_ms": 2478278,
+    "by_archetype_ms": {
+      "build": 3287745,
+      "evaluate": 183773,
+      "plan": 1313010
+    },
+    "total_tokens": {
+      "input": 36,
+      "output": 29631,
+      "cache_read": 1776676,
+      "cache_write": 85185
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 11000,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 36,
+        "output": 18631,
+        "cache_read": 1776676,
+        "cache_write": 85185
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 11000,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999797378528428,
+    "hot_phase_count": 1,
+    "hot_phases": [
+      "tdd"
+    ]
+  }
+}
