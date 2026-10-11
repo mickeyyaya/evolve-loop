@@ -20,6 +20,7 @@ var (
 	resetSHACommitFn  = version.Commit
 	resetSHARepinFn   = phaseintegrity.RepinShipSHA
 	resetSHAGetwd     = os.Getwd
+	resetSHAAbsRoot   = paths.AbsoluteRoot
 )
 
 // See ADR-0065.
@@ -78,7 +79,7 @@ func resetSHAProjectRoot(projectRoot string, stderr io.Writer) (string, error) {
 		}
 		projectRoot = cwd
 	}
-	return paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+	return resetSHAAbsRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve reset-sha: WARN: %s\n", m)
 	}), nil
 }

@@ -398,3 +398,37 @@ func TestRunSyncMain_AnUnresolvableRootWarnsAndKeepsTheRawRoot(t *testing.T) {
 		t.Fatalf("runSyncMain = %d, %q (label %q raw %q); want the WARN line first", code, errb.String(), label, raw)
 	}
 }
+
+func TestResetSHAProjectRoot_AnUnresolvableRootWarnsAndKeepsTheRawRoot(t *testing.T) {
+	var label, raw string
+	bfSwap(t, &resetSHAAbsRoot, func(l, p string, warn func(string)) string {
+		label, raw = l, p
+		warn("abs failed")
+		return p
+	})
+	var errb bytes.Buffer
+
+	got, err := resetSHAProjectRoot("relative/root", &errb)
+
+	if err != nil || got != "relative/root" || label != "--project-root" || raw != "relative/root" {
+		t.Fatalf("resetSHAProjectRoot = %q, %v (label %q raw %q); want the raw root", got, err, label, raw)
+	}
+	if errb.String() != "evolve reset-sha: WARN: abs failed\n" {
+		t.Fatalf("stderr = %q, want the prefixed WARN line", errb.String())
+	}
+}
+
+func TestResetSHAProjectRoot_FlagThenEnvThenCwd(t *testing.T) {
+	bfSwap(t, &resetSHAGetwd, func() (string, error) { return "/from/cwd", nil })
+	t.Setenv("EVOLVE_PROJECT_ROOT", "/from/env")
+	var errb bytes.Buffer
+
+	flagRoot, _ := resetSHAProjectRoot("/from/flag", &errb)
+	envRoot, _ := resetSHAProjectRoot("", &errb)
+	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	cwdRoot, err := resetSHAProjectRoot("", &errb)
+
+	if flagRoot != "/from/flag" || envRoot != "/from/env" || cwdRoot != "/from/cwd" || err != nil || errb.Len() != 0 {
+		t.Fatalf("roots flag=%q env=%q cwd=%q err=%v stderr=%q; want each source in precedence", flagRoot, envRoot, cwdRoot, err, errb.String())
+	}
+}
