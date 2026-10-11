@@ -19,10 +19,7 @@ import (
 
 // t.TempDir uses macOS's /var/folders and would miss the broad /tmp write-grant regression, so this uses /tmp directly.
 func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
-	probe := sandbox.Probe()
-	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED native sandbox: %+v", probe)
-	}
+	probe := requireNativeSandbox(t)
 	if probe.OS != "darwin" {
 		t.Skip("unsupported: linked-worktree metadata requires precise file grants; mandatory Linux launch fails closed")
 	}
@@ -88,7 +85,6 @@ func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 			t.Fatalf("macOS exact-ref policy exposed sibling ref: %s", out)
 		}
 	}
-	// Opens for append without writing bytes, checking write permission without changing contents.
 	for _, control := range []string{
 		filepath.Join(info.GitDir, "commondir"), filepath.Join(info.GitDir, "gitdir"),
 		filepath.Join(info.GitDir, "config.worktree"), filepath.Join(info.GitDir, "config"),
@@ -106,10 +102,7 @@ func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 }
 
 func TestLaunchProfilePolicyWithFixtureChild(t *testing.T) {
-	probe := sandbox.Probe()
-	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED: native sandbox cannot apply: %+v", probe)
-	}
+	probe := requireNativeSandbox(t)
 	fx := newFixture(t, "codex", "")
 	root := t.TempDir()
 	for _, p := range []string{"private-fixture", "evals"} {
@@ -126,7 +119,6 @@ func TestLaunchProfilePolicyWithFixtureChild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stub := filepath.Join(root, "fixture-cli")
-	// A real harmless child using only the generated fixture tree; exit 0 proves both positive and negative cases.
 	script := "#!/bin/sh\nset -eu\n" +
 		`cat evals/sample >/dev/null
 printf allowed > allowed

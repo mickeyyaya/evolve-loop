@@ -5,20 +5,18 @@ package bridge_test
 import (
 	"context"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tmuxtest"
 )
 
 func TestRealTmux_AKilledServerEndsTheWatchingDispatchAsPaneLostWithinOneLivenessInterval(t *testing.T) {
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("tmux not installed; the replay needs a real server to kill")
-	}
+	testhost.Tool(t, "tmux")
 	socket := bridge.DeriveTestSocket(os.Getpid()) + "-panelost"
 	t.Setenv(bridge.TmuxSocketEnv, socket)
 	if err := tmuxtest.StartServer(socket); err != nil {

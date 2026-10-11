@@ -37,6 +37,7 @@
 | [sequential-write-discipline.md](architecture/sequential-write-discipline.md) | Parallelization discipline rule (`parallel_eligible`) + concurrency cap (default 2 since v8.55.0) — when a role can fan out, and how many workers run at once |
 | [build-explanation-contract.md](architecture/build-explanation-contract.md) | Builder-authored rationale deliverable, provenance binding, and Audit/Ship/Retro verification lifecycle |
 | [review-loop-and-quality-index.md](architecture/review-loop-and-quality-index.md) | The code-review phase and the shared quality index (ADR-0124, in shadow since v22.27.0) |
+| [agent-sandbox-contract.md](architecture/agent-sandbox-contract.md) | The capability contract of a phase agent: each allow and deny row, checked under the real `sandbox-exec` |
 | [convergence-policy.md](architecture/convergence-policy.md) | The rule that makes each loop that repeats converge or escalate (ADR-0126, in shadow since v22.27.0) |
 | [event-channels.md](architecture/event-channels.md) | The push-only publish/subscribe protocol: channel logs, cursors, the kernel wake and `evolve events` subscriptions (ADR-0127, proposed) |
 | [fleet-landing-queue.md](architecture/fleet-landing-queue.md) | The landing queue for concurrent fleet lanes: the overlap proof, the tiers T1 to T4, the scoped gates and the review (ADR-0128, proposed) |

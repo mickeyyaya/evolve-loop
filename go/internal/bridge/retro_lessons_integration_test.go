@@ -15,10 +15,7 @@ import (
 )
 
 func TestNativeRetrospectiveLessonBoundary(t *testing.T) {
-	probe := sandbox.Probe()
-	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED native sandbox: %+v", probe)
-	}
+	probe := requireNativeSandbox(t)
 	for _, role := range []string{"retrospective", "builder"} {
 		t.Run(role, func(t *testing.T) {
 			fx := newFixture(t, "claude-p", "")
@@ -86,10 +83,7 @@ func TestNativeRetrospectiveLessonBoundary(t *testing.T) {
 // The caller tests pin root propagation; this half exercises the checked-in
 // Router profile through the real launch parser and native sandbox.
 func TestNativeDecisionProfileOwnedCWD(t *testing.T) {
-	probe := sandbox.Probe()
-	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED native sandbox: %+v", probe)
-	}
+	probe := requireNativeSandbox(t)
 	for _, role := range []string{"router"} {
 		for _, active := range []bool{false, true} {
 			t.Run(role+map[bool]string{false: "/workspace", true: "/worktree"}[active], func(t *testing.T) {

@@ -10,7 +10,7 @@ func TestGenerateSBPL_TerminalGrantNamesOnlyThePaneDevice(t *testing.T) {
 	cfg.TerminalPath = "/dev/ttys042"
 	out := GenerateSBPL(cfg)
 	mustContain(t, out,
-		`(allow file-write-data (literal "/dev/tty") (literal "/dev/ttys042"))`,
+		`(allow file-read* file-write-data (literal "/dev/tty") (literal "/dev/ttys042"))`,
 		`(allow file-ioctl (require-all (require-any (literal "/dev/tty") (literal "/dev/ttys042")) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))`,
 	)
 	if n := strings.Count(out, "/dev/ttys042"); n != 2 {
@@ -34,7 +34,7 @@ func TestGenerateSBPL_ScratchGrantAboveTheRepoPrecedesTheReadOnlyDeny(t *testing
 	}
 }
 
-const ownPtySlaveGrant = `(allow file-write-data file-ioctl (require-all (regex #"^/dev/ttys[0-9]+$") (extension "com.apple.sandbox.pty")))`
+const ownPtySlaveGrant = `(allow file-read* file-write-data file-ioctl (require-all (regex #"^/dev/ttys[0-9]+$") (extension "com.apple.sandbox.pty")))`
 
 func TestGenerateSBPL_GrantsOnlyThePseudoTerminalsTheAgentOpens(t *testing.T) {
 	for _, tc := range []struct {
@@ -53,12 +53,44 @@ func TestGenerateSBPL_GrantsOnlyThePseudoTerminalsTheAgentOpens(t *testing.T) {
 					t.Fatalf("tmux needs %s exactly once to forkpty a window; got %d:\n%s", rule, n, out)
 				}
 			}
-			if n := strings.Count(out, "regex"); n != 1 {
+			if n := strings.Count(out, "(regex") - strings.Count(out, "(require-not (regex"); n != 1 {
 				t.Fatalf("the only pattern grant must be the slave grant that the pty extension scopes; got %d patterns:\n%s", n, out)
 			}
 			if n := strings.Count(out, "/dev/tty"); n != tc.ttyNames {
 				t.Fatalf("only the scoped slave grant and the pane's own terminal rules may name a tty, want %d names, got %d:\n%s", tc.ttyNames, n, out)
 			}
 		})
+	}
+}
+
+const wantDevReadGrant = `(allow file-read* (require-all (subpath "/dev") (require-not (regex #"^/dev/(tty|pty)[^/]+$"))))`
+
+func TestGenerateSBPL_DevReadGrantLeavesOutEveryTerminalButTheAgentsOwn(t *testing.T) {
+	for _, pane := range []string{"", "/dev/ttys042"} {
+		cfg := canonicalConfig()
+		cfg.TerminalPath = pane
+		out := GenerateSBPL(cfg)
+		if n := strings.Count(out, wantDevReadGrant+"\n"); n != 1 {
+			t.Fatalf("pane %q: the /dev read grant must leave out the tty and pty devices, want it once, got %d:\n%s", pane, n, out)
+		}
+		if strings.Contains(out, `(subpath "/dev"))`) {
+			t.Fatalf("pane %q: a bare /dev subpath grant lets the agent read another pane's tty:\n%s", pane, out)
+		}
+	}
+}
+
+func TestGenerateSBPL_ReadDenialsFollowEveryReadGrantAndSkipEmptyEntries(t *testing.T) {
+	cfg := canonicalConfig()
+	cfg.DenyReadPaths = []string{"", "/repo/private"}
+	out := GenerateSBPL(cfg)
+	deny := `(deny file-read* (subpath "/repo/private"))`
+	if n := strings.Count(out, deny); n != 1 {
+		t.Fatalf("want the read denial once, got %d:\n%s", n, out)
+	}
+	if strings.Contains(out, `(deny file-read* (subpath ""))`) {
+		t.Fatalf("an empty read denial must emit no rule:\n%s", out)
+	}
+	if d, g := strings.Index(out, deny), strings.LastIndex(out, "(allow file-read*"); d < g {
+		t.Fatalf("the read denial must follow every read grant, or a later grant reopens it (deny=%d last grant=%d)", d, g)
 	}
 }

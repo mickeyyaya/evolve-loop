@@ -7,29 +7,25 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 func TestIntegration_BridgeBoot_ClaudeTmux(t *testing.T) {
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("tmux not on PATH")
-	}
+	testhost.Tool(t, "tmux")
 	if _, err := exec.LookPath("claude"); err != nil {
 		t.Skip("claude not on PATH")
 	}
 
 	opts := Options{
-		ProjectRoot: t.TempDir(),
-		EvolveDir:   t.TempDir(),
-		SkipBoot:    false,
-		// Empty still falls back to DefaultSpinePhases; only bridge-boot is asserted.
+		ProjectRoot:   t.TempDir(),
+		EvolveDir:     t.TempDir(),
+		SkipBoot:      false,
 		SpinePhases:   []string{},
 		ProfileLister: func() ([]string, error) { return []string{"builder"}, nil },
 		ProfileGetter: func(name string) (profiles.Profile, error) {
 			return profiles.Profile{Name: name, CLI: "claude-tmux"}, nil
 		},
-		DriverKnown: func(string) bool { return true },
-		// BootTester nil: the real bridge.BootSmokeTest runs.
-		// Freeze seams stubbed so the test never reads the real home dir or runs brew.
+		DriverKnown:        func(string) bool { return true },
 		SelfUpdateEvidence: func(string) (bool, string, error) { return false, "", nil },
 		PinnedLister:       func() ([]string, error) { return nil, nil },
 	}

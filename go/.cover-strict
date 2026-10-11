@@ -44,3 +44,4 @@
 ./internal/overlap 100
 ./internal/derived 100
 ./internal/attemptpostmortem 100
+./internal/testhost 100

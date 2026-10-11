@@ -50,8 +50,7 @@ Design notes: [internal-bridge.md](../architecture/packages/internal-bridge.md) 
 ## The proofs
 
 - `TestRealTmux_AgentTmuxProbeCannotKillTheRunServer` runs the exact probe in a real pane, through the real boot, beside a victim session, on the test socket `evolve-bridge-t<pid>`. Before the fix, the victim session was gone and the boot timed out (exit 80). After the fix, the victim stays and the probe still gets its own private server.
-- `TestGenerateSBPL_RunSocketIsDeniedToTheAgentAndOpenToTheHost` runs each attack under the real `sandbox-exec` profile: connect, rename, hard link, symlink, unlink and directory rename. Each one fails, and after each one the host still reaches the server. The agent can still write in the socket directory and drive a private server of its own.
-- `TestGenerateSBPL_TheAgentSignalsOnlyItsOwnProcesses` shows that the agent cannot signal the tmux server and can still stop its own `sleep` child.
+- `TestAgentSandboxContract` (2026-10-10) runs each attack under the real `sandbox-exec` profile of the builder: connect, rename, hard link, symlink, unlink and directory rename. Each one fails, and after each one the host still reaches the server. The agent can still write in the socket directory and drive a private server of its own. The agent cannot signal the tmux server and can still stop its own `sleep` child. The rows replace `TestGenerateSBPL_RunSocketIsDeniedToTheAgentAndOpenToTheHost` and `TestGenerateSBPL_TheAgentSignalsOnlyItsOwnProcesses`. See [agent-sandbox-contract.md](../architecture/agent-sandbox-contract.md).
 
 ## Why the retry ran the probe again
 
@@ -86,9 +85,16 @@ After #836 a private server of the agent is safe. The run socket and the `defaul
 Proofs:
 
 - `TestGenerateSBPL_GrantsOnlyThePseudoTerminalsTheAgentOpens` (unit): the three rules occur once, and the only pattern rule is the slave rule that the extension scopes.
-- `TestGenerateSBPL_TheAgentWindowGetsItsOwnTerminalAndNoOtherPane` (integration, real `sandbox-exec`): the agent starts a private server, and its window runs on its own pty. A write to the host pane's tty fails.
-- `TestGenerateSBPL_TheCycle1853ProbeGetsItsOwnServerAndLeavesTheRunServerAlive` (integration): the exact probe, with `TMUX` unset as the boot does, gets its own server, and the run server keeps its session.
+- `TestAgentSandboxContract` (integration, real `sandbox-exec`), the window row: the agent starts a private server, and its window runs on its own pty. A write to the host pane's tty fails. This row replaces `TestGenerateSBPL_TheAgentWindowGetsItsOwnTerminalAndNoOtherPane`.
+- `TestAgentSandboxContract`, the two incident rows: the exact probe, with `TMUX` unset as the boot does, gets its own server. With `TMUX` still set to the run server, the probe reaches no server. In both rows the run server keeps its sessions. These rows replace `TestGenerateSBPL_TheCycle1853ProbeGetsItsOwnServerAndLeavesTheRunServerAlive`.
+- `TestPaneParity_ReportsTheCycle1853TriggerWhenThePtyRulesAreRemoved` (integration): the pane-parity harness runs `./internal/swarm` on the host and in a real sandboxed pane. With the pty rules removed from the profile, it reports `TestExecTmuxKill_NeverKillsASessionWhoseNameExtendsTheTarget` as host=pass and pane=fail. This is the cycle-1853 trigger, found by a gate and not by an agent.
 - Live: `go test ./internal/swarm` in `sandbox-exec` with the generated profile fails before the fix at `kill_exact_test.go:37` and passes after it.
+
+### The follow-up (lane sandbox contract, 2026-10-10)
+
+- **No read of another pane's terminal.** The base profile granted `file-read*` on all of `/dev`. The R1 lane measured that the read of another pane's tty was not denied (`OTHER-READ-OK`). The `/dev` grant now leaves out the tty and pty devices. The pane's own terminal, `/dev/tty` and the agent's own ptys stay open.
+- **One contract table.** [agent-sandbox-contract.md](../architecture/agent-sandbox-contract.md) lists each allow and deny. Each incident command is a row forever.
+- **CI runs the real-tmux tests.** The macOS job installs tmux. A real-tmux or sandbox test that cannot find its tool fails in macOS CI ([internal-testhost](../architecture/packages/internal-testhost.md)).
 
 ## Residual risks
 
@@ -101,4 +107,5 @@ Proofs:
   - The recipe sessions (`newRecipeDriver`: the `/model` picker capture, the `clicontrol` usage and status captures, the recipe engine). They never call the sandbox wrapper. They also do not send the unset line. The bridge types only slash commands into them, not a task prompt.
   - Boot smoke and live smoke get a scratch worktree (`applyScratchCwd`), so they are wrapped.
 - **No sandbox at all.** Then the agent has only the detach and the rule. This occurs with `EVOLVE_SANDBOX=off`, in a nested session where the sandbox does not apply, and on a host with no sandbox binary.
+- **The run directories of other cycles.** Each profile declares `.evolve/runs/cycle-*` as a write grant, and the grant widens to `.evolve/runs`. An agent can write in the run directory of another cycle. The contract row is `gap` until the profiles change.
 - **Linux.** The profile rules are macOS SBPL. `bwrap` mounts a new `/tmp` and puts the agent in a new PID namespace. Thus the default socket directory is not visible and the host processes cannot be signalled. A run with `TMUX_TMPDIR` outside `/tmp` has no Linux socket denial.

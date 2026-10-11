@@ -36,6 +36,11 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           cache-dependency-path: go/go.sum
+      - name: install tmux (macOS CI fails a real-tmux test without it)
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install tmux
+          fi
       - run: go mod download
       - name: vet + fmt
         run: |

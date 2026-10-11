@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -16,18 +15,13 @@ import (
 	"unsafe"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 func TestRealTmuxSandboxTerminalConfinement(t *testing.T) {
 	requireTmux(t)
-	probe := sandbox.Probe()
-	if probe.OS != "darwin" || !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED native macOS sandbox: %+v", probe)
-	}
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node not installed; native terminal raw-mode fixture requires it")
-	}
+	probe := requireNativeSandbox(t)
+	node := testhost.Tool(t, "node")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	peer := itSession("terminal-peer")
@@ -40,9 +34,6 @@ func TestRealTmuxSandboxTerminalConfinement(t *testing.T) {
 		t.Fatal(err)
 	}
 	peerTTY = strings.TrimSpace(peerTTY)
-	// Establish that the independently owned peer exists and is writable by
-	// this user, so a missing device or ordinary Unix permissions cannot pass
-	// the child's negative test.
 	peerFile, err := os.OpenFile(peerTTY, os.O_RDWR, 0)
 	if err != nil {
 		t.Fatalf("peer tty control unavailable: %v", err)
@@ -59,7 +50,6 @@ func TestRealTmuxSandboxTerminalConfinement(t *testing.T) {
 	cfg.ArtifactTimeoutS = 5
 	protected := filepath.Join(cfg.Worktree, "protected")
 	mustWrite(t, protected, "retained")
-	// runTmuxREPL receives denials already canonicalized by Engine.Launch.
 	cfg.DenyPaths, err = resolveSandboxDenials([]string{protected}, cfg.ProjectRoot, cfg.Worktree, true)
 	if err != nil {
 		t.Fatal(err)
@@ -70,10 +60,7 @@ func TestRealTmuxSandboxTerminalConfinement(t *testing.T) {
 		t.Fatal(err)
 	}
 	const marker = "TERMINAL-FIXTURE-READY"
-	// Resolve the assigned tty from the CHILD's inherited stdin, independently
-	// of the parent's pane_tty lookup. Keep the ready marker only in script
-	// contents, never in the launch command captured by tmux.
-	script := fmt.Sprintf(`const fs=require('node:fs'), tty=require('node:tty'), cp=require('node:child_process');
+	script := fmt.Sprintf(`const fs=require('node:fs'), cp=require('node:child_process');
 const peer=%q, protectedPath=%q, artifact=%q, marker=%q, testBinary=%q;
 function denied(action, name) {
   try { action(); } catch (err) {
@@ -96,11 +83,7 @@ try {
  });
 } catch(err) { throw new Error('ioctl fixture: '+String(err.stdout)+' '+String(err.stderr)); }
 denied(()=>{const fd=fs.openSync(peer,'r+'); fs.closeSync(fd);},'peer tty write');
-let peerStream;
-try {
-  peerStream=new tty.ReadStream(fs.openSync(peer,'r'));
-  denied(()=>{peerStream.setRawMode(true); peerStream.setRawMode(false);},'peer tty ioctl');
-} finally { if(peerStream) peerStream.destroy(); }
+denied(()=>{const fd=fs.openSync(peer,'r'); fs.closeSync(fd);},'peer tty read');
 denied(()=>{const fd=fs.openSync(protectedPath,'a'); fs.closeSync(fd);},'protected file write');
 let received='', completed=false;
 process.stdin.setEncoding('utf8');
@@ -123,8 +106,6 @@ process.stdin.resume();
 	if !sandbox.DetectNested(depEnvGetter(deps)) {
 		t.Fatal("fixture must retain the Codex bootstrap session hint")
 	}
-	// Rebind after configuring the environment: itDeps has already defaulted
-	// the wrapper closure. Use the measured native probe, never a fake success.
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	var stderr bytes.Buffer
 	deps.Stderr = &stderr

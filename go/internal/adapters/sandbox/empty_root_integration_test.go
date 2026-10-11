@@ -7,15 +7,16 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
 
 func TestGenerateSBPL_EmptyRootPreservesDeclaredPolicy(t *testing.T) {
-	probe := Probe()
-	if probe.OS != "darwin" || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED native macOS sandbox: %+v", probe)
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS SBPL enforcement test")
 	}
+	requireCapableSandbox(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

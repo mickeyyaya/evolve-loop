@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -52,9 +51,7 @@ func TestExecRunner_Real(t *testing.T) {
 }
 
 func TestExecTmux_Real(t *testing.T) {
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("tmux not installed; skipping execTmux integration coverage")
-	}
+	requireTmux(t)
 	tx := execTmux{}
 	ctx := context.Background()
 	sess := fmt.Sprintf("evolve-bridge-covtest-%d", os.Getpid())

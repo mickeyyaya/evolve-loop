@@ -7,13 +7,12 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 func privateTmuxServer(t *testing.T) func(args ...string) error {
 	t.Helper()
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("tmux not installed")
-	}
+	testhost.Tool(t, "tmux")
 	dir, err := os.MkdirTemp("/tmp", "swx")
 	if err != nil {
 		t.Fatal(err)

@@ -182,75 +182,15 @@ func probeFor(goos string, look LookPathFunc) ProbeResult {
 // produces a read-only repo with cycle-specific write zones.
 func GenerateSBPL(cfg Config) string {
 	var b strings.Builder
-	// Header — system.sb provides baseline access (dyld, libsystem, etc).
-	b.WriteString("(version 1)\n")
-	b.WriteString("(deny default)\n")
-	b.WriteString(`(import "system.sb")` + "\n")
-	b.WriteString("(allow process-exec)\n")
-	b.WriteString("(allow process-fork)\n")
-	b.WriteString("(allow signal (target same-sandbox))\n")
-	b.WriteString("(allow sysctl-read)\n")
-	b.WriteString("(allow mach-lookup)\n")
-	b.WriteString("(allow ipc-posix-shm)\n")
-	b.WriteString("(allow file-read-metadata)\n")
-	// Always-readable subpaths.
-	for _, p := range []string{
-		cfg.RepoRoot, "/usr", "/System", "/Library",
-		"/private/etc", "/opt", "/bin", "/sbin", "/var",
-		"/private/var", "/dev",
-	} {
-		if p == "" {
-			continue
-		}
-		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
-	}
-	// HOME read.
-	if cfg.HomeDir != "" {
-		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", cfg.HomeDir)
-	}
-	// /tmp + /var/folders: read+write both (bash:477 load-bearing note).
-	for _, p := range []string{"/tmp", "/private/tmp", "/var/folders", "/private/var/folders"} {
-		fmt.Fprintf(&b, "(allow file-read* (subpath %q))\n", p)
-		fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", p)
-	}
+	b.WriteString(sbplPreamble)
+	writeReadGrants(&b, cfg)
 	writeTerminalRules(&b, cfg.TerminalPath)
-	// HOME writes for known Claude config dirs.
-	if cfg.HomeDir != "" {
-		for _, p := range homeStateWriteDirs(cfg.HomeDir) {
-			fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", p)
-		}
-	}
-	// ReadOnlyRepo: explicit deny before per-write-path allows so later
-	// rules re-permit specific subdirs. Mirrors bash:511-517 contract.
-	for _, wp := range cfg.WritePaths {
-		if coversRepository(wp, cfg.RepoRoot) {
-			fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", wp)
-		}
-	}
-	if cfg.ReadOnlyRepo && cfg.RepoRoot != "" {
-		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", cfg.RepoRoot)
-	}
-	// Per-write-path allows. Every entry is a literal absolute path: the
-	// bridge resolves profile globs to their glob-free ancestor before handing
-	// them off (resolveSandboxWriteGrants), so SBPL and bwrap grant the same
-	// thing. A glob reaching here would be emitted verbatim and match nothing.
-	for _, wp := range cfg.WritePaths {
-		if wp == "" {
-			continue
-		}
-		if coversRepository(wp, cfg.RepoRoot) {
-			continue
-		}
-		fmt.Fprintf(&b, "(allow file-write* (subpath %q))\n", wp)
-	}
-	// Per-agent deny paths (kernel-enforced mirror of disallowed_tools).
+	writeWriteGrants(&b, cfg)
 	for _, dp := range cfg.DenyPaths {
-		if dp == "" {
-			continue
+		if dp != "" {
+			fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
 		}
-		fmt.Fprintf(&b, "(deny file-write* (subpath %q))\n", dp)
 	}
-	// Network.
 	for _, dp := range cfg.DenyReadPaths {
 		if dp != "" {
 			fmt.Fprintf(&b, "(deny file-read* (subpath %q))\n", dp)
@@ -260,9 +200,63 @@ func GenerateSBPL(cfg Config) string {
 	return b.String()
 }
 
+const sbplPreamble = `(version 1)
+(deny default)
+(import "system.sb")
+(allow process-exec)
+(allow process-fork)
+(allow signal (target same-sandbox))
+(allow sysctl-read)
+(allow mach-lookup)
+(allow ipc-posix-shm)
+(allow file-read-metadata)
+`
+
+const devReadGrantWithoutTerminals = `(allow file-read* (require-all (subpath "/dev") (require-not (regex #"^/dev/(tty|pty)[^/]+$"))))
+`
+
+func writeReadGrants(b *strings.Builder, cfg Config) {
+	for _, p := range []string{
+		cfg.RepoRoot, "/usr", "/System", "/Library",
+		"/private/etc", "/opt", "/bin", "/sbin", "/var",
+		"/private/var",
+	} {
+		if p != "" {
+			fmt.Fprintf(b, "(allow file-read* (subpath %q))\n", p)
+		}
+	}
+	b.WriteString(devReadGrantWithoutTerminals)
+	if cfg.HomeDir != "" {
+		fmt.Fprintf(b, "(allow file-read* (subpath %q))\n", cfg.HomeDir)
+	}
+	for _, p := range []string{"/tmp", "/private/tmp", "/var/folders", "/private/var/folders"} {
+		fmt.Fprintf(b, "(allow file-read* (subpath %q))\n", p)
+		fmt.Fprintf(b, "(allow file-write* (subpath %q))\n", p)
+	}
+}
+
+func writeWriteGrants(b *strings.Builder, cfg Config) {
+	for _, p := range homeStateWriteDirs(cfg.HomeDir) {
+		fmt.Fprintf(b, "(allow file-write* (subpath %q))\n", p)
+	}
+	for _, wp := range cfg.WritePaths {
+		if coversRepository(wp, cfg.RepoRoot) {
+			fmt.Fprintf(b, "(allow file-write* (subpath %q))\n", wp)
+		}
+	}
+	if cfg.ReadOnlyRepo && cfg.RepoRoot != "" {
+		fmt.Fprintf(b, "(deny file-write* (subpath %q))\n", cfg.RepoRoot)
+	}
+	for _, wp := range cfg.WritePaths {
+		if wp != "" && !coversRepository(wp, cfg.RepoRoot) {
+			fmt.Fprintf(b, "(allow file-write* (subpath %q))\n", wp)
+		}
+	}
+}
+
 const ownPseudoTerminalRules = `(allow pseudo-tty)
 (allow file-read* file-write* file-ioctl (literal "/dev/ptmx"))
-(allow file-write-data file-ioctl (require-all (regex #"^/dev/ttys[0-9]+$") (extension "com.apple.sandbox.pty")))
+(allow file-read* file-write-data file-ioctl (require-all (regex #"^/dev/ttys[0-9]+$") (extension "com.apple.sandbox.pty")))
 `
 
 func writeTerminalRules(b *strings.Builder, pane string) {
@@ -270,7 +264,7 @@ func writeTerminalRules(b *strings.Builder, pane string) {
 	if pane == "" {
 		return
 	}
-	fmt.Fprintf(b, "(allow file-write-data (literal \"/dev/tty\") (literal %q))\n", pane)
+	fmt.Fprintf(b, "(allow file-read* file-write-data (literal \"/dev/tty\") (literal %q))\n", pane)
 	fmt.Fprintf(b, "(allow file-ioctl (require-all (require-any (literal \"/dev/tty\") (literal %q)) (require-any (ioctl-command TIOCGETA) (ioctl-command TIOCSETA) (ioctl-command TIOCSETAW) (ioctl-command TIOCSETAF) (ioctl-command TIOCGWINSZ))))\n", pane)
 }
 
