@@ -309,3 +309,23 @@ func runMakeFixtureContext(t *testing.T, ctx context.Context, root, target strin
 	}
 	return string(out), err
 }
+
+func TestMakeAPIEnforce_LeavesTheIntegrationProfileForCoverChanged(t *testing.T) {
+	root := makeFixture(t)
+	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
+	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
+	integration := "mode: atomic\ngateprobe/internal/probe/probe.go:2.20,2.30 1 7\n"
+	writeMakeFixture(t, root, "coverage.txt", integration)
+
+	out, err := runMakeFixture(t, root, "apicover-enforce")
+
+	if err != nil {
+		t.Fatalf("apicover-enforce: %v\n%s", err, out)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "coverage.txt")); string(got) != integration {
+		t.Errorf("apicover-enforce rewrote coverage.txt, the profile cover-changed reads:\n%s", got)
+	}
+	if got, err := os.ReadFile(filepath.Join(root, "coverage.apicover.txt")); err != nil || !strings.HasPrefix(string(got), "mode: ") {
+		t.Errorf("coverage.apicover.txt = %q, %v; want the scoped profile there", got, err)
+	}
+}

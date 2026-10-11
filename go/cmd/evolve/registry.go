@@ -130,6 +130,7 @@ var commands = []subcommand{
 	{Name: "clihealth", Aliases: []string{"cli-health"}, Summary: "CLI quota/credential benches: list [--json] | clear <family> | usage [--json] [family...] [--project-root DIR]", Run: runClihealth},
 	{Name: "cli", Summary: "CLI binaries: update [--dry-run] [--json] [--project-root P] runs each subscribed family's manifest updater, then smoke-tests a changed version (exit 1 on update-failed or smoke-failed)", Run: runCLICommand},
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]", Run: runRatchet},
+	{Name: "cover", Summary: "Coverage gate over a change: changed --base <ref> [--profile <path>] [--json] [--root DIR] refuses every changed function below 100%", Run: runCover},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
 }
 
