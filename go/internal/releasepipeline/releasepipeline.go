@@ -211,7 +211,7 @@ func journalPath(opts Options, startedAt time.Time) string {
 	return filepath.Join(dir, fmt.Sprintf("%s-%s.json", opts.Target, startedAt.UTC().Format("20060102T150405Z")))
 }
 
-func writeJournal(j *Journal, path string) error {
+var writeJournal = func(j *Journal, path string) error {
 	body, err := json.MarshalIndent(j, "", "  ")
 	if err != nil {
 		return err

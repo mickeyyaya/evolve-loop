@@ -18,9 +18,11 @@ const (
 	serverStopTimeout = 10 * time.Second
 )
 
+var setenv = os.Setenv
+
 func Main(m interface{ Run() int }) int {
 	socket := bridge.DeriveTestSocket(os.Getpid())
-	if err := os.Setenv(bridge.TmuxSocketEnv, socket); err != nil {
+	if err := setenv(bridge.TmuxSocketEnv, socket); err != nil {
 		fmt.Fprintf(os.Stderr, "tmuxtest: select socket %s: %v\n", socket, err)
 		return 1
 	}

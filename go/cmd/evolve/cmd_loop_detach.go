@@ -31,8 +31,13 @@ type detachedLaunch struct {
 	done   <-chan error
 }
 
+var (
+	loopDetachExecutable = os.Executable
+	loopDetachAttr       = detachSysProcAttr
+)
+
 func defaultLoopDetachCommand(argv []string) (*exec.Cmd, error) {
-	self, err := os.Executable()
+	self, err := loopDetachExecutable()
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +45,7 @@ func defaultLoopDetachCommand(argv []string) (*exec.Cmd, error) {
 }
 
 func runLoopDetached(cfg loopConfig, stdout, stderr io.Writer) int {
-	attr, err := detachSysProcAttr()
+	attr, err := loopDetachAttr()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve loop: --detach: %v\n", err)
 		return 1

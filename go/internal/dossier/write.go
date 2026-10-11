@@ -12,6 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
+var renderMarkdown = RenderMarkdown
+
 // Write atomically writes d to dir as cycle-N.json and cycle-N.md. With commit
 // it also commits exactly that pair, so the next phase's tree-diff guard never
 // sees it untracked; pass false when dir is not a git working tree.
@@ -32,7 +34,7 @@ func Write(d *Dossier, dir string, commit bool) error {
 		return fmt.Errorf("dossier: Write JSON: %w", err)
 	}
 
-	mdBytes, err := RenderMarkdown(d)
+	mdBytes, err := renderMarkdown(d)
 	if err != nil {
 		return fmt.Errorf("dossier: Write: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -174,6 +175,8 @@ func runRepoContractPackagesWithTags(ctx context.Context, moduleDir string, out 
 // goTestJSONFn is the seam for one `go test -json` run (package var, mirrors repoContractTestFn).
 var goTestJSONFn = runGoTestJSON
 
+var stdoutPipe = (*exec.Cmd).StdoutPipe
+
 // runRepoContractPackagesAlone re-runs each package with a named red by itself — the whole package, so same-package
 // state stays in play and only the pack's concurrent load is removed. A package green by itself contributes
 // nothing; one still red contributes the tests still red; one whose re-run named nothing keeps its first-run reds,
@@ -222,7 +225,7 @@ func runGoTestJSON(ctx context.Context, moduleDir string, log packLog, args []st
 	cmd.Env = ipcenv.Scrub(os.Environ()) // the lane's IPC state must not reach env-sensitive tests
 	cancelKillsTheProcessGroup(cmd)
 	cmd.WaitDelay = packWaitDelay
-	stdout, err := cmd.StdoutPipe()
+	stdout, err := stdoutPipe(cmd)
 	if err != nil {
 		return packOutcome{err: fmt.Errorf("go test stdout pipe: %w", err)}
 	}

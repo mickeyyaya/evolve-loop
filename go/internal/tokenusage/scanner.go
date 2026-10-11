@@ -76,6 +76,8 @@ type transcriptLine struct {
 	} `json:"message"`
 }
 
+var walkDir = filepath.WalkDir
+
 // ScanConfigRoot sums the usage of the transcripts under root/projects attributed to w; finding none is SourceNone, not an error.
 func ScanConfigRoot(root string, w Window) (Result, error) {
 	projects := filepath.Join(root, "projects")
@@ -88,7 +90,7 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 	matched := false
 	warn := ""
 
-	err := filepath.WalkDir(projects, func(path string, d os.DirEntry, walkErr error) error {
+	err := walkDir(projects, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil || d.IsDir() || !strings.HasSuffix(path, ".jsonl") {
 			return nil
 		}
