@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -367,5 +369,164 @@ func TestDocs_TheVerbListCarriesTheSteLintUsage(t *testing.T) {
 	_, stdout, _ := runDocsCLI()
 	if !strings.Contains(stdout, strings.TrimPrefix(steLintUsage, "usage: evolve ")) {
 		t.Fatalf("the verb list %q does not carry the ste-lint usage %q", stdout, steLintUsage)
+	}
+}
+
+func TestDocsSteLint_HelpPrintsTheUsageBeforeItReadsTheRoot(t *testing.T) {
+	for _, flag := range []string{"--help", "-h"} {
+		t.Run(flag, func(t *testing.T) {
+			code, stdout, stderr := runDocsCLI("ste-lint", flag, "--project-root", filepath.Join(t.TempDir(), "missing"))
+
+			if code != 0 || stdout != steLintUsage+"\n" || stderr != "" {
+				t.Fatalf("code %d, stdout %q, stderr %q; want 0 and only the usage", code, stdout, stderr)
+			}
+		})
+	}
+}
+
+func TestDocsSteLint_AReportWriteFailureExitsTwo(t *testing.T) {
+	root := steFixtureRoot(t, map[string]string{"docs/a.md": "We utilize it.\n"})
+	for name, extra := range map[string][]string{"text": nil, "json": {"--json"}} {
+		t.Run(name, func(t *testing.T) {
+			var stderr bytes.Buffer
+
+			code := runSteLint(append([]string{"--project-root", root}, extra...), &failingWriter{}, &stderr)
+
+			if code != exitIO || stderr.String() != steLintPrefix+"broken pipe\n" {
+				t.Fatalf("code %d, stderr %q; want %d naming the write error", code, stderr.String(), exitIO)
+			}
+		})
+	}
+}
+
+func TestSteLintReport_WriteJSONIsTheIndentedReportAndANewline(t *testing.T) {
+	r := steLintReport{ByRule: map[string]int{stelint.RuleWord: 1}, Skipped: []steLintRow{}}
+	r.add("docs/<a>&b.md", []stelint.Finding{{Line: 2, Rule: stelint.RuleWord, Message: `replace "x" with "y"`, Excerpt: "x"}})
+	want, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+
+	if err := r.writeJSON(&out); err != nil {
+		t.Fatalf("writeJSON: %v", err)
+	}
+
+	if out.String() != string(want)+"\n" {
+		t.Fatalf("writeJSON =\n%s\nwant\n%s", out.String(), want)
+	}
+	if !strings.Contains(out.String(), `"path": "docs/\u003ca\u003e\u0026b.md"`) || strings.Contains(out.String(), `"rows"`) {
+		t.Errorf("the JSON must escape the path and hide the text rows:\n%s", out.String())
+	}
+}
+
+func TestScopeSteTargets_AMissingRootIsAnError(t *testing.T) {
+	_, err := scopeSteTargets(filepath.Join(t.TempDir(), "missing"), steDocsMode)
+
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("err = %v, want fs.ErrNotExist", err)
+	}
+}
+
+func TestScopeSteTargets_AMissingScopeDirectoryLeavesTheRootFiles(t *testing.T) {
+	root := t.TempDir()
+	writeSteFiles(t, root, map[string]string{"README.md": "x\n", "main.go": "package main\n", "go.mod": "module m\n"})
+
+	docs, docsErr := scopeSteTargets(root, steDocsMode)
+	goFiles, goErr := scopeSteTargets(root, steGoMode)
+
+	if docsErr != nil || !reflect.DeepEqual(docs, []steTarget{{abs: filepath.Join(root, "README.md"), display: "README.md"}}) {
+		t.Errorf("docs = %+v, %v; want README.md only", docs, docsErr)
+	}
+	if goErr != nil || len(goFiles) != 0 {
+		t.Errorf("go = %+v, %v; want no target outside go/", goFiles, goErr)
+	}
+}
+
+func unreadableDir(t *testing.T, dir string) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("root reads every directory")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+}
+
+func TestDocsSteLint_AnUnreadableDirectoryExitsTwo(t *testing.T) {
+	root := steFixtureRoot(t, map[string]string{"docs/a.md": "We utilize it.\n", "notes/b.md": "Go via it.\n"})
+	unreadableDir(t, filepath.Join(root, "docs", "locked"))
+	unreadableDir(t, filepath.Join(root, "notes", "locked"))
+
+	scopeCode, scopeOut, scopeErr := runDocsCLI("ste-lint", "--project-root", root)
+	pathCode, pathOut, pathErr := runDocsCLI("ste-lint", "--project-root", root, filepath.Join(root, "notes"))
+
+	if scopeCode != exitIO || scopeOut != "" || !strings.Contains(scopeErr, "locked") || !strings.Contains(scopeErr, "permission denied") {
+		t.Errorf("scope: code %d, stdout %q, stderr %q; want %d naming the locked directory", scopeCode, scopeOut, scopeErr, exitIO)
+	}
+	if pathCode != exitIO || pathOut != "" || !strings.Contains(pathErr, "locked") || !strings.Contains(pathErr, "permission denied") {
+		t.Errorf("path: code %d, stdout %q, stderr %q; want %d naming the locked directory", pathCode, pathOut, pathErr, exitIO)
+	}
+}
+
+func TestExplicitSteTargets_AnUnresolvablePathIsAnError(t *testing.T) {
+	cwdGone := errors.New("getwd: no such file or directory")
+	saved := steAbs
+	steAbs = func(string) (string, error) { return "", cwdGone }
+	t.Cleanup(func() { steAbs = saved })
+
+	got, err := explicitSteTargets(t.TempDir(), []string{"docs/a.md"}, steDocsMode)
+
+	if !errors.Is(err, cwdGone) || got != nil {
+		t.Fatalf("targets %+v, err %v; want no targets and the resolve error", got, err)
+	}
+}
+
+func TestSteDisplay_IsRootRelativeOnlyInsideTheRoot(t *testing.T) {
+	root := t.TempDir()
+	outside := filepath.Join(filepath.Dir(root), "elsewhere", "a.md")
+	for name, tc := range map[string]struct{ abs, want string }{
+		"a file in the root":       {filepath.Join(root, "README.md"), "README.md"},
+		"a nested file":            {filepath.Join(root, "docs", "sub", "a.md"), "docs/sub/a.md"},
+		"a unicode name":           {filepath.Join(root, "docs", "café notes.md"), "docs/café notes.md"},
+		"the root itself":          {root, "."},
+		"a file outside the root":  {outside, filepath.ToSlash(outside)},
+		"a parent of the root":     {filepath.Dir(root), filepath.ToSlash(filepath.Dir(root))},
+		"a relative path is as is": {filepath.Join("docs", "a.md"), "docs/a.md"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := steDisplay(root, tc.abs); got != tc.want {
+				t.Fatalf("steDisplay(%q, %q) = %q, want %q", root, tc.abs, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSteDisplay_ARelativeRootIsResolvedFromTheWorkingDirectory(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := steDisplay(".", filepath.Join(cwd, "docs", "a.md"))
+
+	if got != "docs/a.md" {
+		t.Fatalf("steDisplay(\".\", cwd/docs/a.md) = %q, want docs/a.md", got)
+	}
+}
+
+func TestDocsSteLint_AnExplicitFileOutsideTheRootShowsItsAbsolutePath(t *testing.T) {
+	root := steFixtureRoot(t, nil)
+	outside := filepath.Join(t.TempDir(), "x.md")
+	writeSteFiles(t, filepath.Dir(outside), map[string]string{"x.md": "We utilize it.\n"})
+
+	code, stdout, _ := runDocsCLI("ste-lint", "--project-root", root, outside)
+
+	if want := filepath.ToSlash(outside) + ":1 STE-WORD"; code != 0 || !strings.HasPrefix(stdout, want) {
+		t.Fatalf("code %d, stdout %q; want it to start with %q", code, stdout, want)
 	}
 }

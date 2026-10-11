@@ -59,12 +59,9 @@ func (r *steLintReport) add(path string, findings []stelint.Finding) {
 }
 
 func (r steLintReport) writeJSON(w io.Writer) error {
-	raw, err := json.MarshalIndent(r, "", "  ")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintf(w, "%s\n", raw)
-	return err
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(r)
 }
 
 func (r steLintReport) writeText(w io.Writer) error {
