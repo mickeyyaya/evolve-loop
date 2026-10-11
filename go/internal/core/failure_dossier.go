@@ -68,7 +68,6 @@ func buildFailureDossier(cs CycleState, finalVerdict string, fp policy.SystemFai
 		ACS:              acs,
 		AuditRan:         auditRan,
 		SubstantiveError: hasSubstantiveFailReasons(cs),
-		FailReasons:      cs.AuditFailReasons,
 	})
 
 	if fb, ok := phasecontract.ReadFailureBlock(cs.WorkspacePath, string(PhaseAudit)); ok {

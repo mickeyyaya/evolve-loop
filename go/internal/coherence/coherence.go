@@ -21,8 +21,6 @@ type VerdictInputs struct {
 	// SubstantiveError marks a negative verdict explained by recorded evidence (a
 	// substantive bridge error or a diagnosed gate downgrade); it is never forgery.
 	SubstantiveError bool
-	// FailReasons carries the untruncated explanations behind SubstantiveError.
-	FailReasons []string
 	// DeliverableValid means the audit report passed the full deliverable.Verify
 	// chain, not just the sentinel read; it only downgrades forgery to a reconcile.
 	DeliverableValid bool

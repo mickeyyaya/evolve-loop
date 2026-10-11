@@ -143,3 +143,23 @@ func TestCheckVerdictCoherence_ForgedStillHalts(t *testing.T) {
 		}
 	}
 }
+
+func TestReadCycleVerdicts_AuditReportWithoutSentinel(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "audit-report.md"), []byte("## Verdict\nPASS in prose only\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "acs-verdict.json"), []byte(`{"verdict":"PASS","red_count":0}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	audit, acs, ran := ReadCycleVerdicts(dir)
+	if !ran || audit != "" || acs != "PASS" {
+		t.Fatalf("ReadCycleVerdicts = audit=%q acs=%q ran=%v; want \"\"/PASS/true", audit, acs, ran)
+	}
+	for _, recorded := range []string{"FAIL", "WARN"} {
+		got := CheckVerdictCoherence(VerdictInputs{Recorded: recorded, Audit: audit, ACS: acs, AuditRan: ran})
+		if got.Incoherent || got.Reconciled {
+			t.Errorf("recorded=%s with sentinel-less audit = %+v; want coherent zero value", recorded, got)
+		}
+	}
+}
