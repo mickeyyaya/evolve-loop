@@ -20,7 +20,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-var syncMainFetchSleep = time.Sleep
+var (
+	syncMainFetchSleep   = time.Sleep
+	syncMainGetwd        = os.Getwd
+	syncMainAbsoluteRoot = paths.AbsoluteRoot
+)
 
 func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve sync-main", flag.ContinueOnError)
@@ -36,12 +40,12 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 	if projectRoot == "" {
 		var err error
-		if projectRoot, err = os.Getwd(); err != nil {
+		if projectRoot, err = syncMainGetwd(); err != nil {
 			fmt.Fprintf(stderr, "evolve sync-main: cwd: %v\n", err)
 			return 1
 		}
 	}
-	absRoot := paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+	absRoot := syncMainAbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve sync-main: WARN: %s\n", m)
 	})
 

@@ -90,6 +90,8 @@ type capabilityProbe func(ctx context.Context, binaryPath string) error
 // 80s REPL-boot hang this measurement exists to prevent. Timeout ⇒ not capable.
 const capabilityTimeout = 3 * time.Second
 
+var hostOS = runtime.GOOS
+
 // probeOnce caches the process-lifetime probe (including the capability exec) so
 // every consumer — bridge ShouldWrap, preflight — shares ONE measured value and
 // the exec runs at most once.
@@ -102,7 +104,7 @@ var (
 // it actually applies. Cached once per process.
 func Probe() ProbeResult {
 	probeOnce.Do(func() {
-		probedValue = measureCapability(probeFor(runtime.GOOS, exec.LookPath), defaultCapabilityProbe)
+		probedValue = measureCapability(probeFor(hostOS, exec.LookPath), defaultCapabilityProbe)
 	})
 	return probedValue
 }
@@ -131,7 +133,7 @@ func measureCapability(pr ProbeResult, probe capabilityProbe) ProbeResult {
 // has no REPL, so it cannot hang) to measure whether sandbox_apply succeeds.
 func defaultCapabilityProbe(ctx context.Context, binaryPath string) error {
 	var cmd *exec.Cmd
-	switch runtime.GOOS {
+	switch hostOS {
 	case "darwin":
 		cmd = sysexec.Command(ctx, binaryPath, "-p", "(version 1)(allow default)", "/usr/bin/true")
 	case "linux":
@@ -139,7 +141,7 @@ func defaultCapabilityProbe(ctx context.Context, binaryPath string) error {
 	default:
 		// Unreachable in production: measureCapability only probes when Available,
 		// which probeFor sets solely for darwin/linux.
-		return fmt.Errorf("no capability probe for GOOS=%s", runtime.GOOS)
+		return fmt.Errorf("no capability probe for GOOS=%s", hostOS)
 	}
 	// WaitDelay bounds the post-kill drain: after the context timeout fires and
 	// the child is signalled, Run() is still guaranteed to return promptly even
@@ -402,11 +404,11 @@ func (s *Sandbox) Exec(ctx context.Context, argv []string,
 	}
 	var cmd *exec.Cmd
 	switch {
-	case s.probe.Available && runtime.GOOS == "darwin":
+	case s.probe.Available && hostOS == "darwin":
 		profile := GenerateSBPL(s.cfg)
 		args := append([]string{"-p", profile}, argv...)
 		cmd = sysexec.Command(ctx, s.probe.BinaryPath, args...)
-	case s.probe.Available && runtime.GOOS == "linux":
+	case s.probe.Available && hostOS == "linux":
 		args := GenerateBwrapArgv(s.cfg, argv)
 		cmd = sysexec.Command(ctx, s.probe.BinaryPath, args...)
 	default:

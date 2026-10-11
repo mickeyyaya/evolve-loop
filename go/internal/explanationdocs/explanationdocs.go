@@ -227,7 +227,7 @@ func VerifyLanded(ctx context.Context, binding CycleBinding, landedCommit string
 	if err != nil {
 		return nil, true, fmt.Errorf("create landed verification path: %w", err)
 	}
-	if err := os.Remove(verificationRoot); err != nil {
+	if err := removePath(verificationRoot); err != nil {
 		return nil, true, fmt.Errorf("prepare landed verification path: %w", err)
 	}
 	addOut, err := sysexec.Command(ctx, "git", "-C", binding.ProjectRoot, "worktree", "add", "--quiet", "--detach", verificationRoot, landedCommit).CombinedOutput()

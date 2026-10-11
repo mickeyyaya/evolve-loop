@@ -53,6 +53,14 @@ func isSectionBoundary(line string) bool {
 		strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ")
 }
 
+var (
+	lstat               = os.Lstat
+	evalSymlinks        = filepath.EvalSymlinks
+	readlink            = os.Readlink
+	openRegularNoFollow = OpenRegularNoFollow
+	statFile            = (*os.File).Stat
+)
+
 // listValuedFields may repeat: a careful reviewer writes one `- Evidence:` line
 // per claim (cycle-1604 wrote four and was rejected as "duplicate evidence
 // fields" — five of eleven consecutive FAILs were this section's format). Their
@@ -309,16 +317,16 @@ func ValidReference(reference string) bool {
 }
 
 func readCurrentReference(ctx context.Context, root, reference string) ([]byte, bool, error) {
-	realRoot, err := filepath.EvalSymlinks(root)
+	realRoot, err := evalSymlinks(root)
 	if err != nil {
 		return nil, false, err
 	}
 	path := filepath.Join(realRoot, filepath.FromSlash(reference))
-	info, err := os.Lstat(path)
+	info, err := lstat(path)
 	if err != nil {
 		return nil, false, err
 	}
-	realParent, err := filepath.EvalSymlinks(filepath.Dir(path))
+	realParent, err := evalSymlinks(filepath.Dir(path))
 	if err != nil {
 		return nil, false, err
 	}
@@ -328,11 +336,11 @@ func readCurrentReference(ctx context.Context, root, reference string) ([]byte, 
 	}
 	switch {
 	case info.Mode()&os.ModeSymlink != 0:
-		target, err := os.Readlink(path)
+		target, err := readlink(path)
 		if err != nil {
 			return nil, false, err
 		}
-		after, err := os.Lstat(path)
+		after, err := lstat(path)
 		if err != nil || !os.SameFile(info, after) {
 			return nil, false, fmt.Errorf("citation symlink changed while reading")
 		}
@@ -348,12 +356,12 @@ func readCurrentReference(ctx context.Context, root, reference string) ([]byte, 
 	case info.Size() > maxCitationBytes:
 		return nil, false, fmt.Errorf("citation target exceeds 16 MiB")
 	}
-	file, err := OpenRegularNoFollow(path)
+	file, err := openRegularNoFollow(path)
 	if err != nil {
 		return nil, false, err
 	}
 	defer func() { _ = file.Close() }()
-	opened, err := file.Stat()
+	opened, err := statFile(file)
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(info, opened) {
 		return nil, false, fmt.Errorf("citation target changed type or identity while opening")
 	}
@@ -364,7 +372,7 @@ func readCurrentReference(ctx context.Context, root, reference string) ([]byte, 
 	if len(body) > maxCitationBytes {
 		return nil, false, fmt.Errorf("citation target exceeds 16 MiB")
 	}
-	after, err := file.Stat()
+	after, err := statFile(file)
 	if err != nil || !os.SameFile(opened, after) || opened.Size() != after.Size() || !opened.ModTime().Equal(after.ModTime()) {
 		return nil, false, fmt.Errorf("citation target changed while reading")
 	}
