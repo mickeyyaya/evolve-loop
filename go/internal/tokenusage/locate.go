@@ -49,12 +49,21 @@ func unchangedSince(d os.DirEntry, start time.Time) bool {
 }
 
 func ClaudeConfigRoot(env map[string]string) string {
-	home := env["HOME"]
-	if home == "" {
-		home = os.Getenv("HOME")
+	for _, dir := range []string{env["CLAUDE_CONFIG_DIR"], os.Getenv("CLAUDE_CONFIG_DIR")} {
+		if filepath.IsAbs(dir) {
+			return filepath.Clean(dir)
+		}
 	}
+	home := envOrProcess(env, "HOME")
 	if home == "" {
 		return ""
 	}
 	return filepath.Join(home, ".claude")
+}
+
+func envOrProcess(env map[string]string, key string) string {
+	if v := env[key]; v != "" {
+		return v
+	}
+	return os.Getenv(key)
 }

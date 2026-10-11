@@ -82,7 +82,7 @@ func TestPostmortem_CollectWithATranscriptPathAndNoTimesUsesTheTranscriptWindow(
 	if code != 0 {
 		t.Fatalf("collect = %d, stderr %s", code, errOut)
 	}
-	records, err := attemptpostmortem.ReadAll(paths.RunWorkspace(f.root, 1853), "build")
+	records, _, err := attemptpostmortem.ReadAll(paths.RunWorkspace(f.root, 1853), "build")
 	if err != nil || len(records) != 1 {
 		t.Fatalf("records = %+v, %v", records, err)
 	}
@@ -167,18 +167,73 @@ func withSessionArgs(base []string, session string) []string {
 	return append(append([]string{}, base...), "--session", session)
 }
 
-func TestPostmortem_WriteAndReadFailuresAreIOErrors(t *testing.T) {
+func TestPostmortem_CollectRefusesAnExistingRecordUnlessForced(t *testing.T) {
+	f := newPostmortemFixture(t)
+	args := []string{"collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1, "--cause", "pane_lost"}
+	if code, _, errOut := f.run(args...); code != 0 {
+		t.Fatalf("the first collect = %d (%s), want 0", code, errOut)
+	}
+	again := append(append([]string{}, args[:len(args)-1]...), "review_pause")
+
+	code, _, errOut := f.run(again...)
+
+	if code != exitRefused || !strings.Contains(errOut, "--force") || !strings.Contains(errOut, "build-attempt-1-postmortem.json") {
+		t.Fatalf("a second collect = %d (%s), want %d that names the record and --force", code, errOut, exitRefused)
+	}
+	if got := pmRecords(t, f); len(got) != 1 || got[0].CauseCode != "pane_lost" {
+		t.Fatalf("records = %+v, want the first record unchanged", got)
+	}
+	if code, _, errOut := f.run(append(again, "--force")...); code != 0 {
+		t.Fatalf("a forced collect = %d (%s), want 0", code, errOut)
+	}
+	if got := pmRecords(t, f); len(got) != 1 || got[0].CauseCode != "review_pause" {
+		t.Fatalf("records = %+v, want the forced record", got)
+	}
+}
+
+func pmRecords(t *testing.T, f postmortemFixture) []attemptpostmortem.Record {
+	t.Helper()
+	records, bad, err := attemptpostmortem.ReadAll(paths.RunWorkspace(f.root, 1853), "build")
+	if err != nil || len(bad) != 0 {
+		t.Fatalf("ReadAll: %v, bad %v", err, bad)
+	}
+	return records
+}
+
+func TestPostmortem_AForcedWriteFailureIsAnIOErrorAndShowSkipsABadRecordWithAWarn(t *testing.T) {
 	f := newPostmortemFixture(t)
 	ws := paths.RunWorkspace(f.root, 1853)
-	if err := os.MkdirAll(attemptpostmortem.Path(ws, "build", 1), 0o755); err != nil {
+	bad := attemptpostmortem.Path(ws, "build", 1)
+	if err := os.MkdirAll(bad, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut := f.run("collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1, "--cause", "pane_lost", "--force")
+	if code != exitIO {
+		t.Fatalf("a forced write onto a directory = %d (%s), want %d", code, errOut, exitIO)
+	}
+	if code, _, errOut := f.run("collect", "--cycle", "1853", "--phase", "build", "--attempt", "2", "--session", pmSession1, "--cause", "pane_lost"); code != 0 {
+		t.Fatalf("collect attempt 2 = %d (%s)", code, errOut)
+	}
+
+	code, out, errOut := f.run("show", "--cycle", "1853", "--phase", "build")
+
+	if code != 0 || !strings.Contains(out, "### Attempt 2") || !strings.Contains(errOut, "WARN skipped the bad record "+bad) {
+		t.Fatalf("show = %d %q %q, want the valid record 2 and a WARN that names %s", code, out, errOut, bad)
+	}
+}
+
+func TestPostmortem_ACreateFailureThatIsNotAnExistingRecordIsAnIOError(t *testing.T) {
+	f := newPostmortemFixture(t)
+	ws := paths.RunWorkspace(f.root, 1853)
+	if err := os.MkdirAll(filepath.Dir(ws), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ws, []byte("a file, not the run directory"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	code, _, errOut := f.run("collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1, "--cause", "pane_lost")
 	if code != exitIO {
-		t.Fatalf("a directory at the record path = %d (%s), want %d", code, errOut, exitIO)
-	}
-	if code, _, _ := f.run("show", "--cycle", "1853", "--phase", "build"); code != exitIO {
-		t.Fatalf("show with an unreadable record = %d, want %d", code, exitIO)
+		t.Fatalf("a run directory that is a file = %d (%s), want %d", code, errOut, exitIO)
 	}
 }
 
@@ -204,5 +259,17 @@ func TestRunPostmortem_IsRegisteredAndUsesTheProcessHome(t *testing.T) {
 	var stderr bytes.Buffer
 	if code := runPostmortem(nil, nil, &bytes.Buffer{}, &stderr); code != exitUsage {
 		t.Fatalf("runPostmortem() = %d, want %d", code, exitUsage)
+	}
+}
+
+func TestPostmortem_ShowWithAnUnlistableRunDirectoryIsAnIOError(t *testing.T) {
+	f := newPostmortemFixture(t)
+	f.root = filepath.Join(t.TempDir(), "bad[")
+	if err := os.MkdirAll(paths.EvolveDirOf(f.root), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut := f.run("show", "--cycle", "1853", "--phase", "build")
+	if code != exitIO || !strings.Contains(errOut, "list the records") {
+		t.Fatalf("show = %d (%s), want %d with the list error", code, errOut, exitIO)
 	}
 }

@@ -19,11 +19,11 @@ func TestAttemptPostmortemConfig_AnAbsentBlockIsTheCompiledDefault(t *testing.T)
 }
 
 func TestAttemptPostmortemConfig_EachKeyOverridesItsCap(t *testing.T) {
-	p, err := Parse([]byte(`{"attempt_postmortem":{"max_commands":5,"max_command_runes":77,"max_pane_tail_runes":901,"max_delta_runes":333,"suspect_window_s":45,"max_records":7}}`))
+	p, err := Parse([]byte(`{"attempt_postmortem":{"max_commands":5,"max_command_runes":77,"max_pane_tail_runes":901,"max_delta_runes":333,"suspect_window_s":45,"max_records":7,"max_pane_capture_bytes":4096}}`))
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	want := attemptpostmortem.Config{MaxCommands: 5, MaxCommandRunes: 77, MaxPaneTailRunes: 901, MaxDeltaRunes: 333, SuspectWindow: 45 * time.Second, MaxRecords: 7}
+	want := attemptpostmortem.Config{MaxCommands: 5, MaxCommandRunes: 77, MaxPaneTailRunes: 901, MaxDeltaRunes: 333, SuspectWindow: 45 * time.Second, MaxRecords: 7, MaxPaneCaptureBytes: 4096}
 	if got := p.AttemptPostmortemConfig(); got != want {
 		t.Fatalf("AttemptPostmortemConfig() = %+v, want %+v", got, want)
 	}

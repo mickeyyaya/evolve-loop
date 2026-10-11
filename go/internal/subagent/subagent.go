@@ -159,7 +159,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	overlaySkills := policy.ResolveLaunchOverlaysFailOpen(req.ProjectRoot, req.Agent, cli, model)
 
 	start := r.cfg.Now()
-	bres, bridgeErr := r.cfg.Bridge.Launch(ctx, core.BridgeRequest{
+	bres, bridgeErr := core.LaunchWithFreshSession(ctx, r.cfg.Bridge, core.BridgeRequest{
 		CLI:          cli,
 		Profile:      profilePath,
 		Model:        model,

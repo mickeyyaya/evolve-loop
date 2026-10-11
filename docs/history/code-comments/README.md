@@ -530,6 +530,7 @@ The history the code's comments carried, by the rule `commentaudit check` uses, 
 | `internal/inboxmover/lifecycle` | 24 | [internal-inboxmover-lifecycle.md](internal-inboxmover-lifecycle.md) |
 | `internal/inboxmover` | 81 | [internal-inboxmover.md](internal-inboxmover.md) |
 | `internal/interaction` | 19 | [internal-interaction.md](internal-interaction.md) |
+| `internal/llmcalls` | 1 | [internal-llmcalls.md](internal-llmcalls.md) |
 | `internal/llmroute` | 23 | [internal-llmroute.md](internal-llmroute.md) |
 | `internal/loopchain` | 1 | [internal-loopchain.md](internal-loopchain.md) |
 | `internal/looppreflight` | 28 | [internal-looppreflight.md](internal-looppreflight.md) |

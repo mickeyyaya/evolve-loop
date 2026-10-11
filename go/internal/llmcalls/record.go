@@ -97,20 +97,16 @@ type Record struct {
 	DispatchSource  string `json:"dispatch_source,omitempty"`
 	Attempt         int    `json:"attempt"`
 
-	Tokens      cyclestate.TokenUsage `json:"tokens"`
-	Source      string                `json:"source"`
-	UsageStatus UsageStatus           `json:"usage_status,omitempty"`
-	DurationMS  *int64                `json:"duration_ms,omitempty"`
-	ExitCode    *int                  `json:"exit_code,omitempty"`
-	Tripwire    bool                  `json:"tripwire"`
-	FillPct     float64               `json:"fill_pct"`
-	CauseCode   string                `json:"cause_code,omitempty"`
-	// FreshSessionRetry marks a dispatch whose pane died with a session-
-	// recoverable cause and was followed by ONE fresh session of the same CLI
-	// inside the same Launch (bridge F31). The two rows share Attempt; this
-	// flag — with the BRIDGE_FRESH_SESSION_RETRY signal's call_id — tells the
-	// dead dispatch from the one that followed.
-	FreshSessionRetry bool `json:"fresh_session_retry,omitempty"`
+	Tokens             cyclestate.TokenUsage `json:"tokens"`
+	Source             string                `json:"source"`
+	UsageStatus        UsageStatus           `json:"usage_status,omitempty"`
+	DurationMS         *int64                `json:"duration_ms,omitempty"`
+	ExitCode           *int                  `json:"exit_code,omitempty"`
+	Tripwire           bool                  `json:"tripwire"`
+	FillPct            float64               `json:"fill_pct"`
+	CauseCode          string                `json:"cause_code,omitempty"`
+	FreshSessionRetry  bool                  `json:"fresh_session_retry,omitempty"`
+	SessionRecoverable bool                  `json:"session_recoverable,omitempty"`
 
 	// First-output timing is intentionally optional. The current bridge has no
 	// source that means the same thing across headless and REPL drivers.

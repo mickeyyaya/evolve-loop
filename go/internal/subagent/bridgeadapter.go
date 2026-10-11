@@ -73,8 +73,8 @@ func execAdapter(ctx context.Context, env map[string]string, signals *signalcent
 	if prompt == "" {
 		prompt = "(validate-only: no prompt)"
 	}
-	eng := gobridge.NewEngine(execAdapterDepsWith(env, signals))
-	resp, err := eng.Launch(ctx, core.BridgeRequest{
+	eng := newAdapterBridge(execAdapterDepsWith(env, signals))
+	resp, err := core.LaunchWithFreshSession(ctx, eng, core.BridgeRequest{
 		CLI:          cli,
 		Profile:      env["PROFILE_PATH"],
 		Model:        env["RESOLVED_MODEL"],
@@ -92,6 +92,8 @@ func execAdapter(ctx context.Context, env map[string]string, signals *signalcent
 	}
 	return resp.ExitCode, nil
 }
+
+var newAdapterBridge = func(deps gobridge.Deps) core.Bridge { return gobridge.NewEngine(deps) }
 
 func atoiOrZero(s string) int {
 	n, err := strconv.Atoi(s)

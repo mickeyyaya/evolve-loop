@@ -12,7 +12,7 @@ import (
 )
 
 var externalEnvAllowlist = map[string]bool{
-	"CI": true, "HOME": true, "CODEX_HOME": true, "XDG_RUNTIME_DIR": true,
+	"CI": true, "HOME": true, "CODEX_HOME": true, "CLAUDE_CONFIG_DIR": true, "XDG_RUNTIME_DIR": true,
 	"TMUX_TMPDIR":  true,
 	"GITHUB_TOKEN": true,
 	"CYCLE":        true, "SHIP_CLASS": true, "WORKSPACE_PATH": true, "WORKTREE_PATH": true,

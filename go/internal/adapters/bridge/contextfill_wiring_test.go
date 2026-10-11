@@ -36,3 +36,20 @@ func TestProductionDepsContextFillRejectsOutOfRange(t *testing.T) {
 		t.Errorf("ContextFillWarnPct = %d, want 60 — out-of-range operator input was passed through verbatim instead of resolved", deps.ContextFillWarnPct)
 	}
 }
+
+func TestProductionDepsCarryThePaneCaptureCap(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"attempt_postmortem":{"max_pane_capture_bytes":2048}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := NewDefault(root, nil).productionEngineDeps(nil).PaneCaptureMaxBytes; got != 2048 {
+		t.Fatalf("PaneCaptureMaxBytes = %d, want the policy's 2048", got)
+	}
+	if got := NewDefault(t.TempDir(), nil).productionEngineDeps(nil).PaneCaptureMaxBytes; got != 64<<10 {
+		t.Fatalf("PaneCaptureMaxBytes with no policy = %d, want the compiled 64 KiB", got)
+	}
+}

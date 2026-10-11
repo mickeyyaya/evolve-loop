@@ -179,7 +179,7 @@ func TestExecAdapterDepsWith_CarriesTheCenter(t *testing.T) {
 		t.Fatal(err)
 	}
 	body := regexp.MustCompile(`(?s)func execAdapter\(ctx context\.Context, env map\[string\]string, signals \*signalcenter\.Center\) \(int, error\) \{.*?\n\}`).FindString(string(src))
-	if !strings.Contains(body, "gobridge.NewEngine(execAdapterDepsWith(env, signals))") {
+	if !strings.Contains(body, "newAdapterBridge(execAdapterDepsWith(env, signals))") {
 		t.Fatalf("execAdapter must build its engine from execAdapterDepsWith(env, signals):\n%s", body)
 	}
 	if code, err := execAdapter(context.Background(), map[string]string{"PROMPT_FILE": filepath.Join(t.TempDir(), "missing")}, c); code != -1 || err == nil {

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the dispatch postmortem follow-ups: the fresh session carries the record, agy records name their source, and no record is lost or written over (ADR-0130, 2026-10-11)
+
+- **The fresh session has one owner, `core.LaunchRecoverable`.** Before, `Engine.freshSessionRetry` replayed the same prompt inside one `Launch`, with no record. Now `Launch` runs one session and sets the new `core.BridgeResponse.SessionRecoverable`. The helper launches once more under a live context, with a request marked `FreshSession`, and the runner's hook adds the record. Retro, the swarm workers, the core advisors, `subagent` and the chain walk keep the fresh session with the same request. The ledger marks the dead row `session_recoverable` and the fresh row `fresh_session_retry` ([ADR-0044 amendment](docs/architecture/adr/0044-unified-phase-recovery-protocol.md)).
+- **A cancelled context writes no record.** An operator stop and the deliverable-authority door cancel the context, and the kill can come after a command that finished OK. A deadline (the phase or cycle timeout) keeps its record. Exit 124 gets a record.
+- **One bad record does not drop the section.** `attemptpostmortem.ReadAll` skips it and returns it as a `BadRecord`. The runner emits `RUNNER_ATTEMPT_POSTMORTEM_FAILED` with `step=read` and `path`. `evolve postmortem show` prints a WARN line and the valid records.
+- **The pane of each dispatch.** The bridge writes `<run>/<agent>-<session>-final-pane.txt` (mode 0600, the last `max_pane_capture_bytes`, 64 KiB by default) before it kills a tmux session and names it in `core.BridgeResponse.PaneCapture`. The collector reads only that many bytes from the end. The runner attaches it as the pane tail. A record that read nothing has `command_source` `none`.
+- **The dispatch id.** `core.BridgeResponse.DispatchID` names the dispatch in the record, not `unknown`.
+- **No write over a record.** `attemptpostmortem.Create` links a complete temp file to the record path, so the path never holds a partial record. `Write` takes the next number on `EEXIST`. `evolve postmortem collect --attempt K` refuses a record that is there (exit 1) unless `--force` is given.
+- **`CLAUDE_CONFIG_DIR`.** `tokenusage.ClaudeConfigRoot` honors an absolute, cleaned value before `$HOME/.claude`. The key is on the external env allowlist of `acs/regression/envtaint`, next to `CODEX_HOME`.
+- Docs: [plan §6 Follow-ups](docs/plans/attempt-postmortem-2026-10.md), [ADR-0130 §Scope](docs/architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md), the package pages of `internal-attemptpostmortem`, `internal-phases-runner`, `internal-bridge`, `internal-tokenusage` and `cmd-evolve`.
+
 ## Fixed — the auto-resume cap counts, and a boot failure after a quota wall is a system fault (2026-10-11)
 
 - **The auto-resume counter.** Before, no code incremented `autoResumeAttempts`. Thus a quota pause with a known reset time resumed with no cap. Now the scheduled wake runs `evolve loop --auto-resume`, and `checkpoint.RecordResume` increments the counter. The quota checkpoint and the resume boundary checkpoint keep it.

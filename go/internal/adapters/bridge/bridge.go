@@ -62,7 +62,8 @@ type Adapter struct {
 	bridgeConfig policy.BridgePolicy
 	efforts      policy.EffortTable
 	// contextFillWarnPct is the validated policy threshold; zero lets the engine apply its built-in default.
-	contextFillWarnPct int
+	contextFillWarnPct  int
+	paneCaptureMaxBytes int
 	// bootTimeoutStore records driver-scoped boot-timeout bench strikes.
 	bootTimeoutStore *clihealth.Store
 }
@@ -85,12 +86,10 @@ func NewDefault(projectRoot string, signals *signalcenter.Center) *Adapter {
 	if err == nil {
 		a.bridgeConfig = pol.BridgeConfig()
 		a.efforts = pol.Efforts()
-		// The validating resolver, never the raw field: an out-of-range value must arrive as the built-in.
 		a.contextFillWarnPct = pol.ContextFillConfig().WarnThresholdPct
 	}
-	// Seeded for roots that never call the setters; a failed load leaves pol zero, so compiled defaults apply.
-	// See ADR-0044.
 	a.recoveryStage, a.fatalPaneStage = pol.BridgeRecoveryStages()
+	a.paneCaptureMaxBytes = pol.AttemptPostmortemConfig().MaxPaneCaptureBytes
 	a.bootTimeoutStore = clihealth.NewStore(projectRoot, nil)
 	a.engineFactory = func(env map[string]string) core.Bridge {
 		return gobridge.NewEngine(a.productionEngineDeps(env))
@@ -110,6 +109,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		ScrollbackLines:       a.bridgeConfig.ScrollbackLines,
 		TokenResolver:         tokenusage.DefaultResolver(tokenusage.ClaudeConfigRoot(env)),
 		ContextFillWarnPct:    a.contextFillWarnPct,
+		PaneCaptureMaxBytes:   a.paneCaptureMaxBytes,
 		RecoveryStage:         a.recoveryStage,
 		FatalPaneStage:        a.fatalPaneStage,
 		Signals:               a.signals,

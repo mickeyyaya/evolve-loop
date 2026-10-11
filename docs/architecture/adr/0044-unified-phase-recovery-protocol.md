@@ -275,6 +275,24 @@ These go red if `Launch` bypasses the retry, `runScoped` drops the cause, or the
 - `TestFatalPaneVerdict_EnforceCarriesTheTypedCause`
 - `TestTerminalCause_SessionRecoverable`
 
+### Amendment: F31 moves to one caller-side helper (2026-10-11, ADR-0130 follow-up)
+
+**Problem.** The fresh session of F31 got the same prompt and no record of the dead session ([ADR-0130](0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md), plan Q6). A probe that kills the REPL (`dead_shell`) thus ran once more with no evidence.
+
+**Decision.** One helper, `core.LaunchRecoverable`, owns the retry loop:
+- `Engine.Launch` runs one session. `freshSessionAllowed` stays the one gate. When it holds, `Launch` sets `core.BridgeResponse.SessionRecoverable` and marks the ledger row `session_recoverable`.
+- `LaunchRecoverable` launches once more when the response is session-recoverable and the context is live. It asks a hook for the next request and marks it `FreshSession`. It ignores and clears a second `SessionRecoverable`, so there is at most one retry.
+- `Launch` marks the row of a `FreshSession` request `fresh_session_retry` and emits `BRIDGE_FRESH_SESSION_RETRY`.
+- The phase runner passes its postmortem hook: it writes the record and adds the section. Each other caller uses `LaunchWithFreshSession` (the same request):
+  - the phase advisor, the plan judge, the failure advisor and the retry adjudicator;
+  - retro, the swarm workers, `subagent` and the chain walk of `bridgechain`.
+- `Engine.freshSessionRetry` is removed. No retry stays inside `Launch`.
+
+**Consequences.**
+- Every caller keeps the fresh session. The runner's fresh session also carries the evidence, and each session has its own record and time window.
+- The decorators `usageevidence` and the `bridgechain` pass-through do not retry. They sit on the runner's path, and a retry there skips the runner's hook.
+- Pins: `TestLaunchRecoverable_*` (core); `TestEngineLaunch_ADeadShellAsksTheCallerForAFreshSessionAndRunsNoSecondSession`, `TestEngineLaunch_TheFreshSessionIsMarkedAndSignalledWhenItLaunches`, `TestFreshSessionAllowed_TheGate` (bridge); `TestDispatch_ASessionRecoverableEndGetsOneFreshSessionOfTheSameCLIWithTheRecord` (runner); one `…SurvivesADeadShellFirstSession` test for each other caller. The pins above that name `freshSessionRetry` are replaced by them.
+
 ## Consequences
 
 - **Positive:** a successful recovery is *structurally* recorded (D1 can't recur); self-describing fatal states

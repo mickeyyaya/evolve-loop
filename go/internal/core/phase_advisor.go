@@ -149,7 +149,7 @@ func launcherOf(b Bridge) advisor.Launcher {
 type bridgeLauncher struct{ b Bridge }
 
 func (l bridgeLauncher) Launch(ctx context.Context, req advisor.LaunchRequest) (advisor.LaunchResponse, error) {
-	resp, err := l.b.Launch(ctx, bridgeRequestOf(req))
+	resp, err := LaunchWithFreshSession(ctx, l.b, bridgeRequestOf(req))
 	return launchResponseOf(resp), err
 }
 

@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,7 +21,7 @@ const CodeAttemptPostmortemFailed signalcenter.Code = "RUNNER_ATTEMPT_POSTMORTEM
 const worktreeDeltaTimeout = 30 * time.Second
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeAttemptPostmortemFailed, "the runner could not read the stored attempt postmortems of a phase before a launch (fields.step=read), or could not collect and write the postmortem of an attempt that ended abnormally (fields.step=collect); the dispatch goes on without the Previous attempts section; the reason is the error (ADR-0130)")
+	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeAttemptPostmortemFailed, "the runner could not list the stored attempt postmortems of a phase before a launch (fields.step=read, the dispatch goes on without the Previous attempts section), could not read one stored record (fields.step=read, fields.path names it; the section keeps the valid records), or could not collect and write the postmortem of an attempt that ended abnormally (fields.step=collect); the reason is the error (ADR-0130)")
 }
 
 type postmortemScope struct {
@@ -31,17 +32,22 @@ type postmortemScope struct {
 }
 
 type launchWindow struct {
-	cli        string
-	start, end time.Time
-	exitCode   int
-	causeCode  string
+	cli         string
+	start, end  time.Time
+	exitCode    int
+	causeCode   string
+	dispatchID  string
+	paneCapture string
 }
 
 func (b *BaseRunner) withPostmortems(s postmortemScope, prompt string) string {
-	records, err := attemptpostmortem.ReadAll(s.req.Workspace, s.phase)
+	records, bad, err := attemptpostmortem.ReadAll(s.req.Workspace, s.phase)
 	if err != nil {
-		b.warnPostmortem(s, "read", err)
+		b.warnPostmortem(s, "read", "", err)
 		return prompt
+	}
+	for _, r := range bad {
+		b.warnPostmortem(s, "read", r.Path, r)
 	}
 	section := attemptpostmortem.Render(records, s.cfg)
 	if section == "" {
@@ -50,11 +56,29 @@ func (b *BaseRunner) withPostmortems(s postmortemScope, prompt string) string {
 	return strings.TrimRight(prompt, "\n") + "\n\n" + section
 }
 
+func (b *BaseRunner) launchWithFreshSession(ctx context.Context, s postmortemScope, attempt core.BridgeRequest, prompt string) (core.BridgeRequest, core.BridgeResponse, error) {
+	attempt.Prompt = b.withPostmortems(s, prompt)
+	sent := attempt
+	launch := func(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+		sent = req
+		return b.launchWithPostmortem(ctx, s, req)
+	}
+	bres, err := core.LaunchRecoverable(ctx, launch, attempt, func(core.BridgeResponse) core.BridgeRequest {
+		fresh := attempt
+		fresh.Prompt = b.withPostmortems(s, prompt)
+		return fresh
+	})
+	return sent, bres, err
+}
+
 func (b *BaseRunner) launchWithPostmortem(ctx context.Context, s postmortemScope, attempt core.BridgeRequest) (core.BridgeResponse, error) {
 	start := b.attemptClock()
 	bres, err := b.bridge.Launch(ctx, attempt)
-	if endedInTheAgentSession(bres) {
-		b.recordPostmortem(ctx, s, launchWindow{cli: attempt.CLI, start: start, end: b.attemptClock(), exitCode: bres.ExitCode, causeCode: bres.CauseCode})
+	if endedInTheAgentSession(bres, ctx.Err()) {
+		b.recordPostmortem(ctx, s, launchWindow{
+			cli: attempt.CLI, start: start, end: b.attemptClock(), exitCode: bres.ExitCode, causeCode: bres.CauseCode,
+			dispatchID: bres.DispatchID, paneCapture: bres.PaneCapture,
+		})
 	}
 	return bres, err
 }
@@ -71,7 +95,10 @@ var endsOutsideTheAgentSession = map[int]bool{
 	launchoutcome.ExitMissingBinary:    true,
 }
 
-func endedInTheAgentSession(bres core.BridgeResponse) bool {
+func endedInTheAgentSession(bres core.BridgeResponse, ctxErr error) bool {
+	if errors.Is(ctxErr, context.Canceled) {
+		return false
+	}
 	abnormal := bres.ExitCode != launchoutcome.ExitOK || bres.CauseCode != ""
 	return abnormal && !bres.UsageExhausted && !endsOutsideTheAgentSession[bres.ExitCode]
 }
@@ -79,21 +106,22 @@ func endedInTheAgentSession(bres core.BridgeResponse) bool {
 func (b *BaseRunner) recordPostmortem(ctx context.Context, s postmortemScope, w launchWindow) {
 	a := attemptpostmortem.Attempt{
 		Phase: s.phase, Cycle: s.req.Cycle, CLI: w.cli, StartedAt: w.start, EndedAt: w.end,
-		CauseCode: w.causeCode, ExitCode: w.exitCode,
+		CauseCode: w.causeCode, ExitCode: w.exitCode, DispatchID: w.dispatchID,
 	}
 	transcript := b.locateTranscript(s, w)
 	a.Number = attemptpostmortem.NextNumber(s.req.Workspace, s.phase)
 	a.Session = sessionOf(transcript)
 	rec, err := attemptpostmortem.Collect(attemptpostmortem.Input{
-		Attempt:       a,
-		Transcript:    attemptpostmortem.TranscriptFor(w.cli, transcript),
-		WorktreeDelta: b.worktreeDelta(ctx, s.req.Worktree),
+		Attempt:        a,
+		Transcript:     attemptpostmortem.TranscriptFor(w.cli, transcript),
+		ScrollbackPath: w.paneCapture,
+		WorktreeDelta:  b.worktreeDelta(ctx, s.req.Worktree),
 	}, s.cfg)
 	if err == nil {
-		err = attemptpostmortem.Write(s.req.Workspace, rec)
+		_, err = attemptpostmortem.Write(s.req.Workspace, rec)
 	}
 	if err != nil {
-		b.warnPostmortem(s, "collect", err)
+		b.warnPostmortem(s, "collect", "", err)
 	}
 }
 
@@ -126,15 +154,19 @@ func (b *BaseRunner) worktreeDelta(ctx context.Context, worktree string) string 
 	return out
 }
 
-func (b *BaseRunner) warnPostmortem(s postmortemScope, step string, err error) {
+func (b *BaseRunner) warnPostmortem(s postmortemScope, step, path string, err error) {
 	log.Diag().Warnf("[runner] WARN attempt postmortem phase=%s step=%s: %v\n", s.phase, step, err)
 	if b.signals == nil {
 		return
+	}
+	fields := map[string]string{"step": step}
+	if path != "" {
+		fields["path"] = path
 	}
 	b.signals().Emit(signalcenter.Event{
 		Cycle: s.req.Cycle, RunID: s.req.RunID, Phase: s.phase,
 		Module: signalcenter.ModuleRunner, Origin: "BaseRunner.attemptPostmortem", Kind: signalcenter.KindRunnerWarning,
 		Severity: signalcenter.SeverityWarn, Code: CodeAttemptPostmortemFailed, Reason: err.Error(),
-		Fields: map[string]string{"step": step},
+		Fields: fields,
 	})
 }

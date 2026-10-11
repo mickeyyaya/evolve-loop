@@ -76,6 +76,7 @@ func TestLocateTranscript_FallsBackToTheCwdAndNeedsAStampInTheWindow(t *testing.
 }
 
 func TestClaudeConfigRoot_PrefersTheRequestHomeAndIsEmptyWithNoHome(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	t.Setenv("HOME", "/process/home")
 	if got := ClaudeConfigRoot(map[string]string{"HOME": "/request/home"}); got != "/request/home/.claude" {
 		t.Fatalf("ClaudeConfigRoot(request HOME) = %q", got)
@@ -86,6 +87,17 @@ func TestClaudeConfigRoot_PrefersTheRequestHomeAndIsEmptyWithNoHome(t *testing.T
 	t.Setenv("HOME", "")
 	if got := ClaudeConfigRoot(map[string]string{"HOME": ""}); got != "" {
 		t.Fatalf("ClaudeConfigRoot(no HOME) = %q, want empty, never a relative .claude", got)
+	}
+}
+
+func TestClaudeConfigRoot_CLAUDE_CONFIG_DIRWinsOverHomeRequestFirst(t *testing.T) {
+	t.Setenv("HOME", "/process/home")
+	t.Setenv("CLAUDE_CONFIG_DIR", "/process/claude")
+	if got := ClaudeConfigRoot(map[string]string{"HOME": "/request/home", "CLAUDE_CONFIG_DIR": "/request/claude"}); got != "/request/claude" {
+		t.Fatalf("ClaudeConfigRoot(request CLAUDE_CONFIG_DIR) = %q, want /request/claude", got)
+	}
+	if got := ClaudeConfigRoot(map[string]string{"HOME": "/request/home"}); got != "/process/claude" {
+		t.Fatalf("ClaudeConfigRoot(process CLAUDE_CONFIG_DIR) = %q, want /process/claude: the agent inherits it", got)
 	}
 }
 
@@ -138,4 +150,27 @@ func chdirForTest(t *testing.T, dir string) {
 			t.Errorf("restore the working directory: %v", err)
 		}
 	})
+}
+
+func TestClaudeConfigRoot_CLAUDE_CONFIG_DIRMustBeAbsoluteAndIsCleaned(t *testing.T) {
+	t.Setenv("HOME", "/process/home")
+	cases := []struct {
+		name, request, process, want string
+	}{
+		{"a relative request value is ignored", "rel/claude", "", "/request/home/.claude"},
+		{"an empty value is ignored", "", "", "/request/home/.claude"},
+		{"the value is cleaned", "/request/x/../claude/", "", "/request/claude"},
+		{"a relative request value falls to the process value", "rel/claude", "/process/claude", "/process/claude"},
+		{"a relative process value is ignored", "", "./claude", "/request/home/.claude"},
+		{"the request value wins over the process value", "/request/claude", "/process/claude", "/request/claude"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CLAUDE_CONFIG_DIR", tc.process)
+			got := ClaudeConfigRoot(map[string]string{"HOME": "/request/home", "CLAUDE_CONFIG_DIR": tc.request})
+			if got != tc.want {
+				t.Fatalf("ClaudeConfigRoot = %q, want %q", got, tc.want)
+			}
+		})
+	}
 }

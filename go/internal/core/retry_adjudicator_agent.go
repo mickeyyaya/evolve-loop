@@ -35,7 +35,7 @@ func (a *bridgeRetryAdjudicator) Adjudicate(cs CycleState, env retryEnvelope) *a
 		return nil
 	}
 	artifact := filepath.Join(cs.WorkspacePath, "failure-adjudication.json")
-	resp, err := a.bridge.Launch(context.Background(), BridgeRequest{
+	resp, err := LaunchWithFreshSession(context.Background(), a.bridge, BridgeRequest{
 		CLI:          a.identity.CLI,
 		Profile:      a.profilePath(),
 		Model:        a.identity.Model,

@@ -49,8 +49,7 @@ func (b *BaseRunner) dispatchPhaseAttempts(
 		log.Diag().Infof("%s\n", FormatSkillOverlayLog(phase, skills, tier))
 		attempt := base
 		attempt.CLI, attempt.Model, attempt.Skills = candidateCLI, tier, skills
-		attempt.Prompt = b.withPostmortems(postmortems, prompt)
-		bres, bridgeErr = b.launchWithPostmortem(ctx, postmortems, attempt)
+		attempt, bres, bridgeErr = b.launchWithFreshSession(ctx, postmortems, attempt, prompt)
 		wall.Observe(candidateCLI+"@"+tier, bres, bridgeErr)
 		if err := b.eventsProducer(req.Workspace, phase, candidateCLI, req.Cycle, attempt.Prompt); err != nil {
 			log.Diag().Warnf("[runner] WARN events producer phase=%s cli=%s: %v (cost/classification degraded)\n", phase, candidateCLI, err)

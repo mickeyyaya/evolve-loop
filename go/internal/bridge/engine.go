@@ -110,8 +110,11 @@ type Deps struct {
 	// reports a preempting fatal-pane verdict's cause, session named-ness
 	// and wait interval — the one channel the fresh-session retry reads.
 	// Package-private like onModelDispatch.
-	onFatalPane func(fatalPaneObservation)
-	onBootLoss  func(launchoutcome.BootLossCause)
+	onFatalPane         func(fatalPaneObservation)
+	onBootLoss          func(launchoutcome.BootLossCause)
+	onDispatchID        func(string)
+	PaneCaptureMaxBytes int
+	onPaneCapture       func(string)
 	// KeychainProbe reports whether a macOS login-Keychain generic-password
 	// item exists for the given service; doctorAuth needs it because
 	// claude's OAuth token lives in the Keychain (service "Claude
@@ -415,9 +418,14 @@ func (e *Engine) Launch(ctx context.Context, req core.BridgeRequest) (core.Bridg
 	}
 	model := resolvedModel(req.Model)
 	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
-	run := e.freshSessionRetry(ctx, req, model, func() launchRun { return e.runAttempt(ctx, req, args) })
-	resp := core.BridgeResponse{ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS}
-	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, markBootLoss(run))
+	run := e.runAttempt(ctx, req, args)
+	resp := core.BridgeResponse{
+		ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS,
+		DispatchID: run.dispatchID, PaneCapture: run.paneCapture, SessionRecoverable: e.freshSessionAllowed(ctx, run),
+	}
+	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run))
+	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, marks...)
+	e.reportFreshSession(c, req)
 	e.clearBootStrike(c, req.CLI, run.code)
 	if run.code == ExitOK {
 		e.readResult(c, req, in.stdoutLog, &resp)
@@ -464,31 +472,34 @@ func materializeInputs(req core.BridgeRequest) (launchInputs, error) {
 // captured bridge stderr, the wall-clock window and the driver's
 // observations, including a fatal-pane fast-fail's observation.
 type launchRun struct {
-	code       int
-	stderr     string
-	start, end time.Time
-	bootMS     int64
-	dispatched modelDispatch
-	fatal      fatalPaneObservation
-	bootLoss   launchoutcome.BootLossCause
+	code        int
+	stderr      string
+	start, end  time.Time
+	bootMS      int64
+	dispatched  modelDispatch
+	fatal       fatalPaneObservation
+	bootLoss    launchoutcome.BootLossCause
+	dispatchID  string
+	paneCapture string
 }
 
-// freshSessionRetry runs the launch and, when it ended on a session-
-// recoverable terminal cause and freshSessionAllowed holds, records the dead
-// dispatch (marked fresh_session_retry), clears its boot strike, and runs
-// one fresh session of the same CLI before the caller's chain walks on. At
-// most one retry — the second run's cause is never read.
-func (e *Engine) freshSessionRetry(ctx context.Context, req core.BridgeRequest, model string, run func() launchRun) launchRun {
-	first := run()
-	if !e.freshSessionAllowed(ctx, first) {
-		return first
+func (e *Engine) reportFreshSession(c attemptLogContext, req core.BridgeRequest) {
+	if !req.FreshSession {
+		return
 	}
-	dead := core.BridgeResponse{ExitCode: first.code, Stderr: first.stderr, BootMS: first.bootMS}
-	c := e.recordModelAttempt(req, model, first.code, first.start, first.end, first.dispatched, first.stderr, &dead, markFreshSessionRetry, markBootLoss(first))
-	e.clearBootStrike(c, req.CLI, first.code)
-	c.launchWarn("Engine.freshSessionRetry", "", CodeFreshSessionRetry,
-		fmt.Sprintf("%s pane died (%s): the REPL process is gone, not the CLI — one fresh %s session before the chain moves on", req.Agent, first.fatal.cause, req.CLI), nil)
-	return run()
+	c.launchWarn("Engine.Launch", "", CodeFreshSessionRetry,
+		fmt.Sprintf("%s runs one fresh %s session: the pane of the session before it died with a session-recoverable cause", req.Agent, req.CLI), nil)
+}
+
+func sessionMarks(fresh, recoverable bool) []func(*llmcalls.Record) {
+	var marks []func(*llmcalls.Record)
+	if fresh {
+		marks = append(marks, markFreshSessionRetry)
+	}
+	if recoverable {
+		marks = append(marks, markSessionRecoverable)
+	}
+	return marks
 }
 
 // freshSessionAllowed is the retry's one gate:
@@ -508,8 +519,9 @@ func (e *Engine) freshSessionAllowed(ctx context.Context, first launchRun) bool 
 	return true
 }
 
-// markFreshSessionRetry tags the dead dispatch's ledger row.
 func markFreshSessionRetry(rec *llmcalls.Record) { rec.FreshSessionRetry = true }
+
+func markSessionRecoverable(rec *llmcalls.Record) { rec.SessionRecoverable = true }
 
 // runScoped runs the LaunchArgs pipeline against a scoped Engine holding a
 // per-call Deps copy: the call-local OnBoot and onModelDispatch hooks chain
@@ -547,6 +559,8 @@ func (e *Engine) runScoped(ctx context.Context, args []string, env map[string]st
 			previousBootLossObserver(cause)
 		}
 	}
+	callDeps.onDispatchID = func(id string) { run.dispatchID = id }
+	callDeps.onPaneCapture = func(path string) { run.paneCapture = path }
 	callEngine := &Engine{deps: callDeps}
 	var stderrBuf bytes.Buffer
 	run.start = e.deps.Now()

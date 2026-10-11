@@ -3,6 +3,7 @@ package attemptpostmortem
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -20,7 +21,7 @@ func Collect(in Input, cfg Config) (Record, error) {
 	if err := cfg.Validate(); err != nil {
 		return Record{}, err
 	}
-	pane, panePath, err := readPane(in.ScrollbackPath)
+	pane, panePath, err := readPane(in.ScrollbackPath, cfg.MaxPaneCaptureBytes)
 	if err != nil {
 		return Record{}, err
 	}
@@ -33,7 +34,7 @@ func Collect(in Input, cfg Config) (Record, error) {
 	}
 	trace, err := readTrace(in.Transcript)
 	if err != nil {
-		rec.CommandSource, rec.SourceError = SourcePaneTail, err.Error()
+		rec.CommandSource, rec.SourceError = fallbackSource(rec.PaneTail), err.Error()
 	}
 	rec.LastActivityAt, rec.SkippedTranscriptLines = trace.LastActivityAt, trace.SkippedLines
 	rec.Suspect = findSuspect(trace.Commands, sessionEnd(trace, in.Attempt), cfg.SuspectWindow)
@@ -45,6 +46,13 @@ func Collect(in Input, cfg Config) (Record, error) {
 	return rec, rec.Validate()
 }
 
+func fallbackSource(paneTail string) Source {
+	if paneTail == "" {
+		return SourceNone
+	}
+	return SourcePaneTail
+}
+
 func readTrace(t Transcript) (Trace, error) {
 	if t == nil {
 		return Trace{}, ErrNoTranscript
@@ -52,15 +60,29 @@ func readTrace(t Transcript) (Trace, error) {
 	return t()
 }
 
-func readPane(path string) (string, string, error) {
-	data, err := os.ReadFile(path)
+func readPane(path string, maxBytes int) (string, string, error) {
+	info, err := os.Stat(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return "", "", nil
 	}
+	data, err := readTail(path, info, err, int64(maxBytes))
 	if err != nil {
 		return "", "", fmt.Errorf("attemptpostmortem: read the pane scrollback %s: %w", path, err)
 	}
 	return strings.TrimRight(string(data), " \t\r\n"), path, nil
+}
+
+func readTail(path string, info fs.FileInfo, statErr error, maxBytes int64) ([]byte, error) {
+	if statErr != nil {
+		return nil, statErr
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	offset := max(0, info.Size()-maxBytes)
+	return io.ReadAll(io.NewSectionReader(f, offset, info.Size()-offset))
 }
 
 func sessionEnd(trace Trace, a Attempt) time.Time {

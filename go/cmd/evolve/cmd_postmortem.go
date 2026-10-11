@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,7 +20,7 @@ import (
 const (
 	postmortemPrefix     = "evolve postmortem: "
 	postmortemDefaultCLI = "claude-tmux"
-	postmortemUsage      = `usage: evolve postmortem collect --cycle N --phase P --attempt K (--session UUID | --transcript PATH) --cause CODE [--exit-code E] [--cli C] [--started RFC3339 --ended RFC3339] [--project-root P]
+	postmortemUsage      = `usage: evolve postmortem collect --cycle N --phase P --attempt K (--session UUID | --transcript PATH) --cause CODE [--exit-code E] [--cli C] [--started RFC3339 --ended RFC3339] [--force] [--project-root P]
        evolve postmortem show --cycle N --phase P [--project-root P]`
 )
 
@@ -32,6 +33,7 @@ type postmortemEnv struct {
 
 type postmortemArgs struct {
 	projectRoot, cycle, phase, attempt, session, transcript, cause, exitCode, cli, started, ended string
+	force                                                                                         bool
 }
 
 type postmortemTarget struct {
@@ -84,7 +86,11 @@ func parsePostmortemArgs(args []string, collect bool) (postmortemArgs, error) {
 			values[name] = into
 		}
 	}
-	operands, err := cliFlags{values: values}.parse(args)
+	bools := map[string]*bool{}
+	if collect {
+		bools["--force"] = &a.force
+	}
+	operands, err := cliFlags{bools: bools, values: values}.parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected operand %q", operands[0])
 	}
@@ -134,9 +140,12 @@ func runPostmortemShow(env postmortemEnv, args []string, stdout, stderr io.Write
 	if err != nil {
 		return postmortemFailure(stderr, exitIO, err)
 	}
-	records, err := attemptpostmortem.ReadAll(t.workspace(), t.phase)
+	records, bad, err := attemptpostmortem.ReadAll(t.workspace(), t.phase)
 	if err != nil {
 		return postmortemFailure(stderr, exitIO, err)
+	}
+	for _, b := range bad {
+		fmt.Fprintf(stderr, "%sWARN skipped the bad record %s: %v\n", postmortemPrefix, b.Path, b.Err)
 	}
 	section := attemptpostmortem.Render(records, t.cfg)
 	if section == "" {
@@ -252,13 +261,23 @@ func runPostmortemCollect(env postmortemEnv, args []string, stdout, stderr io.Wr
 		Transcript: func() (attemptpostmortem.Trace, error) { return trace, nil },
 	}, t.cfg)
 	if err == nil {
-		err = attemptpostmortem.Write(t.workspace(), rec)
+		err = storeRecord(t.workspace(), rec, a.force)
+	}
+	if !a.force && errors.Is(err, fs.ErrExist) {
+		return postmortemFailure(stderr, exitRefused, fmt.Errorf("%w; give --force to replace it", err))
 	}
 	if err != nil {
 		return postmortemFailure(stderr, exitIO, err)
 	}
 	fmt.Fprintf(stdout, "%swrote %s\n", postmortemPrefix, attemptpostmortem.Path(t.workspace(), t.phase, rec.Number))
 	return 0
+}
+
+func storeRecord(workspace string, rec attemptpostmortem.Record, force bool) error {
+	if force {
+		return attemptpostmortem.Replace(workspace, rec)
+	}
+	return attemptpostmortem.Create(workspace, rec)
 }
 
 func (r collectRequest) withTrace(path string, trace attemptpostmortem.Trace) attemptpostmortem.Attempt {

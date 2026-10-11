@@ -103,7 +103,7 @@ func (a *FailureAdvisor) Advise(ctx context.Context, in FailureAdviseInput) (*re
 		profile = filepath.Join(in.ProjectRoot, ".evolve", "profiles", "failure-advisor.json")
 	}
 	artifact := filepath.Join(in.Workspace, "failure-advice.json")
-	resp, err := a.bridge.Launch(ctx, BridgeRequest{
+	resp, err := LaunchWithFreshSession(ctx, a.bridge, BridgeRequest{
 		CLI:          a.identity.CLI,
 		Profile:      profile,
 		Model:        a.identity.Model,

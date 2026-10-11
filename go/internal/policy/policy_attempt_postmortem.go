@@ -8,12 +8,13 @@ import (
 )
 
 type AttemptPostmortemPolicy struct {
-	MaxCommands      *int `json:"max_commands,omitempty"`
-	MaxCommandRunes  *int `json:"max_command_runes,omitempty"`
-	MaxPaneTailRunes *int `json:"max_pane_tail_runes,omitempty"`
-	MaxDeltaRunes    *int `json:"max_delta_runes,omitempty"`
-	SuspectWindowS   *int `json:"suspect_window_s,omitempty"`
-	MaxRecords       *int `json:"max_records,omitempty"`
+	MaxCommands         *int `json:"max_commands,omitempty"`
+	MaxCommandRunes     *int `json:"max_command_runes,omitempty"`
+	MaxPaneTailRunes    *int `json:"max_pane_tail_runes,omitempty"`
+	MaxDeltaRunes       *int `json:"max_delta_runes,omitempty"`
+	SuspectWindowS      *int `json:"suspect_window_s,omitempty"`
+	MaxRecords          *int `json:"max_records,omitempty"`
+	MaxPaneCaptureBytes *int `json:"max_pane_capture_bytes,omitempty"`
 }
 
 func (b *AttemptPostmortemPolicy) UnmarshalJSON(raw []byte) error {
@@ -47,6 +48,7 @@ func (b AttemptPostmortemPolicy) config() attemptpostmortem.Config {
 		{b.MaxDeltaRunes, &cfg.MaxDeltaRunes},
 		{b.SuspectWindowS, &window},
 		{b.MaxRecords, &cfg.MaxRecords},
+		{b.MaxPaneCaptureBytes, &cfg.MaxPaneCaptureBytes},
 	} {
 		if knob.from != nil {
 			*knob.to = *knob.from
