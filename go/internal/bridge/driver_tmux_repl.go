@@ -85,15 +85,10 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	}
 	pfx := prep.prefix
 	resolvedPrompt := prep.resolvedPrompt
-	scrollbackFile := prep.scrollbackFile
-	artifactScrollback := prep.artifactScrollback
-	defer tmuxCleanup(ctx, deps, lp.name, lp.session, scrollbackFile, lp.named, artifactScrollback)
+	defer tmuxCleanup(ctx, deps, lp.name, lp.session, paneCapture{shared: prep.scrollbackFile, dispatch: prep.dispatchPaneFile, lines: prep.artifactScrollback}, lp.named)
 
-	// Auto-respond fallback engine, seeded from the CLI's manifest rules.
 	human := humanActive(deps, cfg.HumanInput)
 	ar := newLaunchAutoResponder(cfg.Workspace, deps, lp, human)
-	// tick() strips pane lines that verbatim-echo this session's own
-	// delivered prompt before its exhaustion/escalation scans.
 	ar.injectedPrompt = resolvedPrompt
 
 	phaseName := orDefault(cfg.Agent, lp.name)
@@ -106,14 +101,8 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		Cycle:        strconv.Itoa(cfg.Cycle),
 	})
 	ar.brokerStage = recoveryStageFromEnv(deps)
-	// Promoted rules append after the manifest rules so a promoted rule can
-	// never shadow a vetted built-in (first match wins).
 	ar.prompts = append(ar.prompts, loadPromotedPrompts(cfg.ProjectRoot)...)
-	// Shadow-stage rules ride along observe-only, measuring whether a
-	// promotion to enforce would be safe.
 	ar.shadowRules = loadShadowObservers(cfg.ProjectRoot)
-	// A send can be in flight on ANY exit path (boot-time trust prompts
-	// included) — flush so the last one is never silently dropped.
 	defer ar.flushPending()
 
 	admitRelease, code, err := bootTmuxREPL(ctx, cfg, deps, lp, prep, ar)
@@ -146,7 +135,7 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 		return code, nil
 	}
 
-	raw, capErr := deps.Tmux.CapturePane(ctx, lp.session, artifactScrollback)
+	raw, capErr := deps.Tmux.CapturePane(ctx, lp.session, prep.artifactScrollback)
 	if raw == "" && capErr != nil {
 		raw = waitResult.lastGoodPane
 	}
@@ -160,9 +149,6 @@ func runTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (in
 	case lp.named:
 		fmt.Fprintf(deps.Stderr, "%s RESUME-PRESERVE: skipping exit; REPL stays running for next launch\n", pfx)
 	case ctx.Err() != nil:
-		// Dead ctx: SendKeys is a guaranteed no-op, so the exit sequence would
-		// only burn its inter-key pauses. The deferred session kill (and the
-		// cycle-start orphan GC behind it) owns teardown here.
 		fmt.Fprintf(deps.Stderr, "%s exit sequence skipped (ctx done) — session kill handles teardown\n", pfx)
 	default:
 		lp.sendExitSeq(ctx, deps)

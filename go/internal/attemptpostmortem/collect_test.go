@@ -2,6 +2,7 @@ package attemptpostmortem
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -61,15 +62,30 @@ func TestCollect_AMissingTranscriptFallsBackToThePaneTail(t *testing.T) {
 	}
 }
 
-func TestCollect_AnAgyAttemptUsesThePaneTailOnly(t *testing.T) {
+func TestCollect_AnAgyAttemptWithNoPaneCaptureNamesTheSourceNone(t *testing.T) {
 	a := cycle1853BuildAttempt1(t)
 	a.CLI = "agy-claude-tmux"
 	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(a.CLI, fixtureAttempt1), ScrollbackPath: filepath.Join(t.TempDir(), "none.txt")}, DefaultConfig())
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
-	if rec.CommandSource != SourcePaneTail || !strings.HasPrefix(rec.SourceError, ErrNoTranscript.Error()) || rec.PaneTail != "" || len(rec.EvidencePaths) != 0 {
-		t.Fatalf("rec = %+v, want a pane-only record with no evidence files", rec)
+	if rec.CommandSource != SourceNone || !strings.HasPrefix(rec.SourceError, ErrNoTranscript.Error()) || rec.PaneTail != "" || len(rec.EvidencePaths) != 0 {
+		t.Fatalf("rec = %+v, want the source none: nothing was read", rec)
+	}
+	if err := rec.Validate(); err != nil {
+		t.Fatalf("Validate(source none) = %v, want nil", err)
+	}
+}
+
+func TestCollect_AnAgyAttemptWithAPaneCaptureNamesThePaneTail(t *testing.T) {
+	a := cycle1853BuildAttempt1(t)
+	a.CLI = "agy-claude-tmux"
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor(a.CLI, ""), ScrollbackPath: fixtureFinalPane1}, DefaultConfig())
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if rec.CommandSource != SourcePaneTail || !strings.Contains(rec.PaneTail, "no server running") || strings.Join(rec.EvidencePaths, ",") != fixtureFinalPane1 {
+		t.Fatalf("rec = %+v, want the pane tail as the source", rec)
 	}
 }
 
@@ -147,5 +163,48 @@ func TestCollect_RefusesAnInvalidConfigAnInvalidAttemptAndAnUnreadablePane(t *te
 	_, err := Collect(Input{Attempt: a, Transcript: noTranscript, ScrollbackPath: t.TempDir()}, DefaultConfig())
 	if err == nil || errors.Is(err, ErrNoTranscript) {
 		t.Errorf("a directory as the scrollback: err = %v, want a read error", err)
+	}
+}
+
+func TestCollect_ReadsOnlyTheLastMaxPaneCaptureBytesOfThePane(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.MaxPaneCaptureBytes, cfg.MaxPaneTailRunes = 12, 1000
+	pane := writeFile(t, t.TempDir(), "pane.txt", strings.Repeat("old output\n", 5000)+"LAST-BYTES")
+	a := cycle1853BuildAttempt1(t)
+
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("agy", ""), ScrollbackPath: pane}, cfg)
+
+	if err != nil || rec.PaneTail != "t\nLAST-BYTES" {
+		t.Fatalf("PaneTail = %q, %v; want only the last 12 bytes", rec.PaneTail, err)
+	}
+}
+
+func TestCollect_AShortPaneIsReadWhole(t *testing.T) {
+	pane := writeFile(t, t.TempDir(), "pane.txt", "short pane")
+	a := cycle1853BuildAttempt1(t)
+
+	rec, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("agy", ""), ScrollbackPath: pane}, DefaultConfig())
+
+	if err != nil || rec.PaneTail != "short pane" {
+		t.Fatalf("PaneTail = %q, %v; want the whole short pane", rec.PaneTail, err)
+	}
+}
+
+func TestCollect_RefusesAPaneThatCannotBeStattedOrOpened(t *testing.T) {
+	dir := t.TempDir()
+	file := writeFile(t, dir, "a-file", "x")
+	locked := writeFile(t, dir, "locked.txt", "secret")
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o644) })
+	a := cycle1853BuildAttempt1(t)
+	for name, path := range map[string]string{"a path under a file": filepath.Join(file, "pane.txt"), "an unreadable file": locked} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Collect(Input{Attempt: a, Transcript: TranscriptFor("agy", ""), ScrollbackPath: path}, DefaultConfig())
+			if err == nil || !strings.Contains(err.Error(), "read the pane scrollback") {
+				t.Fatalf("Collect = %v, want the pane read error", err)
+			}
+		})
 	}
 }

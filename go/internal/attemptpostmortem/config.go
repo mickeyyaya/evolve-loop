@@ -6,22 +6,24 @@ import (
 )
 
 type Config struct {
-	MaxCommands      int
-	MaxCommandRunes  int
-	MaxPaneTailRunes int
-	MaxDeltaRunes    int
-	SuspectWindow    time.Duration
-	MaxRecords       int
+	MaxCommands         int
+	MaxCommandRunes     int
+	MaxPaneTailRunes    int
+	MaxDeltaRunes       int
+	SuspectWindow       time.Duration
+	MaxRecords          int
+	MaxPaneCaptureBytes int
 }
 
 func DefaultConfig() Config {
 	return Config{
-		MaxCommands:      8,
-		MaxCommandRunes:  400,
-		MaxPaneTailRunes: 2000,
-		MaxDeltaRunes:    1500,
-		SuspectWindow:    30 * time.Second,
-		MaxRecords:       3,
+		MaxCommands:         8,
+		MaxCommandRunes:     400,
+		MaxPaneTailRunes:    2000,
+		MaxDeltaRunes:       1500,
+		SuspectWindow:       30 * time.Second,
+		MaxRecords:          3,
+		MaxPaneCaptureBytes: 64 << 10,
 	}
 }
 
@@ -36,6 +38,7 @@ func (c Config) Validate() error {
 		{"MaxDeltaRunes", int64(c.MaxDeltaRunes)},
 		{"SuspectWindow", int64(c.SuspectWindow)},
 		{"MaxRecords", int64(c.MaxRecords)},
+		{"MaxPaneCaptureBytes", int64(c.MaxPaneCaptureBytes)},
 	}
 	for _, l := range limits {
 		if l.value <= 0 {

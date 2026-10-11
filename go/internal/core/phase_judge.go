@@ -46,7 +46,7 @@ func (j *PlanJudge) GradePlan(ctx context.Context, in router.RouteInput, plan *r
 		worktree = in.Workspace
 	}
 	artifactPath := filepath.Join(in.Workspace, "routing-judge.json")
-	resp, err := j.bridge.Launch(ctx, BridgeRequest{
+	resp, err := LaunchWithFreshSession(ctx, j.bridge, BridgeRequest{
 		CLI:          j.cli,
 		Profile:      profile,
 		Model:        j.model,

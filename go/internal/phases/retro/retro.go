@@ -156,9 +156,9 @@ func (p *Phase) Run(ctx context.Context, req core.PhaseRequest) (core.PhaseRespo
 	if err := fence.TakeErr(); err != nil {
 		fmt.Fprintf(os.Stderr, "[retro] WARN worktree fence: snapshot failed (%v) — the tree this phase hands downstream is unverified\n", err)
 	}
-	bres, bridgeErr := p.bridge.Launch(ctx, bridgeReq)
+	bres, bridgeErr := core.LaunchWithFreshSession(ctx, p.bridge, bridgeReq)
 	if bridgeErr != nil && core.DeliveryFailureCause(bridgeErr) != "" {
-		bres, bridgeErr = p.bridge.Launch(ctx, bridgeReq)
+		bres, bridgeErr = core.LaunchWithFreshSession(ctx, p.bridge, bridgeReq)
 	}
 	durationMS := p.nowFn().Sub(start).Milliseconds()
 	fenceDiags := fence.End(context.WithoutCancel(ctx)).Diagnostics(phaseName)

@@ -132,7 +132,7 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 				req.Agent, n+1, cli, tier, attempts[n-1], last.ExitCode)
 		}
 		start := w.now()
-		last, lastErr = w.inner.Launch(ctx, attempt)
+		last, lastErr = core.LaunchWithFreshSession(ctx, w.inner, attempt)
 		keeper.Observe(cli+"@"+tier, last, lastErr)
 		attempts = append(attempts, fmt.Sprintf("%s@%s=%d", cli, tier, last.ExitCode))
 		if last.ExitCode == exitQuota && w.bench != nil {

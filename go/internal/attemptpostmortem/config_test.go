@@ -10,19 +10,20 @@ func TestDefaultConfig_IsValidAndBoundsEveryCap(t *testing.T) {
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("DefaultConfig().Validate() = %v, want nil", err)
 	}
-	if cfg.MaxCommands != 8 || cfg.MaxCommandRunes != 400 || cfg.MaxPaneTailRunes != 2000 || cfg.MaxDeltaRunes != 1500 || cfg.SuspectWindow.Seconds() != 30 || cfg.MaxRecords != 3 {
-		t.Fatalf("DefaultConfig() = %+v, want 8/400/2000/1500/30s/3", cfg)
+	if cfg.MaxCommands != 8 || cfg.MaxCommandRunes != 400 || cfg.MaxPaneTailRunes != 2000 || cfg.MaxDeltaRunes != 1500 || cfg.SuspectWindow.Seconds() != 30 || cfg.MaxRecords != 3 || cfg.MaxPaneCaptureBytes != 64<<10 {
+		t.Fatalf("DefaultConfig() = %+v, want 8/400/2000/1500/30s/3/64 KiB", cfg)
 	}
 }
 
 func TestConfigValidate_RefusesEachCapThatIsNotPositive(t *testing.T) {
 	cases := map[string]func(*Config){
-		"MaxCommands":      func(c *Config) { c.MaxCommands = 0 },
-		"MaxCommandRunes":  func(c *Config) { c.MaxCommandRunes = -1 },
-		"MaxPaneTailRunes": func(c *Config) { c.MaxPaneTailRunes = 0 },
-		"MaxDeltaRunes":    func(c *Config) { c.MaxDeltaRunes = 0 },
-		"SuspectWindow":    func(c *Config) { c.SuspectWindow = 0 },
-		"MaxRecords":       func(c *Config) { c.MaxRecords = 0 },
+		"MaxCommands":         func(c *Config) { c.MaxCommands = 0 },
+		"MaxCommandRunes":     func(c *Config) { c.MaxCommandRunes = -1 },
+		"MaxPaneTailRunes":    func(c *Config) { c.MaxPaneTailRunes = 0 },
+		"MaxDeltaRunes":       func(c *Config) { c.MaxDeltaRunes = 0 },
+		"SuspectWindow":       func(c *Config) { c.SuspectWindow = 0 },
+		"MaxRecords":          func(c *Config) { c.MaxRecords = 0 },
+		"MaxPaneCaptureBytes": func(c *Config) { c.MaxPaneCaptureBytes = 0 },
 	}
 	for field, mutate := range cases {
 		t.Run(field, func(t *testing.T) {

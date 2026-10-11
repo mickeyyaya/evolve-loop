@@ -19,7 +19,7 @@ func TestValidPhaseAndRecordValidate_RefuseAPhaseThatIsNotABareName(t *testing.T
 			if err := r.Validate(); err == nil || !strings.Contains(err.Error(), "phase") {
 				t.Fatalf("Validate(phase %q) = %v, want an error that names phase", phase, err)
 			}
-			if _, err := ReadAll(t.TempDir(), phase); err == nil {
+			if _, _, err := ReadAll(t.TempDir(), phase); err == nil {
 				t.Fatalf("ReadAll(phase %q) = nil error, want a refusal", phase)
 			}
 		})
@@ -150,7 +150,7 @@ func TestNextNumber_IsOnePastTheHighestContiguousRecord(t *testing.T) {
 	for _, n := range []int{1, 2} {
 		r := validRecord(t)
 		r.Number = n
-		if err := Write(dir, r); err != nil {
+		if _, err := Write(dir, r); err != nil {
 			t.Fatal(err)
 		}
 	}

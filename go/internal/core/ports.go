@@ -265,6 +265,7 @@ type BridgeRequest struct {
 	// of resolving and walking the chain again; a launch WITHOUT it is a caller
 	// that never heard of the chain and gets the walk by construction.
 	ChainAttempt bool `json:"chain_attempt,omitempty"`
+	FreshSession bool `json:"fresh_session,omitempty"`
 	// BudgetScale scales the launch's artifact-wait budget (a large cycle's
 	// build gets a longer deadline). 0 or 1 = unscaled; <1 never shrinks. The
 	// engine applies it to the per-agent policy base, or the builtin when the
@@ -323,9 +324,12 @@ type BridgeResponse struct {
 	// new-session to the REPL prompt marker appearing — pure dispatch overhead
 	// paid before the prompt is delivered. 0 when no cold boot happened (a
 	// resumed/warm named session, or a headless driver).
-	BootMS         int64  `json:"boot_ms,omitempty"`
-	UsageExhausted bool   `json:"usage_exhausted,omitempty"`
-	CauseCode      string `json:"cause_code,omitempty"`
+	BootMS             int64  `json:"boot_ms,omitempty"`
+	UsageExhausted     bool   `json:"usage_exhausted,omitempty"`
+	CauseCode          string `json:"cause_code,omitempty"`
+	DispatchID         string `json:"dispatch_id,omitempty"`
+	PaneCapture        string `json:"pane_capture,omitempty"`
+	SessionRecoverable bool   `json:"session_recoverable,omitempty"`
 }
 
 // BridgeProbe is what bridge reports about its environment + CLIs.

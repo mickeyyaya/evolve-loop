@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
 )
 
@@ -91,15 +92,21 @@ const tmuxCleanupTimeout = 15 * time.Second
 // from the launch context's cancellation: the deferred cleanup fires exactly
 // when the launch context is canceled, and a canceled context would make
 // every tmux command below refuse to run, leaking the session.
-func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile string, named bool, scrollback int) {
+type paneCapture struct {
+	shared, dispatch string
+	lines            int
+}
+
+func tmuxCleanup(ctx context.Context, deps Deps, name, session string, capture paneCapture, named bool) {
 	pfx := "[" + name + "]"
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tmuxCleanupTimeout)
 	defer cancel()
 	if !deps.Tmux.HasSession(ctx, session) {
 		return
 	}
-	if raw, err := deps.Tmux.CapturePane(ctx, session, scrollback); err == nil {
-		_ = os.WriteFile(scrollbackFile, []byte(raw), 0o644)
+	if raw, err := deps.Tmux.CapturePane(ctx, session, capture.lines); err == nil {
+		_ = os.WriteFile(capture.shared, []byte(raw), 0o644)
+		captureDispatchPane(deps, pfx, capture.dispatch, lastBytes(raw, defaultIfZero(deps.PaneCaptureMaxBytes, attemptpostmortem.DefaultConfig().MaxPaneCaptureBytes)))
 	}
 	if named {
 		deps.sweep.preserve()
@@ -108,4 +115,31 @@ func tmuxCleanup(ctx context.Context, deps Deps, name, session, scrollbackFile s
 	}
 	_ = killSessionSwept(ctx, deps, session)
 	fmt.Fprintf(deps.Stderr, "%s session killed: %s\n", pfx, session)
+}
+
+func captureDispatchPane(deps Deps, pfx, path, raw string) {
+	if path == "" {
+		return
+	}
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		fmt.Fprintf(deps.Stderr, "%s WARN the pane capture of the dispatch was not written: %s: %v\n", pfx, path, err)
+		return
+	}
+	observePaneCapture(deps, path)
+}
+
+func lastBytes(raw string, limit int) string {
+	return raw[max(0, len(raw)-limit):]
+}
+
+func observePaneCapture(deps Deps, path string) {
+	if deps.onPaneCapture != nil {
+		deps.onPaneCapture(path)
+	}
+}
+
+func observeDispatchID(deps Deps, id string) {
+	if deps.onDispatchID != nil {
+		deps.onDispatchID(id)
+	}
 }

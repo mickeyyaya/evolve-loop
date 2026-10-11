@@ -28,15 +28,24 @@
 
   After each launch, `launchWithPostmortem` reads `core.BridgeResponse.CauseCode`. The bridge engine sets it from its one `launchoutcome.Classify` call, so the runner does not classify again. The predicate `endedInTheAgentSession` decides if the end gets a record.
 
-  A normal end, an exhausted account, and the exits 2, 3, 10, 80, 85, 86, 87, 99 and 127 get none. Thus a quota wall does not name a correct `go test` as the suspect. In each other case, `recordPostmortem` collects and writes the record before the next launch. Its inputs are:
-  - the CLI and the next free record number (`attemptpostmortem.NextNumber`);
+  A normal end, an exhausted account, and the exits 2, 3, 10, 80, 85, 86, 87, 99 and 127 get none. Thus a quota wall does not name a correct `go test` as the suspect. 
+
+  A cancelled context (`context.Canceled`) also gets no record. An operator stop and the teardown of the deliverable-authority door cancel it, and their kill can come after a command that finished OK. A deadline (`context.DeadlineExceeded`: the phase or cycle timeout) keeps its record. Exit 124 (a command timeout) gets a record.
+
+  In each other case, `recordPostmortem` collects and writes the record before the next launch. Its inputs are:
+  - the CLI, the dispatch id (`core.BridgeResponse.DispatchID`) and the next free record number (`attemptpostmortem.NextNumber`; `attemptpostmortem.Write` takes the next number if another dispatch claimed it);
+  - the pane capture of the dispatch (`core.BridgeResponse.PaneCapture`), as the pane tail;
   - the start and end times from `Options.AttemptClock` (production: `time.Now`); this clock is not `nowFn`, so the phase duration keeps its two clock reads;
   - for a Claude CLI, the transcript that `tokenusage.LocateTranscript` finds under `tokenusage.ClaudeConfigRoot`; with no `HOME`, there is no transcript; the file name is the session id;
   - `git diff --stat HEAD` of the worktree through `gitexec` and `Options.GitExec` (production: `sysexec.DefaultRunner`), with a 30 s limit; a failure is stated as the delta.
 
   The runner does not attach `tmux-final-scrollback.txt`. All dispatches of a run share it, and it names no session or agent.
 
-  The caps come from the `attempt_postmortem` policy block of the policy that routing resolved (`overlayPolicy.AttemptPostmortemConfig()`). A read failure or a collect or write failure is one WARN `RUNNER_ATTEMPT_POSTMORTEM_FAILED` with `fields.step` `read` or `collect`. The dispatch goes on without the section. The bridge dispatch id is not in `core.BridgeResponse`, so the record states `unknown` for it.
+  **The fresh session.** When the bridge sets `core.BridgeResponse.SessionRecoverable` (a `dead_shell` or `cli_self_updated` pane, see [internal-bridge.md](internal-bridge.md)), `launchWithFreshSession` calls `core.LaunchRecoverable` with its postmortem hook. The hook adds the section, so the record of the dead session is in the prompt of the one fresh session of the same CLI. Under a cancelled context there is no fresh session. A second death walks the chain as before.
+
+  Each session has its own record and its own time window. Before 2026-10-11, the bridge ran this retry inside one `Launch`, with the same prompt and no record (plan Q6).
+
+  The caps come from the `attempt_postmortem` policy block of the policy that routing resolved (`overlayPolicy.AttemptPostmortemConfig()`). A collect or write failure is one WARN `RUNNER_ATTEMPT_POSTMORTEM_FAILED` with `fields.step` `collect`. A record that `ReadAll` cannot read is one WARN with `fields.step` `read` and `fields.path`; the valid records stay in the section. The dispatch goes on.
 - **`LaneScope` sanitizes.** The lane's ids come from the advisor's LLM-authored backlog, so line breaks and tabs are collapsed before the value reaches a prompt. A newline in an id would otherwise forge a new context bullet. An empty scope means a sequential cycle, and phases render nothing.
 - **The fence reports, it never decides.** What the fence did becomes a diagnostic on the response and a WARN in the phase log. It never changes a verdict. The fence assumes the agent is gone when it closes: `Launch` is synchronous and the bridge tears the session down before returning. A driver that returned a still-running REPL could write after the close; those writes reach the ship's own explanation verification, which stays armed. The retro phase, which calls the bridge itself, holds the same `treefence.Fence` around its launch.
 
@@ -89,7 +98,10 @@
   - `TestDispatch_ACleanEndWritesNoRecordAndAddsNoSection`: a clean end writes no record.
   - `TestRun_AResumeCarriesTheStoredRecordInItsFirstPrompt`: a stored record is in the first prompt of a resume.
   - `TestDispatch_ACollectErrorIsAWarnAndTheRetryProceedsWithoutTheSection`: a collect failure is a WARN, and the retry passes.
-  - `TestDispatch_OnlyAnEndInTheAgentSessionWritesARecord`: a quota wall, an exhausted account and the exits 87, 80 and 127 give no record. A lost pane, a review pause, a dead shell and a crash give a record and a section.
+  - `TestDispatch_OnlyAnEndInTheAgentSessionWritesARecord`: a quota wall, an exhausted account, the exits 87, 80 and 127, and an end under a cancelled context give no record. A lost pane, a review pause, a dead shell, a crash and a kill at the phase timeout give a record and a section.
+  - `TestDispatch_AnUnreadableRecordIsAWarnThatNamesItsPathAndTheValidRecordsStay`: one bad record does not drop the section.
+  - `TestDispatch_TheRecordNamesTheDispatchAndAttachesItsOwnPaneCapture` and `TestDispatch_AnAgyRecordNamesThePaneTailAsItsSourceOrNoneWithoutACapture`: the dispatch id, the pane capture and the real source.
+  - `TestDispatch_ASessionRecoverableEndGetsOneFreshSessionOfTheSameCLIWithTheRecord` and `TestDispatch_ASecondSessionRecoverableEndWalksTheChainAndEachRecordHasItsOwnWindow`: the fresh session carries the record, and the retry happens once.
 - **One construction, one projection.** Pinned by `TestVerdictEngine_OneConstructionSite`, `TestNew_BuildsTheEngineOnceEagerly`, `TestDispatchOf_IsTheOneProjection` and `TestNew_SignalsResolveExplicitThenBridgeThenNull`.
 - **The completion contract a dispatch asks for is core's decision, projected once.** `baseRequest` sets `BridgeRequest.Completion` from `PhaseRequest.BridgeCompletion()`, so a correction of a source-writing phase reaches the bridge as `worktree-evidence` and every first dispatch or read-only correction as the artifact contract ([ADR-0113](../adr/0113-correction-completes-on-worktree-evidence.md)). A carried completion is an ordinary exit 0, so the verdict engine verifies and classifies the unchanged deliverable exactly as it would a rewritten one. Pinned by `TestRun_DispatchesTheCompletionContractTheRequestNames`.
 

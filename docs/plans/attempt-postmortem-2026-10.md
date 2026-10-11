@@ -1,6 +1,6 @@
 # Plan: a retry carries the evidence of the dispatch that it replaces (R2, the postmortem of an `attempt`)
 
-- **Status:** wired, 2026-10-10. Components P1 to P5 were built on 2026-10-09 in lane `cl-attempt-postmortem`. The wiring lane W1 (`cl-postmortem-wire`) wired them into the runner. It also added the operator verbs and the policy block, and fixed the R2 review findings.
+- **Status:** wired, 2026-10-10. Follow-ups (Q6, Q7, Q8 and the W1 review items) done on 2026-10-11 in lane `cl-pm-followups` (§6, "Follow-ups"). Components P1 to P5 were built on 2026-10-09 in lane `cl-attempt-postmortem`. The wiring lane W1 (`cl-postmortem-wire`) wired them into the runner. It also added the operator verbs and the policy block, and fixed the R2 review findings.
 - **Decision record:** [ADR-0130](../architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md).
 - **Research:** [attempt-postmortem-2026-10.md](../research/attempt-postmortem-2026-10.md) (findings F1.1 to F3.10, refinements R1 to R9).
 - **Package notes:** [internal-attemptpostmortem.md](../architecture/packages/internal-attemptpostmortem.md).
@@ -158,6 +158,22 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 6. `evolve postmortem collect|show` writes a record for an earlier dispatch and prints the section.
 7. The package has the R2 review fixes. The list is in [internal-attemptpostmortem.md](../architecture/packages/internal-attemptpostmortem.md).
 
+**Follow-ups, as built (2026-10-11, lane `cl-pm-followups`):**
+
+1. **A cancelled context writes no record.** `endedInTheAgentSession(bres, ctx.Err())` gives false for `context.Canceled`: an operator stop and the teardown of the deliverable-authority door. A deadline (`context.DeadlineExceeded`) keeps its record. Exit 124 (a command timeout) ends in the agent session, so it gets a record.
+2. **One bad record does not drop the section.** `ReadAll` returns the valid records and a `BadRecord` for each bad one. The runner emits the WARN `RUNNER_ATTEMPT_POSTMORTEM_FAILED` with `step=read` and `path` for each bad record.
+3. **Q6, the fresh session: option (b), with one shared helper (fix round 1).**
+   - `Engine.Launch` runs one session. It sets `BridgeResponse.SessionRecoverable` when its gate holds.
+   - `core.LaunchRecoverable` is the one retry loop. It launches once more with the request from a hook, marked `FreshSession`, and only under a live context.
+   - The runner's hook writes the record and adds the section. Each other caller retries with the same request (`core.LaunchWithFreshSession`), so retro, the swarm workers and the core advisors keep F31.
+   - Reason: one owner runs the retry, and one owner writes the evidence. Option (a) needs a second collector in the bridge.
+   - Each session has its own time window.
+4. **Q8, the pane of each dispatch.** `tmuxCleanup` writes `<ws>/<agent>-<session>-final-pane.txt` before the kill, with mode 0600 and only the last `max_pane_capture_bytes` (64 KiB by default). `readPane` reads only that many bytes from the end. `BridgeResponse.PaneCapture` names it, and the runner gives it to `Input.ScrollbackPath` (`readPane` is reused). `command_source` is `none` when nothing was read.
+5. **Q7, the dispatch id.** `BridgeResponse.DispatchID` comes from the `EVOLVE_DISPATCH_ID` that `launchSwept` mints.
+6. **`collect` refuses to write over a record.** `evolve postmortem collect --attempt K` exits 1 when the record is there, unless `--force` is given.
+7. **No numbering race.** `Create` writes a temp file, then links it to the record path (`os.Link`, atomic, `EEXIST` when taken). `Write` takes the next number on `EEXIST`. `Replace` is for `--force` only.
+8. **`CLAUDE_CONFIG_DIR`.** `tokenusage.ClaudeConfigRoot` honors an absolute, cleaned value: the request value, then the process value, then `$HOME/.claude`. Reason: when it is set, Claude Code writes its transcripts there.
+
 **G1, the repeat guard (R3):**
 
 - A Claude `PreToolUse` hook on `Bash` runs `evolve guard repeat` ([hooks](https://code.claude.com/docs/en/hooks)).
@@ -207,9 +223,9 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 ## 10. Open questions
 
 - **Q1.** Is 30 s the right window? Cycle 1853 needs 0.27 s. The records of real abnormal ends now give the gap.
-- **Q6.** The bridge does a fresh-session retry inside one `Launch` for a `dead_shell` or `cli_self_updated` pane (`Engine.freshSessionRetry`). That retry gets the same prompt and no record. Must the bridge write a record there too?
-- **Q8.** The bridge can write a pane capture for each agent, for example `<agent>-tmux-final-scrollback.txt`. Then the record can carry a pane tail that names its dispatch.
-- **Q7.** `core.BridgeResponse` has no dispatch id and no tmux session name, so the runner records `unknown` for them. Must the response carry them?
+- **Q6.** Closed 2026-10-11: the runner owns the fresh session (§6, Follow-ups, item 3).
+- **Q8.** Closed 2026-10-11: the bridge writes the pane of each dispatch (§6, Follow-ups, item 4).
+- **Q7.** Closed 2026-10-11: `BridgeResponse.DispatchID` (§6, Follow-ups, item 5). The tmux session name is in the name of the pane capture file.
 - **Q2.** Can the agy pane give the commands? Today the agy record has the pane tail only.
 - **Q3.** Do tools other than Bash belong in the record? Today only Bash commands can kill a process.
 - **Q4.** How does `evolve gc` treat the records? They are small and live in the run directory.
@@ -223,4 +239,5 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 | Design (D1 to D18) | proposed | 2026-10-09 |
 | P1 to P5 | built, not wired, 100% coverage | 2026-10-09 |
 | W1 | wired: runner, locator, policy block, `evolve postmortem`, R2 hardening | 2026-10-10 |
+| Follow-ups (Q6, Q7, Q8, W1 review items) | done | 2026-10-11 |
 | G1 (R3) | designed | 2026-10-09 |

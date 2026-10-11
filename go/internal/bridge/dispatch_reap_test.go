@@ -91,7 +91,7 @@ func TestTmuxCleanup_RecordsThePaneTreeBeforeKillSessionAndTheSweepStopsOnlyOwne
 	deps := reapDeps(h, tmux, &stderr, nil)
 	deps.sweep = &dispatchSweep{id: thisDispatch}
 
-	tmuxCleanup(context.Background(), deps, "agy-tmux", "s1", t.TempDir()+"/scrollback.txt", false, 10)
+	tmuxCleanup(context.Background(), deps, "agy-tmux", "s1", paneCapture{shared: t.TempDir() + "/scrollback.txt", lines: 10}, false)
 	deps.sweep.finish(context.Background(), deps)
 
 	if want := []string{"pane-pids:s1", "list", "kill-session:s1"}; len(events) < 3 || !reflect.DeepEqual(events[:3], want) {
@@ -111,7 +111,7 @@ func TestTmuxCleanup_ANamedSessionIsNeverSwept(t *testing.T) {
 	deps := reapDeps(h, tmux, &stderr, nil)
 	deps.sweep = &dispatchSweep{id: thisDispatch}
 
-	tmuxCleanup(context.Background(), deps, "claude-tmux", "evolve-bridge-named-x", t.TempDir()+"/sb.txt", true, 10)
+	tmuxCleanup(context.Background(), deps, "claude-tmux", "evolve-bridge-named-x", paneCapture{shared: t.TempDir() + "/sb.txt", lines: 10}, true)
 	deps.sweep.finish(context.Background(), deps)
 
 	if len(h.sent) != 0 || h.calls != 0 {

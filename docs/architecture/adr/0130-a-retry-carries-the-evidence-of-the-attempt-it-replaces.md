@@ -39,8 +39,12 @@ The escalation report says only "stalled". It does not say which command ran las
 
 - **In scope.** Each dispatch of `BaseRunner` (`dispatchPhaseAttempts`), a retry in its dispatch walk and a resume through `RunCycleFromPhase`.
 - **No record for an end outside the agent session.** A quota wall, an exhausted account, exit 85 or 87, a boot timeout and a launch refusal do not come from the agent. A record there can name a correct command as the suspect, so the runner writes none (`endedInTheAgentSession`).
-- **Out of scope.** The retro phase and the swarm workers call `Launch` themselves, not through `BaseRunner`. Thus they get no record and no section. The fresh-session retry inside one bridge `Launch` also gets no record (plan Q6).
-- **No pane tail from the runner.** The shared `tmux-final-scrollback.txt` does not name its dispatch, so the runner does not attach it (plan Q8).
+- **No record under a cancelled context.** An operator stop and the teardown of the deliverable-authority door cancel the context (`context.Canceled`), and the kill can come after a command that finished OK. The runner writes no record for them. A deadline (`context.DeadlineExceeded`, the phase or cycle timeout) keeps its record.
+- **A record for exit 124.** A command timeout (exit 124) ends in the agent session, so it gets a record.
+- **The fresh session is in scope (2026-10-11).** The bridge marks a `dead_shell` or `cli_self_updated` end as `SessionRecoverable`. One helper, `core.LaunchRecoverable`, runs the one fresh session. The runner's hook writes the record and adds the section (plan Q6, ADR-0044 amendment).
+- **The pane tail of each dispatch (2026-10-11).** The bridge writes `<run>/<agent>-<session>-final-pane.txt` before it kills a tmux session, and names it in `core.BridgeResponse.PaneCapture`. The runner attaches it. The shared `tmux-final-scrollback.txt` names no dispatch, so the runner still does not attach it (plan Q8).
+- **The dispatch id (2026-10-11).** `core.BridgeResponse.DispatchID` names the dispatch in the record (plan Q7).
+- **Out of scope.** The retro phase and the swarm workers call `Launch` themselves, not through `BaseRunner`. Thus they get no record and no section. They KEEP the fresh session through `core.LaunchWithFreshSession`, with the same request.
 
 ## Alternatives considered
 
@@ -61,4 +65,4 @@ The escalation report says only "stalled". It does not say which command ran las
 - **The wiring.** The runner finds the transcript (`tokenusage.LocateTranscript`), runs `git diff --stat`, collects and writes after an abnormal end, and renders before each launch (`internal/phases/runner/postmortem.go`). A failure is a WARN, and the dispatch goes on.
 - **A backfill.** `evolve postmortem collect` writes the record of a dispatch that ended before the wiring, and `evolve postmortem show` prints the section.
 - **A suspect is not a cause.** The window rule can name an innocent command. The record states the reason, so a reader can judge it.
-- **agy gets less.** It has no transcript, so its record has the pane tail and no command list.
+- **agy gets less.** It has no transcript, so its record has the pane tail and no command list. When no pane tail was read, `command_source` is `none`.

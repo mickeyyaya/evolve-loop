@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,26 +25,39 @@ const (
 )
 
 type launchStep struct {
-	exit       int
-	cause      string
-	transcript string
-	pane       string
-	exhausted  bool
-	endAt      string
+	exit        int
+	cause       string
+	transcript  string
+	pane        string
+	capture     string
+	dispatchID  string
+	recoverable bool
+	ctxErr      error
+	exhausted   bool
+	endAt       string
 }
+
+type switchCtx struct {
+	context.Context
+	err error
+}
+
+func (c *switchCtx) Err() error { return c.err }
 
 type stepBridge struct {
 	t       *testing.T
 	home    string
 	clock   *time.Time
+	ctx     *switchCtx
 	steps   []launchStep
 	prompts []string
 	clis    []string
+	fresh   []bool
 }
 
 func (s *stepBridge) Launch(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
 	i := len(s.prompts)
-	s.prompts, s.clis = append(s.prompts, req.Prompt), append(s.clis, req.CLI)
+	s.prompts, s.clis, s.fresh = append(s.prompts, req.Prompt), append(s.clis, req.CLI), append(s.fresh, req.FreshSession)
 	step := s.steps[i]
 	if step.transcript != "" {
 		s.writeTranscript(req, step.transcript)
@@ -52,8 +66,12 @@ func (s *stepBridge) Launch(_ context.Context, req core.BridgeRequest) (core.Bri
 	if step.endAt != "" {
 		*s.clock = mustStamp(s.t, step.endAt)
 	}
+	s.ctx.err = step.ctxErr
 	if step.exit != 0 {
-		return core.BridgeResponse{ExitCode: step.exit, CauseCode: step.cause, UsageExhausted: step.exhausted}, errors.New("bridge: launch exit=81: artifact-timeout: cause=pane_lost")
+		return core.BridgeResponse{
+			ExitCode: step.exit, CauseCode: step.cause, UsageExhausted: step.exhausted,
+			DispatchID: step.dispatchID, PaneCapture: s.writeCapture(req, step, i), SessionRecoverable: step.recoverable,
+		}, errors.New("bridge: launch exit=81: artifact-timeout: cause=pane_lost")
 	}
 	if err := os.WriteFile(req.ArtifactPath, []byte("# Build Report\n"), 0o644); err != nil {
 		s.t.Fatal(err)
@@ -88,6 +106,17 @@ func (s *stepBridge) writePane(workspace string, step launchStep) {
 	}
 }
 
+func (s *stepBridge) writeCapture(req core.BridgeRequest, step launchStep, i int) string {
+	if step.capture == "" {
+		return ""
+	}
+	path := filepath.Join(req.Workspace, fmt.Sprintf("%s-session-%d-final-pane.txt", req.Agent, i))
+	if err := os.WriteFile(path, []byte(step.capture), 0o644); err != nil {
+		s.t.Fatal(err)
+	}
+	return path
+}
+
 func mustStamp(t *testing.T, s string) time.Time {
 	t.Helper()
 	v, err := time.Parse(time.RFC3339Nano, s)
@@ -110,7 +139,8 @@ func runWithSteps(t *testing.T, req core.PhaseRequest, git func(args []string, s
 	t.Helper()
 	clock := mustStamp(t, "2026-10-09T09:19:20.147Z")
 	run := postmortemRun{ws: req.Workspace}
-	run.bridge = &stepBridge{t: t, home: req.Env["HOME"], clock: &clock, steps: steps}
+	ctx := &switchCtx{Context: context.Background()}
+	run.bridge = &stepBridge{t: t, home: req.Env["HOME"], clock: &clock, ctx: ctx, steps: steps}
 	center := signalcenter.New()
 	center.Subscribe(func(e signalcenter.Event) {
 		if e.Code == CodeAttemptPostmortemFailed {
@@ -139,7 +169,7 @@ func runWithSteps(t *testing.T, req core.PhaseRequest, git func(args []string, s
 			return git(args, stdout), nil
 		},
 	})
-	run.resp, _ = r.Run(context.Background(), req)
+	run.resp, _ = r.Run(ctx, req)
 	return run
 }
 
@@ -194,7 +224,7 @@ func TestDispatch_APaneLostAttemptGivesTheRetryThePostmortemOfCycle1853(t *testi
 	if len(run.events) != 2 || run.events[1] != second {
 		t.Fatal("the events producer must get the prompt that the bridge got, for its echo veto")
 	}
-	records, err := attemptpostmortem.ReadAll(run.ws, "build")
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
 	if err != nil || len(records) != 1 {
 		t.Fatalf("records = %+v, %v; want one", records, err)
 	}
@@ -229,7 +259,7 @@ func TestRun_AResumeCarriesTheStoredRecordInItsFirstPrompt(t *testing.T) {
 		CommandSource: attemptpostmortem.SourceTranscript,
 		Commands:      []attemptpostmortem.Command{{Text: "tmux kill-server", Status: attemptpostmortem.StatusSignal, ExitCode: 137}},
 	}
-	if err := attemptpostmortem.Write(req.Workspace, stored); err != nil {
+	if _, err := attemptpostmortem.Write(req.Workspace, stored); err != nil {
 		t.Fatal(err)
 	}
 
@@ -257,19 +287,28 @@ func TestDispatch_ACollectErrorIsAWarnAndTheRetryProceedsWithoutTheSection(t *te
 	}
 }
 
-func TestDispatch_AnUnreadableRecordIsAWarnAndTheLaunchProceeds(t *testing.T) {
+func TestDispatch_AnUnreadableRecordIsAWarnThatNamesItsPathAndTheValidRecordsStay(t *testing.T) {
 	req := cycle1853Request(t)
-	if err := os.WriteFile(attemptpostmortem.Path(req.Workspace, "build", 1), []byte("{"), 0o644); err != nil {
+	badPath := attemptpostmortem.Path(req.Workspace, "build", 1)
+	if err := os.WriteFile(badPath, []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	valid := attemptpostmortem.Record{
+		Schema:        attemptpostmortem.SchemaVersion,
+		Attempt:       attemptpostmortem.Attempt{Phase: "build", Cycle: 1853, Number: 2, CLI: "claude-tmux", CauseCode: "pane_lost", ExitCode: 81},
+		CommandSource: attemptpostmortem.SourceNone,
+	}
+	if _, err := attemptpostmortem.Write(req.Workspace, valid); err != nil {
 		t.Fatal(err)
 	}
 
 	run := runWithSteps(t, req, noGit(t), cleanAttempt())
 
-	if len(run.bridge.prompts) != 1 || run.bridge.prompts[0] != cycle1853Composed {
-		t.Fatalf("prompts = %q, want the plain prompt", run.bridge.prompts)
+	if len(run.bridge.prompts) != 1 || !strings.Contains(run.bridge.prompts[0], "### Attempt 2") || strings.Contains(run.bridge.prompts[0], "### Attempt 1") {
+		t.Fatalf("prompts = %q, want the section with the valid record 2 only", run.bridge.prompts)
 	}
-	if len(run.warnings) != 1 || run.warnings[0].Fields["step"] != "read" {
-		t.Fatalf("warnings = %+v, want one read WARN", run.warnings)
+	if len(run.warnings) != 1 || run.warnings[0].Fields["step"] != "read" || run.warnings[0].Fields["path"] != badPath {
+		t.Fatalf("warnings = %+v, want one read WARN that names %s", run.warnings, badPath)
 	}
 }
 
@@ -283,7 +322,7 @@ func TestDispatch_TheRecordCarriesTheWorktreeDeltaFromGit(t *testing.T) {
 		return 0
 	}, paneLostAttempt1(), cleanAttempt())
 
-	records, err := attemptpostmortem.ReadAll(run.ws, "build")
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
 	if err != nil || len(records) != 1 || !strings.Contains(records[0].WorktreeDelta, "dispatcher.go | 31") {
 		t.Fatalf("records = %+v, %v; want the git delta", records, err)
 	}
@@ -298,7 +337,7 @@ func TestDispatch_AFailedGitDiffIsStatedAsTheDelta(t *testing.T) {
 
 	run := runWithSteps(t, req, func(_ []string, _ io.Writer) int { return 128 }, paneLostAttempt1(), cleanAttempt())
 
-	records, err := attemptpostmortem.ReadAll(run.ws, "build")
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
 	if err != nil || len(records) != 1 || !strings.Contains(records[0].WorktreeDelta, "git diff --stat failed") {
 		t.Fatalf("records = %+v, %v; want the stated git failure", records, err)
 	}
@@ -307,7 +346,7 @@ func TestDispatch_AFailedGitDiffIsStatedAsTheDelta(t *testing.T) {
 func TestDispatch_TheSharedScrollbackIsNeverAttachedBecauseItNamesNoDispatch(t *testing.T) {
 	run := runWithSteps(t, cycle1853Request(t), noGit(t), paneLostAttempt1(), cleanAttempt())
 
-	records, err := attemptpostmortem.ReadAll(run.ws, "build")
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
 	if err != nil || len(records) != 1 || records[0].PaneTail != "" || len(records[0].EvidencePaths) != 1 {
 		t.Fatalf("records = %+v, %v; want no pane tail and only the transcript as evidence", records, err)
 	}
@@ -420,6 +459,9 @@ func TestDispatch_OnlyAnEndInTheAgentSessionWritesARecord(t *testing.T) {
 		{"a review pause", launchStep{exit: 81, cause: "review_pause"}, true},
 		{"a dead shell", launchStep{exit: 81, cause: "dead_shell"}, true},
 		{"a crash or a kill", launchStep{exit: -1, cause: "driver_error"}, true},
+		{"a kill under an operator stop", launchStep{exit: -1, cause: "driver_error", ctxErr: context.Canceled}, false},
+		{"a review pause under an operator stop", launchStep{exit: 81, cause: "review_pause", ctxErr: context.Canceled}, false},
+		{"a kill at the phase timeout", launchStep{exit: -1, cause: "driver_error", ctxErr: context.DeadlineExceeded}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -428,7 +470,7 @@ func TestDispatch_OnlyAnEndInTheAgentSessionWritesARecord(t *testing.T) {
 
 			run := runWithSteps(t, cycle1853Request(t), noGit(t), first, cleanAttempt())
 
-			records, err := attemptpostmortem.ReadAll(run.ws, "build")
+			records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
 			if err != nil || (len(records) == 1) != tc.record || len(records) > 1 {
 				t.Fatalf("records = %d (%v), want a record: %v", len(records), err, tc.record)
 			}
@@ -446,17 +488,133 @@ func TestDispatch_ARecordFromAnEarlierRunOfThePhaseIsKept(t *testing.T) {
 		Attempt:       attemptpostmortem.Attempt{Phase: "build", Cycle: 1853, Number: 1, CLI: "agy-tmux", CauseCode: "review_pause", ExitCode: 81},
 		CommandSource: attemptpostmortem.SourcePaneTail,
 	}
-	if err := attemptpostmortem.Write(req.Workspace, earlier); err != nil {
+	if _, err := attemptpostmortem.Write(req.Workspace, earlier); err != nil {
 		t.Fatal(err)
 	}
 
 	run := runWithSteps(t, req, noGit(t), paneLostAttempt1(), cleanAttempt())
 
-	records, err := attemptpostmortem.ReadAll(run.ws, "build")
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
 	if err != nil || len(records) != 2 || records[0].CLI != "agy-tmux" || records[1].Number != 2 || records[1].CauseCode != "pane_lost" {
 		t.Fatalf("records = %+v, %v; want the earlier record 1 and a new record 2", records, err)
 	}
 	if !strings.Contains(run.bridge.prompts[1], "### Attempt 1") || !strings.Contains(run.bridge.prompts[1], "### Attempt 2") {
 		t.Fatalf("the retry prompt must state both records:\n%s", run.bridge.prompts[1])
+	}
+}
+
+func TestDispatch_TheRecordNamesTheDispatchAndAttachesItsOwnPaneCapture(t *testing.T) {
+	first := paneLostAttempt1()
+	first.dispatchID = "01M4FY77W5XZNZGJ1NSMN06N3J/1853/build/p64934n6"
+	first.capture = "$ go test ./internal/swarm\nKilled: 9\n"
+
+	run := runWithSteps(t, cycle1853Request(t), noGit(t), first, cleanAttempt())
+
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
+	if err != nil || len(records) != 1 {
+		t.Fatalf("records = %+v, %v; want one", records, err)
+	}
+	rec := records[0]
+	capture := filepath.Join(run.ws, "build-session-0-final-pane.txt")
+	if rec.DispatchID != first.dispatchID || !strings.Contains(rec.PaneTail, "Killed: 9") || rec.CommandSource != attemptpostmortem.SourceTranscript {
+		t.Fatalf("record = %+v, want the dispatch id and the pane capture", rec)
+	}
+	if len(rec.EvidencePaths) != 2 || rec.EvidencePaths[1] != capture {
+		t.Fatalf("evidence = %v, want the transcript and %s", rec.EvidencePaths, capture)
+	}
+	if !strings.Contains(run.bridge.prompts[1], "dispatch `"+first.dispatchID+"`") || !strings.Contains(run.bridge.prompts[1], "Killed: 9") {
+		t.Fatalf("the retry prompt lacks the dispatch id or the pane tail:\n%s", run.bridge.prompts[1])
+	}
+}
+
+func TestDispatch_AnAgyRecordNamesThePaneTailAsItsSourceOrNoneWithoutACapture(t *testing.T) {
+	cases := []struct {
+		name    string
+		capture string
+		want    attemptpostmortem.Source
+	}{
+		{"with a capture", "agy> rm -rf build\n", attemptpostmortem.SourcePaneTail},
+		{"without a capture", "", attemptpostmortem.SourceNone},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := cycle1853Request(t)
+			req.ProjectRoot = writeFallbackProfile(t, "evolve-builder", "agy-claude-tmux", []string{"claude-tmux"})
+
+			run := runWithSteps(t, req, noGit(t), launchStep{exit: 81, cause: "review_pause", capture: tc.capture, endAt: "2026-10-09T09:59:52.115Z"}, cleanAttempt())
+
+			records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
+			if err != nil || len(records) != 1 || records[0].CLI != "agy-claude-tmux" || records[0].CommandSource != tc.want {
+				t.Fatalf("records = %+v, %v; want one agy record with the source %s", records, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestDispatch_ASessionRecoverableEndGetsOneFreshSessionOfTheSameCLIWithTheRecord(t *testing.T) {
+	deadShell := launchStep{exit: 81, cause: "dead_shell", recoverable: true, endAt: "2026-10-09T09:21:10Z"}
+
+	run := runWithSteps(t, cycle1853Request(t), noGit(t), deadShell, cleanAttempt())
+
+	if len(run.bridge.clis) != 2 || run.bridge.clis[0] != "claude-tmux" || run.bridge.clis[1] != "claude-tmux" || run.bridge.fresh[0] || !run.bridge.fresh[1] {
+		t.Fatalf("launches = %v fresh = %v, want one fresh session of claude-tmux, marked as such", run.bridge.clis, run.bridge.fresh)
+	}
+	if !strings.Contains(run.bridge.prompts[1], "Previous attempts") || !strings.Contains(run.bridge.prompts[1], "cause `dead_shell`") {
+		t.Fatalf("the fresh session lacks the record of the dead one:\n%s", run.bridge.prompts[1])
+	}
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
+	if err != nil || len(records) != 1 || records[0].CauseCode != "dead_shell" {
+		t.Fatalf("records = %+v, %v; want exactly the record of the dead session", records, err)
+	}
+	if run.resp.Verdict != core.VerdictPASS || len(run.events) != 1 || run.events[0] != run.bridge.prompts[1] {
+		t.Fatalf("verdict = %s events = %d, want PASS and the events producer fed the fresh prompt once", run.resp.Verdict, len(run.events))
+	}
+}
+
+func TestDispatch_ARecoverableEndUnderACancelledContextGetsNoFreshSessionAndNoRecord(t *testing.T) {
+	stopped := launchStep{exit: 81, cause: "dead_shell", recoverable: true, ctxErr: context.Canceled, endAt: "2026-10-09T09:21:10Z"}
+
+	run := runWithSteps(t, cycle1853Request(t), noGit(t), stopped, cleanAttempt())
+
+	if len(run.bridge.clis) > 1 && run.bridge.clis[1] == run.bridge.clis[0] {
+		t.Fatalf("launches = %v, want no fresh session of the same CLI after the context was cancelled", run.bridge.clis)
+	}
+	if records, _, _ := attemptpostmortem.ReadAll(run.ws, "build"); len(records) != 0 {
+		t.Fatalf("records = %+v, want none under a cancelled context", records)
+	}
+}
+
+func TestDispatch_ASecondSessionRecoverableEndWalksTheChainAndEachRecordHasItsOwnWindow(t *testing.T) {
+	first := launchStep{exit: 81, cause: "dead_shell", recoverable: true, endAt: "2026-10-09T09:21:10Z"}
+	second := launchStep{exit: 81, cause: "dead_shell", recoverable: true, endAt: "2026-10-09T09:30:00Z"}
+
+	run := runWithSteps(t, cycle1853Request(t), noGit(t), first, second, cleanAttempt())
+
+	if strings.Join(run.bridge.clis, ",") != "claude-tmux,claude-tmux,agy-claude-tmux" {
+		t.Fatalf("launches = %v, want one fresh session, then the next CLI", run.bridge.clis)
+	}
+	records, _, err := attemptpostmortem.ReadAll(run.ws, "build")
+	if err != nil || len(records) != 2 {
+		t.Fatalf("records = %+v, %v; want two", records, err)
+	}
+	if !records[1].StartedAt.Equal(mustStamp(t, first.endAt)) || !records[1].EndedAt.Equal(mustStamp(t, second.endAt)) {
+		t.Fatalf("record 2 window = %s .. %s, want only the second session", records[1].StartedAt, records[1].EndedAt)
+	}
+}
+
+func TestDispatch_AnUnlistableRunDirectoryIsAReadWarnWithNoPathAndThePlainPrompt(t *testing.T) {
+	req := cycle1853Request(t)
+	req.Workspace = filepath.Join(t.TempDir(), "run[")
+	if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	run := runWithSteps(t, req, noGit(t), cleanAttempt())
+
+	if len(run.bridge.prompts) != 1 || run.bridge.prompts[0] != cycle1853Composed {
+		t.Fatalf("prompts = %q, want the plain prompt", run.bridge.prompts)
+	}
+	if len(run.warnings) != 1 || run.warnings[0].Fields["step"] != "read" || run.warnings[0].Fields["path"] != "" || !strings.Contains(run.warnings[0].Reason, "list the records") {
+		t.Fatalf("warnings = %+v, want one read WARN with no path", run.warnings)
 	}
 }

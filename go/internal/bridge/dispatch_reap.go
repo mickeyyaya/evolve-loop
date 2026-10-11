@@ -189,6 +189,7 @@ func randomStamp() string {
 
 func launchSwept(ctx context.Context, driver Driver, cfg *Config, deps Deps) (int, error) {
 	cfg.DispatchID = mintDispatchID(cfg, os.Getpid())
+	observeDispatchID(deps, cfg.DispatchID)
 	deps.sweep = newDispatchSweep(cfg.DispatchID, cfg.ProjectRoot)
 	defer deps.sweep.finish(ctx, deps)
 	return driver.Launch(ctx, cfg, deps)

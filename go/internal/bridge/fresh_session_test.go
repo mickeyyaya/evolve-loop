@@ -16,40 +16,14 @@ import (
 
 const deadShellPaneLine = "zsh: command not found: Please"
 
-func TestFreshSessionRetry_OneFreshSessionForASessionRecoverableCause(t *testing.T) {
-	deps, got, _ := recordingDeps(t)
-	e := NewEngine(deps)
-	ws := t.TempDir()
-	req := core.BridgeRequest{CLI: "claude-tmux", Agent: "triage", Cycle: 1687, RunID: "run-1687", Workspace: ws}
-	calls := 0
-	run := e.freshSessionRetry(context.Background(), req, "auto", func() launchRun {
-		calls++
-		if calls == 1 {
-			return launchRun{code: ExitArtifactTimeout, fatal: fatalPaneObservation{cause: recovery.CauseDeadShell, intervalS: 300}, start: time.Now(), end: time.Now()}
-		}
-		return launchRun{code: ExitOK}
-	})
-	if calls != 2 || run.code != ExitOK {
-		t.Fatalf("a dead shell gets exactly one fresh session: calls=%d code=%d", calls, run.code)
-	}
-	w := eventsWithCode(*got, CodeFreshSessionRetry)
-	if len(w) != 1 || w[0].Fields["cli"] != "claude-tmux" || w[0].Fields["agent"] != "triage" || w[0].Cycle != 1687 || !strings.Contains(w[0].Reason, string(recovery.CauseDeadShell)) {
-		t.Fatalf("one BRIDGE_FRESH_SESSION_RETRY naming the cause and the dispatch: %+v", w)
-	}
-	rec := lastLedgerRecord(t, ws)
-	if rec.CallID == "" || rec.CallID != w[0].Fields["call_id"] || !rec.FreshSessionRetry {
-		t.Fatalf("the dead dispatch is on the ledger, marked fresh_session_retry, under the signal's call_id: %+v vs %+v", rec, w[0].Fields)
-	}
-}
-
-func TestFreshSessionRetry_TheGate(t *testing.T) {
-	deps, got, _ := recordingDeps(t)
-	e := NewEngine(deps)
+func TestFreshSessionAllowed_TheGate(t *testing.T) {
+	e := NewEngine(Deps{})
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	tight, cancelTight := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancelTight()
-	req := core.BridgeRequest{CLI: "claude-tmux", Agent: "build", Cycle: 9, Workspace: t.TempDir()}
+	roomy, cancelRoomy := context.WithTimeout(context.Background(), time.Hour)
+	defer cancelRoomy()
 	dead := fatalPaneObservation{cause: recovery.CauseDeadShell, intervalS: 300}
 	named := dead
 	named.named = true
@@ -57,28 +31,21 @@ func TestFreshSessionRetry_TheGate(t *testing.T) {
 		name  string
 		ctx   context.Context
 		first launchRun
-		want  int
+		want  bool
 	}{
-		{"model/config cause: a fresh session fails the same way", context.Background(), launchRun{code: ExitArtifactTimeout, fatal: fatalPaneObservation{cause: recovery.CauseModelInvalid, intervalS: 300}}, 1},
-		{"no fatal cause at all", context.Background(), launchRun{code: ExitArtifactTimeout}, 1},
-		{"a delivered run is never run twice", context.Background(), launchRun{code: ExitOK, fatal: dead}, 1},
-		{"a named session belongs to its owner", context.Background(), launchRun{code: ExitArtifactTimeout, fatal: named}, 1},
-		{"a canceled launch is never retried", canceled, launchRun{code: ExitArtifactTimeout, fatal: fatalPaneObservation{cause: recovery.CauseCLISelfUpdated, intervalS: 300}}, 1},
-		{"no room on the deadline for another of the driver's waits", tight, launchRun{code: ExitArtifactTimeout, fatal: dead}, 1},
-		{"a second death is final: at most one retry", context.Background(), launchRun{code: ExitArtifactTimeout, fatal: dead}, 2},
+		{"model/config cause: a fresh session fails the same way", context.Background(), launchRun{code: ExitArtifactTimeout, fatal: fatalPaneObservation{cause: recovery.CauseModelInvalid, intervalS: 300}}, false},
+		{"no fatal cause at all", context.Background(), launchRun{code: ExitArtifactTimeout}, false},
+		{"a delivered run is never run twice", context.Background(), launchRun{code: ExitOK, fatal: dead}, false},
+		{"a named session belongs to its owner", context.Background(), launchRun{code: ExitArtifactTimeout, fatal: named}, false},
+		{"a canceled launch is never retried", canceled, launchRun{code: ExitArtifactTimeout, fatal: fatalPaneObservation{cause: recovery.CauseCLISelfUpdated, intervalS: 300}}, false},
+		{"no room on the deadline for another of the driver's waits", tight, launchRun{code: ExitArtifactTimeout, fatal: dead}, false},
+		{"room on the deadline", roomy, launchRun{code: ExitArtifactTimeout, fatal: dead}, true},
+		{"a dead shell with no deadline", context.Background(), launchRun{code: ExitArtifactTimeout, fatal: dead}, true},
 	}
 	for _, tc := range cases {
-		calls := 0
-		e.freshSessionRetry(tc.ctx, req, "auto", func() launchRun {
-			calls++
-			return tc.first
-		})
-		if calls != tc.want {
-			t.Errorf("%s: calls=%d, want %d", tc.name, calls, tc.want)
+		if got := e.freshSessionAllowed(tc.ctx, tc.first); got != tc.want {
+			t.Errorf("%s: freshSessionAllowed = %v, want %v", tc.name, got, tc.want)
 		}
-	}
-	if w := eventsWithCode(*got, CodeFreshSessionRetry); len(w) != 1 {
-		t.Errorf("only the second-death case retried once: %d retry signals", len(w))
 	}
 }
 
@@ -143,6 +110,11 @@ func (d *scriptedSessionTmux) PasteBuffer(context.Context, string) error {
 // → checkpoint path against scriptedSessionTmux.
 func launchScripted(t *testing.T, dead int, stage string, mutate func(*core.BridgeRequest)) (*scriptedSessionTmux, core.BridgeResponse, error, *llmcalls.ReadResult, int) {
 	t.Helper()
+	return launchScriptedWith(t, dead, stage, mutate, func(*Deps) {})
+}
+
+func launchScriptedWith(t *testing.T, dead int, stage string, mutate func(*core.BridgeRequest), wire func(*Deps)) (*scriptedSessionTmux, core.BridgeResponse, error, *llmcalls.ReadResult, int) {
+	t.Helper()
 	fx := newFixture(t, "claude-tmux", "")
 	artifact := filepath.Join(fx.ws, "triage-report.md")
 	tmux := &scriptedSessionTmux{fakeTmux: &fakeTmux{}, dead: dead, artifact: artifact}
@@ -160,6 +132,7 @@ func launchScripted(t *testing.T, dead int, stage string, mutate func(*core.Brid
 	if mutate != nil {
 		mutate(&req)
 	}
+	wire(&deps)
 	resp, err := newTestEngine(deps).Launch(context.Background(), req)
 	rows, readErr := llmcalls.ReadWorkspace(fx.ws)
 	if readErr != nil {
@@ -168,26 +141,41 @@ func launchScripted(t *testing.T, dead int, stage string, mutate func(*core.Brid
 	return tmux, resp, err, &rows, len(eventsWithCode(*got, CodeFreshSessionRetry))
 }
 
-func TestEngineLaunch_DeadShellGetsOneFreshSessionAndSucceeds(t *testing.T) {
+func TestEngineLaunch_ADeadShellAsksTheCallerForAFreshSessionAndRunsNoSecondSession(t *testing.T) {
 	tmux, resp, err, rows, retries := launchScripted(t, 1, "enforce", nil)
-	if err != nil || resp.ExitCode != ExitOK {
-		t.Fatalf("the fresh session completes the phase: code=%d err=%v", resp.ExitCode, err)
+	if err == nil || resp.ExitCode != ExitArtifactTimeout || !resp.SessionRecoverable {
+		t.Fatalf("the dead session returns exit 81 marked session-recoverable: code=%d recoverable=%v err=%v", resp.ExitCode, resp.SessionRecoverable, err)
 	}
-	if tmux.sessions != 2 || retries != 1 {
-		t.Fatalf("exactly one fresh session after the dead one: sessions=%d retry signals=%d", tmux.sessions, retries)
+	if tmux.sessions != 1 || retries != 0 {
+		t.Fatalf("the bridge runs no second session and claims no retry: sessions=%d retry signals=%d", tmux.sessions, retries)
 	}
-	if len(rows.Records) != 2 || !rows.Records[0].FreshSessionRetry || rows.Records[1].FreshSessionRetry || rows.Records[0].Attempt != rows.Records[1].Attempt {
-		t.Fatalf("two ledger rows sharing the attempt, the dead one marked: %+v", rows.Records)
+	if len(rows.Records) != 1 || !rows.Records[0].SessionRecoverable || rows.Records[0].FreshSessionRetry {
+		t.Fatalf("one ledger row, marked session_recoverable and not fresh_session_retry: %+v", rows.Records)
 	}
 }
 
-func TestEngineLaunch_ASecondDeathReturnsExit81ToTheChain(t *testing.T) {
-	tmux, resp, err, rows, retries := launchScripted(t, 2, "enforce", nil)
-	if err == nil || resp.ExitCode != ExitArtifactTimeout || !strings.Contains(err.Error(), "exit=81") {
-		t.Fatalf("a second death returns exit 81 to the chain: code=%d err=%v", resp.ExitCode, err)
+func TestEngineLaunch_TheFreshSessionIsMarkedAndSignalledWhenItLaunches(t *testing.T) {
+	_, resp, err, rows, retries := launchScripted(t, 0, "enforce", func(r *core.BridgeRequest) { r.FreshSession = true })
+	if err != nil || resp.ExitCode != ExitOK {
+		t.Fatalf("the fresh session completes: code=%d err=%v", resp.ExitCode, err)
 	}
-	if tmux.sessions != 2 || retries != 1 || len(rows.Records) != 2 || !rows.Records[0].FreshSessionRetry || rows.Records[1].FreshSessionRetry {
-		t.Fatalf("one retry, two rows, the dead first marked: sessions=%d retries=%d rows=%+v", tmux.sessions, retries, rows.Records)
+	if retries != 1 || len(rows.Records) != 1 || !rows.Records[0].FreshSessionRetry || rows.Records[0].SessionRecoverable {
+		t.Fatalf("retry signals=%d rows=%+v, want one BRIDGE_FRESH_SESSION_RETRY and the row marked fresh_session_retry", retries, rows.Records)
+	}
+}
+
+func TestEngineLaunch_TheResponseNamesTheDispatchAndItsOwnPaneCapture(t *testing.T) {
+	_, resp, _, _, _ := launchScripted(t, 1, "enforce", nil)
+	if !strings.HasPrefix(resp.DispatchID, "run-1687/1687/triage/") {
+		t.Fatalf("DispatchID = %q, want the dispatch tag of this launch", resp.DispatchID)
+	}
+	base := filepath.Base(resp.PaneCapture)
+	if !strings.HasPrefix(base, "triage-") || !strings.HasSuffix(base, "-final-pane.txt") {
+		t.Fatalf("PaneCapture = %q, want <workspace>/triage-<session>-final-pane.txt", resp.PaneCapture)
+	}
+	body, err := os.ReadFile(resp.PaneCapture)
+	if err != nil || !strings.Contains(string(body), deadShellPaneLine) {
+		t.Fatalf("the capture = %q, %v; want the final pane of this dispatch", body, err)
 	}
 }
 
@@ -201,23 +189,23 @@ func TestEngineLaunch_NoFreshSessionWithoutEnforceOrForANamedSession(t *testing.
 		{"named by BRIDGE_SESSION_NAME", "enforce", func(r *core.BridgeRequest) { r.Env = map[string]string{"BRIDGE_SESSION_NAME": "swarm-c1687-w1"} }},
 	} {
 		tmux, resp, _, rows, retries := launchScripted(t, 2, tc.stage, tc.mutate)
-		if resp.ExitCode != ExitArtifactTimeout || tmux.sessions != 1 || retries != 0 || len(rows.Records) != 1 {
-			t.Errorf("%s: no retry — code=%d sessions=%d retries=%d rows=%d", tc.name, resp.ExitCode, tmux.sessions, retries, len(rows.Records))
+		if resp.ExitCode != ExitArtifactTimeout || resp.SessionRecoverable || tmux.sessions != 1 || retries != 0 || len(rows.Records) != 1 || rows.Records[0].SessionRecoverable {
+			t.Errorf("%s: not recoverable — code=%d recoverable=%v sessions=%d retries=%d rows=%d", tc.name, resp.ExitCode, resp.SessionRecoverable, tmux.sessions, retries, len(rows.Records))
 		}
 	}
 }
 
-func TestFreshSessionRetry_ClearsTheDeadDispatchsBootStrike(t *testing.T) {
-	deps, got, _ := recordingDeps(t)
-	deps.BootTimeoutStore = brokenBootStrikeStore(t)
-	e := NewEngine(deps)
-	req := core.BridgeRequest{CLI: "claude-tmux", Agent: "build", Cycle: 9, Workspace: t.TempDir()}
-	calls := 0
-	e.freshSessionRetry(context.Background(), req, "auto", func() launchRun {
-		calls++
-		return launchRun{code: ExitArtifactTimeout, fatal: fatalPaneObservation{cause: recovery.CauseDeadShell, intervalS: 300}}
-	})
-	if calls != 2 || len(eventsWithCode(*got, CodeBootStrikeClearFailed)) != 1 {
-		t.Fatalf("the dead dispatch's boot strike is cleared once before the retry: calls=%d clears=%d", calls, len(eventsWithCode(*got, CodeBootStrikeClearFailed)))
+func TestEngineLaunch_TheCallLocalHooksChainThePreWiredObservers(t *testing.T) {
+	var dispatched []modelDispatch
+	var fatal []fatalPaneObservation
+	wire := func(d *Deps) {
+		d.onModelDispatch = func(o modelDispatch) { dispatched = append(dispatched, o) }
+		d.onFatalPane = func(o fatalPaneObservation) { fatal = append(fatal, o) }
+	}
+
+	_, resp, _, _, _ := launchScriptedWith(t, 1, "enforce", nil, wire)
+
+	if len(dispatched) == 0 || len(fatal) != 1 || fatal[0].cause != recovery.CauseDeadShell || !resp.SessionRecoverable {
+		t.Fatalf("dispatched = %d fatal = %+v recoverable = %v; want the pre-wired observers called and the response still fed", len(dispatched), fatal, resp.SessionRecoverable)
 	}
 }

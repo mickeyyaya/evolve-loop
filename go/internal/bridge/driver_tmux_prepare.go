@@ -20,6 +20,7 @@ type replPreparation struct {
 	resolvedPrompt     string
 	namedExists        bool
 	scrollbackFile     string
+	dispatchPaneFile   string
 	artifactScrollback int
 }
 
@@ -66,6 +67,7 @@ func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch)
 	}
 
 	prep.scrollbackFile = filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")
+	prep.dispatchPaneFile = filepath.Join(cfg.Workspace, orDefault(cfg.Agent, "agent")+"-"+lp.session+"-final-pane.txt")
 	prep.artifactScrollback = defaultIfZero(deps.ScrollbackLines, tmuxArtifactScrollback)
 	reportLaunchModel(deps, cfg, prep.prefix, lp.session, prep.workingDir)
 	return prep, ExitOK, nil
