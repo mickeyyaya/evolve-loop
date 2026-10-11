@@ -48,6 +48,8 @@ type steLintArgs struct {
 	paths                        []string
 }
 
+var steAbs = filepath.Abs
+
 type steTarget struct {
 	abs, display string
 }
@@ -195,7 +197,7 @@ func walkWanted(dir string, wanted func(string) bool) ([]string, error) {
 func explicitSteTargets(root string, paths []string, mode steMode) ([]steTarget, error) {
 	var out []steTarget
 	for _, p := range paths {
-		abs, err := filepath.Abs(p)
+		abs, err := steAbs(p)
 		if err != nil {
 			return nil, err
 		}
@@ -216,17 +218,20 @@ func explicitSteTargets(root string, paths []string, mode steMode) ([]steTarget,
 }
 
 func changedSteTargets(root, base string, mode steMode) ([]steTarget, error) {
-	changed, err := steGitLines(root, "diff", "--name-only", "--relative", "--diff-filter=d", base, "--")
-	if err != nil {
-		return nil, err
-	}
-	untracked, err := steGitLines(root, "ls-files", "--others", "--exclude-standard")
-	if err != nil {
-		return nil, err
+	var listed []string
+	for _, args := range [][]string{
+		{"diff", "--name-only", "--relative", "--diff-filter=d", base, "--"},
+		{"ls-files", "--others", "--exclude-standard"},
+	} {
+		lines, err := steGitLines(root, args...)
+		if err != nil {
+			return nil, err
+		}
+		listed = append(listed, lines...)
 	}
 	seen := map[string]bool{}
 	var rels []string
-	for _, rel := range append(changed, untracked...) {
+	for _, rel := range listed {
 		if !seen[rel] && mode.inScope(rel) {
 			seen[rel] = true
 			rels = append(rels, rel)

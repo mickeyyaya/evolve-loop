@@ -183,3 +183,38 @@ func TestDocsFloorWarn_NamesADocThatItCannotRead(t *testing.T) {
 		t.Fatalf("stderr = %q, want the unread doc named beside the findings line", got)
 	}
 }
+
+func TestDocsFloorWarn_AnUndocumentedArchitectureChangeWarnsByStage(t *testing.T) {
+	const warn = "[docs-floor] WARN: architecture-labeled change touches 2 file(s)"
+	for name, tc := range map[string]struct {
+		policy string
+		paths  []string
+		want   bool
+	}{
+		"no project root warns":            {paths: []string{"phases/x.json", "go/x.go"}, want: true},
+		"a project without a policy warns": {policy: "-", paths: []string{"phases/x.json", "go/x.go"}, want: true},
+		"stage shadow warns":               {policy: `{"docs_floor":{"stage":"shadow"}}`, paths: []string{"phases/x.json", "go/x.go"}, want: true},
+		"stage off is silent":              {policy: `{"docs_floor":{"stage":"off"}}`, paths: []string{"phases/x.json", "go/x.go"}},
+		"an ADR beside the change passes":  {paths: []string{"phases/x.json", "docs/adr/0200-x.md"}},
+		"a test-only change is silent":     {paths: []string{"phases/x_test.go", "go/x_test.go"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var in ReviewInput
+			if tc.policy != "" {
+				in.ProjectRoot = t.TempDir()
+			}
+			if tc.policy != "" && tc.policy != "-" {
+				writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), tc.policy)
+			}
+
+			got := captureStderr(t, func() { docsFloorWarn(in, tc.paths) })
+
+			if strings.Contains(got, warn) != tc.want {
+				t.Fatalf("stderr = %q, want the docs-floor WARN = %v", got, tc.want)
+			}
+			if strings.Contains(got, "[ste-lint]") {
+				t.Errorf("no worktree means no ste-lint line; stderr = %q", got)
+			}
+		})
+	}
+}
