@@ -237,3 +237,15 @@ func (p Policy) MergeGateConfig() MergeGateConfig {
 	}
 	return c
 }
+
+type CoverChangedPolicy struct {
+	Stage string `json:"stage,omitempty"`
+}
+
+func (p Policy) CoverChangedConfig() CoverChangedPolicy {
+	c := CoverChangedPolicy{Stage: "shadow"}
+	if p.CoverChanged != nil && p.CoverChanged.Stage != "" {
+		c.Stage = p.CoverChanged.Stage
+	}
+	return c
+}

@@ -25,14 +25,13 @@ type BuildFloorCheckFn func(ctx context.Context, in ReviewInput) []string
 
 // DefaultBuildFloorChecks is the production deterministic engine of the build handoff floor.
 func DefaultBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
-	// Only changedPackageFloorChecks is package-driven; the rest run here because it skips a diff with no Go packages.
 	out := RemovalClaimFailures(ctx, in)
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
-	// The docs floor only WARNs: an undocumented architecture change is an auditor finding, never a handoff REJECT.
 	docsFloorWarn(in, paths)
 	out = append(out, commentFloorFailures(ctx, in)...)
+	out = append(out, coverChangedFailures(ctx, in, paths)...)
 	return append(out, changedPackageFloorChecks(ctx, in, paths)...)
 }
 
@@ -304,31 +303,22 @@ const (
 
 var coverLockWait = verifylock.MaxWait
 
-func coverTestArgs(profile string, pkgs []string) []string {
-	return append([]string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-coverprofile", profile}, pkgs...)
+func coverTestArgs(profile string, pkgs, tags []string) []string {
+	args := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout}
+	if len(tags) > 0 {
+		args = append(args, "-tags", strings.Join(tags, ","))
+	}
+	return append(append(args, "-coverprofile", profile), pkgs...)
 }
 
 // scopedCoverFunc returns the cover -func path, the test output, and a status that separates test failures from
 // plumbing errors. The per-run -timeout keeps one hung package from wedging the check.
 func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path, output string, status int) {
-	// The coverage run is a full go-test execution, so it takes the host-wide verification single-flight.
-	// A lock failure degrades to unserialized, never to skipped verification.
-	if release, lerr := verifylock.AcquireWithin(ctx, filepath.Dir(moduleDir), coverLockWait, os.Stderr); lerr == nil {
-		defer release()
-	} else {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN: verification single-flight unavailable (%v) — running unserialized\n", lerr)
+	profile, out, status := scopedCoverProfile(ctx, moduleDir, pkgs, nil)
+	if status != coverStatusOK {
+		return strings.TrimSuffix(profile, "cover.out"), out, status
 	}
-	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
-	if err != nil {
-		return "", err.Error(), coverStatusPlumbingError
-	}
-	profile := filepath.Join(tmpDir, "cover.out")
-	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, pkgs)...)
-	cmd.Dir = moduleDir
-	cmd.Env = ipcenv.Scrub(os.Environ())
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return tmpDir + "/", string(out), coverStatusTestsFailed
-	}
+	tmpDir := filepath.Dir(profile)
 	funcOut := filepath.Join(tmpDir, "cover.func.txt")
 	cmd2 := sysexec.Command(ctx, "go", "tool", "cover", "-func="+profile)
 	cmd2.Dir = moduleDir
@@ -341,6 +331,26 @@ func scopedCoverFunc(ctx context.Context, moduleDir string, pkgs []string) (path
 		return tmpDir + "/", err.Error(), coverStatusPlumbingError
 	}
 	return funcOut, "", coverStatusOK
+}
+
+func scopedCoverProfile(ctx context.Context, moduleDir string, pkgs, tags []string) (profile, output string, status int) {
+	if release, lerr := verifylock.AcquireWithin(ctx, filepath.Dir(moduleDir), coverLockWait, os.Stderr); lerr == nil {
+		defer release()
+	} else {
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN: verification single-flight unavailable (%v) — running unserialized\n", lerr)
+	}
+	tmpDir, err := os.MkdirTemp("", "buildfloor-cover-*")
+	if err != nil {
+		return "", err.Error(), coverStatusPlumbingError
+	}
+	profile = filepath.Join(tmpDir, "cover.out")
+	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, pkgs, tags)...)
+	cmd.Dir = moduleDir
+	cmd.Env = ipcenv.Scrub(os.Environ())
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return profile, string(out), coverStatusTestsFailed
+	}
+	return profile, "", coverStatusOK
 }
 
 // changedFileBasenamesByDir maps each enforced package dir to the basenames of its changed .go files.

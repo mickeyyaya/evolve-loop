@@ -6,6 +6,7 @@
 coverage.html
 coverage.txt
 coverage.func.txt
+coverage.apicover.txt
 apicover-report.txt
 
 # Local dev
