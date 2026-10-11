@@ -186,6 +186,10 @@ v12.1 utilities + composition:
                               [--project-root P] )
   ratchet                   Function-size + raw-git-fixture ratchets
                               ( ratchet check [size|rawgit] [--root DIR] )
+  cover                     Coverage gate over a change: refuses every
+                              changed function below 100%
+                              ( cover changed --base <ref> [--profile <path>]
+                              [--json] [--root DIR] )
   context-fill              Context-window fill telemetry; correlates each
                               cycle's peak per-phase fill ratio against its
                               dossier final verdict (read-only)
