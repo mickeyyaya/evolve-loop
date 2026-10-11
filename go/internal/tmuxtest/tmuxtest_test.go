@@ -10,6 +10,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 type runFunc func() int
@@ -18,9 +19,7 @@ func (f runFunc) Run() int { return f() }
 
 func privateSocketDir(t *testing.T) string {
 	t.Helper()
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("tmux not installed")
-	}
+	testhost.Tool(t, "tmux")
 	dir, err := os.MkdirTemp("/tmp", "tmt")
 	if err != nil {
 		t.Fatal(err)

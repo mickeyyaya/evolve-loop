@@ -6,9 +6,13 @@ package sandbox
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 // canonicalConfig — minimal Config matching the production scout
@@ -400,13 +404,7 @@ func TestExec_DarwinSandboxExec(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("darwin-only")
 	}
-	pr := Probe()
-	if !pr.Available {
-		t.Skip("sandbox-exec not available on this host")
-	}
-	if pr.CapabilityChecked && !pr.Capable {
-		t.Skipf("sandbox-exec present but cannot apply on this host: %s", pr.Reason)
-	}
+	requireCapableSandbox(t)
 	s := New(canonicalConfig())
 	var stderr strings.Builder
 	err := s.Exec(context.Background(), []string{"/usr/bin/true"}, nil, nil, &stderr)
@@ -493,4 +491,23 @@ func excerpt(s, needle string) string {
 		end = len(s)
 	}
 	return "..." + s[start:end] + "..."
+}
+
+func requireCapableSandbox(t *testing.T) ProbeResult {
+	t.Helper()
+	probe := Probe()
+	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
+		testhost.Unavailable(t, capabilityDiagnosis(probe))
+	}
+	return probe
+}
+
+func capabilityDiagnosis(probe ProbeResult) string {
+	if probe.OS != "darwin" || !probe.Available {
+		return fmt.Sprintf("the sandbox is unavailable on %s: %s", probe.OS, probe.Reason)
+	}
+	const sbpl = "(version 1)(allow default)"
+	out, err := exec.Command(probe.BinaryPath, "-p", sbpl, "/usr/bin/true").CombinedOutput()
+	return fmt.Sprintf("the sandbox cannot apply on this runner: binary=%s probe=%q apply error=%v output=%q SBPL=%q",
+		probe.BinaryPath, probe.Reason, err, strings.TrimSpace(string(out)), sbpl)
 }

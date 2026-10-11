@@ -14,16 +14,36 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 var itTmuxCtl = execTmux{}
 
 func requireTmux(t *testing.T) {
 	t.Helper()
-	if _, err := exec.LookPath("tmux"); err != nil {
-		t.Skip("tmux not installed; skipping real-tmux REPL integration coverage")
+	testhost.Tool(t, "tmux")
+}
+
+func requireNativeSandbox(t *testing.T) sandbox.ProbeResult {
+	t.Helper()
+	probe := sandbox.Probe()
+	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
+		testhost.Unavailable(t, sandboxDiagnosis(probe))
 	}
+	return probe
+}
+
+const capabilityProbeSBPL = "(version 1)(allow default)"
+
+func sandboxDiagnosis(probe sandbox.ProbeResult) string {
+	if probe.OS != "darwin" || !probe.Available {
+		return fmt.Sprintf("the agent sandbox is unavailable on %s: %s", probe.OS, probe.Reason)
+	}
+	out, err := exec.Command(probe.BinaryPath, "-p", capabilityProbeSBPL, "/usr/bin/true").CombinedOutput()
+	return fmt.Sprintf("the agent sandbox cannot apply on this runner: binary=%s probe=%q apply error=%v output=%q SBPL=%q",
+		probe.BinaryPath, probe.Reason, err, strings.TrimSpace(string(out)), capabilityProbeSBPL)
 }
 
 // writeFakeREPL writes a scripted fake CLI to dir and returns its launch

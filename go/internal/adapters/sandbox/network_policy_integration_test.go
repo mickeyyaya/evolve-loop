@@ -9,19 +9,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestGenerateSBPLNetworkPolicyWithLocalServer(t *testing.T) {
-	probe := Probe()
-	if probe.OS != "darwin" {
+	if runtime.GOOS != "darwin" {
 		t.Skip("macOS SBPL enforcement test")
 	}
-	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED: native sandbox unavailable: %+v", probe)
-	}
+	probe := requireCapableSandbox(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "network-policy-fixture")
 	}))

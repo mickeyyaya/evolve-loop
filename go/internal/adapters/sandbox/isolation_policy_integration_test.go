@@ -12,10 +12,7 @@ import (
 )
 
 func TestSandboxFixtureChildEnforcesReadAndWritePolicy(t *testing.T) {
-	probe := Probe()
-	if !probe.Available || !probe.CapabilityChecked || !probe.Capable {
-		t.Skipf("UNVERIFIED: OS sandbox unavailable or could not apply: %+v", probe)
-	}
+	requireCapableSandbox(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -45,8 +42,6 @@ func TestSandboxFixtureChildEnforcesReadAndWritePolicy(t *testing.T) {
 		err := sb.Exec(ctx, append([]string{"/bin/sh", "-c", script, "fixture"}, args...), nil, &output, &output)
 		return output.String(), err
 	}
-	// Prove THIS policy starts and permits useful work before interpreting a
-	// denied operation. A profile/setup failure must never count as containment.
 	if out, err := run(`cat "$1" && printf ok > "$2"`, eval, filepath.Join(root, "allowed")); err != nil {
 		t.Fatalf("policy failed to start or rejected legitimate work (not verified): %v: %s", err, out)
 	}
