@@ -92,6 +92,8 @@ Every watcher of the pipeline polls, and no program outside one process can subs
 
 The catalog is config: `.evolve/policy.json` `events.channels`. The compiled defaults are in `internal/policy` (`EventsConfig()`). The catalog is closed: a publisher appends only to a configured channel, and a selector never makes a channel.
 
+**The message family** ([ADR-0129](adr/0129-cycle-scoped-agent-messaging.md)). The channels `msg.<cycle>` and `msg.dead` are outside the catalog. The messaging service of a cycle is their only writer, and its records hold a `message` variant ([agent-messaging.md](agent-messaging.md) §7). A reader selects them as any channel, for example `--channel 'msg.>'`.
+
 Each channel has these keys:
 
 | Key | Meaning | Default |

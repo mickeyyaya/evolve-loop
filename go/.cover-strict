@@ -45,3 +45,11 @@
 ./internal/derived 100
 ./internal/attemptpostmortem 100
 ./internal/testhost 100
+./internal/agentmsg 100
+./internal/agentmsg/address 100
+./internal/agentmsg/broker 100
+./internal/agentmsg/delivery 100
+./internal/agentmsg/envelope 100
+./internal/agentmsg/identity 100
+./internal/agentmsg/memstore 100
+./internal/agentmsg/policy 100

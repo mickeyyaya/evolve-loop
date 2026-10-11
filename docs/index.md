@@ -41,6 +41,7 @@
 | [convergence-policy.md](architecture/convergence-policy.md) | The rule that makes each loop that repeats converge or escalate (ADR-0126, in shadow since v22.27.0) |
 | [event-channels.md](architecture/event-channels.md) | The push-only publish/subscribe protocol: channel logs, cursors, the kernel wake and `evolve events` subscriptions (ADR-0127, proposed) |
 | [fleet-landing-queue.md](architecture/fleet-landing-queue.md) | The landing queue for concurrent fleet lanes: the overlap proof, the tiers T1 to T4, the scoped gates and the review (ADR-0128, proposed) |
+| [agent-messaging.md](architecture/agent-messaging.md) | Cycle agent messaging: the `msg/1.0` envelope, the addresses, the policy scoped to one cycle, the identity and the delivery (ADR-0129, proposed) |
 
 ## Release & Operations
 
@@ -58,6 +59,7 @@
 | [token-optimization-guide.md](private/research/archived-2026-05-19/token-optimization-guide.md) | Per-cycle token + cost optimization |
 | [event-notification-protocol-2026-10.md](research/event-notification-protocol-2026-10.md) | Research for ADR-0127: kernel file notification, the cost of local IPC, and topic and channel prior art |
 | [concurrent-cycle-landing-2026-10.md](research/concurrent-cycle-landing-2026-10.md) | Research for ADR-0128: the rebase census, the cycle 1843 finding, why the prefix queue is off, prior art and the cost model |
+| [agent-messaging-2026-10.md](research/agent-messaging-2026-10.md) | Research for ADR-0129: agent-to-agent protocols, scope, identity under one uid, delivery to a busy LLM agent, safety and scale |
 | [research-index.md](research-index.md) | Full research-paper index |
 | [research/](research-index.md) | Merged research tree (2026-08-05): research packages + single-file notes from the former `kb/` and `knowledge-base/research/` roots |
 | [chronicle/README.md](chronicle/README.md) | Engineering chronicle — workstream-level narratives (problem / approaches / decision / results / retro) |

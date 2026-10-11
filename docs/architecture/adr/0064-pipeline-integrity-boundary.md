@@ -2,6 +2,7 @@
 
 Status: Accepted (Pillar 1 landed; Pillar 2 in progress)
 Date: 2026-06-23
+Amended by: [ADR-0129](0129-cycle-scoped-agent-messaging.md) (Proposed, 2026-10-09). The protected surface adds `/.evolve/msg/`, the outboxes and the mailboxes of cycle agent messaging.
 Relates to: ADR-0063 (autonomous-loop integrity hardening — the deterministic gate ladder), ADR-0061 (live-feature-flag metric), ADR-0030 (phase observer / role-gate). **Inherits, does not overturn, ADR-0063's through-line:** deterministic gates handle mechanical properties; review/LLM handle the cross-process *semantic* contracts gates structurally cannot test.
 
 ## Context
