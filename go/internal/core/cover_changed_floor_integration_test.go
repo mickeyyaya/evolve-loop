@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 )
 
 func coverChangedModule(t *testing.T, testBody string) string {
@@ -26,14 +28,13 @@ func TestScopedCoverProfile_RunsThePackagesUnderTheGivenTags(t *testing.T) {
 	profile, out, status := scopedCoverProfile(context.Background(), module, []string{"./p"}, []string{"integration"})
 	defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 
-	data, err := os.ReadFile(profile)
-	if status != coverStatusOK || err != nil || !strings.Contains(string(data), "example.com/m/p/a.go:5.3,6.1 1 1") {
-		t.Errorf("status %d out %q profile %q %v; want the integration test to have run F's branch", status, out, data, err)
+	if branch, hit := fCoverage(t, profile); status != coverStatusOK || !branch || !hit {
+		t.Errorf("status %d out %q branch hit %v; want the integration test to have run the branch that returns 1", status, out, branch)
 	}
 	untagged, _, status := scopedCoverProfile(context.Background(), module, []string{"./p"}, nil)
 	defer func() { _ = os.RemoveAll(filepath.Dir(untagged)) }()
-	if data, _ := os.ReadFile(untagged); status != coverStatusOK || !strings.Contains(string(data), "5.3,6.1 1 0") {
-		t.Errorf("without the tag the integration test must not run: status %d profile %q", status, data)
+	if _, hit := fCoverage(t, untagged); status != coverStatusOK || hit {
+		t.Errorf("without the tag the integration test must not run: status %d, a statement of F is hit %v", status, hit)
 	}
 }
 
@@ -99,4 +100,29 @@ func TestScopedCoverFunc_NamesEveryFaultOfTheCoveragePass(t *testing.T) {
 	if path, _, status := scopedCoverFunc(context.Background(), failing, []string{"./p"}); status != coverStatusPlumbingError || path != "" {
 		t.Errorf("no temp dir: status %d path %q, want a plumbing error and no path", status, path)
 	}
+}
+
+func fCoverage(t *testing.T, profile string) (branchHit, anyHit bool) {
+	t.Helper()
+	data, err := os.ReadFile(profile)
+	if err != nil {
+		t.Fatalf("read profile: %v", err)
+	}
+	parsed, err := covchanged.ParseProfile(data, "example.com/m")
+	if err != nil {
+		t.Fatalf("parse profile: %v", err)
+	}
+	blocks := parsed["p/a.go"]
+	if len(blocks) == 0 {
+		t.Fatalf("the profile has no block of p/a.go:\n%s", data)
+	}
+	for _, b := range blocks {
+		if b.Hit && b.StartLine <= 8 && b.EndLine >= 3 {
+			anyHit = true
+		}
+		if b.Hit && b.StartLine <= 5 && b.EndLine >= 5 {
+			branchHit = true
+		}
+	}
+	return branchHit, anyHit
 }
