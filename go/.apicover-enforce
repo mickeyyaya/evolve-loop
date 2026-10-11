@@ -728,3 +728,12 @@
 ./internal/attemptpostmortem
 # testhost — a missing host tool skips a local test and fails a macOS CI test (internal/testhost).
 ./internal/testhost
+# M1 (ADR-0129): the skeleton of cycle agent messaging, unwired (internal/agentmsg and its subpackages).
+./internal/agentmsg
+./internal/agentmsg/address
+./internal/agentmsg/broker
+./internal/agentmsg/delivery
+./internal/agentmsg/envelope
+./internal/agentmsg/identity
+./internal/agentmsg/memstore
+./internal/agentmsg/policy

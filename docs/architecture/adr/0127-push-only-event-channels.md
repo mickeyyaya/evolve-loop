@@ -1,6 +1,7 @@
 # ADR-0127: Events reach other programs through channel logs that the kernel wakes, never through a poll
 
 - **Status:** Proposed (2026-10-09). The operator approved the console plan and the decisions of fix round 1 on 2026-10-09. This ADR moves to Accepted as components E1 to E14 land ([plan](../../plans/event-notification-protocol-2026-10.md) §16).
+- **Amended by:** [ADR-0129](0129-cycle-scoped-agent-messaging.md) (Proposed, 2026-10-09). A record can hold a `message` variant. The channel family `msg.<cycle>` holds the messages of one cycle, and the service of that cycle is its only writer.
 - **Spec of record:** [event-channels.md](../event-channels.md). It holds the protocol, the command surface, the exit codes and the limits.
 - **Plan:** [event-notification-protocol-2026-10.md](../../plans/event-notification-protocol-2026-10.md).
 - **Research:** [event-notification-protocol-2026-10.md](../../research/event-notification-protocol-2026-10.md).

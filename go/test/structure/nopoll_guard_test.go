@@ -9,6 +9,7 @@ import (
 
 var pollFreeDirs = []string{
 	filepath.Join("internal", "events"),
+	filepath.Join("internal", "agentmsg"),
 }
 
 var pollTimers = []string{"Sleep", "Tick", "NewTicker", "After", "NewTimer"}

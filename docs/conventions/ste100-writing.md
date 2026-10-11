@@ -83,6 +83,7 @@ These terms are technical names in this repository. Use them as nouns, with the 
 | anti-gaming | the controls that stop an agent from passing a gate without the work |
 | error handling | the code that detects and reports errors |
 | mutation testing | a test of the tests: change the code and make sure that a test fails |
+| messaging | the exchange of messages between the agents of one cycle ([ADR-0129](../architecture/adr/0129-cycle-scoped-agent-messaging.md)) |
 
 ### Words that are also code names
 
