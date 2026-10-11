@@ -43,7 +43,7 @@ export GIT_CONFIG_VALUE_1 := 0
 
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
         test-latency cover apicover lint tidy clean help dist dist-clean \
-        cover-strict apicover-enforce apicover-check \
+        cover-strict cover-changed apicover-enforce apicover-check \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
         dist-darwin-universal dist-checksums
 
@@ -150,6 +150,12 @@ cover-strict: ## Per-package line-coverage hard-fail over go/.cover-strict (ADR-
 		if awk -v g="$$got" -v m="$$min" 'BEGIN{if (g !~ /^[0-9]+([.][0-9]+)?$$/ || m !~ /^[0-9]+([.][0-9]+)?$$/ || g+0 > 100 || m+0 > 100) exit 2; exit !(g+0 >= m+0)}'; then echo "cover-strict: $$pkg: $$got% >= $$min% ok"; else echo "cover-strict: $$pkg: invalid or unsatisfied floor ($$got% / $$min%) FAIL"; fail=1; fi; \
 	done < .cover-strict; exit $$fail
 
+COVER_CHANGED_BASE ?= origin/main
+COVER_PROFILE ?= coverage.txt
+
+cover-changed: ## Every function the change touches since COVER_CHANGED_BASE is at 100% in the coverage.txt of test-integration (no allowance: a touched gap must be tested)
+	$(GO) run ./cmd/evolve cover changed --base $(COVER_CHANGED_BASE) --root .
+
 # Test-only ACS enrollments have no production API, and their artifact-dependent
 # predicates belong to the cycle runner. Inspect those dirs without running them.
 apicover-enforce: ## Per-package hard-fail over go/.apicover-enforce (mirrors go.yml Phase-5; the composed-gate recipe — a red here means an uncovered/false-green EXPORT, and it must fail the tree)
@@ -160,9 +166,9 @@ apicover-enforce: ## Per-package hard-fail over go/.apicover-enforce (mirrors go
 		case "$$pkg" in */acs/*|acs/*) continue;; esac; \
 		set -- "$$@" "$$pkg"; \
 	done; \
-	if [ "$$#" -eq 0 ]; then printf 'mode: set\n' > coverage.txt; \
-	else $(GO) test -count=1 -tags integration -coverprofile=coverage.txt "$$@" || exit $$?; fi
-	$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" apicover-check
+	if [ "$$#" -eq 0 ]; then printf 'mode: set\n' > coverage.apicover.txt; \
+	else $(GO) test -count=1 -tags integration -coverprofile=coverage.apicover.txt "$$@" || exit $$?; fi
+	$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" apicover-check COVER_PROFILE=coverage.apicover.txt
 
 apicover-check: ## Enforce public API coverage from the successful integration run's coverage.txt
 	@mkdir -p $(BIN_DIR)
@@ -170,7 +176,7 @@ apicover-check: ## Enforce public API coverage from the successful integration r
 	@pkgs="$${APICOVER_PKGS}"; \
 	if [ -z "$$pkgs" ]; then pkgs=$$(sed '/^[[:space:]]*\#/d; /^[[:space:]]*$$/d' .apicover-enforce) || exit $$?; fi; \
 	if [ -z "$$pkgs" ]; then echo "apicover-enforce: no enforced packages — skipping"; exit 0; fi; \
-	$(GO) tool cover -func=coverage.txt > coverage.func.txt || exit $$?; \
+	$(GO) tool cover -func=$(COVER_PROFILE) > coverage.func.txt || exit $$?; \
 	$(GO) list -e -f '{{if .Dir}}{{.Dir}}{{else}}MISSING_PACKAGE{{end}}' $$pkgs > $(BIN_DIR)/apicover-dirs.txt || exit $$?; \
 	set --; while IFS= read -r dir; do \
 		test -d "$$dir" || { echo "apicover-check: missing package directory: $$dir" >&2; exit 1; }; \
@@ -189,4 +195,4 @@ tidy: ## Normalize go.mod / go.sum
 	$(GO) mod verify
 
 clean: dist-clean ## Remove build outputs (incl. cross-compile artifacts)
-	rm -rf $(BIN_DIR) coverage.txt coverage.html coverage.func.txt
+	rm -rf $(BIN_DIR) coverage.txt coverage.apicover.txt coverage.html coverage.func.txt

@@ -737,3 +737,5 @@
 ./internal/agentmsg/identity
 ./internal/agentmsg/memstore
 ./internal/agentmsg/policy
+# cover-changed (2026-10-11): the gate that refuses a changed function below 100% (internal/covchanged).
+./internal/covchanged

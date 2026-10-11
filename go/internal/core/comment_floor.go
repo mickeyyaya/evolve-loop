@@ -48,15 +48,19 @@ func commentFloorResult(stage config.Stage, added []commentaudit.Added) (failure
 }
 
 func commentFloorStage(projectRoot string) config.Stage {
-	word := policy.Policy{}.CommentFloorConfig().Stage
+	return floorStage(projectRoot, "comment_floor", "comment floor", func(p policy.Policy) string { return p.CommentFloorConfig().Stage })
+}
+
+func floorStage(projectRoot, key, label string, word func(policy.Policy) string) config.Stage {
+	chosen := word(policy.Policy{})
 	if projectRoot != "" {
 		if p, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
-			word = p.CommentFloorConfig().Stage
+			chosen = word(p)
 		}
 	}
-	stage, ok := config.GateStage(word)
+	stage, ok := config.GateStage(chosen)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN comment_floor.stage %q is not off, shadow or enforce; the comment floor is off\n", word)
+		fmt.Fprintf(os.Stderr, "[build-floor] WARN %s.stage %q is not off, shadow or enforce; the %s is off\n", key, chosen, label)
 	}
 	return stage
 }

@@ -163,3 +163,29 @@ func workflowRepoRoot(t *testing.T) string {
 	}
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "../../.."))
 }
+
+func TestGoWorkflow_RunsCoverChangedRightAfterTheIntegrationProfile(t *testing.T) {
+	steps := readWorkflowContract(t, "go.yml").Jobs["build-test"].Steps
+	integration, cover := -1, -1
+	for i, step := range steps {
+		if strings.Contains(step.Run, "make test-integration") {
+			integration = i
+		}
+		if strings.Contains(step.Run, "make cover-changed") {
+			cover = i
+		}
+	}
+	if integration < 0 || cover != integration+1 {
+		t.Fatalf("cover-changed step at %d, integration step at %d; want cover-changed right after the integration profile is written", cover, integration)
+	}
+	step := steps[cover]
+	if step.If != "" || step.ContinueOnError != "" {
+		t.Errorf("the cover-changed step must always run and fail the job: if=%q continue-on-error=%q", step.If, step.ContinueOnError)
+	}
+	if got := step.Env["COVER_BASE"]; got != "${{ github.event.pull_request.base.sha || github.event.before }}" {
+		t.Errorf("COVER_BASE = %q, want the PR base or the pushed-over commit", got)
+	}
+	if !strings.Contains(step.Run, `COVER_CHANGED_BASE="$base"`) {
+		t.Errorf("the step must pass its base to make:\n%s", step.Run)
+	}
+}

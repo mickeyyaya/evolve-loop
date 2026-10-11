@@ -160,6 +160,14 @@ The block sets the stages of the two documentation floors of the build handoff. 
 | `stage` | the documentation floor for an architecture change without a document ([ADR-0077](adr/0077-docs-floor-for-architecture-changes.md)). `off` turns it off. `shadow` and `enforce` turn it on. | `enforce` |
 | `ste_stage` | the STE lint of the changed documents ([internal-stelint](packages/internal-stelint.md), `evolve docs ste-lint`). `off` prints nothing. `shadow` and `enforce` print the `[ste-lint] WARN:` line. | `shadow` |
 
+## Changed-function coverage (`cover_changed`)
+
+The block sets the stage of the changed-function coverage check of the build handoff ([plan](../plans/cover-changed-gate-2026-10.md), [internal-covchanged](packages/internal-covchanged.md)). The check runs the tests of the changed packages with coverage. Then it refuses each changed function below 100%. A test failure in that run refuses at `enforce`, and a plumbing fault only warns. A word that is not `off`, `shadow` or `enforce` turns the check off with a WARN.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stage` | `off` skips the check. `shadow` prints the `[build-floor] WARN cover-changed (shadow)` line. `enforce` rejects the handoff. | `shadow` |
+
 ## Context-fill telemetry (`context_fill`)
 
 Every launch's token telemetry carries a derived **fill reading**: the prompt-side

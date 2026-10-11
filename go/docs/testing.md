@@ -216,6 +216,17 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
 
 - **Strict package floors:** `make cover-strict` enforces the thresholds in
   `go/.cover-strict` and rejects failed tests even when they emit high coverage.
+- **Changed functions at 100%:** `make cover-changed` reads the `coverage.txt`
+  of `make test-integration`. It refuses each function that the change since
+  `COVER_CHANGED_BASE` (default `origin/main`) touches and that is below 100%.
+  There is no allowance list. CI runs the same check after
+  `make test-integration` ([plan](../../docs/plans/cover-changed-gate-2026-10.md)).
+  `make apicover-enforce` writes `coverage.apicover.txt`, so it does not
+  replace the integration profile.
+- **The local floor is 8 targets**, run one at a time after you stage the
+  change: `lint`, `test`, `test-integration`, `test-e2e`, `test-acs-durable`,
+  `apicover-enforce`, `cover-strict` and `cover-changed`. Run `cover-changed`
+  after `test-integration`, because it reads that run's profile.
 - **Public API coverage:** `make apicover-enforce` measures and enforces the
   packages in `go/.apicover-enforce`. CI calls `make apicover-check` after its
   successful integration run to inspect that run's fresh `coverage.txt`.
