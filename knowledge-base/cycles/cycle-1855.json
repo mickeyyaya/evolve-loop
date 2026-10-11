@@ -1,0 +1,175 @@
+{
+  "schema_version": 2,
+  "cycle": 1855,
+  "run_id": "01M4NQVDP0Q2VKFCGHBDJ0W2CM",
+  "goal": "Wave 90.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 89 facts (run 20261009T085206Z): 1 of 2 cycles shipped.\n- Cycle 1853: final verdict FAIL. Last phase: aborted. It did not ship. Quota pauses: 1.\n- Cycle 1854: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 90:\n- Pull requests merged since wave 89: #836 (a phase agent cannot reach or kill the run tmux server), #837 (Q1 derived catalog), #838 (an agent runs real-tmux tests on its own pty), #839 and #840 through train #841 (attempt postmortem; pane loss and quota evidence), and #842 (a retry and a resume carry the evidence of the dispatch they replace).\n- Cycle 1853 resumed with its attempt postmortem and did not repeat the tmux probe. It then sealed FAIL on a task cause: the fix needs the protected bridge (ADR-0064). The item swarm-worker-pgid-never-recorded is now console work.\n- This wave is the release gate of v22.28.0. Every cycle must ship clean, with no pipeline-defect failure.\n\nEarlier waves:\n- Wave 86 (run 20261009T055036Z): 2 of 2 cycles shipped.\n- Wave 87 (run 20261009T070638Z): 2 of 2 cycles shipped.\n- Wave 88 (run 20261009T075015Z): 2 of 2 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "d0bf86ae0b84dec25c1e98e511f7554bcbee7aa3",
+  "tree_sha": "611099e5afc7d0718fdc9be3b79ae8c299dfe5da",
+  "tasks": [
+    "coherence-failreasons-unread"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 319832,
+      "started_at": "2026-10-11T15:04:35Z",
+      "ended_at": "2026-10-11T15:09:56Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 246800,
+      "started_at": "2026-10-11T15:10:45Z",
+      "ended_at": "2026-10-11T15:14:54Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 93897,
+      "started_at": "2026-10-11T15:14:54Z",
+      "ended_at": "2026-10-11T15:16:30Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 7100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 426311,
+      "started_at": "2026-10-11T15:16:30Z",
+      "ended_at": "2026-10-11T15:32:46Z",
+      "archetype": "build",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 897267,
+      "started_at": "2026-10-11T15:33:25Z",
+      "ended_at": "2026-10-11T16:01:22Z",
+      "archetype": "evaluate",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 0,
+        "output": 7000,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 427469,
+      "started_at": "2026-10-11T16:03:01Z",
+      "ended_at": "2026-10-11T16:28:09Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 410991,
+      "started_at": "2026-10-11T16:28:10Z",
+      "ended_at": "2026-10-11T16:35:01Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 2822567,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "audit",
+    "longest_ms": 897267,
+    "by_archetype_ms": {
+      "build": 426311,
+      "control": 838460,
+      "evaluate": 897267,
+      "plan": 660529
+    },
+    "total_tokens": {
+      "input": 0,
+      "output": 14100,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 0,
+        "output": 7000,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "plan": {
+        "input": 0,
+        "output": 7100,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0,
+    "hot_phase_count": 0
+  }
+}
