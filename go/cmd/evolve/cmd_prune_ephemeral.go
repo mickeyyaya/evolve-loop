@@ -12,6 +12,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/pruneephemeral"
 )
 
+var (
+	pruneEphemeralRun  = pruneephemeral.Run
+	dispatchLogCatalog = gcpolicy.Policy.LogCatalog
+)
+
 // runPruneEphemeral is `evolve prune-ephemeral [--dry-run] [--quiet]
 //
 //	[--tracker-ttl-days N] [--dispatch-log-ttl-days N]`.
@@ -58,7 +63,7 @@ func runPruneEphemeral(args []string, _ io.Reader, stdout, stderr io.Writer) int
 	if !flagSet(fs, "dispatch-log-ttl-days") {
 		logTTLDays = dispatchLogTTLDays(projectRoot, stderr)
 	}
-	_, err := pruneephemeral.Run(pruneephemeral.Options{
+	_, err := pruneEphemeralRun(pruneephemeral.Options{
 		ProjectRoot:    projectRoot,
 		TrackerTTL:     time.Duration(trackerTTLDays) * 24 * time.Hour,
 		DispatchLogTTL: time.Duration(logTTLDays) * 24 * time.Hour,
@@ -88,7 +93,7 @@ func dispatchLogTTLDays(projectRoot string, stderr io.Writer) int {
 	if pol.GC != nil {
 		gcPol = *pol.GC
 	}
-	for _, cat := range gcPol.LogCatalog() {
+	for _, cat := range dispatchLogCatalog(gcPol) {
 		if cat.Name == gcpolicy.LogCategoryDispatch {
 			return cat.TTLDays
 		}

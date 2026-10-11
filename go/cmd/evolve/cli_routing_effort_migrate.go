@@ -18,6 +18,8 @@ import (
 
 var retiredEffortKeys = []string{"effort_level", "effort_overrides"}
 
+var stripRetiredKeys = removeTopLevelKeys
+
 type profileEffort struct {
 	Name             string            `json:"name"`
 	ModelTierDefault string            `json:"model_tier_default"`
@@ -44,7 +46,7 @@ func moveProfileEfforts(dir string, block policy.CLIRouting, rewrites map[string
 		if block, err = moveOneProfileEffort(block, p, file); err != nil {
 			return block, err
 		}
-		if rewrites[file], err = removeTopLevelKeys(raw, retiredEffortKeys...); err != nil {
+		if rewrites[file], err = stripRetiredKeys(raw, retiredEffortKeys...); err != nil {
 			return block, fmt.Errorf("%s: %w", file, err)
 		}
 	}

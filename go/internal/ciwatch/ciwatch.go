@@ -41,6 +41,8 @@ const ConclusionSuccess = "success"
 // evidence, not a log archive).
 const maxLogExcerpt = 4000
 
+var marshalIndent = json.MarshalIndent
+
 // RunStatus is one observation of the CI run for a pushed SHA.
 type RunStatus struct {
 	// Status is the run lifecycle state ("queued", "in_progress", "completed").
@@ -239,7 +241,7 @@ func fileEscalation(opts Options, st RunStatus, now time.Time) error {
 		Evidence: st.RunURL,
 		Source:   "ciwatch",
 	}
-	body, err := json.MarshalIndent(item, "", "  ")
+	body, err := marshalIndent(item, "", "  ")
 	if err != nil {
 		return fmt.Errorf("ciwatch: marshal escalation: %w", err)
 	}

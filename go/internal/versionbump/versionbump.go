@@ -319,6 +319,8 @@ func HasHistoryRow(path, majorMinor string) (bool, error) {
 	return pattern.MatchString(string(data)), nil
 }
 
+var readFile = os.ReadFile
+
 func BumpReadmeHistory(path, version string, now time.Time, dryRun bool) (bool, error) {
 	majorMinor := MajorMinor(version)
 	has, err := HasHistoryRow(path, majorMinor)
@@ -334,7 +336,7 @@ func BumpReadmeHistory(path, version string, now time.Time, dryRun bool) (bool, 
 	if dryRun {
 		return true, nil
 	}
-	data, err := os.ReadFile(path)
+	data, err := readFile(path)
 	if err != nil {
 		return false, err
 	}

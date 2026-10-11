@@ -118,18 +118,23 @@ func liveRunPhase(runDir string) string {
 	return run.Phase
 }
 
+var (
+	processGetwd         = os.Getwd
+	loopStopAbsoluteRoot = paths.AbsoluteRoot
+)
+
 func loopStopRoot(projectRoot string, stderr io.Writer) (string, error) {
 	if projectRoot == "" {
 		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")
 	}
 	if projectRoot == "" {
-		cwd, err := os.Getwd()
+		cwd, err := processGetwd()
 		if err != nil {
 			return "", err
 		}
 		projectRoot = cwd
 	}
-	return paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
+	return loopStopAbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve loop-stop: WARN: %s\n", m)
 	}), nil
 }

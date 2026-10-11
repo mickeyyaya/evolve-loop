@@ -29,15 +29,16 @@ func runResumeGit(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func TestRunCycleFromPhase_RecoversSecondCrashAfterRebaseCheckpointThroughBuild(t *testing.T) {
-	root := initTestRepo(t)
+func rebasedSplitFixture(t *testing.T) (root, workspace, newBase string) {
+	t.Helper()
+	root = initTestRepo(t)
 	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".evolve/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runResumeGit(t, root, "add", ".gitignore")
 	runResumeGit(t, root, "commit", "-q", "-m", "ignore runtime")
 	base := runResumeGit(t, root, "rev-parse", "HEAD")
-	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
+	workspace = filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -70,10 +71,15 @@ func TestRunCycleFromPhase_RecoversSecondCrashAfterRebaseCheckpointThroughBuild(
 	}
 	runResumeGit(t, root, "add", "peer.txt")
 	runResumeGit(t, root, "commit", "-q", "-m", "peer base")
-	newBase := runResumeGit(t, root, "rev-parse", "HEAD")
+	newBase = runResumeGit(t, root, "rev-parse", "HEAD")
 	if err := explanationdocs.RebaseBuild(context.Background(), binding, newBase); err != nil {
 		t.Fatal(err)
 	}
+	return root, workspace, newBase
+}
+
+func TestRunCycleFromPhase_RecoversSecondCrashAfterRebaseCheckpointThroughBuild(t *testing.T) {
+	root, workspace, newBase := rebasedSplitFixture(t)
 
 	storage := &fakeStorage{state: State{LastCycleNumber: 42}, cycleState: CycleState{
 		CycleID: 42, RunID: "run-42", WorkspacePath: workspace, ActiveWorktree: root,

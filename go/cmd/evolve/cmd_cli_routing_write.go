@@ -71,7 +71,7 @@ func parseRoutingWriteFlags(verb string, args []string, stderr io.Writer) (routi
 	if err != nil {
 		return f, nil, false
 	}
-	root, err := routingProjectRoot(f.root, os.Getwd)
+	root, err := routingProjectRoot(f.root, processGetwd)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cli-routing %s: %v\n", verb, err)
 		return f, nil, false
