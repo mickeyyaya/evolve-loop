@@ -164,3 +164,59 @@ func TestWalking_ALoneExhaustedUsageReadWithNoWallIsNoPause(t *testing.T) {
 		t.Fatalf("resp=%+v err=%v, want the plain exit-1 failure: a pause needs an exit 85 in the walk", resp, err)
 	}
 }
+
+func TestWallKeeper_ABootTimeoutOnALostSessionAfterTheWallIsASystemFaultNotAQuotaPause(t *testing.T) {
+	for _, cause := range []string{"pane_lost", "dead_shell"} {
+		t.Run(cause, func(t *testing.T) {
+			var keeper bridgechain.WallKeeper
+			wall, lost := core.BridgeResponse{ExitCode: 85}, core.BridgeResponse{ExitCode: 80, CauseCode: cause}
+			keeper.Observe("claude-tmux@deep", wall, errors.New("bridge: launch exit=85"))
+			keeper.Observe("agy-claude-tmux@deep", lost, errors.New("bridge: launch exit=80"))
+
+			res, err := keeper.Surface(llmroute.TieredDispatchResult{Walled: true}, lost, errors.New("bridge: launch exit=80"))
+
+			if res.ExitCode != 80 || err == nil || !strings.Contains(err.Error(), "is not a quota pause") {
+				t.Fatalf("res=%+v err=%v, want the exit-80 system fault: a lost session is not a plain non-start", res, err)
+			}
+		})
+	}
+}
+
+func TestWallKeeper_APlainBootTimeoutAfterTheWallStillSurfacesTheWall(t *testing.T) {
+	var keeper bridgechain.WallKeeper
+	wall, boot := core.BridgeResponse{ExitCode: 85}, core.BridgeResponse{ExitCode: 80, CauseCode: "repl_boot_timeout"}
+	keeper.Observe("claude-tmux@deep", wall, errors.New("bridge: launch exit=85"))
+	keeper.Observe("agy-claude-tmux@deep", boot, errors.New("bridge: launch exit=80"))
+
+	res, err := keeper.Surface(llmroute.TieredDispatchResult{Walled: true}, boot, errors.New("bridge: launch exit=80"))
+
+	if res.ExitCode != 85 || err == nil || !strings.Contains(err.Error(), "met a quota wall before its last rung failed") {
+		t.Fatalf("res=%+v err=%v, want the wall: a plain boot timeout is neutral", res, err)
+	}
+}
+
+func TestWallKeeper_OnlyASessionLossCauseMakesABootTimeoutAfterTheWallAFault(t *testing.T) {
+	for _, tc := range []struct {
+		cause    string
+		wantExit int
+	}{
+		{"pane_lost", 80},
+		{"dead_shell", 80},
+		{"", 85},
+		{"repl_boot_timeout", 85},
+		{"gremlins", 85},
+	} {
+		t.Run("cause="+tc.cause, func(t *testing.T) {
+			var keeper bridgechain.WallKeeper
+			boot := core.BridgeResponse{ExitCode: 80, CauseCode: tc.cause}
+			keeper.Observe("claude-tmux@deep", core.BridgeResponse{ExitCode: 85}, errors.New("bridge: launch exit=85"))
+			keeper.Observe("agy-claude-tmux@deep", boot, errors.New("bridge: launch exit=80"))
+
+			res, _ := keeper.Surface(llmroute.TieredDispatchResult{Walled: true}, boot, errors.New("bridge: launch exit=80"))
+
+			if res.ExitCode != tc.wantExit {
+				t.Fatalf("surfaced exit %d, want %d", res.ExitCode, tc.wantExit)
+			}
+		})
+	}
+}

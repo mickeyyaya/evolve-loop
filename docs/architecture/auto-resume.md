@@ -124,6 +124,12 @@ schedules a fresh wake on each cycle.
 4. On rc=0 success, calls `reset-auto-resume-attempts` so a future quota
    hit on a future cycle gets a fresh retry budget.
 
+> **The Go path since 2026-10-11.** The scheduled wake runs `evolve loop --auto-resume`. `checkpoint.RecordResume` increments `autoResumeAttempts` under the cycle-state lock.
+>
+> At the cap, it does not run the cycle: it records the operator action, the marker prints `auto-resume=off: <action>`, and the command exits rc=2. The quota checkpoint and the resume boundary checkpoint keep the counter. A quota pause at the cap also records the operator action, so the marker has no `resume-in=`. An operator resume (`evolve loop --resume`) sets the counter to 0 and clears the operator action. When the stored count is unreadable, the quota pause spends the budget and returns an error.
+>
+> Before this fix, no Go code incremented the counter, so a pause with a known reset time resumed with no cap.
+
 ## Env var reference
 
 | Variable | Default | Layer | Effect |

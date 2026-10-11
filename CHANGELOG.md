@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the auto-resume cap counts, and a boot failure after a quota wall is a system fault (2026-10-11)
+
+- **The auto-resume counter.** Before, no code incremented `autoResumeAttempts`. Thus a quota pause with a known reset time resumed with no cap. Now the scheduled wake runs `evolve loop --auto-resume`, and `checkpoint.RecordResume` increments the counter. The quota checkpoint and the resume boundary checkpoint keep it.
+- **The cap.** At the cap (3), the resume does not run: the checkpoint records an operator action, and the pause line prints `auto-resume=off: <action>`. An operator resume (`evolve loop --resume`) sets the counter to 0.
+- **The boot failure after a wall.** Before, `WallKeeper` read each exit 80 as a non-start. In a walk, one rung exited 85. A later rung exited 80 because the tmux session or the shell died. That walk paused as a quota wall.
+- **The boot-loss cause.** When `has-session` finds no session at the boot deadline, the bridge reports `pane_lost`. When the prompt spills into a shell after the paste, it reports `dead_shell`. The report uses a structured hook, not stderr text, so pane text cannot forge it. `launchoutcome.WithBootLoss` puts that cause on the exit-80 response and on the ledger row.
+- **The rule.** `WallKeeper` reads only a plain exit 80 as neutral, so the walk surfaces the system fault.
+- **An unreadable count.** When the stored count is unreadable, the quota pause spends the budget and returns an error. The resume boundary write returns the error. A missing state file or a missing block gives 0. An operator resume also clears the operator action.
+- Package notes: [cmd-evolve](docs/architecture/packages/cmd-evolve.md), [internal-bridge](docs/architecture/packages/internal-bridge.md), [internal-phases-runner](docs/architecture/packages/internal-phases-runner.md). Design: [auto-resume.md](docs/architecture/auto-resume.md). Incident: [cycle 1853](docs/incidents/cycle-1853-secondary-defects.md).
+
 ## Added — the dispatch postmortem is wired: a retry or a resume gets the evidence of the dispatch it replaces (W1, ADR-0130, 2026-10-10)
 
 - **The runner.** After each launch, `internal/phases/runner` reads the cause code from the new field `core.BridgeResponse.CauseCode`. The bridge engine sets it from its one classification. When the end is abnormal and in the agent session, it collects and writes `<run>/<phase>-attempt-<n>-postmortem.json` before the next launch. Before each launch, it adds the section "## Previous attempts of this phase (stated by the bridge)" after the cycle context, so the cached prefix does not change. A resume gets the section from the stored records.

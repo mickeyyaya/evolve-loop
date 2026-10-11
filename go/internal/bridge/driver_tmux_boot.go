@@ -115,6 +115,7 @@ func bootTmuxREPL(
 	}
 	if !promptSeen {
 		fmt.Fprintf(deps.Stderr, "%s FAIL: REPL prompt never appeared after %ds\n", prep.prefix, bootDeadlineS)
+		reportSessionGoneAtBoot(ctx, deps, lp.session)
 		return nil, ExitREPLBootTimeout, nil
 	}
 	ar.endBoot()

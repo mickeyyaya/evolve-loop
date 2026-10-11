@@ -21,6 +21,7 @@ type loopArgFlags struct {
 	maxCyclesFlag     int
 	cyclesFlag        int
 	resume            bool
+	autoResume        bool
 	dryRun            bool
 	reset             bool
 	fingerprint       string
@@ -45,6 +46,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.IntVar(&lf.maxCyclesFlag, "max-cycles", 0, "maximum iterations to run: cycles when sequential, waves of fleet.count lanes in fleet mode (default 1; aliased by --cycles)")
 	fs.IntVar(&lf.cyclesFlag, "cycles", 0, "alias for --max-cycles")
 	fs.BoolVar(&lf.resume, "resume", false, "locate and resume most-recent checkpointed cycle (protocol lands in M3)")
+	fs.BoolVar(&lf.autoResume, "auto-resume", false, "resume the paused cycle as a scheduled auto-resume: counts against the checkpoint's auto-resume budget and is refused at the cap (a plain --resume is an operator resume and resets the budget)")
 	fs.BoolVar(&lf.dryRun, "dry-run", false, "parse args, print resolved config as JSON, exit 0 (no orchestrator invocation)")
 	fs.BoolVar(&lf.reset, "reset", false, "prune infrastructure-systemic/transient + ship-gate-config from state.json:failedApproaches before loop")
 	fs.StringVar(&lf.fingerprint, "fingerprint", "", "with --reset, acknowledge this failure fingerprint in .evolve/resolved-fingerprints.json so the blocker-breaker excludes it (ADR-0072 extension operator unblock)")
@@ -160,6 +162,7 @@ func parseLoopArgs(args []string, stderr io.Writer) (loopConfig, int) {
 	if rc := validateLoopModes(lf, stderr); rc != 0 {
 		return loopConfig{}, rc
 	}
+	lf.resume = lf.resume || lf.autoResume
 
 	lf.projectRoot = absOrWarn(stderr, "--project-root", lf.projectRoot)
 	posCycles, posStrategy, posGoal := parsePositional(fs.Args())
@@ -276,6 +279,7 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		MaxCycles:         maxCycles,
 		MaxCyclesExplicit: lf.cyclesFlag > 0 || lf.maxCyclesFlag > 0 || posCycles > 0,
 		Resume:            lf.resume,
+		AutoResume:        lf.autoResume,
 		Reset:             lf.reset,
 		Fingerprint:       lf.fingerprint,
 		ConsensusAudit:    lf.consensusAudit,

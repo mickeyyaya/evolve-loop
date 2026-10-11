@@ -25,7 +25,7 @@ func (k *WallKeeper) Observe(rung string, res core.BridgeResponse, err error) {
 	case err == nil:
 	case res.ExitCode == exitQuota:
 		k.res, k.err = res, err
-	case neverStartedWork(res.ExitCode):
+	case neverStartedWork(res):
 	case !res.UsageExhausted && k.unprovenErr == nil:
 		k.unproven, k.unprovenErr, k.unprovenRung = res, err, rung
 	}
@@ -49,9 +49,11 @@ func (k WallKeeper) Surface(walk llmroute.TieredDispatchResult, res core.BridgeR
 	return k.res, fmt.Errorf("%w; the dispatch walk %s met a quota wall before its last rung failed", k.err, rungs)
 }
 
-func neverStartedWork(exitCode int) bool {
-	switch exitCode {
-	case launchoutcome.ExitREPLBootTimeout, launchoutcome.ExitModelMismatch, launchoutcome.ExitMissingBinary:
+func neverStartedWork(res core.BridgeResponse) bool {
+	switch res.ExitCode {
+	case launchoutcome.ExitREPLBootTimeout:
+		return !launchoutcome.BootLossCause(res.CauseCode).Lost()
+	case launchoutcome.ExitModelMismatch, launchoutcome.ExitMissingBinary:
 		return true
 	}
 	return false

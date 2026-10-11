@@ -54,8 +54,8 @@ The seal of the cycle names the cause. `epilogueCauseSuffix` writes `teardown=pa
 A pause needs an exit 85 in the walk. Each other rung that started work must be proven exhausted or be neutral.
 
 - **Proven exhausted.** A usage query read `exhausted`. The `usageevidence.Wrap` decorator writes this into the new field `core.BridgeResponse.UsageExhausted`.
-- **Neutral.** The rung never started work: exit 80 (the REPL did not boot), exit 87 (the agy-claude model label is missing) or exit 127 (no binary). A candidate that the walk did not launch is also neutral.
-- **Unproven.** The rung started work and failed with no proof, for example an exit 81 stall or a `pane_lost`. Then `WallKeeper` surfaces the failure of that rung, and it names every rung.
+- **Neutral.** The rung never started work: a plain exit 80 (no boot), exit 87 (the agy-claude model label is missing) or exit 127 (no binary). A candidate that the walk did not launch is also neutral.
+- **Unproven.** The rung started work and failed with no proof, for example an exit 81 stall or a `pane_lost`. An exit 80 with the cause `pane_lost` or `dead_shell` is also unproven (since 2026-10-11). The tmux session or the shell died. Then `WallKeeper` surfaces the failure of that rung, and it names every rung.
 
 The cycle 1853 walk now surfaces exit 81 `pane_lost`, not exit 85. A walk of agy-claude exit 87 then claude exit 85 still pauses. A walk with no exit 85 never pauses, also when a usage read says `exhausted`.
 

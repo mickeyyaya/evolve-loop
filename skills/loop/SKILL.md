@@ -228,17 +228,19 @@ do this:
    - The 60 s floor stops a near-zero remaining window from a busy loop.
    - The 3600 s cap matches the clamp of `ScheduleWakeup` to [60, 3600]; if the
      window is longer, call ScheduleWakeup again on the next wake.
-3. **Call `ScheduleWakeup`** with that delay and `prompt="/evo:loop --resume"`.
+3. **Call `ScheduleWakeup`** with that delay and `prompt="/evo:loop --auto-resume"`.
    Provide a `reason` like `"waiting for quota reset at <wake-at>"`.
 4. On each wake, if `now < wake_at`, repeat steps 2–3 (chained wake-ups).
-5. When `now >= wake_at`, the prompt fires `/evo:loop --resume` which
-   in turn invokes the native `evolve loop --resume` path → it bumps the
-   `autoResumeAttempts` counter and re-runs the paused cycle from its
+5. When `now >= wake_at`, the prompt fires `/evo:loop --auto-resume`. It runs
+   `evolve loop --auto-resume`. This command increments the
+   `autoResumeAttempts` counter and runs the paused cycle again from its
    last clean phase boundary.
 6. The `autoResumeAttempts` cap (default 3, see `attempts=K/M` in the
-   marker) prevents infinite quota-resume-quota loops; once exhausted,
-   `evolve loop --resume` exits rc=2 and leaves the marker for operator
-   intervention.
+   marker) stops a quota-resume-quota loop. At the cap,
+   `evolve loop --auto-resume` does not run the cycle. It records the operator
+   action in the checkpoint, prints the marker with `auto-resume=off: <action>`
+   and exits rc=2. An operator resume (`evolve loop --resume`) sets the
+   counter to 0.
 
 **Operator interrupt window.** The QUOTA-PAUSE marker line includes the
 exact `wake-at=ISO8601` timestamp so the operator can Ctrl+C any pending
