@@ -36,7 +36,7 @@ func TestScanWorktrees_StatusFailureAbortsTheWholeScan(t *testing.T) {
 		},
 	}
 
-	items, pool, seen, err := o.scanWorktrees(porcelain, map[string]bool{"b1": true, "b2": true})
+	items, pool, seen, err := o.scanWorktrees(porcelain, &mergedSet{o: o, ancestors: map[string]bool{"b1": true, "b2": true}, memo: map[string]landing{}})
 
 	if err == nil || !strings.Contains(err.Error(), "gc: git status --porcelain: git vanished") {
 		t.Fatalf("err = %v, want the status failure", err)

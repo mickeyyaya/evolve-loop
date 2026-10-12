@@ -2,6 +2,7 @@ package gcpolicy_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,5 +135,39 @@ func TestDevQuietMinutes_DecodesBesideMinAgeMinutes(t *testing.T) {
 	}
 	if p.Worktrees.DevQuietMinutes != 240 || p.Worktrees.DevQuietPeriod() != 4*time.Hour {
 		t.Errorf("decoded dev_quiet_minutes=%d (%s), want 240 (4h)", p.Worktrees.DevQuietMinutes, p.Worktrees.DevQuietPeriod())
+	}
+}
+
+func TestDevArchiveAfter_AnUnsetOrNonPositiveHorizonTakesTheFourteenDayDefault(t *testing.T) {
+	const day = 24 * time.Hour
+	cases := []struct {
+		name string
+		days int
+		want time.Duration
+	}{
+		{"unset", 0, 14 * day},
+		{"negative", -3, 14 * day},
+		{"explicit", 30, 30 * day},
+		{"one", 1, day},
+	}
+	for _, c := range cases {
+		if got := (gcpolicy.DevWorktreesPolicy{ArchiveAfterDays: c.days}).ArchiveAfter(); got != c.want {
+			t.Errorf("%s: archive_after_days=%d ArchiveAfter() = %s, want %s", c.name, c.days, got, c.want)
+		}
+	}
+}
+
+func TestDevWorktreesArchiveAfterDays_DecodesFromItsPolicyKeyBesideWorktrees(t *testing.T) {
+	var p gcpolicy.Policy
+	raw := `{"worktrees":{"min_age_minutes":45},"dev_worktrees":{"archive_after_days":21}}`
+	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.DevWorktrees.ArchiveAfterDays != 21 || p.Worktrees.MinAgeMinutes != 45 {
+		t.Errorf("decoded %+v, want dev_worktrees.archive_after_days=21 and worktrees.min_age_minutes=45", p)
+	}
+	out, err := json.Marshal(p)
+	if err != nil || !strings.Contains(string(out), `"dev_worktrees":{"archive_after_days":21}`) {
+		t.Errorf("re-marshal = %s (err %v), want the dev_worktrees key kept", out, err)
 	}
 }

@@ -133,7 +133,7 @@ func TestGCCycleProcesses_AListFailureIsAnError(t *testing.T) {
 func TestGCCycleProcesses_ASignalFailureIsAnErrorAndTheProcessIsNotCountedReaped(t *testing.T) {
 	root := t.TempDir()
 	tree := gcClosedOutCycleTree(t, root, 1700)
-	opts := worktreeGCOptions(root, filepath.Join(root, ".evolve"), gc.WorktreesPolicy{})
+	opts := worktreeGCOptions(root, filepath.Join(root, ".evolve"), gc.WorktreesPolicy{}, nil)
 	opts.Exec = func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, out, _ io.Writer) (int, error) {
 		_, err := io.WriteString(out, "p4242\nR1\nn"+tree+"\n")
 		return 0, err
@@ -333,7 +333,7 @@ func TestGCCycleProcesses_NamesTheOrphanAndSignalsItOnlyOnARealRun(t *testing.T)
 	for _, dryRun := range []bool{true, false} {
 		root := t.TempDir()
 		tree := gcClosedOutCycleTree(t, root, 1701)
-		opts := worktreeGCOptions(root, filepath.Join(root, ".evolve"), gc.WorktreesPolicy{})
+		opts := worktreeGCOptions(root, filepath.Join(root, ".evolve"), gc.WorktreesPolicy{}, nil)
 		opts.Exec = func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, out, _ io.Writer) (int, error) {
 			_, err := io.WriteString(out, "p4343\nR1\nn"+tree+"\n")
 			return 0, err

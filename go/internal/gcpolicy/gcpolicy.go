@@ -36,7 +36,8 @@ type Policy struct {
 	Logs            LogsPolicy `json:"logs,omitempty"`
 	// Worktrees is the retention grace for the worktree+branch backlog sweep
 	// (S4); consumed by PlanWorktrees. Zero value = no KeepRecent/MinAge grace.
-	Worktrees WorktreesPolicy `json:"worktrees,omitempty"`
+	Worktrees    WorktreesPolicy    `json:"worktrees,omitempty"`
+	DevWorktrees DevWorktreesPolicy `json:"dev_worktrees,omitempty"`
 }
 
 // RunsPolicy is the retention ladder for run directories.
@@ -111,4 +112,18 @@ func (w WorktreesPolicy) DevQuietPeriod() time.Duration {
 		return minDevQuietMinutes * time.Minute
 	}
 	return time.Duration(w.DevQuietMinutes) * time.Minute
+}
+
+const defaultDevArchiveAfterDays = 14
+
+type DevWorktreesPolicy struct {
+	ArchiveAfterDays int `json:"archive_after_days,omitempty"`
+}
+
+func (d DevWorktreesPolicy) ArchiveAfter() time.Duration {
+	days := d.ArchiveAfterDays
+	if days <= 0 {
+		days = defaultDevArchiveAfterDays
+	}
+	return time.Duration(days) * 24 * time.Hour
 }

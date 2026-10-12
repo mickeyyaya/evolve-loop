@@ -16,9 +16,10 @@ import (
 )
 
 type (
-	Policy          = gcpolicy.Policy
-	RunsPolicy      = gcpolicy.RunsPolicy
-	WorktreesPolicy = gcpolicy.WorktreesPolicy
+	Policy             = gcpolicy.Policy
+	RunsPolicy         = gcpolicy.RunsPolicy
+	WorktreesPolicy    = gcpolicy.WorktreesPolicy
+	DevWorktreesPolicy = gcpolicy.DevWorktreesPolicy
 )
 
 type RunDir struct {

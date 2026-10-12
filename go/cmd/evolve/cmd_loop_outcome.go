@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -124,6 +125,7 @@ func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
 	// plan, unwritable workspace, non-git ProjectRoot) must never silently
 	// disable the other. Both are best-effort batch-end hygiene.
 	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
+	runDevWorktreeGC(cfg, workspace, gcPol, stderr)
 }
 
 func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {
@@ -161,7 +163,7 @@ func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stde
 		fmt.Fprintf(stderr, "[gc] WARN: worktree sweep skipped: ProjectRoot is unset\n")
 		return
 	}
-	opts := worktreeGCOptions(cfg.ProjectRoot, cfg.EvolveDir, gcPol.Worktrees)
+	opts := worktreeGCOptions(cfg.ProjectRoot, cfg.EvolveDir, gcPol.Worktrees, stderr)
 	manifest, err := gc.PlanWorktrees(opts)
 	if err != nil {
 		fmt.Fprintf(stderr, "[gc] WARN: worktree plan failed: %v; skipping worktree sweep\n", err)
@@ -183,6 +185,27 @@ func runWorktreeGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stde
 	fmt.Fprintf(stderr, "[gc] worktree enforce: applied %d items\n", len(manifest.Items))
 }
 
+func runDevWorktreeGC(cfg loopConfig, workspace string, gcPol gc.Policy, stderr io.Writer) {
+	if cfg.ProjectRoot == "" {
+		return
+	}
+	opts, err := devWorktreeGCOptions(cfg.ProjectRoot, cfg.EvolveDir, gcPol)
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: dev worktree sweep skipped: %v\n", err)
+		return
+	}
+	manifest, err := gc.PlanDevWorktrees(context.Background(), opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "[gc] WARN: dev worktree plan failed: %v\n", err)
+		return
+	}
+	if manifest.Skipped != "" || !publishGCManifest(workspace, "dev-worktree-gc-manifest.json", manifest, stderr) {
+		return
+	}
+	archive, _, _ := gcDevCounts(manifest)
+	fmt.Fprintf(stderr, "[gc] dev worktree shadow: %d of %d idle past the archive limit (only evolve gc archives them)\n", archive, len(manifest.Items))
+}
+
 func gcManifestDir(evolveDir string) string {
 	return filepath.Join(evolveDir, "gc")
 }
@@ -199,14 +222,30 @@ func planRunDirGC(evolveDir string, pol gc.Policy, discoverFailed func(error)) (
 // worktreeGCOptions is the single construction site shared by the in-loop
 // hook and the operator command (`evolve gc`, cmd_gc.go), so both sweeps aim
 // at the same worktree base and carry the same policy.
-func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy) gc.WorktreeOptions {
+func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy, log io.Writer) gc.WorktreeOptions {
 	return gc.WorktreeOptions{
 		ProjectRoot:  projectRoot,
 		WorktreeBase: filepath.Join(projectRoot, ".evolve", "worktrees"),
 		EvolveDir:    evolveDir,
 		Policy:       pol,
 		Exec:         sysexec.DefaultRunner,
+		Log:          log,
 	}
+}
+
+func devWorktreeGCOptions(projectRoot, evolveDir string, pol gc.Policy) (gc.DevOptions, error) {
+	cwd, err := processGetwd()
+	if err != nil {
+		return gc.DevOptions{}, fmt.Errorf("the caller's directory is unreadable, so no dev worktree can be proven free of the caller: %w", err)
+	}
+	return gc.DevOptions{
+		ProjectRoot: projectRoot,
+		EvolveDir:   evolveDir,
+		Cwd:         cwd,
+		Policy:      pol.DevWorktrees,
+		Exec:        sysexec.DefaultRunner,
+		OpenPRs:     ghOpenPRUpdates,
+	}, nil
 }
 
 func publishGCManifest(workspace, name string, v any, stderr io.Writer) bool {
