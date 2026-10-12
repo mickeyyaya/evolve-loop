@@ -103,9 +103,14 @@ func clearConsoleLease(leasePath string, rawPaths []string, stdout, stderr io.Wr
 	return 0
 }
 
+var (
+	leaseMarshalIndent = json.MarshalIndent
+	leaseCloseTemp     = (*os.File).Close
+)
+
 func writeConsoleLease(leasePath string, paths []string, reason string, ttl time.Duration, stdout, stderr io.Writer) int {
 	expires := time.Now().Add(ttl).UTC()
-	b, err := json.MarshalIndent(leaseFile{
+	b, err := leaseMarshalIndent(leaseFile{
 		Paths:     paths,
 		ExpiresAt: expires.Format(time.RFC3339),
 		Reason:    reason,
@@ -125,7 +130,7 @@ func writeConsoleLease(leasePath string, paths []string, reason string, ttl time
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
 		return 1
 	}
-	if err := tmp.Close(); err != nil {
+	if err := leaseCloseTemp(tmp); err != nil {
 		_ = os.Remove(tmp.Name())
 		fmt.Fprintf(stderr, "evolve console-lease: %v\n", err)
 		return 1

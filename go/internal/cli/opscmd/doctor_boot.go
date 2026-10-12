@@ -13,6 +13,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 )
 
+var doctorBootWorktreeTemp = os.MkdirTemp
+
 func doctorBootConfig(sandbox bool, ws string, stderr io.Writer) (cfg *bridge.Config, cleanup func(), code int, ok bool) {
 	cwd, _ := os.Getwd()
 	cfg = &bridge.Config{Workspace: ws, ProjectRoot: cwd}
@@ -20,7 +22,7 @@ func doctorBootConfig(sandbox bool, ws string, stderr io.Writer) (cfg *bridge.Co
 	if !sandbox {
 		return cfg, cleanup, 0, true
 	}
-	wt, err := os.MkdirTemp("", "evolve-doctorboot-wt-*")
+	wt, err := doctorBootWorktreeTemp("", "evolve-doctorboot-wt-*")
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve doctor boot: temp worktree: %v\n", err)
 		return nil, cleanup, 1, false

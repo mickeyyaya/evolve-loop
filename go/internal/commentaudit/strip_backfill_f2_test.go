@@ -1,0 +1,191 @@
+package commentaudit
+
+import (
+	"errors"
+	"go/format"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestStripComments_RejectsSourceThatDoesNotParseF2(t *testing.T) {
+	t.Parallel()
+	for name, src := range map[string]string{
+		"truncated func":   "package p\nfunc (",
+		"no package":       "// only a comment\n",
+		"empty":            "",
+		"unterminated str": "package p\nvar s = \"abc\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := StripComments("p.go", []byte(src))
+
+			if err == nil || got.Source != nil || got.Removed != 0 {
+				t.Errorf("StripComments = (%+v, %v), want a parse error and an empty result", got, err)
+			}
+		})
+	}
+}
+
+func TestStripComments_RefusesWhenTheStrippedSourceDoesNotFormatF2(t *testing.T) {
+	boom := errors.New("format boom")
+	formatStrippedSource = func([]byte) ([]byte, error) { return nil, boom }
+	t.Cleanup(func() { formatStrippedSource = format.Source })
+
+	got, err := StripComments("p.go", []byte("package p\n\n// note\nfunc f() {}\n"))
+
+	if !errors.Is(err, boom) || !strings.Contains(err.Error(), "p.go: stripped source does not format") || got.Source != nil || got.Removed != 0 {
+		t.Errorf("StripComments = (%+v, %v), want the format failure named with the file and an empty result", got, err)
+	}
+}
+
+func TestStripComments_AFileWithoutCommentsIsReturnedAsItWasF2(t *testing.T) {
+	t.Parallel()
+	src := "package p\n\nfunc f() {}\n"
+
+	got, err := StripComments("p.go", []byte(src))
+
+	if err != nil || string(got.Source) != src || got.Removed != 0 {
+		t.Errorf("StripComments = (%+v, %v), want the source unchanged with nothing removed", got, err)
+	}
+}
+
+func TestStripDirs_ReportsAMissingDirAndKeepsTheReportSoFarF2(t *testing.T) {
+	t.Parallel()
+	good := t.TempDir()
+	writeFiles(t, good, map[string]string{"a.go": "package a\n\n// note\nfunc f() {}\n"})
+
+	report, err := StripDirs([]string{good, filepath.Join(good, "gone")})
+
+	if err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("StripDirs error = %v, want a not-exist error for the second dir", err)
+	}
+	if report.Files != 1 || report.Removed != 1 {
+		t.Errorf("report = %+v, want the first dir's work kept: one file and one line", report)
+	}
+	if got := readFile(t, filepath.Join(good, "a.go")); strings.Contains(got, "note") {
+		t.Errorf("the first dir was not stripped:\n%s", got)
+	}
+}
+
+func TestGoFilesByDir_ReportsAnUnreadableSubdirAndSkipsToolDirsF2(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFiles(t, filepath.Join(root, "keep"), map[string]string{"k.go": "package k\n", "k_test.go": "package k\n", "note.txt": "x"})
+	writeFiles(t, filepath.Join(root, "vendor"), map[string]string{"v.go": "package v\n"})
+	writeFiles(t, filepath.Join(root, ".hidden"), map[string]string{"h.go": "package h\n"})
+
+	got, err := goFilesByDir(root)
+
+	if err != nil || len(got) != 1 || len(got[filepath.Join(root, "keep")]) != 2 {
+		t.Errorf("goFilesByDir = (%v, %v), want only keep with its two Go files", got, err)
+	}
+
+	locked := filepath.Join(root, "locked")
+	writeFiles(t, locked, map[string]string{"l.go": "package l\n"})
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a mode 000 dir")
+	}
+
+	if _, err := goFilesByDir(root); !errors.Is(err, os.ErrPermission) {
+		t.Errorf("goFilesByDir over a mode 000 dir = %v, want a permission error", err)
+	}
+}
+
+func TestGoFilesByDir_AMissingRootIsAnErrorF2(t *testing.T) {
+	t.Parallel()
+
+	got, err := goFilesByDir(filepath.Join(t.TempDir(), "gone"))
+
+	if len(got) != 0 || !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("goFilesByDir = (%v, %v), want no packages and a not-exist error", got, err)
+	}
+}
+
+func TestReplaceFile_FailsBeforeTouchingTheTargetF2(t *testing.T) {
+	t.Parallel()
+
+	t.Run("target is missing", func(t *testing.T) {
+		t.Parallel()
+
+		err := replaceFile(filepath.Join(t.TempDir(), "gone.go"), []byte("package p\n"))
+
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("replaceFile = %v, want a not-exist error", err)
+		}
+	})
+
+	t.Run("directory refuses a temp file", func(t *testing.T) {
+		t.Parallel()
+		if os.Geteuid() == 0 {
+			t.Skip("root writes into a read-only dir")
+		}
+		dir := t.TempDir()
+		target := filepath.Join(dir, "a.go")
+		if err := os.WriteFile(target, []byte("package a\n// c\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(dir, 0o555); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+		err := replaceFile(target, []byte("package a\n"))
+
+		if !errors.Is(err, os.ErrPermission) || readFile(t, target) != "package a\n// c\n" {
+			t.Errorf("replaceFile = %v, want a permission error and the target untouched", err)
+		}
+	})
+}
+
+func FuzzStripCommentsF2(f *testing.F) {
+	for _, seed := range []string{
+		"package p\n\n// note\nfunc f() {}\n",
+		"package p\n\nfunc f() { x := 1 /* c */ + 2; _ = x } // tail\n",
+		"package p\n\n/*\nblock\n*/\nvar v = `// not a comment`\n",
+		"// Code generated by x. DO NOT EDIT.\npackage p\n// keep\n",
+		"package p\n",
+		"",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, src string) {
+		first, err := StripComments("p.go", []byte(src))
+		if err != nil {
+			return
+		}
+		again, err := StripComments("p.go", first.Source)
+		if err != nil {
+			t.Fatalf("a stripped file must strip again: %v\n%s", err, first.Source)
+		}
+		if string(again.Source) != string(first.Source) || again.Removed != 0 {
+			t.Fatalf("stripping is not idempotent:\nfirst:\n%s\nagain:\n%s", first.Source, again.Source)
+		}
+		if same, why, err := Equivalent("p.go", []byte(src), first.Source); err != nil || !same {
+			t.Fatalf("stripping changed more than comments (%q, %v)", why, err)
+		}
+	})
+}
+
+func TestGoFilesByDir_AToolNamedRootIsStillWalkedF2(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"vendor", ".hidden", "testdata"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			root := filepath.Join(t.TempDir(), name)
+			writeFiles(t, root, map[string]string{"a.go": "package a\n"})
+
+			got, err := goFilesByDir(root)
+
+			if err != nil || len(got[root]) != 1 || got[root][0] != "a.go" {
+				t.Errorf("goFilesByDir(%s) = (%v, %v), want the root's own file", name, got, err)
+			}
+		})
+	}
+}

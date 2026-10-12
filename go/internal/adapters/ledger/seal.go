@@ -188,6 +188,8 @@ type sealedSegment struct {
 	lines [][]byte
 }
 
+var segmentRel = filepath.Rel
+
 func (l *FileLedger) readChain() ([]sealedSegment, [][]byte, error) {
 	evolveDir := filepath.Dir(l.ledgerPath)
 	segPaths, err := segmentFiles(filepath.Join(evolveDir, segmentsDirName))
@@ -204,7 +206,7 @@ func (l *FileLedger) readChain() ([]sealedSegment, [][]byte, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		rel, err := filepath.Rel(evolveDir, s)
+		rel, err := segmentRel(evolveDir, s)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ledger verify: rel: %w", err)
 		}
@@ -333,16 +335,31 @@ func segmentFiles(segDir string) ([]string, error) {
 
 // writeSegment gzips raw into path atomically (tmp + rename + dir create).
 func writeSegment(path string, raw []byte) error {
-	var gz bytes.Buffer
-	zw := gzip.NewWriter(&gz)
+	return writeSegmentVia(&bytes.Buffer{}, path, raw)
+}
+
+type segmentBuffer interface {
+	io.Writer
+	Bytes() []byte
+}
+
+func writeSegmentVia(gz segmentBuffer, path string, raw []byte) error {
+	if err := gzipSegment(gz, raw); err != nil {
+		return err
+	}
+	if err := atomicwrite.Durable(path, gz.Bytes(), segmentMode); err != nil {
+		return fmt.Errorf("ledger seal: %w", err)
+	}
+	return nil
+}
+
+func gzipSegment(dst io.Writer, raw []byte) error {
+	zw := gzip.NewWriter(dst)
 	if _, err := zw.Write(raw); err != nil {
 		return fmt.Errorf("ledger seal: gzip write: %w", err)
 	}
 	if err := zw.Close(); err != nil {
 		return fmt.Errorf("ledger seal: gzip close: %w", err)
-	}
-	if err := atomicwrite.Durable(path, gz.Bytes(), segmentMode); err != nil {
-		return fmt.Errorf("ledger seal: %w", err)
 	}
 	return nil
 }

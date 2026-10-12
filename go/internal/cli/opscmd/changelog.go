@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/changeloggen"
 )
 
+var changelogWriteEntry = changeloggen.WriteEntry
+
 // runChangelogGen is `evolve changelog-gen <from-ref> <to-ref> <version> [--dry-run]`.
 // Mirrors legacy/scripts/release/changelog-gen.sh.
 func RunChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -44,7 +46,7 @@ func RunChangelogGen(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	}
 
-	wrote, skipped, err := changeloggen.WriteEntry(clPath, version, entry)
+	wrote, skipped, err := changelogWriteEntry(clPath, version, entry)
 	if err != nil {
 		fmt.Fprintf(stderr, "[changelog-gen] FAIL: %v\n", err)
 		return 1
