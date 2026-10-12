@@ -9,6 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
 
+var postReviewExecutable = os.Executable
+
 // applyPostReviewGuards runs only after the deliverable review and correction
 // ladder approves. It owns explanation refresh, Ship success latching, and the
 // final main-tree leak verdict.
@@ -46,7 +48,7 @@ func (cr *cycleRun) applyPostReviewGuards(next Phase, dr *dispatchResult) (loopA
 		} else if !res.OK() {
 			// Attempt phase-agnostic binary churn discard for build artifacts
 			var relBin string
-			if execPath, err := os.Executable(); err == nil {
+			if execPath, err := postReviewExecutable(); err == nil {
 				if rel, err := filepath.Rel(cr.req.ProjectRoot, execPath); err == nil && !strings.HasPrefix(rel, "..") {
 					relBin = filepath.ToSlash(rel)
 				}

@@ -9,6 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
 
+var nextCorrection = interaction.NextCorrection
+
 // reviewWithCorrections owns the bounded contract-review ladder. Every loop
 // iteration consumes one rung budget or terminates, and temporary routing and
 // correction directives are restored before the method returns.
@@ -81,7 +83,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 		corr := 0
 		salvagedFromInvalid := "" // found-but-invalid origin → rung-3 kernel evidence
 		for !rr.Approve {
-			act := interaction.NextCorrection(interaction.CorrectionInput{
+			act := nextCorrection(interaction.CorrectionInput{
 				Phase:      string(next),
 				Workspace:  cr.cs.WorkspacePath,
 				Worktree:   rin.Worktree,

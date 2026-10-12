@@ -15,6 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
 
+var failureDigestMarshal = json.Marshal
+
 // FailureDigest is the stable failure identity written to
 // <workspace>/failure-digest.json and cross-checked by VerifyDisposition.
 type FailureDigest struct {
@@ -92,7 +94,7 @@ func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (F
 		digest.Recurrence = rc.Count(digest.Fingerprint)
 	}
 
-	b, err := json.Marshal(digest)
+	b, err := failureDigestMarshal(digest)
 	if err != nil {
 		return digest, fmt.Errorf("marshal failure digest: %w", err)
 	}
