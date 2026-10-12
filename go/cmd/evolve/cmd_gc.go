@@ -152,11 +152,12 @@ func (r gcRun) project(projectRoot string) int {
 	if pol.GC != nil {
 		gcPol = *pol.GC
 	}
-	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees)
+	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	failed := r.cycleProcesses(opts)
 	failed = r.dispatchProcesses(projectRoot, gcPol.TempTTLHours) || failed
 	failed = r.worktrees(opts) || failed
+	failed = r.devWorktrees(projectRoot, evolveDir, gcPol) || failed
 	failed = r.runDirs(evolveDir, gcPol) || failed
 	failed = r.goCache(gcPol) || failed
 	failed = r.pipelineTemp(gcPol.TempTTLHours) || failed

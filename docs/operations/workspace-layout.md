@@ -159,6 +159,27 @@ It never deletes.
   - **Run at boundaries.** The console runs `--dev --all` at every wave
     boundary (runtime-reference.md, "Wave boundary"). The loop never removes a
     dev tree.
+- Archive of idle trees (2026-10-12): `evolve gc --project-root <plane>` archives each `dev/` tree
+  with no HEAD reflog entry and no HEAD commit for `gc.dev_worktrees.archive_after_days` days
+  (default 14). Landing is not needed.
+  - **What happens.** A tree with uncommitted or untracked work is saved as a checkpoint
+    first. Then `git worktree remove` runs. The branch stays. A record goes to
+    `.evolve/archive/dev-worktrees.jsonl` in the plane.
+  - **What a checkpoint saves.** It saves the staged tree and the working tree: tracked edits
+    and untracked files that git does not ignore. It excludes `go/evolve` and `.evolve/ledger.*`.
+    It does not save ignored files.
+  - **Ignored files block the archive.** A tree that holds an ignored file keeps its place, for
+    example `.env` or `.envrc`. Only rebuildable outputs do not block: `go/bin/`, `go/evolve`,
+    `go/coverage*.txt`, `node_modules/` and the Go caches. A nested git repository also blocks.
+  - **What stays.** The tool never archives the plane or the current directory of the caller.
+    It also keeps a tree with a process inside and a detached tree.
+    It keeps a tree with an open pull request updated inside the limit.
+  - **Restore.** Run `git worktree add dev/<task> <branch>`. Then run
+    `evolve checkpoint restore <task>/<stamp> --into dev/<task>`. `evolve gc` prints both
+    commands for each tree it archives.
+  - **Not the same as cleanup.** `cleanup --dev --all` removes landed trees and deletes their
+    branches. The archive removes idle trees and keeps their branches. Read `evolve gc --dry-run`
+    first. The loop only plans the archive, and it never applies it.
 - Checkpoints (2026-10-06): the store holds the checkpoint refs of the operator,
   `refs/checkpoints/<worktree>/<UTC timestamp>` (`evolve checkpoint`). Each
   one is a commit pair: the staged tree on HEAD, then the full working tree on

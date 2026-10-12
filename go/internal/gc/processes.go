@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 type Process struct {
@@ -78,8 +79,12 @@ func leafUnder(base, p string) (string, bool) {
 }
 
 func (o WorktreeOptions) listProcesses(ctx context.Context) ([]Process, error) {
+	return listCwdProcesses(ctx, o.Exec, o.ProjectRoot)
+}
+
+func listCwdProcesses(ctx context.Context, run sysexec.RunFunc, dir string) ([]Process, error) {
 	var out strings.Builder
-	code, err := o.Exec(ctx, "lsof", o.ProjectRoot, []string{"-a", "-d", "cwd", "-u", uidArg(), "-R", "-F", "pRn"}, nil, nil, &out, nil)
+	code, err := run(ctx, "lsof", dir, []string{"-a", "-d", "cwd", "-u", uidArg(), "-R", "-F", "pRn"}, nil, nil, &out, nil)
 	if err != nil {
 		return nil, fmt.Errorf("gc: list process cwds: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -33,6 +35,7 @@ const (
 type WorktreeItem struct {
 	Path   string         `json:"path,omitempty"`
 	Branch string         `json:"branch,omitempty"`
+	Head   string         `json:"head,omitempty"`
 	Action WorktreeAction `json:"action"`
 	Reason string         `json:"reason,omitempty"`
 }
@@ -50,6 +53,7 @@ type WorktreeOptions struct {
 	Exec         sysexec.RunFunc
 	PidAlive     func(int) bool
 	LeaseTTL     time.Duration
+	Log          io.Writer
 }
 
 var swarmSuffixRe = regexp.MustCompile(`-(integration|w\d+)$`)
@@ -230,24 +234,64 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 	return WorktreeManifest{Items: items}, nil
 }
 
-func (o WorktreeOptions) mergedBranches() (map[string]bool, error) {
+type landing int
+
+const (
+	landingNone landing = iota
+	landingAncestor
+	landingSquash
+	landingNoNet
+)
+
+type mergedSet struct {
+	o         WorktreeOptions
+	ancestors map[string]bool
+	memo      map[string]landing
+}
+
+func (o WorktreeOptions) mergedBranches() (*mergedSet, error) {
 	mergedOut, err := o.git(o.ProjectRoot, "branch", "--merged", "HEAD")
 	if err != nil {
 		return nil, err
 	}
-	merged := map[string]bool{}
+	set := &mergedSet{o: o, ancestors: map[string]bool{}, memo: map[string]landing{}}
 	for _, b := range parseBranchList(mergedOut) {
-		merged[b] = true
+		set.ancestors[b] = true
 	}
-	return merged, nil
+	return set, nil
+}
+
+func (m *mergedSet) landing(branch string) (landing, error) {
+	if m.ancestors[branch] {
+		return landingAncestor, nil
+	}
+	if l, seen := m.memo[branch]; seen {
+		return l, nil
+	}
+	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: m.o.ProjectRoot, Exec: m.o.Exec}, "HEAD", branch)
+	if err != nil {
+		return landingNone, err
+	}
+	l := res.landing()
+	m.memo[branch] = l
+	return l, nil
+}
+
+func (m *mergedSet) squashHead(branch string, l landing) (string, error) {
+	if l != landingSquash && l != landingNoNet {
+		return "", nil
+	}
+	out, err := m.o.git(m.o.ProjectRoot, "rev-parse", "refs/heads/"+branch)
+	return strings.TrimSpace(out), err
 }
 
 type eligible struct {
-	path, branch string
-	mtime        time.Time
+	path, branch, squashHead string
+	landing                  landing
+	mtime                    time.Time
 }
 
-func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool) ([]WorktreeItem, []eligible, map[string]bool, error) {
+func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet) ([]WorktreeItem, []eligible, map[string]bool, error) {
 	minAge := time.Duration(o.Policy.MinAgeMinutes) * time.Minute
 	now := o.now()
 
@@ -273,11 +317,19 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged map[string]bool)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		if dirty || !merged[e.branch] {
+		l, err := merged.landing(e.branch)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if dirty || l == landingNone {
 			items = append(items, o.keptOrSalvaged(path, e.branch, dirty))
 			continue
 		}
 		if c, ok := eligibleAfterGrace(path, e.branch, now, minAge); ok {
+			c.landing = l
+			if c.squashHead, err = merged.squashHead(e.branch, l); err != nil {
+				return nil, nil, nil, err
+			}
 			pool = append(pool, c)
 		}
 	}
@@ -329,15 +381,26 @@ func removalItems(pool []eligible, keepRecent int) []WorktreeItem {
 		if i < keepRecent {
 			continue
 		}
+		reason := removalReason(c.landing)
 		items = append(items,
-			WorktreeItem{Path: c.path, Branch: c.branch, Action: WorktreeActionRemove, Reason: "merged, clean, dead"},
-			WorktreeItem{Path: c.path, Branch: c.branch, Action: WorktreeActionDeleteBranch, Reason: "merged, clean, dead"},
+			WorktreeItem{Path: c.path, Branch: c.branch, Action: WorktreeActionRemove, Reason: reason},
+			WorktreeItem{Path: c.path, Branch: c.branch, Head: c.squashHead, Action: WorktreeActionDeleteBranch, Reason: reason},
 		)
 	}
 	return items
 }
 
-func (o WorktreeOptions) orphanBranchItems(merged, seenBranch map[string]bool) ([]WorktreeItem, error) {
+func removalReason(l landing) string {
+	switch l {
+	case landingSquash:
+		return "squash-merged, clean, dead"
+	case landingNoNet:
+		return "no net changes against HEAD and no commits ahead, clean, dead"
+	}
+	return "merged, clean, dead"
+}
+
+func (o WorktreeOptions) orphanBranchItems(merged *mergedSet, seenBranch map[string]bool) ([]WorktreeItem, error) {
 	backlogOut, err := o.git(o.ProjectRoot, "branch", "--list", "cycle-*")
 	if err != nil {
 		return nil, err
@@ -347,9 +410,22 @@ func (o WorktreeOptions) orphanBranchItems(merged, seenBranch map[string]bool) (
 		if !strings.HasPrefix(b, "cycle-") || seenBranch[b] {
 			continue
 		}
-		if merged[b] {
+		l, err := merged.landing(b)
+		if err != nil {
+			return nil, err
+		}
+		head, err := merged.squashHead(b, l)
+		if err != nil {
+			return nil, err
+		}
+		switch l {
+		case landingAncestor:
 			items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionDeleteBranch, Reason: "merged orphan branch (no worktree)"})
-		} else {
+		case landingSquash:
+			items = append(items, WorktreeItem{Branch: b, Head: head, Action: WorktreeActionDeleteBranch, Reason: "squash-merged orphan branch (no worktree)"})
+		case landingNoNet:
+			items = append(items, WorktreeItem{Branch: b, Head: head, Action: WorktreeActionDeleteBranch, Reason: "orphan branch with no net changes and no commits ahead (no worktree)"})
+		default:
 			items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch (no worktree)"})
 		}
 	}
@@ -451,9 +527,70 @@ func (o WorktreeOptions) deleteBranches(items []WorktreeItem, refused map[string
 		if it.Path != "" && refused[it.Path] {
 			continue
 		}
-		if _, err := o.git(o.ProjectRoot, "branch", "-d", it.Branch); err != nil {
+		if err := o.deleteBranch(it); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errs
+}
+
+const branchNotFullyMerged = "not fully merged"
+
+func (o WorktreeOptions) deleteBranch(it WorktreeItem) error {
+	head := o.branchHead(it.Branch)
+	_, stderr, code, err := o.gitCapture(o.ProjectRoot, "branch", "-d", it.Branch)
+	switch {
+	case err != nil:
+		return fmt.Errorf("gc: git branch -d %s: %w", it.Branch, err)
+	case code == 0:
+		o.logDeleted(it.Branch, head)
+		return nil
+	case it.Head == "" || !strings.Contains(stderr, branchNotFullyMerged):
+		return fmt.Errorf("gc: git branch -d %s: exit %d: %s", it.Branch, code, strings.TrimSpace(stderr))
+	}
+	return o.deleteSquashed(it)
+}
+
+func (o WorktreeOptions) deleteSquashed(it WorktreeItem) error {
+	porcelain, err := o.git(o.ProjectRoot, "worktree", "list", "--porcelain")
+	if err != nil {
+		return err
+	}
+	for _, e := range parseWorktreePorcelain(porcelain) {
+		if e.branch == it.Branch {
+			return fmt.Errorf("gc: refuse to delete %s: worktree %s has it checked out", it.Branch, e.path)
+		}
+	}
+	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: o.ProjectRoot, Exec: o.Exec}, "HEAD", it.Branch)
+	if err != nil {
+		return err
+	}
+	if !res.deletable() {
+		return fmt.Errorf("gc: refuse to delete %s: the squash check no longer passes", it.Branch)
+	}
+	if _, err := o.git(o.ProjectRoot, "update-ref", "-d", "refs/heads/"+it.Branch, it.Head); err != nil {
+		return err
+	}
+	o.logDeleted(it.Branch, it.Head)
+	return nil
+}
+
+func (o WorktreeOptions) branchHead(branch string) string {
+	out, err := o.git(o.ProjectRoot, "rev-parse", "refs/heads/"+branch)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+func (o WorktreeOptions) logDeleted(branch, head string) {
+	if o.Log != nil {
+		fmt.Fprintf(o.Log, "gc: deleted branch %s@%s\n", branch, head)
+	}
+}
+
+func (o WorktreeOptions) gitCapture(dir string, args ...string) (stdout, stderr string, code int, err error) {
+	var out, errOut strings.Builder
+	code, err = o.Exec(context.Background(), "git", dir, args, nil, nil, &out, &errOut)
+	return out.String(), errOut.String(), code, err
 }

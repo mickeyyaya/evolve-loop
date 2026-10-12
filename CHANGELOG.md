@@ -16,6 +16,21 @@ All notable changes to this project will be documented in this file.
 - **The policy block.** `practice_watch` (`timeout_s`, 120 at most, and `sources`) is strict-decoded.
 - **Hardening.** Fetched text is fenced and marked untrusted in the item. Redirects are limited to 5 http(s) hops with no downgrade. A `command` output is capped at 8 MiB. The boundary run has a 60-second budget. The item id carries a minute stamp.
 - Docs: [runtime-reference](docs/operations/runtime-reference.md), [wave-operations](docs/operations/wave-operations.md), [internal-practicewatch](docs/architecture/packages/internal-practicewatch.md), [plan M1](docs/plans/model-capability-practice-2026-10.md).
+## Fixed — `evolve gc` archives idle dev worktrees and sees squash merges (2026-10-12)
+
+- **Dev worktrees.** The cycle sweep never saw the console trees under `<hub>/dev/`: it skips each tree outside `.evolve/worktrees` and each leaf without the `cycle-` prefix. On 2026-10-12 the hub held 160 of them. `gc.PlanDevWorktrees` and `gc.ApplyDevWorktrees` now archive each tree that is idle for `gc.dev_worktrees.archive_after_days` days (default 14).
+  - **Idle** is the newest of the HEAD reflog time and the HEAD commit time. The index time and file times are never used.
+  - **Archive.** Uncommitted work is saved with the checkpoint store first. A failed save keeps the tree. Then `git worktree remove` runs, the branch stays, and one record goes to `.evolve/archive/dev-worktrees.jsonl`. `evolve gc` prints the two restore commands.
+  - **Kept.** The project root, a plane worktree and the caller's directory. Also a tree with a process inside, a detached tree, and a tree with a fresh open pull request.
+  - **The loop** plans the archive and publishes `dev-worktree-gc-manifest.json`. It never applies it.
+- **Squash merges.** The repository lands pull requests with `--squash`, so a landed branch is not an ancestor of `main`. The dry run listed 61 landed `cycle-*` branches as unmerged on 2026-10-12. A branch now counts as merged when each path that it changed since the merge-base has the same content in `HEAD` (`branchLandedBySquash`). A squash-merged branch is deleted with `git update-ref -d` against the planned head.
+- **Safety round.**
+  - **Kept trees.** A tree with an ignored file that is not a rebuildable output stays. A tree with a nested git repository stays.
+  - **The save.** The archive re-checks the tree after the checkpoint save and refuses on any change.
+  - **The pull request rule.** A real run does not skip it when `gh` is absent.
+  - **Branch deletes.** `git branch -d` runs first. `git update-ref -d` runs only for a squash-merged branch that no worktree holds. Each deleted branch is logged as `branch@head`.
+  - **Edge cases.** A branch with no net changes is deleted only when it has no commit that the target lacks. An unreadable caller directory fails the sweep closed.
+- Docs: [internal-gc.md](docs/architecture/packages/internal-gc.md), [runtime-reference.md](docs/operations/runtime-reference.md), [workspace-layout.md](docs/operations/workspace-layout.md).
 
 ## Fixed — the dispatch postmortem follow-ups: the fresh session carries the record, agy records name their source, and no record is lost or written over (ADR-0130, 2026-10-11)
 
