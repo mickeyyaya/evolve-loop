@@ -34,7 +34,10 @@ const (
 one cycle in the foreground: evolve cycle run --goal-text G; resume a paused cycle: evolve loop --resume; stop at the next wave boundary: evolve loop-stop --wait`
 )
 
-var mergedPRSubject = regexp.MustCompile(`^Merge pull request #(\d+)`)
+var (
+	mergedPRSubject = regexp.MustCompile(`^Merge pull request #(\d+)`)
+	squashPRSubject = regexp.MustCompile(`\(#(\d+)\)$`)
+)
 
 type waveEnv struct {
 	resolveRoot func(projectRoot string, stderr io.Writer) (string, error)
@@ -226,7 +229,7 @@ func gitMainHead(root string) (string, error) {
 }
 
 func gitMergedPRs(root, since string) ([]string, error) {
-	out, err := gitexec.Default(root).Output(context.Background(), "log", "--first-parent", "--merges", "--format=%s", since+"..HEAD")
+	out, err := gitexec.Default(root).Output(context.Background(), "log", "--first-parent", "--format=%s", since+"..HEAD")
 	if err != nil {
 		return nil, fmt.Errorf("list the merges since %s: %w", since, err)
 	}
@@ -236,7 +239,12 @@ func gitMergedPRs(root, since string) ([]string, error) {
 func parseMergedPRs(log string) []string {
 	var prs []string
 	for _, line := range strings.Split(log, "\n") {
-		if m := mergedPRSubject.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
+		trimmed := strings.TrimSpace(line)
+		if m := mergedPRSubject.FindStringSubmatch(trimmed); m != nil {
+			prs = append(prs, m[1])
+			continue
+		}
+		if m := squashPRSubject.FindStringSubmatch(trimmed); m != nil {
 			prs = append(prs, m[1])
 		}
 	}

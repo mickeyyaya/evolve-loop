@@ -689,3 +689,29 @@ func TestWaveNext_HistoryHoldsTheLastKWavesBeforeTheLastOne(t *testing.T) {
 		t.Errorf("rc = %d; history part = %q, want %q after the wave 81 facts", rc, history, want)
 	}
 }
+
+func TestParseMergedPRs_CountsSquashMergeSubjects(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		log  string
+		want []string
+	}{
+		{name: "squash subject", log: "feat: x (#123)\n", want: []string{"123"}},
+		{name: "merge and squash mixed", log: "Merge pull request #816 from x/y\nfix: y (#456)\n", want: []string{"816", "456"}},
+		{name: "no number", log: "fix: a commit\nMerge branch 'main'\n", want: nil},
+		{name: "number not in parentheses at end", log: "fix: see #77 for context\n", want: nil},
+		{name: "merge subject mentioning a squash suffix counts once", log: "Merge pull request #9 from o/b (#9)\n", want: []string{"9"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := parseMergedPRs(tc.log)
+
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("parseMergedPRs(%q) = %q, want %q", tc.log, got, tc.want)
+			}
+		})
+	}
+}

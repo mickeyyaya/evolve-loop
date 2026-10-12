@@ -34,3 +34,18 @@ func TestGitWaveAdapters_ReadTheHeadAndTheMergedPRs(t *testing.T) {
 		t.Errorf("gitMergedPRs(bad ref) error = %v, want one that names the ref", badErr)
 	}
 }
+
+func TestGitMergedPRs_ListsSquashMergedPRs(t *testing.T) {
+	t.Parallel()
+	r := gittest.Fixture(t)
+	r.Git("commit", "-q", "--allow-empty", "-m", "base")
+	base := r.Git("rev-parse", "HEAD")
+	r.Git("commit", "-q", "--allow-empty", "-m", "feat: x (#123)")
+	r.Git("commit", "-q", "--allow-empty", "-m", "fix: y (#124)")
+
+	prs, err := gitMergedPRs(r.Dir, base)
+
+	if err != nil || !slices.Equal(prs, []string{"124", "123"}) {
+		t.Errorf("gitMergedPRs = %q, %v; want [124 123]", prs, err)
+	}
+}

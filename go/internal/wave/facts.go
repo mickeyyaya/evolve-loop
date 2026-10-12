@@ -164,16 +164,12 @@ func applySignals(c *Cycle, path string) []string {
 }
 
 func CycleFloor(evolveDir string) (int, error) {
-	b, err := os.ReadFile(filepath.Join(evolveDir, "state.json"))
-	if errors.Is(err, os.ErrNotExist) {
-		return 0, nil
-	}
+	st, ok, err := cyclestate.ReadState(filepath.Join(evolveDir, "state.json"))
 	if err != nil {
-		return 0, fmt.Errorf("read state.json: %w", err)
+		return 0, err
 	}
-	var st cyclestate.State
-	if err := json.Unmarshal(b, &st); err != nil {
-		return 0, fmt.Errorf("parse state.json: %w", err)
+	if !ok {
+		return 0, nil
 	}
 	return st.HighestCycleNumber(), nil
 }

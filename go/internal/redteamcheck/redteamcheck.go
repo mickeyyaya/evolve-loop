@@ -27,6 +27,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
@@ -121,22 +122,6 @@ func LedgerRoleCompleteness(ledgerPath string) (skip bool, err error) {
 	return false, nil
 }
 
-// stateLastCycle reads state.json:lastCycleNumber. Returns (0,false) when the
-// file is absent or the field is missing.
-func stateLastCycle(statePath string) (int, bool) {
-	b, err := os.ReadFile(statePath)
-	if err != nil {
-		return 0, false
-	}
-	var s struct {
-		LastCycleNumber *int `json:"lastCycleNumber"`
-	}
-	if json.Unmarshal(b, &s) != nil || s.LastCycleNumber == nil {
-		return 0, false
-	}
-	return *s.LastCycleNumber, true
-}
-
 // maxLedgerCycle returns the highest cycle number across ALL ledger entries.
 func maxLedgerCycle(entries []ledgerEntry) (int, bool) {
 	max, ok := 0, false
@@ -161,7 +146,10 @@ func NoBatchCycleJump(ledgerPath, statePath string) (skip bool, err error) {
 	if !present {
 		return true, nil
 	}
-	lastState, ok := stateLastCycle(statePath)
+	lastState, ok, err := cyclestate.ReadLastCycleNumber(statePath)
+	if err != nil {
+		return false, fmt.Errorf("red-team-002: %w", err)
+	}
 	if !ok {
 		return true, nil
 	}
