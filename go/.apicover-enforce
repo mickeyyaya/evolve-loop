@@ -742,3 +742,5 @@
 ./internal/coverstrict
 # practicewatch — the CLI practice watch (ADR-0133, plan M1): fetch each configured source, normalize, hash, compare with .evolve/practice/<id>.json, file one inbox research item per changed source.
 ./internal/practicewatch
+# gotooltest — the one owner of how a test runs the go tool: the CPU limit of a nested run and one build for each test binary.
+./internal/gotooltest

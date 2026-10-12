@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 type parityTarget struct {
@@ -175,7 +176,7 @@ func runOnHost(t *testing.T, target parityTarget) goReport {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", target.goTestArgs()...)
 	cmd.Dir = filepath.Join(repoRootForParity(t), "go")
-	cmd.Env = paneEnv(os.Environ())
+	cmd.Env = gotooltest.Env(paneEnv(os.Environ()))
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

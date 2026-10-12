@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 func TestValidateProfile_BashParity(t *testing.T) {
@@ -37,11 +39,11 @@ func TestValidateProfile_BashParity(t *testing.T) {
 	}
 	bashScript := filepath.Join(scripts, "dispatch", "subagent-run.sh")
 
-	goBin := filepath.Join(t.TempDir(), "evolve")
-	build := exec.Command("go", "build", "-o", goBin, "./cmd/evolve")
-	build.Dir = filepath.Join(repoRoot, "go")
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build evolve: %v\n%s", err, out)
+	builds := gotooltest.NewCache(gotooltest.ExecRunner)
+	t.Cleanup(func() { _ = builds.Close() })
+	goBin, err := builds.Build(gotooltest.Spec{Dir: filepath.Join(repoRoot, "go"), Pkg: "./cmd/evolve", Name: "evolve"})
+	if err != nil {
+		t.Fatalf("build evolve: %v", err)
 	}
 
 	fixtureRoot := t.TempDir()

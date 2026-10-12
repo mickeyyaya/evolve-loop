@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 )
 
 var goTestCoverage = regexp.MustCompile(`coverage: ([0-9.]+)% of statements`)
@@ -31,7 +33,7 @@ func TestCheck_PercentEqualsWhatGoTestCoverPrints(t *testing.T) {
 	}
 	cmd := exec.Command("go", "test", "-count=1", "-cover", "-coverprofile=coverage.txt", "./p")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=")
+	cmd.Env = gotooltest.Env(append(os.Environ(), "GOWORK=off", "GOFLAGS="))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go test: %v\n%s", err, out)
