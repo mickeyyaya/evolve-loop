@@ -3,7 +3,6 @@ package core_test
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,11 +144,9 @@ func TestNewCycleRun_EnforceInjectsRecentOutcomesContext(t *testing.T) {
 	}
 }
 
-// Digest failure is best-effort: with the digest target pre-created as a
-// DIRECTORY the atomic rename inside WriteDigest fails — the cycle must still
-// complete PASS and a WARN naming the digest must reach stderr (the
-// archivePollutedWorkspace WARN idiom). No t.Parallel(): os.Stderr is swapped.
 func TestNewCycleRun_DigestFailureWarnsNotAborts(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	seedChronicleDossier(t, root, 42, "harden the flux capacitor", "PASS")
 	// Fresh state → allocateCycle mints cycle 1; pre-create the collision there.
@@ -158,11 +155,9 @@ func TestNewCycleRun_DigestFailureWarnsNotAborts(t *testing.T) {
 		t.Fatalf("pre-create digest collision dir: %v", err)
 	}
 
-	var res core.CycleResult
-	var runErr error
-	stderr := captureStderr(t, func() {
-		res, runErr, _ = runChronicleCycle(t, root, true) // guard disabled: workspace is pre-seeded
-	})
+	var sink chronicleStderr
+	res, runErr, _ := runChronicleCycle(t, root, true, core.WithStderr(&sink))
+	stderr := sink.String()
 	if runErr != nil {
 		t.Fatalf("digest failure must never abort the cycle, got: %v", runErr)
 	}
@@ -177,26 +172,19 @@ func TestNewCycleRun_DigestFailureWarnsNotAborts(t *testing.T) {
 	}
 }
 
-// captureStderr swaps os.Stderr for a pipe around fn and returns what was
-// written. Callers must not run in parallel.
-func captureStderr(t *testing.T, fn func()) string {
-	t.Helper()
-	old := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	os.Stderr = w
-	done := make(chan string, 1)
-	go func() {
-		b, _ := io.ReadAll(r)
-		done <- string(b)
-	}()
-	defer func() {
-		os.Stderr = old
-	}()
-	fn()
-	_ = w.Close()
-	os.Stderr = old
-	return <-done
+type chronicleStderr struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (c *chronicleStderr) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.Write(p)
+}
+
+func (c *chronicleStderr) String() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.buf.String()
 }

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,7 +19,7 @@ import (
 var coverChangedProfiler = scopedCoverProfile
 
 func coverChangedFailures(ctx context.Context, in ReviewInput, paths []string) []string {
-	stage := coverChangedStage(in.ProjectRoot)
+	stage := coverChangedStage(in.ProjectRoot, in.errOut())
 	if stage == config.StageOff || in.Worktree == "" {
 		return nil
 	}
@@ -80,6 +81,6 @@ func coverChangedPackages(moduleDir string, paths []string) []string {
 	return out
 }
 
-func coverChangedStage(projectRoot string) config.Stage {
-	return floorStage(projectRoot, "cover_changed", "cover-changed check", func(p policy.Policy) string { return p.CoverChangedConfig().Stage })
+func coverChangedStage(projectRoot string, warn io.Writer) config.Stage {
+	return floorStage(projectRoot, "cover_changed", "cover-changed check", func(p policy.Policy) string { return p.CoverChangedConfig().Stage }, warn)
 }

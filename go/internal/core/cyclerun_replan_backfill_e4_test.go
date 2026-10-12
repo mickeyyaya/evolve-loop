@@ -76,10 +76,15 @@ func TestPostScoutReplan_OnlyTheAdvisorModeReplans(t *testing.T) {
 }
 
 func TestPostScoutReplan_AnUnreadableWorkspaceWarnsAndNeverReplans(t *testing.T) {
+	t.Parallel()
+
 	pl := &replanPlanner{plan: replanFullPlanE4()}
 	cr := replanRunE4(t, replanOrchestrator(t, &fakeLedger{}, pl), filepath.Join(t.TempDir(), "gone"), replanScoutOnlyPlanE4())
 
-	log := captureStderr(t, cr.postScoutReplan)
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	cr.postScoutReplan()
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN post-scout digest degraded (cycle 9): router digest: workspace:") {
 		t.Fatalf("the degraded digest must be named:\n%s", log)
@@ -107,6 +112,8 @@ func TestPostScoutReplan_APlanThatAlreadyCoversTheMeasuredNeedIsLeftAlone(t *tes
 }
 
 func TestPostScoutReplan_AZeroDepthCapMeansOneReplan(t *testing.T) {
+	t.Parallel()
+
 	ws := scoutWorkspace(t)
 	led := &fakeLedger{}
 	pl := &replanPlanner{plan: replanFullPlanE4()}
@@ -114,10 +121,11 @@ func TestPostScoutReplan_AZeroDepthCapMeansOneReplan(t *testing.T) {
 	o.cfg.RePlanMaxDepth = 0
 	cr := replanRunE4(t, o, ws, replanScoutOnlyPlanE4())
 
-	log := captureStderr(t, func() {
-		cr.postScoutReplan()
-		cr.postScoutReplan()
-	})
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	cr.postScoutReplan()
+	cr.postScoutReplan()
+	log := sink.String()
 
 	if pl.replanCalls != 1 || cr.replanDepth != 1 {
 		t.Fatalf("calls=%d depth=%d, want exactly one re-plan under the default cap of 1", pl.replanCalls, cr.replanDepth)
@@ -128,6 +136,8 @@ func TestPostScoutReplan_AZeroDepthCapMeansOneReplan(t *testing.T) {
 }
 
 func TestPostScoutReplan_AFailingAdvisorWarnsKeepsThePlanAndSpendsNoDepth(t *testing.T) {
+	t.Parallel()
+
 	ws := scoutWorkspace(t)
 	pl := &replanFailingPlannerE4{}
 	o := replanOrchestrator(t, &fakeLedger{}, &replanPlanner{})
@@ -135,7 +145,10 @@ func TestPostScoutReplan_AFailingAdvisorWarnsKeepsThePlanAndSpendsNoDepth(t *tes
 	initial := replanScoutOnlyPlanE4()
 	cr := replanRunE4(t, o, ws, initial)
 
-	log := captureStderr(t, cr.postScoutReplan)
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	cr.postScoutReplan()
+	log := sink.String()
 
 	if pl.calls != 1 || cr.replanDepth != 0 || cr.clampedPlan != initial {
 		t.Fatalf("calls=%d depth=%d: a failed re-plan must fail open", pl.calls, cr.replanDepth)
@@ -149,13 +162,18 @@ func TestPostScoutReplan_AFailingAdvisorWarnsKeepsThePlanAndSpendsNoDepth(t *tes
 }
 
 func TestRecordReplanEscalation_ALostLedgerRowWarnsAndNeverPanics(t *testing.T) {
+	t.Parallel()
+
 	ws := scoutWorkspace(t)
 	led := &fakeLedger{failOnAppend: true}
 	pl := &replanPlanner{plan: replanFullPlanE4()}
 	cr := replanRunE4(t, replanOrchestrator(t, led, pl), ws, replanScoutOnlyPlanE4())
 	cr.replanDepth = 1
 
-	log := captureStderr(t, cr.postScoutReplan)
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	cr.postScoutReplan()
+	log := sink.String()
 
 	if pl.replanCalls != 0 {
 		t.Fatalf("at the cap nothing may be re-planned; calls=%d", pl.replanCalls)

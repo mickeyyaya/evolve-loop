@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -139,7 +138,7 @@ func (cr *cycleRun) dispatchEvaluateBatch(batch []Phase) (loopAction, error) {
 
 func (cr *cycleRun) recordBatchMember(p Phase, resp PhaseResponse) {
 	if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle, Role: string(p), Kind: "phase", ExitCode: 0}); lerr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN evaluate-batch ledger append %s: %v\n", p, lerr)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN evaluate-batch ledger append %s: %v\n", p, lerr)
 	}
 	cr.o.recordReviewFindings(cr.cs, p, resp.Verdict)
 }

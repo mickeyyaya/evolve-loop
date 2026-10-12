@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards/treediff"
@@ -37,7 +36,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		return loopNext, nil
 	}
 	if remediationDenied[next] {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: phase %q is configured remediable but is a judgment/control phase — refused (deterministic gates only)\n", next)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN remediation: phase %q is configured remediable but is a judgment/control phase — refused (deterministic gates only)\n", next)
 		return loopNext, nil
 	}
 	builder, ok := cr.o.runners[PhaseBuild]
@@ -54,7 +53,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	round := cr.remediationRounds[next]
 
 	report := filepath.Join(cr.cs.WorkspacePath, phasecontract.ArtifactFilename(string(next)))
-	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s FAILed — dispatching builder fix round %d/%d (report: %s)\n",
+	fmt.Fprintf(cr.o.errOut(), "[orchestrator] remediation: gate %s FAILed — dispatching builder fix round %d/%d (report: %s)\n",
 		next, round, wf.RemediationRounds, report)
 
 	// Record the original failing gate attempt through the phase-outcome
@@ -93,7 +92,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	if berr != nil || bresp.Verdict == VerdictFAIL {
 		note := fmt.Sprintf("%s: round %d builder-failed", next, round)
 		cr.result.Remediations = append(cr.result.Remediations, note)
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: builder fix failed (%v, verdict=%s) — gate FAIL stands\n", berr, bresp.Verdict)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN remediation: builder fix failed (%v, verdict=%s) — gate FAIL stands\n", berr, bresp.Verdict)
 		return loopNext, nil
 	}
 	fixResult := dispatchResult{
@@ -103,7 +102,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 	if act, reviewErr := cr.reviewAndGuard(PhaseBuild, &fixResult); act == loopAbort {
 		note := fmt.Sprintf("%s: round %d voided (Build review rejected: %v)", next, round, reviewErr)
 		cr.result.Remediations = append(cr.result.Remediations, note)
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
 		return loopNext, nil
 	}
 	bresp = fixResult.resp
@@ -112,7 +111,7 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		if handoff.State != BuildExplanationAvailable {
 			note := fmt.Sprintf("%s: round %d voided (resealed Build explanation unavailable: %s)", next, round, handoff.Error)
 			cr.result.Remediations = append(cr.result.Remediations, note)
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
+			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN remediation: %s — gate FAIL stands\n", note)
 			return loopNext, nil
 		}
 		handoff.apply(&dr.phaseReq)
@@ -131,13 +130,13 @@ func (cr *cycleRun) maybeRemediate(next Phase, dr *dispatchResult) (loopAction, 
 		}
 		note := fmt.Sprintf("%s: round %d re-run dispatch-failed", next, round)
 		cr.result.Remediations = append(cr.result.Remediations, note)
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN remediation: gate re-run dispatch failed (%v) — original FAIL stands\n", rerr)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN remediation: gate re-run dispatch failed (%v) — original FAIL stands\n", rerr)
 		return loopNext, nil
 	}
 	dr.resp, dr.treeGuard, dr.beforeDirty = resp2, rerunGuard, rerunBefore
 	cr.result.Remediations = append(cr.result.Remediations,
 		fmt.Sprintf("%s: round %d -> %s", next, round, resp2.Verdict))
-	fmt.Fprintf(os.Stderr, "[orchestrator] remediation: gate %s re-ran -> %s (round %d/%d)\n",
+	fmt.Fprintf(cr.o.errOut(), "[orchestrator] remediation: gate %s re-ran -> %s (round %d/%d)\n",
 		next, resp2.Verdict, round, wf.RemediationRounds)
 	// The re-run's deliverable meets the same reviewer the original did, so a
 	// re-run that omits a declared deliverable or fails a contract check is

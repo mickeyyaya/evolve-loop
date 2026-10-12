@@ -151,6 +151,22 @@ The `git` call count of a full run fell from 25,162 to 24,414 in `internal/core`
 
 The gain is smaller than D26 expected in `internal/core` and `cmd/evolve`. Most of their remaining calls are production calls: `ls-files`, `diff`, `cat-file` and `status`. The multi-repository fixtures keep absolute paths and linked worktrees, and a copy cannot hold them. T13 targets the production calls.
 
+Update of 2026-10-12, T16 (D31). Code in `internal/core` takes its writer from a dependency. The default stays `os.Stderr`, with the same text. [test-system.md](../architecture/test-system.md) §5.4 states the rule.
+
+99 of the 116 tests that swapped `os.Stderr` now run in parallel with an injected buffer. The serial list of `internal/core` goes from 215 to 116 entries. The summed time of the listed tests goes from 63.4 s to 24.6 s. The package goes from 214.7 s to 141.7 s under `-race -tags integration`.
+
+17 tests stay serial. The table gives the reasons.
+
+| Tests | Reason |
+|---|---|
+| 4 | The code that writes is outside `internal/core`: the advisor and the retry adjudicator. No writer reaches it. |
+| 1 | The test sets the environment through a helper. |
+| 7 | The test also swaps a package variable: `postReviewExecutable` in six tests and `gitRunner` in one. |
+| 4 | `writeBuildSelfCheckArtifact` has an encode guard that no input reaches. A change needs a seam first. |
+| 1 | `stampContinuationManifest` has three failure branches. A change needs three new tests. |
+
+The guard of T11 now also rejects a parallel test that calls a helper that changes process state. `captureStderr` is such a helper.
+
 At most four lanes run at one time. The coverage backfill lanes (E1 to E4, F1 to F4) share the four slots. T1 and T2 come before F1 to F4, because each later floor is faster after T1 and T2.
 
 ## 8. Verification
@@ -225,7 +241,7 @@ Each criterion has a score from 1 (bad) to 5 (good).
 |---|---|---|---|
 | T14 | D28 and D29: one build for each test binary, and the `gotooltest` helper. The first users are the skills-drift tests, `internal/core` and the five tests of research F10.3. Status: built in `internal/gotooltest` (kit at 100% coverage). `cmd/evolve`, `internal/subagent` and `test/e2e` use `Cache`; `internal/core`, `internal/phases/audit` and `cmd/evolve` call `LimitProcess` in `TestMain`. | The number of `go build` runs in a package run drops to one for each binary; nested runs carry the limits | Sonnet |
 | T15 | D30: the phase configurations pass `SleepFn`. Status: built. Six phase configurations carry `SleepFn` to the runner. The 500 ms read grace of `internal/deliverable` adds 8 s over 16 probes, and `SleepFn` does not reach it. The six tests therefore inject a verifier for the empty artifact. A test for each phase proves 15 sleeps of 200 ms. | `TestRun_EmptyArtifact_FAIL` of each phase finishes in under 1 s | Sonnet |
-| T16 | D31: injected writers in place of `os.Stderr` swaps, first in `internal/core` (116 tests) | The guard of T11 accepts the tests as parallel; the outputs stay the same | Sonnet |
+| T16 | D31: injected writers in place of `os.Stderr` swaps, first in `internal/core` (116 tests). Status: built in `internal/core`. 99 of the 116 tests run in parallel with an injected writer. 17 stay serial, each with its reason (see the update of T16 above). | The guard of T11 accepts the tests as parallel; the outputs stay the same | Sonnet |
 | T17 | D32: T11 for `internal/phases/audit`, `internal/bridge` and `internal/ciparity` | As T11, with the `-count=3 -race -shuffle=on` gate | Sonnet |
 
 ### 11.5 Order

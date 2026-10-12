@@ -43,9 +43,9 @@ func (o *Orchestrator) deferLaneWithoutWorktree(cs CycleState, cause error) erro
 }
 
 func (o *Orchestrator) recordProvisioningFailure(cycle int, projectRoot, workspace string, cause error) {
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", cause)
+	fmt.Fprintf(o.errOut(), "[orchestrator] WARN worktree provisioning failed (source phases will be blocked): %v\n", cause)
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN create workspace for provisioning failure: %v\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN create workspace for provisioning failure: %v\n", err)
 		return
 	}
 	o.ensureFailureDigest(cycle, projectRoot, workspace, "worktree", fmt.Sprintf("worktree provisioning failed: %v", cause))

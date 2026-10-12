@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,11 +76,15 @@ func (g gitWorktree) Create(projectRoot string, cycle int) (string, error) {
 var worktreeAddRetrySleep = time.Sleep
 
 func worktreeAddRetry(branch string) gitexec.WorktreeAddRetry {
+	return worktreeAddRetryTo(branch, os.Stderr)
+}
+
+func worktreeAddRetryTo(branch string, warn io.Writer) gitexec.WorktreeAddRetry {
 	return gitexec.WorktreeAddRetry{
 		Sleep:     func(d time.Duration) { worktreeAddRetrySleep(d) },
 		Retryable: gitexec.RetryableWorktreeAddFailure,
 		OnRetry: func(attempt, attempts, code int, _ string) {
-			fmt.Fprintf(os.Stderr, "[worktree] retry %d/%d: git worktree add -B %s after retryable rc=%d\n",
+			fmt.Fprintf(warn, "[worktree] retry %d/%d: git worktree add -B %s after retryable rc=%d\n",
 				attempt, attempts-1, branch, code)
 		},
 	}

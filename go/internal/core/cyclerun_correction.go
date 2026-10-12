@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -108,7 +107,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 					Payload:    rr.Reason,
 				}
 				if cr.o.cfg.PhaseRecovery != config.StageEnforce {
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: would-salvage misplaced deliverable (%s; EVOLVE_PHASE_RECOVERY=%s)\n", next, act.Reason, cr.o.cfg.PhaseRecovery)
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: would-salvage misplaced deliverable (%s; EVOLVE_PHASE_RECOVERY=%s)\n", next, act.Reason, cr.o.cfg.PhaseRecovery)
 					irec.Record(interaction.Outcome{Event: salvEv, Result: interaction.ResultWouldAct})
 					continue
 				}
@@ -123,14 +122,14 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 					if rr.Approve {
 						res = interaction.ResultAccepted
 					}
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: salvaged %s → contracted path (gate approve=%v)\n", next, sr.From, rr.Approve)
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: salvaged %s → contracted path (gate approve=%v)\n", next, sr.From, rr.Approve)
 					irec.Record(interaction.Outcome{Event: salvEv, Result: res, LatencyMS: cr.o.now().Sub(salvStart).Milliseconds()})
 				case sr.Relocated:
 					salvagedFromInvalid = sr.From
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: salvage relocated %s but the destination failed verification — falling through\n", next, sr.From)
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: salvage relocated %s but the destination failed verification — falling through\n", next, sr.From)
 					irec.Record(interaction.Outcome{Event: salvEv, Result: interaction.ResultFoundButInvalid, LatencyMS: cr.o.now().Sub(salvStart).Milliseconds()})
 				default:
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: nothing to salvage (%s)\n", next, sr.Reason)
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: nothing to salvage (%s)\n", next, sr.Reason)
 					irec.Record(interaction.Outcome{Event: salvEv, Result: interaction.ResultNotFound, LatencyMS: cr.o.now().Sub(salvStart).Milliseconds()})
 				}
 				continue
@@ -145,7 +144,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				continue
 			}
 			corr++
-			fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
+			fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 				next, corr, maxCorrections, rr.Reason)
 			// CLI escalation: from the correction answering the SECOND
 			// consecutive block, re-dispatch on a different CLI FAMILY instead
@@ -183,7 +182,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 					if blocksForLog == 0 {
 						blocksForLog = corr // the evalgate door: its ordinal IS the count
 					}
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CLI ESCALATION — %d consecutive identical block(s) on cli=%s; correction %d re-dispatches on cli=%s (these rejections never trigger cli_fallback, which is how an incapable CLI used to burn every round). The phase's primary routing is unchanged.\n",
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CLI ESCALATION — %d consecutive identical block(s) on cli=%s; correction %d re-dispatches on cli=%s (these rejections never trigger cli_fallback, which is how an incapable CLI used to burn every round). The phase's primary routing is unchanged.\n",
 						next, blocksForLog, failedCLI, corr, esc)
 					dr.phaseReq.ModelRoutingCLI = esc
 					escalated = true
@@ -191,7 +190,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 					// The two remedies are disjoint: this arm is reached only when
 					// there is genuinely no other family to escalate to, so one
 					// block's round-2 budget is never spent on both.
-					fmt.Fprintf(os.Stderr, "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s and no other CLI family is available to escalate to; correction %d re-dispatches on the SAME cli with a structured re-prompt carrying the validator output verbatim. Breaker-neutral: no extra dispatch, no extra correction, no routing change.\n",
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: CONTRACT SALVAGE RETRY — %d consecutive contract blocks on cli=%s and no other CLI family is available to escalate to; correction %d re-dispatches on the SAME cli with a structured re-prompt carrying the validator output verbatim. Breaker-neutral: no extra dispatch, no extra correction, no routing change.\n",
 						next, rr.Blocks, failedCLI, corr)
 					salvageRetry = true
 					salvageRetried = true
@@ -208,7 +207,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				Kind:     "contract_correction",
 				ExitCode: 0,
 			}); lerr != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN contract_correction ledger append: %v\n", lerr)
+				fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN contract_correction ledger append: %v\n", lerr)
 			}
 			// Payload carries the violation that TRIGGERED this dispatch;
 			// a rejected_again outcome's NEW violation appears as the next

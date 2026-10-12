@@ -87,7 +87,7 @@ func (o *Orchestrator) adviseOnUnclassifiedFailure(ctx context.Context, cycle in
 	if cause, _, known := det.Detect(recovery.StripAgentContent(report.FinalPane, "", nil)); known {
 		// Deterministic-first: the registry already classifies this pane —
 		// the fast-fail (C2) owns acting on it; no LLM consultation.
-		fmt.Fprintf(os.Stderr, "[orchestrator] phase-recovery: pane already classified (%s); skipping advisor\n", cause)
+		fmt.Fprintf(o.errOut(), "[orchestrator] phase-recovery: pane already classified (%s); skipping advisor\n", cause)
 		return
 	}
 	advCtx, advCancel := context.WithTimeout(ctx, adviseTimeout)
@@ -102,12 +102,12 @@ func (o *Orchestrator) adviseOnUnclassifiedFailure(ctx context.Context, cycle in
 		Env:         env,
 	})
 	if aerr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-recovery advisor: %v (escalating to operator)\n", aerr)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase-recovery advisor: %v (escalating to operator)\n", aerr)
 		return
 	}
 	if perr := recovery.PromoteAdvice(det, sigDir, *advice); perr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-recovery promotion rejected: %v\n", perr)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase-recovery promotion rejected: %v\n", perr)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] phase-recovery: advisor classified %s pane as %s; signature promoted (%s)\n", phase, advice.Cause, advice.Justification)
+	fmt.Fprintf(o.errOut(), "[orchestrator] phase-recovery: advisor classified %s pane as %s; signature promoted (%s)\n", phase, advice.Cause, advice.Justification)
 }

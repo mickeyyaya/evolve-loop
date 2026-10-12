@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -19,23 +20,27 @@ func kindDeclaringPhase(next Phase) bool {
 	return false
 }
 
-func kindSignals(workspace string) router.RoutingSignals {
+func kindSignals(workspace string, warn io.Writer) router.RoutingSignals {
 	phases := make([]string, len(kindReportPhases))
 	for i, p := range kindReportPhases {
 		phases[i] = string(p)
 	}
 	sig, err := router.Digest(workspace, phases)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN deliverable-kind digest failed: %v — reading the conservative kind\n", err)
+		fmt.Fprintf(warn, "[orchestrator] WARN deliverable-kind digest failed: %v — reading the conservative kind\n", err)
 	}
 	for _, reason := range sig.DigestDegraded {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN deliverable-kind digest degraded (%s) — reading the conservative kind\n", reason)
+		fmt.Fprintf(warn, "[orchestrator] WARN deliverable-kind digest degraded (%s) — reading the conservative kind\n", reason)
 	}
 	return sig
 }
 
 func dispatchSignals(next Phase, workspace, projectRoot string) map[string]string {
-	sig := kindSignals(workspace)
+	return dispatchSignalsTo(next, workspace, projectRoot, os.Stderr)
+}
+
+func dispatchSignalsTo(next Phase, workspace, projectRoot string, warn io.Writer) map[string]string {
+	sig := kindSignals(workspace, warn)
 	declared, _ := sig.DeclaredDeliverableKind()
 	domainDefault := noDomainDefault
 	if kindDeclaringPhase(next) && len(sig.DigestDegraded) == 0 {

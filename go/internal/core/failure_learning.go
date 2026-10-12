@@ -134,32 +134,32 @@ func (o *Orchestrator) recordFailureLearning(ctx context.Context, fl failureLear
 		fl.CycleState.ShipFailReasons = []string{fl.Err.Error()}
 	}
 	if gate == gateQuotaDeferred {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: the dispatch chain ended at a quota wall; skipping failure learning (DEFERRED, resumable)\n")
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: the dispatch chain ended at a quota wall; skipping failure learning (DEFERRED, resumable)\n")
 		return
 	}
 	summary, todoID, structured := o.recordFailedApproachState(fl)
 	// A missing persona doc is a deterministically known configuration absence:
 	// learn it deterministically, no LLM dispatch.
 	if errors.Is(fl.Err, ErrAgentDocMissing) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] failure-learning: %s persona doc missing — known configuration absence, learned deterministically (no retrospective agent dispatched)\n", fl.Failed)
+		fmt.Fprintf(o.errOut(), "[orchestrator] failure-learning: %s persona doc missing — known configuration absence, learned deterministically (no retrospective agent dispatched)\n", fl.Failed)
 		o.ensureFailureDigest(fl.Cycle, fl.CycleRequest.ProjectRoot, fl.CycleState.WorkspacePath, string(fl.Failed), fl.Err.Error())
 		o.learnDeterministically(ctx, fl, summary, structured)
 		return
 	}
 	retroRunner, ok := o.runners[PhaseRetro]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: no retro runner registered; queued carryover todo only\n")
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: no retro runner registered; queued carryover todo only\n")
 		o.writeFailureLearningState(ctx, fl.State)
 		return
 	}
 	retroResp, retroErr := o.dispatchRetro(ctx, fl, retroRunner, summary, todoID)
 	if retroErr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: retro failed after %s failure: %v\n", fl.Failed, retroErr)
 		o.learnDeterministically(ctx, fl, summary, structured)
 		return
 	}
 	if !IsVerdict(retroResp.Verdict) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN failure-learning: retro returned non-canonical verdict %q after %s failure\n", retroResp.Verdict, fl.Failed)
 		o.learnDeterministically(ctx, fl, summary, structured)
 		return
 	}

@@ -228,6 +228,63 @@ func processStateMutations(fset *token.FileSet, fd *ast.FuncDecl, tName, qualifi
 	return found
 }
 
+func calledHelper(body *ast.BlockStmt, helpers map[string]string) string {
+	found := ""
+	ast.Inspect(body, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || found != "" {
+			return found == ""
+		}
+		switch fn := call.Fun.(type) {
+		case *ast.Ident:
+			if _, hit := helpers[fn.Name]; hit {
+				found = fn.Name
+			}
+		case *ast.SelectorExpr:
+			if _, hit := helpers[fn.Sel.Name]; hit {
+				found = fn.Sel.Name
+			}
+		}
+		return found == ""
+	})
+	return found
+}
+
+func stateChangingHelpers(fset *token.FileSet, files []parsedTestFile, pkgVars map[string]bool) map[string]string {
+	decls := map[string]*ast.FuncDecl{}
+	qualifiers := map[string]string{}
+	for _, pf := range files {
+		if !strings.HasSuffix(pf.path, "_test.go") {
+			continue
+		}
+		for _, decl := range pf.file.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Body == nil || isTopLevelTest(fd) || fd.Name.Name == "TestMain" {
+				continue
+			}
+			decls[fd.Name.Name] = fd
+			qualifiers[fd.Name.Name] = strings.TrimSuffix(pf.pkgName, "_test")
+		}
+	}
+	helpers := map[string]string{}
+	for changed := true; changed; {
+		changed = false
+		for name, fd := range decls {
+			if _, done := helpers[name]; done {
+				continue
+			}
+			if stmts := processStateMutations(fset, fd, testingTName(fd), qualifiers[name], pkgVars); len(stmts) > 0 {
+				helpers[name] = stmts[0]
+				changed = true
+			} else if callee := calledHelper(fd.Body, helpers); callee != "" {
+				helpers[name] = "calls " + callee
+				changed = true
+			}
+		}
+	}
+	return helpers
+}
+
 func serialByDefaultViolations(sources map[string]string, serial map[string]string) []string {
 	fset := token.NewFileSet()
 	paths := make([]string, 0, len(sources))
@@ -246,6 +303,7 @@ func serialByDefaultViolations(sources map[string]string, serial map[string]stri
 		files = append(files, parsedTestFile{path: path, pkgName: file.Name.Name, file: file})
 	}
 	pkgVars := declaredPackageVars(files)
+	helpers := stateChangingHelpers(fset, files, pkgVars)
 	seen := map[string]bool{}
 	for _, pf := range files {
 		if !strings.HasSuffix(pf.path, "_test.go") {
@@ -259,7 +317,7 @@ func serialByDefaultViolations(sources map[string]string, serial map[string]stri
 			}
 			key := pf.pkgName + "." + fd.Name.Name
 			seen[key] = true
-			violations = append(violations, testViolations(fset, fd, key, filepath.Base(pf.path), qualifier, pkgVars, serial)...)
+			violations = append(violations, testViolations(fset, fd, key, filepath.Base(pf.path), qualifier, pkgVars, helpers, serial)...)
 		}
 	}
 	for key := range serial {
@@ -271,7 +329,7 @@ func serialByDefaultViolations(sources map[string]string, serial map[string]stri
 	return violations
 }
 
-func testViolations(fset *token.FileSet, fd *ast.FuncDecl, key, file, qualifier string, pkgVars map[string]bool, serial map[string]string) []string {
+func testViolations(fset *token.FileSet, fd *ast.FuncDecl, key, file, qualifier string, pkgVars map[string]bool, helpers map[string]string, serial map[string]string) []string {
 	tName := testingTName(fd)
 	parallelFirst := startsWithParallel(fd.Body, tName)
 	parallelAnywhere := callsAnywhere(fd.Body, tName, "Parallel")
@@ -291,6 +349,9 @@ func testViolations(fset *token.FileSet, fd *ast.FuncDecl, key, file, qualifier 
 	if parallelAnywhere {
 		for _, stmt := range processStateMutations(fset, fd, tName, qualifier, pkgVars) {
 			violations = append(violations, key+" ("+file+"): a parallel test must not change process state: "+stmt)
+		}
+		if helper := calledHelper(fd.Body, helpers); helper != "" {
+			violations = append(violations, key+" ("+file+"): a parallel test must not call "+helper+", which changes process state: "+helpers[helper])
 		}
 	}
 	return violations
@@ -428,6 +489,37 @@ func TestSerialByDefaultGuard_ParallelTestMustNotMutateProcessState(t *testing.T
 	}
 }
 
+func TestSerialByDefaultGuard_ParallelTestMustNotCallAHelperThatChangesProcessState(t *testing.T) {
+	t.Parallel()
+	helpers := "func swapStderr(fn func()) {\n\tos.Stderr = nil\n\tfn()\n}\n" +
+		"func swapThroughAnother(fn func()) {\n\tswapStderr(fn)\n}\n" +
+		"func setSeam(t *testing.T) {\n\tt.Setenv(\"A\", \"b\")\n}\n" +
+		"func harmless() int {\n\treturn 1\n}\n"
+	cases := map[string]struct{ call, want string }{
+		"a direct stderr swap":          {"swapStderr(func() {})", "os.Stderr = nil"},
+		"a swap through another helper": {"swapThroughAnother(func() {})", "calls swapStderr"},
+		"a helper that sets the env":    {"setSeam(t)", "t.Setenv"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			body := helpers + "func TestFixtureCalls(t *testing.T) {\n\tt.Parallel()\n\t" + tc.call + "\n}\n"
+			got := fixtureViolations(t, "core", body, nil)
+			if len(got) != 1 || !strings.Contains(got[0], "TestFixtureCalls") || !strings.Contains(got[0], tc.want) {
+				t.Fatalf("%s: want one violation naming the test and %q; got %v", name, tc.want, got)
+			}
+		})
+	}
+	clean := helpers + "func TestFixtureClean(t *testing.T) {\n\tt.Parallel()\n\t_ = harmless()\n}\n"
+	if got := fixtureViolations(t, "core", clean, nil); len(got) != 0 {
+		t.Fatalf("a parallel test that calls only harmless helpers must pass; got %v", got)
+	}
+	serial := helpers + "func TestFixtureSerial(t *testing.T) {\n\tswapStderr(func() {})\n}\n"
+	if got := fixtureViolations(t, "core", serial, map[string]string{"core.TestFixtureSerial": "fixture"}); len(got) != 0 {
+		t.Fatalf("a listed serial test may call a state-changing helper; got %v", got)
+	}
+}
+
 func TestSerialByDefaultGuard_ShadowedNamesAreNotPackageWrites(t *testing.T) {
 	t.Parallel()
 	body := "func TestFixtureShadow(t *testing.T) {\n\tt.Parallel()\n\tsharedSeam := 1\n\tsharedSeam = 2\n\t_ = sharedSeam\n}\n"
@@ -474,6 +566,7 @@ const (
 	swapsOsArgs                     = "test swaps os.Args"
 	swapsPhaseBoundaryCheckpointer  = "test swaps package variable PhaseBoundaryCheckpointer"
 	swapsPhasePlanMarshal           = "test swaps package variable phasePlanMarshal"
+	swapsPostReviewExecutable       = "test swaps package variable postReviewExecutable"
 	swapsPostBuildRepinProvenanceFn = "test swaps package variable postBuildRepinProvenanceFn"
 	swapsPostScoutReplanProbe       = "test swaps package variable postScoutReplanProbe"
 	swapsPredicateModuleDir         = "test swaps package variable predicateModuleDir"
@@ -490,6 +583,20 @@ var serialRequiredTests = map[string]string{
 	"core.TestGitWorktree_RelativeBaseRefused":                                                      changesDirectory,
 	"core.TestGitWorktree_RelativeProjectRootRefused":                                               changesDirectory,
 	"core.TestNewCycleRun_RejectsRootCycleOccupiedInFetchedWorktree":                                setsEnv,
+	"core.TestNoteContractGateDemotion_EachFailingSinkWarnsAndTheOthersStillRecord":                 setsEnv,
+	"core.TestWriteBuildSelfCheck_HealthyWriteIsSilent":                                             swapsStderr,
+	"core.TestWriteBuildSelfCheck_WriteFailureSurfaces":                                             swapsStderr,
+	"core.TestWriteBuildSelfCheckArtifact_HealthyRoundTrip_LargeAndUnicodeContent":                  swapsStderr,
+	"core.TestWriteBuildSelfCheckArtifact_MkdirAllFailure_WARNsAndDoesNotPanic":                     swapsStderr,
+	"core.TestStampContinuation_NeverSnapshotsTheProjectRoot":                                       swapsStderr,
+	"core.TestBridgeRetryAdjudicator_PromptCarriesTheAuditsReasonsFromTheOneReader":                 swapsStderr,
+	"core.TestApplyPostReviewGuards_AGitignoredBinaryIsNeverCheckedOut":                             swapsPostReviewExecutable,
+	"core.TestApplyPostReviewGuards_AGuardThatCannotReSnapshotAfterTheDiscardAbortsUnchecked":       swapsPostReviewExecutable,
+	"core.TestApplyPostReviewGuards_ALeakedPathUnderAConsoleLeaseContinuesButSaysItIsNotClean":      swapsPostReviewExecutable,
+	"core.TestApplyPostReviewGuards_ARebuiltBinaryInsideTheMainTreeIsDiscardedAndThePhaseContinues": swapsPostReviewExecutable,
+	"core.TestApplyPostReviewGuards_AnExecutableOutsideTheMainTreeOrUnknownLeavesNoRelativeBinary":  swapsPostReviewExecutable,
+	"core.TestApplyPostReviewGuards_TheKnownGoEvolvePathIsNotDiscardedTwice":                        swapsPostReviewExecutable,
+	"core.TestLaneStartRef_RetriesRefLockContention":                                                swapsGitRunner,
 	"core.TestExecuteRetryBackoff_AppliedOnAttempt2":                                                swapsBackoffSleep,
 	"core.TestExecuteRetryBackoff_ZeroBaseDisables":                                                 swapsBackoffSleep,
 	"core.TestShipRecovery_JitteredBackoffBetweenReaudits":                                          swapsBackoffSleep,
@@ -582,121 +689,8 @@ var serialRequiredTests = map[string]string{
 	"core.TestRunCycle_WalledCorrectionRedispatch_DefersLikeAFirstDispatch":                         swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_WalledRemediationRerun_DefersLikeAFirstDispatch":                             swapsQuotaBoundaryCheckpointer,
 	"core.TestShipWindowWiring_FailOpenWhenSiblingHolds":                                            swapsShipWindowAcquireTimeout,
-	"core.TestActiveVerifiedMints_ACorruptRegistryThatCannotBeQuarantinedWarnsTwice":                swapsStderr,
-	"core.TestAdviseOnUnclassifiedFailure_RejectedAdviceIsNotPromoted":                              swapsStderr,
 	"core.TestAdvisorStderrAndStream_HappyPathAreSilent":                                            swapsStderr,
-	"core.TestApplyPostReviewGuards_AGitignoredBinaryIsNeverCheckedOut":                             swapsStderr,
-	"core.TestApplyPostReviewGuards_AGuardThatCannotReSnapshotAfterTheDiscardAbortsUnchecked":       swapsStderr,
-	"core.TestApplyPostReviewGuards_ALeakedPathUnderAConsoleLeaseContinuesButSaysItIsNotClean":      swapsStderr,
-	"core.TestApplyPostReviewGuards_ARebuiltBinaryInsideTheMainTreeIsDiscardedAndThePhaseContinues": swapsStderr,
-	"core.TestApplyPostReviewGuards_AnExecutableOutsideTheMainTreeOrUnknownLeavesNoRelativeBinary":  swapsStderr,
-	"core.TestApplyPostReviewGuards_TheKnownGoEvolvePathIsNotDiscardedTwice":                        swapsStderr,
-	"core.TestAuditorFindingsBrief_UnreadableReportWarns":                                           swapsStderr,
-	"core.TestBridgeRetryAdjudicator_PromptCarriesTheAuditsReasonsFromTheOneReader":                 swapsStderr,
-	"core.TestBuildTagVisiblePackages_DropsOnlyPackagesWithNoDefaultTagFiles":                       swapsStderr,
-	"core.TestBuildTagVisiblePackages_GoListFailureFailsOpenWithAWarning":                           swapsStderr,
-	"core.TestCommentFloorFailures_AnOffStageNeverReadsTheDiff":                                     swapsStderr,
-	"core.TestCompleteCycle_AFailedToolOutputPruneWarnsAndStillSeals":                               swapsStderr,
-	"core.TestComposeRepairBrief_ADefectTheBriefedFindingsCarryIsNotRepeated":                       swapsStderr,
-	"core.TestComposeRepairBrief_AFailureBlockEveryDefectOfWhichIsBriefedAddsNoSection":             swapsStderr,
-	"core.TestComposeRepairBrief_AnAgentGradedFailBriefsItsFailureBlockDefects":                     swapsStderr,
-	"core.TestComposeRepairBrief_TheDedupeCoversExactlyTheBriefedFindings":                          swapsStderr,
-	"core.TestComposeRepairBrief_TheRunnersReasonsNotTheWorkspaceFileDecideTheGateSlot":             swapsStderr,
-	"core.TestCompositionCarryForward_DeclinesBeforeAnyGateOnEachUnverifiableComposition":           swapsStderr,
-	"core.TestCompositionCarryForward_GateDeclineWritesNoUntaggedStderr":                            swapsStderr,
 	"core.TestCoreFacades_ProjectTheLeaf":                                                           swapsStderr,
-	"core.TestCoveringTests_AbsentCorpusIsAnnouncedNotSilent":                                       swapsStderr,
-	"core.TestDecideAfterAuditFail_AnExplanationOnlyFailBriefsItsDefectsWithoutARecord":             swapsStderr,
-	"core.TestDefaultBuildFloorChecks_WarnsOnSteFindingsInTheChangedDocs":                           swapsStderr,
-	"core.TestDiscard_ANonRepositoryMainTreeIsNotRecovered":                                         swapsStderr,
-	"core.TestDispatchSignals_DegradedDigestIsLoud":                                                 swapsStderr,
-	"core.TestDispatch_ABestEffortObserverThatFailsAfterShipIsSkippedNotFatal":                      swapsStderr,
-	"core.TestDispatch_ANonCanonicalVerdictAtTheRetryCapDegradesOnlyANonFloorPhase":                 swapsStderr,
-	"core.TestDispatch_AReconciledTimeoutShipsOnTheAgentsVerdictAndLeavesAnAuditRow":                swapsStderr,
-	"core.TestDispatch_ARetryRowThatCannotBeWrittenWarnsAndTheRelaunchStillHappens":                 swapsStderr,
-	"core.TestDocsFloorWarn_ABrokenStandardWarnsThatTheLintDidNotRun":                               swapsStderr,
-	"core.TestDocsFloorWarn_AChangedGeneratedDocIsNotAFinding":                                      swapsStderr,
-	"core.TestDocsFloorWarn_AWorktreeWithoutTheStandardIsSilent":                                    swapsStderr,
-	"core.TestDocsFloorWarn_AnUndocumentedArchitectureChangeWarnsByStage":                           swapsStderr,
-	"core.TestDocsFloorWarn_CleanOrOutOfScopeDocsPrintNothing":                                      swapsStderr,
-	"core.TestDocsFloorWarn_EveryOtherStageOnlyWarns":                                               swapsStderr,
-	"core.TestDocsFloorWarn_NamesADocThatItCannotRead":                                              swapsStderr,
-	"core.TestDocsFloorWarn_NamesTheFirstFindingOfTheChangedDocs":                                   swapsStderr,
-	"core.TestDocsFloorWarn_SteStageOffPrintsNothing":                                               swapsStderr,
-	"core.TestFloorStage_AnUnknownWordTurnsTheCheckOffAndNamesIt":                                   swapsStderr,
-	"core.TestIdentityCarryForward_DeclinesWhenTheWorktreeCannotBeRead":                             swapsStderr,
-	"core.TestIdentityCarryForward_GateDeclineEmitsOneCodedSignalEvent":                             swapsStderr,
-	"core.TestLaneStartRef_RetriesRefLockContention":                                                swapsStderr,
-	"core.TestMaterializedEvalSlugs_NoWorkspaceOrAnUnreadableHomeOwnsNothing":                       swapsStderr,
-	"core.TestMaybeRemediate_AReRunThatTheReviewerRejectsAbortsTheCycle":                            swapsStderr,
-	"core.TestMaybeRemediate_ARejectedBuilderFixVoidsTheRoundAndTheGateFailStands":                  swapsStderr,
-	"core.TestMaybeRemediate_AResealedExplanationThatCannotBeProjectedVoidsTheRound":                swapsStderr,
-	"core_test.TestNewCycleRun_DigestFailureWarnsNotAborts":                                         swapsStderr,
-	"core.TestNormalizeScoutGoalHash_AnAbsentReportIsSilent":                                        swapsStderr,
-	"core.TestNormalizeScoutGoalHash_AnUnreadableReportWarnsAndLeavesItAlone":                       swapsStderr,
-	"core.TestNormalizeWorktreeToBase_ALockedBranchKeepsTheBuilderCommit":                           swapsStderr,
-	"core.TestNormalizeWorktreeToBase_AnUnreadableHeadLeavesTheWorktreeAsIs":                        swapsStderr,
-	"core.TestNoteContractExhaustionSkip_ALedgerFailureWarnsWithoutDroppingTheSkip":                 swapsStderr,
-	"core.TestNoteContractGateDemotion_EachFailingSinkWarnsAndTheOthersStillRecord":                 swapsStderr,
 	"core.TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption":                              swapsStderr,
-	"core.TestPlanCycle_AnUnwritableWorkspaceKeepsTheContextChallengeToken":                         swapsStderr,
-	"core.TestPlanCycle_LedgerStampFailuresWarnAndThePlanStillCarriesTheDirectives":                 swapsStderr,
-	"core.TestPlanCycle_ScopePathsSkipBlankIDsAndRefuseUnencodablePairs":                            swapsStderr,
-	"core.TestPorcelainDirty_AnUnlaunchableGitIsAnErrorAndTheSetReadsClean":                         swapsStderr,
-	"core.TestPostScoutReplan_AFailingAdvisorWarnsKeepsThePlanAndSpendsNoDepth":                     swapsStderr,
-	"core.TestPostScoutReplan_AZeroDepthCapMeansOneReplan":                                          swapsStderr,
-	"core.TestPostScoutReplan_AnUnreadableWorkspaceWarnsAndNeverReplans":                            swapsStderr,
-	"core.TestReadContinuationFindings_RendersReasonsOrFallsBackLoudly":                             swapsStderr,
-	"core.TestRecordAuditBinding_ALostLedgerRowStillCachesTheReusableVerdict":                       swapsStderr,
-	"core.TestRecordAuditBinding_AnUnreadableProjectHeadBindsNothing":                               swapsStderr,
-	"core.TestRecordAuditBinding_AnUnresolvableBaseSkipsTheCache":                                   swapsStderr,
-	"core.TestRecordAuditBinding_AnUnwritableCacheWarnsAfterBinding":                                swapsStderr,
-	"core.TestRecordBatchMember_ALedgerFailureWarnsAndTheBatchStillAdvances":                        swapsStderr,
-	"core.TestRecordFailureLearning_DocMissingArmWritesTheDigestAndTheFallbackArmsNeverRewriteIt":   swapsStderr,
-	"core.TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota":                                  swapsStderr,
-	"core.TestRecordFailureLearning_NoRetroRunner_QueuesTodoAndPersistsWithoutRetroStamp":           swapsStderr,
-	"core.TestRecordFailureLearning_PersistIsTheLastStorageEffect":                                  swapsStderr,
-	"core.TestRecordFailureLearning_RetroLedgerAppendFailure_RaisesOnlyTheLedgerCode":               swapsStderr,
-	"core.TestRecordFailureLearning_StreamIsByteIdenticalApartFromTheDeclaredCodes":                 swapsStderr,
-	"core.TestRecordPhaseOutcome_AnAdvisoryOnAPassRidesTheRecord":                                   swapsStderr,
-	"core.TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail":                   swapsStderr,
-	"core.TestRecordPhasePlanKind_ALostAdvisorCaptureRowWarnsPerCapture":                            swapsStderr,
-	"core.TestRecordProvisioningFailure_AnUncreatableWorkspaceWarnsAndWritesNoDigest":               swapsStderr,
-	"core.TestRecordReplanEscalation_ALostLedgerRowWarnsAndNeverPanics":                             swapsStderr,
-	"core.TestRecordRoutingDecision_AnUnencodableDecisionIsLedgeredWithoutAnArtifact":               swapsStderr,
-	"core.TestRecoverFromShipError_AContinuationLaneRunsTheIdentityProof":                           swapsStderr,
-	"core.TestRecoverFromShipError_AFailedPendAfterAnUnwindAborts":                                  swapsStderr,
-	"core.TestRecoverFromShipError_ARouteTheStateMachineForbidsAborts":                              swapsStderr,
-	"core.TestRecoverPath_AStagedAddOrDeleteIsDiscardedAndAnUnknownStatusAborts":                    swapsStderr,
-	"core.TestRecoverTrackedEdit_AnEditThatVanishedFromTheMainTreeAborts":                           swapsStderr,
-	"core.TestRecoverUntracked_AVanishedLeakCannotBeRelocated":                                      swapsStderr,
-	"core.TestRemoveDuplicateLeak_AnUnremovableLeakIsNotRecovered":                                  swapsStderr,
-	"core.TestRepairRoundDispatch_AnAgentGradedFailBriefsTheDefectsWithoutAWarn":                    swapsStderr,
-	"core.TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff":                        swapsStderr,
-	"core.TestRepoContractFloorChecks_GreenOrAnUnnamedExitPassesTheHandoff":                         swapsStderr,
-	"core.TestRetireSupersededAuditArtifacts_ARenameAndRemoveRefusalLeavesTheSourceWithAWarning":    swapsStderr,
-	"core.TestRetireSupersededAuditArtifacts_AStaleSourceThatCannotBeRemovedIsKeptAndWarned":        swapsStderr,
-	"core.TestRetireSupersededAuditArtifacts_AnArchivePathPastPathMaxRemovesTheSourceUnarchived":    swapsStderr,
-	"core.TestRetryPhaseRunner_ABackfilledArtifactTimeoutReturnsTheWarnResponse":                    swapsStderr,
-	"core.TestReviewResumedDeliverable_ALeakWrittenByTheCorrectionStopsBeforeTheReReview":           swapsStderr,
-	"core.TestReviewWithCorrections_ALeakAfterACorrectionAbortsBeforeTheReReview":                   swapsStderr,
-	"core.TestReviewWithCorrections_ALostCorrectionLedgerRowWarnsAndTheLadderContinues":             swapsStderr,
-	"core.TestRouteRebasedExplanation_ACommittedChangeReportsTheProofSkipped":                       swapsStderr,
-	"core.TestRunCycle_AnUnwritableInteractionSummaryWarnsAndTheCycleStillCompletes":                swapsStderr,
-	"core.TestRunCycle_PlanDegradeEmitsNoOrchestratorCode":                                          swapsStderr,
-	"core.TestScopedMergeCarryForward_DeclinesOnEachFailClosedRung":                                 swapsStderr,
-	"core.TestScopedMergeCarryForward_GateDeclineWritesNoUntaggedStderr":                            swapsStderr,
-	"core.TestSetAsideShadowedLeak_AnUnwritableQuarantineKeepsTheLeakInPlace":                       swapsStderr,
-	"core.TestStageRelocated_NothingToStageIsTrueAndAFailedAddIsFalse":                              swapsStderr,
-	"core.TestStampContinuation_NeverSnapshotsTheProjectRoot":                                       swapsStderr,
-	"core.TestWorktreeAddRetry_AnnouncementDoesNotClaimUnclassifiedTransience":                      swapsStderr,
-	"core.TestWorktreeMutators_RefuseTheProjectRoot":                                                swapsStderr,
-	"core.TestWorktreeReuseBase_UnresolvableAncestorWarnsLoudlyAndDoesNotDegradeSilently":           swapsStderr,
-	"core.TestWriteBuildSelfCheckArtifact_HealthyRoundTrip_LargeAndUnicodeContent":                  swapsStderr,
-	"core.TestWriteBuildSelfCheckArtifact_MkdirAllFailure_WARNsAndDoesNotPanic":                     swapsStderr,
-	"core.TestWriteBuildSelfCheck_HealthyWriteIsSilent":                                             swapsStderr,
-	"core.TestWriteBuildSelfCheck_WriteFailureSurfaces":                                             swapsStderr,
-	"core.TestWriteCoveringTests_SilentWhenNothingTruncated":                                        swapsStderr,
-	"core.TestWriteCoveringTests_WarnsLoudlyOnTruncation":                                           swapsStderr,
 	"core.TestLaneStartRef_RealLockOnTheBaseRefIsRetried":                                           swapsWorktreeAddRetrySleep,
 }

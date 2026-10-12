@@ -140,6 +140,8 @@ func TestReviewResumedDeliverable_ACorrectionThatCannotBeEvaluatedStopsTheResume
 }
 
 func TestReviewResumedDeliverable_ALeakWrittenByTheCorrectionStopsBeforeTheReReview(t *testing.T) {
+	t.Parallel()
+
 	root := gittest.Fixture(t).Dir
 	blocked := filepath.Join(root, "blocked-worktree")
 	writeFile(t, blocked, "not a directory\n")
@@ -152,9 +154,9 @@ func TestReviewResumedDeliverable_ALeakWrittenByTheCorrectionStopsBeforeTheReRev
 	cs := CycleState{CycleID: 9, RunID: "run-9", ActiveWorktree: blocked, WorkspacePath: t.TempDir()}
 
 	var err error
-	captureStderr(t, func() {
-		_, err = o.reviewResumedDeliverable(context.Background(), root, 9, cs, PhaseBuild, runner, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, map[string]bool{"blocked-worktree": true})
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	_, err = o.reviewResumedDeliverable(context.Background(), root, 9, cs, PhaseBuild, runner, PhaseRequest{}, PhaseResponse{Phase: "build", Verdict: VerdictPASS}, map[string]bool{"blocked-worktree": true})
 
 	if err == nil || !strings.Contains(err.Error(), "worktree-leak recovery failed") {
 		t.Fatalf("err = %v, want the correction's leak to stop the resume", err)

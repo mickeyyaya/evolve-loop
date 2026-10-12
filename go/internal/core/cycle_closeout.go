@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
@@ -37,10 +36,10 @@ func (cr *cycleRun) completeCycle() error {
 	// policy floor). Goal text comes from Context["goal"]; falls back to the goal
 	// hash so the dossier's required Goal is never blank.
 	if derr := writeCycleDossier(cr.o.gitMutationLock, cr.dossierParams(cr.result.FinalVerdict)); derr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN cycle %d: closeout dossier not written (non-fatal): %v\n", cr.cycle, derr)
 	}
 	if perr := pruneToolOutputOnPass(cr.cs.WorkspacePath, cr.result.FinalVerdict); perr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: the raw tool output stays (non-fatal): %v\n", cr.cycle, perr)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN cycle %d: the raw tool output stays (non-fatal): %v\n", cr.cycle, perr)
 	}
 	return nil
 }

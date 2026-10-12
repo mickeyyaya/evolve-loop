@@ -134,6 +134,8 @@ func TestCompositionCarryForward_AbsentGateIsNamedInTheDeclineEvent(t *testing.T
 }
 
 func TestCompositionCarryForward_GateDeclineWritesNoUntaggedStderr(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	testTail, _ := realisticGateTail("test")
 	acsTail, _ := realisticGateTail("acs")
@@ -142,16 +144,19 @@ func TestCompositionCarryForward_GateDeclineWritesNoUntaggedStderr(t *testing.T)
 	outcomes["acs"] = ciparity.GateOutcome{Status: "fail", Tail: acsTail}
 	o := declineOrchestrator(t, signalcenter.New(), diff, patchID, outcomes)
 
-	stderr := captureStderr(t, func() {
-		if o.compositionCarryForward(context.Background(), 42, CycleState{ActiveWorktree: worktree, RunID: "run-stderr"}, "") {
-			t.Error("red composed gates must not carry forward")
-		}
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	if o.compositionCarryForward(context.Background(), 42, CycleState{ActiveWorktree: worktree, RunID: "run-stderr"}, "") {
+		t.Error("red composed gates must not carry forward")
+	}
+	stderr := sink.String()
 
 	assertDeclineStderrTagged(t, stderr, 42, testTail, acsTail)
 }
 
 func TestScopedMergeCarryForward_GateDeclineWritesNoUntaggedStderr(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	acsTail, _ := realisticGateTail("acs")
 	outcomes := allComposedGatesPass()
@@ -161,16 +166,19 @@ func TestScopedMergeCarryForward_GateDeclineWritesNoUntaggedStderr(t *testing.T)
 			return ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}
 		}))
 
-	stderr := captureStderr(t, func() {
-		if o.scopedMergeCarryForward(context.Background(), 7, CycleState{ActiveWorktree: worktree, RunID: "run-scoped-stderr"}, "") {
-			t.Error("a red composed gate must not carry forward via the scoped-merge rung")
-		}
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	if o.scopedMergeCarryForward(context.Background(), 7, CycleState{ActiveWorktree: worktree, RunID: "run-scoped-stderr"}, "") {
+		t.Error("a red composed gate must not carry forward via the scoped-merge rung")
+	}
+	stderr := sink.String()
 
 	assertDeclineStderrTagged(t, stderr, 7, acsTail)
 }
 
 func TestIdentityCarryForward_GateDeclineEmitsOneCodedSignalEvent(t *testing.T) {
+	t.Parallel()
+
 	h := pendedIdenticalLane(t)
 	testTail, testLast := realisticGateTail("test")
 	acsTail, acsLast := realisticGateTail("acs")
@@ -181,7 +189,10 @@ func TestIdentityCarryForward_GateDeclineEmitsOneCodedSignalEvent(t *testing.T) 
 	h.signals.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
 
 	var next Phase
-	stderr := captureStderr(t, func() { next, _, _ = h.route(t, h.auditRow()) })
+	var sink injectedStderr
+	h.stderr = &sink
+	next, _, _ = h.route(t, h.auditRow())
+	stderr := sink.String()
 
 	if next != PhaseAudit {
 		t.Fatalf("route = %s, want Audit: a red composed gate on the identity carry is re-audited", next)

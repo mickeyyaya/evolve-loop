@@ -43,13 +43,17 @@ func TestLaneItem_AnUnreadableInboxRecordIsUnresolvedWithItsPath(t *testing.T) {
 }
 
 func TestRetireSupersededAuditArtifacts_AStaleSourceThatCannotBeRemovedIsKeptAndWarned(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	src := filepath.Join(ws, acsverdict.Filename)
 	writeFile(t, filepath.Join(src, "inner"), "x")
 	dst := filepath.Join(ws, phasecontract.RoundArchiveFilename(acsverdict.Filename, 2))
 	writeFile(t, dst, "first retirement")
 
-	log := captureStderr(t, func() { retireSupersededAuditArtifacts(ws, 2) })
+	var sink injectedStderr
+	retireSupersededAuditArtifacts(ws, 2, &sink)
+	log := sink.String()
 
 	if !strings.Contains(log, "exists but stale "+acsverdict.Filename+" could not be removed") {
 		t.Fatalf("stderr %q must warn that the stale verdict survived", log)
@@ -63,6 +67,8 @@ func TestRetireSupersededAuditArtifacts_AStaleSourceThatCannotBeRemovedIsKeptAnd
 }
 
 func TestRetireSupersededAuditArtifacts_ARenameAndRemoveRefusalLeavesTheSourceWithAWarning(t *testing.T) {
+	t.Parallel()
+
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory write permission")
 	}
@@ -74,7 +80,9 @@ func TestRetireSupersededAuditArtifacts_ARenameAndRemoveRefusalLeavesTheSourceWi
 	}
 	t.Cleanup(func() { _ = os.Chmod(ws, 0o700) })
 
-	log := captureStderr(t, func() { retireSupersededAuditArtifacts(ws, 3) })
+	var sink injectedStderr
+	retireSupersededAuditArtifacts(ws, 3, &sink)
+	log := sink.String()
 
 	if !strings.Contains(log, "could not retire superseded "+acsverdict.Filename+" (rename: ") || !strings.Contains(log, "; remove: ") {
 		t.Fatalf("stderr %q must name both the rename and the remove failure", log)
@@ -113,6 +121,8 @@ func workspaceWithPathLength(t *testing.T, total int) string {
 }
 
 func TestRetireSupersededAuditArtifacts_AnArchivePathPastPathMaxRemovesTheSourceUnarchived(t *testing.T) {
+	t.Parallel()
+
 	limit := pathMaxForTest(t)
 	const round = 123456789012
 	name := acsverdict.Filename
@@ -123,7 +133,9 @@ func TestRetireSupersededAuditArtifacts_AnArchivePathPastPathMaxRemovesTheSource
 	}
 	writeFile(t, src, "stale")
 
-	log := captureStderr(t, func() { retireSupersededAuditArtifacts(ws, round) })
+	var sink injectedStderr
+	retireSupersededAuditArtifacts(ws, round, &sink)
+	log := sink.String()
 
 	if !strings.Contains(log, "superseded "+name+" removed, not archived (rename: ") || !strings.Contains(log, "round-123456789012 forensic evidence was lost") {
 		t.Fatalf("stderr %q must warn that the round's evidence was removed unarchived", log)
@@ -272,6 +284,8 @@ func TestCommentFloorFailures_AnOffStageOrNoWorktreeJudgesNothing(t *testing.T) 
 }
 
 func TestCommentFloorFailures_AnOffStageNeverReadsTheDiff(t *testing.T) {
+	t.Parallel()
+
 	repo, base := floorRepo(t)
 	if err := os.MkdirAll(filepath.Join(repo.Dir, "d"), 0o755); err != nil {
 		t.Fatal(err)
@@ -282,10 +296,15 @@ func TestCommentFloorFailures_AnOffStageNeverReadsTheDiff(t *testing.T) {
 	off := floorInput(t, floorRoot(t, `{"comment_floor":{"stage":"off"}}`), repo, base)
 	enforce := floorInput(t, floorRoot(t, `{"comment_floor":{"stage":"enforce"}}`), repo, base)
 
-	if log := captureStderr(t, func() { commentFloorFailures(context.Background(), off) }); log != "" {
+	var offLog, enforceLog injectedStderr
+	off.Stderr, enforce.Stderr = &offLog, &enforceLog
+
+	commentFloorFailures(context.Background(), off)
+	if log := offLog.String(); log != "" {
 		t.Fatalf("stage off read the diff and warned: %q", log)
 	}
-	if log := captureStderr(t, func() { commentFloorFailures(context.Background(), enforce) }); !strings.Contains(log, "could not read the diff") {
+	commentFloorFailures(context.Background(), enforce)
+	if log := enforceLog.String(); !strings.Contains(log, "could not read the diff") {
 		t.Fatalf("control: enforce must read the unreadable diff and warn, got %q", log)
 	}
 }

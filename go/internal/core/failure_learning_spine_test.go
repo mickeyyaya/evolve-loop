@@ -92,12 +92,17 @@ func (p *retroProbeRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespon
 }
 
 func TestRecordFailureLearning_NoRetroRunner_QueuesTodoAndPersistsWithoutRetroStamp(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	st := &fakeStorage{}
 	led := &fakeLedger{}
 	o := NewOrchestrator(st, led, map[Phase]PhaseRunner{})
 	fl := spineRequest(dir, errors.New("audit floor red"))
-	stderr := captureStderr(t, func() { o.recordFailureLearning(context.Background(), fl) })
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordFailureLearning(context.Background(), fl)
+	stderr := sink.String()
 	if len(fl.State.FailedAt) != 1 || !carryoverTodoExists(fl.State.CarryoverTodos, "cycle-1034-failed-audit") {
 		t.Fatalf("the arm records the failure and queues the todo: %+v %+v", fl.State.FailedAt, fl.State.CarryoverTodos)
 	}
@@ -120,6 +125,8 @@ func TestRecordFailureLearning_NoRetroRunner_QueuesTodoAndPersistsWithoutRetroSt
 }
 
 func TestRecordFailureLearning_PersistIsTheLastStorageEffect(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name string
 		prep func(t *testing.T, dir string, runners map[Phase]PhaseRunner)
@@ -157,7 +164,9 @@ func TestRecordFailureLearning_PersistIsTheLastStorageEffect(t *testing.T) {
 			tc.prep(t, dir, runners)
 			st := &seqStorage{fakeStorage: &fakeStorage{}}
 			o := NewOrchestrator(st, &fakeLedger{}, runners)
-			captureStderr(t, func() { o.recordFailureLearning(tc.ctx(), spineRequest(dir, tc.err())) })
+			var sink injectedStderr
+			o.stderr = &sink
+			o.recordFailureLearning(tc.ctx(), spineRequest(dir, tc.err()))
 			if !reflect.DeepEqual(st.seq, tc.want) {
 				t.Fatalf("storage effects on the %s path = %v, want %v (the persist is LAST; silent exits never persist)", tc.name, st.seq, tc.want)
 			}
@@ -297,14 +306,16 @@ func TestRecordFailureLearning_DigestExistsWhenTheRetroRunnerStarts(t *testing.T
 }
 
 func TestRecordFailureLearning_DocMissingArmWritesTheDigestAndTheFallbackArmsNeverRewriteIt(t *testing.T) {
+	t.Parallel()
+
 	t.Run("doc-missing arm assembles the digest and records the closure", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMatchingDigest(t, dir)
 		foreign, _ := os.ReadFile(filepath.Join(dir, "failure-digest.json"))
 		o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
-		captureStderr(t, func() {
-			o.recordFailureLearning(context.Background(), spineRequest(dir, fmt.Errorf("audit: load agent: %w", ErrAgentDocMissing)))
-		})
+		var sink injectedStderr
+		o.stderr = &sink
+		o.recordFailureLearning(context.Background(), spineRequest(dir, fmt.Errorf("audit: load agent: %w", ErrAgentDocMissing)))
 		after, err := os.ReadFile(filepath.Join(dir, "failure-digest.json"))
 		if err != nil || string(after) == string(foreign) {
 			t.Fatalf("the arm runs the assembler, which overwrites the foreign digest: err=%v same=%v", err, string(after) == string(foreign))
@@ -328,9 +339,9 @@ func TestRecordFailureLearning_DocMissingArmWritesTheDigestAndTheFallbackArmsNev
 			pr.inRun = func(req PhaseRequest) { _ = os.Remove(filepath.Join(req.Workspace, "failure-digest.json")) }
 			runners[PhaseRetro] = pr
 			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
-			captureStderr(t, func() {
-				o.recordFailureLearning(context.Background(), spineRequest(dir, errors.New("audit floor red")))
-			})
+			var sink injectedStderr
+			o.stderr = &sink
+			o.recordFailureLearning(context.Background(), spineRequest(dir, errors.New("audit floor red")))
 			if _, err := os.Stat(filepath.Join(dir, "failure-digest.json")); err == nil {
 				t.Fatal("the fallback tail must not run ensureFailureDigest a second time (the digest was written before Run)")
 			}
@@ -362,6 +373,8 @@ func TestRecordFailureLearning_SuccessfulInlineRetroLeavesPhaseStampedRetro(t *t
 }
 
 func TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota(t *testing.T) {
+	t.Parallel()
+
 	exhausted := fmt.Errorf("phase ship: %w", ErrAllFamiliesExhausted)
 	twice := fmt.Errorf("outer: %w", exhausted)
 	canceled := func() context.Context { c, cancel := context.WithCancel(context.Background()); cancel(); return c }
@@ -388,7 +401,10 @@ func TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota(t *testing.T) {
 			if tc.nilResult {
 				fl.Result = nil
 			}
-			stderr := captureStderr(t, func() { o.recordFailureLearning(tc.ctx, fl) })
+			var sink injectedStderr
+			o.stderr = &sink
+			o.recordFailureLearning(tc.ctx, fl)
+			stderr := sink.String()
 			if !reflect.DeepEqual(fl.CycleState.ShipFailReasons, tc.wantCarrier) {
 				t.Fatalf("ShipFailReasons = %q, want %q", fl.CycleState.ShipFailReasons, tc.wantCarrier)
 			}
@@ -406,6 +422,8 @@ func TestRecordFailureLearning_GateOrderIsNilCtxCarrierQuota(t *testing.T) {
 }
 
 func TestRecordFailureLearning_StreamIsByteIdenticalApartFromTheDeclaredCodes(t *testing.T) {
+	t.Parallel()
+
 	plain := func() error { return errors.New("audit floor red") }
 	cases := []struct {
 		name string
@@ -430,7 +448,9 @@ func TestRecordFailureLearning_StreamIsByteIdenticalApartFromTheDeclaredCodes(t 
 			tc.prep(t, dir, runners)
 			c, got := recordingCenter()
 			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners, WithSignalCenter(c))
-			captureStderr(t, func() { o.recordFailureLearning(context.Background(), spineRequest(dir, tc.err())) })
+			var sink injectedStderr
+			o.stderr = &sink
+			o.recordFailureLearning(context.Background(), spineRequest(dir, tc.err()))
 			c.Flush()
 			if seq := streamSequence(*got); !reflect.DeepEqual(seq, tc.want) {
 				t.Fatalf("stream on the %s path = %v, want %v", tc.name, seq, tc.want)
@@ -448,12 +468,16 @@ func streamSequence(events []signalcenter.Event) []string {
 }
 
 func TestRecordFailureLearning_RetroLedgerAppendFailure_RaisesOnlyTheLedgerCode(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	seedValidDisposition(t, dir)
 	c, got := recordingCenter()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{failOnAppend: true}, buildRunners(nil), WithSignalCenter(c))
 	fl := spineRequest(dir, errors.New("audit floor red"))
-	captureStderr(t, func() { o.recordFailureLearning(context.Background(), fl) })
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordFailureLearning(context.Background(), fl)
 	c.Flush()
 	for _, e := range *got {
 		if strings.Contains(string(e.Code), "LEDGER") && (strings.HasPrefix(string(e.Code), "FAILURELEARNING_") || strings.HasPrefix(string(e.Code), "ORCHESTRATOR_")) {

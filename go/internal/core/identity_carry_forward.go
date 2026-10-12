@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
@@ -25,7 +24,7 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 		return false
 	}
 	decline := func(format string, args ...any) bool {
-		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d identity carry declined: %s; re-auditing\n", cycle, fmt.Sprintf(format, args...))
+		fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d identity carry declined: %s; re-auditing\n", cycle, fmt.Sprintf(format, args...))
 		return false
 	}
 	worktree := cs.ActiveWorktree
@@ -66,7 +65,7 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 	if err := o.compositionVerdictWriter(filepath.Join(projectRoot, ".evolve", "ledger.jsonl"), in); err != nil {
 		return decline("carry record: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d rebase is byte-identical: the audited verdict carries, shipping without a second audit (ADR-0105 B3)\n", cycle)
+	fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d rebase is byte-identical: the audited verdict carries, shipping without a second audit (ADR-0105 B3)\n", cycle)
 	return true
 }
 

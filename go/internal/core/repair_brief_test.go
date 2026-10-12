@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,7 +39,7 @@ func TestComposeRepairBrief_GateReasonsThenFindingsThenPersisted(t *testing.T) {
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 2, AuditDispatches: 2}
 	downgradeAudit(t, &cs, "EGPS: acs-verdict.json ship_eligible=false")
 
-	brief := composeRepairBrief(cs)
+	brief := composeRepairBrief(cs, io.Discard)
 	gate := strings.Index(brief, "EGPS: acs-verdict.json ship_eligible=false")
 	h1 := strings.Index(brief, "H1 (HIGH) — caller-proof hard floor violated for the second consecutive round")
 	h2 := strings.Index(brief, "H2 (HIGH) — a scout-selected slug has no eval")
@@ -65,7 +66,7 @@ func TestComposeRepairBrief_FindingsAloneStillSeed(t *testing.T) {
 	ws := t.TempDir()
 	writeBriefFixture(t, ws, phasecontract.ArtifactFilename(string(PhaseAudit)), briefRound1)
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
-	brief := composeRepairBrief(cs)
+	brief := composeRepairBrief(cs, io.Discard)
 	if !strings.Contains(brief, "H1 (HIGH)") || strings.Contains(brief, "PERSISTED") {
 		t.Fatalf("round-1 report with no gate reasons must still brief the findings, none persisted:\n%s", brief)
 	}
@@ -73,7 +74,7 @@ func TestComposeRepairBrief_FindingsAloneStillSeed(t *testing.T) {
 	if !strings.Contains(got[CtxKeyAuditRepairFindings], "H1 (HIGH)") {
 		t.Fatalf("seed must carry the findings brief even without audit-fail-reason.json: %+v", got)
 	}
-	if brief := composeRepairBrief(CycleState{WorkspacePath: t.TempDir(), AuditRepairActive: true}); brief != "" {
+	if brief := composeRepairBrief(CycleState{WorkspacePath: t.TempDir(), AuditRepairActive: true}, io.Discard); brief != "" {
 		t.Fatalf("no artifacts ⇒ empty brief, got %q", brief)
 	}
 }
@@ -157,20 +158,26 @@ func TestRepairRoundDispatch_BriefCarriesAuditorFindingsAndArchivesPrompt(t *tes
 }
 
 func TestAuditorFindingsBrief_UnreadableReportWarns(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	auditName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	if err := os.MkdirAll(filepath.Join(ws, auditName), 0o755); err != nil { // a directory where the file should be
 		t.Fatal(err)
 	}
 	var brief string
-	stderr := captureStderr(t, func() { brief = auditorFindingsBrief(ws, 1) })
+	var sink injectedStderr
+	brief = auditorFindingsBrief(ws, 1, &sink)
+	stderr := sink.String()
 	if brief != "" {
 		t.Fatalf("unreadable report must yield no brief, got %q", brief)
 	}
 	if !strings.Contains(stderr, "WARN audit-repair") || !strings.Contains(stderr, auditName) {
 		t.Fatalf("unreadable report must be reported loudly, stderr=%q", stderr)
 	}
-	if got := captureStderr(t, func() { _ = auditorFindingsBrief(t.TempDir(), 1) }); strings.Contains(got, "WARN") {
+	var quiet injectedStderr
+	_ = auditorFindingsBrief(t.TempDir(), 1, &quiet)
+	if got := quiet.String(); strings.Contains(got, "WARN") {
 		t.Fatalf("a merely absent report is legitimate and must stay quiet, stderr=%q", got)
 	}
 }
