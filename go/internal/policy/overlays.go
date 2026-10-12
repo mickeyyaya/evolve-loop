@@ -58,16 +58,18 @@ type OverlayDispatch struct {
 
 const SelfReviewSkill = "code-review-simplify"
 
+const DocumentWriteSkill = "docs-write"
+
 // compiledDefaultOverlays is the only built-in tier→skills mapping; a policy overlays block replaces it wholesale.
 func compiledDefaultOverlays() []OverlayRule {
 	document := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindDocument}}
 	code := []config.Condition{{Field: config.SignalDeliverableKind, Op: "eq", Value: config.DeliverableKindCode}}
 	return []OverlayRule{
 		{Tiers: []string{"deep", "top"}, Skills: []string{"fable"}},
-		{Phases: []string{"scout"}, When: document, Skills: []string{"solution-scout"}},
-		{Phases: []string{"build"}, When: document, Skills: []string{"solution-build"}},
-		{Phases: []string{"audit"}, When: document, Skills: []string{"solution-audit"}},
-		{WritesSource: true, When: code, Skills: []string{"engineering-craft", SelfReviewSkill}},
+		{Phases: []string{"scout"}, When: document, Skills: []string{"solution-scout", DocumentWriteSkill}},
+		{Phases: []string{"build"}, When: document, Skills: []string{"solution-build", DocumentWriteSkill}},
+		{Phases: []string{"audit"}, When: document, Skills: []string{"solution-audit", DocumentWriteSkill}},
+		{WritesSource: true, When: code, Skills: []string{"engineering-craft", SelfReviewSkill, DocumentWriteSkill}},
 		{Phases: []string{"code-review"}, When: code, Skills: []string{"engineering-craft", SelfReviewSkill, "architecture-review", "quality-index"}},
 	}
 }

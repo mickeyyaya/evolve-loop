@@ -1,6 +1,6 @@
 # Plan: one skill writes every document that a person reads, and it is on by default
 
-- **Status:** accepted, 2026-10-12. K0, K1, K3 and K4 are in this change. K2 (the kernel preload) is a lane with red tests.
+- **Status:** accepted, 2026-10-12. K0, K1, K3 and K4 are in this change. K2 (the kernel preload) is done in the lane `feat/docs-write-preload`.
 - **Decision:** [ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md). **Research:** [docs-write-skill-2026-10.md](../research/docs-write-skill-2026-10.md). **Skill:** [skills/docs-write/SKILL.md](../../skills/docs-write/SKILL.md).
 
 ## Table of contents

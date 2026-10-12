@@ -22,7 +22,7 @@ func TestCompiledDefaultOverlays_TheCodeReviewPhaseLoadsTheStandardTheRubricsAnd
 		{"balanced code review", policy.OverlayDispatch{Phase: "code-review", Tier: "balanced", Signals: code}, review},
 		{"a document cycle never reviews code", policy.OverlayDispatch{Phase: "code-review", Tier: "balanced", Signals: document}, nil},
 		{"the audit stays free of review skills", policy.OverlayDispatch{Phase: "audit", Tier: "balanced", Signals: code}, nil},
-		{"the build keeps only the writer rule", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", policy.SelfReviewSkill}},
+		{"the build keeps only the writer rule", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", policy.SelfReviewSkill, policy.DocumentWriteSkill}},
 		{"another evaluator gets nothing", policy.OverlayDispatch{Phase: "adversarial-review", Tier: "balanced", Signals: code}, nil},
 	}
 	for _, tc := range cases {

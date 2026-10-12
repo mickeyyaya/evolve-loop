@@ -17,11 +17,11 @@ func TestCompiledDefaultOverlays_CodeReviewSimplifyReachesOnlyCodeSourceWriters(
 		d    policy.OverlayDispatch
 		want []string
 	}{
-		{"balanced code build", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify"}},
-		{"balanced code tdd", policy.OverlayDispatch{Phase: "tdd", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify"}},
+		{"balanced code build", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"balanced code tdd", policy.OverlayDispatch{Phase: "tdd", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
 		{"balanced code audit", policy.OverlayDispatch{Phase: "audit", Tier: "balanced", Signals: code}, nil},
-		{"document audit keeps only its persona", policy.OverlayDispatch{Phase: "audit", Tier: "balanced", Signals: document}, []string{"solution-audit"}},
-		{"document build keeps only its persona", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: document}, []string{"solution-build"}},
+		{"document audit keeps its persona and the document skill", policy.OverlayDispatch{Phase: "audit", Tier: "balanced", Signals: document}, []string{"solution-audit", "docs-write"}},
+		{"document build keeps its persona and the document skill", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: document}, []string{"solution-build", "docs-write"}},
 		{"balanced code scout", policy.OverlayDispatch{Phase: "scout", Tier: "balanced", Signals: code}, nil},
 		{"balanced code triage", policy.OverlayDispatch{Phase: "triage", Tier: "balanced", Signals: code}, nil},
 		{"decision-only debugger", policy.OverlayDispatch{Phase: "debugger", Tier: "balanced", Signals: code}, nil},
@@ -35,11 +35,11 @@ func TestCompiledDefaultOverlays_CodeReviewSimplifyReachesOnlyCodeSourceWriters(
 	}
 }
 
-func TestSelfReviewSkill_IsTheSkillTheCompiledWriterRuleLoadsLast(t *testing.T) {
+func TestSelfReviewSkill_IsTheSkillTheCompiledWriterRuleLoadsBeforeTheDocumentSkill(t *testing.T) {
 	var pol policy.Policy
 	code := map[string]string{config.SignalDeliverableKind: config.DeliverableKindCode}
 	got := pol.ResolveOverlays(policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code})
-	if len(got) == 0 || got[len(got)-1] != policy.SelfReviewSkill {
-		t.Errorf("a code build resolves %v; its last skill must be policy.SelfReviewSkill (%q), the name the runner's self-review check reads", got, policy.SelfReviewSkill)
+	if len(got) < 2 || got[len(got)-2] != policy.SelfReviewSkill {
+		t.Errorf("a code build resolves %v; the skill before the last must be policy.SelfReviewSkill (%q), the name the runner's self-review check reads", got, policy.SelfReviewSkill)
 	}
 }

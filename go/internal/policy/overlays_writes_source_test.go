@@ -16,12 +16,12 @@ func TestCompiledDefaultOverlays_EngineeringCraftOnEveryCodeSourceWriterAtAnyTie
 		d    policy.OverlayDispatch
 		want []string
 	}{
-		{"balanced build", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify"}},
-		{"tdd at a concrete model tier", policy.OverlayDispatch{Phase: "tdd", Tier: "sonnet", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify"}},
-		{"conflict-resolving debugger at opus", policy.OverlayDispatch{Phase: "debugger", Tier: "opus", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify"}},
-		{"fast user phase that writes source", policy.OverlayDispatch{Phase: "test-amplification", Tier: "fast", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify"}},
-		{"deep build keeps fable first", policy.OverlayDispatch{Phase: "build", Tier: "deep", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify"}},
-		{"top tdd keeps fable first", policy.OverlayDispatch{Phase: "tdd", Tier: "top", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify"}},
+		{"balanced build", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"tdd at a concrete model tier", policy.OverlayDispatch{Phase: "tdd", Tier: "sonnet", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"conflict-resolving debugger at opus", policy.OverlayDispatch{Phase: "debugger", Tier: "opus", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify", "docs-write"}},
+		{"fast user phase that writes source", policy.OverlayDispatch{Phase: "test-amplification", Tier: "fast", WritesSource: true, Signals: code}, []string{"engineering-craft", "code-review-simplify", "docs-write"}},
+		{"deep build keeps fable first", policy.OverlayDispatch{Phase: "build", Tier: "deep", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify", "docs-write"}},
+		{"top tdd keeps fable first", policy.OverlayDispatch{Phase: "tdd", Tier: "top", WritesSource: true, Signals: code}, []string{"fable", "engineering-craft", "code-review-simplify", "docs-write"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -45,7 +45,7 @@ func TestCompiledDefaultOverlays_EngineeringCraftNeverReachesAReadOnlyOrDocument
 		{"balanced triage", policy.OverlayDispatch{Phase: "triage", Tier: "balanced", Signals: code}, nil},
 		{"audit at opus", policy.OverlayDispatch{Phase: "audit", Tier: "opus", Signals: code}, []string{"fable"}},
 		{"decision-only debugger at opus", policy.OverlayDispatch{Phase: "debugger", Tier: "opus", Signals: code}, []string{"fable"}},
-		{"document build", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: document}, []string{"solution-build"}},
+		{"document build", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true, Signals: document}, []string{"solution-build", "docs-write"}},
 		{"writer without signals", policy.OverlayDispatch{Phase: "build", Tier: "balanced", WritesSource: true}, nil},
 	}
 	for _, tc := range cases {
