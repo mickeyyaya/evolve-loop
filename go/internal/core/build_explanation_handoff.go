@@ -67,6 +67,8 @@ func activateBuildExplanationContract(projectRoot string, cs CycleState) error {
 	return explanationdocs.Activate(binding)
 }
 
+var absPath = filepath.Abs
+
 type resumeCheckpointIdentity struct {
 	workspace string
 	cycle     int
@@ -77,11 +79,11 @@ func authoritativeResumeIdentity(projectRoot, statePath, declaredWorkspace strin
 	if statePath == "" {
 		return resumeCheckpointIdentity{workspace: declaredWorkspace}, nil
 	}
-	statePath, err := filepath.Abs(statePath)
+	statePath, err := absPath(statePath)
 	if err != nil {
 		return resumeCheckpointIdentity{}, fmt.Errorf("resume identity mismatch: resolve checkpoint path: %w", err)
 	}
-	runsRoot, err := filepath.Abs(filepath.Join(projectRoot, ".evolve", "runs"))
+	runsRoot, err := absPath(filepath.Join(projectRoot, ".evolve", "runs"))
 	if err != nil {
 		return resumeCheckpointIdentity{}, fmt.Errorf("resume identity mismatch: resolve runs root: %w", err)
 	}

@@ -17,6 +17,8 @@ const (
 	evidenceStatusMaxNames = 15
 )
 
+var workingDir = os.Getwd
+
 type salvageResult struct {
 	Relocated bool
 	From      string
@@ -51,7 +53,7 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 	}
 	now := o.now()
 	var skips []string
-	cwd, cwdErr := os.Getwd()
+	cwd, cwdErr := workingDir()
 	if cwdErr != nil {
 		skips = append(skips, "cwd: unreadable: "+cwdErr.Error())
 	}
