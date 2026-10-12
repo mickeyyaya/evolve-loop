@@ -15,7 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 )
 
-// cmdBridgeWatch is read-only: it never writes the feed or the inbox.
 func cmdBridgeWatch(args []string, stdout, stderr io.Writer) int {
 	ws, agent := "", ""
 	follow := false
@@ -58,7 +57,6 @@ func cmdBridgeWatch(args []string, stdout, stderr io.Writer) int {
 	return runBridgeWatchFollow(ctx, stdout, stderr, ws, agent)
 }
 
-// runBridgeWatchOnce prints each valid feed line; a missing feed prints nothing.
 func runBridgeWatchOnce(w io.Writer, workspace, agent string) error {
 	data, err := os.ReadFile(channel.FeedPath(workspace, agent))
 	if err != nil {
@@ -118,15 +116,12 @@ func renderFeedLine(e map[string]any) string {
 	return fmt.Sprintf("%s%s", seqPrefix, kind)
 }
 
-// watchFollowInterval is a var so tests can shorten the poll.
 var watchFollowInterval = 500 * time.Millisecond
 
-// runBridgeWatchFollow prints lines appended to the feed until ctx is cancelled.
 func runBridgeWatchFollow(ctx context.Context, stdout, stderr io.Writer, workspace, agent string) int {
 	feedPath := channel.FeedPath(workspace, agent)
 	var offset int64
 
-	// Start at EOF so lines runBridgeWatchOnce already printed are not repeated.
 	if info, err := os.Stat(feedPath); err == nil {
 		offset = info.Size()
 	}

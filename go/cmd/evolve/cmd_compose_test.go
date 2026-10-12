@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 )
 
-// composeStub records every Run call and returns scripted responses by phase.
 type composeStub struct {
 	scripts map[string]core.PhaseResponse
 	calls   []string
@@ -102,7 +101,7 @@ func TestCompose_MissingPhasesArg_Exit10(t *testing.T) {
 func TestCompose_UnknownPhase_Exit10(t *testing.T) {
 	defer registry.SnapshotForTest()()
 	stub := &composeStub{}
-	registerCompose(t, stub, "scout") // audit not registered
+	registerCompose(t, stub, "scout")
 	var stdout, stderr bytes.Buffer
 	code := runCompose([]string{"--phases", "scout,nopephase"}, bytes.NewReader(nil), &stdout, &stderr)
 	if code != 10 {

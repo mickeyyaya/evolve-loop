@@ -34,7 +34,6 @@ func cycleOutputsFixture(t *testing.T, cycle string, auditRan bool, chainPresent
 			}
 		}
 	}
-	// scout deliberately loses its events stream: the gap the report must name.
 	if err := os.Remove(filepath.Join(ws, "scout-events.ndjson")); err != nil {
 		t.Fatal(err)
 	}
@@ -57,9 +56,9 @@ func TestRunCycleOutputs_NamesEveryGapAndTheChainState(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{
-		"2/3 complete",                       // scout gapped, build+audit complete
-		"scout: scout-events.ndjson missing", // the gap, named
-		"chain: chain-present",               // the totalized state
+		"2/3 complete",
+		"scout: scout-events.ndjson missing",
+		"chain: chain-present",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q\n---\n%s", want, got)
@@ -100,8 +99,6 @@ func TestRunCycleOutputs_JSONCarriesTheSameFacts(t *testing.T) {
 	if len(env.Gaps) == 0 {
 		t.Error("gaps must ride the envelope — the machine consumer cannot read prose")
 	}
-	// The envelope keys themselves are the contract: a rename silently blanks
-	// whatever the operator's tooling reads, with no decode error to catch it.
 	for _, key := range []string{`"cycle"`, `"chain"`, `"gaps"`, `"rows"`} {
 		if !strings.Contains(out.String(), key) {
 			t.Errorf("envelope lost wire key %s:\n%s", key, out.String())

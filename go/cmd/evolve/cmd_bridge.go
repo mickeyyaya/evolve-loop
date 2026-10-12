@@ -361,7 +361,6 @@ func corpusLines(raw string) []string {
 	return lines
 }
 
-// emitProbeJSON writes the {os, results:[{cli,tier}]} shape the adapter parses.
 func emitProbeJSON(stdout io.Writer, p core.BridgeProbe, filter string) {
 	type result struct {
 		CLI  string `json:"cli"`
@@ -561,8 +560,6 @@ func emitCatalogText(stdout io.Writer, cat capabilities.Catalog) {
 	}
 }
 
-// runBridgeIntrospect diffs a CLI's /help against its catalog, read offline
-// from --pane-file or captured from the live REPL.
 func runBridgeIntrospect(args []string, stdout, stderr io.Writer) int {
 	cli, paneFile, ws, session := "", "", "", ""
 	allowBypass := false

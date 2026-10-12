@@ -29,8 +29,6 @@ func brCommit(t *testing.T, dir, name, content, msg string) {
 	brGit(t, dir, "commit", "-q", "-m", msg)
 }
 
-// brFixture builds a remote-less repo with one branch that main already
-// contains (superseded) and one that diverges cleanly.
 func brFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -137,9 +135,6 @@ func TestBranchesUnknownSubcommand_Errors(t *testing.T) {
 	}
 }
 
-// brKeptFixture builds a remote-less repo whose cycle-1..cycle-4 are all
-// superseded by main: cycle-1 is checked out in a linked worktree, cycle-2 is
-// named by a continuation binding, and cycle-3 and cycle-4 are free to prune.
 func brKeptFixture(t *testing.T) string {
 	t.Helper()
 	r := gittest.Fixture(t)
@@ -198,7 +193,6 @@ func TestBranchesPruneForce_KeepsCheckedOutAndBoundPrunesRest(t *testing.T) {
 func TestBranchesPruneForce_DeleteFailureReportedPerRef(t *testing.T) {
 	t.Parallel()
 	dir := brKeptFixture(t)
-	// A held ref lock makes git refuse to delete a ref no worktree holds.
 	if err := os.WriteFile(filepath.Join(dir, ".git", "refs", "heads", "cycle-3.lock"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}

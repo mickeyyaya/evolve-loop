@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// Pinned on the recipe text, not a live run, so the test never mutates the tree.
 func TestComposedApicoverGate_TargetRecipeEnforces(t *testing.T) {
 	t.Parallel()
 	target, ok := composedGateTargets["apicover"]
@@ -19,7 +18,6 @@ func TestComposedApicoverGate_TargetRecipeEnforces(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read go/Makefile: %v", err)
 	}
-	// Recipe = the tab-indented block following the target line.
 	re := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(target) + `:[^\n]*\n((?:\t[^\n]*\n?)+)`)
 	m := re.FindSubmatch(mk)
 	if m == nil {

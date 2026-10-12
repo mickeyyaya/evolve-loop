@@ -52,8 +52,6 @@ func TestCapabilitiesCLI_Errors(t *testing.T) {
 	}
 }
 
-// writeOverrideCatalog points policy at a tiny catalog so drift tests do not
-// depend on the embedded list.
 func writeOverrideCatalog(t *testing.T, cmds string) {
 	t.Helper()
 	dir := t.TempDir()

@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// runBranches audits and prunes superseded local cycle-* branches.
 func runBranches(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve branches: missing subcommand (audit|prune)")
@@ -31,7 +30,6 @@ func runBranches(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// branchesFlags parses both subcommands' flags; audit ignores --dry-run.
 func branchesFlags(name string, args []string, stderr io.Writer) (projectRoot, base string, dryRun bool, err error) {
 	fs := flag.NewFlagSet("evolve branches "+name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -47,8 +45,6 @@ func branchesFlags(name string, args []string, stderr io.Writer) (projectRoot, b
 	return projectRoot, base, dryRun, nil
 }
 
-// alwaysOpenPR makes a walk read-only: PruneSupersededOrphans never deletes a
-// ref that has an open PR.
 func alwaysOpenPR(string) (bool, error) { return true, nil }
 
 func runBranchesAudit(args []string, stdout, stderr io.Writer) int {
@@ -127,8 +123,6 @@ func keepLive(isLive func(string) bool, hasOpenPR func(string) (bool, error)) fu
 	}
 }
 
-// remoteOpenPR reports no open PR when there is no remote or no gh CLI, since
-// no remote PR can then protect the ref.
 func remoteOpenPR(dir string) func(ref string) (bool, error) {
 	return func(ref string) (bool, error) {
 		if !hasGitRemote(dir) {

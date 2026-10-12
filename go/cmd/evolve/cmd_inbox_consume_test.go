@@ -28,9 +28,6 @@ func withProjectRoot(t *testing.T, root string) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 }
 
-// The fixture's kind is "pipeline-repair": kind:"pipeline-defect" matches ZERO
-// live items, so gating on it would pass a synthetic fixture and never fire
-// in production.
 func TestRunInbox_Consume_MovesItemAndAcksFingerprint(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -87,9 +84,6 @@ func TestRunInbox_Consume_MissingItemReturnsNonZero(t *testing.T) {
 	if rc == 0 {
 		t.Fatal("a missing item path must exit non-zero, never silently succeed")
 	}
-	// The failure must be about the ITEM, not about an unrecognised
-	// subcommand — otherwise this predicate passes on a tree where `consume`
-	// was never registered at all.
 	if !strings.Contains(stderr.String(), "ghost.json") {
 		t.Errorf("the error must name the item that could not be read, not fall through to subcommand usage; stderr=%q", stderr.String())
 	}
@@ -111,8 +105,6 @@ func TestRunInbox_Consume_NoArgReturnsUsage(t *testing.T) {
 	}
 }
 
-// consumedStamp mirrors the shape continuation_release.go already reads
-// (`{"consumed": {"cycle": ...}}`) plus the sibling fields this task adds.
 type consumedStamp struct {
 	At         string `json:"at"`
 	Via        string `json:"via"`
@@ -135,10 +127,6 @@ func readConsumedStamp(t *testing.T, path string) consumedStamp {
 	return doc.Consumed
 }
 
-// TestRunInbox_Consume_WithFlagsStampsConsumedRecord is AC1: passing
-// --resolution and --cycle must leave the moved item carrying a
-// consumed{at, via, cycle, resolution} stamp with those exact values, and
-// the caller-passed via must override the "console-manual" default.
 func TestRunInbox_Consume_WithFlagsStampsConsumedRecord(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -174,10 +162,6 @@ func TestRunInbox_Consume_WithFlagsStampsConsumedRecord(t *testing.T) {
 	}
 }
 
-// TestRunInbox_Consume_NoFlagsDefaultsConsumedStamp is the no-flag path of
-// AC1: a plain `evolve inbox consume <item>` (no --resolution/--cycle) must
-// still stamp the moved item, defaulting via to "console-manual", cycle to
-// "console", and resolution to "".
 func TestRunInbox_Consume_NoFlagsDefaultsConsumedStamp(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)
@@ -205,10 +189,6 @@ func TestRunInbox_Consume_NoFlagsDefaultsConsumedStamp(t *testing.T) {
 	}
 }
 
-// TestRunInbox_Consume_MissingItemWithFlagsStillFailsAndStampsNothing is the
-// negative/rejection test (adversarial-testing SKILL §6): flags must not
-// bypass the existing missing-item error path, and a failed consume must
-// never leave a stamped file behind anywhere.
 func TestRunInbox_Consume_MissingItemWithFlagsStillFailsAndStampsNothing(t *testing.T) {
 	root := t.TempDir()
 	withProjectRoot(t, root)

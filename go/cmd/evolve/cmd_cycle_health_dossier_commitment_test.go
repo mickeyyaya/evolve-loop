@@ -11,9 +11,6 @@ import (
 
 const dossierCommitmentSignal = "dossier_commitment"
 
-// dossierFixture writes cycle n's dossier (nil tasks omits the field, as a
-// legacy record does) and an empty workspace the CLI's fallback resolves back
-// to root. Other signals fire on that empty workspace; they are not asserted.
 func dossierFixture(t *testing.T, cycle int, tasks []string, phases []string) (root, workspace string) {
 	t.Helper()
 	root = t.TempDir()
@@ -54,7 +51,6 @@ func itoa(n int) string {
 	return string(raw)
 }
 
-// cycleHealthAnomalyLines runs the CLI and returns its dossier_commitment lines.
 func cycleHealthAnomalyLines(t *testing.T, root, workspace string, cycle int) (lines []string, stdout string, code int) {
 	t.Helper()
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
@@ -110,7 +106,7 @@ func TestCycleHealth_EmptyCommitmentDossierWithImplementationIsAnomaly(t *testin
 func TestCycleHealth_DossierCommitmentSignalStaysQuietOnHealthyShapes(t *testing.T) {
 	cases := []struct {
 		name    string
-		tasks   []string // nil ⇒ field omitted (legacy)
+		tasks   []string
 		phases  []string
 		dossier bool
 	}{

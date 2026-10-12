@@ -38,7 +38,6 @@ func runQuarantineCLI(t *testing.T, root string, args ...string) (int, string, s
 
 func TestRunInboxQuarantine_ListEmptyPopulatedAndJSON(t *testing.T) {
 	root := t.TempDir()
-	// Empty (dir absent): zero items, exit 0.
 	if code, out, _ := runQuarantineCLI(t, root, "list"); code != 0 || !strings.Contains(out, "0 quarantined") {
 		t.Fatalf("empty list: code=%d out=%q", code, out)
 	}
