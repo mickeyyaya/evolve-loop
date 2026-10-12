@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -100,8 +99,8 @@ func TestPlanDevWorktrees_ANestedGitRepositoryBlocksTheArchive(t *testing.T) {
 	if err := os.MkdirAll(inner, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command("git", "-C", inner, "init", "-q").CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v %s", err, out)
+	if err := os.MkdirAll(filepath.Join(inner, ".git"), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	writeRepoFile(t, inner, "inner.txt", "inner work\n")
 	it := devItemFor(t, e.plan(e.options(idleOffset)), dir)
