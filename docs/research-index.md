@@ -266,3 +266,11 @@ approaches / decision / results / retro) — lives at
 | [research/docs-write-skill-2026-10.md](research/docs-write-skill-2026-10.md) | Research: the house rules for documents, the conflict of the front matter rule, and the skill preload. It surveys Diátaxis, Google design docs, Rust RFCs, KEPs, ADR collections and The Good Docs Project. Findings F2.1 to F2.8 and P3.1 to P3.7, refinements R1 to R9. |
 | [plans/docs-write-skill-2026-10.md](plans/docs-write-skill-2026-10.md) | Plan: four candidate approaches with scores, the winner (reasoning first) and what it takes from the others. Decisions D1 to D9 and components K0 to K4. |
 | [architecture/adr/0132-documents-are-written-through-one-skill.md](architecture/adr/0132-documents-are-written-through-one-skill.md) | Decision: every document goes through the `docs-write` skill. Each decision cites its evidence and its rejected options. The skill is on by default. |
+
+## 2026-10-12 — the loop watches CLI practice and trims its scaffolding by measure (ADR-0133)
+
+| Document | What it records |
+|---|---|
+| [research/model-capability-practice-2026-10.md](research/model-capability-practice-2026-10.md) | Research: the size and the emphatic words of the phase prompts, the share of console commits, the full-disk stop, and the watch that exists. It also covers the current guidance of Anthropic, OpenAI and Google, and the sources that a watch can read. Findings F2.1 to F3.3 and P4.1 to P4.6, refinements R1 to R7. |
+| [plans/model-capability-practice-2026-10.md](plans/model-capability-practice-2026-10.md) | Plan: four approaches for less scaffolding and four for the practice watch, each with scores, a winner and what it takes from the others. Decisions D1 to D11 and components M0 to M5. |
+| [architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md](architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md) | Decision: a deterministic watch files a research item when a source changes. Prompt trims are measured, one persona at a time. |
