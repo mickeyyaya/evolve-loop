@@ -5,16 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
@@ -488,5 +491,130 @@ func TestRunGCHook_LogsEachDeletedBranchWithItsHeadUnderEnforce(t *testing.T) {
 	runGCHook(loopConfig{EvolveDir: evolveDir, ProjectRoot: projectRoot}, workspace, &buf)
 	if !strings.Contains(buf.String(), "gc: deleted branch "+gcOrphanBranch+"@"+head) {
 		t.Errorf("stderr lacks the branch@head line:\n%s", buf.String())
+	}
+}
+
+func blockingDevExec(verb, dirPart string) sysexec.RunFunc {
+	return func(ctx context.Context, name, d string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
+		if len(args) > 0 && args[0] == verb && strings.Contains(d, dirPart) {
+			<-ctx.Done()
+			return -1, ctx.Err()
+		}
+		return sysexec.DefaultRunner(ctx, name, d, args, env, in, out, errw)
+	}
+}
+
+func oneSecondBudget() gc.Policy {
+	return gc.Policy{DevWorktrees: gc.DevWorktreesPolicy{SweepBudgetSeconds: 1}}
+}
+
+func TestGCRunDevWorktrees_ATreeCutByTheSweepBudgetIsSkippedWithAWarnAndIsNotAFailure(t *testing.T) {
+	h := newGCDevHub(t, `{}`)
+	h.addDevAt("slow-lane", 40)
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(context.Background(), true, &stdout, &stderr)
+	opts := mustDevOptions(t, h.runtime, h.evolve, oneSecondBudget())
+	opts.OpenPRs = func(context.Context, string) (map[string][]time.Time, error) { return nil, nil }
+	opts.Exec = blockingDevExec("symbolic-ref", "slow-lane")
+	if r.devWorktreesWith(opts) {
+		t.Errorf("a budget skip failed gc; stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "SKIPPED path=") || strings.Contains(stdout.String(), "NOT-JUDGED") {
+		t.Errorf("stdout = %q, want SKIPPED and no NOT-JUDGED", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "WARN") || !strings.Contains(stderr.String(), "1s budget") || !strings.Contains(stderr.String(), "1 tree(s) SKIPPED") {
+		t.Errorf("stderr = %q, want a WARN naming the budget and the count", stderr.String())
+	}
+}
+
+func TestGCRunDevWorktrees_ASlowProcessListWarnsArchivesNothingAndIsNotAFailure(t *testing.T) {
+	h := newGCDevHub(t, `{}`)
+	dir := h.addDevAt("old-lane", 40)
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(context.Background(), false, &stdout, &stderr)
+	opts := mustDevOptions(t, h.runtime, h.evolve, oneSecondBudget())
+	opts.Processes = func(ctx context.Context) ([]gc.Process, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	if r.devWorktreesWith(opts) {
+		t.Errorf("a process-list timeout failed gc; stderr=%q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "WARN: dev worktree sweep over its 1s budget") {
+		t.Errorf("stderr = %q, want the over-budget WARN", stderr.String())
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("a tree was archived without a process listing: %v", err)
+	}
+}
+
+func TestGCRunDevWorktrees_ASpentBudgetDefersTheArchiveOfTheTreesItJudged(t *testing.T) {
+	h := newGCDevHub(t, `{}`)
+	oldDir := h.addDevAt("old-lane", 40)
+	h.addDevAt("slow-lane", 40)
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(context.Background(), false, &stdout, &stderr)
+	opts := mustDevOptions(t, h.runtime, h.evolve, oneSecondBudget())
+	opts.OpenPRs = func(context.Context, string) (map[string][]time.Time, error) { return nil, nil }
+	opts.Exec = blockingDevExec("symbolic-ref", "slow-lane")
+	if r.devWorktreesWith(opts) {
+		t.Errorf("a deferred archive failed gc; stderr=%q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "archive deferred to the next run") {
+		t.Errorf("stderr = %q, want the deferral WARN", stderr.String())
+	}
+	if _, err := os.Stat(oldDir); err != nil {
+		t.Errorf("the judged tree was removed on an expired budget: %v", err)
+	}
+}
+
+func TestGCRunDevWorktrees_TheSweepBudgetIsIndependentOfTheReaperDeadline(t *testing.T) {
+	h := newGCDevHub(t, `{}`)
+	h.addDevAt("old-lane", 40)
+	expired, cancel := context.WithCancel(context.Background())
+	cancel()
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(expired, true, &stdout, &stderr)
+	opts := mustDevOptions(t, h.runtime, h.evolve, gc.Policy{})
+	opts.OpenPRs = func(context.Context, string) (map[string][]time.Time, error) { return nil, nil }
+	if r.devWorktreesWith(opts) {
+		t.Errorf("an expired reaper context cut the sweep; stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "WOULD-ARCHIVE path=") || strings.Contains(stdout.String(), "SKIPPED") {
+		t.Errorf("stdout = %q, want the tree judged under the sweep's own budget", stdout.String())
+	}
+}
+
+func TestGCDevItemLine_ASkippedTreeSaysSkipped(t *testing.T) {
+	t.Parallel()
+	it := gc.DevItem{Path: "/p", Action: gc.DevActionKeep, Skipped: true, Reason: "not judged: x"}
+	if got, want := gcDevItemLine(it, true), "SKIPPED path=/p idle=0.0d (not judged: x)"; got != want {
+		t.Errorf("%q, want %q", got, want)
+	}
+}
+
+func TestGCRunDevWorktrees_ABudgetThatEndsMidApplyWarnsNamesTheTreeAndIsNotAFailure(t *testing.T) {
+	h := newGCDevHub(t, `{}`)
+	dir := h.addDevAt("old-lane", 40)
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(context.Background(), false, &stdout, &stderr)
+	opts := mustDevOptions(t, h.runtime, h.evolve, gc.Policy{DevWorktrees: gc.DevWorktreesPolicy{SweepBudgetSeconds: 3}})
+	opts.OpenPRs = func(context.Context, string) (map[string][]time.Time, error) { return nil, nil }
+	var calls atomic.Int32
+	opts.Exec = func(ctx context.Context, name, d string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
+		if len(args) > 0 && args[0] == "symbolic-ref" && strings.Contains(d, "old-lane") && calls.Add(1) > 1 {
+			<-ctx.Done()
+			return -1, ctx.Err()
+		}
+		return sysexec.DefaultRunner(ctx, name, d, args, env, in, out, errw)
+	}
+	if r.devWorktreesWith(opts) {
+		t.Errorf("a mid-apply deferral failed gc; stderr=%q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "old-lane kept: the 3s budget ran out before its archive") {
+		t.Errorf("stderr = %q, want a WARN naming the tree and the budget", stderr.String())
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Errorf("the deferred tree is gone: %v", err)
 	}
 }
