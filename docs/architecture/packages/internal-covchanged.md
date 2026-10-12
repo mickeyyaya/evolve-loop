@@ -18,6 +18,7 @@
 - **Exemptions are listed, not hidden.** `Report.Exempt` names each exempt file with its reason. A test file and a file under `testdata` or `vendor` are exempt. So is a file that the build constraints exclude for the host GOOS and GOARCH and `Options.Tags`. Generated files are not exempt.
 - **"No profile" is a refusal.** A changed function with no block is not at 100%. A function with zero statements and a block is at 100%.
 - **A stale profile stops the check.** The file reader refuses a changed file that is newer than the profile, and names `make -C go test-integration`.
+- **One module-path reader.** `ModulePath` is exported. `internal/coverstrict` calls it, and `ParseProfile` is its one profile parser (`evolve cover strict`, plan T2).
 - **The key.** `<module dir>.<Name>` or `<module dir>.<Receiver>.<Name>`, the same form as the size ratchet. The receiver forms `*T`, `T[K]` and `T[K, V]` all give `T`.
 
 ## Invariants

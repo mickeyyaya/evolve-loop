@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## Changed — the coverage gates read the one profile of the integration run (plan T2, ADR-0131, 2026-10-12)
+
+- **A profile exists only after a green run.** `make test-integration` deletes `coverage.txt`, writes `coverage.partial.txt`, and renames it to `coverage.txt` only when `go test` exits 0. On a failure it removes the partial file and exits with the status of `go test`.
+- **`evolve cover strict` replaces the shell loop of `make cover-strict`.** The new package `internal/coverstrict` reads the profile with `covchanged.ParseProfile` and judges each package of `go/.cover-strict`. The target runs no test. It refuses a missing or stale profile, a bad floors file, a package with no statements and a package below its floor.
+- **The local floor has 7 targets.** `lint`, `test-integration`, `test-e2e`, `test-acs-durable`, `cover-changed`, `cover-strict` and `apicover-check`. `test` and `apicover-enforce` leave the floor. `apicover-enforce` stays for a scoped run.
+- Docs: `go/docs/testing.md`, `docs/architecture/test-system.md` §4.4, `docs/operations/runtime-reference.md`.
+
 ## Fixed — the dispatch postmortem follow-ups: the fresh session carries the record, agy records name their source, and no record is lost or written over (ADR-0130, 2026-10-11)
 
 - **The fresh session has one owner, `core.LaunchRecoverable`.** Before, `Engine.freshSessionRetry` replayed the same prompt inside one `Launch`, with no record. Now `Launch` runs one session and sets the new `core.BridgeResponse.SessionRecoverable`. The helper launches once more under a live context, with a request marked `FreshSession`, and the runner's hook adds the record. Retro, the swarm workers, the core advisors, `subagent` and the chain walk keep the fresh session with the same request. The ledger marks the dead row `session_recoverable` and the fresh row `fresh_session_retry` ([ADR-0044 amendment](docs/architecture/adr/0044-unified-phase-recovery-protocol.md)).

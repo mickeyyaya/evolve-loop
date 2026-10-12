@@ -118,7 +118,7 @@ flowchart LR
 
 ### 4.4 The local floor
 
-This floor takes effect when plan T2 merges. Until then, the floor in [go/docs/testing.md](../../go/docs/testing.md) applies. The floor has the same order as CI. Run one target at a time.
+The floor has the same order as CI, and [go/docs/testing.md](../../go/docs/testing.md) lists the same targets. Run one target at a time. `test-integration` writes `coverage.txt` only when every test passes. The three coverage gates read that one profile and refuse a missing or stale profile.
 
 | Order | Target | Runs tests |
 |---|---|---|

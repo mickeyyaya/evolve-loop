@@ -216,8 +216,15 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
 
 ## Coverage targets
 
-- **Strict package floors:** `make cover-strict` enforces the thresholds in
-  `go/.cover-strict` and rejects failed tests even when they emit high coverage.
+- **One run, many gates:** `make test-integration` is the one instrumented run.
+  It writes `coverage.txt` only when every test passes, so a failed run leaves
+  no profile. The coverage gates (`cover-changed`, `cover-strict` and
+  `apicover-check`) run no test. They read that `coverage.txt` and refuse a
+  missing or stale one.
+- **Strict package floors:** `make cover-strict` runs `evolve cover strict`. It
+  enforces the thresholds in `go/.cover-strict` over the statement coverage of
+  the `coverage.txt` of `make test-integration`. It refuses a missing or stale
+  profile, an invalid floor and a package with no statements in the profile.
 - **Changed functions at 100%:** `make cover-changed` reads the `coverage.txt`
   of `make test-integration`. It refuses each function that the change since
   `COVER_CHANGED_BASE` (default `origin/main`) touches and that is below 100%.
@@ -231,13 +238,16 @@ retired at Stage 5. See `go/test/trustkernel/PORTING-LEDGER.md`.
   the relative link check, one `code-review-simplify` pass and the commit gate.
   The lint judges the added text only.
   A page of `docs/explain/` and the lint standard are not docs-only in CI.
-- **The local floor is 8 targets**, run one at a time after you stage the
-  change: `lint`, `test`, `test-integration`, `test-e2e`, `test-acs-durable`,
-  `apicover-enforce`, `cover-strict` and `cover-changed`. Run `cover-changed`
-  after `test-integration`, because it reads that run's profile.
-- **Public API coverage:** `make apicover-enforce` measures and enforces the
-  packages in `go/.apicover-enforce`. CI calls `make apicover-check` after its
-  successful integration run to inspect that run's fresh `coverage.txt`.
+- **The local floor is 7 targets**, run one at a time after you stage the
+  change: `lint`, `test-integration`, `test-e2e`, `test-acs-durable`,
+  `cover-changed`, `cover-strict` and `apicover-check`. Run the three coverage
+  gates after `test-integration`, because they read that run's profile.
+  `make test` is the fast loop of a developer and is not in the floor.
+- **Public API coverage:** `make apicover-check` enforces the packages in
+  `go/.apicover-enforce` over the `coverage.txt` of the successful integration
+  run, and CI calls it after that run. `make apicover-enforce` stays for a
+  scoped run (`APICOVER_PKGS=...`): it runs the tests of those packages and
+  writes `coverage.apicover.txt`.
 - **Advisory diagnostics:** the ordinary 85% sweep reports function-level
   warnings; it does not enforce an 85% floor on every internal package.
   `make cover` produces reports; the strict/API targets supply the hard gates.
@@ -315,8 +325,9 @@ schema-filter enforcement) are tracked in `PORTING-LEDGER.md` and map to
 - `make test-e2e` — existing no-race, uncached E2E tier with
   `e2e evolve_test_phases` and its 45-minute timeout. Live cases retain their
   individual explicit opt-ins and skip behavior.
-- `make apicover-check` and `make cover-strict` — hard API and enrolled package
-  coverage gates; the separate 85% function diagnostics remain advisory.
+- `make cover-changed`, `make apicover-check` and `make cover-strict` — hard
+  gates over the one profile of the `make test-integration` step. They run no
+  test; the separate 85% function diagnostics remain advisory.
 
 `ci.yml` runs plugin validation (`validate`) and durable ACS (`acs-durable`).
 Neither `go.yml` nor `ci.yml` triggers on a push or pull request of its own;

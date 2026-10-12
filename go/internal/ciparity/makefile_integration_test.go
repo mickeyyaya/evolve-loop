@@ -19,26 +19,51 @@ import (
 // These tests exercise the real Make recipes and Go coverage tools. A percentage
 // alone is not a verdict: Go writes coverage even when a test assertion fails.
 func TestMakeCoverageGates_PropagateTestFailure(t *testing.T) {
-	for _, target := range []string{"cover-strict", "apicover-enforce"} {
-		for _, failing := range []bool{false, true} {
-			name := "passing"
-			if failing {
-				name = "failing_with_full_coverage"
-			}
-			t.Run(target+"/"+name, func(t *testing.T) {
-				root := makeFixture(t)
-				body := `if Value() != 1 { t.Fatal("wrong value") }`
-				if failing {
-					body += `; t.Fatal("intentional assertion failure")`
-				}
-				writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
-				writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { "+body+" }\n")
-				out, err := runMakeFixture(t, root, target)
-				if (err != nil) != failing {
-					t.Fatalf("%s: error = %v, want failure %v\n%s", target, err, failing, out)
-				}
-			})
+	for _, failing := range []bool{false, true} {
+		name := "passing"
+		if failing {
+			name = "failing_with_full_coverage"
 		}
+		t.Run("apicover-enforce/"+name, func(t *testing.T) {
+			root := probeFixture(t, failing)
+			out, err := runMakeFixture(t, root, "apicover-enforce")
+			if (err != nil) != failing {
+				t.Fatalf("apicover-enforce: error = %v, want failure %v\n%s", err, failing, out)
+			}
+		})
+		t.Run("test-integration+cover-strict/"+name, func(t *testing.T) {
+			root := probeFixture(t, failing)
+			out, err := runMakeFixture(t, root, "test-integration")
+			if (err != nil) != failing {
+				t.Fatalf("test-integration: error = %v, want failure %v\n%s", err, failing, out)
+			}
+			strictOut, strictErr := runMakeFixture(t, root, "cover-strict")
+			if (strictErr != nil) != failing {
+				t.Fatalf("cover-strict after test-integration: error = %v, want failure %v\n%s", strictErr, failing, strictOut)
+			}
+			if failing && !strings.Contains(strictOut, "no coverage profile") {
+				t.Errorf("a failed run left a profile for cover-strict to read, or the refusal is unclear:\n%s", strictOut)
+			}
+		})
+	}
+}
+
+func probeFixture(t *testing.T, failing bool) string {
+	t.Helper()
+	root := makeFixture(t)
+	body := `if Value() != 1 { t.Fatal("wrong value") }`
+	if failing {
+		body += `; t.Fatal("intentional assertion failure")`
+	}
+	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
+	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { "+body+" }\n")
+	return root
+}
+
+func requireMake(t *testing.T, root, target string) {
+	t.Helper()
+	if out, err := runMakeFixture(t, root, target); err != nil {
+		t.Fatalf("%s: %v\n%s", target, err, out)
 	}
 }
 
@@ -67,8 +92,10 @@ func TestMakeCoverStrict_PreservesFloor(t *testing.T) {
 	root := makeFixture(t)
 	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value(b bool) int { if b { return 1 }; return 2 }\n")
 	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value(true) != 1 { t.Fatal(\"wrong value\") } }\n")
-	if out, err := runMakeFixture(t, root, "cover-strict"); err == nil {
-		t.Fatalf("partially covered package passed its 100%% floor\n%s", out)
+	requireMake(t, root, "test-integration")
+	out, err := runMakeFixture(t, root, "cover-strict")
+	if err == nil || !strings.Contains(out, "FAIL") {
+		t.Fatalf("partially covered package passed its 100%% floor: %v\n%s", err, out)
 	}
 }
 
@@ -118,9 +145,10 @@ func TestMakeAPICheck_RejectsMissingOrMalformedProfile(t *testing.T) {
 
 func TestMakeCoverStrict_ChecksFinalLineWithoutNewline(t *testing.T) {
 	root := makeFixture(t)
-	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
-	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { _ = Value(); t.Fatal(\"intentional assertion failure\") }\n")
-	writeMakeFixture(t, root, ".cover-strict", "./internal/probe 100")
+	writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value(b bool) int { if b { return 1 }; return 2 }\n")
+	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value(true) != 1 { t.Fatal(\"wrong value\") } }\n")
+	writeMakeFixture(t, root, ".cover-strict", "# first\n./internal/probe 100")
+	requireMake(t, root, "test-integration")
 	if out, err := runMakeFixture(t, root, "cover-strict"); err == nil {
 		t.Fatalf("gate skipped final manifest entry\n%s", out)
 	}
@@ -133,8 +161,12 @@ func TestMakeCoverageGates_RejectMissingManifest(t *testing.T) {
 			if err := os.Remove(filepath.Join(root, "."+target)); err != nil {
 				t.Fatal(err)
 			}
-			if out, err := runMakeFixture(t, root, target); err == nil {
+			out, err := runMakeFixture(t, root, target)
+			if err == nil {
 				t.Fatalf("gate accepted missing manifest\n%s", out)
+			}
+			if target == "cover-strict" && !strings.Contains(out, "floors file") {
+				t.Fatalf("cover-strict does not name the missing floors file\n%s", out)
 			}
 		})
 	}
@@ -149,8 +181,9 @@ func TestMakeCoverStrict_RejectsManifestDirectory(t *testing.T) {
 	if err := os.Mkdir(manifest, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := runMakeFixture(t, root, "cover-strict"); err == nil {
-		t.Fatalf("gate accepted a directory as its manifest\n%s", out)
+	out, err := runMakeFixture(t, root, "cover-strict")
+	if err == nil || !strings.Contains(out, "floors file") {
+		t.Fatalf("gate accepted a directory as its manifest: %v\n%s", err, out)
 	}
 }
 
@@ -173,20 +206,64 @@ func TestMakeFixture_CancellationFailsHarness(t *testing.T) {
 }
 
 func TestMakeCoverStrict_RejectsInvalidFloorOrEvaluator(t *testing.T) {
-	for _, fault := range []string{"invalid_floor", "failed_evaluator"} {
+	for _, fault := range []string{"invalid_floor", "floor_over_100", "failed_evaluator"} {
 		t.Run(fault, func(t *testing.T) {
-			root := makeFixture(t)
-			writeMakeFixture(t, root, "internal/probe/probe.go", "package probe\nfunc Value() int { return 1 }\n")
-			writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
-			if fault == "invalid_floor" {
+			root := probeFixture(t, false)
+			requireMake(t, root, "test-integration")
+			want := "floors line 1"
+			switch fault {
+			case "invalid_floor":
 				writeMakeFixture(t, root, ".cover-strict", "./internal/probe invalid\n")
-			} else {
-				writeMakeFixture(t, root, "awk", "#!/bin/sh\necho intentional-evaluator-failure >&2\nexit 23\n")
+			case "floor_over_100":
+				writeMakeFixture(t, root, ".cover-strict", "./internal/probe 101\n")
+			default:
+				want = "intentional-evaluator-failure"
+				fakeclitest.Install(t, filepath.Join(root, "probe-go"), "#!/bin/sh\nif [ \"$1\" = run ]; then echo intentional-evaluator-failure >&2; exit 23; fi\nexec go \"$@\"\n")
 			}
-			if out, err := runMakeFixture(t, root, "cover-strict"); err == nil {
-				t.Fatalf("gate accepted %s\n%s", fault, out)
+			out, err := runMakeFixture(t, root, "cover-strict")
+			if err == nil || !strings.Contains(out, want) {
+				t.Fatalf("gate accepted %s or lost its diagnostic %q: %v\n%s", fault, want, err, out)
 			}
 		})
+	}
+}
+
+func TestMakeCoverStrict_RefusesAMissingOrStaleProfile(t *testing.T) {
+	root := probeFixture(t, false)
+	out, err := runMakeFixture(t, root, "cover-strict")
+	if err == nil || !strings.Contains(out, "no coverage profile") {
+		t.Fatalf("cover-strict without a profile: %v\n%s", err, out)
+	}
+	requireMake(t, root, "test-integration")
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(root, "internal/probe/probe.go"), later, later); err != nil {
+		t.Fatal(err)
+	}
+	out, err = runMakeFixture(t, root, "cover-strict")
+	if err == nil || !strings.Contains(out, "older than") {
+		t.Fatalf("cover-strict over a profile older than the source: %v\n%s", err, out)
+	}
+}
+
+func TestMakeIntegration_LeavesAProfileOnlyAfterAGreenRun(t *testing.T) {
+	root := probeFixture(t, true)
+	writeMakeFixture(t, root, "coverage.txt", "mode: atomic\nstale profile of an earlier run\n")
+	if out, err := runMakeFixture(t, root, "test-integration"); err == nil {
+		t.Fatalf("known-red suite passed\n%s", out)
+	}
+	for _, name := range []string{"coverage.txt", "coverage.partial.txt"} {
+		if _, err := os.Stat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Errorf("%s exists after a failed run (stat error %v)", name, err)
+		}
+	}
+	writeMakeFixture(t, root, "internal/probe/probe_test.go", "package probe\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 1 { t.Fatal(\"wrong value\") } }\n")
+	requireMake(t, root, "test-integration")
+	got, err := os.ReadFile(filepath.Join(root, "coverage.txt"))
+	if err != nil || !strings.HasPrefix(string(got), "mode: atomic") || !strings.Contains(string(got), "gateprobe/internal/probe/probe.go") {
+		t.Errorf("coverage.txt after a green run = %q, %v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "coverage.partial.txt")); !os.IsNotExist(err) {
+		t.Errorf("coverage.partial.txt remains after a green run (stat error %v)", err)
 	}
 }
 
@@ -269,7 +346,7 @@ func makeFixture(t *testing.T) string {
 	writeMakeFixture(t, root, "go.mod", "module gateprobe\n\ngo 1.23\n")
 	writeMakeFixture(t, root, ".cover-strict", "./internal/probe 100\n")
 	writeMakeFixture(t, root, ".apicover-enforce", "./internal/probe\n")
-	fakeclitest.Install(t, filepath.Join(root, "probe-go"), "#!/bin/sh\n"+makeGoBuildRedirect(t)+"exec go \"$@\"\n")
+	fakeclitest.Install(t, filepath.Join(root, "probe-go"), "#!/bin/sh\n"+makeGoBuildRedirect(t)+makeGoRunRedirect(t)+"exec go \"$@\"\n")
 	return root
 }
 
@@ -278,6 +355,12 @@ func makeGoBuildRedirect(t *testing.T) string {
 	// Build the actual apicover command, with its output still in the fixture.
 	module := filepath.Join(workflowRepoRoot(t), "go")
 	return "if [ \"$1\" = build ]; then exec go -C '" + strings.ReplaceAll(module, "'", "'\"'\"'") + "' \"$@\"; fi\n"
+}
+
+func makeGoRunRedirect(t *testing.T) string {
+	t.Helper()
+	module := filepath.Join(workflowRepoRoot(t), "go")
+	return "if [ \"$1\" = run ]; then shift 2; exec go -C '" + strings.ReplaceAll(module, "'", "'\"'\"'") + "' run ./cmd/evolve \"$@\" --root \"$PWD\"; fi\n"
 }
 
 func writeMakeFixture(t *testing.T, root, name, body string) {
@@ -291,16 +374,17 @@ func writeMakeFixture(t *testing.T, root, name, body string) {
 	}
 }
 
-func runMakeFixture(t *testing.T, root, target string) (string, error) {
+func runMakeFixture(t *testing.T, root, target string, vars ...string) (string, error) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	return runMakeFixtureContext(t, ctx, root, target)
+	return runMakeFixtureContext(t, ctx, root, target, vars...)
 }
 
-func runMakeFixtureContext(t *testing.T, ctx context.Context, root, target string) (string, error) {
+func runMakeFixtureContext(t *testing.T, ctx context.Context, root, target string, vars ...string) (string, error) {
 	t.Helper()
-	cmd := exec.CommandContext(ctx, "make", "--no-print-directory", "-s", "-f", filepath.Join(workflowRepoRoot(t), "go/Makefile"), "GO="+filepath.Join(root, "probe-go"), "BIN_DIR="+filepath.Join(root, "bin"), target)
+	args := append([]string{"--no-print-directory", "-s", "-f", filepath.Join(workflowRepoRoot(t), "go/Makefile"), "GO=" + filepath.Join(root, "probe-go"), "BIN_DIR=" + filepath.Join(root, "bin")}, vars...)
+	cmd := exec.CommandContext(ctx, "make", append(args, target)...)
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "APICOVER_PKGS=", "MAKEFLAGS=", "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
@@ -327,5 +411,33 @@ func TestMakeAPIEnforce_LeavesTheIntegrationProfileForCoverChanged(t *testing.T)
 	}
 	if got, err := os.ReadFile(filepath.Join(root, "coverage.apicover.txt")); err != nil || !strings.HasPrefix(string(got), "mode: ") {
 		t.Errorf("coverage.apicover.txt = %q, %v; want the scoped profile there", got, err)
+	}
+}
+
+func TestMakeApicover_NeverFeedsTheCoverageGates(t *testing.T) {
+	root := probeFixture(t, false)
+	scoped := "APICOVER_PKGS=./internal/probe"
+	if out, err := runMakeFixture(t, root, "apicover", scoped); err != nil {
+		t.Fatalf("apicover: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "coverage.txt")); !os.IsNotExist(err) {
+		t.Errorf("apicover wrote coverage.txt (stat error %v)", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(root, "coverage.apicover.txt")); err != nil || !strings.HasPrefix(string(got), "mode: ") {
+		t.Errorf("coverage.apicover.txt = %q, %v; want the scoped profile there", got, err)
+	}
+	if out, err := runMakeFixture(t, root, "cover-strict"); err == nil || !strings.Contains(out, "no coverage profile") {
+		t.Fatalf("cover-strict trusted a profile that apicover left: %v\n%s", err, out)
+	}
+	requireMake(t, root, "test-integration")
+	before, err := os.ReadFile(filepath.Join(root, "coverage.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runMakeFixture(t, root, "apicover", scoped); err != nil {
+		t.Fatalf("apicover after test-integration: %v\n%s", err, out)
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, "coverage.txt")); string(after) != string(before) {
+		t.Errorf("apicover rewrote the integration profile:\n%s", after)
 	}
 }

@@ -47,7 +47,7 @@ func (w Workspace) Check(ctx context.Context, opt Options) (Verdict, error) {
 }
 
 func (w Workspace) sources(ctx context.Context, git gitexec.Git, base string, opt Options) (Sources, error) {
-	module, err := modulePath(w.ModuleDir)
+	module, err := ModulePath(w.ModuleDir)
 	if err != nil {
 		return Sources{}, err
 	}
@@ -80,7 +80,7 @@ func (w Workspace) sources(ctx context.Context, git gitexec.Git, base string, op
 	return Sources{Changed: changed, Profile: profile, ReadFile: read, Build: ctxt}, nil
 }
 
-func modulePath(moduleDir string) (string, error) {
+func ModulePath(moduleDir string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(moduleDir, "go.mod"))
 	if err != nil {
 		return "", fmt.Errorf("covchanged: read go.mod: %w", err)

@@ -105,10 +105,13 @@ test: ## FAST layer: co-located unit/functional/component tests, race on (exclud
 test-component: ## Component tier: several internal packages wired against temp FS (no subprocess)
 	$(GO) test -race -count=1 ./test/component/...
 
-test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release)
-	@pkgs=$$($(GO) list -tags integration ./...) || exit $$?; \
+test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run
+	@rm -f coverage.txt coverage.partial.txt; \
+	pkgs=$$($(GO) list -tags integration ./...) || exit $$?; \
 	pkgs=$$(printf '%s\n' "$$pkgs" | grep -v '/acs/') || exit $$?; \
-	$(GO) test -race -count=1 -tags integration -coverprofile=coverage.txt $$pkgs
+	$(GO) test -race -count=1 -tags integration -coverprofile=coverage.partial.txt $$pkgs; status=$$?; \
+	if [ "$$status" -ne 0 ]; then rm -f coverage.partial.txt; exit "$$status"; fi; \
+	mv coverage.partial.txt coverage.txt
 
 test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in
 	$(GO) test -count=1 -timeout 45m -tags "e2e evolve_test_phases" ./cmd/... ./test/e2e/...
@@ -136,19 +139,12 @@ APICOVER_PKGS ?= ./internal/...
 apicover: ## Public-API coverage report (warning-only; APICOVER_PKGS=... to scope, -enforce in Phase 5)
 	@mkdir -p $(BIN_DIR)
 	@$(GO) build -o $(BIN_DIR)/apicover ./cmd/apicover
-	@$(GO) test -count=1 -coverprofile=coverage.txt $(APICOVER_PKGS) >/dev/null
-	@$(GO) tool cover -func=coverage.txt > coverage.func.txt
+	@$(GO) test -count=1 -coverprofile=coverage.apicover.txt $(APICOVER_PKGS) >/dev/null
+	@$(GO) tool cover -func=coverage.apicover.txt > coverage.func.txt
 	@$(BIN_DIR)/apicover -cover coverage.func.txt $$($(GO) list -f '{{.Dir}}' $(APICOVER_PKGS))
 
-cover-strict: ## Per-package line-coverage hard-fail over go/.cover-strict (ADR-0101 §11: `<pkg> <min%>` per line; mirrors the go.yml strict step)
-	@test -f .cover-strict && test -r .cover-strict || { echo "cover-strict: cannot read regular file .cover-strict" >&2; exit 1; }
-	@fail=0; while read -r pkg min || [ -n "$$pkg" ]; do \
-		case "$$pkg" in ""|\#*) continue;; esac; \
-		out=$$($(GO) test -count=1 -tags integration -cover $$pkg 2>&1) || { printf 'cover-strict: %s: test failed\n%s\n' "$$pkg" "$$out" >&2; fail=1; continue; }; \
-		got=$$(printf '%s\n' "$$out" | sed -n 's/.*coverage: \([0-9.]*\)%.*/\1/p') || { echo "cover-strict: $$pkg: coverage parsing failed" >&2; fail=1; continue; }; \
-		if [ -z "$$got" ]; then echo "cover-strict: $$pkg: no coverage figure (build or test failure)"; fail=1; continue; fi; \
-		if awk -v g="$$got" -v m="$$min" 'BEGIN{if (g !~ /^[0-9]+([.][0-9]+)?$$/ || m !~ /^[0-9]+([.][0-9]+)?$$/ || g+0 > 100 || m+0 > 100) exit 2; exit !(g+0 >= m+0)}'; then echo "cover-strict: $$pkg: $$got% >= $$min% ok"; else echo "cover-strict: $$pkg: invalid or unsatisfied floor ($$got% / $$min%) FAIL"; fail=1; fi; \
-	done < .cover-strict; exit $$fail
+cover-strict: ## Per-package line-coverage hard-fail over go/.cover-strict (ADR-0101 §11: `<pkg> <min%>` per line), read from the coverage.txt of test-integration; runs no test
+	$(GO) run ./cmd/evolve cover strict --root .
 
 COVER_CHANGED_BASE ?= origin/main
 COVER_PROFILE ?= coverage.txt
@@ -195,4 +191,4 @@ tidy: ## Normalize go.mod / go.sum
 	$(GO) mod verify
 
 clean: dist-clean ## Remove build outputs (incl. cross-compile artifacts)
-	rm -rf $(BIN_DIR) coverage.txt coverage.apicover.txt coverage.html coverage.func.txt
+	rm -rf $(BIN_DIR) coverage.txt coverage.partial.txt coverage.apicover.txt coverage.html coverage.func.txt
