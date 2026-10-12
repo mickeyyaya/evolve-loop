@@ -224,7 +224,7 @@ Each criterion has a score from 1 (bad) to 5 (good).
 | Id | Component | Red test first | Owner |
 |---|---|---|---|
 | T14 | D28 and D29: one build for each test binary, and the `gotooltest` helper. The first users are the skills-drift tests, `internal/core` and the five tests of research F10.3. Status: built in `internal/gotooltest` (kit at 100% coverage). `cmd/evolve`, `internal/subagent` and `test/e2e` use `Cache`; `internal/core`, `internal/phases/audit` and `cmd/evolve` call `LimitProcess` in `TestMain`. | The number of `go build` runs in a package run drops to one for each binary; nested runs carry the limits | Sonnet |
-| T15 | D30: the phase configurations pass `SleepFn` | `TestRun_EmptyArtifact_FAIL` of each phase finishes in under 1 s | Sonnet |
+| T15 | D30: the phase configurations pass `SleepFn`. Status: built. Six phase configurations carry `SleepFn` to the runner. The 500 ms read grace of `internal/deliverable` adds 8 s over 16 probes, and `SleepFn` does not reach it. The six tests therefore inject a verifier for the empty artifact. A test for each phase proves 15 sleeps of 200 ms. | `TestRun_EmptyArtifact_FAIL` of each phase finishes in under 1 s | Sonnet |
 | T16 | D31: injected writers in place of `os.Stderr` swaps, first in `internal/core` (116 tests) | The guard of T11 accepts the tests as parallel; the outputs stay the same | Sonnet |
 | T17 | D32: T11 for `internal/phases/audit`, `internal/bridge` and `internal/ciparity` | As T11, with the `-count=3 -race -shuffle=on` gate | Sonnet |
 
