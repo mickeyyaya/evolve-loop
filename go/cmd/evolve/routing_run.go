@@ -62,6 +62,8 @@ func overrideAllowed(agent, value string, d cliroute.Decision) bool {
 	return d.Allows(value)
 }
 
+var routingRunOverrideRefusals = overrideRefusals
+
 func wireCLIRouter(site routerSite, run routingRun, console io.Writer) (*cliroute.Router, error) {
 	s, err := cliRouterSetup(site, routingHost(os.Stderr, time.Now))
 	if err != nil {
@@ -73,7 +75,7 @@ func wireCLIRouter(site routerSite, run routingRun, console io.Writer) (*clirout
 	if err != nil {
 		return nil, fmt.Errorf("the CLI routing table refuses to route: %w", err)
 	}
-	refusals, err := overrideRefusals(r, site.root, run.env)
+	refusals, err := routingRunOverrideRefusals(r, site.root, run.env)
 	if err != nil {
 		return nil, fmt.Errorf("checking the CLI overrides: %w", err)
 	}

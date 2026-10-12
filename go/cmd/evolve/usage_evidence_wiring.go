@@ -59,11 +59,15 @@ func phaseObserverOptions(cfg policy.ObserverPolicy, recoveryStage string, deps 
 	if !*cfg.Autospawn {
 		return nil
 	}
+	return []core.Option{core.WithObserver(phaseObserverAdapter(cfg, recoveryStage, deps))}
+}
+
+func phaseObserverAdapter(cfg policy.ObserverPolicy, recoveryStage string, deps observerDeps) *observer.CoreAdapter {
 	ca := observer.NewCoreAdapter(cfg)
 	ca.RecoveryStage = recoveryStage
 	ca.Signals = func() *signalcenter.Center { return deps.signals }
 	ca.UsageEvidence = deps.usage
-	return []core.Option{core.WithObserver(ca)}
+	return ca
 }
 
 func usageResetFrom(explain usageevidence.Explain) func(families []string, now time.Time) (time.Time, bool) {

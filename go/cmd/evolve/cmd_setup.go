@@ -15,6 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/setup"
 )
 
+var setupJSONIndent = json.MarshalIndent
+
 func runSetup(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve setup: missing subcommand (detect|recommend|latest|apply|complete)")
@@ -84,7 +86,7 @@ func runSetupDetect(args []string, stdout, stderr io.Writer) int {
 		Router: detectRouter(project, stderr),
 	})
 	if asJSON {
-		buf, err := json.MarshalIndent(rep, "", "  ")
+		buf, err := setupJSONIndent(rep, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve setup detect: %v\n", err)
 			return 1
@@ -122,7 +124,7 @@ func runSetupRecommend(args []string, stdout, stderr io.Writer) int {
 	}
 	rr := setup.Recommend(rep, cfg)
 	if asJSON {
-		buf, err := json.MarshalIndent(rr, "", "  ")
+		buf, err := setupJSONIndent(rr, "", "  ")
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve setup recommend: %v\n", err)
 			return 1

@@ -77,6 +77,8 @@ type statusReport struct {
 	CI     statusRemote             `json:"ci"`
 }
 
+var statusCollect = dashboard.Collect
+
 var failingCheckStates = map[string]bool{
 	"FAILURE": true, "ERROR": true, "TIMED_OUT": true, "CANCELLED": true, "ACTION_REQUIRED": true, "STARTUP_FAILURE": true,
 }
@@ -131,7 +133,7 @@ func statusSnapshotReadable(root string) error {
 }
 
 func buildStatusReport(root string, now time.Time) statusReport {
-	snap := dashboard.Collect(root, now)
+	snap := statusCollect(root, now)
 	cycles := snap.Cycles
 	if cycles == nil {
 		cycles = []dashboard.CycleSummary{}

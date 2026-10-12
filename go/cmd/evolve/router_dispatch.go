@@ -44,6 +44,8 @@ func decisionModel(base string, dt routerDecisionType, rc policy.RouterPolicy) s
 	return base
 }
 
+var routerDispatchWalkAt = cliroute.Decision.WalkAt
+
 type routerDispatch struct {
 	cli     string
 	model   string
@@ -57,7 +59,7 @@ func resolveRouterDispatchHealthy(r *cliroute.Router, projectRoot string, dt rou
 		return routerDispatch{}, err
 	}
 	model := decisionModel(d.Plan.Model, dt, r.Policy().RouterConfig())
-	walk, healthy, err := d.WalkAt(model, func(cli string) bool { return benched[llmroute.Family(cli)] })
+	walk, healthy, err := routerDispatchWalkAt(d, model, func(cli string) bool { return benched[llmroute.Family(cli)] })
 	if err != nil {
 		return routerDispatch{}, err
 	}
