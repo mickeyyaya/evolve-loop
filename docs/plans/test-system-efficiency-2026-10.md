@@ -112,7 +112,7 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 | T1 | The time filter in `ScanConfigRoot` (D7) and the hermetic subagent test (D8) | A transcript file older than the window is not read; a file inside the window still counts; `TestDefaultExecAdapter_DispatchesViaBridge` reads no host home | Sonnet |
 | T2 | Measure once: the profile rename (D2), `evolve cover strict` (D3, D4), the floor (D5, D6), the CI step and `go/docs/testing.md` | A failed test leaves no `coverage.txt`; `evolve cover strict` refuses a package below its floor; its percent equals `go test -cover` on a sample package | Sonnet |
 | T3 | Parallel skills-drift tests (D9) | The tests pass with `-race -count=3 -shuffle=on`, and the package wall time goes down | Sonnet |
-| T4 | Wall budget and timeout (D10, D11) | `cmd/testlatency` flags a package over the budget in a recorded `go test -json` stream | Sonnet |
+| T4 | Wall budget and timeout (D10, D11). Status: built. `make test-integration` passes `-timeout $(TEST_TIMEOUT)` (default 20 m) and writes the `go test -json` stream to `TEST_JSON` when set. `testlatency --budget` leads its report with the packages over the budget. A `go.yml` step prints the table to the job summary and never fails the job. | `cmd/testlatency` flags a package over the budget in a recorded `go test -json` stream | Sonnet |
 | T5 | The duplicate ratchet (D12) and the first standard-library replacements | The ratchet fails on a new copy in a fixture tree; the count goes down by the replaced copies | Haiku for the replacements, Sonnet for the ratchet |
 | T6 | The predicate kit in `pkg/acsassert` (D13) and the persona text | Each new helper has a table test and a failure case | Sonnet |
 | T7 | The seam order (D15) in the house rules and the lane brief | A review checklist item; no code | console |
@@ -135,6 +135,23 @@ Update of 2026-10-12, T13 (D27). The 234 reads came from the retry loop of `snap
 6. T8 and T9 last.
 
 Update of 2026-10-12, after the timeout investigation (research §9). T11 comes next, before T4 and before T9, because it removes the cause of the timeout. T12 and T13 follow T11. T4 then adds the 20-minute timeout and the budget report as a guard. T9 merges into T11 for `internal/core`.
+
+Update of 2026-10-12, T4 (D10, D11). The recipe keeps one test run. With `TEST_JSON=<file>`, it adds `-json` and copies the stream to the file through `tee`. The console keeps the plain text through `testlatency -render`, so `evolve ci classify` still reads `--- FAIL:` lines. The recipe reads the exit status of `go test` from a separate descriptor, so the pipe cannot hide a failure. The rename of `coverage.partial.txt` still happens only after a green run.
+
+The plan rejected a second target because it runs the suite again. A run costs about 12 minutes on the loaded host.
+
+T4 measured these walls after T11 to T17 merged, under `-race -tags integration`:
+
+| Package | Wall |
+|---|---|
+| `cmd/evolve` | 210 s to 230 s |
+| `internal/core` | 120 s to 140 s |
+| `internal/phases/audit` | 113 s |
+| `internal/phases/ship` | 52 s to 93 s |
+| `internal/bridge` | 56 s |
+| `internal/ciparity` | 19 s |
+
+`cmd/evolve` is the one package over the 180 s budget on that host. The budget step is advisory. An enforce step (`--fail-over-budget`) follows when `cmd/evolve` is inside the budget.
 
 Update of 2026-10-12, T12 (D26). `gittest.FromTemplate` builds a git fixture one time for each test binary. Each test gets an independent copy ([test-system.md](../architecture/test-system.md) §6.1). The copy uses `os.CopyFS` and starts no `git` process.
 

@@ -458,3 +458,69 @@ func TestMakeApicover_NeverFeedsTheCoverageGates(t *testing.T) {
 		t.Errorf("apicover rewrote the integration profile:\n%s", after)
 	}
 }
+
+func TestMakeIntegration_PassesTheTestTimeout(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		vars []string
+		want string
+	}{
+		{"default", nil, "-timeout 20m"},
+		{"override", []string{"TEST_TIMEOUT=7m"}, "-timeout 7m"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := probeFixture(t, false)
+			argLog := filepath.Join(root, "go-test-args.txt")
+			wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
+			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
+			out, err := runMakeFixture(t, root, "test-integration", tc.vars...)
+			if err != nil {
+				t.Fatalf("test-integration: %v\n%s", err, out)
+			}
+			got, err := os.ReadFile(argLog)
+			if err != nil || !strings.Contains(string(got), tc.want) {
+				t.Fatalf("go test arguments = %q, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestMakeIntegration_TeesAJSONStreamWithoutLosingTheVerdict(t *testing.T) {
+	t.Parallel()
+	for _, failing := range []bool{false, true} {
+		name := "green"
+		if failing {
+			name = "red"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := probeFixture(t, failing)
+			stream := filepath.Join(root, "stream.json")
+			out, err := runMakeFixture(t, root, "test-integration", "TEST_JSON="+stream)
+			if (err != nil) != failing {
+				t.Fatalf("test-integration with TEST_JSON: error = %v, want failure %v\n%s", err, failing, out)
+			}
+			if strings.Contains(out, `{"Action"`) {
+				t.Errorf("the log carries JSON events; want the plain go test text:\n%s", out)
+			}
+			if failing && (!strings.Contains(out, "--- FAIL: TestValue") || !strings.Contains(out, "FAIL\tgateprobe/internal/probe")) {
+				t.Errorf("the log of a red run lacks the plain failure lines the CI classifier reads:\n%s", out)
+			}
+			if !failing && !strings.Contains(out, "ok  \tgateprobe/internal/probe") {
+				t.Errorf("the log of a green run lacks the plain ok line:\n%s", out)
+			}
+			got, readErr := os.ReadFile(stream)
+			action := `"Action":"pass"`
+			if failing {
+				action = `"Action":"fail"`
+			}
+			if readErr != nil || !strings.Contains(string(got), action) || !strings.Contains(string(got), `"Package":"gateprobe/internal/probe"`) {
+				t.Fatalf("stream %q, %v; want a go test -json stream holding %s", got, readErr, action)
+			}
+			_, statErr := os.Stat(filepath.Join(root, "coverage.txt"))
+			if failing == (statErr == nil) {
+				t.Errorf("coverage.txt presence = %v after a %s run", statErr == nil, name)
+			}
+		})
+	}
+}
