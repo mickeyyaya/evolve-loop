@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
 var errBudgetDeferred = errors.New("gc: the time budget ran out")
+
+const devArchiveTimeout = 2 * time.Minute
 
 func ApplyDevWorktrees(ctx context.Context, o DevOptions, m DevManifest) ([]DevArchiveRecord, error) {
 	s, skipped, err := newDevSweep(ctx, o)
@@ -62,6 +65,8 @@ func (s *devSweep) archiveOne(ctx context.Context, planned DevItem, known map[st
 	case fresh.Head != planned.Head:
 		return DevArchiveRecord{}, fmt.Errorf("gc: refuse %s: HEAD moved from %s to %s since the plan", planned.Path, planned.Head, fresh.Head)
 	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), devArchiveTimeout)
+	defer cancel()
 	rec := DevArchiveRecord{Path: wt.Dir, Branch: fresh.Branch, Head: fresh.Head, IdleDays: fresh.IdleDays, ArchivedAt: s.now}
 	removal := []string{"worktree", "remove"}
 	if fresh.Dirty {

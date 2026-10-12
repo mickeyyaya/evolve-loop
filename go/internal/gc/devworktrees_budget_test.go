@@ -5,10 +5,12 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
 func blockingOn(verb string) sysexec.RunFunc {
@@ -153,5 +155,117 @@ func TestApplyDevWorktrees_AReJudgeFailureWithTheBudgetAliveStillErrors(t *testi
 	}
 	if _, serr := os.Stat(dir); serr != nil {
 		t.Errorf("tree gone: %v", serr)
+	}
+}
+
+func savingThenCancelling(o DevOptions, cancel context.CancelFunc) DevSaveFunc {
+	return func(c context.Context, wt wtcheckpoint.Worktree) (wtcheckpoint.SaveResult, error) {
+		res, err := wtcheckpoint.Save(c, wt, wtcheckpoint.SaveOptions{Label: devArchiveLabel, Now: o.Now})
+		cancel()
+		return res, err
+	}
+}
+
+type archiveState struct {
+	exists      bool
+	checkpoints int
+	recorded    bool
+}
+
+func (e *devEnv) archiveStateOf(dir string) archiveState {
+	e.t.Helper()
+	_, statErr := os.Stat(dir)
+	entries, err := wtcheckpoint.List(context.Background(), e.hub(), filepath.Base(dir))
+	if err != nil {
+		e.t.Fatalf("list checkpoints of %s: %v", dir, err)
+	}
+	stored, err := ReadDevArchive(e.evolve)
+	if err != nil {
+		e.t.Fatalf("read the archive manifest: %v", err)
+	}
+	want := filepath.Join(resolvePath(filepath.Dir(dir)), filepath.Base(dir))
+	recorded := false
+	for _, rec := range stored {
+		recorded = recorded || resolvePath(rec.Path) == want
+	}
+	return archiveState{exists: statErr == nil, checkpoints: len(entries), recorded: recorded}
+}
+
+func (s archiveState) fullyArchived() bool { return !s.exists && s.checkpoints == 1 && s.recorded }
+
+func (s archiveState) untouched() bool { return s.exists && s.checkpoints == 0 && !s.recorded }
+
+func TestApplyDevWorktrees_ArchiveRunsUnderDedicatedContext(t *testing.T) {
+	e := newDevEnv(t)
+	dir := e.addDev("atomic")
+	writeRepoFile(t, dir, "base.txt", "dirty edit\n")
+	o := e.options(idleOffset)
+	m := e.plan(o)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	o.Save = savingThenCancelling(o, cancel)
+	recs, err := ApplyDevWorktrees(ctx, o, m)
+	if err != nil || len(recs) != 1 || recs[0].Checkpoint == "" {
+		t.Fatalf("recs=%+v err=%v, want one record with its checkpoint and no error", recs, err)
+	}
+	if st := e.archiveStateOf(dir); !st.fullyArchived() {
+		t.Errorf("state = %+v, want the started archive finished: tree removed, one checkpoint, one manifest row", st)
+	}
+}
+
+func TestApplyDevWorktrees_ABudgetThatEndsAsTheRemoveStartsStillFinishesTheArchive(t *testing.T) {
+	e := newDevEnv(t)
+	dir := e.addDev("removing")
+	writeRepoFile(t, dir, "base.txt", "dirty edit\n")
+	o := e.options(idleOffset)
+	m := e.plan(o)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	o.Exec = func(c context.Context, name, d string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
+		if len(args) > 1 && args[0] == "worktree" && args[1] == "remove" {
+			cancel()
+		}
+		return sysexec.DefaultRunner(c, name, d, args, env, in, out, errw)
+	}
+	recs, err := ApplyDevWorktrees(ctx, o, m)
+	if err != nil || len(recs) != 1 {
+		t.Fatalf("recs=%+v err=%v, want one record and no error", recs, err)
+	}
+	if st := e.archiveStateOf(dir); !st.fullyArchived() {
+		t.Errorf("state = %+v, want the remove finished and recorded despite the spent budget", st)
+	}
+}
+
+func TestApplyDevWorktrees_BudgetCutLeavesTreeUntouchedOrFullyArchived(t *testing.T) {
+	e := newDevEnv(t)
+	dirs := []string{e.addDev("tree-one"), e.addDev("tree-two")}
+	for _, dir := range dirs {
+		writeRepoFile(t, dir, "base.txt", "dirty "+filepath.Base(dir)+"\n")
+	}
+	o := e.options(idleOffset)
+	m := e.plan(o)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	o.Save = savingThenCancelling(o, cancel)
+	var deferred []string
+	o.Deferred = func(p string) { deferred = append(deferred, p) }
+	recs, err := ApplyDevWorktrees(ctx, o, m)
+	if err != nil {
+		t.Errorf("ApplyDevWorktrees: %v, want no error when the budget ends mid-sweep", err)
+	}
+	archived, untouched := 0, 0
+	for _, dir := range dirs {
+		st := e.archiveStateOf(dir)
+		switch {
+		case st.fullyArchived():
+			archived++
+		case st.untouched():
+			untouched++
+		default:
+			t.Errorf("tree %s is half-archived: %+v", dir, st)
+		}
+	}
+	if archived != 1 || untouched != 1 || len(recs) != 1 || len(deferred) != 1 {
+		t.Errorf("archived=%d untouched=%d recs=%+v deferred=%v, want the started tree archived and the next one deferred untouched", archived, untouched, recs, deferred)
 	}
 }
