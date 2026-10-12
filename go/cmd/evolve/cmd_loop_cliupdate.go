@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliupdate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/practicewatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -29,6 +31,7 @@ func boundaryCLIUpdate(ctx context.Context, cfg loopConfig, stderr io.Writer) []
 		}
 		fmt.Fprintln(stderr, prefix+res.Line())
 	}
+	boundaryPracticeWatch(ctx, cfg, stderr)
 	return rep.SmokeFailed()
 }
 
@@ -73,4 +76,31 @@ func (b *loopBatchCoordinator) updateCLIsAtBoundary(iteration int) (batchDecisio
 	haltOnCLISmokeFailure(b.deps.Signals, "loopBatchCoordinator.updateCLIsAtBoundary", failed, b.result)
 	b.result.emitFatal(b.stdout, b.stderr, b.cfg, 0)
 	return batchDecision{flow: batchReturn, exitCode: 2}, true
+}
+
+var practiceWatchAtBoundary = watchPracticeAtBoundary
+
+var practiceBoundaryBudget = 60 * time.Second
+
+func watchPracticeAtBoundary(ctx context.Context, projectRoot string, stderr io.Writer) (practicewatch.Report, error) {
+	return runPracticeWatch(ctx, projectRoot, false, stderr)
+}
+
+func boundaryPracticeWatch(ctx context.Context, cfg loopConfig, stderr io.Writer) {
+	ctx, cancel := context.WithTimeout(ctx, practiceBoundaryBudget)
+	defer cancel()
+	rep, err := practiceWatchAtBoundary(ctx, cfg.ProjectRoot, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] WARN: practice-watch: %v; the boundary continues\n", err)
+		return
+	}
+	for _, res := range rep.Results {
+		switch res.Status {
+		case practicewatch.StatusOff, practicewatch.StatusUnchanged:
+		case practicewatch.StatusError, practicewatch.StatusSkipped:
+			fmt.Fprintf(stderr, "[loop] WARN: practice-watch: %s %s: %s\n", res.ID, res.Status, res.Detail)
+		default:
+			fmt.Fprintf(stderr, "[loop] practice-watch: %s %s %s\n", res.ID, res.Status, res.Item)
+		}
+	}
 }

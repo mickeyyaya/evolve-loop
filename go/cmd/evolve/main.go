@@ -184,6 +184,10 @@ v12.1 utilities + composition:
                               smoke-test a changed version
                               ( cli update [--dry-run] [--json]
                               [--project-root P] )
+  practice                  Watch the practice sources of each CLI; file
+                              an inbox research item when one changed
+                              ( practice watch [--dry-run] [--json]
+                              [--project-root P] )
   ratchet                   Function-size + raw-git-fixture ratchets
                               ( ratchet check [size|rawgit] [--root DIR] )
   cover                     Coverage gate over a change: refuses every

@@ -740,3 +740,5 @@
 # cover-changed (2026-10-11): the gate that refuses a changed function below 100% (internal/covchanged).
 ./internal/covchanged
 ./internal/coverstrict
+# practicewatch — the CLI practice watch (ADR-0133, plan M1): fetch each configured source, normalize, hash, compare with .evolve/practice/<id>.json, file one inbox research item per changed source.
+./internal/practicewatch

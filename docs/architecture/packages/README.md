@@ -22,6 +22,7 @@ One page per Go package directory, holding what the package's code cannot say: i
 | `internal/ipcenv` | the lane protocol keys a parent evolve process sets for its children, their set (`ProtocolKeys`), and the `EVOLVE_` scrub every judging `go test` runs under | [internal-ipcenv.md](internal-ipcenv.md) |
 | `internal/looppreflight` | the readiness gate `evolve loop` runs before the first wave | [internal-looppreflight.md](internal-looppreflight.md) |
 | `internal/cliupdate` | updates each subscribed CLI family at a loop boundary, smoke-tests a changed version and records the change for the drift check | [internal-cliupdate.md](internal-cliupdate.md) |
+| `internal/practicewatch` | reads the practice sources of each CLI at a loop boundary and files one inbox research item for each source that changed | [internal-practicewatch.md](internal-practicewatch.md) |
 | `internal/usageprobe` | reads each CLI's usage screen into typed windows through its manifest, benches every family already at a cap before a wave's first phase, and records the windows | [internal-usageprobe.md](internal-usageprobe.md) |
 | `internal/usageevidence` | queries a failing CLI's usage on every failure path, records the verdict in the workspace and as a signal, and decorates the bridge with it | [internal-usageevidence.md](internal-usageevidence.md) |
 | `internal/overlap` | the overlap proof of the landing queue: the zones, the closure, the evidence and the tier, with the `go list` adapter (ADR-0128, Q3) | [internal-overlap.md](internal-overlap.md) |
