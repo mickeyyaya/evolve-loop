@@ -137,7 +137,9 @@ func remoteOpenPR(dir string) func(ref string) (bool, error) {
 		if _, err := exec.LookPath("gh"); err != nil {
 			return false, nil
 		}
-		out, err := sysexec.Command(context.Background(), "gh", "-C", dir, "pr", "list", "--head", ref, "--state", "open", "--json", "number", "-q", "length").Output()
+		cmd := sysexec.Command(context.Background(), "gh", "pr", "list", "--head", ref, "--state", "open", "--json", "number", "-q", "length")
+		cmd.Dir = dir
+		out, err := cmd.Output()
 		if err != nil {
 			return false, fmt.Errorf("gh pr list --head %s: %w", ref, err)
 		}

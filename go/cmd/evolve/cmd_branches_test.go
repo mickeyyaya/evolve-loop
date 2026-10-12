@@ -237,3 +237,105 @@ func TestBranchesPruneDryRun_KeptReasonsNeverWouldPrune(t *testing.T) {
 		}
 	}
 }
+
+func brFakeGh(t *testing.T, script string) {
+	t.Helper()
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\n"+script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+const brGhRejectingDashC = `for a in "$@"; do
+  if [ "$a" = "-C" ]; then
+    echo "unknown shorthand flag: 'C' in -C" >&2
+    exit 1
+  fi
+done
+echo 1
+`
+
+func TestRemoteOpenPR_NeverPassesDashCToGh(t *testing.T) {
+	r := gittest.Fixture(t)
+	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "absent.git"))
+	brFakeGh(t, brGhRejectingDashC)
+
+	open, err := remoteOpenPR(r.Dir)("cycle-100")
+
+	if err != nil {
+		t.Fatalf("remoteOpenPR errored although gh was given no -C: %v", err)
+	}
+	if !open {
+		t.Error("remoteOpenPR = false, want true for a ref with an open PR")
+	}
+}
+
+func TestRemoteOpenPR_RunsGhInsideTheRepoDirectory(t *testing.T) {
+	r := gittest.Fixture(t)
+	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "absent.git"))
+	cwdFile := filepath.Join(t.TempDir(), "cwd")
+	brFakeGh(t, "pwd -P > '"+cwdFile+"'\necho 1\n")
+
+	if _, err := remoteOpenPR(r.Dir)("cycle-100"); err != nil {
+		t.Fatalf("remoteOpenPR: %v", err)
+	}
+
+	got, err := os.ReadFile(cwdFile)
+	if err != nil {
+		t.Fatalf("fake gh never recorded its working directory: %v", err)
+	}
+	want, err := filepath.EvalSymlinks(r.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(got)) != want {
+		t.Errorf("gh ran in %q, want the repo directory %q", strings.TrimSpace(string(got)), want)
+	}
+}
+
+func TestRemoteOpenPR_ZeroOpenPRsIsFalseWithoutError(t *testing.T) {
+	r := gittest.Fixture(t)
+	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "absent.git"))
+	brFakeGh(t, "echo 0\n")
+
+	open, err := remoteOpenPR(r.Dir)("cycle-100")
+
+	if err != nil || open {
+		t.Errorf("remoteOpenPR = (%t, %v), want (false, nil)", open, err)
+	}
+}
+
+func TestRemoteOpenPR_NoRemoteIsFalseWithoutCallingGh(t *testing.T) {
+	r := gittest.Fixture(t)
+	called := filepath.Join(t.TempDir(), "called")
+	brFakeGh(t, "touch '"+called+"'\necho 1\n")
+
+	open, err := remoteOpenPR(r.Dir)("cycle-100")
+
+	if err != nil || open {
+		t.Errorf("remoteOpenPR = (%t, %v), want (false, nil)", open, err)
+	}
+	if _, statErr := os.Stat(called); statErr == nil {
+		t.Error("gh was invoked although the repo has no remote")
+	}
+}
+
+func TestRemoteOpenPR_GhAbsentFromPathIsFalseWithoutError(t *testing.T) {
+	r := gittest.Fixture(t)
+	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "absent.git"))
+	gitBin, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", filepath.Dir(gitBin))
+	if _, lookErr := exec.LookPath("gh"); lookErr == nil {
+		t.Skip("gh lives beside git; cannot hide it from PATH")
+	}
+
+	open, runErr := remoteOpenPR(r.Dir)("cycle-100")
+
+	if runErr != nil || open {
+		t.Errorf("remoteOpenPR = (%t, %v), want (false, nil)", open, runErr)
+	}
+}

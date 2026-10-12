@@ -75,7 +75,7 @@ func TestBranchesPrune_AnOpenRemotePRKeepsASupersededRef(t *testing.T) {
 	r := branchesRepo(t)
 	r.Git("remote", "add", "origin", filepath.Join(t.TempDir(), "absent.git"))
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\necho 1\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\nfor a in \"$@\"; do\n  if [ \"$a\" = \"-C\" ]; then\n    echo \"unknown shorthand flag: 'C' in -C\" >&2\n    exit 1\n  fi\ndone\necho 1\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
