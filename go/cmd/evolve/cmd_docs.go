@@ -281,8 +281,11 @@ func relTargets(root string, rels []string) []steTarget {
 
 func steDisplay(root, abs string) string {
 	if absRoot, err := filepath.Abs(root); err == nil {
-		if rel, err := filepath.Rel(absRoot, abs); err == nil && !strings.HasPrefix(rel, "..") {
-			return filepath.ToSlash(rel)
+		if rel, err := filepath.Rel(absRoot, abs); err == nil {
+			slashed := filepath.ToSlash(rel)
+			if slashed != ".." && !strings.HasPrefix(slashed, "../") {
+				return slashed
+			}
 		}
 	}
 	return filepath.ToSlash(abs)

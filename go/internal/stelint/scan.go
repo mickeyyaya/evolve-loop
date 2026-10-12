@@ -241,7 +241,8 @@ func (s *scanner) formatVerb(i, to int) (int, bool) {
 	j = s.skipArgIndex(j, to)
 	j = s.skipWhile(j, to, isWidthRune)
 	if j < to && s.runes[j] == '.' {
-		j = s.skipWhile(j+1, to, isWidthRune)
+		j = s.skipArgIndex(j+1, to)
+		j = s.skipWhile(j, to, isWidthRune)
 	}
 	j = s.skipArgIndex(j, to)
 	if j >= to || !unicode.IsLetter(s.runes[j]) {

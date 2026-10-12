@@ -556,3 +556,30 @@ func TestDocsSteLint_AnExplicitFileOutsideTheRootShowsItsAbsolutePath(t *testing
 		t.Fatalf("code %d, stdout %q; want it to start with %q", code, stdout, want)
 	}
 }
+
+func TestSteDisplay_RootFilesNamedWithTwoLeadingDotsStayRelative(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	outside := filepath.Join(filepath.Dir(root), "outside.md")
+	for name, tc := range map[string]struct{ abs, want string }{
+		"dot-dot-prefixed root file": {filepath.Join(root, "..notes.md"), "..notes.md"},
+		"dot-dot-prefixed nested":    {filepath.Join(root, "docs", "..a.md"), "docs/..a.md"},
+		"plain root file":            {filepath.Join(root, "a.md"), "a.md"},
+		"file outside the root":      {outside, filepath.ToSlash(outside)},
+	} {
+		if got := steDisplay(root, tc.abs); got != tc.want {
+			t.Errorf("%s: steDisplay = %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+func TestDocsSteLint_ADotDotPrefixedRootFileShowsItsRelativePath(t *testing.T) {
+	t.Parallel()
+	root := steFixtureRoot(t, map[string]string{"..notes.md": "We utilize it.\n"})
+
+	code, stdout, _ := runDocsCLI("ste-lint", "--project-root", root, filepath.Join(root, "..notes.md"))
+
+	if code != 0 || !strings.HasPrefix(stdout, "..notes.md:1 STE-WORD") {
+		t.Fatalf("code %d, stdout %q; want a finding shown as ..notes.md:1", code, stdout)
+	}
+}

@@ -168,3 +168,19 @@ func TestCheckGo_IsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckGo_IndexedWidthAndPrecisionVerbsAreCodeTokens(t *testing.T) {
+	verbLetterAsWord := []stelint.Substitution{{Phrase: "f", Replacement: "float"}, {Phrase: "d", Replacement: "digit"}}
+	for _, verb := range []string{"%[3]*.[2]*[1]f", "%[1]*.*f", "%.[2]*f", "%[2]*d", "%[1]*[2]d"} {
+		t.Run(verb, func(t *testing.T) {
+			src := goFile(goImports, `_ = fmt.Errorf("`+verb+`", 1, 2, 3)`)
+			got, err := stelint.CheckGo([]byte(src), stelint.Options{Words: verbLetterAsWord})
+			if err != nil {
+				t.Fatalf("CheckGo: %v", err)
+			}
+			if len(got) != 0 {
+				t.Fatalf("verb %s produced findings %+v; it is one code token", verb, got)
+			}
+		})
+	}
+}
