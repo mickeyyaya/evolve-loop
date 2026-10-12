@@ -258,7 +258,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 
 func liveRefreshRoots(projectRoot, evolveDir string) (string, string, error) {
 	if projectRoot == "" {
-		cwd, err := os.Getwd()
+		cwd, err := processGetwd()
 		if err != nil {
 			return "", "", fmt.Errorf("liveRefresh: resolve workspace: %w", err)
 		}
