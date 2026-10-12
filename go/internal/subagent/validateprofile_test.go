@@ -501,16 +501,17 @@ func TestDefaultExecAdapter_DispatchesViaBridge(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := map[string]string{
-		"RESOLVED_CLI":   "claude",
-		"PROFILE_PATH":   prof,
-		"RESOLVED_MODEL": "sonnet",
-		"PROMPT_FILE":    "",
-		"WORKSPACE_PATH": ws,
-		"ARTIFACT_PATH":  filepath.Join(dir, "art.md"),
-		"STDOUT_LOG":     "/dev/null",
-		"STDERR_LOG":     "/dev/null",
-		"CYCLE":          "0",
-		"VALIDATE_ONLY":  "1",
+		"RESOLVED_CLI":      "claude",
+		"PROFILE_PATH":      prof,
+		"RESOLVED_MODEL":    "sonnet",
+		"PROMPT_FILE":       "",
+		"WORKSPACE_PATH":    ws,
+		"ARTIFACT_PATH":     filepath.Join(dir, "art.md"),
+		"STDOUT_LOG":        "/dev/null",
+		"STDERR_LOG":        "/dev/null",
+		"CYCLE":             "0",
+		"VALIDATE_ONLY":     "1",
+		"CLAUDE_CONFIG_DIR": t.TempDir(),
 	}
 	rc, err := defaultExecAdapter(context.Background(), "/ignored/claude.sh", env)
 	if err != nil {
@@ -532,16 +533,17 @@ func TestDefaultExecAdapter_UnknownCLIFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	env := map[string]string{
-		"RESOLVED_CLI":   "no-such-cli",
-		"PROFILE_PATH":   prof,
-		"RESOLVED_MODEL": "sonnet",
-		"PROMPT_FILE":    "",
-		"WORKSPACE_PATH": ws,
-		"ARTIFACT_PATH":  filepath.Join(dir, "art.md"),
-		"STDOUT_LOG":     "/dev/null",
-		"STDERR_LOG":     "/dev/null",
-		"CYCLE":          "0",
-		"VALIDATE_ONLY":  "0",
+		"RESOLVED_CLI":      "no-such-cli",
+		"PROFILE_PATH":      prof,
+		"RESOLVED_MODEL":    "sonnet",
+		"PROMPT_FILE":       "",
+		"WORKSPACE_PATH":    ws,
+		"ARTIFACT_PATH":     filepath.Join(dir, "art.md"),
+		"STDOUT_LOG":        "/dev/null",
+		"STDERR_LOG":        "/dev/null",
+		"CYCLE":             "0",
+		"VALIDATE_ONLY":     "0",
+		"CLAUDE_CONFIG_DIR": t.TempDir(),
 	}
 	rc, err := defaultExecAdapter(context.Background(), "/ignored/no-such-cli.sh", env)
 	if err == nil {

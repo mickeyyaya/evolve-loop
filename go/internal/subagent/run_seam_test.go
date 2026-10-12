@@ -182,7 +182,7 @@ func TestExecAdapterDepsWith_CarriesTheCenter(t *testing.T) {
 	if !strings.Contains(body, "newAdapterBridge(execAdapterDepsWith(env, signals))") {
 		t.Fatalf("execAdapter must build its engine from execAdapterDepsWith(env, signals):\n%s", body)
 	}
-	if code, err := execAdapter(context.Background(), map[string]string{"PROMPT_FILE": filepath.Join(t.TempDir(), "missing")}, c); code != -1 || err == nil {
+	if code, err := execAdapter(context.Background(), map[string]string{"PROMPT_FILE": filepath.Join(t.TempDir(), "missing"), "CLAUDE_CONFIG_DIR": t.TempDir()}, c); code != -1 || err == nil {
 		t.Fatalf("an unreadable prompt file is the -1 infra error: %d %v", code, err)
 	}
 }

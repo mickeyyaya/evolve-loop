@@ -78,6 +78,18 @@ type transcriptLine struct {
 
 var walkDir = filepath.WalkDir
 
+var readTranscript = readLines
+
+const transcriptMtimeSlack = time.Minute
+
+func predatesWindow(d os.DirEntry, w Window) bool {
+	info, err := d.Info()
+	if err != nil {
+		return false
+	}
+	return info.ModTime().Before(w.Start.Add(-transcriptMtimeSlack))
+}
+
 // ScanConfigRoot sums the usage of the transcripts under root/projects attributed to w; finding none is SourceNone, not an error.
 func ScanConfigRoot(root string, w Window) (Result, error) {
 	projects := filepath.Join(root, "projects")
@@ -94,7 +106,10 @@ func ScanConfigRoot(root string, w Window) (Result, error) {
 		if walkErr != nil || d.IsDir() || !strings.HasSuffix(path, ".jsonl") {
 			return nil
 		}
-		lines, readErr := readLines(path)
+		if predatesWindow(d, w) {
+			return nil
+		}
+		lines, readErr := readTranscript(path)
 		if readErr != nil && warn == "" {
 			warn = "transcript " + path + " was read only in part, so its usage may be under-counted: " + readErr.Error()
 		}
