@@ -16,9 +16,6 @@ import (
 
 var cycleHealthAbsoluteRoot = paths.AbsoluteRoot
 
-// runCycleHealth implements `evolve cycle-health <N> <workspace>`. It exits 0
-// when healthy or only warned, 1 on a fatal anomaly or an internal error, and
-// 10 on bad arguments.
 func runCycleHealth(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("cycle-health", flag.ContinueOnError)
 	fs.SetOutput(stderr)

@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// The raw br may only be constructed, configured through its Set* methods,
-// wrapped, used as the catalog publisher's sink and exposed on orchDeps; never launched.
 func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle.go")
@@ -30,9 +28,9 @@ func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.
 		regexp.MustCompile(`^\s*br := bridge\.NewDefault\(`),
 		regexp.MustCompile(`^\s*br\.Set[A-Za-z]+\(`),
 		regexp.MustCompile(`bridgechain\.New\(withUsageEvidence\(br, explainUsage, signals\),`),
-		regexp.MustCompile(`catalogPublisher\(br, cliRouter\)`), // the concrete adapter's contract-resolver sink — configured, never launched
-		regexp.MustCompile(`wireBridgeStages\(br, `),            // takes a bridgeStageSink (three setters, no Launch) — a configurer by type
-		regexp.MustCompile(`^\s*Bridge:\s{2,}br,\s*$`),          // orchDeps.Bridge (*bridge.Adapter): the host's own Set* handle — never launched
+		regexp.MustCompile(`catalogPublisher\(br, cliRouter\)`),
+		regexp.MustCompile(`wireBridgeStages\(br, `),
+		regexp.MustCompile(`^\s*Bridge:\s{2,}br,\s*$`),
 	}
 	for i, line := range strings.Split(fn, "\n") {
 		if !rawUse.MatchString(line) || strings.Contains(strings.TrimSpace(line), "//") && strings.HasPrefix(strings.TrimSpace(line), "//") {

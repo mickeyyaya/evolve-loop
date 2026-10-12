@@ -1,8 +1,5 @@
 package main
 
-// The fixture helpers (gcGit / gcWorktreeEnv / gcOrphanBranch) are the ones
-// already used by cmd_loop_gc_worktree_test.go in this package.
-
 import (
 	"bytes"
 	"context"
@@ -14,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
-// gcUnmergedBranch is a cycle-* branch carrying a commit that is NOT reachable
-// from HEAD — unlanded cycle work the sweep must refuse to delete.
 const gcUnmergedBranch = "cycle-888"
 
 func gcAddUnmergedBranch(t *testing.T, projectRoot string) {
@@ -30,7 +25,7 @@ func gcAddUnmergedBranch(t *testing.T, projectRoot string) {
 }
 
 func TestRunGC_DryRunPrintsWorkspacePlanAndMutatesNothing(t *testing.T) {
-	projectRoot, _, _ := gcWorktreeEnv(t, "") // repo + merged orphan branch cycle-777
+	projectRoot, _, _ := gcWorktreeEnv(t, "")
 
 	var stdout, stderr bytes.Buffer
 	rc := runGC([]string{"--dry-run", "--project-root", projectRoot}, nil, &stdout, &stderr)

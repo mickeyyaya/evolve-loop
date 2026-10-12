@@ -29,8 +29,6 @@ func writeInboxItemFixture(t *testing.T, path string, fields map[string]string) 
 	}
 }
 
-// jsonQuote is a minimal string literal quoter sufficient for the fixed
-// ASCII fixture text used in these tests (no embedded newlines/quotes).
 func jsonQuote(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`
 }
@@ -63,8 +61,6 @@ func TestRunInbox_AckFingerprint_WritesLedgerFromRealItem(t *testing.T) {
 }
 
 func TestRunInbox_AckFingerprint_FallsBackToNotesField(t *testing.T) {
-	// Omits consumed_by to simulate an item consumed before a narrative
-	// exists, exercising the notes fallback.
 	projectRoot := t.TempDir()
 	t.Setenv("EVOLVE_PROJECT_ROOT", projectRoot)
 	itemPath := filepath.Join(projectRoot, ".evolve", "inbox", "consumed", "pipeline-defect-pipeline-blocker.json")

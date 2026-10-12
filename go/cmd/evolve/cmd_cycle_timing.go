@@ -15,8 +15,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
-// runCycleTiming renders a cycle's per-phase wall-clock table and archetype
-// roll-up from its phase-timing.json; --json emits the phasetiming.Summary.
 func runCycleTiming(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle timing", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -67,8 +65,6 @@ func runCycleTiming(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// renderParallelProjection prints the shadow estimate of parallelizing the
-// independent checking phases, only when it saves measurable time.
 func renderParallelProjection(w io.Writer, p phasetiming.ParallelProjection) {
 	if p.SavingMS == 0 {
 		return
@@ -78,8 +74,6 @@ func renderParallelProjection(w io.Writer, p phasetiming.ParallelProjection) {
 		phasetiming.HumanMS(p.SequentialMS), phasetiming.HumanMS(p.ProjectedParallelMS), phasetiming.HumanMS(p.SavingMS))
 }
 
-// resolveCycleWorkspace returns the requested cycle's workspace and label,
-// defaulting to the highest-numbered cycle with a timing log.
 func resolveCycleWorkspace(runsDir string, rest []string) (workspace, label string) {
 	if len(rest) > 0 {
 		label = "cycle-" + rest[0]
@@ -92,9 +86,6 @@ func resolveCycleWorkspace(runsDir string, rest []string) (workspace, label stri
 	return filepath.Join(runsDir, label), label
 }
 
-// latestCycleDir returns the highest-numbered cycle dir holding a timing log. A
-// reset-suffixed dir (cycle-N.reset-…) parses on its leading integer, so a
-// completed re-run beats an older sealed attempt.
 func latestCycleDir(runsDir string) string {
 	matches, _ := filepath.Glob(filepath.Join(runsDir, "cycle-*", phasetiming.FileName))
 	best, bestN := "", -1
@@ -107,7 +98,6 @@ func latestCycleDir(runsDir string) string {
 	return best
 }
 
-// cycleNumber extracts the leading integer from a "cycle-N[.suffix]" dir name.
 func cycleNumber(dir string) int {
 	s := strings.TrimPrefix(dir, "cycle-")
 	if dot := strings.IndexByte(s, '.'); dot != -1 {
@@ -138,7 +128,6 @@ func renderTiming(w io.Writer, cycleLabel string, entries []phasetiming.Entry, s
 	fmt.Fprintf(w, "By archetype: %s\n", archetypeBreakdown(s))
 }
 
-// archetypeBreakdown renders the per-archetype share, highest first.
 func archetypeBreakdown(s phasetiming.Summary) string {
 	type kv struct {
 		k string
@@ -156,7 +145,6 @@ func archetypeBreakdown(s phasetiming.Summary) string {
 	return strings.Join(parts, " · ")
 }
 
-// clockOf renders the HH:MM:SS of an RFC3339 timestamp, or "—" when absent.
 func clockOf(rfc3339 string) string {
 	if rfc3339 == "" {
 		return "—"

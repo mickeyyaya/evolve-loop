@@ -9,9 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
 
-// A fleet lane's cycle state lives in <project-root>/.evolve/runs/cycle-N, and its override applies
-// only inside the evolve dir storage resolves against; any other --evolve-dir would silently put the
-// lane back on the shared cycle-state.json.
 func TestRunCycleRun_AFleetLaneRefusesAnEvolveDirOutsideItsProjectRoot(t *testing.T) {
 	t.Setenv(ipcenv.FleetKey, "1")
 	root := t.TempDir()

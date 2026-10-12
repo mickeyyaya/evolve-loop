@@ -58,7 +58,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
-// runCycle implements `evolve cycle <subcommand>`: run | reset | timing | outputs.
 func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve cycle: missing subcommand (try: run | reset | timing)")
@@ -81,8 +80,6 @@ func runCycle(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
-// runCycleReset seals an unfinished cycle through core.SealCycle; the
-// complement of `evolve loop --resume`.
 func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle reset", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -101,7 +98,6 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 	if err := fs.Parse(args); err != nil {
 		return 10
 	}
-	// SealCycle's "workspace inside projectRoot" check needs both sides absolute.
 	projectRoot = paths.AbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle reset: WARN: %s\n", m)
 	})
@@ -109,16 +105,13 @@ func runCycleReset(args []string, stdout, stderr io.Writer) int {
 		evolveDir = filepath.Join(projectRoot, ".evolve")
 	}
 
-	// The liveness fence is SealCycle's lease heartbeat. The dispatcher's
-	// .evolve/.lock is per cycle and released between cycles, so it proves nothing.
 	res, err := core.SealCycle(context.Background(), ledger.New(evolveDir), core.SealOptions{
 		EvolveDir:   evolveDir,
 		ProjectRoot: projectRoot,
 		Reason:      reason,
 		DryRun:      dryRun,
 		Force:       force,
-		// A dead owner pid seals without --force even before its heartbeat ages out.
-		PidAlive: pidAlive,
+		PidAlive:    pidAlive,
 	})
 	if err != nil {
 		switch {
@@ -199,8 +192,6 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	projectRoot, evolveDir := f.projectRoot, f.evolveDir
-	// Absolutize before deriving any path: a relative root makes worktree-phase
-	// artifact paths diverge between the agent's cwd and the bridge's.
 	projectRoot = cycleRunAbsoluteRoot("--project-root", projectRoot, func(m string) {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: %s\n", m)
 	})
@@ -231,13 +222,9 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	buf, _ := json.MarshalIndent(result, "", "  ")
 	fmt.Fprintln(stdout, string(buf))
-	// The exit code is a lane's only channel to its parent wave, so a halting
-	// SystemFailure gets its own code and writes the dossier and P0 item here.
 	if sf := result.SystemFailure; sf != nil && sf.Halt {
 		return haltOnSystemFailure(evolveDir, projectRoot, result.Cycle, cycleWorkspace(projectRoot, result.Cycle), sf, stderr, signals, systemFailureRule)
 	}
-	// A FAIL verdict without an error, or a no-work hand-off; the error branch
-	// above already returned, so each applies once.
 	if applied, err := closeoutCycleOutcome(result, projectRoot, evolveDir, stderr, lifecycleLedger, signals); err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d %s to the inbox: %v\n", result.Cycle, applied, err)
 	}
@@ -264,10 +251,6 @@ func releaseDeferredLaneClaims(projectRoot string, cycle int, stderr io.Writer, 
 	return err
 }
 
-// closeoutCycleOutcome is the one post-result closeout every root makes: the
-// failure walk on FAIL, the no-work hand-off for a lane that answered its
-// scope, else nothing. It returns what it applied and the walk's error for the
-// caller to WARN; a lifecycle hiccup never changes an exit code or a batch.
 func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) (applied string, err error) {
 	switch {
 	case result.FinalVerdict == cyclestate.VerdictFAIL:
@@ -278,8 +261,6 @@ func closeoutCycleOutcome(result core.CycleResult, projectRoot, evolveDir string
 	return "", nil
 }
 
-// applyCycleNoWorkOutcome hands a no-work lane's answered scoped items to the
-// console and releases its claims; a cycle without a lane pin has none.
 func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	res, err := cycleoutcome.ApplyNoWork(cycleoutcome.NoWorkInputs{
 		ProjectRoot: projectRoot,
@@ -293,9 +274,6 @@ func applyCycleNoWorkOutcome(projectRoot string, cycle int, stderr io.Writer, li
 	return err
 }
 
-// applyCycleFailureOutcome walks the failed cycle's committed ids through the
-// inbox failure lifecycle on the root's ledger and Signal Center. A nil ledger
-// (the --simulate root) falls back to the mover's own unobserved file ledger.
 func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr io.Writer, lifecycle inboxmover.LedgerAppender, signals *signalcenter.Center) error {
 	if cycle == 0 {
 		return nil
@@ -306,7 +284,6 @@ func applyCycleFailureOutcome(projectRoot, evolveDir string, cycle int, stderr i
 	return err
 }
 
-// warnCycleFailureOutcome is the cycle-run root's voice for a failed walk.
 func warnCycleFailureOutcome(stderr io.Writer, cycle int, err error) {
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve cycle run: WARN: could not apply cycle %d failure outcome to the inbox: %v\n", cycle, err)
@@ -321,38 +298,26 @@ func wireCycleRun(f cycleRunFlags, projectRoot, evolveDir string, stderr io.Writ
 	return wireOrchestratorDepsFn(projectRoot, evolveDir, stderr, routingRun{bypass: f.bypassPolicy, env: filterEvolveEnv(os.Environ())})
 }
 
-// filterEvolveEnv forwards to cmdutil.FilterEvolveEnv, the one definition the
-// internal/cli groups share.
 func filterEvolveEnv(environ []string) map[string]string {
 	return cmdutil.FilterEvolveEnv(environ)
 }
 
-// orchDeps is the wired orchestrator plus the storage and ledger handles its
-// callers query, so none re-resolves evolveDir.
 type orchDeps struct {
 	Storage      core.Storage
 	Ledger       rootLedger
 	Orchestrator *core.Orchestrator
-	// Signals is always built; a nil Center is a test affordance only.
-	Signals *signalcenter.Center
-	// Bridge carries Signals into every engine it builds.
-	Bridge *bridge.Adapter
-	// Runners backs the per-runner Signals wiring proof; no production reader.
-	Runners    map[core.Phase]core.PhaseRunner
-	Router     *cliroute.Router
-	RoutingErr error
+	Signals      *signalcenter.Center
+	Bridge       *bridge.Adapter
+	Runners      map[core.Phase]core.PhaseRunner
+	Router       *cliroute.Router
+	RoutingErr   error
 }
 
-// rootLedger is one object serving the core port and the inbox mover's
-// lifecycle seam, so the failed-cycle walk appends through the observed ledger.
 type rootLedger interface {
 	core.Ledger
 	inboxmover.LedgerAppender
 }
 
-// newRootSignalCenter is the one sink topology every root builds, the loop
-// tests' stub root included: signals.ndjson (the cycle workspace's, or
-// <evolveDir>'s for cycle-less signals) plus the console at WARN and above.
 func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *signalcenter.Center {
 	signals := signalcenter.New(signalcenter.WithPID(os.Getpid()))
 	signals.Subscribe(signals.NDJSONSink(func(cycle int) string {
@@ -365,19 +330,12 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer) *sign
 	return signals
 }
 
-// wireOrchestratorDeps builds the production orchestrator and returns it with
-// its storage, ledger, Signal Center, bridge and runners.
 func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run routingRun) orchDeps {
-	// Pin the model-catalog dir to this .evolve, which the cycle-start refresher
-	// writes; EVOLVE_PROJECT_ROOT may name another tree.
 	if evolveDir != "" {
 		d := evolveDir
 		bridge.SetModelCatalogDirFn(func() string { return d })
 	}
-	// Built first and unconditionally: the bridge takes the Center at construction.
-	// TestNilSignalCenterRootsArePinned lists the roots that may skip it.
 	signals := newRootSignalCenter(projectRoot, evolveDir, console)
-	// The ledger precedes the bridge so the stop-review callback can append to it.
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
 
@@ -385,13 +343,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	br.SetOnStopReview(stopReviewRecorder(ld))
 	prm := cmdutil.NewPromptsLoader(projectRoot)
 
-	// The root is the sole reader of routing env and config. Loaded before the
-	// runners so cfg.PhaseIO reaches the reconcile rung; warnings ride the Center.
 	registryPath := config.RegistryPath(projectRoot)
 	loader := wiredRoutingConfigLoader(signals)
 	cfg, _ := loader.Load(registryPath, filterEvolveEnv(os.Environ()))
 
-	var shipFloor []string // nil ⇒ router.DefaultShipFloor
+	var policyShipFloor []string
 	pol, policyErr := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if policyErr != nil {
 		fmt.Fprintf(console, "[policy] WARN %v (mandatory merge skipped; the routing table refuses it before any dispatch)\n", policyErr)
@@ -399,18 +355,14 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	} else {
 		cfg.Mandatory = pol.MergeMandatory(cfg.Mandatory)
 		if floor, overridden := pol.FloorPhases(); overridden {
-			shipFloor = floor
+			policyShipFloor = floor
 		}
-		// failure_floor is the one surface for the audit-FAIL route, folded the same
-		// way as router.PolicyForProject.
 		cfg.AuditFailRoutesTo = router.FailureRouteFromPolicy(pol)
 	}
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
 	routerCfg := pol.RouterConfig()
 	recoveryCfg := pol.RecoveryConfig()
-	// The policy dials resolve through the Loader's ladders, so a typo'd word warns
-	// CONFIG_UNKNOWN_VALUE; recoveryCfg survives only for this projection.
 	cfg, _ = loader.ApplyPolicyStages(cfg, policyStagesOf(gatesCfg, recoveryCfg, routerCfg, pol.ParallelEvaluateConfig()))
 	wfCfg := pol.WorkflowConfig()
 
@@ -421,18 +373,12 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	}
 	runner.DefaultRouter = cliRouter
 
-	// The CLI/tier fallback chain wraps the bridge handle once, and every consumer
-	// below launches through walked. The runner and the advisor walk their own
-	// chains, so they pass straight through.
 	explainUsage := usageEvidenceFn(projectRoot, evolveDir, console)
 	walked := bridgechain.New(withUsageEvidence(br, explainUsage, signals),
 		bridgechain.DefaultPlanResolver(cliRouter),
 		bridgechain.WithBench(cycleBenchOnEscalation),
 		bridgechain.WithLog(cycleDiagf))
 
-	// Every BaseRunner's verdict engine reads the contract verifier through this
-	// accessor, so the engine classifies the bytes the gate approves. Gate off
-	// keeps the Null-Object PlainVerifier; the gate's Reviewer replaces it below.
 	var contractVerifier runner.ContractVerifier = deliverable.PlainVerifier{PhaseIO: cfg.PhaseIO}
 	verifierOf := func() runner.ContractVerifier { return contractVerifier }
 	var hostEffects core.HostEffects
@@ -440,64 +386,43 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	forbidden := laneForbidden(projectRoot, os.Stderr)
 
 	runners := map[core.Phase]core.PhaseRunner{
-		core.PhaseIntent: intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
-		// Scout and Build are swarm-eligible; below advisory the Decorator delegates.
-		// See ADR-0032.
+		core.PhaseIntent:       intent.New(intent.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseScout:        swarmrunner.New(scout.New(scout.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeReader, swCfg),
 		core.PhaseTriage:       triage.New(triage.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts, LaneForbidden: forbidden}),
 		core.PhaseTDD:          tdd.New(tdd.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
-		// The ship-bind manifest gate is operator-activatable via gates.manifest_gate.
-		core.PhaseShip:  ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
-		core.PhaseRetro: retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter}),
-		// The debugger diagnoses a novel ShipError; optional, never on the spine.
-		core.PhaseDebugger: debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
+		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals}),
+		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter}),
+		core.PhaseDebugger:     debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
 
-	// Catalog-aware so user and minted phases get their spec-derived contract.
 	br.SetContractResolver(phasecontract.NewCatalogResolver(catalog.Get))
-	// catalog.Get is bound to this pre-mint catalog value; the catalog publisher
-	// below re-binds the resolver after each mid-cycle mint.
 	wireBridgeStages(br, cfg)
 	for _, w := range phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat) {
 		fmt.Fprintf(os.Stderr, "[phases] WARN %s\n", w)
 	}
-	// Must use ApplyUserRouting's catalog-aware validator: the bare
-	// ValidateUserSpec rejects optional built-ins such as memo, so routing would
-	// plan a phase that never dispatches.
 	for _, s := range catalog.UserPhases() {
 		if len(phasespec.ValidateUserSpecWithCatalog(s, builtinCat)) > 0 {
-			continue // ApplyUserRouting already warned + skipped it; no dead runner
+			continue
 		}
 		if _, exists := runners[core.Phase(s.Name)]; !exists {
 			runners[core.Phase(s.Name)] = specrunner.New(s, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf})
 		}
 	}
-	// Spec-runner fallback so every advisor-selectable builtin phase dispatches.
 	registerBuiltinSpecRunners(runners, builtinCat, specrunner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}, os.Stderr)
-	// The routing advisor resolves {cli, model} like a phase: router profile, then
-	// policy. Plan decisions use the deep tier. A benched family falls back to
-	// claude; with claude benched too the advisor degrades to the static spine.
 	advisor, advErr := wireRouterAdvisor(routerAdvisorWiring{router: cliRouter, root: projectRoot, bridge: walked, prompts: prm, signals: signals})
 	if advErr != nil {
 		return orchDeps{Signals: signals, RoutingErr: advErr}
 	}
 	strategy := router.Select(cfg, advisor)
-	// The advisor also plans the whole cycle; the orchestrator consults it only at
-	// Stage>=Advisory with DynamicLLM, so wiring it here costs nothing otherwise.
 	opts := []core.Option{
 		core.WithRouting(cfg, strategy),
 		core.WithCatalog(catalog),
 		core.WithPlanner(advisor),
-		// Best-effort and gated on cfg.PhaseRecovery=enforce; below that it never
-		// dispatches.
 		core.WithFailureAdviser(core.NewFailureAdvisor(walked, failureAdvisorOpts(projectRoot, cliRouter, console)...)),
-		// Feeds state.json:triageThroughput, the window the triage clamp bounds with.
 		core.WithThroughputRecorder(triagecap.Recorder(projectRoot)),
-		// Re-bind the bridge's contract resolver on each mid-cycle mint, so a minted
-		// phase resolves its contract in the same cycle.
 		core.WithCatalogPublisher(catalogPublisher(br, cliRouter)),
 		core.WithCLIRouter(cliRouter),
 		core.WithRegistrar(registrarMinter{r: phaseregistrar.Registrar{
@@ -505,16 +430,11 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 			Prompts:      prm,
 			ProfilesDir:  filepath.Join(evolveDir, "profiles"),
 			PhasesDir:    filepath.Join(evolveDir, "phases"),
-			RegistryPath: mintregistry.Path(projectRoot), // the tree-diff guard reads it under projectRoot
+			RegistryPath: mintregistry.Path(projectRoot),
 		}}),
 	}
 	opts = append(opts, phaseObserverOptions(pol.ObserverConfig(), cfg.PhaseRecovery.String(), observerDeps{signals: signals, usage: explainUsage})...)
-	// Every deliverable gate chains behind one reviewer, since WithReviewer takes
-	// one. Each is gated on its own and fails open on ambiguity.
 	var reviewers []core.DeliverableReviewer
-	// The build floor runs first: its rejection carries the defect list the
-	// correction ladder needs. It is the one real go-test run per changed package;
-	// the advisory post-build selfcheck skips its duplicate when this is enforced.
 	if floor := composedBuildHandoffFloor(pol.WorkflowConfig(), cfg); len(floor) > 0 {
 		reviewers = append(reviewers, floor)
 	}
@@ -522,8 +442,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		reviewers = append(reviewers, evalgate.NewReviewer(cfg.EvalGate))
 	}
 	if cfg.ContractGate != config.StageOff {
-		// Catalog-aware, so the gate enforces what `evolve phase verify` derives from
-		// phase.json. The report-size gate rides it as its own dial.
 		rev := deliverable.NewReviewerWithCatalogStageReportSize(
 			cfg.ContractGate, catalog, cfg.PhaseIO,
 			parseGateStage(gatesCfg.ReportSizeGate), pol.ReportBudgetConfig().HandoffTokens, deliverable.WithSignals(signals))
@@ -531,7 +449,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		reviewers = append(reviewers, rev)
 	}
 	if cfg.TriageCapGate != config.StageOff {
-		// Capacity clamp, after the contract gate: well-formedness first.
 		reviewers = append(reviewers, triagecap.NewReviewer(cfg.TriageCapGate))
 	}
 	if cfg.TopNGate != config.StageOff {
@@ -541,39 +458,24 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		opts = append(opts, core.WithReviewer(core.ChainReviewers(reviewers...)))
 	}
 	if cfg.ContractGate != config.StageOff {
-		// The salvage rung's re-check shares the gate's resolution, so they agree on
-		// well-formed. Wired at every stage for shadow telemetry; execution stays
-		// gated on EVOLVE_PHASE_RECOVERY=enforce.
 		opts = append(opts, core.WithContractVerifier(deliverable.NewVerifierWithCatalogStage(catalog, cfg.PhaseIO)))
 	}
-	// Cycle-start live model-catalog refresh, best-effort under its stage.
 	opts = append(opts, core.WithCatalogRefresher(makeCatalogRefresher(projectRoot, evolveDir, pol.CatalogConfig().RefreshStage)))
-	// The refresher's stage, stamped into each catalog_refresh ledger entry.
 	opts = append(opts, core.WithCatalogRefreshStage(catalogRefreshStage(pol)))
 
-	// Without this lookup router.ClampPlanModelRouting cannot clear an
-	// unresolvable {cli, tier} and silently does nothing.
 	opts = append(opts, core.WithModelCatalogLookup(resolveModelTier))
 
-	// The only resolver of operator-directives config; the orchestrator consumes
-	// a snapshot each cycle.
 	opts = append(opts, core.WithDirectivesProvider(makeDirectivesProvider(projectRoot)))
 
-	// The recall bound resolves from policy.json research.recall_k; a knob that
-	// never reaches this construction is dead config.
 	opts = append(opts, core.WithKB(research.NewFileKBWithRecall(kbRootsAbs(projectRoot), kbRecallK(projectRoot))))
 
-	opts = append(opts, core.WithShipFloor(shipFloor))
+	opts = append(opts, core.WithShipFloor(policyShipFloor))
 	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
-	// Retry-tier escalation reads the durable per-item failure counter.
 	opts = append(opts, core.WithFailureCountReader(failureCountReader(projectRoot)))
-	// Continuation-on-fail adopts a prior FAILed attempt's salvage for this scope;
-	// a planner-pinned lane resolves from its lane-scope todo ids.
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(continuationForScope))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
-	// A malformed failure_policy keeps the compiled defaults; the floor holds.
 	if fp, err := pol.FailurePolicyConfig(); err == nil {
 		opts = append(opts, core.WithFailurePolicy(fp))
 	} else {
@@ -581,8 +483,6 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	}
 	opts = append(opts, core.WithWorktreeBase(pol.WorktreeBase()))
 
-	// A clean fleet rebase carries the audit verdict forward instead of
-	// re-auditing; every closure fails closed.
 	opts = append(opts, compositionOptions()...)
 	hostEffects = deliverable.NewHostEffects(catalog, hostInboxClaimer(ld, signals, forbidden))
 	opts = append(opts, core.WithHostEffects(hostEffects))
@@ -634,22 +534,17 @@ func continuationForScope(root string, cycle int, scopeIDs []string) *continuati
 	return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root, Stderr: os.Stderr}, cycle, scopeIDs)
 }
 
-// hostInboxClaimer claims through the same floor as `evolve inbox-mover claim`.
 func hostInboxClaimer(ld inboxmover.LedgerAppender, signals *signalcenter.Center, forbidden func(string) bool) deliverable.Claimer {
 	return func(inboxDir string, cycle int, ids []string) error {
 		return inboxmover.ClaimPending(inboxmover.Options{InboxDir: inboxDir, Stderr: os.Stderr, Ledger: ld, Signals: signals, IsProtectedPath: forbidden}, cycle, ids)
 	}
 }
 
-// kbRecallK resolves the KB recall bound from policy.json. An unreadable
-// policy keeps the default rather than disabling recall.
 func kbRecallK(projectRoot string) int {
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	return pol.ResearchConfig().RecallK
 }
 
-// kbRootsAbs resolves the KB search roots against the project root, so the
-// corpus read does not depend on the process cwd.
 func kbRootsAbs(projectRoot string) []string {
 	pol, _ := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	raw := research.SearchPathsFromEnv(pol.PathsConfig())
@@ -664,8 +559,6 @@ func kbRootsAbs(projectRoot string) []string {
 	return out
 }
 
-// cycleContext seeds CycleRequest.Context with the commit message and, when
-// given, Context["goal"], the key Scout and the routing advisor read.
 func cycleContext(goalHash, goalText string) map[string]string {
 	ctx := map[string]string{
 		"commit_message": fmt.Sprintf("evolve-cycle: goal=%s", goalHash),
@@ -676,9 +569,6 @@ func cycleContext(goalHash, goalText string) map[string]string {
 	return ctx
 }
 
-// registerBuiltinSpecRunners gives each advisor-selectable kind:llm builtin
-// phase that lacks a hand-wired runner a spec runner, so selecting it never
-// aborts dispatch. Control phases are skipped; a phase with no persona WARNs.
 func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtinCat phasespec.Catalog, base specrunner.Config, warn io.Writer) {
 	for _, s := range builtinCat.All() {
 		if s.KindOrDefault() != "llm" || s.RoleOrDefault() == phasespec.RoleControl {
@@ -695,8 +585,6 @@ func registerBuiltinSpecRunners(runners map[core.Phase]core.PhaseRunner, builtin
 	}
 }
 
-// registrarMinter adapts phaseregistrar.Registrar to core.PhaseMinter, keeping
-// core decoupled from phaseregistrar.
 type registrarMinter struct{ r phaseregistrar.Registrar }
 
 func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseSpec, core.PhaseRunner, error) {
@@ -707,8 +595,6 @@ func (m registrarMinter) Register(cfg phaseconfig.PhaseConfig) (phasespec.PhaseS
 	return res.Spec, res.Runner, nil
 }
 
-// scopePathResolver maps a scoped task id to its pending inbox record's path,
-// or "". Named rather than inline so the root's wiring is testable.
 func scopePathResolver(projectRoot, taskID string) string {
 	st := inboxmover.ResolveDispatchState(inboxmover.Options{ProjectRoot: projectRoot}, taskID)
 	if st.State != inboxmover.StatePending {
@@ -748,8 +634,6 @@ func loadPhaseCatalog(projectRoot, registryPath string, prm *prompts.Loader) (ph
 	return catalog, builtinCat, userSpecs
 }
 
-// documentSpecPtr is the registry's document contract, the one resolution the
-// build floor and the audit gate share.
 func documentSpecPtr(cfg config.RoutingConfig) *config.DeliverableKindSpec {
 	spec, ok := cfg.DocumentSpec()
 	if !ok {

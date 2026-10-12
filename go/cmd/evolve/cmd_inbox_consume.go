@@ -18,18 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// ackItemFingerprint reads one inbox item, extracts the failure fingerprint
-// its consumed_by narrative (else its auto-filed notes) carries, and acks it
-// into .evolve/resolved-fingerprints.json.
-//
-// found=false with a nil error is the routine case: the item carries no
-// parseable fingerprint, which is not a failure — most inbox items are
-// features, not pipeline defects. Errors are reserved for an item that could
-// not be read or unmarshalled.
-//
-// An already-acked fingerprint is reported found and skipped: the ledger is a
-// SET, so re-sweeping the consumed corpus on every breaker check must not grow
-// it without bound.
 func ackItemFingerprint(evolveDir, itemPath, resolvedBy string) (fingerprint string, found bool, err error) {
 	raw, err := os.ReadFile(itemPath)
 	if err != nil {
@@ -59,14 +47,6 @@ func ackItemFingerprint(evolveDir, itemPath, resolvedBy string) (fingerprint str
 	return fp, true, nil
 }
 
-// reconcileConsumedFingerprints projects .evolve/inbox/consumed/ into the ack
-// ledger: every consumed item whose narrative names a fingerprint is acked.
-//
-// Fail-loud-but-never-block: a per-item error WARNs by name and the sweep
-// continues to its neighbours. This runs on the breaker's boot path, so a
-// reconciler defect must never become a NEW pipeline blocker — the exact
-// failure class this wiring exists to remove. An absent consumed/ directory is
-// the normal case on a fresh tree and is silent.
 func reconcileConsumedFingerprints(evolveDir string, stderr io.Writer) {
 	dir := filepath.Join(evolveDir, "inbox", "consumed")
 	entries, err := os.ReadDir(dir)
@@ -92,15 +72,6 @@ type inboxConsumedStamp struct {
 	Resolution string `json:"resolution"`
 }
 
-// runInboxConsume implements `evolve inbox consume <item-path> [--resolution
-// <text>] [--cycle <n>]`: move the item into .evolve/inbox/consumed/, stamp it
-// consumed{at, via, cycle, resolution}, and ack any fingerprint it names, in
-// one invocation. The item is decoded BEFORE the move, so a malformed item is
-// refused while still pending. The move lands FIRST — a move that succeeded
-// with a failed stamp or ack is reported non-zero and the ack is repaired by
-// reconcileConsumedFingerprints on the next breaker check, whereas an ack
-// whose move failed would leave the item drawable by a lane while its
-// fingerprint is already excused.
 func runInboxConsume(args []string, stdout, stderr io.Writer) int {
 	itemPath, stamp, ok := parseInboxConsumeArgs(args, stderr)
 	if !ok {
@@ -202,11 +173,6 @@ func writeConsumedStamp(path string, doc map[string]json.RawMessage, stamp inbox
 	return atomicwrite.JSON(path, stamped)
 }
 
-// releaseConsumedItemBinding releases a just-consumed item's continuation
-// binding via the shared inboxmover.ReleaseContinuationBinding transaction. A
-// direct consume needs no recency guard (it is an explicit operator statement
-// the work is closed); the sweep below (reconcileConsumedBindings) carries
-// that guard for items consumed by other routes.
 func releaseConsumedItemBinding(projectRoot, itemPath string, stderr io.Writer) bool {
 	id := ""
 	if raw, err := os.ReadFile(itemPath); err == nil {
@@ -229,10 +195,6 @@ func releaseConsumedItemBinding(projectRoot, itemPath string, stderr io.Writer) 
 	return released
 }
 
-// reconcileConsumedBindings delegates to the canonical consumed-corpus sweep
-// (inboxmover.ReconcileConsumedBindings — live-copy + recency guards, shared
-// release transaction). Runs beside reconcileConsumedFingerprints on the
-// blocker-breaker path, i.e. before EVERY cycle dispatch, not only at boot.
 func reconcileConsumedBindings(projectRoot, evolveDir string, stderr io.Writer) {
 	released := inboxmover.ReconcileConsumedBindings(inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr})
 	for _, id := range released {

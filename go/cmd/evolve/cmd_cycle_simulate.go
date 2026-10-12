@@ -14,7 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 )
 
-// simulatePhase is a core.PhaseRunner that returns PASS without calling out.
 type simulatePhase struct {
 	name core.Phase
 }
@@ -22,16 +21,12 @@ type simulatePhase struct {
 func (s *simulatePhase) Name() string { return string(s.name) }
 
 func (s *simulatePhase) Run(_ context.Context, req core.PhaseRequest) (core.PhaseResponse, error) {
-	// Write the contracted report stub, so the floors still grade a deliverable.
 	if req.Workspace != "" {
 		if err := os.MkdirAll(req.Workspace, 0o755); err != nil {
 			return core.PhaseResponse{}, fmt.Errorf("simulate %s: workspace: %w", s.name, err)
 		}
-		// The sentinel and the declaration come from their owners, so the walk tracks
-		// the grammar the real producers meet.
 		stub := "# " + string(s.name) + " (simulate)\n\n" + phasecontract.RenderVerdictSentinel(string(s.name), core.VerdictPASS) + "\n"
 		if s.name == core.PhaseBuild {
-			// A walk produces no Build diff, so it declares explanation docs not applicable.
 			stub += "\n" + explanationdocs.RenderNotApplicableDeclaration("simulate walk — the no-LLM plumbing check produces no Build diff")
 		}
 		if err := os.WriteFile(filepath.Join(req.Workspace, string(s.name)+"-report.md"), []byte(stub), 0o644); err != nil {
@@ -47,9 +42,6 @@ func (s *simulatePhase) Run(_ context.Context, req core.PhaseRequest) (core.Phas
 	}, nil
 }
 
-// simulatePhases covers every phase the canonical order or the core set can
-// route to; extra runners are harmless. TestSimulatePhases_CoversCanonicalOrder
-// guards it.
 func simulatePhases() []core.Phase {
 	return []core.Phase{
 		core.PhaseIntent,
@@ -69,9 +61,6 @@ func simulatePhases() []core.Phase {
 	}
 }
 
-// wireSimulateOrchestrator builds the --simulate root: stub runners, the
-// plane's storage and ledger, and the production signal topology, so warnings
-// render as in a real cycle. It has no bridge: the walk launches no sessions.
 func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) orchDeps {
 	phases := simulatePhases()
 	runners := make(map[core.Phase]core.PhaseRunner, len(phases))
@@ -82,8 +71,6 @@ func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) 
 	signals := newRootSignalCenter(projectRoot, evolveDir, console)
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
-	// A walk never mutates the operator's repository: no cycle worktree or branch,
-	// and no dossier closeout commit (the record is still written).
 	return orchDeps{
 		Storage: st, Ledger: ld, Signals: signals,
 		Orchestrator: core.NewOrchestrator(st, ld, runners, core.WithSignalCenter(signals),
@@ -91,8 +78,6 @@ func wireSimulateOrchestrator(projectRoot, evolveDir string, console io.Writer) 
 	}
 }
 
-// simulateWorktrees hands out the project root itself as every worktree, and
-// its cleanup never deletes it. It has no CreateFrom: a walk has nothing to adopt.
 type simulateWorktrees struct{}
 
 func (simulateWorktrees) Create(projectRoot string, _ int) (string, error) { return projectRoot, nil }

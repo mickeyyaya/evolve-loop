@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// writeCycleState ignores its cycle argument; writeCycleStateN honors it.
 func writeCycleState(t *testing.T, evolveDir string, cycle int, body string) {
 	t.Helper()
 	dir := filepath.Join(evolveDir, "runs", "cycle-230")

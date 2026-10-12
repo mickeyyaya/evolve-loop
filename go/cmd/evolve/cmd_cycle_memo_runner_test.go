@@ -10,8 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
-// repoRootForMemoRunnerTest locates the repo root three levels up and skips
-// when the real memo overlay fixture is absent.
 func repoRootForMemoRunnerTest(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -30,8 +28,6 @@ func repoRootForMemoRunnerTest(t *testing.T) string {
 	return root
 }
 
-// A temp evolveDir keeps real .evolve state untouched, while projectRoot stays
-// the real repo so the real registry, overlay and policy pins are exercised.
 func TestWireOrchestrator_MemoRunnerRegistered(t *testing.T) {
 	root := repoRootForMemoRunnerTest(t)
 	evolveDir := t.TempDir()

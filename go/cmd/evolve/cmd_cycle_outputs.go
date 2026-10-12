@@ -17,9 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// runCycleOutputs reports whether each completed phase left what a reviewer
-// needs, and the cycle's reasoning-chain status. Every decision and read lives
-// in internal/phaseoutputs, shared with the loop's post-cycle signal emitter.
 func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve cycle outputs", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -82,17 +79,12 @@ func runCycleOutputs(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// catalogAwareResolver resolves report names through the builtin+user catalog
-// the contract gate and bridge use; a builtin-only lookup reports false gaps.
-// It degrades loudly to builtin-only when the registry cannot load.
 func catalogAwareResolver(projectRoot string, warn func(string)) phasecontract.Resolver {
 	builtinCat, err := phasespec.Load(config.RegistryPath(projectRoot))
 	if err != nil {
 		warn(fmt.Sprintf("builtin registry load failed (%v); resolving builtin-only", err))
 		return phasecontract.BuiltinResolver{}
 	}
-	// Demotion only hides a spec from the SELECT menu and Get still resolves it,
-	// so sharing the one path keeps the vocabularies identical.
 	userSpecs, discWarns := discoverUserSpecsClamped(projectRoot, cmdutil.NewPromptsLoader(projectRoot))
 	catalog, mergeWarns := builtinCat.Merge(userSpecs)
 	for _, w := range append(discWarns, mergeWarns...) {

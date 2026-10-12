@@ -25,9 +25,6 @@ type soakKillRec struct {
 	session string
 }
 
-// Do not call t.Parallel(): this test mutates the soakLaunchFn/soakKiller
-// package-level injection vars and would race with TestFleetSoakArgs_* and
-// TestDispatch_FleetSoakRegistered.
 func TestFleetSoak_AllFourInvariants(t *testing.T) {
 	const n = 4
 
@@ -61,11 +58,9 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 		if err := os.MkdirAll(runDir, 0o755); err != nil {
 			return 1, fmt.Errorf("mkdir runDir: %w", err)
 		}
-		// Stale lease (heartbeat at Unix epoch — far beyond any DefaultTTL).
 		if err := runlease.Write(runDir, runlease.Lease{RunID: runID}, time.Unix(1, 0)); err != nil {
 			return 1, fmt.Errorf("write lease: %w", err)
 		}
-		// Session record with evolve-bridge- prefix (required by ReapRunSessions).
 		sess := fmt.Sprintf("evolve-bridge-soak-%s", runID[:8])
 		if err := sessionrecord.Append(sessionrecord.PathIn(runDir), sessionrecord.Record{
 			Session: sess, RunID: runID, Cycle: cycleN, Agent: "soak-fake",
@@ -172,8 +167,6 @@ func TestFleetSoak_AllFourInvariants(t *testing.T) {
 	}
 }
 
-// resolveOwningRunDir searches all run registries under evolveDir/runs/ for the
-// given session name and returns the run dir that owns it, or "UNKNOWN".
 func resolveOwningRunDir(evolveDir, session string) string {
 	entries, _ := os.ReadDir(filepath.Join(evolveDir, "runs"))
 	for _, e := range entries {
@@ -191,8 +184,6 @@ func resolveOwningRunDir(evolveDir, session string) string {
 	return "UNKNOWN"
 }
 
-// appendSoakTomlEntry atomically appends one [projects."<runID>"] entry to
-// the shared TOML file, serialized via mu to prove no torn-write races.
 func appendSoakTomlEntry(mu *sync.Mutex, tomlPath, runID, runDir string) error {
 	mu.Lock()
 	defer mu.Unlock()

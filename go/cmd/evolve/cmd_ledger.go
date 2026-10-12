@@ -13,21 +13,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 )
 
-// runLedger implements `evolve ledger <subcommand>`. Subcommands:
-//
-//	verify [--evolve-dir DIR] [--deep]   walk the chain; exit 2 on break
-//	                                     (--deep reconstructs sealed
-//	                                     segments + live tail, L3.3)
-//	seal   [--evolve-dir DIR] [--keep N] move all but the newest N lines
-//	                                     into ledger-segments/*.jsonl.gz
-//	tail   [--evolve-dir DIR] [--n N]    print the last N entries as JSONL
-//	anchor <seq> [--evolve-dir DIR] [--note S] [--line-sha SHA]
-//	                                     record a non-destructive epoch-anchor
-//	                                     at entry_seq=<seq> (OPERATOR sign-off).
-//	                                     --line-sha names the exact line when
-//	                                     siblings share a seq
-//	rebaseline --note S [--evolve-dir DIR]  seal a densely damaged prefix in ONE
-//	                                     call (OPERATOR sign-off; append-only)
 func runLedger(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve ledger: missing subcommand (try: verify | seal | tail | anchor | rebaseline | evidence)")
@@ -76,13 +61,6 @@ func runLedgerVerify(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// verifiedFrom states WHICH history the verification just accepted: a
-// full-strict chain and a chain that trusted an adjudicated epoch anchor are
-// different claims and must print differently. The anchor is named by its own
-// identity — read from the ledger, never a literal — so two ledgers sealed at
-// different lines read differently and an operator can carry the pair
-// straight to `evolve ledger anchor`.
-// See ADR-0048.
 func verifiedFrom(s ledger.VerifiedScope) string {
 	if s.AnchorLineSHA == "" {
 		return "verified strictly from genesis (no epoch anchor)"
@@ -110,8 +88,6 @@ func runLedgerSeal(args []string, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "[ledger] seal failed: %v\n", err)
 		return 1
 	}
-	// Always leave with a deep-verified chain — a seal that cannot verify
-	// must surface immediately, not at the next audit.
 	if err := l.VerifyDeep(context.Background()); err != nil {
 		fmt.Fprintf(stderr, "[ledger] seal completed but deep verify FAILED: %v\n", err)
 		return 2
@@ -120,16 +96,7 @@ func runLedgerSeal(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// runLedgerAnchor records a non-destructive epoch-anchor. An OPERATOR action:
-// it declares the pre-anchor prefix trusted-as-preserved and validates the
-// chain strictly forward from the anchored line. Always re-verifies after, so
-// an anchor that does not green the chain is surfaced immediately (rc 2), not
-// at the next audit.
 func runLedgerAnchor(args []string, stderr io.Writer) int {
-	// <entry_seq> is the first positional, BEFORE flags: Go's flag.Parse stops
-	// at the first non-flag token, so a flag-first layout (`--note x 42`) would
-	// be the only one that works otherwise — backwards from the usage. Take the
-	// positional explicitly, then parse the remaining flags.
 	if len(args) < 1 {
 		fmt.Fprintln(stderr, "evolve ledger anchor: usage: evolve ledger anchor <entry_seq> [--note S] [--line-sha SHA] [--evolve-dir DIR]")
 		return 10
@@ -151,8 +118,6 @@ func runLedgerAnchor(args []string, stderr io.Writer) int {
 	l := ledger.New(evolveDir)
 	if err := l.AnchorLine(context.Background(), seq, lineSHA, note); err != nil {
 		fmt.Fprintf(stderr, "[ledger] anchor failed: %v\n", err)
-		// The candidate SHAs are in the error above; spell out the remedy so an
-		// ambiguous seq is an actionable refusal rather than a dead end.
 		if errors.Is(err, ledger.ErrAmbiguousAnchorSeq) {
 			fmt.Fprintf(stderr, "[ledger] disambiguate with: evolve ledger anchor %d --line-sha <sha256-from-the-list-above>\n", seq)
 		}
@@ -167,10 +132,6 @@ func runLedgerAnchor(args []string, stderr io.Writer) int {
 	return 0
 }
 
-// runLedgerRebaseline seals a densely damaged prefix in ONE operator call by
-// appending an in-band epoch seal (ADR-0081). Append-only: the damaged history
-// stays on disk, it is simply no longer chain-validated. The --note is the
-// operator gate — an unattributable bulk trust decision is refused.
 func runLedgerRebaseline(args []string, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve ledger rebaseline", flag.ContinueOnError)
 	fs.SetOutput(stderr)

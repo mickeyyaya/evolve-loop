@@ -6,10 +6,6 @@ import (
 	"path/filepath"
 )
 
-// inboxItemFingerprintFields is the minimal subset of an inbox item's JSON
-// shape this subcommand needs — consumed_by (the narrative written when an
-// item moves to .evolve/inbox/consumed/) and notes (the auto-filed field
-// present before a narrative exists).
 type inboxItemFingerprintFields struct {
 	ConsumedBy string `json:"consumed_by"`
 	Notes      string `json:"notes"`
@@ -21,8 +17,6 @@ func runInboxAckFingerprint(args []string, stdout, stderr io.Writer) int {
 		return 10
 	}
 	itemPath := args[0]
-	// Shares ackItemFingerprint with the reconciler and `evolve inbox consume`
-	// (cmd_inbox_consume.go) — one extraction path, one ledger writer.
 	evolveDir := filepath.Join(envOrCwd("EVOLVE_PROJECT_ROOT"), ".evolve")
 	fp, found, err := ackItemFingerprint(evolveDir, itemPath, "inbox-consumption")
 	if err != nil {

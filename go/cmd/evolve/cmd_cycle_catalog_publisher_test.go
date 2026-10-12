@@ -11,10 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasespec"
 )
 
-// A compile-time caller proof: the production bridge adapter is a valid sink.
 var _ contractResolverSink = (*bridge.Adapter)(nil)
 
-// resolverSinkSpy captures what catalogPublisher hands the bridge.
 type resolverSinkSpy struct {
 	last  phasecontract.Resolver
 	calls int

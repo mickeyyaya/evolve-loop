@@ -8,13 +8,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// runInboxMover is `evolve inbox-mover <subcmd> [args]`. Exit codes:
-//
-//	0  — success (or promote no-op for ship.sh compat)
-//	1  — not-found / bad args (claim only)
-//	2  — mv failed (claim only)
-//	3  — console-routed refusal (claim only; ADR-0074 — the item is
-//	     operator-owned and must not be drawn by a lane)
 func runInboxMover(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		printInboxMoverUsage(stderr)
@@ -77,7 +70,6 @@ func printInboxMoverUsage(w io.Writer) {
 	fmt.Fprintln(w, "  recover-orphans")
 }
 
-// parsePromoteArgs walks the optional [<cycle>] [--commit-sha <sha>] tail.
 func parsePromoteArgs(args []string) (inboxmover.PromoteOpts, error) {
 	var p inboxmover.PromoteOpts
 	i := 0
@@ -91,7 +83,6 @@ func parsePromoteArgs(args []string) (inboxmover.PromoteOpts, error) {
 			}
 			p.CommitSHA = args[i]
 		case len(a) >= 2 && a[:2] == "--":
-			// Unknown flag — skip (bash semantics).
 		default:
 			if p.Cycle == "" {
 				p.Cycle = a

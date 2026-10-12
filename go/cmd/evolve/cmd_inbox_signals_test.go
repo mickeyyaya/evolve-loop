@@ -12,8 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// A promote whose destination mkdir fails renders [inbox] on the simulate
-// root's console and lands in the cycle-less signals.ndjson.
 func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -25,7 +23,7 @@ func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(inbox, "t1.json"), []byte(`{"id":"t1"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(inbox, "processed"), []byte("x"), 0o644); err != nil { // a FILE at processed/: the mkdir fault
+	if err := os.WriteFile(filepath.Join(inbox, "processed"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var console bytes.Buffer
@@ -41,15 +39,10 @@ func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
 	}
 }
 
-// The FAIL closeout stamps the run workspace's signals.ndjson with the
-// mover's cycle-scoped event through applyCycleFailureOutcome's signals.
 func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
-	// The committed item is already claimed under processing/cycle-7 (the
-	// triage persona's claim) and a root twin of its basename provokes the
-	// double-move when the drain releases it.
 	proc := filepath.Join(evolveDir, "inbox", "processing", "cycle-7")
 	if err := os.MkdirAll(proc, 0o755); err != nil {
 		t.Fatal(err)
@@ -75,10 +68,6 @@ func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 	}
 }
 
-// TestInboxCenterlessRootsArePinned pins every non-test `inboxmover.Options{`
-// literal without Signals: to an allow-list with its reason, and verifies the
-// applyCycleFailureOutcome( call sites and signalcenter.New( construction
-// sites stay wired to their documented roots.
 func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	t.Parallel()
 	allowed := map[string]string{
@@ -151,12 +140,12 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	for _, src := range []string{string(cycleSrc), string(loopSrc)} {
 		for _, line := range strings.Split(src, "\n") {
 			if strings.Contains(line, "func ") {
-				continue // the two definitions
+				continue
 			}
 			for _, m := range callRE.FindAllStringSubmatch(line, -1) {
 				args := strings.Split(m[1], ",")
 				if len(args) < 6 {
-					continue // the method's one-arg call
+					continue
 				}
 				calls++
 				if last := strings.TrimSpace(args[5]); last == "nil" || last == "" {
@@ -168,10 +157,6 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	if calls != 3 {
 		t.Errorf("the three package-level call sites (cmd_cycle.go ×2, cmd_loop_sequential_outcome.go ×1) must be present, found %d", calls)
 	}
-	// Two process roots build a Center: the cycle/loop root (cmd_cycle.go) and
-	// the manual `evolve phase observer` subcommand (its own process). Every
-	// other Center reaches a component through an accessor.
-	// See ADR-0103.
 	centerRoots := map[string]bool{"cmd/evolve/cmd_cycle.go": true, "internal/cli/phasecmd/phase_observer.go": true}
 	got := nonTestConstructionsOf(t, moduleRoot, `\bsignalcenter\.New\(`)
 	unexpected := false
@@ -185,8 +170,6 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 	}
 }
 
-// nonTestConstructionsOf lists the non-test files under moduleRoot whose
-// source matches re.
 func nonTestConstructionsOf(t *testing.T, moduleRoot, re string) []string {
 	t.Helper()
 	callRE := regexp.MustCompile(re)
