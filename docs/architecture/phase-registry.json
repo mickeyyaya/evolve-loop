@@ -508,6 +508,7 @@
     {
       "name": "tdd",
       "role": "tdd-engineer",
+      "agent": "evolve-tdd-engineer",
       "optional": true,
       "writes_source": true,
       "enable_var": "workflow.phase_enables.tdd=on",
@@ -558,6 +559,7 @@
     {
       "name": "build",
       "role": "builder",
+      "agent": "evolve-builder",
       "optional": false,
       "writes_source": true,
       "gate": {
@@ -644,6 +646,7 @@
     {
       "name": "audit",
       "role": "auditor",
+      "agent": "evolve-auditor",
       "optional": false,
       "on_pass": "ship",
       "on_fail": "retrospective",

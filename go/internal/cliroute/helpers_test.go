@@ -45,9 +45,9 @@ func (c fakeCatalog) Names() []string {
 func syntheticCatalog() fakeCatalog {
 	return fakeCatalog{
 		"scout": {Name: "scout"},
-		"tdd":   {Name: "tdd"},
-		"build": {Name: "build"},
-		"audit": {Name: "audit"},
+		"tdd":   {Name: "tdd", Agent: "evolve-tdd-engineer"},
+		"build": {Name: "build", Agent: "evolve-builder"},
+		"audit": {Name: "audit", Agent: "evolve-auditor"},
 		"memo":  {Name: "memo"},
 	}
 }

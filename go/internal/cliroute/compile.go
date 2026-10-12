@@ -204,9 +204,6 @@ func (c *compiler) agentOf(key string) (string, bool) {
 }
 
 func (c *compiler) agentOfPhase(phase string) (string, bool) {
-	if contract, ok := phasecontract.For(phase); ok && c.isProfile(contract.AgentName) {
-		return contract.AgentName, true
-	}
 	if c.cat == nil {
 		return "", false
 	}

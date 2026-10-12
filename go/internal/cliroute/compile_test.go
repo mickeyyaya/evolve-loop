@@ -233,15 +233,19 @@ func TestCompile_WithoutAProfileSourceIsAFinding(t *testing.T) {
 	}
 }
 
-func TestCompile_WithoutACatalogABuiltinPhaseKeyStillNormalizes(t *testing.T) {
-	_, findings := cliroute.Compile(routingPolicy(policy.CLIRouting{
+func TestCompile_WithoutACatalogAPhaseKeyIsRefusedBecauseTheCatalogIsTheOnlyPhaseToAgentSource(t *testing.T) {
+	block := policy.CLIRouting{
 		CLIs: []string{"claude"}, Default: []string{"claude"},
 		Agents: map[string]policy.AgentRule{"audit": {CLI: []string{"claude"}}, "doc-sync": {CLI: []string{"claude"}}},
-	}), nil, syntheticProfiles(t))
-	if _, ok := findingFor(findings, "cli_routing.agents.audit", cliroute.SeverityError); ok {
-		t.Fatalf("audit is a built-in phase whose contract names the auditor: %+v", findings)
 	}
+	_, findings := cliroute.Compile(routingPolicy(block), nil, syntheticProfiles(t))
+	requireFinding(t, findings, "cli_routing.agents.audit", cliroute.SeverityError, "neither")
 	requireFinding(t, findings, "cli_routing.agents.doc-sync", cliroute.SeverityError, "neither")
+
+	_, findings = cliroute.Compile(routingPolicy(block), syntheticCatalog(), syntheticProfiles(t))
+	if f, ok := findingFor(findings, "cli_routing.agents.audit", cliroute.SeverityError); ok {
+		t.Fatalf("the catalog names the auditor for audit: %+v", f)
+	}
 }
 
 func TestCompile_AnUnknownFamilyInATierCeilingIsAFinding(t *testing.T) {
