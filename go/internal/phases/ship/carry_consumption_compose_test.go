@@ -53,6 +53,7 @@ func carriedLaneBound(t *testing.T) (carriedLane, *Options) {
 }
 
 func TestVerifyStagedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption(t *testing.T) {
+	t.Parallel()
 	l, opts := carriedLaneBound(t)
 	if err := verifyExecutionTree(context.Background(), opts, &RunResult{}, l.repo); err != nil {
 		t.Fatalf("precondition: the carry re-proves on the tree before consumption, as it did live for 1825: %v", err)
@@ -71,6 +72,7 @@ func TestVerifyStagedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption(t *t
 }
 
 func TestVerifyStagedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtraPath(t *testing.T) {
+	t.Parallel()
 	l, opts := carriedLaneBound(t)
 	reShipConsumes(t, l, opts)
 	smuggle(t, l)
@@ -84,6 +86,7 @@ func TestVerifyStagedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtraPa
 }
 
 func TestVerifyCommittedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption(t *testing.T) {
+	t.Parallel()
 	l, opts := carriedLaneBound(t)
 	reShipConsumes(t, l, opts)
 	land(t, l)
@@ -100,6 +103,7 @@ func TestVerifyCommittedTree_ACarriedRebaseShipsWithTheReShipsInboxConsumption(t
 }
 
 func TestVerifyCommittedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtraPath(t *testing.T) {
+	t.Parallel()
 	l, opts := carriedLaneBound(t)
 	reShipConsumes(t, l, opts)
 	smuggle(t, l)
@@ -114,6 +118,7 @@ func TestVerifyCommittedTree_ACarryPlusConsumptionStillRefusesAnUnsanctionedExtr
 }
 
 func TestCarrySatisfied_DeclinesWhatTheReShipsConsumptionCannotCompose(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		arrange func(t *testing.T, l carriedLane) (*Options, string)
 		want    func(l carriedLane, actual string) string

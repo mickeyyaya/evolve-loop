@@ -82,6 +82,7 @@ func releaseStagingOpts(root string, class Class, runner CmdRunner) *Options {
 }
 
 func TestShipDirect_ReleaseClass_StagesExplicitSetKeepsBinary(t *testing.T) {
+	t.Parallel()
 	cap := &stagingCapture{}
 	root := initReleaseStagingTree(t)
 	opts := releaseStagingOpts(root, ClassRelease, cap.runner())

@@ -12,6 +12,7 @@ import (
 )
 
 func TestClassIsValid(t *testing.T) {
+	t.Parallel()
 	valid := []Class{ClassCycle, ClassManual, ClassRelease, ClassTrivial}
 	for _, c := range valid {
 		if !c.IsValid() {
@@ -26,6 +27,7 @@ func TestClassIsValid(t *testing.T) {
 }
 
 func TestNewWithDefaultRunnerStage(t *testing.T) {
+	t.Parallel()
 	p := NewWithDefaultRunnerStage(config.StageEnforce)
 	if p == nil {
 		t.Fatal("NewWithDefaultRunnerStage returned nil")
@@ -43,6 +45,7 @@ func TestNewWithDefaultRunnerStage(t *testing.T) {
 }
 
 func TestPluginVersion_Exported(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if got := PluginVersion(root); got != "" {
 		t.Errorf("PluginVersion on a repo with no plugin.json = %q, want empty", got)
@@ -61,6 +64,7 @@ func TestPluginVersion_Exported(t *testing.T) {
 
 // ExitMissingBin matches the shell's conventional "command not found" code.
 func TestExitMissingBin(t *testing.T) {
+	t.Parallel()
 	if ExitMissingBin != 127 {
 		t.Errorf("ExitMissingBin = %d, want 127", int(ExitMissingBin))
 	}

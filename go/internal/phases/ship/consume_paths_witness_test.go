@@ -12,6 +12,7 @@ import (
 var consumedPathsAssignRe = regexp.MustCompile(`\binternalConsumedPaths\s*=[^=]`)
 
 func TestInternalConsumedPaths_OnlyWrittenInConsumeGo(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

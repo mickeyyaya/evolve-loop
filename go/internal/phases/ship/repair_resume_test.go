@@ -36,6 +36,7 @@ func mergedUnpushedFixture(t *testing.T, cycleBranch string) string {
 }
 
 func TestRepair_Resume_PostMergePrePush_PushOnlyCloses(t *testing.T) {
+	t.Parallel()
 	repo := mergedUnpushedFixture(t, "cycle-246-resume")
 	preHEAD := headSHA(t, repo)
 
@@ -61,6 +62,7 @@ func TestRepair_Resume_PostMergePrePush_PushOnlyCloses(t *testing.T) {
 }
 
 func TestRepair_Resume_BoundTreeMismatch_NoRepair(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
@@ -89,6 +91,7 @@ func TestRepair_Resume_BoundTreeMismatch_NoRepair(t *testing.T) {
 }
 
 func TestRepair_Resume_OriginDiverged_NoRepair(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	bare := addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")

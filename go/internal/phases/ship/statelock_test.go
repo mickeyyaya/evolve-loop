@@ -11,6 +11,7 @@ import (
 )
 
 func TestWithStateLock_SerializesWithUpdateState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stPath := filepath.Join(dir, "state.json")
 	st := storage.New(dir) // UpdateState locks <dir>/state.json.lock — same file withStateLock must lock

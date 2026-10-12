@@ -13,6 +13,7 @@ import (
 // untrusted-format file must fail closed (non-nil error), never silently
 // treat garbage/empty/incomplete JSON as a valid fresh review.
 func TestShipGate_MalformedAttestation_Blocked(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		body string
@@ -41,6 +42,7 @@ func TestShipGate_MalformedAttestation_Blocked(t *testing.T) {
 // that writing .commit-gate/attestation.json never perturbs tree-state SHA —
 // if that ever breaks, every ship attempt would silently look stale.
 func TestShipGate_AttestationDirDoesNotPerturbTreeState(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nactual change\n")
 
@@ -64,6 +66,7 @@ func TestShipGate_AttestationDirDoesNotPerturbTreeState(t *testing.T) {
 // snapshot B. The gate must re-derive freshness from current tree state, not
 // cache the fact that the attestation was valid at write time.
 func TestShipGate_StaleAfterPostAttestationEdit_Blocked(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\napproved change\n")
 	approvedSHA := treeStateSHA(t, repo)
@@ -85,6 +88,7 @@ func TestShipGate_StaleAfterPostAttestationEdit_Blocked(t *testing.T) {
 // attestation matching (e.g. via truncation, buffering, or a hard-coded size
 // assumption in the diff/hash path).
 func TestShipGate_LargeDiffFreshAttestationPasses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\n"+strings.Repeat("large adversarial payload line\n", 20000))
 

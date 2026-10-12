@@ -36,6 +36,7 @@ func promotedPath(root string, cycleID int, id string) string {
 // Builder marked. Both must be consumed by this ship. CommitSHA is empty so
 // the landing gate fails OPEN, isolating this test to the committed-set change.
 func TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1452
 	writeDrainCycleState(t, root, cid)
@@ -62,6 +63,7 @@ func TestPromoteInbox_ClosesInboxMarkerConsumesUnnamedItemOnLandedShip(t *testin
 // lane-scope pin, so the promotion branch was never entered at all; a marker
 // alone must be a sufficient committed set on a landed ship.
 func TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1453
 	writeDrainCycleState(t, root, cid)
@@ -83,6 +85,7 @@ func TestPromoteInbox_ClosesInboxMarkerConsumesWithNoTriageDecision(t *testing.T
 // and lane-scope paths. A non-git TempDir with a real-looking SHA makes
 // isLanded fail closed.
 func TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1454
 	writeDrainCycleState(t, root, cid)
@@ -106,6 +109,7 @@ func TestPromoteInbox_ClosesInboxMarkerSkippedOnUnlandedShip(t *testing.T) {
 // implementation that infers closure from the diff, the cycle dir, or
 // `connects_to` proximity fails here.
 func TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1455
 	writeDrainCycleState(t, root, cid)
@@ -130,6 +134,7 @@ func TestPromoteInbox_LandedShipWithoutMarkerConsumesOnlyTriageNamedItems(t *tes
 // Cycles that skip the build phase have no build-report.md at all, and the
 // triage-sourced promotion must be untouched by that read.
 func TestPromoteInbox_AbsentBuildReportIsNotAnError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1456
 	writeDrainCycleState(t, root, cid)

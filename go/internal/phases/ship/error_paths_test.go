@@ -35,6 +35,7 @@ func faultRunner(failKey string, exit int, failErr error) CmdRunner {
 }
 
 func TestShipDirect_GitAddFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "change.txt"), "a change to stage\n")
 	opts := &Options{Class: ClassManual, CommitMessage: "msg", ProjectRoot: repo,
@@ -46,6 +47,7 @@ func TestShipDirect_GitAddFails_Errors(t *testing.T) {
 }
 
 func TestShipDirect_GitCommitFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "change.txt"), "staged change\n")
 	opts := &Options{Class: ClassCycle, CommitMessage: "msg", ProjectRoot: repo,
@@ -57,6 +59,7 @@ func TestShipDirect_GitCommitFails_Errors(t *testing.T) {
 }
 
 func TestShipDirect_GitPushFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "change.txt"), "staged change\n")
@@ -69,6 +72,7 @@ func TestShipDirect_GitPushFails_Errors(t *testing.T) {
 }
 
 func TestShipDirect_NoStagedChanges_CleanExit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t) // clean tree, nothing to stage
 	opts := &Options{Class: ClassCycle, CommitMessage: "msg", ProjectRoot: repo,
 		Runner: execRunner, Stdout: io.Discard, Stderr: io.Discard}
@@ -82,6 +86,7 @@ func TestShipDirect_NoStagedChanges_CleanExit(t *testing.T) {
 }
 
 func TestAtomicShip_DetachedHEAD_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	opts := &Options{Class: ClassCycle, CommitMessage: "msg", ProjectRoot: repo,
 		Runner: faultRunner("git symbolic-ref", 1, nil), Stdout: io.Discard, Stderr: io.Discard}
@@ -92,6 +97,7 @@ func TestAtomicShip_DetachedHEAD_Refuses(t *testing.T) {
 }
 
 func TestComputeTreeStateSHA_GitExitGreaterThan1_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	opts := &Options{ProjectRoot: repo, Runner: faultRunner("git diff", 2, nil)}
 	if _, err := computeTreeStateSHA(context.Background(), opts); err == nil {
@@ -100,6 +106,7 @@ func TestComputeTreeStateSHA_GitExitGreaterThan1_Errors(t *testing.T) {
 }
 
 func TestComputeTreeStateSHA_RunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	opts := &Options{ProjectRoot: repo, Runner: faultRunner("git diff", -1, errors.New("boom"))}
 	if _, err := computeTreeStateSHA(context.Background(), opts); err == nil {
@@ -108,6 +115,7 @@ func TestComputeTreeStateSHA_RunnerError_Errors(t *testing.T) {
 }
 
 func TestFinalize_ClassifiesExitCodes(t *testing.T) {
+	t.Parallel()
 	opts := &Options{ProjectRoot: t.TempDir()} // DryRun=false → journal no-op
 	t.Run("integrity-error", func(t *testing.T) {
 		breach := shipErr(core.CodeIntegrityTreeDrift, core.ShipClassIntegrity, core.StagePostShip, "breach")

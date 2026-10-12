@@ -20,6 +20,7 @@ import (
 // This joins the real native Audit, the orchestrator's private host recorder,
 // and Ship's binding verifier. Only the model and non-audit phases are replaced.
 func TestHostAuditRoundTrip_CoreLedgerAuthorizesOnlyHostPass(t *testing.T) {
+	t.Parallel()
 	for _, pass := range []bool{true, false} {
 		name, assertion := "green", ""
 		if !pass {

@@ -57,6 +57,7 @@ func pushed(calls [][]string) int {
 }
 
 func TestLand_AnUnreadableLaneTipStopsBeforeTheJournalOrTheIntent(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	fault := realGit(argvIs("rev-parse", "HEAD"), 128)
 	s, _, _ := l.worktreeShip(fault.runner())
@@ -73,6 +74,7 @@ func TestLand_AnUnreadableLaneTipStopsBeforeTheJournalOrTheIntent(t *testing.T) 
 }
 
 func TestLand_ADivergedMainWithAStuckLaneRefReportsTheRefThatDidNotMove(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	tree := strings.TrimSpace(runGitOut(t, l.wt, "write-tree"))
 	pending := strings.TrimSpace(runGitOut(t, l.wt, "-c", "commit.gpgsign=false", "commit-tree", tree, "-p", "HEAD", "-m", "evolve-cycle 1830"))
@@ -92,6 +94,7 @@ func TestLand_ADivergedMainWithAStuckLaneRefReportsTheRefThatDidNotMove(t *testi
 }
 
 func TestAbandonPrepared_AnUnwindThatCannotRunStopsWithTheBoundarySteps(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	gone := filepath.Join(t.TempDir(), "removed-lane")
 	s := newWorktreeShip(context.Background(), &Options{ProjectRoot: root, Runner: execRunner}, &RunResult{}, "main", gone)
@@ -111,6 +114,7 @@ func TestAbandonPrepared_AnUnwindThatCannotRunStopsWithTheBoundarySteps(t *testi
 }
 
 func TestDecline_ARunOwnedTipThatCannotUnwindKeepsTheIntentPrepared(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	opts := &Options{ProjectRoot: root, Runner: execRunner}
 	s := newWorktreeShip(context.Background(), opts, &RunResult{}, "main", filepath.Join(t.TempDir(), "removed-lane"))
@@ -130,6 +134,7 @@ func TestDecline_ARunOwnedTipThatCannotUnwindKeepsTheIntentPrepared(t *testing.T
 }
 
 func TestSettleLanding_EachSettleStepFailsOnItsOwnTerms(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		arrange   func(t *testing.T, l landingLane, opts *Options)
@@ -177,6 +182,7 @@ func TestSettleLanding_EachSettleStepFailsOnItsOwnTerms(t *testing.T) {
 }
 
 func TestRun_APolicyRefusalWhoseUnwoundIntentCannotBeWrittenReportsBoth(t *testing.T) {
+	t.Parallel()
 	skipWhenRoot(t)
 	l := laneReadyToLand(t)
 	outage := &pushOutage{failures: 1 << 20, stderr: githubPolicyError, onPush: func() { l.lockTheLandingDir(t) }}
@@ -194,6 +200,7 @@ func TestRun_APolicyRefusalWhoseUnwoundIntentCannotBeWrittenReportsBoth(t *testi
 }
 
 func TestResumeLanding_DeclinesToResumeWithoutAHostWorktreeBranchOrLock(t *testing.T) {
+	t.Parallel()
 	noFault := func() *gitFault { return realGit(func([]string) bool { return false }, 0) }
 	cases := []struct {
 		name     string
@@ -251,6 +258,7 @@ func TestResumeLanding_DeclinesToResumeWithoutAHostWorktreeBranchOrLock(t *testi
 }
 
 func TestRun_ARollForwardWhoseLaneRefCannotMoveStopsTheResume(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	killed := false
 	kill := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
@@ -279,6 +287,7 @@ func TestRun_ARollForwardWhoseLaneRefCannotMoveStopsTheResume(t *testing.T) {
 }
 
 func TestWitness_NamesWhatItCouldNotRead(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		arrange func(t *testing.T, l landingLane, opts *Options) *gitFault
@@ -328,6 +337,7 @@ func TestWitness_NamesWhatItCouldNotRead(t *testing.T) {
 }
 
 func TestWitness_AReadableLaneWitnessesThePreparedIntent(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	in := l.preparedIntent(t)
 	s, _, _ := l.worktreeShip(execRunner)
@@ -385,6 +395,7 @@ func consumedLane(t *testing.T) (repo, parent, commit string, paths []string) {
 }
 
 func TestLaneTreeBeforeConsumption_RestoresEveryConsumedPathToItsParent(t *testing.T) {
+	t.Parallel()
 	repo, parent, commit, paths := consumedLane(t)
 	opts := &Options{ProjectRoot: repo, Runner: execRunner, internalConsumedPaths: paths}
 
@@ -410,6 +421,7 @@ func TestLaneTreeBeforeConsumption_RestoresEveryConsumedPathToItsParent(t *testi
 }
 
 func TestLaneTreeBeforeConsumption_WithNoConsumptionIsTheCommitTree(t *testing.T) {
+	t.Parallel()
 	repo, _, commit, _ := consumedLane(t)
 
 	tree, err := laneTreeBeforeConsumption(context.Background(), &Options{ProjectRoot: repo, Runner: execRunner}, commit)
@@ -453,6 +465,7 @@ func TestLaneTreeBeforeConsumption_FailsLoudlyOnEveryScratchStep(t *testing.T) {
 }
 
 func TestRun_APostShipErrorAfterAResumeWarnsAndStillLands(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	landingCommit := l.tip(t)
@@ -469,6 +482,7 @@ func TestRun_APostShipErrorAfterAResumeWarnsAndStillLands(t *testing.T) {
 }
 
 func TestRun_APostPushReDispatchWithATamperedAuditFailsInsteadOfReportingSuccess(t *testing.T) {
+	t.Parallel()
 	repo, _ := shipWorktreeFixture(t, "cycle-1-tamper")
 	if res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "evolve-cycle 1: goal=test"}); err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("precondition: the first ship lands: exit=%d err=%v logs=%v", res.ExitCode, err, res.Logs)
@@ -490,6 +504,7 @@ func TestRun_APostPushReDispatchWithATamperedAuditFailsInsteadOfReportingSuccess
 }
 
 func TestRun_AResumeUnpushedWhosePushIsRefusedLeavesTheHeadMovedError(t *testing.T) {
+	t.Parallel()
 	repo := mergedUnpushedFixture(t, "cycle-246-refused")
 	preRemote := remoteHeadSHA(t, repo)
 	outage := &pushOutage{failures: 1 << 20, stderr: githubPolicyError}
@@ -505,6 +520,7 @@ func TestRun_AResumeUnpushedWhosePushIsRefusedLeavesTheHeadMovedError(t *testing
 }
 
 func TestRepairResumeUnpushed_ALandingThatCannotSettleIsNotARepair(t *testing.T) {
+	t.Parallel()
 	repo := mergedUnpushedFixture(t, "cycle-246-unsettled")
 	head, audited := headSHA(t, repo), strings.TrimSpace(runGitOut(t, repo, "rev-parse", "HEAD^"))
 	headTree := strings.TrimSpace(runGitOut(t, repo, "rev-parse", "HEAD^{tree}"))
@@ -535,6 +551,7 @@ func TestRepairResumeUnpushed_ALandingThatCannotSettleIsNotARepair(t *testing.T)
 }
 
 func TestStrandedLanding_ReadsTheHeadItWouldResume(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		fault   func() *gitFault
@@ -597,6 +614,7 @@ func directOpts(repo string, class Class, runner CmdRunner) *Options {
 }
 
 func TestShipDirect_EveryRefusalLeavesMainAndOriginUnmoved(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		class    Class
@@ -658,6 +676,7 @@ func TestShipDirect_EveryRefusalLeavesMainAndOriginUnmoved(t *testing.T) {
 }
 
 func TestShipDirect_ACommittedTreeThatDriftedAfterThePushIsAnIntegrityBreach(t *testing.T) {
+	t.Parallel()
 	repo := directShipRepo(t)
 	runGit(t, repo, "add", "change.txt")
 	staged := strings.TrimSpace(runGitOut(t, repo, "write-tree"))
@@ -689,6 +708,7 @@ func TestShipDirect_ACommittedTreeThatDriftedAfterThePushIsAnIntegrityBreach(t *
 }
 
 func TestRun_AHeldIntegratorLockStopsAWorktreeShipBeforeItStages(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	opts := l.options(execRunner, &sleepLog{})
 	opts.shipLock = func(string) (func(), error) { return nil, errors.New("held by a peer") }
@@ -703,6 +723,7 @@ func TestRun_AHeldIntegratorLockStopsAWorktreeShipBeforeItStages(t *testing.T) {
 }
 
 func TestPrepareChanges_AnUnreadableLaneStatusStopsTheStage(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	fault := realGit(argvIs("status", "--porcelain", "-uall"), 128)
 	s, _, _ := l.worktreeShip(fault.runner())

@@ -64,6 +64,7 @@ func rewriteAuditWithReportComment(t *testing.T, repo, commentTree, ledgerTree s
 // The report comment carries the correct tree here — the only shape in which
 // a report-sourced binding could look trustworthy.
 func TestVerifyAuditBinding_ReportCommentNeverBindsTree(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	seededTree, _ := readSeededAuditEntry(t, repo)["worktree_tree_sha"].(string)
@@ -79,6 +80,7 @@ func TestVerifyAuditBinding_ReportCommentNeverBindsTree(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_EmptyLedgerTreeRefusedBeforeConsumption(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	seededTree, _ := readSeededAuditEntry(t, repo)["worktree_tree_sha"].(string)
@@ -90,6 +92,7 @@ func TestVerifyAuditBinding_EmptyLedgerTreeRefusedBeforeConsumption(t *testing.T
 }
 
 func TestVerifyAuditBinding_LedgerTreeWinsOverReportComment(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	seededTree, _ := readSeededAuditEntry(t, repo)["worktree_tree_sha"].(string)
@@ -109,6 +112,7 @@ func TestVerifyAuditBinding_LedgerTreeWinsOverReportComment(t *testing.T) {
 // The scan targets the report-comment form (`audit_bound_tree_sha:`), not the
 // ship-binding.json key "audit_bound_tree_sha", which production legitimately reads.
 func TestShipSource_NoAuditReportTreeCommentParser(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatalf("read package dir: %v", err)

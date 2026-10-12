@@ -16,6 +16,7 @@ import (
 // logged regardless of the gate value, so the operator has evidence even
 // when the gate itself is misconfigured.
 func TestReconcileManifest_OnlyExactEnforceLiteralBlocks(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []string{"Enforce", "ENFORCE", " enforce", "enforce ", "off", "strict", "block"} {
 		opts := manifestLeakOpts(t)
 		opts.ManifestGate = mode

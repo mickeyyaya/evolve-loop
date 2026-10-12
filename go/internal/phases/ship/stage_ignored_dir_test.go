@@ -14,6 +14,7 @@ import (
 // through the fake runner so the contract holds for any producer that puts a
 // probe-blind path into the pathspec.
 func TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	blind := ".evolve/inbox/processed"
 	ws := writeWorkspaceReports(t,
@@ -66,6 +67,7 @@ func TestShipDirect_CycleClass_RetriesAfterGitNamesAnIgnoredPathspec(t *testing.
 // progress guard, pinned so it cannot be simplified away into a doomed
 // identical retry.
 func TestShipDirect_CycleClass_ForeignOffenderMeansNoRetry(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	ws := writeWorkspaceReports(t, "go/internal/phases/ship/gitops.go")
 	cap := &porcelainCapture{

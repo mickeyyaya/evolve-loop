@@ -8,6 +8,7 @@ import (
 )
 
 func TestSplitNonEmpty(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want int
@@ -27,6 +28,7 @@ func TestSplitNonEmpty(t *testing.T) {
 }
 
 func TestExtractIDs(t *testing.T) {
+	t.Parallel()
 	if got := extractIDs([]byte("not json{")); got != nil {
 		t.Errorf("invalid JSON should return nil, got %v", got)
 	}
@@ -51,12 +53,14 @@ func TestExtractIDs(t *testing.T) {
 }
 
 func TestIsTerminal_NonFile(t *testing.T) {
+	t.Parallel()
 	if isTerminal(&bytes.Buffer{}) {
 		t.Errorf("bytes.Buffer should not be terminal")
 	}
 }
 
 func TestIsTerminal_TempFile(t *testing.T) {
+	t.Parallel()
 	f, err := os.CreateTemp("", "isterminal-*")
 	if err != nil {
 		t.Fatalf("CreateTemp: %v", err)
@@ -69,6 +73,7 @@ func TestIsTerminal_TempFile(t *testing.T) {
 }
 
 func TestCleanExitError(t *testing.T) {
+	t.Parallel()
 	e := (&cleanExitError{}).Error()
 	if e == "" {
 		t.Errorf("Error() empty")
@@ -76,6 +81,7 @@ func TestCleanExitError(t *testing.T) {
 }
 
 func TestStateInt(t *testing.T) {
+	t.Parallel()
 	m := map[string]any{
 		"float":   float64(42),
 		"int":     int(7),
@@ -100,6 +106,7 @@ func TestStateInt(t *testing.T) {
 }
 
 func TestReadStateMap_Missing(t *testing.T) {
+	t.Parallel()
 	m, err := readStateMap("/nonexistent/state.json")
 	if err != nil {
 		t.Errorf("expected nil error for missing file (soft path)")
@@ -110,6 +117,7 @@ func TestReadStateMap_Missing(t *testing.T) {
 }
 
 func TestReadStateMap_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 	if err := os.WriteFile(path, []byte("not json{"), 0o644); err != nil {
@@ -121,6 +129,7 @@ func TestReadStateMap_InvalidJSON(t *testing.T) {
 }
 
 func TestReadStateMap_Valid(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 	if err := os.WriteFile(path, []byte(`{"k":"v","n":42}`), 0o644); err != nil {
@@ -136,6 +145,7 @@ func TestReadStateMap_Valid(t *testing.T) {
 }
 
 func TestWriteStateMap_RoundTrip(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 	if err := writeStateMap(path, map[string]any{"a": "b", "c": float64(1)}); err != nil {
@@ -151,12 +161,14 @@ func TestWriteStateMap_RoundTrip(t *testing.T) {
 }
 
 func TestSha256File_Missing(t *testing.T) {
+	t.Parallel()
 	if _, err := sha256File("/nonexistent/file"); err == nil {
 		t.Errorf("expected error")
 	}
 }
 
 func TestSha256File_Valid(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "f")
 	if err := os.WriteFile(path, []byte("hello"), 0o644); err != nil {
@@ -173,12 +185,14 @@ func TestSha256File_Valid(t *testing.T) {
 }
 
 func TestPluginVersion_Missing(t *testing.T) {
+	t.Parallel()
 	if got := pluginVersion("/nonexistent/plugin.json"); got != "" {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
 
 func TestPluginVersion_Valid(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	pluginDir := filepath.Join(dir, ".claude-plugin")
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
@@ -194,6 +208,7 @@ func TestPluginVersion_Valid(t *testing.T) {
 }
 
 func TestIntegrityError_Error(t *testing.T) {
+	t.Parallel()
 	e := &IntegrityError{Msg: "test failure"}
 	if e.Error() == "" {
 		t.Errorf("Error() empty")

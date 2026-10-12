@@ -32,6 +32,7 @@ func ledgerLinesFor(t *testing.T, root, taskID string) []string {
 // triage/operators can tell a delivery failure from an ordinary residual
 // drain.
 func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 752
 	const id = "inbox-promotion-requires-landed-ship"
@@ -76,6 +77,7 @@ func TestPromoteInbox_UnlandedReleaseCarriesRetryNote(t *testing.T) {
 // unlanded note must NOT appear (guards against a stub that stamps
 // "unlanded" on every release).
 func TestPromoteInbox_LandedResidualReleaseKeepsGenericReason(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 752
 	const id = "inbox-promotion-requires-landed-ship"

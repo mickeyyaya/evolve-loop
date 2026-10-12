@@ -15,6 +15,7 @@ import (
 // never in a dispatcher switch. This is the permanent regression guard for
 // that invariant — the test does not import the dispatcher.
 func TestShipSelfRegisters(t *testing.T) {
+	t.Parallel()
 	factory, ok := registry.For(string(core.PhaseShip))
 	if !ok {
 		t.Fatalf("ship not self-registered: registry.For(%q) returned ok=false", core.PhaseShip)

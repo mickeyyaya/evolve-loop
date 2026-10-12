@@ -12,6 +12,7 @@ import (
 )
 
 func TestVerifyExecutionTree_AcceptsAReProvenCarry(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarry(t, l, "audit-ref", l.tree0)
 	res := &RunResult{}
@@ -27,6 +28,7 @@ func TestVerifyExecutionTree_AcceptsAReProvenCarry(t *testing.T) {
 }
 
 func TestVerifyExecutionTree_RefusesADriftNoRuleExplains(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 
 	err := verifyExecutionTree(context.Background(), boundTo(t, l, l.tree0, "audit-ref"), &RunResult{}, l.repo)
@@ -35,6 +37,7 @@ func TestVerifyExecutionTree_RefusesADriftNoRuleExplains(t *testing.T) {
 }
 
 func TestVerifyExecutionTree_RefusesACarryWhoseRecordNamesAnotherAudit(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarry(t, l, "another-audit", l.tree0)
 
@@ -44,6 +47,7 @@ func TestVerifyExecutionTree_RefusesACarryWhoseRecordNamesAnotherAudit(t *testin
 }
 
 func TestVerifyExecutionTree_RefusesWhenTheTreeCannotBeTaken(t *testing.T) {
+	t.Parallel()
 	opts := boundTo(t, rebasedLane(t), "", "audit-ref")
 
 	err := verifyExecutionTree(context.Background(), opts, &RunResult{}, t.TempDir())
@@ -109,6 +113,7 @@ func carriedAndCleanedUp(t *testing.T, repo string, cycle int) {
 }
 
 func TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit(t *testing.T) {
+	t.Parallel()
 	c := auditedLaneRebasedOntoAPeer(t)
 	writeCarry(t, c.lane, c.ref, c.lane.tree0)
 
@@ -123,6 +128,7 @@ func TestVerifyAuditBinding_ShipsACarriedRebaseWithoutASecondAudit(t *testing.T)
 }
 
 func TestVerifyAuditBinding_ShipsASecondCarryAfterTheFirstCarrysWorktreeIsGone(t *testing.T) {
+	t.Parallel()
 	c := auditedLaneRebasedOntoAPeer(t)
 	carriedAndCleanedUp(t, c.lane.repo, 1766)
 	c.lane.cycle = 1782

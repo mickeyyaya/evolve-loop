@@ -14,6 +14,7 @@ import (
 )
 
 func TestShipDirect_RefusesAnUnsatisfiedBinding(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
@@ -61,6 +62,7 @@ func TestShipDirect_RefusesAnUnsatisfiedBinding(t *testing.T) {
 }
 
 func TestShipDirect_UnboundShipIsUnaffected(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
@@ -81,6 +83,7 @@ func TestShipDirect_UnboundShipIsUnaffected(t *testing.T) {
 }
 
 func TestShipDirect_LegitimateBoundShipIsNotBlocked(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")

@@ -17,6 +17,7 @@ import (
 )
 
 func TestVerifyAuditBinding_AuditorExitCode2_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS", map[string]string{"exit_code": "2"})
 	opts := auditOpts(t, repo)
@@ -25,6 +26,7 @@ func TestVerifyAuditBinding_AuditorExitCode2_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_DualVerdict_PASS_and_FAIL_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedCustomAudit(t, repo,
 		"<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle 1\n\nVerdict: PASS\nVerdict: FAIL\n\nAll criteria met (test fixture).\n",
@@ -36,6 +38,7 @@ func TestVerifyAuditBinding_DualVerdict_PASS_and_FAIL_IntegrityError(t *testing.
 }
 
 func TestVerifyAuditBinding_FailVerdict_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "FAIL")
 	opts := auditOpts(t, repo)
@@ -44,6 +47,7 @@ func TestVerifyAuditBinding_FailVerdict_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	// No git changes needed — just need a WARN verdict + matching HEAD/tree.
 	seedAudit(t, repo, "WARN")
@@ -54,6 +58,7 @@ func TestVerifyAuditBinding_WarnWithStrictAudit_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_NoVerdict_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedCustomAudit(t, repo,
 		"<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle 1\n\nConclusion: Everything looks fine.\n",
@@ -65,6 +70,7 @@ func TestVerifyAuditBinding_NoVerdict_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_GitHEADMismatch_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	mustWrite(t, filepath.Join(repo, "new.txt"), "post-audit change\n")
@@ -77,6 +83,7 @@ func TestVerifyAuditBinding_GitHEADMismatch_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_StaleAudit_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 
@@ -96,6 +103,7 @@ func TestVerifyAuditBinding_StaleAudit_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_ArtifactMissing_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
@@ -108,6 +116,7 @@ func TestVerifyAuditBinding_ArtifactMissing_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_ArtifactSHAMismatch_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
@@ -120,6 +129,7 @@ func TestVerifyAuditBinding_ArtifactSHAMismatch_IntegrityError(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
 	body := "<!-- challenge-token: testtoken123 -->\n# Audit Report — Cycle 1\n\nVerdict: PASS\n\nAll criteria met (test fixture).\n"
@@ -136,6 +146,7 @@ func TestVerifyAuditBinding_LegacyEntryNoGitHead_IntegrityError(t *testing.T) {
 }
 
 func TestCheckEGPSGate_SkipCountWithRedZero_Passes(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	verdict, err := json.Marshal(predicateVerdictFixture(1, 1, 0, 4))
 	if err != nil {
@@ -150,6 +161,7 @@ func TestCheckEGPSGate_SkipCountWithRedZero_Passes(t *testing.T) {
 }
 
 func TestCheckEGPSGate_RedCountWithSkipsPresent_Blocks(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	verdict, err := json.Marshal(predicateVerdictFixture(1, 1, 1, 4))
 	if err != nil {
@@ -185,6 +197,7 @@ func seedCustomAudit(t *testing.T, repo, body string, exitCode int) {
 }
 
 func TestParseVerdicts_BareHeadingLine(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name             string
 		body             string

@@ -16,6 +16,7 @@ import (
 )
 
 func TestPhaseRun_MissingRequiredExplanationBlocksBeforeNativeShip(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -50,6 +51,7 @@ func TestPhaseRun_MissingRequiredExplanationBlocksBeforeNativeShip(t *testing.T)
 }
 
 func TestPhaseRun_UnreadableActiveMarkerCannotBypassExplanationGate(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -74,6 +76,7 @@ func TestPhaseRun_UnreadableActiveMarkerCannotBypassExplanationGate(t *testing.T
 }
 
 func TestNativeRun_EnforcesExplanationGateWithoutPhaseWrapper(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	worktree := t.TempDir()
@@ -114,6 +117,7 @@ func TestNativeRun_EnforcesExplanationGateWithoutPhaseWrapper(t *testing.T) {
 }
 
 func TestVerifyNativeExplanation_IncompleteTypedIdentityCannotHideActiveMarker(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -136,6 +140,7 @@ func TestVerifyNativeExplanation_IncompleteTypedIdentityCannotHideActiveMarker(t
 }
 
 func TestVerifyNativeExplanation_LegacyNoMarkerIgnoresSyntheticWorkspaceCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-1")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -151,6 +156,7 @@ func TestVerifyNativeExplanation_LegacyNoMarkerIgnoresSyntheticWorkspaceCycle(t 
 }
 
 func TestVerifyNativeExplanation_FreezesStandaloneHostIdentity(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-42")
 	worktree := gittest.Fixture(t).Dir
@@ -213,6 +219,7 @@ func TestVerifyNativeExplanation_FreezesStandaloneHostIdentity(t *testing.T) {
 }
 
 func TestNativeRun_PostPushExplanationRetryUsesLandedTreeAfterWorktreeCleanup(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	runGit(t, repo, "branch", "-M", "main")
 	worktree := makeWorktree(t, repo, "cycle-42-branch")
@@ -285,6 +292,7 @@ func TestNativeRun_PostPushExplanationRetryUsesLandedTreeAfterWorktreeCleanup(t 
 }
 
 func TestPostPushBinding_UsesTypedCycleAndRequiresExactTreeWitness(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	runGit(t, repo, "branch", "-M", "main")
 	workspace := filepath.Join(repo, ".evolve", "runs", "cycle-42")
@@ -326,6 +334,7 @@ func TestPostPushBinding_UsesTypedCycleAndRequiresExactTreeWitness(t *testing.T)
 }
 
 func TestWriteShipBinding_UsesTypedCycleInsteadOfRunMirror(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	workspace := filepath.Join(repo, ".evolve", "runs", "cycle-42")
 	mustMkdir(t, workspace)

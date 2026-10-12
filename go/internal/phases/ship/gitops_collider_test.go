@@ -10,6 +10,7 @@ import (
 )
 
 func TestShipFromWorktree_NoCollider(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-232-no-collider")

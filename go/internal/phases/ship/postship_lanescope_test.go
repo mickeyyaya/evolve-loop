@@ -22,6 +22,7 @@ func writeDrainLaneScope(t *testing.T, root string, cycleID int, ids ...string) 
 }
 
 func TestPromoteInbox_LaneScopeFallbackPromotesOnPass(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 51)
 	// NO triage-decision.json — the continuation/lane shape.
@@ -42,6 +43,7 @@ func TestPromoteInbox_LaneScopeFallbackPromotesOnPass(t *testing.T) {
 // triage path: an unlanded ship with a lane-scope committed set promotes
 // nothing and drains with the retry reason.
 func TestPromoteInbox_UnlandedShipSkipsLaneFallbackPromotion(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir() // not a git repo → isLanded fails closed (not landed)
 	writeDrainCycleState(t, root, 53)
 	writeDrainLaneScope(t, root, 53, "salvage-lane")
@@ -62,6 +64,7 @@ func TestPromoteInbox_UnlandedShipSkipsLaneFallbackPromotion(t *testing.T) {
 }
 
 func TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 52)
 	writeDrainTriageDecision(t, root, 52) // present, zero committed ids

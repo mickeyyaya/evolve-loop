@@ -32,6 +32,7 @@ func writePluginJSON(t *testing.T, root, body string) {
 }
 
 func TestMaybeCreateRelease_Success_InvokesGhWithVersionTag(t *testing.T) {
+	t.Parallel()
 	g := &ghCapture{ghExit: 0}
 	root := t.TempDir()
 	writePluginJSON(t, root, `{"version":"9.9.9"}`)
@@ -58,6 +59,7 @@ func TestMaybeCreateRelease_Success_InvokesGhWithVersionTag(t *testing.T) {
 }
 
 func TestMaybeCreateRelease_DryRun_DoesNotInvokeGh(t *testing.T) {
+	t.Parallel()
 	g := &ghCapture{}
 	root := t.TempDir()
 	writePluginJSON(t, root, `{"version":"1.2.3"}`)
@@ -82,6 +84,7 @@ func TestMaybeCreateRelease_DryRun_DoesNotInvokeGh(t *testing.T) {
 }
 
 func TestMaybeCreateRelease_UnparseableVersion_SkipsWithWarn(t *testing.T) {
+	t.Parallel()
 	g := &ghCapture{}
 	root := t.TempDir()
 	writePluginJSON(t, root, `{"name":"no-version-field"}`) // valid JSON, empty version
@@ -105,6 +108,7 @@ func TestMaybeCreateRelease_UnparseableVersion_SkipsWithWarn(t *testing.T) {
 }
 
 func TestMaybeCreateRelease_GhNonZero_WarnsAndContinues(t *testing.T) {
+	t.Parallel()
 	g := &ghCapture{ghExit: 1} // gh fails (e.g., release already exists)
 	root := t.TempDir()
 	writePluginJSON(t, root, `{"version":"4.5.6"}`)

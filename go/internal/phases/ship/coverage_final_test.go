@@ -15,6 +15,7 @@ import (
 )
 
 func TestVerifySelfSHA_CleanPass_ReturnsNilNoLog(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-stable\n")
@@ -36,6 +37,7 @@ func TestVerifySelfSHA_CleanPass_ReturnsNilNoLog(t *testing.T) {
 }
 
 func TestShipFromWorktree_TreeSHABindingVerifiedLog(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "binding-test-branch")
@@ -60,6 +62,7 @@ func TestShipFromWorktree_TreeSHABindingVerifiedLog(t *testing.T) {
 }
 
 func TestShipFromWorktree_WithAuditBoundTreeSHA_BindingLogged(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "treesha-branch")
@@ -89,6 +92,7 @@ func TestShipFromWorktree_WithAuditBoundTreeSHA_BindingLogged(t *testing.T) {
 }
 
 func TestAdvanceLastCycleNumber_WriteStateFails_WarnsAndReturnsNil(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	mustWrite(t, filepath.Join(evolveDir, "cycle-state.json"), `{"cycle_id":15}`)
@@ -111,6 +115,7 @@ func TestAdvanceLastCycleNumber_WriteStateFails_WarnsAndReturnsNil(t *testing.T)
 }
 
 func TestRepinPostCycle_StateReadError_ReturnsError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
 	mustWrite(t, bin, "binary-v4\n")
@@ -133,6 +138,7 @@ func TestRepinPostCycle_StateReadError_ReturnsError(t *testing.T) {
 }
 
 func TestRepinPostCycle_WriteStateFails_ReturnsError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
 	mustWrite(t, bin, "binary-v5\n")
@@ -153,6 +159,7 @@ func TestRepinPostCycle_WriteStateFails_ReturnsError(t *testing.T) {
 }
 
 func TestPostShip_AdvanceError_Propagates(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
 	mustWrite(t, bin, "bin\n")
@@ -175,6 +182,7 @@ func TestPostShip_AdvanceError_Propagates(t *testing.T) {
 }
 
 func TestVerifyTrivial_StagedDiffError_Errors(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
@@ -193,6 +201,7 @@ func TestVerifyTrivial_StagedDiffError_Errors(t *testing.T) {
 }
 
 func TestVerifyTrivial_CriticalPathTruncated_Shows3Max(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
@@ -218,6 +227,7 @@ func TestVerifyTrivial_CriticalPathTruncated_Shows3Max(t *testing.T) {
 }
 
 func TestFindLatestAudit_ReadError_Propagates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// Pass a directory path (not a file) — os.ReadFile returns "is a directory"
 	// which is NOT os.ErrNotExist.
@@ -235,6 +245,7 @@ func TestFindLatestAudit_ReadError_Propagates(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_WarnFluent_LogsAndPasses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "WARN")
 	opts := auditOpts(t, repo)
@@ -248,6 +259,7 @@ func TestVerifyAuditBinding_WarnFluent_LogsAndPasses(t *testing.T) {
 }
 
 func TestReadStateMap_EmptyFile_ReturnsEmptyMap(t *testing.T) {
+	t.Parallel()
 	p := filepath.Join(t.TempDir(), "state.json")
 	if err := os.WriteFile(p, []byte(""), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
@@ -262,6 +274,7 @@ func TestReadStateMap_EmptyFile_ReturnsEmptyMap(t *testing.T) {
 }
 
 func TestAtomicShip_EmptyBranch_DetachedHEAD_Refuses(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
 	// symbolic-ref exits 0 but returns empty string → "" branch name.
@@ -286,6 +299,7 @@ func TestAtomicShip_EmptyBranch_DetachedHEAD_Refuses(t *testing.T) {
 }
 
 func TestShipDirect_BuildDiffFooterRunnerError_Propagates(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "change.txt"), "staged\n")
 	runGit(t, repo, "add", "change.txt")
@@ -314,6 +328,7 @@ func TestShipDirect_BuildDiffFooterRunnerError_Propagates(t *testing.T) {
 }
 
 func TestWriteShipBinding_MkdirFails_ReturnsError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":77}`)
 	mustWrite(t, filepath.Join(root, ".evolve", "runs"), "i am a file\n")

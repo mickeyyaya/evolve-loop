@@ -17,6 +17,7 @@ func stalePinStateJSON(t *testing.T, repo string) {
 }
 
 func TestRepair_SelfSHA_VerifiedRebuild_RepinsAndShips(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
 	addRemote(t, repo)
@@ -53,6 +54,7 @@ func TestRepair_SelfSHA_VerifiedRebuild_RepinsAndShips(t *testing.T) {
 }
 
 func TestRepair_SelfSHA_GenuineTamper_StillBlocks(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
 	addRemote(t, repo)
@@ -78,6 +80,7 @@ func TestRepair_SelfSHA_GenuineTamper_StillBlocks(t *testing.T) {
 }
 
 func TestRepair_SelfSHA_BinaryNotAtHEAD_StillBlocks(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
 	addRemote(t, repo)

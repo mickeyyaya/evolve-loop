@@ -17,6 +17,7 @@ import (
 )
 
 func TestShipFromWorktree_CommitsTheOneShipTree(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 	mustWrite(t, filepath.Join(wt, "fixture.txt"), "fixture line 1\nan undeclared tracked edit\n")
 	mustWrite(t, filepath.Join(wt, "docs", "explain", "cycle-1.md"), "# Why\n")
@@ -44,6 +45,7 @@ func TestShipFromWorktree_CommitsTheOneShipTree(t *testing.T) {
 }
 
 func TestShipFromWorktree_ADeclaredFileRemovedWithPlainRmShipsItsDeletion(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 	if err := os.Remove(filepath.Join(wt, "fixture.txt")); err != nil {
 		t.Fatal(err)
@@ -72,6 +74,7 @@ func TestShipFromWorktree_ADeclaredFileRemovedWithPlainRmShipsItsDeletion(t *tes
 }
 
 func TestShipFromWorktree_AFailedTrackedEditAddFailsTheShipBeforeAnyCommit(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 	mustWrite(t, filepath.Join(wt, "fixture.txt"), "fixture line 1\nan undeclared tracked edit\n")
 	var commits int

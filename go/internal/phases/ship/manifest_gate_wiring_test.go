@@ -24,6 +24,7 @@ func noopRunner(ctx context.Context, name, cwd string, args, env []string, stdin
 // shipOptions seam (the extracted Options literal runNative uses), so the test
 // exercises the real production path rather than a source-grep.
 func TestShipOptions_ThreadsManifestGate(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{
 		Cycle:       1064,
 		ProjectRoot: "/repo",
@@ -55,6 +56,7 @@ func TestShipOptions_ThreadsManifestGate(t *testing.T) {
 // out-of-manifest path with the dedicated code. The shadow row is the negative
 // axis — the same chain with the default value must NOT block.
 func TestManifestGate_PolicyToBlockEndToEnd(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name      string
 		policyRaw string

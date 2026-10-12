@@ -351,6 +351,7 @@ func assertGoldenError(t *testing.T, name string, got, want *goldenError) {
 // the once-guard dropped, declined building a new error, needs-reaudit made
 // transient, the retry push streamed to io.Discard, the worktree head omitted.
 func TestPushSites_GoldenRejectionAndRepairMatrix(t *testing.T) {
+	t.Parallel()
 	for _, site := range pushSites {
 		t.Run(site.name, func(t *testing.T) {
 			golden := loadGolden(t, "push_"+site.name+".golden.json")
@@ -378,6 +379,7 @@ func TestPushSites_GoldenRejectionAndRepairMatrix(t *testing.T) {
 // no-cycle_id error and the MkdirAll error. Kills: the newline dropped,
 // MarshalIndent → Marshal, Rename skipped.
 func TestWriteShipBinding_GoldenBytesAndAtomicity(t *testing.T) {
+	t.Parallel()
 	want, err := os.ReadFile(filepath.Join("landing", "testdata", "ship-binding.golden.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -422,6 +424,7 @@ func TestWriteShipBinding_GoldenBytesAndAtomicity(t *testing.T) {
 // on the run-workspace layout (core.RunWorkspacePath + dossier.ShipBindingFile),
 // green before and after the projection. Kills: cycle-%d → cycle_%d at either site.
 func TestShipBinding_WriterAndIdempotencyReaderAgreeOnThePath(t *testing.T) {
+	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)
 	opts.internalAuditBoundTreeSHA = pinTree
 	r := newArgvRecorder(opts)
@@ -443,6 +446,7 @@ func TestShipBinding_WriterAndIdempotencyReaderAgreeOnThePath(t *testing.T) {
 // error and rc=2 are GIT_IO with git_args + git_err / git_rc; rc=1 is
 // success (git diff's "differences exist").
 func TestCaptureGitOutput_ExitRuleAndErrorTexts(t *testing.T) {
+	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)
 	r := newArgvRecorder(opts)
 	r.on("rev-parse HEAD", scriptedCall{err: errors.New("boom")}, scriptedCall{exit: 2}, scriptedCall{stdout: "out\n", exit: 1})

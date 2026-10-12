@@ -115,6 +115,7 @@ func boundTo(t *testing.T, l carriedLane, tree, ref string) *Options {
 }
 
 func TestAuditBindingSatisfied_AcceptsAReProvenCarry(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarry(t, l, "audit-ref", l.tree0)
 
@@ -129,6 +130,7 @@ func TestAuditBindingSatisfied_AcceptsAReProvenCarry(t *testing.T) {
 }
 
 func TestAuditBindingSatisfied_DeclinesACarryItCannotReProve(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarry(t, l, "audit-ref", l.tree0)
 	ctx := context.Background()
@@ -150,6 +152,7 @@ func TestAuditBindingSatisfied_DeclinesACarryItCannotReProve(t *testing.T) {
 }
 
 func TestAuditBindingSatisfied_DeclinesACarryWhoseRecordLies(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarry(t, l, "audit-ref", l.tree0)
 	runGit(t, l.repo, "reset", "-q", "--hard", l.base0)
@@ -167,6 +170,7 @@ func TestAuditBindingSatisfied_DeclinesACarryWhoseRecordLies(t *testing.T) {
 }
 
 func TestAuditBindingSatisfied_ReProvesTheRecordsClaimsIndependently(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	t.Run("the record names the right tree but the bytes are not the audited change", func(t *testing.T) {
 		l := rebasedLane(t)

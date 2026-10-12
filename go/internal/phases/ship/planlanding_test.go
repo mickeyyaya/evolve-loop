@@ -9,6 +9,7 @@ import (
 )
 
 func TestPlanLanding_RoutesOnLandingMode(t *testing.T) {
+	t.Parallel()
 	lanes := []fleet.LaneCandidate{
 		{ID: "L1", Tier: fleet.TierMaybe, Files: []string{"a/a.go"}},
 		{ID: "L2", Tier: fleet.TierMaybe, Files: []string{"b/b.go"}},
@@ -34,6 +35,7 @@ func TestPlanLanding_RoutesOnLandingMode(t *testing.T) {
 }
 
 func TestPlanLanding_EmptyLanes(t *testing.T) {
+	t.Parallel()
 	perLaneCfg := policy.Policy{}.FleetConfig()
 	pqCfg := policy.Policy{Fleet: &policy.FleetPolicy{Landing: "prefix-queue"}}.FleetConfig()
 	if got := PlanLanding(perLaneCfg, nil); len(got) != 0 {

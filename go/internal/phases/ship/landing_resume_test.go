@@ -183,6 +183,7 @@ func reauditTheLane(t *testing.T, l landingLane) {
 }
 
 func TestRun_ARetryAfterAFailedPushResumesAtThePushWithoutReverifying(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	_, _, _, err := l.failEveryPush(t, githubServerError)
 	wantShipErr(t, err, core.CodeGitPushRejected, core.ShipClassTransient, "")
@@ -206,6 +207,7 @@ func TestRun_ARetryAfterAFailedPushResumesAtThePushWithoutReverifying(t *testing
 }
 
 func TestRun_AFailedPushLeavesSharedMainAtItsPreLandingTip(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 
 	l.failEveryPush(t, githubServerError)
@@ -219,6 +221,7 @@ func TestRun_AFailedPushLeavesSharedMainAtItsPreLandingTip(t *testing.T) {
 }
 
 func TestRun_AFailedPushJournalsItsCommitSoPushOnlyCompletesIt(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	landingCommit := l.tip(t)
@@ -232,6 +235,7 @@ func TestRun_AFailedPushJournalsItsCommitSoPushOnlyCompletesIt(t *testing.T) {
 }
 
 func TestRun_AServerErrorTwiceIsRetriedWithBackoffInTheStep(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	outage := &pushOutage{failures: 2, stderr: githubServerError}
 	var slept sleepLog
@@ -247,6 +251,7 @@ func TestRun_AServerErrorTwiceIsRetriedWithBackoffInTheStep(t *testing.T) {
 }
 
 func TestRun_AResumeDeclinesOnADivergedOriginAndUnwindsTheLaneToTheAuditedShape(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	pushDivergentCommit(t, l.bare)
@@ -268,6 +273,7 @@ func TestRun_AResumeDeclinesOnADivergedOriginAndUnwindsTheLaneToTheAuditedShape(
 }
 
 func TestRun_APolicyRejectionIsNeverRetried(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 
 	outage, slept, _, err := l.failEveryPush(t, githubPolicyError)
@@ -283,6 +289,7 @@ func TestRun_APolicyRejectionIsNeverRetried(t *testing.T) {
 }
 
 func TestRun_APushRaceIsRepairedWithoutBackoff(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	outage := &pushOutage{failures: 1, stderr: githubPushRace}
 	var slept sleepLog
@@ -298,6 +305,7 @@ func TestRun_APushRaceIsRepairedWithoutBackoff(t *testing.T) {
 }
 
 func TestRun_ALandingIntentThatCannotBeRecordedUnwindsAndNeverPushes(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.lockTheLandingDir(t)
 	outage := &pushOutage{}
@@ -312,6 +320,7 @@ func TestRun_ALandingIntentThatCannotBeRecordedUnwindsAndNeverPushes(t *testing.
 }
 
 func TestRun_ALandingThatCannotUnwindStopsTheCycleWithItsCommitJournaled(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	outage := &pushOutage{failures: 1, stderr: githubPolicyError, onPush: func() {
 		mustWrite(t, filepath.Join(l.wt, "debris.txt"), "a writer ship did not expect\n")

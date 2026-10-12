@@ -90,6 +90,7 @@ func readOnlyDir(t *testing.T, dir string) {
 }
 
 func TestRespond_MapsTheShipOutcomeToThePhaseVerdict(t *testing.T) {
+	t.Parallel()
 	req := core.PhaseRequest{Workspace: "/ws/cycle-9"}
 	failure := shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageAtomicShip, "ship: git broke")
 	cases := []struct {
@@ -154,6 +155,7 @@ func errText(err error) string {
 }
 
 func TestAdoptIntentConsumption_AcceptsOnlyWholeInboxPairs(t *testing.T) {
+	t.Parallel()
 	a, b := consumptionPairSlice("a.json"), consumptionPairSlice("2026-10-01T00-00-00Z-b.json")
 	cases := []struct {
 		name    string
@@ -201,6 +203,7 @@ func consumptionPairSlice(name string) []string {
 }
 
 func TestAdoptIntentConsumption_CopiesTheIntentPaths(t *testing.T) {
+	t.Parallel()
 	paths := consumptionPairSlice("x.json")
 	opts := &Options{}
 
@@ -243,6 +246,7 @@ func FuzzAdoptIntentConsumption(f *testing.F) {
 }
 
 func TestLandingComplete_IsTrueOnlyForACompleteIntentOfAPositiveCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	opts := &Options{ProjectRoot: root}
 	write := func(cycle int, status landing.IntentStatus) {
@@ -267,6 +271,7 @@ func TestLandingComplete_IsTrueOnlyForACompleteIntentOfAPositiveCycle(t *testing
 }
 
 func TestAppendShipJournal_AppendsOneTimestampedLinePerEntry(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	before := time.Now().UTC().Add(-time.Second)
 
@@ -324,6 +329,7 @@ func stubMarshalJSON(t *testing.T, err error) {
 }
 
 func TestRunIDForShip_PrefersTheHostRunAndReadsTheStateOtherwise(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, runID, state, want string
 		wantErr                  bool
@@ -352,6 +358,7 @@ func TestRunIDForShip_PrefersTheHostRunAndReadsTheStateOtherwise(t *testing.T) {
 }
 
 func TestReadLandingIntent_DistinguishesAbsentFromUnreadable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		opts       func(root string) *Options
@@ -406,6 +413,7 @@ func TestReadLandingIntent_DistinguishesAbsentFromUnreadable(t *testing.T) {
 }
 
 func TestJournalMinted_JournalsEachMintedCommitOnce(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name        string
 		opts        Options
@@ -464,6 +472,7 @@ func TestJournalMinted_JournalsEachMintedCommitOnce(t *testing.T) {
 }
 
 func TestExplanationViewSHA_AnAbsentContractIsNoViewAndACorruptOneIsAnError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 
 	sum, err := explanationViewSHA(root, 9, "run-9")
@@ -480,6 +489,7 @@ func TestExplanationViewSHA_AnAbsentContractIsNoViewAndACorruptOneIsAnError(t *t
 }
 
 func TestAuditPassed_RequiresAnUntamperedPassArtifact(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	write := func(name, body string) (string, string) {
 		path := filepath.Join(dir, name)
@@ -511,6 +521,7 @@ func TestAuditPassed_RequiresAnUntamperedPassArtifact(t *testing.T) {
 }
 
 func TestStrandedLanding_NeedsACycleShipWithAnAuditBinding(t *testing.T) {
+	t.Parallel()
 	for name, opts := range map[string]*Options{
 		"a manual ship":            {Class: ClassManual, internalAuditBoundTreeSHA: strings.Repeat("a", 40)},
 		"a cycle ship never bound": {Class: ClassCycle},
@@ -529,6 +540,7 @@ func TestStrandedLanding_NeedsACycleShipWithAnAuditBinding(t *testing.T) {
 }
 
 func TestFinishResume_OnOriginStillRefusesAnIntentWithBrokenConsumptionPairs(t *testing.T) {
+	t.Parallel()
 	fault := &gitFault{when: func([]string) bool { return false }}
 	opts := &Options{ProjectRoot: t.TempDir(), Runner: fault.runner(), internalConsumedPaths: []string{"kept"}}
 	res := &RunResult{}
@@ -547,6 +559,7 @@ func TestFinishResume_OnOriginStillRefusesAnIntentWithBrokenConsumptionPairs(t *
 }
 
 func TestVerifyLandingCommit_AdoptsTheIntentPairsWhenNoAuditTreeIsBound(t *testing.T) {
+	t.Parallel()
 	opts := &Options{ProjectRoot: t.TempDir()}
 	s := newWorktreeShip(context.Background(), opts, &RunResult{}, "main", t.TempDir())
 	paths := consumptionPairSlice("item.json")
@@ -559,6 +572,7 @@ func TestVerifyLandingCommit_AdoptsTheIntentPairsWhenNoAuditTreeIsBound(t *testi
 }
 
 func TestRunRepoContractGate_AnUnresolvableLandingTreeStopsTheGate(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	mustWrite(t, filepath.Join(ws, core.RunStateFile), `{"active_worktree":"/some/other/lane"}`)
 	p := New(Config{Runner: (&gitFault{when: func([]string) bool { return false }}).runner()})
@@ -575,6 +589,7 @@ func TestRunRepoContractGate_AnUnresolvableLandingTreeStopsTheGate(t *testing.T)
 }
 
 func TestRunPushOnly_AnUnreadableBranchOrOriginStopsBeforeAnyPush(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		failing argvMatch
@@ -715,6 +730,7 @@ func TestItemConsumerStage_EveryFailureIsLoudAndLeavesTheItemPickable(t *testing
 }
 
 func TestItemConsumerStage_ALookupErrorIsAFailureNotAnAbsence(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	c := &itemConsumer{ctx: context.Background(), opts: &Options{ProjectRoot: root}, res: &RunResult{}, root: root,
 		inboxDir: filepath.Join(root, ".evolve", "inbox"), cid: "1"}
@@ -727,6 +743,7 @@ func TestItemConsumerStage_ALookupErrorIsAFailureNotAnAbsence(t *testing.T) {
 }
 
 func TestItemConsumerStage_ARollbackThatCannotRestoreTheItemSaysSo(t *testing.T) {
+	t.Parallel()
 	const id = "backfill-item"
 	cases := []struct {
 		name  string
@@ -765,6 +782,7 @@ func TestItemConsumerStage_ARollbackThatCannotRestoreTheItemSaysSo(t *testing.T)
 }
 
 func TestItemConsumerStage_AStagedMoveCarriesTheShipAnnotation(t *testing.T) {
+	t.Parallel()
 	const id = "backfill-item"
 	f := newInboxFixture(t, id)
 	fault := &gitFault{when: func([]string) bool { return false }}
@@ -791,6 +809,7 @@ func TestItemConsumerStage_AStagedMoveCarriesTheShipAnnotation(t *testing.T) {
 }
 
 func TestNewIntent_AnUnreadableRunIdentityPreparesNothing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, state string
 		cycleID     int
@@ -823,6 +842,7 @@ func TestNewIntent_AnUnreadableRunIdentityPreparesNothing(t *testing.T) {
 }
 
 func TestMeasure_AnUnreadableTreeOrBranchLeavesTheIntentUnmeasured(t *testing.T) {
+	t.Parallel()
 	treeOK := &gitFault{when: argvIs("rev-parse", "c0ffee^{tree}"), stdout: "7ree\n"}
 	cases := []struct {
 		name  string
@@ -848,6 +868,7 @@ func TestMeasure_AnUnreadableTreeOrBranchLeavesTheIntentUnmeasured(t *testing.T)
 }
 
 func TestAbandonPrepared_ReturnsTheCauseAndEveryRefFailure(t *testing.T) {
+	t.Parallel()
 	cause := shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageAtomicShip, "ship: ship cannot record the landing intent")
 	t.Run("an intent measured before the lane tree is the cause alone", func(t *testing.T) {
 		fault := &gitFault{when: func([]string) bool { return true }, exit: 1}

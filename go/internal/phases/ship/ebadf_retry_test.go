@@ -17,6 +17,7 @@ func ebadfPathError() error {
 }
 
 func TestCaptureWithEBADFRetry_RetriesOnceOnEBADF(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	out, err := captureWithEBADFRetry(func() ([]byte, error) {
 		calls++
@@ -37,6 +38,7 @@ func TestCaptureWithEBADFRetry_RetriesOnceOnEBADF(t *testing.T) {
 }
 
 func TestCaptureWithEBADFRetry_RetriesOnceOnClosedPipe(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	out, err := captureWithEBADFRetry(func() ([]byte, error) {
 		calls++
@@ -54,6 +56,7 @@ func TestCaptureWithEBADFRetry_RetriesOnceOnClosedPipe(t *testing.T) {
 }
 
 func TestCaptureWithEBADFRetry_PersistentEBADF_FailsAfterOneRetry(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	_, err := captureWithEBADFRetry(func() ([]byte, error) {
 		calls++
@@ -71,6 +74,7 @@ func TestCaptureWithEBADFRetry_PersistentEBADF_FailsAfterOneRetry(t *testing.T) 
 }
 
 func TestCaptureWithEBADFRetry_NonEBADFError_NoRetry(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	sentinel := errors.New("exit status 128: not a git repository")
 	out, err := captureWithEBADFRetry(func() ([]byte, error) {
@@ -89,6 +93,7 @@ func TestCaptureWithEBADFRetry_NonEBADFError_NoRetry(t *testing.T) {
 }
 
 func TestCaptureWithEBADFRetry_SuccessFirstTry_NoRetry(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	out, err := captureWithEBADFRetry(func() ([]byte, error) {
 		calls++

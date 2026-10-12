@@ -36,6 +36,7 @@ func classifiedWithAlone(t *testing.T, first packOutcome, alone *aloneRecorder) 
 }
 
 func TestClassifiedPack_ANamedRedGreenAloneIsFlakeEvidenceNotTheLanesRED(t *testing.T) {
+	t.Parallel()
 	alone := &aloneRecorder{outcome: greenPack()}
 	err, out := classifiedWithAlone(t, redPack("p/channel.TestChannel_EndToEnd"), alone)
 	if err != nil {
@@ -53,6 +54,7 @@ func TestClassifiedPack_ANamedRedGreenAloneIsFlakeEvidenceNotTheLanesRED(t *test
 }
 
 func TestBackstopFlakeSignal_IsAShipWarningWithTheCode(t *testing.T) {
+	t.Parallel()
 	center := signalcenter.New()
 	backstopFlakeSignal(center, 1718)([]string{"p/channel.TestChannel_EndToEnd"})
 	events := center.Recent()
@@ -67,6 +69,7 @@ func TestBackstopFlakeSignal_IsAShipWarningWithTheCode(t *testing.T) {
 }
 
 func TestClassifiedPack_ANamedRedStillRedAloneIsTheLanesRED(t *testing.T) {
+	t.Parallel()
 	alone := &aloneRecorder{outcome: redPack("p/channel.TestChannel_EndToEnd")}
 	err, out := classifiedWithAlone(t, redPack("p/channel.TestChannel_EndToEnd", "p/other.TestFlaky"), alone)
 	if err == nil || !strings.Contains(err.Error(), "failing: p/channel.TestChannel_EndToEnd") || strings.Contains(err.Error(), "TestFlaky") {
@@ -78,6 +81,7 @@ func TestClassifiedPack_ANamedRedStillRedAloneIsTheLanesRED(t *testing.T) {
 }
 
 func TestClassifiedPack_AnAmbiguousAloneRunKeepsTheNamedRed(t *testing.T) {
+	t.Parallel()
 	alone := &aloneRecorder{outcome: ambiguousPack()}
 	err, _ := classifiedWithAlone(t, redPack("p/channel.TestChannel_EndToEnd"), alone)
 	if err == nil || !strings.Contains(err.Error(), "failing: p/channel.TestChannel_EndToEnd") {
@@ -86,6 +90,7 @@ func TestClassifiedPack_AnAmbiguousAloneRunKeepsTheNamedRed(t *testing.T) {
 }
 
 func TestClassifiedPack_ManyNamedRedsAreNotRerunAlone(t *testing.T) {
+	t.Parallel()
 	alone := &aloneRecorder{outcome: greenPack()}
 	err, _ := classifiedWithAlone(t, redPack("a.TestA", "b.TestB", "c.TestC", "d.TestD"), alone)
 	if err == nil || alone.calls != 0 {
@@ -94,6 +99,7 @@ func TestClassifiedPack_ManyNamedRedsAreNotRerunAlone(t *testing.T) {
 }
 
 func TestClassifiedPack_ABuildFailureIsNeverRerunAlone(t *testing.T) {
+	t.Parallel()
 	alone := &aloneRecorder{outcome: greenPack()}
 	err, _ := classifiedWithAlone(t, redPack("p.TestA", "q [build failed]"), alone)
 	if err == nil || alone.calls != 0 {
@@ -102,6 +108,7 @@ func TestClassifiedPack_ABuildFailureIsNeverRerunAlone(t *testing.T) {
 }
 
 func TestClassifiedPack_WithoutAnAloneRunnerANamedRedIsTheLanesRED(t *testing.T) {
+	t.Parallel()
 	err, _ := classifiedWithAlone(t, redPack("internal/phasespec.TestSpecParity"), nil)
 	if err == nil || !strings.Contains(err.Error(), "failing: internal/phasespec.TestSpecParity") {
 		t.Fatalf("a pack of the ship's own change has no alone re-run: err=%v", err)
@@ -109,6 +116,7 @@ func TestClassifiedPack_WithoutAnAloneRunnerANamedRedIsTheLanesRED(t *testing.T)
 }
 
 func TestPackagesOf_GroupsFailuresByPackageInOrder(t *testing.T) {
+	t.Parallel()
 	failures := []packFailure{{Package: "z", Test: "T1"}, {Package: "a", Test: "T2"}, {Package: "z", Test: "T3"}}
 	if got := packagesOf(failures); strings.Join(got, ",") != "a,z" {
 		t.Fatalf("packages = %v", got)
@@ -168,6 +176,7 @@ func TestRunRepoContractTestsAlone_EveryPackageGreenIsGreen(t *testing.T) {
 }
 
 func TestPackOutcome_AllNamedTests(t *testing.T) {
+	t.Parallel()
 	if !redPack("p.TestA", "q.TestB").allNamedTests() {
 		t.Fatal("two named tests are all named")
 	}

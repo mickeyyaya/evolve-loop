@@ -24,6 +24,7 @@ func manifestTestHasArg(args []string, needle string) bool {
 // block. The workspace build-report declares only docs/declared.md; the fake
 // `git status --porcelain -uall` reports an undeclared untracked file.
 func TestReconcileManifest_EnforceBlocksCrossLaneLeak(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	mustWrite(t, filepath.Join(ws, "build-report.md"), "changed `docs/declared.md`")
 	runner := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
@@ -52,6 +53,7 @@ func TestReconcileManifest_EnforceBlocksCrossLaneLeak(t *testing.T) {
 // An enforce ship whose entire dirty set IS declared by the manifest must
 // pass cleanly (false-positive guard).
 func TestReconcileManifest_EnforceAllowsFullyDeclaredChange(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	mustWrite(t, filepath.Join(ws, "build-report.md"), "changed `go/internal/foo/bar.go`")
 	runner := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {

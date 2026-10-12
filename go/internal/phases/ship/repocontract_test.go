@@ -152,6 +152,7 @@ func TestRepoContractGate_UnknownStageFailsTowardEnforce(t *testing.T) {
 // it must thread the dial or the gate is permanently off no matter what
 // policy says.
 func TestNew_ThreadsRepoContractGate(t *testing.T) {
+	t.Parallel()
 	p := New(Config{RepoContractGate: "enforce"})
 	if p.repoContractGate != "enforce" {
 		t.Fatalf("Config.RepoContractGate must thread into the Phase, got %q", p.repoContractGate)
@@ -278,6 +279,7 @@ func TestRepoContractGate_RedErrorMessageNamesFailingTests(t *testing.T) {
 // escape: the shipping diff adds a failing Go test outside the four fixed
 // suites. The real scanner must detect it before a ship can proceed.
 func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
@@ -303,6 +305,7 @@ func TestRepoContractGate_NewlyAddedFailingTestBlocksShip(t *testing.T) {
 }
 
 func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *testing.T) {
+	t.Parallel()
 	t.Run("modified test and non-test additions are not added-test candidates", func(t *testing.T) {
 		repo := makeRepo(t)
 		goDir := filepath.Join(repo, "go")
@@ -371,6 +374,7 @@ func TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles(t *te
 // the `go test -json` decoding would be untested production logic sitting
 // under every ship.
 func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
+	t.Parallel()
 	feed := strings.Join([]string{
 		`{"Action":"run","Package":"p/profiles","Test":"TestBound"}`,
 		`{"Action":"output","Package":"p/profiles","Test":"TestBound","Output":"    profiles_test.go:12: mismatch\n"}`,
@@ -406,6 +410,7 @@ func TestClassifyPackEvents_SeparatesRealFailuresFromNoise(t *testing.T) {
 // event must yield ZERO names, so the gate routes to the retry/infra path
 // instead of blocking the ship.
 func TestClassifyPackEvents_AmbiguousFeedNamesNothing(t *testing.T) {
+	t.Parallel()
 	feed := `{"Action":"output","Package":"p/profiles","Output":"signal: killed\n"}`
 	if got, _ := classifyPackEvents(strings.NewReader(feed), io.Discard); len(got) != 0 {
 		t.Fatalf("an OOM-killed run names no failing test; got %v", got)
@@ -447,6 +452,7 @@ func TestRunNative_RepoContractGateReceivesRunWorkspace(t *testing.T) {
 // through Phase.runNative rather than runRepoContractGate directly — closing
 // the gap a helper-only detector, correct only in isolation, would leave.
 func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
@@ -488,6 +494,7 @@ func TestPhaseRunNative_NewlyAddedFailingTestPreventsRun(t *testing.T) {
 // trip the repo-contract gate — skip must stay an honest, non-blocking
 // signal here as elsewhere in this pipeline.
 func TestRunNative_AddedSkippedTestDoesNotBlockShip(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
@@ -527,6 +534,7 @@ func TestRunNative_AddedSkippedTestDoesNotBlockShip(t *testing.T) {
 // leave a durable, explicit backstop record in the scan log naming the file
 // and its exclusion reason.
 func TestRepoContractGate_AddedEnvExclusiveTestBackstopRecorded(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")

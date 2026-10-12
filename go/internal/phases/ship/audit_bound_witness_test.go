@@ -17,6 +17,7 @@ import (
 var assignmentRe = regexp.MustCompile(`\binternalAuditBoundTreeSHA\s*=[^=]`)
 
 func TestInternalAuditBoundTreeSHA_OnlyAssignedInAuditGo(t *testing.T) {
+	t.Parallel()
 	dir := "." // go/internal/phases/ship
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -55,6 +56,7 @@ func TestInternalAuditBoundTreeSHA_OnlyAssignedInAuditGo(t *testing.T) {
 }
 
 func TestInternalAuditBoundTreeSHA_AuditGoStillAssignsIt(t *testing.T) {
+	t.Parallel()
 	body, err := os.ReadFile(filepath.Join(".", "audit.go"))
 	if err != nil {
 		t.Fatalf("read audit.go: %v", err)

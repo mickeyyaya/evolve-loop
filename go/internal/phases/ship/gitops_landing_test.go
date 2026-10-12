@@ -25,6 +25,7 @@ func recordingCenter() (*signalcenter.Center, *[]signalcenter.Event) {
 // copy at the wrong depth would scan the wrong root and pass vacuously, so
 // the count of scanned files is asserted too.
 func TestLanding_OneConstructionSite(t *testing.T) {
+	t.Parallel()
 	const onlySite = "internal/phases/ship/gitops_landing.go"
 	offenders, scanned := nonTestSourcesMentioning(t, "landing.New(", onlySite)
 	if len(offenders) > 0 {
@@ -78,6 +79,7 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) ([]string, i
 }
 
 func TestWorktreeShipLand_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing.T) {
+	t.Parallel()
 	opts, _, stderr := pinOptions(t, ClassCycle)
 	opts.RunID = "run-7"
 	c, got := recordingCenter()
@@ -109,6 +111,7 @@ func TestWorktreeShipLand_BinaryResetFailureIsTheLandingCodeNotStderr(t *testing
 // re-run would otherwise repair twice); on success res.CommitSHA is the
 // landed head; PhaseResponse.Signals through addRepairSignals are unchanged.
 func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
+	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)
 	r := newArgvRecorder(opts)
 	r.on("push origin "+pinBranch, scriptedCall{exit: 1})
@@ -149,6 +152,7 @@ func TestPushWithRepair_WritesBackTheLedgerUnconditionally(t *testing.T) {
 }
 
 func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t *testing.T) {
+	t.Parallel()
 	opts, _, _ := pinOptions(t, ClassCycle)
 	c, got := recordingCenter()
 	opts.Signals = c
@@ -174,6 +178,7 @@ func TestShipFromWorktreeGreen_StreamIsByteIdenticalApartFromTheDeclaredCodes(t 
 // (*Phase).signalsWired reports it (a Config field the translation forgets
 // would be silently never wired).
 func TestShipOptions_ThreadsSignals(t *testing.T) {
+	t.Parallel()
 	c, _ := recordingCenter()
 	p := New(Config{Runner: execRunner, Signals: c})
 	if !p.signalsWired() {
@@ -192,6 +197,7 @@ func TestShipOptions_ThreadsSignals(t *testing.T) {
 // "ship-binding.json" (dossier.ShipBindingFile is the spelling) and neither
 // gitops.go nor native.go spells "cycle-%d" (core.RunWorkspacePath).
 func TestShipBindingLayout_IsSpelledOnce(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

@@ -69,6 +69,7 @@ func (s *scriptedRunner) runner() CmdRunner {
 }
 
 func TestAtomicShip_TypedWorktreeRejectsTamperedRunMirror(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	workspace := filepath.Join(root, ".evolve", "runs", "cycle-7")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -109,6 +110,7 @@ func TestAtomicShip_TypedWorktreeRejectsTamperedRunMirror(t *testing.T) {
 
 // TestTryGitOneShot_Success — exit 0 + stdout returns trimmed.
 func TestTryGitOneShot_Success(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
 		stderr string
@@ -129,6 +131,7 @@ func TestTryGitOneShot_Success(t *testing.T) {
 }
 
 func TestTryGitOneShot_NonZeroExit_ReturnsEmpty(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
 		stderr string
@@ -148,6 +151,7 @@ func TestTryGitOneShot_NonZeroExit_ReturnsEmpty(t *testing.T) {
 }
 
 func TestTryGitOneShot_RunnerError_ReturnsEmpty(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
 		stderr string
@@ -169,6 +173,7 @@ func TestTryGitOneShot_RunnerError_ReturnsEmpty(t *testing.T) {
 // TestWriteDryRunJournal_NoOpWhenDryRunFalse — opts.DryRun=false is a
 // no-op; no file written, no DryRunPath set.
 func TestWriteDryRunJournal_NoOpWhenDryRunFalse(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	r := &scriptedRunner{}
 	opts := &Options{DryRun: false, ProjectRoot: root, Runner: r.runner()}
@@ -184,6 +189,7 @@ func TestWriteDryRunJournal_NoOpWhenDryRunFalse(t *testing.T) {
 }
 
 func TestWriteDryRunJournal_HappyPath_WritesJSON(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -242,6 +248,7 @@ func TestWriteDryRunJournal_HappyPath_WritesJSON(t *testing.T) {
 // TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA —
 // when git probes return empty, branch/headSHA default to "unknown".
 func TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
@@ -272,6 +279,7 @@ func TestWriteDryRunJournal_MissingGitDefaults_PlaceholderBranchSHA(t *testing.T
 }
 
 func TestWriteDryRunJournal_LogAppended(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	r := &scriptedRunner{}
 	opts := &Options{DryRun: true, ProjectRoot: root, Class: Class("cycle"), Runner: r.runner()}
@@ -286,6 +294,7 @@ func TestWriteDryRunJournal_LogAppended(t *testing.T) {
 // TestCaptureGitOutputAtDir_Success — happy path: subprocess succeeds,
 // returns trimmed stdout.
 func TestCaptureGitOutputAtDir_Success(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
 		stderr string
@@ -311,6 +320,7 @@ func TestCaptureGitOutputAtDir_Success(t *testing.T) {
 // TestCaptureGitOutputAtDir_ExitGreaterThan1_ReturnsError — captureGitOutput
 // only errors on exit > 1 (rc=1 means "differences exist" for git diff).
 func TestCaptureGitOutputAtDir_ExitGreaterThan1_ReturnsError(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
 		stderr string
@@ -333,6 +343,7 @@ func TestCaptureGitOutputAtDir_ExitGreaterThan1_ReturnsError(t *testing.T) {
 // TestCaptureGitOutputAtDir_Exit1_NotError — rc=1 is the "differences
 // exist" signal from git diff; the function treats it as success.
 func TestCaptureGitOutputAtDir_Exit1_NotError(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{scripts: map[string]struct {
 		stdout string
 		stderr string
@@ -356,6 +367,7 @@ func TestCaptureGitOutputAtDir_Exit1_NotError(t *testing.T) {
 }
 
 func TestMaybeCreateRelease_NonReleaseClass_SkipsEarly(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{}
 	opts := &Options{Class: Class("cycle"), ProjectRoot: t.TempDir(), Runner: r.runner()}
 	res := &RunResult{}
@@ -370,6 +382,7 @@ func TestMaybeCreateRelease_NonReleaseClass_SkipsEarly(t *testing.T) {
 }
 
 func TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{}
 	root := t.TempDir()
 	opts := &Options{
@@ -386,6 +399,7 @@ func TestMaybeCreateRelease_MissingPluginJson_LogsAndContinues(t *testing.T) {
 }
 
 func TestScriptedRunner_DefaultExitZero(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{}
 	var stdout bytes.Buffer
 	exit, err := r.runner()(context.Background(), "git", "", []string{"status"}, nil, nil, &stdout, nil)

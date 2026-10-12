@@ -69,6 +69,7 @@ func shipUnifiedScenario(t *testing.T, repo, wt, ws string) *RunResult {
 }
 
 func TestShipFromWorktree_UnifiedCommitmentClosesAllOrNothing(t *testing.T) {
+	t.Parallel()
 	t.Run("a member that cannot close keeps every member out of the landing commit", func(t *testing.T) {
 		repo, wt, ws, rel, orig := unifiedShipScenario(t, unifiedMemberB)
 		res := shipUnifiedScenario(t, repo, wt, ws)

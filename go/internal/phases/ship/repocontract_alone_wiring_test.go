@@ -10,6 +10,7 @@ import (
 // The wiring proof through the production caller: a test that reds once under the backstop's full-closure run
 // and is green when run by itself is flake evidence, said loudly, and the ship proceeds.
 func TestRepoContractGate_AnImporterRedThatIsGreenAloneShipsAsFlakeEvidence(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"new-stop\"\n")
 	mustWrite(t, filepath.Join(goDir, "internal", "user", "user_test.go"), "package user\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestUserContract(t *testing.T) {\n\tif _, err := os.Stat(\"first-run.marker\"); err != nil {\n\t\t_ = os.WriteFile(\"first-run.marker\", nil, 0o644)\n\t\tt.Fatal(\"red on the first run only\")\n\t}\n}\n")

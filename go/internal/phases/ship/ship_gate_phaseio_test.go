@@ -16,6 +16,7 @@ import (
 // The sentinel wins over a conflicting prose verdict at enforce; below enforce the
 // prose verdict is what's read (the sentinel JSON does not trip the prose regex).
 func TestShipGate_EnforceSentinelFirst(t *testing.T) {
+	t.Parallel()
 	body := "## Verdict\n**FAIL**\n" + phasecontract.RenderVerdictSentinel("audit", "PASS") + "\n"
 
 	pass, _, fail := parseVerdicts(body, config.StageOff)
@@ -32,6 +33,7 @@ func TestShipGate_EnforceSentinelFirst(t *testing.T) {
 // sentinel verdict at enforce, so the (fail && pass) state the ship gate rejects
 // (CodeAuditBindingDualVerdict) becomes structurally impossible.
 func TestShipGate_DualVerdictImpossibleAtEnforce(t *testing.T) {
+	t.Parallel()
 	body := "## Verdict\n**FAIL**\n\nVerdict: PASS\n" + phasecontract.RenderVerdictSentinel("audit", "PASS") + "\n"
 
 	pass, _, fail := parseVerdicts(body, config.StageOff)
@@ -50,6 +52,7 @@ func TestShipGate_DualVerdictImpossibleAtEnforce(t *testing.T) {
 // No sentinel at enforce → no verdict found (all false), which verifyAuditBinding
 // maps to CodeAuditBindingMalformed. This is the sentinel-mandatory enforcement.
 func TestShipGate_EnforceNoSentinelIsMalformed(t *testing.T) {
+	t.Parallel()
 	body := "## Verdict\n**PASS**\n" // prose only, no sentinel
 	pass, warn, fail := parseVerdicts(body, config.StageEnforce)
 	if pass || warn || fail {
@@ -65,6 +68,7 @@ func TestShipGate_EnforceNoSentinelIsMalformed(t *testing.T) {
 // artifact) must NOT satisfy the audit ship gate at enforce — only an "audit"-phase
 // sentinel is trusted. Otherwise a build PASS could ship a failing build.
 func TestShipGate_EnforceRejectsForeignPhaseSentinel(t *testing.T) {
+	t.Parallel()
 	body := phasecontract.RenderVerdictSentinel("build", "PASS") + "\n"
 	pass, warn, fail := parseVerdicts(body, config.StageEnforce)
 	if pass || warn || fail {
@@ -76,6 +80,7 @@ func TestShipGate_EnforceRejectsForeignPhaseSentinel(t *testing.T) {
 // (all false → CodeAuditBindingMalformed): SKIPPED is not a legitimate ship-gate
 // verdict.
 func TestShipGate_EnforceSkippedSentinelIsMalformed(t *testing.T) {
+	t.Parallel()
 	body := phasecontract.RenderVerdictSentinel("audit", "SKIPPED") + "\n"
 	if pass, warn, fail := parseVerdicts(body, config.StageEnforce); pass || warn || fail {
 		t.Errorf("enforce: SKIPPED sentinel must yield no verdict, got pass=%v warn=%v fail=%v", pass, warn, fail)

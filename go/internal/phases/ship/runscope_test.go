@@ -15,6 +15,7 @@ import (
 // host-global cycle-state.json — so a concurrent cycle's global write can't
 // make ship integrate the WRONG run's worktree.
 func TestReadActiveWorktree_PrefersRunJSON_OverGlobal(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	ws := filepath.Join(repo, ".evolve", "runs", "cycle-7")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"active_worktree":"/global/wrong-run"}`)
@@ -29,6 +30,7 @@ func TestReadActiveWorktree_PrefersRunJSON_OverGlobal(t *testing.T) {
 // TestReadActiveWorktree_FallsBackToGlobal_NoWorkspace: standalone `evolve ship`
 // (no WorkspacePath) keeps reading the host-global cycle-state.json.
 func TestReadActiveWorktree_FallsBackToGlobal_NoWorkspace(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"active_worktree":"/global/wt"}`)
 	opts := &Options{ProjectRoot: repo} // no WorkspacePath
@@ -41,6 +43,7 @@ func TestReadActiveWorktree_FallsBackToGlobal_NoWorkspace(t *testing.T) {
 // the mirror not yet written → fall back to the global file (current behavior;
 // fail-safe, never an empty worktree from a missing mirror).
 func TestReadActiveWorktree_FallsBackToGlobal_RunJSONAbsent(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	ws := filepath.Join(repo, ".evolve", "runs", "cycle-7") // no run.json written
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"active_worktree":"/global/wt"}`)
@@ -56,6 +59,7 @@ func TestReadActiveWorktree_FallsBackToGlobal_RunJSONAbsent(t *testing.T) {
 // auditor (older) then run A auditor (newer/latest); findLatestAudit(ledger,
 // "B") must return B, not the latest A.
 func TestFindLatestAudit_PrefersThisRunsEntry(t *testing.T) {
+	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
 	mustWrite(t, ledger,
 		`{"role":"auditor","kind":"agent_subprocess","exit_code":0,"run_id":"B","git_head":"shaB"}`+"\n"+
@@ -72,6 +76,7 @@ func TestFindLatestAudit_PrefersThisRunsEntry(t *testing.T) {
 // TestFindLatestAudit_EmptyRunID_ReturnsLatest: standalone (runID=="") keeps
 // binding the latest auditor entry overall.
 func TestFindLatestAudit_EmptyRunID_ReturnsLatest(t *testing.T) {
+	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
 	mustWrite(t, ledger,
 		`{"role":"auditor","kind":"agent_subprocess","run_id":"B","git_head":"shaB"}`+"\n"+
@@ -90,6 +95,7 @@ func TestFindLatestAudit_EmptyRunID_ReturnsLatest(t *testing.T) {
 // bind. "This run produced no independent review" is an integrity stop, not
 // a recoverable lookup miss.
 func TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind(t *testing.T) {
+	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
 	mustWrite(t, ledger,
 		`{"role":"auditor","kind":"agent_subprocess","git_head":"shaOld"}`+"\n"+
@@ -104,6 +110,7 @@ func TestFindLatestAudit_RunIDNoMatch_RefusesUnstampedBind(t *testing.T) {
 // error must name the refused foreign entry so an operator can see what
 // would have been bound.
 func TestFindLatestAudit_ForeignRunOnly_RefusesBind(t *testing.T) {
+	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
 	mustWrite(t, ledger,
 		`{"role":"auditor","kind":"agent_subprocess","run_id":"A","git_head":"shaA"}`+"\n")

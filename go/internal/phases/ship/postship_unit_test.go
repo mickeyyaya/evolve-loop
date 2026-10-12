@@ -12,6 +12,7 @@ import (
 // cycle-state.json:cycle_id, advancing the counter must (a) set
 // lastCycleNumber = cycle_id and (b) leave EVERY other field intact.
 func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	mustWriteState(t, filepath.Join(evolve, "state.json"), map[string]any{
@@ -51,6 +52,7 @@ func TestAdvanceLastCycleNumber_AdvancesAndPreservesSiblings(t *testing.T) {
 // TestAdvanceLastCycleNumber_NoCycleIDIsNoop: a cycle-state.json without
 // cycle_id must leave state.json untouched (bash silently skips).
 func TestAdvanceLastCycleNumber_NoCycleIDIsNoop(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	mustWriteState(t, filepath.Join(evolve, "state.json"), map[string]any{"lastCycleNumber": float64(5)})
@@ -69,6 +71,7 @@ func TestAdvanceLastCycleNumber_NoCycleIDIsNoop(t *testing.T) {
 // TestRepinPostCycle_NoopWhenSHAMatches: when the binary's current SHA
 // already equals state.json:expected_ship_sha, repin is a no-op.
 func TestRepinPostCycle_NoopWhenSHAMatches(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	binPath := filepath.Join(root, "evolve-bin")
@@ -97,6 +100,7 @@ func TestRepinPostCycle_NoopWhenSHAMatches(t *testing.T) {
 // TestRepinPostCycle_RepinsOnSHAChange: when the shipped commit changed
 // the binary (current SHA != stored), repin writes the new SHA and logs.
 func TestRepinPostCycle_RepinsOnSHAChange(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	binPath := filepath.Join(root, "evolve-bin")
@@ -130,6 +134,7 @@ func TestRepinPostCycle_RepinsOnSHAChange(t *testing.T) {
 // TestPromoteInbox_NoCycleIDIsNoop: without cycle_id, promote returns nil
 // silently (no triage lookup attempted).
 func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWriteState(t, filepath.Join(root, ".evolve", "cycle-state.json"), map[string]any{"x": "y"})
 	res := &RunResult{}
@@ -142,6 +147,7 @@ func TestPromoteInbox_NoCycleIDIsNoop(t *testing.T) {
 // triage-decision.json ⇒ promote-to-processed is skipped (logged) but the
 // residual drain STILL runs (no early-return strand).
 func TestPromoteInbox_NoTriageDecisionStillDrains(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWriteState(t, filepath.Join(root, ".evolve", "cycle-state.json"), map[string]any{"cycle_id": float64(8)})
 	res := &RunResult{}

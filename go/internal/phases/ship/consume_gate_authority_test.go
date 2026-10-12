@@ -9,6 +9,7 @@ import (
 )
 
 func TestCheckEGPSGate_WarnWithZeroRedCountNeverReachesConsumption(t *testing.T) {
+	t.Parallel()
 	pass := predicateVerdictFixture(1691, 3, 0, 1)
 	if _, err := checkEGPSGate(writeVerdictDoc(t, pass), &RunResult{}); err != nil {
 		t.Fatalf("positive control: a well-formed PASS verdict must clear the EGPS gate: %v", err)

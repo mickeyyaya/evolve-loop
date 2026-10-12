@@ -53,6 +53,7 @@ func shipFromWorktreeOpts(repo string, env map[string]string) *Options {
 // GIT_FLEET_REBASE_NEEDED (transient) so the orchestrator rebases +
 // re-verifies the merged tree and re-ships.
 func TestShipFromWorktree_FleetMode_DivergedFFMerge_SignalsRebase(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	wt := divergedWorktree(t, repo)
 	opts := shipFromWorktreeOpts(repo, map[string]string{"EVOLVE_FLEET": "1"})
@@ -67,6 +68,7 @@ func TestShipFromWorktree_FleetMode_DivergedFFMerge_SignalsRebase(t *testing.T) 
 // TestShipFromWorktree_NonFleet_DivergedFFMerge_Terminal: the sequential loop is
 // unchanged — a diverged ff-merge is still the terminal GIT_FF_MERGE_DIVERGED.
 func TestShipFromWorktree_NonFleet_DivergedFFMerge_Terminal(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	wt := divergedWorktree(t, repo)
 	opts := shipFromWorktreeOpts(repo, nil) // no EVOLVE_FLEET

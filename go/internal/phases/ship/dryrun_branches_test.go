@@ -16,6 +16,7 @@ import (
 // here so the diff check sees staged changes and proceeds to the DryRun
 // short-circuit (the path after the "no staged changes" early return).
 func TestShipDirect_DryRun_LogsAndNoCommit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "change.txt"), "dry-run change\n")
@@ -49,6 +50,7 @@ func TestShipDirect_DryRun_LogsAndNoCommit(t *testing.T) {
 }
 
 func TestShipDirect_DryRun_NoStagedChanges_CleanExit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	res := &RunResult{}
 	opts := &Options{
@@ -71,6 +73,7 @@ func TestShipDirect_DryRun_NoStagedChanges_CleanExit(t *testing.T) {
 // The worktree has an uncommitted file so that the "not ahead" early-exit
 // does NOT fire, and the code reaches the DryRun commit+merge short-circuit.
 func TestShipFromWorktree_DryRun_LogsAndNoFFMerge(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "dry-run-branch")
@@ -110,6 +113,7 @@ func TestShipFromWorktree_DryRun_LogsAndNoFFMerge(t *testing.T) {
 }
 
 func TestRun_DryRun_WritesJournal(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "dry.txt"), "something\n")
@@ -135,6 +139,7 @@ func TestRun_DryRun_WritesJournal(t *testing.T) {
 }
 
 func TestRun_DryRun_ClassManual_WritesJournal_NoCommit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "manual.txt"), "manual dry change\n")
@@ -160,6 +165,7 @@ func TestRun_DryRun_ClassManual_WritesJournal_NoCommit(t *testing.T) {
 }
 
 func TestShipFromWorktree_CleanWorktreeAheadBranch_Merges(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "ahead-branch")

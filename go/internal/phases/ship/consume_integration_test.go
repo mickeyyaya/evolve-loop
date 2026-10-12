@@ -41,6 +41,7 @@ func consumeScenario(t *testing.T, acsVerdict string) (repo, wt, ws, itemRel str
 }
 
 func TestShipFromWorktree_ConsumesCommittedItemInTheShipCommit(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, itemRel := consumeScenario(t, "PASS")
 	opts := &Options{
 		Class:         ClassCycle,
@@ -73,6 +74,7 @@ func TestShipFromWorktree_ConsumesCommittedItemInTheShipCommit(t *testing.T) {
 }
 
 func TestShipFromWorktree_WarnVerdictDoesNotConsume(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, itemRel := consumeScenario(t, "WARN")
 	opts := &Options{
 		Class:         ClassCycle,
@@ -89,6 +91,7 @@ func TestShipFromWorktree_WarnVerdictDoesNotConsume(t *testing.T) {
 }
 
 func TestShipFromWorktree_WarnWithRedsDoesNotConsume(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, itemRel := consumeScenarioWith(t, func(ws string) {
 		mustWrite(t, filepath.Join(ws, "acs-verdict.json"), `{"verdict":"WARN","red_count":2}`)
 	})
@@ -107,6 +110,7 @@ func TestShipFromWorktree_WarnWithRedsDoesNotConsume(t *testing.T) {
 }
 
 func TestShipFromWorktree_MissingItemIsANoOp(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	mustWrite(t, filepath.Join(ws, "triage-decision.json"),
 		`{"schema_version":1,"top_n":[{"id":"fix-the-widget"},{"id":"never-existed"}],"deferred":[],"dropped":[]}`)
@@ -122,6 +126,7 @@ func TestShipFromWorktree_MissingItemIsANoOp(t *testing.T) {
 }
 
 func TestShipDirect_ConsumesCommittedItemFromHead(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	seedAudit(t, repo, "PASS")
@@ -171,6 +176,7 @@ func consumeScenarioWith(t *testing.T, mutate func(ws string)) (repo, wt, ws, it
 }
 
 func TestConsume_ResolvesIDsLikePostShip(t *testing.T) {
+	t.Parallel()
 	consumedRel := ".evolve/inbox/consumed/2026-08-15T03-00-00Z-fix-the-widget.json"
 
 	t.Run("no triage decision: the lane-scope pin is the committed set", func(t *testing.T) {

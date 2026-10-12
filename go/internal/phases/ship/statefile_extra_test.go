@@ -7,6 +7,7 @@ import (
 )
 
 func TestWriteStateMap_MkdirError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	// A regular file where writeStateMap will try to MkdirAll a directory.
 	blocker := filepath.Join(root, "blocker")
@@ -18,6 +19,7 @@ func TestWriteStateMap_MkdirError(t *testing.T) {
 }
 
 func TestStateInt_IntAndJSONNumberCoercion(t *testing.T) {
+	t.Parallel()
 	if v, ok := stateInt(map[string]any{"n": 7}, "n"); !ok || v != 7 {
 		t.Errorf("int value: got (%d,%v), want (7,true)", v, ok)
 	}
@@ -33,6 +35,7 @@ func TestStateInt_IntAndJSONNumberCoercion(t *testing.T) {
 }
 
 func TestReadStateMap_NullJSON_YieldsEmptyMap(t *testing.T) {
+	t.Parallel()
 	p := filepath.Join(t.TempDir(), "state.json")
 	mustWrite(t, p, "null")
 	m, err := readStateMap(p)
@@ -42,6 +45,7 @@ func TestReadStateMap_NullJSON_YieldsEmptyMap(t *testing.T) {
 }
 
 func TestReadStateMap_PathIsDirectory_ReadError(t *testing.T) {
+	t.Parallel()
 	if _, err := readStateMap(t.TempDir()); err == nil {
 		t.Fatal("reading a directory path must return a (non-ErrNotExist) error")
 	}

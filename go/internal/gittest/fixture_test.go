@@ -1,6 +1,7 @@
 package gittest
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -228,5 +229,32 @@ func TestRepoGit_NeverRetriesANonEBADFFailure(t *testing.T) {
 				t.Errorf("failures = %q, want exactly one naming %q", rec.errs, tc.wantFatal)
 			}
 		})
+	}
+}
+
+func TestTolerateWaitDelay_AcceptsOnlyASuccessfulExitThatLeftThePipeOpen(t *testing.T) {
+	t.Parallel()
+	run := func(script string) (*exec.Cmd, error) {
+		cmd := exec.Command("sh", "-c", script)
+		cmd.WaitDelay = 100 * time.Millisecond
+		_, err := cmd.CombinedOutput()
+		return cmd, err
+	}
+	heldOpen, heldErr := run("sleep 2 & exit 0")
+	if !errors.Is(heldErr, exec.ErrWaitDelay) {
+		t.Fatalf("fixture must produce ErrWaitDelay, got %v", heldErr)
+	}
+	if err := tolerateWaitDelay(heldOpen, heldErr); err != nil {
+		t.Errorf("a successful exit with a held pipe = %v, want nil", err)
+	}
+	failed, failedErr := run("sleep 2 & exit 3")
+	if err := tolerateWaitDelay(failed, failedErr); err == nil {
+		t.Errorf("a failing exit with a held pipe must stay an error")
+	}
+	if err := tolerateWaitDelay(nil, errors.New("fork failed")); err == nil {
+		t.Errorf("an unrelated error must stay an error")
+	}
+	if err := tolerateWaitDelay(heldOpen, nil); err != nil {
+		t.Errorf("a nil error stays nil, got %v", err)
 	}
 }

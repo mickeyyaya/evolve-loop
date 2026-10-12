@@ -12,6 +12,7 @@ import (
 )
 
 func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-1-branch")
@@ -56,6 +57,7 @@ func TestShipFromWorktree_HappyPath_FFMergesAndWritesBinding(t *testing.T) {
 }
 
 func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-9-branch")
@@ -84,6 +86,7 @@ func TestShipFromWorktree_TreeSHAMismatch_VerifiesBeforeCommit(t *testing.T) {
 }
 
 func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-10-branch")
@@ -116,6 +119,7 @@ func TestShipFromWorktree_PreCommitBindingMatch_CommitsAndShips(t *testing.T) {
 }
 
 func TestShipFromWorktree_CleanWorktreeNotAhead_ExitsCleanly(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-3-branch") // at main, no edits
@@ -133,6 +137,7 @@ func TestShipFromWorktree_CleanWorktreeNotAhead_ExitsCleanly(t *testing.T) {
 }
 
 func TestShipFromWorktree_AcquiresAndReleasesShipLock(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-1-branch")
@@ -165,6 +170,7 @@ func TestShipFromWorktree_AcquiresAndReleasesShipLock(t *testing.T) {
 }
 
 func TestShipFromWorktree_DryRun_SkipsShipLock(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "cycle-1-branch")

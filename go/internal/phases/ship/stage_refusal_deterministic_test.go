@@ -59,6 +59,7 @@ func stageAndExpectFailure(t *testing.T, workspace, porcelain string) *core.Ship
 }
 
 func TestStageRefusal_FirstStrikeStaysTransient(t *testing.T) {
+	t.Parallel()
 	se := stageAndExpectFailure(t, t.TempDir(), " M .evolve/evals/foo.md\n")
 	if se.Class != core.ShipClassTransient {
 		t.Errorf("first refusal class = %q, want %q — one strike must still be retryable", se.Class, core.ShipClassTransient)
@@ -66,6 +67,7 @@ func TestStageRefusal_FirstStrikeStaysTransient(t *testing.T) {
 }
 
 func TestStageRefusal_SecondSamePathspecIsDeterministic(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	const porcelain = " M .evolve/evals/foo.md\n"
 
@@ -80,6 +82,7 @@ func TestStageRefusal_SecondSamePathspecIsDeterministic(t *testing.T) {
 }
 
 func TestStageRefusal_DifferentPathspecStaysTransient(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 
 	if first := stageAndExpectFailure(t, ws, " M .evolve/evals/foo.md\n"); first.Class != core.ShipClassTransient {
@@ -93,6 +96,7 @@ func TestStageRefusal_DifferentPathspecStaysTransient(t *testing.T) {
 }
 
 func TestStageRefusal_SeparateWorkspacesDoNotShareStrikes(t *testing.T) {
+	t.Parallel()
 	const porcelain = " M .evolve/evals/foo.md\n"
 
 	if first := stageAndExpectFailure(t, t.TempDir(), porcelain); first.Class != core.ShipClassTransient {
@@ -106,6 +110,7 @@ func TestStageRefusal_SeparateWorkspacesDoNotShareStrikes(t *testing.T) {
 }
 
 func TestStageRefusal_NoWorkspaceStaysTransient(t *testing.T) {
+	t.Parallel()
 	const porcelain = " M .evolve/evals/foo.md\n"
 	for i := 0; i < 2; i++ {
 		if se := stageAndExpectFailure(t, "", porcelain); se.Class != core.ShipClassTransient {

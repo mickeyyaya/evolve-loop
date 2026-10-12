@@ -10,6 +10,7 @@ import (
 )
 
 func TestVerifyExecutionTree_NamesWhyACarryWasNotReProven(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		arrange func(t *testing.T, l carriedLane)
 		want    string
@@ -44,6 +45,7 @@ func TestVerifyExecutionTree_NamesWhyACarryWasNotReProven(t *testing.T) {
 }
 
 func TestCarrySatisfied_SignalsACarryRecordItCouldNotReProve(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarryStating(t, l, "audit-ref", l.tree0, strings.Repeat("0", 40))
 	opts := boundTo(t, l, l.tree0, "audit-ref")
@@ -66,6 +68,7 @@ func TestCarrySatisfied_SignalsACarryRecordItCouldNotReProve(t *testing.T) {
 }
 
 func TestCarrySatisfied_SignalsNothingWhenNoCarryNamesTheAudit(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	opts := boundTo(t, l, l.tree0, "audit-ref")
 	center, got := recordingCenter()
@@ -80,6 +83,7 @@ func TestCarrySatisfied_SignalsNothingWhenNoCarryNamesTheAudit(t *testing.T) {
 }
 
 func TestCarrySatisfied_SignalsARecordThatNamesAnotherAuditedTree(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	writeCarryStating(t, l, "audit-ref", strings.Repeat("1", 40), l.tree1)
 	opts := boundTo(t, l, l.tree0, "audit-ref")

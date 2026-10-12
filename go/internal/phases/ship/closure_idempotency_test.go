@@ -44,6 +44,7 @@ func remoteHeadSHA(t *testing.T, repo string) string {
 }
 
 func TestShip_PostPush_Idempotent_CorrectReportOnly(t *testing.T) {
+	t.Parallel()
 	repo, _ := shipWorktreeFixture(t, "cycle-1-branch")
 
 	// First ship: the real push. Precondition, not the behavior under test.
@@ -79,6 +80,7 @@ func TestShip_PostPush_Idempotent_CorrectReportOnly(t *testing.T) {
 }
 
 func TestShip_PrePush_CorrectionStillFullShip(t *testing.T) {
+	t.Parallel()
 	repo, _ := shipWorktreeFixture(t, "cycle-1b-branch")
 
 	// Stale sidecar: a binding whose commit_sha is NOT the current HEAD.
@@ -113,6 +115,7 @@ func trackEvolveBinary(t *testing.T, repo string) {
 }
 
 func TestShip_BinaryChurnNormalizedBeforeAudit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	trackEvolveBinary(t, repo)
 	addRemote(t, repo)
@@ -145,6 +148,7 @@ func TestShip_BinaryChurnNormalizedBeforeAudit(t *testing.T) {
 }
 
 func TestShip_SourceChangesPreserved(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	trackEvolveBinary(t, repo)
 	mustWrite(t, filepath.Join(repo, "go", "internal", "widget.go"), "package widget // v1\n")
@@ -179,6 +183,7 @@ func sha256Hex(b []byte) string {
 }
 
 func TestShip_PinPostCommitSha(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	binRel := filepath.Join("go", "evolve")
 	binAbs := filepath.Join(repo, binRel)

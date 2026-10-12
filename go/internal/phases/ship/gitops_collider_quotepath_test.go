@@ -88,6 +88,7 @@ func colliderTrees(t *testing.T, names []string, mainOnlyAbsent ...string) (root
 }
 
 func TestDetectColliders_QuotePathDecodesPorcelainEntries(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		status string // exactly as git writes it
@@ -132,6 +133,7 @@ func TestDetectColliders_QuotePathDecodesPorcelainEntries(t *testing.T) {
 }
 
 func TestDetectColliders_QuotePathDecodesDiffNameOnly(t *testing.T) {
+	t.Parallel()
 	const want = "café.txt"
 	root, wt := colliderTrees(t, []string{want})
 	stub := &colliderStub{diff: `"caf\303\251.txt"` + "\n"}
@@ -147,6 +149,7 @@ func TestDetectColliders_QuotePathDecodesDiffNameOnly(t *testing.T) {
 }
 
 func TestDetectColliders_QuotePathNonCollidersStaySilent(t *testing.T) {
+	t.Parallel()
 	const (
 		real     = "café.txt"     // untracked on main → the one true collider
 		absent   = "absent é.txt" // worktree-only → not a collider
@@ -173,6 +176,7 @@ func TestDetectColliders_QuotePathNonCollidersStaySilent(t *testing.T) {
 }
 
 func TestDetectColliders_QuotePathDisabledOnGitReads(t *testing.T) {
+	t.Parallel()
 	root, wt := colliderTrees(t, []string{"plain.txt"})
 	stub := &colliderStub{status: "?? plain.txt\n", diff: "plain.txt\n"}
 	opts := &Options{ProjectRoot: root, Runner: stub.runner(), Stderr: io.Discard}

@@ -11,6 +11,7 @@ import (
 )
 
 func TestPhaseRun_NativeDispatch_Ships(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nnative dispatch\n")
 	seedAudit(t, repo, "PASS")
@@ -37,6 +38,7 @@ func TestPhaseRun_NativeDispatch_Ships(t *testing.T) {
 }
 
 func TestPhaseRun_NativeDispatch_NoAuditor_FailVerdict(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t) // no seedAudit → audit binding fails
 
 	p := New(Config{Runner: execRunner})

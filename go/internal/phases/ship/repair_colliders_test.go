@@ -29,6 +29,7 @@ func colliderFixture(t *testing.T, cycleBranch, path, wtContent, mainContent str
 }
 
 func TestRepair_Colliders_IdenticalHealed_ShipProceeds(t *testing.T) {
+	t.Parallel()
 	repo, _ := colliderFixture(t, "cycle-rc-ident",
 		"out/artifact.txt", "same bytes\n", "same bytes\n")
 
@@ -51,6 +52,7 @@ func TestRepair_Colliders_IdenticalHealed_ShipProceeds(t *testing.T) {
 }
 
 func TestRepair_Colliders_DifferingQuarantined_ShipProceeds(t *testing.T) {
+	t.Parallel()
 	repo, _ := colliderFixture(t, "cycle-rc-diff",
 		"notes/topology.md", "audited worktree copy\n", "stale main copy\n")
 
@@ -85,6 +87,7 @@ func TestRepair_Colliders_DifferingQuarantined_ShipProceeds(t *testing.T) {
 }
 
 func TestAttemptRepair_OncePerCode(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
 	stalePinStateJSON(t, repo)

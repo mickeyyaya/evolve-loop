@@ -12,6 +12,7 @@ import (
 )
 
 func TestShipError_AuditBindingHeadMoved(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	// Seed audit against a HEAD that does not match the repo's current HEAD.
 	seedAudit(t, repo, "PASS", map[string]string{
@@ -32,6 +33,7 @@ func TestShipError_AuditBindingHeadMoved(t *testing.T) {
 }
 
 func TestShipError_EGPSRedCount(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\negps red change\n")
 	seedAudit(t, repo, "PASS")
@@ -55,6 +57,7 @@ func TestShipError_EGPSRedCount(t *testing.T) {
 }
 
 func TestShipError_GitPushRejected(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\npush reject change\n")
 	seedAudit(t, repo, "PASS")
@@ -78,6 +81,7 @@ func TestShipError_GitPushRejected(t *testing.T) {
 }
 
 func TestShipError_PredicateTreeDrift(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "drift-branch")
@@ -109,6 +113,7 @@ func TestShipError_PredicateTreeDrift(t *testing.T) {
 // TestShipError_DebugStringDeterministic guards the ledger/debugger contract:
 // DebugString renders sorted key=value pairs joined by "; ".
 func TestShipError_DebugStringDeterministic(t *testing.T) {
+	t.Parallel()
 	se := core.NewShipError(core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition,
 		core.StageVerifyClass, "msg", "current", "abc", "audited", "def")
 	got := se.DebugString()

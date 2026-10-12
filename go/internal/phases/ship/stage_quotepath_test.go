@@ -13,6 +13,7 @@ import (
 // args are only legal there), which is the zero-parsing fix for the common
 // non-ASCII case.
 func TestStageExplicitPaths_QuotePathDisabledOnGitReads(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	ws := writeWorkspaceReports(t, "go/internal/phases/ship/gitops.go")
 	cap := &porcelainCapture{

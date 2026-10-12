@@ -36,6 +36,7 @@ func hasArg(args []string, want string) bool {
 }
 
 func TestRepair_PushRace_FetchFFRetry_Succeeds(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
@@ -59,6 +60,7 @@ func TestRepair_PushRace_FetchFFRetry_Succeeds(t *testing.T) {
 }
 
 func TestRepair_PushRace_Diverged_ReclassifiedNeedsReaudit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	bare := addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
