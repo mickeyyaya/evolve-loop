@@ -12,10 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 )
 
-// writeCLIProfile writes .evolve/profiles/<agent>.json under root carrying the
-// primary cli + optional cli_fallback chain. Deliberately minimal (no
-// $include_policy sentinels) so profiles.Loader.Get parses it without a
-// tool-policy file — same shape writeBuilderProfile uses.
 func writeCLIProfile(t *testing.T, root, agent, cli string, fallback []string) {
 	t.Helper()
 	dir := filepath.Join(root, ".evolve", "profiles")
@@ -35,36 +31,17 @@ func writeCLIProfile(t *testing.T, root, agent, cli string, fallback []string) {
 	}
 }
 
-// escalationProbe is BOTH the phase runner and the deliverable reviewer for one
-// phase, coupled through the single fact the live defect turns on: WHICH CLI
-// produced the deliverable now under review. It reproduces the production
-// contract gate's breaker semantics (deliverable.Reviewer): each non-compliant
-// deliverable is a BLOCK, `threshold` consecutive blocks demote enforce→advisory
-// (Approve + Demoted), and a compliant deliverable resets the counter.
-//
-// compliantCLI == "" models a CLI where no re-dispatch ever complies.
 type escalationProbe struct {
-	phase        string
-	compliantCLI string
-	threshold    int
-	// approveAfter (>0) approves once this many reviews have happened, so a test
-	// can stop the ladder after a chosen number of blocks.
-	approveAfter int
-	// reasonPerBlock, when non-empty, supplies the violation text per consecutive
-	// block (block n uses index n-1, the last entry repeating for later blocks).
-	// Empty ⇒ every block reports the same reason. This is the ONE axis the
-	// fingerprint gate turns on: whether block 2's violation is the SAME defect
-	// as block 1's.
+	phase          string
+	compliantCLI   string
+	threshold      int
+	approveAfter   int
 	reasonPerBlock []string
 
-	lastCLI    string   // ModelRoutingCLI of the most recent dispatch
-	dispatched []string // ModelRoutingCLI per dispatch, in order
-	// blocks is the consecutive-block count the gate reports as
-	// ReviewResult.Blocks. Pre-seeding it models a breaker left HOT by an earlier
-	// cycle or phase — the production counter is a single global file, not a
-	// per-phase, per-cycle counter.
-	blocks  int
-	reviews int
+	lastCLI    string
+	dispatched []string
+	blocks     int
+	reviews    int
 }
 
 func (p *escalationProbe) Name() string { return p.phase }
@@ -103,8 +80,6 @@ func (p *escalationProbe) Review(_ context.Context, in ReviewInput) ReviewResult
 	return ReviewResult{Approve: false, Reason: reason, Blocks: p.blocks}
 }
 
-// runEscalationCycle drives a full RunCycle with probe wired as BOTH the build
-// runner and the reviewer, returning the ledger for demotion-evidence assertions.
 func runEscalationCycle(t *testing.T, root string, probe *escalationProbe) (*fakeLedger, error) {
 	t.Helper()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -118,14 +93,8 @@ func runEscalationCycle(t *testing.T, root string, probe *escalationProbe) (*fak
 	return led, err
 }
 
-// neverDemotingThreshold keeps the probe's breaker shut for the whole ladder so
-// a test observes the correction re-dispatches themselves, not the demotion.
 const neverDemotingThreshold = 99
 
-// After the SECOND consecutive contract block the re-dispatch must go to the
-// profile's cli_fallback, not the same contract-violating CLI. The profile's
-// PRIMARY routing must be untouched — dispatch 1 (initial) and dispatch 2
-// (correction 1) carry no routing override.
 func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) {
 	t.Parallel()
 
@@ -147,15 +116,11 @@ func TestContractCorrection_SecondBlockEscalatesToProfileFallback(t *testing.T) 
 	}
 }
 
-// One bad turn is not a CLI verdict. Correction 1 must re-dispatch on the SAME
-// (primary) routing — escalating on the first block would reroute 99% of a
-// phase's honest single-turn slips onto a different CLI.
 func TestContractCorrection_FirstBlockDoesNotEscalate(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
-	// Block once, then approve: the ladder stops after correction 1.
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold, approveAfter: 1}
 
 	if _, err := runEscalationCycle(t, root, probe); err != nil {
@@ -169,19 +134,12 @@ func TestContractCorrection_FirstBlockDoesNotEscalate(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_HotBreakerEscalatesOnFirstCorrection: the escalation
-// keys off the GATE's consecutive-block count, not a locally re-counted
-// correction ordinal. The production breaker is one global file
-// (.evolve/contract-gate-breaker.json) reset only by a clean verify, so a cycle
-// that aborted mid-ladder leaves it hot. Arriving already at block 2 on the FIRST
-// block of this phase, escalation must still get its shot before the third
-// strike \u2014 with a correction-ordinal trigger it never would.
 func TestContractCorrection_HotBreakerEscalatesOnFirstCorrection(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
-	probe := &escalationProbe{phase: "build", threshold: 3, blocks: 1} // breaker left hot
+	probe := &escalationProbe{phase: "build", threshold: 3, blocks: 1}
 
 	led, err := runEscalationCycle(t, root, probe)
 	if err != nil {
@@ -207,19 +165,12 @@ func TestContractCorrection_HotBreakerEscalatesOnFirstCorrection(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_NonContractRejectionNeverEscalates is the scoping guard
-// for the OTHER gates chained at the same seam (evalgate / topngate / triagecap /
-// the build floor): they report Blocks==0 because they keep no contract-block
-// counter. A wrong-task binding or an over-capacity triage plan is not a
-// format-compliance failure, so a different CLI is not the remedy and the ladder
-// must behave exactly as before.
 func TestContractCorrection_NonContractRejectionNeverEscalates(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", "agy-tmux", []string{"codex-tmux"})
 	probe := &escalationProbe{phase: "build", threshold: neverDemotingThreshold}
-	// A topngate-shaped rejection: real reason, no block counter.
 	rev := &recordingReviewer{
 		default_: ReviewResult{Approve: true},
 		decide:   map[string]ReviewResult{"build": {Approve: false, Reason: "build report task slug outside triage top_n"}},
@@ -240,10 +191,6 @@ func TestContractCorrection_NonContractRejectionNeverEscalates(t *testing.T) {
 	}
 }
 
-// A profile that declares NO cli_fallback still escalates — to the universal
-// claude fallback — so the escape hatch is CLI escalation rather than gate
-// demotion for every profile, not just the ones whose operator happened to
-// configure a chain.
 func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *testing.T) {
 	t.Parallel()
 
@@ -262,11 +209,6 @@ func TestContractCorrection_NoDeclaredFallbackEscalatesToUniversalClaude(t *test
 	}
 }
 
-// TestContractCorrection_SameFamilyFallbackIsNotAnEscalation is the
-// precision/anti-no-op guard: escalation must change the CLI FAMILY. A profile
-// already on the claude family with no other family in its chain has no
-// escalation target, so the re-dispatch stays on the primary rather than
-// "escalating" to the CLI that just failed the contract.
 func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
 	t.Parallel()
 
@@ -285,9 +227,6 @@ func TestContractCorrection_SameFamilyFallbackIsNotAnEscalation(t *testing.T) {
 	}
 }
 
-// The primary CLI never satisfies the contract but the escalation target
-// does, so the third strike never lands: the cycle completes, the contract
-// gate is NOT demoted, and no demotion evidence is recorded.
 func TestContractCorrection_CompliantFallbackPreventsCircuitOpen(t *testing.T) {
 	t.Parallel()
 
@@ -315,12 +254,6 @@ func TestContractCorrection_CompliantFallbackPreventsCircuitOpen(t *testing.T) {
 	}
 }
 
-// When even the escalated CLI fails the contract, the circuit still opens as
-// the LAST resort — but the demotion is not a single invisible log line. It
-// records a cycle-visible ledger entry AND stages an autofile intent
-// naming the demoted phase + CLI (staged, never written straight to
-// .evolve/inbox — a mid-flight inbox write races inboxmover.Claim's os.Rename;
-// recurrence.ApplyBoundary is the only sanctioned inbox writer).
 func TestContractCorrection_CircuitOpenWarnsAndFilesItem(t *testing.T) {
 	t.Parallel()
 
@@ -379,8 +312,6 @@ func TestContractCorrection_CircuitOpenWarnsAndFilesItem(t *testing.T) {
 	}
 }
 
-// TestFormatContractGateDemotionWarn pins the operator-facing WARN's content:
-// the demoted phase and the CLI must both be named.
 func TestFormatContractGateDemotionWarn(t *testing.T) {
 	t.Parallel()
 	reason := "triage deliverable failed contract: [missing_failure_block] schema_version 2 required"
@@ -393,19 +324,12 @@ func TestFormatContractGateDemotionWarn(t *testing.T) {
 	if !strings.Contains(got, "escalation already ran") {
 		t.Errorf("escalated=true must SAY escalation ran: %s", got)
 	}
-	// The unconditional "escalation was attempted" claim is exactly the kind of
-	// line an operator trusts and acts on: it must be false only when it is false.
 	notTried := formatContractGateDemotionWarn("triage", "agy-tmux", contractDispatch{}, reason)
 	if !strings.Contains(notTried, "did NOT run") {
 		t.Errorf("escalated=false must NOT claim escalation was attempted: %s", notTried)
 	}
 }
 
-// TestChainReviewers_PropagatesDemotedThroughApproval is the WIRING proof for
-// the demotion signal: production mounts the contract gate INSIDE
-// core.ChainReviewers (cmd_cycle.go), and the all-approve path must not rebuild
-// a bare ReviewResult{Approve:true} — that would silently swallow the contract
-// gate's Demoted flag and leave the orchestrator blind.
 func TestChainReviewers_PropagatesDemotedThroughApproval(t *testing.T) {
 	t.Parallel()
 	chain := ChainReviewers(
@@ -425,14 +349,6 @@ func TestChainReviewers_PropagatesDemotedThroughApproval(t *testing.T) {
 	}
 }
 
-// TestChainReviewers_CarriesDemotionThroughLaterRejection is the OTHER half of
-// the chain wiring, and the one that actually bites triage. Production order is
-// buildFloor → evalgate → contract → triagecap → topngate (cmd_cycle.go), so the
-// contract gate can demote and a LATER gate still reject the same deliverable. If
-// the chain returned that rejection verbatim, the demotion evidence would be
-// dropped, the gate would be permanently advisory, and — because the breaker stays
-// over threshold — every subsequent review would drop it again: the exact
-// invisibility this fix exists to remove.
 func TestChainReviewers_CarriesDemotionThroughLaterRejection(t *testing.T) {
 	t.Parallel()
 	chain := ChainReviewers(
@@ -454,10 +370,6 @@ func TestChainReviewers_CarriesDemotionThroughLaterRejection(t *testing.T) {
 	}
 }
 
-// TestUniversalContractFallbackMatchesLLMRouteDefault is the drift guard: the
-// escalation's universal fallback must be exactly the CLI llmroute resolves
-// when no env, no profile and no pin name one. Two literals that must agree
-// cannot be allowed to drift silently.
 func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 	t.Parallel()
 	plan := llmroute.Resolve("builder", "build", "balanced", nil, nil, nil, nil)
@@ -469,9 +381,6 @@ func TestUniversalContractFallbackMatchesLLMRouteDefault(t *testing.T) {
 	}
 }
 
-// Block 2 carrying a DIFFERENT violation than block 1 is two honest defects,
-// not one incapable CLI, so correction 2 must re-dispatch on the phase's own
-// routing, unescalated.
 func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
 	t.Parallel()
 
@@ -498,13 +407,6 @@ func TestContractCorrection_DifferingBlockReasonsDoNotEscalate(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_NormalizedIdenticalReasonsEscalate is the POSITIVE
-// acceptance criterion AND the proof that the gate reuses the blocker breaker's
-// identity primitive instead of comparing raw strings. The two reasons name the
-// same defect and differ only in a go-test duration token — exactly the
-// identity-noise class normalizeReasonForFingerprint (failure_digest.go) folds to
-// "<dur>". A raw `block1.Reason == block2.Reason` comparison would suppress this
-// escalation; the fingerprint-normalized one must still escalate.
 func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 	t.Parallel()
 
@@ -518,8 +420,6 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 			"build deliverable failed contract: [missing_section] required section 'Findings' not found (1.495s)",
 		},
 	}
-	// Guard the fixture itself: if these two reasons ever stop being
-	// normalization-equal, this test would pass for the wrong reason.
 	if a, b := normalizeReasonForFingerprint(probe.reasonPerBlock[0]), normalizeReasonForFingerprint(probe.reasonPerBlock[1]); a != b {
 		t.Fatalf("fixture invalid: the two reasons must normalize identically, got %q vs %q", a, b)
 	}
@@ -539,12 +439,6 @@ func TestContractCorrection_NormalizedIdenticalReasonsEscalate(t *testing.T) {
 	}
 }
 
-// Block 1 carries two violations; the correction closes the first, so block 2
-// carries only the second — a strict SUBSET of block 1's code set. Under
-// whole-string identity the two summaries differ verbatim and escalation would
-// be suppressed; under code-set identity the sets intersect on missing_verdict,
-// the blocks are one partially-repaired defect, and the second consecutive
-// block must still escalate off the failing CLI family.
 func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 	t.Parallel()
 
@@ -558,10 +452,6 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 			"build deliverable failed contract: [missing_verdict] no VERDICT sentinel line found",
 		},
 	}
-	// Guard the fixture: the defect only exists if the two rendered reasons
-	// differ verbatim AND stay differing after fingerprint normalization —
-	// otherwise a whole-string compare would already escalate and this test
-	// would pass for the wrong reason.
 	if probe.reasonPerBlock[0] == probe.reasonPerBlock[1] {
 		t.Fatal("fixture invalid: the two reasons must differ VERBATIM")
 	}
@@ -581,10 +471,6 @@ func TestContractCorrection_SubsetRepairStillEscalates(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_SupersetRegressionStillEscalates is the subset case's
-// mirror: the correction not only failed to close block 1's violation, it added
-// a second one. A SUPERSET is at least as strong an incapable-CLI signature as a
-// subset, and whole-string identity suppresses it for the identical reason.
 func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
 	t.Parallel()
 
@@ -614,12 +500,6 @@ func TestContractCorrection_SupersetRegressionStillEscalates(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_DisjointViolationSetsDoNotEscalate is the guard
-// against "fix the subset case by escalating on everything". Two
-// MULTI-violation blocks sharing NO code are two honest, unrelated defects, so
-// correction 2 must re-dispatch on the phase's own routing (empty
-// ModelRoutingCLI override). An implementation that simply deleted the
-// identity gate to make the subset test pass fails here.
 func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
 	t.Parallel()
 
@@ -646,11 +526,6 @@ func TestContractCorrection_DisjointViolationSetsDoNotEscalate(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_ReorderedViolationSetEscalates is the EDGE axis on
-// rendering instability. summarize() joins violations in slice order and quotes
-// their messages verbatim, so ONE defect set can render two ways across blocks
-// (different order, reworded message text). Code-SET identity is invariant to
-// both; any residual text-shaped comparison is not.
 func TestContractCorrection_ReorderedViolationSetEscalates(t *testing.T) {
 	t.Parallel()
 
@@ -680,13 +555,6 @@ func TestContractCorrection_ReorderedViolationSetEscalates(t *testing.T) {
 	}
 }
 
-// TestContractCorrection_UncodedReasonsFallBackToTextIdentity is the fail-safe
-// EDGE axis. Not every rejection reason on this path is a summarize() rendering
-// carrying "[code]" tokens, and a code-set implementation that extracts ZERO
-// codes from both blocks must not conclude "empty ∩ empty = ∅ ⇒ different
-// defect" — that would silently delete the escalation ladder for every
-// non-summarize reason shape. Two IDENTICAL code-less reasons are self-evidently
-// the same defect and must still escalate.
 func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
 	t.Parallel()
 
@@ -714,24 +582,6 @@ func TestContractCorrection_UncodedReasonsFallBackToTextIdentity(t *testing.T) {
 	}
 }
 
-// TestContractArtifactDetermined_Table pins contractArtifactDetermined(code):
-// does repairing this violation NECESSARILY change the bytes of the watched
-// deliverable artifact? — the only precondition under which an unchanged
-// artifact hash is sound evidence of "no new work was done". Six codes
-// qualify, because their repair IS an edit to the artifact.
-// deliverable.CodeStrayInWorktree is the counter-example: it is repaired by
-// DELETING a stray worktree copy, which leaves the watched artifact
-// byte-identical, so a hash-equality short-circuit that does not consult this
-// classifier converts a repairable contract block into a deterministic ladder
-// abort.
-//
-// NEGATIVE + fail-closed axis. Unknown codes must return false. The classifier
-// is an ALLOWLIST, not a denylist: a code this function has never heard of is,
-// by construction, one whose repair mechanics are unknown, and the only safe
-// answer for an unknown repair mechanic is "do not let anyone skip re-verify".
-// A denylist implementation (`return code != "stray_in_worktree"`) passes the
-// six positive rows and the stray row and is still wrong — the unknown-code
-// rows below are what separate it from a correct allowlist.
 func TestContractArtifactDetermined_Table(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -739,7 +589,6 @@ func TestContractArtifactDetermined_Table(t *testing.T) {
 		code string
 		want bool
 	}{
-		// The six artifact-determined codes: repair edits the watched bytes.
 		{"missing_artifact", "missing_artifact", true},
 		{"empty_artifact", "empty_artifact", true},
 		{"missing_section", "missing_section", true},
@@ -747,15 +596,11 @@ func TestContractArtifactDetermined_Table(t *testing.T) {
 		{"missing_key", "missing_key", true},
 		{"missing_challenge_token", "missing_challenge_token", true},
 
-		// The location-class code the whole classifier exists for: repaired by
-		// deleting a file OUTSIDE the watched artifact, so the hash cannot move.
 		{"stray_in_worktree", "stray_in_worktree", false},
 
-		// Other real deliverable codes that are not on the allowlist.
 		{"invalid_json", "invalid_json", false},
 		{"failure_context_missing", "failure_context_missing", false},
 
-		// Fail-closed rows — these are what a denylist implementation fails.
 		{"unknown_code", "totally_unknown_future_code", false},
 		{"empty_string", "", false},
 		{"case_variant_is_not_the_code", "Missing_Section", false},
@@ -771,8 +616,6 @@ func TestContractArtifactDetermined_Table(t *testing.T) {
 	}
 }
 
-// TestContractArtifactDetermined_StrayInWorktreeIsFalse states the crux
-// assertion on its own so a regression names itself in the failure output.
 func TestContractArtifactDetermined_StrayInWorktreeIsFalse(t *testing.T) {
 	t.Parallel()
 	if contractArtifactDetermined("stray_in_worktree") {
@@ -783,17 +626,8 @@ func TestContractArtifactDetermined_StrayInWorktreeIsFalse(t *testing.T) {
 	}
 }
 
-// TestContractArtifactDetermined_CodesMatchDeliverableVocabulary pins the
-// allowlist to the SOURCE vocabulary rather than to string literals invented
-// here: every allowlisted code must be a code deliverable actually emits. The
-// codes reach core as plain strings, because deliverable imports core and core
-// cannot import deliverable.Violation, which is exactly why drift between the
-// two vocabularies is invisible to the compiler and has to be asserted.
 func TestContractArtifactDetermined_CodesMatchDeliverableVocabulary(t *testing.T) {
 	t.Parallel()
-	// Mirrors internal/deliverable's exported code constants, kept as data
-	// rather than an import because of the deliverable→core import-cycle
-	// constraint.
 	allDeliverableCodes := []string{
 		"missing_artifact", "empty_artifact", "missing_section",
 		"missing_challenge_token", "bad_verdict", "stray_in_worktree",

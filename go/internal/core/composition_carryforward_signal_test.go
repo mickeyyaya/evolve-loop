@@ -12,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-// divergedCompositionFixture builds a two-commit repo whose "cycle" branch has
-// diverged from "main" by one commit, and returns the worktree dir plus the
-// composed diff and its patch-id — exactly what compositionCarryForward and
-// scopedMergeCarryForward independently recompute via `git diff main...HEAD`,
-// so a snapshot built from these values always matches at the patch-id check.
 func divergedCompositionFixture(t *testing.T) (worktree string, diff []byte, patchID string) {
 	t.Helper()
 	r := gittest.Fixture(t)
@@ -69,7 +64,6 @@ func assertOneOrchestratorDeclineEvent(t *testing.T, events []signalcenter.Event
 	}
 }
 
-// eventText is everything a delivered event says: its Reason plus every Fields key and value.
 func eventText(e signalcenter.Event) string {
 	keys := make([]string, 0, len(e.Fields))
 	for k := range e.Fields {

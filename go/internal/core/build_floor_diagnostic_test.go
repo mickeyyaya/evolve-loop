@@ -21,7 +21,6 @@ func TestBuildFloorSelfCheckFailures_KeepsTailDiagnostic(t *testing.T) {
 	if !strings.HasPrefix(got, "…") {
 		t.Errorf("a trimmed diagnostic must be marked as trimmed; got prefix %q", got[:1])
 	}
-	// Complete output carries no elision marker, so the marker stays a signal the reader trusts.
 	if short := "FAIL\tpkg\t0.1s\n"; floorFailureDiagnostic(short) != short {
 		t.Errorf("short output was altered: %q", floorFailureDiagnostic(short))
 	}

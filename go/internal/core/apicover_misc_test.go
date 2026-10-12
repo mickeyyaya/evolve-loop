@@ -57,7 +57,7 @@ func TestObserver_StartReturnsCancel(t *testing.T) {
 	if cancel == nil {
 		t.Fatal("Observer.Start must return a non-nil cancel")
 	}
-	cancel() // must not panic
+	cancel()
 	ro := obs.(*recordingObserver)
 	ro.mu.Lock()
 	defer ro.mu.Unlock()
@@ -235,7 +235,6 @@ func TestOrchestrator_FailureAdviserWired(t *testing.T) {
 	}
 }
 
-// Not parallel: PhaseBoundaryCheckpointer is package-global, and core cannot import the checkpoint package that sets it.
 func TestPhaseBoundaryCheckpointer_FiresDuringRunCycle(t *testing.T) {
 	saved := PhaseBoundaryCheckpointer
 	t.Cleanup(func() { PhaseBoundaryCheckpointer = saved })

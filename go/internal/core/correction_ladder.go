@@ -12,49 +12,27 @@ import (
 )
 
 const (
-	// salvageMaxBytes caps what salvage will relocate: a contracted report is
-	// tens of KB; anything over 1 MiB is not a deliverable we should move.
-	salvageMaxBytes = 1 << 20
-	// salvageMaxAge rejects ancient strays: worktree + workspace are
-	// per-cycle fresh, so this mostly guards the cwd candidate from
-	// resurrecting a days-old leftover as this cycle's deliverable.
-	salvageMaxAge = 6 * time.Hour
-	// evidenceStatusMaxNames caps the worktree git-status names embedded in
-	// the rung-3 directive (the ACI compact-feedback principle: ≤20-line
-	// digests, never log dumps).
+	salvageMaxBytes        = 1 << 20
+	salvageMaxAge          = 6 * time.Hour
 	evidenceStatusMaxNames = 15
 )
 
-// salvageResult describes one salvage attempt for the ladder driver.
 type salvageResult struct {
-	// Relocated: a candidate was atomically moved to the contracted path.
 	Relocated bool
-	// From is the candidate path that was moved (kernel evidence for the
-	// rung-3 directive when the destination then failed verification).
-	From string
-	// Verified: the DESTINATION passed the breaker-neutral re-check after
-	// the move.
-	Verified bool
-	// Reason is the human trail when nothing was relocated.
-	Reason string
+	From      string
+	Verified  bool
+	Reason    string
 }
 
-// salvageDeliverable implements rung 1: locate the contracted basename under
-// {worktree, workspace, cwd}, relocate the first safe candidate ATOMICALLY to
-// the contracted path, then verify the DESTINATION breaker-neutrally.
 func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) salvageResult {
 	if o.contractVerifier == nil {
 		return salvageResult{Reason: "no breaker-neutral verifier wired"}
 	}
 	v, err := o.contractVerifier.VerifyDeliverable(ctx, in)
 	if err != nil {
-		// Ambiguity (unknown phase) — fail open by NOT acting (never
-		// relocate blind), mirroring the gate's posture.
 		return salvageResult{Reason: fmt.Sprintf("verifier ambiguity: %v", err)}
 	}
 	if v.OK {
-		// The reject was not artifact-shaped (e.g. an evalgate reject) —
-		// there is nothing for salvage to fix.
 		return salvageResult{Reason: "destination already well-formed (reject was not artifact-shaped)"}
 	}
 	dest := v.ArtifactPath
@@ -67,15 +45,8 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 	}
 
 	destClean := filepath.Clean(dest)
-	// S2 defense-in-depth: relocate ONLY to a contracted path inside the two
-	// legitimate roots phasecontract.ArtifactPath can resolve to — the workspace
-	// (TargetWorkspace) or <ProjectRoot>/.evolve (TargetEvolveDir). The basename
-	// check above bounds the filename; this bounds the DIRECTORY, so a future or
-	// compromised ContractVerifier returning an out-of-tree absolute path can
-	// never make salvage write outside the run's own roots. Current production
-	// dests always satisfy this (ArtifactName is a single component), so it is a
-	// guard, not a behavior change.
-	if !withinRoot(destClean, in.Workspace) && !withinRoot(destClean, filepath.Join(in.ProjectRoot, ".evolve")) {
+	destInsideRunRoots := withinRoot(destClean, in.Workspace) || withinRoot(destClean, filepath.Join(in.ProjectRoot, ".evolve"))
+	if !destInsideRunRoots {
 		return salvageResult{Reason: fmt.Sprintf("contracted dest %q is outside the workspace/.evolve roots", destClean)}
 	}
 	now := o.now()
@@ -84,8 +55,6 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 	if cwdErr != nil {
 		skips = append(skips, "cwd: unreadable: "+cwdErr.Error())
 	}
-	// Search order is load-bearing (worktree first): a source-writing phase
-	// most plausibly misplaced its report into the tree it was editing.
 	for _, root := range []string{in.Worktree, in.Workspace, cwd} {
 		if root == "" {
 			continue
@@ -101,8 +70,6 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 			}
 			continue
 		}
-		// Relocate FIRST (atomic rename — same filesystem for repo-local
-		// roots), THEN verify what actually landed at the contracted path.
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			skips = append(skips, candidate+": mkdir dest: "+err.Error())
 			continue
@@ -125,9 +92,6 @@ func (o *Orchestrator) salvageDeliverable(ctx context.Context, in ReviewInput) s
 	return salvageResult{Reason: reason}
 }
 
-// withinRoot reports whether path is root itself or lives under it, without
-// following symlinks or admitting `..` traversal. An empty root never matches
-// (so a missing ProjectRoot can't accidentally whitelist the whole tree).
 func withinRoot(path, root string) bool {
 	if root == "" {
 		return false
@@ -139,8 +103,6 @@ func withinRoot(path, root string) bool {
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
 }
 
-// fileSalvageable applies the S2 candidate gates: regular file (lstat — a
-// symlink is never followed), non-empty, size-capped, fresh enough.
 func fileSalvageable(path string, now time.Time) (ok bool, reason string) {
 	fi, err := os.Lstat(path)
 	if err != nil {
@@ -161,11 +123,6 @@ func fileSalvageable(path string, now time.Time) (ok bool, reason string) {
 	return true, ""
 }
 
-// kernelEvidenceDigest composes the rung-3 directive's evidence block from
-// kernel-verified facts only — external and unfakeable, never agent
-// self-assessment: the worktree's git-status NAMES and, when rung 1
-// found-but-couldn't-validate a stray, its original path. Compact by
-// construction (ACI): name-level only, capped, never file contents.
 func kernelEvidenceDigest(worktree, foundButInvalid string) string {
 	var b strings.Builder
 	if foundButInvalid != "" {
@@ -183,15 +140,10 @@ func kernelEvidenceDigest(worktree, foundButInvalid string) string {
 	return "## Evidence (kernel-verified)\n" + b.String()
 }
 
-// gitStatusNames returns up to max porcelain-status names for the worktree,
-// best-effort (an unreadable tree degrades to nothing, never an error — the
-// digest is enrichment, not a gate).
 func gitStatusNames(worktree string, max int) []string {
 	if worktree == "" {
 		return nil
 	}
-	// Capture (not gitexec Output) keeps stdout UNTRIMMED — porcelain lines carry
-	// a leading status field (" M path"); trimming would corrupt the first line.
 	out, _, code, err := gitexec.Git{Dir: worktree, Exec: gitRunner}.Capture(context.Background(), "status", "--porcelain")
 	if err != nil || code != 0 {
 		return nil

@@ -6,7 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-// Only this external test package can import inboxmover without an import cycle.
 func init() {
 	core.RealInboxForTest.Resolve = func(root string, cycle int) *continuation.Continuation {
 		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)

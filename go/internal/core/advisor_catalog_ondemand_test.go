@@ -100,7 +100,6 @@ func TestAdvisorPrompt_OnDemandPhaseLeavesTheMenuButStaysNamed(t *testing.T) {
 	if !strings.Contains(menu, "scout") || !strings.Contains(menu, "audit") {
 		t.Fatalf("the real menu must still render its cards:\n%s", menu)
 	}
-	// Slice from the start of the index line: the count precedes the ON REQUEST marker.
 	idx := prompt[strings.Index(prompt, "further phase"):]
 	for _, onMenu := range []string{"scout", "audit"} {
 		if strings.Contains(idx, onMenu) {
@@ -224,7 +223,6 @@ func TestAdvisorPlanInput_PopulatesOnDemandFromTheOrchestratorCatalog(t *testing
 		specWith("market-sizing", "plan", phasespec.CatalogOnDemand),
 		specWith("okr-draft", "plan", phasespec.CatalogOnDemand),
 	)
-	// o.now is dereferenced during assembly; the recall lookup and cfg no-op on zero values.
 	o := &Orchestrator{catalog: cat, now: func() time.Time { return time.Unix(0, 0).UTC() }}
 
 	in := o.advisorPlanInput(context.Background(), "start", router.RoutingSignals{},
@@ -277,7 +275,6 @@ func TestRepoPhaseCatalog_MenuPhasesResolveAPersona(t *testing.T) {
 		if name == "" {
 			name = e.Name()
 		}
-		// Control-role detection uses the production inference, never a private allowlist.
 		if (phasespec.PhaseSpec{Name: name, Role: cfg.Archetype}).RoleOrDefault() == phasespec.RoleControl ||
 			cfg.Catalog == phasespec.CatalogOnDemand {
 			continue
@@ -287,7 +284,6 @@ func TestRepoPhaseCatalog_MenuPhasesResolveAPersona(t *testing.T) {
 		if agent == "" {
 			agent = "evolve-" + name
 		}
-		// Dispatch reads a disk-loaded spec's persona only from agents/<agent>.md; a phase-local agent.md must not count.
 		if _, err := os.Stat(filepath.Join(root, "agents", agent+".md")); err != nil {
 			t.Errorf("menu phase %q resolves NO persona (agents/%s.md absent) — dispatching it kills a lane at load-agent (cycle-1551). Write agents/%s.md or mark the phase catalog:\"on-demand\".", name, agent, agent)
 		}

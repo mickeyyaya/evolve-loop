@@ -67,7 +67,6 @@ func TestWriteFailureLearningState_ReadsTheStoreAtCallTime(t *testing.T) {
 	}
 }
 
-// The golden was captured on the pre-extraction code with this exact fixture.
 func TestWriteFailureLearningState_RMWBranchIsByteIdenticalToTheGolden(t *testing.T) {
 	t.Parallel()
 
@@ -105,8 +104,6 @@ func TestCarryoverLifecycle_OneConstructionSite(t *testing.T) {
 	}
 }
 
-// nonTestSourcesMentioning lists the module's non-test Go files outside the
-// carryover leaf and the one allowed site whose source contains needle.
 func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 	t.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))

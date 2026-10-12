@@ -9,7 +9,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-// stubAdjudicator records whether it was consulted, so the no-deep-tier-without-a-choice guarantee is pinned.
 type stubAdjudicator struct {
 	give     *adjudication
 	consults int
@@ -67,7 +66,7 @@ func TestDecideAfterAuditFail(t *testing.T) {
 			class:        policy.CategoryCodeAuditFail,
 			attempts:     2,
 			wantNext:     PhaseRetro,
-			wantConsults: 0, // one legal action ⇒ no deep-tier dispatch
+			wantConsults: 0,
 		},
 		{
 			name:         "a system-level class halts at audit, before any retry",
@@ -173,7 +172,6 @@ func TestSelectNext_AuditFailUsesTheDecision(t *testing.T) {
 	if staticNext != PhaseRetro {
 		t.Fatalf("precondition changed: static audit-FAIL successor = %s, want retro", staticNext)
 	}
-	// A static successor of "end" proves the decision, not the strategy, picks the next phase.
 	o := floorOrchestrator(fixedNextStrategy{next: "end"})
 	o.failurePolicy = policy.DefaultSystemFailurePolicy()
 	cs := CycleState{CycleID: 1577, WorkspacePath: auditFailFixture(t, policy.CategoryCodeAuditFail, "H1")}
@@ -190,12 +188,10 @@ func TestOrchestrator_AuditFailRetriesTheDevCycle(t *testing.T) {
 
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	led := &fakeLedger{}
-	// Audit always FAILs, so the cycle exhausts its retry budget before reaching retro.
 	runners := buildRunners(map[Phase]string{
 		PhaseAudit: VerdictFAIL,
 		PhaseRetro: VerdictFAIL,
 	})
-	// The plain fakeRunner declares no failure class, so the disposition would decline for want of one.
 	runners[PhaseAudit] = &classDeclaringAuditRunner{t: t}
 	o := NewOrchestrator(st, led, runners)
 
@@ -216,13 +212,11 @@ func TestOrchestrator_AuditFailRetriesTheDevCycle(t *testing.T) {
 	if tdds < 2 {
 		t.Errorf("tdd ran %d time(s); the dev cycle was never re-entered (phases=%v)", tdds, res.PhasesRun)
 	}
-	// MaxRetries is 2 in the policy table.
 	if audits > 3 {
 		t.Errorf("audit ran %d times; the policy retry budget did not bind (phases=%v)", audits, res.PhasesRun)
 	}
 }
 
-// classDeclaringAuditRunner emits a FAIL verdict with the failure block a real auditor writes.
 type classDeclaringAuditRunner struct{ t *testing.T }
 
 func (r *classDeclaringAuditRunner) Name() string { return string(PhaseAudit) }

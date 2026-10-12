@@ -11,7 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-// classifyDirtyPaths splits dirty paths into leaked tracked source to quarantine and loop-managed paths to ignore.
 func classifyDirtyPaths(paths []string) (quarantine, ignored []string) {
 	for _, p := range paths {
 		if isLoopManagedPath(p) {
@@ -25,12 +24,10 @@ func classifyDirtyPaths(paths []string) (quarantine, ignored []string) {
 
 func isLoopManagedPath(p string) bool {
 	p = strings.TrimPrefix(p, "./")
-	// Boot recovery re-pins the ship binary in the same pass; stashing it would reopen the SHA mismatch the repin heals.
 	return p == "go/bin/evolve" ||
 		strings.HasPrefix(p, ".evolve/") || strings.HasPrefix(p, "knowledge-base/")
 }
 
-// QuarantineDirtyTree moves leaked tracked-source dirt into a named stash, never discarding it or touching loop-managed dirs.
 func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, error) {
 	dirty, err := porcelainPaths(ctx, repoRoot)
 	if err != nil {
@@ -40,8 +37,6 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 	if len(quarantine) == 0 {
 		return false, nil
 	}
-	// git may report a collapsed untracked parent dir that classifyDirtyPaths cannot exclude, so the pathspec
-	// excludes the ship binary too.
 	args := append([]string{"stash", "push", "--include-untracked", "-m", label, "--"}, quarantine...)
 	args = append(args, ":(exclude)go/bin/evolve")
 	cmd := sysexec.Command(ctx, "git", args...)
@@ -64,12 +59,7 @@ func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
 		if len(line) < 4 {
 			continue
 		}
-		// Porcelain v1 is "XY <path>"; a rename renders as "old -> new", so take the destination.
-		p := strings.TrimSpace(line[3:])
-		if idx := strings.Index(p, " -> "); idx >= 0 {
-			p = p[idx+len(" -> "):]
-		}
-		p = strings.Trim(p, "\"")
+		p := porcelainDestination(strings.TrimSpace(line[3:]))
 		if p != "" {
 			paths = append(paths, p)
 		}
@@ -77,7 +67,6 @@ func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
 	return paths, nil
 }
 
-// ShipSHAMismatch reports whether the ship binary's SHA-256 differs from expectedSHA, and returns the actual SHA.
 func ShipSHAMismatch(binPath, expectedSHA string) (bool, string, error) {
 	data, err := os.ReadFile(binPath)
 	if err != nil {
@@ -86,4 +75,12 @@ func ShipSHAMismatch(binPath, expectedSHA string) (bool, string, error) {
 	sum := sha256.Sum256(data)
 	actual := hex.EncodeToString(sum[:])
 	return actual != expectedSHA, actual, nil
+}
+
+func porcelainDestination(entry string) string {
+	const renameArrow = " -> "
+	if idx := strings.Index(entry, renameArrow); idx >= 0 {
+		entry = entry[idx+len(renameArrow):]
+	}
+	return strings.Trim(entry, "\"")
 }

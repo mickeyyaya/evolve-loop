@@ -6,14 +6,9 @@ import (
 	"testing"
 )
 
-// salvageProbe is escalationProbe plus the ONE fact these tests turn on that
-// escalationProbe does not record: the CorrectionDirective each re-dispatch
-// carried. Embedding keeps the breaker/family semantics of the existing probe
-// (which the escalation suite already pins) as the single source of truth —
-// only Run is overridden, to capture the directive before delegating.
 type salvageProbe struct {
 	*escalationProbe
-	directives []string // CorrectionDirective per dispatch, in order
+	directives []string
 }
 
 func (p *salvageProbe) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
@@ -21,8 +16,6 @@ func (p *salvageProbe) Run(ctx context.Context, req PhaseRequest) (PhaseResponse
 	return p.escalationProbe.Run(ctx, req)
 }
 
-// runSalvageCycle mirrors runEscalationCycle but wires the directive-recording
-// probe as both build runner and reviewer.
 func runSalvageCycle(t *testing.T, root string, probe *salvageProbe) (*fakeLedger, error) {
 	t.Helper()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
@@ -36,36 +29,12 @@ func runSalvageCycle(t *testing.T, root string, probe *salvageProbe) (*fakeLedge
 	return led, err
 }
 
-// newSalvageProbe builds the probe with the standard blocking behaviour: every
-// deliverable violates the contract with the SAME defect, so the block identity
-// gate holds and block 2 reaches the escalation decision.
 func newSalvageProbe(threshold int) *salvageProbe {
 	return &salvageProbe{escalationProbe: &escalationProbe{phase: "build", threshold: threshold}}
 }
 
-// blockReason is the violation escalationProbe reports for a build block. The
-// structured re-prompt must carry it VERBATIM — a paraphrased or truncated
-// reason is not a diagnosis.
 const blockReason = "build deliverable failed contract: [missing_section] required section 'Findings' not found"
 
-// TestContractEscalation_SalvageRetry_WhenNoOtherFamily: a profile already on
-// the universal-fallback family with no declared chain has NO escalation
-// target — contractEscalationCLI returns ok=false. The correction that would
-// have escalated must instead re-dispatch the SAME CLI with a STRUCTURED
-// RE-PROMPT: the verbatim validator reason under
-// contractSalvageRetryDirectiveHeading.
-//
-// Three assertions, and all three must hold:
-//
-//	(a) breaker-neutral — exactly 3 dispatches, the same count as before this
-//	    feature. The remedy rides the existing re-dispatch; it neither adds a
-//	    round nor spends an extra correction, so the breaker's block accounting
-//	    is untouched by the retry itself.
-//	(b) it is NOT a shuffle — the re-dispatch stays on the phase's own routing
-//	    (ModelRoutingCLI == ""), because there is no other family to move to.
-//	(c) the directive is a structured re-prompt carrying the verbatim reason —
-//	    and correction 1's directive is NOT (one bad turn is not a CLI verdict;
-//	    the remedy belongs to the block that would have escalated).
 func TestContractEscalation_SalvageRetry_WhenNoOtherFamily(t *testing.T) {
 	t.Parallel()
 
@@ -96,11 +65,6 @@ func TestContractEscalation_SalvageRetry_WhenNoOtherFamily(t *testing.T) {
 	}
 }
 
-// TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists is the
-// precision guard: the two remedies are DISJOINT. A phase with a real
-// cross-family escalation target escalates exactly as it does today and must NOT
-// also spend its round-2 budget on a structured re-prompt (double-spending the
-// correction cap for one block).
 func TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists(t *testing.T) {
 	t.Parallel()
 
@@ -121,18 +85,13 @@ func TestContractEscalation_SalvageRetry_NotWhenEscalationTargetExists(t *testin
 	}
 }
 
-// TestContractEscalation_SalvageRetry_NotOnFirstBlock is the edge guard on the
-// SAME trigger rule the escalation obeys: one malformed turn is a bad turn, not
-// a CLI verdict. With no escalation target at all, a first block must still get
-// the plain correction — otherwise the remedy fires on 99% of honest
-// single-turn slips.
 func TestContractEscalation_SalvageRetry_NotOnFirstBlock(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
 	probe := newSalvageProbe(neverDemotingThreshold)
-	probe.approveAfter = 1 // block once, then approve: the ladder stops after correction 1
+	probe.approveAfter = 1
 
 	if _, err := runSalvageCycle(t, root, probe); err != nil {
 		t.Fatalf("RunCycle should proceed after one correction: %v", err)
@@ -145,12 +104,6 @@ func TestContractEscalation_SalvageRetry_NotOnFirstBlock(t *testing.T) {
 	}
 }
 
-// TestContractEscalation_SalvageRetry_NotOnNonContractRejection is the scoping
-// guard for the other gates chained at this seam (evalgate / topngate /
-// triagecap / the build floor): they report Blocks==0 because
-// they keep no contract-block counter. A wrong-task binding is not a
-// format-compliance failure, so a structured re-prompt of a CONTRACT violation
-// is not the remedy — the ladder must behave exactly as before.
 func TestContractEscalation_SalvageRetry_NotOnNonContractRejection(t *testing.T) {
 	t.Parallel()
 
@@ -177,18 +130,12 @@ func TestContractEscalation_SalvageRetry_NotOnNonContractRejection(t *testing.T)
 	}
 }
 
-// TestContractEscalation_SalvageRetry_LedgerRecordsSalvageAttempted: when the
-// structured re-prompt ALSO blocks, the circuit still opens as the last
-// resort — but the demotion record must distinguish "a remedy was tried and
-// failed" from "no remedy was possible". Without it an
-// operator reading the ledger cannot tell an incapable CLI from an unremedied
-// ladder, which is the exact ambiguity the live-evidence note is about.
 func TestContractEscalation_SalvageRetry_LedgerRecordsSalvageAttempted(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	writeCLIProfile(t, root, "builder", universalContractFallbackCLI, nil)
-	probe := newSalvageProbe(3) // third consecutive block opens the circuit
+	probe := newSalvageProbe(3)
 
 	led, err := runSalvageCycle(t, root, probe)
 	if err != nil {
@@ -215,11 +162,6 @@ func TestContractEscalation_SalvageRetry_LedgerRecordsSalvageAttempted(t *testin
 	}
 }
 
-// TestContractEscalation_SalvageRetry_WarnDistinguishesAttemptFromNoRemedy pins
-// the operator-facing WARN. Its "escalation did NOT run" line is the only thing
-// an operator sees, and it must not read as MISLEADING when a structured
-// re-prompt was in fact attempted: a line an operator trusts and acts on must
-// be false only when it is false.
 func TestContractEscalation_SalvageRetry_WarnDistinguishesAttemptFromNoRemedy(t *testing.T) {
 	t.Parallel()
 	reason := "triage deliverable failed contract: [missing_failure_block] schema_version 2 required"
@@ -237,7 +179,6 @@ func TestContractEscalation_SalvageRetry_WarnDistinguishesAttemptFromNoRemedy(t 
 		}
 	}
 
-	// Negative axis: nothing was tried, so nothing may be claimed.
 	noRemedy := formatContractGateDemotionWarn("triage", universalContractFallbackCLI, contractDispatch{}, reason)
 	if !strings.Contains(noRemedy, "did NOT run") {
 		t.Errorf("with neither escalation nor salvage retry, the WARN must still report that no remedy ran: %s", noRemedy)

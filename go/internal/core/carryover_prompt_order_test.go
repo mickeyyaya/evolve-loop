@@ -12,7 +12,6 @@ func TestWriteCarryoverTodos_SevereRecentSurvivesTheCut(t *testing.T) {
 	t.Parallel()
 
 	todos := make([]router.CarryoverTodo, 0, maxCarryoverTodosInPrompt+1)
-	// 20 low-priority, oldest entries first (insertion order == on-disk order).
 	for i := 0; i < maxCarryoverTodosInPrompt; i++ {
 		todos = append(todos, router.CarryoverTodo{
 			ID:             fmt.Sprintf("cycle-%d-failed-scout", 366+i),
@@ -21,7 +20,6 @@ func TestWriteCarryoverTodos_SevereRecentSurvivesTheCut(t *testing.T) {
 			FirstSeenCycle: 366 + i,
 		})
 	}
-	// The 21st entry, last in insertion order, is the newest and most severe.
 	const critical = "cycle-505-failed-changelog-sync"
 	todos = append(todos, router.CarryoverTodo{
 		ID:             critical,

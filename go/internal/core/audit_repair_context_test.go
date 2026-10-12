@@ -20,9 +20,7 @@ func TestSeedAuditRepairContext(t *testing.T) {
 		{name: "an active repair seeds the builder", next: PhaseBuild, active: true, attempts: 1, wantSet: true},
 		{name: "an active repair seeds the test-first phase", next: PhaseTDD, active: true, attempts: 1, wantSet: true},
 		{name: "no repair in flight seeds nothing", next: PhaseBuild, active: false, attempts: 0, wantSet: false},
-		// AuditRepairAttempts is a monotonic counter, not a currently-repairing flag.
 		{name: "a FINISHED repair does not leak into a later unrelated dispatch", next: PhaseBuild, active: false, attempts: 2, wantSet: false},
-		// Audit re-reads its own artifacts, so re-injecting its own rejection would be circular.
 		{name: "audit is not seeded", next: PhaseAudit, active: true, attempts: 1, wantSet: false},
 		{name: "retro is not seeded", next: PhaseRetro, active: true, attempts: 1, wantSet: false},
 		{name: "ship is not seeded", next: PhaseShip, active: true, attempts: 1, wantSet: false},
@@ -84,7 +82,6 @@ func TestAuditRepairBrief_SeededOnBothDispatchSurfaces(t *testing.T) {
 		if !strings.Contains(string(body), "seedAuditRepairContext(") {
 			t.Errorf("%s never calls seedAuditRepairContext; a repair dispatched from this surface rebuilds blind", f)
 		}
-		// Both surfaces must pass the dispatched phase `next`, not merely call the seeder.
 		if !strings.Contains(string(body), "seedAuditRepairContext(ctxSnap, next, cs)") &&
 			!strings.Contains(string(body), "seedAuditRepairContext(phaseCtx, next, cr.cs)") {
 			t.Errorf("%s calls seedAuditRepairContext with something other than the DISPATCHED phase; presence is not correctness", f)
@@ -101,7 +98,7 @@ func TestSeedAuditRepairContext_ShipRecoveryRebuildCarriesStandingFindings(t *te
 		t.Fatal(err)
 	}
 	cs := CycleState{WorkspacePath: dir, AuditDispatches: 4, ShipRecoveryCode: "GIT_FLEET_REBASE_NEEDED"}
-	base := map[string]string{"keep": "me"} // a resumed dispatch: no ship_error_code snapshot
+	base := map[string]string{"keep": "me"}
 
 	got := seedAuditRepairContext(base, PhaseBuild, cs)
 
@@ -162,7 +159,6 @@ func TestSeedAuditRepairContext_RetroRoutedReentryCarriesStandingFindings(t *tes
 	if intro := StandingFindingsIntro(got); !strings.Contains(intro, "retrospective") || !strings.Contains(intro, "unrecognised class") || strings.Contains(intro, "ship-time error") {
 		t.Errorf("the intro names the retro route and the envelope's reason, not a ship error: %q", intro)
 	}
-	// A retro reached without an audit decline is not re-audited work, so nothing is seeded.
 	viaDispatchError := CycleState{WorkspacePath: dir, AuditDispatches: 1, CompletedPhases: []string{"scout", "triage", "tdd", "build", "retro"}}
 	if _, ok := seedAuditRepairContext(map[string]string{}, PhaseBuild, viaDispatchError)[CtxKeyStandingAuditFindings]; ok {
 		t.Error("a retro re-entry without an audit decline is not seeded")

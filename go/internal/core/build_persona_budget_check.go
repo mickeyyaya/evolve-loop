@@ -12,11 +12,9 @@ const (
 	personaDocPrefix = "agents/evolve-"
 	personaDocSuffix = ".md"
 
-	// personaBudgetPkg also names the gate in the failure line.
 	personaBudgetPkg = "./internal/prompts"
 )
 
-// personaDocTouched takes repo-relative, slash-separated paths.
 func personaDocTouched(paths []string) bool {
 	for _, p := range paths {
 		if strings.HasPrefix(p, personaDocPrefix) && strings.HasSuffix(p, personaDocSuffix) {
@@ -26,10 +24,6 @@ func personaDocTouched(paths []string) bool {
 	return false
 }
 
-// personaBudgetFailures fails only on the conjunction of a touched persona doc
-// and a red prompts package; touching a persona doc is not itself a violation.
-// It skips when changedPackageFloorChecks already runs the package, so each
-// package gets one `go test` pass per handoff.
 func personaBudgetFailures(ctx context.Context, worktree string, paths []string) []string {
 	if worktree == "" || !personaDocTouched(paths) {
 		return nil

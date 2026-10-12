@@ -14,7 +14,6 @@ func TestReleaseDeclinedBinding_RemovesMatchingScopesOnly(t *testing.T) {
 	if err := continuation.WriteRegistryEntry(root, "defect-disposition-contract-unsatisfiable", *declined); err != nil {
 		t.Fatal(err)
 	}
-	// A second scope bound to a DIFFERENT ancestor must survive the release.
 	if err := continuation.WriteRegistryEntry(root, "unrelated-live-scope", continuation.Continuation{Cycle: 1421, SnapshotSHA: "feedface"}); err != nil {
 		t.Fatal(err)
 	}

@@ -30,7 +30,6 @@ func TestStampContinuation_NeverSnapshotsTheProjectRoot(t *testing.T) {
 		{"relative spelling of the root", root, relative},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			// A dirty root: an untracked file a snapshot would sweep up with add -A.
 			if err := os.WriteFile(filepath.Join(root, "untracked.txt"), []byte("operator's work\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}

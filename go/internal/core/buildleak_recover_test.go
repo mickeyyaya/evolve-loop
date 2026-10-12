@@ -61,7 +61,7 @@ func TestCorrectionRedispatch_RecoversLeakBeforeReview(t *testing.T) {
 
 	repo, wt := realWorktree(t)
 	workspace := t.TempDir()
-	runner := &correctionLeakRunner{projectRoot: repo, calls: 1} // initial dispatch already completed
+	runner := &correctionLeakRunner{projectRoot: repo, calls: 1}
 	reviewer := &correctionLeakReviewer{projectRoot: repo, worktree: wt}
 	retryCfg := policy.Policy{}.RetryConfig()
 	retryCfg.ContractCorrectionRetries = 1
@@ -105,11 +105,9 @@ func gitInRepoNoFatal(repo string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// realWorktree uses a real `git worktree add`, because two independent repos masked a directory-rename bug.
 func realWorktree(t *testing.T) (string, string) {
 	t.Helper()
 	repo, _ := newRepoWithBaseCommit(t)
-	// A tracked nested dir so the worktree contains it too (mirrors a real checkout).
 	if err := os.MkdirAll(filepath.Join(repo, "go/internal/phases"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +124,7 @@ func realWorktree(t *testing.T) (string, string) {
 func TestRecoverBuildLeak_RelocatesIntoRealWorktree(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
-	baseline := porcelainDirtySet(context.Background(), repo) // clean
+	baseline := porcelainDirtySet(context.Background(), repo)
 
 	leakDir := filepath.Join(repo, "go/internal/phases/backfill")
 	if err := os.MkdirAll(leakDir, 0o755); err != nil {
@@ -181,7 +179,7 @@ func TestRecoverBuildLeak_RelocatesTrackedEditWhenWorktreeClean(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "base.txt"), []byte("LEAKED\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gitInRepo(t, repo, "add", "base.txt") // staged-only ("M ") — the case checkout -- would miss
+	gitInRepo(t, repo, "add", "base.txt")
 
 	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
 		t.Fatal("recoverBuildLeak should return true")
@@ -206,7 +204,7 @@ func TestRecoverBuildLeak_DiscardsTrackedEditWhenWorktreeDiverged(t *testing.T) 
 	if err := os.WriteFile(filepath.Join(wt, "base.txt"), []byte("WORKTREE-EDIT\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	baseline := porcelainDirtySet(context.Background(), repo) // main still clean here
+	baseline := porcelainDirtySet(context.Background(), repo)
 
 	if err := os.WriteFile(filepath.Join(repo, "base.txt"), []byte("MAIN-LEAK\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -231,7 +229,7 @@ func TestRecoverBuildLeak_IgnoresGitignoredArtifact(t *testing.T) {
 	}
 	gitInRepo(t, repo, "add", ".gitignore")
 	gitInRepo(t, repo, "commit", "-q", "-m", "ignore artifact")
-	gitInRepo(t, repo, "worktree", "prune") // keep wt valid after the new commit on main
+	gitInRepo(t, repo, "worktree", "prune")
 	baseline := porcelainDirtySet(context.Background(), repo)
 
 	if err := os.WriteFile(filepath.Join(repo, "artifact.bin"), []byte("rebuilt binary\n"), 0o644); err != nil {
@@ -287,7 +285,7 @@ func TestRecoverBuildLeak_DiscardsRebuiltArtifactEvenWhenWorktreeClean(t *testin
 func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
-	baseline := porcelainDirtySet(context.Background(), repo) // clean
+	baseline := porcelainDirtySet(context.Background(), repo)
 
 	if err := os.MkdirAll(filepath.Join(repo, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -295,7 +293,6 @@ func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing
 	if err := os.WriteFile(filepath.Join(repo, ".evolve/ledger.tip"), []byte("tip\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// A real nested worktree — `git status -uall` reports it as a bare dir (no recurse).
 	gitInRepo(t, repo, "worktree", "add", "--detach", "-q", filepath.Join(repo, ".evolve/worktrees/cycle-1"), "HEAD")
 
 	if !recoverBuildLeak(context.Background(), leakRecovery{projectRoot: repo, worktree: wt, baseline: baseline, authority: sourceWriterAuthority}) {
@@ -312,7 +309,7 @@ func TestRecoverBuildLeak_SkipsEvolveRuntimeStateAndNestedWorktreeDir(t *testing
 func TestRecoverBuildLeak_SkipsNestedEvolveRuntimeState(t *testing.T) {
 	t.Parallel()
 	repo, wt := realWorktree(t)
-	baseline := porcelainDirtySet(context.Background(), repo) // clean
+	baseline := porcelainDirtySet(context.Background(), repo)
 
 	for _, d := range []string{"go", "go/internal/phases"} {
 		if err := os.MkdirAll(filepath.Join(repo, d, ".evolve"), 0o755); err != nil {
@@ -340,7 +337,7 @@ func TestRecoverBuildLeak_LeavesBaselineDirtUntouched(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "preexisting.txt"), []byte("mine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	baseline := porcelainDirtySet(context.Background(), repo) // includes preexisting.txt
+	baseline := porcelainDirtySet(context.Background(), repo)
 
 	if err := os.WriteFile(filepath.Join(repo, "new_leak.txt"), []byte("leaked\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -396,7 +393,6 @@ func TestRecoverBuildLeak_RelocatesTrackedEvolveConfigEdit(t *testing.T) {
 	}
 	gitInRepo(t, repo, "add", "-f", ".evolve/commit-prefix-scope.json")
 	gitInRepo(t, repo, "commit", "-q", "-m", "track prefix scope")
-	// Recreate the worktree off the NEW head so it shares the tracked file.
 	wt2 := filepath.Join(t.TempDir(), "wt2")
 	gitInRepo(t, repo, "worktree", "add", "--detach", "-q", wt2, "HEAD")
 	_ = wt

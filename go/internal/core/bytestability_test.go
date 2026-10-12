@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// Legacy key sets never change. A new persisted field must be omitempty and
-// appended to its additive list, so an older file keeps its bytes.
 var legacyStateKeys = []string{
 	"lastUpdated", "lastCycleNumber", "version", "currentBatch",
 	"failedApproaches", "carryoverTodos", "setupCompletedAt", "setupVersion",
@@ -64,7 +62,7 @@ func jsonKeysOf(t *testing.T, v any) []string {
 	t.Helper()
 	rt := reflect.TypeOf(v)
 	if rt.Kind() == reflect.Pointer {
-		rt = rt.Elem() // NumField on a Ptr kind panics
+		rt = rt.Elem()
 	}
 	keys := make([]string, 0, rt.NumField())
 	for i := 0; i < rt.NumField(); i++ {

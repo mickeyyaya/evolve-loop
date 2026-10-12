@@ -10,7 +10,6 @@ func TestBuildFloorReviewer_RejectsRedSelfcheckThenApproves(t *testing.T) {
 	t.Parallel()
 
 	calls := 0
-	// Named binding exercises the exported check-engine type (apicover).
 	var checks BuildFloorCheckFn = func(ctx context.Context, in ReviewInput) []string {
 		calls++
 		if calls == 1 {

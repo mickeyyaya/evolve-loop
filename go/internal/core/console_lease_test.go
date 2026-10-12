@@ -11,8 +11,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 )
 
-// leaseRoot builds a primary-checkout fixture; the lease then lives at
-// <root>/.git/evolve-console-lease.json (the hub).
 func leaseRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
