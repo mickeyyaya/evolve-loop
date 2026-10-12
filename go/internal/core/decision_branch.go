@@ -17,6 +17,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
+var phasePlanMarshal = json.MarshalIndent
+
+var failureDecide = failureadapter.Decide
+
 func (o *Orchestrator) decideAfterRetroRouted(ctx context.Context, cycle int, cs CycleState, seq int, retroVerdict string, history []FailedRecord, in router.RouteInput) (Phase, map[string]string, string, *SystemFailureSignal) {
 	// The reason string's prefix ("proceed:"/"retry-with-fallback:"/…) is
 	// grepped by dashboards and scenario pins, so it must stay stable.
@@ -118,7 +122,7 @@ func (o *Orchestrator) decideAfterRetro(cs CycleState, retroVerdict string, hist
 			BookkeepingRegradeReasonPrefix + "meta-only audit FAIL with non-FAIL narrative; re-dispatching audit once in-cycle", nil
 	}
 	entries := entriesFromRecords(history)
-	dec := failureadapter.Decide(entries, failureadapter.Options{Now: o.now()})
+	dec := failureDecide(entries, failureadapter.Options{Now: o.now()})
 	switch dec.Action {
 	case failureadapter.ActionRetryWithFallback:
 		return o.recoveryTarget(PhaseRetro, string(dec.Action), PhaseTDD), dec.SetEnv, "retry-with-fallback: " + dec.Reason, nil
@@ -300,7 +304,7 @@ func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs Cy
 	ts := o.now().UTC().Format(time.RFC3339)
 	artifactPath := filepath.Join(cs.WorkspacePath, "phase-"+kind+".json")
 	sha := ""
-	if buf, err := json.MarshalIndent(plan.Entries, "", "  "); err != nil {
+	if buf, err := phasePlanMarshal(plan.Entries, "", "  "); err != nil {
 		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s marshal: %v\n", kind, err)
 		artifactPath = ""
 	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {

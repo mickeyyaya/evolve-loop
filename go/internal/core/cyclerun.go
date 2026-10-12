@@ -22,6 +22,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 )
 
+var (
+	fleetIsolationSetenv = os.Setenv
+	challengeTokenRead   = rand.Read
+)
+
 // loopAction signals how the slim RunCycle driver proceeds after a dispatch-loop
 // sub-method returns. err is non-nil ONLY when action == loopAbort.
 type loopAction int
@@ -435,7 +440,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 	// fleetLaneEvolveDirOK makes the lane's evolve dir; cleared on exit so a reused process never
 	// carries it into a later cycle.
 	if os.Getenv(ipcenv.FleetKey) != "" && cs.WorkspacePath != "" {
-		if err := os.Setenv(ipcenv.CycleStateFileKey, filepath.Join(cs.WorkspacePath, CycleStateFile)); err != nil {
+		if err := fleetIsolationSetenv(ipcenv.CycleStateFileKey, filepath.Join(cs.WorkspacePath, CycleStateFile)); err != nil {
 			// Loud, not silent: a failed Setenv leaves this lane on the shared
 			// host singleton → the clobber-before-audit stall recurs. Abort the
 			// cycle rather than run a lane that will lose its work.
@@ -741,7 +746,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	// indistinguishable from bridge-minted ones.
 	if _, alreadySet := ctxSnap["challengeToken"]; !alreadySet {
 		var tokBytes [8]byte
-		if _, err := rand.Read(tokBytes[:]); err == nil {
+		if _, err := challengeTokenRead(tokBytes[:]); err == nil {
 			tok := hex.EncodeToString(tokBytes[:])
 			ctxSnap["challengeToken"] = tok
 			// Best-effort workspace write — phase agents per agent-templates.md

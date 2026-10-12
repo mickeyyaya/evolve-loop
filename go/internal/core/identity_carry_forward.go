@@ -12,6 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
 )
 
+var identityPatchID = compositionPatchID
+
 // identicalRebaseMethod is the carry record's method; cmd pins it equal to the ledger adapter's constant.
 const identicalRebaseMethod = "identical-rebase"
 
@@ -52,7 +54,7 @@ func (o *Orchestrator) identityCarryForward(ctx context.Context, cycle int, cs C
 		o.declineComposedGates(cycle, cs, "Orchestrator.identityCarryForward", "identity carry", missing, outcomes)
 		return false
 	}
-	patchID, err := compositionPatchID(audited)
+	patchID, err := identityPatchID(audited)
 	if err != nil {
 		return decline("patch-id: %v", err)
 	}
