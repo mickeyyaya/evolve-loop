@@ -21,9 +21,13 @@ type attestationField struct {
 }
 
 func (a *Attestation) Marshal() ([]byte, error) {
+	return a.marshalWith(json.Marshal)
+}
+
+func (a *Attestation) marshalWith(marshal func(any) ([]byte, error)) ([]byte, error) {
 	lines := make([]string, 0, 6)
 	for _, f := range a.fields() {
-		value, err := json.Marshal(f.value)
+		value, err := marshal(f.value)
 		if err != nil {
 			return nil, fmt.Errorf("attestation field %s: %w", f.key, err)
 		}

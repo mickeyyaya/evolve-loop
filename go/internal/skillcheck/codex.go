@@ -123,7 +123,23 @@ func marshalManifest(v any) ([]byte, error) {
 	return append(b, '\n'), nil
 }
 
+type codexManifestSpec struct {
+	rel    string
+	render func(claudePluginMeta) ([]byte, error)
+}
+
+func codexManifestSpecs() []codexManifestSpec {
+	return []codexManifestSpec{
+		{codexPluginManifestRel, renderCodexPluginManifest},
+		{codexMarketplaceRel, renderCodexMarketplace},
+	}
+}
+
 func codexManifestDiffs(projectRoot string) ([]commandDiff, error) {
+	return codexManifestDiffsFor(projectRoot, codexManifestSpecs())
+}
+
+func codexManifestDiffsFor(projectRoot string, specs []codexManifestSpec) ([]commandDiff, error) {
 	meta, err := loadClaudePluginMeta(projectRoot)
 	if err != nil {
 		isNotAnEvoPluginRepo := errors.Is(err, os.ErrNotExist)
@@ -131,13 +147,6 @@ func codexManifestDiffs(projectRoot string) ([]commandDiff, error) {
 			return nil, nil
 		}
 		return nil, err
-	}
-	specs := []struct {
-		rel    string
-		render func(claudePluginMeta) ([]byte, error)
-	}{
-		{codexPluginManifestRel, renderCodexPluginManifest},
-		{codexMarketplaceRel, renderCodexMarketplace},
 	}
 	diffs := make([]commandDiff, 0, len(specs))
 	for _, s := range specs {

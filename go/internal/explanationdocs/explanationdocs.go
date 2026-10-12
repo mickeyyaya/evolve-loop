@@ -146,6 +146,10 @@ func checkBuild(ctx context.Context, binding CycleBinding) ([]string, error) {
 	if err != nil || !active {
 		return nil, err
 	}
+	return checkResolved(ctx, binding)
+}
+
+func checkResolved(ctx context.Context, binding CycleBinding) ([]string, error) {
 	switch binding.ContractVersion {
 	case contractV1:
 		return checkBuildV1(ctx, binding)
@@ -248,18 +252,18 @@ func VerifyLanded(ctx context.Context, binding CycleBinding, landedCommit string
 func verifyResolved(ctx context.Context, binding CycleBinding, verificationRoot string) (*phaseio.ExplanationView, bool, error) {
 	switch binding.ContractVersion {
 	case contractV1:
-		return verifyResolvedV1(ctx, binding, verificationRoot)
+		return verifyResolvedV1(ctx, binding, verificationRoot, LoadSnapshot)
 	default:
 		return nil, true, fmt.Errorf("unsupported explanation contract version %d", binding.ContractVersion)
 	}
 }
 
-func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoot string) (*phaseio.ExplanationView, bool, error) {
+func verifyResolvedV1(ctx context.Context, binding CycleBinding, verificationRoot string, loadSnapshot func(CycleBinding) (*phaseio.ExplanationView, error)) (*phaseio.ExplanationView, bool, error) {
 	view, err := Load(binding.Workspace)
 	if err != nil {
 		return nil, true, err
 	}
-	snapshot, err := LoadSnapshot(binding)
+	snapshot, err := loadSnapshot(binding)
 	if err != nil {
 		return nil, true, err
 	}

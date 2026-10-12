@@ -400,11 +400,39 @@ func existsAtBase(ctx context.Context, worktree, baseSHA, path string) (bool, er
 
 var errArtifactTooLarge = fmt.Errorf("exceeds %d bytes", maxArtifactBytes)
 
+type regularReadFile interface {
+	io.Reader
+	Stat() (os.FileInfo, error)
+	Close() error
+}
+
+type regularReadOps struct {
+	abs          func(string) (string, error)
+	evalSymlinks func(string) (string, error)
+	open         func(string) (regularReadFile, error)
+}
+
+var osRegularReadOps = regularReadOps{
+	abs:          filepath.Abs,
+	evalSymlinks: filepath.EvalSymlinks,
+	open: func(path string) (regularReadFile, error) {
+		file, err := reportdoc.OpenRegularNoFollow(path)
+		if err != nil {
+			return nil, err
+		}
+		return file, nil
+	},
+}
+
 func readRegularWithin(root, rel string) (string, string, error) {
+	return readRegularWithinOps(root, rel, osRegularReadOps)
+}
+
+func readRegularWithinOps(root, rel string, ops regularReadOps) (string, string, error) {
 	if !validRelative(rel) {
 		return "", "", fmt.Errorf("invalid relative path %q", rel)
 	}
-	absRoot, err := filepath.Abs(root)
+	absRoot, err := ops.abs(root)
 	if err != nil {
 		return "", "", err
 	}
@@ -419,15 +447,15 @@ func readRegularWithin(root, rel string) (string, string, error) {
 	if info.Size() > maxArtifactBytes {
 		return "", "", fmt.Errorf("%s %w", rel, errArtifactTooLarge)
 	}
-	realRoot, err := filepath.EvalSymlinks(absRoot)
+	realRoot, err := ops.evalSymlinks(absRoot)
 	if err != nil {
 		return "", "", fmt.Errorf("resolve worktree: %w", err)
 	}
-	real, err := filepath.EvalSymlinks(abs)
+	real, err := ops.evalSymlinks(abs)
 	if err != nil || !within(realRoot, real) {
 		return "", "", fmt.Errorf("%s escapes the worktree", rel)
 	}
-	file, err := reportdoc.OpenRegularNoFollow(real)
+	file, err := ops.open(real)
 	if err != nil {
 		return "", "", fmt.Errorf("open %s without following links: %w", rel, err)
 	}

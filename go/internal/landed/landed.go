@@ -222,13 +222,17 @@ func isBinary(contents ...[]byte) bool {
 }
 
 func mergeKeepsMain(ctx context.Context, run sysexec.RunFunc, v pathVersions) (bool, error) {
+	return mergeKeepsMainWith(ctx, run, v, os.WriteFile)
+}
+
+func mergeKeepsMainWith(ctx context.Context, run sysexec.RunFunc, v pathVersions, write func(string, []byte, fs.FileMode) error) (bool, error) {
 	tmp, err := os.MkdirTemp("", "evolve-landed-")
 	if err != nil {
 		return false, err
 	}
 	defer func() { _ = os.RemoveAll(tmp) }()
 	for name, data := range map[string][]byte{"main": v.main.Data, "base": v.base.Data, "tree": v.tree.Data} {
-		if err := os.WriteFile(filepath.Join(tmp, name), data, 0o600); err != nil {
+		if err := write(filepath.Join(tmp, name), data, 0o600); err != nil {
 			return false, err
 		}
 	}

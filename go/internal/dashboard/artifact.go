@@ -49,7 +49,25 @@ func ListArtifacts(root string, cycle int) ([]ArtifactInfo, error) {
 	return out, nil
 }
 
+type artifactFile interface {
+	io.Reader
+	Stat() (os.FileInfo, error)
+	Close() error
+}
+
+func openArtifactNoFollow(path string) (artifactFile, error) {
+	f, err := reportdoc.OpenRegularNoFollow(path)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 func ReadArtifact(root string, cycle int, name string) ([]byte, error) {
+	return readArtifactVia(root, cycle, name, openArtifactNoFollow)
+}
+
+func readArtifactVia(root string, cycle int, name string, open func(string) (artifactFile, error)) ([]byte, error) {
 	if !allowedArtifactName.MatchString(name) || strings.Contains(name, "..") {
 		return nil, ErrArtifactNotAllowed
 	}
@@ -64,7 +82,7 @@ func ReadArtifact(root string, cycle int, name string) ([]byte, error) {
 	if lst.Size() > ArtifactMaxBytes {
 		return nil, fmt.Errorf("%w: %s is %d bytes", ErrArtifactTooLarge, name, lst.Size())
 	}
-	f, err := reportdoc.OpenRegularNoFollow(path)
+	f, err := open(path)
 	if err != nil {
 		return nil, err
 	}

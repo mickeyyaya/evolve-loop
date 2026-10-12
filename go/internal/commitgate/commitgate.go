@@ -40,6 +40,7 @@ type Options struct {
 	TestInstall  string
 	ForceMissing string
 	lookPath     func(string) (string, error)
+	relPath      func(base, target string) (string, error)
 }
 
 type Result struct {

@@ -596,14 +596,14 @@ func stageReleaseSet(ctx context.Context, opts *Options) error {
 		filepath.Join(opts.ProjectRoot, "go", "evolve"),
 	)
 	if p := opts.ShipBinaryPath; p != "" {
-		if rel, err := filepath.Rel(opts.ProjectRoot, p); err == nil && !strings.HasPrefix(rel, "..") {
+		if rel, err := opts.rel(opts.ProjectRoot, p); err == nil && !strings.HasPrefix(rel, "..") {
 			abs = append(abs, p)
 		}
 	}
 	args := []string{"add", "--"}
 	seen := map[string]struct{}{}
 	for _, a := range abs {
-		rel, err := filepath.Rel(opts.ProjectRoot, a)
+		rel, err := opts.rel(opts.ProjectRoot, a)
 		if err != nil {
 			continue
 		}

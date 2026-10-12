@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -40,6 +41,13 @@ func (o *Options) run(ctx context.Context, name string, args []string, stdout, s
 // runStdin is run with a piped stdin (e.g. `gh release create --notes-file -`).
 func (o *Options) runStdin(ctx context.Context, name string, args []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	return o.runner()(ctx, name, o.ProjectRoot, args, os.Environ(), stdin, stdout, stderr)
+}
+
+func (o *Options) rel(base, target string) (string, error) {
+	if o.relPath != nil {
+		return o.relPath(base, target)
+	}
+	return filepath.Rel(base, target)
 }
 
 // execRunner is the package-level production runner seam. It is an alias for
