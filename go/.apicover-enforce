@@ -746,3 +746,5 @@
 ./internal/gotooltest
 # runnertest — the shared settle-sleep and empty-artifact kit of the phase tests (plan T15).
 ./internal/phases/runner/runnertest
+# paralleltest — the one parallel-by-default guard of the package test trees: serial lists, helper and method following.
+./internal/paralleltest
