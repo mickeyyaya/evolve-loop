@@ -89,6 +89,7 @@ func dispatchUntilPaneLossIn(t *testing.T, ctx context.Context, tm *serverLossTm
 }
 
 func TestRunTmuxREPL_ATmuxServerKilledMidPhaseEndsTheDispatchAsPaneLostWithinOneLivenessInterval(t *testing.T) {
+	t.Parallel()
 	tm := &serverLossTmux{}
 
 	run := dispatchUntilPaneLoss(t, tm, func(s *serverLossTmux) { s.serverGone = true })
@@ -109,6 +110,7 @@ func TestRunTmuxREPL_ATmuxServerKilledMidPhaseEndsTheDispatchAsPaneLostWithinOne
 }
 
 func TestRunTmuxREPL_ACaptureFailureOnALiveSessionDoesNotEndTheDispatch(t *testing.T) {
+	t.Parallel()
 	tm := &serverLossTmux{}
 
 	run := dispatchUntilPaneLoss(t, tm, func(s *serverLossTmux) { s.captureFails = true })
@@ -122,6 +124,7 @@ func TestRunTmuxREPL_ACaptureFailureOnALiveSessionDoesNotEndTheDispatch(t *testi
 }
 
 func TestRunTmuxREPL_OneTickWithoutTheSessionIsNotYetAPaneLoss(t *testing.T) {
+	t.Parallel()
 	tm := &serverLossTmux{}
 
 	run := dispatchUntilPaneLoss(t, tm, func(s *serverLossTmux) { s.blips = 1 })
@@ -135,6 +138,7 @@ func TestRunTmuxREPL_OneTickWithoutTheSessionIsNotYetAPaneLoss(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ACancelDuringTheLossConfirmationEndsAsContextCancelledNeverPaneLost(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tm := &serverLossTmux{cancelAt: paneLossConfirmTicks, cancel: cancel}
@@ -147,6 +151,7 @@ func TestRunTmuxREPL_ACancelDuringTheLossConfirmationEndsAsContextCancelledNever
 }
 
 func TestRunTmuxREPL_AHealthyCaptureNeverQueriesTheSession(t *testing.T) {
+	t.Parallel()
 	tm := &serverLossTmux{}
 
 	run := dispatchUntilPaneLoss(t, tm, func(*serverLossTmux) {})

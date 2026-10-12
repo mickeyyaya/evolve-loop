@@ -11,6 +11,7 @@ import (
 )
 
 func TestEnvValue(t *testing.T) {
+	t.Parallel()
 	env := []string{"A=1", "B=two", "X=a=b"}
 	cases := map[string]string{"A": "1", "B": "two", "X": "a=b", "MISSING": ""}
 	for k, want := range cases {
@@ -21,6 +22,7 @@ func TestEnvValue(t *testing.T) {
 }
 
 func TestExecRunner_WritesPIDFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	pidFile := filepath.Join(dir, "x.bridge-pid")
 	out := filepath.Join(dir, "out")
@@ -46,6 +48,7 @@ func TestExecRunner_WritesPIDFile(t *testing.T) {
 }
 
 func TestExecRunner_NoPIDFileEnv_NoWrite(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stray := filepath.Join(dir, "should-not-exist.bridge-pid")
 	rc, err := execRunner(context.Background(), "sh", "", []string{"-c", "true"},

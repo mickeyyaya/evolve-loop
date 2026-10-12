@@ -38,6 +38,7 @@ func verdictAfterFinalize(t *testing.T, policyJSON string) string {
 }
 
 func TestAuditorPersona_StatesWhatTheAuditAndShipDoWithAWarn(t *testing.T) {
+	t.Parallel()
 	if fluent, strict := verdictAfterFinalize(t, `{}`), verdictAfterFinalize(t, `{"workflow":{"strict_audit":true}}`); fluent != core.VerdictWARN || strict != core.VerdictFAIL {
 		t.Fatalf("WARN stays WARN by default (%s) and becomes FAIL only under strict_audit (%s); the persona sentence below states this", fluent, strict)
 	}
@@ -47,6 +48,7 @@ func TestAuditorPersona_StatesWhatTheAuditAndShipDoWithAWarn(t *testing.T) {
 }
 
 func TestAuditorPersona_MakesAnAddedCommentALowFindingAndNeverAsksForOne(t *testing.T) {
+	t.Parallel()
 	persona := auditorPersona(t)
 	for _, want := range []string{
 		"New and changed code carries no comments ([docs/conventions/code-comments.md]",
@@ -61,6 +63,7 @@ func TestAuditorPersona_MakesAnAddedCommentALowFindingAndNeverAsksForOne(t *test
 }
 
 func TestAuditorPersona_KeepsAnInaccurateExplanationItsOwnFailWhileTheGateRecordsAnAdvisory(t *testing.T) {
+	t.Parallel()
 	report, req := needsCorrectionReview()
 	if advisories, err := validateExplanationReview(report, req); err != nil || !containsAdvisory(advisories, "NEEDS_CORRECTION") {
 		t.Fatalf("the gate records NEEDS_CORRECTION as an advisory and never blocks (ADR-0102): advisories=%v err=%v", advisories, err)

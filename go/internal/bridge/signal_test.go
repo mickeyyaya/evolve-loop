@@ -129,6 +129,7 @@ func TestPaneLivenessHandler_ProjectsStateEdgesToPaneLiveness(t *testing.T) {
 }
 
 func TestNewReplWaitState_RegistersThePaneLivenessHandler(t *testing.T) {
+	t.Parallel()
 	c, got := recordingSignals()
 	lc := panestream.NewLivenessCenter()
 	workspace := t.TempDir()

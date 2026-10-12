@@ -21,6 +21,7 @@ func bootSmokeDeps(tmux *fakeTmux) (Deps, *bytes.Buffer) {
 }
 
 func TestBootSmokeTest_BootSuccess(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	tmux := &fakeTmux{paneSeq: []string{"❯"}} // ❯ marker on first capture
 	deps, _ := bootSmokeDeps(tmux)
@@ -37,6 +38,7 @@ func TestBootSmokeTest_BootSuccess(t *testing.T) {
 }
 
 func TestBootSmokeTest_BootTimeout(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	tmux := &fakeTmux{paneSeq: []string{"booting... (no marker yet)"}}
 	deps, _ := bootSmokeDeps(tmux)
@@ -50,6 +52,7 @@ func TestBootSmokeTest_BootTimeout(t *testing.T) {
 }
 
 func TestBootSmokeTest_UnknownDriver(t *testing.T) {
+	t.Parallel()
 	deps, _ := bootSmokeDeps(&fakeTmux{})
 	if rc, _ := BootSmokeTest(context.Background(), "no-such-driver", &Config{Workspace: t.TempDir()}, deps); rc != ExitBadFlags {
 		t.Errorf("rc = %d, want ExitBadFlags (%d) for an unknown driver", rc, ExitBadFlags)
@@ -57,6 +60,7 @@ func TestBootSmokeTest_UnknownDriver(t *testing.T) {
 }
 
 func TestBootSmokeTest_NonTmuxDriver(t *testing.T) {
+	t.Parallel()
 	deps, _ := bootSmokeDeps(&fakeTmux{})
 	if rc, _ := BootSmokeTest(context.Background(), "claude-p", &Config{Workspace: t.TempDir()}, deps); rc != ExitBadFlags {
 		t.Errorf("rc = %d, want ExitBadFlags (%d) for a non-tmux driver", rc, ExitBadFlags)
@@ -64,6 +68,7 @@ func TestBootSmokeTest_NonTmuxDriver(t *testing.T) {
 }
 
 func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	wt := t.TempDir()
 	tmux := &fakeTmux{paneSeq: []string{"❯"}}
@@ -81,6 +86,7 @@ func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 }
 
 func TestBootSmokeTest_NilCfg(t *testing.T) {
+	t.Parallel()
 	tmux := &fakeTmux{paneSeq: []string{"❯"}} // prompt marker present → boot succeeds
 	deps, _ := bootSmokeDeps(tmux)
 	rc, _ := BootSmokeTest(context.Background(), "claude-tmux", nil, deps)
@@ -90,6 +96,7 @@ func TestBootSmokeTest_NilCfg(t *testing.T) {
 }
 
 func TestScrollbackTail(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		in   string

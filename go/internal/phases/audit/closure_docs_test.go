@@ -31,6 +31,7 @@ func closureDocsRepoRoot(t *testing.T) string {
 }
 
 func TestC1287_DocsPassClosureCitationGate(t *testing.T) {
+	t.Parallel()
 	root := closureDocsRepoRoot(t)
 	for _, rel := range closureGovernedDocs {
 		path := filepath.Join(root, filepath.FromSlash(rel))
@@ -50,6 +51,7 @@ func TestC1287_DocsPassClosureCitationGate(t *testing.T) {
 }
 
 func TestC1287_ClosureGateRejectsUncitedClaim(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		line string

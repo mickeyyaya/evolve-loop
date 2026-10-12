@@ -10,6 +10,7 @@ import (
 )
 
 func TestDrivers_RunnerError_MissingBinary(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"claude-p", "codex", "agy"} {
 		t.Run(cli, func(t *testing.T) {
 			fx := newFixture(t, cli, "")
@@ -23,6 +24,7 @@ func TestDrivers_RunnerError_MissingBinary(t *testing.T) {
 }
 
 func TestRunTmuxREPL_NewSessionError(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{newSessErr: errors.New("tmux down")}
 	code, se := runTmux(t, fx, tmux, nil, "--allow-bypass")
@@ -32,6 +34,7 @@ func TestRunTmuxREPL_NewSessionError(t *testing.T) {
 }
 
 func TestClaudeTmux_CostGuards_BaseURL(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// ANTHROPIC_BASE_URL without allow → cost leak
 	if code, se := runTmux(t, fx, &fakeTmux{}, map[string]string{"ANTHROPIC_BASE_URL": "http://x"}, "--allow-bypass"); code != ExitCostLeak || !strings.Contains(se, "ANTHROPIC_BASE_URL") {
@@ -44,6 +47,7 @@ func TestClaudeTmux_CostGuards_BaseURL(t *testing.T) {
 }
 
 func TestCodex_Notes(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	_, se := runLookup(t, fr, fx.args("codex", "--stream-output", "--session-name=foo"), nil)
@@ -53,6 +57,7 @@ func TestCodex_Notes(t *testing.T) {
 }
 
 func TestAgy_NotesAndModelWarn(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "agy", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	args := []string{
@@ -71,6 +76,7 @@ func TestAgy_NotesAndModelWarn(t *testing.T) {
 }
 
 func TestCodexTmux_StreamOutputNote(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	_, se := runTmuxCLI(t, fx, "codex-tmux", &fakeTmux{}, nil, "--allow-bypass", "--stream-output")
 	if !strings.Contains(se, "stream_output=true is not supported") {
@@ -79,6 +85,7 @@ func TestCodexTmux_StreamOutputNote(t *testing.T) {
 }
 
 func TestAutoResponder_Tick(t *testing.T) {
+	t.Parallel()
 	mkAR := func(prompts []ManifestPrompt, tmux *fakeTmux) *autoResponder {
 		// no-op Sleep: auto_respond paces multi-keystroke sends via deps.Sleep
 		// (production wires it through withDefaults).
@@ -104,6 +111,7 @@ func TestAutoResponder_Tick(t *testing.T) {
 }
 
 func TestDecideAutoRespond_InvalidRegexSkipped(t *testing.T) {
+	t.Parallel()
 	prompts := []ManifestPrompt{
 		{Name: "bad", Regex: "[unclosed", Policy: "escalate"}, // invalid regex → skipped
 		{Name: "ok", Regex: "match", Policy: "escalate"},
@@ -114,6 +122,7 @@ func TestDecideAutoRespond_InvalidRegexSkipped(t *testing.T) {
 }
 
 func TestRunDryRun_EnsureDirsError(t *testing.T) {
+	t.Parallel()
 	f := writeJSON(t, t.TempDir()+"/file", "x") // a regular file used as Workspace
 	eng := NewEngine(Deps{})
 	cfg := &Config{Workspace: f, StdoutLog: f + "/s", StderrLog: f + "/e", Artifact: f + "/a", PromptFile: f}

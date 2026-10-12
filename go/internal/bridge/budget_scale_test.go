@@ -9,6 +9,7 @@ import (
 )
 
 func TestScaledArtifactBudget(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		base  int
@@ -32,6 +33,7 @@ func TestScaledArtifactBudget(t *testing.T) {
 }
 
 func TestLaunchArgs_ArtifactBudgetFlag(t *testing.T) {
+	t.Parallel()
 	req := core.BridgeRequest{
 		CLI: "claude-tmux", Profile: "/p.json", Model: "auto",
 		Workspace: "/ws", ArtifactPath: "/ws/build-report.md", Agent: "builder",

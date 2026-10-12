@@ -16,6 +16,7 @@ import (
 // child requests bracketed paste and treats Enter outside a paste as submission.
 // Drive the real shared REPL path and compare every byte, including newlines.
 func TestRealTmux_BracketedMultilinePromptPreservesBytes(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	python, err := exec.LookPath("python3")
 	if err != nil {

@@ -51,6 +51,7 @@ func readLLMCalls(t *testing.T, workspace string) string {
 }
 
 func TestRecordTokenUsage_EventsLogFallback_EndToEnd(t *testing.T) {
+	t.Parallel()
 	e, req, start := tokenLaunchFixture(t, true)
 
 	var resp core.BridgeResponse
@@ -69,6 +70,7 @@ func TestRecordTokenUsage_EventsLogFallback_EndToEnd(t *testing.T) {
 }
 
 func TestRecordTokenUsage_NoSources_RecordsSourceNoneZeroTokens(t *testing.T) {
+	t.Parallel()
 	e, req, start := tokenLaunchFixture(t, false)
 
 	var resp core.BridgeResponse

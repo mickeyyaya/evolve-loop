@@ -6,6 +6,7 @@ import (
 )
 
 func TestPaneProfileFor_ProjectsExhaustedRegex(t *testing.T) {
+	t.Parallel()
 	p := paneProfileFor(tmuxLaunch{name: "agy-tmux", promptMarker: "? for shortcuts"})
 	if p.ExhaustedRegex == "" {
 		t.Fatal("agy-tmux PaneProfile.ExhaustedRegex is empty — manifest pattern not projected")
@@ -21,6 +22,7 @@ func TestPaneProfileFor_ProjectsExhaustedRegex(t *testing.T) {
 }
 
 func TestPaneProfileFor_UnknownDriver_NoExhaustedRegex(t *testing.T) {
+	t.Parallel()
 	p := paneProfileFor(tmuxLaunch{name: "itest-tmux", promptMarker: "> "})
 	if p.ExhaustedRegex != "" {
 		t.Errorf("unknown driver ExhaustedRegex=%q, want empty (fail-open)", p.ExhaustedRegex)

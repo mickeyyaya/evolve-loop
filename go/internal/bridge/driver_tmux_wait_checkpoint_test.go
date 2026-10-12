@@ -14,6 +14,7 @@ import (
 )
 
 func TestReviewCheckpoint_BuildsAndPublishesEvidence(t *testing.T) {
+	t.Parallel()
 	workspace := t.TempDir()
 	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "unit pause"}}}
 	var callback stopReviewRec
@@ -68,6 +69,7 @@ func TestReviewCheckpoint_BuildsAndPublishesEvidence(t *testing.T) {
 }
 
 func TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	fatalPane := tmuxPromptMarkerDefault + "\n" + fatalTail + "\n" + tmuxPromptMarkerDefault
 	tmux := &fakeTmux{paneSeq: checkpointPaneSeq(fatalPane, fatalPane)}
@@ -149,6 +151,7 @@ func TestRunTmuxREPL_PersistentFatalCheckpointPreservesTheWholeDecisionChain(t *
 }
 
 func TestRunTmuxREPL_FatalPaneDialIsIndependentOfPhaseRecovery(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, fatalStage, recoveryStage string
 		wantResult                      string

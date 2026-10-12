@@ -35,6 +35,7 @@ func writeVerdictFile(t *testing.T, body string) string {
 }
 
 func TestReadACSVerdict_SurfacesPhantomBindings(t *testing.T) {
+	t.Parallel()
 	reading, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -57,6 +58,7 @@ func TestReadACSVerdict_SurfacesPhantomBindings(t *testing.T) {
 }
 
 func TestEGPSRedMessage_PhantomsCarryTheCure(t *testing.T) {
+	t.Parallel()
 	msg := egpsRedMessage(2,
 		[]string{"cycle1544/TestC1544_006_ReusedSnapshotNeverBecomesTheWorktreeBase"},
 		[]string{"TestWorktreeReuseBase_SnapshotHeadResolvesToFirstNonSnapshotAncestor"})
@@ -75,6 +77,7 @@ func TestEGPSRedMessage_PhantomsCarryTheCure(t *testing.T) {
 }
 
 func TestEGPSRedMessage_NoPhantomsIsByteIdentical(t *testing.T) {
+	t.Parallel()
 	got := egpsRedMessage(1, []string{"cycle1543/TestC1543_002_Whatever"}, nil)
 	want := "EGPS: red_count=1 [Whatever] (cycle ships only when red_count==0)"
 	if got != want {
@@ -83,6 +86,7 @@ func TestEGPSRedMessage_NoPhantomsIsByteIdentical(t *testing.T) {
 }
 
 func TestReadACSVerdict_AllPhantomRedsStillRed(t *testing.T) {
+	t.Parallel()
 	reading, err := readACSVerdict(writeVerdictFile(t, phantomVerdictJSON))
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -107,6 +111,7 @@ func contains(xs []string, want string) bool {
 }
 
 func TestRun_PhantomBindingRedEmitsTheCureInTheGateDiagnostic(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "acs-verdict.json"), []byte(phantomVerdictJSON), 0o644); err != nil {
 		t.Fatalf("stage verdict: %v", err)

@@ -10,6 +10,7 @@ import (
 )
 
 func TestOneEvidenceResolves_RejectsEachUnresolvableCitationWithItsReason(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "pkgdir"), 0o755); err != nil {
 		t.Fatal(err)

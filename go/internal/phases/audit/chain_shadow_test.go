@@ -27,6 +27,7 @@ func fullCoherentChain() auditchain.Chain {
 }
 
 func TestChainShadow_NeverChangesTheVerdict(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	broken := fullCoherentChain()
@@ -44,6 +45,7 @@ func TestChainShadow_NeverChangesTheVerdict(t *testing.T) {
 }
 
 func TestChainShadow_RecordsTheConclusionBesideTheCycle(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	broken := fullCoherentChain()
@@ -82,6 +84,7 @@ func TestChainShadow_RecordsTheConclusionBesideTheCycle(t *testing.T) {
 }
 
 func TestChainShadow_AbsentChainIsRecordedNotInvented(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	fb := &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"}

@@ -43,6 +43,7 @@ func TestApicoverEnforceChangedDefault_NewExportViaNewFileInExistingPackage_Caug
 }
 
 func TestApicoverEnforceChangedDefault_NewExportViaNewFile_NotGraduationGate(t *testing.T) {
+	t.Parallel()
 	root, goDir := goWorktree(t)
 	if err := os.WriteFile(filepath.Join(goDir, ".apicover-enforce"), []byte("./internal/p\n"), 0o644); err != nil {
 		t.Fatal(err)

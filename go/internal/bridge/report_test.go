@@ -8,6 +8,7 @@ import (
 )
 
 func TestBuildReport_Verdicts(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 5, 26, 0, 0, 0, 0, time.UTC)
 	ws := t.TempDir()
 	art := filepath.Join(ws, "artifact.md")
@@ -53,6 +54,7 @@ func TestBuildReport_Verdicts(t *testing.T) {
 }
 
 func TestBuildReport_NotADirectory(t *testing.T) {
+	t.Parallel()
 	if _, err := BuildReport(filepath.Join(t.TempDir(), "missing"), "artifact.md", time.Now()); err == nil {
 		t.Fatal("expected error for a non-directory workspace")
 	}

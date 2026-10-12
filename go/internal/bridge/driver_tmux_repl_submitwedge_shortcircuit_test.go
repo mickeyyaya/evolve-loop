@@ -32,6 +32,7 @@ func (p *permanentlyParkedPromptTmux) CapturePane(ctx context.Context, session s
 }
 
 func TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	tm := &permanentlyParkedPromptTmux{
 		fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},

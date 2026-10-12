@@ -35,6 +35,7 @@ func liveCatalog() modelcatalog.Catalog {
 }
 
 func TestApplyCatalogTierMap_LiveOverrides(t *testing.T) {
+	t.Parallel()
 	got := applyCatalogTierMap(manifestWithTierMap(), liveCatalog())
 	if got.ModelTierMap["deep"] != "claude-opus-4-8" {
 		t.Fatalf("deep not overridden: %v", got.ModelTierMap)
@@ -48,6 +49,7 @@ func TestApplyCatalogTierMap_LiveOverrides(t *testing.T) {
 }
 
 func TestApplyCatalogTierMap_DetectDoesNotOverride(t *testing.T) {
+	t.Parallel()
 	cat := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
 		"claude": {Source: modelcatalog.SourceDetect, TierModels: map[string]string{"deep": "wrong"}},
 	}}
@@ -58,6 +60,7 @@ func TestApplyCatalogTierMap_DetectDoesNotOverride(t *testing.T) {
 }
 
 func TestApplyCatalogTierMap_NoEntryIsByteIdentical(t *testing.T) {
+	t.Parallel()
 	m := manifestWithTierMap()
 	cat := modelcatalog.Catalog{CLIs: map[string]modelcatalog.CLIEntry{
 		"codex": {Source: modelcatalog.SourceLive, TierModels: map[string]string{"deep": "gpt-5.5"}},
@@ -69,6 +72,7 @@ func TestApplyCatalogTierMap_NoEntryIsByteIdentical(t *testing.T) {
 }
 
 func TestBaseCLIName(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{"claude-tmux": "claude", "codex-p": "codex", "agy": "agy", "ollama-tmux": "ollama"}
 	for in, want := range cases {
 		if got := policy.BaseCLI(in); got != want {

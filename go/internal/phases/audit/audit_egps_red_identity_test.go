@@ -46,6 +46,7 @@ func egpsRedDiagnostic(t *testing.T, redIDs ...string) string {
 }
 
 func TestEGPSRedDiagnostic_CarriesPredicateIdentity(t *testing.T) {
+	t.Parallel()
 	m1 := egpsRedDiagnostic(t, "cycle1115/TestC1115_003_BridgeAndRecoveryStayGreen")
 	if !strings.Contains(m1, "BridgeAndRecoveryStayGreen") {
 		t.Errorf("EGPS diagnostic lacks the red predicate identity (fingerprint stays content-free):\n  %s", m1)
@@ -57,6 +58,7 @@ func TestEGPSRedDiagnostic_CarriesPredicateIdentity(t *testing.T) {
 }
 
 func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
+	t.Parallel()
 	m1 := egpsRedDiagnostic(t, "cycle1115/TestC1115_003_BridgeAndRecoveryStayGreen")
 	m2 := egpsRedDiagnostic(t, "cycle1116/TestC1116_004_BridgeAndRecoveryStayGreen")
 	if m1 != m2 {
@@ -88,6 +90,7 @@ func TestEGPSRedDiagnostic_CycleNumbersNeverEmbedded(t *testing.T) {
 }
 
 func TestEGPSRedDiagnostic_CapsIDList(t *testing.T) {
+	t.Parallel()
 	ids := make([]string, 8)
 	for i := range ids {
 		ids[i] = "cycleX/TestRed_" + string(rune('A'+i))
@@ -114,6 +117,7 @@ func TestEGPSRedDiagnostic_CapsIDList(t *testing.T) {
 }
 
 func TestEGPSRedDiagnostic_LegacyVerdictWithoutResults(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdictShip(t, ws, 2, nil)
 	h := hooks{}

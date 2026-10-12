@@ -8,6 +8,7 @@ import (
 )
 
 func TestIdentityBlockMatchesNoManifestPattern(t *testing.T) {
+	t.Parallel()
 	block := phaseidentity.Block(phaseidentity.Facts{
 		Agent: "build", Cycle: 1, Session: "evolve-bridge-x", PromptFile: "/w/build-prompt.txt",
 		PastedFile: "/w/resolved-prompt.txt", Artifact: "/w/build-report.md",

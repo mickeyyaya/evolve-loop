@@ -40,6 +40,7 @@ var nonEGPSGates = []struct {
 }
 
 func TestVerdictConflict_EveryNonEGPSGateRecordsTheConflict(t *testing.T) {
+	t.Parallel()
 	for _, g := range nonEGPSGates {
 		t.Run(g.name, func(t *testing.T) {
 			var h hooks
@@ -60,6 +61,7 @@ func TestVerdictConflict_EveryNonEGPSGateRecordsTheConflict(t *testing.T) {
 }
 
 func TestVerdictConflict_NonEGPSGate_NarrativeWARN(t *testing.T) {
+	t.Parallel()
 	h := hooks{gofmtCheck: offenders("main.go")}
 	_, passDiags := classifyGates(t, h, narrativeReport("PASS"))
 	_, warnDiags := classifyGates(t, h, narrativeReport("WARN"))
@@ -71,6 +73,7 @@ func TestVerdictConflict_NonEGPSGate_NarrativeWARN(t *testing.T) {
 }
 
 func TestVerdictConflict_MultipleGatesStillOneRecord(t *testing.T) {
+	t.Parallel()
 	h := hooks{
 		gofmtCheck:       offenders("main.go"),
 		skillsDriftCheck: offenders("skills/x/SKILL.md"),
@@ -88,6 +91,7 @@ func TestVerdictConflict_MultipleGatesStillOneRecord(t *testing.T) {
 }
 
 func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeFAIL(t *testing.T) {
+	t.Parallel()
 	for _, g := range nonEGPSGates {
 		t.Run(g.name, func(t *testing.T) {
 			var h hooks
@@ -101,6 +105,7 @@ func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeFAIL(t *testing.T) {
 }
 
 func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeUnparseable(t *testing.T) {
+	t.Parallel()
 	h := hooks{gofmtCheck: offenders("main.go")}
 	_, diags := classifyGates(t, h, "# Audit Report\n\nprose with no verdict declaration\n")
 	if got := conflictDiags(diags); len(got) != 0 {
@@ -109,6 +114,7 @@ func TestVerdictConflict_NonEGPSGate_NoNoiseWhenNarrativeUnparseable(t *testing.
 }
 
 func TestVerdictConflict_GateCouldNotRun_NoConflict(t *testing.T) {
+	t.Parallel()
 	h := hooks{
 		gofmtCheck:                    cannotRun("gofmt: executable file not found"),
 		skillsDriftCheck:              cannotRun("registry load failed"),
@@ -128,6 +134,7 @@ func TestVerdictConflict_GateCouldNotRun_NoConflict(t *testing.T) {
 }
 
 func TestVerdictConflict_AllGatesGreen_NoConflict(t *testing.T) {
+	t.Parallel()
 	clean := func(core.PhaseRequest) ([]string, error) { return nil, nil }
 	h := hooks{
 		gofmtCheck:                    clean,
@@ -148,6 +155,7 @@ func TestVerdictConflict_AllGatesGreen_NoConflict(t *testing.T) {
 }
 
 func TestVerdictConflict_VerdictUnchangedAcrossGateMatrix(t *testing.T) {
+	t.Parallel()
 	clean := func(core.PhaseRequest) ([]string, error) { return nil, nil }
 	cases := []struct {
 		name      string

@@ -7,6 +7,7 @@ import (
 )
 
 func TestHasTokenResolver_TrueWhenDepsFieldSet(t *testing.T) {
+	t.Parallel()
 	eng := NewEngine(Deps{
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, nil
@@ -18,6 +19,7 @@ func TestHasTokenResolver_TrueWhenDepsFieldSet(t *testing.T) {
 }
 
 func TestHasTokenResolver_FalseWhenDepsFieldNil(t *testing.T) {
+	t.Parallel()
 	eng := NewEngine(Deps{})
 	if eng.HasTokenResolver() {
 		t.Error("HasTokenResolver() = true, want false for a Deps with no TokenResolver set")

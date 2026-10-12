@@ -37,6 +37,7 @@ func premoveGolden(t *testing.T, name string) map[string]string {
 }
 
 func TestApicoverGates_MissingEnforceListWinsOverUnderivable(t *testing.T) {
+	t.Parallel()
 	root, _ := goWorktree(t)
 	req := core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1}
 	if off, err := apicoverEnforceChangedDefault(req); off != nil || err != nil {
@@ -125,6 +126,7 @@ func TestIntegrationTierLog_MatchesTheGoldenBytes(t *testing.T) {
 }
 
 func TestChangedSetUnderivable_SeverityAsymmetryBytes(t *testing.T) {
+	t.Parallel()
 	g := premoveGolden(t, "messages.golden.txt")
 	root := enforceFixtureNonGit(t)
 	req := core.PhaseRequest{ProjectRoot: root, Worktree: root, Cycle: 1, Workspace: t.TempDir()}

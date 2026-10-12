@@ -6,6 +6,7 @@ import (
 )
 
 func TestRecordTokenUsage_Tripwire_ExactlySixtySeconds_Silent(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 60, cycleInDir: true,
 	})
@@ -15,6 +16,7 @@ func TestRecordTokenUsage_Tripwire_ExactlySixtySeconds_Silent(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_OneSecondOverThreshold_Warns(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 61, cycleInDir: true,
 	})
@@ -24,6 +26,7 @@ func TestRecordTokenUsage_Tripwire_OneSecondOverThreshold_Warns(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_NonZeroExitCodeOtherThanQuotaAbort_Silent(t *testing.T) {
+	t.Parallel()
 	for _, code := range []int{1, 2, 137} {
 		stderr, _ := runTripwireCase(t, tripwireCase{
 			cli: "agy", agent: "builder", code: code, durSecs: 90, cycleInDir: true,
@@ -35,6 +38,7 @@ func TestRecordTokenUsage_Tripwire_NonZeroExitCodeOtherThanQuotaAbort_Silent(t *
 }
 
 func TestRecordTokenUsage_Tripwire_ClaudeDriverCaseInsensitive_Silent(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"CLAUDE-TMUX", "Claude", "ClAuDe-Headless"} {
 		stderr, _ := runTripwireCase(t, tripwireCase{
 			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
@@ -46,6 +50,7 @@ func TestRecordTokenUsage_Tripwire_ClaudeDriverCaseInsensitive_Silent(t *testing
 }
 
 func TestRecordTokenUsage_Tripwire_ClaudeSubstringNotPrefix_Warns(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"my-claude-wrapper", "wrapper-claude", "not-claude-at-all"} {
 		stderr, _ := runTripwireCase(t, tripwireCase{
 			cli: cli, agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
@@ -57,6 +62,7 @@ func TestRecordTokenUsage_Tripwire_ClaudeSubstringNotPrefix_Warns(t *testing.T) 
 }
 
 func TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicStillWarns(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("recordTokenUsage panicked on empty CLI: %v", r)
@@ -71,6 +77,7 @@ func TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicStillWarns(t *testing.T) {
 }
 
 func TestRecordTokenUsage_Tripwire_GenericWarnCoexistsWithEscalation(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 90, cycleInDir: true,
 	})
@@ -90,6 +97,7 @@ func TestRecordTokenUsage_Tripwire_GenericWarnCoexistsWithEscalation(t *testing.
 }
 
 func TestRecordTokenUsage_TripwireRecord_FalseFieldPresentAcrossAllSilentPaths(t *testing.T) {
+	t.Parallel()
 	cases := map[string]tripwireCase{
 		"exit0-short-duration": {cli: "agy", agent: "builder", code: 0, durSecs: 5, cycleInDir: true},
 		"claude-baseline":      {cli: "claude-tmux", agent: "builder", code: 0, durSecs: 90, cycleInDir: true},
@@ -104,6 +112,7 @@ func TestRecordTokenUsage_TripwireRecord_FalseFieldPresentAcrossAllSilentPaths(t
 }
 
 func TestRecordTokenUsage_Tripwire_VeryLongDuration_NoOverflowStillWarns(t *testing.T) {
+	t.Parallel()
 	stderr, _ := runTripwireCase(t, tripwireCase{
 		cli: "agy", agent: "builder", code: 0, durSecs: 365 * 24 * 60 * 60, cycleInDir: true, // 1 year
 	})

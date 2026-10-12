@@ -9,6 +9,7 @@ import (
 )
 
 func TestClassify_DispositionEvidenceMixedTypeArrayFailsClosed(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -25,6 +26,7 @@ func TestClassify_DispositionEvidenceMixedTypeArrayFailsClosed(t *testing.T) {
 }
 
 func TestClassify_DispositionEvidenceNullOnFixedStillBlocks(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -40,6 +42,7 @@ func TestClassify_DispositionEvidenceNullOnFixedStillBlocks(t *testing.T) {
 }
 
 func TestClassify_DispositionEvidenceWhitespaceOnlyStillBlocks(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -55,6 +58,7 @@ func TestClassify_DispositionEvidenceWhitespaceOnlyStillBlocks(t *testing.T) {
 }
 
 func TestClassify_DispositionEvidenceSemicolonJoinedBothResolvePasses(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite1 := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	cite2 := evidenceFile(t, req.ProjectRoot, "go/internal/core/cyclerun.go")
@@ -72,6 +76,7 @@ func TestClassify_DispositionEvidenceSemicolonJoinedBothResolvePasses(t *testing
 }
 
 func TestClassify_DispositionEvidenceSemicolonJoinedOneMissingBlocks(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{

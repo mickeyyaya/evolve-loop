@@ -47,6 +47,7 @@ func peerShipsTheChange(t *testing.T, edit generatorEdit, regenerate bool) (*git
 }
 
 func TestSkillsDriftGate_Cycle1841ReplayBaseNewerThanTheHostPasses(t *testing.T) {
+	t.Parallel()
 	repo, base := peerShipsTheChange(t, rendererEdit, true)
 	stubs := generatedStubs(t, repo.Dir)
 	if host, _ := skillcheck.Check(repo.Dir); !reflect.DeepEqual(sortedCopy(host), stubs) {
@@ -62,6 +63,7 @@ func TestSkillsDriftGate_Cycle1841ReplayBaseNewerThanTheHostPasses(t *testing.T)
 }
 
 func TestSkillsDriftGate_BaseGeneratorChangeWithoutRegenerationFails(t *testing.T) {
+	t.Parallel()
 	repo, base := peerShipsTheChange(t, rendererEdit, false)
 	if host, _ := skillcheck.Check(repo.Dir); len(host) != 0 {
 		t.Fatalf("precondition: the host generator must see the old stubs as clean, got %v", host)
@@ -78,6 +80,7 @@ func TestSkillsDriftGate_BaseGeneratorChangeWithoutRegenerationFails(t *testing.
 }
 
 func TestSkillsDriftGate_ImportedPackageChangeIsGradedByTheWorktreeGenerator(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		regenerate bool

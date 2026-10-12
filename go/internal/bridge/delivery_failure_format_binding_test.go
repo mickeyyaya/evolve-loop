@@ -11,6 +11,7 @@ import (
 )
 
 func TestEngineLaunch_PromptSubmitWedged_DeliveryCauseSurvivesClassifier(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	const prompt = "Please produce the retrospective deliverable for this cycle now."
 	eng := newTestEngine(Deps{
@@ -35,6 +36,7 @@ func TestEngineLaunch_PromptSubmitWedged_DeliveryCauseSurvivesClassifier(t *test
 }
 
 func TestEngineLaunch_SilentPaneTimeout_NoDeliveryCause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	eng := newTestEngine(Deps{
 		Tmux:               &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
@@ -58,6 +60,7 @@ func TestEngineLaunch_SilentPaneTimeout_NoDeliveryCause(t *testing.T) {
 }
 
 func TestEngineLaunch_ReviewerReasonCannotForgeArtifactTimeoutMarker(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		reason string

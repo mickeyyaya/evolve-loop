@@ -11,6 +11,7 @@ func effortTableOf(block policy.CLIRouting) policy.EffortTable {
 }
 
 func TestLaunchIntentFor_EffortPrecedence(t *testing.T) {
+	t.Parallel()
 	table := effortTableOf(policy.CLIRouting{
 		Tiers:  map[string]policy.TierRule{"deep": {Effort: "high"}},
 		Agents: map[string]policy.AgentRule{"scout": {Effort: "low"}, "audit": {Effort: "xhigh"}},

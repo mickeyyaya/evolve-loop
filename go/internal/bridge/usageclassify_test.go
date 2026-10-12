@@ -9,6 +9,7 @@ import "testing"
 // so the pattern must be word-boundaried. Conservative by design — only an
 // unambiguous exhaustion phrase benches.
 func TestClassifyExhausted_RealManifests(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, family, pane string
 		want               bool
@@ -60,6 +61,7 @@ func TestClassifyExhausted_RealManifests(t *testing.T) {
 // like"), and that a manifest that cannot be loaded fails open to "not capped".
 func TestClassifyExhausted_FallsBackToRateLimitPattern(t *testing.T) {
 	// No exhausted_regex on the control → use the rate_limit prompt regex.
+	t.Parallel()
 	m := Manifest{
 		CLI:    "x-tmux",
 		Binary: "x",

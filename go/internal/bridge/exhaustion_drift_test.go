@@ -10,6 +10,7 @@ import (
 // exhaustedRegex is passed explicitly so the test stays decoupled from the
 // manifest's current wording.
 func TestWarnExhaustionRegexDrift(t *testing.T) {
+	t.Parallel()
 	const driftMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
 	const narrowExhausted = `(?i)reached your (usage|weekly) limit`
 	perModelWall := "You've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model."
@@ -36,6 +37,7 @@ func TestWarnExhaustionRegexDrift(t *testing.T) {
 }
 
 func TestClaudeTmuxDriftProbe_MatchesRealWall(t *testing.T) {
+	t.Parallel()
 	probe := manifestDriftProbePattern("claude-tmux")
 	if probe == "" {
 		t.Fatal("claude-tmux has no controls.usage.drift_probe_regex — the drift alarm is inert")
@@ -50,6 +52,7 @@ func TestClaudeTmuxDriftProbe_MatchesRealWall(t *testing.T) {
 }
 
 func TestDriftProbeArmedPerCLI(t *testing.T) {
+	t.Parallel()
 	const driftMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
 	cases := []struct {
 		cli         string
@@ -113,6 +116,7 @@ func TestDriftProbeArmedPerCLI(t *testing.T) {
 const driftAlarmMarker = "POSSIBLE EXHAUSTION-REGEX DRIFT"
 
 func TestTmuxREPL_DriftAlarm_AgentDiffContent_NoFalseAlarm(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// A unified-diff content line the agent is WRITING (quota-wall wording inside
 	// a test fixture), framed by prompt markers so the session reads as booted.
@@ -128,6 +132,7 @@ func TestTmuxREPL_DriftAlarm_AgentDiffContent_NoFalseAlarm(t *testing.T) {
 }
 
 func TestTmuxREPL_DriftAlarm_PromptEchoContent_NoFalseAlarm(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// A prompt line that is wall-SHAPED to the broad probe. The pane echoes it
 	// verbatim, exactly as a CLI that re-renders its injected instructions does.
@@ -150,6 +155,7 @@ func TestTmuxREPL_DriftAlarm_PromptEchoContent_NoFalseAlarm(t *testing.T) {
 // A genuine drifted CLI-chrome wall is neither a diff line nor a prompt echo,
 // so it survives strippedForExhaustionScan and must still fire the alarm.
 func TestTmuxREPL_DriftAlarm_RealDriftedWallStillFires(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// Plausible future wording: the shipped exhausted_regex misses "hit your
 	// <model> quota" (it keys on "reached/hit your usage|weekly limit"), while

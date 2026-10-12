@@ -152,6 +152,7 @@ func itSession(tag string) string {
 // --- 1. Happy path end-to-end against real tmux ---------------------------
 
 func TestRealTmux_HappyPath(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	const marker = "READY-IT"
 	cfg := itConfig(t, "ARTIFACT="+"PLACEHOLDER")
@@ -192,6 +193,7 @@ func TestRealTmux_HappyPath(t *testing.T) {
 // --- 2. Boot timeout (real tmux, marker never appears) → EC 80 ------------
 
 func TestRealTmux_BootTimeout(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	cfg := itConfig(t, "ARTIFACT=/dev/null")
 	launchCmd := writeFakeREPL(t, cfg.Worktree, "boot-timeout", "NEVER")
@@ -211,6 +213,7 @@ func TestRealTmux_BootTimeout(t *testing.T) {
 // --- 3. Artifact timeout (REPL boots, artifact never written) → EC 81 -----
 
 func TestRealTmux_ArtifactTimeout(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	const marker = "AT-READY"
 	// The artifact-timeout fake never writes regardless of the ARTIFACT
@@ -244,6 +247,7 @@ func TestRealTmux_ArtifactTimeout(t *testing.T) {
 // --- 4. Multi-line + special-char prompt delivery via paste-buffer --------
 
 func TestRealTmux_MultilineSpecialCharPrompt(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	const marker = "ML-READY"
 	const special = `a"b'c;d $x |f &g`
@@ -269,6 +273,7 @@ func TestRealTmux_MultilineSpecialCharPrompt(t *testing.T) {
 // --- 5. Named session: create → preserve → resume(reattach) → kill --------
 
 func TestRealTmux_NamedSessionResume(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	const marker = "NS-READY"
 	sess := itSession("named")
@@ -317,6 +322,7 @@ func TestRealTmux_NamedSessionResume(t *testing.T) {
 // against prompt cross-contamination between concurrent launches.
 
 func TestRealTmux_ConcurrentSessionsIsolated(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	const marker = "CC-READY"
 	const n = 3
@@ -389,6 +395,7 @@ func readFile(t *testing.T, path string) string {
 }
 
 func TestRealTmux_NewSessionInBindsPaneCwd(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	ctx := context.Background()
 	workdir := t.TempDir()

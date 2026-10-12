@@ -35,6 +35,7 @@ func withoutFooter(pane string) string {
 }
 
 func TestAgyTmux1217_SpinnerTickIsNotProgress(t *testing.T) {
+	t.Parallel()
 	pairs := [][2]string{
 		{"editing-a.txt", "editing-b.txt"},
 		{"generating-a.txt", "generating-b.txt"},
@@ -50,6 +51,7 @@ func TestAgyTmux1217_SpinnerTickIsNotProgress(t *testing.T) {
 }
 
 func TestAgyTmux1217_RealOutputIsProgress(t *testing.T) {
+	t.Parallel()
 	lc := panestream.NewLivenessCenter()
 	lc.Observe("agy", agy1217Frame(t, "editing-after-thought.txt"), agyTmuxProfile())
 	lc.Observe("agy", agy1217Frame(t, "answer.txt"), agyTmuxProfile())
@@ -59,6 +61,7 @@ func TestAgyTmux1217_RealOutputIsProgress(t *testing.T) {
 }
 
 func TestAgyTmux1217_SpinnerLineReadsBusyWithoutTheFooter(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"generating-a.txt", "editing-a.txt", "editing-b.txt", "thought-summary.txt"} {
 		pane := withoutFooter(agy1217Frame(t, name))
 		if !panestream.PaneBusy(pane, agyTmuxProfile()) {
@@ -68,6 +71,7 @@ func TestAgyTmux1217_SpinnerLineReadsBusyWithoutTheFooter(t *testing.T) {
 }
 
 func TestAgyTmux1217_IdleAndParkedPanesAreNotBusy(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"idle.txt", "answer.txt", "parked-paste.txt", "parked-typed.txt"} {
 		if panestream.PaneBusy(agy1217Frame(t, name), agyTmuxProfile()) {
 			t.Errorf("%s: no spinner and no esc footer, but the pane read busy", name)
@@ -76,6 +80,7 @@ func TestAgyTmux1217_IdleAndParkedPanesAreNotBusy(t *testing.T) {
 }
 
 func TestAgyTmux1217_FrozenSpinnerWalksToHungNotConverging(t *testing.T) {
+	t.Parallel()
 	frames := map[string][]string{
 		"1.0.4 exact spinner": {legacyAgyFrame(t, "thinking.txt")},
 		"1.2.17 ticking spinner": {
@@ -109,6 +114,7 @@ func legacyAgyFrame(t *testing.T, name string) string {
 }
 
 func TestAgyTmuxManifest_BusyLineRegexNamesTheSpinnerFrame(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("agy-tmux")
 	if err != nil {
 		t.Fatal(err)

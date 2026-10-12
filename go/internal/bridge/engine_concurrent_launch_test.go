@@ -15,6 +15,7 @@ import (
 // Launch has installed its OnBoot hook, so the shared mutation is exercised
 // deterministically without spawning any real driver.
 func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
+	t.Parallel()
 	eng := NewEngine(Deps{
 		LookupEnv: mapLookup(nil),
 		Now:       func() time.Time { return time.Unix(0, 0) },

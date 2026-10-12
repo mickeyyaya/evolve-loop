@@ -36,6 +36,7 @@ const codexPlanQuestionPane = `• The workspace is effectively empty: there is 
   tab to add notes | enter to submit answer | ←/→ to navigate questions | esc to interrupt`
 
 func TestAutoRespond_PlanModeDialogs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, cli, pane, wantAction string
 		wantRC                      int
@@ -139,6 +140,7 @@ func TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles(t *testing.T) {
 // codex's picker asks several questions, so the rule must stay multi-fire (once:true would hang on Q2).
 // The loop guard's budget bounds a form; the bottom anchor keeps a dismissed picker from spending it.
 func TestAutoRespond_PlanModeAnswersEveryLiveQuestion(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)

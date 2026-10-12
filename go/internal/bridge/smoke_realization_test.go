@@ -37,6 +37,7 @@ func smokeLaunchArgv(t *testing.T, sent []string, binary string) []string {
 }
 
 func TestBootSmokeTest_ACallerWithNoRealizationLaunchesCodexWithTheManifestsArgs(t *testing.T) {
+	t.Parallel()
 	pane := neverReadySmokePane()
 
 	BootSmokeTest(context.Background(), "codex-tmux", &Config{Workspace: t.TempDir()}, smokeDeps(pane))
@@ -48,6 +49,7 @@ func TestBootSmokeTest_ACallerWithNoRealizationLaunchesCodexWithTheManifestsArgs
 }
 
 func TestLiveSmokeTest_ACallerWithNoRealizationLaunchesCodexWithTheManifestsArgs(t *testing.T) {
+	t.Parallel()
 	pane := neverReadySmokePane()
 
 	LiveSmokeTest(context.Background(), "codex-tmux", &Config{Workspace: t.TempDir()}, smokeDeps(pane))
@@ -59,6 +61,7 @@ func TestLiveSmokeTest_ACallerWithNoRealizationLaunchesCodexWithTheManifestsArgs
 }
 
 func TestBootSmokeTest_ACallerWithNoRealizationBootsClaudeAndAgyAsAPhaseLaunchDoes(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		driver, binary string
 		wantArg        string
@@ -84,6 +87,7 @@ func TestBootSmokeTest_ACallerWithNoRealizationBootsClaudeAndAgyAsAPhaseLaunchDo
 }
 
 func TestBootSmokeTest_ACallerWithNoRealizationGetsOllamasDefaultArgs(t *testing.T) {
+	t.Parallel()
 	cfg := &Config{Workspace: t.TempDir()}
 
 	BootSmokeTest(context.Background(), "ollama-tmux", cfg, smokeDeps(neverReadySmokePane()))
@@ -94,6 +98,7 @@ func TestBootSmokeTest_ACallerWithNoRealizationGetsOllamasDefaultArgs(t *testing
 }
 
 func TestBootSmokeTest_ACallerRealizationIsLaunchedUnchanged(t *testing.T) {
+	t.Parallel()
 	pane := neverReadySmokePane()
 	supplied := Realization{LaunchFlags: []string{"--caller-supplied-flag"}}
 

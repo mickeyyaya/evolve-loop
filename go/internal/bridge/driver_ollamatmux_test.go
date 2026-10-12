@@ -10,6 +10,7 @@ import (
 )
 
 func TestOllamaTmux_DriverRegistered(t *testing.T) {
+	t.Parallel()
 	d, ok := LookupDriver("ollama-tmux")
 	if !ok {
 		t.Fatal("ollama-tmux driver not registered (init() didn't fire?)")
@@ -20,6 +21,7 @@ func TestOllamaTmux_DriverRegistered(t *testing.T) {
 }
 
 func TestOllamaTmux_ManifestRealizesYoloOnly(t *testing.T) {
+	t.Parallel()
 	intent := LaunchIntent{
 		ModelTier:     "sonnet",
 		Permission:    "bypass",
@@ -32,6 +34,7 @@ func TestOllamaTmux_ManifestRealizesYoloOnly(t *testing.T) {
 }
 
 func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
+	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{Stderr: &stderr}.withDefaults()
 	cfg := &Config{
@@ -61,6 +64,7 @@ func TestOllamaTmux_RejectsWritePhase(t *testing.T) {
 func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
 	// A bogus binary forces tmuxNonClaudePreflight to short-circuit before
 	// launching real tmux, so only the rejection's ABSENCE is asserted here.
+	t.Parallel()
 	var stderr strings.Builder
 	deps := Deps{
 		Stderr: &stderr,
@@ -82,6 +86,7 @@ func TestOllamaTmux_AcceptsReasoningPhase_RejectionDoesNotFire(t *testing.T) {
 }
 
 func TestOllamaTmux_RealCLI_BootMarkerDetected(t *testing.T) {
+	t.Parallel()
 	if _, err := exec.LookPath("ollama"); err != nil {
 		t.Skip("ollama not installed; skipping real-CLI ground-truth test")
 	}
@@ -100,6 +105,7 @@ func TestOllamaTmux_RealCLI_BootMarkerDetected(t *testing.T) {
 }
 
 func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		model     string
@@ -120,6 +126,7 @@ func TestOllamaTmux_LaunchCmdComposition(t *testing.T) {
 }
 
 func TestOllamaTmux_LaunchCmd_AppendsExtrasAfterModel(t *testing.T) {
+	t.Parallel()
 	got := ollamaComposeLaunchCmd("ollama", "llama3.1:8b", []string{"--experimental-yolo"})
 	want := "ollama run llama3.1:8b --experimental-yolo"
 	if got != want {
@@ -142,6 +149,7 @@ func TestOllamaTmux_LaunchCmd_AppendsExtrasAfterModel(t *testing.T) {
 }
 
 func TestOllamaTmux_CompositionPinsDriverInvariant(t *testing.T) {
+	t.Parallel()
 	got := ollamaComposeLaunchCmd("ollama", "test-model:tag", nil)
 	if !strings.HasPrefix(got, "ollama run ") {
 		t.Errorf("composition contract broken: %q must start with %q", got, "ollama run ")
@@ -153,6 +161,7 @@ func TestOllamaTmux_CompositionPinsDriverInvariant(t *testing.T) {
 }
 
 func TestOllamaTmux_RejectsShellInjectionInModelTag(t *testing.T) {
+	t.Parallel()
 	bad := []string{
 		"llama3.1:8b; rm -rf /",
 		"llama3.1:8b`whoami`",
@@ -186,6 +195,7 @@ func TestOllamaTmux_RejectsShellInjectionInModelTag(t *testing.T) {
 }
 
 func TestOllamaTmux_LaunchSignatureMatchesDriver(t *testing.T) {
+	t.Parallel()
 	var _ Driver = ollamaTmuxDriver{}
 	want := ollamaTmuxDriver{}.Name()
 	if d, ok := LookupDriver("ollama-tmux"); ok {
@@ -197,6 +207,7 @@ func TestOllamaTmux_LaunchSignatureMatchesDriver(t *testing.T) {
 
 func TestOllamaTmux_WorktreeFromPhaseRequest(t *testing.T) {
 	// PhaseRequest.Worktree is the non-bridge mirror of cfg.Worktree.
+	t.Parallel()
 	var pr core.PhaseRequest
 	pr.Worktree = "/abs/wt"
 	if pr.Worktree == "" {

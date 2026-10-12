@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestHasToolUse_FollowsTheDriverManifest(t *testing.T) {
+	t.Parallel()
 	for cli, want := range map[string]bool{
 		"ollama-tmux": false,
 		"claude-tmux": true,

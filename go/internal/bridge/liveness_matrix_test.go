@@ -7,6 +7,7 @@ import (
 )
 
 func TestLivenessMatrix(t *testing.T) {
+	t.Parallel()
 	const max = 6 // maxExtends for this test suite
 	r := NewDeterministicReviewer(max)
 
@@ -49,6 +50,7 @@ func TestLivenessMatrix(t *testing.T) {
 // at attempt=1, strictly less than maxExtends=6, so the detector fast-fails well before the
 // maxExtends×300s backstop would otherwise trigger on BusyButStagnant.
 func TestLivenessMatrix_HungFastFailBeforeMaxExtends(t *testing.T) {
+	t.Parallel()
 	r := NewDeterministicReviewer(6)
 	ev := StopEvent{State: panestream.LivenessHung, Attempt: 1}
 	if r.Review(ev).Action == ReviewExtend {
@@ -57,6 +59,7 @@ func TestLivenessMatrix_HungFastFailBeforeMaxExtends(t *testing.T) {
 }
 
 func TestLivenessMatrix_ConvergingUnconditionalPastMaxExtends(t *testing.T) {
+	t.Parallel()
 	r := NewDeterministicReviewer(2)
 	ev := StopEvent{State: panestream.LivenessConverging, Attempt: 9}
 	if r.Review(ev).Action != ReviewExtend {
@@ -65,6 +68,7 @@ func TestLivenessMatrix_ConvergingUnconditionalPastMaxExtends(t *testing.T) {
 }
 
 func TestLivenessMatrix_BooleanFallbackRetired(t *testing.T) {
+	t.Parallel()
 	r := NewDeterministicReviewer(3)
 	cases := []struct {
 		name string

@@ -10,6 +10,7 @@ import (
 )
 
 func TestProbeBootAttempts_ComeFromTheFamilyManifest(t *testing.T) {
+	t.Parallel()
 	for driver, want := range map[string]int{
 		"agy-tmux":        2,
 		"agy-claude-tmux": 2,
@@ -24,6 +25,7 @@ func TestProbeBootAttempts_ComeFromTheFamilyManifest(t *testing.T) {
 }
 
 func TestParseManifest_RefusesANegativeProbeBootRetryCount(t *testing.T) {
+	t.Parallel()
 	_, err := parseManifestWithStderr("x-tmux", []byte(`{"cli":"x-tmux","binary":"x","probe_boot_retries":-1}`), &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "probe_boot_retries") {
 		t.Fatalf("a negative probe_boot_retries parsed (err=%v); want a refusal naming the field", err)
@@ -56,6 +58,7 @@ func boots(pairs ...any) *scriptedBoot {
 }
 
 func TestBootProbeRetry_ABootTimeoutIsRetriedOnceAndTheLogNamesTheColdStart(t *testing.T) {
+	t.Parallel()
 	var log bytes.Buffer
 	s := boots(ExitREPLBootTimeout, "", ExitOK, "")
 
@@ -72,6 +75,7 @@ func TestBootProbeRetry_ABootTimeoutIsRetriedOnceAndTheLogNamesTheColdStart(t *t
 }
 
 func TestBootProbeRetry_ASecondTimeoutFailsLoudly(t *testing.T) {
+	t.Parallel()
 	var log bytes.Buffer
 	s := boots(ExitREPLBootTimeout, "")
 
@@ -86,6 +90,7 @@ func TestBootProbeRetry_ASecondTimeoutFailsLoudly(t *testing.T) {
 }
 
 func TestBootProbeRetry_OnlyABareBootTimeoutIsRetried(t *testing.T) {
+	t.Parallel()
 	for name, s := range map[string]*scriptedBoot{
 		"booted":            boots(ExitOK, ""),
 		"artifact timeout":  boots(ExitArtifactTimeout, ""),
@@ -107,6 +112,7 @@ func TestBootProbeRetry_OnlyABareBootTimeoutIsRetried(t *testing.T) {
 }
 
 func TestBootProbeRetry_ADriverWhoseManifestDeclaresNoRetryLaunchesOnce(t *testing.T) {
+	t.Parallel()
 	var log bytes.Buffer
 	s := boots(ExitREPLBootTimeout, "")
 
@@ -121,6 +127,7 @@ func TestBootProbeRetry_ADriverWhoseManifestDeclaresNoRetryLaunchesOnce(t *testi
 }
 
 func TestBootProbeRetry_ACancelledContextIsNotRetried(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	s := boots(ExitREPLBootTimeout, "")
@@ -153,6 +160,7 @@ func (c *coldStartTmux) CapturePane(ctx context.Context, session string, scrollb
 }
 
 func TestBootProbeRetry_AnAgyThatDrawsItsREPLLateOnItsFirstLaunchOnlyBootsOnTheRetry(t *testing.T) {
+	t.Parallel()
 	tmux := &coldStartTmux{fakeTmux: &fakeTmux{}}
 	deps, log := bootSmokeDeps(tmux.fakeTmux)
 	deps.Tmux = tmux
@@ -173,6 +181,7 @@ func TestBootProbeRetry_AnAgyThatDrawsItsREPLLateOnItsFirstLaunchOnlyBootsOnTheR
 }
 
 func TestBootProbeRetry_AnAgyThatNeverDrawsItsREPLFailsWithThePaneCaptured(t *testing.T) {
+	t.Parallel()
 	tmux := &fakeTmux{paneSeq: []string{"Antigravity CLI\n  signing in…"}}
 	deps, log := bootSmokeDeps(tmux)
 	launches := 0
@@ -197,6 +206,7 @@ func TestBootProbeRetry_AnAgyThatNeverDrawsItsREPLFailsWithThePaneCaptured(t *te
 }
 
 func TestEscalationPattern_ReadsTheClassifiedWallAWorkspaceRecorded(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if got := EscalationPattern(ws); got != "" {
 		t.Errorf("a workspace with no escalation report = %q, want none", got)

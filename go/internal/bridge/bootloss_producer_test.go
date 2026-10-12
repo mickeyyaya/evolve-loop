@@ -46,6 +46,7 @@ func observedBootLoss(t *testing.T, tm TmuxController, lp tmuxLaunch) launchoutc
 }
 
 func TestBootTimeout_ASessionGoneAtTheDeadlineReportsPaneLost(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		gone bool
@@ -70,6 +71,7 @@ func TestBootTimeout_ASessionGoneAtTheDeadlineReportsPaneLost(t *testing.T) {
 }
 
 func TestPostPasteShellSpill_ReportsDeadShell(t *testing.T) {
+	t.Parallel()
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", cycle274BquoteSpill, cycle274BquoteSpill}, PaneCmd: "node"}
 	tm := &shellWedgeTmux{FakeTmuxController: base, postPasteCmd: "zsh"}
 
@@ -84,6 +86,7 @@ func TestPostPasteShellSpill_ReportsDeadShell(t *testing.T) {
 }
 
 func TestReportBootLoss_WithNoObserverOnlyWritesTheDiagnostic(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	reportBootLoss(Deps{Stderr: &stderr}, launchoutcome.BootLossPaneLost, "gone")
 	if stderr.Len() == 0 {
@@ -92,6 +95,7 @@ func TestReportBootLoss_WithNoObserverOnlyWritesTheDiagnostic(t *testing.T) {
 }
 
 func TestEngineLaunch_ABootTimeoutOnALostSessionCarriesPaneLostToTheResponseAndTheLedger(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		tmux TmuxController
@@ -121,6 +125,7 @@ func TestEngineLaunch_ABootTimeoutOnALostSessionCarriesPaneLostToTheResponseAndT
 }
 
 func TestRunScoped_ACallersObserversStillHearTheLaunch(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	var dispatched, lost bool
 	deps := Deps{Tmux: sessionGoneFake{&fakeTmux{}}, Sleep: func(time.Duration) {}, BootTimeoutS: 3}

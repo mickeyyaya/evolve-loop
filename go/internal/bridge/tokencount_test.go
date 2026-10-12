@@ -14,6 +14,7 @@ import (
 // counter → integer token count (k = thousands), the PEAK across multiple
 // counters, and 0 for any no-match / malformed / empty input.
 func TestExtractTokenCount(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		pane string
@@ -46,6 +47,7 @@ func TestExtractTokenCount(t *testing.T) {
 }
 
 func TestReplWaitResult_RecordTokensRetainsPeak(t *testing.T) {
+	t.Parallel()
 	var result replWaitResult
 	for _, pane := range []string{
 		"\u2193 1.2k tokens",
@@ -66,6 +68,7 @@ func TestReplWaitResult_RecordTokensRetainsPeak(t *testing.T) {
 // workspace/token-usage.json with the peak the pane showed. Behavioral: it
 // invokes the engine end-to-end, not a string check on source.
 func TestTmuxPhase_WritesTokenUsage(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// Pre-seed the artifact so the wait loop completes on its first poll.
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
@@ -103,6 +106,7 @@ func TestTmuxPhase_WritesTokenUsage(t *testing.T) {
 // populates Report.TokenUsage; a missing or malformed sidecar leaves it 0 and
 // never breaks report generation (best-effort telemetry).
 func TestBuildReport_TokenUsage(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC)
 
 	t.Run("valid sidecar populates field", func(t *testing.T) {

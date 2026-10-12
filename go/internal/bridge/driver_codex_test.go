@@ -3,6 +3,7 @@ package bridge
 import "testing"
 
 func TestResolveTierModel_CanonicalTiers_Regression(t *testing.T) {
+	t.Parallel()
 	m := codexFamilyManifest(t)
 	for _, pair := range [][2]string{{"fast", "haiku"}, {"balanced", "sonnet"}, {"deep", "opus"}} {
 		canonical, legacy := pair[0], pair[1]

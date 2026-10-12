@@ -7,6 +7,7 @@ import (
 )
 
 func TestSelectArtifactTimeoutCausePrecedence(t *testing.T) {
+	t.Parallel()
 	allLowerPriority := artifactTimeoutEvidence{
 		terminalDetectorErrored: true,
 		submitWedged:            true,
@@ -56,6 +57,7 @@ func TestSelectArtifactTimeoutCausePrecedence(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ReviewerTextCannotForgeSubmitWedgedCause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	reviewer := &scriptedReviewer{verdicts: []ReviewVerdict{{
@@ -88,6 +90,7 @@ func TestRunTmuxREPL_ReviewerTextCannotForgeSubmitWedgedCause(t *testing.T) {
 }
 
 func TestArtifactTimeoutDiagnosticIsBoundedSingleLineAndKeepsRequiredFields(t *testing.T) {
+	t.Parallel()
 	longIdentity := strings.Repeat("階段 with spaces \u202e\u2066", 100)
 	w := replWaiter{
 		cfg: &Config{
@@ -133,6 +136,7 @@ func TestArtifactTimeoutDiagnosticIsBoundedSingleLineAndKeepsRequiredFields(t *t
 }
 
 func TestBoundedDiagnosticTokenNamesMissingIdentity(t *testing.T) {
+	t.Parallel()
 	if got := boundedDiagnosticToken("", 16); got != "unknown" {
 		t.Fatalf("boundedDiagnosticToken(empty) = %q, want unknown", got)
 	}

@@ -11,6 +11,7 @@ import (
 // cfg.codexConfigPath, not EVOLVE_CODEX_CONFIG_PATH, points both goroutines at one shared temp config, so the
 // real ~/.codex is never touched. The start barrier makes both read the same empty file, the lost-update window.
 func TestPretrustCodexProjects_ConcurrentTwoGoroutines(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
 	cfgA := &Config{Worktree: "/tmp/pretrust-conc-wt-A", codexConfigPath: path}

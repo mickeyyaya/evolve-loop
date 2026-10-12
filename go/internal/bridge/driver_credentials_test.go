@@ -42,6 +42,7 @@ func codexArgs(fx launchFixture, model string) []string {
 // --- claude-p credential-isolation guards ---------------------------------
 
 func TestLaunchArgs_ClaudeP_AnthropicAPIKey_CostLeak(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
 	code, stderr := runLookup(t, fr, fx.args("claude-p"), map[string]string{"ANTHROPIC_API_KEY": "sk-test"})
@@ -57,6 +58,7 @@ func TestLaunchArgs_ClaudeP_AnthropicAPIKey_CostLeak(t *testing.T) {
 }
 
 func TestLaunchArgs_ClaudeP_AnthropicBaseURL_CostLeak(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
 	code, stderr := runLookup(t, fr, fx.args("claude-p"), map[string]string{"ANTHROPIC_BASE_URL": "http://127.0.0.1:4000"})
@@ -69,6 +71,7 @@ func TestLaunchArgs_ClaudeP_AnthropicBaseURL_CostLeak(t *testing.T) {
 }
 
 func TestLaunchArgs_ClaudeP_AnthropicBaseURL_AllowedProceeds(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := runLookup(t, fr, fx.args("claude-p"), map[string]string{
@@ -86,6 +89,7 @@ func TestLaunchArgs_ClaudeP_AnthropicBaseURL_AllowedProceeds(t *testing.T) {
 // --- codex credential-isolation guard --------------------------------------
 
 func TestLaunchArgs_Codex_OpenAIKey_CostLeak(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{}
 	code, stderr := runLookup(t, fr, fx.args("codex"), map[string]string{"OPENAI_API_KEY": "sk-x"})
@@ -98,6 +102,7 @@ func TestLaunchArgs_Codex_OpenAIKey_CostLeak(t *testing.T) {
 }
 
 func TestLaunchArgs_Codex_OpenAIKey_AllowedProceeds(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, _ := runLookup(t, fr, fx.args("codex"), map[string]string{
@@ -112,6 +117,7 @@ func TestLaunchArgs_Codex_OpenAIKey_AllowedProceeds(t *testing.T) {
 // --- codex model-tier mapping ----------------------------------------------
 
 func TestLaunchArgs_Codex_ModelMap(t *testing.T) {
+	t.Parallel()
 	fam := codexFamilyManifest(t)
 	cases := []struct {
 		tier, codexModel string

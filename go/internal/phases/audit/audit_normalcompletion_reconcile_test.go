@@ -32,6 +32,7 @@ func normalPassBridge() *fakeBridge {
 }
 
 func TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	no := false
 	writeACSVerdictShip(t, ws, 0, &no)
@@ -47,6 +48,7 @@ func TestRun_NormalCompletion_PassReport_ShipEligibleFalse_RejectsAsUnreconciled
 }
 
 func TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 2)
 	phase := New(Config{Bridge: normalPassBridge(), Prompts: fakePromptsFS("body")})
@@ -61,6 +63,7 @@ func TestRun_NormalCompletion_PassReport_RedCountPositive_StaysFail(t *testing.T
 }
 
 func TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)
@@ -76,6 +79,7 @@ func TestRun_NormalCompletion_PassReport_ShipEligibleTrue_StaysPass(t *testing.T
 }
 
 func TestRun_NormalCompletion_PassReport_ShipEligibleAbsent_StaysPass(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdictShip(t, ws, 0, nil)
 	phase := New(Config{Bridge: normalPassBridge(), Prompts: fakePromptsFS("body")})

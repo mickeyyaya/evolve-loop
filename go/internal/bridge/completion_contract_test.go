@@ -11,6 +11,7 @@ import (
 )
 
 func TestCompletionContractName_IsTheStrategyKey(t *testing.T) {
+	t.Parallel()
 	for mode, want := range map[core.CompletionContract]core.CompletionContract{
 		"":                 completionArtifact,
 		completionArtifact: "artifact",
@@ -40,6 +41,7 @@ func TestCompletionContractName_IsTheStrategyKey(t *testing.T) {
 // driver_tmux_repl.go's DONE line project completionContractName /
 // completionStdout instead.
 func TestCompletionContractVocabulary_SpelledOnce(t *testing.T) {
+	t.Parallel()
 	for needle, want := range map[string][]string{
 		`= "artifact"`:          {"internal/core/ports.go"},
 		`= "worktree-evidence"`: {"internal/core/ports.go"},
@@ -54,6 +56,7 @@ func TestCompletionContractVocabulary_SpelledOnce(t *testing.T) {
 }
 
 func TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant(t *testing.T) {
+	t.Parallel()
 	bareLiteral := regexp.MustCompile(`\bCompletion:\s+"`)
 	if got := nonTestSourcesWhere(t, bareLiteral.MatchString); len(got) != 0 {
 		t.Errorf("%v spell a completion contract as a bare string: name it by a core.CompletionContract constant, so the contracts are declared once", got)
@@ -61,6 +64,7 @@ func TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedCons
 }
 
 func TestRunTmuxREPL_DoneLineNamesTheContract(t *testing.T) {
+	t.Parallel()
 	for mode, want := range map[core.CompletionContract]string{"": "artifact", "bogus-typo": "bogus-typo"} {
 		cfg := fixtureConfig(t)
 		cfg.Completion = mode

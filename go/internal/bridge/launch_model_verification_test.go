@@ -73,6 +73,7 @@ func agyClaudeLabelWait(t *testing.T) int {
 }
 
 func TestLaunchModelVerification_AgyClaudeBootingGeminiFailsOverWithTheMismatchSignal(t *testing.T) {
+	t.Parallel()
 	frames := append(slices.Repeat([]string{agyFooterGeminiFlash}, agyClaudeLabelWait(t)+2), "cleanup scrollback")
 
 	l := launchAgyClaudeOver(t, frames)
@@ -105,6 +106,7 @@ func TestLaunchModelVerification_AgyClaudeBootingGeminiFailsOverWithTheMismatchS
 }
 
 func TestLaunchModelVerification_AgyClaudeBootingClaudeDeliversThePrompt(t *testing.T) {
+	t.Parallel()
 	l := launchAgyClaudeOver(t, slices.Repeat([]string{agyFooterClaudeOpus}, 60))
 
 	if l.code == ExitModelMismatch || l.tmux.PasteCount != 1 {
@@ -119,6 +121,7 @@ func TestLaunchModelVerification_AgyClaudeBootingClaudeDeliversThePrompt(t *test
 }
 
 func TestLaunchModelVerification_ALabelThatRendersAfterTheMarkerIsStillRead(t *testing.T) {
+	t.Parallel()
 	frames := append([]string{agyFooterNoLabel, agyFooterNoLabel, agyFooterNoLabel}, slices.Repeat([]string{agyFooterClaudeOpus}, 60)...)
 
 	l := launchAgyClaudeOver(t, frames)
@@ -129,6 +132,7 @@ func TestLaunchModelVerification_ALabelThatRendersAfterTheMarkerIsStillRead(t *t
 }
 
 func TestLaunchModelVerification_AnUnreadableLabelFailsOverAfterTheWait(t *testing.T) {
+	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	frames := append(slices.Repeat([]string{agyFooterNoLabel}, wait+2), "cleanup scrollback")
 
@@ -146,6 +150,7 @@ func TestLaunchModelVerification_AnUnreadableLabelFailsOverAfterTheWait(t *testi
 }
 
 func TestLaunchModelVerification_ATargetWithoutTheRuleDeliversWhateverItBooted(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "final scrollback", "cleanup scrollback"}}
 	tm := &artifactOnPasteTmux{FakeTmuxController: base, artifact: cfg.Artifact}
@@ -160,6 +165,7 @@ func TestLaunchModelVerification_ATargetWithoutTheRuleDeliversWhateverItBooted(t
 }
 
 func TestLaunchModelCheckFor_ReadsTheRuleFromTheResolvedManifest(t *testing.T) {
+	t.Parallel()
 	check, err := launchModelCheckFor("agy-claude-tmux")
 	if err != nil {
 		t.Fatal(err)
@@ -177,6 +183,7 @@ func TestLaunchModelCheckFor_ReadsTheRuleFromTheResolvedManifest(t *testing.T) {
 }
 
 func TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck(t *testing.T) {
+	t.Parallel()
 	for cli, want := range map[string]bool{"agy-claude-tmux": true, "agy-tmux": false, "claude-tmux": false} {
 		got, err := VerifiesLaunchModel(cli)
 		if err != nil || got != want {
@@ -189,6 +196,7 @@ func TestVerifiesLaunchModel_IsTheTargetDriversOwnCheck(t *testing.T) {
 }
 
 func TestEveryManifestDeclaringALaunchModelRuleIsDrivenByAVerifier(t *testing.T) {
+	t.Parallel()
 	entries, err := embeddedManifests.ReadDir("manifests")
 	if err != nil {
 		t.Fatal(err)
@@ -206,6 +214,7 @@ func TestEveryManifestDeclaringALaunchModelRuleIsDrivenByAVerifier(t *testing.T)
 }
 
 func TestParseManifest_RefusesALaunchModelRuleItCannotRun(t *testing.T) {
+	t.Parallel()
 	const regex = `"model_label_regex": "^(?P<footer>\\? for shortcuts)?\\s{2,}(?P<model>\\S.*)$"`
 	cases := map[string]string{
 		"no model family":                `{"cli":"x-tmux","binary":"x",` + regex + `,"launch_model_verification":{"label_wait_s":5}}`,
@@ -240,6 +249,7 @@ func TestLaunchModelCheckFor_AnOperatorOverrideThatDropsTheRuleTurnsTheCheckOff(
 }
 
 func TestModelMismatchExit_WalksTheChainToClaudeCodeAndBenchesNothing(t *testing.T) {
+	t.Parallel()
 	plan := llmroute.Plan{Candidates: []string{"agy-claude-tmux", "claude-tmux"}, Triggers: llmroute.DefaultTriggers(), Model: "deep", Tiers: []string{"deep"}}
 	exits := map[string]int{"agy-claude-tmux": ExitModelMismatch, "claude-tmux": ExitOK}
 
@@ -265,6 +275,7 @@ func TestModelMismatchExit_WalksTheChainToClaudeCodeAndBenchesNothing(t *testing
 }
 
 func TestBootedModelLabel_ACancelledLaunchStopsWaitingWithoutReadingThePane(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	slept := 0
@@ -286,6 +297,7 @@ func modelCheckPane(t *testing.T, name string) string {
 }
 
 func TestLaunchModelVerification_TheReviewersHealthyPanesAllVerify(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"claude-opus-footer", "toast-below-footer", "footer-extra-segment", "footer-effort-in-parens"} {
 		t.Run(name, func(t *testing.T) {
 			l := launchAgyClaudeOver(t, slices.Repeat([]string{modelCheckPane(t, name)}, 60))
@@ -298,6 +310,7 @@ func TestLaunchModelVerification_TheReviewersHealthyPanesAllVerify(t *testing.T)
 }
 
 func TestLaunchModelVerification_TheReviewersGeminiPaneIsAMismatch(t *testing.T) {
+	t.Parallel()
 	frames := append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{modelCheckPane(t, "gemini-pro-footer")}, agyClaudeLabelWait(t)+1)...), "cleanup scrollback")
 
 	l := launchAgyClaudeOver(t, frames)
@@ -308,6 +321,7 @@ func TestLaunchModelVerification_TheReviewersGeminiPaneIsAMismatch(t *testing.T)
 }
 
 func TestLaunchModelVerification_TheDispatchedFamilyArrivingBeforeTheDeadlineIsVerified(t *testing.T) {
+	t.Parallel()
 	frames := append([]string{agyFooterGeminiFlash, agyFooterGeminiFlash, agyFooterGeminiFlash}, slices.Repeat([]string{agyFooterClaudeOpus}, 60)...)
 
 	l := launchAgyClaudeOver(t, frames)
@@ -318,6 +332,7 @@ func TestLaunchModelVerification_TheDispatchedFamilyArrivingBeforeTheDeadlineIsV
 }
 
 func TestLaunchModelVerification_TheAutoResponderAnswersADialogDuringTheWait(t *testing.T) {
+	t.Parallel()
 	frames := append([]string{agyFooterNoLabel, "Help us improve: rate the CLI\n" + agyFooterNoLabel}, slices.Repeat([]string{agyFooterClaudeOpus}, 60)...)
 
 	l := launchAgyClaudeOver(t, frames)
@@ -328,6 +343,7 @@ func TestLaunchModelVerification_TheAutoResponderAnswersADialogDuringTheWait(t *
 }
 
 func TestLaunchModelVerification_AFrameTheResponderActedOnIsNotEvidence(t *testing.T) {
+	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	dialog := "Help us improve: rate the CLI\n" + agyFooterClaudeOpus
 	frames := append(append([]string{agyFooterNoLabel, dialog}, slices.Repeat([]string{agyFooterGeminiFlash}, wait)...), "cleanup scrollback")
@@ -352,6 +368,7 @@ func (d *dyingAfterBootTmux) HasSession(ctx context.Context, name string) bool {
 }
 
 func TestLaunchModelVerification_APaneThatDiesDuringTheWaitKeepsTheFreshSessionRetry(t *testing.T) {
+	t.Parallel()
 	for _, named := range []bool{false, true} {
 		cfg := fixtureConfig(t)
 		base := &FakeTmuxController{CaptureFrames: []string{agyFooterNoLabel, agyFooterNoLabel, agyFooterNoLabel}}
@@ -389,6 +406,7 @@ func (s *shellAfterBootTmux) PaneCommand(ctx context.Context, session string) (s
 }
 
 func TestLaunchModelVerification_ALiveSessionWhosePaneFellBackToTheShellIsADeadShell(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	tm := &shellAfterBootTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: []string{agyFooterNoLabel, "cleanup scrollback"}}}
 	var observed []fatalPaneObservation
@@ -405,6 +423,7 @@ func TestLaunchModelVerification_ALiveSessionWhosePaneFellBackToTheShellIsADeadS
 }
 
 func TestLaunchModelVerification_AResponderLoopGuardTripDuringTheWaitIsABootFailureNotAMismatch(t *testing.T) {
+	t.Parallel()
 	dialog := "Allow agy to read the workspace?\n" + agyFooterNoLabel
 	frames := append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{dialog}, autoRespondLoopGuardLimit+2)...), "cleanup scrollback")
 
@@ -416,6 +435,7 @@ func TestLaunchModelVerification_AResponderLoopGuardTripDuringTheWaitIsABootFail
 }
 
 func TestLaunchModelVerification_ANamedSessionOnTheWrongModelIsKilledNotPreserved(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	frames := append(slices.Repeat([]string{agyFooterGeminiFlash}, 4), "cleanup scrollback")
 	tm := &FakeTmuxController{CaptureFrames: frames}
@@ -430,6 +450,7 @@ func TestLaunchModelVerification_ANamedSessionOnTheWrongModelIsKilledNotPreserve
 }
 
 func TestLaunchModelVerification_ABootSmokeVerifiesTheModelToo(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		frames []string
 		want   int
@@ -533,6 +554,7 @@ func footerProbes(t *testing.T) []footerProbe {
 }
 
 func TestLaunchModelVerification_OnlyTheLabelOnTheFooterPrefixLineDecides(t *testing.T) {
+	t.Parallel()
 	for _, p := range footerProbes(t) {
 		t.Run(p.name, func(t *testing.T) {
 			l := launchAgyClaudeOver(t, p.frames)
@@ -552,6 +574,7 @@ func TestLaunchModelVerification_OnlyTheLabelOnTheFooterPrefixLineDecides(t *tes
 }
 
 func TestLaunchModelVerification_TheMismatchKeepsTheLastLabelledFooter(t *testing.T) {
+	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	frames := append(append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{agyFooterGeminiFlash}, 3)...), slices.Repeat([]string{agyFooterNoLabel}, wait+2)...), "cleanup scrollback")
 
@@ -563,6 +586,7 @@ func TestLaunchModelVerification_TheMismatchKeepsTheLastLabelledFooter(t *testin
 }
 
 func TestLaunchModelVerification_AFooterNamingTwoFamiliesIsReportedAmbiguous(t *testing.T) {
+	t.Parallel()
 	footer := "? for shortcuts      Gemini 3.1 Pro (Claude Opus 5.5 unavailable)"
 	frames := append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{footer}, agyClaudeLabelWait(t)+1)...), "cleanup scrollback")
 
@@ -574,6 +598,7 @@ func TestLaunchModelVerification_AFooterNamingTwoFamiliesIsReportedAmbiguous(t *
 }
 
 func TestLaunchModelVerification_ACancelledWaitExitsAsACancelledLaunchWithoutAMismatch(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	center := signalcenter.New()
@@ -604,6 +629,7 @@ func footerUnderToasts(footer string, toasts int) string {
 }
 
 func TestLaunchModelVerification_TheFooterIsReadUpToSixLinesAboveTheBottom(t *testing.T) {
+	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	for _, tc := range []struct {
 		linesUp int
@@ -623,6 +649,7 @@ func TestLaunchModelVerification_TheFooterIsReadUpToSixLinesAboveTheBottom(t *te
 }
 
 func TestLaunchModelVerification_TheMismatchReportsTheLastFooterRead(t *testing.T) {
+	t.Parallel()
 	wait := agyClaudeLabelWait(t)
 	geminiPro := "? for shortcuts      Gemini 3.1 Pro · high"
 	frames := append(append(append([]string{agyFooterNoLabel}, slices.Repeat([]string{agyFooterGeminiFlash}, 3)...), slices.Repeat([]string{geminiPro}, wait-2)...), "cleanup scrollback")
@@ -635,6 +662,7 @@ func TestLaunchModelVerification_TheMismatchReportsTheLastFooterRead(t *testing.
 }
 
 func TestLaunchModelVerification_ALabelShapedToastUnderTheFooterIsSkipped(t *testing.T) {
+	t.Parallel()
 	frame := agyFooterClaudeOpus + "\n  Saved the session (2 files)"
 
 	l := launchAgyClaudeOver(t, slices.Repeat([]string{frame}, 60))

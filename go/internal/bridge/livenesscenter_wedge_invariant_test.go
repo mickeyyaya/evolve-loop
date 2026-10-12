@@ -11,6 +11,7 @@ import (
 )
 
 func TestWedgeCorpus_Converging_ProducingNeverCapped(t *testing.T) {
+	t.Parallel()
 	r := newDeterministicReviewer(2)
 	ev := StopEvent{State: panestream.LivenessConverging, Attempt: 50}
 	if got := r.Review(ev).Action; got != ReviewExtend {
@@ -19,6 +20,7 @@ func TestWedgeCorpus_Converging_ProducingNeverCapped(t *testing.T) {
 }
 
 func TestWedgeCorpus_BusyStagnant_BoundedThenPause(t *testing.T) {
+	t.Parallel()
 	r := newDeterministicReviewer(2)
 	if got := r.Review(StopEvent{State: panestream.LivenessBusyButStagnant, Attempt: 1}).Action; got != ReviewExtend {
 		t.Fatalf("BusyButStagnant under cap (attempt 1/2) = %q, want extend", got)
@@ -29,6 +31,7 @@ func TestWedgeCorpus_BusyStagnant_BoundedThenPause(t *testing.T) {
 }
 
 func TestWedgeCorpus_DeadPane_HungIsNotConverging(t *testing.T) {
+	t.Parallel()
 	r := newDeterministicReviewer(6)
 	got := r.Review(StopEvent{State: panestream.LivenessHung, Attempt: 0}).Action
 	if got != ReviewPause {
@@ -37,6 +40,7 @@ func TestWedgeCorpus_DeadPane_HungIsNotConverging(t *testing.T) {
 }
 
 func TestWedgeCorpus_EvidenceSurvivesEmptyCapture(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	const evidence = "TOOL CALL: go test ./... — last real output before server death"
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", evidence}}
@@ -65,6 +69,7 @@ func TestWedgeCorpus_EvidenceSurvivesEmptyCapture(t *testing.T) {
 // Anti-gaming: the corpus above must exercise the production reviewer type, not a test double standing in
 // for it — a stubbed StopReviewer could satisfy any verdict table without the real Review() logic running.
 func TestWedgeCorpus_UsesRealDeterministicReviewer(t *testing.T) {
+	t.Parallel()
 	var r StopReviewer = newDeterministicReviewer(defaultArtifactMaxExtends)
 	if _, ok := r.(deterministicReviewer); !ok {
 		t.Fatalf("corpus must exercise the real deterministicReviewer, got %T", r)
@@ -72,6 +77,7 @@ func TestWedgeCorpus_UsesRealDeterministicReviewer(t *testing.T) {
 }
 
 func TestStopReview_RenderWedgeOverride(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
 		tmuxPromptMarkerDefault, // boot

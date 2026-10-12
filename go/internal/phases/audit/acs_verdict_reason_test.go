@@ -34,6 +34,7 @@ func egpsGateDiagnostic(t *testing.T, resp core.PhaseResponse, marker string) st
 }
 
 func TestRun_AHarnessRedCarriesWhyItsScopeCouldNotRunIntoTheGateDiagnostic(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "acs-verdict.json"), []byte(harnessRedVerdictJSON), 0o644); err != nil {
 		t.Fatal(err)
@@ -55,6 +56,7 @@ func TestRun_AHarnessRedCarriesWhyItsScopeCouldNotRunIntoTheGateDiagnostic(t *te
 }
 
 func TestRun_ZeroPredicatesFailsWithTheReasonInsteadOfAMissingFile(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	ws := filepath.Join(t.TempDir(), "runs", "cycle-9")
 	if err := os.MkdirAll(ws, 0o755); err != nil {

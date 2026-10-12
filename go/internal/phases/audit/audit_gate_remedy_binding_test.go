@@ -59,6 +59,7 @@ func requireGateClassified(t *testing.T, diags []core.Diagnostic) {
 }
 
 func TestAuditGateRemedies_ClassifyEveryGateProducer(t *testing.T) {
+	t.Parallel()
 	seamType := reflect.TypeOf((func(core.PhaseRequest) ([]string, error))(nil))
 	var seams, walked []string
 	for _, f := range reflect.VisibleFields(reflect.TypeOf(hooks{})) {
@@ -93,6 +94,7 @@ func TestAuditGateRemedies_ClassifyEveryGateProducer(t *testing.T) {
 }
 
 func TestAuditGateRemedies_HostAndBookkeepingFailuresAreNoGateDiagnosis(t *testing.T) {
+	t.Parallel()
 	no := false
 	cases := []struct {
 		name     string
@@ -129,6 +131,7 @@ func TestAuditGateRemedies_HostAndBookkeepingFailuresAreNoGateDiagnosis(t *testi
 }
 
 func TestAuditGateRemedies_ProducersRenderTheTableRemedy(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		gate string
 		wire func(*hooks)

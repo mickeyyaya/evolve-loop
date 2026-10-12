@@ -13,6 +13,7 @@ const evidenceUnparseableMarker = "is unparseable"
 var oneDefect = []string{"boundary refresh does not repin the short sha"}
 
 func TestClassify_DispositionEvidenceStringShapeAccepted(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -29,6 +30,7 @@ func TestClassify_DispositionEvidenceStringShapeAccepted(t *testing.T) {
 }
 
 func TestClassify_DispositionEvidenceArrayShapeAccepted(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	cite1 := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")
 	cite2 := evidenceFile(t, req.ProjectRoot, "go/internal/core/cyclerun.go")
@@ -50,6 +52,7 @@ func TestClassify_DispositionEvidenceArrayShapeAccepted(t *testing.T) {
 }
 
 func TestClassify_DispositionEvidenceArrayShapeUnresolvableStillBlocks(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -70,6 +73,7 @@ func TestClassify_DispositionEvidenceArrayShapeUnresolvableStillBlocks(t *testin
 }
 
 func TestClassify_DispositionEvidenceEmptyArrayOnFixedStillBlocks(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -89,6 +93,7 @@ func TestClassify_DispositionEvidenceEmptyArrayOnFixedStillBlocks(t *testing.T) 
 }
 
 func TestClassify_DispositionEvidenceObjectShapeStillBlocks(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1398, 1403, oneDefect)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{

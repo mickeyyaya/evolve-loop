@@ -18,6 +18,7 @@ import (
 )
 
 func TestEngineLaunch_DurationStopsBeforeTokenResolution(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "duration-freeze", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -59,6 +60,7 @@ func TestEngineLaunch_DurationStopsBeforeTokenResolution(t *testing.T) {
 }
 
 func TestEngineLaunch_RecordsFinalCodexSelectorAfterLateOverride(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "dispatch-selector", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -87,6 +89,7 @@ func TestEngineLaunch_RecordsFinalCodexSelectorAfterLateOverride(t *testing.T) {
 }
 
 func TestEngineLaunch_ModelLikePositionalTextIsNotDispatchIdentity(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "dispatch-boundary", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -107,6 +110,7 @@ func TestEngineLaunch_ModelLikePositionalTextIsNotDispatchIdentity(t *testing.T)
 }
 
 func TestEngineLaunch_ProfileFlagsPreserveDispatchProvenance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		profileRaw []string
@@ -151,6 +155,7 @@ func TestEngineLaunch_ProfileFlagsPreserveDispatchProvenance(t *testing.T) {
 }
 
 func TestEngineLaunch_RepeatedCodexDedicatedSelectorsAreUnknown(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfileWithRawFlags(t, ws, "codex", []string{"-m", "gpt-5.6-terra"})
 	artifact := filepath.Join(ws, "artifact.md")
@@ -302,6 +307,7 @@ func writeProfileWithModelAndRawFlags(t *testing.T, dir, model, cli string, raw 
 }
 
 func TestEngineLaunch_OmittedModelRecordsUnknownCLIDefault(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "dispatch-default", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -333,6 +339,7 @@ func TestEngineLaunch_OmittedModelRecordsUnknownCLIDefault(t *testing.T) {
 }
 
 func TestEngineLaunch_FailedDispatchStillRecordsSelectorAndCause(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "failed-dispatch", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -353,6 +360,7 @@ func TestEngineLaunch_FailedDispatchStillRecordsSelectorAndCause(t *testing.T) {
 }
 
 func TestEngineLaunch_ResolverWarningCarriesAttemptContext(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "resolver-context", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -377,6 +385,7 @@ func TestEngineLaunch_ResolverWarningCarriesAttemptContext(t *testing.T) {
 }
 
 func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "resolver-log-safety", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -406,6 +415,7 @@ func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
 }
 
 func TestEngineLaunch_InvalidResolverMeasurementsRemainRecordable(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		result     tokenusage.Result
@@ -461,6 +471,7 @@ func TestEngineLaunch_InvalidResolverMeasurementsRemainRecordable(t *testing.T) 
 }
 
 func TestEngineLaunch_AgyLogOpenFailureDoesNotClaimProcessDispatch(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "agy-log-open", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -481,6 +492,7 @@ func TestEngineLaunch_AgyLogOpenFailureDoesNotClaimProcessDispatch(t *testing.T)
 }
 
 func TestEngineLaunch_WarmNamedSessionDoesNotClaimGeneratedSelector(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "warm-session", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -508,6 +520,7 @@ func TestEngineLaunch_WarmNamedSessionDoesNotClaimGeneratedSelector(t *testing.T
 }
 
 func TestModelDispatchForTmuxCapturesOnlyLaunchBoundary(t *testing.T) {
+	t.Parallel()
 	realization := Realization{modelDispatchEffect: modelDispatchFromArgs("codex-tmux", modelDispatch{},
 		[]string{"-c", `model="gpt-5.6-sol"`})}
 	got := modelDispatchForTmux("codex-tmux", realization, []string{"--model=gpt-override"})
@@ -536,6 +549,7 @@ func TestModelDispatchForTmuxCapturesOnlyLaunchBoundary(t *testing.T) {
 }
 
 func TestModelDispatchFromExtraArgsLeavesUnknownOptionArityAmbiguous(t *testing.T) {
+	t.Parallel()
 	base := modelDispatchFromArgs("codex", defaultModelDispatch(),
 		[]string{"-c", "model=gpt-5.6-sol"})
 	got := modelDispatchFromExtraArgs("codex", base, []string{"--prompt", "--model=private prompt text"})
@@ -549,6 +563,7 @@ func TestModelDispatchFromExtraArgsLeavesUnknownOptionArityAmbiguous(t *testing.
 }
 
 func TestModelDispatchFromExtraArgsUsesProviderGrammar(t *testing.T) {
+	t.Parallel()
 	base := modelDispatch{model: "opus", source: modelDispatchArgv}
 	got := modelDispatchFromExtraArgs("claude-tmux", base, []string{"-c", "--model=secret"})
 	if got.model != "" || got.source != modelDispatchUnknown {
@@ -557,6 +572,7 @@ func TestModelDispatchFromExtraArgsUsesProviderGrammar(t *testing.T) {
 }
 
 func TestModelDispatchFromFinalizedFlagsKeepsRawSuffixConservative(t *testing.T) {
+	t.Parallel()
 	got := modelDispatchFromFinalizedFlags("codex", nil,
 		[]string{"--prompt", "--model=private option value"})
 	if got.model != "" || got.source != modelDispatchUnknown {
@@ -565,6 +581,7 @@ func TestModelDispatchFromFinalizedFlagsKeepsRawSuffixConservative(t *testing.T)
 }
 
 func TestModelDispatchFromArgsRejectsEmptyCodexDedicatedSelector(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{
 		{"--model="},
 		{"--model=", "--model=gpt-5.6-sol"},
@@ -577,6 +594,7 @@ func TestModelDispatchFromArgsRejectsEmptyCodexDedicatedSelector(t *testing.T) {
 }
 
 func TestModelDispatchFromREPLRecognizesOnlyModelCommand(t *testing.T) {
+	t.Parallel()
 	got, ok := modelDispatchFromREPL("  /model Claude Opus 4.1  ")
 	if !ok || got.model != "Claude Opus 4.1" || got.source != "repl" {
 		t.Fatalf("model REPL command = (%+v, %v)", got, ok)
@@ -589,6 +607,7 @@ func TestModelDispatchFromREPLRecognizesOnlyModelCommand(t *testing.T) {
 }
 
 func TestLaunchArgs_DirectDiagnosticEntryDoesNotClaimAttemptLedgerCoverage(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "OK\n"}
 	eng := NewEngine(Deps{

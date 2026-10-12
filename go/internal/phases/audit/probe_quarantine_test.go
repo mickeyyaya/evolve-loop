@@ -40,6 +40,7 @@ func probeRepo(t *testing.T) (worktree, workspace string, cutoff time.Time) {
 }
 
 func TestQuarantineAuditProbes_PreservesAndExcludesAuditAuthoredTests(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, cutoff := probeRepo(t)
 	var log bytes.Buffer
 
@@ -63,6 +64,7 @@ func TestQuarantineAuditProbes_PreservesAndExcludesAuditAuthoredTests(t *testing
 }
 
 func TestQuarantineAuditProbes_LeavesBuilderWorkAlone(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, cutoff := probeRepo(t)
 	if _, err := quarantineAuditProbes(worktree, workspace, cutoff, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
@@ -73,6 +75,7 @@ func TestQuarantineAuditProbes_LeavesBuilderWorkAlone(t *testing.T) {
 }
 
 func TestQuarantineAuditProbes_NoProbesIsANoOp(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, _ := probeRepo(t)
 	var log bytes.Buffer
 	moved, err := quarantineAuditProbes(worktree, workspace, time.Now().Add(time.Hour), &log)
@@ -85,6 +88,7 @@ func TestQuarantineAuditProbes_NoProbesIsANoOp(t *testing.T) {
 }
 
 func TestQuarantineAuditProbes_CommittedFilesNeverTouched(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, cutoff := probeRepo(t)
 	tracked := filepath.Join(worktree, "go", "internal", "bridge", "tracked_test.go")
 	if err := os.WriteFile(tracked, []byte("package bridge\n"), 0o644); err != nil {
@@ -104,6 +108,7 @@ func TestQuarantineAuditProbes_CommittedFilesNeverTouched(t *testing.T) {
 }
 
 func TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, cutoff := probeRepo(t)
 	gitInAudit(t, worktree, "add", "go/internal/bridge/zz_audit_probe_test.go")
 	moved, err := quarantineAuditProbes(worktree, workspace, cutoff, &bytes.Buffer{})
@@ -116,6 +121,7 @@ func TestQuarantineAuditProbes_StagedLeftoverProbeIsQuarantined(t *testing.T) {
 }
 
 func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, _ := probeRepo(t)
 	workspace = filepath.Join(workspace, "runs", "cycle-9999")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
@@ -154,6 +160,7 @@ func TestClassify_QuarantinesProbesEvenWhenVerdictPreStaged(t *testing.T) {
 }
 
 func TestQuarantineProbesForRequest_AnchorSurvivesRedispatch(t *testing.T) {
+	t.Parallel()
 	worktree, workspace, _ := probeRepo(t)
 	workspace = filepath.Join(workspace, "runs", "cycle-9999")
 	if err := os.MkdirAll(workspace, 0o755); err != nil {

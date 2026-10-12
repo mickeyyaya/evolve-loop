@@ -11,6 +11,7 @@ import (
 // the inbox and the ledger stay out of reach, so a repair can restate the logic but never alter it.
 // See ADR-0106.
 func TestDeliverableRecoveryProfile_WritesOnlyTheRunDir(t *testing.T) {
+	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "deliverable-recovery.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -55,6 +56,7 @@ func TestDeliverableRecoveryProfile_WritesOnlyTheRunDir(t *testing.T) {
 // A helper is launched without a worktree. Inside the repository the wrapper may grant only the workspace and
 // the profile's declared paths; the CLI's own state directories outside it are not the change.
 func TestDeliverableRecoveryLaunch_GrantsNothingOfTheRepositoryButTheRunDir(t *testing.T) {
+	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "deliverable-recovery.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -98,6 +100,7 @@ func TestDeliverableRecoveryLaunch_GrantsNothingOfTheRepositoryButTheRunDir(t *t
 // WARN (inbox: sandbox-wrapper-forces-network-on), so the filesystem grant is the boundary that holds. This
 // pins both facts through the real launch path; it flips when the wrapper honours the declaration.
 func TestDeliverableRecoveryLaunch_DeclaresNoNetworkAndTheWrapperStillForcesIt(t *testing.T) {
+	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "deliverable-recovery.json"))
 	if err != nil {
 		t.Fatal(err)

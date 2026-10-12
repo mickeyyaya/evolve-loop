@@ -27,6 +27,7 @@ func containsAny(msgs []string, sub string) bool {
 }
 
 func TestVerdictConflict_EGPSRed_NarrativeAndGateFactsArriveTogether(t *testing.T) {
+	t.Parallel()
 	verdict, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycle1130/TestC1130_007_ProbeIsolation")
 	})
@@ -49,6 +50,7 @@ func TestVerdictConflict_EGPSRed_NarrativeAndGateFactsArriveTogether(t *testing.
 }
 
 func TestVerdictConflict_ShipEligible_NarrativeAndGateFactsArriveTogether(t *testing.T) {
+	t.Parallel()
 	no := false
 	verdict, diags := classifyWith(t, narrativeReport("WARN"), func(ws string) {
 		writeACSVerdictShip(t, ws, 0, &no)
@@ -65,6 +67,7 @@ func TestVerdictConflict_ShipEligible_NarrativeAndGateFactsArriveTogether(t *tes
 }
 
 func TestVerdictConflict_GateFactsSurviveWithoutAConflict(t *testing.T) {
+	t.Parallel()
 	verdict, diags := classifyWith(t, narrativeReport("FAIL"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycle1130/TestC1130_009_Coherent")
 	})
@@ -83,6 +86,7 @@ func TestVerdictConflict_GateFactsSurviveWithoutAConflict(t *testing.T) {
 }
 
 func TestVerdictConflict_CleanPassEmitsNeitherHalf(t *testing.T) {
+	t.Parallel()
 	yes := true
 	verdict, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictShip(t, ws, 0, &yes)

@@ -30,6 +30,7 @@ func livePane529(t *testing.T) string {
 }
 
 func TestRunTmuxREPL_ArtifactTimeout_MarkerFlagsTransientOnLivePane(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{livePane529(t)}} // boots; artifact never lands
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
@@ -60,6 +61,7 @@ func TestRunTmuxREPL_ArtifactTimeout_MarkerFlagsTransientOnLivePane(t *testing.T
 }
 
 func TestRunTmuxREPL_ArtifactTimeout_SilentPaneIsNotTransient(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
@@ -138,6 +140,7 @@ func transientFamilyCases() []transientFamilyCase {
 }
 
 func TestArtifactTimeoutTransient_LivePaneIsFamilyScopedNotHardCodedText(t *testing.T) {
+	t.Parallel()
 	pane := livePane529(t)
 	for _, tc := range transientFamilyCases() {
 		t.Run(tc.cli, func(t *testing.T) {
@@ -160,6 +163,7 @@ var bridgeAuthoredChatter = map[string]string{
 }
 
 func TestEveryTmuxFamilyDeclaresTransientRecognition(t *testing.T) {
+	t.Parallel()
 	cases := transientFamilyCases()
 	for _, tc := range cases {
 		t.Run(tc.cli, func(t *testing.T) {
@@ -220,6 +224,7 @@ func TestEveryTmuxFamilyDeclaresTransientRecognition(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ArtifactTimeout_TransientFieldIsFamilyAgnostic(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	// codex's own marker and error text: the claude manifest can neither produce nor recognize this pane.
 	pane := "› working…\nstream error: server_error; retrying\n›"
@@ -243,6 +248,7 @@ func TestRunTmuxREPL_ArtifactTimeout_TransientFieldIsFamilyAgnostic(t *testing.T
 }
 
 func TestClassifyTransientPane_IgnoresEchoedPromptText(t *testing.T) {
+	t.Parallel()
 	const echoed = "Task: make the bridge recognize API Error: 529 Overloaded inside an artifact timeout."
 	injected := "Instructions.\n" + echoed + "\nWrite the deliverable."
 
@@ -259,6 +265,7 @@ func TestClassifyTransientPane_IgnoresEchoedPromptText(t *testing.T) {
 }
 
 func TestArtifactTimeoutTransient_EchoedProviderTextNeverClassifiesForAnyFamily(t *testing.T) {
+	t.Parallel()
 	for _, tc := range transientFamilyCases() {
 		t.Run(tc.cli, func(t *testing.T) {
 			for _, providerText := range tc.transient {
@@ -275,6 +282,7 @@ func TestArtifactTimeoutTransient_EchoedProviderTextNeverClassifiesForAnyFamily(
 
 // The only test that fails if the driver hands the classifier the raw pane instead of the stripped one.
 func TestRunTmuxREPL_ArtifactTimeout_EchoedPromptIsNotTransient(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// The task quotes the provider error verbatim, as this repo's own backlog does.
 	const taskLine = "Task: recognize API Error: 529 Overloaded inside an artifact timeout."
@@ -299,6 +307,7 @@ func TestRunTmuxREPL_ArtifactTimeout_EchoedPromptIsNotTransient(t *testing.T) {
 }
 
 func TestClassifyTransientPane_UnknownDriverFailsOpen(t *testing.T) {
+	t.Parallel()
 	if classifyTransientPane("itest-tmux", "API Error: 529 Overloaded") {
 		t.Error("a driver with no manifest reported a transient cause — recognition must fail OPEN, " +
 			"never invent a diagnosis for a family it knows nothing about")

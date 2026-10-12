@@ -47,6 +47,7 @@ func (p *parkedPromptTmux) CapturePane(ctx context.Context, session string, scro
 }
 
 func TestTmuxREPL_CleanSubmit_NeverClassifiesDeliveryFailure(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "final scrollback", "cleanup scrollback"}}
 	tm := &artifactOnPasteTmux{FakeTmuxController: base, artifact: cfg.Artifact}
@@ -72,6 +73,7 @@ func TestTmuxREPL_CleanSubmit_NeverClassifiesDeliveryFailure(t *testing.T) {
 }
 
 func TestTmuxREPL_SilentPaneTimeout_NotClassifiedAsDeliveryFailure(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	// Input line clear after the paste (nothing follows the marker) => the
 	// submit verifies clean; the artifact simply never appears.
@@ -107,6 +109,7 @@ func TestTmuxREPL_SilentPaneTimeout_NotClassifiedAsDeliveryFailure(t *testing.T)
 }
 
 func TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tm := &stickyInputTmux{
 		fakeTmux:      &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
@@ -138,6 +141,7 @@ func TestTmuxREPL_NudgeSubmitWedged_ClassifiedCauseSurvivesIntoMarker(t *testing
 }
 
 func TestEngineLaunch_PromptSubmitWedged_PhaseErrorCarriesClassifiedCause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	const prompt = "Please produce the retrospective deliverable for this cycle now."
 	tm := &parkedPromptTmux{
@@ -173,6 +177,7 @@ func TestEngineLaunch_PromptSubmitWedged_PhaseErrorCarriesClassifiedCause(t *tes
 }
 
 func TestTmuxREPL_ParkedPaneWithDeliveredArtifact_CompletesOK(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here", "❯ still parked prompt text here"}}
 	promptBody, rerr := os.ReadFile(cfg.PromptFile)
@@ -223,6 +228,7 @@ func (p *parkedButDeliveringTmux) CapturePane(ctx context.Context, session strin
 }
 
 func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	if err := os.WriteFile(cfg.Artifact, []byte("stale prior report\n"), 0o644); err != nil {
 		t.Fatal(err)

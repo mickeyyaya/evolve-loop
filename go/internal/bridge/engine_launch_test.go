@@ -11,6 +11,7 @@ import (
 )
 
 func TestEngineLaunch_ClaudeP_MapsToPipeline(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -44,6 +45,7 @@ func TestEngineLaunch_ClaudeP_MapsToPipeline(t *testing.T) {
 }
 
 func TestEngineLaunch_MissingCLI_Errors(t *testing.T) {
+	t.Parallel()
 	_, err := NewEngine(Deps{}).Launch(context.Background(), core.BridgeRequest{
 		Profile: "p", Workspace: "w", ArtifactPath: "a",
 	})
@@ -53,6 +55,7 @@ func TestEngineLaunch_MissingCLI_Errors(t *testing.T) {
 }
 
 func TestEngineLaunch_NonZeroExit_Errors(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	resp, err := NewEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), core.BridgeRequest{

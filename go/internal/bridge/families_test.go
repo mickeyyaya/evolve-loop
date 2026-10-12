@@ -7,6 +7,7 @@ import (
 )
 
 func TestInteractiveFamiliesFrom(t *testing.T) {
+	t.Parallel()
 	names := []string{"claude-tmux", "codex-tmux", "claude-p", "agy-tmux", "ollama-tmux"}
 	manifest := func(name string) (Manifest, error) {
 		return Manifest{CLI: name, Binary: strings.TrimSuffix(name, "-tmux")}, nil
@@ -22,6 +23,7 @@ func TestInteractiveFamiliesFrom(t *testing.T) {
 // The exact set is host-dependent (only installed CLIs), so this asserts only
 // the stable invariants: sorted and deduped.
 func TestInteractiveFamilies_Invariants(t *testing.T) {
+	t.Parallel()
 	got := InteractiveFamilies()
 	seen := map[string]bool{}
 	for i, fam := range got {

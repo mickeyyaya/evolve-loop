@@ -48,6 +48,7 @@ func readRecords(t *testing.T, ws string) []llmCallRecord {
 }
 
 func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-tokens-amp", "")
 	artifact := filepath.Join(ws, "artifact.md")
@@ -87,6 +88,7 @@ func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
 // Attempt is left at its zero value, unlike the append test's explicit 1/2,
 // to catch an off-by-one that would write 0.
 func TestEngineLaunch_ZeroAttempt_DefaultsToOne(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{Input: 7}, tokenusage.SourceTranscript)
 
@@ -110,6 +112,7 @@ func TestEngineLaunch_ZeroAttempt_DefaultsToOne(t *testing.T) {
 // regression would still pass it; this seeds a pre-existing record to catch
 // that.
 func TestEngineLaunch_AppendPreservesExistingRecords(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{Input: 5}, tokenusage.SourceEventsResult)
 
@@ -147,6 +150,7 @@ func TestEngineLaunch_AppendPreservesExistingRecords(t *testing.T) {
 }
 
 func TestEngineLaunch_ZeroUsageStillRecords(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	eng, prof := amplifyEngine(t, ws, cyclestate.TokenUsage{}, tokenusage.SourceTranscript)
 
@@ -174,6 +178,7 @@ func TestEngineLaunch_ZeroUsageStillRecords(t *testing.T) {
 }
 
 func TestEngineLaunch_RecordSchemaConformance(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	usage := cyclestate.TokenUsage{Input: 1234, Output: 567, CacheRead: 89, CacheWrite: 42}
 	eng, prof := amplifyEngine(t, ws, usage, tokenusage.SourceTranscript)

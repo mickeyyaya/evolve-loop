@@ -24,6 +24,7 @@ func codexFamilyManifest(t *testing.T) Manifest {
 
 // The clamp's safe set must admit the deep model, or the clamp would rewrite every deep launch to its default.
 func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
+	t.Parallel()
 	m := codexFamilyManifest(t)
 	for _, tier := range []string{"deep", "top"} {
 		if got := m.ModelTierMap[tier]; got != codexDeepModel {
@@ -49,6 +50,7 @@ func TestCodexManifest_DeepTopTiers_ValuePin(t *testing.T) {
 
 // The pointer is explicit, so a headless manifest that legitimately declares no map (claude-p) is never changed.
 func TestCodexHeadlessManifest_PointsAtFamilyTable(t *testing.T) {
+	t.Parallel()
 	raw, err := loadManifestRaw("codex")
 	if err != nil {
 		t.Fatalf("loadManifestRaw(codex): %v", err)
@@ -93,6 +95,7 @@ func TestLoadManifest_ModelTierMapFrom_UnresolvableIsAnError(t *testing.T) {
 }
 
 func TestResolveTierModel_FollowsManifest(t *testing.T) {
+	t.Parallel()
 	fixture := Manifest{
 		ModelTierMap: map[string]string{"fast": "m-fast", "balanced": "m-bal", "deep": "m-deep", "top": "m-top"},
 		Params:       map[string]ParamSpec{"model_tier": {Channel: "flag", Flag: "-m", From: "model_tier_map"}},
@@ -117,6 +120,7 @@ func TestResolveTierModel_FollowsManifest(t *testing.T) {
 }
 
 func TestLaunch_Codex_ResolvesTierViaFamilyManifest(t *testing.T) {
+	t.Parallel()
 	want := codexFamilyManifest(t).ModelTierMap["deep"]
 	for _, tier := range []string{"deep", "opus"} {
 		t.Run(tier, func(t *testing.T) {
@@ -162,6 +166,7 @@ func TestLaunch_Codex_ManifestUnavailable_OmitsModelFlag(t *testing.T) {
 
 // gpt-6-astra is out of the tier table and the clamp's safe set, so even a stray pin is rewritten to the family default.
 func TestCodexFamilyManifest_AstraIsNotSelectable(t *testing.T) {
+	t.Parallel()
 	m := codexFamilyManifest(t) // raw: a stale live catalog must not mask a manifest regression
 	for tier, model := range m.ModelTierMap {
 		if model == "gpt-6-astra" {

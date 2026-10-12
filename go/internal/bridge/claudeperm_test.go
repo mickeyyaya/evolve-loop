@@ -6,6 +6,7 @@ import (
 )
 
 func TestRealizeFor_ClaudeTmux_AllPermissionModes(t *testing.T) {
+	t.Parallel()
 	cases := map[string][]string{
 		"bypass":      {"--dangerously-skip-permissions"},
 		"plan":        {"--permission-mode", "plan"},

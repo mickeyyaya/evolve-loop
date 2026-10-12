@@ -43,6 +43,7 @@ func recordingDeps(t *testing.T) (Deps, *[]signalcenter.Event, *strings.Builder)
 }
 
 func TestRecordModelAttempt_ReturnsTheAttemptContext(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	e := NewEngine(Deps{Stderr: new(strings.Builder)})
 	req := core.BridgeRequest{CLI: "codex", Agent: "build", Cycle: 7, RunID: "run-7", Workspace: ws}
@@ -243,6 +244,7 @@ func codesOf(events []signalcenter.Event) []string {
 }
 
 func TestLaunchWarn_EmptyStepIsOmitted_WarnIsLaunchWarn(t *testing.T) {
+	t.Parallel()
 	c, got := recordingSignals()
 	ctx := attemptLogContext{signals: c, dispatchIdentity: dispatchIdentity{cycle: 3, runID: "run-3", phase: "build"}, callID: "call-9", cli: "codex", agent: "build", attempt: 1}
 	ctx.launchWarn("Engine.step", "", CodeResultReadFailed, "no step", nil)
@@ -268,6 +270,7 @@ func TestLaunchWarn_EmptyStepIsOmitted_WarnIsLaunchWarn(t *testing.T) {
 }
 
 func TestLaunchStepCodes_DocsNameTheFullPayload(t *testing.T) {
+	t.Parallel()
 	for code, own := range map[signalcenter.Code]string{
 		CodeBootStrikeClearFailed:    "fields step=clear_boot_strike, ",
 		CodeBootStrikeRecordFailed:   "fields step=record_boot_strike, ",

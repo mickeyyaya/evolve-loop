@@ -6,6 +6,7 @@ import (
 )
 
 func TestRequiredRouting_UsesHostEventAndPublishesBothDecisions(t *testing.T) {
+	t.Parallel()
 	w := readWorkflowContract(t, RequiredWorkflow)
 	for _, suite := range []string{"go", "landing", "docs_only", "docs"} {
 		if w.Jobs["changes"].Outputs[suite] != "${{ steps.paths.outputs."+suite+" }}" {

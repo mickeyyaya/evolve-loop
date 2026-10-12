@@ -161,6 +161,7 @@ func TestAgyClaudeTmux_LaunchesWithWhateverEnvironmentAgyTmuxDeclares(t *testing
 }
 
 func TestModelFamily_NamesTheFamilyOfTheModelsATargetDispatches(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"agy-tmux":        "gemini",
 		"agy":             "gemini",
@@ -296,6 +297,7 @@ func TestManifestBase_AMalformedTargetIsStillReportedAsInvalidJSON(t *testing.T)
 }
 
 func TestInteractiveFamilies_AgyClaudeTmuxSharesTheAgyBinary(t *testing.T) {
+	t.Parallel()
 	got := interactiveFamiliesFrom([]string{"agy-claude-tmux", "agy-tmux", "claude-tmux"}, loadManifestRaw, func(string) bool { return true })
 	if want := []string{"agy", "claude"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("installed interactive binaries = %v, want %v: the usage probe and the updater run once per binary", got, want)

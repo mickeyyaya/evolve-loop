@@ -130,6 +130,7 @@ func alternatingPanes(t *testing.T, n int) []string {
 // --- AC-1 -----------------------------------------------------------------
 
 func TestAutoResponder_TransientRegexResolvedAtConstruction(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("load claude-tmux manifest: %v", err)
@@ -163,6 +164,7 @@ func fieldNames(rt reflect.Type) []string {
 }
 
 func TestAutoResponder_TransientRegexIsFamilyAgnostic(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"claude-tmux", "codex-tmux"} {
 		m, err := LoadManifest(cli)
 		if err != nil {
@@ -182,6 +184,7 @@ func TestAutoResponder_TransientRegexIsFamilyAgnostic(t *testing.T) {
 // --- AC-2 / AC-3 / AC-6 ---------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_EnforceStopsBeforeTheArtifactReviewer(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "enforce", 300)
 
@@ -195,6 +198,7 @@ func TestRunTmuxREPL_TransientDwell_EnforceStopsBeforeTheArtifactReviewer(t *tes
 }
 
 func TestRunTmuxREPL_TransientDwell_ReusesExistingExitAndArtifacts(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "enforce", 300)
 
@@ -235,6 +239,7 @@ func TestRunTmuxREPL_TransientDwell_ReusesExistingExitAndArtifacts(t *testing.T)
 }
 
 func TestRunTmuxREPL_TransientDwell_DoesNotFireBeforeSixtySeconds(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "enforce", 40)
 
@@ -248,6 +253,7 @@ func TestRunTmuxREPL_TransientDwell_DoesNotFireBeforeSixtySeconds(t *testing.T) 
 }
 
 func TestRunTmuxREPL_TransientDwell_ResetsOnNonMatchingFrame(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, alternatingPanes(t, 4000), "enforce", 300)
 
@@ -266,6 +272,7 @@ func TestRunTmuxREPL_TransientDwell_ResetsOnNonMatchingFrame(t *testing.T) {
 // --- AC-4 -----------------------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	busy := livePane529(t) + "\nesc to interrupt\n"
 	if !panestream.PaneBusy(busy, panestream.Profiles["claude"]) {
@@ -285,6 +292,7 @@ func TestRunTmuxREPL_TransientDwell_BusyPaneIsNeverPreempted(t *testing.T) {
 // --- AC-5 -----------------------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_ShadowObservesWithoutActing(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "shadow", 300)
 
@@ -305,6 +313,7 @@ func TestRunTmuxREPL_TransientDwell_ShadowObservesWithoutActing(t *testing.T) {
 }
 
 func TestRunTmuxREPL_TransientDwell_EnforceRecordsFastFailed(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "enforce", 300)
 
@@ -318,6 +327,7 @@ func TestRunTmuxREPL_TransientDwell_EnforceRecordsFastFailed(t *testing.T) {
 }
 
 func TestRunTmuxREPL_TransientDwell_OffStageIsLegacy(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "off", 300)
 
@@ -332,6 +342,7 @@ func TestRunTmuxREPL_TransientDwell_OffStageIsLegacy(t *testing.T) {
 // --- AC-7 -----------------------------------------------------------------
 
 func TestRunTmuxREPL_TransientDwell_EnforceDelaysRedispatch(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{livePane529(t)}, "enforce", 300)
 
@@ -361,6 +372,7 @@ func (t *cancelOnTransientCaptureTmux) CapturePane(_ context.Context, _ string, 
 }
 
 func TestRunTmuxREPL_TransientDwell_CancelBeforeCooldownSkipsDelay(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -399,6 +411,7 @@ func TestRunTmuxREPL_TransientDwell_CancelBeforeCooldownSkipsDelay(t *testing.T)
 }
 
 func TestRunTmuxREPL_TransientDwell_NoDelayOnOrdinaryTimeout(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	run := runTransientDwell(t, fx, []string{tmuxPromptMarkerDefault}, "enforce", 40)
 
@@ -446,6 +459,7 @@ func (a *alternatingFlakyTmux) CapturePane(context.Context, string, int) (string
 }
 
 func TestRunTmuxREPL_TransientDwell_CaptureErrorsDoNotResetTheDwell(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "full artifact timeout reached"}}}
 	var sleeps []time.Duration

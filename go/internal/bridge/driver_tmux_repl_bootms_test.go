@@ -10,6 +10,7 @@ import (
 )
 
 func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// Pre-seed the artifact so the post-boot wait loop exits on its first check
 	// and the launch reaches ExitOK — isolating the boot window we assert on.
@@ -52,6 +53,7 @@ func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 }
 
 func TestEngineLaunch_BootMS_ZeroWhenBootNeverCompletes(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	// CapturePane always returns "", so the prompt marker is never seen and
 	// boot times out before OnBoot fires.
@@ -84,6 +86,7 @@ func TestEngineLaunch_BootMS_ZeroWhenBootNeverCompletes(t *testing.T) {
 }
 
 func TestEngineLaunch_BootMS_ZeroOnWarmNamedSession(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)

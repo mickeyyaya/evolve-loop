@@ -11,6 +11,7 @@ import (
 // literal strings captured from live escalation reports rather than a hand-written fixture, since a
 // synthetic fixture can keep passing while the live wording drifts out from under the regex.
 func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("claude-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest(claude-tmux): %v", err)
@@ -79,6 +80,7 @@ func TestClaudeTmuxExhaustedRegex_PerModelWording(t *testing.T) {
 
 // Concatenation avoids triggering agents reading this test as ordinary tool output.
 func TestClaudeSessionWallUsesGuardedExhaustion(t *testing.T) {
+	t.Parallel()
 	wall := "  ⎿  You've hit your session li" + "mit · resets 5:10am (Asia/Taipei)"
 	if !ClassifyExhausted("claude", wall) {
 		t.Error("usage classifier missed captured session wall")
@@ -130,6 +132,7 @@ func TestClaudeSessionWallUsesGuardedExhaustion(t *testing.T) {
 // session-wall branch must accept both, or a live wall never classifies. Concatenation keeps agents
 // reading this test from matching.
 func TestClaudeSessionWall_NBSPIndentIsRecognised(t *testing.T) {
+	t.Parallel()
 	for _, live := range []string{
 		"  ⎿ \u00a0You've hit your session li" + "mit · resets 7:50pm (Asia/Taipei)",
 		"\u00a0\u00a0⎿\u00a0\u00a0You’ve hit your session li" + "mit · resets 7:50pm (Asia/Taipei)",

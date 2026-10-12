@@ -12,6 +12,7 @@ import (
 )
 
 func TestDeterministicReviewer(t *testing.T) {
+	t.Parallel()
 	r := newDeterministicReviewer(2)
 	cases := []struct {
 		name string
@@ -34,6 +35,7 @@ func TestDeterministicReviewer(t *testing.T) {
 }
 
 func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
+	t.Parallel()
 	r := newDeterministicReviewer(2)
 	cases := []struct {
 		name string
@@ -56,6 +58,7 @@ func TestDeterministicReviewer_BusyPaneIsLiveness(t *testing.T) {
 }
 
 func TestDeterministicReviewer_NonPositiveMaxFallsBack(t *testing.T) {
+	t.Parallel()
 	for _, max := range []int{0, -1} {
 		r := newDeterministicReviewer(max)
 		if got := r.Review(StopEvent{State: panestream.LivenessConverging, Attempt: 0}).Action; got != ReviewExtend {
@@ -65,6 +68,7 @@ func TestDeterministicReviewer_NonPositiveMaxFallsBack(t *testing.T) {
 }
 
 func TestEnvInt(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		set  bool
@@ -116,6 +120,7 @@ func (alwaysExtendReviewer) Review(StopEvent) ReviewVerdict {
 }
 
 func TestRunTmuxREPL_ContextCancelledBreaks(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	cfg := &Config{Model: "m", PromptFile: pf, Workspace: ws,
@@ -152,6 +157,7 @@ func runTmuxRev(t *testing.T, fx launchFixture, tmux *fakeTmux, rev StopReviewer
 }
 
 func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}} // boots; artifact never appears
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{
@@ -179,6 +185,7 @@ func TestRunTmuxREPL_ReviewExtendThenPause(t *testing.T) {
 }
 
 func TestRunTmuxREPL_ArtifactAppears_NoReview(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nDONE\n"), 0o644); err != nil {
 		t.Fatalf("seed artifact: %v", err)

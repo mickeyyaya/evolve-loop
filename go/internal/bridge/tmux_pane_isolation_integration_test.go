@@ -30,6 +30,7 @@ func writeProbingREPL(t *testing.T, dir, marker, report string) string {
 }
 
 func TestRealTmux_AgentTmuxProbeCannotKillTheRunServer(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	ctx := context.Background()
 	victim := itSession("victim")

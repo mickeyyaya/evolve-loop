@@ -7,6 +7,7 @@ import (
 )
 
 func TestResolveSessionUniqueUnderSameClock(t *testing.T) {
+	t.Parallel()
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
 	cfg := &Config{Cycle: 7, Agent: "build", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
@@ -19,6 +20,7 @@ func TestResolveSessionUniqueUnderSameClock(t *testing.T) {
 }
 
 func TestResolveSessionNonceSurvivesTruncation(t *testing.T) {
+	t.Parallel()
 	frozen := time.Unix(1_700_000_000, 0)
 	deps := Deps{Now: func() time.Time { return frozen }}.withDefaults()
 	cfg := &Config{Cycle: 9999, Agent: "build-planner", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
@@ -34,6 +36,7 @@ func TestResolveSessionNonceSurvivesTruncation(t *testing.T) {
 }
 
 func TestResolveSessionNoncePreservesRunScopePrefix(t *testing.T) {
+	t.Parallel()
 	deps := Deps{Now: time.Now}.withDefaults()
 	cfg := &Config{Cycle: 12, Agent: "build", RunID: "01ARZ3NDEKTSV4RRFFQ69G5FAV"}
 	got, _ := resolveSession(cfg, deps, "evolve-bridge-")

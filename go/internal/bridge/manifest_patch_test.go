@@ -47,6 +47,7 @@ func TestAddRule_ErrorPaths(t *testing.T) {
 }
 
 func TestAppendInteractiveRule(t *testing.T) {
+	t.Parallel()
 	base := []ManifestPrompt{{Name: "existing", Regex: "x", Policy: "escalate"}}
 	bad := []ManifestPrompt{
 		{},                                       // missing all

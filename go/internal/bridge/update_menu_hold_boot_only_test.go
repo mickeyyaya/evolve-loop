@@ -41,6 +41,7 @@ func requireRunReachedItsNudge(t *testing.T, code int, stderr string) {
 }
 
 func TestCodexRunPhase_AnIdlePaneQuotingTheUpdateMenuHeaderNeverTripsTheLoopGuard(t *testing.T) {
+	t.Parallel()
 	cfg := runPhaseConfig(t)
 	cfg.CLI, cfg.AllowBypass = "codex-tmux", true
 	pane := &fakeTmux{paneSeq: []string{codexComposerFrame, codexIdlePaneQuotingTheMenuHeader}}
@@ -54,6 +55,7 @@ func TestCodexRunPhase_AnIdlePaneQuotingTheUpdateMenuHeaderNeverTripsTheLoopGuar
 }
 
 func TestCodexRunPhase_AResumedNamedSessionHasNoBootSoNoHold(t *testing.T) {
+	t.Parallel()
 	cfg := runPhaseConfig(t)
 	pane := &fakeTmux{existing: map[string]bool{"codex-named": true}, paneSeq: []string{codexIdlePaneQuotingTheMenuHeader}}
 	var stderr bytes.Buffer
@@ -69,6 +71,7 @@ func TestCodexRunPhase_AResumedNamedSessionHasNoBootSoNoHold(t *testing.T) {
 }
 
 func TestRecipeBoot_TheUpdateMenuHoldEndsWithTheBoot(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		pane *fakeTmux
@@ -100,6 +103,7 @@ func TestRecipeBoot_TheUpdateMenuHoldEndsWithTheBoot(t *testing.T) {
 }
 
 func TestAutoRespond_CodexUpdateMenuHoldNeverShadowsALaterRule(t *testing.T) {
+	t.Parallel()
 	m, err := LoadManifest("codex-tmux")
 	if err != nil {
 		t.Fatalf("LoadManifest: %v", err)

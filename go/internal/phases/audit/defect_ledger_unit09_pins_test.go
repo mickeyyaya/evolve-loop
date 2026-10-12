@@ -20,6 +20,7 @@ func ledgerDiagnostics(diags []core.Diagnostic) []string {
 }
 
 func TestClassify_LaneScopeMalformedDisarmsTheRegistryFallback(t *testing.T) {
+	t.Parallel()
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.Remove(filepath.Join(ws, "continuation-manifest.json")); err != nil {
 		t.Fatal(err)
@@ -37,6 +38,7 @@ func TestClassify_LaneScopeMalformedDisarmsTheRegistryFallback(t *testing.T) {
 }
 
 func TestClassify_ReconcilePrecedesEmit_OwnDefectsAppendAfterInherited(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, laundered)
 	writeJSON(t, filepath.Join(ws, ledgerFile), map[string]any{
 		"origin_cycle": 1270,
@@ -63,6 +65,7 @@ func TestClassify_ReconcilePrecedesEmit_OwnDefectsAppendAfterInherited(t *testin
 }
 
 func TestFinalize_EmitsTheLedgerBeforeTheSealCoversIt(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.WriteFile(filepath.Join(ws, "audit-report.md"), []byte("# Audit Report\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -92,6 +95,7 @@ func TestFinalize_EmitsTheLedgerBeforeTheSealCoversIt(t *testing.T) {
 }
 
 func TestClassify_CorruptManifestBlocksEvenWithAHealthyRegistry(t *testing.T) {
+	t.Parallel()
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.WriteFile(filepath.Join(ws, "continuation-manifest.json"), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
@@ -107,6 +111,7 @@ func TestClassify_CorruptManifestBlocksEvenWithAHealthyRegistry(t *testing.T) {
 }
 
 func TestClassify_FirstRowWinsOnDuplicateIds(t *testing.T) {
+	t.Parallel()
 	ws, req := continuationFixture(t, 1255, 1270, []string{"text A"})
 	writeJSON(t, filepath.Join(ws, ledgerFile), map[string]any{
 		"origin_cycle": 1255,

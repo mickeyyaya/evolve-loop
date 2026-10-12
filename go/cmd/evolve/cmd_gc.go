@@ -36,13 +36,9 @@ func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	// Bound the sweep so a wedged tmux socket can't hang the command.
-	ctx, cancel := context.WithTimeout(context.Background(), orphanGCTimeout)
-	defer cancel()
-
-	r := newGCRun(ctx, *dryRun, stdout, stderr)
-	failed := r.sessions()
-	failed = r.sockets() || failed
+	r := newGCRun(context.Background(), *dryRun, stdout, stderr)
+	failed := r.step(gcRun.sessions)
+	failed = r.step(gcRun.sockets) || failed
 	failed = r.project(root) != 0 || failed
 	if failed {
 		return 1
@@ -81,6 +77,13 @@ func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun 
 		r.kill, r.remove, r.removeAll = func(int) error { return nil }, noop, noop
 	}
 	return r
+}
+
+func (r gcRun) step(run func(gcRun) bool) bool {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.ctx), orphanGCTimeout)
+	defer cancel()
+	r.ctx = ctx
+	return run(r)
 }
 
 func (r gcRun) summary(preview, applied string, args ...any) {
@@ -154,14 +157,20 @@ func (r gcRun) project(projectRoot string) int {
 	}
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
-	failed := r.cycleProcesses(opts)
-	failed = r.dispatchProcesses(projectRoot, gcPol.TempTTLHours) || failed
-	failed = r.worktrees(opts) || failed
-	failed = r.devWorktrees(projectRoot, evolveDir, gcPol) || failed
-	failed = r.runDirs(evolveDir, gcPol) || failed
-	failed = r.goCache(gcPol) || failed
-	failed = r.pipelineTemp(gcPol.TempTTLHours) || failed
-	failed = r.claimDirs(projectRoot) || failed
+	steps := []func(gcRun) bool{
+		func(s gcRun) bool { return s.cycleProcesses(opts) },
+		func(s gcRun) bool { return s.dispatchProcesses(projectRoot, gcPol.TempTTLHours) },
+		func(s gcRun) bool { return s.worktrees(opts) },
+		func(s gcRun) bool { return s.devWorktrees(projectRoot, evolveDir, gcPol) },
+		func(s gcRun) bool { return s.runDirs(evolveDir, gcPol) },
+		func(s gcRun) bool { return s.goCache(gcPol) },
+		func(s gcRun) bool { return s.pipelineTemp(gcPol.TempTTLHours) },
+		func(s gcRun) bool { return s.claimDirs(projectRoot) },
+	}
+	failed := false
+	for _, run := range steps {
+		failed = r.step(run) || failed
+	}
 	if !r.dryRun && freeErr == nil {
 		r.reportDiskFree(projectRoot, before)
 	}

@@ -27,6 +27,7 @@ func (t *reviewBeforeNudgeTmux) SendKeys(ctx context.Context, session, keys stri
 }
 
 func TestRunTmuxREPL_StopReviewCallbackPrecedesNudge(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	reviewObserved := false
 	tmux := &reviewBeforeNudgeTmux{
@@ -67,6 +68,7 @@ func TestRunTmuxREPL_StopReviewCallbackPrecedesNudge(t *testing.T) {
 }
 
 func TestApplyCheckpointDisposition_ExtendAdvancesInterval(t *testing.T) {
+	t.Parallel()
 	state := &replWaitState{
 		lastVerdict:    ReviewVerdict{Action: ReviewExtend, Reason: "still working"},
 		attempt:        2,
@@ -121,6 +123,7 @@ func newDispositionFixture(t *testing.T, action ReviewAction) (replWaiter, *repl
 }
 
 func TestApplyCheckpointDisposition_StopActionsDoNotNudge(t *testing.T) {
+	t.Parallel()
 	for _, action := range []ReviewAction{ReviewStop, "", "unexpected"} {
 		t.Run(string(action), func(t *testing.T) {
 			waiter, state, tmux := newDispositionFixture(t, action)
@@ -141,6 +144,7 @@ func TestApplyCheckpointDisposition_StopActionsDoNotNudge(t *testing.T) {
 }
 
 func TestApplyCheckpointDisposition_IdlePauseNudgesAndAdvancesOneInterval(t *testing.T) {
+	t.Parallel()
 	waiter, state, tmux := newDispositionFixture(t, ReviewPause)
 
 	if got := waiter.applyCheckpointDisposition(state, 10); got != checkpointContinueWaiting {
@@ -162,6 +166,7 @@ func TestApplyCheckpointDisposition_IdlePauseNudgesAndAdvancesOneInterval(t *tes
 }
 
 func TestApplyCheckpointDisposition_WedgedNudgeDoesNotAdvanceInterval(t *testing.T) {
+	t.Parallel()
 	waiter, state, baseTmux := newDispositionFixture(t, ReviewPause)
 	waiter.deps.Tmux = &stickyInputTmux{
 		fakeTmux:      baseTmux,

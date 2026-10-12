@@ -6,6 +6,7 @@ import (
 )
 
 func TestTmuxBoot_DetachesThePaneShellFromTheRunServerBeforeTheLaunch(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--project-root="+t.TempDir(), "--worktree="+t.TempDir())

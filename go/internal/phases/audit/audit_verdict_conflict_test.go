@@ -55,6 +55,7 @@ func requireConflict(t *testing.T, diags []core.Diagnostic, narrative string) st
 }
 
 func TestVerdictConflict_RedCountBranch(t *testing.T) {
+	t.Parallel()
 	verdict, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycle1117/TestC1117_002_ProbeTreeIsolation")
 	})
@@ -68,6 +69,7 @@ func TestVerdictConflict_RedCountBranch(t *testing.T) {
 }
 
 func TestVerdictConflict_ShipEligibleBranch(t *testing.T) {
+	t.Parallel()
 	no := false
 	verdict, diags := classifyWith(t, narrativeReport("WARN"), func(ws string) {
 		writeACSVerdictShip(t, ws, 0, &no)
@@ -79,6 +81,7 @@ func TestVerdictConflict_ShipEligibleBranch(t *testing.T) {
 }
 
 func TestVerdictConflict_ACSErrorBranch(t *testing.T) {
+	t.Parallel()
 	t.Run("missing", func(t *testing.T) {
 		verdict, diags := classifyWith(t, narrativeReport("PASS"), nil)
 		if verdict != core.VerdictFAIL {
@@ -100,6 +103,7 @@ func TestVerdictConflict_ACSErrorBranch(t *testing.T) {
 }
 
 func TestVerdictConflict_BranchesAreDistinguishable(t *testing.T) {
+	t.Parallel()
 	_, redDiags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
 	})
@@ -121,6 +125,7 @@ func TestVerdictConflict_BranchesAreDistinguishable(t *testing.T) {
 }
 
 func TestVerdictConflict_NarrativeVerdictIsCarriedVerbatim(t *testing.T) {
+	t.Parallel()
 	reds := func(ws string) { writeACSVerdictReds(t, ws, "cycleX/TestRed_A") }
 	_, passDiags := classifyWith(t, narrativeReport("PASS"), reds)
 	_, warnDiags := classifyWith(t, narrativeReport("WARN"), reds)
@@ -132,6 +137,7 @@ func TestVerdictConflict_NarrativeVerdictIsCarriedVerbatim(t *testing.T) {
 }
 
 func TestVerdictConflict_NoNoiseWhenNarrativeAlreadyFAIL(t *testing.T) {
+	t.Parallel()
 	_, diags := classifyWith(t, narrativeReport("FAIL"), func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
 	})
@@ -141,6 +147,7 @@ func TestVerdictConflict_NoNoiseWhenNarrativeAlreadyFAIL(t *testing.T) {
 }
 
 func TestVerdictConflict_NoNoiseWhenNarrativeUnparseable(t *testing.T) {
+	t.Parallel()
 	_, diags := classifyWith(t, "# Audit Report\n\nprose with no verdict declaration\n", func(ws string) {
 		writeACSVerdictReds(t, ws, "cycleX/TestRed_A")
 	})
@@ -151,6 +158,7 @@ func TestVerdictConflict_NoNoiseWhenNarrativeUnparseable(t *testing.T) {
 }
 
 func TestVerdictConflict_NoNoiseWhenGateGreen(t *testing.T) {
+	t.Parallel()
 	yes := true
 	verdict, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		writeACSVerdictShip(t, ws, 0, &yes)
@@ -164,6 +172,7 @@ func TestVerdictConflict_NoNoiseWhenGateGreen(t *testing.T) {
 }
 
 func TestVerdictConflict_SingleRecordPerClassify(t *testing.T) {
+	t.Parallel()
 	_, diags := classifyWith(t, narrativeReport("PASS"), func(ws string) {
 		no := false
 		v := map[string]any{

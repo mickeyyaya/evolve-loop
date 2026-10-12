@@ -11,6 +11,7 @@ import (
 )
 
 func TestRun_PrestagedGreenCannotSuppressHostRed(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	phase := New(Config{
@@ -31,6 +32,7 @@ func TestRun_PrestagedGreenCannotSuppressHostRed(t *testing.T) {
 }
 
 func TestRun_FailedCaptureRetiresCandidateAuthority(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeACSVerdict(t, ws, 0)
 	report := "## Verdict\n**PASS**\n<!-- evolve-acs-evidence: {\"version\":1} -->\n"

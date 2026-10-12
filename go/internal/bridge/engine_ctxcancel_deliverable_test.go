@@ -11,6 +11,7 @@ import (
 )
 
 func TestEngineLaunch_CtxCancelSignalKill_WrapsTransient(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -44,6 +45,7 @@ func TestEngineLaunch_CtxCancelSignalKill_WrapsTransient(t *testing.T) {
 }
 
 func TestEngineLaunch_StartFailure_MinusOne_StaysPlain(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 

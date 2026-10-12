@@ -38,6 +38,7 @@ func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, 
 }
 
 func TestDriverBinary_DoctorProbesEachDriversBinary(t *testing.T) {
+	t.Parallel()
 	for cli, want := range map[string]string{
 		"claude-p": "claude", "claude-tmux": "claude", "codex": "codex",
 		"codex-tmux": "codex", "agy": "agy", "agy-tmux": "agy", "other-tmux": "other",
@@ -49,6 +50,7 @@ func TestDriverBinary_DoctorProbesEachDriversBinary(t *testing.T) {
 }
 
 func TestDoctorHome_Fallback(t *testing.T) {
+	t.Parallel()
 	if h := doctorEngine(map[string]string{"HOME": "/x"}, nil, 0, nil).doctorHome(); h != "/x" {
 		t.Fatalf("HOME from env = %q", h)
 	}
@@ -60,6 +62,7 @@ func TestDoctorHome_Fallback(t *testing.T) {
 }
 
 func TestDoctorAuth(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
 	eng := doctorEngine(map[string]string{"HOME": home}, nil, 0, nil)
 
@@ -100,6 +103,7 @@ func TestDoctorAuth(t *testing.T) {
 // "Claude Code-credentials"), not a file, so doctorAuth must consult the
 // KeychainProbe seam or a file-only check false-negatives.
 func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir() // deliberately NO ~/.claude/.credentials.json
 
 	eng := NewEngine(Deps{
@@ -122,6 +126,7 @@ func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 }
 
 func TestDoctorEnvWarnings(t *testing.T) {
+	t.Parallel()
 	e := doctorEngine(map[string]string{
 		"ANTHROPIC_API_KEY": "k", "ANTHROPIC_BASE_URL": "u", "OPENAI_API_KEY": "o",
 	}, nil, 0, nil)
@@ -142,6 +147,7 @@ func TestDoctorEnvWarnings(t *testing.T) {
 }
 
 func TestDoctorDeep(t *testing.T) {
+	t.Parallel()
 	e := doctorEngine(nil, nil, 0, nil)
 	if dp := e.doctorDeep(context.Background(), "claude-tmux", "claude"); dp.Ran {
 		t.Fatal("tmux deep should not run")
@@ -166,6 +172,7 @@ func TestDoctorDeep(t *testing.T) {
 }
 
 func TestDoctorVersion_Error(t *testing.T) {
+	t.Parallel()
 	e := NewEngine(Deps{Runner: func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
 		return -1, errNoBin
 	}})
@@ -175,6 +182,7 @@ func TestDoctorVersion_Error(t *testing.T) {
 }
 
 func TestDoctor_VerdictsAndExitCodes(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
 	mkfile(t, filepath.Join(home, ".claude", ".credentials.json"), "{}")
 

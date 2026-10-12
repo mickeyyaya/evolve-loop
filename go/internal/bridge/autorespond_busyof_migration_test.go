@@ -11,6 +11,7 @@ import (
 )
 
 func TestAutoResponderTick_BusyGateViaCenter_SuppressesEscalate(t *testing.T) {
+	t.Parallel()
 	busyPane := "Which absolute path should I write the deliverable to?\n" +
 		"⏵⏵ bypass permissions on (shift+tab to cycle) · esc to interrupt\n"
 
@@ -27,6 +28,7 @@ func TestAutoResponderTick_BusyGateViaCenter_SuppressesEscalate(t *testing.T) {
 }
 
 func TestAutoResponderTick_IdleGateViaCenter_Escalates(t *testing.T) {
+	t.Parallel()
 	idlePane := "Which absolute path should I write the deliverable to?\n" +
 		"⏺ answer complete\n"
 
@@ -72,6 +74,7 @@ func autorespondTickRegionSource(t *testing.T) string {
 }
 
 func TestAutoResponderTick_NoDirectChromeParse(t *testing.T) {
+	t.Parallel()
 	region := autorespondTickRegionSource(t)
 	if strings.Contains(region, "panestream.PaneBusy(") {
 		t.Error("tick() busy-gate region still calls panestream.PaneBusy( directly — must read it via panestream.LivenessCenter.BusyOf instead")

@@ -33,6 +33,7 @@ func (d *dyingServerTmux) HasSession(ctx context.Context, session string) bool {
 // checkpoint is the only good frame before the server dies, so lastGoodPane
 // must come from the checkpoint, not only the baseline.
 func TestEscalationFinalPaneFromEmptyBaseline(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	const evidence = "Working… (esc to interrupt) — mid-turn frame"
 	// Frame budget (the auto-respond tick consumes one capture per loop
@@ -64,6 +65,7 @@ func TestEscalationFinalPaneFromEmptyBaseline(t *testing.T) {
 }
 
 func TestEscalationFinalPaneSurvivesServerDeath(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig(t)
 	const evidence = "TOOL CALL: go test ./... — the last real work the agent did"
 	base := &FakeTmuxController{CaptureFrames: []string{"❯", evidence}}

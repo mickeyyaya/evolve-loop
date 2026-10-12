@@ -22,6 +22,7 @@ func covDeps() Deps {
 }
 
 func TestHeadlessDrivers_PreparePromptError(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := &Config{
 		Model:      "haiku",
@@ -40,6 +41,7 @@ func TestHeadlessDrivers_PreparePromptError(t *testing.T) {
 }
 
 func TestRunTmuxREPL_PreparePromptError(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := &Config{
 		Model: "haiku", AllowBypass: true,
@@ -55,12 +57,14 @@ func TestRunTmuxREPL_PreparePromptError(t *testing.T) {
 
 func TestEnsureDirs_EmptyFieldsSkipped(t *testing.T) {
 	// Workspace "" → the d=="" continue branch; Dir("")=="." is creatable.
+	t.Parallel()
 	if err := ensureDirs(&Config{}); err != nil {
 		t.Fatalf("ensureDirs(empty) err: %v", err)
 	}
 }
 
 func TestOpenDriverLogs_StderrCreateError(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	cfg := &Config{
 		Workspace: ws,

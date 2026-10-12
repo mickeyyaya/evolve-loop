@@ -42,6 +42,7 @@ func launchLine(t *testing.T, tmux *fakeTmux) string {
 }
 
 func TestTmuxDispatch_ClaudeStatesItsAuthorityAsItsSystemPrompt(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	_, stderr := runTmux(t, fx, tmux, nil, "--agent=tdd", "--cycle=1707", "--worktree="+t.TempDir())
@@ -61,6 +62,7 @@ func TestTmuxDispatch_ClaudeStatesItsAuthorityAsItsSystemPrompt(t *testing.T) {
 }
 
 func TestTmuxDispatch_ABootSmokeWithARealizedFileStillWritesTheFileItLaunchesWith(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	authorityFile := filepath.Join(ws, "pane-authority.md")
 	cfg := &Config{Workspace: ws, Agent: "tdd", Realization: RealizeFor("claude-tmux", LaunchIntent{SystemPromptFile: authorityFile})}
@@ -74,6 +76,7 @@ func TestTmuxDispatch_ABootSmokeWithARealizedFileStillWritesTheFileItLaunchesWit
 }
 
 func TestTmuxDispatch_IdentityIsStatedForEveryTmuxCLI(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "codex-tmux", "")
 	_, stderr := runTmuxCLI(t, fx, "codex-tmux", &fakeTmux{}, nil, "--allow-bypass", "--agent=tdd", "--cycle=1707", "--worktree="+t.TempDir())
 	pasted, want := pastedIdentity(t, fx, stderr)
@@ -86,6 +89,7 @@ func TestTmuxDispatch_IdentityIsStatedForEveryTmuxCLI(t *testing.T) {
 }
 
 func TestTmuxDispatch_StdoutCompletionClaimsNoArtifact(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	runTmux(t, fx, &fakeTmux{}, nil, "--agent=router", "--completion=stdout", "--worktree="+t.TempDir())
 	raw, err := os.ReadFile(filepath.Join(fx.ws, "resolved-prompt.txt"))
@@ -101,6 +105,7 @@ func TestTmuxDispatch_StdoutCompletionClaimsNoArtifact(t *testing.T) {
 }
 
 func TestTmuxDispatch_NoAgentNameMeansNoIdentity(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "plan")
 	tmux := &fakeTmux{}
 	runTmux(t, fx, tmux, nil, "--worktree="+t.TempDir())

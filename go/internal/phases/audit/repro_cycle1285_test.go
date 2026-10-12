@@ -53,6 +53,7 @@ func reproContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, openDe
 }
 
 func TestRepro1285_F2_ManifestDeletionSilentlyDisarmsTheReconcileGate(t *testing.T) {
+	t.Parallel()
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.Remove(filepath.Join(ws, "continuation-manifest.json")); err != nil {
 		t.Fatalf("remove manifest: %v", err)
@@ -70,6 +71,7 @@ func TestRepro1285_F2_ManifestDeletionSilentlyDisarmsTheReconcileGate(t *testing
 }
 
 func TestRepro1285_F2_CorruptManifestDegradesOpen(t *testing.T) {
+	t.Parallel()
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if err := os.WriteFile(filepath.Join(ws, "continuation-manifest.json"), []byte("{"), 0o644); err != nil {
 		t.Fatalf("corrupt manifest: %v", err)
@@ -95,6 +97,7 @@ func caseInsensitiveVolume(t *testing.T, dir string) bool {
 }
 
 func TestRepro1285_F3_CaseVariantSelfCitationClosesInheritedDefects(t *testing.T) {
+	t.Parallel()
 	ws, req := reproContinuationFixture(t, 1255, 1285, laundered)
 	if !caseInsensitiveVolume(t, ws) {
 		t.Skip("case-sensitive volume: the citation would fail to resolve for the wrong reason, which is a green-by-accident rather than a pass")
@@ -117,6 +120,7 @@ func TestRepro1285_F3_CaseVariantSelfCitationClosesInheritedDefects(t *testing.T
 }
 
 func TestRepro1285_F5_QuotedDefectTextIsNotAClosureClaim(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	yes := true
 	writeACSVerdictShip(t, ws, 0, &yes)

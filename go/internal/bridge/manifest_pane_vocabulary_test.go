@@ -15,6 +15,7 @@ func jsonString(s string) string {
 }
 
 func TestParseManifest_RejectsABrokenPaneVocabularyPattern(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		field, pattern, why string
 	}{
@@ -34,6 +35,7 @@ func TestParseManifest_RejectsABrokenPaneVocabularyPattern(t *testing.T) {
 }
 
 func TestParseManifest_AcceptsWellFormedPaneVocabulary(t *testing.T) {
+	t.Parallel()
 	for _, field := range []struct{ name, pattern string }{
 		{"busy_line_regex", `^\s*([⣾⣽])\s+\S`},
 		{"token_line_regex", `Thought for \S+, (?P<count>[0-9]+)(?P<scale>k?) tokens`},

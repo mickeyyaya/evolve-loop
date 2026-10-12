@@ -37,6 +37,7 @@ func runTmuxWedge(t *testing.T, fx launchFixture, tmux TmuxController, spy func(
 // jiggle and extend (busy) every interval until the maxExtends backstop
 // exhausts.
 func TestRunTmuxREPL_BlankPaneWedge_JigglesAndExtends(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
 		tmuxPromptMarkerDefault, // boot
@@ -78,6 +79,7 @@ func TestRunTmuxREPL_BlankPaneWedge_JigglesAndExtends(t *testing.T) {
 // tick also captures every iteration). Cases: jiggle recovers content /
 // wedge persists / non-blank no-op / dead session no-op.
 func TestRecoverBlankPane_Unit(t *testing.T) {
+	t.Parallel()
 	mk := func(frames []string, alive bool) (*jiggleTmux, Deps, *bytes.Buffer) {
 		tm := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: frames}}
 		if alive {
@@ -133,6 +135,7 @@ func TestRecoverBlankPane_Unit(t *testing.T) {
 // rendered, not blank) must NOT trigger jiggles: the wedge path is strictly
 // blank-while-alive.
 func TestRunTmuxREPL_BlankAtBaseline_NotWedge(t *testing.T) {
+	t.Parallel()
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &jiggleTmux{fakeTmux: fakeTmux{paneSeq: []string{
 		tmuxPromptMarkerDefault, // boot

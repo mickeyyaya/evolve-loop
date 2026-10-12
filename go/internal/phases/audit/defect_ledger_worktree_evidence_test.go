@@ -18,6 +18,7 @@ func worktreeContinuationFixture(t *testing.T, ancestorCycle, thisCycle int, ope
 }
 
 func TestClassify_WorktreeResidentEvidenceClosesADefect(t *testing.T) {
+	t.Parallel()
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	cite := evidenceFile(t, wt, "go/cmd/evolve/cmd_loop_chain_boundaryrefresh_shortsha_test.go")
 	if _, err := os.Stat(filepath.Join(req.ProjectRoot, "go/cmd/evolve/cmd_loop_chain_boundaryrefresh_shortsha_test.go")); err == nil {
@@ -47,6 +48,7 @@ func TestClassify_WorktreeResidentEvidenceClosesADefect(t *testing.T) {
 }
 
 func TestClassify_EvidenceAbsentFromBothRootsStillBlocks(t *testing.T) {
+	t.Parallel()
 	ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
 		"dispositions": []any{
@@ -69,6 +71,7 @@ func TestClassify_EvidenceAbsentFromBothRootsStillBlocks(t *testing.T) {
 }
 
 func TestClassify_WorktreeSelfCitationStillRejected(t *testing.T) {
+	t.Parallel()
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	cite := evidenceFile(t, wt, "go/internal/phases/audit/"+ledgerFile)
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -88,6 +91,7 @@ func TestClassify_WorktreeSelfCitationStillRejected(t *testing.T) {
 }
 
 func TestClassify_WorktreeEvidenceCannotEscapeRoot(t *testing.T) {
+	t.Parallel()
 	ws, wt, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 	evidenceFile(t, filepath.Dir(wt), "outside-the-worktree.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -107,6 +111,7 @@ func TestClassify_WorktreeEvidenceCannotEscapeRoot(t *testing.T) {
 }
 
 func TestClassify_LineRangeCitationResolves(t *testing.T) {
+	t.Parallel()
 	for _, suffix := range []string{":570-588", ":570", ":570:12"} {
 		t.Run(suffix, func(t *testing.T) {
 			ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"brake resolved twice"})
@@ -127,6 +132,7 @@ func TestClassify_LineRangeCitationResolves(t *testing.T) {
 }
 
 func TestClassify_NonLocatorSuffixIsPartOfThePath(t *testing.T) {
+	t.Parallel()
 	ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"brake resolved twice"})
 	evidenceFile(t, req.ProjectRoot, "go/cmd/evolve/cmd_loop_chain.go")
 	writeJSON(t, filepath.Join(ws, dispositionFile), map[string]any{
@@ -146,6 +152,7 @@ func TestClassify_NonLocatorSuffixIsPartOfThePath(t *testing.T) {
 }
 
 func TestClassify_ProjectRootEvidencePathUnchanged(t *testing.T) {
+	t.Parallel()
 	t.Run("project-root evidence still closes with a worktree set", func(t *testing.T) {
 		ws, _, req := worktreeContinuationFixture(t, 1330, 1340, []string{"boundary refresh does not repin the short sha"})
 		cite := evidenceFile(t, req.ProjectRoot, "go/internal/core/fleet.go")

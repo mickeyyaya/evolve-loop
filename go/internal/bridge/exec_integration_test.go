@@ -14,6 +14,7 @@ import (
 )
 
 func TestExecRunner_Real(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	code, err := execRunner(context.Background(), "sh", "", []string{"-c", "exit 0"}, os.Environ(), nil, &out, &out)
 	if err != nil || code != 0 {
@@ -51,6 +52,7 @@ func TestExecRunner_Real(t *testing.T) {
 }
 
 func TestExecTmux_Real(t *testing.T) {
+	t.Parallel()
 	requireTmux(t)
 	tx := execTmux{}
 	ctx := context.Background()
@@ -98,6 +100,7 @@ func TestExecTmux_Real(t *testing.T) {
 }
 
 func TestStripANSI(t *testing.T) {
+	t.Parallel()
 	in := "\x1b[31mred\x1b[0m plain \x1b]0;title\x07end"
 	if got := stripANSI(in); got != "red plain end" {
 		t.Fatalf("stripANSI = %q, want %q", got, "red plain end")

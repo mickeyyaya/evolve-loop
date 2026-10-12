@@ -12,6 +12,7 @@ import (
 )
 
 func TestEGPSRedMessage_KeepsAnIDThatIsOnlyCycleTokens(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		ids  []string
@@ -35,6 +36,7 @@ func TestEGPSRedMessage_KeepsAnIDThatIsOnlyCycleTokens(t *testing.T) {
 }
 
 func TestEGPSRedMessage_NamesAtMostFiveReds(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		n        int
 		wantMore string
@@ -59,6 +61,7 @@ func TestEGPSRedMessage_NamesAtMostFiveReds(t *testing.T) {
 }
 
 func TestQuarantineAuditProbes_GitStatusFailureDegradesOpenLoudly(t *testing.T) {
+	t.Parallel()
 	notARepo := t.TempDir()
 	probe := filepath.Join(notARepo, "zz_probe_test.go")
 	if err := os.WriteFile(probe, []byte("package x\n"), 0o644); err != nil {
@@ -80,6 +83,7 @@ func TestQuarantineAuditProbes_GitStatusFailureDegradesOpenLoudly(t *testing.T) 
 }
 
 func TestQuarantineAuditProbes_PreserveFailureStopsAndKeepsTheProbe(t *testing.T) {
+	t.Parallel()
 	worktree, _, cutoff := probeRepo(t)
 	workspace := filepath.Join(t.TempDir(), "workspace-file")
 	if err := os.WriteFile(workspace, nil, 0o644); err != nil {
@@ -100,6 +104,7 @@ func TestQuarantineAuditProbes_PreserveFailureStopsAndKeepsTheProbe(t *testing.T
 }
 
 func TestNewTestFilePath(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		line   string
 		want   string
@@ -152,6 +157,7 @@ func FuzzNewTestFilePath_OnlyNewGoTestFilesOutsideACS(f *testing.F) {
 }
 
 func TestWorktreeFailureOffenders(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		code   int

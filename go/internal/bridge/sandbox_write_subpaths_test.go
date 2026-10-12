@@ -48,6 +48,7 @@ func allowWriteLine(path string) string {
 // triage profile's own write_subpaths declaration appears as a write grant
 // in the rendered profile.
 func TestDefaultSandboxWrap_GrantsTriagesDeclaredInboxClaimDir(t *testing.T) {
+	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -133,6 +134,7 @@ func realSandboxProfiles(t *testing.T) map[string]Profile {
 // declarations are proven at the second hop by
 // TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath.
 func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
+	t.Parallel()
 	declared := []string{".evolve/inbox/processing", "{worktree_path}/tests"}
 	fx := newFixture(t, "claude-p", "")
 	body := `{
@@ -172,6 +174,7 @@ func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 // write_subpaths entry — as the production resolver resolves it and the
 // generator widens it — appears as a write grant in the rendered SBPL.
 func TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath(t *testing.T) {
+	t.Parallel()
 	for name, prof := range realSandboxProfiles(t) {
 		t.Run(strings.TrimSuffix(name, ".json"), func(t *testing.T) {
 			root, worktree := t.TempDir(), t.TempDir()
@@ -209,6 +212,7 @@ func TestDefaultSandboxWrap_RendersEveryDeclaredWriteSubpath(t *testing.T) {
 // template-without-worktree, and — the projection the adapters no longer
 // own — glob widening to the longest glob-free ancestor, terminal or not.
 func TestResolveSandboxWriteGrants(t *testing.T) {
+	t.Parallel()
 	root, wt := t.TempDir(), t.TempDir()
 	canonicalRoot, err := canonicalSandboxPath(root)
 	if err != nil {
@@ -270,6 +274,7 @@ func TestResolveSandboxWriteGrants(t *testing.T) {
 // generalized form of retro_lessons_test.go: any declared grant whose path
 // below its base is a symlink is refused, whatever profile declared it.
 func TestResolveSandboxWriteGrants_RefusesASymlinkRetargetBelowTheBase(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	target := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve", "inbox"), 0o755); err != nil {
@@ -292,6 +297,7 @@ var subpathArgRe = regexp.MustCompile(`\(subpath "([^"]*)"\)`)
 // rename writes BOTH directories (unlink at the source, create at the
 // destination).
 func TestTriageProfile_GrantsTheClaimMove(t *testing.T) {
+	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -330,6 +336,7 @@ func coveredByAGrant(dir string, grants []string) bool {
 // it must be denied explicitly, and the generator must emit those denies
 // AFTER the grant (later rules win) or the carve-out is decorative.
 func TestTriageProfile_DeniesTheInboxAuditTrail(t *testing.T) {
+	t.Parallel()
 	prof, err := LoadProfile(filepath.Join(realProfilesDir(t), "triage.json"))
 	if err != nil {
 		t.Fatal(err)

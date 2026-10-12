@@ -7,6 +7,7 @@ import (
 )
 
 func TestExhaustion_TransientWallTextDoesNotFastFail(t *testing.T) {
+	t.Parallel()
 	const wallRegex = `(?i)reached your usage limit`
 	wall := "You've reached your usage limit. Run /usage-credits.\n"
 	fresh := "> Reading incident-report.md ... done. Now writing the audit.\n"
