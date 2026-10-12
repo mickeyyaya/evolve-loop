@@ -273,6 +273,10 @@ The persona text of the phases that write predicates names them.
 | Warning | a package over its budget, in the latency report of each CI run |
 | Hard limit | the `go test` timeout of the recipe, set to 20 minutes (plan T4) |
 
+Status: in force. `make test-integration` passes `-timeout 20m` (the Make variable `TEST_TIMEOUT` overrides it). CI sets `TEST_JSON`, so the same run writes its `go test -json` stream. `testlatency --budget 180s` renders the packages over the budget at the top of the job summary. The step is advisory and never fails the job.
+
+`--fail-over-budget` makes the command exit 1 for a later enforce step. On the loaded dev host, `cmd/evolve` (210 s to 230 s) is the one package over the budget.
+
 The timeout is a stop for a hung run. The budget is the alarm for growth. On 2026-10-12, `internal/core` passed the 10-minute default timeout under local load (research F3.7).
 
 ### 7.3 The order of remedies for a pole

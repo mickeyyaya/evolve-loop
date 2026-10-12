@@ -136,6 +136,23 @@ flags). Regenerate the fast-suite report any time:
 make test-latency   # → go/test/latency-report.md
 ```
 
+### Timeout and package wall budget
+
+`make test-integration` stops a package after 20 minutes. This limit catches a hung run. A load spike made `internal/core` pass the 10-minute default of `go test` and block all three coverage gates. To change the limit, set `TEST_TIMEOUT`:
+
+```
+make test-integration TEST_TIMEOUT=30m
+```
+
+The budget for one package is 180 seconds of wall time under `-race`. Set `TEST_JSON` to a file name, and the same run also writes its `go test -json` stream there. The console keeps the plain test text, because `testlatency -render` rewrites the events. The run still ends with the exit status of `go test`, and `coverage.txt` still exists only after a green run. Then render the report:
+
+```
+make test-integration TEST_JSON=test-integration.json
+go run ./cmd/testlatency --budget 180s < test-integration.json
+```
+
+The report starts with a table of the packages over the budget, longest first. The command exits 0. Add `--fail-over-budget` to make it exit 1 when a package is over. The CI job `build-test` runs the first form and prints the table to the job summary in an advisory step. The step runs after a green suite, and a failure of the report only prints a warning. On the loaded dev host, `cmd/evolve` (210 s to 230 s) is the one package over the budget.
+
 `go/test/latency-baseline.md` is the pre-split snapshot; `go/test/latency-report.md`
 is the post-split snapshot. Both are machine-dependent and regenerable — they
 are tracked as comparison points, not gates.

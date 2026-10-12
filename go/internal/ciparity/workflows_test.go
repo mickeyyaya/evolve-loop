@@ -194,3 +194,36 @@ func TestGoWorkflow_RunsCoverChangedRightAfterTheIntegrationProfile(t *testing.T
 		t.Errorf("the step must pass its base to make:\n%s", step.Run)
 	}
 }
+
+func TestGoWorkflow_ReportsPackageWallBudgetWithoutGatingTheJob(t *testing.T) {
+	t.Parallel()
+	steps := readWorkflowContract(t, "go.yml").Jobs["build-test"].Steps
+	integration, budget := -1, -1
+	for i, step := range steps {
+		if strings.Contains(step.Run, "make test-integration") {
+			integration = i
+		}
+		if strings.Contains(step.Run, "cmd/testlatency") {
+			budget = i
+		}
+	}
+	if integration < 0 || budget <= integration {
+		t.Fatalf("budget step at %d, integration step at %d; want the report after the run it reads", budget, integration)
+	}
+	stream := steps[integration].Env["TEST_JSON"]
+	if stream == "" {
+		t.Fatal("the integration step must set TEST_JSON so the recipe writes the stream the report reads")
+	}
+	step := steps[budget]
+	if step.ContinueOnError != "" || step.If != "" {
+		t.Errorf("a validation job step may not carry a condition or continue-on-error: continue-on-error=%q if=%q", step.ContinueOnError, step.If)
+	}
+	for _, want := range []string{"-budget 180s", stream, `"$GITHUB_STEP_SUMMARY"`, `|| echo "::warning::`} {
+		if !strings.Contains(step.Run, want) {
+			t.Errorf("budget step lacks %q:\n%s", want, step.Run)
+		}
+	}
+	if strings.Contains(step.Run, "fail-over-budget") {
+		t.Error("the budget step is advisory; --fail-over-budget belongs to a later enforce step")
+	}
+}

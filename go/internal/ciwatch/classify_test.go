@@ -360,3 +360,12 @@ func TestClassifyReport_JSONCarriesTheKindAndAnEmptyFailureList(t *testing.T) {
 		}
 	}
 }
+
+func TestParseFailingTests_ReadsTheRenderedTextOfAJSONRun(t *testing.T) {
+	log := ghLog("build-test", "=== RUN   TestRed", "--- FAIL: TestRed (0.01s)", "FAIL", "FAIL\tm/red\t0.123s", "ok  \tm/green\t0.5s")
+	got := parseFailingTests(log)
+	want := []FailingTest{{Package: "m/red", Test: "TestRed", Jobs: []string{"build-test"}}}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("parseFailingTests:\n got %+v\nwant %+v", got, want)
+	}
+}
