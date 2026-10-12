@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,10 +10,14 @@ import (
 )
 
 func TestCoveringTests_AbsentCorpusIsAnnouncedNotSilent(t *testing.T) {
+	t.Parallel()
+
 	worktree, workspace := t.TempDir(), t.TempDir()
 	// A bare temp dir is not a git repository, so the corpus is genuinely
 	// underivable — the fail-open path, exercised for real rather than stubbed.
-	out := captureStderr(t, func() { ensureCoveringTests(context.Background(), worktree, workspace) })
+	var sink injectedStderr
+	ensureCoveringTests(context.Background(), worktree, workspace, &sink)
+	out := sink.String()
 
 	if _, err := os.Stat(filepath.Join(workspace, coveringTestsArtifact)); err == nil {
 		t.Fatal("an underivable diff produced a corpus — fail-open must write nothing, not a fabricated one")
@@ -32,7 +37,7 @@ func TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild(t *testing.
 	derived := 0
 	orig := coveringTestsDeriver
 	t.Cleanup(func() { coveringTestsDeriver = orig })
-	coveringTestsDeriver = func(ctx context.Context, wt, ws string) {
+	coveringTestsDeriver = func(ctx context.Context, wt, ws string, _ io.Writer) {
 		derived++
 		if err := os.WriteFile(filepath.Join(ws, coveringTestsArtifact), []byte("# Covering Tests\n"), 0o644); err != nil {
 			t.Fatalf("stub write: %v", err)
@@ -40,7 +45,9 @@ func TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild(t *testing.
 	}
 
 	// No PhaseBuild completed in this process — the resume-past-build shape.
-	out := captureStderr(t, func() { ensureCoveringTests(context.Background(), worktree, workspace) })
+	var sink injectedStderr
+	ensureCoveringTests(context.Background(), worktree, workspace, &sink)
+	out := sink.String()
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("no corpus after ensure: %v — test-amplification is only scoped on paths where a build happened to complete in-process, which is exactly the hole", err)
 	}
@@ -53,7 +60,9 @@ func TestCoveringTests_AvailableToTestAmplificationWithoutFreshBuild(t *testing.
 
 	// Already on disk ⇒ silent no-op. The build path's fresh derivation stays
 	// authoritative and a normal cycle never pays a second `go list`.
-	out = captureStderr(t, func() { ensureCoveringTests(context.Background(), worktree, workspace) })
+	var again injectedStderr
+	ensureCoveringTests(context.Background(), worktree, workspace, &again)
+	out = again.String()
 	if derived != 1 {
 		t.Errorf("deriver ran again (%d) with the corpus already present — every post-phase normalize would re-pay the derivation", derived)
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -21,6 +22,7 @@ type carryHarness struct {
 	snapErr     error
 	duringGates func()
 	signals     *signalcenter.Center
+	stderr      io.Writer
 	persist     func(string, CompositionVerdictInput) error
 }
 
@@ -51,6 +53,7 @@ func (h *carryHarness) route(t *testing.T, rows ...LedgerEntry) (Phase, bool, Cy
 	t.Helper()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{entries: rows}, buildRunners(nil),
 		WithSignalCenter(h.signals),
+		WithStderr(h.stderr),
 		WithCompositionSnapshot(func(context.Context, string, string) (CompositionAuditSnapshot, error) {
 			return CompositionAuditSnapshot{LaneAuditRef: "audit-ref"}, nil
 		}),

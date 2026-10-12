@@ -55,7 +55,7 @@ func (o *Orchestrator) noteContractExhaustionSkip(ctx context.Context, cs CycleS
 		Role:  string(phase),
 		Kind:  ledgerKindContractExhaustionSkip,
 	}); lerr != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", ledgerKindContractExhaustionSkip, lerr)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN %s ledger append: %v\n", ledgerKindContractExhaustionSkip, lerr)
 	}
 	o.recordReviewSkipped(cs, phase)
 }

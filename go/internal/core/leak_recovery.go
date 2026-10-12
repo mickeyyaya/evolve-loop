@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -59,7 +60,7 @@ func (o *Orchestrator) recoverPhaseLeak(ctx context.Context, scope phaseLeakScop
 	if scope.baseline == nil {
 		return nil
 	}
-	ownership := laneOwnership(scope.cycleState, activeVerifiedMints(scope.projectRoot))
+	ownership := laneOwnership(scope.cycleState, activeVerifiedMints(scope.projectRoot, o.errOut()))
 	recovery := leakRecovery{
 		projectRoot: scope.projectRoot,
 		worktree:    scope.cycleState.ActiveWorktree,
@@ -68,6 +69,7 @@ func (o *Orchestrator) recoverPhaseLeak(ctx context.Context, scope phaseLeakScop
 		authority:   o.writeAuthority(scope.phase),
 		ownership:   ownership,
 		exempt:      ownership.exemptions(scope.projectRoot, scope.cycleState.WorkspacePath, scope.leased),
+		warn:        o.errOut(),
 	}
 	if recoverBuildLeak(ctx, recovery) {
 		return nil
@@ -176,6 +178,7 @@ func (o *Orchestrator) writeAuthority(p Phase) writeAuthority {
 }
 
 type leakRecovery struct {
+	warn        io.Writer
 	projectRoot string
 	worktree    string
 	cycle       int
@@ -183,6 +186,13 @@ type leakRecovery struct {
 	authority   writeAuthority
 	ownership   mainTreeOwnership
 	exempt      leakExemptions
+}
+
+func (r leakRecovery) errOut() io.Writer {
+	if r.warn == nil {
+		return os.Stderr
+	}
+	return r.warn
 }
 
 func (r leakRecovery) authors(p string) bool {
@@ -218,7 +228,7 @@ func recoverBuildLeak(ctx context.Context, r leakRecovery) bool {
 			staged = append(staged, p)
 		}
 	}
-	return stageRelocated(ctx, r.worktree, staged)
+	return stageRelocated(ctx, r.worktree, staged, r.errOut())
 }
 
 func (r leakRecovery) newLeak(line string) (string, bool) {
@@ -234,7 +244,7 @@ func (r leakRecovery) newLeak(line string) (string, bool) {
 
 func (r leakRecovery) recoverPath(ctx context.Context, xy, p string) (stage, recovered bool) {
 	if r.exempt.leased[p] {
-		fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: left %s in the main tree — the console lease holds it\n", p)
+		fmt.Fprintf(r.errOut(), "[orchestrator] build-leak-recover: left %s in the main tree — the console lease holds it\n", p)
 		return false, true
 	}
 	if owner, foreign := r.ownership.foreignOwner(p); foreign {
@@ -252,7 +262,7 @@ func (r leakRecovery) recoverPath(ctx context.Context, xy, p string) (stage, rec
 	case strings.ContainsAny(xy, "AD"):
 		return false, r.discard(ctx, p, "main-tree change")
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: unrecoverable leak status %q for %s (falling through to abort)\n", xy, p)
+	fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: unrecoverable leak status %q for %s (falling through to abort)\n", xy, p)
 	return false, false
 }
 
@@ -266,14 +276,14 @@ func (r leakRecovery) recoverUntracked(p string) (stage, recovered bool) {
 		return false, r.setAsideShadowedLeak(src, dst, p)
 	}
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: mkdir for %s: %v\n", p, err)
+		fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: mkdir for %s: %v\n", p, err)
 		return false, false
 	}
 	if err := moveFile(src, dst); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate %s: %v\n", p, err)
+		fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: relocate %s: %v\n", p, err)
 		return false, false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked %s out of main tree\n", p)
+	fmt.Fprintf(r.errOut(), "[orchestrator] build-leak-recover: relocated leaked %s out of main tree\n", p)
 	return authored, true
 }
 
@@ -289,27 +299,27 @@ func (r leakRecovery) leaveForOwner(p, owner string) bool {
 func (r leakRecovery) setAsideShadowedLeak(src, dst, p string) bool {
 	same, err := sameBytes(src, dst)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: compare leaked %s with the worktree's copy: %v\n", p, err)
+		fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: compare leaked %s with the worktree's copy: %v\n", p, err)
 		return false
 	}
 	if same {
-		return removeDuplicateLeak(src, p)
+		return removeDuplicateLeak(src, p, r.errOut())
 	}
 	quarantined := uniqueQuarantinePath(filepath.Join(quarantineDir(r.projectRoot, r.cycle), p))
 	if err := moveFile(src, quarantined); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: quarantine leaked %s: %v\n", p, err)
+		fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: quarantine leaked %s: %v\n", p, err)
 		return false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: leaked %s differs from the worktree's own copy, which wins; the main-tree copy is kept at %s\n", p, quarantined)
+	fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: leaked %s differs from the worktree's own copy, which wins; the main-tree copy is kept at %s\n", p, quarantined)
 	return true
 }
 
-func removeDuplicateLeak(src, p string) bool {
+func removeDuplicateLeak(src, p string, warn io.Writer) bool {
 	if err := os.Remove(src); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: drop leaked %s: %v\n", p, err)
+		fmt.Fprintf(warn, "[orchestrator] WARN build-leak-recover: drop leaked %s: %v\n", p, err)
 		return false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: dropped leaked %s — the worktree already holds the same bytes\n", p)
+	fmt.Fprintf(warn, "[orchestrator] build-leak-recover: dropped leaked %s — the worktree already holds the same bytes\n", p)
 	return true
 }
 
@@ -330,32 +340,32 @@ func (r leakRecovery) recoverTrackedEdit(ctx context.Context, p string) (stage, 
 		return false, r.discard(ctx, p, "main-tree change (worktree diverged)")
 	}
 	if err := relocateTrackedEdit(ctx, r.projectRoot, r.worktree, p); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: relocate tracked edit %s: %v\n", p, err)
+		fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: relocate tracked edit %s: %v\n", p, err)
 		return false, false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: relocated leaked tracked edit %s into worktree\n", p)
+	fmt.Fprintf(r.errOut(), "[orchestrator] build-leak-recover: relocated leaked tracked edit %s into worktree\n", p)
 	return true, true
 }
 
 func (r leakRecovery) discard(ctx context.Context, p, kind string) bool {
 	if err := discardMainLeak(ctx, r.projectRoot, p); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: %v\n", err)
+		fmt.Fprintf(r.errOut(), "[orchestrator] WARN build-leak-recover: %v\n", err)
 		return false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: discarded leaked %s %s\n", kind, p)
+	fmt.Fprintf(r.errOut(), "[orchestrator] build-leak-recover: discarded leaked %s %s\n", kind, p)
 	return true
 }
 
-func stageRelocated(ctx context.Context, worktree string, paths []string) bool {
+func stageRelocated(ctx context.Context, worktree string, paths []string, warn io.Writer) bool {
 	if len(paths) == 0 {
 		return true
 	}
 	args := append([]string{"add", "-f", "--"}, paths...)
 	if _, c, e := gitCapture(ctx, worktree, args...); e != nil || c != 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-leak-recover: git add of relocated paths failed (rc=%d): %v — aborting recovery\n", c, e)
+		fmt.Fprintf(warn, "[orchestrator] WARN build-leak-recover: git add of relocated paths failed (rc=%d): %v — aborting recovery\n", c, e)
 		return false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] build-leak-recover: %d leaked path(s) relocated into worktree; main tree restored\n", len(paths))
+	fmt.Fprintf(warn, "[orchestrator] build-leak-recover: %d leaked path(s) relocated into worktree; main tree restored\n", len(paths))
 	return true
 }
 

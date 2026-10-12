@@ -53,6 +53,8 @@ func TestRenderCoveringTests_ReportsOmittedCount(t *testing.T) {
 }
 
 func TestWriteCoveringTests_WarnsLoudlyOnTruncation(t *testing.T) {
+	t.Parallel()
+
 	repo := t.TempDir()
 	gitInitCoveringFixture(t, repo)
 
@@ -81,9 +83,9 @@ func TestWriteCoveringTests_WarnsLoudlyOnTruncation(t *testing.T) {
 	}
 
 	ws := t.TempDir()
-	stderr := captureStderr(t, func() {
-		writeCoveringTests(context.Background(), repo, ws)
-	})
+	var sink injectedStderr
+	writeCoveringTests(context.Background(), repo, ws, &sink)
+	stderr := sink.String()
 
 	if _, err := os.Stat(filepath.Join(ws, coveringTestsArtifact)); err != nil {
 		t.Fatalf("no %s written for a truncated corpus (%v) — a trimmed corpus still beats a blind whole-repo search",
@@ -100,6 +102,8 @@ func TestWriteCoveringTests_WarnsLoudlyOnTruncation(t *testing.T) {
 }
 
 func TestWriteCoveringTests_SilentWhenNothingTruncated(t *testing.T) {
+	t.Parallel()
+
 	repo := t.TempDir()
 	gitInitCoveringFixture(t, repo)
 
@@ -112,9 +116,9 @@ func TestWriteCoveringTests_SilentWhenNothingTruncated(t *testing.T) {
 	}
 
 	ws := t.TempDir()
-	stderr := captureStderr(t, func() {
-		writeCoveringTests(context.Background(), repo, ws)
-	})
+	var sink injectedStderr
+	writeCoveringTests(context.Background(), repo, ws, &sink)
+	stderr := sink.String()
 
 	if _, err := os.Stat(filepath.Join(ws, coveringTestsArtifact)); err != nil {
 		t.Fatalf("no %s written for a one-path corpus: %v", coveringTestsArtifact, err)
@@ -138,5 +142,32 @@ func gitInitCoveringFixture(t *testing.T, dir string) {
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Skipf("git init unavailable in this environment (%v): %s", err, out)
+	}
+}
+
+func TestWriteCoveringTests_AnUnwritableArtifactWarnsAndNamesThePath(t *testing.T) {
+	t.Parallel()
+
+	repo := t.TempDir()
+	gitInitCoveringFixture(t, repo)
+	dir := filepath.Join(repo, "go", "internal", "small")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir fixture package: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "small_test.go"), []byte("package small\n"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	ws := t.TempDir()
+	blocked := filepath.Join(ws, coveringTestsArtifact)
+	if err := os.Mkdir(blocked, 0o755); err != nil {
+		t.Fatalf("block the artifact path with a directory: %v", err)
+	}
+
+	var sink injectedStderr
+	writeCoveringTests(context.Background(), repo, ws, &sink)
+	stderr := sink.String()
+
+	if !strings.Contains(stderr, "WARN covering-tests: write "+blocked) {
+		t.Fatalf("a failed artifact write must warn and name %s; stderr was:\n%q", blocked, stderr)
 	}
 }

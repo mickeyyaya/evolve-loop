@@ -23,7 +23,7 @@ func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 		}
 		runs, note := repocontract.PackRuns(repoContractGate(in), in.Worktree)
 		if note != "" {
-			fmt.Fprintf(os.Stderr, "[build-floor] repo-contract floor: %s\n", note)
+			fmt.Fprintf(in.errOut(), "[build-floor] repo-contract floor: %s\n", note)
 		}
 		if !runs {
 			return nil
@@ -33,7 +33,7 @@ func RepoContractFloorChecks(run RepoContractPackFn) BuildFloorCheckFn {
 		reds, diagnostic, err := run(runCtx, in.Worktree)
 		if len(reds) == 0 {
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "[build-floor] WARN repo-contract scanner pack exited nonzero naming no test (%v; the floor's deadline is %s); ship's gate runs the pack again before it pushes:\n%s\n", err, repoContractFloorDeadline, floorFailureDiagnostic(diagnostic))
+				fmt.Fprintf(in.errOut(), "[build-floor] WARN repo-contract scanner pack exited nonzero naming no test (%v; the floor's deadline is %s); ship's gate runs the pack again before it pushes:\n%s\n", err, repoContractFloorDeadline, floorFailureDiagnostic(diagnostic))
 			}
 			return nil
 		}

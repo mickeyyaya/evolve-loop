@@ -178,6 +178,26 @@ A serial test stays short. A slow serial test is a defect of the design. Move it
 
 Use rank 3 only when the function has no dependency struct and a new parameter changes many callers. Never delete a guard to reach 100%. A seam reaches it.
 
+### 5.4 Output to `os.Stderr`
+
+A test never swaps `os.Stderr`. The swap is process state, so the test must run serial.
+
+Code that writes to `os.Stderr` takes its writer from a dependency. The default is `os.Stderr`, with the same text. A nil writer means the default. A test injects a buffer and stays parallel.
+
+| Where the writer lives | Example in `internal/core` |
+|---|---|
+| A field of the orchestrator, set with `WithStderr` | `Orchestrator.errOut` |
+| A field of the input struct | `ReviewInput.Stderr` |
+| A field of the dependency struct that the function already takes | `leakRecovery.warn` |
+| A parameter named `warn` of type `io.Writer` | `ensureCoveringTests` |
+
+The guard in `parallel_default_test.go` rejects a parallel test that calls a helper that changes process state. `captureStderr` is such a helper.
+
+This state is partial and interim:
+
+- T16 moved only the writers that freed a test. About 187 other `os.Stderr` writes stay in the non-test files of `internal/core`.
+- The `warn` parameter and the `*To` wrappers (for example `dispatchSignalsTo`) are interim. The target is one writer that the orchestrator owns and each cycle uses. Inbox item `core-one-diagnostics-writer` records the target and the steps.
+
 ## 6. Helpers: one home for each helper
 
 ### 6.1 The kits

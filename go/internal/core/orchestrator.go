@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"slices"
 	"strings"
 	"sync"
@@ -242,6 +242,8 @@ type Orchestrator struct {
 	scopedMergeReviewer ScopedMergeReviewer
 
 	hostEffects HostEffects
+
+	stderr io.Writer
 
 	// worktree provisions/cleans the per-cycle source worktree.
 	worktree WorktreeProvisioner
@@ -795,7 +797,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		// Best-effort, abort paths included: an interaction not recorded with
 		// its outcome doesn't exist.
 		if werr := interaction.WriteRollup(cr.cs.WorkspacePath); werr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN interaction-summary write: %v\n", werr)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN interaction-summary write: %v\n", werr)
 		}
 		// o.catalog is read at defer-exec time, so mid-cycle mints are visible
 		// to the resolver.
@@ -821,7 +823,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 					o.verdictCacheLookupHook(sha, false, ok, e)
 				}
 				if ok {
-					fmt.Fprintf(os.Stderr, "[verdict-cache SHADOW] worktree tree_sha=%s matched cycle=%d verdict=%s — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)\n", sha, e.Cycle, e.Verdict)
+					fmt.Fprintf(o.errOut(), "[verdict-cache SHADOW] worktree tree_sha=%s matched cycle=%d verdict=%s — would skip tdd/build/audit (ADR-0048 Slice B; enforce pending)\n", sha, e.Cycle, e.Verdict)
 				}
 			}
 		}
@@ -909,7 +911,7 @@ OuterLoop:
 		// handoff is recorded (above) and before the next selectNext, so a
 		// re-plan can never widen the run-set or bypass the spine gate.
 		if next == PhaseScout {
-			normalizeScoutGoalHash(cr.cs.WorkspacePath)
+			normalizeScoutGoalHash(cr.cs.WorkspacePath, o.errOut())
 			cr.postScoutReplan()
 		}
 		// Adoption is keyed to the actual claim: triage claims items into

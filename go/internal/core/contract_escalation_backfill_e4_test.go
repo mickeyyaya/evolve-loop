@@ -144,15 +144,18 @@ func TestNoteContractGateDemotion_EachFailingSinkWarnsAndTheOthersStillRecord(t 
 }
 
 func TestNoteContractExhaustionSkip_ALedgerFailureWarnsWithoutDroppingTheSkip(t *testing.T) {
+	t.Parallel()
+
 	ledger := &fakeLedger{failOnAppend: true}
 	center := signalcenter.New()
 	var events []signalcenter.Event
 	center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
 	o := NewOrchestrator(&fakeStorage{}, ledger, buildRunners(nil), WithSignalCenter(center))
 
-	log := captureStderr(t, func() {
-		o.noteContractExhaustionSkip(context.Background(), CycleState{CycleID: 5, WorkspacePath: t.TempDir()}, Phase(codereview.PhaseName))
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.noteContractExhaustionSkip(context.Background(), CycleState{CycleID: 5, WorkspacePath: t.TempDir()}, Phase(codereview.PhaseName))
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN "+ledgerKindContractExhaustionSkip+" ledger append: forced ledger append fail") {
 		t.Fatalf("stderr %q must surface the lost exhaustion-skip ledger row", log)

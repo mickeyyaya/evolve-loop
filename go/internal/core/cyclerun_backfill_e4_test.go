@@ -101,6 +101,8 @@ func TestNewCycleRun_AFailedFleetIsolationAbortsAndReleasesEverything(t *testing
 }
 
 func TestPlanCycle_LedgerStampFailuresWarnAndThePlanStillCarriesTheDirectives(t *testing.T) {
+	t.Parallel()
+
 	ledger := &fakeLedger{failOnAppend: true}
 	o := NewOrchestrator(&fakeStorage{}, ledger, buildRunners(nil),
 		WithCatalogRefresher(func(context.Context) error { return nil }),
@@ -110,9 +112,10 @@ func TestPlanCycle_LedgerStampFailuresWarnAndThePlanStillCarriesTheDirectives(t 
 	ws := t.TempDir()
 
 	var plan cyclePlan
-	log := captureStderr(t, func() {
-		plan = o.planCycle(context.Background(), CycleRequest{ProjectRoot: ws}, State{}, CycleState{WorkspacePath: ws}, 77)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	plan = o.planCycle(context.Background(), CycleRequest{ProjectRoot: ws}, State{}, CycleState{WorkspacePath: ws}, 77)
+	log := sink.String()
 
 	for _, want := range []string{"WARN catalog-refresh ledger stamp failed: forced ledger append fail", "WARN operator-directives ledger stamp failed: forced ledger append fail"} {
 		if !strings.Contains(log, want) {
@@ -125,6 +128,8 @@ func TestPlanCycle_LedgerStampFailuresWarnAndThePlanStillCarriesTheDirectives(t 
 }
 
 func TestPlanCycle_ScopePathsSkipBlankIDsAndRefuseUnencodablePairs(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	var asked []string
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil),
@@ -141,9 +146,10 @@ func TestPlanCycle_ScopePathsSkipBlankIDsAndRefuseUnencodablePairs(t *testing.T)
 	req := CycleRequest{ProjectRoot: ws, Env: map[string]string{ipcenv.FleetScopeKey: "alpha, ,k=v,spaced-path,,no-record,ünï"}}
 
 	var plan cyclePlan
-	log := captureStderr(t, func() {
-		plan = o.planCycle(context.Background(), req, State{}, CycleState{WorkspacePath: ws}, 5)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	plan = o.planCycle(context.Background(), req, State{}, CycleState{WorkspacePath: ws}, 5)
+	log := sink.String()
 
 	if got := plan.ctxSnap["fleet_scope_paths"]; got != "alpha=/inbox/alpha.json ünï=/inbox/ünï.json" {
 		t.Fatalf("fleet_scope_paths = %q", got)
@@ -157,14 +163,17 @@ func TestPlanCycle_ScopePathsSkipBlankIDsAndRefuseUnencodablePairs(t *testing.T)
 }
 
 func TestPlanCycle_AnUnwritableWorkspaceKeepsTheContextChallengeToken(t *testing.T) {
+	t.Parallel()
+
 	ws := filepath.Join(t.TempDir(), "workspace-is-a-file")
 	writeFile(t, ws, "x")
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 
 	var plan cyclePlan
-	log := captureStderr(t, func() {
-		plan = o.planCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}, State{}, CycleState{WorkspacePath: ws}, 6)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	plan = o.planCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}, State{}, CycleState{WorkspacePath: ws}, 6)
+	log := sink.String()
 
 	if !regexp.MustCompile(`^[0-9a-f]{16}$`).MatchString(plan.ctxSnap["challengeToken"]) {
 		t.Fatalf("challengeToken = %q, want 8 hex-encoded bytes", plan.ctxSnap["challengeToken"])
@@ -182,9 +191,10 @@ func TestPlanCycle_AFailedTokenMintLeavesNoTokenAnywhere(t *testing.T) {
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 
 	var plan cyclePlan
-	log := captureStderr(t, func() {
-		plan = o.planCycle(context.Background(), CycleRequest{ProjectRoot: ws}, State{}, CycleState{WorkspacePath: ws}, 8)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	plan = o.planCycle(context.Background(), CycleRequest{ProjectRoot: ws}, State{}, CycleState{WorkspacePath: ws}, 8)
+	log := sink.String()
 
 	if tok, ok := plan.ctxSnap["challengeToken"]; ok {
 		t.Fatalf("a failed mint set challengeToken %q", tok)

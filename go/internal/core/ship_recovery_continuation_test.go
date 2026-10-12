@@ -44,6 +44,8 @@ func codedEvents(events []signalcenter.Event, code signalcenter.Code) []signalce
 }
 
 func TestRouteRebasedExplanation_ACommittedChangeReportsTheProofSkipped(t *testing.T) {
+	t.Parallel()
+
 	fx := rebasedCommittedLane(t)
 	center := signalcenter.New()
 	events := recordSignals(center)
@@ -52,9 +54,10 @@ func TestRouteRebasedExplanation_ACommittedChangeReportsTheProofSkipped(t *testi
 	var next Phase
 	var recovering bool
 
-	stderr := captureStderr(t, func() {
-		next, recovering = o.routeRebasedExplanation(context.Background(), fx.root, unwindCycle, &cs)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	next, recovering = o.routeRebasedExplanation(context.Background(), fx.root, unwindCycle, &cs)
+	stderr := sink.String()
 
 	if !recovering || next != PhaseBuild {
 		t.Fatalf("route=(%s,%v), want Build: a committed change cannot be rebound", next, recovering)
@@ -79,13 +82,18 @@ func TestRouteRebasedExplanation_ACommittedChangeReportsTheProofSkipped(t *testi
 }
 
 func TestRecoverFromShipError_AContinuationLaneRunsTheIdentityProof(t *testing.T) {
+	t.Parallel()
+
 	fx := newContinuationLane(t)
 	storage := &fakeStorage{}
 	var next Phase
 	var recovering bool
 	var cs CycleState
 
-	stderr := captureStderr(t, func() { next, recovering, cs = fx.recover(storage, fx.auditRow()) })
+	var sink injectedStderr
+	fx.stderr = &sink
+	next, recovering, cs = fx.recover(storage, fx.auditRow())
+	stderr := sink.String()
 
 	if !recovering || next != PhaseAudit {
 		t.Fatalf("recovery=(%s,%v), want Audit with no Build: the rebase of a disjoint lane is byte-identical\n%s", next, recovering, stderr)

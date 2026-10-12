@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,8 +25,8 @@ const (
 // composeRepairBrief renders the repair brief for a cycle in an audit-repair
 // round: gate reasons (absent a gate record, the audit's failure-block defects),
 // then the rejecting round's auditor findings. Empty when there is nothing to tell.
-func composeRepairBrief(cs CycleState) string {
-	findings := actionableAuditFindings(cs.WorkspacePath)
+func composeRepairBrief(cs CycleState, warn io.Writer) string {
+	findings := actionableAuditFindings(cs.WorkspacePath, warn)
 	lead := findingsLead
 	if runnerDiagnosedAudit(cs) {
 		lead = findingsLeadAfterGate
@@ -96,17 +97,17 @@ func alphanumericKey(s string) string {
 // rejected) and the previous round's archive, and renders the findings the
 // builder must act on. round is the audit dispatch count (the live report's
 // round number); the previous archive is round-1.
-func auditorFindingsBrief(workspace string, round int) string {
-	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace), findingsLead)
+func auditorFindingsBrief(workspace string, round int, warn io.Writer) string {
+	return renderAuditorFindings(workspace, round, actionableAuditFindings(workspace, warn), findingsLead)
 }
 
-func actionableAuditFindings(workspace string) []reportdoc.Finding {
+func actionableAuditFindings(workspace string, warn io.Writer) []reportdoc.Finding {
 	reportName := phasecontract.ArtifactFilename(string(PhaseAudit))
 	current, err := os.ReadFile(filepath.Join(workspace, reportName))
 	if err != nil {
 		// Absence is legitimate (the audit crashed before writing a report).
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-repair: %s unreadable (%v) — builder gets no auditor findings\n", reportName, err)
+			fmt.Fprintf(warn, "[orchestrator] WARN audit-repair: %s unreadable (%v) — builder gets no auditor findings\n", reportName, err)
 		}
 		return nil
 	}

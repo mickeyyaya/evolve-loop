@@ -21,12 +21,12 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 	o.recordShipError(ctx, cycle, *cs, se)
 	budget := shipRecoveryBudget(se.Code, fleetWidth)
 	if depth >= budget {
-		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)
+		fmt.Fprintf(o.errOut(), "[orchestrator] ship recovery exhausted after %d attempt(s) (%s/%s, budget %d, fleet width %d); aborting\n", depth, se.Code, se.Class, budget, fleetWidth)
 		return "", false
 	}
 	if isContentionShipCode(se.Code) {
 		pause := contentionBackoff(depth)
-		fmt.Fprintf(os.Stderr, "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, se.Code)
+		fmt.Fprintf(o.errOut(), "[orchestrator] contention backoff %s before ship recovery attempt %d/%d (%s)\n", pause, depth+1, budget, se.Code)
 		backoffSleep(pause)
 	}
 	recoverCode, recoverClass := se.Code, se.Class
@@ -35,9 +35,9 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 		if cs.ActiveWorktree != "" {
 			switch verdict, perr := ClassifyFleetRebaseCandidate(ctx, cs.ActiveWorktree, "HEAD", "main"); {
 			case perr != nil:
-				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet-rebase pre-screen error (%v); falling through to rebase\n", cycle, perr)
+				fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet-rebase pre-screen error (%v); falling through to rebase\n", cycle, perr)
 			case verdict == FleetRebaseAlreadyLanded:
-				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet-rebase candidate already landed on main (superseded); short-circuiting with no wasted replay/re-audit (948 duplicate-work fix)\n", cycle)
+				fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet-rebase candidate already landed on main (superseded); short-circuiting with no wasted replay/re-audit (948 duplicate-work fix)\n", cycle)
 				return "", false
 			case verdict == FleetRebaseConflict:
 				predictedConflict = true
@@ -48,7 +48,7 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 		ok, conflict := rebaseRecordingConflicts(ctx, projectRoot, cs)
 		if unwind == unwindDone || (ok && unwind == unwindKeepsConsumption) {
 			if err := pendRebasedChange(ctx, cs.ActiveWorktree, gitCapture); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d pend the audited change failed: %v\n", cycle, err)
+				fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d pend the audited change failed: %v\n", cycle, err)
 				return "", false
 			}
 		}
@@ -64,10 +64,10 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 				return PhaseShip, true
 			}
 		case conflict:
-			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
+			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase CONFLICT (overlapping work the partition should have separated) → debugger\n", cycle)
 			recoverCode, recoverClass = CodeGitFleetRebaseConflict, ShipClassIntegrity
 		default:
-			fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d fleet rebase onto main failed (infra); aborting\n", cycle)
+			fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d fleet rebase onto main failed (infra); aborting\n", cycle)
 			return "", false
 		}
 	}
@@ -80,14 +80,14 @@ func (o *Orchestrator) recoverFromShipError(ctx context.Context, projectRoot str
 	})
 	cand := o.candidatePhase(dec.NextPhase)
 	if cand == "" || cand == PhaseEnd {
-		fmt.Fprintf(os.Stderr, "[orchestrator] ship error %s (%s) is unrecoverable (%s); aborting\n", se.Code, se.Class, dec.Reason)
+		fmt.Fprintf(o.errOut(), "[orchestrator] ship error %s (%s) is unrecoverable (%s); aborting\n", se.Code, se.Class, dec.Reason)
 		return "", false
 	}
 	if !o.sm.CanTransition(PhaseShip, cand) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] ship recovery proposed illegal edge ship→%s (%s); aborting\n", cand, dec.Reason)
+		fmt.Fprintf(o.errOut(), "[orchestrator] ship recovery proposed illegal edge ship→%s (%s); aborting\n", cand, dec.Reason)
 		return "", false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] ship error %s (%s) → recovery routes to %s (%s)\n", se.Code, se.Class, cand, dec.Reason)
+	fmt.Fprintf(o.errOut(), "[orchestrator] ship error %s (%s) → recovery routes to %s (%s)\n", se.Code, se.Class, cand, dec.Reason)
 	return cand, true
 }
 
@@ -155,7 +155,7 @@ func (o *Orchestrator) unwindUnlessPredictedConflict(ctx context.Context, projec
 }
 
 func (o *Orchestrator) reportIdentityProofSkipped(cycle int, cs CycleState, reason string) {
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d identity proof skipped (%s): %s; Build re-authors the explanation\n", cycle, CodeIdentityProofSkipped, reason)
+	fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d identity proof skipped (%s): %s; Build re-authors the explanation\n", cycle, CodeIdentityProofSkipped, reason)
 	o.signals.Emit(signalcenter.Event{
 		Cycle: cycle, RunID: cs.RunID, Phase: string(PhaseShip), Module: signalcenter.ModuleOrchestrator,
 		Origin: "Orchestrator.routeRebasedExplanation", Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn,

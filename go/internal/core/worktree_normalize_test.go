@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,7 +52,7 @@ func TestNormalizeWorktreeToBase_UncommitsBuilderCommit(t *testing.T) {
 		t.Fatal("precondition: HEAD should be ahead of base after the builder commit")
 	}
 
-	normalizeWorktreeToBase(context.Background(), dir, base)
+	normalizeWorktreeToBase(context.Background(), dir, base, io.Discard)
 
 	if head := gitInRepo(t, dir, "rev-parse", "HEAD"); head != base {
 		t.Fatalf("HEAD=%s, want base=%s (soft-reset should move HEAD to base)", head, base)
@@ -70,7 +71,7 @@ func TestNormalizeWorktreeToBase_NoopWhenUncommitted(t *testing.T) {
 	}
 	gitInRepo(t, dir, "add", "-A") // staged but NOT committed
 
-	normalizeWorktreeToBase(context.Background(), dir, base)
+	normalizeWorktreeToBase(context.Background(), dir, base, io.Discard)
 
 	if head := gitInRepo(t, dir, "rev-parse", "HEAD"); head != base {
 		t.Fatalf("HEAD must remain at base on no-op; got %s want %s", head, base)

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,8 @@ func TestReadMainTreeStatus_AnUnlaunchableGitReturnsItsError(t *testing.T) {
 }
 
 func TestRecoverPath_AStagedAddOrDeleteIsDiscardedAndAnUnknownStatusAborts(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name          string
 		xy            string
@@ -75,7 +78,10 @@ func TestRecoverPath_AStagedAddOrDeleteIsDiscardedAndAnUnknownStatusAborts(t *te
 			rec := leakRecovery{projectRoot: r.Dir, worktree: t.TempDir(), cycle: 4, authority: sourceWriterAuthority}
 
 			var stage, recovered bool
-			log := captureStderr(t, func() { stage, recovered = rec.recoverPath(context.Background(), tc.xy, "tracked.txt") })
+			var sink injectedStderr
+			rec.warn = &sink
+			stage, recovered = rec.recoverPath(context.Background(), tc.xy, "tracked.txt")
+			log := sink.String()
 
 			if stage || recovered != tc.wantRecovered {
 				t.Fatalf("recoverPath = (%v, %v), want (false, %v)", stage, recovered, tc.wantRecovered)
@@ -89,10 +95,15 @@ func TestRecoverPath_AStagedAddOrDeleteIsDiscardedAndAnUnknownStatusAborts(t *te
 }
 
 func TestRecoverUntracked_AVanishedLeakCannotBeRelocated(t *testing.T) {
+	t.Parallel()
+
 	rec := leakRecovery{projectRoot: t.TempDir(), worktree: t.TempDir(), cycle: 4, authority: sourceWriterAuthority}
 
 	var stage, recovered bool
-	log := captureStderr(t, func() { stage, recovered = rec.recoverUntracked("go/p/gone.go") })
+	var sink injectedStderr
+	rec.warn = &sink
+	stage, recovered = rec.recoverUntracked("go/p/gone.go")
+	log := sink.String()
 
 	if stage || recovered {
 		t.Fatalf("recoverUntracked = (%v, %v), want (false, false)", stage, recovered)
@@ -103,6 +114,8 @@ func TestRecoverUntracked_AVanishedLeakCannotBeRelocated(t *testing.T) {
 }
 
 func TestSetAsideShadowedLeak_AnUnwritableQuarantineKeepsTheLeakInPlace(t *testing.T) {
+	t.Parallel()
+
 	root, wt := t.TempDir(), t.TempDir()
 	writeFile(t, filepath.Join(root, ".evolve"), "a file where the quarantine home belongs")
 	src, dst := filepath.Join(root, "a.go"), filepath.Join(wt, "a.go")
@@ -111,7 +124,10 @@ func TestSetAsideShadowedLeak_AnUnwritableQuarantineKeepsTheLeakInPlace(t *testi
 	rec := leakRecovery{projectRoot: root, worktree: wt, cycle: 9}
 
 	var ok bool
-	log := captureStderr(t, func() { ok = rec.setAsideShadowedLeak(src, dst, "a.go") })
+	var sink injectedStderr
+	rec.warn = &sink
+	ok = rec.setAsideShadowedLeak(src, dst, "a.go")
+	log := sink.String()
 
 	if ok {
 		t.Fatal("a leak that could not be quarantined must not count as recovered")
@@ -128,10 +144,14 @@ func TestSetAsideShadowedLeak_AnUnwritableQuarantineKeepsTheLeakInPlace(t *testi
 }
 
 func TestRemoveDuplicateLeak_AnUnremovableLeakIsNotRecovered(t *testing.T) {
+	t.Parallel()
+
 	missing := filepath.Join(t.TempDir(), "gone.go")
 
 	var ok bool
-	log := captureStderr(t, func() { ok = removeDuplicateLeak(missing, "gone.go") })
+	var sink injectedStderr
+	ok = removeDuplicateLeak(missing, "gone.go", &sink)
+	log := sink.String()
 
 	if ok || !strings.Contains(log, "WARN build-leak-recover: drop leaked gone.go: ") {
 		t.Fatalf("removeDuplicateLeak = %v, stderr %q; want a loud refusal", ok, log)
@@ -172,6 +192,8 @@ func TestSameBytes_ComparesContentAndReportsEitherUnreadableSide(t *testing.T) {
 }
 
 func TestRecoverTrackedEdit_AnEditThatVanishedFromTheMainTreeAborts(t *testing.T) {
+	t.Parallel()
+
 	main := committedRepoE4(t, map[string]string{"tracked.txt": "base\n"})
 	wt := committedRepoE4(t, map[string]string{"tracked.txt": "base\n"})
 	if err := os.Remove(filepath.Join(main.Dir, "tracked.txt")); err != nil {
@@ -180,7 +202,10 @@ func TestRecoverTrackedEdit_AnEditThatVanishedFromTheMainTreeAborts(t *testing.T
 	rec := leakRecovery{projectRoot: main.Dir, worktree: wt.Dir, cycle: 4, authority: sourceWriterAuthority}
 
 	var stage, recovered bool
-	log := captureStderr(t, func() { stage, recovered = rec.recoverTrackedEdit(context.Background(), "tracked.txt") })
+	var sink injectedStderr
+	rec.warn = &sink
+	stage, recovered = rec.recoverTrackedEdit(context.Background(), "tracked.txt")
+	log := sink.String()
 
 	if stage || recovered {
 		t.Fatalf("recoverTrackedEdit = (%v, %v), want (false, false)", stage, recovered)
@@ -194,10 +219,15 @@ func TestRecoverTrackedEdit_AnEditThatVanishedFromTheMainTreeAborts(t *testing.T
 }
 
 func TestDiscard_ANonRepositoryMainTreeIsNotRecovered(t *testing.T) {
+	t.Parallel()
+
 	rec := leakRecovery{projectRoot: t.TempDir(), cycle: 4}
 
 	var ok bool
-	log := captureStderr(t, func() { ok = rec.discard(context.Background(), "x.go", "main-tree change") })
+	var sink injectedStderr
+	rec.warn = &sink
+	ok = rec.discard(context.Background(), "x.go", "main-tree change")
+	log := sink.String()
 
 	if ok || !strings.Contains(log, "WARN build-leak-recover: git checkout HEAD -- x.go: exit ") {
 		t.Fatalf("discard = %v, stderr %q; want a loud refusal", ok, log)
@@ -205,12 +235,14 @@ func TestDiscard_ANonRepositoryMainTreeIsNotRecovered(t *testing.T) {
 }
 
 func TestStageRelocated_NothingToStageIsTrueAndAFailedAddIsFalse(t *testing.T) {
+	t.Parallel()
+
 	wt := committedRepoE4(t, map[string]string{"a.txt": "a\n"})
-	if !stageRelocated(context.Background(), t.TempDir(), nil) {
+	if !stageRelocated(context.Background(), t.TempDir(), nil, io.Discard) {
 		t.Fatal("no relocated paths must succeed without running git")
 	}
 	writeFile(t, filepath.Join(wt.Dir, "moved.txt"), "relocated\n")
-	if !stageRelocated(context.Background(), wt.Dir, []string{"moved.txt"}) {
+	if !stageRelocated(context.Background(), wt.Dir, []string{"moved.txt"}, io.Discard) {
 		t.Fatal("control: a relocated path must stage")
 	}
 	if got := wt.Git("diff", "--cached", "--name-only"); got != "moved.txt" {
@@ -218,7 +250,9 @@ func TestStageRelocated_NothingToStageIsTrueAndAFailedAddIsFalse(t *testing.T) {
 	}
 
 	var ok bool
-	log := captureStderr(t, func() { ok = stageRelocated(context.Background(), wt.Dir, []string{"never-written.txt"}) })
+	var sink injectedStderr
+	ok = stageRelocated(context.Background(), wt.Dir, []string{"never-written.txt"}, &sink)
+	log := sink.String()
 
 	if ok || !strings.Contains(log, "git add of relocated paths failed (rc=128)") {
 		t.Fatalf("stageRelocated = %v, stderr %q; want a refusal naming git's exit", ok, log)

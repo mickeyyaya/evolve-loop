@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -62,7 +61,7 @@ func (cr *cycleRun) postScoutReplan() {
 	if err != nil {
 		// Fail-open (like selectNext's digest): a degraded read must not abort the
 		// shadow re-plan — log and fall through; Scout.Present below gates the rest.
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN post-scout digest degraded (cycle %d): %v\n", cr.cycle, err)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN post-scout digest degraded (cycle %d): %v\n", cr.cycle, err)
 	}
 	if !signals.Scout.Present {
 		return
@@ -81,7 +80,7 @@ func (cr *cycleRun) postScoutReplan() {
 		maxDepth = 1 // a directly-constructed cfg (tests) gets the safe default
 	}
 	if cr.replanDepth >= maxDepth {
-		fmt.Fprintf(os.Stderr, "[orchestrator] re-plan depth cap (%d) reached at cycle %d — escalating, not re-planning\n", maxDepth, cr.cycle)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] re-plan depth cap (%d) reached at cycle %d — escalating, not re-planning\n", maxDepth, cr.cycle)
 		cr.recordReplanEscalation(maxDepth)
 		return
 	}
@@ -89,7 +88,7 @@ func (cr *cycleRun) postScoutReplan() {
 	raw, err := cr.observedRePlan(planner, in)
 	if err != nil || raw == nil {
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN post-scout re-plan failed (keeping initial plan): %v\n", err)
+			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN post-scout re-plan failed (keeping initial plan): %v\n", err)
 		}
 		return // fail open: the initial plan stands
 	}
@@ -129,6 +128,6 @@ func (cr *cycleRun) recordReplanEscalation(maxDepth int) {
 		TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle, Role: "orchestrator",
 		Kind: "replan_escalation", ExitCode: 0,
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN replan_escalation ledger append: %v\n", err)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN replan_escalation ledger append: %v\n", err)
 	}
 }

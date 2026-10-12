@@ -63,6 +63,8 @@ func TestDecideAfterAuditFail_AMixedFailKeepsTDD(t *testing.T) {
 }
 
 func TestDecideAfterAuditFail_AnExplanationOnlyFailBriefsItsDefectsWithoutARecord(t *testing.T) {
+	t.Parallel()
+
 	cs := explanationRouteState(t, 0, cycle1745Defects...)
 
 	explanationRouteOrchestrator(nil).decideAfterAuditFail(cs)
@@ -72,7 +74,9 @@ func TestDecideAfterAuditFail_AnExplanationOnlyFailBriefsItsDefectsWithoutARecor
 	}
 	cs.AuditRepairActive = true
 	var brief string
-	stderr := captureStderr(t, func() { brief = composeRepairBrief(cs) })
+	var sink injectedStderr
+	brief = composeRepairBrief(cs, &sink)
+	stderr := sink.String()
 	if strings.Contains(stderr, "unreadable") {
 		t.Fatalf("the re-author's brief WARNs the findings artifact is unreadable:\n%s", stderr)
 	}

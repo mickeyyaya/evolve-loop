@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -43,6 +44,8 @@ func realTempDir(t *testing.T) string {
 }
 
 func TestBuildTagVisiblePackages_DropsOnlyPackagesWithNoDefaultTagFiles(t *testing.T) {
+	t.Parallel()
+
 	moduleDir := filepath.Join(realTempDir(t), "go")
 	writeModuleFiles(t, moduleDir, map[string]string{
 		"go.mod":             "module example.com/tagfixture\n\ngo 1.23\n",
@@ -54,7 +57,9 @@ func TestBuildTagVisiblePackages_DropsOnlyPackagesWithNoDefaultTagFiles(t *testi
 	in := []string{"./src", "./onlytest", "./xtest", "./tagged", "./missing"}
 	var got []string
 
-	stderr := captureStderr(t, func() { got = buildTagVisiblePackages(context.Background(), moduleDir, in) })
+	var sink injectedStderr
+	got = buildTagVisiblePackages(context.Background(), moduleDir, in, &sink)
+	stderr := sink.String()
 
 	if want := []string{"./src", "./onlytest", "./xtest", "./missing"}; !slices.Equal(got, want) {
 		t.Fatalf("buildTagVisiblePackages = %q, want %q (an unresolvable package stays for the floor to judge)", got, want)
@@ -74,7 +79,7 @@ func TestBuildTagVisiblePackages_AllVisibleKeepsTheInputUnchanged(t *testing.T) 
 	})
 	in := []string{"./src"}
 
-	got := buildTagVisiblePackages(context.Background(), moduleDir, in)
+	got := buildTagVisiblePackages(context.Background(), moduleDir, in, io.Discard)
 
 	if !slices.Equal(got, in) {
 		t.Fatalf("buildTagVisiblePackages = %q, want %q", got, in)
@@ -82,10 +87,14 @@ func TestBuildTagVisiblePackages_AllVisibleKeepsTheInputUnchanged(t *testing.T) 
 }
 
 func TestBuildTagVisiblePackages_GoListFailureFailsOpenWithAWarning(t *testing.T) {
+	t.Parallel()
+
 	in := []string{"./a", "./b"}
 	var got []string
 
-	stderr := captureStderr(t, func() { got = buildTagVisiblePackages(context.Background(), t.TempDir(), in) })
+	var sink injectedStderr
+	got = buildTagVisiblePackages(context.Background(), t.TempDir(), in, &sink)
+	stderr := sink.String()
 
 	if !slices.Equal(got, in) || !strings.Contains(stderr, "[build-floor] WARN: go list failed") {
 		t.Fatalf("buildTagVisiblePackages = %q, stderr %q; want the input kept and the WARN", got, stderr)

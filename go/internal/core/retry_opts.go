@@ -197,12 +197,12 @@ func (cr *cycleRun) retryPhaseRunner(phase Phase, req PhaseRequest, opts retryOp
 // SKIPPED keeps contract review from redispatching the missing phase; the
 // warning and ledger retain its failure without making a success claim.
 func (cr *cycleRun) recordPhaseSkip(phase Phase, cause error, kind, msg string) PhaseResponse {
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s (%s)\n", msg, kind)
+	fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN %s (%s)\n", msg, kind)
 	if err := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 		TS: cr.o.now().UTC().Format(time.RFC3339), Cycle: cr.cycle,
 		Role: string(phase), Kind: kind, ExitCode: bridgeExitCode(cause),
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", kind, err)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN %s ledger append: %v\n", kind, err)
 	}
 	return PhaseResponse{Phase: string(phase), Verdict: VerdictSKIPPED,
 		ArtifactsDir: cr.cs.WorkspacePath, Diagnostics: []Diagnostic{{Severity: "warn", Message: msg}}}

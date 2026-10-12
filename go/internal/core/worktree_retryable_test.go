@@ -32,11 +32,15 @@ func TestWorktreeAddRetry_LockCollisionStillRetriesToBound(t *testing.T) {
 }
 
 func TestWorktreeAddRetry_AnnouncementDoesNotClaimUnclassifiedTransience(t *testing.T) {
-	r := worktreeAddRetry("cycle-lane-1")
+	t.Parallel()
+
+	var sink injectedStderr
+	r := worktreeAddRetryTo("cycle-lane-1", &sink)
 	if r.OnRetry == nil {
 		t.Fatal("no retry announcement — contention must stay visible to the operator")
 	}
-	out := captureStderr(t, func() { r.OnRetry(1, 3, 255, "") })
+	r.OnRetry(1, 3, 255, "")
+	out := sink.String()
 
 	if strings.Contains(strings.ToLower(out), "transient") {
 		t.Errorf("announcement claims transience it never established:\n\t%s\nOnRetry fires for every failure the classifier did not RULE OUT, which is not the same as one proven to be contention — that is how a permanent rc=128 came to be logged as contention 33 times per cmd/evolve run", strings.TrimSpace(out))

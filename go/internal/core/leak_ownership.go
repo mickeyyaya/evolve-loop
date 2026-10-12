@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -62,7 +63,7 @@ func laneOwnership(cs CycleState, mints map[string]bool) mainTreeOwnership {
 
 func laneItems(workspace string) map[string]bool {
 	committed, decided := committedset.Committed(workspace)
-	materialized := materializedEvalSlugs(workspace)
+	materialized := materializedEvalSlugs(workspace, os.Stderr)
 	if !decided && len(materialized) == 0 {
 		return nil
 	}
@@ -76,14 +77,14 @@ func laneItems(workspace string) map[string]bool {
 	return items
 }
 
-func materializedEvalSlugs(workspace string) []string {
+func materializedEvalSlugs(workspace string, warn io.Writer) []string {
 	if workspace == "" {
 		return nil
 	}
 	entries, err := os.ReadDir(filepath.Join(workspace, filepath.FromSlash(evalsDir)))
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN lane ownership: workspace eval home unreadable (%v) — owned slugs fall back to the committed set\n", err)
+			fmt.Fprintf(warn, "[orchestrator] WARN lane ownership: workspace eval home unreadable (%v) — owned slugs fall back to the committed set\n", err)
 		}
 		return nil
 	}
@@ -216,7 +217,7 @@ func (o mainTreeOwnership) exemptions(projectRoot, ownWorkspace string, leased m
 }
 
 func (cr *cycleRun) leakExemptions() leakExemptions {
-	ownership := laneOwnership(cr.cs, activeVerifiedMints(cr.req.ProjectRoot))
+	ownership := laneOwnership(cr.cs, activeVerifiedMints(cr.req.ProjectRoot, cr.o.errOut()))
 	return ownership.exemptions(cr.req.ProjectRoot, cr.cs.WorkspacePath, cr.consoleLeased)
 }
 
@@ -234,13 +235,13 @@ func liveHolderCheck(projectRoot, ownWorkspace string, ownership mainTreeOwnersh
 	}
 }
 
-func activeVerifiedMints(projectRoot string) map[string]bool {
+func activeVerifiedMints(projectRoot string, warn io.Writer) map[string]bool {
 	registry := mintregistry.Path(projectRoot)
 	mints, err := mintregistry.ActiveNames(registry, time.Now())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] ABNORMAL mint registry unreadable (%v); mint exemption disabled for this check\n", err)
+		fmt.Fprintf(warn, "[orchestrator] ABNORMAL mint registry unreadable (%v); mint exemption disabled for this check\n", err)
 		if _, qErr := mintregistry.QuarantineCorrupt(registry); qErr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN mint registry quarantine failed: %v\n", qErr)
+			fmt.Fprintf(warn, "[orchestrator] WARN mint registry quarantine failed: %v\n", qErr)
 		}
 		return nil
 	}

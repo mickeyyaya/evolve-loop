@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,14 +88,14 @@ func docsFloorWarn(in ReviewInput, paths []string) {
 			steStage = p.DocsFloorConfig().SteStage
 		}
 	}
-	steLintWarn(in.Worktree, steStage, paths)
+	steLintWarn(in.Worktree, steStage, paths, in.errOut())
 	// The blocking-grade classifier drops test-only diffs; the verdict still stays WARN.
 	v := docsfloor.Evaluate(cfg, docsfloor.Input{
 		ArchitectureLabeled: docsfloor.IsArchitectureClass(paths),
 		ChangedFiles:        paths,
 	})
 	if v.Status == docsfloor.StatusWarn {
-		fmt.Fprintf(os.Stderr, "[docs-floor] WARN: %s\n", v.Reason)
+		fmt.Fprintf(in.errOut(), "[docs-floor] WARN: %s\n", v.Reason)
 	}
 }
 
@@ -123,7 +124,7 @@ func changedPackageFloorChecks(ctx context.Context, in ReviewInput, paths []stri
 	// reviewAndGuard normalizes gofmt and derived projections first, so this tests the tree Audit receives.
 	pkgs := changedGoTestPackages(paths)
 	moduleDir := codequality.ModuleDir(in.Worktree)
-	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs)
+	pkgs = buildTagVisiblePackages(ctx, moduleDir, pkgs, in.errOut())
 	// Added tag-gated packages are invisible to the default-context run, so they run under their own tags.
 	taggedFails := addedTaggedTestFailures(ctx, in, moduleDir)
 	if len(pkgs) == 0 {
@@ -213,7 +214,7 @@ func floorFailureDiagnostic(output string) string {
 
 // buildTagVisiblePackages drops changed packages with no Go files under the default build tags, whose `go test` is a
 // setup failure rather than a test failure. It fails open: a `go list` error returns the input unchanged.
-func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []string) []string {
+func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []string, warn io.Writer) []string {
 	if len(pkgs) == 0 {
 		return pkgs
 	}
@@ -223,7 +224,7 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 	cmd.Env = ipcenv.Scrub(os.Environ())
 	out, err := cmd.Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN: go list failed (%v) — build-tag visibility filter skipped this handoff\n", err)
+		fmt.Fprintf(warn, "[build-floor] WARN: go list failed (%v) — build-tag visibility filter skipped this handoff\n", err)
 		return pkgs
 	}
 	empty := map[string]bool{}
@@ -243,7 +244,7 @@ func buildTagVisiblePackages(ctx context.Context, moduleDir string, pkgs []strin
 	for _, p := range pkgs {
 		dir := filepath.Clean(filepath.Join(moduleDir, strings.TrimPrefix(p, "./")))
 		if empty[dir] {
-			fmt.Fprintf(os.Stderr, "[build-floor] NOTE: %s has no Go files under the default build tags (build-tagged package) — excluded from the selfcheck run\n", p)
+			fmt.Fprintf(warn, "[build-floor] NOTE: %s has no Go files under the default build tags (build-tagged package) — excluded from the selfcheck run\n", p)
 			continue
 		}
 		kept = append(kept, p)

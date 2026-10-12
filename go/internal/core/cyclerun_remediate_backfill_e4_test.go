@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"strings"
 	"testing"
 
@@ -98,12 +99,17 @@ func TestMaybeRemediate_ARoundBelowTheCapStillRunsAndCountsItself(t *testing.T) 
 }
 
 func TestMaybeRemediate_ARejectedBuilderFixVoidsTheRoundAndTheGateFailStands(t *testing.T) {
+	t.Parallel()
+
 	reviewer := &remediateReviewerE4{decide: map[string]ReviewResult{"build": {Approve: false, Reason: "builder touched unrelated files"}}}
 	rig := remediateRigE4(t, 1, reviewer, []string{VerdictPASS})
 
 	var act loopAction
 	var err error
-	log := captureStderr(t, func() { act, err = rig.cr.maybeRemediate(PhaseTDD, rig.dr) })
+	var sink injectedStderr
+	rig.cr.o.stderr = &sink
+	act, err = rig.cr.maybeRemediate(PhaseTDD, rig.dr)
+	log := sink.String()
 
 	if act != loopNext || err != nil {
 		t.Fatalf("act=%v err=%v, a voided round never aborts the cycle", act, err)
@@ -120,12 +126,17 @@ func TestMaybeRemediate_ARejectedBuilderFixVoidsTheRoundAndTheGateFailStands(t *
 }
 
 func TestMaybeRemediate_AResealedExplanationThatCannotBeProjectedVoidsTheRound(t *testing.T) {
+	t.Parallel()
+
 	rig := remediateRigE4(t, 1, &remediateReviewerE4{}, []string{VerdictPASS})
 	rig.cr.cs.ExplanationDocumentationVersion = explanationdocs.CurrentContractVersion
 
 	var act loopAction
 	var err error
-	log := captureStderr(t, func() { act, err = rig.cr.maybeRemediate(PhaseTDD, rig.dr) })
+	var sink injectedStderr
+	rig.cr.o.stderr = &sink
+	act, err = rig.cr.maybeRemediate(PhaseTDD, rig.dr)
+	log := sink.String()
 
 	if act != loopNext || err != nil || rig.gate.calls != 0 || rig.dr.resp.Verdict != VerdictFAIL {
 		t.Fatalf("act=%v err=%v gate=%d verdict=%q, want the round voided before the re-run", act, err, rig.gate.calls, rig.dr.resp.Verdict)
@@ -139,12 +150,15 @@ func TestMaybeRemediate_AResealedExplanationThatCannotBeProjectedVoidsTheRound(t
 }
 
 func TestMaybeRemediate_AReRunThatTheReviewerRejectsAbortsTheCycle(t *testing.T) {
+	t.Parallel()
+
 	reviewer := &remediateReviewerE4{decide: map[string]ReviewResult{"tdd": {Approve: false, Reason: "re-run omitted the declared deliverable"}}}
 	rig := remediateRigE4(t, 1, reviewer, []string{VerdictPASS})
 
 	var act loopAction
 	var err error
-	captureStderr(t, func() { act, err = rig.cr.maybeRemediate(PhaseTDD, rig.dr) })
+	rig.cr.o.stderr = io.Discard
+	act, err = rig.cr.maybeRemediate(PhaseTDD, rig.dr)
 
 	if act != loopAbort || err == nil {
 		t.Fatalf("act=%v err=%v, want the re-run's rejection to abort", act, err)

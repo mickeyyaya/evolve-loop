@@ -11,6 +11,8 @@ import (
 )
 
 func TestCompleteCycle_AFailedToolOutputPruneWarnsAndStillSeals(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	busy := filepath.Join(ws, gcpolicy.ToolOutputFiles()[0])
 	if err := os.MkdirAll(filepath.Join(busy, "child"), 0o755); err != nil {
@@ -27,7 +29,10 @@ func TestCompleteCycle_AFailedToolOutputPruneWarnsAndStillSeals(t *testing.T) {
 	}
 	var err error
 
-	stderr := captureStderr(t, func() { err = cr.completeCycle() })
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	err = cr.completeCycle()
+	stderr := sink.String()
 
 	if err != nil || !cr.cycleCompletedNormally {
 		t.Fatalf("completeCycle = %v (completed %v), want a sealed cycle: the prune is non-fatal", err, cr.cycleCompletedNormally)

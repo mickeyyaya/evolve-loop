@@ -65,6 +65,8 @@ func TestRunCycle_ABuildCannotStartWithoutASealedWorktreeContext(t *testing.T) {
 }
 
 func TestRunCycle_AnUnwritableInteractionSummaryWarnsAndTheCycleStillCompletes(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(nil)
 	runners[PhaseScout] = &runCycleWritingRunnerE4{name: "scout", run: func(req PhaseRequest) error {
 		writeFile(t, filepath.Join(req.Workspace, "scout-interactions.ndjson"), `{"kind":"clarify","result":"answered"}`+"\n")
@@ -73,7 +75,10 @@ func TestRunCycle_AnUnwritableInteractionSummaryWarnsAndTheCycleStillCompletes(t
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, runners)
 
 	var err error
-	log := captureStderr(t, func() { _, err = o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}) })
+	var sink injectedStderr
+	o.stderr = &sink
+	_, err = o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()})
+	log := sink.String()
 
 	if err != nil {
 		t.Fatalf("RunCycle: %v, a lost rollup must not fail the cycle", err)

@@ -29,13 +29,16 @@ func editedLaneWorktreeE4(t *testing.T) (projectRoot, worktree, base string) {
 }
 
 func TestRecordAuditBinding_AnUnreadableProjectHeadBindsNothing(t *testing.T) {
+	t.Parallel()
+
 	ledger := &fakeLedger{}
 	o := auditBindingOrchestratorE4(ledger)
 	missing := filepath.Join(t.TempDir(), "gone")
 
-	log := captureStderr(t, func() {
-		o.recordAuditBinding(context.Background(), 7, missing, putBaseWorkspace(t), "", "", VerdictPASS)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordAuditBinding(context.Background(), 7, missing, putBaseWorkspace(t), "", "", VerdictPASS)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN audit-binding: git rev-parse HEAD failed: ") {
 		t.Fatalf("stderr must name the HEAD failure:\n%s", log)
@@ -46,13 +49,16 @@ func TestRecordAuditBinding_AnUnreadableProjectHeadBindsNothing(t *testing.T) {
 }
 
 func TestRecordAuditBinding_ALostLedgerRowStillCachesTheReusableVerdict(t *testing.T) {
+	t.Parallel()
+
 	projectRoot, worktree, base := editedLaneWorktreeE4(t)
 	ws := putBaseWorkspace(t)
 	o := auditBindingOrchestratorE4(&fakeLedger{failOnAppend: true})
 
-	log := captureStderr(t, func() {
-		o.recordAuditBinding(context.Background(), 8, projectRoot, ws, worktree, base, VerdictPASS)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordAuditBinding(context.Background(), 8, projectRoot, ws, worktree, base, VerdictPASS)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN audit-binding ledger append: forced ledger append fail") {
 		t.Fatalf("stderr must surface the lost binding row:\n%s", log)
@@ -69,13 +75,16 @@ func TestRecordAuditBinding_ALostLedgerRowStillCachesTheReusableVerdict(t *testi
 }
 
 func TestRecordAuditBinding_AnUnresolvableBaseSkipsTheCache(t *testing.T) {
+	t.Parallel()
+
 	projectRoot, worktree, _ := editedLaneWorktreeE4(t)
 	ledger := &fakeLedger{}
 	o := auditBindingOrchestratorE4(ledger)
 
-	log := captureStderr(t, func() {
-		o.recordAuditBinding(context.Background(), 9, projectRoot, putBaseWorkspace(t), worktree, strings.Repeat("d", 40), VerdictPASS)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordAuditBinding(context.Background(), 9, projectRoot, putBaseWorkspace(t), worktree, strings.Repeat("d", 40), VerdictPASS)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN verdict-cache put skipped (cycle 9): worktree base "+strings.Repeat("d", 40)+" did not resolve to a tree") {
 		t.Fatalf("stderr must name the unresolved base:\n%s", log)
@@ -89,6 +98,8 @@ func TestRecordAuditBinding_AnUnresolvableBaseSkipsTheCache(t *testing.T) {
 }
 
 func TestRecordAuditBinding_AnUnwritableCacheWarnsAfterBinding(t *testing.T) {
+	t.Parallel()
+
 	projectRoot, worktree, base := editedLaneWorktreeE4(t)
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".evolve", "verdict-cache.json"), 0o755); err != nil {
 		t.Fatal(err)
@@ -96,9 +107,10 @@ func TestRecordAuditBinding_AnUnwritableCacheWarnsAfterBinding(t *testing.T) {
 	ledger := &fakeLedger{}
 	o := auditBindingOrchestratorE4(ledger)
 
-	log := captureStderr(t, func() {
-		o.recordAuditBinding(context.Background(), 10, projectRoot, putBaseWorkspace(t), worktree, base, VerdictWARN)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordAuditBinding(context.Background(), 10, projectRoot, putBaseWorkspace(t), worktree, base, VerdictWARN)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN verdict-cache put: ") {
 		t.Fatalf("stderr must surface the failed cache write:\n%s", log)
@@ -109,9 +121,13 @@ func TestRecordAuditBinding_AnUnwritableCacheWarnsAfterBinding(t *testing.T) {
 }
 
 func TestNormalizeWorktreeToBase_AnUnreadableHeadLeavesTheWorktreeAsIs(t *testing.T) {
+	t.Parallel()
+
 	missing := filepath.Join(t.TempDir(), "gone")
 
-	log := captureStderr(t, func() { normalizeWorktreeToBase(context.Background(), missing, strings.Repeat("a", 40)) })
+	var sink injectedStderr
+	normalizeWorktreeToBase(context.Background(), missing, strings.Repeat("a", 40), &sink)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN worktree-normalize: rev-parse HEAD failed: ") {
 		t.Fatalf("stderr must name the HEAD failure:\n%s", log)
@@ -119,6 +135,8 @@ func TestNormalizeWorktreeToBase_AnUnreadableHeadLeavesTheWorktreeAsIs(t *testin
 }
 
 func TestNormalizeWorktreeToBase_ALockedBranchKeepsTheBuilderCommit(t *testing.T) {
+	t.Parallel()
+
 	root := putBaseRepo(t)
 	base := gitOut(t, root, "rev-parse", "HEAD")
 	writeFile(t, filepath.Join(root, "built.txt"), "builder output")
@@ -129,7 +147,9 @@ func TestNormalizeWorktreeToBase_ALockedBranchKeepsTheBuilderCommit(t *testing.T
 	lock := filepath.Join(root, ".git", "refs", "heads", branch+".lock")
 	writeFile(t, lock, "")
 
-	log := captureStderr(t, func() { normalizeWorktreeToBase(context.Background(), root, base) })
+	var sink injectedStderr
+	normalizeWorktreeToBase(context.Background(), root, base, &sink)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN worktree-normalize: git reset --soft "+base+" failed (rc=1)") {
 		t.Fatalf("stderr must name the failed soft reset:\n%s", log)
@@ -140,7 +160,8 @@ func TestNormalizeWorktreeToBase_ALockedBranchKeepsTheBuilderCommit(t *testing.T
 	if err := os.Remove(lock); err != nil {
 		t.Fatal(err)
 	}
-	captureStderr(t, func() { normalizeWorktreeToBase(context.Background(), root, base) })
+	var unlocked injectedStderr
+	normalizeWorktreeToBase(context.Background(), root, base, &unlocked)
 	if got := gitOut(t, root, "rev-parse", "HEAD"); got != base {
 		t.Fatalf("control: an unlocked branch soft-resets to the base, HEAD = %s", got)
 	}

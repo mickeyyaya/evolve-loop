@@ -147,6 +147,8 @@ func TestDispatchEvaluateBatch_ACycleStateWriteFailureAbortsAfterRecordingTheMem
 }
 
 func TestRecordBatchMember_ALedgerFailureWarnsAndTheBatchStillAdvances(t *testing.T) {
+	t.Parallel()
+
 	var a, m int32
 	runners := buildRunners(nil)
 	runners[Phase("tester")] = &concurrentRunner{name: "tester", active: &a, maxActive: &m, verdict: VerdictWARN}
@@ -157,7 +159,10 @@ func TestRecordBatchMember_ALedgerFailureWarnsAndTheBatchStillAdvances(t *testin
 
 	var act loopAction
 	var err error
-	log := captureStderr(t, func() { act, err = cr.dispatchEvaluateBatch([]Phase{"tester", "evaluator"}) })
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	act, err = cr.dispatchEvaluateBatch([]Phase{"tester", "evaluator"})
+	log := sink.String()
 
 	if err != nil || act != loopNext || cr.lastVerdict != VerdictWARN {
 		t.Fatalf("act=%v err=%v verdict=%s; a lost ledger row must not fail the batch", act, err, cr.lastVerdict)
@@ -170,6 +175,8 @@ func TestRecordBatchMember_ALedgerFailureWarnsAndTheBatchStillAdvances(t *testin
 }
 
 func TestRetryPhaseRunner_ABackfilledArtifactTimeoutReturnsTheWarnResponse(t *testing.T) {
+	t.Parallel()
+
 	runner := &alwaysFailRunner{name: "build", err: ErrArtifactTimeout}
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, map[Phase]PhaseRunner{PhaseBuild: runner})
 	o.retryConfig.PhaseMaxAttempts = 2
@@ -182,9 +189,9 @@ func TestRetryPhaseRunner_ABackfilledArtifactTimeoutReturnsTheWarnResponse(t *te
 	var resp PhaseResponse
 	var attempts int
 	var err error
-	captureStderr(t, func() {
-		resp, attempts, err = cr.retryPhaseRunner(PhaseBuild, PhaseRequest{}, cr.mainDispatchRetryOpts())
-	})
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	resp, attempts, err = cr.retryPhaseRunner(PhaseBuild, PhaseRequest{}, cr.mainDispatchRetryOpts())
 
 	if err != nil || resp.Verdict != VerdictWARN || attempts != 2 || runner.n != 2 {
 		t.Fatalf("resp=%+v attempts=%d runs=%d err=%v; want WARN after both attempts", resp, attempts, runner.n, err)
