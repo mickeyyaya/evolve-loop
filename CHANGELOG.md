@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Fixed — the dev worktree sweep of `evolve gc` has its own time budget (2026-10-12)
+
+- **The defect.** `evolve gc` ran the dev worktree sweep inside the 15-second bound that protects the session and socket reapers. On a loaded host (load 12) the sweep judged 137 of 172 trees, then every git call failed with `context deadline exceeded`. 35 trees were `NOT-JUDGED`, the run exited 1, and the wave boundary stopped at step 4.
+- **The fix.** The sweep now runs under its own context from `gc.dev_worktrees.sweep_budget_seconds` (default 300 seconds; an unset, zero or negative value takes the default). A tree that the budget stops prints `SKIPPED`, and a `WARN` names the budget and the count. A process listing that the budget stops archives nothing and prints a `WARN`. Neither fails the run. Any other `NOT-JUDGED` reason still fails it.
+- **The default.** A test hub of 40 small trees took 2.0 s on this host (50 ms a tree). Under a load of 25 it took 3.0 s (75 ms a tree). On large trees the incident cost at least 100 ms a tree. At that rate, 172 trees take about 20 seconds, so 300 seconds leaves a large margin.
+- Docs: [runtime-reference](docs/operations/runtime-reference.md), [workspace-layout](docs/operations/workspace-layout.md), [internal-gc](docs/architecture/packages/internal-gc.md)
 ## Changed — the coverage gates read the one profile of the integration run (plan T2, ADR-0131, 2026-10-12)
 
 - **A profile exists only after a green run.** `make test-integration` deletes `coverage.txt`, writes `coverage.partial.txt`, and renames it to `coverage.txt` only when `go test` exits 0. On a failure it removes the partial file and exits with the status of `go test`.

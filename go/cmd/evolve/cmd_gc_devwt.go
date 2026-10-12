@@ -25,10 +25,17 @@ func (r gcRun) devWorktrees(projectRoot, evolveDir string, pol gc.Policy) bool {
 }
 
 func (r gcRun) devWorktreesWith(opts gc.DevOptions) bool {
-	manifest, err := gc.PlanDevWorktrees(r.ctx, opts)
+	budget := opts.Policy.SweepBudget()
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.ctx), budget)
+	defer cancel()
+	manifest, err := gc.PlanDevWorktrees(ctx, opts)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: dev worktree sweep plan failed: %v\n", err)
 		return true
+	}
+	if manifest.OverBudget {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: dev worktree sweep over its %s budget (gc.dev_worktrees.sweep_budget_seconds): %s\n", budget, manifest.Skipped)
+		return false
 	}
 	if manifest.Skipped != "" {
 		fmt.Fprintf(r.stdout, "evolve gc: dev worktree sweep skipped: %s\n", manifest.Skipped)
@@ -43,10 +50,24 @@ func (r gcRun) devWorktreesWith(opts gc.DevOptions) bool {
 		fmt.Fprintf(r.stdout, "  %s\n", gcDevItemLine(it, r.dryRun))
 	}
 	failed := unjudged > 0
+	if skipped := gcDevSkipped(manifest); skipped > 0 {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: dev worktree sweep used its %s budget (gc.dev_worktrees.sweep_budget_seconds): %d tree(s) SKIPPED, not judged\n", budget, skipped)
+	}
 	if r.dryRun {
 		return failed
 	}
-	recs, err := gc.ApplyDevWorktrees(r.ctx, opts, manifest)
+	if ctx.Err() != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: dev worktree archive deferred to the next run: the %s budget is spent\n", budget)
+		return failed
+	}
+	return r.applyDevArchive(ctx, opts, manifest, budget, failed)
+}
+
+func (r gcRun) applyDevArchive(ctx context.Context, opts gc.DevOptions, manifest gc.DevManifest, budget time.Duration, failed bool) bool {
+	opts.Deferred = func(path string) {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: dev worktree %s kept: the %s budget ran out before its archive; the next run retries\n", path, budget)
+	}
+	recs, err := gc.ApplyDevWorktrees(ctx, opts, manifest)
 	for _, rec := range recs {
 		fmt.Fprintf(r.stdout, "  archived path=%s branch=%s checkpoint=%s\n", rec.Path, rec.Branch, gcCheckpointLabel(rec))
 		for _, cmd := range rec.RestoreCommands() {
@@ -73,6 +94,8 @@ func gcDevItemLine(it gc.DevItem, dryRun bool) string {
 	switch {
 	case it.Failed:
 		verb = "NOT-JUDGED"
+	case it.Skipped:
+		verb = "SKIPPED"
 	case it.Action == gc.DevActionArchive && dryRun:
 		verb = "WOULD-ARCHIVE"
 	case it.Action == gc.DevActionArchive:
@@ -90,6 +113,7 @@ func gcDevCounts(m gc.DevManifest) (archive, kept, unjudged int) {
 		switch {
 		case it.Failed:
 			unjudged++
+		case it.Skipped:
 		case it.Action == gc.DevActionArchive:
 			archive++
 		default:
@@ -97,6 +121,16 @@ func gcDevCounts(m gc.DevManifest) (archive, kept, unjudged int) {
 		}
 	}
 	return archive, kept, unjudged
+}
+
+func gcDevSkipped(m gc.DevManifest) int {
+	n := 0
+	for _, it := range m.Items {
+		if it.Skipped {
+			n++
+		}
+	}
+	return n
 }
 
 type ghOpenPR struct {

@@ -114,10 +114,22 @@ func (w WorktreesPolicy) DevQuietPeriod() time.Duration {
 	return time.Duration(w.DevQuietMinutes) * time.Minute
 }
 
-const defaultDevArchiveAfterDays = 14
+const (
+	defaultDevArchiveAfterDays = 14
+	defaultDevSweepBudgetSecs  = 300
+)
 
 type DevWorktreesPolicy struct {
-	ArchiveAfterDays int `json:"archive_after_days,omitempty"`
+	ArchiveAfterDays   int `json:"archive_after_days,omitempty"`
+	SweepBudgetSeconds int `json:"sweep_budget_seconds,omitempty"`
+}
+
+func (d DevWorktreesPolicy) SweepBudget() time.Duration {
+	secs := d.SweepBudgetSeconds
+	if secs <= 0 {
+		secs = defaultDevSweepBudgetSecs
+	}
+	return time.Duration(secs) * time.Second
 }
 
 func (d DevWorktreesPolicy) ArchiveAfter() time.Duration {

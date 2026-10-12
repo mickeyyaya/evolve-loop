@@ -11,6 +11,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
+var errBudgetDeferred = errors.New("gc: the time budget ran out")
+
 func ApplyDevWorktrees(ctx context.Context, o DevOptions, m DevManifest) ([]DevArchiveRecord, error) {
 	s, skipped, err := newDevSweep(ctx, o)
 	if err != nil || skipped != "" {
@@ -35,6 +37,10 @@ func ApplyDevWorktrees(ctx context.Context, o DevOptions, m DevManifest) ([]DevA
 		if rec.Path != "" {
 			done = append(done, rec)
 		}
+		if errors.Is(err, errBudgetDeferred) {
+			o.deferred(planned.Path)
+			continue
+		}
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -49,6 +55,8 @@ func (s *devSweep) archiveOne(ctx context.Context, planned DevItem, known map[st
 	}
 	fresh := s.judge(ctx, wt)
 	switch {
+	case fresh.Skipped:
+		return DevArchiveRecord{}, errBudgetDeferred
 	case fresh.Action != DevActionArchive:
 		return DevArchiveRecord{}, fmt.Errorf("gc: refuse %s: %s since the plan", planned.Path, fresh.Reason)
 	case fresh.Head != planned.Head:
