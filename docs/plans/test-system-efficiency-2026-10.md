@@ -95,6 +95,11 @@ Each criterion has a score from 1 (bad) to 5 (good). Design B wins. Design A hid
 | D20 | The STE lint job also runs on each pull request that changes a doc in scope, also a mixed one. The job is required when it runs. | Operator |
 | D21 | A `push` to `main` and a `workflow_dispatch` keep the full selection. This is the net for tests that read docs. If a docs-only merge breaks one, the push run is red and `evolve ci watch --sha` files the fix-forward item. | Operator |
 | D22 | The local policy for a docs-only change is: `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added`, the relative link check, one `code-review-simplify` pass (ADR-0115) and the commit gate. No make target runs. | Operator |
+| D23 | A test in `internal/core` or `internal/phases/ship` calls `t.Parallel`, unless it changes process state. Process state is the environment, the directory, the standard streams or a package variable. | R14, research §9 |
+| D24 | A structure test in each of the two packages fails on a top-level test that does not call `t.Parallel`. The exceptions are a test that uses `t.Setenv` or `t.Chdir`, and a test named in a short serial list with its reason. | R14 |
+| D25 | A file moves to parallel tests only when `go test -race -count=3 -shuffle=on` passes for its package. | R15 |
+| D26 | A repository template, built one time for each test binary, replaces the repeated build of the same git fixture. | R16 |
+| D27 | One recovery try reads `git status --porcelain -uall` one time and passes the result on. | R17 |
 
 ## 6. Components
 
@@ -113,6 +118,9 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 | T8 | Change-scoped iteration (D16), in shadow | The selected set holds each importer of a changed package | Sonnet |
 | T9 | The `internal/core` pole: the slowest 20 tests, with the remedies of design §7.3 | The package wall time on CI goes down, and the coverage of each touched function stays at 100% | Sonnet |
 | T10 | The STE lint alone for a docs-only pull request (D17 to D22). It has `--added` for `evolve docs ste-lint`, the `ste-lint` job, the routing of `required.yml` and the `internal/ciparity` tests | An old line gives no finding. A docs-only pull request selects only `ste-lint`. A mixed one selects `ste-lint` and the suites of its code paths. A push selects as before. `CI required` accepts a skipped `validate` on a docs-only pull request. It fails when `ste-lint` fails or is missing | Sonnet |
+| T11 | Parallel by default in `internal/core` and `internal/phases/ship` (D23 to D25), with the structure test of D24. It fixes the timeout. | The structure test fails on a serial test with no reason. The package passes `-race -count=3 -shuffle=on`. The serial sum of `internal/core` goes from 596 s to under 180 s. | Sonnet, one lane for each package |
+| T12 | The repository template for git fixtures (D26) | A fixture from the template equals a fixture built step by step; the `git` call count of the slowest tests goes down | Sonnet |
+| T13 | One status read for each recovery try (D27) | A recovery try runs `git status --porcelain -uall` one time; the recovery results stay the same | Sonnet |
 
 ## 7. Order and lanes
 
@@ -122,6 +130,8 @@ Each component is one lane and one pull request. Each lane starts with a red tes
 4. T5 and T6 when a lane slot is free. They stop new duplicates.
 5. T7 with T0 or T2. It is text only. T10 is independent of the other components.
 6. T8 and T9 last.
+
+Update of 2026-10-12, after the timeout investigation (research §9). T11 comes next, before T4 and before T9, because it removes the cause of the timeout. T12 and T13 follow T11. T4 then adds the 20-minute timeout and the budget report as a guard. T9 merges into T11 for `internal/core`.
 
 At most four lanes run at one time. The coverage backfill lanes (E1 to E4, F1 to F4) share the four slots. T1 and T2 come before F1 to F4, because each later floor is faster after T1 and T2.
 
