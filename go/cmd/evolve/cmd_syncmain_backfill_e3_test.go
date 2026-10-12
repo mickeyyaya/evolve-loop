@@ -15,6 +15,7 @@ import (
 )
 
 func TestMergeOrigin_EveryOutcomeOfTheMerge(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("exit 1")
 	cases := []struct {
 		name      string
@@ -60,6 +61,7 @@ func TestMergeOrigin_EveryOutcomeOfTheMerge(t *testing.T) {
 }
 
 func TestFetchSyncBranch_ARepositoryWithoutOriginFailsWithTheGitDetail(t *testing.T) {
+	t.Parallel()
 	repo := gittest.Fixture(t)
 	repo.Git("commit", "-q", "--allow-empty", "-m", "base")
 	var errb bytes.Buffer
@@ -91,6 +93,7 @@ func e3SyncPreparedPlan(t *testing.T) (repo, item string, plan inboxstamps.Plan)
 }
 
 func TestStampLandingRestore_PutsThePreparedStampBack(t *testing.T) {
+	t.Parallel()
 	repo, item, plan := e3SyncPreparedPlan(t)
 	var errb bytes.Buffer
 
@@ -102,6 +105,7 @@ func TestStampLandingRestore_PutsThePreparedStampBack(t *testing.T) {
 }
 
 func TestStampLandingRestore_AnUnwritableItemIsReportedNotSwallowed(t *testing.T) {
+	t.Parallel()
 	repo, item, plan := e3SyncPreparedPlan(t)
 	if err := os.Remove(item); err != nil {
 		t.Fatal(err)

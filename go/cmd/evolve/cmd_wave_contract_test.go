@@ -15,6 +15,7 @@ import (
 )
 
 func TestWaveNext_JSONEnvelopeOnEveryExit(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name        string
 		args        []string
@@ -64,6 +65,7 @@ func TestWaveNext_JSONEnvelopeOnEveryExit(t *testing.T) {
 }
 
 func TestWaveNext_RecordSaveFailureAfterTheLaunchIsLoudAndConsumesTheNotes(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	if _, err := p.store().AddNote("a note", waveTestClock); err != nil {
 		t.Fatal(err)
@@ -86,6 +88,7 @@ func TestWaveNext_RecordSaveFailureAfterTheLaunchIsLoudAndConsumesTheNotes(t *te
 }
 
 func TestWaveNext_WarnsWhenTheRunningBinaryIsNotThePlaneBinary(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, exe string
 		wantWarn  bool
@@ -112,6 +115,7 @@ func TestWaveNext_WarnsWhenTheRunningBinaryIsNotThePlaneBinary(t *testing.T) {
 }
 
 func TestWaveWatch_AReusedPIDIsNotTheLoop(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		writerPID int
@@ -143,6 +147,7 @@ func TestWaveWatch_AReusedPIDIsNotTheLoop(t *testing.T) {
 }
 
 func TestWaveWatch_FollowsANewerWave(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	if err := p.store().Save(wave.Record{Number: 82, RunID: "r82", CycleFloor: 1836, PID: 777, LogPath: p.loopLog("r82", 777), StartedAt: waveTestClock}); err != nil {
 		t.Fatal(err)
@@ -169,6 +174,7 @@ func TestWaveWatch_FollowsANewerWave(t *testing.T) {
 }
 
 func TestWaveNote_ListJSON(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -184,6 +190,7 @@ func TestWaveNote_ListJSON(t *testing.T) {
 }
 
 func TestWaveNext_TheFactsOfABigWaveAreBounded(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	for id := 1835; id < 1835+120; id++ {
 		p.write(fmt.Sprintf(".evolve/runs/cycle-%d/run.json", id), fmt.Sprintf(`{"cycle_id":%d,"phase":"build"}`, id))

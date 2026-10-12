@@ -130,6 +130,7 @@ func TestRunCompose_AnUnresolvablePhaseIsReportedPerPhase(t *testing.T) {
 }
 
 func TestComposeRequest_StdinReadFailureExits1(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 
 	req, code := composeRequest(0, "", iotest.ErrReader(errors.New("pipe closed")), &stderr)
@@ -143,6 +144,7 @@ func TestComposeRequest_StdinReadFailureExits1(t *testing.T) {
 }
 
 func TestComposeResolveFailure(t *testing.T) {
+	t.Parallel()
 	if got := composeResolveFailure("x", t.TempDir(), errors.New("boom")); got != "boom" {
 		t.Errorf("with an error = %q, want the error text", got)
 	}

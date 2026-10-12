@@ -73,6 +73,7 @@ func TestSalvageProbeDiagnostics_QuietWhenNothingToSalvage(t *testing.T) {
 }
 
 func TestSalvageProbeDiagnostics_PathCannotInjectLogLines(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	scratch := filepath.Join(root, "scratch")
 	evolveDir := filepath.Join(root, "evolve\n[bridge] forged\u202e")

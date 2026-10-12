@@ -24,6 +24,7 @@ func writeTimingFixture(t *testing.T, root string, cycle string, entries []phase
 }
 
 func TestRunCycleTiming_RendersTableAndRollup(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTimingFixture(t, root, "42", []phasetiming.Entry{
 		{Phase: "scout", DurationMS: 400_000, Verdict: "PASS", Archetype: "plan", AttemptCount: 1, StartedAt: "2026-06-25T00:00:00Z", EndedAt: "2026-06-25T00:06:40Z"},
@@ -48,6 +49,7 @@ func TestRunCycleTiming_RendersTableAndRollup(t *testing.T) {
 }
 
 func TestRunCycleTiming_ParallelProjection(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTimingFixture(t, root, "55", []phasetiming.Entry{
 		{Phase: "build", DurationMS: 600_000, Verdict: "PASS", Archetype: "build", AttemptCount: 1},
@@ -70,6 +72,7 @@ func TestRunCycleTiming_ParallelProjection(t *testing.T) {
 }
 
 func TestRunCycleTiming_DefaultsToLatestCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTimingFixture(t, root, "7", []phasetiming.Entry{{Phase: "scout", DurationMS: 1000, Archetype: "plan", AttemptCount: 1}})
 	writeTimingFixture(t, root, "41", []phasetiming.Entry{{Phase: "tdd", DurationMS: 2000, Archetype: "plan", AttemptCount: 1}})
@@ -84,6 +87,7 @@ func TestRunCycleTiming_DefaultsToLatestCycle(t *testing.T) {
 }
 
 func TestRunCycleTiming_JSON(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTimingFixture(t, root, "9", []phasetiming.Entry{
 		{Phase: "build", DurationMS: 5000, Archetype: "build", AttemptCount: 1},
@@ -102,6 +106,7 @@ func TestRunCycleTiming_JSON(t *testing.T) {
 }
 
 func TestRunCycleTiming_NoLogs(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var out, errb bytes.Buffer
 	if code := runCycleTiming([]string{"--project-root", root}, &out, &errb); code == 0 {

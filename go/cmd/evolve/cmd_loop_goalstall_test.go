@@ -11,6 +11,7 @@ import (
 )
 
 func TestGoalStallTracker_Escalation(t *testing.T) {
+	t.Parallel()
 	t.Run("threshold-th consecutive non-shipping cycle escalates", func(t *testing.T) {
 		var tr goalStallTracker
 		if esc := tr.observe(true, "SKIPPED_UNKNOWN", 3); esc != nil {
@@ -59,6 +60,7 @@ func TestGoalStallTracker_Escalation(t *testing.T) {
 }
 
 func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(evolveDir, "inbox"), 0o755); err != nil {
 		t.Fatal(err)
@@ -98,6 +100,7 @@ func TestGoalStallItem_WriteIdempotentByGoal(t *testing.T) {
 }
 
 func TestGoalStallItem_ValidateRejectsMalformed(t *testing.T) {
+	t.Parallel()
 	good := buildGoalStallItem(goalStallKind, "abcd1234ef", &goalStallEscalation{streak: 3}, 0.9, 1, "2026-07-18T00:00:00Z")
 	if err := good.validate(); err != nil {
 		t.Fatalf("a well-formed item must validate: %v", err)
@@ -115,6 +118,7 @@ func TestGoalStallItem_ValidateRejectsMalformed(t *testing.T) {
 }
 
 func TestGoalStallTracker_ReArmsAfterFiring(t *testing.T) {
+	t.Parallel()
 	var tr goalStallTracker
 	if tr.observe(true, "x", 2) != nil || tr.observe(true, "x", 2) == nil {
 		t.Fatal("first escalation did not fire at the threshold")
@@ -130,6 +134,7 @@ func TestGoalStallTracker_ReArmsAfterFiring(t *testing.T) {
 }
 
 func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	workspace := filepath.Join(root, "ws")
@@ -162,6 +167,7 @@ func TestHandleGoalStall_FilesInboxAndEmitsEvent(t *testing.T) {
 }
 
 func TestNonShippingOutcome_ExactNegationOfCoreShipping(t *testing.T) {
+	t.Parallel()
 	for _, v := range []string{
 		core.VerdictPASS, core.VerdictFAIL, core.VerdictWARN,
 		core.CycleOutcomeShippedViaBuild, core.CycleOutcomeSkippedAuditAdvisory,

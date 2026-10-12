@@ -13,6 +13,7 @@ import (
 )
 
 func TestDetachChildArgs_StripsOnlyDetachFlagsInTheFlagRegion(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		args    []string
@@ -39,6 +40,7 @@ func TestDetachChildArgs_StripsOnlyDetachFlagsInTheFlagRegion(t *testing.T) {
 }
 
 func TestReservedGoalVerb_MatchesOnlyAWholeReservedWord(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"stop": "evolve loop-stop", " STATUS ": "evolve loop status", "Help": "evolve loop -h",
 		"plan": "evolve loop --dry-run", "watch": "evolve dashboard",
@@ -53,6 +55,7 @@ func TestReservedGoalVerb_MatchesOnlyAWholeReservedWord(t *testing.T) {
 }
 
 func TestIsLoopStatusInvocation_RequiresAFlagOrNothingAfterStatus(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		args []string
 		want bool
@@ -110,6 +113,7 @@ func TestRunLoopStatus_RefusalsUseTheirExitCodes(t *testing.T) {
 }
 
 func TestTailLogSince_ReadsOnlyTheNewestLinesAfterTheOffset(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "loop.log")
 	old := "old line\n"
 	if err := os.WriteFile(path, []byte(old+"a\n\nb\nc\n"), 0o644); err != nil {
@@ -127,6 +131,7 @@ func TestTailLogSince_ReadsOnlyTheNewestLinesAfterTheOffset(t *testing.T) {
 }
 
 func TestDetachExitCode_MapsWaitErrors(t *testing.T) {
+	t.Parallel()
 	if got := detachExitCode(nil); got != 0 {
 		t.Errorf("nil = %d want 0", got)
 	}
@@ -140,6 +145,7 @@ func TestDetachExitCode_MapsWaitErrors(t *testing.T) {
 }
 
 func TestDefaultLoopDetachCommand_ReexecsSelfAsLoop(t *testing.T) {
+	t.Parallel()
 	cmd, err := defaultLoopDetachCommand([]string{"--goal-text", "g"})
 	if err != nil {
 		t.Fatal(err)

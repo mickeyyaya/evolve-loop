@@ -11,6 +11,7 @@ import (
 )
 
 func TestRunWorktreeCreateAndCleanup_RefuseAnUnknownFlag(t *testing.T) {
+	t.Parallel()
 	for _, sub := range []string{"create", "cleanup"} {
 		var out, errb bytes.Buffer
 		if code := runWorktree([]string{sub, "--nope"}, nil, &out, &errb); code != 10 || out.Len() != 0 || !strings.Contains(errb.String(), "flag provided but not defined: -nope") {
@@ -20,6 +21,7 @@ func TestRunWorktreeCreateAndCleanup_RefuseAnUnknownFlag(t *testing.T) {
 }
 
 func TestRunWorktreeCreate_DefaultsTheBaseUnderTheProjectEvolveDir(t *testing.T) {
+	t.Parallel()
 	repo := gittest.Fixture(t)
 	repo.Git("commit", "-q", "--allow-empty", "-m", "base")
 	root, err := filepath.EvalSymlinks(repo.Dir)
@@ -43,6 +45,7 @@ func TestRunWorktreeCreate_DefaultsTheBaseUnderTheProjectEvolveDir(t *testing.T)
 }
 
 func TestRunWorktreeCreate_AnUncreatableBaseExitsOne(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	blocker := filepath.Join(root, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {

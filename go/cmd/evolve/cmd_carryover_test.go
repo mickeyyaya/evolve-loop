@@ -11,6 +11,7 @@ import (
 )
 
 func TestCarryoverSubcommandRegistered(t *testing.T) {
+	t.Parallel()
 	found := false
 	for _, c := range commands {
 		if c.Name == "carryover" {
@@ -66,6 +67,7 @@ func readCarryoverIDs(t *testing.T, statePath string) map[string]bool {
 }
 
 func TestCarryoverApplyDecisions_DropsEntriesToCeiling(t *testing.T) {
+	t.Parallel()
 	ids := make([]string, 0, 30)
 	doc := carryoverDecisionsDoc{SourceCount: 30}
 	for i := 0; i < 30; i++ {
@@ -124,6 +126,7 @@ func TestCarryoverApplyDecisions_DropsEntriesToCeiling(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_RejectsMissingReason(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-keep-me", "todo-drop-me")
 	before := readCarryoverIDs(t, statePath)
 	beforeRaw, _ := os.ReadFile(statePath)
@@ -167,6 +170,7 @@ func writeDecisionsFile(t *testing.T, doc carryoverDecisionsDoc) string {
 }
 
 func TestCarryoverApplyDecisions_UsesLockedRMW(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a", "todo-b", "todo-keep")
 	doc := carryoverDecisionsDoc{
 		SourceCount: 3,
@@ -201,6 +205,7 @@ func TestCarryoverApplyDecisions_UsesLockedRMW(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_PreservesStateSymlink(t *testing.T) {
+	t.Parallel()
 	canonicalDir := t.TempDir()
 	worktreeDir := t.TempDir()
 	canonical := filepath.Join(canonicalDir, "state.json")
@@ -244,6 +249,7 @@ func TestCarryoverApplyDecisions_PreservesStateSymlink(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_DropsConsumedFleetAlias(t *testing.T) {
+	t.Parallel()
 	const (
 		consumedAlias = "pipeline-defect-pipeline-blocker"
 		liveID        = "todo-still-live"

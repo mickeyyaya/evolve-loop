@@ -77,6 +77,7 @@ func TestBuildStatusReport_KeepsCollectedCycles(t *testing.T) {
 }
 
 func TestWriteStatusText_RendersEverySection(t *testing.T) {
+	t.Parallel()
 	r := statusReport{
 		Loop:   dashboard.LoopStatus{Running: true, BrakeEngaged: false, CycleID: 12, Phase: "audit"},
 		Cycles: []dashboard.CycleSummary{{ID: 11, StateName: "shipped"}, {ID: 12, StateName: "auditing"}},
@@ -108,6 +109,7 @@ func TestWriteStatusText_RendersEverySection(t *testing.T) {
 }
 
 func TestWriteStatusText_UnavailableRemotesAndNoZeroShipRun(t *testing.T) {
+	t.Parallel()
 	r := statusReport{
 		PRs: statusRemote{Error: "gh pr list: not logged in"},
 		CI:  statusRemote{Error: "gh run list --branch main: exit 4"},
@@ -128,6 +130,7 @@ func TestWriteStatusText_UnavailableRemotesAndNoZeroShipRun(t *testing.T) {
 }
 
 func TestWriteStatusPRs_ASingleFailingCheckIsNamed(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 
 	writeStatusPRs(&out, statusRemote{Available: true, Items: []statusPR{{Number: 9, Title: "t", HeadRefName: "h", Checks: "failing", FailingChecks: []string{"lint"}}}})
@@ -138,6 +141,7 @@ func TestWriteStatusPRs_ASingleFailingCheckIsNamed(t *testing.T) {
 }
 
 func TestWriteStatusPRs_AvailableWithNoPRs(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 
 	writeStatusPRs(&out, statusRemote{Available: true, Items: []statusPR{}})
@@ -148,6 +152,7 @@ func TestWriteStatusPRs_AvailableWithNoPRs(t *testing.T) {
 }
 
 func TestWriteStatusCI(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		r    statusRemote
@@ -172,6 +177,7 @@ func TestWriteStatusCI(t *testing.T) {
 }
 
 func TestRunStatus_RefusesBadInvocations(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		args     []string

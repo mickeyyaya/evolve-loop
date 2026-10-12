@@ -114,6 +114,7 @@ func u13StepErrorLines(t *testing.T) string {
 }
 
 func TestWaveDispatch_StepErrorsAreByteIdenticalToTheGolden(t *testing.T) {
+	t.Parallel()
 	u13Compare(t, "step errors", u13StepErrorLines(t), u13Golden(t, u13WaveGoldens, "wave_step_errors.golden.txt"))
 	refusal := errors.New("dirty control plane")
 	_, _, _, err := dispatchIteration(context.Background(), policy.FleetConfig{Count: 2, PlanSource: "triage"},
@@ -158,6 +159,7 @@ func u13WidenFixture(t *testing.T) (data []byte, evolveDir string) {
 }
 
 func TestWavePlan_PruneAndWidenBytesAreByteIdenticalToTheGolden(t *testing.T) {
+	t.Parallel()
 	plan, _ := u13PruneFixture(t, `{"note":"keep","top_n":[{"id":"alpha","files":["a.go"]},{"id":"gamma","files":["g.go"]}]}`)
 	var stderr bytes.Buffer
 	u13Compare(t, "prune", string(plan(&stderr)), u13Golden(t, u13WaveGoldens, "decision_prune.golden.json"))
@@ -193,6 +195,7 @@ func u13SeedFixture(t *testing.T, todos int) string {
 }
 
 func TestWaveSeed_JSONAndErrorAreByteIdenticalToTheGolden(t *testing.T) {
+	t.Parallel()
 	data, err := seedWavePlanFromInbox(u13SeedFixture(t, 3), 1)
 	if err != nil {
 		t.Fatal(err)
@@ -303,6 +306,7 @@ func u13CaptureWriter(fn func(io.Writer)) string {
 }
 
 func TestWaveStderr_EveryLineIsByteIdentical(t *testing.T) {
+	t.Parallel()
 	u13Compare(t, "wave stderr", u13WaveStderrSections(t), u13Golden(t, u13WaveGoldens, "stderr_wave.rendered.golden.txt"))
 	u13Compare(t, "min-width console", u13MinWidthSections(t), u13Golden(t, u13WaveGoldens, "stderr_minwidth.rendered.golden.txt"))
 	base := u13Golden(t, u13WaveGoldens, "stderr_wave.golden.txt")

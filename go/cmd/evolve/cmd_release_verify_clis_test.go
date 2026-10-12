@@ -31,6 +31,7 @@ func resultFor(results []cliVerify, key string) (cliVerify, bool) {
 }
 
 func TestVerifyReleaseCLIMatrix_AllPass(t *testing.T) {
+	t.Parallel()
 	results := verifyReleaseCLIMatrix("/src", "/bin/evolve", okDeps())
 
 	for _, cli := range releaseVerifyCLIs {
@@ -48,6 +49,7 @@ func TestVerifyReleaseCLIMatrix_AllPass(t *testing.T) {
 }
 
 func TestVerifyReleaseCLIMatrix_MissingSubcommand(t *testing.T) {
+	t.Parallel()
 	d := okDeps()
 	d.binAnswers = func(binPath, sub string) error {
 		if sub == "loop" {
@@ -70,6 +72,7 @@ func TestVerifyReleaseCLIMatrix_MissingSubcommand(t *testing.T) {
 }
 
 func TestVerifyReleaseCLIMatrix_OneCLIFails(t *testing.T) {
+	t.Parallel()
 	d := okDeps()
 	d.projectTarget = func(srcDir, target string) error {
 		if target == "codex" {
@@ -90,6 +93,7 @@ func TestVerifyReleaseCLIMatrix_OneCLIFails(t *testing.T) {
 }
 
 func TestVerifyReleaseCLIMatrix_AllFailVisible(t *testing.T) {
+	t.Parallel()
 	d := matrixDeps{
 		installClaude: func(string, string) error { return errTest },
 		projectTarget: func(string, string) error { return errTest },
@@ -105,6 +109,7 @@ func TestVerifyReleaseCLIMatrix_AllFailVisible(t *testing.T) {
 }
 
 func TestCoreSubcommandsRegistered(t *testing.T) {
+	t.Parallel()
 	registered := map[string]bool{}
 	for _, c := range commands {
 		registered[c.Name] = true
@@ -122,6 +127,7 @@ func TestCoreSubcommandsRegistered(t *testing.T) {
 // TestBinAnswersStartFailureIsLoud exercises the real default binAnswers, not a
 // stub, so a genuinely missing binary is exercised.
 func TestBinAnswersStartFailureIsLoud(t *testing.T) {
+	t.Parallel()
 	d := defaultMatrixDeps()
 	if err := d.binAnswers(filepath.Join(t.TempDir(), "does-not-exist-evolve"), "loop"); err == nil {
 		t.Fatal("binAnswers must error when the binary cannot be started, got nil")

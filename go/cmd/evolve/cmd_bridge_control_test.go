@@ -12,6 +12,7 @@ import (
 )
 
 func TestEmitControl_Outcomes(t *testing.T) {
+	t.Parallel()
 	t.Run("success prints pane", func(t *testing.T) {
 		var out, errb bytes.Buffer
 		do := func(_ context.Context, family string, ev clicontrol.Event) (clicontrol.Response, error) {
@@ -50,6 +51,7 @@ func TestEmitControl_Outcomes(t *testing.T) {
 }
 
 func TestRunBridgeControl_ArgValidation(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		args []string

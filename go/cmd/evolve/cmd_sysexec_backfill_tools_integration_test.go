@@ -191,6 +191,7 @@ func TestGhMergedPRHeads_FailuresAreReturned(t *testing.T) {
 }
 
 func TestBinaryAnswersSubcommandDep_OnlyAnUnknownCommandIsARefusal(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, body, want string
 	}{
@@ -217,6 +218,7 @@ func TestBinaryAnswersSubcommandDep_OnlyAnUnknownCommandIsARefusal(t *testing.T)
 }
 
 func TestBinaryAnswersSubcommandDep_AMissingBinaryIsALaunchError(t *testing.T) {
+	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "evolve")
 
 	err := binaryAnswersSubcommandDep(missing, "wave")

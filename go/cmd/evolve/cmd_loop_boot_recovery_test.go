@@ -59,6 +59,7 @@ func brPorcelain(t *testing.T, dir string) string {
 // quarantine leaked tracked-source dirt so the tree is clean — proving
 // QuarantineDirtyTree is invoked by the orchestrator, not merely defined.
 func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
+	t.Parallel()
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -94,6 +95,7 @@ func TestDefaultBootRecovery_QuarantinesDirtyTree(t *testing.T) {
 // expected_ship_sha in state.json, defaultBootRecovery must flag the mismatch —
 // proving ShipSHAMismatch is invoked from the orchestrator.
 func TestDefaultBootRecovery_DetectsShipSHAMismatch(t *testing.T) {
+	t.Parallel()
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	binPath := filepath.Join(repo, "go", "bin", "evolve")
@@ -124,6 +126,7 @@ func TestDefaultBootRecovery_DetectsShipSHAMismatch(t *testing.T) {
 // real dead PID (999999) so the orchestrator's REAL liveness probe drives the
 // decision (no injection needed).
 func TestDefaultBootRecovery_AutosealsDeadOwnerMarker(t *testing.T) {
+	t.Parallel()
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	workspace := filepath.Join(evolveDir, "runs", "cycle-491")
@@ -162,6 +165,7 @@ func TestDefaultBootRecovery_AutosealsDeadOwnerMarker(t *testing.T) {
 // AC (negative): a fully clean state — clean tree, no stranded marker, no ship
 // binary / expected_ship_sha — triggers ZERO recovery actions and never panics.
 func TestDefaultBootRecovery_CleanStateNoOp(t *testing.T) {
+	t.Parallel()
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

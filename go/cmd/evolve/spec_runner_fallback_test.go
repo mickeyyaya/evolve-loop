@@ -32,6 +32,7 @@ func loaderWithPersonas(t *testing.T, names ...string) *prompts.Loader {
 }
 
 func TestRegisterBuiltinSpecRunners(t *testing.T) {
+	t.Parallel()
 	// Catalog: an Evaluate-archetype spec phase WITH a persona (should wire),
 	// a Plan-archetype spec phase WITHOUT a persona (should WARN+skip), a Control
 	// phase (should be excluded regardless of persona), and a non-llm phase.
@@ -73,6 +74,7 @@ func TestRegisterBuiltinSpecRunners(t *testing.T) {
 }
 
 func TestRegisterBuiltinSpecRunners_DoesNotOverrideExisting(t *testing.T) {
+	t.Parallel()
 	cat, _ := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "tester", Kind: "llm"}})
 	prm := loaderWithPersonas(t, "evolve-tester")
 	sentinel := stubRunner{}

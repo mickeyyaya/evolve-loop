@@ -12,6 +12,7 @@ import (
 )
 
 func TestModelsPerformance_JSONBuildsCanonicalAttemptIndex(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	cycle := filepath.Join(evolveDir, "runs", "cycle-17")
 	if err := os.MkdirAll(cycle, 0o755); err != nil {
@@ -81,6 +82,7 @@ func TestModelsPerformance_JSONBuildsCanonicalAttemptIndex(t *testing.T) {
 }
 
 func TestModelsPerformance_HumanOutputNeutralizesTerminalControls(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	cycle := filepath.Join(evolveDir, "runs", "cycle-18")
 	if err := os.MkdirAll(cycle, 0o755); err != nil {
@@ -107,6 +109,7 @@ func TestModelsPerformance_HumanOutputNeutralizesTerminalControls(t *testing.T) 
 }
 
 func TestModelsPerformance_ReadWarningCannotInjectDiagnosticLines(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), "bad\n[bridge] forged\u202e")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -129,6 +132,7 @@ func TestModelsPerformance_ReadWarningCannotInjectDiagnosticLines(t *testing.T) 
 }
 
 func TestPrintModelPerformance_DistinguishesMissingAndMeasuredZeroLatency(t *testing.T) {
+	t.Parallel()
 	zeroRate := 0.0
 	rows := []llmcalls.Performance{
 		{CLI: "codex", Model: "missing", Attempts: 1, LatencyUnavailable: 1},
@@ -147,6 +151,7 @@ func TestPrintModelPerformance_DistinguishesMissingAndMeasuredZeroLatency(t *tes
 }
 
 func TestPrintModelPerformance_HeaderDoesNotClaimOneTimingScope(t *testing.T) {
+	t.Parallel()
 	rows := []llmcalls.Performance{{
 		CLI: "claude-tmux", Model: llmcalls.UnknownModel, TimingScope: llmcalls.TimingLegacyUnknown,
 		Attempts: 1, LatencyUnavailable: 1,

@@ -30,6 +30,7 @@ func e2InboxDirAsFile(t *testing.T) string {
 }
 
 func TestInboxUsage_NamesTheVerbsSynopsisOrTheGenericLine(t *testing.T) {
+	t.Parallel()
 	for _, v := range inboxVerbs() {
 		if got := inboxUsage(v.name); got != "usage: evolve inbox "+v.synopsis {
 			t.Errorf("inboxUsage(%q) = %q", v.name, got)
@@ -43,6 +44,7 @@ func TestInboxUsage_NamesTheVerbsSynopsisOrTheGenericLine(t *testing.T) {
 }
 
 func TestParseInboxBatchesArgs_Table(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		args     []string
@@ -121,6 +123,7 @@ func TestRunInboxBatches_RefusesBadArgsAndAnUnreadableInbox(t *testing.T) {
 }
 
 func TestEncodeInboxBatches_WritesIndentedJSONOrFailsOnABrokenWriter(t *testing.T) {
+	t.Parallel()
 	doc := inboxBatchesDoc{Batches: []inboxbatch.Batch{}}
 	var stdout, stderr bytes.Buffer
 
@@ -137,6 +140,7 @@ func TestEncodeInboxBatches_WritesIndentedJSONOrFailsOnABrokenWriter(t *testing.
 }
 
 func TestWarnMonotonicBinaryTargets_ASkippedLintIsAWarning(t *testing.T) {
+	t.Parallel()
 	for _, raw := range []string{"{not json", `{"acceptance":5}`, ""} {
 		var stderr bytes.Buffer
 
@@ -149,6 +153,7 @@ func TestWarnMonotonicBinaryTargets_ASkippedLintIsAWarning(t *testing.T) {
 }
 
 func TestWarnMonotonicBinaryTargets_ACleanItemIsSilent(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 
 	warnMonotonicBinaryTargets([]byte(`{"id":"x","class":"feature"}`), &stderr)
@@ -159,6 +164,7 @@ func TestWarnMonotonicBinaryTargets_ACleanItemIsSilent(t *testing.T) {
 }
 
 func TestReadInboxAddItem_SourcesAndFailures(t *testing.T) {
+	t.Parallel()
 	file := filepath.Join(t.TempDir(), "item.json")
 	writeE2File(t, file, `{"id":"from-file"}`)
 	cases := []struct {
@@ -304,6 +310,7 @@ func TestRunInboxConsume_ADirectoryItemIsRefusedInPlace(t *testing.T) {
 }
 
 func TestParseInboxConsumeArgs_Table(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		args      []string
@@ -348,6 +355,7 @@ func TestParseInboxConsumeArgs_Table(t *testing.T) {
 }
 
 func TestReadInboxItemObject_Table(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cases := []struct {
 		name    string
@@ -385,6 +393,7 @@ func TestReadInboxItemObject_Table(t *testing.T) {
 }
 
 func TestWriteConsumedStamp_AddsTheStampAndKeepsEveryField(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "item.json")
 	doc := map[string]json.RawMessage{"id": json.RawMessage(`"x"`), "weight": json.RawMessage(`0.5`)}
 	stamp := inboxConsumedStamp{At: "2026-10-12T00:00:00Z", Via: "console-manual", Cycle: "7", Resolution: "done"}
@@ -447,6 +456,7 @@ func TestRunInboxList_AnUnreadableInboxExits2(t *testing.T) {
 }
 
 func TestClaimExitCode_MapsEveryClaimOutcome(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		err     error
@@ -473,6 +483,7 @@ func TestClaimExitCode_MapsEveryClaimOutcome(t *testing.T) {
 }
 
 func TestTermSource_DescribesEveryFactor(t *testing.T) {
+	t.Parallel()
 	cfg := policy.InboxPriorityConfig{ClassOrder: []string{"correctness", "stability"}, UnblocksCap: 3, RecurrenceCap: 5, AgeHalflifeDays: 7}
 	doc := func(f inboxrank.Facts) explainedItemDoc {
 		return explainedItemDoc{rankedRow: rankedRow{Weight: 0.25, Breakdown: inboxrank.Breakdown{Facts: f}}}
@@ -502,6 +513,7 @@ func TestTermSource_DescribesEveryFactor(t *testing.T) {
 }
 
 func TestGoalSource_ActiveOnlyCountsWithACampaign(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		facts inboxrank.Facts
 		want  string
@@ -536,6 +548,7 @@ func e2ShownInbox(t *testing.T) pendingInbox {
 }
 
 func TestPrintShownItem_AVanishedItemExits2(t *testing.T) {
+	t.Parallel()
 	inbox := e2ShownInbox(t)
 	var stdout, stderr bytes.Buffer
 
@@ -547,6 +560,7 @@ func TestPrintShownItem_AVanishedItemExits2(t *testing.T) {
 }
 
 func TestPrintShownItem_UnindentableJSONExits2InTextButPassesThroughAsJSONFails(t *testing.T) {
+	t.Parallel()
 	inbox := e2ShownInbox(t)
 	writeE2File(t, filepath.Join(inbox.opts.InboxDir, "bad.json"), `{"id":"bad",`)
 	var stdout, stderr bytes.Buffer
@@ -559,6 +573,7 @@ func TestPrintShownItem_UnindentableJSONExits2InTextButPassesThroughAsJSONFails(
 }
 
 func TestPrintShownItem_TextShowsStatusPathAndThePrettyItem(t *testing.T) {
+	t.Parallel()
 	inbox := e2ShownInbox(t)
 	writeE2File(t, filepath.Join(inbox.opts.InboxDir, "ok.json"), `{"id":"ok","title":"t"}`)
 	var stdout, stderr bytes.Buffer
@@ -571,6 +586,7 @@ func TestPrintShownItem_TextShowsStatusPathAndThePrettyItem(t *testing.T) {
 }
 
 func TestEncodeInboxJSON_KeepsHTMLAndFailsOnABrokenWriter(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	if code := encodeInboxJSON("show", map[string]string{"a": "<b>&"}, &stdout, &stderr); code != 0 || stdout.String() != "{\n \"a\": \"<b>&\"\n}\n" {

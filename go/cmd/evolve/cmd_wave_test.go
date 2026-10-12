@@ -213,6 +213,7 @@ func waveStepVerbs(e waveEnvelope) []string {
 var waveFullSteps = []string{"checkpoint", "loop-stop", "pr", "sync-main", "gc", waveBuildVerb, "reset-sha", "doctor", "loop-stop", boundaryLogVerb, "loop"}
 
 func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.seedWave81()
 	h := newWaveHarness()
@@ -258,6 +259,7 @@ func TestWaveNext_DryRunComposesTheGoalAndWritesNothing(t *testing.T) {
 }
 
 func TestWaveNext_LaunchRecordsTheWaveAndConsumesTheNotes(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.seedWave81()
 	h := newWaveHarness()
@@ -315,6 +317,7 @@ func waveRecordsEqual(a, b wave.Record) bool {
 }
 
 func TestWaveNext_FailedStepRecordsNothingAndKeepsTheNotes(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.seedWave81()
 	h := newWaveHarness()
@@ -337,6 +340,7 @@ func TestWaveNext_FailedStepRecordsNothingAndKeepsTheNotes(t *testing.T) {
 }
 
 func TestWaveNext_RefusesWhileALoopIsLive(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	runDir := filepath.Join(p.evolveDir(), "runs", "cycle-1837")
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
@@ -360,6 +364,7 @@ func TestWaveNext_RefusesWhileALoopIsLive(t *testing.T) {
 }
 
 func TestWaveNext_NumberSeedAndRefusal(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -376,6 +381,7 @@ func TestWaveNext_NumberSeedAndRefusal(t *testing.T) {
 }
 
 func TestWaveNext_PolicyAndFlagsSetCyclesAndHealthDrivers(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, policy string
 		args         []string
@@ -411,6 +417,7 @@ func TestWaveNext_PolicyAndFlagsSetCyclesAndHealthDrivers(t *testing.T) {
 }
 
 func TestWaveNext_InputErrors(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		args   []string
@@ -445,6 +452,7 @@ func TestWaveNext_InputErrors(t *testing.T) {
 }
 
 func TestWaveNext_TextOutputEndsWithTheLaunchedWave(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -462,6 +470,7 @@ func waveFirstGoal() string {
 }
 
 func TestWaveStatus_ReportsTheCurrentWaveFromState(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.seedWave81()
 	if err := p.store().Save(wave.Record{Number: 82, RunID: "r82", CycleFloor: 1836, PID: 777, LogPath: p.loopLog("r82", 777), StartedAt: waveTestClock}); err != nil {
@@ -492,6 +501,7 @@ func TestWaveStatus_ReportsTheCurrentWaveFromState(t *testing.T) {
 }
 
 func TestWaveStatus_TextAndNoRecord(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -511,6 +521,7 @@ func TestWaveStatus_TextAndNoRecord(t *testing.T) {
 }
 
 func TestWaveStatus_BoundsTheCycleList(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	for id := 1; id <= waveStatusMaxCycles+5; id++ {
 		p.write(fmt.Sprintf(".evolve/runs/cycle-%d/run.json", id), fmt.Sprintf(`{"cycle_id":%d,"phase":"scout"}`, id))
@@ -533,6 +544,7 @@ func TestWaveStatus_BoundsTheCycleList(t *testing.T) {
 }
 
 func TestWaveWatch_StreamsStateEventsUntilTheLoopExits(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	if err := p.store().Save(wave.Record{Number: 82, RunID: "r82", CycleFloor: 1836, PID: 777, LogPath: p.loopLog("r82", 777), StartedAt: waveTestClock}); err != nil {
 		t.Fatal(err)
@@ -562,6 +574,7 @@ func TestWaveWatch_StreamsStateEventsUntilTheLoopExits(t *testing.T) {
 }
 
 func TestWaveWatch_JSONLinesAndNoRecord(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -582,6 +595,7 @@ func TestWaveWatch_JSONLinesAndNoRecord(t *testing.T) {
 }
 
 func TestWaveNote_AddListClear(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -597,6 +611,7 @@ func TestWaveNote_AddListClear(t *testing.T) {
 }
 
 func TestWave_UsageErrors(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	for _, args := range [][]string{nil, {"launch"}, {"note"}, {"note", "add"}, {"note", "drop"}, {"status", "extra"}, {"watch", "--bogus"}} {
 		h := newWaveHarness()
@@ -607,6 +622,7 @@ func TestWave_UsageErrors(t *testing.T) {
 }
 
 func TestDispatchWaveVerb_RunsTheBuildAndFallsBackToTheBoundary(t *testing.T) {
+	t.Parallel()
 	var gotName, gotDir string
 	var gotArgs []string
 	run := func(_ context.Context, name, dir string, args, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
@@ -628,6 +644,7 @@ func TestDispatchWaveVerb_RunsTheBuildAndFallsBackToTheBoundary(t *testing.T) {
 }
 
 func TestRegistry_WaveIsAPublicVerb(t *testing.T) {
+	t.Parallel()
 	cmd := lookupCommand("wave")
 	if cmd == nil {
 		t.Fatal(`lookupCommand("wave") = nil, want the public wave verb`)
@@ -642,6 +659,7 @@ func TestRegistry_WaveIsAPublicVerb(t *testing.T) {
 }
 
 func TestParseMergedPRs(t *testing.T) {
+	t.Parallel()
 	log := "Merge pull request #816 from x/y\nfix: a commit\n  Merge pull request #12 from z\nMerge branch 'main'\n"
 
 	got := parseMergedPRs(log)
@@ -652,6 +670,7 @@ func TestParseMergedPRs(t *testing.T) {
 }
 
 func TestWaveNext_HistoryHoldsTheLastKWavesBeforeTheLastOne(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.write(".evolve/policy.json", `{"wave":{"history_k":2}}`)
 	for n := 76; n <= 81; n++ {

@@ -3,6 +3,7 @@ package main
 import "testing"
 
 func TestCarryoverNoOpFastPath_ReturnsNoOpWhenNoMatchingID(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a", "todo-b")
 	remove := map[string]string{"todo-z": "drop"}
 
@@ -19,6 +20,7 @@ func TestCarryoverNoOpFastPath_ReturnsNoOpWhenNoMatchingID(t *testing.T) {
 }
 
 func TestCarryoverNoOpFastPath_FallsThroughWhenMatchingIDPresent(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a", "todo-drop-me")
 	remove := map[string]string{"todo-drop-me": "drop"}
 
@@ -29,6 +31,7 @@ func TestCarryoverNoOpFastPath_FallsThroughWhenMatchingIDPresent(t *testing.T) {
 }
 
 func TestCarryoverNoOpFastPath_FallsThroughOnUnreadableState(t *testing.T) {
+	t.Parallel()
 	remove := map[string]string{"todo-z": "drop"}
 
 	_, ok := carryoverNoOpFastPath("/nonexistent/path/state.json", remove)

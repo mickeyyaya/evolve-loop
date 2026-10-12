@@ -40,6 +40,7 @@ func TestRunSelfcheck_AnUnreadableReportCannotBeJudgedAndExitsTwo(t *testing.T) 
 }
 
 func TestRunSelfcheck_RefusesAnUnknownFlag(t *testing.T) {
+	t.Parallel()
 	var out, errw strings.Builder
 
 	rc := runSelfcheck([]string{"build", "--nope"}, nil, &out, &errw)

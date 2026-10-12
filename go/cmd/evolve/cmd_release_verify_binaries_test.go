@@ -33,6 +33,7 @@ func rowsByAsset(rows []binVerify) map[string]binVerify {
 }
 
 func TestVerifyReleaseBinaries_AllPresent(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
 		if owner != "mickeyyaya" || repo != "evolve-loop" || tag != "v9.9.9" {
@@ -59,6 +60,7 @@ func TestVerifyReleaseBinaries_AllPresent(t *testing.T) {
 }
 
 func TestVerifyReleaseBinaries_MissingArchive(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	// linux_arm64 archive deliberately absent.
 	list := func(owner, repo, tag string) ([]string, error) {
@@ -81,6 +83,7 @@ func TestVerifyReleaseBinaries_MissingArchive(t *testing.T) {
 }
 
 func TestVerifyReleaseBinaries_MissingChecksums(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
 		return []string{"evolve_darwin_amd64.tar.gz", "evolve_linux_arm64.tar.gz"}, nil
@@ -95,6 +98,7 @@ func TestVerifyReleaseBinaries_MissingChecksums(t *testing.T) {
 }
 
 func TestVerifyReleaseBinaries_ListerError(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
 		return nil, fmt.Errorf("release v0.0.0 not found")
@@ -105,6 +109,7 @@ func TestVerifyReleaseBinaries_ListerError(t *testing.T) {
 }
 
 func TestReportBinaryVerification_AllOK(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
 		return []string{
@@ -124,6 +129,7 @@ func TestReportBinaryVerification_AllOK(t *testing.T) {
 }
 
 func TestReportBinaryVerification_SomeMissing(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
 		return []string{"evolve_darwin_amd64.tar.gz"}, nil // arm64 + checksums missing
@@ -139,6 +145,7 @@ func TestReportBinaryVerification_SomeMissing(t *testing.T) {
 }
 
 func TestReportBinaryVerification_ListerError(t *testing.T) {
+	t.Parallel()
 	cfg := fixtureConfig()
 	list := func(owner, repo, tag string) ([]string, error) {
 		return nil, fmt.Errorf("release not found")
@@ -150,6 +157,7 @@ func TestReportBinaryVerification_ListerError(t *testing.T) {
 }
 
 func TestRunReleaseVerifyBinaries_MissingTagArg(t *testing.T) {
+	t.Parallel()
 	var out, errb strings.Builder
 	rc := runReleaseVerifyBinaries(nil, nil, &out, &errb)
 	if rc == 0 {

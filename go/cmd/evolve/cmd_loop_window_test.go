@@ -21,6 +21,7 @@ import (
 const haltMarker = "LOOP_PIPELINE_BLOCKER_HALT"
 
 func TestReadBatchWindowFloor_PrefersAllocationLease(t *testing.T) {
+	t.Parallel()
 	st := &fixtures.FakeStorage{State: core.State{
 		LastCycleNumber:          1325,
 		LastAllocatedCycleNumber: 1330,
@@ -35,6 +36,7 @@ func TestReadBatchWindowFloor_PrefersAllocationLease(t *testing.T) {
 }
 
 func TestReadBatchWindowFloor_LegacyStateFallsBackToCompletionCounter(t *testing.T) {
+	t.Parallel()
 	st := &fixtures.FakeStorage{State: core.State{
 		LastCycleNumber:          1325,
 		LastAllocatedCycleNumber: 0,
@@ -49,6 +51,7 @@ func TestReadBatchWindowFloor_LegacyStateFallsBackToCompletionCounter(t *testing
 }
 
 func TestReadBatchWindowFloor_ReturnsTheStateReadFault(t *testing.T) {
+	t.Parallel()
 	fault := errors.New("state.json is locked")
 	st := &fixtures.FakeStorage{ReadStateErr: fault, State: core.State{LastCycleNumber: 1325}}
 
@@ -60,6 +63,7 @@ func TestReadBatchWindowFloor_ReturnsTheStateReadFault(t *testing.T) {
 }
 
 func TestReadLastCycleNumber_StillReportsCompletionCounter(t *testing.T) {
+	t.Parallel()
 	st := &fixtures.FakeStorage{State: core.State{
 		LastCycleNumber:          1325,
 		LastAllocatedCycleNumber: 1330,
@@ -140,6 +144,7 @@ func TestRunLoop_InBatchDigestsStillHalt(t *testing.T) {
 }
 
 func TestPrepareIteration_ResolvesTheFleetBinaryWhenThePolicyAsksForAFleet(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := iscsProject(t)
 	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"fleet":{"count":2}}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -162,6 +167,7 @@ func TestPrepareIteration_ResolvesTheFleetBinaryWhenThePolicyAsksForAFleet(t *te
 }
 
 func TestTheFleetBinaryFallbackHasOneHome(t *testing.T) {
+	t.Parallel()
 	sources, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)

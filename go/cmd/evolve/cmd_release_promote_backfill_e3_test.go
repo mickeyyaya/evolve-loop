@@ -67,6 +67,7 @@ func e3Promote(t *testing.T, rerun bool, steps ...e3GHStep) (int, string, string
 }
 
 func TestPromoteRelease_PromotesOnlyAVerifiedSuccessfulRun(t *testing.T) {
+	t.Parallel()
 	code, out, errb, r := e3Promote(t, false,
 		e3GHStep{match: e3ListCall, stdout: `[{"databaseId":77,"status":"completed","conclusion":"failure"}]`},
 		e3GHStep{match: e3ViewCall, stdout: `{"databaseId":77,"status":"completed","conclusion":"success"}`},
@@ -86,6 +87,7 @@ func TestPromoteRelease_PromotesOnlyAVerifiedSuccessfulRun(t *testing.T) {
 }
 
 func TestPromoteRelease_RerunWatchesTheFailedJobsBeforeJudging(t *testing.T) {
+	t.Parallel()
 	code, out, errb, r := e3Promote(t, true,
 		e3GHStep{match: e3ListCall, stdout: `[{"databaseId":77}]`},
 		e3GHStep{match: "gh run rerun 77 --failed -R mickeyyaya/evolve-loop"},
@@ -101,6 +103,7 @@ func TestPromoteRelease_RerunWatchesTheFailedJobsBeforeJudging(t *testing.T) {
 }
 
 func TestPromoteRelease_RefusesOrFailsWithoutPatching(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("exec: gh not found")
 	list := e3GHStep{match: e3ListCall, stdout: `[{"databaseId":77}]`}
 	success := e3GHStep{match: e3ViewCall, stdout: `{"status":"completed","conclusion":"success"}`}
@@ -141,6 +144,7 @@ func TestPromoteRelease_RefusesOrFailsWithoutPatching(t *testing.T) {
 }
 
 func TestParseReleasePromoteArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		args      []string
 		wantTag   string
@@ -187,6 +191,7 @@ func FuzzParseReleasePromoteArgs(f *testing.F) {
 }
 
 func TestGHJSON_ReturnsTheRunnerErrorUnwrapped(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("network down")
 	var v map[string]any
 

@@ -7,6 +7,7 @@ import (
 )
 
 func TestDispatch_RoutesServePhase(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"serve-phase"}, nil, &stdout, &stderr)
 	if code != 10 {

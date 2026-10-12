@@ -26,6 +26,7 @@ func claimedInboxItem(t *testing.T, root string, cycle int, id string) (claim, p
 }
 
 func TestCycleRunErrorExit_ALaneDeferralReleasesItsClaimsUnbumpedAndExitsDeferred(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	claim, pending := claimedInboxItem(t, root, 1806, "inboxbatch-utf8-and-resolution")
 	var stderr bytes.Buffer
@@ -52,6 +53,7 @@ func TestCycleRunErrorExit_ALaneDeferralReleasesItsClaimsUnbumpedAndExitsDeferre
 }
 
 func TestCycleRunErrorExit_AnyOtherErrorStillExitsOne(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var stderr bytes.Buffer
 	if code := cycleRunErrorExit(errors.New("allocate cycle: boom"), 0, root, filepath.Join(root, ".evolve"), &stderr, nil, nil); code != 1 {

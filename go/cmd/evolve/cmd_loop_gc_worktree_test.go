@@ -164,6 +164,7 @@ func TestRunGCHook_ExplicitOffSkipsWorktreeSweep(t *testing.T) {
 }
 
 func TestRunGCHook_NonGitProjectRootIsFailOpen(t *testing.T) {
+	t.Parallel()
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "shadow")
 

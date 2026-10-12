@@ -26,6 +26,7 @@ func TestMoveProfileEfforts_AKeyStripFailureNamesTheProfile(t *testing.T) {
 }
 
 func TestMoveProfileEfforts_StripsTheRetiredKeysAndKeepsTheRest(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	body := `{"name":"scout","effort_level":"high","model_tier_default":"deep","extra":1}`
 	if err := os.WriteFile(filepath.Join(dir, "scout.json"), []byte(body), 0o644); err != nil {

@@ -165,6 +165,7 @@ func TestBridgeSessions_EmptyProjectSaysSo(t *testing.T) {
 }
 
 func TestBridgeSessions_BadFlagIsAUsageError(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := runBridge([]string{"sessions", "--bogus"}, nil, &stdout, &stderr); code != 10 {
 		t.Errorf("exit %d, want 10", code)

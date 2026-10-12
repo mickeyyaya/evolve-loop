@@ -110,6 +110,7 @@ func TestRunLoopChain_TheBrakeStopsTheRunningBatchAtItsWaveBoundaryAndTheChainAt
 }
 
 func TestLoopStop_EngagesAndReleasesTheBrake(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := paths.EvolveDirOf(root)
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

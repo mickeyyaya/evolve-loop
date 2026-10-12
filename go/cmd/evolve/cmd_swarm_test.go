@@ -35,6 +35,7 @@ func writeEmptyManifest(t *testing.T, path string, cycle int, phase string, pid 
 }
 
 func TestManifestPath(t *testing.T) {
+	t.Parallel()
 	got := manifestPath(".evolve", 42)
 	want := filepath.Join(".evolve", "runs", "cycle-42", ".swarm", "sessions.json")
 	if got != want {
@@ -43,6 +44,7 @@ func TestManifestPath(t *testing.T) {
 }
 
 func TestRunSwarmStatus_MissingCycle_ExitTwo(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarmStatus([]string{"--evolve-dir", t.TempDir()}, &stdout, &stderr)
 	if code != 2 {
@@ -53,6 +55,7 @@ func TestRunSwarmStatus_MissingCycle_ExitTwo(t *testing.T) {
 // LoadManifest is documented fail-open on a missing file (internal/swarm), so
 // a cycle with no swarm dispatch at all must report cleanly, not error.
 func TestRunSwarmStatus_ManifestMissing_ExitZero(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarmStatus([]string{"--evolve-dir", t.TempDir(), "--cycle", "1"}, &stdout, &stderr)
 	if code != 0 {
@@ -64,6 +67,7 @@ func TestRunSwarmStatus_ManifestMissing_ExitZero(t *testing.T) {
 }
 
 func TestRunSwarmStatus_NoSessions_ExitZero(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	writeEmptyManifest(t, manifestPath(evolveDir, 5), 5, "build", 12345)
 
@@ -78,6 +82,7 @@ func TestRunSwarmStatus_NoSessions_ExitZero(t *testing.T) {
 }
 
 func TestRunSwarmStatus_WithSession_ListsIt(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	reg := swarm.NewSessionRegistry(manifestPath(evolveDir, 7), 7, "build", 999)
 	if err := reg.Register(swarm.SessionHandle{
@@ -98,6 +103,7 @@ func TestRunSwarmStatus_WithSession_ListsIt(t *testing.T) {
 }
 
 func TestRunSwarmReap_MissingCycle_ExitTwo(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarmReap([]string{"--evolve-dir", t.TempDir()}, &stdout, &stderr)
 	if code != 2 {
@@ -106,6 +112,7 @@ func TestRunSwarmReap_MissingCycle_ExitTwo(t *testing.T) {
 }
 
 func TestRunSwarmReap_ManifestMissing_ExitZero(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarmReap([]string{"--evolve-dir", t.TempDir(), "--cycle", "3"}, &stdout, &stderr)
 	if code != 0 {
@@ -117,6 +124,7 @@ func TestRunSwarmReap_ManifestMissing_ExitZero(t *testing.T) {
 }
 
 func TestRunSwarmReap_NoSessions_ExitZero(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	writeEmptyManifest(t, manifestPath(evolveDir, 9), 9, "build", 1)
 	var stdout, stderr strings.Builder
@@ -130,6 +138,7 @@ func TestRunSwarmReap_NoSessions_ExitZero(t *testing.T) {
 }
 
 func TestRunSwarmReap_LiveSession_ReapsWithoutTouchingOS(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	path := manifestPath(evolveDir, 11)
 	reg := swarm.NewSessionRegistry(path, 11, "build", 1)
@@ -153,6 +162,7 @@ func TestRunSwarmReap_LiveSession_ReapsWithoutTouchingOS(t *testing.T) {
 }
 
 func TestRunSwarmReapOrphans_NoRunsDir_ExitZero(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir() // no runs/ subdir at all
 	var stdout, stderr strings.Builder
 	code := runSwarmReapOrphans([]string{"--evolve-dir", evolveDir, "--dry-run"}, &stdout, &stderr)
@@ -165,6 +175,7 @@ func TestRunSwarmReapOrphans_NoRunsDir_ExitZero(t *testing.T) {
 }
 
 func TestRunSwarmReapOrphans_UnknownFlag_ExitTwo(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarmReapOrphans([]string{"--not-a-real-flag"}, &stdout, &stderr)
 	if code != 2 {
@@ -173,6 +184,7 @@ func TestRunSwarmReapOrphans_UnknownFlag_ExitTwo(t *testing.T) {
 }
 
 func TestRunSwarm_NoSubcommand_ExitTwo(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarm(nil, nil, &stdout, &stderr)
 	if code != 2 {
@@ -181,6 +193,7 @@ func TestRunSwarm_NoSubcommand_ExitTwo(t *testing.T) {
 }
 
 func TestRunSwarm_UnknownSubcommand_ExitTwo(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runSwarm([]string{"bogus"}, nil, &stdout, &stderr)
 	if code != 2 {
@@ -189,6 +202,7 @@ func TestRunSwarm_UnknownSubcommand_ExitTwo(t *testing.T) {
 }
 
 func TestRunSwarm_DispatchesStatus(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	writeEmptyManifest(t, manifestPath(evolveDir, 1), 1, "build", 1)
 	var stdout, stderr strings.Builder
@@ -202,6 +216,7 @@ func TestRunSwarm_DispatchesStatus(t *testing.T) {
 // fixtures above are exercising the real on-disk format runSwarmStatus/Reap
 // read — not a shortcut.
 func TestSwarmFixture_PersistsRealManifestFile(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	path := manifestPath(evolveDir, 4)
 	writeEmptyManifest(t, path, 4, "build", 1)

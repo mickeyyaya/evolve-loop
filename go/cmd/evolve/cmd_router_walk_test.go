@@ -48,6 +48,7 @@ func routerTableProject(t *testing.T, routerProfile string, block policy.CLIRout
 }
 
 func TestRouterAdvisor_WalksTheTablesChainWhenItsFirstCLIIsWalled(t *testing.T) {
+	t.Parallel()
 	root, rd := routerTableProject(t,
 		`{"name":"router","cli":"agy-claude-tmux","model_tier_default":"deep","allowed_clis":["agy-claude","claude"]}`,
 		policy.CLIRouting{CLIs: []string{"agy-claude", "claude"}, Default: []string{"agy-claude", "claude"}})

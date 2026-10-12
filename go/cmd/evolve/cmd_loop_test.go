@@ -7,6 +7,7 @@ import (
 )
 
 func TestParseLoopArgs_GoalSources(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		args     []string
@@ -77,6 +78,7 @@ func TestParseLoopArgs_GoalSources(t *testing.T) {
 }
 
 func TestParseLoopArgs_PositionalCyclesStrategy(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name         string
 		args         []string
@@ -131,6 +133,7 @@ func TestParseLoopArgs_PositionalCyclesStrategy(t *testing.T) {
 }
 
 func TestParseLoopArgs_StrategyValidation(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	_, rc := parseLoopArgs([]string{"--strategy", "bogus", "goal"}, &stderr)
 	if rc != 10 {
@@ -142,6 +145,7 @@ func TestParseLoopArgs_StrategyValidation(t *testing.T) {
 }
 
 func TestParseLoopArgs_FlagPrecedence(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{
 		"--cycles", "7",
@@ -163,6 +167,7 @@ func TestParseLoopArgs_FlagPrecedence(t *testing.T) {
 }
 
 func TestParseLoopArgs_DryRun(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--dry-run", "fix bug"}, &stderr)
 	if rc != 0 {
@@ -174,6 +179,7 @@ func TestParseLoopArgs_DryRun(t *testing.T) {
 }
 
 func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &stderr)
 	if rc != 0 {
@@ -188,6 +194,7 @@ func TestParseLoopArgs_BudgetFlagsAreNoOps(t *testing.T) {
 }
 
 func TestParseLoopArgs_BudgetFlagWarnsRemoved(t *testing.T) {
+	t.Parallel()
 	var withFlag bytes.Buffer
 	parseLoopArgs([]string{"--budget-usd", "5", "fix bug"}, &withFlag)
 	got := withFlag.String()
@@ -203,6 +210,7 @@ func TestParseLoopArgs_BudgetFlagWarnsRemoved(t *testing.T) {
 }
 
 func TestParsePositional(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		args     []string
@@ -232,6 +240,7 @@ func TestParsePositional(t *testing.T) {
 }
 
 func TestJoinArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   []string
 		want string

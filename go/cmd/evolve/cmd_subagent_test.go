@@ -15,6 +15,7 @@ func runCLI(args ...string) (stdout, stderr string, rc int) {
 }
 
 func TestRunSubagent_NoArgsPrintsUsage(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI()
 	if rc != 2 {
 		t.Errorf("rc=%d, want 2", rc)
@@ -25,6 +26,7 @@ func TestRunSubagent_NoArgsPrintsUsage(t *testing.T) {
 }
 
 func TestRunSubagent_HelpExitsZero(t *testing.T) {
+	t.Parallel()
 	for _, h := range []string{"--help", "-h", "help"} {
 		out, _, rc := runCLI(h)
 		if rc != 0 {
@@ -37,6 +39,7 @@ func TestRunSubagent_HelpExitsZero(t *testing.T) {
 }
 
 func TestRunSubagent_UnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("nope")
 	if rc != 2 {
 		t.Errorf("rc=%d, want 2", rc)
@@ -47,6 +50,7 @@ func TestRunSubagent_UnknownSubcommand(t *testing.T) {
 }
 
 func TestRunSubagent_CheckToken_OKAndFail(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	artifact := filepath.Join(tmp, "a.md")
 	if err := os.WriteFile(artifact, []byte("body\n<!-- challenge-token: 1234567890abcdef -->\n"), 0o644); err != nil {
@@ -69,6 +73,7 @@ func TestRunSubagent_CheckToken_OKAndFail(t *testing.T) {
 }
 
 func TestRunSubagent_CheckToken_ArgMismatch(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("check-token", "only-one-arg")
 	if rc != 2 {
 		t.Errorf("rc=%d", rc)
@@ -83,6 +88,7 @@ func TestRunSubagent_CheckToken_ArgMismatch(t *testing.T) {
 }
 
 func TestRunSubagent_CheckCtxAdvisory_EmitAndSuppress(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	profile := filepath.Join(tmp, "p.json")
 	if err := os.WriteFile(profile, []byte(`{"context_clear_trigger_tokens":1000}`), 0o644); err != nil {
@@ -105,6 +111,7 @@ func TestRunSubagent_CheckCtxAdvisory_EmitAndSuppress(t *testing.T) {
 }
 
 func TestRunSubagent_CheckCtxAdvisory_MissingProfileWarnExitZero(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("check-ctx-advisory", "/nope.json", "100")
 	if rc != 0 {
 		t.Errorf("rc=%d, want 0 (bash semantics)", rc)
@@ -115,6 +122,7 @@ func TestRunSubagent_CheckCtxAdvisory_MissingProfileWarnExitZero(t *testing.T) {
 }
 
 func TestRunSubagent_CheckCtxAdvisory_ArgErrors(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("check-ctx-advisory", "only-one")
 	if rc != 2 {
 		t.Errorf("rc=%d", rc)
@@ -136,6 +144,7 @@ func TestRunSubagent_CheckCtxAdvisory_ArgErrors(t *testing.T) {
 }
 
 func TestRunSubagent_CachePrefix_Smoke(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	out := filepath.Join(tmp, "out.md")
 	_, errOut, rc := runCLI(
@@ -159,6 +168,7 @@ func TestRunSubagent_CachePrefix_Smoke(t *testing.T) {
 }
 
 func TestRunSubagent_CachePrefix_MissingRequiredArgs(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("cache-prefix", "--agent", "x")
 	if rc != 2 {
 		t.Errorf("rc=%d", rc)
@@ -169,6 +179,7 @@ func TestRunSubagent_CachePrefix_MissingRequiredArgs(t *testing.T) {
 }
 
 func TestRunSubagent_CachePrefix_CycleParseError(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI(
 		"cache-prefix",
 		"--cycle", "not-an-int",
@@ -183,6 +194,7 @@ func TestRunSubagent_CachePrefix_CycleParseError(t *testing.T) {
 }
 
 func TestRunSubagent_CachePrefix_UnknownArg(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("cache-prefix", "--bogus", "1")
 	if rc != 2 {
 		t.Errorf("rc=%d", rc)
@@ -193,6 +205,7 @@ func TestRunSubagent_CachePrefix_UnknownArg(t *testing.T) {
 }
 
 func TestRunSubagent_CachePrefix_Help(t *testing.T) {
+	t.Parallel()
 	out, _, rc := runCLI("cache-prefix", "--help")
 	if rc != 0 || !strings.Contains(out, "Usage") {
 		t.Errorf("help broken")
@@ -200,6 +213,7 @@ func TestRunSubagent_CachePrefix_Help(t *testing.T) {
 }
 
 func TestRunSubagent_ResolveTier_Smoke(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	profile := filepath.Join(tmp, "scout.json")
 	if err := os.WriteFile(profile, []byte(`{"role":"scout","model_tier_default":"sonnet"}`), 0o644); err != nil {
@@ -220,6 +234,7 @@ func TestRunSubagent_ResolveTier_Smoke(t *testing.T) {
 }
 
 func TestRunSubagent_ResolveTier_ErrorPaths(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("resolve-tier")
 	if rc != 2 || !strings.Contains(errOut, "required") {
 		t.Errorf("missing args: rc=%d err=%q", rc, errOut)
@@ -247,6 +262,7 @@ func TestRunSubagent_ResolveTier_ErrorPaths(t *testing.T) {
 }
 
 func TestRunSubagent_ValidateProfile_ArgMismatch(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("validate-profile")
 	if rc != 2 {
 		t.Errorf("rc=%d, want 2", rc)
@@ -257,6 +273,7 @@ func TestRunSubagent_ValidateProfile_ArgMismatch(t *testing.T) {
 }
 
 func TestRunSubagent_ValidateProfile_Help(t *testing.T) {
+	t.Parallel()
 	out, _, rc := runCLI("validate-profile", "-h")
 	if rc != 0 {
 		t.Errorf("rc=%d", rc)
@@ -290,6 +307,7 @@ func TestEnvOrCwd_FallsBackToCwd(t *testing.T) {
 }
 
 func TestNextArgEmptyWhenOutOfRange(t *testing.T) {
+	t.Parallel()
 	if nextArg([]string{"a"}, 5) != "" {
 		t.Errorf("nextArg should return \"\" past end")
 	}

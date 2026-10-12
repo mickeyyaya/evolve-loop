@@ -113,6 +113,7 @@ func TestCLIRoutingExplain_NamesTheRuleChainAndAllowedSet(t *testing.T) {
 }
 
 func TestFindingNamesAgent_MatchesKeysNeverMessages(t *testing.T) {
+	t.Parallel()
 	cases := map[string]bool{"agent.scout": true, "agent.scout.tier_ceiling": true, "profiles.scout": true, "cross_family_with.auditor+scout": true, "agent.scout-scan": false, "cli_routing.default": false}
 	for key, want := range cases {
 		if got := findingNamesAgent(key, "scout"); got != want {

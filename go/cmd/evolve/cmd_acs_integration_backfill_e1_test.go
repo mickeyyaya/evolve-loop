@@ -66,6 +66,7 @@ func TestRunACSRun_AllGreenFromARealGoTestStreamExits0WithoutWritingUnderJSONFal
 }
 
 func TestRunACSSuite_AnAllGreenPredicateTreeExits0(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := t.TempDir(), t.TempDir()
 	pkgDir := filepath.Join(root, "go", "acs", "cycle7")
 	if err := os.MkdirAll(pkgDir, 0o755); err != nil {

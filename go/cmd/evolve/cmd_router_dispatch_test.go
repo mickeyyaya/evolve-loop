@@ -9,6 +9,7 @@ import (
 )
 
 func TestAdvisorDispatch_FallsBackWhenFamilyBenched(t *testing.T) {
+	t.Parallel()
 	benched := map[string]bool{llmroute.Family("codex-tmux"): true}
 	rd, err := resolveRouterDispatchHealthy(advisorRouter(t, t.TempDir(), policy.RouterPolicy{CLI: "codex-tmux"}), "", decisionPlan, benched)
 	if err != nil {
@@ -20,6 +21,7 @@ func TestAdvisorDispatch_FallsBackWhenFamilyBenched(t *testing.T) {
 }
 
 func TestAdvisorDispatch_CircuitBreakerAfterRepeatedFailure(t *testing.T) {
+	t.Parallel()
 	benched := map[string]bool{llmroute.Family("codex-tmux"): true, "claude": true}
 	if rd, _ := resolveRouterDispatchHealthy(advisorRouter(t, t.TempDir(), policy.RouterPolicy{CLI: "codex-tmux"}), "", decisionPlan, benched); rd.healthy {
 		t.Error("primary + claude fallback both benched must signal !ok (degrade to static)")
@@ -27,6 +29,7 @@ func TestAdvisorDispatch_CircuitBreakerAfterRepeatedFailure(t *testing.T) {
 }
 
 func TestResolveRouterDispatch_PerDecisionType(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir() // no profile file ⇒ base = claude-tmux/opus
 	rc := policy.RouterPolicy{}
 

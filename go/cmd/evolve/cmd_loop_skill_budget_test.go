@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoopSkill_NoBudgetReferences(t *testing.T) {
+	t.Parallel()
 	root := repoRootForSkills(t)
 	raw, err := os.ReadFile(filepath.Join(root, "skills", "loop", "SKILL.md"))
 	if err != nil {

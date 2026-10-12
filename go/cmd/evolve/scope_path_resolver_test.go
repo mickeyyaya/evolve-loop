@@ -27,6 +27,7 @@ func seedInbox(t *testing.T, root, sub, id string) string {
 }
 
 func TestScopePathResolver_LiveBeatsNamesakes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	live := seedInbox(t, root, "", "pipeline-defect-pipeline-blocker")
 	seedInbox(t, root, "consumed", "pipeline-defect-pipeline-blocker")
@@ -38,6 +39,7 @@ func TestScopePathResolver_LiveBeatsNamesakes(t *testing.T) {
 }
 
 func TestScopePathResolver_ConsumedOnlyResolvesEmpty(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	seedInbox(t, root, "consumed", "cured-task")
 	if got := scopePathResolver(root, "cured-task"); got != "" {
@@ -49,6 +51,7 @@ func TestScopePathResolver_ConsumedOnlyResolvesEmpty(t *testing.T) {
 }
 
 func TestScopePathResolver_PathStaysUnderTheInbox(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	seedInbox(t, root, "", "a-task")
 	got := scopePathResolver(root, "a-task")

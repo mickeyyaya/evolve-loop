@@ -200,6 +200,7 @@ func TestRunCheckpoint_PruneLandedDeletesTheLandedCheckpoint(t *testing.T) {
 }
 
 func TestRunCheckpoint_UsageErrorsExitTen(t *testing.T) {
+	t.Parallel()
 	for name, args := range map[string][]string{
 		"no subcommand":         nil,
 		"unknown subcommand":    {"snapshot"},

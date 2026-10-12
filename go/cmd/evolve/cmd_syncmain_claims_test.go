@@ -23,6 +23,7 @@ func smClaim(t *testing.T, repo, name string, cycle string) string {
 }
 
 func TestSyncMain_AClaimedTrackedItemDoesNotBlockTheSyncOrComeBackAsADuplicate(t *testing.T) {
+	t.Parallel()
 	repo, bare, item := smStampedPlane(t)
 	claim := smClaim(t, repo, "x.json", "1836")
 	smOriginWrites(t, bare, ".evolve/inbox/x.json", `{"id":"x","weight":0.9}`)
@@ -50,6 +51,7 @@ func TestSyncMain_AClaimedTrackedItemDoesNotBlockTheSyncOrComeBackAsADuplicate(t
 }
 
 func TestSyncMain_ADeletedTrackedItemThatNoClaimHoldsStillRefuses(t *testing.T) {
+	t.Parallel()
 	repo, _, item := smStampedPlane(t)
 	if err := os.Remove(item); err != nil {
 		t.Fatal(err)
@@ -64,6 +66,7 @@ func TestSyncMain_ADeletedTrackedItemThatNoClaimHoldsStillRefuses(t *testing.T) 
 }
 
 func TestSyncMain_AnAbsorbThatCannotParkFailsLoudly(t *testing.T) {
+	t.Parallel()
 	repo, bare, item := smStampedPlane(t)
 	smClaim(t, repo, "x.json", "1836")
 	smOriginWrites(t, bare, ".evolve/inbox/x.json", `{"id":"x","weight":0.9}`)
@@ -83,6 +86,7 @@ func TestSyncMain_AnAbsorbThatCannotParkFailsLoudly(t *testing.T) {
 }
 
 func TestSyncMain_AFailedReplayCommitExitsOneAndNamesTheReplay(t *testing.T) {
+	t.Parallel()
 	repo, bare, item := smStampedPlane(t)
 	smOriginWrites(t, bare, ".evolve/inbox/x.json", `{"id":"x","weight":0.9}`)
 	if err := os.WriteFile(item, []byte(`{"id":"x","weight":0.5,"route":"console-manual"}`), 0o644); err != nil {
@@ -102,6 +106,7 @@ func TestSyncMain_AFailedReplayCommitExitsOneAndNamesTheReplay(t *testing.T) {
 }
 
 func TestSyncMain_AHandRestoredCopyEqualToTheClaimIsRemovedWithNoStamps(t *testing.T) {
+	t.Parallel()
 	repo, _, item := smStampedPlane(t)
 	claim := smClaim(t, repo, "x.json", "1836")
 	smGit(t, repo, "restore", ".evolve/inbox/x.json")

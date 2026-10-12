@@ -208,6 +208,7 @@ func e2StubSoak(t *testing.T, launch fleet.LaunchFn) {
 }
 
 func TestRunFleetSoak_AnUnknownFlagExits1(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	code := runFleet([]string{"soak", "--bogus"}, nil, &stdout, &stderr)

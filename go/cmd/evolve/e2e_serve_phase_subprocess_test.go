@@ -31,6 +31,7 @@ func buildEvolveBinaryWithTestPhases(t *testing.T) string {
 }
 
 func TestServePhase_SubprocessRunnerRoundTrip(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("E2E subprocess test; skipped in -short mode")
 	}
@@ -73,6 +74,7 @@ func TestServePhase_SubprocessRunnerRoundTrip(t *testing.T) {
 }
 
 func TestServePhase_SubprocessRunner_UnknownPhaseSurfacesError(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("E2E subprocess test; skipped in -short mode")
 	}

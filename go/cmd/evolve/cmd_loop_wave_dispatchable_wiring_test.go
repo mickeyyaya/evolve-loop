@@ -41,6 +41,7 @@ func writeWave20Shape(t *testing.T, root string) {
 }
 
 func TestWaveWithNoDispatchableLaneTakesTheEmptyBacklogPathInsteadOfACountedEmptyWave(t *testing.T) {
+	t.Parallel()
 	root := wave20ShapedRoot(t)
 	cfg := loopConfig{ProjectRoot: root, EvolveDir: filepath.Join(root, ".evolve")}
 	fleetCfg := policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: "wave"}
@@ -65,6 +66,7 @@ func TestWaveWithNoDispatchableLaneTakesTheEmptyBacklogPathInsteadOfACountedEmpt
 }
 
 func TestZeroLaneWavesCountTowardWorkSupplyStarvation(t *testing.T) {
+	t.Parallel()
 	root := gittest.Fixture(t).Dir
 	writeWave20Shape(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
@@ -87,6 +89,7 @@ func TestZeroLaneWavesCountTowardWorkSupplyStarvation(t *testing.T) {
 }
 
 func TestConsoleRoutedResolver_ReadsTheConfiguredEvolveDir(t *testing.T) {
+	t.Parallel()
 	moved := filepath.Join(t.TempDir(), "elsewhere")
 	u13WriteJSON(t, filepath.Join(moved, "inbox", "console-item.json"), map[string]any{"id": "console-item", "route": "console"})
 	cfg := loopConfig{ProjectRoot: t.TempDir(), EvolveDir: moved}

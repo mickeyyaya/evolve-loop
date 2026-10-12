@@ -10,6 +10,7 @@ import (
 )
 
 func TestAuditCalibration_InvalidRootFailsLoudly(t *testing.T) {
+	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "missing")
 	out := filepath.Join(t.TempDir(), "report.md")
 	var stdout, stderr bytes.Buffer
@@ -23,6 +24,7 @@ func TestAuditCalibration_InvalidRootFailsLoudly(t *testing.T) {
 }
 
 func TestAuditCalibration_DeterministicMarkdown(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dossiers := filepath.Join(root, "knowledge-base", "cycles")
 	runs := filepath.Join(root, ".evolve", "runs")

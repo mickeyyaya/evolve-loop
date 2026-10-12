@@ -19,6 +19,7 @@ func e3InstallSource(t *testing.T, files ...string) string {
 }
 
 func TestInstallClaudeDep(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		files   []string
@@ -53,6 +54,7 @@ func TestInstallClaudeDep(t *testing.T) {
 }
 
 func TestInstallClaudeDep_AnUnwritableHomeIsAnInstallError(t *testing.T) {
+	t.Parallel()
 	home := filepath.Join(t.TempDir(), "home-file")
 	if err := os.WriteFile(home, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -66,6 +68,7 @@ func TestInstallClaudeDep_AnUnwritableHomeIsAnInstallError(t *testing.T) {
 }
 
 func TestProjectTargetDryRunDep(t *testing.T) {
+	t.Parallel()
 	project := publishTestProject(t, map[string]string{
 		"build": publishSkillDoc("build", "builder skill", "Build things."),
 	})
@@ -83,6 +86,7 @@ func TestProjectTargetDryRunDep(t *testing.T) {
 }
 
 func TestAssertGeminiPayloadPresentDep(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		files   []string

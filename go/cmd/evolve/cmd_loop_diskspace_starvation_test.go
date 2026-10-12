@@ -38,6 +38,7 @@ func starvationCoordinator(t *testing.T) (*loopBatchCoordinator, string) {
 }
 
 func TestObserveWorkSupply_QuotaShrunkWaveThatMissesSizedWidthSelfFiles(t *testing.T) {
+	t.Parallel()
 	b, evolveDir := starvationCoordinator(t)
 	var tr fleet.StarvationTracker
 	fc := policy.FleetConfig{Count: 3, StarvationK: 1, StarvationWeight: 0.9}
@@ -48,6 +49,7 @@ func TestObserveWorkSupply_QuotaShrunkWaveThatMissesSizedWidthSelfFiles(t *testi
 }
 
 func TestObserveWorkSupply_QuotaShrunkWaveThatDeliversSizedWidthFilesNothing(t *testing.T) {
+	t.Parallel()
 	b, evolveDir := starvationCoordinator(t)
 	var tr fleet.StarvationTracker
 	fc := policy.FleetConfig{Count: 3, StarvationK: 1, StarvationWeight: 0.9}
@@ -58,6 +60,7 @@ func TestObserveWorkSupply_QuotaShrunkWaveThatDeliversSizedWidthFilesNothing(t *
 }
 
 func TestDispatchFleetIteration_DiskBelowFloorStopsBeforeLaunching(t *testing.T) {
+	t.Parallel()
 	for _, scheduling := range []string{"wave", "pool"} {
 		b, evolveDir := starvationCoordinator(t)
 		writeFloorPolicy(t, evolveDir, "1000000000")
@@ -78,6 +81,7 @@ func TestDispatchFleetIteration_DiskBelowFloorStopsBeforeLaunching(t *testing.T)
 }
 
 func TestDispatchFleetIteration_DiskAboveFloorDoesNotHalt(t *testing.T) {
+	t.Parallel()
 	b, evolveDir := starvationCoordinator(t)
 	writeFloorPolicy(t, evolveDir, "0.001")
 	b.deps.Signals = newRootSignalCenter(b.cfg.ProjectRoot, evolveDir, io.Discard)
@@ -90,6 +94,7 @@ func TestDispatchFleetIteration_DiskAboveFloorDoesNotHalt(t *testing.T) {
 }
 
 func TestDefaultLoopPreflight_DiskFloorFromPolicyHaltsBoot(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		floor string
 		want  looppreflight.CheckLevel

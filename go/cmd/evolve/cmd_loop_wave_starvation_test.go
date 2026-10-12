@@ -25,6 +25,7 @@ func (f *wsStarvationFakeLauncher) Run(_ context.Context, specs []fleet.CycleSpe
 }
 
 func TestWidenNarrowDecision_EmptyTopNWidensFromInbox(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	inbox := filepath.Join(evolveDir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -56,6 +57,7 @@ func TestWidenNarrowDecision_EmptyTopNWidensFromInbox(t *testing.T) {
 }
 
 func TestWidenNarrowDecision_UnparseableReturnsUnchanged(t *testing.T) {
+	t.Parallel()
 	bad := []byte(`{not json`)
 	if got := widenNarrowDecision(bad, t.TempDir(), 2); string(got) != string(bad) {
 		t.Fatalf("unparseable decision must return unchanged; got %q", got)
@@ -63,6 +65,7 @@ func TestWidenNarrowDecision_UnparseableReturnsUnchanged(t *testing.T) {
 }
 
 func TestMinWidthRepair_EmptyPlanAtFullCapacityRepairsNotSequential(t *testing.T) {
+	t.Parallel()
 	launcher := &wsStarvationFakeLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core"]}`), nil, nil

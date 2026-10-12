@@ -12,6 +12,7 @@ import (
 )
 
 func TestDemotePersonalessSpecs(t *testing.T) {
+	t.Parallel()
 	prm := prompts.NewFromFS(fstest.MapFS{
 		"agents/evolve-has-doc.md": &fstest.MapFile{Data: []byte("---\nname: has-doc\n---\npersona body")},
 	})
@@ -43,6 +44,7 @@ func TestDemotePersonalessSpecs(t *testing.T) {
 }
 
 func TestDiscoverUserSpecsClamped_DemotesPersonalessFromDisk(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "phases", "ghost-check")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

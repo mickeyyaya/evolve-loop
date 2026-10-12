@@ -188,6 +188,7 @@ func TestCLIUpdate_UsageErrorsExitTwoAndUpdateNothing(t *testing.T) {
 }
 
 func TestCLIUpdate_IsTheCLICommandGroup(t *testing.T) {
+	t.Parallel()
 	c := lookupCommand("cli")
 	if c == nil || c.Run == nil || !strings.Contains(c.Summary, "update") {
 		t.Fatalf("evolve cli is registered with an update summary: %+v", c)
@@ -198,6 +199,7 @@ func TestCLIUpdate_IsTheCLICommandGroup(t *testing.T) {
 }
 
 func TestManifestUpdateFamilies_ReadsEachFamilysUpdateArgvFromItsManifest(t *testing.T) {
+	t.Parallel()
 	var log bytes.Buffer
 	got := manifestUpdateFamilies([]string{"claude", "codex", "agy"}, bridge.LoadManifest, &log)
 
@@ -212,6 +214,7 @@ func TestManifestUpdateFamilies_ReadsEachFamilysUpdateArgvFromItsManifest(t *tes
 }
 
 func TestManifestUpdateFamilies_AnUnloadableManifestWarnsAndSkipsTheFamily(t *testing.T) {
+	t.Parallel()
 	var log bytes.Buffer
 	load := func(name string) (bridge.Manifest, error) {
 		if name == "agy-tmux" {
@@ -228,6 +231,7 @@ func TestManifestUpdateFamilies_AnUnloadableManifestWarnsAndSkipsTheFamily(t *te
 }
 
 func TestCredentialWall_OnlyACredentialBenchIsAWall(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	store := clihealth.NewStore(root, nil)
 	if _, err := store.BenchWall("codex", clihealth.CredentialPattern, "Please log in"); err != nil {
@@ -250,6 +254,7 @@ func TestCredentialWall_OnlyACredentialBenchIsAWall(t *testing.T) {
 }
 
 func TestLiveCheck_ProbesTheFamilysTmuxDriverAndNamesAFailure(t *testing.T) {
+	t.Parallel()
 	var probed []string
 	check := liveCheck(func(context.Context) liveProbe {
 		return func(driver string) (int, string, string) {
@@ -274,6 +279,7 @@ func TestLiveCheck_ProbesTheFamilysTmuxDriverAndNamesAFailure(t *testing.T) {
 }
 
 func TestLiveCheck_ABareREPLBootTimeoutIsABootTimeoutWithItsPaneAndAWallIsNot(t *testing.T) {
+	t.Parallel()
 	check := liveCheck(func(context.Context) liveProbe {
 		return func(driver string) (int, string, string) {
 			if driver == "agy-tmux" {
@@ -293,6 +299,7 @@ func TestLiveCheck_ABareREPLBootTimeoutIsABootTimeoutWithItsPaneAndAWallIsNot(t 
 }
 
 func TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding(t *testing.T) {
+	t.Parallel()
 	var log bytes.Buffer
 	pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"Antigravity CLI\n  signing in…"}, 512)}
 	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &log}
@@ -311,6 +318,7 @@ func TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding(t *testing.T)
 }
 
 func TestBoundaryCLIUpdate_ABootTimeoutOrAVerifiedQuotaCauseIsAWarningLine(t *testing.T) {
+	t.Parallel()
 	for _, status := range []cliupdate.Status{cliupdate.StatusBootTimeout, cliupdate.StatusQuotaExhausted} {
 		if prefix := cliUpdateLogPrefix[status]; !strings.Contains(prefix, "WARN") {
 			t.Errorf("%s at the boundary prints as %q; want a WARN line", status, prefix)

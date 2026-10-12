@@ -18,6 +18,7 @@ import (
 )
 
 func TestShouldRefreshCatalog(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 	stale := modelcatalog.Catalog{FetchedAt: now.Add(-48 * time.Hour)}
 	fresh := modelcatalog.Catalog{FetchedAt: now.Add(-1 * time.Hour)}
@@ -44,6 +45,7 @@ func TestShouldRefreshCatalog(t *testing.T) {
 }
 
 func TestPickClassifierCLI(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		ready []string
@@ -65,6 +67,7 @@ func TestPickClassifierCLI(t *testing.T) {
 }
 
 func TestPickClassifierCLIEnvOverride(t *testing.T) {
+	t.Parallel()
 	if got := pickClassifierCLI([]string{"codex", "agy"}, legacyClassifierPreference(t), "agy"); !reflect.DeepEqual(got, []string{"agy", "codex"}) {
 		t.Fatalf("a ready override leads the chain, got %v", got)
 	}
@@ -89,6 +92,7 @@ type offeringLister map[string][]string
 func (l offeringLister) List(_ context.Context, cli string) ([]string, error) { return l[cli], nil }
 
 func TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive(t *testing.T) {
+	t.Parallel()
 	script := &classifierScript{
 		errs:    map[string]error{"codex": errors.New("bridgePromptDispatcher: launch codex: bridge: launch exit=1")},
 		replies: map[string]string{"claude": `{"fast":"Gemini 3.8 Flash (Low)","balanced":"Gemini 3.8 Flash (High)","deep":"Gemini 3.1 Pro (High)","top":"Gemini 3.1 Pro (High)"}`},
@@ -117,6 +121,7 @@ func TestTierClassifier_FirstPreferredCLIFailsTheNextClassifiesLive(t *testing.T
 }
 
 func TestBridgePromptDispatcher_NamesTheArtifactTheBridgeReadsTheReplyFrom(t *testing.T) {
+	t.Parallel()
 	d := bridgePromptDispatcher{workspace: t.TempDir(), projectRoot: t.TempDir()}
 	for cli, driver := range map[string]string{"claude": "claude-p", "agy": "agy", "codex": "codex"} {
 		req := d.request(cli, "PROMPT")
@@ -133,6 +138,7 @@ func TestBridgePromptDispatcher_NamesTheArtifactTheBridgeReadsTheReplyFrom(t *te
 }
 
 func TestBridgePromptDispatcher_ALinkThatWritesNothingNeverReadsTheLastLinksReply(t *testing.T) {
+	t.Parallel()
 	const staleReply = `{"fast":"Gemini 9 Imaginary (Low)"}`
 	read := map[string]string{}
 	d := bridgePromptDispatcher{
@@ -170,6 +176,7 @@ func TestBridgePromptDispatcher_ALinkThatWritesNothingNeverReadsTheLastLinksRepl
 }
 
 func TestBridgePromptDispatcher_AnUnclearableArtifactFailsBeforeLaunching(t *testing.T) {
+	t.Parallel()
 	launched := false
 	d := bridgePromptDispatcher{workspace: t.TempDir(), projectRoot: t.TempDir(),
 		launch: func(context.Context, core.BridgeRequest) (core.BridgeResponse, error) {

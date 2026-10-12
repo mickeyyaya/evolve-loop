@@ -14,6 +14,7 @@ type pinnedLedgerRoot struct {
 }
 
 func TestUnobservedLedgerRootsArePinned(t *testing.T) {
+	t.Parallel()
 	pinned := map[string]pinnedLedgerRoot{
 		"cmd/evolve/cmd_cycle.go":           {1, "evolve cycle reset seals through its own ledger (an operator repair path; its seal anchor is unobserved) — S4b threads the root's; the root's own construction beside it IS observed"},
 		"cmd/evolve/cmd_ledger.go":          {6, "evolve ledger verify/seal/rebaseline/anchor/deep-verify/evidence restore: operator repair roots outside the orchestrator process"},

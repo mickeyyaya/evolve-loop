@@ -17,6 +17,7 @@ import (
 )
 
 func TestLoopResultEmit_AnUnencodableResultEmitsTheMarshalErrorEnvelope(t *testing.T) {
+	t.Parallel()
 	lr := &loopResult{StopReason: "max_cycles", TotalCost: math.NaN(), SpineFailOpens: nil}
 	var out bytes.Buffer
 
@@ -35,6 +36,7 @@ func TestLoopResultEmit_AnUnencodableResultEmitsTheMarshalErrorEnvelope(t *testi
 }
 
 func TestLoopResultEmit_AnUnexplainedCycleFilesItsDefectOnce(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(cycleWorkspace(root, 41), 0o755); err != nil {
 		t.Fatal(err)
@@ -99,6 +101,7 @@ func TestFileUnexplainedOutcomeDefect_IsIdempotentAndBestEffort(t *testing.T) {
 }
 
 func TestProductionPoolPlanFn_ReadsTheSeededInboxAsTodos(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -127,6 +130,7 @@ func TestProductionPoolPlanFn_ReadsTheSeededInboxAsTodos(t *testing.T) {
 }
 
 func TestProductionPoolPlanFn_APlanFailureIsReturned(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeE2File(t, filepath.Join(evolveDir, "inbox"), "not a dir")
@@ -154,6 +158,7 @@ func TestDefaultLoopPreflight_AHarnessFaultIsASyntheticHalt(t *testing.T) {
 }
 
 func TestRemoveEmptyProbeDir_RemovesOnlyAnEmptyDirAndWarnsOnFailure(t *testing.T) {
+	t.Parallel()
 	t.Run("absent is a no-op", func(t *testing.T) {
 		var stderr bytes.Buffer
 		removeEmptyProbeDir(filepath.Join(t.TempDir(), "absent"), &stderr)
@@ -193,6 +198,7 @@ func TestRemoveEmptyProbeDir_RemovesOnlyAnEmptyDirAndWarnsOnFailure(t *testing.T
 }
 
 func TestHandleCycleError_AnUnrecordableFailureWarnsAndTheBatchContinues(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	writeE2File(t, filepath.Join(evolveDir, "state.json"), "{corrupt")
@@ -239,6 +245,7 @@ func TestRunLoopStatus_RefusesBadArgsAndAnUnresolvableRoot(t *testing.T) {
 }
 
 func TestRunLoopStatus_JSONEncodeFailureExits1(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -253,6 +260,7 @@ func TestRunLoopStatus_JSONEncodeFailureExits1(t *testing.T) {
 }
 
 func TestRunLoopStatus_ALiveLeaseShowsItsHeartbeat(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	leaseARun(t, root, 3, os.Getpid())
 	writeE2File(t, filepath.Join(cycleWorkspace(root, 3), "run.json"), `{"cycle_id":3,"run_id":"run-3","phase":"build"}`)
@@ -266,6 +274,7 @@ func TestRunLoopStatus_ALiveLeaseShowsItsHeartbeat(t *testing.T) {
 }
 
 func TestRunLoopStop_RefusesConflictingOrBadFlags(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		args    []string
@@ -309,6 +318,7 @@ func TestRunLoopStop_AnUnresolvableRootExits1(t *testing.T) {
 }
 
 func TestRunLoopStop_WaitOnAnIdlePlaneEngagesTheBrakeAndReturns(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -326,6 +336,7 @@ func TestRunLoopStop_WaitOnAnIdlePlaneEngagesTheBrakeAndReturns(t *testing.T) {
 }
 
 func TestLiveRunPhase_ReadsThePhaseOrNothing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		body *string
@@ -351,6 +362,7 @@ func TestLiveRunPhase_ReadsThePhaseOrNothing(t *testing.T) {
 }
 
 func TestReleaseLoopStop_AnIrremovableBrakeExits1(t *testing.T) {
+	t.Parallel()
 	brake := filepath.Join(t.TempDir(), "loop-stop")
 	writeE2File(t, filepath.Join(brake, "inside"), "x")
 	var stdout, stderr bytes.Buffer
@@ -363,6 +375,7 @@ func TestReleaseLoopStop_AnIrremovableBrakeExits1(t *testing.T) {
 }
 
 func TestReleaseLoopStop_NamesWhatItReleased(t *testing.T) {
+	t.Parallel()
 	brake := filepath.Join(t.TempDir(), "loop-stop")
 	var stdout, stderr bytes.Buffer
 

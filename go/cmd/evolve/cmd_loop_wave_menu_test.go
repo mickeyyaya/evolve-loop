@@ -21,6 +21,7 @@ func writeInboxItemFiles(t *testing.T, inbox, name, id string, weight float64, f
 }
 
 func TestSeedWavePlanFromInbox_CardsCarryFilesAndClusterIntoLanes(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -60,6 +61,7 @@ func TestSeedWavePlanFromInbox_CardsCarryFilesAndClusterIntoLanes(t *testing.T) 
 }
 
 func TestWidenNarrowDecision_ExpandsCommittedLaneWithClusterMates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -95,6 +97,7 @@ func TestWidenNarrowDecision_ExpandsCommittedLaneWithClusterMates(t *testing.T) 
 }
 
 func TestWidenNarrowDecision_CommittedFloorsShortCircuit(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {

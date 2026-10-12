@@ -17,6 +17,7 @@ func addWorktree(t *testing.T, repo, dst string) {
 }
 
 func TestSuiteProjectRoot_NestedPlaneWorktree(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	base := t.TempDir()
 	console := filepath.Join(base, "console")
@@ -47,6 +48,7 @@ func TestSuiteProjectRoot_NestedPlaneWorktree(t *testing.T) {
 }
 
 func TestSuiteProjectRoot_FallbackToGitDerivation(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	base := t.TempDir()
 	console := filepath.Join(base, "console")

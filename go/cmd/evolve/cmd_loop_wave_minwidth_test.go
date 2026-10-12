@@ -27,6 +27,7 @@ func (f *minWidthFakeLauncher) Run(_ context.Context, specs []fleet.CycleSpec) [
 }
 
 func TestForceOneLaneDispatch_DispatchesIsolatedWaveWhenCandidateExists(t *testing.T) {
+	t.Parallel()
 	launcher := &minWidthFakeLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core"]}`), nil, nil
@@ -50,6 +51,7 @@ func TestForceOneLaneDispatch_DispatchesIsolatedWaveWhenCandidateExists(t *testi
 }
 
 func TestForceOneLaneDispatch_EmptyBacklogStaysFalseNoLauncherInvoked(t *testing.T) {
+	t.Parallel()
 	launcher := &minWidthFakeLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":[]}`), nil, nil
@@ -67,6 +69,7 @@ func TestForceOneLaneDispatch_EmptyBacklogStaysFalseNoLauncherInvoked(t *testing
 }
 
 func TestForceOneLaneDispatch_PreflightRefusalNeverPlansNorLaunches(t *testing.T) {
+	t.Parallel()
 	launcher := &minWidthFakeLauncher{}
 	refusal := errors.New("dirty control plane")
 	planFnCalled := false
@@ -90,6 +93,7 @@ func TestForceOneLaneDispatch_PreflightRefusalNeverPlansNorLaunches(t *testing.T
 }
 
 func TestShouldRunWave_CountOneOrZeroStillFalse(t *testing.T) {
+	t.Parallel()
 	if shouldRunWave(policy.FleetConfig{Count: 1, PlanSource: "triage"}) {
 		t.Fatalf("shouldRunWave(Count:1, triage) = true, want false — Count=1 must keep the existing sequential orch.RunCycle path untouched")
 	}

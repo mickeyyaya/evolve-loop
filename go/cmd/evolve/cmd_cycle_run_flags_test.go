@@ -9,6 +9,7 @@ import (
 )
 
 func TestParseCycleRunFlags(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		args    []string
@@ -36,6 +37,7 @@ func TestParseCycleRunFlags(t *testing.T) {
 }
 
 func TestCycleRunFlags_RequestCarriesTheGoalTheBypassAndTheEvolveEnv(t *testing.T) {
+	t.Parallel()
 	f := cycleRunFlags{goalHash: "abcd1234", goalText: "ship it", bypassPolicy: true}
 
 	req := f.request("/abs/root", []string{"EVOLVE_X=1", "HOME=/h"})

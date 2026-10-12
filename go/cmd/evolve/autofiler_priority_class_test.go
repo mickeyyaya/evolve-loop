@@ -26,6 +26,7 @@ func priorityClassAt(t *testing.T, path string) string {
 }
 
 func TestBuildGoalStallItem_IsStabilityClassedAndValidateRequiresAClass(t *testing.T) {
+	t.Parallel()
 	item := buildGoalStallItem(goalStallKind, "abcd1234ef", &goalStallEscalation{streak: 3}, 0.9, 1, "2026-10-06T00:00:00Z")
 	if item.PriorityClass != "stability" {
 		t.Errorf("a goal stuck shipping nothing is a stability defect; priority_class = %q", item.PriorityClass)
@@ -37,6 +38,7 @@ func TestBuildGoalStallItem_IsStabilityClassedAndValidateRequiresAClass(t *testi
 }
 
 func TestWritePipelineEscalation_FilesAStabilityClassedItem(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	sf := &cyclestate.SystemFailureSignal{Category: "verdict-incoherence", Level: "system", Evidence: "e", Halt: true}
@@ -47,6 +49,7 @@ func TestWritePipelineEscalation_FilesAStabilityClassedItem(t *testing.T) {
 }
 
 func TestFileUnexplainedOutcomeDefect_FilesADebuggabilityClassedItem(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	fileUnexplainedOutcomeDefect(root, 77, "no outcome recorded")
 	path := filepath.Join(root, ".evolve", "inbox", "auto-unexplained-outcome-cycle-77.json")

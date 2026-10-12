@@ -21,6 +21,7 @@ func poolSpecID(spec fleet.CycleSpec) string {
 }
 
 func TestShouldRunPool_GateTable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fc   policy.FleetConfig
@@ -42,6 +43,7 @@ func TestShouldRunPool_GateTable(t *testing.T) {
 }
 
 func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
+	t.Parallel()
 	configs := []policy.FleetConfig{
 		{Count: 2, PlanSource: "triage", Scheduling: "pool"},
 		{Count: 2, PlanSource: "triage", Scheduling: "wave"},
@@ -76,6 +78,7 @@ func TestShouldRunWaveAndPool_MutuallyExclusive(t *testing.T) {
 const poolTestSyncTimeout = 10 * time.Second
 
 func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "pool"}
 	backlog := []fleet.Todo{
 		{ID: "A", Files: []string{"a.go"}},
@@ -157,6 +160,7 @@ func TestDispatchPoolIteration_BackfillsReplacementWhileSiblingStillRunning(t *t
 }
 
 func TestDispatchPoolIteration_EmptyBacklogStaysFalseNoLaunch(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "pool"}
 	launched := 0
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
@@ -178,6 +182,7 @@ func TestDispatchPoolIteration_EmptyBacklogStaysFalseNoLaunch(t *testing.T) {
 }
 
 func TestDispatchPoolIteration_WaveConfigInertNoLaunch(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "wave"}
 	launched := 0
 	launch := func(context.Context, fleet.CycleSpec) (int, error) { launched++; return 0, nil }
@@ -203,6 +208,7 @@ func TestDispatchPoolIteration_WaveConfigInertNoLaunch(t *testing.T) {
 }
 
 func TestDispatchPoolIteration_PreflightRefusalNeverPlansNorLaunches(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "pool"}
 	refusal := errors.New("dirty control plane")
 	planCalled, launched := false, 0

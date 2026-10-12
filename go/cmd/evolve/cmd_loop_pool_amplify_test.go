@@ -12,6 +12,7 @@ import (
 )
 
 func TestShouldRunPool_DegenerateAndBoundaryCounts(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fc   policy.FleetConfig
@@ -32,6 +33,7 @@ func TestShouldRunPool_DegenerateAndBoundaryCounts(t *testing.T) {
 }
 
 func TestShouldRunPool_ExactStringMatchRequired(t *testing.T) {
+	t.Parallel()
 	mismatches := []policy.FleetConfig{
 		{Count: 2, PlanSource: "triage", Scheduling: "Pool"},
 		{Count: 2, PlanSource: "triage", Scheduling: "POOL"},
@@ -51,6 +53,7 @@ func TestShouldRunPool_ExactStringMatchRequired(t *testing.T) {
 }
 
 func TestDispatchPoolIteration_SingleLaneCountInertNoLaunch(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage", Scheduling: "pool"}
 	planCalled, launched := false, 0
 	planFn := func(context.Context, int) ([]fleet.Todo, error) {
@@ -75,6 +78,7 @@ func TestDispatchPoolIteration_SingleLaneCountInertNoLaunch(t *testing.T) {
 }
 
 func TestDispatchPoolIteration_ManualPlanSourceInertNoLaunch(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "manual", Scheduling: "pool"}
 	planCalled, launched := false, 0
 	planFn := func(context.Context, int) ([]fleet.Todo, error) {
@@ -96,6 +100,7 @@ func TestDispatchPoolIteration_ManualPlanSourceInertNoLaunch(t *testing.T) {
 }
 
 func TestDispatchPoolIteration_PlanFnErrorSurfacesNoLaunch(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage", Scheduling: "pool"}
 	wantErr := errors.New("triage phase failed")
 	launched := 0
@@ -115,6 +120,7 @@ func TestDispatchPoolIteration_PlanFnErrorSurfacesNoLaunch(t *testing.T) {
 }
 
 func TestDispatchPoolIteration_BacklogShorterThanTargetNeverBlocks(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 5, Concurrency: 5, PlanSource: "triage", Scheduling: "pool"}
 	backlog := []fleet.Todo{
 		{ID: "A", Files: []string{"a.go"}},
@@ -154,6 +160,7 @@ func TestDispatchPoolIteration_BacklogShorterThanTargetNeverBlocks(t *testing.T)
 }
 
 func TestDispatchPoolIteration_LargeScaleBacklogAllDispatchedExactlyOnce(t *testing.T) {
+	t.Parallel()
 	const n = 30
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, PlanSource: "triage", Scheduling: "pool"}
 	backlog := make([]fleet.Todo, n)
@@ -217,6 +224,7 @@ func TestDispatchPoolIteration_LargeScaleBacklogAllDispatchedExactlyOnce(t *test
 }
 
 func TestDispatchPoolIteration_NonPositiveConcurrencyNeverBlocks(t *testing.T) {
+	t.Parallel()
 	for _, conc := range []int{0, -1} {
 		t.Run(fmt.Sprintf("concurrency=%d", conc), func(t *testing.T) {
 			fc := policy.FleetConfig{Count: 3, Concurrency: conc, PlanSource: "triage", Scheduling: "pool"}

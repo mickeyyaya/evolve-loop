@@ -21,6 +21,7 @@ import (
 //
 // findRepoRoot is shared with docs_contract_test.go (same package).
 func TestProfilesDefaultToTmux(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join(findRepoRoot(t), ".evolve", "profiles")
 	profiles, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil {
@@ -59,6 +60,7 @@ func TestProfilesDefaultToTmux(t *testing.T) {
 // hooks. This pins the value so a future flip back to false (the latent bug that
 // shipped silently for lack of a JSON tag) fails the build.
 func TestSourceWritingProfilesAllowNetwork(t *testing.T) {
+	t.Parallel()
 	dir := filepath.Join(findRepoRoot(t), ".evolve", "profiles")
 	for _, name := range []string{"builder", "tdd-engineer"} { // built-in worktree phases (build, tdd)
 		b, err := os.ReadFile(filepath.Join(dir, name+".json"))

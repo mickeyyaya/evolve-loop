@@ -10,6 +10,7 @@ import (
 // The raw br may only be constructed, configured through its Set* methods,
 // wrapped, used as the catalog publisher's sink and exposed on orchDeps; never launched.
 func TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
 		t.Fatal(err)

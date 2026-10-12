@@ -50,6 +50,7 @@ func TestRunInbox_Consume_ReleasesContinuationBinding(t *testing.T) {
 }
 
 func TestReconcileConsumedBindings_ReleasesStrayBinding(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	consumed := filepath.Join(evolveDir, "inbox", "consumed")
@@ -70,6 +71,7 @@ func TestReconcileConsumedBindings_ReleasesStrayBinding(t *testing.T) {
 }
 
 func TestReconcileConsumedBindings_LiveBindingUntouched(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(filepath.Join(evolveDir, "inbox", "consumed"), 0o755); err != nil {
@@ -84,6 +86,7 @@ func TestReconcileConsumedBindings_LiveBindingUntouched(t *testing.T) {
 }
 
 func TestBlockerBreakerBootPath_RunsBindingReconcile(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	consumed := filepath.Join(evolveDir, "inbox", "consumed")
@@ -105,6 +108,7 @@ func TestBlockerBreakerBootPath_RunsBindingReconcile(t *testing.T) {
 // A consumed copy OLDER than the binding is stale evidence (recency guard);
 // the sweep must skip it, loudly.
 func TestReconcileConsumedBindings_NewerBindingSurvivesStaleConsumedCopy(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	consumed := filepath.Join(evolveDir, "inbox", "consumed")
@@ -132,6 +136,7 @@ func TestReconcileConsumedBindings_NewerBindingSurvivesStaleConsumedCopy(t *test
 // evidence (the consumed copy often carries no cycle stamp, so the recency
 // guard alone cannot save it).
 func TestReconcileConsumedBindings_RefiledLiveCopyKeepsItsBinding(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	consumed := filepath.Join(evolveDir, "inbox", "consumed")

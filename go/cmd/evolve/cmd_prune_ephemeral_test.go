@@ -10,6 +10,7 @@ import (
 )
 
 func TestCmd_PruneEphemeral_Help(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runPruneEphemeral([]string{"--help"}, nil, &stdout, &stderr)
 	if rc != 0 {
@@ -21,6 +22,7 @@ func TestCmd_PruneEphemeral_Help(t *testing.T) {
 }
 
 func TestCmd_PruneEphemeral_UnknownFlag(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runPruneEphemeral([]string{"--bogus"}, nil, &stdout, &stderr)
 	if rc != 10 {
@@ -29,6 +31,7 @@ func TestCmd_PruneEphemeral_UnknownFlag(t *testing.T) {
 }
 
 func TestCmd_PruneEphemeral_UnexpectedArg(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runPruneEphemeral([]string{"extra"}, nil, &stdout, &stderr)
 	if rc != 10 {
@@ -37,6 +40,7 @@ func TestCmd_PruneEphemeral_UnexpectedArg(t *testing.T) {
 }
 
 func TestCmd_PruneEphemeral_BadTrackerTTLFlag(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runPruneEphemeral([]string{"--tracker-ttl-days=abc"}, nil, &stdout, &stderr)
 	if rc != 10 {
@@ -45,6 +49,7 @@ func TestCmd_PruneEphemeral_BadTrackerTTLFlag(t *testing.T) {
 }
 
 func TestCmd_PruneEphemeral_BadLogTTLFlag(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runPruneEphemeral([]string{"--dispatch-log-ttl-days=xyz"}, nil, &stdout, &stderr)
 	if rc != 10 {

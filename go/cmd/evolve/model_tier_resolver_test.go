@@ -10,6 +10,7 @@ import (
 )
 
 func TestResolveModelTier_ResolvesEveryCanonicalTierForEveryFamily(t *testing.T) {
+	t.Parallel()
 	for _, cli := range []string{"claude", "codex", "agy", "ollama"} {
 		for _, tier := range modelcatalog.CanonicalTiers {
 			t.Run(cli+"/"+tier, func(t *testing.T) {
@@ -25,6 +26,7 @@ func TestResolveModelTier_ResolvesEveryCanonicalTierForEveryFamily(t *testing.T)
 }
 
 func TestResolveModelTier_RejectsUnresolvablePairings(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, cli, tier string
 	}{

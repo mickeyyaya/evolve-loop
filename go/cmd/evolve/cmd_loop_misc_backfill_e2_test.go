@@ -15,6 +15,7 @@ import (
 )
 
 func TestBlockerBreakerHalt_AnUnreadableFailurePolicyFallsBackToTheDefaults(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeE2File(t, filepath.Join(evolveDir, "policy.json"), `{"failure_policy":{"categories":{"made-up":{"level":"cosmic","action":"halt-and-diagnose"}}}}`)
@@ -107,6 +108,7 @@ func TestStartDetachedLoop_TheOffsetIsTheLogsSizeBeforeTheLaunch(t *testing.T) {
 }
 
 func TestDetachBootWait_AMalformedPolicyWaitsTheDefault(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	writeE2File(t, filepath.Join(evolveDir, "policy.json"), "{")
 	var stderr bytes.Buffer
@@ -119,6 +121,7 @@ func TestDetachBootWait_AMalformedPolicyWaitsTheDefault(t *testing.T) {
 }
 
 func TestDetachBootWait_AnAbsentPolicyIsTheDefaultWithoutAWarning(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 
 	if got := detachBootWait(t.TempDir(), &stderr); got != policy.DefaultBootDetachWait || stderr.Len() != 0 {
@@ -145,6 +148,7 @@ func TestAwaitDetachedBoot_AChildThatExitsBeforeTheLeaseFailsWithItsExitCode(t *
 }
 
 func TestTailLogSince_ReportsAnUnreadableLogInPlaceOfItsLines(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	file := filepath.Join(dir, "loop.log")
 	writeE2File(t, file, "a\n\n  \nb\nc\n")
@@ -182,6 +186,7 @@ func TestTailLogSince_ReportsAnUnreadableLogInPlaceOfItsLines(t *testing.T) {
 }
 
 func TestApplyEscalationBoundary_FailuresWarnAndApplyNothing(t *testing.T) {
+	t.Parallel()
 	t.Run("a malformed policy", func(t *testing.T) {
 		evolveDir := t.TempDir()
 		writeE2File(t, filepath.Join(evolveDir, "policy.json"), "{")
@@ -208,6 +213,7 @@ func TestApplyEscalationBoundary_FailuresWarnAndApplyNothing(t *testing.T) {
 }
 
 func TestApplyEscalationBoundary_NothingStagedIsSilent(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	var stderr bytes.Buffer
 
@@ -219,6 +225,7 @@ func TestApplyEscalationBoundary_NothingStagedIsSilent(t *testing.T) {
 }
 
 func TestWritePipelineEscalation_BothWritesFailLoudlyAndTheRecordStillNamesThePaths(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, "evolve-as-file")
 	writeE2File(t, evolveDir, "x")
@@ -242,6 +249,7 @@ func TestWritePipelineEscalation_BothWritesFailLoudlyAndTheRecordStillNamesThePa
 }
 
 func TestPruneBatchState_ACorruptStateReportsEveryStep(t *testing.T) {
+	t.Parallel()
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	writeE2File(t, statePath, "{corrupt")
 	var stderr bytes.Buffer
@@ -264,6 +272,7 @@ func TestPruneBatchState_ACorruptStateReportsEveryStep(t *testing.T) {
 }
 
 func TestPruneBatchState_AnAbsentStateIsSilent(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 
 	pruneBatchState(filepath.Join(t.TempDir(), "state.json"), &stderr)

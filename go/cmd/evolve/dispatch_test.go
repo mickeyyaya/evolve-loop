@@ -16,6 +16,7 @@ import (
 
 // TestDispatch_NoArgs prints usage and returns 2.
 func TestDispatch_NoArgs(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch(nil, nil, &stdout, &stderr)
 	if code != 2 {
@@ -27,6 +28,7 @@ func TestDispatch_NoArgs(t *testing.T) {
 }
 
 func TestDispatch_Version(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"version"}, nil, &stdout, &stderr)
 	if code != 0 {
@@ -38,6 +40,7 @@ func TestDispatch_Version(t *testing.T) {
 }
 
 func TestDispatch_Help(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"--help"}, nil, &stdout, &stderr)
 	if code != 0 {
@@ -46,6 +49,7 @@ func TestDispatch_Help(t *testing.T) {
 }
 
 func TestDispatch_Unknown(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"flarp"}, nil, &stdout, &stderr)
 	if code != 2 {
@@ -54,6 +58,7 @@ func TestDispatch_Unknown(t *testing.T) {
 }
 
 func TestDispatch_PhaseRoutesToRunPhase(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"phase"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -65,6 +70,7 @@ func TestDispatch_PhaseRoutesToRunPhase(t *testing.T) {
 }
 
 func TestDispatch_CycleRoutesToRunCycle(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"cycle"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -76,6 +82,7 @@ func TestDispatch_CycleRoutesToRunCycle(t *testing.T) {
 }
 
 func TestDispatch_WorktreeRoutesToRunWorktree(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"worktree"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -98,6 +105,7 @@ func TestDispatch_LoopRoutesToRunLoop(t *testing.T) {
 }
 
 func TestDispatch_DoctorProbe_Found(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"doctor", "probe", "go"}, nil, &stdout, &stderr)
 	if code != 0 {
@@ -106,6 +114,7 @@ func TestDispatch_DoctorProbe_Found(t *testing.T) {
 }
 
 func TestDispatch_DoctorProbe_JSON_ReorderedFlag(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	// flag after positional — exercises reorderArgs.
 	code := dispatch([]string{"doctor", "probe", "go", "--json"}, nil, &stdout, &stderr)
@@ -122,6 +131,7 @@ func TestDispatch_DoctorProbe_JSON_ReorderedFlag(t *testing.T) {
 }
 
 func TestDispatch_DoctorProbe_NotFound(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"doctor", "probe", "no_such_binary_evolve_test_xyzzy"}, nil, &stdout, &stderr)
 	if code != 1 {
@@ -130,6 +140,7 @@ func TestDispatch_DoctorProbe_NotFound(t *testing.T) {
 }
 
 func TestDispatch_DoctorProbe_Quiet(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"doctor", "probe", "--quiet", "go"}, nil, &stdout, &stderr)
 	if code != 0 {
@@ -141,6 +152,7 @@ func TestDispatch_DoctorProbe_Quiet(t *testing.T) {
 }
 
 func TestDispatch_DoctorProbe_NoTool(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"doctor", "probe"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -149,6 +161,7 @@ func TestDispatch_DoctorProbe_NoTool(t *testing.T) {
 }
 
 func TestDispatch_Doctor_NoSub(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"doctor"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -157,6 +170,7 @@ func TestDispatch_Doctor_NoSub(t *testing.T) {
 }
 
 func TestDispatch_Doctor_BadSub(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"doctor", "flarp"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -165,6 +179,7 @@ func TestDispatch_Doctor_BadSub(t *testing.T) {
 }
 
 func TestDispatch_GuardShip_Allow(t *testing.T) {
+	t.Parallel()
 	// ship.sh-shaped command — guard should allow.
 	in := strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"bash scripts/lifecycle/ship.sh msg"}}`)
 	var stdout, stderr bytes.Buffer
@@ -191,6 +206,7 @@ func TestDispatch_GuardShip_Deny(t *testing.T) {
 }
 
 func TestDispatch_GuardUnknown(t *testing.T) {
+	t.Parallel()
 	in := strings.NewReader(`{}`)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"guard", "ghostguard"}, in, &stdout, &stderr)
@@ -200,6 +216,7 @@ func TestDispatch_GuardUnknown(t *testing.T) {
 }
 
 func TestDispatch_Guard_NoName(t *testing.T) {
+	t.Parallel()
 	in := strings.NewReader(`{}`)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"guard"}, in, &stdout, &stderr)
@@ -209,6 +226,7 @@ func TestDispatch_Guard_NoName(t *testing.T) {
 }
 
 func TestDispatch_Guard_BadJSON(t *testing.T) {
+	t.Parallel()
 	in := strings.NewReader(`{not json`)
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"guard", "ship"}, in, &stdout, &stderr)
@@ -218,6 +236,7 @@ func TestDispatch_Guard_BadJSON(t *testing.T) {
 }
 
 func TestDispatch_Ledger_Verify_Empty(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"ledger", "verify", "--evolve-dir", tmp}, nil, &stdout, &stderr)
@@ -227,6 +246,7 @@ func TestDispatch_Ledger_Verify_Empty(t *testing.T) {
 }
 
 func TestDispatch_Ledger_Verify_Broken(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmp, "ledger.jsonl"), []byte("garbage\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -242,6 +262,7 @@ func TestDispatch_Ledger_Verify_Broken(t *testing.T) {
 }
 
 func TestDispatch_Ledger_Tail_Empty(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"ledger", "tail", "--evolve-dir", tmp}, nil, &stdout, &stderr)
@@ -251,6 +272,7 @@ func TestDispatch_Ledger_Tail_Empty(t *testing.T) {
 }
 
 func TestDispatch_Ledger_Tail_Populated(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	l := ledger.New(tmp)
 	for i := 0; i < 3; i++ {
@@ -270,6 +292,7 @@ func TestDispatch_Ledger_Tail_Populated(t *testing.T) {
 }
 
 func TestDispatch_Ledger_NoSub(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"ledger"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -278,6 +301,7 @@ func TestDispatch_Ledger_NoSub(t *testing.T) {
 }
 
 func TestDispatch_Ledger_BadSub(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"ledger", "flarp"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -286,6 +310,7 @@ func TestDispatch_Ledger_BadSub(t *testing.T) {
 }
 
 func TestDispatch_ACS_NoSub(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"acs"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -294,6 +319,7 @@ func TestDispatch_ACS_NoSub(t *testing.T) {
 }
 
 func TestDispatch_ACS_BadSub(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"acs", "flarp"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -302,6 +328,7 @@ func TestDispatch_ACS_BadSub(t *testing.T) {
 }
 
 func TestDispatch_ACS_Run_NoCycle(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"acs", "run", "./..."}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -310,6 +337,7 @@ func TestDispatch_ACS_Run_NoCycle(t *testing.T) {
 }
 
 func TestDispatch_ACS_Run_NoPkg(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := dispatch([]string{"acs", "run", "--cycle", "1"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -321,6 +349,7 @@ func TestDispatch_ACS_Run_NoPkg(t *testing.T) {
 var _ = io.EOF
 
 func TestReorderArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in, want []string
 	}{
@@ -351,6 +380,7 @@ func equalStrSlice(a, b []string) bool {
 }
 
 func TestDispatch_EvalQualityCheckPrintsTheUnsatisfiableLintReceipt(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	evalPath := filepath.Join(dir, "eval.md")
 	predicates := filepath.Join(dir, "predicates_test.go")

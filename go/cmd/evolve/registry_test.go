@@ -6,6 +6,7 @@ import (
 )
 
 func TestRegistry_UniqueNames(t *testing.T) {
+	t.Parallel()
 	seen := make(map[string]string) // key → "name" or alias-of-name
 	for _, c := range commands {
 		if prev, ok := seen[c.Name]; ok {
@@ -23,6 +24,7 @@ func TestRegistry_UniqueNames(t *testing.T) {
 }
 
 func TestRegistry_RunNotNil(t *testing.T) {
+	t.Parallel()
 	for _, c := range commands {
 		if c.Run == nil {
 			t.Errorf("command %q has nil Run", c.Name)
@@ -31,6 +33,7 @@ func TestRegistry_RunNotNil(t *testing.T) {
 }
 
 func TestRegistry_SummaryNonEmpty(t *testing.T) {
+	t.Parallel()
 	for _, c := range commands {
 		if c.Summary == "" {
 			t.Errorf("command %q has empty Summary", c.Name)
@@ -39,6 +42,7 @@ func TestRegistry_SummaryNonEmpty(t *testing.T) {
 }
 
 func TestRegistry_LookupResolvesAliases(t *testing.T) {
+	t.Parallel()
 	for _, c := range commands {
 		got := lookupCommand(c.Name)
 		if got == nil {
@@ -63,12 +67,14 @@ func TestRegistry_LookupResolvesAliases(t *testing.T) {
 }
 
 func TestRegistry_LookupUnknownReturnsNil(t *testing.T) {
+	t.Parallel()
 	if got := lookupCommand("definitely-not-a-real-subcommand-xyz"); got != nil {
 		t.Errorf("lookupCommand(unknown) = %+v, want nil", got)
 	}
 }
 
 func TestRegistry_VersionAndHelpAliases(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		alias string
 		want  string
@@ -86,6 +92,7 @@ func TestRegistry_VersionAndHelpAliases(t *testing.T) {
 }
 
 func TestRegistry_VersionRun(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runVersion(nil, nil, &stdout, &stderr)
 	if rc != 0 {
@@ -97,6 +104,7 @@ func TestRegistry_VersionRun(t *testing.T) {
 }
 
 func TestRegistry_HelpRun(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runHelp(nil, nil, &stdout, &stderr)
 	if rc != 0 {

@@ -150,6 +150,7 @@ func TestMaybeRefreshChainBoundary_NoFleetLaneActiveStillRefreshes(t *testing.T)
 // maybeRefreshChainBoundary seam), so the real gc.Discover scanner, not just
 // the fake, is exercised at least once.
 func TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	runsDir := brflRunsDir(t, evolveDir)
 	siblingDir := filepath.Join(runsDir, "cycle-sibling-live")
@@ -174,6 +175,7 @@ func TestDefaultChainBoundaryFleetLaneActive_DetectsLiveSiblingDiscoveredByGC(t 
 // no-runs-dir baseline: a plane that has never recorded a run must report
 // inactive, not an error.
 func TestDefaultChainBoundaryFleetLaneActive_NoRunsDirIsInactive(t *testing.T) {
+	t.Parallel()
 	active, err := defaultChainBoundaryFleetLaneActive(loopConfig{EvolveDir: t.TempDir()})
 	if err != nil {
 		t.Fatalf("no runs/ dir must not error: %v", err)

@@ -24,6 +24,7 @@ func fakeCycleBinary(t *testing.T, body string) string {
 }
 
 func TestExecCycleLaunch_RunsTheChildWithLaneArgsEnvAndPrefixedOutput(t *testing.T) {
+	t.Parallel()
 	bin := fakeCycleBinary(t, "echo \"args:$*\"\necho \"env:$LANE_MARK\"\necho oops >&2\nexit 3\n")
 	var stdout, stderr bytes.Buffer
 	launch := execCycleLaunch(bin, true, "/proj", "fallbackhash", "the goal", &stdout, &stderr)
@@ -43,6 +44,7 @@ func TestExecCycleLaunch_RunsTheChildWithLaneArgsEnvAndPrefixedOutput(t *testing
 }
 
 func TestExecCycleLaunch_TheFallbackHashAndContractApplyWhenTheSpecHasNone(t *testing.T) {
+	t.Parallel()
 	bin := fakeCycleBinary(t, "echo \"$*\"\n")
 	var stdout bytes.Buffer
 	launch := execCycleLaunch(bin, false, "", "fallbackhash", "goal text", &stdout, &bytes.Buffer{})
@@ -58,6 +60,7 @@ func TestExecCycleLaunch_TheFallbackHashAndContractApplyWhenTheSpecHasNone(t *te
 }
 
 func TestExecCycleLaunch_AMissingBinaryIsAnError(t *testing.T) {
+	t.Parallel()
 	launch := execCycleLaunch(filepath.Join(t.TempDir(), "absent"), false, "", "h", "", &bytes.Buffer{}, &bytes.Buffer{})
 
 	code, err := launch(context.Background(), fleet.CycleSpec{GoalHash: "h"})
@@ -68,6 +71,7 @@ func TestExecCycleLaunch_AMissingBinaryIsAnError(t *testing.T) {
 }
 
 func TestExecCycleLaunch_CancelTerminatesTheChild(t *testing.T) {
+	t.Parallel()
 	bin := fakeCycleBinary(t, "trap 'echo got-term; exit 0' TERM\n: > \"$READY\"\nwhile :; do sleep 0.05; done\n")
 	ctx, cancel := context.WithCancel(context.Background())
 	var stdout bytes.Buffer

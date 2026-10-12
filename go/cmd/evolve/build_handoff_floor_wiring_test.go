@@ -35,6 +35,7 @@ func TestBuildHandoffProbes_IterateTheCycleFloorsCheckList(t *testing.T) {
 }
 
 func TestComposedBuildHandoffFloor_FollowsTheWorkflowDialAndTheDocumentContract(t *testing.T) {
+	t.Parallel()
 	enforced := policy.Policy{}.WorkflowConfig()
 	if !enforced.BuildFloorEnforced {
 		t.Fatal("the compiled default enforces the build floor")

@@ -16,6 +16,7 @@ import (
 )
 
 func TestWireOrchestratorDeps_ShipPhaseCarriesTheRootSignalCenter(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +31,7 @@ func TestWireOrchestratorDeps_ShipPhaseCarriesTheRootSignalCenter(t *testing.T) 
 }
 
 func TestWireSimulateOrchestrator_ShipWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -55,6 +57,7 @@ func TestWireSimulateOrchestrator_ShipWarningRenders(t *testing.T) {
 }
 
 func TestCmdShip_BuildsTheRootSignalCenter(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_ship.go")
 	if err != nil {
 		t.Fatal(err)

@@ -58,6 +58,7 @@ func TestRunSelfcheck_WithoutACycleBindingNeverClaimsSafe(t *testing.T) {
 }
 
 func TestRunSelfcheck_UsageOnBadArgs(t *testing.T) {
+	t.Parallel()
 	var out, errw strings.Builder
 	if rc := runSelfcheck([]string{"bogus"}, nil, &out, &errw); rc != 2 {
 		t.Fatalf("unknown subcommand must exit 2 with usage, got %d", rc)
@@ -68,6 +69,7 @@ func TestRunSelfcheck_UsageOnBadArgs(t *testing.T) {
 }
 
 func TestSelfcheckSeam_DefaultsToBuildFloorChecks(t *testing.T) {
+	t.Parallel()
 	want := reflect.ValueOf(probeBuildHandoffFloor).Pointer()
 	got := reflect.ValueOf(buildHandoffFloorFor).Pointer()
 	if want != got {
@@ -76,6 +78,7 @@ func TestSelfcheckSeam_DefaultsToBuildFloorChecks(t *testing.T) {
 }
 
 func TestBuildFloorRoots_ComposeOnlyThroughTheProductionFloor(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

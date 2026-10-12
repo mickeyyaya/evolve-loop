@@ -9,6 +9,7 @@ import (
 )
 
 func TestProcessStartTime_ReadsTheRunningProcess(t *testing.T) {
+	t.Parallel()
 	started, ok := processStartTime(os.Getpid())
 
 	now := time.Now()

@@ -27,6 +27,7 @@ const (
 )
 
 func TestBlockerBreakerHalt_ConsecutiveLaneDeferralsHaltWithTheGitCause(t *testing.T) {
+	t.Parallel()
 	c, got, _ := recordingLoopSignals()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -58,6 +59,7 @@ func TestBlockerBreakerHalt_ConsecutiveLaneDeferralsHaltWithTheGitCause(t *testi
 }
 
 func TestBlockerBreakerHalt_ABrokenRunOrQuotaDeferralsDoNotHalt(t *testing.T) {
+	t.Parallel()
 	cases := map[string][]string{
 		"two deferrals, then a ship, then one":       {laneDeferred, laneDeferred, shipped, laneDeferred},
 		"three quota deferrals are not provisioning": {quotaDeferred, quotaDeferred, quotaDeferred},
@@ -75,6 +77,7 @@ func TestBlockerBreakerHalt_ABrokenRunOrQuotaDeferralsDoNotHalt(t *testing.T) {
 }
 
 func TestBlockerBreakerHalt_AlternatingDeferralsAndFailuresHalt(t *testing.T) {
+	t.Parallel()
 	c, got, _ := recordingLoopSignals()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")

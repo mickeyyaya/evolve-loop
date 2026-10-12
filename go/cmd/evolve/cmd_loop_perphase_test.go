@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseLoopArgs_PerAgentCLIFlag(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{
 		"--cli", "auditor=claude-tmux",
@@ -27,6 +28,7 @@ func TestParseLoopArgs_PerAgentCLIFlag(t *testing.T) {
 }
 
 func TestParseLoopArgs_PerAgentModelFlag(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{
 		"--model", "auditor=opus",
@@ -46,6 +48,7 @@ func TestParseLoopArgs_PerAgentModelFlag(t *testing.T) {
 }
 
 func TestParseLoopArgs_MalformedCLIFlagRejected(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	_, rc := parseLoopArgs([]string{"--cli", "noequals", "--goal-text", "x"}, &stderr)
 	if rc != 10 {
@@ -57,6 +60,7 @@ func TestParseLoopArgs_MalformedCLIFlagRejected(t *testing.T) {
 }
 
 func TestBuildCycleEnv_PerAgentCLI_TranslatesToEvolveEnvKey(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{
 		Strategy: "balanced",
 		PerAgentCLI: map[string]string{
@@ -74,6 +78,7 @@ func TestBuildCycleEnv_PerAgentCLI_TranslatesToEvolveEnvKey(t *testing.T) {
 }
 
 func TestBuildCycleEnv_PerAgentModel_TranslatesToEvolveEnvKey(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{
 		Strategy: "balanced",
 		PerAgentModel: map[string]string{
@@ -91,6 +96,7 @@ func TestBuildCycleEnv_PerAgentModel_TranslatesToEvolveEnvKey(t *testing.T) {
 }
 
 func TestBuildCycleEnv_FlagOverridesInheritedEnv(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{
 		Strategy:    "balanced",
 		PerAgentCLI: map[string]string{"auditor": "claude-tmux"},
@@ -102,6 +108,7 @@ func TestBuildCycleEnv_FlagOverridesInheritedEnv(t *testing.T) {
 }
 
 func TestPhaseEnvAgentKey(t *testing.T) {
+	t.Parallel()
 	// phaseEnvAgentKey must mirror envchain.PhaseEnvKey's normalization, or the
 	// runner's EVOLVE_<AGENT>_CLI lookup misses.
 	cases := []struct {

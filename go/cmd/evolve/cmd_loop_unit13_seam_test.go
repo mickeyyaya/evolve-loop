@@ -94,6 +94,7 @@ func declaredFuncs(t *testing.T, fset *token.FileSet) map[string]bool {
 }
 
 func TestLoopSignalOrigins_NameDeclaredFunctions(t *testing.T) {
+	t.Parallel()
 	fset := token.NewFileSet()
 	declared := declaredFuncs(t, fset)
 	for _, file := range []string{"cmd_loop_window.go", "cmd_loop_escalate.go", "cmd_loop_systemfailure_halt.go", "cmd_loop_blockerbreaker.go"} {
@@ -146,6 +147,7 @@ func nonTestSourcesMentioningU13(t *testing.T, needle, allowed string) []string 
 }
 
 func TestWaveEngine_OneConstructionSite(t *testing.T) {
+	t.Parallel()
 	const seam = "cmd/evolve/cmd_loop_wave.go"
 	if offenders := nonTestSourcesMentioningU13(t, "loopwave.New(", seam); len(offenders) > 0 {
 		t.Errorf("loopwave.New( belongs to %s alone; also in %v", seam, offenders)
@@ -163,6 +165,7 @@ func TestWaveEngine_OneConstructionSite(t *testing.T) {
 }
 
 func TestChainEngines_OneConstructionSite(t *testing.T) {
+	t.Parallel()
 	const seam = "cmd/evolve/cmd_loop_chain.go"
 	for _, needle := range []string{"loopchain.NewRefresher(", "loopchain.NewDriver("} {
 		if offenders := nonTestSourcesMentioningU13(t, needle, seam); len(offenders) > 0 {
@@ -182,6 +185,7 @@ func TestChainEngines_OneConstructionSite(t *testing.T) {
 }
 
 func TestLoopBatchCoordinator_WaveEngineIsCachedAndReadsTheCenterLive(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	b := &loopBatchCoordinator{cfg: loopConfig{ProjectRoot: root, EvolveDir: filepath.Join(root, ".evolve")}, stderr: io.Discard}
 	first := b.wave()
@@ -198,6 +202,7 @@ func TestLoopBatchCoordinator_WaveEngineIsCachedAndReadsTheCenterLive(t *testing
 }
 
 func TestMinWidthRepairFacade_ConsoleKeepsTheFourPinnedSubstringsAndNdjsonCarriesTheCodes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	var console bytes.Buffer
@@ -233,6 +238,7 @@ func TestMinWidthRepairFacade_ConsoleKeepsTheFourPinnedSubstringsAndNdjsonCarrie
 }
 
 func TestDispatchFleetIteration_PreflightRefusalRendersDispatchFailedOnce(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -263,6 +269,7 @@ func TestDispatchFleetIteration_PreflightRefusalRendersDispatchFailedOnce(t *tes
 }
 
 func TestCmdLoopWindow_NoHandWrittenWaveDispatchFailedLine(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_loop_window.go")
 	if err != nil {
 		t.Fatal(err)
@@ -273,6 +280,7 @@ func TestCmdLoopWindow_NoHandWrittenWaveDispatchFailedLine(t *testing.T) {
 }
 
 func TestCmdLoopWave_ACSTokensHoldByCode(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_loop_wave.go")
 	if err != nil {
 		t.Fatal(err)
@@ -346,6 +354,7 @@ func TestRunLoopChain_ConstructsABatchLevelCenterAndRendersItsWarnings(t *testin
 }
 
 func TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar(t *testing.T) {
+	t.Parallel()
 	if CodeLoopMinWidthRepair != loopwave.CodeMinWidthRepair {
 		t.Error("CodeLoopMinWidthRepair projects the leaf's code")
 	}
@@ -372,6 +381,7 @@ func TestEmitLoopWave_ProjectsToTheLeafProducerWithOneRegistrar(t *testing.T) {
 }
 
 func TestChainResult_IsTheLeafResultWithNoReSpelledSchema(t *testing.T) {
+	t.Parallel()
 	if reflect.TypeOf(chainResult{}) != reflect.TypeOf(loopchain.Result{}) {
 		t.Error("chainResult must alias loopchain.Result — two declarations of one wire schema drift silently")
 	}
@@ -425,6 +435,7 @@ func TestWiredChain_FlushesTheChainCenterBeforeEveryBatch(t *testing.T) {
 }
 
 func TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone(t *testing.T) {
+	t.Parallel()
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "cmd_loop_wave.go", nil, 0)
 	if err != nil {
@@ -471,6 +482,7 @@ func TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone(t *testing.T) {
 }
 
 func TestLaneTally_ProjectsToTheLeaf(t *testing.T) {
+	t.Parallel()
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "cmd_loop_window.go", nil, 0)
 	if err != nil {

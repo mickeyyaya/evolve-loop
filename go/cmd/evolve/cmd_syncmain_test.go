@@ -149,6 +149,7 @@ func smWriteLiveLease(t *testing.T, repo string) {
 }
 
 func TestSyncMain_MergesQuietDivergedTree(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
 
@@ -186,6 +187,7 @@ func TestSyncMain_MergesQuietDivergedTree(t *testing.T) {
 }
 
 func TestSyncMain_RefusesOnDirtyIndex(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
 
@@ -212,6 +214,7 @@ func TestSyncMain_RefusesOnDirtyIndex(t *testing.T) {
 }
 
 func TestSyncMain_RefusesOnLiveLease(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
 	smWriteLiveLease(t, repo)
@@ -229,6 +232,7 @@ func TestSyncMain_RefusesOnLiveLease(t *testing.T) {
 }
 
 func TestSyncMain_RefusesCleanlyOnConflict(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "base.txt", "line1\nremote-edit\nline3\n")
 
@@ -266,6 +270,7 @@ func TestSyncMain_RefusesCleanlyOnConflict(t *testing.T) {
 }
 
 func TestSyncMain_AnUntrackedFileDoesNotBlockTheSync(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "remote-change.txt", "from origin\n")
 	item := filepath.Join(repo, "operator-inbox-item.json")
@@ -289,6 +294,7 @@ func TestSyncMain_AnUntrackedFileDoesNotBlockTheSync(t *testing.T) {
 }
 
 func TestSyncMain_AnUntrackedFileTheMergeWouldOverwriteRefusesCleanly(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "incoming.txt", "from origin\n")
 	local := filepath.Join(repo, "incoming.txt")
@@ -316,6 +322,7 @@ func TestSyncMain_AnUntrackedFileTheMergeWouldOverwriteRefusesCleanly(t *testing
 }
 
 func TestSyncMain_ACaseCollidingUntrackedFileIsNeverOverwritten(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	smRemoteCommit(t, bare, "incoming.txt", "from origin\n")
 	local := filepath.Join(repo, "INCOMING.txt")
@@ -334,6 +341,7 @@ func TestSyncMain_ACaseCollidingUntrackedFileIsNeverOverwritten(t *testing.T) {
 }
 
 func TestSyncMain_TheLoopsInboxStampsNeverBlockTheSync(t *testing.T) {
+	t.Parallel()
 	repo, bare := smInitRepoWithRemote(t)
 	inbox := filepath.Join(repo, ".evolve", "inbox")
 	writeItems := func(dir string, items map[string]string) {
@@ -400,6 +408,7 @@ func TestSyncMain_TheLoopsInboxStampsNeverBlockTheSync(t *testing.T) {
 }
 
 func TestSyncMain_AnOperatorEditToAnInboxItemStillRefuses(t *testing.T) {
+	t.Parallel()
 	repo, _ := smInitRepoWithRemote(t)
 	item := filepath.Join(repo, ".evolve", "inbox", "x.json")
 	if err := os.MkdirAll(filepath.Dir(item), 0o755); err != nil {
@@ -426,6 +435,7 @@ func TestSyncMain_AnOperatorEditToAnInboxItemStillRefuses(t *testing.T) {
 }
 
 func TestSyncMain_RefusesToMergeWhenTheStampsCannotLand(t *testing.T) {
+	t.Parallel()
 	repo, bare, kept := smStampedPlane(t)
 	replayed := filepath.Join(repo, ".evolve", "inbox", "y.json")
 	if err := os.WriteFile(replayed, []byte(`{"id":"y","weight":0.5}`), 0o644); err != nil {
@@ -504,6 +514,7 @@ func smOriginWrites(t *testing.T, bare, rel, content string) {
 }
 
 func TestSyncMain_ACompletedSyncWhoseStampIsAlreadyOnOriginSucceeds(t *testing.T) {
+	t.Parallel()
 	repo, bare, item := smStampedPlane(t)
 	stamped := `{"id":"x","weight":0.5,"route":"console-manual"}`
 	smOriginWrites(t, bare, ".evolve/inbox/x.json", stamped)
@@ -520,6 +531,7 @@ func TestSyncMain_ACompletedSyncWhoseStampIsAlreadyOnOriginSucceeds(t *testing.T
 }
 
 func TestSyncMain_AConflictingMergeRestoresTheStampsItPreparedAndReportsNoneDropped(t *testing.T) {
+	t.Parallel()
 	repo, bare, item := smStampedPlane(t)
 	superseded := filepath.Join(repo, ".evolve", "inbox", "z.json")
 	if err := os.WriteFile(superseded, []byte(`{"id":"z","weight":0.5}`), 0o644); err != nil {

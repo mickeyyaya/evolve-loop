@@ -33,6 +33,7 @@ func (r resumedNoWorkRunner) RunCycleFromPhase(context.Context, core.CycleReques
 func (resumedNoWorkRunner) SignalSummary() signalcenter.Summary { return signalcenter.Summary{} }
 
 func TestRunResumeBatch_APlannedNoWorkLaneIsHandedOver(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedNoWorkLane(t, root, 7)
 	st := storage.New(evolveDir)
@@ -94,6 +95,7 @@ func writeResumeCheckpoint(t *testing.T, evolveDir, ws string) {
 }
 
 func TestRunResumeBatch_AResumedFailWalksTheFailureLifecycle(t *testing.T) {
+	t.Parallel()
 	for name, runner := range map[string]resumedFailRunner{
 		"a FAIL verdict":        {result: core.CycleResult{Cycle: 7, FinalVerdict: core.VerdictFAIL}},
 		"a cycle-level failure": {result: core.CycleResult{Cycle: 7}, err: &core.ErrCycleLevelFailure{Phase: "build", Cause: errors.New("builder crashed")}},
@@ -121,6 +123,7 @@ func TestRunResumeBatch_AResumedFailWalksTheFailureLifecycle(t *testing.T) {
 }
 
 func TestRunResumeBatch_AResumedQuotaWallKeepsItsClaims(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, ws := seedFailedCycleInbox(t, root, "worked", 7)
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "worked", "7"); err != nil {

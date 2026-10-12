@@ -43,6 +43,7 @@ func e3Bench(t *testing.T, root string, families ...string) {
 }
 
 func TestBenchedFamilies_ReadsOnlyActiveBenches(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if got := benchedFamilies(root); len(got) != 0 {
 		t.Fatalf("an empty store benched %v", got)
@@ -161,6 +162,7 @@ func e3OverrideProfiles(t *testing.T, root string) {
 }
 
 func TestOverrideRefusals_FaultsAreErrorsNotRefusals(t *testing.T) {
+	t.Parallel()
 	t.Run("profiles path is a file", func(t *testing.T) {
 		root := t.TempDir()
 		writeFileForPublishTest(t, routingProfilesDir(root), "not a dir")
@@ -219,6 +221,7 @@ func TestWireCLIRouter_AnOverrideCheckFaultIsReported(t *testing.T) {
 }
 
 func TestProductionUsageEvidence_BuildsAnExplainerWithoutProbing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	var log bytes.Buffer
@@ -237,6 +240,7 @@ func TestProductionUsageEvidence_BuildsAnExplainerWithoutProbing(t *testing.T) {
 }
 
 func TestFamilyEvidence_AsksTheTmuxDriverOfTheFamily(t *testing.T) {
+	t.Parallel()
 	if familyEvidence(nil) != nil {
 		t.Fatal("no explainer must give no family evidence")
 	}
@@ -254,6 +258,7 @@ func TestFamilyEvidence_AsksTheTmuxDriverOfTheFamily(t *testing.T) {
 }
 
 func TestWithUsageEvidence_AFailedLaunchReportsToTheGivenSignalCenter(t *testing.T) {
+	t.Parallel()
 	center := signalcenter.New()
 	var events []signalcenter.Event
 	center.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
@@ -274,6 +279,7 @@ func TestWithUsageEvidence_AFailedLaunchReportsToTheGivenSignalCenter(t *testing
 }
 
 func TestPhaseObserverAdapter_ReadsTheDepsItWasWiredWith(t *testing.T) {
+	t.Parallel()
 	center := signalcenter.New()
 	var asked string
 	explain := func(_ context.Context, driver string, _ time.Time) usageprobe.Evidence {

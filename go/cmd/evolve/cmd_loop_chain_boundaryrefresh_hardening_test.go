@@ -107,6 +107,7 @@ func TestMaybeRefreshChainBoundary_UnverifiedProvenanceRefusesRepinAndReExec(t *
 // constant — an arbitrary commit is rejected, an empty commit is rejected,
 // and only a real ancestor of HEAD is accepted.
 func TestDefaultChainBoundaryRepinProvenance_RejectsNonAncestorAndEmptyCommits(t *testing.T) {
+	t.Parallel()
 	dir, commitA := brfInitRepo(t)
 	brfAdvance(t, dir)
 

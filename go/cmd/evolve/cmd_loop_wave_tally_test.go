@@ -13,6 +13,7 @@ import (
 )
 
 func TestCompleteWave_ADeferredLaneIsCountedDeferredNotOk(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	c := signalcenter.New()
 	var waves []signalcenter.Event
@@ -36,6 +37,7 @@ func TestCompleteWave_ADeferredLaneIsCountedDeferredNotOk(t *testing.T) {
 }
 
 func TestReportFleetResults_ADeferredLaneIsNotAFailure(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	code := reportFleetResults([]fleet.Result{{Index: 0}, {Index: 1, ExitCode: fleet.ExitDeferred}}, &stderr)
 
@@ -53,6 +55,7 @@ func TestReportFleetResults_ADeferredLaneIsNotAFailure(t *testing.T) {
 }
 
 func TestSoakLaunchesOK_ADeferredLaunchIsNotAFailure(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	ok := soakLaunchesOK([]fleet.Result{{}, {ExitCode: fleet.ExitDeferred}}, 2, &stderr)
 
@@ -68,6 +71,7 @@ func TestSoakLaunchesOK_ADeferredLaunchIsNotAFailure(t *testing.T) {
 }
 
 func TestSoakLaunchesOK_ASoakWhereEveryLaunchDeferredIsInconclusive(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	ok := soakLaunchesOK([]fleet.Result{{ExitCode: fleet.ExitDeferred}, {ExitCode: fleet.ExitDeferred}}, 2, &stderr)
 

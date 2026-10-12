@@ -51,6 +51,7 @@ func randHex(n int) string {
 }
 
 func TestE2E_M4PipelineAgainstLiveLedger(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("EVOLVE_E2E_LIVE_LLM") != "1" {
 		t.Skip("EVOLVE_E2E_LIVE_LLM!=1 — set to 1 to run live LLM e2e (~$0.05)")
 	}
@@ -193,6 +194,7 @@ Verdict: FAIL
 }
 
 func TestE2E_M4LedgerEntryShapeMatch(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("EVOLVE_E2E_LIVE_LLM") != "1" {
 		t.Skip("EVOLVE_E2E_LIVE_LLM!=1")
 	}

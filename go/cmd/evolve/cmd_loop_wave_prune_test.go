@@ -54,6 +54,7 @@ func decisionIDs(t *testing.T, data []byte) map[string]bool {
 }
 
 func TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeLifecycleItem(t, dir, inboxmover.StateProcessed, "gone", "go/internal/x/a.go")
 	writeLifecycleItem(t, dir, inboxmover.StatePending, "fresh", "go/internal/y/b.go")
@@ -74,6 +75,7 @@ func TestWidenNarrowDecision_DropsConsumedCommittedAtFleetWidth(t *testing.T) {
 }
 
 func TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeLifecycleItem(t, dir, inboxmover.StateRejected, "gone", "go/internal/x/a.go")
 
@@ -90,6 +92,7 @@ func TestWidenNarrowDecision_ConsumedIDDroppedEvenWithNoBacklogReplacement(t *te
 }
 
 func TestWidenNarrowDecision_PrunesEveryIDALaneCannotTake(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		state    string
 		wantKeep bool
@@ -124,6 +127,7 @@ func TestWidenNarrowDecision_PrunesEveryIDALaneCannotTake(t *testing.T) {
 }
 
 func TestWaveNPlusOneExcludesConsumedScope(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeLifecycleItem(t, dir, inboxmover.StateProcessed, "consumed", "go/internal/x/a.go")
 	writeLifecycleItem(t, dir, inboxmover.StatePending, "next-up", "go/internal/y/b.go")

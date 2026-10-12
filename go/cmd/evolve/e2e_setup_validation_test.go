@@ -70,6 +70,7 @@ func phase(rep detectReport, role string) (string, string, string, string) {
 }
 
 func TestSetupDetect_PinEnvelopeViolation(t *testing.T) {
+	t.Parallel()
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
@@ -83,6 +84,7 @@ func TestSetupDetect_PinEnvelopeViolation(t *testing.T) {
 }
 
 func TestSetupDetect_PinAllowedCLIsViolation(t *testing.T) {
+	t.Parallel()
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
@@ -96,6 +98,7 @@ func TestSetupDetect_PinAllowedCLIsViolation(t *testing.T) {
 }
 
 func TestSetupDetect_PinValidNoViolation(t *testing.T) {
+	t.Parallel()
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
@@ -112,6 +115,7 @@ func TestSetupDetect_PinValidNoViolation(t *testing.T) {
 }
 
 func TestSetupDetect_MalformedPolicy(t *testing.T) {
+	t.Parallel()
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["all"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,
@@ -128,6 +132,7 @@ func TestSetupDetect_MalformedPolicy(t *testing.T) {
 }
 
 func TestSetupDetect_JSONShape(t *testing.T) {
+	t.Parallel()
 	evolveDir := writeSetupFixture(t,
 		map[string]string{
 			"builder": `{"name":"builder","cli":"claude-tmux","allowed_clis":["claude","agy"],"model_tier_envelope":{"min":"balanced","default":"balanced","max":"deep"}}`,

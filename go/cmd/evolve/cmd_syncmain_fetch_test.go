@@ -44,6 +44,7 @@ func holdRefLock(t *testing.T, r *gittest.Repo, ref string) string {
 }
 
 func TestSyncMain_ALockOnAnUnrelatedRemoteRefDoesNotFailTheSync(t *testing.T) {
+	t.Parallel()
 	seed, runtime := syncFetchFixture(t)
 	smCommitFile(t, seed, "landed.txt", "landed\n")
 	seed.Git("push", "-q", "origin", "main", "+main:train/wave64-boundary")
@@ -85,6 +86,7 @@ func TestSyncMain_RetriesALockOnTheBranchRef(t *testing.T) {
 }
 
 func TestSyncMain_RefusesADetachedHEADBeforeFetching(t *testing.T) {
+	t.Parallel()
 	seed, runtime := syncFetchFixture(t)
 	smCommitFile(t, seed, "landed.txt", "landed\n")
 	seed.Git("push", "-q", "origin", "main")

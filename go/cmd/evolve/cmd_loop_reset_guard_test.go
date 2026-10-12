@@ -18,6 +18,7 @@ import (
 )
 
 func TestUnfinishedCycle(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		cycleID   int

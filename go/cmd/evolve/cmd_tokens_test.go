@@ -25,6 +25,7 @@ func writeTokensTimingFixture(t *testing.T, root string, cycle string, entries [
 }
 
 func TestTokensReport_RanksPhasesByInputTokens(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "1", []phasetiming.Entry{
 		{Phase: "scout", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 500, Output: 50}},
@@ -70,6 +71,7 @@ func TestTokensReport_RanksPhasesByInputTokens(t *testing.T) {
 }
 
 func TestRunTokensReport_TableRendersPhasesAndTotals(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "9", []phasetiming.Entry{
 		{Phase: "scout", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 100, Output: 10, CacheRead: 5}},
@@ -89,6 +91,7 @@ func TestRunTokensReport_TableRendersPhasesAndTotals(t *testing.T) {
 }
 
 func TestRunTokensReport_NoLogsErrors(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var out, errb bytes.Buffer
 	code := runTokensReport([]string{"--project-root", root}, &out, &errb)
@@ -132,6 +135,7 @@ func lineContaining(text, needle string) string {
 }
 
 func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	// Cycle 5 is discovered via its phase-timing log; duration 90000 / exit 0
 	// deliberately carry no stray "5" digit so the cycle-number assertion is real.
@@ -184,6 +188,7 @@ func TestRunTokensReport_SurfacesTripwireInTextAndJSON(t *testing.T) {
 }
 
 func TestRunTokensReport_SurfacesTripwireEvenWhenPhasesEmpty(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "7", []phasetiming.Entry{})
 	writeTokensLLMCalls(t, root, "7", []map[string]any{
@@ -205,6 +210,7 @@ func TestRunTokensReport_SurfacesTripwireEvenWhenPhasesEmpty(t *testing.T) {
 }
 
 func TestRunTokensReport_ZeroTripwireStaysQuiet(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "3", []phasetiming.Entry{
 		{Phase: "build", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 200, Output: 20}},
@@ -226,6 +232,7 @@ func TestRunTokensReport_ZeroTripwireStaysQuiet(t *testing.T) {
 }
 
 func TestRunTokensReport_SanitizesTripwireControlBytes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "4", []phasetiming.Entry{
 		{Phase: "build", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 100, Output: 10}},

@@ -174,6 +174,7 @@ func TestParseLoopArgs_MaxCyclesFlag(t *testing.T) {
 // resolveDispatchPolicy (unknown value → verify with WARN). The WARN line
 // is what we need to see.
 func TestRunLoop_PolicyUnknownLogs(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	got := resolveDispatchPolicy("garbage", &stderr)
 	if got != dispatchPolicyVerify {

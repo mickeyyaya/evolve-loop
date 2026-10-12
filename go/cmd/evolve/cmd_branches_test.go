@@ -82,6 +82,7 @@ func brLine(stdout, ref string, needles ...string) bool {
 }
 
 func TestBranchesAudit_ReportsSupersededAndLandable(t *testing.T) {
+	t.Parallel()
 	dir := brFixture(t)
 	stdout, code := brRun(t, dir, "audit")
 	if code != 0 {
@@ -99,6 +100,7 @@ func TestBranchesAudit_ReportsSupersededAndLandable(t *testing.T) {
 }
 
 func TestBranchesPruneDryRunDefault_KeepsSuperseded(t *testing.T) {
+	t.Parallel()
 	dir := brFixture(t)
 	stdout, code := brRun(t, dir, "prune")
 	if code != 0 {
@@ -113,6 +115,7 @@ func TestBranchesPruneDryRunDefault_KeepsSuperseded(t *testing.T) {
 }
 
 func TestBranchesPruneForce_DeletesSupersededKeepsDivergent(t *testing.T) {
+	t.Parallel()
 	dir := brFixture(t)
 	stdout, code := brRun(t, dir, "prune", "--dry-run=false")
 	if code != 0 {
@@ -127,6 +130,7 @@ func TestBranchesPruneForce_DeletesSupersededKeepsDivergent(t *testing.T) {
 }
 
 func TestBranchesUnknownSubcommand_Errors(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if code := runBranches([]string{"bogus"}, nil, &out, &errb); code == 0 {
 		t.Errorf("unknown subcommand must exit non-zero, got 0")
@@ -165,6 +169,7 @@ func brWantLines(t *testing.T, stdout string, want [][2]string) {
 }
 
 func TestBranchesPruneForce_KeepsCheckedOutAndBoundPrunesRest(t *testing.T) {
+	t.Parallel()
 	dir := brKeptFixture(t)
 	stdout, code := brRun(t, dir, "prune", "--dry-run=false")
 	if code != 0 {
@@ -191,6 +196,7 @@ func TestBranchesPruneForce_KeepsCheckedOutAndBoundPrunesRest(t *testing.T) {
 }
 
 func TestBranchesPruneForce_DeleteFailureReportedPerRef(t *testing.T) {
+	t.Parallel()
 	dir := brKeptFixture(t)
 	// A held ref lock makes git refuse to delete a ref no worktree holds.
 	if err := os.WriteFile(filepath.Join(dir, ".git", "refs", "heads", "cycle-3.lock"), nil, 0o644); err != nil {
@@ -214,6 +220,7 @@ func TestBranchesPruneForce_DeleteFailureReportedPerRef(t *testing.T) {
 }
 
 func TestBranchesPruneDryRun_KeptReasonsNeverWouldPrune(t *testing.T) {
+	t.Parallel()
 	dir := brKeptFixture(t)
 	stdout, code := brRun(t, dir, "prune")
 	if code != 0 {

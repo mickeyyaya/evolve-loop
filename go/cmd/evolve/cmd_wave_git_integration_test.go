@@ -11,6 +11,7 @@ import (
 )
 
 func TestGitWaveAdapters_ReadTheHeadAndTheMergedPRs(t *testing.T) {
+	t.Parallel()
 	r := gittest.Fixture(t)
 	r.Git("commit", "-q", "--allow-empty", "-m", "base")
 	base := r.Git("rev-parse", "HEAD")

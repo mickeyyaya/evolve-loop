@@ -16,6 +16,7 @@ import (
 )
 
 func TestParseGateStage(t *testing.T) {
+	t.Parallel()
 	for input, want := range map[string]config.Stage{
 		"off":     config.StageOff,
 		"0":       config.StageOff,
@@ -138,6 +139,7 @@ func TestCycleContext_GoalOnlyWhenGiven(t *testing.T) {
 }
 
 func TestRunCycleReset_DryRun(t *testing.T) {
+	t.Parallel()
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	var stdout, stderr bytes.Buffer
 	rc := runCycleReset([]string{"--project-root", projectRoot, "--evolve-dir", evolveDir, "--dry-run"}, &stdout, &stderr)
@@ -159,6 +161,7 @@ func TestRunCycleReset_DryRun(t *testing.T) {
 }
 
 func TestRunCycleReset_Seals(t *testing.T) {
+	t.Parallel()
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	var stdout, stderr bytes.Buffer
 	rc := runCycleReset([]string{"--project-root", projectRoot, "--evolve-dir", evolveDir}, &stdout, &stderr)
@@ -189,6 +192,7 @@ func TestRunCycleReset_Seals(t *testing.T) {
 }
 
 func TestRunCycleReset_HeldLockAloneDoesNotBlock(t *testing.T) {
+	t.Parallel()
 	projectRoot, evolveDir := seedResetDir(t, 108, 107)
 	// Hold the .evolve lock; write NO lease (no live owner is proven).
 	st := storage.New(evolveDir)
@@ -208,6 +212,7 @@ func TestRunCycleReset_HeldLockAloneDoesNotBlock(t *testing.T) {
 }
 
 func TestRunCycleReset_NothingToReset(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -249,6 +254,7 @@ func readJSONT(t *testing.T, path string) map[string]any {
 }
 
 func TestParseRouterStage_LadderAndUnknown(t *testing.T) {
+	t.Parallel()
 	for input, want := range map[string]config.Stage{
 		"off":      config.StageOff,
 		"0":        config.StageOff,

@@ -7,6 +7,7 @@ import (
 )
 
 func TestWriteReportAtomicRefusesASymlink(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	victim := filepath.Join(dir, "victim.txt")
 	const secret = "do not truncate me\n"
@@ -31,6 +32,7 @@ func TestWriteReportAtomicRefusesASymlink(t *testing.T) {
 }
 
 func TestWriteReportAtomicWritesAndReplaces(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "report.md")
 
 	for _, want := range []string{"# first\n", "# second\n"} {

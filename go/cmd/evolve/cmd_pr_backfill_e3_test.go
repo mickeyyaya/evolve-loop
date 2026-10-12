@@ -63,6 +63,7 @@ const (
 func e3Behind(n string) e3GHReply { return e3GHReply{out: `{"behind_by":` + n + `}`} }
 
 func TestPRMerger_MergeOneFailurePaths(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("gh: HTTP 502")
 	cases := []struct {
 		name      string
@@ -161,6 +162,7 @@ func TestPRMerger_MergeOneFailurePaths(t *testing.T) {
 }
 
 func TestPRMerger_UpdateBranchRefreshesTheHeadBeforeTheMerge(t *testing.T) {
+	t.Parallel()
 	gh := &e3ScriptedGH{script: map[string][]e3GHReply{
 		"pr view 12 --json number":            {{out: openPR(e3Head)}, {out: openPR(e3Head2)}},
 		"api ":                                {e3Behind("2"), e3Behind("0")},
@@ -193,6 +195,7 @@ func TestPRMerger_UpdateBranchRefreshesTheHeadBeforeTheMerge(t *testing.T) {
 }
 
 func TestPRMerger_AFailedUpdateBranchStopsBeforeCI(t *testing.T) {
+	t.Parallel()
 	gh := &e3ScriptedGH{script: map[string][]e3GHReply{
 		"pr view 12":          {{out: openPR(e3Head)}},
 		"api ":                {e3Behind("1")},
@@ -217,6 +220,7 @@ func TestPRMerger_AFailedUpdateBranchStopsBeforeCI(t *testing.T) {
 }
 
 func TestFailingWhat_PrefersJobsThenTestThenTheRunURL(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		st   ciwatch.RunStatus
@@ -253,6 +257,7 @@ func e3PolicyRoot(t *testing.T, policyJSON string) string {
 }
 
 func TestNewPRMerger_RefusesAnInvalidPolicy(t *testing.T) {
+	t.Parallel()
 	cases := []struct{ name, policy, want string }{
 		{"malformed", "{", "policy"},
 		{"bad merge method", `{"pr":{"merge_method":"fast-forward"}}`, `pr.merge_method must be merge, squash or rebase, got "fast-forward"`},
@@ -274,6 +279,7 @@ func TestNewPRMerger_RefusesAnInvalidPolicy(t *testing.T) {
 func e3Buf() *bytes.Buffer { return &bytes.Buffer{} }
 
 func TestNewPRMerger_TakesMethodAndPollFromPolicyAndWaitFromArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, policy string
 		wantMethod   string
@@ -299,6 +305,7 @@ func TestNewPRMerger_TakesMethodAndPollFromPolicyAndWaitFromArgs(t *testing.T) {
 }
 
 func TestRunPR_AnInvalidPolicyExitsTwo(t *testing.T) {
+	t.Parallel()
 	root := e3PolicyRoot(t, `{"pr":{"merge_method":"octopus"}}`)
 	var stdout, stderr bytes.Buffer
 

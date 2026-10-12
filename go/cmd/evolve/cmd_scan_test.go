@@ -45,6 +45,7 @@ func runScanCapture(args ...string) (code int, stdout, stderr string) {
 }
 
 func TestScanSecretsStagedKeyExitsOneWithAMaskedFinding(t *testing.T) {
+	t.Parallel()
 	r := scanTestRepo(t)
 	scanTestStageKey(t, r, "config/aws.go")
 	code, stdout, stderr := runScanCapture("secrets", "--project-root", r.Dir)
@@ -58,6 +59,7 @@ func TestScanSecretsStagedKeyExitsOneWithAMaskedFinding(t *testing.T) {
 }
 
 func TestScanSecretsCleanAndEmptyStagedDiffsPass(t *testing.T) {
+	t.Parallel()
 	r := scanTestRepo(t)
 	if code, stdout, _ := runScanCapture("secrets", "--project-root", r.Dir); code != 0 || stdout != "scan secrets: PASS: 0 finding(s) in the staged diff\n" {
 		t.Errorf("nothing staged: exit %d stdout %q", code, stdout)
@@ -70,6 +72,7 @@ func TestScanSecretsCleanAndEmptyStagedDiffsPass(t *testing.T) {
 }
 
 func TestScanSecretsDiffRangeScansCommitsNotTheIndex(t *testing.T) {
+	t.Parallel()
 	r := scanTestRepo(t)
 	r.Git("checkout", "-q", "-b", "feature")
 	scanTestWrite(t, r.Dir, "leak.txt", "key="+scanTestKey()+"\n")
@@ -108,6 +111,7 @@ func TestScanSecretsGitFailuresExitTwoWithNoVerdict(t *testing.T) {
 }
 
 func TestScanSecretsUsageErrorsExitTenAndHelpExitsZero(t *testing.T) {
+	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "missing")
 	cases := map[string][]string{
 		"no subcommand":      {},
@@ -135,6 +139,7 @@ func TestScanSecretsUsageErrorsExitTenAndHelpExitsZero(t *testing.T) {
 }
 
 func TestScanSecretsMaskKeepsFourRunesAndTheRuneCount(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"":               "",
 		"abcd":           "****",
@@ -149,6 +154,7 @@ func TestScanSecretsMaskKeepsFourRunesAndTheRuneCount(t *testing.T) {
 }
 
 func TestScanSecretsIsARegisteredCommand(t *testing.T) {
+	t.Parallel()
 	c := lookupCommand("scan")
 	if c == nil || c.Run == nil {
 		t.Fatalf("lookupCommand(\"scan\") = %v, want a runnable command", c)

@@ -198,6 +198,7 @@ func TestCompose_EmptyStdin_OK(t *testing.T) {
 }
 
 func TestSplitNonEmptyPhases_DirectUnit(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want []string

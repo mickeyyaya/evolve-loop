@@ -16,6 +16,7 @@ import (
 )
 
 func TestParsePRMergeArgs_InterleavesAndRejectsUsage(t *testing.T) {
+	t.Parallel()
 	a, err := parsePRMergeArgs([]string{"12", "--wait", "5m", "13", "--update-branch", "--project-root=/p"})
 	if err != nil || strings.Join(a.prs, ",") != "12,13" || a.wait != 5*time.Minute || !a.updateBranch || a.projectRoot != "/p" {
 		t.Fatalf("parsePRMergeArgs = %+v, %v", a, err)
@@ -28,6 +29,7 @@ func TestParsePRMergeArgs_InterleavesAndRejectsUsage(t *testing.T) {
 }
 
 func TestRunPR_UsageExitsTen(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{nil, {"bogus"}, {"merge"}, {"merge", "0"}} {
 		var stdout, stderr bytes.Buffer
 		if code := runPR(args, nil, &stdout, &stderr); code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: evolve pr merge") {
@@ -80,6 +82,7 @@ func openPR(head string) string {
 }
 
 func TestPRMerger_WaitsForGreenThenMergesAtTheVerifiedHead(t *testing.T) {
+	t.Parallel()
 	gh := &fakePRGitHub{
 		views:  map[string]string{"12": openPR("h12")},
 		behind: map[string]string{"h12": `{"behind_by":0}`},
@@ -103,6 +106,7 @@ func TestPRMerger_WaitsForGreenThenMergesAtTheVerifiedHead(t *testing.T) {
 }
 
 func TestPRMerger_RefusesAndStops(t *testing.T) {
+	t.Parallel()
 	green := func(context.Context, string) (ciwatch.RunStatus, error) {
 		return ciwatch.RunStatus{Status: ciwatch.StatusCompleted, Conclusion: ciwatch.ConclusionSuccess}, nil
 	}
@@ -145,6 +149,7 @@ func TestPRMerger_RefusesAndStops(t *testing.T) {
 }
 
 func TestPRMerger_GHFailuresExitTwo(t *testing.T) {
+	t.Parallel()
 	green := func(context.Context, string) (ciwatch.RunStatus, error) {
 		return ciwatch.RunStatus{Status: ciwatch.StatusCompleted, Conclusion: ciwatch.ConclusionSuccess}, nil
 	}
@@ -169,6 +174,7 @@ func TestPRMerger_GHFailuresExitTwo(t *testing.T) {
 }
 
 func TestPlaneLiveRuns_SeesSiblingWorktreesOnly(t *testing.T) {
+	t.Parallel()
 	repo := gittest.Fixture(t)
 	if err := os.WriteFile(filepath.Join(repo.Dir, "README"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)

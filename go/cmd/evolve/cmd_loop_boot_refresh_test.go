@@ -305,6 +305,7 @@ func TestBootBinaryRefresh_PolicyOffDisables(t *testing.T) {
 // pathspec discrimination — against a real fixture repo (the reviewer attack
 // surface: does `git diff short..full -- go/` behave as assumed?).
 func TestBootRefreshDefaultAdapters_RealGit(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	run := func(args ...string) {
 		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)

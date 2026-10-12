@@ -19,6 +19,7 @@ func tokenFastPace(medianTokens int64) budgethistory.Throughput {
 }
 
 func TestQuotaAwareWaveConfig_LogsShadowQuotaTokenJoin(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1,
 		Budget: &policy.FleetBudgetConfig{Stage: "shadow", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
@@ -45,6 +46,7 @@ func TestQuotaAwareWaveConfig_LogsShadowQuotaTokenJoin(t *testing.T) {
 }
 
 func TestQuotaAwareWaveConfig_EnforceStillJoinsAndDecidesUnchanged(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1,
 		Budget: &policy.FleetBudgetConfig{Stage: "enforce", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
@@ -65,6 +67,7 @@ func TestQuotaAwareWaveConfig_EnforceStillJoinsAndDecidesUnchanged(t *testing.T)
 }
 
 func TestQuotaAwareWaveConfig_NoTokenEvidenceEmitsNoJoin(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1,
 		Budget: &policy.FleetBudgetConfig{Stage: "shadow", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
@@ -83,6 +86,7 @@ func TestQuotaAwareWaveConfig_NoTokenEvidenceEmitsNoJoin(t *testing.T) {
 }
 
 func TestQuotaAwareWaveConfig_NilBudgetEmitsNoJoin(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1, Budget: nil}
 	var buf bytes.Buffer

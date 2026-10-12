@@ -96,6 +96,7 @@ func TestRunLoop_ARefusedRoutingTableExitsTwo(t *testing.T) {
 }
 
 func TestCatalogPublisher_RecompilesTheRouterOnAMint(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
 	r, _, err := cliroute.Build(cliroute.Setup{Policy: policy.Policy{CLIRouting: &block}, Profiles: profiles.NewFromDir(dir),
@@ -114,6 +115,7 @@ func TestCatalogPublisher_RecompilesTheRouterOnAMint(t *testing.T) {
 }
 
 func TestRecompileRouter_ARefusedMintWarnsAndKeepsTheTable(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy"}, AfterChain: "stop"}
 	r, _, err := cliroute.Build(cliroute.Setup{Policy: policy.Policy{CLIRouting: &block}, Profiles: profiles.NewFromDir(dir)})
@@ -132,6 +134,7 @@ func TestRecompileRouter_ARefusedMintWarnsAndKeepsTheTable(t *testing.T) {
 }
 
 func TestMemoized_RunsDiscoveryOnce(t *testing.T) {
+	t.Parallel()
 	calls := 0
 	discover := memoized(func() []string { calls++; return []string{"claude-tmux"} })
 	discover()
@@ -162,6 +165,7 @@ func TestBuildCLIRouter_TheRootRouterCarriesTheProductionHost(t *testing.T) {
 }
 
 func TestPreflightRouting_BootsOnlyWhatTheResolvedChainsLaunch(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := wiringRoot(t, `{"cli_routing":{"clis":["agy","claude"],"default":["agy","claude"]}}`)
 	if err := os.WriteFile(filepath.Join(evolveDir, "profiles", "scout.json"), []byte(`{"name":"scout","cli":"codex-tmux","cli_fallback":["claude-tmux"]}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -180,6 +184,7 @@ func TestPreflightRouting_BootsOnlyWhatTheResolvedChainsLaunch(t *testing.T) {
 }
 
 func TestPreflightRouting_ARefusedTableCarriesItsFindings(t *testing.T) {
+	t.Parallel()
 	root, _ := wiringRoot(t, `{"cli_routing":{"clis":["agy"],"default":["agy"]}}`)
 	routing, err := preflightRouting(root)
 	if err == nil || len(routing.Findings) == 0 {
@@ -188,6 +193,7 @@ func TestPreflightRouting_ARefusedTableCarriesItsFindings(t *testing.T) {
 }
 
 func TestDetectRouter_TheSetupDetectRootRendersThroughTheTable(t *testing.T) {
+	t.Parallel()
 	root := routingFixture(t, `{"cli_routing":{"clis":["agy","claude"],"default":["agy","claude"]}}`)
 	var warn bytes.Buffer
 	r := detectRouter(root, &warn)

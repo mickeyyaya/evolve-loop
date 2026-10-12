@@ -51,6 +51,7 @@ func (f postmortemFixture) run(args ...string) (int, string, string) {
 }
 
 func TestPostmortem_CollectThenShowRoundTripsTheCycle1853Backfill(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 
 	code, out, errOut := f.run("collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1,
@@ -75,6 +76,7 @@ func TestPostmortem_CollectThenShowRoundTripsTheCycle1853Backfill(t *testing.T) 
 }
 
 func TestPostmortem_CollectWithATranscriptPathAndNoTimesUsesTheTranscriptWindow(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 
 	code, _, errOut := f.run("collect", "--cycle", "1853", "--phase", "build", "--attempt", "2", "--transcript", pmFixture1, "--cause", "pane_lost", "--cli", "claude")
@@ -93,6 +95,7 @@ func TestPostmortem_CollectWithATranscriptPathAndNoTimesUsesTheTranscriptWindow(
 }
 
 func TestPostmortem_ShowWithNoRecordsSaysSo(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	code, out, errOut := f.run("show", "--cycle", "7", "--phase", "build")
 	if code != 0 || out != "" || !strings.Contains(errOut, "no attempt postmortem") {
@@ -101,6 +104,7 @@ func TestPostmortem_ShowWithNoRecordsSaysSo(t *testing.T) {
 }
 
 func TestPostmortem_RefusesBadArgumentsWithExit10(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	valid := []string{"--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1, "--cause", "pane_lost"}
 	cases := map[string][]string{
@@ -136,6 +140,7 @@ func TestPostmortem_RefusesBadArgumentsWithExit10(t *testing.T) {
 }
 
 func TestPostmortem_CollectFailuresAreNotUsageErrors(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	base := []string{"collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--cause", "pane_lost"}
 	missing := append(append([]string{}, base...), "--session", "00000000-0000-0000-0000-000000000000")
@@ -168,6 +173,7 @@ func withSessionArgs(base []string, session string) []string {
 }
 
 func TestPostmortem_CollectRefusesAnExistingRecordUnlessForced(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	args := []string{"collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1, "--cause", "pane_lost"}
 	if code, _, errOut := f.run(args...); code != 0 {
@@ -201,6 +207,7 @@ func pmRecords(t *testing.T, f postmortemFixture) []attemptpostmortem.Record {
 }
 
 func TestPostmortem_AForcedWriteFailureIsAnIOErrorAndShowSkipsABadRecordWithAWarn(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	ws := paths.RunWorkspace(f.root, 1853)
 	bad := attemptpostmortem.Path(ws, "build", 1)
@@ -223,6 +230,7 @@ func TestPostmortem_AForcedWriteFailureIsAnIOErrorAndShowSkipsABadRecordWithAWar
 }
 
 func TestPostmortem_ACreateFailureThatIsNotAnExistingRecordIsAnIOError(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	ws := paths.RunWorkspace(f.root, 1853)
 	if err := os.MkdirAll(filepath.Dir(ws), 0o755); err != nil {
@@ -238,6 +246,7 @@ func TestPostmortem_ACreateFailureThatIsNotAnExistingRecordIsAnIOError(t *testin
 }
 
 func TestPostmortem_RootResolutionFailureIsAnIOError(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	f.env.resolveRoot = func(string, io.Writer) (string, error) { return "", errors.New("no working directory") }
 	for _, verb := range [][]string{{"show", "--cycle", "1", "--phase", "build"}, {"collect", "--cycle", "1853", "--phase", "build", "--attempt", "1", "--session", pmSession1, "--cause", "pane_lost"}} {
@@ -263,6 +272,7 @@ func TestRunPostmortem_IsRegisteredAndUsesTheProcessHome(t *testing.T) {
 }
 
 func TestPostmortem_ShowWithAnUnlistableRunDirectoryIsAnIOError(t *testing.T) {
+	t.Parallel()
 	f := newPostmortemFixture(t)
 	f.root = filepath.Join(t.TempDir(), "bad[")
 	if err := os.MkdirAll(paths.EvolveDirOf(f.root), 0o755); err != nil {

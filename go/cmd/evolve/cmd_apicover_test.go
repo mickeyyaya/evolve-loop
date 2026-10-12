@@ -22,6 +22,7 @@ func apicoverGoRoot(t *testing.T) string {
 // apicover.Main is the whole of the standalone binary's main, so comparing
 // against it proves byte parity with cmd/apicover.
 func TestApicoverSubcommand_ByteParityWithStandalone(t *testing.T) {
+	t.Parallel()
 	root := apicoverGoRoot(t)
 	pkgs := []string{
 		filepath.Join(root, "internal", "skillcheck"),

@@ -331,6 +331,7 @@ func TestLoopDetach_ChildArgvIsTheParentsWithoutTheDetachFlags(t *testing.T) {
 }
 
 func TestLoopDetach_ChildOutlivesItsExitedParentInItsOwnSession(t *testing.T) {
+	t.Parallel()
 	p := newDetachProject(t)
 	args, err := json.Marshal(p.args())
 	if err != nil {

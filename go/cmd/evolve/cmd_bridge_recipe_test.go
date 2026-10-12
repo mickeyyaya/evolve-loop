@@ -13,6 +13,7 @@ func runRecipeCLI(args ...string) (int, string, string) {
 }
 
 func TestRecipeCLI_List(t *testing.T) {
+	t.Parallel()
 	code, out, _ := runRecipeCLI("list")
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -23,6 +24,7 @@ func TestRecipeCLI_List(t *testing.T) {
 }
 
 func TestRecipeCLI_Show(t *testing.T) {
+	t.Parallel()
 	code, out, _ := runRecipeCLI("show", "plugin-install")
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -33,6 +35,7 @@ func TestRecipeCLI_Show(t *testing.T) {
 }
 
 func TestRecipeCLI_ShowErrors(t *testing.T) {
+	t.Parallel()
 	if code, _, _ := runRecipeCLI("show"); code != 10 {
 		t.Errorf("show no-name code=%d want 10", code)
 	}
@@ -42,6 +45,7 @@ func TestRecipeCLI_ShowErrors(t *testing.T) {
 }
 
 func TestRecipeCLI_Dispatch(t *testing.T) {
+	t.Parallel()
 	if code, _, _ := runRecipeCLI(); code != 10 {
 		t.Errorf("no-action code=%d want 10", code)
 	}
@@ -54,6 +58,7 @@ func TestRecipeCLI_Dispatch(t *testing.T) {
 }
 
 func TestRecipeCLI_RunFlagValidation(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		args []string
@@ -75,12 +80,14 @@ func TestRecipeCLI_RunFlagValidation(t *testing.T) {
 }
 
 func TestRecipeCLI_RunHelp(t *testing.T) {
+	t.Parallel()
 	if code, out, _ := runRecipeCLI("run", "--help"); code != 0 || !strings.Contains(out, "recipe run") {
 		t.Errorf("run --help code=%d out=%q", code, out)
 	}
 }
 
 func TestRecipeCLI_RunUnknownRecipe(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	code, _, errs := runRecipeCLI("run", "no-such-recipe", "--cli=claude-tmux", "--workspace="+tmp)
 	if code != 1 {
@@ -89,6 +96,7 @@ func TestRecipeCLI_RunUnknownRecipe(t *testing.T) {
 }
 
 func TestRecipeCLI_RunUnsupportedCLI(t *testing.T) {
+	t.Parallel()
 	// ollama has no recipe steps, so the run fails before any tmux spawn.
 	tmp := t.TempDir()
 	code, _, _ := runRecipeCLI("run", "plugin-install", "--cli=ollama-tmux", "--workspace="+tmp,
@@ -99,6 +107,7 @@ func TestRecipeCLI_RunUnsupportedCLI(t *testing.T) {
 }
 
 func TestRecipeCLI_RunAllFlagsParsed(t *testing.T) {
+	t.Parallel()
 	// ollama fails after the parse and before any tmux spawn.
 	tmp := t.TempDir()
 	code, _, _ := runRecipeCLI("run", "plugin-install", "--cli=ollama-tmux", "--workspace="+tmp,

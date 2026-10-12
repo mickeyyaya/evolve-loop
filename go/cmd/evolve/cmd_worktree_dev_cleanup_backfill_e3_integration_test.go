@@ -113,6 +113,7 @@ func TestWorktreeDevCleanup_ABranchDeleteFaultAfterRemovalIsReported(t *testing.
 }
 
 func TestWorktreeDevCleanup_AMergedPRAtTheHeadProvesASquashLanding(t *testing.T) {
+	t.Parallel()
 	h, dir := e3CleanTree(t)
 	brCommit(t, dir, "feature.txt", "squashed elsewhere\n", "feature")
 	head := brOut(t, dir, "rev-parse", "HEAD")
@@ -134,6 +135,7 @@ func TestWorktreeDevCleanup_AMergedPRAtTheHeadProvesASquashLanding(t *testing.T)
 }
 
 func TestWorktreeDevCleanup_WithoutAProvableMergeTheReasonNamesWhatGHSaid(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		gh   func(context.Context, string, string) (string, error)
@@ -160,6 +162,7 @@ func TestWorktreeDevCleanup_WithoutAProvableMergeTheReasonNamesWhatGHSaid(t *tes
 }
 
 func TestWorktreeDevCleanup_RefusalsBeforeAnyJudgement(t *testing.T) {
+	t.Parallel()
 	t.Run("not a hub", func(t *testing.T) {
 		r := bfCommittedRepo(t)
 		for _, all := range []bool{false, true} {

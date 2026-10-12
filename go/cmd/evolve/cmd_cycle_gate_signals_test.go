@@ -26,6 +26,7 @@ func TestWireOrchestratorDeps_ContractGateSignalsWired(t *testing.T) {
 }
 
 func TestFormatSignalReport_CountsTheGateVerdicts(t *testing.T) {
+	t.Parallel()
 	s := signalcenter.NewSummary()
 	emit := func(kind signalcenter.Kind, sev signalcenter.Severity) {
 		s.Observe(signalcenter.Event{Cycle: 7, Module: signalcenter.ModuleGateContract, Origin: "Reviewer.Review", Kind: kind, Severity: sev, Reason: "r"})

@@ -31,12 +31,14 @@ func legacyClassifierPreference(t *testing.T) []string {
 }
 
 func TestClassifierOrder_TheLegacyProjectionKeepsTodaysOrder(t *testing.T) {
+	t.Parallel()
 	if got := legacyClassifierPreference(t); !reflect.DeepEqual(got, []string{"codex", "claude", "agy"}) {
 		t.Fatalf("with no cli_routing block the classifier order stays codex > claude > agy: %v", got)
 	}
 }
 
 func TestClassifierOrder_ComesFromTheRoutingTable(t *testing.T) {
+	t.Parallel()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Default: []string{"agy", "claude"}}
 	families, err := classifierFamilies(classifierRouter(t, policy.Policy{CLIRouting: &block}))
 	if err != nil {
@@ -48,6 +50,7 @@ func TestClassifierOrder_ComesFromTheRoutingTable(t *testing.T) {
 }
 
 func TestClassifierPreference_ARefusedTableFailsTheRefresh(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(filepath.Join(evolveDir, "profiles"), 0o755); err != nil {

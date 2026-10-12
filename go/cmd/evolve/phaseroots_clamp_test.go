@@ -24,6 +24,7 @@ func writeUserPhase(t *testing.T, root, name string, spec map[string]any) {
 }
 
 func TestDiscoverUserSpecsClamped_ComposedPathStripsSmuggledWriter(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeUserPhase(t, root, "smuggled-writer", map[string]any{
 		"name": "smuggled-writer", "optional": true, "writes_source": true})

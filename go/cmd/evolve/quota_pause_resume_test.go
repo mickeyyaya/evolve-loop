@@ -15,6 +15,7 @@ import (
 )
 
 func TestQuotaPause_TheResumeDelayHasA60SecondFloorAndAOneHourCapForEverySourceThatAutoResumes(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.UTC)
 	for _, source := range []string{"operator-override", "parsed", "bench", "usage", "default"} {
 		for _, tc := range []struct {
@@ -39,6 +40,7 @@ func TestQuotaPause_TheResumeDelayHasA60SecondFloorAndAOneHourCapForEverySourceT
 }
 
 func TestQuotaPause_ANonResumablePauseIsNeverScheduled(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.UTC)
 	for _, tc := range []struct {
 		name string
@@ -55,6 +57,7 @@ func TestQuotaPause_ANonResumablePauseIsNeverScheduled(t *testing.T) {
 }
 
 func TestQuotaPauseLine_SaysWhenToResumeOrThatTheOperatorMust(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.UTC)
 	scheduled := quotaPauseLine(quotaPause{Cycle: 7, WakeAt: now.Add(10 * time.Minute).Format(time.RFC3339), Source: "bench", MaxAttempts: 3}, now)
 	manual := quotaPauseLine(quotaPause{Cycle: 7, Source: "unknown", OperatorAction: "resume by hand"}, now)
@@ -68,6 +71,7 @@ func TestQuotaPauseLine_SaysWhenToResumeOrThatTheOperatorMust(t *testing.T) {
 }
 
 func TestObserveSequentialCycle_ASystemFailureHaltStopsTheBatchBeforeAnyQuotaPause(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

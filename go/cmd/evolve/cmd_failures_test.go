@@ -72,6 +72,7 @@ func resolvedFingerprintsBody(t *testing.T, evolveDir string) string {
 }
 
 func TestRunFailures_ListFiltersAndRejects(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -105,6 +106,7 @@ func TestRunFailures_ListFiltersAndRejects(t *testing.T) {
 }
 
 func TestResetBatchState_KeepsBasePrefixesOnEveryErrorPath(t *testing.T) {
+	t.Parallel()
 	liveState := `{"failedApproaches":[{"cycle":1,"classification":"infrastructure-systemic","summary":"a"},{"cycle":2,"classification":"code-build-fail","summary":"b"}]}`
 	cases := []struct {
 		name        string
@@ -154,6 +156,7 @@ func TestResetBatchState_KeepsBasePrefixesOnEveryErrorPath(t *testing.T) {
 }
 
 func TestRunFailures_PruneRemovesOnlyExpiredEntries(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := failuresProject(t, failuresLiveState, "")
 	var out, errb bytes.Buffer
 	if code := runFailures([]string{"prune", "--project-root", root}, nil, &out, &errb); code != 0 {
@@ -180,6 +183,7 @@ func TestRunFailures_PruneRemovesOnlyExpiredEntries(t *testing.T) {
 }
 
 func TestRunFailures_ResetErrorPaths(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name        string
 		state       string

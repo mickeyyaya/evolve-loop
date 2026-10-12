@@ -25,6 +25,7 @@ func writeDigestFixture(t *testing.T, evolveDir string, cycle int, fingerprint, 
 }
 
 func TestBlockerBreakerHalt_TripsAndEscalates(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 11, "build|guard-abort|aaa", "guard-abort")
@@ -53,6 +54,7 @@ func TestBlockerBreakerHalt_TripsAndEscalates(t *testing.T) {
 }
 
 func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	// Same two guard-aborts, but the batch starts AFTER them — a fixed
@@ -71,6 +73,7 @@ func TestBlockerBreakerHalt_HistoricDigestsExcluded(t *testing.T) {
 // the ack ledger carries a matching record, and must still halt (unchanged
 // behavior) when the ledger is absent.
 func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
+	t.Parallel()
 	fp := "ship|unknown|76d0f4fca190"
 
 	t.Run("unacked still halts", func(t *testing.T) {
@@ -102,6 +105,7 @@ func TestBlockerBreakerHalt_AckedFingerprintDoesNotReHalt(t *testing.T) {
 }
 
 func TestBlockerBreakerHalt_QuietOnHealthyBatch(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 11, "audit|gate-block|aaa", "gate-block")

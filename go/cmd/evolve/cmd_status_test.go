@@ -12,6 +12,7 @@ import (
 )
 
 func TestPRCheckState_ClassifiesTheRollup(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name        string
 		checks      []ghPRCheck
@@ -33,6 +34,7 @@ func TestPRCheckState_ClassifiesTheRollup(t *testing.T) {
 }
 
 func TestStatusSnapshotReadable_RefusesAMissingOrNonDirectoryEvolveDir(t *testing.T) {
+	t.Parallel()
 	ok := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(ok, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -52,6 +54,7 @@ func TestStatusSnapshotReadable_RefusesAMissingOrNonDirectoryEvolveDir(t *testin
 }
 
 func TestWaitForIdleLoop_PrintsTheRunPhaseOnlyWhenItChanges(t *testing.T) {
+	t.Parallel()
 	runs := t.TempDir()
 	dir := filepath.Join(runs, "cycle-9")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -92,6 +95,7 @@ func TestWaitForIdleLoop_PrintsTheRunPhaseOnlyWhenItChanges(t *testing.T) {
 }
 
 func TestWaitForIdleLoop_TimesOutNamingLiveRun(t *testing.T) {
+	t.Parallel()
 	runs := t.TempDir()
 	dir := filepath.Join(runs, "cycle-9")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

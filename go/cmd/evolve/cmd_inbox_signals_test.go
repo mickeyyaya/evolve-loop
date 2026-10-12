@@ -15,6 +15,7 @@ import (
 // A promote whose destination mkdir fails renders [inbox] on the simulate
 // root's console and lands in the cycle-less signals.ndjson.
 func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	inbox := filepath.Join(evolveDir, "inbox")
@@ -43,6 +44,7 @@ func TestWireSimulateOrchestrator_InboxWarningRenders(t *testing.T) {
 // The FAIL closeout stamps the run workspace's signals.ndjson with the
 // mover's cycle-scoped event through applyCycleFailureOutcome's signals.
 func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	// The committed item is already claimed under processing/cycle-7 (the
@@ -78,6 +80,7 @@ func TestApplyCycleFailureOutcome_StampsRunWorkspaceSignals(t *testing.T) {
 // applyCycleFailureOutcome( call sites and signalcenter.New( construction
 // sites stay wired to their documented roots.
 func TestInboxCenterlessRootsArePinned(t *testing.T) {
+	t.Parallel()
 	allowed := map[string]string{
 		"cmd/evolve/cmd_inbox_mover.go":         "the triage persona's `evolve inbox-mover` root — 06-F1 verifies <run>/signals.ndjson is writable under the triage sandbox first",
 		"cmd/evolve/cmd_inbox.go":               "operator commands `evolve inbox batches`, `list` and `show`: the read-only lane-menu placement (ADR-0106 W3, ADR-0116) — never writes",

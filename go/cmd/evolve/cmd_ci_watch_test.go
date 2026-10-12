@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseCIWatchArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		args      []string
@@ -52,6 +53,7 @@ func TestParseCIWatchArgs(t *testing.T) {
 }
 
 func TestRunCI_RoutesWatchAndPrintsItsUsage(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := runCI([]string{"watch", "--help"}, nil, &stdout, &stderr); code != 0 {
 		t.Fatalf("ci watch --help exit = %d, stderr %s", code, stderr.String())
@@ -70,6 +72,7 @@ func TestRunCI_RoutesWatchAndPrintsItsUsage(t *testing.T) {
 }
 
 func TestRunCIWatch_InvalidTargetExitsUsage(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := runCIWatch([]string{"--sha", "not-hex"}, &stdout, &stderr); code != exitUsage {
 		t.Fatalf("code = %d, want %d", code, exitUsage)
@@ -80,6 +83,7 @@ func TestRunCIWatch_InvalidTargetExitsUsage(t *testing.T) {
 }
 
 func TestRunCIWatch_NonexistentRootExitsIO(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := runCIWatch([]string{"--sha", "1234567", "--project-root", "/nonexistent-path-never-exists"}, &stdout, &stderr); code != exitIO {
 		t.Fatalf("code = %d, want %d", code, exitIO)

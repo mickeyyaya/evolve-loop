@@ -45,6 +45,7 @@ func hasInboxItem(entries []os.DirEntry) bool {
 }
 
 func TestCycleRunErrorExit_ABatchFatalAbortReleasesTheCyclesClaims(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedClaimedCycle(t, root)
 	var stderr bytes.Buffer
@@ -58,6 +59,7 @@ func TestCycleRunErrorExit_ABatchFatalAbortReleasesTheCyclesClaims(t *testing.T)
 }
 
 func TestHandleCycleError_ABatchFatalAbortReleasesClaimsAndStillStopsTheBatch(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedClaimedCycle(t, root)
 	var stdout, stderr bytes.Buffer
@@ -72,6 +74,7 @@ func TestHandleCycleError_ABatchFatalAbortReleasesClaimsAndStillStopsTheBatch(t 
 }
 
 func TestHandleCycleError_ABatchFatalAbortWalksTheLifecycleThroughTheRootLedger(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	fake := newFakeLedger()
@@ -84,6 +87,7 @@ func TestHandleCycleError_ABatchFatalAbortWalksTheLifecycleThroughTheRootLedger(
 }
 
 func TestHandleCycleError_AnUnwrappedQuotaWallKeepsItsClaimsAndPauses(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedClaimedCycle(t, root)
 	var stdout, stderr bytes.Buffer
@@ -100,6 +104,7 @@ func TestHandleCycleError_AnUnwrappedQuotaWallKeepsItsClaimsAndPauses(t *testing
 }
 
 func TestCycleErrorRoots_AnErrorBeforeAllocationWalksNoCycle(t *testing.T) {
+	t.Parallel()
 	early := errors.New("acquire lock: another orchestrator holds it")
 	for name, exit := range map[string]func(root, evolveDir string, fake *fakeLedgerNoAppend, stderr *bytes.Buffer){
 		"the cycle-run root": func(root, evolveDir string, fake *fakeLedgerNoAppend, stderr *bytes.Buffer) {

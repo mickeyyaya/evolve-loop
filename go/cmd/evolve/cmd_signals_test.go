@@ -9,6 +9,7 @@ import (
 )
 
 func TestSignalsCodes_RepoDocIsInSyncWithTheLinkedRegistry(t *testing.T) {
+	t.Parallel()
 	docPath := filepath.Join("..", "..", "..", "docs", "architecture", "signal-codes.md")
 	var out, errb bytes.Buffer
 	if rc := signalCodesRun(docPath, false, &out, &errb); rc != 0 {
@@ -26,6 +27,7 @@ func TestSignalsCodes_RepoDocIsInSyncWithTheLinkedRegistry(t *testing.T) {
 }
 
 func TestSignalsCodes_GenerateFillsTheRegionAndCheckSeesDrift(t *testing.T) {
+	t.Parallel()
 	docPath := filepath.Join(t.TempDir(), "signal-codes.md")
 	stale := "# Codes\n\nprose kept byte-for-byte\n\n" + signalCodesBegin + "\n\nstale\n" + signalCodesEnd + "\n\ntrailing prose\n"
 	if err := os.WriteFile(docPath, []byte(stale), 0o644); err != nil {
@@ -56,6 +58,7 @@ func TestSignalsCodes_GenerateFillsTheRegionAndCheckSeesDrift(t *testing.T) {
 }
 
 func TestSignalsCodes_ErrorsAreLoud(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if rc := signalCodesRun(filepath.Join(t.TempDir(), "missing.md"), false, &out, &errb); rc != 1 {
 		t.Errorf("a missing doc is an error, not a pass: rc=%d", rc)
@@ -103,6 +106,7 @@ func TestRunSignals_DispatchesAgainstTheSourceRoot(t *testing.T) {
 }
 
 func TestSignalsCodes_WriteFailureIsAnError(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("root bypasses file-mode write checks")
 	}

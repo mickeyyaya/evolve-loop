@@ -72,6 +72,7 @@ func bridgeNewEngineCalls(t *testing.T, path string) int {
 }
 
 func TestBridgeEngineRootsAreEnumerated(t *testing.T) {
+	t.Parallel()
 	moduleRoot := filepath.Join("..", "..")
 	found := map[string]int{}
 	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
@@ -113,6 +114,7 @@ func TestBridgeEngineRootsAreEnumerated(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_BridgeExitWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

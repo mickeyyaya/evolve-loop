@@ -306,6 +306,7 @@ func TestChainContinueDecision(t *testing.T) {
 // must produce no skips — shape validation must not start rejecting real
 // items.
 func TestInboxPendingCount(t *testing.T) {
+	t.Parallel()
 	cfg := chainTestEnv(t, 4, "")
 	n, skipped, err := inboxPendingCount(cfg.EvolveDir)
 	if err != nil || n != 4 || len(skipped) != 0 {
@@ -321,6 +322,7 @@ func TestInboxPendingCount(t *testing.T) {
 // chain mode and its absence leaves it off (chaining is never a silent
 // default).
 func TestParseLoopArgs_UntilInboxEmpty(t *testing.T) {
+	t.Parallel()
 	cfg, rc := parseLoopArgs([]string{"--goal-text", "g", "--until-inbox-empty"}, os.Stderr)
 	if rc != 0 || !cfg.ChainMode {
 		t.Fatalf("--until-inbox-empty: rc=%d ChainMode=%v, want 0/true", rc, cfg.ChainMode)

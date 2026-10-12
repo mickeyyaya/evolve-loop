@@ -157,6 +157,7 @@ func TestDispatchLogTTLDays_AnUnparseablePolicyUsesTheDefaultCatalog(t *testing.
 }
 
 func TestRunRunDirGC_AFailedEnforceApplyIsAWarning(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("root removes from a read-only directory")
 	}

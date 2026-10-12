@@ -42,6 +42,7 @@ func TestRunLoop_ResumeWithoutChainingStaysQuiet(t *testing.T) {
 }
 
 func TestRegisterPerAgentOverrides_ParsesAndRefusesPairs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		args      []string
@@ -132,6 +133,7 @@ func TestWithDetachLaunch_ResolvesTheLogAndTheChildArgv(t *testing.T) {
 }
 
 func TestValidateLoopModes_EveryConflictIsAUsageError(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		lf   loopArgFlags
@@ -168,6 +170,7 @@ func TestValidateLoopModes_EveryConflictIsAUsageError(t *testing.T) {
 }
 
 func TestRunLedger_RoutesSealAndEvidence(t *testing.T) {
+	t.Parallel()
 	t.Run("seal", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		if rc := runLedger([]string{"seal", "--keep-it"}, nil, &stdout, &stderr); rc != 10 || !strings.Contains(stderr.String(), "flag provided but not defined: -keep-it") {
@@ -183,6 +186,7 @@ func TestRunLedger_RoutesSealAndEvidence(t *testing.T) {
 }
 
 func TestRunLedgerEvidence_AnUnreadableLedgerFailsTheWalk(t *testing.T) {
+	t.Parallel()
 	for _, dryRun := range []bool{false, true} {
 		evolveDir := t.TempDir()
 		writeE2File(t, filepath.Join(evolveDir, "ledger.jsonl", "blocker"), "a dir where the ledger goes")

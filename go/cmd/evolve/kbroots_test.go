@@ -6,6 +6,7 @@ import (
 )
 
 func TestKBRootsAbs(t *testing.T) {
+	t.Parallel()
 	root := "/proj"
 	got := kbRootsAbs(root)
 	if len(got) == 0 {

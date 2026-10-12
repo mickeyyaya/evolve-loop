@@ -21,6 +21,7 @@ func TestWireOrchestrator_TheNoWorkCheckAsksTheLaneMenu(t *testing.T) {
 }
 
 func TestLaneMenuOf_WithholdsProtectedAndWaitingItems(t *testing.T) {
+	t.Parallel()
 	inboxRoot := filepath.Join(t.TempDir(), ".evolve", "inbox")
 	if err := os.MkdirAll(inboxRoot, 0o755); err != nil {
 		t.Fatal(err)

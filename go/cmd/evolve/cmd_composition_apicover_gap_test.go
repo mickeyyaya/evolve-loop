@@ -13,6 +13,7 @@ import (
 )
 
 func TestComposedApicoverGate_WarningOnlyMissesNewUnnamedExport(t *testing.T) {
+	t.Parallel()
 	t.Skip("reproduction PERMANENTLY disabled. The gap it reproduced is CLOSED — composedGateTargets[\"apicover\"] now names the enforcing apicover-enforce recipe, pinned tree-mutation-free by TestComposedApicoverGate_TargetRecipeEnforces (recipe text) and proven live in both directions at land time. The body runs against a throwaway copy of the module, never this tree (percycle-audit-apicover-newexport-parity residual)")
 	repoRoot := t.TempDir()
 	goRoot := filepath.Join(repoRoot, "go")

@@ -8,6 +8,7 @@ import (
 )
 
 func TestSimulatePhases_CoversCanonicalOrder(t *testing.T) {
+	t.Parallel()
 	have := map[core.Phase]bool{}
 	for _, p := range simulatePhases() {
 		have[p] = true
@@ -20,6 +21,7 @@ func TestSimulatePhases_CoversCanonicalOrder(t *testing.T) {
 }
 
 func TestCycleRunArgs_Simulate(t *testing.T) {
+	t.Parallel()
 	base := cycleRunArgs("abc123", "", "", false, "")
 	if got := join(base); got != "cycle run --goal-hash abc123" {
 		t.Errorf("non-simulate args = %q", got)
@@ -31,6 +33,7 @@ func TestCycleRunArgs_Simulate(t *testing.T) {
 }
 
 func TestCycleRunArgs_ThreadsOutputContractAsGoal(t *testing.T) {
+	t.Parallel()
 	contract := "Delete the 5 dead flags; FlagCeiling toward 35. No new env reads."
 	if got, want := join(cycleRunArgs("abc123", contract, "", false, "")), "cycle run --goal-hash abc123 --goal "+contract; got != want {
 		t.Errorf("output-contract threading:\n got %q\nwant %q", got, want)

@@ -125,6 +125,7 @@ func TestRunResumeBatch_ACheckpointThatCannotRecordTheResumeIsAnError(t *testing
 }
 
 func TestParseLoopArgs_AutoResumeIsAResumeTheCounterCounts(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	cfg, rc := parseLoopArgs([]string{"--project-root", t.TempDir(), "--auto-resume"}, &stderr)
 	if rc != 0 || !cfg.Resume || !cfg.AutoResume {
@@ -164,6 +165,7 @@ func TestRunResumeBatch_ASignalDuringTheResumedCycleIsASignalStop(t *testing.T) 
 }
 
 func TestParseLoopArgs_AReservedWordIsNotAGoal(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 
 	_, rc := parseLoopArgs([]string{"--project-root", t.TempDir(), "status"}, &stderr)

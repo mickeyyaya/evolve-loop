@@ -9,6 +9,7 @@ import (
 )
 
 func TestRunBridge_Send_AppendsEnvelope(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"send", "--workspace=" + ws, "--agent=build", "hello", "world"}, nil, &out, &errb)
@@ -35,6 +36,7 @@ func TestRunBridge_Send_AppendsEnvelope(t *testing.T) {
 }
 
 func TestRunBridge_Send_KindAndSource(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"send", "--workspace=" + ws, "--agent=audit", "--kind=interrupt", "--source=operator", "stop"}, nil, &out, &errb)
@@ -48,6 +50,7 @@ func TestRunBridge_Send_KindAndSource(t *testing.T) {
 }
 
 func TestRunBridge_Send_MissingRequired(t *testing.T) {
+	t.Parallel()
 	cases := [][]string{
 		{"send", "--agent=build", "body"},
 		{"send", "--workspace=/tmp/x", "body"},
@@ -62,6 +65,7 @@ func TestRunBridge_Send_MissingRequired(t *testing.T) {
 }
 
 func TestRunBridge_Send_BadKind(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"send", "--workspace=/tmp/x", "--agent=b", "--kind=bogus", "body"}, nil, &out, &errb)
 	if code != 10 {

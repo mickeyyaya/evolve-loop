@@ -29,6 +29,7 @@ func e2GCRunWithReapers(dryRun bool, sessions swarm.OrphanReapReport, sockets sw
 }
 
 func TestGCSessions_ReportsEveryReapedSessionAndFailsOnAnError(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		rep        swarm.OrphanReapReport
@@ -69,6 +70,7 @@ func TestGCSessions_ReportsEveryReapedSessionAndFailsOnAnError(t *testing.T) {
 }
 
 func TestGCSockets_ReportsEveryReapedSocketAndFailsOnAnError(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		rep        swarm.OrphanSocketReport
@@ -118,6 +120,7 @@ func e2FailingGCExec(context.Context, string, string, []string, []string, io.Rea
 }
 
 func TestGCCycleProcesses_AListFailureIsAnError(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	failed := newGCRun(context.Background(), false, &stdout, &stderr).cycleProcesses(gc.WorktreeOptions{ProjectRoot: t.TempDir(), Exec: e2FailingGCExec})
@@ -131,6 +134,7 @@ func TestGCCycleProcesses_AListFailureIsAnError(t *testing.T) {
 }
 
 func TestGCCycleProcesses_ASignalFailureIsAnErrorAndTheProcessIsNotCountedReaped(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	tree := gcClosedOutCycleTree(t, root, 1700)
 	opts := worktreeGCOptions(root, filepath.Join(root, ".evolve"), gc.WorktreesPolicy{}, nil)
@@ -161,6 +165,7 @@ func TestGCCycleProcesses_ASignalFailureIsAnErrorAndTheProcessIsNotCountedReaped
 }
 
 func TestGCWorktrees_APlanFailureFailsTheStep(t *testing.T) {
+	t.Parallel()
 	for _, dryRun := range []bool{true, false} {
 		var stdout, stderr bytes.Buffer
 
@@ -173,6 +178,7 @@ func TestGCWorktrees_APlanFailureFailsTheStep(t *testing.T) {
 }
 
 func TestGCWorktrees_AGitFailureFailsThePlan(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	failed := newGCRun(context.Background(), false, &stdout, &stderr).worktrees(gc.WorktreeOptions{ProjectRoot: t.TempDir(), Exec: e2FailingGCExec})
@@ -228,6 +234,7 @@ func TestGCPipelineTemp_ARemoveFailureIsReportedAndFailsTheStep(t *testing.T) {
 }
 
 func TestGCPipelineTemp_ZeroOrNegativeTTLIsOff(t *testing.T) {
+	t.Parallel()
 	for _, ttl := range []int{0, -1} {
 		var stdout, stderr bytes.Buffer
 		r := newGCRun(context.Background(), false, &stdout, &stderr)
@@ -240,6 +247,7 @@ func TestGCPipelineTemp_ZeroOrNegativeTTLIsOff(t *testing.T) {
 }
 
 func TestGCReportDiskFree_ReportsTheNetChangeOrAnUnreadablePath(t *testing.T) {
+	t.Parallel()
 	t.Run("readable", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		newGCRun(context.Background(), false, &stdout, &stderr).reportDiskFree(t.TempDir(), 0)
@@ -322,6 +330,7 @@ func TestResolveGCProjectRoot_AnUnreadableCwdSkipsTheDryRunSweep(t *testing.T) {
 }
 
 func TestGCSize_RendersGigabytesWithTwoDecimals(t *testing.T) {
+	t.Parallel()
 	for b, want := range map[int64]string{0: "0.00 GB", 1e9: "1.00 GB", 1_234_567_890: "1.23 GB", -5e8: "-0.50 GB"} {
 		if got := gcSize(b); got != want {
 			t.Errorf("gcSize(%d) = %q, want %q", b, got, want)
@@ -330,6 +339,7 @@ func TestGCSize_RendersGigabytesWithTwoDecimals(t *testing.T) {
 }
 
 func TestGCCycleProcesses_NamesTheOrphanAndSignalsItOnlyOnARealRun(t *testing.T) {
+	t.Parallel()
 	for _, dryRun := range []bool{true, false} {
 		root := t.TempDir()
 		tree := gcClosedOutCycleTree(t, root, 1701)

@@ -59,6 +59,7 @@ func refusedAgents(t *testing.T, refusals []string) []string {
 }
 
 func TestOverrideRefusals_AnOverrideOutsideTheAllowedSetIsRefusedAtStart(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 	env := map[string]string{"EVOLVE_AUDITOR_CLI": "codex-tmux", "EVOLVE_SCOUT_CLI": "agy-tmux", "EVOLVE_ROUTER_CLI": "claude-tmux"}
 
@@ -70,6 +71,7 @@ func TestOverrideRefusals_AnOverrideOutsideTheAllowedSetIsRefusedAtStart(t *test
 }
 
 func TestOverrideRefusals_UnderBypassTheFloorAndTheProfileCeilingStillBind(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 	env := map[string]string{"EVOLVE_AUDITOR_CLI": "codex-tmux", "EVOLVE_ROUTER_CLI": "agy-tmux", "EVOLVE_SCOUT_CLI": "codex-tmux"}
 
@@ -81,6 +83,7 @@ func TestOverrideRefusals_UnderBypassTheFloorAndTheProfileCeilingStillBind(t *te
 }
 
 func TestOverrideRefusals_TheGlobalCLIOverrideIsCheckedForEveryAgent(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 
 	refusals, err := overrideRefusals(overrideRouter(t, root, false), root, map[string]string{"EVOLVE_CLI": "agy-tmux"})
@@ -91,6 +94,7 @@ func TestOverrideRefusals_TheGlobalCLIOverrideIsCheckedForEveryAgent(t *testing.
 }
 
 func TestOverrideRefusals_NoOverrideNoRefusal(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 
 	refusals, err := overrideRefusals(overrideRouter(t, root, false), root, map[string]string{"EVOLVE_PROJECT_ROOT": root})
@@ -149,6 +153,7 @@ func TestRunCycleRun_HandsTheWiringItsBypass(t *testing.T) {
 }
 
 func TestWireCLIRouter_ABypassRunRoutesEveryLaunchWithoutTheTable(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"cli_routing":{"clis":["agy","agy-claude","claude"],"default":["agy","agy-claude","claude"]}}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -169,6 +174,7 @@ func TestWireCLIRouter_ABypassRunRoutesEveryLaunchWithoutTheTable(t *testing.T) 
 }
 
 func TestOverrideRefusals_TheFloorBindsAFloorAgentWhoseProfileNamesNoCeiling(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 	if err := os.WriteFile(filepath.Join(routingProfilesDir(root), "tdd-engineer.json"), []byte(`{"name":"tdd-engineer","cli":"claude-tmux","model_tier_default":"balanced"}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -182,6 +188,7 @@ func TestOverrideRefusals_TheFloorBindsAFloorAgentWhoseProfileNamesNoCeiling(t *
 }
 
 func TestOverrideRefusals_TheAgentKeyOutranksTheGlobalOverrideAsTheResolverReadsThem(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 	env := map[string]string{"EVOLVE_AUDITOR_CLI": "agy-tmux", "EVOLVE_CLI": "claude-tmux"}
 
@@ -193,6 +200,7 @@ func TestOverrideRefusals_TheAgentKeyOutranksTheGlobalOverrideAsTheResolverReads
 }
 
 func TestOverrideRefusals_NamesTheRemedyForTheKeyThatWon(t *testing.T) {
+	t.Parallel()
 	root := overrideProject(t)
 	for env, remedy := range map[string]string{
 		"EVOLVE_AUDITOR_CLI": "unset EVOLVE_AUDITOR_CLI",

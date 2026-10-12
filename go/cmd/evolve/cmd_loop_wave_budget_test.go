@@ -28,6 +28,7 @@ func fastPace() budgethistory.Throughput {
 }
 
 func TestQuotaAwareWaveConfig_BudgetNilByteIdentical(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1, Budget: nil}
 	var buf bytes.Buffer
@@ -46,6 +47,7 @@ func TestQuotaAwareWaveConfig_BudgetNilByteIdentical(t *testing.T) {
 }
 
 func TestQuotaAwareWaveConfig_ShadowLogsButHolds(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1,
 		Budget: &policy.FleetBudgetConfig{Stage: "shadow", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
@@ -66,6 +68,7 @@ func TestQuotaAwareWaveConfig_ShadowLogsButHolds(t *testing.T) {
 }
 
 func TestQuotaAwareWaveConfig_EnforceResizesDown(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	fc := policy.FleetConfig{Count: 3, Concurrency: 3, MinLanes: 1,
 		Budget: &policy.FleetBudgetConfig{Stage: "enforce", CapacityCycles: 10, Safety: 0.5, HistoryWindow: 10}}
@@ -89,6 +92,7 @@ func TestQuotaAwareWaveConfig_EnforceResizesDown(t *testing.T) {
 }
 
 func TestQuotaAwareWaveConfig_EnforceFloorForcedPaces(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, time.July, 3, 12, 0, 0, 0, time.UTC)
 	// rem 0.2, capacity 10 ⇒ 2 budget cycles; safety 0.5, 2 cyc/h, dt 1h ⇒
 	// affordable = 2*0.5/(2*1) = 0.5 < floor 2 ⇒ Lanes clamps up to floor 2 and

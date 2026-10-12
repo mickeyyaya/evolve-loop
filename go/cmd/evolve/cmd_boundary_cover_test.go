@@ -91,10 +91,10 @@ func TestMoveLegacyLoopLog_AnUnmakeableLegacyDirKeepsTheLog(t *testing.T) {
 }
 
 func TestMoveLegacyLoopLog_AnUnremovableLegacyLogIsAnErrorAfterTheCopy(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("root removes from a read-only directory")
 	}
-	t.Parallel()
 	dir := filepath.Join(t.TempDir(), ".evolve")
 	link := filepath.Join(dir, boundaryLoopLog)
 	writeBoundaryFile(t, link, "old\n")

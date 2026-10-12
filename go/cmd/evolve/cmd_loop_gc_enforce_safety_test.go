@@ -35,6 +35,7 @@ func checkedInGCPolicy(t *testing.T) gc.Policy {
 }
 
 func TestTheCheckedInPolicyRunsTheWaveEndGCInEnforce(t *testing.T) {
+	t.Parallel()
 	if mode := checkedInGCPolicy(t).Mode; mode != "enforce" {
 		t.Fatalf("checked-in gc.mode = %q, want enforce: in shadow the loop's batch-start and batch-end GC only reports what it would release", mode)
 	}

@@ -24,6 +24,7 @@ func writeFleetPolicy(t *testing.T, dir, fleetJSON string) string {
 }
 
 func TestFleetDispatch_ReloadsMinLanesAtWaveBoundary(t *testing.T) {
+	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":10,"min_lanes":3,"plan_source":"triage"}`)
 	prev := loadFleetConfig(dir)
 	if prev.Count != 10 || prev.MinLanes != 3 {
@@ -50,6 +51,7 @@ func TestFleetDispatch_ReloadsMinLanesAtWaveBoundary(t *testing.T) {
 }
 
 func TestFleetDispatch_ReloadsCountAtWaveBoundary(t *testing.T) {
+	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":3,"min_lanes":2,"plan_source":"triage"}`)
 	prev := loadFleetConfig(dir)
 	if prev.Count != 3 {
@@ -85,6 +87,7 @@ func TestFleetDispatch_ReloadsCountAtWaveBoundary(t *testing.T) {
 }
 
 func TestFleetDispatch_UnchangedPolicyByteIdenticalDispatch(t *testing.T) {
+	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":3,"min_lanes":2,"plan_source":"triage"}`)
 	prev := loadFleetConfig(dir)
 
@@ -99,6 +102,7 @@ func TestFleetDispatch_UnchangedPolicyByteIdenticalDispatch(t *testing.T) {
 }
 
 func TestFleetDispatch_MalformedPolicyAtWaveBoundaryHoldsWidth(t *testing.T) {
+	t.Parallel()
 	dir := writeFleetPolicy(t, t.TempDir(), `{"count":3,"min_lanes":2,"plan_source":"triage"}`)
 	prev := loadFleetConfig(dir)
 

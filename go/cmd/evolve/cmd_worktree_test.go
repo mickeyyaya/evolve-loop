@@ -47,6 +47,7 @@ func initRepo(t *testing.T, dir string) {
 }
 
 func TestRunWorktreeCreate_Success(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	root := t.TempDir()
 	initRepo(t, root)
@@ -75,6 +76,7 @@ func TestRunWorktreeCreate_Success(t *testing.T) {
 }
 
 func TestRunWorktreeCreate_MissingCycle_Errors(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var stdout, stderr strings.Builder
 	code := runWorktreeCreate([]string{"--cycle", "0", "--project-root", root}, &stdout, &stderr)
@@ -87,6 +89,7 @@ func TestRunWorktreeCreate_MissingCycle_Errors(t *testing.T) {
 }
 
 func TestRunWorktreeCreate_NotAGitRepo_ExitOne(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	root := t.TempDir() // no `git init` — not a repo
 	base := filepath.Join(root, ".evolve", "worktrees")
@@ -102,6 +105,7 @@ func TestRunWorktreeCreate_NotAGitRepo_ExitOne(t *testing.T) {
 }
 
 func TestRunWorktreeList_Success(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	root := t.TempDir()
 	initRepo(t, root)
@@ -117,6 +121,7 @@ func TestRunWorktreeList_Success(t *testing.T) {
 }
 
 func TestRunWorktreeList_NotAGitRepo_ExitOne(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	root := t.TempDir()
 	var stdout, stderr strings.Builder
@@ -127,6 +132,7 @@ func TestRunWorktreeList_NotAGitRepo_ExitOne(t *testing.T) {
 }
 
 func TestRunWorktreeCleanup_RemovesCreatedWorktree(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	root := t.TempDir()
 	initRepo(t, root)
@@ -153,6 +159,7 @@ func TestRunWorktreeCleanup_RemovesCreatedWorktree(t *testing.T) {
 }
 
 func TestRunWorktreeCleanup_PruneAll_ExitZero(t *testing.T) {
+	t.Parallel()
 	requireGit(t)
 	root := t.TempDir()
 	initRepo(t, root)
@@ -166,6 +173,7 @@ func TestRunWorktreeCleanup_PruneAll_ExitZero(t *testing.T) {
 }
 
 func TestRunWorktree_MissingSubcommand_ExitTen(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runWorktree(nil, nil, &stdout, &stderr)
 	if code != 10 {
@@ -174,6 +182,7 @@ func TestRunWorktree_MissingSubcommand_ExitTen(t *testing.T) {
 }
 
 func TestRunWorktree_UnknownSubcommand_ExitTen(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 	code := runWorktree([]string{"bogus"}, nil, &stdout, &stderr)
 	if code != 10 {
@@ -185,6 +194,7 @@ func TestRunWorktree_UnknownSubcommand_ExitTen(t *testing.T) {
 }
 
 func TestErrIsNotExist(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		err  error

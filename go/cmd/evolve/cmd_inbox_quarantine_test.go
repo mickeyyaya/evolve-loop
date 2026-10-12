@@ -98,6 +98,7 @@ func TestRunInboxQuarantine_UsageAndUnknown(t *testing.T) {
 }
 
 func TestIsTaskLevelFailure_AllClassifications(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		c    cycleclassify.Classification
 		want bool

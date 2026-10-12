@@ -22,6 +22,7 @@ func (stubLauncher) Launch(context.Context, advisor.LaunchRequest) (advisor.Laun
 }
 
 func TestWireSimulateOrchestrator_AdvisorWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -48,6 +49,7 @@ func TestWireSimulateOrchestrator_AdvisorWarningRenders(t *testing.T) {
 }
 
 func TestPhaseAdvisorRoot_WiresTheSignalCenter(t *testing.T) {
+	t.Parallel()
 	wiring, err := os.ReadFile("router_dispatch.go")
 	if err != nil {
 		t.Fatal(err)

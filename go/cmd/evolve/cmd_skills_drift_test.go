@@ -23,6 +23,7 @@ func repoRootForSkills(t *testing.T) string {
 }
 
 func TestSkills_NoDrift(t *testing.T) {
+	t.Parallel()
 	root := repoRootForSkills(t)
 	var out, errBuf bytes.Buffer
 	if code := skillsRun(root, false, &out, &errBuf); code != 0 {
@@ -31,6 +32,7 @@ func TestSkills_NoDrift(t *testing.T) {
 }
 
 func TestSkills_CheckDetectsDrift(t *testing.T) {
+	t.Parallel()
 	root := repoRootForSkills(t)
 	tmp := t.TempDir()
 

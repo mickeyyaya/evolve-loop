@@ -18,6 +18,7 @@ func doctorResult(cli string, present bool, verdict string) gobridge.DoctorResul
 }
 
 func TestUniversalFallbackTail_KeepsOnlyPresentFamiliesThatCanRunAWorktreePhase(t *testing.T) {
+	t.Parallel()
 	results := []gobridge.DoctorResult{
 		doctorResult("claude-p", false, "blocked"),
 		doctorResult("claude-tmux", true, "ready"),
@@ -63,6 +64,7 @@ func scoutChainUnder(t *testing.T, pol policy.Policy, root string, results []gob
 }
 
 func TestUniversalFallbackTail_LeavesTheExclusionToTheRouter(t *testing.T) {
+	t.Parallel()
 	_, root := checkedInPolicy(t)
 	results := []gobridge.DoctorResult{doctorResult("claude-tmux", true, "ready"), doctorResult("agy-tmux", true, "ready")}
 	if got := scoutChainUnder(t, policy.Policy{}, root, results); slices.Contains(got, "agy-tmux") {
@@ -71,6 +73,7 @@ func TestUniversalFallbackTail_LeavesTheExclusionToTheRouter(t *testing.T) {
 }
 
 func TestUniversalFallbackTail_OffersEachInstalledBinaryOnceAsItsOwnDriver(t *testing.T) {
+	t.Parallel()
 	results := []gobridge.DoctorResult{
 		doctorResult("agy", true, "ready"),
 		doctorResult("agy-claude-tmux", true, "ready"),

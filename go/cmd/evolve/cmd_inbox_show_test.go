@@ -141,6 +141,7 @@ func TestCmd_InboxShow_RefusesAMalformedRequest(t *testing.T) {
 }
 
 func TestCmd_Inbox_HelpNamesEveryVerbAndAnUnknownVerbIsAUsageError(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	rc := runInbox([]string{"--help"}, nil, &stdout, &stderr)
@@ -162,6 +163,7 @@ func TestCmd_Inbox_HelpNamesEveryVerbAndAnUnknownVerbIsAUsageError(t *testing.T)
 }
 
 func TestCmd_Inbox_EveryUsageLineIsItsVerbsSynopsis(t *testing.T) {
+	t.Parallel()
 	for _, v := range inboxVerbs() {
 		if got, want := inboxUsage(v.name), "usage: evolve inbox "+v.synopsis; got != want {
 			t.Errorf("inboxUsage(%q) = %q, want %q", v.name, got, want)

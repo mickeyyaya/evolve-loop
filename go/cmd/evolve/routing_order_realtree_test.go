@@ -12,6 +12,7 @@ import (
 )
 
 func TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors(t *testing.T) {
+	t.Parallel()
 	projectRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)

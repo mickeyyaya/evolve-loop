@@ -73,6 +73,7 @@ func stubPublishExec(t *testing.T, haveBinaries bool) *[]execCall {
 }
 
 func TestRewriteFrontmatterName(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		label   string
 		raw     string
@@ -142,6 +143,7 @@ func TestRewriteFrontmatterName(t *testing.T) {
 }
 
 func TestProvenanceHeader_ContainsSentinelAndSource(t *testing.T) {
+	t.Parallel()
 	h := provenanceHeader("skills/build/SKILL.md", "codex")
 	if !strings.Contains(h, publishProvenanceSentinel) {
 		t.Errorf("header missing sentinel: %s", h)
@@ -155,6 +157,7 @@ func TestProvenanceHeader_ContainsSentinelAndSource(t *testing.T) {
 }
 
 func TestInjectProvenance_AfterFrontmatter(t *testing.T) {
+	t.Parallel()
 	raw := "---\nname: x\n---\n\nbody\n"
 	out := injectProvenance(raw, "<!-- MARK -->")
 	fm, body, err := prompts.ParseFrontmatter(out)
@@ -714,6 +717,7 @@ func TestRunSkills_PublishUnknownTargetExits10(t *testing.T) {
 }
 
 func TestParsePublishFlags_Defaults(t *testing.T) {
+	t.Parallel()
 	var errBuf bytes.Buffer
 	cfg, ok := parsePublishFlags(nil, &errBuf)
 	if !ok {

@@ -18,6 +18,7 @@ import (
 // LAST one, with every field intact, not the first (a common off-by-one when
 // hand-rolling a tail read) and not a merge/aggregate of all three.
 func TestLastChainBoundaryRefreshLogEntry_ReturnsMostRecentEntry(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	logPath := filepath.Join(evolveDir, chainBoundaryRefreshLogFile)
 	entries := []chainBoundaryRefreshLogEntry{
@@ -56,6 +57,7 @@ func TestLastChainBoundaryRefreshLogEntry_ReturnsMostRecentEntry(t *testing.T) {
 // plane is the overwhelmingly common case and must not spam stderr/fail a
 // summary emission.
 func TestLastChainBoundaryRefreshLogEntry_MissingFileIsNilNoError(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir() // no boundary-refresh-log.jsonl written
 	got, err := lastChainBoundaryRefreshLogEntry(evolveDir)
 	if err != nil {
@@ -70,6 +72,7 @@ func TestLastChainBoundaryRefreshLogEntry_MissingFileIsNilNoError(t *testing.T) 
 // never appended to) also degrades to (nil, nil) — the same fail-open
 // contract as a missing file, not a parse error.
 func TestLastChainBoundaryRefreshLogEntry_EmptyFileIsNilNoError(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(evolveDir, chainBoundaryRefreshLogFile), nil, 0o644); err != nil {
 		t.Fatalf("write empty fixture log: %v", err)
@@ -91,6 +94,7 @@ func TestLastChainBoundaryRefreshLogEntry_EmptyFileIsNilNoError(t *testing.T) {
 // merely non-null) to decide "did a refresh happen this run" must see a
 // clean, absent key on every ordinary run.
 func TestChainResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
+	t.Parallel()
 	res := chainResult{ChainMode: true, MaxBatches: 5, StopReason: "chain_inbox_empty"}
 	buf, err := json.Marshal(res)
 	if err != nil {
@@ -107,6 +111,7 @@ func TestChainResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
 
 // T5 mirrors T4 for loopResult (the non-chain wave/fleet summary).
 func TestLoopResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
+	t.Parallel()
 	lr := loopResult{StopReason: "max_cycles_reached"}
 	buf, err := json.Marshal(lr)
 	if err != nil {
@@ -135,6 +140,7 @@ func TestLoopResult_MarshalOmitsBoundaryRefreshWhenNil(t *testing.T) {
 // acs-predicate: config-check — lastChainBoundaryRefreshLogEntry's own
 // correctness is proven by T1-T3; this only proves the chain calls it.
 func TestRunLoopChain_SetsBoundaryRefreshOnReExecStop(t *testing.T) {
+	t.Parallel()
 	n, err := acsassert.CountInGoFunc(filepath.Join("..", "..", "internal", "loopchain", "driver.go"), "boundary", "res.BoundaryRefresh")
 	if err != nil {
 		t.Fatalf("CountInGoFunc(Driver.boundary, res.BoundaryRefresh): %v", err)
@@ -153,6 +159,7 @@ func TestRunLoopChain_SetsBoundaryRefreshOnReExecStop(t *testing.T) {
 //
 // acs-predicate: config-check — see T6.
 func TestRunLoopBatch_SetsBoundaryRefreshOnWaveBoundaryReExecStop(t *testing.T) {
+	t.Parallel()
 	n, err := acsassert.CountInGoFunc("cmd_loop_window.go", "prepareIteration", "b.result.BoundaryRefresh")
 	if err != nil {
 		t.Fatalf("CountInGoFunc(prepareIteration, b.result.BoundaryRefresh): %v", err)
@@ -169,6 +176,7 @@ func TestRunLoopBatch_SetsBoundaryRefreshOnWaveBoundaryReExecStop(t *testing.T) 
 // not the other (T6/T7's population call) cannot both silently pass. The
 // chain summary's struct is loopchain.Result (chainResult aliases it).
 func TestChainResultAndLoopResult_BoundaryRefreshJSONTagPresent(t *testing.T) {
+	t.Parallel()
 	for _, f := range []string{filepath.Join("..", "..", "internal", "loopchain", "driver.go"), "cmd_loop_outcome.go"} {
 		if !strings.Contains(mustReadFile(t, f), `json:"boundary_refresh,omitempty"`) {
 			t.Errorf("%s: expected a `json:\"boundary_refresh,omitempty\"` struct tag (nil-when-clean, mirrors spine_fail_opens)", f)

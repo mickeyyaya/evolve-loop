@@ -145,6 +145,7 @@ func iscsAssertUntouched(t *testing.T, st *fixtures.FakeStorage, seed core.Cycle
 }
 
 func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		phase     string
@@ -234,6 +235,7 @@ func TestPrepareIteration_StaleCanonicalState(t *testing.T) {
 }
 
 func TestPrepareIteration_ResumableCycleUntouched(t *testing.T) {
+	t.Parallel()
 	const resumable = iscsLastCycle + 1
 	for _, withLease := range []bool{true, false} {
 		t.Run(fmt.Sprintf("dead_owner_lease=%v", withLease), func(t *testing.T) {
@@ -266,6 +268,7 @@ func TestPrepareIteration_ResumableCycleUntouched(t *testing.T) {
 }
 
 func TestPrepareIteration_OwnInFlightCycleUntouched(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := iscsProject(t)
 	runDir := iscsRunDir(t, root, iscsStaleCycle)
 	iscsLease(t, runDir, os.Getpid(), time.Now())
@@ -288,6 +291,7 @@ func TestPrepareIteration_OwnInFlightCycleUntouched(t *testing.T) {
 }
 
 func TestPrepareIteration_CompletedCycleRecordUntouched(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := iscsProject(t)
 	runDir := iscsRunDir(t, root, iscsLastCycle)
 	iscsLease(t, runDir, iscsExitedPID(t), time.Now())
@@ -313,6 +317,7 @@ func TestPrepareIteration_CompletedCycleRecordUntouched(t *testing.T) {
 }
 
 func TestPrepareIteration_TerminalOrFreshRecordUntouched(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		cycle int
@@ -346,6 +351,7 @@ func TestPrepareIteration_TerminalOrFreshRecordUntouched(t *testing.T) {
 }
 
 func TestPrepareIteration_CoherenceReadErrorSurfacesWithoutWrite(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := iscsProject(t)
 	const marker = "iscs-injected: cycle-state unreadable"
 	st := &fixtures.FakeStorage{
@@ -368,6 +374,7 @@ func TestPrepareIteration_CoherenceReadErrorSurfacesWithoutWrite(t *testing.T) {
 }
 
 func TestPrepareIteration_ReconcileWriteErrorSurfaces(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := iscsProject(t)
 	runDir := iscsRunDir(t, root, iscsStaleCycle)
 	iscsLease(t, runDir, iscsExitedPID(t), time.Now())

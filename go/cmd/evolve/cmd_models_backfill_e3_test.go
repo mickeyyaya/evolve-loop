@@ -18,6 +18,7 @@ import (
 )
 
 func TestRunModelsRefresh_RefusesBadArgsBeforeDetecting(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		args       []string
@@ -48,6 +49,7 @@ func TestRunModelsRefresh_RefusesBadArgsBeforeDetecting(t *testing.T) {
 }
 
 func TestCommitAndReport_AnUnwritableEvolveDirFailsWithoutAReport(t *testing.T) {
+	t.Parallel()
 	blocker := filepath.Join(t.TempDir(), "not-a-dir")
 	if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -73,6 +75,7 @@ func TestCommitAndReport_AnUnwritableEvolveDirFailsWithoutAReport(t *testing.T) 
 }
 
 func TestCommitAndReport_HumanReportNamesTheSourceAndCount(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cat := refreshResult(map[string]modelcatalog.CLIEntry{
 		"codex":  {TierModels: map[string]string{"deep": "gpt-5.6"}, Source: modelcatalog.SourceLive},
@@ -95,6 +98,7 @@ func TestCommitAndReport_HumanReportNamesTheSourceAndCount(t *testing.T) {
 }
 
 func TestPrintCatalogHuman_PrintsEffortsOnlyForACLIThatOffersThem(t *testing.T) {
+	t.Parallel()
 	cat := refreshResult(map[string]modelcatalog.CLIEntry{
 		"codex":  {TierModels: map[string]string{"deep": "gpt-5.6"}, Source: modelcatalog.SourceLive, Efforts: []string{"low", "xhigh"}},
 		"claude": {TierModels: map[string]string{"fast": "haiku"}, Source: modelcatalog.SourceLive},
@@ -121,6 +125,7 @@ func TestPrintCatalogHuman_PrintsEffortsOnlyForACLIThatOffersThem(t *testing.T) 
 }
 
 func TestPrintCatalogHuman_EmptyCatalogPrintsNothing(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 
 	printCatalogHuman(&out, modelcatalog.Catalog{})
@@ -131,6 +136,7 @@ func TestPrintCatalogHuman_EmptyCatalogPrintsNothing(t *testing.T) {
 }
 
 func TestBridgePromptDispatcher_ALaunchFailureNamesTheDriver(t *testing.T) {
+	t.Parallel()
 	boom := errors.New("pane died")
 	d := bridgePromptDispatcher{workspace: t.TempDir(), projectRoot: t.TempDir(),
 		launch: func(context.Context, core.BridgeRequest) (core.BridgeResponse, error) {
@@ -149,6 +155,7 @@ func TestBridgePromptDispatcher_ALaunchFailureNamesTheDriver(t *testing.T) {
 }
 
 func TestBridgePromptDispatcher_ReturnsTheLaunchStdout(t *testing.T) {
+	t.Parallel()
 	var got core.BridgeRequest
 	d := bridgePromptDispatcher{workspace: t.TempDir(), projectRoot: t.TempDir(),
 		launch: func(_ context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -168,6 +175,7 @@ func TestBridgePromptDispatcher_ReturnsTheLaunchStdout(t *testing.T) {
 }
 
 func TestBridgePromptDispatcher_LauncherDefaultsToTheBridgeEngine(t *testing.T) {
+	t.Parallel()
 	injected := func(context.Context, core.BridgeRequest) (core.BridgeResponse, error) {
 		return core.BridgeResponse{Stdout: "injected"}, nil
 	}
@@ -182,6 +190,7 @@ func TestBridgePromptDispatcher_LauncherDefaultsToTheBridgeEngine(t *testing.T) 
 }
 
 func TestLiveRefreshRoots(t *testing.T) {
+	t.Parallel()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -205,6 +214,7 @@ func TestLiveRefreshRoots(t *testing.T) {
 }
 
 func TestReadyCLIsWithDetectMaps(t *testing.T) {
+	t.Parallel()
 	codexMap := map[string]string{"deep": "gpt-5.6"}
 	cases := []struct {
 		name      string
@@ -232,6 +242,7 @@ func TestReadyCLIsWithDetectMaps(t *testing.T) {
 }
 
 func TestPolicyAllowedFamilies(t *testing.T) {
+	t.Parallel()
 	writePolicy := func(t *testing.T, body string) string {
 		t.Helper()
 		root := t.TempDir()
@@ -258,6 +269,7 @@ func TestPolicyAllowedFamilies(t *testing.T) {
 }
 
 func TestClassifierPreference_NoTableUsesTheLegacyOrder(t *testing.T) {
+	t.Parallel()
 	got, err := classifierPreference(t.TempDir())
 	if err != nil {
 		t.Fatalf("classifierPreference: %v", err)
@@ -268,6 +280,7 @@ func TestClassifierPreference_NoTableUsesTheLegacyOrder(t *testing.T) {
 }
 
 func TestClassifierFamilies_ATableWithNoDefaultRefusesTheClassifier(t *testing.T) {
+	t.Parallel()
 	block := policy.CLIRouting{CLIs: []string{"agy", "claude"}, Work: map[string][]string{"build": {"agy", "claude"}}}
 
 	families, err := classifierFamilies(classifierRouter(t, policy.Policy{CLIRouting: &block}))
@@ -281,6 +294,7 @@ func TestClassifierFamilies_ATableWithNoDefaultRefusesTheClassifier(t *testing.T
 }
 
 func TestClassifierFamilies_DedupesDriversOfOneFamily(t *testing.T) {
+	t.Parallel()
 	block := policy.CLIRouting{CLIs: []string{"claude", "agy"}, Default: []string{"claude", "agy", "claude"}}
 	families, err := classifierFamilies(classifierRouter(t, policy.Policy{CLIRouting: &block}))
 	if err != nil {
@@ -300,6 +314,7 @@ func e3ReadyReport(clis ...string) setup.DetectReport {
 }
 
 func TestLiveRefresh_NoReadyCLIIsAnError(t *testing.T) {
+	t.Parallel()
 	cat, err := liveRefresh(context.Background(), setup.DetectReport{CLIs: []setup.CLIStatus{{CLI: "codex", Verdict: "blocked"}}}, t.TempDir(), "", modelcatalog.Catalog{}, io.Discard)
 
 	if err == nil || err.Error() != "no ready CLIs to query (run: evolve setup detect)" {
@@ -321,6 +336,7 @@ func TestLiveRefresh_AnUncreatableScratchDirIsAnError(t *testing.T) {
 }
 
 func TestLiveRefresh_ARefusedRoutingTableFailsBeforeProbing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(filepath.Join(evolveDir, "profiles"), 0o755); err != nil {
@@ -341,6 +357,7 @@ func TestLiveRefresh_ARefusedRoutingTableFailsBeforeProbing(t *testing.T) {
 }
 
 func TestLiveRefresh_AnUnlistableCLIFallsBackToItsDetectMap(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var log bytes.Buffer
 

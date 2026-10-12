@@ -123,6 +123,7 @@ func TestCmd_InboxRouteConsole_AFailedRewriteIsExitTwo(t *testing.T) {
 }
 
 func TestCmd_InboxUsageNamesRouteConsole(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	runInbox(nil, nil, &stdout, &stderr)

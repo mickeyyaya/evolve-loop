@@ -9,6 +9,7 @@ import (
 )
 
 func TestCarryoverApplyDecisions_DryRunDoesNotMutateState(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-keep-me", "todo-drop-me")
 	beforeRaw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -43,6 +44,7 @@ func TestCarryoverApplyDecisions_DryRunDoesNotMutateState(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_RejectsFlatArraySchema(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a", "todo-b")
 	beforeRaw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -70,6 +72,7 @@ func TestCarryoverApplyDecisions_RejectsFlatArraySchema(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_RejectsDuplicateID(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-dup")
 	beforeRaw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -101,6 +104,7 @@ func TestCarryoverApplyDecisions_RejectsDuplicateID(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_RejectsInvalidDecisionEnum(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a")
 	beforeRaw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -131,6 +135,7 @@ func TestCarryoverApplyDecisions_RejectsInvalidDecisionEnum(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_RejectsClusterWithoutGroup(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a")
 	beforeRaw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -161,6 +166,7 @@ func TestCarryoverApplyDecisions_RejectsClusterWithoutGroup(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_UnknownIDIgnoredNotCrash(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-real")
 	doc := carryoverDecisionsDoc{
 		SourceCount: 2,
@@ -184,6 +190,7 @@ func TestCarryoverApplyDecisions_UnknownIDIgnoredNotCrash(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_EmptyDecisionsIsNoOp(t *testing.T) {
+	t.Parallel()
 	statePath := writeFixtureState(t, "todo-a", "todo-b")
 	doc := carryoverDecisionsDoc{SourceCount: 0, Decisions: nil}
 
@@ -201,6 +208,7 @@ func TestCarryoverApplyDecisions_EmptyDecisionsIsNoOp(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_CeilingReportedNotEnforced(t *testing.T) {
+	t.Parallel()
 	const n = 40
 	ids := make([]string, 0, n)
 	doc := carryoverDecisionsDoc{SourceCount: n}
@@ -225,6 +233,7 @@ func TestCarryoverApplyDecisions_CeilingReportedNotEnforced(t *testing.T) {
 }
 
 func TestCarryoverApplyDecisions_LargeScaleConverges(t *testing.T) {
+	t.Parallel()
 	const n = 3000
 	const surviveEvery = 50
 	ids := make([]string, 0, n)

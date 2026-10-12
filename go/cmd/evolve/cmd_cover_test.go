@@ -175,6 +175,7 @@ func coverStrictModule(t *testing.T, floors string) string {
 }
 
 func TestCoverStrict_PassesWhenEveryPackageMeetsItsFloor(t *testing.T) {
+	t.Parallel()
 	root := coverStrictModule(t, strictFloorsPass)
 
 	out, errOut, code := runDispatch("cover", "strict", "--root", root)
@@ -185,6 +186,7 @@ func TestCoverStrict_PassesWhenEveryPackageMeetsItsFloor(t *testing.T) {
 }
 
 func TestCoverStrict_RefusesAPackageBelowItsFloorWithExit1(t *testing.T) {
+	t.Parallel()
 	root := coverStrictModule(t, "./p 100\n")
 
 	out, _, code := runDispatch("cover", "strict", "--root", filepath.Join(root, "go"))
@@ -195,6 +197,7 @@ func TestCoverStrict_RefusesAPackageBelowItsFloorWithExit1(t *testing.T) {
 }
 
 func TestCoverStrict_JSONCarriesTheResultsAndTheCleanBit(t *testing.T) {
+	t.Parallel()
 	root := coverStrictModule(t, "./p 100\n")
 	profile := filepath.Join(root, "go", "coverage.txt")
 	floors := filepath.Join(root, "go", ".cover-strict")
@@ -214,6 +217,7 @@ func TestCoverStrict_JSONCarriesTheResultsAndTheCleanBit(t *testing.T) {
 }
 
 func TestCoverStrict_ExitCodesSeparateUsageFromRefusalFromIO(t *testing.T) {
+	t.Parallel()
 	root := coverStrictModule(t, strictFloorsPass)
 	noProfile := coverStrictModule(t, strictFloorsPass)
 	if err := os.Remove(filepath.Join(noProfile, "go", "coverage.txt")); err != nil {
@@ -249,6 +253,7 @@ func TestCoverStrict_ExitCodesSeparateUsageFromRefusalFromIO(t *testing.T) {
 }
 
 func TestCoverStrict_AVerdictItCannotWriteExitsIO(t *testing.T) {
+	t.Parallel()
 	root := coverStrictModule(t, strictFloorsPass)
 	for name, tc := range map[string]struct {
 		args []string
@@ -265,6 +270,7 @@ func TestCoverStrict_AVerdictItCannotWriteExitsIO(t *testing.T) {
 }
 
 func TestCoverUsage_NamesBothVerbs(t *testing.T) {
+	t.Parallel()
 	_, errOut, code := runDispatch("cover")
 
 	if code != exitUsage || !strings.Contains(errOut, "cover changed") || !strings.Contains(errOut, "cover strict") {

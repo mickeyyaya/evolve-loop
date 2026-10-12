@@ -33,6 +33,7 @@ func seedPriorCatalog(t *testing.T) (string, time.Time) {
 }
 
 func TestFinishLiveRefresh_NoLiveCLIExitsNonZeroAndKeepsThePriorCatalog(t *testing.T) {
+	t.Parallel()
 	for _, asJSON := range []bool{false, true} {
 		dir, priorFetched := seedPriorCatalog(t)
 		cat := refreshResult(map[string]modelcatalog.CLIEntry{
@@ -65,6 +66,7 @@ func TestFinishLiveRefresh_NoLiveCLIExitsNonZeroAndKeepsThePriorCatalog(t *testi
 }
 
 func TestFinishLiveRefresh_PartialFallbackCommitsAndNamesEachFallback(t *testing.T) {
+	t.Parallel()
 	dir, _ := seedPriorCatalog(t)
 	cat := refreshResult(map[string]modelcatalog.CLIEntry{
 		"agy":   {TierModels: map[string]string{"balanced": "Gemini 3.8 Flash (High)"}, Source: modelcatalog.SourceLive},
@@ -99,6 +101,7 @@ func TestFinishLiveRefresh_PartialFallbackCommitsAndNamesEachFallback(t *testing
 }
 
 func TestFinishLiveRefresh_JSONCarriesTheFallbackReason(t *testing.T) {
+	t.Parallel()
 	dir, _ := seedPriorCatalog(t)
 	cat := refreshResult(map[string]modelcatalog.CLIEntry{
 		"agy":   {TierModels: map[string]string{"balanced": "Gemini 3.8 Flash (High)"}, Source: modelcatalog.SourceLive},
