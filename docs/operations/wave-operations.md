@@ -33,6 +33,14 @@ Run the plane's own binary, `<plane>/go/bin/evolve`. The build step rebuilds tha
 | 10 | `error: "usage: …"` | A bad argument. | Fix the arguments. |
 | other | `failed_step`, `error` | A step failed with this exit code. The wave is not recorded, and the notes stay. | Fix the cause, then run step 2 again. A failure before the brake release leaves the brake on, which is the safe state. |
 
+### What the loop reads at the boundary
+
+After the loop runs `evolve cli update`, it runs the practice watch. The watch reads the changelogs and guides of Claude Code and agy. It files one inbox research item for each source that changed.
+
+The `[loop] practice-watch:` lines show the result. A `WARN` line does not stop the wave. Run `evolve practice watch --dry-run` to see the result with no record and no filing.
+
+The item has class `hygiene`, so it ranks low. Read it at the next boundary. Then decide which prompt or persona to change under [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
+
 ## 4. Other cases
 
 | Case | Verb |

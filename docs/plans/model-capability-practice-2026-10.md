@@ -106,7 +106,7 @@ Each criterion has a score from 1 (bad) to 5 (good).
 | Id | Component | Red test first | Owner |
 |---|---|---|---|
 | M0 | These documents and the index entry | `evolve docs ste-lint --strict`; the link check | console |
-| M1 | `evolve practice watch` and the boundary call (D1 to D6) | A changed `httptest` source files one item; an unchanged source and a first run file none. A fetch error warns, and the boundary exit code stays 0. A command source (`agy changelog`) runs through a fake CLI. | Sonnet lane |
+| M1 | `evolve practice watch` and the boundary call (D1 to D6) | A changed `httptest` source files one item; an unchanged source and a first run file none. A fetch error warns, and the boundary exit code stays 0. A command source (`agy changelog`) runs through a fake CLI. | Sonnet lane. **Status (2026-10-12): built, in review.** `internal/practicewatch`, `go/cmd/evolve/cmd_practice.go`, the boundary call in `cmd_loop_cliupdate.go`; see [runtime-reference](../operations/runtime-reference.md). |
 | M2 | `evolve prompt stats`: the bytes and emphatic words of each persona and of each phase prompt of a run | Counts on a fixture tree | Sonnet lane |
 | M3 | The first diet change: the builder persona (17 emphatic words), with the D8 measures | The persona tests stay green; the measures of D8 are recorded | loop task |
 | M4 | The host self-heal (D10) | The cache trim runs at a cycle start; the guard warns and pauses at the thresholds | Sonnet lane |

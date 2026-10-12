@@ -91,6 +91,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_gc_claims.go":           "operator command `evolve gc`, the empty claim dir sweep (cycle 1838) — read-only survey, no mover warning",
 		"cmd/evolve/cmd_inbox_route_lane.go":    "operator command `evolve inbox route-lane` — 06-F1",
 		"cmd/evolve/cmd_inbox_add.go":           "operator command `evolve inbox add` — 06-F1",
+		"cmd/evolve/cmd_practice.go":            "operator command `evolve practice watch` and the boundary watch, the one filing of a research item — 06-F1",
 		"cmd/evolve/cmd_continuation.go":        "operator command `evolve continuation` — 06-F1",
 		"cmd/evolve/cmd_inbox_consume.go":       "operator command `evolve inbox consume` (two literals) — 06-F1",
 		"cmd/evolve/cmd_cycle.go":               "read-only probes (failure count, continuation scope, dispatch state) — never write; hostInboxClaimer — WIRED (Signals: signals)",

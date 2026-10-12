@@ -8,6 +8,14 @@ All notable changes to this project will be documented in this file.
 - **`evolve cover strict` replaces the shell loop of `make cover-strict`.** The new package `internal/coverstrict` reads the profile with `covchanged.ParseProfile` and judges each package of `go/.cover-strict`. The target runs no test. It refuses a missing or stale profile, a bad floors file, a package with no statements and a package below its floor.
 - **The local floor has 7 targets.** `lint`, `test-integration`, `test-e2e`, `test-acs-durable`, `cover-changed`, `cover-strict` and `apicover-check`. `test` and `apicover-enforce` leave the floor. `apicover-enforce` stays for a scoped run.
 - Docs: `go/docs/testing.md`, `docs/architecture/test-system.md` §4.4, `docs/operations/runtime-reference.md`.
+## Added — `evolve practice watch` files an inbox item when the practice of a CLI changes (ADR-0133, plan M1, 2026-10-12)
+
+- **The verb.** `evolve practice watch [--dry-run] [--json] [--project-root P]` reads the sources of `practice_watch` (policy), normalizes the text, hashes it and compares it with `.evolve/practice/<id>.json`. The first run records and files nothing. A changed source files one item: kind `research`, class `hygiene`, with the link and the added lines (4 KiB at most). A source with an open item files no second item. Exit 0 when the run completed, 1 on a refused policy, 10 on usage.
+- **The sources.** Kinds `github-file`, `github-releases`, `page` and `command`. The compiled defaults cover Claude Code and agy; the sources of Codex and Gemini CLI are defined and off. A fetch error is one `error` row, never fatal. A missing binary of a `command` source is a `skipped` row.
+- **The boundary.** The loop runs the watch after `evolve cli update`, at loop boot and at each wave boundary. A failure prints a `[loop] WARN: practice-watch:` line and never blocks the boundary.
+- **The policy block.** `practice_watch` (`timeout_s`, 120 at most, and `sources`) is strict-decoded.
+- **Hardening.** Fetched text is fenced and marked untrusted in the item. Redirects are limited to 5 http(s) hops with no downgrade. A `command` output is capped at 8 MiB. The boundary run has a 60-second budget. The item id carries a minute stamp.
+- Docs: [runtime-reference](docs/operations/runtime-reference.md), [wave-operations](docs/operations/wave-operations.md), [internal-practicewatch](docs/architecture/packages/internal-practicewatch.md), [plan M1](docs/plans/model-capability-practice-2026-10.md).
 
 ## Fixed — the dispatch postmortem follow-ups: the fresh session carries the record, agy records name their source, and no record is lost or written over (ADR-0130, 2026-10-11)
 

@@ -129,6 +129,7 @@ var commands = []subcommand{
 	{Name: "reachability", Summary: "Import-cycle-safety probe for structural test pins (reachability check-pin)", Run: runReachability},
 	{Name: "clihealth", Aliases: []string{"cli-health"}, Summary: "CLI quota/credential benches: list [--json] | clear <family> | usage [--json] [family...] [--project-root DIR]", Run: runClihealth},
 	{Name: "cli", Summary: "CLI binaries: update [--dry-run] [--json] [--project-root P] runs each subscribed family's manifest updater, then smoke-tests a changed version (exit 1 on update-failed or smoke-failed)", Run: runCLICommand},
+	{Name: "practice", Summary: "CLI practice watch: watch [--dry-run] [--json] [--project-root P] reads each configured practice source (changelogs, prompting guides), compares it with its last snapshot and files one inbox research item per changed source (exit 1 on a bad policy, 10 on usage)", Run: runPracticeCommand},
 	{Name: "ratchet", Summary: "Function-size + raw-git-fixture ratchets over a module: check [size|rawgit] [--root DIR]", Run: runRatchet},
 	{Name: "cover", Summary: "Coverage gate over a change: changed --base <ref> [--profile <path>] [--json] [--root DIR] refuses every changed function below 100%; strict [--profile <path>] [--floors <path>] [--json] [--root DIR] refuses every package of go/.cover-strict below its floor", Run: runCover},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},

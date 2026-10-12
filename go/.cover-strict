@@ -56,3 +56,4 @@
 ./internal/covchanged 100
 ./internal/coverstrict 100
 ./internal/stelint 100
+./internal/practicewatch 100
