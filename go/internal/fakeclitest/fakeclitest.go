@@ -61,13 +61,18 @@ func interpreterArgv(body []byte, script string, args []string) []string {
 	return append(append(interpreter, script), args...)
 }
 
+var (
+	testBinaryPath = os.Executable
+	linkTestBinary = os.Link
+)
+
 func Install(t testing.TB, path, body string) {
 	t.Helper()
-	self, err := os.Executable()
+	self, err := testBinaryPath()
 	if err != nil {
 		t.Fatalf("fakeclitest: locate the test binary: %v", err)
 	}
-	linkErr, err := install(self, path, body, os.Link)
+	linkErr, err := install(self, path, body, linkTestBinary)
 	if err != nil {
 		t.Fatalf("fakeclitest: %v", err)
 	}

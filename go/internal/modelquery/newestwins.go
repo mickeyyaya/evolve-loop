@@ -107,6 +107,8 @@ type dateVersion struct {
 	value int // YYYYMMDD; a missing month/day is treated as 0
 }
 
+var parseDateAtoi = strconv.Atoi
+
 // parseDate extracts the dateRun token from id into a comparable YYYYMMDD
 // integer. A missing token, or a non-numeric component (impossible given
 // dateRun's own character class but checked for defensiveness), yields ok=false.
@@ -116,18 +118,18 @@ func parseDate(id string) dateVersion {
 		return dateVersion{}
 	}
 	fields := strings.Split(tok, "-")
-	year, err := strconv.Atoi(fields[0])
+	year, err := parseDateAtoi(fields[0])
 	if err != nil {
 		return dateVersion{}
 	}
 	month, day := 0, 0
 	if len(fields) > 1 {
-		if month, err = strconv.Atoi(fields[1]); err != nil {
+		if month, err = parseDateAtoi(fields[1]); err != nil {
 			return dateVersion{}
 		}
 	}
 	if len(fields) > 2 {
-		if day, err = strconv.Atoi(fields[2]); err != nil {
+		if day, err = parseDateAtoi(fields[2]); err != nil {
 			return dateVersion{}
 		}
 	}

@@ -332,9 +332,11 @@ func defaultFullDryRunPreflight(repoRoot, target string) error {
 	return runPreflightLib(repoRoot, target, dryRun, skipTests, strictPass)
 }
 
+var preflightLib = runPreflightLib
+
 func defaultPreflight(repoRoot, target string, dryRun, skipTests bool) error {
 	const strictPass = false
-	return runPreflightLib(repoRoot, target, dryRun, skipTests, strictPass)
+	return preflightLib(repoRoot, target, dryRun, skipTests, strictPass)
 }
 
 func defaultChangelogGen(repoRoot, fromRef, toRef, target string, dryRun bool) error {
@@ -467,6 +469,8 @@ func defaultReleaseVerify(repoRoot, target, commitSHA string) error {
 	return ensureLocalTag(repoRoot, "v"+target, commitSHA)
 }
 
+var repinMarshalIndent = json.MarshalIndent
+
 func repinExpectedShipSHA(statePath, target, blobSHA string) {
 	raw, rerr := os.ReadFile(statePath)
 	if rerr != nil {
@@ -481,7 +485,7 @@ func repinExpectedShipSHA(statePath, target, blobSHA string) {
 	}
 	st["expected_ship_sha"] = blobSHA
 	st["expected_ship_version"] = target
-	body, merr := json.MarshalIndent(st, "", "  ")
+	body, merr := repinMarshalIndent(st, "", "  ")
 	if merr != nil {
 		return
 	}

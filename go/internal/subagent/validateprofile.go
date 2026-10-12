@@ -244,8 +244,10 @@ func resolvedCLI(resolve func(string) (resolvellm.Result, error), agent, profile
 	return matchField(profileBody, reFieldCLI), "profile", "", nil
 }
 
+var newSingleProfileRouter = cliroute.NewSingleProfileRouter
+
 func defaultResolveLLM(agent string) (resolvellm.Result, error) {
-	router, err := cliroute.NewSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{}, cliroute.Host{})
+	router, err := newSingleProfileRouter(policy.Policy{}, cliroute.SingleProfile{}, cliroute.Host{})
 	if err != nil {
 		return resolvellm.Result{}, err
 	}

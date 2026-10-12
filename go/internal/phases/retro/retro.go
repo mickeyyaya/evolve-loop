@@ -220,6 +220,8 @@ func retroProfile(projectRoot string) *profiles.Profile {
 	return &loaded
 }
 
+var walkRetroDecision = cliroute.Decision.Walk
+
 func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model string) (string, error) {
 	router := p.router
 	if router == nil {
@@ -233,7 +235,7 @@ func (p *Phase) resolveCLI(req core.PhaseRequest, prof *profiles.Profile, model 
 	if err != nil {
 		return "", err
 	}
-	walk, err := d.Walk()
+	walk, err := walkRetroDecision(d)
 	if err != nil {
 		return "", err
 	}

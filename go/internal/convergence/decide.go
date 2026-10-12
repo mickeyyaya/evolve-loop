@@ -72,9 +72,11 @@ func (c decider) land(exit scopeExit) Decision {
 	return c.landing(Decision{Rung: rung, Action: ActionLand}, exit)
 }
 
+var keptRoundHasOpenCritical = func(c decider, keep int) bool { return c.hasOpenCritical(keep) }
+
 func (c decider) landing(d Decision, exit scopeExit) Decision {
 	keep := c.keepBest(c.bar, exit.exempt())
-	if c.hasOpenCritical(keep) {
+	if keptRoundHasOpenCritical(c, keep) {
 		return c.stop("")
 	}
 	d.BlockingBar, d.LandRound = c.bar, keep

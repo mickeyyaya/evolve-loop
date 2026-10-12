@@ -79,6 +79,8 @@ func Rollup(workspace string) (Summary, bool) {
 	return s, true
 }
 
+var rollupMarshalIndent = json.MarshalIndent
+
 // WriteRollup writes interaction-summary.json beside the ledgers via tmp and rename;
 // a workspace with nothing to summarize gets no file.
 func WriteRollup(workspace string) error {
@@ -86,7 +88,7 @@ func WriteRollup(workspace string) error {
 	if !ok {
 		return nil
 	}
-	b, err := json.MarshalIndent(s, "", "  ")
+	b, err := rollupMarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}

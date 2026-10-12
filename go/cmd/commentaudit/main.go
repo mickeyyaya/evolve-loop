@@ -8,6 +8,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/commentaudit"
 )
 
+var commentauditExit = os.Exit
+
 func main() {
-	os.Exit(commentaudit.Main(os.Args[1:], os.Stdout, os.Stderr, commentaudit.ExecGit{}))
+	commentauditExit(commentaudit.Main(os.Args[1:], os.Stdout, os.Stderr, commentaudit.ExecGit{}))
 }
