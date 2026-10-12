@@ -137,11 +137,14 @@ type MarkdownOptions struct {
 	Top          int     // rows in the "slowest" tables
 	ThresholdPkg float64 // flag packages whose wall time exceeds this (s)
 	ThresholdTst float64 // flag tests whose elapsed exceeds this (s)
+	Budget       float64
 }
 
 // Markdown renders the report as a Markdown document.
 func (rep *Report) Markdown(o MarkdownOptions) string {
 	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", o.Title)
+	rep.writeOverBudget(&b, o)
 	rep.writeOverview(&b, o)
 	rep.writeSlowPackages(&b, o)
 	rep.writeSlowestTests(&b, o)
@@ -158,7 +161,6 @@ func (rep *Report) writeOverview(b *strings.Builder, o MarkdownOptions) {
 		totalTests += p.NumTests
 	}
 
-	fmt.Fprintf(b, "# %s\n\n", o.Title)
 	fmt.Fprintf(b, "- Packages: **%d**\n", len(rep.Packages))
 	fmt.Fprintf(b, "- Top-level tests: **%d**\n", totalTests)
 	fmt.Fprintf(b, "- Aggregate package wall time: **%.1fs** (sum of parallel-aware per-package times)\n", aggWall)
@@ -168,6 +170,36 @@ func (rep *Report) writeOverview(b *strings.Builder, o MarkdownOptions) {
 		fmt.Fprintf(b, "> ⚠ **%d package(s) had no terminal summary** (truncated stream / panic / timeout) — their wall time is missing and they are NOT counted above: %s\n\n",
 			len(rep.Incomplete), strings.Join(rep.Incomplete, ", "))
 	}
+}
+
+func (rep *Report) OverBudget(limit float64) []pkgStat {
+	var over []pkgStat
+	if limit <= 0 {
+		return over
+	}
+	for _, p := range rep.Packages {
+		if p.Wall > limit {
+			over = append(over, p)
+		}
+	}
+	return over
+}
+
+func (rep *Report) writeOverBudget(b *strings.Builder, o MarkdownOptions) {
+	if o.Budget <= 0 {
+		return
+	}
+	fmt.Fprintf(b, "## Packages over budget (> %.1fs wall)\n\n", o.Budget)
+	over := rep.OverBudget(o.Budget)
+	if len(over) == 0 {
+		b.WriteString("_(none)_ All packages are within the budget.\n\n")
+		return
+	}
+	b.WriteString("| Package | Wall (s) | Over by (s) | Status |\n|---|--:|--:|---|\n")
+	for _, p := range over {
+		fmt.Fprintf(b, "| %s | %.2f | %.2f | %s |\n", shortPkg(p.Pkg), p.Wall, p.Wall-o.Budget, p.Status)
+	}
+	b.WriteString("\n")
 }
 
 func (rep *Report) writeSlowPackages(b *strings.Builder, o MarkdownOptions) {

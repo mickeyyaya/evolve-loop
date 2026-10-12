@@ -105,12 +105,21 @@ test: ## FAST layer: co-located unit/functional/component tests, race on (exclud
 test-component: ## Component tier: several internal packages wired against temp FS (no subprocess)
 	$(GO) test -race -count=1 ./test/component/...
 
-test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run
+TEST_TIMEOUT ?= 20m
+TEST_JSON ?=
+INTEGRATION_TEST = $(GO) test -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration -coverprofile=coverage.partial.txt
+
+test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text
 	@rm -f coverage.txt coverage.partial.txt; \
 	pkgs=$$($(GO) list -tags integration ./...) || exit $$?; \
 	pkgs=$$(printf '%s\n' "$$pkgs" | grep -v '/acs/') || exit $$?; \
-	$(GO) test -race -count=1 -tags integration -coverprofile=coverage.partial.txt $$pkgs; status=$$?; \
-	if [ "$$status" -ne 0 ]; then rm -f coverage.partial.txt; exit "$$status"; fi; \
+	if [ -n "$(TEST_JSON)" ]; then \
+		$(GO) build -o $(BIN_DIR)/testlatency ./cmd/testlatency || exit $$?; \
+		status=$$( { { $(INTEGRATION_TEST) -json $$pkgs; echo $$? >&3; } | tee "$(TEST_JSON)" | $(BIN_DIR)/testlatency -render >&2; } 3>&1 ); \
+	else \
+		$(INTEGRATION_TEST) $$pkgs; status=$$?; \
+	fi; \
+	status=$${status:-1}; if [ "$$status" -ne 0 ]; then rm -f coverage.partial.txt; exit "$$status"; fi; \
 	mv coverage.partial.txt coverage.txt
 
 test-e2e: ## E2E tier: full-cycle subprocess paths (//go:build e2e + evolve_test_phases); live sub-tier self-skips without its opt-in
