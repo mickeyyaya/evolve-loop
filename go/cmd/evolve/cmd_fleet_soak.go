@@ -50,7 +50,7 @@ func runFleetSoak(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	launchFn := soakLaunchFn
 	if launchFn == nil {
-		binPath, err := os.Executable()
+		binPath, err := fleetExecutable()
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve fleet soak: cannot resolve binary: %v\n", err)
 			return 1

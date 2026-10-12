@@ -344,6 +344,8 @@ func sweepRulePromotions(stderr io.Writer, projectRoot string, cycles []core.Cyc
 // fileUnexplainedOutcomeDefect signals that a terminal path escaped without
 // recording its outcome, which is itself a defect. Idempotent per cycle
 // (fixed filename); best-effort.
+var unexplainedOutcomeMarshal = json.MarshalIndent
+
 func fileUnexplainedOutcomeDefect(projectRoot string, cycle int, detail string) {
 	dir := filepath.Join(projectRoot, ".evolve", "inbox")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -353,7 +355,7 @@ func fileUnexplainedOutcomeDefect(projectRoot string, cycle int, detail string) 
 	if _, err := os.Stat(path); err == nil {
 		return
 	}
-	body, err := json.MarshalIndent(map[string]any{
+	body, err := unexplainedOutcomeMarshal(map[string]any{
 		"id":               fmt.Sprintf("unexplained-outcome-cycle-%d", cycle),
 		"action":           fmt.Sprintf("Cycle %d ended FAILED_UNEXPLAINED (%s). Every terminal path must record a ship PASS, a salvage, or an abort_reason (ADR-0044 C1) — locate the escaping path and route it through recordPhaseOutcome.", cycle, detail),
 		"priority":         "HIGH",

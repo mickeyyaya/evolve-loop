@@ -20,6 +20,8 @@ import (
 
 var fleetLaunchFactory = execCycleLaunch
 
+var fleetExecutable = os.Executable
+
 // loadPlanSpecs parses an `evolve fleet --plan` backlog into up to `count`
 // disjoint-scoped cycle specs stamped with goalHash; the second return is the
 // deferred backlog for a later wave.
@@ -64,7 +66,7 @@ func runFleet(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "evolve fleet: --goal-hash is required")
 		return 1
 	}
-	binPath, err := os.Executable()
+	binPath, err := fleetExecutable()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve fleet: cannot resolve binary: %v\n", err)
 		return 1

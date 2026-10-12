@@ -34,6 +34,7 @@ type detachedLaunch struct {
 var (
 	loopDetachExecutable = os.Executable
 	loopDetachAttr       = detachSysProcAttr
+	detachLogStat        = (*os.File).Stat
 )
 
 func defaultLoopDetachCommand(argv []string) (*exec.Cmd, error) {
@@ -75,7 +76,7 @@ func startDetachedLoop(cfg loopConfig, attr *syscall.SysProcAttr) (detachedLaunc
 		return detachedLaunch{}, fmt.Errorf("open log %s: %w", cfg.LogPath, err)
 	}
 	defer func() { _ = logFile.Close() }()
-	info, err := logFile.Stat()
+	info, err := detachLogStat(logFile)
 	if err != nil {
 		return detachedLaunch{}, fmt.Errorf("stat log %s: %w", cfg.LogPath, err)
 	}
@@ -116,7 +117,8 @@ func awaitDetachedBoot(cfg loopConfig, launch detachedLaunch, wait time.Duration
 	deadline := time.Now().Add(wait)
 	ticker := time.NewTicker(loopDetachPoll)
 	defer ticker.Stop()
-	for now := range ticker.C {
+	for {
+		now := <-ticker.C
 		select {
 		case err := <-launch.done:
 			fmt.Fprintf(stderr, "evolve loop: --detach: the loop exited during boot (exit %d); last lines of %s:\n", detachExitCode(err), cfg.LogPath)
@@ -134,7 +136,6 @@ func awaitDetachedBoot(cfg loopConfig, launch detachedLaunch, wait time.Duration
 			return 1
 		}
 	}
-	return 1
 }
 
 func detachExitCode(err error) int {
