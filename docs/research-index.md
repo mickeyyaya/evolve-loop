@@ -249,3 +249,12 @@ approaches / decision / results / retro) — lives at
 | Document | What it records |
 |---|---|
 | [plans/cover-changed-gate-2026-10.md](plans/cover-changed-gate-2026-10.md) | Plan: the 14-day coverage audit, the root cause, four candidate designs and decisions D1 to D13 (no allowance list, CI enforcement). It also holds the criteria to move the loop floor from shadow to enforce. |
+
+## 2026-10-12 — the test system: one run, many judges, one home for each helper (ADR-0131)
+
+| Document | What it records |
+|---|---|
+| [research/test-system-efficiency-2026-10.md](research/test-system-efficiency-2026-10.md) | Research: the growth of the suite, the repeats in the local floor, the poles of the integration run and the 10 GB transcript scan. It also covers duplicate helpers and isolation. Current practice: coverage, fake time and test selection. Findings F1.1 to F5.5, refinements R1 to R13. |
+| [architecture/test-system.md](architecture/test-system.md) | Design, the spec of record: the design of one test case, one instrumented run with judges that read it, and the order of seams. It also covers the helper kits, the duplicate ratchet, wall budgets and test lanes. |
+| [plans/test-system-efficiency-2026-10.md](plans/test-system-efficiency-2026-10.md) | Plan: four candidate designs with scores, decisions D1 to D16, and components T0 to T9 with their red tests, order and lane models. |
+| [architecture/adr/0131-one-test-run-feeds-every-coverage-gate.md](architecture/adr/0131-one-test-run-feeds-every-coverage-gate.md) | Decision: one instrumented run feeds every coverage gate. A test never reads the host home. Each test helper has one home. |
