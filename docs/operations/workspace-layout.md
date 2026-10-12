@@ -162,6 +162,8 @@ It never deletes.
 - Archive of idle trees (2026-10-12): `evolve gc --project-root <plane>` archives each `dev/` tree
   with no HEAD reflog entry and no HEAD commit for `gc.dev_worktrees.archive_after_days` days
   (default 14). Landing is not needed.
+  The sweep stops after `gc.dev_worktrees.sweep_budget_seconds` (default 300). A tree that it
+  did not judge in time is skipped, and the run does not fail.
   - **What happens.** A tree with uncommitted or untracked work is saved as a checkpoint
     first. Then `git worktree remove` runs. The branch stays. A record goes to
     `.evolve/archive/dev-worktrees.jsonl` in the plane.

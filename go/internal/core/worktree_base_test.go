@@ -98,7 +98,7 @@ func TestWorktreeReuseBase_SalvagedWorkIsPendingInTheReviewDiffAfterNormalize(t 
 	if base != wantBase {
 		t.Fatalf("base = %s, want pre-snapshot base %s", base, wantBase)
 	}
-	normalizeWorktreeToBase(context.Background(), wt, base)
+	normalizeWorktreeToBase(context.Background(), wt, base, io.Discard)
 	cmd = exec.Command("git", "diff", "HEAD", "--name-only")
 	cmd.Dir = wt
 	diff, err := cmd.Output()
@@ -206,17 +206,20 @@ func TestNewCycleRun_UnresolvableSnapshotBaseFailsProvisioning(t *testing.T) {
 }
 
 func TestWorktreeReuseBase_UnresolvableAncestorWarnsLoudlyAndDoesNotDegradeSilently(t *testing.T) {
+	t.Parallel()
+
 	wt, commit := gitRepoWithCommits(t)
 	commit(salvageSnapshotSubject)
 	o := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 1543}}, &fakeLedger{}, buildRunners(nil),
 		WithWorktreeProvisioner(&fakeWorktree{path: wt}))
 
 	var runErr error
-	stderr := captureStderr(t, func() {
-		_, _, runErr = o.newCycleRun(context.Background(), CycleRequest{
-			ProjectRoot: t.TempDir(), GoalHash: "g", DisableWorkspaceGuard: true,
-		})
+	var sink injectedStderr
+	o.stderr = &sink
+	_, _, runErr = o.newCycleRun(context.Background(), CycleRequest{
+		ProjectRoot: t.TempDir(), GoalHash: "g", DisableWorkspaceGuard: true,
 	})
+	stderr := sink.String()
 	if runErr == nil {
 		t.Fatal("unresolvable snapshot ancestry must abort provisioning")
 	}

@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,7 +104,7 @@ func TestNormalizeWorktreeToBase_SkipsNonAncestorBase(t *testing.T) {
 		t.Fatal("precondition: three distinct commits required")
 	}
 
-	normalizeWorktreeToBase(context.Background(), dir, side)
+	normalizeWorktreeToBase(context.Background(), dir, side, io.Discard)
 
 	if head := gitInRepo(t, dir, "rev-parse", "HEAD"); head != mainHead {
 		t.Fatalf("RED: HEAD=%s, want %s — normalize reset to a NON-ANCESTOR base "+
@@ -116,8 +117,8 @@ func TestNormalizeWorktreeToBase_Idempotent(t *testing.T) {
 	dir, base := newRepoWithBaseCommit(t)
 	addCommit(t, dir, "feature.go", "feat: x [worktree-build]")
 
-	normalizeWorktreeToBase(context.Background(), dir, base)
-	normalizeWorktreeToBase(context.Background(), dir, base)
+	normalizeWorktreeToBase(context.Background(), dir, base, io.Discard)
+	normalizeWorktreeToBase(context.Background(), dir, base, io.Discard)
 
 	if head := gitInRepo(t, dir, "rev-parse", "HEAD"); head != base {
 		t.Fatalf("HEAD=%s, want base=%s after double normalize", head, base)

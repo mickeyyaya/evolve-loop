@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"os"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/solutioncheck"
@@ -52,7 +53,7 @@ func DocumentCycle(workspace string) bool {
 	if workspace == "" {
 		return false
 	}
-	return kindSignals(workspace).DeliverableKind() == config.DeliverableKindDocument
+	return kindSignals(workspace, os.Stderr).DeliverableKind() == config.DeliverableKindDocument
 }
 
 // seedDispatchContext is the one place both dispatch surfaces enrich a

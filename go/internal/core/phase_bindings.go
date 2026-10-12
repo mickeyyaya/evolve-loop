@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,7 +119,7 @@ func auditBindingExitCode(verdict string) int {
 func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projectRoot, workspace, worktree, worktreeBase, verdict string) {
 	head, _, err := gitCapture(ctx, projectRoot, "rev-parse", "HEAD")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: git rev-parse HEAD failed: %v (ship will refuse to bind)\n", err)
 		return
 	}
 	// The tree ship will commit from the builder-declared index — not the
@@ -130,14 +131,14 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 	// only exit >1 (e.g. 128) is fatal. Match computeTreeStateSHA semantics.
 	diff, code, err := gitCapture(ctx, projectRoot, "diff", "HEAD")
 	if err != nil || code > 1 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: git diff HEAD failed (rc=%d): %v\n", code, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: git diff HEAD failed (rc=%d): %v\n", code, err)
 		return
 	}
 	treeSum := sha256.Sum256([]byte(diff))
 	artPath := filepath.Join(workspace, phasecontract.ArtifactFilename(string(PhaseAudit)))
 	artBytes, err := os.ReadFile(artPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding: read %s: %v\n", artPath, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding: read %s: %v\n", artPath, err)
 		return
 	}
 	artSum := sha256.Sum256(artBytes)
@@ -154,19 +155,19 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 		ArtifactPath:    artPath,
 		ArtifactSHA256:  hex.EncodeToString(artSum[:]),
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN audit-binding ledger append: %v\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN audit-binding ledger append: %v\n", err)
 	}
 
 	if !verdictcache.Reusable(verdict) {
 		return
 	}
 	if worktreeBase == "" {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put skipped (cycle %d): no worktree base identity\n", cycle)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN verdict-cache put skipped (cycle %d): no worktree base identity\n", cycle)
 		return
 	}
 	baseTree := worktreeBaseTreeSHA(ctx, worktree, worktreeBase)
 	if baseTree == "" {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put skipped (cycle %d): worktree base %s did not resolve to a tree\n", cycle, worktreeBase)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN verdict-cache put skipped (cycle %d): worktree base %s did not resolve to a tree\n", cycle, worktreeBase)
 		return
 	}
 	if verdictcache.ProbeEligible(baseTree, worktreeTree) {
@@ -177,7 +178,7 @@ func (o *Orchestrator) recordAuditBinding(ctx context.Context, cycle int, projec
 			ArtifactSHA256: hex.EncodeToString(artSum[:]),
 			ArtifactPath:   artPath,
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN verdict-cache put: %v\n", err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN verdict-cache put: %v\n", err)
 		}
 	}
 }
@@ -332,13 +333,13 @@ func (o *Orchestrator) recordGenericBinding(ctx context.Context, phase Phase, in
 // inspects whatever state exists); it NEVER aborts the cycle. No-op when HEAD is
 // already at baseSHA (the builder left changes uncommitted), so opting in is
 // byte-identical for non-committing builders.
-func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
+func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string, warn io.Writer) {
 	if worktree == "" || baseSHA == "" {
 		return
 	}
 	head, _, err := gitCapture(ctx, worktree, "rev-parse", "HEAD")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: rev-parse HEAD failed: %v (audit inspects worktree as-is)\n", err)
+		fmt.Fprintf(warn, "[orchestrator] WARN worktree-normalize: rev-parse HEAD failed: %v (audit inspects worktree as-is)\n", err)
 		return
 	}
 	if strings.TrimSpace(head) == baseSHA {
@@ -350,18 +351,18 @@ func normalizeWorktreeToBase(ctx context.Context, worktree, baseSHA string) {
 	// delta between histories as a spurious diff. Skip instead — the manual
 	// recovery already leaves the work pending, so "as-is" is correct.
 	if _, code, aerr := gitCapture(ctx, worktree, "merge-base", "--is-ancestor", baseSHA, "HEAD"); aerr != nil || code != 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: base %s is not an ancestor of worktree HEAD (rebase recovery?) — skipping soft-reset, audit inspects worktree as-is\n", baseSHA)
+		fmt.Fprintf(warn, "[orchestrator] WARN worktree-normalize: base %s is not an ancestor of worktree HEAD (rebase recovery?) — skipping soft-reset, audit inspects worktree as-is\n", baseSHA)
 		return
 	}
 	if _, code, rerr := gitCapture(ctx, worktree, "reset", "--soft", baseSHA); rerr != nil || code != 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: git reset --soft %s failed (rc=%d): %v (audit inspects committed state as-is)\n", baseSHA, code, rerr)
+		fmt.Fprintf(warn, "[orchestrator] WARN worktree-normalize: git reset --soft %s failed (rc=%d): %v (audit inspects committed state as-is)\n", baseSHA, code, rerr)
 		return
 	}
 	short := baseSHA
 	if len(short) > 12 {
 		short = short[:12]
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] worktree-normalize: soft-reset builder commits to base %s — changes now pending for audit\n", short)
+	fmt.Fprintf(warn, "[orchestrator] worktree-normalize: soft-reset builder commits to base %s — changes now pending for audit\n", short)
 }
 
 // normalizeBuildWorktree applies two post-phase normalizations to the active
@@ -382,7 +383,7 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 		return
 	}
 	if completed == PhaseBuild {
-		normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA)
+		normalizeWorktreeToBase(ctx, cs.ActiveWorktree, cs.WorktreeBaseSHA, o.errOut())
 	}
 	normalizeBuildGofmt(cs.ActiveWorktree)
 	// Derived-projection regen is build-ONLY: the flag registry (the SSOT) is
@@ -393,7 +394,7 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 		// Derive the covering-test corpus for test-amplification (inserted after
 		// build) so the agent is TOLD its in-scope tests instead of Grepping the
 		// whole repo for them. Best-effort: writes nothing when underivable.
-		writeCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath)
+		writeCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath, o.errOut())
 		// Deterministic false-green backstop: run the changed packages' unit
 		// tests AFTER the regen (so the tested tree matches what audit binds) and
 		// record ground-truth. Best-effort; never aborts — audit is the backstop.
@@ -410,7 +411,7 @@ func (o *Orchestrator) normalizeBuildWorktree(ctx context.Context, completed Pha
 	// would silently degrade to an unscoped whole-repo search. No-op (no stat
 	// miss, no derivation) once the corpus exists, so a normal cycle pays this
 	// exactly once.
-	ensureCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath)
+	ensureCoveringTests(ctx, cs.ActiveWorktree, cs.WorkspacePath, o.errOut())
 }
 
 func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree string) {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -109,11 +110,11 @@ func TestCommentFloorStage_AnUnknownWordIsOff(t *testing.T) {
 	t.Parallel()
 
 	for word, want := range map[string]config.Stage{"enforce": config.StageEnforce, " enforce ": config.StageEnforce, "shadow": config.StageShadow, "enforced": config.StageOff, "Enforce": config.StageOff} {
-		if got := commentFloorStage(floorRoot(t, `{"comment_floor":{"stage":"`+word+`"}}`)); got != want {
+		if got := commentFloorStage(floorRoot(t, `{"comment_floor":{"stage":"`+word+`"}}`), io.Discard); got != want {
 			t.Errorf("stage %q = %s, want %s", word, got, want)
 		}
 	}
-	if got := commentFloorStage(""); got != config.StageShadow {
+	if got := commentFloorStage("", io.Discard); got != config.StageShadow {
 		t.Errorf("no project root = %s, want the compiled default shadow", got)
 	}
 }

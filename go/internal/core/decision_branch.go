@@ -224,13 +224,13 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 	artifactPath := filepath.Join(cs.WorkspacePath, fmt.Sprintf("routing-decision-%d.json", seq))
 	sha := ""
 	if buf, err := json.MarshalIndent(dec, "", "  "); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing-decision marshal: %v\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN routing-decision marshal: %v\n", err)
 		artifactPath = ""
 	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing-decision mkdir: %v\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN routing-decision mkdir: %v\n", err)
 		artifactPath = ""
 	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing-decision write: %v\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN routing-decision write: %v\n", err)
 		artifactPath = ""
 	} else {
 		sum := sha256.Sum256(buf)
@@ -241,14 +241,14 @@ func (o *Orchestrator) recordRoutingDecision(ctx context.Context, cycle int, cs 
 		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "routing_decision",
 		ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN routing_decision ledger append: %v\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN routing_decision ledger append: %v\n", err)
 	}
 	for _, sp := range dec.SkipPhases {
 		if err := o.ledger.Append(ctx, LedgerEntry{
 			TS: ts, Cycle: cycle, Role: sp, Kind: "phase_skipped", ExitCode: 0,
 			Source: "router",
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase_skipped ledger append: %v\n", err)
 		}
 	}
 	o.emitRegistryGatedPhases(cycle, cs, dec)
@@ -305,26 +305,26 @@ func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs Cy
 	artifactPath := filepath.Join(cs.WorkspacePath, "phase-"+kind+".json")
 	sha := ""
 	if buf, err := phasePlanMarshal(plan.Entries, "", "  "); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s marshal: %v\n", kind, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase-%s marshal: %v\n", kind, err)
 		artifactPath = ""
 	} else if err := os.MkdirAll(cs.WorkspacePath, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s mkdir: %v\n", kind, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase-%s mkdir: %v\n", kind, err)
 		artifactPath = ""
 	} else if err := os.WriteFile(artifactPath, buf, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase-%s write: %v\n", kind, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase-%s write: %v\n", kind, err)
 		artifactPath = ""
 	} else {
 		sum := sha256.Sum256(buf)
 		sha = hex.EncodeToString(sum[:])
 	}
 	for _, c := range clamps {
-		fmt.Fprintf(os.Stderr, "[orchestrator] integrity-floor clamp: %s (%s → %s)\n", c.Rule, c.Proposed, c.Forced)
+		fmt.Fprintf(o.errOut(), "[orchestrator] integrity-floor clamp: %s (%s → %s)\n", c.Rule, c.Proposed, c.Forced)
 	}
 	if err := o.ledger.Append(ctx, LedgerEntry{
 		TS: ts, Cycle: cycle, Role: "orchestrator", Kind: "phase_" + kind,
 		ExitCode: 0, ArtifactPath: artifactPath, ArtifactSHA256: sha,
 	}); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_%s ledger append: %v\n", kind, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase_%s ledger append: %v\n", kind, err)
 	}
 
 	for _, cap := range []struct{ kind, file string }{
@@ -340,7 +340,7 @@ func (o *Orchestrator) recordPhasePlanKind(ctx context.Context, cycle int, cs Cy
 			TS: ts, Cycle: cycle, Role: "orchestrator", Kind: cap.kind,
 			ExitCode: 0, ArtifactPath: path, ArtifactSHA256: capSHA,
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s ledger append: %v\n", cap.kind, err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN %s ledger append: %v\n", cap.kind, err)
 		}
 	}
 }

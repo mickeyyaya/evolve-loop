@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,8 @@ import (
 )
 
 func TestReadContinuationFindings_RendersReasonsOrFallsBackLoudly(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	reasons := filepath.Join(dir, "reasons.json")
 	writeFile(t, reasons, `{"schema_version":1,"phase":"audit","reasons":["export X unnamed","race in Y"]}`)
@@ -35,7 +38,9 @@ func TestReadContinuationFindings_RendersReasonsOrFallsBackLoudly(t *testing.T) 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			var got string
-			log := captureStderr(t, func() { got = readContinuationFindings(tc.path) })
+			var sink injectedStderr
+			got = readContinuationFindings(tc.path, &sink)
+			log := sink.String()
 			if got != tc.want {
 				t.Fatalf("findings = %q, want %q", got, tc.want)
 			}
@@ -57,7 +62,7 @@ func FuzzReadContinuationFindings_IsBoundedAndRendersEveryReason(f *testing.F) {
 		if err := os.WriteFile(path, body, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		got := readContinuationFindings(path)
+		got := readContinuationFindings(path, io.Discard)
 		if len(got) > maxFindingsBytes+len("\n…[truncated  bytes]")+20 {
 			t.Fatalf("findings of %d bytes exceed the budget", len(got))
 		}

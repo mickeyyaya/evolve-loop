@@ -59,6 +59,8 @@ func correctionRunE4(t *testing.T, rev DeliverableReviewer, ledger Ledger, root 
 }
 
 func TestReviewWithCorrections_ALostCorrectionLedgerRowWarnsAndTheLadderContinues(t *testing.T) {
+	t.Parallel()
+
 	ledger := &kindFailingLedgerE4{failKinds: map[string]bool{"contract_correction": true}}
 	rev := &sequencedReviewer{phase: "build", results: []ReviewResult{{Approve: false, Reason: "missing header"}, {Approve: true}}}
 	runner := &countingPassRunnerE4{name: "build"}
@@ -66,7 +68,10 @@ func TestReviewWithCorrections_ALostCorrectionLedgerRowWarnsAndTheLadderContinue
 
 	var act loopAction
 	var err error
-	log := captureStderr(t, func() { act, err = cr.reviewWithCorrections(PhaseBuild, dr) })
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	act, err = cr.reviewWithCorrections(PhaseBuild, dr)
+	log := sink.String()
 
 	if act != loopNext || err != nil {
 		t.Fatalf("act=%v err=%v, want the approved correction to advance", act, err)
@@ -83,6 +88,8 @@ func TestReviewWithCorrections_ALostCorrectionLedgerRowWarnsAndTheLadderContinue
 }
 
 func TestReviewWithCorrections_ALeakAfterACorrectionAbortsBeforeTheReReview(t *testing.T) {
+	t.Parallel()
+
 	root := gittest.Fixture(t).Dir
 	blocked := filepath.Join(root, "blocked-worktree")
 	writeFile(t, blocked, "not a directory\n")
@@ -97,7 +104,9 @@ func TestReviewWithCorrections_ALeakAfterACorrectionAbortsBeforeTheReReview(t *t
 
 	var act loopAction
 	var err error
-	captureStderr(t, func() { act, err = cr.reviewWithCorrections(PhaseBuild, dr) })
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	act, err = cr.reviewWithCorrections(PhaseBuild, dr)
 
 	if act != loopAbort || err == nil || !strings.Contains(err.Error(), "worktree-leak recovery failed") {
 		t.Fatalf("act=%v err=%v, want an abort on the failed leak recovery", act, err)
@@ -135,7 +144,9 @@ func TestReviewWithCorrections_ALiveFixRungSpendsItsBudgetWithoutRedispatching(t
 
 	var act loopAction
 	var err error
-	captureStderr(t, func() { act, err = cr.reviewWithCorrections(PhaseBuild, dr) })
+	var sink injectedStderr
+	cr.o.stderr = &sink
+	act, err = cr.reviewWithCorrections(PhaseBuild, dr)
 
 	if act != loopAbort || err == nil || !strings.Contains(err.Error(), "still missing header") {
 		t.Fatalf("act=%v err=%v, want the exhausted ladder to abort with the reviewer's reason", act, err)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -124,7 +125,7 @@ func scoutReportGoalHashFromBytes(b []byte) string {
 // goalhash.Compute emits.
 var canonicalGoalHashRe = regexp.MustCompile("^[0-9a-f]{64}$")
 
-func normalizeScoutGoalHash(workspace string) {
+func normalizeScoutGoalHash(workspace string, warn io.Writer) {
 	ls := loadLaneScope(workspace)
 	if ls == nil || ls.GoalHash == "" {
 		return
@@ -133,7 +134,7 @@ func normalizeScoutGoalHash(workspace string) {
 	b, err := os.ReadFile(reportPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN %s unreadable during goal_hash normalize: %v (lane identity still pinned in %s)\n", scoutArtifactName, err, LaneScopeFile)
+			fmt.Fprintf(warn, "[orchestrator] WARN %s unreadable during goal_hash normalize: %v (lane identity still pinned in %s)\n", scoutArtifactName, err, LaneScopeFile)
 		}
 		return
 	}
@@ -142,13 +143,13 @@ func normalizeScoutGoalHash(workspace string) {
 		return
 	}
 	if !canonicalGoalHashRe.MatchString(got) {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout-report goal_hash %q is not a canonical 64-hex hash — NOT machine-stamping (blast-radius guard); lane identity is the pin %q in %s.\n", got, ls.GoalHash, LaneScopeFile)
+		fmt.Fprintf(warn, "[orchestrator] WARN scout-report goal_hash %q is not a canonical 64-hex hash — NOT machine-stamping (blast-radius guard); lane identity is the pin %q in %s.\n", got, ls.GoalHash, LaneScopeFile)
 		return
 	}
 	fixed := bytes.ReplaceAll(b, []byte(got), []byte(ls.GoalHash))
 	if err := os.WriteFile(reportPath, fixed, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout goal_hash normalize write failed: %v (lane identity still pinned in %s)\n", err, LaneScopeFile)
+		fmt.Fprintf(warn, "[orchestrator] WARN scout goal_hash normalize write failed: %v (lane identity still pinned in %s)\n", err, LaneScopeFile)
 		return
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] WARN scout-report Decision Trace goal_hash %q != pinned %q — machine-stamped the authoritative pin (scout mis-echoed the hash; lane identity is the pin, not the LLM transcription).\n", got, ls.GoalHash)
+	fmt.Fprintf(warn, "[orchestrator] WARN scout-report Decision Trace goal_hash %q != pinned %q — machine-stamped the authoritative pin (scout mis-echoed the hash; lane identity is the pin, not the LLM transcription).\n", got, ls.GoalHash)
 }

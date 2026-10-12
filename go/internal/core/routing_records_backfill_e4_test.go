@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -17,12 +18,17 @@ import (
 )
 
 func TestRecordRoutingDecision_AnUnencodableDecisionIsLedgeredWithoutAnArtifact(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	ledger := &fakeLedger{}
 	o := NewOrchestrator(&fakeStorage{}, ledger, buildRunners(nil))
 	dec := router.RouterDecision{NextPhase: "build", Reason: "scored", Evidence: map[string]interface{}{"score": math.NaN()}}
 
-	log := captureStderr(t, func() { o.recordRoutingDecision(context.Background(), 4, CycleState{WorkspacePath: ws}, 2, dec) })
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordRoutingDecision(context.Background(), 4, CycleState{WorkspacePath: ws}, 2, dec)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN routing-decision marshal: ") {
 		t.Fatalf("stderr must name the marshal failure:\n%s", log)
@@ -52,9 +58,10 @@ func TestRecordPhasePlanKind_AMarshalFailureLedgersThePlanWithoutAnArtifact(t *t
 	ledger := &fakeLedger{}
 	o := NewOrchestrator(&fakeStorage{}, ledger, buildRunners(nil))
 
-	log := captureStderr(t, func() {
-		o.recordPhasePlanKind(context.Background(), 6, CycleState{WorkspacePath: ws}, fullSpinePlan(), nil, "plan")
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordPhasePlanKind(context.Background(), 6, CycleState{WorkspacePath: ws}, fullSpinePlan(), nil, "plan")
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN phase-plan marshal: encoder refused") {
 		t.Fatalf("stderr must name the marshal failure:\n%s", log)
@@ -68,15 +75,18 @@ func TestRecordPhasePlanKind_AMarshalFailureLedgersThePlanWithoutAnArtifact(t *t
 }
 
 func TestRecordPhasePlanKind_ALostAdvisorCaptureRowWarnsPerCapture(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeFile(t, filepath.Join(ws, "advisor-prompt-replan.txt"), "prompt")
 	writeFile(t, filepath.Join(ws, "advisor-response-replan.txt"), "response")
 	ledger := &kindFailingLedgerE4{failKinds: map[string]bool{"advisor_prompt": true, "advisor_response": true}}
 	o := NewOrchestrator(&fakeStorage{}, ledger, buildRunners(nil))
 
-	log := captureStderr(t, func() {
-		o.recordPhasePlanKind(context.Background(), 6, CycleState{WorkspacePath: ws}, fullSpinePlan(), nil, "replan")
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordPhasePlanKind(context.Background(), 6, CycleState{WorkspacePath: ws}, fullSpinePlan(), nil, "replan")
+	log := sink.String()
 
 	for _, kind := range []string{"advisor_prompt", "advisor_response"} {
 		if !strings.Contains(log, "WARN "+kind+" ledger append: forced "+kind+" append fail") {
@@ -153,6 +163,8 @@ func TestAssembleFailureDigest_EachPersistenceFailureReturnsTheBuiltDigest(t *te
 }
 
 func TestPorcelainDirty_AnUnlaunchableGitIsAnErrorAndTheSetReadsClean(t *testing.T) {
+	t.Parallel()
+
 	missing := filepath.Join(t.TempDir(), "no-such-dir")
 
 	set, err := porcelainDirty(context.Background(), missing)
@@ -161,7 +173,9 @@ func TestPorcelainDirty_AnUnlaunchableGitIsAnErrorAndTheSetReadsClean(t *testing
 	}
 
 	var got map[string]bool
-	log := captureStderr(t, func() { got = porcelainDirtySet(context.Background(), missing) })
+	var sink injectedStderr
+	got = porcelainDirtySetTo(context.Background(), missing, &sink)
+	log := sink.String()
 	if got == nil || len(got) != 0 {
 		t.Fatalf("porcelainDirtySet = %v, want an empty non-nil set", got)
 	}
@@ -187,6 +201,8 @@ func identityOrchestrator(h *carryHarness, gateCalls *int, rows ...LedgerEntry) 
 }
 
 func TestIdentityCarryForward_DeclinesWhenTheWorktreeCannotBeRead(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name      string
 		arrange   func(t *testing.T, h *carryHarness, cs *CycleState)
@@ -214,7 +230,10 @@ func TestIdentityCarryForward_DeclinesWhenTheWorktreeCannotBeRead(t *testing.T) 
 			o := identityOrchestrator(h, &gateCalls, h.auditRow())
 
 			var carried bool
-			log := captureStderr(t, func() { carried = o.identityCarryForward(context.Background(), 31, cs, h.fx.base, h.fx.root) })
+			var sink injectedStderr
+			o.stderr = &sink
+			carried = o.identityCarryForward(context.Background(), 31, cs, h.fx.base, h.fx.root)
+			log := sink.String()
 
 			if carried || gateCalls != tc.wantGates || len(h.written) != 0 {
 				t.Fatalf("carried=%v gates=%d written=%d, want a decline before any gate", carried, gateCalls, len(h.written))
@@ -240,7 +259,10 @@ func TestIdentityCarryForward_AnUnidentifiablePatchIsReauditedAfterTheGates(t *t
 	o := identityOrchestrator(h, &gateCalls, h.auditRow())
 
 	var carried bool
-	log := captureStderr(t, func() { carried = o.identityCarryForward(context.Background(), 32, cs, h.fx.base, h.fx.root) })
+	var sink injectedStderr
+	o.stderr = &sink
+	carried = o.identityCarryForward(context.Background(), 32, cs, h.fx.base, h.fx.root)
+	log := sink.String()
 
 	if carried || gateCalls != 1 || len(h.written) != 0 {
 		t.Fatalf("carried=%v gates=%d written=%d, want gates run then a decline with no record", carried, gateCalls, len(h.written))
@@ -273,12 +295,17 @@ func TestGatesOnIntactTree_AnUntakeableFenceReportsNoGates(t *testing.T) {
 }
 
 func TestRecordProvisioningFailure_AnUncreatableWorkspaceWarnsAndWritesNoDigest(t *testing.T) {
+	t.Parallel()
+
 	parent := filepath.Join(t.TempDir(), "file")
 	writeFile(t, parent, "x")
 	ws := filepath.Join(parent, "cycle-3")
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 
-	log := captureStderr(t, func() { o.recordProvisioningFailure(3, t.TempDir(), ws, errors.New("disk full")) })
+	var sink injectedStderr
+	o.stderr = &sink
+	o.recordProvisioningFailure(3, t.TempDir(), ws, errors.New("disk full"))
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN worktree provisioning failed (source phases will be blocked): disk full") ||
 		!strings.Contains(log, "WARN create workspace for provisioning failure: ") {
@@ -290,13 +317,17 @@ func TestRecordProvisioningFailure_AnUncreatableWorkspaceWarnsAndWritesNoDigest(
 }
 
 func TestNormalizeScoutGoalHash_AnUnreadableReportWarnsAndLeavesItAlone(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeFile(t, filepath.Join(ws, LaneScopeFile), `{"todo_ids":["a"],"goal_hash":"`+strings.Repeat("ab", 32)+`"}`)
 	if err := os.Mkdir(filepath.Join(ws, scoutArtifactName), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	log := captureStderr(t, func() { normalizeScoutGoalHash(ws) })
+	var sink injectedStderr
+	normalizeScoutGoalHash(ws, &sink)
+	log := sink.String()
 
 	if !strings.Contains(log, "WARN "+scoutArtifactName+" unreadable during goal_hash normalize") {
 		t.Fatalf("stderr must warn about the unreadable report:\n%s", log)
@@ -307,23 +338,31 @@ func TestNormalizeScoutGoalHash_AnUnreadableReportWarnsAndLeavesItAlone(t *testi
 }
 
 func TestNormalizeScoutGoalHash_AnAbsentReportIsSilent(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeFile(t, filepath.Join(ws, LaneScopeFile), `{"todo_ids":["a"],"goal_hash":"`+strings.Repeat("ab", 32)+`"}`)
 
-	if log := captureStderr(t, func() { normalizeScoutGoalHash(ws) }); log != "" {
+	var sink injectedStderr
+	normalizeScoutGoalHash(ws, &sink)
+	if log := sink.String(); log != "" {
 		t.Fatalf("an absent report is not a warning: %q", log)
 	}
 }
 
 func TestMaterializedEvalSlugs_NoWorkspaceOrAnUnreadableHomeOwnsNothing(t *testing.T) {
-	if got := materializedEvalSlugs(""); got != nil {
+	t.Parallel()
+
+	if got := materializedEvalSlugs("", io.Discard); got != nil {
 		t.Fatalf("no workspace = %v, want nil", got)
 	}
 	ws := t.TempDir()
 	writeFile(t, filepath.Join(ws, filepath.FromSlash(strings.TrimSuffix(evalsDir, "/"))), "a file, not the eval home")
 
 	var got []string
-	log := captureStderr(t, func() { got = materializedEvalSlugs(ws) })
+	var sink injectedStderr
+	got = materializedEvalSlugs(ws, &sink)
+	log := sink.String()
 
 	if got != nil {
 		t.Fatalf("an unreadable eval home = %v, want nil", got)
@@ -331,12 +370,16 @@ func TestMaterializedEvalSlugs_NoWorkspaceOrAnUnreadableHomeOwnsNothing(t *testi
 	if !strings.Contains(log, "WARN lane ownership: workspace eval home unreadable") {
 		t.Fatalf("stderr must warn about the unreadable home:\n%s", log)
 	}
-	if log := captureStderr(t, func() { materializedEvalSlugs(t.TempDir()) }); log != "" {
+	var quiet injectedStderr
+	materializedEvalSlugs(t.TempDir(), &quiet)
+	if log := quiet.String(); log != "" {
 		t.Fatalf("an absent eval home is not a warning: %q", log)
 	}
 }
 
 func TestActiveVerifiedMints_ACorruptRegistryThatCannotBeQuarantinedWarnsTwice(t *testing.T) {
+	t.Parallel()
+
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory write permission")
 	}
@@ -350,7 +393,9 @@ func TestActiveVerifiedMints_ACorruptRegistryThatCannotBeQuarantinedWarnsTwice(t
 	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
 	var got map[string]bool
-	log := captureStderr(t, func() { got = activeVerifiedMints(root) })
+	var sink injectedStderr
+	got = activeVerifiedMints(root, &sink)
+	log := sink.String()
 
 	if got != nil {
 		t.Fatalf("a corrupt registry exempts nothing, got %v", got)

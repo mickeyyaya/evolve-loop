@@ -69,7 +69,7 @@ func (o *Orchestrator) seedTaskContract(ctx context.Context, base map[string]str
 		} else {
 			block += "No Go predicate inventory: this is a document cycle, and the registry declares no document contract — the audit grades the deliverable against the acceptance above alone.\n"
 		}
-		block += tddContractLine(o.cfg, kindSignals(cs.WorkspacePath))
+		block += tddContractLine(o.cfg, kindSignals(cs.WorkspacePath, o.errOut()))
 	} else if next != PhaseTDD {
 		lister := o.acsPredicates
 		if lister == nil {

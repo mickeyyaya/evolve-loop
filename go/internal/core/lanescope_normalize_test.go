@@ -1,6 +1,7 @@
 package core
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +49,7 @@ func TestNormalizeScoutGoalHash_StampsMismatchToPin(t *testing.T) {
 	writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash)
 	writeScoutReportFixture(t, ws, misGoalHash)
 
-	normalizeScoutGoalHash(ws)
+	normalizeScoutGoalHash(ws, io.Discard)
 
 	if got := scoutReportGoalHash(ws); got != pinGoalHash {
 		t.Errorf("post-normalize report goal_hash = %q, want the machine-stamped pin %q", got, pinGoalHash)
@@ -63,7 +64,7 @@ func TestNormalizeScoutGoalHash_CoherentReportUnchanged(t *testing.T) {
 	writeScoutReportFixture(t, ws, pinGoalHash)
 	before := readScoutReport(t, ws)
 
-	normalizeScoutGoalHash(ws)
+	normalizeScoutGoalHash(ws, io.Discard)
 
 	if after := readScoutReport(t, ws); after != before {
 		t.Errorf("coherent report was mutated:\nbefore=%q\nafter =%q", before, after)
@@ -78,7 +79,7 @@ func TestNormalizeScoutGoalHash_NonCanonicalEchoRefused(t *testing.T) {
 	writeScoutReportFixture(t, ws, "goal-1") // detected mismatch, but not 64-hex
 	before := readScoutReport(t, ws)
 
-	normalizeScoutGoalHash(ws)
+	normalizeScoutGoalHash(ws, io.Discard)
 
 	if after := readScoutReport(t, ws); after != before {
 		t.Errorf("non-canonical echo triggered a rewrite:\nbefore=%q\nafter =%q", before, after)
@@ -101,7 +102,7 @@ func TestNormalizeScoutGoalHash_CorrectsEveryOccurrence(t *testing.T) {
 		t.Fatalf("write report: %v", err)
 	}
 
-	normalizeScoutGoalHash(ws)
+	normalizeScoutGoalHash(ws, io.Discard)
 
 	after := readScoutReport(t, ws)
 	if strings.Contains(after, misGoalHash) {
@@ -120,7 +121,7 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 		writeScoutReportFixture(t, ws, misGoalHash) // no lane-scope.json
 		before := readScoutReport(t, ws)
 
-		normalizeScoutGoalHash(ws)
+		normalizeScoutGoalHash(ws, io.Discard)
 
 		if after := readScoutReport(t, ws); after != before {
 			t.Errorf("report mutated with no pin present:\nbefore=%q\nafter =%q", before, after)
@@ -131,7 +132,7 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 		ws := t.TempDir()
 		writeLaneScopeFixture(t, ws, []string{"todo-a"}, pinGoalHash) // no scout-report.md
 
-		normalizeScoutGoalHash(ws) // must not panic / create a file
+		normalizeScoutGoalHash(ws, io.Discard) // must not panic / create a file
 
 		if _, err := os.Stat(filepath.Join(ws, "scout-report.md")); !os.IsNotExist(err) {
 			t.Errorf("normalize fabricated a scout-report.md from a bare pin (err=%v)", err)
@@ -144,7 +145,7 @@ func TestNormalizeScoutGoalHash_FailOpen(t *testing.T) {
 		writeScoutReportFixture(t, ws, "") // trace present, goal_hash key absent
 		before := readScoutReport(t, ws)
 
-		normalizeScoutGoalHash(ws)
+		normalizeScoutGoalHash(ws, io.Discard)
 
 		if after := readScoutReport(t, ws); after != before {
 			t.Errorf("report with no goal_hash echo was mutated:\nbefore=%q\nafter =%q", before, after)
@@ -166,7 +167,7 @@ func TestNormalizeScoutGoalHash_WriteFailureIsLoudNoOp(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(reportPath, 0o644) }) // let TempDir clean up
 
-	normalizeScoutGoalHash(ws) // write fails → loud no-op, no panic
+	normalizeScoutGoalHash(ws, io.Discard) // write fails → loud no-op, no panic
 
 	_ = os.Chmod(reportPath, 0o644)
 	if after := readScoutReport(t, ws); after != before {

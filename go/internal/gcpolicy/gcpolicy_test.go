@@ -171,3 +171,30 @@ func TestDevWorktreesArchiveAfterDays_DecodesFromItsPolicyKeyBesideWorktrees(t *
 		t.Errorf("re-marshal = %s (err %v), want the dev_worktrees key kept", out, err)
 	}
 }
+
+func TestDevSweepBudget_AnUnsetOrNonPositiveValueTakesTheFiveMinuteDefault(t *testing.T) {
+	cases := []struct {
+		name string
+		secs int
+		want time.Duration
+	}{
+		{"unset", 0, 5 * time.Minute},
+		{"negative", -9, 5 * time.Minute},
+		{"explicit", 90, 90 * time.Second},
+	}
+	for _, c := range cases {
+		if got := (gcpolicy.DevWorktreesPolicy{SweepBudgetSeconds: c.secs}).SweepBudget(); got != c.want {
+			t.Errorf("%s: sweep_budget_seconds=%d SweepBudget() = %s, want %s", c.name, c.secs, got, c.want)
+		}
+	}
+}
+
+func TestDevSweepBudgetSeconds_DecodesFromItsPolicyKey(t *testing.T) {
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"dev_worktrees":{"sweep_budget_seconds":120}}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got := p.DevWorktrees.SweepBudget(); got != 2*time.Minute {
+		t.Errorf("SweepBudget() = %s, want 2m0s", got)
+	}
+}

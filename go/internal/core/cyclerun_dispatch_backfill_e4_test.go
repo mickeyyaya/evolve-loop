@@ -49,6 +49,8 @@ func dispatchRunE4(t *testing.T, ledger Ledger, runner PhaseRunner, phase Phase,
 }
 
 func TestDispatch_AReconciledTimeoutShipsOnTheAgentsVerdictAndLeavesAnAuditRow(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name       string
 		failLedger bool
@@ -71,7 +73,10 @@ func TestDispatch_AReconciledTimeoutShipsOnTheAgentsVerdictAndLeavesAnAuditRow(t
 			var dr dispatchResult
 			var act loopAction
 			var err error
-			log := captureStderr(t, func() { dr, act, err = cr.dispatch(PhaseScout) })
+			var sink injectedStderr
+			cr.o.stderr = &sink
+			dr, act, err = cr.dispatch(PhaseScout)
+			log := sink.String()
 
 			if err != nil || act != loopNext || dr.resp.Verdict != VerdictPASS || runner.calls != 1 {
 				t.Fatalf("act=%v err=%v verdict=%q calls=%d, want loopNext on the agent's PASS after one call", act, err, dr.resp.Verdict, runner.calls)
@@ -118,6 +123,8 @@ func TestDispatch_ANonReconciledPassWritesNoReconciledRow(t *testing.T) {
 }
 
 func TestDispatch_ABestEffortObserverThatFailsAfterShipIsSkippedNotFatal(t *testing.T) {
+	t.Parallel()
+
 	catalog, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "post-ship-monitor", Optional: true, After: "ship", Role: string(phasespec.RoleControl)}})
 	if err != nil {
 		t.Fatalf("catalog: %v", err)
@@ -142,7 +149,10 @@ func TestDispatch_ABestEffortObserverThatFailsAfterShipIsSkippedNotFatal(t *test
 			var dr dispatchResult
 			var act loopAction
 			var derr error
-			log := captureStderr(t, func() { dr, act, derr = cr.dispatch(Phase("post-ship-monitor")) })
+			var sink injectedStderr
+			cr.o.stderr = &sink
+			dr, act, derr = cr.dispatch(Phase("post-ship-monitor"))
+			log := sink.String()
 
 			if tc.wantFatal {
 				var clf *ErrCycleLevelFailure
@@ -162,6 +172,8 @@ func TestDispatch_ABestEffortObserverThatFailsAfterShipIsSkippedNotFatal(t *test
 }
 
 func TestDispatch_ANonCanonicalVerdictAtTheRetryCapDegradesOnlyANonFloorPhase(t *testing.T) {
+	t.Parallel()
+
 	catalog, err := phasespec.Catalog{}.Merge([]phasespec.PhaseSpec{{Name: "amplify-tests", Optional: true, After: "build"}})
 	if err != nil {
 		t.Fatalf("catalog: %v", err)
@@ -185,7 +197,10 @@ func TestDispatch_ANonCanonicalVerdictAtTheRetryCapDegradesOnlyANonFloorPhase(t 
 			var dr dispatchResult
 			var act loopAction
 			var derr error
-			log := captureStderr(t, func() { dr, act, derr = cr.dispatch(Phase("amplify-tests")) })
+			var sink injectedStderr
+			cr.o.stderr = &sink
+			dr, act, derr = cr.dispatch(Phase("amplify-tests"))
+			log := sink.String()
 
 			if !tc.wantSkip {
 				var clf *ErrCycleLevelFailure
@@ -205,6 +220,8 @@ func TestDispatch_ANonCanonicalVerdictAtTheRetryCapDegradesOnlyANonFloorPhase(t 
 }
 
 func TestDispatch_ARetryRowThatCannotBeWrittenWarnsAndTheRelaunchStillHappens(t *testing.T) {
+	t.Parallel()
+
 	good := PhaseResponse{Phase: "scout", Verdict: VerdictPASS}
 	cases := []struct {
 		name  string
@@ -222,7 +239,10 @@ func TestDispatch_ARetryRowThatCannotBeWrittenWarnsAndTheRelaunchStillHappens(t 
 			var dr dispatchResult
 			var act loopAction
 			var err error
-			log := captureStderr(t, func() { dr, act, err = cr.dispatch(PhaseScout) })
+			var sink injectedStderr
+			cr.o.stderr = &sink
+			dr, act, err = cr.dispatch(PhaseScout)
+			log := sink.String()
 
 			if err != nil || act != loopNext || dr.resp.Verdict != VerdictPASS || dr.attemptCount != 2 || runner.calls != 2 {
 				t.Fatalf("act=%v err=%v verdict=%q attempts=%d calls=%d, want the second attempt to ship", act, err, dr.resp.Verdict, dr.attemptCount, runner.calls)
@@ -231,5 +251,24 @@ func TestDispatch_ARetryRowThatCannotBeWrittenWarnsAndTheRelaunchStillHappens(t 
 				t.Fatalf("a lost retry row must warn:\n%s", log)
 			}
 		})
+	}
+}
+
+func TestRecordPhaseSkip_ALostLedgerRowWarnsAndStillReturnsTheSkip(t *testing.T) {
+	t.Parallel()
+
+	ledger := &kindFailingLedgerE4{failKinds: map[string]bool{"phase_skipped_absent_deliverable": true}}
+	runner := &dispatchScriptRunnerE4{name: "scout", steps: []func() (PhaseResponse, error){dispatchStepE4(PhaseResponse{}, nil)}}
+	cr := dispatchRunE4(t, ledger, runner, PhaseScout, 1)
+	var sink injectedStderr
+	cr.o.stderr = &sink
+
+	resp := cr.recordPhaseSkip(PhaseScout, errors.New("absent"), "phase_skipped_absent_deliverable", "deliverable absent")
+
+	if resp.Verdict != VerdictSKIPPED {
+		t.Fatalf("verdict = %q, want SKIPPED even when the ledger row is lost", resp.Verdict)
+	}
+	if !strings.Contains(sink.String(), "WARN phase_skipped_absent_deliverable ledger append: ") {
+		t.Fatalf("a lost ledger row must warn; stderr was:\n%q", sink.String())
 	}
 }

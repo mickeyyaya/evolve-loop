@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -25,9 +26,13 @@ func defaultGitHEAD() (string, error) {
 }
 
 func porcelainDirtySet(ctx context.Context, dir string) map[string]bool {
+	return porcelainDirtySetTo(ctx, dir, os.Stderr)
+}
+
+func porcelainDirtySetTo(ctx context.Context, dir string, warn io.Writer) map[string]bool {
 	set, err := porcelainDirty(ctx, dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN dirty-set: %v — read as a clean tree\n", err)
+		fmt.Fprintf(warn, "[orchestrator] WARN dirty-set: %v — read as a clean tree\n", err)
 		return map[string]bool{}
 	}
 	return set

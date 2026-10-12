@@ -236,17 +236,20 @@ func TestCoreFacades_ProjectTheLeaf(t *testing.T) {
 // plan (the advisor reports its own fault) while the verbatim
 // `[orchestrator] WARN phase advisor Plan failed` line still prints.
 func TestRunCycle_PlanDegradeEmitsNoOrchestratorCode(t *testing.T) {
+	t.Parallel()
+
 	c, got := recordingCenter()
 	st := &fakeStorage{state: State{LastCycleNumber: 0}}
 	cfg := shadowCfg(config.StageAdvisory)
 	cfg.Mode = config.ModeDynamicLLM
 	o := NewOrchestrator(st, &fakeLedger{}, buildRunners(nil),
 		WithRouting(cfg, router.StaticPreset{}), WithPlanner(&erroringPlanner{}), WithSignalCenter(c))
-	out := captureStderr(t, func() {
-		if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
-			t.Fatalf("RunCycle: %v", err)
-		}
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
+		t.Fatalf("RunCycle: %v", err)
+	}
+	out := sink.String()
 	if !strings.Contains(out, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): planner: boom") {
 		t.Errorf("the orchestrator's verbatim degrade line stays until unit 05: %q", out)
 	}

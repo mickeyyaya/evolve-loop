@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -177,16 +178,20 @@ func TestCoverChangedFailures_ShadowOffAndEveryPlumbingFaultLeaveTheHandoffAlone
 }
 
 func TestFloorStage_AnUnknownWordTurnsTheCheckOffAndNamesIt(t *testing.T) {
+	t.Parallel()
+
 	for word, want := range map[string]config.Stage{"enforce": config.StageEnforce, "off": config.StageOff, "bogus": config.StageOff} {
-		if got := coverChangedStage(floorRoot(t, `{"cover_changed":{"stage":"`+word+`"}}`)); got != want {
+		if got := coverChangedStage(floorRoot(t, `{"cover_changed":{"stage":"`+word+`"}}`), io.Discard); got != want {
 			t.Errorf("stage %q = %s, want %s", word, got, want)
 		}
 	}
-	if got := coverChangedStage(""); got != config.StageShadow {
+	if got := coverChangedStage("", io.Discard); got != config.StageShadow {
 		t.Errorf("no project root = %s, want the compiled shadow", got)
 	}
-	comment := captureStderr(t, func() { commentFloorStage(floorRoot(t, `{"comment_floor":{"stage":"bogus"}}`)) })
-	cover := captureStderr(t, func() { coverChangedStage(floorRoot(t, `{"cover_changed":{"stage":"bogus"}}`)) })
+	var commentSink, coverSink injectedStderr
+	commentFloorStage(floorRoot(t, `{"comment_floor":{"stage":"bogus"}}`), &commentSink)
+	coverChangedStage(floorRoot(t, `{"cover_changed":{"stage":"bogus"}}`), &coverSink)
+	comment, cover := commentSink.String(), coverSink.String()
 	if !strings.Contains(comment, `comment_floor.stage "bogus" is not off, shadow or enforce; the comment floor is off`) {
 		t.Errorf("comment floor warning = %q, want the original text", comment)
 	}

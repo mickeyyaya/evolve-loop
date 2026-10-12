@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,7 @@ func TestRetireSupersededAuditArtifacts_ArchivesBothVerdictFiles(t *testing.T) {
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), acsBody)
 	mustWriteRoundArtifact(t, filepath.Join(dir, "audit-report.md"), reportBody)
 
-	retireSupersededAuditArtifacts(dir, 1)
+	retireSupersededAuditArtifacts(dir, 1, io.Discard)
 
 	for _, gone := range []string{"acs-verdict.json", "audit-report.md"} {
 		if _, err := os.Stat(filepath.Join(dir, gone)); !os.IsNotExist(err) {
@@ -37,7 +38,7 @@ func TestRetireSupersededAuditArtifacts_RoundZeroHonorsPreStagedVerdict(t *testi
 	dir := t.TempDir()
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), "operator-pre-stage")
 
-	retireSupersededAuditArtifacts(dir, 0)
+	retireSupersededAuditArtifacts(dir, 0, io.Discard)
 
 	if got := mustReadRoundArtifact(t, filepath.Join(dir, "acs-verdict.json")); got != "operator-pre-stage" {
 		t.Errorf("round 0 must not retire a pre-staged verdict; got %q", got)
@@ -52,7 +53,7 @@ func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testin
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.round1.json"), "true-round1-evidence")
 	mustWriteRoundArtifact(t, filepath.Join(dir, "acs-verdict.json"), "partial-from-dead-attempt")
 
-	retireSupersededAuditArtifacts(dir, 1)
+	retireSupersededAuditArtifacts(dir, 1, io.Discard)
 
 	if got := mustReadRoundArtifact(t, filepath.Join(dir, "acs-verdict.round1.json")); got != "true-round1-evidence" {
 		t.Errorf("existing archive clobbered: %q", got)
@@ -65,8 +66,8 @@ func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testin
 func TestRetireSupersededAuditArtifacts_MissingFilesAndWorkspaceAreQuiet(t *testing.T) {
 	t.Parallel()
 
-	retireSupersededAuditArtifacts("", 1)          // no workspace: state-only harnesses
-	retireSupersededAuditArtifacts(t.TempDir(), 1) // absent files: fresh shape
+	retireSupersededAuditArtifacts("", 1, io.Discard)          // no workspace: state-only harnesses
+	retireSupersededAuditArtifacts(t.TempDir(), 1, io.Discard) // absent files: fresh shape
 }
 
 func TestCompletedAuditRounds_CountsOnlyAuditOccurrences(t *testing.T) {

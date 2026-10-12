@@ -55,16 +55,18 @@ func gitOutput(t *testing.T, root string, args ...string) string {
 }
 
 func TestWorktreeMutators_RefuseTheProjectRoot(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
-	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	for _, tc := range []struct {
 		name string
 		run  func(t *testing.T, r inPlaceRepo) string // returns what the helper reported
 	}{
 		{"normalizeBuildWorktree (gofmt -w, reset --soft, projection regen)", func(t *testing.T, r inPlaceRepo) string {
-			return captureStderr(t, func() {
-				o.normalizeBuildWorktree(ctx, PhaseBuild, CycleState{ActiveWorktree: r.root, WorktreeBaseSHA: gitOutput(t, r.root, "rev-parse", "HEAD")}, r.root)
-			})
+			var sink injectedStderr
+			o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), WithStderr(&sink))
+			o.normalizeBuildWorktree(ctx, PhaseBuild, CycleState{ActiveWorktree: r.root, WorktreeBaseSHA: gitOutput(t, r.root, "rev-parse", "HEAD")}, r.root)
+			return sink.String()
 		}},
 		{"recoverBuildLeak (git checkout -- / add -f)", func(t *testing.T, r inPlaceRepo) string {
 			if !recoverBuildLeak(ctx, leakRecovery{projectRoot: r.root, worktree: r.root, baseline: map[string]bool{}, authority: sourceWriterAuthority}) {

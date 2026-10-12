@@ -1,7 +1,6 @@
 package core
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,26 +71,20 @@ func TestDispatchSignals(t *testing.T) {
 }
 
 func TestDispatchSignals_DegradedDigestIsLoud(t *testing.T) {
+	t.Parallel()
+
 	root, ws := t.TempDir(), t.TempDir()
 	writeDomainJSON(t, root, `{"domain":"writing"}`)
 	if err := os.Mkdir(filepath.Join(ws, "triage-report.md"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	orig := os.Stderr
-	os.Stderr = w
-	got := dispatchSignals(PhaseTriage, ws, root)
-	os.Stderr = orig
-	_ = w.Close()
-	logged, _ := io.ReadAll(r)
-	_ = r.Close()
+	var sink injectedStderr
+	got := dispatchSignalsTo(PhaseTriage, ws, root, &sink)
+	logged := sink.String()
 	if got[config.SignalDeliverableKind] != config.DeliverableKindCode {
 		t.Errorf("degraded digest must stay on the conservative kind, never the domain default; got %v", got)
 	}
-	if !strings.Contains(string(logged), "WARN") || !strings.Contains(string(logged), "triage") {
+	if !strings.Contains(logged, "WARN") || !strings.Contains(logged, "triage") {
 		t.Errorf("degraded digest must WARN naming the torn report; stderr=%q", logged)
 	}
 }

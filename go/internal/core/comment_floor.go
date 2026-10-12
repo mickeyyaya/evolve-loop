@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ import (
 )
 
 func commentFloorFailures(ctx context.Context, in ReviewInput) []string {
-	stage := commentFloorStage(in.ProjectRoot)
+	stage := commentFloorStage(in.ProjectRoot, in.errOut())
 	if stage == config.StageOff || in.Worktree == "" {
 		return nil
 	}
@@ -22,12 +23,12 @@ func commentFloorFailures(ctx context.Context, in ReviewInput) []string {
 	paths := changedWorktreePathsSince(ctx, in.Worktree, base, "--no-renames")
 	added, err := commentaudit.AddedAcrossDiff(paths, commentaudit.ReadAtBase(worktreeGit(ctx, in.Worktree), base), worktreeFile(in.Worktree))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN comment floor could not read the diff (%v); the audit still judges comments\n", err)
+		fmt.Fprintf(in.errOut(), "[build-floor] WARN comment floor could not read the diff (%v); the audit still judges comments\n", err)
 		return nil
 	}
 	failures, warning := commentFloorResult(stage, added)
 	if warning != "" {
-		fmt.Fprintln(os.Stderr, warning)
+		fmt.Fprintln(in.errOut(), warning)
 	}
 	return failures
 }
@@ -47,11 +48,11 @@ func commentFloorResult(stage config.Stage, added []commentaudit.Added) (failure
 	return []string{fmt.Sprintf("the build adds %d comment line(s); new and changed code carries no comments (docs/conventions/code-comments.md). Delete each one; put what it says into a name, a test name or the package's design notes:\n    %s", len(added), listing)}, ""
 }
 
-func commentFloorStage(projectRoot string) config.Stage {
-	return floorStage(projectRoot, "comment_floor", "comment floor", func(p policy.Policy) string { return p.CommentFloorConfig().Stage })
+func commentFloorStage(projectRoot string, warn io.Writer) config.Stage {
+	return floorStage(projectRoot, "comment_floor", "comment floor", func(p policy.Policy) string { return p.CommentFloorConfig().Stage }, warn)
 }
 
-func floorStage(projectRoot, key, label string, word func(policy.Policy) string) config.Stage {
+func floorStage(projectRoot, key, label string, word func(policy.Policy) string, warn io.Writer) config.Stage {
 	chosen := word(policy.Policy{})
 	if projectRoot != "" {
 		if p, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json")); err == nil {
@@ -60,7 +61,7 @@ func floorStage(projectRoot, key, label string, word func(policy.Policy) string)
 	}
 	stage, ok := config.GateStage(chosen)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "[build-floor] WARN %s.stage %q is not off, shadow or enforce; the %s is off\n", key, chosen, label)
+		fmt.Fprintf(warn, "[build-floor] WARN %s.stage %q is not off, shadow or enforce; the %s is off\n", key, chosen, label)
 	}
 	return stage
 }

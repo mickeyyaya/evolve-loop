@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +42,7 @@ const coveringTestsMaxBytes = 16 * 1024
 // workspace, an underivable diff, or an empty corpus writes nothing at all, and
 // the phase then behaves exactly as it does today (its input resolver skips a
 // missing file). A write failure is logged, never fatal.
-func writeCoveringTests(ctx context.Context, worktree, workspace string) {
+func writeCoveringTests(ctx context.Context, worktree, workspace string, warn io.Writer) {
 	if worktree == "" || workspace == "" {
 		return
 	}
@@ -58,7 +59,7 @@ func writeCoveringTests(ctx context.Context, worktree, workspace string) {
 	body, omitted := renderCoveringTests(files)
 	path := filepath.Join(workspace, coveringTestsArtifact)
 	if err := atomicwrite.Bytes(path, []byte(body)); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN covering-tests: write %s: %v (test-amplification falls back to its own search)\n", path, err)
+		fmt.Fprintf(warn, "[orchestrator] WARN covering-tests: write %s: %v (test-amplification falls back to its own search)\n", path, err)
 	}
 	// No silent caps: the in-artifact note is visible only to the agent, so an
 	// operator reading the cycle log could not tell a trimmed corpus from a
@@ -66,7 +67,7 @@ func writeCoveringTests(ctx context.Context, worktree, workspace string) {
 	// exists to prove uninterpretable. Silent when nothing was dropped: a
 	// warning on every clean cycle trains the operator to ignore the real one.
 	if omitted > 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN covering-tests: corpus TRUNCATED — %d of %d covering-test paths omitted (cap %d bytes); test-amplification sees a partial corpus\n",
+		fmt.Fprintf(warn, "[orchestrator] WARN covering-tests: corpus TRUNCATED — %d of %d covering-test paths omitted (cap %d bytes); test-amplification sees a partial corpus\n",
 			omitted, len(files), coveringTestsMaxBytes)
 	}
 }
@@ -99,7 +100,7 @@ var coveringTestsDeriver = writeCoveringTests
 //
 // A corpus already on disk is a silent no-op — the build path's fresh
 // derivation stays authoritative, and this never pays a second `go list`.
-func ensureCoveringTests(ctx context.Context, worktree, workspace string) {
+func ensureCoveringTests(ctx context.Context, worktree, workspace string, warn io.Writer) {
 	if worktree == "" || workspace == "" {
 		return
 	}
@@ -107,9 +108,9 @@ func ensureCoveringTests(ctx context.Context, worktree, workspace string) {
 	if _, err := os.Stat(path); err == nil {
 		return
 	}
-	coveringTestsDeriver(ctx, worktree, workspace)
+	coveringTestsDeriver(ctx, worktree, workspace, warn)
 	if _, err := os.Stat(path); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN covering-tests: no corpus at %s — test-amplification falls back to an UNSCOPED whole-repo search; this run's context-token figure is not comparable to a scoped one\n", path)
+		fmt.Fprintf(warn, "[orchestrator] WARN covering-tests: no corpus at %s — test-amplification falls back to an UNSCOPED whole-repo search; this run's context-token figure is not comparable to a scoped one\n", path)
 	}
 }
 

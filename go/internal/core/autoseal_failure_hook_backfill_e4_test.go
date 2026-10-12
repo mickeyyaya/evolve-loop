@@ -146,6 +146,8 @@ func TestAdviseOnUnclassifiedFailure_NoEvidenceNeverConsultsTheAdvisor(t *testin
 }
 
 func TestAdviseOnUnclassifiedFailure_RejectedAdviceIsNotPromoted(t *testing.T) {
+	t.Parallel()
+
 	root := t.TempDir()
 	ws := filepath.Join(root, "ws")
 	writeEscalation(t, ws, "build", "⚠ some never-seen fatal pane state, definitely novel")
@@ -160,9 +162,10 @@ func TestAdviseOnUnclassifiedFailure_RejectedAdviceIsNotPromoted(t *testing.T) {
 			fa := &fakeAdviser{advice: &advice}
 			o := hookOrchestrator(t, config.StageEnforce, fa)
 
-			log := captureStderr(t, func() {
-				o.adviseOnUnclassifiedFailure(context.Background(), 1, ws, root, PhaseBuild, wrapTimeout(), nil)
-			})
+			var sink injectedStderr
+			o.stderr = &sink
+			o.adviseOnUnclassifiedFailure(context.Background(), 1, ws, root, PhaseBuild, wrapTimeout(), nil)
+			log := sink.String()
 
 			if fa.calls != 1 {
 				t.Fatalf("advisor calls = %d, want 1", fa.calls)

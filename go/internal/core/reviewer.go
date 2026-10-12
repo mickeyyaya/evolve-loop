@@ -1,6 +1,10 @@
 package core
 
-import "context"
+import (
+	"context"
+	"io"
+	"os"
+)
 
 // ReviewInput is the bundle a DeliverableReviewer needs to decide on a phase.
 // Includes everything from the PhaseResponse plus the phase identity and the
@@ -20,6 +24,14 @@ type ReviewInput struct {
 	ProjectRoot    string        // absolute project root (for git-evidence verification)
 	ChallengeToken string        // <workspace>/challenge-token.txt; empty if the phase didn't emit one
 	BreakerExempt  bool
+	Stderr         io.Writer
+}
+
+func (in ReviewInput) errOut() io.Writer {
+	if in.Stderr == nil {
+		return os.Stderr
+	}
+	return in.Stderr
 }
 
 // ReviewResult is the reviewer's decision.

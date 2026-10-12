@@ -153,21 +153,21 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 	}
 	snap, err := o.compositionSnapshot(ctx, worktree, cs.RunID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: snapshot unavailable: %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: snapshot unavailable: %v; falling back to full re-audit\n", err)
 		return false
 	}
 	composedDiff, exit, err := gitCapture(ctx, worktree, "diff", "main...HEAD")
 	if err != nil || exit != 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: composed diff unavailable (exit=%d, err=%v); falling back to full re-audit\n", exit, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: composed diff unavailable (exit=%d, err=%v); falling back to full re-audit\n", exit, err)
 		return false
 	}
 	patchID, err := compositionPatchID([]byte(composedDiff))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: patch-id computation failed: %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: patch-id computation failed: %v; falling back to full re-audit\n", err)
 		return false
 	}
 	if patchID != snap.PatchID {
-		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: composed patch-id %s does not match audited %s (semantic drift); falling back to full re-audit\n", patchID, snap.PatchID)
+		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: composed patch-id %s does not match audited %s (semantic drift); falling back to full re-audit\n", patchID, snap.PatchID)
 		return false
 	}
 	gateResults, ok := o.runComposedGates(ctx, cycle, cs, worktree, "Orchestrator.compositionCarryForward", "composition carry-forward")
@@ -188,10 +188,10 @@ func (o *Orchestrator) compositionCarryForward(ctx context.Context, cycle int, c
 	}
 	ledgerPath := filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
 	if err := o.compositionVerdictWriter(ledgerPath, in); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
 		return false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] composition carry-forward: wrote composition-verdict for cycle %d; skipping re-audit\n", cycle)
+	fmt.Fprintf(o.errOut(), "[orchestrator] composition carry-forward: wrote composition-verdict for cycle %d; skipping re-audit\n", cycle)
 	return true
 }
 
@@ -218,12 +218,12 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 	}
 	snap, err := o.compositionSnapshot(ctx, worktree, cs.RunID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: snapshot unavailable: %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: snapshot unavailable: %v; falling back to full re-audit\n", err)
 		return false
 	}
 	composedDiff, exit, err := gitCapture(ctx, worktree, "diff", "main...HEAD")
 	if err != nil || exit != 0 {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: composed diff unavailable (exit=%d, err=%v); falling back to full re-audit\n", exit, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: composed diff unavailable (exit=%d, err=%v); falling back to full re-audit\n", exit, err)
 		return false
 	}
 	res, err := RunScopedMergeReview(ScopedMergeInput{
@@ -233,11 +233,11 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 		ComposedSummary: "composed tree after fleet rebase",
 	}, o.scopedMergeReviewer)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review failed closed: %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review failed closed: %v; falling back to full re-audit\n", err)
 		return false
 	}
 	if res.Disposition != ScopedMergeCompatible {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: %s — escalating to full re-audit\n", res.Disposition)
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: %s — escalating to full re-audit\n", res.Disposition)
 		return false
 	}
 	// A compatible verdict is trusted only when its resolution re-verifies by
@@ -248,11 +248,11 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 	}
 	matches, err := ResolutionMatchesAudited(snap.PatchID, resolution)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: resolution rung-0 re-entry failed: %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: resolution rung-0 re-entry failed: %v; falling back to full re-audit\n", err)
 		return false
 	}
 	if !matches {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: resolution patch-id does not match audited change (unverified); falling back to full re-audit\n")
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: resolution patch-id does not match audited change (unverified); falling back to full re-audit\n")
 		return false
 	}
 	gateResults, ok := o.runComposedGates(ctx, cycle, cs, worktree, "Orchestrator.scopedMergeCarryForward", "scoped merge review")
@@ -274,10 +274,10 @@ func (o *Orchestrator) scopedMergeCarryForward(ctx context.Context, cycle int, c
 	}
 	ledgerPath := filepath.Join(projectRoot, ".evolve", "ledger.jsonl")
 	if err := o.compositionVerdictWriter(ledgerPath, in); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: writer failed (fail-closed): %v; falling back to full re-audit\n", err)
 		return false
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] scoped merge review: wrote scoped-review composition-verdict for cycle %d; skipping re-audit\n", cycle)
+	fmt.Fprintf(o.errOut(), "[orchestrator] scoped merge review: wrote scoped-review composition-verdict for cycle %d; skipping re-audit\n", cycle)
 	return true
 }
 

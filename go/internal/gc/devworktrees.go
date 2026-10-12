@@ -34,13 +34,15 @@ type DevItem struct {
 	IdleDays float64   `json:"idle_days"`
 	Dirty    bool      `json:"dirty,omitempty"`
 	Failed   bool      `json:"failed,omitempty"`
+	Skipped  bool      `json:"skipped,omitempty"`
 	Reason   string    `json:"reason"`
 }
 
 type DevManifest struct {
-	Items   []DevItem `json:"items"`
-	Notes   []string  `json:"notes,omitempty"`
-	Skipped string    `json:"skipped,omitempty"`
+	Items      []DevItem `json:"items"`
+	Notes      []string  `json:"notes,omitempty"`
+	Skipped    string    `json:"skipped,omitempty"`
+	OverBudget bool      `json:"over_budget,omitempty"`
 }
 
 type OpenPRLookup func(ctx context.Context, dir string) (map[string][]time.Time, error)
@@ -57,6 +59,7 @@ type DevOptions struct {
 	Processes   func(ctx context.Context) ([]Process, error)
 	OpenPRs     OpenPRLookup
 	Save        DevSaveFunc
+	Deferred    func(path string)
 }
 
 func (o DevOptions) now() time.Time {
@@ -71,6 +74,12 @@ func (o DevOptions) processes(ctx context.Context) ([]Process, error) {
 		return o.Processes(ctx)
 	}
 	return listCwdProcesses(ctx, o.Exec, o.ProjectRoot)
+}
+
+func (o DevOptions) deferred(path string) {
+	if o.Deferred != nil {
+		o.Deferred(path)
+	}
 }
 
 func (o DevOptions) save(ctx context.Context, w wtcheckpoint.Worktree) (wtcheckpoint.SaveResult, error) {
@@ -111,10 +120,16 @@ func newDevSweep(ctx context.Context, o DevOptions) (*devSweep, string, error) {
 
 func PlanDevWorktrees(ctx context.Context, o DevOptions) (DevManifest, error) {
 	s, skipped, err := newDevSweep(ctx, o)
+	if err != nil && ctx.Err() != nil {
+		return overBudgetManifest(), nil
+	}
 	if err != nil || skipped != "" {
 		return DevManifest{Skipped: skipped}, err
 	}
 	trees, err := s.hub.DevWorktrees(ctx)
+	if err != nil && ctx.Err() != nil {
+		return overBudgetManifest(), nil
+	}
 	if err != nil {
 		return DevManifest{}, err
 	}
@@ -124,6 +139,10 @@ func PlanDevWorktrees(ctx context.Context, o DevOptions) (DevManifest, error) {
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
 	return DevManifest{Items: items, Notes: s.notes}, nil
+}
+
+func overBudgetManifest() DevManifest {
+	return DevManifest{Skipped: "the time budget ran out before the sweep could list the dev worktrees and the processes inside them; nothing is archived this run", OverBudget: true}
 }
 
 type devGate func(ctx context.Context, it *DevItem) (string, error)
@@ -142,6 +161,10 @@ func (s *devSweep) judge(ctx context.Context, wt wtcheckpoint.Worktree) DevItem 
 	}
 	for _, gate := range gates {
 		reason, err := gate(ctx, &it)
+		if err != nil && ctx.Err() != nil {
+			it.Skipped, it.Reason = true, "not judged: the time budget ran out: "+err.Error()
+			return it
+		}
 		if err != nil {
 			it.Failed, it.Reason = true, "cannot judge: "+err.Error()
 			return it
@@ -258,6 +281,10 @@ func (s *devSweep) finish(ctx context.Context, tree gitexec.Git, it DevItem) Dev
 	landed := ""
 	if err == nil {
 		landed, err = s.landed(ctx, it)
+	}
+	if err != nil && ctx.Err() != nil {
+		it.Skipped, it.Reason = true, "not judged: the time budget ran out: "+err.Error()
+		return it
 	}
 	if err != nil {
 		it.Failed, it.Reason = true, "cannot judge: "+err.Error()

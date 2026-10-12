@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ type shippedLane struct {
 	base, auditedTree         string
 	shipCommit, newBase       string
 	doc, lanePath             string
+	stderr                    io.Writer
 }
 
 type laneEdit func(write func(rel, body string))
@@ -206,7 +208,7 @@ func (fx *shippedLane) auditRow() LedgerEntry {
 }
 
 func (fx *shippedLane) recover(storage *fakeStorage, rows ...LedgerEntry) (Phase, bool, CycleState) {
-	o := NewOrchestrator(storage, &fakeLedger{entries: rows}, buildRunners(nil))
+	o := NewOrchestrator(storage, &fakeLedger{entries: rows}, buildRunners(nil), WithStderr(fx.stderr))
 	cs := fx.cycleState()
 	next, recovering := o.recoverFromShipError(context.Background(), fx.root, unwindCycle, &cs,
 		NewShipError(CodeGitFleetRebaseNeeded, ShipClassTransient, StageAtomicShip, "peer moved main"), 0, 2)

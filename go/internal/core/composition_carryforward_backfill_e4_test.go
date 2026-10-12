@@ -51,6 +51,8 @@ func (p *compositionProbeE4) orchestrator(snap CompositionAuditSnapshot, snapErr
 }
 
 func TestCompositionCarryForward_DeclinesBeforeAnyGateOnEachUnverifiableComposition(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	empty := committedRepoE4(t, map[string]string{"file.txt": "base\n"}).Dir
 	cases := []struct {
@@ -70,9 +72,10 @@ func TestCompositionCarryForward_DeclinesBeforeAnyGateOnEachUnverifiableComposit
 			p := &compositionProbeE4{}
 			o := p.orchestrator(tc.snap, nil, nil, nil)
 			var carried bool
-			log := captureStderr(t, func() {
-				carried = o.compositionCarryForward(context.Background(), 3, CycleState{ActiveWorktree: tc.worktree, RunID: "r"}, t.TempDir())
-			})
+			var sink injectedStderr
+			o.stderr = &sink
+			carried = o.compositionCarryForward(context.Background(), 3, CycleState{ActiveWorktree: tc.worktree, RunID: "r"}, t.TempDir())
+			log := sink.String()
 			if carried {
 				t.Fatal("an unverifiable composition carried forward; want a full re-audit")
 			}
@@ -101,6 +104,8 @@ func TestCompositionCarryForward_MatchingPatchIDWritesTheVerdict(t *testing.T) {
 }
 
 func TestScopedMergeCarryForward_DeclinesOnEachFailClosedRung(t *testing.T) {
+	t.Parallel()
+
 	worktree, diff, patchID := divergedCompositionFixture(t)
 	compatible := func([]MergeHunk, string, string) ScopedMergeReviewOutcome {
 		return ScopedMergeReviewOutcome{Disposition: ScopedMergeCompatible}
@@ -135,9 +140,10 @@ func TestScopedMergeCarryForward_DeclinesOnEachFailClosedRung(t *testing.T) {
 			p := &compositionProbeE4{}
 			o := p.orchestrator(tc.snap, tc.snapErr, tc.writerErr, tc.review)
 			var carried bool
-			log := captureStderr(t, func() {
-				carried = o.scopedMergeCarryForward(context.Background(), 4, CycleState{ActiveWorktree: tc.worktree, RunID: "r"}, t.TempDir())
-			})
+			var sink injectedStderr
+			o.stderr = &sink
+			carried = o.scopedMergeCarryForward(context.Background(), 4, CycleState{ActiveWorktree: tc.worktree, RunID: "r"}, t.TempDir())
+			log := sink.String()
 			if carried {
 				t.Fatal("a fail-closed rung carried the composition forward")
 			}

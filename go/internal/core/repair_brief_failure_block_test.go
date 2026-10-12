@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,11 +34,15 @@ func downgradeAudit(t *testing.T, cs *CycleState, reasons ...string) {
 func composeQuietly(t *testing.T, cs CycleState) (string, string) {
 	t.Helper()
 	var brief string
-	stderr := captureStderr(t, func() { brief = composeRepairBrief(cs) })
+	var sink injectedStderr
+	brief = composeRepairBrief(cs, &sink)
+	stderr := sink.String()
 	return brief, stderr
 }
 
 func TestComposeRepairBrief_AnAgentGradedFailBriefsItsFailureBlockDefects(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	defects := []string{
 		"go/internal/decisionsample/sample.go:14 exports Pick with no production caller",
@@ -63,6 +68,8 @@ func TestComposeRepairBrief_AnAgentGradedFailBriefsItsFailureBlockDefects(t *tes
 }
 
 func TestComposeRepairBrief_ADefectTheBriefedFindingsCarryIsNotRepeated(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeAuditReportWithDefects(t, ws, briefRound1+briefLowFinding,
 		"H1 (HIGH) — caller-proof hard floor violated: decisionsample exports have no callers",
@@ -94,7 +101,7 @@ func TestComposeRepairBrief_AGateRecordKeepsTodaysBriefOverTheFailureBlock(t *te
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
 	downgradeAudit(t, &cs, "EGPS: acs-verdict.json ship_eligible=false")
 
-	got := composeRepairBrief(cs)
+	got := composeRepairBrief(cs, io.Discard)
 
 	want := "failed phase: audit\n- EGPS: acs-verdict.json ship_eligible=false\n\n" +
 		"auditor findings (audit round 1 — fix THESE; the gate reasons above are their symptoms):\n" +
@@ -106,16 +113,19 @@ func TestComposeRepairBrief_AGateRecordKeepsTodaysBriefOverTheFailureBlock(t *te
 }
 
 func TestRepairRoundDispatch_AnAgentGradedFailBriefsTheDefectsWithoutAWarn(t *testing.T) {
+	t.Parallel()
+
 	runners := buildRunners(map[Phase]string{PhaseRetro: VerdictFAIL})
 	ar := &findingsAuditRunner{t: t}
 	runners[PhaseAudit] = ar
 	o := NewOrchestrator(&fakeStorage{state: State{LastCycleNumber: 0}}, &fakeLedger{}, runners)
 
-	stderr := captureStderr(t, func() {
-		if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}); err != nil {
-			t.Errorf("RunCycle: %v", err)
-		}
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir()}); err != nil {
+		t.Errorf("RunCycle: %v", err)
+	}
+	stderr := sink.String()
 
 	for _, line := range strings.Split(stderr, "\n") {
 		if strings.Contains(line, "findings artifact") {
@@ -134,6 +144,8 @@ func TestRepairRoundDispatch_AnAgentGradedFailBriefsTheDefectsWithoutAWarn(t *te
 }
 
 func TestComposeRepairBrief_TheDedupeCoversExactlyTheBriefedFindings(t *testing.T) {
+	t.Parallel()
+
 	var issues strings.Builder
 	issues.WriteString("# Audit Report\n\n## Verdict\n\n**FAIL**\n\n## Issues\n")
 	for i := 1; i <= maxBriefFindings+1; i++ {
@@ -163,6 +175,8 @@ func TestComposeRepairBrief_TheDedupeCoversExactlyTheBriefedFindings(t *testing.
 }
 
 func TestComposeRepairBrief_AFailureBlockEveryDefectOfWhichIsBriefedAddsNoSection(t *testing.T) {
+	t.Parallel()
+
 	ws := t.TempDir()
 	writeAuditReportWithDefects(t, ws, briefRound1, "M1: explanation names an area not in the diff")
 
@@ -174,6 +188,8 @@ func TestComposeRepairBrief_AFailureBlockEveryDefectOfWhichIsBriefedAddsNoSectio
 }
 
 func TestComposeRepairBrief_TheRunnersReasonsNotTheWorkspaceFileDecideTheGateSlot(t *testing.T) {
+	t.Parallel()
+
 	defect := "go/internal/decisionsample/sample.go:14 exports Pick with no production caller"
 	stale, unreadable, unwritten := t.TempDir(), t.TempDir(), t.TempDir()
 	writeAuditFailReason(t, stale, "build", agentGradedRouterReason("build"))
@@ -206,8 +222,8 @@ func TestComposeRepairBrief_TheFindingsHeaderNamesGateReasonsOnlyWhenTheyLead(t 
 	cs := CycleState{WorkspacePath: ws, AuditRepairActive: true, AuditRepairAttempts: 1, AuditDispatches: 1}
 
 	for name, brief := range map[string]string{
-		"the failure block's defects": composeRepairBrief(cs),
-		"the standing findings":       auditorFindingsBrief(ws, 1),
+		"the failure block's defects": composeRepairBrief(cs, io.Discard),
+		"the standing findings":       auditorFindingsBrief(ws, 1, io.Discard),
 	} {
 		if !strings.Contains(brief, "auditor findings (audit round 1 — fix THESE):") || strings.Contains(brief, "gate reasons") {
 			t.Errorf("with %s the header must not call anything above it gate reasons or symptoms:\n%s", name, brief)

@@ -3,20 +3,20 @@ package core
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/stelint"
 )
 
-func steLintWarn(worktree, stageWord string, paths []string) {
+func steLintWarn(worktree, stageWord string, paths []string, warn io.Writer) {
 	if stage, _ := config.GateStage(stageWord); stage == config.StageOff || worktree == "" {
 		return
 	}
 	for _, line := range steLintFloorLines(worktree, paths) {
-		fmt.Fprintln(os.Stderr, line)
+		fmt.Fprintln(warn, line)
 	}
 }
 

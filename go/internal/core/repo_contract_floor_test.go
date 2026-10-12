@@ -69,6 +69,8 @@ func TestRepoContractFloorChecks_ARawGitFixtureIsCorrectedAtBuildExitByTheRatche
 }
 
 func TestRepoContractFloorChecks_GreenOrAnUnnamedExitPassesTheHandoff(t *testing.T) {
+	t.Parallel()
+
 	wt := worktreeWithModule(t)
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: wt}
 	if got := RepoContractFloorChecks((&fakeRepoContractPack{}).run)(context.Background(), in); len(got) != 0 {
@@ -76,7 +78,10 @@ func TestRepoContractFloorChecks_GreenOrAnUnnamedExitPassesTheHandoff(t *testing
 	}
 	unnamed := &fakeRepoContractPack{diagnostic: "go: toolchain chatter before the kill\n", err: errors.New("signal: killed")}
 	var got []string
-	stderr := captureStderr(t, func() { got = RepoContractFloorChecks(unnamed.run)(context.Background(), in) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	got = RepoContractFloorChecks(unnamed.run)(context.Background(), in)
+	stderr := sink.String()
 	if len(got) != 0 {
 		t.Fatalf("an exit that names no test passes the handoff, since ship's gate classes it; got %v", got)
 	}
@@ -120,6 +125,8 @@ func TestRepoContractFloorChecks_RunsThePackUnderItsOwnDeadline(t *testing.T) {
 }
 
 func TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 	blocking := func(ctx context.Context, _ string) ([]string, string, error) {
@@ -127,9 +134,9 @@ func TestRepoContractFloorChecks_ADeadlineKillWarnsAndPassesTheHandoff(t *testin
 		return nil, "partial output before the kill\n", ctx.Err()
 	}
 	var got []string
-	stderr := captureStderr(t, func() {
-		got = RepoContractFloorChecks(blocking)(ctx, ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
-	})
+	var sink injectedStderr
+	got = RepoContractFloorChecks(blocking)(ctx, ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t), Stderr: &sink})
+	stderr := sink.String()
 	if len(got) != 0 {
 		t.Fatalf("a kill names nothing, so the floor passes the handoff and ship stays the authority; got %v", got)
 	}

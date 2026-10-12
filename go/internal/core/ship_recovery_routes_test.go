@@ -44,6 +44,8 @@ func TestRecover_EveryRecoveryRouteIsALegalEdgeFromShip(t *testing.T) {
 }
 
 func TestRecoverFromShipError_AFailedPendAfterAnUnwindAborts(t *testing.T) {
+	t.Parallel()
+
 	fx := newShippedLane(t, "lane.txt", addLaneFile, addPeerFile)
 	hooks := t.TempDir()
 	if err := os.WriteFile(filepath.Join(hooks, "pre-rebase"), []byte("#!/bin/sh\ngit update-ref -d refs/heads/main\nexit 1\n"), 0o755); err != nil {
@@ -53,7 +55,10 @@ func TestRecoverFromShipError_AFailedPendAfterAnUnwindAborts(t *testing.T) {
 	var next Phase
 	var recovering bool
 
-	stderr := captureStderr(t, func() { next, recovering, _ = fx.recover(&fakeStorage{}, fx.auditRow()) })
+	var sink injectedStderr
+	fx.stderr = &sink
+	next, recovering, _ = fx.recover(&fakeStorage{}, fx.auditRow())
+	stderr := sink.String()
 
 	if recovering || next != "" {
 		t.Fatalf("recovery=(%s,%v), want an abort: the change cannot be pended with no main", next, recovering)
@@ -113,16 +118,19 @@ func TestRecoverFromShipError_ALegacyRebaseTheTrivialRungMissesShipsOnTheScopedR
 }
 
 func TestRecoverFromShipError_ARouteTheStateMachineForbidsAborts(t *testing.T) {
+	t.Parallel()
+
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
 	o.sm = &StateMachine{allowed: map[Phase]map[Phase]bool{PhaseShip: {PhaseEnd: true}}}
 	cs := CycleState{CycleID: 7, RunID: "run-7"}
 	var next Phase
 	var recovering bool
 
-	stderr := captureStderr(t, func() {
-		next, recovering = o.recoverFromShipError(context.Background(), t.TempDir(), 7, &cs,
-			NewShipError("GIT_PUSH_TRANSIENT", ShipClassTransient, StageAtomicShip, "remote hiccup"), 0, 1)
-	})
+	var sink injectedStderr
+	o.stderr = &sink
+	next, recovering = o.recoverFromShipError(context.Background(), t.TempDir(), 7, &cs,
+		NewShipError("GIT_PUSH_TRANSIENT", ShipClassTransient, StageAtomicShip, "remote hiccup"), 0, 1)
+	stderr := sink.String()
 
 	if recovering || next != "" {
 		t.Fatalf("recovery=(%s,%v), want an abort: ship→ship is not an edge of this state machine", next, recovering)

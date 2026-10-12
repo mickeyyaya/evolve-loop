@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
@@ -34,7 +33,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 		if next.IsValid() || isConfiguredMandatory(cr.o.cfg, string(next)) {
 			return dispatchResult{}, loopAbort, fmt.Errorf("%w: no runner registered for phase %s", ErrPhaseInvalid, next)
 		}
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s selected but no runner is registered — skipping (register a runner or remove it from the registry order)\n", next)
+		fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s selected but no runner is registered — skipping (register a runner or remove it from the registry order)\n", next)
 		cr.current = next
 		return dispatchResult{}, loopContinue, nil
 	}
@@ -220,7 +219,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					Kind:     "reconciled_timeout",
 					ExitCode: failurediag.ExitCodeArtifactTimeout,
 				}); lerr != nil {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN reconciled_timeout ledger append: %v\n", lerr)
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN reconciled_timeout ledger append: %v\n", lerr)
 				}
 			}
 			break
@@ -305,7 +304,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				cr.recordFailureLearning(next, phaseErr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)
+			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s attempt %d/%d hit a transient bridge error or timeout; relaunching (self-heal)\n", next, attempt, maxAttempts)
 			// Emit structured audit trail for the self-heal retry.
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 				TS:       cr.o.now().UTC().Format(time.RFC3339),
@@ -314,7 +313,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				Kind:     "phase_retry",
 				ExitCode: bridgeExitCode(err),
 			}); lerr != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
+				fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 			}
 			executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 			continue
@@ -327,7 +326,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				// recordFinalVerdict then records the degrade into
 				// VerdictsNotAdopted without clobbering the floor verdict.
 				if degraded, ok := cr.o.nonFloorExhaustionDegrade(next, cr.cs.WorkspacePath, cr.o.floorAlreadyCompleted(cr.cs.CompletedPhases)); ok {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (%s)\n", next, resp.Verdict, ledgerKindContractExhaustionSkip)
+					fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s exhausted retries with non-canonical verdict %q; non-floor phase degrading to SKIPPED and advancing (%s)\n", next, resp.Verdict, ledgerKindContractExhaustionSkip)
 					cr.recordFailureLearning(next, fmt.Errorf("phase %s: non-canonical verdict %q after %d attempts", next, resp.Verdict, attempt), attempt)
 					cr.o.noteContractExhaustionSkip(cr.ctx, cr.cs, next)
 					resp = degraded
@@ -341,7 +340,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				cr.recordFailureLearning(next, ferr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, ferr)
 			}
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)
+			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)
 			// Emit structured audit trail for the self-heal retry.
 			if lerr := cr.o.ledger.Append(cr.ctx, LedgerEntry{
 				TS:       cr.o.now().UTC().Format(time.RFC3339),
@@ -350,7 +349,7 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 				Kind:     "phase_retry",
 				ExitCode: 0,
 			}); lerr != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
+				fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase_retry ledger append: %v\n", lerr)
 			}
 			executeRetryBackoff(attempt, cr.retryConfig.RetryBackoffBaseS)
 			continue

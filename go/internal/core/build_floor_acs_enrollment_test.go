@@ -3,6 +3,7 @@ package core
 import (
 	"bufio"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -92,7 +93,7 @@ func TestBuildTagVisiblePackagesDropsACSPackages(t *testing.T) {
 		t.Skipf("fixture package %s absent: %v", acsPkg, err)
 	}
 
-	got := buildTagVisiblePackages(context.Background(), moduleDir, []string{acsPkg, "./internal/phasecontract"})
+	got := buildTagVisiblePackages(context.Background(), moduleDir, []string{acsPkg, "./internal/phasecontract"}, io.Discard)
 
 	for _, p := range got {
 		if p == acsPkg {
@@ -109,7 +110,7 @@ func TestBuildTagVisiblePackagesDropsACSPackages(t *testing.T) {
 func TestBuildTagVisiblePackagesFailsOpen(t *testing.T) {
 	t.Parallel()
 
-	if got := buildTagVisiblePackages(context.Background(), "", nil); len(got) != 0 {
+	if got := buildTagVisiblePackages(context.Background(), "", nil, io.Discard); len(got) != 0 {
 		t.Fatalf("buildTagVisiblePackages(nil) = %v, want empty", got)
 	}
 }

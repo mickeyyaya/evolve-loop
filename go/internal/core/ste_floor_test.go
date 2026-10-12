@@ -36,6 +36,8 @@ func longSentence(words int) string {
 }
 
 func TestDefaultBuildFloorChecks_WarnsOnSteFindingsInTheChangedDocs(t *testing.T) {
+	t.Parallel()
+
 	in := steFloorFixture(t, map[string]string{
 		"docs/new.md":   "# New\n\nIntro.\n\n" + longSentence(30) + "\n",
 		"README.md":     "Go via the bridge.\n",
@@ -44,7 +46,10 @@ func TestDefaultBuildFloorChecks_WarnsOnSteFindingsInTheChangedDocs(t *testing.T
 	})
 
 	var failures []string
-	got := captureStderr(t, func() { failures = DefaultBuildFloorChecks(context.Background(), in) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	failures = DefaultBuildFloorChecks(context.Background(), in)
+	got := sink.String()
 
 	want := "[ste-lint] WARN: 2 finding(s) in 2 file(s) (first: README.md:1 STE-WORD)\n"
 	if !strings.Contains(got, want) {
@@ -61,9 +66,14 @@ func TestDefaultBuildFloorChecks_WarnsOnSteFindingsInTheChangedDocs(t *testing.T
 }
 
 func TestDocsFloorWarn_NamesTheFirstFindingOfTheChangedDocs(t *testing.T) {
+	t.Parallel()
+
 	in := steFloorFixture(t, map[string]string{"docs/new.md": "# New\n\nIntro.\n\n" + longSentence(30) + "\n"})
 
-	got := captureStderr(t, func() { docsFloorWarn(in, changedFloorPaths(context.Background(), in)) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	docsFloorWarn(in, changedFloorPaths(context.Background(), in))
+	got := sink.String()
 
 	if want := "[ste-lint] WARN: 1 finding(s) in 1 file(s) (first: docs/new.md:5 STE-SENTENCE)\n"; !strings.Contains(got, want) {
 		t.Fatalf("stderr = %q, want %q", got, want)
@@ -71,10 +81,15 @@ func TestDocsFloorWarn_NamesTheFirstFindingOfTheChangedDocs(t *testing.T) {
 }
 
 func TestDocsFloorWarn_SteStageOffPrintsNothing(t *testing.T) {
+	t.Parallel()
+
 	in := steFloorFixture(t, map[string]string{"docs/new.md": longSentence(30) + "\n"})
 	writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), `{"docs_floor":{"ste_stage":"off"}}`)
 
-	got := captureStderr(t, func() { docsFloorWarn(in, changedFloorPaths(context.Background(), in)) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	docsFloorWarn(in, changedFloorPaths(context.Background(), in))
+	got := sink.String()
 
 	if strings.Contains(got, "[ste-lint]") {
 		t.Fatalf("ste_stage off must print nothing, got %q", got)
@@ -82,12 +97,17 @@ func TestDocsFloorWarn_SteStageOffPrintsNothing(t *testing.T) {
 }
 
 func TestDocsFloorWarn_EveryOtherStageOnlyWarns(t *testing.T) {
+	t.Parallel()
+
 	for _, stage := range []string{"shadow", "enforce"} {
 		t.Run(stage, func(t *testing.T) {
 			in := steFloorFixture(t, map[string]string{"docs/new.md": longSentence(30) + "\n"})
 			writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), `{"docs_floor":{"ste_stage":"`+stage+`"}}`)
 
-			got := captureStderr(t, func() { docsFloorWarn(in, changedFloorPaths(context.Background(), in)) })
+			var sink injectedStderr
+			in.Stderr = &sink
+			docsFloorWarn(in, changedFloorPaths(context.Background(), in))
+			got := sink.String()
 
 			if !strings.Contains(got, "[ste-lint] WARN: 1 finding(s) in 1 file(s) (first: docs/new.md:1 STE-SENTENCE)") {
 				t.Fatalf("stage %s: stderr = %q, want the WARN line", stage, got)
@@ -97,6 +117,8 @@ func TestDocsFloorWarn_EveryOtherStageOnlyWarns(t *testing.T) {
 }
 
 func TestDocsFloorWarn_CleanOrOutOfScopeDocsPrintNothing(t *testing.T) {
+	t.Parallel()
+
 	for name, changed := range map[string]map[string]string{
 		"a clean doc":          {"docs/new.md": "Short and clean.\n"},
 		"an out-of-scope doc":  {"skills/x/SKILL.md": "We utilize it.\n", "agents/a.md": longSentence(40) + "\n"},
@@ -110,7 +132,10 @@ func TestDocsFloorWarn_CleanOrOutOfScopeDocsPrintNothing(t *testing.T) {
 				paths = append(paths, "docs/gone.md")
 			}
 
-			got := captureStderr(t, func() { docsFloorWarn(in, paths) })
+			var sink injectedStderr
+			in.Stderr = &sink
+			docsFloorWarn(in, paths)
+			got := sink.String()
 
 			if strings.Contains(got, "[ste-lint]") {
 				t.Fatalf("stderr = %q, want no ste-lint line", got)
@@ -120,6 +145,8 @@ func TestDocsFloorWarn_CleanOrOutOfScopeDocsPrintNothing(t *testing.T) {
 }
 
 func TestDocsFloorWarn_AWorktreeWithoutTheStandardIsSilent(t *testing.T) {
+	t.Parallel()
+
 	repo := gittest.Fixture(t)
 	writeFile(t, filepath.Join(repo.Dir, "docs", "a.md"), "x\n")
 	repo.Git("add", "-A")
@@ -130,7 +157,10 @@ func TestDocsFloorWarn_AWorktreeWithoutTheStandardIsSilent(t *testing.T) {
 	repo.Git("commit", "-q", "-m", "change")
 	in := ReviewInput{Phase: string(PhaseBuild), ProjectRoot: t.TempDir(), Worktree: repo.Dir, WorktreeBaseSHA: base}
 
-	got := captureStderr(t, func() { docsFloorWarn(in, changedFloorPaths(context.Background(), in)) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	docsFloorWarn(in, changedFloorPaths(context.Background(), in))
+	got := sink.String()
 
 	if strings.Contains(got, "[ste-lint]") {
 		t.Fatalf("a project without the standard has no STE rule; stderr = %q", got)
@@ -138,12 +168,17 @@ func TestDocsFloorWarn_AWorktreeWithoutTheStandardIsSilent(t *testing.T) {
 }
 
 func TestDocsFloorWarn_ABrokenStandardWarnsThatTheLintDidNotRun(t *testing.T) {
+	t.Parallel()
+
 	in := steFloorFixture(t, map[string]string{
 		stelint.StandardPath: "# The standard\n\nNo word table.\n",
 		"docs/new.md":        longSentence(30) + "\n",
 	})
 
-	got := captureStderr(t, func() { docsFloorWarn(in, changedFloorPaths(context.Background(), in)) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	docsFloorWarn(in, changedFloorPaths(context.Background(), in))
+	got := sink.String()
 
 	if !strings.Contains(got, "[ste-lint] WARN:") || !strings.Contains(got, "did not run") {
 		t.Fatalf("a broken standard must WARN that the lint did not run; stderr = %q", got)
@@ -151,9 +186,14 @@ func TestDocsFloorWarn_ABrokenStandardWarnsThatTheLintDidNotRun(t *testing.T) {
 }
 
 func TestDocsFloorWarn_AChangedGeneratedDocIsNotAFinding(t *testing.T) {
+	t.Parallel()
+
 	in := steFloorFixture(t, map[string]string{"docs/gen.md": "<!-- Code generated by x. DO NOT EDIT. -->\n\n" + longSentence(30) + "\n"})
 
-	got := captureStderr(t, func() { docsFloorWarn(in, changedFloorPaths(context.Background(), in)) })
+	var sink injectedStderr
+	in.Stderr = &sink
+	docsFloorWarn(in, changedFloorPaths(context.Background(), in))
+	got := sink.String()
 
 	if strings.Contains(got, "[ste-lint]") {
 		t.Fatalf("a generated doc is not a finding; stderr = %q", got)
@@ -172,14 +212,17 @@ func TestSteLintFloorLines_ABrokenStandardIsSilentWhenNoDocChanged(t *testing.T)
 }
 
 func TestDocsFloorWarn_NamesADocThatItCannotRead(t *testing.T) {
+	t.Parallel()
+
 	in := steFloorFixture(t, map[string]string{"docs/new.md": longSentence(30) + "\n"})
 	if err := os.MkdirAll(filepath.Join(in.Worktree, "docs", "dir.md"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	got := captureStderr(t, func() {
-		docsFloorWarn(in, append(changedFloorPaths(context.Background(), in), "docs/dir.md"))
-	})
+	var sink injectedStderr
+	in.Stderr = &sink
+	docsFloorWarn(in, append(changedFloorPaths(context.Background(), in), "docs/dir.md"))
+	got := sink.String()
 
 	if !strings.Contains(got, "[ste-lint] WARN: docs/dir.md was not checked:") || !strings.Contains(got, "[ste-lint] WARN: 1 finding(s) in 1 file(s) (first: docs/new.md:1 STE-SENTENCE)") {
 		t.Fatalf("stderr = %q, want the unread doc named beside the findings line", got)
@@ -187,6 +230,8 @@ func TestDocsFloorWarn_NamesADocThatItCannotRead(t *testing.T) {
 }
 
 func TestDocsFloorWarn_AnUndocumentedArchitectureChangeWarnsByStage(t *testing.T) {
+	t.Parallel()
+
 	const warn = "[docs-floor] WARN: architecture-labeled change touches 2 file(s)"
 	for name, tc := range map[string]struct {
 		policy string
@@ -209,7 +254,10 @@ func TestDocsFloorWarn_AnUndocumentedArchitectureChangeWarnsByStage(t *testing.T
 				writeFile(t, filepath.Join(in.ProjectRoot, ".evolve", "policy.json"), tc.policy)
 			}
 
-			got := captureStderr(t, func() { docsFloorWarn(in, tc.paths) })
+			var sink injectedStderr
+			in.Stderr = &sink
+			docsFloorWarn(in, tc.paths)
+			got := sink.String()
 
 			if strings.Contains(got, warn) != tc.want {
 				t.Fatalf("stderr = %q, want the docs-floor WARN = %v", got, tc.want)

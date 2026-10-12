@@ -45,3 +45,11 @@ func TestChangedPackageFloorChecks_RunsAddedTagGatedPackagesUnderTheirTags(t *te
 		t.Fatalf("a red tag-gated added package must be a floor failure naming package, tags and the failing test; got %q", out)
 	}
 }
+
+func TestChangedPackageFloorChecks_NoWorktreeIsGreen(t *testing.T) {
+	t.Parallel()
+
+	if got := changedPackageFloorChecks(context.Background(), ReviewInput{Phase: string(PhaseBuild)}, []string{"go/p/a.go"}); got != nil {
+		t.Fatalf("a handoff with no worktree has nothing to test and must pass; got %v", got)
+	}
+}

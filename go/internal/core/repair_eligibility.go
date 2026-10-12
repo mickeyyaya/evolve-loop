@@ -1,6 +1,9 @@
 package core
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 // legitRejection is the disposition vocabulary word meaning "the auditor was right
 // and the defect is in the task's own work" — the only classification that can
@@ -80,13 +83,13 @@ func seedAuditRepairContext(base map[string]string, next Phase, cs CycleState) m
 		return base
 	}
 	if cs.AuditRepairActive {
-		out := withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs))
+		out := withContext(base, CtxKeyAuditRepairFindings, composeRepairBrief(cs, os.Stderr))
 		return withContext(out, CtxKeyExplanationReauthor, explanationReauthorScope(next, cs))
 	}
 	if cs.ShipRecoveryCode == "" && !retroRouted(cs) {
 		return base
 	}
-	out := withContext(base, CtxKeyStandingAuditFindings, auditorFindingsBrief(cs.WorkspacePath, cs.AuditDispatches))
+	out := withContext(base, CtxKeyStandingAuditFindings, auditorFindingsBrief(cs.WorkspacePath, cs.AuditDispatches, os.Stderr))
 	if cs.ShipRecoveryCode != "" && out[CtxKeyShipErrorCode] == "" { // a resumed dispatch has no snapshot of the code; the prompt names it from state
 		out = withContext(out, CtxKeyShipErrorCode, cs.ShipRecoveryCode)
 	}

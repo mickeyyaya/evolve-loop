@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,7 +19,7 @@ import (
 // committed dossiers + the live failure/recurrence state, and at enforce
 // injects the rendered bytes into ctxSnap["recent_outcomes"] — the single
 // per-cycle resolution point (called once from planCycle).
-func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg policy.ChronicleConfig, ctxSnap map[string]string) {
+func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg policy.ChronicleConfig, ctxSnap map[string]string, warn io.Writer) {
 	if cfg.Digest == "off" || cs.WorkspacePath == "" {
 		return
 	}
@@ -34,7 +35,7 @@ func seedChronicleDigest(projectRoot string, cs CycleState, state State, cfg pol
 	_ = os.MkdirAll(cs.WorkspacePath, 0o755)
 	dc := recurrence.DigestConfig{TokenBudget: cfg.DigestTokens, Cycles: cfg.DigestCycles}
 	if err := recurrence.WriteDigest(cs.WorkspacePath, in, dc); err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN recent-outcomes digest seed failed: %v\n", err)
+		fmt.Fprintf(warn, "[orchestrator] WARN recent-outcomes digest seed failed: %v\n", err)
 		return
 	}
 	if cfg.Digest != "enforce" {

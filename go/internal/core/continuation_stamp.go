@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,7 +155,7 @@ const maxFindingsBytes = 8 * 1024
 // readContinuationFindings loads the prior attempt's findings artifact,
 // tolerantly: missing or unreadable is simply "no findings" (the continuation
 // still adopts — the work matters more than the notes).
-func readContinuationFindings(path string) string {
+func readContinuationFindings(path string, warn io.Writer) string {
 	if path == "" {
 		return ""
 	}
@@ -162,7 +163,7 @@ func readContinuationFindings(path string) string {
 	if err != nil {
 		// Loud, not silent: the operator must be able to tell "no findings
 		// existed" from "manifest points at the wrong path".
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN continuation: findings artifact %s unreadable (%v) — builder gets no prior-attempt findings\n", path, err)
+		fmt.Fprintf(warn, "[orchestrator] WARN continuation: findings artifact %s unreadable (%v) — builder gets no prior-attempt findings\n", path, err)
 		return ""
 	}
 	// Render the reason artifact as readable lines, not raw JSON, so the
@@ -255,7 +256,7 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 		return fmt.Errorf("continuation workspace manifest copy: %w", err)
 	}
 	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
-	if findings := readContinuationFindings(c.FindingsPath); findings != "" {
+	if findings := readContinuationFindings(c.FindingsPath, cr.o.errOut()); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
 	}
 	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ADOPTED continuation: worktree re-seeded from cycle-%d snapshot %s (base %s)\n", cr.cycle, c.Cycle, c.SnapshotSHA[:12], base)

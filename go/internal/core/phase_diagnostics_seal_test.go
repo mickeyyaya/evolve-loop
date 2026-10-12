@@ -3,8 +3,6 @@ package core
 import (
 	"bytes"
 	"context"
-	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -75,35 +73,14 @@ func TestRunCycle_TriageOwnFailReasonReachesTheSealAndTheRecord(t *testing.T) {
 	}
 }
 
-// redirectStderr runs fn with os.Stderr captured (package-internal twin of the
-// external-package helper in cyclerun_chronicle_test.go, which package core
-// cannot call).
-func redirectStderr(t *testing.T, fn func()) string {
-	t.Helper()
-	old := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	os.Stderr = w
-	done := make(chan string, 1)
-	go func() {
-		b, _ := io.ReadAll(r)
-		done <- string(b)
-	}()
-	defer func() { os.Stderr = old }()
-	fn()
-	_ = w.Close()
-	os.Stderr = old
-	return <-done
-}
-
 // The C1 chokepoint is the ONE producer: phaseOutcomeFrom relays the phase's
 // diagnostics, recordPhaseOutcome writes them to the record and emits ONE
 // phase.outcome; the root's WARN-filtered stderr sink renders a reasoned FAIL
 // in one line — the chokepoint itself prints nothing. A PASS carrying
 // warnings is recorded (the durable trail) and stays off stderr.
 func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *testing.T) {
+	t.Parallel()
+
 	c := signalcenter.New()
 	var sink bytes.Buffer
 	c.Subscribe(signalcenter.Filter(signalcenter.StderrSink(&sink), signalcenter.SeverityWarn))
@@ -118,7 +95,10 @@ func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *t
 	}
 	var result CycleResult
 	var timings []phaseTimingEntry
-	stderr := redirectStderr(t, func() { o.recordPhaseOutcome(&result, &timings, t.TempDir(), out) })
+	var chokepointErr injectedStderr
+	o.stderr = &chokepointErr
+	o.recordPhaseOutcome(&result, &timings, t.TempDir(), out)
+	stderr := chokepointErr.String()
 	if len(timings) != 1 || len(timings[0].Diagnostics) != 2 || timings[0].Diagnostics[1].Message != protectedSurfaceRejection {
 		t.Errorf("the record must carry the phase's diagnostics verbatim: %+v", timings)
 	}
@@ -135,9 +115,10 @@ func TestRecordPhaseOutcome_CarriesThePhaseDiagnosticsAndNamesAReasonedFail(t *t
 
 	passing := PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictPASS, Diagnostics: []Diagnostic{{Severity: "warning", Message: "ACS floor overrode a hygiene flag"}}}
 	timings, sink = nil, bytes.Buffer{}
-	stderr = redirectStderr(t, func() {
-		o.recordPhaseOutcome(&result, &timings, t.TempDir(), phaseOutcomeFrom(PhaseAudit, passing, 1, "", ""))
-	})
+	var passErr injectedStderr
+	o.stderr = &passErr
+	o.recordPhaseOutcome(&result, &timings, t.TempDir(), phaseOutcomeFrom(PhaseAudit, passing, 1, "", ""))
+	stderr = passErr.String()
 	if len(timings) != 1 || len(timings[0].Diagnostics) != 1 {
 		t.Errorf("a PASS keeps its warning trail on the record: %+v", timings)
 	}

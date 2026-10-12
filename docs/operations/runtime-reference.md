@@ -360,6 +360,11 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 >   - **Without `gh` in a dry run.** The pull request check is skipped, and the output says so.
 >   - **Restore.** The run prints two commands for each archived tree: `git worktree add <path> <branch>` and then `evolve checkpoint restore <tree>/<stamp> --into <path>`.
 >   - **The preview.** `--dry-run` prints `WOULD-ARCHIVE path=<p> branch=<b> idle=<days>d (<reason>)` or `KEEP ...` for each tree. It changes nothing. A tree that cannot be judged prints `NOT-JUDGED` and makes the run exit 1.
+>   - **The time budget.** The sweep has its own clock, `gc.dev_worktrees.sweep_budget_seconds`. An unset, zero or negative value means 300 seconds. It does not share the 15-second bound of the session and socket reapers.
+>     - **Skipped trees.** A tree that the budget stops before it is judged prints `SKIPPED`. A `WARN` line names the budget and the count. The run does not fail.
+>     - **The process listing.** If the budget ends before the listing finishes, the run archives nothing and prints a `WARN`. It does not fail.
+>     - **The archive step.** If the budget ends before the archive step starts, the archive waits for the next run.
+>     - **Other reasons.** Any other `NOT-JUDGED` reason still makes the run exit 1.
 >   - **The loop.** The batch hook plans this step and publishes `dev-worktree-gc-manifest.json`. It never archives. Only `evolve gc` archives.
 >   - **A project without a hub.** The step prints `skipped` and the reason.
 

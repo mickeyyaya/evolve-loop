@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -40,7 +39,7 @@ func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot 
 	}
 	tree, err := o.latestAuditedTree(ctx, cs.RunID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: read the audited tree: %v\n", cycle, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d ship unwind skipped: read the audited tree: %v\n", cycle, err)
 		return unwindNone
 	}
 	audited := AuditedChange{Base: cs.WorktreeBaseSHA, Tree: tree, Label: fmt.Sprintf("cycle-%d/%s", cycle, cs.RunID)}
@@ -50,16 +49,16 @@ func (o *Orchestrator) unwindBeforeFleetRebase(ctx context.Context, projectRoot 
 	}
 	switch {
 	case err != nil:
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d ship unwind skipped: %v\n", cycle, err)
+		fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d ship unwind skipped: %v\n", cycle, err)
 		return unwindNone
 	case verdict.keepsConsumption:
-		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ship unwind declined: %s; the rebase replays ship's commit and pends it, so the identity proof runs\n", cycle, verdict.declined)
+		fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d ship unwind declined: %s; the rebase replays ship's commit and pends it, so the identity proof runs\n", cycle, verdict.declined)
 		return unwindKeepsConsumption
 	case verdict.declined != "":
-		fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d ship unwind declined: %s\n", cycle, verdict.declined)
+		fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d ship unwind declined: %s\n", cycle, verdict.declined)
 		return unwindNone
 	}
-	fmt.Fprintf(os.Stderr, "[orchestrator] cycle %d unwound its ship commit to the audited tree %s on %s before the fleet rebase\n", cycle, tree, cs.WorktreeBaseSHA)
+	fmt.Fprintf(o.errOut(), "[orchestrator] cycle %d unwound its ship commit to the audited tree %s on %s before the fleet rebase\n", cycle, tree, cs.WorktreeBaseSHA)
 	return unwindDone
 }
 

@@ -469,10 +469,10 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		if err := archivePollutedWorkspace(cs.WorkspacePath, o.now); err != nil {
 			// Best-effort: WARN but don't block the cycle; the failure
 			// mode it prevents is bad-data steering, not safety.
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN workspace archive failed: %v\n", err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN workspace archive failed: %v\n", err)
 		}
 	}
-	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), os.Stderr)
+	consoleLeased := adoptConsoleLease(req.ProjectRoot, time.Now(), o.errOut())
 	// Safe worktrees are cleaned on cycle exit (after ship has merged the
 	// worktree→main).
 	// cs.WorktreeBaseSHA (persisted) is the worktree HEAD at creation == the
@@ -502,7 +502,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		cs.ActiveWorktree = wtPath
 		if inPlaceWorktree(wtPath, req.ProjectRoot) {
 			// Said once per cycle; the mutators it names each stand down silently.
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN cycle %d: the active worktree is the project root %s (in-place provisioner) — host normalization, leak recovery, salvage snapshot and fleet rebase are disabled: a cycle never mutates the operator's tree\n", cycle, wtPath)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN cycle %d: the active worktree is the project root %s (in-place provisioner) — host normalization, leak recovery, salvage snapshot and fleet rebase are disabled: a cycle never mutates the operator's tree\n", cycle, wtPath)
 		}
 		stack = append(stack, func(preserve, completedNormally bool) {
 			o.teardownCycleWorktree(req.ProjectRoot, wtPath, preserve, completedNormally)
@@ -513,7 +513,7 @@ func (o *Orchestrator) newCycleRun(ctx context.Context, req CycleRequest) (cycle
 		// (see worktree_base.go). Ordinary HEADs are returned verbatim.
 		base, berr := resolveWorktreeBaseSHA(ctx, wtPath)
 		if berr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN worktree-normalize: resolving the worktree base at creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN worktree-normalize: resolving the worktree base at creation failed: %v (build-commit normalize disabled this cycle)\n", berr)
 			if errors.Is(berr, errUnresolvableSnapshotBase) {
 				// An empty base would discard the preserved snapshot from audit.
 				// Preserve the reused worktree and abort rather than degrading.
@@ -646,7 +646,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	if o.catalogRefresh != nil {
 		action := "ok"
 		if err := o.catalogRefresh(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN model-catalog refresh failed: %v\n", err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN model-catalog refresh failed: %v\n", err)
 			action = "failed"
 		}
 		stage := ""
@@ -661,7 +661,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 			Action:  action,
 			Message: stage,
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN catalog-refresh ledger stamp failed: %v\n", err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN catalog-refresh ledger stamp failed: %v\n", err)
 		}
 	}
 
@@ -680,7 +680,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 				Kind:   "operator_directives",
 				Action: directivesSet.Version,
 			}); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN operator-directives ledger stamp failed: %v\n", err)
+				fmt.Fprintf(o.errOut(), "[orchestrator] WARN operator-directives ledger stamp failed: %v\n", err)
 			}
 		}
 	}
@@ -724,7 +724,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 				// scout and the Task Contract seeder); a value that cannot be
 				// encoded is refused loudly rather than mis-split downstream.
 				if strings.ContainsAny(id, "= \t") || strings.ContainsAny(p, " \t\n") {
-					fmt.Fprintf(os.Stderr, "[orchestrator] WARN fleet_scope_paths: cannot encode id %q path %q (id must not contain '=' or blanks; path must not contain blanks) — left unresolved\n", id, p)
+					fmt.Fprintf(o.errOut(), "[orchestrator] WARN fleet_scope_paths: cannot encode id %q path %q (id must not contain '=' or blanks; path must not contain blanks) — left unresolved\n", id, p)
 					continue
 				}
 				pairs = append(pairs, id+"="+p)
@@ -756,10 +756,10 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 			// Context).
 			_ = os.MkdirAll(cs.WorkspacePath, 0o755)
 			if err := os.WriteFile(filepath.Join(cs.WorkspacePath, "challenge-token.txt"), []byte(tok+"\n"), 0o644); err != nil {
-				fmt.Fprintf(os.Stderr, "[orchestrator] WARN challenge-token.txt write failed: %v (Context route still works)\n", err)
+				fmt.Fprintf(o.errOut(), "[orchestrator] WARN challenge-token.txt write failed: %v (Context route still works)\n", err)
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN challenge token mint failed: %v (phase agents will fall back to their own protocol)\n", err)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN challenge token mint failed: %v (phase agents will fall back to their own protocol)\n", err)
 		}
 	}
 
@@ -769,7 +769,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 	// bytes ride ctxSnap["recent_outcomes"] into every phase request; shadow
 	// writes the artifact only; off is a no-op. Best-effort — a digest
 	// failure WARNs and never blocks the cycle.
-	seedChronicleDigest(req.ProjectRoot, cs, state, o.chronicle, ctxSnap)
+	seedChronicleDigest(req.ProjectRoot, cs, state, o.chronicle, ctxSnap, o.errOut())
 
 	// Capture HEAD before any phase so the throughput hook can corroborate a
 	// shipped cycle's landing (shippedOutcome). The outcome label never reads it.
@@ -807,7 +807,7 @@ func (o *Orchestrator) planCycle(ctx context.Context, req CycleRequest, state St
 		// user-resolved set or the safe default; the router self-seals the
 		// non-removable evaluator regardless.
 		if raw, perr := o.observedPlan(ctx, cs, cycle, planIn); perr != nil {
-			fmt.Fprintf(os.Stderr, "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
+			fmt.Fprintf(o.errOut(), "[orchestrator] WARN phase advisor Plan failed (degrading to static spine): %v\n", perr)
 		} else if raw != nil {
 			// Record the structural validation of the advisor's RAW plan
 			// (pre-clamp, so the advisor's intent is visible) as standalone
