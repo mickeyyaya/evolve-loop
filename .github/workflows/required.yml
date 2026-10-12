@@ -16,6 +16,8 @@ jobs:
     outputs:
       go: ${{ steps.paths.outputs.go }}
       landing: ${{ steps.paths.outputs.landing }}
+      docs_only: ${{ steps.paths.outputs.docs_only }}
+      docs: ${{ steps.paths.outputs.docs }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,7 +31,7 @@ jobs:
         shell: bash
         run: |
           route() {
-            printf 'go=%s\nlanding=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"
+            printf 'go=%s\nlanding=%s\ndocs_only=%s\ndocs=%s\n' "$1" "$2" "${3:-false}" "${4:-false}" >> "$GITHUB_OUTPUT"
             exit
           }
           case "$EVENT_NAME" in
@@ -59,7 +61,14 @@ jobs:
           fi
           go_required=false
           landing_required=false
+          docs_found=false
+          other_found=false
           while IFS= read -r -d '' path; do
+            case "$path" in
+              docs/explain/*.md|docs/conventions/ste100-writing.md) docs_found=true; other_found=true ;;
+              README.md|CLAUDE.md|AGENTS.md|CHANGELOG.md|docs/*.md) docs_found=true ;;
+              *) other_found=true ;;
+            esac
             case "$path" in
               go/*|skills/*|agents/*) go_required=true ;;
               landing/*|docs/explain/*) landing_required=true ;;
@@ -67,10 +76,18 @@ jobs:
               *) go_required=true; landing_required=true ;;
             esac
           done < "$RUNNER_TEMP/ci-paths"
-          route "$go_required" "$landing_required"
+          if [[ "$EVENT_NAME" != pull_request || "$docs_found" != true ]]; then
+            route "$go_required" "$landing_required"
+          fi
+          if [[ "$other_found" == true ]]; then
+            route "$go_required" "$landing_required" false true
+          fi
+          route false false true true
 
   validate:
     name: plugin and durable ACS
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     uses: ./.github/workflows/ci.yml
 
   go:
@@ -83,9 +100,35 @@ jobs:
     if: needs.changes.outputs.landing == 'true'
     uses: ./.github/workflows/landing-validation.yml
 
+  ste-lint:
+    name: STE lint
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Build the lint
+        working-directory: go
+        run: go build -o "$RUNNER_TEMP/evolve" ./cmd/evolve
+      - id: lint
+        name: Lint the added text
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          "$RUNNER_TEMP/evolve" docs ste-lint --strict --changed "$base" --added --project-root "$GITHUB_WORKSPACE"
+
   required:
     name: CI required
-    needs: [changes, validate, go, landing]
+    needs: [changes, validate, go, landing, ste-lint]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -93,6 +136,9 @@ jobs:
         name: Require every selected suite to succeed
         env:
           ROUTE_RESULT: ${{ needs.changes.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+          DOCS_REQUIRED: ${{ needs.changes.outputs.docs }}
+          STE_LINT_RESULT: ${{ needs.ste-lint.result }}
           VALIDATE_RESULT: ${{ needs.validate.result }}
           PLUGIN_RESULT: ${{ needs.validate.outputs.plugin_result }}
           ACS_RESULT: ${{ needs.validate.outputs.acs_result }}
@@ -104,12 +150,18 @@ jobs:
           LANDING_SUITE_RESULT: ${{ needs.landing.outputs.suite_result }}
         shell: bash
         run: |
-          for result in "$ROUTE_RESULT" "$VALIDATE_RESULT" "$PLUGIN_RESULT" "$ACS_RESULT"; do
-            if [[ "$result" != success ]]; then
-              echo "CI prerequisite did not succeed: $result" >&2
-              exit 1
-            fi
-          done
+          if [[ "$ROUTE_RESULT" != success ]]; then
+            echo "CI prerequisite did not succeed: $ROUTE_RESULT" >&2
+            exit 1
+          fi
+          case "$DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" in
+            false:true:success:success:success|false:false:success:success:success|true:true:skipped::) ;;
+            *) echo "plugin and durable ACS validation did not match the route: $DOCS_ONLY:$DOCS_REQUIRED:$VALIDATE_RESULT:$PLUGIN_RESULT:$ACS_RESULT" >&2; exit 1 ;;
+          esac
+          case "$DOCS_REQUIRED:$STE_LINT_RESULT" in
+            true:success|false:skipped) ;;
+            *) echo "STE lint did not match the route: $DOCS_REQUIRED:$STE_LINT_RESULT" >&2; exit 1 ;;
+          esac
           for result in "$GO_REQUIRED:$GO_RESULT:$GO_SUITE_RESULT" "$LANDING_REQUIRED:$LANDING_RESULT:$LANDING_SUITE_RESULT"; do
             case "$result" in
               true:success:success|false:skipped:) ;;

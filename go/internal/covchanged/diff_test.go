@@ -37,6 +37,10 @@ func TestParseDiff_ReturnsTheAddedLinesAndTheAnchorsOfRemovedCode(t *testing.T) 
 			"diff --git \"a/sp ace.go\" \"b/sp ace.go\"\n--- \"a/sp ace.go\"\n+++ \"b/sp ace.go\"\n@@ -0,0 +1 @@\n+package p\n",
 			Diff{AddedLines{"sp ace.go": {1}}, none},
 		},
+		"git ends the path of a name with a space by a tab": {
+			"diff --git a/sp ace.go b/sp ace.go\n--- a/sp ace.go\t\n+++ b/sp ace.go\t\n@@ -0,0 +1 @@\n+package p\n",
+			Diff{AddedLines{"sp ace.go": {1}}, none},
+		},
 		"context and no-newline markers keep the count": {
 			"diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1,3 +1,3 @@\n keep\n-old\n+new\n\\ No newline at end of file\n keep\n",
 			Diff{AddedLines{"a.go": {2}}, AddedLines{"a.go": {2}}},

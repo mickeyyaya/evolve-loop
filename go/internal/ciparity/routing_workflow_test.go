@@ -7,7 +7,7 @@ import (
 
 func TestRequiredRouting_UsesHostEventAndPublishesBothDecisions(t *testing.T) {
 	w := readWorkflowContract(t, RequiredWorkflow)
-	for _, suite := range []string{"go", "landing"} {
+	for _, suite := range []string{"go", "landing", "docs_only", "docs"} {
 		if w.Jobs["changes"].Outputs[suite] != "${{ steps.paths.outputs."+suite+" }}" {
 			t.Errorf("%s routing is not bound to computed paths", suite)
 		}

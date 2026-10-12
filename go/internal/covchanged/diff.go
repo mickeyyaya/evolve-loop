@@ -47,6 +47,7 @@ func (h *hunk) consume(line string) error {
 }
 
 func (h *hunk) target(path string) error {
+	path = strings.TrimSuffix(path, "\t")
 	if strings.HasPrefix(path, `"`) {
 		unquoted, err := strconv.Unquote(path)
 		if err != nil {

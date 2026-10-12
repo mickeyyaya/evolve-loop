@@ -137,7 +137,7 @@ func TestRequiredRouting_ConsumedPathsAndExplicitDocumentationSkips(t *testing.T
 			if err != nil {
 				t.Fatalf("routing failed: %v\n%s", err, got)
 			}
-			want := "go=" + strconv.FormatBool(tc.wantGo) + "\nlanding=" + strconv.FormatBool(tc.wantLanding) + "\n"
+			want := routeText(tc.wantGo, tc.wantLanding, false, false)
 			if got != want {
 				t.Fatalf("route = %q, want %q", got, want)
 			}
@@ -154,7 +154,7 @@ func TestRequiredRouting_MergeBaseExcludesBaseBranchOnlyChanges(t *testing.T) {
 	routingFile(t, dir, "landing/base-only.html")
 	base := routingCommit(t, dir)
 	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "pull_request", base, head)
-	if err != nil || got != "go=true\nlanding=false\n" {
+	if err != nil || got != routeText(true, false, false, false) {
 		t.Fatalf("PR route included unrelated base changes: %q, %v", got, err)
 	}
 }
@@ -171,7 +171,7 @@ func TestRequiredRouting_NonFastForwardPushDiffsTheReachableOldTip(t *testing.T)
 		t.Fatalf("old tip %s is not reachable from before-force-push (%s)", oldTip, got)
 	}
 	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "push", oldTip, head)
-	if err != nil || got != "go=true\nlanding=false\n" {
+	if err != nil || got != routeText(true, false, false, false) {
 		t.Fatalf("a push that drops a Go commit must run Go: %q, %v", got, err)
 	}
 }
@@ -199,7 +199,7 @@ func TestRequiredRouting_MissingEvidenceCannotBecomeDocumentationSkip(t *testing
 			if (err == nil) != tc.pass {
 				t.Fatalf("pass=%v want %v: %v\n%s", err == nil, tc.pass, err, got)
 			}
-			if tc.pass && got != "go=true\nlanding=true\n" {
+			if tc.pass && got != routeText(true, true, false, false) {
 				t.Fatalf("missing diff evidence weakened routing: %q", got)
 			}
 			if !tc.pass && strings.Contains(got, "=false") {
@@ -224,6 +224,87 @@ func TestRequiredRouting_GitFailuresStopWithoutShellErrexit(t *testing.T) {
 				t.Fatalf("Git failure must stop routing without emitting decisions: err=%v output=%q", err, out)
 			}
 		})
+	}
+}
+
+func routeText(goRequired, landing, docsOnly, docs bool) string {
+	return "go=" + strconv.FormatBool(goRequired) + "\nlanding=" + strconv.FormatBool(landing) +
+		"\ndocs_only=" + strconv.FormatBool(docsOnly) + "\ndocs=" + strconv.FormatBool(docs) + "\n"
+}
+
+type docsRoutingCase struct {
+	name                              string
+	event                             string
+	paths                             []string
+	remove                            string
+	wantGo, wantLanding, wantDocsOnly bool
+	wantDocs                          bool
+}
+
+func docsRoutingCases() []docsRoutingCase {
+	return []docsRoutingCase{
+		{"pr_report", "pull_request", []string{"docs/reports/review.md"}, "", false, false, true, true},
+		{"pr_architecture_doc", "pull_request", []string{"docs/architecture/note.md"}, "", false, false, true, true},
+		{"pr_nested_doc", "pull_request", []string{"docs/a/b/c.md"}, "", false, false, true, true},
+		{"pr_root_doc", "pull_request", []string{"README.md"}, "", false, false, true, true},
+		{"pr_changelog", "pull_request", []string{"CHANGELOG.md"}, "", false, false, true, true},
+		{"pr_explanation_doc_is_landing_source", "pull_request", []string{"docs/explain/topic.md"}, "", false, true, false, true},
+		{"pr_explanation_doc_beside_plain_doc", "pull_request", []string{"docs/explain/topic.md", "docs/reports/review.md"}, "", false, true, false, true},
+		{"pr_lint_standard_is_not_docs_only", "pull_request", []string{"docs/conventions/ste100-writing.md"}, "", true, true, false, true},
+		{"pr_lint_standard_beside_plain_doc", "pull_request", []string{"docs/conventions/ste100-writing.md", "README.md"}, "", true, true, false, true},
+		{"pr_two_docs", "pull_request", []string{"docs/reports/a.md", "AGENTS.md"}, "", false, false, true, true},
+		{"pr_deleted_doc", "pull_request", nil, "docs/reports/existing.md", false, false, true, true},
+		{"pr_renamed_doc", "pull_request", []string{"docs/reports/renamed.md"}, "docs/reports/existing.md", false, false, true, true},
+		{"pr_doc_with_go", "pull_request", []string{"docs/architecture/note.md", "go/internal/core/new.go"}, "", true, true, false, true},
+		{"pr_doc_with_landing", "pull_request", []string{"docs/reports/review.md", "landing/static/site.css"}, "", false, true, false, true},
+		{"pr_doc_with_config", "pull_request", []string{"README.md", "config/new.yaml"}, "", true, true, false, true},
+		{"pr_deleted_doc_with_go", "pull_request", []string{"go/internal/core/new.go"}, "docs/reports/existing.md", true, false, false, true},
+		{"pr_doc_renamed_to_source", "pull_request", []string{"go/renamed.go"}, "docs/reports/existing.md", true, false, false, true},
+		{"pr_skill_doc_is_not_docs", "pull_request", []string{"skills/x/SKILL.md"}, "", true, false, false, false},
+		{"pr_agent_doc_is_not_docs", "pull_request", []string{"agents/x.md"}, "", true, false, false, false},
+		{"pr_docs_json_is_not_docs", "pull_request", []string{"docs/x.json"}, "", true, true, false, false},
+		{"pr_docs_json_beside_doc", "pull_request", []string{"docs/x.json", "docs/reports/review.md"}, "", true, true, false, true},
+		{"pr_go_only", "pull_request", []string{"go/internal/core/new.go"}, "", true, false, false, false},
+		{"pr_landing_only", "pull_request", []string{"landing/static/site.css"}, "", false, true, false, false},
+		{"pr_root_note_is_not_docs", "pull_request", []string{"NOTES.md"}, "", true, true, false, false},
+		{"push_report", "push", []string{"docs/reports/review.md"}, "", false, false, false, false},
+		{"push_architecture_doc", "push", []string{"docs/architecture/note.md"}, "", true, true, false, false},
+		{"push_root_doc", "push", []string{"README.md"}, "", true, true, false, false},
+	}
+}
+
+func TestRequiredRouting_DocsOnlyPullRequestSelectsOnlyTheLint(t *testing.T) {
+	step := workflowStep(t, RequiredWorkflow, "changes", "paths")
+	for _, tc := range docsRoutingCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, base := routingRepo(t)
+			if tc.remove != "" {
+				if err := os.Remove(filepath.Join(dir, tc.remove)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, path := range tc.paths {
+				routingFile(t, dir, path)
+			}
+			head := routingCommit(t, dir)
+			got, err := routingOutput(t, dir, step.Run, tc.event, base, head)
+			if err != nil {
+				t.Fatalf("routing failed: %v\n%s", err, got)
+			}
+			if want := routeText(tc.wantGo, tc.wantLanding, tc.wantDocsOnly, tc.wantDocs); got != want {
+				t.Fatalf("route = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestRequiredRouting_AnEmptyPullRequestDiffKeepsTheFullSelection(t *testing.T) {
+	dir, head := routingRepo(t)
+
+	got, err := routingOutput(t, dir, workflowStep(t, RequiredWorkflow, "changes", "paths").Run, "pull_request", head, head)
+
+	if err != nil || got != routeText(true, true, false, false) {
+		t.Fatalf("an empty PR diff must run everything and no docs-only job: %q, %v", got, err)
 	}
 }
 

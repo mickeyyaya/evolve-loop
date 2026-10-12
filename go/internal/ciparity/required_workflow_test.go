@@ -37,7 +37,7 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 	slices.Sort(needs)
-	if !slices.Equal(needs, []string{"changes", "go", "landing", "validate"}) {
+	if !slices.Equal(needs, []string{"changes", "go", "landing", "ste-lint", "validate"}) {
 		t.Fatalf("required result dependencies = %v", needs)
 	}
 	for id, source := range map[string]string{"go": "go.yml", "validate": "ci.yml", "landing": "landing-validation.yml"} {
@@ -48,8 +48,43 @@ func TestRequiredWorkflow_AlwaysReportsAndCannotSkipDependencies(t *testing.T) {
 		if id != "validate" && (job.If != "needs.changes.outputs."+id+" == 'true'" || job.Needs.Value != "changes") {
 			t.Errorf("%s must use the successful changes job's explicit route", id)
 		}
-		if id == "validate" && job.If != "" {
-			t.Error("plugin/ACS validation cannot be skipped for documentation changes")
+		if id == "validate" && (job.If != "needs.changes.outputs.docs_only != 'true'" || job.Needs.Value != "changes") {
+			t.Error("plugin/ACS validation may be skipped only for a docs-only pull request")
+		}
+	}
+}
+
+func TestRequiredWorkflow_SteLintJobRunsOnlyTheLintOnTheAddedText(t *testing.T) {
+	job := readWorkflowContract(t, RequiredWorkflow).Jobs["ste-lint"]
+	if job.If != "needs.changes.outputs.docs == 'true'" || job.Needs.Value != "changes" || job.ContinueOnError != "" || job.Uses != "" {
+		t.Fatalf("ste-lint must run on the docs route of the changes job: %+v", job)
+	}
+	var checkout, setupGo bool
+	var runs []string
+	for _, step := range job.Steps {
+		switch {
+		case strings.HasPrefix(step.Uses, "actions/checkout@"):
+			checkout = step.With["fetch-depth"] == "0" && step.With["ref"] == "${{ github.event.pull_request.head.sha }}"
+		case strings.HasPrefix(step.Uses, "actions/setup-go@"):
+			setupGo = step.With["go-version-file"] == "go/go.mod"
+		}
+		if step.ContinueOnError != "" || (step.Run != "" && step.If != "") {
+			t.Errorf("ste-lint step %q may not be skipped or ignore its failure", step.ID)
+		}
+		runs = append(runs, step.Run)
+	}
+	if !checkout || !setupGo {
+		t.Errorf("ste-lint needs full history at the PR head (%v) and the module Go version (%v)", checkout, setupGo)
+	}
+	script := strings.Join(runs, "\n")
+	for _, want := range []string{"git merge-base \"$BASE_SHA\" \"$HEAD_SHA\"", "docs ste-lint --strict --changed \"$base\" --added"} {
+		if !strings.Contains(script, want) {
+			t.Errorf("ste-lint does not run %q", want)
+		}
+	}
+	for _, banned := range []string{"go test", "make ", "acs", "go vet"} {
+		if strings.Contains(script, banned) {
+			t.Errorf("a docs-only job may not run test code: %q", banned)
 		}
 	}
 }

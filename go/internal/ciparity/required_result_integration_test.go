@@ -30,13 +30,30 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 	}
 	cases := []resultCase{
 		{"all_required_green", nil, true},
-		{"docs_only", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, true},
+		{"no_docs_change", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, true},
+		{"docs_only", docsOnlyResult(nil), true},
+		{"docs_only_lint_failed", docsOnlyResult(map[string]string{"STE_LINT_RESULT": "failure"}), false},
+		{"docs_only_lint_missing", docsOnlyResult(map[string]string{"STE_LINT_RESULT": ""}), false},
+		{"docs_only_lint_skipped", docsOnlyResult(map[string]string{"STE_LINT_RESULT": "skipped"}), false},
+		{"docs_only_lint_cancelled", docsOnlyResult(map[string]string{"STE_LINT_RESULT": "cancelled"}), false},
+		{"docs_only_validate_ran", docsOnlyResult(map[string]string{"VALIDATE_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success"}), false},
+		{"docs_only_validate_failed", docsOnlyResult(map[string]string{"VALIDATE_RESULT": "failure"}), false},
+		{"docs_only_without_the_docs_route", docsOnlyResult(map[string]string{"DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped"}), false},
+		{"docs_only_unknown_flag", docsOnlyResult(map[string]string{"DOCS_ONLY": "TRUE"}), false},
+		{"mixed_docs_and_code_green", map[string]string{"DOCS_REQUIRED": "true", "STE_LINT_RESULT": "success"}, true},
+		{"mixed_docs_and_code_lint_failed", map[string]string{"DOCS_REQUIRED": "true", "STE_LINT_RESULT": "failure"}, false},
+		{"mixed_docs_and_code_lint_missing", map[string]string{"DOCS_REQUIRED": "true", "STE_LINT_RESULT": ""}, false},
+		{"mixed_docs_and_code_validate_skipped", map[string]string{"DOCS_REQUIRED": "true", "STE_LINT_RESULT": "success", "VALIDATE_RESULT": "skipped", "PLUGIN_RESULT": "", "ACS_RESULT": ""}, false},
+		{"lint_ran_without_the_docs_route", map[string]string{"STE_LINT_RESULT": "success"}, false},
 		{"go_only", map[string]string{"LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, true},
 		{"landing_only", map[string]string{"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": ""}, true},
 		{"route_failed_docs_outputs", map[string]string{"ROUTE_RESULT": "failure", "GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "", "LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": ""}, false},
 	}
-	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT"} {
+	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
 		for _, result := range []string{"failure", "cancelled", "skipped", "", "neutral", "pending"} {
+			if dependency == "STE_LINT_RESULT" && result == "skipped" {
+				continue
+			}
 			cases = append(cases, resultCase{dependency + "_" + result, map[string]string{dependency: result}, false})
 		}
 	}
@@ -50,7 +67,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			env := map[string]string{"ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
+			env := map[string]string{"DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
 			for key, value := range tc.set {
 				env[key] = value
 			}
@@ -60,6 +77,19 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 			}
 		})
 	}
+}
+
+func docsOnlyResult(set map[string]string) map[string]string {
+	env := map[string]string{
+		"DOCS_ONLY": "true", "DOCS_REQUIRED": "true", "STE_LINT_RESULT": "success",
+		"VALIDATE_RESULT": "skipped", "PLUGIN_RESULT": "", "ACS_RESULT": "",
+		"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "",
+		"LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": "",
+	}
+	for key, value := range set {
+		env[key] = value
+	}
+	return env
 }
 
 func runWorkflowShell(t *testing.T, dir, script string, env map[string]string) (string, error) {

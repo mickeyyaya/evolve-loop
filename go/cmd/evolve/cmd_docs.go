@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	steLintForm   = "docs ste-lint [--json] [--strict] [--go] [--changed <base-ref>] [--project-root P] [paths...]"
+	steLintForm   = "docs ste-lint [--json] [--strict] [--go] [--changed <base-ref> [--added]] [--project-root P] [paths...]"
 	steLintUsage  = "usage: evolve " + steLintForm
 	steLintPrefix = "evolve docs ste-lint: "
 	docsUsage     = "usage: evolve docs <verb>\n\nverbs:\n" +
@@ -42,16 +43,17 @@ var (
 )
 
 type steLintArgs struct {
-	asJSON, strict, goMode, help bool
-	changed                      []string
-	projectRoot                  string
-	paths                        []string
+	asJSON, strict, goMode, help, added bool
+	changed                             []string
+	projectRoot                         string
+	paths                               []string
 }
 
 var steAbs = filepath.Abs
 
 type steTarget struct {
 	abs, display string
+	added        map[int]bool
 }
 
 func runDocs(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -69,7 +71,7 @@ func runDocs(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 func parseSteLintArgs(args []string) (steLintArgs, error) {
 	var a steLintArgs
 	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &a.asJSON, "--strict": &a.strict, "--go": &a.goMode, "--help": &a.help, "-h": &a.help},
+		bools:  map[string]*bool{"--json": &a.asJSON, "--strict": &a.strict, "--go": &a.goMode, "--added": &a.added, "--help": &a.help, "-h": &a.help},
 		values: map[string]*string{"--project-root": &a.projectRoot},
 		lists:  map[string]*[]string{"--changed": &a.changed},
 	}.parse(args)
@@ -79,6 +81,8 @@ func parseSteLintArgs(args []string) (steLintArgs, error) {
 		return a, err
 	case len(a.changed) > 1:
 		return a, errors.New("--changed is given more than once")
+	case a.added && len(a.changed) == 0:
+		return a, errors.New("--added needs --changed")
 	case len(a.changed) == 1 && (a.changed[0] == "" || strings.HasPrefix(a.changed[0], "-")):
 		return a, fmt.Errorf("--changed needs a base ref, not %q", a.changed[0])
 	case len(a.changed) == 1 && len(a.paths) > 0:
@@ -146,7 +150,7 @@ func steLintTargets(a steLintArgs, root string) ([]steTarget, error) {
 	}
 	switch {
 	case len(a.changed) == 1:
-		return changedSteTargets(root, a.changed[0], mode)
+		return changedSteTargets(root, a.changed[0], mode, a.added)
 	case len(a.paths) > 0:
 		return explicitSteTargets(root, a.paths, mode)
 	}
@@ -217,8 +221,8 @@ func explicitSteTargets(root string, paths []string, mode steMode) ([]steTarget,
 	return out, nil
 }
 
-func changedSteTargets(root, base string, mode steMode) ([]steTarget, error) {
-	var listed []string
+func changedSteTargets(root, base string, mode steMode, added bool) ([]steTarget, error) {
+	var groups [][]string
 	for _, args := range [][]string{
 		{"diff", "--name-only", "--relative", "--diff-filter=d", base, "--"},
 		{"ls-files", "--others", "--exclude-standard"},
@@ -227,17 +231,26 @@ func changedSteTargets(root, base string, mode steMode) ([]steTarget, error) {
 		if err != nil {
 			return nil, err
 		}
-		listed = append(listed, lines...)
+		groups = append(groups, lines)
+	}
+	tracked, untrackedRels := groups[0], groups[1]
+	untracked := map[string]bool{}
+	for _, rel := range untrackedRels {
+		untracked[rel] = true
 	}
 	seen := map[string]bool{}
 	var rels []string
-	for _, rel := range listed {
+	for _, rel := range slices.Concat(tracked, untrackedRels) {
 		if !seen[rel] && mode.inScope(rel) {
 			seen[rel] = true
 			rels = append(rels, rel)
 		}
 	}
-	return relTargets(root, rels), nil
+	targets := relTargets(root, rels)
+	if !added {
+		return targets, nil
+	}
+	return scopeToAddedLines(root, base, targets, untracked)
 }
 
 func steGitLines(root string, args ...string) ([]string, error) {
