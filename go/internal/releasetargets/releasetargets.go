@@ -17,7 +17,7 @@ import (
 	"strings"
 	"text/template"
 
-	"gopkg.in/yaml.v3"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
 // Target is one (OS, Arch) pair the release publishes a prebuilt binary for,
@@ -82,7 +82,7 @@ func ParseConfig(path string) (Config, error) {
 		return Config{}, fmt.Errorf("read goreleaser config %s: %w", path, err)
 	}
 	var doc goreleaserDoc
-	if err := yaml.Unmarshal(raw, &doc); err != nil {
+	if err := yamlcodec.Unmarshal(raw, &doc); err != nil {
 		return Config{}, fmt.Errorf("parse goreleaser config %s: %w", path, err)
 	}
 

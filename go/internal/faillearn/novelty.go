@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
 const defaultNoveltyThreshold = 0.9
@@ -47,7 +47,7 @@ func isNearDuplicate(lessonsDir string, body []byte, threshold float64) bool {
 
 func observationTokens(body []byte) map[string]struct{} {
 	var lessons []lessonYAML
-	if err := yaml.Unmarshal(body, &lessons); err != nil {
+	if err := yamlcodec.Unmarshal(body, &lessons); err != nil {
 		return nil
 	}
 	set := map[string]struct{}{}

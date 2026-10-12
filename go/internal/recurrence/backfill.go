@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
 // lessonEntry is the minimal read view of a corpus lesson: only the fields the
@@ -53,7 +53,7 @@ func BackfillFromLessons(lessonsDir string, pol EscalationPolicy) (*Ledger, []st
 			continue
 		}
 		var lessons []lessonEntry
-		if yaml.Unmarshal(data, &lessons) != nil {
+		if yamlcodec.Unmarshal(data, &lessons) != nil {
 			skipped = append(skipped, filepath.Base(f))
 			continue
 		}

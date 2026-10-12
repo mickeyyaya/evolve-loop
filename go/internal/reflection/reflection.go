@@ -18,7 +18,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
 )
 
 // SchemaVersionV1 is the only schema currently recognized. Future
@@ -85,7 +85,7 @@ func Sidecar(runsDir string, cycle int, phase string) string {
 // Parse deserializes YAML into a Reflection.
 func Parse(data []byte) (*Reflection, error) {
 	r := &Reflection{}
-	if err := yaml.Unmarshal(data, r); err != nil {
+	if err := yamlcodec.Unmarshal(data, r); err != nil {
 		return nil, fmt.Errorf("reflection: parse: %w", err)
 	}
 	// yaml.v3 leaves `slowdowns: []` as nil; normalize to non-nil
@@ -106,6 +106,8 @@ func ReadFile(path string) (*Reflection, error) {
 	return Parse(b)
 }
 
+var marshalYAML = yamlcodec.Marshal
+
 // Write serializes a Reflection to YAML and writes it to path
 // atomically (tmp file + rename, so concurrent readers never see a
 // half-written file). Validates the Reflection first; a malformed
@@ -114,7 +116,7 @@ func Write(path string, r *Reflection) error {
 	if err := r.Validate(); err != nil {
 		return fmt.Errorf("reflection: refusing to write invalid: %w", err)
 	}
-	data, err := yaml.Marshal(r)
+	data, err := marshalYAML(r)
 	if err != nil {
 		return fmt.Errorf("reflection: marshal: %w", err)
 	}

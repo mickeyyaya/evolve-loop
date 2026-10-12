@@ -141,3 +141,17 @@ jobs:
         # reads the coverage.txt of the earlier test step, which exists only
         # after a green run.
         run: make cover-strict
+
+  vulncheck:
+    name: govulncheck (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27'
+          cache-dependency-path: go/go.sum
+      - run: make vulncheck
