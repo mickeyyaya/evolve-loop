@@ -117,22 +117,22 @@ func tempRepoDir(t *testing.T) string {
 // automatic maintenance stays off and teardown is retried.
 func makeRepo(t *testing.T) string {
 	t.Helper()
-	repo := gittest.Fixture(t).Dir
-	mustWrite(t, filepath.Join(repo, ".gitignore"), ".evolve/\n")
-	mustMkdir(t, filepath.Join(repo, ".evolve", "runs", "cycle-1"))
-	mustWrite(t, filepath.Join(repo, ".evolve", "ledger.jsonl"), "")
-	mustWrite(t, filepath.Join(repo, ".evolve", "state.json"), "{}\n")
-	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\n")
-	// Ship binary fixture: stable initial content. Tests that need to
-	// "tamper" with the ship binary modify this file directly.
-	mustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v1\n")
-
-	runGit(t, repo, "config", "user.email", "test@evolve-loop.test")
-	runGit(t, repo, "config", "user.name", "Test User")
-	runGit(t, repo, "config", "core.hooksPath", "/dev/null")
-	runGit(t, repo, "add", "-A")
-	runGit(t, repo, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "initial test repo")
-	return repo
+	return gittest.FromTemplate(t, "ship-make-repo", func(r *gittest.Repo) error {
+		r.Write(".gitignore", ".evolve/\n")
+		if err := os.MkdirAll(filepath.Join(r.Dir, ".evolve", "runs", "cycle-1"), 0o755); err != nil {
+			return err
+		}
+		r.Write(".evolve/ledger.jsonl", "")
+		r.Write(".evolve/state.json", "{}\n")
+		r.Write("fixture.txt", "fixture line 1\n")
+		r.Write("ship-binary-fixture", "ship-binary-v1\n")
+		r.Git("config", "user.email", "test@evolve-loop.test")
+		r.Git("config", "user.name", "Test User")
+		r.Git("config", "core.hooksPath", "/dev/null")
+		r.Git("add", "-A")
+		r.Git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "initial test repo")
+		return nil
+	}).Dir
 }
 
 // addRemote creates a bare repo to serve as origin and registers it.

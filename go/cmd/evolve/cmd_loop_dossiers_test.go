@@ -31,14 +31,13 @@ func writePendingCloseout(root string) error {
 
 func gitPlane(t *testing.T, branch string) *gittest.Repo {
 	t.Helper()
-	r := gittest.Fixture(t)
-	r.Git("symbolic-ref", "HEAD", "refs/heads/"+branch)
-	if err := os.WriteFile(filepath.Join(r.Dir, "README.md"), []byte("plane\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	r.Git("add", "README.md")
-	r.Git("commit", "-q", "-m", "base")
-	return r
+	return gittest.FromTemplate(t, "cmd-evolve-git-plane-"+branch, func(r *gittest.Repo) error {
+		r.Git("symbolic-ref", "HEAD", "refs/heads/"+branch)
+		r.Write("README.md", "plane\n")
+		r.Git("add", "README.md")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 }
 
 func planeWithAPendingCloseout(t *testing.T, branch string) *gittest.Repo {

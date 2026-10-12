@@ -62,9 +62,14 @@ type Repo struct {
 func Fixture(tb testing.TB) *Repo {
 	tb.Helper()
 	r := newRepo(tb)
+	r.initWorkTree()
+	return r
+}
+
+func (r *Repo) initWorkTree() {
+	r.tb.Helper()
 	r.Git("init", "-q", "-b", "main")
 	r.quiet()
-	return r
 }
 
 // Bare returns an initialized bare repository whose default branch is main.

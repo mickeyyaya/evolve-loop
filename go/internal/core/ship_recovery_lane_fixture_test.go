@@ -62,20 +62,25 @@ func newCommittedLane(t *testing.T, lanePath string, lane, peer laneEdit) *shipp
 	return newLane(t, lanePath, lane, peer, false)
 }
 
+func buildLaneBase(r *gittest.Repo) error {
+	r.Git("config", "commit.gpgsign", "false")
+	r.Write("base.txt", "base\n")
+	r.Write("shared.txt", sharedText(0, ""))
+	r.Write(inboxItem, itemBody)
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "base")
+	r.Git("checkout", "-q", "-b", "cycle")
+	return nil
+}
+
 func newLane(t *testing.T, lanePath string, lane, peer laneEdit, consumes bool) *shippedLane {
 	t.Helper()
 	root := t.TempDir()
-	fx := &shippedLane{t: t, root: root, worktree: gittest.Fixture(t).Dir, workspace: filepath.Join(root, ".evolve", "runs", "cycle-42")}
+	fx := &shippedLane{t: t, root: root, worktree: gittest.FromTemplate(t, "core-shipped-lane-base", buildLaneBase).Dir, workspace: filepath.Join(root, ".evolve", "runs", "cycle-42")}
 	if err := os.MkdirAll(fx.workspace, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	fx.git("config", "commit.gpgsign", "false")
-	fx.write("base.txt", "base\n")
-	fx.write("shared.txt", sharedText(0, ""))
-	fx.write(inboxItem, itemBody)
-	fx.commitAll("base")
 	fx.base = fx.git("rev-parse", "HEAD")
-	fx.git("checkout", "-q", "-b", "cycle")
 
 	fx.lanePath = lanePath
 	fx.build(lanePath, lane)

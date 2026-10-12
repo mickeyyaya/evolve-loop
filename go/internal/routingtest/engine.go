@@ -2,8 +2,6 @@ package routingtest
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -233,18 +231,14 @@ func phaseEnablesOf(enable map[string]config.Enable) map[string]string {
 	return phaseEnables
 }
 
-// initScenarioRepo returns the root of a committed scenario repo built through
-// gittest, so the commits RunCycle makes inside it cannot leave a background
-// git writing into the tree at teardown.
 func initScenarioRepo(t *testing.T) string {
 	t.Helper()
-	repo := gittest.Fixture(t)
-	if err := os.WriteFile(filepath.Join(repo.Dir, ".gitignore"), []byte(".evolve/\ngo/bin/\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	repo.Git("add", ".gitignore")
-	repo.Git("commit", "-q", "-m", "scenario base")
-	return repo.Dir
+	return gittest.FromTemplate(t, "routingtest-scenario-base", func(r *gittest.Repo) error {
+		r.Write(".gitignore", ".evolve/\ngo/bin/\n")
+		r.Git("add", ".gitignore")
+		r.Git("commit", "-q", "-m", "scenario base")
+		return nil
+	}).Dir
 }
 
 // --- assertion helpers ---

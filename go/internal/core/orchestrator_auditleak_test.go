@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 const (
@@ -30,41 +32,19 @@ func (r *auditLeakRunner) Run(_ context.Context, req PhaseRequest) (PhaseRespons
 	return PhaseResponse{Phase: r.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-// initAuditLeakRepo uses a real git repo (not a fake) so the orchestrator's
-// default gitDirtyPaths / tree-diff guard exercises its production code path.
+func buildAuditLeakRepo(r *gittest.Repo) error {
+	r.Git("config", "user.name", "t")
+	r.Git("config", "user.email", "t@t")
+	r.Write("go/evolve", auditLeakBinV1)
+	r.Write("docs/note.md", auditLeakNoteV1)
+	r.Git("add", ".")
+	r.Git("commit", "-q", "-m", "init")
+	return nil
+}
+
 func initAuditLeakRepo(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
-	git := func(args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
-		cmd.Env = append(os.Environ(),
-			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
-			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	write := func(rel, content string) {
-		t.Helper()
-		p := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	git("init", "-q")
-	// In-repo identity so the orchestrator's own git children (dossier
-	// closeout) work on identity-less CI runners.
-	git("config", "user.name", "t")
-	git("config", "user.email", "t@t")
-	write("go/evolve", auditLeakBinV1)
-	write("docs/note.md", auditLeakNoteV1)
-	git("add", ".")
-	git("commit", "-q", "-m", "init")
-	return root
+	return gittest.FromTemplate(t, "core-audit-leak-repo", buildAuditLeakRepo).Dir
 }
 
 func auditLeakReadFile(t *testing.T, path string) string {

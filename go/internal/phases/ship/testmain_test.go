@@ -1,8 +1,11 @@
 package ship
 
 import (
+	"fmt"
 	"os"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 // shipControlFlowEnvVars lists the env vars ship's control flow reads via
@@ -18,7 +21,11 @@ func TestMain(m *testing.M) {
 	for _, v := range shipControlFlowEnvVars {
 		os.Unsetenv(v)
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	if err := gittest.RemoveTemplates(); err != nil {
+		fmt.Fprintln(os.Stderr, "ship tests: remove git templates:", err)
+	}
+	os.Exit(code)
 }
 
 func TestShipSuiteIsHermetic(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gotooltest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/practicewatch"
@@ -55,6 +56,9 @@ func TestMain(m *testing.M) {
 	}
 	if err := os.RemoveAll(tmuxTmp); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", tmuxTmp, err)
+	}
+	if err := gittest.RemoveTemplates(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: remove git templates: %v\n", err)
 	}
 	os.Exit(code)
 }

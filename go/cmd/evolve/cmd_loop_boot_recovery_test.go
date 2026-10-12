@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -21,18 +22,15 @@ import (
 
 func brInitRepo(t *testing.T) string {
 	t.Helper()
-	dir := t.TempDir()
-	bootRecoveryGit(t, dir, "init", "-q")
-	bootRecoveryGit(t, dir, "config", "user.email", "ci@example.com")
-	bootRecoveryGit(t, dir, "config", "user.name", "ci")
-	bootRecoveryGit(t, dir, "config", "commit.gpgsign", "false")
-	// A HEAD commit so autoseal's git-head capture succeeds.
-	if err := os.WriteFile(filepath.Join(dir, "README"), []byte("seed\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	bootRecoveryGit(t, dir, "add", "-A")
-	bootRecoveryGit(t, dir, "commit", "-m", "seed")
-	return dir
+	return gittest.FromTemplate(t, "cmd-evolve-boot-recovery-repo", func(r *gittest.Repo) error {
+		r.Git("config", "user.email", "ci@example.com")
+		r.Git("config", "user.name", "ci")
+		r.Git("config", "commit.gpgsign", "false")
+		r.Write("README", "seed\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-m", "seed")
+		return nil
+	}).Dir
 }
 
 func bootRecoveryGit(t *testing.T, dir string, args ...string) {

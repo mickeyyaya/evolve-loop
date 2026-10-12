@@ -185,7 +185,7 @@ Use rank 3 only when the function has no dependency struct and a new parameter c
 | Kit | Domain |
 |---|---|
 | `go/test/fixtures` | doubles of the `core` ports, the workspace builder, clocks, assertions, `StressN` |
-| `internal/gittest` | git repositories, clones, bare remotes, git config without maintenance |
+| `internal/gittest` | git repositories, clones, bare remotes, git config without maintenance, and `FromTemplate` (one build for each test binary, one independent copy for each test) |
 | `internal/tmuxtest` | real tmux servers and sessions |
 | `internal/gotooltest` | the CPU limit of a nested `go` run (`Env`, `LimitProcess`) and one `go build` for each test binary (`Cache`) |
 | `internal/fakeclitest` | the fake CLI binaries for the drivers |
@@ -193,6 +193,17 @@ Use rank 3 only when the function has no dependency struct and a new parameter c
 | `internal/kerneltest` | the transition kernel fixture |
 | `internal/testhost` | the decision to skip or fail when a host tool is absent |
 | `pkg/acsassert` | the helpers of ACS predicates |
+
+#### Repository templates
+
+Many tests build the same starting repository. `gittest.FromTemplate(t, name, build)` builds it one time for each test binary. Each test gets its own copy.
+
+1. `build` makes the commits, branches and tags on a `gittest.Fixture` work tree. It returns an error. A failure of `build` fails every caller.
+2. The copy uses `os.CopyFS`. It starts no `git` process. On a repository of eight commits it took 15 to 25 ms. `git clone --local --shared` took 70 to 80 ms. `cp -cRp` took 40 to 50 ms. A build with `git` took 450 ms.
+3. A copy shares nothing with the template. A commit, checkout or reset in a copy never reaches another copy.
+4. A template holds regular files and directories only. It holds no linked worktree and no absolute path, because a copy lives at another path.
+5. A test that needs a unique history keeps its own build.
+6. A test binary calls `gittest.RemoveTemplates()` from `TestMain`, after `m.Run`. A binary that does not call it leaves its template in the temporary directory. The next binary removes the templates of processes that have exited.
 
 ### 6.2 Where a new helper goes
 
