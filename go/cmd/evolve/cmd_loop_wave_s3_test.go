@@ -20,6 +20,7 @@ func passingPreflight() error { return nil }
 // so a re-minted context.Background() (which could never carry it) is
 // distinguishable from the caller's actual ctx reaching the plan function.
 func TestDispatchIteration_CtxReachesPlanFn(t *testing.T) {
+	t.Parallel()
 	const key = waveCtxKey("wave-ctx-probe")
 	ctx := context.WithValue(context.Background(), key, "threaded")
 	launcher := &fakeWaveLauncher{}
@@ -41,6 +42,7 @@ func TestDispatchIteration_CtxReachesPlanFn(t *testing.T) {
 }
 
 func TestDispatchIteration_CancelledCtxObservableInPlanFn(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	launcher := &fakeWaveLauncher{}
@@ -60,6 +62,7 @@ func TestDispatchIteration_CancelledCtxObservableInPlanFn(t *testing.T) {
 }
 
 func TestDispatchIteration_PreflightRefusalNeverPlansNorLaunches(t *testing.T) {
+	t.Parallel()
 	refusal := errors.New(`fleet: control-plane file ".evolve/policy.json" has uncommitted changes; commit it via evolve ship --class manual before dispatching a wave`)
 	launcher := &fakeWaveLauncher{}
 	planFn := func(ctx context.Context, waveIndex int) ([]byte, []string, error) {
@@ -79,6 +82,7 @@ func TestDispatchIteration_PreflightRefusalNeverPlansNorLaunches(t *testing.T) {
 }
 
 func TestDispatchIteration_PreflightCleanWaveProceeds(t *testing.T) {
+	t.Parallel()
 	launcher := &fakeWaveLauncher{}
 	planFn := func(ctx context.Context, waveIndex int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["bridge","core"]}`), nil, nil
@@ -96,6 +100,7 @@ func TestDispatchIteration_PreflightCleanWaveProceeds(t *testing.T) {
 }
 
 func TestDispatchIteration_SequentialPathNeverRunsPreflight(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	preflight := func() error {

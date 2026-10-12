@@ -32,6 +32,7 @@ func readText(t *testing.T, path string) string {
 }
 
 func TestPrepareBoundaryLog_AFreshPlaneGetsTheRunDirAndBothLinks(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 
 	if err := prepareBoundaryLog(evolveDir, "20261008T142501Z", noLiveRun); err != nil {
@@ -50,6 +51,7 @@ func TestPrepareBoundaryLog_AFreshPlaneGetsTheRunDirAndBothLinks(t *testing.T) {
 }
 
 func TestPrepareBoundaryLog_TheNextLaunchMovesCurrentAndKeepsTheOldRunDir(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	if err := prepareBoundaryLog(evolveDir, "20261008T142501Z", noLiveRun); err != nil {
 		t.Fatal(err)
@@ -72,6 +74,7 @@ func TestPrepareBoundaryLog_TheNextLaunchMovesCurrentAndKeepsTheOldRunDir(t *tes
 }
 
 func TestPrepareBoundaryLog_ALegacyLogMovesIntoALegacyRunDirWhenNoRunIsLive(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	writeBoundaryFile(t, filepath.Join(evolveDir, boundaryLoopLog), "2.7M lines\n")
 
@@ -92,6 +95,7 @@ func TestPrepareBoundaryLog_ALegacyLogMovesIntoALegacyRunDirWhenNoRunIsLive(t *t
 }
 
 func TestPrepareBoundaryLog_ALiveRunKeepsTheLegacyLogInPlace(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	legacy := filepath.Join(evolveDir, boundaryLoopLog)
 	writeBoundaryFile(t, legacy, "still written\n")
@@ -110,6 +114,7 @@ func TestPrepareBoundaryLog_ALiveRunKeepsTheLegacyLogInPlace(t *testing.T) {
 }
 
 func TestRunBoundaryLog_ReportsTheLayoutAndRefusesABadRunID(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var stdout, stderr bytes.Buffer
 
@@ -137,6 +142,7 @@ func writeBoundaryFile(t *testing.T, path, content string) {
 }
 
 func TestPrepareBoundaryLog_ARerunNeverOverwritesTheFirstLegacyLog(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	link := filepath.Join(evolveDir, boundaryLoopLog)
 	writeBoundaryFile(t, link, "first legacy\n")
@@ -163,6 +169,7 @@ func TestPrepareBoundaryLog_ARerunNeverOverwritesTheFirstLegacyLog(t *testing.T)
 }
 
 func TestRunBoundaryLog_RefusesARunIDWithTrailingText(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if rc := runBoundaryLog([]string{"--project-root", t.TempDir(), "--run-id", "20261008T142501Zjunk"}, nil, &stdout, &stderr); rc != exitUsage {
 		t.Errorf("rc = %d, want %d for a run id with text after the Z\n%s", rc, exitUsage, stderr.String())
@@ -170,6 +177,7 @@ func TestRunBoundaryLog_RefusesARunIDWithTrailingText(t *testing.T) {
 }
 
 func TestPrepareBoundaryLog_ARerunAfterALinkWithoutItsRemoveFinishesTheMove(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	link := filepath.Join(evolveDir, boundaryLoopLog)
 	writeBoundaryFile(t, link, "legacy\n")

@@ -104,6 +104,7 @@ func TestWireOrchestratorDeps_MalformedPolicyWarnsOnTheGivenConsole(t *testing.T
 }
 
 func TestCountCallExprs_CountsCallsNotText(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		src  string
 		want int
@@ -128,6 +129,7 @@ func TestCountCallExprs_CountsCallsNotText(t *testing.T) {
 }
 
 func TestNilSignalCenterRootsPin_UsesTheASTCount(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle_signal_center_test.go")
 	if err != nil {
 		t.Fatal(err)

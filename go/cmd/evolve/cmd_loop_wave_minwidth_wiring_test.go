@@ -28,6 +28,7 @@ func (f *wiringFakeLauncher) Run(_ context.Context, specs []fleet.CycleSpec) []f
 }
 
 func TestMinWidthRepair_GuardNotMetNeverInvokesLauncher(t *testing.T) {
+	t.Parallel()
 	launcher := &wiringFakeLauncher{}
 	preflightCalled, planFnCalled := false, false
 	preflight := func() error { preflightCalled = true; return nil }
@@ -56,6 +57,7 @@ func TestMinWidthRepair_GuardNotMetNeverInvokesLauncher(t *testing.T) {
 }
 
 func TestMinWidthRepair_GuardMetDispatchesOneIsolatedLaneAndSignalsContinue(t *testing.T) {
+	t.Parallel()
 	launcher := &wiringFakeLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":["core"]}`), nil, nil
@@ -81,6 +83,7 @@ func TestMinWidthRepair_GuardMetDispatchesOneIsolatedLaneAndSignalsContinue(t *t
 }
 
 func TestMinWidthRepair_EligibleButEmptyBacklogFallsBackToSequential(t *testing.T) {
+	t.Parallel()
 	launcher := &wiringFakeLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
 		return []byte(`{"committed_floors":[]}`), nil, nil
@@ -103,6 +106,7 @@ func TestMinWidthRepair_EligibleButEmptyBacklogFallsBackToSequential(t *testing.
 }
 
 func TestMinWidthRepair_ForceDispatchErrorSurfacesAndFallsBack(t *testing.T) {
+	t.Parallel()
 	launcher := &wiringFakeLauncher{}
 	refusal := errors.New("dirty control plane")
 	planFn := func(context.Context, int) ([]byte, []string, error) {

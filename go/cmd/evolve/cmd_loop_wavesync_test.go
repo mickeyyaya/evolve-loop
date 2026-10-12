@@ -206,6 +206,7 @@ func TestSyncMainAtWaveBoundary_NotOnMainSkips(t *testing.T) {
 }
 
 func TestSyncMainAtWaveBoundary_NoRemoteSkipsWithoutError(t *testing.T) {
+	t.Parallel()
 	seed := t.TempDir()
 	gitrun(t, seed, "init", "-q", "-b", "main")
 	if err := os.WriteFile(filepath.Join(seed, "f.txt"), []byte("v"), 0o644); err != nil {

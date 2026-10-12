@@ -31,6 +31,7 @@ func writeDashboardDossier(t *testing.T, root string, cycle int) {
 }
 
 func TestDashboard_SnapshotPrintsJSONWithCycles(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeDashboardDossier(t, root, 41)
 	writeDashboardDossier(t, root, 42)
@@ -95,6 +96,7 @@ func TestDashboard_ServeErrorIsExit1(t *testing.T) {
 }
 
 func TestDashboard_BadFlagIsUsageError(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if code := runDashboard([]string{"--nope"}, nil, &out, &errb); code != 10 {
 		t.Fatalf("exit=%d, want 10", code)

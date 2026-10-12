@@ -27,6 +27,7 @@ func writeBridgePolicy(t *testing.T, bridge map[string]string) {
 }
 
 func TestRunBridge_Help(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if code := runBridge([]string{"help"}, nil, &out, &errb); code != 0 {
 		t.Fatalf("help exit = %d, want 0", code)
@@ -37,6 +38,7 @@ func TestRunBridge_Help(t *testing.T) {
 }
 
 func TestRunBridge_NoArgs(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if code := runBridge(nil, nil, &out, &errb); code != 10 {
 		t.Fatalf("no-args exit = %d, want 10", code)
@@ -44,6 +46,7 @@ func TestRunBridge_NoArgs(t *testing.T) {
 }
 
 func TestRunBridge_UnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"frobnicate"}, nil, &out, &errb)
 	if code != 10 {
@@ -55,6 +58,7 @@ func TestRunBridge_UnknownSubcommand(t *testing.T) {
 }
 
 func TestRunBridge_Probe(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if code := runBridge([]string{"probe"}, nil, &out, &errb); code != 0 {
 		t.Fatalf("probe exit = %d, want 0", code)
@@ -71,6 +75,7 @@ func TestRunBridge_Probe(t *testing.T) {
 }
 
 func TestRunBridge_LaunchMissingRequiredFlags(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"launch", "--cli=claude-p"}, nil, &out, &errb)
 	if code != 10 {
@@ -97,6 +102,7 @@ func TestRunBridge_AddRule(t *testing.T) {
 }
 
 func TestRunBridge_Doctor(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"doctor", "--cli=claude-p"}, nil, &out, &errb)
 	if code < 0 || code > 2 {
@@ -117,6 +123,7 @@ func TestRunBridge_Doctor(t *testing.T) {
 }
 
 func TestRunBridge_Billing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	var out, errb bytes.Buffer
 	if code := runBridge([]string{"billing", "snapshot", dir, "pre"}, nil, &out, &errb); code != 0 {

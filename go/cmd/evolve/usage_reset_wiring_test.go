@@ -22,6 +22,7 @@ func resetIn(now time.Time, d time.Duration, exhausted bool) quotastate.UsageWin
 }
 
 func TestUsageResetFrom_TheFirstWalledFamilyBackSetsTheReset(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.UTC)
 	explain := screens(map[string]usageprobe.Evidence{
 		"claude-tmux":     {Verdict: usageprobe.VerdictExhausted, Windows: []quotastate.UsageWindow{resetIn(now, 3*time.Hour, true), resetIn(now, 9*time.Hour, true), resetIn(now, time.Hour, false)}},
@@ -36,6 +37,7 @@ func TestUsageResetFrom_TheFirstWalledFamilyBackSetsTheReset(t *testing.T) {
 }
 
 func TestUsageResetFrom_AScreenThatProvesNoExhaustionGivesNoReset(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 9, 18, 42, 13, 0, time.UTC)
 	explain := screens(map[string]usageprobe.Evidence{
 		"claude-tmux": {Verdict: usageprobe.VerdictHealthy, Windows: []quotastate.UsageWindow{resetIn(now, time.Hour, false)}},

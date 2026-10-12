@@ -32,6 +32,7 @@ func cheapModelFor(driver string) string {
 }
 
 func TestE2ELiveSmoke(t *testing.T) {
+	t.Parallel()
 	liveGate(t, "EVOLVE_E2E_LIVE_SMOKE")
 	repoRoot := mustRepoRoot(t)
 	evolveBin := buildBinary(t, t.TempDir(), "evolve", "./cmd/evolve", repoRoot)

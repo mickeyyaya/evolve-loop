@@ -38,6 +38,7 @@ func TestRunGC_DryRunWarnsWhenTheCurrentLoopLogStaysOverItsCap(t *testing.T) {
 }
 
 func TestRunGCHook_WarnsWhenTheCurrentLoopLogStaysOverItsCap(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	gcWritePolicy(t, root, `{"mode":"shadow","logs":{"loop":{"max_total_mb":1}}}`)

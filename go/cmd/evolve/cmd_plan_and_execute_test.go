@@ -156,6 +156,7 @@ func TestRunPlanAndExecute_PlanArtifactMissing_Exit11(t *testing.T) {
 }
 
 func TestJoinNames_EmptyAndMulti(t *testing.T) {
+	t.Parallel()
 	if got := joinNames(nil); got != "" {
 		t.Errorf("nil → %q, want empty", got)
 	}

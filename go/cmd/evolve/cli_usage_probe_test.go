@@ -22,6 +22,7 @@ func writeProbePolicy(t *testing.T, json string) string {
 }
 
 func TestUsageProbeEnabled(t *testing.T) {
+	t.Parallel()
 	on := writeProbePolicy(t, `{"cli_health":{"proactive_probe":true}}`)
 	off := writeProbePolicy(t, `{}`)
 
@@ -56,6 +57,7 @@ func usageFixture(t *testing.T, name string) string {
 }
 
 func TestNewUsageProber_ReadsEachCLIsWindowsThroughItsManifestAndBenchesTheRightFamily(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		family, fixture string
 		benched         []string

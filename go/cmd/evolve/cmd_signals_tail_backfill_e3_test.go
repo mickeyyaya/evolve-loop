@@ -25,6 +25,7 @@ func e3Mkdir(t *testing.T, path string) {
 }
 
 func TestNewestTailStream_PicksTheHighestCanonicalCycleThatHasAStream(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	runs := e3RunsDir(root)
 	appendTailEvents(t, root, 3, tailTestEvent(3, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome))
@@ -51,6 +52,7 @@ func TestNewestTailStream_PicksTheHighestCanonicalCycleThatHasAStream(t *testing
 }
 
 func TestNewestTailStream_OrderOfEntriesDoesNotMatter(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for _, c := range []int{8, 2, 11} {
 		appendTailEvents(t, root, c, tailTestEvent(c, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome))
@@ -69,6 +71,7 @@ func TestNewestTailStream_OrderOfEntriesDoesNotMatter(t *testing.T) {
 }
 
 func TestSignalsTail_WithNoLiveRunTailsTheNewestStreamOnce(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	old := tailTestEvent(3, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome)
 	newest := tailTestEvent(5, "2026-10-05T10:00:01Z", signalcenter.KindPhaseOutcome)
@@ -90,6 +93,7 @@ func TestSignalsTail_WithNoLiveRunTailsTheNewestStreamOnce(t *testing.T) {
 }
 
 func TestSignalsTail_WaveStopsWhenThereIsNothingToTail(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		setup  func(t *testing.T, root string)
@@ -121,6 +125,7 @@ func TestSignalsTail_WaveStopsWhenThereIsNothingToTail(t *testing.T) {
 }
 
 func TestSignalsTail_AStreamThatCannotBeReadExitsTwo(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	e3Mkdir(t, filepath.Join(paths.RunWorkspace(root, 6), signalcenter.StreamFileName))
 	var stdout, stderr bytes.Buffer
@@ -133,6 +138,7 @@ func TestSignalsTail_AStreamThatCannotBeReadExitsTwo(t *testing.T) {
 }
 
 func TestSignalsTail_MalformedLinesAreCountedAndSkipped(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	good := tailTestEvent(2, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome)
 	appendTailEvents(t, root, 2, good)
@@ -160,6 +166,7 @@ func TestSignalsTail_MalformedLinesAreCountedAndSkipped(t *testing.T) {
 }
 
 func TestSignalsTail_ASingleMalformedLineIsReported(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	appendTailEvents(t, root, 2, tailTestEvent(2, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome))
 	stream := filepath.Join(paths.RunWorkspace(root, 2), signalcenter.StreamFileName)
@@ -183,6 +190,7 @@ func TestSignalsTail_ASingleMalformedLineIsReported(t *testing.T) {
 }
 
 func TestSignalsTail_AFailedWriteExitsTwoInBothFormats(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	appendTailEvents(t, root, 2, tailTestEvent(2, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome))
 	for _, args := range [][]string{{"--cycle", "2"}, {"--cycle", "2", "--json"}} {
@@ -197,6 +205,7 @@ func TestSignalsTail_AFailedWriteExitsTwoInBothFormats(t *testing.T) {
 }
 
 func TestSignalsTail_AFilteredOutEventIsNeverWritten(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	appendTailEvents(t, root, 2, tailTestEvent(2, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome))
 	var stderr bytes.Buffer
@@ -209,6 +218,7 @@ func TestSignalsTail_AFilteredOutEventIsNeverWritten(t *testing.T) {
 }
 
 func TestSignalsTail_JoinLiveLanesSortsAndMarksDepartedLanesGone(t *testing.T) {
+	t.Parallel()
 	tail := &signalsTail{project: "/p"}
 	tail.lanes = []*tailLane{tail.lane(7), tail.lane(5)}
 
@@ -232,6 +242,7 @@ func TestSignalsTail_JoinLiveLanesSortsAndMarksDepartedLanesGone(t *testing.T) {
 }
 
 func TestSignalsTail_AFallbackTailNeverJoinsALaterLiveRun(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	appendTailEvents(t, root, 4, tailTestEvent(4, "2026-10-05T10:00:00Z", signalcenter.KindPhaseOutcome))
 	tail := &signalsTail{project: root, stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}

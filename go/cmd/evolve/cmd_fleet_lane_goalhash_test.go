@@ -3,6 +3,7 @@ package main
 import "testing"
 
 func TestLaneGoalHash_FallsBackToLaunchGoalHashWhenSpecEmpty(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		specGH   string

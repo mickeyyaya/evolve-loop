@@ -24,6 +24,7 @@ func (l *resultEchoLauncher) Run(ctx context.Context, _ []fleet.CycleSpec) []fle
 }
 
 func TestShouldRunWave_AdversarialGateTable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fc   policy.FleetConfig
@@ -46,6 +47,7 @@ func TestShouldRunWave_AdversarialGateTable(t *testing.T) {
 }
 
 func TestDispatchIteration_EmptyPlanNeverClaimsAWave(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
@@ -69,6 +71,7 @@ func TestDispatchIteration_EmptyPlanNeverClaimsAWave(t *testing.T) {
 }
 
 func TestDispatchIteration_LaneResultsPropagateVerbatim(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	laneErr := errors.New("lane 1 wedged")
 	canned := []fleet.Result{
@@ -100,6 +103,7 @@ func TestDispatchIteration_LaneResultsPropagateVerbatim(t *testing.T) {
 }
 
 func TestDispatchIteration_WaveIndexReachesPlanFn(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	for _, waveIndex := range []int{0, 7} {
 		got := -1
@@ -117,6 +121,7 @@ func TestDispatchIteration_WaveIndexReachesPlanFn(t *testing.T) {
 }
 
 func TestDispatchIteration_ContextReachesLauncher(t *testing.T) {
+	t.Parallel()
 	type ctxKey struct{}
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &resultEchoLauncher{}
@@ -136,6 +141,7 @@ func TestDispatchIteration_ContextReachesLauncher(t *testing.T) {
 }
 
 func TestDispatchIteration_CardsFallbackFlowsThroughDispatch(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
@@ -166,6 +172,7 @@ func TestDispatchIteration_CardsFallbackFlowsThroughDispatch(t *testing.T) {
 }
 
 func TestDispatchIteration_DuplicateFloorsNeverCoScheduled(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {

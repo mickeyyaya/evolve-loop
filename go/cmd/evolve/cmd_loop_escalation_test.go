@@ -12,6 +12,7 @@ import (
 )
 
 func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -68,6 +69,7 @@ func TestWritePipelineEscalation_WritesDossierAndInboxItem(t *testing.T) {
 }
 
 func TestWritePipelineEscalation_ConsecutiveFailuresPreservesEvidence(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -116,6 +118,7 @@ func TestWritePipelineEscalation_ConsecutiveFailuresPreservesEvidence(t *testing
 }
 
 func TestWritePipelineEscalation_VerdictIncoherenceKeepsArtifactGuidance(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -150,6 +153,7 @@ func TestWritePipelineEscalation_VerdictIncoherenceKeepsArtifactGuidance(t *test
 // verdict-incoherence root-cause narrative ("forged", "green") that only
 // applies to that one specific category.
 func TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -202,6 +206,7 @@ func TestWritePipelineEscalation_UnknownCategoryRetainsEvidenceOnly(t *testing.T
 // never pipeline-defect-<category> alone — a category-only id is not a
 // unique record identity.
 func TestWritePipelineEscalation_IdentityIncludesCycleNumber(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -235,6 +240,7 @@ func TestWritePipelineEscalation_IdentityIncludesCycleNumber(t *testing.T) {
 // collapse onto one inbox file — both cycles' records must survive side by
 // side.
 func TestWritePipelineEscalation_DistinctCyclesNeverCollideOnDisk(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

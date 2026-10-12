@@ -55,6 +55,7 @@ var inboxWritersThatFileNothing = map[string]string{
 }
 
 func TestInboxWriters_EveryAutofiledItemCarriesAKnownClass(t *testing.T) {
+	t.Parallel()
 	order := checkedInClassOrder(t)
 	for _, w := range autofilers {
 		t.Run(w.name, func(t *testing.T) {
@@ -234,6 +235,7 @@ func unexplainedOutcomeItem(t *testing.T) inboxbatch.Item {
 }
 
 func TestInboxWriteSites_FindsEveryShapeOfAnInboxWriteAndNoRead(t *testing.T) {
+	t.Parallel()
 	module := t.TempDir()
 	fixtures.MustWrite(t, filepath.Join(module, "internal", "filer", "filer.go"), `package filer
 
@@ -281,6 +283,7 @@ func WritesElsewhere(runDir string) error {
 }
 
 func TestEnrollmentProblems_NameAnUnenrolledWriterAndAStaleEnrollment(t *testing.T) {
+	t.Parallel()
 	var sites []string
 	for _, w := range autofilers[1:] {
 		sites = append(sites, w.sites...)

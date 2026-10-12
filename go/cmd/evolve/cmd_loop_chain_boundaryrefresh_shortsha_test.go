@@ -9,6 +9,7 @@ import (
 // that produced the audit FAIL (a freshly rebuilt binary reporting itself
 // stale).
 func TestDefaultChainBoundaryAhead_ShortCommitAtHeadIsNotAhead(t *testing.T) {
+	t.Parallel()
 	dir, commitA := brfInitRepo(t)
 	shortA := commitA[:12]
 
@@ -24,6 +25,7 @@ func TestDefaultChainBoundaryAhead_ShortCommitAtHeadIsNotAhead(t *testing.T) {
 // Sanity check the same short-form seam still detects genuine lag once HEAD
 // moves past the (short) commit the binary was built from.
 func TestDefaultChainBoundaryAhead_ShortCommitBehindHeadIsAhead(t *testing.T) {
+	t.Parallel()
 	dir, commitA := brfInitRepo(t)
 	shortA := commitA[:12]
 	brfAdvance(t, dir)

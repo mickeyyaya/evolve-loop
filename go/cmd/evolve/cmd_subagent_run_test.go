@@ -59,6 +59,7 @@ func TestRunSubagentRun_UnknownAgentRendersTheCodeAndFilesIt(t *testing.T) {
 }
 
 func TestRenderRunOutcome_LineAndExitMapArePinned(t *testing.T) {
+	t.Parallel()
 	want, err := os.ReadFile(filepath.Join("testdata", "root-outcome.golden"))
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +77,7 @@ func TestRenderRunOutcome_LineAndExitMapArePinned(t *testing.T) {
 }
 
 func TestSubagentRunRoot_PassesTheRootSignalCenterAndKeepsTheRawWarns(t *testing.T) {
+	t.Parallel()
 	body, err := os.ReadFile("cmd_subagent.go")
 	if err != nil {
 		t.Fatal(err)

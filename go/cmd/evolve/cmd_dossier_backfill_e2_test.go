@@ -27,6 +27,7 @@ func e2PendingDirAsFile(t *testing.T, root string) {
 }
 
 func TestRunDossier_RoutesEachSubcommandAndRefusesTheRest(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		args       []string
@@ -57,6 +58,7 @@ func TestRunDossier_RoutesEachSubcommandAndRefusesTheRest(t *testing.T) {
 }
 
 func TestRunDossierPublish_RefusesBadInvocations(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		args       []string
@@ -80,6 +82,7 @@ func TestRunDossierPublish_RefusesBadInvocations(t *testing.T) {
 }
 
 func TestRunDossierPublish_AnUnreadablePendingDirExits2(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	e2PendingDirAsFile(t, root)
 	var stdout, stderr bytes.Buffer
@@ -92,6 +95,7 @@ func TestRunDossierPublish_AnUnreadablePendingDirExits2(t *testing.T) {
 }
 
 func TestRunDossierPublish_NothingPendingIsAQuietSuccess(t *testing.T) {
+	t.Parallel()
 	for _, withDir := range []bool{false, true} {
 		root := t.TempDir()
 		if withDir {
@@ -110,6 +114,7 @@ func TestRunDossierPublish_NothingPendingIsAQuietSuccess(t *testing.T) {
 }
 
 func TestRunDossierPublish_HalfPairsAloneStayPendingAndPublishNothing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeE2File(t, filepath.Join(dossier.PendingDir(root), "cycle-8.md"), "# eight\n")
 	var stdout, stderr bytes.Buffer
@@ -126,6 +131,7 @@ func TestRunDossierPublish_HalfPairsAloneStayPendingAndPublishNothing(t *testing
 }
 
 func TestRunDossierPublish_OutsideACheckoutTheHoldErrorExits2(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := writePendingCloseout(root); err != nil {
 		t.Fatal(err)
@@ -143,6 +149,7 @@ func TestRunDossierPublish_OutsideACheckoutTheHoldErrorExits2(t *testing.T) {
 }
 
 func TestRunDossierPublish_ADryRunWithAFreeLockListsAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	head := r.Git("rev-parse", "HEAD")
 	var stdout, stderr bytes.Buffer
@@ -161,6 +168,7 @@ func TestRunDossierPublish_ADryRunWithAFreeLockListsAndChangesNothing(t *testing
 }
 
 func TestRunDossierPublish_PublishesThePendingPairIntoOneCommit(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	var stdout, stderr bytes.Buffer
 
@@ -178,6 +186,7 @@ func TestRunDossierPublish_PublishesThePendingPairIntoOneCommit(t *testing.T) {
 }
 
 func TestPublishDossierPairs_ARefusedPairExits2AndStaysPending(t *testing.T) {
+	t.Parallel()
 	r := gitPlane(t, "main")
 	bad := filepath.Join(dossier.PendingDir(r.Dir), "cycle-9.json")
 	writeE2File(t, bad, "{not json")
@@ -201,6 +210,7 @@ func TestPublishDossierPairs_ARefusedPairExits2AndStaysPending(t *testing.T) {
 }
 
 func TestPublishDossierPairs_AListFailureExits2(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	e2PendingDirAsFile(t, root)
 	var stdout, stderr bytes.Buffer
@@ -213,6 +223,7 @@ func TestPublishDossierPairs_AListFailureExits2(t *testing.T) {
 }
 
 func TestPublishDossierPairs_PublishesEveryPair(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	var stdout, stderr bytes.Buffer
 
@@ -224,6 +235,7 @@ func TestPublishDossierPairs_PublishesEveryPair(t *testing.T) {
 }
 
 func TestHasPendingDossiers_ReportsWhatTheDirectoryHolds(t *testing.T) {
+	t.Parallel()
 	t.Run("absent dir is silent false", func(t *testing.T) {
 		var warn bytes.Buffer
 		if hasPendingDossiers(t.TempDir(), &warn) || warn.Len() != 0 {
@@ -288,6 +300,7 @@ func TestPublishPendingDossiers_APendingDirThatVanishesUnderTheLockWarnsAndKeeps
 }
 
 func TestTryDossierPublishLock_HoldsTheShipLockUntilReleased(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 
 	release, err := tryDossierPublishLock(root)
@@ -307,6 +320,7 @@ func TestTryDossierPublishLock_HoldsTheShipLockUntilReleased(t *testing.T) {
 }
 
 func TestTryDossierPublishLock_AnUncreatableLockDirIsAnError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeE2File(t, filepath.Join(root, ".evolve"), "a file where the dir goes")
 
@@ -321,6 +335,7 @@ func TestTryDossierPublishLock_AnUncreatableLockDirIsAnError(t *testing.T) {
 }
 
 func TestProbeDossierPublishLock_ProbesOnlyAnExistingLockFile(t *testing.T) {
+	t.Parallel()
 	t.Run("no lock file is free and creates nothing", func(t *testing.T) {
 		root := t.TempDir()
 		release, err := probeDossierPublishLock(root)

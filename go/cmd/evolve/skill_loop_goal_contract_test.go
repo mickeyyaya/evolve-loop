@@ -32,6 +32,7 @@ func firstLineContaining(lines []string, needle string) string {
 }
 
 func TestSkillLoopGoalRequired_ArgumentHintAndUsage(t *testing.T) {
+	t.Parallel()
 	lines := readSkillLoopLines(t)
 
 	hint := firstLineContaining(lines, "argument-hint:")

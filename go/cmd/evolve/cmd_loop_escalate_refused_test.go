@@ -11,6 +11,7 @@ import (
 )
 
 func TestApplyEscalationBoundary_NamesEachRefusedIntentInTheLoopLogAndItsSignal(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	fixtures.MustWrite(t, filepath.Join(evolveDir, "policy.json"), `{"failure_disposition":{"stage":"enforce"}}`)
 	fixtures.MustWrite(t, filepath.Join(evolveDir, "inbox", ".keep"), "")

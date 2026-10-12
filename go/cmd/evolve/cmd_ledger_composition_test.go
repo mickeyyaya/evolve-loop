@@ -103,6 +103,7 @@ func runLedgerVerifyRC(t *testing.T, evolveDir string) (int, string) {
 //   - forged-patch-id: both diffs agree with each other but the entry claims
 //     a fabricated patch_id — a hand-edited ledger line.
 func TestCompositionVerdict_KernelRecomputesPatchId(t *testing.T) {
+	t.Parallel()
 	auditedID := compPatchID(t, t.TempDir(), compAuditedDiff)
 	cases := []struct {
 		name                      string
@@ -126,6 +127,7 @@ func TestCompositionVerdict_KernelRecomputesPatchId(t *testing.T) {
 // Guards against over-rejection: the checker must validate composition-verdict
 // entries, not ban them.
 func TestCompositionVerdict_ValidEntryVerifies(t *testing.T) {
+	t.Parallel()
 	honestID := compPatchID(t, t.TempDir(), compAuditedDiff)
 	evolveDir := compFixture(t, compAuditedDiff, compAuditedDiff, honestID)
 	rc, errOut := runLedgerVerifyRC(t, evolveDir)

@@ -24,6 +24,7 @@ func seedResetProject(t *testing.T) string {
 }
 
 func TestRunResetSHA_OperatorRepinsToRunningBinary(t *testing.T) {
+	t.Parallel()
 	root := seedResetProject(t)
 	var out, errb bytes.Buffer
 	code := runResetSHA([]string{"--operator", "--project-root", root}, nil, &out, &errb)
@@ -47,6 +48,7 @@ func TestRunResetSHA_OperatorRepinsToRunningBinary(t *testing.T) {
 }
 
 func TestRunResetSHA_RefusesWithoutProvenanceOrOperator(t *testing.T) {
+	t.Parallel()
 	// The test binary has no verifiable provenance against the (non-git) temp
 	// project, and --operator is absent → RepinShipSHA refuses → non-zero exit,
 	// pin unchanged.

@@ -11,6 +11,7 @@ import (
 )
 
 func TestTheCheckedInCatalogFiltersEachTargetToItsModelFamily(t *testing.T) {
+	t.Parallel()
 	_, thisFile, _, _ := runtime.Caller(0)
 	checkedIn := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".evolve", "policy.json")
 	pol, err := policy.Load(checkedIn)

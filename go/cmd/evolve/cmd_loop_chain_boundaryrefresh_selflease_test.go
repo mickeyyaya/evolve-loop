@@ -17,6 +17,7 @@ import (
 // direct unit-level regression guard: a run dir carrying THIS process's own
 // pid in a fresh lease must not count as an active sibling.
 func TestDefaultChainBoundaryFleetLaneActive_OwnFreshLeaseIsNotASibling(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	runsDir := brflRunsDir(t, evolveDir)
 	ownDir := filepath.Join(runsDir, "cycle-own-lane")
@@ -42,6 +43,7 @@ func TestDefaultChainBoundaryFleetLaneActive_OwnFreshLeaseIsNotASibling(t *testi
 // lease and a sibling's lease coexist under runs/, and the sibling must still
 // be found.
 func TestDefaultChainBoundaryFleetLaneActive_OwnLeasePlusRealSiblingStillDetected(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	runsDir := brflRunsDir(t, evolveDir)
 

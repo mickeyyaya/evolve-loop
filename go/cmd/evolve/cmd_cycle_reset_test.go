@@ -36,6 +36,7 @@ func seedReset(t *testing.T, root string, cycleID int) (evolveDir, workspace str
 }
 
 func TestRunCycleReset_LeaseFencing(t *testing.T) {
+	t.Parallel()
 	// The fence needs a fresh heartbeat and a live pid; this process's own pid is
 	// a guaranteed-live owner.
 	livePID := os.Getpid()

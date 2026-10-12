@@ -11,6 +11,7 @@ import (
 )
 
 func TestRunBridgeIntrospect_ParsesEveryFlagForAPaneFile(t *testing.T) {
+	t.Parallel()
 	pane := filepath.Join(t.TempDir(), "pane.txt")
 	if err := os.WriteFile(pane, []byte("/help\n"), 0o644); err != nil {
 		t.Fatal(err)

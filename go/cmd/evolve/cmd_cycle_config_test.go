@@ -53,6 +53,7 @@ func nonTestSourcesMatching(t *testing.T, re *regexp.Regexp) []string {
 }
 
 func TestRoutingConfigLoader_ConstructionSitesArePinned(t *testing.T) {
+	t.Parallel()
 	want := []string{
 		"cmd/evolve/cmd_cycle_config.go",
 		"internal/router/policy.go",
@@ -64,6 +65,7 @@ func TestRoutingConfigLoader_ConstructionSitesArePinned(t *testing.T) {
 }
 
 func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
+	t.Parallel()
 	want := map[string]bool{
 		"internal/cli/phasecmd/phase_verify.go": true, // the agent's self-check
 		"cmd/evolve/cmd_solution.go":            true, // hand-rendered, no Center (F7)
@@ -87,6 +89,7 @@ func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 }
 
 func TestRegistryPathSpelling_HasOneNonTestHome(t *testing.T) {
+	t.Parallel()
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`"docs",\s*"architecture",\s*"phase-registry\.json"`))
 	if len(hits) != 0 {
 		t.Fatalf("the docs/architecture/phase-registry.json join belongs to config.RegistryPath alone; re-inlined at %v", hits)
@@ -94,6 +97,7 @@ func TestRegistryPathSpelling_HasOneNonTestHome(t *testing.T) {
 }
 
 func TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +132,7 @@ func TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam(t *testing.
 
 // Keyed fields: vet's composites check applies to imported struct literals.
 func TestPolicyStagesOf_ProjectsThePolicyAccessors(t *testing.T) {
+	t.Parallel()
 	pol := policy.Policy{
 		Gates:            &policy.GatesPolicy{ContractGate: "shadow", EvalGate: "off", TriageCapGate: "shadow", ReviewGate: "enforce", TopNGate: "off"},
 		Recovery:         &policy.RecoveryPolicy{PhaseRecovery: "enforce", SpineFloor: "shadow", FatalPane: "shadow"},
@@ -176,6 +181,7 @@ func TestWireOrchestratorDeps_ConfigWarningRendersAndIsDurable(t *testing.T) {
 // --simulate resolves no RoutingConfig, so no CONFIG_* warning can originate
 // there; this proves the topology a future Loader on that root would inherit.
 func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -203,6 +209,7 @@ func TestWireSimulateOrchestrator_CenterTopologyRendersConfigWarnings(t *testing
 }
 
 func TestSolutionCmd_MalformedRegistryPrintsTheRegistryWarning(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	reg := config.RegistryPath(root)
 	if err := os.MkdirAll(filepath.Dir(reg), 0o755); err != nil {
@@ -229,6 +236,7 @@ func (f *fakeBridgeStageSink) SetRecoveryStage(s string)      { f.recovery = s }
 func (f *fakeBridgeStageSink) SetFatalPaneStage(s string)     { f.fatalPane = s }
 
 func TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter(t *testing.T) {
+	t.Parallel()
 	var cfg config.RoutingConfig
 	cfg.PhaseIO, cfg.PhaseRecovery, cfg.FatalPane = config.StageAdvisory, config.StageShadow, config.StageEnforce
 	var sink fakeBridgeStageSink
@@ -240,6 +248,7 @@ func TestWireBridgeStages_ForwardsEachDialOnItsOwnSetter(t *testing.T) {
 }
 
 func TestWireBridgeStages_IsTheRootsOnlyStageForwarding(t *testing.T) {
+	t.Parallel()
 	for _, re := range []string{`\.SetPhaseIOStage\(`, `\.SetRecoveryStage\(`, `\.SetFatalPaneStage\(`} {
 		hits := nonTestSourcesMatching(t, regexp.MustCompile(re))
 		if len(hits) != 1 || hits[0] != "cmd/evolve/cmd_cycle_config.go" {

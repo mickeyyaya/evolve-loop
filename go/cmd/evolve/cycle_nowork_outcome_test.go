@@ -63,6 +63,7 @@ func routeOf(t *testing.T, evolveDir, id string) string {
 }
 
 func TestCloseoutCycleOutcome_PlannedNoWorkHandsTheLanesAnsweredItemToTheConsole(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedNoWorkLane(t, root, 7)
 	fake := newFakeLedger()
@@ -79,6 +80,7 @@ func TestCloseoutCycleOutcome_PlannedNoWorkHandsTheLanesAnsweredItemToTheConsole
 }
 
 func TestCloseoutCycleOutcome_OnlyAPlannedNoWorkHandsOver(t *testing.T) {
+	t.Parallel()
 	notNoWork := plannedNoWork(7)
 	notNoWork.TerminationReason = "audit-advisory"
 	for _, result := range []core.CycleResult{{Cycle: 7, FinalVerdict: core.VerdictPASS}, notNoWork} {
@@ -92,6 +94,7 @@ func TestCloseoutCycleOutcome_OnlyAPlannedNoWorkHandsOver(t *testing.T) {
 }
 
 func TestCloseoutCycleOutcome_ReportsWhatItApplied(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedNoWorkLane(t, root, 7)
 	if applied, err := closeoutCycleOutcome(plannedNoWork(7), root, evolveDir, io.Discard, newFakeLedger(), nil); applied != "no-work hand-off" || err != nil {
@@ -103,6 +106,7 @@ func TestCloseoutCycleOutcome_ReportsWhatItApplied(t *testing.T) {
 }
 
 func TestCompleteSequentialCycle_PlannedNoWorkHandsTheLaneOver(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := seedNoWorkLane(t, root, 7)
 	fake := newFakeLedger()

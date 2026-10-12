@@ -113,6 +113,7 @@ func TestRouter_EveryLaunchOfTheAdvisorStaysOnClaudeModels(t *testing.T) {
 }
 
 func TestIsGeminiPro_TellsTheAgyDisplayNamesApart(t *testing.T) {
+	t.Parallel()
 	if !isGeminiPro("Gemini 3.1 Pro (High)") || isGeminiPro("Gemini 3.8 Flash (High)") || isGeminiPro("Claude Opus 5.5 (High)") {
 		t.Fatal("isGeminiPro misreads the agy display names it must tell apart")
 	}

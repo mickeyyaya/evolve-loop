@@ -93,6 +93,7 @@ func containsID(ids []string, want string) bool {
 }
 
 func TestProductionWavePlanFn_PrunesConsumedScopeFromPriorDecision(t *testing.T) {
+	t.Parallel()
 	cfg := scopePruneEnv(t, 7, []map[string]any{
 		{"id": "alpha", "files": []string{"go/internal/alpha/alpha.go"}},
 		{"id": "gamma", "files": []string{"go/internal/gamma/gamma.go"}},
@@ -115,6 +116,7 @@ func TestProductionWavePlanFn_PrunesConsumedScopeFromPriorDecision(t *testing.T)
 }
 
 func TestProductionWavePlanFn_KeepsPendingAndUnknownScopes(t *testing.T) {
+	t.Parallel()
 	cfg := scopePruneEnv(t, 4, []map[string]any{
 		{"id": "alpha", "files": []string{"go/internal/alpha/alpha.go"}},
 		{"id": "not-inbox-backed", "files": []string{"go/internal/manual/manual.go"}},
@@ -133,6 +135,7 @@ func TestProductionWavePlanFn_KeepsPendingAndUnknownScopes(t *testing.T) {
 }
 
 func TestProductionWavePlanFn_AllConsumedStillPlansLiveWork(t *testing.T) {
+	t.Parallel()
 	cfg := scopePruneEnv(t, 9, []map[string]any{
 		{"id": "gamma", "files": []string{"go/internal/gamma/gamma.go"}},
 		{"id": "delta", "files": []string{"go/internal/delta/delta.go"}},

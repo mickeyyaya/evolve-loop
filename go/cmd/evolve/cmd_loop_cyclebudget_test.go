@@ -9,6 +9,7 @@ import (
 )
 
 func TestReadCarryoverCount(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	write := func(name, body string) string {
 		p := filepath.Join(dir, name)
@@ -45,6 +46,7 @@ func TestReadCarryoverCount(t *testing.T) {
 }
 
 func TestWorkflowMaxCyclesCap(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		workflow *policy.WorkflowPolicy
@@ -65,6 +67,7 @@ func TestWorkflowMaxCyclesCap(t *testing.T) {
 }
 
 func TestParseLoopArgs_MaxCyclesExplicit(t *testing.T) {
+	t.Parallel()
 	// Explicit --cycles ⇒ explicit true, honored as the value.
 	cfg, rc := parseLoopArgs([]string{"--goal-text", "g", "--cycles", "3"}, os.Stderr)
 	if rc != 0 || !cfg.MaxCyclesExplicit || cfg.MaxCycles != 3 {

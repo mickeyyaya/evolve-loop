@@ -9,6 +9,7 @@ import (
 )
 
 func TestDriverBinaryParity_EveryRegisteredBridgeDriverIsKnownToRoutingOnItsManifestBinary(t *testing.T) {
+	t.Parallel()
 	registered := bridge.DriverNames()
 	if len(registered) == 0 {
 		t.Fatal("bridge registers no driver: the parity check would be vacuous")
@@ -30,6 +31,7 @@ func TestDriverBinaryParity_EveryRegisteredBridgeDriverIsKnownToRoutingOnItsMani
 }
 
 func TestDriverBinaryParity_EveryRoutingDriverIsARegisteredBridgeDriver(t *testing.T) {
+	t.Parallel()
 	registered := bridge.DriverNames()
 	for _, driver := range llmroute.Drivers() {
 		if !slices.Contains(registered, driver) {

@@ -15,6 +15,7 @@ import (
 )
 
 func TestE2ECLIFallbackChain(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("E2E test; skipped in -short mode")
 	}

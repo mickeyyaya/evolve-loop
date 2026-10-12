@@ -16,6 +16,7 @@ func runDispatch(args ...string) (string, string, int) {
 }
 
 func TestClihealth_ListShowsActiveAndClearRemovesOnlyTheNamedBench(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	store := clihealth.NewStore(root, time.Now)
 	for _, family := range []string{"codex", "agy"} {
@@ -38,6 +39,7 @@ func TestClihealth_ListShowsActiveAndClearRemovesOnlyTheNamedBench(t *testing.T)
 }
 
 func TestClihealth_RejectsUnknownVerbAndMissingFamily(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"clihealth"}, {"clihealth", "frobnicate"}, {"clihealth", "clear"}} {
 		if _, _, code := runDispatch(args...); code != 2 {
 			t.Errorf("%v exit=%d, want 2", args, code)
@@ -46,6 +48,7 @@ func TestClihealth_RejectsUnknownVerbAndMissingFamily(t *testing.T) {
 }
 
 func TestClihealth_ClearOfAnExpiredBenchExitsOneAndHyphenAliasRoutes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	store := clihealth.NewStore(root, time.Now)
 	if err := store.Bench(clihealth.Entry{Family: "agy", Reason: "rate_limit", BenchedUntil: time.Now().Add(-time.Hour)}); err != nil {

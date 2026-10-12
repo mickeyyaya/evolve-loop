@@ -48,6 +48,7 @@ func cycleOutputsFixture(t *testing.T, cycle string, auditRan bool, chainPresent
 }
 
 func TestRunCycleOutputs_NamesEveryGapAndTheChainState(t *testing.T) {
+	t.Parallel()
 	yes := true
 	root := cycleOutputsFixture(t, "42", true, &yes)
 	var out, errBuf strings.Builder
@@ -67,6 +68,7 @@ func TestRunCycleOutputs_NamesEveryGapAndTheChainState(t *testing.T) {
 }
 
 func TestRunCycleOutputs_AuditNotRunIsItsOwnState(t *testing.T) {
+	t.Parallel()
 	root := cycleOutputsFixture(t, "43", false, nil)
 	var out, errBuf strings.Builder
 	if rc := runCycleOutputs([]string{"-project-root", root, "43"}, &out, &errBuf); rc != 0 {
@@ -78,6 +80,7 @@ func TestRunCycleOutputs_AuditNotRunIsItsOwnState(t *testing.T) {
 }
 
 func TestRunCycleOutputs_JSONCarriesTheSameFacts(t *testing.T) {
+	t.Parallel()
 	yes := false
 	root := cycleOutputsFixture(t, "44", true, &yes)
 	var out, errBuf strings.Builder
@@ -107,6 +110,7 @@ func TestRunCycleOutputs_JSONCarriesTheSameFacts(t *testing.T) {
 }
 
 func TestRunCycleOutputs_CorruptShadowRecordIsItsOwnState(t *testing.T) {
+	t.Parallel()
 	root := cycleOutputsFixture(t, "45", true, nil)
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-45")
 	if err := os.WriteFile(filepath.Join(ws, "audit-chain-shadow.json"), []byte("{truncated"), 0o644); err != nil {

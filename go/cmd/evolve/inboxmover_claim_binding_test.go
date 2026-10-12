@@ -30,6 +30,7 @@ func findRepoRootForBinding(t *testing.T) string {
 }
 
 func TestTriageAgentDoc_ClaimBindsGoInboxMover(t *testing.T) {
+	t.Parallel()
 	root := findRepoRootForBinding(t)
 	doc, err := os.ReadFile(filepath.Join(root, "agents", "evolve-triage.md"))
 	if err != nil {
@@ -45,6 +46,7 @@ func TestTriageAgentDoc_ClaimBindsGoInboxMover(t *testing.T) {
 }
 
 func TestTriageProfile_AllowlistsGoInboxMover(t *testing.T) {
+	t.Parallel()
 	root := findRepoRootForBinding(t)
 	prof, err := os.ReadFile(filepath.Join(root, ".evolve", "profiles", "triage.json"))
 	if err != nil {

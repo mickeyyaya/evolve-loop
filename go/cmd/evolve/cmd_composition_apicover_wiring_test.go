@@ -10,6 +10,7 @@ import (
 
 // Pinned on the recipe text, not a live run, so the test never mutates the tree.
 func TestComposedApicoverGate_TargetRecipeEnforces(t *testing.T) {
+	t.Parallel()
 	target, ok := composedGateTargets["apicover"]
 	if !ok {
 		t.Fatal("composedGateTargets has no apicover entry — MissingComposedGates would fail-closed, but the gate would never run")

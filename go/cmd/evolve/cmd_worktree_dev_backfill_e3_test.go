@@ -13,6 +13,7 @@ func e3DevCreate(t *testing.T, runtime, task, branch string) (string, int) {
 }
 
 func TestRunWorktreeCreateDev_RefusalsAndGitFailures(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		branch   string

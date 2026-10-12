@@ -8,6 +8,7 @@ import (
 // EVOLVE_REQUIRE_INTENT=1 in the operator shell lands in CycleRequest.Env so
 // the orchestrator's intent gate evaluates true.
 func TestBuildCycleEnv_PropagatesRequireIntent(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
 		"PATH=/usr/bin",
@@ -23,6 +24,7 @@ func TestBuildCycleEnv_PropagatesRequireIntent(t *testing.T) {
 // TestBuildCycleEnv_PropagatesSandboxFallback covers the second
 // documented STRICT-MODE flag that was also silently dropped.
 func TestBuildCycleEnv_PropagatesSandboxFallback(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{"EVOLVE_SANDBOX_FALLBACK_ON_EPERM=1"}
 	got := buildCycleEnv(cfg, osEnv)
@@ -35,6 +37,7 @@ func TestBuildCycleEnv_PropagatesSandboxFallback(t *testing.T) {
 // operator surface (EVOLVE_*) makes it through — other env vars stay
 // out of the cycle env to avoid surprising subagents.
 func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
 		"PATH=/usr/bin",
@@ -55,6 +58,7 @@ func TestBuildCycleEnv_SkipsNonEvolvePrefix(t *testing.T) {
 // EVOLVE_STRATEGY is NOT written to the env map by the dispatcher.
 // Strategy flows via Context["strategy"] — not via the cycle env.
 func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{Strategy: "harden"}
 	got := buildCycleEnv(cfg, nil)
 	if _, present := got["EVOLVE_STRATEGY"]; present {
@@ -69,6 +73,7 @@ func TestBuildCycleEnv_StrategyNotWrittenByDispatcher(t *testing.T) {
 // EVOLVE_RESET is no longer written: cfg.Reset is consumed at cmd_loop.go
 // before buildCycleEnv is called.
 func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
+	t.Parallel()
 	t.Run("resume set", func(t *testing.T) {
 		cfg := loopConfig{Strategy: "balanced", Resume: true, Reset: true}
 		got := buildCycleEnv(cfg, nil)
@@ -91,6 +96,7 @@ func TestBuildCycleEnv_DispatcherFlagsPropagate(t *testing.T) {
 // TestBuildCycleEnv_MalformedEnvIgnored guards against panics on env
 // lines without '=' (rare but possible from low-level callers).
 func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
 		"EVOLVE_NO_EQUALS", // no '='
@@ -108,6 +114,7 @@ func TestBuildCycleEnv_MalformedEnvIgnored(t *testing.T) {
 // persona can structure intent.md around the operator's actual goal rather
 // than inferring from leftover workspace artifacts.
 func TestBuildCycleContext_PropagatesGoalText(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{
 		Strategy: "ultrathink",
 		GoalText: "auto-review pipeline for non-stop autonomy",
@@ -122,6 +129,7 @@ func TestBuildCycleContext_PropagatesGoalText(t *testing.T) {
 }
 
 func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
+	t.Parallel()
 	// When --goal-text was not passed (operator used --goal-hash or
 	// resume), the "goal" key must NOT appear in Context — phases
 	// check for empty and skip the prompt-line, but defensive: keep
@@ -137,6 +145,7 @@ func TestBuildCycleContext_EmptyGoalTextOmitsKey(t *testing.T) {
 // documented EVOLVE_* flags from CLAUDE.md (intent, sandbox, triage,
 // build-planner) to lock in the propagation contract.
 func TestBuildCycleEnv_BroadDocumentedFlagsSurface(t *testing.T) {
+	t.Parallel()
 	cfg := loopConfig{Strategy: "balanced"}
 	osEnv := []string{
 		"EVOLVE_REQUIRE_INTENT=1",

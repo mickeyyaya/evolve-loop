@@ -46,6 +46,7 @@ var e2TwoItems = map[string]string{
 }
 
 func TestDispatchPool_RunsTheRollingPoolAndContinues(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 0\n")
 
@@ -61,6 +62,7 @@ func TestDispatchPool_RunsTheRollingPoolAndContinues(t *testing.T) {
 }
 
 func TestDispatchPool_ASystemFailureLaneHaltsTheBatch(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 4\n")
 
@@ -76,6 +78,7 @@ func TestDispatchPool_ASystemFailureLaneHaltsTheBatch(t *testing.T) {
 }
 
 func TestDispatchPool_FallsBackToSequential(t *testing.T) {
+	t.Parallel()
 	t.Run("an empty backlog", func(t *testing.T) {
 		f := newE2WindowFixture(t, nil)
 		f.b.deps.Storage = &fixtures.FakeStorage{State: core.State{LastCycleNumber: 7}}
@@ -96,6 +99,7 @@ func TestDispatchPool_FallsBackToSequential(t *testing.T) {
 }
 
 func TestDispatchFleetIteration_APoolIterationEndsTheIteration(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 0\n")
 
@@ -107,6 +111,7 @@ func TestDispatchFleetIteration_APoolIterationEndsTheIteration(t *testing.T) {
 }
 
 func TestDispatchFleetIteration_AWaveThatRanCompletesTheWave(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 0\n")
 
@@ -119,6 +124,7 @@ func TestDispatchFleetIteration_AWaveThatRanCompletesTheWave(t *testing.T) {
 }
 
 func TestRepairMinWidth_ARepairedLaneEndsTheIteration(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, e2TwoItems)
 	bin := fakeCycleBinary(t, "exit 0\n")
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
@@ -132,6 +138,7 @@ func TestRepairMinWidth_ARepairedLaneEndsTheIteration(t *testing.T) {
 }
 
 func TestCompleteWave_ASystemFailureLaneHaltsBeforeTheBoundary(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, nil)
 
 	d := f.b.completeWave(4, policy.FleetConfig{Count: 2}, policy.FleetConfig{Count: 2}, []fleet.Result{{Index: 0}, {Index: 1, ExitCode: systemFailureHaltExitCode}}, 0, &fleet.StarvationTracker{})
@@ -146,6 +153,7 @@ func TestCompleteWave_ASystemFailureLaneHaltsBeforeTheBoundary(t *testing.T) {
 }
 
 func TestObserveWorkSupply_AnUnwritableStarvationTodoWarns(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, nil)
 	f.b.cfg.EvolveDir = filepath.Join(t.TempDir(), "evolve-as-file")
 	writeE2File(t, f.b.cfg.EvolveDir, "x")
@@ -159,12 +167,14 @@ func TestObserveWorkSupply_AnUnwritableStarvationTodoWarns(t *testing.T) {
 }
 
 func TestRepairedLanes_IsTheRepairWidthOnlyWhenRepaired(t *testing.T) {
+	t.Parallel()
 	if repairedLanes(false) != 0 || repairedLanes(true) <= 0 {
 		t.Fatalf("repairedLanes(false)=%d repairedLanes(true)=%d", repairedLanes(false), repairedLanes(true))
 	}
 }
 
 func TestPrepareIteration_ACancelledBatchStopsBeforeAnyBoundaryWork(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -179,6 +189,7 @@ func TestPrepareIteration_ACancelledBatchStopsBeforeAnyBoundaryWork(t *testing.T
 }
 
 func TestProbeSyncAndPublish_AnInterruptDuringTheProbesStops(t *testing.T) {
+	t.Parallel()
 	f := newE2WindowFixture(t, nil)
 	f.b.cycleEnv = map[string]string{"EVOLVE_CLI_HEALTH": "0"}
 	ctx, cancel := context.WithCancel(context.Background())

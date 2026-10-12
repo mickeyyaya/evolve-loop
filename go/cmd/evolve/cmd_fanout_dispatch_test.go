@@ -7,6 +7,7 @@ import (
 )
 
 func TestFanoutPolicyConfig_Defaults(t *testing.T) {
+	t.Parallel()
 	pol := policy.Policy{}
 	fc := pol.FanoutConfig()
 	if fc.Concurrency != 2 {
@@ -27,6 +28,7 @@ func TestFanoutPolicyConfig_Defaults(t *testing.T) {
 }
 
 func TestFanoutPolicyConfig_Override(t *testing.T) {
+	t.Parallel()
 	tw := false
 	pol := policy.Policy{
 		Fanout: &policy.FanoutPolicy{
@@ -52,6 +54,7 @@ func TestFanoutPolicyConfig_Override(t *testing.T) {
 }
 
 func TestFanoutPolicyConfig_ConcurrencyFloor(t *testing.T) {
+	t.Parallel()
 	pol := policy.Policy{Fanout: &policy.FanoutPolicy{Concurrency: 0}}
 	if fc := pol.FanoutConfig(); fc.Concurrency != 2 {
 		t.Errorf("Concurrency(0) = %d, want 2 (floor)", fc.Concurrency)

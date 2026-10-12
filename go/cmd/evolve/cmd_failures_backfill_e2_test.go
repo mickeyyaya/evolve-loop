@@ -21,6 +21,7 @@ func e2StubProcessGetwd(t *testing.T, err error) {
 }
 
 func TestRunFailures_UnknownSubcommandPrintsUsageAndNamesIt(t *testing.T) {
+	t.Parallel()
 	for _, verb := range []string{"zap", "LIST", "", "清單"} {
 		var stdout, stderr bytes.Buffer
 
@@ -39,6 +40,7 @@ func e2Quote(s string) string {
 }
 
 func TestParseFailuresFlags_AcceptsFlagsAndRefusesTheRest(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		args       []string
@@ -69,6 +71,7 @@ func TestParseFailuresFlags_AcceptsFlagsAndRefusesTheRest(t *testing.T) {
 }
 
 func TestParseFailuresFlags_HelpIsARefusal(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	fs, _ := failuresFlags("reset", &stderr)
 
@@ -163,6 +166,7 @@ func TestFailuresMutatingRoot_DemandsAnExplicitResolvableRoot(t *testing.T) {
 }
 
 func TestLoadFailedApproaches_DecodesOrRefusesTheState(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		body    *string
@@ -209,6 +213,7 @@ func TestLoadFailedApproaches_DecodesOrRefusesTheState(t *testing.T) {
 func e2Ptr(s string) *string { return &s }
 
 func TestRunFailuresList_JSONEmitsTheFilteredEntries(t *testing.T) {
+	t.Parallel()
 	root, _ := failuresProject(t, failuresLiveState, "")
 	cases := []struct {
 		name       string
@@ -245,6 +250,7 @@ func TestRunFailuresList_JSONEmitsTheFilteredEntries(t *testing.T) {
 }
 
 func TestRunFailuresList_AnEmptyStateIsAnEmptyArrayNotNull(t *testing.T) {
+	t.Parallel()
 	root, _ := failuresProject(t, `{"failedApproaches":[]}`, "")
 	var stdout, stderr bytes.Buffer
 
@@ -304,6 +310,7 @@ func TestRunFailuresList_WithoutARootReadsTheWorkingDirectory(t *testing.T) {
 }
 
 func TestPrintFailuresText_ListsEntriesAndSortedAcknowledgements(t *testing.T) {
+	t.Parallel()
 	_, evolveDir := failuresProject(t, "", `[{"fingerprint":"fp-b"},{"fingerprint":"fp-a"},{"fingerprint":""}]`)
 	shown := []map[string]any{
 		{"cycle": float64(5), "recordedAt": "2026-10-01T00:00:00Z", "classification": "code-build-fail", "expiresAt": "2099-01-01T00:00:00Z", "summary": "kept"},
@@ -323,6 +330,7 @@ func TestPrintFailuresText_ListsEntriesAndSortedAcknowledgements(t *testing.T) {
 }
 
 func TestPrintFailuresText_EmptyListAndNoAcknowledgements(t *testing.T) {
+	t.Parallel()
 	_, evolveDir := failuresProject(t, "", "")
 	var stdout, stderr bytes.Buffer
 
@@ -334,6 +342,7 @@ func TestPrintFailuresText_EmptyListAndNoAcknowledgements(t *testing.T) {
 }
 
 func TestPrintFailuresText_ACorruptAckLedgerExits2BeforePrinting(t *testing.T) {
+	t.Parallel()
 	_, evolveDir := failuresProject(t, "", failuresCorruptResolved)
 	var stdout, stderr bytes.Buffer
 
@@ -345,6 +354,7 @@ func TestPrintFailuresText_ACorruptAckLedgerExits2BeforePrinting(t *testing.T) {
 }
 
 func TestFieldOrDash_DashesOnlyAbsentNilOrEmptyStrings(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{"nil": nil, "empty": "", "text": "x", "zero": float64(0), "false": false, "unicode": "期限"}
 	cases := []struct {
 		key  string
@@ -369,6 +379,7 @@ func TestFieldOrDash_DashesOnlyAbsentNilOrEmptyStrings(t *testing.T) {
 }
 
 func TestRunFailuresReset_AnUnknownFlagExits10AndTouchesNothing(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := failuresProject(t, failuresLiveState, "")
 	var stdout, stderr bytes.Buffer
 
@@ -400,6 +411,7 @@ func TestRunFailuresPrune_ErrorPaths(t *testing.T) {
 }
 
 func TestRunFailuresPrune_ADryRunPreviewsAndKeepsTheState(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := failuresProject(t, failuresLiveState, "")
 	before, err := os.ReadFile(filepath.Join(evolveDir, "state.json"))
 	if err != nil {
@@ -437,6 +449,7 @@ func TestRunFailuresPrune_ADryRunWithoutARootReadsTheWorkingDirectory(t *testing
 }
 
 func TestPreviewFailuresPrune_ListsEveryExpiredEntryAtTheGivenInstant(t *testing.T) {
+	t.Parallel()
 	now := time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)
 	state := `{"failedApproaches":[` +
 		`{"cycle":1,"classification":"code-build-fail","expiresAt":"2026-10-11T23:59:59Z"},` +
@@ -463,6 +476,7 @@ func TestPreviewFailuresPrune_ListsEveryExpiredEntryAtTheGivenInstant(t *testing
 }
 
 func TestPreviewFailuresPrune_AnAbsentStateWouldRemoveNothing(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 
 	code := previewFailuresPrune(filepath.Join(t.TempDir(), "state.json"), time.Now(), &stdout, &stderr)
@@ -475,6 +489,7 @@ func TestPreviewFailuresPrune_AnAbsentStateWouldRemoveNothing(t *testing.T) {
 }
 
 func TestPreviewFailuresPrune_ACorruptStateExits2(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "state.json")
 	writeE2File(t, path, "{corrupt")
 	var stdout, stderr bytes.Buffer

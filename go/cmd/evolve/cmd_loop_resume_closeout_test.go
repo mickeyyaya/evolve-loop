@@ -16,6 +16,7 @@ import (
 )
 
 func TestRunResumeBatch_AFailureOutcomeTheInboxCannotTakeIsAWarningAndTheFailStands(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, ws := seedFailedCycleInbox(t, root, "worked", 7)
 	if _, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}, "worked", "7"); err != nil {

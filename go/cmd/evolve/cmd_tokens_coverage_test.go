@@ -11,6 +11,7 @@ import (
 )
 
 func TestTokensReport_CoverageLinePresent(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTimingFixture(t, root, "1", []phasetiming.Entry{
 		{Phase: "build", DurationMS: 1000, Verdict: "PASS",
@@ -32,6 +33,7 @@ func TestTokensReport_CoverageLinePresent(t *testing.T) {
 }
 
 func TestTokensReport_CoverageCountsOnlyPhasesWithData(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTimingFixture(t, root, "1", []phasetiming.Entry{
 		{Phase: "build", DurationMS: 1000, Verdict: "PASS"},
@@ -52,6 +54,7 @@ func TestTokensReport_CoverageCountsOnlyPhasesWithData(t *testing.T) {
 }
 
 func TestTokensReport_TripwireFiresOnNonClaudeSuccess(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "6", []phasetiming.Entry{
 		{Phase: "audit", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 100, Output: 10}},
@@ -81,6 +84,7 @@ func TestTokensReport_TripwireFiresOnNonClaudeSuccess(t *testing.T) {
 }
 
 func TestTokensReport_TripwireSilentOnClaudeShortAndAbort(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeTokensTimingFixture(t, root, "8", []phasetiming.Entry{
 		{Phase: "build", Verdict: "PASS", Tokens: cyclestate.TokenUsage{Input: 200, Output: 20}},

@@ -48,6 +48,7 @@ func legacyAdvisorDispatch(t *testing.T, evolveDir, root string, pol policy.Poli
 }
 
 func TestRouterDispatch_ComesFromTheTable(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(evolveDir, "profiles"), 0o755); err != nil {
 		t.Fatal(err)

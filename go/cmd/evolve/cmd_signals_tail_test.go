@@ -66,6 +66,7 @@ func TestSignalsTailDispatchFromRunSignalsPrintsTheCycleInInstantOrder(t *testin
 }
 
 func TestSignalsTailUsageErrorsExitTen(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"--cycle", "0"}, {"stray"}, {"--kind", "nope"}, {"--code", "a,b"}, {"--bogus"}} {
 		var stdout, stderr bytes.Buffer
 		if rc := runSignalsTail(context.Background(), args, tailEnv{ProjectRoot: t.TempDir()}, &stdout, &stderr); rc != 10 || stdout.Len() != 0 || stderr.Len() == 0 {
@@ -75,6 +76,7 @@ func TestSignalsTailUsageErrorsExitTen(t *testing.T) {
 }
 
 func TestSignalsTailWaveFollowJoinsLiveLanesAndEndsWhenEverySeals(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	backlog := tailTestEvent(7, "2026-10-05T10:00:01Z", signalcenter.KindPhaseOutcome)
 	appendTailEvents(t, root, 7, backlog)
@@ -99,6 +101,7 @@ func TestSignalsTailWaveFollowJoinsLiveLanesAndEndsWhenEverySeals(t *testing.T) 
 }
 
 func TestSignalsTailFollowEndsCleanlyOnCancel(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	appendTailEvents(t, root, 4, tailTestEvent(4, "2026-10-05T10:00:01Z", signalcenter.KindPhaseOutcome))
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -110,6 +113,7 @@ func TestSignalsTailFollowEndsCleanlyOnCancel(t *testing.T) {
 }
 
 func TestSignalsTailDefaultsAPollAndReportsAMissingCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var stdout, stderr bytes.Buffer
 	if rc := runSignalsTail(context.Background(), []string{"--cycle", "9"}, tailEnv{ProjectRoot: root}, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), paths.RunWorkspace(root, 9)) {

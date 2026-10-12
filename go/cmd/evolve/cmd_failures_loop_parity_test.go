@@ -92,6 +92,7 @@ func parityResolvedBy(t *testing.T, evolveDir, fingerprint string) []string {
 }
 
 func TestFailuresResetMatchesTheLoopReset(t *testing.T) {
+	t.Parallel()
 	const fingerprint = "fp-loop-parity"
 	_, loopEvolveDir := parityProject(t)
 	verbRoot, verbEvolveDir := parityProject(t)
@@ -119,6 +120,7 @@ func TestFailuresResetMatchesTheLoopReset(t *testing.T) {
 }
 
 func TestFailuresPruneMatchesTheLaunchPruneWithoutCarryoverBookkeeping(t *testing.T) {
+	t.Parallel()
 	_, loopEvolveDir := parityProject(t)
 	verbRoot, verbEvolveDir := parityProject(t)
 	seeded := parityCarryover(readParityState(t, verbEvolveDir))

@@ -21,6 +21,7 @@ func writeCycleStateN(t *testing.T, evolveDir string, cycle int, body string) {
 }
 
 func TestACSSuiteRootAutosolve_NullAndTypeMismatch_Amp(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		body string
@@ -42,6 +43,7 @@ func TestACSSuiteRootAutosolve_NullAndTypeMismatch_Amp(t *testing.T) {
 }
 
 func TestACSSuiteRootAutosolve_PathPreservation_Amp(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		path string
@@ -63,6 +65,7 @@ func TestACSSuiteRootAutosolve_PathPreservation_Amp(t *testing.T) {
 }
 
 func TestACSSuiteRootAutosolve_WrongCycle_Amp(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	writeCycleStateN(t, evolveDir, 229, `{"active_worktree":"/tmp/worktrees/cycle-229"}`)
 

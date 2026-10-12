@@ -5,6 +5,7 @@ package main
 import "testing"
 
 func TestReleaseVerifyCLIMatrix_RealPayload(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("E2E test (builds the evolve binary); skipped in -short mode")
 	}

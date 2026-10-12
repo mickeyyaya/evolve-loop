@@ -28,6 +28,7 @@ func profileRouter(t *testing.T, root string, pol policy.Policy) *cliroute.Route
 }
 
 func TestFailureAdvisor_ComesFromTheTable(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -47,6 +48,7 @@ func TestFailureAdvisor_ComesFromTheTable(t *testing.T) {
 }
 
 func TestFailureAdvisorOpts_ResolvesProfileCLI(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -89,6 +91,7 @@ func TestFailureAdvisorOpts_AnUnresolvedRouteIsLoudAndKeepsTheCompiledDefault(t 
 }
 
 func TestFailureAdvisorOpts_AResolvedRouteWritesNothing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, ".evolve", "profiles")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

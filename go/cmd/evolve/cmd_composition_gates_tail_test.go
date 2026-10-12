@@ -10,6 +10,7 @@ import (
 )
 
 func TestComposedGatesTo_ReturnsPerGateTail(t *testing.T) {
+	t.Parallel()
 	worktree := t.TempDir()
 	makefile := "build:\n\t@true\n" +
 		"test:\n\t@echo TAIL_MARKER_XYZ; exit 1\n" +
@@ -42,6 +43,7 @@ func TestComposedGatesTo_ReturnsPerGateTail(t *testing.T) {
 }
 
 func TestComposedGatesTo_FailingGateOutputStaysOutOfTheLog(t *testing.T) {
+	t.Parallel()
 	worktree := t.TempDir()
 	makefile := "build:\n\t@true\n" +
 		"test:\n\t@echo TEST_OUTPUT_ONE; echo TEST_OUTPUT_TWO; echo TEST_OUTPUT_THREE; exit 1\n" +

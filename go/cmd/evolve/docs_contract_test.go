@@ -68,6 +68,7 @@ var allowedUndocumented = map[string]bool{
 }
 
 func TestEnvVars_DocumentedInCLAUDEmd(t *testing.T) {
+	t.Parallel()
 	repoRoot := findRepoRoot(t)
 	// CLAUDE.md keeps a digest and runtime-reference.md the full table; scan
 	// both so a row in either file satisfies the contract.

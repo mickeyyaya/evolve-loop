@@ -9,6 +9,7 @@ import (
 )
 
 func TestReachabilitySubcommandRegistered(t *testing.T) {
+	t.Parallel()
 	found := false
 	for _, c := range commands {
 		if c.Name == "reachability" {
@@ -58,6 +59,7 @@ func writeFixtureModule(t *testing.T, storageImportsCore bool) (root, corePkg, s
 }
 
 func TestReachabilityCheckPin_CyclicFixture_DetectsViolation(t *testing.T) {
+	t.Parallel()
 	root, corePkg, storagePkg := writeFixtureModule(t, true)
 
 	var stdout, stderr bytes.Buffer
@@ -82,6 +84,7 @@ func TestReachabilityCheckPin_CyclicFixture_DetectsViolation(t *testing.T) {
 }
 
 func TestReachabilityCheckPin_AcyclicFixture_NoFalsePositive(t *testing.T) {
+	t.Parallel()
 	root, corePkg, storagePkg := writeFixtureModule(t, false)
 
 	var stdout, stderr bytes.Buffer
@@ -100,6 +103,7 @@ func TestReachabilityCheckPin_AcyclicFixture_NoFalsePositive(t *testing.T) {
 }
 
 func TestReachabilityCheckPin_MissingRequiredFlag(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runReachability([]string{
 		"check-pin",
@@ -114,6 +118,7 @@ func TestReachabilityCheckPin_MissingRequiredFlag(t *testing.T) {
 }
 
 func TestReachabilityCommand_UnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runReachability([]string{"bogus-subcommand"}, nil, &stdout, &stderr)
 	if rc == 0 {

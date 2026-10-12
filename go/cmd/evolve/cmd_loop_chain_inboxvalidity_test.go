@@ -32,6 +32,7 @@ func writeInboxFile(t *testing.T, evolveDir, name, body string) {
 // — the skip list is returned, not printed, so the predicate stays pure and the
 // diagnostic lives at the call site (runLoopChain).
 func TestInboxPendingCount_SkipsMalformedAndNamesThem(t *testing.T) {
+	t.Parallel()
 	cfg := chainTestEnv(t, 2, "") // two well-formed items
 	writeInboxFile(t, cfg.EvolveDir, "broken.json", `{"id": "truncated"`)
 
@@ -52,6 +53,7 @@ func TestInboxPendingCount_SkipsMalformedAndNamesThem(t *testing.T) {
 // legitimately zero pending with a nil error and nothing to report —
 // validation must not turn it into a skip or an error.
 func TestInboxPendingCount_MissingInboxIsZeroWithNoSkips(t *testing.T) {
+	t.Parallel()
 	n, skipped, err := inboxPendingCount(filepath.Join(t.TempDir(), "nope"))
 	if err != nil || n != 0 || len(skipped) != 0 {
 		t.Fatalf("missing inbox = (%d,%v,%v), want (0,[],nil)", n, skipped, err)
@@ -63,6 +65,7 @@ func TestInboxPendingCount_MissingInboxIsZeroWithNoSkips(t *testing.T) {
 // invisible (neither pending nor skipped — they were never claimed to be
 // items).
 func TestInboxPendingCount_MalformedShapes(t *testing.T) {
+	t.Parallel()
 	cfg := chainTestEnv(t, 0, "")
 	inbox := filepath.Join(cfg.EvolveDir, "inbox")
 

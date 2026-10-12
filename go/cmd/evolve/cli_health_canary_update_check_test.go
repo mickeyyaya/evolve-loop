@@ -13,6 +13,7 @@ import (
 )
 
 func TestCLIHealthCanaryProbe_LaunchesCodexWithItsStartupUpdateCheckOff(t *testing.T) {
+	t.Parallel()
 	frames := slices.Repeat([]string{"starting"}, 256)
 	pane := &bridge.FakeTmuxController{CaptureFrames: frames}
 	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}

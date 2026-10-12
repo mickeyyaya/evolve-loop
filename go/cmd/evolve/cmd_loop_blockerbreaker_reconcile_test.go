@@ -34,6 +34,7 @@ func writeConsumedItem(t *testing.T, evolveDir, name, body string) {
 // is "pipeline-repair" — production items never carry "pipeline-defect" — so
 // a kind-gated implementation must fail this predicate.
 func TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 1326, incidentFingerprint, "gate-block")
@@ -60,6 +61,7 @@ func TestBlockerBreakerHalt_ReconcilesAlreadyConsumedItem(t *testing.T) {
 // whose fingerprint lives in the auto-filed notes field (the shape an item
 // has before a consumed_by narrative is written), is still reconciled.
 func TestBlockerBreakerHalt_ReconcilesItemWithNoKindFromNotes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 1326, incidentFingerprint, "gate-block")
@@ -79,6 +81,7 @@ func TestBlockerBreakerHalt_ReconcilesItemWithNoKindFromNotes(t *testing.T) {
 // untouched. The exclusion stays scoped to one named fingerprint at a time —
 // never a blanket Rule B disable.
 func TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 1326, incidentFingerprint, "gate-block")
@@ -98,6 +101,7 @@ func TestBlockerBreakerHalt_ReconcileDoesNotWeakenRuleB(t *testing.T) {
 // and let the sweep continue to the good item beside it. A reconciler defect
 // must never become a new boot blocker.
 func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 1326, incidentFingerprint, "gate-block")
@@ -120,6 +124,7 @@ func TestBlockerBreakerHalt_ReconcileSurvivesUnreadableItem(t *testing.T) {
 // consumed/ directory, reconciliation is a silent no-op and the breaker
 // halts exactly as it always did.
 func TestBlockerBreakerHalt_NoConsumedDirIsQuiet(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	writeDigestFixture(t, evolveDir, 1326, incidentFingerprint, "gate-block")

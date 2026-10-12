@@ -145,6 +145,7 @@ func TestBootGate_AcrossVersionMismatchStillAutoRepins(t *testing.T) {
 // matches expected_ship_sha under the same plugin version, boot must take
 // zero self-SHA action and fall through to scout.
 func TestBootGate_MatchingSHABootsIntoScout(t *testing.T) {
+	t.Parallel()
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

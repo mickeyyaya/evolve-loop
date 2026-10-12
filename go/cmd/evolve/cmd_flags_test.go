@@ -104,6 +104,7 @@ func TestFlagsCheck_DriftExitsTwo(t *testing.T) {
 }
 
 func TestSpliceMarkedRegion_EmptyAnchorAppendsAtEOF(t *testing.T) {
+	t.Parallel()
 	out, err := skillcheck.SpliceMarkedRegion("# Doc\n\nprose\n", "BEGIN\nblock\nEND", "BEGIN", "END", "")
 	if err != nil {
 		t.Fatal(err)
@@ -114,6 +115,7 @@ func TestSpliceMarkedRegion_EmptyAnchorAppendsAtEOF(t *testing.T) {
 }
 
 func TestFlagsUnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	if rc := runFlags([]string{"frobnicate"}, nil, io.Discard, io.Discard); rc != 10 {
 		t.Errorf("unknown subcommand rc=%d, want 10", rc)
 	}

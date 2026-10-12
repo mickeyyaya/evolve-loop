@@ -7,6 +7,7 @@ import (
 )
 
 func TestSubagentRun_NoInProcessFallbackSignal(t *testing.T) {
+	t.Parallel()
 	body, err := os.ReadFile("cmd_subagent.go")
 	if err != nil {
 		t.Fatalf("read cmd_subagent.go: %v", err)

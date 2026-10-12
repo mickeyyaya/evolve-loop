@@ -7,6 +7,7 @@ import (
 )
 
 func TestParseLoopArgs_ProjectRootResolvedAbsolute(t *testing.T) {
+	t.Parallel()
 	abs := func(p string) string { a, _ := filepath.Abs(p); return a }
 	cases := []struct {
 		name     string

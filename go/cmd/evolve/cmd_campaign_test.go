@@ -16,6 +16,7 @@ import (
 )
 
 func TestCampaignCycleFromWorkspace(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		workspace string
@@ -35,6 +36,7 @@ func TestCampaignCycleFromWorkspace(t *testing.T) {
 }
 
 func TestCampaignRenderMissingPlan(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := renderCampaignPlan(filepath.Join(t.TempDir(), "missing.json"), &stdout, &stderr); code != 1 {
 		t.Fatalf("renderCampaignPlan code = %d, want 1", code)
@@ -65,6 +67,7 @@ func TestRunCampaign_UnknownSub(t *testing.T) {
 }
 
 func TestRenderCampaignPlan_Valid(t *testing.T) {
+	t.Parallel()
 	path := writeCampaignTestPlan(t)
 	var stdout, stderr bytes.Buffer
 	if code := renderCampaignPlan(path, &stdout, &stderr); code != 0 {
@@ -76,6 +79,7 @@ func TestRenderCampaignPlan_Valid(t *testing.T) {
 }
 
 func TestCampaignLoadVerifiedPlanPropagatesVerifyError(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "campaign-plan.json")
 	if err := os.WriteFile(path, []byte(`{"version":0,"goal":"test","cycles":[{"id":"c1"}]}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -154,6 +158,7 @@ func TestCampaignRun_FiniteConcurrency(t *testing.T) {
 }
 
 func TestCycleRunArgs_IncludesProjectRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	got := strings.Join(cycleRunArgs("abc123", "", "", false, root), " ")
 	want := "cycle run --goal-hash abc123 --project-root " + root
@@ -163,6 +168,7 @@ func TestCycleRunArgs_IncludesProjectRoot(t *testing.T) {
 }
 
 func TestCycleRunArgs_EmptyRootOmitsFlag(t *testing.T) {
+	t.Parallel()
 	if got := strings.Join(cycleRunArgs("abc123", "", "", false, ""), " "); strings.Contains(got, "project-root") {
 		t.Fatalf("cycleRunArgs empty root = %q, want project-root omitted", got)
 	}

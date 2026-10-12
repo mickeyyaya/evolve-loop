@@ -48,6 +48,7 @@ func assertLifecycleWentThroughTheRootLedger(t *testing.T, evolveDir string, fak
 }
 
 func TestApplyCycleFailureOutcome_AppendsLifecycleThroughTheGivenLedger(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	fake := newFakeLedger()
@@ -58,6 +59,7 @@ func TestApplyCycleFailureOutcome_AppendsLifecycleThroughTheGivenLedger(t *testi
 }
 
 func TestCompleteSequentialCycle_FailureWalkGoesThroughTheRootLedger(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, ws := seedFailedCycleInbox(t, root, "poison", 7)
 	fake := newFakeLedger()
@@ -69,6 +71,7 @@ func TestCompleteSequentialCycle_FailureWalkGoesThroughTheRootLedger(t *testing.
 }
 
 func TestHandleCycleError_FailureWalkGoesThroughTheRootLedger(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	fake := newFakeLedger()
@@ -82,6 +85,7 @@ func TestHandleCycleError_FailureWalkGoesThroughTheRootLedger(t *testing.T) {
 }
 
 func TestWarnCycleFailureOutcome_SpeaksOnlyOnAnError(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	warnCycleFailureOutcome(&stderr, 7, nil)
 	if stderr.Len() != 0 {
@@ -94,6 +98,7 @@ func TestWarnCycleFailureOutcome_SpeaksOnlyOnAnError(t *testing.T) {
 }
 
 func TestLoopApplyCycleFailureOutcome_WarnsInTheLoopsVoiceOnAFailedWalk(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir, _ := seedFailedCycleInbox(t, root, "poison", 7)
 	// An inbox root that is a file, not a directory: the walk cannot move

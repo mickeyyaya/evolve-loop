@@ -15,6 +15,7 @@ func runCapCLI(args ...string) (int, string, string) {
 }
 
 func TestCapabilitiesCLI_Text(t *testing.T) {
+	t.Parallel()
 	code, out, _ := runCapCLI("capabilities", "--cli=claude-tmux")
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -25,6 +26,7 @@ func TestCapabilitiesCLI_Text(t *testing.T) {
 }
 
 func TestCapabilitiesCLI_JSON(t *testing.T) {
+	t.Parallel()
 	code, out, _ := runCapCLI("capabilities", "--cli=ollama-tmux", "--json")
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -35,6 +37,7 @@ func TestCapabilitiesCLI_JSON(t *testing.T) {
 }
 
 func TestCapabilitiesCLI_Errors(t *testing.T) {
+	t.Parallel()
 	if code, _, _ := runCapCLI("capabilities"); code != 10 {
 		t.Errorf("no --cli code=%d want 10", code)
 	}
@@ -92,6 +95,7 @@ func TestIntrospectCLI_OfflineDrift(t *testing.T) {
 }
 
 func TestIntrospectCLI_Errors(t *testing.T) {
+	t.Parallel()
 	if code, _, _ := runCapCLI("introspect"); code != 10 {
 		t.Errorf("no --cli code=%d want 10", code)
 	}

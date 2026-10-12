@@ -20,6 +20,7 @@ func writeCycleState(t *testing.T, evolveDir string, cycle int, body string) {
 }
 
 func TestACSSuiteRootAutosolve(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	want := "/tmp/evolve-worktrees/cycle-230"
 	writeCycleState(t, evolveDir, 230, `{"active_worktree":"`+want+`","workspace_path":"/tmp/ws","intent_required":false}`)
@@ -31,6 +32,7 @@ func TestACSSuiteRootAutosolve(t *testing.T) {
 }
 
 func TestACSSuiteRootFallback(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		setup func(t *testing.T, evolveDir string)

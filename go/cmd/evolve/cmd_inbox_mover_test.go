@@ -24,6 +24,7 @@ func setupInbox(t *testing.T, taskID string) string {
 }
 
 func TestCmd_InboxMover_Help(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runInboxMover([]string{"--help"}, nil, &stdout, &stderr)
 	if rc != 0 {
@@ -35,6 +36,7 @@ func TestCmd_InboxMover_Help(t *testing.T) {
 }
 
 func TestCmd_InboxMover_NoArgs(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runInboxMover(nil, nil, &stdout, &stderr)
 	if rc != 1 {
@@ -43,6 +45,7 @@ func TestCmd_InboxMover_NoArgs(t *testing.T) {
 }
 
 func TestCmd_InboxMover_UnknownSubcmd(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runInboxMover([]string{"bogus"}, nil, &stdout, &stderr)
 	if rc != 1 {
@@ -160,6 +163,7 @@ func TestCmd_InboxMover_RecoverOrphans_NoOp(t *testing.T) {
 }
 
 func TestParsePromoteArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		args      []string
@@ -186,6 +190,7 @@ func TestParsePromoteArgs(t *testing.T) {
 }
 
 func TestParsePromoteArgs_SHAMissingValue(t *testing.T) {
+	t.Parallel()
 	_, err := parsePromoteArgs([]string{"--commit-sha"})
 	if err == nil {
 		t.Error("want err for --commit-sha without value")

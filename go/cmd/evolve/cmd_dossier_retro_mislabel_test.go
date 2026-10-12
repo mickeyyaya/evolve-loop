@@ -80,6 +80,7 @@ type mislabelReport struct {
 }
 
 func TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	files := buildMislabelCorpus(t, root)
 
@@ -126,6 +127,7 @@ func TestDossierRetroMislabel_DerivedCountCrossChecksArtifacts(t *testing.T) {
 }
 
 func TestDossierRetroMislabel_AbsentCorpusFailsLoudly(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var out, errb bytes.Buffer
 	rc := runDossier([]string{"retro-mislabel", "--project-root", root, "--json"}, nil, &out, &errb)

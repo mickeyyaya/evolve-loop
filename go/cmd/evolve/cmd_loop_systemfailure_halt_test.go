@@ -11,6 +11,7 @@ import (
 )
 
 func TestCycleRunExitCode_HaltsOnSystemFailureRegardlessOfVerdict(t *testing.T) {
+	t.Parallel()
 	halted := cyclestate.CycleResult{
 		FinalVerdict:  "PASS",
 		SystemFailure: &cyclestate.SystemFailureSignal{Category: "verdict-incoherence", Level: "system", Halt: true},
@@ -29,6 +30,7 @@ func TestCycleRunExitCode_HaltsOnSystemFailureRegardlessOfVerdict(t *testing.T) 
 }
 
 func TestCycleRunExitCode_NoSystemFailure_FollowsOrdinaryVerdictMapping(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		res  cyclestate.CycleResult
@@ -52,6 +54,7 @@ func TestCycleRunExitCode_NoSystemFailure_FollowsOrdinaryVerdictMapping(t *testi
 }
 
 func TestHaltOnSystemFailure_WritesDossierAndP0AndReturnsHaltExitCode(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -88,6 +91,7 @@ func TestHaltOnSystemFailure_WritesDossierAndP0AndReturnsHaltExitCode(t *testing
 }
 
 func TestAnyLaneHaltedForSystemFailure_DetectsHaltExitCodeAmongLanes(t *testing.T) {
+	t.Parallel()
 	results := []fleet.Result{
 		{Index: 0, ExitCode: 0},
 		{Index: 1, ExitCode: systemFailureHaltExitCode},
@@ -99,6 +103,7 @@ func TestAnyLaneHaltedForSystemFailure_DetectsHaltExitCodeAmongLanes(t *testing.
 }
 
 func TestAnyLaneHaltedForSystemFailure_OrdinaryLaneFailuresDoNotHalt(t *testing.T) {
+	t.Parallel()
 	results := []fleet.Result{
 		{Index: 0, ExitCode: 2},
 		{Index: 1, ExitCode: 1},
@@ -110,6 +115,7 @@ func TestAnyLaneHaltedForSystemFailure_OrdinaryLaneFailuresDoNotHalt(t *testing.
 }
 
 func TestAnyLaneHaltedForSystemFailure_EmptyResultsIsFalse(t *testing.T) {
+	t.Parallel()
 	if anyLaneHaltedForSystemFailure(nil) {
 		t.Error("anyLaneHaltedForSystemFailure(nil) = true, want false")
 	}

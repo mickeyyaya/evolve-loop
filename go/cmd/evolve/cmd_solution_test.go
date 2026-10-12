@@ -9,6 +9,7 @@ import (
 )
 
 func TestSolutionCheck(t *testing.T) {
+	t.Parallel()
 	if lookupCommand("solution") == nil {
 		t.Fatal("no `solution` command registered")
 	}

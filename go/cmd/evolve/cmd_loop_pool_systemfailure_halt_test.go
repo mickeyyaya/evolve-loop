@@ -7,6 +7,7 @@ import (
 )
 
 func TestDispatchHaltDecision_HaltsOnSystemFailureLane(t *testing.T) {
+	t.Parallel()
 	results := []fleet.Result{
 		{Index: 0, ExitCode: 0},
 		{Index: 1, ExitCode: systemFailureHaltExitCode},
@@ -25,6 +26,7 @@ func TestDispatchHaltDecision_HaltsOnSystemFailureLane(t *testing.T) {
 }
 
 func TestDispatchHaltDecision_OrdinaryFailuresContinue(t *testing.T) {
+	t.Parallel()
 	results := []fleet.Result{
 		{Index: 0, ExitCode: 2},
 		{Index: 1, ExitCode: 1},
@@ -44,6 +46,7 @@ func TestDispatchHaltDecision_OrdinaryFailuresContinue(t *testing.T) {
 }
 
 func TestDispatchHaltDecision_EmptyResultsContinue(t *testing.T) {
+	t.Parallel()
 	for _, results := range [][]fleet.Result{nil, {}} {
 		rc, stopReason, halt := dispatchHaltDecision(results)
 		if halt || rc != 0 || stopReason != "" {

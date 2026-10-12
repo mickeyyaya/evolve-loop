@@ -39,6 +39,7 @@ func TestWireOrchestrator_CatalogPublisherWired(t *testing.T) {
 }
 
 func TestCatalogPublisher_RebindsResolverOnEachPublish(t *testing.T) {
+	t.Parallel()
 	spy := &resolverSinkSpy{}
 	pub := catalogPublisher(spy, nil)
 	if pub == nil {

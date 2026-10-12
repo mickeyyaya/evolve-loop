@@ -20,6 +20,7 @@ func setupWrite(t *testing.T, path, body string) {
 }
 
 func TestRunSetup_Dispatch(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if rc := runSetup(nil, nil, &out, &errb); rc != 10 {
 		t.Errorf("no subcommand: rc=%d want 10", rc)
@@ -232,6 +233,7 @@ func TestRunSetup_ApplyUnreadablePolicy_FailsLoud(t *testing.T) {
 }
 
 func TestMaybePrintSetupNudge(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	var w bytes.Buffer
 	maybePrintSetupNudge(&w, evolveDir)

@@ -144,6 +144,7 @@ func TestWireSimulateOrchestrator_NeverMutatesGit(t *testing.T) {
 }
 
 func TestSimulatePhase_WritesTheContractedReportStub(t *testing.T) {
+	t.Parallel()
 	ws := filepath.Join(t.TempDir(), "runs", "cycle-3")
 	resp, err := (&simulatePhase{name: core.PhaseBuild}).Run(context.Background(), core.PhaseRequest{Workspace: ws, Cycle: 3})
 	if err != nil || resp.Verdict != core.VerdictPASS {
@@ -165,6 +166,7 @@ func TestSimulatePhase_WritesTheContractedReportStub(t *testing.T) {
 }
 
 func TestCampaignBeforeWave_SimulateRunsNoLiveProbes(t *testing.T) {
+	t.Parallel()
 	if hook := campaignBeforeWave(true, t.TempDir(), os.Stderr); hook != nil {
 		t.Error("--simulate must install no live-probe hook")
 	}

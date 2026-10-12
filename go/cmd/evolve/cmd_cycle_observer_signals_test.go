@@ -15,6 +15,7 @@ import (
 )
 
 func TestObserverAdapterConstructionsAreWired(t *testing.T) {
+	t.Parallel()
 	callRE := regexp.MustCompile(`\bobserver\.NewCoreAdapter\(`)
 	moduleRoot := filepath.Join("..", "..")
 	var unwired []string
@@ -60,6 +61,7 @@ func TestObserverAdapterConstructionsAreWired(t *testing.T) {
 // The workspace is a file, so the adapter's WARN fires. Flush before reading:
 // an Emit that finds a drain in progress returns before delivery.
 func TestWireSimulateOrchestrator_ObserverWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

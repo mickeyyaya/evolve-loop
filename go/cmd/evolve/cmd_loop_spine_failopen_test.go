@@ -31,6 +31,7 @@ func spineFailOpenCycles() []core.CycleResult {
 }
 
 func TestLoopSummary_RollsUpSpineFailOpensPerBatch(t *testing.T) {
+	t.Parallel()
 	lr := loopResult{StopReason: "completed", Cycles: spineFailOpenCycles()}
 	var buf bytes.Buffer
 	lr.emit(&buf)
@@ -86,6 +87,7 @@ func writeSpineDossier(t *testing.T, root string, cycle int, events []cyclestate
 }
 
 func TestLoopSummary_RollsUpFleetLaneCyclesFromCommittedDossiers(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeSpineDossier(t, root, 1200, []cyclestate.SpineFailOpen{
 		{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"},
@@ -125,6 +127,7 @@ func TestLoopSummary_RollsUpFleetLaneCyclesFromCommittedDossiers(t *testing.T) {
 }
 
 func TestSpineFailOpenRollup_PrefersTheCommittedDossierPerCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeSpineDossier(t, root, 1160, []cyclestate.SpineFailOpen{
 		{Phase: "ship", MissingArtifact: "build", Reason: "would-block at enforce"},
@@ -145,6 +148,7 @@ func TestSpineFailOpenRollup_PrefersTheCommittedDossierPerCycle(t *testing.T) {
 }
 
 func TestSpineFailOpenRollup_WarnsOnThresholdBreach(t *testing.T) {
+	t.Parallel()
 	var warn bytes.Buffer
 	rollup := spineFailOpenRollup(spineFailOpenCycles(), "", 0, &warn)
 	if rollup == nil {
@@ -160,6 +164,7 @@ func TestSpineFailOpenRollup_WarnsOnThresholdBreach(t *testing.T) {
 }
 
 func TestLoopSummary_CleanBatchOmitsSpineFailOpens(t *testing.T) {
+	t.Parallel()
 	lr := loopResult{StopReason: "completed", Cycles: []core.CycleResult{
 		{Cycle: 1162, FinalVerdict: "PASS"},
 		{Cycle: 1163, FinalVerdict: "PASS"},

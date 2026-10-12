@@ -9,6 +9,7 @@ import (
 )
 
 func TestLessonsRecurrence_SortedByCountWithFixStatus(t *testing.T) {
+	t.Parallel()
 	led := recurrence.NewLedger()
 	led.Entries["rare"] = &recurrence.Entry{Pattern: "rare", Count: 2}
 	led.Entries["frequent"] = &recurrence.Entry{Pattern: "frequent", Count: 7, FixItemID: "frequent-fix"}

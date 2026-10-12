@@ -21,6 +21,7 @@ import (
 )
 
 func TestSpikeAdvisorLive(t *testing.T) {
+	t.Parallel()
 	root, err := filepath.Abs("../../..") // repo root: go/cmd/evolve → cmd → go → repo
 	if err != nil {
 		t.Fatal(err)

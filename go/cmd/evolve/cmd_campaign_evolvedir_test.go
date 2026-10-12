@@ -7,6 +7,7 @@ import (
 )
 
 func TestCampaignEvolveDir_AbsolutizesRelativeRoot(t *testing.T) {
+	t.Parallel()
 	got := campaignEvolveDir("relative/root")
 	if !filepath.IsAbs(got) {
 		t.Fatalf("campaignEvolveDir must return an absolute path, got %q", got)
@@ -17,6 +18,7 @@ func TestCampaignEvolveDir_AbsolutizesRelativeRoot(t *testing.T) {
 }
 
 func TestCampaignEvolveDir_EmptyRootIsAbsolute(t *testing.T) {
+	t.Parallel()
 	got := campaignEvolveDir("")
 	if !filepath.IsAbs(got) {
 		t.Fatalf("empty root must resolve to an absolute cwd-based path, got %q", got)

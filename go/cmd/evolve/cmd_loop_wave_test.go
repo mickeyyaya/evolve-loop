@@ -39,6 +39,7 @@ func waveScopeIDs(spec fleet.CycleSpec) map[string]bool {
 }
 
 func TestShouldRunWave_GateTable(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fc   policy.FleetConfig
@@ -59,6 +60,7 @@ func TestShouldRunWave_GateTable(t *testing.T) {
 }
 
 func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	waveFloors := [][]string{
@@ -97,6 +99,7 @@ func TestDispatchIteration_TwoWavesDisjointLaneScopes(t *testing.T) {
 }
 
 func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 1, Concurrency: 1, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
@@ -119,6 +122,7 @@ func TestDispatchIteration_AbsentFleetBlockStaysSequentialGolden(t *testing.T) {
 }
 
 func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	planFn := func(context.Context, int) ([]byte, []string, error) {
@@ -137,6 +141,7 @@ func TestDispatchIteration_MalformedTriagePlanFallsBackSequential(t *testing.T) 
 }
 
 func TestDispatchIteration_PlanFnErrorFallsBackSequential(t *testing.T) {
+	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, Concurrency: 2, PlanSource: "triage"}
 	launcher := &fakeWaveLauncher{}
 	wantErr := errors.New("triage phase failed")

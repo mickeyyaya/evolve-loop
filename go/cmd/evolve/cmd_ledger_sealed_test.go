@@ -12,6 +12,7 @@ import (
 )
 
 func TestLedgerVerify_ASealedLedgerVerifiesAndNamesTheSegmentItResumedFrom(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	l := ledger.New(evolveDir)
 	ctx := context.Background()

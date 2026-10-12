@@ -54,6 +54,7 @@ func TestConsecutiveFailBreaker(t *testing.T) {
 }
 
 func TestResolveMaxConsecutiveFails(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		workflow *policy.WorkflowPolicy
@@ -95,6 +96,7 @@ func countFailedApproaches(t *testing.T, statePath string) int {
 // stop-path recordLoopFatal is skipped when continuing — so without this the
 // next cycle's scout would see no record of the failure.
 func TestRecordAbsorbedFail(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	if err := os.MkdirAll(filepath.Join(projectRoot, ".evolve", "runs", "cycle-7"), 0o755); err != nil {
@@ -121,6 +123,7 @@ func TestRecordAbsorbedFail(t *testing.T) {
 // does not panic or hard-fail — the loop must keep running past an absorbed
 // FAIL even when pre-flight never created state.json.
 func TestRecordAbsorbedFail_MissingStateIsSoftWarn(t *testing.T) {
+	t.Parallel()
 	projectRoot := t.TempDir()
 	cfg := loopConfig{ProjectRoot: projectRoot, EvolveDir: filepath.Join(projectRoot, ".evolve")}
 	var stderr bytes.Buffer

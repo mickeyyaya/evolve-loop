@@ -7,6 +7,7 @@ import (
 )
 
 func TestC1735_001_GCManifestDirIsBatchOwnedNotCycleWorkspace(t *testing.T) {
+	t.Parallel()
 	evolveDir := filepath.FromSlash("/tmp/example-evolve-dir")
 
 	got := gcManifestDir(evolveDir)

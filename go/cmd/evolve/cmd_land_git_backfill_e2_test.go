@@ -48,6 +48,7 @@ func (h e2LandHub) devDir(task string) string {
 }
 
 func TestRunLand_APatchLandsUncommittedOnOriginMain(t *testing.T) {
+	t.Parallel()
 	h := newE2LandHub(t)
 	patch := h.patch(t, "two\n")
 	var stdout, stderr bytes.Buffer
@@ -70,6 +71,7 @@ func TestRunLand_APatchLandsUncommittedOnOriginMain(t *testing.T) {
 }
 
 func TestRunLand_ASalvageLeafLandsItsPatchAndUntrackedFiles(t *testing.T) {
+	t.Parallel()
 	h := newE2LandHub(t)
 	leaf := filepath.Join(h.runtime, ".evolve", "operator-salvage", "cycle-9-leaf")
 	if err := os.MkdirAll(leaf, 0o755); err != nil {
@@ -102,6 +104,7 @@ func TestRunLand_ASalvageLeafLandsItsPatchAndUntrackedFiles(t *testing.T) {
 }
 
 func TestRunLand_AConflictIsRefusedButTheUntrackedFilesStillLand(t *testing.T) {
+	t.Parallel()
 	h := newE2LandHub(t)
 	leaf := filepath.Join(h.runtime, ".evolve", "operator-salvage", "conflict-leaf")
 	if err := os.MkdirAll(leaf, 0o755); err != nil {
@@ -153,6 +156,7 @@ func TestRunLand_AHubThatVanishesAfterTheWorktreeIsAnIOError(t *testing.T) {
 }
 
 func TestApplyLandPatch_RefusesAPatchWithNoBase(t *testing.T) {
+	t.Parallel()
 	h := newE2LandHub(t)
 	if code := runWorktreeCreateDev(h.runtime, "nobase", "nobase", &bytes.Buffer{}, &bytes.Buffer{}); code != 0 {
 		t.Fatalf("create dev: %d", code)
@@ -169,6 +173,7 @@ func TestApplyLandPatch_RefusesAPatchWithNoBase(t *testing.T) {
 }
 
 func TestApplyLandPatch_OutsideARepoTheFailedDiffIsAnIOError(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	patch := filepath.Join(t.TempDir(), "x.patch")
 	writeE2File(t, patch, "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n")
@@ -182,6 +187,7 @@ func TestApplyLandPatch_OutsideARepoTheFailedDiffIsAnIOError(t *testing.T) {
 }
 
 func TestApplyLandPatch_AMissingWorktreeIsAnIOError(t *testing.T) {
+	t.Parallel()
 	patch := filepath.Join(t.TempDir(), "x.patch")
 	writeE2File(t, patch, "not empty")
 	var stderr bytes.Buffer
@@ -194,6 +200,7 @@ func TestApplyLandPatch_AMissingWorktreeIsAnIOError(t *testing.T) {
 }
 
 func TestLandInto_AnIOErrorFromThePatchSkipsTheArchive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	patch := filepath.Join(t.TempDir(), "x.patch")
 	writeE2File(t, patch, "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n")

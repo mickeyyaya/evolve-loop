@@ -21,6 +21,7 @@ func writeInboxItem(t *testing.T, inbox, name, id string, weight float64) {
 }
 
 func TestSeedWavePlanFromInbox_SynthesizesTopNDecision(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -47,6 +48,7 @@ func TestSeedWavePlanFromInbox_SynthesizesTopNDecision(t *testing.T) {
 }
 
 func TestSeedWavePlanFromInbox_FewerThanTwoTodosErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
@@ -59,6 +61,7 @@ func TestSeedWavePlanFromInbox_FewerThanTwoTodosErrors(t *testing.T) {
 }
 
 func TestProductionWavePlanFn_SeedsFromInboxWhenNoPriorDecision(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {

@@ -8,6 +8,7 @@ import (
 )
 
 func TestResolveGCProjectRoot_RefusesEmptyMutatingRun(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	root, code, ok := resolveGCProjectRoot("", false, &stderr)
 
@@ -26,6 +27,7 @@ func TestResolveGCProjectRoot_RefusesEmptyMutatingRun(t *testing.T) {
 }
 
 func TestResolveGCProjectRoot_FallsBackToCwdOnDryRun(t *testing.T) {
+	t.Parallel()
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("os.Getwd: %v", err)
@@ -48,6 +50,7 @@ func TestResolveGCProjectRoot_FallsBackToCwdOnDryRun(t *testing.T) {
 }
 
 func TestResolveGCProjectRoot_PassesThroughExplicitValue(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	root, code, ok := resolveGCProjectRoot("/explicit/root", false, &stderr)
 
@@ -66,6 +69,7 @@ func TestResolveGCProjectRoot_PassesThroughExplicitValue(t *testing.T) {
 }
 
 func TestResolveGCProjectRoot_ExplicitValueIgnoresDryRunFlag(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 	root, code, ok := resolveGCProjectRoot("/explicit/root", true, &stderr)
 

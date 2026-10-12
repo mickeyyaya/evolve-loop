@@ -33,6 +33,7 @@ func hasWarning(e waveEnvelope, want string) bool {
 }
 
 func TestWave_ARootThatCannotBeFoundExitsIO(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"next", "--json"}, {"note", "list"}, {"status"}, {"watch"}} {
 		h := newWaveHarness()
 		h.rootErr = errors.New("getwd: no such file")
@@ -51,6 +52,7 @@ func TestWave_ARootThatCannotBeFoundExitsIO(t *testing.T) {
 }
 
 func TestWaveNote_StoreErrorsExitIO(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 	first := h.run("note", "add", "one", "--project-root", p.root)
@@ -73,6 +75,7 @@ func TestWaveNote_StoreErrorsExitIO(t *testing.T) {
 }
 
 func TestDispatchWaveVerb_BuildArgumentAndRunnerErrors(t *testing.T) {
+	t.Parallel()
 	run := func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
 		return -1, errors.New("make: not found")
 	}
@@ -93,6 +96,7 @@ func TestDispatchWaveVerb_BuildArgumentAndRunnerErrors(t *testing.T) {
 }
 
 func TestWaveNext_WarningsFromItsInputs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		prep func(p wavePlane, h *waveHarness)
@@ -120,6 +124,7 @@ func TestWaveNext_WarningsFromItsInputs(t *testing.T) {
 }
 
 func TestWaveNext_ASymlinkToThePlaneBinaryIsThePlaneBinary(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.write("go/bin/evolve", "binary")
 	link := filepath.Join(t.TempDir(), "evolve")
@@ -137,6 +142,7 @@ func TestWaveNext_ASymlinkToThePlaneBinaryIsThePlaneBinary(t *testing.T) {
 }
 
 func TestWaveNext_TextDryRunPrintsTheGoalAndTheSteps(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -151,6 +157,7 @@ func TestWaveNext_TextDryRunPrintsTheGoalAndTheSteps(t *testing.T) {
 }
 
 func TestWaveNext_AnEnvelopeThatCannotBeWrittenExitsIO(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 	var errb bytes.Buffer
@@ -163,6 +170,7 @@ func TestWaveNext_AnEnvelopeThatCannotBeWrittenExitsIO(t *testing.T) {
 }
 
 func TestWaveNext_AGoalFileThatCannotBeWrittenRunsNoStep(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.write(".evolve/waves/wave-1-goal.md/blocked", "x")
 	h := newWaveHarness()
@@ -176,6 +184,7 @@ func TestWaveNext_AGoalFileThatCannotBeWrittenRunsNoStep(t *testing.T) {
 }
 
 func TestWaveNext_RecordingProblemsAreWarningsAfterALaunch(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		prep func(p wavePlane, h *waveHarness)
@@ -219,6 +228,7 @@ func TestWaveNext_RecordingProblemsAreWarningsAfterALaunch(t *testing.T) {
 }
 
 func TestWaveStatus_ErrorsAndEmptyJSON(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	h := newWaveHarness()
 
@@ -236,6 +246,7 @@ func TestWaveStatus_ErrorsAndEmptyJSON(t *testing.T) {
 }
 
 func TestWaveStatus_TextShowsOmittedCyclesLastWaveWarningsAndPauses(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	for id := 1; id <= waveStatusMaxCycles+2; id++ {
 		p.write(fmt.Sprintf(".evolve/runs/cycle-%d/run.json", id), fmt.Sprintf(`{"cycle_id":%d,"phase":"scout"}`, id))
@@ -258,6 +269,7 @@ func TestWaveStatus_TextShowsOmittedCyclesLastWaveWarningsAndPauses(t *testing.T
 }
 
 func TestWaveWatch_ErrorsAndWarnings(t *testing.T) {
+	t.Parallel()
 	t.Run("an unreadable newer record exits IO", func(t *testing.T) {
 		p := newWavePlane(t)
 		_ = p.store().Save(wave.Record{Number: 82, RunID: "r82", PID: 777, LogPath: p.loopLog("r82", 777)})
@@ -306,6 +318,7 @@ func TestWaveWatch_ErrorsAndWarnings(t *testing.T) {
 }
 
 func TestWaveNext_UnreadableNotesExitIOBeforeAnyStep(t *testing.T) {
+	t.Parallel()
 	p := newWavePlane(t)
 	p.write(".evolve/waves/notes", "not a dir")
 	h := newWaveHarness()

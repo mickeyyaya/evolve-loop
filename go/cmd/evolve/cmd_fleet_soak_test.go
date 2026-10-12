@@ -206,6 +206,7 @@ func appendSoakTomlEntry(mu *sync.Mutex, tomlPath, runID, runDir string) error {
 }
 
 func TestFleetSoakArgs_RejectsZeroCount(t *testing.T) {
+	t.Parallel()
 	var out, errBuf bytes.Buffer
 	rc := runFleetSoak([]string{"--count", "0"}, nil, &out, &errBuf)
 	if rc != 1 {
@@ -217,6 +218,7 @@ func TestFleetSoakArgs_RejectsZeroCount(t *testing.T) {
 }
 
 func TestFleetSoakArgs_RejectsNegativeCount(t *testing.T) {
+	t.Parallel()
 	var out, errBuf bytes.Buffer
 	rc := runFleetSoak([]string{"--count", "-1"}, nil, &out, &errBuf)
 	if rc != 1 {
@@ -225,6 +227,7 @@ func TestFleetSoakArgs_RejectsNegativeCount(t *testing.T) {
 }
 
 func TestDispatch_FleetSoakRegistered(t *testing.T) {
+	t.Parallel()
 	var out, errBuf bytes.Buffer
 	rc := dispatch([]string{"fleet", "soak", "--count", "0"}, nil, &out, &errBuf)
 	if rc == 2 {

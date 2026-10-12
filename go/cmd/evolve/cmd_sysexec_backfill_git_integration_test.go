@@ -20,6 +20,7 @@ import (
 )
 
 func TestMainProjectRoot_ResolvesTheMainCheckoutOfAnyWorktree(t *testing.T) {
+	t.Parallel()
 	repo := bfCommittedRepo(t)
 	linked := filepath.Join(t.TempDir(), "linked")
 	repo.Git("worktree", "add", "-q", "-b", "linked", linked)
@@ -162,6 +163,7 @@ func TestResolveRepoRoot_AnExplicitRootNeverAsksGit(t *testing.T) {
 }
 
 func TestPlaneLiveRuns_TheRootListedAgainIsCountedOnce(t *testing.T) {
+	t.Parallel()
 	repo := bfCommittedRepo(t)
 	runs := filepath.Join(repo.Dir, ".evolve", "runs", "cycle-3")
 	if err := os.MkdirAll(runs, 0o755); err != nil {
@@ -180,6 +182,7 @@ func TestPlaneLiveRuns_TheRootListedAgainIsCountedOnce(t *testing.T) {
 }
 
 func TestRunWorktreeList_BadFlagIsUsageExit(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr strings.Builder
 
 	if code := runWorktreeList([]string{"--no-such-flag"}, &stdout, &stderr); code != 10 || !strings.Contains(stderr.String(), "flag provided but not defined") {
@@ -188,6 +191,7 @@ func TestRunWorktreeList_BadFlagIsUsageExit(t *testing.T) {
 }
 
 func TestRemoveCycleWorktree_AnUnknownWorktreeFailsWithGitsReason(t *testing.T) {
+	t.Parallel()
 	repo := bfCommittedRepo(t)
 	var stdout, stderr strings.Builder
 
@@ -240,6 +244,7 @@ func TestPruneWorktrees_NotARepositoryIsExitOne(t *testing.T) {
 }
 
 func TestPruneWorktrees_DropsAWorktreeWhoseDirectoryVanished(t *testing.T) {
+	t.Parallel()
 	repo := bfCommittedRepo(t)
 	gone := filepath.Join(t.TempDir(), "gone")
 	repo.Git("worktree", "add", "-q", "-b", "gone", gone)

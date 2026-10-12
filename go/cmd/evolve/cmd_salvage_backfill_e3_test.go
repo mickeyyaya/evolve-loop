@@ -49,6 +49,7 @@ func TestRunSalvage_ReportDispatchesAndReadsTheEnvRoot(t *testing.T) {
 }
 
 func TestRunSalvageList_RefusesBadArgs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		args []string
@@ -117,6 +118,7 @@ func TestRunSalvageList_UnreadableLeavesExitTwoAfterPrintingTheReadableOnes(t *t
 }
 
 func TestPrintSalvageRows(t *testing.T) {
+	t.Parallel()
 	yes, no := true, false
 	salvaged := time.Now().Add(-49 * time.Hour)
 	rows := []salvageListRow{
@@ -153,6 +155,7 @@ func TestPrintSalvageRows(t *testing.T) {
 }
 
 func TestRunSalvageReport_FailurePaths(t *testing.T) {
+	t.Parallel()
 	writeEvolve := func(t *testing.T, root, name string, body string) {
 		t.Helper()
 		if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
@@ -213,6 +216,7 @@ func TestRunSalvageReport_FailurePaths(t *testing.T) {
 }
 
 func TestRunSalvageReport_AFailedJSONWriteExitsOne(t *testing.T) {
+	t.Parallel()
 	root := salvageCLIFixture(t)
 	var errb bytes.Buffer
 

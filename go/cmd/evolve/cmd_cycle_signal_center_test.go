@@ -60,6 +60,7 @@ func TestWireOrchestratorDeps_SignalCenterWired(t *testing.T) {
 
 // The one pinned nil root, internal/routingtest, is test machinery that takes a *testing.T.
 func TestNilSignalCenterRootsArePinned(t *testing.T) {
+	t.Parallel()
 	allowed := map[string]bool{
 		"internal/routingtest/engine.go": true,
 	}
@@ -166,6 +167,7 @@ func captureConsole(fn func(console io.Writer)) string {
 
 // Only this binary links every producer module, so the real registry is checked here.
 func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
+	t.Parallel()
 	if conflicts := signalcenter.RegistryConflicts(); len(conflicts) != 0 {
 		t.Errorf("code registry conflicts across linked modules: %+v", conflicts)
 	}
@@ -175,6 +177,7 @@ func TestSignalCenterRegistry_EveryLinkedModuleRegistersCleanly(t *testing.T) {
 }
 
 func TestSignalCenterFlush_IsWiredAtBothRoots(t *testing.T) {
+	t.Parallel()
 	for file, needle := range map[string]string{"cmd_cycle.go": "Signals.Flush()", "cmd_loop.go": "Signals.Flush()", "cmd_loop_chain.go": "signals.Flush()"} {
 		src, err := os.ReadFile(file)
 		if err != nil {
@@ -199,6 +202,7 @@ func TestWireOrchestratorDeps_SignalCenterReachesTheBridge(t *testing.T) {
 }
 
 func TestNilSignalBridgeRootsAreExplicit(t *testing.T) {
+	t.Parallel()
 	callRE := regexp.MustCompile(`bridge\.NewDefault\(\s*([^,)]+)\s*,\s*([^)]+)\)`)
 	moduleRoot := filepath.Join("..", "..")
 	err := filepath.WalkDir(moduleRoot, func(path string, entry os.DirEntry, err error) error {
@@ -253,6 +257,7 @@ func TestWireOrchestratorDeps_LedgerIsObservedByTheSignalCenter(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_SignalCenterWired(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -279,6 +284,7 @@ func TestWireSimulateOrchestrator_SignalCenterWired(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_FailureDiagWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -301,6 +307,7 @@ func TestWireSimulateOrchestrator_FailureDiagWarningRenders(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -324,6 +331,7 @@ func TestWireSimulateOrchestrator_CarryoverWarningRenders(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(filepath.Join(evolveDir, "policy.json"), 0o755); err != nil { // a directory at the path: a read fault, not absence
@@ -342,6 +350,7 @@ func TestWireSimulateOrchestrator_FailureLearningWarningRenders(t *testing.T) {
 }
 
 func TestConsoleSinkThresholdHasOneHome(t *testing.T) {
+	t.Parallel()
 	const home = "internal/signalcenter/sinks.go"
 	moduleRoot := filepath.Join("..", "..")
 	var respelled []string
@@ -421,6 +430,7 @@ func TestWireOrchestratorDeps_SignalCenterReachesEveryPhaseRunner(t *testing.T) 
 }
 
 func TestWireSimulateOrchestrator_AuditLedgerWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	ws := core.RunWorkspacePath(root, 1)
@@ -453,6 +463,7 @@ func TestWireSimulateOrchestrator_AuditLedgerWarningRenders(t *testing.T) {
 }
 
 func TestAuditRoot_PassesTheSignalCenter(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
 		t.Fatal(err)
@@ -496,6 +507,7 @@ func (writingBridge) Launch(_ context.Context, req core.BridgeRequest) (core.Bri
 func (writingBridge) Probe(context.Context) (core.BridgeProbe, error) { return core.BridgeProbe{}, nil }
 
 func TestWireSimulateOrchestrator_RunnerWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -531,6 +543,7 @@ func TestWireSimulateOrchestrator_RunnerWarningRenders(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_LoopWaveAndChainWarningsRender(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
@@ -569,6 +582,7 @@ func TestWireSimulateOrchestrator_LoopWaveAndChainWarningsRender(t *testing.T) {
 }
 
 func TestAuditRootPassesTheCenter(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
 		t.Fatal(err)
@@ -580,6 +594,7 @@ func TestAuditRootPassesTheCenter(t *testing.T) {
 }
 
 func TestWireSimulateOrchestrator_CIParityWarningRenders(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.MkdirAll(filepath.Join(root, "go"), 0o755); err != nil {

@@ -6,6 +6,7 @@ import (
 )
 
 func TestCycleRunArgs_FallsBackToLoopGoalText_WhenLaneHasNoOutputContract(t *testing.T) {
+	t.Parallel()
 	args := cycleRunArgs("abc123", "", "fix the flaky bridge test", false, "")
 	got := strings.Join(args, " ")
 	want := "cycle run --goal-hash abc123 --goal fix the flaky bridge test"
@@ -15,6 +16,7 @@ func TestCycleRunArgs_FallsBackToLoopGoalText_WhenLaneHasNoOutputContract(t *tes
 }
 
 func TestCycleRunArgs_OutputContractTakesPrecedenceOverGoalText(t *testing.T) {
+	t.Parallel()
 	args := cycleRunArgs("abc123", "planned removal task", "operator free text goal", false, "")
 	got := strings.Join(args, " ")
 	want := "cycle run --goal-hash abc123 --goal planned removal task"
@@ -24,6 +26,7 @@ func TestCycleRunArgs_OutputContractTakesPrecedenceOverGoalText(t *testing.T) {
 }
 
 func TestCycleRunArgs_BothOutputContractAndGoalTextEmpty_OmitsGoalFlag(t *testing.T) {
+	t.Parallel()
 	args := cycleRunArgs("abc123", "", "", false, "")
 	got := strings.Join(args, " ")
 	want := "cycle run --goal-hash abc123"

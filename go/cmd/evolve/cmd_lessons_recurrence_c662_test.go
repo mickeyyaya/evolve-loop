@@ -9,6 +9,7 @@ import (
 )
 
 func TestC662_RenderExcludesGenericPatterns(t *testing.T) {
+	t.Parallel()
 	led := recurrence.NewLedger()
 	led.Entries["operator-reset"] = &recurrence.Entry{Pattern: "operator-reset", Count: 96, Generic: true}
 	led.Entries["loop-fatal"] = &recurrence.Entry{Pattern: "loop-fatal", Count: 62, Generic: true}

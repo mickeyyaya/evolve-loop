@@ -138,6 +138,7 @@ func realTreeSeatGaps(t *testing.T) (floorGaps, otherGaps []string) {
 }
 
 func TestAgyClaudeRouting_AFloorSeatNeedsTheLaunchModelCheck(t *testing.T) {
+	t.Parallel()
 	floorGaps, _ := realTreeSeatGaps(t)
 	for _, gap := range floorGaps {
 		t.Error(gap)
@@ -145,6 +146,7 @@ func TestAgyClaudeRouting_AFloorSeatNeedsTheLaunchModelCheck(t *testing.T) {
 }
 
 func TestAgyClaudeRouting_ANonFloorSeatNeedsTheLaunchModelCheck(t *testing.T) {
+	t.Parallel()
 	_, otherGaps := realTreeSeatGaps(t)
 	for _, gap := range otherGaps {
 		t.Error(gap)
@@ -152,6 +154,7 @@ func TestAgyClaudeRouting_ANonFloorSeatNeedsTheLaunchModelCheck(t *testing.T) {
 }
 
 func TestSeatGaps_EverySeatWaitsForTheVerifiedLaunch(t *testing.T) {
+	t.Parallel()
 	floor, other := []string{"pin auditor agy-claude"}, []string{"cli_routing tiers deep agy-claude"}
 	verified := func() (bool, error) { return true, nil }
 	unverified := func() (bool, error) { return false, nil }
@@ -184,6 +187,7 @@ func TestSeatGaps_EverySeatWaitsForTheVerifiedLaunch(t *testing.T) {
 }
 
 func TestAgyClaudeRouting_OnlyAFloorAgentsOwnRouteIsAFloorSeat(t *testing.T) {
+	t.Parallel()
 	for route, want := range map[string]bool{
 		"pin auditor agy-claude":                          true,
 		"cli_routing agents tdd-engineer agy-claude-tmux": true,
@@ -217,6 +221,7 @@ func floorChainLeaks(r *cliroute.Router, root string, agents []string) ([]string
 }
 
 func TestAgyClaudeRouting_TheFloorStillAdmitsOnlyClaudeCode(t *testing.T) {
+	t.Parallel()
 	root := checkedInRoot(t)
 	r, _, err := buildCLIRouter(root, routingCatalog(root), cliroute.Host{LookPath: everyBinaryPresent})
 	if err != nil {
@@ -260,6 +265,7 @@ func loadPolicyFixture(t *testing.T, body string) policy.Policy {
 }
 
 func TestAgyClaudeRouting_TheGuardSeesEachRouteL2CanAdd(t *testing.T) {
+	t.Parallel()
 	floor := profiles.Profile{CLI: "agy-claude-tmux", AllowedCLIs: []string{"agy-claude", "claude"}, CLIFallback: []string{"claude-tmux"}}
 	if got := floorProfileRoutesToAgyClaude("auditor", floor); len(got) != 2 {
 		t.Errorf("floor profile routes = %q, want its cli and its allowed_clis entry", got)

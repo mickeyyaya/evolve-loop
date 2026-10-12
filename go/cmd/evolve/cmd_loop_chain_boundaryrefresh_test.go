@@ -83,6 +83,7 @@ func brfWriteJSON(t *testing.T, path string, v any) {
 // TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead: HEAD has
 // moved past the running binary's build commit.
 func TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead(t *testing.T) {
+	t.Parallel()
 	dir, commitA := brfInitRepo(t)
 	brfAdvance(t, dir)
 	ahead, err := defaultChainBoundaryAhead(dir, commitA)
@@ -97,6 +98,7 @@ func TestDefaultChainBoundaryAhead_DetectsRunningCommitBehindHead(t *testing.T) 
 // TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead: the running
 // binary is the tip — nothing to refresh.
 func TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead(t *testing.T) {
+	t.Parallel()
 	dir, commitA := brfInitRepo(t)
 	ahead, err := defaultChainBoundaryAhead(dir, commitA)
 	if err != nil {
@@ -111,6 +113,7 @@ func TestDefaultChainBoundaryAhead_NoLagWhenRunningCommitIsHead(t *testing.T) {
 // binary (empty build commit) has nothing verifiable to compare — must be a
 // quiet no-op, not an error.
 func TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp(t *testing.T) {
+	t.Parallel()
 	dir, _ := brfInitRepo(t)
 	ahead, err := defaultChainBoundaryAhead(dir, "")
 	if err != nil {
@@ -125,6 +128,7 @@ func TestDefaultChainBoundaryAhead_EmptyRunningCommitIsNoOp(t *testing.T) {
 // a repo at all) must return an error the caller treats as "skip this
 // boundary" — never panic, never claim ahead=true on bad data.
 func TestDefaultChainBoundaryAhead_GitFailureDegradesToSkip(t *testing.T) {
+	t.Parallel()
 	notARepo := t.TempDir()
 	_, err := defaultChainBoundaryAhead(notARepo, "deadbeef")
 	if err == nil {

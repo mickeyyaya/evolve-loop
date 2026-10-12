@@ -45,6 +45,7 @@ func writeWiringLedger(t *testing.T) (dir, firstSeq2, secondSeq2 string) {
 }
 
 func TestRunLedgerAnchor_AmbiguousSeqIsRefusedAndLineSHADisambiguates(t *testing.T) {
+	t.Parallel()
 	dir, _, second := writeWiringLedger(t)
 	anchorPath := filepath.Join(dir, "ledger-anchor.json")
 
@@ -85,6 +86,7 @@ func TestRunLedgerAnchor_AmbiguousSeqIsRefusedAndLineSHADisambiguates(t *testing
 }
 
 func TestRunLedgerRebaseline_SubcommandIsReachableAndGated(t *testing.T) {
+	t.Parallel()
 	t.Run("missing_note_is_refused_by_the_command_not_the_dispatcher", func(t *testing.T) {
 		dir, _, _ := writeWiringLedger(t)
 		var stdout, stderr bytes.Buffer

@@ -55,6 +55,7 @@ func brTopStashMessage(t *testing.T, dir string) string {
 // boot-recovery seam (bootRecoverFn) against a dirty git repo and inspects the
 // actual stash git created, not a source grep.
 func TestDefaultBootRecovery_QuarantineStashLabelIsTimestamped(t *testing.T) {
+	t.Parallel()
 	repo := brInitRepo(t)
 	evolveDir := filepath.Join(repo, ".evolve")
 	if err := os.MkdirAll(evolveDir, 0o755); err != nil {

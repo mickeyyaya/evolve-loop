@@ -59,6 +59,7 @@ func (l legacyCarryLedger) run(t *testing.T, args ...string) (int, string, strin
 }
 
 func TestLedgerEvidenceRestore_PreviewsThenRestoresALegacyCarrysDiffsFromGit(t *testing.T) {
+	t.Parallel()
 	l := newLegacyCarryLedger(t, func(pid string) string { return pid })
 	if rc, _, stderr := l.run(t, "verify"); rc != 2 {
 		t.Fatalf("verify before the restore = %d, want 2 (BROKEN): %s", rc, stderr)
@@ -82,6 +83,7 @@ func TestLedgerEvidenceRestore_PreviewsThenRestoresALegacyCarrysDiffsFromGit(t *
 }
 
 func TestLedgerEvidenceRestore_RefusesALineWhoseDiffDoesNotReDeriveItsPatchID(t *testing.T) {
+	t.Parallel()
 	l := newLegacyCarryLedger(t, func(string) string { return strings.Repeat("ab", 20) })
 
 	rc, stdout, stderr := l.run(t, "evidence", "restore")
@@ -92,6 +94,7 @@ func TestLedgerEvidenceRestore_RefusesALineWhoseDiffDoesNotReDeriveItsPatchID(t 
 }
 
 func TestLedgerEvidence_RefusesAnUnknownVerb(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	rc := runLedger([]string{"evidence", "rewrite"}, nil, &stdout, &stderr)
 
@@ -101,6 +104,7 @@ func TestLedgerEvidence_RefusesAnUnknownVerb(t *testing.T) {
 }
 
 func TestLedgerEvidenceRestore_ExitsTwoWhenTheChainStillDoesNotVerify(t *testing.T) {
+	t.Parallel()
 	l := newLegacyCarryLedger(t, func(pid string) string { return pid })
 	ledgerPath := filepath.Join(l.evolveDir, "ledger.jsonl")
 	body, err := os.ReadFile(ledgerPath)

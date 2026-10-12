@@ -12,6 +12,7 @@ import (
 )
 
 func TestRatchet_CheckPassesOnTheRealModuleAndRejectsOtherVerbs(t *testing.T) {
+	t.Parallel()
 	if _, errOut, code := runDispatch("ratchet", "check", "--root", "../.."); code != 0 {
 		t.Errorf("module must satisfy both ratchets: exit=%d stderr=%s", code, errOut)
 	}
@@ -48,6 +49,7 @@ func ratchetFixtureRoot(t *testing.T, funcLines int, offenders string) string {
 }
 
 func TestRatchet_SelectorScansOnlyTheNamedRatchetUnderRoot(t *testing.T) {
+	t.Parallel()
 	root := ratchetFixtureRoot(t, 80, `{"internal/fixture.Big": 60}`)
 	cases := []struct {
 		args     []string

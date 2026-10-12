@@ -36,6 +36,7 @@ func loopHalts(got []signalcenter.Event) []signalcenter.Event {
 }
 
 func TestEmitLoopHalt_IsAnIncidentNamingTheRuleAndTheCycle(t *testing.T) {
+	t.Parallel()
 	c, got, console := recordingLoopSignals()
 	emitLoopHalt(c, 1640, "haltOnSystemFailure", CodeLoopSystemFailureHalt, "verdict-incoherence: recorded FAIL but audit=PASS",
 		map[string]string{"category": "verdict-incoherence", "level": "system"})
@@ -54,6 +55,7 @@ func TestEmitLoopHalt_IsAnIncidentNamingTheRuleAndTheCycle(t *testing.T) {
 }
 
 func TestEmitLoopWave_InfoForASummaryWarnForARepair(t *testing.T) {
+	t.Parallel()
 	c, got, console := recordingLoopSignals()
 	emitLoopWave(c, 3, "runWaveIteration", "", "wave 3: 2/3 lanes ok", map[string]string{"lanes_ok": "2", "lanes": "3"})
 	emitLoopWave(c, 4, "minWidthRepair", CodeLoopMinWidthRepair, "wave 4: min-width repair dispatched 1/1 isolated lane (fleet.count=3 shrank to 0)",
@@ -75,6 +77,7 @@ func TestEmitLoopWave_InfoForASummaryWarnForARepair(t *testing.T) {
 }
 
 func TestEmitLoopWave_NilFieldsStillCarryTheWave(t *testing.T) {
+	t.Parallel()
 	c, got, _ := recordingLoopSignals()
 	emitLoopWave(c, 9, "runWaveIteration", "", "wave 9: 1/1 lanes ok", nil)
 	if len(*got) != 1 || (*got)[0].Fields["wave"] != "9" {
@@ -83,6 +86,7 @@ func TestEmitLoopWave_NilFieldsStillCarryTheWave(t *testing.T) {
 }
 
 func TestEmitLoopWave_DoesNotWriteIntoTheCallersFields(t *testing.T) {
+	t.Parallel()
 	c, got, _ := recordingLoopSignals()
 	fields := map[string]string{"lanes": "3"}
 	emitLoopWave(c, 5, "runWaveIteration", "", "wave 5: 3/3 lanes ok", fields)
@@ -95,6 +99,7 @@ func TestEmitLoopWave_DoesNotWriteIntoTheCallersFields(t *testing.T) {
 }
 
 func TestEmitLoopEscalation_IsAWarnNamingTheStage(t *testing.T) {
+	t.Parallel()
 	c, got, _ := recordingLoopSignals()
 	emitLoopEscalation(c, 1641, "applyEscalationBoundary", "escalation boundary staged 3 items",
 		map[string]string{"stage": "enforce", "bumped": "1", "filed": "2", "skipped": "0", "planned": "0"})
@@ -109,6 +114,7 @@ func TestEmitLoopEscalation_IsAWarnNamingTheStage(t *testing.T) {
 }
 
 func TestHaltOnSystemFailure_EmitsOneHaltNamingTheDossierItWrote(t *testing.T) {
+	t.Parallel()
 	c, got, console := recordingLoopSignals()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -159,6 +165,7 @@ func TestHaltOnSystemFailure_EmitsOneHaltNamingTheDossierItWrote(t *testing.T) {
 }
 
 func TestBlockerBreakerHalt_OneIncidentNamesTheRule(t *testing.T) {
+	t.Parallel()
 	c, got, console := recordingLoopSignals()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
@@ -187,6 +194,7 @@ func TestBlockerBreakerHalt_OneIncidentNamesTheRule(t *testing.T) {
 }
 
 func TestFormatSignalReport_NamesCountsAndTheLastIncident(t *testing.T) {
+	t.Parallel()
 	s := signalcenter.NewSummary()
 	if got := formatSignalReport(7, s.Snapshot()); got != "" {
 		t.Errorf("a cycle with no signals adds no report line, got %q", got)
@@ -217,6 +225,7 @@ type noSignals struct{}
 func (noSignals) SignalSummary() signalcenter.Summary { return signalcenter.Summary{} }
 
 func TestObserveSequentialCycle_ReportsTheDrivenRunnersSignalSummary(t *testing.T) {
+	t.Parallel()
 	s := signalcenter.NewSummary()
 	s.Observe(signalcenter.Event{Cycle: 7, Kind: signalcenter.KindPhaseOutcome, Severity: signalcenter.SeverityWarn, Code: "ORCHESTRATOR_PHASE_VERDICT_FAIL", Reason: "triage FAIL"})
 	s.Observe(signalcenter.Event{Cycle: 7, Kind: signalcenter.KindSystemFailure, Severity: signalcenter.SeverityIncident, Code: "ORCHESTRATOR_SYSTEM_FAILURE", Reason: "forged"})
@@ -249,6 +258,7 @@ func ndjsonLines(t *testing.T, path string) int {
 }
 
 func TestNewRootSignalCenter_WritesTheDurableFilesAndRendersWarnOnTheConsole(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolveDir := filepath.Join(root, ".evolve")
 	var console bytes.Buffer
@@ -272,6 +282,7 @@ func TestNewRootSignalCenter_WritesTheDurableFilesAndRendersWarnOnTheConsole(t *
 }
 
 func TestFleetHaltDecision_ALaneHaltCodeIsALoopHaltIncident(t *testing.T) {
+	t.Parallel()
 	c, got, console := recordingLoopSignals()
 	var stdout, stderr bytes.Buffer
 	b := &loopBatchCoordinator{deps: orchDeps{Signals: c}, result: &loopResult{}, cfg: loopConfig{EvolveDir: filepath.Join(t.TempDir(), ".evolve")}, stdout: &stdout, stderr: &stderr}

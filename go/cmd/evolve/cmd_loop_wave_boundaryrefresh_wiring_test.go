@@ -10,6 +10,7 @@ import (
 )
 
 func TestRunLoop_CallsMaybeRefreshChainBoundaryAtWaveBoundary(t *testing.T) {
+	t.Parallel()
 	n, err := acsassert.CountInGoFunc("cmd_loop_window.go", "prepareIteration", "maybeRefreshChainBoundary")
 	if err != nil {
 		t.Fatalf("CountInGoFunc(prepareIteration, maybeRefreshChainBoundary): %v", err)
@@ -27,6 +28,7 @@ func TestRunLoop_CallsMaybeRefreshChainBoundaryAtWaveBoundary(t *testing.T) {
 }
 
 func TestRunLoop_BoundaryRefreshNeverCalledInsideDispatchHelpers(t *testing.T) {
+	t.Parallel()
 	for _, fn := range []string{"dispatchIteration", "forceOneLaneDispatch", "minWidthRepair"} {
 		n, err := acsassert.CountInGoFunc("cmd_loop_wave.go", fn, "maybeRefreshChainBoundary")
 		if err != nil {

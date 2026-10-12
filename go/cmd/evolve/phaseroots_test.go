@@ -7,6 +7,7 @@ import (
 )
 
 func TestPhaseRoots_DefaultWhenUnset(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	got := phaseRoots(root)
 	want := filepath.Join(root, ".evolve", "phases")
@@ -16,6 +17,7 @@ func TestPhaseRoots_DefaultWhenUnset(t *testing.T) {
 }
 
 func TestPhaseRoots_ColonSplitRelativeAndAbsolute(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)

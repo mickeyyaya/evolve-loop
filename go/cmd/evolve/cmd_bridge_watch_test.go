@@ -33,6 +33,7 @@ func (l *lockedBuffer) String() string {
 }
 
 func TestRenderFeedLine_Correlation(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{
 		"kind": "correlation",
 		"data": map[string]any{"sub": "request", "corr_id": "c1"},
@@ -47,6 +48,7 @@ func TestRenderFeedLine_Correlation(t *testing.T) {
 }
 
 func TestRenderFeedLine_CorrelationMissingData(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{"kind": "correlation"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "correlation") {
@@ -55,6 +57,7 @@ func TestRenderFeedLine_CorrelationMissingData(t *testing.T) {
 }
 
 func TestRenderFeedLine_CorrelationWrongDataType(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{"kind": "correlation", "data": "not-a-map"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "correlation") {
@@ -63,6 +66,7 @@ func TestRenderFeedLine_CorrelationWrongDataType(t *testing.T) {
 }
 
 func TestRenderFeedLine_AssistantText(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{
 		"seq":  float64(1),
 		"kind": "assistant_text",
@@ -78,6 +82,7 @@ func TestRenderFeedLine_AssistantText(t *testing.T) {
 }
 
 func TestRenderFeedLine_AssistantTextTruncation(t *testing.T) {
+	t.Parallel()
 	longText := strings.Repeat("x", 200)
 	e := map[string]any{
 		"kind": "assistant_text",
@@ -90,6 +95,7 @@ func TestRenderFeedLine_AssistantTextTruncation(t *testing.T) {
 }
 
 func TestRenderFeedLine_NoData(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{"kind": "tool_use"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "tool_use") {
@@ -98,6 +104,7 @@ func TestRenderFeedLine_NoData(t *testing.T) {
 }
 
 func TestRenderFeedLine_SeqPresent(t *testing.T) {
+	t.Parallel()
 	e := map[string]any{"seq": float64(42), "kind": "ping"}
 	got := renderFeedLine(e)
 	if !strings.Contains(got, "seq=42") {
@@ -106,6 +113,7 @@ func TestRenderFeedLine_SeqPresent(t *testing.T) {
 }
 
 func TestRunBridgeWatchOnce_RendersFeed(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	feedContent := `{"seq":1,"kind":"assistant_text","data":{"text":"hello"}}` + "\n" +
 		`{"seq":2,"kind":"correlation","data":{"sub":"request","corr_id":"c1","at_seq":2}}` + "\n"
@@ -126,12 +134,14 @@ func TestRunBridgeWatchOnce_RendersFeed(t *testing.T) {
 }
 
 func TestRunBridgeWatchOnce_MissingFeedNoError(t *testing.T) {
+	t.Parallel()
 	if err := runBridgeWatchOnce(&bytes.Buffer{}, t.TempDir(), "build"); err != nil {
 		t.Fatalf("missing feed should return nil err, got %v", err)
 	}
 }
 
 func TestRunBridgeWatchOnce_MalformedLinesSkipped(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	feedContent := "not-json\n" +
 		`{"seq":1,"kind":"ping"}` + "\n" +
@@ -154,6 +164,7 @@ func TestRunBridgeWatchOnce_MalformedLinesSkipped(t *testing.T) {
 }
 
 func TestRunBridgeWatchOnce_EmptyFeedNoOutput(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	if err := os.WriteFile(channel.FeedPath(ws, "scout"), []byte(""), 0o644); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -168,6 +179,7 @@ func TestRunBridgeWatchOnce_EmptyFeedNoOutput(t *testing.T) {
 }
 
 func TestRunBridgeWatchOnce_ReadError(t *testing.T) {
+	t.Parallel()
 	// A directory at the feed path is a read error other than ErrNotExist.
 	ws := t.TempDir()
 	feedPath := channel.FeedPath(ws, "build")
@@ -181,6 +193,7 @@ func TestRunBridgeWatchOnce_ReadError(t *testing.T) {
 }
 
 func TestRenderFeedLine_SeqIntType(t *testing.T) {
+	t.Parallel()
 	// JSON decodes numbers as float64; an int seq comes only from in-process callers.
 	e := map[string]any{"seq": 7, "kind": "ping"}
 	got := renderFeedLine(e)
@@ -190,6 +203,7 @@ func TestRenderFeedLine_SeqIntType(t *testing.T) {
 }
 
 func TestRunBridge_Watch_FeedReadError(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	feedPath := channel.FeedPath(ws, "build")
 	if err := os.MkdirAll(feedPath, 0o755); err != nil {
@@ -203,6 +217,7 @@ func TestRunBridge_Watch_FeedReadError(t *testing.T) {
 }
 
 func TestRunBridge_Watch_MissingWorkspace(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"watch", "--agent=build"}, nil, &out, &errb)
 	if code != 10 {
@@ -214,6 +229,7 @@ func TestRunBridge_Watch_MissingWorkspace(t *testing.T) {
 }
 
 func TestRunBridge_Watch_MissingAgent(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"watch", "--workspace=/tmp/x"}, nil, &out, &errb)
 	if code != 10 {
@@ -225,6 +241,7 @@ func TestRunBridge_Watch_MissingAgent(t *testing.T) {
 }
 
 func TestRunBridge_Watch_NoFollowRendersAndReturns(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	feedContent := `{"seq":1,"kind":"ping","data":{}}` + "\n"
 	if err := os.WriteFile(channel.FeedPath(ws, "build"), []byte(feedContent), 0o644); err != nil {
@@ -241,6 +258,7 @@ func TestRunBridge_Watch_NoFollowRendersAndReturns(t *testing.T) {
 }
 
 func TestRunBridge_Watch_HelpFlag(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"watch", "--help"}, nil, &out, &errb)
 	if code != 0 {
@@ -252,6 +270,7 @@ func TestRunBridge_Watch_HelpFlag(t *testing.T) {
 }
 
 func TestRunBridge_Watch_UnknownFlag(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	code := runBridge([]string{"watch", "--workspace=/tmp/x", "--agent=b", "--bogus=x"}, nil, &out, &errb)
 	if code != 10 {
@@ -260,12 +279,14 @@ func TestRunBridge_Watch_UnknownFlag(t *testing.T) {
 }
 
 func TestRenderFeedLine_MissingKind(t *testing.T) {
+	t.Parallel()
 	if got := renderFeedLine(map[string]any{}); !strings.Contains(got, "unknown") {
 		t.Fatalf("render = %q; want 'unknown'", got)
 	}
 }
 
 func TestRunBridgeWatchFollow_CancelledCtxExits(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	os.WriteFile(channel.FeedPath(ws, "scout"), []byte(`{"seq":3,"kind":"tick_event"}`+"\n"), 0o644)
 	ctx, cancel := context.WithCancel(context.Background())

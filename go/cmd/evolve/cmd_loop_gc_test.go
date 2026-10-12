@@ -92,6 +92,7 @@ func gcManifestHasPath(m gc.Manifest, path string) bool {
 // TestGCShadow: shadow mode writes a valid manifest naming the delete target
 // but performs NO filesystem mutation (the target dir survives).
 func TestGCShadow(t *testing.T) {
+	t.Parallel()
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "shadow")
 
@@ -119,6 +120,7 @@ func TestGCShadow(t *testing.T) {
 // by TestRunGCHook_DefaultModeIsShadow) — only an operator's explicit "off"
 // disables the hook, so this test sets it.
 func TestGCOff(t *testing.T) {
+	t.Parallel()
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "off")
 
@@ -139,6 +141,7 @@ func TestGCOff(t *testing.T) {
 // TestGCEnforce: enforce mode writes the manifest AND applies it — the delete
 // target is actually removed while the kept run survives.
 func TestGCEnforce(t *testing.T) {
+	t.Parallel()
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "enforce")
 
@@ -160,6 +163,7 @@ func TestGCEnforce(t *testing.T) {
 // TestGCInvalidMode: an unrecognized value warns and returns — no manifest, no
 // mutation, no panic.
 func TestGCInvalidMode(t *testing.T) {
+	t.Parallel()
 	evolveDir, workspace, keptPath, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "bogus")
 
@@ -183,6 +187,7 @@ func TestGCInvalidMode(t *testing.T) {
 // TestGCShadowMissingRunsDir: shadow mode against an .evolve with no runs/ dir
 // fails open — empty manifest, no error, no crash.
 func TestGCShadowMissingRunsDir(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir() // deliberately no runs/ subdir
 	workspace := t.TempDir()
 	pol := `{"gc":{"mode":"shadow"}}`
@@ -207,6 +212,7 @@ func TestGCShadowMissingRunsDir(t *testing.T) {
 // as the in-flight workspace is LIVE and must never appear in the manifest, even
 // when it is old enough to be a delete target.
 func TestGCShadowLiveRunExcluded(t *testing.T) {
+	t.Parallel()
 	evolveDir, workspace, _, targetPath := gcEnv(t)
 	gcSetMode(t, evolveDir, "shadow")
 	// Mark the would-be delete target LIVE via cycle-state.json.

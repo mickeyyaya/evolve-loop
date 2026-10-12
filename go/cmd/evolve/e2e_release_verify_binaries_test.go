@@ -12,6 +12,7 @@ import (
 )
 
 func TestReleaseVerifyBinaries_RealConfigAllPresent(t *testing.T) {
+	t.Parallel()
 	repoRoot := mustRepoRoot(t)
 	cfg, err := releasetargets.ParseConfig(filepath.Join(repoRoot, ".goreleaser.yml"))
 	if err != nil {
@@ -49,6 +50,7 @@ func TestReleaseVerifyBinaries_RealConfigAllPresent(t *testing.T) {
 // TestReleaseVerifyBinaries_BinaryDispatch runs with no tag arg so it stays
 // network-free.
 func TestReleaseVerifyBinaries_BinaryDispatch(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("E2E test (builds the evolve binary); skipped in -short mode")
 	}

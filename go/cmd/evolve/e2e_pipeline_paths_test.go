@@ -80,6 +80,7 @@ func isolatedHome(t *testing.T) []string {
 }
 
 func TestIsolatedHome_AnEmptyHomeThatKeepsTheParentsGoCaches(t *testing.T) {
+	t.Parallel()
 	env := append(os.Environ(), isolatedHome(t)...)
 	run := func(name string, args ...string) string {
 		cmd := exec.Command(name, args...)
@@ -130,6 +131,7 @@ func mustBuildPipelineBins(t *testing.T) (evolveBin, fakeBin, repoRoot string) {
 }
 
 func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
+	t.Parallel()
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 	entries, _ := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2efail",
 		"FAKE_CLI_AUDIT_VERDICT=FAIL")
@@ -146,6 +148,7 @@ func TestE2EPipeline_AuditFail_RunsRetro_NoShip(t *testing.T) {
 }
 
 func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
+	t.Parallel()
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 
 	t.Run("fluent_ships", func(t *testing.T) {
@@ -172,6 +175,7 @@ func TestE2EPipeline_AuditWarn_FluentShips_StrictBlocks(t *testing.T) {
 }
 
 func TestE2EPipeline_IntentPhase_RunsAndShips(t *testing.T) {
+	t.Parallel()
 	evolveBin, fakeBin, repoRoot := mustBuildPipelineBins(t)
 	entries, runErr := pipelineCycle(t, evolveBin, fakeBin, repoRoot, "e2eintent",
 		"EVOLVE_REQUIRE_INTENT=1")

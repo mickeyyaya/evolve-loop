@@ -91,6 +91,7 @@ func TestLoopPreflightOptions_AFailedBootIsExplainedByTheUsageEvidence(t *testin
 }
 
 func TestWithUsageEvidence_WrapsTheBridgeOnlyWhenThereIsAnExplainer(t *testing.T) {
+	t.Parallel()
 	inner := &fixtures.FakeBridge{}
 	if got := withUsageEvidence(inner, nil, signalcenter.New()); got != core.Bridge(inner) {
 		t.Errorf("no explainer must leave the bridge as it is, got %T", got)
@@ -102,6 +103,7 @@ func TestWithUsageEvidence_WrapsTheBridgeOnlyWhenThereIsAnExplainer(t *testing.T
 }
 
 func TestWireOrchestratorDeps_TheObserverAndTheBridgeShareOneUsageEvidence(t *testing.T) {
+	t.Parallel()
 	src, err := os.ReadFile("cmd_cycle.go")
 	if err != nil {
 		t.Fatal(err)

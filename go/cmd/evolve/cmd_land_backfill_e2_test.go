@@ -42,6 +42,7 @@ func e2LandArchive(t *testing.T, headers []tar.Header, bodies []string) string {
 }
 
 func TestParseLandArgs_AcceptsExactlyOneInput(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		args    []string
@@ -73,6 +74,7 @@ func TestParseLandArgs_AcceptsExactlyOneInput(t *testing.T) {
 }
 
 func TestParseLandArgs_AFlagParseErrorIsReturned(t *testing.T) {
+	t.Parallel()
 	_, err := parseLandArgs([]string{"--branch"})
 
 	if err == nil {
@@ -99,6 +101,7 @@ func TestRegularFile_ResolvesOnlyRegularFiles(t *testing.T) {
 }
 
 func TestSalvageLeafDir_LooksAtThePathThenTheOperatorSalvageDir(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	named := filepath.Join(root, ".evolve", "operator-salvage", "leaf-1")
 	if err := os.MkdirAll(named, 0o755); err != nil {
@@ -128,6 +131,7 @@ func TestSalvageLeafDir_LooksAtThePathThenTheOperatorSalvageDir(t *testing.T) {
 }
 
 func TestResolveLandInput_Table(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	salvage := filepath.Join(root, ".evolve", "operator-salvage")
 	leaf := func(name string, files map[string]bool) string {
@@ -187,6 +191,7 @@ func TestResolveLandInput_Table(t *testing.T) {
 }
 
 func TestExtractUntracked_RestoresDirsAndFilesWithTheirModes(t *testing.T) {
+	t.Parallel()
 	archive := e2LandArchive(t, []tar.Header{
 		{Name: "pkg/", Typeflag: tar.TypeDir, Mode: 0o755},
 		{Name: "pkg/run.sh", Typeflag: tar.TypeReg, Mode: 0o755},
@@ -212,6 +217,7 @@ func TestExtractUntracked_RestoresDirsAndFilesWithTheirModes(t *testing.T) {
 }
 
 func TestExtractUntracked_FailsOnEachBrokenLayer(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	notGzip := filepath.Join(dir, "plain.tgz")
 	writeE2File(t, notGzip, "plain text")
@@ -253,6 +259,7 @@ func TestExtractUntracked_FailsOnEachBrokenLayer(t *testing.T) {
 }
 
 func TestRestoreEntry_RefusesWhatItCannotPlace(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeE2File(t, filepath.Join(dir, "blocker"), "a file where a dir must go")
 	cases := []struct {
@@ -280,6 +287,7 @@ func TestRestoreEntry_RefusesWhatItCannotPlace(t *testing.T) {
 }
 
 func TestRestoreEntry_ADirEntryIsIdempotent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	hdr := tar.Header{Name: "a/b/", Typeflag: tar.TypeDir, Mode: 0o755}
 
@@ -294,6 +302,7 @@ func TestRestoreEntry_ADirEntryIsIdempotent(t *testing.T) {
 }
 
 func TestRestoreEntry_ACopyFailureIsReturnedAndTheFileIsClosed(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	hdr := tar.Header{Name: "f.txt", Typeflag: tar.TypeReg, Mode: 0o644, Size: 4}
 
@@ -305,6 +314,7 @@ func TestRestoreEntry_ACopyFailureIsReturnedAndTheFileIsClosed(t *testing.T) {
 }
 
 func TestLandInto_AFailedArchiveIsAnIOErrorEvenAfterACleanPatch(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	emptyPatch := filepath.Join(t.TempDir(), "empty.patch")
 	writeE2File(t, emptyPatch, "")
@@ -318,6 +328,7 @@ func TestLandInto_AFailedArchiveIsAnIOErrorEvenAfterACleanPatch(t *testing.T) {
 }
 
 func TestLandInto_AnArchiveAloneLandsAndPointsAtTheCommitGate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	archive := e2LandArchive(t, []tar.Header{{Name: "new.txt", Typeflag: tar.TypeReg, Mode: 0o644}}, []string{"new\n"})
 	var stdout, stderr bytes.Buffer
@@ -335,6 +346,7 @@ func TestLandInto_AnArchiveAloneLandsAndPointsAtTheCommitGate(t *testing.T) {
 }
 
 func TestApplyLandPatch_AnEmptyPatchIsANoOpEvenOutsideARepo(t *testing.T) {
+	t.Parallel()
 	patch := filepath.Join(t.TempDir(), "empty.patch")
 	writeE2File(t, patch, "")
 	var stderr bytes.Buffer
@@ -357,6 +369,7 @@ func TestRunLand_AnUnresolvableRootIsAnIOError(t *testing.T) {
 }
 
 func TestRunLand_AMissingPatchIsAnIOErrorBeforeAnyWorktree(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var stdout, stderr bytes.Buffer
 
@@ -371,6 +384,7 @@ func TestRunLand_AMissingPatchIsAnIOErrorBeforeAnyWorktree(t *testing.T) {
 }
 
 func TestRunLand_ARootOutsideAHubIsRefusedByTheWorktreeStep(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	patch := filepath.Join(root, "x.patch")
 	writeE2File(t, patch, "")

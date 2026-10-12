@@ -9,6 +9,7 @@ import (
 )
 
 func TestRunSocketTeardown(t *testing.T) {
+	t.Parallel()
 	own := bridge.DeriveRunSocket(os.Getpid())
 	for _, tc := range []struct {
 		name   string

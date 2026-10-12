@@ -12,6 +12,7 @@ import (
 // (shadow never mutates). Explicit gc.mode=off remains pinned by TestGCOff
 // and TestRunGCHook_ExplicitOffSkipsWorktreeSweep.
 func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()
 
@@ -33,6 +34,7 @@ func TestAmplifyGCNoPolicyFileDefaultsToShadow(t *testing.T) {
 // "shadow", the safe default — shadow only plans and publishes, it never
 // mutates the tree, which the run-dir assertions below pin directly.
 func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	workspace := t.TempDir()
 	// policy.json is a directory — unreadable, triggers WARN.
@@ -57,6 +59,7 @@ func TestAmplifyGCShadowContinuesAfterPolicyLoadError(t *testing.T) {
 }
 
 func TestAmplifyGCEnforceReturnsWhenManifestPathCannotBeWritten(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	// Write a policy.json with mode=enforce so the hook proceeds to the write step.
 	pol := `{"gc":{"mode":"enforce"}}`

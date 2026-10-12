@@ -11,6 +11,7 @@ import (
 )
 
 func TestRunSetupSubcommands_RefuseAnUnknownFlag(t *testing.T) {
+	t.Parallel()
 	for _, sub := range []string{"detect", "recommend", "apply"} {
 		t.Run(sub, func(t *testing.T) {
 			var out, errb bytes.Buffer
@@ -40,6 +41,7 @@ func TestRunSetupJSON_AMarshalFailureExitsOne(t *testing.T) {
 }
 
 func TestRunSetup_AMalformedPresetOverrideRefusesRecommendAndApply(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{{"recommend"}, {"apply", "--preset", "recommended"}} {
 		t.Run(args[0], func(t *testing.T) {
 			root := t.TempDir()
@@ -56,6 +58,7 @@ func TestRunSetup_AMalformedPresetOverrideRefusesRecommendAndApply(t *testing.T)
 }
 
 func TestPrintDetectHuman_RendersEveryOptionalSection(t *testing.T) {
+	t.Parallel()
 	rep := setup.DetectReport{
 		CLIs: []setup.CLIStatus{
 			{CLI: "claude", BinaryPresent: true, AuthConfigured: true, AuthMode: "oauth", CapabilityTier: "top", Verdict: "ready",
@@ -98,6 +101,7 @@ func TestPrintDetectHuman_RendersEveryOptionalSection(t *testing.T) {
 }
 
 func TestPrintDetectHuman_AnEmptyReportStillNamesTheSetupState(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 
 	printDetectHuman(&out, setup.DetectReport{})

@@ -65,6 +65,7 @@ func TestSyncMainFromOriginAtWaveBoundary_AnUnbornMainWarnsAndSkips(t *testing.T
 }
 
 func TestPrepareInboxStampsForFastForward_AnUnreadableTreeKeepsTheStamps(t *testing.T) {
+	t.Parallel()
 	g := gitexec.Git{Dir: t.TempDir(), Exec: e2WavesyncExec(func(string) bool { return true })}
 	var warn bytes.Buffer
 
@@ -79,6 +80,7 @@ func TestPrepareInboxStampsForFastForward_AnUnreadableTreeKeepsTheStamps(t *test
 }
 
 func TestReplayInboxStampsAfterFastForward_AFailedReplayWarnsAndStillNamesTheStamps(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	stamp := inboxstamps.Stamp{Path: ".evolve/inbox/gone.json", Set: map[string]json.RawMessage{"route": json.RawMessage(`"console-manual"`)}}
 	var warn bytes.Buffer
@@ -121,6 +123,7 @@ func TestRestoreInboxStampsAfterBlockedFastForward_AFailedRestoreWarnsInsteadOfC
 }
 
 func TestWarnOnFailedRestore_ReportsOnlyAnError(t *testing.T) {
+	t.Parallel()
 	var warn bytes.Buffer
 	if warnOnFailedRestore(nil, &warn) || warn.Len() != 0 {
 		t.Fatalf("a nil error must be silent: %q", warn.String())
@@ -131,6 +134,7 @@ func TestWarnOnFailedRestore_ReportsOnlyAnError(t *testing.T) {
 }
 
 func TestBlockingInboxFiles_AnyUnreadableGitAnswerBlocksNothing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		fail func(string) bool

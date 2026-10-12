@@ -10,6 +10,7 @@ import (
 )
 
 func TestParseValidateProfileFlags(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name     string
 		args     []string
@@ -43,6 +44,7 @@ func TestParseValidateProfileFlags(t *testing.T) {
 }
 
 func TestRunSubagentValidateProfile_AnUnknownFlagExitsTwo(t *testing.T) {
+	t.Parallel()
 	_, errOut, rc := runCLI("validate-profile", "--bogus", "scout")
 	if rc != 2 || errOut != "evolve subagent validate-profile: unknown flag: --bogus\n" {
 		t.Fatalf("rc=%d stderr=%q", rc, errOut)
@@ -136,6 +138,7 @@ func TestRunSubagent_ARefusedRoutingTableExitsTwoBeforeDispatch(t *testing.T) {
 }
 
 func TestPrintSubagentRunHelp(t *testing.T) {
+	t.Parallel()
 	for _, h := range []string{"-h", "--help"} {
 		out, errOut, rc := runCLI("run", h)
 		if rc != 0 || errOut != "" {
@@ -149,6 +152,7 @@ func TestPrintSubagentRunHelp(t *testing.T) {
 }
 
 func TestRunSubagentRun_RefusesBadOperands(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		args []string

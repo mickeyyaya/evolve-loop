@@ -31,6 +31,7 @@ func seedCatalog(t *testing.T) string {
 }
 
 func TestModelsUnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	if code, _, _ := runModelsCLI("frobnicate"); code != 10 {
 		t.Fatalf("unknown subcommand code=%d, want 10", code)
 	}
@@ -40,6 +41,7 @@ func TestModelsUnknownSubcommand(t *testing.T) {
 }
 
 func TestModelsListEmpty(t *testing.T) {
+	t.Parallel()
 	code, out, _ := runModelsCLI("list", "--evolve-dir", t.TempDir())
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -50,6 +52,7 @@ func TestModelsListEmpty(t *testing.T) {
 }
 
 func TestModelsListEmptyJSON(t *testing.T) {
+	t.Parallel()
 	code, out, _ := runModelsCLI("list", "--evolve-dir", t.TempDir(), "--json")
 	if code != 0 {
 		t.Fatalf("code=%d", code)
@@ -63,6 +66,7 @@ func TestModelsListEmptyJSON(t *testing.T) {
 }
 
 func TestModelsListHuman(t *testing.T) {
+	t.Parallel()
 	dir := seedCatalog(t)
 	code, out, _ := runModelsCLI("list", "--evolve-dir", dir)
 	if code != 0 {
@@ -74,6 +78,7 @@ func TestModelsListHuman(t *testing.T) {
 }
 
 func TestModelsListJSONFlagOrdering(t *testing.T) {
+	t.Parallel()
 	dir := seedCatalog(t)
 	cases := [][]string{
 		{"list", "--evolve-dir", dir, "--json"},   // --json last (the bug case)

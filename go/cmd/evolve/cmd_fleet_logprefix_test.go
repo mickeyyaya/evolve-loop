@@ -10,6 +10,7 @@ import (
 )
 
 func TestPrefixLineWriter_AttributesAndSerializes(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var sink bytes.Buffer
 	a := &prefixLineWriter{w: &sink, prefix: "[a] ", mu: &mu}
@@ -43,6 +44,7 @@ func TestPrefixLineWriter_AttributesAndSerializes(t *testing.T) {
 }
 
 func TestPrefixLineWriter_BuffersPartialUntilNewline(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var sink bytes.Buffer
 	w := &prefixLineWriter{w: &sink, prefix: "[x] ", mu: &mu}

@@ -82,6 +82,7 @@ func TestParseRoutingWriteFlags_AFlaggedRootNeverReadsTheWorkingDirectory(t *tes
 }
 
 func TestDefaultShipRepinProvenance_VerifiesAncestryAgainstHEAD(t *testing.T) {
+	t.Parallel()
 	r := gittest.Fixture(t)
 	for _, body := range []string{"one", "two"} {
 		if err := os.WriteFile(filepath.Join(r.Dir, "f.txt"), []byte(body), 0o644); err != nil {
@@ -205,6 +206,7 @@ func TestDispatchLogTTLDays_ACatalogWithoutTheDispatchCategoryFallsBackToTheLogs
 }
 
 func TestPrintLoadWarnings(t *testing.T) {
+	t.Parallel()
 	var stderr bytes.Buffer
 
 	printLoadWarnings(&stderr, "inbox x", []inboxbatch.LoadWarning{
@@ -280,6 +282,7 @@ func TestLoopStopRoot_AnUnresolvableRootWarnsAndKeepsTheGivenPath(t *testing.T) 
 }
 
 func TestLoopStopRoot_AResolvableRootIsAbsoluteAndSilent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	var stderr bytes.Buffer
 

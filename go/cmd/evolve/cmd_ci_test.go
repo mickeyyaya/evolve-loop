@@ -12,6 +12,7 @@ import (
 )
 
 func TestParseCIClassifyArgs_OneTargetAndKnownFlags(t *testing.T) {
+	t.Parallel()
 	a, err := parseCIClassifyArgs([]string{"--json", "pr:12", "--rerun", "--project-root", "/p"})
 	if err != nil || a.target != (ciwatch.Target{Kind: ciwatch.TargetPR, Value: "12"}) || !a.asJSON || !a.rerun || a.projectRoot != "/p" {
 		t.Fatalf("parseCIClassifyArgs = %+v, %v", a, err)
@@ -24,6 +25,7 @@ func TestParseCIClassifyArgs_OneTargetAndKnownFlags(t *testing.T) {
 }
 
 func TestRunCI_UsageExitsTen(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{nil, {"bogus"}, {"classify"}, {"classify", "abcde1"}} {
 		var stdout, stderr bytes.Buffer
 		if code := runCI(args, nil, &stdout, &stderr); code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: evolve ci classify") {
@@ -33,6 +35,7 @@ func TestRunCI_UsageExitsTen(t *testing.T) {
 }
 
 func TestGoModulePath_ReadsTheModuleLine(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	goMod := filepath.Join(dir, "go.mod")
 	if err := os.WriteFile(goMod, []byte("// header\nmodule example.com/fix\n\ngo 1.23\n"), 0o644); err != nil {
@@ -47,6 +50,7 @@ func TestGoModulePath_ReadsTheModuleLine(t *testing.T) {
 }
 
 func TestWriteClassifyReport_TextTableAndJSON(t *testing.T) {
+	t.Parallel()
 	rep := ciwatch.ClassifyReport{
 		RunID: 501, RunURL: "https://x/runs/501", Conclusion: "failure",
 		HeadSHA: "0123456789abcdef0123", BaseSHA: "fedcba9876543210fedc",
@@ -72,6 +76,7 @@ func TestWriteClassifyReport_TextTableAndJSON(t *testing.T) {
 }
 
 func TestRunComments_IsCommentauditMain(t *testing.T) {
+	t.Parallel()
 	for _, args := range [][]string{nil, {"bogus"}} {
 		var evolveOut, evolveErr, toolOut, toolErr bytes.Buffer
 		got := runComments(args, nil, &evolveOut, &evolveErr)

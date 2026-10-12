@@ -68,6 +68,7 @@ func e3StaleNonRepo(t *testing.T) string {
 }
 
 func TestWorktreeCleanupStale_NoCycleWorktreesIsASuccess(t *testing.T) {
+	t.Parallel()
 	r, base := e3StaleRepo(t)
 	r.Git("worktree", "add", "-q", "-b", "side", filepath.Join(base, "not-a-cycle"), "main")
 
@@ -79,6 +80,7 @@ func TestWorktreeCleanupStale_NoCycleWorktreesIsASuccess(t *testing.T) {
 }
 
 func TestWorktreeCleanupStale_KeepReasonsForAMissingDirAndABranchBinding(t *testing.T) {
+	t.Parallel()
 	r, base := e3StaleRepo(t, 1, 2)
 	if err := os.RemoveAll(filepath.Join(base, staleLeaf(1))); err != nil {
 		t.Fatal(err)
@@ -104,6 +106,7 @@ func TestWorktreeCleanupStale_KeepReasonsForAMissingDirAndABranchBinding(t *test
 }
 
 func TestWorktreeCleanupStale_ALockedLaneFailsTheApply(t *testing.T) {
+	t.Parallel()
 	r, base := e3StaleRepo(t, 1)
 	r.Git("worktree", "lock", filepath.Join(base, staleLeaf(1)))
 
@@ -118,6 +121,7 @@ func TestWorktreeCleanupStale_ALockedLaneFailsTheApply(t *testing.T) {
 }
 
 func TestWorktreeCleanupStale_AnUnmergedBranchIsLeftInPlace(t *testing.T) {
+	t.Parallel()
 	r, base := e3StaleRepo(t, 1)
 	lane := filepath.Join(base, staleLeaf(1))
 	brCommit(t, lane, "lane.txt", "unmerged\n", "lane work")
@@ -136,6 +140,7 @@ func TestWorktreeCleanupStale_AnUnmergedBranchIsLeftInPlace(t *testing.T) {
 }
 
 func TestRemoveStaleLane_ALeaseThatAppearedBeforeRemovalKeepsTheLane(t *testing.T) {
+	t.Parallel()
 	r, base := e3StaleRepo(t, 3)
 	staleLease(t, r.Dir, 3)
 	l := staleLane{leaf: staleLeaf(3), path: filepath.Join(base, staleLeaf(3)), branch: staleLeaf(3), cycle: 3}
@@ -152,6 +157,7 @@ func TestRemoveStaleLane_ALeaseThatAppearedBeforeRemovalKeepsTheLane(t *testing.
 }
 
 func TestRemoveStaleLane_ALaneWithoutABranchReportsNone(t *testing.T) {
+	t.Parallel()
 	r, base := e3StaleRepo(t, 6)
 	l := staleLane{leaf: staleLeaf(6), path: filepath.Join(base, staleLeaf(6)), cycle: 6}
 	var out, errb bytes.Buffer
@@ -167,6 +173,7 @@ func TestRemoveStaleLane_ALaneWithoutABranchReportsNone(t *testing.T) {
 }
 
 func TestLaneBindingsBound(t *testing.T) {
+	t.Parallel()
 	b := laneBindings{byBranch: map[string]string{"lane-b": "scope-branch", "": "scope-empty"}, byLeaf: map[string]string{"cycle-x-1": "scope-leaf"}}
 	cases := []struct {
 		name      string
@@ -190,6 +197,7 @@ func TestLaneBindingsBound(t *testing.T) {
 }
 
 func TestLiveLaneRef(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	staleLease(t, root, 12)
 	live := liveLaneRef(root, time.Now())
@@ -202,6 +210,7 @@ func TestLiveLaneRef(t *testing.T) {
 }
 
 func TestResolvedPath(t *testing.T) {
+	t.Parallel()
 	real, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

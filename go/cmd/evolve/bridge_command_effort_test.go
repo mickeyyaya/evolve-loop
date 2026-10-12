@@ -12,6 +12,7 @@ import (
 )
 
 func TestBridgeCommandIntent_CarriesTheResolvedEffort(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		cli, permission, want string
 		flags                 []string

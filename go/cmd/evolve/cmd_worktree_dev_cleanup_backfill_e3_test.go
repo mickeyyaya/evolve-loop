@@ -26,6 +26,7 @@ func e3StatusGit(out string, code int, err error) gitexec.Git {
 }
 
 func TestChangedPaths(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		out     string
@@ -81,6 +82,7 @@ func FuzzChangedPaths(f *testing.F) {
 }
 
 func TestDevQuietPeriod(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, policy string
 		want         time.Duration
@@ -111,6 +113,7 @@ func TestDevQuietPeriod(t *testing.T) {
 }
 
 func TestDevFail_KeepsTheErrorTextVerbatim(t *testing.T) {
+	t.Parallel()
 	o := devFail(errors.New("git: rc=128 ünïcode"))
 	if o != (devOutcome{code: devFailed, detail: "git: rc=128 ünïcode"}) {
 		t.Errorf("devFail = %+v", o)
@@ -118,6 +121,7 @@ func TestDevFail_KeepsTheErrorTextVerbatim(t *testing.T) {
 }
 
 func TestDevCleanerReport_RoutesEachOutcome(t *testing.T) {
+	t.Parallel()
 	c := devCleaner{effects: devEffectsFor(false)}
 	var out, errb bytes.Buffer
 

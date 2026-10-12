@@ -26,6 +26,7 @@ var expectedPhasesHappyPath = []string{"scout", "triage", "tdd", "build", "audit
 var allCLIs = []string{"claude-p", "codex", "agy"}
 
 func TestE2ECycleCLIMatrix(t *testing.T) {
+	t.Parallel()
 	t.Skip("legacy ship-script hatch removed (Stage 5.1); native CLI-matrix e2e pending port to go/test/e2e/ — see PORTING-LEDGER.md")
 	if testing.Short() {
 		t.Skip("E2E test; skipped in -short mode")

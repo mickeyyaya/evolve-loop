@@ -65,6 +65,7 @@ func writeACSFixtureModule(t *testing.T, root string) {
 }
 
 func TestRunACSSuite_FlagParseErrorExits10(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--evolve-dir", evolveDir, "--no-such-flag")
 	if code != 10 {
@@ -80,6 +81,7 @@ func TestRunACSSuite_FlagParseErrorExits10(t *testing.T) {
 }
 
 func TestRunACSSuite_MissingOrNonPositiveCycleExits10(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		args []string
@@ -114,6 +116,7 @@ func TestRunACSSuite_MissingOrNonPositiveCycleExits10(t *testing.T) {
 }
 
 func TestRunACSSuite_SuiteErrorIsHardFailureExit1(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", "", "--evolve-dir", evolveDir)
 	if code != 1 {
@@ -129,6 +132,7 @@ func TestRunACSSuite_SuiteErrorIsHardFailureExit1(t *testing.T) {
 }
 
 func TestRunACSSuite_NoPredicateTreeWritesARedVerdictAndExits2(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := t.TempDir(), t.TempDir()
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", root, "--evolve-dir", evolveDir)
 	if code != 2 {
@@ -148,6 +152,7 @@ func TestRunACSSuite_NoPredicateTreeWritesARedVerdictAndExits2(t *testing.T) {
 }
 
 func TestRunACSSuite_AnEvolveDirThatIsNotAnExistingDirectoryIsRefused(t *testing.T) {
+	t.Parallel()
 	const relative = "acs-suite-relative-evolve-dir-must-not-exist"
 	t.Cleanup(func() { _ = os.RemoveAll(relative) })
 	cases := map[string]string{
@@ -171,6 +176,7 @@ func TestRunACSSuite_AnEvolveDirThatIsNotAnExistingDirectoryIsRefused(t *testing
 }
 
 func TestRunACSSuite_JSONFalseSkipsVerdictWrite(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := t.TempDir(), t.TempDir()
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", root, "--evolve-dir", evolveDir, "--json=false")
 	if code != 2 {
@@ -186,6 +192,7 @@ func TestRunACSSuite_JSONFalseSkipsVerdictWrite(t *testing.T) {
 }
 
 func TestRunACSSuite_VerdictWriteFailureExits1AfterSummary(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(evolveDir, "runs"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -206,6 +213,7 @@ func TestRunACSSuite_VerdictWriteFailureExits1AfterSummary(t *testing.T) {
 }
 
 func TestRunACSSuite_DotRootResolvesActiveWorktreeAndPlaneRoot(t *testing.T) {
+	t.Parallel()
 	plane, worktree := t.TempDir(), t.TempDir()
 	evolveDir := filepath.Join(plane, ".evolve")
 	writeCycleStateN(t, evolveDir, 7, `{"active_worktree":"`+worktree+`"}`)
@@ -223,6 +231,7 @@ func TestRunACSSuite_DotRootResolvesActiveWorktreeAndPlaneRoot(t *testing.T) {
 }
 
 func TestRunACSSuite_ExplicitRootIsNotOverriddenByActiveWorktree(t *testing.T) {
+	t.Parallel()
 	plane, worktree, explicit := t.TempDir(), t.TempDir(), t.TempDir()
 	evolveDir := filepath.Join(plane, ".evolve")
 	writeCycleStateN(t, evolveDir, 7, `{"active_worktree":"`+worktree+`"}`)
@@ -236,6 +245,7 @@ func TestRunACSSuite_ExplicitRootIsNotOverriddenByActiveWorktree(t *testing.T) {
 }
 
 func TestRunACSSuite_RedPredicateExits2AndListsIt(t *testing.T) {
+	t.Parallel()
 	root, evolveDir := t.TempDir(), t.TempDir()
 	writeACSFixtureModule(t, root)
 	code, stdout, stderr := runACSSuiteCLI(t, "--cycle", "7", "--root", root, "--evolve-dir", evolveDir)
@@ -259,6 +269,7 @@ func TestRunACSSuite_RedPredicateExits2AndListsIt(t *testing.T) {
 }
 
 func TestRunACSRun_AnEvolveDirThatIsNotAnExistingDirectoryIsRefused(t *testing.T) {
+	t.Parallel()
 	const relative = "acs-run-relative-evolve-dir-must-not-exist"
 	t.Cleanup(func() { _ = os.RemoveAll(relative) })
 	var out, errb bytes.Buffer
@@ -275,6 +286,7 @@ func TestRunACSRun_AnEvolveDirThatIsNotAnExistingDirectoryIsRefused(t *testing.T
 }
 
 func TestRunACSRun_ARunThatCouldNotExecuteExits1WithAFailVerdict(t *testing.T) {
+	t.Parallel()
 	evolveDir := t.TempDir()
 	var out, errb bytes.Buffer
 	code := runACS([]string{"run", "--cycle", "7", "--evolve-dir", evolveDir, "./no-such-predicate-package"}, nil, &out, &errb)

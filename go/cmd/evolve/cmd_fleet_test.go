@@ -7,6 +7,7 @@ import (
 )
 
 func TestRunFleet_RejectsMissingCount(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if rc := runFleet([]string{"--goal-hash", "abc"}, nil, &out, &errb); rc != 1 {
 		t.Fatalf("rc=%d, want 1", rc)
@@ -17,6 +18,7 @@ func TestRunFleet_RejectsMissingCount(t *testing.T) {
 }
 
 func TestRunFleet_RejectsMissingGoalHash(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	if rc := runFleet([]string{"--count", "3"}, nil, &out, &errb); rc != 1 {
 		t.Fatalf("rc=%d, want 1", rc)
@@ -27,6 +29,7 @@ func TestRunFleet_RejectsMissingGoalHash(t *testing.T) {
 }
 
 func TestLoadPlanSpecs_AssignsDisjointScopesWithGoalHash(t *testing.T) {
+	t.Parallel()
 	planJSON := []byte(`[
 		{"id":"t1","files":["a.go"]},
 		{"id":"t2","files":["b.go"]},
@@ -53,12 +56,14 @@ func TestLoadPlanSpecs_AssignsDisjointScopesWithGoalHash(t *testing.T) {
 }
 
 func TestLoadPlanSpecs_BadJSON(t *testing.T) {
+	t.Parallel()
 	if _, _, err := loadPlanSpecs([]byte("{not json"), "gh", 2); err == nil {
 		t.Error("want error on malformed --plan JSON")
 	}
 }
 
 func TestDispatch_FleetRegistered(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
 	rc := dispatch([]string{"fleet"}, nil, &out, &errb)
 	if rc != 1 {

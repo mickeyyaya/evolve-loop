@@ -9,6 +9,7 @@ import (
 )
 
 func TestResolveLLMRole(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		args       []string

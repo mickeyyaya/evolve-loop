@@ -24,6 +24,7 @@ func checkedInRouter(t *testing.T) (*cliroute.Router, []cliroute.Finding, string
 }
 
 func TestTheCheckedInTableCompiles(t *testing.T) {
+	t.Parallel()
 	if pol, _ := checkedInPolicy(t); pol.CLIRouting == nil {
 		t.Fatal("the checked-in policy declares no cli_routing table")
 	}
@@ -36,6 +37,7 @@ func TestTheCheckedInTableCompiles(t *testing.T) {
 }
 
 func TestTheCheckedInTableRoutesNoLaunchToCodex(t *testing.T) {
+	t.Parallel()
 	r, _, root := checkedInRouter(t)
 	agents, err := profiles.NewFromDir(routingProfilesDir(root)).List()
 	if err != nil {

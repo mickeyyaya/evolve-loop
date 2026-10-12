@@ -14,6 +14,7 @@ import (
 )
 
 func TestRepoContractPackSeam_DefaultsToShipsOwnPack(t *testing.T) {
+	t.Parallel()
 	want := reflect.ValueOf(ship.RunRepoContractPack).Pointer()
 	if got := reflect.ValueOf(repoContractPack).Pointer(); got != want {
 		t.Fatal("the build floor must run ship's own repo-contract pack, so the suite list has one home")

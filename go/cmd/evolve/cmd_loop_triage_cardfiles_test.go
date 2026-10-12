@@ -26,6 +26,7 @@ One audit-surface item this cycle.
 `
 
 func TestProjectedDecisionFilesReachTheLanePlanner(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	inbox := filepath.Join(dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {

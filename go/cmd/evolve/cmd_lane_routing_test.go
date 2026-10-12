@@ -12,6 +12,7 @@ import (
 )
 
 func TestLaneForbidden_TheRepoBuilderSandboxRoutesAProfileItemToTheConsole(t *testing.T) {
+	t.Parallel()
 	var warn bytes.Buffer
 	forbidden := laneForbidden(findRepoRoot(t), &warn)
 	if !forbidden(".evolve/profiles/historian.json") {
@@ -26,6 +27,7 @@ func TestLaneForbidden_TheRepoBuilderSandboxRoutesAProfileItemToTheConsole(t *te
 }
 
 func TestLaneForbidden_WithoutTheBuilderProfileWarnsAndJudgesProtectedSurface(t *testing.T) {
+	t.Parallel()
 	var warn bytes.Buffer
 	forbidden := laneForbidden(t.TempDir(), &warn)
 	if !forbidden("go/internal/guards/role.go") || forbidden(".evolve/profiles/historian.json") {
@@ -37,6 +39,7 @@ func TestLaneForbidden_WithoutTheBuilderProfileWarnsAndJudgesProtectedSurface(t 
 }
 
 func TestLaneForbidden_ARootThatNeverRoutesStaysSilent(t *testing.T) {
+	t.Parallel()
 	var warn bytes.Buffer
 	_ = laneForbidden(t.TempDir(), &warn)
 	if warn.Len() != 0 {
@@ -45,6 +48,7 @@ func TestLaneForbidden_ARootThatNeverRoutesStaysSilent(t *testing.T) {
 }
 
 func TestRoutingRoots_JudgeWithTheLanePredicate(t *testing.T) {
+	t.Parallel()
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)

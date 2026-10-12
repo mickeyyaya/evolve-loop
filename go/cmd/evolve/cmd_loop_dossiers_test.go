@@ -51,6 +51,7 @@ func planeWithAPendingCloseout(t *testing.T, branch string) *gittest.Repo {
 }
 
 func TestPublishPendingDossiers_PublishesTheLanesPendingCloseouts(t *testing.T) {
+	t.Parallel()
 	for _, branch := range []string{"main", "fleet-run"} {
 		t.Run(branch, func(t *testing.T) {
 			r := planeWithAPendingCloseout(t, branch)
@@ -69,6 +70,7 @@ func TestPublishPendingDossiers_PublishesTheLanesPendingCloseouts(t *testing.T) 
 }
 
 func TestPublishPendingDossiers_HoldsThePairsUnlessThePlaneHasOriginsHistory(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name      string
 		setup     []string
@@ -126,6 +128,7 @@ func leaseARun(t *testing.T, root string, cycle, ownerPID int) {
 }
 
 func TestPublishPendingDossiers_RefusesWhileAnotherRunIsLive(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name      string
 		owner     func(t *testing.T) int
@@ -165,6 +168,7 @@ func TestPublishPendingDossiers_RefusesWhileAnotherRunIsLive(t *testing.T) {
 }
 
 func TestPublishPendingDossiers_NamesARunTheCycleStateNamesWithoutALease(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	runDir := cycleWorkspace(r.Dir, 1706)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
@@ -193,6 +197,7 @@ func TestPublishPendingDossiers_NamesARunTheCycleStateNamesWithoutALease(t *test
 }
 
 func TestPublishPendingDossiers_HoldsWhenItCannotProveNoOtherRunIsLive(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	if err := os.WriteFile(filepath.Join(r.Dir, ".evolve", "cycle-state.json"), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
@@ -238,6 +243,7 @@ func TestPublishPendingDossiers_ReChecksForALiveRunOnceItHoldsTheLock(t *testing
 }
 
 func TestPublishPendingDossiers_WithAnotherRunLiveNeverWaitsOnTheGitMutationLock(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	leaseARun(t, r.Dir, 1706, os.Getppid())
 	release, err := flock.Lock(flock.ShipLockPath(r.Dir))
@@ -264,6 +270,7 @@ func TestPublishPendingDossiers_WithAnotherRunLiveNeverWaitsOnTheGitMutationLock
 }
 
 func TestLoopSummary_ASecondLoopExitingBesideALiveRunPublishesNothing(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	leaseARun(t, r.Dir, 1706, os.Getppid())
 	head := r.Git("rev-parse", "HEAD")
@@ -280,6 +287,7 @@ func TestLoopSummary_ASecondLoopExitingBesideALiveRunPublishesNothing(t *testing
 }
 
 func TestPublishPendingDossiers_OutsideACheckoutLeavesThePairsPendingSilently(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := writePendingCloseout(root); err != nil {
 		t.Fatal(err)
@@ -300,6 +308,7 @@ func TestPublishPendingDossiers_OutsideACheckoutLeavesThePairsPendingSilently(t 
 }
 
 func TestPublishPendingDossiers_WithNothingPendingNeverWaitsOnTheGitMutationLock(t *testing.T) {
+	t.Parallel()
 	r := gitPlane(t, "main")
 	release, err := flock.Lock(flock.ShipLockPath(r.Dir))
 	if err != nil {
@@ -321,6 +330,7 @@ func TestPublishPendingDossiers_WithNothingPendingNeverWaitsOnTheGitMutationLock
 }
 
 func TestLoopSummaryCountsTheLastWavesPendingCloseouts(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	lr := &loopResult{StopReason: "max_cycles", classifyRoot: r.Dir, batchFirstCycle: 1700}
 
@@ -417,6 +427,7 @@ func TestRunFleet_PublishesTheLanesPendingCloseoutsInItsWorkingTree(t *testing.T
 }
 
 func TestRunDossierPublish_ADryRunReportsABusyLockAsAHoldAndPublishesNothing(t *testing.T) {
+	t.Parallel()
 	r := planeWithAPendingCloseout(t, "main")
 	release, err := flock.Lock(flock.ShipLockPath(r.Dir))
 	if err != nil {

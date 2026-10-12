@@ -12,6 +12,7 @@ import (
 )
 
 func TestDetectQuotaPause_EmitsNonEmptyWakeAtAndSource(t *testing.T) {
+	t.Parallel()
 	if core.QuotaBoundaryCheckpointer == nil {
 		t.Fatal("core.QuotaBoundaryCheckpointer not registered — the evolve binary must link internal/checkpoint")
 	}

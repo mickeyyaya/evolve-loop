@@ -36,6 +36,7 @@ func salvageCLIFixture(t *testing.T) string {
 }
 
 func TestRunSalvageReport_ProseRendersCountsAndNamesSkippedRecords(t *testing.T) {
+	t.Parallel()
 	root := salvageCLIFixture(t)
 	var out, errBuf strings.Builder
 
@@ -58,6 +59,7 @@ func TestRunSalvageReport_ProseRendersCountsAndNamesSkippedRecords(t *testing.T)
 }
 
 func TestRunSalvageReport_JSONEnvelopeMatchesProseNumbers(t *testing.T) {
+	t.Parallel()
 	root := salvageCLIFixture(t)
 	var out, errBuf strings.Builder
 
@@ -83,6 +85,7 @@ func TestRunSalvageReport_JSONEnvelopeMatchesProseNumbers(t *testing.T) {
 }
 
 func TestRunSalvageReport_AbsentSidecarsAreZeroNotError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -97,6 +100,7 @@ func TestRunSalvageReport_AbsentSidecarsAreZeroNotError(t *testing.T) {
 }
 
 func TestRunSalvage_UsageAndUnknownSubcommand(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name string
 		args []string
