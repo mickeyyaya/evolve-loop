@@ -258,3 +258,11 @@ approaches / decision / results / retro) — lives at
 | [architecture/test-system.md](architecture/test-system.md) | Design, the spec of record: the design of one test case, one instrumented run with judges that read it, and the order of seams. It also covers the helper kits, the duplicate ratchet, wall budgets and test lanes. |
 | [plans/test-system-efficiency-2026-10.md](plans/test-system-efficiency-2026-10.md) | Plan: four candidate designs with scores, decisions D1 to D16, and components T0 to T9 with their red tests, order and lane models. |
 | [architecture/adr/0131-one-test-run-feeds-every-coverage-gate.md](architecture/adr/0131-one-test-run-feeds-every-coverage-gate.md) | Decision: one instrumented run feeds every coverage gate. A test never reads the host home. Each test helper has one home. |
+
+## 2026-10-12 — one skill writes every document that a person reads (ADR-0132)
+
+| Document | What it records |
+|---|---|
+| [research/docs-write-skill-2026-10.md](research/docs-write-skill-2026-10.md) | Research: the house rules for documents, the conflict of the front matter rule, and the skill preload. It surveys Diátaxis, Google design docs, Rust RFCs, KEPs, ADR collections and The Good Docs Project. Findings F2.1 to F2.8 and P3.1 to P3.7, refinements R1 to R9. |
+| [plans/docs-write-skill-2026-10.md](plans/docs-write-skill-2026-10.md) | Plan: four candidate approaches with scores, the winner (reasoning first) and what it takes from the others. Decisions D1 to D9 and components K0 to K4. |
+| [architecture/adr/0132-documents-are-written-through-one-skill.md](architecture/adr/0132-documents-are-written-through-one-skill.md) | Decision: every document goes through the `docs-write` skill. Each decision cites its evidence and its rejected options. The skill is on by default. |

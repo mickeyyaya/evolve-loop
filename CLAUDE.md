@@ -107,6 +107,7 @@ Task priority is the computed inbox rank ([ADR-0121](docs/architecture/adr/0121-
   - The claudeFamilyFloor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only.
   - codex is reachable only under `--bypass-policy`.
   - `evolve cli-routing explain <agent>` prints the chain of any agent.
+- Documents: load `docs-write` before you write any document that a person reads. Each decision cites its evidence and its rejected options ([ADR-0132](docs/architecture/adr/0132-documents-are-written-through-one-skill.md), AGENTS.md invariant 11).
 - Comments: code has no comments. The code explains itself (AGENTS.md invariant 10, [docs/conventions/code-comments.md](docs/conventions/code-comments.md)). The commit gate refuses a commit that adds one. In loop lanes, the `comment_floor` of the build floor counts them (rollout stage: the convention).
 - Boot self-heal: `boot.binary_refresh=auto` is a **compiled default** (`cmd_loop_boot_refresh.go`). If the build stamp of the current binary is behind HEAD with a go/ delta, the boot does a rebuild + re-exec. Use `off` only for deliberate pins of an old binary. Unknown words resolve to `auto`.
 - Contract blocks: the second consecutive contract-gate block escalates the re-dispatch CLI (a soft overlay, `internal/core/contract_escalation.go`). Escalation comes before breaker demotion. Salvage rungs are breaker-neutral.
