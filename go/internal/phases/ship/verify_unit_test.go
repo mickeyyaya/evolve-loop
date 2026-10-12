@@ -15,6 +15,7 @@ import (
 // --- checkEGPSGate -------------------------------------------------------
 
 func TestCheckEGPSGate_MissingFile(t *testing.T) {
+	t.Parallel()
 	res := &RunResult{}
 	if _, err := checkEGPSGate(filepath.Join(t.TempDir(), "acs-verdict.json"), res); err == nil {
 		t.Fatal("missing predicate evidence must refuse ship")
@@ -25,6 +26,7 @@ func TestCheckEGPSGate_MissingFile(t *testing.T) {
 }
 
 func TestCheckEGPSGate_RedCountZero(t *testing.T) {
+	t.Parallel()
 	path := writeACSVerdict(t, predicateVerdictFixture(1, 12, 0, 0))
 	res := &RunResult{}
 	if _, err := checkEGPSGate(path, res); err != nil {
@@ -36,6 +38,7 @@ func TestCheckEGPSGate_RedCountZero(t *testing.T) {
 }
 
 func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
+	t.Parallel()
 	v := predicateVerdictFixture(1, 5, 2, 0)
 	v.RedIDs = []string{"pred-auth-leak", "pred-null-deref"}
 	v.Results[5].ACID, v.Results[6].ACID = v.RedIDs[0], v.RedIDs[1]
@@ -52,6 +55,7 @@ func TestCheckEGPSGate_RedCountNonZero(t *testing.T) {
 }
 
 func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "acs-verdict.json")
 	if err := os.WriteFile(path, []byte("{not valid json"), 0o644); err != nil {
@@ -66,6 +70,7 @@ func TestCheckEGPSGate_MalformedJSON(t *testing.T) {
 // TestCheckEGPSGate_ReadError points the gate at a directory: os.ReadFile of a
 // dir errors but is not os.ErrNotExist, exercising the non-ErrNotExist branch.
 func TestCheckEGPSGate_ReadError(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	res := &RunResult{}
 	_, err := checkEGPSGate(dir, res)
@@ -81,6 +86,7 @@ func TestCheckEGPSGate_ReadError(t *testing.T) {
 // --- verifyTrivial -------------------------------------------------------
 
 func TestVerifyTrivial_RejectsNonTrivialEstimate(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeCycleState(t, root, "small")
 	opts := &Options{ProjectRoot: root, Runner: (&scriptedRunner{}).runner()}
@@ -91,6 +97,7 @@ func TestVerifyTrivial_RejectsNonTrivialEstimate(t *testing.T) {
 // TestVerifyTrivial_RejectsPipelineCriticalPath drives the critical path via
 // the untracked file list, to avoid the scriptedRunner "git diff" key collision.
 func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
@@ -102,6 +109,7 @@ func TestVerifyTrivial_RejectsPipelineCriticalPath(t *testing.T) {
 }
 
 func TestVerifyTrivial_AcceptsCleanTrivialCycle(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeCycleState(t, root, "trivial")
 	r := &scriptedRunner{}
@@ -119,14 +127,25 @@ func TestVerifyTrivial_AcceptsCleanTrivialCycle(t *testing.T) {
 	}
 }
 
+func devNullFile(t *testing.T) *os.File {
+	t.Helper()
+	f, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatalf("open %s: %v", os.DevNull, err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+	return f
+}
+
 // --- verifyManualConfirm -------------------------------------------------
 
 func TestVerifyManualConfirm_NothingStaged(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
 	// git add -A → exit 0 (default); git diff --cached --quiet → exit 0 = nothing staged.
 	r.scripts["git diff"] = scriptResult(t, "", 0)
-	opts := &Options{ProjectRoot: t.TempDir(), Runner: r.runner(), Stderr: os.NewFile(0, os.DevNull)}
+	opts := &Options{ProjectRoot: t.TempDir(), Runner: r.runner(), Stderr: devNullFile(t)}
 	err := verifyManualConfirm(context.Background(), opts, &RunResult{})
 	if !errors.Is(err, errEmptyDiff) {
 		t.Fatalf("no staged changes must return errEmptyDiff; got %v", err)
@@ -134,6 +153,7 @@ func TestVerifyManualConfirm_NothingStaged(t *testing.T) {
 }
 
 func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
+	t.Parallel()
 	r := &scriptedRunner{}
 	r.runner()
 	// git diff --cached --quiet → exit 1 = changes staged ⇒ proceed.
@@ -143,7 +163,7 @@ func TestVerifyManualConfirm_AutoConfirm(t *testing.T) {
 		ProjectRoot: t.TempDir(),
 		Runner:      r.runner(),
 		Env:         map[string]string{"EVOLVE_SHIP_AUTO_CONFIRM": "1"},
-		Stderr:      os.NewFile(0, os.DevNull),
+		Stderr:      devNullFile(t),
 	}
 	if err := verifyManualConfirm(context.Background(), opts, res); err != nil {
 		t.Fatalf("auto-confirm must succeed; got %v", err)

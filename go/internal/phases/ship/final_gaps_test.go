@@ -15,6 +15,7 @@ import (
 )
 
 func TestVerifySelfSHA_UnreadableBinary_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 
 	bin := filepath.Join(repo, "unreadable-bin")
@@ -40,6 +41,7 @@ func TestVerifySelfSHA_UnreadableBinary_Errors(t *testing.T) {
 }
 
 func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	bin := filepath.Join(repo, "ship-binary-fixture")
 	preSeedTOFU(t, repo, bin)
@@ -75,6 +77,7 @@ func TestVerifySelfSHA_RepinWriteStateFails_Errors(t *testing.T) {
 }
 
 func TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	call := 0
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
@@ -101,6 +104,7 @@ func TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors(t *testing.T) {
 }
 
 func TestVerifyTrivial_StagedNameOnlyRunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
 		`{"cycle_id":1,"cycle_size_estimate":"trivial"}`)
@@ -125,6 +129,7 @@ func TestVerifyTrivial_StagedNameOnlyRunnerError_Errors(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_UnreadableArtifact_SHA256Error(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 
@@ -146,6 +151,7 @@ func TestVerifyAuditBinding_UnreadableArtifact_SHA256Error(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_RevParseHeadRunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 
@@ -168,6 +174,7 @@ func TestVerifyAuditBinding_RevParseHeadRunnerError_Errors(t *testing.T) {
 }
 
 func TestVerifyAuditBinding_ComputeTreeSHARunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 
@@ -188,6 +195,7 @@ func TestVerifyAuditBinding_ComputeTreeSHARunnerError_Errors(t *testing.T) {
 }
 
 func TestShipDirect_CommitPrefixGateRejects_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "staged.txt"), "staged change\n")
@@ -211,6 +219,7 @@ func TestShipDirect_CommitPrefixGateRejects_Errors(t *testing.T) {
 }
 
 func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	// The gate uses RepoDir=worktree, so the manifest lives in wt/.evolve/.
@@ -233,6 +242,7 @@ func TestShipFromWorktree_CommitPrefixGateRejects_Errors(t *testing.T) {
 }
 
 func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{
@@ -251,6 +261,7 @@ func TestShipFromWorktree_GitCommitFails_Errors(t *testing.T) {
 }
 
 func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{
@@ -278,6 +289,7 @@ func TestShipFromWorktree_WriteTreeFails_Errors(t *testing.T) {
 }
 
 func TestShipFromWorktree_WriteTreeEmptyOutput_FailsClosed(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{

@@ -13,6 +13,7 @@ import (
 // `solution(<slug>)` prefix so the commit vocabulary names the deliverable
 // it carries; code cycles keep the legacy message byte-identical.
 func TestDefaultCommitMessage_SolutionPrefix(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	for name, body := range map[string]string{
 		"triage-report.md":     "<!-- challenge-token: x -->\n# Triage\n\ncycle_size_estimate: medium\ndeliverable_kind: document\n\n## top_n\n- netflix-margin: x\n",
@@ -33,6 +34,7 @@ func TestDefaultCommitMessage_SolutionPrefix(t *testing.T) {
 // TestDefaultCommitMessage_SolutionPrefix_MultiSlug: the scope carries ONE
 // slug (the prefix grammar admits [a-z0-9-] only); the rest ride in the subject.
 func TestDefaultCommitMessage_SolutionPrefix_MultiSlug(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	for name, body := range map[string]string{
 		"triage-report.md":     "<!-- challenge-token: x -->\n# Triage\n\ncycle_size_estimate: medium\ndeliverable_kind: document\n\n## top_n\n- a: x\n- b: y\n",

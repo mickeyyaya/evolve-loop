@@ -12,6 +12,7 @@ import (
 )
 
 func TestShipFromWorktree_StagesDeclaredPathsOnly_ExcludesUndeclaredStray(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	// Un-stage so the ship's own staging step is what decides the commit.

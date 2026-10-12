@@ -29,6 +29,7 @@ func preConsumptionTree(t *testing.T, wt string) string {
 }
 
 func TestShipFromWorktree_ConsumptionDriftIsSanctioned(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
 	opts := &Options{
@@ -55,6 +56,7 @@ func TestShipFromWorktree_ConsumptionDriftIsSanctioned(t *testing.T) {
 // The tolerance is exactly the sanctioned consumption set — an unsanctioned
 // extra file in the drift still refuses.
 func TestShipFromWorktree_UnsanctionedDriftStillRefuses(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
 	// Staged explicitly so the file is guaranteed to be in the tree the
@@ -87,6 +89,7 @@ func TestShipFromWorktree_UnsanctionedDriftStillRefuses(t *testing.T) {
 // A second, unconsumed inbox file staged post-binding must still refuse: the
 // tolerance is the exact consumption set, never an .evolve/inbox/ prefix.
 func TestShipFromWorktree_SecondUnconsumedInboxFileRefuses(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
 	if err := os.WriteFile(filepath.Join(wt, ".evolve/inbox/2026-08-17T00-00-00Z-planted.json"),
@@ -114,6 +117,7 @@ func TestShipFromWorktree_SecondUnconsumedInboxFileRefuses(t *testing.T) {
 // consumption refuses the move (rolled back, pickable), and the ship proceeds
 // without it — nothing unaudited rides the commit.
 func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, itemRel := consumeScenario(t, "PASS")
 	bound := preConsumptionTree(t, wt)
 	if err := os.WriteFile(filepath.Join(wt, filepath.FromSlash(itemRel)),
@@ -151,6 +155,7 @@ func TestShipFromWorktree_TamperedItemIsNotSanctioned(t *testing.T) {
 // No binding set: legacy behavior is byte-identical (the check self-skips) —
 // pinned so this fix cannot accidentally arm the check where it never ran.
 func TestShipFromWorktree_NoBindingStillSkipsCheck(t *testing.T) {
+	t.Parallel()
 	repo, wt, ws, _ := consumeScenario(t, "PASS")
 	opts := &Options{
 		Class:         ClassCycle,

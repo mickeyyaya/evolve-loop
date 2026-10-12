@@ -14,6 +14,7 @@ import (
 )
 
 func TestShipFromWorktree_ARebindIsRefusedBeforeThePush(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")

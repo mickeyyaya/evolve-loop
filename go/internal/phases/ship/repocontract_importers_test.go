@@ -41,6 +41,7 @@ func importerFixture(t *testing.T) (repo, goDir string) {
 // its own tests are green, user's untouched test asserts the old contract.
 // The gate goes RED naming it, and the test-only importer is in the closure.
 func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"new-stop\"\n")
 	var out strings.Builder
@@ -63,6 +64,7 @@ func TestRepoContractGate_ImporterOfAChangedPackageBlocksShip(t *testing.T) {
 
 // A change nothing imports runs only its own package — the closure is bounded.
 func TestRepoContractGate_UnimportedChangeRunsOnlyItself(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "other", "other.go"), "package other\n\nconst Unrelated = 2\n")
 	var out strings.Builder
@@ -80,6 +82,7 @@ func TestRepoContractGate_UnimportedChangeRunsOnlyItself(t *testing.T) {
 
 // No Go change (a docs-only ship): no backstop run, said once.
 func TestRepoContractGate_NoGoChangeSkipsTheImporterBackstop(t *testing.T) {
+	t.Parallel()
 	repo, _ := importerFixture(t)
 	mustWrite(t, filepath.Join(repo, "docs", "only.md"), "docs\n")
 	var out strings.Builder
@@ -95,6 +98,7 @@ func TestRepoContractGate_NoGoChangeSkipsTheImporterBackstop(t *testing.T) {
 // UNTRACKED at gate time (the ship stages it later). An index-based seed saw
 // nothing here and let the reproducer red main.
 func TestRepoContractGate_UntrackedAddedRedTestBlocksShip(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "reproduction", "red_test.go"), "package reproduction\n\nimport \"testing\"\n\nfunc TestUntrackedRed(t *testing.T) { t.Fatal(\"deliberate red\") }\n")
 	err := runRepoContractGate(context.Background(), "enforce", repo, t.TempDir(), io.Discard)
@@ -105,6 +109,7 @@ func TestRepoContractGate_UntrackedAddedRedTestBlocksShip(t *testing.T) {
 
 // A tag-only package seeds the walk but is said, not run.
 func TestRepoContractGate_TagOnlyChangeIsSaidNotRun(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "acs", "cycle9999", "predicates_test.go"), "//go:build acs\n\npackage cycle9999\n\nimport \"testing\"\n\nfunc TestHealthy(t *testing.T) {}\n")
 	var out strings.Builder
@@ -135,6 +140,7 @@ func TestRepoContractGate_DiscoveryFailureIsInfra(t *testing.T) {
 // (main's pre-landing tree) is untouched here — a gate that ran there passes
 // green and lets the red importer land.
 func TestRunNative_GateTestsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
+	t.Parallel()
 	repo, _ := importerFixture(t)
 	base := runGitOut(t, repo, "rev-parse", "HEAD")
 	wt := filepath.Join(t.TempDir(), "cycle-1673")
@@ -163,6 +169,7 @@ func TestRunNative_GateTestsTheLaneWorktreeNotTheProjectRoot(t *testing.T) {
 // atomicShip and the gate, so the gate never tests the project root in the
 // lane's stead and reports a misleading green before Run aborts.
 func TestRepoContractGateRoot_UnresolvableTypedWorktreeFailsClosed(t *testing.T) {
+	t.Parallel()
 	repo, _ := importerFixture(t)
 	ws := t.TempDir()
 	mustWrite(t, filepath.Join(ws, core.RunStateFile), `{"active_worktree":"/elsewhere/cycle-1"}`+"\n")

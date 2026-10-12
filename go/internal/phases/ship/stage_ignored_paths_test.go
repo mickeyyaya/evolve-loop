@@ -9,6 +9,7 @@ import (
 )
 
 func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	// The eval file exists in the tree (isFile passes — that is how it slips
 	// into the pathspec).
@@ -55,6 +56,7 @@ func TestShipDirect_CycleClass_DropsGitignoredDeclaredPaths(t *testing.T) {
 // must not block staging — the full declared set flows through unchanged,
 // and the probe failure is logged.
 func TestShipDirect_CheckIgnoreProbeFailure_FailsOpen(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	ws := writeWorkspaceReports(t, "go/internal/phases/ship/gitops.go")
 	cap := &porcelainCapture{

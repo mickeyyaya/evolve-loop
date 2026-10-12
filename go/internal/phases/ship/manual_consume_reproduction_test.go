@@ -14,6 +14,7 @@ import (
 // a valid manual ship lands the declared fix but leaves its tracked inbox item
 // available for every later cycle to rediscover.
 func TestManualShip_ClosesInboxItemInShipCommit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)

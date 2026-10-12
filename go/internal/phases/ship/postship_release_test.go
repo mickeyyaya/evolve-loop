@@ -11,6 +11,7 @@ import (
 // ship, a claimed-but-not-in-top_n item ("dropped") is released back to the
 // inbox root while the committed item ("kept") is promoted to processed/.
 func TestInboxPromote_UnfinishedClaimReleasedOnShip(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	inbox := filepath.Join(evolve, "inbox")
@@ -59,6 +60,7 @@ func TestInboxPromote_UnfinishedClaimReleasedOnShip(t *testing.T) {
 // The residual drain must run regardless of triage-decision.json's presence
 // (Step 0a reads only inbox/ root).
 func TestInboxPromote_NoTriageDecision_StillDrainsClaims(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	evolve := filepath.Join(root, ".evolve")
 	inbox := filepath.Join(evolve, "inbox")

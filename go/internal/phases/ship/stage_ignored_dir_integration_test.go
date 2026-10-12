@@ -12,6 +12,7 @@ import (
 )
 
 func TestShipFromWorktree_DropsGitignoredDirectoryPathspec(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 	runGit(t, wt, "reset", "HEAD", "wt-change.txt")
 

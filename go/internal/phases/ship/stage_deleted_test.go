@@ -20,6 +20,7 @@ func gitIn(t *testing.T, dir string, args ...string) {
 }
 
 func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
+	t.Parallel()
 	root := gittest.Fixture(t).Dir
 	if err := os.WriteFile(filepath.Join(root, "doomed.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
@@ -51,6 +52,7 @@ func TestStageExplicitPaths_AlreadyStagedDeletion(t *testing.T) {
 // see the source path — yet the source is gone from the worktree AND from the
 // index under its old name, which is exactly the rc=128 condition.
 func TestStageExplicitPaths_AlreadyStagedRename(t *testing.T) {
+	t.Parallel()
 	root := gittest.Fixture(t).Dir
 	// Content long enough that git scores old→new as a rename, not add+delete.
 	body := []byte("{\n  \"id\": \"some-item\",\n  \"weight\": 0.85,\n  \"title\": \"a queued item with enough body to score as a rename\"\n}\n")

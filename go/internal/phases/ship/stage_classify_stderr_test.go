@@ -77,6 +77,7 @@ func stageWithGitFailure(t *testing.T, porcelain, addStderr string, addExit int,
 // so any non-transient verdict here can only come from the stderr classifier and
 // never from the pre-existing two-strikes memo.
 func TestStageFailureClassification(t *testing.T) {
+	t.Parallel()
 	const porcelain = " M docs/architecture/control-flags.md\n"
 
 	cases := []struct {
@@ -164,6 +165,7 @@ func TestStageFailureClassification(t *testing.T) {
 // escalation report read — and it is the classifier's own input, so a
 // refactor that stops capturing it would silently disable classification.
 func TestStageFailureClassification_PreservesCapturedStderr(t *testing.T) {
+	t.Parallel()
 	const marker = "fatal: Invalid path '/go/bin/evolve'"
 	se := stageWithGitFailure(t, " M docs/architecture/control-flags.md\n", marker+"\n", 128, nil)
 	if got := se.Debug["git_stderr"]; !strings.Contains(got, marker) {
@@ -180,6 +182,7 @@ func TestStageFailureClassification_PreservesCapturedStderr(t *testing.T) {
 // same pathspec. The new stderr classifier must sit in FRONT of that rule,
 // not replace it.
 func TestStageFailureClassification_TwoStrikesStillApplies(t *testing.T) {
+	t.Parallel()
 	const porcelain = " M docs/architecture/control-flags.md\n"
 	const unknown = "error: something nobody has catalogued yet\n"
 	ws := writeWorkspaceReports(t, shipmanifest.ChangedPaths(porcelain)...)

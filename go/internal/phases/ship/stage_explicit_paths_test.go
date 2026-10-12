@@ -202,6 +202,7 @@ func stageExplicitOpts(root, workspace string, class Class, runner CmdRunner) *O
 }
 
 func TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	ws := writeWorkspaceReports(t,
 		"go/internal/phases/ship/gitops.go",
@@ -234,6 +235,7 @@ func TestShipDirect_CycleClass_StagesDeclaredPathsNotAddAll(t *testing.T) {
 }
 
 func TestShipDirect_AReportlessWorkspaceAdoptsNoPath(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	emptyWS := t.TempDir()
 	cap := &porcelainCapture{porcelain: " M go/internal/phases/ship/gitops.go\n?? docs/new-note.md\n"}
@@ -251,6 +253,7 @@ func TestShipDirect_AReportlessWorkspaceAdoptsNoPath(t *testing.T) {
 }
 
 func TestShipDirect_NoWorkspacePath_StillStagesExplicitly(t *testing.T) {
+	t.Parallel()
 	root := stageExplicitTree(t)
 	cap := &porcelainCapture{porcelain: " M README.md\n"}
 	opts := stageExplicitOpts(root, "", ClassManual, cap.runner())
@@ -275,6 +278,7 @@ func TestShipDirect_NoWorkspacePath_StillStagesExplicitly(t *testing.T) {
 // `git add -A` must be absent from the recorded git calls — a partial fix
 // that migrates only the cycle path fails here.
 func TestShipDirect_NonReleaseClasses_NeverAddAll(t *testing.T) {
+	t.Parallel()
 	for _, class := range []Class{ClassCycle, ClassManual, ClassTrivial} {
 		t.Run(string(class), func(t *testing.T) {
 			root := stageExplicitTree(t)
@@ -299,6 +303,7 @@ func TestShipDirect_NonReleaseClasses_NeverAddAll(t *testing.T) {
 // cycle commits against unaudited binary churn even with add -A gone from
 // this staging path.
 func TestShipDirect_CycleClass_KeepsChurnDiscard(t *testing.T) {
+	t.Parallel()
 	root := initReleaseStagingTree(t)
 	ws := writeWorkspaceReports(t, "go/evolve", "CHANGELOG.md")
 	cap := &porcelainCapture{porcelain: " M CHANGELOG.md\n"}

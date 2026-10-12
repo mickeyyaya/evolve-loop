@@ -34,6 +34,7 @@ func failingGitF3(match func(args []string) bool) CmdRunner {
 }
 
 func TestVerifyAuditBinding_AReportThatVanishesBeforeItsAgeIsReadIsATransientIOFault(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	report := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
@@ -53,6 +54,7 @@ func TestVerifyAuditBinding_AReportThatVanishesBeforeItsAgeIsReadIsATransientIOF
 }
 
 func TestVerifyAuditBinding_AFailingCarryForwardProbeStopsTheBindingWithThatFault(t *testing.T) {
+	t.Parallel()
 	s := trSetup(t)
 	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
 	opts := auditOpts(t, s.repo)
@@ -75,6 +77,7 @@ func dirtyWorktreeF3(t *testing.T) (repo, wt string) {
 }
 
 func TestDetectColliders_ADirectoryIsExpandedToItsFilesAndUnreadableSubtreesAreSkipped(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("root walks a mode-000 directory")
 	}
@@ -95,6 +98,7 @@ func TestDetectColliders_ADirectoryIsExpandedToItsFilesAndUnreadableSubtreesAreS
 }
 
 func TestDetectColliders_ADanglingSymlinkInsideAnIncomingDirectoryIsNotACollider(t *testing.T) {
+	t.Parallel()
 	repo, wt := dirtyWorktreeF3(t)
 	mustMkdir(t, filepath.Join(wt, "dirsl"))
 	if err := os.Symlink("missing-target", filepath.Join(wt, "dirsl", "link")); err != nil {
@@ -110,6 +114,7 @@ func TestDetectColliders_ADanglingSymlinkInsideAnIncomingDirectoryIsNotACollider
 }
 
 func TestDetectColliders_AnIndexProbeThatFailsSkipsThatPathInsteadOfNamingItACollider(t *testing.T) {
+	t.Parallel()
 	repo, wt := dirtyWorktreeF3(t)
 	mustWrite(t, filepath.Join(wt, "probe.txt"), "wt copy\n")
 	mustWrite(t, filepath.Join(repo, "probe.txt"), "main copy\n")
@@ -153,6 +158,7 @@ func collidersErrF3(t *testing.T, debugPaths string) *core.ShipError {
 }
 
 func TestRepairColliders_EveryUnrepairableStateDeclinesWithoutTouchingAnyFile(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		debug   string
@@ -199,6 +205,7 @@ func TestRepairColliders_EveryUnrepairableStateDeclinesWithoutTouchingAnyFile(t 
 }
 
 func TestRepairColliders_WorktreeWithNoCollidingFileDeclines(t *testing.T) {
+	t.Parallel()
 	r := newRepairRigF3(t, nil)
 	mustWrite(t, filepath.Join(r.wt, "only-in-worktree.txt"), "x\n")
 
@@ -210,6 +217,7 @@ func TestRepairColliders_WorktreeWithNoCollidingFileDeclines(t *testing.T) {
 }
 
 func TestRepairColliders_AnUnprovableColliderDeclinesBeforeAnyMutation(t *testing.T) {
+	t.Parallel()
 	r := newRepairRigF3(t, map[string][2]string{"out/a-first.txt": {"same\n", "same\n"}, "out/z-second.txt": {"wt\n", "main\n"}})
 	r.opts.Runner = hookOnF3("ls-files", func() {
 		second := filepath.Join(r.repo, "out", "z-second.txt")
@@ -230,6 +238,7 @@ func TestRepairColliders_AnUnprovableColliderDeclinesBeforeAnyMutation(t *testin
 }
 
 func TestRepairColliders_AnExecutionFaultAbortsLoudlyAndNeverReRunsTheStage(t *testing.T) {
+	t.Parallel()
 	t.Run("an identical collider that cannot be removed", func(t *testing.T) {
 		if os.Geteuid() == 0 {
 			t.Skip("root removes files from a read-only directory")
@@ -276,6 +285,7 @@ func TestRepairColliders_AnExecutionFaultAbortsLoudlyAndNeverReRunsTheStage(t *t
 }
 
 func TestRepairColliders_AManifestThatCannotBeWrittenIsAWarningAndTheHealStillProceeds(t *testing.T) {
+	t.Parallel()
 	r := newRepairRigF3(t, map[string][2]string{"out/a.txt": {"wt\n", "main\n"}})
 	mustMkdir(t, filepath.Join(r.repo, ".evolve", "quarantine", "cycle-1", "manifest.json"))
 

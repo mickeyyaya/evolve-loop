@@ -12,6 +12,7 @@ import (
 // shipDirect must hold the integrator lock across its add -A -> commit ->
 // push critical section and release it exactly once.
 func TestShipDirect_AcquiresAndReleasesShipLock(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "manual.txt"), "manual change\n")
 	addRemote(t, repo)
@@ -46,6 +47,7 @@ func TestShipDirect_AcquiresAndReleasesShipLock(t *testing.T) {
 // shipFromWorktree convention. Calls shipDirect directly (bypassing Run()'s
 // manual-class TTY gate).
 func TestShipDirect_DryRun_SkipsShipLock(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "manual.txt"), "manual change\n")

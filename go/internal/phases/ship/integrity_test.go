@@ -14,6 +14,7 @@ import (
 )
 
 func TestVerifyNoControlPlaneEdits_RejectsGateEdit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go"),
 		"package flagreaders\n// tampered by a cycle\n")
@@ -30,6 +31,7 @@ func TestVerifyNoControlPlaneEdits_RejectsGateEdit(t *testing.T) {
 }
 
 func TestVerifyNoControlPlaneEdits_RejectsUntrackedGate(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "go/internal/guards/sneaky.go"),
 		"package guards\n")
@@ -41,6 +43,7 @@ func TestVerifyNoControlPlaneEdits_RejectsUntrackedGate(t *testing.T) {
 }
 
 func TestVerifyNoControlPlaneEdits_AllowsNormalSource(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "go/internal/widget/widget.go"),
 		"package widget\n// ordinary change\n")
@@ -55,6 +58,7 @@ func TestVerifyNoControlPlaneEdits_AllowsNormalSource(t *testing.T) {
 }
 
 func TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	gate := filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go")
 	mustWrite(t, gate, "package flagreaders\n"+strings.Repeat("// a pinned assertion\n", 20))
@@ -74,6 +78,7 @@ func TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface(t *testing.T) {
 }
 
 func TestVerifyNoControlPlaneEdits_RejectsTrackedGateModification(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	gate := filepath.Join(repo, "go/acs/regression/flagreaders/readers_test.go")
 	mustWrite(t, gate, "package flagreaders\n// original\n")

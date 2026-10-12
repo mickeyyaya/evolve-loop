@@ -51,6 +51,7 @@ func dropFirstLiveLine(t *testing.T, l carriedLane) {
 }
 
 func TestCarrySatisfied_ReProvesOnASealedLedger(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	t.Run("the carry is the line the seal keeps live", func(t *testing.T) {
 		l := rebasedLane(t)
@@ -79,6 +80,7 @@ func TestCarrySatisfied_ReProvesOnASealedLedger(t *testing.T) {
 }
 
 func TestCarrySatisfied_DeclinesWhenASealedLedgersLiveTailLostALine(t *testing.T) {
+	t.Parallel()
 	l := rebasedLane(t)
 	appendHistory(t, l, 8)
 	sealLaneLedger(t, l, 3)

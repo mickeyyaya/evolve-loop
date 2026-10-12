@@ -14,6 +14,7 @@ import (
 )
 
 func TestNative_A_NoAuditor_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{Class: ClassCycle, CommitMessage: "test commit"})
 	// No-auditor is a re-establishable precondition, not a genuine integrity
@@ -29,6 +30,7 @@ func TestNative_A_NoAuditor_Refuses(t *testing.T) {
 }
 
 func TestNative_B_PASS_AuditMatching_Ships(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified content\n")
 	seedAudit(t, repo, "PASS")
@@ -43,6 +45,7 @@ func TestNative_B_PASS_AuditMatching_Ships(t *testing.T) {
 }
 
 func TestNative_C_WARN_ShipsFluent(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change\n")
 	seedAudit(t, repo, "WARN")
@@ -57,6 +60,7 @@ func TestNative_C_WARN_ShipsFluent(t *testing.T) {
 }
 
 func TestNative_C2_StrictAudit_WARN_Refused(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nwarn change strict\n")
 	seedAudit(t, repo, "WARN")
@@ -86,6 +90,7 @@ func writeStrictAuditPolicy(t *testing.T, root string) {
 }
 
 func TestNative_D_TreeStateMismatch_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nversion 1 of audited content\n")
 	seedAudit(t, repo, "PASS")
@@ -100,6 +105,7 @@ func TestNative_D_TreeStateMismatch_Refuses(t *testing.T) {
 }
 
 func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS", map[string]string{
 		"head": "0000000000000000000000000000000000000000",
@@ -114,6 +120,7 @@ func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
 }
 
 func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
@@ -142,6 +149,7 @@ func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 }
 
 func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "emergency.txt"), "emergency change\n")
 	addRemote(t, repo)
@@ -163,6 +171,7 @@ func TestNative_G_BypassEnv_SilentlyIgnored(t *testing.T) {
 }
 
 func TestNative_H_ClassRelease_ShipsNoAudit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "release.txt"), "release bump\n")
 	addRemote(t, repo)
@@ -176,6 +185,7 @@ func TestNative_H_ClassRelease_ShipsNoAudit(t *testing.T) {
 }
 
 func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "manual.txt"), "manual change\n")
 	addRemote(t, repo)
@@ -193,6 +203,7 @@ func TestNative_I_ManualNoTTY_Refuses(t *testing.T) {
 }
 
 func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "ci.txt"), "ci change\n")
 	addRemote(t, repo)
@@ -213,6 +224,7 @@ func TestNative_J_ManualAutoConfirm_Ships(t *testing.T) {
 }
 
 func TestNative_K_BypassEnv_NoDeprecationLog(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "bridge.txt"), "bridge change\n")
 	seedAudit(t, repo, "PASS")
@@ -234,6 +246,7 @@ func TestNative_K_BypassEnv_NoDeprecationLog(t *testing.T) {
 }
 
 func TestNative_L_InvalidClass_Rejected(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	res, err := runShip(t, repo, Options{Class: Class("garbage"), CommitMessage: "msg"})
 	if err == nil {
@@ -245,6 +258,7 @@ func TestNative_L_InvalidClass_Rejected(t *testing.T) {
 }
 
 func TestNative_M_AuditorExit1_PASS_Ships(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for exit-1 test\n")
 	seedAudit(t, repo, "PASS", map[string]string{"exit_code": "1"})
@@ -256,6 +270,7 @@ func TestNative_M_AuditorExit1_PASS_Ships(t *testing.T) {
 }
 
 func TestNative_N_AuditorExit2_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for exit-2 test\n")
 	seedAudit(t, repo, "PASS", map[string]string{"exit_code": "2"})
@@ -269,6 +284,7 @@ func TestNative_N_AuditorExit2_Refuses(t *testing.T) {
 }
 
 func TestNative_O_VerdictFAIL_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmodified for verdict-fail test\n")
 	seedAudit(t, repo, "FAIL")
@@ -282,6 +298,7 @@ func TestNative_O_VerdictFAIL_Refuses(t *testing.T) {
 }
 
 func TestNative_P_DualVerdict_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndual-verdict change\n")
 	auditPath := filepath.Join(repo, ".evolve", "runs", "cycle-1", "audit-report.md")
@@ -319,6 +336,7 @@ Verdict: PASS
 }
 
 func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
@@ -346,6 +364,7 @@ func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
 }
 
 func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustMkdir(t, filepath.Join(repo, ".claude-plugin"))
 	mustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"2.0.0"}`)
@@ -373,6 +392,7 @@ func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 }
 
 func TestNative_S_CycleAdvancesLastCycleNumber(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nv8.34.0 cycle ship test\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":1,"phase":"ship"}`)
@@ -395,6 +415,7 @@ func TestNative_S_CycleAdvancesLastCycleNumber(t *testing.T) {
 }
 
 func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nmanual change v8.34\n")
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"), `{"cycle_id":99,"phase":"ship"}`)
@@ -420,6 +441,7 @@ func TestNative_T_ManualPreservesLastCycleNumber(t *testing.T) {
 }
 
 func TestNative_U_ActualDiffFooter_CycleCommit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\ndiff transparency test\n")
 	mustWrite(t, filepath.Join(repo, "newfile.txt"), "new file content\n")
@@ -441,6 +463,7 @@ func TestNative_U_ActualDiffFooter_CycleCommit(t *testing.T) {
 }
 
 func TestNative_V_ReleaseSkipsFooter(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nrelease content\n")
 	addRemote(t, repo)

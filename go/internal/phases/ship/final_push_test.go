@@ -16,6 +16,7 @@ import (
 )
 
 func TestRun_NilPluginRoot_DefaultsToProjectRoot(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "p.txt"), "change\n")
@@ -44,6 +45,7 @@ func TestRun_NilPluginRoot_DefaultsToProjectRoot(t *testing.T) {
 }
 
 func TestRun_NilRunner_DefaultsToExecRunner(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "q.txt"), "change\n")
@@ -103,6 +105,7 @@ func TestRun_BypassShipVerify_NilEnvMap_FlagIgnored(t *testing.T) {
 }
 
 func TestShipFromWorktree_EmptyCycleBranch_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "real-cycle-branch")
@@ -136,6 +139,7 @@ func TestShipFromWorktree_EmptyCycleBranch_Errors(t *testing.T) {
 }
 
 func TestShipFromWorktree_PostPushTreeSHAMismatch_BreachLog(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "postpush-test")
@@ -151,6 +155,7 @@ func TestShipFromWorktree_PostPushTreeSHAMismatch_BreachLog(t *testing.T) {
 }
 
 func TestShipFromWorktree_WriteShipBindingUsesFrozenCycleIdentity(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	wt := makeWorktree(t, repo, "binding-warn-branch")
@@ -189,6 +194,7 @@ func TestShipFromWorktree_WriteShipBindingUsesFrozenCycleIdentity(t *testing.T) 
 }
 
 func TestPostShip_CycleClass_RepinError_PropagatesFromPostShip(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
 	mustWrite(t, bin, "bin-content\n")
@@ -250,6 +256,7 @@ func manualConfirmRunner(
 }
 
 func TestVerifyManualConfirm_DiffStatRunnerError_Propagates(t *testing.T) {
+	t.Parallel()
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
 		Runner: manualConfirmRunner(
@@ -269,6 +276,7 @@ func TestVerifyManualConfirm_DiffStatRunnerError_Propagates(t *testing.T) {
 }
 
 func TestVerifyManualConfirm_DiffRunnerError_Propagates(t *testing.T) {
+	t.Parallel()
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
 		Runner: manualConfirmRunner(
@@ -288,6 +296,7 @@ func TestVerifyManualConfirm_DiffRunnerError_Propagates(t *testing.T) {
 }
 
 func TestVerifyManualConfirm_LongDiff_Truncated(t *testing.T) {
+	t.Parallel()
 	var diffLines []string
 	for i := 0; i < 90; i++ {
 		diffLines = append(diffLines, "+line "+string(rune('a'+i%26)))
@@ -317,6 +326,7 @@ func TestVerifyManualConfirm_LongDiff_Truncated(t *testing.T) {
 // A directory at acs-verdict.json triggers a plain read error (not
 // ErrNotExist), which checkEGPSGate must propagate as-is.
 func TestVerifyAuditBinding_EGPSGateReadError_PropagatesFromBinding(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 

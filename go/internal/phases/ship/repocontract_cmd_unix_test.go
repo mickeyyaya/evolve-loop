@@ -14,6 +14,7 @@ import (
 )
 
 func TestCancelKillsTheProcessGroup_CancelReapsTheGrandchildToo(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sh", "-c", "sleep 30 & echo $!; wait")
@@ -59,6 +60,7 @@ func TestCancelKillsTheProcessGroup_CancelReapsTheGrandchildToo(t *testing.T) {
 }
 
 func TestCancelKillsTheProcessGroup_PutsTheChildInItsOwnGroup(t *testing.T) {
+	t.Parallel()
 	cmd := exec.Command("true")
 
 	cancelKillsTheProcessGroup(cmd)

@@ -28,6 +28,7 @@ func excludeCommitGate(t *testing.T, repo string) {
 }
 
 func TestCommitGate_ManualMissingAttestation_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -47,6 +48,7 @@ func TestCommitGate_ManualMissingAttestation_Refuses(t *testing.T) {
 }
 
 func TestCommitGate_ManualValidAttestation_Ships(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -71,6 +73,7 @@ func TestCommitGate_ManualValidAttestation_Ships(t *testing.T) {
 }
 
 func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -92,6 +95,7 @@ func TestCommitGate_ManualStaleAttestation_Refuses(t *testing.T) {
 }
 
 func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -108,6 +112,7 @@ func TestCommitGate_ManualDryRun_SkipsAttestation(t *testing.T) {
 }
 
 func TestCommitGate_ManualBypass_Ships(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -128,6 +133,7 @@ func TestCommitGate_ManualBypass_Ships(t *testing.T) {
 }
 
 func TestCommitGate_GitLogTellsAWaivedCommitFromABypassedOne(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	excludeCommitGate(t, repo)
 	addRemote(t, repo)
@@ -184,6 +190,7 @@ func lintOpts(root string) *Options {
 }
 
 func TestPersonaLint_CleanTreePasses(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read", "Bash"})
 
@@ -194,6 +201,7 @@ func TestPersonaLint_CleanTreePasses(t *testing.T) {
 }
 
 func TestPersonaLint_ViolationBlocks(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	// Persona claims Bash; profile only allows Read → Kind "disallowed".
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"})
@@ -210,6 +218,7 @@ func TestPersonaLint_ViolationBlocks(t *testing.T) {
 }
 
 func TestPersonaLint_UndeclaredDriftLogsButPasses(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read"}, []string{"Read", "WebSearch"})
 
@@ -223,6 +232,7 @@ func TestPersonaLint_UndeclaredDriftLogsButPasses(t *testing.T) {
 }
 
 func TestPersonaLint_MissingDirsSkips(t *testing.T) {
+	t.Parallel()
 	res := &RunResult{}
 	if err := runPersonaLint(context.Background(), lintOpts(t.TempDir()), res); err != nil {
 		t.Fatalf("missing agents/profiles dirs must skip the lint, got %v", err)
@@ -230,6 +240,7 @@ func TestPersonaLint_MissingDirsSkips(t *testing.T) {
 }
 
 func TestPersonaLint_BypassSkipsLint(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writePersonaFixture(t, root, "builder", []string{"Read", "Bash"}, []string{"Read"}) // would block
 
@@ -245,6 +256,7 @@ func TestPersonaLint_BypassSkipsLint(t *testing.T) {
 }
 
 func TestCommitGate_CyclePersonaLint(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	writePersonaFixture(t, repo, "builder", []string{"Read"}, []string{"Read"})

@@ -32,6 +32,7 @@ func manifestLeakOpts(t *testing.T) *Options {
 // Ledger/debugger triage keys off Code, so reuse would make an integrity
 // block indistinguishable from a transient git failure.
 func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
+	t.Parallel()
 	opts := manifestLeakOpts(t)
 	opts.ManifestGate = ManifestGateEnforce
 
@@ -65,6 +66,7 @@ func TestReconcileManifest_EnforceCarriesManifestGateCode(t *testing.T) {
 // would block every cycle today, since the gate is permanently shadow in
 // production.
 func TestReconcileManifest_ShadowUnaffectedByCodeChange(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []string{"", "shadow"} {
 		opts := manifestLeakOpts(t)
 		opts.ManifestGate = mode

@@ -47,6 +47,7 @@ func consumeFixture(t *testing.T, id string) (root, workspace, itemBase string) 
 }
 
 func TestConsumeCommittedItems_ReleasesRegistryBinding(t *testing.T) {
+	t.Parallel()
 	const id = "context-fill-telemetry-and-cap"
 	const liveSibling = "some-other-live-todo"
 	root, workspace, itemBase := consumeFixture(t, id)
@@ -105,6 +106,7 @@ func TestConsumeCommittedItems_ReleasesRegistryBinding(t *testing.T) {
 }
 
 func TestConsumeCommittedItems_NoBindingIsCleanNoOp(t *testing.T) {
+	t.Parallel()
 	const id = "plain-todo-with-no-binding"
 	root, workspace, itemBase := consumeFixture(t, id)
 

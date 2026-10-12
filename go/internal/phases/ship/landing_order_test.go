@@ -37,6 +37,7 @@ func landingIntentOf(t *testing.T, opts *Options) landing.Intent {
 }
 
 func TestWorktreeShipLand_PushesTheLaneCommitBeforeMainMoves(t *testing.T) {
+	t.Parallel()
 	opts, r, s, res := scriptedLanding(t, false)
 
 	if err := s.land(""); err != nil {
@@ -74,6 +75,7 @@ func TestWorktreeShipLand_PushesTheLaneCommitBeforeMainMoves(t *testing.T) {
 }
 
 func TestWorktreeShipLand_ARejectedPushNeverMovesMainAndKeepsTheIntentPrepared(t *testing.T) {
+	t.Parallel()
 	opts, r, s, res := scriptedLanding(t, false)
 	r.on("push origin "+pinHead+":refs/heads/main", scriptedCall{exit: 1})
 	r.on("fetch origin "+pinBranch, scriptedCall{exit: 1})
@@ -95,6 +97,7 @@ func TestWorktreeShipLand_ARejectedPushNeverMovesMainAndKeepsTheIntentPrepared(t
 }
 
 func TestWorktreeShipLand_AMainThatMovedPastTheLaneNeverPushesNorPrepares(t *testing.T) {
+	t.Parallel()
 	for fleet, code := range map[bool]core.ShipErrorCode{true: core.CodeGitFleetRebaseNeeded, false: core.CodeGitFFMergeDiverged} {
 		opts, r, s, _ := scriptedLanding(t, fleet)
 		r.on("merge-base --is-ancestor main "+pinHead, scriptedCall{exit: 1})

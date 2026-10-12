@@ -70,6 +70,7 @@ func itoa(n int) string {
 // promoteInbox must NOT call Promote(..., "processed", ...) — the item
 // stays out of processed/cycle-<cid>/ — and must log the unlanded WARN.
 func TestPromoteInbox_UnlandedCommitSkipsPromotion(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 609
 	const id = "fix-inbox-promotion-landing-gate"
@@ -97,6 +98,7 @@ func TestPromoteInbox_UnlandedCommitSkipsPromotion(t *testing.T) {
 // (merge-base --is-ancestor exits 0); promoteInbox must promote normally
 // and log "promoted: landed".
 func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 609
 	const id = "fix-inbox-promotion-landing-gate"
@@ -123,6 +125,7 @@ func TestPromoteInbox_LandedCommitPromotes(t *testing.T) {
 // The superseded-reconcile path (ReconcileSuperseded) gets the identical
 // landing check — an unlanded commit must not retire a superseded id either.
 func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 609
 	const supersededID = "loop-self-prioritize-unmet-fleet-concurrency"
@@ -177,6 +180,7 @@ func TestPromoteInbox_ReconcileSuperseded_UnlandedSkipsRetirement(t *testing.T) 
 // of HEAD-on-origin) must never promote, regardless of whether a caller
 // upstream still considers the cycle a "PASS".
 func TestPromoteInbox_NeedsReauditOutcomeNeverPromotes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 598
 	const id = "skill-overlays-bridge-layer"

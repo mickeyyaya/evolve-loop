@@ -10,6 +10,7 @@ import (
 )
 
 func TestPromoteInbox_WithTriageDecision_Promotes(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":5}`)
 	mustWrite(t, filepath.Join(root, ".evolve", "runs", "cycle-5", "triage-decision.json"),
@@ -29,6 +30,7 @@ func TestPromoteInbox_WithTriageDecision_Promotes(t *testing.T) {
 // PROJECTS the companion from it — guaranteed present, so promotion runs and the
 // projected companion lands on disk for downstream readers.
 func TestPromoteInbox_ProjectsDecisionFromReport(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":7}`)
 	// No triage-decision.json — only the report the agent actually wrote.
@@ -51,6 +53,7 @@ func TestPromoteInbox_ProjectsDecisionFromReport(t *testing.T) {
 }
 
 func TestPromoteInbox_TriageDecisionWithNoIDs_NoPromoteLog(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":6}`)
 	mustWrite(t, filepath.Join(root, ".evolve", "runs", "cycle-6", "triage-decision.json"),
@@ -66,6 +69,7 @@ func TestPromoteInbox_TriageDecisionWithNoIDs_NoPromoteLog(t *testing.T) {
 }
 
 func TestFindLatestAudit_MissingLedger_NoLedgerShipError(t *testing.T) {
+	t.Parallel()
 	_, err := findLatestAudit(filepath.Join(t.TempDir(), "does-not-exist.jsonl"), "")
 	if err == nil {
 		t.Fatal("missing ledger must error")
@@ -74,6 +78,7 @@ func TestFindLatestAudit_MissingLedger_NoLedgerShipError(t *testing.T) {
 }
 
 func TestFindLatestAudit_AlienAndNonAuditorLinesSkipped(t *testing.T) {
+	t.Parallel()
 	ledger := filepath.Join(t.TempDir(), "ledger.jsonl")
 	mustWrite(t, ledger,
 		"not valid json at all\n"+

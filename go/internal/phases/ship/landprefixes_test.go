@@ -8,6 +8,7 @@ import (
 )
 
 func TestLandPrefixes(t *testing.T) {
+	t.Parallel()
 	lanes := []fleet.LaneCandidate{
 		{ID: "lane-good-a", Files: []string{"a.go"}},
 		{ID: "lane-toxic", Files: []string{"b.go"}},

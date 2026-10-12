@@ -9,6 +9,7 @@ import (
 )
 
 func TestShipGate_StaleAttestationBlocked(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nactual change\n")
 	// Attestation bound to some OTHER tree state.
@@ -21,6 +22,7 @@ func TestShipGate_StaleAttestationBlocked(t *testing.T) {
 }
 
 func TestShipGate_FreshAttestationPasses(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nreviewed change\n")
 	// .commit-gate/ is untracked, so git diff HEAD is unaffected by writing it.
@@ -37,6 +39,7 @@ func TestShipGate_FreshAttestationPasses(t *testing.T) {
 }
 
 func TestShipGate_MissingAttestationBlocked(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture line 1\nunreviewed change\n")
 	// No writeAttestation call: the attestation file is absent.

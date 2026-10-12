@@ -75,6 +75,7 @@ func blockDrainPath(t *testing.T, path string) {
 // lives in the success branch; the failure branch says INCOMPLETE, so the two
 // claims cannot both appear for one cycle.
 func TestPromoteInbox_DrainFailure_NoFalseSuccessLog(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 42)
 	writeDrainTriageDecision(t, root, 42, "committed-task")
@@ -103,6 +104,7 @@ func TestPromoteInbox_DrainFailure_NoFalseSuccessLog(t *testing.T) {
 // return would strand every item parked in processing/cycle-N/. The residual
 // item must be back at the inbox root even though the promote failed.
 func TestPromoteInbox_PromoteError_StillDrainsResidualClaims(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeDrainCycleState(t, root, 43)
 	writeDrainTriageDecision(t, root, 43, "committed-task")

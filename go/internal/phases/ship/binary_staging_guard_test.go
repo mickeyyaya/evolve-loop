@@ -38,6 +38,7 @@ func writeStagedFile(t *testing.T, root, rel string, size int, mode os.FileMode)
 }
 
 func TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const rel = "go/acs/cycle536/evolve"
 	writeStagedFile(t, root, rel, 2*1024*1024, 0o755) // 2MB, executable bit set
@@ -54,6 +55,7 @@ func TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist(t *testing.T)
 }
 
 func TestBinaryStagingGuard_AllowsAllowlistedAndSmallFiles(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeStagedFile(t, root, "go/bin/evolve", 2*1024*1024, 0o755)
 	writeStagedFile(t, root, "go/evolve", 2*1024*1024, 0o755)
@@ -69,6 +71,7 @@ func TestBinaryStagingGuard_AllowsAllowlistedAndSmallFiles(t *testing.T) {
 }
 
 func TestBinaryStagingGuard_AllowsSmallExecutableOutsideAllowlist(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const rel = "scripts/tiny-helper"
 	writeStagedFile(t, root, rel, 512, 0o755)

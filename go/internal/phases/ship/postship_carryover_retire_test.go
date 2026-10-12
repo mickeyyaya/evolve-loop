@@ -55,6 +55,7 @@ func hasID(ids []string, want string) bool {
 // A LANDED PASS closeout whose triage decision committed <id> must leave
 // state.json without that carryover entry — and with every other entry intact.
 func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1440
 	const id = "carryover-pass-retirement"
@@ -82,6 +83,7 @@ func TestPromoteInbox_LandedPassRetiresCommittedCarryover(t *testing.T) {
 // and retirement must obey the same gate: an unlanded commit that retired
 // the todo would erase the only record of work that never shipped.
 func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1440
 	const id = "carryover-pass-retirement"
@@ -105,6 +107,7 @@ func TestPromoteInbox_UnlandedPassKeepsCarryover(t *testing.T) {
 // state lives elsewhere) must not error the whole PASS closeout over
 // bookkeeping.
 func TestPromoteInbox_NoStateFileIsNoOp(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	const cid = 1440
 	writeInboxFixture(t, root, cid, "some-item")

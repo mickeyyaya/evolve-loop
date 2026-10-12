@@ -41,10 +41,10 @@ func TestRunImporterBackstop_DiscoveryThatFailsTwiceIsAnInfraError(t *testing.T)
 }
 
 func TestRunAddedTestBackstop_AnUnreadableAddedTestIsAnInfraError(t *testing.T) {
+	t.Parallel()
 	if os.Geteuid() == 0 {
 		t.Skip("root reads a mode-000 file")
 	}
-	t.Parallel()
 	repo := makeRepo(t)
 	added := filepath.Join(repo, "go", "internal", "x", "x_test.go")
 	mustMkdir(t, filepath.Dir(added))

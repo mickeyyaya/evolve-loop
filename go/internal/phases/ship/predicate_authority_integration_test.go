@@ -16,6 +16,7 @@ import (
 )
 
 func TestVerifyAuditBinding_PredicateEvidenceCannotChangeAfterAudit(t *testing.T) {
+	t.Parallel()
 	for _, mutation := range []string{"delete", "corrupt", "empty", "other-cycle", "other-execution", "other-round", "other-run", "report", "source", "untracked-source", "host-fail", "landed-tree"} {
 		t.Run(mutation, func(t *testing.T) {
 			repo := makeRepo(t)
@@ -112,6 +113,7 @@ func TestVerifyAuditBinding_PredicateEvidenceCannotChangeAfterAudit(t *testing.T
 }
 
 func TestShip_PostAuditBinaryChurnRequiresReaudit(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	trackEvolveBinary(t, repo)
 	addRemote(t, repo)

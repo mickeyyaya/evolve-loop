@@ -16,6 +16,7 @@ import (
 // --- atomicShip: currentBranch runner error (gitops.go:33) -----------------
 
 func TestAtomicShip_CurrentBranchRunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 
 	opts := &Options{
@@ -35,6 +36,7 @@ func TestAtomicShip_CurrentBranchRunnerError_Errors(t *testing.T) {
 // --- shipDirect: buildDiffFooter --name-status error (gitops.go:94) --------
 
 func TestShipDirect_BuildDiffFooterNameStatusError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	mustWrite(t, filepath.Join(repo, "change.txt"), "staged change\n")
 
@@ -61,6 +63,7 @@ func TestShipDirect_BuildDiffFooterNameStatusError_Errors(t *testing.T) {
 // --- promoteInbox: readStateMap error (postship.go:83) ----------------------
 
 func TestPromoteInbox_CycleStateReadError_ReturnsError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 
 	// Replace cycle-state.json with a directory so readStateMap errors.
@@ -80,6 +83,7 @@ func TestPromoteInbox_CycleStateReadError_ReturnsError(t *testing.T) {
 // --- verifyManualConfirm: git add -A runner error (verify.go:157) -----------
 
 func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
+	t.Parallel()
 	opts := &Options{
 		ProjectRoot: t.TempDir(),
 		Runner: func(ctx context.Context, name, cwd string, args, env []string,
@@ -101,6 +105,7 @@ func TestVerifyManualConfirm_GitAddAFails_Errors(t *testing.T) {
 // --- verifyTrivial: diff --name-only runner error (verify.go:267) -----------
 
 func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
@@ -128,6 +133,7 @@ func TestVerifyTrivial_DiffNameOnlyRunnerError_Errors(t *testing.T) {
 // --- verifyTrivial: ls-files runner error (verify.go:271) ------------------
 
 func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 
 	mustWrite(t, filepath.Join(repo, ".evolve", "cycle-state.json"),
@@ -154,6 +160,7 @@ func TestVerifyTrivial_LSFilesRunnerError_Errors(t *testing.T) {
 // --- native.go:213: postShip WARN log (postShip returns error) --------------
 
 func TestRun_PostShipError_LogsWarnAndContinues(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	mustWrite(t, filepath.Join(repo, "warn.txt"), "change\n")

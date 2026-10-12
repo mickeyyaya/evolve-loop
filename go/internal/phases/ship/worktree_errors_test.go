@@ -15,6 +15,7 @@ import (
 // --- gitops.go:153-154: worktree git add -A runner error -------------------
 
 func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	// Un-stage the file so "git add -A" is needed, then fail it.
@@ -37,6 +38,7 @@ func TestShipFromWorktree_GitAddFails_Errors(t *testing.T) {
 // --- gitops.go:160-162: worktree diff --cached --quiet runner error ---------
 
 func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{
@@ -63,6 +65,7 @@ func TestShipFromWorktree_DiffCachedQuietFails_Errors(t *testing.T) {
 // --- gitops.go:167-169: rev-list runner error (ahead check) ----------------
 
 func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
+	t.Parallel()
 	// Create a worktree with nothing to commit but ahead of main by one commit,
 	// so prepareChanges resolves to worktreeBranchAhead.
 	repo := makeRepo(t)
@@ -92,6 +95,7 @@ func TestShipFromWorktree_RevListFails_WhenBranchAheadCheck(t *testing.T) {
 // --- gitops.go:181-183: buildDiffFooterAtDir error in worktree commit path -
 
 func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{
@@ -121,6 +125,7 @@ func TestShipFromWorktree_BuildDiffFooterFails_Errors(t *testing.T) {
 }
 
 func TestShipFromWorktree_ADivergedMainFailsBeforeThePush(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 	published := remoteHeadSHA(t, repo)
 
@@ -142,6 +147,7 @@ func TestShipFromWorktree_ADivergedMainFailsBeforeThePush(t *testing.T) {
 }
 
 func TestShipFromWorktree_AFastForwardThatFailsAfterThePushStillLands(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 	res := &RunResult{}
 
@@ -167,6 +173,7 @@ func TestShipFromWorktree_AFastForwardThatFailsAfterThePushStillLands(t *testing
 // --- gitops.go:234-237: push failure ---------------------------------------
 
 func TestShipFromWorktree_PushFails_Errors(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	opts := &Options{
@@ -186,6 +193,7 @@ func TestShipFromWorktree_PushFails_Errors(t *testing.T) {
 // --- gitops.go:268-270: writeShipBinding readStateMap error ----------------
 
 func TestWriteShipBinding_ReadStateMapError_ReturnsError(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 
 	// Make cycle-state.json a directory so readStateMap errors.

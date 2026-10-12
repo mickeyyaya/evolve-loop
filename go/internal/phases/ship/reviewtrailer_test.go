@@ -8,6 +8,7 @@ import (
 )
 
 func TestReviewTrailer(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	writeAttestation(t, repo, "deadbeef") // reviewers_run: simplifier, reviewer, go-reviewer
 

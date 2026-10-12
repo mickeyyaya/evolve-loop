@@ -51,6 +51,7 @@ func containsAny(haystack string, needles ...string) bool {
 // and must ship — a gate that graded skip as failure would push lanes back
 // to landing bare reds.
 func TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip(t *testing.T) {
+	t.Parallel()
 	repo := newLaneRepo(t)
 	const path = "go/internal/reproduction/skip_test.go"
 	mustWrite(t, filepath.Join(repo, path),
@@ -72,6 +73,7 @@ func TestRepoContractGate_NewlyAddedSkippedTestDoesNotBlockShip(t *testing.T) {
 // backstop must run each added candidate under the build tags that file
 // actually declares, and fail closed naming the failing test.
 func TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen(t *testing.T) {
+	t.Parallel()
 	repo := newLaneRepo(t)
 	pkgDir := filepath.Join(repo, "go", "internal", "reproduction")
 	mustWrite(t, filepath.Join(pkgDir, "green_test.go"),
@@ -102,6 +104,7 @@ func TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen(t *testi
 // the scan log must say what was done with it rather than dropping it
 // silently.
 func TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed(t *testing.T) {
+	t.Parallel()
 	repo := newLaneRepo(t)
 	const path = "go/acs/cycle9999/predicates_test.go"
 	mustWrite(t, filepath.Join(repo, path),
@@ -122,6 +125,7 @@ func TestRepoContractGate_NewlyAddedTagGuardedGreenPackageIsNotFalseRed(t *testi
 // can disable itself invisibly is worse than no backstop — the ship report
 // would claim coverage it never had.
 func TestRepoContractGate_AddedTestDiscoveryFailureIsRecorded(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir() // a real Go module but not a git repo — how the underlying git query fails
 	goDir := filepath.Join(root, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")
@@ -188,6 +192,7 @@ func TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests(t *testi
 // than an observed timeout, since the defect this guards is the missing flag
 // itself — a test that actually waited out a deadline would have to burn one.
 func TestRepoContractTestArgs_CarriesAnExplicitTimeout(t *testing.T) {
+	t.Parallel()
 	args := repoContractTestArgs([]string{"./internal/core"}, nil)
 
 	i := indexOfArg(args, "-timeout")
@@ -214,6 +219,7 @@ func TestRepoContractTestArgs_CarriesAnExplicitTimeout(t *testing.T) {
 // extracting the argv builder did not disturb the flags the backstop's
 // tag-grouped run depends on (the `//go:build acs` predicate packages).
 func TestRepoContractTestArgs_KeepsTagsAndPackagesAfterTheTimeout(t *testing.T) {
+	t.Parallel()
 	args := repoContractTestArgs([]string{"./acs/cycle1679"}, []string{"acs"})
 
 	want := []string{"test", "-json", "-count=1", "-timeout", repoContractTestTimeout, "-tags", "acs", "./acs/cycle1679"}

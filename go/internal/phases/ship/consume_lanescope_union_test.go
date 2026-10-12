@@ -15,6 +15,7 @@ func writeLaneScope(t *testing.T, dir string, ids string) {
 }
 
 func TestCommittedInboxIDs_UnionsLaneScopeWhenTriageDroppedTheScope(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"premise-challenge-fail-never-reaches-failure-learning"`)
 	body := []byte(`{"schema_version":1,"top_n":[],"deferred":[],
@@ -28,6 +29,7 @@ func TestCommittedInboxIDs_UnionsLaneScopeWhenTriageDroppedTheScope(t *testing.T
 // Triage decomposed the scope id into sub-ids that are not inbox files; the
 // sub-ids stay in the set too — FindFileByTaskID misses them harmlessly.
 func TestCommittedInboxIDs_UnionsLaneScopeWithDecomposedTopN(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"park-consume-releases-continuation-binding"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"registry-release-on-park-consume"},{"id":"planner-adoption-live-item-guard"}]}`)
@@ -49,6 +51,7 @@ func TestCommittedInboxIDs_UnionsLaneScopeWithDecomposedTopN(t *testing.T) {
 // deferral must beat the rename-shape union — this is exactly the overlap
 // the guard exists to resolve.
 func TestCommittedInboxIDs_TriageDeferredScopeIDStaysPickable(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"renamed-work","postponed-item"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"sub-task-a"}],"deferred":[{"id":"postponed-item","reason":"needs the other fix first"}]}`)
@@ -67,6 +70,7 @@ func TestCommittedInboxIDs_TriageDeferredScopeIDStaysPickable(t *testing.T) {
 
 // Nil body (no triage decision at all) keeps the existing lane-scope fallback.
 func TestCommittedInboxIDs_NilBodyStillResolvesLaneScope(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"solo-item"`)
 	ids := committedInboxIDs(ws, nil, true)
@@ -80,6 +84,7 @@ func TestCommittedInboxIDs_NilBodyStillResolvesLaneScope(t *testing.T) {
 // lane-scope must not override an explicit empty commitment (also pinned by
 // TestPromoteInbox_EmptyCommittedDeclinedMenuStaysOpen in postship).
 func TestCommittedInboxIDs_DeclinedMenuUnmentionedScopeStaysPickable(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"declined-item"`)
 	body := []byte(`{"schema_version":1,"top_n":[],"deferred":[],"dropped":[]}`)
@@ -92,6 +97,7 @@ func TestCommittedInboxIDs_DeclinedMenuUnmentionedScopeStaysPickable(t *testing.
 // menu mate pending as dispatchable backlog. When triage engages the scope by
 // name, the unmentioned mate must not be consumed.
 func TestCommittedInboxIDs_PendingMenuMateStaysPickable(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"worked-item","pending-mate"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"worked-item"}]}`)
@@ -110,6 +116,7 @@ func TestCommittedInboxIDs_PendingMenuMateStaysPickable(t *testing.T) {
 // Only close-class drop reasons consume; an unknown reason keeps the item —
 // forgetting a live todo is worse than carrying a stale one.
 func TestCommittedInboxIDs_DropReasonGate(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		reason  string
 		consume bool
@@ -143,6 +150,7 @@ func TestCommittedInboxIDs_DropReasonGate(t *testing.T) {
 // The widened union is PASS-only: a WARN landing promotes exactly the
 // pre-union set, so partial work stays pickable.
 func TestCommittedInboxIDs_WarnLandingGetsNoScopeUnion(t *testing.T) {
+	t.Parallel()
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"scoped-item"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"named-item"}],"dropped":[{"id":"scoped-item","reason":"already-shipped"}]}`)

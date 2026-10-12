@@ -30,6 +30,7 @@ func laneAuditedInWorktree(t *testing.T) (string, string) {
 }
 
 func TestVerifyAuditBinding_PlaneBookkeepingAfterAuditDoesNotUnbindAWorktreeShip(t *testing.T) {
+	t.Parallel()
 	repo, wt := laneAuditedInWorktree(t)
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "a tracked queue file moved after audit\n")
 
@@ -41,6 +42,7 @@ func TestVerifyAuditBinding_PlaneBookkeepingAfterAuditDoesNotUnbindAWorktreeShip
 }
 
 func TestVerifyAuditBinding_APlaneSpelledWithATrailingSlashIsStillThePlane(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	seedAudit(t, repo, "PASS")
 	mustWrite(t, filepath.Join(repo, "fixture.txt"), "fixture modified post-audit\n")
@@ -52,6 +54,7 @@ func TestVerifyAuditBinding_APlaneSpelledWithATrailingSlashIsStillThePlane(t *te
 }
 
 func TestVerifyAuditBinding_AChangeToTheShippedWorktreeAfterAuditStillUnbinds(t *testing.T) {
+	t.Parallel()
 	repo, wt := laneAuditedInWorktree(t)
 	mustWrite(t, filepath.Join(wt, "wt-change.txt"), "edited after audit\n")
 

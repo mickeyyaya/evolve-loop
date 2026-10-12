@@ -10,6 +10,7 @@ import (
 // member an earlier landing already consumed counts as closed, and a member
 // this ship does not commit keeps the whole unit open.
 func TestConsumeCommittedItems_UnifiedMemberEdges(t *testing.T) {
+	t.Parallel()
 	pair := []string{unifiedMemberA, unifiedMemberB}
 
 	t.Run("a member already in consumed/ counts as closed", func(t *testing.T) {

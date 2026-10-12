@@ -149,6 +149,7 @@ func pushOnTopOf(t *testing.T, bare, commit string) string {
 }
 
 func TestRun_ASupersedingAuditOfAnotherTreeMarksTheIntentStaleAndTheGatesBindIt(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	stale := l.tip(t)
@@ -169,6 +170,7 @@ func TestRun_ASupersedingAuditOfAnotherTreeMarksTheIntentStaleAndTheGatesBindIt(
 }
 
 func TestRun_ASupersededIntentOnItsOwnCommitUnwindsBeforeTheGates(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	reauditTheLane(t, l)
@@ -185,6 +187,7 @@ func TestRun_ASupersededIntentOnItsOwnCommitUnwindsBeforeTheGates(t *testing.T) 
 }
 
 func TestRun_AResumeSettlesACommitOriginHoldsUnderAPeerLanding(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	if res, err := runShip(t, l.repo, l.options(execRunner, &sleepLog{})); err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("precondition: the first landing completes: %v %v", err, res.Logs)
@@ -207,6 +210,7 @@ func TestRun_AResumeSettlesACommitOriginHoldsUnderAPeerLanding(t *testing.T) {
 }
 
 func TestRun_AResumeFastForwardsMainToACommitAPeerPushedOnTopOf(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	if res, err := runShip(t, l.repo, l.options(execRunner, &sleepLog{})); err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("precondition: the first landing completes: %v %v", err, res.Logs)
@@ -227,6 +231,7 @@ func TestRun_AResumeFastForwardsMainToACommitAPeerPushedOnTopOf(t *testing.T) {
 }
 
 func TestRun_ALaggingMainCatchesUpBeforeTheNextLandingChecksItsFastForward(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	if res, err := runShip(t, l.repo, l.options(failFastForwards, &sleepLog{})); err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("precondition: the first landing pushes and only its fast-forward fails: %v %v", err, res.Logs)
@@ -247,6 +252,7 @@ func TestRun_ALaggingMainCatchesUpBeforeTheNextLandingChecksItsFastForward(t *te
 }
 
 func TestRun_AForgedIntentNeverShipsAnAuditFAIL(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	seedAudit(t, l.repo, "FAIL")
 	runGit(t, l.wt, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "not a ship commit")
@@ -275,6 +281,7 @@ func (l landingLane) setIntentField(t *testing.T, key string, value any) {
 }
 
 func TestRun_AResumeTakesTheBranchFromTheHostNeverFromTheIntent(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	l.setIntentField(t, "branch", "forged")
@@ -287,6 +294,7 @@ func TestRun_AResumeTakesTheBranchFromTheHostNeverFromTheIntent(t *testing.T) {
 }
 
 func TestRun_APreparedIntentOfAnotherRunNeverStopsAPendingLane(t *testing.T) {
+	t.Parallel()
 	for name, options := range map[string]func(landingLane) Options{
 		"the phase path names the run": func(l landingLane) Options { return l.options(execRunner, &sleepLog{}) },
 		"the CLI path names no run": func(landingLane) Options {
@@ -309,6 +317,7 @@ func TestRun_APreparedIntentOfAnotherRunNeverStopsAPendingLane(t *testing.T) {
 }
 
 func TestRun_AResumeNeverUnwindsALaneTipShipDidNotPrepare(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	runGit(t, l.wt, "-c", "commit.gpgsign=false", "commit", "-q", "--amend", "-m", "a lane tip ship did not prepare")
@@ -325,6 +334,7 @@ func TestRun_AResumeNeverUnwindsALaneTipShipDidNotPrepare(t *testing.T) {
 }
 
 func TestRun_AResumeAfterTheOrchestratorPendedTheLaneMarksTheIntentStale(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	l.pendTheAuditedChangeAgain(t)
@@ -340,6 +350,7 @@ func TestRun_AResumeAfterTheOrchestratorPendedTheLaneMarksTheIntentStale(t *test
 }
 
 func TestRun_AFailedWriteOfTheUnwoundIntentIsAnError(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	pushDivergentCommit(t, l.bare)
@@ -352,6 +363,7 @@ func TestRun_AFailedWriteOfTheUnwoundIntentIsAnError(t *testing.T) {
 }
 
 func TestRun_AResumeBindsTheNewestAuditOfItsOwnRun(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	appendAnAuditOfAnotherRun(t, l)
@@ -364,6 +376,7 @@ func TestRun_AResumeBindsTheNewestAuditOfItsOwnRun(t *testing.T) {
 }
 
 func TestRun_AKillBeforeTheLaneRefMovesRollsTheLaneRefForward(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	killed := false
 	kill := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
@@ -389,6 +402,7 @@ func TestRun_AKillBeforeTheLaneRefMovesRollsTheLaneRefForward(t *testing.T) {
 }
 
 func TestRun_APeerLaneOnAStrandedLandingStopsWithItsSteps(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	runGit(t, l.repo, "merge", "--ff-only", "-q", landingBranch)
@@ -410,6 +424,7 @@ func TestRun_APeerLaneOnAStrandedLandingStopsWithItsSteps(t *testing.T) {
 }
 
 func TestRun_ALaneOnAMainAheadByBoundaryCommitsIsStillNothingToShip(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	addRemote(t, repo)
 	runGit(t, repo, "push", "-q", "origin", "main")
@@ -429,6 +444,7 @@ func TestRun_ALaneOnAMainAheadByBoundaryCommitsIsStillNothingToShip(t *testing.T
 }
 
 func TestRun_ALaneOnACompletedLandingOriginLostIsStillNothingToShip(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	if res, err := runShip(t, l.repo, l.options(execRunner, &sleepLog{})); err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("precondition: the landing completes: %v %v", err, res.Logs)
@@ -486,6 +502,7 @@ func (l landingLane) prepareACarriedLanding(t *testing.T, base1, tree1 string) s
 }
 
 func TestRun_APolicyRefusalOfACarriedLaneUnwindsItToItsCarriedTree(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	base1, tree1 := l.carryOntoAPeer(t)
 	l.prepareACarriedLanding(t, base1, tree1)
@@ -505,6 +522,7 @@ func TestRun_APolicyRefusalOfACarriedLaneUnwindsItToItsCarriedTree(t *testing.T)
 }
 
 func TestRun_AnUnreadableCycleStateStopsTheResumeLoudly(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	mustWrite(t, filepath.Join(l.repo, ".evolve", "cycle-state.json"), "{")
@@ -515,6 +533,7 @@ func TestRun_AnUnreadableCycleStateStopsTheResumeLoudly(t *testing.T) {
 }
 
 func TestRun_AStopAfterThePushAndBeforeTheFastForwardSettlesWithNoPush(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	if res, err := runShip(t, l.repo, l.options(execRunner, &sleepLog{})); err != nil || res.ExitCode != ExitOK {
 		t.Fatalf("precondition: the first landing completes: %v %v", err, res.Logs)
@@ -532,6 +551,7 @@ func TestRun_AStopAfterThePushAndBeforeTheFastForwardSettlesWithNoPush(t *testin
 }
 
 func TestRun_AnIntentTheJournalDoesNotHoldUnwindsAndLandsThroughTheGates(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	l.failEveryPush(t, githubServerError)
 	if err := os.Remove(shipJournalPath(l.repo)); err != nil {
@@ -549,6 +569,7 @@ func TestRun_AnIntentTheJournalDoesNotHoldUnwindsAndLandsThroughTheGates(t *test
 }
 
 func TestRun_AnErrorInTheLaneTreeMeasureKeepsTheLaneRefAndStaysTransient(t *testing.T) {
+	t.Parallel()
 	l := laneReadyToLand(t)
 	before := l.tip(t)
 	failed := false

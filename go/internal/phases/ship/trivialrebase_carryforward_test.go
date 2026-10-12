@@ -113,6 +113,7 @@ func (s trScenario) entry(t *testing.T, patchID string, gates map[string]string)
 }
 
 func TestTrivialRebase_ChangedTreeRequiresPredicateReaudit(t *testing.T) {
+	t.Parallel()
 	s := trSetup(t)
 	trAppendLedgerLine(t, s.repo, s.entry(t, s.patchID, trPassingGates()))
 	err := verifyAuditBinding(context.Background(), auditOpts(t, s.repo), &RunResult{})
@@ -120,6 +121,7 @@ func TestTrivialRebase_ChangedTreeRequiresPredicateReaudit(t *testing.T) {
 }
 
 func TestTrivialRebase_PatchIdDriftFallsBackToReaudit(t *testing.T) {
+	t.Parallel()
 	s := trSetup(t)
 	// Semantic drift after the audit: the composed diff no longer matches
 	// the audited patch-id the entry claims.
@@ -133,6 +135,7 @@ func TestTrivialRebase_PatchIdDriftFallsBackToReaudit(t *testing.T) {
 }
 
 func TestTrivialRebase_FailedComposedGatesRejected(t *testing.T) {
+	t.Parallel()
 	s := trSetup(t)
 	gates := trPassingGates()
 	gates["test"] = "fail"

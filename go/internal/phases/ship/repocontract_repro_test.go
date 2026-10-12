@@ -11,6 +11,7 @@ import (
 // detector must not exclude this real failing test, or the ship would
 // proceed with a red test in its staged diff.
 func TestBugReproduction_AddedTestLiteralBuildConstraintIsNotExcluded(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t)
 	goDir := filepath.Join(repo, "go")
 	mustWrite(t, filepath.Join(goDir, "go.mod"), "module example.com/lane\n\ngo 1.24\n")

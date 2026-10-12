@@ -15,6 +15,7 @@ import (
 // --- Run: input validation -------------------------------------------------
 
 func TestRun_MissingCommitMessage_Errors(t *testing.T) {
+	t.Parallel()
 	_, err := Run(context.Background(), Options{
 		Class:       ClassCycle,
 		ProjectRoot: t.TempDir(),
@@ -25,6 +26,7 @@ func TestRun_MissingCommitMessage_Errors(t *testing.T) {
 }
 
 func TestRun_InvalidClass_Errors(t *testing.T) {
+	t.Parallel()
 	_, err := Run(context.Background(), Options{
 		Class:         Class("unknown"),
 		CommitMessage: "msg",
@@ -36,6 +38,7 @@ func TestRun_InvalidClass_Errors(t *testing.T) {
 }
 
 func TestRun_EmptyProjectRoot_Errors(t *testing.T) {
+	t.Parallel()
 	_, err := Run(context.Background(), Options{
 		Class:         ClassCycle,
 		CommitMessage: "msg",
@@ -48,6 +51,7 @@ func TestRun_EmptyProjectRoot_Errors(t *testing.T) {
 // --- verifySelfSHA ---------------------------------------------------------
 
 func TestVerifySelfSHA_BinaryUnreadable_Errors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	opts := &Options{
 		ProjectRoot:    dir,
@@ -65,6 +69,7 @@ func TestVerifySelfSHA_BinaryUnreadable_Errors(t *testing.T) {
 }
 
 func TestVerifySelfSHA_StateMapReadError_Errors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary\n")
@@ -88,6 +93,7 @@ func TestVerifySelfSHA_StateMapReadError_Errors(t *testing.T) {
 }
 
 func TestVerifySelfSHA_SchemaMigration_RepinsVersion(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-content\n")
@@ -117,6 +123,7 @@ func TestVerifySelfSHA_SchemaMigration_RepinsVersion(t *testing.T) {
 }
 
 func TestVerifySelfSHA_LegacySHAOnlyPin_Migrates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-content-v2\n")
@@ -138,6 +145,7 @@ func TestVerifySelfSHA_LegacySHAOnlyPin_Migrates(t *testing.T) {
 }
 
 func TestVerifySelfSHA_PluginVersionChange_Repins(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-v3\n")
@@ -162,6 +170,7 @@ func TestVerifySelfSHA_PluginVersionChange_Repins(t *testing.T) {
 }
 
 func TestVerifySelfSHA_SameVersionSHATamper_IntegrityError(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "evolve")
 	mustWrite(t, bin, "binary-v3\n")
@@ -189,6 +198,7 @@ func TestVerifySelfSHA_SameVersionSHATamper_IntegrityError(t *testing.T) {
 // --- advanceLastCycleNumber: state.json read error -------------------------
 
 func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":5}`)
 	// Create state.json as a directory — readStateMap will error.
@@ -209,6 +219,7 @@ func TestAdvanceLastCycleNumber_StateReadError_ReturnsError(t *testing.T) {
 // still proceeds to the DONE log. Distinct from an ABSENT companion (which
 // logs INFO).
 func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	bin := filepath.Join(root, "evolve-bin")
 	mustWrite(t, bin, "fake bin\n")
@@ -242,6 +253,7 @@ func TestPostShip_ClassCycle_InboxPromoteErrorIsWarn(t *testing.T) {
 // --- Run: cleanExitError path (no staged changes in manual class) ----------
 
 func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
+	t.Parallel()
 	repo := makeRepo(t) // clean tree, no staged changes
 	// No seedAudit needed — manual class skips audit.
 	res, err := runShip(t, repo, Options{
@@ -260,6 +272,7 @@ func TestRun_ManualClass_NoStagedChanges_ExitOK(t *testing.T) {
 // --- readActiveWorktree: corrupt cycle-state.json --------------------------
 
 func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), "not json{")
 	opts := &Options{ProjectRoot: root}
@@ -272,6 +285,7 @@ func TestReadActiveWorktree_CorruptState_ReturnsEmpty(t *testing.T) {
 // --- captureGitOutput: runner error propagates ----------------------------
 
 func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
+	t.Parallel()
 	errRunner := func(ctx context.Context, name, cwd string, args, env []string,
 		stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 		return -1, errors.New("runner exploded")
@@ -286,6 +300,7 @@ func TestCaptureGitOutput_RunnerError_Propagates(t *testing.T) {
 // --- writeShipBinding: cycle_id present, successful write -----------------
 
 func TestWriteShipBinding_ValidCycleID_WritesFile(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mustWrite(t, filepath.Join(root, ".evolve", "cycle-state.json"), `{"cycle_id":42}`)
 	opts := &Options{ProjectRoot: root}

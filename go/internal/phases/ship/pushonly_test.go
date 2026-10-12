@@ -50,6 +50,7 @@ func pushOnlyRun(t *testing.T, root string) (RunResult, error) {
 }
 
 func TestPushOnly_RefusesUnprovenancedAheadCommit(t *testing.T) {
+	t.Parallel()
 	root, run := initPushOnlyRepo(t)
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("hand\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -71,6 +72,7 @@ func TestPushOnly_RefusesUnprovenancedAheadCommit(t *testing.T) {
 }
 
 func TestPushOnly_PushesJournaledStrand(t *testing.T) {
+	t.Parallel()
 	root, run := initPushOnlyRepo(t)
 	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("shipped\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -95,6 +97,7 @@ func TestPushOnly_PushesJournaledStrand(t *testing.T) {
 }
 
 func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
+	t.Parallel()
 	root, run := initPushOnlyRepo(t)
 	clone := gittest.Clone(t, run(root, "remote", "get-url", "origin")).Dir
 	if err := os.WriteFile(filepath.Join(clone, "b.txt"), []byte("console\n"), 0o644); err != nil {
@@ -131,6 +134,7 @@ func TestPushOnly_SyncMainMergeCountsAsProvenance(t *testing.T) {
 // A merge of two LOCAL unprovenanced branches has no origin-side parent; a
 // degenerate isSyncMainMerge accepting any merge would push it.
 func TestPushOnly_LocalOnlyMergeRefuses(t *testing.T) {
+	t.Parallel()
 	root, run := initPushOnlyRepo(t)
 	run(root, "checkout", "-b", "side")
 	if err := os.WriteFile(filepath.Join(root, "side.txt"), []byte("s\n"), 0o644); err != nil {
@@ -153,6 +157,7 @@ func TestPushOnly_LocalOnlyMergeRefuses(t *testing.T) {
 }
 
 func TestPushOnly_StagedChangesRefuseAndNothingToPushIsClean(t *testing.T) {
+	t.Parallel()
 	root, run := initPushOnlyRepo(t)
 	if _, err := pushOnlyRun(t, root); err != nil {
 		t.Fatalf("nothing-to-push must be a clean exit: %v", err)
@@ -167,6 +172,7 @@ func TestPushOnly_StagedChangesRefuseAndNothingToPushIsClean(t *testing.T) {
 }
 
 func TestFinalize_SuccessAppendsShipJournal(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
@@ -190,6 +196,7 @@ func TestFinalize_SuccessAppendsShipJournal(t *testing.T) {
 }
 
 func TestFinalize_MintedCommitIsJournaledEvenWhenThePushFailed(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)

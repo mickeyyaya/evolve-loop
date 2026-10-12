@@ -7,6 +7,7 @@ import (
 )
 
 func TestCheckEGPSGate_IncompleteEvidenceFailsClosed(t *testing.T) {
+	t.Parallel()
 	for _, body := range []string{"", "{}", "null", "{broken", `{"red_count":0,"ship_eligible":false}`} {
 		t.Run(body, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "acs-verdict.json")

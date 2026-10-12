@@ -14,6 +14,7 @@ import (
 )
 
 func TestRepoContractGate_StderrGetsTheNotesAndThePathWhileTheScanLogGetsTheRawStream(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"new-stop\"\n")
 	ws := t.TempDir()
@@ -47,6 +48,7 @@ func TestRepoContractGate_StderrGetsTheNotesAndThePathWhileTheScanLogGetsTheRawS
 }
 
 func TestRepoContractGate_WithoutARunDirTheRawStreamStaysOnStderr(t *testing.T) {
+	t.Parallel()
 	repo, goDir := importerFixture(t)
 	mustWrite(t, filepath.Join(goDir, "internal", "base", "base.go"), "package base\n\nconst Stop = \"new-stop\"\n")
 	var stderr strings.Builder
@@ -64,6 +66,7 @@ func TestRepoContractGate_WithoutARunDirTheRawStreamStaysOnStderr(t *testing.T) 
 }
 
 func TestScanLogName_IsAToolOutputFileThatACyclePassDeletes(t *testing.T) {
+	t.Parallel()
 	if !slices.Contains(gcpolicy.ToolOutputFiles(), scanLogName) {
 		t.Errorf("gcpolicy.ToolOutputFiles() = %v does not name %q, so a PASS seal keeps the scan log", gcpolicy.ToolOutputFiles(), scanLogName)
 	}
@@ -74,6 +77,7 @@ type wrappedWriter struct{ w io.Writer }
 func (w wrappedWriter) Write(p []byte) (int, error) { return w.w.Write(p) }
 
 func TestRunGoTestJSON_AWrappedNotesWriterNeverGetsTheRawStream(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "go.mod"), "module packlog\n\ngo 1.23\n")
 	mustWrite(t, filepath.Join(dir, "packlog_test.go"), "package packlog\n\nimport \"testing\"\n\nfunc TestChatty(t *testing.T) { t.Log(\"raw chatter\") }\n")

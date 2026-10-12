@@ -9,6 +9,7 @@ import (
 )
 
 func TestClassifyPackEvents_KeepsEachFailuresOwnOutput(t *testing.T) {
+	t.Parallel()
 	feed := strings.Join([]string{
 		`{"Action":"output","Package":"p/ok","Test":"TestFine","Output":"=== RUN   TestFine\n"}`,
 		`{"Action":"output","Package":"p/ok","Test":"TestFine","Output":"    fine_test.go:3: passing chatter\n"}`,
@@ -47,6 +48,7 @@ func TestClassifyPackEvents_KeepsEachFailuresOwnOutput(t *testing.T) {
 }
 
 func TestRunRepoContractPackages_CarriesTheFailingTestsOwnOutput(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mustWrite(t, filepath.Join(dir, "go.mod"), "module failurelog\n\ngo 1.23\n")
 	mustWrite(t, filepath.Join(dir, "failurelog_test.go"), `package failurelog

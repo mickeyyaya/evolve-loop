@@ -18,6 +18,7 @@ import (
 // ignored paths with rc=1), the declared source file lands in the commit, and
 // the eval file stays on disk untouched.
 func TestShipFromWorktree_DropsGitignoredDeclaredEvalPath(t *testing.T) {
+	t.Parallel()
 	repo, wt := makeWorktreeScenario(t)
 
 	// Un-stage so the ship's own staging step is what decides the commit.

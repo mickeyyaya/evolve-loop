@@ -43,6 +43,7 @@ func shipOnce(t *testing.T, req core.PhaseRequest) string {
 }
 
 func TestShip_CommitMessage_TypedVsMap(t *testing.T) {
+	t.Parallel()
 	typedEnvelope := func(msg string) phaseio.PhaseInput {
 		return phaseio.NewPhaseInput(phaseio.PhaseInputInit{
 			Phase:       "ship",

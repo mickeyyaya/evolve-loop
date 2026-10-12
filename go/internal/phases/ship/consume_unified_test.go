@@ -176,6 +176,7 @@ func unifiedWarn(res *RunResult, failing string) bool {
 }
 
 func TestConsumeCommittedItems_UnifiedRollsBackAllOnPartialFailure(t *testing.T) {
+	t.Parallel()
 	members := []string{unifiedMemberA, unifiedMemberB}
 
 	t.Run("stage failure after a sibling staged rolls the sibling back", func(t *testing.T) {
@@ -230,6 +231,7 @@ func TestConsumeCommittedItems_UnifiedRollsBackAllOnPartialFailure(t *testing.T)
 }
 
 func TestConsumeCommittedItems_UnifiedAllSucceed(t *testing.T) {
+	t.Parallel()
 	members := []string{unifiedMemberA, unifiedMemberB}
 	root, ws, base, _ := unifiedConsumeFixture(t, unifiedDecision(t, members, members, true), members)
 	opts, res := runUnifiedConsume(root, ws, stubRunner)
@@ -247,6 +249,7 @@ func TestConsumeCommittedItems_UnifiedAllSucceed(t *testing.T) {
 // claim the triage phase rejected, and an independent item beside a commitment
 // all keep the per-item fail-open contract.
 func TestConsumeCommittedItems_UnifiedScopeIsOnlyTheValidatedMembers(t *testing.T) {
+	t.Parallel()
 	pair := []string{unifiedMemberA, unifiedMemberB}
 
 	t.Run("an ordinary top_n batch stays per-item fail-open", func(t *testing.T) {

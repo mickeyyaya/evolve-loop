@@ -47,6 +47,7 @@ func TestRunRepoContractPack_NamesRedsOnlyForTheGatesRealRed(t *testing.T) {
 }
 
 func TestContractRed_NamesEverySuiteOfTheOnePackList(t *testing.T) {
+	t.Parallel()
 	err := contractRed("scanner pack", redPack("pkg.TestX"))
 	for _, pattern := range repoContractPackages {
 		suite := path.Base(strings.TrimSuffix(pattern, "/..."))
@@ -61,6 +62,7 @@ func TestContractRed_NamesEverySuiteOfTheOnePackList(t *testing.T) {
 }
 
 func TestRepoContractSelectionArgs_RunsEachSelectedTestByNameInItsPackages(t *testing.T) {
+	t.Parallel()
 	args := repoContractSelectionArgs([]repocontract.TestSelection{
 		{Package: "./internal/core", Tests: []string{"TestPhaseTimings_SingleWriter", "TestSeam_OneConstructionSite"}},
 		{Package: "./cmd/evolve", Tests: []string{"TestSeam_OneConstructionSite"}},
@@ -72,6 +74,7 @@ func TestRepoContractSelectionArgs_RunsEachSelectedTestByNameInItsPackages(t *te
 }
 
 func TestPackOutcomeMerged_KeepsEveryRunsRedsAndErrors(t *testing.T) {
+	t.Parallel()
 	whole := redPack("pkg.TestWhole")
 	whole.failureLog = "whole\n"
 	byName := redPack("other.TestByName")

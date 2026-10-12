@@ -105,7 +105,8 @@ func (r *Repo) Git(args ...string) string {
 	out, err := CaptureWithEBADFRetry(func() ([]byte, error) {
 		cmd := sysexec.Command(context.Background(), "git", append([]string{"-C", r.Dir}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
-		return combinedOutput(cmd)
+		out, err := combinedOutput(cmd)
+		return out, tolerateWaitDelay(cmd, err)
 	})
 	if err != nil {
 		r.tb.Fatalf("gittest: git %s in %s: %v\n%s", strings.Join(args, " "), r.Dir, err, out)
@@ -114,6 +115,13 @@ func (r *Repo) Git(args ...string) string {
 }
 
 var combinedOutput = (*exec.Cmd).CombinedOutput
+
+func tolerateWaitDelay(cmd *exec.Cmd, err error) error {
+	if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+		return nil
+	}
+	return err
+}
 
 func CaptureWithEBADFRetry(fn func() ([]byte, error)) ([]byte, error) {
 	out, err := fn()
