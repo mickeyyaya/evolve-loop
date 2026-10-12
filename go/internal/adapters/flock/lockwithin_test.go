@@ -137,11 +137,13 @@ func TestLockWithin_ADeadlineAtTheGrantInstantHasExactlyOneOwner(t *testing.T) {
 		h := newHandoff()
 		h.state.Store(stateHanded)
 		got := make(chan bool, 1)
+		expired := make(chan time.Time)
 		go func() {
-			_, owned := h.await(firedChan())
+			_, owned := h.await(expired)
 			got <- owned
 		}()
 
+		expired <- time.Time{}
 		h.granted <- grant{release: func() {}}
 
 		if owned := <-got; !owned {
