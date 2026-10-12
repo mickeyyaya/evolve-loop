@@ -13,9 +13,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
-func blockingOn(verb string) sysexec.RunFunc {
+func blockingOn(verb string, endBudget context.CancelFunc) sysexec.RunFunc {
 	return func(ctx context.Context, name, d string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
 		if len(args) > 0 && args[0] == verb {
+			endBudget()
 			<-ctx.Done()
 			return -1, ctx.Err()
 		}
@@ -27,9 +28,9 @@ func TestPlanDevWorktrees_AGitCallThatOutlivesTheBudgetSkipsTheTreeInsteadOfFail
 	e := newDevEnv(t)
 	dir := e.addDev("slow")
 	o := e.options(idleOffset)
-	o.Exec = blockingOn("symbolic-ref")
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	o.Exec = blockingOn("symbolic-ref", cancel)
 	m, err := PlanDevWorktrees(ctx, o)
 	if err != nil {
 		t.Fatalf("PlanDevWorktrees: %v", err)
@@ -44,12 +45,13 @@ func TestPlanDevWorktrees_AProcessListThatOutlivesTheBudgetArchivesNothingAndFai
 	e := newDevEnv(t)
 	e.addDev("slow")
 	o := e.options(idleOffset)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	o.Processes = func(ctx context.Context) ([]Process, error) {
+		cancel()
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
 	m, err := PlanDevWorktrees(ctx, o)
 	if err != nil || !m.OverBudget || m.Skipped == "" || len(m.Items) != 0 {
 		t.Errorf("manifest = %+v err = %v, want over budget, a reason, no items, no error", m, err)
@@ -77,9 +79,9 @@ func TestPlanDevWorktrees_ALandedCheckThatOutlivesTheBudgetSkipsTheTree(t *testi
 	dir := e.addDev("late")
 	e.commitDatedIn(dir, "late.txt", "x\n", e.real.Add(-40*24*time.Hour))
 	o := e.options(idleOffset)
-	o.Exec = blockingOn("merge-base")
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	o.Exec = blockingOn("merge-base", cancel)
 	it := devItemFor(t, mustPlan(t, ctx, o), dir)
 	if !it.Skipped || it.Failed || it.Action != DevActionKeep {
 		t.Errorf("item = %+v, want skipped, not failed, kept", it)
